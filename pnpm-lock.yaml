@@ -20,6 +20,9 @@ importers:
       '@dead-air/core':
         specifier: workspace:*
         version: link:../core
+      '@dead-air/pipeline':
+        specifier: workspace:*
+        version: link:../pipeline
       commander:
         specifier: ^13.0.0
         version: 13.1.0
@@ -78,6 +81,9 @@ importers:
         specifier: workspace:*
         version: link:../core
     devDependencies:
+      '@types/better-sqlite3':
+        specifier: ^7.6.0
+        version: 7.6.13
       '@types/node':
         specifier: ^22.0.0
         version: 22.19.11

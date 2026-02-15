@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@dead-air/core": "workspace:*",
+    "@dead-air/pipeline": "workspace:*",
     "commander": "^13.0.0"
   },
   "devDependencies": {
