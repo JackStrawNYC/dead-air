@@ -1,0 +1,22 @@
+{
+  "name": "dead-air",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Automated Grateful Dead concert documentary pipeline",
+  "packageManager": "pnpm@9.15.4",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "type-check": "turbo run type-check",
+    "db:migrate": "pnpm --filter @dead-air/core run db:migrate",
+    "deadair": "npx tsx packages/cli/src/index.ts"
+  },
+  "devDependencies": {
+    "turbo": "^2.3.0",
+    "typescript": "^5.7.0"
+  }
+}

@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.turbo/
+.env
+.env.local
+data/
+*.db
+*.sqlite
+coverage/
+.DS_Store
+out/

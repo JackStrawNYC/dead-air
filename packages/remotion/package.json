@@ -1,0 +1,26 @@
+{
+  "name": "@dead-air/remotion",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc --project tsconfig.json",
+    "studio": "npx remotion studio",
+    "type-check": "tsc --noEmit",
+    "lint": "eslint src/"
+  },
+  "dependencies": {
+    "@dead-air/core": "workspace:*",
+    "@remotion/bundler": "4.0.242",
+    "@remotion/cli": "4.0.242",
+    "@remotion/renderer": "4.0.242",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "remotion": "4.0.242"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.3",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0"
+  }
+}
