@@ -9,6 +9,7 @@ import { registerStatusCommand } from './commands/status.js';
 import { registerIngestCommand } from './commands/ingest.js';
 import { registerAnalyzeCommand } from './commands/analyze.js';
 import { registerScriptCommand } from './commands/script.js';
+import { registerGenerateAssetsCommand } from './commands/generate-assets.js';
 
 const program = new Command();
 
@@ -27,6 +28,7 @@ program
 registerIngestCommand(program);
 registerAnalyzeCommand(program);
 registerScriptCommand(program);
+registerGenerateAssetsCommand(program);
 registerCatalogCommand(program);
 registerProduceCommand(program);
 registerPreviewCommand(program);

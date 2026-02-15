@@ -9,3 +9,7 @@ export type { AnalyzeOptions, AnalyzeResult } from './audio/index.js';
 // Script generation pipeline
 export { orchestrateScript } from './script/index.js';
 export type { ScriptOptions, ScriptResult } from './script/index.js';
+
+// Asset generation pipeline
+export { orchestrateAssetGeneration } from './assets/index.js';
+export type { AssetGenOptions, AssetGenResult } from './assets/index.js';
