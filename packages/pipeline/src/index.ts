@@ -13,3 +13,7 @@ export type { ScriptOptions, ScriptResult } from './script/index.js';
 // Asset generation pipeline
 export { orchestrateAssetGeneration } from './assets/index.js';
 export type { AssetGenOptions, AssetGenResult } from './assets/index.js';
+
+// Render pipeline
+export { orchestrateRender, buildCompositionProps } from './render/index.js';
+export type { RenderPipelineOptions, RenderPipelineResult, EpisodeProps, SegmentProps } from './render/index.js';

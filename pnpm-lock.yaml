@@ -83,6 +83,12 @@ importers:
       '@dead-air/core':
         specifier: workspace:*
         version: link:../core
+      '@remotion/bundler':
+        specifier: 4.0.242
+        version: 4.0.242(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      '@remotion/renderer':
+        specifier: 4.0.242
+        version: 4.0.242(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       replicate:
         specifier: ^1.0.0
         version: 1.4.0
@@ -112,6 +118,9 @@ importers:
         specifier: 4.0.242
         version: 4.0.242(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@remotion/cli':
+        specifier: 4.0.242
+        version: 4.0.242(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      '@remotion/media-utils':
         specifier: 4.0.242
         version: 4.0.242(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@remotion/renderer':

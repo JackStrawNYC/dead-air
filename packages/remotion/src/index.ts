@@ -1,4 +1,20 @@
 // @dead-air/remotion — Video compositions
-// Placeholder for later phase: episode compositions, scene components
 
-export {};
+export { RemotionRoot } from './Root.js';
+export { Episode } from './Episode.js';
+export type { EpisodeProps, SegmentProps } from './Episode.js';
+
+// Components
+export { KenBurns } from './components/KenBurns.js';
+export { TextOverlay } from './components/TextOverlay.js';
+export { SongMetadata } from './components/SongMetadata.js';
+export { Branding } from './components/Branding.js';
+
+// Compositions
+export { BrandIntro } from './compositions/BrandIntro.js';
+export { NarrationSegment } from './compositions/NarrationSegment.js';
+export { ConcertSegment } from './compositions/ConcertSegment.js';
+export { ContextSegment } from './compositions/ContextSegment.js';
+
+// Styles
+export * from './styles/themes.js';
