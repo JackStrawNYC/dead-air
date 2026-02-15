@@ -12,7 +12,9 @@
     "lint": "eslint src/"
   },
   "dependencies": {
-    "@dead-air/core": "workspace:*"
+    "@anthropic-ai/sdk": "^0.39.0",
+    "@dead-air/core": "workspace:*",
+    "zod": "^3.24.0"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.0",
