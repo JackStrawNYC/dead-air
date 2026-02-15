@@ -7,6 +7,7 @@ import { registerPreviewCommand } from './commands/preview.js';
 import { registerPublishCommand } from './commands/publish.js';
 import { registerStatusCommand } from './commands/status.js';
 import { registerIngestCommand } from './commands/ingest.js';
+import { registerAnalyzeCommand } from './commands/analyze.js';
 
 const program = new Command();
 
@@ -23,6 +24,7 @@ program
   });
 
 registerIngestCommand(program);
+registerAnalyzeCommand(program);
 registerCatalogCommand(program);
 registerProduceCommand(program);
 registerPreviewCommand(program);
