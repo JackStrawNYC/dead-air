@@ -29,14 +29,16 @@ export const ShortsComposition: React.FC<ShortsCompositionProps> = ({
   const frame = useCurrentFrame();
   const { durationInFrames } = useVideoConfig();
 
-  if (images.length === 0) return null;
+  const hasImages = images.length > 0;
 
   // Image cycling
-  const slotCount = Math.max(Math.ceil(durationInFrames / MAX_FRAMES_PER_IMAGE), images.length);
+  const slotCount = hasImages
+    ? Math.max(Math.ceil(durationInFrames / MAX_FRAMES_PER_IMAGE), images.length)
+    : 1;
   const framesPerSlot = Math.ceil(durationInFrames / slotCount);
 
   const currentSlot = Math.min(Math.floor(frame / framesPerSlot), slotCount - 1);
-  const imgIndex = currentSlot % images.length;
+  const imgIndex = hasImages ? currentSlot % images.length : 0;
   const localFrame = frame - currentSlot * framesPerSlot;
   const progress = Math.max(0, Math.min(1, localFrame / framesPerSlot));
 
@@ -61,18 +63,32 @@ export const ShortsComposition: React.FC<ShortsCompositionProps> = ({
     <VintageFilter intensity={0.7}>
       <div style={{ width: '100%', height: '100%', backgroundColor: COLORS.bg, overflow: 'hidden' }}>
         {/* Center-cropped background */}
-        <Img
-          src={staticFile(images[imgIndex])}
-          style={{
-            position: 'absolute',
-            width: '100%',
-            height: '100%',
-            objectFit: 'cover',
-            transform: `scale(${scale})`,
-          }}
-        />
+        {hasImages ? (
+          <Img
+            src={staticFile(images[imgIndex])}
+            style={{
+              position: 'absolute',
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              transform: `scale(${scale})`,
+            }}
+          />
+        ) : (
+          <div
+            style={{
+              position: 'absolute',
+              width: '100%',
+              height: '100%',
+              background: `radial-gradient(ellipse at 50% 40%, ${COLORS.accent}22 0%, ${COLORS.bg} 70%)`,
+              transform: `scale(${scale})`,
+            }}
+          />
+        )}
 
-        <Audio src={staticFile(audioSrc)} startFrom={startFrom} volume={volume} />
+        {audioSrc ? (
+          <Audio src={staticFile(audioSrc)} startFrom={startFrom} volume={volume} />
+        ) : null}
 
         {/* Hook text in top 25% */}
         <div
