@@ -1,5 +1,5 @@
 import React from 'react';
-import { COLORS, FONTS } from '../styles/themes.js';
+import { COLORS, FONTS } from '../styles/themes';
 
 export const Branding: React.FC = () => (
   <div

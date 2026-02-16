@@ -1,10 +1,10 @@
 import React from 'react';
 import { Sequence } from 'remotion';
-import { ColdOpen } from './compositions/ColdOpen.js';
-import { BrandIntro } from './compositions/BrandIntro.js';
-import { NarrationSegment } from './compositions/NarrationSegment.js';
-import { ConcertSegment } from './compositions/ConcertSegment.js';
-import { ContextSegment } from './compositions/ContextSegment.js';
+import { ColdOpen } from './compositions/ColdOpen';
+import { BrandIntro } from './compositions/BrandIntro';
+import { NarrationSegment } from './compositions/NarrationSegment';
+import { ConcertSegment } from './compositions/ConcertSegment';
+import { ContextSegment } from './compositions/ContextSegment';
 
 interface TextLine {
   text: string;

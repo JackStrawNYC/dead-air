@@ -31,6 +31,14 @@ const MODEL_COSTS: Record<ImageModel, number> = {
   'flux-schnell': 0.003,
 };
 
+const NEGATIVE_PROMPT_SUFFIX =
+  ', no text, no words, no letters, no writing, no signs, no logos, no watermarks';
+
+function appendNegativePrompt(prompt: string): string {
+  if (prompt.toLowerCase().includes('no text')) return prompt;
+  return prompt + NEGATIVE_PROMPT_SUFFIX;
+}
+
 /**
  * Generate a single image via Replicate.
  */
@@ -42,11 +50,12 @@ export async function generateImage(
 
   const replicate = new Replicate({ auth: replicateToken });
   const modelId = MODEL_IDS[model];
+  const safePrompt = appendNegativePrompt(prompt);
 
   const input: Record<string, unknown> =
     model === 'flux-pro'
-      ? { prompt, width, height, num_inference_steps: 25 }
-      : { prompt, aspect_ratio: '16:9', num_outputs: 1 };
+      ? { prompt: safePrompt, width, height, num_inference_steps: 25 }
+      : { prompt: safePrompt, aspect_ratio: '16:9', num_outputs: 1 };
 
   log.info(`Generating ${model} image...`);
 

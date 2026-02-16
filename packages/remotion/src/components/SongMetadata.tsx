@@ -1,6 +1,6 @@
 import React from 'react';
 import { interpolate, useCurrentFrame } from 'remotion';
-import { COLORS, FONTS } from '../styles/themes.js';
+import { COLORS, FONTS } from '../styles/themes';
 
 interface SongMetadataProps {
   songName: string;

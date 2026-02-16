@@ -1,6 +1,6 @@
 import React from 'react';
 import { Audio, Img, interpolate, staticFile, useCurrentFrame, useVideoConfig } from 'remotion';
-import { COLORS } from '../styles/themes.js';
+import { COLORS } from '../styles/themes';
 
 interface ColdOpenProps {
   audioSrc: string;

@@ -77,14 +77,35 @@ Respond with ONLY valid JSON matching this exact structure. No markdown fences, 
 
 ## VISUAL DIRECTION
 
-- **scenePrompts** should describe cinematic, painterly scenes — not stock photos. Think: "Warm amber light filtering through a packed arena, silhouettes of raised hands, haze drifting through stage lights" not "concert crowd photo."
+Your image prompts will be sent to AI image generators. They MUST produce images that look like vintage 1970s documentary photography — grainy, warm, realistic. NOT digital art, NOT fantasy, NOT stock photos, NOT psychedelic swirls.
+
+### MANDATORY STYLE RULES
+- **Always specify the actual venue, era, and setting.** "Interior of Barton Hall gymnasium, Cornell University, 1977" not "a concert venue."
+- **Always include**: "vintage 1970s documentary photography, warm film grain, realistic, 35mm film look"
+- **Never include abstract, cosmic, or psychedelic imagery** UNLESS the song is literally Space, Dark Star, or a psychedelic jam.
+- **Never describe text, tickets, posters, signage, or documents** — AI generators produce garbled text that looks terrible.
+- **Every prompt must end with**: "no text, no words, no letters, no writing, no signs, no logos"
+- **Ground every image in physical reality**: real people, real places, real objects from 1977. Think Ken Burns documentary stills, not album cover art.
+
+### WHAT GOOD PROMPTS LOOK LIKE
+- "Packed college gymnasium crowd at Barton Hall, Cornell University, warm amber stage lighting cutting through haze, silhouettes of students with raised hands, 1977, vintage 35mm documentary photography, warm film grain, no text, no words, no letters, no writing, no signs, no logos"
+- "Close-up of guitar neck and hands on fretboard, warm spotlight, sweat visible, vintage 1970s concert photography, shallow depth of field, film grain, no text, no words, no letters, no writing, no signs, no logos"
+- "Crowd in a 1970s college gymnasium viewed from stage, faces lit by warm amber light, long hair and tie-dye visible, smoke haze, vintage documentary photography, no text, no words, no letters, no writing, no signs, no logos"
+
+### WHAT BAD PROMPTS LOOK LIKE (DO NOT DO THIS)
+- "Cosmic swirling nebula of music energy" — this produces AI art, not documentary footage
+- "Vintage concert ticket for Grateful Dead at Cornell" — AI text is always garbled
+- "Psychedelic kaleidoscope of sound and color" — too abstract, no grounding in reality
+- "Professional mixing board in a recording studio" — generic stock imagery
+
+### COLOR PALETTE
 - **colorPalette** should evolve with the music:
-  - Warm/earthy (ambers, browns, deep reds) for acoustic, folk, and country songs
-  - Electric/neon (teals, purples, hot pinks) for electric jams
-  - Dark/muted (navy, charcoal, deep green) for space passages and quiet moments
-  - Cosmic (deep purples, gold, starfield blues) for psychedelic peaks
-- Each segment needs 2-3 scenePrompts for visual variety.
-- **thumbnailPrompt** must be dramatic and work at YouTube thumbnail size — bold, high contrast, iconic imagery.
+  - Warm/earthy (ambers, browns, deep reds) for acoustic, folk, country, and most songs
+  - Electric/cooler (teals, deep blues, silvers) for electric jams and high-energy moments
+  - Dark/muted (navy, charcoal, deep green) for quiet passages and space
+  - Rich/saturated (deep golds, warm oranges, burgundy) for peak moments
+- Each segment needs 2-3 scenePrompts for visual variety. Each prompt should show a DIFFERENT angle or subject — wide shot, close-up, crowd, stage, venue exterior, etc.
+- **thumbnailPrompt** must be dramatic and work at YouTube thumbnail size — bold, high contrast, iconic imagery of the actual venue/era. Must end with the no-text instruction.
 
 ## RESEARCH CONTEXT
 

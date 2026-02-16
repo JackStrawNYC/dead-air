@@ -1,8 +1,8 @@
 import React from 'react';
 import { Audio, interpolate, staticFile, useCurrentFrame, useVideoConfig } from 'remotion';
-import { KenBurns } from '../components/KenBurns.js';
-import { SongMetadata } from '../components/SongMetadata.js';
-import { Branding } from '../components/Branding.js';
+import { KenBurns } from '../components/KenBurns';
+import { SongMetadata } from '../components/SongMetadata';
+import { Branding } from '../components/Branding';
 
 interface ConcertSegmentProps {
   songName: string;

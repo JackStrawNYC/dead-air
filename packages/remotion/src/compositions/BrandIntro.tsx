@@ -1,6 +1,6 @@
 import React from 'react';
 import { interpolate, useCurrentFrame } from 'remotion';
-import { COLORS, FONTS, FPS } from '../styles/themes.js';
+import { COLORS, FONTS, FPS } from '../styles/themes';
 
 const DURATION = 5 * FPS; // 150 frames
 

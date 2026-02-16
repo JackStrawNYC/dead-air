@@ -1,21 +1,21 @@
 // @dead-air/remotion — Video compositions
 
-export { RemotionRoot } from './Root.js';
-export { Episode } from './Episode.js';
-export type { EpisodeProps, SegmentProps } from './Episode.js';
+export { RemotionRoot } from './Root';
+export { Episode } from './Episode';
+export type { EpisodeProps, SegmentProps } from './Episode';
 
 // Components
-export { KenBurns } from './components/KenBurns.js';
-export { TextOverlay } from './components/TextOverlay.js';
-export { SongMetadata } from './components/SongMetadata.js';
-export { Branding } from './components/Branding.js';
+export { KenBurns } from './components/KenBurns';
+export { TextOverlay } from './components/TextOverlay';
+export { SongMetadata } from './components/SongMetadata';
+export { Branding } from './components/Branding';
 
 // Compositions
-export { ColdOpen } from './compositions/ColdOpen.js';
-export { BrandIntro } from './compositions/BrandIntro.js';
-export { NarrationSegment } from './compositions/NarrationSegment.js';
-export { ConcertSegment } from './compositions/ConcertSegment.js';
-export { ContextSegment } from './compositions/ContextSegment.js';
+export { ColdOpen } from './compositions/ColdOpen';
+export { BrandIntro } from './compositions/BrandIntro';
+export { NarrationSegment } from './compositions/NarrationSegment';
+export { ConcertSegment } from './compositions/ConcertSegment';
+export { ContextSegment } from './compositions/ContextSegment';
 
 // Styles
-export * from './styles/themes.js';
+export * from './styles/themes';

@@ -28,6 +28,18 @@ const REPLICATE_MODELS: Record<string, string> = {
   'flux-schnell': 'black-forest-labs/flux-schnell',
 };
 
+const NEGATIVE_PROMPT_SUFFIX =
+  ', no text, no words, no letters, no writing, no signs, no logos, no watermarks';
+
+/**
+ * Ensure the prompt ends with negative instructions to prevent garbled AI text.
+ */
+function appendNegativePrompt(prompt: string): string {
+  // Don't double-append if the prompt already has it
+  if (prompt.toLowerCase().includes('no text')) return prompt;
+  return prompt + NEGATIVE_PROMPT_SUFFIX;
+}
+
 // ── Result type ──
 
 export interface RoutedImageResult {
@@ -43,6 +55,7 @@ async function generateWithGrokAurora(
   prompt: string,
   apiKey: string,
 ): Promise<{ imageBuffer: Buffer; cost: number }> {
+  const safePrompt = appendNegativePrompt(prompt);
   const response = await fetch('https://api.x.ai/v1/images/generations', {
     method: 'POST',
     headers: {
@@ -51,7 +64,7 @@ async function generateWithGrokAurora(
     },
     body: JSON.stringify({
       model: 'grok-2-image-1212',
-      prompt,
+      prompt: safePrompt,
       n: 1,
       size: '1440x810',
       response_format: 'b64_json',
@@ -94,11 +107,12 @@ async function generateWithReplicate(
 ): Promise<{ imageBuffer: Buffer; cost: number }> {
   const replicate = new Replicate({ auth: replicateToken });
   const modelId = REPLICATE_MODELS[provider];
+  const safePrompt = appendNegativePrompt(prompt);
 
   const input: Record<string, unknown> =
     provider === 'flux-dev'
-      ? { prompt, width, height, num_inference_steps: 25 }
-      : { prompt, aspect_ratio: '16:9', num_outputs: 1 };
+      ? { prompt: safePrompt, width, height, num_inference_steps: 25 }
+      : { prompt: safePrompt, aspect_ratio: '16:9', num_outputs: 1 };
 
   const output = await replicate.run(modelId as `${string}/${string}`, { input });
 

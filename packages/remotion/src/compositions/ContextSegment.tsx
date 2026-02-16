@@ -1,9 +1,9 @@
 import React from 'react';
 import { Audio, interpolate, staticFile, useCurrentFrame, useVideoConfig } from 'remotion';
-import { KenBurns } from '../components/KenBurns.js';
-import { TextOverlay } from '../components/TextOverlay.js';
-import { Branding } from '../components/Branding.js';
-import { FPS } from '../styles/themes.js';
+import { KenBurns } from '../components/KenBurns';
+import { TextOverlay } from '../components/TextOverlay';
+import { Branding } from '../components/Branding';
+import { FPS } from '../styles/themes';
 
 interface TextLineProps {
   text: string;

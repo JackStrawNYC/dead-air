@@ -1,8 +1,8 @@
 import React from 'react';
 import { Composition } from 'remotion';
-import { Episode } from './Episode.js';
-import type { EpisodeProps } from './Episode.js';
-import { FPS, WIDTH, HEIGHT } from './styles/themes.js';
+import { Episode } from './Episode';
+import type { EpisodeProps } from './Episode';
+import { FPS, WIDTH, HEIGHT } from './styles/themes';
 
 const DEFAULT_DURATION = 300; // 10s fallback for Studio preview
 

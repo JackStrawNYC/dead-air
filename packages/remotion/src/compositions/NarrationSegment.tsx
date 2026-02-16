@@ -1,7 +1,7 @@
 import React from 'react';
 import { Audio, interpolate, staticFile, useCurrentFrame, useVideoConfig } from 'remotion';
-import { KenBurns } from '../components/KenBurns.js';
-import { Branding } from '../components/Branding.js';
+import { KenBurns } from '../components/KenBurns';
+import { Branding } from '../components/Branding';
 
 interface NarrationSegmentProps {
   audioSrc: string;
