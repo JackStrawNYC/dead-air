@@ -11,6 +11,7 @@ export { SongMetadata } from './components/SongMetadata.js';
 export { Branding } from './components/Branding.js';
 
 // Compositions
+export { ColdOpen } from './compositions/ColdOpen.js';
 export { BrandIntro } from './compositions/BrandIntro.js';
 export { NarrationSegment } from './compositions/NarrationSegment.js';
 export { ConcertSegment } from './compositions/ConcertSegment.js';

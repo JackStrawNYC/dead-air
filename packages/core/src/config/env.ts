@@ -9,6 +9,7 @@ export const envSchema = z.object({
   OPENAI_API_KEY: z.string().optional(),
   ANTHROPIC_API_KEY: z.string().optional(),
   REPLICATE_API_TOKEN: z.string().optional(),
+  XAI_API_KEY: z.string().optional(),
 
   // ElevenLabs
   ELEVENLABS_API_KEY: z.string().optional(),

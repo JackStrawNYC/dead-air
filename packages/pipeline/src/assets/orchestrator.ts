@@ -6,10 +6,10 @@ import { createLogger, logCost } from '@dead-air/core';
 import type { EpisodeScript, EpisodeSegment } from '@dead-air/core';
 import { computeHash, checkCache, storeInCache, copyFromCache } from './cache.js';
 import { generateNarration } from './narration-generator.js';
-import { generateImageBatch } from './image-generator.js';
-import type { BatchItem, BatchResult } from './image-generator.js';
 import { generateImage } from './image-generator.js';
 import type { ImageModel } from './image-generator.js';
+import { routeImageBatch } from './model-router.js';
+import type { RoutedBatchItem, RoutedBatchResult, ImageTier } from './model-router.js';
 import { compositeThumbnail } from './thumbnail-generator.js';
 import { searchArchivalAssets, downloadArchivalAsset } from './archival-fetcher.js';
 
@@ -22,6 +22,7 @@ export interface AssetGenOptions {
   db: Database.Database;
   dataDir: string;
   replicateToken: string;
+  xaiApiKey?: string;
   elevenlabsKey: string;
   elevenlabsVoiceId: string;
   concurrency?: number;
@@ -46,14 +47,14 @@ export interface AssetGenResult {
 
 // ── Helpers ──
 
-function assignImageModels(
+function assignImageTiers(
   segments: EpisodeSegment[],
-): Array<{ segmentIndex: number; promptIndex: number; prompt: string; model: ImageModel }> {
+): Array<{ segmentIndex: number; promptIndex: number; prompt: string; tier: ImageTier }> {
   const assignments: Array<{
     segmentIndex: number;
     promptIndex: number;
     prompt: string;
-    model: ImageModel;
+    tier: ImageTier;
   }> = [];
 
   for (let si = 0; si < segments.length; si++) {
@@ -61,14 +62,15 @@ function assignImageModels(
     const prompts = seg.visual.scenePrompts;
 
     for (let pi = 0; pi < prompts.length; pi++) {
-      // First prompt of narration or concert_audio → Flux Pro (hero)
+      // First prompt of narration or concert_audio → hero (Grok Aurora)
+      // Other prompts → scene (FLUX Dev, good enough behind KenBurns motion)
       const isHero =
         pi === 0 && (seg.type === 'narration' || seg.type === 'concert_audio');
       assignments.push({
         segmentIndex: si,
         promptIndex: pi,
         prompt: prompts[pi],
-        model: isHero ? 'flux-pro' : 'flux-schnell',
+        tier: isHero ? 'hero' : 'scene',
       });
     }
   }
@@ -111,6 +113,7 @@ export async function orchestrateAssetGeneration(
     db,
     dataDir,
     replicateToken,
+    xaiApiKey,
     elevenlabsKey,
     elevenlabsVoiceId,
     concurrency = 3,
@@ -156,7 +159,7 @@ export async function orchestrateAssetGeneration(
   const script: EpisodeScript = JSON.parse(episode.script as string);
 
   // 2. Build asset manifest
-  const imageAssignments = assignImageModels(script.segments);
+  const imageAssignments = assignImageTiers(script.segments);
   const narrationKeys = skipNarration
     ? []
     : (['intro', 'set_break', 'outro'] as const);
@@ -185,7 +188,7 @@ export async function orchestrateAssetGeneration(
       images: imageAssignments.map((a) => ({
         segment: a.segmentIndex,
         prompt: a.promptIndex,
-        model: a.model,
+        tier: a.tier,
         promptPreview: a.prompt.slice(0, 80) + '...',
       })),
       thumbnailPrompt: script.thumbnailPrompt.slice(0, 100) + '...',
@@ -290,11 +293,11 @@ export async function orchestrateAssetGeneration(
     }
   }
 
-  // 6. Generate images (parallel with concurrency)
+  // 6. Generate images (parallel with concurrency via tiered router)
   if (!skipImages) {
-    const batchItems: BatchItem[] = imageAssignments.map((a) => ({
+    const batchItems: RoutedBatchItem[] = imageAssignments.map((a) => ({
       prompt: a.prompt,
-      model: a.model,
+      tier: a.tier,
       destPath: resolve(
         assetDir,
         'images',
@@ -304,7 +307,8 @@ export async function orchestrateAssetGeneration(
       promptIndex: a.promptIndex,
     }));
 
-    const batchResults = await generateImageBatch(batchItems, {
+    const batchResults = await routeImageBatch(batchItems, {
+      xaiApiKey,
       replicateToken,
       cacheDir,
       concurrency,
@@ -320,22 +324,23 @@ export async function orchestrateAssetGeneration(
       } else {
         const hash = computeHash({
           prompt: item.prompt,
-          model: item.model,
+          provider: br.provider,
           width: 1440,
           height: 810,
         });
-        const service = item.model === 'flux-pro' ? 'replicate' : 'replicate';
+        const service = br.provider === 'grok-aurora' ? 'xai' : 'replicate';
         insertAsset(db, episodeId, 'image', service, hash, br.destPath, br.cost, {
           segmentIndex: item.segmentIndex,
           promptIndex: item.promptIndex,
-          model: item.model,
+          provider: br.provider,
+          tier: br.tier,
         });
 
         if (br.cost > 0) {
           logCost(db, {
             episodeId,
-            operation: `image-${item.model}`,
-            service: 'replicate',
+            operation: `image-${br.tier}-${br.provider}`,
+            service,
             cost: br.cost,
           });
         }
@@ -344,7 +349,7 @@ export async function orchestrateAssetGeneration(
           segIndex: item.segmentIndex,
           promptIndex: item.promptIndex,
           filePath: br.destPath,
-          model: item.model,
+          model: br.provider,
           cost: br.cost,
           cached: br.cached,
         });

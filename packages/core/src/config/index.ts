@@ -52,6 +52,7 @@ export function loadConfig(envPath?: string): DeadAirConfig {
       openaiKey: parsed.OPENAI_API_KEY,
       anthropicKey: parsed.ANTHROPIC_API_KEY,
       replicateToken: parsed.REPLICATE_API_TOKEN,
+      xaiApiKey: parsed.XAI_API_KEY,
       elevenlabsKey: parsed.ELEVENLABS_API_KEY,
       elevenlabsVoiceId: parsed.ELEVENLABS_VOICE_ID,
       setlistfmKey: parsed.SETLISTFM_API_KEY,

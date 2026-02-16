@@ -1,5 +1,5 @@
 import React from 'react';
-import { useVideoConfig } from 'remotion';
+import { Audio, interpolate, staticFile, useCurrentFrame, useVideoConfig } from 'remotion';
 import { KenBurns } from '../components/KenBurns.js';
 import { TextOverlay } from '../components/TextOverlay.js';
 import { Branding } from '../components/Branding.js';
@@ -16,15 +16,33 @@ interface ContextSegmentProps {
   images: string[];
   mood: string;
   colorPalette: string[];
+  ambientAudioSrc?: string;
+  ambientStartFrom?: number;
 }
+
+const FADE_FRAMES = 75; // 2.5s
+const AMBIENT_VOLUME = 0.08; // very low background bleed
 
 export const ContextSegment: React.FC<ContextSegmentProps> = ({
   textLines,
   images,
   colorPalette,
+  ambientAudioSrc,
+  ambientStartFrom,
 }) => {
   const { durationInFrames } = useVideoConfig();
+  const frame = useCurrentFrame();
   const accent = colorPalette?.[0];
+
+  // Ambient audio bed: fade in/out at very low volume
+  const ambientVolume = ambientAudioSrc
+    ? interpolate(
+        frame,
+        [0, FADE_FRAMES, durationInFrames - FADE_FRAMES, durationInFrames],
+        [0, AMBIENT_VOLUME, AMBIENT_VOLUME, 0],
+        { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' },
+      )
+    : 0;
 
   // Lay out text lines sequentially
   let cursor = 0;
@@ -56,6 +74,13 @@ export const ContextSegment: React.FC<ContextSegmentProps> = ({
           colorAccent={accent}
         />
       ))}
+      {ambientAudioSrc && (
+        <Audio
+          src={staticFile(ambientAudioSrc)}
+          startFrom={ambientStartFrom ?? 0}
+          volume={ambientVolume}
+        />
+      )}
       <Branding />
     </div>
   );

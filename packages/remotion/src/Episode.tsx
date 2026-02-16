@@ -1,5 +1,6 @@
 import React from 'react';
 import { Sequence } from 'remotion';
+import { ColdOpen } from './compositions/ColdOpen.js';
 import { BrandIntro } from './compositions/BrandIntro.js';
 import { NarrationSegment } from './compositions/NarrationSegment.js';
 import { ConcertSegment } from './compositions/ConcertSegment.js';
@@ -12,6 +13,7 @@ interface TextLine {
 }
 
 export type SegmentProps =
+  | { type: 'cold_open'; durationInFrames: number; audioSrc: string; startFrom: number; image: string }
   | { type: 'brand_intro'; durationInFrames: number }
   | {
       type: 'narration';
@@ -39,6 +41,8 @@ export type SegmentProps =
       images: string[];
       mood: string;
       colorPalette: string[];
+      ambientAudioSrc?: string;
+      ambientStartFrom?: number;
     };
 
 export interface EpisodeProps {
@@ -60,6 +64,9 @@ export const Episode: React.FC<Record<string, unknown>> = (rawProps) => {
 
         return (
           <Sequence key={i} from={from} durationInFrames={seg.durationInFrames}>
+            {seg.type === 'cold_open' && (
+              <ColdOpen audioSrc={seg.audioSrc} startFrom={seg.startFrom} image={seg.image} />
+            )}
             {seg.type === 'brand_intro' && <BrandIntro />}
             {seg.type === 'narration' && (
               <NarrationSegment
@@ -86,6 +93,8 @@ export const Episode: React.FC<Record<string, unknown>> = (rawProps) => {
                 images={seg.images}
                 mood={seg.mood}
                 colorPalette={seg.colorPalette}
+                ambientAudioSrc={seg.ambientAudioSrc}
+                ambientStartFrom={seg.ambientStartFrom}
               />
             )}
           </Sequence>

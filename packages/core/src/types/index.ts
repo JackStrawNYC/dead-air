@@ -213,6 +213,7 @@ export interface DeadAirConfig {
     openaiKey?: string;
     anthropicKey?: string;
     replicateToken?: string;
+    xaiApiKey?: string;
     elevenlabsKey?: string;
     elevenlabsVoiceId?: string;
     setlistfmKey?: string;

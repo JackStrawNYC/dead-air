@@ -28,6 +28,21 @@ export interface ShowContext {
   peakMoments: PeakMomentContext[];
   weather: WeatherContext | null;
   totalDurationMin: number;
+  research?: ResearchContext | null;
+}
+
+export interface ResearchContext {
+  tourContext: string;
+  bandMemberContext: string;
+  historicalContext: string;
+  songHistories: Array<{
+    songName: string;
+    timesPlayed: string;
+    notableVersions: string;
+    thisVersionNotes: string;
+  }>;
+  fanConsensus: string;
+  venueHistory: string;
 }
 
 export interface SongSummary {
@@ -229,6 +244,26 @@ export function assembleContext(
     0,
   );
 
+  // 9. Load research context if available
+  let research: ResearchContext | null = null;
+  const researchPath = resolve(dataDir, 'research', date, 'research.json');
+  if (existsSync(researchPath)) {
+    try {
+      const rawResearch = JSON.parse(readFileSync(researchPath, 'utf-8'));
+      research = {
+        tourContext: rawResearch.tourContext ?? '',
+        bandMemberContext: rawResearch.bandMemberContext ?? '',
+        historicalContext: rawResearch.historicalContext ?? '',
+        songHistories: rawResearch.songHistories ?? [],
+        fanConsensus: rawResearch.fanConsensus ?? '',
+        venueHistory: rawResearch.venueHistory ?? '',
+      };
+      log.info(`Loaded research context (${JSON.stringify(research).length} chars)`);
+    } catch (err) {
+      log.warn(`Failed to load research: ${(err as Error).message}`);
+    }
+  }
+
   const ctx: ShowContext = {
     show: {
       date,
@@ -245,6 +280,7 @@ export function assembleContext(
     peakMoments: peaks,
     weather,
     totalDurationMin: Math.round(totalSec / 60),
+    research,
   };
 
   log.info(

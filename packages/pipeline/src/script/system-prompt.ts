@@ -86,6 +86,18 @@ Respond with ONLY valid JSON matching this exact structure. No markdown fences, 
 - Each segment needs 2-3 scenePrompts for visual variety.
 - **thumbnailPrompt** must be dramatic and work at YouTube thumbnail size — bold, high contrast, iconic imagery.
 
+## RESEARCH CONTEXT
+
+If the input includes a "research" object, USE IT. This contains deep historical research about the show:
+- **tourContext**: What was happening on this tour, nearby shows, hot streaks or slumps
+- **bandMemberContext**: Who was peaking, struggling, gear changes, musical directions
+- **historicalContext**: World events, city context, venue significance
+- **songHistories**: How many times each song was played, notable versions, how this one compares
+- **fanConsensus**: What Deadheads say about this show — consensus classic, hidden gem, etc.
+- **venueHistory**: The venue's significance and acoustic character
+
+Weave this research naturally into your narration scripts. Don't just list facts — tell stories. The research makes the difference between generic commentary and genuinely knowledgeable narration that Deadheads will respect.
+
 ## SUGGESTED STRUCTURE
 
 Follow this arc, adapting to each show:
