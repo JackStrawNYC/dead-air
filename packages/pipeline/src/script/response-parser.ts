@@ -148,15 +148,16 @@ function validateSemantics(
       segDurationSec = seg.textLines.reduce((sum, l) => sum + l.displayDuration, 0);
     }
     // Only validate segments with known duration > 30s
+    // padImages() in composition-builder cycles images to fill duration,
+    // so we only need enough unique prompts for visual variety (1 per ~30s)
     if (segDurationSec > 30) {
-      // ~8s per image → minimum prompts = duration / 8, halved for error threshold
-      const minPrompts = Math.ceil(segDurationSec / 8 / 2);
+      const minPrompts = Math.ceil(segDurationSec / 30);
       if (promptCount < minPrompts) {
         errors.push(
           `Segment "${seg.songName ?? seg.type}" is ${segDurationSec}s but has only ${promptCount} scenePrompts (need at least ${minPrompts})`,
         );
       } else {
-        const idealMin = Math.ceil(segDurationSec / 10);
+        const idealMin = Math.ceil(segDurationSec / 15);
         if (promptCount < idealMin) {
           warnings.push(
             `Segment "${seg.songName ?? seg.type}" is ${segDurationSec}s with ${promptCount} scenePrompts (recommend ${idealMin}+)`,
