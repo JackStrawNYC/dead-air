@@ -3,6 +3,10 @@ import { Audio, interpolate, staticFile, useCurrentFrame, useVideoConfig } from 
 import { KenBurns } from '../components/KenBurns';
 import { SongMetadata } from '../components/SongMetadata';
 import { Branding } from '../components/Branding';
+import { WaveformBar } from '../components/WaveformBar';
+import { FilmGrain } from '../components/FilmGrain';
+import { VintageFilter } from '../components/VintageFilter';
+import { sampleEnergy, normalizeEnergy } from '../utils/energy';
 
 interface ConcertSegmentProps {
   songName: string;
@@ -14,7 +18,7 @@ interface ConcertSegmentProps {
   energyData?: number[];
 }
 
-const FADE_FRAMES = 75; // 2.5s crossfade
+const FADE_FRAMES = 15; // 0.5s crossfade
 
 export const ConcertSegment: React.FC<ConcertSegmentProps> = ({
   songName,
@@ -26,7 +30,7 @@ export const ConcertSegment: React.FC<ConcertSegmentProps> = ({
   const { durationInFrames } = useVideoConfig();
   const frame = useCurrentFrame();
 
-  // Audio crossfade: fade in over first 2.5s, fade out over last 2.5s
+  // Audio crossfade: fade in over first 0.5s, fade out over last 0.5s
   const volume = interpolate(
     frame,
     [0, FADE_FRAMES, durationInFrames - FADE_FRAMES, durationInFrames],
@@ -34,12 +38,26 @@ export const ConcertSegment: React.FC<ConcertSegmentProps> = ({
     { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' },
   );
 
+  // Compute current energy for SongMetadata pulse
+  let currentEnergy: number | undefined;
+  if (energyData && energyData.length > 0) {
+    const raw = sampleEnergy(energyData, frame, durationInFrames);
+    const { min, range } = normalizeEnergy(energyData);
+    currentEnergy = (raw - min) / range;
+  }
+
   return (
-    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
-      <KenBurns images={images} durationInFrames={durationInFrames} energyData={energyData} />
-      <Audio src={staticFile(audioSrc)} startFrom={startFrom} volume={volume} />
-      <SongMetadata songName={songName} durationInFrames={durationInFrames} />
-      <Branding />
-    </div>
+    <VintageFilter>
+      <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+        <KenBurns images={images} durationInFrames={durationInFrames} energyData={energyData} />
+        <Audio src={staticFile(audioSrc)} startFrom={startFrom} volume={volume} />
+        <SongMetadata songName={songName} durationInFrames={durationInFrames} currentEnergy={currentEnergy} />
+        {energyData && energyData.length > 0 && (
+          <WaveformBar energyData={energyData} />
+        )}
+        <Branding />
+        <FilmGrain intensity={0.12} />
+      </div>
+    </VintageFilter>
   );
 };

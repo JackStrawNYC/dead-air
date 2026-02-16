@@ -138,6 +138,34 @@ function validateSemantics(
     );
   }
 
+  // Check image prompt counts vs segment duration
+  for (const seg of script.segments) {
+    const promptCount = seg.visual?.scenePrompts?.length ?? 0;
+    let segDurationSec = 0;
+    if (seg.type === 'concert_audio' && seg.excerptDuration) {
+      segDurationSec = seg.excerptDuration;
+    } else if (seg.type === 'context_text' && seg.textLines) {
+      segDurationSec = seg.textLines.reduce((sum, l) => sum + l.displayDuration, 0);
+    }
+    // Only validate segments with known duration > 30s
+    if (segDurationSec > 30) {
+      // ~8s per image → minimum prompts = duration / 8, halved for error threshold
+      const minPrompts = Math.ceil(segDurationSec / 8 / 2);
+      if (promptCount < minPrompts) {
+        errors.push(
+          `Segment "${seg.songName ?? seg.type}" is ${segDurationSec}s but has only ${promptCount} scenePrompts (need at least ${minPrompts})`,
+        );
+      } else {
+        const idealMin = Math.ceil(segDurationSec / 10);
+        if (promptCount < idealMin) {
+          warnings.push(
+            `Segment "${seg.songName ?? seg.type}" is ${segDurationSec}s with ${promptCount} scenePrompts (recommend ${idealMin}+)`,
+          );
+        }
+      }
+    }
+  }
+
   // Check chapters start at 0:00
   if (
     script.youtube.chapters.length > 0 &&

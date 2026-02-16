@@ -7,11 +7,11 @@ const log = createLogger('assets:model-router');
 
 // ── Tier definitions ──
 
-export type ImageTier = 'hero' | 'scene' | 'thumbnail';
+export type ImageTier = 'hero' | 'scene' | 'thumbnail' | 'video';
 
 export type ImageProvider = 'grok-aurora' | 'flux-dev' | 'flux-schnell';
 
-const TIER_ROUTING: Record<ImageTier, ImageProvider> = {
+const TIER_ROUTING: Record<Exclude<ImageTier, 'video'>, ImageProvider> = {
   hero: 'grok-aurora',
   scene: 'flux-dev',
   thumbnail: 'flux-schnell',
@@ -139,6 +139,9 @@ export async function routeImageGeneration(
   options: RouteImageOptions,
 ): Promise<RoutedImageResult> {
   const { prompt, tier, xaiApiKey, replicateToken, width, height } = options;
+  if (tier === 'video') {
+    throw new Error('Video tier should be handled by video-generator.ts, not image routing');
+  }
   let provider = TIER_ROUTING[tier];
 
   // Fallback: if Grok key not available, fall back hero → flux-dev
@@ -236,6 +239,9 @@ export async function routeImageBatch(
   let completed = 0;
 
   const tasks = items.map((item) => async (): Promise<RoutedBatchResult> => {
+    if (item.tier === 'video') {
+      return { destPath: item.destPath, cost: 0, cached: false, provider: 'flux-dev', tier: item.tier, error: 'Video tier not supported in image batch' };
+    }
     const provider = TIER_ROUTING[item.tier];
     const cacheService =
       provider === 'grok-aurora'

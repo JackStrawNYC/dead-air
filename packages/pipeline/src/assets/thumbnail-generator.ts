@@ -40,6 +40,7 @@ function escapeXml(text: string): string {
 
 /**
  * Composite text overlay onto a hero image for YouTube thumbnail.
+ * Bolder text with stroke outlines for maximum visibility at small sizes.
  */
 export async function compositeThumbnail(
   options: ThumbnailOptions,
@@ -52,27 +53,27 @@ export async function compositeThumbnail(
   const venueText = venue ? escapeXml(venue) : '';
   const titleText = escapeXml(episodeTitle);
 
-  // SVG overlay with gradient bar and text
+  // SVG overlay with gradient bar and bold text with stroke outlines
   const svg = `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
     <defs>
       <linearGradient id="bottomGrad" x1="0" y1="0" x2="0" y2="1">
         <stop offset="0%" stop-color="rgba(0,0,0,0)" />
-        <stop offset="100%" stop-color="rgba(0,0,0,0.85)" />
+        <stop offset="100%" stop-color="rgba(0,0,0,0.92)" />
       </linearGradient>
       <filter id="shadow" x="-5%" y="-5%" width="110%" height="110%">
-        <feDropShadow dx="2" dy="2" stdDeviation="4" flood-color="rgba(0,0,0,0.8)" />
+        <feDropShadow dx="3" dy="3" stdDeviation="5" flood-color="rgba(0,0,0,0.9)" />
       </filter>
     </defs>
-    <!-- Bottom gradient bar -->
-    <rect x="0" y="${height - 300}" width="${width}" height="300" fill="url(#bottomGrad)" />
+    <!-- Bottom gradient bar (higher opacity) -->
+    <rect x="0" y="${height - 350}" width="${width}" height="350" fill="url(#bottomGrad)" />
     <!-- DEAD AIR branding top-left -->
-    <text x="60" y="80" font-family="Arial, Helvetica, sans-serif" font-size="42" font-weight="bold" fill="white" filter="url(#shadow)" letter-spacing="8">DEAD AIR</text>
-    <!-- Date -->
-    <text x="60" y="${height - 160}" font-family="Arial, Helvetica, sans-serif" font-size="64" font-weight="bold" fill="white" filter="url(#shadow)">${escapeXml(dateFormatted)}</text>
+    <text x="60" y="80" font-family="Arial, Helvetica, sans-serif" font-size="42" font-weight="bold" fill="white" stroke="black" stroke-width="4" filter="url(#shadow)" letter-spacing="8">DEAD AIR</text>
+    <!-- Date (larger, bolder) -->
+    <text x="60" y="${height - 180}" font-family="Arial, Helvetica, sans-serif" font-size="84" font-weight="900" fill="white" stroke="black" stroke-width="6" filter="url(#shadow)">${escapeXml(dateFormatted)}</text>
     <!-- Venue -->
-    ${venueText ? `<text x="60" y="${height - 95}" font-family="Arial, Helvetica, sans-serif" font-size="36" fill="rgba(255,255,255,0.9)" filter="url(#shadow)">${venueText}</text>` : ''}
-    <!-- Title -->
-    <text x="60" y="${height - 40}" font-family="Arial, Helvetica, sans-serif" font-size="28" fill="rgba(255,215,0,0.95)" filter="url(#shadow)">${titleText}</text>
+    ${venueText ? `<text x="60" y="${height - 95}" font-family="Arial, Helvetica, sans-serif" font-size="36" font-weight="bold" fill="rgba(255,255,255,0.95)" stroke="black" stroke-width="4" filter="url(#shadow)">${venueText}</text>` : ''}
+    <!-- Title (larger, gold with stroke) -->
+    <text x="60" y="${height - 36}" font-family="Arial, Helvetica, sans-serif" font-size="42" font-weight="bold" fill="rgba(255,215,0,0.95)" stroke="black" stroke-width="4" filter="url(#shadow)">${titleText}</text>
   </svg>`;
 
   const svgBuffer = Buffer.from(svg);

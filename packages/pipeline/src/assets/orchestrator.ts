@@ -12,6 +12,9 @@ import { routeImageBatch } from './model-router.js';
 import type { RoutedBatchItem, RoutedBatchResult, ImageTier } from './model-router.js';
 import { compositeThumbnail } from './thumbnail-generator.js';
 import { searchArchivalAssets, downloadArchivalAsset } from './archival-fetcher.js';
+import { generateVideoBatch, generateMotionPrompt } from './video-generator.js';
+import type { VideoBatchItem } from './video-generator.js';
+import { searchWikimediaImages, downloadWikimediaImage } from './wikimedia-client.js';
 
 const log = createLogger('assets:orchestrator');
 
@@ -29,6 +32,7 @@ export interface AssetGenOptions {
   skipArchival?: boolean;
   skipNarration?: boolean;
   skipImages?: boolean;
+  skipVideo?: boolean;
   dryRun?: boolean;
   force?: boolean;
 }
@@ -39,6 +43,7 @@ export interface AssetGenResult {
   images: { segIndex: number; promptIndex: number; filePath: string; model: string; cost: number; cached: boolean }[];
   thumbnail: { filePath: string; cost: number } | null;
   archival: { filePath: string; title: string }[];
+  videos: { segIndex: number; filePath: string; cost: number; cached: boolean }[];
   totalCost: number;
   totalAssets: number;
   cachedAssets: number;
@@ -120,6 +125,7 @@ export async function orchestrateAssetGeneration(
     skipArchival = false,
     skipNarration = false,
     skipImages = false,
+    skipVideo = false,
     dryRun = false,
     force = false,
   } = options;
@@ -149,6 +155,7 @@ export async function orchestrateAssetGeneration(
       images: [],
       thumbnail: null,
       archival: [],
+      videos: [],
       totalCost: 0,
       totalAssets: 0,
       cachedAssets: 0,
@@ -200,6 +207,7 @@ export async function orchestrateAssetGeneration(
       images: [],
       thumbnail: null,
       archival: [],
+      videos: [],
       totalCost: 0,
       totalAssets: 0,
       cachedAssets: 0,
@@ -231,6 +239,7 @@ export async function orchestrateAssetGeneration(
     images: [],
     thumbnail: null,
     archival: [],
+    videos: [],
     totalCost: 0,
     totalAssets: 0,
     cachedAssets: 0,
@@ -453,7 +462,7 @@ export async function orchestrateAssetGeneration(
           `${asset.identifier.slice(0, 50)}.jpg`,
         );
 
-        const buffer = await downloadArchivalAsset(asset.thumbnailUrl, destPath);
+        const buffer = await downloadArchivalAsset(asset, destPath);
         if (buffer) {
           writeFileSync(destPath, buffer);
           insertAsset(db, episodeId, 'archival', 'archive_org', null, destPath, 0, {
@@ -469,7 +478,108 @@ export async function orchestrateAssetGeneration(
     }
   }
 
-  // 9. Update episode status
+  // 9. Generate video clips from hero images (cap at 15/episode)
+  if (!skipVideo && !skipImages) {
+    try {
+      const heroImages = result.images
+        .filter((img) => {
+          const assignment = imageAssignments.find(
+            (a) => a.segmentIndex === img.segIndex && a.promptIndex === img.promptIndex,
+          );
+          return assignment?.tier === 'hero';
+        })
+        .slice(0, 15);
+
+      if (heroImages.length > 0) {
+        log.info(`Generating ${heroImages.length} video clips from hero images...`);
+
+        const videoBatchItems: VideoBatchItem[] = heroImages.map((img) => {
+          const seg = script.segments[img.segIndex];
+          const motionPrompt = seg?.visual?.motionPrompts?.[0]
+            ?? generateMotionPrompt({
+              mood: seg?.visual?.mood,
+              visualIntensity: seg?.visual?.visualIntensity,
+            });
+
+          const destPath = img.filePath.replace(/\.png$/, '.mp4');
+          return {
+            sourceImagePath: resolve(dataDir, img.filePath),
+            motionPrompt,
+            destPath,
+            segmentIndex: img.segIndex,
+          };
+        });
+
+        const videoResults = await generateVideoBatch(videoBatchItems, {
+          replicateToken,
+          cacheDir,
+          concurrency: 2,
+        });
+
+        for (const vr of videoResults) {
+          result.totalAssets++;
+          if (vr.error) {
+            result.failedAssets.push(vr.error);
+          } else {
+            result.videos.push({
+              segIndex: videoBatchItems.find((i) => i.destPath === vr.destPath)?.segmentIndex ?? 0,
+              filePath: vr.destPath,
+              cost: vr.cost,
+              cached: vr.cached,
+            });
+            result.totalCost += vr.cost;
+            if (vr.cached) result.cachedAssets++;
+
+            if (vr.cost > 0) {
+              logCost(db, {
+                episodeId,
+                operation: 'video-clip',
+                service: 'replicate',
+                cost: vr.cost,
+              });
+            }
+          }
+        }
+      }
+    } catch (err) {
+      log.warn(`Video generation error: ${(err as Error).message}`);
+    }
+  }
+
+  // 10. Search Wikimedia Commons for CC-licensed photos (best effort)
+  if (!skipArchival) {
+    try {
+      const show = db
+        .prepare('SELECT venue, city, state FROM shows WHERE id = ?')
+        .get(episode.show_id as string) as Record<string, string> | undefined;
+
+      const year = (episode.show_id as string)?.split('-')[0];
+      const wikiImages = await searchWikimediaImages({
+        venue: show?.venue,
+        year,
+        maxResults: 10,
+      });
+
+      const wikiDir = resolve(assetDir, 'archival', 'wikimedia');
+      if (!existsSync(wikiDir)) mkdirSync(wikiDir, { recursive: true });
+
+      for (let i = 0; i < wikiImages.length; i++) {
+        const img = wikiImages[i];
+        const destPath = resolve(wikiDir, `wiki-${String(i).padStart(2, '0')}.jpg`);
+
+        const buffer = await downloadWikimediaImage(img.url);
+        if (buffer) {
+          writeFileSync(destPath, buffer);
+          result.archival.push({ filePath: destPath, title: `Wikimedia: ${img.license}` });
+          result.totalAssets++;
+        }
+      }
+    } catch (err) {
+      log.warn(`Wikimedia fetch error: ${(err as Error).message}`);
+    }
+  }
+
+  // 11. Update episode status
   const finalStatus =
     result.narrations.length === 0 && narrationKeys.length > 0
       ? 'failed'

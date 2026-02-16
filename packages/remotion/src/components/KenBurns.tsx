@@ -1,5 +1,6 @@
 import React from 'react';
-import { Img, interpolate, staticFile, useCurrentFrame } from 'remotion';
+import { Img, OffthreadVideo, interpolate, staticFile, useCurrentFrame } from 'remotion';
+import { sampleEnergy } from '../utils/energy';
 
 interface KenBurnsProps {
   images: string[];
@@ -41,25 +42,8 @@ function panDirection(slot: number): { panXDir: number; panYDir: number } {
   };
 }
 
-/**
- * Sample the energy array at a given frame position.
- * Energy data is sampled at ~10Hz (librosa hop=2205 at 22050Hz),
- * so we map frames (30fps) to energy indices.
- */
-function sampleEnergy(energyData: number[], frame: number, durationInFrames: number): number {
-  if (energyData.length === 0) return 0;
-  const t = Math.max(0, Math.min(1, frame / durationInFrames));
-  const idx = Math.min(Math.floor(t * energyData.length), energyData.length - 1);
-  // Smooth over 5 samples to avoid jitter
-  const lo = Math.max(0, idx - 2);
-  const hi = Math.min(energyData.length - 1, idx + 2);
-  let sum = 0;
-  let count = 0;
-  for (let i = lo; i <= hi; i++) {
-    sum += energyData[i];
-    count++;
-  }
-  return sum / count;
+function isVideo(path: string): boolean {
+  return /\.(mp4|webm|mov)$/i.test(path);
 }
 
 /**
@@ -157,20 +141,30 @@ export const KenBurns: React.FC<KenBurnsProps> = ({ images, durationInFrames, en
         // Color temperature overlay (warm amber at peaks)
         const warmthOpacity = warmth * 0.15;
 
+        const mediaStyle: React.CSSProperties = {
+          position: 'absolute',
+          width: '100%',
+          height: '100%',
+          objectFit: 'cover',
+          opacity,
+          transform: `scale(${scale}) translate(${panX}%, ${panY}%)`,
+          willChange: 'transform, opacity',
+        };
+
         return (
           <React.Fragment key={slot}>
-            <Img
-              src={staticFile(img)}
-              style={{
-                position: 'absolute',
-                width: '100%',
-                height: '100%',
-                objectFit: 'cover',
-                opacity,
-                transform: `scale(${scale}) translate(${panX}%, ${panY}%)`,
-                willChange: 'transform, opacity',
-              }}
-            />
+            {isVideo(img) ? (
+              <OffthreadVideo
+                src={staticFile(img)}
+                style={mediaStyle}
+                muted
+              />
+            ) : (
+              <Img
+                src={staticFile(img)}
+                style={mediaStyle}
+              />
+            )}
             {warmthOpacity > 0.01 && (
               <div
                 style={{

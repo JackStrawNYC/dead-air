@@ -1,17 +1,20 @@
-import { readFileSync, existsSync, mkdirSync, writeFileSync } from 'fs';
+import { readFileSync, existsSync, mkdirSync, writeFileSync, readdirSync } from 'fs';
 import { resolve } from 'path';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import type Database from 'better-sqlite3';
 import { createLogger } from '@dead-air/core';
-import type { EpisodeScript, EpisodeSegment, AudioAnalysis, SongAnalysisData } from '@dead-air/core';
+import type { EpisodeScript, EpisodeSegment, AudioAnalysis } from '@dead-air/core';
 
 const execFileAsync = promisify(execFile);
 const log = createLogger('render:composition-builder');
 
 const FPS = 30;
 const BRAND_INTRO_FRAMES = 150; // 5 seconds
-const COLD_OPEN_FRAMES = 90; // 3 seconds
+const COLD_OPEN_FRAMES = 240; // 8 seconds (upgraded from 3s)
+const END_SCREEN_FRAMES = 600; // 20 seconds
+const CHAPTER_CARD_FRAMES = 60; // 2 seconds
+const CROSSFADE_FRAMES = 15; // 15-frame overlap between segments
 
 export interface EpisodeProps {
   episodeId: string;
@@ -22,6 +25,7 @@ export interface EpisodeProps {
 
 export type SegmentProps =
   | { type: 'cold_open'; durationInFrames: number; audioSrc: string; startFrom: number; image: string }
+  | { type: 'cold_open_v2'; durationInFrames: number; audioSrc: string; startFrom: number; media: string; hookText?: string }
   | { type: 'brand_intro'; durationInFrames: number }
   | {
       type: 'narration';
@@ -30,6 +34,8 @@ export type SegmentProps =
       images: string[];
       mood: string;
       colorPalette: string[];
+      concertBedSrc?: string;
+      concertBedStartFrom?: number;
     }
   | {
       type: 'concert_audio';
@@ -51,6 +57,20 @@ export type SegmentProps =
       colorPalette: string[];
       ambientAudioSrc?: string;
       ambientStartFrom?: number;
+    }
+  | {
+      type: 'end_screen';
+      durationInFrames: number;
+      nextEpisodeTitle?: string;
+      nextEpisodeDate?: string;
+      channelName?: string;
+    }
+  | {
+      type: 'chapter_card';
+      durationInFrames: number;
+      title: string;
+      subtitle?: string;
+      colorAccent?: string;
     };
 
 export interface BuildOptions {
@@ -70,6 +90,9 @@ async function getAudioDurationSec(filePath: string): Promise<number> {
   return parseFloat(data.format?.duration ?? '0');
 }
 
+/**
+ * Resolve images for a segment, preferring .mp4 video over .png.
+ */
 function resolveImages(
   segment: EpisodeSegment,
   episodeId: string,
@@ -79,15 +102,76 @@ function resolveImages(
   const images: string[] = [];
   const sceneCount = segment.visual?.scenePrompts?.length ?? 0;
   for (let pi = 0; pi < sceneCount; pi++) {
-    // Assets follow the pattern: assets/{episodeId}/images/seg-{NN}-{M}.png
-    const filename = `seg-${String(segIndex + 1).padStart(2, '0')}-${pi + 1}.png`;
-    const relPath = `assets/${episodeId}/images/${filename}`;
-    const absPath = resolve(dataDir, relPath);
-    if (existsSync(absPath)) {
-      images.push(relPath);
+    const baseName = `seg-${String(segIndex).padStart(2, '0')}-${pi}`;
+    const videoRelPath = `assets/${episodeId}/images/${baseName}.mp4`;
+    const imageRelPath = `assets/${episodeId}/images/${baseName}.png`;
+
+    // Prefer video over static image
+    if (existsSync(resolve(dataDir, videoRelPath))) {
+      images.push(videoRelPath);
+    } else if (existsSync(resolve(dataDir, imageRelPath))) {
+      images.push(imageRelPath);
     }
   }
   return images;
+}
+
+/**
+ * Scan archival directory and return relative paths to found images.
+ */
+function resolveArchivalImages(episodeId: string, dataDir: string): string[] {
+  const archivalDir = resolve(dataDir, 'assets', episodeId, 'archival');
+  if (!existsSync(archivalDir)) return [];
+
+  const images: string[] = [];
+
+  // Scan top-level archival dir
+  try {
+    const files = readdirSync(archivalDir);
+    for (const file of files) {
+      if (/\.(jpg|jpeg|png|gif)$/i.test(file)) {
+        images.push(`assets/${episodeId}/archival/${file}`);
+      }
+    }
+  } catch {
+    // ignore
+  }
+
+  // Scan wikimedia subdir
+  const wikiDir = resolve(archivalDir, 'wikimedia');
+  if (existsSync(wikiDir)) {
+    try {
+      const wikiFiles = readdirSync(wikiDir);
+      for (const file of wikiFiles) {
+        if (/\.(jpg|jpeg|png|gif)$/i.test(file)) {
+          images.push(`assets/${episodeId}/archival/wikimedia/${file}`);
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  return images;
+}
+
+/**
+ * Interleave archival images into an image array every Nth position.
+ */
+function interleaveArchival(images: string[], archival: string[], every = 3): string[] {
+  if (archival.length === 0) return images;
+  const result: string[] = [];
+  let archIdx = 0;
+
+  for (let i = 0; i < images.length; i++) {
+    result.push(images[i]);
+    if ((i + 1) % every === 0 && archIdx < archival.length) {
+      result.push(archival[archIdx]);
+      archIdx++;
+    }
+  }
+
+  return result;
 }
 
 function findConcertAudio(
@@ -100,16 +184,13 @@ function findConcertAudio(
   );
   if (!seg) return null;
 
-  // Concert audio path is stored as absolute in analysis; convert to relative for staticFile
   const absPath = seg.filePath;
   if (!existsSync(absPath)) return null;
 
-  // Derive relative path from dataDir
   if (absPath.startsWith(dataDir)) {
     const relPath = absPath.slice(dataDir.length).replace(/^\//, '');
     return { audioSrc: relPath, filePath: absPath };
   }
-  // Fallback: use as-is if relative
   return { audioSrc: absPath, filePath: absPath };
 }
 
@@ -120,11 +201,6 @@ function findEnergyData(songName: string, analysis: AudioAnalysis): number[] | u
   return data?.energy;
 }
 
-/**
- * Find the optimal excerpt start time using energy analysis.
- * Scans for the 30-second window with highest energy delta (the build into the peak),
- * then returns a start time 45 seconds before that window.
- */
 function findSmartExcerptStart(
   songName: string,
   excerptDuration: number,
@@ -137,18 +213,15 @@ function findSmartExcerptStart(
 
   const energy = songAnalysis.energy;
   const songDuration = songAnalysis.durationSec;
-  const sampleRate = energy.length / songDuration; // samples per second (~10Hz from librosa)
+  const sampleRate = energy.length / songDuration;
 
-  // Window size: 30 seconds of energy data
   const windowSamples = Math.round(30 * sampleRate);
   if (windowSamples >= energy.length) return null;
 
-  // Find the window with highest energy delta (build into peak)
   let bestDelta = -Infinity;
   let bestWindowStart = 0;
 
   for (let i = 0; i <= energy.length - windowSamples; i++) {
-    // Compare first third vs last third of window (measures "build")
     const thirdSize = Math.floor(windowSamples / 3);
     const firstThird = energy.slice(i, i + thirdSize);
     const lastThird = energy.slice(i + windowSamples - thirdSize, i + windowSamples);
@@ -163,13 +236,9 @@ function findSmartExcerptStart(
     }
   }
 
-  // Convert sample index to seconds
   const peakBuildSec = bestWindowStart / sampleRate;
-
-  // Start 45 seconds before the peak build window
   let startSec = Math.max(0, peakBuildSec - 45);
 
-  // Ensure we don't exceed the song duration
   if (startSec + excerptDuration > songDuration) {
     startSec = Math.max(0, songDuration - excerptDuration);
   }
@@ -181,10 +250,6 @@ function findSmartExcerptStart(
   return startSec;
 }
 
-/**
- * Find the highest energy peak across all songs for the cold open.
- * Returns the song's audio path and the frame offset of the peak.
- */
 function findColdOpenMoment(
   analysis: AudioAnalysis,
   dataDir: string,
@@ -208,7 +273,6 @@ function findColdOpenMoment(
 
   if (!bestSongName) return null;
 
-  // Find the audio file for this song
   const seg = analysis.songSegments.find(
     (s) => s.songName.toLowerCase() === bestSongName.toLowerCase(),
   );
@@ -219,7 +283,6 @@ function findColdOpenMoment(
     audioSrc = audioSrc.slice(dataDir.length).replace(/^\//, '');
   }
 
-  // Start 1.5s before the peak (so the peak hits mid-cold-open)
   const startFromSec = Math.max(0, bestTimeSec - 1.5);
 
   log.info(`Cold open: "${bestSongName}" at ${bestTimeSec.toFixed(1)}s (energy: ${bestEnergy.toFixed(3)})`);
@@ -251,33 +314,38 @@ export async function buildCompositionProps(options: BuildOptions): Promise<Epis
     log.warn(`No analysis found at ${analysisPath}`);
   }
 
-  // 3. Build segments
+  // 3. Resolve archival images for interleaving
+  const archivalImages = resolveArchivalImages(episodeId, dataDir);
+  log.info(`Found ${archivalImages.length} archival images for interleaving`);
+
+  // 4. Build segments
   const segments: SegmentProps[] = [];
 
-  // Prepend cold open (3s of peak moment) + brand intro
+  // Prepend cold open (8s of peak moment) + brand intro
   if (analysis) {
     const coldOpen = findColdOpenMoment(analysis, dataDir);
     if (coldOpen) {
-      // Find an image for the cold open — use the first concert segment's first image
-      let coldOpenImage = '';
+      // Find an image/video for the cold open
+      let coldOpenMedia = '';
       for (let si = 0; si < script.segments.length; si++) {
         const seg = script.segments[si];
         if (seg.type === 'concert_audio') {
           const imgs = resolveImages(seg, episodeId, si, dataDir);
           if (imgs.length > 0) {
-            coldOpenImage = imgs[0];
+            coldOpenMedia = imgs[0];
             break;
           }
         }
       }
 
-      if (coldOpenImage) {
+      if (coldOpenMedia) {
         segments.push({
-          type: 'cold_open',
+          type: 'cold_open_v2',
           durationInFrames: COLD_OPEN_FRAMES,
           audioSrc: coldOpen.audioSrc,
           startFrom: Math.round(coldOpen.startFromSec * FPS),
-          image: coldOpenImage,
+          media: coldOpenMedia,
+          hookText: script.shortsMoments?.[0]?.hookText,
         });
       }
     }
@@ -298,11 +366,28 @@ export async function buildCompositionProps(options: BuildOptions): Promise<Epis
 
   for (let i = 0; i < script.segments.length; i++) {
     const seg = script.segments[i];
-    const images = resolveImages(seg, episodeId, i, dataDir);
+    let images = resolveImages(seg, episodeId, i, dataDir);
+
+    // Interleave archival images into narration and context segments
+    if (seg.type === 'narration' || seg.type === 'context_text') {
+      images = interleaveArchival(images, archivalImages.slice(0, 3));
+    }
+
     const mood = seg.visual?.mood ?? 'warm';
     const colorPalette = seg.visual?.colorPalette ?? [];
 
     if (seg.type === 'narration' && seg.narrationKey) {
+      // Insert chapter card before set_break narration
+      if (seg.narrationKey === 'set_break') {
+        segments.push({
+          type: 'chapter_card',
+          durationInFrames: CHAPTER_CARD_FRAMES,
+          title: 'SET II',
+          subtitle: 'The Second Set',
+          colorAccent: colorPalette[0],
+        });
+      }
+
       const audioRel = narrationMap[seg.narrationKey];
       const audioAbs = resolve(dataDir, audioRel);
 
@@ -320,12 +405,12 @@ export async function buildCompositionProps(options: BuildOptions): Promise<Epis
         images,
         mood,
         colorPalette,
+        concertBedSrc: lastConcertAudioSrc || undefined,
+        concertBedStartFrom: lastConcertAudioSrc ? lastConcertStartFrom : undefined,
       });
     } else if (seg.type === 'concert_audio' && seg.songName) {
       const excerptDuration = seg.excerptDuration ?? 60;
 
-      // Smart excerpt: use energy analysis to find the best moment
-      // Falls back to script's startTimeInSong, then 0
       let startTimeSec = seg.startTimeInSong ?? 0;
       if (analysis) {
         const smartStart = findSmartExcerptStart(seg.songName, excerptDuration, analysis);
@@ -341,7 +426,7 @@ export async function buildCompositionProps(options: BuildOptions): Promise<Epis
           audioSrc = found.audioSrc;
         } else {
           log.warn(`Concert audio not found for "${seg.songName}" — skipping segment`);
-          continue; // Skip segments with no audio file
+          continue;
         }
       }
 
@@ -360,7 +445,6 @@ export async function buildCompositionProps(options: BuildOptions): Promise<Epis
         energyData,
       });
 
-      // Track for ambient bleed on following context_text segments
       lastConcertAudioSrc = audioSrc;
       lastConcertStartFrom = computedStartFrom + Math.ceil(excerptDuration * FPS);
     } else if (seg.type === 'context_text' && seg.textLines) {
@@ -383,10 +467,19 @@ export async function buildCompositionProps(options: BuildOptions): Promise<Epis
     }
   }
 
-  const totalDurationInFrames = segments.reduce((sum, s) => sum + s.durationInFrames, 0);
+  // Append end screen
+  segments.push({
+    type: 'end_screen',
+    durationInFrames: END_SCREEN_FRAMES,
+  });
+
+  // Calculate total duration accounting for transition overlaps
+  const rawTotal = segments.reduce((sum, s) => sum + s.durationInFrames, 0);
+  const transitionOverlap = CROSSFADE_FRAMES * Math.max(0, segments.length - 1);
+  const totalDurationInFrames = rawTotal - transitionOverlap;
 
   log.info(
-    `Built ${segments.length} segments, total ${totalDurationInFrames} frames (${(totalDurationInFrames / FPS).toFixed(1)}s)`,
+    `Built ${segments.length} segments, total ${totalDurationInFrames} frames (${(totalDurationInFrames / FPS).toFixed(1)}s) [${transitionOverlap} frames of crossfade overlap]`,
   );
 
   const props: EpisodeProps = {

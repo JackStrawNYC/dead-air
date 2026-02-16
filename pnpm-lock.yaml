@@ -126,6 +126,9 @@ importers:
       '@remotion/renderer':
         specifier: 4.0.242
         version: 4.0.242(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      '@remotion/transitions':
+        specifier: 4.0.242
+        version: 4.0.242(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       react:
         specifier: ^18.3.1
         version: 18.3.1
@@ -649,6 +652,9 @@ packages:
       react: '>=16.8.0'
       react-dom: '>=16.8.0'
 
+  '@remotion/paths@4.0.242':
+    resolution: {integrity: sha512-dWNX6PlNBBvZZQUGcgrOjuxZ5pmMqRRv+d2CHMM/sDf+NcXO46GB3V5wp9GkWdiHG6lEmjh59qHkptIcfqRrHw==}
+
   '@remotion/player@4.0.242':
     resolution: {integrity: sha512-ZcQQOoVQ/3R5jj9JumE5Z0+byG8vuA0uaFGF6UB3deTjhVr/8O4tavRi/XZ3vDk/NQBTwV68BcxAAN7a8bEyAg==}
     peerDependencies:
@@ -657,6 +663,12 @@ packages:
 
   '@remotion/renderer@4.0.242':
     resolution: {integrity: sha512-GqedGvaAKn9HFYLBQb9DpU4ixVeyXAHMSPXrE6r7pJA4oCp7Wxd2QLWLhmynjyFa+EAoAR/6ZkQJNuAUnhZS7A==}
+    peerDependencies:
+      react: '>=16.8.0'
+      react-dom: '>=16.8.0'
+
+  '@remotion/shapes@4.0.242':
+    resolution: {integrity: sha512-VNRB5v+HUSFZzJk5Eh/GbW7gvZktzoYhbdds6taAAb323mTbpu6zHN2xHixOJgk9foIixZN7rKBNeg85NO0YQA==}
     peerDependencies:
       react: '>=16.8.0'
       react-dom: '>=16.8.0'
@@ -672,6 +684,12 @@ packages:
 
   '@remotion/studio@4.0.242':
     resolution: {integrity: sha512-MEmw8naMlgMDPz8//KA6SoQx4scZoFa9lOlVgMKidQSvNhc/H8bBR2oq8erIVNNYAFZdThuUjRkR/Pl5MiIJWQ==}
+
+  '@remotion/transitions@4.0.242':
+    resolution: {integrity: sha512-HLx8RZNRPnCD2jrVbfknnT+w231DvOX+1JUwfj9sAW4xa7jbEPYd1H1I5+jg/KeZB2Y/uB6qSGJmrwDYOooeqA==}
+    peerDependencies:
+      react: '>=16.8.0'
+      react-dom: '>=16.8.0'
 
   '@types/better-sqlite3@7.6.13':
     resolution: {integrity: sha512-NMv9ASNARoKksWtsq/SHakpYAYnhBrQgGD8zkLYk/jaK8jUGn08CfEdTRgYhMypUQAfzSP8W6gNLe0q19/t4VA==}
@@ -2013,6 +2031,8 @@ snapshots:
       react-dom: 18.3.1(react@18.3.1)
       remotion: 4.0.242(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
 
+  '@remotion/paths@4.0.242': {}
+
   '@remotion/player@4.0.242(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
     dependencies:
       react: 18.3.1
@@ -2041,6 +2061,12 @@ snapshots:
       - bufferutil
       - supports-color
       - utf-8-validate
+
+  '@remotion/shapes@4.0.242(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
+    dependencies:
+      '@remotion/paths': 4.0.242
+      react: 18.3.1
+      react-dom: 18.3.1(react@18.3.1)
 
   '@remotion/streaming@4.0.242': {}
 
@@ -2091,6 +2117,14 @@ snapshots:
       - react-dom
       - supports-color
       - utf-8-validate
+
+  '@remotion/transitions@4.0.242(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
+    dependencies:
+      '@remotion/paths': 4.0.242
+      '@remotion/shapes': 4.0.242(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      react: 18.3.1
+      react-dom: 18.3.1(react@18.3.1)
+      remotion: 4.0.242(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
 
   '@types/better-sqlite3@7.6.13':
     dependencies:

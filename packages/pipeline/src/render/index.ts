@@ -9,3 +9,9 @@ export type { PostProcessOptions } from './post-process.js';
 
 export { orchestrateRender } from './orchestrator.js';
 export type { RenderPipelineOptions, RenderPipelineResult } from './orchestrator.js';
+
+export { buildShortsProps } from './shorts-builder.js';
+export type { ShortsProps, ShortsBuilderOptions } from './shorts-builder.js';
+
+export { renderShorts } from './shorts-renderer.js';
+export type { ShortsRenderOptions, ShortsRenderResult } from './shorts-renderer.js';

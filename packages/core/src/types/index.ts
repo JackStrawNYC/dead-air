@@ -88,7 +88,7 @@ export interface PeakMoment {
 
 export interface EpisodeScript {
   episodeTitle: string;
-  episodeType: 'gateway' | 'deep_dive';
+  episodeType: 'gateway' | 'deep_dive' | 'song_history' | 'top_list';
   introNarration: string;
   setBreakNarration: string;
   outroNarration: string;
@@ -115,6 +115,7 @@ export interface EpisodeSegment {
     colorPalette: string[];
     mood: 'warm' | 'cosmic' | 'electric' | 'dark' | 'earthy' | 'psychedelic';
     visualIntensity: number;
+    motionPrompts?: string[];
   };
 }
 

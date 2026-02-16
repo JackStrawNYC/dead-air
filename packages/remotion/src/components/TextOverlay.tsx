@@ -1,6 +1,6 @@
 import React from 'react';
-import { interpolate, useCurrentFrame } from 'remotion';
-import { COLORS, FONTS } from '../styles/themes';
+import { Easing, interpolate, useCurrentFrame } from 'remotion';
+import { COLORS, EASE, FONTS } from '../styles/themes';
 
 interface TextOverlayProps {
   text: string;
@@ -30,11 +30,12 @@ export const TextOverlay: React.FC<TextOverlayProps> = ({
     local,
     [0, ENTER, holdEnd, durationInFrames],
     [0, 1, 1, 0],
-    { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' },
+    { extrapolateLeft: 'clamp', extrapolateRight: 'clamp', easing: Easing.bezier(...EASE.smooth) },
   );
   const slideY = interpolate(local, [0, ENTER], [20, 0], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
+    easing: Easing.bezier(...EASE.out),
   });
 
   const baseStyle: React.CSSProperties = {

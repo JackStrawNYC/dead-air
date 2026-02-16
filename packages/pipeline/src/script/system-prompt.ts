@@ -104,7 +104,12 @@ Your image prompts will be sent to AI image generators. They MUST produce images
   - Electric/cooler (teals, deep blues, silvers) for electric jams and high-energy moments
   - Dark/muted (navy, charcoal, deep green) for quiet passages and space
   - Rich/saturated (deep golds, warm oranges, burgundy) for peak moments
-- Each segment needs 2-3 scenePrompts for visual variety. Each prompt should show a DIFFERENT angle or subject — wide shot, close-up, crowd, stage, venue exterior, etc.
+- Each image displays for ~8 seconds with a Ken Burns pan/zoom, so the number of scenePrompts MUST scale with segment duration:
+  - Short segments (<20s): 2-3 scenePrompts
+  - Medium segments (20-45s): 4-5 scenePrompts
+  - Long segments (45-90s): 6-8 scenePrompts
+  - Very long segments (90s+): 8-10 scenePrompts
+  For example, a 90-second concert excerpt needs ~11 image slots, so provide 8-10 unique prompts (some will repeat). Each prompt should show a DIFFERENT angle or subject — wide shot, close-up, crowd, stage, venue exterior, etc.
 - **thumbnailPrompt** must be dramatic and work at YouTube thumbnail size — bold, high contrast, iconic imagery of the actual venue/era. Must end with the no-text instruction.
 
 ## RESEARCH CONTEXT
@@ -133,4 +138,26 @@ Follow this arc, adapting to each show:
 8. narration (outro) — Legacy, significance, subscribe CTA
 9. context_text — Closing facts / "where to listen"
 
-Adapt freely based on the show's actual energy and story.`;
+Adapt freely based on the show's actual energy and story.
+
+## ENGAGEMENT HOOKS
+
+Drive comments, watch time, and subscriptions:
+
+1. **Intro hook**: Start introNarration with a question or provocative statement. Examples:
+   - "What happens when the greatest band in the world plays the greatest show of their lives?"
+   - "Nobody who walked into Barton Hall that night knew they were about to witness history."
+2. **Comment bait**: Include 1-2 questions in context_text segments (style: "analysis") that invite viewer responses:
+   - "Was this the best Dark Star ever played? Drop your pick in the comments."
+   - "Which song from this set deserves a full Deep Dive episode?"
+3. **Subscribe CTA**: outroNarration should end with a natural call to action:
+   - "If this show blew your mind, subscribe — we've got [next show] coming next."
+4. **shortsMoments**: hookText must be attention-grabbing and work as bold text overlay on 9:16 vertical video. Keep it under 8 words. Examples: "This solo changed everything", "Listen to that crowd roar", "The moment it all clicked".
+
+## VIDEO-READY PROMPTS
+
+Hero-tier scenePrompts (first prompt of narration and concert_audio segments) should work as both still images AND as source frames for AI video generation. This means:
+- Frame subjects that have natural movement potential (crowd swaying, hands raised, stage lights sweeping)
+- Avoid static subjects like empty rooms, documents, or still objects
+- Include motion-suggestive language: "crowd surging", "light sweeping across", "musician leaning into"
+- motionPrompts (optional): If you include visual.motionPrompts[], each should describe the desired camera motion for that scene: "slow pan across crowd", "gentle zoom into stage", "subtle camera shake, handheld feel"`;

@@ -3,6 +3,8 @@ import { Audio, interpolate, staticFile, useCurrentFrame, useVideoConfig } from 
 import { KenBurns } from '../components/KenBurns';
 import { TextOverlay } from '../components/TextOverlay';
 import { Branding } from '../components/Branding';
+import { FilmGrain } from '../components/FilmGrain';
+import { VintageFilter } from '../components/VintageFilter';
 import { FPS } from '../styles/themes';
 
 interface TextLineProps {
@@ -20,8 +22,8 @@ interface ContextSegmentProps {
   ambientStartFrom?: number;
 }
 
-const FADE_FRAMES = 75; // 2.5s
-const AMBIENT_VOLUME = 0.08; // very low background bleed
+const FADE_FRAMES = 15; // 0.5s
+const AMBIENT_VOLUME = 0.18; // audible background bleed
 
 export const ContextSegment: React.FC<ContextSegmentProps> = ({
   textLines,
@@ -54,34 +56,37 @@ export const ContextSegment: React.FC<ContextSegmentProps> = ({
   });
 
   return (
-    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
-      <KenBurns images={images} durationInFrames={durationInFrames} />
-      {/* Dim overlay for text readability */}
-      <div
-        style={{
-          position: 'absolute',
-          inset: 0,
-          background: 'linear-gradient(to top, rgba(10,10,10,0.85) 0%, rgba(10,10,10,0.2) 50%, transparent 100%)',
-        }}
-      />
-      {entries.map((entry, i) => (
-        <TextOverlay
-          key={i}
-          text={entry.text}
-          style={entry.style}
-          startFrame={entry.startFrame}
-          durationInFrames={entry.durationInFrames}
-          colorAccent={accent}
+    <VintageFilter>
+      <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+        <KenBurns images={images} durationInFrames={durationInFrames} />
+        {/* Dim overlay for text readability */}
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            background: 'linear-gradient(to top, rgba(10,10,10,0.85) 0%, rgba(10,10,10,0.2) 50%, transparent 100%)',
+          }}
         />
-      ))}
-      {ambientAudioSrc && (
-        <Audio
-          src={staticFile(ambientAudioSrc)}
-          startFrom={ambientStartFrom ?? 0}
-          volume={ambientVolume}
-        />
-      )}
-      <Branding />
-    </div>
+        {entries.map((entry, i) => (
+          <TextOverlay
+            key={i}
+            text={entry.text}
+            style={entry.style}
+            startFrame={entry.startFrame}
+            durationInFrames={entry.durationInFrames}
+            colorAccent={accent}
+          />
+        ))}
+        {ambientAudioSrc && (
+          <Audio
+            src={staticFile(ambientAudioSrc)}
+            startFrom={ambientStartFrom ?? 0}
+            volume={ambientVolume}
+          />
+        )}
+        <Branding />
+        <FilmGrain intensity={0.10} />
+      </div>
+    </VintageFilter>
   );
 };

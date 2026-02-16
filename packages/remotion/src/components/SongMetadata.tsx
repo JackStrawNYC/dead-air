@@ -1,14 +1,20 @@
 import React from 'react';
-import { interpolate, useCurrentFrame } from 'remotion';
+import { interpolate, spring, useCurrentFrame, useVideoConfig } from 'remotion';
 import { COLORS, FONTS } from '../styles/themes';
 
 interface SongMetadataProps {
   songName: string;
   durationInFrames: number;
+  currentEnergy?: number;
 }
 
-export const SongMetadata: React.FC<SongMetadataProps> = ({ songName, durationInFrames }) => {
+export const SongMetadata: React.FC<SongMetadataProps> = ({
+  songName,
+  durationInFrames,
+  currentEnergy,
+}) => {
   const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
 
   const opacity = interpolate(
     frame,
@@ -17,10 +23,13 @@ export const SongMetadata: React.FC<SongMetadataProps> = ({ songName, durationIn
     { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' },
   );
 
-  const slideX = interpolate(frame, [0, 20], [-30, 0], {
-    extrapolateLeft: 'clamp',
-    extrapolateRight: 'clamp',
+  // Spring-based slide in instead of linear
+  const slideProgress = spring({
+    frame,
+    fps,
+    config: { damping: 18, mass: 0.6, stiffness: 100 },
   });
+  const slideX = (1 - slideProgress) * -30;
 
   // Subtle re-appear near the end
   const endOpacity = durationInFrames > 180
@@ -33,6 +42,10 @@ export const SongMetadata: React.FC<SongMetadataProps> = ({ songName, durationIn
     : 0;
 
   const combinedOpacity = Math.max(opacity, endOpacity);
+
+  // Energy-reactive accent bar
+  const barHeight = currentEnergy != null ? 48 + currentEnergy * 16 : 48;
+  const barOpacity = currentEnergy != null ? 0.8 + currentEnergy * 0.2 : 1;
 
   return (
     <div
@@ -50,9 +63,10 @@ export const SongMetadata: React.FC<SongMetadataProps> = ({ songName, durationIn
       <div
         style={{
           width: 4,
-          height: 48,
+          height: barHeight,
           backgroundColor: COLORS.accent,
           borderRadius: 2,
+          opacity: barOpacity,
         }}
       />
       <div>
