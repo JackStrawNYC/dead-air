@@ -109,15 +109,16 @@ export const KenBurns: React.FC<KenBurnsProps> = ({ images, durationInFrames, en
         if (frame < slotStart - CROSSFADE_FRAMES || frame > slotEnd + CROSSFADE_FRAMES) return null;
 
         // Opacity: crossfade in at start, crossfade out at end
-        // First slot fades in instantly; last slot holds until end
-        const fadeInStart = slot === 0 ? slotStart : slotStart - CROSSFADE_FRAMES;
-        const fadeInEnd = slot === 0 ? slotStart : slotStart;
-        const fadeOutStart = slot === slotCount - 1 ? durationInFrames : slotEnd - CROSSFADE_FRAMES;
+        // First slot starts fully visible; last slot stays until end
+        // Ensure all input values are strictly monotonically increasing
+        const fadeInStart = slot === 0 ? 0 : slotStart - CROSSFADE_FRAMES;
+        const fadeInEnd = slot === 0 ? 1 : slotStart;
+        const fadeOutStart = slot === slotCount - 1 ? durationInFrames - 1 : slotEnd - CROSSFADE_FRAMES;
         const fadeOutEnd = slot === slotCount - 1 ? durationInFrames : slotEnd;
 
         const opacity = interpolate(
           frame,
-          [fadeInStart, fadeInEnd, fadeOutStart, fadeOutEnd],
+          [fadeInStart, Math.max(fadeInEnd, fadeInStart + 1), Math.max(fadeOutStart, fadeInEnd + 1), Math.max(fadeOutEnd, fadeOutStart + 1)],
           [0, 1, 1, 0],
           { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' },
         );

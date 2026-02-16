@@ -340,7 +340,8 @@ export async function buildCompositionProps(options: BuildOptions): Promise<Epis
         if (found) {
           audioSrc = found.audioSrc;
         } else {
-          log.warn(`Concert audio not found for "${seg.songName}"`);
+          log.warn(`Concert audio not found for "${seg.songName}" — skipping segment`);
+          continue; // Skip segments with no audio file
         }
       }
 
@@ -360,10 +361,8 @@ export async function buildCompositionProps(options: BuildOptions): Promise<Epis
       });
 
       // Track for ambient bleed on following context_text segments
-      if (audioSrc) {
-        lastConcertAudioSrc = audioSrc;
-        lastConcertStartFrom = computedStartFrom + Math.ceil(excerptDuration * FPS);
-      }
+      lastConcertAudioSrc = audioSrc;
+      lastConcertStartFrom = computedStartFrom + Math.ceil(excerptDuration * FPS);
     } else if (seg.type === 'context_text' && seg.textLines) {
       const totalSec = seg.textLines.reduce((sum, l) => sum + l.displayDuration, 0);
 
