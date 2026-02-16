@@ -22,7 +22,7 @@ Respond with ONLY valid JSON matching this exact structure. No markdown fences, 
       "narrationKey": "intro" | "set_break" | "outro" (only for narration segments),
       "songName": "Song Name" (only for concert_audio segments, must match setlist exactly),
       "startTimeInSong": 45 (seconds into the song to begin excerpt),
-      "excerptDuration": 90 (seconds of concert audio to play, 30-120s typical),
+      "excerptDuration": 180 (seconds of concert audio to play, 120-240s; let the music breathe),
       "textLines": [
         {
           "text": "On-screen text content",
@@ -63,7 +63,7 @@ Respond with ONLY valid JSON matching this exact structure. No markdown fences, 
 
 2. **Narration length**: Each narration script must be speakable in the stated time. Budget ~2.5 words per second. introNarration: 150-220 words. setBreakNarration: 75-150 words. outroNarration: 40-75 words.
 
-3. **Concert excerpts**: Feature 6-10 song excerpts total. Do NOT excerpt every song — be selective. Focus on peak energy moments, famous versions, segues, and songs that serve the narrative. Each excerpt should be 30-120 seconds.
+3. **Concert excerpts**: Feature 6-10 song excerpts total. Do NOT excerpt every song — be selective. Focus on peak energy moments, famous versions, segues, and songs that serve the narrative. Each excerpt should be 120-240 seconds — let the music breathe and give the audience time to feel the jam. Include 5-8 textLines per concert_audio segment: fun facts about the song, when it was first played, notable lyrics, band member highlights, crowd reactions, musical analysis. These display as overlays while the music plays and keep viewers engaged during longer excerpts.
 
 4. **startTimeInSong**: Start 5-10 seconds before the interesting moment, not at 0:00, unless it is a cold open or the song begins with an iconic riff. Use the peak moment timestamps and energy data to find the best entry points.
 
@@ -108,8 +108,9 @@ Your image prompts will be sent to AI image generators. They MUST produce images
   - Short segments (<20s): 2-3 scenePrompts
   - Medium segments (20-45s): 4-5 scenePrompts
   - Long segments (45-90s): 6-8 scenePrompts
-  - Very long segments (90s+): 8-10 scenePrompts
-  For example, a 90-second concert excerpt needs ~11 image slots, so provide 8-10 unique prompts (some will repeat). Each prompt should show a DIFFERENT angle or subject — wide shot, close-up, crowd, stage, venue exterior, etc.
+  - Very long segments (90-150s): 10-15 scenePrompts
+  - Extra long segments (150s+): 15-20 scenePrompts
+  CRITICAL: match scenePrompts count to segment duration. A 120s concert segment MUST have 12-15 scenePrompts. A 180s segment needs 18-22. Each image displays for ~8 seconds; do the math. Each prompt should show a DIFFERENT angle or subject — wide shot, close-up, crowd, stage, venue exterior, etc.
 - **thumbnailPrompt** must be dramatic and work at YouTube thumbnail size — bold, high contrast, iconic imagery of the actual venue/era. Must end with the no-text instruction.
 
 ## RESEARCH CONTEXT

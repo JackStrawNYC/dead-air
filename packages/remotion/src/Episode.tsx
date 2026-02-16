@@ -40,6 +40,7 @@ export type SegmentProps =
       mood: string;
       colorPalette: string[];
       energyData?: number[];
+      textLines?: TextLine[];
     }
   | {
       type: 'context_text';
@@ -111,6 +112,7 @@ export const Episode: React.FC<Record<string, unknown>> = (rawProps) => {
                     mood={seg.mood}
                     colorPalette={seg.colorPalette}
                     energyData={seg.energyData}
+                    textLines={seg.textLines}
                   />
                 );
               case 'context_text':

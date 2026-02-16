@@ -47,6 +47,7 @@ export type SegmentProps =
       mood: string;
       colorPalette: string[];
       energyData?: number[];
+      textLines?: { text: string; displayDuration: number; style: string }[];
     }
   | {
       type: 'context_text';
@@ -172,6 +173,23 @@ function interleaveArchival(images: string[], archival: string[], every = 3): st
   }
 
   return result;
+}
+
+/**
+ * Pad an image array by cycling so there's roughly one image per 8 seconds.
+ * Prevents long segments from showing the same 1-2 images on repeat.
+ */
+function padImages(images: string[], durationInFrames: number): string[] {
+  if (images.length === 0) return images;
+  const framesPerImage = 8 * FPS; // 240 frames = 8s per image
+  const targetCount = Math.ceil(durationInFrames / framesPerImage);
+  if (images.length >= targetCount) return images;
+
+  const padded: string[] = [];
+  for (let i = 0; i < targetCount; i++) {
+    padded.push(images[i % images.length]);
+  }
+  return padded;
 }
 
 function findConcertAudio(
@@ -398,11 +416,12 @@ export async function buildCompositionProps(options: BuildOptions): Promise<Epis
         log.warn(`Narration not found: ${audioAbs}, using fallback duration`);
       }
 
+      const narDurationFrames = Math.ceil(durationSec * FPS);
       segments.push({
         type: 'narration',
-        durationInFrames: Math.ceil(durationSec * FPS),
+        durationInFrames: narDurationFrames,
         audioSrc: audioRel,
-        images,
+        images: padImages(images, narDurationFrames),
         mood,
         colorPalette,
         concertBedSrc: lastConcertAudioSrc || undefined,
@@ -433,32 +452,39 @@ export async function buildCompositionProps(options: BuildOptions): Promise<Epis
       const energyData = analysis ? findEnergyData(seg.songName, analysis) : undefined;
 
       const computedStartFrom = Math.round(startTimeSec * FPS);
+      const concertDurationFrames = Math.ceil(excerptDuration * FPS);
       segments.push({
         type: 'concert_audio',
-        durationInFrames: Math.ceil(excerptDuration * FPS),
+        durationInFrames: concertDurationFrames,
         songName: seg.songName,
         audioSrc,
         startFrom: computedStartFrom,
-        images,
+        images: padImages(images, concertDurationFrames),
         mood,
         colorPalette,
         energyData,
+        textLines: seg.textLines?.map((l) => ({
+          text: l.text,
+          displayDuration: l.displayDuration,
+          style: l.style,
+        })),
       });
 
       lastConcertAudioSrc = audioSrc;
       lastConcertStartFrom = computedStartFrom + Math.ceil(excerptDuration * FPS);
     } else if (seg.type === 'context_text' && seg.textLines) {
       const totalSec = seg.textLines.reduce((sum, l) => sum + l.displayDuration, 0);
+      const ctxDurationFrames = Math.ceil(totalSec * FPS);
 
       segments.push({
         type: 'context_text',
-        durationInFrames: Math.ceil(totalSec * FPS),
+        durationInFrames: ctxDurationFrames,
         textLines: seg.textLines.map((l) => ({
           text: l.text,
           displayDuration: l.displayDuration,
           style: l.style,
         })),
-        images,
+        images: padImages(images, ctxDurationFrames),
         mood,
         colorPalette,
         ambientAudioSrc: lastConcertAudioSrc || undefined,

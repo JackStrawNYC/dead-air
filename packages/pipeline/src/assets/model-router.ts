@@ -66,7 +66,6 @@ async function generateWithGrokAurora(
       model: 'grok-2-image-1212',
       prompt: safePrompt,
       n: 1,
-      size: '1440x810',
       response_format: 'b64_json',
     }),
   });
