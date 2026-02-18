@@ -28,16 +28,27 @@ const REPLICATE_MODELS: Record<string, string> = {
   'flux-schnell': 'black-forest-labs/flux-schnell',
 };
 
+const STYLE_PREFIX =
+  'vintage 1970s documentary concert photography, 35mm film grain, warm analog tones, ';
+
 const NEGATIVE_PROMPT_SUFFIX =
-  ', no text, no words, no letters, no writing, no signs, no logos, no watermarks';
+  ', no text, no words, no letters, no writing, no signs, no logos, no watermarks, no named individuals, no celebrity likenesses';
 
 /**
- * Ensure the prompt ends with negative instructions to prevent garbled AI text.
+ * Prepend cinematic style and append negative instructions.
+ * Ensures all AI-generated images match the archival documentary aesthetic.
  */
-function appendNegativePrompt(prompt: string): string {
-  // Don't double-append if the prompt already has it
-  if (prompt.toLowerCase().includes('no text')) return prompt;
-  return prompt + NEGATIVE_PROMPT_SUFFIX;
+function stylizePrompt(prompt: string): string {
+  let result = prompt;
+  // Add style prefix if not already documentary-styled
+  if (!result.toLowerCase().includes('documentary') && !result.toLowerCase().includes('35mm')) {
+    result = STYLE_PREFIX + result;
+  }
+  // Add negative suffix if not already present
+  if (!result.toLowerCase().includes('no text')) {
+    result += NEGATIVE_PROMPT_SUFFIX;
+  }
+  return result;
 }
 
 // ── Result type ──
@@ -55,7 +66,7 @@ async function generateWithGrokAurora(
   prompt: string,
   apiKey: string,
 ): Promise<{ imageBuffer: Buffer; cost: number }> {
-  const safePrompt = appendNegativePrompt(prompt);
+  const safePrompt = stylizePrompt(prompt);
   const response = await fetch('https://api.x.ai/v1/images/generations', {
     method: 'POST',
     headers: {
@@ -106,7 +117,7 @@ async function generateWithReplicate(
 ): Promise<{ imageBuffer: Buffer; cost: number }> {
   const replicate = new Replicate({ auth: replicateToken });
   const modelId = REPLICATE_MODELS[provider];
-  const safePrompt = appendNegativePrompt(prompt);
+  const safePrompt = stylizePrompt(prompt);
 
   const input: Record<string, unknown> =
     provider === 'flux-dev'

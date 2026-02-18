@@ -53,6 +53,7 @@ export function loadConfig(envPath?: string): DeadAirConfig {
       anthropicKey: parsed.ANTHROPIC_API_KEY,
       replicateToken: parsed.REPLICATE_API_TOKEN,
       xaiApiKey: parsed.XAI_API_KEY,
+      flickrApiKey: parsed.FLICKR_API_KEY,
       elevenlabsKey: parsed.ELEVENLABS_API_KEY,
       elevenlabsVoiceId: parsed.ELEVENLABS_VOICE_ID,
       setlistfmKey: parsed.SETLISTFM_API_KEY,
@@ -64,6 +65,11 @@ export function loadConfig(envPath?: string): DeadAirConfig {
     },
     remotion: {
       concurrency: parsed.REMOTION_CONCURRENCY,
+    },
+    aws: {
+      accessKeyId: parsed.REMOTION_AWS_ACCESS_KEY_ID,
+      secretAccessKey: parsed.REMOTION_AWS_SECRET_ACCESS_KEY,
+      region: parsed.REMOTION_AWS_REGION,
     },
   };
 

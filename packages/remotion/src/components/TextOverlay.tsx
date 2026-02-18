@@ -1,5 +1,5 @@
 import React from 'react';
-import { Easing, interpolate, useCurrentFrame } from 'remotion';
+import { Easing, interpolate, spring, useCurrentFrame, useVideoConfig } from 'remotion';
 import { COLORS, EASE, FONTS } from '../styles/themes';
 
 interface TextOverlayProps {
@@ -13,6 +13,14 @@ interface TextOverlayProps {
 const ENTER = 15;
 const EXIT = 15;
 
+const FROSTED_PANEL: React.CSSProperties = {
+  backgroundColor: 'rgba(10, 10, 10, 0.55)',
+  backdropFilter: 'blur(8px)',
+  WebkitBackdropFilter: 'blur(8px)',
+  padding: '16px 24px',
+  borderRadius: 8,
+};
+
 export const TextOverlay: React.FC<TextOverlayProps> = ({
   text,
   style,
@@ -21,6 +29,7 @@ export const TextOverlay: React.FC<TextOverlayProps> = ({
   colorAccent = COLORS.accent,
 }) => {
   const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
   const local = frame - startFrame;
 
   if (local < 0 || local > durationInFrames) return null;
@@ -55,6 +64,7 @@ export const TextOverlay: React.FC<TextOverlayProps> = ({
         <div style={{ width: 60, height: 3, backgroundColor: colorAccent, marginBottom: 16 }} />
         <div
           style={{
+            ...FROSTED_PANEL,
             fontFamily: FONTS.body,
             fontSize: 42,
             fontWeight: 700,
@@ -70,17 +80,44 @@ export const TextOverlay: React.FC<TextOverlayProps> = ({
   }
 
   if (style === 'quote') {
+    const words = text.split(/\s+/);
     return (
       <div style={{ ...baseStyle, textAlign: 'center', left: 200, right: 200 }}>
         <div
           style={{
+            ...FROSTED_PANEL,
+            padding: '24px 32px',
+            display: 'inline-block',
             fontFamily: FONTS.heading,
             fontSize: 48,
             fontStyle: 'italic',
             lineHeight: 1.4,
           }}
         >
-          &ldquo;{text}&rdquo;
+          <span>&ldquo;</span>
+          {words.map((word, wi) => {
+            const delay = wi * 3;
+            const wordProgress = spring({
+              frame: Math.max(0, local - delay),
+              fps,
+              config: { damping: 20, mass: 0.5, stiffness: 120 },
+            });
+            const wordSlide = (1 - wordProgress) * 15;
+            return (
+              <span
+                key={wi}
+                style={{
+                  display: 'inline-block',
+                  opacity: wordProgress,
+                  transform: `translateY(${wordSlide}px)`,
+                  marginRight: '0.3em',
+                }}
+              >
+                {word}
+              </span>
+            );
+          })}
+          <span>&rdquo;</span>
         </div>
       </div>
     );
@@ -91,6 +128,7 @@ export const TextOverlay: React.FC<TextOverlayProps> = ({
       <div style={baseStyle}>
         <div
           style={{
+            ...FROSTED_PANEL,
             fontFamily: FONTS.body,
             fontSize: 38,
             fontWeight: 400,
@@ -103,7 +141,7 @@ export const TextOverlay: React.FC<TextOverlayProps> = ({
     );
   }
 
-  // transition
+  // transition — no backing panel (stays clean and cinematic)
   return (
     <div
       style={{

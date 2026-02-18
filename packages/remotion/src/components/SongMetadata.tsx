@@ -6,12 +6,14 @@ interface SongMetadataProps {
   songName: string;
   durationInFrames: number;
   currentEnergy?: number;
+  colorAccent?: string;
 }
 
 export const SongMetadata: React.FC<SongMetadataProps> = ({
   songName,
   durationInFrames,
   currentEnergy,
+  colorAccent = COLORS.accent,
 }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
@@ -64,7 +66,7 @@ export const SongMetadata: React.FC<SongMetadataProps> = ({
         style={{
           width: 4,
           height: barHeight,
-          backgroundColor: COLORS.accent,
+          backgroundColor: colorAccent,
           borderRadius: 2,
           opacity: barOpacity,
         }}

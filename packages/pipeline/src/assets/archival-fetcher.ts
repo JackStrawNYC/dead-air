@@ -63,7 +63,13 @@ export async function searchArchivalAssets(options: {
   const year = showDate.split('-')[0];
   queries.push(`collection:GratefulDead AND date:[${year}-01-01 TO ${year}-12-31] AND mediatype:image`);
 
-  // Strategy 3: General Grateful Dead images
+  // Strategy 3: Etree live music archive (audio items often contain photos)
+  if (venue) {
+    queries.push(`collection:etree AND "grateful dead" AND "${venue}" AND mediatype:etree`);
+  }
+  queries.push(`collection:etree AND "grateful dead" AND date:[${year}-01-01 TO ${year}-12-31]`);
+
+  // Strategy 4: General Grateful Dead images
   queries.push(`"grateful dead" AND mediatype:image`);
 
   for (const query of queries) {
@@ -101,9 +107,12 @@ export async function searchArchivalAssets(options: {
           if (metaResponse.ok) {
             const meta = (await metaResponse.json()) as ArchiveMetadataResponse;
 
-            // Find the original image file
+            // Find image files — check originals first, then any image
+            // This catches photos embedded in audio/etree items
             const imageFile = meta.files?.find(
               (f) => f.source === 'original' && /\.(jpg|jpeg|png|gif|tif|tiff)$/i.test(f.name),
+            ) ?? meta.files?.find(
+              (f) => /\.(jpg|jpeg|png|gif)$/i.test(f.name) && !/thumb/i.test(f.name),
             );
 
             if (imageFile) {

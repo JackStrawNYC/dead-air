@@ -7,7 +7,7 @@ interface FilmGrainProps {
 
 export const FilmGrain: React.FC<FilmGrainProps> = ({ intensity = 0.12 }) => {
   const frame = useCurrentFrame();
-  const seed = frame % 100;
+  const seed = Math.floor(frame / 2);
 
   return (
     <div

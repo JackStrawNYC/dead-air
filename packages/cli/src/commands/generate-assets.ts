@@ -60,6 +60,7 @@ export function registerGenerateAssetsCommand(program: Command): void {
             db,
             dataDir: config.paths.data,
             replicateToken: config.api.replicateToken ?? '',
+            flickrApiKey: config.api.flickrApiKey,
             elevenlabsKey: config.api.elevenlabsKey ?? '',
             elevenlabsVoiceId: config.api.elevenlabsVoiceId ?? '',
             concurrency: Number(options.concurrency) || 3,

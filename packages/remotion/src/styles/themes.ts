@@ -25,6 +25,10 @@ export const MOOD_PALETTES: Record<Mood, { primary: string; secondary: string; g
   psychedelic: { primary: '#ff6ec7', secondary: '#9b59b6', glow: 'rgba(255, 110, 199, 0.3)' },
 };
 
+export function getMoodAccent(mood: string): string {
+  return (MOOD_PALETTES as Record<string, { primary: string }>)[mood]?.primary ?? COLORS.accent;
+}
+
 export const EASE = {
   smooth: [0.25, 0.1, 0.25, 1] as [number, number, number, number],
   out: [0, 0, 0.2, 1] as [number, number, number, number],

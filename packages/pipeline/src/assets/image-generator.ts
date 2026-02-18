@@ -31,12 +31,21 @@ const MODEL_COSTS: Record<ImageModel, number> = {
   'flux-schnell': 0.003,
 };
 
-const NEGATIVE_PROMPT_SUFFIX =
-  ', no text, no words, no letters, no writing, no signs, no logos, no watermarks';
+const STYLE_PREFIX =
+  'vintage 1970s documentary concert photography, 35mm film grain, warm analog tones, ';
 
-function appendNegativePrompt(prompt: string): string {
-  if (prompt.toLowerCase().includes('no text')) return prompt;
-  return prompt + NEGATIVE_PROMPT_SUFFIX;
+const NEGATIVE_PROMPT_SUFFIX =
+  ', no text, no words, no letters, no writing, no signs, no logos, no watermarks, no named individuals, no celebrity likenesses';
+
+function stylizePrompt(prompt: string): string {
+  let result = prompt;
+  if (!result.toLowerCase().includes('documentary') && !result.toLowerCase().includes('35mm')) {
+    result = STYLE_PREFIX + result;
+  }
+  if (!result.toLowerCase().includes('no text')) {
+    result += NEGATIVE_PROMPT_SUFFIX;
+  }
+  return result;
 }
 
 /**
@@ -50,7 +59,7 @@ export async function generateImage(
 
   const replicate = new Replicate({ auth: replicateToken });
   const modelId = MODEL_IDS[model];
-  const safePrompt = appendNegativePrompt(prompt);
+  const safePrompt = stylizePrompt(prompt);
 
   const input: Record<string, unknown> =
     model === 'flux-pro'

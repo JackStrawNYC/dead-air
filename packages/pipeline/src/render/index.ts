@@ -4,6 +4,9 @@ export type { EpisodeProps, SegmentProps, BuildOptions } from './composition-bui
 export { renderEpisode } from './renderer.js';
 export type { RenderOptions, RenderResult } from './renderer.js';
 
+export { renderEpisodeOnLambda } from './lambda-renderer.js';
+export type { LambdaRenderOptions, LambdaRenderResult } from './lambda-renderer.js';
+
 export { postProcess } from './post-process.js';
 export type { PostProcessOptions } from './post-process.js';
 

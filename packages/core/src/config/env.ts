@@ -5,6 +5,9 @@ export const envSchema = z.object({
   ARCHIVE_ORG_EMAIL: z.string().optional(),
   ARCHIVE_ORG_PASSWORD: z.string().optional(),
 
+  // Flickr (free API key from flickr.com/services/api/)
+  FLICKR_API_KEY: z.string().optional(),
+
   // AI Services
   OPENAI_API_KEY: z.string().optional(),
   ANTHROPIC_API_KEY: z.string().optional(),
@@ -33,6 +36,11 @@ export const envSchema = z.object({
 
   // Remotion
   REMOTION_CONCURRENCY: z.coerce.number().int().min(1).default(1),
+
+  // AWS (for Remotion Lambda rendering)
+  REMOTION_AWS_ACCESS_KEY_ID: z.string().optional(),
+  REMOTION_AWS_SECRET_ACCESS_KEY: z.string().optional(),
+  REMOTION_AWS_REGION: z.string().default('us-east-1'),
 
   // General
   NODE_ENV: z

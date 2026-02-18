@@ -82,6 +82,7 @@ Your image prompts will be sent to AI image generators. They MUST produce images
 ### MANDATORY STYLE RULES
 - **Always specify the actual venue, era, and setting.** "Interior of Barton Hall gymnasium, Cornell University, 1977" not "a concert venue."
 - **Always include**: "vintage 1970s documentary photography, warm film grain, realistic, 35mm film look"
+- **NEVER name or depict specific real people** (Jerry Garcia, Bob Weir, Phil Lesh, Bill Kreutzmann, Mickey Hart, etc.) in scenePrompts. AI-generated portraits of real people look terrible. Instead, describe anonymous musicians, silhouettes, hands on instruments, crowd reactions, venue details, and atmospheric shots. Good: "guitarist's hands on fretboard, warm spotlight." Bad: "Jerry Garcia playing guitar on stage."
 - **Never include abstract, cosmic, or psychedelic imagery** UNLESS the song is literally Space, Dark Star, or a psychedelic jam.
 - **Never describe text, tickets, posters, signage, or documents** — AI generators produce garbled text that looks terrible.
 - **Every prompt must end with**: "no text, no words, no letters, no writing, no signs, no logos"

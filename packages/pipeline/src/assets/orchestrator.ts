@@ -15,6 +15,9 @@ import { searchArchivalAssets, downloadArchivalAsset } from './archival-fetcher.
 import { generateVideoBatch, generateMotionPrompt } from './video-generator.js';
 import type { VideoBatchItem } from './video-generator.js';
 import { searchWikimediaImages, downloadWikimediaImage } from './wikimedia-client.js';
+import { searchFlickrImages, downloadFlickrImage } from './flickr-client.js';
+import { searchLocImages, downloadLocImage } from './loc-client.js';
+import { searchUcscArchive, downloadCalisphereImage } from './ucsc-archive-client.js';
 
 const log = createLogger('assets:orchestrator');
 
@@ -26,6 +29,7 @@ export interface AssetGenOptions {
   dataDir: string;
   replicateToken: string;
   xaiApiKey?: string;
+  flickrApiKey?: string;
   elevenlabsKey: string;
   elevenlabsVoiceId: string;
   concurrency?: number;
@@ -119,6 +123,7 @@ export async function orchestrateAssetGeneration(
     dataDir,
     replicateToken,
     xaiApiKey,
+    flickrApiKey,
     elevenlabsKey,
     elevenlabsVoiceId,
     concurrency = 3,
@@ -579,7 +584,106 @@ export async function orchestrateAssetGeneration(
     }
   }
 
-  // 11. Update episode status
+  // 11. Search Flickr CC for concert photography (best effort)
+  if (!skipArchival && flickrApiKey) {
+    try {
+      const show = db
+        .prepare('SELECT venue, city, state FROM shows WHERE id = ?')
+        .get(episode.show_id as string) as Record<string, string> | undefined;
+
+      const year = (episode.show_id as string)?.split('-')[0];
+      const flickrImages = await searchFlickrImages({
+        apiKey: flickrApiKey,
+        venue: show?.venue,
+        year,
+        maxResults: 20,
+      });
+
+      const flickrDir = resolve(assetDir, 'archival', 'flickr');
+      if (!existsSync(flickrDir)) mkdirSync(flickrDir, { recursive: true });
+
+      for (let i = 0; i < flickrImages.length; i++) {
+        const img = flickrImages[i];
+        const destPath = resolve(flickrDir, `flickr-${String(i).padStart(2, '0')}.jpg`);
+
+        const buffer = await downloadFlickrImage(img.url);
+        if (buffer) {
+          writeFileSync(destPath, buffer);
+          result.archival.push({ filePath: destPath, title: `Flickr: ${img.title} (${img.ownerName})` });
+          result.totalAssets++;
+        }
+      }
+
+      log.info(`Flickr: downloaded ${flickrImages.length} CC-licensed concert photos`);
+    } catch (err) {
+      log.warn(`Flickr fetch error: ${(err as Error).message}`);
+    }
+  } else if (!skipArchival && !flickrApiKey) {
+    log.info('Flickr skipped: no FLICKR_API_KEY set (get one free at flickr.com/services/api/)');
+  }
+
+  // 12. Search Library of Congress for public domain imagery (best effort)
+  if (!skipArchival) {
+    try {
+      const show = db
+        .prepare('SELECT venue, city, state FROM shows WHERE id = ?')
+        .get(episode.show_id as string) as Record<string, string> | undefined;
+
+      const year = (episode.show_id as string)?.split('-')[0];
+      const locImages = await searchLocImages({
+        venue: show?.venue,
+        year,
+        maxResults: 15,
+      });
+
+      const locDir = resolve(assetDir, 'archival', 'loc');
+      if (!existsSync(locDir)) mkdirSync(locDir, { recursive: true });
+
+      for (let i = 0; i < locImages.length; i++) {
+        const img = locImages[i];
+        const destPath = resolve(locDir, `loc-${String(i).padStart(2, '0')}.jpg`);
+
+        const buffer = await downloadLocImage(img.url);
+        if (buffer) {
+          writeFileSync(destPath, buffer);
+          result.archival.push({ filePath: destPath, title: `LOC: ${img.title}` });
+          result.totalAssets++;
+        }
+      }
+
+      log.info(`LOC: downloaded ${locImages.length} public domain images`);
+    } catch (err) {
+      log.warn(`LOC fetch error: ${(err as Error).message}`);
+    }
+  }
+
+  // 13. Search UCSC Grateful Dead Archive via Calisphere (best effort)
+  if (!skipArchival) {
+    try {
+      const ucscImages = await searchUcscArchive({ maxResults: 15 });
+
+      const ucscDir = resolve(assetDir, 'archival', 'ucsc');
+      if (!existsSync(ucscDir)) mkdirSync(ucscDir, { recursive: true });
+
+      for (let i = 0; i < ucscImages.length; i++) {
+        const img = ucscImages[i];
+        const destPath = resolve(ucscDir, `ucsc-${String(i).padStart(2, '0')}.jpg`);
+
+        const buffer = await downloadCalisphereImage(img.url);
+        if (buffer) {
+          writeFileSync(destPath, buffer);
+          result.archival.push({ filePath: destPath, title: `UCSC: ${img.title}` });
+          result.totalAssets++;
+        }
+      }
+
+      log.info(`UCSC/Calisphere: downloaded ${ucscImages.length} archival images`);
+    } catch (err) {
+      log.warn(`UCSC archive fetch error: ${(err as Error).message}`);
+    }
+  }
+
+  // 14. Update episode status
   const finalStatus =
     result.narrations.length === 0 && narrationKeys.length > 0
       ? 'failed'

@@ -126,32 +126,24 @@ function resolveArchivalImages(episodeId: string, dataDir: string): string[] {
 
   const images: string[] = [];
 
-  // Scan top-level archival dir
-  try {
-    const files = readdirSync(archivalDir);
-    for (const file of files) {
-      if (/\.(jpg|jpeg|png|gif)$/i.test(file)) {
-        images.push(`assets/${episodeId}/archival/${file}`);
-      }
-    }
-  } catch {
-    // ignore
-  }
-
-  // Scan wikimedia subdir
-  const wikiDir = resolve(archivalDir, 'wikimedia');
-  if (existsSync(wikiDir)) {
+  // Scan all archival subdirectories (flickr, wikimedia, loc, ucsc, top-level)
+  const scanDir = (dir: string, relPrefix: string): void => {
+    if (!existsSync(dir)) return;
     try {
-      const wikiFiles = readdirSync(wikiDir);
-      for (const file of wikiFiles) {
-        if (/\.(jpg|jpeg|png|gif)$/i.test(file)) {
-          images.push(`assets/${episodeId}/archival/wikimedia/${file}`);
+      const entries = readdirSync(dir, { withFileTypes: true });
+      for (const entry of entries) {
+        if (entry.isDirectory()) {
+          scanDir(resolve(dir, entry.name), `${relPrefix}/${entry.name}`);
+        } else if (/\.(jpg|jpeg|png|gif)$/i.test(entry.name)) {
+          images.push(`assets/${episodeId}/archival${relPrefix}/${entry.name}`);
         }
       }
     } catch {
       // ignore
     }
-  }
+  };
+
+  scanDir(archivalDir, '');
 
   return images;
 }
@@ -386,9 +378,19 @@ export async function buildCompositionProps(options: BuildOptions): Promise<Epis
     const seg = script.segments[i];
     let images = resolveImages(seg, episodeId, i, dataDir);
 
-    // Interleave archival images into narration and context segments
-    if (seg.type === 'narration' || seg.type === 'context_text') {
-      images = interleaveArchival(images, archivalImages.slice(0, 3));
+    // Interleave archival images into visual segments, or use them directly if no AI images
+    if (seg.type === 'narration' || seg.type === 'context_text' || seg.type === 'concert_audio') {
+      if (images.length === 0 && archivalImages.length > 0) {
+        // No AI-generated images — use archival images directly, cycling through them
+        const offset = i * 3; // stagger so each segment gets different photos
+        const slice: string[] = [];
+        for (let j = 0; j < 5; j++) {
+          slice.push(archivalImages[(offset + j) % archivalImages.length]);
+        }
+        images = slice;
+      } else {
+        images = interleaveArchival(images, archivalImages);
+      }
     }
 
     const mood = seg.visual?.mood ?? 'warm';

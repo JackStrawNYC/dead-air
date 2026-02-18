@@ -6,15 +6,30 @@ import { COLORS } from '../styles/themes';
 interface WaveformBarProps {
   energyData: number[];
   colorAccent?: string;
+  secondaryColor?: string;
   height?: number;
 }
 
 const BAR_COUNT = 64;
 const FADE_FRAMES = 30;
 
+function lerpColor(a: string, b: string, t: number): string {
+  const parseHex = (hex: string) => {
+    const h = hex.replace('#', '');
+    return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+  };
+  const [r1, g1, b1] = parseHex(a);
+  const [r2, g2, b2] = parseHex(b);
+  const r = Math.round(r1 + (r2 - r1) * t);
+  const g = Math.round(g1 + (g2 - g1) * t);
+  const bl = Math.round(b1 + (b2 - b1) * t);
+  return `rgb(${r},${g},${bl})`;
+}
+
 export const WaveformBar: React.FC<WaveformBarProps> = ({
   energyData,
   colorAccent = COLORS.accent,
+  secondaryColor,
   height = 60,
 }) => {
   const frame = useCurrentFrame();
@@ -73,13 +88,17 @@ export const WaveformBar: React.FC<WaveformBarProps> = ({
 
           const barHeight = Math.max(2, normalized * height);
 
+          const barColor = secondaryColor
+            ? lerpColor(secondaryColor, colorAccent, i / (BAR_COUNT - 1))
+            : colorAccent;
+
           return (
             <div
               key={i}
               style={{
                 width: `${80 / BAR_COUNT}%`,
                 height: barHeight,
-                backgroundColor: colorAccent,
+                backgroundColor: barColor,
                 opacity: 0.6 + normalized * 0.4,
                 borderRadius: 1,
               }}

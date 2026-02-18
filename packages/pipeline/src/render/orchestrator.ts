@@ -2,6 +2,7 @@ import type Database from 'better-sqlite3';
 import { createLogger, logCost } from '@dead-air/core';
 import { buildCompositionProps } from './composition-builder.js';
 import { renderEpisode } from './renderer.js';
+import { renderEpisodeOnLambda } from './lambda-renderer.js';
 import { postProcess } from './post-process.js';
 
 const log = createLogger('render:orchestrator');
@@ -13,6 +14,9 @@ export interface RenderPipelineOptions {
   concurrency?: number;
   skipPost?: boolean;
   dryRun?: boolean;
+  lambda?: boolean;
+  lambdaRegion?: string;
+  skipDeploy?: boolean;
 }
 
 export interface RenderPipelineResult {
@@ -27,7 +31,11 @@ export interface RenderPipelineResult {
 export async function orchestrateRender(
   options: RenderPipelineOptions,
 ): Promise<RenderPipelineResult> {
-  const { episodeId, db, dataDir, concurrency = 4, skipPost = false, dryRun = false } = options;
+  const {
+    episodeId, db, dataDir, concurrency = 4,
+    skipPost = false, dryRun = false,
+    lambda = false, lambdaRegion, skipDeploy = false,
+  } = options;
 
   log.info(`=== Render pipeline: ${episodeId} ===`);
 
@@ -53,16 +61,36 @@ export async function orchestrateRender(
   }
 
   // Step 2: Render video
-  log.info('Step 2/4: Rendering video...');
-  const renderResult = await renderEpisode({ props, dataDir, concurrency });
+  let renderOutputPath: string;
+  let durationSec: number;
+  let renderCost = 0;
+
+  if (lambda) {
+    log.info('Step 2/4: Rendering on AWS Lambda...');
+    const lambdaResult = await renderEpisodeOnLambda({
+      props,
+      dataDir,
+      region: lambdaRegion,
+      skipDeploy,
+    });
+    renderOutputPath = lambdaResult.outputPath;
+    durationSec = lambdaResult.durationSec;
+    renderCost = lambdaResult.cost;
+    log.info(`Lambda render: ${lambdaResult.lambdasInvoked} lambdas, $${renderCost.toFixed(4)}`);
+  } else {
+    log.info('Step 2/4: Rendering locally...');
+    const localResult = await renderEpisode({ props, dataDir, concurrency });
+    renderOutputPath = localResult.outputPath;
+    durationSec = localResult.durationSec;
+  }
 
   // Step 3: Post-process
-  let finalPath = renderResult.outputPath;
+  let finalPath = renderOutputPath;
   if (!skipPost) {
     log.info('Step 3/4: Post-processing (loudness normalization)...');
-    const outputPath = renderResult.outputPath.replace('-raw.mp4', '.mp4');
+    const outputPath = renderOutputPath.replace('-raw.mp4', '.mp4');
     finalPath = await postProcess({
-      inputPath: renderResult.outputPath,
+      inputPath: renderOutputPath,
       outputPath,
     });
   } else {
@@ -73,23 +101,23 @@ export async function orchestrateRender(
   log.info('Step 4/4: Updating database...');
   db.prepare(
     'UPDATE episodes SET render_path = ?, duration_seconds = ?, current_stage = ?, status = ? WHERE id = ?',
-  ).run(finalPath, Math.round(renderResult.durationSec), 'rendered', 'rendered', episodeId);
+  ).run(finalPath, Math.round(durationSec), 'rendered', 'rendered', episodeId);
 
   logCost(db, {
     episodeId,
-    service: 'remotion',
+    service: lambda ? 'remotion-lambda' : 'remotion',
     operation: 'render',
-    cost: 0, // Local render, no API cost
+    cost: renderCost,
   });
 
-  log.info(`=== Render complete: ${finalPath} (${renderResult.durationSec.toFixed(1)}s) ===`);
+  log.info(`=== Render complete: ${finalPath} (${durationSec.toFixed(1)}s) ===`);
 
   return {
     episodeId,
     propsPath,
-    rawPath: renderResult.outputPath,
+    rawPath: renderOutputPath,
     finalPath,
-    durationSec: renderResult.durationSec,
+    durationSec,
     totalFrames: props.totalDurationInFrames,
   };
 }

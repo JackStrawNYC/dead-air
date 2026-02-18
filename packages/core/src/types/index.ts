@@ -215,6 +215,7 @@ export interface DeadAirConfig {
     anthropicKey?: string;
     replicateToken?: string;
     xaiApiKey?: string;
+    flickrApiKey?: string;
     elevenlabsKey?: string;
     elevenlabsVoiceId?: string;
     setlistfmKey?: string;
@@ -226,5 +227,10 @@ export interface DeadAirConfig {
   };
   remotion: {
     concurrency: number;
+  };
+  aws: {
+    accessKeyId?: string;
+    secretAccessKey?: string;
+    region: string;
   };
 }
