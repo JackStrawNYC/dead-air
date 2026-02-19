@@ -144,7 +144,7 @@ export async function orchestrateScript(
   let totalOutputTokens = 0;
 
   for (let attempt = 0; attempt < 2; attempt++) {
-    const maxTokens = attempt === 0 ? 16000 : 24000;
+    const maxTokens = attempt === 0 ? 32000 : 48000;
 
     const response = await withRetry(
       () => client.messages.create({ model, max_tokens: maxTokens, system: DEAD_AIR_SYSTEM_PROMPT, messages }),

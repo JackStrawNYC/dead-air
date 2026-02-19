@@ -69,13 +69,13 @@ Respond with ONLY valid JSON matching this exact structure. No markdown fences, 
 
 2. **Narration length**: Each narration script must be speakable in the stated time. Budget ~2.5 words per second. introNarration: 150-220 words. setBreakNarration: 75-150 words. outroNarration: 40-75 words.
 
-3. **Concert excerpts**: Feature 8-12 song excerpts total. Do NOT excerpt every song — be selective. Focus on peak energy moments, famous versions, segues, and songs that serve the narrative. Each excerpt should be 45-120 seconds (sweet spot 60-90s; reserve 120s for THE peak moment only). No excerpt should exceed 120 seconds. Include 12-18 textLines per concert_audio segment covering: song origin, musical analysis, band spotlights, crowd reactions, trivia, lyric callouts, comment bait. Never leave more than 8 seconds without a text overlay during concert audio. These display as overlays while the music plays and keep viewers engaged.
+3. **Concert excerpts**: Feature EVERY song from the setlist — do not skip any songs. Each excerpt should be 45-120 seconds (sweet spot 60-90s; reserve 120s for THE peak moment only). For shorter or less notable songs, use 45-60s. For highlights and jams, use 75-120s. No excerpt should exceed 120 seconds. Include 8-15 textLines per concert_audio segment covering: song origin, musical analysis, band spotlights, crowd reactions, trivia, lyric callouts, comment bait. Never leave more than 8 seconds without a text overlay during concert audio. These display as overlays while the music plays and keep viewers engaged.
 
 4. **startTimeInSong**: Start 5-10 seconds before the interesting moment, not at 0:00, unless it is a cold open or the song begins with an iconic riff. Use the peak moment timestamps and energy data to find the best entry points.
 
 5. **Segues**: If the setlist contains segue pairs (isSegue: true), feature at least one segue transition as a single excerpt spanning the transition point.
 
-6. **Episode duration**: Target 15-25 minutes total. Concert audio should be 60-70% of runtime. Narration + context_text fills the rest.
+6. **Episode duration**: Target 30-50 minutes total to cover the full show. Concert audio should be 65-75% of runtime. Narration + context_text fills the rest. Longer episodes are fine — this is a deep documentary, not a highlight reel.
 
 7. **visualIntensity**: Track musical energy. 0.2-0.4 for ballads and narration. 0.6-0.8 for upbeat songs. 0.9-1.0 for peak moments only.
 
