@@ -22,6 +22,7 @@ async function main() {
       dataDir: config.paths.data,
       apiKey: config.api.anthropicKey!,
       model: 'claude-sonnet-4-5-20250929',
+      setlistfmKey: config.api.setlistfmKey,
     });
     console.log(`Research: ${research.cached ? 'cached' : `$${research.cost.toFixed(4)}`}`);
   } catch (err) {

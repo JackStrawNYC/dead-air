@@ -128,7 +128,7 @@ export async function orchestrateResearch(
   }
 
   // Fetch real external data before calling Claude
-  const archiveId = overrideArchiveId ?? metadata.archiveOrgIdentifier ?? metadata.archiveId ?? '';
+  const archiveId = overrideArchiveId ?? metadata.archiveOrgIdentifier ?? metadata.archiveId ?? (show.recording_id as string) ?? '';
   let archiveReviews: ArchiveReview[] = [];
   let songStats: SongStatistic[] = [];
 
@@ -139,7 +139,7 @@ export async function orchestrateResearch(
 
   if (setlistfmKey && songNames.length > 0) {
     log.info(`Fetching setlist.fm stats for ${songNames.length} songs...`);
-    songStats = await fetchSongStats(songNames, setlistfmKey);
+    songStats = await fetchSongStats(songNames, setlistfmKey, date);
   }
 
   // Build research prompt
