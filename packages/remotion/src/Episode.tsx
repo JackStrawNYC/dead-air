@@ -31,7 +31,14 @@ import { diagonalWipe } from './transitions/diagonal-wipe';
 interface TextLine {
   text: string;
   displayDuration: number;
-  style: 'fact' | 'quote' | 'analysis' | 'transition';
+  style: 'fact' | 'quote' | 'analysis' | 'transition' | 'listenFor' | 'fanQuote';
+}
+
+interface SongDNAData {
+  timesPlayed: number;
+  firstPlayed: string;
+  lastPlayed: string;
+  rank?: string;
 }
 
 export type SegmentProps =
@@ -59,6 +66,7 @@ export type SegmentProps =
       colorPalette: string[];
       energyData?: number[];
       textLines?: TextLine[];
+      songDNA?: SongDNAData;
     }
   | {
       type: 'context_text';
@@ -96,7 +104,7 @@ export interface EpisodeProps {
   tensionDroneSrc?: string;
 }
 
-const CROSSFADE_FRAMES = 15;
+const CROSSFADE_FRAMES = 30;
 
 /**
  * Concert-doc enriched transition selection.
@@ -252,6 +260,7 @@ export const Episode: React.FC<Record<string, unknown>> = (rawProps) => {
                     colorPalette={seg.colorPalette}
                     energyData={seg.energyData}
                     textLines={seg.textLines}
+                    songDNA={seg.songDNA}
                     segmentIndex={i}
                   />
                 );

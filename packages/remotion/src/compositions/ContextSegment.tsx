@@ -9,8 +9,20 @@ import { CinematicGrade, MOOD_GRADE_PRESET } from '../components/CinematicGrade'
 import { ArchivalTexture } from '../components/ArchivalTexture';
 import { BreathingOverlay } from '../components/BreathingOverlay';
 import { FPS, getMoodAccent } from '../styles/themes';
+import { PsychedelicLoop, PsychedelicVariant } from '../components/PsychedelicLoop';
+import { ListenFor } from '../components/ListenFor';
+import { FanQuote } from '../components/FanQuote';
 import { smoothstepVolume } from '../utils/audio';
 import { assignCameraPreset, getCameraSpeed } from '../utils/cameraAssignment';
+
+const MOOD_TO_PSYCHEDELIC: Record<string, PsychedelicVariant> = {
+  psychedelic: 'fractal',
+  cosmic: 'aurora',
+  warm: 'liquid',
+  earthy: 'liquid',
+  electric: 'liquid',
+  dark: 'liquid',
+};
 
 const MOOD_TO_GRADE_START: Record<string, GradeMood> = {
   warm: 'warm', earthy: 'warm', psychedelic: 'warm',
@@ -24,7 +36,7 @@ const MOOD_TO_GRADE_END: Record<string, GradeMood> = {
 interface TextLineProps {
   text: string;
   displayDuration: number;
-  style: 'fact' | 'quote' | 'analysis' | 'transition';
+  style: 'fact' | 'quote' | 'analysis' | 'transition' | 'listenFor' | 'fanQuote';
 }
 
 interface ContextSegmentProps {
@@ -38,8 +50,8 @@ interface ContextSegmentProps {
   segmentIndex?: number;
 }
 
-const FADE_FRAMES = 15;
-const AMBIENT_VOLUME = 0.18;
+const FADE_FRAMES = 45;
+const AMBIENT_VOLUME = 0.28;
 
 export const ContextSegment: React.FC<ContextSegmentProps> = ({
   textLines,
@@ -58,12 +70,13 @@ export const ContextSegment: React.FC<ContextSegmentProps> = ({
     ? smoothstepVolume(frame, durationInFrames, FADE_FRAMES, FADE_FRAMES, AMBIENT_VOLUME)
     : 0;
 
-  // Sequential text layout
-  let cursor = 0;
-  const entries = textLines.map((line) => {
+  // Sequential text layout with breathing gaps
+  const CTX_GAP_FRAMES = Math.round(FPS * 0.5); // 0.5s between context lines
+  let cursor = Math.round(FPS * 0.5); // start at 0.5s
+  const entries = textLines.map((line, idx) => {
     const dur = Math.round(line.displayDuration * FPS);
     const entry = { ...line, startFrame: cursor, durationInFrames: dur };
-    cursor += dur;
+    cursor += dur + (idx < textLines.length - 1 ? CTX_GAP_FRAMES : 0);
     return entry;
   });
 
@@ -79,6 +92,11 @@ export const ContextSegment: React.FC<ContextSegmentProps> = ({
     <CinematicGrade preset={gradePreset}>
       <DynamicGrade startMood={gradeStart} endMood={gradeEnd}>
         <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+          <PsychedelicLoop
+            variant={MOOD_TO_PSYCHEDELIC[mood] ?? 'liquid'}
+            colorPalette={colorPalette}
+            durationInFrames={durationInFrames}
+          />
           <KenBurns
             images={images}
             durationInFrames={durationInFrames}
@@ -93,16 +111,44 @@ export const ContextSegment: React.FC<ContextSegmentProps> = ({
               background: 'linear-gradient(to top, rgba(10,10,10,0.85) 0%, rgba(10,10,10,0.2) 50%, transparent 100%)',
             }}
           />
-          {entries.map((entry, i) => (
-            <TextOverlay
-              key={i}
-              text={entry.text}
-              style={entry.style}
-              startFrame={entry.startFrame}
-              durationInFrames={entry.durationInFrames}
-              colorAccent={accent}
-            />
-          ))}
+          {entries.map((entry, i) => {
+            if (entry.style === 'listenFor') {
+              return (
+                <ListenFor
+                  key={i}
+                  text={entry.text}
+                  startFrame={entry.startFrame}
+                  durationInFrames={entry.durationInFrames}
+                  colorAccent={accent}
+                />
+              );
+            }
+            if (entry.style === 'fanQuote') {
+              const dashMatch = entry.text.match(/^(.+?)\s*[—–-]\s*(.+)$/);
+              const quoteText = dashMatch ? dashMatch[1].replace(/^[""]|[""]$/g, '') : entry.text;
+              const reviewer = dashMatch ? dashMatch[2].replace(/,\s*archive\.org$/i, '') : 'anonymous';
+              return (
+                <FanQuote
+                  key={i}
+                  text={quoteText}
+                  reviewer={reviewer}
+                  startFrame={entry.startFrame}
+                  durationInFrames={entry.durationInFrames}
+                  colorAccent={accent}
+                />
+              );
+            }
+            return (
+              <TextOverlay
+                key={i}
+                text={entry.text}
+                style={entry.style as 'fact' | 'quote' | 'analysis' | 'transition'}
+                startFrame={entry.startFrame}
+                durationInFrames={entry.durationInFrames}
+                colorAccent={accent}
+              />
+            );
+          })}
           {ambientAudioSrc && (
             <Audio
               src={staticFile(ambientAudioSrc)}

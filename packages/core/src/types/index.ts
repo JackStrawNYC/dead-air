@@ -103,6 +103,33 @@ export interface EpisodeScript {
   shortsMoments: ShortsMoment[];
 }
 
+export interface SongDNAData {
+  timesPlayed: number;
+  firstPlayed: string;   // "1966" or "March 1966"
+  lastPlayed: string;
+  rank?: string;          // "This version: #198 of 271"
+}
+
+export interface ArchiveReview {
+  reviewer: string;
+  rating: number;         // 1-5 stars
+  text: string;           // truncated to ~200 chars
+  date?: string;
+}
+
+export interface SongStatistic {
+  songName: string;
+  timesPlayed: number;
+  firstPlayed: string;    // ISO date
+  lastPlayed: string;     // ISO date
+}
+
+export interface ListenForMoment {
+  songName: string;
+  timestampSec: number;
+  description: string;    // "Listen for Phil's bass run steering into Space"
+}
+
 export interface EpisodeSegment {
   type: 'narration' | 'concert_audio' | 'context_text';
   narrationKey?: 'intro' | 'set_break' | 'outro';
@@ -110,6 +137,7 @@ export interface EpisodeSegment {
   startTimeInSong?: number;
   excerptDuration?: number;
   textLines?: TextLine[];
+  songDNA?: SongDNAData;
   visual: {
     scenePrompts: string[];
     colorPalette: string[];
@@ -122,7 +150,7 @@ export interface EpisodeSegment {
 export interface TextLine {
   text: string;
   displayDuration: number;
-  style: 'fact' | 'quote' | 'analysis' | 'transition';
+  style: 'fact' | 'quote' | 'analysis' | 'transition' | 'listenFor' | 'fanQuote';
 }
 
 export interface ShortsMoment {

@@ -4,7 +4,8 @@ import { execFile } from 'child_process';
 import { promisify } from 'util';
 import type Database from 'better-sqlite3';
 import { createLogger } from '@dead-air/core';
-import type { EpisodeScript, EpisodeSegment, AudioAnalysis } from '@dead-air/core';
+import type { EpisodeScript, EpisodeSegment, AudioAnalysis, SongDNAData } from '@dead-air/core';
+import type { ShowResearch } from '../research/index.js';
 
 const execFileAsync = promisify(execFile);
 const log = createLogger('render:composition-builder');
@@ -14,7 +15,7 @@ const BRAND_INTRO_FRAMES = 150; // 5 seconds
 const COLD_OPEN_FRAMES = 240; // 8 seconds (upgraded from 3s)
 const END_SCREEN_FRAMES = 600; // 20 seconds
 const CHAPTER_CARD_FRAMES = 60; // 2 seconds
-const CROSSFADE_FRAMES = 15; // 15-frame overlap between segments
+const CROSSFADE_FRAMES = 30; // 30-frame overlap (1s) between segments
 
 export interface EpisodeProps {
   episodeId: string;
@@ -48,6 +49,7 @@ export type SegmentProps =
       colorPalette: string[];
       energyData?: number[];
       textLines?: { text: string; displayDuration: number; style: string }[];
+      songDNA?: SongDNAData;
     }
   | {
       type: 'context_text';
@@ -173,13 +175,23 @@ function interleaveArchival(images: string[], archival: string[], every = 3): st
  */
 function padImages(images: string[], durationInFrames: number): string[] {
   if (images.length === 0) return images;
-  const framesPerImage = 8 * FPS; // 240 frames = 8s per image
+  const framesPerImage = 5 * FPS; // 150 frames = 5s per image
   const targetCount = Math.ceil(durationInFrames / framesPerImage);
   if (images.length >= targetCount) return images;
 
   const padded: string[] = [];
   for (let i = 0; i < targetCount; i++) {
-    padded.push(images[i % images.length]);
+    if (i < images.length) {
+      padded.push(images[i]);
+    } else {
+      // Alternate between cycling real images and procedural slots
+      const cycleIndex = i - images.length;
+      if (cycleIndex % 2 === 1) {
+        padded.push('__procedural__');
+      } else {
+        padded.push(images[cycleIndex % images.length]);
+      }
+    }
   }
   return padded;
 }
@@ -324,7 +336,15 @@ export async function buildCompositionProps(options: BuildOptions): Promise<Epis
     log.warn(`No analysis found at ${analysisPath}`);
   }
 
-  // 3. Resolve archival images for interleaving
+  // 3. Load research for songDNA
+  const researchPath = resolve(dataDir, 'research', showId, 'research.json');
+  let research: ShowResearch | null = null;
+  if (existsSync(researchPath)) {
+    research = JSON.parse(readFileSync(researchPath, 'utf-8')) as ShowResearch;
+    log.info(`Loaded research data (${research.songStats?.length ?? 0} song stats)`);
+  }
+
+  // 4. Resolve archival images for interleaving
   const archivalImages = resolveArchivalImages(episodeId, dataDir);
   log.info(`Found ${archivalImages.length} archival images for interleaving`);
 
@@ -453,6 +473,17 @@ export async function buildCompositionProps(options: BuildOptions): Promise<Epis
 
       const energyData = analysis ? findEnergyData(seg.songName, analysis) : undefined;
 
+      // Resolve songDNA from script or research
+      const scriptSongDNA = seg.songDNA;
+      const researchStats = research?.songStats?.find(
+        (s) => s.songName.toLowerCase() === seg.songName!.toLowerCase(),
+      );
+      const songDNA: SongDNAData | undefined = scriptSongDNA ?? (researchStats ? {
+        timesPlayed: researchStats.timesPlayed,
+        firstPlayed: researchStats.firstPlayed,
+        lastPlayed: researchStats.lastPlayed,
+      } : undefined);
+
       const computedStartFrom = Math.round(startTimeSec * FPS);
       const concertDurationFrames = Math.ceil(excerptDuration * FPS);
       segments.push({
@@ -470,6 +501,7 @@ export async function buildCompositionProps(options: BuildOptions): Promise<Epis
           displayDuration: l.displayDuration,
           style: l.style,
         })),
+        songDNA,
       });
 
       lastConcertAudioSrc = audioSrc;

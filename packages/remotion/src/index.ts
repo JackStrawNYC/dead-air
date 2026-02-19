@@ -27,6 +27,8 @@ export { SetlistProgress } from './components/SetlistProgress';
 export type { SongPosition } from './components/SetlistProgress';
 export { VinylNoise } from './components/VinylNoise';
 export { ParallaxBg } from './components/ParallaxBg';
+export { PsychedelicLoop } from './components/PsychedelicLoop';
+export type { PsychedelicVariant } from './components/PsychedelicLoop';
 export { CinematicGrade, MOOD_GRADE_PRESET } from './components/CinematicGrade';
 export type { GradePreset } from './components/CinematicGrade';
 export { SegmentErrorBoundary } from './components/SegmentErrorBoundary';
@@ -35,6 +37,14 @@ export { DuckedBGM } from './components/DuckedBGM';
 export { AmbientBed } from './components/AmbientBed';
 export { TensionDrone } from './components/TensionDrone';
 export type { DroneType } from './components/TensionDrone';
+export { SongDNA } from './components/SongDNA';
+export type { SongDNAProps } from './components/SongDNA';
+export { ListenFor } from './components/ListenFor';
+export type { ListenForProps } from './components/ListenFor';
+export { FanQuote } from './components/FanQuote';
+export type { FanQuoteProps } from './components/FanQuote';
+export { EnergyPreview } from './components/EnergyPreview';
+export type { EnergyPreviewProps } from './components/EnergyPreview';
 
 // Transitions
 export { whipPan } from './transitions/whip-pan';
@@ -59,7 +69,7 @@ export { ShortsComposition } from './compositions/ShortsComposition';
 
 // Utils
 export { sampleEnergy, normalizeEnergy } from './utils/energy';
-export { smoothstepVolume, jCutVolume } from './utils/audio';
+export { smoothstepVolume, jCutVolume, concertFadeVolume } from './utils/audio';
 export { computeSilenceFactor, computePreSwellFactor } from './utils/silenceWindows';
 export type { SilenceWindow, PreSwellWindow } from './utils/silenceWindows';
 export { assignCameraPreset, getCameraSpeed } from './utils/cameraAssignment';

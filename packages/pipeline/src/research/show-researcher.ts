@@ -3,6 +3,9 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { resolve } from 'path';
 import type Database from 'better-sqlite3';
 import { createLogger, logCost } from '@dead-air/core';
+import type { ArchiveReview, SongStatistic, ListenForMoment } from '@dead-air/core';
+import { fetchArchiveReviews } from './archive-reviews.js';
+import { fetchSongStats } from './song-stats.js';
 
 const log = createLogger('research:show-researcher');
 
@@ -15,6 +18,8 @@ export interface ResearchOptions {
   apiKey: string;
   model?: string;
   force?: boolean;
+  setlistfmKey?: string;
+  archiveId?: string;
 }
 
 export interface ShowResearch {
@@ -26,6 +31,9 @@ export interface ShowResearch {
   songHistories: SongHistory[];
   fanConsensus: string;
   venueHistory: string;
+  archiveReviews?: ArchiveReview[];
+  songStats?: SongStatistic[];
+  listenForMoments?: ListenForMoment[];
 }
 
 export interface SongHistory {
@@ -64,6 +72,12 @@ Respond with ONLY valid JSON matching this structure. No markdown, no preamble.
   "venueHistory": "1 paragraph about the venue itself — its significance, memorable shows there, acoustics, capacity."
 }
 
+If the input includes "archiveReviews", use these real fan quotes from archive.org — attribute them by reviewer name. These are authentic audience reactions.
+
+If the input includes "songStatistics", use these for accurate play counts — DO NOT invent numbers. Reference exact counts like "Played 271 times between 1966 and 1995."
+
+Generate 3-5 "listenForMoments" in the JSON output: specific musical moments to direct viewer attention during playback. Each should have songName, timestampSec (approximate seconds into the song), and description (e.g. "Listen for Phil's bass run steering into Space"). Focus on instrument entries, tempo changes, segue transitions, and crowd reactions.
+
 Be specific. Use actual dates, song names, and details from your knowledge. If you're unsure about something, say so rather than fabricating. Focus on details that would make compelling documentary narration.`;
 
 // ── Main ──
@@ -78,6 +92,8 @@ export async function orchestrateResearch(
     apiKey,
     model = 'claude-sonnet-4-5-20250929',
     force = false,
+    setlistfmKey,
+    archiveId: overrideArchiveId,
   } = options;
 
   const researchDir = resolve(dataDir, 'research', date);
@@ -111,6 +127,21 @@ export async function orchestrateResearch(
     songNames = setlist.map((s: { songName: string }) => s.songName);
   }
 
+  // Fetch real external data before calling Claude
+  const archiveId = overrideArchiveId ?? metadata.archiveOrgIdentifier ?? metadata.archiveId ?? '';
+  let archiveReviews: ArchiveReview[] = [];
+  let songStats: SongStatistic[] = [];
+
+  if (archiveId) {
+    log.info(`Fetching archive.org reviews for ${archiveId}...`);
+    archiveReviews = await fetchArchiveReviews(archiveId);
+  }
+
+  if (setlistfmKey && songNames.length > 0) {
+    log.info(`Fetching setlist.fm stats for ${songNames.length} songs...`);
+    songStats = await fetchSongStats(songNames, setlistfmKey);
+  }
+
   // Build research prompt
   const userMessage = JSON.stringify({
     date,
@@ -122,6 +153,8 @@ export async function orchestrateResearch(
     archiveDescription: metadata.archiveOrgDescription
       ? (metadata.archiveOrgDescription as string).slice(0, 1000)
       : null,
+    archiveReviews: archiveReviews.length > 0 ? archiveReviews : undefined,
+    songStatistics: songStats.length > 0 ? songStats : undefined,
   });
 
   log.info(`Researching show ${date} at ${show.venue}...`);
@@ -148,6 +181,9 @@ export async function orchestrateResearch(
       showId: date,
       generatedAt: new Date().toISOString(),
       ...parsed,
+      archiveReviews: archiveReviews.length > 0 ? archiveReviews : (parsed.archiveReviews ?? []),
+      songStats: songStats.length > 0 ? songStats : (parsed.songStats ?? []),
+      listenForMoments: parsed.listenForMoments ?? [],
     };
   } catch (err) {
     throw new Error(`Failed to parse research response: ${(err as Error).message}`);

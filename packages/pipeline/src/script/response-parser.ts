@@ -9,7 +9,7 @@ const log = createLogger('script:parser');
 const textLineSchema = z.object({
   text: z.string().min(1),
   displayDuration: z.number().min(1).max(30),
-  style: z.enum(['fact', 'quote', 'analysis', 'transition']),
+  style: z.enum(['fact', 'quote', 'analysis', 'transition', 'listenFor', 'fanQuote']),
 });
 
 const visualSchema = z.object({
@@ -19,6 +19,13 @@ const visualSchema = z.object({
   visualIntensity: z.number().min(0).max(1),
 });
 
+const songDNASchema = z.object({
+  timesPlayed: z.number(),
+  firstPlayed: z.string(),
+  lastPlayed: z.string(),
+  rank: z.string().optional(),
+}).optional();
+
 const segmentSchema = z.object({
   type: z.enum(['narration', 'concert_audio', 'context_text']),
   narrationKey: z.enum(['intro', 'set_break', 'outro']).optional(),
@@ -26,6 +33,7 @@ const segmentSchema = z.object({
   startTimeInSong: z.number().min(0).optional(),
   excerptDuration: z.number().min(5).max(300).optional(),
   textLines: z.array(textLineSchema).optional(),
+  songDNA: songDNASchema,
   visual: visualSchema,
 });
 

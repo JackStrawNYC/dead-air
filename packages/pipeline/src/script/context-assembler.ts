@@ -7,6 +7,9 @@ import type {
   SongAnalysisData,
   PeakMoment,
   SetlistSong,
+  ArchiveReview,
+  SongStatistic,
+  ListenForMoment,
 } from '@dead-air/core';
 import type Database from 'better-sqlite3';
 
@@ -43,6 +46,9 @@ export interface ResearchContext {
   }>;
   fanConsensus: string;
   venueHistory: string;
+  archiveReviews?: ArchiveReview[];
+  songStats?: SongStatistic[];
+  listenForMoments?: ListenForMoment[];
 }
 
 export interface SongSummary {
@@ -257,6 +263,9 @@ export function assembleContext(
         songHistories: rawResearch.songHistories ?? [],
         fanConsensus: rawResearch.fanConsensus ?? '',
         venueHistory: rawResearch.venueHistory ?? '',
+        archiveReviews: rawResearch.archiveReviews,
+        songStats: rawResearch.songStats,
+        listenForMoments: rawResearch.listenForMoments,
       };
       log.info(`Loaded research context (${JSON.stringify(research).length} chars)`);
     } catch (err) {

@@ -22,12 +22,18 @@ Respond with ONLY valid JSON matching this exact structure. No markdown fences, 
       "narrationKey": "intro" | "set_break" | "outro" (only for narration segments),
       "songName": "Song Name" (only for concert_audio segments, must match setlist exactly),
       "startTimeInSong": 45 (seconds into the song to begin excerpt),
-      "excerptDuration": 180 (seconds of concert audio to play, 120-240s; let the music breathe),
+      "excerptDuration": 75 (seconds of concert audio to play, 45-120s; sweet spot is 60-90s),
+      "songDNA": {
+        "timesPlayed": 271,
+        "firstPlayed": "1966",
+        "lastPlayed": "1995",
+        "rank": "#198 of 271"
+      },
       "textLines": [
         {
           "text": "On-screen text content",
           "displayDuration": 5 (seconds on screen, 3-10 typical),
-          "style": "fact" | "quote" | "analysis" | "transition"
+          "style": "fact" | "quote" | "analysis" | "transition" | "listenFor" | "fanQuote"
         }
       ],
       "visual": {
@@ -63,7 +69,7 @@ Respond with ONLY valid JSON matching this exact structure. No markdown fences, 
 
 2. **Narration length**: Each narration script must be speakable in the stated time. Budget ~2.5 words per second. introNarration: 150-220 words. setBreakNarration: 75-150 words. outroNarration: 40-75 words.
 
-3. **Concert excerpts**: Feature 6-10 song excerpts total. Do NOT excerpt every song — be selective. Focus on peak energy moments, famous versions, segues, and songs that serve the narrative. Each excerpt should be 120-240 seconds — let the music breathe and give the audience time to feel the jam. Include 5-8 textLines per concert_audio segment: fun facts about the song, when it was first played, notable lyrics, band member highlights, crowd reactions, musical analysis. These display as overlays while the music plays and keep viewers engaged during longer excerpts.
+3. **Concert excerpts**: Feature 8-12 song excerpts total. Do NOT excerpt every song — be selective. Focus on peak energy moments, famous versions, segues, and songs that serve the narrative. Each excerpt should be 45-120 seconds (sweet spot 60-90s; reserve 120s for THE peak moment only). No excerpt should exceed 120 seconds. Include 12-18 textLines per concert_audio segment covering: song origin, musical analysis, band spotlights, crowd reactions, trivia, lyric callouts, comment bait. Never leave more than 8 seconds without a text overlay during concert audio. These display as overlays while the music plays and keep viewers engaged.
 
 4. **startTimeInSong**: Start 5-10 seconds before the interesting moment, not at 0:00, unless it is a cold open or the song begins with an iconic riff. Use the peak moment timestamps and energy data to find the best entry points.
 
@@ -74,6 +80,12 @@ Respond with ONLY valid JSON matching this exact structure. No markdown fences, 
 7. **visualIntensity**: Track musical energy. 0.2-0.4 for ballads and narration. 0.6-0.8 for upbeat songs. 0.9-1.0 for peak moments only.
 
 8. **episodeType**: Use "gateway" for legendary/famous shows (Cornell '77, Veneta '72, etc.). Use "deep_dive" for deep cuts and lesser-known gems.
+
+9. **"Listen for..." moments**: Include 2-3 textLines with style "listenFor" per concert segment. These direct the viewer's attention to specific musical details: instrument entries, tempo changes, segue transitions, crowd reactions. Place them 3-5 seconds BEFORE the moment happens. Use the listenForMoments from research data when available.
+
+10. **Fan quotes**: Include 1-2 textLines with style "fanQuote" per concert segment when archiveReviews are available. Use real quotes from archive.org reviews with attribution. Format: "When that first note hit, the whole balcony stood up" — reviewer_name, archive.org
+
+11. **Song DNA**: For every concert_audio segment, include a songDNA object with real statistics from the songStats data. If exact numbers aren't available, use your best knowledge.
 
 ## VISUAL DIRECTION
 
@@ -105,13 +117,12 @@ Your image prompts will be sent to AI image generators. They MUST produce images
   - Electric/cooler (teals, deep blues, silvers) for electric jams and high-energy moments
   - Dark/muted (navy, charcoal, deep green) for quiet passages and space
   - Rich/saturated (deep golds, warm oranges, burgundy) for peak moments
-- Each image displays for ~8 seconds with a Ken Burns pan/zoom, so the number of scenePrompts MUST scale with segment duration:
-  - Short segments (<20s): 2-3 scenePrompts
-  - Medium segments (20-45s): 4-5 scenePrompts
-  - Long segments (45-90s): 6-8 scenePrompts
-  - Very long segments (90-150s): 10-15 scenePrompts
-  - Extra long segments (150s+): 15-20 scenePrompts
-  CRITICAL: match scenePrompts count to segment duration. A 120s concert segment MUST have 12-15 scenePrompts. A 180s segment needs 18-22. Each image displays for ~8 seconds; do the math. Each prompt should show a DIFFERENT angle or subject — wide shot, close-up, crowd, stage, venue exterior, etc.
+- Each image displays for ~5 seconds with a Ken Burns pan/zoom, so the number of scenePrompts MUST scale with segment duration:
+  - Short segments (<20s): 3-4 scenePrompts
+  - Medium segments (20-45s): 5-9 scenePrompts
+  - Long segments (45-90s): 9-18 scenePrompts
+  - Very long segments (90-120s): 18-24 scenePrompts
+  CRITICAL: match scenePrompts count to segment duration. A 60s concert segment MUST have 12 scenePrompts. A 90s segment needs 18. Each image displays for ~5 seconds; do the math. Each prompt should show a DIFFERENT angle or subject — wide shot, close-up, crowd, stage, venue exterior, etc.
 - **thumbnailPrompt** must be dramatic and work at YouTube thumbnail size — bold, high contrast, iconic imagery of the actual venue/era. Must end with the no-text instruction.
 
 ## RESEARCH CONTEXT
@@ -128,19 +139,27 @@ Weave this research naturally into your narration scripts. Don't just list facts
 
 ## SUGGESTED STRUCTURE
 
-Follow this arc, adapting to each show:
+Enforce a **MUSIC → CONTEXT → MUSIC → CONTEXT** rhythm. Every concert segment should be followed by a context segment (except back-to-back segue pairs). Never go more than 90 seconds without the viewer learning something new. Context segments should bridge: what just happened + what's coming next.
 
 1. narration (intro) — Date, venue, era, why this show matters
-2. context_text — 2-4 historical fact cards
+2. context_text — 4-8 historical fact cards setting the scene
 3. concert_audio — Opening song excerpt (first set opener or crowd-pleaser)
-4. Alternate narration/context_text + concert_audio for 3-5 first set highlights
-5. narration (set_break) — Reflect on first set energy, tease second set
-6. concert_audio + narration — 3-5 second set highlights, building to peak
-7. concert_audio — The peak moment (longest excerpt, highest energy)
-8. narration (outro) — Legacy, significance, subscribe CTA
-9. context_text — Closing facts / "where to listen"
+4. context_text — Bridge: react to opener, tease what's next
+5. concert_audio — First set highlight #1
+6. context_text — Song history, band context, or crowd reaction
+7. concert_audio — First set highlight #2
+8. context_text — Musical analysis or era context
+9. narration (set_break) — Reflect on first set energy, tease second set
+10. concert_audio — Second set opener or highlight
+11. context_text — Bridge into the peak section
+12. concert_audio — Second set highlight (build toward peak)
+13. context_text — Build anticipation for the climax
+14. concert_audio — The peak moment (longest excerpt, up to 120s max)
+15. context_text — React to the peak, legacy context
+16. narration (outro) — Legacy, significance, subscribe CTA
+17. context_text — Closing facts / "where to listen"
 
-Adapt freely based on the show's actual energy and story.
+Adapt freely based on the show's actual energy and story, but maintain the alternating rhythm.
 
 ## ENGAGEMENT HOOKS
 
