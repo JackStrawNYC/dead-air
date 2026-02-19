@@ -505,12 +505,12 @@ export async function buildCompositionProps(options: BuildOptions): Promise<Epis
       const audioRel = narrationMap[seg.narrationKey];
       const audioAbs = resolve(dataDir, audioRel);
 
-      let durationSec = 60; // fallback
-      if (existsSync(audioAbs)) {
-        durationSec = await getAudioDurationSec(audioAbs);
-      } else {
-        log.warn(`Narration not found: ${audioAbs}, using fallback duration`);
+      if (!existsSync(audioAbs)) {
+        log.warn(`Narration audio missing: ${audioAbs} — skipping narration segment`);
+        continue;
       }
+
+      const durationSec = await getAudioDurationSec(audioAbs);
 
       const narDurationFrames = Math.ceil(durationSec * FPS);
       segments.push({
@@ -543,6 +543,11 @@ export async function buildCompositionProps(options: BuildOptions): Promise<Epis
           log.warn(`Concert audio not found for "${seg.songName}" — skipping segment`);
           continue;
         }
+      }
+
+      if (!audioSrc) {
+        log.warn(`Skipping concert_audio "${seg.songName}" — no audio source (analysis missing?)`);
+        continue;
       }
 
       const energyData = analysis ? findEnergyData(seg.songName, analysis) : undefined;

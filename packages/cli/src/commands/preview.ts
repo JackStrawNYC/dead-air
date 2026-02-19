@@ -42,22 +42,21 @@ export function registerPreviewCommand(program: Command): void {
         '..', '..', '..', 'remotion',
       );
 
+      const propsPath = resolve(
+        config.paths.data,
+        'renders',
+        resolvedId,
+        'props.json',
+      );
+
       console.log(`Launching Remotion Studio on port ${options.port}...`);
       const studio = spawn(
         'npx',
-        ['remotion', 'studio', '--port', options.port],
+        ['remotion', 'studio', '--port', options.port, '--props', propsPath],
         {
           cwd: remotionDir,
           stdio: 'inherit',
-          env: {
-            ...process.env,
-            REMOTION_INPUT_PROPS: resolve(
-              config.paths.data,
-              'renders',
-              resolvedId,
-              'props.json',
-            ),
-          },
+          env: { ...process.env },
         },
       );
 
