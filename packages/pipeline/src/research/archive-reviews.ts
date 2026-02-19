@@ -61,3 +61,46 @@ export async function fetchArchiveReviews(identifier: string): Promise<ArchiveRe
     return [];
   }
 }
+
+interface ArchiveSearchResponse {
+  response?: {
+    docs?: Array<{
+      identifier: string;
+      num_reviews?: number;
+    }>;
+  };
+}
+
+/**
+ * Search archive.org for the Grateful Dead recording with the most reviews for a given date.
+ * Returns the identifier, or null if nothing found.
+ */
+export async function findBestReviewedIdentifier(showDate: string): Promise<string | null> {
+  try {
+    await rateLimit();
+
+    const query = encodeURIComponent(`collection:GratefulDead AND date:${showDate}`);
+    const url = `https://archive.org/advancedsearch.php?q=${query}&fl[]=identifier,num_reviews&sort[]=num_reviews+desc&rows=5&output=json`;
+    log.info(`Searching for best-reviewed recording for ${showDate}`);
+
+    const response = await fetch(url);
+    if (!response.ok) {
+      log.warn(`Archive.org search failed: ${response.status} ${response.statusText}`);
+      return null;
+    }
+
+    const data = (await response.json()) as ArchiveSearchResponse;
+    const docs = data.response?.docs;
+    if (!docs || docs.length === 0) {
+      log.info(`No recordings found for ${showDate}`);
+      return null;
+    }
+
+    const best = docs[0];
+    log.info(`Best-reviewed recording: ${best.identifier} (${best.num_reviews ?? 0} reviews)`);
+    return best.identifier;
+  } catch (err) {
+    log.warn(`Failed to search archive.org: ${(err as Error).message}`);
+    return null;
+  }
+}

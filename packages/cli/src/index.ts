@@ -8,6 +8,7 @@ import { registerPublishCommand } from './commands/publish.js';
 import { registerStatusCommand } from './commands/status.js';
 import { registerIngestCommand } from './commands/ingest.js';
 import { registerAnalyzeCommand } from './commands/analyze.js';
+import { registerResearchCommand } from './commands/research.js';
 import { registerScriptCommand } from './commands/script.js';
 import { registerGenerateAssetsCommand } from './commands/generate-assets.js';
 
@@ -27,6 +28,7 @@ program
 
 registerIngestCommand(program);
 registerAnalyzeCommand(program);
+registerResearchCommand(program);
 registerScriptCommand(program);
 registerGenerateAssetsCommand(program);
 registerCatalogCommand(program);

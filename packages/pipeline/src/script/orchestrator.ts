@@ -11,6 +11,7 @@ import {
   parseScriptResponse,
   formatValidationErrors,
 } from './response-parser.js';
+import { withRetry } from '../utils/retry.js';
 
 const log = createLogger('script:orchestrator');
 
@@ -145,12 +146,10 @@ export async function orchestrateScript(
   for (let attempt = 0; attempt < 2; attempt++) {
     const maxTokens = attempt === 0 ? 16000 : 24000;
 
-    const response = await client.messages.create({
-      model,
-      max_tokens: maxTokens,
-      system: DEAD_AIR_SYSTEM_PROMPT,
-      messages,
-    });
+    const response = await withRetry(
+      () => client.messages.create({ model, max_tokens: maxTokens, system: DEAD_AIR_SYSTEM_PROMPT, messages }),
+      { label: 'script:claude-api' },
+    );
 
     totalInputTokens += response.usage.input_tokens;
     totalOutputTokens += response.usage.output_tokens;

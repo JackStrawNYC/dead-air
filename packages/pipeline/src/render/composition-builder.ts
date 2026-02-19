@@ -196,13 +196,33 @@ function padImages(images: string[], durationInFrames: number): string[] {
   return padded;
 }
 
+/**
+ * Match song names, handling segue notation (e.g. "Scarlet Begonias > Fire On The Mountain")
+ * and reprise suffixes.
+ */
+function matchSongName(scriptName: string, candidateName: string): boolean {
+  const normalize = (s: string) => s.toLowerCase().replace(/\s*\(reprise\)\s*$/i, '').trim();
+  const a = normalize(scriptName);
+  const b = normalize(candidateName);
+
+  if (a === b) return true;
+
+  // If script name is a segue like "Scarlet Begonias > Fire On The Mountain", match any part
+  if (a.includes(' > ')) {
+    const parts = a.split(' > ').map((p) => p.trim());
+    return parts.some((part) => part === b);
+  }
+
+  return false;
+}
+
 function findConcertAudio(
   songName: string,
   analysis: AudioAnalysis,
   dataDir: string,
 ): { audioSrc: string; filePath: string } | null {
   const seg = analysis.songSegments.find(
-    (s) => s.songName.toLowerCase() === songName.toLowerCase(),
+    (s) => matchSongName(songName, s.songName),
   );
   if (!seg) return null;
 
@@ -218,7 +238,7 @@ function findConcertAudio(
 
 function findEnergyData(songName: string, analysis: AudioAnalysis): number[] | undefined {
   const data = analysis.perSongAnalysis.find(
-    (s) => s.songName.toLowerCase() === songName.toLowerCase(),
+    (s) => matchSongName(songName, s.songName),
   );
   return data?.energy;
 }
@@ -229,7 +249,7 @@ function findSmartExcerptStart(
   analysis: AudioAnalysis,
 ): number | null {
   const songAnalysis = analysis.perSongAnalysis.find(
-    (s) => s.songName.toLowerCase() === songName.toLowerCase(),
+    (s) => matchSongName(songName, s.songName),
   );
   if (!songAnalysis || songAnalysis.energy.length < 10) return null;
 
@@ -476,7 +496,7 @@ export async function buildCompositionProps(options: BuildOptions): Promise<Epis
       // Resolve songDNA from script or research
       const scriptSongDNA = seg.songDNA;
       const researchStats = research?.songStats?.find(
-        (s) => s.songName.toLowerCase() === seg.songName!.toLowerCase(),
+        (s) => matchSongName(seg.songName!, s.songName),
       );
       const songDNA: SongDNAData | undefined = scriptSongDNA ?? (researchStats ? {
         timesPlayed: researchStats.timesPlayed,

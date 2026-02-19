@@ -4,8 +4,9 @@ import { resolve } from 'path';
 import type Database from 'better-sqlite3';
 import { createLogger, logCost } from '@dead-air/core';
 import type { ArchiveReview, SongStatistic, ListenForMoment } from '@dead-air/core';
-import { fetchArchiveReviews } from './archive-reviews.js';
+import { fetchArchiveReviews, findBestReviewedIdentifier } from './archive-reviews.js';
 import { fetchSongStats } from './song-stats.js';
+import { withRetry } from '../utils/retry.js';
 
 const log = createLogger('research:show-researcher');
 
@@ -137,6 +138,18 @@ export async function orchestrateResearch(
     archiveReviews = await fetchArchiveReviews(archiveId);
   }
 
+  // If reviews are thin, search for a better-reviewed recording
+  if (archiveReviews.length < 5) {
+    const bestId = await findBestReviewedIdentifier(date);
+    if (bestId && bestId !== archiveId) {
+      log.info(`Found better-reviewed recording: ${bestId}. Fetching reviews...`);
+      const betterReviews = await fetchArchiveReviews(bestId);
+      if (betterReviews.length > archiveReviews.length) {
+        archiveReviews = betterReviews;
+      }
+    }
+  }
+
   if (setlistfmKey && songNames.length > 0) {
     log.info(`Fetching setlist.fm stats for ${songNames.length} songs...`);
     songStats = await fetchSongStats(songNames, setlistfmKey, date);
@@ -161,12 +174,10 @@ export async function orchestrateResearch(
 
   // Call Claude
   const client = new Anthropic({ apiKey });
-  const response = await client.messages.create({
-    model,
-    max_tokens: 6000,
-    system: RESEARCH_SYSTEM_PROMPT,
-    messages: [{ role: 'user', content: userMessage }],
-  });
+  const response = await withRetry(
+    () => client.messages.create({ model, max_tokens: 6000, system: RESEARCH_SYSTEM_PROMPT, messages: [{ role: 'user', content: userMessage }] }),
+    { label: 'research:claude-api' },
+  );
 
   const responseText =
     response.content[0].type === 'text' ? response.content[0].text : '';
