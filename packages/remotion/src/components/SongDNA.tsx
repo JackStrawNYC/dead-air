@@ -25,6 +25,8 @@ export const SongDNA: React.FC<SongDNAProps> = ({
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
+  // Skip rendering if data is missing/placeholder
+  if (timesPlayed <= 0 && !firstPlayed) return null;
   if (frame < SHOW_AT || frame > HIDE_AT + 15) return null;
 
   // Spring slide-in from right

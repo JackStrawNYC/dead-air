@@ -102,6 +102,10 @@ export interface EpisodeProps {
   ambientBedSrc?: string;
   /** Optional tension drone audio source */
   tensionDroneSrc?: string;
+  /** Whether vinyl noise ambient file exists (default true) */
+  hasVinylNoise?: boolean;
+  /** Whether crowd ambience ambient file exists (default true) */
+  hasCrowdAmbience?: boolean;
 }
 
 const CROSSFADE_FRAMES = 30;
@@ -217,7 +221,7 @@ function getSegmentName(seg: SegmentProps, index: number): string {
 }
 
 export const Episode: React.FC<Record<string, unknown>> = (rawProps) => {
-  const { segments, totalDurationInFrames, ambientBedSrc, tensionDroneSrc } = rawProps as unknown as EpisodeProps;
+  const { segments, totalDurationInFrames, ambientBedSrc, tensionDroneSrc, hasVinylNoise = true, hasCrowdAmbience = true } = rawProps as unknown as EpisodeProps;
   const songPositions = buildSongPositions(segments, CROSSFADE_FRAMES);
   const narrationTimings = buildNarrationTimings(segments, CROSSFADE_FRAMES);
 
@@ -262,6 +266,7 @@ export const Episode: React.FC<Record<string, unknown>> = (rawProps) => {
                     textLines={seg.textLines}
                     songDNA={seg.songDNA}
                     segmentIndex={i}
+                    hasCrowdAmbience={hasCrowdAmbience}
                   />
                 );
               case 'context_text':
@@ -334,7 +339,7 @@ export const Episode: React.FC<Record<string, unknown>> = (rawProps) => {
       )}
       <LightLeak />
       <FilmLook />
-      <VinylNoise />
+      <VinylNoise enabled={hasVinylNoise} />
       {songPositions.length > 0 && (
         <SetlistProgress
           songs={songPositions}

@@ -72,6 +72,8 @@ interface ConcertSegmentProps {
   foleyVolume?: number;
   /** Foley delay in frames (default: 5) */
   foleyDelay?: number;
+  /** Whether crowd ambience audio file exists (default true) */
+  hasCrowdAmbience?: boolean;
 }
 
 const FADE_FRAMES = 60;
@@ -90,6 +92,7 @@ export const ConcertSegment: React.FC<ConcertSegmentProps> = ({
   foleySrc,
   foleyVolume = 0.10,
   foleyDelay = 5,
+  hasCrowdAmbience = true,
 }) => {
   const { durationInFrames } = useVideoConfig();
   const frame = useCurrentFrame();
@@ -251,7 +254,7 @@ export const ConcertSegment: React.FC<ConcertSegmentProps> = ({
             />
           )}
           <StageLighting mood={mood} currentEnergy={currentEnergy} />
-          <CrowdAmbience />
+          <CrowdAmbience enabled={hasCrowdAmbience} />
           <Branding />
           <ArchivalTexture era="early_modern" intensity={0.3} />
           <FilmGrain intensity={0.12} />

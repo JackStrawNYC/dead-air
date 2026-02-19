@@ -22,6 +22,8 @@ export interface EpisodeProps {
   episodeTitle: string;
   segments: SegmentProps[];
   totalDurationInFrames: number;
+  hasVinylNoise?: boolean;
+  hasCrowdAmbience?: boolean;
 }
 
 export type SegmentProps =
@@ -545,16 +547,21 @@ export async function buildCompositionProps(options: BuildOptions): Promise<Epis
 
       const energyData = analysis ? findEnergyData(seg.songName, analysis) : undefined;
 
-      // Resolve songDNA from script or research
+      // Resolve songDNA from script or research — skip if data is placeholder/empty
       const scriptSongDNA = seg.songDNA;
       const researchStats = research?.songStats?.find(
         (s) => matchSongName(seg.songName!, s.songName),
       );
-      const songDNA: SongDNAData | undefined = scriptSongDNA ?? (researchStats ? {
-        timesPlayed: researchStats.timesPlayed,
-        firstPlayed: researchStats.firstPlayed,
-        lastPlayed: researchStats.lastPlayed,
-      } : undefined);
+      let songDNA: SongDNAData | undefined;
+      if (scriptSongDNA && (scriptSongDNA.timesPlayed > 0 || scriptSongDNA.firstPlayed)) {
+        songDNA = scriptSongDNA;
+      } else if (researchStats && (researchStats.timesPlayed > 0 || researchStats.firstPlayed)) {
+        songDNA = {
+          timesPlayed: researchStats.timesPlayed,
+          firstPlayed: researchStats.firstPlayed,
+          lastPlayed: researchStats.lastPlayed,
+        };
+      }
 
       const computedStartFrom = Math.round(startTimeSec * FPS);
       const concertDurationFrames = Math.ceil(excerptDuration * FPS);
@@ -614,11 +621,22 @@ export async function buildCompositionProps(options: BuildOptions): Promise<Epis
     `Built ${segments.length} segments, total ${totalDurationInFrames} frames (${(totalDurationInFrames / FPS).toFixed(1)}s) [${transitionOverlap} frames of crossfade overlap]`,
   );
 
+  // Check ambient audio file existence
+  const vinylNoisePath = resolve(dataDir, 'assets', 'ambient', 'vinyl-noise.mp3');
+  const crowdAmbiencePath = resolve(dataDir, 'assets', 'ambient', 'crowd-ambience.mp3');
+  const hasVinylNoise = existsSync(vinylNoisePath);
+  const hasCrowdAmbience = existsSync(crowdAmbiencePath);
+
+  if (!hasVinylNoise) log.warn('Ambient file missing: vinyl-noise.mp3 — VinylNoise layer disabled');
+  if (!hasCrowdAmbience) log.warn('Ambient file missing: crowd-ambience.mp3 — CrowdAmbience layer disabled');
+
   const props: EpisodeProps = {
     episodeId,
     episodeTitle: script.episodeTitle,
     segments,
     totalDurationInFrames,
+    hasVinylNoise,
+    hasCrowdAmbience,
   };
 
   // Write props to disk

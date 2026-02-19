@@ -104,18 +104,21 @@ export async function fetchSongStats(
 
     log.info(`setlist.fm confirmed ${confirmedSongs.length} songs: ${confirmedSongs.join(', ')}`);
 
-    // Build stats entries for confirmed songs (play counts left for Claude)
+    // Build stats entries — only include confirmed songs, omit play counts
+    // so Claude uses its training knowledge for accurate statistics
     for (const songName of songNames) {
       const confirmed = confirmedSongs.some(
         (cs) => cs?.toLowerCase() === songName.toLowerCase(),
       );
 
-      stats.push({
-        songName,
-        timesPlayed: 0, // Claude will fill from knowledge; 0 = "use your knowledge"
-        firstPlayed: confirmed ? 'confirmed' : 'unconfirmed',
-        lastPlayed: showDate,
-      });
+      if (confirmed) {
+        stats.push({
+          songName,
+          timesPlayed: 0,
+          firstPlayed: '',
+          lastPlayed: '',
+        });
+      }
     }
   } catch (err) {
     log.warn(`Failed to fetch setlist.fm data: ${(err as Error).message}`);

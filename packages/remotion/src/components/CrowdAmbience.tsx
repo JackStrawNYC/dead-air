@@ -9,6 +9,8 @@ interface CrowdAmbienceProps {
   maxVolume?: number;
   /** Frame offset into the audio file */
   startFrom?: number;
+  /** Set to false to disable (e.g. when audio file is missing) */
+  enabled?: boolean;
 }
 
 /**
@@ -20,9 +22,12 @@ export const CrowdAmbience: React.FC<CrowdAmbienceProps> = ({
   src = 'assets/ambient/crowd-ambience.mp3',
   maxVolume = 0.06,
   startFrom = 0,
+  enabled = true,
 }) => {
   const frame = useCurrentFrame();
   const { durationInFrames } = useVideoConfig();
+
+  if (!enabled) return null;
 
   const volume = smoothstepVolume(frame, durationInFrames, 30, 30, maxVolume);
 

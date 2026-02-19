@@ -70,16 +70,67 @@ Respond with ONLY valid JSON matching this structure. No markdown, no preamble.
     }
   ],
   "fanConsensus": "1-2 paragraphs about what Deadheads say about this show. Is it a consensus classic? A hidden gem? Controversial? What do the tape traders and reviewers say?",
-  "venueHistory": "1 paragraph about the venue itself — its significance, memorable shows there, acoustics, capacity."
+  "venueHistory": "1 paragraph about the venue itself — its significance, memorable shows there, acoustics, capacity.",
+  "songStats": [
+    {
+      "songName": "Song Title",
+      "timesPlayed": 271,
+      "firstPlayed": "1966-01-08",
+      "lastPlayed": "1995-07-09"
+    }
+  ]
 }
 
 If the input includes "archiveReviews", use these real fan quotes from archive.org — attribute them by reviewer name. These are authentic audience reactions.
 
-If the input includes "songStatistics", use these for accurate play counts — DO NOT invent numbers. Reference exact counts like "Played 271 times between 1966 and 1995."
+If the input includes "songStatistics", it confirms which songs were played. Use your training knowledge for accurate play counts, first-played dates, and last-played dates. Reference specific counts like "Played 271 times between 1966 and 1995." Be as accurate as possible — the Grateful Dead catalog is well-documented.
 
 Generate 3-5 "listenForMoments" in the JSON output: specific musical moments to direct viewer attention during playback. Each should have songName, timestampSec (approximate seconds into the song), and description (e.g. "Listen for Phil's bass run steering into Space"). Focus on instrument entries, tempo changes, segue transitions, and crowd reactions.
 
 Be specific. Use actual dates, song names, and details from your knowledge. If you're unsure about something, say so rather than fabricating. Focus on details that would make compelling documentary narration.`;
+
+// ── Helpers ──
+
+/**
+ * Merge song stats: prefer Claude's play counts/dates over the fetch result
+ * (which only confirms song names). Falls back to fetch data for any song
+ * Claude didn't cover.
+ */
+function mergeSongStats(
+  fetchedStats: SongStatistic[],
+  claudeStats: SongStatistic[],
+): SongStatistic[] {
+  if (claudeStats.length === 0) return fetchedStats;
+  if (fetchedStats.length === 0) return claudeStats;
+
+  const claudeMap = new Map(
+    claudeStats.map((s) => [s.songName.toLowerCase(), s]),
+  );
+
+  const merged: SongStatistic[] = [];
+  for (const fetched of fetchedStats) {
+    const claude = claudeMap.get(fetched.songName.toLowerCase());
+    if (claude && (claude.timesPlayed > 0 || claude.firstPlayed)) {
+      // Claude has real data — use it but keep the confirmed song name
+      merged.push({
+        songName: fetched.songName,
+        timesPlayed: claude.timesPlayed || 0,
+        firstPlayed: claude.firstPlayed || '',
+        lastPlayed: claude.lastPlayed || '',
+      });
+      claudeMap.delete(fetched.songName.toLowerCase());
+    } else {
+      merged.push(fetched);
+    }
+  }
+
+  // Add any songs Claude mentioned that weren't in the fetch result
+  for (const remaining of claudeMap.values()) {
+    merged.push(remaining);
+  }
+
+  return merged;
+}
 
 // ── Main ──
 
@@ -193,7 +244,7 @@ export async function orchestrateResearch(
       generatedAt: new Date().toISOString(),
       ...parsed,
       archiveReviews: archiveReviews.length > 0 ? archiveReviews : (parsed.archiveReviews ?? []),
-      songStats: songStats.length > 0 ? songStats : (parsed.songStats ?? []),
+      songStats: mergeSongStats(songStats, parsed.songStats ?? []),
       listenForMoments: parsed.listenForMoments ?? [],
     };
   } catch (err) {
