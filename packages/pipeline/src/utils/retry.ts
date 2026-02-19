@@ -15,7 +15,10 @@ function isRetriableError(err: unknown): boolean {
     message.includes('timeout') ||
     message.includes('fetch failed') ||
     message.includes('econnreset') ||
-    message.includes('socket hang up')
+    message.includes('socket hang up') ||
+    message.includes('connection error') ||
+    message.includes('network error') ||
+    message.includes('econnrefused')
   ) {
     return true;
   }

@@ -133,7 +133,7 @@ export async function orchestrateScript(
 
   // 6. Call Claude API
   log.info(`Calling ${model}...`);
-  const client = new Anthropic({ apiKey, timeout: 10 * 60 * 1000 }); // 10 min
+  const client = new Anthropic({ apiKey, timeout: 15 * 60 * 1000 }); // 15 min
   const messages: Anthropic.MessageParam[] = [
     { role: 'user', content: JSON.stringify(context) },
   ];
