@@ -14,7 +14,7 @@ interface KenBurnsProps {
   speedMultiplier?: number;
 }
 
-const MAX_SECONDS_PER_IMAGE = 8;
+const MAX_SECONDS_PER_IMAGE = 5;
 const FPS = 30;
 const MAX_FRAMES_PER_IMAGE = MAX_SECONDS_PER_IMAGE * FPS; // 240
 const CROSSFADE_FRAMES = 20; // ~0.67s crossfade overlap
@@ -38,6 +38,10 @@ function panDirection(slot: number): { panXDir: number; panYDir: number } {
     panXDir: Math.cos(angle),
     panYDir: Math.sin(angle),
   };
+}
+
+function isProcedural(path: string): boolean {
+  return path === '__procedural__';
 }
 
 function isVideo(path: string): boolean {
@@ -310,7 +314,9 @@ export const KenBurns: React.FC<KenBurnsProps> = ({
 
         return (
           <React.Fragment key={slot}>
-            {isVideo(img) ? (
+            {isProcedural(img) ? (
+              <div style={{ ...mediaStyle, opacity: 0 }} />
+            ) : isVideo(img) ? (
               <OffthreadVideo
                 src={staticFile(img)}
                 style={mediaStyle}

@@ -42,3 +42,15 @@ export function jCutVolume(
 ): number {
   return smoothstepVolume(frame, durationInFrames, 3, 15, maxVolume);
 }
+
+/**
+ * Concert fade volume: fast attack (5 frames), long tail (60 frames / 2s).
+ * Concert audio should linger — abrupt cuts kill the vibe.
+ */
+export function concertFadeVolume(
+  frame: number,
+  durationInFrames: number,
+  maxVolume: number = 1,
+): number {
+  return smoothstepVolume(frame, durationInFrames, 5, 60, maxVolume);
+}

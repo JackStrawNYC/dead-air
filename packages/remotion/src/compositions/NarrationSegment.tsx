@@ -8,8 +8,18 @@ import { CinematicGrade, MOOD_GRADE_PRESET } from '../components/CinematicGrade'
 import { ArchivalTexture } from '../components/ArchivalTexture';
 import { BreathingOverlay } from '../components/BreathingOverlay';
 import { COLORS, FONTS, getMoodAccent } from '../styles/themes';
+import { PsychedelicLoop, PsychedelicVariant } from '../components/PsychedelicLoop';
 import { smoothstepVolume } from '../utils/audio';
 import { assignCameraPreset, getCameraSpeed } from '../utils/cameraAssignment';
+
+const MOOD_TO_PSYCHEDELIC: Record<string, PsychedelicVariant> = {
+  psychedelic: 'fractal',
+  cosmic: 'aurora',
+  warm: 'liquid',
+  earthy: 'liquid',
+  electric: 'liquid',
+  dark: 'liquid',
+};
 
 const MOOD_TO_GRADE_START: Record<string, GradeMood> = {
   warm: 'warm', earthy: 'warm', psychedelic: 'warm',
@@ -31,7 +41,7 @@ interface NarrationSegmentProps {
   segmentIndex?: number;
 }
 
-const FADE_FRAMES = 15;
+const FADE_FRAMES = 45;
 
 export const NarrationSegment: React.FC<NarrationSegmentProps> = ({
   audioSrc,
@@ -51,7 +61,7 @@ export const NarrationSegment: React.FC<NarrationSegmentProps> = ({
   // Concert bed: smoothstep ducking (asymmetric)
   const bedVolume = (() => {
     if (!concertBedSrc) return 0;
-    const FULL = 0.12;
+    const FULL = 0.20;
     const DUCKED = 0.04;
     // Duck down over 24 frames at start, recover over 30 at end
     const duckDown = interpolate(frame, [0, 24], [FULL, DUCKED], {
@@ -89,6 +99,10 @@ export const NarrationSegment: React.FC<NarrationSegmentProps> = ({
     <CinematicGrade preset={gradePreset}>
       <DynamicGrade startMood={gradeStart} endMood={gradeEnd} intensity={0.5}>
         <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+          <PsychedelicLoop
+            variant={MOOD_TO_PSYCHEDELIC[mood] ?? 'liquid'}
+            durationInFrames={durationInFrames}
+          />
           <KenBurns
             images={images}
             durationInFrames={durationInFrames}
