@@ -131,9 +131,9 @@ export async function orchestrateScript(
     context.setlist.map((s) => [s.songName, s.durationSec]),
   );
 
-  // 6. Call Claude API
-  log.info(`Calling ${model}...`);
-  const client = new Anthropic({ apiKey, timeout: 15 * 60 * 1000 }); // 15 min
+  // 6. Call Claude API (streaming to avoid connection timeouts on long generations)
+  log.info(`Calling ${model} (streaming)...`);
+  const client = new Anthropic({ apiKey, timeout: 30 * 60 * 1000 }); // 30 min
   const messages: Anthropic.MessageParam[] = [
     { role: 'user', content: JSON.stringify(context) },
   ];
@@ -147,7 +147,17 @@ export async function orchestrateScript(
     const maxTokens = attempt === 0 ? 32000 : 48000;
 
     const response = await withRetry(
-      () => client.messages.create({ model, max_tokens: maxTokens, system: DEAD_AIR_SYSTEM_PROMPT, messages }),
+      async () => {
+        const stream = client.messages.stream({ model, max_tokens: maxTokens, system: DEAD_AIR_SYSTEM_PROMPT, messages });
+        let tokensReceived = 0;
+        stream.on('text', () => {
+          tokensReceived++;
+          if (tokensReceived % 2000 === 0) {
+            log.info(`  ...streaming: ~${tokensReceived} text events received`);
+          }
+        });
+        return await stream.finalMessage();
+      },
       { label: 'script:claude-api' },
     );
 

@@ -20,7 +20,7 @@ const visualSchema = z.object({
 });
 
 const songDNASchema = z.object({
-  timesPlayed: z.number(),
+  timesPlayed: z.coerce.number(),
   firstPlayed: z.string(),
   lastPlayed: z.string(),
   rank: z.string().optional(),

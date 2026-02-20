@@ -87,6 +87,8 @@ Respond with ONLY valid JSON matching this exact structure. No markdown fences, 
 
 11. **Song DNA**: For every concert_audio segment, include a songDNA object with real statistics from the songStats data. If exact numbers aren't available, use your best knowledge.
 
+12. **Content guidelines**: Keep all narration and text overlays focused on the music, the performance, and the fan experience. Avoid references to illegal drug use, substance abuse, or explicit content. Focus on musicianship, setlist choices, crowd energy, and historical context.
+
 ## VISUAL DIRECTION
 
 Your image prompts will be sent to AI image generators. They MUST produce images that look like vintage 1970s documentary photography — grainy, warm, realistic. NOT digital art, NOT fantasy, NOT stock photos, NOT psychedelic swirls.
