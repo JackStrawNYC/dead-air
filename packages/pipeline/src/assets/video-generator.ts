@@ -53,6 +53,35 @@ export function generateMotionPrompt(segment: {
   return 'slow pan left, documentary style, natural movement';
 }
 
+/**
+ * Generate motion prompts suited to psychedelic poster art.
+ * Used for concert_audio segments where images are stylized art, not photography.
+ */
+export function generatePsychedelicMotionPrompt(segment: {
+  mood?: string;
+  visualIntensity?: number;
+}): string {
+  const intensity = segment.visualIntensity ?? 0.5;
+  const mood = segment.mood ?? 'warm';
+
+  if (intensity > 0.8) {
+    return 'rapid fractal expansion, kaleidoscopic rotation, intense psychedelic energy burst';
+  }
+  if (mood === 'cosmic' || mood === 'psychedelic') {
+    return 'slow spiral outward, cosmic nebula rotating, ethereal morphing colors';
+  }
+  if (mood === 'dark') {
+    return 'shadows dissolving into fractal patterns, slow organic pulse, dark energy flowing';
+  }
+  if (mood === 'electric') {
+    return 'electric arcs branching outward, neon colors pulsing, crackling energy expansion';
+  }
+  if (intensity < 0.3) {
+    return 'gentle color breathing, slow organic flow, contemplative rippling';
+  }
+  return 'flowing liquid color morphing, psychedelic patterns slowly evolving';
+}
+
 export async function generateVideo(options: VideoGenOptions): Promise<VideoGenResult> {
   const { sourceImagePath, motionPrompt, replicateToken, cacheDir } = options;
 

@@ -11,6 +11,8 @@ export type ImageTier = 'hero' | 'scene' | 'thumbnail' | 'video';
 
 export type ImageProvider = 'grok-aurora' | 'flux-dev' | 'flux-schnell';
 
+export type PromptStyle = 'documentary' | 'psychedelic';
+
 const TIER_ROUTING: Record<Exclude<ImageTier, 'video'>, ImageProvider> = {
   hero: 'grok-aurora',
   scene: 'flux-dev',
@@ -28,22 +30,36 @@ const REPLICATE_MODELS: Record<string, string> = {
   'flux-schnell': 'black-forest-labs/flux-schnell',
 };
 
-const STYLE_PREFIX =
+const DOCUMENTARY_STYLE_PREFIX =
   'vintage 1970s documentary concert photography, 35mm film grain, warm analog tones, ';
+
+const PSYCHEDELIC_STYLE_PREFIX =
+  'psychedelic concert poster art, vivid saturated colors, flowing organic patterns, Art Nouveau influences, ';
 
 const NEGATIVE_PROMPT_SUFFIX =
   ', no text, no words, no letters, no writing, no signs, no logos, no watermarks, no named individuals, no celebrity likenesses';
 
 /**
  * Prepend cinematic style and append negative instructions.
- * Ensures all AI-generated images match the archival documentary aesthetic.
+ * Style is chosen based on segment type:
+ *   - 'documentary' (default): archival concert photography for narration/context
+ *   - 'psychedelic': poster art for concert_audio segments
  */
-function stylizePrompt(prompt: string): string {
+function stylizePrompt(prompt: string, style: PromptStyle = 'documentary'): string {
   let result = prompt;
-  // Add style prefix if not already documentary-styled
-  if (!result.toLowerCase().includes('documentary') && !result.toLowerCase().includes('35mm')) {
-    result = STYLE_PREFIX + result;
+
+  if (style === 'psychedelic') {
+    // Add psychedelic prefix if not already styled
+    if (!result.toLowerCase().includes('psychedelic') && !result.toLowerCase().includes('poster art')) {
+      result = PSYCHEDELIC_STYLE_PREFIX + result;
+    }
+  } else {
+    // Add documentary prefix if not already documentary-styled
+    if (!result.toLowerCase().includes('documentary') && !result.toLowerCase().includes('35mm')) {
+      result = DOCUMENTARY_STYLE_PREFIX + result;
+    }
   }
+
   // Add negative suffix if not already present
   if (!result.toLowerCase().includes('no text')) {
     result += NEGATIVE_PROMPT_SUFFIX;
@@ -65,8 +81,9 @@ export interface RoutedImageResult {
 async function generateWithGrokAurora(
   prompt: string,
   apiKey: string,
+  style: PromptStyle = 'documentary',
 ): Promise<{ imageBuffer: Buffer; cost: number }> {
-  const safePrompt = stylizePrompt(prompt);
+  const safePrompt = stylizePrompt(prompt, style);
   const response = await fetch('https://api.x.ai/v1/images/generations', {
     method: 'POST',
     headers: {
@@ -114,10 +131,11 @@ async function generateWithReplicate(
   replicateToken: string,
   width = 1440,
   height = 810,
+  style: PromptStyle = 'documentary',
 ): Promise<{ imageBuffer: Buffer; cost: number }> {
   const replicate = new Replicate({ auth: replicateToken });
   const modelId = REPLICATE_MODELS[provider];
-  const safePrompt = stylizePrompt(prompt);
+  const safePrompt = stylizePrompt(prompt, style);
 
   const input: Record<string, unknown> =
     provider === 'flux-dev'
@@ -139,6 +157,7 @@ async function generateWithReplicate(
 export interface RouteImageOptions {
   prompt: string;
   tier: ImageTier;
+  style?: PromptStyle;
   xaiApiKey?: string;
   replicateToken?: string;
   width?: number;
@@ -148,7 +167,7 @@ export interface RouteImageOptions {
 export async function routeImageGeneration(
   options: RouteImageOptions,
 ): Promise<RoutedImageResult> {
-  const { prompt, tier, xaiApiKey, replicateToken, width, height } = options;
+  const { prompt, tier, style = 'documentary', xaiApiKey, replicateToken, width, height } = options;
   if (tier === 'video') {
     throw new Error('Video tier should be handled by video-generator.ts, not image routing');
   }
@@ -169,9 +188,9 @@ export async function routeImageGeneration(
   let result: { imageBuffer: Buffer; cost: number };
 
   if (provider === 'grok-aurora') {
-    result = await generateWithGrokAurora(prompt, xaiApiKey!);
+    result = await generateWithGrokAurora(prompt, xaiApiKey!, style);
   } else {
-    result = await generateWithReplicate(prompt, provider, replicateToken!, width, height);
+    result = await generateWithReplicate(prompt, provider, replicateToken!, width, height, style);
   }
 
   log.info(`Generated ${provider} image: ${result.imageBuffer.length} bytes, $${result.cost.toFixed(4)}`);
@@ -189,6 +208,7 @@ export async function routeImageGeneration(
 export interface RoutedBatchItem {
   prompt: string;
   tier: ImageTier;
+  style?: PromptStyle;
   destPath: string;
   segmentIndex: number;
   promptIndex: number;
@@ -282,6 +302,7 @@ export async function routeImageBatch(
       const result = await routeImageGeneration({
         prompt: item.prompt,
         tier: item.tier,
+        style: item.style,
         xaiApiKey,
         replicateToken,
       });

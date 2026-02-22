@@ -14,6 +14,8 @@ const FPS = 30;
 const BRAND_INTRO_FRAMES = 150; // 5 seconds
 const COLD_OPEN_FRAMES = 240; // 8 seconds (upgraded from 3s)
 const END_SCREEN_FRAMES = 600; // 20 seconds
+const LEGACY_CARD_FRAMES = 240; // 8 seconds
+const SCROLLING_CREDITS_FRAMES = 450; // 15 seconds
 const CHAPTER_CARD_FRAMES = 60; // 2 seconds
 const CROSSFADE_FRAMES = 30; // 30-frame overlap (1s) between segments
 
@@ -24,12 +26,24 @@ export interface EpisodeProps {
   totalDurationInFrames: number;
   hasVinylNoise?: boolean;
   hasCrowdAmbience?: boolean;
+  /** Composition-level ambient bed audio source (ducked under narration) */
+  ambientBedSrc?: string;
+  /** Composition-level tension drone audio source */
+  tensionDroneSrc?: string;
+  /** Silence windows for dramatic audio drops */
+  silenceWindows?: Array<{ startFrame: number; durationFrames: number }>;
+  /** Pre-swell windows for dramatic volume builds */
+  preSwellWindows?: Array<{ peakFrame: number; rampFrames: number; boostMultiplier: number }>;
+  /** Per-episode audio mix overrides */
+  audioMix?: Record<string, Record<string, number>>;
+  /** BGM audio source for narration segments */
+  bgmSrc?: string;
 }
 
 export type SegmentProps =
   | { type: 'cold_open'; durationInFrames: number; audioSrc: string; startFrom: number; image: string }
   | { type: 'cold_open_v2'; durationInFrames: number; audioSrc: string; startFrom: number; media: string; hookText?: string }
-  | { type: 'brand_intro'; durationInFrames: number }
+  | { type: 'brand_intro'; durationInFrames: number; ambientSrc?: string; ambientVolume?: number }
   | {
       type: 'narration';
       durationInFrames: number;
@@ -50,8 +64,15 @@ export type SegmentProps =
       mood: string;
       colorPalette: string[];
       energyData?: number[];
+      /** Onset timings in frames (from librosa onset_detect, converted from seconds) */
+      onsetFrames?: number[];
+      /** Spectral centroid data for frequency-aware visuals */
+      spectralCentroid?: number[];
       textLines?: { text: string; displayDuration: number; style: string }[];
       songDNA?: SongDNAData;
+      foleySrc?: string;
+      foleyVolume?: number;
+      foleyDelay?: number;
     }
   | {
       type: 'context_text';
@@ -76,6 +97,18 @@ export type SegmentProps =
       title: string;
       subtitle?: string;
       colorAccent?: string;
+      actNumber?: string;
+    }
+  | {
+      type: 'legacy_card';
+      durationInFrames: number;
+      statement: string;
+      attribution?: string;
+    }
+  | {
+      type: 'scrolling_credits';
+      durationInFrames: number;
+      showTitle?: string;
     };
 
 export interface BuildOptions {
@@ -281,13 +314,33 @@ function findConcertAudio(
   if (!seg) return null;
 
   const absPath = seg.filePath;
-  if (!existsSync(absPath)) return null;
 
-  if (absPath.startsWith(dataDir)) {
-    const relPath = absPath.slice(dataDir.length).replace(/^\//, '');
-    return { audioSrc: relPath, filePath: absPath };
+  // Try the absolute path first (works when rendering on same machine)
+  if (existsSync(absPath)) {
+    if (absPath.startsWith(dataDir)) {
+      const relPath = absPath.slice(dataDir.length).replace(/^\//, '');
+      return { audioSrc: relPath, filePath: absPath };
+    }
+    return { audioSrc: absPath, filePath: absPath };
   }
-  return { audioSrc: absPath, filePath: absPath };
+
+  // Absolute path doesn't exist (e.g. rendering on EC2) — resolve by filename relative to dataDir
+  const filename = absPath.split('/').pop();
+  if (filename) {
+    // Extract the show date directory from the original path (e.g. "1977-05-08")
+    const pathParts = absPath.split('/');
+    const audioIdx = pathParts.indexOf('audio');
+    if (audioIdx >= 0 && audioIdx + 1 < pathParts.length) {
+      const showDate = pathParts[audioIdx + 1];
+      const relPath = `audio/${showDate}/${filename}`;
+      const resolvedPath = resolve(dataDir, relPath);
+      if (existsSync(resolvedPath)) {
+        return { audioSrc: relPath, filePath: resolvedPath };
+      }
+    }
+  }
+
+  return null;
 }
 
 function findEnergyData(songName: string, analysis: AudioAnalysis): number[] | undefined {
@@ -295,6 +348,133 @@ function findEnergyData(songName: string, analysis: AudioAnalysis): number[] | u
     (s) => matchSongName(songName, s.songName),
   );
   return data?.energy;
+}
+
+/**
+ * Find onset timings for a song and convert from seconds to frames.
+ * Onsets are filtered to only include strong onsets (>10Hz minimum gap).
+ */
+function findOnsetFrames(
+  songName: string,
+  analysis: AudioAnalysis,
+  startTimeSec: number,
+  excerptDuration: number,
+): number[] | undefined {
+  const data = analysis.perSongAnalysis.find(
+    (s) => matchSongName(songName, s.songName),
+  );
+  if (!data?.onsets || data.onsets.length === 0) return undefined;
+
+  // Filter to only onsets within excerpt window, offset to segment-local frames
+  const endTimeSec = startTimeSec + excerptDuration;
+  const onsetFrames = data.onsets
+    .filter((sec) => sec >= startTimeSec && sec <= endTimeSec)
+    .map((sec) => Math.round((sec - startTimeSec) * FPS));
+
+  // Thin out onsets: minimum 3-frame gap to avoid visual noise
+  const thinned: number[] = [];
+  let lastFrame = -10;
+  for (const f of onsetFrames) {
+    if (f - lastFrame >= 3) {
+      thinned.push(f);
+      lastFrame = f;
+    }
+  }
+
+  return thinned.length > 0 ? thinned : undefined;
+}
+
+/**
+ * Find spectral centroid data for a song, sliced to excerpt window.
+ */
+function findSpectralCentroid(
+  songName: string,
+  analysis: AudioAnalysis,
+  startTimeSec: number,
+  excerptDuration: number,
+): number[] | undefined {
+  const data = analysis.perSongAnalysis.find(
+    (s) => matchSongName(songName, s.songName),
+  );
+  if (!data?.spectralCentroid || data.spectralCentroid.length === 0) return undefined;
+
+  // Spectral centroid is sampled at ~10Hz (same as energy)
+  const sampleRate = data.spectralCentroid.length / data.durationSec;
+  const startIdx = Math.floor(startTimeSec * sampleRate);
+  const endIdx = Math.min(
+    Math.ceil((startTimeSec + excerptDuration) * sampleRate),
+    data.spectralCentroid.length,
+  );
+
+  const sliced = data.spectralCentroid.slice(startIdx, endIdx);
+  return sliced.length > 0 ? sliced : undefined;
+}
+
+/**
+ * Find the actual musical content boundaries in a song.
+ * Trims leading dead air (tuning, crowd noise) and trailing dead air
+ * (applause, banter, tuning for next song).
+ *
+ * Uses energy threshold detection: music typically >0.08, dead air <0.08.
+ * Requires 5 consecutive samples (~0.5s) above threshold to confirm music.
+ *
+ * Returns null if no analysis data available (caller should use full duration).
+ */
+function findMusicBounds(
+  songName: string,
+  analysis: AudioAnalysis,
+  opts?: { leadPadSec?: number; trailPadSec?: number },
+): { startSec: number; endSec: number; trimmedDuration: number } | null {
+  const data = analysis.perSongAnalysis.find(
+    (s) => matchSongName(songName, s.songName),
+  );
+  if (!data || data.energy.length < 10) return null;
+
+  const leadPad = opts?.leadPadSec ?? 1.0; // 1s before music starts
+  const trailPad = opts?.trailPadSec ?? 4.0; // 4s after music ends (crowd reaction)
+  const energy = data.energy;
+  const sampleRate = energy.length / data.durationSec;
+  const windowSize = 5; // ~0.5s of sustained energy
+  const threshold = 0.08;
+
+  // Find where music starts: first 5 consecutive samples above threshold
+  let firstActive = 0;
+  for (let i = 0; i < energy.length - windowSize; i++) {
+    let allAbove = true;
+    for (let j = 0; j < windowSize; j++) {
+      if (energy[i + j] <= threshold) { allAbove = false; break; }
+    }
+    if (allAbove) {
+      firstActive = i;
+      break;
+    }
+  }
+
+  // Find where music ends: last 5 consecutive samples above threshold
+  let lastActive = energy.length - 1;
+  for (let i = energy.length - 1; i >= windowSize - 1; i--) {
+    let allAbove = true;
+    for (let j = 0; j < windowSize; j++) {
+      if (energy[i - j] <= threshold) { allAbove = false; break; }
+    }
+    if (allAbove) {
+      lastActive = i;
+      break;
+    }
+  }
+
+  const musicStartSec = firstActive / sampleRate;
+  const musicEndSec = lastActive / sampleRate;
+
+  // Apply padding
+  const startSec = Math.max(0, musicStartSec - leadPad);
+  const endSec = Math.min(data.durationSec, musicEndSec + trailPad);
+
+  return {
+    startSec,
+    endSec,
+    trimmedDuration: endSec - startSec,
+  };
 }
 
 function findSmartExcerptStart(
@@ -369,15 +549,10 @@ function findColdOpenMoment(
 
   if (!bestSongName) return null;
 
-  const seg = analysis.songSegments.find(
-    (s) => s.songName.toLowerCase() === bestSongName.toLowerCase(),
-  );
-  if (!seg || !existsSync(seg.filePath)) return null;
+  const found = findConcertAudio(bestSongName, analysis, dataDir);
+  if (!found) return null;
 
-  let audioSrc = seg.filePath;
-  if (audioSrc.startsWith(dataDir)) {
-    audioSrc = audioSrc.slice(dataDir.length).replace(/^\//, '');
-  }
+  const audioSrc = found.audioSrc;
 
   const startFromSec = Math.max(0, bestTimeSec - 1.5);
 
@@ -455,7 +630,13 @@ export async function buildCompositionProps(options: BuildOptions): Promise<Epis
     }
   }
 
-  segments.push({ type: 'brand_intro', durationInFrames: BRAND_INTRO_FRAMES });
+  const crowdAmbienceExists = existsSync(resolve(dataDir, 'assets', 'ambient', 'crowd-ambience.mp3'));
+  segments.push({
+    type: 'brand_intro',
+    durationInFrames: BRAND_INTRO_FRAMES,
+    ambientSrc: crowdAmbienceExists ? 'assets/ambient/crowd-ambience.mp3' : undefined,
+    ambientVolume: 0.15,
+  });
 
   // Track last concert audio for ambient bleed on context_text segments
   let lastConcertAudioSrc = '';
@@ -483,7 +664,10 @@ export async function buildCompositionProps(options: BuildOptions): Promise<Epis
         }
         images = slice;
       } else {
-        images = interleaveArchival(images, archivalImages);
+        // Concert segments: archival photos as occasional grounding (every 6th)
+        // Narration/context: more frequent archival grounding (every 3rd)
+        const interval = seg.type === 'concert_audio' ? 6 : 3;
+        images = interleaveArchival(images, archivalImages, interval);
       }
     }
 
@@ -524,16 +708,7 @@ export async function buildCompositionProps(options: BuildOptions): Promise<Epis
         concertBedStartFrom: lastConcertAudioSrc ? lastConcertStartFrom : undefined,
       });
     } else if (seg.type === 'concert_audio' && seg.songName) {
-      const excerptDuration = seg.excerptDuration ?? 60;
-
-      let startTimeSec = seg.startTimeInSong ?? 0;
-      if (analysis) {
-        const smartStart = findSmartExcerptStart(seg.songName, excerptDuration, analysis);
-        if (smartStart !== null) {
-          startTimeSec = smartStart;
-        }
-      }
-
+      // ── Full concert mode: use entire song with trimmed dead air ──
       let audioSrc = '';
       if (analysis) {
         const found = findConcertAudio(seg.songName, analysis, dataDir);
@@ -550,7 +725,50 @@ export async function buildCompositionProps(options: BuildOptions): Promise<Epis
         continue;
       }
 
-      const energyData = analysis ? findEnergyData(seg.songName, analysis) : undefined;
+      // Get full song duration from analysis
+      const songAnalysis = analysis?.perSongAnalysis.find(
+        (s) => matchSongName(seg.songName!, s.songName),
+      );
+      const fullDurationSec = songAnalysis?.durationSec ?? (seg.excerptDuration ?? 60);
+
+      // Detect segue context: check if this song or next song is a segue
+      const nextSeg = script.segments[i + 1];
+      const prevSeg = i > 0 ? script.segments[i - 1] : undefined;
+      const isSegueOut = nextSeg?.type === 'concert_audio' && (
+        seg.songName!.includes('>') || seg.songName!.includes('→') ||
+        nextSeg.songName?.includes('>') || nextSeg.songName?.includes('→')
+      );
+      const isSegueIn = prevSeg?.type === 'concert_audio' && (
+        prevSeg.songName?.includes('>') || prevSeg.songName?.includes('→') ||
+        seg.songName!.includes('>') || seg.songName!.includes('→')
+      );
+
+      // Trim dead air using energy analysis
+      let startTimeSec = 0;
+      let songDurationSec = fullDurationSec;
+
+      if (analysis) {
+        const bounds = findMusicBounds(seg.songName!, analysis, {
+          leadPadSec: isSegueIn ? 0 : 1.0,   // No lead trim on segue-in (music is flowing)
+          trailPadSec: isSegueOut ? 0 : 4.0,  // No trail trim on segue-out (music flows into next)
+        });
+        if (bounds) {
+          startTimeSec = bounds.startSec;
+          songDurationSec = bounds.trimmedDuration;
+          const trimmed = fullDurationSec - songDurationSec;
+          if (trimmed > 2) {
+            log.info(`"${seg.songName}": trimmed ${trimmed.toFixed(1)}s dead air (${startTimeSec.toFixed(1)}s lead, ${(fullDurationSec - bounds.endSec).toFixed(1)}s trail)`);
+          }
+        }
+      }
+
+      const energyData = analysis ? findEnergyData(seg.songName!, analysis) : undefined;
+      const onsetFrames = analysis ? findOnsetFrames(seg.songName!, analysis, startTimeSec, songDurationSec) : undefined;
+      const spectralCentroid = analysis ? findSpectralCentroid(seg.songName!, analysis, startTimeSec, songDurationSec) : undefined;
+
+      if (onsetFrames) {
+        log.info(`"${seg.songName}": ${onsetFrames.length} onset frames for FX triggers`);
+      }
 
       // Resolve songDNA from script or research — skip if data is placeholder/empty
       const scriptSongDNA = seg.songDNA;
@@ -569,7 +787,27 @@ export async function buildCompositionProps(options: BuildOptions): Promise<Epis
       }
 
       const computedStartFrom = Math.round(startTimeSec * FPS);
-      const concertDurationFrames = Math.ceil(excerptDuration * FPS);
+      const concertDurationFrames = Math.ceil(songDurationSec * FPS);
+
+      // Foley: assign crowd reaction SFX based on energy peaks
+      let foleySrc: string | undefined;
+      let foleyVolume = 0.10;
+      const foleyDir = resolve(dataDir, 'assets', 'sfx');
+      if (energyData && energyData.length > 0 && existsSync(foleyDir)) {
+        const maxEnergy = Math.max(...energyData);
+        const isSegue = seg.songName!.includes('>') || seg.songName!.includes('→');
+        if (isSegue && existsSync(resolve(foleyDir, 'crowd-roar.mp3'))) {
+          foleySrc = 'assets/sfx/crowd-roar.mp3';
+          foleyVolume = 0.15;
+        } else if (maxEnergy > 0.85 && existsSync(resolve(foleyDir, 'crowd-cheer.mp3'))) {
+          foleySrc = 'assets/sfx/crowd-cheer.mp3';
+          foleyVolume = 0.12;
+        } else if (existsSync(resolve(foleyDir, 'scattered-clapping.mp3'))) {
+          foleySrc = 'assets/sfx/scattered-clapping.mp3';
+          foleyVolume = 0.06;
+        }
+      }
+
       segments.push({
         type: 'concert_audio',
         durationInFrames: concertDurationFrames,
@@ -580,16 +818,19 @@ export async function buildCompositionProps(options: BuildOptions): Promise<Epis
         mood,
         colorPalette,
         energyData,
+        onsetFrames,
+        spectralCentroid,
         textLines: seg.textLines?.map((l) => ({
           text: l.text,
           displayDuration: l.displayDuration,
           style: l.style,
         })),
         songDNA,
-      });
+        ...(foleySrc ? { foleySrc, foleyVolume } : {}),
+      } as SegmentProps);
 
       lastConcertAudioSrc = audioSrc;
-      lastConcertStartFrom = computedStartFrom + Math.ceil(excerptDuration * FPS);
+      lastConcertStartFrom = computedStartFrom + concertDurationFrames;
     } else if (seg.type === 'context_text' && seg.textLines) {
       const totalSec = seg.textLines.reduce((sum, l) => sum + l.displayDuration, 0);
       const ctxDurationFrames = Math.ceil(totalSec * FPS);
@@ -611,7 +852,20 @@ export async function buildCompositionProps(options: BuildOptions): Promise<Epis
     }
   }
 
-  // Append end screen
+  // Append closing sequence: legacy card → scrolling credits → end screen
+  segments.push({
+    type: 'legacy_card',
+    durationInFrames: LEGACY_CARD_FRAMES,
+    statement: script.legacyStatement ?? `${script.episodeTitle} — a concert that transcended the ordinary and became legend.`,
+    attribution: script.legacyAttribution,
+  });
+
+  segments.push({
+    type: 'scrolling_credits',
+    durationInFrames: SCROLLING_CREDITS_FRAMES,
+    showTitle: script.episodeTitle,
+  });
+
   segments.push({
     type: 'end_screen',
     durationInFrames: END_SCREEN_FRAMES,
@@ -621,6 +875,44 @@ export async function buildCompositionProps(options: BuildOptions): Promise<Epis
   const rawTotal = segments.reduce((sum, s) => sum + s.durationInFrames, 0);
   const transitionOverlap = CROSSFADE_FRAMES * Math.max(0, segments.length - 1);
   const totalDurationInFrames = rawTotal - transitionOverlap;
+
+  // ── Build silence windows + pre-swell from mood data ──
+  // Dramatic moods get audio drops; preceding segments get pre-swell builds
+  const DRAMATIC_MOODS = new Set(['dark', 'cosmic']);
+  const silenceWindows: Array<{ startFrame: number; durationFrames: number }> = [];
+  const preSwellWindows: Array<{ peakFrame: number; rampFrames: number; boostMultiplier: number }> = [];
+
+  {
+    let segCursor = 0;
+    for (let si = 0; si < segments.length; si++) {
+      const seg = segments[si];
+      const segStart = segCursor;
+      segCursor += seg.durationInFrames;
+      if (si < segments.length - 1) segCursor -= CROSSFADE_FRAMES;
+
+      // Check if this segment has a dramatic mood
+      const mood = 'mood' in seg ? (seg as { mood?: string }).mood : undefined;
+      if (mood && DRAMATIC_MOODS.has(mood)) {
+        // Silence window: first 60 frames of dramatic segment (2s of near-silence)
+        silenceWindows.push({
+          startFrame: segStart,
+          durationFrames: 60,
+        });
+        log.info(`Silence window: segment ${si} (${mood}) at frame ${segStart}`);
+
+        // Pre-swell: 45 frames before this segment, 1.5x boost
+        if (si > 0) {
+          preSwellWindows.push({
+            peakFrame: segStart,
+            rampFrames: 45,
+            boostMultiplier: 1.5,
+          });
+          log.info(`Pre-swell: before segment ${si} (${mood}), peak at frame ${segStart}`);
+        }
+      }
+    }
+    log.info(`Built ${silenceWindows.length} silence windows, ${preSwellWindows.length} pre-swell windows`);
+  }
 
   log.info(
     `Built ${segments.length} segments, total ${totalDurationInFrames} frames (${(totalDurationInFrames / FPS).toFixed(1)}s) [${transitionOverlap} frames of crossfade overlap]`,
@@ -635,6 +927,11 @@ export async function buildCompositionProps(options: BuildOptions): Promise<Epis
   if (!hasVinylNoise) log.warn('Ambient file missing: vinyl-noise.mp3 — VinylNoise layer disabled');
   if (!hasCrowdAmbience) log.warn('Ambient file missing: crowd-ambience.mp3 — CrowdAmbience layer disabled');
 
+  // Check BGM audio file existence
+  const bgmPath = resolve(dataDir, 'assets', episodeId, 'bgm', 'bgm-intro.mp3');
+  const hasBgm = existsSync(bgmPath);
+  if (!hasBgm) log.info('No BGM found — narration segments will be music-free');
+
   const props: EpisodeProps = {
     episodeId,
     episodeTitle: script.episodeTitle,
@@ -642,6 +939,13 @@ export async function buildCompositionProps(options: BuildOptions): Promise<Epis
     totalDurationInFrames,
     hasVinylNoise,
     hasCrowdAmbience,
+    // Ambient bed: crowd ambience runs composition-wide, ducked under narration
+    ambientBedSrc: hasCrowdAmbience ? 'assets/ambient/crowd-ambience.mp3' : undefined,
+    // Dramatic audio automation
+    silenceWindows: silenceWindows.length > 0 ? silenceWindows : undefined,
+    preSwellWindows: preSwellWindows.length > 0 ? preSwellWindows : undefined,
+    // BGM under narration (when no concert bed bleed)
+    bgmSrc: hasBgm ? `assets/${episodeId}/bgm/bgm-intro.mp3` : undefined,
   };
 
   // Write props to disk

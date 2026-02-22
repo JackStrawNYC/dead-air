@@ -9,10 +9,10 @@ import { generateNarration } from './narration-generator.js';
 import { generateImage } from './image-generator.js';
 import type { ImageModel } from './image-generator.js';
 import { routeImageBatch } from './model-router.js';
-import type { RoutedBatchItem, RoutedBatchResult, ImageTier } from './model-router.js';
+import type { RoutedBatchItem, RoutedBatchResult, ImageTier, PromptStyle } from './model-router.js';
 import { compositeThumbnail } from './thumbnail-generator.js';
 import { searchArchivalAssets, downloadArchivalAsset } from './archival-fetcher.js';
-import { generateVideoBatch, generateMotionPrompt } from './video-generator.js';
+import { generateVideoBatch, generateMotionPrompt, generatePsychedelicMotionPrompt } from './video-generator.js';
 import type { VideoBatchItem } from './video-generator.js';
 import { searchWikimediaImages, downloadWikimediaImage } from './wikimedia-client.js';
 import { searchFlickrImages, downloadFlickrImage } from './flickr-client.js';
@@ -58,17 +58,19 @@ export interface AssetGenResult {
 
 function assignImageTiers(
   segments: EpisodeSegment[],
-): Array<{ segmentIndex: number; promptIndex: number; prompt: string; tier: ImageTier }> {
+): Array<{ segmentIndex: number; promptIndex: number; prompt: string; tier: ImageTier; style: PromptStyle }> {
   const assignments: Array<{
     segmentIndex: number;
     promptIndex: number;
     prompt: string;
     tier: ImageTier;
+    style: PromptStyle;
   }> = [];
 
   for (let si = 0; si < segments.length; si++) {
     const seg = segments[si];
     const prompts = seg.visual.scenePrompts;
+    const style: PromptStyle = seg.type === 'concert_audio' ? 'psychedelic' : 'documentary';
 
     for (let pi = 0; pi < prompts.length; pi++) {
       // First prompt of narration or concert_audio → hero (Grok Aurora)
@@ -80,6 +82,7 @@ function assignImageTiers(
         promptIndex: pi,
         prompt: prompts[pi],
         tier: isHero ? 'hero' : 'scene',
+        style,
       });
     }
   }
@@ -312,6 +315,7 @@ export async function orchestrateAssetGeneration(
     const batchItems: RoutedBatchItem[] = imageAssignments.map((a) => ({
       prompt: a.prompt,
       tier: a.tier,
+      style: a.style,
       destPath: resolve(
         assetDir,
         'images',
@@ -483,28 +487,64 @@ export async function orchestrateAssetGeneration(
     }
   }
 
-  // 9. Generate video clips from hero images (cap at 15/episode)
+  // 9. Generate video clips from hero images + concert_audio energy peaks
+  //    - Documentary segments: hero image (index 0) → video (existing behavior)
+  //    - Concert_audio segments: hero image + up to 2 energy-peak images → video
+  //    Cap total at videoCap (default 40, ~$14 at $0.35/clip)
   if (!skipVideo && !skipImages) {
     try {
-      const heroImages = result.images
-        .filter((img) => {
-          const assignment = imageAssignments.find(
-            (a) => a.segmentIndex === img.segIndex && a.promptIndex === img.promptIndex,
-          );
-          return assignment?.tier === 'hero';
-        })
-        .slice(0, 15);
+      const videoCap = 40;
+      const videoTargets: Array<{ img: typeof result.images[0]; seg: EpisodeSegment; assignment: typeof imageAssignments[0] }> = [];
 
-      if (heroImages.length > 0) {
-        log.info(`Generating ${heroImages.length} video clips from hero images...`);
+      for (const img of result.images) {
+        const assignment = imageAssignments.find(
+          (a) => a.segmentIndex === img.segIndex && a.promptIndex === img.promptIndex,
+        );
+        if (!assignment) continue;
 
-        const videoBatchItems: VideoBatchItem[] = heroImages.map((img) => {
-          const seg = script.segments[img.segIndex];
+        const seg = script.segments[img.segIndex];
+
+        if (seg?.type === 'concert_audio') {
+          // Concert segments: hero (index 0) always, plus up to 2 peak-aligned images
+          if (assignment.tier === 'hero') {
+            videoTargets.push({ img, seg, assignment });
+          } else if (assignment.promptIndex > 0) {
+            // Select peak-aligned images: high visual intensity segments get more videos
+            const intensity = seg.visual?.visualIntensity ?? 0.5;
+            // Pick images at ~1/3 and ~2/3 through the segment's prompts
+            const totalPrompts = seg.visual.scenePrompts.length;
+            const peakPositions = [
+              Math.floor(totalPrompts / 3),
+              Math.floor((totalPrompts * 2) / 3),
+            ];
+            if (intensity > 0.6 && peakPositions.includes(assignment.promptIndex)) {
+              videoTargets.push({ img, seg, assignment });
+            }
+          }
+        } else if (assignment.tier === 'hero') {
+          // Non-concert hero images → video (existing behavior)
+          videoTargets.push({ img, seg, assignment });
+        }
+      }
+
+      const cappedTargets = videoTargets.slice(0, videoCap);
+
+      if (cappedTargets.length > 0) {
+        log.info(`Generating ${cappedTargets.length} video clips (cap: ${videoCap})...`);
+
+        const videoBatchItems: VideoBatchItem[] = cappedTargets.map(({ img, seg, assignment }) => {
+          const isConcert = seg?.type === 'concert_audio';
+
           const motionPrompt = seg?.visual?.motionPrompts?.[0]
-            ?? generateMotionPrompt({
-              mood: seg?.visual?.mood,
-              visualIntensity: seg?.visual?.visualIntensity,
-            });
+            ?? (isConcert
+              ? generatePsychedelicMotionPrompt({
+                  mood: seg?.visual?.mood,
+                  visualIntensity: seg?.visual?.visualIntensity,
+                })
+              : generateMotionPrompt({
+                  mood: seg?.visual?.mood,
+                  visualIntensity: seg?.visual?.visualIntensity,
+                }));
 
           const destPath = img.filePath.replace(/\.png$/, '.mp4');
           return {

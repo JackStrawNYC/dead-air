@@ -91,27 +91,70 @@ Respond with ONLY valid JSON matching this exact structure. No markdown fences, 
 
 ## VISUAL DIRECTION
 
-Your image prompts will be sent to AI image generators. They MUST produce images that look like vintage 1970s documentary photography — grainy, warm, realistic. NOT digital art, NOT fantasy, NOT stock photos, NOT psychedelic swirls.
+Your image prompts will be sent to AI image generators. The visual style depends on the segment type:
 
-### MANDATORY STYLE RULES
+### TWO VISUAL MODES
+
+**NARRATION & CONTEXT_TEXT segments → Documentary photography style**
+These are grounding/historical segments. Prompts should produce images that look like vintage 1970s documentary photography — grainy, warm, realistic. Think Ken Burns documentary stills.
+
+**CONCERT_AUDIO segments → Psychedelic poster art themed to each song**
+AI can't produce convincing concert photography — it looks fake. Instead, lean into AI's strengths: generate psychedelic poster art themed to each song's lyrics, characters, and story. Think concert poster art, Art Nouveau influences, vivid saturated colors, flowing organic patterns. The visual FX layers (BeatKick, ChromaticAberration, OnsetFlash, ParticleBurst, Halation) already enhance this style perfectly.
+
+### RULES FOR NARRATION & CONTEXT_TEXT PROMPTS (documentary style)
 - **Always specify the actual venue, era, and setting.** "Interior of Barton Hall gymnasium, Cornell University, 1977" not "a concert venue."
 - **Always include**: "vintage 1970s documentary photography, warm film grain, realistic, 35mm film look"
-- **NEVER name or depict specific real people** (Jerry Garcia, Bob Weir, Phil Lesh, Bill Kreutzmann, Mickey Hart, etc.) in scenePrompts. AI-generated portraits of real people look terrible. Instead, describe anonymous musicians, silhouettes, hands on instruments, crowd reactions, venue details, and atmospheric shots. Good: "guitarist's hands on fretboard, warm spotlight." Bad: "Jerry Garcia playing guitar on stage."
-- **Never include abstract, cosmic, or psychedelic imagery** UNLESS the song is literally Space, Dark Star, or a psychedelic jam.
-- **Never describe text, tickets, posters, signage, or documents** — AI generators produce garbled text that looks terrible.
+- **Ground every image in physical reality**: real people, real places, real objects. Think Ken Burns documentary stills.
+- Good: "Packed college gymnasium crowd at Barton Hall, Cornell University, warm amber stage lighting cutting through haze, silhouettes of students with raised hands, 1977, vintage 35mm documentary photography, warm film grain"
+- Good: "Close-up of guitar neck and hands on fretboard, warm spotlight, sweat visible, vintage 1970s concert photography, shallow depth of field, film grain"
+
+### RULES FOR CONCERT_AUDIO PROMPTS (psychedelic poster art)
+- **Reference the song's themes, lyrics, characters, and story** — NOT the band members or venue.
+- **Style directive**: "psychedelic concert poster art, flowing organic patterns, vivid saturated colors, Art Nouveau influences"
+- **Hero prompts** (first prompt of each segment) should describe subjects with morphing potential for video generation: flowers blooming, fractals expanding, cosmic swirls, flames rising, waves crashing.
+- Good: "Scarlet flowers blooming through cosmic nebula, stardust trails cascading like rain, psychedelic concert poster art, vivid saturated colors, Art Nouveau influences, deep space background"
+- Good: "Two outlaws silhouetted against a fractal desert sky, neon cacti glowing, swirling starfield above, psychedelic poster art, flowing organic patterns, warm earth tones meeting cosmic purples"
+- Good: "Post-apocalyptic sunrise over crystalline wasteland, ethereal light beams through prismatic clouds, psychedelic art, flowing organic forms, delicate watercolor meets bold poster design"
+- Good: "Infinite cosmic void with spiraling galaxies, aurora borealis fractals pulsing with rhythm, deep psychedelic art, flowing nebula patterns, Art Nouveau star formations"
+- Bad: "Jerry Garcia playing guitar on stage" — never depict real people
+- Bad: "Realistic concert photograph of a band performing" — this is what we're moving AWAY from
+- Bad: "Psychedelic kaleidoscope of random colors" — too generic, must be themed to the specific song
+- Bad: "Concert ticket for Grateful Dead show" — AI text is always garbled
+
+### SHARED RULES (both styles)
+- **NEVER name or depict specific real people** (Jerry Garcia, Bob Weir, Phil Lesh, Bill Kreutzmann, Mickey Hart, etc.) in scenePrompts. AI-generated portraits of real people look terrible. Instead, describe anonymous musicians, silhouettes, hands on instruments, crowd reactions, venue details, and atmospheric shots.
+- **Never describe text, tickets, posters, signage, or documents** — AI generators produce garbled text.
 - **Every prompt must end with**: "no text, no words, no letters, no writing, no signs, no logos"
-- **Ground every image in physical reality**: real people, real places, real objects from 1977. Think Ken Burns documentary stills, not album cover art.
 
-### WHAT GOOD PROMPTS LOOK LIKE
-- "Packed college gymnasium crowd at Barton Hall, Cornell University, warm amber stage lighting cutting through haze, silhouettes of students with raised hands, 1977, vintage 35mm documentary photography, warm film grain, no text, no words, no letters, no writing, no signs, no logos"
-- "Close-up of guitar neck and hands on fretboard, warm spotlight, sweat visible, vintage 1970s concert photography, shallow depth of field, film grain, no text, no words, no letters, no writing, no signs, no logos"
-- "Crowd in a 1970s college gymnasium viewed from stage, faces lit by warm amber light, long hair and tie-dye visible, smoke haze, vintage documentary photography, no text, no words, no letters, no writing, no signs, no logos"
+### SONG VISUAL THEMES REFERENCE
 
-### WHAT BAD PROMPTS LOOK LIKE (DO NOT DO THIS)
-- "Cosmic swirling nebula of music energy" — this produces AI art, not documentary footage
-- "Vintage concert ticket for Grateful Dead at Cornell" — AI text is always garbled
-- "Psychedelic kaleidoscope of sound and color" — too abstract, no grounding in reality
-- "Professional mixing board in a recording studio" — generic stock imagery
+Use these as inspiration for concert_audio scenePrompts. Match the song's story and lyrics to the visual theme:
+  - "Jack Straw": two outlaws under a fractal desert sky, neon cacti, swirling starfield
+  - "Scarlet Begonias": scarlet flowers blooming through cosmic nebula, stardust trails
+  - "Morning Dew": post-apocalyptic sunrise over crystalline wasteland, ethereal light
+  - "Dark Star": infinite cosmic void with spiraling galaxies, aurora borealis fractals
+  - "Fire on the Mountain": blazing mountain peak with rivers of molten light, ember spirals ascending into aurora sky
+  - "Eyes of the World": giant luminous eye reflecting a fractal Earth, prismatic light rays
+  - "China Cat Sunflower": kaleidoscopic sunflower with crystalline petals, Cheshire cat dissolving into prismatic fractals
+  - "St. Stephen": stained glass saint shattering into prismatic shards, medieval geometry meets cosmic energy
+  - "The Other One": fractured reality splitting into parallel dimensions, electric lightning between mirrored worlds
+  - "Playing in the Band": musicians dissolving into pure sound waves, instruments morphing into flowing light streams
+  - "Estimated Prophet": wild-eyed prophet on a cliff above churning fractal ocean, lightning and revelation
+  - "Terrapin Station": ancient stone station at the edge of the cosmos, terrapin shells spiraling into galaxies
+  - "Help on the Way": labyrinthine crystal corridors reflecting infinite pathways, geometric precision melting into organic flow
+  - "Truckin'": endless highway dissolving into fractal horizon, neon motel signs melting into desert mirage
+  - "Sugar Magnolia": enormous magnolia blossom opening to reveal a universe of golden pollen and butterflies
+  - "Uncle John's Band": circle of spectral musicians in a moonlit meadow, fireflies forming constellations
+  - "Bird Song": luminous birds trailing ribbons of pure color across a dawn sky, feathers dissolving into music notes
+  - "Wharf Rat": rain-soaked waterfront at twilight, neon reflections in puddles, solitary figure silhouetted
+  - "Stella Blue": deep blue void with a single fading star, melancholy light cascading like slow rain
+  - "Not Fade Away": pulsing heartbeat ripple expanding outward through layers of warm light
+  - "Drums": tribal rhythmic patterns radiating from center, concentric percussion waves in deep earth tones
+  - "Space": formless cosmic void, nebula clouds shifting between dimensions, pure abstract energy
+  - "The Wheel": enormous cosmic wheel turning slowly through starfields, spokes of pure light
+  - "Althea": woman made of flowing water and wildflowers standing at a crossroads, gentle psychedelic warmth
+
+For songs not listed, generate a theme based on the song's lyrics, story, and mood. Use the mood field to guide the visual temperature.
 
 ### COLOR PALETTE
 - **colorPalette** should evolve with the music:
@@ -119,12 +162,13 @@ Your image prompts will be sent to AI image generators. They MUST produce images
   - Electric/cooler (teals, deep blues, silvers) for electric jams and high-energy moments
   - Dark/muted (navy, charcoal, deep green) for quiet passages and space
   - Rich/saturated (deep golds, warm oranges, burgundy) for peak moments
+  - Psychedelic/vivid (deep purples, electric blues, hot magentas, neon greens) for psychedelic jams
 - Each image displays for ~5 seconds with a Ken Burns pan/zoom, so the number of scenePrompts MUST scale with segment duration:
   - Short segments (<20s): 3-4 scenePrompts
   - Medium segments (20-45s): 5-9 scenePrompts
   - Long segments (45-90s): 9-18 scenePrompts
   - Very long segments (90-120s): 18-24 scenePrompts
-  CRITICAL: match scenePrompts count to segment duration. A 60s concert segment MUST have 12 scenePrompts. A 90s segment needs 18. Each image displays for ~5 seconds; do the math. Each prompt should show a DIFFERENT angle or subject — wide shot, close-up, crowd, stage, venue exterior, etc.
+  CRITICAL: match scenePrompts count to segment duration. A 60s concert segment MUST have 12 scenePrompts. A 90s segment needs 18. Each image displays for ~5 seconds; do the math. Each prompt should show a DIFFERENT angle or subject — vary the visual theme, zoom level, and composition across prompts.
 - **thumbnailPrompt** must be dramatic and work at YouTube thumbnail size — bold, high contrast, iconic imagery of the actual venue/era. Must end with the no-text instruction.
 
 ## RESEARCH CONTEXT
