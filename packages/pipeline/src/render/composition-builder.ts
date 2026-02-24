@@ -129,7 +129,9 @@ async function getAudioDurationSec(filePath: string): Promise<number> {
 }
 
 /**
- * Resolve images for a segment, preferring .mp4 video over .png.
+ * Resolve images for a segment, preferring .png over .mp4.
+ * Static images avoid the OffthreadVideo compositor which leaks memory
+ * and causes OOM crashes (SIGKILL) on long renders.
  */
 function resolveImages(
   segment: EpisodeSegment,
@@ -141,14 +143,14 @@ function resolveImages(
   const sceneCount = segment.visual?.scenePrompts?.length ?? 0;
   for (let pi = 0; pi < sceneCount; pi++) {
     const baseName = `seg-${String(segIndex).padStart(2, '0')}-${pi}`;
-    const videoRelPath = `assets/${episodeId}/images/${baseName}.mp4`;
     const imageRelPath = `assets/${episodeId}/images/${baseName}.png`;
+    const videoRelPath = `assets/${episodeId}/images/${baseName}.mp4`;
 
-    // Prefer video over static image
-    if (existsSync(resolve(dataDir, videoRelPath))) {
-      images.push(videoRelPath);
-    } else if (existsSync(resolve(dataDir, imageRelPath))) {
+    // Prefer static image — video backgrounds cause compositor OOM on long segments
+    if (existsSync(resolve(dataDir, imageRelPath))) {
       images.push(imageRelPath);
+    } else if (existsSync(resolve(dataDir, videoRelPath))) {
+      images.push(videoRelPath);
     }
   }
   return images;

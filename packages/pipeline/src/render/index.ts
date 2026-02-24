@@ -18,3 +18,9 @@ export type { ShortsProps, ShortsBuilderOptions } from './shorts-builder.js';
 
 export { renderShorts } from './shorts-renderer.js';
 export type { ShortsRenderOptions, ShortsRenderResult } from './shorts-renderer.js';
+
+export { renderScenes, concatScenes } from './scene-renderer.js';
+export type { SceneRenderOptions, SceneRenderResult } from './scene-renderer.js';
+
+export { generateSubtitles } from './subtitle-generator.js';
+export type { SubtitleOptions, SubtitleResult } from './subtitle-generator.js';
