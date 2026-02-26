@@ -8,6 +8,7 @@
 import React from "react";
 import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
+import { useShowContext } from "../data/ShowContext";
 
 /** Seeded PRNG (mulberry32) */
 function seeded(seed: number): () => number {
@@ -19,30 +20,6 @@ function seeded(seed: number): () => number {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
-
-// -- Setlist data -----------------------------------------------------------
-
-const SET_1 = [
-  "Minglewood Blues",
-  "Loser",
-  "El Paso",
-  "They Love Each Other",
-  "Jack Straw",
-  "Deal",
-  "Lazy Lightnin'",
-  "Supplication",
-];
-
-const SET_2 = [
-  "Scarlet Begonias",
-  "Fire on the Mountain",
-  "Estimated Prophet",
-  "St. Stephen",
-  "Not Fade Away",
-  "Drums/Space",
-  "Morning Dew",
-  "Saturday Night",
-];
 
 // -- Timing -----------------------------------------------------------------
 
@@ -72,6 +49,7 @@ interface Props {
 export const SetlistScroll: React.FC<Props> = ({ frames, currentSong }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
+  const ctx = useShowContext();
 
   // Rolling energy (75-frame window each side)
   const idx = Math.min(Math.max(0, frame), frames.length - 1);
@@ -123,7 +101,7 @@ export const SetlistScroll: React.FC<Props> = ({ frames, currentSong }) => {
   });
 
   // Seeded jitter for authentic handwritten feel
-  const rng = seeded(frame * 7 + 1977);
+  const rng = seeded(frame * 7 + (ctx?.dateSeed ?? 1977));
   const jitterX = (rng() - 0.5) * 1.2;
   const jitterY = (rng() - 0.5) * 1.2;
 
@@ -214,7 +192,7 @@ export const SetlistScroll: React.FC<Props> = ({ frames, currentSong }) => {
               marginBottom: 2,
             }}
           >
-            Cornell 5/8/77
+            {ctx ? `${ctx.venueShort} ${ctx.dateShort}` : "Cornell 5/8/77"}
           </div>
 
           {/* Divider line */}
@@ -227,42 +205,31 @@ export const SetlistScroll: React.FC<Props> = ({ frames, currentSong }) => {
             }}
           />
 
-          {/* Set 1 label */}
-          <div
-            style={{
-              fontFamily: "Georgia, serif",
-              fontSize: 10,
-              fontWeight: 700,
-              fontStyle: "italic",
-              color: "rgba(100, 70, 40, 0.6)",
-              marginBottom: 2,
-              letterSpacing: 1,
-            }}
-          >
-            Set I
-          </div>
-
-          {/* Set 1 songs */}
-          {SET_1.map((song, i) => renderSongLine(song, i))}
-
-          {/* Set 2 label */}
-          <div
-            style={{
-              fontFamily: "Georgia, serif",
-              fontSize: 10,
-              fontWeight: 700,
-              fontStyle: "italic",
-              color: "rgba(100, 70, 40, 0.6)",
-              marginTop: 8,
-              marginBottom: 2,
-              letterSpacing: 1,
-            }}
-          >
-            Set II
-          </div>
-
-          {/* Set 2 songs */}
-          {SET_2.map((song, i) => renderSongLine(song, i + SET_1.length))}
+          {/* Setlist sets from context */}
+          {(ctx?.setlistSets ?? []).map((set, setIdx) => {
+            const songOffset = ctx!.setlistSets
+              .slice(0, setIdx)
+              .reduce((sum, s) => sum + s.songs.length, 0);
+            return (
+              <React.Fragment key={set.label}>
+                {setIdx > 0 && <div style={{ height: 8 }} />}
+                <div
+                  style={{
+                    fontFamily: "Georgia, serif",
+                    fontSize: 10,
+                    fontWeight: 700,
+                    fontStyle: "italic",
+                    color: "rgba(100, 70, 40, 0.6)",
+                    marginBottom: 2,
+                    letterSpacing: 1,
+                  }}
+                >
+                  {set.label}
+                </div>
+                {set.songs.map((song, i) => renderSongLine(song, i + songOffset))}
+              </React.Fragment>
+            );
+          })}
         </div>
       </div>
     </div>

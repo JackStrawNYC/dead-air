@@ -6,9 +6,10 @@
  * Deterministic via mulberry32 PRNG.
  */
 
-import React from "react";
+import React, { useMemo } from "react";
 import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
+import { useShowContext } from "../data/ShowContext";
 
 /** Seeded PRNG (mulberry32) */
 function seeded(seed: number): () => number {
@@ -21,16 +22,41 @@ function seeded(seed: number): () => number {
   };
 }
 
-// -- Label text lines -------------------------------------------------------
+// -- Label text lines (fallback when no context) ---------------------------
 
-const LABEL_LINES = [
-  { text: "GRATEFUL DEAD", style: "title" as const },
-  { text: "Cornell University - Barton Hall", style: "venue" as const },
-  { text: "Ithaca, NY  5/8/77", style: "date" as const },
-  { text: "", style: "spacer" as const },
-  { text: "SBD > Master Reel > Cassette", style: "chain" as const },
-  { text: "Betty Boards", style: "taper" as const },
+interface LabelLine {
+  text: string;
+  style: "title" | "venue" | "date" | "spacer" | "chain" | "taper";
+}
+
+const DEFAULT_LABEL_LINES: LabelLine[] = [
+  { text: "GRATEFUL DEAD", style: "title" },
+  { text: "Cornell University - Barton Hall", style: "venue" },
+  { text: "Ithaca, NY  5/8/77", style: "date" },
+  { text: "", style: "spacer" },
+  { text: "SBD > Master Reel > Cassette", style: "chain" },
+  { text: "Betty Boards", style: "taper" },
 ];
+
+function buildLabelLines(ctx: ReturnType<typeof useShowContext>): LabelLine[] {
+  if (!ctx) return DEFAULT_LABEL_LINES;
+
+  // Split taper info into chain + taper lines if it contains " — "
+  const taperParts = ctx.taperInfo ? ctx.taperInfo.split(" — ") : [];
+  const chainLine = taperParts[0] ?? "";
+  const taperLine = taperParts[1] ?? taperParts[0] ?? "";
+
+  return [
+    { text: ctx.bandName.toUpperCase(), style: "title" },
+    { text: ctx.venue, style: "venue" },
+    { text: `${ctx.venueLocation}  ${ctx.dateShort}`, style: "date" },
+    { text: "", style: "spacer" },
+    ...(chainLine ? [{ text: chainLine, style: "chain" as const }] : []),
+    ...(taperLine && taperLine !== chainLine
+      ? [{ text: taperLine, style: "taper" as const }]
+      : []),
+  ];
+}
 
 // -- Component --------------------------------------------------------------
 
@@ -41,6 +67,8 @@ interface Props {
 export const BootlegLabel: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { durationInFrames } = useVideoConfig();
+  const ctx = useShowContext();
+  const labelLines = useMemo(() => buildLabelLines(ctx), [ctx]);
 
   // Rolling energy (75-frame window each side)
   const idx = Math.min(Math.max(0, frame), frames.length - 1);
@@ -191,7 +219,7 @@ export const BootlegLabel: React.FC<Props> = ({ frames }) => {
           }}
         >
           {/* Label lines */}
-          {LABEL_LINES.map((line, i) => renderLine(line, i))}
+          {labelLines.map((line, i) => renderLine(line, i))}
 
           {/* Divider */}
           <div

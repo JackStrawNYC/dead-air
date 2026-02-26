@@ -207,6 +207,10 @@ export interface ShowSetlist {
   date: string;
   /** Venue */
   venue: string;
+  /** Band name (defaults to "Grateful Dead") */
+  bandName?: string;
+  /** Taper/source info for bootleg label */
+  taperInfo?: string;
   /** All songs in order */
   songs: SetlistEntry[];
   /** Path to show intro poster art (relative to public/) */

@@ -6,9 +6,10 @@
  * Deterministic via mulberry32 PRNG.
  */
 
-import React from "react";
+import React, { useMemo } from "react";
 import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
+import { useShowContext } from "../data/ShowContext";
 
 /** Seeded PRNG (mulberry32) */
 function seeded(seed: number): () => number {
@@ -45,21 +46,17 @@ interface PosterDesign {
   };
 }
 
-const POSTERS: PosterDesign[] = [
-  {
-    bandLine: "GRATEFUL DEAD",
-    venueLine: "Barton Hall",
-    dateLine: "May 8, 1977",
-    extraLine: "Cornell University - Ithaca, NY",
-    colorScheme: {
-      bg: "rgba(20, 5, 35, 0.85)",
-      border: "#FF00FF",
-      primary: "#FF1493",
-      secondary: "#FFD700",
-      accent: "#00FFFF",
-      glow: "#FF00FF",
-    },
-  },
+/** Poster 0 is a placeholder — replaced at runtime with show context data */
+const POSTER_0_COLORS = {
+  bg: "rgba(20, 5, 35, 0.85)",
+  border: "#FF00FF",
+  primary: "#FF1493",
+  secondary: "#FFD700",
+  accent: "#00FFFF",
+  glow: "#FF00FF",
+};
+
+const STATIC_POSTERS: PosterDesign[] = [
   {
     bandLine: "THE GRATEFUL DEAD",
     venueLine: "Fillmore West",
@@ -290,6 +287,19 @@ interface Props {
 export const TourPosterGallery: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { durationInFrames } = useVideoConfig();
+  const ctx = useShowContext();
+
+  // Build poster list: poster 0 = actual show, 1-3 = decorative
+  const posters = useMemo<PosterDesign[]>(() => {
+    const showPoster: PosterDesign = {
+      bandLine: (ctx?.bandName ?? "GRATEFUL DEAD").toUpperCase(),
+      venueLine: ctx?.venueShort ?? "Barton Hall",
+      dateLine: ctx?.date ?? "May 8, 1977",
+      extraLine: ctx ? `${ctx.venueLocation}` : "Cornell University - Ithaca, NY",
+      colorScheme: POSTER_0_COLORS,
+    };
+    return [showPoster, ...STATIC_POSTERS];
+  }, [ctx]);
 
   // Rolling energy (75-frame window each side)
   const idx = Math.min(Math.max(0, frame), frames.length - 1);
@@ -329,8 +339,8 @@ export const TourPosterGallery: React.FC<Props> = ({ frames }) => {
 
   // Which poster to show (cycle through based on appearance count)
   const cycleIndex = Math.floor(frame / REAPPEAR_INTERVAL);
-  const posterIdx = cycleIndex % POSTERS.length;
-  const poster = POSTERS[posterIdx];
+  const posterIdx = cycleIndex % posters.length;
+  const poster = posters[posterIdx];
 
   // Slide in from top
   const slideY = interpolate(cycleFrame, [0, FADE_IN_FRAMES], [-30, 0], {

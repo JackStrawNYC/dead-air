@@ -40,7 +40,7 @@ export const SongTitle: React.FC<Props> = ({ title, setNumber, trackNumber }) =>
     <div
       style={{
         position: "absolute",
-        bottom: 120,
+        bottom: 150,
         left: 0,
         right: 0,
         display: "flex",

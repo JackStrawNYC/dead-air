@@ -208,7 +208,7 @@ function renderShowIntro(): string | null {
     return outputPath;
   }
 
-  console.log("\nRendering show intro (18s) ...");
+  console.log("\nRendering show intro (10s) ...");
   const cmd = [
     "npx remotion render",
     ENTRY,

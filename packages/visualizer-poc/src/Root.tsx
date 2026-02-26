@@ -5,6 +5,7 @@ import { ShowIntro } from "./components/ShowIntro";
 import { ChapterCard } from "./components/ChapterCard";
 import { EndCard } from "./components/EndCard";
 import type { SetlistEntry, ShowSetlist, OverlaySchedule } from "./data/types";
+import { formatDateLong } from "./data/ShowContext";
 import setlistData from "../data/setlist.json";
 import showContextData from "../data/show-context.json";
 
@@ -21,7 +22,7 @@ const setlist = setlistData as ShowSetlist;
 
 const DEFAULT_FRAMES = 31417; // Morning Dew fallback
 const SET_BREAK_FRAMES = 150; // 5 seconds at 30fps
-const SHOW_INTRO_FRAMES = 540; // 18 seconds at 30fps (8s brand + 10s poster)
+const SHOW_INTRO_FRAMES = 300; // 10 seconds at 30fps (5s brand + 5s poster)
 const CHAPTER_CARD_FRAMES = 180; // 6 seconds at 30fps
 const END_CARD_FRAMES = 360;     // 12 seconds at 30fps
 
@@ -70,8 +71,9 @@ export const Root: React.FC = () => {
           defaultProps={{
             brandSrc: "assets/song-art/dead-air-brand.png",
             posterSrc: setlist.showPoster,
-            date: "May 8, 1977",
+            date: formatDateLong(setlist.date),
             venue: setlist.venue,
+            introAudioSrc: `audio/${setlist.songs[0]?.audioFile}`,
           }}
         />
       )}
@@ -103,6 +105,7 @@ export const Root: React.FC = () => {
           defaultProps={{
             song,
             activeOverlays: getActiveOverlays(song.trackId),
+            show: setlist,
           } satisfies SongVisualizerProps as Record<string, unknown>}
           calculateMetadata={async ({ props }) => {
             const meta = props.meta as { totalFrames?: number } | undefined;
@@ -135,8 +138,8 @@ export const Root: React.FC = () => {
         defaultProps={{
           brandSrc: "assets/song-art/dead-air-brand.png",
           posterSrc: setlist.showPoster,
-          date: "May 8, 1977",
-          venue: "Barton Hall, Cornell University",
+          date: formatDateLong(setlist.date),
+          venue: setlist.venue,
         }}
       />
 
@@ -151,6 +154,7 @@ export const Root: React.FC = () => {
         defaultProps={{
           song: setlist.songs.find((s) => s.trackId === "s2t08")!,
           activeOverlays: getActiveOverlays("s2t08"),
+          show: setlist,
         } satisfies SongVisualizerProps as Record<string, unknown>}
         calculateMetadata={async ({ props }) => {
           const meta = props.meta as { totalFrames?: number } | undefined;

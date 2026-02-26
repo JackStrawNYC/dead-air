@@ -21,22 +21,23 @@ import { SetlistScroll } from "./components/SetlistScroll";
 import { FilmGrain } from "./components/FilmGrain";
 
 import { loadAnalysis, getSections } from "./data/analysis-loader";
-import type { SetlistEntry, TrackAnalysis } from "./data/types";
+import type { SetlistEntry, ShowSetlist, TrackAnalysis } from "./data/types";
+import { ShowContextProvider } from "./data/ShowContext";
 
 const FADE_FRAMES = 90; // 3 seconds at 30fps
 
 // ─── Song Art Phases ───
-const ART_FULL_END = 900;      // 30s at 30fps — full opacity title card
-const ART_FADE_END = 1080;     // 36s — fade completes
+const ART_FULL_END = 120;      // 4s at 30fps — full opacity title card
+const ART_FADE_END = 300;      // 10s — fade completes (6s transition)
 const ART_BG_OPACITY = 0.15;   // background wash opacity
 
 /** Per-song psychedelic poster art with 3-phase animation */
 const SongArtLayer: React.FC<{ src: string }> = ({ src }) => {
   const frame = useCurrentFrame();
 
-  // Phase 1 (0–900): full opacity
-  // Phase 2 (900–1080): fade 1.0 → 0.15
-  // Phase 3 (1080+): hold at 0.15
+  // Phase 1 (0–120): full opacity (4s title card)
+  // Phase 2 (120–300): fade 1.0 → 0.15 (6s transition)
+  // Phase 3 (300+): hold at 0.15 background wash
   const artOpacity = interpolate(
     frame,
     [0, ART_FULL_END, ART_FADE_END],
@@ -48,11 +49,11 @@ const SongArtLayer: React.FC<{ src: string }> = ({ src }) => {
     },
   );
 
-  // Slow Ken Burns zoom: 1.0 → 1.08 (phase 1+2), then 1.08 → 1.15 (phase 3)
+  // Slow Ken Burns zoom: 1.0 → 1.04 (phase 1+2), then 1.04 → 1.10 (phase 3 bg wash)
   const scale = interpolate(
     frame,
     [0, ART_FADE_END, ART_FADE_END + 9000],
-    [1.0, 1.08, 1.15],
+    [1.0, 1.04, 1.10],
     { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
   );
 
@@ -60,7 +61,7 @@ const SongArtLayer: React.FC<{ src: string }> = ({ src }) => {
   const translateX = interpolate(
     frame,
     [0, ART_FADE_END + 9000],
-    [0, -15],
+    [0, -10],
     { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
   );
 
@@ -79,6 +80,7 @@ const SongArtLayer: React.FC<{ src: string }> = ({ src }) => {
           width: "100%",
           height: "100%",
           objectFit: "cover",
+          objectPosition: "center 55%",
           transform: `scale(${scale}) translateX(${translateX}px)`,
           willChange: "transform",
         }}
@@ -110,6 +112,8 @@ export interface SongVisualizerProps {
   song: SetlistEntry;
   /** Active overlay names (from overlay schedule). If undefined, all overlays render. */
   activeOverlays?: string[];
+  /** Full show setlist (for ShowContext) */
+  show?: ShowSetlist;
 }
 
 export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
@@ -144,7 +148,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
 
   // Per-frame overlay opacities
   const opacityMap = rotationSchedule
-    ? getOverlayOpacities(frame, rotationSchedule)
+    ? getOverlayOpacities(frame, rotationSchedule, analysis?.frames)
     : null;
 
   if (!analysis || analysis.frames.length === 0) {
@@ -201,39 +205,41 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
         )}
 
         {/* ═══ Dynamic overlay layers (1-10) ═══ */}
-        {/* Hidden during poster art phase, then fade in over 6 seconds */}
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            opacity: props.song.songArt
-              ? interpolate(frame, [ART_FULL_END, ART_FULL_END + 180], [0, 1], {
-                  extrapolateLeft: "clamp",
-                  extrapolateRight: "clamp",
-                  easing: Easing.out(Easing.cubic),
-                })
-              : 1,
-          }}
-        >
-          {activeEntries.map(([name, { Component }]) => {
-            const overlayOpacity = opacityMap ? (opacityMap[name] ?? 0) : 1;
-            return (
-              <div
-                key={name}
-                style={{
-                  position: "absolute",
-                  inset: 0,
-                  opacity: overlayOpacity,
-                  pointerEvents: "none",
-                }}
-              >
-                <Component frames={f} />
-              </div>
-            );
-          })}
-          <ConcertInfo songTitle={props.song.title} />
-          <SetlistScroll frames={f} currentSong={props.song.title} />
-        </div>
+        {/* Hidden during title card, then fade in over 3 seconds */}
+        <ShowContextProvider show={props.show}>
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              opacity: props.song.songArt
+                ? interpolate(frame, [ART_FULL_END, ART_FULL_END + 90], [0, 1], {
+                    extrapolateLeft: "clamp",
+                    extrapolateRight: "clamp",
+                    easing: Easing.out(Easing.cubic),
+                  })
+                : 1,
+            }}
+          >
+            {activeEntries.map(([name, { Component }]) => {
+              const overlayOpacity = opacityMap ? (opacityMap[name] ?? 0) : 1;
+              return (
+                <div
+                  key={name}
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    opacity: overlayOpacity,
+                    pointerEvents: "none",
+                  }}
+                >
+                  <Component frames={f} />
+                </div>
+              );
+            })}
+            <ConcertInfo songTitle={props.song.title} />
+            <SetlistScroll frames={f} currentSong={props.song.title} />
+          </div>
+        </ShowContextProvider>
 
         {/* ═══ Always-active: special-prop components ═══ */}
         <SongTitle

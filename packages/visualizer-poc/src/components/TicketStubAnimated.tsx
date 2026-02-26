@@ -9,6 +9,7 @@
 import React from "react";
 import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
+import { useShowContext } from "../data/ShowContext";
 
 function seeded(seed: number): () => number {
   let s = seed | 0;
@@ -38,6 +39,15 @@ interface Props {
 export const TicketStubAnimated: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width } = useVideoConfig();
+  const ctx = useShowContext();
+
+  const bandName = ctx?.bandName?.toUpperCase() ?? "GRATEFUL DEAD";
+  const venueDateLine = ctx
+    ? `${ctx.venueShort.toUpperCase()} - ${ctx.date.toUpperCase()}`
+    : "BARTON HALL - MAY 8, 1977";
+  const locationLine = ctx
+    ? ctx.venueLocation.toUpperCase()
+    : "CORNELL UNIVERSITY, ITHACA NY";
 
   const idx = Math.min(Math.max(0, frame), frames.length - 1);
 
@@ -52,13 +62,13 @@ export const TicketStubAnimated: React.FC<Props> = ({ frames }) => {
 
   // Perforation dots (must be before any return null)
   const perfDots = React.useMemo(() => {
-    const rng = seeded(19770508);
+    const rng = seeded(ctx?.dateSeed ?? 19770508);
     return Array.from({ length: NUM_PERF_DOTS }, (_, i) => ({
       y: 6 + (i / (NUM_PERF_DOTS - 1)) * (TICKET_H - 12),
       offsetX: (rng() - 0.5) * 1.5,
       size: 1.5 + rng() * 1,
     }));
-  }, []);
+  }, [ctx?.dateSeed]);
 
   // Cycle timing
   const cyclePos = frame % CYCLE_PERIOD;
@@ -157,7 +167,7 @@ export const TicketStubAnimated: React.FC<Props> = ({ frames }) => {
               fill={perfColor}
             />
           ))}
-          {/* Title: GRATEFUL DEAD */}
+          {/* Band name */}
           <text
             x={PERFORATION_X / 2}
             y={18}
@@ -170,7 +180,7 @@ export const TicketStubAnimated: React.FC<Props> = ({ frames }) => {
               letterSpacing: 2.5,
             }}
           >
-            GRATEFUL DEAD
+            {bandName}
           </text>
           {/* Venue / date */}
           <text
@@ -184,7 +194,7 @@ export const TicketStubAnimated: React.FC<Props> = ({ frames }) => {
               letterSpacing: 0.5,
             }}
           >
-            BARTON HALL - MAY 8, 1977
+            {venueDateLine}
           </text>
           {/* Location */}
           <text
@@ -198,7 +208,7 @@ export const TicketStubAnimated: React.FC<Props> = ({ frames }) => {
               letterSpacing: 0.3,
             }}
           >
-            CORNELL UNIVERSITY, ITHACA NY
+            {locationLine}
           </text>
           {/* Divider line */}
           <line

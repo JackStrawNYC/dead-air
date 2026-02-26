@@ -6,6 +6,7 @@
 
 import React from "react";
 import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
+import { useShowContext, formatDateCompact } from "../data/ShowContext";
 
 const SHOW_DURATION = 210; // 7 seconds visible
 const FADE_IN = 60;
@@ -19,12 +20,18 @@ interface Props {
 }
 
 export const ConcertInfo: React.FC<Props> = ({
-  venue = "BARTON HALL, CORNELL UNIVERSITY",
-  date = "MAY 8, 1977",
+  venue: venueProp,
+  date: dateProp,
   songTitle,
 }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
+  const ctx = useShowContext();
+
+  const venue = (venueProp ?? ctx?.venue ?? "BARTON HALL, CORNELL UNIVERSITY").toUpperCase();
+  const date = (dateProp ?? ctx?.date ?? "MAY 8, 1977").toUpperCase();
+  const bandName = ctx?.bandName ?? "GRATEFUL DEAD";
+  const ticketNumber = ctx ? formatDateCompact(ctx.dateRaw) : "05081977";
 
   // Show at start and every REAPPEAR_INTERVAL frames
   const cycleFrame = frame % REAPPEAR_INTERVAL;
@@ -74,7 +81,7 @@ export const ConcertInfo: React.FC<Props> = ({
             willChange: "transform, opacity",
           }}
         >
-          {/* GRATEFUL DEAD */}
+          {/* Band name */}
           <div
             style={{
               fontSize: 52,
@@ -86,7 +93,7 @@ export const ConcertInfo: React.FC<Props> = ({
               textTransform: "uppercase",
             }}
           >
-            GRATEFUL DEAD
+            {bandName}
           </div>
 
           {/* Venue */}
@@ -175,11 +182,11 @@ export const ConcertInfo: React.FC<Props> = ({
           }}
         >
           <div style={{ fontSize: 7, letterSpacing: 3, opacity: 0.6 }}>ADMIT ONE</div>
-          <div style={{ fontWeight: 700, fontSize: 11, marginTop: 2 }}>GRATEFUL DEAD</div>
+          <div style={{ fontWeight: 700, fontSize: 11, marginTop: 2 }}>{bandName}</div>
           <div style={{ fontSize: 9, opacity: 0.8 }}>{venue.split(",")[0]}</div>
           <div style={{ fontSize: 9, opacity: 0.7 }}>{date}</div>
           <div style={{ borderTop: "1px dashed rgba(255,200,100,0.3)", marginTop: 4, paddingTop: 3, fontSize: 8, opacity: 0.5 }}>
-            NO. 05081977 &nbsp; GA
+            NO. {ticketNumber} &nbsp; GA
           </div>
         </div>
       </div>
