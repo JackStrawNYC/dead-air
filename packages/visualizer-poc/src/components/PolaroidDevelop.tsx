@@ -9,6 +9,7 @@
 import React from "react";
 import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
+import { useShowContext } from "../data/ShowContext";
 
 function seeded(seed: number): () => number {
   let s = seed | 0;
@@ -45,6 +46,7 @@ interface Props {
 export const PolaroidDevelop: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
+  const ctx = useShowContext();
 
   const idx = Math.min(Math.max(0, frame), frames.length - 1);
   let eSum = 0;
@@ -58,7 +60,7 @@ export const PolaroidDevelop: React.FC<Props> = ({ frames }) => {
   // Pre-compute photo events
   const photoEvents = React.useMemo(() => {
     const events: PhotoEvent[] = [];
-    const rng = seeded(19770508);
+    const rng = seeded(ctx?.showSeed ?? 19770508);
     const totalFrames = frames.length;
     let f = PHOTO_INTERVAL;
     while (f < totalFrames) {
@@ -87,7 +89,7 @@ export const PolaroidDevelop: React.FC<Props> = ({ frames }) => {
       f += PHOTO_INTERVAL;
     }
     return events;
-  }, [frames, width, height]);
+  }, [frames, width, height, ctx?.showSeed]);
 
   // Find active photo
   const activePhoto = photoEvents.find(
@@ -216,7 +218,7 @@ export const PolaroidDevelop: React.FC<Props> = ({ frames }) => {
             letterSpacing: 1,
           }}
         >
-          1977
+          {ctx?.dateRaw?.slice(0, 4) ?? "1977"}
         </div>
       </div>
     </div>

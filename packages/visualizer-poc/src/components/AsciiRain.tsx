@@ -7,6 +7,7 @@
 import React from "react";
 import { useCurrentFrame, useVideoConfig, interpolate } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
+import { useShowContext } from "../data/ShowContext";
 
 function seeded(seed: number): () => number {
   let s = seed | 0;
@@ -46,6 +47,7 @@ interface Props {
 export const AsciiRain: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
+  const ctx = useShowContext();
 
   const idx = Math.min(Math.max(0, frame), frames.length - 1);
   let eSum = 0;
@@ -56,7 +58,7 @@ export const AsciiRain: React.FC<Props> = ({ frames }) => {
   }
   const energy = eCount > 0 ? eSum / eCount : 0;
 
-  const columns = React.useMemo(() => generateColumns(19770508), []);
+  const columns = React.useMemo(() => generateColumns(ctx?.showSeed ?? 19770508), [ctx?.showSeed]);
 
   const opacity = interpolate(energy, [0.03, 0.2], [0.1, 0.25], {
     extrapolateLeft: "clamp",

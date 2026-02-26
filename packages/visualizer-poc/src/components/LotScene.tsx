@@ -9,6 +9,7 @@
 import React from "react";
 import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
+import { useShowContext } from "../data/ShowContext";
 
 /** Seeded PRNG (mulberry32) */
 function seeded(seed: number): () => number {
@@ -189,6 +190,7 @@ interface Props {
 export const LotScene: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height, durationInFrames } = useVideoConfig();
+  const ctx = useShowContext();
 
   // Rolling energy (75-frame window each side)
   const idx = Math.min(Math.max(0, frame), frames.length - 1);
@@ -217,7 +219,7 @@ export const LotScene: React.FC<Props> = ({ frames }) => {
 
   if (opacity < 0.02) return null;
 
-  const figures = React.useMemo(() => generateFigures(19770508), []);
+  const figures = React.useMemo(() => generateFigures(ctx?.showSeed ?? 19770508), [ctx?.showSeed]);
 
   // Slow parallax scroll: total scene width is wider than viewport
   const sceneWidth = width * 1.8;

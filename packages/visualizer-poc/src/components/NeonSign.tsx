@@ -10,6 +10,7 @@
 import React from "react";
 import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
+import { useShowContext } from "../data/ShowContext";
 
 /* ---- seeded PRNG (mulberry32) ---- */
 function seeded(seed: number): () => number {
@@ -22,18 +23,17 @@ function seeded(seed: number): () => number {
   };
 }
 
-const SIGN_TEXT = "GRATEFUL DEAD";
 const CYCLE = 2100; // 70s at 30fps
 const DURATION = 600; // 20s
 
-/* neon tube colours per letter -- deterministic */
-const TUBE_COLORS: string[] = [];
-{
-  const rng = seeded(770508);
-  const palette = ["#FF1744", "#2979FF", "#FF4081", "#FF1493", "#448AFF", "#F50057"];
-  for (let i = 0; i < SIGN_TEXT.length; i++) {
-    TUBE_COLORS.push(palette[Math.floor(rng() * palette.length)]);
-  }
+const NEON_PALETTE = ["#FF1744", "#2979FF", "#FF4081", "#FF1493", "#448AFF", "#F50057"];
+
+/** Generate tube colors for each letter (deterministic per seed) */
+function generateTubeColors(text: string, seed: number): string[] {
+  const rng = seeded(seed);
+  return Array.from({ length: text.length }, () =>
+    NEON_PALETTE[Math.floor(rng() * NEON_PALETTE.length)],
+  );
 }
 
 /* per-letter flicker characteristics (deterministic) */
@@ -46,16 +46,17 @@ interface LetterFlicker {
   minBright: number;
 }
 
-const LETTER_FLICKERS: LetterFlicker[] = [];
-{
-  const rng = seeded(19770508);
-  for (let i = 0; i < SIGN_TEXT.length; i++) {
-    LETTER_FLICKERS.push({
+function generateFlickers(seed: number, count: number): LetterFlicker[] {
+  const rng = seeded(seed);
+  const result: LetterFlicker[] = [];
+  for (let i = 0; i < count; i++) {
+    result.push({
       speed: 0.15 + rng() * 0.5,
       phase: rng() * Math.PI * 2,
       minBright: rng() < 0.3 ? 0.1 + rng() * 0.3 : 0.6 + rng() * 0.35,
     });
   }
+  return result;
 }
 
 interface Props {
@@ -65,6 +66,9 @@ interface Props {
 export const NeonSign: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
+  const ctx = useShowContext();
+
+  const signText = ctx?.bandName?.toUpperCase() ?? "GRATEFUL DEAD";
 
   /* ----- energy ----- */
   const idx = Math.min(Math.max(0, frame), frames.length - 1);
@@ -77,8 +81,9 @@ export const NeonSign: React.FC<Props> = ({ frames }) => {
   const energy = eCount > 0 ? eSum / eCount : 0;
 
   /* useMemo BEFORE any conditional returns */
-  const _memoStub = React.useMemo(() => null, []);
-  void _memoStub;
+  const showSeed = ctx?.showSeed ?? 19770508;
+  const letterFlickers = React.useMemo(() => generateFlickers(showSeed, signText.length), [showSeed, signText.length]);
+  const tubeColors = React.useMemo(() => generateTubeColors(signText, showSeed + 1), [signText, showSeed]);
 
   /* ----- cycle gate ----- */
   const cycleFrame = frame % CYCLE;
@@ -110,18 +115,18 @@ export const NeonSign: React.FC<Props> = ({ frames }) => {
   if (masterOpacity < 0.01) return null;
 
   /* layout: letters spaced across top */
-  const fontSize = Math.min(80, width / (SIGN_TEXT.length * 0.7));
-  const totalTextWidth = SIGN_TEXT.length * fontSize * 0.65;
+  const fontSize = Math.min(80, width / (signText.length * 0.7));
+  const totalTextWidth = signText.length * fontSize * 0.65;
   const startX = (width - totalTextWidth) / 2;
   const baseY = height * 0.08 + fontSize;
 
   return (
     <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden" }}>
       <svg width={width} height={height} style={{ opacity: masterOpacity }}>
-        {SIGN_TEXT.split("").map((ch, i) => {
+        {signText.split("").map((ch, i) => {
           if (ch === " ") return null;
-          const fl = LETTER_FLICKERS[i];
-          const color = TUBE_COLORS[i];
+          const fl = letterFlickers[i];
+          const color = tubeColors[i];
 
           /* per-letter brightness flicker */
           const raw = Math.sin(frame * fl.speed + fl.phase);

@@ -10,6 +10,7 @@
 import React from "react";
 import { useCurrentFrame, useVideoConfig, interpolate } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
+import { useShowContext } from "../data/ShowContext";
 
 function seeded(seed: number): () => number {
   let s = seed | 0;
@@ -118,6 +119,7 @@ interface Props {
 export const ParticleExplosion: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
+  const ctx = useShowContext();
 
   const idx = Math.min(Math.max(0, frame), frames.length - 1);
 
@@ -132,8 +134,8 @@ export const ParticleExplosion: React.FC<Props> = ({ frames }) => {
 
   // Precompute all burst events deterministically from the audio data
   const burstEvents = React.useMemo(
-    () => precomputeBursts(frames, 19770508),
-    [frames],
+    () => precomputeBursts(frames, ctx?.showSeed ?? 19770508),
+    [frames, ctx?.showSeed],
   );
 
   // Find active bursts at current frame

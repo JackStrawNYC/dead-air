@@ -10,6 +10,7 @@
 import React from "react";
 import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
+import { useShowContext } from "../data/ShowContext";
 
 /** Seeded PRNG (mulberry32) */
 function seeded(seed: number): () => number {
@@ -110,8 +111,9 @@ interface Props {
 export const LavaFlow: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
+  const ctx = useShowContext();
 
-  const channels = React.useMemo(() => generateChannels(19770508), []);
+  const channels = React.useMemo(() => generateChannels((ctx?.showSeed ?? 19770508)), [ctx?.showSeed]);
   const crustPatches = React.useMemo(() => generateCrust(50819771), []);
 
   // Energy calculation

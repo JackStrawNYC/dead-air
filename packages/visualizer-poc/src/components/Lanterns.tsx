@@ -9,6 +9,7 @@
 import React from "react";
 import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
+import { useShowContext } from "../data/ShowContext";
 
 /* ---- seeded PRNG (mulberry32) ---- */
 function seeded(seed: number): () => number {
@@ -75,6 +76,7 @@ interface Props {
 export const Lanterns: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
+  const ctx = useShowContext();
 
   /* ----- energy ----- */
   const idx = Math.min(Math.max(0, frame), frames.length - 1);
@@ -87,7 +89,7 @@ export const Lanterns: React.FC<Props> = ({ frames }) => {
   const energy = eCount > 0 ? eSum / eCount : 0;
 
   /* memos BEFORE conditional returns */
-  const lanterns = React.useMemo(() => generateLanterns(19770508), []);
+  const lanterns = React.useMemo(() => generateLanterns((ctx?.showSeed ?? 19770508)), [ctx?.showSeed]);
 
   /* Cycle: 50s total, 18s visible */
   const cycleFrame = frame % CYCLE;

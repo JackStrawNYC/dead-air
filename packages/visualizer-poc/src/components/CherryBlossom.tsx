@@ -9,6 +9,7 @@
 import React from "react";
 import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
+import { useShowContext } from "../data/ShowContext";
 
 /* ---- seeded PRNG (mulberry32) ---- */
 function seeded(seed: number): () => number {
@@ -84,6 +85,7 @@ interface Props {
 export const CherryBlossom: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
+  const ctx = useShowContext();
 
   /* ----- energy ----- */
   const idx = Math.min(Math.max(0, frame), frames.length - 1);
@@ -96,7 +98,7 @@ export const CherryBlossom: React.FC<Props> = ({ frames }) => {
   const energy = eCount > 0 ? eSum / eCount : 0;
 
   /* memos BEFORE conditional returns */
-  const petals = React.useMemo(() => generatePetals(19770508), []);
+  const petals = React.useMemo(() => generatePetals((ctx?.showSeed ?? 19770508)), [ctx?.showSeed]);
 
   /* master opacity: always visible 0.1-0.25 */
   const masterOpacity = interpolate(energy, [0.03, 0.25], [0.1, 0.25], {

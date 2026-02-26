@@ -1,14 +1,15 @@
 /**
  * HighwaySign — Green highway signs passing by as if driving.
  * Signs slide from right to left. Each sign is a green rectangle with white
- * border and white text ("ITHACA 5 MI", "BARTON HALL NEXT EXIT", "DEAD AHEAD",
- * "TRUCKIN'"). Signs appear at intervals, pass through, and exit. Speed driven
- * by energy. Reflective sign aesthetic. Cycle: 50s, 16s visible.
+ * border and white text (venue city, venue name, band name, Dead references).
+ * Show-specific text from ShowContext. Signs appear at intervals, pass through,
+ * and exit. Speed driven by energy. Reflective sign aesthetic. Cycle: 50s, 16s visible.
  */
 
 import React from "react";
 import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
+import { useShowContext } from "../data/ShowContext";
 
 /** Seeded PRNG (mulberry32) */
 function seeded(seed: number): () => number {
@@ -25,16 +26,29 @@ const VISIBLE_DURATION = 480; // 16s at 30fps
 const CYCLE_GAP = 1020; // 34s gap (50s total - 16s visible)
 const CYCLE_TOTAL = VISIBLE_DURATION + CYCLE_GAP;
 
-const SIGN_TEXTS = [
-  { lines: ["ITHACA", "5 MI"], width: 200, height: 100 },
-  { lines: ["BARTON HALL", "NEXT EXIT"], width: 260, height: 100 },
-  { lines: ["DEAD", "AHEAD"], width: 180, height: 100 },
-  { lines: ["TRUCKIN'"], width: 180, height: 80 },
-  { lines: ["CORNELL", "UNIVERSITY", "1 MI"], width: 220, height: 120 },
-  { lines: ["GRATEFUL DEAD", "LIVE TONIGHT"], width: 280, height: 100 },
-  { lines: ["SPEED LIMIT", "77"], width: 160, height: 110 },
-  { lines: ["SHAKEDOWN", "STREET"], width: 220, height: 100 },
-];
+interface SignText {
+  lines: string[];
+  width: number;
+  height: number;
+}
+
+function buildSignTexts(ctx: ReturnType<typeof useShowContext>): SignText[] {
+  const city = ctx?.venueLocation?.split(",")[0]?.trim()?.toUpperCase() ?? "ITHACA";
+  const venue = ctx?.venueShort?.toUpperCase() ?? "BARTON HALL";
+  const band = ctx?.bandName?.toUpperCase() ?? "GRATEFUL DEAD";
+  const year = ctx?.dateRaw?.slice(2, 4) ?? "77";
+
+  return [
+    { lines: [city, "5 MI"], width: 200, height: 100 },
+    { lines: [venue, "NEXT EXIT"], width: 260, height: 100 },
+    { lines: ["DEAD", "AHEAD"], width: 180, height: 100 },
+    { lines: ["TRUCKIN'"], width: 180, height: 80 },
+    { lines: [city, "1 MI"], width: 220, height: 100 },
+    { lines: [band, "LIVE TONIGHT"], width: 280, height: 100 },
+    { lines: ["SPEED LIMIT", year], width: 160, height: 110 },
+    { lines: ["SHAKEDOWN", "STREET"], width: 220, height: 100 },
+  ];
+}
 
 interface SignInstance {
   textIdx: number;
@@ -44,11 +58,11 @@ interface SignInstance {
   postHeight: number; // length of post below sign
 }
 
-function generateSigns(seed: number): SignInstance[] {
+function generateSigns(seed: number, signCount: number): SignInstance[] {
   const rng = seeded(seed);
   const count = 4; // 4 signs per cycle
   return Array.from({ length: count }, (_, i) => ({
-    textIdx: Math.floor(rng() * SIGN_TEXTS.length),
+    textIdx: Math.floor(rng() * signCount),
     yPos: 0.12 + rng() * 0.35,
     enterDelay: i * 0.2 + rng() * 0.05,
     scale: 0.8 + rng() * 0.4,
@@ -58,7 +72,7 @@ function generateSigns(seed: number): SignInstance[] {
 
 /** Single highway sign SVG */
 const HighwaySignSVG: React.FC<{
-  sign: (typeof SIGN_TEXTS)[number];
+  sign: SignText;
   signScale: number;
   postHeight: number;
   reflectIntensity: number;
@@ -150,16 +164,19 @@ interface Props {
 export const HighwaySign: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
+  const ctx = useShowContext();
+
+  const signTexts = React.useMemo(() => buildSignTexts(ctx), [ctx]);
 
   const cycleIndex = Math.floor(frame / CYCLE_TOTAL);
   const signs = React.useMemo(() => {
     // Generate different signs for different cycles using cycle seed
     const allSigns: SignInstance[][] = [];
     for (let c = 0; c < 200; c++) {
-      allSigns.push(generateSigns(19770508 + c * 7919));
+      allSigns.push(generateSigns((ctx?.showSeed ?? 19770508) + c * 7919, signTexts.length));
     }
     return allSigns;
-  }, []);
+  }, [ctx?.showSeed, signTexts.length]);
 
   // Energy calculation
   const idx = Math.min(Math.max(0, frame), frames.length - 1);
@@ -198,7 +215,7 @@ export const HighwaySign: React.FC<Props> = ({ frames }) => {
   return (
     <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden" }}>
       {currentSigns.map((signInst, si) => {
-        const signData = SIGN_TEXTS[signInst.textIdx % SIGN_TEXTS.length];
+        const signData = signTexts[signInst.textIdx % signTexts.length];
         const signW = signData.width * signInst.scale;
 
         // Each sign enters at its staggered time

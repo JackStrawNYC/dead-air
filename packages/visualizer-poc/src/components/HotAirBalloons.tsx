@@ -9,6 +9,7 @@
 import React from "react";
 import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
+import { useShowContext } from "../data/ShowContext";
 
 /** Seeded PRNG (mulberry32) */
 function seeded(seed: number): () => number {
@@ -115,8 +116,9 @@ interface Props {
 export const HotAirBalloons: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
+  const ctx = useShowContext();
 
-  const balloons = React.useMemo(() => generateBalloons(19770508), []);
+  const balloons = React.useMemo(() => generateBalloons((ctx?.showSeed ?? 19770508)), [ctx?.showSeed]);
 
   // Energy calculation
   const idx = Math.min(Math.max(0, frame), frames.length - 1);

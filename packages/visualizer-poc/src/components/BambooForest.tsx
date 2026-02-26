@@ -9,6 +9,7 @@
 import React from "react";
 import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
+import { useShowContext } from "../data/ShowContext";
 
 /* ---- seeded PRNG (mulberry32) ---- */
 function seeded(seed: number): () => number {
@@ -103,6 +104,7 @@ interface Props {
 export const BambooForest: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
+  const ctx = useShowContext();
 
   /* ----- energy ----- */
   const idx = Math.min(Math.max(0, frame), frames.length - 1);
@@ -115,7 +117,7 @@ export const BambooForest: React.FC<Props> = ({ frames }) => {
   const energy = eCount > 0 ? eSum / eCount : 0;
 
   /* memos BEFORE conditional returns */
-  const stalks = React.useMemo(() => generateStalks(19770508), []);
+  const stalks = React.useMemo(() => generateStalks((ctx?.showSeed ?? 19770508)), [ctx?.showSeed]);
 
   /* Cycle: 75s total, 22s visible */
   const cycleFrame = frame % CYCLE;

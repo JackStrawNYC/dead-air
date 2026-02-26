@@ -9,6 +9,7 @@
 import React from "react";
 import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
+import { useShowContext } from "../data/ShowContext";
 
 function seeded(seed: number): () => number {
   let s = seed | 0;
@@ -118,6 +119,7 @@ interface Props {
 export const PaperCranes: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
+  const ctx = useShowContext();
 
   const idx = Math.min(Math.max(0, frame), frames.length - 1);
   let eSum = 0;
@@ -128,7 +130,7 @@ export const PaperCranes: React.FC<Props> = ({ frames }) => {
   }
   const energy = eCount > 0 ? eSum / eCount : 0;
 
-  const cranes = React.useMemo(() => generateCranes(19770508), []);
+  const cranes = React.useMemo(() => generateCranes((ctx?.showSeed ?? 19770508)), [ctx?.showSeed]);
 
   // Timing gate
   const cycleFrame = frame % CYCLE;

@@ -10,6 +10,7 @@
 import React from "react";
 import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
+import { useShowContext } from "../data/ShowContext";
 
 function seeded(seed: number): () => number {
   let s = seed | 0;
@@ -64,6 +65,7 @@ interface Props {
 export const Rainsplash: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
+  const ctx = useShowContext();
 
   const idx = Math.min(Math.max(0, frame), frames.length - 1);
   let eSum = 0;
@@ -77,8 +79,8 @@ export const Rainsplash: React.FC<Props> = ({ frames }) => {
   // Generate drops schedule for this cycle (useMemo BEFORE return null)
   const cycleIndex = Math.floor(frame / CYCLE_FRAMES);
   const drops = React.useMemo(
-    () => generateDropSchedule(cycleIndex * 137 + 19770508, VISIBLE_FRAMES, energy),
-    [cycleIndex, energy],
+    () => generateDropSchedule(cycleIndex * 137 + (ctx?.showSeed ?? 19770508), VISIBLE_FRAMES, energy),
+    [cycleIndex, energy, ctx?.showSeed],
   );
 
   // Periodic visibility

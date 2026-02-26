@@ -9,6 +9,7 @@
 import React from "react";
 import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
+import { useShowContext } from "../data/ShowContext";
 
 function seeded(seed: number): () => number {
   let s = seed | 0;
@@ -45,6 +46,7 @@ interface Props {
 export const Radar: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
+  const ctx = useShowContext();
 
   const idx = Math.min(Math.max(0, frame), frames.length - 1);
   let eSum = 0;
@@ -65,7 +67,7 @@ export const Radar: React.FC<Props> = ({ frames }) => {
       const fd = frames[f];
       // Detect onset peaks as blip triggers
       if (fd.onset > 0.5 && fd.rms > 0.15) {
-        const rng = seeded(f * 31 + 19770508);
+        const rng = seeded(f * 31 + (ctx?.showSeed ?? 19770508));
         // Random position within the radar circle
         const angle = rng() * Math.PI * 2;
         const dist = 0.2 + rng() * 0.75;
@@ -79,7 +81,7 @@ export const Radar: React.FC<Props> = ({ frames }) => {
     }
     // Keep only the most recent blips
     return result.slice(-MAX_BLIPS);
-  }, [idx, frames]);
+  }, [idx, frames, ctx?.showSeed]);
 
   // Periodic visibility
   const cycleFrame = frame % CYCLE_FRAMES;

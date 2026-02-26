@@ -9,6 +9,7 @@
 import React from "react";
 import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
+import { useShowContext } from "../data/ShowContext";
 
 function seeded(seed: number): () => number {
   let s = seed | 0;
@@ -64,6 +65,7 @@ interface Props {
 export const StageLights: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
+  const ctx = useShowContext();
 
   const idx = Math.min(Math.max(0, frame), frames.length - 1);
 
@@ -76,7 +78,7 @@ export const StageLights: React.FC<Props> = ({ frames }) => {
   }
   const energy = eCount > 0 ? eSum / eCount : 0;
 
-  const pars = React.useMemo(() => generatePars(19770508), []);
+  const pars = React.useMemo(() => generatePars(ctx?.showSeed ?? 19770508), [ctx?.showSeed]);
 
   // Cycle timing
   const cyclePos = frame % CYCLE_PERIOD;

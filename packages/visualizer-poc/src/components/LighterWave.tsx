@@ -10,6 +10,7 @@
 import React from "react";
 import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
+import { useShowContext } from "../data/ShowContext";
 
 function seeded(seed: number): () => number {
   let s = seed | 0;
@@ -75,6 +76,7 @@ interface Props {
 export const LighterWave: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
+  const ctx = useShowContext();
 
   const idx = Math.min(Math.max(0, frame), frames.length - 1);
 
@@ -87,7 +89,7 @@ export const LighterWave: React.FC<Props> = ({ frames }) => {
   }
   const energy = eCount > 0 ? eSum / eCount : 0;
 
-  const lighters = React.useMemo(() => generateLighters(19770508), []);
+  const lighters = React.useMemo(() => generateLighters(ctx?.showSeed ?? 19770508), [ctx?.showSeed]);
 
   // Quiet detection: only visible when energy < 0.12
   const quietness = interpolate(energy, [0.04, 0.12], [1, 0], {

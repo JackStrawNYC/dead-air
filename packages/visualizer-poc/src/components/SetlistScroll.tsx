@@ -1,8 +1,8 @@
 /**
  * SetlistScroll -- handwritten-style setlist that appears briefly at song transitions.
- * Shows the Cornell '77 setlist on an aged-paper background with torn edges.
+ * Shows the show setlist on an aged-paper background with torn edges.
  * Current song highlighted. Appears every 90 seconds for 8 seconds.
- * Deterministic via mulberry32 PRNG.
+ * Deterministic via mulberry32 PRNG. Show data from ShowContext.
  */
 
 import React from "react";
@@ -206,8 +206,8 @@ export const SetlistScroll: React.FC<Props> = ({ frames, currentSong }) => {
           />
 
           {/* Setlist sets from context */}
-          {(ctx?.setlistSets ?? []).map((set, setIdx) => {
-            const songOffset = ctx!.setlistSets
+          {(ctx?.setlistSets ?? []).map((set, setIdx, allSets) => {
+            const songOffset = allSets
               .slice(0, setIdx)
               .reduce((sum, s) => sum + s.songs.length, 0);
             return (

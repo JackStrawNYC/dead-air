@@ -9,6 +9,7 @@
 import React from "react";
 import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
+import { useShowContext } from "../data/ShowContext";
 
 /** Seeded PRNG (mulberry32) */
 function seeded(seed: number): () => number {
@@ -40,6 +41,7 @@ interface Props {
 export const Turntable: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
+  const ctx = useShowContext();
 
   const idx = Math.min(Math.max(0, frame), frames.length - 1);
   let eSum = 0;
@@ -183,7 +185,7 @@ export const Turntable: React.FC<Props> = ({ frames }) => {
               fontWeight="bold"
               opacity={0.8}
             >
-              GRATEFUL DEAD
+              {ctx?.bandName?.toUpperCase() ?? "GRATEFUL DEAD"}
             </text>
             <text
               x={0}
@@ -194,7 +196,7 @@ export const Turntable: React.FC<Props> = ({ frames }) => {
               fontFamily="Georgia, serif"
               opacity={0.6}
             >
-              CORNELL 5/8/77
+              {ctx ? `${ctx.venueShort} ${ctx.dateShort}` : "CORNELL 5/8/77"}
             </text>
           </g>
         </g>

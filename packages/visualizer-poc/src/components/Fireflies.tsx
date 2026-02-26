@@ -10,6 +10,7 @@
 import React from "react";
 import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
+import { useShowContext } from "../data/ShowContext";
 
 /* ---- seeded PRNG (mulberry32) ---- */
 function seeded(seed: number): () => number {
@@ -73,6 +74,7 @@ interface Props {
 export const Fireflies: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
+  const ctx = useShowContext();
 
   /* ----- energy ----- */
   const idx = Math.min(Math.max(0, frame), frames.length - 1);
@@ -85,7 +87,7 @@ export const Fireflies: React.FC<Props> = ({ frames }) => {
   const energy = eCount > 0 ? eSum / eCount : 0;
 
   /* memos BEFORE conditional returns */
-  const fireflies = React.useMemo(() => generateFireflies(19770508), []);
+  const fireflies = React.useMemo(() => generateFireflies(ctx?.showSeed ?? 19770508), [ctx?.showSeed]);
 
   /* inverse energy: more visible during quiet passages */
   const quietness = 1 - interpolate(energy, [0.03, 0.22], [0, 1], {

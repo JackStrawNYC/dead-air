@@ -8,6 +8,7 @@
 import React from "react";
 import { useCurrentFrame, useVideoConfig, interpolate } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
+import { useShowContext } from "../data/ShowContext";
 
 function seeded(seed: number): () => number {
   let s = seed | 0;
@@ -56,6 +57,7 @@ interface Props {
 export const InkDrop: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
+  const ctx = useShowContext();
 
   // Rolling energy (151-frame window)
   const idx = Math.min(Math.max(0, frame), frames.length - 1);
@@ -86,7 +88,7 @@ export const InkDrop: React.FC<Props> = ({ frames }) => {
         // Check how many active blooms at this frame
         const active = result.filter(b => f - b.spawnFrame < BLOOM_LIFETIME);
         if (active.length < MAX_BLOOMS) {
-          const rng = seeded(f * 7 + 19770508);
+          const rng = seeded(f * 7 + (ctx?.showSeed ?? 19770508));
           const hue = getDominantHue(frames[f].chroma);
           const circles = Array.from({ length: CIRCLES_PER_BLOOM }, () => ({
             dx: (rng() - 0.5) * 80,
@@ -106,7 +108,7 @@ export const InkDrop: React.FC<Props> = ({ frames }) => {
       }
     }
     return result;
-  }, [frames]);
+  }, [frames, ctx?.showSeed]);
 
   // Find active blooms for current frame
   const activeBlooms = blooms.filter(

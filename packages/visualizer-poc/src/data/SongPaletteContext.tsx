@@ -3,7 +3,7 @@
  *
  * Provides palette.primary / palette.secondary hues so overlays can tint
  * their colors toward the song's harmonic identity. Components consume via
- * useSongPalette() hook — returns null when no palette is set.
+ * useSongPalette() hook — always returns a value (defaults to psychedelic purple).
  *
  * Separation from ShowContext: ShowContext = per-show metadata (venue, date);
  * SongPaletteContext = per-song visual identity (primary/secondary hue).
@@ -81,9 +81,12 @@ export function blendWithPalette(
  * Capped at ±60° to avoid garish shifts.
  */
 export function paletteHueRotation(palette: ColorPalette): number {
-  // Neutral point: 0 means "no rotation"
-  // We use a 25% influence from the palette primary hue
-  const rotation = palette.primary * 0.25;
-  // Clamp to ±60° to keep things tasteful
-  return Math.max(-60, Math.min(60, rotation > 180 ? rotation - 360 : rotation));
+  // Rotation relative to default palette hue (270° purple).
+  // Shortest-arc difference, scaled to 25% influence, capped at ±60°.
+  const neutralHue = DEFAULT_PALETTE.primary; // 270
+  let diff = palette.primary - neutralHue;
+  if (diff > 180) diff -= 360;
+  if (diff < -180) diff += 360;
+  const rotation = diff * 0.25;
+  return Math.max(-60, Math.min(60, rotation));
 }

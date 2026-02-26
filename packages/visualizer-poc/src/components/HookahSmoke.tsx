@@ -10,6 +10,7 @@
 import React from "react";
 import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
+import { useShowContext } from "../data/ShowContext";
 
 function seeded(seed: number): () => number {
   let s = seed | 0;
@@ -68,6 +69,7 @@ interface Props {
 export const HookahSmoke: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
+  const ctx = useShowContext();
 
   const idx = Math.min(Math.max(0, frame), frames.length - 1);
 
@@ -80,7 +82,7 @@ export const HookahSmoke: React.FC<Props> = ({ frames }) => {
   }
   const energy = eCount > 0 ? eSum / eCount : 0;
 
-  const tendrils = React.useMemo(() => generateTendrils(19770508), []);
+  const tendrils = React.useMemo(() => generateTendrils(ctx?.showSeed ?? 19770508), [ctx?.showSeed]);
 
   // Chroma tinting: pick dominant chroma pitch for subtle color
   const chromaData = frames[idx].chroma;

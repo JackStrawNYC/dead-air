@@ -10,6 +10,7 @@
 import React from "react";
 import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
+import { useShowContext } from "../data/ShowContext";
 
 /* ---- seeded PRNG (mulberry32) ---- */
 function seeded(seed: number): () => number {
@@ -79,6 +80,7 @@ interface Props {
 export const RansomNote: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
+  const ctx = useShowContext();
 
   /* ----- energy ----- */
   const idx = Math.min(Math.max(0, frame), frames.length - 1);
@@ -94,8 +96,8 @@ export const RansomNote: React.FC<Props> = ({ frames }) => {
 
   /* memos BEFORE conditional returns */
   const letters = React.useMemo(
-    () => generateLetters(cycleIndex * 131 + 19770508),
-    [cycleIndex],
+    () => generateLetters(cycleIndex * 131 + (ctx?.showSeed ?? 19770508)),
+    [cycleIndex, ctx?.showSeed],
   );
 
   /* ----- cycle gate ----- */

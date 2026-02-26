@@ -10,6 +10,7 @@
 import React from "react";
 import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
+import { useShowContext } from "../data/ShowContext";
 
 function seeded(seed: number): () => number {
   let s = seed | 0;
@@ -100,6 +101,7 @@ interface Props {
 export const GlowSticks: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
+  const ctx = useShowContext();
 
   const idx = Math.min(Math.max(0, frame), frames.length - 1);
 
@@ -113,8 +115,8 @@ export const GlowSticks: React.FC<Props> = ({ frames }) => {
   const _energy = eCount > 0 ? eSum / eCount : 0;
 
   const stickEvents = React.useMemo(
-    () => precomputeSticks(frames, 19770508),
-    [frames],
+    () => precomputeSticks(frames, (ctx?.showSeed ?? 19770508)),
+    [frames, ctx?.showSeed],
   );
 
   // Cycle fade

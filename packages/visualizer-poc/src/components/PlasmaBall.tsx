@@ -10,6 +10,7 @@
 import React from "react";
 import { useCurrentFrame, useVideoConfig, interpolate } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
+import { useShowContext } from "../data/ShowContext";
 
 function seeded(seed: number): () => number {
   let s = seed | 0;
@@ -65,6 +66,7 @@ interface Props {
 export const PlasmaBall: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
+  const ctx = useShowContext();
 
   // Rolling energy (151-frame window)
   const idx = Math.min(Math.max(0, frame), frames.length - 1);
@@ -79,7 +81,7 @@ export const PlasmaBall: React.FC<Props> = ({ frames }) => {
   const currentFrame = frames[idx];
   const subBass = currentFrame ? currentFrame.sub : 0;
 
-  const tendrils = React.useMemo(() => generateTendrils(19770508), []);
+  const tendrils = React.useMemo(() => generateTendrils(ctx?.showSeed ?? 19770508), [ctx?.showSeed]);
 
   // Cycle gating
   const cycleFrame = frame % CYCLE;
