@@ -120,13 +120,15 @@ function smoothstep(edge0: number, edge1: number, x: number): number {
 /**
  * Build a rotation schedule from the active overlay pool + section data.
  * Called once per song via useMemo.
+ * @param showSeed — Show-level seed to salt the PRNG (same track, different show = different rotation)
  */
 export function buildRotationSchedule(
   activeOverlays: string[],
   sections: SectionBoundary[],
   trackId: string,
+  showSeed?: number,
 ): RotationSchedule {
-  const trackHash = hashString(trackId);
+  const trackHash = hashString(trackId) + (showSeed ?? 0);
 
   // 1. Separate always-active from rotation pool
   const alwaysActiveSet = new Set(ALWAYS_ACTIVE);

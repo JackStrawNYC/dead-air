@@ -259,13 +259,15 @@ export interface SelectionResult {
  * @param profile — Audio summary stats for this song
  * @param previousSongOverlays — Names used in the previous song (for variety)
  * @param overrides — Manual include/exclude/targetCount from setlist
+ * @param showSeed — Show-level seed to salt the PRNG (same trackId, different show = different selection)
  */
 export function selectOverlays(
   profile: SongProfile,
   previousSongOverlays: Set<string>,
   overrides?: OverlayOverrides,
+  showSeed?: number,
 ): SelectionResult {
-  const rng = seededRandom(hashString(profile.trackId));
+  const rng = seededRandom(hashString(profile.trackId) + (showSeed ?? 0));
 
   // Score all overlays
   const scored: ScoredOverlay[] = OVERLAY_REGISTRY.map((entry) => ({
@@ -359,9 +361,11 @@ export function selectOverlays(
 
 /**
  * Run full-show selection with cross-song variety enforcement.
+ * @param showSeed — Show-level seed to salt the PRNG
  */
 export function selectOverlaysForShow(
   songs: { song: SetlistEntry; analysis: TrackAnalysis }[],
+  showSeed?: number,
 ): Record<string, SelectionResult & { title: string }> {
   const results: Record<string, SelectionResult & { title: string }> = {};
   let previousOverlays = new Set<string>();
@@ -369,7 +373,7 @@ export function selectOverlaysForShow(
   for (const { song, analysis } of songs) {
     const profile = buildSongProfile(song, analysis);
     const overrides = song.overlayOverrides;
-    const result = selectOverlays(profile, previousOverlays, overrides);
+    const result = selectOverlays(profile, previousOverlays, overrides, showSeed);
 
     results[song.trackId] = {
       ...result,

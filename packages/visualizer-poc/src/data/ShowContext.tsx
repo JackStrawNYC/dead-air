@@ -36,6 +36,22 @@ export function dateSeed(iso: string): number {
   return Number(iso.replace(/-/g, ""));
 }
 
+// ─── Show-level seed ───
+
+/** djb2 hash for strings → positive integer */
+export function hashString(str: string): number {
+  let hash = 5381;
+  for (let i = 0; i < str.length; i++) {
+    hash = ((hash << 5) + hash + str.charCodeAt(i)) | 0;
+  }
+  return Math.abs(hash);
+}
+
+/** Derive a show-level PRNG seed from date + venue. Stable across runs. */
+export function deriveShowSeed(date: string, venue: string): number {
+  return hashString(`${date}::${venue}`);
+}
+
 // ─── Setlist grouping ───
 
 export interface SetlistSet {
@@ -91,7 +107,12 @@ export interface ShowContextValue {
   dateShort: string;
   dateRaw: string;
   dateSeed: number;
+  /** Show-level PRNG seed (unique per show, salts all procedural generation) */
+  showSeed: number;
   taperInfo: string;
+  era: string;
+  venueType: string;
+  tourName: string;
   setlistSets: SetlistSet[];
 }
 
@@ -116,7 +137,11 @@ export const ShowContextProvider: React.FC<ProviderProps> = ({ show, children })
       dateShort: formatDateShort(show.date),
       dateRaw: show.date,
       dateSeed: dateSeed(show.date),
+      showSeed: show.showSeed ?? deriveShowSeed(show.date, show.venue),
       taperInfo: show.taperInfo ?? "",
+      era: show.era ?? "",
+      venueType: show.venueType ?? "",
+      tourName: show.tourName ?? "",
       setlistSets: groupSets(show.songs),
     };
   }, [show]);
@@ -129,4 +154,9 @@ export const ShowContextProvider: React.FC<ProviderProps> = ({ show, children })
 /** Access show metadata. Returns null if no ShowContextProvider is above. */
 export function useShowContext(): ShowContextValue | null {
   return useContext(ShowContext);
+}
+
+/** Resolve showSeed from a ShowSetlist (for non-React code like scripts). */
+export function getShowSeed(show: ShowSetlist): number {
+  return show.showSeed ?? deriveShowSeed(show.date, show.venue);
 }

@@ -16,6 +16,7 @@ import { join, resolve } from "path";
 import type { SetlistEntry, ShowSetlist, TrackAnalysis, OverlaySchedule } from "../src/data/types";
 import { buildSongProfile, selectOverlays } from "../src/data/overlay-selector";
 import { OVERLAY_REGISTRY } from "../src/data/overlay-registry";
+import { getShowSeed } from "../src/data/ShowContext";
 
 const ROOT = resolve(import.meta.dirname, "..");
 const DATA_DIR = join(ROOT, "data");
@@ -29,9 +30,12 @@ const setlist = JSON.parse(
   readFileSync(join(DATA_DIR, "setlist.json"), "utf-8"),
 ) as ShowSetlist;
 
+const showSeed = getShowSeed(setlist);
+
 console.log(`Overlay schedule generator`);
 console.log(`  ${setlist.songs.length} songs in setlist`);
 console.log(`  ${OVERLAY_REGISTRY.length} overlays in registry`);
+console.log(`  Show seed: ${showSeed}`);
 console.log();
 
 // ─── Analysis file discovery ───
@@ -124,7 +128,7 @@ for (const song of setlist.songs) {
   }
 
   const profile = buildSongProfile(song, analysis);
-  const result = selectOverlays(profile, previousOverlays, song.overlayOverrides);
+  const result = selectOverlays(profile, previousOverlays, song.overlayOverrides, showSeed);
 
   schedule.songs[song.trackId] = {
     title: song.title,

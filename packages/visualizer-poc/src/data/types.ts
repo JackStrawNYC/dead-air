@@ -211,6 +211,14 @@ export interface ShowSetlist {
   bandName?: string;
   /** Taper/source info for bootleg label */
   taperInfo?: string;
+  /** Explicit show-level PRNG seed (auto-derived from date+venue if omitted) */
+  showSeed?: number;
+  /** Era classification for visual theming */
+  era?: "primal" | "classic" | "hiatus" | "touch_of_grey" | "revival";
+  /** Venue type for ambient theming */
+  venueType?: "theater" | "arena" | "amphitheater" | "festival" | "club" | "ballroom";
+  /** Tour name (e.g., "Spring 1977", "Fall 1989") */
+  tourName?: string;
   /** All songs in order */
   songs: SetlistEntry[];
   /** Path to show intro poster art (relative to public/) */

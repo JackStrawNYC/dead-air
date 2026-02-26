@@ -22,7 +22,7 @@ import { FilmGrain } from "./components/FilmGrain";
 
 import { loadAnalysis, getSections } from "./data/analysis-loader";
 import type { SetlistEntry, ShowSetlist, TrackAnalysis } from "./data/types";
-import { ShowContextProvider } from "./data/ShowContext";
+import { ShowContextProvider, getShowSeed } from "./data/ShowContext";
 
 const FADE_FRAMES = 90; // 3 seconds at 30fps
 
@@ -140,11 +140,15 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
   }, [activeSet]);
 
   // Build rotation schedule (once per song, only when activeOverlays provided)
+  const showSeed = useMemo(
+    () => props.show ? getShowSeed(props.show) : undefined,
+    [props.show],
+  );
   const rotationSchedule = useMemo(() => {
     if (!props.activeOverlays || !analysis) return null;
     const sects = getSections(analysis);
-    return buildRotationSchedule(props.activeOverlays, sects, props.song.trackId);
-  }, [props.activeOverlays, analysis, props.song.trackId]);
+    return buildRotationSchedule(props.activeOverlays, sects, props.song.trackId, showSeed);
+  }, [props.activeOverlays, analysis, props.song.trackId, showSeed]);
 
   // Per-frame overlay opacities
   const opacityMap = rotationSchedule
