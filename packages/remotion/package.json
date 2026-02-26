@@ -13,6 +13,7 @@
     "@dead-air/core": "workspace:*",
     "@remotion/bundler": "4.0.242",
     "@remotion/cli": "4.0.242",
+    "@remotion/google-fonts": "4.0.242",
     "@remotion/media-utils": "4.0.242",
     "@remotion/renderer": "4.0.242",
     "@remotion/transitions": "4.0.242",
@@ -21,8 +22,8 @@
     "remotion": "4.0.242"
   },
   "devDependencies": {
-    "@types/react": "^18.3.3",
     "@types/node": "^22.0.0",
+    "@types/react": "^18.3.3",
     "typescript": "^5.7.0"
   }
 }

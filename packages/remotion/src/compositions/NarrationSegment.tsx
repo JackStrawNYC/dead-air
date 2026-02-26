@@ -30,6 +30,16 @@ const MOOD_TO_GRADE_END: Record<string, GradeMood> = {
   cosmic: 'cold', electric: 'cold', psychedelic: 'cold', dark: 'cold',
 };
 
+// Mood → archival texture era (consistent with ConcertSegment)
+const MOOD_TO_ERA: Record<string, 'colonial' | 'victorian' | 'early_modern' | 'modern'> = {
+  psychedelic: 'colonial',
+  cosmic: 'victorian',
+  dark: 'victorian',
+  warm: 'early_modern',
+  earthy: 'early_modern',
+  electric: 'modern',
+};
+
 interface NarrationSegmentProps {
   audioSrc: string;
   images: string[];
@@ -58,22 +68,22 @@ export const NarrationSegment: React.FC<NarrationSegmentProps> = ({
   // Narration: J-cut fast attack
   const volume = smoothstepVolume(frame, durationInFrames, 3, FADE_FRAMES);
 
-  // Concert bed: smoothstep ducking (asymmetric)
+  // Concert bed: smoothstep ducking (asymmetric, gentler levels for breathing room)
   const bedVolume = (() => {
     if (!concertBedSrc) return 0;
-    const FULL = 0.20;
-    const DUCKED = 0.04;
-    // Duck down over 24 frames at start, recover over 30 at end
-    const duckDown = interpolate(frame, [0, 24], [FULL, DUCKED], {
+    const FULL = 0.12;    // Reduced from 0.20 — concert bed should be felt, not competing
+    const DUCKED = 0.03;  // Reduced from 0.04 — lower floor so narration voice stays clear
+    // Duck down over 36 frames (longer ramp for natural feel), recover over 45 at end
+    const duckDown = interpolate(frame, [0, 36], [FULL, DUCKED], {
       extrapolateLeft: 'clamp', extrapolateRight: 'clamp',
     });
-    const duckUp = interpolate(frame, [durationInFrames - 30, durationInFrames], [DUCKED, FULL], {
+    const duckUp = interpolate(frame, [durationInFrames - 45, durationInFrames], [DUCKED, FULL], {
       extrapolateLeft: 'clamp', extrapolateRight: 'clamp',
     });
     // Composition fade
     const compFade = smoothstepVolume(frame, durationInFrames, FADE_FRAMES, FADE_FRAMES);
     // During the body, stay ducked
-    const bodyVolume = frame < 24 ? duckDown : frame > durationInFrames - 30 ? duckUp : DUCKED;
+    const bodyVolume = frame < 36 ? duckDown : frame > durationInFrames - 45 ? duckUp : DUCKED;
     return bodyVolume * compFade;
   })();
 
@@ -154,7 +164,7 @@ export const NarrationSegment: React.FC<NarrationSegmentProps> = ({
             </span>
           </div>
           <Branding />
-          <ArchivalTexture era="early_modern" intensity={0.3} />
+          <ArchivalTexture era={MOOD_TO_ERA[mood] ?? 'early_modern'} intensity={0.3} />
           <FilmGrain intensity={0.10} />
           <BreathingOverlay breathingFrames={60} />
         </div>

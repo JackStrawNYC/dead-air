@@ -1,6 +1,6 @@
 import React from 'react';
-import { useCurrentFrame, interpolate } from 'remotion';
-import { COLORS } from '../styles/themes';
+import { useCurrentFrame, interpolate, spring, useVideoConfig } from 'remotion';
+import { COLORS, FONTS } from '../styles/themes';
 
 export interface SongPosition {
   name: string;
@@ -17,11 +17,12 @@ interface SetlistProgressProps {
 }
 
 /**
- * Minimal setlist progress indicator — thin line at the bottom of frame
- * (inside letterbox area) with dots for each song.
+ * Setlist progress indicator — thin line at the bottom of frame
+ * with dots for each song and an active song label.
  *
  * - Thin horizontal track showing episode progress
  * - Dots for each concert segment, glow on active
+ * - Active song name label with animated reveal
  * - Current position indicator
  * - Fades in/out to avoid cluttering opening/closing
  */
@@ -31,10 +32,11 @@ export const SetlistProgress: React.FC<SetlistProgressProps> = ({
   colorAccent = COLORS.accent,
 }) => {
   const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
 
   if (songs.length === 0) return null;
 
-  // Only show during concert portions (fade in after first song starts, fade before end)
+  // Only show during concert portions
   const firstSongStart = songs[0].startFrame;
   const lastSongEnd = songs[songs.length - 1].endFrame;
 
@@ -62,11 +64,11 @@ export const SetlistProgress: React.FC<SetlistProgressProps> = ({
         bottom: 24,
         left: '10%',
         right: '10%',
-        height: 20,
+        height: 40,
         opacity,
         zIndex: 998,
         display: 'flex',
-        alignItems: 'center',
+        alignItems: 'flex-end',
         pointerEvents: 'none',
       }}
     >
@@ -76,6 +78,7 @@ export const SetlistProgress: React.FC<SetlistProgressProps> = ({
           position: 'absolute',
           left: 0,
           right: 0,
+          bottom: 0,
           height: 1,
           backgroundColor: 'rgba(255,255,255,0.15)',
           borderRadius: 1,
@@ -86,33 +89,79 @@ export const SetlistProgress: React.FC<SetlistProgressProps> = ({
         style={{
           position: 'absolute',
           left: 0,
+          bottom: 0,
           width: `${progressFraction * 100}%`,
           height: 1,
-          backgroundColor: `rgba(255,255,255,0.3)`,
+          backgroundColor: 'rgba(255,255,255,0.3)',
           borderRadius: 1,
         }}
       />
-      {/* Song dots */}
+      {/* Song dots + labels */}
       {songs.map((song, i) => {
         const dotPosition = ((song.startFrame + song.endFrame) / 2) / totalDurationInFrames;
         const isActive = i === activeSongIndex;
         const isPast = frame > song.endFrame;
 
+        // Animated label for active song
+        const labelProgress = isActive
+          ? spring({
+              frame: Math.max(0, frame - song.startFrame),
+              fps,
+              config: { damping: 18, mass: 0.6, stiffness: 100 },
+            })
+          : 0;
+
+        // Fade out label near end of song
+        const labelFadeOut = isActive
+          ? interpolate(frame, [song.endFrame - 30, song.endFrame], [1, 0], {
+              extrapolateLeft: 'clamp',
+              extrapolateRight: 'clamp',
+            })
+          : 0;
+
+        const labelOpacity = labelProgress * labelFadeOut;
+
+        // Truncate long song names
+        const displayName = song.name.length > 22 ? song.name.slice(0, 20) + '...' : song.name;
+
         return (
-          <div
-            key={i}
-            style={{
-              position: 'absolute',
-              left: `${dotPosition * 100}%`,
-              transform: 'translateX(-50%)',
-              width: isActive ? 6 : 4,
-              height: isActive ? 6 : 4,
-              borderRadius: '50%',
-              backgroundColor: isActive ? colorAccent : isPast ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.2)',
-              boxShadow: isActive ? `0 0 8px ${colorAccent}` : 'none',
-              transition: 'all 0.1s',
-            }}
-          />
+          <React.Fragment key={i}>
+            {/* Dot */}
+            <div
+              style={{
+                position: 'absolute',
+                left: `${dotPosition * 100}%`,
+                bottom: -1,
+                transform: 'translateX(-50%)',
+                width: isActive ? 6 : 4,
+                height: isActive ? 6 : 4,
+                borderRadius: '50%',
+                backgroundColor: isActive ? colorAccent : isPast ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.2)',
+                boxShadow: isActive ? `0 0 8px ${colorAccent}` : 'none',
+              }}
+            />
+            {/* Active song label */}
+            {labelOpacity > 0.01 && (
+              <div
+                style={{
+                  position: 'absolute',
+                  left: `${dotPosition * 100}%`,
+                  bottom: 12,
+                  transform: `translateX(-50%) translateY(${(1 - labelProgress) * 6}px)`,
+                  opacity: labelOpacity,
+                  fontFamily: FONTS.body,
+                  fontSize: 13,
+                  fontWeight: 500,
+                  color: colorAccent,
+                  whiteSpace: 'nowrap',
+                  textShadow: '0 1px 6px rgba(0,0,0,0.8)',
+                  letterSpacing: 0.5,
+                }}
+              >
+                {displayName}
+              </div>
+            )}
+          </React.Fragment>
         );
       })}
       {/* Current position indicator */}
@@ -120,8 +169,8 @@ export const SetlistProgress: React.FC<SetlistProgressProps> = ({
         style={{
           position: 'absolute',
           left: `${progressFraction * 100}%`,
-          transform: 'translate(-50%, -50%)',
-          top: '50%',
+          bottom: -3,
+          transform: 'translateX(-50%)',
           width: 2,
           height: 8,
           backgroundColor: 'rgba(255,255,255,0.5)',

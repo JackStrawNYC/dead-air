@@ -33,6 +33,15 @@ const MOOD_TO_GRADE_END: Record<string, GradeMood> = {
   cosmic: 'cold', electric: 'cold', psychedelic: 'cold', dark: 'cold',
 };
 
+const MOOD_TO_ERA: Record<string, 'colonial' | 'victorian' | 'early_modern' | 'modern'> = {
+  psychedelic: 'colonial',
+  cosmic: 'victorian',
+  dark: 'victorian',
+  warm: 'early_modern',
+  earthy: 'early_modern',
+  electric: 'modern',
+};
+
 interface TextLineProps {
   text: string;
   displayDuration: number;
@@ -51,7 +60,7 @@ interface ContextSegmentProps {
 }
 
 const FADE_FRAMES = 45;
-const AMBIENT_VOLUME = 0.28;
+const AMBIENT_VOLUME = 0.10;  // Reduced from 0.28 — was ~5x louder than AmbientBed (0.06)
 
 export const ContextSegment: React.FC<ContextSegmentProps> = ({
   textLines,
@@ -157,7 +166,7 @@ export const ContextSegment: React.FC<ContextSegmentProps> = ({
             />
           )}
           <Branding />
-          <ArchivalTexture era="early_modern" intensity={0.4} />
+          <ArchivalTexture era={MOOD_TO_ERA[mood] ?? 'early_modern'} intensity={0.4} />
           <FilmGrain intensity={0.10} />
           <BreathingOverlay breathingFrames={45} />
         </div>

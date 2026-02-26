@@ -1,0 +1,40 @@
+{
+  "name": "@dead-air/visualizer-poc",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "analyze": ".venv/bin/python scripts/analyze.py",
+    "analyze:show": ".venv/bin/python scripts/analyze_show.py",
+    "analyze:show:resume": ".venv/bin/python scripts/analyze_show.py --resume",
+    "studio": "npx remotion studio src/entry.ts --props=data/morning-dew-analysis.json",
+    "studio:song": "npx remotion studio src/entry.ts",
+    "render:morning-dew": "npx remotion render src/entry.ts MorningDew out/morning-dew.mp4 --props=data/morning-dew-analysis.json --gl=angle",
+    "render:clip": "npx remotion render src/entry.ts MorningDew out/test-clip.mp4 --props=data/morning-dew-analysis.json --frames=0-900 --gl=angle",
+    "render:climax": "npx remotion render src/entry.ts MorningDew out/test-climax.mp4 --props=data/morning-dew-analysis.json --frames=23200-24100 --gl=angle",
+    "render:show": "npx tsx scripts/render-show.ts",
+    "render:show:resume": "npx tsx scripts/render-show.ts --resume",
+    "build": "tsc --noEmit",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@react-three/fiber": "^8.18.0",
+    "@remotion/cli": "4.0.242",
+    "@remotion/google-fonts": "4.0.242",
+    "@remotion/media-utils": "4.0.242",
+    "@remotion/three": "4.0.242",
+    "dotenv": "^16.4.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "remotion": "4.0.242",
+    "replicate": "^1.0.0",
+    "three": "^0.183.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/react": "^18.3.3",
+    "@types/three": "^0.183.1",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  }
+}

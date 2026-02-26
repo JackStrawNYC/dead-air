@@ -55,11 +55,16 @@ export async function renderEpisode(options: RenderOptions): Promise<RenderResul
     outputLocation: outputPath,
     inputProps: props as unknown as Record<string, unknown>,
     concurrency,
+    timeoutInMilliseconds: 120_000, // 2 min per frame (images can be slow to load)
+    chromiumOptions: {
+      disableWebSecurity: true,
+      gl: 'swiftshader',
+    },
     onProgress: (() => {
       let lastPct = -1;
       return ({ progress }: { progress: number }) => {
         const pct = Math.round(progress * 100);
-        if (pct % 10 === 0 && pct !== lastPct) {
+        if (pct % 5 === 0 && pct !== lastPct) {
           lastPct = pct;
           log.info(`Render progress: ${pct}%`);
         }

@@ -1,7 +1,7 @@
 import React from 'react';
 import { interpolate, spring, useCurrentFrame, useVideoConfig } from 'remotion';
-import { COLORS, FONTS } from '../styles/themes';
-import { AnimatedTitle } from '../components/AnimatedTitle';
+import { COLORS } from '../styles/themes';
+import { CINEMA_FONTS } from '../styles/fonts';
 import { FilmGrain } from '../components/FilmGrain';
 
 interface EndScreenProps {
@@ -56,19 +56,29 @@ export const EndScreen: React.FC<EndScreenProps> = ({
       }}
     >
       <div style={{ textAlign: 'center' }}>
-        <AnimatedTitle
-          text={channelName}
-          variant="scale_in"
-          fontSize={80}
-          fontFamily={FONTS.body}
-          color={COLORS.text}
-        />
+        {/* Channel name in display serif */}
+        <div
+          style={{
+            fontFamily: CINEMA_FONTS.display,
+            fontSize: 80,
+            fontWeight: 700,
+            letterSpacing: 8,
+            textTransform: 'uppercase',
+            color: COLORS.text,
+            opacity: interpolate(frame, [10, 40], [0, 1], {
+              extrapolateLeft: 'clamp',
+              extrapolateRight: 'clamp',
+            }),
+          }}
+        >
+          {channelName}
+        </div>
 
         {/* Accent bar */}
         <div
           style={{
             width: barWidth,
-            height: 3,
+            height: 2,
             backgroundColor: COLORS.accent,
             margin: '24px auto',
           }}
@@ -78,10 +88,10 @@ export const EndScreen: React.FC<EndScreenProps> = ({
         <div
           style={{
             opacity: ctaOpacity,
-            fontFamily: FONTS.body,
-            fontSize: 28,
+            fontFamily: CINEMA_FONTS.sans,
+            fontSize: 22,
             fontWeight: 600,
-            letterSpacing: 4,
+            letterSpacing: 5,
             textTransform: 'uppercase',
             color: COLORS.textMuted,
             marginTop: 16,
@@ -101,23 +111,24 @@ export const EndScreen: React.FC<EndScreenProps> = ({
           >
             <div
               style={{
-                fontFamily: FONTS.body,
-                fontSize: 16,
+                fontFamily: CINEMA_FONTS.sans,
+                fontSize: 14,
                 fontWeight: 600,
-                letterSpacing: 3,
+                letterSpacing: 4,
                 textTransform: 'uppercase',
                 color: COLORS.textMuted,
-                marginBottom: 8,
+                marginBottom: 12,
               }}
             >
               {nextEpisodeDate ? `Next — ${nextEpisodeDate}` : 'Next Episode'}
             </div>
             <div
               style={{
-                fontFamily: FONTS.heading,
+                fontFamily: CINEMA_FONTS.display,
                 fontSize: 36,
                 fontWeight: 700,
                 color: COLORS.accent,
+                letterSpacing: 1,
               }}
             >
               {nextEpisodeTitle}

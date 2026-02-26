@@ -35,66 +35,136 @@ export const TextOverlay: React.FC<TextOverlayProps> = ({
   if (local < 0 || local > durationInFrames) return null;
 
   const holdEnd = durationInFrames - EXIT;
-  const opacity = interpolate(
+  const exitOpacity = interpolate(
     local,
-    [0, ENTER, holdEnd, durationInFrames],
-    [0, 1, 1, 0],
-    { extrapolateLeft: 'clamp', extrapolateRight: 'clamp', easing: Easing.bezier(...EASE.smooth) },
+    [holdEnd, durationInFrames],
+    [1, 0],
+    { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' },
   );
-  const slideY = interpolate(local, [0, ENTER], [20, 0], {
-    extrapolateLeft: 'clamp',
-    extrapolateRight: 'clamp',
-    easing: Easing.bezier(...EASE.out),
-  });
 
-  const baseStyle: React.CSSProperties = {
-    position: 'absolute',
-    left: 120,
-    right: 120,
-    bottom: 160,
-    opacity,
-    transform: `translateY(${slideY}px)`,
-    color: COLORS.text,
-    textShadow: '0 2px 12px rgba(0,0,0,0.8)',
-  };
-
+  // ── FACT: Typewriter reveal with monospace accent + data-pulse glow ──
   if (style === 'fact') {
+    const chars = text.split('');
+    const charsPerFrame = chars.length / Math.max(1, Math.min(durationInFrames * 0.4, 45));
+    const revealedCount = Math.min(chars.length, Math.floor(local * charsPerFrame));
+
+    // Data-pulse glow on the accent bar
+    const pulsePhase = Math.sin(local * 0.15) * 0.5 + 0.5;
+    const glowSize = 4 + pulsePhase * 8;
+    const barOpacity = interpolate(local, [0, 8], [0, 1], {
+      extrapolateLeft: 'clamp',
+      extrapolateRight: 'clamp',
+    });
+
+    // Cursor blink (visible while typing, fades after completion)
+    const cursorVisible = revealedCount < chars.length
+      ? Math.floor(local / 8) % 2 === 0
+      : local - (chars.length / charsPerFrame) < 20 && Math.floor(local / 8) % 2 === 0;
+
     return (
-      <div style={baseStyle}>
-        <div style={{ width: 60, height: 3, backgroundColor: colorAccent, marginBottom: 16 }} />
+      <div
+        style={{
+          position: 'absolute',
+          left: 120,
+          right: 120,
+          bottom: 160,
+          opacity: exitOpacity,
+          color: COLORS.text,
+          textShadow: '0 2px 12px rgba(0,0,0,0.8)',
+        }}
+      >
+        <div
+          style={{
+            width: 60,
+            height: 3,
+            backgroundColor: colorAccent,
+            marginBottom: 16,
+            opacity: barOpacity,
+            boxShadow: `0 0 ${glowSize}px ${colorAccent}`,
+          }}
+        />
         <div
           style={{
             ...FROSTED_PANEL,
-            fontFamily: FONTS.body,
-            fontSize: 42,
+            fontFamily: FONTS.mono,
+            fontSize: 40,
             fontWeight: 700,
             textTransform: 'uppercase',
-            letterSpacing: 2,
-            lineHeight: 1.3,
+            letterSpacing: 1.5,
+            lineHeight: 1.4,
           }}
         >
-          {text}
+          {chars.slice(0, revealedCount).join('')}
+          {cursorVisible && (
+            <span
+              style={{
+                display: 'inline-block',
+                width: 3,
+                height: '0.85em',
+                backgroundColor: colorAccent,
+                marginLeft: 2,
+                verticalAlign: 'baseline',
+                boxShadow: `0 0 6px ${colorAccent}`,
+              }}
+            />
+          )}
         </div>
       </div>
     );
   }
 
+  // ── QUOTE: Per-word spring animation with enhanced typography ──
   if (style === 'quote') {
     const words = text.split(/\s+/);
+    const enterOpacity = interpolate(local, [0, 10], [0, 1], {
+      extrapolateLeft: 'clamp',
+      extrapolateRight: 'clamp',
+    });
+
+    // Subtle quote mark animation
+    const quoteMarkProgress = spring({
+      frame: local,
+      fps,
+      config: { damping: 15, mass: 0.8, stiffness: 80 },
+    });
+
     return (
-      <div style={{ ...baseStyle, textAlign: 'center', left: 200, right: 200 }}>
+      <div
+        style={{
+          position: 'absolute',
+          left: 200,
+          right: 200,
+          bottom: 160,
+          textAlign: 'center',
+          opacity: exitOpacity * enterOpacity,
+          color: COLORS.text,
+          textShadow: '0 2px 12px rgba(0,0,0,0.8)',
+        }}
+      >
         <div
           style={{
             ...FROSTED_PANEL,
-            padding: '24px 32px',
+            padding: '28px 36px',
             display: 'inline-block',
             fontFamily: FONTS.heading,
-            fontSize: 48,
+            fontSize: 46,
             fontStyle: 'italic',
-            lineHeight: 1.4,
+            lineHeight: 1.5,
+            borderLeft: `3px solid ${colorAccent}`,
           }}
         >
-          <span>&ldquo;</span>
+          <span
+            style={{
+              opacity: quoteMarkProgress,
+              color: colorAccent,
+              fontSize: 60,
+              lineHeight: 0,
+              verticalAlign: -8,
+              marginRight: 4,
+            }}
+          >
+            &ldquo;
+          </span>
           {words.map((word, wi) => {
             const delay = wi * 3;
             const wordProgress = spring({
@@ -117,39 +187,169 @@ export const TextOverlay: React.FC<TextOverlayProps> = ({
               </span>
             );
           })}
-          <span>&rdquo;</span>
+          <span
+            style={{
+              opacity: quoteMarkProgress,
+              color: colorAccent,
+              fontSize: 60,
+              lineHeight: 0,
+              verticalAlign: -8,
+              marginLeft: 2,
+            }}
+          >
+            &rdquo;
+          </span>
         </div>
       </div>
     );
   }
 
+  // ── ANALYSIS: Slide from left with accent bar + staggered line reveal ──
   if (style === 'analysis') {
+    const lines = text.split(/[.!?]+/).filter((l) => l.trim().length > 0);
+    if (lines.length <= 1) {
+      // Single line: slide from left with accent bar
+      const slideX = interpolate(local, [0, ENTER], [-40, 0], {
+        extrapolateLeft: 'clamp',
+        extrapolateRight: 'clamp',
+        easing: Easing.bezier(...EASE.out),
+      });
+      const enterOpacity = interpolate(local, [0, ENTER], [0, 1], {
+        extrapolateLeft: 'clamp',
+        extrapolateRight: 'clamp',
+      });
+
+      return (
+        <div
+          style={{
+            position: 'absolute',
+            left: 120,
+            right: 120,
+            bottom: 160,
+            opacity: exitOpacity * enterOpacity,
+            transform: `translateX(${slideX}px)`,
+            color: COLORS.text,
+            textShadow: '0 2px 12px rgba(0,0,0,0.8)',
+            display: 'flex',
+            alignItems: 'stretch',
+            gap: 0,
+          }}
+        >
+          <div
+            style={{
+              width: 4,
+              backgroundColor: colorAccent,
+              borderRadius: 2,
+              flexShrink: 0,
+              boxShadow: `0 0 8px ${colorAccent}40`,
+            }}
+          />
+          <div
+            style={{
+              ...FROSTED_PANEL,
+              borderRadius: '0 8px 8px 0',
+              fontFamily: FONTS.body,
+              fontSize: 38,
+              fontWeight: 400,
+              lineHeight: 1.5,
+            }}
+          >
+            {text}
+          </div>
+        </div>
+      );
+    }
+
+    // Multi-line: stagger each sentence
     return (
-      <div style={baseStyle}>
+      <div
+        style={{
+          position: 'absolute',
+          left: 120,
+          right: 120,
+          bottom: 160,
+          opacity: exitOpacity,
+          color: COLORS.text,
+          textShadow: '0 2px 12px rgba(0,0,0,0.8)',
+          display: 'flex',
+          alignItems: 'stretch',
+          gap: 0,
+        }}
+      >
+        <div
+          style={{
+            width: 4,
+            backgroundColor: colorAccent,
+            borderRadius: 2,
+            flexShrink: 0,
+            boxShadow: `0 0 8px ${colorAccent}40`,
+          }}
+        />
         <div
           style={{
             ...FROSTED_PANEL,
+            borderRadius: '0 8px 8px 0',
             fontFamily: FONTS.body,
             fontSize: 38,
             fontWeight: 400,
             lineHeight: 1.5,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 8,
           }}
         >
-          {text}
+          {lines.map((line, li) => {
+            const lineDelay = li * 10;
+            const lineSlide = interpolate(local - lineDelay, [0, ENTER], [-30, 0], {
+              extrapolateLeft: 'clamp',
+              extrapolateRight: 'clamp',
+              easing: Easing.bezier(...EASE.out),
+            });
+            const lineOpacity = interpolate(local - lineDelay, [0, ENTER], [0, 1], {
+              extrapolateLeft: 'clamp',
+              extrapolateRight: 'clamp',
+            });
+            return (
+              <span
+                key={li}
+                style={{
+                  opacity: lineOpacity,
+                  transform: `translateX(${lineSlide}px)`,
+                  display: 'block',
+                }}
+              >
+                {line.trim()}.
+              </span>
+            );
+          })}
         </div>
       </div>
     );
   }
 
-  // transition — no backing panel (stays clean and cinematic)
+  // ── TRANSITION: Scale up from center with blur-to-sharp resolve ──
+  const scaleProgress = spring({
+    frame: local,
+    fps,
+    config: { damping: 14, mass: 0.6, stiffness: 100 },
+  });
+  const scale = interpolate(scaleProgress, [0, 1], [0.7, 1]);
+  const blurAmount = interpolate(scaleProgress, [0, 1], [12, 0]);
+  const enterOpacity = interpolate(scaleProgress, [0, 1], [0, 1]);
+
   return (
     <div
       style={{
-        ...baseStyle,
+        position: 'absolute',
+        left: 120,
+        right: 120,
         top: '50%',
-        bottom: 'auto',
-        transform: `translateY(calc(-50% + ${slideY}px))`,
+        transform: `translateY(-50%) scale(${scale})`,
         textAlign: 'center',
+        opacity: exitOpacity * enterOpacity,
+        filter: `blur(${blurAmount}px)`,
+        color: COLORS.text,
+        textShadow: `0 2px 12px rgba(0,0,0,0.8), 0 0 40px ${colorAccent}20`,
       }}
     >
       <div
@@ -157,7 +357,8 @@ export const TextOverlay: React.FC<TextOverlayProps> = ({
           fontFamily: FONTS.heading,
           fontSize: 64,
           fontWeight: 700,
-          letterSpacing: 4,
+          letterSpacing: 6,
+          textTransform: 'uppercase',
         }}
       >
         {text}

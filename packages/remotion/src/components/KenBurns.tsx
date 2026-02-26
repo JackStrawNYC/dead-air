@@ -326,6 +326,7 @@ export const KenBurns: React.FC<KenBurnsProps> = ({
               <Img
                 src={staticFile(img)}
                 style={mediaStyle}
+                delayRenderTimeoutInMilliseconds={120_000}
               />
             )}
             {warmthOpacity > 0.01 && (

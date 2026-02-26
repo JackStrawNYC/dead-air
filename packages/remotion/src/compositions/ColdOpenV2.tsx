@@ -24,20 +24,16 @@ export const ColdOpenV2: React.FC<ColdOpenV2Props> = ({
   const frame = useCurrentFrame();
   const { durationInFrames } = useVideoConfig();
 
-  const contentEnd = durationInFrames - 30;
-  const contentOpacity = interpolate(frame, [contentEnd, contentEnd + 5], [1, 0], {
+  // Let TransitionSeries handle visual blending — keep content visible through full duration
+  const scale = interpolate(frame, [0, durationInFrames], [1.02, 1.12], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
   });
 
-  const scale = interpolate(frame, [0, contentEnd], [1.02, 1.12], {
-    extrapolateLeft: 'clamp',
-    extrapolateRight: 'clamp',
-  });
-
+  // Sustain audio through full duration — TransitionSeries crossfade handles the blend
   const volume = interpolate(
     frame,
-    [0, 5, contentEnd - 5, contentEnd],
+    [0, 5, durationInFrames - 5, durationInFrames],
     [0, 1, 1, 0],
     { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' },
   );
@@ -51,55 +47,49 @@ export const ColdOpenV2: React.FC<ColdOpenV2Props> = ({
         overflow: 'hidden',
       }}
     >
-      {contentOpacity > 0 && (
-        <>
-          {isVideo(media) ? (
-            <OffthreadVideo
-              src={staticFile(media)}
-              style={{
-                position: 'absolute',
-                width: '100%',
-                height: '100%',
-                objectFit: 'cover',
-                transform: `scale(${scale})`,
-                opacity: contentOpacity,
-              }}
-              muted
-            />
-          ) : (
-            <Img
-              src={staticFile(media)}
-              style={{
-                position: 'absolute',
-                width: '100%',
-                height: '100%',
-                objectFit: 'cover',
-                transform: `scale(${scale})`,
-                opacity: contentOpacity,
-              }}
-            />
-          )}
-          <Audio src={staticFile(audioSrc)} startFrom={startFrom} volume={volume} />
-          {hookText && (
-            <div
-              style={{
-                position: 'absolute',
-                bottom: 120,
-                left: 80,
-                right: 80,
-              }}
-            >
-              <AnimatedTitle
-                text={hookText}
-                variant="scale_in"
-                fontSize={72}
-                color={COLORS.text}
-              />
-            </div>
-          )}
-          <FilmGrain intensity={0.15} />
-        </>
+      {isVideo(media) ? (
+        <OffthreadVideo
+          src={staticFile(media)}
+          style={{
+            position: 'absolute',
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            transform: `scale(${scale})`,
+          }}
+          muted
+        />
+      ) : (
+        <Img
+          src={staticFile(media)}
+          style={{
+            position: 'absolute',
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            transform: `scale(${scale})`,
+          }}
+        />
       )}
+      <Audio src={staticFile(audioSrc)} startFrom={startFrom} volume={volume} />
+      {hookText && (
+        <div
+          style={{
+            position: 'absolute',
+            bottom: 120,
+            left: 80,
+            right: 80,
+          }}
+        >
+          <AnimatedTitle
+            text={hookText}
+            variant="scale_in"
+            fontSize={72}
+            color={COLORS.text}
+          />
+        </div>
+      )}
+      <FilmGrain intensity={0.15} />
     </div>
   );
 };

@@ -8,6 +8,8 @@ interface WaveformBarProps {
   colorAccent?: string;
   secondaryColor?: string;
   height?: number;
+  /** Spectral centroid data for frequency-aware coloring */
+  spectralCentroid?: number[];
 }
 
 const BAR_COUNT = 64;
@@ -26,11 +28,30 @@ function lerpColor(a: string, b: string, t: number): string {
   return `rgb(${r},${g},${bl})`;
 }
 
+/**
+ * Map energy level to spectral color: cool blue → warm gold → hot white.
+ */
+function energyToColor(energy: number, accent: string, secondary: string | undefined): string {
+  if (energy < 0.3) {
+    // Cool: secondary or muted accent
+    return secondary ?? lerpColor('#334455', accent, energy / 0.3);
+  }
+  if (energy < 0.7) {
+    // Warm: accent color
+    const t = (energy - 0.3) / 0.4;
+    return secondary ? lerpColor(secondary, accent, t) : accent;
+  }
+  // Hot: accent → white
+  const t = (energy - 0.7) / 0.3;
+  return lerpColor(accent, '#ffffff', t * 0.6);
+}
+
 export const WaveformBar: React.FC<WaveformBarProps> = ({
   energyData,
   colorAccent = COLORS.accent,
   secondaryColor,
   height = 60,
+  spectralCentroid,
 }) => {
   const frame = useCurrentFrame();
   const { durationInFrames } = useVideoConfig();
@@ -41,6 +62,23 @@ export const WaveformBar: React.FC<WaveformBarProps> = ({
     [0, 1, 1, 0],
     { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' },
   );
+
+  // Precompute normalization once
+  const minE = Math.min(...energyData);
+  const maxE = Math.max(...energyData);
+  const rangeE = maxE - minE || 1;
+
+  // Current overall energy for glow effect
+  const currentEnergy = sampleEnergy(energyData, frame, durationInFrames);
+  const currentNorm = (currentEnergy - minE) / rangeE;
+
+  // Spectral brightness (0-1) — higher = brighter/warmer color shift
+  let spectralBrightness = 0.5;
+  if (spectralCentroid && spectralCentroid.length > 0) {
+    const t = Math.max(0, Math.min(1, frame / durationInFrames));
+    const idx = Math.min(Math.floor(t * spectralCentroid.length), spectralCentroid.length - 1);
+    spectralBrightness = spectralCentroid[idx];
+  }
 
   return (
     <div
@@ -62,6 +100,20 @@ export const WaveformBar: React.FC<WaveformBarProps> = ({
           background: 'linear-gradient(to top, rgba(0,0,0,0.6) 0%, transparent 100%)',
         }}
       />
+      {/* Glow effect at high energy */}
+      {currentNorm > 0.7 && (
+        <div
+          style={{
+            position: 'absolute',
+            bottom: 0,
+            left: '10%',
+            right: '10%',
+            height: height * 1.5,
+            background: `radial-gradient(ellipse 100% 100% at 50% 100%, ${colorAccent}${Math.round((currentNorm - 0.7) * 60).toString(16).padStart(2, '0')} 0%, transparent 70%)`,
+            filter: 'blur(8px)',
+          }}
+        />
+      )}
       <div
         style={{
           position: 'absolute',
@@ -79,18 +131,19 @@ export const WaveformBar: React.FC<WaveformBarProps> = ({
           // Sample energy at a slightly offset frame for each bar to create wave effect
           const offset = (i / BAR_COUNT) * 3 - 1.5;
           const energy = sampleEnergy(energyData, frame + offset, durationInFrames);
-
-          // Normalize to 0-1 range
-          const minE = Math.min(...energyData);
-          const maxE = Math.max(...energyData);
-          const range = maxE - minE || 1;
-          const normalized = (energy - minE) / range;
+          const normalized = (energy - minE) / rangeE;
 
           const barHeight = Math.max(2, normalized * height);
 
-          const barColor = secondaryColor
-            ? lerpColor(secondaryColor, colorAccent, i / (BAR_COUNT - 1))
-            : colorAccent;
+          // Spectral coloring: energy level determines warmth
+          const barColor = energyToColor(
+            normalized * (0.5 + spectralBrightness * 0.5),
+            colorAccent,
+            secondaryColor,
+          );
+
+          // Peak bars get glow
+          const isHot = normalized > 0.85;
 
           return (
             <div
@@ -101,6 +154,9 @@ export const WaveformBar: React.FC<WaveformBarProps> = ({
                 backgroundColor: barColor,
                 opacity: 0.6 + normalized * 0.4,
                 borderRadius: 1,
+                boxShadow: isHot
+                  ? `0 0 ${4 + normalized * 4}px ${barColor}`
+                  : undefined,
               }}
             />
           );

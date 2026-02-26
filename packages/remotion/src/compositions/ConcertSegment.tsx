@@ -7,7 +7,7 @@ import { Branding } from '../components/Branding';
 import { WaveformBar } from '../components/WaveformBar';
 import { FilmGrain } from '../components/FilmGrain';
 import { DynamicGrade, GradeMood } from '../components/DynamicGrade';
-import { CinematicGrade, MOOD_GRADE_PRESET } from '../components/CinematicGrade';
+import { CinematicGrade } from '../components/CinematicGrade';
 import { ArchivalTexture } from '../components/ArchivalTexture';
 import { BreathingOverlay } from '../components/BreathingOverlay';
 import { CrowdAmbience } from '../components/CrowdAmbience';
@@ -20,6 +20,13 @@ import { FanQuote } from '../components/FanQuote';
 import { EnergyPreview } from '../components/EnergyPreview';
 import { smoothstepVolume } from '../utils/audio';
 import { assignCameraPreset, getCameraSpeed } from '../utils/cameraAssignment';
+import { BeatKick } from '../components/BeatKick';
+import { ChromaticAberration } from '../components/ChromaticAberration';
+import { OnsetFlash } from '../components/OnsetFlash';
+import { ParticleBurst } from '../components/ParticleBurst';
+import { FilmStockGrade, MOOD_FILM_STOCK } from '../components/FilmStockGrade';
+import { Halation } from '../components/Halation';
+import { FilmGateWeaveWrapper } from '../components/FilmGateWeave';
 
 const MOOD_TO_PSYCHEDELIC: Record<string, PsychedelicVariant> = {
   psychedelic: 'fractal',
@@ -39,6 +46,16 @@ const MOOD_TO_GRADE_END: Record<string, GradeMood> = {
   cosmic: 'cold', electric: 'cold', psychedelic: 'cold', dark: 'cold',
 };
 import { FPS, getMoodAccent, MOOD_PALETTES } from '../styles/themes';
+
+// Mood → archival texture era: psychedelic gets heavy grain, high-energy gets clean
+const MOOD_TO_ERA: Record<string, 'colonial' | 'victorian' | 'early_modern' | 'modern'> = {
+  psychedelic: 'colonial',   // heavy grain — trippy analog feel
+  cosmic: 'victorian',       // amber tint, film scratches
+  dark: 'victorian',         // moody, aged look
+  warm: 'early_modern',      // classic film grain
+  earthy: 'early_modern',    // natural warmth
+  electric: 'modern',        // lighter grain, cleaner energy
+};
 
 interface TextLineProps {
   text: string;
@@ -61,6 +78,10 @@ interface ConcertSegmentProps {
   mood: string;
   colorPalette: string[];
   energyData?: number[];
+  /** Onset timings in frames (from librosa onset_detect) */
+  onsetFrames?: number[];
+  /** Spectral centroid data for frequency-aware visuals */
+  spectralCentroid?: number[];
   textLines?: TextLineProps[];
   songDNA?: SongDNAData;
   visualIntensity?: number;
@@ -76,7 +97,8 @@ interface ConcertSegmentProps {
   hasCrowdAmbience?: boolean;
 }
 
-const FADE_FRAMES = 60;
+const FADE_IN_FRAMES = 15;  // Quick but not instant — J-cut style
+const FADE_OUT_FRAMES = 60; // 2s tail for natural concert feel
 
 export const ConcertSegment: React.FC<ConcertSegmentProps> = ({
   songName,
@@ -86,6 +108,8 @@ export const ConcertSegment: React.FC<ConcertSegmentProps> = ({
   mood,
   colorPalette,
   energyData,
+  onsetFrames,
+  spectralCentroid,
   textLines,
   songDNA,
   segmentIndex = 0,
@@ -100,7 +124,7 @@ export const ConcertSegment: React.FC<ConcertSegmentProps> = ({
   const moodPalette = (MOOD_PALETTES as Record<string, { primary: string; secondary: string; glow: string }>)[mood];
   const secondaryColor = moodPalette?.secondary;
 
-  const volume = smoothstepVolume(frame, durationInFrames, 5, FADE_FRAMES);
+  const volume = smoothstepVolume(frame, durationInFrames, FADE_IN_FRAMES, FADE_OUT_FRAMES);
 
   // Energy
   let currentEnergy: number | undefined;
@@ -146,7 +170,7 @@ export const ConcertSegment: React.FC<ConcertSegmentProps> = ({
 
   const gradeStart = MOOD_TO_GRADE_START[mood] ?? 'neutral';
   const gradeEnd = MOOD_TO_GRADE_END[mood] ?? 'neutral';
-  const gradePreset = MOOD_GRADE_PRESET[mood] ?? 'documentary';
+  const filmStock = MOOD_FILM_STOCK[mood] ?? 'teal_orange';
 
   // Foley volume with delay and fade
   const foleyVol = foleySrc
@@ -154,13 +178,18 @@ export const ConcertSegment: React.FC<ConcertSegmentProps> = ({
     : 0;
 
   return (
-    <CinematicGrade preset={gradePreset}>
+    <FilmStockGrade stock={filmStock} intensity={0.85}>
       <DynamicGrade startMood={gradeStart} endMood={gradeEnd}>
+        <FilmGateWeaveWrapper format="35mm" intensity={0.3}>
         <div style={{ position: 'relative', width: '100%', height: '100%' }}>
           <PsychedelicLoop
             variant={MOOD_TO_PSYCHEDELIC[mood] ?? 'liquid'}
             colorPalette={colorPalette}
             durationInFrames={durationInFrames}
+            speed={currentEnergy !== undefined
+              ? 0.5 + currentEnergy * 1.3  // calm=0.5, mid=1.15, peak=1.8
+              : 1
+            }
           />
           <KenBurns
             images={images}
@@ -251,16 +280,42 @@ export const ConcertSegment: React.FC<ConcertSegmentProps> = ({
               energyData={energyData}
               colorAccent={accent}
               secondaryColor={secondaryColor}
+              spectralCentroid={spectralCentroid}
             />
           )}
           <StageLighting mood={mood} currentEnergy={currentEnergy} />
+          {/* Energy-reactive FX layers */}
+          {energyData && energyData.length > 0 && (
+            <>
+              <BeatKick
+                energyData={energyData}
+                durationInFrames={durationInFrames}
+                accentColor={accent}
+              />
+              <ChromaticAberration
+                energyData={energyData}
+              />
+              <ParticleBurst
+                energyData={energyData}
+                colorPalette={colorPalette}
+              />
+            </>
+          )}
+          {onsetFrames && onsetFrames.length > 0 && (
+            <OnsetFlash
+              onsetFrames={onsetFrames}
+              accentColor={accent}
+            />
+          )}
           <CrowdAmbience enabled={hasCrowdAmbience} />
           <Branding />
-          <ArchivalTexture era="early_modern" intensity={0.3} />
+          <ArchivalTexture era={MOOD_TO_ERA[mood] ?? 'early_modern'} intensity={0.3} />
           <FilmGrain intensity={0.12} />
+          <Halation intensity={0.06} currentEnergy={currentEnergy} />
           <BreathingOverlay breathingFrames={45} />
         </div>
+        </FilmGateWeaveWrapper>
       </DynamicGrade>
-    </CinematicGrade>
+    </FilmStockGrade>
   );
 };

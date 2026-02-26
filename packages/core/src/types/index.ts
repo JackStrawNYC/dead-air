@@ -101,6 +101,10 @@ export interface EpisodeScript {
   };
   thumbnailPrompt: string;
   shortsMoments: ShortsMoment[];
+  /** Legacy impact statement for closing card (optional — auto-generated if missing) */
+  legacyStatement?: string;
+  /** Attribution for legacy statement */
+  legacyAttribution?: string;
 }
 
 export interface SongDNAData {

@@ -1,8 +1,13 @@
+import { CINEMA_FONTS } from './fonts';
+
+/** @deprecated Use CINEMA_FONTS instead for production-grade typography */
 export const FONTS = {
-  heading: 'Georgia, "Times New Roman", serif',
-  body: '"Helvetica Neue", Helvetica, Arial, sans-serif',
-  mono: '"SF Mono", "Fira Code", monospace',
+  heading: CINEMA_FONTS.display,
+  body: CINEMA_FONTS.sans,
+  mono: CINEMA_FONTS.mono,
 } as const;
+
+export { CINEMA_FONTS };
 
 export const COLORS = {
   bg: '#0a0a0a',

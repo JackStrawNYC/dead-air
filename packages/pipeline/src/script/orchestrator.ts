@@ -171,6 +171,29 @@ export async function orchestrateScript(
       `Response: ${response.usage.output_tokens} tokens, stop_reason: ${response.stop_reason}`,
     );
 
+    // Handle content filter (not in SDK types but returned by API)
+    if ((response.stop_reason as string) === 'content_filter') {
+      if (attempt === 0) {
+        log.warn('Response blocked by content filter. Retrying with guidance...');
+        messages.push({ role: 'assistant', content: response.content });
+        messages.push({
+          role: 'user',
+          content:
+            'Your response was blocked by a safety filter. Please regenerate the complete JSON script. ' +
+            'Focus entirely on musicianship, venue acoustics, setlist choices, historical context, and fan experience. ' +
+            'Keep all narration and visual descriptions focused on the music and the art. ' +
+            'Avoid any references to substances, counterculture excess, or explicit content.',
+        });
+        continue;
+      }
+      db.prepare(
+        'UPDATE episodes SET status = ?, current_stage = ? WHERE id = ?',
+      ).run('failed', 'script_content_filter', episodeId);
+      throw new Error(
+        'Script generation blocked by content filter after retry. Try running with --model claude-opus-4-6 or softening the system prompt.',
+      );
+    }
+
     // Handle truncated response
     if (response.stop_reason === 'max_tokens' && attempt === 0) {
       log.warn('Response truncated (max_tokens). Retrying with higher limit...');

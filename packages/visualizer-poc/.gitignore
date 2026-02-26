@@ -1,0 +1,7 @@
+data/*.json
+out/
+node_modules/
+dist/
+.venv/
+__pycache__/
+public/audio/

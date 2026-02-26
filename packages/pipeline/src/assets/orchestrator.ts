@@ -488,13 +488,16 @@ export async function orchestrateAssetGeneration(
   }
 
   // 9. Generate video clips from hero images + concert_audio energy peaks
-  //    - Documentary segments: hero image (index 0) → video (existing behavior)
   //    - Concert_audio segments: hero image + up to 2 energy-peak images → video
-  //    Cap total at videoCap (default 40, ~$14 at $0.35/clip)
+  //    - Non-concert segments: hero image → video (lower priority)
+  //    Prioritize concert content, then fill remaining budget with non-concert heroes.
+  //    Cap via VIDEO_CAP env var or default 55 (~$19.25 at $0.35/clip).
   if (!skipVideo && !skipImages) {
     try {
-      const videoCap = 40;
-      const videoTargets: Array<{ img: typeof result.images[0]; seg: EpisodeSegment; assignment: typeof imageAssignments[0] }> = [];
+      const videoCap = Number(process.env.VIDEO_CAP) || 55;
+      const concertHeroes: Array<{ img: typeof result.images[0]; seg: EpisodeSegment; assignment: typeof imageAssignments[0] }> = [];
+      const concertPeaks: Array<{ img: typeof result.images[0]; seg: EpisodeSegment; assignment: typeof imageAssignments[0] }> = [];
+      const nonConcertHeroes: Array<{ img: typeof result.images[0]; seg: EpisodeSegment; assignment: typeof imageAssignments[0] }> = [];
 
       for (const img of result.images) {
         const assignment = imageAssignments.find(
@@ -505,28 +508,26 @@ export async function orchestrateAssetGeneration(
         const seg = script.segments[img.segIndex];
 
         if (seg?.type === 'concert_audio') {
-          // Concert segments: hero (index 0) always, plus up to 2 peak-aligned images
           if (assignment.tier === 'hero') {
-            videoTargets.push({ img, seg, assignment });
+            concertHeroes.push({ img, seg, assignment });
           } else if (assignment.promptIndex > 0) {
-            // Select peak-aligned images: high visual intensity segments get more videos
             const intensity = seg.visual?.visualIntensity ?? 0.5;
-            // Pick images at ~1/3 and ~2/3 through the segment's prompts
             const totalPrompts = seg.visual.scenePrompts.length;
             const peakPositions = [
               Math.floor(totalPrompts / 3),
               Math.floor((totalPrompts * 2) / 3),
             ];
             if (intensity > 0.6 && peakPositions.includes(assignment.promptIndex)) {
-              videoTargets.push({ img, seg, assignment });
+              concertPeaks.push({ img, seg, assignment });
             }
           }
         } else if (assignment.tier === 'hero') {
-          // Non-concert hero images → video (existing behavior)
-          videoTargets.push({ img, seg, assignment });
+          nonConcertHeroes.push({ img, seg, assignment });
         }
       }
 
+      // Priority order: concert heroes → concert peaks → non-concert heroes
+      const videoTargets = [...concertHeroes, ...concertPeaks, ...nonConcertHeroes];
       const cappedTargets = videoTargets.slice(0, videoCap);
 
       if (cappedTargets.length > 0) {

@@ -2,6 +2,7 @@ import type Database from 'better-sqlite3';
 import { createLogger, logCost } from '@dead-air/core';
 import { buildCompositionProps } from './composition-builder.js';
 import { renderEpisode } from './renderer.js';
+import { renderScenes, concatScenes } from './scene-renderer.js';
 import { renderEpisodeOnLambda } from './lambda-renderer.js';
 import { postProcess } from './post-process.js';
 
@@ -78,10 +79,17 @@ export async function orchestrateRender(
     renderCost = lambdaResult.cost;
     log.info(`Lambda render: ${lambdaResult.lambdasInvoked} lambdas, $${renderCost.toFixed(4)}`);
   } else {
-    log.info('Step 2/4: Rendering locally...');
-    const localResult = await renderEpisode({ props, dataDir, concurrency });
-    renderOutputPath = localResult.outputPath;
-    durationSec = localResult.durationSec;
+    log.info(`Step 2/4: Rendering locally (scene-by-scene, ${props.segments.length} segments, concurrency ${concurrency})...`);
+    await renderScenes({
+      props,
+      dataDir,
+      segmentIndex: 'all',
+      concurrency,
+      force: false,
+    });
+    log.info('Step 2.5/4: Concatenating scenes...');
+    renderOutputPath = await concatScenes(props, dataDir);
+    durationSec = props.totalDurationInFrames / 30;
   }
 
   // Step 3: Post-process

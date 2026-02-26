@@ -11,6 +11,8 @@ import { ConcertSegment } from './compositions/ConcertSegment';
 import { ContextSegment } from './compositions/ContextSegment';
 import { EndScreen } from './compositions/EndScreen';
 import { ChapterCard } from './compositions/ChapterCard';
+import { LegacyCard } from './components/LegacyCard';
+import { ScrollingCredits } from './components/ScrollingCredits';
 import { CinematicLetterbox } from './components/CinematicLetterbox';
 import { FilmLook } from './components/FilmLook';
 import { LightLeak } from './components/LightLeak';
@@ -19,6 +21,7 @@ import { SetlistProgress, SongPosition } from './components/SetlistProgress';
 import { SegmentErrorBoundary } from './components/SegmentErrorBoundary';
 import { AmbientBed } from './components/AmbientBed';
 import { TensionDrone } from './components/TensionDrone';
+import { DuckedBGM } from './components/DuckedBGM';
 import { whipPan } from './transitions/whip-pan';
 import { lightLeakTransition } from './transitions/light-leak-transition';
 import { iris } from './transitions/iris';
@@ -44,7 +47,7 @@ interface SongDNAData {
 export type SegmentProps =
   | { type: 'cold_open'; durationInFrames: number; audioSrc: string; startFrom: number; image: string }
   | { type: 'cold_open_v2'; durationInFrames: number; audioSrc: string; startFrom: number; media: string; hookText?: string }
-  | { type: 'brand_intro'; durationInFrames: number }
+  | { type: 'brand_intro'; durationInFrames: number; ambientSrc?: string; ambientVolume?: number }
   | {
       type: 'narration';
       durationInFrames: number;
@@ -65,8 +68,15 @@ export type SegmentProps =
       mood: string;
       colorPalette: string[];
       energyData?: number[];
+      /** Onset timings in frames (from librosa onset_detect, converted from seconds) */
+      onsetFrames?: number[];
+      /** Spectral centroid data for frequency-aware visuals */
+      spectralCentroid?: number[];
       textLines?: TextLine[];
       songDNA?: SongDNAData;
+      foleySrc?: string;
+      foleyVolume?: number;
+      foleyDelay?: number;
     }
   | {
       type: 'context_text';
@@ -91,7 +101,41 @@ export type SegmentProps =
       title: string;
       subtitle?: string;
       colorAccent?: string;
+      actNumber?: string;
+    }
+  | {
+      type: 'legacy_card';
+      durationInFrames: number;
+      statement: string;
+      attribution?: string;
+    }
+  | {
+      type: 'scrolling_credits';
+      durationInFrames: number;
+      showTitle?: string;
     };
+
+/** Silence window for dramatic audio drops */
+interface SilenceWindow {
+  startFrame: number;
+  durationFrames: number;
+}
+
+/** Pre-swell window for dramatic volume builds */
+interface PreSwellWindow {
+  peakFrame: number;
+  rampFrames: number;
+  boostMultiplier: number;
+}
+
+/** Per-episode audio mix overrides */
+interface AudioMixConfig {
+  bgm?: { fullVolume?: number; duckedVolume?: number };
+  ambientBed?: { baseVolume?: number; duckedVolume?: number; breathingVolume?: number };
+  tensionDrone?: { baseVolume?: number; duckedVolume?: number };
+  concertBed?: { fullVolume?: number; duckedVolume?: number };
+  contextAmbient?: { volume?: number };
+}
 
 export interface EpisodeProps {
   episodeId: string;
@@ -106,6 +150,14 @@ export interface EpisodeProps {
   hasVinylNoise?: boolean;
   /** Whether crowd ambience ambient file exists (default true) */
   hasCrowdAmbience?: boolean;
+  /** Silence windows for dramatic audio drops (composition-level frames) */
+  silenceWindows?: SilenceWindow[];
+  /** Pre-swell windows for dramatic volume builds */
+  preSwellWindows?: PreSwellWindow[];
+  /** Per-episode audio mix overrides */
+  audioMix?: AudioMixConfig;
+  /** BGM audio source for narration segments */
+  bgmSrc?: string;
 }
 
 const CROSSFADE_FRAMES = 30;
@@ -150,6 +202,9 @@ function enrichTransition(prevType: string, nextType: string, prevMood?: string,
 
   // Context segments: diagonal wipe for editorial variety
   if (nextType === 'context_text') return diagonalWipe();
+
+  // Legacy card + credits: dip to black for gravitas
+  if (nextType === 'legacy_card' || nextType === 'scrolling_credits') return dipToBlack();
 
   // End screen: dip to black
   if (nextType === 'end_screen') return dipToBlack();
@@ -216,12 +271,18 @@ function getSegmentName(seg: SegmentProps, index: number): string {
     case 'cold_open_v2': return 'Cold Open';
     case 'brand_intro': return 'Brand Intro';
     case 'end_screen': return 'End Screen';
+    case 'legacy_card': return 'Legacy Card';
+    case 'scrolling_credits': return 'Credits';
     default: return `Segment #${index}`;
   }
 }
 
 export const Episode: React.FC<Record<string, unknown>> = (rawProps) => {
-  const { segments, totalDurationInFrames, ambientBedSrc, tensionDroneSrc, hasVinylNoise = true, hasCrowdAmbience = true } = rawProps as unknown as EpisodeProps;
+  const {
+    segments, totalDurationInFrames, ambientBedSrc, tensionDroneSrc,
+    hasVinylNoise = true, hasCrowdAmbience = true,
+    silenceWindows = [], preSwellWindows = [], audioMix, bgmSrc,
+  } = rawProps as unknown as EpisodeProps;
   const songPositions = buildSongPositions(segments, CROSSFADE_FRAMES);
   const narrationTimings = buildNarrationTimings(segments, CROSSFADE_FRAMES);
 
@@ -240,7 +301,7 @@ export const Episode: React.FC<Record<string, unknown>> = (rawProps) => {
               case 'cold_open_v2':
                 return <ColdOpenV2 audioSrc={seg.audioSrc} startFrom={seg.startFrom} media={seg.media} hookText={seg.hookText} />;
               case 'brand_intro':
-                return <BrandIntro />;
+                return <BrandIntro ambientSrc={seg.ambientSrc} ambientVolume={seg.ambientVolume} />;
               case 'narration':
                 return (
                   <NarrationSegment
@@ -263,10 +324,15 @@ export const Episode: React.FC<Record<string, unknown>> = (rawProps) => {
                     mood={seg.mood}
                     colorPalette={seg.colorPalette}
                     energyData={seg.energyData}
+                    onsetFrames={seg.onsetFrames}
+                    spectralCentroid={seg.spectralCentroid}
                     textLines={seg.textLines}
                     songDNA={seg.songDNA}
                     segmentIndex={i}
                     hasCrowdAmbience={hasCrowdAmbience}
+                    foleySrc={seg.foleySrc}
+                    foleyVolume={seg.foleyVolume}
+                    foleyDelay={seg.foleyDelay}
                   />
                 );
               case 'context_text':
@@ -295,6 +361,20 @@ export const Episode: React.FC<Record<string, unknown>> = (rawProps) => {
                     title={seg.title}
                     subtitle={seg.subtitle}
                     colorAccent={seg.colorAccent}
+                    actNumber={seg.actNumber}
+                  />
+                );
+              case 'legacy_card':
+                return (
+                  <LegacyCard
+                    statement={seg.statement}
+                    attribution={seg.attribution}
+                  />
+                );
+              case 'scrolling_credits':
+                return (
+                  <ScrollingCredits
+                    showTitle={seg.showTitle}
                   />
                 );
               default:
@@ -324,17 +404,35 @@ export const Episode: React.FC<Record<string, unknown>> = (rawProps) => {
           );
         })}
       </TransitionSeries>
+      {/* Composition-level BGM under narration segments */}
+      {bgmSrc && (
+        <DuckedBGM
+          src={bgmSrc}
+          fullVolume={audioMix?.bgm?.fullVolume ?? 0.12}
+          duckedVolume={audioMix?.bgm?.duckedVolume ?? 0.04}
+          narrationTimings={narrationTimings}
+          silenceWindows={silenceWindows}
+          preSwellWindows={preSwellWindows}
+        />
+      )}
       {/* Composition-level ambient audio */}
       {ambientBedSrc && (
         <AmbientBed
           src={ambientBedSrc}
+          baseVolume={audioMix?.ambientBed?.baseVolume ?? 0.06}
+          duckedVolume={audioMix?.ambientBed?.duckedVolume ?? 0.035}
+          breathingVolume={audioMix?.ambientBed?.breathingVolume ?? 0.09}
           narrationTimings={narrationTimings}
+          silenceWindows={silenceWindows}
         />
       )}
       {tensionDroneSrc && (
         <TensionDrone
           src={tensionDroneSrc}
+          baseVolume={audioMix?.tensionDrone?.baseVolume ?? 0.06}
+          duckedVolume={audioMix?.tensionDrone?.duckedVolume ?? 0.03}
           narrationTimings={narrationTimings}
+          silenceWindows={silenceWindows}
         />
       )}
       <LightLeak />

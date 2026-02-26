@@ -98,8 +98,8 @@ Your image prompts will be sent to AI image generators. The visual style depends
 **NARRATION & CONTEXT_TEXT segments → Documentary photography style**
 These are grounding/historical segments. Prompts should produce images that look like vintage 1970s documentary photography — grainy, warm, realistic. Think Ken Burns documentary stills.
 
-**CONCERT_AUDIO segments → Psychedelic poster art themed to each song**
-AI can't produce convincing concert photography — it looks fake. Instead, lean into AI's strengths: generate psychedelic poster art themed to each song's lyrics, characters, and story. Think concert poster art, Art Nouveau influences, vivid saturated colors, flowing organic patterns. The visual FX layers (BeatKick, ChromaticAberration, OnsetFlash, ParticleBurst, Halation) already enhance this style perfectly.
+**CONCERT_AUDIO segments → Visionary concert poster art themed to each song**
+AI can't produce convincing concert photography — it looks fake. Instead, lean into AI's strengths: generate visionary concert poster art themed to each song's lyrics, characters, and story. Think classic rock poster art, Art Nouveau influences, vivid saturated colors, flowing organic patterns. The visual FX layers (BeatKick, ChromaticAberration, OnsetFlash, ParticleBurst, Halation) already enhance this style perfectly.
 
 ### RULES FOR NARRATION & CONTEXT_TEXT PROMPTS (documentary style)
 - **Always specify the actual venue, era, and setting.** "Interior of Barton Hall gymnasium, Cornell University, 1977" not "a concert venue."
@@ -108,17 +108,17 @@ AI can't produce convincing concert photography — it looks fake. Instead, lean
 - Good: "Packed college gymnasium crowd at Barton Hall, Cornell University, warm amber stage lighting cutting through haze, silhouettes of students with raised hands, 1977, vintage 35mm documentary photography, warm film grain"
 - Good: "Close-up of guitar neck and hands on fretboard, warm spotlight, sweat visible, vintage 1970s concert photography, shallow depth of field, film grain"
 
-### RULES FOR CONCERT_AUDIO PROMPTS (psychedelic poster art)
+### RULES FOR CONCERT_AUDIO PROMPTS (visionary poster art)
 - **Reference the song's themes, lyrics, characters, and story** — NOT the band members or venue.
-- **Style directive**: "psychedelic concert poster art, flowing organic patterns, vivid saturated colors, Art Nouveau influences"
+- **Style directive**: "visionary concert poster art, flowing organic patterns, vivid saturated colors, Art Nouveau influences"
 - **Hero prompts** (first prompt of each segment) should describe subjects with morphing potential for video generation: flowers blooming, fractals expanding, cosmic swirls, flames rising, waves crashing.
-- Good: "Scarlet flowers blooming through cosmic nebula, stardust trails cascading like rain, psychedelic concert poster art, vivid saturated colors, Art Nouveau influences, deep space background"
-- Good: "Two outlaws silhouetted against a fractal desert sky, neon cacti glowing, swirling starfield above, psychedelic poster art, flowing organic patterns, warm earth tones meeting cosmic purples"
-- Good: "Post-apocalyptic sunrise over crystalline wasteland, ethereal light beams through prismatic clouds, psychedelic art, flowing organic forms, delicate watercolor meets bold poster design"
-- Good: "Infinite cosmic void with spiraling galaxies, aurora borealis fractals pulsing with rhythm, deep psychedelic art, flowing nebula patterns, Art Nouveau star formations"
+- Good: "Scarlet flowers blooming through cosmic nebula, stardust trails cascading like rain, visionary concert poster art, vivid saturated colors, Art Nouveau influences, deep space background"
+- Good: "Two outlaws silhouetted against a fractal desert sky, neon cacti glowing, swirling starfield above, visionary poster art, flowing organic patterns, warm earth tones meeting cosmic purples"
+- Good: "Post-apocalyptic sunrise over crystalline wasteland, ethereal light beams through prismatic clouds, visionary art, flowing organic forms, delicate watercolor meets bold poster design"
+- Good: "Infinite cosmic void with spiraling galaxies, aurora borealis fractals pulsing with rhythm, deep visionary art, flowing nebula patterns, Art Nouveau star formations"
 - Bad: "Jerry Garcia playing guitar on stage" — never depict real people
 - Bad: "Realistic concert photograph of a band performing" — this is what we're moving AWAY from
-- Bad: "Psychedelic kaleidoscope of random colors" — too generic, must be themed to the specific song
+- Bad: "Generic kaleidoscope of random colors" — too generic, must be themed to the specific song
 - Bad: "Concert ticket for Grateful Dead show" — AI text is always garbled
 
 ### SHARED RULES (both styles)
@@ -152,7 +152,7 @@ Use these as inspiration for concert_audio scenePrompts. Match the song's story 
   - "Drums": tribal rhythmic patterns radiating from center, concentric percussion waves in deep earth tones
   - "Space": formless cosmic void, nebula clouds shifting between dimensions, pure abstract energy
   - "The Wheel": enormous cosmic wheel turning slowly through starfields, spokes of pure light
-  - "Althea": woman made of flowing water and wildflowers standing at a crossroads, gentle psychedelic warmth
+  - "Althea": woman made of flowing water and wildflowers standing at a crossroads, gentle visionary warmth
 
 For songs not listed, generate a theme based on the song's lyrics, story, and mood. Use the mood field to guide the visual temperature.
 
@@ -162,7 +162,7 @@ For songs not listed, generate a theme based on the song's lyrics, story, and mo
   - Electric/cooler (teals, deep blues, silvers) for electric jams and high-energy moments
   - Dark/muted (navy, charcoal, deep green) for quiet passages and space
   - Rich/saturated (deep golds, warm oranges, burgundy) for peak moments
-  - Psychedelic/vivid (deep purples, electric blues, hot magentas, neon greens) for psychedelic jams
+  - Vivid/visionary (deep purples, electric blues, hot magentas, neon greens) for cosmic jams and high-energy peaks
 - Each image displays for ~5 seconds with a Ken Burns pan/zoom, so the number of scenePrompts MUST scale with segment duration:
   - Short segments (<20s): 3-4 scenePrompts
   - Medium segments (20-45s): 5-9 scenePrompts

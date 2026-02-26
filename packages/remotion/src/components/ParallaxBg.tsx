@@ -53,6 +53,7 @@ export const ParallaxBg: React.FC<ParallaxBgProps> = ({
       {/* Background layer — slow */}
       <Img
         src={staticFile(image)}
+        delayRenderTimeoutInMilliseconds={120_000}
         style={{
           position: 'absolute',
           width: '120%',
