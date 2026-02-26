@@ -9,6 +9,9 @@ import { useCurrentFrame } from "remotion";
 import { LiquidLightScene } from "./LiquidLightScene";
 import { ParticleNebulaScene } from "./ParticleNebulaScene";
 import { ConcertLightingScene } from "./ConcertLightingScene";
+import { LoFiGrainScene } from "./LoFiGrainScene";
+import { StarkMinimalScene } from "./StarkMinimalScene";
+import { OilProjectorScene } from "./OilProjectorScene";
 import { SceneCrossfade } from "./SceneCrossfade";
 import type {
   EnhancedFrameData,
@@ -50,6 +53,12 @@ function renderMode(
       return <ParticleNebulaScene frames={frames} sections={sections} palette={palette} tempo={tempo} style={style} />;
     case "concert_lighting":
       return <ConcertLightingScene frames={frames} sections={sections} palette={palette} tempo={tempo} style={style} />;
+    case "lo_fi_grain":
+      return <LoFiGrainScene frames={frames} sections={sections} palette={palette} tempo={tempo} style={style} />;
+    case "stark_minimal":
+      return <StarkMinimalScene frames={frames} sections={sections} palette={palette} tempo={tempo} style={style} />;
+    case "oil_projector":
+      return <OilProjectorScene frames={frames} sections={sections} palette={palette} tempo={tempo} style={style} />;
     default:
       return <LiquidLightScene frames={frames} sections={sections} palette={palette} tempo={tempo} style={style} />;
   }

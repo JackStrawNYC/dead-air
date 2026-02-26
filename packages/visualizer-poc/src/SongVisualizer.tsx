@@ -24,6 +24,7 @@ import { loadAnalysis, getSections } from "./data/analysis-loader";
 import type { SetlistEntry, ShowSetlist, TrackAnalysis } from "./data/types";
 import { ShowContextProvider, getShowSeed } from "./data/ShowContext";
 import { SongPaletteProvider, paletteHueRotation } from "./data/SongPaletteContext";
+import { EraGrade } from "./components/EraGrade";
 
 const FADE_FRAMES = 90; // 3 seconds at 30fps
 
@@ -201,59 +202,60 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
 
   return (
     <div style={{ width, height, position: "relative", overflow: "hidden", background: "#000" }}>
+      <ShowContextProvider show={props.show}>
       <div style={{ position: "absolute", inset: 0, opacity }}>
-        {/* ═══ Layer 0: Base shader visualization ═══ */}
-        <SceneRouter
-          frames={f}
-          sections={sections}
-          song={props.song}
-          tempo={tempo}
-        />
+        <EraGrade>
+          {/* ═══ Layer 0: Base shader visualization ═══ */}
+          <SceneRouter
+            frames={f}
+            sections={sections}
+            song={props.song}
+            tempo={tempo}
+          />
 
-        {/* ═══ Layer 0.5: Per-song poster art ═══ */}
-        {props.song.songArt && (
-          <SongArtLayer src={staticFile(props.song.songArt)} />
-        )}
+          {/* ═══ Layer 0.5: Per-song poster art ═══ */}
+          {props.song.songArt && (
+            <SongArtLayer src={staticFile(props.song.songArt)} />
+          )}
 
-        {/* ═══ Dynamic overlay layers (1-10) ═══ */}
-        {/* Hidden during title card, then fade in over 3 seconds */}
-        <ShowContextProvider show={props.show}>
-        <SongPaletteProvider palette={props.song.palette}>
-          <div
-            style={{
-              position: "absolute",
-              inset: 0,
-              opacity: props.song.songArt
-                ? interpolate(frame, [ART_FULL_END, ART_FULL_END + 90], [0, 1], {
-                    extrapolateLeft: "clamp",
-                    extrapolateRight: "clamp",
-                    easing: Easing.out(Easing.cubic),
-                  })
-                : 1,
-              filter: hueRotation !== 0 ? `hue-rotate(${hueRotation.toFixed(1)}deg)` : undefined,
-            }}
-          >
-            {activeEntries.map(([name, { Component }]) => {
-              const overlayOpacity = opacityMap ? (opacityMap[name] ?? 0) : 1;
-              return (
-                <div
-                  key={name}
-                  style={{
-                    position: "absolute",
-                    inset: 0,
-                    opacity: overlayOpacity,
-                    pointerEvents: "none",
-                  }}
-                >
-                  <Component frames={f} />
-                </div>
-              );
-            })}
-            <ConcertInfo songTitle={props.song.title} />
-            <SetlistScroll frames={f} currentSong={props.song.title} />
-          </div>
-        </SongPaletteProvider>
-        </ShowContextProvider>
+          {/* ═══ Dynamic overlay layers (1-10) ═══ */}
+          {/* Hidden during title card, then fade in over 3 seconds */}
+          <SongPaletteProvider palette={props.song.palette}>
+            <div
+              style={{
+                position: "absolute",
+                inset: 0,
+                opacity: props.song.songArt
+                  ? interpolate(frame, [ART_FULL_END, ART_FULL_END + 90], [0, 1], {
+                      extrapolateLeft: "clamp",
+                      extrapolateRight: "clamp",
+                      easing: Easing.out(Easing.cubic),
+                    })
+                  : 1,
+                filter: hueRotation !== 0 ? `hue-rotate(${hueRotation.toFixed(1)}deg)` : undefined,
+              }}
+            >
+              {activeEntries.map(([name, { Component }]) => {
+                const overlayOpacity = opacityMap ? (opacityMap[name] ?? 0) : 1;
+                return (
+                  <div
+                    key={name}
+                    style={{
+                      position: "absolute",
+                      inset: 0,
+                      opacity: overlayOpacity,
+                      pointerEvents: "none",
+                    }}
+                  >
+                    <Component frames={f} />
+                  </div>
+                );
+              })}
+              <ConcertInfo songTitle={props.song.title} />
+              <SetlistScroll frames={f} currentSong={props.song.title} />
+            </div>
+          </SongPaletteProvider>
+        </EraGrade>
 
         {/* ═══ Always-active: special-prop components ═══ */}
         <SongTitle
@@ -263,6 +265,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
         />
         <FilmGrain opacity={0.06} />
       </div>
+      </ShowContextProvider>
       <Audio src={staticFile(`audio/${props.song.audioFile}`)} />
     </div>
   );

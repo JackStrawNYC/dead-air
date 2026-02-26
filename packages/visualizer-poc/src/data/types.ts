@@ -74,7 +74,13 @@ export interface TrackAnalysis {
 }
 
 /** Visual mode for a scene */
-export type VisualMode = "liquid_light" | "particle_nebula" | "concert_lighting";
+export type VisualMode =
+  | "liquid_light"
+  | "particle_nebula"
+  | "concert_lighting"
+  | "lo_fi_grain"
+  | "stark_minimal"
+  | "oil_projector";
 
 /** Per-section mode override in setlist */
 export interface SectionOverride {
