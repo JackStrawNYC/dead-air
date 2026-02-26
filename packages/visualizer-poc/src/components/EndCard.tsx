@@ -12,6 +12,7 @@
 import React from "react";
 import { Img, staticFile, useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
 import { loadFont } from "@remotion/google-fonts/CormorantGaramond";
+import { useShowContext } from "../data/ShowContext";
 
 const { fontFamily: cormorant } = loadFont("normal", {
   weights: ["300", "400", "600"],
@@ -36,6 +37,7 @@ export interface EndCardProps {
 export const EndCard: React.FC<EndCardProps> = ({ brandSrc, date, venue }) => {
   const { width, height } = useVideoConfig();
   const frame = useCurrentFrame();
+  const ctx = useShowContext();
 
   const total = FADE_IN + HOLD + FADE_OUT;
 
@@ -175,7 +177,7 @@ export const EndCard: React.FC<EndCardProps> = ({ brandSrc, date, venue }) => {
             letterSpacing: "0.1em",
           }}
         >
-          Dead Air — Full Grateful Dead Concerts
+          Dead Air — Full {ctx?.bandName ?? "Grateful Dead"} Concerts
         </div>
       </div>
     </div>

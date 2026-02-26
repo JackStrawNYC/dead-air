@@ -9,16 +9,7 @@
 import React from "react";
 import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
-
-function seeded(seed: number): () => number {
-  let s = seed | 0;
-  return () => {
-    s = (s + 0x6d2b79f5) | 0;
-    let t = Math.imul(s ^ (s >>> 15), 1 | s);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
+import { seeded } from "../utils/seededRandom";
 
 const STATIC_CYCLE = 55 * 30; // 55 seconds at 30fps = 1650 frames
 const STATIC_DURATION = 3 * 30; // 3 seconds = 90 frames

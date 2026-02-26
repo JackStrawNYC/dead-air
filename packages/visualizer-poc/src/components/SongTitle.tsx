@@ -81,8 +81,8 @@ export const SongTitle: React.FC<Props> = ({ title, setNumber, trackNumber }) =>
   const ctx = useShowContext();
 
   const typo = useMemo((): EraTypography => {
-    if (!ctx?.era) return DEFAULT_TYPO;
-    return ERA_TYPOGRAPHY[ctx.era as Era] ?? DEFAULT_TYPO;
+    if (!ctx?.era || !(ctx.era in ERA_TYPOGRAPHY)) return DEFAULT_TYPO;
+    return ERA_TYPOGRAPHY[ctx.era as Era];
   }, [ctx?.era]);
 
   if (frame >= TOTAL) return null;

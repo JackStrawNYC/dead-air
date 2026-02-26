@@ -10,17 +10,8 @@
 import React from "react";
 import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
-
-/** Seeded PRNG (mulberry32) */
-function seeded(seed: number): () => number {
-  let s = seed | 0;
-  return () => {
-    s = (s + 0x6d2b79f5) | 0;
-    let t = Math.imul(s ^ (s >>> 15), 1 | s);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
+import { seeded } from "../utils/seededRandom";
+import { useShowContext } from "../data/ShowContext";
 
 const CYCLE = 1950; // 65 seconds at 30fps
 const DURATION = 600; // 20 seconds visible
@@ -64,6 +55,7 @@ interface Props {
 export const HoneycombGrid: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
+  const ctx = useShowContext();
 
   const idx = Math.min(Math.max(0, frame), frames.length - 1);
   let eSum = 0;
@@ -76,7 +68,7 @@ export const HoneycombGrid: React.FC<Props> = ({ frames }) => {
 
   // Pre-generate hex grid and bees
   const { hexCells, bees } = React.useMemo(() => {
-    const rng = seeded(77050807);
+    const rng = seeded(ctx?.showSeed ?? 77050807);
     const cells: HexCell[] = [];
     const screenCx = width / 2;
     const screenCy = height / 2;
@@ -127,7 +119,7 @@ export const HoneycombGrid: React.FC<Props> = ({ frames }) => {
     }
 
     return { hexCells: cells, bees: beeList };
-  }, [width, height]);
+  }, [width, height, ctx?.showSeed]);
 
   // Timing gate
   const cycleFrame = frame % CYCLE;

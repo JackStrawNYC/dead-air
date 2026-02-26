@@ -23,6 +23,7 @@ import { FilmGrain } from "./components/FilmGrain";
 import { loadAnalysis, getSections } from "./data/analysis-loader";
 import type { SetlistEntry, ShowSetlist, TrackAnalysis } from "./data/types";
 import { ShowContextProvider, getShowSeed } from "./data/ShowContext";
+import { VisualizerErrorBoundary } from "./components/VisualizerErrorBoundary";
 import { SongPaletteProvider, paletteHueRotation } from "./data/SongPaletteContext";
 import { EraGrade } from "./components/EraGrade";
 
@@ -203,6 +204,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
   return (
     <div style={{ width, height, position: "relative", overflow: "hidden", background: "#000" }}>
       <ShowContextProvider show={props.show}>
+      <VisualizerErrorBoundary>
       <div style={{ position: "absolute", inset: 0, opacity }}>
         <EraGrade>
           {/* ═══ Layer 0: Base shader visualization ═══ */}
@@ -265,6 +267,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
         />
         <FilmGrain opacity={0.06} />
       </div>
+      </VisualizerErrorBoundary>
       </ShowContextProvider>
       <Audio src={staticFile(`audio/${props.song.audioFile}`)} />
     </div>

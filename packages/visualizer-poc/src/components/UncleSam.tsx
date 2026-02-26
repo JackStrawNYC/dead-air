@@ -10,17 +10,7 @@
 import React from "react";
 import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
-
-/** Seeded PRNG (mulberry32) */
-function seeded(seed: number): () => number {
-  let s = seed | 0;
-  return () => {
-    s = (s + 0x6d2b79f5) | 0;
-    let t = Math.imul(s ^ (s >>> 15), 1 | s);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
+import { seeded } from "../utils/seededRandom";
 
 const APPEAR_DURATION = 180; // 6 seconds at 30fps
 const APPEAR_GAP = 2520;     // 84 second gap (90s total cycle)

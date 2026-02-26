@@ -10,16 +10,8 @@
 import React from "react";
 import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
-
-function seeded(seed: number): () => number {
-  let s = seed | 0;
-  return () => {
-    s = (s + 0x6d2b79f5) | 0;
-    let t = Math.imul(s ^ (s >>> 15), 1 | s);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
+import { seeded } from "../utils/seededRandom";
+import { useShowContext } from "../data/ShowContext";
 
 const CYCLE = 2250; // 75s at 30fps
 const DURATION = 720; // 24s visible
@@ -50,6 +42,7 @@ interface Props {
 export const TapestryWeave: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
+  const ctx = useShowContext();
 
   const idx = Math.min(Math.max(0, frame), frames.length - 1);
   let eSum = 0;
@@ -61,22 +54,22 @@ export const TapestryWeave: React.FC<Props> = ({ frames }) => {
   const energy = eCount > 0 ? eSum / eCount : 0;
 
   const warpThreads = React.useMemo(() => {
-    const rng = seeded(77_050_801);
+    const rng = seeded(ctx?.showSeed ?? 77_050_801);
     return Array.from({ length: WARP_COUNT }, (): ThreadData => ({
       colorIdx: Math.floor(rng() * EARTH_TONES.length),
       offset: rng() * 200,
       thickness: 3 + rng() * 4,
     }));
-  }, []);
+  }, [ctx?.showSeed]);
 
   const weftThreads = React.useMemo(() => {
-    const rng = seeded(77_050_802);
+    const rng = seeded(ctx?.showSeed ?? 77_050_802);
     return Array.from({ length: WEFT_COUNT }, (): ThreadData => ({
       colorIdx: Math.floor(rng() * EARTH_TONES.length),
       offset: rng() * 200,
       thickness: 3 + rng() * 4,
     }));
-  }, []);
+  }, [ctx?.showSeed]);
 
   // Cycle gating
   const cycleFrame = frame % CYCLE;

@@ -9,17 +9,8 @@
 import React from "react";
 import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
-
-/** Seeded PRNG (mulberry32) */
-function seeded(seed: number): () => number {
-  let s = seed | 0;
-  return () => {
-    s = (s + 0x6d2b79f5) | 0;
-    let t = Math.imul(s ^ (s >>> 15), 1 | s);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
+import { seeded } from "../utils/seededRandom";
+import { useShowContext } from "../data/ShowContext";
 
 const CYCLE = 1350; // 45 seconds at 30fps
 const DURATION = 420; // 14 seconds visible
@@ -40,6 +31,7 @@ interface Props {
 export const CoffeeSwirl: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
+  const ctx = useShowContext();
 
   const idx = Math.min(Math.max(0, frame), frames.length - 1);
   let eSum = 0;
@@ -52,7 +44,7 @@ export const CoffeeSwirl: React.FC<Props> = ({ frames }) => {
 
   // Pre-generate steam wisps
   const wisps = React.useMemo(() => {
-    const rng = seeded(77050806);
+    const rng = seeded(ctx?.showSeed ?? 77050806);
     const w: SteamWisp[] = [];
     for (let i = 0; i < 8; i++) {
       w.push({
@@ -65,7 +57,7 @@ export const CoffeeSwirl: React.FC<Props> = ({ frames }) => {
       });
     }
     return w;
-  }, []);
+  }, [ctx?.showSeed]);
 
   // Timing gate
   const cycleFrame = frame % CYCLE;

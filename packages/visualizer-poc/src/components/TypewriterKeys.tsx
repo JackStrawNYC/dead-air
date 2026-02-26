@@ -10,17 +10,8 @@
 import React from "react";
 import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
-
-/* ---- seeded PRNG (mulberry32) ---- */
-function seeded(seed: number): () => number {
-  let s = seed | 0;
-  return () => {
-    s = (s + 0x6d2b79f5) | 0;
-    let t = Math.imul(s ^ (s >>> 15), 1 | s);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
+import { seeded } from "../utils/seededRandom";
+import { useShowContext } from "../data/ShowContext";
 
 const NUM_KEYS = 10;
 const KEY_LABELS = ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"];
@@ -51,6 +42,7 @@ interface Props {
 export const TypewriterKeys: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
+  const ctx = useShowContext();
 
   /* ----- energy ----- */
   const idx = Math.min(Math.max(0, frame), frames.length - 1);
@@ -64,9 +56,9 @@ export const TypewriterKeys: React.FC<Props> = ({ frames }) => {
 
   /* memos BEFORE conditional returns */
   const keyPhases = React.useMemo(() => {
-    const rng = seeded(770501);
+    const rng = seeded(ctx?.showSeed ?? 770501);
     return Array.from({ length: NUM_KEYS }, () => rng() * Math.PI * 2);
-  }, []);
+  }, [ctx?.showSeed]);
 
   /* gentle fade-in at start */
   const masterFade = interpolate(frame, [0, 120], [0, 1], {

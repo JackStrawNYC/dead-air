@@ -56,8 +56,8 @@ export const EraGrade: React.FC<Props> = ({ children }) => {
   const ctx = useShowContext();
 
   const gradeStyle = useMemo((): EraGradeStyle | null => {
-    if (!ctx?.era) return null;
-    return ERA_GRADES[ctx.era as Era] ?? null;
+    if (!ctx?.era || !(ctx.era in ERA_GRADES)) return null;
+    return ERA_GRADES[ctx.era as Era];
   }, [ctx?.era]);
 
   if (!gradeStyle) {
