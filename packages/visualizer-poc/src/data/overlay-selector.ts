@@ -34,6 +34,48 @@ const LAYER_TARGETS: Record<number, { min: number; max: number }> = {
 
 const MAX_TOTAL_WEIGHT = 60;
 
+// ─── Cross-Song Memory ───
+
+/** How many previous songs to remember for variety penalties */
+const LOOKBACK_DEPTH = 4;
+
+/** Graduated recency penalties: N-1 = 50%, N-2 = 35%, N-3 = 20%, N-4 = 10% */
+const RECENCY_PENALTIES = [0.50, 0.35, 0.20, 0.10];
+
+/** No overlay should appear in more than this fraction of songs */
+const MAX_FREQUENCY_RATIO = 0.40;
+
+/** Score penalty when an overlay exceeds the frequency cap */
+const FREQUENCY_CAP_PENALTY = 0.35;
+
+/**
+ * Cross-song memory for variety enforcement.
+ * Tracks recent song selections + show-wide frequency.
+ */
+export interface OverlayHistory {
+  /** Recent song overlays, most recent first (up to LOOKBACK_DEPTH) */
+  recentSongs: Set<string>[];
+  /** Total appearances per overlay across all songs so far */
+  frequency: Map<string, number>;
+  /** Total songs processed so far */
+  songCount: number;
+}
+
+/** Create an empty history (for the first song in a show) */
+export function emptyHistory(): OverlayHistory {
+  return { recentSongs: [], frequency: new Map(), songCount: 0 };
+}
+
+/** Push a song's selected overlays into history, maintaining LOOKBACK_DEPTH window */
+export function pushHistory(history: OverlayHistory, overlays: string[]): OverlayHistory {
+  const recentSongs = [new Set(overlays), ...history.recentSongs].slice(0, LOOKBACK_DEPTH);
+  const frequency = new Map(history.frequency);
+  for (const name of overlays) {
+    frequency.set(name, (frequency.get(name) ?? 0) + 1);
+  }
+  return { recentSongs, frequency, songCount: history.songCount + 1 };
+}
+
 // ─── Deterministic PRNG ───
 function seededRandom(seed: number): () => number {
   let s = seed;
@@ -207,7 +249,7 @@ interface ScoredOverlay {
 function scoreOverlay(
   entry: OverlayEntry,
   profile: SongProfile,
-  previousSongOverlays: Set<string>,
+  history: OverlayHistory,
   rng: () => number,
 ): number {
   if (entry.alwaysActive) return 1; // Always selected
@@ -235,9 +277,21 @@ function scoreOverlay(
   if (entry.weight === 3) score -= 0.1;
   if (entry.weight === 1) score += 0.05;
 
-  // Variety penalty: 50% reduction if used in previous song
-  if (previousSongOverlays.has(entry.name)) {
-    score *= 0.5;
+  // Graduated recency penalty: strongest for N-1, decaying over LOOKBACK_DEPTH songs
+  for (let i = 0; i < history.recentSongs.length; i++) {
+    if (history.recentSongs[i].has(entry.name)) {
+      score *= (1 - RECENCY_PENALTIES[i]);
+      break; // Apply only the strongest (most recent) penalty
+    }
+  }
+
+  // Show-level frequency cap: penalize overlays appearing in >40% of songs
+  if (history.songCount >= 3) {
+    const appearances = history.frequency.get(entry.name) ?? 0;
+    const ratio = appearances / history.songCount;
+    if (ratio > MAX_FREQUENCY_RATIO) {
+      score -= FREQUENCY_CAP_PENALTY * (ratio - MAX_FREQUENCY_RATIO) / (1 - MAX_FREQUENCY_RATIO);
+    }
   }
 
   // Deterministic jitter (0-0.08)
@@ -257,22 +311,27 @@ export interface SelectionResult {
 /**
  * Select overlays for a single song.
  * @param profile — Audio summary stats for this song
- * @param previousSongOverlays — Names used in the previous song (for variety)
+ * @param history — Cross-song memory (recent selections + frequency). Accepts legacy Set<string> for backwards compat.
  * @param overrides — Manual include/exclude/targetCount from setlist
  * @param showSeed — Show-level seed to salt the PRNG (same trackId, different show = different selection)
  */
 export function selectOverlays(
   profile: SongProfile,
-  previousSongOverlays: Set<string>,
+  history: OverlayHistory | Set<string>,
   overrides?: OverlayOverrides,
   showSeed?: number,
 ): SelectionResult {
+  // Backwards compat: wrap bare Set in a single-song history
+  const resolvedHistory: OverlayHistory = history instanceof Set
+    ? { recentSongs: [history], frequency: new Map(), songCount: 1 }
+    : history;
+
   const rng = seededRandom(hashString(profile.trackId) + (showSeed ?? 0));
 
   // Score all overlays
   const scored: ScoredOverlay[] = OVERLAY_REGISTRY.map((entry) => ({
     entry,
-    score: scoreOverlay(entry, profile, previousSongOverlays, rng),
+    score: scoreOverlay(entry, profile, resolvedHistory, rng),
   }));
 
   // Group by layer
@@ -361,6 +420,7 @@ export function selectOverlays(
 
 /**
  * Run full-show selection with cross-song variety enforcement.
+ * Uses deep history (LOOKBACK_DEPTH songs) + show-level frequency cap.
  * @param showSeed — Show-level seed to salt the PRNG
  */
 export function selectOverlaysForShow(
@@ -368,19 +428,19 @@ export function selectOverlaysForShow(
   showSeed?: number,
 ): Record<string, SelectionResult & { title: string }> {
   const results: Record<string, SelectionResult & { title: string }> = {};
-  let previousOverlays = new Set<string>();
+  let history = emptyHistory();
 
   for (const { song, analysis } of songs) {
     const profile = buildSongProfile(song, analysis);
     const overrides = song.overlayOverrides;
-    const result = selectOverlays(profile, previousOverlays, overrides, showSeed);
+    const result = selectOverlays(profile, history, overrides, showSeed);
 
     results[song.trackId] = {
       ...result,
       title: song.title,
     };
 
-    previousOverlays = new Set(result.activeOverlays);
+    history = pushHistory(history, result.activeOverlays);
   }
 
   return results;

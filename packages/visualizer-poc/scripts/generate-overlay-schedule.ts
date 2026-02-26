@@ -14,7 +14,7 @@
 import { readFileSync, writeFileSync, existsSync } from "fs";
 import { join, resolve } from "path";
 import type { SetlistEntry, ShowSetlist, TrackAnalysis, OverlaySchedule } from "../src/data/types";
-import { buildSongProfile, selectOverlays } from "../src/data/overlay-selector";
+import { buildSongProfile, selectOverlays, emptyHistory, pushHistory } from "../src/data/overlay-selector";
 import { OVERLAY_REGISTRY } from "../src/data/overlay-registry";
 import { getShowSeed } from "../src/data/ShowContext";
 
@@ -108,7 +108,7 @@ const schedule: OverlaySchedule = {
   songs: {},
 };
 
-let previousOverlays = new Set<string>();
+let history = emptyHistory();
 let songsWithAnalysis = 0;
 let songsWithMock = 0;
 
@@ -128,7 +128,7 @@ for (const song of setlist.songs) {
   }
 
   const profile = buildSongProfile(song, analysis);
-  const result = selectOverlays(profile, previousOverlays, song.overlayOverrides, showSeed);
+  const result = selectOverlays(profile, history, song.overlayOverrides, showSeed);
 
   schedule.songs[song.trackId] = {
     title: song.title,
@@ -147,7 +147,7 @@ for (const song of setlist.songs) {
     console.log(`  ${song.trackId} "${song.title}" → ${result.totalCount} overlays (weight: ${result.totalWeight})`);
   }
 
-  previousOverlays = new Set(result.activeOverlays);
+  history = pushHistory(history, result.activeOverlays);
 }
 
 // ─── Write output ───
