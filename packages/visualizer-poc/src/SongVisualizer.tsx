@@ -23,6 +23,7 @@ import { FilmGrain } from "./components/FilmGrain";
 import { loadAnalysis, getSections } from "./data/analysis-loader";
 import type { SetlistEntry, ShowSetlist, TrackAnalysis } from "./data/types";
 import { ShowContextProvider, getShowSeed } from "./data/ShowContext";
+import { SongPaletteProvider, paletteHueRotation } from "./data/SongPaletteContext";
 
 const FADE_FRAMES = 90; // 3 seconds at 30fps
 
@@ -155,6 +156,12 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
     ? getOverlayOpacities(frame, rotationSchedule, analysis?.frames)
     : null;
 
+  // Per-song palette hue rotation (CSS filter applied to overlay wrapper)
+  const hueRotation = useMemo(
+    () => props.song.palette ? paletteHueRotation(props.song.palette) : 0,
+    [props.song.palette],
+  );
+
   if (!analysis || analysis.frames.length === 0) {
     return (
       <div
@@ -211,6 +218,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
         {/* ═══ Dynamic overlay layers (1-10) ═══ */}
         {/* Hidden during title card, then fade in over 3 seconds */}
         <ShowContextProvider show={props.show}>
+        <SongPaletteProvider palette={props.song.palette}>
           <div
             style={{
               position: "absolute",
@@ -222,6 +230,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
                     easing: Easing.out(Easing.cubic),
                   })
                 : 1,
+              filter: hueRotation !== 0 ? `hue-rotate(${hueRotation.toFixed(1)}deg)` : undefined,
             }}
           >
             {activeEntries.map(([name, { Component }]) => {
@@ -243,6 +252,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
             <ConcertInfo songTitle={props.song.title} />
             <SetlistScroll frames={f} currentSong={props.song.title} />
           </div>
+        </SongPaletteProvider>
         </ShowContextProvider>
 
         {/* ═══ Always-active: special-prop components ═══ */}
