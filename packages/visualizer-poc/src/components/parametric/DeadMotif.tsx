@@ -39,6 +39,8 @@ const VARIANT_CONFIGS: DeadMotifVariantConfig[] = [
   { name: "scarab_scatter", seed: 7006, motif: "scarab", count: 6, arrangement: "scatter", animation: "rotate", colorMode: "silhouette", energyResponse: "glow", scale: 0.5 },
   { name: "stealie_pulse", seed: 7007, motif: "stealie", count: 1, arrangement: "centered", animation: "pulse", colorMode: "neon_outline", energyResponse: "breathe", scale: 2.5 },
   { name: "mushroom_bloom", seed: 7008, motif: "mushroom", count: 7, arrangement: "border", animation: "bob", colorMode: "rainbow", energyResponse: "multiply", scale: 0.6 },
+  { name: "vw_bus_convoy", seed: 7009, motif: "vw_bus", count: 4, arrangement: "parade", animation: "bob", colorMode: "rainbow", energyResponse: "breathe", scale: 1.0 },
+  { name: "garcia_hand_drift", seed: 7010, motif: "garcia_hand", count: 2, arrangement: "scatter", animation: "drift", colorMode: "neon_outline", energyResponse: "glow", scale: 1.5 },
 ];
 
 // ─── Instance Layout ───
@@ -258,3 +260,5 @@ export const DeadMotif_TerrapinDrift = createDeadMotifVariant(VARIANT_CONFIGS[4]
 export const DeadMotif_ScarabScatter = createDeadMotifVariant(VARIANT_CONFIGS[5]);
 export const DeadMotif_StealiePulse = createDeadMotifVariant(VARIANT_CONFIGS[6]);
 export const DeadMotif_MushroomBloom = createDeadMotifVariant(VARIANT_CONFIGS[7]);
+export const DeadMotif_VWBusConvoy = createDeadMotifVariant(VARIANT_CONFIGS[8]);
+export const DeadMotif_GarciaHandDrift = createDeadMotifVariant(VARIANT_CONFIGS[9]);

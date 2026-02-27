@@ -266,6 +266,8 @@ export const OVERLAY_REGISTRY: OverlayEntry[] = [
   { name: "MoshPit",          layer: 6, category: "character", tags: ["festival", "intense"],          energyBand: "high", weight: 3 },
   { name: "StageDive",        layer: 6, category: "character", tags: ["festival", "intense"],          energyBand: "high", weight: 3 },
   { name: "JerryGuitar",      layer: 6, category: "character", tags: ["dead-culture", "organic"],      energyBand: "mid",  weight: 2 },
+  { name: "VWBusParade",     layer: 6, category: "character", tags: ["dead-culture", "festival"],     energyBand: "low",  weight: 2 },
+  { name: "SkeletonRoses",   layer: 2, category: "sacred",    tags: ["dead-culture", "organic"],      energyBand: "any",  weight: 3 },
 
   // ═══ Layer 7: Frame & info (artifact) ═══
   { name: "PsychedelicBorder", layer: 7, category: "artifact", tags: ["psychedelic", "dead-culture"],   energyBand: "mid",  weight: 2 },
@@ -365,7 +367,7 @@ const ENABLED_OVERLAYS = new Set([
   // Layer 2: Sacred (13)
   "BreathingStealie", "SacredGeometry", "SkullKaleidoscope", "FractalZoom",
   "MandalaGenerator", "ThirdEye", "DarkStarPortal", "StealYourFaceOff",
-  "ThirteenPointBolt", "SpaceDrums", "Totem", "StainedGlass", "LotusOpen",
+  "ThirteenPointBolt", "SpaceDrums", "Totem", "StainedGlass", "LotusOpen", "SkeletonRoses",
   // Layer 3: Reactive (9)
   "SongReactiveEffects", "EnergyEffects", "WallOfSound", "GuitarStrings",
   "DrumCircles", "EmberRise", "InkDrop", "RipplePool", "StageLights",
@@ -379,7 +381,7 @@ const ENABLED_OVERLAYS = new Set([
   // Layer 6: Character (15)
   "SkeletonBand", "DeadIcons", "BearParade", "MushroomForest", "MarchingTerrapins",
   "CosmicCharlie", "SkeletonCouple", "UncleSam", "LotScene", "CrowdSilhouette",
-  "Bertha", "AmericanBeauty", "JerryGuitar", "DreamCatcher", "PhoenixWings",
+  "Bertha", "AmericanBeauty", "JerryGuitar", "DreamCatcher", "PhoenixWings", "VWBusParade",
   // Layer 7: Frame/Info (10)
   "PsychedelicBorder", "ConcertInfo", "SongTitle", "SetlistScroll", "BumperStickers",
   "BootlegLabel", "TourPosterGallery", "TicketStubAnimated", "PeaceSignShower", "GlowSticks",

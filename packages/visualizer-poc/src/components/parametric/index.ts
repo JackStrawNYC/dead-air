@@ -53,6 +53,8 @@ import {
   DeadMotif_ScarabScatter,
   DeadMotif_StealiePulse,
   DeadMotif_MushroomBloom,
+  DeadMotif_VWBusConvoy,
+  DeadMotif_GarciaHandDrift,
 } from "./DeadMotif";
 
 import {
@@ -123,7 +125,9 @@ export const PARAMETRIC_COMPONENTS: Record<string, OverlayComponentEntry> = {
   DeadMotif_TerrapinDrift: { Component: DeadMotif_TerrapinDrift, layer: 6 },
   DeadMotif_ScarabScatter: { Component: DeadMotif_ScarabScatter, layer: 6 },
   DeadMotif_StealiePulse:  { Component: DeadMotif_StealiePulse, layer: 6 },
-  DeadMotif_MushroomBloom: { Component: DeadMotif_MushroomBloom, layer: 6 },
+  DeadMotif_MushroomBloom:    { Component: DeadMotif_MushroomBloom, layer: 6 },
+  DeadMotif_VWBusConvoy:     { Component: DeadMotif_VWBusConvoy, layer: 6 },
+  DeadMotif_GarciaHandDrift: { Component: DeadMotif_GarciaHandDrift, layer: 6 },
 
   // CrowdEnergy (Layer 6) — 6 variants
   CrowdEnergy_LighterWave: { Component: CrowdEnergy_LighterWave, layer: 6 },
@@ -191,7 +195,9 @@ export const PARAMETRIC_REGISTRY_ENTRIES: OverlayEntry[] = [
   { name: "DeadMotif_TerrapinDrift", layer: 6, category: "character", tags: ["dead-culture", "contemplative"],   energyBand: "low",  weight: 1 },
   { name: "DeadMotif_ScarabScatter", layer: 6, category: "character", tags: ["cosmic", "dead-culture"],          energyBand: "mid",  weight: 1 },
   { name: "DeadMotif_StealiePulse",  layer: 6, category: "character", tags: ["dead-culture", "psychedelic"],     energyBand: "any",  weight: 3 },
-  { name: "DeadMotif_MushroomBloom", layer: 6, category: "character", tags: ["dead-culture", "psychedelic"],     energyBand: "mid",  weight: 1 },
+  { name: "DeadMotif_MushroomBloom",    layer: 6, category: "character", tags: ["dead-culture", "psychedelic"],     energyBand: "mid",  weight: 1 },
+  { name: "DeadMotif_VWBusConvoy",     layer: 6, category: "character", tags: ["dead-culture", "festival"],        energyBand: "low",  weight: 2 },
+  { name: "DeadMotif_GarciaHandDrift", layer: 6, category: "character", tags: ["dead-culture", "organic"],         energyBand: "any",  weight: 2 },
 
   // CrowdEnergy — 6 variants
   { name: "CrowdEnergy_LighterWave", layer: 6, category: "character", tags: ["festival", "contemplative"],       energyBand: "low",  weight: 2 },

@@ -264,6 +264,8 @@ import { Crane } from "../components/Crane";
 import { MoshPit } from "../components/MoshPit";
 import { StageDive } from "../components/StageDive";
 import { JerryGuitar } from "../components/JerryGuitar";
+import { VWBusParade } from "../components/VWBusParade";
+import { SkeletonRoses } from "../components/SkeletonRoses";
 
 // ─── Layer 7: Frame & info (standard-prop overlays only) ───
 import { PsychedelicBorder } from "../components/PsychedelicBorder";
@@ -616,6 +618,8 @@ export const OVERLAY_COMPONENTS: Record<string, OverlayComponentEntry> = {
   MoshPit:           { Component: MoshPit, layer: 6 },
   StageDive:         { Component: StageDive, layer: 6 },
   JerryGuitar:       { Component: JerryGuitar, layer: 6 },
+  VWBusParade:       { Component: VWBusParade, layer: 6 },
+  SkeletonRoses:     { Component: SkeletonRoses, layer: 2 },
 
   // Layer 7: Frame & info (standard-prop only; SongTitle/ConcertInfo/SetlistScroll/FilmGrain excluded)
   PsychedelicBorder:  { Component: PsychedelicBorder, layer: 7 },
