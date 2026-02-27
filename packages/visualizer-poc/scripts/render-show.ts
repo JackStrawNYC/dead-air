@@ -164,7 +164,7 @@ function renderSong(
 
   console.log(`  Muxing audio: ${song.audioFile}`);
   execSync(
-    `ffmpeg -y -i "${videoOnlyPath}" -i "${audioPath}" -c:v copy -c:a aac -b:a 320k -shortest "${outputPath}"`,
+    `ffmpeg -y -i "${videoOnlyPath}" -i "${audioPath}" -c:v copy -c:a aac -ar 48000 -b:a 320k -shortest "${outputPath}"`,
     { cwd: ROOT, stdio: "inherit" },
   );
 }
