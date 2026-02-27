@@ -84,8 +84,8 @@ export const ShowIntro: React.FC<ShowIntroProps> = ({ brandSrc, posterSrc, date,
   const audioVolume = introAudioSrc
     ? interpolate(
         frame,
-        [BRAND_DURATION - CROSSFADE_FRAMES, BRAND_DURATION, durationInFrames - 15, durationInFrames],
-        [0, 0.06, 0.15, 0],
+        [BRAND_DURATION - CROSSFADE_FRAMES, BRAND_DURATION, durationInFrames],
+        [0, 0.06, 0.15],
         { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
       )
     : 0;

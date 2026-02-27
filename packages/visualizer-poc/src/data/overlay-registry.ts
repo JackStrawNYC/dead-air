@@ -356,6 +356,46 @@ export const OVERLAY_REGISTRY: OverlayEntry[] = [
   { name: "FilmGrain",           layer: 10, category: "distortion", tags: ["retro"],                      energyBand: "any",  weight: 1, alwaysActive: true },
 ];
 
+/** Overlays that fit the Dead aesthetic — everything else is cut from selection */
+const ENABLED_OVERLAYS = new Set([
+  // Layer 1: Atmospheric (16)
+  "CosmicStarfield", "TieDyeWash", "LavaLamp", "SmokeWisps", "AuroraBorealis",
+  "Fireflies", "OilSlick", "NebulaCloud", "CampfireSparks", "CandleFlicker",
+  "GodRays", "FogMachine", "VaporTrails", "SpiritWisps", "HookahSmoke", "FestivalTent",
+  // Layer 2: Sacred (13)
+  "BreathingStealie", "SacredGeometry", "SkullKaleidoscope", "FractalZoom",
+  "MandalaGenerator", "ThirdEye", "DarkStarPortal", "StealYourFaceOff",
+  "ThirteenPointBolt", "SpaceDrums", "Totem", "StainedGlass", "LotusOpen",
+  // Layer 3: Reactive (9)
+  "SongReactiveEffects", "EnergyEffects", "WallOfSound", "GuitarStrings",
+  "DrumCircles", "EmberRise", "InkDrop", "RipplePool", "StageLights",
+  // Layer 4: Geometric (8)
+  "OpArtPatterns", "TunnelVision", "VortexSpiral", "KaleidoscopeFilter",
+  "VoronoiFlow", "ReactionDiffusion", "FibonacciSpiral", "Paisley",
+  // Layer 5: Nature (15)
+  "SugarMagnolia", "ChinaCatSunflower", "BoxOfRain", "LighterWave", "MeteorShower",
+  "Constellation", "TreeOfLife", "Thunderhead", "MushroomBloom", "SolarEclipse",
+  "CherryBlossom", "Octopus", "MoonPhases", "ShootingStar", "BlackHole",
+  // Layer 6: Character (15)
+  "SkeletonBand", "DeadIcons", "BearParade", "MushroomForest", "MarchingTerrapins",
+  "CosmicCharlie", "SkeletonCouple", "UncleSam", "LotScene", "CrowdSilhouette",
+  "Bertha", "AmericanBeauty", "JerryGuitar", "DreamCatcher", "PhoenixWings",
+  // Layer 7: Frame/Info (10)
+  "PsychedelicBorder", "ConcertInfo", "SongTitle", "SetlistScroll", "BumperStickers",
+  "BootlegLabel", "TourPosterGallery", "TicketStubAnimated", "PeaceSignShower", "GlowSticks",
+  // Layer 8: Typography (2)
+  "LyricFlash", "GarciaQuotes",
+  // Layer 9: HUD (2)
+  "CassetteReels", "HeartbeatEKG",
+  // Layer 10: Distortion (5)
+  "ChromaticAberration", "VHSGlitch", "FilmBurn", "VinylGrooves", "FilmGrain",
+]);
+
+/** Registry filtered to only Dead-aesthetic overlays — used by the selector */
+export const SELECTABLE_REGISTRY = OVERLAY_REGISTRY.filter(
+  (e) => ENABLED_OVERLAYS.has(e.name),
+);
+
 /** Quick lookup by name */
 export const OVERLAY_BY_NAME = new Map(
   OVERLAY_REGISTRY.map((entry) => [entry.name, entry]),

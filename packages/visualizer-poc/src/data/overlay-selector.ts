@@ -16,7 +16,7 @@ import type {
   SetlistEntry,
   OverlayOverrides,
 } from "./types";
-import { OVERLAY_REGISTRY, ALWAYS_ACTIVE } from "./overlay-registry";
+import { SELECTABLE_REGISTRY, ALWAYS_ACTIVE } from "./overlay-registry";
 
 // ─── Per-layer selection targets ───
 const LAYER_TARGETS: Record<number, { min: number; max: number }> = {
@@ -329,7 +329,7 @@ export function selectOverlays(
   const rng = seededRandom(hashString(profile.trackId) + (showSeed ?? 0));
 
   // Score all overlays
-  const scored: ScoredOverlay[] = OVERLAY_REGISTRY.map((entry) => ({
+  const scored: ScoredOverlay[] = SELECTABLE_REGISTRY.map((entry) => ({
     entry,
     score: scoreOverlay(entry, profile, resolvedHistory, rng),
   }));
@@ -349,7 +349,7 @@ export function selectOverlays(
   // Always-active overlays first
   for (const name of ALWAYS_ACTIVE) {
     selected.add(name);
-    const entry = OVERLAY_REGISTRY.find((e) => e.name === name);
+    const entry = SELECTABLE_REGISTRY.find((e) => e.name === name);
     if (entry) totalWeight += entry.weight;
   }
 
@@ -357,7 +357,7 @@ export function selectOverlays(
   if (overrides?.include) {
     for (const name of overrides.include) {
       selected.add(name);
-      const entry = OVERLAY_REGISTRY.find((e) => e.name === name);
+      const entry = SELECTABLE_REGISTRY.find((e) => e.name === name);
       if (entry) totalWeight += entry.weight;
     }
   }
@@ -376,7 +376,7 @@ export function selectOverlays(
     let layerCount = 0;
     // Count already-selected items in this layer
     for (const name of selected) {
-      const entry = OVERLAY_REGISTRY.find((e) => e.name === name);
+      const entry = SELECTABLE_REGISTRY.find((e) => e.name === name);
       if (entry?.layer === layer) layerCount++;
     }
 

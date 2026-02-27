@@ -92,17 +92,17 @@ const ACCENT_CONFIG: Record<string, AccentConfig | null> = {
 
 // ─── Constants ───
 
-/** Target window duration in frames (~5 seconds at 30fps) */
-const WINDOW_FRAMES = 150;
+/** Target window duration in frames (~60 seconds at 30fps) */
+const WINDOW_FRAMES = 1800;
 
 /** Crossfade duration at window boundaries */
-const CROSSFADE_FRAMES = 30;
+const CROSSFADE_FRAMES = 180;
 
 /** Overlay count ranges by section energy */
 const ENERGY_COUNTS: Record<string, { min: number; max: number }> = {
-  low:  { min: 3, max: 4 },
-  mid:  { min: 4, max: 5 },
-  high: { min: 5, max: 7 },
+  low:  { min: 2, max: 3 },
+  mid:  { min: 3, max: 4 },
+  high: { min: 4, max: 5 },
 };
 
 /** Score penalty for overlays used in the previous window */
