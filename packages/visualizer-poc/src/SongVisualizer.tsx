@@ -27,6 +27,7 @@ import { VisualizerErrorBoundary } from "./components/VisualizerErrorBoundary";
 import { SilentErrorBoundary } from "./components/SilentErrorBoundary";
 import { SongPaletteProvider, paletteHueRotation } from "./data/SongPaletteContext";
 import { EraGrade } from "./components/EraGrade";
+import { EnergyEnvelope } from "./components/EnergyEnvelope";
 
 const FADE_FRAMES = 90; // 3 seconds at 30fps
 
@@ -208,6 +209,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
       <VisualizerErrorBoundary>
       <div style={{ position: "absolute", inset: 0, opacity }}>
         <EraGrade>
+        <EnergyEnvelope frames={f}>
           {/* ═══ Layer 0: Base shader visualization ═══ */}
           <SceneRouter
             frames={f}
@@ -262,6 +264,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
               <SetlistScroll frames={f} currentSong={props.song.title} />
             </div>
           </SongPaletteProvider>
+        </EnergyEnvelope>
         </EraGrade>
 
         {/* ═══ Always-active: special-prop components ═══ */}

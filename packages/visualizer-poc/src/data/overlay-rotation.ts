@@ -12,6 +12,7 @@
  */
 import type { SectionBoundary, OverlayEntry, EnhancedFrameData } from "./types";
 import { OVERLAY_BY_NAME, ALWAYS_ACTIVE } from "./overlay-registry";
+import { computeSmoothedEnergy, overlayEnergyFactor } from "../utils/energy";
 
 // ─── Deterministic PRNG (same pattern as overlay-selector.ts) ───
 
@@ -456,6 +457,21 @@ export function getOverlayOpacities(
           }
         }
         result[name] = accentOpacity;
+      }
+    }
+  }
+
+  // ─── Energy-based overlay breathing ───
+  // Quiet passages reduce non-always-active overlay density to 30%;
+  // loud passages keep them at full intensity.
+  if (frames && frames.length > 0) {
+    const energyIdx = Math.min(Math.max(0, frame), frames.length - 1);
+    const energy = computeSmoothedEnergy(frames, energyIdx);
+    const opacityFactor = overlayEnergyFactor(energy);
+    const alwaysActiveSet = new Set(schedule.alwaysActive);
+    for (const name of Object.keys(result)) {
+      if (!alwaysActiveSet.has(name)) {
+        result[name] *= opacityFactor;
       }
     }
   }
