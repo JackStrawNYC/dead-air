@@ -8,6 +8,7 @@
 import React from "react";
 import { useCurrentFrame, useVideoConfig, interpolate } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
+import { useAudioSnapshot } from "./parametric/audio-helpers";
 
 // ── MAIN COMPONENT ──────────────────────────────────────────────
 
@@ -19,15 +20,8 @@ export const ChromaticAberration: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
 
-  // Rolling energy (151-frame window)
-  const idx = Math.min(Math.max(0, frame), frames.length - 1);
-  let eSum = 0;
-  let eCount = 0;
-  for (let i = Math.max(0, idx - 75); i <= Math.min(frames.length - 1, idx + 75); i++) {
-    eSum += frames[i].rms;
-    eCount++;
-  }
-  const energy = eCount > 0 ? eSum / eCount : 0;
+  const snap = useAudioSnapshot(frames);
+  const energy = snap.energy;
 
   // Always visible, 8-20% opacity
   const opacity = interpolate(energy, [0, 0.35], [0.08, 0.2], {
@@ -35,14 +29,16 @@ export const ChromaticAberration: React.FC<Props> = ({ frames }) => {
     extrapolateRight: "clamp",
   });
 
-  // Offset distance: 2px quiet -> 12px loud
-  const offset = interpolate(energy, [0, 0.4], [2, 12], {
+  // Offset distance: 2px quiet -> 12px loud, onset spike ×2 (6-frame decay already in envelope)
+  const baseOffset = interpolate(energy, [0, 0.4], [2, 12], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
+  const offset = baseOffset * (1 + snap.onsetEnvelope);
 
-  // Slow drift angle for the offset direction
-  const angle = frame * 0.008;
+  // Slow drift angle, bass modulates rotation speed (0.6-1.4x)
+  const bassAngleSpeed = 0.6 + snap.bass * 1.6;
+  const angle = frame * 0.008 * bassAngleSpeed;
   const redDx = Math.cos(angle) * offset;
   const redDy = Math.sin(angle) * offset;
   const blueDx = Math.cos(angle + Math.PI * 2 / 3) * offset;

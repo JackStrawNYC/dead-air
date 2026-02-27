@@ -11,6 +11,7 @@ import React from "react";
 import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
 import { seeded } from "../utils/seededRandom";
+import { useAudioSnapshot } from "./parametric/audio-helpers";
 
 const CYCLE_TOTAL = 2100; // 70s
 const VISIBLE_DURATION = 660; // 22s
@@ -43,14 +44,8 @@ export const BlackHole: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
 
-  const idx = Math.min(Math.max(0, frame), frames.length - 1);
-  let eSum = 0;
-  let eCount = 0;
-  for (let i = Math.max(0, idx - 75); i <= Math.min(frames.length - 1, idx + 75); i++) {
-    eSum += frames[i].rms;
-    eCount++;
-  }
-  const energy = eCount > 0 ? eSum / eCount : 0;
+  const snap = useAudioSnapshot(frames);
+  const energy = snap.energy;
 
   const stars = React.useMemo(() => generateStars(99001122), []);
 
@@ -76,7 +71,7 @@ export const BlackHole: React.FC<Props> = ({ frames }) => {
 
   const cx = width * 0.5;
   const cy = height * 0.45;
-  const holeRadius = 45 + energy * 10;
+  const holeRadius = 45 + energy * 10 + snap.bass * 15;
   const maxStarDist = Math.min(width, height) * 0.45;
 
   // Accretion disk rotation
@@ -230,7 +225,7 @@ export const BlackHole: React.FC<Props> = ({ frames }) => {
           stroke="rgba(200,120,255,0.4)"
           strokeWidth={2}
           filter="url(#bh-intense-glow)"
-          opacity={0.5 + energy * 0.5}
+          opacity={0.5 + energy * 0.5 + snap.onsetEnvelope * 0.3}
         />
 
         {/* Relativistic jet hint (faint vertical beams) */}

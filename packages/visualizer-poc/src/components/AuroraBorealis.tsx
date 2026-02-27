@@ -10,6 +10,7 @@ import React from "react";
 import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
 import { seeded } from "../utils/seededRandom";
+import { useAudioSnapshot } from "./parametric/audio-helpers";
 
 interface AuroraBand {
   /** Y offset from top as fraction (0 = very top) */
@@ -61,30 +62,9 @@ export const AuroraBorealis: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
 
-  const idx = Math.min(Math.max(0, frame), frames.length - 1);
-
-  // Rolling energy over +/-75 frames
-  let eSum = 0;
-  let eCount = 0;
-  for (let i = Math.max(0, idx - 75); i <= Math.min(frames.length - 1, idx + 75); i++) {
-    eSum += frames[i].rms;
-    eCount++;
-  }
-  const energy = eCount > 0 ? eSum / eCount : 0;
-
-  // Smooth chroma hue over +/-20 frames
-  let chromaSum = 0;
-  let chromaCount = 0;
-  for (let i = Math.max(0, idx - 20); i <= Math.min(frames.length - 1, idx + 20); i++) {
-    const ch = frames[i].chroma;
-    let maxIdx = 0;
-    for (let j = 1; j < 12; j++) {
-      if (ch[j] > ch[maxIdx]) maxIdx = j;
-    }
-    chromaSum += maxIdx / 12;
-    chromaCount++;
-  }
-  const chromaHue = chromaCount > 0 ? (chromaSum / chromaCount) * 360 : 120;
+  const snap = useAudioSnapshot(frames);
+  const energy = snap.energy;
+  const chromaHue = snap.chromaHue; // already 0-360
 
   const bands = React.useMemo(() => generateBands(19720401), []);
 
@@ -114,7 +94,7 @@ export const AuroraBorealis: React.FC<Props> = ({ frames }) => {
         height={height}
         style={{
           opacity: masterOpacity * shimmer,
-          filter: `blur(6px) drop-shadow(0 0 20px hsla(${chromaHue}, 80%, 60%, 0.3))`,
+          filter: `blur(${4 + snap.flatness * 4}px) drop-shadow(0 0 20px hsla(${chromaHue}, 80%, 60%, 0.3))`,
           mixBlendMode: "screen",
         }}
       >
@@ -160,8 +140,9 @@ export const AuroraBorealis: React.FC<Props> = ({ frames }) => {
             const xNorm = s / WAVE_SEGMENTS;
             const wave1 = Math.sin(x * band.waveFreq + t * 0.05 + band.phase) * band.waveAmp;
             const wave2 = Math.sin(x * band.waveFreq2 + t * 0.03 + band.phase * 1.7) * band.waveAmp2;
-            // Energy-driven amplitude boost
-            const energyWave = Math.sin(x * 0.003 + t * 0.02) * energy * 25;
+            // Energy-driven amplitude boost, bass scales wave amplitude (0.8-1.4x)
+            const bassAmpMult = 0.8 + snap.bass * 1.2;
+            const energyWave = Math.sin(x * 0.003 + t * 0.02) * energy * 25 * bassAmpMult;
             // Taper at edges for natural look
             const edgeTaper = Math.sin(xNorm * Math.PI);
             const y = topY + (wave1 + wave2 + energyWave) * edgeTaper;

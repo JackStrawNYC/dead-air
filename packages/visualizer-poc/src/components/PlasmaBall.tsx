@@ -12,6 +12,7 @@ import { useCurrentFrame, useVideoConfig, interpolate } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
 import { useShowContext } from "../data/ShowContext";
 import { seeded } from "../utils/seededRandom";
+import { useAudioSnapshot } from "./parametric/audio-helpers";
 
 // ── TENDRIL DATA ────────────────────────────────────────────────
 
@@ -59,18 +60,8 @@ export const PlasmaBall: React.FC<Props> = ({ frames }) => {
   const { width, height } = useVideoConfig();
   const ctx = useShowContext();
 
-  // Rolling energy (151-frame window)
-  const idx = Math.min(Math.max(0, frame), frames.length - 1);
-  let eSum = 0;
-  let eCount = 0;
-  for (let i = Math.max(0, idx - 75); i <= Math.min(frames.length - 1, idx + 75); i++) {
-    eSum += frames[i].rms;
-    eCount++;
-  }
-  const energy = eCount > 0 ? eSum / eCount : 0;
-
-  const currentFrame = frames[idx];
-  const subBass = currentFrame ? currentFrame.sub : 0;
+  const snap = useAudioSnapshot(frames);
+  const energy = snap.energy;
 
   const tendrils = React.useMemo(() => generateTendrils(ctx?.showSeed ?? 19770508), [ctx?.showSeed]);
 
@@ -88,9 +79,9 @@ export const PlasmaBall: React.FC<Props> = ({ frames }) => {
   const cy = height / 2;
   const maxReach = Math.min(width, height) * 0.45;
 
-  // Orb pulse with sub-bass
-  const orbRadius = 25 + subBass * 35 + Math.sin(frame * 0.15) * 5;
-  const orbGlow = 15 + subBass * 25;
+  // Orb pulse with bass
+  const orbRadius = 25 + snap.bass * 45 + Math.sin(frame * 0.15) * 5;
+  const orbGlow = 15 + snap.bass * 30;
 
   return (
     <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden" }}>
@@ -122,7 +113,7 @@ export const PlasmaBall: React.FC<Props> = ({ frames }) => {
         {/* Tendrils */}
         {tendrils.map((t, i) => {
           const rng = seeded(frame * 3 + i * 137);
-          const flicker = 0.4 + rng() * 0.6;
+          const flicker = 0.4 + rng() * 0.6 + snap.onsetEnvelope * 0.3;
           if (flicker < 0.3) return null; // Random dropout for flickering effect
 
           const reach = maxReach * t.lengthFactor * energy * 3;
@@ -134,8 +125,9 @@ export const PlasmaBall: React.FC<Props> = ({ frames }) => {
           const ey = cy + Math.sin(angle) * clampedReach;
 
           // Control points with wobble for lightning effect
-          const wobble1 = Math.sin(frame * t.wobbleFreq + i * 2.3) * t.wobbleAmp;
-          const wobble2 = Math.cos(frame * t.wobbleFreq * 1.3 + i * 1.7) * t.wobbleAmp * 0.7;
+          const highsFlicker = 1 + snap.highs * 0.5; // highs → faster wobble
+          const wobble1 = Math.sin(frame * t.wobbleFreq * highsFlicker + i * 2.3) * t.wobbleAmp;
+          const wobble2 = Math.cos(frame * t.wobbleFreq * 1.3 * highsFlicker + i * 1.7) * t.wobbleAmp * 0.7;
 
           const midAngle = angle + Math.PI / 2;
           const cp1x = cx + Math.cos(angle) * clampedReach * 0.35 + Math.cos(midAngle) * wobble1;

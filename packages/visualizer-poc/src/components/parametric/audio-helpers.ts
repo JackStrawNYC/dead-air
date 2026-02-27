@@ -6,6 +6,7 @@
 
 import { useCurrentFrame } from "remotion";
 import type { EnhancedFrameData } from "../../data/types";
+import { computeAudioSnapshot, type AudioSnapshot } from "../../utils/audio-reactive";
 
 /** Current frame clamped to valid frames index range */
 export function useFrameIndex(frames: EnhancedFrameData[]): number {
@@ -56,4 +57,13 @@ export function useSmoothedField(
     count++;
   }
   return count > 0 ? sum / count : 0;
+}
+
+/**
+ * Full audio snapshot: all smoothed fields in one call.
+ * Replaces inline smoothing loops in upgraded overlay components.
+ */
+export function useAudioSnapshot(frames: EnhancedFrameData[]): AudioSnapshot {
+  const idx = useFrameIndex(frames);
+  return computeAudioSnapshot(frames, idx);
 }

@@ -7,6 +7,7 @@
 import React from "react";
 import { useCurrentFrame, useVideoConfig, interpolate } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
+import { useAudioSnapshot } from "./parametric/audio-helpers";
 
 /** Full Steal Your Face SVG — detailed version */
 const Stealie: React.FC<{ size: number; mainColor: string; boltColor: string }> = ({
@@ -68,30 +69,9 @@ export const BreathingStealie: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
 
-  const idx = Math.min(Math.max(0, frame), frames.length - 1);
-
-  // Smooth energy (wide window)
-  let eSum = 0;
-  let eCount = 0;
-  for (let i = Math.max(0, idx - 75); i <= Math.min(frames.length - 1, idx + 75); i++) {
-    eSum += frames[i].rms;
-    eCount++;
-  }
-  const energy = eCount > 0 ? eSum / eCount : 0;
-
-  // Smooth chroma hue
-  let chromaSum = 0;
-  let chromaCount = 0;
-  for (let i = Math.max(0, idx - 15); i <= Math.min(frames.length - 1, idx + 15); i++) {
-    const ch = frames[i].chroma;
-    let maxI = 0;
-    for (let j = 1; j < 12; j++) {
-      if (ch[j] > ch[maxI]) maxI = j;
-    }
-    chromaSum += maxI / 12;
-    chromaCount++;
-  }
-  const chromaHue = chromaCount > 0 ? chromaSum / chromaCount : 0;
+  const snap = useAudioSnapshot(frames);
+  const energy = snap.energy;
+  const chromaHue = snap.chromaHue / 360; // normalize to 0-1 for hueToHex
 
   // Size: breathes with energy (300-500px)
   const baseSize = Math.min(width, height) * 0.35;
@@ -101,8 +81,8 @@ export const BreathingStealie: React.FC<Props> = ({ frames }) => {
   });
   const size = baseSize * breathe;
 
-  // Slow rotation
-  const rotation = (frame / 30) * 3; // 3 degrees per second
+  // Slow rotation + beat impulse (+2deg on beat)
+  const rotation = (frame / 30) * 3 + snap.beatDecay * 2;
 
   // Opacity: always visible but brighter on peaks
   const opacity = interpolate(energy, [0.02, 0.3], [0.08, 0.3], {
@@ -114,11 +94,15 @@ export const BreathingStealie: React.FC<Props> = ({ frames }) => {
   const mainColor = hueToHex(chromaHue);
   const boltColor = hueToHex(chromaHue + 0.15);
 
-  // Glow intensity from energy
+  // Glow intensity from energy + bass (0.8x-1.4x)
+  const bassGlow = 0.8 + snap.bass * 1.2; // clamps ~0.8-1.4
   const glowRadius = interpolate(energy, [0.05, 0.3], [10, 40], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
-  });
+  }) * bassGlow;
+
+  // Onset → scale spike (+5%)
+  const onsetScale = 1 + snap.onsetEnvelope * 0.05;
 
   return (
     <div
@@ -133,7 +117,7 @@ export const BreathingStealie: React.FC<Props> = ({ frames }) => {
     >
       <div
         style={{
-          transform: `rotate(${rotation}deg) scale(${breathe})`,
+          transform: `rotate(${rotation}deg) scale(${breathe * onsetScale})`,
           opacity,
           filter: `drop-shadow(0 0 ${glowRadius}px ${mainColor}) drop-shadow(0 0 ${glowRadius * 2}px ${boltColor})`,
           willChange: "transform, opacity, filter",

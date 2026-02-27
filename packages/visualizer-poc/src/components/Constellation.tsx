@@ -10,6 +10,7 @@ import React from "react";
 import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
 import { seeded } from "../utils/seededRandom";
+import { useAudioSnapshot } from "./parametric/audio-helpers";
 
 // Constellation point data: normalized 0-1 coordinates
 // Each constellation has points and edges (index pairs)
@@ -136,14 +137,8 @@ export const Constellation: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
 
-  const idx = Math.min(Math.max(0, frame), frames.length - 1);
-  let eSum = 0;
-  let eCount = 0;
-  for (let i = Math.max(0, idx - 75); i <= Math.min(frames.length - 1, idx + 75); i++) {
-    eSum += frames[i].rms;
-    eCount++;
-  }
-  const energy = eCount > 0 ? eSum / eCount : 0;
+  const snap = useAudioSnapshot(frames);
+  const energy = snap.energy;
 
   const bgStars = React.useMemo(() => generateBgStars(3141592, 80), []);
 
@@ -206,12 +201,14 @@ export const Constellation: React.FC<Props> = ({ frames }) => {
         {/* Active constellation */}
         {isActive && constOpacity > 0.01 && (
           <g opacity={constOpacity}>
-            {/* Draw lines sequentially */}
+            {/* Draw lines sequentially — beat doubles draw speed */}
             {constellation.edges.map(([a, b], lineIdx) => {
-              const lineStart = lineIdx * LINE_DRAW_FRAMES;
+              const beatDrawSpeed = 1 + snap.beatDecay; // 1x normal, 2x on beat
+              const effectiveLineFrames = LINE_DRAW_FRAMES / beatDrawSpeed;
+              const lineStart = lineIdx * effectiveLineFrames;
               const lineProgress = interpolate(
                 cycleFrame,
-                [lineStart, lineStart + LINE_DRAW_FRAMES],
+                [lineStart, lineStart + effectiveLineFrames],
                 [0, 1],
                 { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
               );
@@ -242,13 +239,20 @@ export const Constellation: React.FC<Props> = ({ frames }) => {
               );
             })}
 
-            {/* Star points */}
+            {/* Star points — chroma tint 15% blend, centroid glow radius */}
             {constellation.points.map(([px, py], pi) => {
               const twinkle =
                 (Math.sin(frame * 0.08 + pi * 1.7) + 1) * 0.5;
               const sx = offsetX + px * scale;
               const sy = offsetY + py * scale;
-              const r = 2 + twinkle * 1.5 + energy * 1;
+              // Centroid → glow radius (bigger when brighter/treble)
+              const centroidGlow = 0.8 + snap.centroid * 0.4;
+              const r = (2 + twinkle * 1.5 + energy * 1) * centroidGlow;
+
+              // Chroma → star tint (15% blend toward chroma hue)
+              const chromaR = Math.round(180 + (Math.cos(snap.chromaHue * Math.PI / 180) * 40) * 0.15);
+              const chromaG = Math.round(210 + (Math.cos((snap.chromaHue - 120) * Math.PI / 180) * 40) * 0.15);
+              const chromaB = Math.round(255 + (Math.cos((snap.chromaHue - 240) * Math.PI / 180) * 40) * 0.15);
 
               return (
                 <g key={`star${pi}`}>
@@ -256,14 +260,14 @@ export const Constellation: React.FC<Props> = ({ frames }) => {
                     cx={sx}
                     cy={sy}
                     r={r * 2.5}
-                    fill={`rgba(180, 210, 255, ${0.15 * twinkle})`}
+                    fill={`rgba(${chromaR}, ${chromaG}, ${chromaB}, ${0.15 * twinkle})`}
                     style={{ filter: "blur(3px)" }}
                   />
                   <circle
                     cx={sx}
                     cy={sy}
                     r={r}
-                    fill={`rgba(220, 235, 255, ${0.7 + twinkle * 0.3})`}
+                    fill={`rgba(${Math.min(255, chromaR + 40)}, ${Math.min(255, chromaG + 25)}, 255, ${0.7 + twinkle * 0.3})`}
                     filter="url(#star-glow-const)"
                   />
                 </g>

@@ -10,6 +10,7 @@ import React from "react";
 import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
 import { seeded } from "../utils/seededRandom";
+import { useAudioSnapshot } from "./parametric/audio-helpers";
 
 interface CandleData {
   /** Position x (0-1) */
@@ -103,14 +104,8 @@ export const CandleFlicker: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
 
-  const idx = Math.min(Math.max(0, frame), frames.length - 1);
-  let eSum = 0;
-  let eCount = 0;
-  for (let i = Math.max(0, idx - 75); i <= Math.min(frames.length - 1, idx + 75); i++) {
-    eSum += frames[i].rms;
-    eCount++;
-  }
-  const energy = eCount > 0 ? eSum / eCount : 0;
+  const snap = useAudioSnapshot(frames);
+  const energy = snap.energy;
 
   const candles = React.useMemo(() => generateCandles(770805), []);
 
@@ -169,9 +164,10 @@ export const CandleFlicker: React.FC<Props> = ({ frames }) => {
           const wobble = Math.sin(frame * candle.wobbleFreq + candle.wobblePhase) * 3
             + Math.sin(frame * candle.wobbleFreq2 + candle.wobblePhase * 1.4) * 1.5;
 
-          // Flicker: brightness pulse
-          const flicker = 0.7 + Math.sin(frame * candle.flickerFreq + candle.flickerPhase) * 0.2
-            + Math.sin(frame * candle.flickerFreq * 2.3 + candle.flickerPhase * 0.7) * 0.1;
+          // Flicker: brightness pulse — flatness scales flicker rate (0.6-1.5x)
+          const flatnessFlickerMult = 0.6 + snap.flatness * 0.9;
+          const flicker = 0.7 + Math.sin(frame * candle.flickerFreq * flatnessFlickerMult + candle.flickerPhase) * 0.2
+            + Math.sin(frame * candle.flickerFreq * 2.3 * flatnessFlickerMult + candle.flickerPhase * 0.7) * 0.1;
 
           const flameH = candle.baseHeight * flameScale * flicker;
           const flameW = candle.baseWidth * (0.9 + flicker * 0.15);
@@ -180,7 +176,11 @@ export const CandleFlicker: React.FC<Props> = ({ frames }) => {
           const mainPath = buildFlamePath(cx, baseY, flameW, flameH, wobble);
           const innerPath = buildFlamePath(cx, baseY, flameW * 0.5, flameH * 0.65, wobble * 0.7);
 
-          const hue = candle.hue;
+          // Chroma → flame hue: 10% blend toward chroma hue (keep in warm range)
+          const chromaBlend = snap.chromaHue * 0.1;
+          const hue = candle.hue * 0.9 + chromaBlend;
+          // Centroid → core brightness (brighter when treble-heavy)
+          const centroidBright = 0.9 + snap.centroid * 0.2;
 
           return (
             <g key={ci}>
@@ -196,10 +196,10 @@ export const CandleFlicker: React.FC<Props> = ({ frames }) => {
                 fill={`hsla(${hue}, 100%, 55%, ${0.5 * flicker})`}
                 filter="url(#candle-glow)"
               />
-              {/* Inner bright core */}
+              {/* Inner bright core — centroid boosts brightness */}
               <path
                 d={innerPath}
-                fill={`hsla(${hue + 15}, 90%, 85%, ${0.7 * flicker})`}
+                fill={`hsla(${hue + 15}, 90%, ${Math.min(97, 85 * centroidBright)}%, ${0.7 * flicker})`}
               />
               {/* Wick dot */}
               <circle

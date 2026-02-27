@@ -10,6 +10,7 @@ import { useCurrentFrame, useVideoConfig, interpolate } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
 import { useShowContext } from "../data/ShowContext";
 import { seeded } from "../utils/seededRandom";
+import { useAudioSnapshot } from "./parametric/audio-helpers";
 
 interface Star {
   angle: number;    // radians from center
@@ -44,14 +45,8 @@ export const CosmicStarfield: React.FC<Props> = ({ frames }) => {
   const { width, height } = useVideoConfig();
   const ctx = useShowContext();
 
-  const idx = Math.min(Math.max(0, frame), frames.length - 1);
-  let eSum = 0;
-  let eCount = 0;
-  for (let i = Math.max(0, idx - 60); i <= Math.min(frames.length - 1, idx + 60); i++) {
-    eSum += frames[i].rms;
-    eCount++;
-  }
-  const energy = eCount > 0 ? eSum / eCount : 0;
+  const snap = useAudioSnapshot(frames);
+  const energy = snap.energy;
 
   const stars = React.useMemo(() => generateStars(ctx?.showSeed ?? 19770508), [ctx?.showSeed]);
 
@@ -59,11 +54,15 @@ export const CosmicStarfield: React.FC<Props> = ({ frames }) => {
   const cy = height / 2;
   const maxR = Math.sqrt(cx * cx + cy * cy);
 
-  // Speed multiplier from energy
+  // Speed multiplier from energy + beat pulse (×1.5 on beat, 10-frame decay)
+  const beatSpeedPulse = 1 + snap.beatDecay * 0.5;
   const speedMult = interpolate(energy, [0.03, 0.3], [0.5, 2.5], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
-  });
+  }) * beatSpeedPulse;
+
+  // Highs → streak length multiplier (0.7-1.5)
+  const highsStreakMult = 0.7 + snap.highs * 1.6; // clamps ~0.7-1.5
 
   // Overall opacity
   const opacity = interpolate(energy, [0.02, 0.2], [0.15, 0.55], {
@@ -83,8 +82,8 @@ export const CosmicStarfield: React.FC<Props> = ({ frames }) => {
           const x = cx + Math.cos(star.angle) * r;
           const y = cy + Math.sin(star.angle) * r;
 
-          // Streak: line from current pos toward center
-          const streakLen = interpolate(energy, [0.05, 0.3], [2, 15], { extrapolateLeft: "clamp", extrapolateRight: "clamp" }) * star.speed;
+          // Streak: line from current pos toward center, highs stretch it
+          const streakLen = interpolate(energy, [0.05, 0.3], [2, 15], { extrapolateLeft: "clamp", extrapolateRight: "clamp" }) * star.speed * highsStreakMult;
           const x2 = cx + Math.cos(star.angle) * (r - streakLen);
           const y2 = cy + Math.sin(star.angle) * (r - streakLen);
 
@@ -94,8 +93,10 @@ export const CosmicStarfield: React.FC<Props> = ({ frames }) => {
 
           if (alpha < 0.05) return null;
 
-          const color = `hsla(${star.hue}, 80%, ${70 + energy * 20}%, ${alpha})`;
-          const glowColor = `hsla(${star.hue}, 100%, 80%, ${alpha * 0.5})`;
+          // Blend star hue 20% toward chroma-derived hue
+          const blendedHue = star.hue * 0.8 + snap.chromaHue * 0.2;
+          const color = `hsla(${blendedHue}, 80%, ${70 + energy * 20}%, ${alpha})`;
+          const glowColor = `hsla(${blendedHue}, 100%, 80%, ${alpha * 0.5})`;
 
           return (
             <g key={i}>

@@ -10,6 +10,7 @@ import React from "react";
 import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
 import { seeded } from "../utils/seededRandom";
+import { useAudioSnapshot } from "./parametric/audio-helpers";
 
 interface OrbitRing {
   radius: number;
@@ -70,14 +71,8 @@ export const DarkStarPortal: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
 
-  const idx = Math.min(Math.max(0, frame), frames.length - 1);
-  let eSum = 0;
-  let eCount = 0;
-  for (let i = Math.max(0, idx - 75); i <= Math.min(frames.length - 1, idx + 75); i++) {
-    eSum += frames[i].rms;
-    eCount++;
-  }
-  const energy = eCount > 0 ? eSum / eCount : 0;
+  const snap = useAudioSnapshot(frames);
+  const energy = snap.energy;
 
   const rings = React.useMemo(() => generateRings(42_000_1), []);
   const spiralStars = React.useMemo(() => generateSpiralStars(42_000_2), []);
@@ -163,7 +158,9 @@ export const DarkStarPortal: React.FC<Props> = ({ frames }) => {
           const stretchFactor = 1 + (lensStrength * 300) / Math.max(distFromCenter, 50);
           const stretchAngle = Math.atan2(sy - cy, sx - cx) * (180 / Math.PI);
 
-          const alpha = star.brightness * (1 - spiralProgress * 0.5) * glowIntensity;
+          // Highs → star shimmer (0.7-1.3x brightness)
+          const highsShimmer = 0.7 + snap.highs * 1.2;
+          const alpha = star.brightness * (1 - spiralProgress * 0.5) * glowIntensity * highsShimmer;
           const color = `hsla(${star.hue}, 80%, 75%, ${alpha})`;
           const glowColor = `hsla(${star.hue}, 100%, 85%, ${alpha * 0.6})`;
 
@@ -185,7 +182,9 @@ export const DarkStarPortal: React.FC<Props> = ({ frames }) => {
 
         {/* Orbiting rings */}
         {rings.map((ring, i) => {
-          const rotAngle = cycleFrame * ring.speed * 0.5 + ring.phase;
+          // Bass → ring rotation speed multiplier
+          const bassRotMult = 0.6 + snap.bass * 0.8;
+          const rotAngle = cycleFrame * ring.speed * 0.5 * bassRotMult + ring.phase;
           const ringR = ring.radius * formScale;
           const ringAlpha = glowIntensity * 0.7;
           const color = `hsla(${ring.hue}, 85%, 70%, ${ringAlpha})`;
@@ -212,8 +211,8 @@ export const DarkStarPortal: React.FC<Props> = ({ frames }) => {
           cy={cy}
           r={(voidRadius + 8) * formScale}
           fill="none"
-          stroke={`hsla(270, 100%, 80%, ${glowIntensity * 0.6})`}
-          strokeWidth={3 + energy * 4}
+          stroke={`hsla(270, 100%, 80%, ${glowIntensity * 0.6 + snap.onsetEnvelope * 0.3})`}
+          strokeWidth={3 + energy * 4 + snap.onsetEnvelope * 3}
           style={{ filter: `drop-shadow(0 0 ${10 + glowIntensity * 15}px hsla(270, 100%, 75%, ${glowIntensity * 0.8}))` }}
         />
         <circle

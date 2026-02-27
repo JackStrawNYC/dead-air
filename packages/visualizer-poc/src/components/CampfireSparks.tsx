@@ -11,6 +11,7 @@ import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
 import { useShowContext } from "../data/ShowContext";
 import { seeded } from "../utils/seededRandom";
+import { useAudioSnapshot } from "./parametric/audio-helpers";
 
 interface SparkData {
   /** Horizontal origin offset from center (-0.3 to 0.3 of width) */
@@ -80,14 +81,8 @@ export const CampfireSparks: React.FC<Props> = ({ frames }) => {
   const { width, height } = useVideoConfig();
   const ctx = useShowContext();
 
-  const idx = Math.min(Math.max(0, frame), frames.length - 1);
-  let eSum = 0;
-  let eCount = 0;
-  for (let i = Math.max(0, idx - 75); i <= Math.min(frames.length - 1, idx + 75); i++) {
-    eSum += frames[i].rms;
-    eCount++;
-  }
-  const energy = eCount > 0 ? eSum / eCount : 0;
+  const snap = useAudioSnapshot(frames);
+  const energy = snap.energy;
 
   const sparks = React.useMemo(() => generateSparks(ctx?.showSeed ?? 19770508), [ctx?.showSeed]);
 
@@ -119,11 +114,17 @@ export const CampfireSparks: React.FC<Props> = ({ frames }) => {
     extrapolateRight: "clamp",
   });
 
-  // Visible count scales with energy
-  const visibleCount = Math.round(interpolate(energy, [0.03, 0.35], [MIN_SPARKS, MAX_SPARKS], {
+  // Visible count scales with energy + onset burst (×1.3 on transients)
+  const onsetCountBoost = 1 + snap.onsetEnvelope * 0.3;
+  const visibleCount = Math.min(MAX_SPARKS, Math.round(interpolate(energy, [0.03, 0.35], [MIN_SPARKS, MAX_SPARKS], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
-  }));
+  }) * onsetCountBoost));
+
+  // Bass → spark size multiplier (0.85-1.15)
+  const bassSizeMult = 0.85 + snap.bass * 0.6; // clamps ~0.85-1.15
+  // Centroid → hue shift within amber range (±10 degrees)
+  const centroidHueShift = (snap.centroid - 0.5) * 20;
 
   const centerX = width / 2;
   const bottomY = height * 0.95;
@@ -158,10 +159,10 @@ export const CampfireSparks: React.FC<Props> = ({ frames }) => {
           const alpha = verticalFade * flicker * brightnessMult;
           if (alpha < 0.03) return null;
 
-          // Size shrinks as spark rises (cools)
-          const r = spark.size * (1 - riseProgress * 0.4);
+          // Size shrinks as spark rises (cools), bass pulses size
+          const r = spark.size * (1 - riseProgress * 0.4) * bassSizeMult;
 
-          const hue = spark.hue;
+          const hue = spark.hue + centroidHueShift;
           const lightness = Math.min(95, spark.lightness * brightnessMult);
           const coreColor = `hsla(${hue}, 100%, ${Math.min(97, lightness + 18)}%, ${alpha})`;
           const glowColor = `hsla(${hue}, 100%, ${lightness}%, ${alpha * 0.5})`;
