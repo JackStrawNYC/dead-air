@@ -26,6 +26,7 @@ import { ShowContextProvider, getShowSeed } from "./data/ShowContext";
 import { VisualizerErrorBoundary } from "./components/VisualizerErrorBoundary";
 import { SilentErrorBoundary } from "./components/SilentErrorBoundary";
 import { SongPaletteProvider, paletteHueRotation } from "./data/SongPaletteContext";
+import { TempoProvider } from "./data/TempoContext";
 import { EraGrade } from "./components/EraGrade";
 import { EnergyEnvelope } from "./components/EnergyEnvelope";
 import { computeClimaxState, climaxModulation } from "./utils/climax-state";
@@ -256,6 +257,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
 
           {/* ═══ Dynamic overlay layers (1-10) ═══ */}
           {/* Hidden during title card, then fade in over 3 seconds */}
+          <TempoProvider tempo={tempo}>
           <SongPaletteProvider palette={props.song.palette}>
             <div
               style={{
@@ -295,6 +297,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
               <SetlistScroll frames={f} currentSong={props.song.title} />
             </div>
           </SongPaletteProvider>
+          </TempoProvider>
         </EnergyEnvelope>
         </EraGrade>
 

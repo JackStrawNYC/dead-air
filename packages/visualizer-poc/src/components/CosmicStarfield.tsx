@@ -11,6 +11,7 @@ import type { EnhancedFrameData } from "../data/types";
 import { useShowContext } from "../data/ShowContext";
 import { seeded } from "../utils/seededRandom";
 import { useAudioSnapshot } from "./parametric/audio-helpers";
+import { useTempoFactor } from "../data/TempoContext";
 
 interface Star {
   angle: number;    // radians from center
@@ -47,6 +48,7 @@ export const CosmicStarfield: React.FC<Props> = ({ frames }) => {
 
   const snap = useAudioSnapshot(frames);
   const energy = snap.energy;
+  const tempoFactor = useTempoFactor();
 
   const stars = React.useMemo(() => generateStars(ctx?.showSeed ?? 19770508), [ctx?.showSeed]);
 
@@ -54,12 +56,12 @@ export const CosmicStarfield: React.FC<Props> = ({ frames }) => {
   const cy = height / 2;
   const maxR = Math.sqrt(cx * cx + cy * cy);
 
-  // Speed multiplier from energy + beat pulse (×1.5 on beat, 10-frame decay)
+  // Speed multiplier from energy + beat pulse (×1.5 on beat, 10-frame decay) + tempo
   const beatSpeedPulse = 1 + snap.beatDecay * 0.5;
   const speedMult = interpolate(energy, [0.03, 0.3], [0.5, 2.5], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
-  }) * beatSpeedPulse;
+  }) * beatSpeedPulse * tempoFactor;
 
   // Highs → streak length multiplier (0.7-1.5)
   const highsStreakMult = 0.7 + snap.highs * 1.6; // clamps ~0.7-1.5

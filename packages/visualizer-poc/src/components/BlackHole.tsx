@@ -12,6 +12,7 @@ import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
 import { seeded } from "../utils/seededRandom";
 import { useAudioSnapshot } from "./parametric/audio-helpers";
+import { useTempoFactor } from "../data/TempoContext";
 
 const CYCLE_TOTAL = 2100; // 70s
 const VISIBLE_DURATION = 660; // 22s
@@ -46,6 +47,7 @@ export const BlackHole: React.FC<Props> = ({ frames }) => {
 
   const snap = useAudioSnapshot(frames);
   const energy = snap.energy;
+  const tempoFactor = useTempoFactor();
 
   const stars = React.useMemo(() => generateStars(99001122), []);
 
@@ -74,8 +76,8 @@ export const BlackHole: React.FC<Props> = ({ frames }) => {
   const holeRadius = 45 + energy * 10 + snap.bass * 15;
   const maxStarDist = Math.min(width, height) * 0.45;
 
-  // Accretion disk rotation
-  const diskRotation = frame * (0.3 + energy * 1.2);
+  // Accretion disk rotation (tempo-scaled)
+  const diskRotation = frame * (0.3 + energy * 1.2) * tempoFactor;
   const diskRx = holeRadius * 3.2 + energy * 20;
   const diskRy = holeRadius * 0.8;
   const diskGlow = 0.5 + energy * 0.5;

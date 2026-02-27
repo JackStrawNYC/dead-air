@@ -8,6 +8,7 @@ import React from "react";
 import { useCurrentFrame, useVideoConfig, interpolate } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
 import { useAudioSnapshot } from "./parametric/audio-helpers";
+import { useTempoFactor } from "../data/TempoContext";
 
 /** Full Steal Your Face SVG — detailed version */
 const Stealie: React.FC<{ size: number; mainColor: string; boltColor: string }> = ({
@@ -72,6 +73,7 @@ export const BreathingStealie: React.FC<Props> = ({ frames }) => {
   const snap = useAudioSnapshot(frames);
   const energy = snap.energy;
   const chromaHue = snap.chromaHue / 360; // normalize to 0-1 for hueToHex
+  const tempoFactor = useTempoFactor();
 
   // Size: breathes with energy (300-500px)
   const baseSize = Math.min(width, height) * 0.35;
@@ -81,8 +83,8 @@ export const BreathingStealie: React.FC<Props> = ({ frames }) => {
   });
   const size = baseSize * breathe;
 
-  // Slow rotation + beat impulse (+2deg on beat)
-  const rotation = (frame / 30) * 3 + snap.beatDecay * 2;
+  // Slow rotation (tempo-scaled) + beat impulse (+2deg on beat, NOT tempo-scaled)
+  const rotation = (frame / 30) * 3 * tempoFactor + snap.beatDecay * 2;
 
   // Opacity: always visible but brighter on peaks
   const opacity = interpolate(energy, [0.02, 0.3], [0.08, 0.3], {

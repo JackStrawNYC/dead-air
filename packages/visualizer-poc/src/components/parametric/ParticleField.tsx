@@ -13,6 +13,7 @@ import { useShowContext } from "../../data/ShowContext";
 import { useSongPalette, blendWithPalette } from "../../data/SongPaletteContext";
 import { seeded } from "../../utils/seededRandom";
 import { useSmoothedEnergy } from "./audio-helpers";
+import { useTempoFactor } from "../../data/TempoContext";
 import type { OverlayProps } from "./types";
 
 // ─── Variant Configuration ───
@@ -211,6 +212,8 @@ function createParticleFieldVariant(config: ParticleVariantConfig): React.FC<Ove
     const palette = useSongPalette();
     const energy = useSmoothedEnergy(frames);
 
+    const tempoFactor = useTempoFactor();
+
     const showSeed = ctx?.showSeed ?? 19770508;
     const particles = React.useMemo(
       () => generateParticles(config, showSeed),
@@ -250,7 +253,7 @@ function createParticleFieldVariant(config: ParticleVariantConfig): React.FC<Ove
     const syncStrength = interpolate(energy, [0.1, 0.35], [0, 0.7], {
       extrapolateLeft: "clamp", extrapolateRight: "clamp",
     });
-    const globalBlink = (Math.sin(frame * config.blinkFreq) + 1) * 0.5;
+    const globalBlink = (Math.sin(frame * config.blinkFreq * tempoFactor) + 1) * 0.5;
 
     const activeCount = Math.floor(
       interpolate(energyFactor, [0, 1], [
@@ -270,9 +273,9 @@ function createParticleFieldVariant(config: ParticleVariantConfig): React.FC<Ove
             );
             if (pFade < 0.01) return null;
 
-            // Position with drift + sine wander + edge wrap
-            const rawX = p.x * width + Math.sin(frame * p.sineFreqX + p.blinkPhase) * p.ampX + frame * p.driftX;
-            const rawY = p.y * height + Math.cos(frame * p.sineFreqY + p.blinkPhase * 1.3) * p.ampY + frame * p.driftY;
+            // Position with drift + sine wander + edge wrap (tempo-scaled)
+            const rawX = p.x * width + Math.sin(frame * p.sineFreqX * tempoFactor + p.blinkPhase) * p.ampX + frame * p.driftX * tempoFactor;
+            const rawY = p.y * height + Math.cos(frame * p.sineFreqY * tempoFactor + p.blinkPhase * 1.3) * p.ampY + frame * p.driftY * tempoFactor;
             const wx = ((rawX % width) + width) % width;
             const wy = ((rawY % height) + height) % height;
 

@@ -12,6 +12,7 @@ import { useShowContext } from "../../data/ShowContext";
 import { useSongPalette } from "../../data/SongPaletteContext";
 import { seeded } from "../../utils/seededRandom";
 import { useSmoothedEnergy, useFrameIndex } from "./audio-helpers";
+import { useTempoFactor } from "../../data/TempoContext";
 import type { OverlayProps } from "./types";
 
 // ─── Variant Configuration ───
@@ -90,6 +91,8 @@ function createCrowdEnergyVariant(config: CrowdVariantConfig): React.FC<OverlayP
     const energy = useSmoothedEnergy(frames);
     const idx = useFrameIndex(frames);
 
+    const tempoFactor = useTempoFactor();
+
     const showSeed = ctx?.showSeed ?? 19770508;
     const crowd = React.useMemo(
       () => generateCrowd(config, showSeed),
@@ -129,17 +132,17 @@ function createCrowdEnergyVariant(config: CrowdVariantConfig): React.FC<OverlayP
 
             switch (config.energyMapping) {
               case "sway_amplitude":
-                swayX = Math.sin(t * person.swaySpeed) * person.swayAmount * (0.5 + energy * 2);
+                swayX = Math.sin(t * person.swaySpeed * tempoFactor) * person.swayAmount * (0.5 + energy * 2);
                 break;
               case "hands":
-                swayX = Math.sin(t * person.swaySpeed) * person.swayAmount * 0.5;
+                swayX = Math.sin(t * person.swaySpeed * tempoFactor) * person.swayAmount * 0.5;
                 break;
               case "density":
-                swayX = Math.sin(t * person.swaySpeed) * person.swayAmount * 0.3;
+                swayX = Math.sin(t * person.swaySpeed * tempoFactor) * person.swayAmount * 0.3;
                 swayScale = 0.8 + energy * 0.4;
                 break;
               case "glow_intensity":
-                swayX = Math.sin(t * person.swaySpeed) * person.swayAmount * 0.4;
+                swayX = Math.sin(t * person.swaySpeed * tempoFactor) * person.swayAmount * 0.4;
                 break;
             }
 

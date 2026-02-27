@@ -10,6 +10,7 @@ import React from "react";
 import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
 import { seeded } from "../utils/seededRandom";
+import { useTempoFactor } from "../data/TempoContext";
 
 const CYCLE = 1350; // 45s at 30fps
 const DURATION = 360; // 12s visible
@@ -28,6 +29,8 @@ interface Props {
 export const Tambourine: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
+
+  const tempoFactor = useTempoFactor();
 
   const idx = Math.min(Math.max(0, frame), frames.length - 1);
   let eSum = 0;
@@ -193,10 +196,10 @@ export const Tambourine: React.FC<Props> = ({ frames }) => {
             const slotCx = tamCx + Math.cos(j.angle) * frameRadius;
             const slotCy = tamCy + Math.sin(j.angle) * frameRadius;
 
-            // Swing outward on beats
+            // Swing outward on beats (tempo-scaled frequencies)
             const swingAmount = isBeat
-              ? Math.sin(frame * 1.5 + j.swingPhase) * 6 * (0.5 + onset)
-              : Math.sin(frame * 0.3 + j.swingPhase) * 1.5 * energy;
+              ? Math.sin(frame * 1.5 * tempoFactor + j.swingPhase) * 6 * (0.5 + onset)
+              : Math.sin(frame * 0.3 * tempoFactor + j.swingPhase) * 1.5 * energy;
 
             const outwardX = Math.cos(j.angle) * swingAmount;
             const outwardY = Math.sin(j.angle) * swingAmount;

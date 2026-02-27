@@ -9,6 +9,7 @@
 import React from "react";
 import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
+import { useTempoFactor } from "../data/TempoContext";
 
 const CYCLE = 1350; // 45s at 30fps
 const DURATION = 450; // 15s visible
@@ -21,6 +22,8 @@ export const Metronome: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
 
+  const tempoFactor = useTempoFactor();
+
   const idx = Math.min(Math.max(0, frame), frames.length - 1);
   let eSum = 0;
   let eCount = 0;
@@ -30,23 +33,8 @@ export const Metronome: React.FC<Props> = ({ frames }) => {
   }
   const energy = eCount > 0 ? eSum / eCount : 0;
 
-  // Estimate tempo from beat intervals (look at nearby beats)
-  const tempoEstimate = React.useMemo(() => {
-    const beatFrames: number[] = [];
-    for (let i = 0; i < frames.length; i++) {
-      if (frames[i].beat) beatFrames.push(i);
-    }
-    if (beatFrames.length < 2) return 120; // default 120 BPM
-    // Average interval over all beats
-    let totalInterval = 0;
-    for (let i = 1; i < beatFrames.length; i++) {
-      totalInterval += beatFrames[i] - beatFrames[i - 1];
-    }
-    const avgIntervalFrames = totalInterval / (beatFrames.length - 1);
-    // Convert frames to BPM (at 30fps)
-    const bpm = (30 * 60) / avgIntervalFrames;
-    return Math.max(40, Math.min(240, bpm));
-  }, [frames]);
+  // Tempo from context (120 * tempoFactor gives actual BPM)
+  const tempoEstimate = 120 * tempoFactor;
 
   // Timing gate
   const cycleFrame = frame % CYCLE;

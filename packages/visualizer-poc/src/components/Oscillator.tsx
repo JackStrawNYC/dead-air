@@ -10,6 +10,7 @@ import React from "react";
 import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
 import { seeded } from "../utils/seededRandom";
+import { useTempoFactor } from "../data/TempoContext";
 
 const CYCLE = 1200; // 40s at 30fps
 const DURATION = 420; // 14s
@@ -82,6 +83,8 @@ export const Oscillator: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
 
+  const tempoFactor = useTempoFactor();
+
   const idx = Math.min(Math.max(0, frame), frames.length - 1);
   let eSum = 0;
   let eCount = 0;
@@ -137,7 +140,7 @@ export const Oscillator: React.FC<Props> = ({ frames }) => {
           const amplitude = ampScale * (0.3 + bandEnergy * 2.5) * (0.5 + energy * 1.5);
           const freq = wave.freqBase + centroid * 3;
           const cy = height * wave.yOffset;
-          const phase = frame * 0.06 + wave.phaseOffset;
+          const phase = frame * 0.06 * tempoFactor + wave.phaseOffset;
 
           // Build path
           const points: string[] = [];

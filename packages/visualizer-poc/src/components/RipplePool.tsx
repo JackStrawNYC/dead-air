@@ -12,6 +12,7 @@ import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
 import { useShowContext } from "../data/ShowContext";
 import { seeded } from "../utils/seededRandom";
+import { useTempoFactor } from "../data/TempoContext";
 
 interface RippleData {
   /** Frame when this ripple was "born" */
@@ -78,6 +79,8 @@ export const RipplePool: React.FC<Props> = ({ frames }) => {
   }
   const energy = eCount > 0 ? eSum / eCount : 0;
 
+  const tempoFactor = useTempoFactor();
+
   const rippleSchedule = React.useMemo(() => generateRippleSchedule(ctx?.showSeed ?? 19770508), [ctx?.showSeed]);
 
   // Master fade in
@@ -97,11 +100,11 @@ export const RipplePool: React.FC<Props> = ({ frames }) => {
 
   if (masterOpacity < 0.01) return null;
 
-  // Expansion speed: faster when energy is high
+  // Expansion speed: faster when energy is high, scaled by tempo
   const expansionMult = interpolate(energy, [0.03, 0.3], [0.7, 1.8], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
-  });
+  }) * tempoFactor;
 
   const cx = width / 2;
   const cy = height / 2;
