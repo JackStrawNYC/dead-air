@@ -7,6 +7,7 @@ import React from "react";
 import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
 import { seeded } from "../utils/seededRandom";
+import { useShowContext } from "../data/ShowContext";
 
 // Pre-1977 Dead lyrics only — no anachronistic songs for '77 shows
 const LYRICS = [
@@ -44,6 +45,7 @@ interface Props {
 export const LyricFlash: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
+  const ctx = useShowContext();
 
   const idx = Math.min(Math.max(0, frame), frames.length - 1);
   let eSum = 0;
@@ -59,7 +61,7 @@ export const LyricFlash: React.FC<Props> = ({ frames }) => {
 
   if (cycleFrame >= DURATION) return null;
 
-  const rng = seeded(cycleIndex * 37 + 5081977);
+  const rng = seeded(cycleIndex * 37 + (ctx?.showSeed ?? 19770508));
   const lyricIdx = Math.floor(rng() * LYRICS.length);
   const lyric = LYRICS[lyricIdx];
 

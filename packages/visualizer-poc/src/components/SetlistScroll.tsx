@@ -182,7 +182,7 @@ export const SetlistScroll: React.FC<Props> = ({ frames, currentSong }) => {
               marginBottom: 2,
             }}
           >
-            {ctx ? `${ctx.venueShort} ${ctx.dateShort}` : "Cornell 5/8/77"}
+            {ctx ? `${ctx.venueShort} ${ctx.dateShort}` : "Dead Air"}
           </div>
 
           {/* Divider line */}

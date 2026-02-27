@@ -30,6 +30,8 @@ import { TempoProvider } from "./data/TempoContext";
 import { EraGrade } from "./components/EraGrade";
 import { EnergyEnvelope } from "./components/EnergyEnvelope";
 import { computeClimaxState, climaxModulation } from "./utils/climax-state";
+import { computeAudioSnapshot } from "./utils/audio-reactive";
+import { AudioSnapshotProvider } from "./data/AudioSnapshotContext";
 
 import type { RotationSchedule } from "./data/overlay-rotation";
 
@@ -213,8 +215,12 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
   const tempo = analysis.meta.tempo ?? 120;
   const f = analysis.frames;
 
-  // Climax/release state machine — emotional arc modulation
-  const climaxState = computeClimaxState(f, frame, sections);
+  // Compute audio snapshot ONCE per frame — shared via context with all consumers
+  const frameIdx = Math.min(Math.max(0, frame), f.length - 1);
+  const audioSnapshot = computeAudioSnapshot(f, frameIdx);
+
+  // Climax/release state machine — uses precomputed energy from snapshot
+  const climaxState = computeClimaxState(f, frame, sections, audioSnapshot.energy);
   const climaxMod = climaxModulation(climaxState);
 
   // Apply climax density multiplier to overlay opacities
@@ -238,10 +244,11 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
   return (
     <div style={{ width, height, position: "relative", overflow: "hidden", background: "#000" }}>
       <ShowContextProvider show={props.show}>
+      <AudioSnapshotProvider snapshot={audioSnapshot}>
       <VisualizerErrorBoundary>
       <div style={{ position: "absolute", inset: 0, opacity }}>
         <EraGrade>
-        <EnergyEnvelope frames={f} climaxMod={climaxMod}>
+        <EnergyEnvelope snapshot={audioSnapshot} climaxMod={climaxMod}>
           {/* ═══ Layer 0: Base shader visualization ═══ */}
           <SceneRouter
             frames={f}
@@ -252,7 +259,9 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
 
           {/* ═══ Layer 0.5: Per-song poster art (skipped on segue-in) ═══ */}
           {props.song.songArt && !props.segueIn && (
-            <SongArtLayer src={staticFile(props.song.songArt)} />
+            <SilentErrorBoundary name="SongArt">
+              <SongArtLayer src={staticFile(props.song.songArt)} />
+            </SilentErrorBoundary>
           )}
 
           {/* ═══ Dynamic overlay layers (1-10) ═══ */}
@@ -310,8 +319,14 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
         <FilmGrain opacity={0.10} />
       </div>
       </VisualizerErrorBoundary>
+
+      {/* Audio outside error boundary would crash the entire render if file is missing.
+          Wrap in its own error boundary so a missing file produces silence, not a crash. */}
+      <SilentErrorBoundary name="SongAudio">
+        <Audio src={staticFile(`audio/${props.song.audioFile}`)} />
+      </SilentErrorBoundary>
+      </AudioSnapshotProvider>
       </ShowContextProvider>
-      <Audio src={staticFile(`audio/${props.song.audioFile}`)} />
     </div>
   );
 };

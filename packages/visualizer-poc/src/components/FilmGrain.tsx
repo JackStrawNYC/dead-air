@@ -25,17 +25,16 @@ export const FilmGrain: React.FC<Props> = ({ opacity = 0.06 }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
 
-  // Generate grain pattern as SVG noise (lighter than canvas)
-  // Use frame-based seed for per-frame variation
+  // feTurbulence seed changes every frame for grain variation
   const grainSeed = frame * 31337;
 
-  // Breathing opacity
-  const breathe = 0.85 + 0.3 * Math.sin(frame * Math.PI / 2) * 0.5;
+  // Breathing opacity: gentle 3-second cycle (0.85–1.0 range)
+  const breathe = 0.85 + 0.15 * Math.sin(frame * Math.PI / 45);
   const finalOpacity = opacity * breathe;
 
-  // Generate sparse noise dots using SVG
+  // Static noise dots — only depend on viewport size, not frame
   const dots = useMemo(() => {
-    const rng = mulberry32(grainSeed);
+    const rng = mulberry32(width * 7919 + height * 104729);
     const count = 400;
     const result: Array<{ x: number; y: number; r: number; o: number }> = [];
     for (let i = 0; i < count; i++) {
@@ -47,7 +46,7 @@ export const FilmGrain: React.FC<Props> = ({ opacity = 0.06 }) => {
       });
     }
     return result;
-  }, [grainSeed, width, height]);
+  }, [width, height]);
 
   return (
     <svg

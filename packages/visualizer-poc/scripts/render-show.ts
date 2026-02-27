@@ -240,7 +240,11 @@ function renderSetBreak(bundlePath: string): string {
 // ─── Final concat ───
 
 function concatShow(rendered: { path: string; set: number }[], bundlePath: string) {
-  const showOutput = join(OUT_DIR, "cornell-77-full-show.mp4");
+  // Derive show output name from setlist date + venue (no hardcoded show name)
+  const setlistData = JSON.parse(readFileSync(join(DATA_DIR, "setlist.json"), "utf-8"));
+  const showDate = (setlistData.date || "show").replace(/\//g, "-");
+  const showVenue = (setlistData.venue || "").split(",")[0].trim().toLowerCase().replace(/\s+/g, "-") || "show";
+  const showOutput = join(OUT_DIR, `${showDate}-${showVenue}-full-show.mp4`);
   const listPath = join(OUT_DIR, "show-concat.txt");
 
   const entries: string[] = [];

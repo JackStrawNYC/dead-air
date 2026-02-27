@@ -11,6 +11,7 @@ import React from "react";
 import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
 import { seeded } from "../utils/seededRandom";
+import { useShowContext } from "../data/ShowContext";
 
 const BAND_LABELS = ["SUB", "LOW", "L-MID", "MID", "H-MID", "HIGH", "AIR"];
 const CREAM = "#F5E6C8";
@@ -203,6 +204,7 @@ interface Props {
 export const VUMeters: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width } = useVideoConfig();
+  const ctx = useShowContext();
 
   const idx = Math.min(Math.max(0, frame), frames.length - 1);
   let eSum = 0;
@@ -224,7 +226,7 @@ export const VUMeters: React.FC<Props> = ({ frames }) => {
   });
 
   // Per-meter flicker from seeded PRNG
-  const rng = seeded(frame * 13 + 5081977);
+  const rng = seeded(frame * 13 + (ctx?.showSeed ?? 19770508));
   const flickers = BAND_LABELS.map(() => rng() * 0.3);
 
   // Smooth the needle values with previous frames (3-frame average)

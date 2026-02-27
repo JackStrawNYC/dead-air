@@ -35,10 +35,10 @@ export const TicketStubAnimated: React.FC<Props> = ({ frames }) => {
   const bandName = ctx?.bandName?.toUpperCase() ?? "GRATEFUL DEAD";
   const venueDateLine = ctx
     ? `${ctx.venueShort.toUpperCase()} - ${ctx.date.toUpperCase()}`
-    : "BARTON HALL - MAY 8, 1977";
+    : "LIVE IN CONCERT";
   const locationLine = ctx
     ? ctx.venueLocation.toUpperCase()
-    : "CORNELL UNIVERSITY, ITHACA NY";
+    : "THE GRATEFUL DEAD";
 
   const idx = Math.min(Math.max(0, frame), frames.length - 1);
 

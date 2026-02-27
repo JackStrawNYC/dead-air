@@ -18,8 +18,8 @@ import librosa
 import numpy as np
 from sklearn.cluster import AgglomerativeClustering
 
-AUDIO_DIR = Path(__file__).resolve().parents[3] / "data" / "audio" / "1977-05-08"
-DEFAULT_AUDIO = AUDIO_DIR / "gd77-05-08s2t08.mp3"
+DEFAULT_AUDIO_DIR = Path(__file__).resolve().parent.parent / "public" / "audio"
+DEFAULT_AUDIO = DEFAULT_AUDIO_DIR / "gd77-05-08s2t08.mp3"
 DEFAULT_OUTPUT = Path(__file__).resolve().parent.parent / "data" / "morning-dew-analysis.json"
 
 SR = 22050
@@ -81,7 +81,7 @@ def detect_sections(y: np.ndarray, sr: int, n_frames: int, rms_norm: np.ndarray)
             frame_start = section_start * seg_hop
             frame_end = min(i * seg_hop, n_frames)
             avg_energy = float(rms_norm[frame_start:frame_end].mean()) if frame_end > frame_start else 0.0
-            energy_label = "high" if avg_energy > 0.5 else ("mid" if avg_energy > 0.25 else "low")
+            energy_label = "high" if avg_energy > 0.35 else ("mid" if avg_energy > 0.15 else "low")
             sections.append({
                 "frameStart": frame_start,
                 "frameEnd": frame_end,
@@ -96,7 +96,7 @@ def detect_sections(y: np.ndarray, sr: int, n_frames: int, rms_norm: np.ndarray)
     frame_start = section_start * seg_hop
     frame_end = n_frames
     avg_energy = float(rms_norm[frame_start:frame_end].mean()) if frame_end > frame_start else 0.0
-    energy_label = "high" if avg_energy > 0.5 else ("mid" if avg_energy > 0.25 else "low")
+    energy_label = "high" if avg_energy > 0.35 else ("mid" if avg_energy > 0.15 else "low")
     sections.append({
         "frameStart": frame_start,
         "frameEnd": frame_end,

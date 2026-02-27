@@ -2,35 +2,26 @@
  * EnergyEnvelope — continuous visual modulation based on audio energy.
  *
  * Wraps children inside EraGrade and applies per-frame CSS filters + vignette
- * + bloom based on Gaussian-smoothed energy. All modulations are subtle (10-20%
- * range) so they compose cleanly with EraGrade's per-era color grading.
+ * + bloom based on the pre-computed AudioSnapshot. All modulations are subtle
+ * (10-20% range) so they compose cleanly with EraGrade's per-era color grading.
  *
  * Quiet passages: cooler, slightly desaturated, minimal vignette
  * Loud passages:  warmer, saturated, focused vignette + warm bloom
  */
 
-import React, { useMemo } from "react";
-import { useCurrentFrame } from "remotion";
-import type { EnhancedFrameData } from "../data/types";
-import { computeSmoothedEnergy, energyToFactor } from "../utils/energy";
-import { computeAudioSnapshot } from "../utils/audio-reactive";
+import React from "react";
+import { energyToFactor } from "../utils/energy";
+import type { AudioSnapshot } from "../utils/audio-reactive";
 import type { ClimaxModulation } from "../utils/climax-state";
 
 interface Props {
-  frames: EnhancedFrameData[];
+  /** Pre-computed audio snapshot from SongVisualizer (shared, not recomputed) */
+  snapshot: AudioSnapshot;
   children: React.ReactNode;
   climaxMod?: ClimaxModulation;
 }
 
-export const EnergyEnvelope: React.FC<Props> = ({ frames, children, climaxMod }) => {
-  const frame = useCurrentFrame();
-  const idx = Math.min(Math.max(0, frame), frames.length - 1);
-
-  const snapshot = useMemo(
-    () => computeAudioSnapshot(frames, idx),
-    [frames, idx],
-  );
-
+export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod }) => {
   const energy = snapshot.energy;
   const factor = energyToFactor(energy); // 0 (quiet) → 1 (loud)
 

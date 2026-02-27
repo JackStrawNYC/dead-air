@@ -489,8 +489,18 @@ export function getOverlayOpacities(
   // Check if we're in a crossfade zone
   const distFromStart = frame - currentWindow.frameStart;
   const distFromEnd = currentWindow.frameEnd - 1 - frame;
-  const halfFadeIn = fadeInFrames / 2;
-  const halfFadeOut = fadeOutFrames / 2;
+  const windowLen = currentWindow.frameEnd - currentWindow.frameStart;
+
+  // Clamp crossfade to fit within the window — if the window is shorter than
+  // the combined half-fades, scale them down proportionally so overlays still
+  // reach full opacity mid-window.
+  let halfFadeIn = fadeInFrames / 2;
+  let halfFadeOut = fadeOutFrames / 2;
+  if (halfFadeIn + halfFadeOut > windowLen) {
+    const scale = windowLen / (halfFadeIn + halfFadeOut);
+    halfFadeIn *= scale;
+    halfFadeOut *= scale;
+  }
 
   // Fade-in zone: first halfFadeIn of window (if there's a previous window)
   const inFadeIn = wi > 0 && distFromStart < halfFadeIn;

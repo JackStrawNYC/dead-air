@@ -49,21 +49,24 @@ function lerp(a: number, b: number, t: number): number {
 /**
  * Compute the current climax phase from energy data + section context.
  *
- * @param frames  Full frame array (for Gaussian smoothing)
+ * @param frames  Full frame array (for Gaussian smoothing of lookback delta)
  * @param idx     Current frame index
  * @param sections  Section boundaries from analysis
+ * @param precomputedEnergy  Pre-computed Gaussian-smoothed energy from AudioSnapshot
+ *                           (avoids duplicate 150-frame smoothing loop)
  */
 export function computeClimaxState(
   frames: EnhancedFrameData[],
   idx: number,
   sections: SectionBoundary[],
+  precomputedEnergy?: number,
 ): ClimaxState {
   if (frames.length === 0 || sections.length === 0) {
     return { phase: "idle", intensity: 0, anticipation: false };
   }
 
-  // 1. Smoothed energy at current frame (150-frame Gaussian, same as EnergyEnvelope)
-  const energy = gaussianSmooth(frames, idx, (f) => f.rms, 150);
+  // 1. Smoothed energy — use precomputed if available (saves one 150-frame Gaussian loop)
+  const energy = precomputedEnergy ?? gaussianSmooth(frames, idx, (f) => f.rms, 150);
 
   // 2. Energy delta: slope over 60-frame lookback
   const lookbackIdx = Math.max(0, idx - 60);
@@ -81,11 +84,13 @@ export function computeClimaxState(
     }
   }
 
-  // 4. Find next section
+  // 4. Find next and previous sections
   const nextSection =
     currentSectionIdx >= 0 && currentSectionIdx < sections.length - 1
       ? sections[currentSectionIdx + 1]
       : null;
+  const prevSection =
+    currentSectionIdx > 0 ? sections[currentSectionIdx - 1] : null;
 
   // 5. Section progress (0-1)
   let sectionProgress = 0;
@@ -128,6 +133,13 @@ export function computeClimaxState(
     // Release: energy falling from high
     phase = "release";
     intensity = smoothstep((energy - 0.08) / 0.17); // fades as energy drops
+    // Smooth ramp after leaving a high-energy section to avoid intensity pop
+    if (prevSection?.energy === "high" && currentSection) {
+      const framesSinceBoundary = idx - currentSection.frameStart;
+      if (framesSinceBoundary < 30) {
+        intensity *= smoothstep(framesSinceBoundary / 30);
+      }
+    }
   } else if (energy >= 0.08) {
     // Moderate energy, stable — mild build
     phase = "build";

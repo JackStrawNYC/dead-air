@@ -20,12 +20,11 @@ interface LabelLine {
 }
 
 const DEFAULT_LABEL_LINES: LabelLine[] = [
-  { text: "GRATEFUL DEAD", style: "title" },
-  { text: "Cornell University - Barton Hall", style: "venue" },
-  { text: "Ithaca, NY  5/8/77", style: "date" },
+  { text: "Grateful Dead", style: "title" },
+  { text: "Live Recording", style: "venue" },
+  { text: "Audience Tape", style: "date" },
   { text: "", style: "spacer" },
-  { text: "SBD > Master Reel > Cassette", style: "chain" },
-  { text: "Betty Boards", style: "taper" },
+  { text: "Not For Sale", style: "chain" },
 ];
 
 function buildLabelLines(ctx: ReturnType<typeof useShowContext>): LabelLine[] {

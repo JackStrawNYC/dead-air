@@ -1,10 +1,15 @@
 #!/usr/bin/env python3
 """
-Batch audio analysis for the full Cornell '77 show.
-Runs analyze.py on all 20 tracks and generates a show timeline.
+Batch audio analysis for a full show.
+Runs analyze.py on all tracks in the setlist and generates a show timeline.
 
 Usage:
-  python analyze_show.py [--resume]
+  python analyze_show.py [--resume] [--audio-dir=/path/to/audio]
+
+The audio directory is resolved from (in priority order):
+  1. --audio-dir CLI argument
+  2. setlist.json "audioDir" field
+  3. public/audio/ (default)
 
 Output:
   data/tracks/{trackId}-analysis.json   (per-track)
@@ -19,10 +24,10 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 from analyze import analyze_track
 
-AUDIO_DIR = Path(__file__).resolve().parents[3] / "data" / "audio" / "1977-05-08"
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 TRACKS_DIR = DATA_DIR / "tracks"
 SETLIST_PATH = DATA_DIR / "setlist.json"
+PUBLIC_AUDIO_DIR = Path(__file__).resolve().parent.parent / "public" / "audio"
 
 FPS = 30
 
@@ -30,9 +35,27 @@ FPS = 30
 def main():
     resume = "--resume" in sys.argv
 
+    # Parse --audio-dir argument
+    cli_audio_dir = None
+    for arg in sys.argv[1:]:
+        if arg.startswith("--audio-dir="):
+            cli_audio_dir = Path(arg.split("=", 1)[1])
+
     # Load setlist
     with open(SETLIST_PATH) as f:
         setlist = json.load(f)
+
+    # Resolve audio directory: CLI > setlist.audioDir > public/audio/
+    if cli_audio_dir:
+        audio_dir = cli_audio_dir
+    elif "audioDir" in setlist:
+        audio_dir = Path(setlist["audioDir"])
+        if not audio_dir.is_absolute():
+            audio_dir = DATA_DIR / audio_dir
+    else:
+        audio_dir = PUBLIC_AUDIO_DIR
+
+    print(f"Audio directory: {audio_dir}")
 
     TRACKS_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -43,7 +66,7 @@ def main():
     for song in setlist["songs"]:
         track_id = song["trackId"]
         audio_file = song["audioFile"]
-        audio_path = AUDIO_DIR / audio_file
+        audio_path = audio_dir / audio_file
         output_path = TRACKS_DIR / f"{track_id}-analysis.json"
 
         if not audio_path.exists():

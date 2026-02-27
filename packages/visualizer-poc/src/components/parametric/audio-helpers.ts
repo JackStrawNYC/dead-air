@@ -2,11 +2,14 @@
  * Parametric Overlay Library — shared audio helpers.
  *
  * DRYs the 8-line rolling-energy loop duplicated in every existing component.
+ * useAudioSnapshot now reads from the shared AudioSnapshotContext when available,
+ * eliminating redundant Gaussian smoothing loops across 19+ overlay components.
  */
 
 import { useCurrentFrame } from "remotion";
 import type { EnhancedFrameData } from "../../data/types";
 import { computeAudioSnapshot, type AudioSnapshot } from "../../utils/audio-reactive";
+import { useAudioSnapshotContext } from "../../data/AudioSnapshotContext";
 
 /** Current frame clamped to valid frames index range */
 export function useFrameIndex(frames: EnhancedFrameData[]): number {
@@ -24,6 +27,11 @@ export function useSmoothedEnergy(
   frames: EnhancedFrameData[],
   window = 75,
 ): number {
+  // If context snapshot is available and window is close to default, use it
+  const ctxSnapshot = useAudioSnapshotContext();
+  if (ctxSnapshot && window === 75) {
+    return ctxSnapshot.energy;
+  }
   const idx = useFrameIndex(frames);
   let sum = 0;
   let count = 0;
@@ -61,9 +69,13 @@ export function useSmoothedField(
 
 /**
  * Full audio snapshot: all smoothed fields in one call.
- * Replaces inline smoothing loops in upgraded overlay components.
+ * Prefers the shared AudioSnapshotContext (computed once in SongVisualizer).
+ * Falls back to local computation when no context is available.
  */
 export function useAudioSnapshot(frames: EnhancedFrameData[]): AudioSnapshot {
+  const ctxSnapshot = useAudioSnapshotContext();
+  if (ctxSnapshot) return ctxSnapshot;
+  // Fallback: compute locally (for standalone/test usage without SongVisualizer)
   const idx = useFrameIndex(frames);
   return computeAudioSnapshot(frames, idx);
 }

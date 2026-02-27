@@ -69,11 +69,11 @@ export const Root: React.FC = () => {
           width={1920}
           height={1080}
           defaultProps={{
-            brandSrc: "assets/song-art/dead-air-brand.png",
+            videoSrc: "assets/dead-air-intro.mp4",
             posterSrc: setlist.showPoster,
             date: formatDateLong(setlist.date),
             venue: setlist.venue,
-            introAudioSrc: `audio/${setlist.songs[0]?.audioFile}`,
+            introAudioSrc: setlist.songs[0]?.audioFile ? `audio/${setlist.songs[0].audioFile}` : undefined,
           }}
         />
       )}
@@ -151,27 +151,29 @@ export const Root: React.FC = () => {
         }}
       />
 
-      {/* Morning Dew standalone composition for testing */}
-      <Composition
-        id="MorningDew"
-        component={SongVisualizerComponent}
-        durationInFrames={DEFAULT_FRAMES}
-        fps={30}
-        width={1920}
-        height={1080}
-        defaultProps={{
-          song: setlist.songs.find((s) => s.trackId === "s2t08")!,
-          activeOverlays: getActiveOverlays("s2t08"),
-          show: setlist,
-        } satisfies SongVisualizerProps as Record<string, unknown>}
-        calculateMetadata={async ({ props }) => {
-          const meta = props.meta as { totalFrames?: number } | undefined;
-          if (meta?.totalFrames) {
-            return { durationInFrames: meta.totalFrames };
-          }
-          return { durationInFrames: DEFAULT_FRAMES };
-        }}
-      />
+      {/* Morning Dew standalone composition for testing (only if s2t08 exists in this setlist) */}
+      {setlist.songs.find((s) => s.trackId === "s2t08") && (
+        <Composition
+          id="MorningDew"
+          component={SongVisualizerComponent}
+          durationInFrames={DEFAULT_FRAMES}
+          fps={30}
+          width={1920}
+          height={1080}
+          defaultProps={{
+            song: setlist.songs.find((s) => s.trackId === "s2t08")!,
+            activeOverlays: getActiveOverlays("s2t08"),
+            show: setlist,
+          } satisfies SongVisualizerProps as Record<string, unknown>}
+          calculateMetadata={async ({ props }) => {
+            const meta = props.meta as { totalFrames?: number } | undefined;
+            if (meta?.totalFrames) {
+              return { durationInFrames: meta.totalFrames };
+            }
+            return { durationInFrames: DEFAULT_FRAMES };
+          }}
+        />
+      )}
     </>
   );
 };

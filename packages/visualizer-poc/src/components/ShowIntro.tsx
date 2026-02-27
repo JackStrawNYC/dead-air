@@ -1,57 +1,75 @@
 /**
  * ShowIntro — Two-phase intro sequence:
- *   Phase 1: Dead Air branding card (5s) with Ken Burns zoom
- *   Phase 2: Crossfade to Cornell show poster (5s) with Ken Burns zoom
- *   First song audio bleeds in during poster phase at low volume
+ *   Phase 1: Dead Air brand VIDEO (7s) with its own audio
+ *   Phase 2: Crossfade to show poster (3s) — video audio fades out,
+ *            concert audio fades in underneath
  *
- * Total duration: ~10s (300 frames at 30fps)
+ * Total duration: 10s (300 frames at 30fps)
  */
 
 import React from "react";
-import { Audio, Img, staticFile, useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
+import {
+  Audio,
+  Img,
+  OffthreadVideo,
+  staticFile,
+  useCurrentFrame,
+  useVideoConfig,
+  interpolate,
+  Easing,
+} from "remotion";
 
 // ─── Timing constants (frames at 30fps) ───
-const BRAND_DURATION = 150;     // 5s — Dead Air branding card
-const CROSSFADE_FRAMES = 45;    // 1.5s — crossfade between brand → show poster
-const FADE_OUT_FRAMES = 60;     // 2s — fade to black at end
+const POSTER_START = 210;          // 7s — poster begins crossfading in
+const CROSSFADE_FRAMES = 60;      // 2s — video → poster visual crossfade
+const FADE_OUT_FRAMES = 45;       // 1.5s — poster fades to black at end
+const AUDIO_CROSSFADE_START = 195; // 6.5s — video audio starts fading out (0.5s before visual)
 
 export interface ShowIntroProps {
-  /** Path to Dead Air branding art (relative to public/) */
-  brandSrc: string;
+  /** Path to Dead Air brand video (relative to public/) */
+  videoSrc: string;
   /** Path to show poster art (relative to public/) */
   posterSrc: string;
   /** Show date display string */
   date: string;
   /** Venue display string */
   venue: string;
-  /** First song audio file (relative to public/audio/) — bleeds in during poster phase */
+  /** First song audio file (relative to public/) — fades in during poster phase */
   introAudioSrc?: string;
 }
 
-export const ShowIntro: React.FC<ShowIntroProps> = ({ brandSrc, posterSrc, date, venue, introAudioSrc }) => {
+export const ShowIntro: React.FC<ShowIntroProps> = ({
+  videoSrc,
+  posterSrc,
+  date,
+  venue,
+  introAudioSrc,
+}) => {
   const { width, height, durationInFrames } = useVideoConfig();
   const frame = useCurrentFrame();
 
-  // ─── Phase 1: Brand card ───
-  // Full opacity for 5s, then fades out over crossfade
-  const brandOpacity = interpolate(
+  // ─── Phase 1: Brand video ───
+  // Full opacity for 7s, then fades out over crossfade
+  const videoOpacity = interpolate(
     frame,
-    [0, BRAND_DURATION - CROSSFADE_FRAMES, BRAND_DURATION],
-    [1, 1, 0],
+    [POSTER_START, POSTER_START + CROSSFADE_FRAMES],
+    [1, 0],
     { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: Easing.out(Easing.cubic) },
   );
 
-  // Brand: slow zoom 1.0 → 1.04
-  const brandScale = interpolate(frame, [0, BRAND_DURATION], [1.0, 1.04], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
+  // Video audio: full volume, starts fading out slightly before the visual crossfade
+  const videoAudioVolume = interpolate(
+    frame,
+    [AUDIO_CROSSFADE_START, POSTER_START + CROSSFADE_FRAMES],
+    [1, 0],
+    { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
+  );
 
   // ─── Phase 2: Show poster ───
   // Fades in during crossfade, holds, then fades to black at end
   const posterFadeIn = interpolate(
     frame,
-    [BRAND_DURATION - CROSSFADE_FRAMES, BRAND_DURATION],
+    [POSTER_START, POSTER_START + CROSSFADE_FRAMES],
     [0, 1],
     { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: Easing.in(Easing.cubic) },
   );
@@ -63,10 +81,10 @@ export const ShowIntro: React.FC<ShowIntroProps> = ({ brandSrc, posterSrc, date,
   );
   const posterOpacity = Math.min(posterFadeIn, posterFadeOut);
 
-  // Poster: slow zoom over its visible duration
+  // Poster: slow Ken Burns zoom over its visible duration
   const posterScale = interpolate(
     frame,
-    [BRAND_DURATION - CROSSFADE_FRAMES, durationInFrames],
+    [POSTER_START, durationInFrames],
     [1.0, 1.06],
     { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
   );
@@ -74,17 +92,16 @@ export const ShowIntro: React.FC<ShowIntroProps> = ({ brandSrc, posterSrc, date,
   // Poster: subtle drift
   const posterTranslateX = interpolate(
     frame,
-    [BRAND_DURATION - CROSSFADE_FRAMES, durationInFrames],
+    [POSTER_START, durationInFrames],
     [0, -8],
     { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
   );
 
-  // ─── Audio: first song bleeds in during poster phase ───
-  // Starts when poster begins appearing, builds to 0.15 by end
-  const audioVolume = introAudioSrc
+  // ─── Audio: concert audio fades in as poster appears ───
+  const concertAudioVolume = introAudioSrc
     ? interpolate(
         frame,
-        [BRAND_DURATION - CROSSFADE_FRAMES, BRAND_DURATION, durationInFrames],
+        [POSTER_START, POSTER_START + CROSSFADE_FRAMES, durationInFrames],
         [0, 0.06, 0.15],
         { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
       )
@@ -92,7 +109,7 @@ export const ShowIntro: React.FC<ShowIntroProps> = ({ brandSrc, posterSrc, date,
 
   return (
     <div style={{ width, height, position: "relative", overflow: "hidden", background: "#000" }}>
-      {/* Layer 1: Show poster (behind, fades in during crossfade) */}
+      {/* Layer 1: Show poster (behind video, fades in during crossfade) */}
       <div style={{ position: "absolute", inset: 0, opacity: posterOpacity, overflow: "hidden" }}>
         <Img
           src={staticFile(posterSrc)}
@@ -165,34 +182,32 @@ export const ShowIntro: React.FC<ShowIntroProps> = ({ brandSrc, posterSrc, date,
         )}
       </div>
 
-      {/* Layer 2: Dead Air brand card (on top, fades out during crossfade) */}
+      {/* Layer 2: Brand video (on top, fades out during crossfade) */}
       <div
         style={{
           position: "absolute",
           inset: 0,
-          opacity: brandOpacity,
+          opacity: videoOpacity,
           overflow: "hidden",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
           backgroundColor: "#000",
         }}
       >
-        <Img
-          src={staticFile(brandSrc)}
+        <OffthreadVideo
+          src={staticFile(videoSrc)}
           style={{
-            width: width * 0.65,
-            height: height * 0.65,
-            objectFit: "contain",
-            transform: `scale(${brandScale})`,
-            willChange: "transform",
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
           }}
         />
       </div>
 
-      {/* First song audio bleeding in during poster phase */}
-      {introAudioSrc && audioVolume > 0 && (
-        <Audio src={staticFile(introAudioSrc)} volume={audioVolume} />
+      {/* Brand video audio — fades out as poster appears */}
+      <Audio src={staticFile(videoSrc)} volume={videoAudioVolume} />
+
+      {/* Concert audio — fades in during poster phase */}
+      {introAudioSrc && concertAudioVolume > 0 && (
+        <Audio src={staticFile(introAudioSrc)} volume={concertAudioVolume} />
       )}
     </div>
   );

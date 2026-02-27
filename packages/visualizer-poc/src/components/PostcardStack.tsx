@@ -268,7 +268,7 @@ export const PostcardStack: React.FC<Props> = ({ frames }) => {
                 fontFamily="serif"
                 opacity={0.3}
               >
-                MAY 8
+                {ctx?.dateShort ?? "LIVE"}
               </text>
 
               {/* Address lines (right half) */}

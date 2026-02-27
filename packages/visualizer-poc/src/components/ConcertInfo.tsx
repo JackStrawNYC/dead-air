@@ -28,10 +28,10 @@ export const ConcertInfo: React.FC<Props> = ({
   const { width, height } = useVideoConfig();
   const ctx = useShowContext();
 
-  const venue = (venueProp ?? ctx?.venue ?? "BARTON HALL, CORNELL UNIVERSITY").toUpperCase();
-  const date = (dateProp ?? ctx?.date ?? "MAY 8, 1977").toUpperCase();
+  const venue = (venueProp ?? ctx?.venue ?? "VENUE").toUpperCase();
+  const date = (dateProp ?? ctx?.date ?? "DATE").toUpperCase();
   const bandName = ctx?.bandName ?? "GRATEFUL DEAD";
-  const ticketNumber = ctx ? formatDateCompact(ctx.dateRaw) : "05081977";
+  const ticketNumber = ctx ? formatDateCompact(ctx.dateRaw) : "00000000";
 
   // Show at start and every REAPPEAR_INTERVAL frames
   const cycleFrame = frame % REAPPEAR_INTERVAL;

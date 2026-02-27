@@ -77,9 +77,9 @@ const STATIC_POSTERS: PosterDesign[] = [
   },
   {
     bandLine: "THE GRATEFUL DEAD",
-    venueLine: "Barton Hall",
-    dateLine: "Ithaca, New York — 1977",
-    extraLine: "Cornell University Spring Concert",
+    venueLine: "The Grateful Dead",
+    dateLine: "Live In Concert",
+    extraLine: "An Evening of Musical Exploration",
     colorScheme: {
       bg: "rgba(8, 20, 10, 0.85)",
       border: "#76FF03",
@@ -283,9 +283,9 @@ export const TourPosterGallery: React.FC<Props> = ({ frames }) => {
   const posters = useMemo<PosterDesign[]>(() => {
     const showPoster: PosterDesign = {
       bandLine: (ctx?.bandName ?? "GRATEFUL DEAD").toUpperCase(),
-      venueLine: ctx?.venueShort ?? "Barton Hall",
-      dateLine: ctx?.date ?? "May 8, 1977",
-      extraLine: ctx ? `${ctx.venueLocation}` : "Cornell University - Ithaca, NY",
+      venueLine: ctx?.venueShort ?? "VENUE",
+      dateLine: ctx?.date ?? "DATE",
+      extraLine: ctx ? `${ctx.venueLocation}` : "Live In Concert",
       colorScheme: POSTER_0_COLORS,
     };
     return [showPoster, ...STATIC_POSTERS];

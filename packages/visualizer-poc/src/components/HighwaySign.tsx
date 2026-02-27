@@ -23,8 +23,8 @@ interface SignText {
 }
 
 function buildSignTexts(ctx: ReturnType<typeof useShowContext>): SignText[] {
-  const city = ctx?.venueLocation?.split(",")[0]?.trim()?.toUpperCase() ?? "ITHACA";
-  const venue = ctx?.venueShort?.toUpperCase() ?? "BARTON HALL";
+  const city = ctx?.venueLocation?.split(",")[0]?.trim()?.toUpperCase() ?? "NEXT EXIT";
+  const venue = ctx?.venueShort?.toUpperCase() ?? "VENUE";
   const band = ctx?.bandName?.toUpperCase() ?? "GRATEFUL DEAD";
   const year = ctx?.dateRaw?.slice(2, 4) ?? "77";
 

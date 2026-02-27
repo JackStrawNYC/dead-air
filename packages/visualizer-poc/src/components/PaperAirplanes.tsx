@@ -10,6 +10,7 @@ import React from "react";
 import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
 import { seeded } from "../utils/seededRandom";
+import { useShowContext } from "../data/ShowContext";
 
 const CYCLE = 1350;    // 45 seconds at 30fps
 const DURATION = 420;  // 14 seconds
@@ -84,6 +85,7 @@ interface Props {
 export const PaperAirplanes: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
+  const ctx = useShowContext();
 
   const idx = Math.min(Math.max(0, frame), frames.length - 1);
   let eSum = 0;
@@ -94,7 +96,7 @@ export const PaperAirplanes: React.FC<Props> = ({ frames }) => {
   }
   const energy = eCount > 0 ? eSum / eCount : 0;
 
-  const planes = React.useMemo(() => generatePlanes(5081977), []);
+  const planes = React.useMemo(() => generatePlanes(ctx?.showSeed ?? 19770508), [ctx?.showSeed]);
 
   // Timing gate
   const cycleFrame = frame % CYCLE;
