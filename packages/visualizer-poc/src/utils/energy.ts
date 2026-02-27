@@ -57,10 +57,17 @@ export function energyToFactor(
 }
 
 /**
- * Map smoothed energy to overlay opacity multiplier (0.3–1.0).
- * Quiet passages get 30% overlay density; loud passages get 100%.
+ * Map smoothed energy to overlay opacity multiplier (0.10–1.0).
+ * 10x dynamic range: quiet passages nearly vanish (10% density),
+ * peaks flood to full intensity. Matches the Dead's visual philosophy —
+ * restraint during Space earns the climax.
+ *
+ * The smoothstep transition band (0.04–0.30) is calibrated so:
+ *   - Quiet tuning (energy ~0.03) → 10% (almost invisible)
+ *   - Mid jam (energy ~0.15)      → ~45% (present but not dominant)
+ *   - Peak climax (energy ~0.30+) → 100% (full flood)
  */
 export function overlayEnergyFactor(energy: number): number {
-  const factor = energyToFactor(energy);
-  return 0.3 + factor * 0.7;
+  const factor = energyToFactor(energy, 0.04, 0.30);
+  return 0.10 + factor * 0.90;
 }

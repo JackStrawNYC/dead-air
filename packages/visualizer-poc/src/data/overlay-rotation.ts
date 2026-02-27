@@ -1,8 +1,15 @@
 /**
  * Overlay Rotation Engine — temporal overlay management.
  *
- * Instead of rendering all ~45 selected overlays simultaneously for an entire song,
- * this module rotates 2-7 overlays at any moment based on musical sections and energy.
+ * Tuned for the Dead's visual philosophy: restraint during quiet passages,
+ * visual silence before peaks, full flood at climax. The music leads.
+ *
+ * Key design principles:
+ *   - 10x dynamic range: quiet passages nearly invisible, peaks at full intensity
+ *   - Pre-peak dropout: strip to 1-2 overlays before a climax → dramatic contrast
+ *   - Energy-scaled crossfades: glacial in Space, snappy at peaks
+ *   - Wide overlay count range: 1-2 during quiet, 5-7 at climax
+ *   - Accent overlays: Dead iconography pulses on beats during peaks
  *
  * Two exports:
  *   buildRotationSchedule() — called once per song via useMemo
@@ -43,6 +50,8 @@ export interface RotationWindow {
   overlays: string[];
   /** Energy level for this window (inherited from section) */
   energy: "low" | "mid" | "high";
+  /** Whether this window is a pre-peak dropout (visual silence before climax) */
+  isDropout?: boolean;
 }
 
 export interface RotationSchedule {
@@ -65,8 +74,13 @@ export interface AccentConfig {
   decayFrames: number;
 }
 
-/** High-energy overlays eligible for accent (strobe-on-beat) treatment */
+/**
+ * Overlays eligible for accent (beat-synced flash) treatment.
+ * Expanded to include Dead iconography — stealies, bolts, bears, skeletons
+ * should pulse with the music during peaks.
+ */
 const ACCENT_ELIGIBLE = new Set([
+  // Original reactive/distortion overlays
   "ChromaticAberration",
   "PixelExplosion",
   "ParticleExplosion",
@@ -82,33 +96,73 @@ const ACCENT_ELIGIBLE = new Set([
   "TeslaCoil",
   "LiquidMetal",
   "ThirteenPointBolt",
+  // Dead iconography — pulse on Garcia's attack, Bobby's chords
+  "BreathingStealie",
+  "StealYourFaceOff",
+  "SkullKaleidoscope",
+  "BearParade",
+  "SkeletonBand",
+  "SkeletonCouple",
+  "DeadIcons",
+  "VWBusParade",
+  "SkeletonRoses",
+  // Parametric Dead motifs
+  "DeadMotif_SkeletonMarch",
+  "DeadMotif_BearParade",
+  "DeadMotif_BoltFlash",
+  "DeadMotif_StealiePulse",
+  "DeadMotif_VWBusConvoy",
+  "DeadMotif_GarciaHandDrift",
+  // Venue/crowd energy
+  "MoshPit",
+  "StageDive",
+  "CrowdSilhouette",
+  "EmberRise",
+  "Thunderhead",
 ]);
 
 /** Energy-dependent accent tuning */
 const ACCENT_CONFIG: Record<string, AccentConfig | null> = {
-  high: { onsetThreshold: 0.4, peakOpacity: 0.55, decayFrames: 10 },
-  mid:  { onsetThreshold: 0.5, peakOpacity: 0.35, decayFrames: 8 },
-  low:  null, // no accents in low-energy windows
+  high: { onsetThreshold: 0.35, peakOpacity: 0.6, decayFrames: 12 },
+  mid:  { onsetThreshold: 0.45, peakOpacity: 0.35, decayFrames: 8 },
+  low:  null, // no accents in low-energy windows — let it breathe
 };
 
 // ─── Constants ───
 
-/** Target window duration in frames by energy (~90s low, ~75s mid, ~60s high at 30fps) */
+/**
+ * Window duration in frames by energy.
+ * Quiet passages get long, patient windows (3 minutes).
+ * Peaks rotate faster for visual energy.
+ */
 const WINDOW_FRAMES_BY_ENERGY: Record<string, number> = {
-  low:  2700,  // 90 seconds — let it breathe
-  mid:  2250,  // 75 seconds
-  high: 1800,  // 60 seconds — faster rotation at high energy
+  low:  5400,  // 180 seconds — let a single visual breathe for 3 minutes
+  mid:  2700,  // 90 seconds — comfortable rotation
+  high: 1350,  // 45 seconds — fast visual turnover at peaks
 };
-const WINDOW_FRAMES_DEFAULT = 2250;
+const WINDOW_FRAMES_DEFAULT = 2700;
 
-/** Crossfade duration at window boundaries (10 seconds for smooth flow) */
-const CROSSFADE_FRAMES = 300;
+/**
+ * Crossfade duration at window boundaries, energy-scaled.
+ * Quiet transitions are glacial (20s). Peak transitions are snappy (6s).
+ * Matches the tempo of the music's own dynamics.
+ */
+const CROSSFADE_FRAMES_BY_ENERGY: Record<string, number> = {
+  low:  600,   // 20 seconds — glacial, like morning fog
+  mid:  300,   // 10 seconds — comfortable
+  high: 180,   // 6 seconds — snappy, matching peak energy
+};
+const CROSSFADE_FRAMES_DEFAULT = 300;
 
-/** Overlay count ranges by section energy */
+/**
+ * Overlay count ranges by section energy.
+ * Wide range: quiet = 1-2 (almost nothing), peak = 5-7 (full flood).
+ * The contrast is what makes the peaks feel earned.
+ */
 const ENERGY_COUNTS: Record<string, { min: number; max: number }> = {
-  low:  { min: 2, max: 4 },
-  mid:  { min: 3, max: 5 },
-  high: { min: 4, max: 6 },
+  low:  { min: 1, max: 2 },
+  mid:  { min: 2, max: 4 },
+  high: { min: 5, max: 7 },
 };
 
 /** Score penalty for overlays used in the previous window */
@@ -119,6 +173,14 @@ const CARRYOVER_BONUS = 0.4;
 
 /** Windows shorter than this get carryover instead of repeat-penalty (30 seconds) */
 const MIN_WINDOW_FOR_ROTATION = 900;
+
+/**
+ * Pre-peak dropout: overlay count cap for the window immediately before a
+ * higher-energy section. Strips the visual field to near-silence so the
+ * peak floods in with maximum contrast. Like pulling the kick drum out
+ * of the mix right before the drop.
+ */
+const DROPOUT_MAX_OVERLAYS = 1;
 
 // ─── smoothstep for crossfades ───
 
@@ -181,7 +243,20 @@ export function buildRotationSchedule(
     }
   }
 
-  // 4. Select overlays per window
+  // 4. Identify pre-peak dropout windows
+  //    The last window before a jump to higher energy gets flagged.
+  //    This creates visual silence → climax contrast.
+  const energyRank: Record<string, number> = { low: 0, mid: 1, high: 2 };
+  for (let wi = 0; wi < windows.length - 1; wi++) {
+    const currentRank = energyRank[windows[wi].energy];
+    const nextRank = energyRank[windows[wi + 1].energy];
+    // Only dropout when jumping UP at least 1 level (low→mid, low→high, mid→high)
+    if (nextRank > currentRank) {
+      windows[wi].isDropout = true;
+    }
+  }
+
+  // 5. Select overlays per window
   let previousWindowOverlays = new Set<string>();
   let previousWindowFrames = 0;
 
@@ -193,13 +268,9 @@ export function buildRotationSchedule(
     const energyRange = ENERGY_COUNTS[window.energy] ?? ENERGY_COUNTS.mid;
     let targetCount = energyRange.min + Math.floor(rng() * (energyRange.max - energyRange.min + 1));
 
-    // Pre-peak anticipation: last window before a higher-energy section gets +1
-    if (wi < windows.length - 1) {
-      const nextEnergy = windows[wi + 1].energy;
-      const energyRank = { low: 0, mid: 1, high: 2 };
-      if (energyRank[nextEnergy] > energyRank[window.energy]) {
-        targetCount = Math.min(targetCount + 1, energyRange.max + 1);
-      }
+    // Pre-peak dropout: strip to near-silence before the climax
+    if (window.isDropout) {
+      targetCount = Math.min(targetCount, DROPOUT_MAX_OVERLAYS);
     }
 
     // Cap at pool size
@@ -225,6 +296,12 @@ export function buildRotationSchedule(
       if (window.energy === "high" && entry.weight >= 2) score += 0.15;
       if (window.energy === "low" && entry.weight === 3) score -= 0.25;
 
+      // Dropout windows: prefer atmospheric/sacred layers (1-2) — the quietest visuals
+      if (window.isDropout) {
+        if (entry.layer <= 2) score += 0.4;
+        else score -= 0.3;
+      }
+
       // Carryover vs repeat: if previous window was too short for the overlay
       // to register visually, encourage it to persist instead of penalizing
       if (previousWindowOverlays.has(entry.name)) {
@@ -244,12 +321,13 @@ export function buildRotationSchedule(
     // Sort by score descending
     scored.sort((a, b) => b.score - a.score);
 
-    // Layer diversity: ensure ≥3 different layers via round-robin pick
+    // Layer diversity: ensure ≥2 different layers via round-robin pick
+    // (relaxed from 3 since low-energy windows may only have 1-2 overlays)
     const selected: OverlayEntry[] = [];
     const selectedNames = new Set<string>();
     const usedLayers = new Set<number>();
 
-    // First pass: pick top candidate from each unique layer until we have ≥3 layers
+    // First pass: pick top candidate from each unique layer
     const byLayer = new Map<number, typeof scored>();
     for (const s of scored) {
       const layerList = byLayer.get(s.entry.layer) ?? [];
@@ -262,8 +340,8 @@ export function buildRotationSchedule(
       .map(([layer, candidates]) => ({ layer, topScore: candidates[0].score }))
       .sort((a, b) => b.topScore - a.topScore);
 
-    // Pick one from each layer until we have min(3, available layers) or hit target
-    const minLayers = Math.min(3, layerOrder.length);
+    // Pick one from each layer until we have min(2, available layers) or hit target
+    const minLayers = Math.min(2, layerOrder.length, targetCount);
     for (const { layer } of layerOrder) {
       if (selected.length >= targetCount) break;
       if (usedLayers.size >= minLayers && selected.length >= minLayers) break;
@@ -292,7 +370,7 @@ export function buildRotationSchedule(
     previousWindowFrames = windowFrames;
   }
 
-  // 5. Accent selection — pull eligible overlays out of rotation into accent map
+  // 6. Accent selection — pull eligible overlays out of rotation into accent map
   const accentOverlays = new Map<number, string[]>();
 
   for (let wi = 0; wi < windows.length; wi++) {
@@ -300,15 +378,18 @@ export function buildRotationSchedule(
     const config = ACCENT_CONFIG[window.energy];
     if (!config) continue; // no accents for this energy level
 
+    // No accents in dropout windows — they should be silent
+    if (window.isDropout) continue;
+
     // Find accent-eligible overlays in this window's rotation list
     const eligible = window.overlays.filter((name) => ACCENT_ELIGIBLE.has(name));
     if (eligible.length === 0) continue;
 
-    // Pick 1 (mid) or 1-2 (high) using offset seed
+    // Pick 1-2 (mid) or 2-3 (high) using offset seed
     const accentRng = seededRandom(trackHash + wi * 7919 + 31337);
     const pickCount = window.energy === "high"
-      ? Math.min(1 + (accentRng() < 0.5 ? 1 : 0), eligible.length)
-      : 1;
+      ? Math.min(2 + (accentRng() < 0.4 ? 1 : 0), eligible.length)
+      : Math.min(1 + (accentRng() < 0.3 ? 1 : 0), eligible.length);
 
     // Shuffle eligible deterministically, take pickCount
     for (let i = eligible.length - 1; i > 0; i--) {
@@ -352,13 +433,26 @@ function findWindow(windows: RotationWindow[], frame: number): number {
 }
 
 /**
+ * Get the crossfade duration for a window boundary, based on the
+ * energy of both adjacent windows. Uses the slower (longer) of the two
+ * to ensure transitions feel organic.
+ */
+function getCrossfadeFrames(energyA: string, energyB: string): number {
+  const framesA = CROSSFADE_FRAMES_BY_ENERGY[energyA] ?? CROSSFADE_FRAMES_DEFAULT;
+  const framesB = CROSSFADE_FRAMES_BY_ENERGY[energyB] ?? CROSSFADE_FRAMES_DEFAULT;
+  // Use the average — biased toward the slower side for organic feel
+  return Math.round((framesA + framesB) / 2);
+}
+
+/**
  * Compute per-overlay opacity for a given frame.
  * Called every frame during rendering.
  *
  * - Always-active overlays: fixed at 1.0
- * - Rotation pool overlays: 0 or 1, with 30-frame smoothstep crossfades at window boundaries
+ * - Rotation pool overlays: 0 or 1, with energy-scaled smoothstep crossfades
  * - Overlays present in consecutive windows stay at 1.0 through the transition
  * - Accent overlays: flash on onset peaks with inverse smoothstep decay
+ * - Energy breathing: real-time opacity modulation (10%–100%) on top of rotation
  */
 export function getOverlayOpacities(
   frame: number,
@@ -381,36 +475,44 @@ export function getOverlayOpacities(
   const currentWindow = windows[wi];
   const currentSet = new Set(currentWindow.overlays);
 
+  // Energy-scaled crossfade duration for this boundary region
+  const prevWindow = wi > 0 ? windows[wi - 1] : null;
+  const nextWindow = wi < windows.length - 1 ? windows[wi + 1] : null;
+
+  const fadeInFrames = prevWindow
+    ? getCrossfadeFrames(prevWindow.energy, currentWindow.energy)
+    : CROSSFADE_FRAMES_DEFAULT;
+  const fadeOutFrames = nextWindow
+    ? getCrossfadeFrames(currentWindow.energy, nextWindow.energy)
+    : CROSSFADE_FRAMES_DEFAULT;
+
   // Check if we're in a crossfade zone
   const distFromStart = frame - currentWindow.frameStart;
   const distFromEnd = currentWindow.frameEnd - 1 - frame;
-  const halfCrossfade = CROSSFADE_FRAMES / 2;
+  const halfFadeIn = fadeInFrames / 2;
+  const halfFadeOut = fadeOutFrames / 2;
 
-  // Fade-in zone: first CROSSFADE_FRAMES/2 of window (if there's a previous window)
-  const inFadeIn = wi > 0 && distFromStart < halfCrossfade;
-  // Fade-out zone: last CROSSFADE_FRAMES/2 of window (if there's a next window)
-  const inFadeOut = wi < windows.length - 1 && distFromEnd < halfCrossfade;
+  // Fade-in zone: first halfFadeIn of window (if there's a previous window)
+  const inFadeIn = wi > 0 && distFromStart < halfFadeIn;
+  // Fade-out zone: last halfFadeOut of window (if there's a next window)
+  const inFadeOut = wi < windows.length - 1 && distFromEnd < halfFadeOut;
 
-  const prevWindow = wi > 0 ? windows[wi - 1] : null;
-  const nextWindow = wi < windows.length - 1 ? windows[wi + 1] : null;
   const prevSet = prevWindow ? new Set(prevWindow.overlays) : new Set<string>();
   const nextSet = nextWindow ? new Set(nextWindow.overlays) : new Set<string>();
 
   // Compute opacity for each overlay in the current window.
-  // Crossfades are centered on window boundaries using the full CROSSFADE_FRAMES
-  // span so both sides of the boundary compute the same value (no discontinuity).
   for (const name of currentWindow.overlays) {
     let opacity = 1;
 
     if (inFadeIn && !prevSet.has(name)) {
       // This overlay is new (not in prev window) — crossfade centered on start boundary
       const boundary = currentWindow.frameStart;
-      opacity = smoothstep(boundary - halfCrossfade, boundary + halfCrossfade, frame);
+      opacity = smoothstep(boundary - halfFadeIn, boundary + halfFadeIn, frame);
     }
     if (inFadeOut && !nextSet.has(name)) {
       // This overlay is leaving (not in next window) — crossfade centered on end boundary
       const boundary = currentWindow.frameEnd;
-      const fadeOutOpacity = 1 - smoothstep(boundary - halfCrossfade, boundary + halfCrossfade, frame);
+      const fadeOutOpacity = 1 - smoothstep(boundary - halfFadeOut, boundary + halfFadeOut, frame);
       opacity = Math.min(opacity, fadeOutOpacity);
     }
 
@@ -422,8 +524,7 @@ export function getOverlayOpacities(
     const boundary = currentWindow.frameStart;
     for (const name of prevWindow.overlays) {
       if (!currentSet.has(name) && result[name] === undefined) {
-        // Fading out overlay from previous window — same boundary-centered crossfade
-        result[name] = 1 - smoothstep(boundary - halfCrossfade, boundary + halfCrossfade, frame);
+        result[name] = 1 - smoothstep(boundary - halfFadeIn, boundary + halfFadeIn, frame);
       }
     }
   }
@@ -433,8 +534,7 @@ export function getOverlayOpacities(
     const boundary = currentWindow.frameEnd;
     for (const name of nextWindow.overlays) {
       if (!currentSet.has(name) && result[name] === undefined) {
-        // Fading in overlay from next window — same boundary-centered crossfade
-        result[name] = smoothstep(boundary - halfCrossfade, boundary + halfCrossfade, frame);
+        result[name] = smoothstep(boundary - halfFadeOut, boundary + halfFadeOut, frame);
       }
     }
   }
@@ -462,8 +562,8 @@ export function getOverlayOpacities(
   }
 
   // ─── Energy-based overlay breathing ───
-  // Quiet passages reduce non-always-active overlay density to 30%;
-  // loud passages keep them at full intensity.
+  // 10x dynamic range: quiet passages at 10% density, peaks at 100%.
+  // This is the single biggest factor in making peaks feel earned.
   if (frames && frames.length > 0) {
     const energyIdx = Math.min(Math.max(0, frame), frames.length - 1);
     const energy = computeSmoothedEnergy(frames, energyIdx);
