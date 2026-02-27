@@ -15,7 +15,6 @@ import { seeded } from "../utils/seededRandom";
 const STICKER_TEXTS = [
   "What a long strange trip it's been",
   "Keep on truckin'",
-  "Steal Your Face",
   "Not all who wander are lost",
   "Further",
   "NFA",
@@ -54,7 +53,7 @@ const MOTION_TYPES: MotionType[] = [
 
 // -- Timing -----------------------------------------------------------------
 
-const STICKER_CYCLE = 1200; // 40 seconds between stickers
+const STICKER_CYCLE = 3600; // 2 minutes between stickers
 const STICKER_LIFETIME = 300; // 10 seconds on screen (travel time)
 
 // -- Schedule ---------------------------------------------------------------

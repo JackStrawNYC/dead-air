@@ -100,9 +100,9 @@ const CROSSFADE_FRAMES = 180;
 
 /** Overlay count ranges by section energy */
 const ENERGY_COUNTS: Record<string, { min: number; max: number }> = {
-  low:  { min: 2, max: 3 },
-  mid:  { min: 3, max: 4 },
-  high: { min: 4, max: 5 },
+  low:  { min: 1, max: 2 },
+  mid:  { min: 2, max: 3 },
+  high: { min: 3, max: 4 },
 };
 
 /** Score penalty for overlays used in the previous window */

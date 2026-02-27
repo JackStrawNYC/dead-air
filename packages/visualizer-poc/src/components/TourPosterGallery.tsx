@@ -76,10 +76,10 @@ const STATIC_POSTERS: PosterDesign[] = [
     },
   },
   {
-    bandLine: "JERRY GARCIA & THE DEAD",
-    venueLine: "Winterland Arena",
-    dateLine: "New Year's Eve",
-    extraLine: "One Night Only",
+    bandLine: "THE GRATEFUL DEAD",
+    venueLine: "Barton Hall",
+    dateLine: "Ithaca, New York — 1977",
+    extraLine: "Cornell University Spring Concert",
     colorScheme: {
       bg: "rgba(8, 20, 10, 0.85)",
       border: "#76FF03",

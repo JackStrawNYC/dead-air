@@ -8,7 +8,7 @@
  * prop is provided, ALL overlays render (backwards compatible).
  */
 
-import React, { useMemo } from "react";
+import React, { Suspense, useMemo } from "react";
 import { Audio, Img, staticFile, useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
 import { SceneRouter } from "./scenes/SceneRouter";
 import { OVERLAY_COMPONENTS } from "./data/overlay-components";
@@ -24,6 +24,7 @@ import { loadAnalysis, getSections } from "./data/analysis-loader";
 import type { SetlistEntry, ShowSetlist, TrackAnalysis } from "./data/types";
 import { ShowContextProvider, getShowSeed } from "./data/ShowContext";
 import { VisualizerErrorBoundary } from "./components/VisualizerErrorBoundary";
+import { SilentErrorBoundary } from "./components/SilentErrorBoundary";
 import { SongPaletteProvider, paletteHueRotation } from "./data/SongPaletteContext";
 import { EraGrade } from "./components/EraGrade";
 
@@ -249,7 +250,11 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
                       pointerEvents: "none",
                     }}
                   >
-                    <Component frames={f} />
+                    <Suspense fallback={null}>
+                      <SilentErrorBoundary name={name}>
+                        <Component frames={f} />
+                      </SilentErrorBoundary>
+                    </Suspense>
                   </div>
                 );
               })}
@@ -265,7 +270,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
           setNumber={props.song.set}
           trackNumber={props.song.trackNumber}
         />
-        <FilmGrain opacity={0.06} />
+        <FilmGrain opacity={0.10} />
       </div>
       </VisualizerErrorBoundary>
       </ShowContextProvider>
