@@ -14,13 +14,15 @@ import { useCurrentFrame } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
 import { computeSmoothedEnergy, energyToFactor } from "../utils/energy";
 import { computeAudioSnapshot } from "../utils/audio-reactive";
+import type { ClimaxModulation } from "../utils/climax-state";
 
 interface Props {
   frames: EnhancedFrameData[];
   children: React.ReactNode;
+  climaxMod?: ClimaxModulation;
 }
 
-export const EnergyEnvelope: React.FC<Props> = ({ frames, children }) => {
+export const EnergyEnvelope: React.FC<Props> = ({ frames, children, climaxMod }) => {
   const frame = useCurrentFrame();
   const idx = Math.min(Math.max(0, frame), frames.length - 1);
 
@@ -40,13 +42,13 @@ export const EnergyEnvelope: React.FC<Props> = ({ frames, children }) => {
   // Flatness: tonal passages slightly richer, noisy passages slightly flatter
   const flatnessSaturation = 0.02 - snapshot.flatness * 0.06; // +2% to -4%
 
-  // Modulation ranges (all subtle), now with multi-field additions
-  const saturation = 0.92 + factor * 0.16 + flatnessSaturation; // 0.88 → 1.10
-  const brightness = 0.97 + factor * 0.06 + onsetBrightness;    // 0.97 → 1.07
+  // Modulation ranges (all subtle), now with multi-field + climax additions
+  const saturation = 0.92 + factor * 0.16 + flatnessSaturation + (climaxMod?.saturationOffset ?? 0);
+  const brightness = 0.97 + factor * 0.06 + onsetBrightness + (climaxMod?.brightnessOffset ?? 0);
   const contrast = 0.98 + factor * 0.06;                        // 0.98 → 1.04
   const hueRotate = 3 - factor * 6 + centroidHueOffset;         // ±7deg
-  const vignetteOpacity = 0.05 + factor * 0.17;                 // 0.05 → 0.22
-  const bloomOpacity = factor * 0.08;                            // 0 → 0.08
+  const vignetteOpacity = 0.05 + factor * 0.17 + (climaxMod?.vignetteOffset ?? 0);
+  const bloomOpacity = factor * 0.08 + (climaxMod?.bloomOffset ?? 0);
 
   const filterStr = `saturate(${saturation.toFixed(3)}) brightness(${brightness.toFixed(3)}) contrast(${contrast.toFixed(3)}) hue-rotate(${hueRotate.toFixed(1)}deg)`;
 

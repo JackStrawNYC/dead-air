@@ -28,8 +28,26 @@ import { SilentErrorBoundary } from "./components/SilentErrorBoundary";
 import { SongPaletteProvider, paletteHueRotation } from "./data/SongPaletteContext";
 import { EraGrade } from "./components/EraGrade";
 import { EnergyEnvelope } from "./components/EnergyEnvelope";
+import { computeClimaxState, climaxModulation } from "./utils/climax-state";
+
+import type { RotationSchedule } from "./data/overlay-rotation";
 
 const FADE_FRAMES = 90; // 3 seconds at 30fps
+
+/** Apply climax density multiplier to overlay opacities (skips always-active) */
+function applyDensityMult(
+  opacities: Record<string, number>,
+  mult: number,
+  schedule: RotationSchedule,
+): Record<string, number> {
+  if (mult === 1) return opacities;
+  const alwaysSet = new Set(schedule.alwaysActive);
+  const result: Record<string, number> = {};
+  for (const [name, opacity] of Object.entries(opacities)) {
+    result[name] = alwaysSet.has(name) ? opacity : opacity * mult;
+  }
+  return result;
+}
 
 // ─── Song Art Phases ───
 const ART_FULL_END = 120;      // 4s at 30fps — full opacity title card
@@ -155,8 +173,8 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
     return buildRotationSchedule(props.activeOverlays, sects, props.song.trackId, showSeed);
   }, [props.activeOverlays, analysis, props.song.trackId, showSeed]);
 
-  // Per-frame overlay opacities
-  const opacityMap = rotationSchedule
+  // Per-frame overlay opacities (densityMult applied after climax state computed below)
+  const opacityMapBase = rotationSchedule
     ? getOverlayOpacities(frame, rotationSchedule, analysis?.frames)
     : null;
 
@@ -190,6 +208,15 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
   const tempo = analysis.meta.tempo ?? 120;
   const f = analysis.frames;
 
+  // Climax/release state machine — emotional arc modulation
+  const climaxState = computeClimaxState(f, frame, sections);
+  const climaxMod = climaxModulation(climaxState);
+
+  // Apply climax density multiplier to overlay opacities
+  const opacityMap = opacityMapBase
+    ? applyDensityMult(opacityMapBase, climaxMod.overlayDensityMult, rotationSchedule!)
+    : null;
+
   // Fade in/out for set break transitions
   const fadeIn = interpolate(frame, [0, FADE_FRAMES], [0, 1], {
     extrapolateLeft: "clamp",
@@ -209,7 +236,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
       <VisualizerErrorBoundary>
       <div style={{ position: "absolute", inset: 0, opacity }}>
         <EraGrade>
-        <EnergyEnvelope frames={f}>
+        <EnergyEnvelope frames={f} climaxMod={climaxMod}>
           {/* ═══ Layer 0: Base shader visualization ═══ */}
           <SceneRouter
             frames={f}
