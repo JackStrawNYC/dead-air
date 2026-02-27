@@ -113,7 +113,7 @@ export const PlasmaBall: React.FC<Props> = ({ frames }) => {
         {/* Tendrils */}
         {tendrils.map((t, i) => {
           const rng = seeded(frame * 3 + i * 137);
-          const flicker = 0.4 + rng() * 0.6 + snap.onsetEnvelope * 0.3;
+          const flicker = 0.4 + rng() * 0.6 + snap.onsetEnvelope * 0.6;
           if (flicker < 0.3) return null; // Random dropout for flickering effect
 
           const reach = maxReach * t.lengthFactor * energy * 3;

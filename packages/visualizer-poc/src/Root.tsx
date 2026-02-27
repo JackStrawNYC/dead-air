@@ -1,8 +1,9 @@
 import React from "react";
-import { Composition, useVideoConfig } from "remotion";
+import { Composition } from "remotion";
 import { SongVisualizer, SongVisualizerProps } from "./SongVisualizer";
 import { ShowIntro } from "./components/ShowIntro";
 import { ChapterCard } from "./components/ChapterCard";
+import { SetBreakCard } from "./components/SetBreakCard";
 import { EndCard } from "./components/EndCard";
 import type { SetlistEntry, ShowSetlist, OverlaySchedule } from "./data/types";
 import { formatDateLong } from "./data/ShowContext";
@@ -21,7 +22,7 @@ try {
 const setlist = setlistData as ShowSetlist;
 
 const DEFAULT_FRAMES = 31417; // Morning Dew fallback
-const SET_BREAK_FRAMES = 150; // 5 seconds at 30fps
+const SET_BREAK_FRAMES = 300; // 10 seconds at 30fps
 const SHOW_INTRO_FRAMES = 465; // ~15.5s at 30fps (7s video + 2s crossfade + 5s poster hold + 1.5s fade)
 const CHAPTER_CARD_FRAMES = 180; // 6 seconds at 30fps
 const END_CARD_FRAMES = 360;     // 12 seconds at 30fps
@@ -33,15 +34,9 @@ const ShowIntroComponent = ShowIntro as React.ComponentType<any>;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const ChapterCardComponent = ChapterCard as React.ComponentType<any>;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
+const SetBreakCardComponent = SetBreakCard as React.ComponentType<any>;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const EndCardComponent = EndCard as React.ComponentType<any>;
-
-/** SetBreak — 5-second black gap between sets */
-const SetBreak: React.FC = () => {
-  const { width, height } = useVideoConfig();
-  return (
-    <div style={{ width, height, backgroundColor: "#000" }} />
-  );
-};
 
 /** Get activeOverlays for a given trackId from the schedule */
 function getActiveOverlays(trackId: string): string[] | undefined {
@@ -124,14 +119,19 @@ export const Root: React.FC = () => {
         );
       })}
 
-      {/* Set break compositions for between-set gaps */}
+      {/* Set break — cinematic interstitial between sets */}
       <Composition
         id="SetBreak"
-        component={SetBreak}
+        component={SetBreakCardComponent}
         durationInFrames={SET_BREAK_FRAMES}
         fps={30}
         width={1920}
         height={1080}
+        defaultProps={{
+          venue: setlist.venue,
+          date: formatDateLong(setlist.date),
+          setNumber: 1,
+        }}
       />
 
       {/* End card composition */}

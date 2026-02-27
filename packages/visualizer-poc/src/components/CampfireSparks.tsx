@@ -115,7 +115,7 @@ export const CampfireSparks: React.FC<Props> = ({ frames }) => {
   });
 
   // Visible count scales with energy + onset burst (×1.3 on transients)
-  const onsetCountBoost = 1 + snap.onsetEnvelope * 0.3;
+  const onsetCountBoost = 1 + snap.onsetEnvelope * 0.6;
   const visibleCount = Math.min(MAX_SPARKS, Math.round(interpolate(energy, [0.03, 0.35], [MIN_SPARKS, MAX_SPARKS], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",

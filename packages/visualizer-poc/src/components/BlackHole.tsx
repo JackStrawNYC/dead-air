@@ -227,7 +227,7 @@ export const BlackHole: React.FC<Props> = ({ frames }) => {
           stroke="rgba(200,120,255,0.4)"
           strokeWidth={2}
           filter="url(#bh-intense-glow)"
-          opacity={0.5 + energy * 0.5 + snap.onsetEnvelope * 0.3}
+          opacity={0.5 + energy * 0.5 + snap.onsetEnvelope * 0.6}
         />
 
         {/* Relativistic jet hint (faint vertical beams) */}

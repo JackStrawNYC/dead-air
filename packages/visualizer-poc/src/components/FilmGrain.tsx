@@ -21,16 +21,20 @@ function mulberry32(seed: number) {
   };
 }
 
-export const FilmGrain: React.FC<Props> = ({ opacity = 0.06 }) => {
+export const FilmGrain: React.FC<Props> = ({ opacity = 0.20 }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
 
   // feTurbulence seed changes every frame for grain variation
   const grainSeed = frame * 31337;
 
-  // Breathing opacity: gentle 3-second cycle (0.85–1.0 range)
-  const breathe = 0.85 + 0.15 * Math.sin(frame * Math.PI / 45);
+  // Breathing opacity: gentle 3-second cycle (0.85–1.15 range)
+  const breathe = 0.85 + 0.30 * Math.sin(frame * Math.PI / 45);
   const finalOpacity = opacity * breathe;
+
+  // Gate weave — sub-pixel sine offset simulating projector gate instability
+  const weaveX = Math.sin(frame * 0.037) * 0.8;
+  const weaveY = Math.cos(frame * 0.029) * 0.6;
 
   // Static noise dots — only depend on viewport size, not frame
   const dots = useMemo(() => {
@@ -59,6 +63,8 @@ export const FilmGrain: React.FC<Props> = ({ opacity = 0.06 }) => {
         pointerEvents: "none",
         zIndex: 90,
         mixBlendMode: "overlay",
+        transform: `translate(${weaveX.toFixed(2)}px, ${weaveY.toFixed(2)}px)`,
+        willChange: "transform",
       }}
     >
       <filter id={`grain-${frame}`}>

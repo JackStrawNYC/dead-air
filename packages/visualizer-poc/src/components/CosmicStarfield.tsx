@@ -96,7 +96,7 @@ export const CosmicStarfield: React.FC<Props> = ({ frames }) => {
           if (alpha < 0.05) return null;
 
           // Blend star hue 20% toward chroma-derived hue
-          const blendedHue = star.hue * 0.8 + snap.chromaHue * 0.2;
+          const blendedHue = star.hue * 0.8 + snap.chromaHue * 0.55;
           const color = `hsla(${blendedHue}, 80%, ${70 + energy * 20}%, ${alpha})`;
           const glowColor = `hsla(${blendedHue}, 100%, 80%, ${alpha * 0.5})`;
 

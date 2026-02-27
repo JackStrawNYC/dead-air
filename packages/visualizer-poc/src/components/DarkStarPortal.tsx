@@ -211,7 +211,7 @@ export const DarkStarPortal: React.FC<Props> = ({ frames }) => {
           cy={cy}
           r={(voidRadius + 8) * formScale}
           fill="none"
-          stroke={`hsla(270, 100%, 80%, ${glowIntensity * 0.6 + snap.onsetEnvelope * 0.3})`}
+          stroke={`hsla(270, 100%, 80%, ${glowIntensity * 0.6 + snap.onsetEnvelope * 0.6})`}
           strokeWidth={3 + energy * 4 + snap.onsetEnvelope * 3}
           style={{ filter: `drop-shadow(0 0 ${10 + glowIntensity * 15}px hsla(270, 100%, 75%, ${glowIntensity * 0.8}))` }}
         />
