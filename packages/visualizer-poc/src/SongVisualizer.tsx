@@ -137,6 +137,10 @@ export interface SongVisualizerProps {
   activeOverlays?: string[];
   /** Full show setlist (for ShowContext) */
   show?: ShowSetlist;
+  /** Previous song segues into this one — skip fade-in + song art */
+  segueIn?: boolean;
+  /** This song segues into the next — skip fade-out */
+  segueOut?: boolean;
 }
 
 export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
@@ -217,12 +221,12 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
     ? applyDensityMult(opacityMapBase, climaxMod.overlayDensityMult, rotationSchedule!)
     : null;
 
-  // Fade in/out for set break transitions
-  const fadeIn = interpolate(frame, [0, FADE_FRAMES], [0, 1], {
+  // Fade in/out for set break transitions (segues skip the fade)
+  const fadeIn = props.segueIn ? 1 : interpolate(frame, [0, FADE_FRAMES], [0, 1], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
-  const fadeOut = interpolate(
+  const fadeOut = props.segueOut ? 1 : interpolate(
     frame,
     [durationInFrames - FADE_FRAMES, durationInFrames],
     [1, 0],
@@ -245,8 +249,8 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
             tempo={tempo}
           />
 
-          {/* ═══ Layer 0.5: Per-song poster art ═══ */}
-          {props.song.songArt && (
+          {/* ═══ Layer 0.5: Per-song poster art (skipped on segue-in) ═══ */}
+          {props.song.songArt && !props.segueIn && (
             <SongArtLayer src={staticFile(props.song.songArt)} />
           )}
 
@@ -257,7 +261,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
               style={{
                 position: "absolute",
                 inset: 0,
-                opacity: props.song.songArt
+                opacity: props.song.songArt && !props.segueIn
                   ? interpolate(frame, [ART_FULL_END, ART_FULL_END + 90], [0, 1], {
                       extrapolateLeft: "clamp",
                       extrapolateRight: "clamp",

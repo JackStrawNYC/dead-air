@@ -93,29 +93,37 @@ export const Root: React.FC = () => {
       ))}
 
       {/* Per-song compositions */}
-      {setlist.songs.map((song: SetlistEntry) => (
-        <Composition
-          key={song.trackId}
-          id={song.trackId}
-          component={SongVisualizerComponent}
-          durationInFrames={DEFAULT_FRAMES}
-          fps={30}
-          width={1920}
-          height={1080}
-          defaultProps={{
-            song,
-            activeOverlays: getActiveOverlays(song.trackId),
-            show: setlist,
-          } satisfies SongVisualizerProps as Record<string, unknown>}
-          calculateMetadata={async ({ props }) => {
-            const meta = props.meta as { totalFrames?: number } | undefined;
-            if (meta?.totalFrames) {
-              return { durationInFrames: meta.totalFrames };
-            }
-            return { durationInFrames: DEFAULT_FRAMES };
-          }}
-        />
-      ))}
+      {setlist.songs.map((song: SetlistEntry, i: number) => {
+        const prevSong = i > 0 ? setlist.songs[i - 1] : null;
+        const segueIn = !!(prevSong?.segueInto && prevSong.set === song.set);
+        const segueOut = !!song.segueInto;
+
+        return (
+          <Composition
+            key={song.trackId}
+            id={song.trackId}
+            component={SongVisualizerComponent}
+            durationInFrames={DEFAULT_FRAMES}
+            fps={30}
+            width={1920}
+            height={1080}
+            defaultProps={{
+              song,
+              segueIn,
+              segueOut,
+              activeOverlays: getActiveOverlays(song.trackId),
+              show: setlist,
+            } satisfies SongVisualizerProps as Record<string, unknown>}
+            calculateMetadata={async ({ props }) => {
+              const meta = props.meta as { totalFrames?: number } | undefined;
+              if (meta?.totalFrames) {
+                return { durationInFrames: meta.totalFrames };
+              }
+              return { durationInFrames: DEFAULT_FRAMES };
+            }}
+          />
+        );
+      })}
 
       {/* Set break compositions for between-set gaps */}
       <Composition

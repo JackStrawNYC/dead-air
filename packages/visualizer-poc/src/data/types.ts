@@ -124,6 +124,8 @@ export interface SetlistEntry {
   overlayOverrides?: OverlayOverrides;
   /** Path to per-song poster art (relative to public/) */
   songArt?: string;
+  /** This song flows directly into the next (segue) — no fade-out, next song skips fade-in + art */
+  segueInto?: boolean;
 }
 
 /** Manual overlay overrides per song */
