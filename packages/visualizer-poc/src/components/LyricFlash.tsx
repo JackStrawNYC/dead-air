@@ -8,11 +8,11 @@ import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
 import { seeded } from "../utils/seededRandom";
 
+// Pre-1977 Dead lyrics only — no anachronistic songs for '77 shows
 const LYRICS = [
   "What a long strange trip it's been",
   "Ripple in still water",
   "Once in a while you get shown the light",
-  "Every silver lining's got a touch of grey",
   "Shall we go, you and I, while we can?",
   "Nothing left to do but smile, smile, smile",
   "Driving that train, high on cocaine",
@@ -21,19 +21,17 @@ const LYRICS = [
   "If I knew the way, I would take you home",
   "Without love in the dream it will never come true",
   "Sometimes the light's all shining on me",
-  "I will get by, I will survive",
   "Such a long long time to be gone, and a short time to be there",
-  "Standing on the moon with nothing left to do",
   "Believe it if you need it, if you don't just pass it on",
-  "Row, row, row your boat gently down the stream",
   "Into the closing of my mind",
   "Let it be known there is a fountain that was not made by the hands of men",
-  "Fare you well, fare you well, I love you more than words can tell",
   "Going where the wind don't blow so strange",
   "There is a road, no simple highway",
   "In the land of the dark the ship of the sun is drawn by the Grateful Dead",
   "Comes a time when the blind man takes your hand",
   "The bus came by and I got on, that's when it all began",
+  "Ain't no time to hate, barely time to wait",
+  "Saint Stephen with a rose, in and out of the garden he goes",
 ];
 
 const CYCLE = 1350; // 45 seconds
@@ -84,7 +82,7 @@ export const LyricFlash: React.FC<Props> = ({ frames }) => {
 
   const scale = 1 + energy * 0.15;
   const yOffset = Math.sin(frame * 0.03) * 8;
-  const fontSize = lyric.length > 40 ? 42 : lyric.length > 25 ? 52 : 64;
+  const fontSize = lyric.length > 40 ? 30 : lyric.length > 25 ? 36 : 42;
 
   return (
     <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden" }}>
@@ -103,11 +101,9 @@ export const LyricFlash: React.FC<Props> = ({ frames }) => {
           fontStyle: "italic",
           color,
           textShadow: `
-            0 0 10px ${color},
-            0 0 20px ${color},
-            0 0 40px ${color},
-            0 0 80px ${color2},
-            0 0 120px ${color2}
+            0 0 8px ${color},
+            0 0 16px ${color},
+            0 0 30px ${color2}
           `,
           letterSpacing: 2,
           lineHeight: 1.3,

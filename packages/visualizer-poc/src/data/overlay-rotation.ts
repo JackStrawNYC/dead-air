@@ -92,21 +92,32 @@ const ACCENT_CONFIG: Record<string, AccentConfig | null> = {
 
 // ─── Constants ───
 
-/** Target window duration in frames (~60 seconds at 30fps) */
-const WINDOW_FRAMES = 1800;
+/** Target window duration in frames by energy (~90s low, ~75s mid, ~60s high at 30fps) */
+const WINDOW_FRAMES_BY_ENERGY: Record<string, number> = {
+  low:  2700,  // 90 seconds — let it breathe
+  mid:  2250,  // 75 seconds
+  high: 1800,  // 60 seconds — faster rotation at high energy
+};
+const WINDOW_FRAMES_DEFAULT = 2250;
 
-/** Crossfade duration at window boundaries */
-const CROSSFADE_FRAMES = 180;
+/** Crossfade duration at window boundaries (10 seconds for smooth flow) */
+const CROSSFADE_FRAMES = 300;
 
 /** Overlay count ranges by section energy */
 const ENERGY_COUNTS: Record<string, { min: number; max: number }> = {
-  low:  { min: 1, max: 2 },
-  mid:  { min: 2, max: 3 },
-  high: { min: 3, max: 4 },
+  low:  { min: 2, max: 4 },
+  mid:  { min: 3, max: 5 },
+  high: { min: 4, max: 6 },
 };
 
 /** Score penalty for overlays used in the previous window */
 const REPEAT_PENALTY = 0.6;
+
+/** Score bonus for overlays from a short previous window (encourages persistence) */
+const CARRYOVER_BONUS = 0.4;
+
+/** Windows shorter than this get carryover instead of repeat-penalty (30 seconds) */
+const MIN_WINDOW_FOR_ROTATION = 900;
 
 // ─── smoothstep for crossfades ───
 
@@ -147,11 +158,12 @@ export function buildRotationSchedule(
     if (entry) poolEntries.push(entry);
   }
 
-  // 3. Subdivide sections into ~WINDOW_FRAMES windows, aligned to section boundaries
+  // 3. Subdivide sections into energy-aware windows, aligned to section boundaries
   const windows: RotationWindow[] = [];
   for (const section of sections) {
     const sectionLen = section.frameEnd - section.frameStart;
-    const windowCount = Math.max(1, Math.round(sectionLen / WINDOW_FRAMES));
+    const targetWindowFrames = WINDOW_FRAMES_BY_ENERGY[section.energy] ?? WINDOW_FRAMES_DEFAULT;
+    const windowCount = Math.max(1, Math.round(sectionLen / targetWindowFrames));
     const windowLen = Math.floor(sectionLen / windowCount);
 
     for (let w = 0; w < windowCount; w++) {
@@ -170,9 +182,11 @@ export function buildRotationSchedule(
 
   // 4. Select overlays per window
   let previousWindowOverlays = new Set<string>();
+  let previousWindowFrames = 0;
 
   for (let wi = 0; wi < windows.length; wi++) {
     const window = windows[wi];
+    const windowFrames = window.frameEnd - window.frameStart;
     const rng = seededRandom(trackHash + wi * 7919); // unique seed per window
 
     const energyRange = ENERGY_COUNTS[window.energy] ?? ENERGY_COUNTS.mid;
@@ -210,9 +224,14 @@ export function buildRotationSchedule(
       if (window.energy === "high" && entry.weight >= 2) score += 0.15;
       if (window.energy === "low" && entry.weight === 3) score -= 0.25;
 
-      // No-repeat penalty
+      // Carryover vs repeat: if previous window was too short for the overlay
+      // to register visually, encourage it to persist instead of penalizing
       if (previousWindowOverlays.has(entry.name)) {
-        score -= REPEAT_PENALTY;
+        if (previousWindowFrames < MIN_WINDOW_FOR_ROTATION) {
+          score += CARRYOVER_BONUS;
+        } else {
+          score -= REPEAT_PENALTY;
+        }
       }
 
       // Deterministic jitter
@@ -269,6 +288,7 @@ export function buildRotationSchedule(
 
     window.overlays = selected.map((e) => e.name);
     previousWindowOverlays = selectedNames;
+    previousWindowFrames = windowFrames;
   }
 
   // 5. Accent selection — pull eligible overlays out of rotation into accent map
@@ -375,17 +395,21 @@ export function getOverlayOpacities(
   const prevSet = prevWindow ? new Set(prevWindow.overlays) : new Set<string>();
   const nextSet = nextWindow ? new Set(nextWindow.overlays) : new Set<string>();
 
-  // Compute opacity for each overlay in the current window
+  // Compute opacity for each overlay in the current window.
+  // Crossfades are centered on window boundaries using the full CROSSFADE_FRAMES
+  // span so both sides of the boundary compute the same value (no discontinuity).
   for (const name of currentWindow.overlays) {
     let opacity = 1;
 
     if (inFadeIn && !prevSet.has(name)) {
-      // This overlay is new (not in prev window) — fade it in
-      opacity = smoothstep(0, halfCrossfade, distFromStart);
+      // This overlay is new (not in prev window) — crossfade centered on start boundary
+      const boundary = currentWindow.frameStart;
+      opacity = smoothstep(boundary - halfCrossfade, boundary + halfCrossfade, frame);
     }
     if (inFadeOut && !nextSet.has(name)) {
-      // This overlay is leaving (not in next window) — fade it out
-      const fadeOutOpacity = smoothstep(0, halfCrossfade, distFromEnd);
+      // This overlay is leaving (not in next window) — crossfade centered on end boundary
+      const boundary = currentWindow.frameEnd;
+      const fadeOutOpacity = 1 - smoothstep(boundary - halfCrossfade, boundary + halfCrossfade, frame);
       opacity = Math.min(opacity, fadeOutOpacity);
     }
 
@@ -394,20 +418,22 @@ export function getOverlayOpacities(
 
   // Handle outgoing overlays from previous window during fade-in zone
   if (inFadeIn && prevWindow) {
+    const boundary = currentWindow.frameStart;
     for (const name of prevWindow.overlays) {
       if (!currentSet.has(name) && result[name] === undefined) {
-        // Fading out overlay from previous window
-        result[name] = 1 - smoothstep(0, halfCrossfade, distFromStart);
+        // Fading out overlay from previous window — same boundary-centered crossfade
+        result[name] = 1 - smoothstep(boundary - halfCrossfade, boundary + halfCrossfade, frame);
       }
     }
   }
 
   // Handle incoming overlays from next window during fade-out zone
   if (inFadeOut && nextWindow) {
+    const boundary = currentWindow.frameEnd;
     for (const name of nextWindow.overlays) {
       if (!currentSet.has(name) && result[name] === undefined) {
-        // Fading in overlay from next window
-        result[name] = 1 - smoothstep(0, halfCrossfade, distFromEnd);
+        // Fading in overlay from next window — same boundary-centered crossfade
+        result[name] = smoothstep(boundary - halfCrossfade, boundary + halfCrossfade, frame);
       }
     }
   }

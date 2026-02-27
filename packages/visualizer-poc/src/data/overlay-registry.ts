@@ -391,6 +391,13 @@ const ENABLED_OVERLAYS = new Set([
   "ChromaticAberration", "VHSGlitch", "FilmBurn", "VinylGrooves", "FilmGrain",
 ]);
 
+// ─── Parametric Overlays (50 variants across 7 families) ───
+import { PARAMETRIC_REGISTRY_ENTRIES } from "../components/parametric";
+for (const entry of PARAMETRIC_REGISTRY_ENTRIES) {
+  OVERLAY_REGISTRY.push(entry);
+  ENABLED_OVERLAYS.add(entry.name);
+}
+
 /** Registry filtered to only Dead-aesthetic overlays — used by the selector */
 export const SELECTABLE_REGISTRY = OVERLAY_REGISTRY.filter(
   (e) => ENABLED_OVERLAYS.has(e.name),

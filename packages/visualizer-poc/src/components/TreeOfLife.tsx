@@ -12,8 +12,8 @@ import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
 import { seeded } from "../utils/seededRandom";
 
-const CYCLE = 2250; // 75s at 30fps
-const DURATION = 480; // 16s
+/** Growth animation duration — tree grows to full size over this many frames */
+const GROWTH_DURATION = 480; // 16s to fully grow
 const MAX_DEPTH = 7;
 const BASE_LENGTH = 90;
 const LENGTH_DECAY = 0.72;
@@ -118,28 +118,22 @@ export const TreeOfLife: React.FC<Props> = ({ frames }) => {
 
   const tree = React.useMemo(() => generateTree(19671967), []);
 
-  // Timing gate
-  const cycleFrame = frame % CYCLE;
-  if (cycleFrame >= DURATION) return null;
-
-  const progress = cycleFrame / DURATION;
-  const fadeIn = interpolate(progress, [0, 0.06], [0, 1], {
+  // Growth: tree grows over GROWTH_DURATION frames, then stays fully grown.
+  // The rotation system handles appearance/disappearance via opacity crossfades.
+  const growthFrame = Math.min(frame, GROWTH_DURATION);
+  const fadeIn = interpolate(growthFrame, [0, 30], [0, 1], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
     easing: Easing.out(Easing.cubic),
   });
-  const fadeOut = interpolate(progress, [0.9, 1], [1, 0], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
-  const masterOpacity = Math.min(fadeIn, fadeOut) * (0.5 + energy * 0.35);
+  const masterOpacity = fadeIn * (0.5 + energy * 0.35);
 
   // Tree position: bottom-center
   const treeBaseX = width * 0.5;
   const treeBaseY = height * 0.88;
 
-  // Growth: which depth level is currently visible based on cycleFrame
-  const growthProgress = cycleFrame / GROWTH_FRAMES_PER_LEVEL;
+  // Growth: which depth level is currently visible
+  const growthProgress = growthFrame / GROWTH_FRAMES_PER_LEVEL;
   const currentMaxDepth = Math.min(MAX_DEPTH, growthProgress);
 
   // Sway: slight wind effect
@@ -207,8 +201,7 @@ export const TreeOfLife: React.FC<Props> = ({ frames }) => {
           })}
 
           {/* Leaves/flowers at tips when energy > 0.15 */}
-          {energy > 0.15 &&
-            tree
+          {tree
               .filter((b) => b.isLeaf && b.depth <= currentMaxDepth)
               .map((branch, i) => {
                 const leafGrowth =
@@ -225,7 +218,7 @@ export const TreeOfLife: React.FC<Props> = ({ frames }) => {
                 const leafColor = LEAF_COLORS[branch.index % LEAF_COLORS.length];
                 const pulse =
                   (Math.sin(frame * 0.06 + branch.index * 1.1) + 1) * 0.5;
-                const leafRadius = (2 + pulse * 2 + energy * 3) * leafGrowth;
+                const leafRadius = (2.5 + pulse * 1.5 + energy * 3) * leafGrowth;
 
                 return (
                   <g key={`leaf${i}`}>

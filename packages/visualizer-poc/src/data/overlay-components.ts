@@ -701,3 +701,7 @@ export const OVERLAY_COMPONENTS: Record<string, OverlayComponentEntry> = {
   Screensaver:         { Component: Screensaver, layer: 10 },
   MatrixRain:          { Component: MatrixRain, layer: 10 },
 };
+
+// ─── Parametric Overlays (50 variants across 7 families) ───
+import { PARAMETRIC_COMPONENTS } from "../components/parametric";
+Object.assign(OVERLAY_COMPONENTS, PARAMETRIC_COMPONENTS);
