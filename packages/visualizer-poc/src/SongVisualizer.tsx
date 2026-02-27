@@ -323,7 +323,10 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
       {/* Audio outside error boundary would crash the entire render if file is missing.
           Wrap in its own error boundary so a missing file produces silence, not a crash. */}
       <SilentErrorBoundary name="SongAudio">
-        <Audio src={staticFile(`audio/${props.song.audioFile}`)} />
+        <Audio
+          src={staticFile(`audio/${props.song.audioFile}`)}
+          volume={1}
+        />
       </SilentErrorBoundary>
       </AudioSnapshotProvider>
       </ShowContextProvider>

@@ -22,7 +22,7 @@ const setlist = setlistData as ShowSetlist;
 
 const DEFAULT_FRAMES = 31417; // Morning Dew fallback
 const SET_BREAK_FRAMES = 150; // 5 seconds at 30fps
-const SHOW_INTRO_FRAMES = 300; // 10 seconds at 30fps (5s brand + 5s poster)
+const SHOW_INTRO_FRAMES = 465; // ~15.5s at 30fps (7s video + 2s crossfade + 5s poster hold + 1.5s fade)
 const CHAPTER_CARD_FRAMES = 180; // 6 seconds at 30fps
 const END_CARD_FRAMES = 360;     // 12 seconds at 30fps
 
@@ -73,7 +73,6 @@ export const Root: React.FC = () => {
             posterSrc: setlist.showPoster,
             date: formatDateLong(setlist.date),
             venue: setlist.venue,
-            introAudioSrc: setlist.songs[0]?.audioFile ? `audio/${setlist.songs[0].audioFile}` : undefined,
           }}
         />
       )}

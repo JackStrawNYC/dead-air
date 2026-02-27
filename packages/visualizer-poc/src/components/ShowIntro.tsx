@@ -1,10 +1,10 @@
 /**
  * ShowIntro — Two-phase intro sequence:
  *   Phase 1: Dead Air brand VIDEO (7s) with its own audio
- *   Phase 2: Crossfade to show poster (3s) — video audio fades out,
- *            concert audio fades in underneath
+ *   Phase 2: Crossfade to show poster, hold 5s, fade to black over 1.5s
+ *            Concert audio fades in during poster phase
  *
- * Total duration: 10s (300 frames at 30fps)
+ * Total duration: ~15.5s (465 frames at 30fps)
  */
 
 import React from "react";
@@ -34,8 +34,6 @@ export interface ShowIntroProps {
   date: string;
   /** Venue display string */
   venue: string;
-  /** First song audio file (relative to public/) — fades in during poster phase */
-  introAudioSrc?: string;
 }
 
 export const ShowIntro: React.FC<ShowIntroProps> = ({
@@ -43,7 +41,6 @@ export const ShowIntro: React.FC<ShowIntroProps> = ({
   posterSrc,
   date,
   venue,
-  introAudioSrc,
 }) => {
   const { width, height, durationInFrames } = useVideoConfig();
   const frame = useCurrentFrame();
@@ -97,15 +94,6 @@ export const ShowIntro: React.FC<ShowIntroProps> = ({
     { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
   );
 
-  // ─── Audio: concert audio fades in as poster appears ───
-  const concertAudioVolume = introAudioSrc
-    ? interpolate(
-        frame,
-        [POSTER_START, POSTER_START + CROSSFADE_FRAMES, durationInFrames],
-        [0, 0.06, 0.15],
-        { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
-      )
-    : 0;
 
   return (
     <div style={{ width, height, position: "relative", overflow: "hidden", background: "#000" }}>
@@ -205,10 +193,6 @@ export const ShowIntro: React.FC<ShowIntroProps> = ({
       {/* Brand video audio — fades out as poster appears */}
       <Audio src={staticFile(videoSrc)} volume={videoAudioVolume} />
 
-      {/* Concert audio — fades in during poster phase */}
-      {introAudioSrc && concertAudioVolume > 0 && (
-        <Audio src={staticFile(introAudioSrc)} volume={concertAudioVolume} />
-      )}
     </div>
   );
 };
