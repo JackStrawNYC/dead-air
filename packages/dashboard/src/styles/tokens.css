@@ -1,0 +1,63 @@
+:root {
+  /* Backgrounds */
+  --bg-base: #0d0d0f;
+  --bg-surface: #16161a;
+  --bg-elevated: #1e1e24;
+  --bg-hover: #26262e;
+  --bg-active: #2e2e38;
+
+  /* Text */
+  --text-primary: #e8e8ec;
+  --text-secondary: #a0a0aa;
+  --text-muted: #6e6e7a;
+  --text-inverse: #0d0d0f;
+
+  /* Accent */
+  --amber: #f59e0b;
+  --amber-dim: #92600a;
+  --green: #22c55e;
+  --green-dim: #166534;
+  --blue: #3b82f6;
+  --blue-dim: #1e3a5f;
+  --red: #ef4444;
+  --red-dim: #7f1d1d;
+  --purple: #a855f7;
+
+  /* Borders */
+  --border: #2a2a32;
+  --border-focus: #f59e0b;
+
+  /* Fonts */
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --font-sans: 'Inter', system-ui, sans-serif;
+
+  /* Purple */
+  --purple-dim: #3b1f66;
+
+  /* Spacing scale */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.3);
+  --shadow-md: 0 2px 8px rgba(0,0,0,0.4);
+  --shadow-lg: 0 4px 16px rgba(0,0,0,0.5);
+
+  /* Transitions */
+  --transition-fast: 0.1s ease;
+  --transition-normal: 0.15s ease;
+  --transition-slow: 0.25s ease;
+
+  /* Focus ring */
+  --focus-ring: 0 0 0 2px var(--bg-base), 0 0 0 4px var(--amber);
+
+  /* Sizing */
+  --sidebar-width: 220px;
+  --radius: 6px;
+  --radius-lg: 10px;
+}
