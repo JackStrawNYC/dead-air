@@ -1,7 +1,7 @@
 /**
  * Parametric Overlay Library — barrel export.
  *
- * 50 total variants across 7 parametric component families.
+ * 52 total variants across 7 parametric component families.
  * Exports PARAMETRIC_COMPONENTS (for overlay-components.ts) and
  * PARAMETRIC_REGISTRY_ENTRIES (for overlay-registry.ts).
  */
@@ -117,7 +117,7 @@ export const PARAMETRIC_COMPONENTS: Record<string, OverlayComponentEntry> = {
   SacredPattern_VesicaPiscis:  { Component: SacredPattern_VesicaPiscis, layer: 2 },
   SacredPattern_GoldenSpiral:  { Component: SacredPattern_GoldenSpiral, layer: 2 },
 
-  // DeadMotif (Layer 6) — 8 variants
+  // DeadMotif (Layer 6) — 10 variants
   DeadMotif_SkeletonMarch: { Component: DeadMotif_SkeletonMarch, layer: 6 },
   DeadMotif_BearParade:    { Component: DeadMotif_BearParade, layer: 6 },
   DeadMotif_RoseGarden:    { Component: DeadMotif_RoseGarden, layer: 6 },
@@ -187,7 +187,7 @@ export const PARAMETRIC_REGISTRY_ENTRIES: OverlayEntry[] = [
   { name: "SacredPattern_VesicaPiscis",  layer: 2, category: "sacred", tags: ["cosmic", "contemplative"],        energyBand: "low",  weight: 2 },
   { name: "SacredPattern_GoldenSpiral",  layer: 2, category: "sacred", tags: ["cosmic", "organic"],              energyBand: "mid",  weight: 2 },
 
-  // DeadMotif — 8 variants
+  // DeadMotif — 10 variants
   { name: "DeadMotif_SkeletonMarch", layer: 6, category: "character", tags: ["dead-culture", "festival"],        energyBand: "mid",  weight: 2 },
   { name: "DeadMotif_BearParade",    layer: 6, category: "character", tags: ["dead-culture", "festival"],        energyBand: "mid",  weight: 2 },
   { name: "DeadMotif_RoseGarden",    layer: 6, category: "character", tags: ["dead-culture", "organic"],         energyBand: "low",  weight: 1 },
