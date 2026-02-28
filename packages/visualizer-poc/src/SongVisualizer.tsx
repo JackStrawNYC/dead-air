@@ -26,7 +26,10 @@ import { ShowContextProvider, getShowSeed } from "./data/ShowContext";
 import { VisualizerErrorBoundary } from "./components/VisualizerErrorBoundary";
 import { SilentErrorBoundary } from "./components/SilentErrorBoundary";
 import { SceneVideoLayer } from "./components/SceneVideoLayer";
+import { LyricTriggerLayer } from "./components/LyricTriggerLayer";
 import { resolveMediaForSong } from "./data/media-resolver";
+import { resolveLyricTriggers } from "./data/lyric-trigger-resolver";
+import type { LyricAlignment, LyricTriggerConfig } from "./data/lyric-trigger-resolver";
 import { SongPaletteProvider, paletteHueRotation } from "./data/SongPaletteContext";
 import { TempoProvider } from "./data/TempoContext";
 import { EraGrade } from "./components/EraGrade";
@@ -156,6 +159,10 @@ export interface SongVisualizerProps {
   segueIn?: boolean;
   /** This song segues into the next — skip fade-out */
   segueOut?: boolean;
+  /** Lyric alignment data (injected via calculateMetadata) */
+  lyricAlignment?: LyricAlignment | null;
+  /** Lyric trigger config (injected via calculateMetadata) */
+  lyricTriggerConfig?: LyricTriggerConfig | null;
 }
 
 export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
@@ -213,6 +220,17 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
       props.song.trackId,
     );
   }, [props.song.title, props.song.trackId, showSeed]);
+
+  // Resolve lyric triggers (if alignment + config available)
+  const triggerResult = useMemo(() => {
+    if (!props.lyricAlignment || !props.lyricTriggerConfig) return null;
+    return resolveLyricTriggers(
+      props.song.title,
+      props.song.trackId,
+      props.lyricAlignment,
+      props.lyricTriggerConfig,
+    );
+  }, [props.song.title, props.song.trackId, props.lyricAlignment, props.lyricTriggerConfig]);
 
   // Explicit overrides in setlist.json take priority over auto-resolution
   const effectiveSongArt = props.song.songArt ?? resolvedMedia?.songArt ?? undefined;
@@ -310,6 +328,16 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
               />
             </SilentErrorBoundary>
           )}
+
+          {/* ═══ Layer 0.8: Lyric-triggered visuals ═══ */}
+          {triggerResult?.windows.length ? (
+            <SilentErrorBoundary name="LyricTriggers">
+              <LyricTriggerLayer
+                windows={triggerResult.windows}
+                frames={f}
+              />
+            </SilentErrorBoundary>
+          ) : null}
 
           {/* ═══ Dynamic overlay layers (1-10) ═══ */}
           {/* Hidden during title card, then fade in over 3 seconds */}
