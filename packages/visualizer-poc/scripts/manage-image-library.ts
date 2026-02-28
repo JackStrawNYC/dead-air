@@ -62,7 +62,7 @@ interface ImageLibrary {
 
 // ─── Helpers ───
 
-const IMAGE_EXTS = new Set([".png", ".jpg", ".jpeg", ".webp", ".svg"]);
+const IMAGE_EXTS = new Set([".png", ".jpg", ".jpeg", ".webp"]);
 const VIDEO_EXTS = new Set([".mp4", ".webm", ".mov"]);
 
 function normalizeSongKey(title: string): string {

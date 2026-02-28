@@ -124,9 +124,9 @@ export function resolveMediaForSong(
     }
   }
 
-  // Pick poster: prefer curated image over AI-generated
+  // Pick poster: prefer curated image over AI-generated (exclude SVGs)
   let songArt: string | null = null;
-  const songImages = songEntries.filter((e) => e.type === "image");
+  const songImages = songEntries.filter((e) => e.type === "image" && !e.path.endsWith(".svg"));
   if (songImages.length > 0) {
     // Prefer curated (from Desktop ingest) over AI-generated (from setlist ingest)
     const curated = songImages.find((e) => e.tags.includes("curated-image"));
@@ -159,7 +159,8 @@ export function resolveMediaForSong(
   }
 
   // Priority 3: general images (seeded shuffle, different salt)
-  const generalImages = generalEntries.filter((e) => e.type === "image");
+  // Exclude SVGs — Remotion's <Img> doesn't reliably render them
+  const generalImages = generalEntries.filter((e) => e.type === "image" && !e.path.endsWith(".svg"));
   const shuffledGenImgs = seededShuffle(
     generalImages,
     hashString(trackId) + showSeed + 4217, // different salt

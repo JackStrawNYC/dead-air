@@ -231,7 +231,8 @@ export const SceneVideoLayer: React.FC<SceneVideoLayerProps> = ({
     // Sort windows chronologically for rendering
     result.sort((a, b) => a.frameStart - b.frameStart);
     return result;
-  }, [videos, media, sections, trackId, showSeed, frames]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps — frames is stable (analysis JSON ref)
+  }, [videos, media, sections, trackId, showSeed]);
 
   // Find the active window for the current frame
   const activeWindow = windows.find(
