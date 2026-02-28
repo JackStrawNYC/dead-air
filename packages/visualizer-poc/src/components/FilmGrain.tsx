@@ -9,6 +9,8 @@ import { useCurrentFrame, useVideoConfig } from "remotion";
 
 interface Props {
   opacity?: number;
+  /** Audio energy (0–1) for energy-aware breathing speed */
+  energy?: number;
 }
 
 /** Mulberry32 PRNG */
@@ -21,15 +23,17 @@ function mulberry32(seed: number) {
   };
 }
 
-export const FilmGrain: React.FC<Props> = ({ opacity = 0.20 }) => {
+export const FilmGrain: React.FC<Props> = ({ opacity = 0.20, energy = 0 }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
 
   // feTurbulence seed changes every frame for grain variation
   const grainSeed = frame * 31337;
 
-  // Breathing opacity: gentle 3-second cycle (0.85–1.15 range)
-  const breathe = 0.85 + 0.30 * Math.sin(frame * Math.PI / 45);
+  // Energy-aware breathing: peaks pulse fast (1.5s/45fr), quiet drifts slow (3.5s/105fr)
+  const energyFactor = Math.max(0, Math.min(1, (energy - 0.03) / 0.27));
+  const breathePeriod = 45 + (1 - energyFactor) * 60; // 45 (peak) → 105 (quiet)
+  const breathe = 0.85 + 0.30 * Math.sin(frame * Math.PI / breathePeriod);
   const finalOpacity = opacity * breathe;
 
   // Gate weave — sub-pixel sine offset simulating projector gate instability

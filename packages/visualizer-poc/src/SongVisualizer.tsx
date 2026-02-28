@@ -334,7 +334,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
         <FilmGrain opacity={interpolate(
           audioSnapshot.energy, [0.03, 0.30], [0.15, 0.06],
           { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
-        )} />
+        )} energy={audioSnapshot.energy} />
       </div>
       </VisualizerErrorBoundary>
 

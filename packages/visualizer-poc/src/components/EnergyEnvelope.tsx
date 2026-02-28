@@ -13,6 +13,7 @@ import React from "react";
 import { energyToFactor } from "../utils/energy";
 import type { AudioSnapshot } from "../utils/audio-reactive";
 import { detectTexture, type ClimaxModulation } from "../utils/climax-state";
+import { useShowContext } from "../data/ShowContext";
 
 interface Props {
   /** Pre-computed audio snapshot from SongVisualizer (shared, not recomputed) */
@@ -21,9 +22,20 @@ interface Props {
   climaxMod?: ClimaxModulation;
 }
 
+// Per-era bloom color — matches era grade for visual cohesion
+const ERA_BLOOM: Record<string, string> = {
+  primal:        "rgba(200,150,80,0.18)",    // amber warmth, 16mm film
+  classic:       "rgba(255,220,180,0.15)",   // golden-era warm
+  hiatus:        "rgba(120,160,220,0.12)",   // cool blue, restrained
+  touch_of_grey: "rgba(255,245,230,0.20)",   // bright white, stadium punch
+  revival:       "rgba(220,200,170,0.14)",   // neutral warm
+};
+const DEFAULT_BLOOM = ERA_BLOOM.classic;
+
 export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod }) => {
   const energy = snapshot.energy;
   const factor = energyToFactor(energy); // 0 (quiet) → 1 (loud)
+  const showCtx = useShowContext();
 
   // ── Multi-field modulations (perceptible, not subtle) ──
   // Centroid: low centroid (bass-heavy) = cooler, high centroid (treble) = warmer
@@ -40,13 +52,19 @@ export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod 
     texture === "sparse" ? 0.08 :     // gentle focus during ballad intro
     texture === "peak" ? -0.05 : 0;   // wide open, let the flood breathe
 
-  // Modulation ranges — wider floors for Brightman-style darkness in quiet passages
-  const saturation = 0.65 + factor * 0.55 + flatnessSaturation + (climaxMod?.saturationOffset ?? 0);
-  const brightness = 0.88 + factor * 0.18 + onsetBrightness + (climaxMod?.brightnessOffset ?? 0);
-  const contrast = 0.96 + factor * 0.10;                        // 0.96 → 1.06
+  // Texture-aware saturation offset — Space→grayscale void, peaks→oversaturated ecstasy
+  const textureSaturationOffset =
+    texture === "ambient" ? -0.10 :   // Space: push toward grayscale void
+    texture === "sparse" ? -0.05 :    // ballad intros: restrained
+    texture === "peak" ? +0.08 : 0;   // peaks: oversaturated ecstasy
+
+  // Widened modulation ranges — quiet feels void, peaks feel radiant
+  const saturation = 0.45 + factor * 0.85 + flatnessSaturation + textureSaturationOffset + (climaxMod?.saturationOffset ?? 0);
+  const brightness = 0.82 + factor * 0.24 + onsetBrightness + (climaxMod?.brightnessOffset ?? 0);
+  const contrast = 0.94 + factor * 0.14;                        // 0.94 → 1.08
   const hueRotate = 5 - factor * 10 + centroidHueOffset;        // ±17deg (was ±7)
-  const vignetteOpacity = 0.05 + factor * 0.30 + textureVignetteBonus + (climaxMod?.vignetteOffset ?? 0);
-  const bloomOpacity = factor * 0.14 + (climaxMod?.bloomOffset ?? 0);
+  const vignetteOpacity = 0.08 + factor * 0.42 + textureVignetteBonus + (climaxMod?.vignetteOffset ?? 0);
+  const bloomOpacity = factor * 0.35 + (climaxMod?.bloomOffset ?? 0);
 
   const filterStr = `saturate(${saturation.toFixed(3)}) brightness(${brightness.toFixed(3)}) contrast(${contrast.toFixed(3)}) hue-rotate(${hueRotate.toFixed(1)}deg)`;
 
@@ -66,14 +84,14 @@ export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod 
         }}
       />
 
-      {/* Bloom — warm glow at high energy */}
+      {/* Bloom — era-aware glow at high energy */}
       {bloomOpacity > 0.001 && (
         <div
           style={{
             position: "absolute",
             inset: 0,
             background:
-              "radial-gradient(ellipse at center, rgba(255,220,180,0.15) 0%, transparent 70%)",
+              `radial-gradient(ellipse at center, ${ERA_BLOOM[showCtx?.era ?? ""] ?? DEFAULT_BLOOM} 0%, transparent 70%)`,
             mixBlendMode: "screen",
             opacity: bloomOpacity,
             pointerEvents: "none",
