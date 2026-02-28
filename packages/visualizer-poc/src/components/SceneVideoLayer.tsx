@@ -18,7 +18,7 @@
  */
 
 import React, { useMemo } from "react";
-import { Img, OffthreadVideo, staticFile, useCurrentFrame, interpolate } from "remotion";
+import { Img, OffthreadVideo, Sequence, staticFile, useCurrentFrame, interpolate } from "remotion";
 import type { SceneVideo, SectionBoundary, EnhancedFrameData } from "../data/types";
 import type { ResolvedMedia } from "../data/media-resolver";
 import { seeded } from "../utils/seededRandom";
@@ -267,9 +267,10 @@ export const SceneVideoLayer: React.FC<SceneVideoLayerProps> = ({
     filters.push(`hue-rotate(${hueRotation.toFixed(1)}deg)`);
   }
 
-  // Negative startFrom offsets video so it plays from frame 0 at window start
+  // Window start including fade-in lead time
   const windowStart = activeWindow.frameStart - FADE_FRAMES;
-  const startFrom = -windowStart;
+  // Total display duration (fade-in + display + fade-out)
+  const windowDuration = (activeWindow.frameEnd + FADE_FRAMES) - windowStart;
 
   return (
     <div
@@ -284,16 +285,17 @@ export const SceneVideoLayer: React.FC<SceneVideoLayerProps> = ({
       }}
     >
       {activeWindow.media.mediaType === "video" ? (
-        <OffthreadVideo
-          src={staticFile(activeWindow.media.src)}
-          muted
-          startFrom={startFrom}
-          style={{
-            width: "100%",
-            height: "100%",
-            objectFit: "cover",
-          }}
-        />
+        <Sequence from={windowStart} durationInFrames={windowDuration} layout="none">
+          <OffthreadVideo
+            src={staticFile(activeWindow.media.src)}
+            muted
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+            }}
+          />
+        </Sequence>
       ) : (
         <ImageMediaDisplay
           src={activeWindow.media.src}
