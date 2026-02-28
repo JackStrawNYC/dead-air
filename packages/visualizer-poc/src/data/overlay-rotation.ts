@@ -184,6 +184,37 @@ const MIN_WINDOW_FOR_ROTATION = 900;
  */
 const DROPOUT_MAX_OVERLAYS = 0;
 
+// ─── Texture × Category routing ───
+// Atmospheric overlays dominate jams/space. Structured overlays only during melodic passages.
+
+const ATMOSPHERIC_CATEGORIES = new Set([
+  "atmospheric",  // layer 1: CosmicStarfield, TieDyeWash, SmokeWisps...
+  "sacred",       // layer 2: BreathingStealie, SacredGeometry, DarkStarPortal...
+  "nature",       // layer 5: SolarFlare, Constellation, BlackHole...
+]);
+
+const REACTIVE_CATEGORIES = new Set([
+  "reactive",     // layer 3: WallOfSound, Oscilloscope, StageLights...
+  "geometric",    // layer 4: VortexSpiral, LorenzAttractor, VoronoiFlow...
+  "distortion",   // layer 10: ChromaticAberration, FilmBurn, VHSGlitch...
+]);
+
+const STRUCTURED_CATEGORIES = new Set([
+  "character",    // layer 6: SkeletonBand, BearParade, DeadIcons...
+  "artifact",     // layer 7: PsychedelicBorder, BumperStickers, BootlegLabel...
+  "info",         // layer 8: LyricFlash, GarciaQuotes, MantraScroll...
+  "hud",          // layer 9: NixieTubes, HeartbeatEKG, TerminalPrompt...
+]);
+
+const TEXTURE_CATEGORY_SCORE: Record<string, Record<string, number>> = {
+  ambient:  { atmospheric: +0.35, reactive: -0.25, structured: -0.50 },
+  sparse:   { atmospheric: +0.25, reactive: -0.15, structured: -0.40 },
+  melodic:  { atmospheric: +0.10, reactive: +0.05, structured: +0.15 },
+  building: { atmospheric: +0.05, reactive: +0.10, structured: +0.05 },
+  rhythmic: { atmospheric:  0,    reactive: +0.20, structured: -0.10 },
+  peak:     { atmospheric:  0,    reactive: +0.25, structured: -0.30 },
+};
+
 // ─── smoothstep for crossfades ───
 
 function smoothstep(edge0: number, edge1: number, x: number): number {
@@ -272,6 +303,7 @@ export function buildRotationSchedule(
     let targetCount = energyRange.min + Math.floor(rng() * (energyRange.max - energyRange.min + 1));
 
     // Texture-aware count adjustment: sample midpoint audio
+    let windowTexture: string | null = null;
     if (frames && frames.length > 0) {
       const midFrame = Math.min(
         Math.floor((window.frameStart + window.frameEnd) / 2),
@@ -279,10 +311,10 @@ export function buildRotationSchedule(
       );
       const midSnapshot = computeAudioSnapshot(frames, midFrame);
       const midEnergy = computeSmoothedEnergy(frames, midFrame);
-      const texture = detectTexture(midSnapshot, midEnergy);
-      if (texture === "ambient" || texture === "sparse") {
+      windowTexture = detectTexture(midSnapshot, midEnergy);
+      if (windowTexture === "ambient" || windowTexture === "sparse") {
         targetCount = Math.min(targetCount, 1);
-      } else if (texture === "peak") {
+      } else if (windowTexture === "peak") {
         targetCount += 1;
       }
     }
@@ -319,6 +351,18 @@ export function buildRotationSchedule(
       if (window.isDropout) {
         if (entry.layer <= 2) score += 0.4;
         else score -= 0.3;
+      }
+
+      // Texture × category routing: atmospheric overlays for jams,
+      // structured overlays for melodic passages, reactive for peaks
+      if (windowTexture) {
+        const group = ATMOSPHERIC_CATEGORIES.has(entry.category) ? "atmospheric"
+          : REACTIVE_CATEGORIES.has(entry.category) ? "reactive"
+          : STRUCTURED_CATEGORIES.has(entry.category) ? "structured"
+          : null;
+        if (group) {
+          score += TEXTURE_CATEGORY_SCORE[windowTexture]?.[group] ?? 0;
+        }
       }
 
       // Carryover vs repeat: if previous window was too short for the overlay
