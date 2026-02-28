@@ -1,7 +1,7 @@
 /**
  * GarciaQuotes — Jerry Garcia quotes typed out letter by letter.
- * Typewriter effect, green-on-black terminal aesthetic.
- * One quote every 80s for 10s.
+ * Warm serif italic on transparent background — precious, not persistent.
+ * Once per song, only during quiet passages. Energy-gated.
  */
 
 import React from "react";
@@ -27,10 +27,10 @@ const QUOTES = [
   "There is no shortcut to anywhere worth going.",
 ];
 
-const INITIAL_DELAY = 1200; // 40s — skip the intro clutter
-const CYCLE = 2400;         // 80 seconds between quotes
-const DURATION = 480;       // 16 seconds visible
-const CHARS_PER_FRAME = 0.5; // ~15 chars/sec (faster typing)
+const INITIAL_DELAY = 2400; // 80s — deep enough to feel earned
+const CYCLE = 999999;       // once per song
+const DURATION = 360;       // 12 seconds — shorter is more precious
+const CHARS_PER_FRAME = 0.5; // ~15 chars/sec
 
 interface Props {
   frames: EnhancedFrameData[];
@@ -38,8 +38,8 @@ interface Props {
 
 export const GarciaQuotes: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
-  const { width, height } = useVideoConfig();
 
+  // Rolling energy (75-frame window each side)
   const idx = Math.min(Math.max(0, frame), frames.length - 1);
   let eSum = 0;
   let eCount = 0;
@@ -48,6 +48,9 @@ export const GarciaQuotes: React.FC<Props> = ({ frames }) => {
     eCount++;
   }
   const energy = eCount > 0 ? eSum / eCount : 0;
+
+  // Energy gate: quotes only during quiet passages
+  if (energy > 0.15) return null;
 
   const delayedFrame = frame - INITIAL_DELAY;
   if (delayedFrame < 0) return null;
@@ -62,19 +65,21 @@ export const GarciaQuotes: React.FC<Props> = ({ frames }) => {
   const quote = QUOTES[quoteIdx];
 
   const progress = cycleFrame / DURATION;
+  const fadeIn = interpolate(progress, [0, 0.08], [0, 1], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+    easing: Easing.out(Easing.cubic),
+  });
   const fadeOut = interpolate(progress, [0.85, 1], [1, 0], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
     easing: Easing.in(Easing.cubic),
   });
+  const fadeOpacity = Math.min(fadeIn, fadeOut);
 
   // Typewriter: reveal characters one at a time
   const charsRevealed = Math.floor(cycleFrame * CHARS_PER_FRAME);
   const visibleText = quote.slice(0, Math.min(charsRevealed, quote.length));
-  const showCursor = cycleFrame % 20 < 12; // Blink cursor
-
-  const hue = (120 + Math.sin(frame * 0.01) * 30) % 360; // Green range
-  const color = `hsl(${hue}, 80%, 55%)`;
 
   return (
     <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden" }}>
@@ -85,37 +90,30 @@ export const GarciaQuotes: React.FC<Props> = ({ frames }) => {
           left: "50%",
           transform: "translateX(-50%)",
           maxWidth: "75%",
-          opacity: fadeOut,
-          padding: "16px 24px",
-          background: "rgba(0, 10, 0, 0.6)",
-          borderRadius: 4,
-          border: `1px solid ${color}`,
-          boxShadow: `0 0 15px rgba(0, 255, 0, 0.15)`,
+          opacity: fadeOpacity,
         }}
       >
         <div
           style={{
-            fontFamily: "'Courier New', Courier, monospace",
-            fontSize: 20,
-            color,
-            textShadow: `0 0 6px ${color}, 0 0 12px ${color}`,
-            lineHeight: 1.5,
-            letterSpacing: 0.5,
+            fontFamily: "'Playfair Display', Georgia, serif",
+            fontSize: 18,
+            fontStyle: "italic",
+            color: "rgba(255, 245, 225, 0.75)",
+            textShadow: "0 0 20px rgba(255, 200, 100, 0.15)",
+            lineHeight: 1.6,
+            letterSpacing: 0.3,
           }}
         >
           {visibleText}
-          {showCursor && charsRevealed < quote.length && (
-            <span style={{ opacity: 0.9 }}>_</span>
-          )}
         </div>
         <div
           style={{
             marginTop: 8,
-            fontFamily: "'Courier New', Courier, monospace",
-            fontSize: 12,
-            color,
-            opacity: 0.5,
-            letterSpacing: 1,
+            fontFamily: "'Playfair Display', Georgia, serif",
+            fontSize: 11,
+            fontStyle: "italic",
+            color: "rgba(255, 245, 225, 0.45)",
+            letterSpacing: 2,
           }}
         >
           — JERRY GARCIA

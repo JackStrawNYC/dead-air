@@ -10,7 +10,7 @@
  */
 
 import type { EnhancedFrameData, SectionBoundary } from "../data/types";
-import { gaussianSmooth } from "./audio-reactive";
+import { gaussianSmooth, type AudioSnapshot } from "./audio-reactive";
 
 // ─── Types ───
 
@@ -160,28 +160,46 @@ export function computeClimaxState(
   return { phase, intensity, anticipation };
 }
 
+// ─── Musical Texture Detection ───
+
+export type MusicalTexture = "sparse" | "melodic" | "rhythmic" | "building" | "peak" | "ambient";
+
+/**
+ * Detect the musical texture from audio features + energy.
+ * Used to modulate overlay counts and vignette — Space/Drums gets near-void,
+ * driving grooves get moderate density, peaks get full flood.
+ */
+export function detectTexture(snapshot: AudioSnapshot, energy: number): MusicalTexture {
+  if (energy < 0.10 && snapshot.flatness > 0.4) return "ambient";   // Space/Drums
+  if (energy < 0.08) return "sparse";                                // quiet/tonal
+  if (energy > 0.25 && snapshot.onsetEnvelope > 0.3) return "peak"; // loud+percussive
+  if (energy > 0.12 && snapshot.beatDecay > 0.5) return "rhythmic"; // driving groove
+  if (energy > 0.08 && snapshot.flatness < 0.3) return "melodic";   // tonal, moderate
+  return "building";
+}
+
 // ─── Modulation Output ───
 
-/** Per-phase target values */
+/** Per-phase target values — widened for Brightman-style dynamic range */
 const PHASE_TARGETS: Record<
   ClimaxPhase,
   { sat: number; bright: number; vig: number; bloom: number; density: number }
 > = {
-  idle:    { sat: -0.03, bright: -0.01, vig: -0.03, bloom: 0,    density: 0.7 },
-  build:   { sat: +0.04, bright: +0.02, vig: +0.04, bloom: 0.03, density: 1.1 },
-  climax:  { sat: +0.08, bright: +0.04, vig: +0.08, bloom: 0.06, density: 1.3 },
-  sustain: { sat: +0.05, bright: +0.02, vig: +0.05, bloom: 0.04, density: 1.1 },
-  release: { sat: -0.02, bright: 0,     vig: -0.02, bloom: 0,    density: 0.7 },
+  idle:    { sat: -0.03, bright: -0.01, vig: -0.03, bloom: 0,    density: 0.4 },
+  build:   { sat: +0.04, bright: +0.02, vig: +0.04, bloom: 0.03, density: 1.0 },
+  climax:  { sat: +0.08, bright: +0.04, vig: +0.08, bloom: 0.06, density: 1.5 },
+  sustain: { sat: +0.05, bright: +0.02, vig: +0.05, bloom: 0.04, density: 1.2 },
+  release: { sat: -0.02, bright: 0,     vig: -0.02, bloom: 0,    density: 0.5 },
 };
 
 /** Anticipation sub-state overrides (desaturation dip before peak) */
-const ANTICIPATION = { sat: -0.06, bright: +0.01, vig: +0.02, bloom: 0.01, density: 0.9 };
+const ANTICIPATION = { sat: -0.06, bright: +0.01, vig: +0.02, bloom: 0.01, density: 0.6 };
 
 /** Build phase start values (intensity interpolates from start → target) */
-const BUILD_START = { sat: 0, bright: 0, vig: 0, bloom: 0, density: 0.8 };
+const BUILD_START = { sat: 0, bright: 0, vig: 0, bloom: 0, density: 0.5 };
 
 /** Release phase start values (intensity interpolates from start → target) */
-const RELEASE_START = { sat: +0.04, bright: +0.01, vig: +0.03, bloom: 0.02, density: 1.0 };
+const RELEASE_START = { sat: +0.04, bright: +0.01, vig: +0.03, bloom: 0.02, density: 0.8 };
 
 /**
  * Map a ClimaxState to additive visual modifiers.

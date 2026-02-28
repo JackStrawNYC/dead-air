@@ -3,12 +3,12 @@
  * shader like projected light. Sits at Layer 0.7.
  *
  * Blending strategy:
- *   - `mix-blend-mode: screen` — additive blending, dark pixels vanish
- *   - 2px blur softens HD footage into the organic shader texture
+ *   - `mix-blend-mode: lighten` — natural compositing, no blown highlights
+ *   - 0.5px blur softens HD footage into the organic shader texture
  *   - 5-second smoothstep fades (glacial, like the shader breathing)
- *   - Max ~35% opacity — tints the background, never dominates
+ *   - Max ~70% opacity — primary visual during quiet, recedes at peaks
  *   - Palette hue-rotate matches the rest of the visual field
- *   - Energy dimming: quieter = more visible, louder = shader dominates
+ *   - Inverse energy: quieter = MORE visible, louder = shader dominates
  *
  * Videos are muted — concert audio is the soundtrack.
  */
@@ -17,8 +17,11 @@ import React, { useMemo } from "react";
 import { OffthreadVideo, staticFile, useCurrentFrame } from "remotion";
 import type { SceneVideo, SectionBoundary, EnhancedFrameData } from "../data/types";
 import { seeded } from "../utils/seededRandom";
+import { energyToFactor, computeSmoothedEnergy } from "../utils/energy";
+import { detectTexture } from "../utils/climax-state";
+import { computeAudioSnapshot } from "../utils/audio-reactive";
 
-const VIDEO_DISPLAY_FRAMES = 300; // 10 seconds at 30fps
+const VIDEO_DISPLAY_FRAMES = 600; // 20 seconds at 30fps
 const FADE_FRAMES = 150;          // 5-second smoothstep fade in/out
 
 function hashString(str: string): number {
@@ -65,22 +68,35 @@ export const SceneVideoLayer: React.FC<SceneVideoLayerProps> = ({
 
     const rng = seeded(hashString(trackId) + (showSeed ?? 0) + 9973);
 
-    // Score each section — low energy scores higher
+    // Score each section — low energy scores highest, mid gets video too
     const scored = sections.map((section, idx) => {
       let score = 0;
       if (section.energy === "low") score += 3;
-      else if (section.energy === "mid") score += 1;
+      else if (section.energy === "mid") score += 2;
+      else score += 1; // high sections can get video too (lower priority)
 
       const sectionLen = section.frameEnd - section.frameStart;
       score += Math.min(2, sectionLen / 3000);
 
-      // High→low transitions get a bonus
+      // Post-climax comedown: high→low transition bonus
       if (idx > 0 && sections[idx - 1].energy === "high" && section.energy === "low") {
-        score += 2;
+        score += 3;
       }
 
-      // Penalize first section (title card overlap) and last (fade-out)
-      if (idx === 0) score -= 3;
+      // Texture-aware bonus: ambient/sparse sections get video priority
+      if (frames.length > 0) {
+        const midFrame = Math.min(
+          Math.floor((section.frameStart + section.frameEnd) / 2),
+          frames.length - 1,
+        );
+        const midSnapshot = computeAudioSnapshot(frames, midFrame);
+        const midEnergy = computeSmoothedEnergy(frames, midFrame);
+        const texture = detectTexture(midSnapshot, midEnergy);
+        if (texture === "ambient") score += 4;
+        else if (texture === "sparse") score += 3;
+      }
+
+      // Penalize last section (fade-out)
       if (idx === sections.length - 1) score -= 1;
 
       // Sections too short for a full video window get penalized
@@ -144,12 +160,12 @@ export const SceneVideoLayer: React.FC<SceneVideoLayerProps> = ({
   );
   const fadeEnvelope = Math.min(fadeIn, fadeOut);
 
-  // Energy dimming: quieter = more visible
+  // Inverse energy: videos FILL the quiet, RECEDE at peaks
   const frameIdx = Math.min(Math.max(0, frame), frames.length - 1);
   const energy = frames[frameIdx]?.rms ?? 0.1;
-  const energyDim = 1 - energy * 0.7;
+  const energyBoost = 1.0 - energyToFactor(energy, 0.05, 0.30) * 0.65;
 
-  const opacity = fadeEnvelope * energyDim * 0.35; // Max ~35% — tint, don't dominate
+  const opacity = fadeEnvelope * energyBoost * 0.70; // 70% quiet, ~25% peaks
 
   // Negative startFrom offsets the video so it plays from frame 0
   // starting at the composition frame when the window begins.
@@ -158,8 +174,8 @@ export const SceneVideoLayer: React.FC<SceneVideoLayerProps> = ({
   const windowStart = activeWindow.frameStart - FADE_FRAMES;
   const startFrom = -windowStart;
 
-  // Build filter: blur to soften + palette hue rotation to match visual field
-  const filters: string[] = ["blur(2px)"];
+  // Build filter: light blur to soften + palette hue rotation to match visual field
+  const filters: string[] = ["blur(0.5px)"];
   if (hueRotation !== 0) {
     filters.push(`hue-rotate(${hueRotation.toFixed(1)}deg)`);
   }
@@ -170,7 +186,7 @@ export const SceneVideoLayer: React.FC<SceneVideoLayerProps> = ({
         position: "absolute",
         inset: 0,
         opacity,
-        mixBlendMode: "screen",
+        mixBlendMode: "lighten",
         overflow: "hidden",
         pointerEvents: "none",
         filter: filters.join(" "),

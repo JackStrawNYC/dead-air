@@ -57,6 +57,9 @@ export const SetlistScroll: React.FC<Props> = ({ frames, currentSong }) => {
 
   if (!inWindow) return null;
 
+  // Energy gate: setlist only during quiet passages
+  if (energy > 0.20) return null;
+
   // Fade in/out
   const fadeIn = interpolate(localFrame, [0, FADE_IN_FRAMES], [0, 1], {
     extrapolateLeft: "clamp",

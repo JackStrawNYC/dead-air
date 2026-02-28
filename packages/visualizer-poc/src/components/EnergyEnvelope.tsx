@@ -12,7 +12,7 @@
 import React from "react";
 import { energyToFactor } from "../utils/energy";
 import type { AudioSnapshot } from "../utils/audio-reactive";
-import type { ClimaxModulation } from "../utils/climax-state";
+import { detectTexture, type ClimaxModulation } from "../utils/climax-state";
 
 interface Props {
   /** Pre-computed audio snapshot from SongVisualizer (shared, not recomputed) */
@@ -33,12 +33,19 @@ export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod 
   // Flatness: tonal passages richer, noisy passages flatter
   const flatnessSaturation = 0.04 - snapshot.flatness * 0.12; // +4% to -8% (was +2/-4)
 
-  // Modulation ranges — wide enough to feel, narrow enough to compose with EraGrade
-  const saturation = 0.82 + factor * 0.36 + flatnessSaturation + (climaxMod?.saturationOffset ?? 0);
-  const brightness = 0.94 + factor * 0.12 + onsetBrightness + (climaxMod?.brightnessOffset ?? 0);
+  // Texture-aware vignette bonus
+  const texture = detectTexture(snapshot, energy);
+  const textureVignetteBonus =
+    texture === "ambient" ? 0.15 :    // tunnel/portal during Space
+    texture === "sparse" ? 0.08 :     // gentle focus during ballad intro
+    texture === "peak" ? -0.05 : 0;   // wide open, let the flood breathe
+
+  // Modulation ranges — wider floors for Brightman-style darkness in quiet passages
+  const saturation = 0.65 + factor * 0.55 + flatnessSaturation + (climaxMod?.saturationOffset ?? 0);
+  const brightness = 0.88 + factor * 0.18 + onsetBrightness + (climaxMod?.brightnessOffset ?? 0);
   const contrast = 0.96 + factor * 0.10;                        // 0.96 → 1.06
   const hueRotate = 5 - factor * 10 + centroidHueOffset;        // ±17deg (was ±7)
-  const vignetteOpacity = 0.05 + factor * 0.22 + (climaxMod?.vignetteOffset ?? 0);
+  const vignetteOpacity = 0.05 + factor * 0.30 + textureVignetteBonus + (climaxMod?.vignetteOffset ?? 0);
   const bloomOpacity = factor * 0.14 + (climaxMod?.bloomOffset ?? 0);
 
   const filterStr = `saturate(${saturation.toFixed(3)}) brightness(${brightness.toFixed(3)}) contrast(${contrast.toFixed(3)}) hue-rotate(${hueRotate.toFixed(1)}deg)`;

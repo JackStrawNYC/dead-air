@@ -7,6 +7,7 @@
 import React from "react";
 import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
 import { useShowContext, formatDateCompact } from "../data/ShowContext";
+import { useSongPalette } from "../data/SongPaletteContext";
 
 const DELAY = 360;          // 12s — appears after SongTitle fades out
 const SHOW_DURATION = 390;  // 13 seconds visible
@@ -27,6 +28,7 @@ export const ConcertInfo: React.FC<Props> = ({
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
   const ctx = useShowContext();
+  const palette = useSongPalette();
 
   const venue = (venueProp ?? ctx?.venue ?? "VENUE").toUpperCase();
   const date = (dateProp ?? ctx?.date ?? "DATE").toUpperCase();
@@ -50,12 +52,12 @@ export const ConcertInfo: React.FC<Props> = ({
   });
   const posterOpacity = inWindow ? Math.min(posterFadeIn, posterFadeOut) : 0;
 
-  // Color cycling for the poster text
-  const hue1 = (frame * 0.6) % 360;
-  const hue2 = (hue1 + 60) % 360;
+  // Palette-locked colors (no more rainbow cycling)
+  const hue1 = palette.primary;
+  const hue2 = palette.secondary;
 
-  // Ticket stub: always visible, corner element
-  const ticketOpacity = 0.45;
+  // Ticket stub: fades with concert info
+  const ticketOpacity = posterOpacity * 0.6;
 
   // Slight scale animation on poster
   const posterScale = interpolate(localFrame, [0, FADE_IN, SHOW_DURATION - FADE_OUT, SHOW_DURATION], [0.9, 1, 1, 0.95], {

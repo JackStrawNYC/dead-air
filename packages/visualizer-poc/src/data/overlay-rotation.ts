@@ -20,6 +20,8 @@
 import type { SectionBoundary, OverlayEntry, EnhancedFrameData } from "./types";
 import { OVERLAY_BY_NAME, ALWAYS_ACTIVE } from "./overlay-registry";
 import { computeSmoothedEnergy, overlayEnergyFactor } from "../utils/energy";
+import { detectTexture } from "../utils/climax-state";
+import { computeAudioSnapshot } from "../utils/audio-reactive";
 
 // ─── Deterministic PRNG (same pattern as overlay-selector.ts) ───
 
@@ -156,13 +158,13 @@ const CROSSFADE_FRAMES_DEFAULT = 300;
 
 /**
  * Overlay count ranges by section energy.
- * Quiet = 2-4 (present but subdued), peak = 5-7 (full flood).
- * Peaks still feel earned via opacity contrast + accent system.
+ * Quiet = 0-2 (near-void — shader + grain only), peak = 5-8 (full flood).
+ * The darkness earns the flood. Zero overlays during quiet = just shader + film grain.
  */
 const ENERGY_COUNTS: Record<string, { min: number; max: number }> = {
-  low:  { min: 2, max: 4 },
-  mid:  { min: 3, max: 5 },
-  high: { min: 5, max: 7 },
+  low:  { min: 0, max: 2 },
+  mid:  { min: 2, max: 4 },
+  high: { min: 5, max: 8 },
 };
 
 /** Score penalty for overlays used in the previous window */
@@ -176,11 +178,11 @@ const MIN_WINDOW_FOR_ROTATION = 900;
 
 /**
  * Pre-peak dropout: overlay count cap for the window immediately before a
- * higher-energy section. Strips the visual field to near-silence so the
+ * higher-energy section. Strips the visual field to complete void so the
  * peak floods in with maximum contrast. Like pulling the kick drum out
  * of the mix right before the drop.
  */
-const DROPOUT_MAX_OVERLAYS = 1;
+const DROPOUT_MAX_OVERLAYS = 0;
 
 // ─── smoothstep for crossfades ───
 
@@ -201,6 +203,7 @@ export function buildRotationSchedule(
   sections: SectionBoundary[],
   trackId: string,
   showSeed?: number,
+  frames?: EnhancedFrameData[],
 ): RotationSchedule {
   const trackHash = hashString(trackId) + (showSeed ?? 0);
 
@@ -268,7 +271,23 @@ export function buildRotationSchedule(
     const energyRange = ENERGY_COUNTS[window.energy] ?? ENERGY_COUNTS.mid;
     let targetCount = energyRange.min + Math.floor(rng() * (energyRange.max - energyRange.min + 1));
 
-    // Pre-peak dropout: strip to near-silence before the climax
+    // Texture-aware count adjustment: sample midpoint audio
+    if (frames && frames.length > 0) {
+      const midFrame = Math.min(
+        Math.floor((window.frameStart + window.frameEnd) / 2),
+        frames.length - 1,
+      );
+      const midSnapshot = computeAudioSnapshot(frames, midFrame);
+      const midEnergy = computeSmoothedEnergy(frames, midFrame);
+      const texture = detectTexture(midSnapshot, midEnergy);
+      if (texture === "ambient" || texture === "sparse") {
+        targetCount = Math.min(targetCount, 1);
+      } else if (texture === "peak") {
+        targetCount += 1;
+      }
+    }
+
+    // Pre-peak dropout: strip to complete void before the climax
     if (window.isDropout) {
       targetCount = Math.min(targetCount, DROPOUT_MAX_OVERLAYS);
     }

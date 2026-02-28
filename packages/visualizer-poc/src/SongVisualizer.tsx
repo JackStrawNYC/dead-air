@@ -178,7 +178,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
   const rotationSchedule = useMemo(() => {
     if (!props.activeOverlays || !analysis) return null;
     const sects = getSections(analysis);
-    return buildRotationSchedule(props.activeOverlays, sects, props.song.trackId, showSeed);
+    return buildRotationSchedule(props.activeOverlays, sects, props.song.trackId, showSeed, analysis?.frames);
   }, [props.activeOverlays, analysis, props.song.trackId, showSeed]);
 
   // Per-frame overlay opacities (densityMult applied after climax state computed below)
@@ -331,7 +331,10 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
           setNumber={props.song.set}
           trackNumber={props.song.trackNumber}
         />
-        <FilmGrain opacity={0.10} />
+        <FilmGrain opacity={interpolate(
+          audioSnapshot.energy, [0.03, 0.30], [0.15, 0.06],
+          { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+        )} />
       </div>
       </VisualizerErrorBoundary>
 
