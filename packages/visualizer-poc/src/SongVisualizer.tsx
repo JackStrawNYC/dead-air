@@ -26,6 +26,7 @@ import { ShowContextProvider, getShowSeed } from "./data/ShowContext";
 import { VisualizerErrorBoundary } from "./components/VisualizerErrorBoundary";
 import { SilentErrorBoundary } from "./components/SilentErrorBoundary";
 import { SceneVideoLayer } from "./components/SceneVideoLayer";
+import { resolveMediaForSong } from "./data/media-resolver";
 import { SongPaletteProvider, paletteHueRotation } from "./data/SongPaletteContext";
 import { TempoProvider } from "./data/TempoContext";
 import { EraGrade } from "./components/EraGrade";
@@ -35,6 +36,16 @@ import { computeAudioSnapshot } from "./utils/audio-reactive";
 import { AudioSnapshotProvider } from "./data/AudioSnapshotContext";
 
 import type { RotationSchedule } from "./data/overlay-rotation";
+
+// Media catalog — safe import with fallback for when catalog doesn't exist yet
+let mediaCatalog: { version: number; assets: Array<{ id: string; path: string; type: "image" | "video"; songKey: string; category?: "song" | "general"; tags: string[] }> } | null = null;
+try {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const raw = require("../data/image-library.json");
+  mediaCatalog = raw?.assets?.length ? raw : null;
+} catch {
+  // Catalog not yet generated — auto-resolution disabled
+}
 
 const FADE_FRAMES = 90; // 3 seconds at 30fps
 
@@ -192,6 +203,26 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
     [props.song.palette],
   );
 
+  // Auto-resolve media from catalog (poster + prioritized media list)
+  const resolvedMedia = useMemo(() => {
+    if (!mediaCatalog) return null;
+    return resolveMediaForSong(
+      props.song.title,
+      mediaCatalog,
+      showSeed ?? 0,
+      props.song.trackId,
+    );
+  }, [props.song.title, props.song.trackId, showSeed]);
+
+  // Explicit overrides in setlist.json take priority over auto-resolution
+  const effectiveSongArt = props.song.songArt ?? resolvedMedia?.songArt ?? undefined;
+  const effectiveMedia = (props.song.sceneVideos?.length)
+    ? undefined    // legacy path — use SceneVideo[] directly
+    : resolvedMedia?.media;
+  const effectiveLegacyVideos = (props.song.sceneVideos?.length)
+    ? props.song.sceneVideos
+    : undefined;
+
   if (!analysis || analysis.frames.length === 0) {
     return (
       <div
@@ -259,17 +290,18 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
           />
 
           {/* ═══ Layer 0.5: Per-song poster art ═══ */}
-          {props.song.songArt && (
+          {effectiveSongArt && (
             <SilentErrorBoundary name="SongArt">
-              <SongArtLayer src={staticFile(props.song.songArt)} />
+              <SongArtLayer src={staticFile(effectiveSongArt)} />
             </SilentErrorBoundary>
           )}
 
           {/* ═══ Layer 0.7: Atmospheric scene videos ═══ */}
-          {props.song.sceneVideos && props.song.sceneVideos.length > 0 && (
+          {(effectiveLegacyVideos || effectiveMedia) && (
             <SilentErrorBoundary name="SceneVideos">
               <SceneVideoLayer
-                videos={props.song.sceneVideos}
+                videos={effectiveLegacyVideos}
+                media={effectiveMedia}
                 sections={sections}
                 frames={f}
                 trackId={props.song.trackId}
@@ -287,7 +319,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
               style={{
                 position: "absolute",
                 inset: 0,
-                opacity: props.song.songArt
+                opacity: effectiveSongArt
                   ? interpolate(frame, [ART_FULL_END, ART_FULL_END + 90], [0, 1], {
                       extrapolateLeft: "clamp",
                       extrapolateRight: "clamp",

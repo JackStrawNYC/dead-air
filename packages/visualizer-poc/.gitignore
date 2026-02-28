@@ -1,5 +1,6 @@
 data/*.json
 out/
+build/
 node_modules/
 dist/
 .venv/

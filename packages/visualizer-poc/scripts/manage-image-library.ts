@@ -39,6 +39,8 @@ interface AssetEntry {
   song: string;
   /** Normalized song key for matching (lowercase, no punctuation) */
   songKey: string;
+  /** "song" = matches a specific song title, "general" = atmospheric/band, usable anywhere */
+  category?: "song" | "general";
   /** Show this was first generated for */
   sourceShow?: string;
   /** Freeform tags */
@@ -60,7 +62,7 @@ interface ImageLibrary {
 
 // ─── Helpers ───
 
-const IMAGE_EXTS = new Set([".png", ".jpg", ".jpeg", ".webp"]);
+const IMAGE_EXTS = new Set([".png", ".jpg", ".jpeg", ".webp", ".svg"]);
 const VIDEO_EXTS = new Set([".mp4", ".webm", ".mov"]);
 
 function normalizeSongKey(title: string): string {
@@ -281,6 +283,9 @@ function showStats(): void {
   const songs = new Set(catalog.assets.map((a) => a.songKey));
   const images = catalog.assets.filter((a) => a.type === "image");
   const videos = catalog.assets.filter((a) => a.type === "video");
+  const songSpecific = catalog.assets.filter((a) => a.category === "song");
+  const general = catalog.assets.filter((a) => a.category === "general");
+  const legacy = catalog.assets.filter((a) => !a.category);
   const totalSize = catalog.assets.reduce((sum, a) => sum + a.sizeBytes, 0);
   const shows = new Set(catalog.assets.map((a) => a.sourceShow).filter(Boolean));
 
@@ -289,6 +294,9 @@ function showStats(): void {
   console.log(`Total assets:    ${catalog.assets.length}`);
   console.log(`  Images:        ${images.length}`);
   console.log(`  Videos:        ${videos.length}`);
+  console.log(`  Song-specific: ${songSpecific.length}`);
+  console.log(`  General:       ${general.length}`);
+  if (legacy.length > 0) console.log(`  Legacy:        ${legacy.length}`);
   console.log(`Unique songs:    ${songs.size}`);
   console.log(`Source shows:    ${shows.size}`);
   console.log(`Total size:      ${(totalSize / 1024 / 1024).toFixed(0)}M`);
@@ -309,6 +317,194 @@ function showStats(): void {
   }
 }
 
+// ─── Media Classification ───
+
+/** Song-specific slugs — filenames that match a Grateful Dead song */
+const SONG_SLUGS = new Set([
+  "althea", "birdsong", "darkstar", "eyesoftheworld",
+  "fireonthemountain", "franklinstower", "morningdew",
+  "scarletbegonias", "shakedownstreet", "ststephen",
+  "sugarmagnolia", "theotherone", "unclejohnsband",
+  "weatherreportsuite", "dancinginthestreet",
+]);
+
+/** General/atmospheric slugs — usable in any song */
+const GENERAL_SLUGS = new Set([
+  "dancingbears", "gratefuldeadband", "jerrygarcia",
+  "psychedeliclightningstorm", "stealyourface", "trippy",
+  "trippyfractal", "waves", "spinningdisco", "general",
+  "whirpoolpsychedelic",
+]);
+
+/** Handle naming mismatches between image/video filenames */
+const SLUG_ALIASES: Record<string, string> = {
+  "spinningdiscoball": "spinningdisco",
+  "wavescrashing": "waves",
+};
+
+/** Slug → human-readable song title for catalog entries */
+const SLUG_TITLES: Record<string, string> = {
+  "althea": "Althea",
+  "birdsong": "Bird Song",
+  "darkstar": "Dark Star",
+  "eyesoftheworld": "Eyes of the World",
+  "fireonthemountain": "Fire on the Mountain",
+  "franklinstower": "Franklin's Tower",
+  "morningdew": "Morning Dew",
+  "scarletbegonias": "Scarlet Begonias",
+  "shakedownstreet": "Shakedown Street",
+  "ststephen": "St. Stephen",
+  "sugarmagnolia": "Sugar Magnolia",
+  "theotherone": "The Other One",
+  "unclejohnsband": "Uncle John's Band",
+  "weatherreportsuite": "Weather Report Suite",
+  "dancinginthestreet": "Dancin' in the Street",
+  "dancingbears": "Dancing Bears",
+  "gratefuldeadband": "Grateful Dead Band",
+  "jerrygarcia": "Jerry Garcia",
+  "psychedeliclightningstorm": "Psychedelic Lightning Storm",
+  "stealyourface": "Steal Your Face",
+  "trippy": "Trippy",
+  "trippyfractal": "Trippy Fractal",
+  "waves": "Waves",
+  "spinningdisco": "Spinning Disco",
+  "general": "General",
+  "whirpoolpsychedelic": "Whirlpool Psychedelic",
+};
+
+/**
+ * Derive a slug from a filename: strip extension, lowercase, remove non-alphanumeric.
+ * Returns the base slug and any numeric suffix (e.g. "eyesoftheworld2" → base "eyesoftheworld", variant "2").
+ */
+function deriveSlug(filename: string): { slug: string; base: string; variant: string | null } {
+  const raw = basename(filename, extname(filename)).toLowerCase().replace(/[^a-z0-9]/g, "");
+  const resolved = SLUG_ALIASES[raw] ?? raw;
+
+  // Check for numeric suffix: "eyesoftheworld2" → base "eyesoftheworld", variant "2"
+  const suffixMatch = resolved.match(/^(.+?)(\d+)$/);
+  if (suffixMatch) {
+    const base = suffixMatch[1];
+    const variant = suffixMatch[2];
+    // Only treat as variant if the base is a known slug
+    if (SONG_SLUGS.has(base) || GENERAL_SLUGS.has(base)) {
+      return { slug: resolved, base, variant };
+    }
+  }
+
+  return { slug: resolved, base: resolved, variant: null };
+}
+
+function classifySlug(slug: string): "song" | "general" | null {
+  if (SONG_SLUGS.has(slug)) return "song";
+  if (GENERAL_SLUGS.has(slug)) return "general";
+  return null;
+}
+
+function ingestMedia(imageDir?: string, videoDir?: string): void {
+  if (!imageDir && !videoDir) {
+    console.error("Usage: ingest-media --images=<dir> [--videos=<dir>]");
+    process.exit(1);
+  }
+
+  const catalog = loadCatalog();
+
+  // Ensure subdirectories exist
+  const imgLibDir = join(LIBRARY_DIR, "images");
+  const vidLibDir = join(LIBRARY_DIR, "videos");
+  mkdirSync(imgLibDir, { recursive: true });
+  mkdirSync(vidLibDir, { recursive: true });
+
+  let added = 0;
+  let skipped = 0;
+  let unknown = 0;
+
+  function processFile(srcPath: string, type: "image" | "video"): void {
+    const ext = extname(srcPath).toLowerCase();
+    const { slug, base, variant } = deriveSlug(srcPath);
+    const category = classifySlug(base);
+
+    if (!category) {
+      console.warn(`  ? Unknown slug: ${slug} (${basename(srcPath)}) — skipping`);
+      unknown++;
+      return;
+    }
+
+    const hash = fileHash(srcPath);
+    if (catalog.assets.some((a) => a.id === hash)) {
+      console.log(`  ✓ Already in library: ${slug} (${hash})`);
+      skipped++;
+      return;
+    }
+
+    const subdir = type === "image" ? "images" : "videos";
+    const destFilename = `${slug}${ext}`;
+    const destPath = join(LIBRARY_DIR, subdir, destFilename);
+
+    copyFileSync(srcPath, destPath);
+    const stats = statSync(destPath);
+
+    const songKey = normalizeSongKey(SLUG_TITLES[base] ?? base);
+    const title = SLUG_TITLES[base] ?? base;
+
+    const tags: string[] = [type === "image" ? "curated-image" : "curated-video"];
+    if (category === "general") tags.push("atmospheric");
+    if (variant) tags.push(`variant-${variant}`);
+
+    const entry: AssetEntry = {
+      id: hash,
+      path: `assets/library/${subdir}/${destFilename}`,
+      originalFile: basename(srcPath),
+      type,
+      song: title,
+      songKey,
+      category,
+      tags,
+      sizeBytes: stats.size,
+      addedAt: new Date().toISOString(),
+    };
+
+    catalog.assets.push(entry);
+    console.log(`  + ${category === "song" ? "🎵" : "🌀"} ${title} → ${subdir}/${destFilename} (${(stats.size / 1024 / 1024).toFixed(1)}M)`);
+    added++;
+  }
+
+  // Process images
+  if (imageDir) {
+    const absImageDir = resolve(imageDir);
+    if (!existsSync(absImageDir)) {
+      console.error(`Image directory not found: ${absImageDir}`);
+      process.exit(1);
+    }
+    console.log(`\nScanning images: ${absImageDir}`);
+    for (const file of readdirSync(absImageDir)) {
+      const filePath = join(absImageDir, file);
+      if (!statSync(filePath).isFile()) continue;
+      const type = detectType(filePath);
+      if (type === "image") processFile(filePath, "image");
+    }
+  }
+
+  // Process videos
+  if (videoDir) {
+    const absVideoDir = resolve(videoDir);
+    if (!existsSync(absVideoDir)) {
+      console.error(`Video directory not found: ${absVideoDir}`);
+      process.exit(1);
+    }
+    console.log(`\nScanning videos: ${absVideoDir}`);
+    for (const file of readdirSync(absVideoDir)) {
+      const filePath = join(absVideoDir, file);
+      if (!statSync(filePath).isFile()) continue;
+      const type = detectType(filePath);
+      if (type === "video") processFile(filePath, "video");
+    }
+  }
+
+  saveCatalog(catalog);
+  console.log(`\nIngested: ${added} new, ${skipped} duplicates, ${unknown} unknown`);
+  console.log(`Total library: ${catalog.assets.length} assets`);
+}
+
 // ─── CLI ───
 
 const args = process.argv.slice(2);
@@ -320,6 +516,12 @@ function getFlag(name: string): string | undefined {
 }
 
 switch (command) {
+  case "ingest-media": {
+    const imgDir = getFlag("images");
+    const vidDir = getFlag("videos");
+    ingestMedia(imgDir, vidDir);
+    break;
+  }
   case "ingest": {
     const showId = getFlag("show");
     console.log(`Ingesting current show art into library...`);
@@ -350,7 +552,8 @@ switch (command) {
   }
   default:
     console.log(`Usage:
-  npx tsx scripts/manage-image-library.ts ingest [--show=gd77-05-08]
+  npx tsx scripts/manage-image-library.ts ingest-media --images=<dir> --videos=<dir>  # bulk ingest
+  npx tsx scripts/manage-image-library.ts ingest [--show=gd77-05-08]                  # catalog show art
   npx tsx scripts/manage-image-library.ts add <file> --song="Title" [--tags=a,b] [--type=video]
   npx tsx scripts/manage-image-library.ts list [--song="Title"]
   npx tsx scripts/manage-image-library.ts stats`);

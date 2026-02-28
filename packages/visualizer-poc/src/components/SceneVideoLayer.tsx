@@ -1,5 +1,5 @@
 /**
- * SceneVideoLayer — atmospheric AI-generated videos that blend into the
+ * SceneVideoLayer — atmospheric videos and images that blend into the
  * shader like projected light. Sits at Layer 0.7.
  *
  * Blending strategy:
@@ -10,12 +10,17 @@
  *   - Palette hue-rotate matches the rest of the visual field
  *   - Inverse energy: quieter = MORE visible, louder = shader dominates
  *
+ * Supports both legacy SceneVideo[] and new ResolvedMedia[] from the
+ * media resolver. Priority scheduling assigns song-specific assets to
+ * the best-scoring sections, general assets fill the rest.
+ *
  * Videos are muted — concert audio is the soundtrack.
  */
 
 import React, { useMemo } from "react";
-import { OffthreadVideo, staticFile, useCurrentFrame } from "remotion";
+import { Img, OffthreadVideo, staticFile, useCurrentFrame, interpolate } from "remotion";
 import type { SceneVideo, SectionBoundary, EnhancedFrameData } from "../data/types";
+import type { ResolvedMedia } from "../data/media-resolver";
 import { seeded } from "../utils/seededRandom";
 import { energyToFactor, computeSmoothedEnergy } from "../utils/energy";
 import { detectTexture } from "../utils/climax-state";
@@ -37,14 +42,56 @@ function smoothstep(edge0: number, edge1: number, x: number): number {
   return t * t * (3 - 2 * t);
 }
 
-interface VideoWindow {
-  frameStart: number;
-  frameEnd: number;
-  video: SceneVideo;
+// ─── Unified media item for scheduling ───
+
+interface MediaItem {
+  src: string;
+  mediaType: "image" | "video";
+  priority: number; // 0 = song video, 1 = song image, 2 = general video, 3 = general image
 }
 
+interface MediaWindow {
+  frameStart: number;
+  frameEnd: number;
+  media: MediaItem;
+}
+
+// ─── Ken Burns image display ───
+
+const ImageMediaDisplay: React.FC<{
+  src: string;
+  frame: number;
+  windowStart: number;
+  windowEnd: number;
+}> = ({ src, frame, windowStart, windowEnd }) => {
+  const windowLen = windowEnd - windowStart;
+  const progress = Math.max(0, Math.min(1, (frame - windowStart) / Math.max(1, windowLen)));
+
+  // Ken Burns: scale 1.0 → 1.06 + drift -8px
+  const scale = 1.0 + progress * 0.06;
+  const translateX = -progress * 8;
+
+  return (
+    <Img
+      src={staticFile(src)}
+      style={{
+        width: "100%",
+        height: "100%",
+        objectFit: "cover",
+        transform: `scale(${scale}) translateX(${translateX}px)`,
+        willChange: "transform",
+      }}
+    />
+  );
+};
+
+// ─── Props ───
+
 interface SceneVideoLayerProps {
-  videos: SceneVideo[];
+  /** Legacy prop: explicit scene videos from setlist.json */
+  videos?: SceneVideo[];
+  /** New: auto-resolved prioritized media from catalog */
+  media?: ResolvedMedia[];
   sections: SectionBoundary[];
   frames: EnhancedFrameData[];
   trackId: string;
@@ -53,8 +100,66 @@ interface SceneVideoLayerProps {
   hueRotation?: number;
 }
 
+// ─── Section scoring (shared logic) ───
+
+function scoreSections(
+  sections: SectionBoundary[],
+  frames: EnhancedFrameData[],
+): { section: SectionBoundary; idx: number; score: number }[] {
+  return sections.map((section, idx) => {
+    let score = 0;
+    if (section.energy === "low") score += 3;
+    else if (section.energy === "mid") score += 2;
+    else score += 1;
+
+    const sectionLen = section.frameEnd - section.frameStart;
+    score += Math.min(2, sectionLen / 3000);
+
+    // Post-climax comedown bonus
+    if (idx > 0 && sections[idx - 1].energy === "high" && section.energy === "low") {
+      score += 3;
+    }
+
+    // Texture-aware bonus
+    if (frames.length > 0) {
+      const midFrame = Math.min(
+        Math.floor((section.frameStart + section.frameEnd) / 2),
+        frames.length - 1,
+      );
+      const midSnapshot = computeAudioSnapshot(frames, midFrame);
+      const midEnergy = computeSmoothedEnergy(frames, midFrame);
+      const texture = detectTexture(midSnapshot, midEnergy);
+      if (texture === "ambient") score += 4;
+      else if (texture === "sparse") score += 3;
+    }
+
+    // Penalize last section (fade-out)
+    if (idx === sections.length - 1) score -= 1;
+
+    // Too short for a full window
+    if (sectionLen < VIDEO_DISPLAY_FRAMES + FADE_FRAMES * 2) score -= 2;
+
+    return { section, idx, score };
+  });
+}
+
+function placeMediaInSection(
+  section: SectionBoundary,
+  media: MediaItem,
+): MediaWindow {
+  const sectionLen = section.frameEnd - section.frameStart;
+  const displayLen = Math.min(VIDEO_DISPLAY_FRAMES, sectionLen - FADE_FRAMES);
+  const center = section.frameStart + Math.floor(sectionLen / 2);
+  const frameStart = Math.max(section.frameStart, center - Math.floor(displayLen / 2));
+  const frameEnd = frameStart + displayLen;
+  return { frameStart, frameEnd, media };
+}
+
+// ─── Component ───
+
 export const SceneVideoLayer: React.FC<SceneVideoLayerProps> = ({
   videos,
+  media,
   sections,
   frames,
   trackId,
@@ -64,81 +169,69 @@ export const SceneVideoLayer: React.FC<SceneVideoLayerProps> = ({
   const frame = useCurrentFrame();
 
   const windows = useMemo(() => {
-    if (videos.length === 0 || sections.length === 0) return [];
+    if (sections.length === 0) return [];
 
-    const rng = seeded(hashString(trackId) + (showSeed ?? 0) + 9973);
+    // Normalize into unified MediaItem list
+    let items: MediaItem[];
 
-    // Score each section — low energy scores highest, mid gets video too
-    const scored = sections.map((section, idx) => {
-      let score = 0;
-      if (section.energy === "low") score += 3;
-      else if (section.energy === "mid") score += 2;
-      else score += 1; // high sections can get video too (lower priority)
+    if (media && media.length > 0) {
+      // New path: auto-resolved media with priority scheduling
+      items = media.map((m) => ({
+        src: m.src,
+        mediaType: m.mediaType,
+        priority: m.priority,
+      }));
+    } else if (videos && videos.length > 0) {
+      // Legacy path: all treated as priority 0 videos
+      items = videos.map((v) => ({
+        src: v.src,
+        mediaType: "video" as const,
+        priority: 0,
+      }));
+    } else {
+      return [];
+    }
 
-      const sectionLen = section.frameEnd - section.frameStart;
-      score += Math.min(2, sectionLen / 3000);
-
-      // Post-climax comedown: high→low transition bonus
-      if (idx > 0 && sections[idx - 1].energy === "high" && section.energy === "low") {
-        score += 3;
-      }
-
-      // Texture-aware bonus: ambient/sparse sections get video priority
-      if (frames.length > 0) {
-        const midFrame = Math.min(
-          Math.floor((section.frameStart + section.frameEnd) / 2),
-          frames.length - 1,
-        );
-        const midSnapshot = computeAudioSnapshot(frames, midFrame);
-        const midEnergy = computeSmoothedEnergy(frames, midFrame);
-        const texture = detectTexture(midSnapshot, midEnergy);
-        if (texture === "ambient") score += 4;
-        else if (texture === "sparse") score += 3;
-      }
-
-      // Penalize last section (fade-out)
-      if (idx === sections.length - 1) score -= 1;
-
-      // Sections too short for a full video window get penalized
-      if (sectionLen < VIDEO_DISPLAY_FRAMES + FADE_FRAMES * 2) score -= 2;
-
-      return { section, idx, score };
-    });
-
+    // Score sections by suitability for media display
+    const scored = scoreSections(sections, frames);
     scored.sort((a, b) => b.score - a.score);
 
     const totalFrames = sections[sections.length - 1].frameEnd;
     const maxSlots = Math.max(1, Math.floor(totalFrames / 600));
-    const slotCount = Math.min(videos.length, maxSlots, scored.length);
+
+    // Split media into song-specific (priority 0-1) and general (priority 2-3)
+    const songSpecific = items.filter((m) => m.priority <= 1);
+    const general = items.filter((m) => m.priority >= 2);
+
+    // Shuffle general pool with seeded PRNG (song-specific keep natural order)
+    const rng = seeded(hashString(trackId) + (showSeed ?? 0) + 9973);
+    const shuffledGeneral = [...general];
+    for (let i = shuffledGeneral.length - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1));
+      [shuffledGeneral[i], shuffledGeneral[j]] = [shuffledGeneral[j], shuffledGeneral[i]];
+    }
+
+    // Assign: best sections → song-specific first, then general
+    const orderedMedia = [...songSpecific, ...shuffledGeneral];
+    const slotCount = Math.min(orderedMedia.length, maxSlots, scored.length);
 
     const selectedSections = scored
       .slice(0, slotCount)
       .filter((s) => s.score > 0)
       .sort((a, b) => a.idx - b.idx);
 
-    // Shuffle videos via Fisher-Yates with seeded PRNG
-    const shuffledVideos = [...videos];
-    for (let i = shuffledVideos.length - 1; i > 0; i--) {
-      const j = Math.floor(rng() * (i + 1));
-      [shuffledVideos[i], shuffledVideos[j]] = [shuffledVideos[j], shuffledVideos[i]];
+    // Re-sort by score for assignment (best section → best media)
+    const byScoredOrder = [...selectedSections].sort((a, b) => b.score - a.score);
+
+    const result: MediaWindow[] = [];
+    for (let i = 0; i < byScoredOrder.length && i < orderedMedia.length; i++) {
+      result.push(placeMediaInSection(byScoredOrder[i].section, orderedMedia[i]));
     }
 
-    const result: VideoWindow[] = [];
-    for (let i = 0; i < selectedSections.length; i++) {
-      const { section } = selectedSections[i];
-      const video = shuffledVideos[i % shuffledVideos.length];
-      const sectionLen = section.frameEnd - section.frameStart;
-
-      const displayLen = Math.min(VIDEO_DISPLAY_FRAMES, sectionLen - FADE_FRAMES);
-      const center = section.frameStart + Math.floor(sectionLen / 2);
-      const frameStart = Math.max(section.frameStart, center - Math.floor(displayLen / 2));
-      const frameEnd = frameStart + displayLen;
-
-      result.push({ frameStart, frameEnd, video });
-    }
-
+    // Sort windows chronologically for rendering
+    result.sort((a, b) => a.frameStart - b.frameStart);
     return result;
-  }, [videos, sections, trackId, showSeed]);
+  }, [videos, media, sections, trackId, showSeed, frames]);
 
   // Find the active window for the current frame
   const activeWindow = windows.find(
@@ -160,25 +253,22 @@ export const SceneVideoLayer: React.FC<SceneVideoLayerProps> = ({
   );
   const fadeEnvelope = Math.min(fadeIn, fadeOut);
 
-  // Inverse energy: videos FILL the quiet, RECEDE at peaks
+  // Inverse energy: media FILLS the quiet, RECEDES at peaks
   const frameIdx = Math.min(Math.max(0, frame), frames.length - 1);
   const energy = frames[frameIdx]?.rms ?? 0.1;
   const energyBoost = 1.0 - energyToFactor(energy, 0.05, 0.30) * 0.65;
 
   const opacity = fadeEnvelope * energyBoost * 0.70; // 70% quiet, ~25% peaks
 
-  // Negative startFrom offsets the video so it plays from frame 0
-  // starting at the composition frame when the window begins.
-  // Without this, the composition frame (e.g. 5000) would seek past
-  // the end of a 15-second video, showing only the last frame as static.
-  const windowStart = activeWindow.frameStart - FADE_FRAMES;
-  const startFrom = -windowStart;
-
   // Build filter: light blur to soften + palette hue rotation to match visual field
   const filters: string[] = ["blur(0.5px)"];
   if (hueRotation !== 0) {
     filters.push(`hue-rotate(${hueRotation.toFixed(1)}deg)`);
   }
+
+  // Negative startFrom offsets video so it plays from frame 0 at window start
+  const windowStart = activeWindow.frameStart - FADE_FRAMES;
+  const startFrom = -windowStart;
 
   return (
     <div
@@ -192,16 +282,25 @@ export const SceneVideoLayer: React.FC<SceneVideoLayerProps> = ({
         filter: filters.join(" "),
       }}
     >
-      <OffthreadVideo
-        src={staticFile(activeWindow.video.src)}
-        muted
-        startFrom={startFrom}
-        style={{
-          width: "100%",
-          height: "100%",
-          objectFit: "cover",
-        }}
-      />
+      {activeWindow.media.mediaType === "video" ? (
+        <OffthreadVideo
+          src={staticFile(activeWindow.media.src)}
+          muted
+          startFrom={startFrom}
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+          }}
+        />
+      ) : (
+        <ImageMediaDisplay
+          src={activeWindow.media.src}
+          frame={frame}
+          windowStart={activeWindow.frameStart}
+          windowEnd={activeWindow.frameEnd}
+        />
+      )}
     </div>
   );
 };
