@@ -184,35 +184,64 @@ const MIN_WINDOW_FOR_ROTATION = 900;
  */
 const DROPOUT_MAX_OVERLAYS = 0;
 
-// ─── Texture × Category routing ───
-// Atmospheric overlays dominate jams/space. Structured overlays only during melodic passages.
+// ─── Texture × Category routing (Dead-authentic) ───
+// 5 groups tuned to what a Grateful Dead show actually feels like:
+// Sacred geometry owns Space/Drums. Bears and skeletons welcome during songs.
+// Festival energy at peaks. Set II goes deeper. Post-peak grace after the void.
 
-const ATMOSPHERIC_CATEGORIES = new Set([
-  "atmospheric",  // layer 1: CosmicStarfield, TieDyeWash, SmokeWisps...
-  "sacred",       // layer 2: BreathingStealie, SacredGeometry, DarkStarPortal...
-  "nature",       // layer 5: SolarFlare, Constellation, BlackHole...
-]);
+const AMBIENT_WASH = new Set(["atmospheric", "nature"]);       // background canvas
+const COSMIC_SACRED = new Set(["sacred"]);                      // inner journey
+const ENERGY_REACTIVE = new Set(["reactive", "geometric", "distortion"]); // the pulse
+const DEAD_FAMILY = new Set(["character"]);                     // bears, skeletons, crowd
+const SHOW_NARRATIVE = new Set(["artifact", "info", "hud"]);   // posters, text, HUD
 
-const REACTIVE_CATEGORIES = new Set([
-  "reactive",     // layer 3: WallOfSound, Oscilloscope, StageLights...
-  "geometric",    // layer 4: VortexSpiral, LorenzAttractor, VoronoiFlow...
-  "distortion",   // layer 10: ChromaticAberration, FilmBurn, VHSGlitch...
-]);
+type TextureGroup = "wash" | "sacred" | "reactive" | "family" | "narrative";
 
-const STRUCTURED_CATEGORIES = new Set([
-  "character",    // layer 6: SkeletonBand, BearParade, DeadIcons...
-  "artifact",     // layer 7: PsychedelicBorder, BumperStickers, BootlegLabel...
-  "info",         // layer 8: LyricFlash, GarciaQuotes, MantraScroll...
-  "hud",          // layer 9: NixieTubes, HeartbeatEKG, TerminalPrompt...
-]);
+const TEXTURE_GROUP_SCORE: Record<string, Record<TextureGroup, number>> = {
+  ambient:  { wash: +0.25, sacred: +0.45, reactive: -0.30, family: -0.40, narrative: -0.50 },
+  sparse:   { wash: +0.20, sacred: +0.25, reactive: -0.20, family: -0.15, narrative: -0.40 },
+  melodic:  { wash: +0.10, sacred: +0.05, reactive:  0.00, family: +0.20, narrative: +0.10 },
+  building: { wash: +0.05, sacred: +0.10, reactive: +0.15, family: +0.10, narrative: -0.05 },
+  rhythmic: { wash:  0.00, sacred:  0.00, reactive: +0.20, family: +0.25, narrative: -0.15 },
+  peak:     { wash: -0.05, sacred: +0.10, reactive: +0.25, family: +0.30, narrative: -0.35 },
+};
 
-const TEXTURE_CATEGORY_SCORE: Record<string, Record<string, number>> = {
-  ambient:  { atmospheric: +0.35, reactive: -0.25, structured: -0.50 },
-  sparse:   { atmospheric: +0.25, reactive: -0.15, structured: -0.40 },
-  melodic:  { atmospheric: +0.10, reactive: +0.05, structured: +0.15 },
-  building: { atmospheric: +0.05, reactive: +0.10, structured: +0.05 },
-  rhythmic: { atmospheric:  0,    reactive: +0.20, structured: -0.10 },
-  peak:     { atmospheric:  0,    reactive: +0.25, structured: -0.30 },
+/** Tag-based texture scoring — tags carry rich Dead-specific signal */
+const TAG_TEXTURE_BONUS: Record<string, Partial<Record<string, number>>> = {
+  cosmic:         { ambient: +0.15, sparse: +0.10, peak: -0.05 },
+  psychedelic:    { ambient: +0.05, melodic: +0.05, building: +0.10, rhythmic: +0.10, peak: +0.10 },
+  festival:       { rhythmic: +0.15, peak: +0.20, melodic: +0.05, ambient: -0.15 },
+  contemplative:  { ambient: +0.10, sparse: +0.15, melodic: +0.05, peak: -0.15 },
+  "dead-culture": { ambient: +0.05, sparse: +0.05, melodic: +0.10, rhythmic: +0.10, peak: +0.15 },
+  intense:        { peak: +0.15, rhythmic: +0.10, building: +0.05, ambient: -0.20, sparse: -0.15 },
+  organic:        { ambient: +0.05, sparse: +0.05, melodic: +0.05 },
+  mechanical:     { ambient: -0.15, sparse: -0.10, rhythmic: +0.05, peak: -0.10 },
+  retro:          { ambient: -0.10, melodic: +0.05, sparse: -0.05 },
+  aquatic:        { ambient: +0.05, sparse: +0.10, peak: -0.10 },
+};
+
+/** Set II = the journey. More cosmic/sacred, fewer artifacts. */
+const SET2_ADJUSTMENTS: Record<TextureGroup, number> = {
+  sacred:    +0.10,
+  wash:      +0.05,
+  narrative: -0.15,
+  reactive:   0.00,
+  family:    -0.05,
+};
+
+/** Post-peak grace: after high→low/mid drop, favor sacred/contemplative overlays */
+const POST_PEAK_GRACE: Record<TextureGroup, number> = {
+  sacred:    +0.20,
+  wash:      +0.10,
+  family:    -0.20,
+  reactive:  -0.25,
+  narrative: -0.30,
+};
+
+/** Tag bonuses/penalties during post-peak grace windows */
+const POST_PEAK_TAG_BONUS: Record<string, number> = {
+  contemplative: +0.10,
+  intense:       -0.15,
 };
 
 // ─── smoothstep for crossfades ───
@@ -220,6 +249,22 @@ const TEXTURE_CATEGORY_SCORE: Record<string, Record<string, number>> = {
 function smoothstep(edge0: number, edge1: number, x: number): number {
   const t = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)));
   return t * t * (3 - 2 * t);
+}
+
+/** Parse set number from trackId format "s{set}t{track}" */
+function parseSetNumber(trackId: string): number {
+  const match = trackId.match(/^s(\d+)t/);
+  return match ? parseInt(match[1], 10) : 1;
+}
+
+/** Resolve an overlay's category to a texture group */
+function resolveTextureGroup(category: string): TextureGroup | null {
+  if (AMBIENT_WASH.has(category)) return "wash";
+  if (COSMIC_SACRED.has(category)) return "sacred";
+  if (ENERGY_REACTIVE.has(category)) return "reactive";
+  if (DEAD_FAMILY.has(category)) return "family";
+  if (SHOW_NARRATIVE.has(category)) return "narrative";
+  return null;
 }
 
 // ─── Schedule Builder ───
@@ -293,6 +338,8 @@ export function buildRotationSchedule(
   // 5. Select overlays per window
   let previousWindowOverlays = new Set<string>();
   let previousWindowFrames = 0;
+  let previousWindowEnergy: string | null = null;
+  const setNumber = parseSetNumber(trackId);
 
   for (let wi = 0; wi < windows.length; wi++) {
     const window = windows[wi];
@@ -353,15 +400,34 @@ export function buildRotationSchedule(
         else score -= 0.3;
       }
 
-      // Texture × category routing: atmospheric overlays for jams,
-      // structured overlays for melodic passages, reactive for peaks
+      // Texture × category routing (Dead-authentic):
+      // Sacred geometry for Space, bears for songs, festival energy at peaks
       if (windowTexture) {
-        const group = ATMOSPHERIC_CATEGORIES.has(entry.category) ? "atmospheric"
-          : REACTIVE_CATEGORIES.has(entry.category) ? "reactive"
-          : STRUCTURED_CATEGORIES.has(entry.category) ? "structured"
-          : null;
+        const group = resolveTextureGroup(entry.category);
         if (group) {
-          score += TEXTURE_CATEGORY_SCORE[windowTexture]?.[group] ?? 0;
+          score += TEXTURE_GROUP_SCORE[windowTexture]?.[group] ?? 0;
+
+          // Tag-based texture bonus: cosmic, psychedelic, festival, etc.
+          if (entry.tags) {
+            for (const tag of entry.tags) {
+              score += TAG_TEXTURE_BONUS[tag]?.[windowTexture] ?? 0;
+            }
+          }
+
+          // Set II deepening: more sacred/cosmic, fewer artifacts
+          if (setNumber >= 2) {
+            score += SET2_ADJUSTMENTS[group];
+          }
+
+          // Post-peak grace: after high→low/mid drop, favor sacred/contemplative
+          if (previousWindowEnergy === "high" && (window.energy === "low" || window.energy === "mid")) {
+            score += POST_PEAK_GRACE[group];
+            if (entry.tags) {
+              for (const tag of entry.tags) {
+                score += POST_PEAK_TAG_BONUS[tag] ?? 0;
+              }
+            }
+          }
         }
       }
 
@@ -431,6 +497,7 @@ export function buildRotationSchedule(
     window.overlays = selected.map((e) => e.name);
     previousWindowOverlays = selectedNames;
     previousWindowFrames = windowFrames;
+    previousWindowEnergy = window.energy;
   }
 
   // 6. Accent selection — pull eligible overlays out of rotation into accent map
