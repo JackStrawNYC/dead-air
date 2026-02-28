@@ -151,7 +151,12 @@ export const SceneVideoLayer: React.FC<SceneVideoLayerProps> = ({
 
   const opacity = fadeEnvelope * energyDim * 0.35; // Max ~35% — tint, don't dominate
 
-  const startFrom = Math.max(0, frame - activeWindow.frameStart + FADE_FRAMES);
+  // Negative startFrom offsets the video so it plays from frame 0
+  // starting at the composition frame when the window begins.
+  // Without this, the composition frame (e.g. 5000) would seek past
+  // the end of a 15-second video, showing only the last frame as static.
+  const windowStart = activeWindow.frameStart - FADE_FRAMES;
+  const startFrom = -windowStart;
 
   // Build filter: blur to soften + palette hue rotation to match visual field
   const filters: string[] = ["blur(2px)"];
