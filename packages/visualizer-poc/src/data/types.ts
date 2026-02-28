@@ -102,6 +102,23 @@ export interface ColorPalette {
   brightness?: number;
 }
 
+/** Scene video category for atmospheric AI-generated clips */
+export type SceneVideoCategory =
+  | "landscape"    // Mountains, rivers, wide vistas
+  | "venue"        // 1970s concert venue interiors, stage lighting
+  | "psychedelic"  // Liquid light projections, saturated abstract
+  | "nocturnal"    // Moonlit, campfire, deep blue/amber
+  | "era"          // 1977 candid photography aesthetic
+  | "cosmic";      // Deep space, nebulae, aurora
+
+/** AI-generated atmospheric video clip for scene layer */
+export interface SceneVideo {
+  /** Path relative to public/ (e.g. "assets/scene-videos/s2t08-001.mp4") */
+  src: string;
+  /** Visual category */
+  category: SceneVideoCategory;
+}
+
 /** Single song in the setlist */
 export interface SetlistEntry {
   /** Track identifier (e.g., "s2t08") */
@@ -124,6 +141,8 @@ export interface SetlistEntry {
   overlayOverrides?: OverlayOverrides;
   /** Path to per-song poster art (relative to public/) */
   songArt?: string;
+  /** AI-generated atmospheric scene videos */
+  sceneVideos?: SceneVideo[];
   /** This song flows directly into the next (segue) — no fade-out, next song skips fade-in + art */
   segueInto?: boolean;
 }

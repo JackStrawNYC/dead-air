@@ -13,10 +13,10 @@ import { seeded } from "../utils/seededRandom";
 
 // -- Timing -----------------------------------------------------------------
 
-const REAPPEAR_INTERVAL = 2700; // every 90 seconds at 30 fps
-const SHOW_DURATION = 240; // 8 seconds visible
-const FADE_IN_FRAMES = 45;
-const FADE_OUT_FRAMES = 45;
+const DELAY = 780;            // 26s — appears after ConcertInfo fades
+const SHOW_DURATION = 420;    // 14 seconds visible
+const FADE_IN_FRAMES = 60;
+const FADE_OUT_FRAMES = 60;
 
 // -- Torn edge clip path ----------------------------------------------------
 
@@ -51,20 +51,20 @@ export const SetlistScroll: React.FC<Props> = ({ frames, currentSong }) => {
   }
   const energy = energyCount > 0 ? energySum / energyCount : 0;
 
-  // Cycle timing
-  const cycleFrame = frame % REAPPEAR_INTERVAL;
-  const inWindow = cycleFrame < SHOW_DURATION;
+  // Show only once, after delay
+  const localFrame = frame - DELAY;
+  const inWindow = localFrame >= 0 && localFrame < SHOW_DURATION;
 
   if (!inWindow) return null;
 
   // Fade in/out
-  const fadeIn = interpolate(cycleFrame, [0, FADE_IN_FRAMES], [0, 1], {
+  const fadeIn = interpolate(localFrame, [0, FADE_IN_FRAMES], [0, 1], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
     easing: Easing.out(Easing.cubic),
   });
   const fadeOut = interpolate(
-    cycleFrame,
+    localFrame,
     [SHOW_DURATION - FADE_OUT_FRAMES, SHOW_DURATION],
     [1, 0],
     {
@@ -78,7 +78,7 @@ export const SetlistScroll: React.FC<Props> = ({ frames, currentSong }) => {
   if (opacity < 0.01) return null;
 
   // Slide in from the left
-  const slideX = interpolate(cycleFrame, [0, FADE_IN_FRAMES], [-40, 0], {
+  const slideX = interpolate(localFrame, [0, FADE_IN_FRAMES], [-40, 0], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
     easing: Easing.out(Easing.cubic),
@@ -96,8 +96,8 @@ export const SetlistScroll: React.FC<Props> = ({ frames, currentSong }) => {
   const jitterY = (rng() - 0.5) * 1.2;
 
   // Tilt angle -- slight and consistent per cycle
-  const cycleSeed = seeded(Math.floor(frame / REAPPEAR_INTERVAL) * 508);
-  const tiltAngle = -3 + cycleSeed() * 4; // -3 to +1 degrees
+  const tiltSeed = seeded((ctx?.dateSeed ?? 1977) * 508);
+  const tiltAngle = -3 + tiltSeed() * 4; // -3 to +1 degrees
 
   // Current song matching (case insensitive partial match)
   const matchesSong = (songName: string) => {

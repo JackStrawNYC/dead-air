@@ -25,6 +25,7 @@ import type { SetlistEntry, ShowSetlist, TrackAnalysis } from "./data/types";
 import { ShowContextProvider, getShowSeed } from "./data/ShowContext";
 import { VisualizerErrorBoundary } from "./components/VisualizerErrorBoundary";
 import { SilentErrorBoundary } from "./components/SilentErrorBoundary";
+import { SceneVideoLayer } from "./components/SceneVideoLayer";
 import { SongPaletteProvider, paletteHueRotation } from "./data/SongPaletteContext";
 import { TempoProvider } from "./data/TempoContext";
 import { EraGrade } from "./components/EraGrade";
@@ -55,7 +56,7 @@ function applyDensityMult(
 // ─── Song Art Phases ───
 const ART_FULL_END = 120;      // 4s at 30fps — full opacity title card
 const ART_FADE_END = 300;      // 10s — fade completes (6s transition)
-const ART_BG_OPACITY = 0.15;   // background wash opacity
+const ART_BG_OPACITY = 0.25;   // background wash opacity
 
 /** Per-song psychedelic poster art with 3-phase animation */
 const SongArtLayer: React.FC<{ src: string }> = ({ src }) => {
@@ -257,10 +258,24 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
             tempo={tempo}
           />
 
-          {/* ═══ Layer 0.5: Per-song poster art (skipped on segue-in) ═══ */}
-          {props.song.songArt && !props.segueIn && (
+          {/* ═══ Layer 0.5: Per-song poster art ═══ */}
+          {props.song.songArt && (
             <SilentErrorBoundary name="SongArt">
               <SongArtLayer src={staticFile(props.song.songArt)} />
+            </SilentErrorBoundary>
+          )}
+
+          {/* ═══ Layer 0.7: Atmospheric scene videos ═══ */}
+          {props.song.sceneVideos && props.song.sceneVideos.length > 0 && (
+            <SilentErrorBoundary name="SceneVideos">
+              <SceneVideoLayer
+                videos={props.song.sceneVideos}
+                sections={sections}
+                frames={f}
+                trackId={props.song.trackId}
+                showSeed={showSeed}
+                hueRotation={hueRotation}
+              />
             </SilentErrorBoundary>
           )}
 
@@ -272,7 +287,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
               style={{
                 position: "absolute",
                 inset: 0,
-                opacity: props.song.songArt && !props.segueIn
+                opacity: props.song.songArt
                   ? interpolate(frame, [ART_FULL_END, ART_FULL_END + 90], [0, 1], {
                       extrapolateLeft: "clamp",
                       extrapolateRight: "clamp",
@@ -302,7 +317,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
                   </div>
                 );
               })}
-              <ConcertInfo songTitle={props.song.title} />
+              <ConcertInfo />
               <SetlistScroll frames={f} currentSong={props.song.title} />
             </div>
           </SongPaletteProvider>

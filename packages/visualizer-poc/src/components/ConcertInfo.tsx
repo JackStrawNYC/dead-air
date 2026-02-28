@@ -8,10 +8,10 @@ import React from "react";
 import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
 import { useShowContext, formatDateCompact } from "../data/ShowContext";
 
-const SHOW_DURATION = 210; // 7 seconds visible
+const DELAY = 360;          // 12s — appears after SongTitle fades out
+const SHOW_DURATION = 390;  // 13 seconds visible
 const FADE_IN = 60;
 const FADE_OUT = 60;
-const REAPPEAR_INTERVAL = 2700; // re-show every 90 seconds
 
 interface Props {
   venue?: string;
@@ -33,17 +33,17 @@ export const ConcertInfo: React.FC<Props> = ({
   const bandName = ctx?.bandName ?? "GRATEFUL DEAD";
   const ticketNumber = ctx ? formatDateCompact(ctx.dateRaw) : "00000000";
 
-  // Show at start and every REAPPEAR_INTERVAL frames
-  const cycleFrame = frame % REAPPEAR_INTERVAL;
-  const inWindow = cycleFrame < SHOW_DURATION;
+  // Show only once, after delay
+  const localFrame = frame - DELAY;
+  const inWindow = localFrame >= 0 && localFrame < SHOW_DURATION;
 
   // Poster text opacity
-  const posterFadeIn = interpolate(cycleFrame, [0, FADE_IN], [0, 1], {
+  const posterFadeIn = interpolate(localFrame, [0, FADE_IN], [0, 1], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
     easing: Easing.out(Easing.cubic),
   });
-  const posterFadeOut = interpolate(cycleFrame, [SHOW_DURATION - FADE_OUT, SHOW_DURATION], [1, 0], {
+  const posterFadeOut = interpolate(localFrame, [SHOW_DURATION - FADE_OUT, SHOW_DURATION], [1, 0], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
     easing: Easing.in(Easing.cubic),
@@ -58,7 +58,7 @@ export const ConcertInfo: React.FC<Props> = ({
   const ticketOpacity = 0.45;
 
   // Slight scale animation on poster
-  const posterScale = interpolate(cycleFrame, [0, FADE_IN, SHOW_DURATION - FADE_OUT, SHOW_DURATION], [0.9, 1, 1, 0.95], {
+  const posterScale = interpolate(localFrame, [0, FADE_IN, SHOW_DURATION - FADE_OUT, SHOW_DURATION], [0.9, 1, 1, 0.95], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
@@ -70,12 +70,14 @@ export const ConcertInfo: React.FC<Props> = ({
         <div
           style={{
             position: "absolute",
-            top: "8%",
+            top: 0,
             left: 0,
             right: 0,
+            bottom: 0,
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
+            justifyContent: "center",
             opacity: posterOpacity,
             transform: `scale(${posterScale})`,
             willChange: "transform, opacity",

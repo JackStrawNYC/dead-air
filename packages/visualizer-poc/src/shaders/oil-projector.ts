@@ -82,7 +82,7 @@ void main() {
   float blob1 = oilBlob(warped1 * 0.7, 0.05);
   float hue1 = uPalettePrimary + uChromaHue * 0.2;
   vec3 col1 = 0.5 + 0.5 * cos(6.28318 * vec3(hue1, hue1 + 0.33, hue1 + 0.67));
-  col1 *= mix(0.6, 1.0, energy);
+  col1 *= mix(0.7, 1.0, energy);
 
   // === LAYER 3: Secondary oil blob (smaller, offset) ===
   vec3 blob2Pos = vec3(p * 0.6 + vec2(0.3, -0.2), t * 0.35 + sectionSeed * 0.7);
@@ -93,7 +93,7 @@ void main() {
   float blob2 = oilBlob(warped2 * 0.8, 0.1);
   float hue2 = uPaletteSecondary + uChromaHue * 0.15 + 0.15;
   vec3 col2 = 0.5 + 0.5 * cos(6.28318 * vec3(hue2, hue2 + 0.33, hue2 + 0.67));
-  col2 *= mix(0.5, 0.9, energy);
+  col2 *= mix(0.6, 0.9, energy);
 
   // === LAYER 4: Tertiary blob (smallest, fastest, accent) ===
   vec3 blob3Pos = vec3(p * 0.8 + vec2(-0.15, 0.25), t * 0.45 + sectionSeed * 1.3);
@@ -104,7 +104,7 @@ void main() {
   float blob3 = oilBlob(warped3 * 1.0, 0.15);
   float hue3 = uPalettePrimary + 0.5; // Complementary
   vec3 col3 = 0.5 + 0.5 * cos(6.28318 * vec3(hue3, hue3 + 0.33, hue3 + 0.67));
-  col3 *= mix(0.4, 0.8, energy);
+  col3 *= mix(0.5, 0.8, energy);
 
   // === COMPOSITE: additive blending (like real oil projector) ===
   col += col1 * blob1 * 0.5;
@@ -146,7 +146,7 @@ void main() {
   col += filmGrain(uv, grainTime) * grainIntensity;
 
   // Lifted blacks (warm)
-  col = max(col, vec3(0.02, 0.015, 0.01));
+  col = max(col, vec3(0.08, 0.065, 0.085));
 
   gl_FragColor = vec4(col, 1.0);
 }

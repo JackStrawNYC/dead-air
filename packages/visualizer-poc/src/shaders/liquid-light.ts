@@ -104,7 +104,7 @@ void main() {
   float bgNoise = fbm(bgQ);
   float bgHue = uPaletteSecondary + bgNoise * 0.15;
   vec3 bgCol = palette(bgHue, vec3(0.4), vec3(0.3), vec3(1.0), vec3(bgHue, bgHue + 0.33, bgHue + 0.67));
-  bgCol *= 0.35 + energy * 0.15;
+  bgCol *= 0.55 + energy * 0.15;
 
   // ============ LAYER 2: Midground (hero) ============
   float warpStrength = (0.5 + uBass * 0.5) * complexity * contrastWarp;
@@ -158,7 +158,7 @@ void main() {
   vec3 coolShift = vec3(0.85, 0.95, 1.12);
   midCol *= mix(coolShift, warmShift, energy);
 
-  float brightness = mix(0.35, 0.75, energy) + uRms * 0.2;
+  float brightness = mix(0.60, 0.80, energy) + uRms * 0.2;
   midCol *= brightness;
 
   // ============ LAYER 3: Foreground ============
@@ -167,7 +167,7 @@ void main() {
   vec3 fgCol = vec3(fgNoise * 0.5 + 0.5) * vec3(0.8, 0.9, 1.0) * fgIntensity;
 
   // ============ COMPOSITE ============
-  float bgMix = mix(0.4, 0.25, energy);
+  float bgMix = mix(0.45, 0.25, energy);
   float midMix = mix(0.5, 0.6, energy);
   float fgMix = mix(0.1, 0.18, energy);
   vec3 col = bgCol * bgMix + midCol * midMix + fgCol * fgMix;
@@ -260,7 +260,7 @@ void main() {
   col += filmGrain(uv, grainTime) * grainIntensity;
 
   // Lifted blacks
-  col = max(col, vec3(0.025, 0.018, 0.03));
+  col = max(col, vec3(0.08, 0.065, 0.085));
 
   gl_FragColor = vec4(col, 1.0);
 }

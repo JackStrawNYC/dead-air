@@ -222,7 +222,7 @@ void main() {
   col += filmGrain(uv, grainTime) * grainIntensity;
 
   // Lifted blacks
-  col = max(col, vec3(0.008, 0.006, 0.012));
+  col = max(col, vec3(0.08, 0.065, 0.085));
 
   gl_FragColor = vec4(col, 1.0);
 }

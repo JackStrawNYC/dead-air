@@ -87,7 +87,7 @@ void main() {
   midCol = mix(midCol, palTint * 0.3, 0.15 * uPaletteSaturation);
 
   // Energy brightens the warm tones
-  float brightness = mix(0.4, 0.7, energy) + uRms * 0.15;
+  float brightness = mix(0.60, 0.75, energy) + uRms * 0.15;
   midCol *= brightness;
 
   // === LAYER 3: High frequency shimmer ===
@@ -123,7 +123,7 @@ void main() {
   col *= vig;
 
   // Lifted blacks (warm)
-  col = max(col, vec3(0.035, 0.025, 0.018));
+  col = max(col, vec3(0.08, 0.065, 0.085));
 
   // S-curve for film look
   col = sCurveGrade(col, energy * 0.6); // Gentler grading

@@ -27,9 +27,10 @@ const QUOTES = [
   "There is no shortcut to anywhere worth going.",
 ];
 
-const CYCLE = 2400; // 80 seconds
-const DURATION = 300; // 10 seconds
-const CHARS_PER_FRAME = 0.35; // ~10.5 chars/sec
+const INITIAL_DELAY = 1200; // 40s — skip the intro clutter
+const CYCLE = 2400;         // 80 seconds between quotes
+const DURATION = 480;       // 16 seconds visible
+const CHARS_PER_FRAME = 0.5; // ~15 chars/sec (faster typing)
 
 interface Props {
   frames: EnhancedFrameData[];
@@ -48,8 +49,11 @@ export const GarciaQuotes: React.FC<Props> = ({ frames }) => {
   }
   const energy = eCount > 0 ? eSum / eCount : 0;
 
-  const cycleIndex = Math.floor(frame / CYCLE);
-  const cycleFrame = frame % CYCLE;
+  const delayedFrame = frame - INITIAL_DELAY;
+  if (delayedFrame < 0) return null;
+
+  const cycleIndex = Math.floor(delayedFrame / CYCLE);
+  const cycleFrame = delayedFrame % CYCLE;
 
   if (cycleFrame >= DURATION) return null;
 

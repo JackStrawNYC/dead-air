@@ -10,6 +10,20 @@ import { formatDateLong } from "./data/ShowContext";
 import setlistData from "../data/setlist.json";
 import showContextData from "../data/show-context.json";
 
+// Import all track analysis files
+const analysisCache: Record<string, unknown> = {};
+function loadTrackAnalysis(trackId: string) {
+  if (analysisCache[trackId]) return analysisCache[trackId];
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const data = require(`../data/tracks/${trackId}-analysis.json`);
+    analysisCache[trackId] = data;
+    return data;
+  } catch {
+    return null;
+  }
+}
+
 // Try to load overlay schedule (may not exist yet — that's OK)
 let overlaySchedule: OverlaySchedule | null = null;
 try {
@@ -109,9 +123,12 @@ export const Root: React.FC = () => {
               show: setlist,
             } satisfies SongVisualizerProps as Record<string, unknown>}
             calculateMetadata={async ({ props }) => {
-              const meta = props.meta as { totalFrames?: number } | undefined;
-              if (meta?.totalFrames) {
-                return { durationInFrames: meta.totalFrames };
+              const analysis = loadTrackAnalysis(song.trackId) as { meta?: { totalFrames?: number } } | null;
+              if (analysis?.meta) {
+                return {
+                  durationInFrames: analysis.meta.totalFrames ?? DEFAULT_FRAMES,
+                  props: { ...props, analysis },
+                };
               }
               return { durationInFrames: DEFAULT_FRAMES };
             }}
@@ -165,9 +182,12 @@ export const Root: React.FC = () => {
             show: setlist,
           } satisfies SongVisualizerProps as Record<string, unknown>}
           calculateMetadata={async ({ props }) => {
-            const meta = props.meta as { totalFrames?: number } | undefined;
-            if (meta?.totalFrames) {
-              return { durationInFrames: meta.totalFrames };
+            const analysis = loadTrackAnalysis("s2t08") as { meta?: { totalFrames?: number } } | null;
+            if (analysis?.meta) {
+              return {
+                durationInFrames: analysis.meta.totalFrames ?? DEFAULT_FRAMES,
+                props: { ...props, analysis },
+              };
             }
             return { durationInFrames: DEFAULT_FRAMES };
           }}

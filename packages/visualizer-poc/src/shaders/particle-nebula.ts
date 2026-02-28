@@ -180,7 +180,7 @@ void main() {
   float distFade = 1.0 / (1.0 + vDist * 0.05);
   float alpha = glow * vAlpha * distFade;
 
-  rgb *= mix(0.5, 0.8, vEnergy) + uRms * 0.3;
+  rgb *= mix(0.6, 0.8, vEnergy) + uRms * 0.3;
 
   // === DISTANCE FOG: quiet = thick/intimate, loud = clear/vast ===
   float fogDensity = mix(0.15, 0.02, vEnergy);

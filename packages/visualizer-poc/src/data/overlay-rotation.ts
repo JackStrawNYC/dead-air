@@ -132,11 +132,11 @@ const ACCENT_CONFIG: Record<string, AccentConfig | null> = {
 
 /**
  * Window duration in frames by energy.
- * Quiet passages get long, patient windows (3 minutes).
+ * Quiet passages rotate every 60s to prevent visual stagnation.
  * Peaks rotate faster for visual energy.
  */
 const WINDOW_FRAMES_BY_ENERGY: Record<string, number> = {
-  low:  5400,  // 180 seconds — let a single visual breathe for 3 minutes
+  low:  1800,  // 60 seconds — gentle rotation, prevents dead stretches
   mid:  2700,  // 90 seconds — comfortable rotation
   high: 1350,  // 45 seconds — fast visual turnover at peaks
 };
@@ -156,12 +156,12 @@ const CROSSFADE_FRAMES_DEFAULT = 300;
 
 /**
  * Overlay count ranges by section energy.
- * Wide range: quiet = 1-2 (almost nothing), peak = 5-7 (full flood).
- * The contrast is what makes the peaks feel earned.
+ * Quiet = 2-4 (present but subdued), peak = 5-7 (full flood).
+ * Peaks still feel earned via opacity contrast + accent system.
  */
 const ENERGY_COUNTS: Record<string, { min: number; max: number }> = {
-  low:  { min: 1, max: 2 },
-  mid:  { min: 2, max: 4 },
+  low:  { min: 2, max: 4 },
+  mid:  { min: 3, max: 5 },
   high: { min: 5, max: 7 },
 };
 

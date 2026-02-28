@@ -15,9 +15,9 @@ interface Props {
   trackNumber: number;
 }
 
-const FADE_IN = 30;
-const HOLD = 120;
-const FADE_OUT = 30;
+const FADE_IN = 45;
+const HOLD = 240;
+const FADE_OUT = 45;
 const TOTAL = FADE_IN + HOLD + FADE_OUT;
 
 type Era = "primal" | "classic" | "hiatus" | "touch_of_grey" | "revival";

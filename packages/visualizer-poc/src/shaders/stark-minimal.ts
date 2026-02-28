@@ -141,7 +141,7 @@ void main() {
   col += filmGrain(uv, grainTime) * 0.03;
 
   // Lifted blacks (cold)
-  col = max(col, vec3(0.012, 0.010, 0.015));
+  col = max(col, vec3(0.08, 0.065, 0.085));
 
   gl_FragColor = vec4(col, 1.0);
 }

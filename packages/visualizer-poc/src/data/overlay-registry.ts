@@ -382,9 +382,10 @@ const ENABLED_OVERLAYS = new Set([
   "SkeletonBand", "DeadIcons", "BearParade", "MushroomForest", "MarchingTerrapins",
   "CosmicCharlie", "SkeletonCouple", "UncleSam", "LotScene", "CrowdSilhouette",
   "Bertha", "AmericanBeauty", "JerryGuitar", "DreamCatcher", "PhoenixWings", "VWBusParade",
-  // Layer 7: Frame/Info (10)
+  // Layer 7: Frame/Info (12)
   "PsychedelicBorder", "ConcertInfo", "SongTitle", "SetlistScroll", "BumperStickers",
   "BootlegLabel", "TourPosterGallery", "TicketStubAnimated", "PeaceSignShower", "GlowSticks",
+  "RainbowArc", "PrismRainbow",
   // Layer 8: Typography (2)
   "LyricFlash", "GarciaQuotes",
   // Layer 9: HUD (2)
