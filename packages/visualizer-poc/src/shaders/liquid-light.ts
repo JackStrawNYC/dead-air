@@ -79,11 +79,11 @@ void main() {
   p += vec2(shakeX, shakeY);
 
   float energy = clamp(uEnergy, 0.0, 1.0);
-  float complexity = mix(0.3, 1.0, energy);
+  float complexity = mix(0.5, 1.0, energy);
   float tempoScale = uTempo / 120.0;
   float sectionSeed = uSectionIndex * 7.3;
   float sectionWarp = 1.0 + (uSectionProgress - 0.5) * 0.3;
-  float t = uTime * (0.04 + uRms * 0.03) * tempoScale;
+  float t = uTime * (0.08 + uRms * 0.02) * tempoScale;
   float smoothness = 1.0 - uFlatness * 0.6;
   float grainAmount = uFlatness * 0.12;
 
@@ -104,7 +104,7 @@ void main() {
   float bgNoise = fbm(bgQ);
   float bgHue = uPaletteSecondary + bgNoise * 0.15;
   vec3 bgCol = palette(bgHue, vec3(0.4), vec3(0.3), vec3(1.0), vec3(bgHue, bgHue + 0.33, bgHue + 0.67));
-  bgCol *= 0.55 + energy * 0.15;
+  bgCol *= 0.65 + energy * 0.08;
 
   // ============ LAYER 2: Midground (hero) ============
   float warpStrength = (0.5 + uBass * 0.5) * complexity * contrastWarp;
@@ -149,16 +149,16 @@ void main() {
   vec3 midCol = vec3(midColR.r, midColG.g, midColB.b);
 
   // Palette saturation
-  float sat = mix(0.6, 1.0, energy) * uPaletteSaturation * (1.0 - uFlatness * 0.15);
+  float sat = mix(0.80, 1.0, energy) * uPaletteSaturation * (1.0 - uFlatness * 0.10);
   vec3 midGray = vec3(dot(midCol, vec3(0.299, 0.587, 0.114)));
   midCol = mix(midGray, midCol, sat);
 
-  // Color temperature
-  vec3 warmShift = vec3(1.12, 0.95, 0.82);
-  vec3 coolShift = vec3(0.85, 0.95, 1.12);
+  // Color temperature (gentle — warm at peaks, cool at rest)
+  vec3 warmShift = vec3(1.06, 0.97, 0.92);
+  vec3 coolShift = vec3(0.93, 0.97, 1.06);
   midCol *= mix(coolShift, warmShift, energy);
 
-  float brightness = mix(0.60, 0.80, energy) + uRms * 0.2;
+  float brightness = mix(0.82, 0.90, energy);
   midCol *= brightness;
 
   // ============ LAYER 3: Foreground ============
@@ -167,9 +167,9 @@ void main() {
   vec3 fgCol = vec3(fgNoise * 0.5 + 0.5) * vec3(0.8, 0.9, 1.0) * fgIntensity;
 
   // ============ COMPOSITE ============
-  float bgMix = mix(0.45, 0.25, energy);
-  float midMix = mix(0.5, 0.6, energy);
-  float fgMix = mix(0.1, 0.18, energy);
+  float bgMix = mix(0.38, 0.28, energy);
+  float midMix = mix(0.52, 0.58, energy);
+  float fgMix = mix(0.10, 0.14, energy);
   vec3 col = bgCol * bgMix + midCol * midMix + fgCol * fgMix;
 
   // Flatness grain
@@ -232,7 +232,7 @@ void main() {
   col += sectionBloom * vec3(1.0, 0.98, 0.94);
 
   // Vignette (energy-driven, no beat pulse)
-  float vigScale = mix(0.75, 0.55, energy);
+  float vigScale = mix(0.72, 0.64, energy);
   float vignette = 1.0 - dot(p * vigScale, p * vigScale);
   vignette = smoothstep(0.0, 1.0, vignette);
 
@@ -246,7 +246,7 @@ void main() {
 
   // === BLOOM: bright pixel self-illumination ===
   float lum = dot(col, vec3(0.299, 0.587, 0.114));
-  float bloomThreshold = mix(0.5, 0.35, energy);
+  float bloomThreshold = mix(0.50, 0.42, energy);
   float bloomAmount = max(0.0, lum - bloomThreshold) * 2.5;
   vec3 bloomColor = mix(col, vec3(1.0, 0.98, 0.95), 0.3);
   col += bloomColor * bloomAmount * 0.35;

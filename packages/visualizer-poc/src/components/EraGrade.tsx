@@ -26,25 +26,28 @@ interface EraGradeStyle {
 
 const ERA_GRADES: Record<Era, EraGradeStyle> = {
   primal: {
-    filter: "saturate(0.55) sepia(0.25) contrast(1.05) brightness(0.95)",
-    tintColor: "rgba(140, 90, 40, 0.06)",
-    tintOpacity: 0.06,
+    // Raised saturation 0.55→0.70 to prevent compound grayscale with EnergyEnvelope
+    filter: "saturate(0.70) sepia(0.20) contrast(1.03) brightness(0.97)",
+    tintColor: "rgba(140, 90, 40, 0.05)",
+    tintOpacity: 0.05,
   },
   classic: {
-    filter: "saturate(0.85) contrast(1.02) brightness(1.0)",
-    tintColor: "rgba(180, 140, 80, 0.03)",
-    tintOpacity: 0.03,
+    filter: "saturate(0.90) contrast(1.02) brightness(1.0)",
+    tintColor: "rgba(180, 140, 80, 0.02)",
+    tintOpacity: 0.02,
   },
   hiatus: {
-    filter: "saturate(0.65) contrast(1.0) brightness(0.92) hue-rotate(-5deg)",
+    // Removed hue-rotate — EnergyEnvelope no longer stacks hue-rotate
+    filter: "saturate(0.75) contrast(1.0) brightness(0.95)",
     tintColor: "rgba(60, 80, 120, 0.04)",
     tintOpacity: 0.04,
   },
   touch_of_grey: {
-    filter: "saturate(1.25) contrast(1.1) brightness(1.02)",
+    // Reduced contrast to prevent compound with EnergyEnvelope
+    filter: "saturate(1.15) contrast(1.06) brightness(1.01)",
   },
   revival: {
-    filter: "saturate(0.9) contrast(1.0) brightness(1.0)",
+    filter: "saturate(0.95) contrast(1.0) brightness(1.0)",
   },
 };
 

@@ -14,6 +14,8 @@ import type { EnhancedFrameData } from "../data/types";
 export interface AudioSnapshot {
   /** Gaussian-smoothed RMS energy (window=150, ~5s) */
   energy: number;
+  /** Slow-moving energy for ambient modulation (window=300, ~10s) — drifts, doesn't pulse */
+  slowEnergy: number;
   /** Bass: (sub+low)/2, smoothed (window=20) */
   bass: number;
   /** Mids: smoothed (window=12) */
@@ -154,6 +156,7 @@ export function computeAudioSnapshot(
 ): AudioSnapshot {
   return {
     energy: gaussianSmooth(frames, idx, (f) => f.rms, 150),
+    slowEnergy: gaussianSmooth(frames, idx, (f) => f.rms, 300),
     bass: gaussianSmooth(frames, idx, (f) => (f.sub + f.low) * 0.5, 20),
     mids: gaussianSmooth(frames, idx, (f) => f.mid, 12),
     highs: gaussianSmooth(frames, idx, (f) => f.high, 8),

@@ -25,7 +25,7 @@ import type { SetlistEntry, ShowSetlist, TrackAnalysis } from "./data/types";
 import { ShowContextProvider, getShowSeed } from "./data/ShowContext";
 import { VisualizerErrorBoundary } from "./components/VisualizerErrorBoundary";
 import { SilentErrorBoundary } from "./components/SilentErrorBoundary";
-import { SceneVideoLayer } from "./components/SceneVideoLayer";
+import { SceneVideoLayer, computeMediaWindows } from "./components/SceneVideoLayer";
 import { LyricTriggerLayer } from "./components/LyricTriggerLayer";
 import { resolveMediaForSong } from "./data/media-resolver";
 import { resolveLyricTriggers } from "./data/lyric-trigger-resolver";
@@ -69,17 +69,26 @@ function applyDensityMult(
 
 // ─── Song Art Phases ───
 const ART_FULL_END = 120;      // 4s at 30fps — full opacity title card
-const ART_FADE_END = 300;      // 10s — fade completes (6s transition)
-const ART_BG_OPACITY = 0.25;   // background wash opacity
+const ART_FADE_END = 300;      // 10s — fade to background wash level
+const ART_BG_OPACITY = 0.25;   // persistent background wash opacity
 
-/** Per-song psychedelic poster art with 3-phase animation */
-const SongArtLayer: React.FC<{ src: string }> = ({ src }) => {
+interface SongArtProps {
+  src: string;
+  /** When curated media is active, suppress art so it doesn't clash */
+  mediaActive: boolean;
+  /** Curated media (song-specific) dims art more than general filler */
+  mediaCurated: boolean;
+}
+
+/** Per-song poster art — the visual foundation of each song.
+ *  Intro: full opacity title card (4s), then settles to background wash.
+ *  Suppressed to 0% when curated media (images/videos) is active.
+ */
+const SongArtLayer: React.FC<SongArtProps> = ({ src, mediaActive, mediaCurated }) => {
   const frame = useCurrentFrame();
 
-  // Phase 1 (0–120): full opacity (4s title card)
-  // Phase 2 (120–300): fade 1.0 → 0.15 (6s transition)
-  // Phase 3 (300+): hold at 0.15 background wash
-  const artOpacity = interpolate(
+  // Base target: full during intro, then settle to background wash
+  const baseOpacity = interpolate(
     frame,
     [0, ART_FULL_END, ART_FADE_END],
     [1, 1, ART_BG_OPACITY],
@@ -90,7 +99,13 @@ const SongArtLayer: React.FC<{ src: string }> = ({ src }) => {
     },
   );
 
-  // Slow Ken Burns zoom: 1.0 → 1.04 (phase 1+2), then 1.04 → 1.10 (phase 3 bg wash)
+  // Curated media: dim song art but keep a trace for visual continuity.
+  const suppressionTarget = mediaCurated ? 0.25 : mediaActive ? 0.7 : 1;
+  const artOpacity = baseOpacity * suppressionTarget;
+
+  if (artOpacity < 0.01) return null;
+
+  // Slow Ken Burns zoom + drift throughout
   const scale = interpolate(
     frame,
     [0, ART_FADE_END, ART_FADE_END + 9000],
@@ -98,7 +113,6 @@ const SongArtLayer: React.FC<{ src: string }> = ({ src }) => {
     { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
   );
 
-  // Subtle horizontal drift
   const translateX = interpolate(
     frame,
     [0, ART_FADE_END + 9000],
@@ -126,7 +140,7 @@ const SongArtLayer: React.FC<{ src: string }> = ({ src }) => {
           willChange: "transform",
         }}
       />
-      {/* Bottom vignette for text legibility during Phase 1 */}
+      {/* Bottom vignette for text legibility during intro */}
       {frame < ART_FADE_END && (
         <div
           style={{
@@ -232,6 +246,15 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
     );
   }, [props.song.title, props.song.trackId, props.lyricAlignment, props.lyricTriggerConfig]);
 
+  // Compute suppressed frame ranges from lyric trigger windows (for SceneVideoLayer)
+  const triggerSuppressedRanges = useMemo(() => {
+    if (!triggerResult?.windows.length) return undefined;
+    return triggerResult.windows.map((w) => ({
+      start: w.fadeInStart,
+      end: w.fadeOutEnd,
+    }));
+  }, [triggerResult]);
+
   // Explicit overrides in setlist.json take priority over auto-resolution
   const effectiveSongArt = props.song.songArt ?? resolvedMedia?.songArt ?? undefined;
   const effectiveMedia = (props.song.sceneVideos?.length)
@@ -278,6 +301,18 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
     ? applyDensityMult(opacityMapBase, climaxMod.overlayDensityMult, rotationSchedule!)
     : null;
 
+  // ── Media suppression: reduce overlay opacity when curated media is active ──
+  const mediaWindows = useMemo(
+    () => computeMediaWindows(effectiveLegacyVideos, effectiveMedia, sections, f, props.song.trackId, showSeed),
+    [effectiveLegacyVideos, effectiveMedia, sections, f, props.song.trackId, showSeed],
+  );
+  const activeMediaWindow = mediaWindows.find(
+    (w) => frame >= w.frameStart - 270 && frame < w.frameEnd + 270, // 270 = CURATED_FADE_FRAMES
+  );
+  const mediaActive = !!activeMediaWindow;
+  const mediaCurated = activeMediaWindow ? activeMediaWindow.media.priority <= 1 : false;
+  const mediaSuppression = mediaCurated ? 0.15 : mediaActive ? 0.5 : 1.0;
+
   // Fade in/out for set break transitions (segues skip the fade)
   const fadeIn = props.segueIn ? 1 : interpolate(frame, [0, FADE_FRAMES], [0, 1], {
     extrapolateLeft: "clamp",
@@ -307,10 +342,10 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
             tempo={tempo}
           />
 
-          {/* ═══ Layer 0.5: Per-song poster art ═══ */}
+          {/* ═══ Layer 0.5: Per-song poster art (persistent background wash) ═══ */}
           {effectiveSongArt && (
             <SilentErrorBoundary name="SongArt">
-              <SongArtLayer src={staticFile(effectiveSongArt)} />
+              <SongArtLayer src={staticFile(effectiveSongArt)} mediaActive={mediaActive} mediaCurated={mediaCurated} />
             </SilentErrorBoundary>
           )}
 
@@ -325,6 +360,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
                 trackId={props.song.trackId}
                 showSeed={showSeed}
                 hueRotation={hueRotation}
+                suppressedRanges={triggerSuppressedRanges}
               />
             </SilentErrorBoundary>
           )}
@@ -358,7 +394,8 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
               }}
             >
               {activeEntries.map(([name, { Component }]) => {
-                const overlayOpacity = opacityMap ? (opacityMap[name] ?? 0) : 1;
+                const overlayOpacity = (opacityMap ? (opacityMap[name] ?? 0) : 1) * mediaSuppression;
+                if (overlayOpacity < 0.01) return null; // Skip render — invisible overlays waste ~450 renders/sec
                 return (
                   <div
                     key={name}
@@ -392,7 +429,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
           trackNumber={props.song.trackNumber}
         />
         <FilmGrain opacity={interpolate(
-          audioSnapshot.energy, [0.03, 0.30], [0.15, 0.06],
+          audioSnapshot.energy, [0.03, 0.30], [0.10, 0.04],
           { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
         )} energy={audioSnapshot.energy} />
       </div>

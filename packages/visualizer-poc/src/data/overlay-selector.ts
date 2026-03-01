@@ -5,7 +5,7 @@
  * 1. Build a SongProfile from audio analysis frames (avg energy, centroid, flatness, etc.)
  * 2. Score each overlay 0-1 against the profile (energy band match, tag affinity, weight, variety)
  * 3. Select top overlays per layer within min/max targets
- * 4. Cap total visual weight at 60
+ * 4. Cap total visual weight at 18
  */
 import type {
   EnhancedFrameData,
@@ -18,21 +18,21 @@ import type {
 } from "./types";
 import { SELECTABLE_REGISTRY, ALWAYS_ACTIVE } from "./overlay-registry";
 
-// ─── Per-layer selection targets ───
+// ─── Per-layer selection targets (sparse — let each visual moment breathe) ───
 const LAYER_TARGETS: Record<number, { min: number; max: number }> = {
-  1:  { min: 3, max: 6 },   // Atmospheric
-  2:  { min: 2, max: 5 },   // Sacred/Center
-  3:  { min: 3, max: 6 },   // Reactive
-  4:  { min: 2, max: 5 },   // Geometric
-  5:  { min: 3, max: 7 },   // Nature/Cosmic
-  6:  { min: 2, max: 5 },   // Characters
-  7:  { min: 2, max: 5 },   // Frame/Info
-  8:  { min: 1, max: 3 },   // Typography
-  9:  { min: 1, max: 3 },   // HUD
-  10: { min: 1, max: 3 },   // Distortion
+  1:  { min: 0, max: 1 },   // Atmospheric
+  2:  { min: 0, max: 1 },   // Sacred
+  3:  { min: 0, max: 1 },   // Reactive
+  4:  { min: 0, max: 1 },   // Geometric
+  5:  { min: 0, max: 1 },   // Nature/Cosmic
+  6:  { min: 0, max: 1 },   // Characters
+  7:  { min: 0, max: 1 },   // Frame/Info
+  8:  { min: 0, max: 0 },   // Typography — skip
+  9:  { min: 0, max: 0 },   // HUD — skip
+  10: { min: 0, max: 1 },   // Distortion
 };
 
-const MAX_TOTAL_WEIGHT = 60;
+const MAX_TOTAL_WEIGHT = 8;
 
 // ─── Cross-Song Memory ───
 

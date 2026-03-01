@@ -37,36 +37,40 @@ export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod 
   const factor = energyToFactor(energy); // 0 (quiet) → 1 (loud)
   const showCtx = useShowContext();
 
-  // ── Multi-field modulations (perceptible, not subtle) ──
-  // Centroid: low centroid (bass-heavy) = cooler, high centroid (treble) = warmer
-  const centroidHueOffset = (snapshot.centroid - 0.5) * 24; // ±12deg (was ±4)
-  // Onset: percussive attacks create brightness punch
-  const onsetBrightness = snapshot.onsetEnvelope * 0.12;    // +0-12% (was 4%)
-  // Flatness: tonal passages richer, noisy passages flatter
-  const flatnessSaturation = 0.04 - snapshot.flatness * 0.12; // +4% to -8% (was +2/-4)
+  // Slow-moving energy for ambient systems (vignette, bloom) — drifts, doesn't pulse
+  const slowFactor = energyToFactor(snapshot.slowEnergy);
 
-  // Texture-aware vignette bonus
+  // ── Multi-field modulations (gentle — felt, not seen) ──
+  // Onset: percussive attacks create mild brightness punch
+  const onsetBrightness = snapshot.onsetEnvelope * 0.04;    // +0-4%
+  // Flatness: tonal passages richer, noisy passages flatter
+  const flatnessSaturation = 0.02 - snapshot.flatness * 0.04; // +2% to -2%
+
+  // Texture-aware vignette bonus (minimal — atmosphere, not tunnel)
   const texture = detectTexture(snapshot, energy);
   const textureVignetteBonus =
-    texture === "ambient" ? 0.15 :    // tunnel/portal during Space
-    texture === "sparse" ? 0.08 :     // gentle focus during ballad intro
-    texture === "peak" ? -0.05 : 0;   // wide open, let the flood breathe
+    texture === "ambient" ? 0.03 :    // hint of focus during Space
+    texture === "sparse" ? 0.02 :     // barely-there focus during ballad intro
+    texture === "peak" ? -0.02 : 0;   // wide open, let the flood breathe
 
-  // Texture-aware saturation offset — Space→grayscale void, peaks→oversaturated ecstasy
+  // Texture-aware saturation offset (gentle — Space subdued, not grayscale)
   const textureSaturationOffset =
-    texture === "ambient" ? -0.10 :   // Space: push toward grayscale void
-    texture === "sparse" ? -0.05 :    // ballad intros: restrained
-    texture === "peak" ? +0.08 : 0;   // peaks: oversaturated ecstasy
+    texture === "ambient" ? -0.03 :   // Space: slightly subdued
+    texture === "sparse" ? -0.02 :    // ballad intros: barely restrained
+    texture === "peak" ? +0.02 : 0;   // peaks: touch of saturation
 
-  // Widened modulation ranges — quiet feels void, peaks feel radiant
-  const saturation = 0.45 + factor * 0.85 + flatnessSaturation + textureSaturationOffset + (climaxMod?.saturationOffset ?? 0);
-  const brightness = 0.82 + factor * 0.24 + onsetBrightness + (climaxMod?.brightnessOffset ?? 0);
-  const contrast = 0.94 + factor * 0.14;                        // 0.94 → 1.08
-  const hueRotate = 5 - factor * 10 + centroidHueOffset;        // ±17deg (was ±7)
-  const vignetteOpacity = 0.08 + factor * 0.42 + textureVignetteBonus + (climaxMod?.vignetteOffset ?? 0);
-  const bloomOpacity = factor * 0.35 + (climaxMod?.bloomOffset ?? 0);
+  // Tight modulation ranges — no visible pumping, no pulsing black
+  // Saturation + brightness use fast energy (responsive to dynamics)
+  const saturation = 0.92 + factor * 0.12 + flatnessSaturation + textureSaturationOffset + (climaxMod?.saturationOffset ?? 0);
+  const brightness = 0.96 + factor * 0.06 + onsetBrightness + (climaxMod?.brightnessOffset ?? 0);
+  const contrast = 0.97 + factor * 0.06;                        // 0.97 → 1.03
+  // Vignette + bloom use slow energy (drift, not pulse) — staggered from sat/brightness
+  const vignetteOpacity = 0.02 + slowFactor * 0.10 + textureVignetteBonus + (climaxMod?.vignetteOffset ?? 0);
+  const bloomOpacity = slowFactor * 0.10 + (climaxMod?.bloomOffset ?? 0);
 
-  const filterStr = `saturate(${saturation.toFixed(3)}) brightness(${brightness.toFixed(3)}) contrast(${contrast.toFixed(3)}) hue-rotate(${hueRotate.toFixed(1)}deg)`;
+  // No hue-rotate here — EraGrade + SongPalette already handle color character.
+  // Stacking 3 hue-rotates caused unpredictable color shifts.
+  const filterStr = `saturate(${saturation.toFixed(3)}) brightness(${brightness.toFixed(3)}) contrast(${contrast.toFixed(3)})`;
 
   return (
     <div style={{ position: "absolute", inset: 0, filter: filterStr }}>

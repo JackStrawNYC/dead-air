@@ -138,9 +138,9 @@ const ACCENT_CONFIG: Record<string, AccentConfig | null> = {
  * Peaks rotate faster for visual energy.
  */
 const WINDOW_FRAMES_BY_ENERGY: Record<string, number> = {
-  low:  1800,  // 60 seconds — gentle rotation, prevents dead stretches
-  mid:  2700,  // 90 seconds — comfortable rotation
-  high: 1350,  // 45 seconds — fast visual turnover at peaks
+  low:  2700,  // 90 seconds — let the shader breathe
+  mid:  3600,  // 120 seconds — slow rotation, overlays don't churn
+  high: 1800,  // 60 seconds — moderate visual turnover at peaks
 };
 const WINDOW_FRAMES_DEFAULT = 2700;
 
@@ -158,13 +158,13 @@ const CROSSFADE_FRAMES_DEFAULT = 300;
 
 /**
  * Overlay count ranges by section energy.
- * Quiet = 0-2 (near-void — shader + grain only), peak = 5-8 (full flood).
- * The darkness earns the flood. Zero overlays during quiet = just shader + film grain.
+ * Quiet = 0-1 (near-void — shader + grain only), peak = 3-5 (controlled flood).
+ * Reduced from original 0-8 range — fewer overlays, let each breathe.
  */
 const ENERGY_COUNTS: Record<string, { min: number; max: number }> = {
-  low:  { min: 0, max: 2 },
-  mid:  { min: 2, max: 4 },
-  high: { min: 5, max: 8 },
+  low:  { min: 0, max: 0 },  // shader only — let it breathe
+  mid:  { min: 0, max: 1 },  // one overlay accent
+  high: { min: 1, max: 2 },  // two max at peaks
 };
 
 /** Score penalty for overlays used in the previous window */
@@ -293,6 +293,13 @@ export function buildRotationSchedule(
     return { alwaysActive, windows: [], accentOverlays: new Map() };
   }
 
+  // Per-song visual mode: detect overall energy character from sections
+  // Quiet songs (mostly low/mid sections) get reduced overlay counts
+  const highSections = sections.filter((s) => s.energy === "high").length;
+  const highRatio = highSections / sections.length;
+  // 0 = all quiet, 1 = all high-energy. Songs < 20% high sections are "contemplative"
+  const songIntensity = Math.min(1, highRatio / 0.5); // 0-1 scale
+
   // 2. Build overlay entries for scoring (with layer info)
   const poolEntries: OverlayEntry[] = [];
   for (const name of rotationPool) {
@@ -348,6 +355,11 @@ export function buildRotationSchedule(
 
     const energyRange = ENERGY_COUNTS[window.energy] ?? ENERGY_COUNTS.mid;
     let targetCount = energyRange.min + Math.floor(rng() * (energyRange.max - energyRange.min + 1));
+
+    // Per-song mode: contemplative songs (low songIntensity) get fewer overlays
+    if (songIntensity < 0.4 && window.energy !== "high") {
+      targetCount = Math.max(0, targetCount - 1);
+    }
 
     // Texture-aware count adjustment: sample midpoint audio
     let windowTexture: string | null = null;

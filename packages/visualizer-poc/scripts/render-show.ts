@@ -12,12 +12,14 @@
  *
  * Usage:
  *   npx tsx scripts/render-show.ts [--resume] [--track=s2t08] [--gl=angle]
+ *   npx tsx scripts/render-show.ts --track=s1t10 --preview   # 10-second preview
  *
  * Features:
  *   --resume     Skip tracks with existing output
  *   --track=ID   Render only one track
  *   --gl=angle   GPU backend (default: angle)
  *   --chunk=N    Frames per chunk for long songs (default: 4500)
+ *   --preview    Render only first 300 frames (10s) to a separate preview file
  */
 
 import { execSync } from "child_process";
@@ -41,6 +43,8 @@ const resume = args.includes("--resume");
 const glArg = args.find((a) => a.startsWith("--gl="))?.split("=")[1] ?? "angle";
 const chunkSize = parseInt(args.find((a) => a.startsWith("--chunk="))?.split("=")[1] ?? "4500", 10);
 const trackFilter = args.find((a) => a.startsWith("--track="))?.split("=")[1];
+const previewMode = args.includes("--preview");
+const PREVIEW_FRAMES = 450; // 15 seconds at 30fps
 
 interface SetlistEntry {
   trackId: string;
@@ -70,6 +74,19 @@ function computeSourceHash(): string {
     join(ROOT, "src", "entry.ts"),
     join(ROOT, "src", "Root.tsx"),
     join(ROOT, "src", "SongVisualizer.tsx"),
+    join(ROOT, "src", "components", "EnergyEnvelope.tsx"),
+    join(ROOT, "src", "components", "EraGrade.tsx"),
+    join(ROOT, "src", "components", "FilmGrain.tsx"),
+    join(ROOT, "src", "components", "FullscreenQuad.tsx"),
+    join(ROOT, "src", "components", "AudioReactiveCanvas.tsx"),
+    join(ROOT, "src", "components", "SceneVideoLayer.tsx"),
+    join(ROOT, "src", "shaders", "liquid-light.ts"),
+    join(ROOT, "src", "shaders", "noise.ts"),
+    join(ROOT, "src", "utils", "audio-reactive.ts"),
+    join(ROOT, "src", "utils", "energy.ts"),
+    join(ROOT, "src", "utils", "climax-state.ts"),
+    join(ROOT, "src", "data", "overlay-selector.ts"),
+    join(ROOT, "src", "data", "overlay-rotation.ts"),
     join(DATA_DIR, "setlist.json"),
   ];
   // Optional files (may not exist)
@@ -454,7 +471,9 @@ function main() {
   let totalFrames = 0;
   for (const song of songsToRender) {
     const track = tracks.find((t: TimelineTrack) => t.trackId === song.trackId);
-    if (track && !track.missing) totalFrames += track.totalFrames;
+    if (track && !track.missing) {
+      totalFrames += previewMode ? Math.min(PREVIEW_FRAMES, track.totalFrames) : track.totalFrames;
+    }
   }
 
   console.log(`\nRendering ${songsToRender.length} track(s) with gl=${glArg}, chunk=${chunkSize}`);
@@ -466,7 +485,7 @@ function main() {
   const startTime = Date.now();
   let framesRendered = 0;
 
-  if (!trackFilter) {
+  if (!trackFilter && !previewMode) {
     const introPath = renderShowIntro(bundlePath);
     if (introPath) {
       rendered.push({ path: introPath, set: 0 });
@@ -480,35 +499,42 @@ function main() {
       continue;
     }
 
-    const outputPath = join(SONGS_DIR, `${song.trackId}.mp4`);
+    const outputPath = previewMode
+      ? join(SONGS_DIR, `${song.trackId}-preview.mp4`)
+      : join(SONGS_DIR, `${song.trackId}.mp4`);
+    const renderFrames = previewMode ? Math.min(PREVIEW_FRAMES, track.totalFrames) : track.totalFrames;
 
     if (resume && existsSync(outputPath)) {
       console.log(`RESUME: ${song.trackId} already rendered`);
       rendered.push({ path: outputPath, set: song.set, trackId: song.trackId });
-      framesRendered += track.totalFrames;
+      framesRendered += renderFrames;
     } else {
       const analysisPath = join(TRACKS_DIR, `${song.trackId}-analysis.json`);
 
-      console.log(`\n[${ (framesRendered / totalFrames * 100).toFixed(0) }%] Rendering: ${song.title} (${song.trackId}) — ${track.totalFrames} frames`);
+      console.log(`\n[${ (framesRendered / totalFrames * 100).toFixed(0) }%] Rendering: ${song.title} (${song.trackId}) — ${renderFrames} frames${previewMode ? " (PREVIEW)" : ""}`);
 
-      renderSong(song, track.totalFrames, analysisPath, outputPath, bundlePath);
+      const songStart = Date.now();
+      renderSong(song, renderFrames, analysisPath, outputPath, bundlePath);
+      const songElapsed = (Date.now() - songStart) / 1000;
+      const songFps = renderFrames / songElapsed;
 
-      framesRendered += track.totalFrames;
+      framesRendered += renderFrames;
       const elapsed = (Date.now() - startTime) / 1000;
       const fps = framesRendered / elapsed;
       const remaining = (totalFrames - framesRendered) / fps;
+      console.log(`  Song: ${renderFrames} frames in ${(songElapsed / 60).toFixed(1)}m (${songFps.toFixed(1)} fps)`);
       console.log(`  Progress: ${framesRendered.toLocaleString()}/${totalFrames.toLocaleString()} frames (${fps.toFixed(1)} eff. fps, ~${(remaining / 60).toFixed(0)}m remaining)`);
 
       rendered.push({ path: outputPath, set: song.set, trackId: song.trackId });
     }
   }
 
-  if (!trackFilter) {
+  if (!trackFilter && !previewMode) {
     const endCardPath = renderEndCard(bundlePath);
     rendered.push({ path: endCardPath, set: 0 });
   }
 
-  if (!trackFilter && rendered.length > 1) {
+  if (!trackFilter && !previewMode && rendered.length > 1) {
     concatShow(rendered, bundlePath, chapters);
   }
 

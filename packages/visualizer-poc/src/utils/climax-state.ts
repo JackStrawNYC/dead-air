@@ -180,26 +180,26 @@ export function detectTexture(snapshot: AudioSnapshot, energy: number): MusicalT
 
 // ─── Modulation Output ───
 
-/** Per-phase target values — widened for Brightman-style dynamic range */
+/** Per-phase target values — scaled to match tight EnergyEnvelope ranges (0.08 brightness, 0.25 sat) */
 const PHASE_TARGETS: Record<
   ClimaxPhase,
   { sat: number; bright: number; vig: number; bloom: number; density: number }
 > = {
-  idle:    { sat: -0.05, bright: -0.02, vig: -0.03, bloom: 0,    density: 0.3 },
-  build:   { sat: +0.06, bright: +0.03, vig: +0.06, bloom: 0.05, density: 1.0 },
-  climax:  { sat: +0.12, bright: +0.06, vig: +0.12, bloom: 0.10, density: 1.5 },
-  sustain: { sat: +0.08, bright: +0.03, vig: +0.08, bloom: 0.06, density: 1.2 },
-  release: { sat: -0.04, bright: -0.01, vig: -0.03, bloom: 0,    density: 0.4 },
+  idle:    { sat: -0.03, bright: -0.01, vig: -0.02, bloom: 0,    density: 0.6 },
+  build:   { sat: +0.02, bright: +0.01, vig: +0.02, bloom: 0.02, density: 1.0 },
+  climax:  { sat: +0.03, bright: +0.03, vig: +0.03, bloom: 0.05, density: 1.15 },
+  sustain: { sat: +0.02, bright: +0.02, vig: +0.02, bloom: 0.03, density: 1.05 },
+  release: { sat: -0.02, bright: -0.01, vig: -0.02, bloom: 0,    density: 0.7 },
 };
 
-/** Anticipation sub-state overrides (desaturation dip before peak) */
-const ANTICIPATION = { sat: -0.10, bright: +0.01, vig: +0.04, bloom: 0.01, density: 0.5 };
+/** Anticipation sub-state overrides (mild desaturation dip before peak) */
+const ANTICIPATION = { sat: -0.05, bright: +0.005, vig: +0.02, bloom: 0.01, density: 0.7 };
 
 /** Build phase start values (intensity interpolates from start → target) */
-const BUILD_START = { sat: 0, bright: 0, vig: 0, bloom: 0, density: 0.5 };
+const BUILD_START = { sat: 0, bright: 0, vig: 0, bloom: 0, density: 0.7 };
 
 /** Release phase start values (intensity interpolates from start → target) */
-const RELEASE_START = { sat: +0.04, bright: +0.01, vig: +0.03, bloom: 0.02, density: 0.8 };
+const RELEASE_START = { sat: +0.02, bright: +0.005, vig: +0.02, bloom: 0.01, density: 0.8 };
 
 /**
  * Map a ClimaxState to additive visual modifiers.

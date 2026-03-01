@@ -23,7 +23,7 @@ function mulberry32(seed: number) {
   };
 }
 
-export const FilmGrain: React.FC<Props> = ({ opacity = 0.20, energy = 0 }) => {
+export const FilmGrain: React.FC<Props> = ({ opacity = 0.10, energy = 0 }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
 
@@ -33,7 +33,7 @@ export const FilmGrain: React.FC<Props> = ({ opacity = 0.20, energy = 0 }) => {
   // Energy-aware breathing: peaks pulse fast (1.5s/45fr), quiet drifts slow (3.5s/105fr)
   const energyFactor = Math.max(0, Math.min(1, (energy - 0.03) / 0.27));
   const breathePeriod = 45 + (1 - energyFactor) * 60; // 45 (peak) → 105 (quiet)
-  const breathe = 0.85 + 0.30 * Math.sin(frame * Math.PI / breathePeriod);
+  const breathe = 0.90 + 0.10 * Math.sin(frame * Math.PI / breathePeriod);
   const finalOpacity = opacity * breathe;
 
   // Gate weave — sub-pixel sine offset simulating projector gate instability
