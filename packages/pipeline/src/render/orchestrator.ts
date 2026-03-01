@@ -1,7 +1,6 @@
 import type Database from 'better-sqlite3';
 import { createLogger, logCost } from '@dead-air/core';
 import { buildCompositionProps } from './composition-builder.js';
-import { renderEpisode } from './renderer.js';
 import { renderScenes, concatScenes } from './scene-renderer.js';
 import { renderEpisodeOnLambda } from './lambda-renderer.js';
 import { postProcess } from './post-process.js';

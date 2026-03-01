@@ -1,5 +1,5 @@
 import { resolve } from 'path';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync, renameSync } from 'fs';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { createHash } from 'crypto';
@@ -19,6 +19,142 @@ const CROSSFADE_FRAMES = 30;
  * large segments into chunks with fresh browser instances avoids this.
  */
 const MAX_FRAMES_PER_CHUNK = 3000;
+
+// ─── Render Checkpoint System ────────────────────────────────────────
+
+interface RenderCheckpoint {
+  episodeId: string;
+  totalSegments: number;
+  completedSegments: number[];
+  startedAt: string;
+  lastUpdatedAt: string;
+}
+
+function getCheckpointPath(dataDir: string, episodeId: string): string {
+  return resolve(dataDir, 'renders', episodeId, 'render-checkpoint.json');
+}
+
+function loadCheckpoint(dataDir: string, episodeId: string): RenderCheckpoint | null {
+  const path = getCheckpointPath(dataDir, episodeId);
+  if (!existsSync(path)) return null;
+  try {
+    return JSON.parse(readFileSync(path, 'utf-8'));
+  } catch {
+    return null;
+  }
+}
+
+function saveCheckpoint(dataDir: string, checkpoint: RenderCheckpoint): void {
+  const dir = resolve(dataDir, 'renders', checkpoint.episodeId);
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+  const path = getCheckpointPath(dataDir, checkpoint.episodeId);
+  writeFileSync(path, JSON.stringify(checkpoint, null, 2));
+}
+
+function clearCheckpoint(dataDir: string, episodeId: string): void {
+  const path = getCheckpointPath(dataDir, episodeId);
+  try { unlinkSync(path); } catch { /* ignore */ }
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────
+
+/**
+ * Get the duration (in seconds) of a video file via ffprobe.
+ */
+async function getVideoDuration(path: string): Promise<number> {
+  try {
+    const { stdout } = await execFileAsync('ffprobe', [
+      '-v', 'quiet', '-show_entries', 'format=duration',
+      '-of', 'csv=p=0', path,
+    ]);
+    return parseFloat(stdout.trim()) || 0;
+  } catch {
+    return 0;
+  }
+}
+
+/**
+ * Probe a segment's codec parameters for verification before concat.
+ */
+interface SegmentInfo {
+  path: string;
+  videoCodec: string;
+  width: number;
+  height: number;
+  fps: string;
+  pixFmt: string;
+  duration: number;
+}
+
+async function probeSegment(path: string): Promise<SegmentInfo | null> {
+  try {
+    const { stdout } = await execFileAsync('ffprobe', [
+      '-v', 'quiet',
+      '-select_streams', 'v:0',
+      '-show_entries', 'stream=codec_name,width,height,r_frame_rate,pix_fmt',
+      '-show_entries', 'format=duration',
+      '-of', 'json',
+      path,
+    ]);
+    const data = JSON.parse(stdout);
+    const stream = data.streams?.[0];
+    const format = data.format;
+    if (!stream) return null;
+    return {
+      path,
+      videoCodec: stream.codec_name,
+      width: stream.width,
+      height: stream.height,
+      fps: stream.r_frame_rate,
+      pixFmt: stream.pix_fmt,
+      duration: parseFloat(format?.duration || '0'),
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Verify all segments have matching codec parameters before concat.
+ */
+async function verifySegments(segmentPaths: string[]): Promise<void> {
+  const infos = await Promise.all(segmentPaths.map(probeSegment));
+  const valid = infos.filter((i): i is SegmentInfo => i !== null);
+
+  if (valid.length === 0) {
+    log.warn('No segments could be probed — skipping verification');
+    return;
+  }
+
+  const reference = valid[0];
+  let mismatches = 0;
+  for (const info of valid.slice(1)) {
+    if (info.width !== reference.width || info.height !== reference.height) {
+      log.warn(`Resolution mismatch: ${info.path} is ${info.width}x${info.height}, expected ${reference.width}x${reference.height}`);
+      mismatches++;
+    }
+    if (info.fps !== reference.fps) {
+      log.warn(`FPS mismatch: ${info.path} is ${info.fps}, expected ${reference.fps}`);
+      mismatches++;
+    }
+    if (info.videoCodec !== reference.videoCodec) {
+      log.warn(`Codec mismatch: ${info.path} is ${info.videoCodec}, expected ${reference.videoCodec}`);
+      mismatches++;
+    }
+    if (info.pixFmt !== reference.pixFmt) {
+      log.warn(`Pixel format mismatch: ${info.path} is ${info.pixFmt}, expected ${reference.pixFmt}`);
+      mismatches++;
+    }
+  }
+
+  if (mismatches === 0) {
+    log.info(`Verified ${valid.length} segments: ${reference.width}x${reference.height} ${reference.videoCodec} ${reference.fps}fps ${reference.pixFmt}`);
+  } else {
+    log.warn(`Found ${mismatches} codec mismatches across ${valid.length} segments — concat may produce artifacts`);
+  }
+}
+
+// ─── Core Render Logic ───────────────────────────────────────────────
 
 export interface SceneRenderOptions {
   props: EpisodeProps;
@@ -235,6 +371,7 @@ async function renderChunk(
     composition,
     serveUrl,
     codec: 'h264',
+    crf: 18,
     outputLocation: outputPath,
     inputProps: miniProps as unknown as Record<string, unknown>,
     concurrency: frameConcurrency,
@@ -325,11 +462,31 @@ async function renderSingleSegment(
     ], { maxBuffer: 10 * 1024 * 1024, timeout: 60_000 });
 
     // Clean up chunk files
-    const { unlinkSync } = await import('fs');
     for (const p of chunkPaths) {
       try { unlinkSync(p); } catch { /* ignore */ }
     }
     try { unlinkSync(concatListPath); } catch { /* ignore */ }
+  }
+
+  // Apply micro audio fades to prevent clicks at concat boundaries
+  const fadedPath = outputPath.replace('.mp4', '-faded.mp4');
+  const segDuration = await getVideoDuration(outputPath);
+  if (segDuration > 0.1) {
+    const fadeOutStart = Math.max(0, segDuration - 0.034);
+    try {
+      await execFileAsync('ffmpeg', [
+        '-y', '-i', outputPath,
+        '-af', `afade=t=in:d=0.034,afade=t=out:st=${fadeOutStart.toFixed(3)}:d=0.034`,
+        '-c:v', 'copy',
+        '-c:a', 'aac', '-b:a', '192k',
+        fadedPath,
+      ], { maxBuffer: 10 * 1024 * 1024, timeout: 60_000 });
+      try { unlinkSync(outputPath); } catch { /* ignore */ }
+      renameSync(fadedPath, outputPath);
+    } catch (err) {
+      log.warn(`  [${paddedIdx}] Audio micro-fade failed (non-critical): ${err}`);
+      try { unlinkSync(fadedPath); } catch { /* ignore */ }
+    }
   }
 
   // Save hash
@@ -342,6 +499,7 @@ async function renderSingleSegment(
 /**
  * Render segments with concurrency control.
  * Bundles the Remotion project once and reuses across all workers.
+ * Tracks progress via checkpoint file for resume support.
  */
 async function renderWithConcurrency(
   props: EpisodeProps,
@@ -357,6 +515,22 @@ async function renderWithConcurrency(
 
   log.info(`Render config: ${concurrency} segment workers × ${frameConcurrency} frame threads, GL: ${gl}`);
 
+  // Load or create checkpoint
+  let checkpoint = loadCheckpoint(dataDir, props.episodeId);
+  if (checkpoint && checkpoint.completedSegments.length > 0) {
+    log.info(`Resuming from checkpoint: ${checkpoint.completedSegments.length}/${checkpoint.totalSegments} segments complete`);
+  }
+  if (!checkpoint) {
+    checkpoint = {
+      episodeId: props.episodeId,
+      totalSegments: props.segments.length,
+      completedSegments: [],
+      startedAt: new Date().toISOString(),
+      lastUpdatedAt: new Date().toISOString(),
+    };
+    saveCheckpoint(dataDir, checkpoint);
+  }
+
   const results: SceneRenderResult[] = [];
   const queue = [...indices];
 
@@ -365,11 +539,21 @@ async function renderWithConcurrency(
       const idx = queue.shift()!;
       const result = await renderSingleSegment(props, idx, dataDir, force, serveUrl, frameConcurrency, gl);
       results.push(result);
+
+      // Update checkpoint after each successful segment
+      if (!result.skipped) {
+        checkpoint!.completedSegments.push(idx);
+        checkpoint!.lastUpdatedAt = new Date().toISOString();
+        saveCheckpoint(dataDir, checkpoint!);
+      }
     }
   }
 
   const workers = Array.from({ length: Math.min(concurrency, queue.length) }, () => processNext());
   await Promise.all(workers);
+
+  // All segments complete — clear checkpoint
+  clearCheckpoint(dataDir, props.episodeId);
 
   return results.sort((a, b) => a.segmentIndex - b.segmentIndex);
 }
@@ -399,6 +583,19 @@ export async function renderScenes(options: SceneRenderOptions): Promise<SceneRe
     indices = [segmentIndex];
   }
 
+  // Filter out checkpoint-completed segments when resuming
+  if (changedOnly) {
+    const checkpoint = loadCheckpoint(dataDir, props.episodeId);
+    if (checkpoint) {
+      const completed = new Set(checkpoint.completedSegments);
+      const before = indices.length;
+      indices = indices.filter((i) => !completed.has(i));
+      if (before !== indices.length) {
+        log.info(`Checkpoint: skipping ${before - indices.length} already-completed segments`);
+      }
+    }
+  }
+
   const results = await renderWithConcurrency(props, indices, dataDir, concurrency, force, frameConcurrency, gl);
 
   const rendered = results.filter((r) => !r.skipped);
@@ -410,6 +607,7 @@ export async function renderScenes(options: SceneRenderOptions): Promise<SceneRe
 
 /**
  * Concatenate rendered scene files into a single MP4 using FFmpeg concat demuxer.
+ * Verifies codec parameters before concat and checks duration after.
  */
 export async function concatScenes(
   props: EpisodeProps,
@@ -422,6 +620,7 @@ export async function concatScenes(
 
   // Build concat list
   const lines: string[] = [];
+  const segmentPaths: string[] = [];
   for (let i = 0; i < props.segments.length; i++) {
     const paddedIdx = String(i).padStart(3, '0');
     const scenePath = resolve(sceneDir, `segment-${paddedIdx}.mp4`);
@@ -430,7 +629,11 @@ export async function concatScenes(
       continue;
     }
     lines.push(`file '${scenePath}'`);
+    segmentPaths.push(scenePath);
   }
+
+  // Verify codec parameters before concat
+  await verifySegments(segmentPaths);
 
   writeFileSync(concatListPath, lines.join('\n'));
   log.info(`Concatenating ${lines.length} scenes...`);
@@ -447,6 +650,17 @@ export async function concatScenes(
     ],
     { maxBuffer: 10 * 1024 * 1024, timeout: 300_000 },
   );
+
+  // Post-concat duration verification
+  const expectedDuration = segmentPaths.length > 0
+    ? (await Promise.all(segmentPaths.map(getVideoDuration))).reduce((a, b) => a + b, 0)
+    : 0;
+  const actualDuration = await getVideoDuration(outputPath);
+  if (expectedDuration > 0 && Math.abs(actualDuration - expectedDuration) > 1.0) {
+    log.warn(`Duration mismatch: expected ${expectedDuration.toFixed(1)}s, got ${actualDuration.toFixed(1)}s (delta: ${(actualDuration - expectedDuration).toFixed(1)}s)`);
+  } else {
+    log.info(`Duration verified: ${actualDuration.toFixed(1)}s`);
+  }
 
   log.info(`Concatenated: ${outputPath}`);
   return outputPath;

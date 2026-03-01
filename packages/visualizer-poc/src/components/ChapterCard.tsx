@@ -22,12 +22,20 @@ const FADE_IN = 45;    // 1.5s
 const HOLD = 90;       // 3s
 const FADE_OUT = 45;   // 1.5s
 
+export interface SongStats {
+  timesPlayed: number;
+  firstPlayed?: string;
+  notable?: string;
+}
+
 export interface ChapterCardProps {
   /** The chapter text — one or two sentences max */
   text: string;
+  /** Optional song statistics */
+  stats?: SongStats;
 }
 
-export const ChapterCard: React.FC<ChapterCardProps> = ({ text }) => {
+export const ChapterCard: React.FC<ChapterCardProps> = ({ text, stats }) => {
   const { width, height } = useVideoConfig();
   const frame = useCurrentFrame();
 
@@ -108,6 +116,52 @@ export const ChapterCard: React.FC<ChapterCardProps> = ({ text }) => {
         >
           {text}
         </div>
+
+        {/* Song stats — staggered fade-in after main text */}
+        {stats && (
+          <div
+            style={{
+              marginTop: 24,
+              opacity: interpolate(
+                frame,
+                [FADE_IN + 20, FADE_IN + 50, FADE_IN + HOLD, total],
+                [0, 0.6, 0.6, 0],
+                { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
+              ),
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: 6,
+            }}
+          >
+            <div
+              style={{
+                color: "rgba(255, 200, 140, 0.65)",
+                fontSize: 18,
+                fontFamily: `${cormorant}, 'Cormorant Garamond', Georgia, serif`,
+                fontWeight: 300,
+                letterSpacing: "0.08em",
+                textTransform: "uppercase",
+              }}
+            >
+              {stats.timesPlayed} performances{stats.firstPlayed ? ` since ${stats.firstPlayed}` : ""}
+            </div>
+            {stats.notable && (
+              <div
+                style={{
+                  color: "rgba(255, 248, 240, 0.45)",
+                  fontSize: 15,
+                  fontFamily: `${cormorant}, 'Cormorant Garamond', Georgia, serif`,
+                  fontWeight: 300,
+                  fontStyle: "italic",
+                  letterSpacing: "0.02em",
+                }}
+              >
+                {stats.notable}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Decorative rule below */}
         <div

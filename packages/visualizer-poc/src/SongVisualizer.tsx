@@ -37,6 +37,9 @@ import { EnergyEnvelope } from "./components/EnergyEnvelope";
 import { computeClimaxState, climaxModulation } from "./utils/climax-state";
 import { computeAudioSnapshot } from "./utils/audio-reactive";
 import { AudioSnapshotProvider } from "./data/AudioSnapshotContext";
+import { LyricDisplay } from "./components/LyricDisplay";
+import { CrowdAmbience } from "./components/CrowdAmbience";
+import { computeJamEvolution } from "./utils/jam-evolution";
 
 import type { RotationSchedule } from "./data/overlay-rotation";
 
@@ -296,9 +299,20 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
   const climaxState = computeClimaxState(f, frame, sections, audioSnapshot.energy);
   const climaxMod = climaxModulation(climaxState);
 
-  // Apply climax density multiplier to overlay opacities
+  // Jam evolution — phase detection for long jams (10+ min)
+  const jamEvolution = useMemo(
+    () => computeJamEvolution(f, frame),
+    // Recompute every ~30 frames (1 second) for performance
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [f, Math.floor(frame / 30)],
+  );
+
+  // Combined density multiplier: climax × jam evolution
+  const combinedDensityMult = climaxMod.overlayDensityMult * (jamEvolution.isLongJam ? jamEvolution.densityMult : 1);
+
+  // Apply combined density multiplier to overlay opacities
   const opacityMap = opacityMapBase
-    ? applyDensityMult(opacityMapBase, climaxMod.overlayDensityMult, rotationSchedule!)
+    ? applyDensityMult(opacityMapBase, combinedDensityMult, rotationSchedule!)
     : null;
 
   // ── Media suppression: reduce overlay opacity when curated media is active ──
@@ -333,7 +347,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
       <VisualizerErrorBoundary>
       <div style={{ position: "absolute", inset: 0, opacity }}>
         <EraGrade>
-        <EnergyEnvelope snapshot={audioSnapshot} climaxMod={climaxMod}>
+        <EnergyEnvelope snapshot={audioSnapshot} climaxMod={climaxMod} jamColorTemp={jamEvolution.isLongJam ? jamEvolution.colorTemperature : undefined}>
           {/* ═══ Layer 0: Base shader visualization ═══ */}
           <SceneRouter
             frames={f}
@@ -432,6 +446,13 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
           audioSnapshot.energy, [0.03, 0.30], [0.10, 0.04],
           { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
         )} energy={audioSnapshot.energy} />
+
+        {/* ═══ Lyric display overlay (always-active when alignment data exists) ═══ */}
+        {props.lyricAlignment && (
+          <SilentErrorBoundary name="LyricDisplay">
+            <LyricDisplay alignment={props.lyricAlignment} />
+          </SilentErrorBoundary>
+        )}
       </div>
       </VisualizerErrorBoundary>
 
@@ -442,6 +463,11 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
           src={staticFile(`audio/${props.song.audioFile}`)}
           volume={1}
         />
+      </SilentErrorBoundary>
+
+      {/* ═══ Crowd ambience — subtle live room atmosphere ═══ */}
+      <SilentErrorBoundary name="CrowdAmbience">
+        <CrowdAmbience snapshot={audioSnapshot} />
       </SilentErrorBoundary>
       </AudioSnapshotProvider>
       </ShowContextProvider>

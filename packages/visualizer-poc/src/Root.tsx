@@ -87,6 +87,11 @@ interface ChapterEntry {
   before?: string;
   after?: string;
   text: string;
+  stats?: {
+    timesPlayed: number;
+    firstPlayed?: string;
+    notable?: string;
+  };
 }
 const chapters: ChapterEntry[] = showContextData.chapters;
 
@@ -121,7 +126,7 @@ export const Root: React.FC = () => {
           fps={30}
           width={1920}
           height={1080}
-          defaultProps={{ text: ch.text }}
+          defaultProps={{ text: ch.text, stats: ch.stats }}
         />
       ))}
 

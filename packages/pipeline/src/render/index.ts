@@ -1,9 +1,6 @@
 export { buildCompositionProps } from './composition-builder.js';
 export type { EpisodeProps, SegmentProps, BuildOptions } from './composition-builder.js';
 
-export { renderEpisode } from './renderer.js';
-export type { RenderOptions, RenderResult } from './renderer.js';
-
 export { renderEpisodeOnLambda } from './lambda-renderer.js';
 export type { LambdaRenderOptions, LambdaRenderResult } from './lambda-renderer.js';
 

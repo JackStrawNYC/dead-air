@@ -20,6 +20,8 @@ interface Props {
   snapshot: AudioSnapshot;
   children: React.ReactNode;
   climaxMod?: ClimaxModulation;
+  /** Jam evolution color temperature (-1 cool to +1 warm). Only set for long jams. */
+  jamColorTemp?: number;
 }
 
 // Per-era bloom color — matches era grade for visual cohesion
@@ -32,7 +34,7 @@ const ERA_BLOOM: Record<string, string> = {
 };
 const DEFAULT_BLOOM = ERA_BLOOM.classic;
 
-export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod }) => {
+export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod, jamColorTemp }) => {
   const energy = snapshot.energy;
   const factor = energyToFactor(energy); // 0 (quiet) → 1 (loud)
   const showCtx = useShowContext();
@@ -68,9 +70,12 @@ export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod 
   const vignetteOpacity = 0.02 + slowFactor * 0.10 + textureVignetteBonus + (climaxMod?.vignetteOffset ?? 0);
   const bloomOpacity = slowFactor * 0.10 + (climaxMod?.bloomOffset ?? 0);
 
-  // No hue-rotate here — EraGrade + SongPalette already handle color character.
-  // Stacking 3 hue-rotates caused unpredictable color shifts.
-  const filterStr = `saturate(${saturation.toFixed(3)}) brightness(${brightness.toFixed(3)}) contrast(${contrast.toFixed(3)})`;
+  // Jam color temperature: warm shifts yellow, cool shifts blue (very subtle — max ±8deg)
+  // Only applied during long jams. EraGrade + SongPalette handle base color character.
+  const jamHueShift = jamColorTemp != null ? jamColorTemp * 8 : 0; // ±8 degrees max
+  const filterStr = jamHueShift !== 0
+    ? `saturate(${saturation.toFixed(3)}) brightness(${brightness.toFixed(3)}) contrast(${contrast.toFixed(3)}) hue-rotate(${jamHueShift.toFixed(1)}deg)`
+    : `saturate(${saturation.toFixed(3)}) brightness(${brightness.toFixed(3)}) contrast(${contrast.toFixed(3)})`;
 
   return (
     <div style={{ position: "absolute", inset: 0, filter: filterStr }}>
