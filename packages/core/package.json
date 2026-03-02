@@ -28,6 +28,8 @@
     "dev": "tsc --watch --project tsconfig.json",
     "type-check": "tsc --noEmit",
     "lint": "eslint src/",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "db:migrate": "tsx src/db/migrations.ts"
   },
   "dependencies": {
@@ -39,6 +41,7 @@
     "@types/better-sqlite3": "^7.6.0",
     "@types/node": "^22.0.0",
     "tsx": "^4.19.0",
-    "typescript": "^5.7.0"
+    "typescript": "^5.7.0",
+    "vitest": "^4.0.18"
   }
 }

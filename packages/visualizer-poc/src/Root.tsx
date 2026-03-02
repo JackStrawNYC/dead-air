@@ -133,6 +133,7 @@ export const Root: React.FC = () => {
       {/* Per-song compositions */}
       {setlist.songs.map((song: SetlistEntry, i: number) => {
         const prevSong = i > 0 ? setlist.songs[i - 1] : null;
+        const nextSong = i < setlist.songs.length - 1 ? setlist.songs[i + 1] : null;
         const segueIn = !!(prevSong?.segueInto && prevSong.set === song.set);
         const segueOut = !!song.segueInto;
 
@@ -149,6 +150,8 @@ export const Root: React.FC = () => {
               song,
               segueIn,
               segueOut,
+              segueFromPalette: segueIn ? prevSong?.palette : undefined,
+              segueToPalette: segueOut ? nextSong?.palette : undefined,
               activeOverlays: getActiveOverlays(song.trackId),
               show: setlist,
             } satisfies SongVisualizerProps as Record<string, unknown>}
@@ -179,6 +182,8 @@ export const Root: React.FC = () => {
           venue: setlist.venue,
           date: formatDateLong(setlist.date),
           setNumber: 1,
+          narrative: chapters.find((ch) => ch.after === "s1t13")?.text,
+          nextSetNarrative: chapters.find((ch) => ch.before === "s2t02")?.text,
         }}
       />
 

@@ -35,12 +35,18 @@ export interface SetBreakCardProps {
   date?: string;
   /** Set number just completed */
   setNumber?: number;
+  /** Narrative bridging text (from show-context.json chapters) */
+  narrative?: string;
+  /** Anticipation text for the next set */
+  nextSetNarrative?: string;
 }
 
 export const SetBreakCard: React.FC<SetBreakCardProps> = ({
   venue,
   date,
   setNumber = 1,
+  narrative,
+  nextSetNarrative,
 }) => {
   const { width, height } = useVideoConfig();
   const frame = useCurrentFrame();
@@ -71,6 +77,22 @@ export const SetBreakCard: React.FC<SetBreakCardProps> = ({
   const detailOpacity = interpolate(
     frame,
     [FADE_IN * 0.4, FADE_IN * 1.2],
+    [0, 0.7],
+    { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
+  );
+
+  // Narrative text fades in after the title settles
+  const narrativeOpacity = interpolate(
+    frame,
+    [FADE_IN * 1.0, FADE_IN * 1.8],
+    [0, 0.85],
+    { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
+  );
+
+  // Next set anticipation text fades in late
+  const nextSetOpacity = interpolate(
+    frame,
+    [FADE_IN + HOLD * 0.4, FADE_IN + HOLD * 0.7],
     [0, 0.7],
     { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
   );
@@ -201,6 +223,57 @@ export const SetBreakCard: React.FC<SetBreakCardProps> = ({
                 {date}
               </div>
             )}
+          </div>
+        )}
+
+        {/* Narrative bridging text — documentary chapter feel */}
+        {narrative && (
+          <div
+            style={{
+              maxWidth: 800,
+              marginTop: 32,
+              opacity: narrativeOpacity,
+              textAlign: "center",
+            }}
+          >
+            <div
+              style={{
+                fontFamily: `${cormorant}, 'Cormorant Garamond', Georgia, serif`,
+                fontSize: 26,
+                fontWeight: 300,
+                fontStyle: "italic",
+                color: "rgba(255, 248, 240, 0.75)",
+                lineHeight: 1.7,
+                letterSpacing: "0.02em",
+              }}
+            >
+              {narrative}
+            </div>
+          </div>
+        )}
+
+        {/* Next set anticipation — builds tension */}
+        {nextSetNarrative && (
+          <div
+            style={{
+              maxWidth: 700,
+              marginTop: 24,
+              opacity: nextSetOpacity,
+              textAlign: "center",
+            }}
+          >
+            <div
+              style={{
+                fontFamily: `${cormorant}, 'Cormorant Garamond', Georgia, serif`,
+                fontSize: 20,
+                fontWeight: 300,
+                color: "rgba(255, 200, 140, 0.55)",
+                lineHeight: 1.6,
+                letterSpacing: "0.03em",
+              }}
+            >
+              {nextSetNarrative}
+            </div>
           </div>
         )}
       </div>

@@ -51,7 +51,7 @@ describe("computeClimaxState", () => {
   it("returns idle for very low energy", () => {
     const frames = Array.from({ length: 300 }, () => makeFrame({ rms: 0.02 }));
     const sections: SectionBoundary[] = [
-      { frameStart: 0, frameEnd: 300, energy: "low" },
+      { frameStart: 0, frameEnd: 300, label: "section_0", energy: "low", avgEnergy: 0.02 },
     ];
     const state = computeClimaxState(frames, 150, sections, 0.02);
     expect(state.phase).toBe("idle");
@@ -60,8 +60,8 @@ describe("computeClimaxState", () => {
   it("returns climax at start of high-energy section", () => {
     const frames = Array.from({ length: 600 }, () => makeFrame({ rms: 0.35 }));
     const sections: SectionBoundary[] = [
-      { frameStart: 0, frameEnd: 300, energy: "low" },
-      { frameStart: 300, frameEnd: 600, energy: "high" },
+      { frameStart: 0, frameEnd: 300, label: "section_0", energy: "low", avgEnergy: 0.05 },
+      { frameStart: 300, frameEnd: 600, label: "section_1", energy: "high", avgEnergy: 0.35 },
     ];
     // Frame 310 = 10 frames into high section (3.3% progress, < 20%)
     const state = computeClimaxState(frames, 310, sections, 0.35);
@@ -71,7 +71,7 @@ describe("computeClimaxState", () => {
   it("returns sustain in middle of high-energy section", () => {
     const frames = Array.from({ length: 600 }, () => makeFrame({ rms: 0.35 }));
     const sections: SectionBoundary[] = [
-      { frameStart: 0, frameEnd: 600, energy: "high" },
+      { frameStart: 0, frameEnd: 600, label: "section_0", energy: "high", avgEnergy: 0.35 },
     ];
     // Frame 300 = 50% through section
     const state = computeClimaxState(frames, 300, sections, 0.35);
@@ -83,8 +83,8 @@ describe("computeClimaxState", () => {
       makeFrame({ rms: i < 300 ? 0.12 + (i / 300) * 0.05 : 0.35 }),
     );
     const sections: SectionBoundary[] = [
-      { frameStart: 0, frameEnd: 300, energy: "low" },
-      { frameStart: 300, frameEnd: 600, energy: "high" },
+      { frameStart: 0, frameEnd: 300, label: "section_0", energy: "low", avgEnergy: 0.12 },
+      { frameStart: 300, frameEnd: 600, label: "section_1", energy: "high", avgEnergy: 0.35 },
     ];
     // 50 frames before high section
     const state = computeClimaxState(frames, 250, sections, 0.14);

@@ -39,7 +39,21 @@ import { computeAudioSnapshot } from "./utils/audio-reactive";
 import { AudioSnapshotProvider } from "./data/AudioSnapshotContext";
 import { LyricDisplay } from "./components/LyricDisplay";
 import { CrowdAmbience } from "./components/CrowdAmbience";
+import { SongDNA } from "./components/SongDNA";
+import type { SongStats } from "./components/SongDNA";
 import { computeJamEvolution } from "./utils/jam-evolution";
+import { blendPalettes } from "./utils/segue-detection";
+import type { ColorPalette } from "./data/types";
+
+// Song stats — real Grateful Dead performance data
+let songStatsData: Record<string, SongStats> | null = null;
+try {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const raw = require("../data/song-stats.json");
+  songStatsData = raw?.songs ?? null;
+} catch {
+  // Stats not available yet
+}
 
 import type { RotationSchedule } from "./data/overlay-rotation";
 
@@ -180,6 +194,10 @@ export interface SongVisualizerProps {
   lyricAlignment?: LyricAlignment | null;
   /** Lyric trigger config (injected via calculateMetadata) */
   lyricTriggerConfig?: LyricTriggerConfig | null;
+  /** Previous song's palette (for segue-in blending) */
+  segueFromPalette?: ColorPalette;
+  /** Next song's palette (for segue-out blending) */
+  segueToPalette?: ColorPalette;
 }
 
 export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
@@ -210,11 +228,19 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
     () => props.show ? getShowSeed(props.show) : undefined,
     [props.show],
   );
+
+  // Detect Drums/Space — the psychedelic centerpiece deserves special treatment
+  const isDrumsSpace = useMemo(() => {
+    const title = props.song.title.toLowerCase();
+    return title.includes("drums") || title.includes("space") ||
+      title === "drums / space" || title === "drums/space";
+  }, [props.song.title]);
+
   const rotationSchedule = useMemo(() => {
     if (!props.activeOverlays || !analysis) return null;
     const sects = getSections(analysis);
-    return buildRotationSchedule(props.activeOverlays, sects, props.song.trackId, showSeed, analysis?.frames);
-  }, [props.activeOverlays, analysis, props.song.trackId, showSeed]);
+    return buildRotationSchedule(props.activeOverlays, sects, props.song.trackId, showSeed, analysis?.frames, isDrumsSpace);
+  }, [props.activeOverlays, analysis, props.song.trackId, showSeed, isDrumsSpace]);
 
   // Per-frame overlay opacities (densityMult applied after climax state computed below)
   const opacityMapBase = rotationSchedule
@@ -222,10 +248,26 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
     : null;
 
   // Per-song palette hue rotation (CSS filter applied to overlay wrapper)
-  const hueRotation = useMemo(
-    () => props.song.palette ? paletteHueRotation(props.song.palette) : 0,
-    [props.song.palette],
-  );
+  // During segues, blend palette from prev/next song for smooth color transition
+  const hueRotation = useMemo(() => {
+    if (!props.song.palette) return 0;
+
+    // Segue-in: blend from previous song's palette over first FADE_FRAMES
+    if (props.segueIn && props.segueFromPalette && frame < FADE_FRAMES) {
+      const progress = frame / FADE_FRAMES;
+      const blended = blendPalettes(props.segueFromPalette, props.song.palette, progress);
+      return paletteHueRotation(blended);
+    }
+
+    // Segue-out: blend toward next song's palette over last FADE_FRAMES
+    if (props.segueOut && props.segueToPalette && frame > durationInFrames - FADE_FRAMES) {
+      const progress = (frame - (durationInFrames - FADE_FRAMES)) / FADE_FRAMES;
+      const blended = blendPalettes(props.song.palette, props.segueToPalette, progress);
+      return paletteHueRotation(blended);
+    }
+
+    return paletteHueRotation(props.song.palette);
+  }, [props.song.palette, props.segueIn, props.segueOut, props.segueFromPalette, props.segueToPalette, frame, durationInFrames]);
 
   // Auto-resolve media from catalog (poster + prioritized media list)
   const resolvedMedia = useMemo(() => {
@@ -442,6 +484,12 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
           setNumber={props.song.set}
           trackNumber={props.song.trackNumber}
         />
+        {/* Song DNA stats card — appears after song art settles (skip during segue-in) */}
+        {!props.segueIn && songStatsData && songStatsData[props.song.trackId] && (
+          <SilentErrorBoundary name="SongDNA">
+            <SongDNA stats={songStatsData[props.song.trackId]} />
+          </SilentErrorBoundary>
+        )}
         <FilmGrain opacity={interpolate(
           audioSnapshot.energy, [0.03, 0.30], [0.10, 0.04],
           { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
@@ -466,8 +514,13 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
       </SilentErrorBoundary>
 
       {/* ═══ Crowd ambience — subtle live room atmosphere ═══ */}
+      {/* During Drums/Space: near-silent crowd — the audience holds its breath */}
       <SilentErrorBoundary name="CrowdAmbience">
-        <CrowdAmbience snapshot={audioSnapshot} />
+        <CrowdAmbience
+          snapshot={audioSnapshot}
+          baseVolume={isDrumsSpace ? 0.005 : 0.02}
+          peakVolume={isDrumsSpace ? 0.02 : 0.07}
+        />
       </SilentErrorBoundary>
       </AudioSnapshotProvider>
       </ShowContextProvider>

@@ -238,6 +238,21 @@ const POST_PEAK_GRACE: Record<TextureGroup, number> = {
   narrative: -0.30,
 };
 
+/**
+ * Drums/Space adjustments — the psychedelic centerpiece.
+ * During Drums: high onset energy would normally trigger peak/reactive overlays,
+ * but we want sacred/cosmic geometry instead. The primal percussion should be
+ * accompanied by inner-journey visuals, not party energy.
+ * During Space: pure ambient/sparse — minimal overlays, maximum shader.
+ */
+const DRUMS_SPACE_ADJUSTMENTS: Record<TextureGroup, number> = {
+  sacred:    +0.40,   // Sacred geometry dominates — mandalas, stealies, cosmic portals
+  wash:      +0.15,   // Atmospheric backgrounds welcome
+  reactive:  -0.30,   // Suppress reactive/geometric — this isn't a dance party
+  family:    -0.35,   // No dancing bears during Drums/Space — save them for songs
+  narrative: -0.50,   // No info overlays during the inner journey
+};
+
 /** Tag bonuses/penalties during post-peak grace windows */
 const POST_PEAK_TAG_BONUS: Record<string, number> = {
   contemplative: +0.10,
@@ -280,6 +295,7 @@ export function buildRotationSchedule(
   trackId: string,
   showSeed?: number,
   frames?: EnhancedFrameData[],
+  isDrumsSpace?: boolean,
 ): RotationSchedule {
   const trackHash = hashString(trackId) + (showSeed ?? 0);
 
@@ -383,6 +399,11 @@ export function buildRotationSchedule(
       targetCount = Math.min(targetCount, DROPOUT_MAX_OVERLAYS);
     }
 
+    // Drums/Space: cap overlay count — the shader + 1 sacred overlay is enough
+    if (isDrumsSpace) {
+      targetCount = Math.min(targetCount, 1);
+    }
+
     // Cap at pool size
     targetCount = Math.min(targetCount, poolEntries.length);
 
@@ -429,6 +450,11 @@ export function buildRotationSchedule(
           // Set II deepening: more sacred/cosmic, fewer artifacts
           if (setNumber >= 2) {
             score += SET2_ADJUSTMENTS[group];
+          }
+
+          // Drums/Space: sacred geometry dominates, suppress reactive/family
+          if (isDrumsSpace) {
+            score += DRUMS_SPACE_ADJUSTMENTS[group];
           }
 
           // Post-peak grace: after high→low/mid drop, favor sacred/contemplative
