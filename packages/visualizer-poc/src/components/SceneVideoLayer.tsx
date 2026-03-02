@@ -179,9 +179,12 @@ function scoreSections(
       else if (texture === "sparse") score += 3;
     }
 
-    // Penalize post-music dead air (applause/tuning after the song ends)
-    if (musicEnd < totalFrames && section.frameStart >= musicEnd) {
-      score -= 20;
+    // Exclude sections in post-music dead air (applause/tuning after song ends).
+    // Check both section start AND center — a section that starts before musicEnd
+    // but whose center is past it would place the video during dead air.
+    const sectionCenter = section.frameStart + Math.floor(sectionLen / 2);
+    if (musicEnd < totalFrames && (section.frameStart >= musicEnd || sectionCenter >= musicEnd)) {
+      return { section, idx, score: -Infinity };
     }
 
     // Too short for a full window
