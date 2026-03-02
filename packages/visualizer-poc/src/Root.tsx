@@ -6,7 +6,6 @@ import { ChapterCard } from "./components/ChapterCard";
 import { SetBreakCard } from "./components/SetBreakCard";
 import { EndCard } from "./components/EndCard";
 import type { SetlistEntry, ShowSetlist, OverlaySchedule } from "./data/types";
-import type { LyricAlignment, LyricTriggerConfig } from "./data/lyric-trigger-resolver";
 import { formatDateLong } from "./data/ShowContext";
 import setlistData from "../data/setlist.json";
 import showContextData from "../data/show-context.json";
@@ -34,29 +33,6 @@ try {
   // Schedule not generated yet — all overlays will render
 }
 
-// Lyric alignment cache — per-track WhisperX or heuristic alignment data
-const alignmentCache: Record<string, LyricAlignment | null> = {};
-function loadLyricAlignment(trackId: string): LyricAlignment | null {
-  if (trackId in alignmentCache) return alignmentCache[trackId];
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const data = require(`../data/lyrics/${trackId}-alignment.json`);
-    alignmentCache[trackId] = data;
-    return data;
-  } catch {
-    alignmentCache[trackId] = null;
-    return null;
-  }
-}
-
-// Lyric trigger config (hand-authored, optional)
-let lyricTriggerConfig: LyricTriggerConfig | null = null;
-try {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  lyricTriggerConfig = require("../data/lyric-triggers.json") as LyricTriggerConfig;
-} catch {
-  // No trigger config yet
-}
 
 const setlist = setlistData as ShowSetlist;
 
@@ -157,11 +133,10 @@ export const Root: React.FC = () => {
             } satisfies SongVisualizerProps as Record<string, unknown>}
             calculateMetadata={async ({ props }) => {
               const analysis = loadTrackAnalysis(song.trackId) as { meta?: { totalFrames?: number } } | null;
-              const lyricAlignment = loadLyricAlignment(song.trackId);
               if (analysis?.meta) {
                 return {
                   durationInFrames: analysis.meta.totalFrames ?? DEFAULT_FRAMES,
-                  props: { ...props, analysis, lyricAlignment, lyricTriggerConfig },
+                  props: { ...props, analysis },
                 };
               }
               return { durationInFrames: DEFAULT_FRAMES };
@@ -219,11 +194,10 @@ export const Root: React.FC = () => {
           } satisfies SongVisualizerProps as Record<string, unknown>}
           calculateMetadata={async ({ props }) => {
             const analysis = loadTrackAnalysis("s2t08") as { meta?: { totalFrames?: number } } | null;
-            const lyricAlignment = loadLyricAlignment("s2t08");
             if (analysis?.meta) {
               return {
                 durationInFrames: analysis.meta.totalFrames ?? DEFAULT_FRAMES,
-                props: { ...props, analysis, lyricAlignment, lyricTriggerConfig },
+                props: { ...props, analysis },
               };
             }
             return { durationInFrames: DEFAULT_FRAMES };

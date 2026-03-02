@@ -26,10 +26,7 @@ import { ShowContextProvider, getShowSeed } from "./data/ShowContext";
 import { VisualizerErrorBoundary } from "./components/VisualizerErrorBoundary";
 import { SilentErrorBoundary } from "./components/SilentErrorBoundary";
 import { SceneVideoLayer, computeMediaWindows } from "./components/SceneVideoLayer";
-import { LyricTriggerLayer } from "./components/LyricTriggerLayer";
 import { resolveMediaForSong } from "./data/media-resolver";
-import { resolveLyricTriggers } from "./data/lyric-trigger-resolver";
-import type { LyricAlignment, LyricTriggerConfig } from "./data/lyric-trigger-resolver";
 import { SongPaletteProvider, paletteHueRotation } from "./data/SongPaletteContext";
 import { TempoProvider } from "./data/TempoContext";
 import { EraGrade } from "./components/EraGrade";
@@ -37,7 +34,6 @@ import { EnergyEnvelope } from "./components/EnergyEnvelope";
 import { computeClimaxState, climaxModulation } from "./utils/climax-state";
 import { computeAudioSnapshot } from "./utils/audio-reactive";
 import { AudioSnapshotProvider } from "./data/AudioSnapshotContext";
-import { LyricDisplay } from "./components/LyricDisplay";
 import { CrowdAmbience } from "./components/CrowdAmbience";
 import { SongDNA } from "./components/SongDNA";
 import type { SongStats } from "./components/SongDNA";
@@ -190,10 +186,6 @@ export interface SongVisualizerProps {
   segueIn?: boolean;
   /** This song segues into the next — skip fade-out */
   segueOut?: boolean;
-  /** Lyric alignment data (injected via calculateMetadata) */
-  lyricAlignment?: LyricAlignment | null;
-  /** Lyric trigger config (injected via calculateMetadata) */
-  lyricTriggerConfig?: LyricTriggerConfig | null;
   /** Previous song's palette (for segue-in blending) */
   segueFromPalette?: ColorPalette;
   /** Next song's palette (for segue-out blending) */
@@ -279,26 +271,6 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
       props.song.trackId,
     );
   }, [props.song.title, props.song.trackId, showSeed]);
-
-  // Resolve lyric triggers (if alignment + config available)
-  const triggerResult = useMemo(() => {
-    if (!props.lyricAlignment || !props.lyricTriggerConfig) return null;
-    return resolveLyricTriggers(
-      props.song.title,
-      props.song.trackId,
-      props.lyricAlignment,
-      props.lyricTriggerConfig,
-    );
-  }, [props.song.title, props.song.trackId, props.lyricAlignment, props.lyricTriggerConfig]);
-
-  // Compute suppressed frame ranges from lyric trigger windows (for SceneVideoLayer)
-  const triggerSuppressedRanges = useMemo(() => {
-    if (!triggerResult?.windows.length) return undefined;
-    return triggerResult.windows.map((w) => ({
-      start: w.fadeInStart,
-      end: w.fadeOutEnd,
-    }));
-  }, [triggerResult]);
 
   // Explicit overrides in setlist.json take priority over auto-resolution
   const effectiveSongArt = props.song.songArt ?? resolvedMedia?.songArt ?? undefined;
@@ -416,20 +388,9 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
                 trackId={props.song.trackId}
                 showSeed={showSeed}
                 hueRotation={hueRotation}
-                suppressedRanges={triggerSuppressedRanges}
               />
             </SilentErrorBoundary>
           )}
-
-          {/* ═══ Layer 0.8: Lyric-triggered visuals ═══ */}
-          {triggerResult?.windows.length ? (
-            <SilentErrorBoundary name="LyricTriggers">
-              <LyricTriggerLayer
-                windows={triggerResult.windows}
-                frames={f}
-              />
-            </SilentErrorBoundary>
-          ) : null}
 
           {/* ═══ Dynamic overlay layers (1-10) ═══ */}
           {/* Hidden during title card, then fade in over 3 seconds */}
@@ -495,12 +456,6 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
           { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
         )} energy={audioSnapshot.energy} />
 
-        {/* ═══ Lyric display overlay (always-active when alignment data exists) ═══ */}
-        {props.lyricAlignment && (
-          <SilentErrorBoundary name="LyricDisplay">
-            <LyricDisplay alignment={props.lyricAlignment} />
-          </SilentErrorBoundary>
-        )}
       </div>
       </VisualizerErrorBoundary>
 

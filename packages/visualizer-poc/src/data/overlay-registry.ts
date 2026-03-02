@@ -357,8 +357,6 @@ export const OVERLAY_REGISTRY: OverlayEntry[] = [
   { name: "MatrixRain",          layer: 10, category: "distortion", tags: ["retro", "mechanical"],        energyBand: "mid",  weight: 2 },
   { name: "FilmGrain",           layer: 10, category: "distortion", tags: ["retro"],                      energyBand: "any",  weight: 1, alwaysActive: true },
 
-  // ═══ Always-active: Lyric display ═══
-  { name: "LyricDisplay",       layer: 8, category: "info", tags: ["dead-culture"],                    energyBand: "any",  weight: 1, alwaysActive: true },
 ];
 
 /** Overlays that fit the Dead aesthetic — everything else is cut from selection */
@@ -395,8 +393,6 @@ const ENABLED_OVERLAYS = new Set([
   "CassetteReels", "HeartbeatEKG",
   // Layer 10: Distortion (5)
   "ChromaticAberration", "VHSGlitch", "FilmBurn", "VinylGrooves", "FilmGrain",
-  // Always-active
-  "LyricDisplay",
 ]);
 
 // ─── Parametric Overlays (50 variants across 7 families) ───
