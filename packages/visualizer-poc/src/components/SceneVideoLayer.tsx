@@ -18,7 +18,7 @@
  */
 
 import React, { useMemo } from "react";
-import { Img, OffthreadVideo, Sequence, staticFile, useCurrentFrame, interpolate } from "remotion";
+import { Freeze, Img, OffthreadVideo, Sequence, staticFile, useCurrentFrame, interpolate } from "remotion";
 import type { SceneVideo, SectionBoundary, EnhancedFrameData } from "../data/types";
 import type { ResolvedMedia } from "../data/media-resolver";
 import { seeded } from "../utils/seededRandom";
@@ -29,6 +29,8 @@ import { computeAudioSnapshot } from "../utils/audio-reactive";
 const VIDEO_DISPLAY_FRAMES = 600; // 20 seconds at 30fps
 const FADE_FRAMES = 150;          // 5-second smoothstep fade in/out
 const CURATED_FADE_FRAMES = 270;  // 9-second glacial fade for curated media
+const VIDEO_CROSSFADE = 90;       // 3-second crossfade between still and video
+const VIDEO_DURATION_FRAMES = 450; // 15 seconds — generated video length
 
 function hashString(str: string): number {
   let hash = 5381;
@@ -388,27 +390,103 @@ export const SceneVideoLayer: React.FC<SceneVideoLayerProps> = ({
     // Media: present but blended — shader textures still visible beneath
     const mediaOpacity = fadeEnvelope * (isImage ? 0.55 : 0.60);
 
-    const mediaContent = isImage ? (
-      <ImageMediaDisplay
-        src={activeWindow.media.src}
-        frame={frame}
-        windowStart={activeWindow.frameStart}
-        windowEnd={activeWindow.frameEnd}
-      />
-    ) : (
-      <Sequence from={windowStart} durationInFrames={windowDuration} layout="none">
-        <OffthreadVideo
-          src={staticFile(activeWindow.media.src)}
-          muted
-          style={{
-            width: "100%",
-            height: "100%",
-            objectFit: "cover",
-          }}
-        />
-      </Sequence>
-    );
+    // ─── Video: freeze on first frame during fade-in, play once visible, fade out at tail ───
+    // The video enters frozen (paused on frame 0) while fading in from 0% opacity.
+    // Once barely visible (~15%), it starts playing. Before the video's duration ends,
+    // we fade out so there's no frozen last-frame glitch.
+    if (!isImage) {
+      // How far into the fade-in are we? 0 = just started fading, 1 = fully faded in
+      const fadeProgress = smoothstep(
+        activeWindow.frameStart - fadeDur,
+        activeWindow.frameStart,
+        frame,
+      );
 
+      // Video starts playing once ~15% visible. Before that, freeze on frame 0.
+      const PLAY_THRESHOLD = 0.15;
+      const playStartFrame = activeWindow.frameStart - Math.floor(fadeDur * (1 - PLAY_THRESHOLD));
+      const isFrozen = frame < playStartFrame;
+
+      // Fade out before video duration ends (avoid last-frame freeze).
+      // VIDEO_DURATION_FRAMES (15s) from when playback begins.
+      const videoEndFrame = playStartFrame + VIDEO_DURATION_FRAMES;
+      const tailFadeOut = 1 - smoothstep(
+        videoEndFrame - VIDEO_CROSSFADE,
+        videoEndFrame,
+        frame,
+      );
+      // Also apply the normal window fade-out
+      const effectiveOpacity = mediaOpacity * Math.min(1, tailFadeOut);
+
+      // Don't render past the video's natural end
+      if (frame >= videoEndFrame) {
+        return null;
+      }
+
+      // The Sequence starts at playStartFrame so the video timeline begins there.
+      // During the frozen period (before playStartFrame), we wrap in <Freeze frame={0}>
+      // to show the first frame without advancing.
+      const seqFrom = playStartFrame;
+      const seqDuration = videoEndFrame - seqFrom;
+
+      return (
+        <>
+          {/* Dark backdrop */}
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              backgroundColor: "#000",
+              opacity: backdropOpacity,
+              pointerEvents: "none",
+            }}
+          />
+          {/* Video — frozen during fade-in, playing once visible */}
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              opacity: effectiveOpacity,
+              overflow: "hidden",
+              pointerEvents: "none",
+              filter: filterStr,
+            }}
+          >
+            {isFrozen ? (
+              // Show first frame as a still while fading in
+              <Sequence from={seqFrom} durationInFrames={seqDuration} layout="none">
+                <Freeze frame={0}>
+                  <OffthreadVideo
+                    src={staticFile(activeWindow.media.src)}
+                    muted
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "cover",
+                    }}
+                  />
+                </Freeze>
+              </Sequence>
+            ) : (
+              // Playing — video timeline starts from frame 0 at playStartFrame
+              <Sequence from={seqFrom} durationInFrames={seqDuration} layout="none">
+                <OffthreadVideo
+                  src={staticFile(activeWindow.media.src)}
+                  muted
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "cover",
+                  }}
+                />
+              </Sequence>
+            )}
+          </div>
+        </>
+      );
+    }
+
+    // ─── Image: standard display ───
     return (
       <>
         {/* Dark backdrop — suppresses shader/song art */}
@@ -421,7 +499,7 @@ export const SceneVideoLayer: React.FC<SceneVideoLayerProps> = ({
             pointerEvents: "none",
           }}
         />
-        {/* Media on clean canvas */}
+        {/* Image on clean canvas */}
         <div
           style={{
             position: "absolute",
@@ -432,7 +510,12 @@ export const SceneVideoLayer: React.FC<SceneVideoLayerProps> = ({
             filter: filterStr,
           }}
         >
-          {mediaContent}
+          <ImageMediaDisplay
+            src={activeWindow.media.src}
+            frame={frame}
+            windowStart={activeWindow.frameStart}
+            windowEnd={activeWindow.frameEnd}
+          />
         </div>
       </>
     );
