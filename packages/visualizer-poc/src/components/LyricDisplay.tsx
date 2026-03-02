@@ -37,11 +37,31 @@ const LINE_BREAK_GAP = 2.0;
 const INSTRUMENTAL_GAP = 4.0;
 const WORD_ANTICIPATION = 0.15;
 const WORD_FADE_DURATION = 0.3;
+const MAX_WORD_DURATION = 3.5; // Clamp absurd heuristic durations (some files have 60s+ per word)
 
 // ─── Colors ───
 
 const CREAM = "rgba(245, 240, 232, 0.92)";
 const GOLD_HIGHLIGHT = "rgba(212, 168, 83, 1.0)";
+
+// ─── Sanitize heuristic alignment data ───
+
+const GARBAGE_WORDS = new Set(["", "lyrics", "contributor"]);
+
+function sanitizeWords(words: LyricWord[]): LyricWord[] {
+  return words
+    .filter((w) => {
+      if (GARBAGE_WORDS.has(w.word)) return false;
+      if (w.word.includes("contributor")) return false;
+      return true;
+    })
+    .map((w) => ({
+      ...w,
+      // Clamp absurd end times — heuristic data sometimes stretches a single
+      // word across 60+ seconds of instrumental passage
+      end: Math.min(w.end, w.start + MAX_WORD_DURATION),
+    }));
+}
 
 // ─── Line Grouping ───
 
@@ -197,10 +217,15 @@ export const LyricDisplay: React.FC<LyricDisplayProps> = ({
   const frame = useCurrentFrame();
   const currentTimeSec = frame / FPS;
 
-  const lines = useMemo(() => {
+  const cleanWords = useMemo(() => {
     if (!alignment?.words?.length) return [];
-    return groupIntoLines(alignment.words);
+    return sanitizeWords(alignment.words);
   }, [alignment]);
+
+  const lines = useMemo(() => {
+    if (cleanWords.length === 0) return [];
+    return groupIntoLines(cleanWords);
+  }, [cleanWords]);
 
   if (lines.length === 0) return null;
 
@@ -215,7 +240,7 @@ export const LyricDisplay: React.FC<LyricDisplayProps> = ({
 
   if (!activeLine) return null;
 
-  const instDist = instrumentalDistance(currentTimeSec, alignment!.words);
+  const instDist = instrumentalDistance(currentTimeSec, cleanWords);
   if (instDist > INSTRUMENTAL_GAP) return null;
 
   const containerOpacity = (() => {
