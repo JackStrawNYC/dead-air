@@ -139,9 +139,9 @@ const ACCENT_CONFIG: Record<string, AccentConfig | null> = {
  * Peaks rotate faster for visual energy.
  */
 const WINDOW_FRAMES_BY_ENERGY: Record<string, number> = {
-  low:  900,   // 30 seconds — keeps viewer anticipating what's next
-  mid:  600,   // 20 seconds — fresh overlays frequently
-  high: 450,   // 15 seconds — rapid visual events at peaks
+  low:  2700,  // 90 seconds — let quiet moments breathe
+  mid:  1800,  // 60 seconds — each overlay becomes the moment's identity
+  high: 900,   // 30 seconds — restrained rotation at peaks
 };
 const WINDOW_FRAMES_DEFAULT = 900;
 
@@ -151,9 +151,9 @@ const WINDOW_FRAMES_DEFAULT = 900;
  * Matches the tempo of the music's own dynamics.
  */
 const CROSSFADE_FRAMES_BY_ENERGY: Record<string, number> = {
-  low:  180,   // 6 seconds — smooth but doesn't linger
-  mid:  90,    // 3 seconds — brisk transitions
-  high: 45,    // 1.5 seconds — snappy at peaks
+  low:  270,   // 9 seconds — glacial tides
+  mid:  150,   // 5 seconds — smooth transitions
+  high: 90,    // 3 seconds — still unhurried at peaks
 };
 const CROSSFADE_FRAMES_DEFAULT = 120;
 
@@ -163,9 +163,9 @@ const CROSSFADE_FRAMES_DEFAULT = 120;
  * Dynamic range between quiet and peak creates the show's breathing rhythm.
  */
 const ENERGY_COUNTS: Record<string, { min: number; max: number }> = {
-  low:  { min: 1, max: 1 },  // single overlay — music is the show
-  mid:  { min: 1, max: 2 },  // subtle layering
-  high: { min: 2, max: 3 },  // restrained flood at peaks
+  low:  { min: 0, max: 0 },  // nothing — music is the show
+  mid:  { min: 0, max: 1 },  // at most 1
+  high: { min: 1, max: 2 },  // restrained at peaks
 };
 
 /**

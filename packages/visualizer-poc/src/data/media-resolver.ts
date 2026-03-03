@@ -25,6 +25,10 @@ export interface ResolvedMedia {
   mediaType: "image" | "video";
   /** 0 = song-specific video, 1 = song-specific image, 2 = general video, 3 = general image */
   priority: number;
+  /** Energy phase tag from catalog (for section-aware placement) */
+  energyTag?: "low" | "mid" | "high";
+  /** Video duration in frames (default 450 = 15s for Grok, 300 = 10s for Hailuo) */
+  durationFrames?: number;
 }
 
 export interface ResolvedSongMedia {
@@ -90,6 +94,27 @@ function seededShuffle<T>(arr: T[], seed: number): T[] {
   return result;
 }
 
+// ─── Tag extraction helpers ───
+
+/** Extract energy tag (low/mid/high) from catalog tags like "energy-low" */
+function extractEnergyTag(tags: string[]): "low" | "mid" | "high" | undefined {
+  for (const t of tags) {
+    if (t === "energy-low") return "low";
+    if (t === "energy-mid") return "mid";
+    if (t === "energy-high") return "high";
+  }
+  return undefined;
+}
+
+/** Extract duration in frames from catalog tags like "duration-300" */
+function extractDurationFrames(tags: string[]): number | undefined {
+  for (const t of tags) {
+    const match = t.match(/^duration-(\d+)$/);
+    if (match) return parseInt(match[1], 10);
+  }
+  return undefined;
+}
+
 // ─── Core Resolver ───
 
 /**
@@ -139,7 +164,13 @@ export function resolveMediaForSong(
   // Priority 0: song-specific videos
   const songVideos = songEntries.filter((e) => e.type === "video");
   for (const v of songVideos) {
-    media.push({ src: v.path, mediaType: "video", priority: 0 });
+    media.push({
+      src: v.path,
+      mediaType: "video",
+      priority: 0,
+      energyTag: extractEnergyTag(v.tags),
+      durationFrames: extractDurationFrames(v.tags),
+    });
   }
 
   // Priority 1: song-specific images (excluding the poster)
@@ -155,7 +186,13 @@ export function resolveMediaForSong(
     hashString(trackId) + showSeed + 7919, // salt for video pool
   );
   for (const v of shuffledGenVids) {
-    media.push({ src: v.path, mediaType: "video", priority: 2 });
+    media.push({
+      src: v.path,
+      mediaType: "video",
+      priority: 2,
+      energyTag: extractEnergyTag(v.tags),
+      durationFrames: extractDurationFrames(v.tags),
+    });
   }
 
   // Priority 3: general images (seeded shuffle, different salt)

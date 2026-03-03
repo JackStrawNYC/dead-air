@@ -28,7 +28,7 @@ import { computeAudioSnapshot } from "../utils/audio-reactive";
 
 const VIDEO_DISPLAY_FRAMES = 600; // 20 seconds at 30fps
 const FADE_FRAMES = 150;          // 5-second smoothstep fade in/out
-const CURATED_FADE_FRAMES = 270;  // 9-second glacial fade for curated media
+const CURATED_FADE_FRAMES = 90;   // 3-second fade for curated media
 const VIDEO_CROSSFADE = 90;       // 3-second crossfade between still and video
 const VIDEO_DURATION_FRAMES = 450; // 15 seconds — generated video length
 
@@ -51,6 +51,8 @@ interface MediaItem {
   src: string;
   mediaType: "image" | "video";
   priority: number; // 0 = song video, 1 = song image, 2 = general video, 3 = general image
+  energyTag?: "low" | "mid" | "high";
+  durationFrames?: number; // video length in frames (default VIDEO_DURATION_FRAMES)
 }
 
 export interface MediaWindow {
@@ -210,7 +212,7 @@ function placeMediaInSection(
 
 // ─── Exported window computation (for media suppression in SongVisualizer) ───
 
-const MIN_WINDOW_GAP = 1800; // 60 seconds minimum between media windows
+const MIN_WINDOW_GAP = 600; // 20 seconds minimum between media windows
 
 export function computeMediaWindows(
   videos: SceneVideo[] | undefined,
@@ -230,6 +232,8 @@ export function computeMediaWindows(
       src: m.src,
       mediaType: m.mediaType,
       priority: m.priority,
+      energyTag: m.energyTag,
+      durationFrames: m.durationFrames,
     }));
   } else if (videos && videos.length > 0) {
     items = videos.map((v) => ({
@@ -246,8 +250,15 @@ export function computeMediaWindows(
   scored.sort((a, b) => b.score - a.score);
 
   const totalFrames = sections[sections.length - 1].frameEnd;
-  // Max 2 windows per song, one per ~40 seconds of track
-  const maxSlots = Math.min(2, Math.max(1, Math.floor(totalFrames / 1200)));
+  // Scale max windows by song duration:
+  //   8+ min → 4 windows (Morning Dew, Drums/Space, Estimated Prophet)
+  //   4-8 min → 3 windows (most mid-length songs)
+  //   < 4 min → 2 windows (Mama Tried, Lazy Lightnin')
+  const durationSec = totalFrames / 30;
+  const maxSlots =
+    durationSec >= 480 ? 8 :
+    durationSec >= 240 ? 6 :
+    4;
 
   // Split media into song-specific (priority 0-1) and general (priority 2-3)
   const songSpecific = items.filter((m) => m.priority <= 1);
@@ -273,9 +284,37 @@ export function computeMediaWindows(
   // Re-sort by score for assignment (best section → best media)
   const byScoredOrder = [...selectedSections].sort((a, b) => b.score - a.score);
 
+  // Energy-matched assignment: when media has energy tags, prefer matching
+  // the section's energy level (low video → low section, high → high).
   let result: MediaWindow[] = [];
-  for (let i = 0; i < byScoredOrder.length && i < orderedMedia.length; i++) {
-    result.push(placeMediaInSection(byScoredOrder[i].section, orderedMedia[i]));
+  const usedMedia = new Set<number>();
+  const usedSections = new Set<number>();
+
+  // First pass: match energy-tagged media to same-energy sections
+  for (let si = 0; si < byScoredOrder.length; si++) {
+    const section = byScoredOrder[si];
+    for (let mi = 0; mi < orderedMedia.length; mi++) {
+      if (usedMedia.has(mi) || usedSections.has(si)) continue;
+      const m = orderedMedia[mi];
+      if (m.energyTag && m.energyTag === section.section.energy) {
+        result.push(placeMediaInSection(section.section, m));
+        usedMedia.add(mi);
+        usedSections.add(si);
+        break;
+      }
+    }
+  }
+
+  // Second pass: fill remaining slots with unmatched media (priority order)
+  for (let si = 0; si < byScoredOrder.length; si++) {
+    if (usedSections.has(si)) continue;
+    for (let mi = 0; mi < orderedMedia.length; mi++) {
+      if (usedMedia.has(mi)) continue;
+      result.push(placeMediaInSection(byScoredOrder[si].section, orderedMedia[mi]));
+      usedMedia.add(mi);
+      usedSections.add(si);
+      break;
+    }
   }
 
   // Sort windows chronologically
@@ -385,10 +424,10 @@ export const SceneVideoLayer: React.FC<SceneVideoLayerProps> = ({
   const windowDuration = (activeWindow.frameEnd + fadeDur) - windowStart;
 
   if (isCurated) {
-    // Gentle backdrop: dims shader but lets it breathe through
-    const backdropOpacity = fadeEnvelope * 0.40;
-    // Media: present but blended — shader textures still visible beneath
-    const mediaOpacity = fadeEnvelope * (isImage ? 0.55 : 0.60);
+    // Strong backdrop: suppress shader so video is the star
+    const backdropOpacity = fadeEnvelope * 0.75;
+    // Media: dominant — these are the visuals the user paid for
+    const mediaOpacity = fadeEnvelope * (isImage ? 0.85 : 0.92);
 
     // ─── Video: freeze on first frame during fade-in, play once visible, fade out at tail ───
     // The video enters frozen (paused on frame 0) while fading in from 0% opacity.
@@ -408,8 +447,10 @@ export const SceneVideoLayer: React.FC<SceneVideoLayerProps> = ({
       const isFrozen = frame < playStartFrame;
 
       // Fade out before video duration ends (avoid last-frame freeze).
-      // VIDEO_DURATION_FRAMES (15s) from when playback begins.
-      const videoEndFrame = playStartFrame + VIDEO_DURATION_FRAMES;
+      // Use per-media duration if available (e.g. 300 for 10s Hailuo clips),
+      // otherwise default VIDEO_DURATION_FRAMES (450 = 15s for Grok clips).
+      const mediaDuration = activeWindow.media.durationFrames ?? VIDEO_DURATION_FRAMES;
+      const videoEndFrame = playStartFrame + mediaDuration;
       const tailFadeOut = 1 - smoothstep(
         videoEndFrame - VIDEO_CROSSFADE,
         videoEndFrame,
@@ -521,8 +562,8 @@ export const SceneVideoLayer: React.FC<SceneVideoLayerProps> = ({
     );
   }
 
-  // General (priority 2-3): subtle color wash, no backdrop
-  const maxOpacity = isImage ? 0.18 : 0.22;
+  // General (priority 2-3): visible atmospheric layer, blended with shader
+  const maxOpacity = isImage ? 0.45 : 0.55;
   const opacity = fadeEnvelope * energyBoost * maxOpacity;
 
   const generalContent = isImage ? (

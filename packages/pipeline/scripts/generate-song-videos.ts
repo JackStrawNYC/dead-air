@@ -88,6 +88,8 @@ interface LibraryAsset {
   tags: string[];
   sizeBytes: number;
   addedAt: string;
+  prompt?: string;
+  model?: string;
 }
 
 interface ImageLibrary {
@@ -485,7 +487,15 @@ async function main() {
       const vidSize = await downloadFile(vidUrl, finalVidPath);
       console.log(`    ✓ Video saved: assets/library/videos/${vidFilename} (${(vidSize / 1024 / 1024).toFixed(1)}MB)`);
 
-      // Step 4: Add to image-library.json catalog
+      // Step 4: Add to image-library.json catalog with rich metadata
+      const baseTags = [
+        'generated',
+        'psychedelic',
+        `set-${song.set}`,
+        `mode-${song.defaultMode ?? 'liquid_light'}`,
+        `palette-${song.palette?.primary ?? 270}`,
+      ];
+
       const imgAsset: LibraryAsset = {
         id: generateId(),
         path: `assets/library/images/${imgFilename}`,
@@ -495,9 +505,11 @@ async function main() {
         songKey,
         sourceShow: `gd${showDate}`,
         category: 'song',
-        tags: ['generated', 'song-video-still'],
+        tags: [...baseTags, 'song-video-still', 'grok-imagine-image'],
         sizeBytes: imgSize,
         addedAt: new Date().toISOString(),
+        prompt: imagePrompt,
+        model: 'grok-imagine-image',
       };
 
       const vidAsset: LibraryAsset = {
@@ -509,9 +521,11 @@ async function main() {
         songKey,
         sourceShow: `gd${showDate}`,
         category: 'song',
-        tags: ['generated', 'song-video'],
+        tags: [...baseTags, 'song-video', 'grok-imagine-video', 'duration-450', 'image-to-video'],
         sizeBytes: vidSize,
         addedAt: new Date().toISOString(),
+        prompt: videoPrompt,
+        model: 'grok-imagine-video',
       };
 
       // Remove any existing generated entries for this songKey before adding

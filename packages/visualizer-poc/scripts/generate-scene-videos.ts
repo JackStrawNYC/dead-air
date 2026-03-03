@@ -2,11 +2,13 @@
 /**
  * generate-scene-videos.ts — Generate section-aware video clips for each song.
  *
- * Two-tier strategy:
- *   - Grok Imagine ($0.75/15s, 720p) — Song-specific hero videos (3-4 per song),
- *     each tagged to a different energy phase (low/mid/high) of the song's arc.
- *   - Minimax Hailuo 02 ($0.10-0.50/10s, 768p) — General atmospheric videos
- *     (psychedelic, nature, cosmic) reusable across all songs.
+ * Two-step image→video pipeline via Grok Imagine:
+ *   1. Generate a psychedelic Dead-aesthetic image (Grok Imagine Image, 1k, 16:9)
+ *   2. Animate that image into video (Grok Imagine Video, image-to-video mode)
+ *
+ * Song-specific: 3-4 hero videos per song ($0.75/15s), each tagged to a
+ * different energy phase (low/mid/high) of the song's arc.
+ * General atmospheric: 10 reusable Dead-themed clips ($0.50/10s).
  *
  * Claude generates thematically diverse prompts per song, using audio analysis
  * sections and lyric context to match each video to a moment in the energy arc.
@@ -18,9 +20,10 @@
  *   npx tsx scripts/generate-scene-videos.ts --force             # regenerate existing
  *   npx tsx scripts/generate-scene-videos.ts --general-only      # general atmospheric only
  *
- * Requires: ANTHROPIC_API_KEY, XAI_API_KEY, REPLICATE_API_TOKEN in .env
+ * Requires: ANTHROPIC_API_KEY, REPLICATE_API_TOKEN in .env
  */
 
+import Replicate from "replicate";
 import { readFileSync, writeFileSync, mkdirSync, existsSync, createWriteStream, statSync, copyFileSync, unlinkSync } from "fs";
 import { join, resolve } from "path";
 import { config } from "dotenv";
@@ -50,23 +53,20 @@ const generalOnly = args.includes("--general-only");
 const songFilter = args.find((a) => a.startsWith("--song="))?.split("=")[1];
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
-const XAI_API_KEY = process.env.XAI_API_KEY;
 const REPLICATE_API_TOKEN = process.env.REPLICATE_API_TOKEN;
 
 if (!dryRun) {
-  if (!ANTHROPIC_API_KEY) {
+  if (!ANTHROPIC_API_KEY && !generalOnly) {
     console.error("ERROR: ANTHROPIC_API_KEY not set.");
     process.exit(1);
   }
-  if (!XAI_API_KEY && !generalOnly) {
-    console.error("ERROR: XAI_API_KEY not set (needed for Grok Imagine). Use --general-only to skip song videos.");
-    process.exit(1);
-  }
   if (!REPLICATE_API_TOKEN) {
-    console.error("ERROR: REPLICATE_API_TOKEN not set (needed for Hailuo 02).");
+    console.error("ERROR: REPLICATE_API_TOKEN not set (needed for Grok Imagine via Replicate).");
     process.exit(1);
   }
 }
+
+const replicate = dryRun ? null : new Replicate({ auth: REPLICATE_API_TOKEN });
 
 // ─── Types ───
 
@@ -343,94 +343,32 @@ async function callClaude(
   }));
 }
 
-// ─── Grok Imagine API ───
+// ─── Grok Imagine via Replicate ───
 
-async function generateGrokVideo(prompt: string): Promise<string> {
-  // Start generation
-  const startResponse = await fetch("https://api.x.ai/v1/videos/generations", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${XAI_API_KEY}`,
-    },
-    body: JSON.stringify({
-      model: "grok-imagine-video",
-      prompt,
-      duration: 15,
-      aspect_ratio: "16:9",
-      resolution: "720p",
-    }),
-  });
-
-  if (!startResponse.ok) {
-    const body = await startResponse.text();
-    throw new Error(`Grok API error ${startResponse.status}: ${body}`);
-  }
-
-  const startData = (await startResponse.json()) as { request_id: string };
-  const requestId = startData.request_id;
-  console.log(`    Grok request: ${requestId}`);
-
-  // Poll for completion
-  const MAX_POLLS = 120; // 10 minutes at 5s interval
-  const POLL_INTERVAL = 5000;
-
-  for (let i = 0; i < MAX_POLLS; i++) {
-    await new Promise((r) => setTimeout(r, POLL_INTERVAL));
-
-    const pollResponse = await fetch(`https://api.x.ai/v1/videos/${requestId}`, {
-      headers: { "Authorization": `Bearer ${XAI_API_KEY}` },
-    });
-
-    if (!pollResponse.ok) {
-      const body = await pollResponse.text();
-      throw new Error(`Grok poll error ${pollResponse.status}: ${body}`);
-    }
-
-    const pollData = (await pollResponse.json()) as {
-      status: string;
-      video?: { url: string };
-      error?: string;
-    };
-
-    if (pollData.status === "done" && pollData.video?.url) {
-      return pollData.video.url;
-    }
-    if (pollData.status === "failed") {
-      throw new Error(`Grok generation failed: ${pollData.error ?? "unknown error"}`);
-    }
-
-    if (i % 6 === 5) {
-      console.log(`    Still generating... (${((i + 1) * POLL_INTERVAL / 1000).toFixed(0)}s)`);
-    }
-  }
-
-  throw new Error("Grok generation timed out after 10 minutes");
-}
-
-// ─── Hailuo 02 via Replicate ───
-
-async function generateHailuoVideo(prompt: string): Promise<string> {
-  const Replicate = (await import("replicate")).default;
-  const replicate = new Replicate({ auth: REPLICATE_API_TOKEN });
-
-  const output = await replicate.run("minimax/hailuo-02", {
-    input: {
-      prompt,
-      duration: 10,
-      resolution: "768p",
-    },
-  });
-
-  // Extract URL from output
+/** Extract URL from Replicate output (handles string, array, FileOutput, ReadableStream) */
+async function extractOutputUrl(output: unknown): Promise<string> {
   let raw: unknown = output;
+
+  // Array → take first element
   if (Array.isArray(raw)) raw = raw[0];
-  if (typeof raw === "string" && raw.startsWith("http")) return raw;
+
+  // String URL
+  if (typeof raw === "string") return raw;
+
+  // FileOutput — has toString() that returns the URL string
+  if (raw && typeof raw === "object" && typeof (raw as any).toString === "function") {
+    const str = String(raw);
+    if (str.startsWith("http")) return str;
+  }
+
+  // FileOutput / object with .url property or method
   if (raw && typeof raw === "object" && "url" in (raw as object)) {
     const u = (raw as { url: unknown }).url;
+    if (typeof u === "function") return String(u.call(raw));
     if (typeof u === "string") return u;
   }
-  // ReadableStream fallback
+
+  // ReadableStream (Replicate SDK v1.x)
   if (raw && typeof (raw as any).getReader === "function") {
     const reader = (raw as any).getReader();
     const chunks: Uint8Array[] = [];
@@ -440,15 +378,51 @@ async function generateHailuoVideo(prompt: string): Promise<string> {
       if (result.value) chunks.push(result.value);
       done = result.done;
     }
-    const str = Buffer.concat(chunks).toString("utf-8");
-    if (str.startsWith("http")) return str;
-  }
-  if (raw && typeof (raw as any).toString === "function") {
-    const s = (raw as any).toString();
-    if (s.startsWith("http")) return s;
+    const text = Buffer.concat(chunks).toString("utf-8").trim();
+    if (text.startsWith("http")) return text;
   }
 
-  throw new Error(`Unexpected Hailuo output: ${typeof raw}`);
+  throw new Error(`Could not extract URL from Replicate output: ${JSON.stringify(output).slice(0, 200)}`);
+}
+
+/**
+ * Step 1: Generate a psychedelic Dead image with Grok Imagine Image via Replicate.
+ * Returns the image URL (used as input for image-to-video).
+ */
+async function generateGrokImage(prompt: string): Promise<string> {
+  console.log(`    Replicate: xai/grok-imagine-image...`);
+  const output = await replicate!.run("xai/grok-imagine-image", {
+    input: {
+      prompt,
+      aspect_ratio: "16:9",
+    },
+  });
+
+  return extractOutputUrl(output);
+}
+
+/**
+ * Step 2: Generate a video with Grok Imagine Video via Replicate.
+ * If imageUrl is provided, uses image-to-video (animates the given image).
+ * Otherwise, uses text-to-video (fallback).
+ */
+async function generateGrokVideo(prompt: string, duration: number = 15, imageUrl?: string): Promise<string> {
+  const input: Record<string, unknown> = {
+    prompt,
+    duration,
+    aspect_ratio: "16:9",
+  };
+
+  if (imageUrl) {
+    input.image = imageUrl;
+  }
+
+  console.log(`    Replicate: xai/grok-imagine-video (${duration}s${imageUrl ? ", image-to-video" : ""})...`);
+  const output = await replicate!.run("xai/grok-imagine-video", {
+    input,
+  });
+
+  return extractOutputUrl(output);
 }
 
 // ─── Catalog registration ───
@@ -656,9 +630,9 @@ async function main() {
 
         // Show what Claude would generate (fake prompts for preview)
         const videoCount = meta && meta.duration >= 300 ? 4 : 3;
-        estimatedCost += videoCount * 0.75;
+        estimatedCost += videoCount * 0.80; // image ($0.05) + video ($0.75) per clip
         generated += videoCount;
-        console.log(`    → Would generate ${videoCount} videos ($${(videoCount * 0.75).toFixed(2)})`);
+        console.log(`    → Would generate ${videoCount} videos ($${(videoCount * 0.80).toFixed(2)})`);
         continue;
       }
 
@@ -677,14 +651,19 @@ async function main() {
         continue;
       }
 
-      // Generate each video via Grok Imagine
+      // Generate each video via Grok Imagine (image → video pipeline)
       for (let i = 0; i < videoPrompts.length; i++) {
         const vp = videoPrompts[i];
         const tmpPath = join(VIDEO_DIR, `${songKey}-scene-${vp.energy}-tmp.mp4`);
 
         try {
-          console.log(`    Generating video ${i + 1}/${videoPrompts.length} [${vp.energy}]...`);
-          const videoUrl = await generateGrokVideo(vp.prompt);
+          // Step 1: Generate psychedelic Dead image
+          console.log(`    [${i + 1}/${videoPrompts.length}] Generating image [${vp.energy}]...`);
+          const imageUrl = await generateGrokImage(vp.prompt);
+          console.log(`    Image ready → animating to video...`);
+
+          // Step 2: Animate the image into video
+          const videoUrl = await generateGrokVideo(vp.prompt, 15, imageUrl);
 
           console.log(`    Downloading...`);
           await download(videoUrl, tmpPath);
@@ -702,7 +681,7 @@ async function main() {
 
           if (added) {
             generated++;
-            estimatedCost += 0.75;
+            estimatedCost += 0.80; // image ($0.05) + video ($0.75)
           } else {
             skipped++;
           }
@@ -734,9 +713,9 @@ async function main() {
     }
   }
 
-  // ─── General atmospheric videos (Hailuo 02) ───
+  // ─── General atmospheric videos (Grok Imagine, 10s) ───
 
-  console.log("\n═══ General Atmospheric Videos (Hailuo 02) ═══\n");
+  console.log("\n═══ General Atmospheric Videos (Grok Imagine 10s) ═══\n");
 
   // Check which generals already exist
   const existingGenerals = catalog.assets.filter(
@@ -767,7 +746,7 @@ async function main() {
 
       if (dryRun) {
         console.log(`  [${gp.energy}] ${gp.name}: ${gp.prompt.slice(0, 80)}...`);
-        estimatedCost += 0.30;
+        estimatedCost += 0.55; // image ($0.05) + video ($0.05/sec × 10s)
         generated++;
         continue;
       }
@@ -775,8 +754,13 @@ async function main() {
       const tmpPath = join(VIDEO_DIR, `general-${gp.name}-tmp.mp4`);
 
       try {
-        console.log(`  Generating: ${gp.name} [${gp.energy}]...`);
-        const videoUrl = await generateHailuoVideo(gp.prompt);
+        // Step 1: Generate psychedelic Dead image
+        console.log(`  Generating image: ${gp.name} [${gp.energy}]...`);
+        const imageUrl = await generateGrokImage(gp.prompt);
+        console.log(`  Image ready → animating to video...`);
+
+        // Step 2: Animate the image into video
+        const videoUrl = await generateGrokVideo(gp.prompt, 10, imageUrl);
 
         console.log(`  Downloading...`);
         await download(videoUrl, tmpPath);
@@ -810,13 +794,13 @@ async function main() {
             ],
             sizeBytes: stats.size,
             addedAt: new Date().toISOString(),
-            model: "minimax-hailuo-02",
+            model: "grok-imagine",
             prompt: gp.prompt,
           });
 
           console.log(`  + Added: general → videos/${libraryFilename} (${(stats.size / 1024 / 1024).toFixed(1)}M) [${gp.energy}]`);
           generated++;
-          estimatedCost += 0.30;
+          estimatedCost += 0.55;
         }
 
         // Clean up tmp
@@ -824,7 +808,7 @@ async function main() {
           if (existsSync(tmpPath)) unlinkSync(tmpPath);
         } catch { /* ignore */ }
       } catch (err) {
-        console.error(`  ERROR (Hailuo ${gp.name}): ${err instanceof Error ? err.message : err}`);
+        console.error(`  ERROR (Grok general ${gp.name}): ${err instanceof Error ? err.message : err}`);
         failed++;
         try {
           if (existsSync(tmpPath)) unlinkSync(tmpPath);

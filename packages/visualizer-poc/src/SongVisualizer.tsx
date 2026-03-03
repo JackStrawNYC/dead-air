@@ -102,21 +102,19 @@ function applyDensityMult(
 // ─── Song Art Phases ───
 const ART_FULL_END = 120;      // 4s at 30fps — full opacity title card
 const ART_FADE_END = 300;      // 10s — fade to background wash level
-const ART_BG_OPACITY = 0.25;   // persistent background wash opacity
+const ART_BG_OPACITY = 0.55;   // persistent background — song art is the visual foundation
 
 interface SongArtProps {
   src: string;
-  /** When curated media is active, suppress art so it doesn't clash */
-  mediaActive: boolean;
-  /** Curated media (song-specific) dims art more than general filler */
-  mediaCurated: boolean;
+  /** Smooth 0-1 suppression factor: 1 = full art, 0.25 = dimmed for curated media */
+  suppressionFactor: number;
 }
 
 /** Per-song poster art — the visual foundation of each song.
  *  Intro: full opacity title card (4s), then settles to background wash.
- *  Suppressed to 0% when curated media (images/videos) is active.
+ *  Smoothly dims when curated media (images/videos) is active.
  */
-const SongArtLayer: React.FC<SongArtProps> = ({ src, mediaActive, mediaCurated }) => {
+const SongArtLayer: React.FC<SongArtProps> = ({ src, suppressionFactor }) => {
   const frame = useCurrentFrame();
 
   // Base target: full during intro, then settle to background wash
@@ -131,9 +129,7 @@ const SongArtLayer: React.FC<SongArtProps> = ({ src, mediaActive, mediaCurated }
     },
   );
 
-  // Curated media: dim song art but keep a trace for visual continuity.
-  const suppressionTarget = mediaCurated ? 0.25 : mediaActive ? 0.7 : 1;
-  const artOpacity = baseOpacity * suppressionTarget;
+  const artOpacity = baseOpacity * suppressionFactor;
 
   if (artOpacity < 0.01) return null;
 
@@ -368,7 +364,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
     [effectiveLegacyVideos, effectiveMedia, sections, f, props.song.trackId, showSeed],
   );
   const activeMediaWindow = mediaWindows.find(
-    (w) => frame >= w.frameStart - 270 && frame < w.frameEnd + 270, // 270 = CURATED_FADE_FRAMES
+    (w) => frame >= w.frameStart - 150 && frame < w.frameEnd + 150, // fade detection range
   );
   // Also check if a lyric trigger is currently active (highest-priority curated media)
   const activeLyricTrigger = lyricTriggerWindows.find(
@@ -377,6 +373,30 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
   const mediaActive = !!activeMediaWindow || !!activeLyricTrigger;
   const mediaCurated = activeLyricTrigger ? true : (activeMediaWindow ? activeMediaWindow.media.priority <= 1 : false);
   const mediaSuppression = activeLyricTrigger ? 0.45 : mediaCurated ? 0.55 : mediaActive ? 0.75 : 1.0;
+
+  // Smooth suppression factor for song art — crossfades with video fade envelope
+  // instead of snapping when video windows start/end
+  const SUPPRESS_FADE = 90; // 3-second smooth transition
+  const artSuppressionFactor = useMemo(() => {
+    if (activeLyricTrigger) {
+      // Smooth in/out around lyric trigger
+      const fadeIn = Math.min(1, Math.max(0, (frame - (activeLyricTrigger.frameStart - 150)) / 150));
+      const fadeOut = Math.min(1, Math.max(0, (activeLyricTrigger.frameEnd + 120 - frame) / 120));
+      const envelope = Math.min(fadeIn, fadeOut);
+      return 1 - envelope * 0.75; // dims to 0.25 at peak
+    }
+    if (activeMediaWindow) {
+      const isCurated = activeMediaWindow.media.priority <= 1;
+      const fadeIn = Math.min(1, Math.max(0, (frame - (activeMediaWindow.frameStart - SUPPRESS_FADE)) / SUPPRESS_FADE));
+      const fadeOut = Math.min(1, Math.max(0, (activeMediaWindow.frameEnd + SUPPRESS_FADE - frame) / SUPPRESS_FADE));
+      const envelope = Math.min(fadeIn, fadeOut);
+      // Smoothstep for natural feel
+      const smooth = envelope * envelope * (3 - 2 * envelope);
+      const dimTarget = isCurated ? 0.25 : 0.7;
+      return 1 - smooth * (1 - dimTarget);
+    }
+    return 1;
+  }, [frame, activeMediaWindow, activeLyricTrigger]);
 
   // Fade in/out for set break transitions (segues skip the fade)
   const fadeIn = props.segueIn ? 1 : interpolate(frame, [0, FADE_FRAMES], [0, 1], {
@@ -410,7 +430,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
           {/* ═══ Layer 0.5: Per-song poster art (persistent background wash) ═══ */}
           {effectiveSongArt && (
             <SilentErrorBoundary name="SongArt">
-              <SongArtLayer src={staticFile(effectiveSongArt)} mediaActive={mediaActive} mediaCurated={mediaCurated} />
+              <SongArtLayer src={staticFile(effectiveSongArt)} suppressionFactor={artSuppressionFactor} />
             </SilentErrorBoundary>
           )}
 

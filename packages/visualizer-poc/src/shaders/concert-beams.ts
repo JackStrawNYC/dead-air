@@ -91,7 +91,7 @@ void main() {
   // Background
   float bgHue = uPalettePrimary + uTime * 0.02;
   vec3 bgColor = 0.5 + 0.5 * cos(6.28318 * (vec3(bgHue, bgHue + 0.33, bgHue + 0.67) + vec3(0.0, 0.1, 0.2)));
-  bgColor *= 0.04 + uRms * 0.03;
+  bgColor *= 0.12 + uRms * 0.08;
   vec3 col = bgColor;
 
   float activeBeamCount = 2.0 + energy * 4.0;
@@ -112,7 +112,7 @@ void main() {
 
     float contrastBoost = getContrastForBeam(i) * 0.3;
     // Snappy beat for intensity
-    float intensity = (0.3 + uRms * 0.4 + contrastBoost) * beamActive;
+    float intensity = (0.5 + uRms * 0.5 + contrastBoost) * beamActive;
 
     // === CHROMATIC ABERRATION on beams ===
     // Compute beam at 3 UV offsets for R/G/B separation
@@ -154,14 +154,14 @@ void main() {
 
   // Stage silhouette
   float stageY = smoothstep(0.35, 0.25, uv.y);
-  col = mix(col, vec3(0.005, 0.005, 0.01), stageY * 0.95);
+  col = mix(col, vec3(0.02, 0.015, 0.025), stageY * 0.80);
 
   // === CROWD SILHOUETTE: wavy heads along bottom edge ===
   float crowdY = 0.12 + snoise(vec3(uv.x * 8.0, uTime * 0.3, 0.0)) * 0.02
                + snoise(vec3(uv.x * 25.0, 0.0, uTime * 0.1)) * 0.008;
   crowdY += uBeatSnap * 0.005 * sin(uv.x * 15.0 + uTime);
   float crowdMask = smoothstep(crowdY + 0.01, crowdY - 0.01, uv.y);
-  col = mix(col, vec3(0.003, 0.003, 0.008), crowdMask * 0.92);
+  col = mix(col, vec3(0.015, 0.012, 0.02), crowdMask * 0.85);
 
   // Floor reflection
   if (uv.y < 0.25) {

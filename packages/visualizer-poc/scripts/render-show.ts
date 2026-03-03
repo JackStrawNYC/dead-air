@@ -81,6 +81,7 @@ function computeSourceHash(): string {
     join(ROOT, "src", "components", "AudioReactiveCanvas.tsx"),
     join(ROOT, "src", "components", "SceneVideoLayer.tsx"),
     join(ROOT, "src", "shaders", "liquid-light.ts"),
+    join(ROOT, "src", "shaders", "concert-beams.ts"),
     join(ROOT, "src", "shaders", "noise.ts"),
     join(ROOT, "src", "utils", "audio-reactive.ts"),
     join(ROOT, "src", "utils", "energy.ts"),
