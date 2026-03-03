@@ -1,18 +1,15 @@
 /**
  * RainbowArc -- Classic rainbow arc across upper portion of screen.
- * 7 concentric arcs in ROYGBIV colors. Rainbow fades in gradually,
- * holds, then fades out. Arc width pulses gently with energy.
- * Subtle secondary rainbow (fainter, reversed colors) outside the
- * main arc. Cycle: 90s, 25s visible.
+ * 7 concentric arcs in ROYGBIV colors. Energy controls band opacity and glow.
+ * Arc width pulses gently with energy. Subtle secondary rainbow (fainter,
+ * reversed colors) outside the main arc. Renders continuously —
+ * the overlay rotation system controls visibility via opacity.
  */
 
 import React from "react";
-import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
+import { useCurrentFrame, useVideoConfig, interpolate } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
-
-const VISIBLE_DURATION = 750; // 25s at 30fps
-const CYCLE_GAP = 1950;       // 65s gap (90s total - 25s visible)
-const CYCLE_TOTAL = VISIBLE_DURATION + CYCLE_GAP;
+import { useAudioSnapshot } from "./parametric/audio-helpers";
 
 // ROYGBIV colors
 const RAINBOW_COLORS = [
@@ -38,41 +35,9 @@ interface Props {
 export const RainbowArc: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
+  const snap = useAudioSnapshot(frames);
 
-  // Memo to satisfy hooks-before-conditionals rule
-  const _stable = React.useMemo(() => true, []);
-  void _stable;
-
-  // Energy calculation
-  const idx = Math.min(Math.max(0, frame), frames.length - 1);
-  let eSum = 0;
-  let eCount = 0;
-  for (let i = Math.max(0, idx - 75); i <= Math.min(frames.length - 1, idx + 75); i++) {
-    eSum += frames[i].rms;
-    eCount++;
-  }
-  const energy = eCount > 0 ? eSum / eCount : 0;
-
-  const cycleFrame = frame % CYCLE_TOTAL;
-
-  if (cycleFrame >= VISIBLE_DURATION) return null;
-
-  const progress = cycleFrame / VISIBLE_DURATION;
-
-  // Slow fade in (20% of duration), hold, slow fade out (20% of duration)
-  const fadeIn = interpolate(progress, [0, 0.2], [0, 1], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-    easing: Easing.out(Easing.cubic),
-  });
-  const fadeOut = interpolate(progress, [0.8, 1], [1, 0], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-    easing: Easing.in(Easing.cubic),
-  });
-  const masterOpacity = Math.min(fadeIn, fadeOut) * 0.65;
-
-  if (masterOpacity < 0.01) return null;
+  const energy = snap.energy;
 
   // Arc center and base radius
   const centerX = width * 0.5;
@@ -85,6 +50,12 @@ export const RainbowArc: React.FC<Props> = ({ frames }) => {
 
   // Shimmer effect
   const shimmer = 1 + Math.sin(frame * 0.07) * 0.03 + Math.sin(frame * 0.13) * 0.02;
+
+  // Master opacity driven by energy (brighter during louder passages)
+  const masterOpacity = interpolate(energy, [0.03, 0.25], [0.35, 0.65], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+  });
 
   return (
     <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden" }}>
@@ -116,13 +87,6 @@ export const RainbowArc: React.FC<Props> = ({ frames }) => {
         {RAINBOW_COLORS.map((color, ci) => {
           const r = baseRadius + (RAINBOW_COLORS.length - 1 - ci) * (bandWidth + ARC_GAP);
 
-          // Stagger the fade-in per band
-          const bandDelay = ci * 0.02;
-          const bandFade = interpolate(progress, [bandDelay, bandDelay + 0.15], [0, 1], {
-            extrapolateLeft: "clamp",
-            extrapolateRight: "clamp",
-          });
-
           return (
             <path
               key={`main-${ci}`}
@@ -130,7 +94,7 @@ export const RainbowArc: React.FC<Props> = ({ frames }) => {
               stroke={color}
               strokeWidth={bandWidth}
               fill="none"
-              opacity={bandFade * (0.5 + energy * 0.3)}
+              opacity={0.5 + energy * 0.3}
               style={{
                 filter: `drop-shadow(0 0 ${4 + energy * 8}px ${color}88)`,
               }}

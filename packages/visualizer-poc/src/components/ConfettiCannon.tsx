@@ -1,14 +1,15 @@
 /**
- * ConfettiCannon — Burst of 50-80 confetti pieces from bottom corners on energy peaks (>0.3).
+ * ConfettiCannon — Burst of 50-80 confetti pieces from bottom corners on energy peaks (>0.18).
  * Confetti shoots upward in a fountain arc, then falls with gravity. Each piece is a small
  * rect with random bright color and rotation. Multiple cannons can fire from alternating sides.
- * Cycle: 30s, 8s visible, energy-gated.
+ * Bursts fire whenever the music warrants it — no cycle timer.
  */
 
 import React from "react";
 import { useCurrentFrame, useVideoConfig, interpolate } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
 import { seeded } from "../utils/seededRandom";
+import { useAudioSnapshot } from "./parametric/audio-helpers";
 
 const CONFETTI_COLORS = [
   "#FF1744", "#FF9100", "#FFD600", "#00E676",
@@ -21,7 +22,7 @@ const PARTICLES_PER_BURST = 65;
 const MAX_ACTIVE_BURSTS = 4;
 const BURST_LIFETIME = 150; // 5 seconds at 30fps
 const CHECK_INTERVAL = 12;
-const ENERGY_THRESHOLD = 0.3;
+const ENERGY_THRESHOLD = 0.18;
 
 interface ConfettiPiece {
   vx: number;
@@ -59,13 +60,13 @@ function precomputeBursts(
 
       const pieces: ConfettiPiece[] = Array.from({ length: PARTICLES_PER_BURST }, () => {
         const angle = -Math.PI / 2 + (rng() - 0.5) * 1.2; // upward with spread
-        const speed = 4 + rng() * 8;
+        const speed = 6 + rng() * 12;
         const sideDir = side === "left" ? 1 : -1;
         return {
           vx: Math.cos(angle) * speed * sideDir + (rng() - 0.5) * 2,
           vy: Math.sin(angle) * speed - 1,
-          width: 3 + rng() * 6,
-          height: 2 + rng() * 4,
+          width: 8 + rng() * 14,
+          height: 5 + rng() * 9,
           colorIdx: Math.floor(rng() * CONFETTI_COLORS.length),
           rotSpeed: (rng() - 0.5) * 15,
           rotPhase: rng() * 360,
@@ -90,25 +91,13 @@ export const ConfettiCannon: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
 
-  const idx = Math.min(Math.max(0, frame), frames.length - 1);
-  let eSum = 0;
-  let eCount = 0;
-  for (let i = Math.max(0, idx - 75); i <= Math.min(frames.length - 1, idx + 75); i++) {
-    eSum += frames[i].rms;
-    eCount++;
-  }
-  const _energy = eCount > 0 ? eSum / eCount : 0;
+  // Use shared audio snapshot (replaces inline energy loop)
+  const _snap = useAudioSnapshot(frames);
 
   const burstEvents = React.useMemo(
     () => precomputeBursts(frames, 7777_1977),
     [frames],
   );
-
-  // Timing gate -- cycle: 30s visible window of 8s
-  const CYCLE = 900;     // 30 seconds
-  const DURATION = 240;  // 8 seconds
-  const cycleFrame = frame % CYCLE;
-  if (cycleFrame >= DURATION) return null;
 
   const activeBursts = burstEvents.filter(
     (e) => frame >= e.frame && frame < e.frame + BURST_LIFETIME,

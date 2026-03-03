@@ -166,8 +166,8 @@ export const SkeletonRoses: React.FC<Props> = ({ frames }) => {
   // Slow rotation (tempo-scaled) + beat impulse
   const rotation = (frame / 30) * 1.5 * tempoFactor + snap.beatDecay * 1.5;
 
-  // Opacity: always visible but brighter on peaks (0.05 - 0.25)
-  const opacity = interpolate(energy, [0.02, 0.3], [0.05, 0.25], {
+  // Opacity: always visible, vivid at peaks (0.30 - 0.75)
+  const opacity = interpolate(energy, [0.02, 0.3], [0.30, 0.75], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });

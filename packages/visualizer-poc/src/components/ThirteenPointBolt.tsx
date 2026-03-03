@@ -8,6 +8,8 @@
 import React from "react";
 import { useCurrentFrame, useVideoConfig, interpolate } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
+import { useAudioSnapshot } from "./parametric/audio-helpers";
+import { useTempoFactor } from "../data/TempoContext";
 
 /** Map 0-1 hue to an RGB hex string (s=0.85, l=0.6) */
 function hueToHex(h: number): string {
@@ -67,40 +69,10 @@ interface Props {
 export const ThirteenPointBolt: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
+  const snap = useAudioSnapshot(frames);
+  const tempoFactor = useTempoFactor();
 
-  const idx = Math.min(Math.max(0, frame), frames.length - 1);
-
-  // Smooth energy (wide window — 151 frames)
-  let eSum = 0;
-  let eCount = 0;
-  for (let i = Math.max(0, idx - 75); i <= Math.min(frames.length - 1, idx + 75); i++) {
-    eSum += frames[i].rms;
-    eCount++;
-  }
-  const energy = eCount > 0 ? eSum / eCount : 0;
-
-  // Smooth chroma hue (31-frame window)
-  let chromaSum = 0;
-  let chromaCount = 0;
-  for (let i = Math.max(0, idx - 15); i <= Math.min(frames.length - 1, idx + 15); i++) {
-    const ch = frames[i].chroma;
-    let maxI = 0;
-    for (let j = 1; j < 12; j++) {
-      if (ch[j] > ch[maxI]) maxI = j;
-    }
-    chromaSum += maxI / 12;
-    chromaCount++;
-  }
-  const chromaHue = chromaCount > 0 ? chromaSum / chromaCount : 0;
-
-  // Beat flash: detect beat, 4-frame decay
-  let beatFlash = 0;
-  for (let lookback = 0; lookback < 4; lookback++) {
-    const bi = idx - lookback;
-    if (bi >= 0 && frames[bi].beat) {
-      beatFlash = Math.max(beatFlash, 0.3 * (1 - lookback / 4));
-    }
-  }
+  const energy = snap.energy;
 
   // Size: ~60% viewport height
   const baseSize = Math.min(width, height) * 0.6;
@@ -109,17 +81,20 @@ export const ThirteenPointBolt: React.FC<Props> = ({ frames }) => {
     extrapolateRight: "clamp",
   });
 
-  // Slow rotation: ~2 deg/s
-  const rotation = (frame / 30) * 2;
+  // Slow rotation: ~2 deg/s, scaled by tempo
+  const rotation = (frame / 30) * 2 * tempoFactor;
 
-  // Opacity: energy-gated (fades below 0.08)
-  const baseOpacity = interpolate(energy, [0.02, 0.3], [0.08, 0.45], {
+  // Opacity: energy-gated, visible even at low energy
+  const baseOpacity = interpolate(energy, [0.02, 0.3], [0.25, 0.80], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
-  const opacity = Math.min(baseOpacity + beatFlash, 0.75);
+  // Beat flash from snap.beatDecay (replaces manual 4-frame lookback)
+  const beatFlash = snap.beatDecay * 0.3;
+  const opacity = Math.min(baseOpacity + beatFlash, 0.95);
 
-  // Colors from chroma
+  // Colors from chroma (snap.chromaHue is 0-360, convert to 0-1)
+  const chromaHue = snap.chromaHue / 360;
   const boltColor = hueToHex(chromaHue);
   const glowColor = hueToHex(chromaHue + 0.15);
 

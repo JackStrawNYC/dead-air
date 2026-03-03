@@ -12,6 +12,8 @@ import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
 import { useShowContext } from "../data/ShowContext";
 import { seeded } from "../utils/seededRandom";
+import { useAudioSnapshot } from "./parametric/audio-helpers";
+import { useTempoFactor } from "../data/TempoContext";
 
 interface LighterData {
   /** x position as fraction of width */
@@ -53,7 +55,7 @@ function generateLighters(seed: number): LighterData[] {
     flameScale: 0.7 + rng() * 0.6,
     hue: 30 + rng() * 25,
     bodyDarkness: 0.15 + rng() * 0.25,
-    sizeMult: 0.6 + rng() * 0.5,
+    sizeMult: 1.2 + rng() * 0.8,
   }));
 }
 
@@ -68,22 +70,13 @@ export const LighterWave: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
   const ctx = useShowContext();
-
-  const idx = Math.min(Math.max(0, frame), frames.length - 1);
-
-  // Rolling energy over +/-75 frames
-  let eSum = 0;
-  let eCount = 0;
-  for (let i = Math.max(0, idx - 75); i <= Math.min(frames.length - 1, idx + 75); i++) {
-    eSum += frames[i].rms;
-    eCount++;
-  }
-  const energy = eCount > 0 ? eSum / eCount : 0;
+  const snap = useAudioSnapshot(frames);
+  const tempoFactor = useTempoFactor();
 
   const lighters = React.useMemo(() => generateLighters(ctx?.showSeed ?? 19770508), [ctx?.showSeed]);
 
-  // Quiet detection: only visible when energy < 0.12
-  const quietness = interpolate(energy, [0.04, 0.12], [1, 0], {
+  // Quiet detection: use slowEnergy for smoother quiet-detection
+  const quietness = interpolate(snap.slowEnergy, [0.04, 0.12], [1, 0], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
@@ -125,12 +118,12 @@ export const LighterWave: React.FC<Props> = ({ frames }) => {
           const py = lighter.y * height;
           const size = lighter.sizeMult;
 
-          // Sway angle
-          const sway = Math.sin(frame * lighter.swayFreq + lighter.swayPhase) * lighter.swayAmp;
+          // Sway angle — scaled by tempoFactor
+          const sway = Math.sin(frame * lighter.swayFreq * tempoFactor + lighter.swayPhase) * lighter.swayAmp;
 
-          // Flicker intensity
-          const flicker = 0.5 + (Math.sin(frame * lighter.flickerFreq + lighter.flickerPhase) * 0.3
-            + Math.sin(frame * lighter.flickerFreq * 2.3 + lighter.flickerPhase * 1.7) * 0.2);
+          // Flicker intensity — scaled by tempoFactor
+          const flicker = 0.5 + (Math.sin(frame * lighter.flickerFreq * tempoFactor + lighter.flickerPhase) * 0.3
+            + Math.sin(frame * lighter.flickerFreq * 2.3 * tempoFactor + lighter.flickerPhase * 1.7) * 0.2);
 
           // Flame height varies with flicker
           const flameH = 10 * lighter.flameScale * (0.8 + flicker * 0.4) * size;

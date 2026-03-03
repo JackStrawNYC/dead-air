@@ -1,13 +1,20 @@
 /**
  * SkeletonBand — parade of skeletons with instruments crossing the screen.
  * 4 skeletons: guitarist, drummer, bassist, keyboardist (the Dead lineup).
- * Marches across mid-screen during high-energy passages.
- * Appears less frequently than bears — every ~45 seconds during loud sections.
+ * Music-driven: marches across mid-screen during high-energy passages,
+ * starting on beat frames when energy sustains above threshold.
  */
 
 import React from "react";
 import { useCurrentFrame, useVideoConfig, interpolate } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
+import {
+  useAudioSnapshot,
+  precomputeMarchWindows,
+  findActiveMarch,
+  type MarchConfig,
+} from "./parametric/audio-helpers";
+import { useTempoFactor } from "../data/TempoContext";
 
 type IconFC = React.FC<{ size: number; color: string }>;
 
@@ -128,7 +135,15 @@ const SkeletonKeys: IconFC = ({ size, color }) => (
 );
 
 const SKELETONS: IconFC[] = [SkeletonGuitar, SkeletonDrums, SkeletonBass, SkeletonKeys];
-const SKELETON_SPACING = 160;
+const SKELETON_SPACING = 300;
+
+const MARCH_CONFIG: MarchConfig = {
+  enterThreshold: 0.14,
+  exitThreshold: 0.09,
+  sustainFrames: 30,       // ~1 second sustained
+  cooldownFrames: 300,      // ~10 seconds between marches (skeleton band is rare)
+  marchDuration: 450,       // 15 seconds to cross
+};
 
 interface Props {
   frames: EnhancedFrameData[];
@@ -137,33 +152,27 @@ interface Props {
 export const SkeletonBand: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
+  const snap = useAudioSnapshot(frames);
+  const tempoFactor = useTempoFactor();
 
-  const idx = Math.min(Math.max(0, frame), frames.length - 1);
-  let eSum = 0;
-  let eCount = 0;
-  for (let i = Math.max(0, idx - 75); i <= Math.min(frames.length - 1, idx + 75); i++) {
-    eSum += frames[i].rms;
-    eCount++;
-  }
-  const energy = eCount > 0 ? eSum / eCount : 0;
+  const energy = snap.energy;
 
-  // Only appear during high energy (> 0.15 rolling RMS)
-  if (energy < 0.12) return null;
+  const marchWindows = React.useMemo(
+    () => precomputeMarchWindows(frames, MARCH_CONFIG),
+    [frames],
+  );
 
-  const CYCLE = 1350; // 45 seconds
-  const MARCH_DURATION = 600; // 20 seconds to cross
+  const activeMarch = findActiveMarch(marchWindows, frame);
+  if (!activeMarch) return null;
 
-  const cycleFrame = frame % CYCLE;
-  const cycleIndex = Math.floor(frame / CYCLE);
-  const goingRight = cycleIndex % 2 === 0;
-
-  if (cycleFrame >= MARCH_DURATION) return null;
-
-  const progress = cycleFrame / MARCH_DURATION;
+  const marchFrame = frame - activeMarch.startFrame;
+  const marchDuration = activeMarch.endFrame - activeMarch.startFrame;
+  const progress = marchFrame / marchDuration;
+  const goingRight = activeMarch.direction === 1;
 
   const fadeIn = interpolate(progress, [0, 0.06], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
   const fadeOut = interpolate(progress, [0.94, 1], [1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-  const opacity = Math.min(fadeIn, fadeOut) * interpolate(energy, [0.12, 0.25], [0.3, 0.8], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const opacity = Math.min(fadeIn, fadeOut) * interpolate(energy, [0.06, 0.2], [0.5, 0.95], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
 
   const totalWidth = SKELETONS.length * SKELETON_SPACING;
   const yBase = height * 0.35; // mid-screen
@@ -185,8 +194,9 @@ export const SkeletonBand: React.FC<Props> = ({ frames }) => {
           }) - i * SKELETON_SPACING + totalWidth;
         }
 
-        const bob = Math.sin((frame * 0.1) + i * 1.5) * (6 + energy * 12);
-        const tilt = Math.sin((frame * 0.06) + i * 0.8) * 5;
+        // Bob: tempo-scaled, beat-reactive
+        const bob = Math.sin((frame * 0.1 * tempoFactor) + i * 1.5) * (6 + energy * 12 + snap.beatDecay * 8);
+        const tilt = Math.sin((frame * 0.06 * tempoFactor) + i * 0.8) * 5;
         const glow = `drop-shadow(0 0 10px ${color}) drop-shadow(0 0 25px ${color})`;
 
         return (
@@ -202,7 +212,7 @@ export const SkeletonBand: React.FC<Props> = ({ frames }) => {
               willChange: "transform, opacity",
             }}
           >
-            <Skeleton size={100} color={color} />
+            <Skeleton size={200} color={color} />
           </div>
         );
       })}

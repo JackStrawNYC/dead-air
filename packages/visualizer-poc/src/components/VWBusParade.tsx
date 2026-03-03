@@ -1,14 +1,20 @@
 /**
  * VWBusParade — tie-dye VW Microbus parade crossing the bottom of the screen.
  * 5 buses in classic Dead lot colors, bobbing to audio energy.
- * March direction alternates per cycle. Energy drives bob height + speed.
+ * March direction alternates per window. Energy drives bob height + speed.
+ * Music-driven: marches start on beat frames during mid-energy passages.
  * Slower and more chill than BearParade — lot scene vibes.
  */
 
 import React from "react";
 import { useCurrentFrame, useVideoConfig, interpolate } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
-import { useAudioSnapshot } from "./parametric/audio-helpers";
+import {
+  useAudioSnapshot,
+  precomputeMarchWindows,
+  findActiveMarch,
+  type MarchConfig,
+} from "./parametric/audio-helpers";
 import { useTempoFactor } from "../data/TempoContext";
 
 const BUS_COLORS: Array<{ body: string; roof: string; accent: string }> = [
@@ -20,12 +26,17 @@ const BUS_COLORS: Array<{ body: string; roof: string; accent: string }> = [
 ];
 
 const NUM_BUSES = 5;
-const PARADE_DURATION = 600; // 20 seconds to cross (slower than bears)
-const PARADE_GAP = 1050;     // 35 second gap between parades (55s total cycle)
-const PARADE_CYCLE = PARADE_DURATION + PARADE_GAP;
-const BUS_SPACING = 200;
-const BUS_WIDTH = 140;
-const BUS_HEIGHT = 90;
+const BUS_SPACING = 360;
+const BUS_WIDTH = 260;
+const BUS_HEIGHT = 170;
+
+const MARCH_CONFIG: MarchConfig = {
+  enterThreshold: 0.07,
+  exitThreshold: 0.04,
+  sustainFrames: 45,       // ~1.5 seconds sustained (buses are chill)
+  cooldownFrames: 200,      // ~6.7 seconds between marches
+  marchDuration: 600,       // 20 seconds to cross (slower than bears)
+};
 
 /** Single VW Type 2 Microbus SVG */
 const VWBus: React.FC<{
@@ -84,24 +95,28 @@ interface Props {
 export const VWBusParade: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
-
   const snap = useAudioSnapshot(frames);
-  const energy = snap.energy;
   const tempoFactor = useTempoFactor();
 
-  const cycleIndex = Math.floor(frame / PARADE_CYCLE);
-  const cycleFrame = frame % PARADE_CYCLE;
-  const goingRight = cycleIndex % 2 === 0;
+  const energy = snap.energy;
 
-  // Only render during parade portion (not gap)
-  if (cycleFrame >= PARADE_DURATION) return null;
+  const marchWindows = React.useMemo(
+    () => precomputeMarchWindows(frames, MARCH_CONFIG),
+    [frames],
+  );
 
-  const progress = cycleFrame / PARADE_DURATION;
+  const activeMarch = findActiveMarch(marchWindows, frame);
+  if (!activeMarch) return null;
+
+  const marchFrame = frame - activeMarch.startFrame;
+  const marchDuration = activeMarch.endFrame - activeMarch.startFrame;
+  const progress = marchFrame / marchDuration;
+  const goingRight = activeMarch.direction === 1;
 
   // Fade in/out
   const fadeIn = interpolate(progress, [0, 0.06], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
   const fadeOut = interpolate(progress, [0.94, 1], [1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-  const opacity = Math.min(fadeIn, fadeOut) * 0.8;
+  const opacity = Math.min(fadeIn, fadeOut);
 
   const totalWidth = NUM_BUSES * BUS_SPACING;
   const yBase = height - BUS_HEIGHT - 15;

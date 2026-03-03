@@ -4,14 +4,15 @@
  * rotation. Each stick leaves a fading trail of its recent positions.
  * Neon colors (green, pink, blue, yellow, orange). Sticks spin as they fly.
  * Triggered deterministically on beats when energy > 0.15.
- * Cycle: every 50s (1500 frames) for 20s (600 frames).
+ * No cycle timer — fires whenever the music warrants it.
  */
 
 import React from "react";
-import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
+import { useCurrentFrame, useVideoConfig, interpolate } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
 import { useShowContext } from "../data/ShowContext";
 import { seeded } from "../utils/seededRandom";
+import { useAudioSnapshot } from "./parametric/audio-helpers";
 
 const STICK_COLORS = [
   { h: 120, s: 100, l: 60 }, // neon green
@@ -39,13 +40,8 @@ interface StickEvent {
 }
 
 const GRAVITY = 0.1;
-const MAX_CONCURRENT = 5;
+const MAX_CONCURRENT = 8;
 const STICK_LIFETIME = 80;
-
-// Cycle: every 50s (1500 frames) for 20s (600 frames)
-const CYCLE_PERIOD = 1500;
-const SHOW_DURATION = 600;
-const FADE_FRAMES = 45;
 
 function precomputeSticks(
   frames: EnhancedFrameData[],
@@ -55,9 +51,6 @@ function precomputeSticks(
   const events: StickEvent[] = [];
 
   for (let f = 0; f < frames.length; f++) {
-    const cyclePos = f % CYCLE_PERIOD;
-    if (cyclePos >= SHOW_DURATION) continue;
-
     if (frames[f].beat && frames[f].rms > 0.15) {
       const active = events.filter((e) => f - e.frame < STICK_LIFETIME);
       if (active.length >= MAX_CONCURRENT) continue;
@@ -73,7 +66,7 @@ function precomputeSticks(
           vx: (rng() - 0.5) * 4,
           vy: -(5 + rng() * 5),
           colorIdx: Math.floor(rng() * STICK_COLORS.length),
-          stickLen: 16 + rng() * 12,
+          stickLen: 40 + rng() * 30,
           spinSpeed: 0.12 + rng() * 0.2,
           spinPhase: rng() * Math.PI * 2,
           lifetime: 60 + Math.floor(rng() * 30),
@@ -94,52 +87,26 @@ export const GlowSticks: React.FC<Props> = ({ frames }) => {
   const { width, height } = useVideoConfig();
   const ctx = useShowContext();
 
-  const idx = Math.min(Math.max(0, frame), frames.length - 1);
-
-  // Rolling energy over +/-75 frames
-  let eSum = 0;
-  let eCount = 0;
-  for (let i = Math.max(0, idx - 75); i <= Math.min(frames.length - 1, idx + 75); i++) {
-    eSum += frames[i].rms;
-    eCount++;
-  }
-  const _energy = eCount > 0 ? eSum / eCount : 0;
+  // Use shared audio snapshot (replaces inline energy loop)
+  const _snap = useAudioSnapshot(frames);
 
   const stickEvents = React.useMemo(
     () => precomputeSticks(frames, (ctx?.showSeed ?? 19770508)),
     [frames, ctx?.showSeed],
   );
 
-  // Cycle fade
-  const cyclePos = frame % CYCLE_PERIOD;
-  const inShowWindow = cyclePos < SHOW_DURATION;
-
-  const showFadeIn = interpolate(cyclePos, [0, FADE_FRAMES], [0, 1], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-    easing: Easing.out(Easing.cubic),
-  });
-  const showFadeOut = interpolate(
-    cyclePos,
-    [SHOW_DURATION - FADE_FRAMES, SHOW_DURATION],
-    [1, 0],
-    { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: Easing.in(Easing.cubic) },
-  );
-  const showEnvelope = Math.min(showFadeIn, showFadeOut);
-  const cycleOpacity = inShowWindow ? showEnvelope : 0;
-
   // Active sticks
   const activeSticks = stickEvents.filter(
     (e) => frame >= e.frame && frame < e.frame + e.stick.lifetime,
   );
 
-  if (activeSticks.length === 0 || cycleOpacity < 0.01) return null;
+  if (activeSticks.length === 0) return null;
 
   const launchY = height * 0.85;
 
   return (
     <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden" }}>
-      <svg width={width} height={height} style={{ opacity: cycleOpacity }}>
+      <svg width={width} height={height}>
         {activeSticks.map((event, si) => {
           const age = frame - event.frame;
           const stick = event.stick;
@@ -201,7 +168,7 @@ export const GlowSticks: React.FC<Props> = ({ frames }) => {
                 x2={px + dx}
                 y2={py + dy}
                 stroke={glowHsl}
-                strokeWidth={8}
+                strokeWidth={14}
                 strokeLinecap="round"
                 style={{ filter: `blur(4px)` }}
               />
@@ -212,7 +179,7 @@ export const GlowSticks: React.FC<Props> = ({ frames }) => {
                 x2={px + dx}
                 y2={py + dy}
                 stroke={fillHsl}
-                strokeWidth={3}
+                strokeWidth={6}
                 strokeLinecap="round"
                 style={{
                   filter: `drop-shadow(0 0 6px ${glowHsl})`,
@@ -220,8 +187,8 @@ export const GlowSticks: React.FC<Props> = ({ frames }) => {
                 transform={`rotate(${rotation - rotation}, ${px}, ${py})`}
               />
               {/* End caps glow */}
-              <circle cx={px - dx} cy={py - dy} r={3} fill={fillHsl} style={{ filter: `blur(2px)` }} />
-              <circle cx={px + dx} cy={py + dy} r={3} fill={fillHsl} style={{ filter: `blur(2px)` }} />
+              <circle cx={px - dx} cy={py - dy} r={6} fill={fillHsl} style={{ filter: `blur(3px)` }} />
+              <circle cx={px + dx} cy={py + dy} r={6} fill={fillHsl} style={{ filter: `blur(3px)` }} />
             </g>
           );
         })}

@@ -3,13 +3,15 @@
  * Each piece rotates (simulated via scaleX oscillation), has random bright color
  * (red, blue, green, yellow, pink, orange). Fall speed varies per piece.
  * Energy drives confetti count and fall speed. Pieces flutter side-to-side as
- * they fall. Cycle: 40s, 12s visible.
+ * they fall. Renders continuously — the overlay rotation system controls visibility.
  */
 
 import React from "react";
-import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
+import { useCurrentFrame, useVideoConfig, interpolate } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
 import { seeded } from "../utils/seededRandom";
+import { useAudioSnapshot } from "./parametric/audio-helpers";
+import { useTempoFactor } from "../data/TempoContext";
 
 const CONFETTI_COLORS = [
   "hsl(0, 90%, 60%)",    // red
@@ -50,9 +52,6 @@ interface ConfettiPiece {
 }
 
 const NUM_CONFETTI = 55;
-const CYCLE_FRAMES = 40 * 30; // 40s
-const VISIBLE_FRAMES = 12 * 30; // 12s
-const FADE_FRAMES = 45;
 const FALL_CYCLE = 240; // how many frames for a confetti to fall full screen + wrap
 
 function generateConfetti(seed: number): ConfettiPiece[] {
@@ -66,8 +65,8 @@ function generateConfetti(seed: number): ConfettiPiece[] {
     flutterPhase: rng() * Math.PI * 2,
     rotFreq: 0.06 + rng() * 0.1,
     rotPhase: rng() * Math.PI * 2,
-    pieceW: 4 + rng() * 6,
-    pieceH: 3 + rng() * 5,
+    pieceW: 10 + rng() * 14,
+    pieceH: 7 + rng() * 11,
     colorIdx: Math.floor(rng() * CONFETTI_COLORS.length),
     tilt: (rng() - 0.5) * 40,
   }));
@@ -80,38 +79,12 @@ interface Props {
 export const Confetti: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
+  const snap = useAudioSnapshot(frames);
+  const tempoFactor = useTempoFactor();
 
-  const idx = Math.min(Math.max(0, frame), frames.length - 1);
-
-  // Rolling energy over +/-75 frames
-  let eSum = 0;
-  let eCount = 0;
-  for (let i = Math.max(0, idx - 75); i <= Math.min(frames.length - 1, idx + 75); i++) {
-    eSum += frames[i].rms;
-    eCount++;
-  }
-  const energy = eCount > 0 ? eSum / eCount : 0;
+  const energy = snap.energy;
 
   const confetti = React.useMemo(() => generateConfetti(40197708), []);
-
-  // Cycle timing
-  const cyclePos = frame % CYCLE_FRAMES;
-  const inShowWindow = cyclePos < VISIBLE_FRAMES;
-
-  if (!inShowWindow) return null;
-
-  // Fade envelope
-  const fadeIn = interpolate(cyclePos, [0, FADE_FRAMES], [0, 1], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-    easing: Easing.out(Easing.cubic),
-  });
-  const fadeOut = interpolate(cyclePos, [VISIBLE_FRAMES - FADE_FRAMES, VISIBLE_FRAMES], [1, 0], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-    easing: Easing.in(Easing.cubic),
-  });
-  const envelope = Math.min(fadeIn, fadeOut);
 
   // Energy drives count and speed
   const visibleCount = Math.round(interpolate(energy, [0.05, 0.3], [20, NUM_CONFETTI], {
@@ -122,35 +95,33 @@ export const Confetti: React.FC<Props> = ({ frames }) => {
   const speedMult = interpolate(energy, [0.05, 0.3], [0.6, 1.5], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
-  });
+  }) * tempoFactor;
 
-  const masterOpacity = envelope * 0.7;
-
-  if (masterOpacity < 0.01) return null;
+  const masterOpacity = 0.92;
 
   return (
     <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden" }}>
       <svg width={width} height={height} style={{ opacity: masterOpacity }}>
         {confetti.slice(0, visibleCount).map((piece, ci) => {
-          // Fall position with wrapping
+          // Fall position with wrapping — use continuous frame (no cycle)
           const rawY =
-            (cyclePos * piece.fallSpeed * speedMult + piece.yOffset * piece.fallSpeed) %
+            (frame * piece.fallSpeed * speedMult + piece.yOffset * piece.fallSpeed) %
             (height + 40);
           const py = rawY - 20; // start above screen
 
-          // Horizontal flutter
+          // Horizontal flutter — scaled by tempoFactor
           const flutter =
-            Math.sin(frame * piece.flutterFreq + piece.flutterPhase) * piece.flutterAmp;
+            Math.sin(frame * piece.flutterFreq * tempoFactor + piece.flutterPhase) * piece.flutterAmp;
           const px = piece.x * width + flutter;
 
           // Wrap X
           const wx = ((px % width) + width) % width;
 
           // Tumble: simulate 3D rotation via scaleX oscillation
-          const scaleX = Math.cos(frame * piece.rotFreq + piece.rotPhase);
+          const scaleX = Math.cos(frame * piece.rotFreq * tempoFactor + piece.rotPhase);
 
           // Tilt for visual variety
-          const tilt = piece.tilt + Math.sin(frame * 0.03 + ci) * 10;
+          const tilt = piece.tilt + Math.sin(frame * 0.03 * tempoFactor + ci) * 10;
 
           const color = CONFETTI_COLORS[piece.colorIdx];
 

@@ -1,16 +1,18 @@
 /**
- * HotAirBalloons -- 3-5 hot air balloons floating upward slowly.
+ * HotAirBalloons -- 3-5 hot air balloons floating upward continuously.
  * Each balloon is a large oval/teardrop envelope with horizontal stripe pattern,
  * basket hanging below (small rectangle connected by 4 lines).
  * Bright colors: red/yellow, blue/white, green/gold. Balloons sway gently
- * side-to-side. Rise speed driven by energy. Cycle: 60s, 18s visible.
+ * side-to-side. Rise speed driven by energy. Balloons wrap: exit top → re-enter bottom.
+ * The overlay rotation system controls visibility via opacity.
  */
 
 import React from "react";
-import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
+import { useCurrentFrame, useVideoConfig, interpolate } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
 import { useShowContext } from "../data/ShowContext";
 import { seeded } from "../utils/seededRandom";
+import { useAudioSnapshot } from "./parametric/audio-helpers";
 
 interface BalloonDef {
   envelopeColor1: string;
@@ -24,9 +26,6 @@ interface BalloonDef {
 }
 
 const NUM_BALLOONS = 4;
-const VISIBLE_DURATION = 540; // 18s at 30fps
-const CYCLE_GAP = 1260;       // 42s gap (60s total - 18s visible)
-const CYCLE_TOTAL = VISIBLE_DURATION + CYCLE_GAP;
 
 function generateBalloons(seed: number): BalloonDef[] {
   const rng = seeded(seed);
@@ -107,53 +106,25 @@ export const HotAirBalloons: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
   const ctx = useShowContext();
+  const snap = useAudioSnapshot(frames);
 
   const balloons = React.useMemo(() => generateBalloons((ctx?.showSeed ?? 19770508)), [ctx?.showSeed]);
 
-  // Energy calculation
-  const idx = Math.min(Math.max(0, frame), frames.length - 1);
-  let eSum = 0;
-  let eCount = 0;
-  for (let i = Math.max(0, idx - 75); i <= Math.min(frames.length - 1, idx + 75); i++) {
-    eSum += frames[i].rms;
-    eCount++;
-  }
-  const energy = eCount > 0 ? eSum / eCount : 0;
-
-  const cycleFrame = frame % CYCLE_TOTAL;
-
-  // Only visible during the first VISIBLE_DURATION frames of each cycle
-  if (cycleFrame >= VISIBLE_DURATION) return null;
-
-  const progress = cycleFrame / VISIBLE_DURATION;
-
-  // Fade in/out
-  const fadeIn = interpolate(progress, [0, 0.1], [0, 1], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-    easing: Easing.out(Easing.cubic),
-  });
-  const fadeOut = interpolate(progress, [0.88, 1], [1, 0], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-    easing: Easing.in(Easing.cubic),
-  });
-  const masterOpacity = Math.min(fadeIn, fadeOut) * 0.8;
-
-  if (masterOpacity < 0.01) return null;
+  const energy = snap.energy;
 
   return (
     <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden" }}>
       {balloons.map((b, i) => {
-        const size = 70 * b.sizeScale;
+        const size = 150 * b.sizeScale;
+        const balloonH = size * 1.6;
 
-        // Rise: starts below screen, floats up. Energy increases speed.
+        // Rise: continuous wrapping. Energy increases speed.
         const riseSpeed = b.riseSpeedBase + energy * 1.5;
-        const yStart = height + 50;
-        const yEnd = -size * 2.5;
-        const yRange = yStart - yEnd;
-        const yProgress = (cycleFrame * riseSpeed) / yRange;
-        const y = yStart - yProgress * yRange;
+        // Total travel distance: from below screen to above screen
+        const totalTravel = height + balloonH + 100;
+        // Continuous rising position with wrapping
+        const rawY = (frame * riseSpeed + i * (totalTravel / NUM_BALLOONS)) % totalTravel;
+        const y = height + 50 - rawY;
 
         // Sway side to side
         const sway = Math.sin(frame * b.swayFreq + b.phase) * b.swayAmp * (1 + energy * 0.5);
@@ -173,7 +144,7 @@ export const HotAirBalloons: React.FC<Props> = ({ frames }) => {
               left: x - size / 2,
               top: y,
               transform: `rotate(${tilt}deg)`,
-              opacity: masterOpacity,
+              opacity: 0.85,
               filter: glow,
               willChange: "transform, opacity",
             }}

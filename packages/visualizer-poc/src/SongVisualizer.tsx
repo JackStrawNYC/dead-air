@@ -12,7 +12,7 @@ import React, { Suspense, useMemo } from "react";
 import { Audio, Img, staticFile, useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
 import { SceneRouter } from "./scenes/SceneRouter";
 import { OVERLAY_COMPONENTS } from "./data/overlay-components";
-import { buildRotationSchedule, getOverlayOpacities } from "./data/overlay-rotation";
+import { buildRotationSchedule, getOverlayOpacities, HERO_OVERLAY_NAMES } from "./data/overlay-rotation";
 
 // Special-prop components that stay hardcoded
 import { SongTitle } from "./components/SongTitle";
@@ -339,7 +339,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
   );
   const mediaActive = !!activeMediaWindow;
   const mediaCurated = activeMediaWindow ? activeMediaWindow.media.priority <= 1 : false;
-  const mediaSuppression = mediaCurated ? 0.15 : mediaActive ? 0.5 : 1.0;
+  const mediaSuppression = mediaCurated ? 0.55 : mediaActive ? 0.75 : 1.0;
 
   // Fade in/out for set break transitions (segues skip the fade)
   const fadeIn = props.segueIn ? 1 : interpolate(frame, [0, FADE_FRAMES], [0, 1], {
@@ -411,7 +411,10 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
               }}
             >
               {activeEntries.map(([name, { Component }]) => {
-                const overlayOpacity = (opacityMap ? (opacityMap[name] ?? 0) : 1) * mediaSuppression;
+                // Hero overlays get 1.8x opacity boost so concrete animated objects
+                // (bears, bolts, balloons) are clearly visible through the opacity stack
+                const heroBoost = HERO_OVERLAY_NAMES.has(name) ? 1.8 : 1.0;
+                const overlayOpacity = Math.min(1, (opacityMap ? (opacityMap[name] ?? 0) : 1) * mediaSuppression * heroBoost);
                 if (overlayOpacity < 0.01) return null; // Skip render — invisible overlays waste ~450 renders/sec
                 return (
                   <div

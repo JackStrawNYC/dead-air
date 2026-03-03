@@ -5,11 +5,12 @@
  * visual silence before peaks, full flood at climax. The music leads.
  *
  * Key design principles:
- *   - 10x dynamic range: quiet passages nearly invisible, peaks at full intensity
- *   - Pre-peak dropout: strip to 1-2 overlays before a climax → dramatic contrast
- *   - Energy-scaled crossfades: glacial in Space, snappy at peaks
- *   - Wide overlay count range: 1-2 during quiet, 5-7 at climax
- *   - Accent overlays: Dead iconography pulses on beats during peaks
+ *   - 5x dynamic range: quiet passages have gentle presence, peaks flood vivid
+ *   - Pre-peak dropout: strip to 1 overlay before climax → contrast without void
+ *   - Energy-scaled crossfades: organic in Space (15s), snappy at peaks (4s)
+ *   - Overlay count range: 1-2 during quiet, 3-5 at climax
+ *   - Accent overlays: Dead iconography pulses on beats at ALL energy levels
+ *   - Always alive: even silence has a faint atmospheric wash
  *
  * Two exports:
  *   buildRotationSchedule() — called once per song via useMemo
@@ -125,9 +126,9 @@ const ACCENT_ELIGIBLE = new Set([
 
 /** Energy-dependent accent tuning */
 const ACCENT_CONFIG: Record<string, AccentConfig | null> = {
-  high: { onsetThreshold: 0.35, peakOpacity: 0.6, decayFrames: 12 },
-  mid:  { onsetThreshold: 0.45, peakOpacity: 0.35, decayFrames: 8 },
-  low:  null, // no accents in low-energy windows — let it breathe
+  high: { onsetThreshold: 0.30, peakOpacity: 0.85, decayFrames: 18 },
+  mid:  { onsetThreshold: 0.40, peakOpacity: 0.50, decayFrames: 12 },
+  low:  { onsetThreshold: 0.55, peakOpacity: 0.25, decayFrames: 8 },  // gentle pulse, not dead
 };
 
 // ─── Constants ───
@@ -138,11 +139,11 @@ const ACCENT_CONFIG: Record<string, AccentConfig | null> = {
  * Peaks rotate faster for visual energy.
  */
 const WINDOW_FRAMES_BY_ENERGY: Record<string, number> = {
-  low:  2700,  // 90 seconds — let the shader breathe
-  mid:  3600,  // 120 seconds — slow rotation, overlays don't churn
-  high: 1800,  // 60 seconds — moderate visual turnover at peaks
+  low:  900,   // 30 seconds — keeps viewer anticipating what's next
+  mid:  600,   // 20 seconds — fresh overlays frequently
+  high: 450,   // 15 seconds — rapid visual events at peaks
 };
-const WINDOW_FRAMES_DEFAULT = 2700;
+const WINDOW_FRAMES_DEFAULT = 900;
 
 /**
  * Crossfade duration at window boundaries, energy-scaled.
@@ -150,22 +151,47 @@ const WINDOW_FRAMES_DEFAULT = 2700;
  * Matches the tempo of the music's own dynamics.
  */
 const CROSSFADE_FRAMES_BY_ENERGY: Record<string, number> = {
-  low:  600,   // 20 seconds — glacial, like morning fog
-  mid:  300,   // 10 seconds — comfortable
-  high: 180,   // 6 seconds — snappy, matching peak energy
+  low:  180,   // 6 seconds — smooth but doesn't linger
+  mid:  90,    // 3 seconds — brisk transitions
+  high: 45,    // 1.5 seconds — snappy at peaks
 };
-const CROSSFADE_FRAMES_DEFAULT = 300;
+const CROSSFADE_FRAMES_DEFAULT = 120;
 
 /**
  * Overlay count ranges by section energy.
- * Quiet = 0-1 (near-void — shader + grain only), peak = 3-5 (controlled flood).
- * Reduced from original 0-8 range — fewer overlays, let each breathe.
+ * Quiet = 1-2 (gentle wash — always alive), peak = 3-5 (vivid but brief flood).
+ * Dynamic range between quiet and peak creates the show's breathing rhythm.
  */
 const ENERGY_COUNTS: Record<string, { min: number; max: number }> = {
-  low:  { min: 0, max: 0 },  // shader only — let it breathe
-  mid:  { min: 0, max: 1 },  // one overlay accent
-  high: { min: 1, max: 2 },  // two max at peaks
+  low:  { min: 1, max: 2 },  // gentle wash — always something alive
+  mid:  { min: 2, max: 3 },  // comfortable visual presence
+  high: { min: 3, max: 5 },  // full flood at peaks (brief moments)
 };
+
+/**
+ * Hero overlays — the most visually impactful character/reactive components.
+ * One hero is guaranteed per rotation window (reserved slot) so viewers
+ * always see concrete animated objects, not just abstract washes.
+ */
+/**
+ * Tier 1 heroes: animated Dead objects that CROSS THE SCREEN.
+ * These get guaranteed slots + opacity boost. No abstract rings or centered geometry.
+ */
+export const HERO_OVERLAY_NAMES = new Set([
+  // Marching parades (cross the screen)
+  "BearParade", "SkeletonBand", "VWBusParade", "MarchingTerrapins",
+  // Parametric marching motifs
+  "DeadMotif_SkeletonMarch", "DeadMotif_BearParade", "DeadMotif_VWBusConvoy",
+  "DeadMotif_TerrapinDrift", "DeadMotif_GarciaHandDrift",
+  // Floating / flying objects
+  "HotAirBalloons", "PeaceSignShower", "RainbowArc",
+  // Explosive / celebratory
+  "Confetti", "ConfettiCannon", "Pyrotechnics", "GlowSticks",
+  // Atmospheric action
+  "Thunderhead", "LighterWave",
+  // Crowd energy
+  "CrowdEnergy_LighterWave", "CrowdEnergy_HandsUp", "CrowdEnergy_DanceFloor",
+]);
 
 /** Score penalty for overlays used in the previous window */
 const REPEAT_PENALTY = 0.6;
@@ -182,7 +208,7 @@ const MIN_WINDOW_FOR_ROTATION = 900;
  * peak floods in with maximum contrast. Like pulling the kick drum out
  * of the mix right before the drop.
  */
-const DROPOUT_MAX_OVERLAYS = 0;
+const DROPOUT_MAX_OVERLAYS = 1;
 
 // ─── Texture × Category routing (Dead-authentic) ───
 // 5 groups tuned to what a Grateful Dead show actually feels like:
@@ -198,12 +224,12 @@ const SHOW_NARRATIVE = new Set(["artifact", "info", "hud"]);   // posters, text,
 type TextureGroup = "wash" | "sacred" | "reactive" | "family" | "narrative";
 
 const TEXTURE_GROUP_SCORE: Record<string, Record<TextureGroup, number>> = {
-  ambient:  { wash: +0.25, sacred: +0.45, reactive: -0.30, family: -0.40, narrative: -0.50 },
-  sparse:   { wash: +0.20, sacred: +0.25, reactive: -0.20, family: -0.15, narrative: -0.40 },
-  melodic:  { wash: +0.10, sacred: +0.05, reactive:  0.00, family: +0.20, narrative: +0.10 },
-  building: { wash: +0.05, sacred: +0.10, reactive: +0.15, family: +0.10, narrative: -0.05 },
-  rhythmic: { wash:  0.00, sacred:  0.00, reactive: +0.20, family: +0.25, narrative: -0.15 },
-  peak:     { wash: -0.05, sacred: +0.10, reactive: +0.25, family: +0.30, narrative: -0.35 },
+  ambient:  { wash: +0.25, sacred: +0.45, reactive: -0.30, family: +0.05, narrative: -0.50 },
+  sparse:   { wash: +0.20, sacred: +0.25, reactive: -0.20, family: +0.10, narrative: -0.40 },
+  melodic:  { wash: +0.10, sacred: +0.05, reactive:  0.00, family: +0.25, narrative: +0.10 },
+  building: { wash: +0.05, sacred: +0.10, reactive: +0.15, family: +0.20, narrative: -0.05 },
+  rhythmic: { wash:  0.00, sacred:  0.00, reactive: +0.20, family: +0.30, narrative: -0.15 },
+  peak:     { wash: -0.05, sacred: +0.10, reactive: +0.25, family: +0.35, narrative: -0.35 },
 };
 
 /** Tag-based texture scoring — tags carry rich Dead-specific signal */
@@ -233,7 +259,7 @@ const SET2_ADJUSTMENTS: Record<TextureGroup, number> = {
 const POST_PEAK_GRACE: Record<TextureGroup, number> = {
   sacred:    +0.20,
   wash:      +0.10,
-  family:    -0.20,
+  family:    +0.05,   // keep fun objects — bears are welcome after peaks too
   reactive:  -0.25,
   narrative: -0.30,
 };
@@ -372,11 +398,6 @@ export function buildRotationSchedule(
     const energyRange = ENERGY_COUNTS[window.energy] ?? ENERGY_COUNTS.mid;
     let targetCount = energyRange.min + Math.floor(rng() * (energyRange.max - energyRange.min + 1));
 
-    // Per-song mode: contemplative songs (low songIntensity) get fewer overlays
-    if (songIntensity < 0.4 && window.energy !== "high") {
-      targetCount = Math.max(0, targetCount - 1);
-    }
-
     // Texture-aware count adjustment: sample midpoint audio
     let windowTexture: string | null = null;
     if (frames && frames.length > 0) {
@@ -387,9 +408,7 @@ export function buildRotationSchedule(
       const midSnapshot = computeAudioSnapshot(frames, midFrame);
       const midEnergy = computeSmoothedEnergy(frames, midFrame);
       windowTexture = detectTexture(midSnapshot, midEnergy);
-      if (windowTexture === "ambient" || windowTexture === "sparse") {
-        targetCount = Math.min(targetCount, 1);
-      } else if (windowTexture === "peak") {
+      if (windowTexture === "peak") {
         targetCount += 1;
       }
     }
@@ -488,15 +507,32 @@ export function buildRotationSchedule(
     // Sort by score descending
     scored.sort((a, b) => b.score - a.score);
 
-    // Layer diversity: ensure ≥2 different layers via round-robin pick
-    // (relaxed from 3 since low-energy windows may only have 1-2 overlays)
+    // ── Hero guarantee: reserve slots for concrete Dead-themed animated objects ──
+    // Without this, the scoring system picks abstract washes/geometry every time.
+    // 2 hero slots ensures Dead stuff dominates the visual field.
     const selected: OverlayEntry[] = [];
     const selectedNames = new Set<string>();
     const usedLayers = new Set<number>();
 
-    // First pass: pick top candidate from each unique layer
+    // Pick top 2 hero overlays (or 1 if targetCount is 1)
+    const heroScored = scored.filter((s) => HERO_OVERLAY_NAMES.has(s.entry.name));
+    const heroSlots = Math.min(2, targetCount, heroScored.length);
+    for (let h = 0; h < heroSlots; h++) {
+      // Avoid picking from the same layer twice for visual diversity
+      const hero = heroScored.find(
+        (s) => !selectedNames.has(s.entry.name) && !usedLayers.has(s.entry.layer),
+      ) ?? heroScored.find((s) => !selectedNames.has(s.entry.name));
+      if (hero) {
+        selected.push(hero.entry);
+        selectedNames.add(hero.entry.name);
+        usedLayers.add(hero.entry.layer);
+      }
+    }
+
+    // ── Fill remaining slots with layer-diverse picks ──
     const byLayer = new Map<number, typeof scored>();
     for (const s of scored) {
+      if (selectedNames.has(s.entry.name)) continue;
       const layerList = byLayer.get(s.entry.layer) ?? [];
       layerList.push(s);
       byLayer.set(s.entry.layer, layerList);
@@ -507,7 +543,7 @@ export function buildRotationSchedule(
       .map(([layer, candidates]) => ({ layer, topScore: candidates[0].score }))
       .sort((a, b) => b.topScore - a.topScore);
 
-    // Pick one from each layer until we have min(2, available layers) or hit target
+    // Pick one from each layer for diversity
     const minLayers = Math.min(2, layerOrder.length, targetCount);
     for (const { layer } of layerOrder) {
       if (selected.length >= targetCount) break;
@@ -524,7 +560,7 @@ export function buildRotationSchedule(
       }
     }
 
-    // Second pass: fill remaining slots from top scores overall
+    // Fill remaining slots from top scores overall
     for (const s of scored) {
       if (selected.length >= targetCount) break;
       if (selectedNames.has(s.entry.name)) continue;

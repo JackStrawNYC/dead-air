@@ -62,8 +62,8 @@ describe("energyToFactor", () => {
 });
 
 describe("overlayEnergyFactor", () => {
-  it("returns 0.08 at silence", () => {
-    expect(overlayEnergyFactor(0.01)).toBeCloseTo(0.08, 2);
+  it("returns 0.20 at silence", () => {
+    expect(overlayEnergyFactor(0.01)).toBeCloseTo(0.20, 2);
   });
 
   it("returns 1.0 at peak", () => {

@@ -11,6 +11,8 @@ import React from "react";
 import { useCurrentFrame, useVideoConfig, interpolate } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
 import { seeded } from "../utils/seededRandom";
+import { useAudioSnapshot } from "./parametric/audio-helpers";
+import { useTempoFactor } from "../data/TempoContext";
 
 interface PeaceParticle {
   startFrame: number;
@@ -34,15 +36,15 @@ function generateParticles(totalFrames: number, seed: number): PeaceParticle[] {
       startFrame: nextStart,
       lifetime,
       startX: rng(),
-      size: 40 + rng() * 60, // 40-100px
+      size: 90 + rng() * 130, // 90-220px
       hueOffset: rng() * 360,
       driftXSpeed: (rng() - 0.5) * 1.2,
       fallSpeed: 0.8 + rng() * 1.5,
       rotationSpeed: (rng() - 0.5) * 1.5,
       rotationStart: rng() * 360,
     });
-    // Spacing: 60-150 frames between spawns
-    nextStart += 60 + Math.floor(rng() * 90);
+    // Spacing: 30-80 frames between spawns (more frequent)
+    nextStart += 30 + Math.floor(rng() * 50);
   }
   return particles;
 }
@@ -54,29 +56,24 @@ interface Props {
 export const PeaceSignShower: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height, durationInFrames } = useVideoConfig();
+  const snap = useAudioSnapshot(frames);
+  const tempoFactor = useTempoFactor();
 
-  const idx = Math.min(Math.max(0, frame), frames.length - 1);
-  let eSum = 0;
-  let eCount = 0;
-  for (let i = Math.max(0, idx - 75); i <= Math.min(frames.length - 1, idx + 75); i++) {
-    eSum += frames[i].rms;
-    eCount++;
-  }
-  const energy = eCount > 0 ? eSum / eCount : 0;
+  const energy = snap.energy;
 
   const particles = React.useMemo(
     () => generateParticles(durationInFrames, 55667),
     [durationInFrames],
   );
 
-  // Master opacity: 15-35% based on energy
-  const masterOpacity = interpolate(energy, [0.02, 0.25], [0.15, 0.35], {
+  // Master opacity: 35-70% based on energy
+  const masterOpacity = interpolate(energy, [0.02, 0.25], [0.35, 0.70], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
 
-  // Max concurrent: 3 during quiet, 5 during loud
-  const maxVisible = Math.round(interpolate(energy, [0.03, 0.3], [3, 5], {
+  // Max concurrent: 4 during quiet, 8 during loud
+  const maxVisible = Math.round(interpolate(energy, [0.03, 0.3], [4, 8], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   }));
@@ -105,9 +102,9 @@ export const PeaceSignShower: React.FC<Props> = ({ frames }) => {
 
           if (particleOpacity < 0.01) return null;
 
-          // Position: start at top, drift down diagonally
-          const x = p.startX * width + age * p.driftXSpeed;
-          const y = -p.size + age * p.fallSpeed;
+          // Position: start at top, drift down diagonally — scaled by tempoFactor
+          const x = p.startX * width + age * p.driftXSpeed * tempoFactor;
+          const y = -p.size + age * p.fallSpeed * tempoFactor;
 
           // Wrap horizontally
           const wx = ((x % width) + width) % width;
@@ -115,11 +112,10 @@ export const PeaceSignShower: React.FC<Props> = ({ frames }) => {
           // If past bottom, skip
           if (y > height + p.size) return null;
 
-          const rotation = p.rotationStart + age * p.rotationSpeed;
+          const rotation = p.rotationStart + age * p.rotationSpeed * tempoFactor;
           const hue = (frame * 1.2 + p.hueOffset) % 360;
           const color = `hsl(${hue}, 100%, 65%)`;
-          const s = p.size;
-          const r = s * 0.44;
+          const r = p.size * 0.44;
 
           return (
             <g

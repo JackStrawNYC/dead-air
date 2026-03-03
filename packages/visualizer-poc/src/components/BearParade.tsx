@@ -1,12 +1,20 @@
 /**
  * BearParade — rainbow dancing bears marching across the bottom.
  * 6 bears in classic GD colors, bobbing to audio energy.
- * March direction alternates per cycle. Energy drives bob height + speed.
+ * March direction alternates per window. Energy drives bob height + speed.
+ * Music-driven: marches start on beat frames during high-energy passages.
  */
 
 import React from "react";
-import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
+import { useCurrentFrame, useVideoConfig, interpolate } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
+import {
+  useAudioSnapshot,
+  precomputeMarchWindows,
+  findActiveMarch,
+  type MarchConfig,
+} from "./parametric/audio-helpers";
+import { useTempoFactor } from "../data/TempoContext";
 
 const BEAR_COLORS = [
   "#FF1744", // red
@@ -18,11 +26,16 @@ const BEAR_COLORS = [
 ];
 
 const NUM_BEARS = 6;
-const PARADE_DURATION = 450; // 15 seconds to cross
-const PARADE_GAP = 300;      // 10 second gap between parades
-const PARADE_CYCLE = PARADE_DURATION + PARADE_GAP;
-const BEAR_SPACING = 120;    // px between bears
-const BEAR_SIZE = 90;
+const BEAR_SPACING = 260;    // px between bears
+const BEAR_SIZE = 200;
+
+const MARCH_CONFIG: MarchConfig = {
+  enterThreshold: 0.12,
+  exitThreshold: 0.07,
+  sustainFrames: 30,      // ~1 second of sustained energy
+  cooldownFrames: 150,     // ~5 seconds between marches
+  marchDuration: 450,      // 15 seconds to cross
+};
 
 /** Single dancing bear SVG */
 const Bear: React.FC<{ size: number; color: string; bobOffset: number }> = ({ size, color, bobOffset }) => (
@@ -59,30 +72,28 @@ interface Props {
 export const BearParade: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
+  const snap = useAudioSnapshot(frames);
+  const tempoFactor = useTempoFactor();
 
-  // Energy for bob intensity
-  const idx = Math.min(Math.max(0, frame), frames.length - 1);
-  let eSum = 0;
-  let eCount = 0;
-  for (let i = Math.max(0, idx - 50); i <= Math.min(frames.length - 1, idx + 50); i++) {
-    eSum += frames[i].rms;
-    eCount++;
-  }
-  const energy = eCount > 0 ? eSum / eCount : 0;
+  const energy = snap.energy;
 
-  const cycleIndex = Math.floor(frame / PARADE_CYCLE);
-  const cycleFrame = frame % PARADE_CYCLE;
-  const goingRight = cycleIndex % 2 === 0;
+  const marchWindows = React.useMemo(
+    () => precomputeMarchWindows(frames, MARCH_CONFIG),
+    [frames],
+  );
 
-  // Only render during parade portion (not gap)
-  if (cycleFrame >= PARADE_DURATION) return null;
+  const activeMarch = findActiveMarch(marchWindows, frame);
+  if (!activeMarch) return null;
 
-  const progress = cycleFrame / PARADE_DURATION;
+  const marchFrame = frame - activeMarch.startFrame;
+  const marchDuration = activeMarch.endFrame - activeMarch.startFrame;
+  const progress = marchFrame / marchDuration;
+  const goingRight = activeMarch.direction === 1;
 
   // Fade in/out
   const fadeIn = interpolate(progress, [0, 0.08], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
   const fadeOut = interpolate(progress, [0.92, 1], [1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-  const opacity = Math.min(fadeIn, fadeOut) * 0.85;
+  const opacity = Math.min(fadeIn, fadeOut);
 
   const totalWidth = NUM_BEARS * BEAR_SPACING;
   const yBase = height - BEAR_SIZE - 20; // bottom of screen
@@ -107,13 +118,13 @@ export const BearParade: React.FC<Props> = ({ frames }) => {
           }) - i * BEAR_SPACING + totalWidth;
         }
 
-        // Bob: each bear offset in phase, amplitude from energy
-        const bobSpeed = 8 + energy * 6;
-        const bobAmp = 8 + energy * 20;
+        // Bob: each bear offset in phase, amplitude from energy + beatDecay, speed scaled by tempo
+        const bobSpeed = (8 + energy * 6) * tempoFactor;
+        const bobAmp = 8 + energy * 20 + snap.beatDecay * 10;
         const bob = Math.sin((frame * bobSpeed * 0.01) + i * 1.2) * bobAmp;
 
-        // Slight tilt
-        const tilt = Math.sin((frame * 0.08) + i * 0.9) * 8;
+        // Slight tilt — tempo-scaled
+        const tilt = Math.sin((frame * 0.08 * tempoFactor) + i * 0.9) * 8;
 
         // Neon glow
         const glow = `drop-shadow(0 0 8px ${color}) drop-shadow(0 0 20px ${color})`;

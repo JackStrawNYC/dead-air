@@ -57,16 +57,16 @@ export function energyToFactor(
 }
 
 /**
- * Map smoothed energy to overlay opacity multiplier (0.08–1.0).
- * 12.5x dynamic range: quiet passages nearly invisible (8% density),
- * peaks flood to full intensity. The silence earns the climax.
+ * Map smoothed energy to overlay opacity multiplier (0.20–1.0).
+ * 5x dynamic range: quiet passages have gentle presence (20% density),
+ * peaks flood to full intensity. Always something alive on screen.
  *
  * The smoothstep transition band (0.04–0.30) is calibrated so:
- *   - Quiet tuning (energy ~0.03) → 8% (near-void, shader + grain only)
- *   - Mid jam (energy ~0.15)      → ~50% (comfortable)
+ *   - Quiet tuning (energy ~0.03) → 20% (gentle wash, not void)
+ *   - Mid jam (energy ~0.15)      → ~55% (comfortable)
  *   - Peak climax (energy ~0.30+) → 100% (full flood)
  */
 export function overlayEnergyFactor(energy: number): number {
   const factor = energyToFactor(energy, 0.04, 0.30);
-  return 0.08 + factor * 0.92;
+  return 0.20 + factor * 0.80;
 }

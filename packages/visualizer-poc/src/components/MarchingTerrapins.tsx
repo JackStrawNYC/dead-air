@@ -3,13 +3,19 @@
  * Much slower than the bear parade — chill and groovy.
  * Each turtle has a domed shell with hexagonal pattern, four stubby walking legs, and a small head.
  * Different neon colors per turtle. Slow waddle, gentle bob, neon drop-shadow glow.
- * Crosses every 70 seconds, takes 25 seconds to cross.
+ * Music-driven: marches during gentle passages when energy sustains above a low threshold.
  */
 
 import React from "react";
 import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
-import { seeded } from "../utils/seededRandom";
+import {
+  useAudioSnapshot,
+  precomputeMarchWindows,
+  findActiveMarch,
+  type MarchConfig,
+} from "./parametric/audio-helpers";
+import { useTempoFactor } from "../data/TempoContext";
 
 const TURTLE_COLORS = [
   "#00FF7F", // spring green
@@ -20,11 +26,16 @@ const TURTLE_COLORS = [
 ];
 
 const NUM_TURTLES = 5;
-const PARADE_DURATION = 750; // 25 seconds at 30fps
-const PARADE_GAP = 1350;     // 45 second gap (70s total cycle - 25s crossing)
-const PARADE_CYCLE = PARADE_DURATION + PARADE_GAP;
-const TURTLE_SPACING = 140;
-const TURTLE_SIZE = 100;
+const TURTLE_SPACING = 280;
+const TURTLE_SIZE = 200;
+
+const MARCH_CONFIG: MarchConfig = {
+  enterThreshold: 0.05,
+  exitThreshold: 0.03,
+  sustainFrames: 60,       // ~2 seconds sustained (turtles are patient)
+  cooldownFrames: 250,      // ~8.3 seconds between marches
+  marchDuration: 600,       // 20 seconds to cross (slow turtles)
+};
 
 /** Single terrapin SVG with hexagonal shell pattern, stubby legs, and head */
 const Turtle: React.FC<{
@@ -178,28 +189,23 @@ interface Props {
 export const MarchingTerrapins: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
-  const rng = React.useMemo(() => seeded(841977), []);
-  const _rng = rng; // keep reference alive
-  void _rng;
+  const snap = useAudioSnapshot(frames);
+  const tempoFactor = useTempoFactor();
 
-  // Rolling energy (window of 151 frames centered on current)
-  const idx = Math.min(Math.max(0, frame), frames.length - 1);
-  let eSum = 0;
-  let eCount = 0;
-  for (let i = Math.max(0, idx - 75); i <= Math.min(frames.length - 1, idx + 75); i++) {
-    eSum += frames[i].rms;
-    eCount++;
-  }
-  const energy = eCount > 0 ? eSum / eCount : 0;
+  const energy = snap.energy;
 
-  const cycleIndex = Math.floor(frame / PARADE_CYCLE);
-  const cycleFrame = frame % PARADE_CYCLE;
-  const goingRight = cycleIndex % 2 === 0;
+  const marchWindows = React.useMemo(
+    () => precomputeMarchWindows(frames, MARCH_CONFIG),
+    [frames],
+  );
 
-  // Only render during parade portion (not gap)
-  if (cycleFrame >= PARADE_DURATION) return null;
+  const activeMarch = findActiveMarch(marchWindows, frame);
+  if (!activeMarch) return null;
 
-  const progress = cycleFrame / PARADE_DURATION;
+  const marchFrame = frame - activeMarch.startFrame;
+  const marchDuration = activeMarch.endFrame - activeMarch.startFrame;
+  const progress = marchFrame / marchDuration;
+  const goingRight = activeMarch.direction === 1;
 
   // Fade in/out with easing
   const fadeIn = interpolate(progress, [0, 0.1], [0, 1], {
@@ -245,16 +251,16 @@ export const MarchingTerrapins: React.FC<Props> = ({ frames }) => {
             totalWidth;
         }
 
-        // Slow gentle bob (much slower than bears)
-        const bobSpeed = 2 + energy * 1.5;
+        // Slow gentle bob (much slower than bears) — tempo-scaled
+        const bobSpeed = (2 + energy * 1.5) * tempoFactor;
         const bobAmp = 3 + energy * 5;
         const bob = Math.sin(frame * bobSpeed * 0.01 + i * 1.8) * bobAmp;
 
-        // Very slight tilt for groovy feel
-        const tilt = Math.sin(frame * 0.02 + i * 1.1) * 3;
+        // Very slight tilt for groovy feel — tempo-scaled
+        const tilt = Math.sin(frame * 0.02 * tempoFactor + i * 1.1) * 3;
 
-        // Slow waddle leg phase
-        const legPhase = frame * 0.06 + i * 0.9;
+        // Slow waddle leg phase — tempo-scaled
+        const legPhase = frame * 0.06 * tempoFactor + i * 0.9;
 
         // Per-turtle staggered fade for variety
         const turtleFadeOffset = i * 0.03;

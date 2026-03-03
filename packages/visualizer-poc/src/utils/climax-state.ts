@@ -185,21 +185,21 @@ const PHASE_TARGETS: Record<
   ClimaxPhase,
   { sat: number; bright: number; vig: number; bloom: number; density: number }
 > = {
-  idle:    { sat: -0.03, bright: -0.01, vig: -0.02, bloom: 0,    density: 0.6 },
+  idle:    { sat: -0.03, bright: -0.01, vig: -0.02, bloom: 0,    density: 0.80 },
   build:   { sat: +0.02, bright: +0.01, vig: +0.02, bloom: 0.02, density: 1.0 },
-  climax:  { sat: +0.03, bright: +0.03, vig: +0.03, bloom: 0.05, density: 1.15 },
-  sustain: { sat: +0.02, bright: +0.02, vig: +0.02, bloom: 0.03, density: 1.05 },
-  release: { sat: -0.02, bright: -0.01, vig: -0.02, bloom: 0,    density: 0.7 },
+  climax:  { sat: +0.03, bright: +0.03, vig: +0.03, bloom: 0.05, density: 1.30 },
+  sustain: { sat: +0.02, bright: +0.02, vig: +0.02, bloom: 0.03, density: 1.15 },
+  release: { sat: -0.02, bright: -0.01, vig: -0.02, bloom: 0,    density: 0.60 },
 };
 
 /** Anticipation sub-state overrides (mild desaturation dip before peak) */
 const ANTICIPATION = { sat: -0.05, bright: +0.005, vig: +0.02, bloom: 0.01, density: 0.7 };
 
 /** Build phase start values (intensity interpolates from start → target) */
-const BUILD_START = { sat: 0, bright: 0, vig: 0, bloom: 0, density: 0.7 };
+const BUILD_START = { sat: 0, bright: 0, vig: 0, bloom: 0, density: 0.85 };
 
 /** Release phase start values (intensity interpolates from start → target) */
-const RELEASE_START = { sat: +0.02, bright: +0.005, vig: +0.02, bloom: 0.01, density: 0.8 };
+const RELEASE_START = { sat: +0.02, bright: +0.005, vig: +0.02, bloom: 0.01, density: 1.0 };
 
 /**
  * Map a ClimaxState to additive visual modifiers.
