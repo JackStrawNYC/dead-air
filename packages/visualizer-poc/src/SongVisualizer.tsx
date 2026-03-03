@@ -39,6 +39,8 @@ import { AudioSnapshotProvider } from "./data/AudioSnapshotContext";
 import { CrowdAmbience } from "./components/CrowdAmbience";
 import { SongDNA } from "./components/SongDNA";
 import type { SongStats } from "./components/SongDNA";
+import { MilestoneCard } from "./components/MilestoneCard";
+import type { Milestone } from "./data/types";
 import { computeJamEvolution } from "./utils/jam-evolution";
 import { blendPalettes } from "./utils/segue-detection";
 import type { ColorPalette } from "./data/types";
@@ -51,6 +53,21 @@ try {
   songStatsData = raw?.songs ?? null;
 } catch {
   // Stats not available yet
+}
+
+// Milestones — historically significant moments at this show
+let milestonesMap: Record<string, Milestone> | null = null;
+try {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const raw = require("../data/milestones.json");
+  if (raw?.milestones) {
+    milestonesMap = {};
+    for (const m of raw.milestones as Milestone[]) {
+      milestonesMap[m.trackId] = m;
+    }
+  }
+} catch {
+  // Milestones not available yet
 }
 
 import type { RotationSchedule } from "./data/overlay-rotation";
@@ -480,6 +497,12 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
         {!props.segueIn && songStatsData && songStatsData[props.song.trackId] && (
           <SilentErrorBoundary name="SongDNA">
             <SongDNA stats={songStatsData[props.song.trackId]} />
+          </SilentErrorBoundary>
+        )}
+        {/* Milestone card — historic moments */}
+        {milestonesMap && milestonesMap[props.song.trackId] && (
+          <SilentErrorBoundary name="MilestoneCard">
+            <MilestoneCard milestone={milestonesMap[props.song.trackId]} />
           </SilentErrorBoundary>
         )}
         <FilmGrain opacity={interpolate(

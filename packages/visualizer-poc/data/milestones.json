@@ -1,0 +1,41 @@
+{
+  "showDate": "1977-05-08",
+  "milestones": [
+    {
+      "trackId": "s2t03",
+      "type": "debut",
+      "headline": "FIRST TIME EVER PLAYED",
+      "subtext": "Tonight's Scarlet \u2192 Fire is the first of 232"
+    },
+    {
+      "trackId": "s2t04",
+      "type": "debut",
+      "headline": "FIRST TIME EVER PLAYED",
+      "subtext": "Weir's apocalyptic vision enters the canon"
+    },
+    {
+      "trackId": "s2t05",
+      "type": "revival",
+      "headline": "BACK AFTER 6 YEARS",
+      "subtext": "Last played October 31, 1971"
+    },
+    {
+      "trackId": "s1t08",
+      "type": "rare",
+      "headline": "ONLY 36 PERFORMANCES EVER",
+      "subtext": "Gone from the repertoire by year's end"
+    },
+    {
+      "trackId": "s1t09",
+      "type": "rare",
+      "headline": "ONLY 36 PERFORMANCES EVER",
+      "subtext": "Always paired with Lazy Lightnin' \u2014 inseparable"
+    },
+    {
+      "trackId": "s2t08",
+      "type": "return",
+      "headline": "FIRST IN 7 MONTHS",
+      "subtext": "Garcia's most devastating ballad returns"
+    }
+  ]
+}
