@@ -221,10 +221,14 @@ export interface SongProfile {
 /** Generated overlay schedule for the full show */
 export interface OverlaySchedule {
   generatedAt: string;
+  /** Model used for intelligent curation (absent for rule-based) */
+  model?: string;
   songs: Record<string, {
     title: string;
     activeOverlays: string[];
     totalCount: number;
+    /** Claude's reasoning for overlay choices (intelligent mode only) */
+    reasoning?: string;
   }>;
 }
 

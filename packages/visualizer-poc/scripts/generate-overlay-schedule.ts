@@ -2,28 +2,97 @@
 /**
  * Generate Overlay Schedule — pre-builds which overlays each song gets.
  *
- * Reads setlist.json + audio analysis files, runs the scoring/selection
- * algorithm, and writes data/overlay-schedule.json.
+ * Two modes:
+ *   1. **Intelligent** (Claude-powered): Sends rich per-song context to Claude
+ *      for thematically curated overlay selection. Used when ANTHROPIC_API_KEY
+ *      is set or --intelligent flag is passed.
+ *   2. **Rule-based** (algorithmic fallback): Scores overlays via audio analysis
+ *      stats. Used when no API key is available.
  *
  * Usage:
- *   npx tsx scripts/generate-overlay-schedule.ts
- *   npx tsx scripts/generate-overlay-schedule.ts --verbose
- *   npx tsx scripts/generate-overlay-schedule.ts --mock   # use synthetic profiles when no analysis
+ *   npx tsx scripts/generate-overlay-schedule.ts                # auto-detect mode
+ *   npx tsx scripts/generate-overlay-schedule.ts --intelligent   # force Claude mode
+ *   npx tsx scripts/generate-overlay-schedule.ts --algorithmic   # force rule-based mode
+ *   npx tsx scripts/generate-overlay-schedule.ts --verbose       # verbose rule-based output
+ *   npx tsx scripts/generate-overlay-schedule.ts --mock          # use synthetic profiles when no analysis
  */
 
 import { readFileSync, writeFileSync, existsSync } from "fs";
 import { join, resolve } from "path";
+import { execSync } from "child_process";
+import { config } from "dotenv";
 import type { SetlistEntry, ShowSetlist, TrackAnalysis, OverlaySchedule } from "../src/data/types";
 import { buildSongProfile, selectOverlays, emptyHistory, pushHistory } from "../src/data/overlay-selector";
 import { OVERLAY_REGISTRY } from "../src/data/overlay-registry";
 import { getShowSeed } from "../src/data/ShowContext";
 
 const ROOT = resolve(import.meta.dirname, "..");
+const MONOREPO_ROOT = resolve(ROOT, "..", "..");
+
+// Load .env from package dir, then monorepo root as fallback
+config({ path: join(ROOT, ".env") });
+config({ path: join(MONOREPO_ROOT, ".env") });
+
 const DATA_DIR = join(ROOT, "data");
 
 const args = process.argv.slice(2);
 const verbose = args.includes("--verbose");
 const useMock = args.includes("--mock");
+const forceIntelligent = args.includes("--intelligent");
+const forceAlgorithmic = args.includes("--algorithmic");
+
+// ─── Mode detection ───
+const hasApiKey = !!process.env.ANTHROPIC_API_KEY;
+const schedulePath = join(DATA_DIR, "overlay-schedule.json");
+const hasExistingIntelligent = (() => {
+  try {
+    const existing = JSON.parse(readFileSync(schedulePath, "utf-8"));
+    return !!existing.model; // intelligent schedules have a model field
+  } catch {
+    return false;
+  }
+})();
+
+const useIntelligent =
+  forceAlgorithmic ? false :
+  forceIntelligent ? true :
+  hasApiKey && !hasExistingIntelligent;
+
+if (useIntelligent) {
+  if (!hasApiKey) {
+    console.error("ERROR: --intelligent requires ANTHROPIC_API_KEY. Set it or use --algorithmic.");
+    process.exit(1);
+  }
+
+  console.log("Mode: INTELLIGENT (Claude-powered curation)");
+  console.log("Delegating to generate-overlay-profiles.ts...\n");
+
+  // Forward relevant flags
+  const profileArgs: string[] = [];
+  if (args.includes("--force")) profileArgs.push("--force");
+  const songArg = args.find((a) => a.startsWith("--song"));
+  if (songArg) {
+    const songIdx = args.indexOf(songArg);
+    profileArgs.push(songArg);
+    if (!songArg.includes("=") && args[songIdx + 1]) {
+      profileArgs.push(args[songIdx + 1]);
+    }
+  }
+
+  try {
+    execSync(
+      `npx tsx ${join(ROOT, "scripts", "generate-overlay-profiles.ts")} ${profileArgs.join(" ")}`,
+      { stdio: "inherit", cwd: ROOT },
+    );
+  } catch {
+    console.error("\nIntelligent generation failed. Run with --algorithmic to use fallback.");
+    process.exit(1);
+  }
+  process.exit(0);
+}
+
+// ─── Algorithmic fallback ───
+console.log("Mode: ALGORITHMIC (rule-based scoring)");
 
 // ─── Load setlist ───
 const setlist = JSON.parse(
@@ -32,21 +101,17 @@ const setlist = JSON.parse(
 
 const showSeed = getShowSeed(setlist);
 
-console.log(`Overlay schedule generator`);
 console.log(`  ${setlist.songs.length} songs in setlist`);
 console.log(`  ${OVERLAY_REGISTRY.length} overlays in registry`);
 console.log(`  Show seed: ${showSeed}`);
 console.log();
 
 // ─── Analysis file discovery ───
-// Try multiple naming conventions for analysis files
 function findAnalysisFile(song: SetlistEntry): string | null {
   const candidates = [
     join(DATA_DIR, `${song.trackId}-analysis.json`),
     join(DATA_DIR, `tracks`, `${song.trackId}-analysis.json`),
-    // Morning Dew has a special name
     ...(song.trackId === "s2t08" ? [join(DATA_DIR, "morning-dew-analysis.json")] : []),
-    // Try by audio file name (strip .mp3, add -analysis.json)
     join(DATA_DIR, song.audioFile.replace(/\.mp3$/, "-analysis.json")),
   ];
   for (const path of candidates) {
@@ -57,15 +122,13 @@ function findAnalysisFile(song: SetlistEntry): string | null {
 
 /**
  * Build a synthetic analysis for songs without real analysis data.
- * Uses the song's position in the show to estimate energy characteristics.
  */
 function buildMockAnalysis(song: SetlistEntry): TrackAnalysis {
-  // Rough heuristics based on set position
   const isSet2 = song.set === 2;
   const baseEnergy = isSet2 ? 0.18 : 0.14;
-  const trackFactor = song.trackNumber / 12; // position within set
+  const trackFactor = song.trackNumber / 12;
 
-  const totalFrames = 10000; // ~5.5 min placeholder
+  const totalFrames = 10000;
   const frames = [];
   for (let i = 0; i < totalFrames; i++) {
     const t = i / totalFrames;

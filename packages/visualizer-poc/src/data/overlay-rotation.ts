@@ -163,9 +163,9 @@ const CROSSFADE_FRAMES_DEFAULT = 120;
  * Dynamic range between quiet and peak creates the show's breathing rhythm.
  */
 const ENERGY_COUNTS: Record<string, { min: number; max: number }> = {
-  low:  { min: 1, max: 2 },  // gentle wash — always something alive
-  mid:  { min: 2, max: 3 },  // comfortable visual presence
-  high: { min: 3, max: 5 },  // full flood at peaks (brief moments)
+  low:  { min: 1, max: 1 },  // single overlay — music is the show
+  mid:  { min: 1, max: 2 },  // subtle layering
+  high: { min: 2, max: 3 },  // restrained flood at peaks
 };
 
 /**
@@ -514,9 +514,9 @@ export function buildRotationSchedule(
     const selectedNames = new Set<string>();
     const usedLayers = new Set<number>();
 
-    // Pick top 2 hero overlays (or 1 if targetCount is 1)
+    // Hero guarantee: 1 hero in mid/high energy windows, 0 in low
     const heroScored = scored.filter((s) => HERO_OVERLAY_NAMES.has(s.entry.name));
-    const heroSlots = Math.min(2, targetCount, heroScored.length);
+    const heroSlots = window.energy === "low" ? 0 : Math.min(1, targetCount, heroScored.length);
     for (let h = 0; h < heroSlots; h++) {
       // Avoid picking from the same layer twice for visual diversity
       const hero = heroScored.find(

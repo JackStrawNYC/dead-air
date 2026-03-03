@@ -402,10 +402,13 @@ for (const entry of PARAMETRIC_REGISTRY_ENTRIES) {
   ENABLED_OVERLAYS.add(entry.name);
 }
 
-/** Registry filtered to only Dead-aesthetic overlays — used by the selector */
-export const SELECTABLE_REGISTRY = OVERLAY_REGISTRY.filter(
-  (e) => ENABLED_OVERLAYS.has(e.name),
-);
+/**
+ * Registry of all selectable overlays — the full pool.
+ * Per-song curation (via generate-overlay-profiles.ts) now controls which
+ * overlays each song actually uses, so we no longer gate at the registry level.
+ * The old ENABLED_OVERLAYS set is kept above as a reference of the original curated subset.
+ */
+export const SELECTABLE_REGISTRY = [...OVERLAY_REGISTRY];
 
 /** Quick lookup by name */
 export const OVERLAY_BY_NAME = new Map(
