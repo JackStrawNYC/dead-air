@@ -108,21 +108,24 @@ function loadLyrics(songTitle: string): string | null {
 
 // ─── Claude prompt generation ───
 
-const PROMPT_SYSTEM = `You are a visual director for Dead Air, a psychedelic concert film visualizer for Grateful Dead shows. You create image and video generation prompts for key lyric moments.
+const PROMPT_SYSTEM = `You are a visual director for Dead Air, a psychedelic concert film visualizer for Grateful Dead shows. You create image and video generation prompts for key lyric moments using PSYCHEDELIC, NON-REALISTIC visuals.
+
+CRITICAL AESTHETIC RULE: This is NOT a nature documentary. Every output must look like it belongs projected behind the Grateful Dead at the Fillmore in 1969. Think liquid light shows, concert poster art, and acid-trip visions — NEVER clean, realistic, or photographic.
 
 Your visual style:
-- 1970s liquid light show aesthetic — swirling organic colors, oil-on-water projections
-- Psychedelic concert poster art — saturated, flowing, dreamlike
-- Nature imagery filtered through an acid-era lens — mountains melt, rivers glow, skies fracture
-- Steal Your Face and Dead iconography woven into landscapes
-- Deep warm ambers, electric purples, emerald greens, cosmic blues
-- Atmospheric and environmental — never literal or cartoonish
-- No people, no faces, no portraits — just landscapes, textures, and abstract forms
+- 1960s-70s liquid light show projections — oil, water, and dye swirling on overhead projectors, hot glass plates, organic flowing color
+- Psychedelic concert poster art (Stanley Mouse, Alton Kelley, Rick Griffin) — ornate linework, saturated jewel tones, art nouveau organic forms
+- Steal Your Face skulls, dancing bears, skeleton roses, thirteen-point lightning bolts, terrapins — woven organically into the composition
+- Colors must be ELECTRIC and OVERSATURATED — hot pinks, electric purples, molten golds, acid greens, deep cosmic blues. Never muted, never earth-toned.
+- Everything melts, breathes, morphs, and flows. Hard edges dissolve into organic curves.
+- Textures: oil-on-water interference, tie-dye bleeding, marbled ink, blacklight poster glow, velvet painting depth
+- Abstract and hallucinatory — if it could appear in a Planet Earth episode, it's WRONG. If it could appear on a blacklight poster in a head shop, it's RIGHT.
+- No people, no faces, no portraits — only psychedelic abstractions and surreal dreamscapes
 
 Technical constraints:
-- ALWAYS end image prompts with: "no text no words no letters, 16:9"
+- ALWAYS end image prompts with: "psychedelic art, liquid light show, no text no words no letters, 16:9"
 - Image prompts should describe a single rich still frame (for FLUX image generation)
-- Video prompts should describe motion/energy for a 5-10 second animation of that still (for image-to-video)
+- Video prompts should describe motion/energy for a 5-10 second animation — emphasize SWIRLING, MORPHING, BREATHING motion
 - Keep prompts under 200 words each`;
 
 interface GeneratedPrompts {
