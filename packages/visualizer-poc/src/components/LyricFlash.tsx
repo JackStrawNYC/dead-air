@@ -8,6 +8,7 @@ import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
 import { seeded } from "../utils/seededRandom";
 import { useShowContext } from "../data/ShowContext";
+import { useAudioSnapshot } from "./parametric/audio-helpers";
 
 // Pre-1977 Dead lyrics only — no anachronistic songs for '77 shows
 const LYRICS = [
@@ -46,15 +47,9 @@ export const LyricFlash: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
   const ctx = useShowContext();
+  const snap = useAudioSnapshot(frames);
 
-  const idx = Math.min(Math.max(0, frame), frames.length - 1);
-  let eSum = 0;
-  let eCount = 0;
-  for (let i = Math.max(0, idx - 75); i <= Math.min(frames.length - 1, idx + 75); i++) {
-    eSum += frames[i].rms;
-    eCount++;
-  }
-  const energy = eCount > 0 ? eSum / eCount : 0;
+  const energy = snap.energy;
 
   const cycleIndex = Math.floor(frame / CYCLE);
   const cycleFrame = frame % CYCLE;

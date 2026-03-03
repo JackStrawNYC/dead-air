@@ -26,6 +26,8 @@ import { ShowContextProvider, getShowSeed } from "./data/ShowContext";
 import { VisualizerErrorBoundary } from "./components/VisualizerErrorBoundary";
 import { SilentErrorBoundary } from "./components/SilentErrorBoundary";
 import { SceneVideoLayer, computeMediaWindows } from "./components/SceneVideoLayer";
+import { LyricTriggerLayer } from "./components/LyricTriggerLayer";
+import { resolveLyricTriggers, loadAlignmentWords } from "./data/lyric-trigger-resolver";
 import { resolveMediaForSong } from "./data/media-resolver";
 import { SongPaletteProvider, paletteHueRotation } from "./data/SongPaletteContext";
 import { TempoProvider } from "./data/TempoContext";
@@ -281,6 +283,18 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
     ? props.song.sceneVideos
     : undefined;
 
+  // ── Lyric trigger windows ──
+  const lyricTriggerWindows = useMemo(() => {
+    const words = loadAlignmentWords(props.song.trackId);
+    return resolveLyricTriggers(props.song.title, words, 30);
+  }, [props.song.trackId, props.song.title]);
+
+  // Frame ranges where lyric triggers suppress SceneVideoLayer
+  const triggerSuppressedRanges = useMemo(
+    () => lyricTriggerWindows.map((w) => ({ start: w.frameStart, end: w.frameEnd })),
+    [lyricTriggerWindows],
+  );
+
   if (!analysis || analysis.frames.length === 0) {
     return (
       <div
@@ -337,9 +351,13 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
   const activeMediaWindow = mediaWindows.find(
     (w) => frame >= w.frameStart - 270 && frame < w.frameEnd + 270, // 270 = CURATED_FADE_FRAMES
   );
-  const mediaActive = !!activeMediaWindow;
-  const mediaCurated = activeMediaWindow ? activeMediaWindow.media.priority <= 1 : false;
-  const mediaSuppression = mediaCurated ? 0.55 : mediaActive ? 0.75 : 1.0;
+  // Also check if a lyric trigger is currently active (highest-priority curated media)
+  const activeLyricTrigger = lyricTriggerWindows.find(
+    (w) => frame >= w.frameStart - 90 && frame < w.frameEnd + 90, // 90 = LyricTriggerLayer FADE_FRAMES
+  );
+  const mediaActive = !!activeMediaWindow || !!activeLyricTrigger;
+  const mediaCurated = activeLyricTrigger ? true : (activeMediaWindow ? activeMediaWindow.media.priority <= 1 : false);
+  const mediaSuppression = activeLyricTrigger ? 0.45 : mediaCurated ? 0.55 : mediaActive ? 0.75 : 1.0;
 
   // Fade in/out for set break transitions (segues skip the fade)
   const fadeIn = props.segueIn ? 1 : interpolate(frame, [0, FADE_FRAMES], [0, 1], {
@@ -388,7 +406,15 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
                 trackId={props.song.trackId}
                 showSeed={showSeed}
                 hueRotation={hueRotation}
+                suppressedRanges={triggerSuppressedRanges}
               />
+            </SilentErrorBoundary>
+          )}
+
+          {/* ═══ Layer 0.8: Lyric-triggered curated visuals ═══ */}
+          {lyricTriggerWindows.length > 0 && (
+            <SilentErrorBoundary name="LyricTriggers">
+              <LyricTriggerLayer windows={lyricTriggerWindows} />
             </SilentErrorBoundary>
           )}
 
