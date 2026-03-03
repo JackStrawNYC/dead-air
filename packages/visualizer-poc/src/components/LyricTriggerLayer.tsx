@@ -6,8 +6,9 @@
  * with a dark backdrop, holds for the configured duration, then fades out.
  * During the trigger window, SceneVideoLayer yields via suppressedRanges.
  *
- * Videos use the freeze-play pattern: enter frozen, start playback once
- * ~15% visible, fade out before the video's natural end.
+ * Videos: frozen first frame during fade-in → full playback once visible →
+ * smooth fade-out. This ensures all 15 seconds of motion video are used
+ * without clipping the start during the opacity ramp.
  */
 
 import React, { useMemo } from "react";
@@ -22,14 +23,16 @@ import {
 } from "remotion";
 import type { LyricTriggerWindow } from "../data/lyric-trigger-resolver";
 
-const FADE_FRAMES = 90; // 3-second fade in/out
-const VIDEO_DURATION_FRAMES = 450; // 15-second max video playback
-const VIDEO_TAIL_FADE = 90; // 3-second tail fade before video end
-const PLAY_THRESHOLD = 0.15; // start playback at 15% opacity
+const FADE_IN_FRAMES = 150; // 5-second fade in (slow cinematic reveal)
+const FADE_OUT_FRAMES = 120; // 4-second fade out
+const VIDEO_DURATION_FRAMES = 450; // 15-second video playback (full motion)
+const VIDEO_TAIL_FADE = 120; // 4-second tail fade before video end
 
-function smoothstep(edge0: number, edge1: number, x: number): number {
+/** Double-smoothstep for extra-soft transitions */
+function softFade(edge0: number, edge1: number, x: number): number {
   const t = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)));
-  return t * t * (3 - 2 * t);
+  const s = t * t * (3 - 2 * t);
+  return s * s * (3 - 2 * s);
 }
 
 // ─── Image display with Ken Burns ───
@@ -74,55 +77,68 @@ export const LyricTriggerLayer: React.FC<Props> = ({ windows }) => {
   const active = useMemo(() => {
     return windows.find(
       (w) =>
-        frame >= w.frameStart - FADE_FRAMES &&
-        frame < w.frameEnd + FADE_FRAMES,
+        frame >= w.frameStart - FADE_IN_FRAMES &&
+        frame < w.frameEnd + FADE_OUT_FRAMES,
     );
   }, [windows, frame]);
 
   if (!active) return null;
 
-  // Smoothstep fade envelope
-  const fadeIn = smoothstep(
-    active.frameStart - FADE_FRAMES,
+  // Double-smoothstep fade envelope — very gentle in/out
+  const fadeIn = softFade(
+    active.frameStart - FADE_IN_FRAMES,
     active.frameStart,
     frame,
   );
   const fadeOut =
-    1 - smoothstep(active.frameEnd, active.frameEnd + FADE_FRAMES, frame);
+    1 - softFade(active.frameEnd, active.frameEnd + FADE_OUT_FRAMES, frame);
   const envelope = Math.min(fadeIn, fadeOut);
 
   if (envelope < 0.01) return null;
 
-  const backdropOpacity = envelope * 0.45;
+  // Backdrop darkens slightly ahead of the media for a cinematic "lights down" feel
+  const backdropEnvelope = softFade(
+    active.frameStart - FADE_IN_FRAMES,
+    active.frameStart - Math.floor(FADE_IN_FRAMES * 0.3),
+    frame,
+  ) * (1 - softFade(active.frameEnd + Math.floor(FADE_OUT_FRAMES * 0.3), active.frameEnd + FADE_OUT_FRAMES, frame));
+  const backdropOpacity = backdropEnvelope * 0.40;
+
   const isImage = active.mediaType === "image";
   const mediaOpacity = envelope * active.opacity;
 
   const filterStr = isImage
     ? "blur(1px) saturate(0.9)"
-    : "blur(0.5px) saturate(0.9)";
+    : "blur(0.5px) saturate(0.95)";
 
-  // ─── Video: freeze-play pattern ───
+  // ─── Video: frozen reveal → full playback → smooth exit ───
   if (!isImage) {
-    const playStartFrame =
-      active.frameStart - Math.floor(FADE_FRAMES * (1 - PLAY_THRESHOLD));
-    const isFrozen = frame < playStartFrame;
+    // Phase 1 (fade-in): frozen first frame, opacity ramps up
+    // Phase 2 (play): video plays from frame 0 once fully visible
+    // Phase 3 (tail fade): smooth exit before video ends
+    const playStartFrame = active.frameStart - 60; // start motion 2s before full opacity
     const videoEndFrame = playStartFrame + VIDEO_DURATION_FRAMES;
+    const isPlayPhase = frame >= playStartFrame;
 
-    // Don't render past the video's natural end
-    if (frame >= videoEndFrame) return null;
+    // Don't render past the video's natural end + fade out
+    if (frame >= videoEndFrame + FADE_OUT_FRAMES) return null;
 
-    // Tail fade: smoothly exit before last frame
+    // Tail fade: smoothly exit before video ends
     const tailFade =
       1 -
-      smoothstep(
+      softFade(
         videoEndFrame - VIDEO_TAIL_FADE,
         videoEndFrame,
         frame,
       );
     const effectiveOpacity = mediaOpacity * Math.min(1, tailFade);
 
-    const seqFrom = playStartFrame;
-    const seqDuration = videoEndFrame - seqFrom;
+    const videoSrc = staticFile(active.visual);
+    const videoStyle: React.CSSProperties = {
+      width: "100%",
+      height: "100%",
+      objectFit: "cover",
+    };
 
     return (
       <>
@@ -145,39 +161,25 @@ export const LyricTriggerLayer: React.FC<Props> = ({ windows }) => {
             filter: filterStr,
           }}
         >
-          {isFrozen ? (
+          {isPlayPhase ? (
+            // Full playback — video starts from its beginning at playStartFrame
             <Sequence
-              from={seqFrom}
-              durationInFrames={seqDuration}
+              from={playStartFrame}
+              durationInFrames={VIDEO_DURATION_FRAMES}
+              layout="none"
+            >
+              <OffthreadVideo src={videoSrc} muted style={videoStyle} />
+            </Sequence>
+          ) : (
+            // Frozen first frame during fade-in (preserves full 15s of motion for later)
+            <Sequence
+              from={active.frameStart - FADE_IN_FRAMES}
+              durationInFrames={FADE_IN_FRAMES}
               layout="none"
             >
               <Freeze frame={0}>
-                <OffthreadVideo
-                  src={staticFile(active.visual)}
-                  muted
-                  style={{
-                    width: "100%",
-                    height: "100%",
-                    objectFit: "cover",
-                  }}
-                />
+                <OffthreadVideo src={videoSrc} muted style={videoStyle} />
               </Freeze>
-            </Sequence>
-          ) : (
-            <Sequence
-              from={seqFrom}
-              durationInFrames={seqDuration}
-              layout="none"
-            >
-              <OffthreadVideo
-                src={staticFile(active.visual)}
-                muted
-                style={{
-                  width: "100%",
-                  height: "100%",
-                  objectFit: "cover",
-                }}
-              />
             </Sequence>
           )}
         </div>

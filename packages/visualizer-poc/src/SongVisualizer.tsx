@@ -353,7 +353,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
   );
   // Also check if a lyric trigger is currently active (highest-priority curated media)
   const activeLyricTrigger = lyricTriggerWindows.find(
-    (w) => frame >= w.frameStart - 90 && frame < w.frameEnd + 90, // 90 = LyricTriggerLayer FADE_FRAMES
+    (w) => frame >= w.frameStart - 150 && frame < w.frameEnd + 120, // 150/120 = LyricTriggerLayer FADE_IN/OUT_FRAMES
   );
   const mediaActive = !!activeMediaWindow || !!activeLyricTrigger;
   const mediaCurated = activeLyricTrigger ? true : (activeMediaWindow ? activeMediaWindow.media.priority <= 1 : false);
