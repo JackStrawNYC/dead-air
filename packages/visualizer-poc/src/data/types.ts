@@ -218,6 +218,9 @@ export interface SongProfile {
   sectionCount: number;
 }
 
+/** Per-overlay energy phase hint from Claude curation */
+export type OverlayPhaseHint = "low" | "mid" | "high";
+
 /** Generated overlay schedule for the full show */
 export interface OverlaySchedule {
   generatedAt: string;
@@ -229,6 +232,8 @@ export interface OverlaySchedule {
     totalCount: number;
     /** Claude's reasoning for overlay choices (intelligent mode only) */
     reasoning?: string;
+    /** Per-overlay energy phase hints (intelligent mode only) */
+    energyHints?: Record<string, OverlayPhaseHint>;
   }>;
 }
 

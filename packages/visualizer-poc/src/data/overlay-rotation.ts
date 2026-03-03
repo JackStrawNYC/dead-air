@@ -18,7 +18,7 @@
  *
  * Deterministic: seeded PRNG keyed on trackId + windowIndex.
  */
-import type { SectionBoundary, OverlayEntry, EnhancedFrameData } from "./types";
+import type { SectionBoundary, OverlayEntry, EnhancedFrameData, OverlayPhaseHint } from "./types";
 import { OVERLAY_BY_NAME, ALWAYS_ACTIVE } from "./overlay-registry";
 import { computeSmoothedEnergy, overlayEnergyFactor } from "../utils/energy";
 import { detectTexture } from "../utils/climax-state";
@@ -322,6 +322,7 @@ export function buildRotationSchedule(
   showSeed?: number,
   frames?: EnhancedFrameData[],
   isDrumsSpace?: boolean,
+  energyHints?: Record<string, OverlayPhaseHint>,
 ): RotationSchedule {
   const trackHash = hashString(trackId) + (showSeed ?? 0);
 
@@ -430,7 +431,7 @@ export function buildRotationSchedule(
     const scored = poolEntries.map((entry) => {
       let score = 0.5;
 
-      // Energy band match
+      // Energy band match (registry default)
       if (entry.energyBand !== "any") {
         if (entry.energyBand === window.energy) {
           score += 0.3;
@@ -438,6 +439,19 @@ export function buildRotationSchedule(
           const rank = { low: 0, mid: 1, high: 2 };
           const dist = Math.abs(rank[entry.energyBand] - rank[window.energy]);
           score -= dist * 0.15;
+        }
+      }
+
+      // Per-song energy phase hint (from Claude curation) — overrides registry default
+      // This is stronger than the registry energyBand because it's song-specific
+      const phaseHint = energyHints?.[entry.name];
+      if (phaseHint) {
+        if (phaseHint === window.energy) {
+          score += 0.35; // strong match — Claude says this overlay belongs here
+        } else {
+          const rank = { low: 0, mid: 1, high: 2 };
+          const dist = Math.abs(rank[phaseHint] - rank[window.energy]);
+          score -= dist * 0.20; // stronger penalty than registry mismatch
         }
       }
 

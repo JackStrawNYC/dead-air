@@ -182,6 +182,8 @@ export interface SongVisualizerProps {
   song: SetlistEntry;
   /** Active overlay names (from overlay schedule). If undefined, all overlays render. */
   activeOverlays?: string[];
+  /** Per-overlay energy phase hints (from intelligent curation) */
+  energyHints?: Record<string, import("./data/types").OverlayPhaseHint>;
   /** Full show setlist (for ShowContext) */
   show?: ShowSetlist;
   /** Previous song segues into this one — skip fade-in + song art */
@@ -233,8 +235,8 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
   const rotationSchedule = useMemo(() => {
     if (!props.activeOverlays || !analysis) return null;
     const sects = getSections(analysis);
-    return buildRotationSchedule(props.activeOverlays, sects, props.song.trackId, showSeed, analysis?.frames, isDrumsSpace);
-  }, [props.activeOverlays, analysis, props.song.trackId, showSeed, isDrumsSpace]);
+    return buildRotationSchedule(props.activeOverlays, sects, props.song.trackId, showSeed, analysis?.frames, isDrumsSpace, props.energyHints);
+  }, [props.activeOverlays, analysis, props.song.trackId, showSeed, isDrumsSpace, props.energyHints]);
 
   // Per-frame overlay opacities (densityMult applied after climax state computed below)
   const opacityMapBase = rotationSchedule

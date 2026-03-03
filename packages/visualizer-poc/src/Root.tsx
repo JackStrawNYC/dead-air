@@ -58,6 +58,11 @@ function getActiveOverlays(trackId: string): string[] | undefined {
   return overlaySchedule?.songs[trackId]?.activeOverlays;
 }
 
+/** Get per-overlay energy phase hints for a given trackId */
+function getEnergyHints(trackId: string): Record<string, import("./data/types").OverlayPhaseHint> | undefined {
+  return overlaySchedule?.songs[trackId]?.energyHints;
+}
+
 /** Chapter card entries from show-context.json */
 interface ChapterEntry {
   before?: string;
@@ -129,6 +134,7 @@ export const Root: React.FC = () => {
               segueFromPalette: segueIn ? prevSong?.palette : undefined,
               segueToPalette: segueOut ? nextSong?.palette : undefined,
               activeOverlays: getActiveOverlays(song.trackId),
+              energyHints: getEnergyHints(song.trackId),
               show: setlist,
             } satisfies SongVisualizerProps as Record<string, unknown>}
             calculateMetadata={async ({ props }) => {
@@ -190,6 +196,7 @@ export const Root: React.FC = () => {
           defaultProps={{
             song: setlist.songs.find((s) => s.trackId === "s2t08")!,
             activeOverlays: getActiveOverlays("s2t08"),
+            energyHints: getEnergyHints("s2t08"),
             show: setlist,
           } satisfies SongVisualizerProps as Record<string, unknown>}
           calculateMetadata={async ({ props }) => {
