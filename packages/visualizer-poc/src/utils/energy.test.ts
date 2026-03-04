@@ -62,17 +62,20 @@ describe("energyToFactor", () => {
 });
 
 describe("overlayEnergyFactor", () => {
-  it("returns 0.05 at silence", () => {
-    expect(overlayEnergyFactor(0.01)).toBeCloseTo(0.05, 2);
+  it("returns floor (0.40) at silence", () => {
+    // energy 0.01 < low threshold 0.04 → factor=0 → 0.40 + 0 = 0.40
+    expect(overlayEnergyFactor(0.01)).toBeCloseTo(0.40, 2);
   });
 
-  it("returns 0.85 at peak", () => {
-    expect(overlayEnergyFactor(0.5)).toBeCloseTo(0.85, 2);
+  it("returns 1.0 at peak", () => {
+    // energy 0.5 > high threshold 0.30 → factor=1 → 0.40 + 0.60 = 1.0
+    expect(overlayEnergyFactor(0.5)).toBeCloseTo(1.0, 2);
   });
 
-  it("returns ~0.45 at moderate energy", () => {
-    const val = overlayEnergyFactor(0.17); // midpoint of 0.04-0.30
-    expect(val).toBeGreaterThan(0.3);
-    expect(val).toBeLessThan(0.6);
+  it("returns ~0.70 at moderate energy", () => {
+    // energy 0.17 ≈ midpoint of 0.04-0.30 → factor≈0.5 → 0.40 + 0.30 = 0.70
+    const val = overlayEnergyFactor(0.17);
+    expect(val).toBeGreaterThan(0.6);
+    expect(val).toBeLessThan(0.8);
   });
 });
