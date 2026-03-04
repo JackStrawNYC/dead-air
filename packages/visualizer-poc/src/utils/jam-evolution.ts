@@ -32,18 +32,24 @@ export interface JamEvolution {
 }
 
 const LONG_JAM_THRESHOLD = 18000; // 10 minutes at 30fps
+const DRUMS_SPACE_THRESHOLD = 5400; // 3 minutes — Drums/Space always gets phase evolution
 const FPS = 30;
 
 /**
  * Compute the jam evolution state for the current frame.
  * Returns phase, progress, and visual modulation suggestions.
+ *
+ * @param isDrumsSpace — uses lower threshold (3 min) since Drums/Space
+ *   is inherently improvisational and benefits from phase evolution at any length.
  */
 export function computeJamEvolution(
   frames: EnhancedFrameData[],
   currentFrame: number,
+  isDrumsSpace = false,
 ): JamEvolution {
   const totalFrames = frames.length;
-  const isLongJam = totalFrames >= LONG_JAM_THRESHOLD;
+  const threshold = isDrumsSpace ? DRUMS_SPACE_THRESHOLD : LONG_JAM_THRESHOLD;
+  const isLongJam = totalFrames >= threshold;
   const songProgress = Math.min(1, currentFrame / Math.max(1, totalFrames - 1));
 
   if (!isLongJam) {

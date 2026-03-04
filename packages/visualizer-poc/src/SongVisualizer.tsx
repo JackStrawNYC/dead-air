@@ -35,6 +35,7 @@ import { EraGrade } from "./components/EraGrade";
 import { EnergyEnvelope } from "./components/EnergyEnvelope";
 import { computeClimaxState, climaxModulation } from "./utils/climax-state";
 import { computeAudioSnapshot } from "./utils/audio-reactive";
+import { calibrateEnergy } from "./utils/energy";
 import { AudioSnapshotProvider } from "./data/AudioSnapshotContext";
 import { CrowdAmbience } from "./components/CrowdAmbience";
 import { SongDNA } from "./components/SongDNA";
@@ -245,6 +246,12 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
       title === "drums / space" || title === "drums/space";
   }, [props.song.title]);
 
+  // Per-song energy calibration — maps this recording's dynamic range to full visual range
+  const energyCalibration = useMemo(
+    () => analysis ? calibrateEnergy(analysis.frames) : undefined,
+    [analysis],
+  );
+
   const rotationSchedule = useMemo(() => {
     if (!props.activeOverlays || !analysis) return null;
     const sects = getSections(analysis);
@@ -253,7 +260,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
 
   // Per-frame overlay opacities (densityMult applied after climax state computed below)
   const opacityMapBase = rotationSchedule
-    ? getOverlayOpacities(frame, rotationSchedule, analysis?.frames)
+    ? getOverlayOpacities(frame, rotationSchedule, analysis?.frames, energyCalibration)
     : null;
 
   // Per-song palette hue rotation (CSS filter applied to overlay wrapper)
@@ -342,12 +349,12 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
   const climaxState = computeClimaxState(f, frame, sections, audioSnapshot.energy);
   const climaxMod = climaxModulation(climaxState);
 
-  // Jam evolution — phase detection for long jams (10+ min)
+  // Jam evolution — phase detection for long jams (10+ min, or 3+ min for Drums/Space)
   const jamEvolution = useMemo(
-    () => computeJamEvolution(f, frame),
+    () => computeJamEvolution(f, frame, isDrumsSpace),
     // Recompute every ~30 frames (1 second) for performance
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [f, Math.floor(frame / 30)],
+    [f, Math.floor(frame / 30), isDrumsSpace],
   );
 
   // Combined density multiplier: climax × jam evolution
@@ -418,7 +425,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
       <VisualizerErrorBoundary>
       <div style={{ position: "absolute", inset: 0, opacity }}>
         <EraGrade>
-        <EnergyEnvelope snapshot={audioSnapshot} climaxMod={climaxMod} jamColorTemp={jamEvolution.isLongJam ? jamEvolution.colorTemperature : undefined}>
+        <EnergyEnvelope snapshot={audioSnapshot} climaxMod={climaxMod} jamColorTemp={jamEvolution.isLongJam ? jamEvolution.colorTemperature : undefined} calibration={energyCalibration}>
           {/* ═══ Layer 0: Base shader visualization ═══ */}
           <SceneRouter
             frames={f}
@@ -428,7 +435,8 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
           />
 
           {/* ═══ Layer 0.5: Per-song poster art (persistent background wash) ═══ */}
-          {effectiveSongArt && (
+          {/* Skip song art during segue-in — visual continuity from prev song, no jarring poster pop */}
+          {effectiveSongArt && !props.segueIn && (
             <SilentErrorBoundary name="SongArt">
               <SongArtLayer src={staticFile(effectiveSongArt)} suppressionFactor={artSuppressionFactor} />
             </SilentErrorBoundary>
@@ -458,14 +466,14 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
           )}
 
           {/* ═══ Dynamic overlay layers (1-10) ═══ */}
-          {/* Hidden during title card, then fade in over 3 seconds */}
+          {/* Hidden during title card, then fade in over 3 seconds (skip gate during segue-in) */}
           <TempoProvider tempo={tempo}>
           <SongPaletteProvider palette={props.song.palette}>
             <div
               style={{
                 position: "absolute",
                 inset: 0,
-                opacity: effectiveSongArt
+                opacity: (effectiveSongArt && !props.segueIn)
                   ? interpolate(frame, [ART_FULL_END, ART_FULL_END + 90], [0, 1], {
                       extrapolateLeft: "clamp",
                       extrapolateRight: "clamp",
@@ -508,11 +516,14 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
         </EraGrade>
 
         {/* ═══ Always-active: special-prop components ═══ */}
-        <SongTitle
-          title={props.song.title}
-          setNumber={props.song.set}
-          trackNumber={props.song.trackNumber}
-        />
+        {/* Suppress SongTitle during segue-in — seamless visual transition */}
+        {!props.segueIn && (
+          <SongTitle
+            title={props.song.title}
+            setNumber={props.song.set}
+            trackNumber={props.song.trackNumber}
+          />
+        )}
         {/* Song DNA stats card — appears after song art settles (skip during segue-in) */}
         {!props.segueIn && songStatsData && songStatsData[props.song.trackId] && (
           <SilentErrorBoundary name="SongDNA">

@@ -9,8 +9,8 @@ import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
 import { useShowContext, formatDateCompact } from "../data/ShowContext";
 import { useSongPalette } from "../data/SongPaletteContext";
 
-const DELAY = 360;          // 12s — appears after SongTitle fades out
-const SHOW_DURATION = 390;  // 13 seconds visible
+const DELAY = 300;          // 10s — appears once, clean during music
+const SHOW_DURATION = 240;  // 8 seconds visible total (incl fades)
 const FADE_IN = 60;
 const FADE_OUT = 60;
 
@@ -26,7 +26,7 @@ export const ConcertInfo: React.FC<Props> = ({
   songTitle,
 }) => {
   const frame = useCurrentFrame();
-  const { width, height } = useVideoConfig();
+  const { width, height, durationInFrames } = useVideoConfig();
   const ctx = useShowContext();
   const palette = useSongPalette();
 
@@ -35,8 +35,16 @@ export const ConcertInfo: React.FC<Props> = ({
   const bandName = ctx?.bandName ?? "GRATEFUL DEAD";
   const ticketNumber = ctx ? formatDateCompact(ctx.dateRaw) : "00000000";
 
-  // Show only once, after delay
-  const localFrame = frame - DELAY;
+  // Show only once, after delay — skip entirely if song is too short (< 30s total)
+  const totalNeeded = DELAY + SHOW_DURATION;
+  if (durationInFrames < 900) return null; // < 30s — don't clutter short songs
+
+  // For songs shorter than the full window, reduce delay proportionally
+  const effectiveDelay = durationInFrames < totalNeeded + 180
+    ? Math.max(120, Math.floor((durationInFrames - SHOW_DURATION - 180) * 0.5))
+    : DELAY;
+
+  const localFrame = frame - effectiveDelay;
   const inWindow = localFrame >= 0 && localFrame < SHOW_DURATION;
 
   // Poster text opacity

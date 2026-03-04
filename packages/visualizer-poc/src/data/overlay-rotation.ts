@@ -21,6 +21,7 @@
 import type { SectionBoundary, OverlayEntry, EnhancedFrameData, OverlayPhaseHint } from "./types";
 import { OVERLAY_BY_NAME, ALWAYS_ACTIVE } from "./overlay-registry";
 import { computeSmoothedEnergy, overlayEnergyFactor } from "../utils/energy";
+import type { EnergyCalibration } from "../utils/energy";
 import { detectTexture } from "../utils/climax-state";
 import { computeAudioSnapshot } from "../utils/audio-reactive";
 
@@ -626,6 +627,33 @@ export function buildRotationSchedule(
   return { alwaysActive, windows, accentOverlays };
 }
 
+// ─── Overlay Manifest (for debugging and render logging) ───
+
+export interface OverlayManifestEntry {
+  windowIndex: number;
+  frameStart: number;
+  frameEnd: number;
+  energy: string;
+  overlays: string[];
+  accents: string[];
+  isDropout: boolean;
+}
+
+/** Generate a JSON-serializable manifest of which overlays were selected per window.
+ *  Useful for debugging overlay selection and creating per-render logs.
+ */
+export function buildOverlayManifest(schedule: RotationSchedule): OverlayManifestEntry[] {
+  return schedule.windows.map((w, i) => ({
+    windowIndex: i,
+    frameStart: w.frameStart,
+    frameEnd: w.frameEnd,
+    energy: w.energy,
+    overlays: w.overlays,
+    accents: schedule.accentOverlays.get(i) ?? [],
+    isDropout: w.isDropout ?? false,
+  }));
+}
+
 // ─── Per-Frame Opacity Calculator ───
 
 /**
@@ -676,6 +704,7 @@ export function getOverlayOpacities(
   frame: number,
   schedule: RotationSchedule,
   frames?: EnhancedFrameData[],
+  calibration?: EnergyCalibration,
 ): Record<string, number> {
   const result: Record<string, number> = {};
 
@@ -795,7 +824,7 @@ export function getOverlayOpacities(
   if (frames && frames.length > 0) {
     const energyIdx = Math.min(Math.max(0, frame), frames.length - 1);
     const energy = computeSmoothedEnergy(frames, energyIdx);
-    const opacityFactor = overlayEnergyFactor(energy);
+    const opacityFactor = overlayEnergyFactor(energy, calibration);
     const alwaysActiveSet = new Set(schedule.alwaysActive);
     for (const name of Object.keys(result)) {
       if (!alwaysActiveSet.has(name)) {

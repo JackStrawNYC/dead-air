@@ -4,23 +4,13 @@
  * Renders as a canvas-generated noise pattern.
  */
 
-import React, { useMemo } from "react";
+import React from "react";
 import { useCurrentFrame, useVideoConfig } from "remotion";
 
 interface Props {
   opacity?: number;
   /** Audio energy (0–1) for energy-aware breathing speed */
   energy?: number;
-}
-
-/** Mulberry32 PRNG */
-function mulberry32(seed: number) {
-  return () => {
-    let t = (seed += 0x6d2b79f5);
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
 }
 
 export const FilmGrain: React.FC<Props> = ({ opacity = 0.10, energy = 0 }) => {
@@ -40,22 +30,6 @@ export const FilmGrain: React.FC<Props> = ({ opacity = 0.10, energy = 0 }) => {
   const weaveX = Math.sin(frame * 0.037) * 0.8;
   const weaveY = Math.cos(frame * 0.029) * 0.6;
 
-  // Static noise dots — only depend on viewport size, not frame
-  const dots = useMemo(() => {
-    const rng = mulberry32(width * 7919 + height * 104729);
-    const count = 400;
-    const result: Array<{ x: number; y: number; r: number; o: number }> = [];
-    for (let i = 0; i < count; i++) {
-      result.push({
-        x: rng() * width,
-        y: rng() * height,
-        r: 0.5 + rng() * 1.5,
-        o: rng() * 0.5,
-      });
-    }
-    return result;
-  }, [width, height]);
-
   return (
     <svg
       width={width}
@@ -74,8 +48,8 @@ export const FilmGrain: React.FC<Props> = ({ opacity = 0.10, energy = 0 }) => {
       <filter id={`grain-${frame}`}>
         <feTurbulence
           type="fractalNoise"
-          baseFrequency="0.65"
-          numOctaves="3"
+          baseFrequency="0.75"
+          numOctaves="4"
           seed={grainSeed}
           stitchTiles="stitch"
         />
@@ -84,17 +58,8 @@ export const FilmGrain: React.FC<Props> = ({ opacity = 0.10, energy = 0 }) => {
         width="100%"
         height="100%"
         filter={`url(#grain-${frame})`}
-        opacity="0.4"
+        opacity="0.5"
       />
-      {dots.map((d, i) => (
-        <circle
-          key={i}
-          cx={d.x}
-          cy={d.y}
-          r={d.r}
-          fill={`rgba(255,255,255,${d.o})`}
-        />
-      ))}
     </svg>
   );
 };

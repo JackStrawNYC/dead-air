@@ -157,8 +157,10 @@ void main() {
   col = mix(col, vec3(0.02, 0.015, 0.025), stageY * 0.80);
 
   // === CROWD SILHOUETTE: wavy heads along bottom edge ===
-  float crowdY = 0.12 + snoise(vec3(uv.x * 8.0, uTime * 0.3, 0.0)) * 0.02
-               + snoise(vec3(uv.x * 25.0, 0.0, uTime * 0.1)) * 0.008;
+  // Higher frequency + extra octave prevents visible repeating patterns at 1920px
+  float crowdY = 0.12 + snoise(vec3(uv.x * 20.0, uTime * 0.3, 0.0)) * 0.02
+               + snoise(vec3(uv.x * 50.0, 0.0, uTime * 0.1)) * 0.008
+               + snoise(vec3(uv.x * 80.0, uTime * 0.05, 3.7)) * 0.004;
   crowdY += uBeatSnap * 0.005 * sin(uv.x * 15.0 + uTime);
   float crowdMask = smoothstep(crowdY + 0.01, crowdY - 0.01, uv.y);
   col = mix(col, vec3(0.015, 0.012, 0.02), crowdMask * 0.85);

@@ -5,7 +5,7 @@
  */
 
 import React from "react";
-import { interpolate } from "remotion";
+import { interpolate, Easing } from "remotion";
 
 interface Props {
   /** Progress through the crossfade: 0 = fully outgoing, 1 = fully incoming */
@@ -15,13 +15,16 @@ interface Props {
 }
 
 export const SceneCrossfade: React.FC<Props> = ({ progress, outgoing, incoming }) => {
+  // Smoothstep easing prevents the washed-out grey at linear midpoint
   const outOpacity = interpolate(progress, [0, 1], [1, 0], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
+    easing: Easing.inOut(Easing.ease),
   });
   const inOpacity = interpolate(progress, [0, 1], [0, 1], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
+    easing: Easing.inOut(Easing.ease),
   });
 
   return (

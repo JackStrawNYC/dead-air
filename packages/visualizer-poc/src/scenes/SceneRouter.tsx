@@ -23,6 +23,20 @@ import type {
 
 const CROSSFADE_FRAMES = 90; // 3 seconds at 30fps
 
+// Auto-variety: complementary modes for each default mode.
+// When a long song lacks sectionOverrides, alternate sections get a contrasting shader.
+const COMPLEMENT_MODES: Record<VisualMode, VisualMode> = {
+  liquid_light: "oil_projector",
+  oil_projector: "liquid_light",
+  concert_lighting: "lo_fi_grain",
+  lo_fi_grain: "concert_lighting",
+  particle_nebula: "liquid_light",
+  stark_minimal: "liquid_light",
+};
+
+// Minimum section duration (in frames) to qualify for auto-variety
+const AUTO_VARIETY_MIN_SECTION = 7200; // 4 minutes at 30fps
+
 interface Props {
   frames: EnhancedFrameData[];
   sections: SectionBoundary[];
@@ -30,10 +44,31 @@ interface Props {
   tempo?: number;
 }
 
-/** Determine the visual mode for a given section index */
-function getModeForSection(song: SetlistEntry, sectionIndex: number): VisualMode {
+/** Determine the visual mode for a given section index.
+ *  Priority: explicit sectionOverrides > auto-variety for long songs > defaultMode.
+ */
+function getModeForSection(
+  song: SetlistEntry,
+  sectionIndex: number,
+  sections: SectionBoundary[],
+): VisualMode {
+  // Explicit override always wins
   const override = song.sectionOverrides?.find((o) => o.sectionIndex === sectionIndex);
   if (override) return override.mode;
+
+  // Auto-variety: if no overrides at all and the song has sections long enough,
+  // alternate between default and complement to prevent visual fatigue
+  if (!song.sectionOverrides?.length && sections.length >= 3) {
+    const section = sections[sectionIndex];
+    const sectionLen = section ? section.frameEnd - section.frameStart : 0;
+    const totalLen = sections[sections.length - 1]?.frameEnd ?? 0;
+
+    // Only auto-vary for songs >6min total with sections >4min
+    if (totalLen > 10800 && sectionLen > AUTO_VARIETY_MIN_SECTION && sectionIndex % 2 === 1) {
+      return COMPLEMENT_MODES[song.defaultMode] ?? song.defaultMode;
+    }
+  }
+
   return song.defaultMode;
 }
 
@@ -84,7 +119,7 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo }) 
     }
   }
 
-  const currentMode = getModeForSection(song, currentSectionIdx);
+  const currentMode = getModeForSection(song, currentSectionIdx, sections);
   const currentSection = sections[currentSectionIdx];
 
   const nextSectionIdx = currentSectionIdx + 1;
@@ -92,7 +127,7 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo }) 
 
   // Crossfade INTO this section (from previous)
   if (prevSectionIdx >= 0) {
-    const prevMode = getModeForSection(song, prevSectionIdx);
+    const prevMode = getModeForSection(song, prevSectionIdx, sections);
     if (prevMode !== currentMode) {
       const distFromStart = frame - currentSection.frameStart;
       if (distFromStart < CROSSFADE_FRAMES) {
@@ -110,7 +145,7 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo }) 
 
   // Crossfade OUT of this section (to next)
   if (nextSectionIdx < sections.length) {
-    const nextMode = getModeForSection(song, nextSectionIdx);
+    const nextMode = getModeForSection(song, nextSectionIdx, sections);
     if (nextMode !== currentMode) {
       const distToEnd = currentSection.frameEnd - frame;
       if (distToEnd < CROSSFADE_FRAMES) {

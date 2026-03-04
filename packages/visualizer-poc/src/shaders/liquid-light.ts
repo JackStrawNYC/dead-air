@@ -100,8 +100,9 @@ void main() {
   float contrastWarp = 0.5 + bandInfluence * 0.8;
 
   // ============ LAYER 1: Background ============
+  // fbm3 (3 octaves) suffices — background gets dominated by warp passes
   vec3 bgQ = vec3(p * 0.4, t * 0.03 + sectionSeed);
-  float bgNoise = fbm(bgQ);
+  float bgNoise = fbm3(bgQ);
   float bgHue = uPaletteSecondary + bgNoise * 0.15;
   vec3 bgCol = palette(bgHue, vec3(0.4), vec3(0.3), vec3(1.0), vec3(bgHue, bgHue + 0.33, bgHue + 0.67));
   bgCol *= 0.65 + energy * 0.08;

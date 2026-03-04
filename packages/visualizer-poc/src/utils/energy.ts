@@ -65,8 +65,85 @@ export function energyToFactor(
  *   - Quiet tuning (energy ~0.03) → 5% (barely there — music is the show)
  *   - Mid jam (energy ~0.15)      → ~40% (subtle presence)
  *   - Peak climax (energy ~0.30+) → 85% (vivid but not overwhelming)
+ *
+ * When calibration is provided, thresholds are derived from the recording's
+ * own percentile analysis, so every show maps its full dynamic range.
  */
-export function overlayEnergyFactor(energy: number): number {
-  const factor = energyToFactor(energy, 0.04, 0.30);
+export function overlayEnergyFactor(energy: number, calibration?: EnergyCalibration): number {
+  const low = calibration ? calibration.quietThreshold * 0.8 : 0.04;
+  const high = calibration ? calibration.loudThreshold * 0.85 : 0.30;
+  const factor = energyToFactor(energy, low, high);
   return 0.05 + factor * 0.80;
+}
+
+// ─── Per-show energy calibration ───
+
+export interface EnergyCalibration {
+  /** 10th percentile RMS — defines "quiet" threshold */
+  quietThreshold: number;
+  /** 90th percentile RMS — defines "loud" threshold */
+  loudThreshold: number;
+}
+
+/**
+ * Auto-calibrate energy thresholds from a song's frame data.
+ * Uses percentile analysis so the full dynamic range of the recording
+ * maps to the full visual range, regardless of absolute levels.
+ *
+ * Call once per song via useMemo. Falls back to hardcoded defaults
+ * if frame data is too short.
+ */
+export function calibrateEnergy(frames: EnhancedFrameData[]): EnergyCalibration {
+  if (frames.length < 60) {
+    return { quietThreshold: 0.05, loudThreshold: 0.35 };
+  }
+
+  // Sample every 10th frame for performance (still ~900 samples for a 5-min song)
+  const samples: number[] = [];
+  for (let i = 0; i < frames.length; i += 10) {
+    samples.push(frames[i].rms);
+  }
+  samples.sort((a, b) => a - b);
+
+  const p10 = samples[Math.floor(samples.length * 0.10)];
+  const p90 = samples[Math.floor(samples.length * 0.90)];
+
+  // Clamp to reasonable range — don't let a very quiet recording
+  // map silence to "loud" or a very loud recording compress everything
+  const quietThreshold = Math.max(0.02, Math.min(0.10, p10));
+  const loudThreshold = Math.max(0.15, Math.min(0.50, p90));
+
+  return { quietThreshold, loudThreshold };
+}
+
+/**
+ * Show-level energy calibration — aggregates RMS across all songs
+ * so every song in the show uses the same energy scale.
+ *
+ * Use this when you want Morning Dew's climax and Mama Tried's
+ * gentle verses to be calibrated relative to each other, not just
+ * to themselves. Pass the result as calibration to per-song consumers.
+ *
+ * @param allFrameSets - Array of per-song EnhancedFrameData arrays
+ */
+export function calibrateEnergyGlobal(allFrameSets: EnhancedFrameData[][]): EnergyCalibration {
+  const samples: number[] = [];
+  for (const frames of allFrameSets) {
+    for (let i = 0; i < frames.length; i += 10) {
+      samples.push(frames[i].rms);
+    }
+  }
+
+  if (samples.length < 100) {
+    return { quietThreshold: 0.05, loudThreshold: 0.35 };
+  }
+
+  samples.sort((a, b) => a - b);
+  const p10 = samples[Math.floor(samples.length * 0.10)];
+  const p90 = samples[Math.floor(samples.length * 0.90)];
+
+  const quietThreshold = Math.max(0.02, Math.min(0.10, p10));
+  const loudThreshold = Math.max(0.15, Math.min(0.50, p90));
+
+  return { quietThreshold, loudThreshold };
 }

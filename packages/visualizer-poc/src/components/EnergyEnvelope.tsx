@@ -11,6 +11,7 @@
 
 import React from "react";
 import { energyToFactor } from "../utils/energy";
+import type { EnergyCalibration } from "../utils/energy";
 import type { AudioSnapshot } from "../utils/audio-reactive";
 import { detectTexture, type ClimaxModulation } from "../utils/climax-state";
 import { useShowContext } from "../data/ShowContext";
@@ -22,7 +23,19 @@ interface Props {
   climaxMod?: ClimaxModulation;
   /** Jam evolution color temperature (-1 cool to +1 warm). Only set for long jams. */
   jamColorTemp?: number;
+  /** Per-song energy calibration (auto-derived from recording percentiles) */
+  calibration?: EnergyCalibration;
 }
+
+// Venue-type vignette modifier: indoor spaces feel tighter, outdoor feels open
+const VENUE_VIGNETTE: Record<string, number> = {
+  arena:        0.03,   // gym/arena: slightly tighter (enclosed, intimate)
+  theater:      0.04,   // theater: focused, formal
+  club:         0.05,   // club: intimate, dark edges
+  ballroom:     0.03,   // ballroom: elegant enclosure
+  amphitheater: -0.02,  // outdoor: wider, open sky breathing room
+  festival:     -0.03,  // festival: wide open, bright, diffuse
+};
 
 // Per-era bloom color — matches era grade for visual cohesion
 const ERA_BLOOM: Record<string, string> = {
@@ -34,13 +47,15 @@ const ERA_BLOOM: Record<string, string> = {
 };
 const DEFAULT_BLOOM = ERA_BLOOM.classic;
 
-export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod, jamColorTemp }) => {
+export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod, jamColorTemp, calibration }) => {
   const energy = snapshot.energy;
-  const factor = energyToFactor(energy); // 0 (quiet) → 1 (loud)
+  const low = calibration?.quietThreshold;
+  const high = calibration?.loudThreshold;
+  const factor = energyToFactor(energy, low, high); // 0 (quiet) → 1 (loud)
   const showCtx = useShowContext();
 
   // Slow-moving energy for ambient systems (vignette, bloom) — drifts, doesn't pulse
-  const slowFactor = energyToFactor(snapshot.slowEnergy);
+  const slowFactor = energyToFactor(snapshot.slowEnergy, low, high);
 
   // ── Multi-field modulations (gentle — felt, not seen) ──
   // Onset: percussive attacks create mild brightness punch
@@ -61,13 +76,16 @@ export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod,
     texture === "sparse" ? -0.02 :    // ballad intros: barely restrained
     texture === "peak" ? +0.02 : 0;   // peaks: touch of saturation
 
+  // Venue-type vignette: indoor spaces (Barton Hall) feel slightly tighter
+  const venueVig = VENUE_VIGNETTE[showCtx?.venueType ?? ""] ?? 0;
+
   // Tight modulation ranges — no visible pumping, no pulsing black
   // Saturation + brightness use fast energy (responsive to dynamics)
   const saturation = 0.92 + factor * 0.12 + flatnessSaturation + textureSaturationOffset + (climaxMod?.saturationOffset ?? 0);
   const brightness = 0.96 + factor * 0.06 + onsetBrightness + (climaxMod?.brightnessOffset ?? 0);
   const contrast = 0.97 + factor * 0.06;                        // 0.97 → 1.03
   // Vignette + bloom use slow energy (drift, not pulse) — staggered from sat/brightness
-  const vignetteOpacity = 0.02 + slowFactor * 0.10 + textureVignetteBonus + (climaxMod?.vignetteOffset ?? 0);
+  const vignetteOpacity = 0.02 + slowFactor * 0.10 + textureVignetteBonus + venueVig + (climaxMod?.vignetteOffset ?? 0);
   const bloomOpacity = slowFactor * 0.10 + (climaxMod?.bloomOffset ?? 0);
 
   // Jam color temperature: warm shifts yellow, cool shifts blue (very subtle — max ±8deg)

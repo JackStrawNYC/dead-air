@@ -13,8 +13,8 @@ import { seeded } from "../utils/seededRandom";
 
 // -- Timing -----------------------------------------------------------------
 
-const DELAY = 780;            // 26s — appears after ConcertInfo fades
-const SHOW_DURATION = 420;    // 14 seconds visible
+const DELAY = 300;            // 10s — appears once, clean during music
+const SHOW_DURATION = 240;    // 8 seconds visible total (incl fades)
 const FADE_IN_FRAMES = 60;
 const FADE_OUT_FRAMES = 60;
 
@@ -57,8 +57,9 @@ export const SetlistScroll: React.FC<Props> = ({ frames, currentSong }) => {
 
   if (!inWindow) return null;
 
-  // Energy gate: setlist only during quiet passages
-  if (energy > 0.20) return null;
+  // Energy gate: setlist only during quieter passages
+  // 0.28 allows display during gentle mid-energy songs (Row Jimmy, Loser)
+  if (energy > 0.28) return null;
 
   // Fade in/out
   const fadeIn = interpolate(localFrame, [0, FADE_IN_FRAMES], [0, 1], {
@@ -93,8 +94,8 @@ export const SetlistScroll: React.FC<Props> = ({ frames, currentSong }) => {
     extrapolateRight: "clamp",
   });
 
-  // Seeded jitter for authentic handwritten feel
-  const rng = seeded(frame * 7 + (ctx?.dateSeed ?? 1977));
+  // Seeded jitter for authentic handwritten feel (static per song, not per-frame)
+  const rng = seeded((ctx?.dateSeed ?? 1977) * 313);
   const jitterX = (rng() - 0.5) * 1.2;
   const jitterY = (rng() - 0.5) * 1.2;
 
