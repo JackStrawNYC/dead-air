@@ -164,10 +164,10 @@ const CROSSFADE_FRAMES_DEFAULT = 120;
  * Dynamic range between quiet and peak creates the show's breathing rhythm.
  */
 /**
- * Overlay count per rotation window. These numbers look high but most components
- * have internal cycle timing (visible ~20% of the time). With 10 overlays at 20%
- * duty cycle, ~2 are visible at any frame — the user sees a few fun elements,
- * not a flood. The components self-manage their presence.
+ * Base overlay count per rotation window. The rotation engine adjusts upward
+ * based on duty cycle metadata — if selected overlays have low duty cycles
+ * (internal cycling), more are picked to ensure ~3 are visible at any frame.
+ * Always-on heroes are prioritized first for guaranteed visibility.
  */
 const ENERGY_COUNTS: Record<string, { min: number; max: number }> = {
   low:  { min: 4,  max: 6 },   // quiet passages: fill the visual gap
@@ -531,21 +531,46 @@ export function buildRotationSchedule(
     const selectedNames = new Set<string>();
     const usedLayers = new Set<number>();
 
-    // Hero guarantee: 2-3 Dead icons per window — they fill visual gaps
-    // With 10+ overlays per window and ~20% duty cycles, need multiple heroes
-    // to ensure at least 1 is in its "on" phase at any given frame
+    // Hero guarantee: prioritize always-on heroes first, then cycled heroes.
+    // Always-on heroes (dutyCycle 100) guarantee something is visible at every frame.
+    // Cycled heroes add variety when their internal timing aligns.
     const heroScored = scored.filter((s) => HERO_OVERLAY_NAMES.has(s.entry.name));
+    const alwaysOnHeroes = heroScored.filter((s) => (s.entry.dutyCycle ?? 50) >= 80);
+    const cycledHeroes = heroScored.filter((s) => (s.entry.dutyCycle ?? 50) < 80);
     const heroSlots = Math.min(3, Math.max(2, Math.floor(targetCount * 0.25)), heroScored.length);
-    for (let h = 0; h < heroSlots; h++) {
-      // Avoid picking from the same layer twice for visual diversity
-      const hero = heroScored.find(
-        (s) => !selectedNames.has(s.entry.name) && !usedLayers.has(s.entry.layer),
-      ) ?? heroScored.find((s) => !selectedNames.has(s.entry.name));
-      if (hero) {
+
+    // Pick at least 1 always-on hero first (guaranteed visibility)
+    let herosPicked = 0;
+    for (const hero of alwaysOnHeroes) {
+      if (herosPicked >= heroSlots) break;
+      if (!selectedNames.has(hero.entry.name) && !usedLayers.has(hero.entry.layer)) {
         selected.push(hero.entry);
         selectedNames.add(hero.entry.name);
         usedLayers.add(hero.entry.layer);
+        herosPicked++;
       }
+    }
+    // Fill remaining hero slots with cycled heroes for variety
+    for (const hero of cycledHeroes) {
+      if (herosPicked >= heroSlots) break;
+      if (!selectedNames.has(hero.entry.name) && !usedLayers.has(hero.entry.layer)) {
+        selected.push(hero.entry);
+        selectedNames.add(hero.entry.name);
+        usedLayers.add(hero.entry.layer);
+        herosPicked++;
+      }
+    }
+
+    // ── Duty-cycle-aware count adjustment ──
+    // If we're picking mostly cycled components (low duty cycle), pick more
+    // to compensate. Target: ~2-3 overlays visible at any given frame.
+    const TARGET_VISIBLE = 3;
+    const avgDutyCycle = selected.length > 0
+      ? selected.reduce((sum, e) => sum + (e.dutyCycle ?? 50), 0) / selected.length
+      : 50;
+    if (avgDutyCycle < 60 && !isDrumsSpace && !window.isDropout) {
+      const adjustedCount = Math.ceil(TARGET_VISIBLE / (avgDutyCycle / 100));
+      targetCount = Math.max(targetCount, Math.min(adjustedCount, poolEntries.length));
     }
 
     // ── Fill remaining slots with layer-diverse picks ──

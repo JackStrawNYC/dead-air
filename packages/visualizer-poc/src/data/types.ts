@@ -199,6 +199,10 @@ export interface OverlayEntry {
   weight: 1 | 2 | 3;
   /** If true, always rendered regardless of selection */
   alwaysActive?: boolean;
+  /** Approximate percentage of frames this component is visible (0-100).
+   *  100 = always renders, 20 = visible ~20% due to internal cycling.
+   *  Used by rotation engine to adjust overlay count per window. */
+  dutyCycle?: number;
 }
 
 /** Summary audio profile computed from a song's analysis frames */
