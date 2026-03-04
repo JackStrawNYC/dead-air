@@ -194,6 +194,9 @@ function scoreSections(
     // Too short for a full window
     if (sectionLen < VIDEO_DISPLAY_FRAMES + FADE_FRAMES * 2) score -= 2;
 
+    // Protect song art intro — no videos in the first 15 seconds
+    if (section.frameStart < 450) score -= 10;
+
     return { section, idx, score };
   });
 }

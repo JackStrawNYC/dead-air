@@ -161,8 +161,8 @@ export function resolveMediaForSong(
   // Build prioritized media list
   const media: ResolvedMedia[] = [];
 
-  // Priority 0: song-specific videos
-  const songVideos = songEntries.filter((e) => e.type === "video");
+  // Priority 0: song-specific videos (scene-video only — exclude bare "generated" clips)
+  const songVideos = songEntries.filter((e) => e.type === "video" && e.tags.includes("scene-video"));
   for (const v of songVideos) {
     media.push({
       src: v.path,
@@ -173,9 +173,10 @@ export function resolveMediaForSong(
     });
   }
 
-  // Priority 1: song-specific images (excluding the poster)
+  // Priority 1: song-specific images (excluding poster and generated stills)
   for (const img of songImages) {
     if (img.path === songArt) continue;
+    if (img.tags.includes("song-video-still")) continue;
     media.push({ src: img.path, mediaType: "image", priority: 1 });
   }
 
