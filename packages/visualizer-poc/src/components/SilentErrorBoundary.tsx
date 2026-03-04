@@ -28,9 +28,7 @@ export class SilentErrorBoundary extends React.Component<Props, State> {
   }
 
   componentDidCatch(error: Error) {
-    if (this.props.name) {
-      console.warn(`[SilentErrorBoundary] ${this.props.name} crashed:`, error.message);
-    }
+    console.error(`[SilentErrorBoundary] ${this.props.name ?? "unknown"} crashed: ${error.message}`);
   }
 
   render() {

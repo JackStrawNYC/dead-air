@@ -167,12 +167,12 @@ function computeColorTemperature(phase: JamPhase, progress: number): number {
 function computeDensityMult(phase: JamPhase, progress: number): number {
   switch (phase) {
     case "exploration":
-      return 0.6 + progress * 0.15;       // sparse, slowly filling
+      return 0.85 + progress * 0.10;      // gentle presence from the start
     case "building":
-      return 0.75 + progress * 0.5;       // filling steadily
+      return 0.90 + progress * 0.20;      // filling steadily
     case "peak_space":
-      return 1.25 + progress * 0.25;      // dense, maximum
+      return 1.10 + progress * 0.15;      // dense, maximum
     case "resolution":
-      return 1.5 - progress * 0.7;        // thinning back out
+      return 1.25 - progress * 0.30;      // gradual thinning
   }
 }

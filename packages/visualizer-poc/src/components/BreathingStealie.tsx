@@ -75,9 +75,9 @@ export const BreathingStealie: React.FC<Props> = ({ frames }) => {
   const chromaHue = snap.chromaHue / 360; // normalize to 0-1 for hueToHex
   const tempoFactor = useTempoFactor();
 
-  // Size: breathes with energy (300-500px)
-  const baseSize = Math.min(width, height) * 0.35;
-  const breathe = interpolate(energy, [0.03, 0.35], [0.85, 1.2], {
+  // Size: breathes with energy — subtle, not dominating
+  const baseSize = Math.min(width, height) * 0.18;
+  const breathe = interpolate(energy, [0.03, 0.35], [0.90, 1.1], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
@@ -86,8 +86,8 @@ export const BreathingStealie: React.FC<Props> = ({ frames }) => {
   // Slow rotation (tempo-scaled) + beat impulse (+2deg on beat, NOT tempo-scaled)
   const rotation = (frame / 30) * 3 * tempoFactor + snap.beatDecay * 2;
 
-  // Opacity: clearly visible, brighter on peaks
-  const opacity = interpolate(energy, [0.02, 0.3], [0.45, 0.85], {
+  // Opacity: clearly present but not dominating
+  const opacity = interpolate(energy, [0.02, 0.3], [0.30, 0.60], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });

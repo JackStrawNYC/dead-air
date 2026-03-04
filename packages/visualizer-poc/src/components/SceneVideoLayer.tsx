@@ -428,7 +428,7 @@ export const SceneVideoLayer: React.FC<SceneVideoLayerProps> = ({
 
   if (isCurated) {
     // Strong backdrop: suppress shader so video is the star
-    const backdropOpacity = fadeEnvelope * 0.75;
+    const backdropOpacity = fadeEnvelope * 0.35;
     // Media: dominant — these are the visuals the user paid for
     const mediaOpacity = fadeEnvelope * (isImage ? 0.85 : 0.92);
 
@@ -526,6 +526,17 @@ export const SceneVideoLayer: React.FC<SceneVideoLayerProps> = ({
               </Sequence>
             )}
           </div>
+          {/* Light color wash — blends curated video into overall visual flow */}
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              background: `linear-gradient(135deg, hsla(${260 + hueRotation}, 60%, 40%, 0.12) 0%, hsla(${320 + hueRotation}, 50%, 35%, 0.08) 100%)`,
+              mixBlendMode: "color",
+              opacity: fadeEnvelope,
+              pointerEvents: "none",
+            }}
+          />
         </>
       );
     }
@@ -561,6 +572,17 @@ export const SceneVideoLayer: React.FC<SceneVideoLayerProps> = ({
             windowEnd={activeWindow.frameEnd}
           />
         </div>
+        {/* Light color wash — blends curated image into overall visual flow */}
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            background: `linear-gradient(135deg, hsla(${260 + hueRotation}, 60%, 40%, 0.12) 0%, hsla(${320 + hueRotation}, 50%, 35%, 0.08) 100%)`,
+            mixBlendMode: "color",
+            opacity: fadeEnvelope,
+            pointerEvents: "none",
+          }}
+        />
       </>
     );
   }

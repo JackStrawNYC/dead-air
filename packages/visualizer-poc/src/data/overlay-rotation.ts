@@ -163,10 +163,16 @@ const CROSSFADE_FRAMES_DEFAULT = 120;
  * Quiet = 1-2 (gentle wash — always alive), peak = 3-5 (vivid but brief flood).
  * Dynamic range between quiet and peak creates the show's breathing rhythm.
  */
+/**
+ * Overlay count per rotation window. These numbers look high but most components
+ * have internal cycle timing (visible ~20% of the time). With 10 overlays at 20%
+ * duty cycle, ~2 are visible at any frame — the user sees a few fun elements,
+ * not a flood. The components self-manage their presence.
+ */
 const ENERGY_COUNTS: Record<string, { min: number; max: number }> = {
-  low:  { min: 1, max: 2 },  // gentle presence — always something to see
-  mid:  { min: 2, max: 3 },  // building visual interest
-  high: { min: 3, max: 5 },  // vivid flood at peaks
+  low:  { min: 4,  max: 6 },   // quiet passages: fill the visual gap
+  mid:  { min: 5,  max: 8 },   // moderate: a mix of elements
+  high: { min: 6,  max: 10 },  // peaks: visual energy
 };
 
 /**
@@ -179,19 +185,15 @@ const ENERGY_COUNTS: Record<string, { min: number; max: number }> = {
  * These get guaranteed slots + opacity boost. No abstract rings or centered geometry.
  */
 export const HERO_OVERLAY_NAMES = new Set([
-  // Marching parades (cross the screen)
+  // Core Dead icons — concrete, recognizable, always-render components
+  "BreathingStealie", "ThirteenPointBolt", "DeadIcons", "SkullKaleidoscope",
+  "StealYourFaceOff", "SkeletonRoses",
+  // Marching parades
   "BearParade", "SkeletonBand", "VWBusParade", "MarchingTerrapins",
-  // Parametric marching motifs
-  "DeadMotif_SkeletonMarch", "DeadMotif_BearParade", "DeadMotif_VWBusConvoy",
-  "DeadMotif_TerrapinDrift", "DeadMotif_GarciaHandDrift",
-  // Floating / flying objects
-  "HotAirBalloons", "PeaceSignShower", "RainbowArc",
-  // Explosive / celebratory
-  "Confetti", "ConfettiCannon", "Pyrotechnics", "GlowSticks",
-  // Atmospheric action
-  "Thunderhead", "LighterWave",
-  // Crowd energy
-  "CrowdEnergy_LighterWave", "CrowdEnergy_HandsUp", "CrowdEnergy_DanceFloor",
+  // Floating objects
+  "HotAirBalloons",
+  // Character overlays
+  "SkeletonCouple", "Bertha", "CosmicCharlie", "JerryGuitar",
 ]);
 
 /** Score penalty for overlays used in the previous window */
@@ -529,9 +531,11 @@ export function buildRotationSchedule(
     const selectedNames = new Set<string>();
     const usedLayers = new Set<number>();
 
-    // Hero guarantee: 1 hero in mid/high energy windows, 0 in low
+    // Hero guarantee: 2-3 Dead icons per window — they fill visual gaps
+    // With 10+ overlays per window and ~20% duty cycles, need multiple heroes
+    // to ensure at least 1 is in its "on" phase at any given frame
     const heroScored = scored.filter((s) => HERO_OVERLAY_NAMES.has(s.entry.name));
-    const heroSlots = window.energy === "low" ? 0 : Math.min(1, targetCount, heroScored.length);
+    const heroSlots = Math.min(3, Math.max(2, Math.floor(targetCount * 0.25)), heroScored.length);
     for (let h = 0; h < heroSlots; h++) {
       // Avoid picking from the same layer twice for visual diversity
       const hero = heroScored.find(
@@ -617,10 +621,9 @@ export function buildRotationSchedule(
     }
     const picked = eligible.slice(0, pickCount);
 
-    // Remove accent overlays from the window's regular rotation
-    const pickedSet = new Set(picked);
-    window.overlays = window.overlays.filter((name) => !pickedSet.has(name));
-
+    // Keep accent overlays in regular rotation — they maintain steady presence
+    // AND get beat-synced brightness flashes on top. Removing them left windows
+    // empty (hero was the only overlay → accent pulled it → 0 visible overlays).
     accentOverlays.set(wi, picked);
   }
 
@@ -813,7 +816,8 @@ export function getOverlayOpacities(
             break;
           }
         }
-        result[name] = accentOpacity;
+        // Accent boosts on top of regular rotation opacity — use max, not replace
+        result[name] = Math.max(result[name] ?? 0, accentOpacity);
       }
     }
   }

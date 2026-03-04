@@ -74,8 +74,8 @@ export const ThirteenPointBolt: React.FC<Props> = ({ frames }) => {
 
   const energy = snap.energy;
 
-  // Size: ~60% viewport height
-  const baseSize = Math.min(width, height) * 0.6;
+  // Size: accent element, not dominating
+  const baseSize = Math.min(width, height) * 0.30;
   const breathe = interpolate(energy, [0.03, 0.35], [0.9, 1.15], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
@@ -85,13 +85,13 @@ export const ThirteenPointBolt: React.FC<Props> = ({ frames }) => {
   const rotation = (frame / 30) * 2 * tempoFactor;
 
   // Opacity: energy-gated, visible even at low energy
-  const baseOpacity = interpolate(energy, [0.02, 0.3], [0.50, 0.90], {
+  const baseOpacity = interpolate(energy, [0.02, 0.3], [0.20, 0.55], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
-  // Beat flash from snap.beatDecay (replaces manual 4-frame lookback)
-  const beatFlash = snap.beatDecay * 0.3;
-  const opacity = Math.min(baseOpacity + beatFlash, 1.0);
+  // Beat flash from snap.beatDecay
+  const beatFlash = snap.beatDecay * 0.2;
+  const opacity = Math.min(baseOpacity + beatFlash, 0.65);
 
   // Colors from chroma (snap.chromaHue is 0-360, convert to 0-1)
   const chromaHue = snap.chromaHue / 360;

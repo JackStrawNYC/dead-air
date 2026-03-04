@@ -6,6 +6,7 @@ import { ChapterCard } from "./components/ChapterCard";
 import { SetBreakCard } from "./components/SetBreakCard";
 import { EndCard } from "./components/EndCard";
 import type { SetlistEntry, ShowSetlist, OverlaySchedule } from "./data/types";
+import { SELECTABLE_REGISTRY } from "./data/overlay-registry";
 import { formatDateLong } from "./data/ShowContext";
 import setlistData from "../data/setlist.json";
 import showContextData from "../data/show-context.json";
@@ -53,9 +54,22 @@ const SetBreakCardComponent = SetBreakCard as React.ComponentType<any>;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const EndCardComponent = EndCard as React.ComponentType<any>;
 
-/** Get activeOverlays for a given trackId from the schedule */
+/** Overlays that use Three.js WebGL — excluded from rotation pool because
+ *  headless rendering exhausts WebGL contexts and causes delayRender timeouts.
+ */
+const WEBGL_OVERLAYS = new Set([
+  "FluidLight_OilGlass", "FluidLight_LavaFlow", "FluidLight_Aurora",
+  "FluidLight_SmokeWisps", "FluidLight_PlasmaField", "FluidLight_InkWater",
+]);
+
+/** Get activeOverlays for a given trackId — full library available.
+ *  The rotation engine's scoring (texture, energy, layer) handles
+ *  what's appropriate per window. No need to pre-filter to 17 overlays.
+ */
 function getActiveOverlays(trackId: string): string[] | undefined {
-  return overlaySchedule?.songs[trackId]?.activeOverlays;
+  if (!overlaySchedule?.songs[trackId]) return undefined;
+  // Give the rotation engine the full selectable registry (minus WebGL overlays)
+  return SELECTABLE_REGISTRY.map((e) => e.name).filter((n) => !WEBGL_OVERLAYS.has(n));
 }
 
 /** Get per-overlay energy phase hints for a given trackId */

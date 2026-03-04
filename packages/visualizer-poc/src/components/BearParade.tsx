@@ -25,16 +25,16 @@ const BEAR_COLORS = [
   "#D500F9", // purple
 ];
 
-const NUM_BEARS = 6;
-const BEAR_SPACING = 260;    // px between bears
-const BEAR_SIZE = 200;
+const NUM_BEARS = 5;
+const BEAR_SPACING = 200;    // px between bears
+const BEAR_SIZE = 140;
 
 const MARCH_CONFIG: MarchConfig = {
-  enterThreshold: 0.12,
-  exitThreshold: 0.07,
-  sustainFrames: 30,      // ~1 second of sustained energy
-  cooldownFrames: 150,     // ~5 seconds between marches
-  marchDuration: 450,      // 15 seconds to cross
+  enterThreshold: 0.06,    // low threshold — bears should appear often
+  exitThreshold: 0.03,     // don't cut short on small energy dips
+  sustainFrames: 15,       // quick trigger
+  cooldownFrames: 300,     // 10 seconds between marches
+  marchDuration: 600,      // 20 seconds — full leisurely crossing
 };
 
 /** Single dancing bear SVG */

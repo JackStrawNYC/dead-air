@@ -115,7 +115,7 @@ export const HotAirBalloons: React.FC<Props> = ({ frames }) => {
   return (
     <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden" }}>
       {balloons.map((b, i) => {
-        const size = 150 * b.sizeScale;
+        const size = 90 * b.sizeScale;
         const balloonH = size * 1.6;
 
         // Rise: continuous wrapping. Energy increases speed.
@@ -144,7 +144,7 @@ export const HotAirBalloons: React.FC<Props> = ({ frames }) => {
               left: x - size / 2,
               top: y,
               transform: `rotate(${tilt}deg)`,
-              opacity: 0.85,
+              opacity: 0.55,
               filter: glow,
               willChange: "transform, opacity",
             }}

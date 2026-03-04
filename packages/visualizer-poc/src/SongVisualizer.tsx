@@ -103,19 +103,21 @@ function applyDensityMult(
 // ─── Song Art Phases ───
 const ART_FULL_END = 120;      // 4s at 30fps — full opacity title card
 const ART_FADE_END = 300;      // 10s — fade to background wash level
-const ART_BG_OPACITY = 0.25;   // subtle background wash — shader and overlays lead
+const ART_BG_OPACITY = 0.55;   // background wash — poster clearly visible under overlays
 
 interface SongArtProps {
   src: string;
-  /** Smooth 0-1 suppression factor: 1 = full art, 0.25 = dimmed for curated media */
+  /** Smooth 0-1 suppression factor: 1 = full art, 0.45 = dimmed for curated media */
   suppressionFactor: number;
+  /** Hue rotation in degrees (palette consistency with overlays/scene) */
+  hueRotation?: number;
 }
 
 /** Per-song poster art — the visual foundation of each song.
  *  Intro: full opacity title card (4s), then settles to background wash.
  *  Smoothly dims when curated media (images/videos) is active.
  */
-const SongArtLayer: React.FC<SongArtProps> = ({ src, suppressionFactor }) => {
+const SongArtLayer: React.FC<SongArtProps> = ({ src, suppressionFactor, hueRotation = 0 }) => {
   const frame = useCurrentFrame();
 
   // Base target: full during intro, then settle to background wash
@@ -156,6 +158,7 @@ const SongArtLayer: React.FC<SongArtProps> = ({ src, suppressionFactor }) => {
         inset: 0,
         opacity: artOpacity,
         overflow: "hidden",
+        filter: hueRotation !== 0 ? `hue-rotate(${hueRotation.toFixed(1)}deg)` : undefined,
       }}
     >
       <Img
@@ -245,6 +248,17 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
     return title.includes("drums") || title.includes("space") ||
       title === "drums / space" || title === "drums/space";
   }, [props.song.title]);
+
+  // Songs emerging from Drums/Space deserve their reveal moment — show title + poster
+  // even during a segue-in (the crowd erupting when they recognize the song)
+  const comesFromDrumsSpace = useMemo(() => {
+    if (!props.show || !props.segueIn) return false;
+    const songs = props.show.songs;
+    const idx = songs.findIndex((s) => s.trackId === props.song.trackId);
+    if (idx <= 0) return false;
+    const prev = songs[idx - 1].title.toLowerCase();
+    return prev.includes("drums") || prev.includes("space");
+  }, [props.show, props.segueIn, props.song.trackId]);
 
   // Per-song energy calibration — maps this recording's dynamic range to full visual range
   const energyCalibration = useMemo(
@@ -357,8 +371,8 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
     [f, Math.floor(frame / 30), isDrumsSpace],
   );
 
-  // Combined density multiplier: climax × jam evolution
-  const combinedDensityMult = climaxMod.overlayDensityMult * (jamEvolution.isLongJam ? jamEvolution.densityMult : 1);
+  // Combined density multiplier: climax × jam evolution (floor at 0.75 — overlays should always be visible)
+  const combinedDensityMult = Math.max(0.75, climaxMod.overlayDensityMult * (jamEvolution.isLongJam ? jamEvolution.densityMult : 1));
 
   // Apply combined density multiplier to overlay opacities
   const opacityMap = opacityMapBase
@@ -379,7 +393,8 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
   );
   const mediaActive = !!activeMediaWindow || !!activeLyricTrigger;
   const mediaCurated = activeLyricTrigger ? true : (activeMediaWindow ? activeMediaWindow.media.priority <= 1 : false);
-  const mediaSuppression = activeLyricTrigger ? 0.70 : mediaCurated ? 0.80 : mediaActive ? 0.90 : 1.0;
+  // When curated media is playing, icons yield — they fill the gaps, not compete
+  const mediaSuppression = activeLyricTrigger ? 0.15 : mediaCurated ? 0.25 : mediaActive ? 0.40 : 1.0;
 
   // Smooth suppression factor for song art — crossfades with video fade envelope
   // instead of snapping when video windows start/end
@@ -399,7 +414,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
       const envelope = Math.min(fadeIn, fadeOut);
       // Smoothstep for natural feel
       const smooth = envelope * envelope * (3 - 2 * envelope);
-      const dimTarget = isCurated ? 0.25 : 0.7;
+      const dimTarget = isCurated ? 0.60 : 0.80;
       return 1 - smooth * (1 - dimTarget);
     }
     return 1;
@@ -435,10 +450,10 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
           />
 
           {/* ═══ Layer 0.5: Per-song poster art (persistent background wash) ═══ */}
-          {/* Skip song art during segue-in — visual continuity from prev song, no jarring poster pop */}
-          {effectiveSongArt && !props.segueIn && (
+          {/* Skip song art during segue-in UNLESS emerging from Drums/Space (reveal moment) */}
+          {effectiveSongArt && (!props.segueIn || comesFromDrumsSpace) && (
             <SilentErrorBoundary name="SongArt">
-              <SongArtLayer src={staticFile(effectiveSongArt)} suppressionFactor={artSuppressionFactor} />
+              <SongArtLayer src={staticFile(effectiveSongArt)} suppressionFactor={artSuppressionFactor} hueRotation={hueRotation} />
             </SilentErrorBoundary>
           )}
 
@@ -474,7 +489,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
                 position: "absolute",
                 inset: 0,
                 opacity: (effectiveSongArt && !props.segueIn)
-                  ? interpolate(frame, [60, 120], [0, 1], {
+                  ? interpolate(frame, [ART_FADE_END, ART_FADE_END + 90], [0, 1], {
                       extrapolateLeft: "clamp",
                       extrapolateRight: "clamp",
                       easing: Easing.out(Easing.cubic),
@@ -484,10 +499,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
               }}
             >
               {activeEntries.map(([name, { Component }]) => {
-                // Hero overlays get 1.8x opacity boost so concrete animated objects
-                // (bears, bolts, balloons) are clearly visible through the opacity stack
-                const heroBoost = HERO_OVERLAY_NAMES.has(name) ? 1.8 : 1.0;
-                const overlayOpacity = Math.min(1, (opacityMap ? (opacityMap[name] ?? 0) : 1) * mediaSuppression * heroBoost);
+                const overlayOpacity = Math.min(1, (opacityMap ? (opacityMap[name] ?? 0) : 1) * mediaSuppression);
                 if (overlayOpacity < 0.01) return null; // Skip render — invisible overlays waste ~450 renders/sec
                 return (
                   <div
@@ -516,16 +528,16 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
         </EraGrade>
 
         {/* ═══ Always-active: special-prop components ═══ */}
-        {/* Suppress SongTitle during segue-in — seamless visual transition */}
-        {!props.segueIn && (
+        {/* Suppress SongTitle during segue-in UNLESS emerging from Drums/Space */}
+        {(!props.segueIn || comesFromDrumsSpace) && (
           <SongTitle
             title={props.song.title}
             setNumber={props.song.set}
             trackNumber={props.song.trackNumber}
           />
         )}
-        {/* Song DNA stats card — appears after song art settles (skip during segue-in) */}
-        {!props.segueIn && songStatsData && songStatsData[props.song.trackId] && (
+        {/* Song DNA stats card — appears after song art settles (skip during segue-in unless from Drums/Space) */}
+        {(!props.segueIn || comesFromDrumsSpace) && songStatsData && songStatsData[props.song.trackId] && (
           <SilentErrorBoundary name="SongDNA">
             <SongDNA stats={songStatsData[props.song.trackId]} />
           </SilentErrorBoundary>
