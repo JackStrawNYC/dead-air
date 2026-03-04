@@ -56,9 +56,9 @@ interface Catalog {
 
 /** Edge-case title aliases (normalized form → canonical slug) */
 const TITLE_ALIASES: Record<string, string> = {
-  "dancininthestreet": "dancinginthestreet",
-  "dancininthestreets": "dancinginthestreet",
-  "dancinginthestreets": "dancinginthestreet",
+  "dancinginthestreet": "dancininthestreet",
+  "dancinginthestreets": "dancininthestreet",
+  "dancininthestreets": "dancininthestreet",
   "fireinthemountain": "fireonthemountain",
   "birdssong": "birdsong",
   "unclejohnsband": "unclejohnsband",
@@ -179,32 +179,8 @@ export function resolveMediaForSong(
     media.push({ src: img.path, mediaType: "image", priority: 1 });
   }
 
-  // Priority 2: general videos (seeded shuffle per trackId + showSeed)
-  const generalVideos = generalEntries.filter((e) => e.type === "video");
-  const shuffledGenVids = seededShuffle(
-    generalVideos,
-    hashString(trackId) + showSeed + 7919, // salt for video pool
-  );
-  for (const v of shuffledGenVids) {
-    media.push({
-      src: v.path,
-      mediaType: "video",
-      priority: 2,
-      energyTag: extractEnergyTag(v.tags),
-      durationFrames: extractDurationFrames(v.tags),
-    });
-  }
-
-  // Priority 3: general images (seeded shuffle, different salt)
-  // Exclude SVGs — Remotion's <Img> doesn't reliably render them
-  const generalImages = generalEntries.filter((e) => e.type === "image" && !e.path.endsWith(".svg"));
-  const shuffledGenImgs = seededShuffle(
-    generalImages,
-    hashString(trackId) + showSeed + 4217, // different salt
-  );
-  for (const img of shuffledGenImgs) {
-    media.push({ src: img.path, mediaType: "image", priority: 3 });
-  }
+  // General pool videos/images excluded — they break song-specific atmosphere.
+  // Each song has 4-6 dedicated videos which is enough. The generals are filler.
 
   return { songArt, media };
 }

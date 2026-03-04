@@ -103,7 +103,7 @@ function applyDensityMult(
 // ─── Song Art Phases ───
 const ART_FULL_END = 120;      // 4s at 30fps — full opacity title card
 const ART_FADE_END = 300;      // 10s — fade to background wash level
-const ART_BG_OPACITY = 0.55;   // persistent background — song art is the visual foundation
+const ART_BG_OPACITY = 0.25;   // subtle background wash — shader and overlays lead
 
 interface SongArtProps {
   src: string;
@@ -379,7 +379,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
   );
   const mediaActive = !!activeMediaWindow || !!activeLyricTrigger;
   const mediaCurated = activeLyricTrigger ? true : (activeMediaWindow ? activeMediaWindow.media.priority <= 1 : false);
-  const mediaSuppression = activeLyricTrigger ? 0.45 : mediaCurated ? 0.55 : mediaActive ? 0.75 : 1.0;
+  const mediaSuppression = activeLyricTrigger ? 0.70 : mediaCurated ? 0.80 : mediaActive ? 0.90 : 1.0;
 
   // Smooth suppression factor for song art — crossfades with video fade envelope
   // instead of snapping when video windows start/end
@@ -474,7 +474,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
                 position: "absolute",
                 inset: 0,
                 opacity: (effectiveSongArt && !props.segueIn)
-                  ? interpolate(frame, [ART_FULL_END, ART_FULL_END + 90], [0, 1], {
+                  ? interpolate(frame, [60, 120], [0, 1], {
                       extrapolateLeft: "clamp",
                       extrapolateRight: "clamp",
                       easing: Easing.out(Easing.cubic),

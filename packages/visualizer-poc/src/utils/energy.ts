@@ -57,14 +57,9 @@ export function energyToFactor(
 }
 
 /**
- * Map smoothed energy to overlay opacity multiplier (0.05–0.85).
- * 17x dynamic range: quiet passages are nearly invisible (5% density),
- * peaks reach 85% — never fully opaque so the music always leads.
- *
- * The smoothstep transition band (0.04–0.30) is calibrated so:
- *   - Quiet tuning (energy ~0.03) → 5% (barely there — music is the show)
- *   - Mid jam (energy ~0.15)      → ~40% (subtle presence)
- *   - Peak climax (energy ~0.30+) → 85% (vivid but not overwhelming)
+ * Map smoothed energy to overlay opacity multiplier (0.40–1.0).
+ * 2.5x dynamic range: quiet passages still have clear presence (40%),
+ * peaks reach full opacity. Overlays should always be visible.
  *
  * When calibration is provided, thresholds are derived from the recording's
  * own percentile analysis, so every show maps its full dynamic range.
@@ -73,7 +68,7 @@ export function overlayEnergyFactor(energy: number, calibration?: EnergyCalibrat
   const low = calibration ? calibration.quietThreshold * 0.8 : 0.04;
   const high = calibration ? calibration.loudThreshold * 0.85 : 0.30;
   const factor = energyToFactor(energy, low, high);
-  return 0.05 + factor * 0.80;
+  return 0.40 + factor * 0.60;
 }
 
 // ─── Per-show energy calibration ───
