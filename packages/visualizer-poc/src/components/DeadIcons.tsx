@@ -482,7 +482,7 @@ export const DeadIcons: React.FC<Props> = ({ frames, baseOpacity = 1 }) => {
         const progress = age / icon.lifetime;
         const state = computeMotion(icon.motion, progress, width, height, icon.yOffset, icon.seed);
 
-        const finalOpacity = state.opacity * baseOpacity * 0.7;
+        const finalOpacity = state.opacity * baseOpacity;
         if (finalOpacity < 0.01) return null;
 
         // Cycle between two psychedelic colors over the lifetime

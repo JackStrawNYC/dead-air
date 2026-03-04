@@ -85,13 +85,13 @@ export const ThirteenPointBolt: React.FC<Props> = ({ frames }) => {
   const rotation = (frame / 30) * 2 * tempoFactor;
 
   // Opacity: energy-gated, visible even at low energy
-  const baseOpacity = interpolate(energy, [0.02, 0.3], [0.25, 0.80], {
+  const baseOpacity = interpolate(energy, [0.02, 0.3], [0.50, 0.90], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
   // Beat flash from snap.beatDecay (replaces manual 4-frame lookback)
   const beatFlash = snap.beatDecay * 0.3;
-  const opacity = Math.min(baseOpacity + beatFlash, 0.95);
+  const opacity = Math.min(baseOpacity + beatFlash, 1.0);
 
   // Colors from chroma (snap.chromaHue is 0-360, convert to 0-1)
   const chromaHue = snap.chromaHue / 360;

@@ -86,8 +86,8 @@ export const BreathingStealie: React.FC<Props> = ({ frames }) => {
   // Slow rotation (tempo-scaled) + beat impulse (+2deg on beat, NOT tempo-scaled)
   const rotation = (frame / 30) * 3 * tempoFactor + snap.beatDecay * 2;
 
-  // Opacity: always visible but brighter on peaks
-  const opacity = interpolate(energy, [0.02, 0.3], [0.08, 0.3], {
+  // Opacity: clearly visible, brighter on peaks
+  const opacity = interpolate(energy, [0.02, 0.3], [0.45, 0.85], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });

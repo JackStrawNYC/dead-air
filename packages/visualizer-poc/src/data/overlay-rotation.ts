@@ -20,7 +20,7 @@
  */
 import type { SectionBoundary, OverlayEntry, EnhancedFrameData, OverlayPhaseHint } from "./types";
 import { OVERLAY_BY_NAME, ALWAYS_ACTIVE } from "./overlay-registry";
-import { computeSmoothedEnergy, overlayEnergyFactor } from "../utils/energy";
+import { computeSmoothedEnergy } from "../utils/energy";
 import type { EnergyCalibration } from "../utils/energy";
 import { detectTexture } from "../utils/climax-state";
 import { computeAudioSnapshot } from "../utils/audio-reactive";
@@ -127,9 +127,9 @@ const ACCENT_ELIGIBLE = new Set([
 
 /** Energy-dependent accent tuning */
 const ACCENT_CONFIG: Record<string, AccentConfig | null> = {
-  high: { onsetThreshold: 0.30, peakOpacity: 0.85, decayFrames: 18 },
-  mid:  { onsetThreshold: 0.40, peakOpacity: 0.50, decayFrames: 12 },
-  low:  { onsetThreshold: 0.55, peakOpacity: 0.25, decayFrames: 8 },  // gentle pulse, not dead
+  high: { onsetThreshold: 0.25, peakOpacity: 1.0,  decayFrames: 24 },
+  mid:  { onsetThreshold: 0.35, peakOpacity: 0.80, decayFrames: 18 },
+  low:  { onsetThreshold: 0.45, peakOpacity: 0.50, decayFrames: 12 },
 };
 
 // ─── Constants ───
@@ -164,9 +164,9 @@ const CROSSFADE_FRAMES_DEFAULT = 120;
  * Dynamic range between quiet and peak creates the show's breathing rhythm.
  */
 const ENERGY_COUNTS: Record<string, { min: number; max: number }> = {
-  low:  { min: 0, max: 0 },  // nothing — music is the show
-  mid:  { min: 0, max: 1 },  // at most 1
-  high: { min: 1, max: 2 },  // restrained at peaks
+  low:  { min: 1, max: 2 },  // gentle presence — always something to see
+  mid:  { min: 2, max: 3 },  // building visual interest
+  high: { min: 3, max: 5 },  // vivid flood at peaks
 };
 
 /**
@@ -818,20 +818,8 @@ export function getOverlayOpacities(
     }
   }
 
-  // ─── Energy-based overlay breathing ───
-  // 10x dynamic range: quiet passages at 10% density, peaks at 100%.
-  // This is the single biggest factor in making peaks feel earned.
-  if (frames && frames.length > 0) {
-    const energyIdx = Math.min(Math.max(0, frame), frames.length - 1);
-    const energy = computeSmoothedEnergy(frames, energyIdx);
-    const opacityFactor = overlayEnergyFactor(energy, calibration);
-    const alwaysActiveSet = new Set(schedule.alwaysActive);
-    for (const name of Object.keys(result)) {
-      if (!alwaysActiveSet.has(name)) {
-        result[name] *= opacityFactor;
-      }
-    }
-  }
+  // Energy breathing removed — SongVisualizer already applies overlayEnergyFactor
+  // via mediaSuppression. Double-applying crushed overlays to <2% opacity.
 
   return result;
 }

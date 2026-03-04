@@ -172,7 +172,7 @@ export const SkeletonBand: React.FC<Props> = ({ frames }) => {
 
   const fadeIn = interpolate(progress, [0, 0.06], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
   const fadeOut = interpolate(progress, [0.94, 1], [1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-  const opacity = Math.min(fadeIn, fadeOut) * interpolate(energy, [0.06, 0.2], [0.5, 0.95], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const opacity = Math.min(fadeIn, fadeOut) * interpolate(energy, [0.06, 0.2], [0.70, 1.0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
 
   const totalWidth = SKELETONS.length * SKELETON_SPACING;
   const yBase = height * 0.35; // mid-screen
