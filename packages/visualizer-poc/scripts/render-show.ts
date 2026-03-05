@@ -144,12 +144,27 @@ function ensureBundle(): string {
 function preflight(songs: SetlistEntry[], tracks: TimelineTrack[]): void {
   console.log("\nPre-flight validation ...");
   const errors: string[] = [];
+  const warnings: string[] = [];
 
   for (const song of songs) {
-    // Check analysis JSON
+    // Check analysis JSON exists and has valid structure
     const analysisPath = join(TRACKS_DIR, `${song.trackId}-analysis.json`);
     if (!existsSync(analysisPath)) {
       errors.push(`Missing analysis: ${analysisPath}`);
+    } else {
+      // Spot-check: verify meta.totalFrames matches frames array length
+      try {
+        const raw = JSON.parse(readFileSync(analysisPath, "utf-8"));
+        if (raw.meta && raw.frames) {
+          if (raw.meta.totalFrames !== raw.frames.length) {
+            warnings.push(
+              `Frame count mismatch: ${song.trackId} — meta says ${raw.meta.totalFrames}, got ${raw.frames.length} frames`,
+            );
+          }
+        }
+      } catch {
+        errors.push(`Unparseable analysis: ${song.trackId}`);
+      }
     }
 
     // Check audio file
@@ -158,17 +173,25 @@ function preflight(songs: SetlistEntry[], tracks: TimelineTrack[]): void {
       errors.push(`Missing audio: ${audioPath}`);
     }
 
-    // Check timeline entry
+    // Check timeline entry and frame count consistency
     const track = tracks.find((t) => t.trackId === song.trackId);
     if (!track || track.missing) {
       errors.push(`Missing timeline entry: ${song.trackId} (run analyze_show.py)`);
+    } else if (track.totalFrames === 0) {
+      errors.push(`Zero frames: ${song.trackId} — analysis may have failed`);
     }
+  }
+
+  if (warnings.length > 0) {
+    console.warn("\n  Warnings:");
+    for (const w of warnings) console.warn(`    ! ${w}`);
   }
 
   if (errors.length > 0) {
     console.error("\nPRE-FLIGHT FAILED — missing assets:\n");
     for (const e of errors) console.error(`  ✗ ${e}`);
-    console.error(`\n${errors.length} error(s). Fix these before rendering.\n`);
+    console.error(`\n${errors.length} error(s). Fix these before rendering.`);
+    console.error(`Tip: run 'npx tsx scripts/validate-pipeline.ts' for full diagnostics.\n`);
     process.exit(1);
   }
 

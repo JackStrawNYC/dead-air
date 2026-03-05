@@ -14,6 +14,8 @@
     "render:climax": "npx remotion render src/entry.ts MorningDew out/test-climax.mp4 --props=data/morning-dew-analysis.json --frames=23200-24100 --gl=angle",
     "render:show": "npx tsx scripts/render-show.ts",
     "render:show:resume": "npx tsx scripts/render-show.ts --resume",
+    "validate": "npx tsx scripts/validate-pipeline.ts",
+    "validate:verbose": "npx tsx scripts/validate-pipeline.ts --verbose",
     "build": "tsc --noEmit",
     "type-check": "tsc --noEmit",
     "test": "vitest run",
