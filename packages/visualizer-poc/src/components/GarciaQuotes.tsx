@@ -8,24 +8,10 @@ import React from "react";
 import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
 import { seeded } from "../utils/seededRandom";
+import { BAND_CONFIG } from "../data/band-config";
 
-const QUOTES = [
-  "Somebody has to do something, and it's just incredibly pathetic that it has to be us.",
-  "You do not merely want to be considered just the best of the best. You want to be considered the only ones who do what you do.",
-  "What we do is as American as lynch mobs. America has always been a complex place.",
-  "I read somewhere that 77 percent of all the mentally ill live in poverty. Actually, I'm more intrigued by the 23 percent who are apparently doing quite well for themselves.",
-  "The feeling I get when I play music is something I can't get any other way.",
-  "We're like licorice. Not everybody likes licorice, but the people who like licorice really like licorice.",
-  "I'm not trying to be anything. I'm just trying to play music.",
-  "Too much of a good thing is just about right.",
-  "It's not enough to be the best at what you do. You have to be perceived as the only one who does what you do.",
-  "I don't know why, the Grateful Dead is like bad beer or something. It's like an acquired taste.",
-  "For me, the lame part of the sixties was the political part. The cool part was the spiritual part.",
-  "The world is getting weirder every day. It's up to us to make it work.",
-  "Music is the doorway that has led me to drawing, painting, and sculpting.",
-  "I think it's too bad that everybody's decided to turn on drugs. I think drugs have been very useful to me.",
-  "There is no shortcut to anywhere worth going.",
-];
+// Quotes from band config — portable across artists
+const QUOTES = BAND_CONFIG.quotes.map((q) => q.text);
 
 const INITIAL_DELAY = 2400; // 80s — deep enough to feel earned
 const CYCLE = 999999;       // once per song
@@ -116,7 +102,7 @@ export const GarciaQuotes: React.FC<Props> = ({ frames }) => {
             letterSpacing: 2,
           }}
         >
-          — JERRY GARCIA
+          — {BAND_CONFIG.musicians[0]?.toUpperCase() ?? "UNKNOWN"}
         </div>
       </div>
     </div>

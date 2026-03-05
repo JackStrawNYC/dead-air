@@ -9,32 +9,10 @@ import type { EnhancedFrameData } from "../data/types";
 import { seeded } from "../utils/seededRandom";
 import { useShowContext } from "../data/ShowContext";
 import { useAudioSnapshot } from "./parametric/audio-helpers";
+import { BAND_CONFIG } from "../data/band-config";
 
-// Pre-1977 Dead lyrics only — no anachronistic songs for '77 shows
-const LYRICS = [
-  "What a long strange trip it's been",
-  "Ripple in still water",
-  "Once in a while you get shown the light",
-  "Shall we go, you and I, while we can?",
-  "Nothing left to do but smile, smile, smile",
-  "Driving that train, high on cocaine",
-  "Wake up to find out that you are the eyes of the world",
-  "Let there be songs to fill the air",
-  "If I knew the way, I would take you home",
-  "Without love in the dream it will never come true",
-  "Sometimes the light's all shining on me",
-  "Such a long long time to be gone, and a short time to be there",
-  "Believe it if you need it, if you don't just pass it on",
-  "Into the closing of my mind",
-  "Let it be known there is a fountain that was not made by the hands of men",
-  "Going where the wind don't blow so strange",
-  "There is a road, no simple highway",
-  "In the land of the dark the ship of the sun is drawn by the Grateful Dead",
-  "Comes a time when the blind man takes your hand",
-  "The bus came by and I got on, that's when it all began",
-  "Ain't no time to hate, barely time to wait",
-  "Saint Stephen with a rose, in and out of the garden he goes",
-];
+// Lyrics from band config — portable across artists
+const LYRICS = BAND_CONFIG.lyrics;
 
 const CYCLE = 1350; // 45 seconds
 const DURATION = 180; // 6 seconds

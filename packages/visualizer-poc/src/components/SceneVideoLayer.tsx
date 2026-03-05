@@ -25,25 +25,14 @@ import { seeded } from "../utils/seededRandom";
 import { energyToFactor, computeSmoothedEnergy } from "../utils/energy";
 import { detectTexture } from "../utils/climax-state";
 import { computeAudioSnapshot } from "../utils/audio-reactive";
+import { hashString } from "../utils/hash";
+import { smoothstep } from "../utils/math";
 
 const VIDEO_DISPLAY_FRAMES = 600; // 20 seconds at 30fps
 const FADE_FRAMES = 150;          // 5-second smoothstep fade in/out
 const CURATED_FADE_FRAMES = 90;   // 3-second fade for curated media
 const VIDEO_CROSSFADE = 90;       // 3-second crossfade between still and video
 const VIDEO_DURATION_FRAMES = 450; // 15 seconds — generated video length
-
-function hashString(str: string): number {
-  let hash = 5381;
-  for (let i = 0; i < str.length; i++) {
-    hash = ((hash << 5) + hash + str.charCodeAt(i)) | 0;
-  }
-  return Math.abs(hash);
-}
-
-function smoothstep(edge0: number, edge1: number, x: number): number {
-  const t = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)));
-  return t * t * (3 - 2 * t);
-}
 
 // ─── Unified media item for scheduling ───
 

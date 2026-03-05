@@ -11,6 +11,7 @@
 
 import type { EnhancedFrameData, SectionBoundary } from "../data/types";
 import { gaussianSmooth, type AudioSnapshot } from "./audio-reactive";
+import { smoothstepSimple as smoothstep, lerp } from "./math";
 
 // ─── Types ───
 
@@ -30,18 +31,6 @@ export interface ClimaxModulation {
   vignetteOffset: number;
   bloomOffset: number;
   overlayDensityMult: number;
-}
-
-// ─── Smoothstep ───
-
-function smoothstep(t: number): number {
-  const c = Math.max(0, Math.min(1, t));
-  return c * c * (3 - 2 * c);
-}
-
-/** Linear interpolation */
-function lerp(a: number, b: number, t: number): number {
-  return a + (b - a) * t;
 }
 
 // ─── Phase Detection ───

@@ -14,7 +14,8 @@
  * No React hooks, no side effects, no imports from Remotion.
  */
 
-import { seeded } from "../utils/seededRandom";
+import { seeded, seededShuffle } from "../utils/seededRandom";
+import { hashString } from "../utils/hash";
 
 // ─── Types ───
 
@@ -74,25 +75,7 @@ function normalizeForMatch(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
-// ─── Seeded Shuffle ───
-
-function hashString(str: string): number {
-  let hash = 5381;
-  for (let i = 0; i < str.length; i++) {
-    hash = ((hash << 5) + hash + str.charCodeAt(i)) | 0;
-  }
-  return Math.abs(hash);
-}
-
-function seededShuffle<T>(arr: T[], seed: number): T[] {
-  const result = [...arr];
-  const rng = seeded(seed);
-  for (let i = result.length - 1; i > 0; i--) {
-    const j = Math.floor(rng() * (i + 1));
-    [result[i], result[j]] = [result[j], result[i]];
-  }
-  return result;
-}
+// ─── Seeded Shuffle (imported from utils/seededRandom) ───
 
 // ─── Tag extraction helpers ───
 

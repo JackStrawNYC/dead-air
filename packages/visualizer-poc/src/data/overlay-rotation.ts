@@ -24,24 +24,9 @@ import { computeSmoothedEnergy } from "../utils/energy";
 import type { EnergyCalibration } from "../utils/energy";
 import { detectTexture } from "../utils/climax-state";
 import { computeAudioSnapshot } from "../utils/audio-reactive";
-
-// ─── Deterministic PRNG (same pattern as overlay-selector.ts) ───
-
-function seededRandom(seed: number): () => number {
-  let s = seed;
-  return () => {
-    s = (s * 16807 + 0) % 2147483647;
-    return (s - 1) / 2147483646;
-  };
-}
-
-function hashString(str: string): number {
-  let hash = 5381;
-  for (let i = 0; i < str.length; i++) {
-    hash = ((hash << 5) + hash + str.charCodeAt(i)) | 0;
-  }
-  return Math.abs(hash);
-}
+import { seededLCG as seededRandom } from "../utils/seededRandom";
+import { hashString } from "../utils/hash";
+import { smoothstep } from "../utils/math";
 
 // ─── Types ───
 
@@ -288,12 +273,7 @@ const POST_PEAK_TAG_BONUS: Record<string, number> = {
   intense:       -0.15,
 };
 
-// ─── smoothstep for crossfades ───
-
-function smoothstep(edge0: number, edge1: number, x: number): number {
-  const t = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)));
-  return t * t * (3 - 2 * t);
-}
+// smoothstep imported from ../utils/math
 
 /** Parse set number from trackId format "s{set}t{track}" */
 function parseSetNumber(trackId: string): number {

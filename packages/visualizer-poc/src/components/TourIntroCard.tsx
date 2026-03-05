@@ -8,6 +8,7 @@
 
 import React from "react";
 import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
+import { BAND_CONFIG } from "../data/band-config";
 
 const FADE_IN = 60;    // 2s
 const HOLD = 120;      // 4s
@@ -28,7 +29,7 @@ export const TourIntroCard: React.FC<TourIntroCardProps> = ({
   tourName,
   dateRange,
   showCount,
-  bandName = "Grateful Dead",
+  bandName = BAND_CONFIG.bandName,
 }) => {
   const { width, height } = useVideoConfig();
   const frame = useCurrentFrame();

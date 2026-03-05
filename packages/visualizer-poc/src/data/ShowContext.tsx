@@ -6,6 +6,8 @@
 
 import React, { createContext, useContext, useMemo } from "react";
 import type { ShowSetlist } from "./types";
+import { hashString } from "../utils/hash";
+import { BAND_CONFIG } from "./band-config";
 
 // ─── Date formatting ───
 
@@ -38,14 +40,7 @@ export function dateSeed(iso: string): number {
 
 // ─── Show-level seed ───
 
-/** djb2 hash for strings → positive integer */
-export function hashString(str: string): number {
-  let hash = 5381;
-  for (let i = 0; i < str.length; i++) {
-    hash = ((hash << 5) + hash + str.charCodeAt(i)) | 0;
-  }
-  return Math.abs(hash);
-}
+// hashString imported from ../utils/hash (single source of truth)
 
 /** Derive a show-level PRNG seed from date + venue. Stable across runs. */
 export function deriveShowSeed(date: string, venue: string): number {
@@ -129,7 +124,7 @@ export const ShowContextProvider: React.FC<ProviderProps> = ({ show, children })
   const value = useMemo<ShowContextValue | null>(() => {
     if (!show) return null;
     return {
-      bandName: show.bandName ?? "Grateful Dead",
+      bandName: show.bandName ?? BAND_CONFIG.bandName,
       venue: show.venue,
       venueShort: venueShort(show.venue),
       venueLocation: venueLocation(show.venue),

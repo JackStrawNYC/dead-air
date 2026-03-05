@@ -6,16 +6,8 @@
 
 import React from "react";
 import { useCurrentFrame } from "remotion";
-import { LiquidLightScene } from "./LiquidLightScene";
-import { ParticleNebulaScene } from "./ParticleNebulaScene";
-import { ConcertLightingScene } from "./ConcertLightingScene";
-import { LoFiGrainScene } from "./LoFiGrainScene";
-import { StarkMinimalScene } from "./StarkMinimalScene";
-import { OilProjectorScene } from "./OilProjectorScene";
-import { TieDyeScene } from "./TieDyeScene";
-import { CosmicDustScene } from "./CosmicDustScene";
-import { VintageFilmScene } from "./VintageFilmScene";
 import { SceneCrossfade } from "./SceneCrossfade";
+import { renderScene, getComplement, getModesForEnergy } from "./scene-registry";
 import type {
   EnhancedFrameData,
   SectionBoundary,
@@ -23,28 +15,12 @@ import type {
   SetlistEntry,
   ColorPalette,
 } from "../data/types";
+import { seededLCG as seededRandom } from "../utils/seededRandom";
 
 const CROSSFADE_FRAMES = 90; // 3 seconds at 30fps (default when no beat found)
 const BEAT_CROSSFADE_FRAMES = 60; // 2 seconds when beat-synced (30 before + 30 after)
 
-// Auto-variety: complementary modes for each default mode.
-// When a long song lacks sectionOverrides, alternate sections get a contrasting shader.
-const COMPLEMENT_MODES: Record<VisualMode, VisualMode> = {
-  liquid_light: "oil_projector",
-  oil_projector: "liquid_light",
-  concert_lighting: "lo_fi_grain",
-  lo_fi_grain: "concert_lighting",
-  particle_nebula: "cosmic_dust",
-  stark_minimal: "liquid_light",
-  tie_dye: "vintage_film",
-  cosmic_dust: "particle_nebula",
-  vintage_film: "tie_dye",
-};
-
-// Energy-appropriate mode pools — seed selects from these
-const HIGH_ENERGY_MODES: VisualMode[] = ["concert_lighting", "tie_dye", "liquid_light", "oil_projector"];
-const MID_ENERGY_MODES: VisualMode[] = ["liquid_light", "oil_projector", "vintage_film", "lo_fi_grain"];
-const LOW_ENERGY_MODES: VisualMode[] = ["cosmic_dust", "particle_nebula", "stark_minimal", "vintage_film"];
+// Complement modes and energy pools are now in scene-registry.ts
 
 // Minimum section duration (in frames) to qualify for auto-variety
 const AUTO_VARIETY_MIN_SECTION = 7200; // 4 minutes at 30fps
@@ -83,15 +59,6 @@ interface Props {
   seed?: number;
 }
 
-/** Simple deterministic PRNG */
-function seededRandom(seed: number): () => number {
-  let s = seed;
-  return () => {
-    s = (s * 16807 + 0) % 2147483647;
-    return (s - 1) / 2147483646;
-  };
-}
-
 /** Determine the visual mode for a given section index.
  *  Priority: explicit sectionOverrides > seeded variation > auto-variety for long songs > defaultMode.
  */
@@ -111,9 +78,7 @@ function getModeForSection(
     const section = sections[sectionIndex];
     if (section) {
       const energy = section.energy;
-      const pool = energy === "high" ? HIGH_ENERGY_MODES
-        : energy === "low" ? LOW_ENERGY_MODES
-        : MID_ENERGY_MODES;
+      const pool = getModesForEnergy(energy);
       const rng = seededRandom(seed + sectionIndex * 7919);
       const idx = Math.floor(rng() * pool.length);
       return pool[idx];
@@ -129,14 +94,14 @@ function getModeForSection(
 
     // Only auto-vary for songs >6min total with sections >4min
     if (totalLen > 10800 && sectionLen > AUTO_VARIETY_MIN_SECTION && sectionIndex % 2 === 1) {
-      return COMPLEMENT_MODES[song.defaultMode] ?? song.defaultMode;
+      return getComplement(song.defaultMode);
     }
   }
 
   return song.defaultMode;
 }
 
-/** Render a scene for a given mode */
+/** Render a scene for a given mode (delegates to scene registry) */
 function renderMode(
   mode: VisualMode,
   frames: EnhancedFrameData[],
@@ -145,28 +110,7 @@ function renderMode(
   tempo?: number,
   style?: React.CSSProperties,
 ): React.ReactNode {
-  switch (mode) {
-    case "liquid_light":
-      return <LiquidLightScene frames={frames} sections={sections} palette={palette} tempo={tempo} style={style} />;
-    case "particle_nebula":
-      return <ParticleNebulaScene frames={frames} sections={sections} palette={palette} tempo={tempo} style={style} />;
-    case "concert_lighting":
-      return <ConcertLightingScene frames={frames} sections={sections} palette={palette} tempo={tempo} style={style} />;
-    case "lo_fi_grain":
-      return <LoFiGrainScene frames={frames} sections={sections} palette={palette} tempo={tempo} style={style} />;
-    case "stark_minimal":
-      return <StarkMinimalScene frames={frames} sections={sections} palette={palette} tempo={tempo} style={style} />;
-    case "oil_projector":
-      return <OilProjectorScene frames={frames} sections={sections} palette={palette} tempo={tempo} style={style} />;
-    case "tie_dye":
-      return <TieDyeScene frames={frames} sections={sections} palette={palette} tempo={tempo} style={style} />;
-    case "cosmic_dust":
-      return <CosmicDustScene frames={frames} sections={sections} palette={palette} tempo={tempo} style={style} />;
-    case "vintage_film":
-      return <VintageFilmScene frames={frames} sections={sections} palette={palette} tempo={tempo} style={style} />;
-    default:
-      return <LiquidLightScene frames={frames} sections={sections} palette={palette} tempo={tempo} style={style} />;
-  }
+  return renderScene(mode, { frames, sections, palette, tempo, style });
 }
 
 export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, seed }) => {

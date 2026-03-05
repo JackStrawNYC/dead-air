@@ -76,22 +76,9 @@ export function pushHistory(history: OverlayHistory, overlays: string[]): Overla
   return { recentSongs, frequency, songCount: history.songCount + 1 };
 }
 
-// ─── Deterministic PRNG ───
-function seededRandom(seed: number): () => number {
-  let s = seed;
-  return () => {
-    s = (s * 16807 + 0) % 2147483647;
-    return (s - 1) / 2147483646;
-  };
-}
-
-function hashString(str: string): number {
-  let hash = 5381;
-  for (let i = 0; i < str.length; i++) {
-    hash = ((hash << 5) + hash + str.charCodeAt(i)) | 0;
-  }
-  return Math.abs(hash);
-}
+// ─── Deterministic PRNG + Hashing (shared utils) ───
+import { seededLCG as seededRandom } from "../utils/seededRandom";
+import { hashString } from "../utils/hash";
 
 // ─── Song Profiling ───
 

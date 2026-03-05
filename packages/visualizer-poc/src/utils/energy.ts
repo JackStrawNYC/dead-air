@@ -10,6 +10,7 @@
  */
 
 import type { EnhancedFrameData } from "../data/types";
+import { smoothstep } from "./math";
 
 /**
  * Gaussian-weighted RMS energy over ±window frames (~5s at default 150).
@@ -34,14 +35,6 @@ export function computeSmoothedEnergy(
   }
 
   return weightSum > 0 ? sum / weightSum : 0;
-}
-
-/**
- * Hermite smoothstep: maps x from [edge0, edge1] to [0, 1].
- */
-function smoothstep(edge0: number, edge1: number, x: number): number {
-  const t = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)));
-  return t * t * (3 - 2 * t);
 }
 
 /**

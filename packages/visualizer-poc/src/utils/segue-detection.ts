@@ -6,6 +6,7 @@
  */
 
 import type { SetlistEntry } from '../data/types';
+import { BAND_CONFIG } from '../data/band-config';
 
 export interface SegueChain {
   /** Index of first song in the chain */
@@ -18,19 +19,8 @@ export interface SegueChain {
   sacred: boolean;
 }
 
-/** Well-known Dead segue pairings that deserve special visual treatment */
-const SACRED_SEGUES: string[][] = [
-  ['Scarlet Begonias', 'Fire on the Mountain'],
-  ['St. Stephen', 'Not Fade Away'],
-  ['China Cat Sunflower', 'I Know You Rider'],
-  ['Playing in the Band', "Uncle John's Band"],
-  ['Help on the Way', 'Slipknot!', "Franklin's Tower"],
-  ['The Other One', 'Wharf Rat'],
-  ['Estimated Prophet', 'Eyes of the World'],
-  ['Drums', 'Space'],
-  ['Drums / Space', 'Morning Dew'],
-  ['Not Fade Away', 'Going Down the Road Feeling Bad'],
-];
+/** Well-known segue pairings that deserve special visual treatment (from band config) */
+const SACRED_SEGUES: string[][] = BAND_CONFIG.sacredSegues;
 
 /**
  * Detect segue chains from the setlist.
