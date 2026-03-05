@@ -1,17 +1,20 @@
 /**
- * Overlay Registry — static metadata for all overlay components.
+ * Overlay Registry — curated metadata for all overlay components.
  * Used by the overlay selector to score and pick overlays per song.
  *
  * Layer assignments match the rendering order in SongVisualizer.tsx:
  *   1=Atmospheric, 2=Sacred/Center, 3=Reactive, 4=Geometric/Physics,
  *   5=Nature/Cosmic, 6=Character, 7=Frame/Info (artifact), 8=Typography (info),
  *   9=HUD, 10=Distortion
+ *
+ * Curated 2026-03-05: 163 filler overlays removed (see OVERLAY-AUDIT.md).
+ * Component files are preserved — any overlay can be restored by re-adding
+ * its registry entry here.
  */
 import type { OverlayEntry } from "./types";
 
 export const OVERLAY_REGISTRY: OverlayEntry[] = [
-  // ═══ Layer 1: Atmospheric backgrounds ═══
-  // dutyCycle: percentage of frames where component is visible (100 = always on)
+  // ═══ Layer 1: Atmospheric backgrounds (22) ═══
   { name: "CosmicStarfield",  layer: 1, category: "atmospheric", tags: ["cosmic", "contemplative"],       energyBand: "low",  weight: 1, dutyCycle: 100 },
   { name: "TieDyeWash",       layer: 1, category: "atmospheric", tags: ["psychedelic", "dead-culture"],    energyBand: "any",  weight: 1, dutyCycle: 100 },
   { name: "LavaLamp",         layer: 1, category: "atmospheric", tags: ["psychedelic", "retro"],           energyBand: "mid",  weight: 1, dutyCycle: 100 },
@@ -19,17 +22,11 @@ export const OVERLAY_REGISTRY: OverlayEntry[] = [
   { name: "AuroraBorealis",   layer: 1, category: "atmospheric", tags: ["cosmic", "organic"],             energyBand: "low",  weight: 1, dutyCycle: 100 },
   { name: "Fireflies",        layer: 1, category: "atmospheric", tags: ["organic", "contemplative"],      energyBand: "low",  weight: 1, dutyCycle: 100 },
   { name: "OilSlick",         layer: 1, category: "atmospheric", tags: ["psychedelic", "organic"],         energyBand: "mid",  weight: 1 },
-  { name: "OceanWaves",       layer: 1, category: "atmospheric", tags: ["aquatic", "organic"],            energyBand: "low",  weight: 1 },
-  { name: "PollenDrift",      layer: 1, category: "atmospheric", tags: ["organic", "contemplative"],      energyBand: "low",  weight: 1 },
   { name: "NebulaCloud",      layer: 1, category: "atmospheric", tags: ["cosmic"],                        energyBand: "low",  weight: 1 },
-  { name: "Snowfall",         layer: 1, category: "atmospheric", tags: ["organic", "contemplative"],      energyBand: "low",  weight: 1 },
   { name: "Sandstorm",        layer: 1, category: "atmospheric", tags: ["intense", "organic"],            energyBand: "high", weight: 2 },
-  { name: "Pointillism",      layer: 1, category: "atmospheric", tags: ["retro", "contemplative"],        energyBand: "low",  weight: 1 },
   { name: "CampfireSparks",   layer: 1, category: "atmospheric", tags: ["organic", "festival"],           energyBand: "mid",  weight: 1 },
   { name: "CandleFlicker",    layer: 1, category: "atmospheric", tags: ["contemplative", "organic"],      energyBand: "low",  weight: 1 },
   { name: "GodRays",          layer: 1, category: "atmospheric", tags: ["cosmic", "contemplative"],       energyBand: "mid",  weight: 1 },
-  { name: "Caustics",         layer: 1, category: "atmospheric", tags: ["aquatic", "psychedelic"],         energyBand: "mid",  weight: 1 },
-  { name: "WaterfallMist",    layer: 1, category: "atmospheric", tags: ["aquatic", "organic"],            energyBand: "mid",  weight: 1 },
   { name: "HookahSmoke",      layer: 1, category: "atmospheric", tags: ["psychedelic", "dead-culture"],    energyBand: "low",  weight: 1 },
   { name: "FogMachine",       layer: 1, category: "atmospheric", tags: ["festival", "psychedelic"],        energyBand: "mid",  weight: 1 },
   { name: "VaporTrails",      layer: 1, category: "atmospheric", tags: ["cosmic", "psychedelic"],          energyBand: "mid",  weight: 1 },
@@ -37,21 +34,13 @@ export const OVERLAY_REGISTRY: OverlayEntry[] = [
   { name: "SpiritWisps",      layer: 1, category: "atmospheric", tags: ["cosmic", "contemplative"],       energyBand: "low",  weight: 1 },
   { name: "ZenRipples",       layer: 1, category: "atmospheric", tags: ["contemplative", "aquatic"],       energyBand: "low",  weight: 1 },
   { name: "TreeSilhouette",   layer: 1, category: "atmospheric", tags: ["organic", "contemplative"],      energyBand: "low",  weight: 1 },
-  { name: "MountainRange",    layer: 1, category: "atmospheric", tags: ["organic", "contemplative"],      energyBand: "low",  weight: 1 },
-  { name: "CitySkyline",      layer: 1, category: "atmospheric", tags: ["retro", "contemplative"],        energyBand: "low",  weight: 1 },
-  { name: "RainbowArc",       layer: 1, category: "atmospheric", tags: ["psychedelic", "cosmic"],          energyBand: "mid",  weight: 1 },
-  { name: "FrostCrystals",    layer: 1, category: "atmospheric", tags: ["organic", "contemplative"],      energyBand: "low",  weight: 1 },
-  { name: "HeatShimmer",      layer: 1, category: "atmospheric", tags: ["intense", "organic"],            energyBand: "mid",  weight: 1 },
-  { name: "DesertMirage",     layer: 1, category: "atmospheric", tags: ["psychedelic", "organic"],         energyBand: "mid",  weight: 1 },
-  { name: "IcebergFloat",     layer: 1, category: "atmospheric", tags: ["aquatic", "contemplative"],       energyBand: "low",  weight: 1 },
   { name: "NorthernLights",   layer: 1, category: "atmospheric", tags: ["cosmic", "psychedelic"],          energyBand: "low",  weight: 1 },
-  { name: "Topography",       layer: 1, category: "atmospheric", tags: ["organic", "retro"],              energyBand: "low",  weight: 1 },
   { name: "FestivalTent",     layer: 1, category: "atmospheric", tags: ["festival", "dead-culture"],       energyBand: "mid",  weight: 1 },
+  { name: "RainbowArc",       layer: 1, category: "atmospheric", tags: ["psychedelic", "cosmic"],          energyBand: "mid",  weight: 1 },
 
-  // ═══ Layer 2: Sacred / Center-stage elements ═══
+  // ═══ Layer 2: Sacred / Center-stage elements (26) ═══
   { name: "BreathingStealie",  layer: 2, category: "sacred", tags: ["dead-culture", "psychedelic"],    energyBand: "any",  weight: 3, dutyCycle: 100 },
   { name: "StealieFade",       layer: 2, category: "sacred", tags: ["dead-culture", "contemplative"],  energyBand: "low",  weight: 2, dutyCycle: 100 },
-  { name: "LightningBoltOverlay", layer: 3, category: "reactive", tags: ["dead-culture", "intense"],   energyBand: "high", weight: 3 },
   { name: "RoseOverlay",       layer: 2, category: "sacred", tags: ["dead-culture", "contemplative"],  energyBand: "low",  weight: 2, dutyCycle: 100 },
   { name: "SkullRosesOverlay", layer: 2, category: "sacred", tags: ["dead-culture", "contemplative"],  energyBand: "mid",  weight: 2, dutyCycle: 100 },
   { name: "DancingTerrapinOverlay", layer: 2, category: "sacred", tags: ["dead-culture", "cosmic"],    energyBand: "low",  weight: 2, dutyCycle: 100 },
@@ -64,41 +53,24 @@ export const OVERLAY_REGISTRY: OverlayEntry[] = [
   { name: "ThirdEye",          layer: 2, category: "sacred", tags: ["psychedelic", "cosmic"],           energyBand: "mid",  weight: 3 },
   { name: "DarkStarPortal",    layer: 2, category: "sacred", tags: ["cosmic", "dead-culture"],          energyBand: "mid",  weight: 3 },
   { name: "StealYourFaceOff",  layer: 2, category: "sacred", tags: ["dead-culture", "intense"],        energyBand: "high", weight: 3, dutyCycle: 100 },
-  { name: "GearWorks",         layer: 2, category: "sacred", tags: ["mechanical", "retro"],            energyBand: "mid",  weight: 2 },
-  { name: "Clockwork",         layer: 2, category: "sacred", tags: ["mechanical", "retro"],            energyBand: "mid",  weight: 2 },
   { name: "CompassRose",       layer: 2, category: "sacred", tags: ["retro", "contemplative"],         energyBand: "low",  weight: 2 },
   { name: "StainedGlass",      layer: 2, category: "sacred", tags: ["contemplative", "cosmic"],        energyBand: "low",  weight: 2 },
-  { name: "RuneCircle",        layer: 2, category: "sacred", tags: ["cosmic", "contemplative"],        energyBand: "mid",  weight: 2 },
   { name: "CelticKnot",        layer: 2, category: "sacred", tags: ["organic", "contemplative"],       energyBand: "low",  weight: 2 },
   { name: "LotusOpen",         layer: 2, category: "sacred", tags: ["contemplative", "organic"],       energyBand: "low",  weight: 2 },
-  { name: "ZodiacWheel",       layer: 2, category: "sacred", tags: ["cosmic", "contemplative"],        energyBand: "mid",  weight: 2 },
-  { name: "CavePaintings",     layer: 2, category: "sacred", tags: ["retro", "organic"],               energyBand: "low",  weight: 2 },
-  { name: "AztecCalendar",     layer: 2, category: "sacred", tags: ["cosmic", "retro"],                energyBand: "mid",  weight: 2 },
-  { name: "PyramidBeams",      layer: 2, category: "sacred", tags: ["cosmic", "intense"],              energyBand: "high", weight: 2 },
-  { name: "RomanColumns",      layer: 2, category: "sacred", tags: ["retro", "contemplative"],         energyBand: "low",  weight: 2 },
-  { name: "Hieroglyphs",       layer: 2, category: "sacred", tags: ["retro", "cosmic"],                energyBand: "low",  weight: 2 },
-  { name: "Hourglass",         layer: 2, category: "sacred", tags: ["mechanical", "contemplative"],    energyBand: "low",  weight: 2 },
   { name: "Totem",             layer: 2, category: "sacred", tags: ["organic", "dead-culture"],         energyBand: "mid",  weight: 2 },
-  { name: "Abacus",            layer: 2, category: "sacred", tags: ["mechanical", "retro"],            energyBand: "low",  weight: 1 },
-  { name: "Lanterns",          layer: 2, category: "sacred", tags: ["contemplative", "festival"],       energyBand: "low",  weight: 1 },
-  { name: "Cathedral",         layer: 2, category: "sacred", tags: ["contemplative", "cosmic"],        energyBand: "low",  weight: 2 },
-  { name: "Pagoda",            layer: 2, category: "sacred", tags: ["contemplative", "organic"],       energyBand: "low",  weight: 2 },
-  { name: "Colosseum",         layer: 2, category: "sacred", tags: ["retro"],                          energyBand: "low",  weight: 2 },
-  { name: "Obelisk",           layer: 2, category: "sacred", tags: ["cosmic", "retro"],                energyBand: "low",  weight: 2 },
-  { name: "GothicArch",        layer: 2, category: "sacred", tags: ["contemplative", "cosmic"],        energyBand: "low",  weight: 2 },
   { name: "AstrolabeOverlay",  layer: 2, category: "sacred", tags: ["cosmic", "mechanical"],            energyBand: "mid",  weight: 2 },
   { name: "SunMandala",        layer: 2, category: "sacred", tags: ["cosmic", "psychedelic"],           energyBand: "mid",  weight: 2 },
-  { name: "Sundial",           layer: 2, category: "sacred", tags: ["mechanical", "contemplative"],    energyBand: "low",  weight: 1 },
   { name: "ThirteenPointBolt", layer: 2, category: "sacred", tags: ["dead-culture", "intense"],        energyBand: "high", weight: 3, dutyCycle: 100 },
   { name: "SpaceDrums",        layer: 2, category: "sacred", tags: ["cosmic", "dead-culture"],         energyBand: "low",  weight: 3 },
+  { name: "SkeletonRoses",     layer: 2, category: "sacred", tags: ["dead-culture", "organic"],        energyBand: "any",  weight: 3, dutyCycle: 100 },
 
-  // ═══ Layer 3: Song-reactive effects ═══
+  // ═══ Layer 3: Song-reactive effects (18) ═══
+  { name: "LightningBoltOverlay", layer: 3, category: "reactive", tags: ["dead-culture", "intense"],   energyBand: "high", weight: 3 },
   { name: "WaveformOverlay",     layer: 3, category: "reactive", tags: ["psychedelic", "organic"],        energyBand: "any",  weight: 1, dutyCycle: 100 },
   { name: "SongReactiveEffects", layer: 3, category: "reactive", tags: ["intense", "psychedelic"],       energyBand: "any",  weight: 2 },
   { name: "EnergyEffects",       layer: 3, category: "reactive", tags: ["intense", "psychedelic"],       energyBand: "any",  weight: 2 },
   { name: "WallOfSound",         layer: 3, category: "reactive", tags: ["intense", "festival"],          energyBand: "high", weight: 3, dutyCycle: 17 },
   { name: "Oscilloscope",        layer: 3, category: "reactive", tags: ["mechanical", "retro"],          energyBand: "any",  weight: 2, dutyCycle: 100 },
-  { name: "SpectrumAnalyzer",    layer: 3, category: "reactive", tags: ["mechanical", "retro"],          energyBand: "any",  weight: 2 },
   { name: "GuitarStrings",       layer: 3, category: "reactive", tags: ["organic", "dead-culture"],      energyBand: "mid",  weight: 2 },
   { name: "DrumCircles",         layer: 3, category: "reactive", tags: ["organic", "festival"],          energyBand: "mid",  weight: 2 },
   { name: "ParticleExplosion",   layer: 3, category: "reactive", tags: ["intense", "psychedelic"],       energyBand: "high", weight: 3, dutyCycle: 8 },
@@ -107,69 +79,30 @@ export const OVERLAY_REGISTRY: OverlayEntry[] = [
   { name: "InkDrop",             layer: 3, category: "reactive", tags: ["organic", "psychedelic"],       energyBand: "mid",  weight: 2 },
   { name: "PlasmaBall",          layer: 3, category: "reactive", tags: ["intense", "psychedelic"],       energyBand: "high", weight: 2 },
   { name: "LaserShow",           layer: 3, category: "reactive", tags: ["festival", "intense"],          energyBand: "high", weight: 3 },
-  { name: "PianoRoll",           layer: 3, category: "reactive", tags: ["mechanical", "retro"],          energyBand: "mid",  weight: 2 },
   { name: "VUMeters",            layer: 3, category: "reactive", tags: ["retro", "mechanical"],          energyBand: "any",  weight: 1 },
-  { name: "SheetMusic",          layer: 3, category: "reactive", tags: ["retro", "contemplative"],       energyBand: "low",  weight: 1 },
-  { name: "Amplifier",           layer: 3, category: "reactive", tags: ["festival", "mechanical"],       energyBand: "mid",  weight: 2 },
-  { name: "Seismograph",         layer: 3, category: "reactive", tags: ["mechanical", "intense"],        energyBand: "any",  weight: 1 },
-  { name: "TypewriterKeys",      layer: 3, category: "reactive", tags: ["retro", "mechanical"],          energyBand: "mid",  weight: 1 },
-  { name: "Whirlpool",           layer: 3, category: "reactive", tags: ["aquatic", "intense"],           energyBand: "mid",  weight: 2 },
-  { name: "SaxophoneKeys",       layer: 3, category: "reactive", tags: ["organic", "contemplative"],     energyBand: "mid",  weight: 1 },
-  { name: "Tambourine",          layer: 3, category: "reactive", tags: ["festival", "organic"],          energyBand: "mid",  weight: 1 },
-  { name: "WindChimes",          layer: 3, category: "reactive", tags: ["contemplative", "organic"],     energyBand: "low",  weight: 1 },
-  { name: "Turntable",           layer: 3, category: "reactive", tags: ["retro", "dead-culture"],        energyBand: "mid",  weight: 2 },
-  { name: "PinballMachine",      layer: 3, category: "reactive", tags: ["retro", "mechanical"],          energyBand: "mid",  weight: 2 },
-  { name: "Metronome",           layer: 3, category: "reactive", tags: ["mechanical", "contemplative"],  energyBand: "any",  weight: 1 },
-  { name: "Oscillator",          layer: 3, category: "reactive", tags: ["mechanical", "psychedelic"],    energyBand: "mid",  weight: 2 },
-  { name: "SynthPatch",          layer: 3, category: "reactive", tags: ["psychedelic", "mechanical"],    energyBand: "mid",  weight: 2 },
   { name: "StageLights",         layer: 3, category: "reactive", tags: ["festival", "intense"],          energyBand: "high", weight: 2 },
   { name: "SpotlightFollow",     layer: 3, category: "reactive", tags: ["festival", "intense"],          energyBand: "mid",  weight: 2 },
   { name: "FogLaser",            layer: 3, category: "reactive", tags: ["festival", "psychedelic"],      energyBand: "mid",  weight: 2 },
 
-  // ═══ Layer 4: Geometric / Physics ═══
+  // ═══ Layer 4: Geometric / Physics (16) ═══
   { name: "OpArtPatterns",        layer: 4, category: "geometric", tags: ["psychedelic", "retro"],        energyBand: "mid",  weight: 2 },
   { name: "MoireInterference",    layer: 4, category: "geometric", tags: ["psychedelic", "mechanical"],   energyBand: "mid",  weight: 2 },
   { name: "TunnelVision",         layer: 4, category: "geometric", tags: ["psychedelic", "intense"],      energyBand: "mid",  weight: 2 },
   { name: "VortexSpiral",         layer: 4, category: "geometric", tags: ["psychedelic", "cosmic"],       energyBand: "mid",  weight: 2 },
   { name: "WormholeTransit",      layer: 4, category: "geometric", tags: ["cosmic", "psychedelic"],       energyBand: "high", weight: 3 },
-  { name: "WireframeDodecahedron",layer: 4, category: "geometric", tags: ["mechanical", "cosmic"],        energyBand: "mid",  weight: 2 },
   { name: "KaleidoscopeFilter",   layer: 4, category: "geometric", tags: ["psychedelic", "cosmic"],       energyBand: "mid",  weight: 2 },
   { name: "DoublePendulum",       layer: 4, category: "geometric", tags: ["mechanical", "contemplative"], energyBand: "mid",  weight: 2 },
   { name: "LorenzAttractor",      layer: 4, category: "geometric", tags: ["cosmic", "mechanical"],        energyBand: "mid",  weight: 2 },
-  { name: "PendulumWave",         layer: 4, category: "geometric", tags: ["mechanical", "contemplative"], energyBand: "mid",  weight: 2 },
   { name: "GameOfLife",            layer: 4, category: "geometric", tags: ["mechanical", "organic"],       energyBand: "mid",  weight: 2 },
   { name: "ReactionDiffusion",    layer: 4, category: "geometric", tags: ["organic", "psychedelic"],      energyBand: "mid",  weight: 2 },
   { name: "VoronoiFlow",          layer: 4, category: "geometric", tags: ["organic", "psychedelic"],      energyBand: "mid",  weight: 2 },
   { name: "FibonacciSpiral",      layer: 4, category: "geometric", tags: ["cosmic", "organic"],           energyBand: "mid",  weight: 2 },
   { name: "PenroseTiling",        layer: 4, category: "geometric", tags: ["mechanical", "cosmic"],        energyBand: "low",  weight: 2 },
-  { name: "MengerSponge",         layer: 4, category: "geometric", tags: ["mechanical", "cosmic"],        energyBand: "mid",  weight: 2 },
-  { name: "HilbertCurve",         layer: 4, category: "geometric", tags: ["mechanical", "cosmic"],        energyBand: "low",  weight: 1 },
-  { name: "MoirePattern",         layer: 4, category: "geometric", tags: ["psychedelic", "mechanical"],   energyBand: "mid",  weight: 2 },
-  { name: "MolecularBonds",       layer: 4, category: "geometric", tags: ["mechanical", "cosmic"],        energyBand: "mid",  weight: 2 },
-  { name: "BubbleChamber",        layer: 4, category: "geometric", tags: ["cosmic", "mechanical"],        energyBand: "mid",  weight: 2 },
-  { name: "CrystalGrowth",        layer: 4, category: "geometric", tags: ["organic", "cosmic"],           energyBand: "mid",  weight: 2 },
-  { name: "Diatoms",              layer: 4, category: "geometric", tags: ["organic", "aquatic"],          energyBand: "low",  weight: 1 },
-  { name: "TapestryWeave",        layer: 4, category: "geometric", tags: ["organic", "retro"],            energyBand: "low",  weight: 1 },
-  { name: "BatikPattern",         layer: 4, category: "geometric", tags: ["organic", "retro"],            energyBand: "low",  weight: 1 },
   { name: "Paisley",              layer: 4, category: "geometric", tags: ["psychedelic", "organic"],      energyBand: "mid",  weight: 1 },
-  { name: "Ikat",                  layer: 4, category: "geometric", tags: ["organic", "retro"],            energyBand: "low",  weight: 1 },
-  { name: "Macrame",              layer: 4, category: "geometric", tags: ["organic", "retro"],            energyBand: "low",  weight: 1 },
-  { name: "ArtNouveau",           layer: 4, category: "geometric", tags: ["organic", "retro"],            energyBand: "low",  weight: 1 },
-  { name: "ArtDeco",              layer: 4, category: "geometric", tags: ["retro", "mechanical"],         energyBand: "mid",  weight: 1 },
+  { name: "CrystalGrowth",        layer: 4, category: "geometric", tags: ["organic", "cosmic"],           energyBand: "mid",  weight: 2 },
   { name: "MemphisDesign",        layer: 4, category: "geometric", tags: ["retro", "psychedelic"],        energyBand: "mid",  weight: 2 },
-  { name: "NewtonsCradle",        layer: 4, category: "geometric", tags: ["mechanical", "contemplative"], energyBand: "mid",  weight: 2 },
-  { name: "Gyroscope",            layer: 4, category: "geometric", tags: ["mechanical"],                  energyBand: "mid",  weight: 2 },
-  { name: "YoYo",                 layer: 4, category: "geometric", tags: ["retro", "mechanical"],         energyBand: "mid",  weight: 1 },
-  { name: "Slinky",               layer: 4, category: "geometric", tags: ["mechanical", "retro"],         energyBand: "mid",  weight: 1 },
-  { name: "SpinningTop",          layer: 4, category: "geometric", tags: ["mechanical", "retro"],         energyBand: "mid",  weight: 1 },
-  { name: "Piston",               layer: 4, category: "geometric", tags: ["mechanical", "intense"],       energyBand: "high", weight: 2 },
-  { name: "Turbine",              layer: 4, category: "geometric", tags: ["mechanical", "intense"],       energyBand: "high", weight: 2 },
-  { name: "ConveyorBelt",         layer: 4, category: "geometric", tags: ["mechanical"],                  energyBand: "mid",  weight: 1 },
-  { name: "Hydraulic",            layer: 4, category: "geometric", tags: ["mechanical", "intense"],       energyBand: "high", weight: 2 },
-  { name: "CircuitBoard",         layer: 4, category: "geometric", tags: ["mechanical", "retro"],         energyBand: "mid",  weight: 1 },
-  { name: "Transistor",           layer: 4, category: "geometric", tags: ["mechanical", "retro"],         energyBand: "mid",  weight: 1 },
 
-  // ═══ Layer 5: Nature / Cosmic / Space ═══
+  // ═══ Layer 5: Nature / Cosmic / Space (35) ═══
   { name: "SolarFlare",       layer: 5, category: "nature", tags: ["cosmic", "intense"],           energyBand: "high", weight: 2, dutyCycle: 15 },
   { name: "JellyfishSwarm",   layer: 5, category: "nature", tags: ["aquatic", "organic"],          energyBand: "low",  weight: 2 },
   { name: "CrystalFormation", layer: 5, category: "nature", tags: ["cosmic", "organic"],           energyBand: "mid",  weight: 2 },
@@ -184,54 +117,21 @@ export const OVERLAY_REGISTRY: OverlayEntry[] = [
   { name: "DNAHelix",         layer: 5, category: "nature", tags: ["organic", "cosmic"],           energyBand: "mid",  weight: 2 },
   { name: "TreeOfLife",        layer: 5, category: "nature", tags: ["organic", "contemplative"],    energyBand: "low",  weight: 2 },
   { name: "Thunderhead",      layer: 5, category: "nature", tags: ["intense", "organic"],          energyBand: "high", weight: 2 },
-  { name: "Rainsplash",       layer: 5, category: "nature", tags: ["aquatic", "organic"],          energyBand: "mid",  weight: 1 },
-  { name: "BubbleRise",       layer: 5, category: "nature", tags: ["aquatic", "contemplative"],    energyBand: "low",  weight: 1 },
-  { name: "VineGrowth",       layer: 5, category: "nature", tags: ["organic", "contemplative"],    energyBand: "low",  weight: 1 },
-  { name: "FernUnfurl",       layer: 5, category: "nature", tags: ["organic", "contemplative"],    energyBand: "low",  weight: 1 },
   { name: "MushroomBloom",    layer: 5, category: "nature", tags: ["organic", "psychedelic"],      energyBand: "mid",  weight: 2 },
   { name: "ButterflySwarm",   layer: 5, category: "nature", tags: ["organic", "contemplative"],    energyBand: "mid",  weight: 2 },
-  { name: "Jellyfish",        layer: 5, category: "nature", tags: ["aquatic", "organic"],          energyBand: "low",  weight: 1 },
   { name: "Flock",            layer: 5, category: "nature", tags: ["organic", "contemplative"],    energyBand: "mid",  weight: 2 },
-  { name: "SpiderWeb",        layer: 5, category: "nature", tags: ["organic", "contemplative"],    energyBand: "low",  weight: 1 },
-  { name: "RainOnGlass",      layer: 5, category: "nature", tags: ["aquatic", "contemplative"],    energyBand: "low",  weight: 1 },
-  { name: "Dewdrops",         layer: 5, category: "nature", tags: ["organic", "contemplative"],    energyBand: "low",  weight: 1 },
   { name: "CherryBlossom",    layer: 5, category: "nature", tags: ["organic", "contemplative"],    energyBand: "low",  weight: 1 },
-  { name: "KoiPond",          layer: 5, category: "nature", tags: ["aquatic", "contemplative"],    energyBand: "low",  weight: 1 },
-  { name: "BambooForest",     layer: 5, category: "nature", tags: ["organic", "contemplative"],    energyBand: "low",  weight: 1 },
-  { name: "PaperCranes",      layer: 5, category: "nature", tags: ["organic", "contemplative"],    energyBand: "low",  weight: 1 },
-  { name: "PaperAirplanes",   layer: 5, category: "nature", tags: ["retro", "contemplative"],      energyBand: "low",  weight: 1 },
-  { name: "BirdMigration",    layer: 5, category: "nature", tags: ["organic", "contemplative"],    energyBand: "mid",  weight: 1 },
-  { name: "Pinwheel",         layer: 5, category: "nature", tags: ["retro", "organic"],            energyBand: "mid",  weight: 1 },
   { name: "CoralReef",        layer: 5, category: "nature", tags: ["aquatic", "organic"],          energyBand: "low",  weight: 2 },
-  { name: "SeaweedForest",    layer: 5, category: "nature", tags: ["aquatic", "organic"],          energyBand: "low",  weight: 1 },
-  { name: "SeaTurtles",       layer: 5, category: "nature", tags: ["aquatic", "organic"],          energyBand: "low",  weight: 1 },
-  { name: "Seahorses",        layer: 5, category: "nature", tags: ["aquatic", "organic"],          energyBand: "low",  weight: 1 },
-  { name: "Anemone",          layer: 5, category: "nature", tags: ["aquatic", "organic"],          energyBand: "low",  weight: 1 },
   { name: "SolarEclipse",     layer: 5, category: "nature", tags: ["cosmic", "intense"],           energyBand: "mid",  weight: 3 },
   { name: "CometTail",        layer: 5, category: "nature", tags: ["cosmic"],                      energyBand: "mid",  weight: 2 },
-  { name: "TelescopeView",    layer: 5, category: "nature", tags: ["cosmic", "retro"],             energyBand: "low",  weight: 2 },
-  { name: "GeyserEruption",   layer: 5, category: "nature", tags: ["intense", "organic"],          energyBand: "high", weight: 2 },
-  { name: "TidePool",         layer: 5, category: "nature", tags: ["aquatic", "contemplative"],    energyBand: "low",  weight: 1 },
-  { name: "StalactiteCave",   layer: 5, category: "nature", tags: ["organic", "contemplative"],    energyBand: "low",  weight: 2 },
   { name: "VolcanoFlow",      layer: 5, category: "nature", tags: ["intense", "organic"],          energyBand: "high", weight: 3 },
-  { name: "LavaFlow",         layer: 5, category: "nature", tags: ["intense", "organic"],          energyBand: "high", weight: 2 },
   { name: "ShadowPuppets",    layer: 5, category: "nature", tags: ["organic", "retro"],            energyBand: "low",  weight: 2 },
   { name: "UFOBeam",          layer: 5, category: "nature", tags: ["cosmic", "psychedelic"],       energyBand: "mid",  weight: 2 },
   { name: "BlackHole",        layer: 5, category: "nature", tags: ["cosmic", "intense"],           energyBand: "mid",  weight: 3 },
   { name: "WarpDrive",        layer: 5, category: "nature", tags: ["cosmic", "intense"],           energyBand: "high", weight: 3 },
   { name: "Supernova",        layer: 5, category: "nature", tags: ["cosmic", "intense"],           energyBand: "high", weight: 3 },
-  { name: "CoffeeSwirl",      layer: 5, category: "nature", tags: ["organic", "contemplative"],    energyBand: "low",  weight: 1 },
-  { name: "SoapBubbles",      layer: 5, category: "nature", tags: ["organic", "contemplative"],    energyBand: "low",  weight: 1 },
-  { name: "Tumbleweed",       layer: 5, category: "nature", tags: ["organic", "retro"],            energyBand: "low",  weight: 1 },
-  { name: "CactusGarden",     layer: 5, category: "nature", tags: ["organic", "retro"],            energyBand: "low",  weight: 1 },
-  { name: "Dragonfly",        layer: 5, category: "nature", tags: ["organic", "contemplative"],    energyBand: "low",  weight: 1 },
-  { name: "Caterpillar",      layer: 5, category: "nature", tags: ["organic"],                     energyBand: "low",  weight: 1 },
-  { name: "Ladybug",          layer: 5, category: "nature", tags: ["organic"],                     energyBand: "low",  weight: 1 },
-  { name: "Scorpion",         layer: 5, category: "nature", tags: ["organic", "intense"],          energyBand: "mid",  weight: 1 },
-  { name: "Chameleon",        layer: 5, category: "nature", tags: ["organic", "psychedelic"],      energyBand: "mid",  weight: 1 },
   { name: "Octopus",          layer: 5, category: "nature", tags: ["aquatic", "organic"],          energyBand: "mid",  weight: 2 },
   { name: "Peacock",          layer: 5, category: "nature", tags: ["organic", "psychedelic"],      energyBand: "mid",  weight: 2 },
-  { name: "Moth",             layer: 5, category: "nature", tags: ["organic", "contemplative"],    energyBand: "low",  weight: 1 },
   { name: "MoonPhases",       layer: 5, category: "nature", tags: ["cosmic", "contemplative"],     energyBand: "low",  weight: 1 },
   { name: "ShootingStar",     layer: 5, category: "nature", tags: ["cosmic"],                      energyBand: "mid",  weight: 1 },
   { name: "EclipseCorona",    layer: 5, category: "nature", tags: ["cosmic", "intense"],           energyBand: "mid",  weight: 2 },
@@ -239,7 +139,7 @@ export const OVERLAY_REGISTRY: OverlayEntry[] = [
   { name: "Pulsar",           layer: 5, category: "nature", tags: ["cosmic", "intense"],           energyBand: "high", weight: 2 },
   { name: "Orrery",           layer: 5, category: "nature", tags: ["cosmic", "mechanical"],        energyBand: "mid",  weight: 2 },
 
-  // ═══ Layer 6: Character parades / Dead album art ═══
+  // ═══ Layer 6: Character parades / Dead album art (22) ═══
   { name: "SkeletonBand",     layer: 6, category: "character", tags: ["dead-culture", "festival"],     energyBand: "mid",  weight: 2, dutyCycle: 25 },
   { name: "DeadIcons",        layer: 6, category: "character", tags: ["dead-culture"],                 energyBand: "any",  weight: 2, dutyCycle: 100 },
   { name: "BearParade",       layer: 6, category: "character", tags: ["dead-culture", "festival"],     energyBand: "mid",  weight: 2, dutyCycle: 30 },
@@ -252,31 +152,17 @@ export const OVERLAY_REGISTRY: OverlayEntry[] = [
   { name: "CrowdSilhouette",  layer: 6, category: "character", tags: ["festival", "dead-culture"],     energyBand: "mid",  weight: 2 },
   { name: "Bertha",           layer: 6, category: "character", tags: ["dead-culture"],                 energyBand: "mid",  weight: 3 },
   { name: "AmericanBeauty",   layer: 6, category: "character", tags: ["dead-culture", "organic"],      energyBand: "low",  weight: 2 },
-  { name: "TouchOfGrey",      layer: 6, category: "character", tags: ["dead-culture"],                 energyBand: "mid",  weight: 2 },
-  { name: "EuropeTour",       layer: 6, category: "character", tags: ["dead-culture", "retro"],        energyBand: "mid",  weight: 2 },
   { name: "PhoenixWings",     layer: 6, category: "character", tags: ["cosmic", "intense"],            energyBand: "high", weight: 3 },
-  { name: "AlchemySymbols",   layer: 6, category: "character", tags: ["cosmic", "contemplative"],      energyBand: "mid",  weight: 1 },
-  { name: "TarotReveal",      layer: 6, category: "character", tags: ["cosmic", "contemplative"],      energyBand: "mid",  weight: 2 },
   { name: "HotAirBalloons",   layer: 6, category: "character", tags: ["retro", "contemplative"],       energyBand: "low",  weight: 2, dutyCycle: 100 },
-  { name: "SteamTrain",       layer: 6, category: "character", tags: ["retro", "mechanical"],          energyBand: "mid",  weight: 2 },
-  { name: "SailingShips",     layer: 6, category: "character", tags: ["aquatic", "retro"],             energyBand: "mid",  weight: 2 },
-  { name: "BicycleWheels",    layer: 6, category: "character", tags: ["retro", "mechanical"],          energyBand: "mid",  weight: 1 },
-  { name: "Zeppelin",         layer: 6, category: "character", tags: ["retro", "cosmic"],              energyBand: "mid",  weight: 2 },
   { name: "CarouselHorses",   layer: 6, category: "character", tags: ["retro", "festival"],            energyBand: "mid",  weight: 2 },
   { name: "FerrisWheel",      layer: 6, category: "character", tags: ["retro", "festival"],            energyBand: "mid",  weight: 2 },
   { name: "DreamCatcher",     layer: 6, category: "character", tags: ["organic", "dead-culture"],      energyBand: "low",  weight: 2 },
-  { name: "PrayerFlags",      layer: 6, category: "character", tags: ["organic", "contemplative"],     energyBand: "low",  weight: 1 },
-  { name: "Lighthouse",       layer: 6, category: "character", tags: ["aquatic", "contemplative"],     energyBand: "low",  weight: 2 },
-  { name: "Windmill",         layer: 6, category: "character", tags: ["organic", "retro"],             energyBand: "mid",  weight: 1 },
-  { name: "Aqueduct",         layer: 6, category: "character", tags: ["retro"],                        energyBand: "low",  weight: 1 },
-  { name: "Crane",            layer: 6, category: "character", tags: ["mechanical"],                   energyBand: "mid",  weight: 1 },
   { name: "MoshPit",          layer: 6, category: "character", tags: ["festival", "intense"],          energyBand: "high", weight: 3, dutyCycle: 40 },
   { name: "StageDive",        layer: 6, category: "character", tags: ["festival", "intense"],          energyBand: "high", weight: 3 },
   { name: "JerryGuitar",      layer: 6, category: "character", tags: ["dead-culture", "organic"],      energyBand: "mid",  weight: 2, dutyCycle: 33 },
-  { name: "VWBusParade",     layer: 6, category: "character", tags: ["dead-culture", "festival"],     energyBand: "low",  weight: 2 },
-  { name: "SkeletonRoses",   layer: 2, category: "sacred",    tags: ["dead-culture", "organic"],      energyBand: "any",  weight: 3, dutyCycle: 100 },
+  { name: "VWBusParade",      layer: 6, category: "character", tags: ["dead-culture", "festival"],     energyBand: "low",  weight: 2 },
 
-  // ═══ Layer 7: Frame & info (artifact) ═══
+  // ═══ Layer 7: Frame & info (22) ═══
   { name: "PsychedelicBorder", layer: 7, category: "artifact", tags: ["psychedelic", "dead-culture"],   energyBand: "mid",  weight: 2 },
   { name: "ConcertInfo",       layer: 7, category: "artifact", tags: ["dead-culture"],                  energyBand: "any",  weight: 1 },
   { name: "SongTitle",         layer: 7, category: "artifact", tags: ["dead-culture"],                  energyBand: "any",  weight: 1, alwaysActive: true },
@@ -285,12 +171,9 @@ export const OVERLAY_REGISTRY: OverlayEntry[] = [
   { name: "BootlegLabel",      layer: 7, category: "artifact", tags: ["dead-culture", "retro"],         energyBand: "low",  weight: 1 },
   { name: "TourPosterGallery", layer: 7, category: "artifact", tags: ["dead-culture", "retro"],         energyBand: "mid",  weight: 2 },
   { name: "TicketStubAnimated",layer: 7, category: "artifact", tags: ["dead-culture", "retro"],         energyBand: "mid",  weight: 1 },
-  { name: "ChakraStack",       layer: 7, category: "artifact", tags: ["cosmic", "psychedelic"],          energyBand: "mid",  weight: 2 },
   { name: "PeaceSignShower",   layer: 7, category: "artifact", tags: ["dead-culture", "festival"],      energyBand: "mid",  weight: 2 },
   { name: "WarholGrid",        layer: 7, category: "artifact", tags: ["retro", "psychedelic"],           energyBand: "mid",  weight: 2 },
   { name: "ComicExplosions",   layer: 7, category: "artifact", tags: ["retro", "intense"],              energyBand: "high", weight: 2 },
-  { name: "Radar",             layer: 7, category: "artifact", tags: ["mechanical", "retro"],           energyBand: "mid",  weight: 1 },
-  { name: "PolaroidDevelop",   layer: 7, category: "artifact", tags: ["retro"],                         energyBand: "mid",  weight: 1 },
   { name: "LensFlare",         layer: 7, category: "artifact", tags: ["cosmic", "festival"],             energyBand: "mid",  weight: 1 },
   { name: "PrismRainbow",      layer: 7, category: "artifact", tags: ["psychedelic", "cosmic"],          energyBand: "mid",  weight: 2 },
   { name: "NeonSign",          layer: 7, category: "artifact", tags: ["retro", "festival"],              energyBand: "mid",  weight: 2 },
@@ -298,125 +181,44 @@ export const OVERLAY_REGISTRY: OverlayEntry[] = [
   { name: "ChalkBoard",        layer: 7, category: "artifact", tags: ["retro", "contemplative"],        energyBand: "low",  weight: 1 },
   { name: "Confetti",          layer: 7, category: "artifact", tags: ["festival"],                       energyBand: "high", weight: 2, dutyCycle: 100 },
   { name: "ConfettiCannon",    layer: 7, category: "artifact", tags: ["festival", "intense"],            energyBand: "high", weight: 2 },
-  { name: "Streamers",         layer: 7, category: "artifact", tags: ["festival"],                       energyBand: "mid",  weight: 1 },
-  { name: "NeonCarousel",      layer: 7, category: "artifact", tags: ["retro", "festival"],              energyBand: "mid",  weight: 2 },
-  { name: "PostcardStack",     layer: 7, category: "artifact", tags: ["retro", "contemplative"],        energyBand: "low",  weight: 1 },
-  { name: "StampCollection",   layer: 7, category: "artifact", tags: ["retro"],                         energyBand: "low",  weight: 1 },
-  { name: "VintageMap",        layer: 7, category: "artifact", tags: ["retro", "contemplative"],        energyBand: "low",  weight: 1 },
-  { name: "CompassNeedle",     layer: 7, category: "artifact", tags: ["mechanical", "retro"],           energyBand: "mid",  weight: 1 },
   { name: "MarqueeLights",     layer: 7, category: "artifact", tags: ["festival", "retro"],              energyBand: "mid",  weight: 2 },
-  { name: "DiceRoll",          layer: 7, category: "artifact", tags: ["retro"],                         energyBand: "mid",  weight: 1 },
-  { name: "ChessPieces",       layer: 7, category: "artifact", tags: ["retro", "contemplative"],        energyBand: "low",  weight: 1 },
-  { name: "MotelSign",         layer: 7, category: "artifact", tags: ["retro"],                         energyBand: "low",  weight: 1 },
-  { name: "HighwaySign",       layer: 7, category: "artifact", tags: ["retro"],                         energyBand: "low",  weight: 1 },
   { name: "HoneycombGrid",     layer: 7, category: "artifact", tags: ["organic", "mechanical"],         energyBand: "mid",  weight: 1 },
-  { name: "Compass",           layer: 7, category: "artifact", tags: ["retro", "mechanical"],           energyBand: "mid",  weight: 1 },
-  { name: "Altimeter",         layer: 7, category: "artifact", tags: ["mechanical", "retro"],           energyBand: "mid",  weight: 1 },
-  { name: "FlightInstruments", layer: 7, category: "artifact", tags: ["mechanical", "retro"],           energyBand: "mid",  weight: 1 },
-  { name: "TrailMap",          layer: 7, category: "artifact", tags: ["organic", "retro"],              energyBand: "low",  weight: 1 },
-  { name: "WeatherVane",       layer: 7, category: "artifact", tags: ["retro", "organic"],              energyBand: "mid",  weight: 1 },
-  { name: "Sextant",           layer: 7, category: "artifact", tags: ["retro", "mechanical"],           energyBand: "low",  weight: 1 },
-  { name: "Porthole",          layer: 7, category: "artifact", tags: ["aquatic", "retro"],              energyBand: "low",  weight: 1 },
-  { name: "CuckooClockOverlay",layer: 7, category: "artifact", tags: ["mechanical", "retro"],           energyBand: "mid",  weight: 1 },
-  { name: "SandTimer",         layer: 7, category: "artifact", tags: ["mechanical", "contemplative"],   energyBand: "low",  weight: 1 },
-  { name: "Chronograph",       layer: 7, category: "artifact", tags: ["mechanical", "retro"],           energyBand: "mid",  weight: 1 },
-  { name: "PocketWatch",       layer: 7, category: "artifact", tags: ["retro", "mechanical"],           energyBand: "low",  weight: 1 },
-  { name: "WaterClock",        layer: 7, category: "artifact", tags: ["aquatic", "mechanical"],         energyBand: "low",  weight: 1 },
   { name: "Pyrotechnics",      layer: 7, category: "artifact", tags: ["festival", "intense"],            energyBand: "high", weight: 2 },
   { name: "GlowSticks",        layer: 7, category: "artifact", tags: ["festival", "psychedelic"],        energyBand: "mid",  weight: 1 },
-  { name: "SteamValve",        layer: 7, category: "artifact", tags: ["mechanical", "intense"],         energyBand: "mid",  weight: 1 },
-  { name: "Anvil",             layer: 7, category: "artifact", tags: ["mechanical"],                    energyBand: "mid",  weight: 1 },
-  { name: "WeldingSparks",     layer: 7, category: "artifact", tags: ["mechanical", "intense"],         energyBand: "high", weight: 1 },
 
-  // ═══ Layer 8: Typography (info) ═══
+  // ═══ Layer 8: Typography (4) ═══
   { name: "LyricFlash",   layer: 8, category: "info", tags: ["dead-culture", "psychedelic"],   energyBand: "mid",  weight: 2 },
   { name: "GarciaQuotes",  layer: 8, category: "info", tags: ["dead-culture", "contemplative"], energyBand: "low",  weight: 2 },
   { name: "MantraScroll",  layer: 8, category: "info", tags: ["cosmic", "contemplative"],       energyBand: "low",  weight: 1 },
   { name: "AsciiRain",    layer: 8, category: "info", tags: ["retro", "mechanical"],            energyBand: "mid",  weight: 2 },
-  { name: "RansomNote",   layer: 8, category: "info", tags: ["retro", "psychedelic"],           energyBand: "mid",  weight: 2 },
-  { name: "BookPages",    layer: 8, category: "info", tags: ["retro", "contemplative"],         energyBand: "low",  weight: 1 },
-  { name: "BinaryStream", layer: 8, category: "info", tags: ["mechanical", "retro"],            energyBand: "mid",  weight: 1 },
 
-  // ═══ Layer 9: HUD elements ═══
+  // ═══ Layer 9: HUD elements (4) ═══
   { name: "CassetteReels",   layer: 9, category: "hud", tags: ["retro", "dead-culture"],     energyBand: "any",  weight: 2 },
   { name: "NixieTubes",      layer: 9, category: "hud", tags: ["retro", "mechanical"],       energyBand: "mid",  weight: 2 },
   { name: "HeartbeatEKG",    layer: 9, category: "hud", tags: ["organic", "intense"],        energyBand: "any",  weight: 1 },
-  { name: "NeuralNetwork",   layer: 9, category: "hud", tags: ["cosmic", "mechanical"],      energyBand: "mid",  weight: 2 },
-  { name: "TerminalPrompt",  layer: 9, category: "hud", tags: ["retro", "mechanical"],       energyBand: "mid",  weight: 1 },
-  { name: "LoadingBars",     layer: 9, category: "hud", tags: ["retro", "mechanical"],       energyBand: "mid",  weight: 1 },
-  { name: "SpiralArms",      layer: 9, category: "hud", tags: ["cosmic"],                    energyBand: "mid",  weight: 2 },
-  { name: "VacuumTube",      layer: 9, category: "hud", tags: ["retro", "mechanical"],       energyBand: "mid",  weight: 1 },
-  { name: "TeslaCoil",       layer: 9, category: "hud", tags: ["mechanical", "intense"],     energyBand: "high", weight: 2 },
   { name: "HolographicDisc", layer: 9, category: "hud", tags: ["cosmic", "psychedelic"],     energyBand: "mid",  weight: 2 },
 
-  // ═══ Layer 10: Distortion / Film treatment ═══
-  { name: "LiquidMetal",         layer: 10, category: "distortion", tags: ["psychedelic", "intense"],     energyBand: "high", weight: 3 },
+  // ═══ Layer 10: Distortion / Film treatment (7) ═══
   { name: "ChromaticAberration",  layer: 10, category: "distortion", tags: ["psychedelic"],                energyBand: "mid",  weight: 2 },
   { name: "ChromaticSplit",       layer: 10, category: "distortion", tags: ["psychedelic", "intense"],     energyBand: "mid",  weight: 2 },
-  { name: "HologramGlitch",      layer: 10, category: "distortion", tags: ["psychedelic", "retro"],       energyBand: "mid",  weight: 2 },
   { name: "VHSGlitch",           layer: 10, category: "distortion", tags: ["retro", "psychedelic"],       energyBand: "mid",  weight: 2 },
   { name: "FilmBurn",            layer: 10, category: "distortion", tags: ["retro"],                      energyBand: "mid",  weight: 2 },
-  { name: "RetroTV",             layer: 10, category: "distortion", tags: ["retro"],                      energyBand: "mid",  weight: 2 },
   { name: "VinylGrooves",        layer: 10, category: "distortion", tags: ["retro", "dead-culture"],      energyBand: "mid",  weight: 1 },
-  { name: "FilmStrip",           layer: 10, category: "distortion", tags: ["retro"],                      energyBand: "mid",  weight: 1 },
   { name: "PixelExplosion",      layer: 10, category: "distortion", tags: ["intense", "psychedelic"],     energyBand: "high", weight: 3 },
-  { name: "Screensaver",         layer: 10, category: "distortion", tags: ["retro"],                      energyBand: "low",  weight: 1 },
-  { name: "MatrixRain",          layer: 10, category: "distortion", tags: ["retro", "mechanical"],        energyBand: "mid",  weight: 2 },
   { name: "FilmGrain",           layer: 10, category: "distortion", tags: ["retro"],                      energyBand: "any",  weight: 1, alwaysActive: true },
 
 ];
 
-/** Overlays that fit the Dead aesthetic — everything else is cut from selection */
-const ENABLED_OVERLAYS = new Set([
-  // Layer 1: Atmospheric (16)
-  "CosmicStarfield", "TieDyeWash", "LavaLamp", "SmokeWisps", "AuroraBorealis",
-  "Fireflies", "OilSlick", "NebulaCloud", "CampfireSparks", "CandleFlicker",
-  "GodRays", "FogMachine", "VaporTrails", "SpiritWisps", "HookahSmoke", "FestivalTent",
-  // Layer 2: Sacred (13)
-  "BreathingStealie", "SacredGeometry", "SkullKaleidoscope", "FractalZoom",
-  "MandalaGenerator", "ThirdEye", "DarkStarPortal", "StealYourFaceOff",
-  "ThirteenPointBolt", "SpaceDrums", "Totem", "StainedGlass", "LotusOpen", "SkeletonRoses",
-  // Layer 3: Reactive (9)
-  "SongReactiveEffects", "EnergyEffects", "WallOfSound", "GuitarStrings",
-  "DrumCircles", "EmberRise", "InkDrop", "RipplePool", "StageLights",
-  // Layer 4: Geometric (8)
-  "OpArtPatterns", "TunnelVision", "VortexSpiral", "KaleidoscopeFilter",
-  "VoronoiFlow", "ReactionDiffusion", "FibonacciSpiral", "Paisley",
-  // Layer 5: Nature (15)
-  "SugarMagnolia", "ChinaCatSunflower", "BoxOfRain", "LighterWave", "MeteorShower",
-  "Constellation", "TreeOfLife", "Thunderhead", "MushroomBloom", "SolarEclipse",
-  "CherryBlossom", "Octopus", "MoonPhases", "ShootingStar", "BlackHole",
-  // Layer 6: Character (15)
-  "SkeletonBand", "DeadIcons", "BearParade", "MushroomForest", "MarchingTerrapins",
-  "CosmicCharlie", "SkeletonCouple", "UncleSam", "LotScene", "CrowdSilhouette",
-  "Bertha", "AmericanBeauty", "JerryGuitar", "DreamCatcher", "PhoenixWings", "VWBusParade",
-  // Layer 7: Frame/Info (12)
-  "PsychedelicBorder", "ConcertInfo", "SongTitle", "SetlistScroll", "BumperStickers",
-  "BootlegLabel", "TourPosterGallery", "TicketStubAnimated", "PeaceSignShower", "GlowSticks",
-  "RainbowArc", "PrismRainbow",
-  // Layer 8: Typography (2)
-  "LyricFlash", "GarciaQuotes",
-  // Layer 9: HUD (2)
-  "CassetteReels", "HeartbeatEKG",
-  // Layer 10: Distortion (5)
-  "ChromaticAberration", "VHSGlitch", "FilmBurn", "VinylGrooves", "FilmGrain",
-]);
-
-// ─── Parametric Overlays (50 variants across 7 families) ───
-// NOTE: Parametric overlays are registered + enabled so the overlay schedule
-// (generated by Claude via generate-overlay-profiles.ts) can reference them.
-// Actual per-song curation happens at the schedule level, not here.
+// ─── Parametric Overlays (52 variants across 7 families) ───
 import { PARAMETRIC_REGISTRY_ENTRIES } from "../components/parametric";
 for (const entry of PARAMETRIC_REGISTRY_ENTRIES) {
   OVERLAY_REGISTRY.push(entry);
-  ENABLED_OVERLAYS.add(entry.name);
 }
 
 /**
- * Registry of all selectable overlays — the full pool.
- * Per-song curation (via generate-overlay-profiles.ts) now controls which
- * overlays each song actually uses, so we no longer gate at the registry level.
- * The old ENABLED_OVERLAYS set is kept above as a reference of the original curated subset.
+ * Registry of all selectable overlays — the curated pool.
+ * 163 filler overlays removed (see OVERLAY-AUDIT.md).
+ * Component files preserved — any overlay can be restored by re-adding here.
  */
 export const SELECTABLE_REGISTRY = [...OVERLAY_REGISTRY];
 
