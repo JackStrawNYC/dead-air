@@ -104,7 +104,7 @@ function applyDensityMult(
 const ART_FULL_END = 120;      // 4s at 30fps — full opacity title card
 const ART_FADE_END = 300;      // 10s — fade to background wash level
 const OVERLAY_GATE_END = 420;  // 14s — overlays hidden until intro elements clear
-const ART_BG_OPACITY = 0.55;   // background wash — poster clearly visible under overlays
+// Art wash opacity is now energy-reactive: 0.30 (quiet) → 0.10 (peak)
 
 interface SongArtProps {
   src: string;
@@ -112,20 +112,30 @@ interface SongArtProps {
   suppressionFactor: number;
   /** Hue rotation in degrees (palette consistency with overlays/scene) */
   hueRotation?: number;
+  /** Rolling energy (0-1) for breath modulation */
+  energy?: number;
 }
 
 /** Per-song poster art — the visual foundation of each song.
- *  Intro: full opacity title card (4s), then settles to background wash.
- *  Smoothly dims when curated media (images/videos) is active.
+ *  Intro: full opacity title card (4s), then settles to energy-reactive background wash.
+ *  Quiet passages: art rises (contemplative). Peak energy: art fades, visuals dominate.
  */
-const SongArtLayer: React.FC<SongArtProps> = ({ src, suppressionFactor, hueRotation = 0 }) => {
+const SongArtLayer: React.FC<SongArtProps> = ({ src, suppressionFactor, hueRotation = 0, energy = 0 }) => {
   const frame = useCurrentFrame();
 
-  // Base target: full during intro, then settle to background wash
+  // Energy-reactive wash: quiet → 0.30, peak → 0.10
+  const energyWash = interpolate(
+    energy,
+    [0.03, 0.30],
+    [0.30, 0.10],
+    { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
+  );
+
+  // Base target: full during intro, then settle to energy-reactive wash
   const baseOpacity = interpolate(
     frame,
     [0, ART_FULL_END, ART_FADE_END],
-    [1, 1, ART_BG_OPACITY],
+    [1, 1, energyWash],
     {
       extrapolateLeft: "clamp",
       extrapolateRight: "clamp",
@@ -453,7 +463,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
           {/* ═══ Layer 0.5: Per-song poster art (persistent background wash) ═══ */}
           {effectiveSongArt && (
             <SilentErrorBoundary name="SongArt">
-              <SongArtLayer src={staticFile(effectiveSongArt)} suppressionFactor={artSuppressionFactor} hueRotation={hueRotation} />
+              <SongArtLayer src={staticFile(effectiveSongArt)} suppressionFactor={artSuppressionFactor} hueRotation={hueRotation} energy={audioSnapshot.energy} />
             </SilentErrorBoundary>
           )}
 
