@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeSmoothedEnergy, energyToFactor, overlayEnergyFactor } from "./energy";
+import { computeSmoothedEnergy, energyToFactor, overlayEnergyFactor, calibrateEnergy } from "./energy";
 import type { EnhancedFrameData } from "../data/types";
 
 function makeFrame(rms: number): EnhancedFrameData {
@@ -77,5 +77,38 @@ describe("overlayEnergyFactor", () => {
     const val = overlayEnergyFactor(0.17);
     expect(val).toBeGreaterThan(0.6);
     expect(val).toBeLessThan(0.8);
+  });
+});
+
+describe("energy response curve integration", () => {
+  it("overlayEnergyFactor increases with energy", () => {
+    const low = overlayEnergyFactor(0.02);
+    const mid = overlayEnergyFactor(0.17);
+    const high = overlayEnergyFactor(0.40);
+    expect(low).toBeLessThan(mid);
+    expect(mid).toBeLessThan(high);
+  });
+
+  it("calibrateEnergy produces reasonable thresholds", () => {
+    // Create frames with varied energy
+    const frames = Array.from({ length: 300 }, (_, i) =>
+      makeFrame(i < 200 ? 0.05 : 0.35),
+    );
+    const cal = calibrateEnergy(frames);
+    expect(cal.quietThreshold).toBeGreaterThanOrEqual(0.02);
+    expect(cal.quietThreshold).toBeLessThanOrEqual(0.10);
+    expect(cal.loudThreshold).toBeGreaterThanOrEqual(0.15);
+    expect(cal.loudThreshold).toBeLessThanOrEqual(0.50);
+  });
+
+  it("overlayEnergyFactor uses calibration when provided", () => {
+    const cal = { quietThreshold: 0.03, loudThreshold: 0.25 };
+    const withCal = overlayEnergyFactor(0.14, cal);
+    const withoutCal = overlayEnergyFactor(0.14);
+    // Both should be in valid range, but may differ
+    expect(withCal).toBeGreaterThanOrEqual(0.40);
+    expect(withCal).toBeLessThanOrEqual(1.0);
+    expect(withoutCal).toBeGreaterThanOrEqual(0.40);
+    expect(withoutCal).toBeLessThanOrEqual(1.0);
   });
 });

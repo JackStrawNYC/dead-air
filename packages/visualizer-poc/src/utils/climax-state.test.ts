@@ -36,6 +36,7 @@ function makeSnapshot(overrides: Partial<AudioSnapshot> = {}): AudioSnapshot {
     chromaHue: 0,
     centroid: 0.5,
     flatness: 0.2,
+    spectralFlux: 0,
     ...overrides,
   };
 }

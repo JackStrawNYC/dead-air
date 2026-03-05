@@ -119,6 +119,8 @@ uniform float uOnsetSnap;
 uniform float uBass;
 uniform float uChromaShift;
 uniform float uAfterglowHue;
+uniform float uClimaxPhase;
+uniform float uClimaxIntensity;
 
 varying float vAlpha;
 varying float vColorMix;

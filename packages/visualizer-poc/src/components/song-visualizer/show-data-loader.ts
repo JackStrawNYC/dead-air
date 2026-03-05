@@ -8,6 +8,7 @@
 import type { Milestone } from "../../data/types";
 import type { SongStats } from "../SongDNA";
 import type { FanReview } from "../FanQuoteOverlay";
+import { safeParse, SongStatsSchema, MilestoneDataSchema, NarrationSchema, ImageLibrarySchema } from "../../data/schemas";
 
 // ─── Song Stats ───
 
@@ -15,7 +16,8 @@ let _songStatsData: Record<string, SongStats> | null = null;
 try {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const raw = require("../../../data/song-stats.json");
-  _songStatsData = raw?.songs ?? null;
+  const validated = safeParse(SongStatsSchema, raw);
+  _songStatsData = validated?.songs ?? null;
 } catch {
   // Stats not available yet
 }
@@ -27,9 +29,10 @@ let _milestonesMap: Record<string, Milestone> | null = null;
 try {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const raw = require("../../../data/milestones.json");
-  if (raw?.milestones) {
+  const validated = safeParse(MilestoneDataSchema, raw);
+  if (validated?.milestones) {
     _milestonesMap = {};
-    for (const m of raw.milestones as Milestone[]) {
+    for (const m of validated.milestones) {
       _milestonesMap[m.trackId] = m;
     }
   }
@@ -51,8 +54,9 @@ let _fanReviewsData: FanReview[] = [];
 try {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const raw = require("../../../data/narration.json");
-  _narrationData = raw?.songs ?? null;
-  _fanReviewsData = raw?.fanReviews ?? [];
+  const validated = safeParse(NarrationSchema, raw);
+  _narrationData = (validated?.songs as Record<string, NarrationSong> | undefined) ?? null;
+  _fanReviewsData = (validated?.fanReviews as FanReview[] | undefined) ?? [];
 } catch {
   // Narration not available yet
 }
@@ -74,7 +78,8 @@ let _mediaCatalog: { version: number; assets: MediaCatalogAsset[] } | null = nul
 try {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const raw = require("../../../data/image-library.json");
-  _mediaCatalog = raw?.assets?.length ? raw : null;
+  const validated = safeParse(ImageLibrarySchema, raw);
+  _mediaCatalog = validated?.assets?.length ? (validated as { version: number; assets: MediaCatalogAsset[] }) : null;
 } catch {
   // Catalog not yet generated — auto-resolution disabled
 }

@@ -827,6 +827,30 @@ export function getOverlayOpacities(
     }
   }
 
+  // ─── Energy response curves: continuous per-overlay modulation ───
+  if (frames && frames.length > 0) {
+    const frameIdx = Math.min(frame, frames.length - 1);
+    const energy = computeSmoothedEnergy(frames, frameIdx);
+    for (const name of Object.keys(result)) {
+      const entry = OVERLAY_BY_NAME.get(name);
+      if (!entry?.energyResponse) continue;
+      const [threshold, peak, falloff] = entry.energyResponse;
+      let response: number;
+      if (energy <= threshold) {
+        response = 0;
+      } else if (energy <= peak) {
+        // Ramp up: smoothstep from threshold to peak
+        const t = (energy - threshold) / (peak - threshold);
+        response = t * t * (3 - 2 * t);
+      } else {
+        // Falloff above peak
+        const overshoot = (energy - peak) * falloff;
+        response = Math.max(0.3, 1 - overshoot);
+      }
+      result[name] = (result[name] ?? 0) * (0.3 + response * 0.7);
+    }
+  }
+
   // Energy breathing removed — SongVisualizer already applies overlayEnergyFactor
   // via mediaSuppression. Double-applying crushed overlays to <2% opacity.
 

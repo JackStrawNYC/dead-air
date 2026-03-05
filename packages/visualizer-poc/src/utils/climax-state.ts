@@ -12,6 +12,7 @@
 import type { EnhancedFrameData, SectionBoundary } from "../data/types";
 import { gaussianSmooth, type AudioSnapshot } from "./audio-reactive";
 import { smoothstepSimple as smoothstep, lerp } from "./math";
+import { findCurrentSection } from "./section-lookup";
 
 // ─── Types ───
 
@@ -63,15 +64,7 @@ export function computeClimaxState(
   const delta = energy - prevEnergy;
 
   // 3. Find current section
-  let currentSection: SectionBoundary | null = null;
-  let currentSectionIdx = -1;
-  for (let i = 0; i < sections.length; i++) {
-    if (idx >= sections[i].frameStart && idx < sections[i].frameEnd) {
-      currentSection = sections[i];
-      currentSectionIdx = i;
-      break;
-    }
-  }
+  const { sectionIndex: currentSectionIdx, section: currentSection } = findCurrentSection(sections, idx);
 
   // 4. Find next and previous sections
   const nextSection =

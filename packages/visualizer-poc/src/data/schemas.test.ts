@@ -7,6 +7,8 @@ import {
   MilestoneDataSchema,
   SongStatsSchema,
   SetlistEntrySchema,
+  OverlayScheduleSchema,
+  FlexibleTrackAnalysisSchema,
   safeParse,
 } from "./schemas";
 
@@ -140,5 +142,51 @@ describe("safeParse", () => {
     // ShowSetlistSchema requires songs array
     const result = safeParse(ShowSetlistSchema, { date: "bad" });
     expect(result).toBeNull();
+  });
+});
+
+describe("schema integration — safeParse with real schemas", () => {
+  it("validates a minimal overlay schedule", () => {
+    const schedule = {
+      generatedAt: "2026-03-05",
+      songs: {
+        s1t01: {
+          title: "Test Song",
+          activeOverlays: ["CosmicStarfield"],
+          totalCount: 1,
+        },
+      },
+    };
+    const result = safeParse(OverlayScheduleSchema, schedule);
+    expect(result).not.toBeNull();
+  });
+
+  it("rejects overlay schedule with invalid structure", () => {
+    const result = safeParse(OverlayScheduleSchema, { songs: "invalid" });
+    expect(result).toBeNull();
+  });
+
+  it("validates flexible track analysis with enhanced frames", () => {
+    const analysis = {
+      meta: {
+        source: "test.mp3",
+        duration: 300,
+        fps: 30,
+        sr: 22050,
+        hopLength: 512,
+        totalFrames: 1,
+        tempo: 120,
+        sections: [],
+      },
+      frames: [{
+        rms: 0.1, centroid: 0.5, onset: 0, beat: false,
+        sub: 0, low: 0, mid: 0, high: 0,
+        chroma: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        contrast: [0, 0, 0, 0, 0, 0, 0],
+        flatness: 0.2,
+      }],
+    };
+    const result = safeParse(FlexibleTrackAnalysisSchema, analysis);
+    expect(result).not.toBeNull();
   });
 });

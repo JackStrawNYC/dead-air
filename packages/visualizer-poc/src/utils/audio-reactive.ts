@@ -32,6 +32,8 @@ export interface AudioSnapshot {
   centroid: number;
   /** Smoothed tonal-vs-noise (window=15) */
   flatness: number;
+  /** Spectral flux: L2 norm of consecutive contrast vector differences, Gaussian-smoothed (window=8) */
+  spectralFlux: number;
 }
 
 /**
@@ -145,6 +147,39 @@ export function audioMap(
 }
 
 /**
+ * Compute spectral flux — rate of spectral change over a window.
+ * L2 norm of consecutive contrast vector differences, Gaussian-smoothed.
+ * High values indicate rapid timbral changes (transitions, drum hits).
+ */
+export function computeSpectralFlux(
+  frames: EnhancedFrameData[],
+  idx: number,
+  window = 8,
+): number {
+  let sum = 0;
+  let weightSum = 0;
+  const sigma = window * 0.5;
+  const lo = Math.max(1, idx - window);
+  const hi = Math.min(frames.length - 1, idx + window);
+
+  for (let i = lo; i <= hi; i++) {
+    const curr = frames[i].contrast;
+    const prev = frames[i - 1].contrast;
+    let l2 = 0;
+    for (let b = 0; b < 7; b++) {
+      const diff = curr[b] - prev[b];
+      l2 += diff * diff;
+    }
+    const dist = i - idx;
+    const weight = Math.exp(-(dist * dist) / (2 * sigma * sigma));
+    sum += Math.sqrt(l2) * weight;
+    weightSum += weight;
+  }
+
+  return weightSum > 0 ? sum / weightSum : 0;
+}
+
+/**
  * Compute all audio snapshot fields in one call.
  * Two-pass loop strategy for performance:
  *   - Wide pass (window=150) for energy
@@ -165,5 +200,6 @@ export function computeAudioSnapshot(
     chromaHue: smoothedChromaHue(frames, idx, 15),
     centroid: gaussianSmooth(frames, idx, (f) => f.centroid, 18),
     flatness: gaussianSmooth(frames, idx, (f) => f.flatness, 15),
+    spectralFlux: computeSpectralFlux(frames, idx, 8),
   };
 }

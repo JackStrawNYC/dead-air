@@ -252,6 +252,101 @@ function checkTrackAnalysis() {
   }
 }
 
+// ─── Stage 3b: Per-Frame Degenerate Detection ───
+
+function checkFrameQuality() {
+  console.log("\n--- Stage 3b: Frame Quality ---");
+
+  const setlistData = loadJson(join(DATA_DIR, "setlist.json")) as { songs: Array<{ trackId: string; title: string }> } | null;
+  if (!setlistData) {
+    fail("frame-quality:setlist", "Cannot check frame quality — setlist.json missing");
+    return;
+  }
+
+  const issues: string[] = [];
+  const repairs: string[] = [];
+
+  for (const song of setlistData.songs) {
+    const analysisPath = join(TRACKS_DIR, `${song.trackId}-analysis.json`);
+    if (!existsSync(analysisPath)) continue;
+
+    const data = loadJson(analysisPath) as {
+      meta: { totalFrames: number };
+      frames: Array<{ rms: number; centroid: number; onset: number; sub: number; low: number; mid: number; high: number; flatness: number }>;
+    } | null;
+    if (!data?.frames) continue;
+
+    const frames = data.frames;
+    let nanCount = 0;
+    let silenceRunStart = -1;
+    let longestSilence = 0;
+    let longestSilenceStart = 0;
+
+    for (let i = 0; i < frames.length; i++) {
+      const f = frames[i];
+
+      // Check for NaN values in critical fields
+      if (isNaN(f.rms) || isNaN(f.centroid) || isNaN(f.onset) || isNaN(f.flatness)) {
+        nanCount++;
+      }
+
+      // Track silence runs (RMS === 0 for extended periods)
+      if (f.rms === 0) {
+        if (silenceRunStart === -1) silenceRunStart = i;
+      } else {
+        if (silenceRunStart !== -1) {
+          const runLen = i - silenceRunStart;
+          if (runLen > longestSilence) {
+            longestSilence = runLen;
+            longestSilenceStart = silenceRunStart;
+          }
+          silenceRunStart = -1;
+        }
+      }
+    }
+
+    // Check trailing silence
+    if (silenceRunStart !== -1) {
+      const runLen = frames.length - silenceRunStart;
+      if (runLen > longestSilence) {
+        longestSilence = runLen;
+        longestSilenceStart = silenceRunStart;
+      }
+    }
+
+    if (nanCount > 0) {
+      issues.push(`NaN VALUES: ${song.trackId} has ${nanCount} frames with NaN fields`);
+      repairs.push(`Fix: re-run analysis for ${song.trackId}: npx tsx scripts/analyze.ts --track=${song.trackId}`);
+    }
+
+    // >10s of zero RMS at 30fps = 300 frames
+    if (longestSilence > 300) {
+      const startSec = (longestSilenceStart / 30).toFixed(1);
+      const durSec = (longestSilence / 30).toFixed(1);
+      issues.push(
+        `LONG SILENCE: ${song.trackId} has ${durSec}s of zero RMS starting at ${startSec}s (frame ${longestSilenceStart})`,
+      );
+      repairs.push(
+        `Fix: check audio file for ${song.trackId} — may have dead air or encoding issues. Try: ffmpeg -i public/audio/${song.trackId}.mp3 -af silencedetect=n=-50dB:d=5 -f null -`,
+      );
+    }
+  }
+
+  // Print repair suggestions
+  if (repairs.length > 0) {
+    console.log("\n  Repair suggestions:");
+    for (const r of repairs) {
+      console.log(`    ${r}`);
+    }
+  }
+
+  if (issues.length === 0) {
+    pass("frame-quality", "All frames pass quality checks (no NaN, no long silence runs)");
+  } else {
+    warn("frame-quality", `${issues.length} frame quality issue(s)`, issues);
+  }
+}
+
 // ─── Stage 4: Cross-File Consistency ───
 
 function checkConsistency() {
@@ -510,6 +605,7 @@ function main() {
     checkFileExistence();
     checkSchemas();
     checkTrackAnalysis();
+    checkFrameQuality();
     checkConsistency();
     checkDataQuality();
   }

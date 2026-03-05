@@ -8,6 +8,9 @@ import React, { createContext, useContext, useMemo } from "react";
 import { ThreeCanvas } from "@remotion/three";
 import { useCurrentFrame, useVideoConfig } from "remotion";
 import type { EnhancedFrameData, SectionBoundary, ColorPalette } from "../data/types";
+import { findCurrentSection } from "../utils/section-lookup";
+import { computeClimaxState, type ClimaxPhase } from "../utils/climax-state";
+import { computeAudioSnapshot as computeSnapshot } from "../utils/audio-reactive";
 
 /** Audio data context passed to all Three.js children */
 export interface AudioDataContext {
@@ -56,6 +59,10 @@ export interface AudioDataContext {
   tempo: number;
   /** Musical time: beat count + fractional interpolation, phase-locked to detected tempo */
   musicalTime: number;
+  /** Current climax phase (0=idle, 1=build, 2=climax, 3=sustain, 4=release) */
+  climaxPhase: number;
+  /** Climax intensity (0-1) within current phase */
+  climaxIntensity: number;
 }
 
 const AudioCtx = createContext<AudioDataContext | null>(null);
@@ -191,24 +198,6 @@ function colorAfterglowHue(frames: EnhancedFrameData[], idx: number, decayFrames
   return peakHue;
 }
 
-/** Find current section info from frame index */
-function findSection(
-  sections: SectionBoundary[],
-  frameIdx: number,
-): { sectionIndex: number; sectionProgress: number } {
-  for (let i = 0; i < sections.length; i++) {
-    const s = sections[i];
-    if (frameIdx >= s.frameStart && frameIdx < s.frameEnd) {
-      const progress = (frameIdx - s.frameStart) / Math.max(1, s.frameEnd - s.frameStart);
-      return { sectionIndex: i, sectionProgress: progress };
-    }
-  }
-  if (sections.length > 0) {
-    return { sectionIndex: sections.length - 1, sectionProgress: 1 };
-  }
-  return { sectionIndex: 0, sectionProgress: 0 };
-}
-
 /**
  * Pre-compute cumulative beat indices for O(1) musical time lookups.
  * Returns array of frame indices where beat=true.
@@ -288,7 +277,7 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
   const beatArray = useMemo(() => buildBeatArray(frames), [frames]);
 
   const sectionList = sections ?? [];
-  const { sectionIndex, sectionProgress } = findSection(sectionList, idx);
+  const { sectionIndex, sectionProgress } = findCurrentSection(sectionList, idx);
 
   const energy = smoothValue(frames, idx, (f) => f.rms, 150);
   const chromaHue = smoothValue(frames, idx, (f) => dominantChromaHue(f.chroma), 15);
@@ -302,6 +291,12 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
   // Key change detection + color afterglow
   const chromaShift = chromaShiftMagnitude(frames, idx);
   const afterglowHue = colorAfterglowHue(frames, idx);
+
+  // Climax state for shader uniforms
+  const phaseMap: Record<ClimaxPhase, number> = { idle: 0, build: 1, climax: 2, sustain: 3, release: 4 };
+  const climaxEnergy = smoothValue(frames, idx, (f) => f.rms, 150);
+  const climaxState = computeClimaxState(frames, idx, sectionList, climaxEnergy);
+  const climaxPhaseNum = phaseMap[climaxState.phase];
 
   const pal = palette ?? DEFAULT_PALETTE;
   const palettePrimary = pal.primary / 360;
@@ -336,6 +331,8 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
     paletteSaturation,
     tempo: tempo ?? 120,
     musicalTime: computeMusicalTime(beatArray, idx, fps, tempo ?? 120),
+    climaxPhase: climaxPhaseNum,
+    climaxIntensity: climaxState.intensity,
   };
 
   return (

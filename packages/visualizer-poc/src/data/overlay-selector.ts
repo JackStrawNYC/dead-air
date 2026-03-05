@@ -50,7 +50,8 @@ const FREQUENCY_CAP_PENALTY = 0.35;
 
 /**
  * Cross-song memory for variety enforcement.
- * Tracks recent song selections + show-wide frequency.
+ * Tracks recent song selections + show-wide frequency to prevent
+ * the same overlays appearing in every song. Used by selectOverlays().
  */
 export interface OverlayHistory {
   /** Recent song overlays, most recent first (up to LOOKBACK_DEPTH) */
@@ -61,12 +62,12 @@ export interface OverlayHistory {
   songCount: number;
 }
 
-/** Create an empty history (for the first song in a show) */
+/** Create an empty overlay history for the first song in a show. */
 export function emptyHistory(): OverlayHistory {
   return { recentSongs: [], frequency: new Map(), songCount: 0 };
 }
 
-/** Push a song's selected overlays into history, maintaining LOOKBACK_DEPTH window */
+/** Push a song's selected overlays into history, maintaining a sliding window of recent songs. */
 export function pushHistory(history: OverlayHistory, overlays: string[]): OverlayHistory {
   const recentSongs = [new Set(overlays), ...history.recentSongs].slice(0, LOOKBACK_DEPTH);
   const frequency = new Map(history.frequency);

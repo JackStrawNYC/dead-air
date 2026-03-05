@@ -16,6 +16,7 @@ import type {
   ColorPalette,
 } from "../data/types";
 import { seededLCG as seededRandom } from "../utils/seededRandom";
+import { findCurrentSection } from "../utils/section-lookup";
 
 const CROSSFADE_FRAMES = 90; // 3 seconds at 30fps (default when no beat found)
 const BEAT_CROSSFADE_FRAMES = 60; // 2 seconds when beat-synced (30 before + 30 after)
@@ -122,16 +123,7 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
   }
 
   // Find current section
-  let currentSectionIdx = 0;
-  for (let i = 0; i < sections.length; i++) {
-    if (frame >= sections[i].frameStart && frame < sections[i].frameEnd) {
-      currentSectionIdx = i;
-      break;
-    }
-    if (i === sections.length - 1) {
-      currentSectionIdx = i;
-    }
-  }
+  const { sectionIndex: currentSectionIdx } = findCurrentSection(sections, frame);
 
   const currentMode = getModeForSection(song, currentSectionIdx, sections, seed);
   const currentSection = sections[currentSectionIdx];

@@ -62,6 +62,8 @@ uniform float uPaletteSaturation;
 uniform float uOnsetSnap;
 uniform float uBeatSnap;
 uniform float uAfterglowHue;
+uniform float uClimaxPhase;
+uniform float uClimaxIntensity;
 uniform vec4 uContrast0;
 uniform vec4 uContrast1;
 

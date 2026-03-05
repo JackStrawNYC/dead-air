@@ -6,6 +6,7 @@ import { ChapterCard } from "./components/ChapterCard";
 import { SetBreakCard } from "./components/SetBreakCard";
 import { EndCard } from "./components/EndCard";
 import type { SetlistEntry, ShowSetlist, OverlaySchedule } from "./data/types";
+import { parseSetlist, safeParse, FlexibleTrackAnalysisSchema, OverlayScheduleSchema } from "./data/schemas";
 import { SELECTABLE_REGISTRY } from "./data/overlay-registry";
 import { formatDateLong } from "./data/ShowContext";
 import setlistData from "../data/setlist.json";
@@ -18,8 +19,9 @@ function loadTrackAnalysis(trackId: string) {
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const data = require(`../data/tracks/${trackId}-analysis.json`);
-    analysisCache[trackId] = data;
-    return data;
+    const validated = safeParse(FlexibleTrackAnalysisSchema, data);
+    analysisCache[trackId] = validated;
+    return validated;
   } catch {
     return null;
   }
@@ -29,13 +31,14 @@ function loadTrackAnalysis(trackId: string) {
 let overlaySchedule: OverlaySchedule | null = null;
 try {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  overlaySchedule = require("../data/overlay-schedule.json") as OverlaySchedule;
+  const rawSchedule = require("../data/overlay-schedule.json");
+  overlaySchedule = safeParse(OverlayScheduleSchema, rawSchedule);
 } catch {
   // Schedule not generated yet — all overlays will render
 }
 
 
-const setlist = setlistData as ShowSetlist;
+const setlist = parseSetlist(setlistData);
 
 const DEFAULT_FRAMES = 31417; // Morning Dew fallback
 const SET_BREAK_FRAMES = 300; // 10 seconds at 30fps
@@ -208,7 +211,7 @@ export const Root: React.FC = () => {
           width={1920}
           height={1080}
           defaultProps={{
-            song: setlist.songs.find((s) => s.trackId === "s2t08")!,
+            song: setlist.songs.find((s) => s.trackId === "s2t08") ?? setlist.songs[0],
             activeOverlays: getActiveOverlays("s2t08"),
             energyHints: getEnergyHints("s2t08"),
             show: setlist,

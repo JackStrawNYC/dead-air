@@ -6,6 +6,7 @@ import {
   smoothedChromaHue,
   audioMap,
   computeAudioSnapshot,
+  computeSpectralFlux,
 } from "./audio-reactive";
 import type { EnhancedFrameData } from "../data/types";
 
@@ -159,5 +160,36 @@ describe("computeAudioSnapshot", () => {
     expect(snap).toHaveProperty("centroid");
     expect(snap).toHaveProperty("flatness");
     expect(snap.energy).toBeCloseTo(0.15, 1);
+  });
+});
+
+describe("computeSpectralFlux", () => {
+  it("returns 0 for identical contrast vectors", () => {
+    const frames = Array.from({ length: 20 }, () =>
+      makeFrame({ contrast: [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5] }),
+    );
+    expect(computeSpectralFlux(frames, 10)).toBeCloseTo(0, 3);
+  });
+
+  it("returns positive value for changing contrast", () => {
+    const frames = Array.from({ length: 20 }, (_, i) =>
+      makeFrame({
+        contrast: i < 10
+          ? [0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1]
+          : [0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9],
+      }),
+    );
+    expect(computeSpectralFlux(frames, 10)).toBeGreaterThan(0);
+  });
+});
+
+describe("computeAudioSnapshot includes spectralFlux", () => {
+  it("snapshot has spectralFlux field", () => {
+    const frames = Array.from({ length: 100 }, () =>
+      makeFrame({ rms: 0.15, sub: 0.1, low: 0.1, mid: 0.2, high: 0.15, centroid: 0.5, flatness: 0.3 }),
+    );
+    const snap = computeAudioSnapshot(frames, 50);
+    expect(snap).toHaveProperty("spectralFlux");
+    expect(typeof snap.spectralFlux).toBe("number");
   });
 });

@@ -36,7 +36,7 @@ import { SceneVideoLayer, computeMediaWindows } from "./components/SceneVideoLay
 import { LyricTriggerLayer } from "./components/LyricTriggerLayer";
 import { resolveLyricTriggers, loadAlignmentWords } from "./data/lyric-trigger-resolver";
 import { resolveMediaForSong } from "./data/media-resolver";
-import { SongPaletteProvider, paletteHueRotation } from "./data/SongPaletteContext";
+import { SongPaletteProvider } from "./data/SongPaletteContext";
 import { EraGrade } from "./components/EraGrade";
 import { EnergyEnvelope } from "./components/EnergyEnvelope";
 import { computeClimaxState, climaxModulation } from "./utils/climax-state";
@@ -45,7 +45,8 @@ import { calibrateEnergy } from "./utils/energy";
 import { AudioSnapshotProvider } from "./data/AudioSnapshotContext";
 import { PoeticLyrics } from "./components/PoeticLyrics";
 import { computeJamEvolution } from "./utils/jam-evolution";
-import { blendPalettes } from "./utils/segue-detection";
+import { computeMediaSuppression, computeArtSuppressionFactor } from "./utils/media-suppression";
+import { computeSegueHueRotation } from "./utils/segue-blend";
 import { detectCrowdMoments } from "./data/crowd-detector";
 import { CrowdOverlay } from "./components/CrowdOverlay";
 import { CameraMotion } from "./components/CameraMotion";
@@ -108,7 +109,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
 
   const activeEntries = useMemo(() => {
     const entries = Object.entries(OVERLAY_COMPONENTS);
-    if (!activeSet) return entries;
+    if (!activeSet) return entries.slice(0, 50);
     return entries.filter(([name]) => activeSet.has(name));
   }, [activeSet]);
 
@@ -150,18 +151,12 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
 
   // ─── Palette hue rotation ───
   const hueRotation = useMemo(() => {
-    if (!props.song.palette) return 0;
-    if (props.segueIn && props.segueFromPalette && frame < FADE_FRAMES) {
-      const progress = frame / FADE_FRAMES;
-      const blended = blendPalettes(props.segueFromPalette, props.song.palette, progress);
-      return paletteHueRotation(blended);
-    }
-    if (props.segueOut && props.segueToPalette && frame > durationInFrames - FADE_FRAMES) {
-      const progress = (frame - (durationInFrames - FADE_FRAMES)) / FADE_FRAMES;
-      const blended = blendPalettes(props.song.palette, props.segueToPalette, progress);
-      return paletteHueRotation(blended);
-    }
-    return paletteHueRotation(props.song.palette);
+    return computeSegueHueRotation(
+      props.song.palette,
+      !!props.segueIn, !!props.segueOut,
+      props.segueFromPalette, props.segueToPalette,
+      frame, durationInFrames, FADE_FRAMES,
+    );
   }, [props.song.palette, props.segueIn, props.segueOut, props.segueFromPalette, props.segueToPalette, frame, durationInFrames]);
 
   // ─── Media resolution ───
@@ -204,7 +199,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
 
   // ─── Audio-reactive state (per-frame) ───
   const sections = getSections(analysis);
-  const tempo = analysis.meta.tempo ?? 120;
+  const tempo = analysis?.meta?.tempo ?? 120;
   const f = analysis.frames;
 
   const crowdMoments = useMemo(() => detectCrowdMoments(f), [f]);
@@ -229,25 +224,13 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
   );
   const activeMediaWindow = mediaWindows.find((w) => frame >= w.frameStart - 150 && frame < w.frameEnd + 150);
   const activeLyricTrigger = lyricTriggerWindows.find((w) => frame >= w.frameStart - 150 && frame < w.frameEnd + 120);
-  const mediaSuppression = activeLyricTrigger ? 0.15 : (activeMediaWindow?.media.priority ?? 99) <= 1 ? 0.25 : activeMediaWindow ? 0.40 : 1.0;
+  const mediaSuppression = computeMediaSuppression(frame, activeMediaWindow, activeLyricTrigger);
 
   const SUPPRESS_FADE = 90;
-  const artSuppressionFactor = useMemo(() => {
-    if (activeLyricTrigger) {
-      const fadeIn = Math.min(1, Math.max(0, (frame - (activeLyricTrigger.frameStart - 150)) / 150));
-      const fadeOut = Math.min(1, Math.max(0, (activeLyricTrigger.frameEnd + 120 - frame) / 120));
-      return 1 - Math.min(fadeIn, fadeOut) * 0.75;
-    }
-    if (activeMediaWindow) {
-      const isCurated = activeMediaWindow.media.priority <= 1;
-      const fadeIn = Math.min(1, Math.max(0, (frame - (activeMediaWindow.frameStart - SUPPRESS_FADE)) / SUPPRESS_FADE));
-      const fadeOut = Math.min(1, Math.max(0, (activeMediaWindow.frameEnd + SUPPRESS_FADE - frame) / SUPPRESS_FADE));
-      const envelope = Math.min(fadeIn, fadeOut);
-      const smooth = envelope * envelope * (3 - 2 * envelope);
-      return 1 - smooth * (1 - (isCurated ? 0.60 : 0.80));
-    }
-    return 1;
-  }, [frame, activeMediaWindow, activeLyricTrigger]);
+  const artSuppressionFactor = useMemo(
+    () => computeArtSuppressionFactor(frame, activeMediaWindow, activeLyricTrigger, SUPPRESS_FADE),
+    [frame, activeMediaWindow, activeLyricTrigger],
+  );
 
   // ─── Fade in/out ───
   const fadeIn = props.segueIn ? 1 : interpolate(frame, [0, FADE_FRAMES], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
@@ -264,7 +247,9 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
         <CameraMotion frames={f}>
         <EraGrade>
         <EnergyEnvelope snapshot={audioSnapshot} climaxMod={climaxMod} jamColorTemp={jamEvolution.isLongJam ? jamEvolution.colorTemperature : undefined} calibration={energyCalibration}>
-          <SceneRouter frames={f} sections={sections} song={props.song} tempo={tempo} seed={showSeed} />
+          <SilentErrorBoundary name="SceneRouter">
+            <SceneRouter frames={f} sections={sections} song={props.song} tempo={tempo} seed={showSeed} />
+          </SilentErrorBoundary>
 
           {effectiveSongArt && (
             <SilentErrorBoundary name="SongArt">
