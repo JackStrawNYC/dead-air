@@ -11,7 +11,7 @@ import {
 
 const log = createLogger('cli:produce');
 
-const STAGES = ['ingest', 'analyze', 'research', 'script', 'generate', 'render'] as const;
+const STAGES = ['ingest', 'analyze', 'research', 'bridge', 'script', 'generate', 'render'] as const;
 type Stage = (typeof STAGES)[number];
 
 function isValidDate(date: string): boolean {
@@ -164,6 +164,25 @@ export function registerProduceCommand(program: Command): void {
             });
             console.log(`  ${result.cached ? 'Cached' : `Cost: $${result.cost.toFixed(4)}`}`);
             console.log(`  Output: ${result.researchPath}\n`);
+          }
+
+          // ── bridge (pipeline → visualizer data) ──
+          if (stagesToRun.includes('bridge')) {
+            currentStage = 'bridge';
+            console.log('--- Stage: bridge ---');
+            const { execSync } = await import('child_process');
+            const bridgeScript = require.resolve('@dead-air/visualizer-poc/scripts/bridge-pipeline.ts') ??
+              require('path').resolve(__dirname, '..', '..', '..', 'visualizer-poc', 'scripts', 'bridge-pipeline.ts');
+            try {
+              execSync(
+                `npx tsx "${bridgeScript}" --date=${date} --data-dir="${config.paths.data}"`,
+                { stdio: 'inherit' },
+              );
+              console.log('  Bridge complete\n');
+            } catch (e) {
+              // Bridge is optional — warn but don't fail
+              console.warn(`  Bridge warning: ${(e as Error).message}\n`);
+            }
           }
 
           // ── script ──

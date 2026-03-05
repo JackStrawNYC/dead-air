@@ -61,19 +61,19 @@ try {
 
 /**
  * Load alignment words for a trackId.
- * Prefers deepgram alignment (better word-level timing),
- * falls back to mapped-lyrics source.
+ * Prefers mapped-lyrics alignment (correct lyrics force-aligned to timing),
+ * falls back to deepgram transcription (timing is good but words are often wrong).
  */
 export function loadAlignmentWords(trackId: string): AlignmentWord[] {
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const data = require(`../../data/lyrics/${trackId}-alignment-deepgram.json`);
+    const data = require(`../../data/lyrics/${trackId}-alignment.json`);
     if (data?.words?.length) return data.words;
   } catch { /* not available */ }
 
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const data = require(`../../data/lyrics/${trackId}-alignment.json`);
+    const data = require(`../../data/lyrics/${trackId}-alignment-deepgram.json`);
     if (data?.words?.length) return data.words;
   } catch { /* not available */ }
 
