@@ -10,6 +10,7 @@
  *   npx tsx scripts/generate-song-art.ts --track=show-poster # show poster only
  *   npx tsx scripts/generate-song-art.ts --force             # regenerate existing
  *   npx tsx scripts/generate-song-art.ts --track=s2t08 --fallback  # use Ideogram
+ *   npx tsx scripts/generate-song-art.ts --variants=3        # generate N style variants per song
  */
 
 import dotenv from "dotenv";
@@ -35,6 +36,16 @@ const dryRun = args.includes("--dry-run");
 const force = args.includes("--force");
 const useFallback = args.includes("--fallback");
 const trackFilter = args.find((a) => a.startsWith("--track="))?.split("=")[1];
+const variantCount = parseInt(args.find((a) => a.startsWith("--variants="))?.split("=")[1] ?? "1", 10);
+
+// Style modifiers for art variants
+const STYLE_MODIFIERS: Record<number, { label: string; modifier: string }> = {
+  1: { label: "psychedelic poster", modifier: "" }, // base style, no modifier
+  2: { label: "watercolor", modifier: "Rendered in loose, flowing watercolor style with wet-on-wet bleeding edges, transparent layering, and visible brushstrokes. Muted washes with splashes of vivid color." },
+  3: { label: "risograph", modifier: "Printed in risograph style with halftone dots, limited 3-color separation (cyan, magenta, gold), slight misregistration, textured recycled paper grain." },
+  4: { label: "screenprint", modifier: "Rendered as a hand-pulled screenprint with bold flat color fills, heavy black outlines, visible screen texture, limited to 5 spot colors. Vintage gig poster feel." },
+  5: { label: "blacklight", modifier: "Designed for blacklight viewing with intensely fluorescent neon colors (electric purple, hot pink, lime green, UV orange) against deep black. Glowing edges and phosphorescent details." },
+};
 
 // ─── Models ───
 const PRIMARY_MODEL = "recraft-ai/recraft-v4-pro" as const;
@@ -229,61 +240,79 @@ async function main() {
     }
   }
 
-  // ─── Per-song posters ───
+  // ─── Per-song posters (with variant support) ───
   if (trackFilter === SHOW_POSTER_ID) {
     // Only generating show poster, skip songs
   } else for (const song of targets) {
-    const outPath = join(ART_DIR, `${song.trackId}.png`);
-    const prompt = buildPrompt(song.title, song.trackId);
+    for (let v = 1; v <= variantCount; v++) {
+      const suffix = variantCount > 1 ? `-v${v}` : "";
+      const outPath = join(ART_DIR, `${song.trackId}${suffix}.png`);
+      const basePrompt = buildPrompt(song.title, song.trackId);
+      const styleModifier = STYLE_MODIFIERS[v]?.modifier ?? "";
+      const prompt = styleModifier ? `${basePrompt}\n${styleModifier}` : basePrompt;
 
-    if (!force && existsSync(outPath)) {
-      console.log(`  SKIP  ${song.trackId} — ${song.title} (exists)`);
-      skipped++;
-      continue;
-    }
-
-    console.log(`\n  ── ${song.trackId}: ${song.title} ──`);
-
-    if (dryRun) {
-      console.log(`  PROMPT:\n${prompt.split("\n").map((l) => `    ${l}`).join("\n")}`);
-      generated++;
-      continue;
-    }
-
-    try {
-      console.log(`  Generating with ${model}...`);
-      const output = await replicate!.run(model, {
-        input: {
-          prompt,
-          size: "3072x1536",
-        },
-      });
-
-      const imageUrl = await extractImageUrl(output);
-
-      if (!imageUrl) {
-        console.error(`  FAIL  No image URL returned`);
-        failed++;
+      if (!force && existsSync(outPath)) {
+        console.log(`  SKIP  ${song.trackId}${suffix} — ${song.title} (exists)`);
+        skipped++;
         continue;
       }
 
-      console.log(`  Downloading → ${outPath}`);
-      await download(imageUrl, outPath);
-      console.log(`  OK    ${song.trackId}.png saved`);
-      generated++;
-    } catch (err: any) {
-      console.error(`  FAIL  ${song.trackId}: ${err.message}`);
-      failed++;
+      const styleLabel = STYLE_MODIFIERS[v]?.label ?? `variant ${v}`;
+      console.log(`\n  ── ${song.trackId}${suffix}: ${song.title} [${styleLabel}] ──`);
+
+      if (dryRun) {
+        console.log(`  PROMPT:\n${prompt.split("\n").map((l) => `    ${l}`).join("\n")}`);
+        generated++;
+        continue;
+      }
+
+      try {
+        console.log(`  Generating with ${model}...`);
+        const output = await replicate!.run(model, {
+          input: {
+            prompt,
+            size: "3072x1536",
+          },
+        });
+
+        const imageUrl = await extractImageUrl(output);
+
+        if (!imageUrl) {
+          console.error(`  FAIL  No image URL returned`);
+          failed++;
+          continue;
+        }
+
+        console.log(`  Downloading → ${outPath}`);
+        await download(imageUrl, outPath);
+        console.log(`  OK    ${song.trackId}${suffix}.png saved`);
+        generated++;
+      } catch (err: any) {
+        console.error(`  FAIL  ${song.trackId}${suffix}: ${err.message}`);
+        failed++;
+      }
     }
   }
 
-  // Update setlist.json with songArt paths + showPoster
+  // Update setlist.json with songArt paths + showPoster + variant counts
   if (!dryRun && generated > 0) {
     const freshSetlist = JSON.parse(readFileSync(SETLIST_PATH, "utf-8"));
     for (const song of freshSetlist.songs) {
       const artPath = join(ART_DIR, `${song.trackId}.png`);
       if (existsSync(artPath)) {
         song.songArt = `assets/song-art/${song.trackId}.png`;
+      }
+      // Count how many variants exist for this song
+      if (variantCount > 1) {
+        let actualVariants = 0;
+        for (let v = 1; v <= variantCount; v++) {
+          if (existsSync(join(ART_DIR, `${song.trackId}-v${v}.png`))) {
+            actualVariants++;
+          }
+        }
+        if (actualVariants > 0) {
+          song.artVariantCount = actualVariants;
+        }
       }
     }
     // Add show poster path at top level

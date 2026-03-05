@@ -4,7 +4,7 @@
  * Provides audio data context for child Three.js components.
  */
 
-import React, { createContext, useContext } from "react";
+import React, { createContext, useContext, useMemo } from "react";
 import { ThreeCanvas } from "@remotion/three";
 import { useCurrentFrame, useVideoConfig } from "remotion";
 import type { EnhancedFrameData, SectionBoundary, ColorPalette } from "../data/types";
@@ -54,6 +54,8 @@ export interface AudioDataContext {
   paletteSaturation: number;
   /** Track tempo in BPM (default 120) */
   tempo: number;
+  /** Musical time: beat count + fractional interpolation, phase-locked to detected tempo */
+  musicalTime: number;
 }
 
 const AudioCtx = createContext<AudioDataContext | null>(null);
@@ -207,6 +209,63 @@ function findSection(
   return { sectionIndex: 0, sectionProgress: 0 };
 }
 
+/**
+ * Pre-compute cumulative beat indices for O(1) musical time lookups.
+ * Returns array of frame indices where beat=true.
+ */
+function buildBeatArray(frames: EnhancedFrameData[]): number[] {
+  const beats: number[] = [];
+  for (let i = 0; i < frames.length; i++) {
+    if (frames[i].beat) beats.push(i);
+  }
+  return beats;
+}
+
+/**
+ * Compute musical time: beat count + fractional interpolation between beats.
+ * Phase-locks to detected tempo so visuals breathe with the music.
+ * Returns a continuously incrementing value where integer crossings = beat hits.
+ */
+function computeMusicalTime(
+  beatArray: number[],
+  frameIdx: number,
+  fps: number,
+  tempo: number,
+): number {
+  if (beatArray.length === 0) {
+    // No beats detected — fall back to tempo-based estimate
+    return (frameIdx / fps) * (tempo / 60);
+  }
+
+  // Binary search for the last beat at or before frameIdx
+  let lo = 0;
+  let hi = beatArray.length - 1;
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >>> 1;
+    if (beatArray[mid] <= frameIdx) lo = mid;
+    else hi = mid - 1;
+  }
+
+  if (beatArray[lo] > frameIdx) {
+    // Before first beat — interpolate from frame 0 to first beat
+    const expectedSpacing = (fps * 60) / tempo;
+    return frameIdx / expectedSpacing;
+  }
+
+  const beatCount = lo;
+  const beatFrame = beatArray[lo];
+
+  // Fractional interpolation to next beat
+  const nextBeatFrame = lo + 1 < beatArray.length
+    ? beatArray[lo + 1]
+    : beatFrame + (fps * 60) / tempo; // estimate next beat from tempo
+
+  const spacing = nextBeatFrame - beatFrame;
+  const fraction = spacing > 0 ? (frameIdx - beatFrame) / spacing : 0;
+
+  return beatCount + Math.min(fraction, 1);
+}
+
 interface Props {
   frames: EnhancedFrameData[];
   children: React.ReactNode;
@@ -224,6 +283,9 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
 
   const idx = Math.min(Math.max(0, frameIdx), frames.length - 1);
   const fd = frames[idx];
+
+  // Pre-compute cumulative beat array (once per song, avoids O(n) per frame)
+  const beatArray = useMemo(() => buildBeatArray(frames), [frames]);
 
   const sectionList = sections ?? [];
   const { sectionIndex, sectionProgress } = findSection(sectionList, idx);
@@ -273,6 +335,7 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
     paletteSecondary,
     paletteSaturation,
     tempo: tempo ?? 120,
+    musicalTime: computeMusicalTime(beatArray, idx, fps, tempo ?? 120),
   };
 
   return (

@@ -13,13 +13,17 @@
  * Usage:
  *   npx tsx scripts/render-show.ts [--resume] [--track=s2t08] [--gl=angle]
  *   npx tsx scripts/render-show.ts --track=s1t10 --preview   # 10-second preview
+ *   npx tsx scripts/render-show.ts --show-date=1977-05-08    # dynamic show (after bridge)
  *
  * Features:
- *   --resume     Skip tracks with existing output
- *   --track=ID   Render only one track
- *   --gl=angle   GPU backend (default: angle)
- *   --chunk=N    Frames per chunk for long songs (default: 4500)
- *   --preview    Render only first 300 frames (10s) to a separate preview file
+ *   --resume      Skip tracks with existing output
+ *   --track=ID    Render only one track
+ *   --gl=angle    GPU backend (default: angle)
+ *   --chunk=N     Frames per chunk for long songs (default: 4500)
+ *   --preview     Render only first 300 frames (10s) to a separate preview file
+ *   --show-date   Show date for output naming (default: from setlist.json)
+ *   --data-dir    Data directory override (default: ROOT/data)
+ *   --seed        PRNG seed for generative variation (default: timestamp)
  */
 
 import { execSync } from "child_process";
@@ -44,6 +48,10 @@ const glArg = args.find((a) => a.startsWith("--gl="))?.split("=")[1] ?? "angle";
 const chunkSize = parseInt(args.find((a) => a.startsWith("--chunk="))?.split("=")[1] ?? "4500", 10);
 const trackFilter = args.find((a) => a.startsWith("--track="))?.split("=")[1];
 const previewMode = args.includes("--preview");
+const showDateArg = args.find((a) => a.startsWith("--show-date="))?.split("=")[1];
+const dataDirArg = args.find((a) => a.startsWith("--data-dir="))?.split("=")[1];
+const seedArg = args.find((a) => a.startsWith("--seed="))?.split("=")[1];
+const renderSeed = seedArg ? parseInt(seedArg, 10) : Date.now();
 const PREVIEW_FRAMES = 450; // 15 seconds at 30fps
 
 interface SetlistEntry {
@@ -380,6 +388,15 @@ function concatShow(
     }
   });
 
+  // Build segue set — songs whose predecessor has segueInto: true
+  const segueIntoSet = new Set<string>();
+  const setlistSongs: SetlistEntry[] = JSON.parse(readFileSync(join(DATA_DIR, "setlist.json"), "utf-8")).songs;
+  for (let i = 1; i < setlistSongs.length; i++) {
+    if (setlistSongs[i - 1].segueInto) {
+      segueIntoSet.add(setlistSongs[i].trackId);
+    }
+  }
+
   const entries: string[] = [];
   let prevSet = rendered[0]?.set ?? 1;
   let chaptersInserted = 0;
@@ -392,8 +409,8 @@ function concatShow(
       console.log(`  Inserted set break between set ${prevSet} and set ${set}`);
     }
 
-    // Insert "before" chapter cards (before this song)
-    if (trackId) {
+    // Insert "before" chapter cards (skip for segue-into songs — music flows continuously)
+    if (trackId && !segueIntoSet.has(trackId)) {
       const beforeIndices = chaptersBefore.get(trackId);
       if (beforeIndices) {
         for (const idx of beforeIndices) {
@@ -402,6 +419,11 @@ function concatShow(
           chaptersInserted++;
           console.log(`  Inserted chapter ${idx} before ${trackId}`);
         }
+      }
+    } else if (trackId && segueIntoSet.has(trackId)) {
+      const beforeIndices = chaptersBefore.get(trackId);
+      if (beforeIndices?.length) {
+        console.log(`  SEGUE: skipped ${beforeIndices.length} chapter card(s) before ${trackId}`);
       }
     }
 
@@ -539,8 +561,23 @@ function main() {
     concatShow(rendered, bundlePath, chapters);
   }
 
+  // Write variation metadata
+  const variationMeta = {
+    seed: renderSeed,
+    showDate: showDateArg ?? setlist.date,
+    renderedAt: new Date().toISOString(),
+    tracksRendered: rendered.length,
+    totalFrames,
+    previewMode,
+  };
+  writeFileSync(
+    join(OUT_DIR, "variation-meta.json"),
+    JSON.stringify(variationMeta, null, 2),
+  );
+  console.log(`\nVariation seed: ${renderSeed}`);
+
   const totalElapsed = (Date.now() - startTime) / 1000;
-  console.log(`\nDone! Rendered ${rendered.length} segment(s) in ${(totalElapsed / 60).toFixed(1)} minutes.`);
+  console.log(`Done! Rendered ${rendered.length} segment(s) in ${(totalElapsed / 60).toFixed(1)} minutes.`);
 }
 
 main();

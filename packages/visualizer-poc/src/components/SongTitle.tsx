@@ -13,12 +13,20 @@ interface Props {
   title: string;
   setNumber: number;
   trackNumber: number;
+  /** Segue mode: subtle lower-third title instead of center card */
+  isSegue?: boolean;
 }
 
 const FADE_IN = 45;
 const HOLD = 240;
 const FADE_OUT = 45;
 const TOTAL = FADE_IN + HOLD + FADE_OUT;
+
+// Segue lower-third timing
+const SEGUE_FADE_IN = 30;
+const SEGUE_HOLD = 180; // 6 seconds
+const SEGUE_FADE_OUT = 30;
+const SEGUE_TOTAL = SEGUE_FADE_IN + SEGUE_HOLD + SEGUE_FADE_OUT;
 
 type Era = "primal" | "classic" | "hiatus" | "touch_of_grey" | "revival";
 
@@ -76,7 +84,7 @@ const ERA_TYPOGRAPHY: Record<Era, EraTypography> = {
 
 const DEFAULT_TYPO: EraTypography = ERA_TYPOGRAPHY.classic;
 
-export const SongTitle: React.FC<Props> = ({ title, setNumber, trackNumber }) => {
+export const SongTitle: React.FC<Props> = ({ title, setNumber, trackNumber, isSegue }) => {
   const frame = useCurrentFrame();
   const ctx = useShowContext();
 
@@ -84,6 +92,51 @@ export const SongTitle: React.FC<Props> = ({ title, setNumber, trackNumber }) =>
     if (!ctx?.era || !(ctx.era in ERA_TYPOGRAPHY)) return DEFAULT_TYPO;
     return ERA_TYPOGRAPHY[ctx.era as Era];
   }, [ctx?.era]);
+
+  // Segue lower-third mode: subtle bottom-left title
+  if (isSegue) {
+    if (frame >= SEGUE_TOTAL) return null;
+
+    const segueOpacity = interpolate(
+      frame,
+      [0, SEGUE_FADE_IN, SEGUE_FADE_IN + SEGUE_HOLD, SEGUE_TOTAL],
+      [0, 0.65, 0.65, 0],
+      { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
+    );
+
+    const slideX = interpolate(
+      frame,
+      [0, SEGUE_FADE_IN],
+      [-20, 0],
+      { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
+    );
+
+    return (
+      <div
+        style={{
+          position: "absolute",
+          bottom: 60,
+          left: 60,
+          opacity: segueOpacity,
+          transform: `translateX(${slideX}px)`,
+          pointerEvents: "none",
+          zIndex: 100,
+        }}
+      >
+        <div
+          style={{
+            color: "rgba(255, 255, 255, 0.85)",
+            fontSize: 28,
+            fontFamily: typo.titleFont,
+            fontWeight: typo.titleWeight,
+            textShadow: "0 2px 16px rgba(0,0,0,0.7)",
+          }}
+        >
+          {title}
+        </div>
+      </div>
+    );
+  }
 
   if (frame >= TOTAL) return null;
 

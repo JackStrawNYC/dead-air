@@ -20,7 +20,7 @@ export const FullscreenQuad: React.FC<Props> = ({
   fragmentShader,
   extraUniforms,
 }) => {
-  const { time, beatDecay, smooth, palettePrimary, paletteSecondary, paletteSaturation, tempo } = useAudioData();
+  const { time, beatDecay, smooth, palettePrimary, paletteSecondary, paletteSaturation, tempo, musicalTime } = useAudioData();
   const { width, height } = useVideoConfig();
 
   const uniforms = useMemo(() => {
@@ -47,6 +47,7 @@ export const FullscreenQuad: React.FC<Props> = ({
       uBeatSnap: { value: 0 },
       uChromaShift: { value: 0 },
       uAfterglowHue: { value: 0 },
+      uMusicalTime: { value: 0 },
       uContrast0: { value: new THREE.Vector4(0, 0, 0, 0) },
       uContrast1: { value: new THREE.Vector4(0, 0, 0, 0) },
       ...extraUniforms,
@@ -76,6 +77,7 @@ export const FullscreenQuad: React.FC<Props> = ({
   uniforms.uBeatSnap.value = smooth.beatSnap;
   uniforms.uChromaShift.value = smooth.chromaShift;
   uniforms.uAfterglowHue.value = smooth.afterglowHue;
+  uniforms.uMusicalTime.value = musicalTime;
 
   const c = smooth.contrast;
   uniforms.uContrast0.value.set(c[0] ?? 0, c[1] ?? 0, c[2] ?? 0, c[3] ?? 0);

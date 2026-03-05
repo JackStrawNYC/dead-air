@@ -41,10 +41,17 @@ import { CrowdAmbience } from "./components/CrowdAmbience";
 import { SongDNA } from "./components/SongDNA";
 import type { SongStats } from "./components/SongDNA";
 import { MilestoneCard } from "./components/MilestoneCard";
+import { PoeticLyrics } from "./components/PoeticLyrics";
+import { ListenFor } from "./components/ListenFor";
 import type { Milestone } from "./data/types";
 import { computeJamEvolution } from "./utils/jam-evolution";
 import { blendPalettes } from "./utils/segue-detection";
 import type { ColorPalette } from "./data/types";
+import { detectCrowdMoments } from "./data/crowd-detector";
+import { CrowdOverlay } from "./components/CrowdOverlay";
+import { CameraMotion } from "./components/CameraMotion";
+import { FanQuoteOverlay } from "./components/FanQuoteOverlay";
+import type { FanReview } from "./components/FanQuoteOverlay";
 
 // Song stats — real Grateful Dead performance data
 let songStatsData: Record<string, SongStats> | null = null;
@@ -69,6 +76,23 @@ try {
   }
 } catch {
   // Milestones not available yet
+}
+
+// Narration data — "listen for" moments and song context
+interface NarrationSong {
+  listenFor: string[];
+  context?: string;
+  songHistory?: string;
+}
+let narrationData: Record<string, NarrationSong> | null = null;
+let fanReviewsData: FanReview[] = [];
+try {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const raw = require("../data/narration.json");
+  narrationData = raw?.songs ?? null;
+  fanReviewsData = raw?.fanReviews ?? [];
+} catch {
+  // Narration not available yet
 }
 
 import type { RotationSchedule } from "./data/overlay-rotation";
@@ -104,7 +128,7 @@ function applyDensityMult(
 const ART_FULL_END = 120;      // 4s at 30fps — full opacity title card
 const ART_FADE_END = 300;      // 10s — fade to background wash level
 const OVERLAY_GATE_END = 420;  // 14s — overlays hidden until intro elements clear
-// Art wash opacity is now energy-reactive: 0.30 (quiet) → 0.10 (peak)
+// Art wash opacity is now energy-reactive: 0.55 (quiet) → 0.25 (peak)
 
 interface SongArtProps {
   src: string;
@@ -123,11 +147,11 @@ interface SongArtProps {
 const SongArtLayer: React.FC<SongArtProps> = ({ src, suppressionFactor, hueRotation = 0, energy = 0 }) => {
   const frame = useCurrentFrame();
 
-  // Energy-reactive wash: quiet → 0.30, peak → 0.10
+  // Energy-reactive wash: quiet → 0.55, peak → 0.25
   const energyWash = interpolate(
     energy,
     [0.03, 0.30],
-    [0.30, 0.10],
+    [0.55, 0.25],
     { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
   );
 
@@ -321,8 +345,18 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
     );
   }, [props.song.title, props.song.trackId, showSeed]);
 
+  // Variant art selection: if variants exist, pick based on seed
+  const variantArt = useMemo(() => {
+    const base = props.song.songArt;
+    const count = props.song.artVariantCount;
+    if (!base || !count || count <= 0 || !showSeed) return null;
+    const variantIdx = (showSeed % count) + 1;
+    // e.g., assets/song-art/s2t08.png → assets/song-art/s2t08-v2.png
+    return base.replace(/\.png$/, `-v${variantIdx}.png`);
+  }, [props.song.songArt, props.song.artVariantCount, showSeed]);
+
   // Explicit overrides in setlist.json take priority over auto-resolution
-  const effectiveSongArt = props.song.songArt ?? resolvedMedia?.songArt ?? undefined;
+  const effectiveSongArt = variantArt ?? props.song.songArt ?? resolvedMedia?.songArt ?? undefined;
   const effectiveMedia = (props.song.sceneVideos?.length)
     ? undefined    // legacy path — use SceneVideo[] directly
     : resolvedMedia?.media;
@@ -365,6 +399,9 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
   const sections = getSections(analysis);
   const tempo = analysis.meta.tempo ?? 120;
   const f = analysis.frames;
+
+  // Detect crowd noise moments (once per song)
+  const crowdMoments = useMemo(() => detectCrowdMoments(f), [f]);
 
   // Compute audio snapshot ONCE per frame — shared via context with all consumers
   const frameIdx = Math.min(Math.max(0, frame), f.length - 1);
@@ -450,6 +487,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
       <AudioSnapshotProvider snapshot={audioSnapshot}>
       <VisualizerErrorBoundary>
       <div style={{ position: "absolute", inset: 0, opacity }}>
+        <CameraMotion frames={f}>
         <EraGrade>
         <EnergyEnvelope snapshot={audioSnapshot} climaxMod={climaxMod} jamColorTemp={jamEvolution.isLongJam ? jamEvolution.colorTemperature : undefined} calibration={energyCalibration}>
           {/* ═══ Layer 0: Base shader visualization ═══ */}
@@ -458,6 +496,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
             sections={sections}
             song={props.song}
             tempo={tempo}
+            seed={showSeed}
           />
 
           {/* ═══ Layer 0.5: Per-song poster art (persistent background wash) ═══ */}
@@ -489,6 +528,16 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
               <LyricTriggerLayer windows={lyricTriggerWindows} />
             </SilentErrorBoundary>
           )}
+
+          {/* ═══ Layer 0.9: Poetic lyrics — flowing text synced to word-level alignment ═══ */}
+          <SilentErrorBoundary name="PoeticLyrics">
+            <PoeticLyrics
+              alignmentWords={loadAlignmentWords(props.song.trackId)}
+              triggerWindows={triggerSuppressedRanges}
+              sections={sections}
+              frames={f}
+            />
+          </SilentErrorBoundary>
 
           {/* ═══ Dynamic overlay layers (1-10) ═══ */}
           {/* Hidden during title card, then fade in over 3 seconds (skip gate during segue-in) */}
@@ -532,17 +581,28 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
           </SongPaletteProvider>
           </TempoProvider>
 
+          {/* ═══ Crowd noise overlay — warm glow during applause ═══ */}
+          {crowdMoments.length > 0 && (
+            <SilentErrorBoundary name="CrowdOverlay">
+              <SongPaletteProvider palette={props.song.palette}>
+                <CrowdOverlay moments={crowdMoments} />
+              </SongPaletteProvider>
+            </SilentErrorBoundary>
+          )}
+
           {/* ═══ ConcertInfo + SetlistScroll — own timing, outside overlay gate ═══ */}
           <ConcertInfo />
           <SetlistScroll frames={f} currentSong={props.song.title} />
         </EnergyEnvelope>
         </EraGrade>
+        </CameraMotion>
 
         {/* ═══ Always-active: special-prop components ═══ */}
         <SongTitle
           title={props.song.title}
           setNumber={props.song.set}
           trackNumber={props.song.trackNumber}
+          isSegue={props.segueIn && !comesFromDrumsSpace}
         />
         {/* Song DNA stats card — appears after song art settles */}
         {songStatsData && songStatsData[props.song.trackId] && (
@@ -554,6 +614,27 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
         {milestonesMap && milestonesMap[props.song.trackId] && (
           <SilentErrorBoundary name="MilestoneCard">
             <MilestoneCard milestone={milestonesMap[props.song.trackId]} />
+          </SilentErrorBoundary>
+        )}
+        {/* Listen For card — contextual "listen for" moments */}
+        {narrationData && narrationData[props.song.trackId] && (
+          <SilentErrorBoundary name="ListenFor">
+            <SongPaletteProvider palette={props.song.palette}>
+              <ListenFor
+                items={narrationData[props.song.trackId].listenFor}
+                context={narrationData[props.song.trackId].context}
+              />
+            </SongPaletteProvider>
+          </SilentErrorBoundary>
+        )}
+        {/* Fan quote overlay — archive.org reviews every 3rd song */}
+        {fanReviewsData.length > 0 && (
+          <SilentErrorBoundary name="FanQuoteOverlay">
+            <FanQuoteOverlay
+              reviews={fanReviewsData}
+              trackNumber={props.song.trackNumber}
+              seed={showSeed}
+            />
           </SilentErrorBoundary>
         )}
         <FilmGrain opacity={interpolate(

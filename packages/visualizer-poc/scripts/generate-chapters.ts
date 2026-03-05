@@ -10,6 +10,7 @@
  * Usage:
  *   npx tsx scripts/generate-chapters.ts
  *   npx tsx scripts/generate-chapters.ts --include-cards   # also timestamp chapter cards
+ *   npx tsx scripts/generate-chapters.ts --sub-chapters    # add listen-for, jam peaks, segues
  */
 
 import { existsSync, readFileSync, writeFileSync } from "fs";
@@ -17,6 +18,7 @@ import { join, resolve } from "path";
 
 const ROOT = resolve(import.meta.dirname, "..");
 const DATA_DIR = join(ROOT, "data");
+const TRACKS_DIR = join(DATA_DIR, "tracks");
 const OUT_DIR = join(ROOT, "out");
 
 // Constants matching Root.tsx / render-show.ts
@@ -25,6 +27,7 @@ const CHAPTER_CARD_FRAMES = 180; // 6s
 const SET_BREAK_FRAMES = 300;    // 10s
 const END_CARD_FRAMES = 360;     // 12s
 const FPS = 30;
+const JAM_MIN_FRAMES = 14400; // 8 minutes at 30fps — songs with jams
 
 interface SetlistEntry {
   trackId: string;
@@ -45,6 +48,15 @@ interface ChapterEntry {
   text: string;
 }
 
+interface NarrationSong {
+  listenFor: string[];
+  context?: string;
+}
+
+interface FrameData {
+  rms: number;
+}
+
 function framesToTimestamp(frames: number): string {
   const totalSeconds = Math.floor(frames / FPS);
   const hours = Math.floor(totalSeconds / 3600);
@@ -57,14 +69,52 @@ function framesToTimestamp(frames: number): string {
   return `${minutes}:${String(seconds).padStart(2, "0")}`;
 }
 
+/**
+ * Find jam peak: 30-frame window with highest average RMS.
+ * Only for songs > 8 minutes.
+ */
+function findJamPeak(trackId: string): number | null {
+  const analysisPath = join(TRACKS_DIR, `${trackId}-analysis.json`);
+  if (!existsSync(analysisPath)) return null;
+
+  try {
+    const analysis = JSON.parse(readFileSync(analysisPath, "utf-8"));
+    const frames: FrameData[] = analysis.frames;
+    if (!frames || frames.length < JAM_MIN_FRAMES) return null;
+
+    const WINDOW = 30;
+    let bestStart = 0;
+    let bestAvg = 0;
+
+    for (let i = 0; i <= frames.length - WINDOW; i++) {
+      let sum = 0;
+      for (let j = i; j < i + WINDOW; j++) {
+        sum += frames[j].rms;
+      }
+      const avg = sum / WINDOW;
+      if (avg > bestAvg) {
+        bestAvg = avg;
+        bestStart = i;
+      }
+    }
+
+    // Return center of the best window
+    return bestStart + Math.floor(WINDOW / 2);
+  } catch {
+    return null;
+  }
+}
+
 function main() {
   const args = process.argv.slice(2);
   const includeCards = args.includes("--include-cards");
+  const subChapters = args.includes("--sub-chapters");
 
   // Load data
   const setlistPath = join(DATA_DIR, "setlist.json");
   const timelinePath = join(DATA_DIR, "show-timeline.json");
   const contextPath = join(DATA_DIR, "show-context.json");
+  const narrationPath = join(DATA_DIR, "narration.json");
 
   if (!existsSync(setlistPath)) {
     console.error("ERROR: setlist.json not found");
@@ -85,6 +135,13 @@ function main() {
   if (existsSync(contextPath)) {
     const ctx = JSON.parse(readFileSync(contextPath, "utf-8"));
     chapters = ctx.chapters ?? [];
+  }
+
+  // Load narration for sub-chapters
+  let narrationSongs: Record<string, NarrationSong> = {};
+  if (subChapters && existsSync(narrationPath)) {
+    const narration = JSON.parse(readFileSync(narrationPath, "utf-8"));
+    narrationSongs = narration.songs ?? {};
   }
 
   // Build chapter lookup maps
@@ -115,7 +172,8 @@ function main() {
     cursor += SHOW_INTRO_FRAMES;
   }
 
-  for (const song of songs) {
+  for (let si = 0; si < songs.length; si++) {
+    const song = songs[si];
     const track = tracks.find((t: TimelineTrack) => t.trackId === song.trackId);
     if (!track || track.missing) continue;
 
@@ -127,9 +185,13 @@ function main() {
       cursor += SET_BREAK_FRAMES;
     }
 
+    // Skip "before" chapter cards for segue-into songs
+    const prevSong = si > 0 ? songs[si - 1] : null;
+    const isSegueInto = prevSong?.segueInto === true;
+
     // "Before" chapter cards
     const beforeIndices = chaptersBefore.get(song.trackId);
-    if (beforeIndices) {
+    if (beforeIndices && !isSegueInto) {
       for (const idx of beforeIndices) {
         if (includeCards) {
           output.push({
@@ -142,12 +204,51 @@ function main() {
       }
     }
 
+    const songStartFrame = cursor;
+
     // Song start
     output.push({
       timestamp: framesToTimestamp(cursor),
       label: song.title,
       frames: cursor,
     });
+
+    // Sub-chapters (if --sub-chapters enabled)
+    if (subChapters) {
+      // "Listen for" sub-chapter at 30s into each song
+      const narration = narrationSongs[song.trackId];
+      if (narration?.listenFor?.length > 0) {
+        const listenForFrame = songStartFrame + 900; // 30s in
+        if (listenForFrame < songStartFrame + track.totalFrames) {
+          output.push({
+            timestamp: framesToTimestamp(listenForFrame),
+            label: `  \u2192 Listen for: ${narration.listenFor[0]}`,
+            frames: listenForFrame,
+          });
+        }
+      }
+
+      // Jam peak marker for songs > 8 min
+      const jamPeakFrame = findJamPeak(song.trackId);
+      if (jamPeakFrame !== null) {
+        output.push({
+          timestamp: framesToTimestamp(songStartFrame + jamPeakFrame),
+          label: `  \u2605 Jam peak`,
+          frames: songStartFrame + jamPeakFrame,
+        });
+      }
+
+      // Segue marker at end of this song
+      if (song.segueInto && si + 1 < songs.length) {
+        const nextSong = songs[si + 1];
+        const segueFrame = songStartFrame + track.totalFrames - 150; // ~5s before end
+        output.push({
+          timestamp: framesToTimestamp(segueFrame),
+          label: `  \u2192 \u2192 ${nextSong.title}`,
+          frames: segueFrame,
+        });
+      }
+    }
 
     cursor += track.totalFrames;
 
@@ -175,19 +276,22 @@ function main() {
   }
   cursor += END_CARD_FRAMES;
 
+  // Sort sub-chapters by frame position
+  output.sort((a, b) => a.frames - b.frames);
+
   // Output
   const totalDuration = framesToTimestamp(cursor);
   console.log(`\nYouTube Chapters — ${setlist.date} ${setlist.venue}`);
   console.log(`Total duration: ${totalDuration}\n`);
-  console.log("─".repeat(50));
+  console.log("\u2500".repeat(50));
 
   const chapterText = output.map((o) => `${o.timestamp} ${o.label}`).join("\n");
   console.log(chapterText);
-  console.log("─".repeat(50));
+  console.log("\u2500".repeat(50));
 
   // Write to file
   const outFile = join(OUT_DIR, "youtube-chapters.txt");
-  const header = `# YouTube Chapters — ${setlist.date} ${setlist.venue}\n# Total: ${totalDuration}\n# Generated: ${new Date().toISOString()}\n\n`;
+  const header = `# YouTube Chapters \u2014 ${setlist.date} ${setlist.venue}\n# Total: ${totalDuration}\n# Generated: ${new Date().toISOString()}\n\n`;
   writeFileSync(outFile, header + chapterText + "\n");
   console.log(`\nWritten to: ${outFile}`);
 }

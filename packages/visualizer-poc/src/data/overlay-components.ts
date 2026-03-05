@@ -45,8 +45,16 @@ import { NorthernLights } from "../components/NorthernLights";
 import { Topography } from "../components/Topography";
 import { FestivalTent } from "../components/FestivalTent";
 
+// ─── Layer 3 (pre-import): Waveform ───
+import { WaveformOverlay } from "../components/WaveformOverlay";
+
 // ─── Layer 2: Sacred / Center-stage ───
 import { BreathingStealie } from "../components/BreathingStealie";
+import { StealieFade } from "../components/StealieFade";
+import { LightningBoltOverlay } from "../components/LightningBoltOverlay";
+import { RoseOverlay } from "../components/RoseOverlay";
+import { SkullRosesOverlay } from "../components/SkullRosesOverlay";
+import { DancingTerrapinOverlay } from "../components/DancingTerrapinOverlay";
 import { SacredGeometry } from "../components/SacredGeometry";
 import { SkullKaleidoscope } from "../components/SkullKaleidoscope";
 import { FractalZoom } from "../components/FractalZoom";
@@ -401,6 +409,11 @@ export const OVERLAY_COMPONENTS: Record<string, OverlayComponentEntry> = {
 
   // Layer 2: Sacred / Center-stage
   BreathingStealie:  { Component: BreathingStealie, layer: 2 },
+  StealieFade:       { Component: StealieFade, layer: 2 },
+  LightningBoltOverlay: { Component: LightningBoltOverlay, layer: 3 },
+  RoseOverlay:       { Component: RoseOverlay, layer: 2 },
+  SkullRosesOverlay: { Component: SkullRosesOverlay, layer: 2 },
+  DancingTerrapinOverlay: { Component: DancingTerrapinOverlay, layer: 2 },
   SacredGeometry:    { Component: SacredGeometry, layer: 2 },
   SkullKaleidoscope: { Component: SkullKaleidoscope, layer: 2 },
   FractalZoom:       { Component: FractalZoom, layer: 2 },
@@ -439,6 +452,7 @@ export const OVERLAY_COMPONENTS: Record<string, OverlayComponentEntry> = {
   SpaceDrums:        { Component: SpaceDrums, layer: 2 },
 
   // Layer 3: Song-reactive
+  WaveformOverlay:       { Component: WaveformOverlay, layer: 3 },
   SongReactiveEffects: { Component: SongReactiveEffects, layer: 3 },
   EnergyEffects:       { Component: EnergyEffects, layer: 3 },
   WallOfSound:         { Component: WallOfSound, layer: 3 },

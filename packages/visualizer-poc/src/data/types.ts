@@ -80,7 +80,10 @@ export type VisualMode =
   | "concert_lighting"
   | "lo_fi_grain"
   | "stark_minimal"
-  | "oil_projector";
+  | "oil_projector"
+  | "tie_dye"
+  | "cosmic_dust"
+  | "vintage_film";
 
 /** Per-section mode override in setlist */
 export interface SectionOverride {
@@ -145,6 +148,8 @@ export interface SetlistEntry {
   sceneVideos?: SceneVideo[];
   /** This song flows directly into the next (segue) — no fade-out, next song skips fade-in + art */
   segueInto?: boolean;
+  /** Number of art variants generated (for seed-based selection) */
+  artVariantCount?: number;
 }
 
 /** Manual overlay overrides per song */

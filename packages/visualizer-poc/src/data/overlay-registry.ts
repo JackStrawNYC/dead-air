@@ -50,6 +50,11 @@ export const OVERLAY_REGISTRY: OverlayEntry[] = [
 
   // ═══ Layer 2: Sacred / Center-stage elements ═══
   { name: "BreathingStealie",  layer: 2, category: "sacred", tags: ["dead-culture", "psychedelic"],    energyBand: "any",  weight: 3, dutyCycle: 100 },
+  { name: "StealieFade",       layer: 2, category: "sacred", tags: ["dead-culture", "contemplative"],  energyBand: "low",  weight: 2, dutyCycle: 100 },
+  { name: "LightningBoltOverlay", layer: 3, category: "reactive", tags: ["dead-culture", "intense"],   energyBand: "high", weight: 3 },
+  { name: "RoseOverlay",       layer: 2, category: "sacred", tags: ["dead-culture", "contemplative"],  energyBand: "low",  weight: 2, dutyCycle: 100 },
+  { name: "SkullRosesOverlay", layer: 2, category: "sacred", tags: ["dead-culture", "contemplative"],  energyBand: "mid",  weight: 2, dutyCycle: 100 },
+  { name: "DancingTerrapinOverlay", layer: 2, category: "sacred", tags: ["dead-culture", "cosmic"],    energyBand: "low",  weight: 2, dutyCycle: 100 },
   { name: "SacredGeometry",    layer: 2, category: "sacred", tags: ["cosmic", "contemplative"],        energyBand: "mid",  weight: 2, dutyCycle: 36 },
   { name: "SkullKaleidoscope", layer: 2, category: "sacred", tags: ["dead-culture", "psychedelic"],    energyBand: "mid",  weight: 3, dutyCycle: 100 },
   { name: "FractalZoom",       layer: 2, category: "sacred", tags: ["psychedelic", "cosmic"],           energyBand: "mid",  weight: 2 },
@@ -88,6 +93,7 @@ export const OVERLAY_REGISTRY: OverlayEntry[] = [
   { name: "SpaceDrums",        layer: 2, category: "sacred", tags: ["cosmic", "dead-culture"],         energyBand: "low",  weight: 3 },
 
   // ═══ Layer 3: Song-reactive effects ═══
+  { name: "WaveformOverlay",     layer: 3, category: "reactive", tags: ["psychedelic", "organic"],        energyBand: "any",  weight: 1, dutyCycle: 100 },
   { name: "SongReactiveEffects", layer: 3, category: "reactive", tags: ["intense", "psychedelic"],       energyBand: "any",  weight: 2 },
   { name: "EnergyEffects",       layer: 3, category: "reactive", tags: ["intense", "psychedelic"],       energyBand: "any",  weight: 2 },
   { name: "WallOfSound",         layer: 3, category: "reactive", tags: ["intense", "festival"],          energyBand: "high", weight: 3, dutyCycle: 17 },
