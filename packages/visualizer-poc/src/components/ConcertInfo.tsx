@@ -9,7 +9,7 @@ import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
 import { useShowContext, formatDateCompact } from "../data/ShowContext";
 import { useSongPalette } from "../data/SongPaletteContext";
 
-const DELAY = 300;          // 10s — appears once, clean during music
+const DELAY = 60;           // 2s — appears during poster art intro, alongside song title
 const SHOW_DURATION = 240;  // 8 seconds visible total (incl fades)
 const FADE_IN = 60;
 const FADE_OUT = 60;

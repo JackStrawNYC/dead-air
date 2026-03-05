@@ -13,7 +13,7 @@ import { seeded } from "../utils/seededRandom";
 
 // -- Timing -----------------------------------------------------------------
 
-const DELAY = 300;            // 10s — appears once, clean during music
+const DELAY = 900;            // 30s — appears well after intro clears, its own moment
 const SHOW_DURATION = 240;    // 8 seconds visible total (incl fades)
 const FADE_IN_FRAMES = 60;
 const FADE_OUT_FRAMES = 60;

@@ -103,6 +103,7 @@ function applyDensityMult(
 // ─── Song Art Phases ───
 const ART_FULL_END = 120;      // 4s at 30fps — full opacity title card
 const ART_FADE_END = 300;      // 10s — fade to background wash level
+const OVERLAY_GATE_END = 420;  // 14s — overlays hidden until intro elements clear
 const ART_BG_OPACITY = 0.55;   // background wash — poster clearly visible under overlays
 
 interface SongArtProps {
@@ -450,8 +451,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
           />
 
           {/* ═══ Layer 0.5: Per-song poster art (persistent background wash) ═══ */}
-          {/* Skip song art during segue-in UNLESS emerging from Drums/Space (reveal moment) */}
-          {effectiveSongArt && (!props.segueIn || comesFromDrumsSpace) && (
+          {effectiveSongArt && (
             <SilentErrorBoundary name="SongArt">
               <SongArtLayer src={staticFile(effectiveSongArt)} suppressionFactor={artSuppressionFactor} hueRotation={hueRotation} />
             </SilentErrorBoundary>
@@ -488,13 +488,12 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
               style={{
                 position: "absolute",
                 inset: 0,
-                opacity: (effectiveSongArt && !props.segueIn)
-                  ? interpolate(frame, [ART_FADE_END, ART_FADE_END + 90], [0, 1], {
-                      extrapolateLeft: "clamp",
-                      extrapolateRight: "clamp",
-                      easing: Easing.out(Easing.cubic),
-                    })
-                  : 1,
+                opacity: interpolate(
+                  frame,
+                  [OVERLAY_GATE_END, OVERLAY_GATE_END + 90],
+                  [0, 1],
+                  { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: Easing.out(Easing.cubic) },
+                ),
                 filter: hueRotation !== 0 ? `hue-rotate(${hueRotation.toFixed(1)}deg)` : undefined,
               }}
             >
@@ -519,25 +518,24 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
                   </div>
                 );
               })}
-              <ConcertInfo />
-              <SetlistScroll frames={f} currentSong={props.song.title} />
             </div>
           </SongPaletteProvider>
           </TempoProvider>
+
+          {/* ═══ ConcertInfo + SetlistScroll — own timing, outside overlay gate ═══ */}
+          <ConcertInfo />
+          <SetlistScroll frames={f} currentSong={props.song.title} />
         </EnergyEnvelope>
         </EraGrade>
 
         {/* ═══ Always-active: special-prop components ═══ */}
-        {/* Suppress SongTitle during segue-in UNLESS emerging from Drums/Space */}
-        {(!props.segueIn || comesFromDrumsSpace) && (
-          <SongTitle
-            title={props.song.title}
-            setNumber={props.song.set}
-            trackNumber={props.song.trackNumber}
-          />
-        )}
-        {/* Song DNA stats card — appears after song art settles (skip during segue-in unless from Drums/Space) */}
-        {(!props.segueIn || comesFromDrumsSpace) && songStatsData && songStatsData[props.song.trackId] && (
+        <SongTitle
+          title={props.song.title}
+          setNumber={props.song.set}
+          trackNumber={props.song.trackNumber}
+        />
+        {/* Song DNA stats card — appears after song art settles */}
+        {songStatsData && songStatsData[props.song.trackId] && (
           <SilentErrorBoundary name="SongDNA">
             <SongDNA stats={songStatsData[props.song.trackId]} />
           </SilentErrorBoundary>

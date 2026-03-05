@@ -34,8 +34,8 @@ export interface SongDNAProps {
   colorAccent?: string;
 }
 
-const APPEAR_FRAME = 210;  // 7s — after song art fades to wash (ART_FADE_END=300) and overlays start
-const HOLD_END = 390;       // 13s — holds for 6 seconds
+const APPEAR_FRAME = 360;  // 12s — after title fades out (11s), clean reveal
+const HOLD_END = 540;       // 18s — holds for 6 seconds
 const FADE_DURATION = 30;   // 1s fade out
 
 export const SongDNA: React.FC<SongDNAProps> = ({
