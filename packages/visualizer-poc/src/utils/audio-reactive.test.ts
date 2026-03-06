@@ -7,6 +7,8 @@ import {
   audioMap,
   computeAudioSnapshot,
   computeSpectralFlux,
+  buildBeatArray,
+  computeMusicalTime,
 } from "./audio-reactive";
 import type { EnhancedFrameData } from "../data/types";
 
@@ -191,5 +193,61 @@ describe("computeAudioSnapshot includes spectralFlux", () => {
     const snap = computeAudioSnapshot(frames, 50);
     expect(snap).toHaveProperty("spectralFlux");
     expect(typeof snap.spectralFlux).toBe("number");
+  });
+});
+
+describe("buildBeatArray", () => {
+  it("returns indices where beat is true", () => {
+    const frames = [
+      makeFrame({ beat: false }),
+      makeFrame({ beat: true }),
+      makeFrame({ beat: false }),
+      makeFrame({ beat: true }),
+    ];
+    expect(buildBeatArray(frames)).toEqual([1, 3]);
+  });
+
+  it("returns empty array when no beats", () => {
+    const frames = Array.from({ length: 10 }, () => makeFrame());
+    expect(buildBeatArray(frames)).toEqual([]);
+  });
+});
+
+describe("computeMusicalTime", () => {
+  it("falls back to tempo-based estimate with no beats", () => {
+    const mt = computeMusicalTime([], 30, 30, 120);
+    // 30 frames at 30fps = 1 second, 120 BPM = 2 beats/sec → musicalTime = 2.0
+    expect(mt).toBeCloseTo(2.0, 3);
+  });
+
+  it("returns integer at beat boundaries", () => {
+    const beatArray = [0, 15, 30];
+    const mt = computeMusicalTime(beatArray, 15, 30, 120);
+    expect(mt).toBeCloseTo(1.0, 3);
+  });
+
+  it("returns fractional value between beats", () => {
+    const beatArray = [0, 30];
+    const mt = computeMusicalTime(beatArray, 15, 30, 120);
+    expect(mt).toBeCloseTo(0.5, 3);
+  });
+});
+
+describe("computeAudioSnapshot includes musicalTime", () => {
+  it("defaults musicalTime to 0 without beat params", () => {
+    const frames = Array.from({ length: 100 }, () =>
+      makeFrame({ rms: 0.15 }),
+    );
+    const snap = computeAudioSnapshot(frames, 50);
+    expect(snap.musicalTime).toBe(0);
+  });
+
+  it("computes musicalTime when beat params provided", () => {
+    const frames = Array.from({ length: 100 }, (_, i) =>
+      makeFrame({ rms: 0.15, beat: i % 15 === 0 }),
+    );
+    const beatArray = buildBeatArray(frames);
+    const snap = computeAudioSnapshot(frames, 22, beatArray, 30, 120);
+    expect(snap.musicalTime).toBeGreaterThan(0);
   });
 });

@@ -52,6 +52,7 @@ uniform float uPaletteSaturation;
 uniform float uTempo;
 uniform float uOnsetSnap;
 uniform float uBeatSnap;
+uniform float uMusicalTime;
 uniform float uChromaShift;
 uniform float uAfterglowHue;
 uniform float uClimaxPhase;
@@ -156,6 +157,9 @@ void main() {
   float curtainBrightness = mix(0.15, 0.8, energy);
   // Onset pulse
   curtainBrightness += onset * 0.3;
+  // Half-time beat pulse for slow aurora swell
+  float bpH = beatPulseHalf(uMusicalTime);
+  curtainBrightness += bpH * 0.08;
 
   // === RENDER AURORA CURTAINS ===
   float auroraIntensity = 0.0;

@@ -39,6 +39,7 @@ uniform float uPaletteSaturation;
 uniform float uTempo;
 uniform float uOnsetSnap;
 uniform float uBeatSnap;
+uniform float uMusicalTime;
 uniform float uChromaShift;
 uniform float uAfterglowHue;
 uniform float uClimaxPhase;
@@ -112,8 +113,9 @@ void main() {
   float flash = uOnsetSnap * 0.3 * smoothstep(0.6, 0.0, r);
   color += flash;
 
-  // Beat pulse — saturation boost
-  color = mix(color, color * 1.3, uBeatSnap * 0.2);
+  // Beat pulse — tempo-locked saturation boost
+  float bp = beatPulse(uMusicalTime);
+  color = mix(color, color * 1.3, bp * 0.12);
 
   // Vignette
   float vig = 1.0 - smoothstep(0.5, 1.2, r);

@@ -47,6 +47,7 @@ uniform float uPaletteSaturation;
 uniform float uTempo;
 uniform float uOnsetSnap;
 uniform float uBeatSnap;
+uniform float uMusicalTime;
 uniform float uChromaShift;
 uniform float uAfterglowHue;
 uniform float uClimaxPhase;
@@ -228,6 +229,10 @@ void main() {
 
   // === LIGHT LEAK ===
   col += lightLeak(p, uTime, energy, uOnsetSnap);
+
+  // === BEAT PULSE: tempo-locked emission swell ===
+  float bp = beatPulse(uMusicalTime);
+  col *= 1.0 + bp * 0.04;
 
   // === BLOOM: bright pixel self-illumination ===
   float lum = dot(col, vec3(0.299, 0.587, 0.114));

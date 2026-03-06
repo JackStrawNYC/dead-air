@@ -48,6 +48,7 @@ uniform float uPaletteSaturation;
 uniform float uTempo;
 uniform float uOnsetSnap;
 uniform float uBeatSnap;
+uniform float uMusicalTime;
 uniform float uChromaShift;
 uniform float uAfterglowHue;
 uniform float uClimaxPhase;
@@ -176,6 +177,10 @@ void main() {
   }
 
   vec3 col = accColor;
+
+  // === BEAT PULSE: tempo-locked flame intensity ===
+  float bp = beatPulse(uMusicalTime);
+  col *= 1.0 + bp * 0.08;
 
   // === RISING EMBERS: particle field ===
   float emberCount = 5.0 + energy * 20.0;

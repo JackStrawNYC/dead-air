@@ -39,6 +39,7 @@ uniform float uPaletteSaturation;
 uniform float uTempo;
 uniform float uOnsetSnap;
 uniform float uBeatSnap;
+uniform float uMusicalTime;
 uniform float uChromaShift;
 uniform float uAfterglowHue;
 uniform float uClimaxPhase;
@@ -93,7 +94,8 @@ void main() {
   col += circleFill * accentCol * energy; // Subtle accent fill
 
   // Concentric rings — expand on beats
-  float ringExpand = uBeatSnap * 0.08;
+  float bp = beatPulse(uMusicalTime);
+  float ringExpand = uBeatSnap * 0.08 + bp * 0.06;
   for (int i = 1; i <= 3; i++) {
     float fi = float(i);
     float ringR = circleR + fi * 0.08 + ringExpand * fi;

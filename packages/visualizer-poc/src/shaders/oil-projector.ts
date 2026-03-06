@@ -39,6 +39,7 @@ uniform float uPaletteSaturation;
 uniform float uTempo;
 uniform float uOnsetSnap;
 uniform float uBeatSnap;
+uniform float uMusicalTime;
 uniform float uChromaShift;
 uniform float uAfterglowHue;
 uniform float uClimaxPhase;
@@ -114,8 +115,9 @@ void main() {
   col += col3 * blob3 * 0.3;
 
   // Blob overlap creates white-hot regions (additive)
+  float bp = beatPulse(uMusicalTime);
   float overlap = blob1 * blob2 * 0.15 + blob2 * blob3 * 0.1 + blob1 * blob3 * 0.1;
-  col += overlap * vec3(1.0, 0.95, 0.85) * energy;
+  col += overlap * vec3(1.0, 0.95, 0.85) * energy * (1.0 + bp * 0.12);
 
   // Palette saturation
   float lum = dot(col, vec3(0.299, 0.587, 0.114));

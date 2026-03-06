@@ -24,6 +24,7 @@ uniform float uSectionIndex;
 uniform float uTempo;
 uniform float uOnsetSnap;
 uniform float uBeatSnap;
+uniform float uMusicalTime;
 
 attribute float aRadius;
 attribute float aTheta;
@@ -46,8 +47,11 @@ void main() {
 
   // (beat/onset pulsing removed — unreliable for live music)
 
+  // Beat pulse for orbit modulation
+  float bp = beatPulse(uMusicalTime);
+
   // Tempo-aware orbit
-  float orbitSpeed = (mix(0.008, 0.025, energy) + uMids * 0.015) * tempoScale;
+  float orbitSpeed = (mix(0.008, 0.025, energy) + uMids * 0.015) * tempoScale * (1.0 + bp * 0.08);
   float theta = aTheta + uTime * orbitSpeed * (0.5 + aRandom * 0.5);
   float phi = aPhi + uTime * orbitSpeed * 0.2 * (aRandom - 0.5);
 
@@ -115,6 +119,7 @@ uniform float uPaletteSecondary;
 uniform float uPaletteSaturation;
 uniform float uSectionProgress;
 uniform float uBeatSnap;
+uniform float uMusicalTime;
 uniform float uOnsetSnap;
 uniform float uBass;
 uniform float uChromaShift;

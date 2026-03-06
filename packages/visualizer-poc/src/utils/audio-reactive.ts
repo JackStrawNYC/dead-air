@@ -34,6 +34,8 @@ export interface AudioSnapshot {
   flatness: number;
   /** Spectral flux: L2 norm of consecutive contrast vector differences, Gaussian-smoothed (window=8) */
   spectralFlux: number;
+  /** Musical time: beat count + fractional interpolation, phase-locked to detected tempo */
+  musicalTime: number;
 }
 
 /**
@@ -180,14 +182,72 @@ export function computeSpectralFlux(
 }
 
 /**
+ * Pre-compute cumulative beat indices for O(1) musical time lookups.
+ * Returns array of frame indices where beat=true.
+ */
+export function buildBeatArray(frames: EnhancedFrameData[]): number[] {
+  const beats: number[] = [];
+  for (let i = 0; i < frames.length; i++) {
+    if (frames[i].beat) beats.push(i);
+  }
+  return beats;
+}
+
+/**
+ * Compute musical time: beat count + fractional interpolation between beats.
+ * Phase-locks to detected tempo so visuals breathe with the music.
+ * Returns a continuously incrementing value where integer crossings = beat hits.
+ */
+export function computeMusicalTime(
+  beatArray: number[],
+  frameIdx: number,
+  fps: number,
+  tempo: number,
+): number {
+  if (beatArray.length === 0) {
+    return (frameIdx / fps) * (tempo / 60);
+  }
+
+  let lo = 0;
+  let hi = beatArray.length - 1;
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >>> 1;
+    if (beatArray[mid] <= frameIdx) lo = mid;
+    else hi = mid - 1;
+  }
+
+  if (beatArray[lo] > frameIdx) {
+    const expectedSpacing = (fps * 60) / tempo;
+    return frameIdx / expectedSpacing;
+  }
+
+  const beatCount = lo;
+  const beatFrame = beatArray[lo];
+  const nextBeatFrame = lo + 1 < beatArray.length
+    ? beatArray[lo + 1]
+    : beatFrame + (fps * 60) / tempo;
+
+  const spacing = nextBeatFrame - beatFrame;
+  const fraction = spacing > 0 ? (frameIdx - beatFrame) / spacing : 0;
+
+  return beatCount + Math.min(fraction, 1);
+}
+
+/**
  * Compute all audio snapshot fields in one call.
  * Two-pass loop strategy for performance:
  *   - Wide pass (window=150) for energy
  *   - Narrow passes for everything else (window=8-20)
+ *
+ * Optional beatArray/fps/tempo params enable musicalTime computation.
+ * Existing callers passing only (frames, idx) get musicalTime: 0.
  */
 export function computeAudioSnapshot(
   frames: EnhancedFrameData[],
   idx: number,
+  beatArray?: number[],
+  fps?: number,
+  tempo?: number,
 ): AudioSnapshot {
   return {
     energy: gaussianSmooth(frames, idx, (f) => f.rms, 150),
@@ -201,5 +261,6 @@ export function computeAudioSnapshot(
     centroid: gaussianSmooth(frames, idx, (f) => f.centroid, 18),
     flatness: gaussianSmooth(frames, idx, (f) => f.flatness, 15),
     spectralFlux: computeSpectralFlux(frames, idx, 8),
+    musicalTime: (beatArray && fps && tempo) ? computeMusicalTime(beatArray, idx, fps, tempo) : 0,
   };
 }

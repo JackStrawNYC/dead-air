@@ -40,6 +40,7 @@ uniform float uPaletteSaturation;
 uniform float uTempo;
 uniform float uOnsetSnap;
 uniform float uBeatSnap;
+uniform float uMusicalTime;
 uniform float uChromaShift;
 uniform float uAfterglowHue;
 uniform float uClimaxPhase;
@@ -141,7 +142,8 @@ void main() {
   color *= flicker;
 
   // Beat-triggered gate flicker (projector stutter)
-  float gateFlicker = 1.0 - uBeatSnap * 0.08;
+  float bp = beatPulse(uMusicalTime);
+  float gateFlicker = 1.0 - bp * 0.06;
   color *= gateFlicker;
 
   // Vignette — heavy, like a projector hotspot

@@ -16,7 +16,7 @@ const PARTICLE_COUNT = 15000;
 const GOLDEN_RATIO = (1 + Math.sqrt(5)) / 2;
 
 const ParticleSystem: React.FC = () => {
-  const { time, beatDecay, smooth, palettePrimary, paletteSecondary, paletteSaturation, tempo } = useAudioData();
+  const { time, beatDecay, smooth, palettePrimary, paletteSecondary, paletteSaturation, tempo, musicalTime } = useAudioData();
 
   const { geometry, uniforms } = useMemo(() => {
     const radiuses = new Float32Array(PARTICLE_COUNT);
@@ -64,6 +64,7 @@ const ParticleSystem: React.FC = () => {
       uTempo: { value: 120 },
       uOnsetSnap: { value: 0 },
       uBeatSnap: { value: 0 },
+      uMusicalTime: { value: 0 },
       uChromaShift: { value: 0 },
       uAfterglowHue: { value: 0 },
     };
@@ -90,6 +91,7 @@ const ParticleSystem: React.FC = () => {
   uniforms.uTempo.value = tempo;
   uniforms.uOnsetSnap.value = smooth.onsetSnap;
   uniforms.uBeatSnap.value = smooth.beatSnap;
+  uniforms.uMusicalTime.value = musicalTime;
   uniforms.uChromaShift.value = smooth.chromaShift;
   uniforms.uAfterglowHue.value = smooth.afterglowHue;
 

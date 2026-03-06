@@ -39,6 +39,7 @@ uniform float uPaletteSaturation;
 uniform float uTempo;
 uniform float uOnsetSnap;
 uniform float uBeatSnap;
+uniform float uMusicalTime;
 uniform float uChromaShift;
 uniform float uAfterglowHue;
 uniform float uClimaxPhase;
@@ -123,6 +124,10 @@ void main() {
   float vig = 1.0 - dot(p * 0.9, p * 0.9);
   vig = smoothstep(-0.1, 0.8, vig);
   col *= vig;
+
+  // === BEAT PULSE: tempo-locked warm glow ===
+  float bp = beatPulse(uMusicalTime);
+  col *= 1.0 + bp * 0.04;
 
   // Lifted blacks (warm)
   col = max(col, vec3(0.08, 0.065, 0.085));

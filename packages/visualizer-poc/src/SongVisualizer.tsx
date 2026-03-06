@@ -42,7 +42,7 @@ import { SongPaletteProvider } from "./data/SongPaletteContext";
 import { EraGrade } from "./components/EraGrade";
 import { EnergyEnvelope } from "./components/EnergyEnvelope";
 import { computeClimaxState, climaxModulation } from "./utils/climax-state";
-import { computeAudioSnapshot } from "./utils/audio-reactive";
+import { computeAudioSnapshot, buildBeatArray } from "./utils/audio-reactive";
 import { calibrateEnergy } from "./utils/energy";
 import { AudioSnapshotProvider } from "./data/AudioSnapshotContext";
 import { computeJamEvolution } from "./utils/jam-evolution";
@@ -208,8 +208,9 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
   const f = analysis.frames;
 
   const crowdMoments = useMemo(() => detectCrowdMoments(f), [f]);
+  const beatArray = useMemo(() => buildBeatArray(f), [f]);
   const frameIdx = Math.min(Math.max(0, frame), f.length - 1);
-  const audioSnapshot = computeAudioSnapshot(f, frameIdx);
+  const audioSnapshot = computeAudioSnapshot(f, frameIdx, beatArray, 30, tempo);
   const climaxState = computeClimaxState(f, frame, sections, audioSnapshot.energy);
   const climaxMod = climaxModulation(climaxState);
 
@@ -249,7 +250,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
       <AudioSnapshotProvider snapshot={audioSnapshot}>
       <VisualizerErrorBoundary>
       <div style={{ position: "absolute", inset: 0, opacity }}>
-        <CameraMotion frames={f}>
+        <CameraMotion frames={f} jamEvolution={jamEvolution}>
         <EraGrade>
         <EnergyEnvelope snapshot={audioSnapshot} climaxMod={climaxMod} jamColorTemp={jamEvolution.isLongJam ? jamEvolution.colorTemperature : undefined} calibration={energyCalibration}>
           <SilentErrorBoundary name="SceneRouter">

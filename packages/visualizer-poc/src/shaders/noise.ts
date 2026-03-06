@@ -133,6 +133,14 @@ vec3 sCurveGrade(vec3 col, float energy) {
   return col;
 }
 
+// --- Beat pulse: sharp spike at beat boundaries, locked to musical time ---
+float beatPulse(float musicalTime) {
+  return pow(1.0 - fract(musicalTime), 4.0);
+}
+float beatPulseHalf(float musicalTime) {
+  return pow(1.0 - fract(musicalTime * 0.5), 4.0);
+}
+
 // --- Light leak: warm amber glow from drifting edge position ---
 // Energy-only driven (no onset snap) for smooth, non-flashy behavior.
 vec3 lightLeak(vec2 p, float time, float energy, float onsetSnap) {

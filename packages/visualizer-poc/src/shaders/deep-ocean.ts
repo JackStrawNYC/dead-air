@@ -48,6 +48,7 @@ uniform float uPaletteSaturation;
 uniform float uTempo;
 uniform float uOnsetSnap;
 uniform float uBeatSnap;
+uniform float uMusicalTime;
 uniform float uChromaShift;
 uniform float uAfterglowHue;
 uniform float uClimaxPhase;
@@ -143,7 +144,8 @@ void main() {
   col += causticColor * caustic * 0.35;
 
   // === GOD RAYS: vertical light shafts from above ===
-  float rayIntensity = 0.3 + bass * 0.5;
+  float bpH = beatPulseHalf(uMusicalTime);
+  float rayIntensity = (0.3 + bass * 0.5) * (1.0 + bpH * 0.12);
   float rayX = swayUv.x * 3.0;
   float ray1 = smoothstep(0.8, 1.0, sin(rayX * 2.0 + uTime * 0.2)) * rayIntensity;
   float ray2 = smoothstep(0.85, 1.0, sin(rayX * 3.5 + uTime * 0.15 + 1.0)) * rayIntensity * 0.7;

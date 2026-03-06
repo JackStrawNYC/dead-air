@@ -39,6 +39,7 @@ uniform float uPaletteSaturation;
 uniform float uTempo;
 uniform float uOnsetSnap;
 uniform float uBeatSnap;
+uniform float uMusicalTime;
 uniform float uChromaShift;
 uniform float uAfterglowHue;
 uniform float uClimaxPhase;
@@ -209,6 +210,10 @@ void main() {
 
   // === LIGHT LEAK ===
   col += lightLeak(p, uTime, energy, uOnsetSnap);
+
+  // === BEAT PULSE: tempo-locked beam intensity ===
+  float bp = beatPulse(uMusicalTime);
+  col *= 1.0 + bp * 0.10;
 
   // === BLOOM ===
   float lum = dot(col, vec3(0.299, 0.587, 0.114));

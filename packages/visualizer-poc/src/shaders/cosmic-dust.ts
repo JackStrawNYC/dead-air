@@ -39,6 +39,7 @@ uniform float uPaletteSaturation;
 uniform float uTempo;
 uniform float uOnsetSnap;
 uniform float uBeatSnap;
+uniform float uMusicalTime;
 uniform float uChromaShift;
 uniform float uAfterglowHue;
 uniform float uClimaxPhase;
@@ -148,7 +149,8 @@ void main() {
   color += shootTrail * uOnsetSnap * 0.5;
 
   // Beat: gentle pulse on nebula brightness
-  color *= 1.0 + uBeatSnap * 0.1;
+  float bp = beatPulse(uMusicalTime);
+  color *= 1.0 + bp * 0.08;
 
   // Vignette — subtle
   float vig = 1.0 - smoothstep(0.6, 1.4, length(uv));
