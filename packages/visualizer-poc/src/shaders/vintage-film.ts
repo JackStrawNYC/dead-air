@@ -65,11 +65,6 @@ float hash2(vec2 p) {
   return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
 }
 
-// Film grain
-float filmGrain(vec2 uv, float t) {
-  return hash2(uv * 500.0 + t * 100.0) * 2.0 - 1.0;
-}
-
 // Gate weave — subtle frame jitter
 vec2 gateWeave(float t) {
   float wx = sin(t * 7.3) * 0.002 + sin(t * 13.1) * 0.001;
@@ -131,9 +126,9 @@ void main() {
     (1.0 - sprocketEdge) * hole * 0.3);
   color *= sprocketMask;
 
-  // Film grain
-  float grain = filmGrain(uv, t);
-  color += grain * 0.06;
+  // Film grain (uses shared filmGrain from noise.ts — returns warm-tinted vec3)
+  float grainTime = floor(t * 15.0) / 15.0;
+  color += filmGrain(uv, grainTime) * 0.06;
 
   // Vertical scratches — random thin lines
   float scratch = smoothstep(0.001, 0.0, abs(uv.x - hash(floor(t * 3.0)) ));
