@@ -52,6 +52,10 @@ import { OilProjectorScene } from "./OilProjectorScene";
 import { TieDyeScene } from "./TieDyeScene";
 import { CosmicDustScene } from "./CosmicDustScene";
 import { VintageFilmScene } from "./VintageFilmScene";
+import { CosmicVoyageScene } from "./CosmicVoyageScene";
+import { InfernoScene } from "./InfernoScene";
+import { DeepOceanScene } from "./DeepOceanScene";
+import { AuroraScene } from "./AuroraScene";
 
 // ─── Scene Registry ───
 
@@ -99,6 +103,26 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
   vintage_film: {
     Component: VintageFilmScene,
     energyAffinity: "mid",
+    complement: "tie_dye",
+  },
+  cosmic_voyage: {
+    Component: CosmicVoyageScene,
+    energyAffinity: "low",
+    complement: "concert_lighting",
+  },
+  inferno: {
+    Component: InfernoScene,
+    energyAffinity: "high",
+    complement: "cosmic_voyage",
+  },
+  deep_ocean: {
+    Component: DeepOceanScene,
+    energyAffinity: "low",
+    complement: "inferno",
+  },
+  aurora: {
+    Component: AuroraScene,
+    energyAffinity: "low",
     complement: "tie_dye",
   },
 };

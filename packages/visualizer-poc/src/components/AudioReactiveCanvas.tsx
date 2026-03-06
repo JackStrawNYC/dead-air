@@ -48,6 +48,8 @@ export interface AudioDataContext {
     chromaShift: number;
     /** Afterglow hue: decaying peak hue from recent loud moments (0-1) */
     afterglowHue: number;
+    /** Slow energy: 300-frame (~10s) Gaussian window for ambient drift signals */
+    slowEnergy: number;
   };
   /** Per-song palette primary hue (0-1 normalized) */
   palettePrimary: number;
@@ -325,6 +327,7 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
       beatSnap,
       chromaShift,
       afterglowHue,
+      slowEnergy: smoothValue(frames, idx, (f) => f.rms, 300),
     },
     palettePrimary,
     paletteSecondary,

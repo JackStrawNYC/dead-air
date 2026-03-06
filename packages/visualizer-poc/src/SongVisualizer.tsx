@@ -21,13 +21,15 @@
 import React, { useMemo } from "react";
 import { staticFile, useCurrentFrame, useVideoConfig, interpolate } from "remotion";
 import { SceneRouter } from "./scenes/SceneRouter";
+import { SceneCrossfade } from "./scenes/SceneCrossfade";
+import { renderScene } from "./scenes/scene-registry";
 import { OVERLAY_COMPONENTS } from "./data/overlay-components";
 import { buildRotationSchedule, getOverlayOpacities } from "./data/overlay-rotation";
 import type { RotationSchedule } from "./data/overlay-rotation";
 import { ConcertInfo } from "./components/ConcertInfo";
 import { SetlistScroll } from "./components/SetlistScroll";
 import { loadAnalysis, getSections } from "./data/analysis-loader";
-import type { SetlistEntry, ShowSetlist, TrackAnalysis, ColorPalette } from "./data/types";
+import type { SetlistEntry, ShowSetlist, TrackAnalysis, ColorPalette, VisualMode } from "./data/types";
 import type { OverlayPhaseHint } from "./data/types";
 import { ShowContextProvider, getShowSeed } from "./data/ShowContext";
 import { VisualizerErrorBoundary } from "./components/VisualizerErrorBoundary";
@@ -92,6 +94,10 @@ export interface SongVisualizerProps {
   segueOut?: boolean;
   segueFromPalette?: ColorPalette;
   segueToPalette?: ColorPalette;
+  /** Visual mode of the previous song (for segue crossfade) */
+  segueFromMode?: VisualMode;
+  /** Visual mode of the next song (for segue crossfade) */
+  segueToMode?: VisualMode;
 }
 
 export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
@@ -247,7 +253,36 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
         <EraGrade>
         <EnergyEnvelope snapshot={audioSnapshot} climaxMod={climaxMod} jamColorTemp={jamEvolution.isLongJam ? jamEvolution.colorTemperature : undefined} calibration={energyCalibration}>
           <SilentErrorBoundary name="SceneRouter">
-            <SceneRouter frames={f} sections={sections} song={props.song} tempo={tempo} seed={showSeed} />
+            {(() => {
+              const sceneRouter = <SceneRouter frames={f} sections={sections} song={props.song} tempo={tempo} seed={showSeed} />;
+              const palette = props.song.palette;
+
+              // Segue IN crossfade: blend from previous song's shader
+              if (props.segueIn && props.segueFromMode && props.segueFromMode !== props.song.defaultMode && frame < FADE_FRAMES) {
+                const progress = frame / FADE_FRAMES;
+                return (
+                  <SceneCrossfade
+                    progress={progress}
+                    outgoing={renderScene(props.segueFromMode, { frames: f, sections, palette, tempo })}
+                    incoming={sceneRouter}
+                  />
+                );
+              }
+
+              // Segue OUT crossfade: blend into next song's shader
+              if (props.segueOut && props.segueToMode && props.segueToMode !== props.song.defaultMode && frame > durationInFrames - FADE_FRAMES) {
+                const progress = (frame - (durationInFrames - FADE_FRAMES)) / FADE_FRAMES;
+                return (
+                  <SceneCrossfade
+                    progress={progress}
+                    outgoing={sceneRouter}
+                    incoming={renderScene(props.segueToMode, { frames: f, sections, palette, tempo })}
+                  />
+                );
+              }
+
+              return sceneRouter;
+            })()}
           </SilentErrorBoundary>
 
           {effectiveSongArt && (

@@ -110,6 +110,7 @@ export const Root: React.FC = () => {
             posterSrc: setlist.showPoster,
             date: formatDateLong(setlist.date),
             venue: setlist.venue,
+            eraPalette: { primary: 210, secondary: 270 },
           }}
         />
       )}
@@ -150,6 +151,8 @@ export const Root: React.FC = () => {
               segueOut,
               segueFromPalette: segueIn ? prevSong?.palette : undefined,
               segueToPalette: segueOut ? nextSong?.palette : undefined,
+              segueFromMode: segueIn ? prevSong?.defaultMode : undefined,
+              segueToMode: segueOut ? nextSong?.defaultMode : undefined,
               activeOverlays: getActiveOverlays(song.trackId),
               energyHints: getEnergyHints(song.trackId),
               show: setlist,

@@ -83,7 +83,11 @@ export type VisualMode =
   | "oil_projector"
   | "tie_dye"
   | "cosmic_dust"
-  | "vintage_film";
+  | "vintage_film"
+  | "cosmic_voyage"
+  | "inferno"
+  | "deep_ocean"
+  | "aurora";
 
 /** Per-section mode override in setlist */
 export interface SectionOverride {

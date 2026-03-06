@@ -50,6 +50,7 @@ export const FullscreenQuad: React.FC<Props> = ({
       uMusicalTime: { value: 0 },
       uClimaxPhase: { value: 0 },
       uClimaxIntensity: { value: 0 },
+      uSlowEnergy: { value: 0 },
       uContrast0: { value: new THREE.Vector4(0, 0, 0, 0) },
       uContrast1: { value: new THREE.Vector4(0, 0, 0, 0) },
       ...extraUniforms,
@@ -82,6 +83,7 @@ export const FullscreenQuad: React.FC<Props> = ({
   uniforms.uMusicalTime.value = musicalTime;
   uniforms.uClimaxPhase.value = climaxPhase;
   uniforms.uClimaxIntensity.value = climaxIntensity;
+  uniforms.uSlowEnergy.value = smooth.slowEnergy;
 
   const c = smooth.contrast;
   uniforms.uContrast0.value.set(c[0] ?? 0, c[1] ?? 0, c[2] ?? 0, c[3] ?? 0);

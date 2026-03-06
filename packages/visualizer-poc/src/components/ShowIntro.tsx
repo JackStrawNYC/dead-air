@@ -1,16 +1,15 @@
 /**
  * ShowIntro — Two-phase intro sequence:
  *   Phase 1: Dead Air brand VIDEO (7s) with its own audio
- *   Phase 2: Crossfade to show poster, hold 5s, fade to black over 1.5s
- *            Concert audio fades in during poster phase
+ *   Phase 2: Crossfade to cosmic_voyage shader scene (generative nebula emergence)
+ *            with venue/date text overlay, then fade to black
  *
  * Total duration: ~15.5s (465 frames at 30fps)
  */
 
-import React from "react";
+import React, { useMemo } from "react";
 import {
   Audio,
-  Img,
   OffthreadVideo,
   staticFile,
   useCurrentFrame,
@@ -18,12 +17,44 @@ import {
   interpolate,
   Easing,
 } from "remotion";
+import { CosmicVoyageScene } from "../scenes/CosmicVoyageScene";
+import type { EnhancedFrameData, ColorPalette } from "../data/types";
 
 // ─── Timing constants (frames at 30fps) ───
-const POSTER_START = 210;          // 7s — poster begins crossfading in
-const CROSSFADE_FRAMES = 60;      // 2s — video → poster visual crossfade
-const FADE_OUT_FRAMES = 45;       // 1.5s — poster fades to black at end
+const POSTER_START = 210;          // 7s — scene begins crossfading in
+const CROSSFADE_FRAMES = 60;      // 2s — video → scene visual crossfade
+const FADE_OUT_FRAMES = 45;       // 1.5s — scene fades to black at end
 const AUDIO_CROSSFADE_START = 195; // 6.5s — video audio starts fading out (0.5s before visual)
+
+// Duration of Phase 2 in frames (from POSTER_START to end)
+const PHASE2_FRAMES = 255;        // ~8.5s
+
+/** Generate synthetic audio frames for the intro nebula emergence.
+ *  RMS ramps from 0 → 0.3 over first 150 frames, holds at 0.3.
+ *  All other features at minimal/defaults. Creates: thick fog → slow emergence → gentle drift.
+ */
+function generateSyntheticFrames(count: number): EnhancedFrameData[] {
+  const frames: EnhancedFrameData[] = [];
+  for (let i = 0; i < count; i++) {
+    const rms = i < 150
+      ? (i / 150) * 0.3
+      : 0.3;
+    frames.push({
+      rms,
+      centroid: 0.2,
+      onset: 0,
+      beat: false,
+      sub: 0.1,
+      low: 0.1,
+      mid: 0.1,
+      high: 0.05,
+      chroma: [0.3, 0.1, 0.1, 0.1, 0.2, 0.1, 0.1, 0.1, 0.2, 0.1, 0.1, 0.1],
+      contrast: [0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2],
+      flatness: 0.3,
+    });
+  }
+  return frames;
+}
 
 export interface ShowIntroProps {
   /** Path to Dead Air brand video (relative to public/) */
@@ -34,16 +65,21 @@ export interface ShowIntroProps {
   date: string;
   /** Venue display string */
   venue: string;
+  /** Era palette for generative scene coloring */
+  eraPalette?: ColorPalette;
 }
 
 export const ShowIntro: React.FC<ShowIntroProps> = ({
   videoSrc,
-  posterSrc,
   date,
   venue,
+  eraPalette,
 }) => {
   const { width, height, durationInFrames } = useVideoConfig();
   const frame = useCurrentFrame();
+
+  // Synthetic frames for cosmic_voyage scene (generated once)
+  const syntheticFrames = useMemo(() => generateSyntheticFrames(PHASE2_FRAMES), []);
 
   // ─── Phase 1: Brand video ───
   // Full opacity for 7s, then fades out over crossfade
@@ -62,52 +98,40 @@ export const ShowIntro: React.FC<ShowIntroProps> = ({
     { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
   );
 
-  // ─── Phase 2: Show poster ───
+  // ─── Phase 2: Generative nebula scene ───
   // Fades in during crossfade, holds, then fades to black at end
-  const posterFadeIn = interpolate(
+  const sceneFadeIn = interpolate(
     frame,
     [POSTER_START, POSTER_START + CROSSFADE_FRAMES],
     [0, 1],
     { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: Easing.in(Easing.cubic) },
   );
-  const posterFadeOut = interpolate(
+  const sceneFadeOut = interpolate(
     frame,
     [durationInFrames - FADE_OUT_FRAMES, durationInFrames],
     [1, 0],
     { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: Easing.out(Easing.cubic) },
   );
-  const posterOpacity = Math.min(posterFadeIn, posterFadeOut);
+  const sceneOpacity = Math.min(sceneFadeIn, sceneFadeOut);
 
-  // Poster: slow Ken Burns zoom over its visible duration
-  const posterScale = interpolate(
+  // Text appearance: fade in after scene is established, fade out with scene
+  const textOpacity = interpolate(
     frame,
-    [POSTER_START, durationInFrames],
-    [1.0, 1.06],
+    [POSTER_START + CROSSFADE_FRAMES + 30, POSTER_START + CROSSFADE_FRAMES + 60],
+    [0, 1],
     { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
-  );
+  ) * sceneFadeOut;
 
-  // Poster: subtle drift
-  const posterTranslateX = interpolate(
-    frame,
-    [POSTER_START, durationInFrames],
-    [0, -8],
-    { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
-  );
-
+  // Default era palette: cosmic deep blue/purple for classic era
+  const palette = eraPalette ?? { primary: 210, secondary: 270 };
 
   return (
     <div style={{ width, height, position: "relative", overflow: "hidden", background: "#000" }}>
-      {/* Layer 1: Show poster (behind video, fades in during crossfade) */}
-      <div style={{ position: "absolute", inset: 0, opacity: posterOpacity, overflow: "hidden" }}>
-        <Img
-          src={staticFile(posterSrc)}
-          style={{
-            width: "100%",
-            height: "100%",
-            objectFit: "cover",
-            transform: `scale(${posterScale}) translateX(${posterTranslateX}px)`,
-            willChange: "transform",
-          }}
+      {/* Layer 1: Cosmic voyage scene (behind video, fades in during crossfade) */}
+      <div style={{ position: "absolute", inset: 0, opacity: sceneOpacity, overflow: "hidden" }}>
+        <CosmicVoyageScene
+          frames={syntheticFrames}
+          palette={palette}
         />
         {/* Bottom vignette for legibility */}
         <div
@@ -121,7 +145,7 @@ export const ShowIntro: React.FC<ShowIntroProps> = ({
             pointerEvents: "none",
           }}
         />
-        {/* Venue + date text over poster */}
+        {/* Venue + date text over scene */}
         {(venue || date) && (
           <div
             style={{
@@ -134,6 +158,7 @@ export const ShowIntro: React.FC<ShowIntroProps> = ({
               alignItems: "center",
               gap: 6,
               pointerEvents: "none",
+              opacity: textOpacity,
             }}
           >
             {venue && (
@@ -190,7 +215,7 @@ export const ShowIntro: React.FC<ShowIntroProps> = ({
         />
       </div>
 
-      {/* Brand video audio — fades out as poster appears */}
+      {/* Brand video audio — fades out as scene appears */}
       <Audio src={staticFile(videoSrc)} volume={videoAudioVolume} />
 
     </div>

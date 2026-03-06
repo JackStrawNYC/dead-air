@@ -10,11 +10,12 @@ import type { VisualMode } from "../data/types";
 const ALL_MODES: VisualMode[] = [
   "liquid_light", "oil_projector", "concert_lighting", "lo_fi_grain",
   "particle_nebula", "stark_minimal", "tie_dye", "cosmic_dust", "vintage_film",
+  "cosmic_voyage", "inferno", "deep_ocean", "aurora",
 ];
 
 describe("SCENE_REGISTRY", () => {
-  it("has exactly 9 registered modes", () => {
-    expect(Object.keys(SCENE_REGISTRY).length).toBe(9);
+  it("has exactly 13 registered modes", () => {
+    expect(Object.keys(SCENE_REGISTRY).length).toBe(13);
   });
 
   it("contains all expected modes", () => {
@@ -50,6 +51,10 @@ describe("getComplement", () => {
     expect(getComplement("tie_dye")).toBe("vintage_film");
     expect(getComplement("vintage_film")).toBe("tie_dye");
     expect(getComplement("stark_minimal")).toBe("liquid_light");
+    expect(getComplement("cosmic_voyage")).toBe("concert_lighting");
+    expect(getComplement("inferno")).toBe("cosmic_voyage");
+    expect(getComplement("deep_ocean")).toBe("inferno");
+    expect(getComplement("aurora")).toBe("tie_dye");
   });
 
   it("returns the mode itself for unknown modes", () => {
@@ -63,6 +68,7 @@ describe("getModesForEnergy", () => {
     expect(modes).toContain("liquid_light");
     expect(modes).toContain("concert_lighting");
     expect(modes).toContain("tie_dye");
+    expect(modes).toContain("inferno");
     expect(modes).not.toContain("particle_nebula"); // low energy
   });
 
@@ -79,6 +85,9 @@ describe("getModesForEnergy", () => {
     expect(modes).toContain("particle_nebula");
     expect(modes).toContain("stark_minimal");
     expect(modes).toContain("cosmic_dust");
+    expect(modes).toContain("cosmic_voyage");
+    expect(modes).toContain("deep_ocean");
+    expect(modes).toContain("aurora");
     expect(modes).not.toContain("concert_lighting"); // high energy
   });
 
@@ -90,9 +99,9 @@ describe("getModesForEnergy", () => {
 });
 
 describe("getRegisteredModes", () => {
-  it("returns all 9 modes", () => {
+  it("returns all 13 modes", () => {
     const modes = getRegisteredModes();
-    expect(modes.length).toBe(9);
+    expect(modes.length).toBe(13);
     for (const mode of ALL_MODES) {
       expect(modes).toContain(mode);
     }
