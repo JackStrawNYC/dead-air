@@ -173,72 +173,119 @@ function loadLyrics(slug: string): string[] | null {
     .filter(l => l.length > 0);
 }
 
+// ─── Content-aware similarity ───
+
+/** Normalize a word for comparison: lowercase, strip punctuation */
+function normWord(w: string): string {
+  return w.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+/**
+ * Jaccard word overlap between two sets of words.
+ * Returns 0-1 (1 = perfect overlap).
+ */
+function wordOverlap(a: string[], b: string[]): number {
+  const setA = new Set(a.map(normWord).filter(w => w.length > 1));
+  const setB = new Set(b.map(normWord).filter(w => w.length > 1));
+  if (setA.size === 0 || setB.size === 0) return 0;
+  let intersection = 0;
+  for (const w of setA) {
+    if (setB.has(w)) intersection++;
+  }
+  const union = new Set([...setA, ...setB]).size;
+  return union > 0 ? intersection / union : 0;
+}
+
 // ─── Core: Map lyrics to vocal regions ───
 
+/**
+ * Content-aware lyric mapping.
+ *
+ * Instead of distributing lyrics proportionally (which breaks on jam songs),
+ * this matches each lyric line to its best-matching vocal region using word
+ * overlap with Deepgram's transcription. Deepgram gets timing right even when
+ * it gets words wrong — distinctive words like "morning", "people", "baby"
+ * survive transcription and anchor the match.
+ *
+ * Algorithm:
+ *   1. For each vocal region, build a word set from Deepgram transcription
+ *   2. For each lyric line, score against all regions (Jaccard overlap)
+ *   3. Greedily assign lines to regions in chronological order:
+ *      - If a line matches a region well (>= threshold), assign it there
+ *      - If no match, assign to the next unmatched region (sequential fallback)
+ *   4. Skip regions with no lyric assignment (instrumental sections)
+ *   5. Map lyric words to Deepgram timestamps within assigned regions
+ */
 function mapLyricsToRegions(
   lyricLines: string[],
   regions: VocalRegion[],
 ): AlignedWord[] {
   if (regions.length === 0 || lyricLines.length === 0) return [];
 
-  const mappedWords: AlignedWord[] = [];
+  const MATCH_THRESHOLD = 0.15; // minimum Jaccard overlap to consider a content match
 
-  // Strategy: distribute lyric lines across vocal regions proportionally
-  // based on each region's Deepgram word count (how much vocal activity detected).
-  // Then map each lyric word to the TIMESTAMP of the corresponding Deepgram word
-  // so the rhythm follows the actual vocal cadence, not a mechanical even distribution.
+  // Build word sets for each region from Deepgram transcription
+  const regionWordSets = regions.map(r => r.words.map(w => w.word));
 
-  const totalDeepgramWords = regions.reduce((sum, r) => sum + r.wordCount, 0);
+  // Score each lyric line against each region
+  const lineWords = lyricLines.map(l => l.split(/\s+/).filter(w => w.length > 0));
 
-  // Assign lyric lines to regions proportionally
-  let lyricIdx = 0;
-  const regionAssignments: { region: VocalRegion; lines: string[] }[] = [];
+  // Greedy chronological assignment: walk through lyric lines and regions together.
+  // Lines are in verse order. Regions are in time order. We advance through both,
+  // using content overlap to skip instrumental regions.
+  const regionAssignments: { region: VocalRegion; lines: string[] }[] =
+    regions.map(r => ({ region: r, lines: [] }));
 
-  for (let r = 0; r < regions.length; r++) {
-    const region = regions[r];
-    const proportion = region.wordCount / totalDeepgramWords;
-    let lineCount: number;
+  let regionPtr = 0; // next region to consider
+  for (let li = 0; li < lyricLines.length; li++) {
+    if (regionPtr >= regions.length) break;
 
-    if (r === regions.length - 1) {
-      lineCount = lyricLines.length - lyricIdx;
-    } else {
-      lineCount = Math.max(1, Math.round(proportion * lyricLines.length));
-      lineCount = Math.min(lineCount, lyricLines.length - lyricIdx);
-    }
+    const words = lineWords[li];
+    if (words.length === 0) continue;
 
-    if (lineCount <= 0 && lyricIdx < lyricLines.length) {
-      lineCount = 0;
-    }
+    // Look ahead up to 5 regions for best content match
+    let bestIdx = regionPtr;
+    let bestScore = -1;
+    const lookAhead = Math.min(regionPtr + 5, regions.length);
 
-    const lines = lyricLines.slice(lyricIdx, lyricIdx + lineCount);
-    regionAssignments.push({ region, lines });
-    lyricIdx += lineCount;
-  }
-
-  // Handle remaining lyrics: distribute to empty regions
-  if (lyricIdx < lyricLines.length) {
-    for (const assignment of regionAssignments) {
-      if (lyricIdx >= lyricLines.length) break;
-      if (assignment.lines.length === 0) {
-        assignment.lines.push(lyricLines[lyricIdx]);
-        lyricIdx++;
+    for (let ri = regionPtr; ri < lookAhead; ri++) {
+      const score = wordOverlap(words, regionWordSets[ri]);
+      if (score > bestScore) {
+        bestScore = score;
+        bestIdx = ri;
       }
     }
-  }
 
-  // Jam songs: cycle lyrics through empty regions
-  let cycleIdx = 0;
-  for (const assignment of regionAssignments) {
-    if (assignment.lines.length === 0 && lyricLines.length > 0) {
-      assignment.lines.push(lyricLines[cycleIdx % lyricLines.length]);
-      cycleIdx++;
+    // If we found a good content match ahead, skip to that region
+    if (bestScore >= MATCH_THRESHOLD) {
+      regionAssignments[bestIdx].lines.push(lyricLines[li]);
+      // Don't advance regionPtr past bestIdx — next line might also belong here
+      // Only advance if next line would need a later region
+    } else {
+      // No content match — assign to current region (sequential fallback)
+      regionAssignments[regionPtr].lines.push(lyricLines[li]);
+    }
+
+    // Peek at next lyric line: if it matches a LATER region better,
+    // advance regionPtr past current assignments
+    if (li + 1 < lyricLines.length) {
+      const nextWords = lineWords[li + 1];
+      const currentScore = wordOverlap(nextWords, regionWordSets[Math.min(bestIdx, regions.length - 1)]);
+      for (let ri = bestIdx + 1; ri < lookAhead + 1 && ri < regions.length; ri++) {
+        const aheadScore = wordOverlap(nextWords, regionWordSets[ri]);
+        if (aheadScore > currentScore && aheadScore >= MATCH_THRESHOLD) {
+          regionPtr = ri;
+          break;
+        }
+      }
+      // Ensure regionPtr is at least at bestIdx
+      if (regionPtr < bestIdx) regionPtr = bestIdx;
     }
   }
 
-  // Map lyric words to Deepgram word timestamps.
-  // Each lyric word inherits timing from the corresponding Deepgram word,
-  // preserving the natural vocal cadence. When multiple lyric words map to
-  // one Deepgram word, subdivide that word's time slot evenly.
+  // Map lyric words to Deepgram word timestamps within each assigned region.
+  const mappedWords: AlignedWord[] = [];
+
   for (const { region, lines } of regionAssignments) {
     if (lines.length === 0) continue;
 
@@ -247,7 +294,7 @@ function mapLyricsToRegions(
 
     const dgWords = region.words;
 
-    // Step 1: Assign each lyric word to a Deepgram word index
+    // Assign each lyric word to a Deepgram word index (evenly distributed)
     const assignments: number[] = [];
     for (let i = 0; i < lyricWords.length; i++) {
       assignments.push(Math.min(
@@ -256,25 +303,21 @@ function mapLyricsToRegions(
       ));
     }
 
-    // Step 2: For each Deepgram word, find all lyric words assigned to it
-    // and subdivide its time slot
+    // For each Deepgram word, subdivide its time slot among assigned lyric words
     let i = 0;
     while (i < lyricWords.length) {
       const dgIdx = assignments[i];
-      // Count how many consecutive lyric words share this Deepgram word
       let count = 0;
       while (i + count < lyricWords.length && assignments[i + count] === dgIdx) {
         count++;
       }
 
-      // Time slot: from this Deepgram word's start to the next word's start (or this word's end)
       const slotStart = dgWords[dgIdx].start;
       const slotEnd = dgIdx < dgWords.length - 1
         ? dgWords[dgIdx + 1].start
         : dgWords[dgIdx].end;
       const slotDuration = slotEnd - slotStart;
 
-      // Subdivide among the lyric words sharing this slot
       for (let j = 0; j < count; j++) {
         const wordStart = slotStart + (j / count) * slotDuration;
         const wordEnd = slotStart + ((j + 1) / count) * slotDuration;

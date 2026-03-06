@@ -27,6 +27,7 @@ const VISUALIZER_DIR = resolve(__dirname, '..', '..', 'visualizer-poc');
 const AUDIO_DIR = resolve(VISUALIZER_DIR, 'public', 'audio');
 const OUTPUT_DIR = resolve(VISUALIZER_DIR, 'data', 'lyrics');
 const LYRICS_DIR = resolve(__dirname, '..', '..', '..', 'data', 'lyrics');
+const STEMS_DIR = resolve(__dirname, '..', '..', '..', 'data', 'stems');
 
 // Instrumental tracks — no vocals to align
 const INSTRUMENTAL_TRACKS = new Set(['s1t09', 's2t07']);
@@ -166,6 +167,7 @@ async function transcribeWithDeepgram(
   audioPath: string,
   model: string,
   keywords?: string[],
+  contentType = 'audio/mpeg',
 ): Promise<DeepgramResponse> {
   const audioBuffer = readFileSync(audioPath);
 
@@ -187,7 +189,7 @@ async function transcribeWithDeepgram(
     method: 'POST',
     headers: {
       'Authorization': `Token ${apiKey}`,
-      'Content-Type': 'audio/mpeg',
+      'Content-Type': contentType,
     },
     body: audioBuffer,
   });
@@ -254,8 +256,13 @@ async function processTrack(song: SetlistSong): Promise<'aligned' | 'skipped' | 
     return 'skipped';
   }
 
-  // Find audio file
-  const audioPath = resolve(AUDIO_DIR, audioFile);
+  // Find audio file — prefer vocal stem if available
+  const vocalStemPath = resolve(STEMS_DIR, trackId, 'vocals.wav');
+  const fullMixPath = resolve(AUDIO_DIR, audioFile);
+  const useVocalStem = existsSync(vocalStemPath);
+  const audioPath = useVocalStem ? vocalStemPath : fullMixPath;
+  const contentType = useVocalStem ? 'audio/wav' : 'audio/mpeg';
+
   if (!existsSync(audioPath)) {
     console.log(`  ✗ ${trackId} (${title}) — audio file not found: ${audioFile}`);
     return 'failed';
@@ -266,10 +273,11 @@ async function processTrack(song: SetlistSong): Promise<'aligned' | 'skipped' | 
 
   // Call Deepgram
   const startTime = Date.now();
-  console.log(`  ⋯ ${trackId} (${title}) — sending to Deepgram (${modelArg})...`);
+  const sourceLabel = useVocalStem ? 'vocal stem' : 'full mix';
+  console.log(`  ⋯ ${trackId} (${title}) — sending to Deepgram (${modelArg}, ${sourceLabel})...`);
 
   try {
-    const dgResponse = await transcribeWithDeepgram(audioPath, modelArg, keywords);
+    const dgResponse = await transcribeWithDeepgram(audioPath, modelArg, keywords, contentType);
     const alignment = transformResponse(title, trackId, dgResponse, modelArg);
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
 

@@ -23,6 +23,9 @@ export function upgradeFrame(frame: Record<string, unknown>): EnhancedFrameData 
     chroma: (frame.chroma as EnhancedFrameData["chroma"]) ?? [...EMPTY_CHROMA],
     contrast: (frame.contrast as EnhancedFrameData["contrast"]) ?? [...EMPTY_CONTRAST],
     flatness: (frame.flatness as number) ?? 0,
+    ...(frame.stemBassRms != null && { stemBassRms: frame.stemBassRms as number }),
+    ...(frame.stemDrumOnset != null && { stemDrumOnset: frame.stemDrumOnset as number }),
+    ...(frame.stemDrumBeat != null && { stemDrumBeat: frame.stemDrumBeat as boolean }),
   };
 }
 

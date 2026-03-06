@@ -27,6 +27,12 @@ export interface EnhancedFrameData {
   contrast: [number, number, number, number, number, number, number];
   /** Spectral flatness — 0 = tonal, 1 = noise-like */
   flatness: number;
+  /** Stem-separated bass RMS energy (from Demucs bass.wav), 0-1 */
+  stemBassRms?: number;
+  /** Stem-separated drum onset strength (from Demucs drums.wav), 0-1 */
+  stemDrumOnset?: number;
+  /** Stem-separated drum beat detected on this frame */
+  stemDrumBeat?: boolean;
 }
 
 /** Legacy frame data from POC (subset of EnhancedFrameData) */

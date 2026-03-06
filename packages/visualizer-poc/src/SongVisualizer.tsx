@@ -36,6 +36,7 @@ import { VisualizerErrorBoundary } from "./components/VisualizerErrorBoundary";
 import { SilentErrorBoundary } from "./components/SilentErrorBoundary";
 import { SceneVideoLayer, computeMediaWindows } from "./components/SceneVideoLayer";
 import { LyricTriggerLayer } from "./components/LyricTriggerLayer";
+import { PoeticLyrics } from "./components/PoeticLyrics";
 import { resolveLyricTriggers, loadAlignmentWords } from "./data/lyric-trigger-resolver";
 import { resolveMediaForSong } from "./data/media-resolver";
 import { SongPaletteProvider } from "./data/SongPaletteContext";
@@ -182,11 +183,15 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
   const effectiveMedia = (props.song.sceneVideos?.length) ? undefined : resolvedMedia?.media;
   const effectiveLegacyVideos = (props.song.sceneVideos?.length) ? props.song.sceneVideos : undefined;
 
-  // ─── Lyric triggers ───
+  // ─── Lyrics ───
+  const alignmentWords = useMemo(
+    () => loadAlignmentWords(props.song.trackId),
+    [props.song.trackId],
+  );
+
   const lyricTriggerWindows = useMemo(() => {
-    const words = loadAlignmentWords(props.song.trackId);
-    return resolveLyricTriggers(props.song.title, words, 30);
-  }, [props.song.trackId, props.song.title]);
+    return resolveLyricTriggers(props.song.title, alignmentWords, 30);
+  }, [props.song.title, alignmentWords]);
 
   const triggerSuppressedRanges = useMemo(
     () => lyricTriggerWindows.map((w) => ({ start: w.frameStart, end: w.frameEnd })),
@@ -304,6 +309,18 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
             </SilentErrorBoundary>
           )}
 
+          {alignmentWords.length > 0 && (
+            <SilentErrorBoundary name="PoeticLyrics">
+              <SongPaletteProvider palette={props.song.palette}>
+                <PoeticLyrics
+                  alignmentWords={alignmentWords}
+                  triggerWindows={triggerSuppressedRanges}
+                  sections={sections}
+                  frames={f}
+                />
+              </SongPaletteProvider>
+            </SilentErrorBoundary>
+          )}
 
           <DynamicOverlayStack
             activeEntries={activeEntries}

@@ -4,10 +4,12 @@ Enhanced audio analysis for Cornell '77 at 30fps frame resolution.
 
 Extracts per-frame features using librosa with hop_length=735 (30fps at sr=22050).
 Supports single-track and batch-show analysis.
+Optional stem-specific features when --stems-dir is provided.
 
 Usage:
-  python analyze.py                           # Morning Dew only (default)
-  python analyze.py /path/to/track.mp3 out.json   # Arbitrary track
+  python analyze.py                                          # Morning Dew only (default)
+  python analyze.py /path/to/track.mp3 out.json              # Arbitrary track
+  python analyze.py /path/to/track.mp3 out.json /stems/dir   # With stem features
 """
 
 import json
@@ -109,7 +111,54 @@ def detect_sections(y: np.ndarray, sr: int, n_frames: int, rms_norm: np.ndarray)
     return sections
 
 
-def analyze_track(audio_path: Path, output_path: Path):
+def analyze_stems(stems_dir: Path, n_frames: int) -> dict:
+    """Extract per-frame features from separated stems (bass, drums)."""
+    result = {"available": False}
+
+    bass_path = stems_dir / "bass.wav"
+    drums_path = stems_dir / "drums.wav"
+
+    if not bass_path.exists() or not drums_path.exists():
+        print(f"Stems not found in {stems_dir}, skipping stem analysis")
+        return result
+
+    print("Analyzing stem: bass.wav ...")
+    y_bass, _ = librosa.load(str(bass_path), sr=SR, mono=True)
+    bass_rms = librosa.feature.rms(y=y_bass, hop_length=HOP_LENGTH)[0]
+    bass_rms_norm = normalize(bass_rms)
+    bass_rms_norm = pad_or_trim_1d(bass_rms_norm, n_frames)
+
+    print("Analyzing stem: drums.wav ...")
+    y_drums, _ = librosa.load(str(drums_path), sr=SR, mono=True)
+    drum_onset = librosa.onset.onset_strength(y=y_drums, sr=SR, hop_length=HOP_LENGTH)
+    drum_onset_norm = normalize(drum_onset)
+    drum_onset_norm = pad_or_trim_1d(drum_onset_norm, n_frames)
+
+    drum_tempo, drum_beat_frames = librosa.beat.beat_track(
+        y=y_drums, sr=SR, hop_length=HOP_LENGTH, units="frames"
+    )
+    drum_tempo_val = float(drum_tempo[0]) if hasattr(drum_tempo, '__len__') else float(drum_tempo)
+    drum_beat_set = set(int(b) for b in drum_beat_frames)
+
+    result = {
+        "available": True,
+        "bassRms": bass_rms_norm,
+        "drumOnset": drum_onset_norm,
+        "drumBeatSet": drum_beat_set,
+        "stemTempo": round(drum_tempo_val, 1),
+    }
+    print(f"Stem analysis: bass RMS frames={len(bass_rms_norm)}, drum beats={len(drum_beat_set)}, tempo={drum_tempo_val:.1f}")
+    return result
+
+
+def pad_or_trim_1d(arr: np.ndarray, length: int) -> np.ndarray:
+    """Pad or trim a 1D array to exact length."""
+    if len(arr) >= length:
+        return arr[:length]
+    return np.pad(arr, (0, length - len(arr)), mode="edge")
+
+
+def analyze_track(audio_path: Path, output_path: Path, stems_dir: Path | None = None):
     """Full analysis pipeline for a single track."""
     if not audio_path.exists():
         print(f"ERROR: Audio file not found: {audio_path}", file=sys.stderr)
@@ -177,35 +226,35 @@ def analyze_track(audio_path: Path, output_path: Path):
     flatness_norm = normalize(flatness)
 
     # --- Align all arrays to n_frames ---
-    def pad_or_trim(arr: np.ndarray, length: int) -> np.ndarray:
-        if len(arr) >= length:
-            return arr[:length]
-        return np.pad(arr, (0, length - len(arr)), mode="edge")
-
     def pad_or_trim_2d(arr: np.ndarray, length: int) -> np.ndarray:
         if arr.shape[1] >= length:
             return arr[:, :length]
         return np.pad(arr, ((0, 0), (0, length - arr.shape[1])), mode="edge")
 
-    rms_norm = pad_or_trim(rms_norm, n_frames)
-    cent_norm = pad_or_trim(cent_norm, n_frames)
-    onset_norm = pad_or_trim(onset_norm, n_frames)
-    sub = pad_or_trim(sub, n_frames)
-    low = pad_or_trim(low, n_frames)
-    mid = pad_or_trim(mid, n_frames)
-    high = pad_or_trim(high, n_frames)
+    rms_norm = pad_or_trim_1d(rms_norm, n_frames)
+    cent_norm = pad_or_trim_1d(cent_norm, n_frames)
+    onset_norm = pad_or_trim_1d(onset_norm, n_frames)
+    sub = pad_or_trim_1d(sub, n_frames)
+    low = pad_or_trim_1d(low, n_frames)
+    mid = pad_or_trim_1d(mid, n_frames)
+    high = pad_or_trim_1d(high, n_frames)
     chroma = pad_or_trim_2d(chroma, n_frames)
     contrast_norm = pad_or_trim_2d(contrast_norm, n_frames)
-    flatness_norm = pad_or_trim(flatness_norm, n_frames)
+    flatness_norm = pad_or_trim_1d(flatness_norm, n_frames)
 
     # --- Section detection ---
     sections = detect_sections(y, sr, n_frames, rms_norm)
+
+    # --- Optional stem analysis ---
+    stem_data = None
+    if stems_dir is not None:
+        stem_data = analyze_stems(stems_dir, n_frames)
 
     # --- Build output ---
     print("Building JSON ...")
     frames = []
     for i in range(n_frames):
-        frames.append({
+        frame = {
             "rms": round(float(rms_norm[i]), 4),
             "centroid": round(float(cent_norm[i]), 4),
             "onset": round(float(onset_norm[i]), 4),
@@ -217,19 +266,30 @@ def analyze_track(audio_path: Path, output_path: Path):
             "chroma": [round(float(chroma[c, i]), 3) for c in range(12)],
             "contrast": [round(float(contrast_norm[c, i]), 3) for c in range(7)],
             "flatness": round(float(flatness_norm[i]), 4),
-        })
+        }
+        # Add stem-specific fields when available
+        if stem_data and stem_data["available"]:
+            frame["stemBassRms"] = round(float(stem_data["bassRms"][i]), 4)
+            frame["stemDrumOnset"] = round(float(stem_data["drumOnset"][i]), 4)
+            frame["stemDrumBeat"] = i in stem_data["drumBeatSet"]
+        frames.append(frame)
+
+    meta = {
+        "source": str(audio_path.name),
+        "duration": round(duration, 2),
+        "fps": FPS,
+        "sr": SR,
+        "hopLength": HOP_LENGTH,
+        "totalFrames": n_frames,
+        "tempo": round(tempo_val, 1),
+        "sections": sections,
+    }
+    if stem_data and stem_data["available"]:
+        meta["stemsAvailable"] = True
+        meta["stemTempo"] = stem_data["stemTempo"]
 
     output = {
-        "meta": {
-            "source": str(audio_path.name),
-            "duration": round(duration, 2),
-            "fps": FPS,
-            "sr": SR,
-            "hopLength": HOP_LENGTH,
-            "totalFrames": n_frames,
-            "tempo": round(tempo_val, 1),
-            "sections": sections,
-        },
+        "meta": meta,
         "frames": frames,
     }
 
@@ -250,7 +310,8 @@ def main():
         audio_path = DEFAULT_AUDIO
         output_path = DEFAULT_OUTPUT
 
-    analyze_track(audio_path, output_path)
+    stems_dir = Path(sys.argv[3]) if len(sys.argv) >= 4 else None
+    analyze_track(audio_path, output_path, stems_dir)
 
 
 if __name__ == "__main__":

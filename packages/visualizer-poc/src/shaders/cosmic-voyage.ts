@@ -58,32 +58,12 @@ uniform vec4 uContrast1;
 varying vec2 vUv;
 
 #define PI 3.14159265
-#define MAX_STEPS 80
-#define MAX_DIST 12.0
+#define VOLSTEPS 18
+#define FRACTAL_ITERS 17
 
 // --- Cosine color palette ---
 vec3 palette(float t, vec3 a, vec3 b, vec3 c, vec3 d) {
   return a + b * cos(6.28318 * (c * t + d));
-}
-
-// --- 5-octave volumetric FBM: bass boosts low octaves, highs boost detail ---
-float fbmVolume(vec3 p, float bassAmp, float detailAmp) {
-  float value = 0.0;
-  float amplitude = 0.5;
-  float frequency = 1.0;
-  for (int i = 0; i < 5; i++) {
-    // Low octaves (0-1) get bass boost, high octaves (3-4) get detail boost
-    float octaveBoost = 1.0;
-    if (i < 2) {
-      octaveBoost += bassAmp * 0.5;
-    } else if (i > 2) {
-      octaveBoost += detailAmp * 0.4;
-    }
-    value += amplitude * octaveBoost * snoise(p * frequency);
-    frequency *= 2.0;
-    amplitude *= 0.5;
-  }
-  return value;
 }
 
 // --- Camera path: Lissajous curve with constant Z-forward drift ---
@@ -121,16 +101,12 @@ void main() {
   vec3 camRight = normalize(cross(vec3(0.0, 1.0, 0.0), camForward));
   vec3 camUp = cross(camForward, camRight);
 
-  // Ray direction
-  vec3 rd = normalize(p.x * camRight + p.y * camUp + 1.5 * camForward);
+  // FOV modulated by bass
+  float fov = mix(1.5, 2.0, bass);
+  vec3 rd = normalize(p.x * camRight + p.y * camUp + fov * camForward);
 
-  // === RAYMARCHING ===
-  vec3 accColor = vec3(0.0);
-  float accAlpha = 0.0;
-  vec3 accEmission = vec3(0.0);
-  float stepSize = 0.12;
-
-  // Cloud body color from palette primary
+  // === STAR NEST: Kaliset volumetric fractal ===
+  // Nebula/cloud color from palette primary
   float hue1 = uPalettePrimary;
   vec3 cloudColor = 0.5 + 0.5 * cos(6.28318 * vec3(hue1, hue1 + 0.33, hue1 + 0.67));
 
@@ -138,73 +114,77 @@ void main() {
   float hue2 = uPaletteSecondary;
   vec3 emissionColor = 0.5 + 0.5 * cos(6.28318 * vec3(hue2, hue2 + 0.33, hue2 + 0.67));
 
-  for (int i = 0; i < MAX_STEPS; i++) {
-    if (accAlpha > 0.95) break;
+  // Kaliset parameters
+  float formuparam = 0.53 + onset * 0.06;   // onset modulates fractal turbulence
+  float tile = 0.85;
+  float stepsize = 0.12;
+  float darkmatter = mix(0.3, 0.1, bass);   // bass reduces dark matter = denser clouds
+  float distfading = 0.73;
+  float saturation = 0.85;
 
-    float t = float(i) * stepSize;
-    if (t > MAX_DIST) break;
+  // Highs modulate iteration count (14-17 range via loop + early exit)
+  int maxIters = 14 + int(highs * 3.0);
 
-    vec3 pos = camPos + rd * t;
+  // Travel speed from energy
+  float travelSpeed = energy * 0.08 + 0.02;
+  vec3 from = camPos + rd * 0.1;
+  from += vec3(1.0, 1.0, 1.0) * uTime * travelSpeed;
 
-    // Domain warp from onset hits — clouds churn
-    vec3 warpedPos = pos;
-    warpedPos.xy += onset * 0.4 * vec2(
-      snoise(pos * 0.5 + uTime * 0.3),
-      snoise(pos * 0.5 + uTime * 0.3 + 100.0)
-    );
+  // Volumetric rendering
+  float s = 0.1;
+  float fade = 1.0;
+  vec3 accColor = vec3(0.0);
 
-    // Density from volumetric FBM
-    float density = fbmVolume(warpedPos * 0.3, bass, highs);
+  for (int r = 0; r < VOLSTEPS; r++) {
+    vec3 samplePos = from + s * rd * 0.5;
 
-    // Bass lowers threshold → Phil bombs = thick clouds
-    float threshold = 0.1 - bass * 0.15;
-    density = smoothstep(threshold, threshold + 0.4, density);
+    // Tiling fold
+    samplePos = abs(vec3(tile) - mod(samplePos, vec3(tile * 2.0)));
 
-    if (density > 0.01) {
-      // Emission cores: different frequency snoise inside dense regions
-      float emissionNoise = snoise(warpedPos * 0.8 + uTime * 0.15);
-      float emissionStrength = smoothstep(0.3, 0.7, emissionNoise) * energy * 0.8;
+    float pa = 0.0;
+    float a = 0.0;
 
-      // Cloud shading: depth-based darkening
-      float depthFade = exp(-t * 0.08);
-      vec3 localColor = cloudColor * (0.4 + 0.6 * depthFade);
-      localColor += emissionColor * emissionStrength;
-
-      // Front-to-back alpha compositing
-      float alpha = density * stepSize * 3.0;
-      alpha = min(alpha, 1.0);
-      float weight = alpha * (1.0 - accAlpha);
-
-      accColor += localColor * weight;
-      accEmission += emissionColor * emissionStrength * weight;
-      accAlpha += weight;
-
-      // Dense region: use normal step size
-      stepSize = 0.12;
-    } else {
-      // Empty space: larger steps for performance
-      stepSize = 0.18;
+    // Kaliset fractal iterations
+    for (int i = 0; i < FRACTAL_ITERS; i++) {
+      if (i >= maxIters) break;
+      samplePos = abs(samplePos) / dot(samplePos, samplePos) - formuparam;
+      a += abs(length(samplePos) - pa);
+      pa = length(samplePos);
     }
+
+    // Dark matter subtraction
+    float dm = max(0.0, darkmatter - a * a * 0.001);
+    a *= a * a;
+
+    if (r > 6) {
+      fade *= 1.0 - dm;
+    }
+
+    // Color from fractal iteration depth
+    float s1 = s;
+    vec3 v = vec3(s1, s1 * s1, s1 * s1 * s1 * s1);
+    // Mix palette colors with the fractal structure
+    vec3 localColor = mix(cloudColor, emissionColor, clamp(a * 0.001, 0.0, 1.0));
+    accColor += fade * localColor * a * 0.00013;
+    accColor += fade * v * a * 0.00005;
+
+    fade *= distfading;
+    s += stepsize;
   }
 
-  vec3 col = accColor;
-
-  // === GOD RAYS: radial glow from accumulated emission ===
-  float godRayStrength = length(accEmission) * energy * 0.6;
-  float radialDist = length(p);
-  float godRay = exp(-radialDist * 2.0) * godRayStrength;
-  col += emissionColor * godRay * 0.5;
+  // Apply saturation
+  float lumAcc = dot(accColor, vec3(0.299, 0.587, 0.114));
+  vec3 col = mix(vec3(lumAcc), accColor, saturation);
 
   // === CHROMATIC ABERRATION from highs ===
   float caAmount = highs * 0.015;
   if (caAmount > 0.001) {
     vec2 caOffset = p * caAmount;
-    // Shift R and B channels
-    col.r = col.r + accColor.r * caOffset.x * 0.3;
-    col.b = col.b - accColor.b * caOffset.x * 0.3;
+    col.r += col.r * caOffset.x * 0.3;
+    col.b -= col.b * caOffset.x * 0.3;
   }
 
-  // === BIOLUMINESCENT PARTICLES in quiet passages ===
+  // === QUIET PASSAGE PARTICLES ===
   float quietness = smoothstep(0.3, 0.05, energy);
   if (quietness > 0.01) {
     float spark1 = snoise(vec3(p * 20.0, uTime * 0.2));
@@ -214,11 +194,11 @@ void main() {
     col += particle * quietness * 0.15 * particleColor;
   }
 
-  // === FOG: distance from energy (quiet = thick fog, loud = clear) ===
+  // === FOG ===
   float fogDist = mix(0.3, 0.9, energy);
-  float fog = 1.0 - exp(-accAlpha * (1.0 - fogDist) * 2.0);
   vec3 fogColor = cloudColor * 0.15;
-  col = mix(col, fogColor, (1.0 - fogDist) * (1.0 - accAlpha) * 0.5);
+  float fogAmount = (1.0 - fogDist) * 0.5;
+  col = mix(col, fogColor, fogAmount * smoothstep(0.5, 0.0, lumAcc));
 
   // === VIGNETTE ===
   float vigScale = mix(0.72, 0.64, energy);

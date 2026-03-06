@@ -50,6 +50,8 @@ export interface AudioDataContext {
     afterglowHue: number;
     /** Slow energy: 300-frame (~10s) Gaussian window for ambient drift signals */
     slowEnergy: number;
+    /** Stem-separated bass energy (falls back to (sub+low)/2 when stems unavailable) */
+    stemBass: number;
   };
   /** Per-song palette primary hue (0-1 normalized) */
   palettePrimary: number;
@@ -235,6 +237,12 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
   const onsetSnap = transientEnvelope(frames, idx, (f) => f.onset, 15);
   const beatSnap = transientEnvelope(frames, idx, (f) => (f.beat ? 1 : 0), 20);
 
+  // Stem-separated bass: use stemBassRms if available, else fallback to (sub+low)/2
+  const hasStemBass = frames[idx].stemBassRms != null;
+  const stemBass = hasStemBass
+    ? smoothValue(frames, idx, (f) => f.stemBassRms ?? 0, 20)
+    : smoothValue(frames, idx, (f) => f.sub + f.low, 20) * 0.5;
+
   // Key change detection + color afterglow
   const chromaShift = chromaShiftMagnitude(frames, idx);
   const afterglowHue = colorAfterglowHue(frames, idx);
@@ -273,6 +281,7 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
       chromaShift,
       afterglowHue,
       slowEnergy: smoothValue(frames, idx, (f) => f.rms, 300),
+      stemBass,
     },
     palettePrimary,
     paletteSecondary,

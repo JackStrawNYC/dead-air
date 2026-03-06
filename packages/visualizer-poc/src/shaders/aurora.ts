@@ -76,28 +76,34 @@ vec3 hsv2rgb(vec3 c) {
 float stars(vec2 uv, float density) {
   vec2 cell = floor(uv * density);
   vec2 f = fract(uv * density);
-  // Pseudo-random star position within cell
   float h = fract(sin(dot(cell, vec2(127.1, 311.7))) * 43758.5453);
   float h2 = fract(sin(dot(cell, vec2(269.5, 183.3))) * 43758.5453);
   vec2 starPos = vec2(h, h2);
   float dist = length(f - starPos);
-  // Only ~30% of cells have a star
   float hasStar = step(0.7, h);
   float brightness = h2 * 0.5 + 0.5;
   return hasStar * brightness * smoothstep(0.03, 0.005, dist);
 }
 
-// --- Aurora curtain function ---
-// Returns intensity of a single curtain ribbon at position y
-// given an x-offset and fold parameters.
-float curtainRibbon(vec2 p, float xOffset, float fold, float width, float sharpness) {
-  // Ribbon center: sine wave with noise-based folding
-  float ribbonX = xOffset + sin(p.y * 2.0 + fold) * 0.15
-                + snoise(vec3(p.y * 1.5, fold * 0.5, 0.0)) * 0.2;
-  float dist = abs(p.x - ribbonX);
-  // Width narrows with sharpness (highs)
-  float w = width * mix(1.0, 0.5, sharpness);
-  return smoothstep(w, w * 0.1, dist);
+// --- Volumetric Aurora FBM (nimitz-inspired) ---
+// Rotation matrix per octave for organic swirl
+mat2 m2 = mat2(0.80, 0.60, -0.60, 0.80);
+
+float auroraFBM(vec3 p, float turbulence) {
+  float val = 0.0;
+  float amp = 0.5;
+  float freq = 1.0;
+  for (int i = 0; i < 5; i++) {
+    val += amp * snoise(p * freq);
+    // Rotate XZ per octave for organic swirl (nimitz technique)
+    p.xz = m2 * p.xz;
+    p.y *= 1.1;
+    // Turbulence from onset adds extra displacement per octave
+    p.x += turbulence * 0.2 * float(i);
+    freq *= 2.1;
+    amp *= 0.5;
+  }
+  return val;
 }
 
 void main() {
@@ -117,10 +123,9 @@ void main() {
   float driftSpeed = 0.03 + slowE * 0.02;
 
   // === DARK SKY background ===
-  // Gradient: darker at top, slightly lighter at horizon
   vec3 skyColor = mix(
-    vec3(0.005, 0.008, 0.02),  // top: near black
-    vec3(0.02, 0.03, 0.06),    // bottom: dark blue
+    vec3(0.005, 0.008, 0.02),
+    vec3(0.02, 0.03, 0.06),
     smoothstep(0.5, -0.3, p.y)
   );
   vec3 col = skyColor;
@@ -128,7 +133,6 @@ void main() {
   // === STARS: visible through gaps in aurora ===
   float starLayer1 = stars(uv + slowTime * 0.01, 80.0);
   float starLayer2 = stars(uv + slowTime * 0.005 + 10.0, 120.0) * 0.6;
-  // Subtle twinkle
   float twinkle = 0.7 + 0.3 * sin(uTime * 2.0 + uv.x * 50.0 + uv.y * 30.0);
   vec3 starColor = vec3(0.8, 0.85, 1.0) * (starLayer1 + starLayer2) * twinkle;
   col += starColor * 0.4;
@@ -140,90 +144,92 @@ void main() {
 
   vec3 auroraColor1 = hsv2rgb(vec3(hue1, sat, 1.0));
   vec3 auroraColor2 = hsv2rgb(vec3(hue2, sat * 0.9, 0.9));
-  // Classic aurora green-to-purple gradient as a mix target
   vec3 classicGreen = vec3(0.1, 0.9, 0.4);
   vec3 classicPurple = vec3(0.5, 0.2, 0.8);
   auroraColor1 = mix(auroraColor1, classicGreen, 0.25);
   auroraColor2 = mix(auroraColor2, classicPurple, 0.2);
 
-  // === CURTAIN PARAMETERS ===
-  // Bass controls sway amplitude
-  float swayAmt = 0.1 + bass * 0.25;
-  // Energy controls vertical extent: quiet = faint shimmer near top, peaks = full sky
+  // === VOLUMETRIC AURORA RAYMARCHING (nimitz-inspired) ===
+  // Energy controls step count (24-32 range) and vertical coverage
+  int maxSteps = 24 + int(energy * 8.0);
   float verticalCoverage = mix(0.15, 0.7, energy);
-  // Curtain base position: starts near top of screen
-  float curtainBase = mix(0.35, 0.0, energy);
-  // Brightness: quiet = faint, peaks = vivid
   float curtainBrightness = mix(0.15, 0.8, energy);
-  // Onset pulse
   curtainBrightness += onset * 0.3;
-  // Half-time beat pulse for slow aurora swell
   float bpH = beatPulseHalf(uMusicalTime);
   curtainBrightness += bpH * 0.08;
 
-  // === RENDER AURORA CURTAINS ===
-  float auroraIntensity = 0.0;
-  float colorMix = 0.0;
+  // Ray setup: looking upward into aurora band
+  vec3 rd = normalize(vec3(p.x, 0.6 + p.y * 0.8, -1.0));
 
-  // Multiple overlapping curtain ribbons for depth
-  for (int i = 0; i < 5; i++) {
-    float fi = float(i);
-    float seed = fi * 2.37;
+  // Volumetric accumulation
+  vec4 auroraAcc = vec4(0.0);
+  float stepSize = mix(0.15, 0.1, energy);
 
-    // Each ribbon has its own sway phase and fold pattern
-    float fold = slowTime * (0.5 + fi * 0.15) + seed * 3.0;
-    float xOff = sin(seed * 5.0 + slowTime * 0.3) * 0.4 + (fi - 2.0) * 0.15;
+  // Aurora exists in a constrained vertical band
+  float bandLow = mix(2.0, 1.0, energy);
+  float bandHigh = mix(3.5, 5.0, energy);
 
-    // Bass drives additional sway
-    float bassSway = swayAmt * sin(uTime * 0.5 + fi * 1.2);
-    xOff += bassSway;
+  for (int i = 0; i < 32; i++) {
+    if (i >= maxSteps) break;
+    if (auroraAcc.a > 0.95) break;   // Early exit at near-opaque
 
-    // Ribbon width varies per layer
-    float width = 0.12 + fi * 0.02;
-    float sharpness = highs;
+    float t = float(i) * stepSize + 0.5;
+    vec3 pos = rd * t;
 
-    // Y-domain: curtain fades below curtainBase
-    float yMask = smoothstep(curtainBase - 0.05, curtainBase + verticalCoverage, p.y + 0.5);
-    // Also fade at very top
-    float topFade = smoothstep(0.55, 0.45, p.y);
-    yMask *= topFade;
+    // Constrain to aurora band (skip steps outside)
+    if (pos.y < bandLow || pos.y > bandHigh) continue;
 
-    float ribbon = curtainRibbon(p, xOff, fold, width, sharpness);
-    ribbon *= yMask;
+    // Curtain sway from bass
+    float swayAmt = bass * 0.4;
+    pos.x += swayAmt * sin(pos.y * 2.0 + slowTime * 0.5);
+    pos.z += swayAmt * 0.5 * cos(pos.y * 1.5 + slowTime * 0.3);
 
-    // Vertical brightness variation within curtain (brighter at lower edge)
-    float vertBright = smoothstep(curtainBase + verticalCoverage, curtainBase, p.y + 0.5);
-    vertBright = mix(0.4, 1.0, vertBright);
-    ribbon *= vertBright;
+    // Slow ambient drift
+    pos.x += slowTime * driftSpeed * 10.0;
+    pos.z += slowTime * driftSpeed * 5.0;
 
-    // Noise-based luminosity variation along the ribbon
-    float lumNoise = snoise(vec3(p.x * 3.0 + seed, p.y * 2.0, slowTime + fi * 0.5));
-    ribbon *= 0.6 + 0.4 * lumNoise;
+    // FBM density with onset turbulence
+    float density = auroraFBM(pos * 0.3, onset);
 
-    auroraIntensity += ribbon * (1.0 - fi * 0.12);
-    colorMix += ribbon * fi * 0.25;
+    // Threshold: must exceed 0 to be visible
+    density = smoothstep(-0.1, 0.4, density);
+
+    // Vertical falloff: fade at edges of band
+    float bandFade = smoothstep(bandLow, bandLow + 0.5, pos.y)
+                   * smoothstep(bandHigh, bandHigh - 0.5, pos.y);
+    density *= bandFade;
+
+    if (density > 0.01) {
+      // Color varies with height (green at bottom, purple at top)
+      float heightMix = smoothstep(bandLow, bandHigh, pos.y);
+      vec3 auroraCol = mix(auroraColor1, auroraColor2, heightMix);
+
+      // Noise-based luminosity variation for shimmer
+      float lumNoise = snoise(vec3(pos.x * 2.0, pos.y * 3.0, slowTime * 0.5));
+      density *= 0.6 + 0.4 * lumNoise;
+
+      // Front-to-back alpha compositing
+      float alpha = density * stepSize * 3.0;
+      alpha = min(alpha, 1.0);
+      float weight = alpha * (1.0 - auroraAcc.a);
+
+      auroraAcc.rgb += auroraCol * curtainBrightness * weight;
+      auroraAcc.a += weight;
+    }
   }
 
-  auroraIntensity = clamp(auroraIntensity, 0.0, 1.0);
-  colorMix = clamp(colorMix, 0.0, 1.0);
-
-  // Color the aurora: blend between primary and secondary
-  vec3 auroraCol = mix(auroraColor1, auroraColor2, colorMix);
-  // Add vertical color shift (green at bottom, purple at top — classic aurora)
-  float vertColorShift = smoothstep(-0.2, 0.4, p.y);
-  auroraCol = mix(auroraCol, auroraColor2, vertColorShift * 0.4);
+  float auroraIntensity = auroraAcc.a;
 
   // Apply aurora to scene
-  col += auroraCol * auroraIntensity * curtainBrightness;
+  col += auroraAcc.rgb;
 
-  // === ATMOSPHERIC GLOW: diffuse light beneath curtains ===
-  float glowY = smoothstep(curtainBase + verticalCoverage + 0.1, curtainBase - 0.1, p.y + 0.5);
+  // === ATMOSPHERIC GLOW: diffuse light beneath aurora ===
+  float glowY = smoothstep(0.3, -0.2, p.y);
   float glowStrength = auroraIntensity * energy * 0.15;
   vec3 glowColor = mix(auroraColor1, vec3(0.1, 0.2, 0.15), 0.5);
   col += glowColor * glowY * glowStrength;
 
   // === DIM STARS behind bright aurora ===
-  // Aurora should obscure stars where it's bright
   col -= starColor * 0.4 * auroraIntensity * curtainBrightness;
 
   // === VIGNETTE ===

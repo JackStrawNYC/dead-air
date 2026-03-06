@@ -63,9 +63,8 @@ varying vec2 vUv;
 #define MAX_STEPS 64
 #define MAX_DIST 8.0
 
-// --- Multi-octave FBM with vertical bias for flame structure ---
+// --- Flame FBM with noise displacement (XT95 technique) ---
 float flameFBM(vec3 p, float bassAmp, float detailAmp) {
-  // Stretch Y for vertical flame bias
   p.y *= 0.5;
   float value = 0.0;
   float amplitude = 0.5;
@@ -82,6 +81,31 @@ float flameFBM(vec3 p, float bassAmp, float detailAmp) {
     amplitude *= 0.5;
   }
   return value;
+}
+
+// --- Flame SDF: stretched sphere with noise displacement ---
+float flameSDF(vec3 p, float bass, float highs, float onset) {
+  // Bass stretches flame wider and flatter
+  vec3 q = p;
+  q.x *= mix(1.0, 0.7, bass);   // wider with bass
+  q.y *= mix(1.0, 1.4, bass);   // taller with bass
+  q.z *= mix(1.0, 0.7, bass);
+
+  // Base sphere distance
+  float d = length(q) - 1.0;
+
+  // Noise displacement for fire shape
+  vec3 np = p * 1.5;
+  np.y -= uTime * (0.8 + bass * 0.6);  // rise speed from bass
+  // Onset churns domain
+  np.xy += onset * 0.3 * vec2(
+    sin(p.z * 3.0 + uTime * 2.0),
+    cos(p.x * 3.0 + uTime * 2.0)
+  );
+  float noiseVal = flameFBM(np, bass, highs);
+  d += noiseVal * 0.5;
+
+  return d;
 }
 
 void main() {
@@ -110,73 +134,47 @@ void main() {
   // === FLAME COLORS from palette ===
   float hue1 = uPalettePrimary;
   vec3 flameColor = 0.5 + 0.5 * cos(6.28318 * vec3(hue1, hue1 + 0.33, hue1 + 0.67));
-  // Push towards warm orange/red
   flameColor = mix(flameColor, vec3(1.0, 0.5, 0.1), 0.4);
 
   float hue2 = uPaletteSecondary;
   vec3 coreColor = 0.5 + 0.5 * cos(6.28318 * vec3(hue2, hue2 + 0.33, hue2 + 0.67));
-  // Push cores towards white-hot
   coreColor = mix(coreColor, vec3(1.0, 0.95, 0.8), 0.5);
 
-  // === RAYMARCHING: volumetric flames ===
+  // === GLOW ACCUMULATION RAYMARCHING (XT95 Flame technique) ===
+  // Track how deep ray penetrates fire volume, accumulate glow
   vec3 accColor = vec3(0.0);
-  float accAlpha = 0.0;
-  float stepSize = 0.1;
+  float glow = 0.0;
+  float glowPower = mix(3.0, 5.0, energy);  // energy controls glow exponent
 
   for (int i = 0; i < MAX_STEPS; i++) {
-    if (accAlpha > 0.95) break;
-
-    float t = float(i) * stepSize;
+    float t = float(i) * 0.1 + 0.05;
     if (t > MAX_DIST) break;
 
     vec3 pos = camPos + camDir * t;
+    float d = flameSDF(pos, bass, highs, onset);
 
-    // Domain warp from bass hits — flames churn
-    vec3 warpedPos = pos;
-    warpedPos.xz += bass * 0.3 * vec2(
-      snoise(pos * 0.6 + uTime * 0.5),
-      snoise(pos * 0.6 + uTime * 0.5 + 100.0)
-    );
+    // Accumulate glow based on proximity to fire surface
+    // Closer to surface = stronger glow (XT95 key insight)
+    if (d < 0.5) {
+      float proximity = 1.0 - smoothstep(0.0, 0.5, d);
+      glow += proximity * 0.04;
 
-    // Rising motion: offset Y with time
-    warpedPos.y -= uTime * 0.8;
-
-    // Flame density from FBM
-    float density = flameFBM(warpedPos * 0.4, bass, highs);
-
-    // Bass controls flame intensity: quiet = smoldering, peaks = full blaze
-    float threshold = mix(0.25, -0.05, bass);
-    density = smoothstep(threshold, threshold + 0.35, density);
-
-    // Fade flames at distance
-    float heightFade = smoothstep(MAX_DIST, MAX_DIST * 0.3, t);
-    density *= heightFade;
-
-    if (density > 0.01) {
-      // Core temperature: inner regions are white-hot
-      float coreNoise = snoise(warpedPos * 1.2 + uTime * 0.3);
-      float coreStrength = smoothstep(0.2, 0.6, coreNoise) * energy;
-
-      // Depth coloring: near=white-hot, far=deep orange/red
+      // Color based on depth into flame: core=white, edge=orange
+      float depthInFlame = max(0.0, -d);
+      float coreStrength = smoothstep(0.0, 0.3, depthInFlame) * energy;
       float depthT = t / MAX_DIST;
-      vec3 localColor = mix(coreColor * (0.8 + coreStrength * 0.5), flameColor * 0.6, depthT);
-      localColor += coreColor * coreStrength * 0.4;
-
-      // Front-to-back compositing
-      float alpha = density * stepSize * 4.0;
-      alpha = min(alpha, 1.0);
-      float weight = alpha * (1.0 - accAlpha);
-
-      accColor += localColor * weight;
-      accAlpha += weight;
-
-      stepSize = 0.1;
-    } else {
-      stepSize = 0.15;
+      vec3 localColor = mix(flameColor, coreColor, coreStrength);
+      localColor = mix(localColor, flameColor * 0.6, depthT);
+      accColor += localColor * proximity * 0.04;
     }
   }
 
-  vec3 col = accColor;
+  // Punchy emission: pow(glow*2, 4) — the XT95 signature
+  float emission = pow(clamp(glow * 2.0, 0.0, 1.0), glowPower);
+  vec3 col = accColor * emission * 4.0;
+
+  // Add core white-hot bloom from emission
+  col += coreColor * pow(emission, 2.0) * 0.5;
 
   // === BEAT PULSE: tempo-locked flame intensity ===
   float bp = beatPulse(uMusicalTime);

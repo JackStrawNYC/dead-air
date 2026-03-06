@@ -61,24 +61,29 @@ varying vec2 vUv;
 
 #define PI 3.14159265
 
-// --- Voronoi-style caustics ---
+// --- Tileable Water Caustic (joltz0r / Dave_Hoskins technique) ---
+// Iterative trig-based caustic: 5 iterations of sin/cos folding produce
+// sharp, physically plausible light networks. Cheaper than 3-layer Voronoi.
 float causticPattern(vec2 p, float time, float scale) {
   p *= scale;
-  vec2 i = floor(p);
-  vec2 f = fract(p);
-  float minDist = 1.0;
-  for (int y = -1; y <= 1; y++) {
-    for (int x = -1; x <= 1; x++) {
-      vec2 neighbor = vec2(float(x), float(y));
-      vec2 cellCenter = neighbor + vec2(
-        0.5 + 0.4 * sin(dot(i + neighbor, vec2(127.1, 311.7)) * 43758.5453 + time),
-        0.5 + 0.4 * cos(dot(i + neighbor, vec2(269.5, 183.3)) * 43758.5453 + time * 1.3)
-      );
-      float dist = length(f - cellCenter);
-      minDist = min(minDist, dist);
-    }
+  vec2 i = p;
+  float c = 1.0;
+  float inten = 0.005;
+
+  for (int n = 0; n < 5; n++) {
+    float t = time * (1.0 - (3.5 / float(n + 1)));
+    i = p + vec2(
+      cos(t - i.x) + sin(t + i.y),
+      sin(t - i.y) + cos(t + i.x)
+    );
+    c += 1.0 / length(vec2(
+      p.x / (sin(i.x + t) / inten),
+      p.y / (cos(i.y + t) / inten)
+    ));
   }
-  return minDist;
+  c /= 5.0;
+  c = 1.17 - pow(c, 1.4);
+  return clamp(pow(abs(c), 8.0), 0.0, 1.0);
 }
 
 void main() {
@@ -131,10 +136,11 @@ void main() {
   float c2 = causticPattern(causticUv + 0.3, uTime * 0.35 + 10.0, 6.0);
   float c3 = causticPattern(causticUv - 0.2, uTime * 0.45 + 20.0, 8.0);
 
-  // Combine caustic layers: sharper with highs
-  float caustic = 1.0 - smoothstep(0.0, mix(0.4, 0.2, causticSharpness), c1);
-  caustic += (1.0 - smoothstep(0.0, mix(0.35, 0.15, causticSharpness), c2)) * 0.6;
-  caustic += (1.0 - smoothstep(0.0, mix(0.3, 0.12, causticSharpness), c3)) * 0.3;
+  // Combine caustic layers: sharper with highs (pow sharpens peaks)
+  float sharpPow = mix(1.0, 2.5, causticSharpness);
+  float caustic = pow(c1, sharpPow);
+  caustic += pow(c2, sharpPow) * 0.6;
+  caustic += pow(c3, sharpPow) * 0.3;
   caustic = clamp(caustic, 0.0, 1.0);
 
   // Base water color
