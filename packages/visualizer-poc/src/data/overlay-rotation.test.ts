@@ -221,8 +221,8 @@ describe("HERO_OVERLAY_NAMES", () => {
     expect(HERO_OVERLAY_NAMES.has("ThirteenPointBolt")).toBe(true);
   });
 
-  it("has a reasonable size (10-20)", () => {
-    expect(HERO_OVERLAY_NAMES.size).toBeGreaterThanOrEqual(10);
-    expect(HERO_OVERLAY_NAMES.size).toBeLessThanOrEqual(20);
+  it("has a focused size (6-12)", () => {
+    expect(HERO_OVERLAY_NAMES.size).toBeGreaterThanOrEqual(6);
+    expect(HERO_OVERLAY_NAMES.size).toBeLessThanOrEqual(12);
   });
 });

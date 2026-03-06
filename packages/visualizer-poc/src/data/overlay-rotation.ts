@@ -8,7 +8,7 @@
  *   - 5x dynamic range: quiet passages have gentle presence, peaks flood vivid
  *   - Pre-peak dropout: strip to 1 overlay before climax → contrast without void
  *   - Energy-scaled crossfades: organic in Space (15s), snappy at peaks (4s)
- *   - Overlay count range: 1-2 during quiet, 3-5 at climax
+ *   - Overlay count range: 2-3 during quiet, 4-5 at climax
  *   - Accent overlays: Dead iconography pulses on beats at ALL energy levels
  *   - Always alive: even silence has a faint atmospheric wash
  *
@@ -155,9 +155,9 @@ const CROSSFADE_FRAMES_DEFAULT = 120;
  * Always-on heroes are prioritized first for guaranteed visibility.
  */
 const ENERGY_COUNTS: Record<string, { min: number; max: number }> = {
-  low:  { min: 4,  max: 6 },   // quiet passages: fill the visual gap
-  mid:  { min: 5,  max: 8 },   // moderate: a mix of elements
-  high: { min: 6,  max: 10 },  // peaks: visual energy
+  low:  { min: 2,  max: 3 },   // quiet passages: breathe — one wash, one character
+  mid:  { min: 3,  max: 4 },   // moderate: a few elements, not a collage
+  high: { min: 4,  max: 5 },   // peaks: impactful, not overwhelming
 };
 
 /**
@@ -166,19 +166,16 @@ const ENERGY_COUNTS: Record<string, { min: number; max: number }> = {
  * always see concrete animated objects, not just abstract washes.
  */
 /**
- * Tier 1 heroes: animated Dead objects that CROSS THE SCREEN.
- * These get guaranteed slots + opacity boost. No abstract rings or centered geometry.
+ * Tier 1 heroes: the iconic Dead visuals that read instantly.
+ * Trimmed to 8 — each one should land with weight, not compete for attention.
  */
 export const HERO_OVERLAY_NAMES = new Set([
-  // Core Dead icons — concrete, recognizable, always-render components
-  "BreathingStealie", "ThirteenPointBolt", "DeadIcons", "SkullKaleidoscope",
-  "StealYourFaceOff", "SkeletonRoses",
-  // Marching parades
-  "BearParade", "SkeletonBand", "VWBusParade", "MarchingTerrapins",
-  // Floating objects
-  "HotAirBalloons",
-  // Character overlays
-  "SkeletonCouple", "Bertha", "CosmicCharlie", "JerryGuitar",
+  // Core Dead icons — the ones everyone recognizes
+  "BreathingStealie", "ThirteenPointBolt", "StealYourFaceOff",
+  // Marching parades — the signature animated moments
+  "BearParade", "SkeletonBand", "MarchingTerrapins",
+  // Characters
+  "Bertha", "JerryGuitar",
 ]);
 
 /** Score penalty for overlays used in the previous window */
