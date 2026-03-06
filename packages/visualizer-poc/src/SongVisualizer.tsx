@@ -43,7 +43,6 @@ import { computeClimaxState, climaxModulation } from "./utils/climax-state";
 import { computeAudioSnapshot } from "./utils/audio-reactive";
 import { calibrateEnergy } from "./utils/energy";
 import { AudioSnapshotProvider } from "./data/AudioSnapshotContext";
-import { PoeticLyrics } from "./components/PoeticLyrics";
 import { computeJamEvolution } from "./utils/jam-evolution";
 import { computeMediaSuppression, computeArtSuppressionFactor } from "./utils/media-suppression";
 import { computeSegueHueRotation } from "./utils/segue-blend";
@@ -269,9 +268,6 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
             </SilentErrorBoundary>
           )}
 
-          <SilentErrorBoundary name="PoeticLyrics">
-            <PoeticLyrics alignmentWords={loadAlignmentWords(props.song.trackId)} triggerWindows={triggerSuppressedRanges} sections={sections} frames={f} />
-          </SilentErrorBoundary>
 
           <DynamicOverlayStack
             activeEntries={activeEntries}
