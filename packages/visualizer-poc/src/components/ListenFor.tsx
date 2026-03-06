@@ -3,7 +3,7 @@
  * Appears at ~20s into each song (after SongDNA fades out at 19s).
  * Bottom-right positioning, similar style to SongDNA.
  *
- * Shows 2-3 bullet points: "Listen for the key change at 3:42"
+ * Shows up to 2 bullet points: "Listen for the key change at 3:42"
  * Fades in over 1s, holds 6s, fades out over 1s.
  * Uses useSongPalette() for accent color.
  */
@@ -41,6 +41,9 @@ export const ListenFor: React.FC<ListenForProps> = ({ items, context }) => {
   const palette = useSongPalette();
 
   if (items.length === 0) return null;
+
+  // Cap at 2 items for readability
+  const displayItems = items.slice(0, 2);
 
   const accent = `hsl(${palette.primary}, 55%, 65%)`;
 
@@ -105,7 +108,7 @@ export const ListenFor: React.FC<ListenForProps> = ({ items, context }) => {
         </div>
 
         {/* Bullet items */}
-        {items.map((item, i) => (
+        {displayItems.map((item, i) => (
           <div
             key={i}
             style={{
@@ -115,7 +118,7 @@ export const ListenFor: React.FC<ListenForProps> = ({ items, context }) => {
               color: "rgba(240, 235, 225, 0.9)",
               textShadow: "0 2px 6px rgba(0,0,0,0.5)",
               lineHeight: 1.45,
-              marginBottom: i < items.length - 1 ? 8 : 0,
+              marginBottom: i < displayItems.length - 1 ? 8 : 0,
               paddingLeft: 14,
               position: "relative",
             }}

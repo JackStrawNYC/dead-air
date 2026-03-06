@@ -53,6 +53,8 @@ export interface PoeticLyricsProps {
 // ─── Constants ───
 
 const OVERLAY_GATE_END = 420; // 14s — overlays hidden until intro clears
+const MIN_WORDS_FOR_DISPLAY = 40; // don't show lyrics if fewer than 40 words — not impactful enough
+const MIN_PHRASES_FOR_DISPLAY = 4; // need at least 4 phrases for a meaningful lyric experience
 const PHRASE_GAP_THRESHOLD = 0.8; // seconds — gap before new phrase starts
 const INSTRUMENTAL_GAP = 10; // seconds — suppress lyrics in long gaps
 const WORD_STAGGER_FRAMES = 3; // frames between each word fade-in (~100ms at 30fps)
@@ -145,8 +147,9 @@ export const PoeticLyrics: React.FC<PoeticLyricsProps> = ({
   // Don't render during overlay gate
   if (frame < OVERLAY_GATE_END) return null;
 
-  // Don't render if no alignment data
-  if (phrases.length === 0) return null;
+  // Don't render if insufficient lyrics — a few scattered words isn't impactful
+  if (alignmentWords.length < MIN_WORDS_FOR_DISPLAY) return null;
+  if (phrases.length < MIN_PHRASES_FOR_DISPLAY) return null;
 
   // Don't render during instrumental gaps
   if (isInstrumentalGap(currentTime, phrases)) return null;

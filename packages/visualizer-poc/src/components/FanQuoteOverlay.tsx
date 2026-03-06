@@ -1,7 +1,7 @@
 /**
  * FanQuoteOverlay — frosted glass card showing archive.org fan reviews.
  *
- * Appears at frame 900 (30s in), holds 8s, spring slide-in from bottom.
+ * Appears at frame 900 (30s in), holds 11s, spring slide-in from bottom.
  * Only shown every 3rd song (trackNumber % 3 === 0) to avoid fatigue.
  * Seed-based review selection for generative variation.
  */
@@ -24,7 +24,7 @@ interface Props {
 
 const APPEAR_FRAME = 900; // 30 seconds in
 const SLIDE_IN_FRAMES = 30;
-const HOLD_FRAMES = 240; // 8 seconds
+const HOLD_FRAMES = 330; // 11 seconds
 const SLIDE_OUT_FRAMES = 30;
 const TOTAL_FRAMES = SLIDE_IN_FRAMES + HOLD_FRAMES + SLIDE_OUT_FRAMES;
 

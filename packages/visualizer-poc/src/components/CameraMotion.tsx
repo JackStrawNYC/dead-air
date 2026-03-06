@@ -21,8 +21,8 @@ interface Props {
 const BASE_SCALE = 1.04;
 const QUIET_SCALE = 1.08;
 const PEAK_SCALE = 1.03;
-const SHAKE_PX = 2;
-const SHAKE_DECAY_FRAMES = 4;
+const SHAKE_PX = 1;
+const SHAKE_DECAY_FRAMES = 8;
 
 /** Simple seeded hash for deterministic shake direction */
 function shakeHash(frame: number): { x: number; y: number } {
@@ -41,7 +41,7 @@ export const CameraMotion: React.FC<Props> = ({ frames, children }) => {
   // Smoothed energy for zoom (rolling 30-frame window)
   let energySum = 0;
   let count = 0;
-  for (let i = Math.max(0, idx - 15); i <= Math.min(frames.length - 1, idx + 15); i++) {
+  for (let i = Math.max(0, idx - 45); i <= Math.min(frames.length - 1, idx + 45); i++) {
     energySum += frames[i].rms;
     count++;
   }
@@ -57,7 +57,7 @@ export const CameraMotion: React.FC<Props> = ({ frames, children }) => {
   for (let ago = 0; ago < SHAKE_DECAY_FRAMES; ago++) {
     const checkIdx = idx - ago;
     if (checkIdx < 0) break;
-    if (frames[checkIdx].beat && frames[checkIdx].onset > 0.4) {
+    if (frames[checkIdx].beat && frames[checkIdx].onset > 0.6) {
       const decay = Math.exp(-ago * 1.5);
       const dir = shakeHash(checkIdx);
       shakeX += dir.x * SHAKE_PX * decay;
