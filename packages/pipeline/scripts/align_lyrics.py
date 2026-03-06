@@ -14,8 +14,25 @@ import os
 # Suppress noisy warnings before importing heavy libs
 os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
 
+# Fix SSL certificates on macOS Python (needed for model downloads)
+try:
+    import certifi
+    os.environ.setdefault("SSL_CERT_FILE", certifi.where())
+except ImportError:
+    pass
 
 def align(config):
+    # Redirect stdout to stderr during alignment so whisperx log noise
+    # doesn't corrupt the JSON output on stdout
+    real_stdout = sys.stdout
+    sys.stdout = sys.stderr
+
+    import logging
+    # Force all existing and future loggers to stderr
+    for handler in logging.root.handlers[:]:
+        logging.root.removeHandler(handler)
+    logging.basicConfig(stream=sys.stderr, level=logging.WARNING, force=True)
+
     import whisperx
     import torch
 
@@ -24,21 +41,45 @@ def align(config):
     language = config.get("language", "en")
     model_name = config.get("model", "large-v3")
 
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    compute_type = "float16" if device == "cuda" else "int8"
+    # CTranslate2 (used by faster-whisper inside WhisperX) only supports CUDA/CPU
+    if torch.cuda.is_available():
+        transcribe_device = "cuda"
+        compute_type = "float16"
+    else:
+        transcribe_device = "cpu"
+        compute_type = "int8"
+
+    # For alignment (wav2vec2 via torch), MPS may work
+    if torch.cuda.is_available():
+        align_device = "cuda"
+    elif torch.backends.mps.is_available():
+        align_device = "mps"
+    else:
+        align_device = "cpu"
 
     # Step 1: Load WhisperX model and transcribe with lyrics as vocabulary hint
-    model = whisperx.load_model(model_name, device, compute_type=compute_type)
+    asr_options = {"initial_prompt": lyrics}
+    model = whisperx.load_model(
+        model_name, transcribe_device, compute_type=compute_type,
+        asr_options=asr_options
+    )
     audio = whisperx.load_audio(audio_path)
 
-    result = model.transcribe(audio, language=language, initial_prompt=lyrics)
+    result = model.transcribe(audio, language=language)
 
     # Step 2: Force-align transcription to audio
-    align_model, metadata = whisperx.load_align_model(
-        language_code=language, device=device
-    )
+    # MPS may not be supported for wav2vec2 — gracefully fall back to CPU
+    try:
+        align_model, metadata = whisperx.load_align_model(
+            language_code=language, device=align_device
+        )
+    except Exception:
+        align_device = "cpu"
+        align_model, metadata = whisperx.load_align_model(
+            language_code=language, device=align_device
+        )
     aligned = whisperx.align(
-        result["segments"], align_model, metadata, audio, device,
+        result["segments"], align_model, metadata, audio, align_device,
         return_char_alignments=False
     )
 
@@ -65,14 +106,19 @@ def align(config):
             "text": seg.get("text", "").strip(),
         })
 
+    # Restore stdout
+    sys.stdout = real_stdout
+
     return {"ok": True, "words": words, "segments": segments}
 
 
 if __name__ == "__main__":
+    # Save original stdout before anything can redirect it
+    _original_stdout = sys.stdout
     try:
         config = json.loads(sys.stdin.read())
         result = align(config)
-        print(json.dumps(result))
+        _original_stdout.write(json.dumps(result) + "\n")
     except Exception as e:
-        print(json.dumps({"ok": False, "error": str(e)}))
+        _original_stdout.write(json.dumps({"ok": False, "error": str(e)}) + "\n")
         sys.exit(1)

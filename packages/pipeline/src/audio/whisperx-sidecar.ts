@@ -1,4 +1,5 @@
 import { execFileSync } from 'child_process';
+import { existsSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { createLogger } from '@dead-air/core';
@@ -43,6 +44,21 @@ function getScriptPath(): string {
 }
 
 /**
+ * Resolve the venv Python that has whisperx installed.
+ * Falls back to system python3 if venv not found.
+ */
+function getPythonPath(): string {
+  const __dirname = dirname(fileURLToPath(import.meta.url));
+  // From src/audio/ -> packages/visualizer-poc/.venv/bin/python3
+  const venvPython = resolve(__dirname, '..', '..', '..', 'visualizer-poc', '.venv', 'bin', 'python3');
+  if (existsSync(venvPython)) {
+    return venvPython;
+  }
+  log.warn('Venv python not found, falling back to system python3');
+  return 'python3';
+}
+
+/**
  * Run WhisperX forced alignment on a single audio file via Python sidecar.
  */
 export function alignWithWhisperX(
@@ -63,7 +79,9 @@ export function alignWithWhisperX(
 
   let rawOutput: string;
   try {
-    const result = execFileSync('python3', [scriptPath], {
+    const pythonPath = getPythonPath();
+    log.info(`Using Python: ${pythonPath}`);
+    const result = execFileSync(pythonPath, [scriptPath], {
       input: JSON.stringify(config),
       maxBuffer: 100 * 1024 * 1024, // 100MB for large word arrays
       timeout: 600_000, // 10 min — WhisperX is slower than librosa
