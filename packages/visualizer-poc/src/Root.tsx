@@ -21,19 +21,20 @@ const inputProps = getInputProps() as Record<string, unknown>;
 const showId = (inputProps.showId as string) ?? process.env.SHOW_ID ?? "";
 
 // Resolve data directory based on showId
-function resolveDataDir(): string {
-  if (!showId || showId === "cornell-77") return "../data";
-  return `../data/shows/${showId}`;
-}
-const DATA_DIR = resolveDataDir();
+// Uses static requires for the default show (Cornell '77) so Webpack can resolve them.
+// Dynamic shows use require() with variable paths.
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const setlistData = require(`${DATA_DIR}/setlist.json`);
+const setlistData = (!showId || showId === "cornell-77")
+  ? require("../data/setlist.json")
+  : require(`../data/shows/${showId}/setlist.json`);
+
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 let showContextData: { chapters: ChapterEntry[] } = { chapters: [] };
 try {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  showContextData = require(`${DATA_DIR}/show-context.json`);
+  showContextData = (!showId || showId === "cornell-77")
+    ? require("../data/show-context.json")
+    : require(`../data/shows/${showId}/show-context.json`);
 } catch {
   // show-context.json is optional
 }
@@ -43,8 +44,9 @@ const analysisCache: Record<string, unknown> = {};
 function loadTrackAnalysis(trackId: string) {
   if (analysisCache[trackId]) return analysisCache[trackId];
   try {
+    const dataDir = (!showId || showId === "cornell-77") ? "../data" : `../data/shows/${showId}`;
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const data = require(`${DATA_DIR}/tracks/${trackId}-analysis.json`);
+    const data = require(`${dataDir}/tracks/${trackId}-analysis.json`);
     const validated = safeParse(FlexibleTrackAnalysisSchema, data);
     analysisCache[trackId] = validated;
     return validated;
@@ -57,7 +59,9 @@ function loadTrackAnalysis(trackId: string) {
 let overlaySchedule: OverlaySchedule | null = null;
 try {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const rawSchedule = require(`${DATA_DIR}/overlay-schedule.json`);
+  const rawSchedule = (!showId || showId === "cornell-77")
+    ? require("../data/overlay-schedule.json")
+    : require(`../data/shows/${showId}/overlay-schedule.json`);
   overlaySchedule = safeParse(OverlayScheduleSchema, rawSchedule);
 } catch {
   // Schedule not generated yet — all overlays will render

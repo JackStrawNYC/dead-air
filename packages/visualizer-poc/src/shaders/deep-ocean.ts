@@ -56,27 +56,30 @@ uniform float uClimaxIntensity;
 uniform float uSlowEnergy;
 uniform vec4 uContrast0;
 uniform vec4 uContrast1;
-uniform vec4 uChroma0;
-uniform vec4 uChroma1;
-uniform vec4 uChroma2;
-uniform vec2 uCamOffset;
 
 varying vec2 vUv;
 
 #define PI 3.14159265
-#define VOLSTEPS 64
-#define LIGHT_STEPS 6
 
-// --- Tileable Water Caustic (joltz0r technique) ---
+// --- Tileable Water Caustic (joltz0r / Dave_Hoskins technique) ---
+// Iterative trig-based caustic: 5 iterations of sin/cos folding produce
+// sharp, physically plausible light networks. Cheaper than 3-layer Voronoi.
 float causticPattern(vec2 p, float time, float scale) {
   p *= scale;
   vec2 i = p;
   float c = 1.0;
   float inten = 0.005;
+
   for (int n = 0; n < 5; n++) {
     float t = time * (1.0 - (3.5 / float(n + 1)));
-    i = p + vec2(cos(t - i.x) + sin(t + i.y), sin(t - i.y) + cos(t + i.x));
-    c += 1.0 / length(vec2(p.x / (sin(i.x + t) / inten), p.y / (cos(i.y + t) / inten)));
+    i = p + vec2(
+      cos(t - i.x) + sin(t + i.y),
+      sin(t - i.y) + cos(t + i.x)
+    );
+    c += 1.0 / length(vec2(
+      p.x / (sin(i.x + t) / inten),
+      p.y / (cos(i.y + t) / inten)
+    ));
   }
   c /= 5.0;
   c = 1.17 - pow(c, 1.4);
@@ -94,88 +97,77 @@ void main() {
   float onset = clamp(uOnsetSnap, 0.0, 1.0);
   float slowE = clamp(uSlowEnergy, 0.0, 1.0);
 
-  // === PARALLAX DEPTH ===
-  float preDepth = length(p) * 0.5;
-  p = parallaxUV(p, uCamOffset, preDepth);
-
   // === WATER COLORS from palette ===
   float hue1 = uPalettePrimary;
   vec3 waterColor = 0.5 + 0.5 * cos(6.28318 * vec3(hue1, hue1 + 0.33, hue1 + 0.67));
+  // Push towards deep blue-green
   waterColor = mix(waterColor, vec3(0.02, 0.15, 0.25), 0.5);
 
   float hue2 = uPaletteSecondary;
-  vec3 causticColorBase = 0.5 + 0.5 * cos(6.28318 * vec3(hue2, hue2 + 0.33, hue2 + 0.67));
-  causticColorBase = mix(causticColorBase, vec3(0.4, 0.8, 0.9), 0.3);
-  // Chroma-colored caustics from Pillar 4
-  vec3 chromaCaustic = chromaColor(p, uChroma0, uChroma1, uChroma2, energy);
-  vec3 causticColor = mix(causticColorBase, causticColorBase + chromaCaustic * 0.8, 0.35);
+  vec3 causticColor = 0.5 + 0.5 * cos(6.28318 * vec3(hue2, hue2 + 0.33, hue2 + 0.67));
+  causticColor = mix(causticColor, vec3(0.4, 0.8, 0.9), 0.3);
 
-  // === RAY SETUP: looking forward through water ===
-  vec3 camPos = vec3(p.x * 0.5, p.y * 0.5 - 0.5, 0.0);
-  vec3 rd = normalize(vec3(p.x * 0.3, p.y * 0.3 - 0.1, 1.0));
+  // === AMBIENT SWAY: gentle UV distortion from slowEnergy ===
+  vec2 swayUv = p;
+  float swayAmt = 0.02 + slowE * 0.02;
+  swayUv += swayAmt * vec2(
+    sin(p.y * 3.0 + uTime * 0.3),
+    cos(p.x * 2.5 + uTime * 0.25)
+  );
 
-  // Light comes from above surface
-  vec3 lightDir = normalize(vec3(0.2, 1.0, -0.3));
+  // Surface chop from energy: quiet = glassy, loud = churning
+  float chop = energy * 0.04;
+  swayUv += chop * vec2(
+    snoise(vec3(p * 6.0, uTime * 1.5)),
+    snoise(vec3(p * 6.0 + 50.0, uTime * 1.5))
+  );
 
-  // Wavelength-dependent absorption coefficients (R absorbs fastest → natural depth color)
-  vec3 absorption = vec3(0.45, 0.18, 0.06);
+  // === CAUSTIC LIGHT PATTERNS: multiple overlapping layers ===
+  float causticSharpness = 0.5 + highs * 0.5;
 
-  // === 64-STEP VOLUMETRIC UNDERWATER RAYMARCHING ===
-  vec3 accColor = vec3(0.0);
-  vec3 T = vec3(1.0);  // Per-channel transmittance for wavelength absorption
+  // Onset distortion on caustic domain
+  vec2 causticUv = swayUv;
+  causticUv += onset * 0.05 * vec2(
+    snoise(vec3(p * 3.0, uTime * 2.0)),
+    snoise(vec3(p * 3.0 + 70.0, uTime * 2.0))
+  );
 
-  for (int i = 0; i < VOLSTEPS; i++) {
-    float travelDist = float(i) * 0.15 + 0.1;
-    vec3 pos = camPos + rd * travelDist;
+  float c1 = causticPattern(causticUv, uTime * 0.4, 4.0);
+  float c2 = causticPattern(causticUv + 0.3, uTime * 0.35 + 10.0, 6.0);
+  float c3 = causticPattern(causticUv - 0.2, uTime * 0.45 + 20.0, 8.0);
 
-    // Noise-driven particle density (plankton/sediment scattering medium)
-    float particleDensity = fbm3(vec3(pos.xz * 2.0 + uTime * 0.02, pos.y * 1.5 + uTime * 0.01));
-    particleDensity = max(0.0, particleDensity * 0.3 + 0.15);
-    particleDensity *= 1.0 + slowE * 0.3;
+  // Combine caustic layers: sharper with highs (pow sharpens peaks)
+  float sharpPow = mix(1.0, 2.5, causticSharpness);
+  float caustic = pow(c1, sharpPow);
+  caustic += pow(c2, sharpPow) * 0.6;
+  caustic += pow(c3, sharpPow) * 0.3;
+  caustic = clamp(caustic, 0.0, 1.0);
 
-    float stepSize = 0.15;
+  // Base water color
+  vec3 col = waterColor * 0.3;
 
-    // Wavelength-dependent Beer's law (per channel)
-    vec3 channelAbsorption = exp(-absorption * particleDensity * stepSize);
-    vec3 absorbed = vec3(1.0) - channelAbsorption;
+  // Add caustics
+  col += causticColor * caustic * 0.35;
 
-    // Caustic focusing: project caustic pattern at this depth
-    float depth01 = travelDist / 9.6; // normalize to 0-1 over ray distance
-    float causticScale = mix(4.0, 8.0, depth01);
-    vec2 causticUv = pos.xz * 0.5 + onset * 0.03 * vec2(snoise(vec3(pos.xz, uTime)), snoise(vec3(pos.xz + 50.0, uTime)));
-    float caustic = causticPattern(causticUv, uTime * 0.4, causticScale);
-    caustic *= smoothstep(1.0, 0.0, depth01) * (0.5 + highs * 0.5); // brighter near surface
+  // === GOD RAYS: vertical light shafts from above ===
+  float bpH = beatPulseHalf(uMusicalTime);
+  float rayIntensity = (0.3 + bass * 0.5) * (1.0 + bpH * 0.12);
+  float rayX = swayUv.x * 3.0;
+  float ray1 = smoothstep(0.8, 1.0, sin(rayX * 2.0 + uTime * 0.2)) * rayIntensity;
+  float ray2 = smoothstep(0.85, 1.0, sin(rayX * 3.5 + uTime * 0.15 + 1.0)) * rayIntensity * 0.7;
+  float ray3 = smoothstep(0.9, 1.0, sin(rayX * 1.5 + uTime * 0.25 + 2.5)) * rayIntensity * 0.5;
+  float rays = ray1 + ray2 + ray3;
+  // Rays fade toward bottom of screen
+  float rayFade = smoothstep(-0.5, 0.5, swayUv.y);
+  rays *= rayFade;
+  col += causticColor * rays * 0.25;
 
-    // Volumetric god rays: trace toward surface light
-    float lightDensity = 0.0;
-    for (int j = 0; j < LIGHT_STEPS; j++) {
-      float lt = float(j) * 0.2 + 0.1;
-      vec3 lightPos = pos + lightDir * lt;
-      float ld = fbm3(vec3(lightPos.xz * 2.0, lightPos.y * 1.5 + uTime * 0.01));
-      lightDensity += max(0.0, ld * 0.3 + 0.1) * 0.2;
-    }
-    float lightReach = beerLaw(lightDensity * 2.0, 1.0);
-
-    // Henyey-Greenstein forward scattering
-    float cosTheta = dot(rd, lightDir);
-    float scatter = hgPhase(cosTheta, 0.6) * particleDensity;
-
-    // Emission: scattered surface light + caustic patterns
-    vec3 waterEmit = waterColor * 0.3 * lightReach * particleDensity;
-    waterEmit += causticColor * caustic * lightReach * 0.4;
-    waterEmit += causticColor * scatter * lightReach * 0.5;
-
-    // Beat pulse on god rays
-    float bpH = beatPulseHalf(uMusicalTime);
-    waterEmit *= 1.0 + bpH * 0.08 * lightReach;
-
-    accColor += waterEmit * absorbed * T;
-    T *= channelAbsorption;
-
-    if (max(T.r, max(T.g, T.b)) < 0.01) break;
-  }
-
-  vec3 col = accColor;
+  // === DEPTH FOG: clears with energy ===
+  float fogDensity = mix(0.6, 0.2, energy);
+  float fogNoise = fbm3(vec3(swayUv * 2.0, uTime * 0.05));
+  float fog = fogDensity * (0.5 + fogNoise * 0.5);
+  vec3 fogColor = waterColor * 0.15;
+  col = mix(col, fogColor, fog * 0.6);
 
   // === BIOLUMINESCENT PARTICLES: active during quiet ===
   float quietness = smoothstep(0.35, 0.05, energy);
@@ -195,9 +187,23 @@ void main() {
     }
   }
 
-  // === VIGNETTE (counterpoint: opens at peaks, closes at valleys) ===
-  float vigInverse = inverseEnergy(energy);
-  float vigScale = mix(0.60, 0.75, vigInverse);
+  // === FLOATING DEBRIS / PLANKTON ===
+  float driftSpeed = 0.02 + slowE * 0.03;
+  for (int k = 0; k < 4; k++) {
+    float fk = float(k);
+    float seed = fk * 5.73 + 100.0;
+    vec2 debrisPos = vec2(
+      fract(seed * 0.37 + uTime * driftSpeed * 0.5) * 2.0 - 1.0,
+      fract(seed * 0.53 + uTime * driftSpeed * 0.3) * 2.0 - 1.0
+    );
+    debrisPos *= 0.6;
+    float dist = length(p - debrisPos);
+    float debris = smoothstep(0.008, 0.002, dist);
+    col += vec3(0.3, 0.5, 0.6) * debris * 0.08;
+  }
+
+  // === VIGNETTE ===
+  float vigScale = mix(0.72, 0.65, energy);
   float vignette = 1.0 - dot(p * vigScale, p * vigScale);
   vignette = smoothstep(0.0, 1.0, vignette);
   vec3 vigTint = waterColor * 0.02;
@@ -206,8 +212,12 @@ void main() {
   // === LIGHT LEAK ===
   col += lightLeak(p, uTime, energy, uOnsetSnap);
 
-  // === COLOR GRADING: deep teal shadows, caustic gold highlights ===
-  col = colorGrade(col, vec3(0.0, 0.08, 0.12), vec3(0.9, 1.0, 0.8), 1.1, 1.05);
+  // === BLOOM: soft underwater glow ===
+  float lum = dot(col, vec3(0.299, 0.587, 0.114));
+  float bloomThreshold = mix(0.4, 0.3, energy);
+  float bloomAmount = max(0.0, lum - bloomThreshold) * 2.0;
+  vec3 bloomColor = mix(col, causticColor, 0.3);
+  col += bloomColor * bloomAmount * 0.3;
 
   // === S-CURVE COLOR GRADING ===
   col = sCurveGrade(col, energy);
