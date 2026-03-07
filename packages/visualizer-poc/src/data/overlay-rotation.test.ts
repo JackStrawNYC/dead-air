@@ -31,12 +31,12 @@ function makeSections(configs: { start: number; end: number; energy: "low" | "mi
   }));
 }
 
-// Sample overlays for testing (mix of real names from registry)
+// Sample overlays for testing (mix of real names from curated registry)
 const TEST_OVERLAYS = [
   "CosmicStarfield", "BreathingStealie", "WallOfSound",
-  "OpArtPatterns", "SolarFlare", "SkeletonBand",
-  "PsychedelicBorder", "LyricFlash", "ChromaticAberration",
-  "BearParade", "DeadIcons", "ThirteenPointBolt",
+  "FractalZoom", "ChinaCatSunflower", "SkeletonBand",
+  "LaserShow", "EmberRise", "VHSGlitch",
+  "BearParade", "MarchingTerrapins", "ThirteenPointBolt",
 ];
 
 // ─── buildRotationSchedule ───

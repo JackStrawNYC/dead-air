@@ -1,6 +1,6 @@
 /**
  * ParticleNebulaScene — cosmic particle cloud (20% of show).
- * 15K particles in golden-ratio sphere distribution.
+ * 8K particles in golden-ratio sphere distribution.
  * Camera orbits with bass-driven shake.
  * Uses AudioReactiveCanvas for shared smoothing + all uniforms.
  */
@@ -12,7 +12,7 @@ import { useVideoConfig } from "remotion";
 import { particleNebulaVert, particleNebulaFrag } from "../shaders/particle-nebula";
 import type { EnhancedFrameData, SectionBoundary, ColorPalette } from "../data/types";
 
-const PARTICLE_COUNT = 15000;
+const PARTICLE_COUNT = 8000;
 const GOLDEN_RATIO = (1 + Math.sqrt(5)) / 2;
 
 const ParticleSystem: React.FC = () => {

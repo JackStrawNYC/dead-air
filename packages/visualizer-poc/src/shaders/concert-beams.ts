@@ -117,12 +117,8 @@ void main() {
     // Snappy beat for intensity
     float intensity = (0.5 + uRms * 0.5 + contrastBoost) * beamActive;
 
-    // === CHROMATIC ABERRATION on beams ===
-    // Compute beam at 3 UV offsets for R/G/B separation
-    vec2 caOffset = normalize(p + vec2(0.001)) * caStrength;
-    float beamR = beam(p - caOffset, beamX, angle, width, intensity);
-    float beamG = beam(p, beamX, angle, width, intensity);
-    float beamB = beam(p + caOffset, beamX, angle, width, intensity);
+    // Single beam evaluation (simplified from per-channel chromatic aberration)
+    float beamVal = beam(p, beamX, angle, width, intensity);
 
     // Beam color
     float hue = uPalettePrimary + uChromaHue * 0.3 + fi * 0.12 + sectionHueShift;
@@ -144,8 +140,13 @@ void main() {
     vec3 coolShift = vec3(0.88, 0.95, 1.1);
     beamCol *= mix(coolShift, warmShift, energy);
 
-    // Composite with chromatic aberration
-    col += beamCol * vec3(beamR, beamG, beamB) * 0.6;
+    // Simple chromatic offset on composite
+    vec2 caOffset = normalize(p + vec2(0.001)) * caStrength;
+    float caShift = dot(caOffset, vec2(1.0, 0.5)) * 0.5;
+    beamCol.r *= 1.0 + caShift;
+    beamCol.b *= 1.0 - caShift;
+
+    col += beamCol * beamVal * 0.6;
   }
 
   // (beat/onset pulsing removed — unreliable detection for live music)
@@ -167,31 +168,6 @@ void main() {
   crowdY += uBeatSnap * 0.005 * sin(uv.x * 15.0 + uTime);
   float crowdMask = smoothstep(crowdY + 0.01, crowdY - 0.01, uv.y);
   col = mix(col, vec3(0.015, 0.012, 0.02), crowdMask * 0.85);
-
-  // Floor reflection
-  if (uv.y < 0.25) {
-    float reflection = smoothstep(0.15, 0.25, uv.y) * 0.15;
-    vec2 mirrorUv = vec2(uv.x, 0.5 - uv.y);
-    vec2 mirrorP = (mirrorUv - vec2(0.5, 0.0)) * aspect;
-
-    for (int i = 0; i < NUM_BEAMS; i++) {
-      float fi = float(i);
-      float beamActive = smoothstep(activeBeamCount, activeBeamCount - 1.0, fi);
-      if (beamActive < 0.01) continue;
-
-      float beamPhase = fi * 1.618;
-      float beamX = -aspect.x * 0.5 + beamSpacing * (fi + 1.0);
-      float sweepSpeed = mix(0.1, 0.3, energy) * tempoScale + uBass * 0.1;
-      float angle = PI * 0.5 + sin(uTime * sweepSpeed + beamPhase * 2.0) * mix(0.2, 0.45, energy);
-      float width = mix(0.05, 0.12, energy) + uMids * 0.06;
-      float intensity = (0.3 + uRms * 0.3) * beamActive;
-      float beamVal = beam(mirrorP, beamX, angle, width, intensity);
-
-      float hue = uPalettePrimary + uChromaHue * 0.3 + fi * 0.12 + sectionHueShift;
-      vec3 beamCol = 0.5 + 0.5 * cos(6.28318 * (vec3(hue, hue + 0.33, hue + 0.67)));
-      col += beamCol * beamVal * reflection;
-    }
-  }
 
   // Sparkle dust
   float sparkle = snoise(vec3(p * 30.0, uTime * 3.0));

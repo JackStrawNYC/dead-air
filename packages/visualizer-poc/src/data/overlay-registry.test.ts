@@ -28,6 +28,10 @@ describe("overlay-registry integrity", () => {
     expect(unique.size).toBe(names.length);
   });
 
+  it("has exactly 32 entries (30 keepers + 2 always-active)", () => {
+    expect(OVERLAY_REGISTRY.length).toBe(32);
+  });
+
   it("all entries have required fields", () => {
     for (const entry of OVERLAY_REGISTRY) {
       expect(entry.name).toBeTruthy();
@@ -54,10 +58,10 @@ describe("overlay-registry integrity", () => {
     }
   });
 
-  it("all 10 layers are populated", () => {
+  it("populated layers include 1, 2, 3, 5, 6, 7, 10", () => {
     const layers = new Set(OVERLAY_REGISTRY.map((e) => e.layer));
-    for (let i = 1; i <= 10; i++) {
-      expect(layers.has(i)).toBe(true);
+    for (const l of [1, 2, 3, 5, 6, 7, 10]) {
+      expect(layers.has(l)).toBe(true);
     }
   });
 

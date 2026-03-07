@@ -77,21 +77,12 @@ export interface AccentConfig {
  * should pulse with the music during peaks.
  */
 const ACCENT_ELIGIBLE = new Set([
-  // Original reactive/distortion overlays
-  "ChromaticAberration",
-  "PixelExplosion",
+  // Reactive overlays
   "ParticleExplosion",
   "WallOfSound",
   "LaserShow",
-  "PlasmaBall",
-  "StageLights",
-  "SolarFlare",
-  "Supernova",
-  "PhoenixWings",
-  "Pyrotechnics",
-  "FilmBurn",
-  "TeslaCoil",
-  "LiquidMetal",
+  "LightningBoltOverlay",
+  "EmberRise",
   "ThirteenPointBolt",
   // Dead iconography — pulse on Garcia's attack, Bobby's chords
   "BreathingStealie",
@@ -99,23 +90,10 @@ const ACCENT_ELIGIBLE = new Set([
   "SkullKaleidoscope",
   "BearParade",
   "SkeletonBand",
-  "SkeletonCouple",
-  "DeadIcons",
   "VWBusParade",
   "SkeletonRoses",
-  // Parametric Dead motifs
-  "DeadMotif_SkeletonMarch",
-  "DeadMotif_BearParade",
-  "DeadMotif_BoltFlash",
-  "DeadMotif_StealiePulse",
-  "DeadMotif_VWBusConvoy",
-  "DeadMotif_GarciaHandDrift",
-  // Venue/crowd energy
-  "MoshPit",
-  "StageDive",
-  "CrowdSilhouette",
-  "EmberRise",
-  "Thunderhead",
+  // Distortion
+  "VHSGlitch",
 ]);
 
 /** Energy-dependent accent tuning */
@@ -338,13 +316,8 @@ export function buildRotationSchedule(
     if (entry) allPoolEntries.push(entry);
   }
 
-  // 2b. Tier-aware pool filtering — exclude C-tier (archived) overlays entirely.
-  // B-tier only included when section energy allows larger overlay counts.
-  const poolEntries = allPoolEntries.filter((e) => {
-    const tier = e.tier ?? "B";
-    if (tier === "C") return false;
-    return true;
-  });
+  // All overlays in the curated registry are eligible (no tier filtering needed)
+  const poolEntries = allPoolEntries;
 
   // 3. Subdivide sections into energy-aware windows, aligned to section boundaries
   const windows: RotationWindow[] = [];
@@ -423,12 +396,8 @@ export function buildRotationSchedule(
     // Cap at pool size
     targetCount = Math.min(targetCount, poolEntries.length);
 
-    // Tier-aware pool: quiet passages (target ≤ 3) use A-tier only
-    const effectivePool = poolEntries.filter((e) => {
-      const tier = e.tier ?? "B";
-      if (tier === "B" && targetCount <= 3) return false;
-      return true;
-    });
+    // All curated overlays are eligible for all energy levels
+    const effectivePool = poolEntries;
 
     // Score each overlay for this window
     const scored = effectivePool.map((entry) => {

@@ -1,6 +1,6 @@
 /**
  * Particle Nebula — vertex + fragment shaders for THREE.Points.
- * 15K particles in golden-ratio sphere distribution.
+ * 8K particles in golden-ratio sphere distribution.
  *
  * v6 additions: distance fog, key change flash, color afterglow.
  */
@@ -55,11 +55,12 @@ void main() {
   float theta = aTheta + uTime * orbitSpeed * (0.5 + aRandom * 0.5);
   float phi = aPhi + uTime * orbitSpeed * 0.2 * (aRandom - 0.5);
 
-  // Flatness-driven jitter
+  // Flatness-driven jitter (single noise call, split across theta/phi)
   float jitterAmount = uFlatness * 0.15 + uHighs * 0.04;
   float sectionOffset = uSectionIndex * 3.7;
-  theta += snoise(vec3(aRandom * 100.0, uTime * 0.5, sectionOffset)) * jitterAmount * aRandom;
-  phi += snoise(vec3(sectionOffset, aRandom * 100.0, uTime * 0.5)) * jitterAmount * aRandom;
+  float jitterNoise = snoise(vec3(aRandom * 100.0, uTime * 0.5, sectionOffset));
+  theta += jitterNoise * jitterAmount * aRandom;
+  phi += jitterNoise * jitterAmount * (1.0 - aRandom);
 
   vec3 pos = vec3(
     r * sin(phi) * cos(theta),

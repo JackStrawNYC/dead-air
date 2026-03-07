@@ -67,7 +67,7 @@ float fbmFlat(vec3 p, float smoothness) {
   float value = 0.0;
   float amplitude = 0.5;
   float frequency = 1.0;
-  for (int i = 0; i < 6; i++) {
+  for (int i = 0; i < 5; i++) {
     value += amplitude * snoise(p * frequency);
     frequency *= 2.0;
     amplitude *= 0.5 * pow(smoothness, float(i) * 0.3);
@@ -121,12 +121,7 @@ void main() {
   float warpY = fbmFlat(q + vec3(8.3, 2.8, 0.0), smoothness);
   vec2 warp1 = vec2(warpX, warpY) * warpStrength;
 
-  float pass2Strength = (0.3 + uBass * 0.25) * complexity;
-  vec3 r = vec3((p + warp1) * 1.6, t * 0.12 + sectionSeed * 0.5);
-  float warp2X = fbmFlat(r + vec3(3.1, 4.7, t * 0.08), smoothness);
-  float warp2Y = fbmFlat(r + vec3(6.5, 1.3, t * 0.06), smoothness);
-  vec2 warp2 = vec2(warp2X, warp2Y) * pass2Strength;
-  vec2 warped = p + warp1 + warp2;
+  vec2 warped = p + warp1;
 
   float n = fbmFlat(vec3(warped * 0.9, t * 0.15 + sectionSeed * 0.3), smoothness);
 
