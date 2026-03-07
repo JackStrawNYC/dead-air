@@ -227,6 +227,67 @@ export const OVERLAY_BY_NAME = new Map(
   OVERLAY_REGISTRY.map((entry) => [entry.name, entry]),
 );
 
+// ─── Tier Assignments ───
+// A=essential (~33): iconic Dead overlays, best atmospherics/reactives
+// B=good (~42): well-animated, fills pool for longer shows
+// C=archived (everything else): excluded from selection
+
+const A_TIER = new Set([
+  // Sacred
+  "BreathingStealie", "ThirteenPointBolt", "StealYourFaceOff", "SkullKaleidoscope",
+  "SacredGeometry", "DarkStarPortal", "SkeletonRoses",
+  // Character
+  "BearParade", "SkeletonBand", "MarchingTerrapins", "Bertha", "JerryGuitar",
+  "VWBusParade", "CosmicCharlie", "AmericanBeauty",
+  // Atmospheric
+  "CosmicStarfield", "TieDyeWash", "Fireflies", "CampfireSparks",
+  // Reactive
+  "WallOfSound", "LaserShow", "ParticleExplosion", "LightningBoltOverlay",
+  // Nature
+  "SolarFlare", "Supernova", "BlackHole",
+  // Culture
+  "ChinaCatSunflower", "SugarMagnolia", "BoxOfRain",
+  // Distortion
+  "ChromaticAberration", "VHSGlitch",
+  // Info
+  "CassetteReels", "BootlegLabel",
+]);
+
+const B_TIER = new Set([
+  // Atmospheric
+  "SmokeWisps", "AuroraBorealis", "OilSlick", "NebulaCloud", "CandleFlicker",
+  "GodRays", "NorthernLights",
+  // Sacred
+  "StealieFade", "SkullRosesOverlay", "DancingTerrapinOverlay", "FractalZoom",
+  "MandalaGenerator", "SpaceDrums",
+  // Reactive
+  "WaveformOverlay", "Oscilloscope", "EmberRise", "StageLights",
+  // Geometric
+  "VortexSpiral", "WormholeTransit", "KaleidoscopeFilter",
+  // Nature
+  "MeteorShower", "SolarEclipse", "JellyfishSwarm", "Constellation",
+  "WarpDrive", "Thunderhead",
+  // Character
+  "DeadIcons", "MushroomForest", "CrowdSilhouette", "PhoenixWings",
+  // Artifact
+  "SongTitle", "PsychedelicBorder",
+  // Typography
+  "LyricFlash", "GarciaQuotes",
+  // HUD
+  "NixieTubes",
+  // Distortion
+  "FilmBurn", "FilmGrain", "VinylGrooves",
+  // Parametric
+  "ParticleField_Fireflies", "TieDyePattern_Spiral",
+  "DeadMotif_StealiePulse", "FluidLight_OilGlass",
+]);
+
+for (const entry of OVERLAY_REGISTRY) {
+  if (A_TIER.has(entry.name)) entry.tier = "A";
+  else if (B_TIER.has(entry.name)) entry.tier = "B";
+  else entry.tier = "C";
+}
+
 /** Always-active overlays (rendered regardless of selection) */
 export const ALWAYS_ACTIVE = OVERLAY_REGISTRY
   .filter((e) => e.alwaysActive)

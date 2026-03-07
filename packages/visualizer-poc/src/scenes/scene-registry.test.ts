@@ -10,12 +10,12 @@ import type { VisualMode } from "../data/types";
 const ALL_MODES: VisualMode[] = [
   "liquid_light", "oil_projector", "concert_lighting", "lo_fi_grain",
   "particle_nebula", "stark_minimal", "tie_dye", "cosmic_dust", "vintage_film",
-  "cosmic_voyage", "inferno", "deep_ocean", "aurora",
+  "cosmic_voyage", "inferno", "deep_ocean", "aurora", "crystal_cavern",
 ];
 
 describe("SCENE_REGISTRY", () => {
-  it("has exactly 13 registered modes", () => {
-    expect(Object.keys(SCENE_REGISTRY).length).toBe(13);
+  it("has exactly 14 registered modes", () => {
+    expect(Object.keys(SCENE_REGISTRY).length).toBe(14);
   });
 
   it("contains all expected modes", () => {
@@ -55,6 +55,7 @@ describe("getComplement", () => {
     expect(getComplement("inferno")).toBe("cosmic_voyage");
     expect(getComplement("deep_ocean")).toBe("inferno");
     expect(getComplement("aurora")).toBe("tie_dye");
+    expect(getComplement("crystal_cavern")).toBe("inferno");
   });
 
   it("returns the mode itself for unknown modes", () => {
@@ -88,6 +89,7 @@ describe("getModesForEnergy", () => {
     expect(modes).toContain("cosmic_voyage");
     expect(modes).toContain("deep_ocean");
     expect(modes).toContain("aurora");
+    expect(modes).toContain("crystal_cavern");
     expect(modes).not.toContain("concert_lighting"); // high energy
   });
 
@@ -99,9 +101,9 @@ describe("getModesForEnergy", () => {
 });
 
 describe("getRegisteredModes", () => {
-  it("returns all 13 modes", () => {
+  it("returns all 14 modes", () => {
     const modes = getRegisteredModes();
-    expect(modes.length).toBe(13);
+    expect(modes.length).toBe(14);
     for (const mode of ALL_MODES) {
       expect(modes).toContain(mode);
     }

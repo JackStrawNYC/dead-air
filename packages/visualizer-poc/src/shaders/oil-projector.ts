@@ -144,10 +144,13 @@ void main() {
   // S-curve grading
   col = sCurveGrade(col, energy);
 
+  // === HALATION: warm film bloom ===
+  col = halation(vUv, col, energy);
+
   // Film grain (moderate)
   float grainTime = floor(uTime * 15.0) / 15.0;
   float grainIntensity = mix(0.08, 0.04, energy);
-  col += filmGrain(uv, grainTime) * grainIntensity;
+  col += filmGrainRes(uv, grainTime, uResolution.y) * grainIntensity;
 
   // Lifted blacks (warm)
   col = max(col, vec3(0.08, 0.065, 0.085));

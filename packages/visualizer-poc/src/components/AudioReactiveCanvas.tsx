@@ -52,6 +52,8 @@ export interface AudioDataContext {
     slowEnergy: number;
     /** Stem-separated bass energy (falls back to (sub+low)/2 when stems unavailable) */
     stemBass: number;
+    /** Raw 12-element chroma array at current frame (C, C#, D, ..., B) */
+    chroma: number[];
   };
   /** Per-song palette primary hue (0-1 normalized) */
   palettePrimary: number;
@@ -282,6 +284,7 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
       afterglowHue,
       slowEnergy: smoothValue(frames, idx, (f) => f.rms, 180),
       stemBass,
+      chroma: Array.from(fd.chroma),
     },
     palettePrimary,
     paletteSecondary,

@@ -12,6 +12,7 @@ import type {
   TrackAnalysis,
   SongProfile,
 } from "./types";
+import { OVERLAY_REGISTRY } from "./overlay-registry";
 
 // ─── Test Helpers ───
 
@@ -276,5 +277,39 @@ describe("selectOverlaysForShow", () => {
       if (name === "SongTitle" || name === "FilmGrain") continue; // always-active
       expect(count).toBeLessThanOrEqual(5); // max ~83% of 6 songs, but with penalties should be lower
     }
+  });
+});
+
+// ─── Tier Filtering ───
+
+describe("overlay tier system", () => {
+  it("all overlays in registry have a tier assigned", () => {
+    for (const entry of OVERLAY_REGISTRY) {
+      expect(["A", "B", "C"]).toContain(entry.tier);
+    }
+  });
+
+  it("A-tier contains key Dead iconography", () => {
+    const aTier = OVERLAY_REGISTRY.filter((e) => e.tier === "A").map((e) => e.name);
+    expect(aTier).toContain("BreathingStealie");
+    expect(aTier).toContain("ThirteenPointBolt");
+    expect(aTier).toContain("BearParade");
+    expect(aTier).toContain("SkeletonBand");
+    expect(aTier).toContain("WallOfSound");
+  });
+
+  it("C-tier is the largest pool (archived overlays)", () => {
+    const counts = { A: 0, B: 0, C: 0 };
+    for (const entry of OVERLAY_REGISTRY) {
+      counts[entry.tier as "A" | "B" | "C"]++;
+    }
+    expect(counts.C).toBeGreaterThan(counts.A);
+    expect(counts.C).toBeGreaterThan(counts.B);
+  });
+
+  it("A+B combined is around 75 overlays (quality pool)", () => {
+    const qualityPool = OVERLAY_REGISTRY.filter((e) => e.tier !== "C");
+    expect(qualityPool.length).toBeGreaterThanOrEqual(60);
+    expect(qualityPool.length).toBeLessThanOrEqual(100);
   });
 });

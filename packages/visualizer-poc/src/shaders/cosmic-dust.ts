@@ -156,6 +156,9 @@ void main() {
   float vig = 1.0 - smoothstep(0.6, 1.4, length(uv));
   color *= vig;
 
+  // === HALATION: warm film bloom ===
+  color = halation(vUv, color, uEnergy);
+
   gl_FragColor = vec4(color, 1.0);
 }
 `;

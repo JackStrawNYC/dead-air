@@ -52,6 +52,8 @@ import { computeSegueHueRotation } from "./utils/segue-blend";
 import { detectCrowdMoments } from "./data/crowd-detector";
 import { CrowdOverlay } from "./components/CrowdOverlay";
 import { CameraMotion } from "./components/CameraMotion";
+import { computeVisualFocus } from "./utils/visual-focus";
+import { computeCounterpoint, resetCounterpoint } from "./utils/visual-counterpoint";
 
 // Extracted sub-components
 import { SongArtLayer } from "./components/song-visualizer/SongArtLayer";
@@ -218,6 +220,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
   const audioSnapshot = computeAudioSnapshot(f, frameIdx, beatArray, 30, tempo);
   const climaxState = computeClimaxState(f, frame, sections, audioSnapshot.energy);
   const climaxMod = climaxModulation(climaxState);
+  const counterpoint = computeCounterpoint(audioSnapshot, climaxState.phase, frame);
 
   const jamEvolution = useMemo(
     () => computeJamEvolution(f, frame, isDrumsSpace),
@@ -243,6 +246,13 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
     [frame, activeMediaWindow, activeLyricTrigger],
   );
 
+  // ─── Visual focus system ───
+  const isVideoActive = !!activeMediaWindow && frame >= activeMediaWindow.frameStart && frame < activeMediaWindow.frameEnd;
+  const focusState = computeVisualFocus(climaxState.phase, climaxState.intensity, isVideoActive, frame);
+
+  // Derive energy level hint for overlay hard cap
+  const energyLevel: "quiet" | "mid" | "peak" = audioSnapshot.energy < 0.10 ? "quiet" : audioSnapshot.energy > 0.25 ? "peak" : "mid";
+
   // ─── Fade in/out ───
   // Start fade-out 1 frame before the end of analyzed audio to ensure visuals are fully
   // gone by the time audio ends (analysis rounds up via ceil, creating a +1 frame mismatch)
@@ -258,9 +268,10 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
       <AudioSnapshotProvider snapshot={audioSnapshot}>
       <VisualizerErrorBoundary>
       <div style={{ position: "absolute", inset: 0, opacity }}>
-        <CameraMotion frames={f} jamEvolution={jamEvolution} bass={audioSnapshot.bass}>
+        <CameraMotion frames={f} jamEvolution={jamEvolution} bass={audioSnapshot.bass} cameraFreeze={counterpoint.cameraFreeze}>
         <EraGrade>
-        <EnergyEnvelope snapshot={audioSnapshot} climaxMod={climaxMod} jamColorTemp={jamEvolution.isLongJam ? jamEvolution.colorTemperature : undefined} calibration={energyCalibration}>
+        <EnergyEnvelope snapshot={audioSnapshot} climaxMod={climaxMod} jamColorTemp={jamEvolution.isLongJam ? jamEvolution.colorTemperature : undefined} calibration={energyCalibration} counterpointSatMult={counterpoint.saturationMult}>
+          <div style={{ position: "absolute", inset: 0, opacity: focusState.shaderOpacity }}>
           <SilentErrorBoundary name="SceneRouter">
             {(() => {
               const sceneRouter = <SceneRouter frames={f} sections={sections} song={props.song} tempo={tempo} seed={showSeed} />;
@@ -293,10 +304,11 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
               return sceneRouter;
             })()}
           </SilentErrorBoundary>
+          </div>
 
           {effectiveSongArt && (
             <SilentErrorBoundary name="SongArt">
-              <SongArtLayer src={staticFile(effectiveSongArt)} suppressionFactor={artSuppressionFactor} hueRotation={hueRotation} energy={audioSnapshot.energy} climaxIntensity={climaxState.intensity} />
+              <SongArtLayer src={staticFile(effectiveSongArt)} suppressionFactor={artSuppressionFactor} hueRotation={hueRotation} energy={audioSnapshot.energy} climaxIntensity={climaxState.intensity} focusOpacity={focusState.artOpacity} />
             </SilentErrorBoundary>
           )}
 
@@ -316,6 +328,8 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
             tempo={tempo}
             palette={props.song.palette}
             frames={f}
+            focusSuppression={focusState.overlayOpacity}
+            energyLevel={energyLevel}
           />
 
           {crowdMoments.length > 0 && (

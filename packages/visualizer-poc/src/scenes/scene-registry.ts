@@ -56,6 +56,7 @@ import { CosmicVoyageScene } from "./CosmicVoyageScene";
 import { InfernoScene } from "./InfernoScene";
 import { DeepOceanScene } from "./DeepOceanScene";
 import { AuroraScene } from "./AuroraScene";
+import { CrystalCavernScene } from "./CrystalCavernScene";
 
 // ─── Scene Registry ───
 
@@ -124,6 +125,11 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     Component: AuroraScene,
     energyAffinity: "low",
     complement: "tie_dye",
+  },
+  crystal_cavern: {
+    Component: CrystalCavernScene,
+    energyAffinity: "low",
+    complement: "inferno",
   },
 };
 

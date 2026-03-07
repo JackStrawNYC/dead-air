@@ -14,6 +14,9 @@ import { validateSectionOverrides } from "./scenes/SceneRouter";
 // ─── Dynamic show loading ───
 // Supports multi-show via --props='{"showId":"1972-08-27"}' or SHOW_ID env var.
 // Falls back to data/ root (Cornell '77) for backward compatibility.
+const RENDER_WIDTH = parseInt(process.env.RENDER_WIDTH ?? "1920", 10);
+const RENDER_HEIGHT = parseInt(process.env.RENDER_HEIGHT ?? "1080", 10);
+
 const inputProps = getInputProps() as Record<string, unknown>;
 const showId = (inputProps.showId as string) ?? process.env.SHOW_ID ?? "";
 
@@ -126,8 +129,8 @@ export const Root: React.FC = () => {
           component={ShowIntroComponent}
           durationInFrames={SHOW_INTRO_FRAMES}
           fps={30}
-          width={1920}
-          height={1080}
+          width={RENDER_WIDTH}
+          height={RENDER_HEIGHT}
           defaultProps={{
             videoSrc: "assets/dead-air-intro.mp4",
             posterSrc: setlist.showPoster,
@@ -146,8 +149,8 @@ export const Root: React.FC = () => {
           component={ChapterCardComponent}
           durationInFrames={CHAPTER_CARD_FRAMES}
           fps={30}
-          width={1920}
-          height={1080}
+          width={RENDER_WIDTH}
+          height={RENDER_HEIGHT}
           defaultProps={{ text: ch.text, stats: ch.stats }}
         />
       ))}
@@ -238,8 +241,8 @@ export const Root: React.FC = () => {
           component={SongVisualizerComponent}
           durationInFrames={DEFAULT_FRAMES}
           fps={30}
-          width={1920}
-          height={1080}
+          width={RENDER_WIDTH}
+          height={RENDER_HEIGHT}
           defaultProps={{
             song: setlist.songs.find((s) => s.trackId === "s2t08") ?? setlist.songs[0],
             activeOverlays: getActiveOverlays("s2t08"),

@@ -44,6 +44,7 @@ const BUNDLE_HASH_FILE = join(BUNDLE_DIR, ".source-hash");
 // Parse args
 const args = process.argv.slice(2);
 const resume = args.includes("--resume");
+const draftMode = args.includes("--draft");
 const glArg = args.find((a) => a.startsWith("--gl="))?.split("=")[1] ?? "angle";
 const chunkSize = parseInt(args.find((a) => a.startsWith("--chunk="))?.split("=")[1] ?? "4500", 10);
 const trackFilter = args.find((a) => a.startsWith("--track="))?.split("=")[1];
@@ -484,6 +485,11 @@ function concatShow(
 // ─── Main ───
 
 function main() {
+  // Set resolution env vars: 4K for final renders, 1080p for draft/preview
+  process.env.RENDER_WIDTH = draftMode || previewMode ? "1920" : "3840";
+  process.env.RENDER_HEIGHT = draftMode || previewMode ? "1080" : "2160";
+  console.log(`Resolution: ${process.env.RENDER_WIDTH}x${process.env.RENDER_HEIGHT}${draftMode ? " (draft)" : ""}`);
+
   const setlist = JSON.parse(readFileSync(join(DATA_DIR, "setlist.json"), "utf-8"));
   const timelinePath = join(DATA_DIR, "show-timeline.json");
 

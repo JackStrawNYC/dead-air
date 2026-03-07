@@ -48,6 +48,10 @@ uniform float uClimaxPhase;
 uniform float uClimaxIntensity;
 uniform vec4 uContrast0;
 uniform vec4 uContrast1;
+uniform vec4 uChroma0;
+uniform vec4 uChroma1;
+uniform vec4 uChroma2;
+uniform vec2 uCamOffset;
 
 varying vec2 vUv;
 
@@ -151,6 +155,11 @@ void main() {
 
   // Composite: R from red-shifted, G from center, B from blue-shifted
   vec3 midCol = vec3(midColR.r, midColG.g, midColB.b);
+
+  // Multi-chroma domain warping: harmonic content adds multi-colored regions
+  // instead of single-hue uChromaHue, the oil-on-glass gains harmonic complexity
+  vec3 chromaInfluence = chromaColor(warped * 0.5, uChroma0, uChroma1, uChroma2, energy);
+  midCol = mix(midCol, midCol + chromaInfluence * 0.6, 0.2);
 
   // Palette saturation
   float sat = mix(0.80, 1.0, energy) * uPaletteSaturation * (1.0 - uFlatness * 0.10);
@@ -262,10 +271,13 @@ void main() {
   // === S-CURVE COLOR GRADING ===
   col = sCurveGrade(col, energy);
 
+  // === HALATION: warm film bloom ===
+  col = halation(vUv, col, energy);
+
   // === FILM GRAIN: animated 2-frame hold ===
   float grainTime = floor(uTime * 15.0) / 15.0;
   float grainIntensity = mix(0.06, 0.02, energy);
-  col += filmGrain(uv, grainTime) * grainIntensity;
+  col += filmGrainRes(uv, grainTime, uResolution.y) * grainIntensity;
 
   // Lifted blacks
   col = max(col, vec3(0.08, 0.065, 0.085));

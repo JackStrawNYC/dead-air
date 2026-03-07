@@ -103,7 +103,7 @@ describe("buildRotationSchedule", () => {
   });
 
   it("varies with different seeds", () => {
-    const sections = makeSections([{ start: 0, end: 3600, energy: "mid" }]);
+    const sections = makeSections([{ start: 0, end: 3600, energy: "high" }]);
     const s1 = buildRotationSchedule(TEST_OVERLAYS, sections, "s1t01", 42);
     const s2 = buildRotationSchedule(TEST_OVERLAYS, sections, "s1t01", 999);
     // At least one window should have different overlays

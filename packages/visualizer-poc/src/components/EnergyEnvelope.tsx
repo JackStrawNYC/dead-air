@@ -26,6 +26,8 @@ interface Props {
   jamColorTemp?: number;
   /** Per-song energy calibration (auto-derived from recording percentiles) */
   calibration?: EnergyCalibration;
+  /** Counterpoint saturation multiplier (0.4-1.3) */
+  counterpointSatMult?: number;
 }
 
 // Per-era bloom color — matches era grade for visual cohesion
@@ -38,7 +40,7 @@ const ERA_BLOOM: Record<string, string> = {
 };
 const DEFAULT_BLOOM = ERA_BLOOM.classic;
 
-export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod, jamColorTemp, calibration }) => {
+export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod, jamColorTemp, calibration, counterpointSatMult = 1 }) => {
   const energy = snapshot.energy;
   const low = calibration?.quietThreshold;
   const high = calibration?.loudThreshold;
@@ -64,7 +66,7 @@ export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod,
 
   // Tight modulation ranges — no visible pumping, no pulsing black
   // Saturation + brightness use fast energy (responsive to dynamics)
-  const saturation = 0.85 + factor * 0.30 + flatnessSaturation + textureSaturationOffset + (climaxMod?.saturationOffset ?? 0);
+  const saturation = (0.85 + factor * 0.30 + flatnessSaturation + textureSaturationOffset + (climaxMod?.saturationOffset ?? 0)) * counterpointSatMult;
   const brightness = 0.92 + factor * 0.12 + onsetBrightness + (climaxMod?.brightnessOffset ?? 0);
   const contrast = 0.93 + factor * 0.12 + (climaxMod?.contrastOffset ?? 0);  // 0.93 → 1.05
   // Bloom uses slow energy (drift, not pulse) — staggered from sat/brightness

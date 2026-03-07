@@ -111,7 +111,7 @@ void main() {
   // === HEAVY FILM GRAIN: 2-frame hold, much stronger than other modes ===
   float grainTime = floor(uTime * 15.0) / 15.0;
   float grainIntensity = mix(0.14, 0.08, energy); // Much heavier grain
-  col += filmGrain(uv, grainTime) * grainIntensity;
+  col += filmGrainRes(uv, grainTime, uResolution.y) * grainIntensity;
 
   // Gate scratch (vertical line that occasionally appears)
   float scratchSeed = floor(uTime * 2.0);
@@ -134,6 +134,9 @@ void main() {
 
   // S-curve for film look
   col = sCurveGrade(col, energy * 0.6); // Gentler grading
+
+  // === HALATION: warm film bloom ===
+  col = halation(vUv, col, energy);
 
   gl_FragColor = vec4(col, 1.0);
 }

@@ -60,6 +60,10 @@ uniform float uClimaxIntensity;
 uniform float uSlowEnergy;
 uniform vec4 uContrast0;
 uniform vec4 uContrast1;
+uniform vec4 uChroma0;
+uniform vec4 uChroma1;
+uniform vec4 uChroma2;
+uniform vec2 uCamOffset;
 
 varying vec2 vUv;
 
@@ -89,12 +93,21 @@ float stars(vec2 uv, float density) {
 // Rotation matrix per octave for organic swirl
 mat2 m2 = mat2(0.80, 0.60, -0.60, 0.80);
 
-float auroraFBM(vec3 p, float turbulence) {
+float auroraFBM(vec3 p, float turbulence, vec4 ct0, vec4 ct1) {
   float val = 0.0;
   float amp = 0.5;
   float freq = 1.0;
+  // Per-octave scaling by contrast bands: low frequencies drive base ribbon,
+  // high frequencies drive shimmering detail. Aurora literally visualizes
+  // the spectral shape.
+  float contrastScale[5];
+  contrastScale[0] = 0.7 + ct0.x * 0.6;   // sub-bass → base ribbon
+  contrastScale[1] = 0.7 + ct0.y * 0.6;   // low → main body
+  contrastScale[2] = 0.7 + ct0.z * 0.5;   // low-mid → folding
+  contrastScale[3] = 0.7 + ct0.w * 0.5;   // mid → detail
+  contrastScale[4] = 0.7 + ct1.x * 0.4;   // high-mid → shimmer
   for (int i = 0; i < 5; i++) {
-    val += amp * snoise(p * freq);
+    val += amp * contrastScale[i] * snoise(p * freq);
     // Rotate XZ per octave for organic swirl (nimitz technique)
     p.xz = m2 * p.xz;
     p.y *= 1.1;
@@ -117,6 +130,10 @@ void main() {
   float onset = clamp(uOnsetSnap, 0.0, 1.0);
   float slowE = clamp(uSlowEnergy, 0.0, 1.0);
   float chromaH = clamp(uChromaHue, 0.0, 1.0);
+
+  // === PARALLAX DEPTH: bright areas shift more when camera pans ===
+  float preDepth = length(p) * 0.5;
+  p = parallaxUV(p, uCamOffset, preDepth);
 
   // === SLOW TIME: aurora should never feel rushed ===
   float slowTime = uTime * 0.08;
@@ -149,10 +166,7 @@ void main() {
   auroraColor1 = mix(auroraColor1, classicGreen, 0.25);
   auroraColor2 = mix(auroraColor2, classicPurple, 0.2);
 
-  // === VOLUMETRIC AURORA RAYMARCHING (nimitz-inspired) ===
-  // Energy controls step count (24-32 range) and vertical coverage
-  int maxSteps = 24 + int(energy * 8.0);
-  float verticalCoverage = mix(0.15, 0.7, energy);
+  // === VOLUMETRIC AURORA RAYMARCHING — 3-curtain system (64 steps) ===
   float curtainBrightness = mix(0.15, 0.8, energy);
   curtainBrightness += onset * 0.3;
   float bpH = beatPulseHalf(uMusicalTime);
@@ -161,67 +175,97 @@ void main() {
   // Ray setup: looking upward into aurora band
   vec3 rd = normalize(vec3(p.x, 0.6 + p.y * 0.8, -1.0));
 
+  // 3 curtain layers at different depths
+  float curtainDepths[3];
+  curtainDepths[0] = 1.0;   // near
+  curtainDepths[1] = 2.0;   // mid
+  curtainDepths[2] = 3.5;   // far
+
+  float curtainPhases[3];
+  curtainPhases[0] = 0.0;
+  curtainPhases[1] = 2.1;
+  curtainPhases[2] = 4.7;
+
   // Volumetric accumulation
   vec4 auroraAcc = vec4(0.0);
-  float stepSize = mix(0.15, 0.1, energy);
+  float stepSize = 0.1;
 
   // Aurora exists in a constrained vertical band
   float bandLow = mix(2.0, 1.0, energy);
-  float bandHigh = mix(3.5, 5.0, energy);
+  float bandHigh = mix(3.5, 5.5, energy);
 
-  for (int i = 0; i < 32; i++) {
-    if (i >= maxSteps) break;
-    if (auroraAcc.a > 0.95) break;   // Early exit at near-opaque
+  for (int i = 0; i < 64; i++) {
+    if (auroraAcc.a > 0.95) break;
 
     float t = float(i) * stepSize + 0.5;
     vec3 pos = rd * t;
 
-    // Constrain to aurora band (skip steps outside)
     if (pos.y < bandLow || pos.y > bandHigh) continue;
 
-    // Curtain sway from bass
-    float swayAmt = bass * 0.4;
-    pos.x += swayAmt * sin(pos.y * 2.0 + slowTime * 0.5);
-    pos.z += swayAmt * 0.5 * cos(pos.y * 1.5 + slowTime * 0.3);
+    // Accumulate from all 3 curtain layers
+    float totalDensity = 0.0;
+    vec3 totalColor = vec3(0.0);
 
-    // Slow ambient drift
-    pos.x += slowTime * driftSpeed * 10.0;
-    pos.z += slowTime * driftSpeed * 5.0;
+    for (int c = 0; c < 3; c++) {
+      vec3 curtainPos = pos;
+      curtainPos.z += curtainDepths[c];
 
-    // FBM density with onset turbulence
-    float density = auroraFBM(pos * 0.3, onset);
+      // Per-curtain sway
+      float swayAmt = bass * 0.4 * (1.0 - float(c) * 0.2);
+      curtainPos.x += swayAmt * sin(curtainPos.y * 2.0 + slowTime * 0.5 + curtainPhases[c]);
+      curtainPos.z += swayAmt * 0.5 * cos(curtainPos.y * 1.5 + slowTime * 0.3 + curtainPhases[c]);
+      curtainPos.x += slowTime * driftSpeed * 10.0 + curtainPhases[c] * 3.0;
+      curtainPos.z += slowTime * driftSpeed * 5.0;
 
-    // Threshold: must exceed 0 to be visible
-    density = smoothstep(-0.1, 0.4, density);
+      float density = auroraFBM(curtainPos * 0.3, onset, uContrast0, uContrast1);
+      density = smoothstep(-0.1, 0.4, density);
 
-    // Vertical falloff: fade at edges of band
-    float bandFade = smoothstep(bandLow, bandLow + 0.5, pos.y)
-                   * smoothstep(bandHigh, bandHigh - 0.5, pos.y);
-    density *= bandFade;
+      // Vertical falloff
+      float bandFade = smoothstep(bandLow, bandLow + 0.5, pos.y)
+                     * smoothstep(bandHigh, bandHigh - 0.5, pos.y);
+      density *= bandFade;
 
-    if (density > 0.01) {
-      // Color varies with height (green at bottom, purple at top)
-      float heightMix = smoothstep(bandLow, bandHigh, pos.y);
-      vec3 auroraCol = mix(auroraColor1, auroraColor2, heightMix);
+      // Atmospheric perspective: far curtains are hazed
+      float distFade = 1.0 - float(c) * 0.25;
+      density *= distFade;
 
-      // Noise-based luminosity variation for shimmer
-      float lumNoise = snoise(vec3(pos.x * 2.0, pos.y * 3.0, slowTime * 0.5));
-      density *= 0.6 + 0.4 * lumNoise;
+      if (density > 0.01) {
+        float heightMix = smoothstep(bandLow, bandHigh, pos.y);
+        vec3 curtainCol = mix(auroraColor1, auroraColor2, heightMix + float(c) * 0.15);
+        vec3 chromaTint = chromaColor(vec2(heightMix, curtainPos.x * 0.1), uChroma0, uChroma1, uChroma2, energy);
+        curtainCol = mix(curtainCol, curtainCol + chromaTint, 0.25);
 
-      // Front-to-back alpha compositing
-      float alpha = density * stepSize * 3.0;
-      alpha = min(alpha, 1.0);
+        // Far curtains mix toward horizon color
+        vec3 horizonColor = mix(skyColor, auroraColor1 * 0.3, 0.5);
+        curtainCol = mix(curtainCol, horizonColor, float(c) * 0.2);
+
+        float lumNoise = snoise(vec3(curtainPos.x * 2.0, curtainPos.y * 3.0, slowTime * 0.5 + curtainPhases[c]));
+        density *= 0.6 + 0.4 * lumNoise;
+
+        totalDensity += density;
+        totalColor += curtainCol * density;
+      }
+    }
+
+    if (totalDensity > 0.01) {
+      vec3 avgColor = totalColor / totalDensity;
+      float alpha = min(totalDensity * stepSize * 3.0, 1.0);
       float weight = alpha * (1.0 - auroraAcc.a);
-
-      auroraAcc.rgb += auroraCol * curtainBrightness * weight;
+      auroraAcc.rgb += avgColor * curtainBrightness * weight;
       auroraAcc.a += weight;
     }
   }
 
   float auroraIntensity = auroraAcc.a;
-
-  // Apply aurora to scene
   col += auroraAcc.rgb;
+
+  // === GROUND REFLECTION: mirror aurora below horizon with reduced intensity ===
+  if (p.y < -0.2) {
+    float reflectY = -p.y - 0.2;
+    float reflectStrength = smoothstep(0.0, 0.3, reflectY) * 0.3;
+    // Blurred reflection from aurora accumulation
+    col += auroraAcc.rgb * reflectStrength * (0.5 + 0.5 * snoise(vec3(p.x * 3.0, reflectY * 5.0, uTime * 0.1)));
+  }
 
   // === ATMOSPHERIC GLOW: diffuse light beneath aurora ===
   float glowY = smoothstep(0.3, -0.2, p.y);
@@ -232,8 +276,9 @@ void main() {
   // === DIM STARS behind bright aurora ===
   col -= starColor * 0.4 * auroraIntensity * curtainBrightness;
 
-  // === VIGNETTE ===
-  float vigScale = mix(0.70, 0.62, energy);
+  // === VIGNETTE (counterpoint: opens at peaks, closes at valleys) ===
+  float vigInverse = inverseEnergy(energy);
+  float vigScale = mix(0.58, 0.73, vigInverse);
   float vignette = 1.0 - dot(p * vigScale, p * vigScale);
   vignette = smoothstep(0.0, 1.0, vignette);
   col = mix(vec3(0.0), col, vignette);
@@ -248,13 +293,19 @@ void main() {
   vec3 bloomColor = mix(col, auroraColor1, 0.3);
   col += bloomColor * bloomAmount * 0.3;
 
+  // === COLOR GRADING: dark sky shadows, green-purple highlights ===
+  col = colorGrade(col, vec3(0.02, 0.02, 0.05), vec3(0.3, 1.0, 0.5), 1.05, 1.1);
+
   // === S-CURVE COLOR GRADING ===
   col = sCurveGrade(col, energy);
+
+  // === HALATION: warm film bloom ===
+  col = halation(vUv, col, energy);
 
   // === FILM GRAIN ===
   float grainTime = floor(uTime * 15.0) / 15.0;
   float grainIntensity = mix(0.05, 0.025, energy);
-  col += filmGrain(uv, grainTime) * grainIntensity;
+  col += filmGrainRes(uv, grainTime, uResolution.y) * grainIntensity;
 
   // === LIFTED BLACKS (cold blue-green tint) ===
   col = max(col, vec3(0.02, 0.03, 0.05));

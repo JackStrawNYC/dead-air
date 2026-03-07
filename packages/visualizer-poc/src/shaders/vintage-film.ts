@@ -127,6 +127,9 @@ void main() {
     (1.0 - sprocketEdge) * hole * 0.3);
   color *= sprocketMask;
 
+  // === HALATION: warm film bloom ===
+  color = halation(vUv, color, uEnergy);
+
   // Film grain (uses shared filmGrain from noise.ts — returns warm-tinted vec3)
   float grainTime = floor(t * 15.0) / 15.0;
   color += filmGrain(uv, grainTime) * 0.06;

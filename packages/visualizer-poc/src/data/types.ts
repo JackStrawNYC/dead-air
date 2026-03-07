@@ -93,7 +93,8 @@ export type VisualMode =
   | "cosmic_voyage"
   | "inferno"
   | "deep_ocean"
-  | "aurora";
+  | "aurora"
+  | "crystal_cavern";
 
 /** Per-section mode override in setlist */
 export interface SectionOverride {
@@ -247,6 +248,8 @@ export interface OverlayEntry {
    *  peak: energy level for maximum response (0-1)
    *  falloff: rate of decay above peak (higher = faster falloff) */
   energyResponse?: [threshold: number, peak: number, falloff: number];
+  /** Quality tier: A=essential, B=good, C=archived (excluded from selection) */
+  tier?: "A" | "B" | "C";
 }
 
 /** Summary audio profile computed from a song's analysis frames.

@@ -367,6 +367,8 @@ import { MatrixRain } from "../components/MatrixRain";
 export interface OverlayComponentEntry {
   Component: React.ComponentType<{ frames: EnhancedFrameData[] }>;
   layer: number;
+  /** Render context: 'dom' for HTML/CSS overlays, 'glsl' for Three.js shader overlays */
+  renderContext?: 'dom' | 'glsl';
 }
 
 export const OVERLAY_COMPONENTS: Record<string, OverlayComponentEntry> = {

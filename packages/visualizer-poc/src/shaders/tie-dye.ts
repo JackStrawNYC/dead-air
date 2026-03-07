@@ -124,6 +124,9 @@ void main() {
   // Energy-reactive overall brightness
   color *= 0.8 + uRms * 0.4;
 
+  // === HALATION: warm film bloom ===
+  color = halation(vUv, color, uEnergy);
+
   gl_FragColor = vec4(color, 1.0);
 }
 `;

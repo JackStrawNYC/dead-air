@@ -140,6 +140,9 @@ void main() {
   vig = smoothstep(0.0, 1.0, vig);
   col *= mix(0.7, 1.0, vig);
 
+  // === HALATION: warm film bloom ===
+  col = halation(vUv, col, energy);
+
   // Very light grain
   float grainTime = floor(uTime * 15.0) / 15.0;
   col += filmGrain(uv, grainTime) * 0.03;

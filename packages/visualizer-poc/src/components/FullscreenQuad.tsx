@@ -54,6 +54,10 @@ export const FullscreenQuad: React.FC<Props> = ({
       uStemBass: { value: 0 },
       uContrast0: { value: new THREE.Vector4(0, 0, 0, 0) },
       uContrast1: { value: new THREE.Vector4(0, 0, 0, 0) },
+      uChroma0: { value: new THREE.Vector4(0, 0, 0, 0) },
+      uChroma1: { value: new THREE.Vector4(0, 0, 0, 0) },
+      uChroma2: { value: new THREE.Vector4(0, 0, 0, 0) },
+      uCamOffset: { value: new THREE.Vector2(0, 0) },
       ...extraUniforms,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -90,6 +94,18 @@ export const FullscreenQuad: React.FC<Props> = ({
   const c = smooth.contrast;
   uniforms.uContrast0.value.set(c[0] ?? 0, c[1] ?? 0, c[2] ?? 0, c[3] ?? 0);
   uniforms.uContrast1.value.set(c[4] ?? 0, c[5] ?? 0, c[6] ?? 0, 0);
+
+  const ch = smooth.chroma;
+  uniforms.uChroma0.value.set(ch[0] ?? 0, ch[1] ?? 0, ch[2] ?? 0, ch[3] ?? 0);
+  uniforms.uChroma1.value.set(ch[4] ?? 0, ch[5] ?? 0, ch[6] ?? 0, ch[7] ?? 0);
+  uniforms.uChroma2.value.set(ch[8] ?? 0, ch[9] ?? 0, ch[10] ?? 0, ch[11] ?? 0);
+
+  // Camera offset: approximate CameraMotion's drift for parallax
+  // Bass-driven sway + slow sinusoidal drift
+  const bassAmp = smooth.bass * 8.0;
+  const camOffX = Math.sin(time * 3.7) * bassAmp * 0.5 + Math.sin(time * 0.03 * Math.PI * 2) * 4;
+  const camOffY = Math.cos(time * 2.3) * bassAmp * 0.3 + Math.cos(time * 0.03 * Math.PI * 2 * 0.7 + 1.3) * 2.4;
+  uniforms.uCamOffset.value.set(camOffX, camOffY);
 
   return (
     <mesh>

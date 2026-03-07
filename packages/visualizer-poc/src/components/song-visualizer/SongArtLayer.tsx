@@ -22,9 +22,11 @@ interface SongArtProps {
   energy?: number;
   /** Climax intensity (0-1) — art suppresses further during climax/sustain */
   climaxIntensity?: number;
+  /** Focus system opacity multiplier (0-1) — controls art visibility by climax phase */
+  focusOpacity?: number;
 }
 
-export const SongArtLayer: React.FC<SongArtProps> = ({ src, suppressionFactor, hueRotation = 0, energy = 0, climaxIntensity = 0 }) => {
+export const SongArtLayer: React.FC<SongArtProps> = ({ src, suppressionFactor, hueRotation = 0, energy = 0, climaxIntensity = 0, focusOpacity = 1 }) => {
   const frame = useCurrentFrame();
 
   // Energy-reactive wash: quiet → 0.35, peak → 0.05
@@ -50,7 +52,7 @@ export const SongArtLayer: React.FC<SongArtProps> = ({ src, suppressionFactor, h
 
   // Climax suppression: during climax/sustain, further suppress art
   const climaxSuppression = 1 - climaxIntensity * 0.7;
-  const artOpacity = baseOpacity * suppressionFactor * climaxSuppression;
+  const artOpacity = baseOpacity * suppressionFactor * climaxSuppression * focusOpacity;
 
   if (artOpacity < 0.01) return null;
 

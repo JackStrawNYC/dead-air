@@ -56,6 +56,10 @@ uniform float uClimaxIntensity;
 uniform float uSlowEnergy;
 uniform vec4 uContrast0;
 uniform vec4 uContrast1;
+uniform vec4 uChroma0;
+uniform vec4 uChroma1;
+uniform vec4 uChroma2;
+uniform vec2 uCamOffset;
 
 varying vec2 vUv;
 
@@ -64,17 +68,20 @@ varying vec2 vUv;
 #define MAX_DIST 8.0
 
 // --- Flame FBM with noise displacement (XT95 technique) ---
+// Contrast bands modulate per-octave: low bands = slow roil, high bands = fast shimmer
 float flameFBM(vec3 p, float bassAmp, float detailAmp) {
   p.y *= 0.5;
+  float contrastLow = uContrast0.x * 0.3 + uContrast0.y * 0.3;
+  float contrastHigh = uContrast1.x * 0.2 + uContrast1.y * 0.2;
   float value = 0.0;
   float amplitude = 0.5;
   float frequency = 1.0;
   for (int i = 0; i < 5; i++) {
     float octaveBoost = 1.0;
     if (i < 2) {
-      octaveBoost += bassAmp * 0.6;
+      octaveBoost += bassAmp * 0.6 + contrastLow;
     } else if (i > 2) {
-      octaveBoost += detailAmp * 0.5;
+      octaveBoost += detailAmp * 0.5 + contrastHigh;
     }
     value += amplitude * octaveBoost * snoise(p * frequency);
     frequency *= 2.0;
@@ -140,41 +147,77 @@ void main() {
   vec3 coreColor = 0.5 + 0.5 * cos(6.28318 * vec3(hue2, hue2 + 0.33, hue2 + 0.67));
   coreColor = mix(coreColor, vec3(1.0, 0.95, 0.8), 0.5);
 
-  // === GLOW ACCUMULATION RAYMARCHING (XT95 Flame technique) ===
-  // Track how deep ray penetrates fire volume, accumulate glow
+  // === TRUE VOLUME RENDERING (64 steps, Beer's law) ===
   vec3 accColor = vec3(0.0);
-  float glow = 0.0;
-  float glowPower = mix(3.0, 5.0, energy);  // energy controls glow exponent
+  float T = 1.0;  // Beer's law transmittance
+  float accDensityColumn = 0.0;  // For heat shimmer post-effect
 
   for (int i = 0; i < MAX_STEPS; i++) {
-    float t = float(i) * 0.1 + 0.05;
+    if (T < 0.01) break;
+
+    float t = float(i) * 0.12 + 0.05;
     if (t > MAX_DIST) break;
 
     vec3 pos = camPos + camDir * t;
     float d = flameSDF(pos, bass, highs, onset);
 
-    // Accumulate glow based on proximity to fire surface
-    // Closer to surface = stronger glow (XT95 key insight)
-    if (d < 0.5) {
-      float proximity = 1.0 - smoothstep(0.0, 0.5, d);
-      glow += proximity * 0.04;
+    if (d < 0.6) {
+      float proximity = 1.0 - smoothstep(0.0, 0.6, d);
+      float flameDensity = proximity * (1.5 + bass * 0.8);
+      float stepSize = 0.12;
 
-      // Color based on depth into flame: core=white, edge=orange
-      float depthInFlame = max(0.0, -d);
-      float coreStrength = smoothstep(0.0, 0.3, depthInFlame) * energy;
-      float depthT = t / MAX_DIST;
-      vec3 localColor = mix(flameColor, coreColor, coreStrength);
-      localColor = mix(localColor, flameColor * 0.6, depthT);
-      accColor += localColor * proximity * 0.04;
+      // Temperature field: SDF proximity → temperature (0-1)
+      float temperature = smoothstep(0.6, -0.2, d);
+      temperature *= energy * 0.8 + 0.2;
+
+      // Beer's law absorption
+      float absorption = beerLaw(flameDensity * 1.5, stepSize);
+      float absorbed = 1.0 - absorption;
+
+      // Emission from blackbody radiation
+      vec3 bbColor = blackbodyColor(temperature);
+      vec3 emission = bbColor * flameDensity * (1.0 + temperature * 2.0);
+
+      // Blend with palette colors
+      emission = mix(emission, flameColor * flameDensity, 0.3);
+      emission = mix(emission, coreColor * temperature * 2.0, temperature * 0.4);
+
+      accColor += emission * absorbed * T * 0.8;
+      T *= absorption;
+      accDensityColumn += flameDensity * stepSize;
+    }
+
+    // === VOLUMETRIC SMOKE LAYER: above flames ===
+    float smokeHeight = pos.y - 1.5;
+    if (smokeHeight > 0.0 && smokeHeight < 3.0) {
+      float smokeNoise = fbm3(vec3(pos.xz * 0.5, uTime * 0.05 + pos.y * 0.3));
+      float smokeDensity = max(0.0, smokeNoise * 0.5 + 0.2) * smoothstep(0.0, 0.5, smokeHeight) * smoothstep(3.0, 1.5, smokeHeight);
+      smokeDensity *= 0.8;
+
+      if (smokeDensity > 0.001) {
+        float smokeAbsorption = beerLaw(smokeDensity * 3.0, 0.12);
+        float smokeAbsorbed = 1.0 - smokeAbsorption;
+        // Smoke: high absorption, low emission (dark billowing)
+        vec3 smokeEmit = flameColor * 0.05 * smokeDensity;
+        accColor += smokeEmit * smokeAbsorbed * T;
+        T *= smokeAbsorption;
+      }
     }
   }
 
-  // Punchy emission: pow(glow*2, 4) — the XT95 signature
-  float emission = pow(clamp(glow * 2.0, 0.0, 1.0), glowPower);
-  vec3 col = accColor * emission * 4.0;
+  vec3 col = accColor;
 
-  // Add core white-hot bloom from emission
-  col += coreColor * pow(emission, 2.0) * 0.5;
+  // Core white-hot bloom
+  float colLum = dot(col, vec3(0.299, 0.587, 0.114));
+  col += coreColor * smoothstep(0.3, 1.0, colLum) * 0.3;
+
+  // === HEAT SHIMMER POST: UV distortion based on accumulated density ===
+  float shimmerPost = accDensityColumn * 0.02;
+  vec2 shimmerOffset = shimmerPost * vec2(
+    snoise(vec3(p * 12.0, uTime * 3.0)),
+    snoise(vec3(p * 12.0 + 100.0, uTime * 3.0))
+  );
+  col += col * shimmerOffset.x * 0.1;
 
   // === BEAT PULSE: tempo-locked flame intensity ===
   float bp = beatPulse(uMusicalTime);
@@ -223,13 +266,19 @@ void main() {
   vec3 bloomColor = mix(col, vec3(1.0, 0.9, 0.7), 0.4);
   col += bloomColor * bloomAmount * 0.5;
 
+  // === COLOR GRADING: black shadows, blown-out orange highlights ===
+  col = colorGrade(col, vec3(0.0), vec3(1.0, 0.5, 0.1), 1.15, 1.1);
+
   // === S-CURVE COLOR GRADING ===
   col = sCurveGrade(col, energy);
+
+  // === HALATION: warm film bloom ===
+  col = halation(vUv, col, energy);
 
   // === FILM GRAIN ===
   float grainTime = floor(uTime * 15.0) / 15.0;
   float grainIntensity = mix(0.04, 0.02, energy);
-  col += filmGrain(uv, grainTime) * grainIntensity;
+  col += filmGrainRes(uv, grainTime, uResolution.y) * grainIntensity;
 
   // === LIFTED BLACKS (warm tint for fire) ===
   col = max(col, vec3(0.08, 0.04, 0.02));

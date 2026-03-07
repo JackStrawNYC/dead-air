@@ -21,6 +21,8 @@ interface Props {
   jamEvolution?: JamEvolution;
   /** Bass energy from AudioSnapshot (0-1) for bass-driven shake scaling */
   bass?: number;
+  /** Counterpoint camera freeze — hold transform still when true */
+  cameraFreeze?: boolean;
 }
 
 const QUIET_SCALE = 1.08;
@@ -48,7 +50,10 @@ function shakeHash(frame: number): { x: number; y: number } {
   return { x, y };
 }
 
-export const CameraMotion: React.FC<Props> = ({ frames, children, jamEvolution, bass }) => {
+// Persisted transform for camera freeze (holds last computed values)
+let frozenTransform = { scale: 1.04, totalX: 0, totalY: 0 };
+
+export const CameraMotion: React.FC<Props> = ({ frames, children, jamEvolution, bass, cameraFreeze }) => {
   const frame = useCurrentFrame();
   const idx = Math.min(Math.max(0, frame), frames.length - 1);
 
@@ -107,8 +112,17 @@ export const CameraMotion: React.FC<Props> = ({ frames, children, jamEvolution, 
   shakeX += Math.sin(bassT * 3.7) * bassAmp * 0.5;
   shakeY += Math.cos(bassT * 2.3) * bassAmp * 0.3;
 
-  const totalX = shakeX + driftX;
-  const totalY = shakeY + driftY;
+  let totalX = shakeX + driftX;
+  let totalY = shakeY + driftY;
+
+  // Camera freeze: hold previous frame's transform during counterpoint freeze
+  if (cameraFreeze) {
+    scale = frozenTransform.scale;
+    totalX = frozenTransform.totalX;
+    totalY = frozenTransform.totalY;
+  } else {
+    frozenTransform = { scale, totalX, totalY };
+  }
 
   return (
     <div

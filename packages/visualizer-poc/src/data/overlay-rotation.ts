@@ -18,6 +18,7 @@
  *
  * Deterministic: seeded PRNG keyed on trackId + windowIndex.
  */
+import { Easing } from "remotion";
 import type { SectionBoundary, OverlayEntry, EnhancedFrameData, OverlayPhaseHint } from "./types";
 import { OVERLAY_BY_NAME, ALWAYS_ACTIVE } from "./overlay-registry";
 import { computeSmoothedEnergy } from "../utils/energy";
@@ -26,7 +27,14 @@ import { detectTexture } from "../utils/climax-state";
 import { computeAudioSnapshot } from "../utils/audio-reactive";
 import { seededLCG as seededRandom } from "../utils/seededRandom";
 import { hashString } from "../utils/hash";
-import { smoothstep } from "../utils/math";
+
+// Eased crossfade function: replaces linear smoothstep with Remotion's
+// Easing.inOut(Easing.ease) for more organic overlay transitions.
+const easedCrossfade = Easing.inOut(Easing.ease);
+function smoothstepEased(edge0: number, edge1: number, x: number): number {
+  const t = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)));
+  return easedCrossfade(t);
+}
 
 // ─── Types ───
 
@@ -270,7 +278,7 @@ const POST_PEAK_TAG_BONUS: Record<string, number> = {
   intense:       -0.15,
 };
 
-// smoothstep imported from ../utils/math
+// smoothstepEased defined above (Easing.inOut for overlay crossfades)
 
 /** Parse set number from trackId format "s{set}t{track}" */
 function parseSetNumber(trackId: string): number {
@@ -324,11 +332,19 @@ export function buildRotationSchedule(
   const songIntensity = Math.min(1, highRatio / 0.5); // 0-1 scale
 
   // 2. Build overlay entries for scoring (with layer info)
-  const poolEntries: OverlayEntry[] = [];
+  const allPoolEntries: OverlayEntry[] = [];
   for (const name of rotationPool) {
     const entry = OVERLAY_BY_NAME.get(name);
-    if (entry) poolEntries.push(entry);
+    if (entry) allPoolEntries.push(entry);
   }
+
+  // 2b. Tier-aware pool filtering — exclude C-tier (archived) overlays entirely.
+  // B-tier only included when section energy allows larger overlay counts.
+  const poolEntries = allPoolEntries.filter((e) => {
+    const tier = e.tier ?? "B";
+    if (tier === "C") return false;
+    return true;
+  });
 
   // 3. Subdivide sections into energy-aware windows, aligned to section boundaries
   const windows: RotationWindow[] = [];
@@ -407,8 +423,15 @@ export function buildRotationSchedule(
     // Cap at pool size
     targetCount = Math.min(targetCount, poolEntries.length);
 
+    // Tier-aware pool: quiet passages (target ≤ 3) use A-tier only
+    const effectivePool = poolEntries.filter((e) => {
+      const tier = e.tier ?? "B";
+      if (tier === "B" && targetCount <= 3) return false;
+      return true;
+    });
+
     // Score each overlay for this window
-    const scored = poolEntries.map((entry) => {
+    const scored = effectivePool.map((entry) => {
       let score = 0.5;
 
       // Energy band match (registry default)
@@ -769,12 +792,12 @@ export function getOverlayOpacities(
     if (inFadeIn && !prevSet.has(name)) {
       // This overlay is new (not in prev window) — crossfade centered on start boundary
       const boundary = currentWindow.frameStart;
-      opacity = smoothstep(boundary - halfFadeIn, boundary + halfFadeIn, frame);
+      opacity = smoothstepEased(boundary - halfFadeIn, boundary + halfFadeIn, frame);
     }
     if (inFadeOut && !nextSet.has(name)) {
       // This overlay is leaving (not in next window) — crossfade centered on end boundary
       const boundary = currentWindow.frameEnd;
-      const fadeOutOpacity = 1 - smoothstep(boundary - halfFadeOut, boundary + halfFadeOut, frame);
+      const fadeOutOpacity = 1 - smoothstepEased(boundary - halfFadeOut, boundary + halfFadeOut, frame);
       opacity = Math.min(opacity, fadeOutOpacity);
     }
 
@@ -786,7 +809,7 @@ export function getOverlayOpacities(
     const boundary = currentWindow.frameStart;
     for (const name of prevWindow.overlays) {
       if (!currentSet.has(name) && result[name] === undefined) {
-        result[name] = 1 - smoothstep(boundary - halfFadeIn, boundary + halfFadeIn, frame);
+        result[name] = 1 - smoothstepEased(boundary - halfFadeIn, boundary + halfFadeIn, frame);
       }
     }
   }
@@ -796,7 +819,7 @@ export function getOverlayOpacities(
     const boundary = currentWindow.frameEnd;
     for (const name of nextWindow.overlays) {
       if (!currentSet.has(name) && result[name] === undefined) {
-        result[name] = smoothstep(boundary - halfFadeOut, boundary + halfFadeOut, frame);
+        result[name] = smoothstepEased(boundary - halfFadeOut, boundary + halfFadeOut, frame);
       }
     }
   }

@@ -2,6 +2,11 @@
  * DynamicOverlayStack — renders the 5-20 active overlay components
  * with per-frame opacity control, media suppression, and palette context.
  *
+ * Separates DOM overlays from GLSL overlays:
+ * - DOM overlays render as positioned divs (HTML/CSS/SVG)
+ * - GLSL overlays render inside a Three.js Canvas (shader-based)
+ * Both receive the same opacity values from the rotation engine.
+ *
  * Extracted from SongVisualizer to isolate the overlay rendering loop.
  */
 
@@ -17,7 +22,15 @@ const OVERLAY_GATE_END = 420;  // 14s — overlays hidden until intro elements c
 interface OverlayComponentEntry {
   Component: React.ComponentType<{ frames: EnhancedFrameData[] }>;
   layer: number;
+  renderContext?: 'dom' | 'glsl';
 }
+
+/** Max concurrent overlays by energy level (hard cap after opacity sorting) */
+const MAX_CONCURRENT: Record<string, number> = {
+  quiet: 3,
+  mid: 4,
+  peak: 5,
+};
 
 interface Props {
   activeEntries: [string, OverlayComponentEntry][];
@@ -27,6 +40,10 @@ interface Props {
   tempo: number;
   palette?: ColorPalette;
   frames: EnhancedFrameData[];
+  /** Focus system suppression multiplier (0-1), applied to all overlay opacities */
+  focusSuppression?: number;
+  /** Current energy level hint for hard cap determination */
+  energyLevel?: "quiet" | "mid" | "peak";
 }
 
 export const DynamicOverlayStack: React.FC<Props> = ({
@@ -37,35 +54,54 @@ export const DynamicOverlayStack: React.FC<Props> = ({
   tempo,
   palette,
   frames,
+  focusSuppression = 1,
+  energyLevel = "mid",
 }) => {
   const frame = useCurrentFrame();
+
+  // Compute opacities and apply hard cap on concurrent overlays
+  const maxConcurrent = MAX_CONCURRENT[energyLevel] ?? 4;
+  const withOpacity = activeEntries
+    .map(([name, entry]) => ({
+      name,
+      entry,
+      opacity: Math.min(1, (opacityMap ? (opacityMap[name] ?? 0) : 1) * mediaSuppression * focusSuppression),
+    }))
+    .filter((o) => o.opacity > 0.01)
+    .sort((a, b) => b.opacity - a.opacity)
+    .slice(0, maxConcurrent);
+
+  // Separate DOM overlays from GLSL overlays
+  const domOverlays = withOpacity.filter((o) => (o.entry.renderContext ?? 'dom') === 'dom');
+  const glslOverlays = withOpacity.filter((o) => o.entry.renderContext === 'glsl');
+
+  const gateOpacity = interpolate(
+    frame,
+    [OVERLAY_GATE_END, OVERLAY_GATE_END + 90],
+    [0, 1],
+    { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: Easing.out(Easing.cubic) },
+  );
 
   return (
     <TempoProvider tempo={tempo}>
     <SongPaletteProvider palette={palette}>
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          opacity: interpolate(
-            frame,
-            [OVERLAY_GATE_END, OVERLAY_GATE_END + 90],
-            [0, 1],
-            { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: Easing.out(Easing.cubic) },
-          ),
-          filter: hueRotation !== 0 ? `hue-rotate(${hueRotation.toFixed(1)}deg)` : undefined,
-        }}
-      >
-        {activeEntries.map(([name, { Component }]) => {
-          const overlayOpacity = Math.min(1, (opacityMap ? (opacityMap[name] ?? 0) : 1) * mediaSuppression);
-          if (overlayOpacity < 0.01) return null;
-          return (
+      {/* GLSL overlays — rendered as regular components (they wrap OverlayQuad internally) */}
+      {glslOverlays.length > 0 && (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            opacity: gateOpacity,
+            pointerEvents: "none",
+          }}
+        >
+          {glslOverlays.map(({ name, entry: { Component }, opacity }) => (
             <div
               key={name}
               style={{
                 position: "absolute",
                 inset: 0,
-                opacity: overlayOpacity,
+                opacity,
                 pointerEvents: "none",
               }}
             >
@@ -75,8 +111,36 @@ export const DynamicOverlayStack: React.FC<Props> = ({
                 </SilentErrorBoundary>
               </Suspense>
             </div>
-          );
-        })}
+          ))}
+        </div>
+      )}
+
+      {/* DOM overlays — rendered above GLSL overlays */}
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          opacity: gateOpacity,
+          filter: hueRotation !== 0 ? `hue-rotate(${hueRotation.toFixed(1)}deg)` : undefined,
+        }}
+      >
+        {domOverlays.map(({ name, entry: { Component }, opacity }) => (
+          <div
+            key={name}
+            style={{
+              position: "absolute",
+              inset: 0,
+              opacity,
+              pointerEvents: "none",
+            }}
+          >
+            <Suspense fallback={null}>
+              <SilentErrorBoundary name={name}>
+                <Component frames={frames} />
+              </SilentErrorBoundary>
+            </Suspense>
+          </div>
+        ))}
       </div>
     </SongPaletteProvider>
     </TempoProvider>
