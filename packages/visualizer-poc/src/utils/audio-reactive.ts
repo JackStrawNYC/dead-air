@@ -12,19 +12,19 @@
 import type { EnhancedFrameData } from "../data/types";
 
 export interface AudioSnapshot {
-  /** Gaussian-smoothed RMS energy (window=150, ~5s) */
+  /** Gaussian-smoothed RMS energy (window=60, ~2s) */
   energy: number;
-  /** Slow-moving energy for ambient modulation (window=300, ~10s) — drifts, doesn't pulse */
+  /** Slow-moving energy for ambient modulation (window=180, ~6s) — drifts, doesn't pulse */
   slowEnergy: number;
-  /** Bass: (sub+low)/2, smoothed (window=20) */
+  /** Bass: (sub+low)/2, smoothed (window=10) */
   bass: number;
-  /** Mids: smoothed (window=12) */
+  /** Mids: smoothed (window=8) */
   mids: number;
-  /** Highs: smoothed (window=8) */
+  /** Highs: smoothed (window=5) */
   highs: number;
-  /** Fast-attack / slow-decay onset transient envelope (release=12 frames) */
+  /** Fast-attack / slow-decay onset transient envelope (release=18 frames) */
   onsetEnvelope: number;
-  /** Exponential falloff from last beat (halfLife=20) */
+  /** Exponential falloff from last beat (halfLife=15) */
   beatDecay: number;
   /** Dominant pitch class as hue 0-360 (circular mean, window=15) */
   chromaHue: number;
@@ -236,8 +236,8 @@ export function computeMusicalTime(
 /**
  * Compute all audio snapshot fields in one call.
  * Two-pass loop strategy for performance:
- *   - Wide pass (window=150) for energy
- *   - Narrow passes for everything else (window=8-20)
+ *   - Wide pass (window=60) for energy
+ *   - Narrow passes for everything else (window=5-18)
  *
  * Optional beatArray/fps/tempo params enable musicalTime computation.
  * Existing callers passing only (frames, idx) get musicalTime: 0.
@@ -250,13 +250,13 @@ export function computeAudioSnapshot(
   tempo?: number,
 ): AudioSnapshot {
   return {
-    energy: gaussianSmooth(frames, idx, (f) => f.rms, 150),
-    slowEnergy: gaussianSmooth(frames, idx, (f) => f.rms, 300),
-    bass: gaussianSmooth(frames, idx, (f) => (f.sub + f.low) * 0.5, 20),
-    mids: gaussianSmooth(frames, idx, (f) => f.mid, 12),
-    highs: gaussianSmooth(frames, idx, (f) => f.high, 8),
-    onsetEnvelope: onsetEnvelope(frames, idx, 12),
-    beatDecay: beatDecay(frames, idx, 20),
+    energy: gaussianSmooth(frames, idx, (f) => f.rms, 60),
+    slowEnergy: gaussianSmooth(frames, idx, (f) => f.rms, 180),
+    bass: gaussianSmooth(frames, idx, (f) => (f.sub + f.low) * 0.5, 10),
+    mids: gaussianSmooth(frames, idx, (f) => f.mid, 8),
+    highs: gaussianSmooth(frames, idx, (f) => f.high, 5),
+    onsetEnvelope: onsetEnvelope(frames, idx, 18),
+    beatDecay: beatDecay(frames, idx, 15),
     chromaHue: smoothedChromaHue(frames, idx, 15),
     centroid: gaussianSmooth(frames, idx, (f) => f.centroid, 18),
     flatness: gaussianSmooth(frames, idx, (f) => f.flatness, 15),

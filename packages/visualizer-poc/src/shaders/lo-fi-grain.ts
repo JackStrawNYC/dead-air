@@ -127,7 +127,7 @@ void main() {
 
   // === BEAT PULSE: tempo-locked warm glow ===
   float bp = beatPulse(uMusicalTime);
-  col *= 1.0 + bp * 0.04;
+  col *= 1.0 + bp * 0.10;
 
   // Lifted blacks (warm)
   col = max(col, vec3(0.08, 0.065, 0.085));

@@ -97,7 +97,7 @@ void main() {
   bgColor *= 0.12 + uRms * 0.08;
   vec3 col = bgColor;
 
-  float activeBeamCount = 2.0 + energy * 4.0;
+  float activeBeamCount = 3.0 + energy * 5.0;
   float beamSpacing = aspect.x / float(NUM_BEAMS + 1);
   float sectionHueShift = mod(uSectionIndex * 0.15, 1.0);
 
@@ -213,7 +213,7 @@ void main() {
 
   // === BEAT PULSE: tempo-locked beam intensity ===
   float bp = beatPulse(uMusicalTime);
-  col *= 1.0 + bp * 0.10;
+  col *= 1.0 + bp * 0.18;
 
   // === BLOOM ===
   float lum = dot(col, vec3(0.299, 0.587, 0.114));

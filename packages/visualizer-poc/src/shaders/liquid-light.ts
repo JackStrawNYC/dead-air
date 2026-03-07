@@ -250,7 +250,7 @@ void main() {
 
   // === BEAT PULSE: tempo-locked brightness swell ===
   float bp = beatPulse(uMusicalTime);
-  col *= 1.0 + bp * 0.06;
+  col *= 1.0 + bp * 0.12;
 
   // === BLOOM: bright pixel self-illumination ===
   float lum = dot(col, vec3(0.299, 0.587, 0.114));

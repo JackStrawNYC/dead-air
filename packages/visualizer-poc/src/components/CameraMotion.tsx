@@ -5,7 +5,7 @@
  * - Base scale 1.04x (always slightly overscaled, cropped by overflow:hidden)
  * - Quiet passages: slow zoom-in to 1.08x
  * - Peak energy: pull-back to 1.03x
- * - Beat hits: ±2px micro-shake with 4-frame exponential decay
+ * - Beat hits: ±3px micro-shake with 8-frame exponential decay
  * - Long jams: phase-driven zoom/drift (exploration → build → peak → resolution)
  * - Pure CSS transforms — negligible performance cost
  */
@@ -19,12 +19,14 @@ interface Props {
   frames: EnhancedFrameData[];
   children: React.ReactNode;
   jamEvolution?: JamEvolution;
+  /** Bass energy from AudioSnapshot (0-1) for bass-driven shake scaling */
+  bass?: number;
 }
 
 const QUIET_SCALE = 1.08;
 const PEAK_SCALE = 1.03;
-const SHAKE_PX = 1;
-const SHAKE_DECAY_FRAMES = 8;
+const SHAKE_PX = 3;
+const SHAKE_DECAY_FRAMES = 12;
 
 /** Phase-driven camera parameters for long jams */
 const PHASE_CAMERA: Record<JamPhase, {
@@ -46,7 +48,7 @@ function shakeHash(frame: number): { x: number; y: number } {
   return { x, y };
 }
 
-export const CameraMotion: React.FC<Props> = ({ frames, children, jamEvolution }) => {
+export const CameraMotion: React.FC<Props> = ({ frames, children, jamEvolution, bass }) => {
   const frame = useCurrentFrame();
   const idx = Math.min(Math.max(0, frame), frames.length - 1);
 
@@ -90,14 +92,20 @@ export const CameraMotion: React.FC<Props> = ({ frames, children, jamEvolution }
   for (let ago = 0; ago < SHAKE_DECAY_FRAMES; ago++) {
     const checkIdx = idx - ago;
     if (checkIdx < 0) break;
-    if (frames[checkIdx].beat && frames[checkIdx].onset > 0.6) {
-      const decay = Math.exp(-ago * 1.5);
+    if (frames[checkIdx].beat && frames[checkIdx].onset > 0.35) {
+      const decay = Math.exp(-ago * 0.7);
       const dir = shakeHash(checkIdx);
       shakeX += dir.x * SHAKE_PX * decay;
       shakeY += dir.y * SHAKE_PX * decay;
       break; // use the most recent beat
     }
   }
+
+  // Bass-driven continuous micro-sway
+  const bassAmp = (bass ?? 0) * 8.0;
+  const bassT = frame / 30;
+  shakeX += Math.sin(bassT * 3.7) * bassAmp * 0.5;
+  shakeY += Math.cos(bassT * 2.3) * bassAmp * 0.3;
 
   const totalX = shakeX + driftX;
   const totalY = shakeY + driftY;

@@ -450,6 +450,57 @@ function checkConsistency() {
   }
 }
 
+// ─── Stage 4b: Section Override Validation ───
+
+function checkSectionOverrides() {
+  console.log("\n--- Stage 4b: Section Override Bounds ---");
+
+  const setlistData = loadJson(join(DATA_DIR, "setlist.json")) as {
+    songs: Array<{
+      trackId: string;
+      title: string;
+      sectionOverrides?: Array<{ sectionIndex: number; mode: string }>;
+    }>;
+  } | null;
+  if (!setlistData) {
+    fail("section-overrides:setlist", "Cannot check section overrides — setlist.json missing");
+    return;
+  }
+
+  const issues: string[] = [];
+  let checkedCount = 0;
+
+  for (const song of setlistData.songs) {
+    if (!song.sectionOverrides?.length) continue;
+
+    const analysisPath = join(TRACKS_DIR, `${song.trackId}-analysis.json`);
+    if (!existsSync(analysisPath)) continue;
+
+    const data = loadJson(analysisPath) as {
+      meta: { sections: Array<{ frameStart: number; frameEnd: number }> };
+    } | null;
+    if (!data?.meta?.sections) continue;
+
+    const sectionCount = data.meta.sections.length;
+    checkedCount++;
+
+    for (const override of song.sectionOverrides) {
+      if (override.sectionIndex >= sectionCount) {
+        issues.push(
+          `OUT OF BOUNDS: ${song.trackId} (${song.title}) — sectionIndex ${override.sectionIndex} ` +
+          `exceeds section count ${sectionCount} (valid: 0-${sectionCount - 1}). Mode "${override.mode}" will never render.`
+        );
+      }
+    }
+  }
+
+  if (issues.length === 0) {
+    pass("section-overrides", `All section overrides are valid (${checkedCount} songs checked)`);
+  } else {
+    fail("section-overrides", `${issues.length} invalid section override(s) — these modes will never render`, issues);
+  }
+}
+
 // ─── Stage 5: Data Quality ───
 
 function checkDataQuality() {
@@ -607,6 +658,7 @@ function main() {
     checkTrackAnalysis();
     checkFrameQuality();
     checkConsistency();
+    checkSectionOverrides();
     checkDataQuality();
   }
 

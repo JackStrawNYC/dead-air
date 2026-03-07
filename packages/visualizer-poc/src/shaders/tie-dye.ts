@@ -110,12 +110,12 @@ void main() {
   vec3 color = hsv2rgb(vec3(fract(hue), sat, val));
 
   // Onset flash — bright center pulse
-  float flash = uOnsetSnap * 0.3 * smoothstep(0.6, 0.0, r);
+  float flash = uOnsetSnap * 0.5 * smoothstep(0.6, 0.0, r);
   color += flash;
 
   // Beat pulse — tempo-locked saturation boost
   float bp = beatPulse(uMusicalTime);
-  color = mix(color, color * 1.3, bp * 0.12);
+  color = mix(color, color * 1.3, bp * 0.20);
 
   // Vignette
   float vig = 1.0 - smoothstep(0.5, 1.2, r);

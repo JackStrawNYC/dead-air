@@ -52,7 +52,10 @@ const showDateArg = args.find((a) => a.startsWith("--show-date="))?.split("=")[1
 const dataDirArg = args.find((a) => a.startsWith("--data-dir="))?.split("=")[1];
 const seedArg = args.find((a) => a.startsWith("--seed="))?.split("=")[1];
 const renderSeed = seedArg ? parseInt(seedArg, 10) : Date.now();
-const PREVIEW_FRAMES = 450; // 15 seconds at 30fps
+const PREVIEW_FRAMES = parseInt(
+  args.find((a) => a.startsWith("--preview-seconds="))?.split("=")[1] ?? "15",
+  10,
+) * 30;
 
 interface SetlistEntry {
   trackId: string;
@@ -228,7 +231,7 @@ function renderSong(
         videoOnlyPath,
         `--props=${analysisPath}`,
         `--gl=${glArg}`,
-        `--concurrency=6`,
+        `--concurrency=10`,
         `--timeout=300000`,
         `--frames=0-${totalFrames - 1}`,
         "--muted",
@@ -257,7 +260,7 @@ function renderSong(
           chunkPath,
           `--props=${analysisPath}`,
           `--gl=${glArg}`,
-          `--concurrency=6`,
+          `--concurrency=10`,
           `--timeout=300000`,
           `--frames=${start}-${end}`,
           "--muted",

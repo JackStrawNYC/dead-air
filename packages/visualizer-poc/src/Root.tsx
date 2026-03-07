@@ -1,5 +1,5 @@
 import React from "react";
-import { Composition } from "remotion";
+import { Composition, getInputProps } from "remotion";
 import { SongVisualizer, SongVisualizerProps } from "./SongVisualizer";
 import { ShowIntro } from "./components/ShowIntro";
 import { ChapterCard } from "./components/ChapterCard";
@@ -9,8 +9,31 @@ import type { SetlistEntry, ShowSetlist, OverlaySchedule } from "./data/types";
 import { parseSetlist, safeParse, FlexibleTrackAnalysisSchema, OverlayScheduleSchema } from "./data/schemas";
 import { SELECTABLE_REGISTRY } from "./data/overlay-registry";
 import { formatDateLong } from "./data/ShowContext";
-import setlistData from "../data/setlist.json";
-import showContextData from "../data/show-context.json";
+import { validateSectionOverrides } from "./scenes/SceneRouter";
+
+// ─── Dynamic show loading ───
+// Supports multi-show via --props='{"showId":"1972-08-27"}' or SHOW_ID env var.
+// Falls back to data/ root (Cornell '77) for backward compatibility.
+const inputProps = getInputProps() as Record<string, unknown>;
+const showId = (inputProps.showId as string) ?? process.env.SHOW_ID ?? "";
+
+// Resolve data directory based on showId
+function resolveDataDir(): string {
+  if (!showId || showId === "cornell-77") return "../data";
+  return `../data/shows/${showId}`;
+}
+const DATA_DIR = resolveDataDir();
+
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const setlistData = require(`${DATA_DIR}/setlist.json`);
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+let showContextData: { chapters: ChapterEntry[] } = { chapters: [] };
+try {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  showContextData = require(`${DATA_DIR}/show-context.json`);
+} catch {
+  // show-context.json is optional
+}
 
 // Import all track analysis files
 const analysisCache: Record<string, unknown> = {};
@@ -18,7 +41,7 @@ function loadTrackAnalysis(trackId: string) {
   if (analysisCache[trackId]) return analysisCache[trackId];
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const data = require(`../data/tracks/${trackId}-analysis.json`);
+    const data = require(`${DATA_DIR}/tracks/${trackId}-analysis.json`);
     const validated = safeParse(FlexibleTrackAnalysisSchema, data);
     analysisCache[trackId] = validated;
     return validated;
@@ -31,7 +54,7 @@ function loadTrackAnalysis(trackId: string) {
 let overlaySchedule: OverlaySchedule | null = null;
 try {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const rawSchedule = require("../data/overlay-schedule.json");
+  const rawSchedule = require(`${DATA_DIR}/overlay-schedule.json`);
   overlaySchedule = safeParse(OverlayScheduleSchema, rawSchedule);
 } catch {
   // Schedule not generated yet — all overlays will render
@@ -158,8 +181,12 @@ export const Root: React.FC = () => {
               show: setlist,
             } satisfies SongVisualizerProps as Record<string, unknown>}
             calculateMetadata={async ({ props }) => {
-              const analysis = loadTrackAnalysis(song.trackId) as { meta?: { totalFrames?: number } } | null;
+              const analysis = loadTrackAnalysis(song.trackId) as { meta?: { totalFrames?: number; sections?: unknown[] } } | null;
               if (analysis?.meta) {
+                // Validate section overrides against actual section count
+                if (analysis.meta.sections) {
+                  validateSectionOverrides(song, analysis.meta.sections.length);
+                }
                 return {
                   durationInFrames: analysis.meta.totalFrames ?? DEFAULT_FRAMES,
                   props: { ...props, analysis },

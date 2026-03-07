@@ -28,7 +28,7 @@ export interface AudioDataContext {
     mids: number;
     highs: number;
     onset: number;
-    /** Rolling energy: 150-frame (~5s) RMS window, tracks actual loudness envelope */
+    /** Rolling energy: 60-frame (~2s) RMS window, tracks actual loudness envelope */
     energy: number;
     /** Position within current section (0-1) */
     sectionProgress: number;
@@ -48,7 +48,7 @@ export interface AudioDataContext {
     chromaShift: number;
     /** Afterglow hue: decaying peak hue from recent loud moments (0-1) */
     afterglowHue: number;
-    /** Slow energy: 300-frame (~10s) Gaussian window for ambient drift signals */
+    /** Slow energy: 180-frame (~6s) Gaussian window for ambient drift signals */
     slowEnergy: number;
     /** Stem-separated bass energy (falls back to (sub+low)/2 when stems unavailable) */
     stemBass: number;
@@ -81,7 +81,7 @@ export function useAudioData(): AudioDataContext {
  * Compute beat decay — slow, gentle swell rather than strobe.
  * halfLife=20 frames (~0.67s) gives a slow breathing pulse.
  */
-function beatDecay(frames: EnhancedFrameData[], idx: number, halfLife = 20): number {
+function beatDecay(frames: EnhancedFrameData[], idx: number, halfLife = 15): number {
   for (let ago = 0; ago < 45; ago++) {
     if (idx - ago < 0) break;
     if (frames[idx - ago].beat) return Math.pow(0.5, ago / halfLife);
@@ -228,20 +228,20 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
   const sectionList = sections ?? [];
   const { sectionIndex, sectionProgress } = findCurrentSection(sectionList, idx);
 
-  const energy = smoothValue(frames, idx, (f) => f.rms, 150);
+  const energy = smoothValue(frames, idx, (f) => f.rms, 60);
   const chromaHue = smoothValue(frames, idx, (f) => dominantChromaHue(f.chroma), 15);
   const contrast = smoothContrast(frames, idx, 12);
   const flatness = smoothValue(frames, idx, (f) => f.flatness, 15);
 
   // Snappy transient envelopes: fast attack, slow exponential release
-  const onsetSnap = transientEnvelope(frames, idx, (f) => f.onset, 15);
-  const beatSnap = transientEnvelope(frames, idx, (f) => (f.beat ? 1 : 0), 20);
+  const onsetSnap = transientEnvelope(frames, idx, (f) => f.onset, 18);
+  const beatSnap = transientEnvelope(frames, idx, (f) => (f.beat ? 1 : 0), 15);
 
   // Stem-separated bass: use stemBassRms if available, else fallback to (sub+low)/2
   const hasStemBass = frames[idx].stemBassRms != null;
   const stemBass = hasStemBass
-    ? smoothValue(frames, idx, (f) => f.stemBassRms ?? 0, 20)
-    : smoothValue(frames, idx, (f) => f.sub + f.low, 20) * 0.5;
+    ? smoothValue(frames, idx, (f) => f.stemBassRms ?? 0, 10)
+    : smoothValue(frames, idx, (f) => f.sub + f.low, 10) * 0.5;
 
   // Key change detection + color afterglow
   const chromaShift = chromaShiftMagnitude(frames, idx);
@@ -249,7 +249,7 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
 
   // Climax state for shader uniforms
   const phaseMap: Record<ClimaxPhase, number> = { idle: 0, build: 1, climax: 2, sustain: 3, release: 4 };
-  const climaxEnergy = smoothValue(frames, idx, (f) => f.rms, 150);
+  const climaxEnergy = smoothValue(frames, idx, (f) => f.rms, 60);
   const climaxState = computeClimaxState(frames, idx, sectionList, climaxEnergy);
   const climaxPhaseNum = phaseMap[climaxState.phase];
 
@@ -266,9 +266,9 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
     smooth: {
       rms: smoothValue(frames, idx, (f) => f.rms, 12),
       centroid: smoothValue(frames, idx, (f) => f.centroid, 18),
-      bass: smoothValue(frames, idx, (f) => f.sub + f.low, 20) * 0.5,
-      mids: smoothValue(frames, idx, (f) => f.mid, 10),
-      highs: smoothValue(frames, idx, (f) => f.high, 4),
+      bass: smoothValue(frames, idx, (f) => f.sub + f.low, 10) * 0.5,
+      mids: smoothValue(frames, idx, (f) => f.mid, 8),
+      highs: smoothValue(frames, idx, (f) => f.high, 3),
       onset: smoothValue(frames, idx, (f) => f.onset, 6),
       energy,
       sectionProgress,
@@ -280,7 +280,7 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
       beatSnap,
       chromaShift,
       afterglowHue,
-      slowEnergy: smoothValue(frames, idx, (f) => f.rms, 300),
+      slowEnergy: smoothValue(frames, idx, (f) => f.rms, 180),
       stemBass,
     },
     palettePrimary,

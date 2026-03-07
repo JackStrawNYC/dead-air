@@ -848,8 +848,5 @@ export function getOverlayOpacities(
     }
   }
 
-  // Energy breathing removed — SongVisualizer already applies overlayEnergyFactor
-  // via mediaSuppression. Double-applying crushed overlays to <2% opacity.
-
   return result;
 }

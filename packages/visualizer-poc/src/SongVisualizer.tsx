@@ -244,8 +244,11 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
   );
 
   // ─── Fade in/out ───
+  // Start fade-out 1 frame before the end of analyzed audio to ensure visuals are fully
+  // gone by the time audio ends (analysis rounds up via ceil, creating a +1 frame mismatch)
   const fadeIn = props.segueIn ? 1 : interpolate(frame, [0, FADE_FRAMES], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-  const fadeOut = props.segueOut ? 1 : interpolate(frame, [durationInFrames - FADE_FRAMES, durationInFrames], [1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const fadeOutStart = durationInFrames - FADE_FRAMES - 1;
+  const fadeOut = props.segueOut ? 1 : interpolate(frame, [fadeOutStart, durationInFrames - 1], [1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
   const opacity = Math.min(fadeIn, fadeOut);
 
   // ─── Render ───
@@ -255,7 +258,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
       <AudioSnapshotProvider snapshot={audioSnapshot}>
       <VisualizerErrorBoundary>
       <div style={{ position: "absolute", inset: 0, opacity }}>
-        <CameraMotion frames={f} jamEvolution={jamEvolution}>
+        <CameraMotion frames={f} jamEvolution={jamEvolution} bass={audioSnapshot.bass}>
         <EraGrade>
         <EnergyEnvelope snapshot={audioSnapshot} climaxMod={climaxMod} jamColorTemp={jamEvolution.isLongJam ? jamEvolution.colorTemperature : undefined} calibration={energyCalibration}>
           <SilentErrorBoundary name="SceneRouter">
@@ -269,7 +272,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
                 return (
                   <SceneCrossfade
                     progress={progress}
-                    outgoing={renderScene(props.segueFromMode, { frames: f, sections, palette, tempo })}
+                    outgoing={renderScene(props.segueFromMode, { frames: f, sections, palette: props.segueFromPalette ?? palette, tempo })}
                     incoming={sceneRouter}
                   />
                 );
@@ -282,7 +285,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
                   <SceneCrossfade
                     progress={progress}
                     outgoing={sceneRouter}
-                    incoming={renderScene(props.segueToMode, { frames: f, sections, palette, tempo })}
+                    incoming={renderScene(props.segueToMode, { frames: f, sections, palette: props.segueToPalette ?? palette, tempo })}
                   />
                 );
               }
@@ -293,7 +296,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
 
           {effectiveSongArt && (
             <SilentErrorBoundary name="SongArt">
-              <SongArtLayer src={staticFile(effectiveSongArt)} suppressionFactor={artSuppressionFactor} hueRotation={hueRotation} energy={audioSnapshot.energy} />
+              <SongArtLayer src={staticFile(effectiveSongArt)} suppressionFactor={artSuppressionFactor} hueRotation={hueRotation} energy={audioSnapshot.energy} climaxIntensity={climaxState.intensity} />
             </SilentErrorBoundary>
           )}
 
@@ -303,24 +306,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
             </SilentErrorBoundary>
           )}
 
-          {lyricTriggerWindows.length > 0 && (
-            <SilentErrorBoundary name="LyricTriggers">
-              <LyricTriggerLayer windows={lyricTriggerWindows} />
-            </SilentErrorBoundary>
-          )}
-
-          {alignmentWords.length > 0 && (
-            <SilentErrorBoundary name="PoeticLyrics">
-              <SongPaletteProvider palette={props.song.palette}>
-                <PoeticLyrics
-                  alignmentWords={alignmentWords}
-                  triggerWindows={triggerSuppressedRanges}
-                  sections={sections}
-                  frames={f}
-                />
-              </SongPaletteProvider>
-            </SilentErrorBoundary>
-          )}
+          {/* Lyrics disabled — LyricTriggerLayer and PoeticLyrics removed */}
 
           <DynamicOverlayStack
             activeEntries={activeEntries}
@@ -342,24 +328,24 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
 
           <ConcertInfo />
           <SetlistScroll frames={f} currentSong={props.song.title} />
+
+          <SpecialPropsLayer
+            songTitle={props.song.title}
+            setNumber={props.song.set}
+            trackNumber={props.song.trackNumber}
+            trackId={props.song.trackId}
+            isSegue={!!(props.segueIn && !comesFromDrumsSpace)}
+            energy={audioSnapshot.energy}
+            palette={props.song.palette}
+            songStats={songStatsData}
+            milestonesMap={milestonesMap}
+            narrationData={narrationData}
+            fanReviews={fanReviewsData}
+            showSeed={showSeed}
+          />
         </EnergyEnvelope>
         </EraGrade>
         </CameraMotion>
-
-        <SpecialPropsLayer
-          songTitle={props.song.title}
-          setNumber={props.song.set}
-          trackNumber={props.song.trackNumber}
-          trackId={props.song.trackId}
-          isSegue={!!(props.segueIn && !comesFromDrumsSpace)}
-          energy={audioSnapshot.energy}
-          palette={props.song.palette}
-          songStats={songStatsData}
-          milestonesMap={milestonesMap}
-          narrationData={narrationData}
-          fanReviews={fanReviewsData}
-          showSeed={showSeed}
-        />
       </div>
       </VisualizerErrorBoundary>
 

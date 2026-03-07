@@ -41,25 +41,23 @@ export const SetlistScroll: React.FC<Props> = ({ frames, currentSong }) => {
   const { width, height } = useVideoConfig();
   const ctx = useShowContext();
 
-  // Rolling energy (75-frame window each side)
-  const idx = Math.min(Math.max(0, frame), frames.length - 1);
-  let energySum = 0;
-  let energyCount = 0;
-  for (let i = Math.max(0, idx - 75); i <= Math.min(frames.length - 1, idx + 75); i++) {
-    energySum += frames[i].rms;
-    energyCount++;
+  // Energy gate: evaluate once at the trigger frame, not per-frame.
+  // This prevents flashing when energy oscillates near the threshold during the display window.
+  const triggerIdx = Math.min(Math.max(0, DELAY), frames.length - 1);
+  let triggerEnergySum = 0;
+  let triggerCount = 0;
+  for (let i = Math.max(0, triggerIdx - 75); i <= Math.min(frames.length - 1, triggerIdx + 75); i++) {
+    triggerEnergySum += frames[i].rms;
+    triggerCount++;
   }
-  const energy = energyCount > 0 ? energySum / energyCount : 0;
+  const triggerEnergy = triggerCount > 0 ? triggerEnergySum / triggerCount : 0;
 
-  // Show only once, after delay
+  // Gate on trigger-frame energy only (no flashing)
+  if (triggerEnergy > 0.28) return null;
+
   const localFrame = frame - DELAY;
   const inWindow = localFrame >= 0 && localFrame < SHOW_DURATION;
-
   if (!inWindow) return null;
-
-  // Energy gate: setlist only during quieter passages
-  // 0.28 allows display during gentle mid-energy songs (Row Jimmy, Loser)
-  if (energy > 0.28) return null;
 
   // Fade in/out
   const fadeIn = interpolate(localFrame, [0, FADE_IN_FRAMES], [0, 1], {
@@ -86,12 +84,6 @@ export const SetlistScroll: React.FC<Props> = ({ frames, currentSong }) => {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
     easing: Easing.out(Easing.cubic),
-  });
-
-  // Energy-driven subtle scale breathing
-  const breathScale = 1 + interpolate(energy, [0.05, 0.35], [0, 0.03], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
   });
 
   // Seeded jitter for authentic handwritten feel (static per song, not per-frame)
@@ -158,7 +150,7 @@ export const SetlistScroll: React.FC<Props> = ({ frames, currentSong }) => {
           bottom: 40,
           left: 24,
           opacity,
-          transform: `translate(${slideX + jitterX}px, ${jitterY}px) rotate(${tiltAngle}deg) scale(${breathScale})`,
+          transform: `translate(${slideX + jitterX}px, ${jitterY}px) rotate(${tiltAngle}deg)`,
           willChange: "transform, opacity",
         }}
       >

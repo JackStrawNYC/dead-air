@@ -31,6 +31,7 @@ export interface ClimaxModulation {
   brightnessOffset: number;
   vignetteOffset: number;
   bloomOffset: number;
+  contrastOffset: number;
   overlayDensityMult: number;
 }
 
@@ -162,26 +163,26 @@ export function detectTexture(snapshot: AudioSnapshot, energy: number): MusicalT
 
 // ─── Modulation Output ───
 
-/** Per-phase target values — scaled to match tight EnergyEnvelope ranges (0.08 brightness, 0.25 sat) */
+/** Per-phase target values — amplified for concert-grade visual intensity */
 const PHASE_TARGETS: Record<
   ClimaxPhase,
-  { sat: number; bright: number; vig: number; bloom: number; density: number }
+  { sat: number; bright: number; vig: number; bloom: number; contrast: number; density: number }
 > = {
-  idle:    { sat: -0.03, bright: -0.01, vig: -0.02, bloom: 0,    density: 1.0 },
-  build:   { sat: +0.02, bright: +0.01, vig: +0.02, bloom: 0.02, density: 1.0 },
-  climax:  { sat: +0.03, bright: +0.03, vig: +0.03, bloom: 0.05, density: 1.15 },
-  sustain: { sat: +0.02, bright: +0.02, vig: +0.02, bloom: 0.03, density: 1.10 },
-  release: { sat: -0.02, bright: -0.01, vig: -0.02, bloom: 0,    density: 0.90 },
+  idle:    { sat: -0.06, bright: -0.03, vig: -0.03, bloom: 0,    contrast: 0,     density: 1.0  },
+  build:   { sat: +0.10, bright: +0.06, vig: +0.04, bloom: 0.08, contrast: +0.05, density: 1.0  },
+  climax:  { sat: +0.20, bright: +0.12, vig: +0.06, bloom: 0.20, contrast: +0.10, density: 1.40 },
+  sustain: { sat: +0.12, bright: +0.08, vig: +0.04, bloom: 0.12, contrast: +0.06, density: 1.20 },
+  release: { sat: -0.10, bright: -0.05, vig: -0.03, bloom: 0,    contrast: -0.03, density: 0.60 },
 };
 
-/** Anticipation sub-state overrides (mild desaturation dip before peak) */
-const ANTICIPATION = { sat: -0.05, bright: +0.005, vig: +0.02, bloom: 0.01, density: 0.85 };
+/** Anticipation sub-state overrides (deep desaturation dip before peak) */
+const ANTICIPATION = { sat: -0.18, bright: +0.02, vig: +0.04, bloom: 0.04, contrast: 0, density: 0.55 };
 
 /** Build phase start values (intensity interpolates from start → target) */
-const BUILD_START = { sat: 0, bright: 0, vig: 0, bloom: 0, density: 0.95 };
+const BUILD_START = { sat: 0, bright: 0, vig: 0, bloom: 0, contrast: 0, density: 0.95 };
 
 /** Release phase start values (intensity interpolates from start → target) */
-const RELEASE_START = { sat: +0.02, bright: +0.005, vig: +0.02, bloom: 0.01, density: 1.0 };
+const RELEASE_START = { sat: +0.02, bright: +0.005, vig: +0.02, bloom: 0.01, contrast: +0.02, density: 1.0 };
 
 /**
  * Map a ClimaxState to additive visual modifiers.
@@ -198,6 +199,7 @@ export function climaxModulation(state: ClimaxState): ClimaxModulation {
       brightnessOffset: lerp(0, ANTICIPATION.bright, t),
       vignetteOffset: lerp(0, ANTICIPATION.vig, t),
       bloomOffset: lerp(0, ANTICIPATION.bloom, t),
+      contrastOffset: lerp(0, ANTICIPATION.contrast, t),
       overlayDensityMult: lerp(1, ANTICIPATION.density, t),
     };
   }
@@ -212,6 +214,7 @@ export function climaxModulation(state: ClimaxState): ClimaxModulation {
       brightnessOffset: lerp(BUILD_START.bright, target.bright, t),
       vignetteOffset: lerp(BUILD_START.vig, target.vig, t),
       bloomOffset: lerp(BUILD_START.bloom, target.bloom, t),
+      contrastOffset: lerp(BUILD_START.contrast, target.contrast, t),
       overlayDensityMult: lerp(BUILD_START.density, target.density, t),
     };
   }
@@ -222,6 +225,7 @@ export function climaxModulation(state: ClimaxState): ClimaxModulation {
       brightnessOffset: lerp(RELEASE_START.bright, target.bright, t),
       vignetteOffset: lerp(RELEASE_START.vig, target.vig, t),
       bloomOffset: lerp(RELEASE_START.bloom, target.bloom, t),
+      contrastOffset: lerp(RELEASE_START.contrast, target.contrast, t),
       overlayDensityMult: lerp(RELEASE_START.density, target.density, t),
     };
   }
@@ -232,6 +236,7 @@ export function climaxModulation(state: ClimaxState): ClimaxModulation {
     brightnessOffset: target.bright * t,
     vignetteOffset: target.vig * t,
     bloomOffset: target.bloom * t,
+    contrastOffset: target.contrast * t,
     overlayDensityMult: lerp(1, target.density, t),
   };
 }

@@ -24,7 +24,7 @@ const BEAT_CROSSFADE_FRAMES = 60; // 2 seconds when beat-synced (30 before + 30 
 // Complement modes and energy pools are now in scene-registry.ts
 
 // Minimum section duration (in frames) to qualify for auto-variety
-const AUTO_VARIETY_MIN_SECTION = 7200; // 4 minutes at 30fps
+const AUTO_VARIETY_MIN_SECTION = 2700; // 1.5 minutes at 30fps
 
 /**
  * Find nearest strong beat within a frame range for beat-synced transitions.
@@ -49,6 +49,32 @@ function findNearestBeat(
   }
 
   return bestScore > 0 ? bestFrame : null;
+}
+
+/**
+ * Validate section overrides against actual section count.
+ * Call during calculateMetadata or at load time to catch invalid indices early.
+ * Returns list of warnings (empty = all valid).
+ */
+export function validateSectionOverrides(
+  song: SetlistEntry,
+  sectionCount: number,
+): string[] {
+  if (!song.sectionOverrides?.length) return [];
+  const warnings: string[] = [];
+  for (const override of song.sectionOverrides) {
+    if (override.sectionIndex >= sectionCount) {
+      warnings.push(
+        `[${song.trackId}] sectionOverride index ${override.sectionIndex} (mode: ${override.mode}) ` +
+        `exceeds section count ${sectionCount} (valid: 0-${sectionCount - 1})`
+      );
+    }
+  }
+  if (warnings.length > 0) {
+    console.warn(`Section override validation failed for "${song.title}":`);
+    warnings.forEach((w) => console.warn(`  ${w}`));
+  }
+  return warnings;
 }
 
 interface Props {
@@ -93,8 +119,8 @@ function getModeForSection(
     const sectionLen = section ? section.frameEnd - section.frameStart : 0;
     const totalLen = sections[sections.length - 1]?.frameEnd ?? 0;
 
-    // Only auto-vary for songs >6min total with sections >4min
-    if (totalLen > 10800 && sectionLen > AUTO_VARIETY_MIN_SECTION && sectionIndex % 2 === 1) {
+    // Only auto-vary for songs >3min total with sections >1.5min
+    if (totalLen > 5400 && sectionLen > AUTO_VARIETY_MIN_SECTION && sectionIndex % 2 === 1) {
       return getComplement(song.defaultMode);
     }
   }

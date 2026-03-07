@@ -20,16 +20,19 @@ interface SongArtProps {
   hueRotation?: number;
   /** Rolling energy (0-1) for breath modulation */
   energy?: number;
+  /** Climax intensity (0-1) — art suppresses further during climax/sustain */
+  climaxIntensity?: number;
 }
 
-export const SongArtLayer: React.FC<SongArtProps> = ({ src, suppressionFactor, hueRotation = 0, energy = 0 }) => {
+export const SongArtLayer: React.FC<SongArtProps> = ({ src, suppressionFactor, hueRotation = 0, energy = 0, climaxIntensity = 0 }) => {
   const frame = useCurrentFrame();
 
-  // Energy-reactive wash: quiet → 0.55, peak → 0.25
+  // Energy-reactive wash: quiet → 0.35, peak → 0.05
+  // Art should vanish during loud passages so shaders dominate
   const energyWash = interpolate(
     energy,
-    [0.03, 0.30],
-    [0.55, 0.25],
+    [0.03, 0.20, 0.40],
+    [0.35, 0.12, 0.05],
     { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
   );
 
@@ -45,7 +48,9 @@ export const SongArtLayer: React.FC<SongArtProps> = ({ src, suppressionFactor, h
     },
   );
 
-  const artOpacity = baseOpacity * suppressionFactor;
+  // Climax suppression: during climax/sustain, further suppress art
+  const climaxSuppression = 1 - climaxIntensity * 0.7;
+  const artOpacity = baseOpacity * suppressionFactor * climaxSuppression;
 
   if (artOpacity < 0.01) return null;
 

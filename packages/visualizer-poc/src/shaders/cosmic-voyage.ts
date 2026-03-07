@@ -58,20 +58,39 @@ uniform vec4 uContrast1;
 varying vec2 vUv;
 
 #define PI 3.14159265
-#define VOLSTEPS 18
-#define FRACTAL_ITERS 17
+#define VOLSTEPS 42
+#define FRACTAL_ITERS 24
 
 // --- Cosine color palette ---
 vec3 palette(float t, vec3 a, vec3 b, vec3 c, vec3 d) {
   return a + b * cos(6.28318 * (c * t + d));
 }
 
-// --- Camera path: Lissajous curve with constant Z-forward drift ---
+// --- Domain warp: two-pass FBM distortion for organic cloud shapes ---
+vec3 domainWarp(vec3 p, float onset, float time) {
+  // Pass 1: large-scale cloud shaping
+  vec3 q = vec3(
+    fbm3(p + vec3(0.0, 0.0, time * 0.03)),
+    fbm3(p + vec3(5.2, 1.3, time * 0.03)),
+    fbm3(p + vec3(2.1, 7.8, time * 0.03))
+  );
+
+  // Pass 2: onset-reactive turbulence
+  vec3 r = vec3(
+    fbm3(p + 4.0 * q + vec3(1.7, 9.2, time * 0.05)),
+    fbm3(p + 4.0 * q + vec3(8.3, 2.8, time * 0.05)),
+    fbm3(p + 4.0 * q + vec3(3.1, 5.4, time * 0.05))
+  );
+
+  return p + 0.35 * (q + onset * 0.8 * r);
+}
+
+// --- Camera path: Lissajous curve with variable Z-forward drift ---
 vec3 cameraPath(float t) {
   return vec3(
-    sin(t * 0.7) * 1.5 + cos(t * 0.3) * 0.8,
-    cos(t * 0.5) * 1.2 + sin(t * 0.2) * 0.6,
-    t * 3.0
+    sin(t * 0.7) * 2.0 + cos(t * 0.3) * 0.8,
+    cos(t * 0.5) * 1.6 + sin(t * 0.2) * 0.6,
+    t * (3.5 + sin(t * 0.15) * 1.0)
   );
 }
 
@@ -86,7 +105,7 @@ void main() {
   float onset = clamp(uOnsetSnap, 0.0, 1.0);
 
   // === CAMERA SETUP ===
-  float driftSpeed = 0.04 + energy * 0.06;
+  float driftSpeed = 0.05 + energy * 0.08;
   float camT = uTime * driftSpeed;
   vec3 camPos = cameraPath(camT);
 
@@ -101,9 +120,14 @@ void main() {
   vec3 camRight = normalize(cross(vec3(0.0, 1.0, 0.0), camForward));
   vec3 camUp = cross(camForward, camRight);
 
+  // Slow barrel roll: ±13 degrees via incommensurate frequencies
+  float rollAngle = sin(camT * 0.37) * 0.12 + cos(camT * 0.23) * 0.1;
+  vec3 rolledRight = camRight * cos(rollAngle) + camUp * sin(rollAngle);
+  vec3 rolledUp = -camRight * sin(rollAngle) + camUp * cos(rollAngle);
+
   // FOV modulated by bass
   float fov = mix(1.5, 2.0, bass);
-  vec3 rd = normalize(p.x * camRight + p.y * camUp + fov * camForward);
+  vec3 rd = normalize(p.x * rolledRight + p.y * rolledUp + fov * camForward);
 
   // === STAR NEST: Kaliset volumetric fractal ===
   // Nebula/cloud color from palette primary
@@ -114,16 +138,15 @@ void main() {
   float hue2 = uPaletteSecondary;
   vec3 emissionColor = 0.5 + 0.5 * cos(6.28318 * vec3(hue2, hue2 + 0.33, hue2 + 0.67));
 
-  // Kaliset parameters
-  float formuparam = 0.53 + onset * 0.06;   // onset modulates fractal turbulence
-  float tile = 0.85;
-  float stepsize = 0.12;
-  float darkmatter = mix(0.3, 0.1, bass);   // bass reduces dark matter = denser clouds
-  float distfading = 0.73;
-  float saturation = 0.85;
+  // Kaliset parameters (retuned for 42 steps)
+  float formuparam = 0.53 + onset * 0.15;
+  float tile = 0.92;
+  float darkmatter = mix(0.25, 0.05, bass);
+  float distfading = 0.78;
+  float saturation = 0.92;
 
-  // Highs modulate iteration count (14-17 range via loop + early exit)
-  int maxIters = 14 + int(highs * 3.0);
+  // Highs modulate iteration count (18-24 range)
+  int maxIters = 18 + int(highs * 6.0);
 
   // Travel speed from energy
   float travelSpeed = energy * 0.08 + 0.02;
@@ -134,22 +157,35 @@ void main() {
   float s = 0.1;
   float fade = 1.0;
   vec3 accColor = vec3(0.0);
+  float accGlow = 0.0;
 
   for (int r = 0; r < VOLSTEPS; r++) {
+    // Adaptive step size: dense near camera, efficient in distance
+    float stepsize = 0.08 + float(r) * 0.004;
+
     vec3 samplePos = from + s * rd * 0.5;
+
+    // Domain warp with distance fade (near samples only)
+    float warpFade = smoothstep(3.0, 0.5, float(r) / 42.0 * 5.0);
+    if (warpFade > 0.01) {
+      samplePos = mix(samplePos, domainWarp(samplePos, onset, uTime), warpFade);
+    }
 
     // Tiling fold
     samplePos = abs(vec3(tile) - mod(samplePos, vec3(tile * 2.0)));
 
     float pa = 0.0;
     float a = 0.0;
+    float minOrbit = 1e10;
 
     // Kaliset fractal iterations
     for (int i = 0; i < FRACTAL_ITERS; i++) {
       if (i >= maxIters) break;
       samplePos = abs(samplePos) / dot(samplePos, samplePos) - formuparam;
-      a += abs(length(samplePos) - pa);
-      pa = length(samplePos);
+      float orbitLen = length(samplePos);
+      a += abs(orbitLen - pa);
+      pa = orbitLen;
+      minOrbit = min(minOrbit, orbitLen);
     }
 
     // Dark matter subtraction
@@ -160,13 +196,42 @@ void main() {
       fade *= 1.0 - dm;
     }
 
-    // Color from fractal iteration depth
+    // === Multi-scale color mapping (3-band gradient) ===
+    float density = clamp(a * 0.001, 0.0, 1.0);
+    // Depth-dependent hue shift for layered color separation
+    float depthHue = float(r) * 0.008;
+    vec3 shiftedCloud = 0.5 + 0.5 * cos(6.28318 * vec3(hue1 + depthHue, hue1 + 0.33 + depthHue, hue1 + 0.67 + depthHue));
+
+    // Band 1 (low density, outer wisps): cool-shifted cloud color
+    vec3 bandCool = shiftedCloud * vec3(0.7, 0.85, 1.0);
+    // Band 2 (mid density, body): warm mix of cloud + emission
+    vec3 bandWarm = mix(shiftedCloud, emissionColor, 0.35) * vec3(1.0, 0.95, 0.85);
+    // Band 3 (high density, cores): bright white-hot emission
+    vec3 bandHot = mix(emissionColor, vec3(1.0, 0.98, 0.95), 0.5);
+
+    // Blend bands based on density
+    vec3 localColor = mix(bandCool, bandWarm, smoothstep(0.1, 0.5, density));
+    localColor = mix(localColor, bandHot, smoothstep(0.5, 0.9, density));
+
     float s1 = s;
     vec3 v = vec3(s1, s1 * s1, s1 * s1 * s1 * s1);
-    // Mix palette colors with the fractal structure
-    vec3 localColor = mix(cloudColor, emissionColor, clamp(a * 0.001, 0.0, 1.0));
     accColor += fade * localColor * a * 0.00013;
     accColor += fade * v * a * 0.00005;
+
+    // === Emission cores: detect fractal convergence ===
+    float coreGlow = smoothstep(0.5, 0.05, minOrbit) * a * 0.0002;
+    accColor += fade * emissionColor * coreGlow;
+
+    // === God rays: directional light shafts from bright nodes ===
+    if (coreGlow > 0.001) {
+      vec3 toSample = normalize(samplePos);
+      float rayAlign = abs(dot(rd, toSample));
+      float godRay = pow(rayAlign, 8.0) * coreGlow * 3.0;
+      accColor += fade * emissionColor * godRay * 0.5;
+    }
+
+    // Accumulate volumetric luminance for nebula glow
+    accGlow += fade * a * 0.00008;
 
     fade *= distfading;
     s += stepsize;
@@ -212,14 +277,19 @@ void main() {
 
   // === BEAT PULSE: tempo-locked emission swell ===
   float bp = beatPulse(uMusicalTime);
-  col *= 1.0 + bp * 0.04;
+  col *= 1.0 + bp * 0.10;
 
   // === BLOOM: bright pixel self-illumination ===
   float lum = dot(col, vec3(0.299, 0.587, 0.114));
-  float bloomThreshold = mix(0.45, 0.35, energy);
+  float bloomThreshold = mix(0.35, 0.2, energy);
   float bloomAmount = max(0.0, lum - bloomThreshold) * 2.5;
   vec3 bloomColor = mix(col, vec3(1.0, 0.98, 0.95), 0.3);
-  col += bloomColor * bloomAmount * 0.4;
+  col += bloomColor * bloomAmount * 0.55;
+
+  // === NEBULA GLOW: diffuse volumetric luminance layer ===
+  float glowAmount = accGlow * (0.6 + bass * 0.4);
+  vec3 glowColor = mix(emissionColor, cloudColor, 0.3) * 0.35;
+  col += glowColor * glowAmount;
 
   // === S-CURVE COLOR GRADING ===
   col = sCurveGrade(col, energy);

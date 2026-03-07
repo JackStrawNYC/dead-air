@@ -178,7 +178,7 @@ void main() {
 
   // === BEAT PULSE: tempo-locked flame intensity ===
   float bp = beatPulse(uMusicalTime);
-  col *= 1.0 + bp * 0.08;
+  col *= 1.0 + bp * 0.14;
 
   // === RISING EMBERS: particle field ===
   float emberCount = 5.0 + energy * 20.0;

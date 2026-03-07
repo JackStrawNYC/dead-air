@@ -180,7 +180,47 @@ function loadShowFromDb(): { venue: string; city: string; state: string; setlist
 
 // ─── Visual mode assignment based on energy ───
 
-type VisualMode = "liquid_light" | "particle_nebula" | "concert_lighting" | "lo_fi_grain" | "stark_minimal" | "oil_projector" | "tie_dye" | "cosmic_dust" | "vintage_film";
+type VisualMode = "liquid_light" | "particle_nebula" | "concert_lighting" | "lo_fi_grain" | "stark_minimal" | "oil_projector" | "tie_dye" | "cosmic_dust" | "vintage_film" | "cosmic_voyage" | "inferno" | "deep_ocean" | "aurora";
+
+/** Energy affinity for each mode — used for auto section override generation */
+const MODE_ENERGY: Record<VisualMode, "low" | "mid" | "high"> = {
+  liquid_light: "high",
+  oil_projector: "mid",
+  concert_lighting: "high",
+  lo_fi_grain: "mid",
+  particle_nebula: "low",
+  stark_minimal: "low",
+  tie_dye: "high",
+  cosmic_dust: "low",
+  vintage_film: "mid",
+  cosmic_voyage: "low",
+  inferno: "high",
+  deep_ocean: "low",
+  aurora: "low",
+};
+
+/** Mode complements — used to avoid picking the same mode twice in a row */
+const MODE_COMPLEMENT: Record<VisualMode, VisualMode> = {
+  liquid_light: "oil_projector",
+  oil_projector: "liquid_light",
+  concert_lighting: "lo_fi_grain",
+  lo_fi_grain: "concert_lighting",
+  particle_nebula: "cosmic_dust",
+  cosmic_dust: "particle_nebula",
+  tie_dye: "vintage_film",
+  vintage_film: "tie_dye",
+  stark_minimal: "liquid_light",
+  cosmic_voyage: "concert_lighting",
+  inferno: "cosmic_voyage",
+  deep_ocean: "inferno",
+  aurora: "tie_dye",
+};
+
+function getModesForEnergy(energy: "low" | "mid" | "high"): VisualMode[] {
+  return (Object.entries(MODE_ENERGY) as [VisualMode, string][])
+    .filter(([, e]) => e === energy)
+    .map(([m]) => m);
+}
 
 function assignVisualMode(songAnalysis: SongAnalysisData | undefined, songName: string): VisualMode {
   if (!songAnalysis) return "liquid_light";
@@ -193,15 +233,54 @@ function assignVisualMode(songAnalysis: SongAnalysisData | undefined, songName: 
   const nameLower = songName.toLowerCase();
 
   // Special cases
-  if (nameLower.includes("drums") || nameLower.includes("space")) return "particle_nebula";
+  if (nameLower.includes("drums") || nameLower.includes("space")) return "cosmic_voyage";
   if (nameLower.includes("dark star")) return "cosmic_dust";
+  if (nameLower.includes("morning dew")) return "deep_ocean";
+  if (nameLower.includes("fire on the mountain")) return "inferno";
 
-  // Energy-based assignment
+  // Energy-based assignment with full mode set
   if (avgEnergy > 0.5 && bpm > 130) return "tie_dye";
+  if (avgEnergy > 0.5) return "inferno";
   if (avgEnergy > 0.4) return "concert_lighting";
   if (avgEnergy > 0.25) return "liquid_light";
   if (avgEnergy > 0.15) return "vintage_film";
-  return "oil_projector";
+  if (avgEnergy > 0.08) return "aurora";
+  return "deep_ocean";
+}
+
+/** Auto-generate section overrides from section energy labels.
+ *  Uses a deterministic seeded selection to avoid the same mode repeating. */
+function generateSectionOverrides(
+  sections: Array<{ energy: string; avgEnergy: number }>,
+  defaultMode: VisualMode,
+  songSeed: number,
+): Array<{ sectionIndex: number; mode: VisualMode }> {
+  if (sections.length <= 1) return [];
+
+  const overrides: Array<{ sectionIndex: number; mode: VisualMode }> = [];
+  let lastMode = defaultMode;
+
+  for (let i = 0; i < sections.length; i++) {
+    const section = sections[i];
+    const energy = section.energy as "low" | "mid" | "high";
+
+    // Skip section 0 (uses defaultMode) and don't override every section
+    // Override on energy transitions only
+    if (i === 0) continue;
+    const prevEnergy = sections[i - 1]?.energy;
+    if (energy === prevEnergy && i > 1) continue; // Same energy as previous — skip
+
+    // Pick mode appropriate for this section's energy
+    const candidates = getModesForEnergy(energy).filter((m) => m !== lastMode && m !== defaultMode);
+    if (candidates.length === 0) continue;
+
+    // Deterministic selection using seed + section index
+    const pick = candidates[Math.abs((songSeed + i * 7) % candidates.length)];
+    overrides.push({ sectionIndex: i, mode: pick });
+    lastMode = pick;
+  }
+
+  return overrides;
 }
 
 // ─── Palette assignment based on song position ───
@@ -261,6 +340,16 @@ function bridge() {
     return { song, trackId, songAnalysis, segment };
   });
 
+  // ── Pre-pass: compute sections per track for auto sectionOverrides ──
+  const trackSections: Record<string, Array<{ frameStart: number; frameEnd: number; label: string; energy: string; avgEnergy: number }>> = {};
+  for (const { trackId, songAnalysis, segment } of trackMapping) {
+    if (!songAnalysis) continue;
+    const duration = segment?.duration ?? songAnalysis.durationSec;
+    const totalFrames = Math.round(duration * 30);
+    const frames = generateFrameData(songAnalysis, totalFrames);
+    trackSections[trackId] = generateSections(frames, totalFrames);
+  }
+
   // ── 1. Generate setlist.json ──
   console.log("1. Generating setlist.json ...");
   const setlistJson = {
@@ -271,21 +360,31 @@ function bridge() {
     era: classifyEra(showDate),
     venueType: "arena" as const,
     tourName: tour,
-    songs: trackMapping.map(({ song, trackId, songAnalysis, segment }) => ({
-      trackId,
-      title: song.songName,
-      set: song.setNumber,
-      trackNumber: setTrackCounts[song.setNumber] ?? 1,
-      defaultMode: assignVisualMode(songAnalysis, song.songName),
-      audioFile: segment
-        ? inferAudioFilename(segment.filePath, trackId)
-        : `${showDate.replace(/-/g, "")}-${trackId}.mp3`,
-      palette: assignPalette(song.setNumber, song.position),
-      segueInto: song.isSegue || undefined,
-    })),
+    songs: trackMapping.map(({ song, trackId, songAnalysis, segment }, idx) => {
+      const defaultMode = assignVisualMode(songAnalysis, song.songName);
+      const sections = trackSections[trackId];
+      // Auto-generate section overrides from energy analysis
+      const sectionOverrides = sections?.length
+        ? generateSectionOverrides(sections, defaultMode, idx * 31 + showDate.charCodeAt(8))
+        : undefined;
+
+      return {
+        trackId,
+        title: song.songName,
+        set: song.setNumber,
+        trackNumber: setTrackCounts[song.setNumber] ?? 1,
+        defaultMode,
+        audioFile: segment
+          ? inferAudioFilename(segment.filePath, trackId)
+          : `${showDate.replace(/-/g, "")}-${trackId}.mp3`,
+        palette: assignPalette(song.setNumber, song.position),
+        sectionOverrides: sectionOverrides?.length ? sectionOverrides : undefined,
+        segueInto: song.isSegue || undefined,
+      };
+    }),
   };
   writeFileSync(join(VIZ_DATA, "setlist.json"), JSON.stringify(setlistJson, null, 2));
-  console.log(`  ✓ ${setlistJson.songs.length} songs`);
+  console.log(`  ✓ ${setlistJson.songs.length} songs (with auto section overrides)`);
 
   // ── 2. Copy/generate analysis files ──
   console.log("2. Generating analysis files ...");
