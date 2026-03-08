@@ -34,8 +34,8 @@ export interface SongDNAProps {
   colorAccent?: string;
 }
 
-const APPEAR_FRAME = 360;  // 12s — after title fades out (11s), clean reveal
-const HOLD_END = 540;       // 18s — holds for 6 seconds
+const APPEAR_FRAME = 540;  // 18s — spaced from ConcertInfo (gone by 12s) and title
+const HOLD_END = 720;       // 24s — holds for 6 seconds
 const FADE_DURATION = 30;   // 1s fade out
 
 export const SongDNA: React.FC<SongDNAProps> = ({
@@ -67,7 +67,7 @@ export const SongDNA: React.FC<SongDNAProps> = ({
   // Don't render before appearance or after full fade
   if (frame < APPEAR_FRAME - 5 || fadeOut <= 0) return null;
 
-  const opacity = slideProgress * fadeOut;
+  const opacity = slideProgress * fadeOut * 0.70;
 
   return (
     <div
@@ -86,10 +86,10 @@ export const SongDNA: React.FC<SongDNAProps> = ({
           minWidth: 200,
           maxWidth: 320,
           padding: "16px 22px",
-          background: "rgba(10, 10, 10, 0.5)",
-          backdropFilter: "blur(12px)",
-          WebkitBackdropFilter: "blur(12px)",
-          borderLeft: `3px solid ${colorAccent}`,
+          background: "rgba(10, 10, 10, 0.25)",
+          backdropFilter: "blur(8px)",
+          WebkitBackdropFilter: "blur(8px)",
+          borderLeft: `2px solid ${colorAccent}`,
           borderRadius: 2,
         }}
       >

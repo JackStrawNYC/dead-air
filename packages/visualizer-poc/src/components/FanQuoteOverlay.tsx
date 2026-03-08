@@ -22,7 +22,7 @@ interface Props {
   seed?: number;
 }
 
-const APPEAR_FRAME = 900; // 30 seconds in
+const APPEAR_FRAME = 1350; // 45 seconds in — breathe before showing
 const SLIDE_IN_FRAMES = 30;
 const HOLD_FRAMES = 330; // 11 seconds
 const SLIDE_OUT_FRAMES = 30;
@@ -57,7 +57,7 @@ export const FanQuoteOverlay: React.FC<Props> = ({ reviews, trackNumber, seed = 
   const opacity = interpolate(
     localFrame,
     [0, SLIDE_IN_FRAMES * 0.5, SLIDE_IN_FRAMES + HOLD_FRAMES, TOTAL_FRAMES],
-    [0, 1, 1, 0],
+    [0, 0.70, 0.70, 0],
     { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
   );
 
@@ -81,7 +81,7 @@ export const FanQuoteOverlay: React.FC<Props> = ({ reviews, trackNumber, seed = 
     >
       <div
         style={{
-          background: "rgba(0, 0, 0, 0.45)",
+          background: "rgba(0, 0, 0, 0.25)",
           backdropFilter: "blur(12px)",
           WebkitBackdropFilter: "blur(12px)",
           borderRadius: 12,

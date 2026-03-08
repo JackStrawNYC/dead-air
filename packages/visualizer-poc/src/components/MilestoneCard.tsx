@@ -30,8 +30,8 @@ export interface MilestoneCardProps {
   colorAccent?: string;
 }
 
-const APPEAR_FRAME = 450;  // 15s — after SongTitle + SongDNA are gone
-const HOLD_END = 690;       // 23s — 8 seconds of display
+const APPEAR_FRAME = 780;  // 26s — after SongDNA is gone (24s), owns its moment
+const HOLD_END = 1020;      // 34s — 8 seconds of display
 const FADE_DURATION = 45;   // 1.5s fade out
 
 /** Accent color per milestone type */
@@ -80,7 +80,7 @@ export const MilestoneCard: React.FC<MilestoneCardProps> = ({
   // Don't render before appearance or after full fade
   if (frame < APPEAR_FRAME - 5 || fadeOut <= 0) return null;
 
-  const opacity = slideProgress * fadeOut;
+  const opacity = slideProgress * fadeOut * 0.70;
 
   return (
     <div
@@ -99,7 +99,7 @@ export const MilestoneCard: React.FC<MilestoneCardProps> = ({
           minWidth: 240,
           maxWidth: 420,
           padding: "16px 24px",
-          background: "rgba(10, 10, 10, 0.5)",
+          background: "rgba(10, 10, 10, 0.25)",
           backdropFilter: "blur(12px)",
           WebkitBackdropFilter: "blur(12px)",
           borderTop: `3px solid ${accent}`,

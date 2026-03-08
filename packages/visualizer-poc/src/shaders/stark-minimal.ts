@@ -151,6 +151,17 @@ void main() {
   float grainTime = floor(uTime * 15.0) / 15.0;
   col += filmGrain(uv, grainTime) * 0.03;
 
+  // ONSET BRIGHTNESS PULSE: raw transient spike
+  float onsetPulse = step(0.5, uOnsetSnap) * uOnsetSnap * 0.30;
+  col *= 1.0 + onsetPulse;
+
+  // ONSET CHROMATIC ABERRATION
+  if (uOnsetSnap > 0.4) {
+    float caAmt = (uOnsetSnap - 0.4) * 0.15;
+    col.r *= 1.0 + caAmt;
+    col.b *= 1.0 - caAmt * 0.5;
+  }
+
   // Lifted blacks (cold)
   col = max(col, vec3(0.08, 0.065, 0.085));
 

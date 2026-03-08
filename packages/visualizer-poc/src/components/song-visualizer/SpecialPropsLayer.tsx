@@ -19,6 +19,8 @@ import type { FanReview } from "../FanQuoteOverlay";
 import { SilentErrorBoundary } from "../SilentErrorBoundary";
 import { SongPaletteProvider } from "../../data/SongPaletteContext";
 import type { ColorPalette, Milestone } from "../../data/types";
+import { getEraPreset } from "../../data/era-presets";
+import { useShowContext } from "../../data/ShowContext";
 
 interface Props {
   songTitle: string;
@@ -49,6 +51,9 @@ export const SpecialPropsLayer: React.FC<Props> = ({
   fanReviews,
   showSeed,
 }) => {
+  const showCtx = useShowContext();
+  const eraGrainMult = getEraPreset(showCtx?.era ?? "")?.grainIntensity ?? 1.0;
+
   return (
     <>
       <SongTitle
@@ -73,6 +78,7 @@ export const SpecialPropsLayer: React.FC<Props> = ({
             <ListenFor
               items={narrationData[trackId].listenFor}
               context={narrationData[trackId].context}
+              trackNumberInSet={trackNumber}
             />
           </SongPaletteProvider>
         </SilentErrorBoundary>
@@ -86,10 +92,12 @@ export const SpecialPropsLayer: React.FC<Props> = ({
           />
         </SilentErrorBoundary>
       )}
-      <FilmGrain opacity={interpolate(
-        energy, [0.03, 0.30], [0.10, 0.04],
-        { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
-      )} energy={energy} />
+      {!process.env.SKIP_GRAIN && (
+        <FilmGrain opacity={interpolate(
+          energy, [0.03, 0.30], [0.10, 0.04],
+          { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+        ) * eraGrainMult} energy={energy} />
+      )}
     </>
   );
 };

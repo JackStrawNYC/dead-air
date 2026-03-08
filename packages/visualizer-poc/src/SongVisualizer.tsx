@@ -22,6 +22,7 @@ import React, { useMemo } from "react";
 import { staticFile, useCurrentFrame, useVideoConfig, interpolate } from "remotion";
 import { SceneRouter } from "./scenes/SceneRouter";
 import { SceneCrossfade } from "./scenes/SceneCrossfade";
+import { SegueCrossfade } from "./scenes/SegueCrossfade";
 import { renderScene } from "./scenes/scene-registry";
 import { OVERLAY_COMPONENTS } from "./data/overlay-components";
 import { buildRotationSchedule, getOverlayOpacities } from "./data/overlay-rotation";
@@ -53,6 +54,7 @@ import { detectCrowdMoments } from "./data/crowd-detector";
 import { CrowdOverlay } from "./components/CrowdOverlay";
 import { CameraMotion } from "./components/CameraMotion";
 import { computeVisualFocus } from "./utils/visual-focus";
+import { findMusicEnd } from "./utils/music-end";
 import { computeCounterpoint, resetCounterpoint } from "./utils/visual-counterpoint";
 
 // Extracted sub-components
@@ -150,8 +152,8 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
   const rotationSchedule = useMemo(() => {
     if (!props.activeOverlays || !analysis) return null;
     const sects = getSections(analysis);
-    return buildRotationSchedule(props.activeOverlays, sects, props.song.trackId, showSeed, analysis?.frames, isDrumsSpace, props.energyHints);
-  }, [props.activeOverlays, analysis, props.song.trackId, showSeed, isDrumsSpace, props.energyHints]);
+    return buildRotationSchedule(props.activeOverlays, sects, props.song.trackId, showSeed, analysis?.frames, isDrumsSpace, props.energyHints, props.show?.era);
+  }, [props.activeOverlays, analysis, props.song.trackId, showSeed, isDrumsSpace, props.energyHints, props.show?.era]);
 
   const opacityMapBase = rotationSchedule
     ? getOverlayOpacities(frame, rotationSchedule, analysis?.frames, energyCalibration)
@@ -228,6 +230,11 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
     [f, Math.floor(frame / 30), isDrumsSpace],
   );
 
+  // Normalize densityMult (0.75-1.25) to shader-friendly 0-1 range (0.5 = neutral)
+  const jamDensity = jamEvolution.isLongJam
+    ? Math.max(0, Math.min(1, (jamEvolution.densityMult - 0.75) / 0.5))
+    : 0.5;
+
   const combinedDensityMult = Math.max(0.75, climaxMod.overlayDensityMult * (jamEvolution.isLongJam ? jamEvolution.densityMult : 1));
   const opacityMap = opacityMapBase ? applyDensityMult(opacityMapBase, combinedDensityMult, rotationSchedule!) : null;
 
@@ -253,6 +260,14 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
   // Derive energy level hint for overlay hard cap
   const energyLevel: "quiet" | "mid" | "peak" = audioSnapshot.energy < 0.10 ? "quiet" : audioSnapshot.energy > 0.25 ? "peak" : "mid";
 
+  // ─── Dead air detection: ambient visuals after music ends ───
+  const musicEndFrame = useMemo(() => findMusicEnd(f, durationInFrames), [f, durationInFrames]);
+  const DEAD_AIR_CROSSFADE = 90; // 3 seconds
+  const deadAirFactor = musicEndFrame < durationInFrames && frame > musicEndFrame
+    ? Math.min(1, (frame - musicEndFrame) / DEAD_AIR_CROSSFADE)
+    : 0;
+  const isDeadAir = deadAirFactor > 0.99;
+
   // ─── Fade in/out ───
   // Start fade-out 1 frame before the end of analyzed audio to ensure visuals are fully
   // gone by the time audio ends (analysis rounds up via ceil, creating a +1 frame mismatch)
@@ -270,33 +285,33 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
       <div style={{ position: "absolute", inset: 0, opacity }}>
         <CameraMotion frames={f} jamEvolution={jamEvolution} bass={audioSnapshot.bass} cameraFreeze={counterpoint.cameraFreeze}>
         <EraGrade>
-        <EnergyEnvelope snapshot={audioSnapshot} climaxMod={climaxMod} jamColorTemp={jamEvolution.isLongJam ? jamEvolution.colorTemperature : undefined} calibration={energyCalibration} counterpointSatMult={counterpoint.saturationMult}>
+        <EnergyEnvelope snapshot={audioSnapshot} climaxMod={climaxMod} jamColorTemp={jamEvolution.isLongJam ? jamEvolution.colorTemperature : undefined} calibration={energyCalibration} counterpointSatMult={counterpoint.saturationMult} setNumber={props.song.set}>
           <div style={{ position: "absolute", inset: 0, opacity: focusState.shaderOpacity }}>
           <SilentErrorBoundary name="SceneRouter">
             {(() => {
-              const sceneRouter = <SceneRouter frames={f} sections={sections} song={props.song} tempo={tempo} seed={showSeed} />;
+              const sceneRouter = <SceneRouter frames={f} sections={sections} song={props.song} tempo={tempo} seed={showSeed} jamDensity={jamDensity} deadAirMode={deadAirFactor > 0 ? "cosmic_dust" : undefined} deadAirFactor={deadAirFactor > 0 ? deadAirFactor : undefined} era={props.show?.era} />;
               const palette = props.song.palette;
 
-              // Segue IN crossfade: blend from previous song's shader
+              // Segue IN crossfade: smooth dual-render dissolve from previous song's shader
               if (props.segueIn && props.segueFromMode && props.segueFromMode !== props.song.defaultMode && frame < FADE_FRAMES) {
                 const progress = frame / FADE_FRAMES;
                 return (
-                  <SceneCrossfade
+                  <SegueCrossfade
                     progress={progress}
-                    outgoing={renderScene(props.segueFromMode, { frames: f, sections, palette: props.segueFromPalette ?? palette, tempo })}
+                    outgoing={renderScene(props.segueFromMode, { frames: f, sections, palette: props.segueFromPalette ?? palette, tempo, jamDensity })}
                     incoming={sceneRouter}
                   />
                 );
               }
 
-              // Segue OUT crossfade: blend into next song's shader
+              // Segue OUT crossfade: smooth dual-render dissolve into next song's shader
               if (props.segueOut && props.segueToMode && props.segueToMode !== props.song.defaultMode && frame > durationInFrames - FADE_FRAMES) {
                 const progress = (frame - (durationInFrames - FADE_FRAMES)) / FADE_FRAMES;
                 return (
-                  <SceneCrossfade
+                  <SegueCrossfade
                     progress={progress}
                     outgoing={sceneRouter}
-                    incoming={renderScene(props.segueToMode, { frames: f, sections, palette: props.segueToPalette ?? palette, tempo })}
+                    incoming={renderScene(props.segueToMode, { frames: f, sections, palette: props.segueToPalette ?? palette, tempo, jamDensity })}
                   />
                 );
               }
@@ -308,7 +323,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
 
           {effectiveSongArt && (
             <SilentErrorBoundary name="SongArt">
-              <SongArtLayer src={staticFile(effectiveSongArt)} suppressionFactor={artSuppressionFactor} hueRotation={hueRotation} energy={audioSnapshot.energy} climaxIntensity={climaxState.intensity} focusOpacity={focusState.artOpacity} />
+              <SongArtLayer src={staticFile(effectiveSongArt)} suppressionFactor={artSuppressionFactor} hueRotation={hueRotation} energy={audioSnapshot.energy} climaxIntensity={climaxState.intensity} focusOpacity={focusState.artOpacity} segueIn={props.segueIn} />
             </SilentErrorBoundary>
           )}
 
@@ -323,7 +338,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
           <DynamicOverlayStack
             activeEntries={activeEntries}
             opacityMap={opacityMap}
-            mediaSuppression={mediaSuppression}
+            mediaSuppression={mediaSuppression * (1 - deadAirFactor)}
             hueRotation={hueRotation}
             tempo={tempo}
             palette={props.song.palette}
@@ -340,8 +355,8 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
             </SilentErrorBoundary>
           )}
 
-          <ConcertInfo />
-          <SetlistScroll frames={f} currentSong={props.song.title} />
+          {!isDeadAir && <ConcertInfo />}
+          {!isDeadAir && <SetlistScroll frames={f} currentSong={props.song.title} />}
 
           <SpecialPropsLayer
             songTitle={props.song.title}

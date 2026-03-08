@@ -125,6 +125,17 @@ void main() {
 
   vec3 col = baseColor + glowColor * emissive + flash + beatKick + rim * glowColor * 0.5;
 
+  // ONSET BRIGHTNESS PULSE: raw transient spike
+  float onsetPulse = step(0.5, uOnsetSnap) * uOnsetSnap * 0.30;
+  col *= 1.0 + onsetPulse;
+
+  // ONSET CHROMATIC ABERRATION
+  if (uOnsetSnap > 0.4) {
+    float caAmt = (uOnsetSnap - 0.4) * 0.15;
+    col.r *= 1.0 + caAmt;
+    col.b *= 1.0 - caAmt * 0.5;
+  }
+
   // Fog: distance-based
   float fogDist = length(vWorldPos);
   float fog = 1.0 - exp(-fogDist * (0.08 - uEnergy * 0.03));

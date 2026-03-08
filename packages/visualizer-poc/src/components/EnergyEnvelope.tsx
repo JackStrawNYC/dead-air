@@ -15,7 +15,9 @@ import { energyToFactor } from "../utils/energy";
 import type { EnergyCalibration } from "../utils/energy";
 import type { AudioSnapshot } from "../utils/audio-reactive";
 import { detectTexture, type ClimaxModulation } from "../utils/climax-state";
+import { getSetTheme } from "../utils/set-theme";
 import { useShowContext } from "../data/ShowContext";
+import { getEraPreset } from "../data/era-presets";
 
 interface Props {
   /** Pre-computed audio snapshot from SongVisualizer (shared, not recomputed) */
@@ -28,6 +30,8 @@ interface Props {
   calibration?: EnergyCalibration;
   /** Counterpoint saturation multiplier (0.4-1.3) */
   counterpointSatMult?: number;
+  /** Set number (1, 2, or 3=encore) for set-level color theming */
+  setNumber?: number;
 }
 
 // Per-era bloom color — matches era grade for visual cohesion
@@ -40,8 +44,9 @@ const ERA_BLOOM: Record<string, string> = {
 };
 const DEFAULT_BLOOM = ERA_BLOOM.classic;
 
-export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod, jamColorTemp, calibration, counterpointSatMult = 1 }) => {
+export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod, jamColorTemp, calibration, counterpointSatMult = 1, setNumber }) => {
   const energy = snapshot.energy;
+  const setTheme = getSetTheme(setNumber ?? 1);
   const low = calibration?.quietThreshold;
   const high = calibration?.loudThreshold;
   const factor = energyToFactor(energy, low, high); // 0 (quiet) → 1 (loud)
@@ -64,27 +69,37 @@ export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod,
     texture === "sparse" ? -0.02 :    // ballad intros: barely restrained
     texture === "peak" ? +0.02 : 0;   // peaks: touch of saturation
 
-  // Wide modulation ranges — visuals should BREATHE with the music
-  // Saturation + brightness use fast energy (responsive to dynamics)
-  const saturation = (0.95 + factor * 0.40 + flatnessSaturation + textureSaturationOffset + (climaxMod?.saturationOffset ?? 0)) * counterpointSatMult;
-  const brightness = 0.95 + factor * 0.25 + onsetBrightness + (climaxMod?.brightnessOffset ?? 0);
-  const contrast = 0.95 + factor * 0.18 + (climaxMod?.contrastOffset ?? 0);
+  // Era-specific color adjustments
+  const eraPreset = getEraPreset(showCtx?.era ?? "");
+  const eraColorTempShift = eraPreset?.colorTempShift ?? 0;
+  const eraSatOffset = eraPreset?.saturationOffset ?? 0;
+
+  // Wide dynamic range — quiet passages are darker/desaturated, peaks vivid.
+  // Saturation: 0.65 (quiet) → 1.25 (loud)
+  // Brightness: 0.50 (quiet) → 1.25 (loud) — expanded range for more punch
+  // Contrast:   0.85 (quiet) → 1.15 (loud)
+  // Safety clamp at 1.50 prevents edge-case stacking blowout
+  const saturation = (0.65 + factor * 0.60 + flatnessSaturation + textureSaturationOffset + (climaxMod?.saturationOffset ?? 0) + eraSatOffset) * counterpointSatMult * setTheme.saturationMult;
+  const brightness = Math.min(1.50, 0.50 + factor * 0.75 + onsetBrightness + (climaxMod?.brightnessOffset ?? 0) + setTheme.brightnessOffset);
+  const contrast = 0.85 + factor * 0.30 + (climaxMod?.contrastOffset ?? 0);
   // Bloom uses slow energy (drift, not pulse)
   const bloomOpacity = slowFactor * 0.30 + (climaxMod?.bloomOffset ?? 0);
 
   // Jam color temperature: warm shifts yellow, cool shifts blue (max ±12deg)
   // Only applied during long jams. EraGrade + SongPalette handle base color character.
   const jamHueShift = jamColorTemp != null ? jamColorTemp * 15 : 0; // ±12 degrees max
-  const filterStr = jamHueShift !== 0
-    ? `saturate(${saturation.toFixed(3)}) brightness(${brightness.toFixed(3)}) contrast(${contrast.toFixed(3)}) hue-rotate(${jamHueShift.toFixed(1)}deg)`
+  // Set-level warmth shift: Set 1 warm (+5deg), Set 2 cool (-8deg), Encore neutral (0)
+  const totalHueShift = jamHueShift + setTheme.warmthShift + eraColorTempShift;
+  const filterStr = totalHueShift !== 0
+    ? `saturate(${saturation.toFixed(3)}) brightness(${brightness.toFixed(3)}) contrast(${contrast.toFixed(3)}) hue-rotate(${totalHueShift.toFixed(1)}deg)`
     : `saturate(${saturation.toFixed(3)}) brightness(${brightness.toFixed(3)}) contrast(${contrast.toFixed(3)})`;
 
   return (
     <div style={{ position: "absolute", inset: 0, filter: filterStr }}>
       {children}
 
-      {/* Bloom — era-aware glow at high energy */}
-      {bloomOpacity > 0.001 && (
+      {/* Bloom — era-aware glow at high energy (skipped in draft preset) */}
+      {bloomOpacity > 0.001 && !process.env.SKIP_BLOOM && (
         <div
           style={{
             position: "absolute",

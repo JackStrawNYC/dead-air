@@ -15,11 +15,12 @@ interface Props {
   palette?: ColorPalette;
   tempo?: number;
   style?: React.CSSProperties;
+  jamDensity?: number;
 }
 
-export const AuroraScene: React.FC<Props> = ({ frames, sections, palette, tempo, style }) => {
+export const AuroraScene: React.FC<Props> = ({ frames, sections, palette, tempo, style, jamDensity }) => {
   return (
-    <AudioReactiveCanvas frames={frames} sections={sections} palette={palette} tempo={tempo} style={style}>
+    <AudioReactiveCanvas frames={frames} sections={sections} palette={palette} tempo={tempo} style={style} jamDensity={jamDensity}>
       <FullscreenQuad
         vertexShader={auroraVert}
         fragmentShader={auroraFrag}

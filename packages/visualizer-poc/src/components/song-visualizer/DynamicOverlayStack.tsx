@@ -16,6 +16,7 @@ import { SilentErrorBoundary } from "../SilentErrorBoundary";
 import { SongPaletteProvider } from "../../data/SongPaletteContext";
 import { TempoProvider } from "../../data/TempoContext";
 import type { EnhancedFrameData, ColorPalette } from "../../data/types";
+import { A_TIER_OVERLAY_NAMES } from "../../data/overlay-rotation";
 
 const OVERLAY_GATE_END = 420;  // 14s — overlays hidden until intro elements clear
 
@@ -25,11 +26,13 @@ interface OverlayComponentEntry {
   renderContext?: 'dom' | 'glsl';
 }
 
-/** Max concurrent overlays by energy level (hard cap after opacity sorting) */
+/** Max concurrent overlays by energy level (hard cap after opacity sorting).
+ *  Overlays are rare, sacred punctuation — the shader is the star.
+ *  Peak = 0: shader owns the climax entirely. */
 const MAX_CONCURRENT: Record<string, number> = {
-  quiet: 3,
-  mid: 4,
-  peak: 5,
+  quiet: 1,
+  mid: 1,
+  peak: 1,
 };
 
 interface Props {
@@ -68,6 +71,8 @@ export const DynamicOverlayStack: React.FC<Props> = ({
       opacity: Math.min(1, (opacityMap ? (opacityMap[name] ?? 0) : 1) * mediaSuppression * focusSuppression),
     }))
     .filter((o) => o.opacity > 0.01)
+    // At peak energy, only A-tier overlays (iconic Dead imagery) are allowed
+    .filter((o) => energyLevel !== "peak" || A_TIER_OVERLAY_NAMES.has(o.name))
     .sort((a, b) => b.opacity - a.opacity)
     .slice(0, maxConcurrent);
 
@@ -93,6 +98,7 @@ export const DynamicOverlayStack: React.FC<Props> = ({
             inset: 0,
             opacity: gateOpacity,
             pointerEvents: "none",
+            mixBlendMode: "screen",
           }}
         >
           {glslOverlays.map(({ name, entry: { Component }, opacity }) => (
@@ -103,6 +109,7 @@ export const DynamicOverlayStack: React.FC<Props> = ({
                 inset: 0,
                 opacity,
                 pointerEvents: "none",
+                mixBlendMode: "screen",
               }}
             >
               <Suspense fallback={null}>
@@ -122,6 +129,7 @@ export const DynamicOverlayStack: React.FC<Props> = ({
           inset: 0,
           opacity: gateOpacity,
           filter: hueRotation !== 0 ? `hue-rotate(${hueRotation.toFixed(1)}deg)` : undefined,
+          mixBlendMode: "screen",
         }}
       >
         {domOverlays.map(({ name, entry: { Component }, opacity }) => (
@@ -132,6 +140,7 @@ export const DynamicOverlayStack: React.FC<Props> = ({
               inset: 0,
               opacity,
               pointerEvents: "none",
+              mixBlendMode: "screen",
             }}
           >
             <Suspense fallback={null}>

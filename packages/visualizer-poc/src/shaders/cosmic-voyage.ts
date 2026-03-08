@@ -54,11 +54,12 @@ uniform float uClimaxPhase;
 uniform float uClimaxIntensity;
 uniform vec4 uContrast0;
 uniform vec4 uContrast1;
+uniform float uJamDensity;
 
 varying vec2 vUv;
 
 #define PI 3.14159265
-#define VOLSTEPS 30
+#define VOLSTEPS_LIMIT 40
 #define FRACTAL_ITERS 16
 
 // --- Cosine color palette ---
@@ -147,7 +148,9 @@ void main() {
   // Kaliset parameters (retuned for 30 steps)
   float formuparam = 0.53 + onset * 0.15 + uBeatSnap * 0.12;
   float tile = 0.92;
-  float darkmatter = mix(0.25, 0.05, bass);
+  // Jam density reduces dark matter absorption → denser nebula at peaks
+  // At neutral density (0.5) the multiplier is 1.0, preserving original behavior.
+  float darkmatter = mix(0.25, 0.05, bass) * mix(1.3, 0.7, uJamDensity);
   float distfading = 0.78;
   float saturation = 0.92;
 
@@ -160,19 +163,22 @@ void main() {
   from += vec3(1.0, 1.0, 1.0) * uTime * travelSpeed;
 
   // Volumetric rendering
+  // Jam density modulates volume step count: sparse exploration (20) → dense peak (40)
+  int volSteps = int(mix(20.0, 40.0, uJamDensity));
   float s = 0.1;
   float fade = 1.0;
   vec3 accColor = vec3(0.0);
   float accGlow = 0.0;
 
-  for (int r = 0; r < VOLSTEPS; r++) {
+  for (int r = 0; r < VOLSTEPS_LIMIT; r++) {
+    if (r >= volSteps) break;
     // Adaptive step size: dense near camera, efficient in distance
     float stepsize = 0.08 + float(r) * 0.006;
 
     vec3 samplePos = from + s * rd * 0.5;
 
     // Domain warp with distance fade (near samples only)
-    float warpFade = smoothstep(3.0, 0.5, float(r) / 30.0 * 5.0);
+    float warpFade = smoothstep(3.0, 0.5, float(r) / float(volSteps) * 5.0);
     if (warpFade > 0.01) {
       samplePos = mix(samplePos, domainWarp(samplePos, onset, uTime), warpFade);
     }
@@ -243,6 +249,12 @@ void main() {
     s += stepsize;
   }
 
+  // === SDF STEALIE: emerges from cosmic nebula ===
+  {
+    float nf = fbm3(vec3(p * 3.0, uTime * 0.08));
+    accColor += stealieEmergence(p, uTime, energy, bass, cloudColor, emissionColor, nf);
+  }
+
   // Apply saturation (boosted for vivid nebula)
   float lumAcc = dot(accColor, vec3(0.299, 0.587, 0.114));
   float boostedSat = saturation + climaxBoost * 0.15;
@@ -250,7 +262,7 @@ void main() {
   col *= 1.15 + climaxBoost * 0.20;
 
   // === CHROMATIC ABERRATION from highs ===
-  float caAmount = highs * 0.015;
+  float caAmount = highs * 0.015 + uOnsetSnap * 0.04;
   if (caAmount > 0.001) {
     vec2 caOffset = p * caAmount;
     col.r += col.r * caOffset.x * 0.3;
@@ -268,7 +280,7 @@ void main() {
   }
 
   // === FOG ===
-  float fogDist = mix(0.3, 0.9, energy);
+  float fogDist = mix(0.18, 0.85, energy);
   vec3 fogColor = cloudColor * 0.15;
   float fogAmount = (1.0 - fogDist) * 0.5;
   col = mix(col, fogColor, fogAmount * smoothstep(0.5, 0.0, lumAcc));
@@ -312,6 +324,17 @@ void main() {
   float grainTime = floor(uTime * 15.0) / 15.0;
   float grainIntensity = mix(0.05, 0.02, energy);
   col += filmGrainRes(uv, grainTime, uResolution.y) * grainIntensity;
+
+  // ONSET BRIGHTNESS PULSE: raw transient spike
+  float onsetPulse = step(0.5, uOnsetSnap) * uOnsetSnap * 0.30;
+  col *= 1.0 + onsetPulse;
+
+  // ONSET CHROMATIC ABERRATION
+  if (uOnsetSnap > 0.4) {
+    float caAmt = (uOnsetSnap - 0.4) * 0.15;
+    col.r *= 1.0 + caAmt;
+    col.b *= 1.0 - caAmt * 0.5;
+  }
 
   // === LIFTED BLACKS ===
   col = max(col, vec3(0.06, 0.05, 0.07));

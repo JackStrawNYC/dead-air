@@ -56,20 +56,24 @@ uniform float uClimaxIntensity;
 uniform float uSlowEnergy;
 uniform vec4 uContrast0;
 uniform vec4 uContrast1;
+uniform float uJamDensity;
 
 varying vec2 vUv;
 
 #define PI 3.14159265
-#define MAX_STEPS 40
+#define MAX_STEPS_LIMIT 50
 #define MAX_DIST 8.0
 
 // --- Flame FBM with noise displacement (XT95 technique) ---
+// Octave count modulated by jam density: sparse fire (3) → detailed blaze (6)
 float flameFBM(vec3 p, float bassAmp, float detailAmp) {
+  int octaves = int(mix(3.0, 6.0, uJamDensity));
   p.y *= 0.5;
   float value = 0.0;
   float amplitude = 0.5;
   float frequency = 1.0;
-  for (int i = 0; i < 4; i++) {
+  for (int i = 0; i < 6; i++) {
+    if (i >= octaves) break;
     float octaveBoost = 1.0;
     if (i < 2) {
       octaveBoost += bassAmp * 0.6;
@@ -148,11 +152,15 @@ void main() {
 
   // === GLOW ACCUMULATION RAYMARCHING (XT95 Flame technique) ===
   // Track how deep ray penetrates fire volume, accumulate glow
+  // Jam density modulates step count: sparse fire during exploration (20), intense at peak (50)
+  // At neutral density (0.5) this produces 40 steps, matching original MAX_STEPS behavior.
+  int maxSteps = int(mix(20.0, 60.0, uJamDensity));
   vec3 accColor = vec3(0.0);
   float glow = 0.0;
-  float glowPower = mix(3.0, 5.0, energy);  // energy controls glow exponent
+  float glowPower = mix(2.0, 4.8, energy);  // energy controls glow exponent — wider range
 
-  for (int i = 0; i < MAX_STEPS; i++) {
+  for (int i = 0; i < MAX_STEPS_LIMIT; i++) {
+    if (i >= maxSteps) break;
     float t = float(i) * 0.15 + 0.05;
     if (t > MAX_DIST) break;
 
@@ -242,6 +250,17 @@ void main() {
   float grainTime = floor(uTime * 15.0) / 15.0;
   float grainIntensity = mix(0.04, 0.02, energy);
   col += filmGrainRes(uv, grainTime, uResolution.y) * grainIntensity;
+
+  // ONSET BRIGHTNESS PULSE: raw transient spike
+  float onsetPulse = step(0.5, uOnsetSnap) * uOnsetSnap * 0.30;
+  col *= 1.0 + onsetPulse;
+
+  // ONSET CHROMATIC ABERRATION
+  if (uOnsetSnap > 0.4) {
+    float caAmt = (uOnsetSnap - 0.4) * 0.15;
+    col.r *= 1.0 + caAmt;
+    col.b *= 1.0 - caAmt * 0.5;
+  }
 
   // === LIFTED BLACKS (warm tint for fire) ===
   col = max(col, vec3(0.08, 0.04, 0.02));

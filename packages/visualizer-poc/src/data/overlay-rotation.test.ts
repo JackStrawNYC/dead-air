@@ -103,9 +103,13 @@ describe("buildRotationSchedule", () => {
   });
 
   it("varies with different seeds", () => {
-    const sections = makeSections([{ start: 0, end: 3600, energy: "high" }]);
+    // Long mid section creates many windows; with 1-2 overlays per window
+    // different seeds should produce different selections across enough windows
+    const sections = makeSections([{ start: 0, end: 27000, energy: "mid" }]);
     const s1 = buildRotationSchedule(TEST_OVERLAYS, sections, "s1t01", 42);
     const s2 = buildRotationSchedule(TEST_OVERLAYS, sections, "s1t01", 999);
+    expect(s1.windows.length).toBeGreaterThan(0);
+    expect(s2.windows.length).toBeGreaterThan(0);
     // At least one window should have different overlays
     let anyDiff = false;
     for (let i = 0; i < Math.min(s1.windows.length, s2.windows.length); i++) {
@@ -117,26 +121,28 @@ describe("buildRotationSchedule", () => {
     expect(anyDiff).toBe(true);
   });
 
-  it("marks pre-peak dropout windows", () => {
+  it("marks pre-peak dropout windows with 0 overlays", () => {
     const sections = makeSections([
-      { start: 0, end: 2700, energy: "low" },
-      { start: 2700, end: 5400, energy: "high" },
+      { start: 0, end: 5400, energy: "low" },
+      { start: 5400, end: 10800, energy: "high" },
     ]);
     const schedule = buildRotationSchedule(TEST_OVERLAYS, sections, "s1t01");
     // The last window before the high section should be marked dropout
     const lowWindows = schedule.windows.filter((w) => w.energy === "low");
     const lastLow = lowWindows[lowWindows.length - 1];
     expect(lastLow?.isDropout).toBe(true);
+    // Dropout should have 0 overlays (complete visual silence)
+    expect(lastLow?.overlays.length).toBe(0);
   });
 
   it("reduces overlays in Drums/Space mode", () => {
-    const sections = makeSections([{ start: 0, end: 1800, energy: "mid" }]);
+    // Use a longer mid section so normal mode can pick up to 2 overlays
+    const sections = makeSections([{ start: 0, end: 5400, energy: "mid" }]);
     const normal = buildRotationSchedule(TEST_OVERLAYS, sections, "s1t01", 0);
     const drumsSpace = buildRotationSchedule(TEST_OVERLAYS, sections, "s1t01", 0, undefined, true);
-    // Drums/Space should have fewer overlays per window than normal
-    const normalAvg = normal.windows.reduce((s, w) => s + w.overlays.length, 0) / normal.windows.length;
-    const dsAvg = drumsSpace.windows.reduce((s, w) => s + w.overlays.length, 0) / drumsSpace.windows.length;
-    expect(dsAvg).toBeLessThan(normalAvg);
+    // Drums/Space should have at most 1 overlay per window
+    const dsMax = Math.max(...drumsSpace.windows.map((w) => w.overlays.length));
+    expect(dsMax).toBeLessThanOrEqual(1);
   });
 });
 

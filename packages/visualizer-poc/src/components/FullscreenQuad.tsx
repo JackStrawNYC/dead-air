@@ -20,7 +20,7 @@ export const FullscreenQuad: React.FC<Props> = ({
   fragmentShader,
   extraUniforms,
 }) => {
-  const { time, beatDecay, smooth, palettePrimary, paletteSecondary, paletteSaturation, tempo, musicalTime, climaxPhase, climaxIntensity } = useAudioData();
+  const { time, beatDecay, smooth, palettePrimary, paletteSecondary, paletteSaturation, tempo, musicalTime, climaxPhase, climaxIntensity, jamDensity } = useAudioData();
   const { width, height } = useVideoConfig();
 
   const uniforms = useMemo(() => {
@@ -58,6 +58,7 @@ export const FullscreenQuad: React.FC<Props> = ({
       uChroma1: { value: new THREE.Vector4(0, 0, 0, 0) },
       uChroma2: { value: new THREE.Vector4(0, 0, 0, 0) },
       uCamOffset: { value: new THREE.Vector2(0, 0) },
+      uJamDensity: { value: 0.5 },
       ...extraUniforms,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -88,6 +89,7 @@ export const FullscreenQuad: React.FC<Props> = ({
   uniforms.uMusicalTime.value = musicalTime;
   uniforms.uClimaxPhase.value = climaxPhase;
   uniforms.uClimaxIntensity.value = climaxIntensity;
+  uniforms.uJamDensity.value = jamDensity;
   uniforms.uSlowEnergy.value = smooth.slowEnergy;
   uniforms.uStemBass.value = smooth.stemBass;
 

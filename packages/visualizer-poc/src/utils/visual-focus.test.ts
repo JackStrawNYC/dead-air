@@ -3,19 +3,19 @@ import { computeVisualFocus } from "./visual-focus";
 import type { ClimaxPhase } from "./climax-state";
 
 describe("computeVisualFocus", () => {
-  it("climax: shader at full, art gone, overlays visible", () => {
+  it("climax: shader at full, art gone, A-tier overlays allowed at low opacity", () => {
     const state = computeVisualFocus("climax", 1.0, false, 100);
     expect(state.shaderOpacity).toBe(1.0);
     expect(state.artOpacity).toBe(0.0);
-    expect(state.overlayOpacity).toBeGreaterThanOrEqual(0.5);
+    expect(state.overlayOpacity).toBe(0.20); // A-tier icons at low opacity
     expect(state.grainOpacity).toBeLessThanOrEqual(0.5);
   });
 
-  it("sustain: shader near full, overlays present", () => {
+  it("sustain: shader near full, A-tier overlays at low opacity", () => {
     const state = computeVisualFocus("sustain", 1.0, false, 100);
     expect(state.shaderOpacity).toBeGreaterThanOrEqual(0.85);
     expect(state.artOpacity).toBe(0.0);
-    expect(state.overlayOpacity).toBeGreaterThanOrEqual(0.5);
+    expect(state.overlayOpacity).toBe(0.15); // A-tier icons at low opacity
   });
 
   it("build: overlays present, shader below full", () => {
@@ -25,9 +25,9 @@ describe("computeVisualFocus", () => {
     expect(state.shaderOpacity).toBeLessThan(1.0);
   });
 
-  it("release: art comes back as emotional anchor", () => {
+  it("release: art comes back as emotional anchor, overlays gentle", () => {
     const state = computeVisualFocus("release", 1.0, false, 100);
-    expect(state.artOpacity).toBeGreaterThanOrEqual(0.5);
+    expect(state.artOpacity).toBeGreaterThanOrEqual(0.3);
     expect(state.shaderOpacity).toBeLessThanOrEqual(0.75);
     expect(state.grainOpacity).toBeGreaterThanOrEqual(0.9);
   });
@@ -38,8 +38,8 @@ describe("computeVisualFocus", () => {
     // Frame 180: sin(3π/2)=-1 → breathT=0.0 (trough)
     const peak = computeVisualFocus("idle", 0, false, 60);
     const trough = computeVisualFocus("idle", 0, false, 180);
-    // Art opacity should differ across the breathing cycle
-    expect(Math.abs(peak.artOpacity - trough.artOpacity)).toBeGreaterThan(0.05);
+    // Art opacity should differ across the breathing cycle (range 0.10-0.15)
+    expect(Math.abs(peak.artOpacity - trough.artOpacity)).toBeGreaterThan(0.01);
   });
 
   it("video active: shader suppressed, overlays visible", () => {

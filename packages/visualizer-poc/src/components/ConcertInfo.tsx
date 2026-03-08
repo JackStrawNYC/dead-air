@@ -185,7 +185,7 @@ export const ConcertInfo: React.FC<Props> = ({
             border: "1.5px solid rgba(255, 200, 100, 0.6)",
             borderRadius: 4,
             padding: "8px 14px",
-            background: "rgba(0, 0, 0, 0.5)",
+            background: "rgba(0, 0, 0, 0.25)",
             fontFamily: "monospace",
             fontSize: 10,
             color: "rgba(255, 200, 100, 0.8)",

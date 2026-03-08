@@ -60,6 +60,7 @@ uniform float uClimaxIntensity;
 uniform float uSlowEnergy;
 uniform vec4 uContrast0;
 uniform vec4 uContrast1;
+uniform float uJamDensity;
 
 varying vec2 vUv;
 
@@ -89,11 +90,15 @@ float stars(vec2 uv, float density) {
 // Rotation matrix per octave for organic swirl
 mat2 m2 = mat2(0.80, 0.60, -0.60, 0.80);
 
+// Octave count modulated by jam density: sparse exploration (3) → dense peak (6)
+// At neutral density (0.5) this produces 5 octaves, matching the original behavior.
 float auroraFBM(vec3 p, float turbulence) {
+  int octaves = int(mix(3.0, 7.0, uJamDensity));
   float val = 0.0;
   float amp = 0.5;
   float freq = 1.0;
-  for (int i = 0; i < 5; i++) {
+  for (int i = 0; i < 6; i++) {
+    if (i >= octaves) break;
     val += amp * snoise(p * freq);
     // Rotate XZ per octave for organic swirl (nimitz technique)
     p.xz = m2 * p.xz;
@@ -151,15 +156,17 @@ void main() {
 
   // === VOLUMETRIC AURORA RAYMARCHING (nimitz-inspired) ===
   // Energy controls step count (24-32 range) and vertical coverage
-  int maxSteps = 24 + int(energy * 8.0);
-  float verticalCoverage = mix(0.15, 0.7, energy);
+  // Jam density expands step budget and coverage during peak jams
+  // At neutral density (0.5) this produces 24 base steps, matching original behavior.
+  int maxSteps = int(mix(16.0, 32.0, uJamDensity)) + int(energy * 8.0);
+  float verticalCoverage = mix(0.15, 0.7, energy) * mix(0.8, 1.2, uJamDensity);
   // === CLIMAX REACTIVITY ===
   float climaxPhase = uClimaxPhase;
   float climaxI = uClimaxIntensity;
   float isClimax = step(1.5, climaxPhase) * step(climaxPhase, 3.5);
   float climaxBoost = isClimax * climaxI;
 
-  float curtainBrightness = mix(0.15, 0.8, energy);
+  float curtainBrightness = mix(0.10, 0.75, energy) * mix(0.7, 1.3, uJamDensity);
   curtainBrightness += onset * 0.5;
   float bpH = beatPulseHalf(uMusicalTime);
   curtainBrightness += bpH * 0.20 + uBeatSnap * 0.15;
@@ -176,7 +183,7 @@ void main() {
   float bandLow = mix(2.0, 1.0, energy);
   float bandHigh = mix(3.5, 5.0, energy);
 
-  for (int i = 0; i < 32; i++) {
+  for (int i = 0; i < 40; i++) {
     if (i >= maxSteps) break;
     if (auroraAcc.a > 0.95) break;   // Early exit at near-opaque
 
@@ -230,6 +237,13 @@ void main() {
   // Apply aurora to scene
   col += auroraAcc.rgb;
 
+  // === SDF STEALIE: subtler emergence in aurora (scale 0.7) ===
+  {
+    float nf = auroraFBM(vec3(p * 2.0, slowTime), 0.0);
+    vec3 stLight = stealieEmergence(p, uTime, energy, bass, auroraColor1, auroraColor2, nf) * 0.7;
+    col += stLight;
+  }
+
   // === ATMOSPHERIC GLOW: diffuse light beneath aurora ===
   float glowY = smoothstep(0.3, -0.2, p.y);
   float glowStrength = auroraIntensity * energy * 0.15;
@@ -265,6 +279,17 @@ void main() {
   float grainTime = floor(uTime * 15.0) / 15.0;
   float grainIntensity = mix(0.05, 0.025, energy);
   col += filmGrainRes(uv, grainTime, uResolution.y) * grainIntensity;
+
+  // ONSET BRIGHTNESS PULSE: raw transient spike
+  float onsetPulse = step(0.5, uOnsetSnap) * uOnsetSnap * 0.30;
+  col *= 1.0 + onsetPulse;
+
+  // ONSET CHROMATIC ABERRATION
+  if (uOnsetSnap > 0.4) {
+    float caAmt = (uOnsetSnap - 0.4) * 0.15;
+    col.r *= 1.0 + caAmt;
+    col.b *= 1.0 - caAmt * 0.5;
+  }
 
   // === LIFTED BLACKS (cold blue-green tint) ===
   col = max(col, vec3(0.02, 0.03, 0.05));

@@ -19,6 +19,7 @@
 
 import React from "react";
 import type { EnhancedFrameData, SectionBoundary, ColorPalette, VisualMode } from "../data/types";
+import { getEraPreset } from "../data/era-presets";
 
 // ─── Scene Component Interface ───
 
@@ -28,6 +29,8 @@ export interface SceneProps {
   palette?: ColorPalette;
   tempo?: number;
   style?: React.CSSProperties;
+  /** Normalized jam density from jam evolution system (0-1, default 0.5) */
+  jamDensity?: number;
 }
 
 export type SceneComponent = React.ComponentType<SceneProps>;
@@ -140,11 +143,36 @@ export function getComplement(mode: VisualMode): VisualMode {
   return SCENE_REGISTRY[mode]?.complement ?? mode;
 }
 
-/** Get modes appropriate for a given energy level */
-export function getModesForEnergy(energy: "low" | "mid" | "high"): VisualMode[] {
-  return (Object.entries(SCENE_REGISTRY) as [VisualMode, SceneRegistryEntry][])
+/** Get modes appropriate for a given energy level, with optional era filtering.
+ *  Era preferred modes get 3x weight, excluded modes are removed.
+ *  Song's defaultMode is always included as fallback. */
+export function getModesForEnergy(energy: "low" | "mid" | "high", era?: string, defaultMode?: VisualMode): VisualMode[] {
+  let modes = (Object.entries(SCENE_REGISTRY) as [VisualMode, SceneRegistryEntry][])
     .filter(([, entry]) => entry.energyAffinity === energy || entry.energyAffinity === "any")
     .map(([mode]) => mode);
+
+  const eraPreset = era ? getEraPreset(era) : null;
+  if (eraPreset) {
+    // Filter out excluded modes
+    modes = modes.filter((m) => !eraPreset.excludedModes.includes(m));
+
+    // 3x weight for preferred modes
+    const weighted: VisualMode[] = [];
+    for (const m of modes) {
+      weighted.push(m);
+      if (eraPreset.preferredModes.includes(m)) {
+        weighted.push(m, m); // 2 more copies = 3x total
+      }
+    }
+    modes = weighted;
+  }
+
+  // Guarantee defaultMode is always in the pool to prevent empty pools
+  if (defaultMode && modes.length === 0) {
+    modes = [defaultMode];
+  }
+
+  return modes;
 }
 
 /** Render a scene by mode ID */

@@ -18,8 +18,8 @@ import type {
 import { seededLCG as seededRandom } from "../utils/seededRandom";
 import { findCurrentSection } from "../utils/section-lookup";
 
-const CROSSFADE_FRAMES = 90; // 3 seconds at 30fps (default when no beat found)
-const BEAT_CROSSFADE_FRAMES = 60; // 2 seconds when beat-synced (30 before + 30 after)
+const CROSSFADE_FRAMES = 30; // 1 second at 30fps — dramatic flash→blackout→eruption
+const BEAT_CROSSFADE_FRAMES = 30; // 1 second when beat-synced (15 before + 15 after)
 
 // Complement modes and energy pools are now in scene-registry.ts
 
@@ -84,6 +84,14 @@ interface Props {
   tempo?: number;
   /** Optional seed for generative variation — different seed → different scene assignments */
   seed?: number;
+  /** Normalized jam density from jam evolution system (0-1, default 0.5) */
+  jamDensity?: number;
+  /** Ambient visual mode to crossfade into during dead air */
+  deadAirMode?: VisualMode;
+  /** 0→1 crossfade progress into dead air ambient mode */
+  deadAirFactor?: number;
+  /** Show era for mode pool filtering */
+  era?: string;
 }
 
 /** Determine the visual mode for a given section index.
@@ -94,6 +102,7 @@ function getModeForSection(
   sectionIndex: number,
   sections: SectionBoundary[],
   seed?: number,
+  era?: string,
 ): VisualMode {
   // Explicit override always wins
   const override = song.sectionOverrides?.find((o) => o.sectionIndex === sectionIndex);
@@ -105,7 +114,7 @@ function getModeForSection(
     const section = sections[sectionIndex];
     if (section) {
       const energy = section.energy;
-      const pool = getModesForEnergy(energy);
+      const pool = getModesForEnergy(energy, era, song.defaultMode);
       const rng = seededRandom(seed + sectionIndex * 7919);
       const idx = Math.floor(rng() * pool.length);
       return pool[idx];
@@ -136,22 +145,23 @@ function renderMode(
   palette?: ColorPalette,
   tempo?: number,
   style?: React.CSSProperties,
+  jamDensity?: number,
 ): React.ReactNode {
-  return renderScene(mode, { frames, sections, palette, tempo, style });
+  return renderScene(mode, { frames, sections, palette, tempo, style, jamDensity });
 }
 
-export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, seed }) => {
+export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, seed, jamDensity, deadAirMode, deadAirFactor, era }) => {
   const frame = useCurrentFrame();
   const palette = song.palette;
 
   if (sections.length === 0) {
-    return <>{renderMode(song.defaultMode, frames, sections, palette, tempo)}</>;
+    return <>{renderMode(song.defaultMode, frames, sections, palette, tempo, undefined, jamDensity)}</>;
   }
 
   // Find current section
   const { sectionIndex: currentSectionIdx } = findCurrentSection(sections, frame);
 
-  const currentMode = getModeForSection(song, currentSectionIdx, sections, seed);
+  const currentMode = getModeForSection(song, currentSectionIdx, sections, seed, era);
   const currentSection = sections[currentSectionIdx];
 
   const nextSectionIdx = currentSectionIdx + 1;
@@ -159,7 +169,7 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
 
   // Crossfade INTO this section (from previous) — beat-synced when possible
   if (prevSectionIdx >= 0) {
-    const prevMode = getModeForSection(song, prevSectionIdx, sections, seed);
+    const prevMode = getModeForSection(song, prevSectionIdx, sections, seed, era);
     if (prevMode !== currentMode) {
       const boundary = currentSection.frameStart;
       const beatFrame = findNearestBeat(frames, boundary - 30, boundary + 30);
@@ -172,8 +182,8 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
         return (
           <SceneCrossfade
             progress={progress}
-            outgoing={renderMode(prevMode, frames, sections, palette, tempo)}
-            incoming={renderMode(currentMode, frames, sections, palette, tempo)}
+            outgoing={renderMode(prevMode, frames, sections, palette, tempo, undefined, jamDensity)}
+            incoming={renderMode(currentMode, frames, sections, palette, tempo, undefined, jamDensity)}
             flashFrame={beatFrame !== null ? beatFrame : undefined}
           />
         );
@@ -183,7 +193,7 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
 
   // Crossfade OUT of this section (to next) — beat-synced when possible
   if (nextSectionIdx < sections.length) {
-    const nextMode = getModeForSection(song, nextSectionIdx, sections, seed);
+    const nextMode = getModeForSection(song, nextSectionIdx, sections, seed, era);
     if (nextMode !== currentMode) {
       const boundary = currentSection.frameEnd;
       const beatFrame = findNearestBeat(frames, boundary - 30, boundary + 30);
@@ -196,8 +206,8 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
         return (
           <SceneCrossfade
             progress={progress}
-            outgoing={renderMode(currentMode, frames, sections, palette, tempo)}
-            incoming={renderMode(nextMode, frames, sections, palette, tempo)}
+            outgoing={renderMode(currentMode, frames, sections, palette, tempo, undefined, jamDensity)}
+            incoming={renderMode(nextMode, frames, sections, palette, tempo, undefined, jamDensity)}
             flashFrame={beatFrame !== null ? beatFrame : undefined}
           />
         );
@@ -205,5 +215,21 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
     }
   }
 
-  return <>{renderMode(currentMode, frames, sections, palette, tempo)}</>;
+  const mainScene = renderMode(currentMode, frames, sections, palette, tempo, undefined, jamDensity);
+
+  // Dead air crossfade: transition to ambient shader after music ends
+  if (deadAirMode && deadAirFactor !== undefined && deadAirFactor > 0) {
+    if (deadAirFactor >= 1) {
+      return <>{renderMode(deadAirMode, frames, sections, palette, tempo, undefined, 0.2)}</>;
+    }
+    return (
+      <SceneCrossfade
+        progress={deadAirFactor}
+        outgoing={mainScene}
+        incoming={renderMode(deadAirMode, frames, sections, palette, tempo, undefined, 0.2)}
+      />
+    );
+  }
+
+  return <>{mainScene}</>;
 };

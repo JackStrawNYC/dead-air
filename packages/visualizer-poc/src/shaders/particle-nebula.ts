@@ -42,7 +42,7 @@ void main() {
   float tempoScale = uTempo / 120.0;
 
   float r = aRadius;
-  r *= mix(0.7, 1.3, energy);
+  r *= mix(0.3, 1.5, energy);
   r *= 1.0 + uBass * 0.3;
 
   // Beat pulse for orbit modulation
@@ -84,7 +84,7 @@ void main() {
 
   gl_Position = projectionMatrix * mvPosition;
 
-  vAlpha = mix(0.15, 0.5, energy) + uRms * 0.4 - aRadius * 0.08;
+  vAlpha = mix(0.08, 0.45, energy) + uRms * 0.4 - aRadius * 0.08;
   vAlpha = clamp(vAlpha, 0.05, 0.9);
   vColorMix = aRandom;
   vDist = length(mvPosition.xyz);
@@ -145,7 +145,7 @@ void main() {
   glow *= glow;
 
   // === CHROMATIC ABERRATION: hue-offset for R/G/B channels ===
-  float caAmount = uBass * 0.03 + vEnergy * 0.015;
+  float caAmount = uBass * 0.03 + vEnergy * 0.015 + uOnsetSnap * 0.04;
 
   float hueCenter = uPalettePrimary + uChromaHue * 0.25 + vColorMix * 0.3;
   float hueR = hueCenter - caAmount;
@@ -194,7 +194,7 @@ void main() {
   float distFade = 1.0 / (1.0 + vDist * 0.05);
   float alpha = glow * vAlpha * distFade;
 
-  rgb *= mix(0.6, 0.8, vEnergy) + uRms * 0.3;
+  rgb *= mix(0.40, 0.78, vEnergy) + uRms * 0.3;
 
   // === DISTANCE FOG: quiet = thick/intimate, loud = clear/vast ===
   float fogDensity = mix(0.15, 0.02, vEnergy);
@@ -213,6 +213,10 @@ void main() {
   float bloomAmount = max(0.0, lum - bThresh) * (2.0 + climaxBoost * 1.5);
   vec3 bloomColor = mix(rgb, vec3(1.0, 0.98, 0.95), 0.3);
   rgb += bloomColor * bloomAmount * (0.25 + climaxBoost * 0.15);
+
+  // ONSET BRIGHTNESS PULSE: raw transient spike
+  float onsetPulse = step(0.5, uOnsetSnap) * uOnsetSnap * 0.30;
+  rgb *= 1.0 + onsetPulse;
 
   // === S-CURVE COLOR GRADING ===
   rgb = sCurveGrade(rgb, vEnergy);

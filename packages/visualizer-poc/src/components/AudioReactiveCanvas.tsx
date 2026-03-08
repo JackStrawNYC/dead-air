@@ -69,6 +69,8 @@ export interface AudioDataContext {
   climaxPhase: number;
   /** Climax intensity (0-1) within current phase */
   climaxIntensity: number;
+  /** Jam density: normalized 0-1 from jam evolution system (0.5 = neutral) */
+  jamDensity: number;
 }
 
 const AudioCtx = createContext<AudioDataContext | null>(null);
@@ -213,11 +215,13 @@ interface Props {
   sections?: SectionBoundary[];
   palette?: ColorPalette;
   tempo?: number;
+  /** Normalized jam density from jam evolution system (0-1, default 0.5) */
+  jamDensity?: number;
 }
 
 const DEFAULT_PALETTE: ColorPalette = { primary: 210, secondary: 270 };
 
-export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, sections, palette, tempo }) => {
+export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, sections, palette, tempo, jamDensity }) => {
   const frameIdx = useCurrentFrame();
   const { fps, width, height } = useVideoConfig();
 
@@ -293,6 +297,7 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
     musicalTime: computeMusicalTimeUtil(beatArray, idx, fps, tempo ?? 120),
     climaxPhase: climaxPhaseNum,
     climaxIntensity: climaxState.intensity,
+    jamDensity: jamDensity ?? 0.5,
   };
 
   return (

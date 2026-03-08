@@ -52,11 +52,33 @@ const previewMode = args.includes("--preview");
 const showDateArg = args.find((a) => a.startsWith("--show-date="))?.split("=")[1];
 const dataDirArg = args.find((a) => a.startsWith("--data-dir="))?.split("=")[1];
 const seedArg = args.find((a) => a.startsWith("--seed="))?.split("=")[1];
+const presetArg = args.find((a) => a.startsWith("--preset="))?.split("=")[1];
+// Backwards-compatible: --draft maps to draft preset, --preview flag maps to preview preset
+const activePreset: RenderPreset | null = presetArg
+  ? PRESETS[presetArg] ?? null
+  : draftMode ? PRESETS.draft : null;
 const renderSeed = seedArg ? parseInt(seedArg, 10) : Date.now();
 const PREVIEW_FRAMES = parseInt(
   args.find((a) => a.startsWith("--preview-seconds="))?.split("=")[1] ?? "15",
   10,
 ) * 30;
+
+// ─── Render Presets ───
+
+interface RenderPreset {
+  width: number;
+  height: number;
+  concurrency: number;
+  skipGrain: boolean;
+  skipBloom: boolean;
+  label: string;
+}
+
+const PRESETS: Record<string, RenderPreset> = {
+  draft:   { width: 1280, height: 720,  concurrency: 6, skipGrain: true,  skipBloom: true,  label: "Draft (720p, no grain/bloom)" },
+  preview: { width: 1920, height: 1080, concurrency: 4, skipGrain: false, skipBloom: false, label: "Preview (1080p, full quality)" },
+  final:   { width: 1920, height: 1080, concurrency: 3, skipGrain: false, skipBloom: false, label: "Final (1080p, full quality, max fidelity)" },
+};
 
 interface SetlistEntry {
   trackId: string;
@@ -232,7 +254,7 @@ function renderSong(
         videoOnlyPath,
         `--props=${analysisPath}`,
         `--gl=${glArg}`,
-        `--concurrency=10`,
+        `--concurrency=${activePreset?.concurrency ?? 10}`,
         `--timeout=300000`,
         `--frames=0-${totalFrames - 1}`,
         "--muted",
@@ -261,7 +283,7 @@ function renderSong(
           chunkPath,
           `--props=${analysisPath}`,
           `--gl=${glArg}`,
-          `--concurrency=10`,
+          `--concurrency=${activePreset?.concurrency ?? 10}`,
           `--timeout=300000`,
           `--frames=${start}-${end}`,
           "--muted",
@@ -485,10 +507,19 @@ function concatShow(
 // ─── Main ───
 
 function main() {
-  // Set resolution env vars: 4K for final renders, 1080p for draft/preview
-  process.env.RENDER_WIDTH = draftMode || previewMode ? "1920" : "3840";
-  process.env.RENDER_HEIGHT = draftMode || previewMode ? "1080" : "2160";
-  console.log(`Resolution: ${process.env.RENDER_WIDTH}x${process.env.RENDER_HEIGHT}${draftMode ? " (draft)" : ""}`);
+  // Apply preset or legacy resolution logic
+  if (activePreset) {
+    process.env.RENDER_WIDTH = String(activePreset.width);
+    process.env.RENDER_HEIGHT = String(activePreset.height);
+    process.env.RENDER_QUALITY = presetArg ?? (draftMode ? "draft" : "preview");
+    if (activePreset.skipGrain) process.env.SKIP_GRAIN = "1";
+    if (activePreset.skipBloom) process.env.SKIP_BLOOM = "1";
+    console.log(`Preset: ${activePreset.label}`);
+  } else {
+    process.env.RENDER_WIDTH = previewMode ? "1920" : "3840";
+    process.env.RENDER_HEIGHT = previewMode ? "1080" : "2160";
+  }
+  console.log(`Resolution: ${process.env.RENDER_WIDTH}x${process.env.RENDER_HEIGHT}`);
 
   const setlist = JSON.parse(readFileSync(join(DATA_DIR, "setlist.json"), "utf-8"));
   const timelinePath = join(DATA_DIR, "show-timeline.json");

@@ -27,6 +27,7 @@ import { detectTexture } from "../utils/climax-state";
 import { computeAudioSnapshot } from "../utils/audio-reactive";
 import { seededLCG as seededRandom } from "../utils/seededRandom";
 import { hashString } from "../utils/hash";
+import { getEraPreset } from "./era-presets";
 
 // Eased crossfade function: replaces linear smoothstep with Remotion's
 // Easing.inOut(Easing.ease) for more organic overlay transitions.
@@ -111,9 +112,9 @@ const ACCENT_CONFIG: Record<string, AccentConfig | null> = {
  * Peaks rotate faster for visual energy.
  */
 const WINDOW_FRAMES_BY_ENERGY: Record<string, number> = {
-  low:  2700,  // 90 seconds — let quiet moments breathe
-  mid:  1800,  // 60 seconds — each overlay becomes the moment's identity
-  high: 900,   // 30 seconds — restrained rotation at peaks
+  low:  5400,  // 3 minutes — overlays are rare, sacred punctuation
+  mid:  2700,  // 90 seconds — each overlay earns its time
+  high: 1800,  // 60 seconds — restrained even at peaks
 };
 const WINDOW_FRAMES_DEFAULT = 900;
 
@@ -141,10 +142,18 @@ const CROSSFADE_FRAMES_DEFAULT = 120;
  * Always-on heroes are prioritized first for guaranteed visibility.
  */
 const ENERGY_COUNTS: Record<string, { min: number; max: number }> = {
-  low:  { min: 2,  max: 3 },   // quiet passages: breathe — one wash, one character
-  mid:  { min: 3,  max: 4 },   // moderate: a few elements, not a collage
-  high: { min: 4,  max: 5 },   // peaks: impactful, not overwhelming
+  low:  { min: 1,  max: 1 },   // quiet: one gentle wash, nothing more
+  mid:  { min: 1,  max: 2 },   // moderate: one or two at most
+  high: { min: 0,  max: 1 },   // peaks: max 1 A-tier icon at low opacity
 };
+
+/** A-tier overlays: the only overlays allowed during peaks (high energy).
+ *  Iconic Dead imagery that earns its moment — screen blend, low opacity. */
+export const A_TIER_OVERLAY_NAMES = new Set([
+  "BreathingStealie",
+  "ThirteenPointBolt",
+  "BearParade",
+]);
 
 /**
  * Hero overlays — the most visually impactful character/reactive components.
@@ -179,7 +188,7 @@ const MIN_WINDOW_FOR_ROTATION = 900;
  * peak floods in with maximum contrast. Like pulling the kick drum out
  * of the mix right before the drop.
  */
-const DROPOUT_MAX_OVERLAYS = 1;
+const DROPOUT_MAX_OVERLAYS = 0;
 
 // ─── Texture × Category routing (Dead-authentic) ───
 // 5 groups tuned to what a Grateful Dead show actually feels like:
@@ -289,6 +298,7 @@ export function buildRotationSchedule(
   frames?: EnhancedFrameData[],
   isDrumsSpace?: boolean,
   energyHints?: Record<string, OverlayPhaseHint>,
+  era?: string,
 ): RotationSchedule {
   const trackHash = hashString(trackId) + (showSeed ?? 0);
 
@@ -316,8 +326,12 @@ export function buildRotationSchedule(
     if (entry) allPoolEntries.push(entry);
   }
 
-  // All overlays in the curated registry are eligible (no tier filtering needed)
-  const poolEntries = allPoolEntries;
+  // Filter by era: remove overlays excluded by the current era preset
+  const eraPreset = era ? getEraPreset(era) : null;
+  const eraExcluded = eraPreset ? new Set(eraPreset.excludedOverlays) : null;
+  const poolEntries = eraExcluded
+    ? allPoolEntries.filter((e) => !eraExcluded.has(e.name))
+    : allPoolEntries;
 
   // 3. Subdivide sections into energy-aware windows, aligned to section boundaries
   const windows: RotationWindow[] = [];
@@ -396,8 +410,10 @@ export function buildRotationSchedule(
     // Cap at pool size
     targetCount = Math.min(targetCount, poolEntries.length);
 
-    // All curated overlays are eligible for all energy levels
-    const effectivePool = poolEntries;
+    // At high energy, only A-tier overlays are eligible (iconic Dead imagery)
+    const effectivePool = window.energy === "high"
+      ? poolEntries.filter((e) => A_TIER_OVERLAY_NAMES.has(e.name))
+      : poolEntries;
 
     // Score each overlay for this window
     const scored = effectivePool.map((entry) => {
@@ -495,7 +511,7 @@ export function buildRotationSchedule(
 
     // ── Hero guarantee: reserve slots for concrete Dead-themed animated objects ──
     // Without this, the scoring system picks abstract washes/geometry every time.
-    // 2 hero slots ensures Dead stuff dominates the visual field.
+    // Skip entirely when targetCount is 0 (peak/dropout = shader owns the moment).
     const selected: OverlayEntry[] = [];
     const selectedNames = new Set<string>();
     const usedLayers = new Set<number>();
@@ -506,7 +522,7 @@ export function buildRotationSchedule(
     const heroScored = scored.filter((s) => HERO_OVERLAY_NAMES.has(s.entry.name));
     const alwaysOnHeroes = heroScored.filter((s) => (s.entry.dutyCycle ?? 50) >= 80);
     const cycledHeroes = heroScored.filter((s) => (s.entry.dutyCycle ?? 50) < 80);
-    const heroSlots = Math.min(3, Math.max(2, Math.floor(targetCount * 0.25)), heroScored.length);
+    const heroSlots = targetCount > 0 ? Math.min(1, heroScored.length) : 0;
 
     // Pick at least 1 always-on hero first (guaranteed visibility)
     let herosPicked = 0;
@@ -533,7 +549,7 @@ export function buildRotationSchedule(
     // ── Duty-cycle-aware count adjustment ──
     // If we're picking mostly cycled components (low duty cycle), pick more
     // to compensate. Target: ~2-3 overlays visible at any given frame.
-    const TARGET_VISIBLE = 3;
+    const TARGET_VISIBLE = 1;
     const avgDutyCycle = selected.length > 0
       ? selected.reduce((sum, e) => sum + (e.dutyCycle ?? 50), 0) / selected.length
       : 50;

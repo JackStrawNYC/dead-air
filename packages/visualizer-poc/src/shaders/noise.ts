@@ -200,4 +200,99 @@ vec3 chromaColor(vec2 uv, vec4 c0, vec4 c1, vec4 c2, float energy) {
   }
   return col * energy * 0.5;
 }
+
+// ═══════════════════════════════════════════════════════════
+// SDF Stealie — Steal Your Face as signed distance field.
+// Emerges from the shader's own noise field like a vision
+// forming in liquid light. Prefixed _ns_ to avoid collision
+// with overlay-sdf.ts which has its own sdCircle/sdBox/sdBolt.
+// ═══════════════════════════════════════════════════════════
+
+float _ns_sdCircle(vec2 p, float r) {
+  return length(p) - r;
+}
+
+float _ns_sdBox(vec2 p, vec2 b) {
+  vec2 d = abs(p) - b;
+  return length(max(d, 0.0)) + min(max(d.x, d.y), 0.0);
+}
+
+// Lightning bolt SDF (simplified 13-point bolt shape)
+float _ns_sdBolt(vec2 p) {
+  // Zigzag bolt: 3 segments approximated as rotated boxes
+  float d = 1e10;
+  // Top segment
+  vec2 p1 = p - vec2(0.0, 0.25);
+  float seg1 = _ns_sdBox(vec2(p1.x * 0.9 + p1.y * 0.4, -p1.x * 0.4 + p1.y * 0.9), vec2(0.04, 0.18));
+  d = min(d, seg1);
+  // Middle segment
+  vec2 p2 = p - vec2(0.0, 0.0);
+  float seg2 = _ns_sdBox(vec2(p2.x * 0.9 - p2.y * 0.4, p2.x * 0.4 + p2.y * 0.9), vec2(0.04, 0.16));
+  d = min(d, seg2);
+  // Bottom segment
+  vec2 p3 = p - vec2(0.0, -0.25);
+  float seg3 = _ns_sdBox(vec2(p3.x * 0.9 + p3.y * 0.4, -p3.x * 0.4 + p3.y * 0.9), vec2(0.04, 0.18));
+  d = min(d, seg3);
+  return d;
+}
+
+// Steal Your Face SDF: outer ring + dividing line + bolt
+float sdStealie(vec2 p, float radius) {
+  // Outer ring
+  float ring = abs(length(p) - radius) - radius * 0.08;
+  // Inner circle (skull face area)
+  float inner = length(p) - radius * 0.85;
+  // Horizontal divider across the middle
+  float divider = _ns_sdBox(p, vec2(radius * 0.85, radius * 0.035));
+  // Lightning bolt through center
+  float bolt = _ns_sdBolt(p * (1.0 / radius));
+  // Combine: ring OR divider OR bolt, masked to circle
+  float shape = min(ring, min(divider, bolt * radius));
+  return shape;
+}
+
+// Complete stealie emergence effect — call this from shaders.
+// Returns additive light contribution (vec3) to blend with col += result.
+//
+// Parameters:
+//   uv       — centered screen coords (aspect-corrected)
+//   time     — uTime for slow rotation
+//   energy   — 0-1 audio energy (gates appearance)
+//   bass     — 0-1 bass for pulse
+//   col1     — shader's primary palette color
+//   col2     — shader's secondary palette color
+//   noiseField — shader's own FBM/noise value at this pixel (for dissolution)
+vec3 stealieEmergence(vec2 uv, float time, float energy, float bass, vec3 col1, vec3 col2, float noiseField) {
+  // Energy gate: only visible when energy > 0.3, fully formed at 0.7
+  float gate = smoothstep(0.3, 0.7, energy);
+  if (gate < 0.001) return vec3(0.0);
+
+  // Slow rotation
+  float angle = time * 0.05;
+  float ca = cos(angle);
+  float sa = sin(angle);
+  vec2 rotUv = vec2(ca * uv.x - sa * uv.y, sa * uv.x + ca * uv.y);
+
+  // Bass pulse: stealie breathes with the low end
+  float pulse = 1.0 + bass * 0.5;
+  float radius = 0.18 * pulse;
+
+  // SDF evaluation
+  float d = sdStealie(rotUv, radius);
+
+  // Noise dissolution: erode edges with the shader's own noise field
+  d += noiseField * 0.08 * (1.0 - gate * 0.5);
+
+  // Glow: inverse-square falloff from shape boundary
+  float glow = 1.0 / (1.0 + d * d * 800.0);
+  glow *= gate;
+
+  // Edge line (crisp at high energy, dissolved at low)
+  float edge = smoothstep(0.008, 0.0, abs(d)) * gate * 0.6;
+
+  // Color: blend shader's own palette colors
+  vec3 stealieColor = mix(col1, col2, 0.5 + 0.5 * sin(time * 0.3));
+
+  return stealieColor * (glow * 0.35 + edge);
+}
 `;

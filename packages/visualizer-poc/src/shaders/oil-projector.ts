@@ -85,7 +85,7 @@ void main() {
   float blob1 = oilBlob(warped1 * 0.7, 0.05);
   float hue1 = uPalettePrimary + uChromaHue * 0.2;
   vec3 col1 = 0.5 + 0.5 * cos(6.28318 * vec3(hue1, hue1 + 0.33, hue1 + 0.67));
-  col1 *= mix(0.7, 1.0, energy);
+  col1 *= mix(0.40, 0.95, energy);
 
   // === LAYER 3: Secondary oil blob (smaller, offset) ===
   vec3 blob2Pos = vec3(p * 0.6 + vec2(0.3, -0.2), t * 0.35 + sectionSeed * 0.7);
@@ -96,7 +96,7 @@ void main() {
   float blob2 = oilBlob(warped2 * 0.8, 0.1);
   float hue2 = uPaletteSecondary + uChromaHue * 0.15 + 0.15;
   vec3 col2 = 0.5 + 0.5 * cos(6.28318 * vec3(hue2, hue2 + 0.33, hue2 + 0.67));
-  col2 *= mix(0.6, 0.9, energy);
+  col2 *= mix(0.35, 0.85, energy);
 
   // === LAYER 4: Tertiary blob (smallest, fastest, accent) ===
   vec3 blob3Pos = vec3(p * 0.8 + vec2(-0.15, 0.25), t * 0.45 + sectionSeed * 1.3);
@@ -107,7 +107,7 @@ void main() {
   float blob3 = oilBlob(warped3 * 1.0, 0.15);
   float hue3 = uPalettePrimary + 0.5; // Complementary
   vec3 col3 = 0.5 + 0.5 * cos(6.28318 * vec3(hue3, hue3 + 0.33, hue3 + 0.67));
-  col3 *= mix(0.5, 0.8, energy);
+  col3 *= mix(0.28, 0.78, energy);
 
   // === COMPOSITE: additive blending (like real oil projector) ===
   col += col1 * blob1 * 0.5;
@@ -158,6 +158,17 @@ void main() {
   float grainTime = floor(uTime * 15.0) / 15.0;
   float grainIntensity = mix(0.08, 0.04, energy);
   col += filmGrainRes(uv, grainTime, uResolution.y) * grainIntensity;
+
+  // ONSET BRIGHTNESS PULSE: raw transient spike
+  float onsetPulse = step(0.5, uOnsetSnap) * uOnsetSnap * 0.30;
+  col *= 1.0 + onsetPulse;
+
+  // ONSET CHROMATIC ABERRATION
+  if (uOnsetSnap > 0.4) {
+    float caAmt = (uOnsetSnap - 0.4) * 0.15;
+    col.r *= 1.0 + caAmt;
+    col.b *= 1.0 - caAmt * 0.5;
+  }
 
   // Lifted blacks (warm)
   col = max(col, vec3(0.08, 0.065, 0.085));

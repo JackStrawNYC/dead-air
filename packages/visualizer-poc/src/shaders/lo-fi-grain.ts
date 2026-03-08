@@ -90,7 +90,7 @@ void main() {
   midCol = mix(midCol, palTint * 0.3, 0.15 * uPaletteSaturation);
 
   // Energy brightens the warm tones
-  float brightness = mix(0.60, 0.75, energy) + uRms * 0.15;
+  float brightness = mix(0.35, 0.72, energy) + uRms * 0.15;
   midCol *= brightness;
 
   // === LAYER 3: High frequency shimmer ===
@@ -139,6 +139,17 @@ void main() {
 
   // S-curve for film look
   col = sCurveGrade(col, energy * 0.6); // Gentler grading
+
+  // ONSET BRIGHTNESS PULSE: raw transient spike
+  float onsetPulse = step(0.5, uOnsetSnap) * uOnsetSnap * 0.30;
+  col *= 1.0 + onsetPulse;
+
+  // ONSET CHROMATIC ABERRATION
+  if (uOnsetSnap > 0.4) {
+    float caAmt = (uOnsetSnap - 0.4) * 0.15;
+    col.r *= 1.0 + caAmt;
+    col.b *= 1.0 - caAmt * 0.5;
+  }
 
   // === HALATION: warm film bloom ===
   col = halation(vUv, col, energy);

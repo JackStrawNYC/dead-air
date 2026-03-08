@@ -52,6 +52,7 @@ uniform vec4 uChroma0;
 uniform vec4 uChroma1;
 uniform vec4 uChroma2;
 uniform vec2 uCamOffset;
+uniform float uJamDensity;
 
 varying vec2 vUv;
 
@@ -63,11 +64,15 @@ vec3 palette(float t, vec3 a, vec3 b, vec3 c, vec3 d) {
 }
 
 // --- FBM with flatness-controlled octave damping ---
+// Octave count modulated by jam density: sparse exploration (3) → dense peak (6)
+// At neutral density (0.5) this produces 5 octaves, matching the original behavior.
 float fbmFlat(vec3 p, float smoothness) {
+  int octaves = int(mix(3.0, 7.0, uJamDensity));
   float value = 0.0;
   float amplitude = 0.5;
   float frequency = 1.0;
-  for (int i = 0; i < 5; i++) {
+  for (int i = 0; i < 6; i++) {
+    if (i >= octaves) break;
     value += amplitude * snoise(p * frequency);
     frequency *= 2.0;
     amplitude *= 0.5 * pow(smoothness, float(i) * 0.3);
@@ -127,7 +132,7 @@ void main() {
 
   // === CHROMATIC ABERRATION (aggressive) ===
   // Compute palette at 3 hue offsets for R/G/B channel separation
-  float caAmount = uBass * 0.08 + length(p) * 0.025;
+  float caAmount = uBass * 0.08 + length(p) * 0.025 + uOnsetSnap * 0.04;
   float hue = uPalettePrimary + uChromaHue * 0.3 + t * 0.05;
 
   vec3 palA = vec3(0.5, 0.5, 0.5);
@@ -166,7 +171,7 @@ void main() {
   vec3 coolShift = vec3(0.90, 0.97, 1.10);
   midCol *= mix(coolShift, warmShift, energy);
 
-  float brightness = mix(0.88, 1.15, energy);
+  float brightness = mix(0.45, 1.10, energy);
   midCol *= brightness;
 
   // ============ LAYER 3: Foreground ============
@@ -232,6 +237,14 @@ void main() {
   vec3 wfColor = 0.5 + 0.5 * cos(6.28318 * vec3(uPalettePrimary, uPalettePrimary + 0.33, uPalettePrimary + 0.67));
   col += wfRing * wfColor;
 
+  // === SDF STEALIE: emerges from the liquid light ===
+  {
+    vec3 palCol1 = 0.5 + 0.5 * cos(6.28318 * vec3(uPalettePrimary, uPalettePrimary + 0.33, uPalettePrimary + 0.67));
+    vec3 palCol2 = 0.5 + 0.5 * cos(6.28318 * vec3(uPaletteSecondary, uPaletteSecondary + 0.33, uPaletteSecondary + 0.67));
+    float nf = fbm3(vec3(p * 2.0, uTime * 0.1));
+    col += stealieEmergence(p, uTime, energy, uBass, palCol1, palCol2, nf);
+  }
+
   // === CLIMAX REACTIVITY ===
   float climaxPhase = uClimaxPhase;
   float climaxI = uClimaxIntensity;
@@ -281,6 +294,10 @@ void main() {
   float grainTime = floor(uTime * 15.0) / 15.0;
   float grainIntensity = mix(0.06, 0.02, energy);
   col += filmGrainRes(uv, grainTime, uResolution.y) * grainIntensity;
+
+  // ONSET BRIGHTNESS PULSE: raw transient spike
+  float onsetPulse = step(0.5, uOnsetSnap) * uOnsetSnap * 0.30;
+  col *= 1.0 + onsetPulse;
 
   // Lifted blacks
   col = max(col, vec3(0.08, 0.065, 0.085));

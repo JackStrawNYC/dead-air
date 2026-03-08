@@ -106,6 +106,21 @@ export const CameraMotion: React.FC<Props> = ({ frames, children, jamEvolution, 
     }
   }
 
+  // Onset jolt: sharp camera punch on transient attacks (onset > 0.5)
+  const ONSET_JOLT_PX = 5;
+  const ONSET_JOLT_DECAY = 6;
+  for (let ago = 0; ago < ONSET_JOLT_DECAY; ago++) {
+    const checkIdx = idx - ago;
+    if (checkIdx < 0) break;
+    if (frames[checkIdx].onset > 0.5) {
+      const decay = Math.exp(-ago * 1.2);
+      const dir = shakeHash(checkIdx + 9973);
+      shakeX += dir.x * ONSET_JOLT_PX * frames[checkIdx].onset * decay;
+      shakeY += dir.y * ONSET_JOLT_PX * frames[checkIdx].onset * decay;
+      break;
+    }
+  }
+
   // Bass-driven continuous micro-sway
   const bassAmp = (bass ?? 0) * 8.0;
   const bassT = frame / 30;

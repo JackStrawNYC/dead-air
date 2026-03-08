@@ -105,9 +105,17 @@ void main() {
   float sat = 0.7 + pattern * 0.25;
   sat *= uPaletteSaturation;
 
-  float val = 0.4 + pattern * 0.35 + uEnergy * 0.15;
+  float val = 0.25 + pattern * 0.35 + uEnergy * 0.25;
 
   vec3 color = hsv2rgb(vec3(fract(hue), sat, val));
+
+  // === SDF STEALIE: emerges from the tie-dye swirl ===
+  {
+    vec3 palCol1 = hsv2rgb(vec3(uPalettePrimary, 0.8, 1.0));
+    vec3 palCol2 = hsv2rgb(vec3(uPaletteSecondary, 0.8, 1.0));
+    float nf = warp1;
+    color += stealieEmergence(uv, uTime, clamp(uEnergy, 0.0, 1.0), uBass, palCol1, palCol2, nf);
+  }
 
   // === CLIMAX REACTIVITY ===
   float isClimax = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5);
@@ -130,6 +138,17 @@ void main() {
 
   // Energy-reactive overall brightness
   color *= 0.8 + uRms * 0.4;
+
+  // ONSET BRIGHTNESS PULSE: raw transient spike
+  float onsetPulse = step(0.5, uOnsetSnap) * uOnsetSnap * 0.30;
+  color *= 1.0 + onsetPulse;
+
+  // ONSET CHROMATIC ABERRATION
+  if (uOnsetSnap > 0.4) {
+    float caAmt = (uOnsetSnap - 0.4) * 0.15;
+    color.r *= 1.0 + caAmt;
+    color.b *= 1.0 - caAmt * 0.5;
+  }
 
   // === HALATION: warm film bloom ===
   color = halation(vUv, color, uEnergy);

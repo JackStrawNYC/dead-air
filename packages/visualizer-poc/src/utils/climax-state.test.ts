@@ -80,7 +80,7 @@ describe("computeClimaxState", () => {
     expect(state.phase).toBe("sustain");
   });
 
-  it("detects anticipation before high-energy section", () => {
+  it("detects anticipation before high-energy section (150-frame window)", () => {
     const frames = Array.from({ length: 600 }, (_, i) =>
       makeFrame({ rms: i < 300 ? 0.12 + (i / 300) * 0.05 : 0.35 }),
     );
@@ -88,8 +88,8 @@ describe("computeClimaxState", () => {
       { frameStart: 0, frameEnd: 300, label: "section_0", energy: "low", avgEnergy: 0.12 },
       { frameStart: 300, frameEnd: 600, label: "section_1", energy: "high", avgEnergy: 0.35 },
     ];
-    // 50 frames before high section
-    const state = computeClimaxState(frames, 250, sections, 0.14);
+    // 100 frames before high section (within 150-frame anticipation window)
+    const state = computeClimaxState(frames, 200, sections, 0.14);
     expect(state.anticipation).toBe(true);
   });
 });
@@ -110,9 +110,10 @@ describe("climaxModulation", () => {
     expect(mod.overlayDensityMult).toBeGreaterThan(1);
   });
 
-  it("produces desaturation during anticipation", () => {
+  it("produces deep desaturation and darkness during anticipation", () => {
     const mod = climaxModulation({ phase: "build", intensity: 1, anticipation: true });
-    expect(mod.saturationOffset).toBeLessThan(0);
+    expect(mod.saturationOffset).toBeLessThan(-0.3);
+    expect(mod.brightnessOffset).toBeLessThan(-0.3);
   });
 });
 

@@ -24,17 +24,22 @@ interface SongArtProps {
   climaxIntensity?: number;
   /** Focus system opacity multiplier (0-1) — controls art visibility by climax phase */
   focusOpacity?: number;
+  /** Whether this song is a segue-in — suppress art during first 10s */
+  segueIn?: boolean;
 }
 
-export const SongArtLayer: React.FC<SongArtProps> = ({ src, suppressionFactor, hueRotation = 0, energy = 0, climaxIntensity = 0, focusOpacity = 1 }) => {
+export const SongArtLayer: React.FC<SongArtProps> = ({ src, suppressionFactor, hueRotation = 0, energy = 0, climaxIntensity = 0, focusOpacity = 1, segueIn = false }) => {
   const frame = useCurrentFrame();
 
-  // Energy-reactive wash: quiet → 0.35, peak → 0.05
-  // Art should vanish during loud passages so shaders dominate
+  // Suppress art during segue-in (first 10s) — let the crossfade breathe
+  if (segueIn && frame < ART_FADE_END) return null;
+
+  // Energy-reactive wash: quiet → 0.15, peak → 0.05
+  // Art stays subtle after intro so shaders dominate
   const energyWash = interpolate(
     energy,
     [0.03, 0.20, 0.40],
-    [0.35, 0.12, 0.05],
+    [0.15, 0.10, 0.05],
     { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
   );
 
@@ -77,6 +82,7 @@ export const SongArtLayer: React.FC<SongArtProps> = ({ src, suppressionFactor, h
         position: "absolute",
         inset: 0,
         opacity: artOpacity,
+        mixBlendMode: "screen",
         overflow: "hidden",
         filter: hueRotation !== 0 ? `hue-rotate(${hueRotation.toFixed(1)}deg)` : undefined,
       }}

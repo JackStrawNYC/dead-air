@@ -29,18 +29,23 @@ export interface ListenForProps {
   items: string[];
   /** Optional context line (e.g., song history) */
   context?: string;
+  /** Track number within the set — only show for first song per set */
+  trackNumberInSet?: number;
 }
 
 const APPEAR_FRAME = 600;  // 20s — after SongDNA fades out (19s)
 const HOLD_END = 780;       // 26s — holds for 6 seconds
 const FADE_DURATION = 30;   // 1s fade out
 
-export const ListenFor: React.FC<ListenForProps> = ({ items, context }) => {
+export const ListenFor: React.FC<ListenForProps> = ({ items, context, trackNumberInSet }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const palette = useSongPalette();
 
   if (items.length === 0) return null;
+
+  // Only show for the first song in each set — don't break immersion every song
+  if (trackNumberInSet !== undefined && trackNumberInSet > 1) return null;
 
   // Cap at 2 items for readability
   const displayItems = items.slice(0, 2);
@@ -85,7 +90,7 @@ export const ListenFor: React.FC<ListenForProps> = ({ items, context }) => {
           minWidth: 240,
           maxWidth: 380,
           padding: "16px 22px",
-          background: "rgba(10, 10, 10, 0.5)",
+          background: "rgba(10, 10, 10, 0.25)",
           backdropFilter: "blur(12px)",
           WebkitBackdropFilter: "blur(12px)",
           borderLeft: `3px solid ${accent}`,

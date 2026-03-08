@@ -169,7 +169,7 @@ void main() {
   col += causticColor * rays * 0.25;
 
   // === DEPTH FOG: clears with energy ===
-  float fogDensity = mix(0.6, 0.2, energy);
+  float fogDensity = mix(0.75, 0.22, energy);
   float fogNoise = fbm3(vec3(swayUv * 2.0, uTime * 0.05));
   float fog = fogDensity * (0.5 + fogNoise * 0.5);
   vec3 fogColor = waterColor * 0.15;
@@ -235,6 +235,17 @@ void main() {
   float grainTime = floor(uTime * 15.0) / 15.0;
   float grainIntensity = mix(0.04, 0.02, energy);
   col += filmGrainRes(uv, grainTime, uResolution.y) * grainIntensity;
+
+  // ONSET BRIGHTNESS PULSE: raw transient spike
+  float onsetPulse = step(0.5, uOnsetSnap) * uOnsetSnap * 0.30;
+  col *= 1.0 + onsetPulse;
+
+  // ONSET CHROMATIC ABERRATION
+  if (uOnsetSnap > 0.4) {
+    float caAmt = (uOnsetSnap - 0.4) * 0.15;
+    col.r *= 1.0 + caAmt;
+    col.b *= 1.0 - caAmt * 0.5;
+  }
 
   // === LIFTED BLACKS (cool blue tint for underwater) ===
   col = max(col, vec3(0.03, 0.05, 0.08));

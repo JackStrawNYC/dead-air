@@ -129,14 +129,14 @@ export function computeClimaxState(
     intensity = smoothstep((energy - 0.08) / 0.17) * 0.5;
   }
 
-  // 7. Anticipation: in build AND next section is high AND within 90 frames
+  // 7. Anticipation: in build AND next section is high AND within 150 frames (5s)
   let anticipation = false;
   if (phase === "build" && nextSection?.energy === "high") {
     const distToNext = nextSection.frameStart - idx;
-    if (distToNext > 0 && distToNext < 90) {
+    if (distToNext > 0 && distToNext < 150) {
       anticipation = true;
       // Override intensity to ramp up as we approach
-      intensity = smoothstep(1 - distToNext / 90);
+      intensity = smoothstep(1 - distToNext / 150);
     }
   }
 
@@ -169,15 +169,16 @@ const PHASE_TARGETS: Record<
   ClimaxPhase,
   { sat: number; bright: number; vig: number; bloom: number; contrast: number; density: number }
 > = {
-  idle:    { sat: -0.10, bright: -0.05, vig: -0.04, bloom: 0,    contrast: 0,     density: 0.85 },
-  build:   { sat: +0.15, bright: +0.10, vig: +0.06, bloom: 0.15, contrast: +0.08, density: 1.10 },
-  climax:  { sat: +0.40, bright: +0.25, vig: +0.12, bloom: 0.45, contrast: +0.20, density: 1.60 },
-  sustain: { sat: +0.25, bright: +0.16, vig: +0.08, bloom: 0.28, contrast: +0.12, density: 1.40 },
+  idle:    { sat: -0.15, bright: -0.15, vig: -0.06, bloom: -0.05, contrast: -0.05, density: 0.70 },
+  build:   { sat: +0.15, bright: +0.05, vig: +0.06, bloom: 0.15, contrast: +0.08, density: 1.10 },
+  climax:  { sat: +0.30, bright: +0.20, vig: +0.12, bloom: 0.35, contrast: +0.12, density: 1.60 },
+  sustain: { sat: +0.20, bright: +0.06, vig: +0.08, bloom: 0.22, contrast: +0.08, density: 1.40 },
   release: { sat: -0.15, bright: -0.08, vig: -0.05, bloom: 0,    contrast: -0.05, density: 0.50 },
 };
 
-/** Anticipation sub-state overrides (deep desaturation dip before peak — the inhale before the scream) */
-const ANTICIPATION = { sat: -0.30, bright: -0.04, vig: +0.06, bloom: 0.02, contrast: -0.05, density: 0.40 };
+/** Anticipation sub-state overrides — dramatic darkness before the drop.
+ *  bright: -0.40 = house lights dimming. The inhale before the scream. */
+const ANTICIPATION = { sat: -0.50, bright: -0.40, vig: +0.12, bloom: -0.10, contrast: -0.15, density: 0.0 };
 
 /** Build phase start values (intensity interpolates from start → target) */
 const BUILD_START = { sat: 0, bright: 0, vig: 0, bloom: 0, contrast: 0, density: 0.95 };

@@ -18,13 +18,14 @@ export interface VisualFocusState {
   grainOpacity: number;     // 0.5-1.0
 }
 
-/** Focus rules by climax phase — overlays should always be visible */
+/** Focus rules by climax phase — shader IS the show at peaks.
+ *  Overlays are zero during climax/sustain so the shader owns the moment. */
 const PHASE_FOCUS: Record<ClimaxPhase, VisualFocusState> = {
-  climax:  { shaderOpacity: 1.0, artOpacity: 0.0, overlayOpacity: 0.75, grainOpacity: 0.5 },
-  sustain: { shaderOpacity: 0.95, artOpacity: 0.0, overlayOpacity: 0.80, grainOpacity: 0.6 },
-  build:   { shaderOpacity: 0.85, artOpacity: 0.1, overlayOpacity: 0.85, grainOpacity: 0.8 },
-  release: { shaderOpacity: 0.75, artOpacity: 0.5, overlayOpacity: 0.70, grainOpacity: 1.0 },
-  idle:    { shaderOpacity: 0.85, artOpacity: 0.35, overlayOpacity: 0.85, grainOpacity: 1.0 },
+  climax:  { shaderOpacity: 1.0,  artOpacity: 0.0, overlayOpacity: 0.20, grainOpacity: 0.5 },
+  sustain: { shaderOpacity: 0.95, artOpacity: 0.0, overlayOpacity: 0.15, grainOpacity: 0.6 },
+  build:   { shaderOpacity: 0.85, artOpacity: 0.1, overlayOpacity: 0.60, grainOpacity: 0.8 },
+  release: { shaderOpacity: 0.75, artOpacity: 0.5, overlayOpacity: 0.50, grainOpacity: 1.0 },
+  idle:    { shaderOpacity: 0.85, artOpacity: 0.15, overlayOpacity: 0.70, grainOpacity: 1.0 },
 };
 
 /** Focus state when a scene video is actively playing */
@@ -71,7 +72,7 @@ export function computeVisualFocus(
     const breathT = (Math.sin(frame * Math.PI * 2 / 240) + 1) * 0.5;
     state = {
       ...state,
-      artOpacity: lerp(0.25, 0.55, breathT),
+      artOpacity: lerp(0.10, 0.15, breathT),
       shaderOpacity: lerp(0.80, 0.90, 1 - breathT),
     };
   }

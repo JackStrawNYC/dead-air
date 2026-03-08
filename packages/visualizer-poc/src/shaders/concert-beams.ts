@@ -89,7 +89,7 @@ void main() {
   p += vec2(shakeX, shakeY);
 
   // === CHROMATIC ABERRATION setup ===
-  float caStrength = uBass * 0.006 + uRms * 0.003;
+  float caStrength = uBass * 0.006 + uRms * 0.003 + uOnsetSnap * 0.04;
 
   // Background — deeper and more colorful
   float bgHue = uPalettePrimary + uTime * 0.02;
@@ -111,7 +111,7 @@ void main() {
     float beamX = -aspect.x * 0.5 + beamSpacing * (fi + 1.0);
     float sweepSpeed = mix(0.1, 0.3, energy) * tempoScale + uBass * 0.1;
     float angle = PI * 0.5 + sin(uTime * sweepSpeed + beamPhase * 2.0) * mix(0.2, 0.45, energy);
-    float width = mix(0.05, 0.12, energy) + uMids * 0.04;
+    float width = mix(0.03, 0.11, energy) + uMids * 0.04;
 
     float contrastBoost = getContrastForBeam(i) * 0.3;
     // Snappy beat for intensity
@@ -216,6 +216,10 @@ void main() {
   float grainTime = floor(uTime * 15.0) / 15.0;
   float grainIntensity = mix(0.05, 0.015, energy);
   col += filmGrainRes(uv, grainTime, uResolution.y) * grainIntensity;
+
+  // ONSET BRIGHTNESS PULSE: raw transient spike
+  float onsetPulse = step(0.5, uOnsetSnap) * uOnsetSnap * 0.30;
+  col *= 1.0 + onsetPulse;
 
   // Lifted blacks
   col = max(col, vec3(0.08, 0.065, 0.085));

@@ -161,6 +161,17 @@ void main() {
   float vig = 1.0 - smoothstep(0.6, 1.4, length(uv));
   color *= vig;
 
+  // ONSET BRIGHTNESS PULSE: raw transient spike
+  float onsetPulse = step(0.5, uOnsetSnap) * uOnsetSnap * 0.30;
+  color *= 1.0 + onsetPulse;
+
+  // ONSET CHROMATIC ABERRATION
+  if (uOnsetSnap > 0.4) {
+    float caAmt = (uOnsetSnap - 0.4) * 0.15;
+    color.r *= 1.0 + caAmt;
+    color.b *= 1.0 - caAmt * 0.5;
+  }
+
   // === HALATION: warm film bloom ===
   color = halation(vUv, color, uEnergy);
 
