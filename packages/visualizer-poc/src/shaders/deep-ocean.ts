@@ -125,9 +125,15 @@ void main() {
   // === CAUSTIC LIGHT PATTERNS: multiple overlapping layers ===
   float causticSharpness = 0.5 + highs * 0.5;
 
-  // Onset distortion on caustic domain
+  // === CLIMAX REACTIVITY ===
+  float climaxPhase = uClimaxPhase;
+  float climaxI = uClimaxIntensity;
+  float isClimax = step(1.5, climaxPhase) * step(climaxPhase, 3.5);
+  float climaxBoost = isClimax * climaxI;
+
+  // Onset distortion on caustic domain (amplified)
   vec2 causticUv = swayUv;
-  causticUv += onset * 0.05 * vec2(
+  causticUv += onset * 0.12 * vec2(
     snoise(vec3(p * 3.0, uTime * 2.0)),
     snoise(vec3(p * 3.0 + 70.0, uTime * 2.0))
   );
@@ -146,12 +152,12 @@ void main() {
   // Base water color
   vec3 col = waterColor * 0.3;
 
-  // Add caustics
-  col += causticColor * caustic * 0.35;
+  // Add caustics (bright and vivid)
+  col += causticColor * caustic * 0.55;
 
-  // === GOD RAYS: vertical light shafts from above ===
+  // === GOD RAYS: vertical light shafts from above (beat-reactive) ===
   float bpH = beatPulseHalf(uMusicalTime);
-  float rayIntensity = (0.3 + bass * 0.5) * (1.0 + bpH * 0.12);
+  float rayIntensity = (0.3 + bass * 0.5) * (1.0 + bpH * 0.25 + uBeatSnap * 0.18 + climaxBoost * 0.20);
   float rayX = swayUv.x * 3.0;
   float ray1 = smoothstep(0.8, 1.0, sin(rayX * 2.0 + uTime * 0.2)) * rayIntensity;
   float ray2 = smoothstep(0.85, 1.0, sin(rayX * 3.5 + uTime * 0.15 + 1.0)) * rayIntensity * 0.7;
@@ -212,12 +218,12 @@ void main() {
   // === LIGHT LEAK ===
   col += lightLeak(p, uTime, energy, uOnsetSnap);
 
-  // === BLOOM: soft underwater glow ===
+  // === BLOOM: soft underwater glow (climax-amplified) ===
   float lum = dot(col, vec3(0.299, 0.587, 0.114));
-  float bloomThreshold = mix(0.4, 0.3, energy);
-  float bloomAmount = max(0.0, lum - bloomThreshold) * 2.0;
+  float bloomThreshold = mix(0.4, 0.3, energy) - climaxBoost * 0.08;
+  float bloomAmount = max(0.0, lum - bloomThreshold) * (2.0 + climaxBoost * 1.5);
   vec3 bloomColor = mix(col, causticColor, 0.3);
-  col += bloomColor * bloomAmount * 0.3;
+  col += bloomColor * bloomAmount * (0.3 + climaxBoost * 0.20);
 
   // === S-CURVE COLOR GRADING ===
   col = sCurveGrade(col, energy);

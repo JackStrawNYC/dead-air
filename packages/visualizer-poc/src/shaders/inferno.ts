@@ -119,9 +119,15 @@ void main() {
   float onset = clamp(uOnsetSnap, 0.0, 1.0);
   float slowE = clamp(uSlowEnergy, 0.0, 1.0);
 
+  // === CLIMAX REACTIVITY ===
+  float climaxPhase = uClimaxPhase;
+  float climaxI = uClimaxIntensity;
+  float isClimax = step(1.5, climaxPhase) * step(climaxPhase, 3.5);
+  float climaxBoost = isClimax * climaxI;
+
   // === HEAT SHIMMER: UV distortion from onset hits ===
   vec2 shimmerUv = p;
-  float shimmerStrength = onset * 0.03 + bass * 0.01;
+  float shimmerStrength = onset * 0.08 + bass * 0.02 + uBeatSnap * 0.05;
   shimmerUv += shimmerStrength * vec2(
     snoise(vec3(p * 8.0, uTime * 2.0)),
     snoise(vec3(p * 8.0 + 50.0, uTime * 2.0 + 30.0))
@@ -169,19 +175,22 @@ void main() {
     }
   }
 
-  // Punchy emission: pow(glow*2, 4) — the XT95 signature
+  // Punchy emission: pow(glow*2, 4) — the XT95 signature (amplified)
   float emission = pow(clamp(glow * 2.0, 0.0, 1.0), glowPower);
-  vec3 col = accColor * emission * 4.0;
+  vec3 col = accColor * emission * 6.0;
 
   // Add core white-hot bloom from emission
-  col += coreColor * pow(emission, 2.0) * 0.5;
+  col += coreColor * pow(emission, 2.0) * 0.8;
 
   // === BEAT PULSE: tempo-locked flame intensity ===
   float bp = beatPulse(uMusicalTime);
-  col *= 1.0 + bp * 0.14;
+  col *= 1.0 + bp * 0.30 + climaxBoost * bp * 0.15;
 
-  // === RISING EMBERS: particle field ===
-  float emberCount = 5.0 + energy * 20.0;
+  // === BEAT SNAP: sharp flame flare on transients ===
+  col *= 1.0 + uBeatSnap * 0.15 * (1.0 + climaxBoost * 0.5);
+
+  // === RISING EMBERS: particle field (beat-reactive) ===
+  float emberCount = 5.0 + energy * 20.0 + uBeatSnap * 8.0;
   for (int j = 0; j < 8; j++) {
     float fj = float(j);
     float seed = fj * 7.13;
@@ -216,12 +225,12 @@ void main() {
   // === LIGHT LEAK ===
   col += lightLeak(p, uTime, energy, uOnsetSnap);
 
-  // === BLOOM: aggressive for fire ===
+  // === BLOOM: aggressive for fire (climax-amplified) ===
   float lum = dot(col, vec3(0.299, 0.587, 0.114));
-  float bloomThreshold = mix(0.3, 0.2, energy);
-  float bloomAmount = max(0.0, lum - bloomThreshold) * 3.0;
+  float bloomThreshold = mix(0.3, 0.2, energy) - climaxBoost * 0.08;
+  float bloomAmount = max(0.0, lum - bloomThreshold) * (3.0 + climaxBoost * 2.0);
   vec3 bloomColor = mix(col, vec3(1.0, 0.9, 0.7), 0.4);
-  col += bloomColor * bloomAmount * 0.5;
+  col += bloomColor * bloomAmount * (0.5 + climaxBoost * 0.25);
 
   // === S-CURVE COLOR GRADING ===
   col = sCurveGrade(col, energy);

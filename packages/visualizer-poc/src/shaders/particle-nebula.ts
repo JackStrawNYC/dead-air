@@ -45,13 +45,15 @@ void main() {
   r *= mix(0.7, 1.3, energy);
   r *= 1.0 + uBass * 0.3;
 
-  // (beat/onset pulsing removed — unreliable for live music)
-
   // Beat pulse for orbit modulation
   float bp = beatPulse(uMusicalTime);
 
-  // Tempo-aware orbit
-  float orbitSpeed = (mix(0.008, 0.025, energy) + uMids * 0.015) * tempoScale * (1.0 + bp * 0.08);
+  // === BEAT SNAP: radius pulse on transients ===
+  r *= 1.0 + uBeatSnap * 0.15;
+  r *= 1.0 + uOnsetSnap * 0.08;
+
+  // Tempo-aware orbit (amplified beat pulse)
+  float orbitSpeed = (mix(0.008, 0.025, energy) + uMids * 0.015) * tempoScale * (1.0 + bp * 0.20);
   float theta = aTheta + uTime * orbitSpeed * (0.5 + aRandom * 0.5);
   float phi = aPhi + uTime * orbitSpeed * 0.2 * (aRandom - 0.5);
 
@@ -73,11 +75,11 @@ void main() {
 
   vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
 
-  // Motion stretch: energy-driven (smooth, no beat pulsing)
-  float velocity = uBass * 0.5 + energy * 0.3;
+  // Motion stretch: energy + beat reactive
+  float velocity = uBass * 0.5 + energy * 0.3 + uBeatSnap * 0.3;
   float motionStretch = 1.0 + velocity * 0.5;
 
-  float baseSize = mix(1.5, 4.5, energy) + uRms * 3.0;
+  float baseSize = mix(1.5, 4.5, energy) + uRms * 3.0 + uOnsetSnap * 2.0;
   gl_PointSize = baseSize * motionStretch * (200.0 / -mvPosition.z);
 
   gl_Position = projectionMatrix * mvPosition;
@@ -183,7 +185,11 @@ void main() {
   float sectionBloom = smoothstep(0.06, 0.0, edgeDist) * 0.15;
   rgb += sectionBloom * vec3(1.0, 0.98, 0.95);
 
-  // (beat/onset pulsing removed — smooth energy drives everything)
+  // === BEAT SNAP: particle brightness flash ===
+  float isClimax = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5);
+  float climaxBoost = isClimax * uClimaxIntensity;
+  rgb *= 1.0 + uBeatSnap * 0.20 * (1.0 + climaxBoost * 0.5);
+  rgb *= 1.0 + vOnsetSnap * 0.12;
 
   float distFade = 1.0 / (1.0 + vDist * 0.05);
   float alpha = glow * vAlpha * distFade;
@@ -201,11 +207,12 @@ void main() {
   vec3 afterglowCol = 0.5 + 0.5 * cos(6.28318 * vec3(uAfterglowHue, uAfterglowHue + 0.33, uAfterglowHue + 0.67));
   rgb += afterglowCol * afterglowStr;
 
-  // === BLOOM: bright particle self-illumination ===
+  // === BLOOM: bright particle self-illumination (climax-amplified) ===
   float lum = dot(rgb, vec3(0.299, 0.587, 0.114));
-  float bloomAmount = max(0.0, lum - 0.4) * 2.0;
+  float bThresh = 0.4 - climaxBoost * 0.08;
+  float bloomAmount = max(0.0, lum - bThresh) * (2.0 + climaxBoost * 1.5);
   vec3 bloomColor = mix(rgb, vec3(1.0, 0.98, 0.95), 0.3);
-  rgb += bloomColor * bloomAmount * 0.25;
+  rgb += bloomColor * bloomAmount * (0.25 + climaxBoost * 0.15);
 
   // === S-CURVE COLOR GRADING ===
   rgb = sCurveGrade(rgb, vEnergy);

@@ -50,7 +50,8 @@ function loadTrackAnalysis(trackId: string) {
     const validated = safeParse(FlexibleTrackAnalysisSchema, data);
     analysisCache[trackId] = validated;
     return validated;
-  } catch {
+  } catch (e) {
+    console.error(`[loadTrackAnalysis] FAILED for ${trackId}:`, e);
     return null;
   }
 }

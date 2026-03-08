@@ -115,7 +115,7 @@ void main() {
   bgCol *= 0.65 + energy * 0.08;
 
   // ============ LAYER 2: Midground (hero) ============
-  float warpStrength = (0.5 + uBass * 0.5) * complexity * contrastWarp;
+  float warpStrength = (0.7 + uBass * 0.8) * complexity * contrastWarp;
   vec3 q = vec3(p * 1.2 * sectionWarp, t * 0.2 + sectionSeed);
   float warpX = fbmFlat(q + vec3(1.7, 9.2, 0.0), smoothness);
   float warpY = fbmFlat(q + vec3(8.3, 2.8, 0.0), smoothness);
@@ -125,9 +125,9 @@ void main() {
 
   float n = fbmFlat(vec3(warped * 0.9, t * 0.15 + sectionSeed * 0.3), smoothness);
 
-  // === CHROMATIC ABERRATION ===
+  // === CHROMATIC ABERRATION (aggressive) ===
   // Compute palette at 3 hue offsets for R/G/B channel separation
-  float caAmount = uBass * 0.04 + length(p) * 0.015;
+  float caAmount = uBass * 0.08 + length(p) * 0.025;
   float hue = uPalettePrimary + uChromaHue * 0.3 + t * 0.05;
 
   vec3 palA = vec3(0.5, 0.5, 0.5);
@@ -156,17 +156,17 @@ void main() {
   vec3 chromaInfluence = chromaColor(warped * 0.5, uChroma0, uChroma1, uChroma2, energy);
   midCol = mix(midCol, midCol + chromaInfluence * 0.6, 0.2);
 
-  // Palette saturation
-  float sat = mix(0.80, 1.0, energy) * uPaletteSaturation * (1.0 - uFlatness * 0.10);
+  // Palette saturation — vivid, not washed out
+  float sat = mix(0.92, 1.25, energy) * uPaletteSaturation * (1.0 - uFlatness * 0.08);
   vec3 midGray = vec3(dot(midCol, vec3(0.299, 0.587, 0.114)));
   midCol = mix(midGray, midCol, sat);
 
-  // Color temperature (gentle — warm at peaks, cool at rest)
-  vec3 warmShift = vec3(1.06, 0.97, 0.92);
-  vec3 coolShift = vec3(0.93, 0.97, 1.06);
+  // Color temperature (warm at peaks, cool at rest)
+  vec3 warmShift = vec3(1.10, 0.95, 0.88);
+  vec3 coolShift = vec3(0.90, 0.97, 1.10);
   midCol *= mix(coolShift, warmShift, energy);
 
-  float brightness = mix(0.82, 0.90, energy);
+  float brightness = mix(0.88, 1.15, energy);
   midCol *= brightness;
 
   // ============ LAYER 3: Foreground ============
@@ -174,10 +174,10 @@ void main() {
   float fgIntensity = uHighs * 0.18 * complexity;
   vec3 fgCol = vec3(fgNoise * 0.5 + 0.5) * vec3(0.8, 0.9, 1.0) * fgIntensity;
 
-  // ============ COMPOSITE ============
-  float bgMix = mix(0.38, 0.28, energy);
-  float midMix = mix(0.52, 0.58, energy);
-  float fgMix = mix(0.10, 0.14, energy);
+  // ============ COMPOSITE (hero-dominant) ============
+  float bgMix = mix(0.25, 0.15, energy);
+  float midMix = mix(0.62, 0.72, energy);
+  float fgMix = mix(0.13, 0.18, energy);
   vec3 col = bgCol * bgMix + midCol * midMix + fgCol * fgMix;
 
   // Flatness grain
@@ -232,7 +232,15 @@ void main() {
   vec3 wfColor = 0.5 + 0.5 * cos(6.28318 * vec3(uPalettePrimary, uPalettePrimary + 0.33, uPalettePrimary + 0.67));
   col += wfRing * wfColor;
 
-  // (beat/onset pulsing removed — unreliable detection for live music)
+  // === CLIMAX REACTIVITY ===
+  float climaxPhase = uClimaxPhase;
+  float climaxI = uClimaxIntensity;
+  float isClimax = step(1.5, climaxPhase) * step(climaxPhase, 3.5);
+  float climaxBoost = isClimax * climaxI;
+
+  // === BEAT SNAP: onset-reactive color saturation surge ===
+  float beatKick = uBeatSnap * 0.20 * (1.0 + climaxBoost * 0.5);
+  col *= 1.0 + beatKick;
 
   // Section transition bloom
   float edgeDist = min(uSectionProgress, 1.0 - uSectionProgress);
@@ -254,14 +262,14 @@ void main() {
 
   // === BEAT PULSE: tempo-locked brightness swell ===
   float bp = beatPulse(uMusicalTime);
-  col *= 1.0 + bp * 0.12;
+  col *= 1.0 + bp * 0.28 + climaxBoost * bp * 0.12;
 
-  // === BLOOM: bright pixel self-illumination ===
+  // === BLOOM: bright pixel self-illumination (climax-amplified) ===
   float lum = dot(col, vec3(0.299, 0.587, 0.114));
-  float bloomThreshold = mix(0.50, 0.42, energy);
-  float bloomAmount = max(0.0, lum - bloomThreshold) * 2.5;
+  float bloomThreshold = mix(0.50, 0.42, energy) - climaxBoost * 0.10;
+  float bloomAmount = max(0.0, lum - bloomThreshold) * (2.5 + climaxBoost * 1.5);
   vec3 bloomColor = mix(col, vec3(1.0, 0.98, 0.95), 0.3);
-  col += bloomColor * bloomAmount * 0.35;
+  col += bloomColor * bloomAmount * (0.35 + climaxBoost * 0.20);
 
   // === S-CURVE COLOR GRADING ===
   col = sCurveGrade(col, energy);

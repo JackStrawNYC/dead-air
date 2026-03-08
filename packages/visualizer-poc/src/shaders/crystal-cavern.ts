@@ -72,6 +72,10 @@ uniform float uHighs;
 uniform float uPalettePrimary;
 uniform float uPaletteSecondary;
 uniform float uPaletteSaturation;
+uniform float uBeatSnap;
+uniform float uMusicalTime;
+uniform float uClimaxPhase;
+uniform float uClimaxIntensity;
 uniform vec4 uChroma0;
 uniform vec4 uChroma1;
 uniform vec4 uChroma2;
@@ -105,14 +109,21 @@ void main() {
   float chromaHue = chromaIdx / 12.0;
   vec3 glowColor = hsv2rgb(vec3(chromaHue, 0.8, 1.0));
 
-  // Onset refraction flash
-  float flash = uOnsetSnap * 0.4;
+  // === CLIMAX REACTIVITY ===
+  float isClimax = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5);
+  float climaxBoost = isClimax * uClimaxIntensity;
+
+  // Onset refraction flash (amplified)
+  float flash = uOnsetSnap * 0.7 * (1.0 + climaxBoost * 0.5);
+
+  // Beat snap: crystal brightness pulse
+  float beatKick = uBeatSnap * 0.20 * (1.0 + climaxBoost * 0.4);
 
   // Rim glow for depth
   float rim = 1.0 - max(0.0, dot(vNormal, normalize(-vWorldPos)));
-  rim = pow(rim, 3.0) * 0.3;
+  rim = pow(rim, 3.0) * (0.3 + climaxBoost * 0.2);
 
-  vec3 col = baseColor + glowColor * emissive + flash + rim * glowColor * 0.5;
+  vec3 col = baseColor + glowColor * emissive + flash + beatKick + rim * glowColor * 0.5;
 
   // Fog: distance-based
   float fogDist = length(vWorldPos);

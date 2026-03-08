@@ -91,10 +91,10 @@ void main() {
   // === CHROMATIC ABERRATION setup ===
   float caStrength = uBass * 0.006 + uRms * 0.003;
 
-  // Background
+  // Background — deeper and more colorful
   float bgHue = uPalettePrimary + uTime * 0.02;
   vec3 bgColor = 0.5 + 0.5 * cos(6.28318 * (vec3(bgHue, bgHue + 0.33, bgHue + 0.67) + vec3(0.0, 0.1, 0.2)));
-  bgColor *= 0.12 + uRms * 0.08;
+  bgColor *= 0.08 + uRms * 0.12;
   vec3 col = bgColor;
 
   float activeBeamCount = 3.0 + energy * 5.0;
@@ -146,10 +146,18 @@ void main() {
     beamCol.r *= 1.0 + caShift;
     beamCol.b *= 1.0 - caShift;
 
-    col += beamCol * beamVal * 0.6;
+    col += beamCol * beamVal * 0.85;
   }
 
-  // (beat/onset pulsing removed — unreliable detection for live music)
+  // === CLIMAX REACTIVITY ===
+  float climaxPhase = uClimaxPhase;
+  float climaxI = uClimaxIntensity;
+  float isClimax = step(1.5, climaxPhase) * step(climaxPhase, 3.5);
+  float climaxBoost = isClimax * climaxI;
+
+  // === BEAT SNAP: strobe-like flash on hard transients ===
+  float strobeKick = uBeatSnap * 0.25 * (1.0 + climaxBoost * 0.5);
+  col += strobeKick * vec3(1.0, 0.95, 0.85);
 
   // === COLOR AFTERGLOW ===
   float afterglowStr = smoothstep(0.3, 0.7, energy) * 0.04;
@@ -189,14 +197,14 @@ void main() {
 
   // === BEAT PULSE: tempo-locked beam intensity ===
   float bp = beatPulse(uMusicalTime);
-  col *= 1.0 + bp * 0.18;
+  col *= 1.0 + bp * 0.35 + climaxBoost * bp * 0.15;
 
-  // === BLOOM ===
+  // === BLOOM (climax-amplified) ===
   float lum = dot(col, vec3(0.299, 0.587, 0.114));
-  float bloomThreshold = mix(0.45, 0.3, energy);
-  float bloomAmount = max(0.0, lum - bloomThreshold) * 2.5;
+  float bloomThreshold = mix(0.45, 0.3, energy) - climaxBoost * 0.10;
+  float bloomAmount = max(0.0, lum - bloomThreshold) * (2.5 + climaxBoost * 1.5);
   vec3 bloomColor = mix(col, vec3(1.0, 0.98, 0.95), 0.35);
-  col += bloomColor * bloomAmount * 0.3;
+  col += bloomColor * bloomAmount * (0.3 + climaxBoost * 0.20);
 
   // === S-CURVE COLOR GRADING ===
   col = sCurveGrade(col, energy);

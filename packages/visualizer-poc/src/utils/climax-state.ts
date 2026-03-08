@@ -163,20 +163,21 @@ export function detectTexture(snapshot: AudioSnapshot, energy: number): MusicalT
 
 // ─── Modulation Output ───
 
-/** Per-phase target values — amplified for concert-grade visual intensity */
+/** Per-phase target values — concert-grade visual intensity.
+ *  These are the emotional core of the visualizer. Climax should GLOW. */
 const PHASE_TARGETS: Record<
   ClimaxPhase,
   { sat: number; bright: number; vig: number; bloom: number; contrast: number; density: number }
 > = {
-  idle:    { sat: -0.06, bright: -0.03, vig: -0.03, bloom: 0,    contrast: 0,     density: 1.0  },
-  build:   { sat: +0.10, bright: +0.06, vig: +0.04, bloom: 0.08, contrast: +0.05, density: 1.0  },
-  climax:  { sat: +0.20, bright: +0.12, vig: +0.06, bloom: 0.20, contrast: +0.10, density: 1.40 },
-  sustain: { sat: +0.12, bright: +0.08, vig: +0.04, bloom: 0.12, contrast: +0.06, density: 1.20 },
-  release: { sat: -0.10, bright: -0.05, vig: -0.03, bloom: 0,    contrast: -0.03, density: 0.60 },
+  idle:    { sat: -0.10, bright: -0.05, vig: -0.04, bloom: 0,    contrast: 0,     density: 0.85 },
+  build:   { sat: +0.15, bright: +0.10, vig: +0.06, bloom: 0.15, contrast: +0.08, density: 1.10 },
+  climax:  { sat: +0.40, bright: +0.25, vig: +0.12, bloom: 0.45, contrast: +0.20, density: 1.60 },
+  sustain: { sat: +0.25, bright: +0.16, vig: +0.08, bloom: 0.28, contrast: +0.12, density: 1.40 },
+  release: { sat: -0.15, bright: -0.08, vig: -0.05, bloom: 0,    contrast: -0.05, density: 0.50 },
 };
 
-/** Anticipation sub-state overrides (deep desaturation dip before peak) */
-const ANTICIPATION = { sat: -0.18, bright: +0.02, vig: +0.04, bloom: 0.04, contrast: 0, density: 0.55 };
+/** Anticipation sub-state overrides (deep desaturation dip before peak — the inhale before the scream) */
+const ANTICIPATION = { sat: -0.30, bright: -0.04, vig: +0.06, bloom: 0.02, contrast: -0.05, density: 0.40 };
 
 /** Build phase start values (intensity interpolates from start → target) */
 const BUILD_START = { sat: 0, bright: 0, vig: 0, bloom: 0, contrast: 0, density: 0.95 };

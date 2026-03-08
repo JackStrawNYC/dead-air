@@ -125,9 +125,14 @@ void main() {
   vig = smoothstep(-0.1, 0.8, vig);
   col *= vig;
 
-  // === BEAT PULSE: tempo-locked warm glow ===
+  // === CLIMAX REACTIVITY ===
+  float isClimax = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5);
+  float climaxBoost = isClimax * uClimaxIntensity;
+
+  // === BEAT PULSE: tempo-locked warm glow (amplified) ===
   float bp = beatPulse(uMusicalTime);
-  col *= 1.0 + bp * 0.10;
+  col *= 1.0 + bp * 0.22 + climaxBoost * bp * 0.10;
+  col *= 1.0 + uBeatSnap * 0.10;
 
   // Lifted blacks (warm)
   col = max(col, vec3(0.08, 0.065, 0.085));

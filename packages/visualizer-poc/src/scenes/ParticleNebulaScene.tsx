@@ -16,7 +16,7 @@ const PARTICLE_COUNT = 8000;
 const GOLDEN_RATIO = (1 + Math.sqrt(5)) / 2;
 
 const ParticleSystem: React.FC = () => {
-  const { time, beatDecay, smooth, palettePrimary, paletteSecondary, paletteSaturation, tempo, musicalTime } = useAudioData();
+  const { time, beatDecay, smooth, palettePrimary, paletteSecondary, paletteSaturation, tempo, musicalTime, climaxPhase, climaxIntensity } = useAudioData();
 
   const { geometry, uniforms } = useMemo(() => {
     const radiuses = new Float32Array(PARTICLE_COUNT);
@@ -67,6 +67,8 @@ const ParticleSystem: React.FC = () => {
       uMusicalTime: { value: 0 },
       uChromaShift: { value: 0 },
       uAfterglowHue: { value: 0 },
+      uClimaxPhase: { value: 0 },
+      uClimaxIntensity: { value: 0 },
     };
 
     return { geometry: geo, uniforms: u };
@@ -94,6 +96,8 @@ const ParticleSystem: React.FC = () => {
   uniforms.uMusicalTime.value = musicalTime;
   uniforms.uChromaShift.value = smooth.chromaShift;
   uniforms.uAfterglowHue.value = smooth.afterglowHue;
+  uniforms.uClimaxPhase.value = climaxPhase;
+  uniforms.uClimaxIntensity.value = climaxIntensity;
 
   // Camera orbit with bass shake
   const sectionProgress = smooth.sectionProgress;

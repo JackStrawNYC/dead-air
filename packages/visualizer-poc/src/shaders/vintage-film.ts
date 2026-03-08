@@ -144,9 +144,13 @@ void main() {
   flicker *= 0.97 + 0.03 * hash(floor(t * 24.0));
   color *= flicker;
 
-  // Beat-triggered gate flicker (projector stutter)
+  // === CLIMAX REACTIVITY ===
+  float isClimax = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5);
+  float climaxBoost = isClimax * uClimaxIntensity;
+
+  // Beat-triggered gate flicker (projector stutter — amplified)
   float bp = beatPulse(uMusicalTime);
-  float gateFlicker = 1.0 - bp * 0.06;
+  float gateFlicker = 1.0 - bp * 0.15 - uBeatSnap * 0.08;
   color *= gateFlicker;
 
   // Vignette — heavy, like a projector hotspot

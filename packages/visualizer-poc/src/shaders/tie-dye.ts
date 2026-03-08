@@ -109,13 +109,20 @@ void main() {
 
   vec3 color = hsv2rgb(vec3(fract(hue), sat, val));
 
-  // Onset flash — bright center pulse
-  float flash = uOnsetSnap * 0.5 * smoothstep(0.6, 0.0, r);
+  // === CLIMAX REACTIVITY ===
+  float isClimax = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5);
+  float climaxBoost = isClimax * uClimaxIntensity;
+
+  // Onset flash — bright center pulse (amplified)
+  float flash = uOnsetSnap * 0.9 * smoothstep(0.6, 0.0, r) * (1.0 + climaxBoost * 0.5);
   color += flash;
+
+  // Beat snap — sharp saturation kick on transients
+  color *= 1.0 + uBeatSnap * 0.18 * (1.0 + climaxBoost * 0.4);
 
   // Beat pulse — tempo-locked saturation boost
   float bp = beatPulse(uMusicalTime);
-  color = mix(color, color * 1.3, bp * 0.20);
+  color = mix(color, color * 1.3, bp * 0.35 + climaxBoost * bp * 0.15);
 
   // Vignette
   float vig = 1.0 - smoothstep(0.5, 1.2, r);

@@ -82,7 +82,7 @@ vec3 domainWarp(vec3 p, float onset, float time) {
     fbm3(p + 4.0 * q + vec3(3.1, 5.4, time * 0.05))
   );
 
-  return p + 0.35 * (q + onset * 0.8 * r);
+  return p + 0.35 * (q + onset * 1.5 * r);
 }
 
 // --- Camera path: Lissajous curve with variable Z-forward drift ---
@@ -138,8 +138,14 @@ void main() {
   float hue2 = uPaletteSecondary;
   vec3 emissionColor = 0.5 + 0.5 * cos(6.28318 * vec3(hue2, hue2 + 0.33, hue2 + 0.67));
 
+  // === CLIMAX REACTIVITY: shaders respond to emotional arc ===
+  float climaxPhase = uClimaxPhase; // 0=idle,1=build,2=climax,3=sustain,4=release
+  float climaxI = uClimaxIntensity;
+  float isClimax = step(1.5, climaxPhase) * step(climaxPhase, 3.5); // climax or sustain
+  float climaxBoost = isClimax * climaxI;
+
   // Kaliset parameters (retuned for 30 steps)
-  float formuparam = 0.53 + onset * 0.15;
+  float formuparam = 0.53 + onset * 0.15 + uBeatSnap * 0.12;
   float tile = 0.92;
   float darkmatter = mix(0.25, 0.05, bass);
   float distfading = 0.78;
@@ -237,9 +243,11 @@ void main() {
     s += stepsize;
   }
 
-  // Apply saturation
+  // Apply saturation (boosted for vivid nebula)
   float lumAcc = dot(accColor, vec3(0.299, 0.587, 0.114));
-  vec3 col = mix(vec3(lumAcc), accColor, saturation);
+  float boostedSat = saturation + climaxBoost * 0.15;
+  vec3 col = mix(vec3(lumAcc), accColor, boostedSat);
+  col *= 1.15 + climaxBoost * 0.20;
 
   // === CHROMATIC ABERRATION from highs ===
   float caAmount = highs * 0.015;
@@ -277,14 +285,17 @@ void main() {
 
   // === BEAT PULSE: tempo-locked emission swell ===
   float bp = beatPulse(uMusicalTime);
-  col *= 1.0 + bp * 0.10;
+  col *= 1.0 + bp * 0.25 + climaxBoost * bp * 0.15;
 
-  // === BLOOM: bright pixel self-illumination ===
+  // === BEAT SNAP: sharp brightness kick on transients ===
+  col *= 1.0 + uBeatSnap * 0.12 * (1.0 + climaxBoost * 0.5);
+
+  // === BLOOM: bright pixel self-illumination (climax-amplified) ===
   float lum = dot(col, vec3(0.299, 0.587, 0.114));
-  float bloomThreshold = mix(0.35, 0.2, energy);
-  float bloomAmount = max(0.0, lum - bloomThreshold) * 2.5;
+  float bloomThreshold = mix(0.35, 0.2, energy) - climaxBoost * 0.08;
+  float bloomAmount = max(0.0, lum - bloomThreshold) * (2.5 + climaxBoost * 1.5);
   vec3 bloomColor = mix(col, vec3(1.0, 0.98, 0.95), 0.3);
-  col += bloomColor * bloomAmount * 0.55;
+  col += bloomColor * bloomAmount * (0.55 + climaxBoost * 0.25);
 
   // === NEBULA GLOW: diffuse volumetric luminance layer ===
   float glowAmount = accGlow * (0.6 + bass * 0.4);

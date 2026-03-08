@@ -140,7 +140,7 @@ void main() {
   // === AURORA COLORS from palette + chromaHue shift ===
   float hue1 = uPalettePrimary + chromaH * 0.1;
   float hue2 = uPaletteSecondary + chromaH * 0.08;
-  float sat = mix(0.5, 0.9, slowE) * uPaletteSaturation;
+  float sat = mix(0.7, 1.0, slowE) * uPaletteSaturation;
 
   vec3 auroraColor1 = hsv2rgb(vec3(hue1, sat, 1.0));
   vec3 auroraColor2 = hsv2rgb(vec3(hue2, sat * 0.9, 0.9));
@@ -153,10 +153,17 @@ void main() {
   // Energy controls step count (24-32 range) and vertical coverage
   int maxSteps = 24 + int(energy * 8.0);
   float verticalCoverage = mix(0.15, 0.7, energy);
+  // === CLIMAX REACTIVITY ===
+  float climaxPhase = uClimaxPhase;
+  float climaxI = uClimaxIntensity;
+  float isClimax = step(1.5, climaxPhase) * step(climaxPhase, 3.5);
+  float climaxBoost = isClimax * climaxI;
+
   float curtainBrightness = mix(0.15, 0.8, energy);
-  curtainBrightness += onset * 0.3;
+  curtainBrightness += onset * 0.5;
   float bpH = beatPulseHalf(uMusicalTime);
-  curtainBrightness += bpH * 0.08;
+  curtainBrightness += bpH * 0.20 + uBeatSnap * 0.15;
+  curtainBrightness += climaxBoost * 0.25;
 
   // Ray setup: looking upward into aurora band
   vec3 rd = normalize(vec3(p.x, 0.6 + p.y * 0.8, -1.0));
@@ -241,12 +248,12 @@ void main() {
   // === LIGHT LEAK ===
   col += lightLeak(p, uTime, energy * 0.5, uOnsetSnap) * 0.7;
 
-  // === BLOOM: soft ethereal glow ===
+  // === BLOOM: soft ethereal glow (climax-amplified) ===
   float lum = dot(col, vec3(0.299, 0.587, 0.114));
-  float bloomThreshold = mix(0.35, 0.25, energy);
-  float bloomAmount = max(0.0, lum - bloomThreshold) * 2.0;
+  float bloomThreshold = mix(0.35, 0.25, energy) - climaxBoost * 0.08;
+  float bloomAmount = max(0.0, lum - bloomThreshold) * (2.0 + climaxBoost * 1.5);
   vec3 bloomColor = mix(col, auroraColor1, 0.3);
-  col += bloomColor * bloomAmount * 0.3;
+  col += bloomColor * bloomAmount * (0.3 + climaxBoost * 0.20);
 
   // === S-CURVE COLOR GRADING ===
   col = sCurveGrade(col, energy);

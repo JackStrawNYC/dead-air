@@ -18,7 +18,7 @@ const CAVE_RADIUS = 8;
 const CAVE_LENGTH = 40;
 
 const CrystalSystem: React.FC = () => {
-  const { time, smooth, palettePrimary, paletteSecondary, paletteSaturation, musicalTime } = useAudioData();
+  const { time, smooth, palettePrimary, paletteSecondary, paletteSaturation, musicalTime, climaxPhase, climaxIntensity } = useAudioData();
 
   const { geometry, material, instancedMesh } = useMemo(() => {
     const geo = new THREE.IcosahedronGeometry(0.3, 1);
@@ -39,6 +39,9 @@ const CrystalSystem: React.FC = () => {
       uPalettePrimary: { value: 0 },
       uPaletteSecondary: { value: 0 },
       uPaletteSaturation: { value: 1 },
+      uBeatSnap: { value: 0 },
+      uClimaxPhase: { value: 0 },
+      uClimaxIntensity: { value: 0 },
       uChroma0: { value: new THREE.Vector4(0, 0, 0, 0) },
       uChroma1: { value: new THREE.Vector4(0, 0, 0, 0) },
       uChroma2: { value: new THREE.Vector4(0, 0, 0, 0) },
@@ -96,6 +99,9 @@ const CrystalSystem: React.FC = () => {
   material.uniforms.uPalettePrimary.value = palettePrimary;
   material.uniforms.uPaletteSecondary.value = paletteSecondary;
   material.uniforms.uPaletteSaturation.value = paletteSaturation;
+  material.uniforms.uBeatSnap.value = smooth.beatSnap;
+  material.uniforms.uClimaxPhase.value = climaxPhase;
+  material.uniforms.uClimaxIntensity.value = climaxIntensity;
 
   const ch = smooth.chroma;
   material.uniforms.uChroma0.value.set(ch[0] ?? 0, ch[1] ?? 0, ch[2] ?? 0, ch[3] ?? 0);

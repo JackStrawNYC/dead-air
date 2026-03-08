@@ -64,13 +64,13 @@ export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod,
     texture === "sparse" ? -0.02 :    // ballad intros: barely restrained
     texture === "peak" ? +0.02 : 0;   // peaks: touch of saturation
 
-  // Tight modulation ranges — no visible pumping, no pulsing black
+  // Wide modulation ranges — visuals should BREATHE with the music
   // Saturation + brightness use fast energy (responsive to dynamics)
-  const saturation = (0.85 + factor * 0.30 + flatnessSaturation + textureSaturationOffset + (climaxMod?.saturationOffset ?? 0)) * counterpointSatMult;
-  const brightness = 0.92 + factor * 0.12 + onsetBrightness + (climaxMod?.brightnessOffset ?? 0);
-  const contrast = 0.93 + factor * 0.12 + (climaxMod?.contrastOffset ?? 0);  // 0.93 → 1.05
-  // Bloom uses slow energy (drift, not pulse) — staggered from sat/brightness
-  const bloomOpacity = slowFactor * 0.15 + (climaxMod?.bloomOffset ?? 0);
+  const saturation = (0.95 + factor * 0.40 + flatnessSaturation + textureSaturationOffset + (climaxMod?.saturationOffset ?? 0)) * counterpointSatMult;
+  const brightness = 0.95 + factor * 0.25 + onsetBrightness + (climaxMod?.brightnessOffset ?? 0);
+  const contrast = 0.95 + factor * 0.18 + (climaxMod?.contrastOffset ?? 0);
+  // Bloom uses slow energy (drift, not pulse)
+  const bloomOpacity = slowFactor * 0.30 + (climaxMod?.bloomOffset ?? 0);
 
   // Jam color temperature: warm shifts yellow, cool shifts blue (max ±12deg)
   // Only applied during long jams. EraGrade + SongPalette handle base color character.

@@ -141,16 +141,21 @@ void main() {
   // Combine layers
   vec3 color = bgColor + nebulaMix + vec3(stars);
 
-  // Onset: shooting star flash
+  // === CLIMAX REACTIVITY ===
+  float isClimax = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5);
+  float climaxBoost = isClimax * uClimaxIntensity;
+
+  // Onset: shooting star flash (amplified)
   float shootAngle = uTime * 0.5 + uSectionIndex * 2.0;
   vec2 shootDir = vec2(cos(shootAngle), sin(shootAngle));
   float shootTrail = smoothstep(0.02, 0.0, abs(dot(uv - shootDir * 0.3, vec2(-shootDir.y, shootDir.x))));
   shootTrail *= smoothstep(0.8, 0.0, length(uv - shootDir * 0.3));
-  color += shootTrail * uOnsetSnap * 0.5;
+  color += shootTrail * uOnsetSnap * 0.8 * (1.0 + climaxBoost * 0.5);
 
-  // Beat: gentle pulse on nebula brightness
+  // Beat: pulse on nebula brightness (amplified + beat snap)
   float bp = beatPulse(uMusicalTime);
-  color *= 1.0 + bp * 0.08;
+  color *= 1.0 + bp * 0.20 + climaxBoost * bp * 0.12;
+  color *= 1.0 + uBeatSnap * 0.12 * (1.0 + climaxBoost * 0.4);
 
   // Vignette — subtle
   float vig = 1.0 - smoothstep(0.6, 1.4, length(uv));

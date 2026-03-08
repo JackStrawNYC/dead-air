@@ -3,19 +3,19 @@ import { computeVisualFocus } from "./visual-focus";
 import type { ClimaxPhase } from "./climax-state";
 
 describe("computeVisualFocus", () => {
-  it("climax: shader at full, art gone, overlays minimal", () => {
+  it("climax: shader at full, art gone, overlays visible", () => {
     const state = computeVisualFocus("climax", 1.0, false, 100);
     expect(state.shaderOpacity).toBe(1.0);
     expect(state.artOpacity).toBe(0.0);
-    expect(state.overlayOpacity).toBeLessThanOrEqual(0.15);
+    expect(state.overlayOpacity).toBeGreaterThanOrEqual(0.5);
     expect(state.grainOpacity).toBeLessThanOrEqual(0.5);
   });
 
-  it("sustain: shader near full, overlays suppressed", () => {
+  it("sustain: shader near full, overlays present", () => {
     const state = computeVisualFocus("sustain", 1.0, false, 100);
     expect(state.shaderOpacity).toBeGreaterThanOrEqual(0.85);
     expect(state.artOpacity).toBe(0.0);
-    expect(state.overlayOpacity).toBeLessThanOrEqual(0.35);
+    expect(state.overlayOpacity).toBeGreaterThanOrEqual(0.5);
   });
 
   it("build: overlays present, shader below full", () => {
@@ -42,11 +42,11 @@ describe("computeVisualFocus", () => {
     expect(Math.abs(peak.artOpacity - trough.artOpacity)).toBeGreaterThan(0.05);
   });
 
-  it("video active: shader suppressed, overlays minimal", () => {
+  it("video active: shader suppressed, overlays visible", () => {
     const state = computeVisualFocus("idle", 0, true, 100);
     expect(state.shaderOpacity).toBeLessThanOrEqual(0.55);
     expect(state.artOpacity).toBeLessThanOrEqual(0.1);
-    expect(state.overlayOpacity).toBeLessThanOrEqual(0.35);
+    expect(state.overlayOpacity).toBeGreaterThanOrEqual(0.3);
   });
 
   it("all values stay within 0-1 range for every phase", () => {

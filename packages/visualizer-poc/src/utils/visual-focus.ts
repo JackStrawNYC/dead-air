@@ -18,20 +18,20 @@ export interface VisualFocusState {
   grainOpacity: number;     // 0.5-1.0
 }
 
-/** Focus rules by climax phase */
+/** Focus rules by climax phase — overlays should always be visible */
 const PHASE_FOCUS: Record<ClimaxPhase, VisualFocusState> = {
-  climax:  { shaderOpacity: 1.0, artOpacity: 0.0, overlayOpacity: 0.15, grainOpacity: 0.5 },
-  sustain: { shaderOpacity: 0.9, artOpacity: 0.0, overlayOpacity: 0.3,  grainOpacity: 0.6 },
-  build:   { shaderOpacity: 0.8, artOpacity: 0.1, overlayOpacity: 0.7,  grainOpacity: 0.8 },
-  release: { shaderOpacity: 0.7, artOpacity: 0.6, overlayOpacity: 0.4,  grainOpacity: 1.0 },
-  idle:    { shaderOpacity: 0.85, artOpacity: 0.4, overlayOpacity: 0.6, grainOpacity: 1.0 },
+  climax:  { shaderOpacity: 1.0, artOpacity: 0.0, overlayOpacity: 0.75, grainOpacity: 0.5 },
+  sustain: { shaderOpacity: 0.95, artOpacity: 0.0, overlayOpacity: 0.80, grainOpacity: 0.6 },
+  build:   { shaderOpacity: 0.85, artOpacity: 0.1, overlayOpacity: 0.85, grainOpacity: 0.8 },
+  release: { shaderOpacity: 0.75, artOpacity: 0.5, overlayOpacity: 0.70, grainOpacity: 1.0 },
+  idle:    { shaderOpacity: 0.85, artOpacity: 0.35, overlayOpacity: 0.85, grainOpacity: 1.0 },
 };
 
 /** Focus state when a scene video is actively playing */
 const VIDEO_ACTIVE_FOCUS: VisualFocusState = {
   shaderOpacity: 0.4,
   artOpacity: 0.0,
-  overlayOpacity: 0.2,
+  overlayOpacity: 0.50,
   grainOpacity: 0.7,
 };
 

@@ -93,9 +93,13 @@ void main() {
   col += circleEdge * vec3(0.5, 0.48, 0.45) * 0.4; // Thin white circle outline
   col += circleFill * accentCol * energy; // Subtle accent fill
 
-  // Concentric rings — expand on beats
+  // === CLIMAX REACTIVITY ===
+  float isClimax = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5);
+  float climaxBoost = isClimax * uClimaxIntensity;
+
+  // Concentric rings — expand on beats (amplified)
   float bp = beatPulse(uMusicalTime);
-  float ringExpand = uBeatSnap * 0.08 + bp * 0.06;
+  float ringExpand = uBeatSnap * 0.15 + bp * 0.15 + climaxBoost * 0.08;
   for (int i = 1; i <= 3; i++) {
     float fi = float(i);
     float ringR = circleR + fi * 0.08 + ringExpand * fi;
@@ -122,8 +126,8 @@ void main() {
   float noiseField = fbm(vec3(p * 2.0, t * 0.2 + sectionSeed));
   col += noiseField * 0.015 * vec3(0.8, 0.75, 0.7);
 
-  // === CENTROID-DRIVEN GLOW: brighter when treble-heavy ===
-  float centroidGlow = uCentroid * 0.04;
+  // === CENTROID-DRIVEN GLOW: brighter when treble-heavy + climax ===
+  float centroidGlow = uCentroid * 0.04 + climaxBoost * 0.03;
   float glowDist = length(p);
   float glow = exp(-glowDist * 4.0) * centroidGlow;
   col += glow * accentCol;
