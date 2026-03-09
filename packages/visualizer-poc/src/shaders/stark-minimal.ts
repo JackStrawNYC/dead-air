@@ -71,7 +71,7 @@ void main() {
   float energy = clamp(uEnergy, 0.0, 1.0);
   float tempoScale = uTempo / 120.0;
   float sectionSeed = uSectionIndex * 3.14;
-  float t = uTime * 0.03 * tempoScale;
+  float t = uTime * 0.08 * tempoScale;
 
   // Deep black background with subtle warm gradient
   float bgGrad = 1.0 - length(p) * 0.3;
@@ -80,7 +80,7 @@ void main() {
   // === GEOMETRIC ELEMENTS ===
 
   // Breathing circle — radius tied to RMS
-  float circleR = 0.15 + uRms * 0.12 + sin(t * 2.0) * 0.02;
+  float circleR = 0.15 + uRms * 0.12 + sin(t * 2.0) * 0.04;
   float circleDist = sdCircle(p, circleR);
   float circleEdge = smoothstep(0.003, 0.0, abs(circleDist));
   float circleFill = smoothstep(0.02, 0.0, circleDist) * 0.03;
@@ -111,7 +111,7 @@ void main() {
   }
 
   // Rotating line — sweeps slowly, brightens on mids
-  float lineAngle = t * 0.5 + sectionSeed;
+  float lineAngle = t * 1.2 + sectionSeed;
   float lineLen = 0.35 + uMids * 0.15;
   vec2 lineDir = vec2(cos(lineAngle), sin(lineAngle));
   float lineDist = sdLine(p, -lineDir * lineLen, lineDir * lineLen);
@@ -171,8 +171,10 @@ void main() {
     col.b *= 1.0 - caAmt * 0.5;
   }
 
-  // Lifted blacks (cold)
-  col = max(col, vec3(0.14, 0.11, 0.15));
+  // Lifted blacks (build-phase-aware: near true black during build for anticipation)
+  float isBuild = step(0.5, uClimaxPhase) * step(uClimaxPhase, 1.5);
+  float liftMult = mix(1.0, 0.15, isBuild * uClimaxIntensity);
+  col = max(col, vec3(0.14, 0.11, 0.15) * liftMult);
 
   gl_FragColor = vec4(col, 1.0);
 }

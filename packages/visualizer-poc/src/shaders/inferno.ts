@@ -91,6 +91,7 @@ float flameFBM(vec3 p, float bassAmp, float detailAmp) {
 float flameSDF(vec3 p, float bass, float highs, float onset) {
   // Bass stretches flame wider and flatter
   vec3 q = p;
+  q.x += bass * 0.3 * sin(uTime * 1.5); // lateral flame lean
   q.x *= mix(1.0, 0.7, bass);   // wider with bass
   q.y *= mix(1.0, 1.4, bass);   // taller with bass
   q.z *= mix(1.0, 0.7, bass);
@@ -100,7 +101,7 @@ float flameSDF(vec3 p, float bass, float highs, float onset) {
 
   // Noise displacement for fire shape
   vec3 np = p * 1.5;
-  np.y -= uTime * (0.8 + bass * 0.6);  // rise speed from bass
+  np.y -= uTime * (1.2 + bass * 0.8);  // rise speed from bass
   // Onset churns domain
   np.xy += onset * 0.3 * vec2(
     sin(p.z * 3.0 + uTime * 2.0),
@@ -268,8 +269,10 @@ void main() {
     col.b *= 1.0 - caAmt * 0.5;
   }
 
-  // === LIFTED BLACKS (warm tint for fire) ===
-  col = max(col, vec3(0.14, 0.08, 0.06));
+  // Lifted blacks (build-phase-aware: near true black during build for anticipation)
+  float isBuild = step(0.5, uClimaxPhase) * step(uClimaxPhase, 1.5);
+  float liftMult = mix(1.0, 0.15, isBuild * uClimaxIntensity);
+  col = max(col, vec3(0.14, 0.08, 0.06) * liftMult);
 
   gl_FragColor = vec4(col, 1.0);
 }

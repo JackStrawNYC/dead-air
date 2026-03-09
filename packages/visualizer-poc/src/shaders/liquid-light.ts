@@ -90,12 +90,17 @@ void main() {
   float shakeY = snoise(vec3(0.0, uTime * 8.0, 0.0)) * uBass * 0.004;
   p += vec2(shakeX, shakeY);
 
+  // Bass-driven horizontal sweep: directional motion
+  float bassWave = sin(p.x * 3.0 + uTime * 2.0 + uBass * 6.0) * uBass * 0.15;
+  p.y += bassWave;
+  p.x += sin(p.y * 2.0 + uTime * 1.5) * uBass * 0.08;
+
   float energy = clamp(uEnergy, 0.0, 1.0);
   float complexity = mix(0.5, 1.0, energy);
   float tempoScale = uTempo / 120.0;
   float sectionSeed = uSectionIndex * 7.3;
   float sectionWarp = 1.0 + (uSectionProgress - 0.5) * 0.3;
-  float t = uTime * (0.08 + uRms * 0.02) * tempoScale;
+  float t = uTime * (0.25 + uRms * 0.05) * tempoScale;
   float smoothness = 1.0 - uFlatness * 0.6;
   float grainAmount = uFlatness * 0.12;
 
@@ -310,8 +315,10 @@ void main() {
   col = mix(vec3(onsetLuma), col, 1.0 + onsetPulse * 0.7);
   col *= 1.0 + onsetPulse * 0.08;
 
-  // Lifted blacks
-  col = max(col, vec3(0.14, 0.11, 0.15));
+  // Lifted blacks (build-phase-aware: near true black during build for anticipation)
+  float isBuild = step(0.5, uClimaxPhase) * step(uClimaxPhase, 1.5);
+  float liftMult = mix(1.0, 0.15, isBuild * uClimaxIntensity);
+  col = max(col, vec3(0.14, 0.11, 0.15) * liftMult);
 
   gl_FragColor = vec4(col, 1.0);
 }

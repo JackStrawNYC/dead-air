@@ -315,19 +315,19 @@ float sdStealie(vec2 p, float radius) {
 //   col2     — shader's secondary palette color
 //   noiseField — shader's own FBM/noise value at this pixel (for dissolution)
 vec3 stealieEmergence(vec2 uv, float time, float energy, float bass, vec3 col1, vec3 col2, float noiseField) {
-  // Energy gate: only visible when energy > 0.3, fully formed at 0.7
-  float gate = smoothstep(0.3, 0.7, energy);
+  // Energy gate: only visible when energy > 0.55, fully formed at 0.85
+  float gate = smoothstep(0.55, 0.85, energy);
   if (gate < 0.001) return vec3(0.0);
 
   // Slow rotation
-  float angle = time * 0.05;
+  float angle = time * 0.08;
   float ca = cos(angle);
   float sa = sin(angle);
   vec2 rotUv = vec2(ca * uv.x - sa * uv.y, sa * uv.x + ca * uv.y);
 
   // Bass pulse: stealie breathes with the low end
-  float pulse = 1.0 + bass * 0.5;
-  float radius = 0.18 * pulse;
+  float pulse = 1.0 + bass * 0.8;
+  float radius = 0.45 * pulse;
 
   // SDF evaluation
   float d = sdStealie(rotUv, radius);
@@ -340,11 +340,11 @@ vec3 stealieEmergence(vec2 uv, float time, float energy, float bass, vec3 col1, 
   glow *= gate;
 
   // Edge line (crisp at high energy, dissolved at low)
-  float edge = smoothstep(0.008, 0.0, abs(d)) * gate * 0.6;
+  float edge = smoothstep(0.008, 0.0, abs(d)) * gate * 1.0;
 
   // Color: blend shader's own palette colors
   vec3 stealieColor = mix(col1, col2, 0.5 + 0.5 * sin(time * 0.3));
 
-  return stealieColor * (glow * 0.35 + edge);
+  return stealieColor * (glow * 0.70 + edge * 1.5);
 }
 `;

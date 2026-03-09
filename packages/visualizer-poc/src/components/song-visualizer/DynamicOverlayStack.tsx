@@ -18,7 +18,7 @@ import { TempoProvider } from "../../data/TempoContext";
 import type { EnhancedFrameData, ColorPalette } from "../../data/types";
 import { A_TIER_OVERLAY_NAMES } from "../../data/overlay-rotation";
 
-const OVERLAY_GATE_END = 420;  // 14s — overlays hidden until intro elements clear
+const OVERLAY_GATE_END = 180;  // 6s — overlays hidden until intro elements clear
 
 interface OverlayComponentEntry {
   Component: React.ComponentType<{ frames: EnhancedFrameData[] }>;
@@ -30,8 +30,8 @@ interface OverlayComponentEntry {
  *  Overlays are rare, sacred punctuation — the shader is the star.
  *  Peak = 0: shader owns the climax entirely. */
 const MAX_CONCURRENT: Record<string, number> = {
-  quiet: 1,
-  mid: 1,
+  quiet: 2,
+  mid: 2,
   peak: 1,
 };
 

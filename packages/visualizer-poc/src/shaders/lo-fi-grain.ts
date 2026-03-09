@@ -59,7 +59,7 @@ void main() {
   float energy = clamp(uEnergy, 0.0, 1.0);
   float tempoScale = uTempo / 120.0;
   float sectionSeed = uSectionIndex * 5.7;
-  float t = uTime * 0.025 * tempoScale; // Very slow movement
+  float t = uTime * 0.07 * tempoScale; // Purposeful movement
 
   // Subtle gate weave (projector instability)
   float weaveX = snoise(vec3(uTime * 2.0, 0.0, sectionSeed)) * 0.001;
@@ -134,8 +134,10 @@ void main() {
   col *= 1.0 + bp * 0.22 + climaxBoost * bp * 0.10;
   col *= 1.0 + uBeatSnap * 0.10;
 
-  // Lifted blacks (warm)
-  col = max(col, vec3(0.14, 0.11, 0.15));
+  // Lifted blacks (build-phase-aware: near true black during build for anticipation)
+  float isBuild = step(0.5, uClimaxPhase) * step(uClimaxPhase, 1.5);
+  float liftMult = mix(1.0, 0.15, isBuild * uClimaxIntensity);
+  col = max(col, vec3(0.14, 0.11, 0.15) * liftMult);
 
   // S-curve for film look
   col = sCurveGrade(col, energy * 0.6); // Gentler grading

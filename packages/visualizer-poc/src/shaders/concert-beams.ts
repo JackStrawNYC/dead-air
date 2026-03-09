@@ -108,9 +108,9 @@ void main() {
     float beamActive = smoothstep(activeBeamCount, activeBeamCount - 1.0, fi);
     if (beamActive < 0.01) continue;
 
-    float beamX = -aspect.x * 0.5 + beamSpacing * (fi + 1.0);
-    float sweepSpeed = mix(0.1, 0.3, energy) * tempoScale + uBass * 0.1;
-    float angle = PI * 0.5 + sin(uTime * sweepSpeed + beamPhase * 2.0) * mix(0.2, 0.45, energy);
+    float beamX = -aspect.x * 0.5 + beamSpacing * (fi + 1.0) + sin(uTime * 0.15 + fi * 0.7) * 0.08;
+    float sweepSpeed = mix(0.25, 0.6, energy) * tempoScale + uBass * 0.1;
+    float angle = PI * 0.5 + sin(uTime * sweepSpeed + beamPhase * 2.0) * mix(0.35, 0.70, energy);
     float width = mix(0.03, 0.11, energy) + uMids * 0.04;
 
     float contrastBoost = getContrastForBeam(i) * 0.3;
@@ -230,8 +230,10 @@ void main() {
   col = mix(vec3(onsetLuma), col, 1.0 + onsetPulse * 0.7);
   col *= 1.0 + onsetPulse * 0.08;
 
-  // Lifted blacks
-  col = max(col, vec3(0.14, 0.11, 0.15));
+  // Lifted blacks (build-phase-aware: near true black during build for anticipation)
+  float isBuild = step(0.5, uClimaxPhase) * step(uClimaxPhase, 1.5);
+  float liftMult = mix(1.0, 0.15, isBuild * uClimaxIntensity);
+  col = max(col, vec3(0.14, 0.11, 0.15) * liftMult);
 
   gl_FragColor = vec4(col, 1.0);
 }

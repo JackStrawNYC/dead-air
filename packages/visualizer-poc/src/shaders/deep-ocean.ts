@@ -111,9 +111,12 @@ void main() {
   vec2 swayUv = p;
   float swayAmt = 0.02 + slowE * 0.02;
   swayUv += swayAmt * vec2(
-    sin(p.y * 3.0 + uTime * 0.3),
-    cos(p.x * 2.5 + uTime * 0.25)
+    sin(p.y * 3.0 + uTime * 0.8),
+    cos(p.x * 2.5 + uTime * 0.65)
   );
+
+  // Ocean current: steady horizontal drift
+  swayUv.x += uTime * 0.05;
 
   // Surface chop from energy: quiet = glassy, loud = churning
   float chop = energy * 0.04;
@@ -138,9 +141,9 @@ void main() {
     snoise(vec3(p * 3.0 + 70.0, uTime * 2.0))
   );
 
-  float c1 = causticPattern(causticUv, uTime * 0.4, 4.0);
-  float c2 = causticPattern(causticUv + 0.3, uTime * 0.35 + 10.0, 6.0);
-  float c3 = causticPattern(causticUv - 0.2, uTime * 0.45 + 20.0, 8.0);
+  float c1 = causticPattern(causticUv, uTime * 1.0, 4.0);
+  float c2 = causticPattern(causticUv + 0.3, uTime * 0.9 + 10.0, 6.0);
+  float c3 = causticPattern(causticUv - 0.2, uTime * 1.1 + 20.0, 8.0);
 
   // Combine caustic layers: sharper with highs (pow sharpens peaks)
   float sharpPow = mix(1.0, 2.5, causticSharpness);
@@ -158,10 +161,10 @@ void main() {
   // === GOD RAYS: vertical light shafts from above (beat-reactive) ===
   float bpH = beatPulseHalf(uMusicalTime);
   float rayIntensity = (0.3 + bass * 0.5) * (1.0 + bpH * 0.25 + uBeatSnap * 0.18 + climaxBoost * 0.20);
-  float rayX = swayUv.x * 3.0;
-  float ray1 = smoothstep(0.8, 1.0, sin(rayX * 2.0 + uTime * 0.2)) * rayIntensity;
-  float ray2 = smoothstep(0.85, 1.0, sin(rayX * 3.5 + uTime * 0.15 + 1.0)) * rayIntensity * 0.7;
-  float ray3 = smoothstep(0.9, 1.0, sin(rayX * 1.5 + uTime * 0.25 + 2.5)) * rayIntensity * 0.5;
+  float rayX = swayUv.x * 3.0 + bass * sin(uTime * 0.3) * 0.5;
+  float ray1 = smoothstep(0.8, 1.0, sin(rayX * 2.0 + uTime * 0.5)) * rayIntensity;
+  float ray2 = smoothstep(0.85, 1.0, sin(rayX * 3.5 + uTime * 0.4 + 1.0)) * rayIntensity * 0.7;
+  float ray3 = smoothstep(0.9, 1.0, sin(rayX * 1.5 + uTime * 0.6 + 2.5)) * rayIntensity * 0.5;
   float rays = ray1 + ray2 + ray3;
   // Rays fade toward bottom of screen
   float rayFade = smoothstep(-0.5, 0.5, swayUv.y);
@@ -253,8 +256,10 @@ void main() {
     col.b *= 1.0 - caAmt * 0.5;
   }
 
-  // === LIFTED BLACKS (cool blue tint for underwater) ===
-  col = max(col, vec3(0.08, 0.10, 0.15));
+  // Lifted blacks (build-phase-aware: near true black during build for anticipation)
+  float isBuild = step(0.5, uClimaxPhase) * step(uClimaxPhase, 1.5);
+  float liftMult = mix(1.0, 0.15, isBuild * uClimaxIntensity);
+  col = max(col, vec3(0.08, 0.10, 0.15) * liftMult);
 
   gl_FragColor = vec4(col, 1.0);
 }

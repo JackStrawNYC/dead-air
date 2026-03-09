@@ -34,12 +34,12 @@ export const SongArtLayer: React.FC<SongArtProps> = ({ src, suppressionFactor, h
   // Suppress art during segue-in (first 10s) — let the crossfade breathe
   if (segueIn && frame < ART_FADE_END) return null;
 
-  // Energy-reactive wash: quiet → 0.15, peak → 0.05
-  // Art stays subtle after intro so shaders dominate
+  // Energy-reactive wash: quiet → 0.40, peak → 0.10
+  // Art visible during quiet passages, fades as shaders take over
   const energyWash = interpolate(
     energy,
     [0.03, 0.20, 0.40],
-    [0.15, 0.10, 0.05],
+    [0.30, 0.18, 0.08],
     { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
   );
 
@@ -57,7 +57,9 @@ export const SongArtLayer: React.FC<SongArtProps> = ({ src, suppressionFactor, h
 
   // Climax suppression: during climax/sustain, further suppress art
   const climaxSuppression = 1 - climaxIntensity * 0.7;
-  const artOpacity = baseOpacity * suppressionFactor * climaxSuppression * focusOpacity;
+  // Intro override: bypass focusOpacity during intro frames so the title card stays visible
+  const introOverride = frame < ART_FULL_END ? 1.0 : focusOpacity;
+  const artOpacity = baseOpacity * suppressionFactor * climaxSuppression * introOverride;
 
   if (artOpacity < 0.01) return null;
 

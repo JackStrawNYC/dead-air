@@ -106,7 +106,7 @@ void main() {
   float onset = clamp(uOnsetSnap, 0.0, 1.0);
 
   // === CAMERA SETUP ===
-  float driftSpeed = 0.05 + energy * 0.08;
+  float driftSpeed = 0.12 + energy * 0.15;
   float camT = uTime * driftSpeed;
   vec3 camPos = cameraPath(camT);
 
@@ -122,7 +122,7 @@ void main() {
   vec3 camUp = cross(camForward, camRight);
 
   // Slow barrel roll: ±13 degrees via incommensurate frequencies
-  float rollAngle = sin(camT * 0.37) * 0.12 + cos(camT * 0.23) * 0.1;
+  float rollAngle = sin(camT * 0.37) * 0.20 + cos(camT * 0.23) * 0.16;
   vec3 rolledRight = camRight * cos(rollAngle) + camUp * sin(rollAngle);
   vec3 rolledUp = -camRight * sin(rollAngle) + camUp * cos(rollAngle);
 
@@ -342,8 +342,10 @@ void main() {
     col.b *= 1.0 - caAmt * 0.5;
   }
 
-  // === LIFTED BLACKS ===
-  col = max(col, vec3(0.12, 0.10, 0.14));
+  // Lifted blacks (build-phase-aware: near true black during build for anticipation)
+  float isBuild = step(0.5, uClimaxPhase) * step(uClimaxPhase, 1.5);
+  float liftMult = mix(1.0, 0.15, isBuild * uClimaxIntensity);
+  col = max(col, vec3(0.12, 0.10, 0.14) * liftMult);
 
   gl_FragColor = vec4(col, 1.0);
 }

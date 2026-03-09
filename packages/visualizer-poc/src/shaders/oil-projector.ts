@@ -65,7 +65,7 @@ void main() {
   float energy = clamp(uEnergy, 0.0, 1.0);
   float tempoScale = uTempo / 120.0;
   float sectionSeed = uSectionIndex * 4.3;
-  float t = uTime * 0.02 * tempoScale; // Very slow — oil moves lazily
+  float t = uTime * 0.06 * tempoScale; // Oil moves with purpose
 
   // Bass camera shake (gentle — projector on a table)
   float shakeX = snoise(vec3(uTime * 4.0, 0.0, sectionSeed)) * uBass * 0.002;
@@ -76,7 +76,7 @@ void main() {
   vec3 col = vec3(0.02, 0.015, 0.01);
 
   // === LAYER 2: Primary oil blob (largest, slowest) ===
-  vec3 blob1Pos = vec3(p * 0.5, t * 0.3 + sectionSeed);
+  vec3 blob1Pos = vec3(p * 0.5 + vec2(0.0, -uTime * 0.008), t * 0.3 + sectionSeed);
   // Warp for organic movement
   float w1x = fbm(blob1Pos + vec3(3.1, 7.2, 0.0));
   float w1y = fbm(blob1Pos + vec3(8.4, 1.9, 0.0));
@@ -88,7 +88,7 @@ void main() {
   col1 *= mix(0.40, 0.95, energy);
 
   // === LAYER 3: Secondary oil blob (smaller, offset) ===
-  vec3 blob2Pos = vec3(p * 0.6 + vec2(0.3, -0.2), t * 0.35 + sectionSeed * 0.7);
+  vec3 blob2Pos = vec3(p * 0.6 + vec2(0.3, -0.2 - uTime * 0.005), t * 0.35 + sectionSeed * 0.7);
   float w2x = fbm(blob2Pos + vec3(5.5, 2.1, 0.0));
   float w2y = fbm(blob2Pos + vec3(1.3, 6.8, 0.0));
   vec3 warped2 = vec3(p + vec2(w2x, w2y) * (0.35 + uMids * 0.15), t * 0.3);
@@ -176,8 +176,10 @@ void main() {
     col.b *= 1.0 - caAmt * 0.5;
   }
 
-  // Lifted blacks (warm)
-  col = max(col, vec3(0.14, 0.11, 0.15));
+  // Lifted blacks (build-phase-aware: near true black during build for anticipation)
+  float isBuild = step(0.5, uClimaxPhase) * step(uClimaxPhase, 1.5);
+  float liftMult = mix(1.0, 0.15, isBuild * uClimaxIntensity);
+  col = max(col, vec3(0.14, 0.11, 0.15) * liftMult);
 
   gl_FragColor = vec4(col, 1.0);
 }

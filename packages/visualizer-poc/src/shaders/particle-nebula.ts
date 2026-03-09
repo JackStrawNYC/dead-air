@@ -53,7 +53,7 @@ void main() {
   r *= 1.0 + uOnsetSnap * 0.08;
 
   // Tempo-aware orbit (amplified beat pulse)
-  float orbitSpeed = (mix(0.008, 0.025, energy) + uMids * 0.015) * tempoScale * (1.0 + bp * 0.20);
+  float orbitSpeed = (mix(0.02, 0.06, energy) + uMids * 0.04) * tempoScale * (1.0 + bp * 0.20);
   float theta = aTheta + uTime * orbitSpeed * (0.5 + aRandom * 0.5);
   float phi = aPhi + uTime * orbitSpeed * 0.2 * (aRandom - 0.5);
 

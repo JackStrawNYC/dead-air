@@ -254,7 +254,7 @@ void main() {
   col -= starColor * 0.4 * auroraIntensity * curtainBrightness;
 
   // === VIGNETTE ===
-  float vigScale = mix(0.70, 0.62, energy);
+  float vigScale = mix(0.46, 0.30, energy);
   float vignette = 1.0 - dot(p * vigScale, p * vigScale);
   vignette = smoothstep(0.0, 1.0, vignette);
   col = mix(vec3(0.0), col, vignette);
@@ -267,10 +267,14 @@ void main() {
   float bloomThreshold = mix(0.35, 0.25, energy) - climaxBoost * 0.08;
   float bloomAmount = max(0.0, lum - bloomThreshold) * (2.0 + climaxBoost * 1.5);
   vec3 bloomColor = mix(col, auroraColor1, 0.3);
-  col += bloomColor * bloomAmount * (0.3 + climaxBoost * 0.20);
+  vec3 bloom = bloomColor * bloomAmount * (0.3 + climaxBoost * 0.20);
+  col = col + bloom - col * bloom; // screen blend
 
   // === S-CURVE COLOR GRADING ===
   col = sCurveGrade(col, energy);
+
+  // === ANIMATED STAGE FLOOD: flowing palette noise in dark areas ===
+  col = stageFloodFill(col, p, uTime, energy, uPalettePrimary, uPaletteSecondary);
 
   // === HALATION: warm film bloom ===
   col = halation(vUv, col, energy);
@@ -280,9 +284,11 @@ void main() {
   float grainIntensity = mix(0.05, 0.025, energy);
   col += filmGrainRes(uv, grainTime, uResolution.y) * grainIntensity;
 
-  // ONSET BRIGHTNESS PULSE: raw transient spike
-  float onsetPulse = step(0.5, uOnsetSnap) * uOnsetSnap * 0.30;
-  col *= 1.0 + onsetPulse;
+  // ONSET SATURATION PULSE: push colors away from gray (psychedelic, not white)
+  float onsetPulse = step(0.5, uOnsetSnap) * uOnsetSnap;
+  float onsetLuma = dot(col, vec3(0.299, 0.587, 0.114));
+  col = mix(vec3(onsetLuma), col, 1.0 + onsetPulse * 0.7);
+  col *= 1.0 + onsetPulse * 0.08;
 
   // ONSET CHROMATIC ABERRATION
   if (uOnsetSnap > 0.4) {
@@ -291,8 +297,10 @@ void main() {
     col.b *= 1.0 - caAmt * 0.5;
   }
 
-  // === LIFTED BLACKS (cold blue-green tint) ===
-  col = max(col, vec3(0.02, 0.03, 0.05));
+  // Lifted blacks (build-phase-aware: near true black during build for anticipation)
+  float isBuild = step(0.5, uClimaxPhase) * step(uClimaxPhase, 1.5);
+  float liftMult = mix(1.0, 0.15, isBuild * uClimaxIntensity);
+  col = max(col, vec3(0.08, 0.10, 0.14) * liftMult);
 
   gl_FragColor = vec4(col, 1.0);
 }
