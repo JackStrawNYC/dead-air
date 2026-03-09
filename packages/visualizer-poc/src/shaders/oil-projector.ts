@@ -83,7 +83,7 @@ void main() {
   vec3 warped1 = vec3(p + vec2(w1x, w1y) * (0.4 + uBass * 0.2), t * 0.25);
 
   float blob1 = oilBlob(warped1 * 0.7, 0.05);
-  float hue1 = uPalettePrimary + uChromaHue * 0.2;
+  float hue1 = hsvToCosineHue(uPalettePrimary) + uChromaHue * 0.2;
   vec3 col1 = 0.5 + 0.5 * cos(6.28318 * vec3(hue1, hue1 + 0.33, hue1 + 0.67));
   col1 *= mix(0.40, 0.95, energy);
 
@@ -94,7 +94,7 @@ void main() {
   vec3 warped2 = vec3(p + vec2(w2x, w2y) * (0.35 + uMids * 0.15), t * 0.3);
 
   float blob2 = oilBlob(warped2 * 0.8, 0.1);
-  float hue2 = uPaletteSecondary + uChromaHue * 0.15 + 0.15;
+  float hue2 = hsvToCosineHue(uPaletteSecondary) + uChromaHue * 0.15 + 0.15;
   vec3 col2 = 0.5 + 0.5 * cos(6.28318 * vec3(hue2, hue2 + 0.33, hue2 + 0.67));
   col2 *= mix(0.35, 0.85, energy);
 
@@ -105,7 +105,7 @@ void main() {
   vec3 warped3 = vec3(p + vec2(w3x, w3y) * (0.25 + uHighs * 0.1), t * 0.4);
 
   float blob3 = oilBlob(warped3 * 1.0, 0.15);
-  float hue3 = uPalettePrimary + 0.5; // Complementary
+  float hue3 = hsvToCosineHue(uPalettePrimary) + 0.5; // Complementary
   vec3 col3 = 0.5 + 0.5 * cos(6.28318 * vec3(hue3, hue3 + 0.33, hue3 + 0.67));
   col3 *= mix(0.28, 0.78, energy);
 
@@ -142,7 +142,8 @@ void main() {
 
   // === COLOR AFTERGLOW ===
   float afterglowStr = smoothstep(0.3, 0.6, energy) * 0.04;
-  vec3 afterglowCol = 0.5 + 0.5 * cos(6.28318 * vec3(uAfterglowHue, uAfterglowHue + 0.33, uAfterglowHue + 0.67));
+  float agHue = hsvToCosineHue(uAfterglowHue);
+  vec3 afterglowCol = 0.5 + 0.5 * cos(6.28318 * vec3(agHue, agHue + 0.33, agHue + 0.67));
   col += afterglowCol * afterglowStr;
 
   // Light leak
@@ -150,6 +151,9 @@ void main() {
 
   // S-curve grading
   col = sCurveGrade(col, energy);
+
+  // === ANIMATED STAGE FLOOD: flowing palette noise in dark areas ===
+  col = stageFloodFill(col, p, uTime, energy, uPalettePrimary, uPaletteSecondary);
 
   // === HALATION: warm film bloom ===
   col = halation(vUv, col, energy);
@@ -159,9 +163,11 @@ void main() {
   float grainIntensity = mix(0.08, 0.04, energy);
   col += filmGrainRes(uv, grainTime, uResolution.y) * grainIntensity;
 
-  // ONSET BRIGHTNESS PULSE: raw transient spike
-  float onsetPulse = step(0.5, uOnsetSnap) * uOnsetSnap * 0.30;
-  col *= 1.0 + onsetPulse;
+  // ONSET SATURATION PULSE: push colors away from gray (psychedelic, not white)
+  float onsetPulse = step(0.5, uOnsetSnap) * uOnsetSnap;
+  float onsetLuma = dot(col, vec3(0.299, 0.587, 0.114));
+  col = mix(vec3(onsetLuma), col, 1.0 + onsetPulse * 0.7);
+  col *= 1.0 + onsetPulse * 0.08;
 
   // ONSET CHROMATIC ABERRATION
   if (uOnsetSnap > 0.4) {
@@ -171,7 +177,7 @@ void main() {
   }
 
   // Lifted blacks (warm)
-  col = max(col, vec3(0.08, 0.065, 0.085));
+  col = max(col, vec3(0.14, 0.11, 0.15));
 
   gl_FragColor = vec4(col, 1.0);
 }

@@ -92,7 +92,7 @@ void main() {
   float caStrength = uBass * 0.006 + uRms * 0.003 + uOnsetSnap * 0.04;
 
   // Background — deeper and more colorful
-  float bgHue = uPalettePrimary + uTime * 0.02;
+  float bgHue = hsvToCosineHue(uPalettePrimary) + uTime * 0.02;
   vec3 bgColor = 0.5 + 0.5 * cos(6.28318 * (vec3(bgHue, bgHue + 0.33, bgHue + 0.67) + vec3(0.0, 0.1, 0.2)));
   bgColor *= 0.08 + uRms * 0.12;
   vec3 col = bgColor;
@@ -121,7 +121,7 @@ void main() {
     float beamVal = beam(p, beamX, angle, width, intensity);
 
     // Beam color
-    float hue = uPalettePrimary + uChromaHue * 0.3 + fi * 0.12 + sectionHueShift;
+    float hue = hsvToCosineHue(uPalettePrimary) + uChromaHue * 0.3 + fi * 0.12 + sectionHueShift;
     vec3 beamCol = 0.5 + 0.5 * cos(6.28318 * (vec3(hue, hue + 0.33, hue + 0.67)));
 
     // Palette saturation
@@ -131,7 +131,8 @@ void main() {
     // Warm white alternating beams
     if (i == 0 || i == 3) {
       vec3 warmWhite = vec3(1.0, 0.95, 0.85);
-      vec3 palTint = 0.5 + 0.5 * cos(6.28318 * vec3(uPaletteSecondary, uPaletteSecondary + 0.33, uPaletteSecondary + 0.67));
+      float ptHue = hsvToCosineHue(uPaletteSecondary);
+      vec3 palTint = 0.5 + 0.5 * cos(6.28318 * vec3(ptHue, ptHue + 0.33, ptHue + 0.67));
       beamCol = mix(beamCol, mix(warmWhite, palTint, 0.3), 0.5);
     }
 
@@ -161,7 +162,8 @@ void main() {
 
   // === COLOR AFTERGLOW ===
   float afterglowStr = smoothstep(0.3, 0.7, energy) * 0.04;
-  vec3 afterglowCol = 0.5 + 0.5 * cos(6.28318 * vec3(uAfterglowHue, uAfterglowHue + 0.33, uAfterglowHue + 0.67));
+  float agHue = hsvToCosineHue(uAfterglowHue);
+  vec3 afterglowCol = 0.5 + 0.5 * cos(6.28318 * vec3(agHue, agHue + 0.33, agHue + 0.67));
   col += afterglowCol * afterglowStr;
 
   // Stage silhouette
@@ -183,12 +185,13 @@ void main() {
   col += sparkle * uHighs * 0.15 * vec3(1.0, 0.95, 0.9);
 
   // Vignette (energy-driven, no beat pulse)
-  float vigScale = 1.2;
+  float vigScale = mix(0.50, 0.35, energy);
   float vig = 1.0 - dot((uv - 0.5) * vigScale, (uv - 0.5) * vigScale);
   vig = smoothstep(0.0, 1.0, vig);
 
   // Colored vignette
-  vec3 vigTint = 0.5 + 0.5 * cos(6.28318 * vec3(uPaletteSecondary, uPaletteSecondary + 0.33, uPaletteSecondary + 0.67));
+  float vigHue = hsvToCosineHue(uPaletteSecondary);
+  vec3 vigTint = 0.5 + 0.5 * cos(6.28318 * vec3(vigHue, vigHue + 0.33, vigHue + 0.67));
   vigTint *= 0.02;
   col = mix(vigTint, col, vig);
 
@@ -204,10 +207,14 @@ void main() {
   float bloomThreshold = mix(0.45, 0.3, energy) - climaxBoost * 0.10;
   float bloomAmount = max(0.0, lum - bloomThreshold) * (2.5 + climaxBoost * 1.5);
   vec3 bloomColor = mix(col, vec3(1.0, 0.98, 0.95), 0.35);
-  col += bloomColor * bloomAmount * (0.3 + climaxBoost * 0.20);
+  vec3 bloom = bloomColor * bloomAmount * (0.3 + climaxBoost * 0.20);
+  col = col + bloom - col * bloom; // screen blend
 
   // === S-CURVE COLOR GRADING ===
   col = sCurveGrade(col, energy);
+
+  // === ANIMATED STAGE FLOOD: flowing palette noise in dark areas ===
+  col = stageFloodFill(col, p, uTime, energy, uPalettePrimary, uPaletteSecondary);
 
   // === HALATION: warm film bloom ===
   col = halation(vUv, col, energy);
@@ -217,12 +224,14 @@ void main() {
   float grainIntensity = mix(0.05, 0.015, energy);
   col += filmGrainRes(uv, grainTime, uResolution.y) * grainIntensity;
 
-  // ONSET BRIGHTNESS PULSE: raw transient spike
-  float onsetPulse = step(0.5, uOnsetSnap) * uOnsetSnap * 0.30;
-  col *= 1.0 + onsetPulse;
+  // ONSET SATURATION PULSE: push colors away from gray (psychedelic, not white)
+  float onsetPulse = step(0.5, uOnsetSnap) * uOnsetSnap;
+  float onsetLuma = dot(col, vec3(0.299, 0.587, 0.114));
+  col = mix(vec3(onsetLuma), col, 1.0 + onsetPulse * 0.7);
+  col *= 1.0 + onsetPulse * 0.08;
 
   // Lifted blacks
-  col = max(col, vec3(0.08, 0.065, 0.085));
+  col = max(col, vec3(0.14, 0.11, 0.15));
 
   gl_FragColor = vec4(col, 1.0);
 }

@@ -86,7 +86,8 @@ void main() {
   float circleFill = smoothstep(0.02, 0.0, circleDist) * 0.03;
 
   // Accent color from palette (used sparingly)
-  vec3 accentCol = 0.5 + 0.5 * cos(6.28318 * vec3(uPalettePrimary, uPalettePrimary + 0.33, uPalettePrimary + 0.67));
+  float acHue = hsvToCosineHue(uPalettePrimary);
+  vec3 accentCol = 0.5 + 0.5 * cos(6.28318 * vec3(acHue, acHue + 0.33, acHue + 0.67));
   vec3 accentGray = vec3(dot(accentCol, vec3(0.299, 0.587, 0.114)));
   accentCol = mix(accentGray, accentCol, uPaletteSaturation * 0.7); // Reduced saturation
 
@@ -140,9 +141,9 @@ void main() {
   col += wipeEdge * vec3(0.4, 0.38, 0.35) * 0.5;
 
   // Subtle vignette
-  float vig = 1.0 - dot(p * 0.7, p * 0.7);
+  float vig = 1.0 - dot(p * 0.45, p * 0.45);
   vig = smoothstep(0.0, 1.0, vig);
-  col *= mix(0.7, 1.0, vig);
+  col *= mix(0.85, 1.0, vig);
 
   // === HALATION: warm film bloom ===
   col = halation(vUv, col, energy);
@@ -151,9 +152,17 @@ void main() {
   float grainTime = floor(uTime * 15.0) / 15.0;
   col += filmGrain(uv, grainTime) * 0.03;
 
-  // ONSET BRIGHTNESS PULSE: raw transient spike
-  float onsetPulse = step(0.5, uOnsetSnap) * uOnsetSnap * 0.30;
-  col *= 1.0 + onsetPulse;
+  // === S-CURVE COLOR GRADING ===
+  col = sCurveGrade(col, uEnergy);
+
+  // === ANIMATED STAGE FLOOD: flowing palette noise in dark areas ===
+  col = stageFloodFill(col, p, uTime, uEnergy, uPalettePrimary, uPaletteSecondary);
+
+  // ONSET SATURATION PULSE: push colors away from gray (psychedelic, not white)
+  float onsetPulse = step(0.5, uOnsetSnap) * uOnsetSnap;
+  float onsetLuma = dot(col, vec3(0.299, 0.587, 0.114));
+  col = mix(vec3(onsetLuma), col, 1.0 + onsetPulse * 0.7);
+  col *= 1.0 + onsetPulse * 0.08;
 
   // ONSET CHROMATIC ABERRATION
   if (uOnsetSnap > 0.4) {
@@ -163,7 +172,7 @@ void main() {
   }
 
   // Lifted blacks (cold)
-  col = max(col, vec3(0.08, 0.065, 0.085));
+  col = max(col, vec3(0.14, 0.11, 0.15));
 
   gl_FragColor = vec4(col, 1.0);
 }

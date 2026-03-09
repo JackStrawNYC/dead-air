@@ -132,11 +132,11 @@ void main() {
 
   // === STAR NEST: Kaliset volumetric fractal ===
   // Nebula/cloud color from palette primary
-  float hue1 = uPalettePrimary;
+  float hue1 = hsvToCosineHue(uPalettePrimary);
   vec3 cloudColor = 0.5 + 0.5 * cos(6.28318 * vec3(hue1, hue1 + 0.33, hue1 + 0.67));
 
   // Emission color from palette secondary
-  float hue2 = uPaletteSecondary;
+  float hue2 = hsvToCosineHue(uPaletteSecondary);
   vec3 emissionColor = 0.5 + 0.5 * cos(6.28318 * vec3(hue2, hue2 + 0.33, hue2 + 0.67));
 
   // === CLIMAX REACTIVITY: shaders respond to emotional arc ===
@@ -286,7 +286,7 @@ void main() {
   col = mix(col, fogColor, fogAmount * smoothstep(0.5, 0.0, lumAcc));
 
   // === VIGNETTE ===
-  float vigScale = mix(0.72, 0.64, energy);
+  float vigScale = mix(0.48, 0.32, energy);
   float vignette = 1.0 - dot(p * vigScale, p * vigScale);
   vignette = smoothstep(0.0, 1.0, vignette);
   vec3 vigTint = cloudColor * 0.03;
@@ -307,7 +307,8 @@ void main() {
   float bloomThreshold = mix(0.35, 0.2, energy) - climaxBoost * 0.08;
   float bloomAmount = max(0.0, lum - bloomThreshold) * (2.5 + climaxBoost * 1.5);
   vec3 bloomColor = mix(col, vec3(1.0, 0.98, 0.95), 0.3);
-  col += bloomColor * bloomAmount * (0.55 + climaxBoost * 0.25);
+  vec3 bloom = bloomColor * bloomAmount * (0.55 + climaxBoost * 0.25);
+  col = col + bloom - col * bloom; // screen blend
 
   // === NEBULA GLOW: diffuse volumetric luminance layer ===
   float glowAmount = accGlow * (0.6 + bass * 0.4);
@@ -317,6 +318,9 @@ void main() {
   // === S-CURVE COLOR GRADING ===
   col = sCurveGrade(col, energy);
 
+  // === ANIMATED STAGE FLOOD: flowing palette noise in dark areas ===
+  col = stageFloodFill(col, p, uTime, energy, uPalettePrimary, uPaletteSecondary);
+
   // === HALATION: warm film bloom ===
   col = halation(vUv, col, energy);
 
@@ -325,9 +329,11 @@ void main() {
   float grainIntensity = mix(0.05, 0.02, energy);
   col += filmGrainRes(uv, grainTime, uResolution.y) * grainIntensity;
 
-  // ONSET BRIGHTNESS PULSE: raw transient spike
-  float onsetPulse = step(0.5, uOnsetSnap) * uOnsetSnap * 0.30;
-  col *= 1.0 + onsetPulse;
+  // ONSET SATURATION PULSE: push colors away from gray (psychedelic, not white)
+  float onsetPulse = step(0.5, uOnsetSnap) * uOnsetSnap;
+  float onsetLuma = dot(col, vec3(0.299, 0.587, 0.114));
+  col = mix(vec3(onsetLuma), col, 1.0 + onsetPulse * 0.7);
+  col *= 1.0 + onsetPulse * 0.08;
 
   // ONSET CHROMATIC ABERRATION
   if (uOnsetSnap > 0.4) {
@@ -337,7 +343,7 @@ void main() {
   }
 
   // === LIFTED BLACKS ===
-  col = max(col, vec3(0.06, 0.05, 0.07));
+  col = max(col, vec3(0.12, 0.10, 0.14));
 
   gl_FragColor = vec4(col, 1.0);
 }

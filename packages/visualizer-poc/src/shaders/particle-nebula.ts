@@ -103,13 +103,26 @@ vec3 filmGrain(vec2 uv, float grainTime) {
   return n * vec3(1.0, 0.95, 0.85);
 }
 
-// S-curve grading helper
+// HSV-to-cosine hue correction (see noise.ts for explanation)
+float hsvToCosineHue(float h) { return 1.0 - h; }
+
+// S-curve grading: hue-preserving tone mapping
 vec3 sCurveGrade(vec3 col, float energy) {
-  col = clamp(col, 0.0, 1.0);
+  float maxC = max(col.r, max(col.g, col.b));
+  float excess = 0.0;
+  if (maxC > 1.0) {
+    excess = min(maxC - 1.0, 3.0);
+    col /= maxC;
+  }
+  col = max(col, vec3(0.0));
   vec3 curved = col * col * (3.0 - 2.0 * col);
   float amount = mix(0.3, 0.6, energy);
   col = mix(col, curved, amount);
   col = 1.0 - exp(-col * (1.2 + energy * 0.3));
+  if (excess > 0.0) {
+    float luma = dot(col, vec3(0.299, 0.587, 0.114));
+    col = mix(vec3(luma), col, 1.0 + excess * 0.6);
+  }
   return col;
 }
 
@@ -147,7 +160,7 @@ void main() {
   // === CHROMATIC ABERRATION: hue-offset for R/G/B channels ===
   float caAmount = uBass * 0.03 + vEnergy * 0.015 + uOnsetSnap * 0.04;
 
-  float hueCenter = uPalettePrimary + uChromaHue * 0.25 + vColorMix * 0.3;
+  float hueCenter = hsvToCosineHue(uPalettePrimary) + uChromaHue * 0.25 + vColorMix * 0.3;
   float hueR = hueCenter - caAmount;
   float hueB = hueCenter + caAmount;
 
@@ -163,7 +176,7 @@ void main() {
   vec3 rgb = vec3(rgbR.r, rgbG.g, rgbB.b);
 
   // Secondary palette blend
-  float secHue = uPaletteSecondary + vColorMix * 0.2;
+  float secHue = hsvToCosineHue(uPaletteSecondary) + vColorMix * 0.2;
   vec3 secRgb = 0.5 + 0.5 * cos(6.28318 * (vec3(secHue, secHue + 0.33, secHue + 0.67)));
   rgb = mix(rgb, secRgb, vColorMix * 0.3);
 
@@ -204,7 +217,8 @@ void main() {
 
   // === COLOR AFTERGLOW ===
   float afterglowStr = smoothstep(0.3, 0.7, vEnergy) * 0.04;
-  vec3 afterglowCol = 0.5 + 0.5 * cos(6.28318 * vec3(uAfterglowHue, uAfterglowHue + 0.33, uAfterglowHue + 0.67));
+  float agHue = hsvToCosineHue(uAfterglowHue);
+  vec3 afterglowCol = 0.5 + 0.5 * cos(6.28318 * vec3(agHue, agHue + 0.33, agHue + 0.67));
   rgb += afterglowCol * afterglowStr;
 
   // === BLOOM: bright particle self-illumination (climax-amplified) ===
@@ -212,11 +226,14 @@ void main() {
   float bThresh = 0.4 - climaxBoost * 0.08;
   float bloomAmount = max(0.0, lum - bThresh) * (2.0 + climaxBoost * 1.5);
   vec3 bloomColor = mix(rgb, vec3(1.0, 0.98, 0.95), 0.3);
-  rgb += bloomColor * bloomAmount * (0.25 + climaxBoost * 0.15);
+  vec3 bloom = bloomColor * bloomAmount * (0.25 + climaxBoost * 0.15);
+  rgb = rgb + bloom - rgb * bloom; // screen blend
 
-  // ONSET BRIGHTNESS PULSE: raw transient spike
-  float onsetPulse = step(0.5, uOnsetSnap) * uOnsetSnap * 0.30;
-  rgb *= 1.0 + onsetPulse;
+  // ONSET SATURATION PULSE: push colors away from gray (psychedelic, not white)
+  float onsetPulse = step(0.5, uOnsetSnap) * uOnsetSnap;
+  float onsetLuma = dot(rgb, vec3(0.299, 0.587, 0.114));
+  rgb = mix(vec3(onsetLuma), rgb, 1.0 + onsetPulse * 0.7);
+  rgb *= 1.0 + onsetPulse * 0.08;
 
   // === S-CURVE COLOR GRADING ===
   rgb = sCurveGrade(rgb, vEnergy);

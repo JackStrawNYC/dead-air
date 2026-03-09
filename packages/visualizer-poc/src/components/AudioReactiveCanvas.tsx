@@ -260,8 +260,10 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
   const climaxPhaseNum = phaseMap[climaxState.phase];
 
   const pal = palette ?? DEFAULT_PALETTE;
-  const palettePrimary = pal.primary / 360;
-  const paletteSecondary = pal.secondary / 360;
+  // Energy-driven hue evolution: quiet = base palette, peak = +30° shift
+  const energyHueShift = energy * (30 / 360);
+  const palettePrimary = pal.primary / 360 + energyHueShift;
+  const paletteSecondary = pal.secondary / 360 + energyHueShift;
   const paletteSaturation = pal.saturation ?? 1;
 
   const audioData: AudioDataContext = {

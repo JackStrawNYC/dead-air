@@ -98,12 +98,12 @@ void main() {
   float slowE = clamp(uSlowEnergy, 0.0, 1.0);
 
   // === WATER COLORS from palette ===
-  float hue1 = uPalettePrimary;
+  float hue1 = hsvToCosineHue(uPalettePrimary);
   vec3 waterColor = 0.5 + 0.5 * cos(6.28318 * vec3(hue1, hue1 + 0.33, hue1 + 0.67));
   // Push towards deep blue-green
   waterColor = mix(waterColor, vec3(0.02, 0.15, 0.25), 0.5);
 
-  float hue2 = uPaletteSecondary;
+  float hue2 = hsvToCosineHue(uPaletteSecondary);
   vec3 causticColor = 0.5 + 0.5 * cos(6.28318 * vec3(hue2, hue2 + 0.33, hue2 + 0.67));
   causticColor = mix(causticColor, vec3(0.4, 0.8, 0.9), 0.3);
 
@@ -209,7 +209,7 @@ void main() {
   }
 
   // === VIGNETTE ===
-  float vigScale = mix(0.72, 0.65, energy);
+  float vigScale = mix(0.48, 0.32, energy);
   float vignette = 1.0 - dot(p * vigScale, p * vigScale);
   vignette = smoothstep(0.0, 1.0, vignette);
   vec3 vigTint = waterColor * 0.02;
@@ -223,10 +223,14 @@ void main() {
   float bloomThreshold = mix(0.4, 0.3, energy) - climaxBoost * 0.08;
   float bloomAmount = max(0.0, lum - bloomThreshold) * (2.0 + climaxBoost * 1.5);
   vec3 bloomColor = mix(col, causticColor, 0.3);
-  col += bloomColor * bloomAmount * (0.3 + climaxBoost * 0.20);
+  vec3 bloom = bloomColor * bloomAmount * (0.3 + climaxBoost * 0.20);
+  col = col + bloom - col * bloom; // screen blend
 
   // === S-CURVE COLOR GRADING ===
   col = sCurveGrade(col, energy);
+
+  // === ANIMATED STAGE FLOOD: flowing palette noise in dark areas ===
+  col = stageFloodFill(col, p, uTime, energy, uPalettePrimary, uPaletteSecondary);
 
   // === HALATION: warm film bloom ===
   col = halation(vUv, col, energy);
@@ -236,9 +240,11 @@ void main() {
   float grainIntensity = mix(0.04, 0.02, energy);
   col += filmGrainRes(uv, grainTime, uResolution.y) * grainIntensity;
 
-  // ONSET BRIGHTNESS PULSE: raw transient spike
-  float onsetPulse = step(0.5, uOnsetSnap) * uOnsetSnap * 0.30;
-  col *= 1.0 + onsetPulse;
+  // ONSET SATURATION PULSE: push colors away from gray (psychedelic, not white)
+  float onsetPulse = step(0.5, uOnsetSnap) * uOnsetSnap;
+  float onsetLuma = dot(col, vec3(0.299, 0.587, 0.114));
+  col = mix(vec3(onsetLuma), col, 1.0 + onsetPulse * 0.7);
+  col *= 1.0 + onsetPulse * 0.08;
 
   // ONSET CHROMATIC ABERRATION
   if (uOnsetSnap > 0.4) {
@@ -248,7 +254,7 @@ void main() {
   }
 
   // === LIFTED BLACKS (cool blue tint for underwater) ===
-  col = max(col, vec3(0.03, 0.05, 0.08));
+  col = max(col, vec3(0.08, 0.10, 0.15));
 
   gl_FragColor = vec4(col, 1.0);
 }

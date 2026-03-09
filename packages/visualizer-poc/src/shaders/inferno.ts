@@ -142,11 +142,11 @@ void main() {
   vec3 camDir = normalize(vec3(shimmerUv.x * 0.8, 1.0, shimmerUv.y * 0.8));
 
   // === FLAME COLORS from palette ===
-  float hue1 = uPalettePrimary;
+  float hue1 = hsvToCosineHue(uPalettePrimary);
   vec3 flameColor = 0.5 + 0.5 * cos(6.28318 * vec3(hue1, hue1 + 0.33, hue1 + 0.67));
   flameColor = mix(flameColor, vec3(1.0, 0.5, 0.1), 0.4);
 
-  float hue2 = uPaletteSecondary;
+  float hue2 = hsvToCosineHue(uPaletteSecondary);
   vec3 coreColor = 0.5 + 0.5 * cos(6.28318 * vec3(hue2, hue2 + 0.33, hue2 + 0.67));
   coreColor = mix(coreColor, vec3(1.0, 0.95, 0.8), 0.5);
 
@@ -224,7 +224,7 @@ void main() {
   }
 
   // === VIGNETTE ===
-  float vigScale = mix(0.68, 0.58, energy);
+  float vigScale = mix(0.46, 0.30, energy);
   float vignette = 1.0 - dot(p * vigScale, p * vigScale);
   vignette = smoothstep(0.0, 1.0, vignette);
   vec3 vigTint = flameColor * 0.03;
@@ -238,10 +238,14 @@ void main() {
   float bloomThreshold = mix(0.3, 0.2, energy) - climaxBoost * 0.08;
   float bloomAmount = max(0.0, lum - bloomThreshold) * (3.0 + climaxBoost * 2.0);
   vec3 bloomColor = mix(col, vec3(1.0, 0.9, 0.7), 0.4);
-  col += bloomColor * bloomAmount * (0.5 + climaxBoost * 0.25);
+  vec3 bloom = bloomColor * bloomAmount * (0.5 + climaxBoost * 0.25);
+  col = col + bloom - col * bloom; // screen blend
 
   // === S-CURVE COLOR GRADING ===
   col = sCurveGrade(col, energy);
+
+  // === ANIMATED STAGE FLOOD: flowing palette noise in dark areas ===
+  col = stageFloodFill(col, p, uTime, energy, uPalettePrimary, uPaletteSecondary);
 
   // === HALATION: warm film bloom ===
   col = halation(vUv, col, energy);
@@ -251,9 +255,11 @@ void main() {
   float grainIntensity = mix(0.04, 0.02, energy);
   col += filmGrainRes(uv, grainTime, uResolution.y) * grainIntensity;
 
-  // ONSET BRIGHTNESS PULSE: raw transient spike
-  float onsetPulse = step(0.5, uOnsetSnap) * uOnsetSnap * 0.30;
-  col *= 1.0 + onsetPulse;
+  // ONSET SATURATION PULSE: push colors away from gray (psychedelic, not white)
+  float onsetPulse = step(0.5, uOnsetSnap) * uOnsetSnap;
+  float onsetLuma = dot(col, vec3(0.299, 0.587, 0.114));
+  col = mix(vec3(onsetLuma), col, 1.0 + onsetPulse * 0.7);
+  col *= 1.0 + onsetPulse * 0.08;
 
   // ONSET CHROMATIC ABERRATION
   if (uOnsetSnap > 0.4) {
@@ -263,7 +269,7 @@ void main() {
   }
 
   // === LIFTED BLACKS (warm tint for fire) ===
-  col = max(col, vec3(0.08, 0.04, 0.02));
+  col = max(col, vec3(0.14, 0.08, 0.06));
 
   gl_FragColor = vec4(col, 1.0);
 }

@@ -120,16 +120,68 @@ vec3 filmGrain(vec2 uv, float grainTime) {
   return n * vec3(1.0, 0.95, 0.85);
 }
 
-// --- S-curve color grading: lifted shadows, punchy mids, soft highlights ---
+// --- S-curve color grading: hue-preserving tone mapping ---
+// Over-bright pixels become MORE SATURATED, not white.
+// Dark pixels get lifted to visible color during peaks (stage flood lights).
 vec3 sCurveGrade(vec3 col, float energy) {
-  col = clamp(col, 0.0, 1.0);
-  // S-curve via smoothstep: lifts shadows, compresses highlights, punches mids
+  // Hue-preserving normalization: scale down to 0-1 keeping color ratios
+  float maxC = max(col.r, max(col.g, col.b));
+  float excess = 0.0;
+  if (maxC > 1.0) {
+    excess = min(maxC - 1.0, 3.0);
+    col /= maxC; // preserve hue — (3.0, 0.5, 0.1) → (1.0, 0.17, 0.03) stays RED
+  }
+  col = max(col, vec3(0.0));
+  // S-curve: lifts shadows, compresses highlights, punches mids
   vec3 curved = col * col * (3.0 - 2.0 * col);
-  // Blend amount is energy-responsive: louder = more contrast
   float amount = mix(0.3, 0.6, energy);
   col = mix(col, curved, amount);
-  // Highlight rolloff: prevent harsh clipping
+  // Highlight rolloff
   col = 1.0 - exp(-col * (1.2 + energy * 0.3));
+  // Convert excess brightness to SATURATION BOOST (psychedelic color)
+  if (excess > 0.0) {
+    float luma = dot(col, vec3(0.299, 0.587, 0.114));
+    col = mix(vec3(luma), col, 1.0 + excess * 0.6);
+  }
+  return col;
+}
+
+// --- HSV-to-cosine hue correction ---
+// Cosine palette cycles R→B→G (reverse of HSV's R→G→B).
+// All palette values in setlist.json use HSV convention,
+// so we invert the hue to get correct colors.
+float hsvToCosineHue(float h) { return 1.0 - h; }
+
+// --- Animated stage flood: flowing palette-colored noise in dark areas ---
+// Call AFTER sCurveGrade so flood colors bypass tone mapping compression.
+// Additive blend gated by darkness: lifts dark pixels, transparent on bright ones.
+vec3 stageFloodFill(vec3 col, vec2 uv, float time, float energy, float palHue1, float palHue2) {
+  // Activate even at very low energy — concerts are never pitch black
+  float gate = smoothstep(0.02, 0.15, energy);
+  if (gate < 0.01) return col;
+  // Darkness mask: fill dim pixels (luma < 0.20 after tone mapping)
+  float luma = dot(col, vec3(0.299, 0.587, 0.114));
+  float darkness = smoothstep(0.20, 0.02, luma);
+  if (darkness < 0.01) return col;
+  // Three-layer flowing noise: organic patterns
+  float slowT = time * 0.12;
+  float n1 = snoise(vec3(uv * 2.0, slowT));
+  float n2 = snoise(vec3(uv * 4.5 + 30.0, slowT * 0.7));
+  float n3 = snoise(vec3(uv * 9.0 + 70.0, slowT * 1.3));
+  float pattern = n1 * 0.5 + n2 * 0.3 + n3 * 0.2;
+  // Palette-derived colors (convert HSV hue to cosine-palette hue)
+  float cHue1 = hsvToCosineHue(palHue1);
+  float cHue2 = hsvToCosineHue(palHue2);
+  vec3 c1 = 0.5 + 0.5 * cos(6.28318 * vec3(cHue1, cHue1 + 0.33, cHue1 + 0.67));
+  vec3 c2 = 0.5 + 0.5 * cos(6.28318 * vec3(cHue2, cHue2 + 0.33, cHue2 + 0.67));
+  vec3 floodColor = mix(c1, c2, pattern * 0.5 + 0.5);
+  // Energy-scaled brightness: quiet=0.28, loud=0.40
+  // Gate already controls early-out; no double-gating in final blend.
+  floodColor *= mix(0.28, 0.40, gate);
+  // Gentle spatial variation (never kills to zero — range 0.8-1.1)
+  floodColor *= 0.8 + 0.3 * clamp(pattern + 0.5, 0.0, 1.0);
+  // Additive blend gated by darkness only: dark areas get lifted, bright areas unchanged
+  col += floodColor * darkness;
   return col;
 }
 
