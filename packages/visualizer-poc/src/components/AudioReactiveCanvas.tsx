@@ -11,6 +11,7 @@ import type { EnhancedFrameData, SectionBoundary, ColorPalette } from "../data/t
 import { findCurrentSection } from "../utils/section-lookup";
 import { computeClimaxState, type ClimaxPhase } from "../utils/climax-state";
 import { computeAudioSnapshot as computeSnapshot, buildBeatArray as buildBeatArrayUtil, computeMusicalTime as computeMusicalTimeUtil } from "../utils/audio-reactive";
+import { energyGate } from "../utils/math";
 
 /** Audio data context passed to all Three.js children */
 export interface AudioDataContext {
@@ -243,13 +244,14 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
   const { sectionIndex, sectionProgress } = findCurrentSection(sectionList, idx);
 
   const energy = smoothValue(frames, idx, (f) => f.rms, 60);
+  const egate = energyGate(energy);
   const chromaHue = smoothValue(frames, idx, (f) => dominantChromaHue(f.chroma), 15);
   const contrast = smoothContrast(frames, idx, 12);
   const flatness = smoothValue(frames, idx, (f) => f.flatness, 15);
 
-  // Snappy transient envelopes: fast attack, slow exponential release
-  const onsetSnap = transientEnvelope(frames, idx, (f) => f.onset, 18);
-  const beatSnap = transientEnvelope(frames, idx, (f) => (f.beat ? 1 : 0), 15);
+  // Snappy transient envelopes: fast attack, slow exponential release, energy-gated
+  const onsetSnap = transientEnvelope(frames, idx, (f) => f.onset, 18) * egate;
+  const beatSnap = transientEnvelope(frames, idx, (f) => (f.beat ? 1 : 0), 15) * egate;
 
   // Stem-separated bass: use stemBassRms if available, else fallback to (sub+low)/2
   const hasStemBass = frames[idx].stemBassRms != null;
@@ -278,11 +280,11 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
     frame: fd,
     frameIndex: idx,
     time: frameIdx / fps,
-    beatDecay: beatDecay(frames, idx),
+    beatDecay: beatDecay(frames, idx) * egate,
     smooth: {
       rms: smoothValue(frames, idx, (f) => f.rms, 12),
       centroid: smoothValue(frames, idx, (f) => f.centroid, 18),
-      bass: smoothValue(frames, idx, (f) => f.sub + f.low, 10) * 0.5,
+      bass: smoothValue(frames, idx, (f) => f.sub + f.low, 24) * 0.5 * (0.3 + 0.7 * egate),
       mids: smoothValue(frames, idx, (f) => f.mid, 8),
       highs: smoothValue(frames, idx, (f) => f.high, 3),
       onset: smoothValue(frames, idx, (f) => f.onset, 6),

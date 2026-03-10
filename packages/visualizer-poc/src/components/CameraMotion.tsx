@@ -14,6 +14,7 @@ import React from "react";
 import { useCurrentFrame } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
 import type { JamEvolution, JamPhase } from "../utils/jam-evolution";
+import { energyGate } from "../utils/math";
 
 interface Props {
   frames: EnhancedFrameData[];
@@ -67,6 +68,7 @@ export const CameraMotion: React.FC<Props> = ({ frames, children, jamEvolution, 
     count++;
   }
   const smoothEnergy = count > 0 ? energySum / count : 0;
+  const egate = energyGate(smoothEnergy);
 
   // Energy-based zoom (existing behavior)
   const energyT = Math.min(1, smoothEnergy * 5);
@@ -102,8 +104,8 @@ export const CameraMotion: React.FC<Props> = ({ frames, children, jamEvolution, 
     if (frames[checkIdx].beat && frames[checkIdx].onset > 0.25) {
       const decay = Math.exp(-ago * 0.7);
       const dir = shakeHash(checkIdx);
-      shakeX += dir.x * SHAKE_PX * decay;
-      shakeY += dir.y * SHAKE_PX * decay;
+      shakeX += dir.x * SHAKE_PX * decay * egate;
+      shakeY += dir.y * SHAKE_PX * decay * egate;
       break; // use the most recent beat
     }
   }
@@ -117,14 +119,15 @@ export const CameraMotion: React.FC<Props> = ({ frames, children, jamEvolution, 
     if (frames[checkIdx].onset > 0.5) {
       const decay = Math.exp(-ago * 1.2);
       const dir = shakeHash(checkIdx + 9973);
-      shakeX += dir.x * ONSET_JOLT_PX * frames[checkIdx].onset * decay;
-      shakeY += dir.y * ONSET_JOLT_PX * frames[checkIdx].onset * decay;
+      shakeX += dir.x * ONSET_JOLT_PX * frames[checkIdx].onset * decay * egate;
+      shakeY += dir.y * ONSET_JOLT_PX * frames[checkIdx].onset * decay * egate;
       break;
     }
   }
 
-  // Bass-driven continuous micro-sway
-  const bassAmp = (bass ?? 0) * 12.0;
+  // Bass-driven continuous micro-sway (30% floor keeps subtle movement in quiet passages)
+  const bassGate = 0.3 + 0.7 * egate;
+  const bassAmp = (bass ?? 0) * 12.0 * bassGate;
   const bassT = frame / 30;
   shakeX += Math.sin(bassT * 3.7) * bassAmp * 0.5;
   shakeY += Math.cos(bassT * 2.3) * bassAmp * 0.3;

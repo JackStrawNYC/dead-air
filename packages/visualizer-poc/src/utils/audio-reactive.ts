@@ -10,6 +10,7 @@
  */
 
 import type { EnhancedFrameData } from "../data/types";
+import { energyGate } from "./math";
 
 export interface AudioSnapshot {
   /** Gaussian-smoothed RMS energy (window=60, ~2s) */
@@ -253,14 +254,17 @@ export function computeAudioSnapshot(
   fps?: number,
   tempo?: number,
 ): AudioSnapshot {
+  const energy = gaussianSmooth(frames, idx, (f) => f.rms, 60);
+  const egate = energyGate(energy);
+
   return {
-    energy: gaussianSmooth(frames, idx, (f) => f.rms, 60),
+    energy,
     slowEnergy: gaussianSmooth(frames, idx, (f) => f.rms, 180),
     bass: gaussianSmooth(frames, idx, (f) => (f.sub + f.low) * 0.5, 10),
     mids: gaussianSmooth(frames, idx, (f) => f.mid, 8),
     highs: gaussianSmooth(frames, idx, (f) => f.high, 5),
-    onsetEnvelope: onsetEnvelope(frames, idx, 18),
-    beatDecay: beatDecay(frames, idx, 15),
+    onsetEnvelope: onsetEnvelope(frames, idx, 18) * egate,
+    beatDecay: beatDecay(frames, idx, 15) * egate,
     chromaHue: smoothedChromaHue(frames, idx, 15),
     centroid: gaussianSmooth(frames, idx, (f) => f.centroid, 18),
     flatness: gaussianSmooth(frames, idx, (f) => f.flatness, 15),

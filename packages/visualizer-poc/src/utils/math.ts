@@ -26,3 +26,9 @@ export function lerp(a: number, b: number, t: number): number {
 export function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
+
+/** Energy gate: smoothstep that suppresses transient effects during quiet passages.
+ *  Returns 0 below lo, 1 above hi, smooth Hermite between. */
+export function energyGate(energy: number, lo = 0.08, hi = 0.20): number {
+  return smoothstep(lo, hi, energy);
+}
