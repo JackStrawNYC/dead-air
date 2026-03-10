@@ -58,6 +58,11 @@ uniform vec4 uContrast0;
 uniform vec4 uContrast1;
 uniform float uJamDensity;
 uniform float uCoherence;
+uniform float uFastEnergy;
+uniform float uFastBass;
+uniform float uDrumOnset;
+uniform float uDrumBeat;
+uniform float uSpectralFlux;
 
 varying vec2 vUv;
 
@@ -133,7 +138,7 @@ void main() {
 
   // === HEAT SHIMMER: UV distortion from onset hits ===
   vec2 shimmerUv = p;
-  float shimmerStrength = onset * 0.08 + bass * 0.02 + uBeatSnap * 0.05;
+  float shimmerStrength = onset * 0.08 + bass * 0.02 + uBeatSnap * 0.05 + uFastEnergy * 0.06;
   shimmerUv += shimmerStrength * vec2(
     snoise(vec3(p * 8.0, uTime * 2.0)),
     snoise(vec3(p * 8.0 + 50.0, uTime * 2.0 + 30.0))
@@ -167,7 +172,7 @@ void main() {
     if (t > MAX_DIST) break;
 
     vec3 pos = camPos + camDir * t;
-    float d = flameSDF(pos, bass, highs, onset);
+    float d = flameSDF(pos, bass, highs, max(onset, uDrumOnset));
 
     // Accumulate glow based on proximity to fire surface
     // Closer to surface = stronger glow (XT95 key insight)

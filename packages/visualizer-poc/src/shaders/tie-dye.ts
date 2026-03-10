@@ -47,6 +47,11 @@ uniform float uClimaxIntensity;
 uniform vec4 uContrast0;
 uniform vec4 uContrast1;
 uniform float uCoherence;
+uniform float uFastEnergy;
+uniform float uFastBass;
+uniform float uDrumOnset;
+uniform float uDrumBeat;
+uniform float uSpectralFlux;
 
 varying vec2 vUv;
 
@@ -78,7 +83,7 @@ void main() {
   float angle = atan(uv.y, uv.x);
 
   // Time-based rotation — bass drives swirl speed
-  float t = uTime * 0.15 * (0.8 + uBass * 0.6);
+  float t = uTime * 0.15 * (0.8 + uBass * 0.6 + uFastBass * 0.4);
   float bassSwirl = uBass * 1.5;
 
   // Domain warping — noise-based spiral distortion
@@ -123,7 +128,7 @@ void main() {
   float climaxBoost = isClimax * uClimaxIntensity;
 
   // Onset flash — bright center pulse (amplified)
-  float flash = uOnsetSnap * 0.9 * smoothstep(0.6, 0.0, r) * (1.0 + climaxBoost * 0.5);
+  float flash = max(uOnsetSnap, uDrumOnset) * 0.9 * smoothstep(0.6, 0.0, r) * (1.0 + climaxBoost * 0.5);
   color += flash;
 
   // Beat snap — sharp saturation kick on transients

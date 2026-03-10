@@ -60,6 +60,11 @@ export const FullscreenQuad: React.FC<Props> = ({
       uCamOffset: { value: new THREE.Vector2(0, 0) },
       uJamDensity: { value: 0.5 },
       uCoherence: { value: 0 },
+      uFastEnergy: { value: 0 },
+      uFastBass: { value: 0 },
+      uDrumOnset: { value: 0 },
+      uDrumBeat: { value: 0 },
+      uSpectralFlux: { value: 0 },
       ...extraUniforms,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -94,6 +99,11 @@ export const FullscreenQuad: React.FC<Props> = ({
   uniforms.uCoherence.value = coherence;
   uniforms.uSlowEnergy.value = smooth.slowEnergy;
   uniforms.uStemBass.value = smooth.stemBass;
+  uniforms.uFastEnergy.value = smooth.fastEnergy;
+  uniforms.uFastBass.value = smooth.fastBass;
+  uniforms.uDrumOnset.value = smooth.drumOnset;
+  uniforms.uDrumBeat.value = smooth.drumBeat;
+  uniforms.uSpectralFlux.value = smooth.spectralFlux;
 
   const c = smooth.contrast;
   uniforms.uContrast0.value.set(c[0] ?? 0, c[1] ?? 0, c[2] ?? 0, c[3] ?? 0);

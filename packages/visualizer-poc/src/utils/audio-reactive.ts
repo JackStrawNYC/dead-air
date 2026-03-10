@@ -35,6 +35,12 @@ export interface AudioSnapshot {
   flatness: number;
   /** Spectral flux: L2 norm of consecutive contrast vector differences, Gaussian-smoothed (window=8) */
   spectralFlux: number;
+  /** Fast-responding energy: 8-frame Gaussian (~0.27s) for transient punch */
+  fastEnergy: number;
+  /** Stem-separated drum onset transient envelope (release=12) */
+  drumOnset: number;
+  /** Stem-separated drum beat decay (halfLife=12) */
+  drumBeat: number;
   /** Musical time: beat count + fractional interpolation, phase-locked to detected tempo */
   musicalTime: number;
   /** Coherence: 0-1 band lock-in score (undefined when not computed) */
@@ -102,6 +108,43 @@ export function beatDecay(
   for (let ago = 0; ago < 45; ago++) {
     if (idx - ago < 0) break;
     if (frames[idx - ago].beat) return Math.pow(0.5, ago / halfLife);
+  }
+  return 0;
+}
+
+/**
+ * Generic fast-attack / slow-release transient envelope.
+ * Like onsetEnvelope but takes an accessor for any numeric field.
+ */
+export function onsetEnvelopeGeneric(
+  frames: EnhancedFrameData[],
+  idx: number,
+  accessor: (f: EnhancedFrameData) => number,
+  releaseFrames = 12,
+): number {
+  let peak = 0;
+  for (let ago = 0; ago <= releaseFrames; ago++) {
+    if (idx - ago < 0) break;
+    const val = accessor(frames[idx - ago]);
+    const decay = Math.exp((-ago * 3.0) / releaseFrames);
+    peak = Math.max(peak, val * decay);
+  }
+  return peak;
+}
+
+/**
+ * Generic exponential decay from last truthy frame.
+ * Like beatDecay but takes an accessor for any boolean-ish field.
+ */
+export function beatDecayGeneric(
+  frames: EnhancedFrameData[],
+  idx: number,
+  accessor: (f: EnhancedFrameData) => boolean,
+  halfLife = 12,
+): number {
+  for (let ago = 0; ago < 45; ago++) {
+    if (idx - ago < 0) break;
+    if (accessor(frames[idx - ago])) return Math.pow(0.5, ago / halfLife);
   }
   return 0;
 }
@@ -269,6 +312,9 @@ export function computeAudioSnapshot(
     centroid: gaussianSmooth(frames, idx, (f) => f.centroid, 18),
     flatness: gaussianSmooth(frames, idx, (f) => f.flatness, 15),
     spectralFlux: computeSpectralFlux(frames, idx, 8),
+    fastEnergy: gaussianSmooth(frames, idx, (f) => f.rms, 8),
+    drumOnset: onsetEnvelopeGeneric(frames, idx, (f) => f.stemDrumOnset ?? 0, 12) * egate,
+    drumBeat: beatDecayGeneric(frames, idx, (f) => f.stemDrumBeat ?? false, 12) * egate,
     musicalTime: (beatArray && fps && tempo) ? computeMusicalTime(beatArray, idx, fps, tempo) : 0,
   };
 }

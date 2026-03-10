@@ -47,6 +47,11 @@ uniform float uClimaxIntensity;
 uniform vec4 uContrast0;
 uniform vec4 uContrast1;
 uniform float uCoherence;
+uniform float uFastEnergy;
+uniform float uFastBass;
+uniform float uDrumOnset;
+uniform float uDrumBeat;
+uniform float uSpectralFlux;
 
 varying vec2 vUv;
 
@@ -111,7 +116,7 @@ void main() {
 
   // === HEAVY FILM GRAIN: 2-frame hold, much stronger than other modes ===
   float grainTime = floor(uTime * 15.0) / 15.0;
-  float grainIntensity = mix(0.14, 0.08, energy); // Much heavier grain
+  float grainIntensity = mix(0.14, 0.08, energy) + uFastEnergy * 0.04; // Much heavier grain
   col += filmGrainRes(uv, grainTime, uResolution.y) * grainIntensity;
 
   // Gate scratch (vertical line that occasionally appears)

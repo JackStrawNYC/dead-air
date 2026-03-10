@@ -47,6 +47,11 @@ uniform float uClimaxIntensity;
 uniform vec4 uContrast0;
 uniform vec4 uContrast1;
 uniform float uCoherence;
+uniform float uFastEnergy;
+uniform float uFastBass;
+uniform float uDrumOnset;
+uniform float uDrumBeat;
+uniform float uSpectralFlux;
 
 varying vec2 vUv;
 
@@ -81,7 +86,7 @@ void main() {
   // === GEOMETRIC ELEMENTS ===
 
   // Breathing circle — radius tied to RMS
-  float circleR = 0.15 + uRms * 0.12 + sin(t * 2.0) * 0.04;
+  float circleR = 0.15 + (uRms + uFastEnergy * 0.5) * 0.12 + sin(t * 2.0) * 0.04;
   float circleDist = sdCircle(p, circleR);
   float circleEdge = smoothstep(0.003, 0.0, abs(circleDist));
   float circleFill = smoothstep(0.02, 0.0, circleDist) * 0.03;
@@ -101,7 +106,7 @@ void main() {
 
   // Concentric rings — expand on beats (amplified)
   float bp = beatPulse(uMusicalTime);
-  float ringExpand = uBeatSnap * 0.25 + bp * 0.15 + climaxBoost * 0.08;
+  float ringExpand = uBeatSnap * 0.25 + bp * 0.15 + climaxBoost * 0.08 + uDrumOnset * 0.15;
   for (int i = 1; i <= 3; i++) {
     float fi = float(i);
     float ringR = circleR + fi * 0.08 + ringExpand * fi;

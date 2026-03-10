@@ -83,15 +83,15 @@ export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod,
   // Saturation: 0.80 (quiet) → 1.50 (loud), capped at 1.80 to prevent neon blowout
   // Brightness: 0.80 (quiet) → 1.15 (loud) — fills the frame, never washes out
   // Contrast:   0.95 (quiet) → 1.20 (loud) — punchy but not crushing
-  const saturation = Math.min(1.80, (0.80 + factor * 0.70 + flatnessSaturation + textureSaturationOffset + (climaxMod?.saturationOffset ?? 0) + eraSatOffset) * counterpointSatMult * setTheme.saturationMult);
+  const saturation = Math.min(1.80, (0.80 + factor * 0.70 + flatnessSaturation + textureSaturationOffset + (climaxMod?.saturationOffset ?? 0) + eraSatOffset + (snapshot.drumOnset ?? 0) * 0.08) * counterpointSatMult * setTheme.saturationMult);
   const isClimaxPhase = (climaxMod?.brightnessOffset ?? 0) > 0.04;
   const brightCap = isClimaxPhase ? 1.50 : 1.25;
-  const brightness = Math.min(brightCap, 0.95 + factor * 0.30 + onsetBrightness * 0.4 + (climaxMod?.brightnessOffset ?? 0) + setTheme.brightnessOffset);
+  const brightness = Math.min(brightCap, 0.95 + factor * 0.30 + onsetBrightness * 0.4 + (climaxMod?.brightnessOffset ?? 0) + setTheme.brightnessOffset + (snapshot.fastEnergy ?? 0) * 0.12);
   // Contrast: restrained range (0.97-1.10) to preserve GLSL stage flood + lifted blacks.
   // High CSS contrast crushes dark values back toward black, undoing shader color work.
   const contrast = Math.min(1.15, 0.97 + factor * 0.13 + (climaxMod?.contrastOffset ?? 0) * 0.5);
   // Bloom uses slow energy (drift, not pulse) — reduced to prevent white wash
-  const bloomOpacity = slowFactor * 0.15 + (climaxMod?.bloomOffset ?? 0) * 0.5;
+  const bloomOpacity = slowFactor * 0.15 + (climaxMod?.bloomOffset ?? 0) * 0.5 + (snapshot.fastEnergy ?? 0) * 0.05;
 
   // Drums/Space phase adjustments
   let dsSatOffset = 0;

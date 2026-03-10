@@ -54,6 +54,11 @@ uniform vec4 uChroma2;
 uniform vec2 uCamOffset;
 uniform float uJamDensity;
 uniform float uCoherence;
+uniform float uFastEnergy;
+uniform float uFastBass;
+uniform float uDrumOnset;
+uniform float uDrumBeat;
+uniform float uSpectralFlux;
 
 varying vec2 vUv;
 
@@ -86,22 +91,22 @@ void main() {
   vec2 aspect = vec2(uResolution.x / uResolution.y, 1.0);
   vec2 p = (uv - 0.5) * aspect;
 
-  // Bass camera shake
-  float shakeX = snoise(vec3(uTime * 8.0, 0.0, 0.0)) * uBass * 0.004;
-  float shakeY = snoise(vec3(0.0, uTime * 8.0, 0.0)) * uBass * 0.004;
+  // Bass camera shake (fast bass for punchy response)
+  float shakeX = snoise(vec3(uTime * 8.0, 0.0, 0.0)) * uFastBass * 0.015;
+  float shakeY = snoise(vec3(0.0, uTime * 8.0, 0.0)) * uFastBass * 0.015;
   p += vec2(shakeX, shakeY);
 
   // Bass-driven horizontal sweep: directional motion
-  float bassWave = sin(p.x * 3.0 + uTime * 2.0 + uBass * 6.0) * uBass * 0.15;
+  float bassWave = sin(p.x * 3.0 + uTime * 2.0 + uBass * 6.0) * (uBass * 0.15 + uFastBass * 0.12);
   p.y += bassWave;
-  p.x += sin(p.y * 2.0 + uTime * 1.5) * uBass * 0.08;
+  p.x += sin(p.y * 2.0 + uTime * 1.5) * (uBass * 0.08 + uFastBass * 0.06);
 
   float energy = clamp(uEnergy, 0.0, 1.0);
   float complexity = mix(0.5, 1.0, energy);
   float tempoScale = uTempo / 120.0;
   float sectionSeed = uSectionIndex * 7.3;
   float sectionWarp = 1.0 + (uSectionProgress - 0.5) * 0.3;
-  float t = uTime * (0.25 + uRms * 0.05) * tempoScale;
+  float t = uTime * (0.25 + uRms * 0.05 + uFastEnergy * 0.12) * tempoScale;
   float smoothness = 1.0 - uFlatness * 0.6;
   float grainAmount = uFlatness * 0.12;
 
@@ -126,8 +131,9 @@ void main() {
   bgCol *= 0.65 + energy * 0.08;
 
   // ============ LAYER 2: Midground (hero) ============
-  float warpStrength = (0.7 + uBass * 0.8) * complexity * contrastWarp;
-  vec3 q = vec3(p * 1.2 * sectionWarp, t * 0.2 + sectionSeed);
+  float warpStrength = (0.7 + uBass * 0.8 + uDrumOnset * 0.3) * complexity * contrastWarp;
+  float tFlux = t * 0.2 + sectionSeed + uSpectralFlux * 0.3;
+  vec3 q = vec3(p * 1.2 * sectionWarp, tFlux);
   float warpX = fbmFlat(q + vec3(1.7, 9.2, 0.0), smoothness);
   float warpY = fbmFlat(q + vec3(8.3, 2.8, 0.0), smoothness);
   vec2 warp1 = vec2(warpX, warpY) * warpStrength;
@@ -138,7 +144,7 @@ void main() {
 
   // === CHROMATIC ABERRATION (aggressive) ===
   // Compute palette at 3 hue offsets for R/G/B channel separation
-  float caAmount = uBass * 0.08 + length(p) * 0.025 + uOnsetSnap * 0.06;
+  float caAmount = uBass * 0.08 + length(p) * 0.025 + uOnsetSnap * 0.06 + uDrumOnset * 0.10;
   float hue = hsvToCosineHue(uPalettePrimary) + uChromaHue * 0.3 + t * 0.05;
 
   vec3 palA = vec3(0.5, 0.5, 0.5);
@@ -177,7 +183,7 @@ void main() {
   vec3 coolShift = vec3(0.90, 0.97, 1.10);
   midCol *= mix(coolShift, warmShift, energy);
 
-  float brightness = mix(0.45, 1.10, energy);
+  float brightness = mix(0.45, 1.10, energy) + uFastEnergy * 0.20;
   midCol *= brightness;
 
   // ============ LAYER 3: Foreground ============
@@ -262,7 +268,7 @@ void main() {
   float climaxBoost = isClimax * climaxI;
 
   // === BEAT SNAP: onset-reactive color saturation surge ===
-  float beatKick = uBeatSnap * 0.25 * (1.0 + climaxBoost * 0.5);
+  float beatKick = max(uBeatSnap, uDrumBeat) * 0.25 * (1.0 + climaxBoost * 0.5);
   col *= 1.0 + beatKick;
 
   // Section transition bloom
@@ -311,7 +317,7 @@ void main() {
   col += filmGrainRes(uv, grainTime, uResolution.y) * grainIntensity;
 
   // ONSET SATURATION PULSE: push colors away from gray (psychedelic, not white)
-  float onsetPulse = step(0.5, uOnsetSnap) * uOnsetSnap;
+  float onsetPulse = step(0.5, max(uOnsetSnap, uDrumOnset)) * max(uOnsetSnap, uDrumOnset);
   float onsetLuma = dot(col, vec3(0.299, 0.587, 0.114));
   col = mix(vec3(onsetLuma), col, 1.0 + onsetPulse * 1.0);
   col *= 1.0 + onsetPulse * 0.12;

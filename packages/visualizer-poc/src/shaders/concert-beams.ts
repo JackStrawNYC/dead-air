@@ -47,6 +47,11 @@ uniform float uClimaxIntensity;
 uniform vec4 uContrast0;
 uniform vec4 uContrast1;
 uniform float uCoherence;
+uniform float uFastEnergy;
+uniform float uFastBass;
+uniform float uDrumOnset;
+uniform float uDrumBeat;
+uniform float uSpectralFlux;
 
 varying vec2 vUv;
 
@@ -111,7 +116,7 @@ void main() {
 
     float beamX = -aspect.x * 0.5 + beamSpacing * (fi + 1.0) + sin(uTime * 0.15 + fi * 0.7) * 0.08;
     float sweepSpeed = mix(0.25, 0.6, energy) * tempoScale + uBass * 0.1;
-    float angle = PI * 0.5 + sin(uTime * sweepSpeed + beamPhase * 2.0) * mix(0.35, 0.70, energy);
+    float angle = PI * 0.5 + sin(uTime * sweepSpeed + beamPhase * 2.0) * mix(0.35, 0.70, energy + uFastEnergy * 0.15);
     float width = mix(0.03, 0.11, energy) + uMids * 0.04;
 
     float contrastBoost = getContrastForBeam(i) * 0.3;
@@ -158,7 +163,7 @@ void main() {
   float climaxBoost = isClimax * climaxI;
 
   // === BEAT SNAP: strobe-like flash on hard transients ===
-  float strobeKick = uBeatSnap * 0.40 * (1.0 + climaxBoost * 0.5);
+  float strobeKick = max(uBeatSnap, uDrumBeat) * 0.60 * (1.0 + climaxBoost * 0.5);
   col += strobeKick * vec3(1.0, 0.95, 0.85);
 
   // === COLOR AFTERGLOW ===
@@ -176,7 +181,7 @@ void main() {
   float crowdY = 0.12 + snoise(vec3(uv.x * 20.0, uTime * 0.3, 0.0)) * 0.02
                + snoise(vec3(uv.x * 50.0, 0.0, uTime * 0.1)) * 0.008
                + snoise(vec3(uv.x * 80.0, uTime * 0.05, 3.7)) * 0.004;
-  crowdY += uBeatSnap * 0.005 * sin(uv.x * 15.0 + uTime);
+  crowdY += uDrumBeat * 0.005 * sin(uv.x * 15.0 + uTime);
   float crowdMask = smoothstep(crowdY + 0.01, crowdY - 0.01, uv.y);
   col = mix(col, vec3(0.015, 0.012, 0.02), crowdMask * 0.85);
 
@@ -197,7 +202,7 @@ void main() {
   col = mix(vigTint, col, vig);
 
   // === LIGHT LEAK ===
-  col += lightLeak(p, uTime, energy, uOnsetSnap);
+  col += lightLeak(p, uTime, energy, uOnsetSnap) + uDrumOnset * 0.15 * vec3(1.0, 0.95, 0.85);
 
   // === BEAT PULSE: tempo-locked beam intensity ===
   float bp = beatPulse(uMusicalTime);

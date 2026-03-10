@@ -47,6 +47,11 @@ uniform float uClimaxIntensity;
 uniform vec4 uContrast0;
 uniform vec4 uContrast1;
 uniform float uCoherence;
+uniform float uFastEnergy;
+uniform float uFastBass;
+uniform float uDrumOnset;
+uniform float uDrumBeat;
+uniform float uSpectralFlux;
 
 varying vec2 vUv;
 
@@ -81,7 +86,7 @@ void main() {
   // Warp for organic movement
   float w1x = fbm(blob1Pos + vec3(3.1, 7.2, 0.0));
   float w1y = fbm(blob1Pos + vec3(8.4, 1.9, 0.0));
-  vec3 warped1 = vec3(p + vec2(w1x, w1y) * (0.4 + uBass * 0.2), t * 0.25);
+  vec3 warped1 = vec3(p + vec2(w1x, w1y) * (0.4 + uBass * 0.2 + uFastBass * 0.15), t * 0.25);
 
   float blob1 = oilBlob(warped1 * 0.7, 0.05);
   float hue1 = hsvToCosineHue(uPalettePrimary) + uChromaHue * 0.2;
@@ -148,7 +153,7 @@ void main() {
   col += afterglowCol * afterglowStr;
 
   // Light leak
-  col += lightLeak(p, uTime, energy * 0.6, uOnsetSnap);
+  col += lightLeak(p, uTime, energy * 0.6, uOnsetSnap) + uDrumOnset * 0.12 * vec3(1.0, 0.95, 0.85);
 
   // S-curve grading
   col = sCurveGrade(col, energy);

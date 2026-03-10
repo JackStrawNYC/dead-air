@@ -25,6 +25,8 @@ uniform float uMusicalTime;
 uniform vec4 uChroma0;
 uniform vec4 uChroma1;
 uniform vec4 uChroma2;
+uniform float uFastEnergy;
+uniform float uDrumBeat;
 
 ${noiseGLSL}
 
@@ -41,7 +43,7 @@ void main() {
 
   // Bass-driven scale pulse: each crystal pulses slightly with low frequencies
   float bassPhase = aInstanceIndex * 0.37;
-  float scalePulse = 1.0 + uBass * 0.15 * sin(uMusicalTime * 3.14159 + bassPhase);
+  float scalePulse = 1.0 + uBass * 0.15 * sin(uMusicalTime * 3.14159 + bassPhase) + uDrumBeat * 0.10;
 
   // Highs-driven rotation around local Y axis
   float rotAngle = uTime * (0.3 + uHighs * 0.5) + aInstanceIndex * 1.618;
@@ -80,6 +82,8 @@ uniform vec4 uChroma0;
 uniform vec4 uChroma1;
 uniform vec4 uChroma2;
 uniform float uCoherence;
+uniform float uFastEnergy;
+uniform float uDrumOnset;
 
 ${noiseGLSL}
 
@@ -105,7 +109,7 @@ void main() {
   vec3 baseColor = hsv2rgb(vec3(hue, sat, 0.4 + ndotl * 0.4));
 
   // Chroma-reactive emissive glow: pitch class lights different crystals
-  float emissive = vGlow * uEnergy * 1.5;
+  float emissive = vGlow * (uEnergy + uFastEnergy * 0.8) * 1.5;
   float chromaIdx = mod(vInstanceIndex, 12.0);
   float chromaHue = chromaIdx / 12.0;
   vec3 glowColor = hsv2rgb(vec3(chromaHue, 0.8, 1.0));
@@ -115,7 +119,7 @@ void main() {
   float climaxBoost = isClimax * uClimaxIntensity;
 
   // Onset refraction flash (amplified)
-  float flash = uOnsetSnap * 0.7 * (1.0 + climaxBoost * 0.5);
+  float flash = max(uOnsetSnap, uDrumOnset) * 0.7 * (1.0 + climaxBoost * 0.5);
 
   // Beat snap: crystal brightness pulse
   float beatKick = uBeatSnap * 0.30 * (1.0 + climaxBoost * 0.4);

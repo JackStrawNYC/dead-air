@@ -62,6 +62,11 @@ uniform vec4 uContrast0;
 uniform vec4 uContrast1;
 uniform float uJamDensity;
 uniform float uCoherence;
+uniform float uFastEnergy;
+uniform float uFastBass;
+uniform float uDrumOnset;
+uniform float uDrumBeat;
+uniform float uSpectralFlux;
 
 varying vec2 vUv;
 
@@ -160,7 +165,7 @@ void main() {
   // Jam density expands step budget and coverage during peak jams
   // At neutral density (0.5) this produces 24 base steps, matching original behavior.
   int maxSteps = int(mix(16.0, 32.0, uJamDensity)) + int(energy * 8.0);
-  float verticalCoverage = mix(0.15, 0.7, energy) * mix(0.8, 1.2, uJamDensity);
+  float verticalCoverage = mix(0.15, 0.7, energy + uFastEnergy * 0.15) * mix(0.8, 1.2, uJamDensity);
   // === CLIMAX REACTIVITY ===
   float climaxPhase = uClimaxPhase;
   float climaxI = uClimaxIntensity;
@@ -170,7 +175,7 @@ void main() {
   float curtainBrightness = mix(0.10, 0.75, energy) * mix(0.7, 1.3, uJamDensity);
   curtainBrightness += onset * 0.5;
   float bpH = beatPulseHalf(uMusicalTime);
-  curtainBrightness += bpH * 0.20 + uBeatSnap * 0.25;
+  curtainBrightness += bpH * 0.20 + max(uBeatSnap, uDrumBeat) * 0.25;
   curtainBrightness += climaxBoost * 0.25;
 
   // Ray setup: looking upward into aurora band
@@ -195,7 +200,7 @@ void main() {
     if (pos.y < bandLow || pos.y > bandHigh) continue;
 
     // Curtain sway from bass
-    float swayAmt = bass * 0.4;
+    float swayAmt = bass * 0.4 + uFastBass * 0.25;
     pos.x += swayAmt * sin(pos.y * 2.0 + slowTime * 0.5);
     pos.z += swayAmt * 0.5 * cos(pos.y * 1.5 + slowTime * 0.3);
 
@@ -204,7 +209,7 @@ void main() {
     pos.z += slowTime * driftSpeed * 5.0;
 
     // FBM density with onset turbulence
-    float density = auroraFBM(pos * 0.3, onset);
+    float density = auroraFBM(pos * 0.3, max(onset, uDrumOnset) * 1.25);
 
     // Threshold: must exceed 0 to be visible
     density = smoothstep(-0.1, 0.4, density);

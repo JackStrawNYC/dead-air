@@ -25,6 +25,11 @@ uniform float uTempo;
 uniform float uOnsetSnap;
 uniform float uBeatSnap;
 uniform float uMusicalTime;
+uniform float uFastEnergy;
+uniform float uFastBass;
+uniform float uDrumOnset;
+uniform float uDrumBeat;
+uniform float uSpectralFlux;
 
 attribute float aRadius;
 attribute float aTheta;
@@ -49,8 +54,8 @@ void main() {
   float bp = beatPulse(uMusicalTime);
 
   // === BEAT SNAP: radius pulse on transients ===
-  r *= 1.0 + uBeatSnap * 0.15;
-  r *= 1.0 + uOnsetSnap * 0.08;
+  r *= 1.0 + max(uBeatSnap, uDrumBeat) * 0.20;
+  r *= 1.0 + uOnsetSnap * 0.08 + uDrumOnset * 0.12;
 
   // Tempo-aware orbit (amplified beat pulse)
   float orbitSpeed = (mix(0.02, 0.06, energy) + uMids * 0.04) * tempoScale * (1.0 + bp * 0.20);
@@ -143,6 +148,8 @@ uniform float uAfterglowHue;
 uniform float uClimaxPhase;
 uniform float uClimaxIntensity;
 uniform float uCoherence;
+uniform float uFastEnergy;
+uniform float uDrumOnset;
 
 varying float vAlpha;
 varying float vColorMix;
@@ -159,7 +166,7 @@ void main() {
   glow *= glow;
 
   // === CHROMATIC ABERRATION: hue-offset for R/G/B channels ===
-  float caAmount = uBass * 0.03 + vEnergy * 0.015 + uOnsetSnap * 0.04;
+  float caAmount = uBass * 0.03 + vEnergy * 0.015 + uOnsetSnap * 0.04 + uDrumOnset * 0.05;
 
   float hueCenter = hsvToCosineHue(uPalettePrimary) + uChromaHue * 0.25 + vColorMix * 0.3;
   float hueR = hueCenter - caAmount;
@@ -208,7 +215,7 @@ void main() {
   float distFade = 1.0 / (1.0 + vDist * 0.05);
   float alpha = glow * vAlpha * distFade;
 
-  rgb *= mix(0.40, 0.78, vEnergy) + uRms * 0.3;
+  rgb *= mix(0.40, 0.78, vEnergy) + uRms * 0.3 + uFastEnergy * 0.15;
 
   // === DISTANCE FOG: quiet = thick/intimate, loud = clear/vast ===
   float fogDensity = mix(0.15, 0.02, vEnergy);

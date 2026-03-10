@@ -69,6 +69,11 @@ const ParticleSystem: React.FC = () => {
       uAfterglowHue: { value: 0 },
       uClimaxPhase: { value: 0 },
       uClimaxIntensity: { value: 0 },
+      uFastEnergy: { value: 0 },
+      uFastBass: { value: 0 },
+      uDrumOnset: { value: 0 },
+      uDrumBeat: { value: 0 },
+      uSpectralFlux: { value: 0 },
     };
 
     return { geometry: geo, uniforms: u };
@@ -98,6 +103,11 @@ const ParticleSystem: React.FC = () => {
   uniforms.uAfterglowHue.value = smooth.afterglowHue;
   uniforms.uClimaxPhase.value = climaxPhase;
   uniforms.uClimaxIntensity.value = climaxIntensity;
+  uniforms.uFastEnergy.value = smooth.fastEnergy;
+  uniforms.uFastBass.value = smooth.fastBass;
+  uniforms.uDrumOnset.value = smooth.drumOnset;
+  uniforms.uDrumBeat.value = smooth.drumBeat;
+  uniforms.uSpectralFlux.value = smooth.spectralFlux;
 
   // Camera orbit with bass shake
   const sectionProgress = smooth.sectionProgress;

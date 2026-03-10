@@ -26,6 +26,8 @@ interface Props {
   cameraFreeze?: boolean;
   /** Drums/Space sub-phase for phase-specific camera behavior */
   drumsSpacePhase?: string;
+  /** Fast-responding energy (8-frame window) for snappier zoom response */
+  fastEnergy?: number;
 }
 
 const QUIET_SCALE = 1.08;
@@ -56,7 +58,7 @@ function shakeHash(frame: number): { x: number; y: number } {
 // Persisted transform for camera freeze (holds last computed values)
 let frozenTransform = { scale: 1.04, totalX: 0, totalY: 0 };
 
-export const CameraMotion: React.FC<Props> = ({ frames, children, jamEvolution, bass, cameraFreeze, drumsSpacePhase }) => {
+export const CameraMotion: React.FC<Props> = ({ frames, children, jamEvolution, bass, cameraFreeze, drumsSpacePhase, fastEnergy }) => {
   const frame = useCurrentFrame();
   const idx = Math.min(Math.max(0, frame), frames.length - 1);
 
@@ -70,8 +72,9 @@ export const CameraMotion: React.FC<Props> = ({ frames, children, jamEvolution, 
   const smoothEnergy = count > 0 ? energySum / count : 0;
   const egate = energyGate(smoothEnergy);
 
-  // Energy-based zoom (existing behavior)
-  const energyT = Math.min(1, smoothEnergy * 5);
+  // Energy-based zoom: blend fastEnergy for snappier zoom snap
+  const blendedEnergy = smoothEnergy + (fastEnergy ?? 0) * 0.3;
+  const energyT = Math.min(1, blendedEnergy * 5);
   const energyScale = QUIET_SCALE + (PEAK_SCALE - QUIET_SCALE) * energyT;
 
   // Determine final scale and drift
@@ -95,13 +98,15 @@ export const CameraMotion: React.FC<Props> = ({ frames, children, jamEvolution, 
     scale = energyScale;
   }
 
-  // Micro-shake on beat hits
+  // Micro-shake on beat hits (prefer stemDrumBeat when available)
   let shakeX = 0;
   let shakeY = 0;
   for (let ago = 0; ago < SHAKE_DECAY_FRAMES; ago++) {
     const checkIdx = idx - ago;
     if (checkIdx < 0) break;
-    if (frames[checkIdx].beat && frames[checkIdx].onset > 0.25) {
+    const f = frames[checkIdx];
+    const hasBeat = (f.stemDrumBeat != null ? f.stemDrumBeat : f.beat) && (f.stemDrumOnset ?? f.onset) > 0.25;
+    if (hasBeat) {
       const decay = Math.exp(-ago * 0.7);
       const dir = shakeHash(checkIdx);
       shakeX += dir.x * SHAKE_PX * decay * egate;
@@ -110,17 +115,19 @@ export const CameraMotion: React.FC<Props> = ({ frames, children, jamEvolution, 
     }
   }
 
-  // Onset jolt: sharp camera punch on transient attacks (onset > 0.5)
+  // Onset jolt: sharp camera punch on transient attacks (prefer stemDrumOnset when available)
   const ONSET_JOLT_PX = 8;
   const ONSET_JOLT_DECAY = 8;
   for (let ago = 0; ago < ONSET_JOLT_DECAY; ago++) {
     const checkIdx = idx - ago;
     if (checkIdx < 0) break;
-    if (frames[checkIdx].onset > 0.5) {
+    const f = frames[checkIdx];
+    const onsetVal = f.stemDrumOnset ?? f.onset;
+    if (onsetVal > 0.5) {
       const decay = Math.exp(-ago * 1.2);
       const dir = shakeHash(checkIdx + 9973);
-      shakeX += dir.x * ONSET_JOLT_PX * frames[checkIdx].onset * decay * egate;
-      shakeY += dir.y * ONSET_JOLT_PX * frames[checkIdx].onset * decay * egate;
+      shakeX += dir.x * ONSET_JOLT_PX * onsetVal * decay * egate;
+      shakeY += dir.y * ONSET_JOLT_PX * onsetVal * decay * egate;
       break;
     }
   }

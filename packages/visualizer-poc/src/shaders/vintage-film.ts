@@ -48,6 +48,11 @@ uniform float uClimaxIntensity;
 uniform vec4 uContrast0;
 uniform vec4 uContrast1;
 uniform float uCoherence;
+uniform float uFastEnergy;
+uniform float uFastBass;
+uniform float uDrumOnset;
+uniform float uDrumBeat;
+uniform float uSpectralFlux;
 
 varying vec2 vUv;
 
@@ -133,7 +138,7 @@ void main() {
 
   // Film grain (uses shared filmGrain from noise.ts — returns warm-tinted vec3)
   float grainTime = floor(t * 15.0) / 15.0;
-  color += filmGrain(uv, grainTime) * 0.06;
+  color += filmGrain(uv, grainTime) * (0.06 + uSpectralFlux * 0.04);
 
   // Vertical scratches — random thin lines
   float scratch = smoothstep(0.001, 0.0, abs(uv.x - hash(floor(t * 3.0)) ));
@@ -151,7 +156,7 @@ void main() {
 
   // Beat-triggered gate flicker (projector stutter — amplified)
   float bp = beatPulse(uMusicalTime);
-  float gateFlicker = 1.0 - bp * 0.15 - uBeatSnap * 0.14;
+  float gateFlicker = 1.0 - bp * 0.15 - max(uBeatSnap, uDrumBeat) * 0.14;
   color *= gateFlicker;
 
   // Vignette — heavy, like a projector hotspot

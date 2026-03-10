@@ -10,7 +10,7 @@ import { useCurrentFrame, useVideoConfig } from "remotion";
 import type { EnhancedFrameData, SectionBoundary, ColorPalette } from "../data/types";
 import { findCurrentSection } from "../utils/section-lookup";
 import { computeClimaxState, type ClimaxPhase } from "../utils/climax-state";
-import { computeAudioSnapshot as computeSnapshot, buildBeatArray as buildBeatArrayUtil, computeMusicalTime as computeMusicalTimeUtil } from "../utils/audio-reactive";
+import { computeAudioSnapshot as computeSnapshot, buildBeatArray as buildBeatArrayUtil, computeMusicalTime as computeMusicalTimeUtil, computeSpectralFlux } from "../utils/audio-reactive";
 import { energyGate } from "../utils/math";
 
 /** Audio data context passed to all Three.js children */
@@ -55,6 +55,16 @@ export interface AudioDataContext {
     stemBass: number;
     /** Raw 12-element chroma array at current frame (C, C#, D, ..., B) */
     chroma: number[];
+    /** Fast-responding energy: 8-frame Gaussian (~0.27s) for transient punch */
+    fastEnergy: number;
+    /** Fast bass: 6-frame window for punchy bass response */
+    fastBass: number;
+    /** Stem-separated drum onset transient envelope */
+    drumOnset: number;
+    /** Stem-separated drum beat decay */
+    drumBeat: number;
+    /** Spectral flux: timbral change rate */
+    spectralFlux: number;
   };
   /** Per-song palette primary hue (0-1 normalized) */
   palettePrimary: number;
@@ -263,6 +273,13 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
   const chromaShift = chromaShiftMagnitude(frames, idx);
   const afterglowHue = colorAfterglowHue(frames, idx);
 
+  // Fast-responding signals for transient punch
+  const fastEnergy = smoothValue(frames, idx, (f) => f.rms, 8);
+  const fastBass = smoothValue(frames, idx, (f) => f.sub + f.low, 6) * 0.5;
+  const drumOnset = transientEnvelope(frames, idx, (f) => f.stemDrumOnset ?? 0, 12) * egate;
+  const drumBeat = transientEnvelope(frames, idx, (f) => (f.stemDrumBeat ? 1 : 0), 12) * egate;
+  const spectralFlux = computeSpectralFlux(frames, idx, 8);
+
   // Climax state for shader uniforms
   const phaseMap: Record<ClimaxPhase, number> = { idle: 0, build: 1, climax: 2, sustain: 3, release: 4 };
   const climaxEnergy = smoothValue(frames, idx, (f) => f.rms, 60);
@@ -301,6 +318,11 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
       slowEnergy: smoothValue(frames, idx, (f) => f.rms, 180),
       stemBass,
       chroma: Array.from(fd.chroma),
+      fastEnergy,
+      fastBass,
+      drumOnset,
+      drumBeat,
+      spectralFlux,
     },
     palettePrimary,
     paletteSecondary,

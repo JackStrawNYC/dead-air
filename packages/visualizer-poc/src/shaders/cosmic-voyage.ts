@@ -56,6 +56,11 @@ uniform vec4 uContrast0;
 uniform vec4 uContrast1;
 uniform float uJamDensity;
 uniform float uCoherence;
+uniform float uFastEnergy;
+uniform float uFastBass;
+uniform float uDrumOnset;
+uniform float uDrumBeat;
+uniform float uSpectralFlux;
 
 varying vec2 vUv;
 
@@ -84,7 +89,7 @@ vec3 domainWarp(vec3 p, float onset, float time) {
     fbm3(p + 4.0 * q + vec3(3.1, 5.4, time * 0.05))
   );
 
-  return p + 0.35 * (q + onset * 1.5 * r);
+  return p + 0.35 * (q + onset * 1.5 * r) + uSpectralFlux * 0.8 * q;
 }
 
 // --- Camera path: Lissajous curve with variable Z-forward drift ---
@@ -107,7 +112,7 @@ void main() {
   float onset = clamp(uOnsetSnap, 0.0, 1.0);
 
   // === CAMERA SETUP ===
-  float driftSpeed = 0.12 + energy * 0.15;
+  float driftSpeed = 0.12 + energy * 0.15 + uFastEnergy * 0.06;
   float camT = uTime * driftSpeed;
   vec3 camPos = cameraPath(camT);
 
@@ -147,7 +152,7 @@ void main() {
   float climaxBoost = isClimax * climaxI;
 
   // Kaliset parameters (retuned for 30 steps)
-  float formuparam = 0.53 + onset * 0.15 + uBeatSnap * 0.12;
+  float formuparam = 0.53 + onset * 0.15 + max(uBeatSnap, uDrumBeat) * 0.12 + uDrumOnset * 0.15;
   float tile = 0.92;
   // Jam density reduces dark matter absorption → denser nebula at peaks
   // At neutral density (0.5) the multiplier is 1.0, preserving original behavior.
@@ -301,7 +306,7 @@ void main() {
   col *= 1.0 + bp * 0.25 + climaxBoost * bp * 0.15;
 
   // === BEAT SNAP: sharp brightness kick on transients ===
-  col *= 1.0 + uBeatSnap * 0.25 * (1.0 + climaxBoost * 0.5);
+  col *= 1.0 + max(uBeatSnap, uDrumBeat) * 0.25 * (1.0 + climaxBoost * 0.5);
 
   // === BLOOM: bright pixel self-illumination (climax-amplified) ===
   float lum = dot(col, vec3(0.299, 0.587, 0.114));

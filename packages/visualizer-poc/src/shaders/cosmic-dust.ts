@@ -47,6 +47,11 @@ uniform float uClimaxIntensity;
 uniform vec4 uContrast0;
 uniform vec4 uContrast1;
 uniform float uCoherence;
+uniform float uFastEnergy;
+uniform float uFastBass;
+uniform float uDrumOnset;
+uniform float uDrumBeat;
+uniform float uSpectralFlux;
 
 varying vec2 vUv;
 
@@ -120,7 +125,7 @@ void main() {
   stars += starField(starUv * 0.8 + 10.0, 80.0, 0.5) * 0.15;
 
   // Energy brightens stars
-  stars *= 0.7 + uEnergy * 0.6;
+  stars *= 0.7 + uEnergy * 0.6 + uFastEnergy * 0.2;
 
   // Nebula clouds — palette-locked colors
   float neb1 = nebula(uv * 0.8 + drift * 0.5, uTime);
@@ -156,7 +161,7 @@ void main() {
   // Beat: pulse on nebula brightness (amplified + beat snap)
   float bp = beatPulse(uMusicalTime);
   color *= 1.0 + bp * 0.20 + climaxBoost * bp * 0.12;
-  color *= 1.0 + uBeatSnap * 0.20 * (1.0 + climaxBoost * 0.4);
+  color *= 1.0 + max(uBeatSnap, uDrumBeat) * 0.20 * (1.0 + climaxBoost * 0.4);
 
   // Vignette — subtle
   float vig = 1.0 - smoothstep(0.8, 1.6, length(uv));

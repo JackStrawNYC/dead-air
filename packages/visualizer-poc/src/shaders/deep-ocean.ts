@@ -57,6 +57,11 @@ uniform float uSlowEnergy;
 uniform vec4 uContrast0;
 uniform vec4 uContrast1;
 uniform float uCoherence;
+uniform float uFastEnergy;
+uniform float uFastBass;
+uniform float uDrumOnset;
+uniform float uDrumBeat;
+uniform float uSpectralFlux;
 
 varying vec2 vUv;
 
@@ -120,7 +125,7 @@ void main() {
   swayUv.x += uTime * 0.05;
 
   // Surface chop from energy: quiet = glassy, loud = churning
-  float chop = energy * 0.04;
+  float chop = energy * 0.04 + uFastBass * 0.03;
   swayUv += chop * vec2(
     snoise(vec3(p * 6.0, uTime * 1.5)),
     snoise(vec3(p * 6.0 + 50.0, uTime * 1.5))
@@ -137,7 +142,7 @@ void main() {
 
   // Onset distortion on caustic domain (amplified)
   vec2 causticUv = swayUv;
-  causticUv += onset * 0.12 * vec2(
+  causticUv += (onset + uDrumOnset * 0.15) * 0.12 * vec2(
     snoise(vec3(p * 3.0, uTime * 2.0)),
     snoise(vec3(p * 3.0 + 70.0, uTime * 2.0))
   );
@@ -161,7 +166,7 @@ void main() {
 
   // === GOD RAYS: vertical light shafts from above (beat-reactive) ===
   float bpH = beatPulseHalf(uMusicalTime);
-  float rayIntensity = (0.3 + bass * 0.5) * (1.0 + bpH * 0.25 + uBeatSnap * 0.30 + climaxBoost * 0.20);
+  float rayIntensity = (0.3 + bass * 0.5 + uFastEnergy * 0.2) * (1.0 + bpH * 0.25 + uBeatSnap * 0.30 + climaxBoost * 0.20);
   float rayX = swayUv.x * 3.0 + bass * sin(uTime * 0.3) * 0.5;
   float ray1 = smoothstep(0.8, 1.0, sin(rayX * 2.0 + uTime * 0.5)) * rayIntensity;
   float ray2 = smoothstep(0.85, 1.0, sin(rayX * 3.5 + uTime * 0.4 + 1.0)) * rayIntensity * 0.7;
