@@ -55,6 +55,7 @@ uniform float uClimaxIntensity;
 uniform vec4 uContrast0;
 uniform vec4 uContrast1;
 uniform float uJamDensity;
+uniform float uCoherence;
 
 varying vec2 vUv;
 
@@ -262,7 +263,7 @@ void main() {
   col *= 1.15 + climaxBoost * 0.20;
 
   // === CHROMATIC ABERRATION from highs ===
-  float caAmount = highs * 0.015 + uOnsetSnap * 0.04;
+  float caAmount = highs * 0.015 + uOnsetSnap * 0.059;
   if (caAmount > 0.001) {
     vec2 caOffset = p * caAmount;
     col.r += col.r * caOffset.x * 0.3;
@@ -300,7 +301,7 @@ void main() {
   col *= 1.0 + bp * 0.25 + climaxBoost * bp * 0.15;
 
   // === BEAT SNAP: sharp brightness kick on transients ===
-  col *= 1.0 + uBeatSnap * 0.12 * (1.0 + climaxBoost * 0.5);
+  col *= 1.0 + uBeatSnap * 0.25 * (1.0 + climaxBoost * 0.5);
 
   // === BLOOM: bright pixel self-illumination (climax-amplified) ===
   float lum = dot(col, vec3(0.299, 0.587, 0.114));
@@ -332,8 +333,8 @@ void main() {
   // ONSET SATURATION PULSE: push colors away from gray (psychedelic, not white)
   float onsetPulse = step(0.5, uOnsetSnap) * uOnsetSnap;
   float onsetLuma = dot(col, vec3(0.299, 0.587, 0.114));
-  col = mix(vec3(onsetLuma), col, 1.0 + onsetPulse * 0.7);
-  col *= 1.0 + onsetPulse * 0.08;
+  col = mix(vec3(onsetLuma), col, 1.0 + onsetPulse * 1.0);
+  col *= 1.0 + onsetPulse * 0.12;
 
   // ONSET CHROMATIC ABERRATION
   if (uOnsetSnap > 0.4) {

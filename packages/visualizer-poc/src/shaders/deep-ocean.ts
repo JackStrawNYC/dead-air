@@ -56,6 +56,7 @@ uniform float uClimaxIntensity;
 uniform float uSlowEnergy;
 uniform vec4 uContrast0;
 uniform vec4 uContrast1;
+uniform float uCoherence;
 
 varying vec2 vUv;
 
@@ -160,7 +161,7 @@ void main() {
 
   // === GOD RAYS: vertical light shafts from above (beat-reactive) ===
   float bpH = beatPulseHalf(uMusicalTime);
-  float rayIntensity = (0.3 + bass * 0.5) * (1.0 + bpH * 0.25 + uBeatSnap * 0.18 + climaxBoost * 0.20);
+  float rayIntensity = (0.3 + bass * 0.5) * (1.0 + bpH * 0.25 + uBeatSnap * 0.30 + climaxBoost * 0.20);
   float rayX = swayUv.x * 3.0 + bass * sin(uTime * 0.3) * 0.5;
   float ray1 = smoothstep(0.8, 1.0, sin(rayX * 2.0 + uTime * 0.5)) * rayIntensity;
   float ray2 = smoothstep(0.85, 1.0, sin(rayX * 3.5 + uTime * 0.4 + 1.0)) * rayIntensity * 0.7;
@@ -246,12 +247,12 @@ void main() {
   // ONSET SATURATION PULSE: push colors away from gray (psychedelic, not white)
   float onsetPulse = step(0.5, uOnsetSnap) * uOnsetSnap;
   float onsetLuma = dot(col, vec3(0.299, 0.587, 0.114));
-  col = mix(vec3(onsetLuma), col, 1.0 + onsetPulse * 0.7);
-  col *= 1.0 + onsetPulse * 0.08;
+  col = mix(vec3(onsetLuma), col, 1.0 + onsetPulse * 1.0);
+  col *= 1.0 + onsetPulse * 0.12;
 
   // ONSET CHROMATIC ABERRATION
   if (uOnsetSnap > 0.4) {
-    float caAmt = (uOnsetSnap - 0.4) * 0.15;
+    float caAmt = (uOnsetSnap - 0.4) * 0.22;
     col.r *= 1.0 + caAmt;
     col.b *= 1.0 - caAmt * 0.5;
   }

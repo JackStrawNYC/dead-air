@@ -32,6 +32,10 @@ interface Props {
   counterpointSatMult?: number;
   /** Set number (1, 2, or 3=encore) for set-level color theming */
   setNumber?: number;
+  /** Drums/Space sub-phase for phase-specific color adjustments */
+  drumsSpacePhase?: string;
+  /** Show narrative phase for show-level arc modulation */
+  showPhase?: string;
 }
 
 // Per-era bloom color — matches era grade for visual cohesion
@@ -44,7 +48,7 @@ const ERA_BLOOM: Record<string, string> = {
 };
 const DEFAULT_BLOOM = ERA_BLOOM.classic;
 
-export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod, jamColorTemp, calibration, counterpointSatMult = 1, setNumber }) => {
+export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod, jamColorTemp, calibration, counterpointSatMult = 1, setNumber, drumsSpacePhase, showPhase }) => {
   const energy = snapshot.energy;
   const setTheme = getSetTheme(setNumber ?? 1);
   const low = calibration?.quietThreshold;
@@ -57,7 +61,7 @@ export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod,
 
   // ── Multi-field modulations (gentle — felt, not seen) ──
   // Onset: percussive attacks create mild brightness punch
-  const onsetBrightness = snapshot.onsetEnvelope * 0.10;    // +0-10%
+  const onsetBrightness = snapshot.onsetEnvelope * 0.15;    // +0-15%
   // Flatness: tonal passages richer, noisy passages flatter
   const flatnessSaturation = 0.02 - snapshot.flatness * 0.04; // +2% to -2%
 
@@ -89,14 +93,43 @@ export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod,
   // Bloom uses slow energy (drift, not pulse) — reduced to prevent white wash
   const bloomOpacity = slowFactor * 0.15 + (climaxMod?.bloomOffset ?? 0) * 0.5;
 
+  // Drums/Space phase adjustments
+  let dsSatOffset = 0;
+  let dsBrightOffset = 0;
+  let dsHueOffset = 0;
+  let dsContrastOffset = 0;
+  if (drumsSpacePhase === "space_ambient") {
+    dsSatOffset = -0.15;    // desaturated void
+    dsBrightOffset = -0.10; // darkness
+    dsHueOffset = 15;       // blue shift
+  } else if (drumsSpacePhase === "drums_tribal") {
+    dsContrastOffset = 0.08; // primal punch
+    dsHueOffset = 8;         // warmth shift
+  }
+
+  // Show narrative phase adjustments
+  let showSatOffset = 0;
+  let showBrightOffset = 0;
+  if (showPhase === "opening") {
+    showBrightOffset = 0.03;  // show is fresh
+    showSatOffset = 0.05;
+  } else if (showPhase === "closing") {
+    showSatOffset = -0.05;    // bittersweet ending
+  }
+
+  // Apply phase offsets
+  const finalSaturation = Math.min(1.80, Math.max(0.3, saturation + dsSatOffset + showSatOffset));
+  const finalBrightness = Math.min(brightCap, Math.max(0.6, brightness + dsBrightOffset + showBrightOffset));
+  const finalContrast = Math.min(1.20, Math.max(0.90, contrast + dsContrastOffset));
+
   // Jam color temperature: warm shifts yellow, cool shifts blue (max ±12deg)
   // Only applied during long jams. EraGrade + SongPalette handle base color character.
   const jamHueShift = jamColorTemp != null ? jamColorTemp * 35 : 0; // ±28 degrees max
   // Set-level warmth shift: Set 1 warm (+5deg), Set 2 cool (-8deg), Encore neutral (0)
-  const totalHueShift = jamHueShift + setTheme.warmthShift + eraColorTempShift;
+  const totalHueShift = jamHueShift + setTheme.warmthShift + eraColorTempShift + dsHueOffset;
   const filterStr = totalHueShift !== 0
-    ? `saturate(${saturation.toFixed(3)}) brightness(${brightness.toFixed(3)}) contrast(${contrast.toFixed(3)}) hue-rotate(${totalHueShift.toFixed(1)}deg)`
-    : `saturate(${saturation.toFixed(3)}) brightness(${brightness.toFixed(3)}) contrast(${contrast.toFixed(3)})`;
+    ? `saturate(${finalSaturation.toFixed(3)}) brightness(${finalBrightness.toFixed(3)}) contrast(${finalContrast.toFixed(3)}) hue-rotate(${totalHueShift.toFixed(1)}deg)`
+    : `saturate(${finalSaturation.toFixed(3)}) brightness(${finalBrightness.toFixed(3)}) contrast(${finalContrast.toFixed(3)})`;
 
   return (
     <div style={{ position: "absolute", inset: 0, filter: filterStr }}>

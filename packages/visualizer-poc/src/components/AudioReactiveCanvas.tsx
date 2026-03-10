@@ -71,6 +71,10 @@ export interface AudioDataContext {
   climaxIntensity: number;
   /** Jam density: normalized 0-1 from jam evolution system (0.5 = neutral) */
   jamDensity: number;
+  /** Coherence: 0-1 band lock-in score */
+  coherence: number;
+  /** Whether band is in "locked in" state */
+  isLocked: boolean;
 }
 
 const AudioCtx = createContext<AudioDataContext | null>(null);
@@ -217,11 +221,15 @@ interface Props {
   tempo?: number;
   /** Normalized jam density from jam evolution system (0-1, default 0.5) */
   jamDensity?: number;
+  /** Coherence score (0-1) from coherence detector */
+  coherence?: number;
+  /** Whether band is in "locked in" state */
+  isLocked?: boolean;
 }
 
 const DEFAULT_PALETTE: ColorPalette = { primary: 210, secondary: 270 };
 
-export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, sections, palette, tempo, jamDensity }) => {
+export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, sections, palette, tempo, jamDensity, coherence: coherenceProp, isLocked: isLockedProp }) => {
   const frameIdx = useCurrentFrame();
   const { fps, width, height } = useVideoConfig();
 
@@ -300,6 +308,8 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
     climaxPhase: climaxPhaseNum,
     climaxIntensity: climaxState.intensity,
     jamDensity: jamDensity ?? 0.5,
+    coherence: coherenceProp ?? 0,
+    isLocked: isLockedProp ?? false,
   };
 
   return (

@@ -46,6 +46,7 @@ uniform float uClimaxPhase;
 uniform float uClimaxIntensity;
 uniform vec4 uContrast0;
 uniform vec4 uContrast1;
+uniform float uCoherence;
 
 varying vec2 vUv;
 
@@ -124,7 +125,7 @@ void main() {
   col += overlap * vec3(1.0, 0.95, 0.85) * energy * (1.0 + bp * 0.35 + climaxBoost * 0.20);
 
   // === BEAT SNAP: blob brightness pulse ===
-  col *= 1.0 + uBeatSnap * 0.15 * (1.0 + climaxBoost * 0.4);
+  col *= 1.0 + uBeatSnap * 0.25 * (1.0 + climaxBoost * 0.4);
 
   // Palette saturation
   float lum = dot(col, vec3(0.299, 0.587, 0.114));
@@ -166,8 +167,8 @@ void main() {
   // ONSET SATURATION PULSE: push colors away from gray (psychedelic, not white)
   float onsetPulse = step(0.5, uOnsetSnap) * uOnsetSnap;
   float onsetLuma = dot(col, vec3(0.299, 0.587, 0.114));
-  col = mix(vec3(onsetLuma), col, 1.0 + onsetPulse * 0.7);
-  col *= 1.0 + onsetPulse * 0.08;
+  col = mix(vec3(onsetLuma), col, 1.0 + onsetPulse * 1.0);
+  col *= 1.0 + onsetPulse * 0.12;
 
   // ONSET CHROMATIC ABERRATION
   if (uOnsetSnap > 0.4) {

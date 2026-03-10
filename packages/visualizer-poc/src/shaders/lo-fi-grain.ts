@@ -46,6 +46,7 @@ uniform float uClimaxPhase;
 uniform float uClimaxIntensity;
 uniform vec4 uContrast0;
 uniform vec4 uContrast1;
+uniform float uCoherence;
 
 varying vec2 vUv;
 
@@ -132,7 +133,7 @@ void main() {
   // === BEAT PULSE: tempo-locked warm glow (amplified) ===
   float bp = beatPulse(uMusicalTime);
   col *= 1.0 + bp * 0.22 + climaxBoost * bp * 0.10;
-  col *= 1.0 + uBeatSnap * 0.10;
+  col *= 1.0 + uBeatSnap * 0.18;
 
   // Lifted blacks (build-phase-aware: near true black during build for anticipation)
   float isBuild = step(0.5, uClimaxPhase) * step(uClimaxPhase, 1.5);
@@ -148,8 +149,8 @@ void main() {
   // ONSET SATURATION PULSE: push colors away from gray (psychedelic, not white)
   float onsetPulse = step(0.5, uOnsetSnap) * uOnsetSnap;
   float onsetLuma = dot(col, vec3(0.299, 0.587, 0.114));
-  col = mix(vec3(onsetLuma), col, 1.0 + onsetPulse * 0.7);
-  col *= 1.0 + onsetPulse * 0.08;
+  col = mix(vec3(onsetLuma), col, 1.0 + onsetPulse * 1.0);
+  col *= 1.0 + onsetPulse * 0.12;
 
   // ONSET CHROMATIC ABERRATION
   if (uOnsetSnap > 0.4) {

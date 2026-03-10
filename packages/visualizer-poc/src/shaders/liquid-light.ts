@@ -53,6 +53,7 @@ uniform vec4 uChroma1;
 uniform vec4 uChroma2;
 uniform vec2 uCamOffset;
 uniform float uJamDensity;
+uniform float uCoherence;
 
 varying vec2 vUv;
 
@@ -137,7 +138,7 @@ void main() {
 
   // === CHROMATIC ABERRATION (aggressive) ===
   // Compute palette at 3 hue offsets for R/G/B channel separation
-  float caAmount = uBass * 0.08 + length(p) * 0.025 + uOnsetSnap * 0.04;
+  float caAmount = uBass * 0.08 + length(p) * 0.025 + uOnsetSnap * 0.06;
   float hue = hsvToCosineHue(uPalettePrimary) + uChromaHue * 0.3 + t * 0.05;
 
   vec3 palA = vec3(0.5, 0.5, 0.5);
@@ -261,7 +262,7 @@ void main() {
   float climaxBoost = isClimax * climaxI;
 
   // === BEAT SNAP: onset-reactive color saturation surge ===
-  float beatKick = uBeatSnap * 0.20 * (1.0 + climaxBoost * 0.5);
+  float beatKick = uBeatSnap * 0.25 * (1.0 + climaxBoost * 0.5);
   col *= 1.0 + beatKick;
 
   // Section transition bloom
@@ -312,8 +313,8 @@ void main() {
   // ONSET SATURATION PULSE: push colors away from gray (psychedelic, not white)
   float onsetPulse = step(0.5, uOnsetSnap) * uOnsetSnap;
   float onsetLuma = dot(col, vec3(0.299, 0.587, 0.114));
-  col = mix(vec3(onsetLuma), col, 1.0 + onsetPulse * 0.7);
-  col *= 1.0 + onsetPulse * 0.08;
+  col = mix(vec3(onsetLuma), col, 1.0 + onsetPulse * 1.0);
+  col *= 1.0 + onsetPulse * 0.12;
 
   // Lifted blacks (build-phase-aware: near true black during build for anticipation)
   float isBuild = step(0.5, uClimaxPhase) * step(uClimaxPhase, 1.5);

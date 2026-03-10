@@ -20,7 +20,7 @@ export const FullscreenQuad: React.FC<Props> = ({
   fragmentShader,
   extraUniforms,
 }) => {
-  const { time, beatDecay, smooth, palettePrimary, paletteSecondary, paletteSaturation, tempo, musicalTime, climaxPhase, climaxIntensity, jamDensity } = useAudioData();
+  const { time, beatDecay, smooth, palettePrimary, paletteSecondary, paletteSaturation, tempo, musicalTime, climaxPhase, climaxIntensity, jamDensity, coherence } = useAudioData();
   const { width, height } = useVideoConfig();
 
   const uniforms = useMemo(() => {
@@ -59,6 +59,7 @@ export const FullscreenQuad: React.FC<Props> = ({
       uChroma2: { value: new THREE.Vector4(0, 0, 0, 0) },
       uCamOffset: { value: new THREE.Vector2(0, 0) },
       uJamDensity: { value: 0.5 },
+      uCoherence: { value: 0 },
       ...extraUniforms,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -90,6 +91,7 @@ export const FullscreenQuad: React.FC<Props> = ({
   uniforms.uClimaxPhase.value = climaxPhase;
   uniforms.uClimaxIntensity.value = climaxIntensity;
   uniforms.uJamDensity.value = jamDensity;
+  uniforms.uCoherence.value = coherence;
   uniforms.uSlowEnergy.value = smooth.slowEnergy;
   uniforms.uStemBass.value = smooth.stemBass;
 
@@ -104,7 +106,7 @@ export const FullscreenQuad: React.FC<Props> = ({
 
   // Camera offset: approximate CameraMotion's drift for parallax
   // Bass-driven sway + slow sinusoidal drift
-  const bassAmp = smooth.bass * 8.0;
+  const bassAmp = smooth.bass * 12.0;
   const camOffX = Math.sin(time * 3.7) * bassAmp * 0.5 + Math.sin(time * 0.03 * Math.PI * 2) * 4;
   const camOffY = Math.cos(time * 2.3) * bassAmp * 0.3 + Math.cos(time * 0.03 * Math.PI * 2 * 0.7 + 1.3) * 2.4;
   uniforms.uCamOffset.value.set(camOffX, camOffY);

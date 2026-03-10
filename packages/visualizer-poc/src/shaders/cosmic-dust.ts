@@ -46,6 +46,7 @@ uniform float uClimaxPhase;
 uniform float uClimaxIntensity;
 uniform vec4 uContrast0;
 uniform vec4 uContrast1;
+uniform float uCoherence;
 
 varying vec2 vUv;
 
@@ -155,15 +156,23 @@ void main() {
   // Beat: pulse on nebula brightness (amplified + beat snap)
   float bp = beatPulse(uMusicalTime);
   color *= 1.0 + bp * 0.20 + climaxBoost * bp * 0.12;
-  color *= 1.0 + uBeatSnap * 0.12 * (1.0 + climaxBoost * 0.4);
+  color *= 1.0 + uBeatSnap * 0.20 * (1.0 + climaxBoost * 0.4);
 
   // Vignette — subtle
-  float vig = 1.0 - smoothstep(0.6, 1.4, length(uv));
-  color *= vig;
+  float vig = 1.0 - smoothstep(0.8, 1.6, length(uv));
+  color *= 0.3 + vig * 0.7;
 
-  // ONSET BRIGHTNESS PULSE: raw transient spike
-  float onsetPulse = step(0.5, uOnsetSnap) * uOnsetSnap * 0.30;
-  color *= 1.0 + onsetPulse;
+  // === S-CURVE COLOR GRADING ===
+  color = sCurveGrade(color, uEnergy);
+
+  // === ANIMATED STAGE FLOOD: flowing palette noise in dark areas ===
+  color = stageFloodFill(color, uv, uTime, uEnergy, uPalettePrimary, uPaletteSecondary);
+
+  // ONSET SATURATION PULSE: push colors away from gray (psychedelic, not white)
+  float onsetPulse = step(0.5, uOnsetSnap) * uOnsetSnap;
+  float onsetLuma = dot(color, vec3(0.299, 0.587, 0.114));
+  color = mix(vec3(onsetLuma), color, 1.0 + onsetPulse * 1.0);
+  color *= 1.0 + onsetPulse * 0.12;
 
   // ONSET CHROMATIC ABERRATION
   if (uOnsetSnap > 0.4) {

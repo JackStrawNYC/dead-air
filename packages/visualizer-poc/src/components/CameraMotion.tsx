@@ -23,11 +23,13 @@ interface Props {
   bass?: number;
   /** Counterpoint camera freeze — hold transform still when true */
   cameraFreeze?: boolean;
+  /** Drums/Space sub-phase for phase-specific camera behavior */
+  drumsSpacePhase?: string;
 }
 
 const QUIET_SCALE = 1.08;
 const PEAK_SCALE = 1.03;
-const SHAKE_PX = 3;
+const SHAKE_PX = 5;
 const SHAKE_DECAY_FRAMES = 12;
 
 /** Phase-driven camera parameters for long jams */
@@ -53,7 +55,7 @@ function shakeHash(frame: number): { x: number; y: number } {
 // Persisted transform for camera freeze (holds last computed values)
 let frozenTransform = { scale: 1.04, totalX: 0, totalY: 0 };
 
-export const CameraMotion: React.FC<Props> = ({ frames, children, jamEvolution, bass, cameraFreeze }) => {
+export const CameraMotion: React.FC<Props> = ({ frames, children, jamEvolution, bass, cameraFreeze, drumsSpacePhase }) => {
   const frame = useCurrentFrame();
   const idx = Math.min(Math.max(0, frame), frames.length - 1);
 
@@ -97,7 +99,7 @@ export const CameraMotion: React.FC<Props> = ({ frames, children, jamEvolution, 
   for (let ago = 0; ago < SHAKE_DECAY_FRAMES; ago++) {
     const checkIdx = idx - ago;
     if (checkIdx < 0) break;
-    if (frames[checkIdx].beat && frames[checkIdx].onset > 0.35) {
+    if (frames[checkIdx].beat && frames[checkIdx].onset > 0.25) {
       const decay = Math.exp(-ago * 0.7);
       const dir = shakeHash(checkIdx);
       shakeX += dir.x * SHAKE_PX * decay;
@@ -107,8 +109,8 @@ export const CameraMotion: React.FC<Props> = ({ frames, children, jamEvolution, 
   }
 
   // Onset jolt: sharp camera punch on transient attacks (onset > 0.5)
-  const ONSET_JOLT_PX = 5;
-  const ONSET_JOLT_DECAY = 6;
+  const ONSET_JOLT_PX = 8;
+  const ONSET_JOLT_DECAY = 8;
   for (let ago = 0; ago < ONSET_JOLT_DECAY; ago++) {
     const checkIdx = idx - ago;
     if (checkIdx < 0) break;
@@ -122,10 +124,25 @@ export const CameraMotion: React.FC<Props> = ({ frames, children, jamEvolution, 
   }
 
   // Bass-driven continuous micro-sway
-  const bassAmp = (bass ?? 0) * 8.0;
+  const bassAmp = (bass ?? 0) * 12.0;
   const bassT = frame / 30;
   shakeX += Math.sin(bassT * 3.7) * bassAmp * 0.5;
   shakeY += Math.cos(bassT * 2.3) * bassAmp * 0.3;
+
+  // Drums/Space phase-specific camera overrides
+  if (drumsSpacePhase === "space_ambient") {
+    // Near-zero shake, very slow drift, intimate zoom
+    shakeX *= 0.1;
+    shakeY *= 0.1;
+    const slowDrift = 0.5; // px/s
+    driftX = Math.sin(bassT * 0.02 * Math.PI * 2) * slowDrift;
+    driftY = Math.cos(bassT * 0.02 * Math.PI * 2 * 0.7) * slowDrift * 0.6;
+    scale = 1.02; // intimate zoom
+  } else if (drumsSpacePhase === "drums_tribal") {
+    // Amplified shake for primal energy
+    shakeX *= 1.5;
+    shakeY *= 1.5;
+  }
 
   let totalX = shakeX + driftX;
   let totalY = shakeY + driftY;

@@ -95,6 +95,10 @@ interface SceneVideoLayerProps {
   hueRotation?: number;
   /** Frame ranges where a lyric trigger is active — SceneVideoLayer yields during these */
   suppressedRanges?: Array<{ start: number; end: number }>;
+  /** Current climax phase for phase-aware opacity control */
+  climaxPhase?: string;
+  /** Whether band is in coherence "locked in" state — suppresses videos */
+  isLocked?: boolean;
 }
 
 // ─── Section scoring (shared logic) ───
@@ -115,9 +119,14 @@ function scoreSections(
     const sectionLen = section.frameEnd - section.frameStart;
     score += Math.min(2, sectionLen / 3000);
 
-    // Post-climax comedown bonus
+    // Post-climax comedown bonus (release sections = visual reward)
     if (idx > 0 && sections[idx - 1].energy === "high" && section.energy === "low") {
-      score += 3;
+      score += 5; // boosted: release sections are prime video moments
+    }
+
+    // Build phase bonus: videos during build add anticipation
+    if (idx > 0 && sections[idx - 1].energy === "low" && section.energy === "mid") {
+      score += 2;
     }
 
     // Texture-aware bonus
@@ -131,6 +140,16 @@ function scoreSections(
       const texture = detectTexture(midSnapshot, midEnergy);
       if (texture === "ambient") score += 4;
       else if (texture === "sparse") score += 3;
+
+      // Onset density: sections with low onset density (ambient, sustained) get bonus
+      const sampleCount = Math.min(30, section.frameEnd - section.frameStart);
+      let onsetSum = 0;
+      for (let fi = 0; fi < sampleCount; fi++) {
+        const sampleIdx = Math.min(section.frameStart + Math.floor(fi * (section.frameEnd - section.frameStart) / sampleCount), frames.length - 1);
+        onsetSum += frames[sampleIdx].onset;
+      }
+      const avgOnset = sampleCount > 0 ? onsetSum / sampleCount : 0;
+      if (avgOnset < 0.15) score += 2; // low onset density = good for video
     }
 
     // Exclude sections in post-music dead air (applause/tuning after song ends).
@@ -165,7 +184,7 @@ function placeMediaInSection(
 
 // ─── Exported window computation (for media suppression in SongVisualizer) ───
 
-const MIN_WINDOW_GAP = 600; // 20 seconds minimum between media windows
+const MIN_WINDOW_GAP = 450; // 15 seconds minimum between media windows
 
 export function computeMediaWindows(
   videos: SceneVideo[] | undefined,
@@ -308,6 +327,8 @@ export const SceneVideoLayer: React.FC<SceneVideoLayerProps> = ({
   showSeed,
   hueRotation = 0,
   suppressedRanges,
+  climaxPhase,
+  isLocked,
 }) => {
   const frame = useCurrentFrame();
 
@@ -324,6 +345,9 @@ export const SceneVideoLayer: React.FC<SceneVideoLayerProps> = ({
   );
 
   if (!activeWindow) return null;
+
+  // During coherence lock: suppress videos entirely (the band is the show)
+  if (isLocked) return null;
 
   // Yield to LyricTriggerLayer when a curated visual is active
   if (suppressedRanges?.some((r) => frame >= r.start && frame < r.end)) {
@@ -364,8 +388,10 @@ export const SceneVideoLayer: React.FC<SceneVideoLayerProps> = ({
     filters.push(isImage ? "blur(1.5px)" : "blur(1px)");
     filters.push("saturate(0.85)");
   } else {
-    filters.push(isImage ? "blur(5px)" : "blur(3px)");
-    filters.push("saturate(0.5)");
+    filters.push(isImage ? "blur(5px)" : "blur(2px)");
+    // Energy-reactive saturation: quiet=0.6, loud=0.9 (prevents washed-out videos)
+    const satFactor = 0.6 + energyToFactor(energy, 0.05, 0.30) * 0.3;
+    filters.push(`saturate(${satFactor.toFixed(2)})`);
   }
   if (hueRotation !== 0 && !isCurated) {
     filters.push(`hue-rotate(${hueRotation.toFixed(1)}deg)`);
@@ -538,7 +564,11 @@ export const SceneVideoLayer: React.FC<SceneVideoLayerProps> = ({
   }
 
   // General (priority 2-3): visible atmospheric layer, blended with shader
-  const maxOpacity = isImage ? 0.45 : 0.55;
+  let maxOpacity = isImage ? 0.45 : 0.65;
+  // During climax phase: force video opacity to max 30% (shader should dominate)
+  if (climaxPhase === "climax" || climaxPhase === "sustain") {
+    maxOpacity = Math.min(maxOpacity, 0.30);
+  }
   const opacity = fadeEnvelope * energyBoost * maxOpacity;
 
   const generalContent = isImage ? (
@@ -562,13 +592,18 @@ export const SceneVideoLayer: React.FC<SceneVideoLayerProps> = ({
     </Sequence>
   );
 
+  // Use screen blend mode for videos during build/release phases
+  const blendMode = (!isImage && (climaxPhase === "build" || climaxPhase === "release"))
+    ? "screen" as const
+    : "screen" as const;
+
   return (
     <div
       style={{
         position: "absolute",
         inset: 0,
         opacity,
-        mixBlendMode: "screen",
+        mixBlendMode: blendMode,
         overflow: "hidden",
         pointerEvents: "none",
         filter: filterStr,

@@ -46,6 +46,7 @@ uniform float uClimaxPhase;
 uniform float uClimaxIntensity;
 uniform vec4 uContrast0;
 uniform vec4 uContrast1;
+uniform float uCoherence;
 
 varying vec2 vUv;
 
@@ -126,22 +127,30 @@ void main() {
   color += flash;
 
   // Beat snap — sharp saturation kick on transients
-  color *= 1.0 + uBeatSnap * 0.18 * (1.0 + climaxBoost * 0.4);
+  color *= 1.0 + uBeatSnap * 0.28 * (1.0 + climaxBoost * 0.4);
 
   // Beat pulse — tempo-locked saturation boost
   float bp = beatPulse(uMusicalTime);
   color = mix(color, color * 1.3, bp * 0.35 + climaxBoost * bp * 0.15);
 
   // Vignette
-  float vig = 1.0 - smoothstep(0.5, 1.2, r);
-  color *= vig;
+  float vig = 1.0 - smoothstep(0.7, 1.5, r);
+  color *= 0.3 + vig * 0.7;
 
   // Energy-reactive overall brightness
   color *= 0.8 + uRms * 0.4;
 
-  // ONSET BRIGHTNESS PULSE: raw transient spike
-  float onsetPulse = step(0.5, uOnsetSnap) * uOnsetSnap * 0.30;
-  color *= 1.0 + onsetPulse;
+  // === S-CURVE COLOR GRADING ===
+  color = sCurveGrade(color, uEnergy);
+
+  // === ANIMATED STAGE FLOOD: flowing palette noise in dark areas ===
+  color = stageFloodFill(color, uv, uTime, uEnergy, uPalettePrimary, uPaletteSecondary);
+
+  // ONSET SATURATION PULSE: push colors away from gray (psychedelic, not white)
+  float onsetPulse = step(0.5, uOnsetSnap) * uOnsetSnap;
+  float onsetLuma = dot(color, vec3(0.299, 0.587, 0.114));
+  color = mix(vec3(onsetLuma), color, 1.0 + onsetPulse * 1.0);
+  color *= 1.0 + onsetPulse * 0.12;
 
   // ONSET CHROMATIC ABERRATION
   if (uOnsetSnap > 0.4) {

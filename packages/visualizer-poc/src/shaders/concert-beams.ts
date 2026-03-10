@@ -46,6 +46,7 @@ uniform float uClimaxPhase;
 uniform float uClimaxIntensity;
 uniform vec4 uContrast0;
 uniform vec4 uContrast1;
+uniform float uCoherence;
 
 varying vec2 vUv;
 
@@ -89,7 +90,7 @@ void main() {
   p += vec2(shakeX, shakeY);
 
   // === CHROMATIC ABERRATION setup ===
-  float caStrength = uBass * 0.006 + uRms * 0.003 + uOnsetSnap * 0.04;
+  float caStrength = uBass * 0.006 + uRms * 0.003 + uOnsetSnap * 0.06;
 
   // Background — deeper and more colorful
   float bgHue = hsvToCosineHue(uPalettePrimary) + uTime * 0.02;
@@ -157,7 +158,7 @@ void main() {
   float climaxBoost = isClimax * climaxI;
 
   // === BEAT SNAP: strobe-like flash on hard transients ===
-  float strobeKick = uBeatSnap * 0.25 * (1.0 + climaxBoost * 0.5);
+  float strobeKick = uBeatSnap * 0.40 * (1.0 + climaxBoost * 0.5);
   col += strobeKick * vec3(1.0, 0.95, 0.85);
 
   // === COLOR AFTERGLOW ===
@@ -227,8 +228,8 @@ void main() {
   // ONSET SATURATION PULSE: push colors away from gray (psychedelic, not white)
   float onsetPulse = step(0.5, uOnsetSnap) * uOnsetSnap;
   float onsetLuma = dot(col, vec3(0.299, 0.587, 0.114));
-  col = mix(vec3(onsetLuma), col, 1.0 + onsetPulse * 0.7);
-  col *= 1.0 + onsetPulse * 0.08;
+  col = mix(vec3(onsetLuma), col, 1.0 + onsetPulse * 1.0);
+  col *= 1.0 + onsetPulse * 0.12;
 
   // Lifted blacks (build-phase-aware: near true black during build for anticipation)
   float isBuild = step(0.5, uClimaxPhase) * step(uClimaxPhase, 1.5);

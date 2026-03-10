@@ -45,6 +45,9 @@ import { EraGrade } from "./components/EraGrade";
 import { EnergyEnvelope } from "./components/EnergyEnvelope";
 import { computeClimaxState, climaxModulation } from "./utils/climax-state";
 import { computeAudioSnapshot, buildBeatArray } from "./utils/audio-reactive";
+import { computeCoherence, resetCoherence } from "./utils/coherence";
+import { computeDrumsSpacePhase, resetDrumsSpacePhase } from "./utils/drums-space-phase";
+import { useShowNarrative } from "./data/ShowNarrativeContext";
 import { calibrateEnergy } from "./utils/energy";
 import { AudioSnapshotProvider } from "./data/AudioSnapshotContext";
 import { computeJamEvolution } from "./utils/jam-evolution";
@@ -108,6 +111,9 @@ export interface SongVisualizerProps {
 export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
   const { width, height, durationInFrames } = useVideoConfig();
   const frame = useCurrentFrame();
+
+  // ─── Show narrative arc (cross-song state) ───
+  const narrative = useShowNarrative();
 
   // ─── Data loading & analysis ───
   const analysis = loadAnalysis(props as unknown as Record<string, unknown>);
@@ -220,6 +226,15 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
   const beatArray = useMemo(() => buildBeatArray(f), [f]);
   const frameIdx = Math.min(Math.max(0, frame), f.length - 1);
   const audioSnapshot = computeAudioSnapshot(f, frameIdx, beatArray, 30, tempo);
+
+  // Coherence detection — "IT" detector
+  const coherenceState = computeCoherence(f, frameIdx);
+  audioSnapshot.coherence = coherenceState.score;
+  audioSnapshot.isLocked = coherenceState.isLocked;
+
+  // Drums→Space phase detection
+  const drumsSpaceState = isDrumsSpace ? computeDrumsSpacePhase(audioSnapshot, isDrumsSpace) : null;
+
   const climaxState = computeClimaxState(f, frame, sections, audioSnapshot.energy);
   const climaxMod = climaxModulation(climaxState);
   const counterpoint = computeCounterpoint(audioSnapshot, climaxState.phase, frame);
@@ -283,13 +298,13 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
       <AudioSnapshotProvider snapshot={audioSnapshot}>
       <VisualizerErrorBoundary>
       <div style={{ position: "absolute", inset: 0, opacity }}>
-        <CameraMotion frames={f} jamEvolution={jamEvolution} bass={audioSnapshot.bass} cameraFreeze={counterpoint.cameraFreeze}>
+        <CameraMotion frames={f} jamEvolution={jamEvolution} bass={audioSnapshot.bass} cameraFreeze={counterpoint.cameraFreeze} drumsSpacePhase={drumsSpaceState?.subPhase}>
         <EraGrade>
-        <EnergyEnvelope snapshot={audioSnapshot} climaxMod={climaxMod} jamColorTemp={jamEvolution.isLongJam ? jamEvolution.colorTemperature : undefined} calibration={energyCalibration} counterpointSatMult={counterpoint.saturationMult} setNumber={props.song.set}>
+        <EnergyEnvelope snapshot={audioSnapshot} climaxMod={climaxMod} jamColorTemp={jamEvolution.isLongJam ? jamEvolution.colorTemperature : undefined} calibration={energyCalibration} counterpointSatMult={counterpoint.saturationMult} setNumber={props.song.set} drumsSpacePhase={drumsSpaceState?.subPhase} showPhase={narrative?.state.showPhase}>
           <div style={{ position: "absolute", inset: 0, opacity: focusState.shaderOpacity }}>
           <SilentErrorBoundary name="SceneRouter">
             {(() => {
-              const sceneRouter = <SceneRouter frames={f} sections={sections} song={props.song} tempo={tempo} seed={showSeed} jamDensity={jamDensity} deadAirMode={deadAirFactor > 0 ? "cosmic_dust" : undefined} deadAirFactor={deadAirFactor > 0 ? deadAirFactor : undefined} era={props.show?.era} />;
+              const sceneRouter = <SceneRouter frames={f} sections={sections} song={props.song} tempo={tempo} seed={showSeed} jamDensity={jamDensity} deadAirMode={deadAirFactor > 0 ? "cosmic_dust" : undefined} deadAirFactor={deadAirFactor > 0 ? deadAirFactor : undefined} era={props.show?.era} coherenceIsLocked={coherenceState.isLocked} drumsSpacePhase={drumsSpaceState?.subPhase} usedShaderModes={narrative?.state.usedShaderModes} />;
               const palette = props.song.palette;
 
               // Segue IN crossfade: smooth dual-render dissolve from previous song's shader
@@ -329,7 +344,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
 
           {(effectiveLegacyVideos || effectiveMedia) && (
             <SilentErrorBoundary name="SceneVideos">
-              <SceneVideoLayer videos={effectiveLegacyVideos} media={effectiveMedia} sections={sections} frames={f} trackId={props.song.trackId} showSeed={showSeed} hueRotation={hueRotation} suppressedRanges={triggerSuppressedRanges} />
+              <SceneVideoLayer videos={effectiveLegacyVideos} media={effectiveMedia} sections={sections} frames={f} trackId={props.song.trackId} showSeed={showSeed} hueRotation={hueRotation} suppressedRanges={triggerSuppressedRanges} climaxPhase={climaxState.phase} isLocked={coherenceState.isLocked} />
             </SilentErrorBoundary>
           )}
 
@@ -342,6 +357,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
             hueRotation={hueRotation}
             tempo={tempo}
             palette={props.song.palette}
+            usedOverlayIds={narrative?.state.usedOverlayIds}
             frames={f}
             focusSuppression={focusState.overlayOpacity}
             energyLevel={energyLevel}

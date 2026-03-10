@@ -47,6 +47,7 @@ uniform float uClimaxPhase;
 uniform float uClimaxIntensity;
 uniform vec4 uContrast0;
 uniform vec4 uContrast1;
+uniform float uCoherence;
 
 varying vec2 vUv;
 
@@ -150,17 +151,25 @@ void main() {
 
   // Beat-triggered gate flicker (projector stutter — amplified)
   float bp = beatPulse(uMusicalTime);
-  float gateFlicker = 1.0 - bp * 0.15 - uBeatSnap * 0.08;
+  float gateFlicker = 1.0 - bp * 0.15 - uBeatSnap * 0.14;
   color *= gateFlicker;
 
   // Vignette — heavy, like a projector hotspot
-  float vig = 1.0 - smoothstep(0.3, 1.0, length(centered));
-  vig = 0.4 + vig * 0.6;
+  float vig = 1.0 - smoothstep(0.6, 1.4, length(centered));
+  vig = 0.55 + vig * 0.45;
   color *= vig;
 
-  // ONSET BRIGHTNESS PULSE: raw transient spike
-  float onsetPulse = step(0.5, uOnsetSnap) * uOnsetSnap * 0.30;
-  color *= 1.0 + onsetPulse;
+  // === S-CURVE COLOR GRADING ===
+  color = sCurveGrade(color, uEnergy);
+
+  // === ANIMATED STAGE FLOOD: flowing palette noise in dark areas ===
+  color = stageFloodFill(color, centered, uTime, uEnergy, uPalettePrimary, uPaletteSecondary);
+
+  // ONSET SATURATION PULSE: push colors away from gray (psychedelic, not white)
+  float onsetPulse = step(0.5, uOnsetSnap) * uOnsetSnap;
+  float onsetLuma = dot(color, vec3(0.299, 0.587, 0.114));
+  color = mix(vec3(onsetLuma), color, 1.0 + onsetPulse * 1.0);
+  color *= 1.0 + onsetPulse * 0.12;
 
   // ONSET CHROMATIC ABERRATION
   if (uOnsetSnap > 0.4) {
@@ -168,9 +177,6 @@ void main() {
     color.r *= 1.0 + caAmt;
     color.b *= 1.0 - caAmt * 0.5;
   }
-
-  // Clamp to valid range
-  color = clamp(color, 0.0, 1.0);
 
   gl_FragColor = vec4(color, 1.0);
 }

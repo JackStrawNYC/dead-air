@@ -142,6 +142,7 @@ uniform float uChromaShift;
 uniform float uAfterglowHue;
 uniform float uClimaxPhase;
 uniform float uClimaxIntensity;
+uniform float uCoherence;
 
 varying float vAlpha;
 varying float vColorMix;
@@ -201,7 +202,7 @@ void main() {
   // === BEAT SNAP: particle brightness flash ===
   float isClimax = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5);
   float climaxBoost = isClimax * uClimaxIntensity;
-  rgb *= 1.0 + uBeatSnap * 0.20 * (1.0 + climaxBoost * 0.5);
+  rgb *= 1.0 + uBeatSnap * 0.30 * (1.0 + climaxBoost * 0.5);
   rgb *= 1.0 + vOnsetSnap * 0.12;
 
   float distFade = 1.0 / (1.0 + vDist * 0.05);
@@ -232,8 +233,8 @@ void main() {
   // ONSET SATURATION PULSE: push colors away from gray (psychedelic, not white)
   float onsetPulse = step(0.5, uOnsetSnap) * uOnsetSnap;
   float onsetLuma = dot(rgb, vec3(0.299, 0.587, 0.114));
-  rgb = mix(vec3(onsetLuma), rgb, 1.0 + onsetPulse * 0.7);
-  rgb *= 1.0 + onsetPulse * 0.08;
+  rgb = mix(vec3(onsetLuma), rgb, 1.0 + onsetPulse * 1.0);
+  rgb *= 1.0 + onsetPulse * 0.12;
 
   // === S-CURVE COLOR GRADING ===
   rgb = sCurveGrade(rgb, vEnergy);

@@ -61,6 +61,7 @@ uniform float uSlowEnergy;
 uniform vec4 uContrast0;
 uniform vec4 uContrast1;
 uniform float uJamDensity;
+uniform float uCoherence;
 
 varying vec2 vUv;
 
@@ -169,7 +170,7 @@ void main() {
   float curtainBrightness = mix(0.10, 0.75, energy) * mix(0.7, 1.3, uJamDensity);
   curtainBrightness += onset * 0.5;
   float bpH = beatPulseHalf(uMusicalTime);
-  curtainBrightness += bpH * 0.20 + uBeatSnap * 0.15;
+  curtainBrightness += bpH * 0.20 + uBeatSnap * 0.25;
   curtainBrightness += climaxBoost * 0.25;
 
   // Ray setup: looking upward into aurora band
@@ -287,8 +288,8 @@ void main() {
   // ONSET SATURATION PULSE: push colors away from gray (psychedelic, not white)
   float onsetPulse = step(0.5, uOnsetSnap) * uOnsetSnap;
   float onsetLuma = dot(col, vec3(0.299, 0.587, 0.114));
-  col = mix(vec3(onsetLuma), col, 1.0 + onsetPulse * 0.7);
-  col *= 1.0 + onsetPulse * 0.08;
+  col = mix(vec3(onsetLuma), col, 1.0 + onsetPulse * 1.0);
+  col *= 1.0 + onsetPulse * 0.12;
 
   // ONSET CHROMATIC ABERRATION
   if (uOnsetSnap > 0.4) {

@@ -79,6 +79,7 @@ uniform float uClimaxIntensity;
 uniform vec4 uChroma0;
 uniform vec4 uChroma1;
 uniform vec4 uChroma2;
+uniform float uCoherence;
 
 ${noiseGLSL}
 
@@ -117,7 +118,7 @@ void main() {
   float flash = uOnsetSnap * 0.7 * (1.0 + climaxBoost * 0.5);
 
   // Beat snap: crystal brightness pulse
-  float beatKick = uBeatSnap * 0.20 * (1.0 + climaxBoost * 0.4);
+  float beatKick = uBeatSnap * 0.30 * (1.0 + climaxBoost * 0.4);
 
   // Rim glow for depth
   float rim = 1.0 - max(0.0, dot(vNormal, normalize(-vWorldPos)));
@@ -125,9 +126,11 @@ void main() {
 
   vec3 col = baseColor + glowColor * emissive + flash + beatKick + rim * glowColor * 0.5;
 
-  // ONSET BRIGHTNESS PULSE: raw transient spike
-  float onsetPulse = step(0.5, uOnsetSnap) * uOnsetSnap * 0.30;
-  col *= 1.0 + onsetPulse;
+  // ONSET SATURATION PULSE: push colors away from gray (psychedelic, not white)
+  float onsetPulse = step(0.5, uOnsetSnap) * uOnsetSnap;
+  float onsetLuma = dot(col, vec3(0.299, 0.587, 0.114));
+  col = mix(vec3(onsetLuma), col, 1.0 + onsetPulse * 1.0);
+  col *= 1.0 + onsetPulse * 0.12;
 
   // ONSET CHROMATIC ABERRATION
   if (uOnsetSnap > 0.4) {
@@ -135,6 +138,12 @@ void main() {
     col.r *= 1.0 + caAmt;
     col.b *= 1.0 - caAmt * 0.5;
   }
+
+  // === S-CURVE COLOR GRADING ===
+  col = sCurveGrade(col, uEnergy);
+
+  // === ANIMATED STAGE FLOOD: flowing palette noise in dark areas ===
+  col = stageFloodFill(col, vWorldPos.xz * 0.3, uTime, uEnergy, uPalettePrimary, uPaletteSecondary);
 
   // Fog: distance-based
   float fogDist = length(vWorldPos);

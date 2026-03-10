@@ -36,6 +36,10 @@ export interface AudioSnapshot {
   spectralFlux: number;
   /** Musical time: beat count + fractional interpolation, phase-locked to detected tempo */
   musicalTime: number;
+  /** Coherence: 0-1 band lock-in score (undefined when not computed) */
+  coherence?: number;
+  /** Whether band is in "locked in" state */
+  isLocked?: boolean;
 }
 
 /**

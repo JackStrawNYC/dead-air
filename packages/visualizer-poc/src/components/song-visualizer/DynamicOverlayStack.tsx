@@ -47,6 +47,8 @@ interface Props {
   focusSuppression?: number;
   /** Current energy level hint for hard cap determination */
   energyLevel?: "quiet" | "mid" | "peak";
+  /** Overlay IDs already used in previous songs (for cross-song variety) */
+  usedOverlayIds?: Set<string>;
 }
 
 export const DynamicOverlayStack: React.FC<Props> = ({
@@ -59,17 +61,21 @@ export const DynamicOverlayStack: React.FC<Props> = ({
   frames,
   focusSuppression = 1,
   energyLevel = "mid",
+  usedOverlayIds,
 }) => {
   const frame = useCurrentFrame();
 
   // Compute opacities and apply hard cap on concurrent overlays
   const maxConcurrent = MAX_CONCURRENT[energyLevel] ?? 4;
   const withOpacity = activeEntries
-    .map(([name, entry]) => ({
-      name,
-      entry,
-      opacity: Math.min(1, (opacityMap ? (opacityMap[name] ?? 0) : 1) * mediaSuppression * focusSuppression),
-    }))
+    .map(([name, entry]) => {
+      let op = Math.min(1, (opacityMap ? (opacityMap[name] ?? 0) : 1) * mediaSuppression * focusSuppression);
+      // Cross-song dedup: deprioritize overlays already shown earlier in the show
+      if (usedOverlayIds && usedOverlayIds.has(name)) {
+        op *= 0.4; // reduce but don't eliminate — variety, not exclusion
+      }
+      return { name, entry, opacity: op };
+    })
     .filter((o) => o.opacity > 0.01)
     // At peak energy, only A-tier overlays (iconic Dead imagery) are allowed
     .filter((o) => energyLevel !== "peak" || A_TIER_OVERLAY_NAMES.has(o.name))

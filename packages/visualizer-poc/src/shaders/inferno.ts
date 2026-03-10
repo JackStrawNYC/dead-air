@@ -57,6 +57,7 @@ uniform float uSlowEnergy;
 uniform vec4 uContrast0;
 uniform vec4 uContrast1;
 uniform float uJamDensity;
+uniform float uCoherence;
 
 varying vec2 vUv;
 
@@ -196,7 +197,7 @@ void main() {
   col *= 1.0 + bp * 0.30 + climaxBoost * bp * 0.15;
 
   // === BEAT SNAP: sharp flame flare on transients ===
-  col *= 1.0 + uBeatSnap * 0.15 * (1.0 + climaxBoost * 0.5);
+  col *= 1.0 + uBeatSnap * 0.25 * (1.0 + climaxBoost * 0.5);
 
   // === RISING EMBERS: particle field (beat-reactive) ===
   float emberCount = 5.0 + energy * 20.0 + uBeatSnap * 8.0;
@@ -259,12 +260,12 @@ void main() {
   // ONSET SATURATION PULSE: push colors away from gray (psychedelic, not white)
   float onsetPulse = step(0.5, uOnsetSnap) * uOnsetSnap;
   float onsetLuma = dot(col, vec3(0.299, 0.587, 0.114));
-  col = mix(vec3(onsetLuma), col, 1.0 + onsetPulse * 0.7);
-  col *= 1.0 + onsetPulse * 0.08;
+  col = mix(vec3(onsetLuma), col, 1.0 + onsetPulse * 1.0);
+  col *= 1.0 + onsetPulse * 0.12;
 
   // ONSET CHROMATIC ABERRATION
   if (uOnsetSnap > 0.4) {
-    float caAmt = (uOnsetSnap - 0.4) * 0.15;
+    float caAmt = (uOnsetSnap - 0.4) * 0.22;
     col.r *= 1.0 + caAmt;
     col.b *= 1.0 - caAmt * 0.5;
   }
