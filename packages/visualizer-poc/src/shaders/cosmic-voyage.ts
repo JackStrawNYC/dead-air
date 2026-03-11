@@ -28,6 +28,7 @@ precision highp float;
 ${noiseGLSL}
 
 uniform float uTime;
+uniform float uDynamicTime;
 uniform float uBass;
 uniform float uRms;
 uniform float uCentroid;
@@ -74,19 +75,19 @@ vec3 palette(float t, vec3 a, vec3 b, vec3 c, vec3 d) {
 }
 
 // --- Domain warp: two-pass FBM distortion for organic cloud shapes ---
-vec3 domainWarp(vec3 p, float onset, float time) {
+vec3 domainWarp(vec3 p, float onset, float dynTime) {
   // Pass 1: large-scale cloud shaping
   vec3 q = vec3(
-    fbm3(p + vec3(0.0, 0.0, time * 0.03)),
-    fbm3(p + vec3(5.2, 1.3, time * 0.03)),
-    fbm3(p + vec3(2.1, 7.8, time * 0.03))
+    fbm3(p + vec3(0.0, 0.0, dynTime * 0.03)),
+    fbm3(p + vec3(5.2, 1.3, dynTime * 0.03)),
+    fbm3(p + vec3(2.1, 7.8, dynTime * 0.03))
   );
 
   // Pass 2: onset-reactive turbulence
   vec3 r = vec3(
-    fbm3(p + 4.0 * q + vec3(1.7, 9.2, time * 0.05)),
-    fbm3(p + 4.0 * q + vec3(8.3, 2.8, time * 0.05)),
-    fbm3(p + 4.0 * q + vec3(3.1, 5.4, time * 0.05))
+    fbm3(p + 4.0 * q + vec3(1.7, 9.2, dynTime * 0.05)),
+    fbm3(p + 4.0 * q + vec3(8.3, 2.8, dynTime * 0.05)),
+    fbm3(p + 4.0 * q + vec3(3.1, 5.4, dynTime * 0.05))
   );
 
   return p + 0.35 * (q + onset * 1.5 * r) + uSpectralFlux * 0.8 * q;
@@ -113,11 +114,12 @@ void main() {
 
   // === CAMERA SETUP ===
   float driftSpeed = 0.12 + energy * 0.15 + uFastEnergy * 0.06;
-  float camT = uTime * driftSpeed;
+  float camT = uDynamicTime * driftSpeed;
   vec3 camPos = cameraPath(camT);
 
-  // Bass camera shake
-  float shakeAmt = bass * 0.06;
+  // Bass camera shake (energy-gated: calm during quiet)
+  float shakeGate = smoothstep(0.25, 0.55, energy);
+  float shakeAmt = bass * 0.06 * shakeGate;
   camPos.x += snoise(vec3(uTime * 6.0, 0.0, 0.0)) * shakeAmt;
   camPos.y += snoise(vec3(0.0, uTime * 6.0, 0.0)) * shakeAmt;
 
@@ -156,7 +158,7 @@ void main() {
   float tile = 0.92;
   // Jam density reduces dark matter absorption → denser nebula at peaks
   // At neutral density (0.5) the multiplier is 1.0, preserving original behavior.
-  float darkmatter = mix(0.25, 0.05, bass) * mix(1.3, 0.7, uJamDensity);
+  float darkmatter = mix(0.15, 0.05, bass) * mix(1.3, 0.7, uJamDensity);
   float distfading = 0.78;
   float saturation = 0.92;
 
@@ -166,7 +168,7 @@ void main() {
   // Travel speed from energy
   float travelSpeed = energy * 0.08 + 0.02;
   vec3 from = camPos + rd * 0.1;
-  from += vec3(1.0, 1.0, 1.0) * uTime * travelSpeed;
+  from += vec3(1.0, 1.0, 1.0) * uDynamicTime * travelSpeed;
 
   // Volumetric rendering
   // Jam density modulates volume step count: sparse exploration (20) → dense peak (40)
@@ -186,7 +188,7 @@ void main() {
     // Domain warp with distance fade (near samples only)
     float warpFade = smoothstep(3.0, 0.5, float(r) / float(volSteps) * 5.0);
     if (warpFade > 0.01) {
-      samplePos = mix(samplePos, domainWarp(samplePos, onset, uTime), warpFade);
+      samplePos = mix(samplePos, domainWarp(samplePos, onset, uDynamicTime), warpFade);
     }
 
     // Tiling fold
@@ -233,8 +235,8 @@ void main() {
 
     float s1 = s;
     vec3 v = vec3(s1, s1 * s1, s1 * s1 * s1 * s1);
-    accColor += fade * localColor * a * 0.00013;
-    accColor += fade * v * a * 0.00005;
+    accColor += fade * localColor * a * 0.00018;
+    accColor += fade * v * a * 0.00006;
 
     // === Emission cores: detect fractal convergence ===
     float coreGlow = smoothstep(0.5, 0.05, minOrbit) * a * 0.0002;
@@ -278,28 +280,33 @@ void main() {
   // === QUIET PASSAGE PARTICLES ===
   float quietness = smoothstep(0.3, 0.05, energy);
   if (quietness > 0.01) {
-    float spark1 = snoise(vec3(p * 20.0, uTime * 0.2));
-    float spark2 = snoise(vec3(p * 25.0 + 50.0, uTime * 0.15 + 10.0));
+    float spark1 = snoise(vec3(p * 20.0, uDynamicTime * 0.2));
+    float spark2 = snoise(vec3(p * 25.0 + 50.0, uDynamicTime * 0.15 + 10.0));
     float particle = max(0.0, spark1 * spark2 - 0.4) * 5.0;
     vec3 particleColor = mix(emissionColor, vec3(0.4, 0.8, 1.0), 0.5);
     col += particle * quietness * 0.15 * particleColor;
   }
 
-  // === FOG ===
-  float fogDist = mix(0.18, 0.85, energy);
-  vec3 fogColor = cloudColor * 0.15;
-  float fogAmount = (1.0 - fogDist) * 0.5;
+  // === FOG: palette-colored atmosphere (fills voids with color, not black) ===
+  float fogDist = mix(0.40, 0.85, energy);
+  vec3 fogColor = mix(cloudColor, emissionColor, 0.3) * 0.25;
+  float fogAmount = (1.0 - fogDist) * 0.35;
   col = mix(col, fogColor, fogAmount * smoothstep(0.5, 0.0, lumAcc));
 
+  // === AMBIENT NEBULA: subtle palette color everywhere (no dark voids) ===
+  float ambNeb = fbm3(vec3(p * 0.8, uDynamicTime * 0.05)) * 0.5 + 0.5;
+  vec3 ambColor = mix(cloudColor, emissionColor, ambNeb) * mix(0.10, 0.04, energy);
+  col += ambColor;
+
   // === VIGNETTE ===
-  float vigScale = mix(0.48, 0.32, energy);
+  float vigScale = mix(0.36, 0.30, energy);
   float vignette = 1.0 - dot(p * vigScale, p * vigScale);
   vignette = smoothstep(0.0, 1.0, vignette);
   vec3 vigTint = cloudColor * 0.03;
   col = mix(vigTint, col, vignette);
 
   // === LIGHT LEAK ===
-  col += lightLeak(p, uTime, energy, uOnsetSnap);
+  col += lightLeak(p, uDynamicTime, energy, uOnsetSnap);
 
   // === BEAT PULSE: tempo-locked emission swell ===
   float bp = beatPulse(uMusicalTime);
@@ -317,18 +324,21 @@ void main() {
   col = col + bloom - col * bloom; // screen blend
 
   // === NEBULA GLOW: diffuse volumetric luminance layer ===
-  float glowAmount = accGlow * (0.6 + bass * 0.4);
-  vec3 glowColor = mix(emissionColor, cloudColor, 0.3) * 0.35;
+  float glowAmount = accGlow * (0.8 + bass * 0.4);
+  vec3 glowColor = mix(emissionColor, cloudColor, 0.3) * 0.45;
   col += glowColor * glowAmount;
 
-  // === S-CURVE COLOR GRADING ===
-  col = sCurveGrade(col, energy);
-
   // === ANIMATED STAGE FLOOD: flowing palette noise in dark areas ===
-  col = stageFloodFill(col, p, uTime, energy, uPalettePrimary, uPaletteSecondary);
+  col = stageFloodFill(col, p, uDynamicTime, energy, uPalettePrimary, uPaletteSecondary);
+
+  // === ANAMORPHIC FLARE: horizontal light streak ===
+  col = anamorphicFlare(vUv, col, energy, uOnsetSnap);
 
   // === HALATION: warm film bloom ===
   col = halation(vUv, col, energy);
+
+  // === CINEMATIC GRADE (ACES filmic tone mapping) ===
+  col = cinematicGrade(col, energy);
 
   // === FILM GRAIN ===
   float grainTime = floor(uTime * 15.0) / 15.0;
@@ -351,7 +361,7 @@ void main() {
   // Lifted blacks (build-phase-aware: near true black during build for anticipation)
   float isBuild = step(0.5, uClimaxPhase) * step(uClimaxPhase, 1.5);
   float liftMult = mix(1.0, 0.15, isBuild * uClimaxIntensity);
-  col = max(col, vec3(0.12, 0.10, 0.14) * liftMult);
+  col = max(col, vec3(0.06, 0.05, 0.08) * liftMult);
 
   gl_FragColor = vec4(col, 1.0);
 }

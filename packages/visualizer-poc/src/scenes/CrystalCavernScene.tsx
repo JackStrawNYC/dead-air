@@ -18,7 +18,7 @@ const CAVE_RADIUS = 8;
 const CAVE_LENGTH = 40;
 
 const CrystalSystem: React.FC = () => {
-  const { time, smooth, palettePrimary, paletteSecondary, paletteSaturation, musicalTime, climaxPhase, climaxIntensity } = useAudioData();
+  const { time, smooth, palettePrimary, paletteSecondary, paletteSaturation, musicalTime, climaxPhase, climaxIntensity, dynamicTime } = useAudioData();
 
   const { geometry, material, instancedMesh } = useMemo(() => {
     const geo = new THREE.IcosahedronGeometry(0.3, 1);
@@ -31,6 +31,7 @@ const CrystalSystem: React.FC = () => {
 
     const uniforms = {
       uTime: { value: 0 },
+      uDynamicTime: { value: 0 },
       uBass: { value: 0 },
       uHighs: { value: 0 },
       uEnergy: { value: 0 },
@@ -94,6 +95,7 @@ const CrystalSystem: React.FC = () => {
 
   // Update uniforms per frame
   material.uniforms.uTime.value = time;
+  material.uniforms.uDynamicTime.value = dynamicTime;
   material.uniforms.uBass.value = smooth.bass;
   material.uniforms.uHighs.value = smooth.highs;
   material.uniforms.uEnergy.value = smooth.energy;
@@ -115,7 +117,7 @@ const CrystalSystem: React.FC = () => {
   material.uniforms.uChroma2.value.set(ch[8] ?? 0, ch[9] ?? 0, ch[10] ?? 0, ch[11] ?? 0);
 
   // Helical camera path: spirals forward through the cave
-  const camT = time * 0.3;
+  const camT = dynamicTime * 0.3;
   const camZ = camT * 4 - CAVE_LENGTH * 0.5;
   const camAngle = camT * 0.5;
   const camR = 2.0;
@@ -156,10 +158,22 @@ interface Props {
   style?: React.CSSProperties;
 }
 
+/** Energy-reactive background — cavern ambience. */
+const CavernBackground: React.FC = () => {
+  const { smooth, palettePrimary } = useAudioData();
+  const energy = smooth.energy;
+  const hue = palettePrimary;
+  const brightness = 0.03 + energy * 0.06; // darker than nebula — cave feel
+  const r = brightness * (0.6 + 0.4 * Math.cos(2 * Math.PI * (hue)));
+  const g = brightness * (0.6 + 0.4 * Math.cos(2 * Math.PI * (hue - 0.333)));
+  const b = brightness * (0.6 + 0.4 * Math.cos(2 * Math.PI * (hue - 0.667)));
+  return <color attach="background" args={[r, g, b]} />;
+};
+
 export const CrystalCavernScene: React.FC<Props> = ({ frames, sections, palette, tempo, style }) => {
   return (
     <AudioReactiveCanvas frames={frames} sections={sections} palette={palette} tempo={tempo} style={style}>
-      <color attach="background" args={["#020208"]} />
+      <CavernBackground />
       <CrystalSystem />
     </AudioReactiveCanvas>
   );

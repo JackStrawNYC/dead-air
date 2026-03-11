@@ -20,12 +20,13 @@ export const FullscreenQuad: React.FC<Props> = ({
   fragmentShader,
   extraUniforms,
 }) => {
-  const { time, beatDecay, smooth, palettePrimary, paletteSecondary, paletteSaturation, tempo, musicalTime, climaxPhase, climaxIntensity, jamDensity, coherence } = useAudioData();
+  const { time, beatDecay, smooth, palettePrimary, paletteSecondary, paletteSaturation, tempo, musicalTime, climaxPhase, climaxIntensity, jamDensity, coherence, dynamicTime } = useAudioData();
   const { width, height } = useVideoConfig();
 
   const uniforms = useMemo(() => {
     return {
       uTime: { value: 0 },
+      uDynamicTime: { value: 0 },
       uBass: { value: 0 },
       uRms: { value: 0 },
       uCentroid: { value: 0 },
@@ -71,6 +72,7 @@ export const FullscreenQuad: React.FC<Props> = ({
   }, []);
 
   uniforms.uTime.value = time;
+  uniforms.uDynamicTime.value = dynamicTime;
   uniforms.uBass.value = smooth.bass;
   uniforms.uRms.value = smooth.rms;
   uniforms.uCentroid.value = smooth.centroid;
@@ -117,8 +119,8 @@ export const FullscreenQuad: React.FC<Props> = ({
   // Camera offset: approximate CameraMotion's drift for parallax
   // Bass-driven sway + slow sinusoidal drift
   const bassAmp = smooth.bass * 12.0;
-  const camOffX = Math.sin(time * 3.7) * bassAmp * 0.5 + Math.sin(time * 0.03 * Math.PI * 2) * 4;
-  const camOffY = Math.cos(time * 2.3) * bassAmp * 0.3 + Math.cos(time * 0.03 * Math.PI * 2 * 0.7 + 1.3) * 2.4;
+  const camOffX = Math.sin(time * 3.7) * bassAmp * 0.5 + Math.sin(dynamicTime * 0.03 * Math.PI * 2) * 4;
+  const camOffY = Math.cos(time * 2.3) * bassAmp * 0.3 + Math.cos(dynamicTime * 0.03 * Math.PI * 2 * 0.7 + 1.3) * 2.4;
   uniforms.uCamOffset.value.set(camOffX, camOffY);
 
   return (

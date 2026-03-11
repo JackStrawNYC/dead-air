@@ -7,7 +7,7 @@
 import React from "react";
 import { AudioReactiveCanvas } from "../components/AudioReactiveCanvas";
 import { FullscreenQuad } from "../components/FullscreenQuad";
-import { loFiGrainVert, loFiGrainFrag } from "../shaders/lo-fi-grain";
+import { smokeAndMirrorsVert, smokeAndMirrorsFrag } from "../shaders/smoke-and-mirrors";
 import type { EnhancedFrameData, SectionBoundary, ColorPalette } from "../data/types";
 
 interface Props {
@@ -22,8 +22,8 @@ export const LoFiGrainScene: React.FC<Props> = ({ frames, sections, palette, tem
   return (
     <AudioReactiveCanvas frames={frames} sections={sections} palette={palette} tempo={tempo} style={style}>
       <FullscreenQuad
-        vertexShader={loFiGrainVert}
-        fragmentShader={loFiGrainFrag}
+        vertexShader={smokeAndMirrorsVert}
+        fragmentShader={smokeAndMirrorsFrag}
       />
     </AudioReactiveCanvas>
   );

@@ -33,6 +33,7 @@ precision highp float;
 ${noiseGLSL}
 
 uniform float uTime;
+uniform float uDynamicTime;
 uniform float uBass;
 uniform float uRms;
 uniform float uCentroid;
@@ -130,13 +131,13 @@ void main() {
   float chromaH = clamp(uChromaHue, 0.0, 1.0);
 
   // === SLOW TIME: aurora should never feel rushed ===
-  float slowTime = uTime * 0.08;
+  float slowTime = uDynamicTime * 0.08;
   float driftSpeed = 0.03 + slowE * 0.02;
 
-  // === DARK SKY background ===
+  // === SKY background (dim but visible, not pitch black) ===
   vec3 skyColor = mix(
-    vec3(0.005, 0.008, 0.02),
-    vec3(0.02, 0.03, 0.06),
+    vec3(0.015, 0.02, 0.05),
+    vec3(0.04, 0.05, 0.10),
     smoothstep(0.5, -0.3, p.y)
   );
   vec3 col = skyColor;
@@ -172,7 +173,7 @@ void main() {
   float isClimax = step(1.5, climaxPhase) * step(climaxPhase, 3.5);
   float climaxBoost = isClimax * climaxI;
 
-  float curtainBrightness = mix(0.10, 0.75, energy) * mix(0.7, 1.3, uJamDensity);
+  float curtainBrightness = mix(0.25, 0.80, energy) * mix(0.7, 1.3, uJamDensity);
   curtainBrightness += onset * 0.5;
   float bpH = beatPulseHalf(uMusicalTime);
   curtainBrightness += bpH * 0.20 + max(uBeatSnap, uDrumBeat) * 0.25;
@@ -252,7 +253,7 @@ void main() {
 
   // === ATMOSPHERIC GLOW: diffuse light beneath aurora ===
   float glowY = smoothstep(0.3, -0.2, p.y);
-  float glowStrength = auroraIntensity * energy * 0.15;
+  float glowStrength = auroraIntensity * (0.08 + energy * 0.12);
   vec3 glowColor = mix(auroraColor1, vec3(0.1, 0.2, 0.15), 0.5);
   col += glowColor * glowY * glowStrength;
 
@@ -260,13 +261,13 @@ void main() {
   col -= starColor * 0.4 * auroraIntensity * curtainBrightness;
 
   // === VIGNETTE ===
-  float vigScale = mix(0.46, 0.30, energy);
+  float vigScale = mix(0.34, 0.28, energy);
   float vignette = 1.0 - dot(p * vigScale, p * vigScale);
   vignette = smoothstep(0.0, 1.0, vignette);
   col = mix(vec3(0.0), col, vignette);
 
   // === LIGHT LEAK ===
-  col += lightLeak(p, uTime, energy * 0.5, uOnsetSnap) * 0.7;
+  col += lightLeak(p, uDynamicTime, energy * 0.5, uOnsetSnap) * 0.7;
 
   // === BLOOM: soft ethereal glow (climax-amplified) ===
   float lum = dot(col, vec3(0.299, 0.587, 0.114));
@@ -276,14 +277,17 @@ void main() {
   vec3 bloom = bloomColor * bloomAmount * (0.3 + climaxBoost * 0.20);
   col = col + bloom - col * bloom; // screen blend
 
-  // === S-CURVE COLOR GRADING ===
-  col = sCurveGrade(col, energy);
-
   // === ANIMATED STAGE FLOOD: flowing palette noise in dark areas ===
-  col = stageFloodFill(col, p, uTime, energy, uPalettePrimary, uPaletteSecondary);
+  col = stageFloodFill(col, p, uDynamicTime, energy, uPalettePrimary, uPaletteSecondary);
+
+  // === ANAMORPHIC FLARE: horizontal light streak ===
+  col = anamorphicFlare(vUv, col, energy, uOnsetSnap);
 
   // === HALATION: warm film bloom ===
   col = halation(vUv, col, energy);
+
+  // === CINEMATIC GRADE (ACES filmic tone mapping) ===
+  col = cinematicGrade(col, energy);
 
   // === FILM GRAIN ===
   float grainTime = floor(uTime * 15.0) / 15.0;
@@ -306,7 +310,7 @@ void main() {
   // Lifted blacks (build-phase-aware: near true black during build for anticipation)
   float isBuild = step(0.5, uClimaxPhase) * step(uClimaxPhase, 1.5);
   float liftMult = mix(1.0, 0.15, isBuild * uClimaxIntensity);
-  col = max(col, vec3(0.08, 0.10, 0.14) * liftMult);
+  col = max(col, vec3(0.06, 0.05, 0.08) * liftMult);
 
   gl_FragColor = vec4(col, 1.0);
 }

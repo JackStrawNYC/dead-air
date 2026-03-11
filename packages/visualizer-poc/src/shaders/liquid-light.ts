@@ -22,6 +22,7 @@ precision highp float;
 ${noiseGLSL}
 
 uniform float uTime;
+uniform float uDynamicTime;
 uniform float uBass;
 uniform float uRms;
 uniform float uCentroid;
@@ -59,6 +60,7 @@ uniform float uFastBass;
 uniform float uDrumOnset;
 uniform float uDrumBeat;
 uniform float uSpectralFlux;
+uniform float uSlowEnergy;
 
 varying vec2 vUv;
 
@@ -91,48 +93,45 @@ void main() {
   vec2 aspect = vec2(uResolution.x / uResolution.y, 1.0);
   vec2 p = (uv - 0.5) * aspect;
 
-  // Bass camera shake (fast bass for punchy response)
-  float shakeX = snoise(vec3(uTime * 8.0, 0.0, 0.0)) * uFastBass * 0.015;
-  float shakeY = snoise(vec3(0.0, uTime * 8.0, 0.0)) * uFastBass * 0.015;
+  // Bass camera shake (energy-gated: silent during quiet, punchy during loud)
+  float shakeGate = smoothstep(0.25, 0.55, uEnergy);
+  float shakeX = snoise(vec3(uTime * 8.0, 0.0, 0.0)) * uFastBass * 0.015 * shakeGate;
+  float shakeY = snoise(vec3(0.0, uTime * 8.0, 0.0)) * uFastBass * 0.015 * shakeGate;
   p += vec2(shakeX, shakeY);
 
-  // Bass-driven horizontal sweep: directional motion
-  float bassWave = sin(p.x * 3.0 + uTime * 2.0 + uBass * 6.0) * (uBass * 0.15 + uFastBass * 0.12);
-  p.y += bassWave;
-  p.x += sin(p.y * 2.0 + uTime * 1.5) * (uBass * 0.08 + uFastBass * 0.06);
-
   float energy = clamp(uEnergy, 0.0, 1.0);
-  float complexity = mix(0.5, 1.0, energy);
+
+  // === PATTERN STABILITY: FBM domain uses ONLY dynamicTime and slowEnergy ===
+  // Audio-reactive features (bass, highs, onset) only affect post-FBM rendering.
+  // This prevents frame-to-frame audio jitter from moving the FBM pattern.
+  float slowE = clamp(uSlowEnergy, 0.0, 1.0); // 6-second smoothed, no jitter
+
+  // Bass-driven horizontal sweep: uses slowEnergy for smooth amplitude
+  float bassAmp = slowE * 0.08;
+  float bassWave = sin(p.x * 3.0 + uDynamicTime * 2.0) * bassAmp;
+  p.y += bassWave;
+  p.x += sin(p.y * 2.0 + uDynamicTime * 1.5) * bassAmp * 0.6;
+  float complexity = mix(0.5, 1.0, slowE);
   float tempoScale = uTempo / 120.0;
   float sectionSeed = uSectionIndex * 7.3;
   float sectionWarp = 1.0 + (uSectionProgress - 0.5) * 0.3;
-  float t = uTime * (0.25 + uRms * 0.05 + uFastEnergy * 0.12) * tempoScale;
+  // FBM time: only dynamicTime (already energy-scaled), no per-frame audio jitter
+  float t = uDynamicTime * 0.25 * tempoScale;
   float smoothness = 1.0 - uFlatness * 0.6;
-  float grainAmount = uFlatness * 0.12;
 
-  // Spectral contrast spatial shaping
-  float normY = uv.y;
-  float bandInfluence =
-    uContrast0.x * smoothstep(0.15, 0.0, normY) +
-    uContrast0.y * smoothstep(0.0, 0.15, normY) * smoothstep(0.3, 0.15, normY) +
-    uContrast0.z * smoothstep(0.15, 0.3, normY) * smoothstep(0.5, 0.3, normY) +
-    uContrast0.w * smoothstep(0.3, 0.5, normY) * smoothstep(0.65, 0.5, normY) +
-    uContrast1.x * smoothstep(0.5, 0.65, normY) * smoothstep(0.8, 0.65, normY) +
-    uContrast1.y * smoothstep(0.65, 0.8, normY) * smoothstep(0.95, 0.8, normY) +
-    uContrast1.z * smoothstep(0.8, 1.0, normY);
-  float contrastWarp = 0.5 + bandInfluence * 0.8;
+  // Spectral contrast: constant spatial variation (no per-frame jitter)
+  float contrastWarp = 0.8;
 
   // ============ LAYER 1: Background ============
-  // fbm3 (3 octaves) suffices — background gets dominated by warp passes
   vec3 bgQ = vec3(p * 0.4, t * 0.03 + sectionSeed);
   float bgNoise = fbm3(bgQ);
   float bgHue = hsvToCosineHue(uPaletteSecondary) + bgNoise * 0.15;
   vec3 bgCol = palette(bgHue, vec3(0.4), vec3(0.3), vec3(1.0), vec3(bgHue, bgHue + 0.33, bgHue + 0.67));
-  bgCol *= 0.65 + energy * 0.08;
+  bgCol *= mix(0.35, 0.72, energy);
 
   // ============ LAYER 2: Midground (hero) ============
-  float warpStrength = (0.7 + uBass * 0.8 + uDrumOnset * 0.3) * complexity * contrastWarp;
-  float tFlux = t * 0.2 + sectionSeed + uSpectralFlux * 0.3;
+  float warpStrength = (0.65 + slowE * 0.55) * complexity;
+  float tFlux = t * 0.2 + sectionSeed;
   vec3 q = vec3(p * 1.2 * sectionWarp, tFlux);
   float warpX = fbmFlat(q + vec3(1.7, 9.2, 0.0), smoothness);
   float warpY = fbmFlat(q + vec3(8.3, 2.8, 0.0), smoothness);
@@ -143,33 +142,33 @@ void main() {
   float n = fbmFlat(vec3(warped * 0.9, t * 0.15 + sectionSeed * 0.3), smoothness);
 
   // === CHROMATIC ABERRATION (aggressive) ===
-  // Compute palette at 3 hue offsets for R/G/B channel separation
   float caAmount = uBass * 0.08 + length(p) * 0.025 + uOnsetSnap * 0.06 + uDrumOnset * 0.10;
   float hue = hsvToCosineHue(uPalettePrimary) + uChromaHue * 0.3 + t * 0.05;
 
-  vec3 palA = vec3(0.5, 0.5, 0.5);
-  vec3 palB = vec3(0.5, 0.5, 0.4);
+  // Palette compression: at quiet, raise floor so valleys have visible color (no black gaps).
+  // At peak, full contrast range for vivid psychedelic color.
+  vec3 palA = vec3(mix(0.55, 0.50, energy));
+  vec3 palB = vec3(mix(0.32, 0.50, energy), mix(0.32, 0.50, energy), mix(0.26, 0.40, energy));
   vec3 palC = vec3(1.0, 0.8, 0.7);
 
-  // G channel: center hue
+  // G channel: center hue (wider n multiplier for more color variation)
   vec3 dG = vec3(hue, hue + 0.33, hue + 0.67);
-  vec3 midColG = palette(n * 0.7 + hue, palA, palB, palC, dG);
+  vec3 midColG = palette(n * 1.2 + hue, palA, palB, palC, dG);
 
   // R channel: hue shifted inward
   float hueR = hue - caAmount;
   vec3 dR = vec3(hueR, hueR + 0.33, hueR + 0.67);
-  vec3 midColR = palette(n * 0.7 + hueR, palA, palB, palC, dR);
+  vec3 midColR = palette(n * 1.2 + hueR, palA, palB, palC, dR);
 
   // B channel: hue shifted outward
   float hueB = hue + caAmount;
   vec3 dB = vec3(hueB, hueB + 0.33, hueB + 0.67);
-  vec3 midColB = palette(n * 0.7 + hueB, palA, palB, palC, dB);
+  vec3 midColB = palette(n * 1.2 + hueB, palA, palB, palC, dB);
 
   // Composite: R from red-shifted, G from center, B from blue-shifted
   vec3 midCol = vec3(midColR.r, midColG.g, midColB.b);
 
-  // Multi-chroma domain warping: harmonic content adds multi-colored regions
-  // instead of single-hue uChromaHue, the oil-on-glass gains harmonic complexity
+  // Multi-chroma domain warping
   vec3 chromaInfluence = chromaColor(warped * 0.5, uChroma0, uChroma1, uChroma2, energy);
   midCol = mix(midCol, midCol + chromaInfluence * 0.6, 0.2);
 
@@ -183,7 +182,7 @@ void main() {
   vec3 coolShift = vec3(0.90, 0.97, 1.10);
   midCol *= mix(coolShift, warmShift, energy);
 
-  float brightness = mix(0.45, 1.10, energy) + uFastEnergy * 0.20;
+  float brightness = mix(0.45, 1.15, energy) + uFastEnergy * 0.15;
   midCol *= brightness;
 
   // ============ LAYER 3: Foreground ============
@@ -192,12 +191,13 @@ void main() {
   vec3 fgCol = vec3(fgNoise * 0.5 + 0.5) * vec3(0.8, 0.9, 1.0) * fgIntensity;
 
   // ============ COMPOSITE (hero-dominant) ============
-  float bgMix = mix(0.25, 0.15, energy);
-  float midMix = mix(0.62, 0.72, energy);
-  float fgMix = mix(0.13, 0.18, energy);
+  float bgMix = mix(0.35, 0.18, energy);
+  float midMix = mix(0.55, 0.72, energy);
+  float fgMix = mix(0.10, 0.18, energy);
   vec3 col = bgCol * bgMix + midCol * midMix + fgCol * fgMix;
 
   // Flatness grain
+  float grainAmount = uFlatness * 0.12;
   float grain = snoise(vec3(p * 40.0, t * 2.0)) * grainAmount;
   col += grain * vec3(0.9, 0.85, 0.8);
 
@@ -208,8 +208,8 @@ void main() {
   // === DUST MOTES: gentle floating particles during quiet passages ===
   float dustIntensity = smoothstep(0.35, 0.1, energy) * 0.1;
   if (dustIntensity > 0.001) {
-    float dust1 = snoise(vec3(p * 15.0 + uTime * 0.05, uTime * 0.1));
-    float dust2 = snoise(vec3(p * 20.0 - uTime * 0.03, uTime * 0.15 + 5.0));
+    float dust1 = snoise(vec3(p * 15.0 + uDynamicTime * 0.05, uDynamicTime * 0.1));
+    float dust2 = snoise(vec3(p * 20.0 - uDynamicTime * 0.03, uDynamicTime * 0.15 + 5.0));
     float dustParticle = max(0.0, dust1 * dust2 - 0.3) * 4.0;
     col += dustParticle * dustIntensity * vec3(1.0, 0.95, 0.85);
   }
@@ -218,7 +218,7 @@ void main() {
   float warpIntensity = smoothstep(0.6, 0.9, energy) * 0.12;
   if (warpIntensity > 0.001) {
     float warpAngle = atan(p.y, p.x);
-    float radialNoise = snoise(vec3(warpAngle * 10.0, length(p) * 3.0, uTime * 2.0));
+    float radialNoise = snoise(vec3(warpAngle * 10.0, length(p) * 3.0, uDynamicTime * 2.0));
     float trail = max(0.0, radialNoise - 0.5) * 2.0;
     float radialFade = smoothstep(0.1, 0.5, length(p));
     col += trail * warpIntensity * radialFade * vec3(0.9, 0.95, 1.0);
@@ -230,7 +230,7 @@ void main() {
   vec3 afterglowColor = 0.5 + 0.5 * cos(6.28318 * vec3(agHue, agHue + 0.33, agHue + 0.67));
   col += afterglowColor * afterglowStrength;
 
-  // === WAVEFORM RING: subtle spectrum circle, radius driven by contrast bands ===
+  // === WAVEFORM RING: subtle spectrum circle ===
   float wfAngle = atan(p.y, p.x);
   float wfR = length(p);
   float baseWfRadius = 0.3 + uRms * 0.1;
@@ -257,7 +257,7 @@ void main() {
     float stHue2 = hsvToCosineHue(uPaletteSecondary);
     vec3 palCol1 = 0.5 + 0.5 * cos(6.28318 * vec3(stHue1, stHue1 + 0.33, stHue1 + 0.67));
     vec3 palCol2 = 0.5 + 0.5 * cos(6.28318 * vec3(stHue2, stHue2 + 0.33, stHue2 + 0.67));
-    float nf = fbm3(vec3(p * 2.0, uTime * 0.1));
+    float nf = fbm3(vec3(p * 2.0, uDynamicTime * 0.1));
     col += stealieEmergence(p, uTime, energy, uBass, palCol1, palCol2, nf);
   }
 
@@ -276,8 +276,8 @@ void main() {
   float sectionBloom = smoothstep(0.06, 0.0, edgeDist) * 0.1;
   col += sectionBloom * vec3(1.0, 0.98, 0.94);
 
-  // Vignette (energy-driven, no beat pulse)
-  float vigScale = mix(0.48, 0.32, energy);
+  // Vignette (energy-driven)
+  float vigScale = mix(0.36, 0.30, energy);
   float vignette = 1.0 - dot(p * vigScale, p * vigScale);
   vignette = smoothstep(0.0, 1.0, vignette);
 
@@ -288,7 +288,7 @@ void main() {
   col = mix(vigTint, col, vignette);
 
   // === LIGHT LEAK: warm amber glow from drifting edge ===
-  col += lightLeak(p, uTime, energy, uOnsetSnap);
+  col += lightLeak(p, uDynamicTime, energy, uOnsetSnap);
 
   // === BEAT PULSE: tempo-locked brightness swell ===
   float bp = beatPulse(uMusicalTime);
@@ -300,20 +300,23 @@ void main() {
   float bloomAmount = max(0.0, lum - bloomThreshold) * (2.5 + climaxBoost * 1.5);
   vec3 bloomColor = mix(col, vec3(1.0, 0.98, 0.95), 0.3);
   vec3 bloom = bloomColor * bloomAmount * (0.35 + climaxBoost * 0.20);
-  col = col + bloom - col * bloom; // screen blend: preserves color, can't exceed 1.0
-
-  // === S-CURVE COLOR GRADING ===
-  col = sCurveGrade(col, energy);
+  col = col + bloom - col * bloom; // screen blend
 
   // === ANIMATED STAGE FLOOD: flowing palette noise in dark areas ===
-  col = stageFloodFill(col, p, uTime, energy, uPalettePrimary, uPaletteSecondary);
+  col = stageFloodFill(col, p, uDynamicTime, energy, uPalettePrimary, uPaletteSecondary);
+
+  // === ANAMORPHIC FLARE: horizontal light streak ===
+  col = anamorphicFlare(vUv, col, energy, uOnsetSnap);
 
   // === HALATION: warm film bloom ===
   col = halation(vUv, col, energy);
 
+  // === CINEMATIC GRADE (ACES filmic tone mapping) ===
+  col = cinematicGrade(col, energy);
+
   // === FILM GRAIN: animated 2-frame hold ===
   float grainTime = floor(uTime * 15.0) / 15.0;
-  float grainIntensity = mix(0.06, 0.02, energy);
+  float grainIntensity = mix(0.03, 0.04, energy);
   col += filmGrainRes(uv, grainTime, uResolution.y) * grainIntensity;
 
   // ONSET SATURATION PULSE: push colors away from gray (psychedelic, not white)
@@ -325,7 +328,7 @@ void main() {
   // Lifted blacks (build-phase-aware: near true black during build for anticipation)
   float isBuild = step(0.5, uClimaxPhase) * step(uClimaxPhase, 1.5);
   float liftMult = mix(1.0, 0.15, isBuild * uClimaxIntensity);
-  col = max(col, vec3(0.14, 0.11, 0.15) * liftMult);
+  col = max(col, vec3(0.08, 0.06, 0.10) * liftMult);
 
   gl_FragColor = vec4(col, 1.0);
 }

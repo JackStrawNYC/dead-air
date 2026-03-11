@@ -20,6 +20,7 @@ precision highp float;
 ${noiseGLSL}
 
 uniform float uTime;
+uniform float uDynamicTime;
 uniform float uBass;
 uniform float uRms;
 uniform float uCentroid;
@@ -83,7 +84,7 @@ void main() {
   float angle = atan(uv.y, uv.x);
 
   // Time-based rotation — bass drives swirl speed
-  float t = uTime * 0.15 * (0.8 + uBass * 0.6 + uFastBass * 0.4);
+  float t = uDynamicTime * 0.15 * (0.8 + uBass * 0.6 + uFastBass * 0.4);
   float bassSwirl = uBass * 1.5;
 
   // Domain warping — noise-based spiral distortion
@@ -145,11 +146,14 @@ void main() {
   // Energy-reactive overall brightness
   color *= 0.8 + uRms * 0.4;
 
-  // === S-CURVE COLOR GRADING ===
-  color = sCurveGrade(color, uEnergy);
+  // === CINEMATIC GRADE (ACES filmic tone mapping) ===
+  color = cinematicGrade(color, uEnergy);
 
   // === ANIMATED STAGE FLOOD: flowing palette noise in dark areas ===
-  color = stageFloodFill(color, uv, uTime, uEnergy, uPalettePrimary, uPaletteSecondary);
+  color = stageFloodFill(color, uv, uDynamicTime, uEnergy, uPalettePrimary, uPaletteSecondary);
+
+  // === ANAMORPHIC FLARE: horizontal light streak ===
+  color = anamorphicFlare(vUv, color, uEnergy, uOnsetSnap);
 
   // ONSET SATURATION PULSE: push colors away from gray (psychedelic, not white)
   float onsetPulse = step(0.5, uOnsetSnap) * uOnsetSnap;
@@ -166,6 +170,9 @@ void main() {
 
   // === HALATION: warm film bloom ===
   color = halation(vUv, color, uEnergy);
+
+  // Lifted blacks
+  color = max(color, vec3(0.06, 0.05, 0.08));
 
   gl_FragColor = vec4(color, 1.0);
 }

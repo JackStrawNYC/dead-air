@@ -21,6 +21,7 @@ precision highp float;
 ${noiseGLSL}
 
 uniform float uTime;
+uniform float uDynamicTime;
 uniform float uBass;
 uniform float uRms;
 uniform float uCentroid;
@@ -72,23 +73,56 @@ float hash2(vec2 p) {
   return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
 }
 
-// Gate weave — subtle frame jitter
-vec2 gateWeave(float t) {
+// Gate weave — onset-reactive frame jitter (film physically jolts on transients)
+vec2 gateWeave(float t, float onset) {
   float wx = sin(t * 7.3) * 0.002 + sin(t * 13.1) * 0.001;
   float wy = sin(t * 5.7) * 0.003 + sin(t * 11.3) * 0.0015;
+  // Onset jolt: sharp kick on percussive hits
+  wx += onset * 0.004 * sin(t * 31.7);
+  wy += onset * 0.006 * cos(t * 27.3);
   return vec2(wx, wy);
+}
+
+// Hexagonal bokeh: bright defocused circles
+float hexBokeh(vec2 uv, vec2 center, float radius) {
+  vec2 d = abs(uv - center);
+  // Hexagonal distance (approximate)
+  float hex = max(d.x * 0.866 + d.y * 0.5, d.y);
+  return smoothstep(radius, radius * 0.7, hex);
+}
+
+// Bayer matrix dithering (4x4) for blue-noise-approximation grain
+float bayerGrain(vec2 fragCoord, float time) {
+  // 4x4 Bayer pattern
+  int x = int(mod(fragCoord.x, 4.0));
+  int y = int(mod(fragCoord.y, 4.0));
+  int idx = x + y * 4;
+  float bayer = 0.0;
+  if (idx == 0) bayer = 0.0;    else if (idx == 1) bayer = 8.0;
+  else if (idx == 2) bayer = 2.0;  else if (idx == 3) bayer = 10.0;
+  else if (idx == 4) bayer = 12.0; else if (idx == 5) bayer = 4.0;
+  else if (idx == 6) bayer = 14.0; else if (idx == 7) bayer = 6.0;
+  else if (idx == 8) bayer = 3.0;  else if (idx == 9) bayer = 11.0;
+  else if (idx == 10) bayer = 1.0; else if (idx == 11) bayer = 9.0;
+  else if (idx == 12) bayer = 15.0;else if (idx == 13) bayer = 7.0;
+  else if (idx == 14) bayer = 13.0;else bayer = 5.0;
+  bayer /= 16.0;
+  // Animate with time hash for temporal variation
+  float h = fract(sin(dot(fragCoord * 0.01, vec2(12.9898, 78.233)) + time * 43758.5453) * 43758.5453);
+  return (bayer + h - 1.0) * 2.0;
 }
 
 void main() {
   float t = uTime;
-  vec2 weave = gateWeave(t) * (1.0 + uBeatSnap * 2.0);
+  vec2 weave = gateWeave(t, uOnsetSnap) * (1.0 + uBeatSnap * 2.0);
   vec2 uv = vUv + weave;
   vec2 centered = (gl_FragCoord.xy - 0.5 * uResolution) / min(uResolution.x, uResolution.y);
 
   // Base scene — warm amber abstract shapes (as if projected concert footage)
-  float n1 = snoise(vec3(centered * 1.5 + t * 0.1, t * 0.05));
-  float n2 = snoise(vec3(centered * 3.0 - t * 0.08, t * 0.03 + 5.0));
-  float n3 = snoise(vec3(centered * 0.8 + t * 0.15, t * 0.07 + 10.0));
+  float dt = uDynamicTime;
+  float n1 = snoise(vec3(centered * 1.5 + dt * 0.1, dt * 0.05));
+  float n2 = snoise(vec3(centered * 3.0 - dt * 0.08, dt * 0.03 + 5.0));
+  float n3 = snoise(vec3(centered * 0.8 + dt * 0.15, dt * 0.07 + 10.0));
 
   float scene = n1 * 0.5 + n2 * 0.3 + n3 * 0.2;
   scene = scene * 0.5 + 0.5;
@@ -136,9 +170,26 @@ void main() {
   // === HALATION: warm film bloom ===
   color = halation(vUv, color, uEnergy);
 
-  // Film grain (uses shared filmGrain from noise.ts — returns warm-tinted vec3)
+  // === HEXAGONAL BOKEH: bright defocused circles ===
+  float lum2 = dot(color, vec3(0.299, 0.587, 0.114));
+  if (lum2 > 0.45) {
+    float bokehStr = smoothstep(0.45, 0.8, lum2) * 0.12;
+    // 3 bokeh circles at semi-random positions near bright areas
+    for (int b = 0; b < 3; b++) {
+      float fb = float(b);
+      vec2 bokehPos = centered + vec2(
+        sin(t * 0.3 + fb * 2.1) * 0.15,
+        cos(t * 0.25 + fb * 3.7) * 0.1
+      );
+      float bokeh = hexBokeh(centered, bokehPos, 0.06 + fb * 0.02);
+      color += bokeh * bokehStr * vec3(1.0, 0.95, 0.85);
+    }
+  }
+
+  // Bayer-dithered film grain (blue-noise approximation — less harsh than hash grain)
   float grainTime = floor(t * 15.0) / 15.0;
-  color += filmGrain(uv, grainTime) * (0.06 + uSpectralFlux * 0.04);
+  float bayerN = bayerGrain(gl_FragCoord.xy, grainTime);
+  color += bayerN * vec3(1.0, 0.95, 0.85) * (0.05 + uSpectralFlux * 0.03);
 
   // Vertical scratches — random thin lines
   float scratch = smoothstep(0.001, 0.0, abs(uv.x - hash(floor(t * 3.0)) ));
@@ -164,11 +215,21 @@ void main() {
   vig = 0.55 + vig * 0.45;
   color *= vig;
 
-  // === S-CURVE COLOR GRADING ===
-  color = sCurveGrade(color, uEnergy);
-
   // === ANIMATED STAGE FLOOD: flowing palette noise in dark areas ===
-  color = stageFloodFill(color, centered, uTime, uEnergy, uPalettePrimary, uPaletteSecondary);
+  color = stageFloodFill(color, centered, uDynamicTime, uEnergy, uPalettePrimary, uPaletteSecondary);
+
+  // === ANAMORPHIC FLARE: horizontal light streak ===
+  color = anamorphicFlare(vUv, color, uEnergy, uOnsetSnap);
+
+  // === CINEMATIC GRADE (ACES filmic tone mapping) ===
+  color = cinematicGrade(color, uEnergy);
+
+  // === KODACHROME COLOR PUSH: warm shadows, rich midtones ===
+  float filmLuma = dot(color, vec3(0.299, 0.587, 0.114));
+  // Warm shadows (push dark areas toward amber)
+  color = mix(color, color * vec3(1.15, 0.95, 0.75), smoothstep(0.3, 0.0, filmLuma) * 0.25);
+  // Rich midtone saturation boost
+  color = mix(color, color * vec3(1.08, 1.0, 0.88), smoothstep(0.0, 0.4, filmLuma) * smoothstep(0.8, 0.4, filmLuma) * 0.2);
 
   // ONSET SATURATION PULSE: push colors away from gray (psychedelic, not white)
   float onsetPulse = step(0.5, uOnsetSnap) * uOnsetSnap;

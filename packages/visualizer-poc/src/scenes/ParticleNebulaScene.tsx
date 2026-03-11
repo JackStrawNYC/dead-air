@@ -1,24 +1,29 @@
 /**
  * ParticleNebulaScene — cosmic particle cloud (20% of show).
- * 8K particles in golden-ratio sphere distribution.
+ * 4K icosphere particles in toroidal flow field with Phong shading.
  * Camera orbits with bass-driven shake.
  * Uses AudioReactiveCanvas for shared smoothing + all uniforms.
+ *
+ * v7: Upgraded from Points to InstancedMesh for proper lighting.
  */
 
 import React, { useMemo } from "react";
 import * as THREE from "three";
 import { AudioReactiveCanvas, useAudioData } from "../components/AudioReactiveCanvas";
-import { useVideoConfig } from "remotion";
 import { particleNebulaVert, particleNebulaFrag } from "../shaders/particle-nebula";
 import type { EnhancedFrameData, SectionBoundary, ColorPalette } from "../data/types";
 
-const PARTICLE_COUNT = 8000;
+const PARTICLE_COUNT = 4000;
 const GOLDEN_RATIO = (1 + Math.sqrt(5)) / 2;
 
 const ParticleSystem: React.FC = () => {
-  const { time, beatDecay, smooth, palettePrimary, paletteSecondary, paletteSaturation, tempo, musicalTime, climaxPhase, climaxIntensity } = useAudioData();
+  const { time, beatDecay, smooth, palettePrimary, paletteSecondary, paletteSaturation, tempo, musicalTime, climaxPhase, climaxIntensity, dynamicTime } = useAudioData();
 
-  const { geometry, uniforms } = useMemo(() => {
+  const { material, instancedMesh } = useMemo(() => {
+    // Small icosphere geometry for each particle
+    const geo = new THREE.IcosahedronGeometry(0.08, 1);
+
+    // Instance attributes
     const radiuses = new Float32Array(PARTICLE_COUNT);
     const thetas = new Float32Array(PARTICLE_COUNT);
     const phis = new Float32Array(PARTICLE_COUNT);
@@ -28,24 +33,23 @@ const ParticleSystem: React.FC = () => {
       const t = i / PARTICLE_COUNT;
       const theta = 2 * Math.PI * i / GOLDEN_RATIO;
       const phi = Math.acos(1 - 2 * t);
-      const baseR = 1.0 + (i % 5) * 0.4;
+      const baseR = 0.5 + (i % 5) * 0.3;
 
-      radiuses[i] = baseR + (Math.sin(i * 0.1) * 0.3);
+      radiuses[i] = baseR + (Math.sin(i * 0.1) * 0.2);
       thetas[i] = theta;
       phis[i] = phi;
       randoms[i] = (i * 0.618033988) % 1.0;
     }
 
-    const positions = new Float32Array(PARTICLE_COUNT * 3);
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-    geo.setAttribute("aRadius", new THREE.BufferAttribute(radiuses, 1));
-    geo.setAttribute("aTheta", new THREE.BufferAttribute(thetas, 1));
-    geo.setAttribute("aPhi", new THREE.BufferAttribute(phis, 1));
-    geo.setAttribute("aRandom", new THREE.BufferAttribute(randoms, 1));
+    // Add instanced attributes
+    geo.setAttribute("aRadius", new THREE.InstancedBufferAttribute(radiuses, 1));
+    geo.setAttribute("aTheta", new THREE.InstancedBufferAttribute(thetas, 1));
+    geo.setAttribute("aPhi", new THREE.InstancedBufferAttribute(phis, 1));
+    geo.setAttribute("aRandom", new THREE.InstancedBufferAttribute(randoms, 1));
 
     const u = {
       uTime: { value: 0 },
+      uDynamicTime: { value: 0 },
       uBass: { value: 0 },
       uMids: { value: 0 },
       uHighs: { value: 0 },
@@ -76,44 +80,63 @@ const ParticleSystem: React.FC = () => {
       uSpectralFlux: { value: 0 },
     };
 
-    return { geometry: geo, uniforms: u };
+    const mat = new THREE.ShaderMaterial({
+      vertexShader: particleNebulaVert,
+      fragmentShader: particleNebulaFrag,
+      uniforms: u,
+      side: THREE.FrontSide,
+    });
+
+    // Create instanced mesh — identity transforms (shader computes positions)
+    const mesh = new THREE.InstancedMesh(geo, mat, PARTICLE_COUNT);
+    const dummy = new THREE.Object3D();
+    dummy.position.set(0, 0, 0);
+    dummy.scale.setScalar(1);
+    dummy.updateMatrix();
+    for (let i = 0; i < PARTICLE_COUNT; i++) {
+      mesh.setMatrixAt(i, dummy.matrix);
+    }
+    mesh.instanceMatrix.needsUpdate = true;
+
+    return { material: mat, instancedMesh: mesh };
   }, []);
 
-  uniforms.uTime.value = time;
-  uniforms.uBass.value = smooth.bass;
-  uniforms.uMids.value = smooth.mids;
-  uniforms.uHighs.value = smooth.highs;
-  uniforms.uOnset.value = smooth.onset;
-  uniforms.uBeat.value = beatDecay;
-  uniforms.uRms.value = smooth.rms;
-  uniforms.uCentroid.value = smooth.centroid;
-  uniforms.uEnergy.value = smooth.energy;
-  uniforms.uFlatness.value = smooth.flatness;
-  uniforms.uSectionProgress.value = smooth.sectionProgress;
-  uniforms.uSectionIndex.value = smooth.sectionIndex;
-  uniforms.uChromaHue.value = smooth.chromaHue;
-  uniforms.uPalettePrimary.value = palettePrimary;
-  uniforms.uPaletteSecondary.value = paletteSecondary;
-  uniforms.uPaletteSaturation.value = paletteSaturation;
-  uniforms.uTempo.value = tempo;
-  uniforms.uOnsetSnap.value = smooth.onsetSnap;
-  uniforms.uBeatSnap.value = smooth.beatSnap;
-  uniforms.uMusicalTime.value = musicalTime;
-  uniforms.uChromaShift.value = smooth.chromaShift;
-  uniforms.uAfterglowHue.value = smooth.afterglowHue;
-  uniforms.uClimaxPhase.value = climaxPhase;
-  uniforms.uClimaxIntensity.value = climaxIntensity;
-  uniforms.uFastEnergy.value = smooth.fastEnergy;
-  uniforms.uFastBass.value = smooth.fastBass;
-  uniforms.uDrumOnset.value = smooth.drumOnset;
-  uniforms.uDrumBeat.value = smooth.drumBeat;
-  uniforms.uSpectralFlux.value = smooth.spectralFlux;
+  material.uniforms.uTime.value = time;
+  material.uniforms.uDynamicTime.value = dynamicTime;
+  material.uniforms.uBass.value = smooth.bass;
+  material.uniforms.uMids.value = smooth.mids;
+  material.uniforms.uHighs.value = smooth.highs;
+  material.uniforms.uOnset.value = smooth.onset;
+  material.uniforms.uBeat.value = beatDecay;
+  material.uniforms.uRms.value = smooth.rms;
+  material.uniforms.uCentroid.value = smooth.centroid;
+  material.uniforms.uEnergy.value = smooth.energy;
+  material.uniforms.uFlatness.value = smooth.flatness;
+  material.uniforms.uSectionProgress.value = smooth.sectionProgress;
+  material.uniforms.uSectionIndex.value = smooth.sectionIndex;
+  material.uniforms.uChromaHue.value = smooth.chromaHue;
+  material.uniforms.uPalettePrimary.value = palettePrimary;
+  material.uniforms.uPaletteSecondary.value = paletteSecondary;
+  material.uniforms.uPaletteSaturation.value = paletteSaturation;
+  material.uniforms.uTempo.value = tempo;
+  material.uniforms.uOnsetSnap.value = smooth.onsetSnap;
+  material.uniforms.uBeatSnap.value = smooth.beatSnap;
+  material.uniforms.uMusicalTime.value = musicalTime;
+  material.uniforms.uChromaShift.value = smooth.chromaShift;
+  material.uniforms.uAfterglowHue.value = smooth.afterglowHue;
+  material.uniforms.uClimaxPhase.value = climaxPhase;
+  material.uniforms.uClimaxIntensity.value = climaxIntensity;
+  material.uniforms.uFastEnergy.value = smooth.fastEnergy;
+  material.uniforms.uFastBass.value = smooth.fastBass;
+  material.uniforms.uDrumOnset.value = smooth.drumOnset;
+  material.uniforms.uDrumBeat.value = smooth.drumBeat;
+  material.uniforms.uSpectralFlux.value = smooth.spectralFlux;
 
   // Camera orbit with bass shake
   const sectionProgress = smooth.sectionProgress;
   const energy = smooth.energy;
-  const camAngle = time * 0.05;
-  const baseDist = 5 + Math.sin(time * 0.02) * 0.5;
+  const camAngle = dynamicTime * 0.05;
+  const baseDist = 6 + Math.sin(dynamicTime * 0.02) * 0.5;
   const camDist = baseDist + (sectionProgress - 0.3) * 1.5 * energy;
 
   const shakeAmt = smooth.bass * 0.08;
@@ -122,7 +145,7 @@ const ParticleSystem: React.FC = () => {
 
   const camX = Math.cos(camAngle) * camDist + shakeX;
   const camZ = Math.sin(camAngle) * camDist;
-  const camY = Math.sin(time * 0.03) * 0.5 + shakeY;
+  const camY = Math.sin(dynamicTime * 0.03) * 0.5 + shakeY;
 
   return (
     <>
@@ -134,16 +157,7 @@ const ParticleSystem: React.FC = () => {
         // @ts-expect-error — R3F sets this on the default camera
         makeDefault
       />
-      <points geometry={geometry}>
-        <shaderMaterial
-          vertexShader={particleNebulaVert}
-          fragmentShader={particleNebulaFrag}
-          uniforms={uniforms}
-          transparent
-          depthWrite={false}
-          blending={THREE.AdditiveBlending}
-        />
-      </points>
+      <primitive object={instancedMesh} />
     </>
   );
 };
@@ -156,10 +170,23 @@ interface Props {
   style?: React.CSSProperties;
 }
 
+/** Energy-reactive background — never pitch black. */
+const NebulaBackground: React.FC = () => {
+  const { smooth, palettePrimary } = useAudioData();
+  const energy = smooth.energy;
+  // HSV-to-RGB for palette hue at low brightness
+  const hue = palettePrimary;
+  const brightness = 0.04 + energy * 0.08; // 4%-12% brightness
+  const r = brightness * (0.6 + 0.4 * Math.cos(2 * Math.PI * (hue)));
+  const g = brightness * (0.6 + 0.4 * Math.cos(2 * Math.PI * (hue - 0.333)));
+  const b = brightness * (0.6 + 0.4 * Math.cos(2 * Math.PI * (hue - 0.667)));
+  return <color attach="background" args={[r, g, b]} />;
+};
+
 export const ParticleNebulaScene: React.FC<Props> = ({ frames, sections, palette, tempo, style }) => {
   return (
     <AudioReactiveCanvas frames={frames} sections={sections} palette={palette} tempo={tempo} style={style}>
-      <color attach="background" args={["#020208"]} />
+      <NebulaBackground />
       <ParticleSystem />
     </AudioReactiveCanvas>
   );

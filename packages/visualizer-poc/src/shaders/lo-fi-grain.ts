@@ -20,6 +20,7 @@ precision highp float;
 ${noiseGLSL}
 
 uniform float uTime;
+uniform float uDynamicTime;
 uniform float uBass;
 uniform float uRms;
 uniform float uCentroid;
@@ -65,7 +66,7 @@ void main() {
   float energy = clamp(uEnergy, 0.0, 1.0);
   float tempoScale = uTempo / 120.0;
   float sectionSeed = uSectionIndex * 5.7;
-  float t = uTime * 0.07 * tempoScale; // Purposeful movement
+  float t = uDynamicTime * 0.07 * tempoScale; // Purposeful movement
 
   // Subtle gate weave (projector instability)
   float weaveX = snoise(vec3(uTime * 2.0, 0.0, sectionSeed)) * 0.001;
@@ -96,7 +97,7 @@ void main() {
   midCol = mix(midCol, palTint * 0.3, 0.15 * uPaletteSaturation);
 
   // Energy brightens the warm tones
-  float brightness = mix(0.35, 0.72, energy) + uRms * 0.15;
+  float brightness = mix(0.12, 0.72, energy) + uRms * 0.15;
   midCol *= brightness;
 
   // === LAYER 3: High frequency shimmer ===
@@ -143,13 +144,16 @@ void main() {
   // Lifted blacks (build-phase-aware: near true black during build for anticipation)
   float isBuild = step(0.5, uClimaxPhase) * step(uClimaxPhase, 1.5);
   float liftMult = mix(1.0, 0.15, isBuild * uClimaxIntensity);
-  col = max(col, vec3(0.14, 0.11, 0.15) * liftMult);
+  col = max(col, vec3(0.06, 0.05, 0.08) * liftMult);
 
-  // S-curve for film look
-  col = sCurveGrade(col, energy * 0.6); // Gentler grading
+  // Cinematic grade for film look (gentler)
+  col = cinematicGrade(col, energy * 0.6);
 
   // === ANIMATED STAGE FLOOD: flowing palette noise in dark areas ===
-  col = stageFloodFill(col, p, uTime, energy, uPalettePrimary, uPaletteSecondary);
+  col = stageFloodFill(col, p, uDynamicTime, energy, uPalettePrimary, uPaletteSecondary);
+
+  // === ANAMORPHIC FLARE: horizontal light streak ===
+  col = anamorphicFlare(vUv, col, energy, uOnsetSnap);
 
   // ONSET SATURATION PULSE: push colors away from gray (psychedelic, not white)
   float onsetPulse = step(0.5, uOnsetSnap) * uOnsetSnap;

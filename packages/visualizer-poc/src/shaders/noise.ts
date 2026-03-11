@@ -153,15 +153,16 @@ vec3 sCurveGrade(vec3 col, float energy) {
 float hsvToCosineHue(float h) { return 1.0 - h; }
 
 // --- Animated stage flood: flowing palette-colored noise in dark areas ---
-// Call AFTER sCurveGrade so flood colors bypass tone mapping compression.
+// Call BEFORE cinematicGrade (in HDR space) — tone curve will compress the result.
 // Additive blend gated by darkness: lifts dark pixels, transparent on bright ones.
+// Ensures no dead black voids — concerts are never pitch black.
 vec3 stageFloodFill(vec3 col, vec2 uv, float time, float energy, float palHue1, float palHue2) {
   // Activate even at very low energy — concerts are never pitch black
   float gate = smoothstep(0.02, 0.15, energy);
   if (gate < 0.01) return col;
-  // Darkness mask: fill dim pixels (luma < 0.20 after tone mapping)
+  // Darkness mask: fill dim pixels (luma < 0.60 in pre-tonemap HDR range)
   float luma = dot(col, vec3(0.299, 0.587, 0.114));
-  float darkness = smoothstep(0.20, 0.02, luma);
+  float darkness = smoothstep(0.60, 0.05, luma);
   if (darkness < 0.01) return col;
   // Three-layer flowing noise: organic patterns
   float slowT = time * 0.12;
@@ -169,17 +170,21 @@ vec3 stageFloodFill(vec3 col, vec2 uv, float time, float energy, float palHue1, 
   float n2 = snoise(vec3(uv * 4.5 + 30.0, slowT * 0.7));
   float n3 = snoise(vec3(uv * 9.0 + 70.0, slowT * 1.3));
   float pattern = n1 * 0.5 + n2 * 0.3 + n3 * 0.2;
-  // Palette-derived colors (convert HSV hue to cosine-palette hue)
-  float cHue1 = hsvToCosineHue(palHue1);
-  float cHue2 = hsvToCosineHue(palHue2);
+  // Palette-derived colors with time-varying hue drift for color variety
+  float cHue1 = hsvToCosineHue(palHue1) + sin(time * 0.04) * 0.08;
+  float cHue2 = hsvToCosineHue(palHue2) + cos(time * 0.03) * 0.08;
   vec3 c1 = 0.5 + 0.5 * cos(6.28318 * vec3(cHue1, cHue1 + 0.33, cHue1 + 0.67));
   vec3 c2 = 0.5 + 0.5 * cos(6.28318 * vec3(cHue2, cHue2 + 0.33, cHue2 + 0.67));
+  // Third color: complementary hue for richer palette (breaks monochromatic dominance)
+  float cHue3 = hsvToCosineHue(palHue1 + 0.5);
+  vec3 c3 = 0.5 + 0.5 * cos(6.28318 * vec3(cHue3, cHue3 + 0.33, cHue3 + 0.67));
+  // Blend all three: primary + secondary + complementary
   vec3 floodColor = mix(c1, c2, pattern * 0.5 + 0.5);
-  // Energy-scaled brightness: quiet=0.28, loud=0.40
-  // Gate already controls early-out; no double-gating in final blend.
-  floodColor *= mix(0.28, 0.40, gate);
-  // Gentle spatial variation (never kills to zero — range 0.8-1.1)
-  floodColor *= 0.8 + 0.3 * clamp(pattern + 0.5, 0.0, 1.0);
+  floodColor = mix(floodColor, c3, 0.15 + pattern * 0.1);
+  // Energy-scaled brightness: quiet=0.55, loud=0.75
+  floodColor *= mix(0.55, 0.75, gate);
+  // Gentle spatial variation (never kills to zero — range 0.85-1.1)
+  floodColor *= 0.85 + 0.25 * clamp(pattern + 0.5, 0.0, 1.0);
   // Additive blend gated by darkness only: dark areas get lifted, bright areas unchanged
   col += floodColor * darkness;
   return col;
@@ -213,12 +218,78 @@ vec3 filmGrainRes(vec2 uv, float grainTime, float resY) {
   return n * vec3(1.0, 0.95, 0.85);
 }
 
-// --- Halation: subtle warm glow around bright areas (film artifact) ---
+// --- Halation: warm glow around bright areas (film stock red channel bleed) ---
+// Stronger output feeds CSS backdrop-filter bloom for real spatial spread.
 vec3 halation(vec2 uv, vec3 col, float energy) {
   float lum = dot(col, vec3(0.2126, 0.7152, 0.0722));
-  float bloom = smoothstep(0.6, 1.0, lum);
-  vec3 halo = vec3(1.0, 0.7, 0.4) * bloom * (0.04 + energy * 0.03);
-  return col + halo;
+  // Lower threshold, wider range — CSS bloom will spread this
+  float bloom = smoothstep(0.35, 0.9, lum);
+  // Stronger warm halo (film stock red channel bleed)
+  vec3 haloColor = vec3(1.0, 0.65, 0.35);
+  float strength = bloom * (0.05 + energy * 0.04);
+  // Edge warmth: brighter halation near screen edges (lens vignette inverse)
+  float edgeDist = length(uv - 0.5) * 1.4;
+  strength *= (1.0 + edgeDist * 0.3);
+  return col + haloColor * strength;
+}
+
+// --- ACES filmic tone mapping (Krzysztof Narkowicz fit) ---
+vec3 acesToneMap(vec3 x) {
+  float a = 2.51;
+  float b = 0.03;
+  float c = 2.43;
+  float d = 0.59;
+  float e = 0.14;
+  return clamp((x * (a * x + b)) / (x * (c * x + d) + e), 0.0, 1.0);
+}
+
+// Full cinematic grade: hue-preserving filmic tone curve + energy-driven contrast.
+// Should be the LAST color transform before film grain — compresses all additive effects.
+// Hue-preserving: tone-maps the max channel, scales others proportionally.
+// Without this, per-channel exponential mapping crushes HDR fire (3,2.8,2.5) → near-white.
+// With hue preservation, (3,2.8,2.5) → (0.98,0.92,0.82) — reads as warm, not white.
+vec3 cinematicGrade(vec3 col, float energy) {
+  // Hue-preserving normalization: extract color ratio before tone curve
+  float maxC = max(col.r, max(col.g, col.b));
+  vec3 hueRatio = col / max(maxC, 0.001);
+
+  // Filmic tone curve on max channel: smooth shoulder rolloff
+  float exposure = 1.2 + energy * 0.2;
+  float mapped = 1.0 - exp(-maxC * exposure);
+
+  // Reconstruct color with preserved hue ratios
+  col = hueRatio * mapped;
+
+  // Gentle contrast: lift midtones at higher energy for punch
+  float luma = dot(col, vec3(0.2126, 0.7152, 0.0722));
+  float contrast = mix(0.95, 1.06, energy);
+  col = mix(vec3(luma), col, contrast);
+  // Lifted blacks: concert venues are never truly black — warm ambient light floor
+  // Warm-biased (R > G > B) to avoid blue/cold cast in dark areas
+  col = max(col, vec3(0.07, 0.055, 0.045));
+  return col;
+}
+
+// --- Anamorphic flare: horizontal light streak from bright areas ---
+vec3 anamorphicFlare(vec2 uv, vec3 col, float energy, float onset) {
+  float luma = dot(col, vec3(0.2126, 0.7152, 0.0722));
+  float threshold = mix(0.45, 0.25, energy); // lower threshold catches more content
+  float bright = smoothstep(threshold, threshold + 0.3, luma);
+  // Horizontal streak: wide Gaussian in X, narrow in Y
+  float streak = bright * exp(-abs(uv.y - 0.5) * 6.0); // wider vertical spread
+  streak *= (0.3 + energy * 0.7);
+  streak *= (1.0 + onset * 2.0);  // stronger onset punch
+  // Warm cyan-white flare color (anamorphic coatings)
+  vec3 flareColor = mix(vec3(0.6, 0.8, 1.0), vec3(1.0, 0.95, 0.9), energy);
+  return col + flareColor * streak * 0.25;
+}
+
+// --- Barrel distortion: subtle lens curvature ---
+vec2 barrelDistort(vec2 uv, float strength) {
+  vec2 centered = uv - 0.5;
+  float r2 = dot(centered, centered);
+  vec2 distorted = centered * (1.0 + strength * r2);
+  return distorted + 0.5;
 }
 
 // --- Chroma helpers: access 12-element pitch class array from 3 vec4s ---

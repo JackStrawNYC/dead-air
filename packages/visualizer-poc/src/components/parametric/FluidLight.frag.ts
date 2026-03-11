@@ -143,8 +143,8 @@ void main() {
   float grainTime = floor(uTime * 15.0) / 15.0;
   col += filmGrain(uv, grainTime) * 0.03;
 
-  // S-curve grade
-  col = sCurveGrade(col, uEnergy);
+  // Cinematic grade (ACES filmic tone mapping)
+  col = cinematicGrade(col, uEnergy);
 
   // Lifted blacks
   col = max(col, vec3(0.03, 0.025, 0.035));

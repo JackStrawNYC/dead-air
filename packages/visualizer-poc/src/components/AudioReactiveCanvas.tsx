@@ -86,6 +86,8 @@ export interface AudioDataContext {
   coherence: number;
   /** Whether band is in "locked in" state */
   isLocked: boolean;
+  /** Dynamic time: accumulates proportionally to energy (freezes in silence, full speed at peaks) */
+  dynamicTime: number;
 }
 
 const AudioCtx = createContext<AudioDataContext | null>(null);
@@ -250,6 +252,34 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
   // Pre-compute cumulative beat array (once per song, avoids O(n) per frame)
   const beatArray = useMemo(() => buildBeatArrayUtil(frames), [frames]);
 
+  // Dynamic time accumulator: advances proportionally to energy.
+  // Auto-calibrated to song's own percentiles so the quietest 20% of the song
+  // runs at near-zero speed and only the loudest passages reach full speed.
+  const dynamicTimeLookup = useMemo(() => {
+    // Auto-calibrate: P15 = quiet threshold, P85 = loud threshold
+    const samples = frames.filter((_, i) => i % 5 === 0).map(f => f.rms).sort((a, b) => a - b);
+    const quietThresh = samples[Math.floor(samples.length * 0.15)] ?? 0.05;
+    const loudThresh = samples[Math.floor(samples.length * 0.85)] ?? 0.35;
+    const range = Math.max(0.05, loudThresh - quietThresh);
+
+    const dt = 1 / fps;
+    const lookup = new Float64Array(frames.length);
+    let accum = 0;
+    for (let i = 0; i < frames.length; i++) {
+      const lo = Math.max(0, i - 90);
+      const hi = Math.min(frames.length - 1, i + 90);
+      let eSum = 0, eCount = 0;
+      for (let j = lo; j <= hi; j++) { eSum += frames[j].rms; eCount++; }
+      const localEnergy = eCount > 0 ? eSum / eCount : 0;
+      const t = Math.max(0, Math.min(1, (localEnergy - quietThresh) / range));
+      const factor = t * t * (3 - 2 * t); // smoothstep
+      const speed = 0.01 + factor * 0.99; // 1% at quiet → 100% at peak
+      accum += dt * speed;
+      lookup[i] = accum;
+    }
+    return lookup;
+  }, [frames, fps]);
+
   const sectionList = sections ?? [];
   const { sectionIndex, sectionProgress } = findCurrentSection(sectionList, idx);
 
@@ -334,6 +364,7 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
     jamDensity: jamDensity ?? 0.5,
     coherence: coherenceProp ?? 0,
     isLocked: isLockedProp ?? false,
+    dynamicTime: dynamicTimeLookup[idx] ?? (idx / fps),
   };
 
   return (

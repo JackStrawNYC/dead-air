@@ -20,6 +20,7 @@ precision highp float;
 ${noiseGLSL}
 
 uniform float uTime;
+uniform float uDynamicTime;
 uniform float uBass;
 uniform float uRms;
 uniform float uCentroid;
@@ -77,18 +78,22 @@ void main() {
   float energy = clamp(uEnergy, 0.0, 1.0);
   float tempoScale = uTempo / 120.0;
   float sectionSeed = uSectionIndex * 3.14;
-  float t = uTime * 0.08 * tempoScale;
+  float t = uDynamicTime * 0.08 * tempoScale;
 
   // Deep black background with subtle warm gradient
   float bgGrad = 1.0 - length(p) * 0.3;
   vec3 col = vec3(0.015, 0.012, 0.018) * bgGrad;
 
   // === GEOMETRIC ELEMENTS ===
+  // Sub-pixel anti-aliasing width (resolution-aware)
+  float px = 1.5 / min(uResolution.x, uResolution.y);
 
-  // Breathing circle — radius tied to RMS
-  float circleR = 0.15 + (uRms + uFastEnergy * 0.5) * 0.12 + sin(t * 2.0) * 0.04;
+  // Breathing circle — radius tied to RMS (smoothstep eased)
+  float breathPhase = sin(t * 2.0);
+  float easedBreath = breathPhase * breathPhase * (3.0 - 2.0 * abs(breathPhase)) * sign(breathPhase);
+  float circleR = 0.15 + (uRms + uFastEnergy * 0.5) * 0.12 + easedBreath * 0.04;
   float circleDist = sdCircle(p, circleR);
-  float circleEdge = smoothstep(0.003, 0.0, abs(circleDist));
+  float circleEdge = smoothstep(px, 0.0, abs(circleDist));
   float circleFill = smoothstep(0.02, 0.0, circleDist) * 0.03;
 
   // Accent color from palette (used sparingly)
@@ -104,29 +109,59 @@ void main() {
   float isClimax = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5);
   float climaxBoost = isClimax * uClimaxIntensity;
 
-  // Concentric rings — expand on beats (amplified)
+  // Concentric rings — expand on beats (amplified, sub-pixel AA)
   float bp = beatPulse(uMusicalTime);
   float ringExpand = uBeatSnap * 0.25 + bp * 0.15 + climaxBoost * 0.08 + uDrumOnset * 0.15;
+  // Store ring positions for connecting lines
+  vec2 ringPoints[3];
   for (int i = 1; i <= 3; i++) {
     float fi = float(i);
     float ringR = circleR + fi * 0.08 + ringExpand * fi;
     float ringDist = sdCircle(p, ringR);
-    float ringEdge = smoothstep(0.002, 0.0, abs(ringDist));
-    float ringAlpha = 0.15 / fi; // Fades with distance
+    float ringEdge = smoothstep(px, 0.0, abs(ringDist));
+    float ringAlpha = 0.15 / fi;
     col += ringEdge * vec3(0.35, 0.33, 0.30) * ringAlpha;
+    // Point on ring for constellation lines
+    float ptAngle = t * (0.3 + fi * 0.15) + fi * 2.094;
+    ringPoints[i-1] = vec2(cos(ptAngle), sin(ptAngle)) * ringR;
   }
 
-  // Rotating line — sweeps slowly, brightens on mids
-  float lineAngle = t * 1.2 + sectionSeed;
+  // === GOLDEN RATIO SPIRAL (Fibonacci) ===
+  float spiralAngle = atan(p.y, p.x);
+  float spiralR = length(p);
+  // Logarithmic spiral: r = a * e^(b*theta), b = 1/golden_ratio
+  float goldenB = 0.3063; // ln(golden_ratio) / (PI/2)
+  float spiralPhase = t * 0.5;
+  float spiralDist = abs(spiralR - 0.05 * exp(goldenB * (spiralAngle + spiralPhase + 6.28318)));
+  // Wrap for multiple arms
+  float spiralDist2 = abs(spiralR - 0.05 * exp(goldenB * (spiralAngle + spiralPhase + 6.28318 * 2.0)));
+  float spiralDist3 = abs(spiralR - 0.05 * exp(goldenB * (spiralAngle + spiralPhase)));
+  float minSpiral = min(spiralDist, min(spiralDist2, spiralDist3));
+  float spiralEdge = smoothstep(px * 1.5, 0.0, minSpiral) * smoothstep(0.5, 0.15, spiralR);
+  col += spiralEdge * accentCol * 0.12;
+
+  // === CONSTELLATION LINES: thin connecting lines between ring points ===
+  for (int i = 0; i < 2; i++) {
+    float connDist = sdLine(p, ringPoints[i], ringPoints[i+1]);
+    float connEdge = smoothstep(px, 0.0, connDist);
+    col += connEdge * vec3(0.2, 0.19, 0.18) * 0.08;
+  }
+  // Close the triangle
+  float closeDist = sdLine(p, ringPoints[2], ringPoints[0]);
+  col += smoothstep(px, 0.0, closeDist) * vec3(0.2, 0.19, 0.18) * 0.06;
+
+  // Rotating line — sweeps slowly with eased acceleration
+  float linePhase = t * 1.2 + sectionSeed;
+  float easedAngle = linePhase + 0.15 * sin(linePhase * 0.7); // smooth acceleration/deceleration
   float lineLen = 0.35 + uMids * 0.15;
-  vec2 lineDir = vec2(cos(lineAngle), sin(lineAngle));
+  vec2 lineDir = vec2(cos(easedAngle), sin(easedAngle));
   float lineDist = sdLine(p, -lineDir * lineLen, lineDir * lineLen);
-  float lineEdge = smoothstep(0.002, 0.0, abs(lineDist - 0.001));
+  float lineEdge = smoothstep(px, 0.0, abs(lineDist - 0.001));
   col += lineEdge * vec3(0.3, 0.28, 0.25) * 0.3;
 
-  // Cross-hair at center — subtle
-  float crossH = smoothstep(0.001, 0.0, abs(p.y)) * smoothstep(0.06, 0.04, abs(p.x));
-  float crossV = smoothstep(0.001, 0.0, abs(p.x)) * smoothstep(0.06, 0.04, abs(p.y));
+  // Cross-hair at center — subtle (sub-pixel AA)
+  float crossH = smoothstep(px, 0.0, abs(p.y)) * smoothstep(0.06, 0.04, abs(p.x));
+  float crossV = smoothstep(px, 0.0, abs(p.x)) * smoothstep(0.06, 0.04, abs(p.y));
   col += (crossH + crossV) * vec3(0.2, 0.19, 0.17) * 0.15;
 
   // === SLOW NOISE FIELD: very subtle background texture ===
@@ -151,18 +186,21 @@ void main() {
   vig = smoothstep(0.0, 1.0, vig);
   col *= mix(0.85, 1.0, vig);
 
+  // === ANIMATED STAGE FLOOD: flowing palette noise in dark areas ===
+  col = stageFloodFill(col, p, uDynamicTime, uEnergy, uPalettePrimary, uPaletteSecondary);
+
+  // === ANAMORPHIC FLARE: horizontal light streak ===
+  col = anamorphicFlare(vUv, col, uEnergy, uOnsetSnap);
+
   // === HALATION: warm film bloom ===
-  col = halation(vUv, col, energy);
+  col = halation(vUv, col, uEnergy);
+
+  // === CINEMATIC GRADE (ACES filmic tone mapping) ===
+  col = cinematicGrade(col, uEnergy);
 
   // Very light grain
   float grainTime = floor(uTime * 15.0) / 15.0;
   col += filmGrain(uv, grainTime) * 0.03;
-
-  // === S-CURVE COLOR GRADING ===
-  col = sCurveGrade(col, uEnergy);
-
-  // === ANIMATED STAGE FLOOD: flowing palette noise in dark areas ===
-  col = stageFloodFill(col, p, uTime, uEnergy, uPalettePrimary, uPaletteSecondary);
 
   // ONSET SATURATION PULSE: push colors away from gray (psychedelic, not white)
   float onsetPulse = step(0.5, uOnsetSnap) * uOnsetSnap;
@@ -180,7 +218,7 @@ void main() {
   // Lifted blacks (build-phase-aware: near true black during build for anticipation)
   float isBuild = step(0.5, uClimaxPhase) * step(uClimaxPhase, 1.5);
   float liftMult = mix(1.0, 0.15, isBuild * uClimaxIntensity);
-  col = max(col, vec3(0.14, 0.11, 0.15) * liftMult);
+  col = max(col, vec3(0.06, 0.05, 0.08) * liftMult);
 
   gl_FragColor = vec4(col, 1.0);
 }

@@ -29,6 +29,7 @@ precision highp float;
 ${noiseGLSL}
 
 uniform float uTime;
+uniform float uDynamicTime;
 uniform float uBass;
 uniform float uRms;
 uniform float uCentroid;
@@ -117,18 +118,18 @@ void main() {
   vec2 swayUv = p;
   float swayAmt = 0.02 + slowE * 0.02;
   swayUv += swayAmt * vec2(
-    sin(p.y * 3.0 + uTime * 0.8),
-    cos(p.x * 2.5 + uTime * 0.65)
+    sin(p.y * 3.0 + uDynamicTime * 0.8),
+    cos(p.x * 2.5 + uDynamicTime * 0.65)
   );
 
   // Ocean current: steady horizontal drift
-  swayUv.x += uTime * 0.05;
+  swayUv.x += uDynamicTime * 0.05;
 
   // Surface chop from energy: quiet = glassy, loud = churning
   float chop = energy * 0.04 + uFastBass * 0.03;
   swayUv += chop * vec2(
-    snoise(vec3(p * 6.0, uTime * 1.5)),
-    snoise(vec3(p * 6.0 + 50.0, uTime * 1.5))
+    snoise(vec3(p * 6.0, uDynamicTime * 1.5)),
+    snoise(vec3(p * 6.0 + 50.0, uDynamicTime * 1.5))
   );
 
   // === CAUSTIC LIGHT PATTERNS: multiple overlapping layers ===
@@ -143,13 +144,13 @@ void main() {
   // Onset distortion on caustic domain (amplified)
   vec2 causticUv = swayUv;
   causticUv += (onset + uDrumOnset * 0.15) * 0.12 * vec2(
-    snoise(vec3(p * 3.0, uTime * 2.0)),
-    snoise(vec3(p * 3.0 + 70.0, uTime * 2.0))
+    snoise(vec3(p * 3.0, uDynamicTime * 2.0)),
+    snoise(vec3(p * 3.0 + 70.0, uDynamicTime * 2.0))
   );
 
-  float c1 = causticPattern(causticUv, uTime * 1.0, 4.0);
-  float c2 = causticPattern(causticUv + 0.3, uTime * 0.9 + 10.0, 6.0);
-  float c3 = causticPattern(causticUv - 0.2, uTime * 1.1 + 20.0, 8.0);
+  float c1 = causticPattern(causticUv, uDynamicTime * 1.0, 4.0);
+  float c2 = causticPattern(causticUv + 0.3, uDynamicTime * 0.9 + 10.0, 6.0);
+  float c3 = causticPattern(causticUv - 0.2, uDynamicTime * 1.1 + 20.0, 8.0);
 
   // Combine caustic layers: sharper with highs (pow sharpens peaks)
   float sharpPow = mix(1.0, 2.5, causticSharpness);
@@ -158,8 +159,8 @@ void main() {
   caustic += pow(c3, sharpPow) * 0.3;
   caustic = clamp(caustic, 0.0, 1.0);
 
-  // Base water color
-  vec3 col = waterColor * 0.3;
+  // Base water color (visible even during quiet — ocean is never pitch black)
+  vec3 col = waterColor * mix(0.35, 0.45, energy);
 
   // Add caustics (bright and vivid)
   col += causticColor * caustic * 0.55;
@@ -167,10 +168,10 @@ void main() {
   // === GOD RAYS: vertical light shafts from above (beat-reactive) ===
   float bpH = beatPulseHalf(uMusicalTime);
   float rayIntensity = (0.3 + bass * 0.5 + uFastEnergy * 0.2) * (1.0 + bpH * 0.25 + uBeatSnap * 0.30 + climaxBoost * 0.20);
-  float rayX = swayUv.x * 3.0 + bass * sin(uTime * 0.3) * 0.5;
-  float ray1 = smoothstep(0.8, 1.0, sin(rayX * 2.0 + uTime * 0.5)) * rayIntensity;
-  float ray2 = smoothstep(0.85, 1.0, sin(rayX * 3.5 + uTime * 0.4 + 1.0)) * rayIntensity * 0.7;
-  float ray3 = smoothstep(0.9, 1.0, sin(rayX * 1.5 + uTime * 0.6 + 2.5)) * rayIntensity * 0.5;
+  float rayX = swayUv.x * 3.0 + bass * sin(uDynamicTime * 0.3) * 0.5;
+  float ray1 = smoothstep(0.8, 1.0, sin(rayX * 2.0 + uDynamicTime * 0.5)) * rayIntensity;
+  float ray2 = smoothstep(0.85, 1.0, sin(rayX * 3.5 + uDynamicTime * 0.4 + 1.0)) * rayIntensity * 0.7;
+  float ray3 = smoothstep(0.9, 1.0, sin(rayX * 1.5 + uDynamicTime * 0.6 + 2.5)) * rayIntensity * 0.5;
   float rays = ray1 + ray2 + ray3;
   // Rays fade toward bottom of screen
   float rayFade = smoothstep(-0.5, 0.5, swayUv.y);
@@ -178,10 +179,10 @@ void main() {
   col += causticColor * rays * 0.25;
 
   // === DEPTH FOG: clears with energy ===
-  float fogDensity = mix(0.75, 0.22, energy);
-  float fogNoise = fbm3(vec3(swayUv * 2.0, uTime * 0.05));
+  float fogDensity = mix(0.50, 0.18, energy);
+  float fogNoise = fbm3(vec3(swayUv * 2.0, uDynamicTime * 0.05));
   float fog = fogDensity * (0.5 + fogNoise * 0.5);
-  vec3 fogColor = waterColor * 0.15;
+  vec3 fogColor = mix(waterColor, causticColor, 0.2) * 0.20;
   col = mix(col, fogColor, fog * 0.6);
 
   // === BIOLUMINESCENT PARTICLES: active during quiet ===
@@ -191,12 +192,12 @@ void main() {
       float fj = float(j);
       float seed = fj * 11.31;
       vec2 particlePos = vec2(
-        snoise(vec3(seed, uTime * 0.04, 0.0)) * 0.7,
-        snoise(vec3(0.0, seed, uTime * 0.03)) * 0.5
+        snoise(vec3(seed, uDynamicTime * 0.04, 0.0)) * 0.7,
+        snoise(vec3(0.0, seed, uDynamicTime * 0.03)) * 0.5
       );
       float dist = length(p - particlePos);
       float glow = smoothstep(0.04, 0.005, dist);
-      float pulse = 0.5 + 0.5 * sin(uTime * 1.5 + seed * 3.0);
+      float pulse = 0.5 + 0.5 * sin(uDynamicTime * 1.5 + seed * 3.0);
       vec3 bioColor = mix(causticColor, vec3(0.2, 0.9, 0.7), 0.5);
       col += bioColor * glow * pulse * quietness * 0.2;
     }
@@ -208,8 +209,8 @@ void main() {
     float fk = float(k);
     float seed = fk * 5.73 + 100.0;
     vec2 debrisPos = vec2(
-      fract(seed * 0.37 + uTime * driftSpeed * 0.5) * 2.0 - 1.0,
-      fract(seed * 0.53 + uTime * driftSpeed * 0.3) * 2.0 - 1.0
+      fract(seed * 0.37 + uDynamicTime * driftSpeed * 0.5) * 2.0 - 1.0,
+      fract(seed * 0.53 + uDynamicTime * driftSpeed * 0.3) * 2.0 - 1.0
     );
     debrisPos *= 0.6;
     float dist = length(p - debrisPos);
@@ -218,14 +219,14 @@ void main() {
   }
 
   // === VIGNETTE ===
-  float vigScale = mix(0.48, 0.32, energy);
+  float vigScale = mix(0.36, 0.30, energy);
   float vignette = 1.0 - dot(p * vigScale, p * vigScale);
   vignette = smoothstep(0.0, 1.0, vignette);
-  vec3 vigTint = waterColor * 0.02;
+  vec3 vigTint = waterColor * 0.04;
   col = mix(vigTint, col, vignette);
 
   // === LIGHT LEAK ===
-  col += lightLeak(p, uTime, energy, uOnsetSnap);
+  col += lightLeak(p, uDynamicTime, energy, uOnsetSnap);
 
   // === BLOOM: soft underwater glow (climax-amplified) ===
   float lum = dot(col, vec3(0.299, 0.587, 0.114));
@@ -235,14 +236,17 @@ void main() {
   vec3 bloom = bloomColor * bloomAmount * (0.3 + climaxBoost * 0.20);
   col = col + bloom - col * bloom; // screen blend
 
-  // === S-CURVE COLOR GRADING ===
-  col = sCurveGrade(col, energy);
-
   // === ANIMATED STAGE FLOOD: flowing palette noise in dark areas ===
-  col = stageFloodFill(col, p, uTime, energy, uPalettePrimary, uPaletteSecondary);
+  col = stageFloodFill(col, p, uDynamicTime, energy, uPalettePrimary, uPaletteSecondary);
+
+  // === ANAMORPHIC FLARE: horizontal light streak ===
+  col = anamorphicFlare(vUv, col, energy, uOnsetSnap);
 
   // === HALATION: warm film bloom ===
   col = halation(vUv, col, energy);
+
+  // === CINEMATIC GRADE (ACES filmic tone mapping) ===
+  col = cinematicGrade(col, energy);
 
   // === FILM GRAIN ===
   float grainTime = floor(uTime * 15.0) / 15.0;
@@ -265,7 +269,7 @@ void main() {
   // Lifted blacks (build-phase-aware: near true black during build for anticipation)
   float isBuild = step(0.5, uClimaxPhase) * step(uClimaxPhase, 1.5);
   float liftMult = mix(1.0, 0.15, isBuild * uClimaxIntensity);
-  col = max(col, vec3(0.08, 0.10, 0.15) * liftMult);
+  col = max(col, vec3(0.06, 0.05, 0.08) * liftMult);
 
   gl_FragColor = vec4(col, 1.0);
 }

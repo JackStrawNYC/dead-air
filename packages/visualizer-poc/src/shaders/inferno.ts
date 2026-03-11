@@ -29,6 +29,7 @@ precision highp float;
 ${noiseGLSL}
 
 uniform float uTime;
+uniform float uDynamicTime;
 uniform float uBass;
 uniform float uRms;
 uniform float uCentroid;
@@ -97,7 +98,7 @@ float flameFBM(vec3 p, float bassAmp, float detailAmp) {
 float flameSDF(vec3 p, float bass, float highs, float onset) {
   // Bass stretches flame wider and flatter
   vec3 q = p;
-  q.x += bass * 0.3 * sin(uTime * 1.5); // lateral flame lean
+  q.x += bass * 0.3 * sin(uDynamicTime * 1.5); // lateral flame lean
   q.x *= mix(1.0, 0.7, bass);   // wider with bass
   q.y *= mix(1.0, 1.4, bass);   // taller with bass
   q.z *= mix(1.0, 0.7, bass);
@@ -107,11 +108,11 @@ float flameSDF(vec3 p, float bass, float highs, float onset) {
 
   // Noise displacement for fire shape
   vec3 np = p * 1.5;
-  np.y -= uTime * (1.2 + bass * 0.8);  // rise speed from bass
+  np.y -= uDynamicTime * (1.2 + bass * 0.8);  // rise speed from bass
   // Onset churns domain
   np.xy += onset * 0.3 * vec2(
-    sin(p.z * 3.0 + uTime * 2.0),
-    cos(p.x * 3.0 + uTime * 2.0)
+    sin(p.z * 3.0 + uDynamicTime * 2.0),
+    cos(p.x * 3.0 + uDynamicTime * 2.0)
   );
   float noiseVal = flameFBM(np, bass, highs);
   d += noiseVal * 0.5;
@@ -140,8 +141,8 @@ void main() {
   vec2 shimmerUv = p;
   float shimmerStrength = onset * 0.08 + bass * 0.02 + uBeatSnap * 0.05 + uFastEnergy * 0.06;
   shimmerUv += shimmerStrength * vec2(
-    snoise(vec3(p * 8.0, uTime * 2.0)),
-    snoise(vec3(p * 8.0 + 50.0, uTime * 2.0 + 30.0))
+    snoise(vec3(p * 8.0, uDynamicTime * 2.0)),
+    snoise(vec3(p * 8.0 + 50.0, uDynamicTime * 2.0 + 30.0))
   );
 
   // === CAMERA: looking upward through flames ===
@@ -151,11 +152,12 @@ void main() {
   // === FLAME COLORS from palette ===
   float hue1 = hsvToCosineHue(uPalettePrimary);
   vec3 flameColor = 0.5 + 0.5 * cos(6.28318 * vec3(hue1, hue1 + 0.33, hue1 + 0.67));
-  flameColor = mix(flameColor, vec3(1.0, 0.5, 0.1), 0.4);
+  // Strong warm mix: fire must always read as fire, palette only tints
+  flameColor = mix(flameColor, vec3(1.0, 0.5, 0.1), 0.80);
 
   float hue2 = hsvToCosineHue(uPaletteSecondary);
   vec3 coreColor = 0.5 + 0.5 * cos(6.28318 * vec3(hue2, hue2 + 0.33, hue2 + 0.67));
-  coreColor = mix(coreColor, vec3(1.0, 0.95, 0.8), 0.5);
+  coreColor = mix(coreColor, vec3(1.0, 0.95, 0.8), 0.70);
 
   // === GLOW ACCUMULATION RAYMARCHING (XT95 Flame technique) ===
   // Track how deep ray penetrates fire volume, accumulate glow
@@ -164,7 +166,7 @@ void main() {
   int maxSteps = int(mix(20.0, 60.0, uJamDensity));
   vec3 accColor = vec3(0.0);
   float glow = 0.0;
-  float glowPower = mix(2.0, 4.8, energy);  // energy controls glow exponent — wider range
+  float glowPower = mix(1.2, 2.0, energy);  // softer falloff for visible fire edges
 
   for (int i = 0; i < MAX_STEPS_LIMIT; i++) {
     if (i >= maxSteps) break;
@@ -175,10 +177,10 @@ void main() {
     float d = flameSDF(pos, bass, highs, max(onset, uDrumOnset));
 
     // Accumulate glow based on proximity to fire surface
-    // Closer to surface = stronger glow (XT95 key insight)
+    // Tighter proximity zone (0.5) for defined fire shape with dark background
     if (d < 0.5) {
       float proximity = 1.0 - smoothstep(0.0, 0.5, d);
-      glow += proximity * 0.04;
+      glow += proximity * 0.02;
 
       // Color based on depth into flame: core=white, edge=orange
       float depthInFlame = max(0.0, -d);
@@ -186,16 +188,17 @@ void main() {
       float depthT = t / MAX_DIST;
       vec3 localColor = mix(flameColor, coreColor, coreStrength);
       localColor = mix(localColor, flameColor * 0.6, depthT);
-      accColor += localColor * proximity * 0.04;
+      accColor += localColor * proximity * 0.02;
     }
   }
 
-  // Punchy emission: pow(glow*2, 4) — the XT95 signature (amplified)
+  // Punchy emission: pow(glow*2, glowPower) — the XT95 signature
+  // glowPower lower for softer falloff: fire edges visible, not just core
   float emission = pow(clamp(glow * 2.0, 0.0, 1.0), glowPower);
-  vec3 col = accColor * emission * 6.0;
+  vec3 col = accColor * emission * 3.5;
 
   // Add core white-hot bloom from emission
-  col += coreColor * pow(emission, 2.0) * 0.8;
+  col += coreColor * pow(emission, 2.0) * 0.4;
 
   // === BEAT PULSE: tempo-locked flame intensity ===
   float bp = beatPulse(uMusicalTime);
@@ -210,49 +213,66 @@ void main() {
     float fj = float(j);
     float seed = fj * 7.13;
     vec2 emberPos = vec2(
-      snoise(vec3(seed, 0.0, uTime * 0.1)) * 0.8,
-      fract(seed * 0.37 + uTime * (0.05 + energy * 0.08)) * 2.0 - 0.5
+      snoise(vec3(seed, 0.0, uDynamicTime * 0.1)) * 0.8,
+      fract(seed * 0.37 + uDynamicTime * (0.05 + energy * 0.08)) * 2.0 - 0.5
     );
     float dist = length(p - emberPos);
     float size = 0.003 + highs * 0.002;
     float ember = smoothstep(size, size * 0.3, dist);
-    float flicker = 0.5 + 0.5 * snoise(vec3(seed * 3.0, uTime * 4.0, 0.0));
+    float flicker = 0.5 + 0.5 * snoise(vec3(seed * 3.0, uDynamicTime * 4.0, 0.0));
     col += coreColor * ember * flicker * energy * 0.6;
   }
 
   // === SMOKE WISPS: slow drifting layer from slowEnergy ===
   float smokeOpacity = slowE * 0.4 * (1.0 - energy * 0.6);
   if (smokeOpacity > 0.01) {
-    vec3 smokePos = vec3(p * 1.5, uTime * 0.03);
+    vec3 smokePos = vec3(p * 1.5, uDynamicTime * 0.03);
     float smoke = fbm3(smokePos) * 0.5 + 0.5;
     smoke *= smokeOpacity;
     vec3 smokeColor = flameColor * 0.15 + vec3(0.05, 0.03, 0.02);
     col = mix(col, smokeColor, smoke * 0.5);
   }
 
-  // === VIGNETTE ===
-  float vigScale = mix(0.46, 0.30, energy);
+  // === BROAD FIRELIGHT: warm FBM wash filling the entire frame ===
+  // The fire SDF only hits at specific angles — most of the screen misses it.
+  // This wide noise-based glow ensures every pixel reads as warm firelight.
+  // Must produce col > 0.5 to dominate over screen-blended overlays.
+  float fireNoise1 = fbm3(vec3(p * 0.6, uDynamicTime * 0.05)) * 0.5 + 0.5;
+  float fireNoise2 = snoise(vec3(p * 2.0 + 20.0, uDynamicTime * 0.08)) * 0.5 + 0.5;
+  vec3 warmBase = mix(flameColor, coreColor, fireNoise2 * 0.3);
+  // Ambient firelight: subtle warmth, not a wash
+  float fireLightStr = (0.06 + energy * 0.12) * (0.70 + fireNoise1 * 0.30);
+  fireLightStr *= 1.0 + bass * 0.10;
+  col += warmBase * fireLightStr;
+
+  // === VIGNETTE (strong — fire falls off dramatically at edges) ===
+  float vigScale = mix(0.55, 0.40, energy);
   float vignette = 1.0 - dot(p * vigScale, p * vigScale);
-  vignette = smoothstep(0.0, 1.0, vignette);
+  vignette = smoothstep(0.0, 0.8, vignette);
   vec3 vigTint = flameColor * 0.03;
   col = mix(vigTint, col, vignette);
 
   // === LIGHT LEAK ===
-  col += lightLeak(p, uTime, energy, uOnsetSnap);
+  col += lightLeak(p, uDynamicTime, energy, uOnsetSnap);
+
+  // === CINEMATIC GRADE (tone map HDR → LDR before bloom) ===
+  // Hue-preserving mapping keeps fire orange, not white.
+  col = cinematicGrade(col, energy);
 
   // === BLOOM: aggressive for fire (climax-amplified) ===
+  // Additive blend on LDR values. Screen blend goes negative with HDR (cyan on ANGLE).
   float lum = dot(col, vec3(0.299, 0.587, 0.114));
   float bloomThreshold = mix(0.3, 0.2, energy) - climaxBoost * 0.08;
   float bloomAmount = max(0.0, lum - bloomThreshold) * (3.0 + climaxBoost * 2.0);
   vec3 bloomColor = mix(col, vec3(1.0, 0.9, 0.7), 0.4);
   vec3 bloom = bloomColor * bloomAmount * (0.5 + climaxBoost * 0.25);
-  col = col + bloom - col * bloom; // screen blend
+  col = col + bloom - col * bloom; // screen blend (safe: col is LDR from tone map)
 
-  // === S-CURVE COLOR GRADING ===
-  col = sCurveGrade(col, energy);
+  // Skip stageFloodFill for inferno — ambient heat provides warm fire glow.
+  // stageFloodFill uses palette hues which can be cold/blue, wrong for fire.
 
-  // === ANIMATED STAGE FLOOD: flowing palette noise in dark areas ===
-  col = stageFloodFill(col, p, uTime, energy, uPalettePrimary, uPaletteSecondary);
+  // === ANAMORPHIC FLARE: horizontal light streak ===
+  col = anamorphicFlare(vUv, col, energy, uOnsetSnap);
 
   // === HALATION: warm film bloom ===
   col = halation(vUv, col, energy);
@@ -278,7 +298,7 @@ void main() {
   // Lifted blacks (build-phase-aware: near true black during build for anticipation)
   float isBuild = step(0.5, uClimaxPhase) * step(uClimaxPhase, 1.5);
   float liftMult = mix(1.0, 0.15, isBuild * uClimaxIntensity);
-  col = max(col, vec3(0.14, 0.08, 0.06) * liftMult);
+  col = max(col, vec3(0.06, 0.04, 0.04) * liftMult);
 
   gl_FragColor = vec4(col, 1.0);
 }

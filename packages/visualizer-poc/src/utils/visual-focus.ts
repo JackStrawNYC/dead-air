@@ -20,12 +20,16 @@ export interface VisualFocusState {
 
 /** Focus rules by climax phase — shader IS the show at peaks.
  *  Overlays are zero during climax/sustain so the shader owns the moment. */
+/** Overlay opacity reduced to enforce "shader is the star" — overlays are subtle accents.
+ *  Screen blend always ADDS brightness, so even moderate opacity overlays dominate dark shaders.
+ *  At 0.40 idle: effective overlay contribution ≈ 0.40 * rotation * mediaSuppression ≈ 0.15-0.20.
+ *  This prevents overlays from washing out shader character (especially warm shaders like inferno). */
 const PHASE_FOCUS: Record<ClimaxPhase, VisualFocusState> = {
-  climax:  { shaderOpacity: 1.0,  artOpacity: 0.0,  overlayOpacity: 0.30, grainOpacity: 0.5 },
-  sustain: { shaderOpacity: 0.95, artOpacity: 0.0,  overlayOpacity: 0.25, grainOpacity: 0.6 },
-  build:   { shaderOpacity: 0.85, artOpacity: 0.12, overlayOpacity: 0.75, grainOpacity: 0.8 },
-  release: { shaderOpacity: 0.75, artOpacity: 0.35, overlayOpacity: 0.65, grainOpacity: 1.0 },
-  idle:    { shaderOpacity: 0.85, artOpacity: 0.25, overlayOpacity: 0.85, grainOpacity: 1.0 },
+  climax:  { shaderOpacity: 1.0,  artOpacity: 0.0,  overlayOpacity: 0.12, grainOpacity: 0.5 },
+  sustain: { shaderOpacity: 0.95, artOpacity: 0.0,  overlayOpacity: 0.10, grainOpacity: 0.6 },
+  build:   { shaderOpacity: 0.85, artOpacity: 0.12, overlayOpacity: 0.35, grainOpacity: 0.8 },
+  release: { shaderOpacity: 0.75, artOpacity: 0.35, overlayOpacity: 0.30, grainOpacity: 1.0 },
+  idle:    { shaderOpacity: 0.85, artOpacity: 0.25, overlayOpacity: 0.40, grainOpacity: 1.0 },
 };
 
 /** Focus state when a scene video is actively playing */

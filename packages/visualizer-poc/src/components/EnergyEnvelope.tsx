@@ -80,18 +80,23 @@ export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod,
 
   // Psychedelic color strategy: saturate hard, brighten gently.
   // Vivid colors come from high saturation + contrast, NOT high brightness.
-  // Saturation: 0.80 (quiet) → 1.50 (loud), capped at 1.80 to prevent neon blowout
-  // Brightness: 0.80 (quiet) → 1.15 (loud) — fills the frame, never washes out
-  // Contrast:   0.95 (quiet) → 1.20 (loud) — punchy but not crushing
-  const saturation = Math.min(1.80, (0.80 + factor * 0.70 + flatnessSaturation + textureSaturationOffset + (climaxMod?.saturationOffset ?? 0) + eraSatOffset + (snapshot.drumOnset ?? 0) * 0.08) * counterpointSatMult * setTheme.saturationMult);
+  // Saturation: 0.75 (quiet) → 1.25 (loud), capped at 1.40.
+  // Higher CSS saturation crushes dark-pixel non-dominant channels toward zero,
+  // making dark areas blacker and colors monochromatic (green-only at high energy).
+  // Keep saturation moderate; shaders provide color richness internally.
+  // Brightness: 0.82 (quiet) → 1.20 (loud) — fills the frame, never washes out
+  // Contrast:   0.95 (quiet) → 1.15 (loud) — punchy but not crushing
+  // Gate reactive CSS terms during quiet to prevent frame-to-frame jitter
+  const cssGate = factor; // 0 during quiet, 1 during loud (already smoothstep-based)
+  const saturation = Math.min(1.40, (0.75 + factor * 0.50 + flatnessSaturation * cssGate + textureSaturationOffset * cssGate + (climaxMod?.saturationOffset ?? 0) + eraSatOffset + (snapshot.drumOnset ?? 0) * 0.06 * cssGate) * counterpointSatMult * setTheme.saturationMult);
   const isClimaxPhase = (climaxMod?.brightnessOffset ?? 0) > 0.04;
   const brightCap = isClimaxPhase ? 1.50 : 1.25;
-  const brightness = Math.min(brightCap, 0.95 + factor * 0.30 + onsetBrightness * 0.4 + (climaxMod?.brightnessOffset ?? 0) + setTheme.brightnessOffset + (snapshot.fastEnergy ?? 0) * 0.12);
+  const brightness = Math.min(brightCap, 0.82 + factor * 0.38 + onsetBrightness * 0.4 * cssGate + (climaxMod?.brightnessOffset ?? 0) + setTheme.brightnessOffset + (snapshot.fastEnergy ?? 0) * 0.12 * cssGate);
   // Contrast: restrained range (0.97-1.10) to preserve GLSL stage flood + lifted blacks.
   // High CSS contrast crushes dark values back toward black, undoing shader color work.
-  const contrast = Math.min(1.15, 0.97 + factor * 0.13 + (climaxMod?.contrastOffset ?? 0) * 0.5);
+  const contrast = Math.min(1.15, 0.95 + factor * 0.20 + (climaxMod?.contrastOffset ?? 0) * 0.5);
   // Bloom uses slow energy (drift, not pulse) — reduced to prevent white wash
-  const bloomOpacity = slowFactor * 0.15 + (climaxMod?.bloomOffset ?? 0) * 0.5 + (snapshot.fastEnergy ?? 0) * 0.05;
+  const bloomOpacity = slowFactor * 0.35 + (climaxMod?.bloomOffset ?? 0) * 0.5 + (snapshot.fastEnergy ?? 0) * 0.05;
 
   // Drums/Space phase adjustments
   let dsSatOffset = 0;
@@ -118,8 +123,8 @@ export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod,
   }
 
   // Apply phase offsets
-  const finalSaturation = Math.min(1.80, Math.max(0.3, saturation + dsSatOffset + showSatOffset));
-  const finalBrightness = Math.min(brightCap, Math.max(0.6, brightness + dsBrightOffset + showBrightOffset));
+  const finalSaturation = Math.min(1.40, Math.max(0.5, saturation + dsSatOffset + showSatOffset));
+  const finalBrightness = Math.min(brightCap, Math.max(0.55, brightness + dsBrightOffset + showBrightOffset));
   const finalContrast = Math.min(1.20, Math.max(0.90, contrast + dsContrastOffset));
 
   // Jam color temperature: warm shifts yellow, cool shifts blue (max ±12deg)
@@ -135,16 +140,16 @@ export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod,
     <div style={{ position: "absolute", inset: 0, filter: filterStr }}>
       {children}
 
-      {/* Bloom — era-aware glow at high energy (skipped in draft preset) */}
-      {bloomOpacity > 0.001 && !process.env.SKIP_BLOOM && (
+      {/* Spatial bloom — backdrop-filter blurs bright pixels, screen blend adds glow */}
+      {!process.env.SKIP_BLOOM && (
         <div
           style={{
             position: "absolute",
             inset: 0,
-            background:
-              `radial-gradient(ellipse at center, ${ERA_BLOOM[showCtx?.era ?? ""] ?? DEFAULT_BLOOM} 0%, transparent 70%)`,
+            backdropFilter: `blur(${(8 + slowFactor * 16).toFixed(1)}px) brightness(${(0.9 + factor * 0.3).toFixed(2)})`,
+            WebkitBackdropFilter: `blur(${(8 + slowFactor * 16).toFixed(1)}px) brightness(${(0.9 + factor * 0.3).toFixed(2)})`,
             mixBlendMode: "screen",
-            opacity: bloomOpacity,
+            opacity: 0.08 + slowFactor * 0.12,
             pointerEvents: "none",
           }}
         />

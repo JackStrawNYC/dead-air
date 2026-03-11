@@ -89,10 +89,11 @@ export const CameraMotion: React.FC<Props> = ({ frames, children, jamEvolution, 
     const phaseZoom = phaseParams.zoomStart + (phaseParams.zoomEnd - phaseParams.zoomStart) * phaseProgress;
     scale = phaseZoom * 0.6 + energyScale * 0.4;
 
-    // Sinusoidal lateral drift
+    // Sinusoidal lateral drift — energy-gated: near-still in silence
     const time = frame / 30; // seconds
-    driftX = Math.sin(time * phaseParams.driftHz * Math.PI * 2) * phaseParams.driftAmp;
-    driftY = Math.cos(time * phaseParams.driftHz * Math.PI * 2 * 0.7 + 1.3) * phaseParams.driftAmp * 0.6;
+    const driftGate = 0.05 + 0.95 * egate;
+    driftX = Math.sin(time * phaseParams.driftHz * Math.PI * 2) * phaseParams.driftAmp * driftGate;
+    driftY = Math.cos(time * phaseParams.driftHz * Math.PI * 2 * 0.7 + 1.3) * phaseParams.driftAmp * 0.6 * driftGate;
   } else {
     // Short songs: existing energy-only behavior
     scale = energyScale;
@@ -132,8 +133,8 @@ export const CameraMotion: React.FC<Props> = ({ frames, children, jamEvolution, 
     }
   }
 
-  // Bass-driven continuous micro-sway (30% floor keeps subtle movement in quiet passages)
-  const bassGate = 0.3 + 0.7 * egate;
+  // Bass-driven continuous micro-sway (energy-gated: true stillness in silence)
+  const bassGate = egate;
   const bassAmp = (bass ?? 0) * 12.0 * bassGate;
   const bassT = frame / 30;
   shakeX += Math.sin(bassT * 3.7) * bassAmp * 0.5;

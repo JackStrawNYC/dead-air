@@ -20,6 +20,7 @@ precision highp float;
 ${noiseGLSL}
 
 uniform float uTime;
+uniform float uDynamicTime;
 uniform float uBass;
 uniform float uRms;
 uniform float uCentroid;
@@ -112,30 +113,56 @@ float nebula(vec2 uv, float t) {
 
 void main() {
   vec2 uv = (gl_FragCoord.xy - 0.5 * uResolution) / min(uResolution.x, uResolution.y);
-  float t = uTime * 0.08;
+  float t = uDynamicTime * 0.08;
 
   // Slow cosmic drift
   vec2 drift = vec2(t * 0.1, t * 0.05);
   vec2 starUv = uv + drift;
 
-  // Star layers at different depths
+  // Star layers at different depths (parallax: different speeds per layer)
   float stars = 0.0;
-  stars += starField(starUv, 30.0, 1.0) * 0.6;
-  stars += starField(starUv * 1.1 + 5.0, 50.0, 0.7) * 0.3;
-  stars += starField(starUv * 0.8 + 10.0, 80.0, 0.5) * 0.15;
+  vec2 parallax1 = starUv;
+  vec2 parallax2 = starUv * 1.1 + drift * 0.3 + 5.0;  // medium depth — slower
+  vec2 parallax3 = starUv * 0.8 + drift * 0.1 + 10.0;  // far depth — slowest
+  stars += starField(parallax1, 30.0, 1.0) * 0.6;
+  stars += starField(parallax2, 50.0, 0.7) * 0.3;
+  stars += starField(parallax3, 80.0, 0.5) * 0.15;
 
   // Energy brightens stars
   stars *= 0.7 + uEnergy * 0.6 + uFastEnergy * 0.2;
 
-  // Nebula clouds — palette-locked colors
-  float neb1 = nebula(uv * 0.8 + drift * 0.5, uTime);
-  float neb2 = nebula(uv * 1.2 + drift * 0.3 + 5.0, uTime + 100.0);
+  // === STAR GLOW: diffraction spikes (4-point cross) on bright stars ===
+  float spikeStar = starField(parallax1, 30.0, 1.0);
+  if (spikeStar > 0.3) {
+    // Find approximate star center from grid
+    vec2 spikeCenter = (floor(parallax1 * 30.0) + 0.5) / 30.0;
+    vec2 toStar = uv - spikeCenter;
+    // 4-point cross spikes
+    float spikeH = exp(-abs(toStar.y) * 200.0) * exp(-abs(toStar.x) * 20.0);
+    float spikeV = exp(-abs(toStar.x) * 200.0) * exp(-abs(toStar.y) * 20.0);
+    float spikes = (spikeH + spikeV) * spikeStar * 0.15;
+    stars += spikes;
+  }
 
-  // Nebula colors from palette
-  vec3 nebColor1 = hsv2rgb(vec3(uPalettePrimary, 0.5 * uPaletteSaturation, 0.15));
-  vec3 nebColor2 = hsv2rgb(vec3(uPaletteSecondary, 0.4 * uPaletteSaturation, 0.12));
+  // === VOLUMETRIC NEBULA: raymarched dust clouds (4-step accumulation) ===
+  vec3 nebColor1 = hsv2rgb(vec3(uPalettePrimary, 0.6 * uPaletteSaturation, 0.25));
+  vec3 nebColor2 = hsv2rgb(vec3(uPaletteSecondary, 0.5 * uPaletteSaturation, 0.20));
 
-  vec3 nebulaMix = nebColor1 * neb1 * 0.6 + nebColor2 * neb2 * 0.4;
+  vec3 nebulaMix = vec3(0.0);
+  float nebAlpha = 0.0;
+  for (int s = 0; s < 4; s++) {
+    float fs = float(s);
+    float depth = 0.8 + fs * 0.4;
+    vec2 sampleUv = uv * (0.6 + fs * 0.15) + drift * (0.5 - fs * 0.1);
+    float density = nebula(sampleUv, uDynamicTime + fs * 50.0);
+    density = smoothstep(0.25, 0.7, density);
+    float layerAlpha = density * 0.3 * (1.0 - nebAlpha);
+    vec3 layerColor = mix(nebColor1, nebColor2, fs / 3.0 + density * 0.2);
+    // Depth-dependent brightness (further = dimmer)
+    layerColor *= 1.0 / depth;
+    nebulaMix += layerColor * layerAlpha;
+    nebAlpha += layerAlpha;
+  }
 
   // Bass makes nebula pulse
   nebulaMix *= 0.8 + uBass * 0.5;
@@ -167,11 +194,17 @@ void main() {
   float vig = 1.0 - smoothstep(0.8, 1.6, length(uv));
   color *= 0.3 + vig * 0.7;
 
-  // === S-CURVE COLOR GRADING ===
-  color = sCurveGrade(color, uEnergy);
-
   // === ANIMATED STAGE FLOOD: flowing palette noise in dark areas ===
-  color = stageFloodFill(color, uv, uTime, uEnergy, uPalettePrimary, uPaletteSecondary);
+  color = stageFloodFill(color, uv, uDynamicTime, uEnergy, uPalettePrimary, uPaletteSecondary);
+
+  // === ANAMORPHIC FLARE: horizontal light streak ===
+  color = anamorphicFlare(vUv, color, uEnergy, uOnsetSnap);
+
+  // === HALATION: warm film bloom ===
+  color = halation(vUv, color, uEnergy);
+
+  // === CINEMATIC GRADE (ACES filmic tone mapping) ===
+  color = cinematicGrade(color, uEnergy);
 
   // ONSET SATURATION PULSE: push colors away from gray (psychedelic, not white)
   float onsetPulse = step(0.5, uOnsetSnap) * uOnsetSnap;
@@ -186,8 +219,8 @@ void main() {
     color.b *= 1.0 - caAmt * 0.5;
   }
 
-  // === HALATION: warm film bloom ===
-  color = halation(vUv, color, uEnergy);
+  // Lifted blacks
+  color = max(color, vec3(0.06, 0.05, 0.08));
 
   gl_FragColor = vec4(color, 1.0);
 }
