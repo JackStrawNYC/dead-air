@@ -260,7 +260,7 @@ void main() {
   // === SDF STEALIE: emerges from cosmic nebula ===
   {
     float nf = fbm3(vec3(p * 3.0, uTime * 0.08));
-    accColor += stealieEmergence(p, uTime, energy, bass, cloudColor, emissionColor, nf);
+    accColor += stealieEmergence(p, uTime, energy, bass, cloudColor, emissionColor, nf, uClimaxPhase);
   }
 
   // Apply saturation (boosted for vivid nebula)

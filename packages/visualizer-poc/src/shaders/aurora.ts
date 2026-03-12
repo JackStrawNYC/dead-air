@@ -247,7 +247,7 @@ void main() {
   // === SDF STEALIE: subtler emergence in aurora (scale 0.7) ===
   {
     float nf = auroraFBM(vec3(p * 2.0, slowTime), 0.0);
-    vec3 stLight = stealieEmergence(p, uTime, energy, bass, auroraColor1, auroraColor2, nf) * 0.7;
+    vec3 stLight = stealieEmergence(p, uTime, energy, bass, auroraColor1, auroraColor2, nf, uClimaxPhase) * 0.7;
     col += stLight;
   }
 

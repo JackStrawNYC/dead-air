@@ -193,7 +193,7 @@ void main() {
     vec3 palCol1 = hsv2rgb(vec3(uPalettePrimary, 0.8, 1.0));
     vec3 palCol2 = hsv2rgb(vec3(uPaletteSecondary, 0.8, 1.0));
     float nf = w1;
-    col += stealieEmergence(dp, uTime, energy, bass, palCol1, palCol2, nf);
+    col += stealieEmergence(dp, uTime, energy, bass, palCol1, palCol2, nf, uClimaxPhase);
   }
 
   // === VIGNETTE ===

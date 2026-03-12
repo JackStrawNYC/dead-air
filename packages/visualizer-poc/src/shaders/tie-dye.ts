@@ -121,7 +121,7 @@ void main() {
     vec3 palCol1 = hsv2rgb(vec3(uPalettePrimary, 0.8, 1.0));
     vec3 palCol2 = hsv2rgb(vec3(uPaletteSecondary, 0.8, 1.0));
     float nf = warp1;
-    color += stealieEmergence(uv, uTime, clamp(uEnergy, 0.0, 1.0), uBass, palCol1, palCol2, nf);
+    color += stealieEmergence(uv, uTime, clamp(uEnergy, 0.0, 1.0), uBass, palCol1, palCol2, nf, uClimaxPhase);
   }
 
   // === CLIMAX REACTIVITY ===

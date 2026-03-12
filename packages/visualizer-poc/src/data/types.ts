@@ -157,6 +157,8 @@ export interface SetlistEntry {
   songArt?: string;
   /** AI-generated atmospheric scene videos */
   sceneVideos?: SceneVideo[];
+  /** CSS mix-blend-mode for song art layer (default "screen") */
+  artBlendMode?: string;
   /** This song flows directly into the next (segue) — no fade-out, next song skips fade-in + art */
   segueInto?: boolean;
   /** Number of art variants generated (for seed-based selection) */

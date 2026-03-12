@@ -26,9 +26,11 @@ interface SongArtProps {
   focusOpacity?: number;
   /** Whether this song is a segue-in — suppress art during first 10s */
   segueIn?: boolean;
+  /** CSS mix-blend-mode override (default "screen") */
+  artBlendMode?: string;
 }
 
-export const SongArtLayer: React.FC<SongArtProps> = ({ src, suppressionFactor, hueRotation = 0, energy = 0, climaxIntensity = 0, focusOpacity = 1, segueIn = false }) => {
+export const SongArtLayer: React.FC<SongArtProps> = ({ src, suppressionFactor, hueRotation = 0, energy = 0, climaxIntensity = 0, focusOpacity = 1, segueIn = false, artBlendMode }) => {
   const frame = useCurrentFrame();
 
   // Suppress art during segue-in (first 10s) — let the crossfade breathe
@@ -84,7 +86,7 @@ export const SongArtLayer: React.FC<SongArtProps> = ({ src, suppressionFactor, h
         position: "absolute",
         inset: 0,
         opacity: artOpacity,
-        mixBlendMode: "screen",
+        mixBlendMode: (artBlendMode ?? "screen") as React.CSSProperties["mixBlendMode"],
         overflow: "hidden",
         filter: [
           frame < ART_FADE_END ? "brightness(0.7) contrast(0.8)" : "",

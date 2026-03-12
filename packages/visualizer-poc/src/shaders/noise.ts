@@ -385,9 +385,12 @@ float sdStealie(vec2 p, float radius) {
 //   col1     — shader's primary palette color
 //   col2     — shader's secondary palette color
 //   noiseField — shader's own FBM/noise value at this pixel (for dissolution)
-vec3 stealieEmergence(vec2 uv, float time, float energy, float bass, vec3 col1, vec3 col2, float noiseField) {
-  // Energy gate: only visible when energy > 0.55, fully formed at 0.85
-  float gate = smoothstep(0.55, 0.85, energy);
+vec3 stealieEmergence(vec2 uv, float time, float energy, float bass, vec3 col1, vec3 col2, float noiseField, float climaxPhase) {
+  // Climax gate: only during climax (2) or sustain (3)
+  float climaxGate = smoothstep(1.5, 2.5, climaxPhase);
+  // Energy gate: raised from 0.55 to 0.60
+  float energyGate = smoothstep(0.60, 0.85, energy);
+  float gate = energyGate * climaxGate;
   if (gate < 0.001) return vec3(0.0);
 
   // Slow rotation

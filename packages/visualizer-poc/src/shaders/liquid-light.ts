@@ -258,7 +258,7 @@ void main() {
     vec3 palCol1 = 0.5 + 0.5 * cos(6.28318 * vec3(stHue1, stHue1 + 0.33, stHue1 + 0.67));
     vec3 palCol2 = 0.5 + 0.5 * cos(6.28318 * vec3(stHue2, stHue2 + 0.33, stHue2 + 0.67));
     float nf = fbm3(vec3(p * 2.0, uDynamicTime * 0.1));
-    col += stealieEmergence(p, uTime, energy, uBass, palCol1, palCol2, nf);
+    col += stealieEmergence(p, uTime, energy, uBass, palCol1, palCol2, nf, uClimaxPhase);
   }
 
   // === CLIMAX REACTIVITY ===
