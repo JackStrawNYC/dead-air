@@ -3,25 +3,25 @@ import { computeVisualFocus } from "./visual-focus";
 import type { ClimaxPhase } from "./climax-state";
 
 describe("computeVisualFocus", () => {
-  it("climax: shader at full, art gone, overlays at moderate opacity", () => {
+  it("climax: shader at full, art gone, overlays at minimal opacity", () => {
     const state = computeVisualFocus("climax", 1.0, false, 100);
     expect(state.shaderOpacity).toBe(1.0);
     expect(state.artOpacity).toBe(0.0); // art fully suppressed during climax
-    expect(state.overlayOpacity).toBe(0.12); // overlays minimal during climax
+    expect(state.overlayOpacity).toBe(0.05); // overlays near-zero during climax
     expect(state.grainOpacity).toBeLessThanOrEqual(0.5);
   });
 
-  it("sustain: shader near full, overlays at low-moderate opacity", () => {
+  it("sustain: shader near full, overlays at minimal opacity", () => {
     const state = computeVisualFocus("sustain", 1.0, false, 100);
     expect(state.shaderOpacity).toBeGreaterThanOrEqual(0.85);
     expect(state.artOpacity).toBe(0.0); // art fully suppressed during sustain
-    expect(state.overlayOpacity).toBe(0.10); // overlays minimal during sustain
+    expect(state.overlayOpacity).toBe(0.05); // overlays near-zero during sustain
   });
 
   it("build: overlays present, shader below full", () => {
     const state = computeVisualFocus("build", 1.0, false, 100);
     // Build phase should show overlays and have shader below full
-    expect(state.overlayOpacity).toBeGreaterThan(0.2);
+    expect(state.overlayOpacity).toBeGreaterThan(0.1);
     expect(state.shaderOpacity).toBeLessThan(1.0);
   });
 

@@ -39,7 +39,7 @@ export const SongArtLayer: React.FC<SongArtProps> = ({ src, suppressionFactor, h
   const energyWash = interpolate(
     energy,
     [0.03, 0.20, 0.40],
-    [0.30, 0.18, 0.08],
+    [0.50, 0.30, 0.12],
     { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
   );
 
@@ -47,7 +47,7 @@ export const SongArtLayer: React.FC<SongArtProps> = ({ src, suppressionFactor, h
   const baseOpacity = interpolate(
     frame,
     [0, ART_FULL_END, ART_FADE_END],
-    [1, 1, energyWash],
+    [0.70, 0.70, energyWash],
     {
       extrapolateLeft: "clamp",
       extrapolateRight: "clamp",
@@ -86,7 +86,10 @@ export const SongArtLayer: React.FC<SongArtProps> = ({ src, suppressionFactor, h
         opacity: artOpacity,
         mixBlendMode: "screen",
         overflow: "hidden",
-        filter: hueRotation !== 0 ? `hue-rotate(${hueRotation.toFixed(1)}deg)` : undefined,
+        filter: [
+          frame < ART_FADE_END ? "brightness(0.7) contrast(0.8)" : "",
+          hueRotation !== 0 ? `hue-rotate(${hueRotation.toFixed(1)}deg)` : "",
+        ].filter(Boolean).join(" ") || undefined,
       }}
     >
       <Img

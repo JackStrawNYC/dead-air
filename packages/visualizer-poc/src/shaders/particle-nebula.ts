@@ -123,7 +123,7 @@ vec3 cinematicGrade(vec3 col, float energy) {
   float luma = dot(col, vec3(0.2126, 0.7152, 0.0722));
   float contrast = mix(0.95, 1.06, energy);
   col = mix(vec3(luma), col, contrast);
-  col = max(col, vec3(0.055, 0.045, 0.07));
+  col = max(col, vec3(0.08, 0.065, 0.10));
   return col;
 }
 

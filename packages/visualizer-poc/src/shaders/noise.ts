@@ -266,7 +266,7 @@ vec3 cinematicGrade(vec3 col, float energy) {
   col = mix(vec3(luma), col, contrast);
   // Lifted blacks: concert venues are never truly black — warm ambient light floor
   // Warm-biased (R > G > B) to avoid blue/cold cast in dark areas
-  col = max(col, vec3(0.07, 0.055, 0.045));
+  col = max(col, vec3(0.10, 0.08, 0.065));
   return col;
 }
 

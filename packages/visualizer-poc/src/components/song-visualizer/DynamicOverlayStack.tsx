@@ -115,7 +115,6 @@ export const DynamicOverlayStack: React.FC<Props> = ({
                 inset: 0,
                 opacity,
                 pointerEvents: "none",
-                mixBlendMode: "screen",
               }}
             >
               <Suspense fallback={null}>
@@ -146,7 +145,6 @@ export const DynamicOverlayStack: React.FC<Props> = ({
               inset: 0,
               opacity,
               pointerEvents: "none",
-              mixBlendMode: "screen",
             }}
           >
             <Suspense fallback={null}>

@@ -25,11 +25,11 @@ export interface VisualFocusState {
  *  At 0.40 idle: effective overlay contribution ≈ 0.40 * rotation * mediaSuppression ≈ 0.15-0.20.
  *  This prevents overlays from washing out shader character (especially warm shaders like inferno). */
 const PHASE_FOCUS: Record<ClimaxPhase, VisualFocusState> = {
-  climax:  { shaderOpacity: 1.0,  artOpacity: 0.0,  overlayOpacity: 0.12, grainOpacity: 0.5 },
-  sustain: { shaderOpacity: 0.95, artOpacity: 0.0,  overlayOpacity: 0.10, grainOpacity: 0.6 },
-  build:   { shaderOpacity: 0.85, artOpacity: 0.12, overlayOpacity: 0.35, grainOpacity: 0.8 },
-  release: { shaderOpacity: 0.75, artOpacity: 0.35, overlayOpacity: 0.30, grainOpacity: 1.0 },
-  idle:    { shaderOpacity: 0.85, artOpacity: 0.25, overlayOpacity: 0.40, grainOpacity: 1.0 },
+  climax:  { shaderOpacity: 1.0,  artOpacity: 0.0,  overlayOpacity: 0.05, grainOpacity: 0.5 },
+  sustain: { shaderOpacity: 0.95, artOpacity: 0.0,  overlayOpacity: 0.05, grainOpacity: 0.6 },
+  build:   { shaderOpacity: 0.85, artOpacity: 0.12, overlayOpacity: 0.18, grainOpacity: 0.8 },
+  release: { shaderOpacity: 0.75, artOpacity: 0.35, overlayOpacity: 0.15, grainOpacity: 1.0 },
+  idle:    { shaderOpacity: 0.85, artOpacity: 0.25, overlayOpacity: 0.20, grainOpacity: 1.0 },
 };
 
 /** Focus state when a scene video is actively playing */
@@ -76,7 +76,7 @@ export function computeVisualFocus(
     const breathT = (Math.sin(frame * Math.PI * 2 / 240) + 1) * 0.5;
     state = {
       ...state,
-      artOpacity: lerp(0.18, 0.30, breathT),
+      artOpacity: lerp(0.35, 0.50, breathT),
       shaderOpacity: lerp(0.80, 0.90, 1 - breathT),
     };
   }

@@ -84,14 +84,14 @@ export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod,
   // Higher CSS saturation crushes dark-pixel non-dominant channels toward zero,
   // making dark areas blacker and colors monochromatic (green-only at high energy).
   // Keep saturation moderate; shaders provide color richness internally.
-  // Brightness: 0.82 (quiet) → 1.20 (loud) — fills the frame, never washes out
+  // Brightness: 0.92 (quiet) → 1.20 (loud) — fills the frame, never washes out
   // Contrast:   0.95 (quiet) → 1.15 (loud) — punchy but not crushing
   // Gate reactive CSS terms during quiet to prevent frame-to-frame jitter
   const cssGate = factor; // 0 during quiet, 1 during loud (already smoothstep-based)
   const saturation = Math.min(1.40, (0.75 + factor * 0.50 + flatnessSaturation * cssGate + textureSaturationOffset * cssGate + (climaxMod?.saturationOffset ?? 0) + eraSatOffset + (snapshot.drumOnset ?? 0) * 0.06 * cssGate) * counterpointSatMult * setTheme.saturationMult);
   const isClimaxPhase = (climaxMod?.brightnessOffset ?? 0) > 0.04;
   const brightCap = isClimaxPhase ? 1.50 : 1.25;
-  const brightness = Math.min(brightCap, 0.82 + factor * 0.38 + onsetBrightness * 0.4 * cssGate + (climaxMod?.brightnessOffset ?? 0) + setTheme.brightnessOffset + (snapshot.fastEnergy ?? 0) * 0.12 * cssGate);
+  const brightness = Math.min(brightCap, 0.92 + factor * 0.28 + onsetBrightness * 0.4 * cssGate + (climaxMod?.brightnessOffset ?? 0) + setTheme.brightnessOffset + (snapshot.fastEnergy ?? 0) * 0.12 * cssGate);
   // Contrast: restrained range (0.97-1.10) to preserve GLSL stage flood + lifted blacks.
   // High CSS contrast crushes dark values back toward black, undoing shader color work.
   const contrast = Math.min(1.15, 0.95 + factor * 0.20 + (climaxMod?.contrastOffset ?? 0) * 0.5);

@@ -56,7 +56,7 @@ uniform float uSpectralFlux;
 
 varying vec2 vUv;
 
-#define NUM_BEAMS 6
+#define NUM_BEAMS 8
 #define PI 3.14159265
 
 float beam(vec2 uv, float beamX, float angle, float width, float intensity) {
@@ -79,7 +79,9 @@ float getContrastForBeam(int i) {
   if (i == 2) return uContrast0.z;
   if (i == 3) return uContrast0.w;
   if (i == 4) return uContrast1.x;
-  return uContrast1.y;
+  if (i == 5) return uContrast1.y;
+  if (i == 6) return uContrast1.z;
+  return uContrast1.w;
 }
 
 void main() {
@@ -102,6 +104,9 @@ void main() {
   float bgHue = hsvToCosineHue(uPalettePrimary) + uDynamicTime * 0.02;
   vec3 bgColor = 0.5 + 0.5 * cos(6.28318 * (vec3(bgHue, bgHue + 0.33, bgHue + 0.67) + vec3(0.0, 0.1, 0.2)));
   bgColor *= 0.08 + uRms * 0.12;
+  // FBM noise to break flat background banding
+  float bgNoise = fbm3(vec3(p * 3.0, uDynamicTime * 0.1));
+  bgColor *= 0.85 + bgNoise * 0.3;
   vec3 col = bgColor;
 
   float activeBeamCount = 3.0 + energy * 5.0;
@@ -157,6 +162,13 @@ void main() {
     col += beamCol * beamVal * 0.85;
   }
 
+  // === ATMOSPHERIC HAZE: fbm-driven secondary palette color between beams ===
+  float hazeNoise = fbm3(vec3(p * 2.0 + 50.0, uDynamicTime * 0.08));
+  float secHue = hsvToCosineHue(uPaletteSecondary) + hazeNoise * 0.15;
+  vec3 hazeColor = 0.5 + 0.5 * cos(6.28318 * vec3(secHue, secHue + 0.33, secHue + 0.67));
+  float hazeAmount = (0.03 + energy * 0.05) * (0.5 + hazeNoise * 0.5);
+  col += hazeColor * hazeAmount;
+
   // === CLIMAX REACTIVITY ===
   float climaxPhase = uClimaxPhase;
   float climaxI = uClimaxIntensity;
@@ -173,9 +185,10 @@ void main() {
   vec3 afterglowCol = 0.5 + 0.5 * cos(6.28318 * vec3(agHue, agHue + 0.33, agHue + 0.67));
   col += afterglowCol * afterglowStr;
 
-  // Stage silhouette
-  float stageY = smoothstep(0.35, 0.25, uv.y);
-  col = mix(col, vec3(0.02, 0.015, 0.025), stageY * 0.80);
+  // Stage silhouette — softened with wider smoothstep + noise edge
+  float stageNoise = snoise(vec3(uv.x * 12.0, uDynamicTime * 0.15, 5.0)) * 0.02;
+  float stageY = smoothstep(0.38, 0.22, uv.y + stageNoise);
+  col = mix(col, vec3(0.02, 0.015, 0.025), stageY * 0.70);
 
   // === CROWD SILHOUETTE: wavy heads along bottom edge ===
   // Higher frequency + extra octave prevents visible repeating patterns at 1920px
