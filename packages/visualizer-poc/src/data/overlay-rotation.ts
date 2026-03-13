@@ -226,6 +226,28 @@ const TAG_TEXTURE_BONUS: Record<string, Partial<Record<string, number>>> = {
   aquatic:        { ambient: +0.05, sparse: +0.10, peak: -0.10 },
 };
 
+/**
+ * Scene-specific overlay bias: certain overlays look better with certain shaders.
+ * Boosts the selection score so cosmic_voyage gets CosmicStarfield,
+ * concert_lighting gets LaserShow, etc.
+ */
+const SCENE_OVERLAY_BIAS: Partial<Record<string, Record<string, number>>> = {
+  cosmic_voyage:    { CosmicStarfield: +0.25, DarkStarPortal: +0.20, SacredGeometry: +0.15 },
+  concert_lighting: { LaserShow: +0.25, WallOfSound: +0.20, ParticleExplosion: +0.15 },
+  deep_ocean:       { Fireflies: +0.20, BoxOfRain: +0.15, CosmicStarfield: +0.15 },
+  inferno:          { EmberRise: +0.25, ThirteenPointBolt: +0.20, ParticleExplosion: +0.15 },
+  aurora:           { CosmicStarfield: +0.20, SacredGeometry: +0.15, Fireflies: +0.15 },
+  tie_dye:          { TieDyeWash: +0.25, LavaLamp: +0.20, ChinaCatSunflower: +0.15 },
+  liquid_light:     { TieDyeWash: +0.20, FractalZoom: +0.15, MandalaGenerator: +0.15 },
+  vintage_film:     { VHSGlitch: +0.20, RoseOverlay: +0.15, SkeletonRoses: +0.10 },
+  crystal_cavern:   { SacredGeometry: +0.25, FractalZoom: +0.20, DarkStarPortal: +0.15 },
+  cosmic_dust:      { CosmicStarfield: +0.25, Fireflies: +0.20, SacredGeometry: +0.15 },
+  oil_projector:    { LavaLamp: +0.20, TieDyeWash: +0.15, MandalaGenerator: +0.15 },
+  particle_nebula:  { CosmicStarfield: +0.20, DarkStarPortal: +0.15 },
+  stark_minimal:    { RoseOverlay: +0.15, BreathingStealie: +0.10 },
+  lo_fi_grain:      { VHSGlitch: +0.20, RoseOverlay: +0.15, SkeletonRoses: +0.10 },
+};
+
 /** Set II = the journey. More cosmic/sacred, fewer artifacts. */
 const SET2_ADJUSTMENTS: Record<TextureGroup, number> = {
   sacred:    +0.10,
@@ -299,6 +321,7 @@ export function buildRotationSchedule(
   isDrumsSpace?: boolean,
   energyHints?: Record<string, OverlayPhaseHint>,
   era?: string,
+  mode?: string,
 ): RotationSchedule {
   const trackHash = hashString(trackId) + (showSeed ?? 0);
 
@@ -489,6 +512,9 @@ export function buildRotationSchedule(
           }
         }
       }
+
+      // Scene-specific overlay bias: boost overlays that pair well with the shader
+      score += SCENE_OVERLAY_BIAS[mode ?? ""]?.[entry.name] ?? 0;
 
       // Carryover vs repeat: if previous window was too short for the overlay
       // to register visually, encourage it to persist instead of penalizing

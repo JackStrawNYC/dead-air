@@ -10,11 +10,13 @@
 import React from "react";
 import type { EnhancedFrameData } from "./types";
 
-// ─── Layer 1: Atmospheric (4) ───
+// ─── Layer 1: Atmospheric (6) ───
 import { CosmicStarfield } from "../components/CosmicStarfield";
 import { TieDyeWash } from "../components/TieDyeWash";
 import { LavaLamp } from "../components/LavaLamp";
 import { Fireflies } from "../components/Fireflies";
+import { LighterWave } from "../components/LighterWave";
+import { CrowdDance } from "../components/CrowdDance";
 
 // ─── Layer 2: Sacred / Center-stage (10) ───
 import { BreathingStealie } from "../components/BreathingStealie";
@@ -28,19 +30,20 @@ import { FractalZoom } from "../components/FractalZoom";
 import { MandalaGenerator } from "../components/MandalaGenerator";
 import { RoseOverlay } from "../components/RoseOverlay";
 
-// ─── Layer 3: Reactive (5) ───
+// ─── Layer 3: Reactive (6) ───
 import { LightningBoltOverlay } from "../components/LightningBoltOverlay";
 import { ParticleExplosion } from "../components/ParticleExplosion";
 import { LaserShow } from "../components/LaserShow";
 import { EmberRise } from "../components/EmberRise";
 import { WallOfSound } from "../components/WallOfSound";
+import { PhilZone } from "../components/PhilZone";
 
 // ─── Layer 5: Song References (3) ───
 import { ChinaCatSunflower } from "../components/ChinaCatSunflower";
 import { SugarMagnolia } from "../components/SugarMagnolia";
 import { BoxOfRain } from "../components/BoxOfRain";
 
-// ─── Layer 6: Character / Dead Culture (7) ───
+// ─── Layer 6: Character / Dead Culture (10) ───
 import { BearParade } from "../components/BearParade";
 import { SkeletonBand } from "../components/SkeletonBand";
 import { MarchingTerrapins } from "../components/MarchingTerrapins";
@@ -48,6 +51,13 @@ import { Bertha } from "../components/Bertha";
 import { JerryGuitar } from "../components/JerryGuitar";
 import { VWBusParade } from "../components/VWBusParade";
 import { CosmicCharlie } from "../components/CosmicCharlie";
+import { JerrySpotlight } from "../components/JerrySpotlight";
+import { BobWeir } from "../components/BobWeir";
+import { DrumCircle } from "../components/DrumCircle";
+
+// ─── Layer 7: Show Artifacts (2) ───
+import { VenueMarquee } from "../components/VenueMarquee";
+import { TapeTrader } from "../components/TapeTrader";
 
 // ─── Layer 10: Distortion (1) ───
 import { VHSGlitch } from "../components/VHSGlitch";
@@ -70,6 +80,8 @@ export const OVERLAY_COMPONENTS: Record<string, OverlayComponentEntry> = {
   TieDyeWash:        { Component: TieDyeWash, layer: 1 },
   LavaLamp:          { Component: LavaLamp, layer: 1 },
   Fireflies:         { Component: Fireflies, layer: 1 },
+  LighterWave:       { Component: LighterWave, layer: 1 },
+  CrowdDance:        { Component: CrowdDance, layer: 1 },
 
   // Layer 2: Sacred / Center-stage
   BreathingStealie:  { Component: BreathingStealie, layer: 2 },
@@ -89,6 +101,7 @@ export const OVERLAY_COMPONENTS: Record<string, OverlayComponentEntry> = {
   LaserShow:           { Component: LaserShow, layer: 3 },
   EmberRise:           { Component: EmberRise, layer: 3 },
   WallOfSound:         { Component: WallOfSound, layer: 3 },
+  PhilZone:            { Component: PhilZone, layer: 3 },
 
   // Layer 5: Song References
   ChinaCatSunflower: { Component: ChinaCatSunflower, layer: 5 },
@@ -103,6 +116,13 @@ export const OVERLAY_COMPONENTS: Record<string, OverlayComponentEntry> = {
   JerryGuitar:       { Component: JerryGuitar, layer: 6 },
   VWBusParade:       { Component: VWBusParade, layer: 6 },
   CosmicCharlie:     { Component: CosmicCharlie, layer: 6 },
+  JerrySpotlight:    { Component: JerrySpotlight, layer: 6 },
+  BobWeir:           { Component: BobWeir, layer: 6 },
+  DrumCircle:        { Component: DrumCircle, layer: 6 },
+
+  // Layer 7: Show Artifacts
+  VenueMarquee:      { Component: VenueMarquee, layer: 7 },
+  TapeTrader:        { Component: TapeTrader, layer: 7 },
 
   // Layer 10: Distortion
   VHSGlitch:           { Component: VHSGlitch, layer: 10 },

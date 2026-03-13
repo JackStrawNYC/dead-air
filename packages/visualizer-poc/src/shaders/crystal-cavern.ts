@@ -184,6 +184,10 @@ void main() {
   col += beatKick;
   col += rim * glowColor * 0.4;
 
+  // Beat pulse — tempo-locked crystal intensity
+  float bp = beatPulse(uMusicalTime);
+  col *= 1.0 + bp * 0.20;
+
   // ONSET SATURATION PULSE
   float onsetPulse = step(0.5, uOnsetSnap) * uOnsetSnap;
   float onsetLuma = dot(col, vec3(0.299, 0.587, 0.114));
@@ -201,6 +205,11 @@ void main() {
   float fog = 1.0 - exp(-fogDist * (0.08 - uEnergy * 0.03));
   vec3 fogColor = vec3(0.02, 0.03, 0.06);
   col = mix(col, fogColor, fog);
+
+  // Lifted blacks (build-phase-aware: near true black during build for anticipation)
+  float isBuild = step(0.5, uClimaxPhase) * step(uClimaxPhase, 1.5);
+  float liftMult = mix(1.0, 0.15, isBuild * uClimaxIntensity);
+  col = max(col, vec3(0.06, 0.05, 0.08) * liftMult);
 
   gl_FragColor = vec4(col, 1.0);
 }

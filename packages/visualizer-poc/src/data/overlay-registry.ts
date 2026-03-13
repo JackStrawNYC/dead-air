@@ -19,6 +19,8 @@ export const OVERLAY_REGISTRY: OverlayEntry[] = [
   { name: "TieDyeWash",       layer: 1, category: "atmospheric", tags: ["psychedelic", "dead-culture"],    energyBand: "any",  weight: 1, dutyCycle: 100 },
   { name: "LavaLamp",         layer: 1, category: "atmospheric", tags: ["psychedelic", "retro"],           energyBand: "mid",  weight: 1, dutyCycle: 100 },
   { name: "Fireflies",        layer: 1, category: "atmospheric", tags: ["organic", "contemplative"],      energyBand: "low",  weight: 1, dutyCycle: 100, energyResponse: [0.0, 0.05, 2.0] },
+  { name: "LighterWave",     layer: 1, category: "atmospheric", tags: ["dead-culture", "contemplative"], energyBand: "low",  weight: 1, dutyCycle: 100, energyResponse: [0.0, 0.05, 2.5] },
+  { name: "CrowdDance",      layer: 1, category: "atmospheric", tags: ["festival", "intense"],           energyBand: "high", weight: 1, dutyCycle: 100, energyResponse: [0.20, 0.35, 2.0] },
 
   // ═══ Layer 2: Sacred / Center-stage (10) ═══
   { name: "BreathingStealie",  layer: 2, category: "sacred", tags: ["dead-culture", "psychedelic"],    energyBand: "any",  weight: 3, dutyCycle: 100, energyResponse: [0.03, 0.15, 1.5] },
@@ -38,8 +40,9 @@ export const OVERLAY_REGISTRY: OverlayEntry[] = [
   { name: "LaserShow",           layer: 3, category: "reactive", tags: ["festival", "intense"],          energyBand: "high", weight: 3, energyResponse: [0.15, 0.30, 1.5] },
   { name: "EmberRise",           layer: 3, category: "reactive", tags: ["intense", "organic"],           energyBand: "mid",  weight: 2, energyResponse: [0.10, 0.25, 1.8] },
 
-  // ═══ Layer 3: Reactive — WallOfSound (placed here for layer 3) ═══
+  // ═══ Layer 3: Reactive — WallOfSound + PhilZone ═══
   { name: "WallOfSound",         layer: 3, category: "reactive", tags: ["intense", "festival"],          energyBand: "high", weight: 3, dutyCycle: 17, energyResponse: [0.15, 0.35, 2.0] },
+  { name: "PhilZone",            layer: 3, category: "reactive", tags: ["dead-culture", "organic"],      energyBand: "mid",  weight: 2, dutyCycle: 100, energyResponse: [0.08, 0.20, 2.0] },
 
   // ═══ Layer 5: Song References (3) ═══
   { name: "ChinaCatSunflower",layer: 5, category: "nature", tags: ["psychedelic", "dead-culture"], energyBand: "mid",  weight: 2, dutyCycle: 14 },
@@ -54,9 +57,16 @@ export const OVERLAY_REGISTRY: OverlayEntry[] = [
   { name: "JerryGuitar",      layer: 6, category: "character", tags: ["dead-culture", "organic"],      energyBand: "mid",  weight: 2, dutyCycle: 33 },
   { name: "VWBusParade",      layer: 6, category: "character", tags: ["dead-culture", "festival"],     energyBand: "low",  weight: 2 },
   { name: "CosmicCharlie",    layer: 6, category: "character", tags: ["dead-culture", "cosmic"],       energyBand: "mid",  weight: 2 },
+  { name: "JerrySpotlight",  layer: 6, category: "character", tags: ["dead-culture", "organic"],      energyBand: "mid",  weight: 2, dutyCycle: 100, energyResponse: [0.10, 0.25, 1.5] },
+  { name: "BobWeir",         layer: 6, category: "character", tags: ["dead-culture", "organic"],      energyBand: "mid",  weight: 2, dutyCycle: 100, energyResponse: [0.08, 0.20, 1.5] },
+  { name: "DrumCircle",      layer: 6, category: "character", tags: ["dead-culture", "intense"],      energyBand: "mid",  weight: 2, dutyCycle: 100, energyResponse: [0.10, 0.30, 2.0] },
 
   // ═══ Layer 7: Always-active info (hardcoded in SongVisualizer) ═══
   { name: "SongTitle",         layer: 7, category: "artifact", tags: ["dead-culture"],                  energyBand: "any",  weight: 1, alwaysActive: true },
+
+  // ═══ Layer 7: Show Artifacts (2) ═══
+  { name: "VenueMarquee",     layer: 7, category: "artifact", tags: ["dead-culture", "retro"],          energyBand: "any",  weight: 1, dutyCycle: 15 },
+  { name: "TapeTrader",       layer: 7, category: "artifact", tags: ["dead-culture", "retro"],          energyBand: "any",  weight: 1, dutyCycle: 10 },
 
   // ═══ Layer 10: Distortion (1) + always-active ═══
   { name: "VHSGlitch",           layer: 10, category: "distortion", tags: ["retro", "psychedelic"],       energyBand: "mid",  weight: 2 },

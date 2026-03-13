@@ -264,9 +264,6 @@ vec3 cinematicGrade(vec3 col, float energy) {
   float luma = dot(col, vec3(0.2126, 0.7152, 0.0722));
   float contrast = mix(0.95, 1.06, energy);
   col = mix(vec3(luma), col, contrast);
-  // Lifted blacks: concert venues are never truly black — warm ambient light floor
-  // Warm-biased (R > G > B) to avoid blue/cold cast in dark areas
-  col = max(col, vec3(0.10, 0.08, 0.065));
   return col;
 }
 
@@ -282,6 +279,17 @@ vec3 anamorphicFlare(vec2 uv, vec3 col, float energy, float onset) {
   // Warm cyan-white flare color (anamorphic coatings)
   vec3 flareColor = mix(vec3(0.6, 0.8, 1.0), vec3(1.0, 0.95, 0.9), energy);
   return col + flareColor * streak * 0.25;
+}
+
+// --- Directional chromatic aberration: lens-like color fringing ---
+// Separates R/B channels along a directional vector from center.
+// Replaces simple channel scaling with physically-motivated fringing.
+vec3 applyCA(vec3 col, vec2 uv, float amount) {
+  vec2 dir = normalize(uv - vec2(0.5) + vec2(0.001));
+  float shift = dot(dir, vec2(1.0, 0.3)) * amount;
+  col.r = col.r * (1.0 + shift * 2.0) - col.g * shift * 0.3;
+  col.b = col.b * (1.0 + abs(shift) * 1.5) - col.g * abs(shift) * 0.2;
+  return max(col, vec3(0.0));
 }
 
 // --- Barrel distortion: subtle lens curvature ---
@@ -388,8 +396,8 @@ float sdStealie(vec2 p, float radius) {
 vec3 stealieEmergence(vec2 uv, float time, float energy, float bass, vec3 col1, vec3 col2, float noiseField, float climaxPhase) {
   // Climax gate: only during climax (2) or sustain (3)
   float climaxGate = smoothstep(1.5, 2.5, climaxPhase);
-  // Energy gate: raised from 0.55 to 0.60
-  float energyGate = smoothstep(0.60, 0.85, energy);
+  // Energy gate: lowered so stealie appears during climax (max energy ~0.465)
+  float energyGate = smoothstep(0.35, 0.55, energy);
   float gate = energyGate * climaxGate;
   if (gate < 0.001) return vec3(0.0);
 

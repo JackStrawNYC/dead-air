@@ -1,10 +1,12 @@
 /**
- * LighterWave — Sea of lighters swaying during slow songs.
- * 30-40 tiny flame SVGs arranged along bottom third. Each lighter has a small
- * rectangle body + teardrop flame. Flames sway gently with sine waves
- * (different phase per lighter). Only appears during QUIET passages
- * (energy < 0.12) — this is for the ballads. Flame brightness flickers.
- * Warm yellow/orange colors. Always ready but only visible when quiet.
+ * LighterWave — Crowd lighters during ballads.
+ * 30-50 small flame shapes (teardrop path + inner glow) scattered across
+ * bottom 40% of screen. Each flame flickers independently (sine-based
+ * brightness). Gentle horizontal sway simulating hand movement. Warm
+ * yellow/orange with white-hot tips. INVERSELY gated on energy — MORE
+ * visible during quiet passages (rms < 0.15), fading out during loud parts.
+ * Creates "sea of lighters" effect for Morning Dew quiet section, Row Jimmy.
+ * Layer 1, low energy, 10-25% base opacity.
  */
 
 import React from "react";
@@ -12,55 +14,57 @@ import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
 import { useShowContext } from "../data/ShowContext";
 import { seeded } from "../utils/seededRandom";
-import { useAudioSnapshot } from "./parametric/audio-helpers";
-import { useTempoFactor } from "../data/TempoContext";
 
-interface LighterData {
-  /** x position as fraction of width */
+interface FlameData {
+  /** X position as fraction of width */
   x: number;
-  /** y position as fraction of height (bottom third: 0.67-0.95) */
+  /** Y position as fraction of height (within bottom 40%) */
   y: number;
-  /** Sway frequency */
-  swayFreq: number;
-  /** Sway phase offset */
-  swayPhase: number;
-  /** Sway amplitude in degrees */
-  swayAmp: number;
+  /** Base size scale (0.6-1.4) */
+  scale: number;
   /** Flicker frequency */
   flickerFreq: number;
   /** Flicker phase offset */
   flickerPhase: number;
-  /** Base flame height multiplier */
-  flameScale: number;
-  /** Hue: warm yellow-orange range (30-55) */
+  /** Sway frequency (hand movement) */
+  swayFreq: number;
+  /** Sway amplitude (px) */
+  swayAmp: number;
+  /** Sway phase */
+  swayPhase: number;
+  /** Hue: 30-55 (yellow to orange) */
   hue: number;
-  /** Lighter body color darkness */
-  bodyDarkness: number;
-  /** Size multiplier (depth variation) */
-  sizeMult: number;
+  /** Base brightness (0.5-1.0) */
+  brightness: number;
+  /** Vertical bob frequency (gentle arm movement) */
+  bobFreq: number;
+  /** Vertical bob amplitude (px) */
+  bobAmp: number;
+  /** Bob phase */
+  bobPhase: number;
 }
 
-const NUM_LIGHTERS = 35;
+const NUM_FLAMES = 40;
+const STAGGER_START = 90; // 3 seconds fade in
 
-function generateLighters(seed: number): LighterData[] {
+function generateFlames(seed: number): FlameData[] {
   const rng = seeded(seed);
-  return Array.from({ length: NUM_LIGHTERS }, () => ({
-    x: 0.02 + rng() * 0.96,
-    y: 0.67 + rng() * 0.28,
-    swayFreq: 0.015 + rng() * 0.03,
-    swayPhase: rng() * Math.PI * 2,
-    swayAmp: 5 + rng() * 12,
-    flickerFreq: 0.08 + rng() * 0.15,
+  return Array.from({ length: NUM_FLAMES }, () => ({
+    x: 0.03 + rng() * 0.94,
+    y: 0.60 + rng() * 0.38, // bottom 40% (0.60 to 0.98)
+    scale: 0.6 + rng() * 0.8,
+    flickerFreq: 0.06 + rng() * 0.18,
     flickerPhase: rng() * Math.PI * 2,
-    flameScale: 0.7 + rng() * 0.6,
+    swayFreq: 0.008 + rng() * 0.02,
+    swayAmp: 3 + rng() * 10,
+    swayPhase: rng() * Math.PI * 2,
     hue: 30 + rng() * 25,
-    bodyDarkness: 0.15 + rng() * 0.25,
-    sizeMult: 1.2 + rng() * 0.8,
+    brightness: 0.5 + rng() * 0.5,
+    bobFreq: 0.01 + rng() * 0.015,
+    bobAmp: 2 + rng() * 6,
+    bobPhase: rng() * Math.PI * 2,
   }));
 }
-
-// Stagger timing: 300 frames (10s) to build atmosphere
-const STAGGER_START = 300;
 
 interface Props {
   frames: EnhancedFrameData[];
@@ -70,122 +74,115 @@ export const LighterWave: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
   const ctx = useShowContext();
-  const snap = useAudioSnapshot(frames);
-  const tempoFactor = useTempoFactor();
 
-  const lighters = React.useMemo(() => generateLighters(ctx?.showSeed ?? 19770508), [ctx?.showSeed]);
+  const idx = Math.min(Math.max(0, frame), frames.length - 1);
 
-  // Quiet detection: use slowEnergy for smoother quiet-detection
-  const quietness = interpolate(snap.slowEnergy, [0.04, 0.12], [1, 0], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
+  // Rolling energy over +/-75 frames
+  let eSum = 0;
+  let eCount = 0;
+  for (let i = Math.max(0, idx - 75); i <= Math.min(frames.length - 1, idx + 75); i++) {
+    eSum += frames[i].rms;
+    eCount++;
+  }
+  const energy = eCount > 0 ? eSum / eCount : 0;
+
+  const flames = React.useMemo(() => generateFlames(ctx?.showSeed ?? 19770508), [ctx?.showSeed]);
 
   // Master fade in
-  const masterFade = interpolate(frame, [STAGGER_START, STAGGER_START + 120], [0, 1], {
+  const masterFade = interpolate(frame, [STAGGER_START, STAGGER_START + 90], [0, 1], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
     easing: Easing.out(Easing.cubic),
   });
 
-  const masterOpacity = quietness * masterFade * 0.85;
+  // INVERSE energy gating: MORE visible when quiet, LESS when loud
+  // Full opacity below rms 0.08, fading to zero above rms 0.20
+  const energyGate = interpolate(energy, [0.08, 0.20], [1, 0], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+  });
+
+  // Base opacity 10-25% (higher when quieter)
+  const baseOpacity = interpolate(energy, [0.0, 0.15], [0.25, 0.10], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+  });
+
+  const masterOpacity = baseOpacity * masterFade * energyGate;
 
   if (masterOpacity < 0.01) return null;
 
+  // How many flames visible (more during quiet passages)
+  const visibleCount = Math.round(
+    interpolate(energy, [0.0, 0.15], [NUM_FLAMES, 25], {
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+    }),
+  );
+
   return (
     <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden" }}>
-      <svg width={width} height={height} style={{ opacity: masterOpacity }}>
-        <defs>
-          {lighters.map((_, i) => (
-            <radialGradient key={`fg-${i}`} id={`flame-glow-${i}`} cx="50%" cy="60%" r="50%">
-              <stop offset="0%" stopColor={`hsla(${lighters[i].hue}, 100%, 90%, 0.9)`} />
-              <stop offset="50%" stopColor={`hsla(${lighters[i].hue}, 100%, 65%, 0.6)`} />
-              <stop offset="100%" stopColor={`hsla(${lighters[i].hue + 10}, 100%, 45%, 0)`} />
-            </radialGradient>
-          ))}
-        </defs>
-        {lighters.map((lighter, i) => {
-          // Stagger each lighter's entrance
-          const lighterFade = interpolate(
-            frame,
-            [STAGGER_START + i * 6, STAGGER_START + i * 6 + 90],
-            [0, 1],
-            { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: Easing.out(Easing.cubic) },
-          );
-          if (lighterFade < 0.01) return null;
+      <svg
+        width={width}
+        height={height}
+        style={{ opacity: masterOpacity, mixBlendMode: "screen" }}
+      >
+        {flames.slice(0, visibleCount).map((flame, i) => {
+          // Flicker: sine-based brightness variation
+          const flicker =
+            0.5 +
+            Math.sin(frame * flame.flickerFreq + flame.flickerPhase) * 0.3 +
+            Math.sin(frame * flame.flickerFreq * 2.3 + flame.flickerPhase * 1.7) * 0.15 +
+            Math.sin(frame * flame.flickerFreq * 0.4 + flame.flickerPhase * 0.5) * 0.05;
 
-          const px = lighter.x * width;
-          const py = lighter.y * height;
-          const size = lighter.sizeMult;
+          // Horizontal sway (simulating hand movement)
+          const swayX =
+            Math.sin(frame * flame.swayFreq + flame.swayPhase) * flame.swayAmp;
 
-          // Sway angle — scaled by tempoFactor
-          const sway = Math.sin(frame * lighter.swayFreq * tempoFactor + lighter.swayPhase) * lighter.swayAmp;
+          // Vertical bob (arm movement)
+          const bobY =
+            Math.sin(frame * flame.bobFreq + flame.bobPhase) * flame.bobAmp;
 
-          // Flicker intensity — scaled by tempoFactor
-          const flicker = 0.5 + (Math.sin(frame * lighter.flickerFreq * tempoFactor + lighter.flickerPhase) * 0.3
-            + Math.sin(frame * lighter.flickerFreq * 2.3 * tempoFactor + lighter.flickerPhase * 1.7) * 0.2);
+          const px = flame.x * width + swayX;
+          const py = flame.y * height + bobY;
 
-          // Flame height varies with flicker
-          const flameH = 10 * lighter.flameScale * (0.8 + flicker * 0.4) * size;
-          const flameW = 5 * lighter.flameScale * size;
+          const alpha = flicker * flame.brightness;
+          if (alpha < 0.05) return null;
 
-          // Lighter body dimensions
-          const bodyW = 6 * size;
-          const bodyH = 16 * size;
+          const s = flame.scale * 8; // base flame size
 
-          const alpha = lighterFade * flicker;
-          const coreColor = `hsla(${lighter.hue}, 100%, 85%, ${alpha})`;
-          const midColor = `hsla(${lighter.hue + 5}, 100%, 65%, ${alpha * 0.8})`;
-          const outerColor = `hsla(${lighter.hue + 15}, 90%, 50%, ${alpha * 0.4})`;
+          // Flame colors — warm yellow/orange with white-hot tips
+          const tipColor = `hsla(50, 100%, 95%, ${alpha})`;
+          const bodyColor = `hsla(${flame.hue}, 100%, 65%, ${alpha * 0.8})`;
+          const outerGlow = `hsla(${flame.hue + 5}, 90%, 50%, ${alpha * 0.3})`;
 
           return (
-            <g
-              key={i}
-              transform={`translate(${px}, ${py}) rotate(${sway}, 0, ${bodyH / 2})`}
-              opacity={lighterFade}
-            >
-              {/* Lighter body */}
-              <rect
-                x={-bodyW / 2}
-                y={0}
-                width={bodyW}
-                height={bodyH}
-                rx={1.5}
-                fill={`rgba(${40 + lighter.bodyDarkness * 80}, ${35 + lighter.bodyDarkness * 60}, ${50 + lighter.bodyDarkness * 50}, 0.7)`}
-              />
-              {/* Lighter top nozzle */}
-              <rect
-                x={-bodyW * 0.3 / 2}
-                y={-2 * size}
-                width={bodyW * 0.3}
-                height={2 * size}
-                fill="rgba(100, 100, 110, 0.6)"
-              />
+            <g key={i} transform={`translate(${px}, ${py})`}>
               {/* Outer glow */}
               <ellipse
                 cx={0}
-                cy={-flameH * 0.5 - 2 * size}
-                rx={flameW * 2.5}
-                ry={flameH * 1.8}
-                fill={outerColor}
-                style={{ filter: `blur(${4 * size}px)` }}
+                cy={0}
+                rx={s * 2.5}
+                ry={s * 3}
+                fill={outerGlow}
+                style={{ filter: "blur(4px)" }}
               />
-              {/* Mid flame */}
-              <ellipse
-                cx={0}
-                cy={-flameH * 0.4 - 2 * size}
-                rx={flameW * 1.2}
-                ry={flameH * 1.1}
-                fill={midColor}
-                style={{ filter: `blur(${2 * size}px)` }}
+              {/* Flame body — teardrop path */}
+              <path
+                d={`M 0 ${-s * 2}
+                    C ${s * 0.8} ${-s * 0.8}, ${s * 0.6} ${s * 0.5}, 0 ${s * 0.8}
+                    C ${-s * 0.6} ${s * 0.5}, ${-s * 0.8} ${-s * 0.8}, 0 ${-s * 2}
+                    Z`}
+                fill={bodyColor}
               />
-              {/* Core flame (teardrop via ellipse) */}
-              <ellipse
-                cx={0}
-                cy={-flameH * 0.35 - 2 * size}
-                rx={flameW * 0.6}
-                ry={flameH * 0.8}
-                fill={coreColor}
+              {/* Inner bright core (white-hot tip) */}
+              <path
+                d={`M 0 ${-s * 1.2}
+                    C ${s * 0.3} ${-s * 0.3}, ${s * 0.2} ${s * 0.1}, 0 ${s * 0.3}
+                    C ${-s * 0.2} ${s * 0.1}, ${-s * 0.3} ${-s * 0.3}, 0 ${-s * 1.2}
+                    Z`}
+                fill={tipColor}
+                style={{ filter: "blur(0.5px)" }}
               />
             </g>
           );

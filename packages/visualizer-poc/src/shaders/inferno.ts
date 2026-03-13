@@ -152,12 +152,12 @@ void main() {
   // === FLAME COLORS from palette ===
   float hue1 = hsvToCosineHue(uPalettePrimary);
   vec3 flameColor = 0.5 + 0.5 * cos(6.28318 * vec3(hue1, hue1 + 0.33, hue1 + 0.67));
-  // Strong warm mix: fire must always read as fire, palette only tints
-  flameColor = mix(flameColor, vec3(1.0, 0.5, 0.1), 0.80);
+  // Warm bias: blend toward fire orange but let palette tint through
+  flameColor = mix(flameColor, vec3(1.0, 0.5, 0.1), 0.25);
 
   float hue2 = hsvToCosineHue(uPaletteSecondary);
   vec3 coreColor = 0.5 + 0.5 * cos(6.28318 * vec3(hue2, hue2 + 0.33, hue2 + 0.67));
-  coreColor = mix(coreColor, vec3(1.0, 0.95, 0.8), 0.70);
+  // No warm override — let secondary palette color (purple) show in hot cores
 
   // === GLOW ACCUMULATION RAYMARCHING (XT95 Flame technique) ===
   // Track how deep ray penetrates fire volume, accumulate glow
@@ -182,12 +182,12 @@ void main() {
       float proximity = 1.0 - smoothstep(0.0, 0.5, d);
       glow += proximity * 0.02;
 
-      // Color based on depth into flame: core=white, edge=orange
+      // Color based on depth into flame: core=secondary palette, edge=primary palette
       float depthInFlame = max(0.0, -d);
-      float coreStrength = smoothstep(0.0, 0.3, depthInFlame) * energy;
+      float coreStrength = smoothstep(0.0, 0.25, depthInFlame);
       float depthT = t / MAX_DIST;
       vec3 localColor = mix(flameColor, coreColor, coreStrength);
-      localColor = mix(localColor, flameColor * 0.6, depthT);
+      localColor = mix(localColor, flameColor * 0.7, depthT * 0.6);
       accColor += localColor * proximity * 0.02;
     }
   }
@@ -197,8 +197,8 @@ void main() {
   float emission = pow(clamp(glow * 2.0, 0.0, 1.0), glowPower);
   vec3 col = accColor * emission * 3.5;
 
-  // Add core white-hot bloom from emission
-  col += coreColor * pow(emission, 2.0) * 0.4;
+  // Add core bloom from emission — secondary palette color in hottest areas
+  col += coreColor * pow(emission, 1.5) * 0.8;
 
   // === BEAT PULSE: tempo-locked flame intensity ===
   float bp = beatPulse(uMusicalTime);
@@ -288,11 +288,10 @@ void main() {
   col = mix(vec3(onsetLuma), col, 1.0 + onsetPulse * 1.0);
   col *= 1.0 + onsetPulse * 0.12;
 
-  // ONSET CHROMATIC ABERRATION
+  // ONSET CHROMATIC ABERRATION (directional fringing)
   if (uOnsetSnap > 0.4) {
     float caAmt = (uOnsetSnap - 0.4) * 0.22;
-    col.r *= 1.0 + caAmt;
-    col.b *= 1.0 - caAmt * 0.5;
+    col = applyCA(col, vUv, caAmt);
   }
 
   // Lifted blacks (build-phase-aware: near true black during build for anticipation)

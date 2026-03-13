@@ -269,12 +269,10 @@ void main() {
   vec3 col = mix(vec3(lumAcc), accColor, boostedSat);
   col *= 1.15 + climaxBoost * 0.20;
 
-  // === CHROMATIC ABERRATION from highs ===
+  // === CHROMATIC ABERRATION from highs (directional fringing) ===
   float caAmount = highs * 0.015 + uOnsetSnap * 0.059;
   if (caAmount > 0.001) {
-    vec2 caOffset = p * caAmount;
-    col.r += col.r * caOffset.x * 0.3;
-    col.b -= col.b * caOffset.x * 0.3;
+    col = applyCA(col, vUv, caAmount);
   }
 
   // === QUIET PASSAGE PARTICLES ===
@@ -351,11 +349,10 @@ void main() {
   col = mix(vec3(onsetLuma), col, 1.0 + onsetPulse * 1.0);
   col *= 1.0 + onsetPulse * 0.12;
 
-  // ONSET CHROMATIC ABERRATION
+  // ONSET CHROMATIC ABERRATION (directional fringing)
   if (uOnsetSnap > 0.4) {
     float caAmt = (uOnsetSnap - 0.4) * 0.15;
-    col.r *= 1.0 + caAmt;
-    col.b *= 1.0 - caAmt * 0.5;
+    col = applyCA(col, vUv, caAmt);
   }
 
   // Lifted blacks (build-phase-aware: near true black during build for anticipation)

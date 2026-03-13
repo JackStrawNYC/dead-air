@@ -123,7 +123,6 @@ vec3 cinematicGrade(vec3 col, float energy) {
   float luma = dot(col, vec3(0.2126, 0.7152, 0.0722));
   float contrast = mix(0.95, 1.06, energy);
   col = mix(vec3(luma), col, contrast);
-  col = max(col, vec3(0.08, 0.065, 0.10));
   return col;
 }
 
@@ -250,6 +249,11 @@ void main() {
   // Use world position as UV proxy for grain
   vec2 grainUv = vWorldPos.xy * 10.0;
   rgb += filmGrain(grainUv, grainTime) * grainIntensity;
+
+  // Lifted blacks (build-phase-aware: near true black during build for anticipation)
+  float isBuild = step(0.5, uClimaxPhase) * step(uClimaxPhase, 1.5);
+  float liftMult = mix(1.0, 0.15, isBuild * uClimaxIntensity);
+  rgb = max(rgb, vec3(0.06, 0.05, 0.08) * liftMult);
 
   gl_FragColor = vec4(rgb, 1.0);
 }

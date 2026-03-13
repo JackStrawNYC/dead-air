@@ -153,11 +153,8 @@ void main() {
     vec3 coolShift = vec3(0.88, 0.95, 1.1);
     beamCol *= mix(coolShift, warmShift, energy);
 
-    // Simple chromatic offset on composite
-    vec2 caOffset = normalize(p + vec2(0.001)) * caStrength;
-    float caShift = dot(caOffset, vec2(1.0, 0.5)) * 0.5;
-    beamCol.r *= 1.0 + caShift;
-    beamCol.b *= 1.0 - caShift;
+    // Directional chromatic aberration on beam color
+    beamCol = applyCA(beamCol, vUv, caStrength);
 
     col += beamCol * beamVal * 0.85;
   }

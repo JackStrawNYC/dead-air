@@ -158,8 +158,8 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
   const rotationSchedule = useMemo(() => {
     if (!props.activeOverlays || !analysis) return null;
     const sects = getSections(analysis);
-    return buildRotationSchedule(props.activeOverlays, sects, props.song.trackId, showSeed, analysis?.frames, isDrumsSpace, props.energyHints, props.show?.era);
-  }, [props.activeOverlays, analysis, props.song.trackId, showSeed, isDrumsSpace, props.energyHints, props.show?.era]);
+    return buildRotationSchedule(props.activeOverlays, sects, props.song.trackId, showSeed, analysis?.frames, isDrumsSpace, props.energyHints, props.show?.era, props.song.defaultMode);
+  }, [props.activeOverlays, analysis, props.song.trackId, showSeed, isDrumsSpace, props.energyHints, props.show?.era, props.song.defaultMode]);
 
   const opacityMapBase = rotationSchedule
     ? getOverlayOpacities(frame, rotationSchedule, analysis?.frames, energyCalibration)

@@ -212,15 +212,16 @@ void main() {
   color = mix(vec3(onsetLuma), color, 1.0 + onsetPulse * 1.0);
   color *= 1.0 + onsetPulse * 0.12;
 
-  // ONSET CHROMATIC ABERRATION
+  // ONSET CHROMATIC ABERRATION (directional fringing)
   if (uOnsetSnap > 0.4) {
     float caAmt = (uOnsetSnap - 0.4) * 0.15;
-    color.r *= 1.0 + caAmt;
-    color.b *= 1.0 - caAmt * 0.5;
+    color = applyCA(color, vUv, caAmt);
   }
 
-  // Lifted blacks
-  color = max(color, vec3(0.06, 0.05, 0.08));
+  // Lifted blacks (build-phase-aware: near true black during build for anticipation)
+  float isBuild = step(0.5, uClimaxPhase) * step(uClimaxPhase, 1.5);
+  float liftMult = mix(1.0, 0.15, isBuild * uClimaxIntensity);
+  color = max(color, vec3(0.06, 0.05, 0.08) * liftMult);
 
   gl_FragColor = vec4(color, 1.0);
 }

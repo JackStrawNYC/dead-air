@@ -28,8 +28,8 @@ describe("overlay-registry integrity", () => {
     expect(unique.size).toBe(names.length);
   });
 
-  it("has exactly 32 entries (30 keepers + 2 always-active)", () => {
-    expect(OVERLAY_REGISTRY.length).toBe(32);
+  it("has exactly 40 entries (38 keepers + 2 always-active)", () => {
+    expect(OVERLAY_REGISTRY.length).toBe(40);
   });
 
   it("all entries have required fields", () => {

@@ -226,11 +226,10 @@ void main() {
   col = mix(vec3(onsetLuma), col, 1.0 + onsetPulse * 1.0);
   col *= 1.0 + onsetPulse * 0.12;
 
-  // ONSET CHROMATIC ABERRATION
+  // ONSET CHROMATIC ABERRATION (directional fringing)
   if (uOnsetSnap > 0.4) {
     float caAmt = (uOnsetSnap - 0.4) * 0.15;
-    col.r *= 1.0 + caAmt;
-    col.b *= 1.0 - caAmt * 0.5;
+    col = applyCA(col, vUv, caAmt);
   }
 
   // Lifted blacks (build-phase-aware: near true black during build for anticipation)
