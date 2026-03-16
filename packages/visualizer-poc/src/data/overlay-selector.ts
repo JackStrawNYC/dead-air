@@ -17,6 +17,7 @@ import type {
   OverlayOverrides,
 } from "./types";
 import { SELECTABLE_REGISTRY, ALWAYS_ACTIVE } from "./overlay-registry";
+import type { SongIdentity } from "./song-identities";
 
 // ─── Per-layer selection targets (sparse — let each visual moment breathe) ───
 const LAYER_TARGETS: Record<number, { min: number; max: number }> = {
@@ -239,6 +240,7 @@ function scoreOverlay(
   profile: SongProfile,
   history: OverlayHistory,
   rng: () => number,
+  songIdentity?: SongIdentity,
 ): number {
   if (entry.alwaysActive) return 1; // Always selected
 
@@ -282,6 +284,16 @@ function scoreOverlay(
     }
   }
 
+  // Song identity overlay boost/suppress
+  if (songIdentity) {
+    if (songIdentity.overlayBoost?.includes(entry.name)) {
+      score += 0.25;
+    }
+    if (songIdentity.overlaySuppress?.includes(entry.name)) {
+      score -= 0.35;
+    }
+  }
+
   // Deterministic jitter (0-0.08)
   score += rng() * 0.08;
 
@@ -308,6 +320,7 @@ export function selectOverlays(
   history: OverlayHistory | Set<string>,
   overrides?: OverlayOverrides,
   showSeed?: number,
+  songIdentity?: SongIdentity,
 ): SelectionResult {
   // Backwards compat: wrap bare Set in a single-song history
   const resolvedHistory: OverlayHistory = history instanceof Set
@@ -319,7 +332,7 @@ export function selectOverlays(
   // Score all overlays
   const scored: ScoredOverlay[] = SELECTABLE_REGISTRY.map((entry) => ({
     entry,
-    score: scoreOverlay(entry, profile, resolvedHistory, rng),
+    score: scoreOverlay(entry, profile, resolvedHistory, rng, songIdentity),
   }));
 
   // Group by layer

@@ -28,6 +28,10 @@ import { computeAudioSnapshot } from "../utils/audio-reactive";
 import { seededLCG as seededRandom } from "../utils/seededRandom";
 import { hashString } from "../utils/hash";
 import { getEraPreset } from "./era-presets";
+import type { SongIdentity } from "./song-identities";
+import type { ShowArcModifiers } from "./show-arc";
+import type { DrumsSpaceSubPhase } from "../utils/drums-space-phase";
+import { DRUMS_SPACE_TREATMENTS } from "../utils/drums-space-phase";
 
 // Eased crossfade function: replaces linear smoothstep with Remotion's
 // Easing.inOut(Easing.ease) for more organic overlay transitions.
@@ -322,6 +326,9 @@ export function buildRotationSchedule(
   energyHints?: Record<string, OverlayPhaseHint>,
   era?: string,
   mode?: string,
+  songIdentity?: SongIdentity,
+  showArcModifiers?: ShowArcModifiers,
+  drumsSpacePhase?: DrumsSpaceSubPhase,
 ): RotationSchedule {
   const trackHash = hashString(trackId) + (showSeed ?? 0);
 
@@ -420,14 +427,27 @@ export function buildRotationSchedule(
       }
     }
 
+    // Song identity overlay density multiplier
+    if (songIdentity?.overlayDensity) {
+      targetCount = Math.round(targetCount * songIdentity.overlayDensity);
+    }
+
+    // Show arc density multiplier
+    if (showArcModifiers?.densityMult) {
+      targetCount = Math.round(targetCount * showArcModifiers.densityMult);
+    }
+
     // Pre-peak dropout: strip to complete void before the climax
     if (window.isDropout) {
       targetCount = Math.min(targetCount, DROPOUT_MAX_OVERLAYS);
     }
 
-    // Drums/Space: cap overlay count — the shader + 1 sacred overlay is enough
+    // Drums/Space: use per-phase overlay cap from treatment constants
     if (isDrumsSpace) {
-      targetCount = Math.min(targetCount, 1);
+      const dsMaxOverlays = drumsSpacePhase
+        ? DRUMS_SPACE_TREATMENTS[drumsSpacePhase]?.maxOverlays ?? 1
+        : 1;
+      targetCount = Math.min(targetCount, dsMaxOverlays);
     }
 
     // Cap at pool size
@@ -515,6 +535,36 @@ export function buildRotationSchedule(
 
       // Scene-specific overlay bias: boost overlays that pair well with the shader
       score += SCENE_OVERLAY_BIAS[mode ?? ""]?.[entry.name] ?? 0;
+
+      // Song identity overlay boost/suppress
+      if (songIdentity) {
+        if (songIdentity.overlayBoost?.includes(entry.name)) {
+          score += 0.30;
+        }
+        if (songIdentity.overlaySuppress?.includes(entry.name)) {
+          score -= 0.40;
+        }
+        // Mood keyword tag bonuses
+        if (songIdentity.moodKeywords && entry.tags) {
+          for (const tag of entry.tags) {
+            if (songIdentity.moodKeywords.includes(tag)) {
+              score += 0.15;
+            }
+          }
+        }
+      }
+
+      // Show arc overlay bias (per-category)
+      if (showArcModifiers?.overlayBias) {
+        const group = resolveTextureGroup(entry.category);
+        if (group) {
+          // Map texture groups to overlay categories for bias lookup
+          const categoryBias = showArcModifiers.overlayBias[entry.category];
+          if (categoryBias !== undefined) {
+            score += categoryBias;
+          }
+        }
+      }
 
       // Carryover vs repeat: if previous window was too short for the overlay
       // to register visually, encourage it to persist instead of penalizing

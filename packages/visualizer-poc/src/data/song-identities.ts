@@ -1,0 +1,423 @@
+/**
+ * Song Identity Data Layer — per-song visual personality definitions.
+ *
+ * Each entry defines a song's visual character: preferred shaders, color palette,
+ * overlay scoring modifiers, climax behavior, and segue styles. These feed into
+ * SceneRouter, overlay-rotation, EnergyEnvelope, and SegueCrossfade to make
+ * every song visually distinct.
+ *
+ * Covers 30 most-played Grateful Dead songs with curated visual identities.
+ */
+
+import type { VisualMode, ColorPalette, OverlayTag } from "./types";
+import type { DrumsSpaceSubPhase } from "../utils/drums-space-phase";
+
+// ─── Types ───
+
+export type TransitionStyle = "dissolve" | "morph" | "flash" | "void";
+
+export interface ClimaxBehavior {
+  /** Peak saturation offset (additive, default from climax-state) */
+  peakSaturation?: number;
+  /** Peak brightness offset (additive) */
+  peakBrightness?: number;
+  /** Whether to trigger a brief white flash at climax onset */
+  flash?: boolean;
+  /** Overlay density multiplier during climax */
+  climaxDensityMult?: number;
+}
+
+export interface SongIdentity {
+  /** Preferred shader modes — weighted 3x in selection pool */
+  preferredModes: VisualMode[];
+  /** Color palette override */
+  palette: ColorPalette;
+  /** Overlay names to boost in scoring (+0.30) */
+  overlayBoost?: string[];
+  /** Overlay names to suppress in scoring (-0.40) */
+  overlaySuppress?: string[];
+  /** Multiplier on overlay count (0.5 = sparse, 2.0 = dense) */
+  overlayDensity?: number;
+  /** Texture routing keyword bonuses (+0.15 per match) */
+  moodKeywords?: OverlayTag[];
+  /** Per-song climax behavior overrides */
+  climaxBehavior?: ClimaxBehavior;
+  /** Segue visual style entering this song */
+  transitionIn?: TransitionStyle;
+  /** Segue visual style leaving this song */
+  transitionOut?: TransitionStyle;
+  /** Drums/Space sub-phase shader overrides */
+  drumsSpaceShaders?: Partial<Record<DrumsSpaceSubPhase, VisualMode>>;
+  /** Additive hue shift for EnergyEnvelope (degrees) */
+  hueShift?: number;
+  /** Additive saturation offset for EnergyEnvelope */
+  saturationOffset?: number;
+}
+
+// ─── Song Identity Registry ───
+
+export const SONG_IDENTITIES: Record<string, SongIdentity> = {
+  // ══════════════════════════════════════════
+  // SET 1 STAPLES — warm, recognizable, grounded
+  // ══════════════════════════════════════════
+
+  "bertha": {
+    preferredModes: ["concert_lighting", "tie_dye", "liquid_light"],
+    palette: { primary: 15, secondary: 45, saturation: 0.95 }, // warm orange/gold
+    overlayBoost: ["Bertha", "BearParade", "BreathingStealie"],
+    moodKeywords: ["festival", "dead-culture"],
+    climaxBehavior: { peakSaturation: 0.55, flash: true },
+  },
+
+  "deal": {
+    preferredModes: ["concert_lighting", "inferno", "tie_dye"],
+    palette: { primary: 10, secondary: 40, saturation: 1.0 }, // hot red/orange
+    overlayBoost: ["ThirteenPointBolt", "ParticleExplosion"],
+    moodKeywords: ["intense", "festival"],
+    climaxBehavior: { peakBrightness: 0.25, flash: true },
+  },
+
+  "sugaree": {
+    preferredModes: ["liquid_light", "oil_projector", "vintage_film"],
+    palette: { primary: 30, secondary: 200, saturation: 0.85 }, // amber/sky blue
+    overlayBoost: ["JerryGuitar", "RoseOverlay", "SacredGeometry"],
+    overlaySuppress: ["LaserShow", "WallOfSound"],
+    moodKeywords: ["contemplative", "organic"],
+    overlayDensity: 0.7,
+    hueShift: 5,
+  },
+
+  "althea": {
+    preferredModes: ["liquid_light", "oil_projector", "aurora"],
+    palette: { primary: 180, secondary: 280, saturation: 0.9 }, // teal/purple
+    overlayBoost: ["SacredGeometry", "MandalaGenerator", "JerryGuitar"],
+    moodKeywords: ["contemplative", "psychedelic"],
+    overlayDensity: 0.8,
+  },
+
+  "friendofthedevil": {
+    preferredModes: ["vintage_film", "lo_fi_grain", "oil_projector"],
+    palette: { primary: 25, secondary: 160, saturation: 0.75 }, // warm gold/green
+    overlayBoost: ["VWBusParade", "Fireflies", "SkeletonBand"],
+    moodKeywords: ["organic", "retro"],
+    overlayDensity: 0.6,
+    saturationOffset: -0.05,
+  },
+
+  "ripple": {
+    preferredModes: ["aurora", "deep_ocean", "crystal_cavern"],
+    palette: { primary: 200, secondary: 270, saturation: 0.7, brightness: 0.95 }, // cool blue/lavender
+    overlayBoost: ["Fireflies", "RoseOverlay", "BoxOfRain"],
+    overlaySuppress: ["LaserShow", "ParticleExplosion", "WallOfSound"],
+    moodKeywords: ["contemplative", "organic"],
+    overlayDensity: 0.5,
+    hueShift: -8,
+    saturationOffset: -0.08,
+  },
+
+  "caseyjones": {
+    preferredModes: ["concert_lighting", "tie_dye", "inferno"],
+    palette: { primary: 5, secondary: 50, saturation: 1.0 }, // red/yellow
+    overlayBoost: ["VWBusParade", "BearParade", "ThirteenPointBolt"],
+    moodKeywords: ["festival", "intense"],
+    climaxBehavior: { flash: true, peakSaturation: 0.5 },
+  },
+
+  "unclejohnsband": {
+    preferredModes: ["liquid_light", "aurora", "oil_projector"],
+    palette: { primary: 40, secondary: 220, saturation: 0.85 }, // warm gold/blue
+    overlayBoost: ["SacredGeometry", "JerryGuitar", "BreathingStealie"],
+    moodKeywords: ["organic", "dead-culture"],
+    overlayDensity: 0.8,
+  },
+
+  "shakedownstreet": {
+    preferredModes: ["concert_lighting", "tie_dye", "inferno"],
+    palette: { primary: 290, secondary: 50, saturation: 1.0 }, // magenta/gold
+    overlayBoost: ["BearParade", "SkeletonBand", "LaserShow"],
+    moodKeywords: ["festival", "psychedelic"],
+    climaxBehavior: { peakSaturation: 0.5, climaxDensityMult: 1.8 },
+  },
+
+  // ══════════════════════════════════════════
+  // SET 2 EXPLORERS — cosmic, deep, transcendent
+  // ══════════════════════════════════════════
+
+  "darkstar": {
+    preferredModes: ["cosmic_voyage", "deep_ocean", "crystal_cavern"],
+    palette: { primary: 260, secondary: 180, saturation: 0.6, brightness: 0.85 }, // deep indigo/teal
+    overlayBoost: ["DarkStarPortal", "CosmicStarfield", "SacredGeometry"],
+    overlaySuppress: ["BearParade", "VWBusParade", "CrowdDance"],
+    moodKeywords: ["cosmic", "contemplative"],
+    overlayDensity: 0.4,
+    hueShift: -15,
+    saturationOffset: -0.1,
+    climaxBehavior: { peakBrightness: 0.3, peakSaturation: 0.6 },
+    transitionOut: "void",
+  },
+
+  "fireonthemountain": {
+    preferredModes: ["inferno", "liquid_light", "concert_lighting"],
+    palette: { primary: 10, secondary: 45, saturation: 1.0, brightness: 1.05 }, // deep red/fire
+    overlayBoost: ["EmberRise", "ThirteenPointBolt", "ParticleExplosion"],
+    moodKeywords: ["intense", "festival"],
+    climaxBehavior: { peakSaturation: 0.6, peakBrightness: 0.25, flash: true, climaxDensityMult: 1.6 },
+    transitionIn: "morph", // from Scarlet
+  },
+
+  "scarletbegonias": {
+    preferredModes: ["tie_dye", "liquid_light", "concert_lighting"],
+    palette: { primary: 0, secondary: 330, saturation: 1.0 }, // scarlet red/rose
+    overlayBoost: ["ChinaCatSunflower", "TieDyeWash", "BreathingStealie"],
+    moodKeywords: ["psychedelic", "festival"],
+    transitionOut: "morph", // into Fire
+    climaxBehavior: { peakSaturation: 0.5 },
+  },
+
+  "eyesoftheworld": {
+    preferredModes: ["aurora", "cosmic_voyage", "liquid_light"],
+    palette: { primary: 170, secondary: 50, saturation: 0.9 }, // aquamarine/gold
+    overlayBoost: ["CosmicStarfield", "SacredGeometry", "Fireflies"],
+    overlaySuppress: ["WallOfSound"],
+    moodKeywords: ["cosmic", "organic"],
+    overlayDensity: 0.7,
+    climaxBehavior: { peakBrightness: 0.2, peakSaturation: 0.45 },
+  },
+
+  "morningdew": {
+    preferredModes: ["stark_minimal", "crystal_cavern", "deep_ocean"],
+    palette: { primary: 210, secondary: 30, saturation: 0.7, brightness: 0.9 }, // dawn blue/amber
+    overlayBoost: ["RoseOverlay", "Fireflies", "SacredGeometry"],
+    overlaySuppress: ["BearParade", "VWBusParade", "LaserShow"],
+    moodKeywords: ["contemplative", "organic"],
+    overlayDensity: 0.5,
+    hueShift: -5,
+    climaxBehavior: { peakBrightness: 0.35, peakSaturation: 0.65, flash: true, climaxDensityMult: 0.5 },
+  },
+
+  "stellablue": {
+    preferredModes: ["deep_ocean", "cosmic_voyage", "aurora"],
+    palette: { primary: 220, secondary: 280, saturation: 0.65, brightness: 0.88 }, // deep blue/violet
+    overlayBoost: ["CosmicStarfield", "RoseOverlay", "Fireflies"],
+    overlaySuppress: ["LaserShow", "ParticleExplosion", "CrowdDance"],
+    moodKeywords: ["contemplative", "cosmic"],
+    overlayDensity: 0.4,
+    hueShift: -10,
+    saturationOffset: -0.1,
+  },
+
+  "notfadeaway": {
+    preferredModes: ["concert_lighting", "inferno", "tie_dye"],
+    palette: { primary: 20, secondary: 340, saturation: 1.0 }, // warm orange/magenta
+    overlayBoost: ["BearParade", "SkeletonBand", "WallOfSound"],
+    moodKeywords: ["festival", "intense"],
+    climaxBehavior: { peakSaturation: 0.55, flash: true },
+  },
+
+  "estimatedprophet": {
+    preferredModes: ["cosmic_voyage", "crystal_cavern", "inferno"],
+    palette: { primary: 270, secondary: 30, saturation: 0.95 }, // deep purple/gold
+    overlayBoost: ["DarkStarPortal", "SacredGeometry", "FractalZoom"],
+    moodKeywords: ["cosmic", "intense"],
+    climaxBehavior: { peakBrightness: 0.3, peakSaturation: 0.6, flash: true },
+    transitionOut: "flash",
+  },
+
+  "chinacatsunflower": {
+    preferredModes: ["tie_dye", "liquid_light", "oil_projector"],
+    palette: { primary: 50, secondary: 320, saturation: 1.0 }, // golden yellow/pink
+    overlayBoost: ["ChinaCatSunflower", "TieDyeWash", "BearParade"],
+    moodKeywords: ["psychedelic", "festival"],
+    transitionOut: "morph", // into Rider
+  },
+
+  "iknowyourider": {
+    preferredModes: ["concert_lighting", "tie_dye", "liquid_light"],
+    palette: { primary: 30, secondary: 350, saturation: 0.95 }, // amber/rose
+    overlayBoost: ["BreathingStealie", "SkeletonBand"],
+    moodKeywords: ["festival", "dead-culture"],
+    transitionIn: "morph", // from China Cat
+    climaxBehavior: { flash: true },
+  },
+
+  "truckin": {
+    preferredModes: ["concert_lighting", "vintage_film", "tie_dye"],
+    palette: { primary: 35, secondary: 200, saturation: 0.9 }, // golden/blue
+    overlayBoost: ["VWBusParade", "BearParade", "SkeletonBand"],
+    moodKeywords: ["festival", "retro"],
+  },
+
+  "sugarmagnolia": {
+    preferredModes: ["tie_dye", "concert_lighting", "liquid_light"],
+    palette: { primary: 340, secondary: 60, saturation: 1.0 }, // pink/golden
+    overlayBoost: ["SugarMagnolia", "ChinaCatSunflower", "BearParade"],
+    moodKeywords: ["festival", "organic"],
+    climaxBehavior: { peakSaturation: 0.5, flash: true },
+  },
+
+  "terrapinstation": {
+    preferredModes: ["cosmic_voyage", "crystal_cavern", "aurora"],
+    palette: { primary: 160, secondary: 280, saturation: 0.85 }, // sea green/purple
+    overlayBoost: ["MarchingTerrapins", "SacredGeometry", "CosmicStarfield"],
+    moodKeywords: ["cosmic", "organic"],
+    overlayDensity: 0.7,
+    climaxBehavior: { peakBrightness: 0.2, peakSaturation: 0.5 },
+  },
+
+  "playingintheband": {
+    preferredModes: ["liquid_light", "cosmic_voyage", "tie_dye"],
+    palette: { primary: 280, secondary: 60, saturation: 0.9 }, // purple/gold
+    overlayBoost: ["FractalZoom", "MandalaGenerator", "DarkStarPortal"],
+    moodKeywords: ["psychedelic", "cosmic"],
+    overlayDensity: 0.6,
+    climaxBehavior: { peakSaturation: 0.55 },
+    transitionOut: "morph",
+  },
+
+  "theotherone": {
+    preferredModes: ["inferno", "concert_lighting", "liquid_light"],
+    palette: { primary: 350, secondary: 20, saturation: 1.0, brightness: 1.05 }, // crimson/scarlet
+    overlayBoost: ["ParticleExplosion", "LightningBoltOverlay", "ThirteenPointBolt"],
+    moodKeywords: ["intense", "psychedelic"],
+    climaxBehavior: { peakSaturation: 0.6, peakBrightness: 0.25, flash: true },
+    transitionOut: "flash",
+  },
+
+  "wharfrat": {
+    preferredModes: ["stark_minimal", "deep_ocean", "vintage_film"],
+    palette: { primary: 210, secondary: 150, saturation: 0.6, brightness: 0.88 }, // steel blue/sage
+    overlayBoost: ["RoseOverlay", "Fireflies", "JerryGuitar"],
+    overlaySuppress: ["LaserShow", "ParticleExplosion", "CrowdDance"],
+    moodKeywords: ["contemplative", "organic"],
+    overlayDensity: 0.4,
+    hueShift: -5,
+    saturationOffset: -0.08,
+    transitionIn: "void", // from The Other One
+    climaxBehavior: { peakBrightness: 0.3, peakSaturation: 0.5 },
+  },
+
+  "birdsong": {
+    preferredModes: ["aurora", "cosmic_voyage", "crystal_cavern"],
+    palette: { primary: 170, secondary: 60, saturation: 0.8 }, // teal/golden
+    overlayBoost: ["Fireflies", "CosmicStarfield", "SacredGeometry"],
+    overlaySuppress: ["WallOfSound"],
+    moodKeywords: ["organic", "cosmic"],
+    overlayDensity: 0.6,
+    climaxBehavior: { peakBrightness: 0.25, peakSaturation: 0.5 },
+  },
+
+  "helpontheway": {
+    preferredModes: ["crystal_cavern", "cosmic_voyage", "liquid_light"],
+    palette: { primary: 240, secondary: 30, saturation: 0.9 }, // royal blue/gold
+    overlayBoost: ["SacredGeometry", "FractalZoom"],
+    moodKeywords: ["cosmic", "intense"],
+    transitionOut: "morph", // into Slipknot
+  },
+
+  "slipknot": {
+    preferredModes: ["inferno", "liquid_light", "concert_lighting"],
+    palette: { primary: 10, secondary: 270, saturation: 1.0 }, // fire/purple
+    overlayBoost: ["FractalZoom", "MandalaGenerator", "ParticleExplosion"],
+    moodKeywords: ["intense", "psychedelic"],
+    transitionIn: "morph", // from Help on the Way
+    transitionOut: "morph", // into Franklin's Tower
+    climaxBehavior: { peakSaturation: 0.6, flash: true },
+  },
+
+  "franklinstower": {
+    preferredModes: ["concert_lighting", "tie_dye", "liquid_light"],
+    palette: { primary: 45, secondary: 320, saturation: 0.95 }, // gold/magenta
+    overlayBoost: ["BearParade", "BreathingStealie", "SkeletonBand"],
+    moodKeywords: ["festival", "dead-culture"],
+    transitionIn: "morph", // from Slipknot
+    climaxBehavior: { flash: true, peakSaturation: 0.5 },
+  },
+
+  "ststephen": {
+    preferredModes: ["concert_lighting", "inferno", "liquid_light"],
+    palette: { primary: 300, secondary: 45, saturation: 0.95 }, // magenta/gold
+    overlayBoost: ["SkeletonBand", "ThirteenPointBolt", "SacredGeometry"],
+    moodKeywords: ["intense", "dead-culture"],
+    climaxBehavior: { peakSaturation: 0.55, flash: true },
+    transitionOut: "flash",
+  },
+};
+
+// ─── Title Normalization ───
+
+/** Strip non-alphanumeric, lowercase — matches media-resolver.ts pattern */
+function normalizeTitle(title: string): string {
+  return title.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+/** Extended title aliases for song lookup (normalized form → registry key) */
+const SONG_ALIASES: Record<string, string> = {
+  // Common abbreviations and alternate names
+  "nfa": "notfadeaway",
+  "fotm": "fireonthemountain",
+  "eotw": "eyesoftheworld",
+  "pitb": "playingintheband",
+  "ujb": "unclejohnsband",
+  "chinacatsunfloweriknowourider": "chinacatsunflower",
+  "chinacat": "chinacatsunflower",
+  "chinacat sunflower": "chinacatsunflower",
+  "rider": "iknowyourider",
+  "iknowurider": "iknowyourider",
+  "scarlet": "scarletbegonias",
+  "fire": "fireonthemountain",
+  "fireinthemountain": "fireonthemountain",
+  "estimated": "estimatedprophet",
+  "terrapin": "terrapinstation",
+  "terrapinstationmedley": "terrapinstation",
+  "playing": "playingintheband",
+  "playinintheband": "playingintheband",
+  "theother one": "theotherone",
+  "otherone": "theotherone",
+  "wharf": "wharfrat",
+  "stella": "stellablue",
+  "bird": "birdsong",
+  "birdsong": "birdsong",
+  "birdssong": "birdsong",
+  "sugar": "sugarmagnolia",
+  "sugarmagnoliesunshine": "sugarmagnolia",
+  "magnolia": "sugarmagnolia",
+  "trucking": "truckin",
+  "fotd": "friendofthedevil",
+  "devil": "friendofthedevil",
+  "dew": "morningdew",
+  "helpslipfranklin": "helpontheway",
+  "helpslipfrank": "helpontheway",
+  "helpontheway": "helpontheway",
+  "slipknot!": "slipknot",
+  "franklins": "franklinstower",
+  "ststephen": "ststephen",
+  "saintstephen": "ststephen",
+  "shakedown": "shakedownstreet",
+  "casey": "caseyjones",
+  "darkstar": "darkstar",
+  "dark star": "darkstar",
+};
+
+// ─── Lookup ───
+
+/**
+ * Look up a song's visual identity by title.
+ * Handles normalization and aliases for flexible matching.
+ * Returns undefined for songs without curated identities (fallback to defaults).
+ */
+export function lookupSongIdentity(title: string): SongIdentity | undefined {
+  const normalized = normalizeTitle(title);
+
+  // Direct match
+  if (SONG_IDENTITIES[normalized]) {
+    return SONG_IDENTITIES[normalized];
+  }
+
+  // Alias match
+  const aliased = SONG_ALIASES[normalized];
+  if (aliased && SONG_IDENTITIES[aliased]) {
+    return SONG_IDENTITIES[aliased];
+  }
+
+  return undefined;
+}

@@ -238,11 +238,13 @@ interface Props {
   coherence?: number;
   /** Whether band is in "locked in" state */
   isLocked?: boolean;
+  /** When true, shaders snap to musical time instead of organic drift */
+  snapToMusicalTime?: boolean;
 }
 
 const DEFAULT_PALETTE: ColorPalette = { primary: 210, secondary: 270 };
 
-export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, sections, palette, tempo, jamDensity, coherence: coherenceProp, isLocked: isLockedProp }) => {
+export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, sections, palette, tempo, jamDensity, coherence: coherenceProp, isLocked: isLockedProp, snapToMusicalTime: snapToMusicalTimeProp }) => {
   const frameIdx = useCurrentFrame();
   const { fps, width, height } = useVideoConfig();
 
@@ -364,7 +366,9 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
     jamDensity: jamDensity ?? 0.5,
     coherence: coherenceProp ?? 0,
     isLocked: isLockedProp ?? false,
-    dynamicTime: dynamicTimeLookup[idx] ?? (idx / fps),
+    dynamicTime: snapToMusicalTimeProp
+      ? computeMusicalTimeUtil(beatArray, idx, fps, tempo ?? 120) / (tempo ?? 120) * 60
+      : (dynamicTimeLookup[idx] ?? (idx / fps)),
   };
 
   return (

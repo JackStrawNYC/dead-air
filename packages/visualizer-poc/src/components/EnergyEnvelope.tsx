@@ -18,6 +18,8 @@ import { detectTexture, type ClimaxModulation } from "../utils/climax-state";
 import { getSetTheme } from "../utils/set-theme";
 import { useShowContext } from "../data/ShowContext";
 import { getEraPreset } from "../data/era-presets";
+import type { SongIdentity } from "../data/song-identities";
+import type { ShowArcModifiers } from "../data/show-arc";
 
 interface Props {
   /** Pre-computed audio snapshot from SongVisualizer (shared, not recomputed) */
@@ -36,6 +38,12 @@ interface Props {
   drumsSpacePhase?: string;
   /** Show narrative phase for show-level arc modulation */
   showPhase?: string;
+  /** Per-song visual identity for hue/saturation modifiers */
+  songIdentity?: SongIdentity;
+  /** Show arc modifiers for phase-level color modulation */
+  showArcModifiers?: ShowArcModifiers;
+  /** IT response luminance lift (additive brightness) */
+  itLuminanceLift?: number;
 }
 
 // Per-era bloom color — matches era grade for visual cohesion
@@ -48,7 +56,7 @@ const ERA_BLOOM: Record<string, string> = {
 };
 const DEFAULT_BLOOM = ERA_BLOOM.classic;
 
-export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod, jamColorTemp, calibration, counterpointSatMult = 1, setNumber, drumsSpacePhase, showPhase }) => {
+export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod, jamColorTemp, calibration, counterpointSatMult = 1, setNumber, drumsSpacePhase, showPhase, songIdentity, showArcModifiers, itLuminanceLift }) => {
   const energy = snapshot.energy;
   const setTheme = getSetTheme(setNumber ?? 1);
   const low = calibration?.quietThreshold;
@@ -122,16 +130,30 @@ export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod,
     showSatOffset = -0.05;    // bittersweet ending
   }
 
-  // Apply phase offsets
-  const finalSaturation = Math.min(1.40, Math.max(0.5, saturation + dsSatOffset + showSatOffset));
-  const finalBrightness = Math.min(brightCap, Math.max(0.55, brightness + dsBrightOffset + showBrightOffset));
+  // Song identity modifiers
+  const siSatOffset = songIdentity?.saturationOffset ?? 0;
+  const siHueShift = songIdentity?.hueShift ?? 0;
+  const siPaletteSat = songIdentity?.palette?.saturation != null ? (songIdentity.palette.saturation - 1) * 0.2 : 0;
+  const siPaletteBright = songIdentity?.palette?.brightness != null ? (songIdentity.palette.brightness - 1) * 0.2 : 0;
+
+  // Show arc modifiers
+  const arcSatOffset = showArcModifiers?.saturationOffset ?? 0;
+  const arcBrightOffset = showArcModifiers?.brightnessOffset ?? 0;
+  const arcHueShift = showArcModifiers?.hueShift ?? 0;
+
+  // IT luminance lift
+  const itBrightLift = itLuminanceLift ?? 0;
+
+  // Apply phase offsets + song identity + show arc + IT
+  const finalSaturation = Math.min(1.40, Math.max(0.5, saturation + dsSatOffset + showSatOffset + siSatOffset + siPaletteSat + arcSatOffset));
+  const finalBrightness = Math.min(brightCap, Math.max(0.55, brightness + dsBrightOffset + showBrightOffset + siPaletteBright + arcBrightOffset + itBrightLift));
   const finalContrast = Math.min(1.20, Math.max(0.90, contrast + dsContrastOffset));
 
   // Jam color temperature: warm shifts yellow, cool shifts blue (max ±12deg)
   // Only applied during long jams. EraGrade + SongPalette handle base color character.
   const jamHueShift = jamColorTemp != null ? jamColorTemp * 35 : 0; // ±28 degrees max
   // Set-level warmth shift: Set 1 warm (+5deg), Set 2 cool (-8deg), Encore neutral (0)
-  const totalHueShift = jamHueShift + setTheme.warmthShift + eraColorTempShift + dsHueOffset;
+  const totalHueShift = jamHueShift + setTheme.warmthShift + eraColorTempShift + dsHueOffset + siHueShift + arcHueShift;
   const filterStr = totalHueShift !== 0
     ? `saturate(${finalSaturation.toFixed(3)}) brightness(${finalBrightness.toFixed(3)}) contrast(${finalContrast.toFixed(3)}) hue-rotate(${totalHueShift.toFixed(1)}deg)`
     : `saturate(${finalSaturation.toFixed(3)}) brightness(${finalBrightness.toFixed(3)}) contrast(${finalContrast.toFixed(3)})`;

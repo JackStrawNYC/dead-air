@@ -17,6 +17,7 @@ import type {
 } from "../data/types";
 import { seededLCG as seededRandom } from "../utils/seededRandom";
 import { findCurrentSection } from "../utils/section-lookup";
+import type { SongIdentity } from "../data/song-identities";
 
 const CROSSFADE_FRAMES = 30; // 1 second at 30fps — dramatic flash→blackout→eruption
 const BEAT_CROSSFADE_FRAMES = 30; // 1 second when beat-synced (15 before + 15 after)
@@ -98,6 +99,8 @@ interface Props {
   usedShaderModes?: Map<VisualMode, number>;
   /** Drums/Space sub-phase override for forced shader selection */
   drumsSpacePhase?: string;
+  /** Per-song visual identity for preferred modes and D/S shader overrides */
+  songIdentity?: SongIdentity;
 }
 
 /** Determine the visual mode for a given section index.
@@ -114,6 +117,7 @@ function getModeForSection(
   era?: string,
   coherenceIsLocked?: boolean,
   usedShaderModes?: Map<VisualMode, number>,
+  songIdentity?: SongIdentity,
 ): VisualMode {
   // Explicit override always wins
   const override = song.sectionOverrides?.find((o) => o.sectionIndex === sectionIndex);
@@ -121,7 +125,7 @@ function getModeForSection(
 
   // Coherence lock: hold current shader during peak moments
   if (coherenceIsLocked && sectionIndex > 0) {
-    return getModeForSection(song, sectionIndex - 1, sections, seed, era, false, usedShaderModes);
+    return getModeForSection(song, sectionIndex - 1, sections, seed, era, false, usedShaderModes, songIdentity);
   }
 
   // Seeded variation with affinity-aware morphing
@@ -130,7 +134,7 @@ function getModeForSection(
     if (section) {
       const prevSection = sectionIndex > 0 ? sections[sectionIndex - 1] : null;
       const prevMode = sectionIndex > 0
-        ? getModeForSection(song, sectionIndex - 1, sections, seed, era, false, usedShaderModes)
+        ? getModeForSection(song, sectionIndex - 1, sections, seed, era, false, usedShaderModes, songIdentity)
         : song.defaultMode;
 
       // Energy transition detection: pick from affinity map when energy changes
@@ -166,6 +170,15 @@ function getModeForSection(
         if (unused.length > 0) filteredPool = unused;
       }
 
+      // Song identity preferred modes: weight 3x in selection pool
+      if (songIdentity?.preferredModes?.length) {
+        const preferred = songIdentity.preferredModes.filter((m) => filteredPool.includes(m));
+        if (preferred.length > 0) {
+          // Add preferred modes 2 extra times (3x total weight)
+          filteredPool = [...filteredPool, ...preferred, ...preferred];
+        }
+      }
+
       const rng = seededRandom(seed + sectionIndex * 7919);
       const idx = Math.floor(rng() * filteredPool.length);
       return filteredPool[idx];
@@ -193,13 +206,19 @@ function getModeForSection(
 }
 
 /** Map Drums/Space sub-phase to forced shader mode */
-function getDrumsSpaceMode(phase: string, seed?: number): VisualMode {
+function getDrumsSpaceMode(phase: string, seed?: number, songIdentity?: SongIdentity): VisualMode {
+  // Song identity overrides for D/S sub-phases
+  if (songIdentity?.drumsSpaceShaders) {
+    const override = songIdentity.drumsSpaceShaders[phase as import("../utils/drums-space-phase").DrumsSpaceSubPhase];
+    if (override) return override;
+  }
+
   const rng = seededRandom((seed ?? 0) + 31337);
   switch (phase) {
     case "drums_tribal": return rng() > 0.5 ? "inferno" : "concert_lighting";
     case "transition": return rng() > 0.5 ? "cosmic_voyage" : "aurora";
     case "space_ambient": {
-      const pool: VisualMode[] = ["deep_ocean", "cosmic_dust", "crystal_cavern"];
+      const pool: VisualMode[] = ["deep_ocean", "cosmic_dust", "crystal_cavern", "void_light"];
       return pool[Math.floor(rng() * pool.length)];
     }
     case "reemergence": return rng() > 0.5 ? "concert_lighting" : "liquid_light";
@@ -220,7 +239,7 @@ function renderMode(
   return renderScene(mode, { frames, sections, palette, tempo, style, jamDensity });
 }
 
-export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, seed, jamDensity, deadAirMode, deadAirFactor, era, coherenceIsLocked, usedShaderModes, drumsSpacePhase }) => {
+export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, seed, jamDensity, deadAirMode, deadAirFactor, era, coherenceIsLocked, usedShaderModes, drumsSpacePhase, songIdentity }) => {
   const frame = useCurrentFrame();
   const palette = song.palette;
 
@@ -233,11 +252,11 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
 
   // Drums/Space phase override: force specific shaders per sub-phase
   if (drumsSpacePhase) {
-    const dsMode = getDrumsSpaceMode(drumsSpacePhase, seed);
+    const dsMode = getDrumsSpaceMode(drumsSpacePhase, seed, songIdentity);
     return <>{renderMode(dsMode, frames, sections, palette, tempo, undefined, jamDensity)}</>;
   }
 
-  const currentMode = getModeForSection(song, currentSectionIdx, sections, seed, era, coherenceIsLocked, usedShaderModes);
+  const currentMode = getModeForSection(song, currentSectionIdx, sections, seed, era, coherenceIsLocked, usedShaderModes, songIdentity);
   const currentSection = sections[currentSectionIdx];
 
   const nextSectionIdx = currentSectionIdx + 1;
@@ -245,7 +264,7 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
 
   // Crossfade INTO this section (from previous) — beat-synced when possible
   if (prevSectionIdx >= 0) {
-    const prevMode = getModeForSection(song, prevSectionIdx, sections, seed, era, false, usedShaderModes);
+    const prevMode = getModeForSection(song, prevSectionIdx, sections, seed, era, false, usedShaderModes, songIdentity);
     if (prevMode !== currentMode) {
       const boundary = currentSection.frameStart;
       const beatFrame = findNearestBeat(frames, boundary - 30, boundary + 30);
@@ -269,7 +288,7 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
 
   // Crossfade OUT of this section (to next) — beat-synced when possible
   if (nextSectionIdx < sections.length) {
-    const nextMode = getModeForSection(song, nextSectionIdx, sections, seed, era, false, usedShaderModes);
+    const nextMode = getModeForSection(song, nextSectionIdx, sections, seed, era, false, usedShaderModes, songIdentity);
     if (nextMode !== currentMode) {
       const boundary = currentSection.frameEnd;
       const beatFrame = findNearestBeat(frames, boundary - 30, boundary + 30);

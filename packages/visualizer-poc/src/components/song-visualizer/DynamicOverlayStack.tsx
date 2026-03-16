@@ -49,6 +49,8 @@ interface Props {
   energyLevel?: "quiet" | "mid" | "peak";
   /** Overlay IDs already used in previous songs (for cross-song variety) */
   usedOverlayIds?: Set<string>;
+  /** IT response overlay opacity multiplier (1.0 = normal, 0.05 = locked) */
+  itOverlayOverride?: number;
 }
 
 export const DynamicOverlayStack: React.FC<Props> = ({
@@ -62,6 +64,7 @@ export const DynamicOverlayStack: React.FC<Props> = ({
   focusSuppression = 1,
   energyLevel = "mid",
   usedOverlayIds,
+  itOverlayOverride = 1,
 }) => {
   const frame = useCurrentFrame();
 
@@ -69,7 +72,7 @@ export const DynamicOverlayStack: React.FC<Props> = ({
   const maxConcurrent = MAX_CONCURRENT[energyLevel] ?? 4;
   const withOpacity = activeEntries
     .map(([name, entry]) => {
-      let op = Math.min(1, (opacityMap ? (opacityMap[name] ?? 0) : 1) * mediaSuppression * focusSuppression);
+      let op = Math.min(1, (opacityMap ? (opacityMap[name] ?? 0) : 1) * mediaSuppression * focusSuppression * itOverlayOverride);
       // Cross-song dedup: deprioritize overlays already shown earlier in the show
       if (usedOverlayIds && usedOverlayIds.has(name)) {
         op *= 0.4; // reduce but don't eliminate — variety, not exclusion

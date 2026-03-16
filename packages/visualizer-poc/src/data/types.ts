@@ -94,7 +94,9 @@ export type VisualMode =
   | "inferno"
   | "deep_ocean"
   | "aurora"
-  | "crystal_cavern";
+  | "crystal_cavern"
+  | "fluid_light"
+  | "void_light";
 
 /** Per-section mode override in setlist */
 export interface SectionOverride {

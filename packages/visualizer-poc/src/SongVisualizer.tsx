@@ -59,6 +59,11 @@ import { CameraMotion } from "./components/CameraMotion";
 import { computeVisualFocus } from "./utils/visual-focus";
 import { findMusicEnd } from "./utils/music-end";
 import { computeCounterpoint, resetCounterpoint } from "./utils/visual-counterpoint";
+import { lookupSongIdentity } from "./data/song-identities";
+import { computeShowArcPhase, getShowArcModifiers } from "./data/show-arc";
+import type { ShowArcPhase } from "./data/show-arc";
+import { computeITResponse } from "./utils/it-response";
+import { isSacredSegue } from "./data/band-config";
 
 // Extracted sub-components
 import { SongArtLayer } from "./components/song-visualizer/SongArtLayer";
@@ -154,12 +159,56 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
     [analysis],
   );
 
+  // ─── Song identity ───
+  const songIdentity = useMemo(
+    () => lookupSongIdentity(props.song.title),
+    [props.song.title],
+  );
+
+  // ─── Show arc phase ───
+  const showArcPhase = useMemo((): ShowArcPhase | undefined => {
+    if (!props.show) return undefined;
+    const songsInSet = props.show.songs.filter((s) => s.set === props.song.set).length;
+    const trackNumber = props.song.trackNumber ?? 1;
+    return computeShowArcPhase({
+      setNumber: props.song.set,
+      trackNumber,
+      songsInSet,
+      totalSongs: props.show.songs.length,
+      songsCompleted: narrative?.state.songsCompleted ?? 0,
+      isDrumsSpace,
+      postDrumsSpaceCount: narrative?.state.postDrumsSpaceCount ?? 0,
+    });
+  }, [props.show, props.song.set, props.song.trackNumber, isDrumsSpace, narrative?.state?.songsCompleted, narrative?.state?.postDrumsSpaceCount]);
+
+  const showArcModifiers = useMemo(
+    () => showArcPhase ? getShowArcModifiers(showArcPhase) : undefined,
+    [showArcPhase],
+  );
+
+  // ─── Sacred segue detection ───
+  const isSacredSegueIn = useMemo(() => {
+    if (!props.segueIn || !props.show) return false;
+    const songs = props.show.songs;
+    const idx = songs.findIndex((s) => s.trackId === props.song.trackId);
+    if (idx <= 0) return false;
+    return isSacredSegue(songs[idx - 1].title, props.song.title);
+  }, [props.segueIn, props.show, props.song.trackId, props.song.title]);
+
+  const isSacredSegueOut = useMemo(() => {
+    if (!props.segueOut || !props.show) return false;
+    const songs = props.show.songs;
+    const idx = songs.findIndex((s) => s.trackId === props.song.trackId);
+    if (idx < 0 || idx >= songs.length - 1) return false;
+    return isSacredSegue(props.song.title, songs[idx + 1].title);
+  }, [props.segueOut, props.show, props.song.trackId, props.song.title]);
+
   // ─── Overlay scheduling ───
   const rotationSchedule = useMemo(() => {
     if (!props.activeOverlays || !analysis) return null;
     const sects = getSections(analysis);
-    return buildRotationSchedule(props.activeOverlays, sects, props.song.trackId, showSeed, analysis?.frames, isDrumsSpace, props.energyHints, props.show?.era, props.song.defaultMode);
-  }, [props.activeOverlays, analysis, props.song.trackId, showSeed, isDrumsSpace, props.energyHints, props.show?.era, props.song.defaultMode]);
+    return buildRotationSchedule(props.activeOverlays, sects, props.song.trackId, showSeed, analysis?.frames, isDrumsSpace, props.energyHints, props.show?.era, props.song.defaultMode, songIdentity, showArcModifiers);
+  }, [props.activeOverlays, analysis, props.song.trackId, showSeed, isDrumsSpace, props.energyHints, props.show?.era, props.song.defaultMode, songIdentity, showArcModifiers]);
 
   const opacityMapBase = rotationSchedule
     ? getOverlayOpacities(frame, rotationSchedule, analysis?.frames, energyCalibration)
@@ -232,11 +281,14 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
   audioSnapshot.coherence = coherenceState.score;
   audioSnapshot.isLocked = coherenceState.isLocked;
 
+  // IT visual response state machine
+  const itState = computeITResponse(f, frameIdx);
+
   // Drums→Space phase detection
   const drumsSpaceState = isDrumsSpace ? computeDrumsSpacePhase(audioSnapshot, isDrumsSpace) : null;
 
   const climaxState = computeClimaxState(f, frame, sections, audioSnapshot.energy);
-  const climaxMod = climaxModulation(climaxState);
+  const climaxMod = climaxModulation(climaxState, songIdentity?.climaxBehavior);
   const counterpoint = computeCounterpoint(audioSnapshot, climaxState.phase, frame);
 
   const jamEvolution = useMemo(
@@ -298,23 +350,25 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
       <AudioSnapshotProvider snapshot={audioSnapshot}>
       <VisualizerErrorBoundary>
       <div style={{ position: "absolute", inset: 0, opacity }}>
-        <CameraMotion frames={f} jamEvolution={jamEvolution} bass={audioSnapshot.bass} cameraFreeze={counterpoint.cameraFreeze} drumsSpacePhase={drumsSpaceState?.subPhase} fastEnergy={audioSnapshot.fastEnergy}>
+        <CameraMotion frames={f} jamEvolution={jamEvolution} bass={audioSnapshot.bass} cameraFreeze={counterpoint.cameraFreeze || itState.cameraLock} drumsSpacePhase={drumsSpaceState?.subPhase} fastEnergy={audioSnapshot.fastEnergy}>
         <EraGrade>
-        <EnergyEnvelope snapshot={audioSnapshot} climaxMod={climaxMod} jamColorTemp={jamEvolution.isLongJam ? jamEvolution.colorTemperature : undefined} calibration={energyCalibration} counterpointSatMult={counterpoint.saturationMult} setNumber={props.song.set} drumsSpacePhase={drumsSpaceState?.subPhase} showPhase={narrative?.state.showPhase}>
+        <EnergyEnvelope snapshot={audioSnapshot} climaxMod={climaxMod} jamColorTemp={jamEvolution.isLongJam ? jamEvolution.colorTemperature : undefined} calibration={energyCalibration} counterpointSatMult={counterpoint.saturationMult} setNumber={props.song.set} drumsSpacePhase={drumsSpaceState?.subPhase} showPhase={narrative?.state.showPhase} songIdentity={songIdentity} showArcModifiers={showArcModifiers} itLuminanceLift={itState.luminanceLift}>
           <div style={{ position: "absolute", inset: 0, opacity: focusState.shaderOpacity }}>
           <SilentErrorBoundary name="SceneRouter">
             {(() => {
-              const sceneRouter = <SceneRouter frames={f} sections={sections} song={props.song} tempo={tempo} seed={showSeed} jamDensity={jamDensity} deadAirMode={deadAirFactor > 0 ? "cosmic_dust" : undefined} deadAirFactor={deadAirFactor > 0 ? deadAirFactor : undefined} era={props.show?.era} coherenceIsLocked={coherenceState.isLocked} drumsSpacePhase={drumsSpaceState?.subPhase} usedShaderModes={narrative?.state.usedShaderModes} />;
+              const sceneRouter = <SceneRouter frames={f} sections={sections} song={props.song} tempo={tempo} seed={showSeed} jamDensity={jamDensity} deadAirMode={deadAirFactor > 0 ? "cosmic_dust" : undefined} deadAirFactor={deadAirFactor > 0 ? deadAirFactor : undefined} era={props.show?.era} coherenceIsLocked={coherenceState.isLocked} drumsSpacePhase={drumsSpaceState?.subPhase} usedShaderModes={narrative?.state.usedShaderModes} songIdentity={songIdentity} />;
               const palette = props.song.palette;
 
               // Segue IN crossfade: smooth dual-render dissolve from previous song's shader
               if (props.segueIn && props.segueFromMode && props.segueFromMode !== props.song.defaultMode && frame < FADE_FRAMES) {
                 const progress = frame / FADE_FRAMES;
+                const segueStyle = songIdentity?.transitionIn ?? (isSacredSegueIn ? "morph" : "dissolve");
                 return (
                   <SegueCrossfade
                     progress={progress}
                     outgoing={renderScene(props.segueFromMode, { frames: f, sections, palette: props.segueFromPalette ?? palette, tempo, jamDensity })}
                     incoming={sceneRouter}
+                    style={segueStyle}
                   />
                 );
               }
@@ -322,11 +376,13 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
               // Segue OUT crossfade: smooth dual-render dissolve into next song's shader
               if (props.segueOut && props.segueToMode && props.segueToMode !== props.song.defaultMode && frame > durationInFrames - FADE_FRAMES) {
                 const progress = (frame - (durationInFrames - FADE_FRAMES)) / FADE_FRAMES;
+                const segueStyle = songIdentity?.transitionOut ?? (isSacredSegueOut ? "morph" : "dissolve");
                 return (
                   <SegueCrossfade
                     progress={progress}
                     outgoing={sceneRouter}
                     incoming={renderScene(props.segueToMode, { frames: f, sections, palette: props.segueToPalette ?? palette, tempo, jamDensity })}
+                    style={segueStyle}
                   />
                 );
               }
@@ -361,6 +417,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
             frames={f}
             focusSuppression={focusState.overlayOpacity}
             energyLevel={energyLevel}
+            itOverlayOverride={itState.overlayOpacityOverride}
           />
 
           {crowdMoments.length > 0 && (
@@ -369,6 +426,18 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
                 <CrowdOverlay moments={crowdMoments} />
               </SongPaletteProvider>
             </SilentErrorBoundary>
+          )}
+
+          {/* IT flash — brief white flash on coherence break */}
+          {itState.flashIntensity > 0.01 && (
+            <div
+              style={{
+                position: "absolute",
+                inset: 0,
+                backgroundColor: `rgba(255, 255, 255, ${itState.flashIntensity})`,
+                pointerEvents: "none",
+              }}
+            />
           )}
 
           {!isDeadAir && <ConcertInfo />}

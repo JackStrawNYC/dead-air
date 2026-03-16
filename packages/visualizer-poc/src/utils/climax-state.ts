@@ -13,6 +13,7 @@ import type { EnhancedFrameData, SectionBoundary } from "../data/types";
 import { gaussianSmooth, type AudioSnapshot } from "./audio-reactive";
 import { smoothstepSimple as smoothstep, lerp } from "./math";
 import { findCurrentSection } from "./section-lookup";
+import type { ClimaxBehavior } from "../data/song-identities";
 
 // ─── Types ───
 
@@ -191,7 +192,7 @@ const RELEASE_START = { sat: +0.02, bright: +0.005, vig: +0.02, bloom: 0.01, con
  * Map a ClimaxState to additive visual modifiers.
  * All values are small offsets that compose with EnergyEnvelope's existing modulation.
  */
-export function climaxModulation(state: ClimaxState): ClimaxModulation {
+export function climaxModulation(state: ClimaxState, behavior?: ClimaxBehavior): ClimaxModulation {
   const { phase, intensity, anticipation } = state;
 
   // Anticipation overrides build modulation
@@ -234,7 +235,7 @@ export function climaxModulation(state: ClimaxState): ClimaxModulation {
   }
 
   // Idle, climax, sustain: intensity scales the offset
-  return {
+  const result: ClimaxModulation = {
     saturationOffset: target.sat * t,
     brightnessOffset: target.bright * t,
     vignetteOffset: target.vig * t,
@@ -242,4 +243,19 @@ export function climaxModulation(state: ClimaxState): ClimaxModulation {
     contrastOffset: target.contrast * t,
     overlayDensityMult: lerp(1, target.density, t),
   };
+
+  // Apply per-song ClimaxBehavior overrides during climax/sustain phases
+  if (behavior && (phase === "climax" || phase === "sustain")) {
+    if (behavior.peakSaturation !== undefined) {
+      result.saturationOffset = Math.max(result.saturationOffset, behavior.peakSaturation * t);
+    }
+    if (behavior.peakBrightness !== undefined) {
+      result.brightnessOffset = Math.max(result.brightnessOffset, behavior.peakBrightness * t);
+    }
+    if (behavior.climaxDensityMult !== undefined) {
+      result.overlayDensityMult = lerp(1, behavior.climaxDensityMult, t);
+    }
+  }
+
+  return result;
 }

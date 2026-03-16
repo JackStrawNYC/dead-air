@@ -60,6 +60,8 @@ import { InfernoScene } from "./InfernoScene";
 import { DeepOceanScene } from "./DeepOceanScene";
 import { AuroraScene } from "./AuroraScene";
 import { CrystalCavernScene } from "./CrystalCavernScene";
+import { FluidLightScene } from "./FluidLightScene";
+import { VoidLightScene } from "./VoidLightScene";
 
 // ─── Scene Registry ───
 
@@ -134,6 +136,16 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     energyAffinity: "low",
     complement: "inferno",
   },
+  fluid_light: {
+    Component: FluidLightScene,
+    energyAffinity: "high",
+    complement: "oil_projector",
+  },
+  void_light: {
+    Component: VoidLightScene,
+    energyAffinity: "low",
+    complement: "concert_lighting",
+  },
 };
 
 // ─── Transition Affinity Map ───
@@ -154,6 +166,8 @@ export const TRANSITION_AFFINITY: Partial<Record<VisualMode, VisualMode[]>> = {
   vintage_film: ["oil_projector", "lo_fi_grain", "stark_minimal"],
   stark_minimal: ["lo_fi_grain", "vintage_film", "cosmic_dust"],
   crystal_cavern: ["deep_ocean", "aurora", "cosmic_dust"],
+  fluid_light: ["liquid_light", "oil_projector", "tie_dye"],
+  void_light: ["deep_ocean", "cosmic_voyage", "crystal_cavern"],
 };
 
 // ─── Helper functions ───
