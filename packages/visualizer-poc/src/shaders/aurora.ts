@@ -32,9 +32,9 @@ void main() {
 export const auroraFrag = /* glsl */ `
 precision highp float;
 
-${noiseGLSL}
-
 ${sharedUniformsGLSL}
+
+${noiseGLSL}
 
 ${buildPostProcessGLSL({ grainStrength: 'light', flareEnabled: false, halationEnabled: false, caEnabled: false })}
 

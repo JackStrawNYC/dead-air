@@ -19,9 +19,9 @@ void main() {
 export const vintageFilmFrag = /* glsl */ `
 precision highp float;
 
-${noiseGLSL}
-
 ${sharedUniformsGLSL}
+
+${noiseGLSL}
 
 varying vec2 vUv;
 

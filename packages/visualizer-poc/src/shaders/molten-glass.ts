@@ -27,9 +27,9 @@ void main() {
 export const moltenGlassFrag = /* glsl */ `
 precision highp float;
 
-${noiseGLSL}
-
 ${sharedUniformsGLSL}
+
+${noiseGLSL}
 
 ${buildPostProcessGLSL({ grainStrength: 'normal' })}
 

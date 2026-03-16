@@ -27,9 +27,9 @@ void main() {
 export const cosmicVoyageFrag = /* glsl */ `
 precision highp float;
 
-${noiseGLSL}
-
 ${sharedUniformsGLSL}
+
+${noiseGLSL}
 
 ${buildPostProcessGLSL({ halationEnabled: false, caEnabled: true })}
 

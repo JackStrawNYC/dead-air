@@ -28,9 +28,9 @@ void main() {
 export const voidLightFrag = /* glsl */ `
 precision highp float;
 
-${noiseGLSL}
-
 ${sharedUniformsGLSL}
+
+${noiseGLSL}
 
 varying vec2 vUv;
 

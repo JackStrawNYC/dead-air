@@ -28,9 +28,9 @@ void main() {
 export const deepOceanFrag = /* glsl */ `
 precision highp float;
 
-${noiseGLSL}
-
 ${sharedUniformsGLSL}
+
+${noiseGLSL}
 
 ${buildPostProcessGLSL({ grainStrength: 'normal' })}
 

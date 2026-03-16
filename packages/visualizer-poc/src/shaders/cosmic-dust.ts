@@ -19,9 +19,9 @@ void main() {
 export const cosmicDustFrag = /* glsl */ `
 precision highp float;
 
-${noiseGLSL}
-
 ${sharedUniformsGLSL}
+
+${noiseGLSL}
 
 ${buildPostProcessGLSL({ grainStrength: 'normal' })}
 

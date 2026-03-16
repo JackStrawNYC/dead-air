@@ -104,9 +104,9 @@ void main() {
 export const particleNebulaFrag = /* glsl */ `
 precision highp float;
 
-${noiseGLSL}
-
 ${sharedUniformsGLSL}
+
+${noiseGLSL}
 
 varying vec3 vNormal;
 varying vec3 vWorldPos;

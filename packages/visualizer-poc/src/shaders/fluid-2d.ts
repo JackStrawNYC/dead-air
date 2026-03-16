@@ -41,9 +41,9 @@ void main() {
 export const fluid2DFrag = /* glsl */ `
 precision highp float;
 
-${noiseGLSL}
-
 ${sharedUniformsGLSL}
+
+${noiseGLSL}
 
 // Feedback texture from MultiPassQuad (previous frame's output)
 uniform sampler2D uPrevFrame;

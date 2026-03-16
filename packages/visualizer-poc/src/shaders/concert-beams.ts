@@ -20,9 +20,9 @@ void main() {
 export const concertBeamsFrag = /* glsl */ `
 precision highp float;
 
-${noiseGLSL}
-
 ${sharedUniformsGLSL}
+
+${noiseGLSL}
 
 ${buildPostProcessGLSL({ halationEnabled: true, bloomThresholdOffset: -0.08 })}
 

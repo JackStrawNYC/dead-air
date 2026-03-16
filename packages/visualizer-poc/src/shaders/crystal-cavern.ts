@@ -88,9 +88,9 @@ void main() {
 export const crystalCavernFrag = /* glsl */ `
 precision highp float;
 
-${noiseGLSL}
-
 ${sharedUniformsGLSL}
+
+${noiseGLSL}
 
 ${buildPostProcessGLSL({ grainStrength: 'normal' })}
 

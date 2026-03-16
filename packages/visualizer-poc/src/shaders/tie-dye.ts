@@ -18,9 +18,9 @@ void main() {
 export const tieDyeFrag = /* glsl */ `
 precision highp float;
 
-${noiseGLSL}
-
 ${sharedUniformsGLSL}
+
+${noiseGLSL}
 
 varying vec2 vUv;
 

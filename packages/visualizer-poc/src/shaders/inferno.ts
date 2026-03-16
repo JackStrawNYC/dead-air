@@ -28,9 +28,9 @@ void main() {
 export const infernoFrag = /* glsl */ `
 precision highp float;
 
-${noiseGLSL}
-
 ${sharedUniformsGLSL}
+
+${noiseGLSL}
 
 ${buildPostProcessGLSL({ halationEnabled: true, bloomThresholdOffset: -0.10, stageFloodEnabled: false })}
 

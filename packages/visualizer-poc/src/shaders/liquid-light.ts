@@ -21,9 +21,9 @@ void main() {
 export const liquidLightFrag = /* glsl */ `
 precision highp float;
 
-${noiseGLSL}
-
 ${sharedUniformsGLSL}
+
+${noiseGLSL}
 
 ${buildPostProcessGLSL({ grainStrength: 'normal', flareEnabled: true, halationEnabled: true })}
 

@@ -30,9 +30,9 @@ void main() {
 export const fluidLightFrag = /* glsl */ `
 precision highp float;
 
-${noiseGLSL}
-
 ${sharedUniformsGLSL}
+
+${noiseGLSL}
 
 varying vec2 vUv;
 
