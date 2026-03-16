@@ -148,14 +148,14 @@ export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod,
   // IT luminance lift
   const itBrightLift = itLuminanceLift ?? 0;
 
+  // Vocal warmth: +15deg hue shift + +0.05 saturation during singing
+  const vocalHueShift = (vocalWarmth ?? 0) * 15;
+  const vocalSatBoost = (vocalWarmth ?? 0) * 0.05;
+
   // Apply phase offsets + song identity + show arc + IT + vocal warmth
   const finalSaturation = Math.min(1.40, Math.max(0.5, saturation + dsSatOffset + showSatOffset + siSatOffset + siPaletteSat + arcSatOffset + vocalSatBoost));
   const finalBrightness = Math.min(brightCap, Math.max(0.55, brightness + dsBrightOffset + showBrightOffset + siPaletteBright + arcBrightOffset + itBrightLift));
   const finalContrast = Math.min(1.20, Math.max(0.90, contrast + dsContrastOffset));
-
-  // Vocal warmth: +15deg hue shift + +0.05 saturation during singing
-  const vocalHueShift = (vocalWarmth ?? 0) * 15;
-  const vocalSatBoost = (vocalWarmth ?? 0) * 0.05;
 
   // Guitar color temp: ±12deg hue shift based on Jerry's neck position
   const guitarHueShift = (guitarColorTemp ?? 0) * 12;
