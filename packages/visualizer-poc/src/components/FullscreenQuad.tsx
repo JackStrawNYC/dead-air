@@ -146,6 +146,8 @@ export const FullscreenQuad: React.FC<Props> = ({
   uniforms.uEnergyTrend.value = smooth.energyTrend;
   uniforms.uLocalTempo.value = smooth.localTempo;
 
+  const c = smooth.contrast;
+
   // Update FFT texture from 7-band contrast (padded to 64 bins)
   if (fftTextureRef.current) {
     const texData = fftTextureRef.current.image.data as Uint8Array;
@@ -161,7 +163,6 @@ export const FullscreenQuad: React.FC<Props> = ({
     fftTextureRef.current.needsUpdate = true;
   }
 
-  const c = smooth.contrast;
   uniforms.uContrast0.value.set(c[0] ?? 0, c[1] ?? 0, c[2] ?? 0, c[3] ?? 0);
   uniforms.uContrast1.value.set(c[4] ?? 0, c[5] ?? 0, c[6] ?? 0, 0);
 
