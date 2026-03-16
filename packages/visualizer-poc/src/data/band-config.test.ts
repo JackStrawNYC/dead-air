@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { BAND_CONFIG, getEra, isSacredSegue, getSeededLyric, getSeededQuote } from "./band-config";
+import { BAND_CONFIG, getEra, isSacredSegue, getSeededLyric, getSeededQuote, isJamSegmentTitle } from "./band-config";
 
 describe("BAND_CONFIG", () => {
   it("has a band name", () => {
@@ -27,6 +27,26 @@ describe("BAND_CONFIG", () => {
     for (const pair of BAND_CONFIG.sacredSegues) {
       expect(pair.length).toBeGreaterThanOrEqual(2);
     }
+  });
+
+  it("has jam segment titles", () => {
+    expect(BAND_CONFIG.jamSegmentTitles.length).toBeGreaterThan(0);
+  });
+
+  it("has accent-eligible overlays", () => {
+    expect(BAND_CONFIG.accentEligibleOverlays.length).toBeGreaterThan(0);
+  });
+
+  it("has hero overlays", () => {
+    expect(BAND_CONFIG.heroOverlays.length).toBeGreaterThan(0);
+  });
+
+  it("has era presets with at least one key", () => {
+    expect(Object.keys(BAND_CONFIG.eraPresets).length).toBeGreaterThan(0);
+  });
+
+  it("has scene overlay bias", () => {
+    expect(Object.keys(BAND_CONFIG.sceneOverlayBias).length).toBeGreaterThan(0);
   });
 });
 
@@ -57,6 +77,30 @@ describe("isSacredSegue", () => {
 
   it("is directional (A→B not B→A)", () => {
     expect(isSacredSegue("Fire on the Mountain", "Scarlet Begonias")).toBe(false);
+  });
+});
+
+describe("isJamSegmentTitle", () => {
+  it("detects Drums as a jam segment", () => {
+    expect(isJamSegmentTitle("Drums")).toBe(true);
+  });
+
+  it("detects Space as a jam segment", () => {
+    expect(isJamSegmentTitle("Space")).toBe(true);
+  });
+
+  it("detects Drums / Space as a jam segment", () => {
+    expect(isJamSegmentTitle("Drums / Space")).toBe(true);
+  });
+
+  it("is case-insensitive", () => {
+    expect(isJamSegmentTitle("DRUMS")).toBe(true);
+    expect(isJamSegmentTitle("space")).toBe(true);
+  });
+
+  it("rejects non-jam-segment titles", () => {
+    expect(isJamSegmentTitle("Scarlet Begonias")).toBe(false);
+    expect(isJamSegmentTitle("Fire on the Mountain")).toBe(false);
   });
 });
 

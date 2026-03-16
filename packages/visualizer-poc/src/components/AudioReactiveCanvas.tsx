@@ -65,6 +65,14 @@ export interface AudioDataContext {
     drumBeat: number;
     /** Spectral flux: timbral change rate */
     spectralFlux: number;
+    /** Smoothed vocal energy from stem separation (0-1) */
+    vocalEnergy: number;
+    /** Smoothed vocal presence from stem separation (0-1) */
+    vocalPresence: number;
+    /** Smoothed other (guitar/keys) energy from stem separation (0-1) */
+    otherEnergy: number;
+    /** Smoothed other spectral centroid (guitar brightness) from stem separation (0-1) */
+    otherCentroid: number;
   };
   /** Per-song palette primary hue (0-1 normalized) */
   palettePrimary: number;
@@ -312,6 +320,17 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
   const drumBeat = transientEnvelope(frames, idx, (f) => (f.stemDrumBeat ? 1 : 0), 12) * egate;
   const spectralFlux = computeSpectralFlux(frames, idx, 8);
 
+  // Stem-separated vocal + other features
+  const vocalEnergy = smoothValue(frames, idx, (f) => f.stemVocalRms ?? 0, 12);
+  const vocalPresence = smoothValue(frames, idx, (f) => f.stemVocalPresence ? 1 : 0, 20);
+  const hasOtherStem = frames[idx].stemOtherRms != null;
+  const otherEnergy = hasOtherStem
+    ? smoothValue(frames, idx, (f) => f.stemOtherRms ?? 0, 10)
+    : smoothValue(frames, idx, (f) => (f.mid + f.high) * 0.5, 10);
+  const otherCentroid = hasOtherStem
+    ? smoothValue(frames, idx, (f) => f.stemOtherCentroid ?? 0, 15)
+    : smoothValue(frames, idx, (f) => f.centroid, 15);
+
   // Climax state for shader uniforms
   const phaseMap: Record<ClimaxPhase, number> = { idle: 0, build: 1, climax: 2, sustain: 3, release: 4 };
   const climaxEnergy = smoothValue(frames, idx, (f) => f.rms, 60);
@@ -355,6 +374,10 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
       drumOnset,
       drumBeat,
       spectralFlux,
+      vocalEnergy,
+      vocalPresence,
+      otherEnergy,
+      otherCentroid,
     },
     palettePrimary,
     paletteSecondary,

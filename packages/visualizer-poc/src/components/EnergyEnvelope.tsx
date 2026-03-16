@@ -44,6 +44,10 @@ interface Props {
   showArcModifiers?: ShowArcModifiers;
   /** IT response luminance lift (additive brightness) */
   itLuminanceLift?: number;
+  /** Vocal warmth factor 0-1 (from stem-features) */
+  vocalWarmth?: number;
+  /** Guitar color temperature -1 (cool) to +1 (warm) */
+  guitarColorTemp?: number;
 }
 
 // Per-era bloom color — matches era grade for visual cohesion
@@ -56,7 +60,7 @@ const ERA_BLOOM: Record<string, string> = {
 };
 const DEFAULT_BLOOM = ERA_BLOOM.classic;
 
-export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod, jamColorTemp, calibration, counterpointSatMult = 1, setNumber, drumsSpacePhase, showPhase, songIdentity, showArcModifiers, itLuminanceLift }) => {
+export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod, jamColorTemp, calibration, counterpointSatMult = 1, setNumber, drumsSpacePhase, showPhase, songIdentity, showArcModifiers, itLuminanceLift, vocalWarmth, guitarColorTemp }) => {
   const energy = snapshot.energy;
   const setTheme = getSetTheme(setNumber ?? 1);
   const low = calibration?.quietThreshold;
@@ -144,16 +148,23 @@ export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod,
   // IT luminance lift
   const itBrightLift = itLuminanceLift ?? 0;
 
-  // Apply phase offsets + song identity + show arc + IT
-  const finalSaturation = Math.min(1.40, Math.max(0.5, saturation + dsSatOffset + showSatOffset + siSatOffset + siPaletteSat + arcSatOffset));
+  // Apply phase offsets + song identity + show arc + IT + vocal warmth
+  const finalSaturation = Math.min(1.40, Math.max(0.5, saturation + dsSatOffset + showSatOffset + siSatOffset + siPaletteSat + arcSatOffset + vocalSatBoost));
   const finalBrightness = Math.min(brightCap, Math.max(0.55, brightness + dsBrightOffset + showBrightOffset + siPaletteBright + arcBrightOffset + itBrightLift));
   const finalContrast = Math.min(1.20, Math.max(0.90, contrast + dsContrastOffset));
+
+  // Vocal warmth: +15deg hue shift + +0.05 saturation during singing
+  const vocalHueShift = (vocalWarmth ?? 0) * 15;
+  const vocalSatBoost = (vocalWarmth ?? 0) * 0.05;
+
+  // Guitar color temp: ±12deg hue shift based on Jerry's neck position
+  const guitarHueShift = (guitarColorTemp ?? 0) * 12;
 
   // Jam color temperature: warm shifts yellow, cool shifts blue (max ±12deg)
   // Only applied during long jams. EraGrade + SongPalette handle base color character.
   const jamHueShift = jamColorTemp != null ? jamColorTemp * 35 : 0; // ±28 degrees max
   // Set-level warmth shift: Set 1 warm (+5deg), Set 2 cool (-8deg), Encore neutral (0)
-  const totalHueShift = jamHueShift + setTheme.warmthShift + eraColorTempShift + dsHueOffset + siHueShift + arcHueShift;
+  const totalHueShift = jamHueShift + setTheme.warmthShift + eraColorTempShift + dsHueOffset + siHueShift + arcHueShift + vocalHueShift + guitarHueShift;
   const filterStr = totalHueShift !== 0
     ? `saturate(${finalSaturation.toFixed(3)}) brightness(${finalBrightness.toFixed(3)}) contrast(${finalContrast.toFixed(3)}) hue-rotate(${totalHueShift.toFixed(1)}deg)`
     : `saturate(${finalSaturation.toFixed(3)}) brightness(${finalBrightness.toFixed(3)}) contrast(${finalContrast.toFixed(3)})`;

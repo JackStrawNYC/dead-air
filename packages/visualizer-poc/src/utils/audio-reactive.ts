@@ -47,6 +47,14 @@ export interface AudioSnapshot {
   coherence?: number;
   /** Whether band is in "locked in" state */
   isLocked?: boolean;
+  /** Smoothed vocal energy from stem separation (0-1, fallback 0) */
+  vocalEnergy: number;
+  /** Smoothed vocal presence from stem separation (0-1, fallback 0) */
+  vocalPresence: number;
+  /** Smoothed other (guitar/keys) energy from stem separation (0-1, fallback (mid+high)/2) */
+  otherEnergy: number;
+  /** Smoothed other spectral centroid (guitar brightness) from stem separation (0-1, fallback overall centroid) */
+  otherCentroid: number;
 }
 
 /**
@@ -316,5 +324,13 @@ export function computeAudioSnapshot(
     drumOnset: onsetEnvelopeGeneric(frames, idx, (f) => f.stemDrumOnset ?? 0, 12) * egate,
     drumBeat: beatDecayGeneric(frames, idx, (f) => f.stemDrumBeat ?? false, 12) * egate,
     musicalTime: (beatArray && fps && tempo) ? computeMusicalTime(beatArray, idx, fps, tempo) : 0,
+    vocalEnergy: gaussianSmooth(frames, idx, (f) => f.stemVocalRms ?? 0, 12),
+    vocalPresence: gaussianSmooth(frames, idx, (f) => f.stemVocalPresence ? 1 : 0, 20),
+    otherEnergy: frames[idx].stemOtherRms != null
+      ? gaussianSmooth(frames, idx, (f) => f.stemOtherRms ?? 0, 10)
+      : gaussianSmooth(frames, idx, (f) => (f.mid + f.high) * 0.5, 10),
+    otherCentroid: frames[idx].stemOtherCentroid != null
+      ? gaussianSmooth(frames, idx, (f) => f.stemOtherCentroid ?? 0, 15)
+      : gaussianSmooth(frames, idx, (f) => f.centroid, 15),
   };
 }

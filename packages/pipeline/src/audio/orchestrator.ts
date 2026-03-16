@@ -11,6 +11,7 @@ import type {
 } from '@dead-air/core';
 import { getAudioInfo, detectSilence, splitAtBoundaries } from './ffmpeg.js';
 import { analyzeWithLibrosa, toSongAnalysis } from './librosa-sidecar.js';
+import type { ExecutionMode } from './docker-runner.js';
 import {
   matchPreSegmentedFiles,
   buildSegmentsFromSilence,
@@ -26,6 +27,7 @@ export interface AnalyzeOptions {
   dataDir: string;
   silenceThresholdDb?: number;
   skipLibrosa?: boolean;
+  mode?: ExecutionMode;
 }
 
 export interface AnalyzeResult {
@@ -60,6 +62,7 @@ export async function orchestrateAnalysis(
     dataDir,
     silenceThresholdDb = -35,
     skipLibrosa = false,
+    mode,
   } = options;
 
   // 1. Look up show in DB
@@ -154,7 +157,7 @@ export async function orchestrateAnalysis(
         `Analyzing ${i + 1}/${segments.length}: ${seg.songName}`,
       );
       try {
-        const output = analyzeWithLibrosa(seg.filePath);
+        const output = analyzeWithLibrosa(seg.filePath, undefined, mode);
         perSongAnalysis.push(toSongAnalysis(seg.songName, output));
       } catch (err) {
         log.error(

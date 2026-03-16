@@ -3,8 +3,17 @@ import { existsSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { createLogger } from '@dead-air/core';
+import {
+  type ExecutionMode,
+  resolveMode,
+  execViaDocker,
+  toContainerPath,
+  buildVolumeMount,
+} from './docker-runner.js';
 
 const log = createLogger('audio:whisperx');
+
+const DOCKER_IMAGE = 'dead-air-gpu';
 
 export interface AlignedWord {
   word: string;
@@ -60,41 +69,60 @@ function getPythonPath(): string {
 
 /**
  * Run WhisperX forced alignment on a single audio file via Python sidecar.
+ * When mode is 'docker', runs inside the dead-air-gpu container with model cache.
+ * When mode is 'local', uses local python3 (existing behavior).
+ * Default 'auto' uses Docker if available, else local.
  */
 export function alignWithWhisperX(
   audioPath: string,
   lyrics: string,
   language = 'en',
   model = 'large-v3',
+  mode: ExecutionMode = 'auto',
 ): WhisperXOutput {
-  const scriptPath = getScriptPath();
+  const resolved = resolveMode(mode, DOCKER_IMAGE);
   const config = {
-    audioPath,
+    audioPath: resolved === 'docker' ? toContainerPath(audioPath) : audioPath,
     lyrics,
     language,
     model,
   };
 
-  log.info(`Aligning ${audioPath}...`);
+  log.info(`Aligning ${audioPath} (${resolved})...`);
 
   let rawOutput: string;
-  try {
-    const pythonPath = getPythonPath();
-    log.info(`Using Python: ${pythonPath}`);
-    const result = execFileSync(pythonPath, [scriptPath], {
+
+  if (resolved === 'docker') {
+    rawOutput = execViaDocker({
+      image: DOCKER_IMAGE,
+      command: 'align-lyrics',
       input: JSON.stringify(config),
-      maxBuffer: 100 * 1024 * 1024, // 100MB for large word arrays
-      timeout: 600_000, // 10 min — WhisperX is slower than librosa
+      volumeMounts: [
+        buildVolumeMount(audioPath),
+        'dead-air-model-cache:/data/cache',
+      ],
+      maxBuffer: 100 * 1024 * 1024,
+      timeout: 600_000,
     });
-    rawOutput = result.toString();
-  } catch (err: unknown) {
-    const execErr = err as { stderr?: Buffer; status?: number; signal?: string };
-    const stderr = execErr.stderr?.toString().trim() ?? '';
-    const detail = stderr ? `: ${stderr.slice(0, 500)}` : '';
-    if (execErr.signal === 'SIGTERM') {
-      throw new Error(`WhisperX timed out after 10 minutes${detail}`);
+  } else {
+    try {
+      const pythonPath = getPythonPath();
+      log.info(`Using Python: ${pythonPath}`);
+      const result = execFileSync(pythonPath, [getScriptPath()], {
+        input: JSON.stringify(config),
+        maxBuffer: 100 * 1024 * 1024, // 100MB for large word arrays
+        timeout: 600_000, // 10 min — WhisperX is slower than librosa
+      });
+      rawOutput = result.toString();
+    } catch (err: unknown) {
+      const execErr = err as { stderr?: Buffer; status?: number; signal?: string };
+      const stderr = execErr.stderr?.toString().trim() ?? '';
+      const detail = stderr ? `: ${stderr.slice(0, 500)}` : '';
+      if (execErr.signal === 'SIGTERM') {
+        throw new Error(`WhisperX timed out after 10 minutes${detail}`);
+      }
+      throw new Error(`WhisperX process crashed (exit ${execErr.status ?? 'unknown'})${detail}`);
     }
-    throw new Error(`WhisperX process crashed (exit ${execErr.status ?? 'unknown'})${detail}`);
   }
 
   let output: WhisperXOutput;
@@ -122,8 +150,9 @@ export function alignLyrics(
   trackId: string,
   language = 'en',
   model = 'large-v3',
+  mode: ExecutionMode = 'auto',
 ): LyricAlignment {
-  const output = alignWithWhisperX(audioPath, lyrics, language, model);
+  const output = alignWithWhisperX(audioPath, lyrics, language, model, mode);
 
   return {
     songName,

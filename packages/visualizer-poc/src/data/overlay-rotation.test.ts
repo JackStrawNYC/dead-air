@@ -4,9 +4,10 @@ import {
   getOverlayOpacities,
   buildOverlayManifest,
   HERO_OVERLAY_NAMES,
+  A_TIER_OVERLAY_NAMES,
 } from "./overlay-rotation";
 import type { SectionBoundary, EnhancedFrameData } from "./types";
-import { ALWAYS_ACTIVE } from "./overlay-registry";
+import { OVERLAY_REGISTRY, ALWAYS_ACTIVE } from "./overlay-registry";
 
 // ─── Test Helpers ───
 
@@ -214,6 +215,58 @@ describe("buildOverlayManifest", () => {
       expect(entry).toHaveProperty("accents");
       expect(entry).toHaveProperty("isDropout");
     }
+  });
+});
+
+// ─── A_TIER_OVERLAY_NAMES ───
+
+describe("A_TIER_OVERLAY_NAMES", () => {
+  it("derives from registry tier field (no hardcoded drift)", () => {
+    for (const name of A_TIER_OVERLAY_NAMES) {
+      const entry = OVERLAY_REGISTRY.find((e) => e.name === name);
+      expect(entry, `${name} not in registry`).toBeDefined();
+      expect(entry!.tier, `${name} is not A-tier in registry`).toBe("A");
+      expect(entry!.alwaysActive, `${name} should not be always-active`).toBeFalsy();
+    }
+  });
+
+  it("includes all selectable A-tier overlays from registry", () => {
+    const registryATier = OVERLAY_REGISTRY
+      .filter((e) => e.tier === "A" && !e.alwaysActive)
+      .map((e) => e.name);
+    for (const name of registryATier) {
+      expect(A_TIER_OVERLAY_NAMES.has(name), `${name} missing from A_TIER_OVERLAY_NAMES`).toBe(true);
+    }
+  });
+});
+
+describe("A-tier overlays score higher in rotation", () => {
+  it("A-tier overlays appear more often than B-tier on average", () => {
+    // Build schedule with many windows to get statistical signal
+    const sections = makeSections([
+      { start: 0, end: 5400, energy: "low" },
+      { start: 5400, end: 10800, energy: "mid" },
+    ]);
+    const allOverlays = OVERLAY_REGISTRY
+      .filter((e) => !e.alwaysActive)
+      .map((e) => e.name);
+    const schedule = buildRotationSchedule(allOverlays, sections, "s1t01", 42);
+
+    // Count appearances per overlay across all windows
+    const counts = new Map<string, number>();
+    for (const w of schedule.windows) {
+      for (const name of w.overlays) {
+        counts.set(name, (counts.get(name) ?? 0) + 1);
+      }
+    }
+
+    // Compute average appearances for A-tier vs B-tier
+    const aTierEntries = OVERLAY_REGISTRY.filter((e) => e.tier === "A" && !e.alwaysActive);
+    const bTierEntries = OVERLAY_REGISTRY.filter((e) => e.tier === "B");
+    const aTierAvg = aTierEntries.reduce((sum, e) => sum + (counts.get(e.name) ?? 0), 0) / aTierEntries.length;
+    const bTierAvg = bTierEntries.reduce((sum, e) => sum + (counts.get(e.name) ?? 0), 0) / bTierEntries.length;
+
+    expect(aTierAvg).toBeGreaterThan(bTierAvg);
   });
 });
 

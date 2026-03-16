@@ -5,20 +5,22 @@
  * Components with special props (SongTitle, ConcertInfo, SetlistScroll, FilmGrain)
  * are NOT included here — they remain hardcoded in SongVisualizer.tsx.
  *
- * Culled to 30 keepers (2026-03-07). Component files preserved in src/components/.
+ * 46 selectable keepers (2026-03-16). Component files preserved in src/components/.
  */
 import React from "react";
 import type { EnhancedFrameData } from "./types";
 
-// ─── Layer 1: Atmospheric (6) ───
+// ─── Layer 1: Atmospheric (8) ───
 import { CosmicStarfield } from "../components/CosmicStarfield";
 import { TieDyeWash } from "../components/TieDyeWash";
 import { LavaLamp } from "../components/LavaLamp";
 import { Fireflies } from "../components/Fireflies";
 import { LighterWave } from "../components/LighterWave";
 import { CrowdDance } from "../components/CrowdDance";
+import { GlowSticks } from "../components/GlowSticks";
+import { GodRays } from "../components/GodRays";
 
-// ─── Layer 2: Sacred / Center-stage (10) ───
+// ─── Layer 2: Sacred / Center-stage (13) ───
 import { BreathingStealie } from "../components/BreathingStealie";
 import { ThirteenPointBolt } from "../components/ThirteenPointBolt";
 import { StealYourFaceOff } from "../components/StealYourFaceOff";
@@ -29,6 +31,9 @@ import { DarkStarPortal } from "../components/DarkStarPortal";
 import { FractalZoom } from "../components/FractalZoom";
 import { MandalaGenerator } from "../components/MandalaGenerator";
 import { RoseOverlay } from "../components/RoseOverlay";
+import { StainedGlass } from "../components/StainedGlass";
+import { DreamCatcher } from "../components/DreamCatcher";
+import { StealieFade } from "../components/StealieFade";
 
 // ─── Layer 3: Reactive (6) ───
 import { LightningBoltOverlay } from "../components/LightningBoltOverlay";
@@ -43,7 +48,7 @@ import { ChinaCatSunflower } from "../components/ChinaCatSunflower";
 import { SugarMagnolia } from "../components/SugarMagnolia";
 import { BoxOfRain } from "../components/BoxOfRain";
 
-// ─── Layer 6: Character / Dead Culture (10) ───
+// ─── Layer 6: Character / Dead Culture (12) ───
 import { BearParade } from "../components/BearParade";
 import { SkeletonBand } from "../components/SkeletonBand";
 import { MarchingTerrapins } from "../components/MarchingTerrapins";
@@ -54,10 +59,13 @@ import { CosmicCharlie } from "../components/CosmicCharlie";
 import { JerrySpotlight } from "../components/JerrySpotlight";
 import { BobWeir } from "../components/BobWeir";
 import { DrumCircle } from "../components/DrumCircle";
+import { DancingTerrapinOverlay } from "../components/DancingTerrapinOverlay";
+import { SkeletonCouple } from "../components/SkeletonCouple";
 
-// ─── Layer 7: Show Artifacts (2) ───
+// ─── Layer 7: Show Artifacts (3) ───
 import { VenueMarquee } from "../components/VenueMarquee";
 import { TapeTrader } from "../components/TapeTrader";
+import { TourPosterGallery } from "../components/TourPosterGallery";
 
 // ─── Layer 10: Distortion (1) ───
 import { VHSGlitch } from "../components/VHSGlitch";
@@ -82,6 +90,8 @@ export const OVERLAY_COMPONENTS: Record<string, OverlayComponentEntry> = {
   Fireflies:         { Component: Fireflies, layer: 1 },
   LighterWave:       { Component: LighterWave, layer: 1 },
   CrowdDance:        { Component: CrowdDance, layer: 1 },
+  GlowSticks:        { Component: GlowSticks, layer: 1 },
+  GodRays:           { Component: GodRays, layer: 1 },
 
   // Layer 2: Sacred / Center-stage
   BreathingStealie:  { Component: BreathingStealie, layer: 2 },
@@ -94,6 +104,9 @@ export const OVERLAY_COMPONENTS: Record<string, OverlayComponentEntry> = {
   FractalZoom:       { Component: FractalZoom, layer: 2 },
   MandalaGenerator:  { Component: MandalaGenerator, layer: 2 },
   RoseOverlay:       { Component: RoseOverlay, layer: 2 },
+  StainedGlass:      { Component: StainedGlass, layer: 2 },
+  DreamCatcher:      { Component: DreamCatcher, layer: 2 },
+  StealieFade:       { Component: StealieFade, layer: 2 },
 
   // Layer 3: Reactive
   LightningBoltOverlay: { Component: LightningBoltOverlay, layer: 3 },
@@ -119,10 +132,13 @@ export const OVERLAY_COMPONENTS: Record<string, OverlayComponentEntry> = {
   JerrySpotlight:    { Component: JerrySpotlight, layer: 6 },
   BobWeir:           { Component: BobWeir, layer: 6 },
   DrumCircle:        { Component: DrumCircle, layer: 6 },
+  DancingTerrapinOverlay: { Component: DancingTerrapinOverlay, layer: 6 },
+  SkeletonCouple:    { Component: SkeletonCouple, layer: 6 },
 
   // Layer 7: Show Artifacts
   VenueMarquee:      { Component: VenueMarquee, layer: 7 },
   TapeTrader:        { Component: TapeTrader, layer: 7 },
+  TourPosterGallery: { Component: TourPosterGallery, layer: 7 },
 
   // Layer 10: Distortion
   VHSGlitch:           { Component: VHSGlitch, layer: 10 },

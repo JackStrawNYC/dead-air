@@ -1,6 +1,7 @@
 import type { Command } from 'commander';
 import { getConfig, getDb, closeDb, createLogger } from '@dead-air/core';
 import { orchestrateAnalysis } from '@dead-air/pipeline';
+import type { ExecutionMode } from '@dead-air/pipeline';
 
 const log = createLogger('cli:analyze');
 
@@ -24,10 +25,17 @@ export function registerAnalyzeCommand(program: Command): void {
       '-35',
     )
     .option('--skip-librosa', 'Skip librosa analysis (FFmpeg segmentation only)')
+    .option('--docker', 'Force Docker execution for Python sidecars')
+    .option('--local', 'Force local Python execution (skip Docker)')
     .action(
       async (
         date: string,
-        options: { silenceThreshold?: string; skipLibrosa?: boolean },
+        options: {
+          silenceThreshold?: string;
+          skipLibrosa?: boolean;
+          docker?: boolean;
+          local?: boolean;
+        },
       ) => {
         if (!isValidDate(date)) {
           console.error(
@@ -35,6 +43,15 @@ export function registerAnalyzeCommand(program: Command): void {
           );
           process.exit(1);
         }
+
+        if (options.docker && options.local) {
+          console.error('Error: --docker and --local are mutually exclusive');
+          process.exit(1);
+        }
+
+        let mode: ExecutionMode = 'auto';
+        if (options.docker) mode = 'docker';
+        if (options.local) mode = 'local';
 
         const config = getConfig();
         const db = getDb(config.paths.database);
@@ -46,6 +63,7 @@ export function registerAnalyzeCommand(program: Command): void {
             dataDir: config.paths.data,
             silenceThresholdDb: Number(options.silenceThreshold) || -35,
             skipLibrosa: options.skipLibrosa,
+            mode,
           });
 
           const durationMin = Math.round(result.totalDurationSec / 60);

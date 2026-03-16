@@ -26,6 +26,10 @@ export function upgradeFrame(frame: Record<string, unknown>): EnhancedFrameData 
     ...(frame.stemBassRms != null && { stemBassRms: frame.stemBassRms as number }),
     ...(frame.stemDrumOnset != null && { stemDrumOnset: frame.stemDrumOnset as number }),
     ...(frame.stemDrumBeat != null && { stemDrumBeat: frame.stemDrumBeat as boolean }),
+    ...(frame.stemVocalRms != null && { stemVocalRms: frame.stemVocalRms as number }),
+    ...(frame.stemVocalPresence != null && { stemVocalPresence: frame.stemVocalPresence as boolean }),
+    ...(frame.stemOtherRms != null && { stemOtherRms: frame.stemOtherRms as number }),
+    ...(frame.stemOtherCentroid != null && { stemOtherCentroid: frame.stemOtherCentroid as number }),
   };
 }
 

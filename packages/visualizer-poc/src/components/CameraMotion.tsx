@@ -28,6 +28,12 @@ interface Props {
   drumsSpacePhase?: string;
   /** Fast-responding energy (8-frame window) for snappier zoom response */
   fastEnergy?: number;
+  /** Vocal presence factor (0-1) for intimate camera during singing */
+  vocalPresence?: number;
+  /** Whether a solo is detected */
+  isSolo?: boolean;
+  /** Solo intensity (0-1) for dramatic zoom */
+  soloIntensity?: number;
 }
 
 const QUIET_SCALE = 1.08;
@@ -58,7 +64,7 @@ function shakeHash(frame: number): { x: number; y: number } {
 // Persisted transform for camera freeze (holds last computed values)
 let frozenTransform = { scale: 1.04, totalX: 0, totalY: 0 };
 
-export const CameraMotion: React.FC<Props> = ({ frames, children, jamEvolution, bass, cameraFreeze, drumsSpacePhase, fastEnergy }) => {
+export const CameraMotion: React.FC<Props> = ({ frames, children, jamEvolution, bass, cameraFreeze, drumsSpacePhase, fastEnergy, vocalPresence, isSolo, soloIntensity }) => {
   const frame = useCurrentFrame();
   const idx = Math.min(Math.max(0, frame), frames.length - 1);
 
@@ -153,6 +159,19 @@ export const CameraMotion: React.FC<Props> = ({ frames, children, jamEvolution, 
     // Amplified shake for primal energy
     shakeX *= 1.5;
     shakeY *= 1.5;
+  }
+
+  // Vocal intimacy: reduce shake 40%, gentle 1% zoom in during singing
+  if (vocalPresence && vocalPresence > 0.3) {
+    const vocalFactor = Math.min(1, vocalPresence);
+    shakeX *= 1 - vocalFactor * 0.4;
+    shakeY *= 1 - vocalFactor * 0.4;
+    scale *= 1 + vocalFactor * 0.01; // gentle zoom in
+  }
+
+  // Solo zoom: dramatic slow push during solos (up to 1.5% zoom)
+  if (isSolo && soloIntensity && soloIntensity > 0) {
+    scale *= 1 + soloIntensity * 0.015;
   }
 
   let totalX = shakeX + driftX;

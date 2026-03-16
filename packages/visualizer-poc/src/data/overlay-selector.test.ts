@@ -278,6 +278,49 @@ describe("selectOverlaysForShow", () => {
   });
 });
 
+// ─── A-tier Scoring ───
+
+describe("A-tier scoring in selection", () => {
+  it("A-tier overlays appear disproportionately", () => {
+    // Run selection 20 times with different seeds
+    const aTierNames = new Set(
+      OVERLAY_REGISTRY.filter((e) => e.tier === "A" && !e.alwaysActive).map((e) => e.name),
+    );
+    const selectableCount = OVERLAY_REGISTRY.filter((e) => !e.alwaysActive).length;
+    const aTierPoolRatio = aTierNames.size / selectableCount;
+
+    let totalSelected = 0;
+    let aTierSelected = 0;
+    for (let seed = 0; seed < 20; seed++) {
+      const profile: SongProfile = {
+        trackId: `s1t${String(seed).padStart(2, "0")}`,
+        title: `Test ${seed}`,
+        set: 1,
+        avgEnergy: 0.15,
+        energyVariance: 0.01,
+        dominantEnergyBand: "mid",
+        peakEnergyRatio: 0.3,
+        avgCentroid: 0.3,
+        avgFlatness: 0.05,
+        avgSub: 0.2,
+        chromaSpread: 0.1,
+        tempo: 120,
+        sectionCount: 3,
+      };
+      const result = selectOverlays(profile, emptyHistory(), undefined, seed * 1000);
+      const nonAlwaysActive = result.activeOverlays.filter(
+        (n) => n !== "SongTitle" && n !== "FilmGrain",
+      );
+      totalSelected += nonAlwaysActive.length;
+      aTierSelected += nonAlwaysActive.filter((n) => aTierNames.has(n)).length;
+    }
+
+    // A-tier should appear more than their pool proportion
+    const aTierSelectionRatio = aTierSelected / totalSelected;
+    expect(aTierSelectionRatio).toBeGreaterThan(aTierPoolRatio);
+  });
+});
+
 // ─── Curated Pool ───
 
 describe("curated overlay pool", () => {
@@ -290,7 +333,7 @@ describe("curated overlay pool", () => {
     expect(names).toContain("WallOfSound");
   });
 
-  it("has 40 total overlays (38 keepers + 2 always-active)", () => {
-    expect(OVERLAY_REGISTRY.length).toBe(40);
+  it("has 48 total overlays (46 selectable + 2 always-active)", () => {
+    expect(OVERLAY_REGISTRY.length).toBe(48);
   });
 });

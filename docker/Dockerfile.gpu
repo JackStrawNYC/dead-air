@@ -1,0 +1,41 @@
+FROM python:3.12-slim
+
+LABEL org.opencontainers.image.title="dead-air-gpu"
+LABEL org.opencontainers.image.description="Stem separation (Demucs) and lyrics alignment (WhisperX) for Dead Air pipeline"
+LABEL org.opencontainers.image.source="https://github.com/chrisgardella/dead-air"
+
+# System deps: ffmpeg, libsndfile, git (for whisperx model downloads)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ffmpeg libsndfile1 git && \
+    rm -rf /var/lib/apt/lists/*
+
+# Layer 1: torch CPU-only (~800MB, changes rarely)
+RUN pip install --no-cache-dir \
+    torch torchaudio --index-url https://download.pytorch.org/whl/cpu
+
+# Layer 2-3: ML + audio/science deps (pinned versions)
+COPY docker/requirements-gpu.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir -r /tmp/requirements.txt
+
+# Copy scripts
+COPY packages/pipeline/scripts/separate_stems.py /app/separate_stems.py
+COPY packages/pipeline/scripts/align_lyrics.py /app/align_lyrics.py
+COPY packages/pipeline/scripts/analyze_audio.py /app/analyze_audio.py
+
+# Copy entrypoint and healthcheck
+COPY docker/entrypoint-gpu.sh /app/entrypoint.sh
+COPY docker/healthcheck.py /app/healthcheck.py
+RUN chmod +x /app/entrypoint.sh
+
+WORKDIR /app
+
+# Model cache persistence across runs
+ENV TORCH_HOME=/data/cache/torch
+ENV HF_HOME=/data/cache/huggingface
+ENV TOKENIZERS_PARALLELISM=false
+
+HEALTHCHECK --interval=60s --timeout=30s --retries=2 \
+    CMD python /app/healthcheck.py --image=gpu
+
+ENTRYPOINT ["/app/entrypoint.sh"]
+CMD ["help"]

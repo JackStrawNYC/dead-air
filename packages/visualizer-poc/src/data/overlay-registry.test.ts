@@ -5,13 +5,17 @@ import {
   OVERLAY_BY_NAME,
   ALWAYS_ACTIVE,
 } from "./overlay-registry";
-import type { OverlayTag, OverlayCategory } from "./types";
+import type { OverlayCategory } from "./types";
+import { BAND_CONFIG } from "./band-config";
 
 // ─── Valid values for validation ───
+// OverlayTag is now `string` for portability. We validate that registry
+// tags are from the known set (generic tags + band culture tag).
 
 const VALID_TAGS: Set<string> = new Set([
   "cosmic", "organic", "mechanical", "psychedelic", "festival",
-  "contemplative", "dead-culture", "intense", "retro", "aquatic",
+  "contemplative", "intense", "retro", "aquatic",
+  BAND_CONFIG.overlayTags.culture,
 ]);
 
 const VALID_CATEGORIES: Set<string> = new Set([
@@ -28,8 +32,8 @@ describe("overlay-registry integrity", () => {
     expect(unique.size).toBe(names.length);
   });
 
-  it("has exactly 40 entries (38 keepers + 2 always-active)", () => {
-    expect(OVERLAY_REGISTRY.length).toBe(40);
+  it("has exactly 48 entries (46 selectable + 2 always-active)", () => {
+    expect(OVERLAY_REGISTRY.length).toBe(48);
   });
 
   it("all entries have required fields", () => {
@@ -72,6 +76,21 @@ describe("overlay-registry integrity", () => {
         expect(entry.dutyCycle).toBeLessThanOrEqual(100);
       }
     }
+  });
+
+  it("every selectable overlay has an energyResponse curve", () => {
+    const selectable = OVERLAY_REGISTRY.filter((e) => !e.alwaysActive);
+    for (const entry of selectable) {
+      expect(entry.energyResponse, `${entry.name} missing energyResponse`).toBeDefined();
+      const [threshold, peak, falloff] = entry.energyResponse!;
+      expect(threshold, `${entry.name} threshold > peak`).toBeLessThanOrEqual(peak);
+      expect(falloff, `${entry.name} falloff <= 0`).toBeGreaterThan(0);
+    }
+  });
+
+  it("has at least 10 A-tier overlays", () => {
+    const aTier = OVERLAY_REGISTRY.filter((e) => e.tier === "A");
+    expect(aTier.length).toBeGreaterThanOrEqual(10);
   });
 });
 

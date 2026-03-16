@@ -63,7 +63,9 @@ import { lookupSongIdentity } from "./data/song-identities";
 import { computeShowArcPhase, getShowArcModifiers } from "./data/show-arc";
 import type { ShowArcPhase } from "./data/show-arc";
 import { computeITResponse } from "./utils/it-response";
-import { isSacredSegue } from "./data/band-config";
+import { isSacredSegue, isJamSegmentTitle } from "./data/band-config";
+import { classifyStemSection, detectSolo, computeVocalWarmth, computeGuitarColorTemp } from "./utils/stem-features";
+import type { StemSectionType } from "./utils/stem-features";
 
 // Extracted sub-components
 import { SongArtLayer } from "./components/song-visualizer/SongArtLayer";
@@ -139,19 +141,17 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
     [props.show],
   );
 
-  const isDrumsSpace = useMemo(() => {
-    const title = props.song.title.toLowerCase();
-    return title.includes("drums") || title.includes("space") ||
-      title === "drums / space" || title === "drums/space";
-  }, [props.song.title]);
+  const isDrumsSpace = useMemo(
+    () => isJamSegmentTitle(props.song.title),
+    [props.song.title],
+  );
 
   const comesFromDrumsSpace = useMemo(() => {
     if (!props.show || !props.segueIn) return false;
     const songs = props.show.songs;
     const idx = songs.findIndex((s) => s.trackId === props.song.trackId);
     if (idx <= 0) return false;
-    const prev = songs[idx - 1].title.toLowerCase();
-    return prev.includes("drums") || prev.includes("space");
+    return isJamSegmentTitle(songs[idx - 1].title);
   }, [props.show, props.segueIn, props.song.trackId]);
 
   const energyCalibration = useMemo(
@@ -176,8 +176,8 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
       songsInSet,
       totalSongs: props.show.songs.length,
       songsCompleted: narrative?.state.songsCompleted ?? 0,
-      isDrumsSpace,
-      postDrumsSpaceCount: narrative?.state.postDrumsSpaceCount ?? 0,
+      isJamSegment: isDrumsSpace,
+      postJamSegmentCount: narrative?.state.postDrumsSpaceCount ?? 0,
     });
   }, [props.show, props.song.set, props.song.trackNumber, isDrumsSpace, narrative?.state?.songsCompleted, narrative?.state?.postDrumsSpaceCount]);
 
@@ -203,12 +203,26 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
     return isSacredSegue(props.song.title, songs[idx + 1].title);
   }, [props.segueOut, props.show, props.song.trackId, props.song.title]);
 
+  // ─── Dominant stem section (sampled every 30th frame for perf) ───
+  const dominantStemSection = useMemo((): StemSectionType | undefined => {
+    if (!analysis?.frames) return undefined;
+    const counts: Record<string, number> = {};
+    const ba = buildBeatArray(analysis.frames);
+    const t = analysis.meta?.tempo ?? 120;
+    for (let i = 0; i < analysis.frames.length; i += 30) {
+      const section = classifyStemSection(computeAudioSnapshot(analysis.frames, i, ba, 30, t));
+      counts[section] = (counts[section] ?? 0) + 1;
+    }
+    const sorted = Object.entries(counts).filter(([k]) => k !== "quiet").sort((a, b) => b[1] - a[1]);
+    return sorted[0]?.[0] as StemSectionType | undefined;
+  }, [analysis?.frames, analysis?.meta?.tempo]);
+
   // ─── Overlay scheduling ───
   const rotationSchedule = useMemo(() => {
     if (!props.activeOverlays || !analysis) return null;
     const sects = getSections(analysis);
-    return buildRotationSchedule(props.activeOverlays, sects, props.song.trackId, showSeed, analysis?.frames, isDrumsSpace, props.energyHints, props.show?.era, props.song.defaultMode, songIdentity, showArcModifiers);
-  }, [props.activeOverlays, analysis, props.song.trackId, showSeed, isDrumsSpace, props.energyHints, props.show?.era, props.song.defaultMode, songIdentity, showArcModifiers]);
+    return buildRotationSchedule(props.activeOverlays, sects, props.song.trackId, showSeed, analysis?.frames, isDrumsSpace, props.energyHints, props.show?.era, props.song.defaultMode, songIdentity, showArcModifiers, undefined, dominantStemSection);
+  }, [props.activeOverlays, analysis, props.song.trackId, showSeed, isDrumsSpace, props.energyHints, props.show?.era, props.song.defaultMode, songIdentity, showArcModifiers, dominantStemSection]);
 
   const opacityMapBase = rotationSchedule
     ? getOverlayOpacities(frame, rotationSchedule, analysis?.frames, energyCalibration)
@@ -275,6 +289,12 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
   const beatArray = useMemo(() => buildBeatArray(f), [f]);
   const frameIdx = Math.min(Math.max(0, frame), f.length - 1);
   const audioSnapshot = computeAudioSnapshot(f, frameIdx, beatArray, 30, tempo);
+
+  // Stem-derived features (per-frame)
+  const stemSection = classifyStemSection(audioSnapshot);
+  const soloState = detectSolo(audioSnapshot);
+  const vocalWarmth = computeVocalWarmth(audioSnapshot);
+  const guitarColorTemp = computeGuitarColorTemp(audioSnapshot);
 
   // Coherence detection — "IT" detector
   const coherenceState = computeCoherence(f, frameIdx);
@@ -350,13 +370,13 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
       <AudioSnapshotProvider snapshot={audioSnapshot}>
       <VisualizerErrorBoundary>
       <div style={{ position: "absolute", inset: 0, opacity }}>
-        <CameraMotion frames={f} jamEvolution={jamEvolution} bass={audioSnapshot.bass} cameraFreeze={counterpoint.cameraFreeze || itState.cameraLock} drumsSpacePhase={drumsSpaceState?.subPhase} fastEnergy={audioSnapshot.fastEnergy}>
+        <CameraMotion frames={f} jamEvolution={jamEvolution} bass={audioSnapshot.bass} cameraFreeze={counterpoint.cameraFreeze || itState.cameraLock} drumsSpacePhase={drumsSpaceState?.subPhase} fastEnergy={audioSnapshot.fastEnergy} vocalPresence={audioSnapshot.vocalPresence} isSolo={soloState.isSolo} soloIntensity={soloState.intensity}>
         <EraGrade>
-        <EnergyEnvelope snapshot={audioSnapshot} climaxMod={climaxMod} jamColorTemp={jamEvolution.isLongJam ? jamEvolution.colorTemperature : undefined} calibration={energyCalibration} counterpointSatMult={counterpoint.saturationMult} setNumber={props.song.set} drumsSpacePhase={drumsSpaceState?.subPhase} showPhase={narrative?.state.showPhase} songIdentity={songIdentity} showArcModifiers={showArcModifiers} itLuminanceLift={itState.luminanceLift}>
+        <EnergyEnvelope snapshot={audioSnapshot} climaxMod={climaxMod} jamColorTemp={jamEvolution.isLongJam ? jamEvolution.colorTemperature : undefined} calibration={energyCalibration} counterpointSatMult={counterpoint.saturationMult} setNumber={props.song.set} drumsSpacePhase={drumsSpaceState?.subPhase} showPhase={narrative?.state.showPhase} songIdentity={songIdentity} showArcModifiers={showArcModifiers} itLuminanceLift={itState.luminanceLift} vocalWarmth={vocalWarmth} guitarColorTemp={guitarColorTemp}>
           <div style={{ position: "absolute", inset: 0, opacity: focusState.shaderOpacity }}>
           <SilentErrorBoundary name="SceneRouter">
             {(() => {
-              const sceneRouter = <SceneRouter frames={f} sections={sections} song={props.song} tempo={tempo} seed={showSeed} jamDensity={jamDensity} deadAirMode={deadAirFactor > 0 ? "cosmic_dust" : undefined} deadAirFactor={deadAirFactor > 0 ? deadAirFactor : undefined} era={props.show?.era} coherenceIsLocked={coherenceState.isLocked} drumsSpacePhase={drumsSpaceState?.subPhase} usedShaderModes={narrative?.state.usedShaderModes} songIdentity={songIdentity} />;
+              const sceneRouter = <SceneRouter frames={f} sections={sections} song={props.song} tempo={tempo} seed={showSeed} jamDensity={jamDensity} deadAirMode={deadAirFactor > 0 ? "cosmic_dust" : undefined} deadAirFactor={deadAirFactor > 0 ? deadAirFactor : undefined} era={props.show?.era} coherenceIsLocked={coherenceState.isLocked} drumsSpacePhase={drumsSpaceState?.subPhase} usedShaderModes={narrative?.state.usedShaderModes} songIdentity={songIdentity} stemSection={stemSection} />;
               const palette = props.song.palette;
 
               // Segue IN crossfade: smooth dual-render dissolve from previous song's shader

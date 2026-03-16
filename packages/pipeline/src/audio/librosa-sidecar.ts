@@ -3,8 +3,17 @@ import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { createLogger } from '@dead-air/core';
 import type { SongAnalysisData } from '@dead-air/core';
+import {
+  type ExecutionMode,
+  resolveMode,
+  execViaDocker,
+  toContainerPath,
+  buildVolumeMount,
+} from './docker-runner.js';
 
 const log = createLogger('audio:librosa');
+
+const DOCKER_IMAGE = 'dead-air-gpu';
 
 export interface LibrosaOutput {
   ok: boolean;
@@ -28,28 +37,47 @@ function getScriptPath(): string {
 
 /**
  * Run librosa analysis on a single audio file via Python sidecar.
+ * When mode is 'docker', runs inside the dead-air-gpu container.
+ * When mode is 'local', uses local python3 (existing behavior).
+ * Default 'auto' uses Docker if available, else local.
  */
 export function analyzeWithLibrosa(
   audioPath: string,
   analyses?: string[],
+  mode: ExecutionMode = 'auto',
 ): LibrosaOutput {
-  const scriptPath = getScriptPath();
+  const resolved = resolveMode(mode, DOCKER_IMAGE);
   const config = {
-    audioPath,
+    audioPath: resolved === 'docker' ? toContainerPath(audioPath) : audioPath,
     sampleRate: 22050,
     hopLength: 2205, // 10Hz resolution
     analyses: analyses ?? ['energy', 'tempo', 'spectral', 'onsets', 'key'],
   };
 
-  log.info(`Analyzing ${audioPath}...`);
+  log.info(`Analyzing ${audioPath} (${resolved})...`);
 
-  const result = execFileSync('python3', [scriptPath], {
-    input: JSON.stringify(config),
-    maxBuffer: 50 * 1024 * 1024, // 50MB for large arrays
-    timeout: 300_000, // 5 min per song
-  });
+  let rawOutput: string;
 
-  const output: LibrosaOutput = JSON.parse(result.toString());
+  if (resolved === 'docker') {
+    rawOutput = execViaDocker({
+      image: DOCKER_IMAGE,
+      command: 'analyze-audio',
+      input: JSON.stringify(config),
+      volumeMounts: [buildVolumeMount(audioPath)],
+      maxBuffer: 50 * 1024 * 1024,
+      timeout: 300_000,
+    });
+  } else {
+    const scriptPath = getScriptPath();
+    const result = execFileSync('python3', [scriptPath], {
+      input: JSON.stringify(config),
+      maxBuffer: 50 * 1024 * 1024, // 50MB for large arrays
+      timeout: 300_000, // 5 min per song
+    });
+    rawOutput = result.toString();
+  }
+
+  const output: LibrosaOutput = JSON.parse(rawOutput);
 
   if (!output.ok) {
     throw new Error(`Librosa analysis failed: ${output.error}`);

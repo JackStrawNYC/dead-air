@@ -39,6 +39,13 @@ export const EnhancedFrameDataSchema = z.object({
     z.number(), z.number(), z.number(),
   ]),
   flatness: z.number(),
+  stemBassRms: z.number().optional(),
+  stemDrumOnset: z.number().optional(),
+  stemDrumBeat: z.boolean().optional(),
+  stemVocalRms: z.number().optional(),
+  stemVocalPresence: z.boolean().optional(),
+  stemOtherRms: z.number().optional(),
+  stemOtherCentroid: z.number().optional(),
 });
 
 /** Legacy 8-field frame format (auto-upgraded by analysis-loader) */
@@ -72,6 +79,10 @@ export const TrackMetaSchema = z.object({
   totalFrames: PositiveInt,
   tempo: z.number().positive(),
   sections: z.array(SectionBoundarySchema),
+  stemsAvailable: z.boolean().optional(),
+  stemTempo: z.number().optional(),
+  stemVocalMean: z.number().optional(),
+  stemOtherMean: z.number().optional(),
 });
 
 export const TrackAnalysisSchema = z.object({

@@ -1,0 +1,67 @@
+x-analyze-volumes: &analyze-volumes
+  - ../packages/visualizer-poc/public/audio:/data/audio:ro
+  - ../packages/visualizer-poc/data:/data/output
+  - ../data/stems:/data/stems:ro
+  - ../packages/visualizer-poc/data:/data/setlist:ro
+
+x-gpu-volumes: &gpu-volumes
+  - ../packages/visualizer-poc/public/audio:/data/audio:ro
+  - ../data/stems:/data/stems
+  - ../data/lyrics:/data/lyrics
+  - ../data/cache:/data/cache
+
+services:
+  # ── Analyze image services ──────────────────────────────────
+
+  analyze:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.analyze
+    image: dead-air-analyze
+    volumes: *analyze-volumes
+    command: ["analyze"]
+
+  analyze-show:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.analyze
+    image: dead-air-analyze
+    volumes: *analyze-volumes
+    command: ["analyze-show"]
+
+  # ── GPU image services ──────────────────────────────────────
+
+  separate-stems:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.gpu
+    image: dead-air-gpu
+    volumes: *gpu-volumes
+    command: ["separate-stems"]
+    stdin_open: true
+    deploy:
+      resources:
+        limits:
+          memory: 8g
+
+  align-lyrics:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.gpu
+    image: dead-air-gpu
+    volumes: *gpu-volumes
+    command: ["align-lyrics"]
+    stdin_open: true
+    deploy:
+      resources:
+        limits:
+          memory: 6g
+
+  analyze-audio:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.gpu
+    image: dead-air-gpu
+    volumes: *gpu-volumes
+    command: ["analyze-audio"]
+    stdin_open: true

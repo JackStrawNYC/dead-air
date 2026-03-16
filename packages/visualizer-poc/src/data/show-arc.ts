@@ -181,23 +181,23 @@ export interface ShowArcInput {
   totalSongs: number;
   /** Songs completed so far (0-based, current song not counted) */
   songsCompleted: number;
-  /** Whether this song IS Drums/Space */
-  isDrumsSpace: boolean;
-  /** Number of songs completed since Drums/Space ended */
-  postDrumsSpaceCount: number;
+  /** Whether this song IS a jam segment (e.g. Drums/Space) */
+  isJamSegment: boolean;
+  /** Number of songs completed since the jam segment ended */
+  postJamSegmentCount: number;
 }
 
 /**
  * Compute the show arc phase from song position context.
  */
 export function computeShowArcPhase(input: ShowArcInput): ShowArcPhase {
-  const { setNumber, trackNumber, songsInSet, isDrumsSpace, postDrumsSpaceCount } = input;
+  const { setNumber, trackNumber, songsInSet, isJamSegment, postJamSegmentCount } = input;
 
-  // Drums/Space always gets its own phase
-  if (isDrumsSpace) return "drums_space";
+  // Jam segment (e.g. Drums/Space) always gets its own phase
+  if (isJamSegment) return "drums_space";
 
-  // Post-Space: first 2 songs after D/S
-  if (postDrumsSpaceCount > 0 && postDrumsSpaceCount <= 2) return "post_space";
+  // Post-jam: first 2 songs after jam segment
+  if (postJamSegmentCount > 0 && postJamSegmentCount <= 2) return "post_space";
 
   // Encore (set 3+)
   if (setNumber >= 3) return "encore";

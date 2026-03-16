@@ -17,6 +17,7 @@ Output:
 """
 
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -24,10 +25,15 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 from analyze import analyze_track
 
-DATA_DIR = Path(__file__).resolve().parent.parent / "data"
+# Support env var overrides for Docker (fall back to relative paths for local dev)
+_DATA_DIR_ENV = os.environ.get("DEAD_AIR_DATA_DIR")
+_AUDIO_DIR_ENV = os.environ.get("DEAD_AIR_AUDIO_DIR")
+_STEMS_DIR_ENV = os.environ.get("DEAD_AIR_STEMS_DIR")
+
+DATA_DIR = Path(_DATA_DIR_ENV) if _DATA_DIR_ENV else Path(__file__).resolve().parent.parent / "data"
 TRACKS_DIR = DATA_DIR / "tracks"
 SETLIST_PATH = DATA_DIR / "setlist.json"
-PUBLIC_AUDIO_DIR = Path(__file__).resolve().parent.parent / "public" / "audio"
+PUBLIC_AUDIO_DIR = Path(_AUDIO_DIR_ENV) if _AUDIO_DIR_ENV else Path(__file__).resolve().parent.parent / "public" / "audio"
 
 FPS = 30
 
@@ -35,11 +41,14 @@ FPS = 30
 def main():
     resume = "--resume" in sys.argv
 
-    # Parse --audio-dir argument
+    # Parse --audio-dir and --stems-dir arguments
     cli_audio_dir = None
+    cli_stems_dir = None
     for arg in sys.argv[1:]:
         if arg.startswith("--audio-dir="):
             cli_audio_dir = Path(arg.split("=", 1)[1])
+        elif arg.startswith("--stems-dir="):
+            cli_stems_dir = Path(arg.split("=", 1)[1])
 
     # Load setlist
     with open(SETLIST_PATH) as f:
@@ -55,7 +64,15 @@ def main():
     else:
         audio_dir = PUBLIC_AUDIO_DIR
 
+    # Resolve stems base directory: CLI > env var > ../../data/stems/
+    if cli_stems_dir:
+        stems_base = cli_stems_dir
+    elif _STEMS_DIR_ENV:
+        stems_base = Path(_STEMS_DIR_ENV)
+    else:
+        stems_base = DATA_DIR.parent.parent / "data" / "stems"
     print(f"Audio directory: {audio_dir}")
+    print(f"Stems base directory: {stems_base}")
 
     TRACKS_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -91,7 +108,12 @@ def main():
             print(f"\n{'='*60}")
             print(f"Analyzing: {song['title']} ({track_id})")
             print(f"{'='*60}")
-            result = analyze_track(audio_path, output_path)
+            # Auto-detect stems dir for this track
+            track_stems_dir = stems_base / track_id
+            stems_dir = track_stems_dir if track_stems_dir.is_dir() else None
+            if stems_dir:
+                print(f"  Stems found: {stems_dir}")
+            result = analyze_track(audio_path, output_path, stems_dir)
             total_frames = result["meta"]["totalFrames"]
             track_duration = result["meta"]["duration"]
 

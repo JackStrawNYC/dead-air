@@ -7,6 +7,14 @@
  * every song visually distinct.
  *
  * Covers 30 most-played Grateful Dead songs with curated visual identities.
+ *
+ * **Extending for a new band:**
+ * Song identities are looked up by title via `lookupSongIdentity()`. For a new
+ * band, add entries to `SONG_IDENTITIES` keyed by normalized title (lowercase,
+ * alphanumeric only) and add aliases to `SONG_ALIASES`. Songs without entries
+ * gracefully fall through to defaults everywhere — no code changes needed.
+ * Consider creating a separate file (e.g. `phish-song-identities.ts`) and
+ * merging into SONG_IDENTITIES at init time based on BandConfig.
  */
 
 import type { VisualMode, ColorPalette, OverlayTag } from "./types";
@@ -258,7 +266,7 @@ export const SONG_IDENTITIES: Record<string, SongIdentity> = {
   "terrapinstation": {
     preferredModes: ["cosmic_voyage", "crystal_cavern", "aurora"],
     palette: { primary: 160, secondary: 280, saturation: 0.85 }, // sea green/purple
-    overlayBoost: ["MarchingTerrapins", "SacredGeometry", "CosmicStarfield"],
+    overlayBoost: ["MarchingTerrapins", "DancingTerrapinOverlay", "SacredGeometry", "CosmicStarfield"],
     moodKeywords: ["cosmic", "organic"],
     overlayDensity: 0.7,
     climaxBehavior: { peakBrightness: 0.2, peakSaturation: 0.5 },
@@ -341,6 +349,137 @@ export const SONG_IDENTITIES: Record<string, SongIdentity> = {
     climaxBehavior: { peakSaturation: 0.55, flash: true },
     transitionOut: "flash",
   },
+
+  // ══════════════════════════════════════════
+  // CORNELL 5/8/77 — remaining setlist songs
+  // ══════════════════════════════════════════
+
+  "newminglewoodblues": {
+    preferredModes: ["concert_lighting", "inferno", "tie_dye"],
+    palette: { primary: 15, secondary: 50, saturation: 1.0 }, // hot orange/gold
+    overlayBoost: ["ThirteenPointBolt", "SkeletonBand"],
+    moodKeywords: ["intense", "festival"],
+    overlayDensity: 1.2,
+    climaxBehavior: { peakSaturation: 0.5, flash: true },
+  },
+
+  "loser": {
+    preferredModes: ["vintage_film", "oil_projector", "liquid_light"],
+    palette: { primary: 30, secondary: 180, saturation: 0.7, brightness: 0.9 }, // amber/teal
+    overlayBoost: ["JerryGuitar", "RoseOverlay", "SkeletonRoses"],
+    overlaySuppress: ["LaserShow", "ParticleExplosion", "CrowdDance"],
+    moodKeywords: ["contemplative", "dead-culture"],
+    overlayDensity: 0.6,
+    hueShift: -3,
+    saturationOffset: -0.05,
+  },
+
+  "elpaso": {
+    preferredModes: ["vintage_film", "lo_fi_grain"],
+    palette: { primary: 35, secondary: 160, saturation: 0.75 }, // warm gold/sage
+    overlayBoost: ["VWBusParade", "Fireflies"],
+    moodKeywords: ["retro", "organic"],
+    overlayDensity: 0.5,
+    saturationOffset: -0.08,
+  },
+
+  "theyloveeachother": {
+    preferredModes: ["liquid_light", "tie_dye", "oil_projector"],
+    palette: { primary: 340, secondary: 50, saturation: 0.95 }, // rose/golden
+    overlayBoost: ["BreathingStealie", "BearParade"],
+    moodKeywords: ["organic", "festival"],
+    overlayDensity: 0.9,
+    climaxBehavior: { peakSaturation: 0.45 },
+  },
+
+  "jackstraw": {
+    preferredModes: ["concert_lighting", "inferno", "liquid_light"],
+    palette: { primary: 10, secondary: 300, saturation: 1.0 }, // red/purple
+    overlayBoost: ["SkeletonBand", "ThirteenPointBolt", "LightningBoltOverlay"],
+    moodKeywords: ["intense", "dead-culture"],
+    overlayDensity: 1.1,
+    climaxBehavior: { peakSaturation: 0.55, flash: true },
+  },
+
+  "lazylightnin": {
+    preferredModes: ["tie_dye", "concert_lighting", "liquid_light"],
+    palette: { primary: 55, secondary: 280, saturation: 1.0 }, // electric yellow/violet
+    overlayBoost: ["LightningBoltOverlay", "TieDyeWash", "BearParade"],
+    moodKeywords: ["psychedelic", "festival"],
+    overlayDensity: 1.0,
+    climaxBehavior: { peakSaturation: 0.5 },
+    transitionOut: "morph", // into Supplication
+  },
+
+  "supplication": {
+    preferredModes: ["inferno", "liquid_light", "concert_lighting"],
+    palette: { primary: 5, secondary: 40, saturation: 1.0, brightness: 1.05 }, // deep red/fire
+    overlayBoost: ["ParticleExplosion", "EmberRise", "FractalZoom"],
+    moodKeywords: ["intense", "psychedelic"],
+    overlayDensity: 1.3,
+    climaxBehavior: { peakSaturation: 0.6, peakBrightness: 0.25, flash: true, climaxDensityMult: 1.6 },
+    transitionIn: "morph", // from Lazy Lightnin'
+  },
+
+  "browneyedwomen": {
+    preferredModes: ["oil_projector", "vintage_film", "liquid_light"],
+    palette: { primary: 25, secondary: 190, saturation: 0.85 }, // warm brown/teal
+    overlayBoost: ["JerryGuitar", "BreathingStealie", "RoseOverlay"],
+    moodKeywords: ["organic", "dead-culture"],
+    overlayDensity: 0.7,
+    climaxBehavior: { peakSaturation: 0.45 },
+  },
+
+  "mamatried": {
+    preferredModes: ["vintage_film", "lo_fi_grain"],
+    palette: { primary: 40, secondary: 170, saturation: 0.7 }, // dusty gold/sage
+    overlayBoost: ["VWBusParade", "JerryGuitar"],
+    moodKeywords: ["retro", "organic"],
+    overlayDensity: 0.5,
+    saturationOffset: -0.06,
+  },
+
+  "rowjimmy": {
+    preferredModes: ["deep_ocean", "aurora", "liquid_light"],
+    palette: { primary: 210, secondary: 270, saturation: 0.65, brightness: 0.9 }, // ocean blue/lavender
+    overlayBoost: ["Fireflies", "RoseOverlay", "SacredGeometry"],
+    overlaySuppress: ["LaserShow", "ParticleExplosion", "CrowdDance"],
+    moodKeywords: ["contemplative", "organic"],
+    overlayDensity: 0.4,
+    hueShift: -8,
+    saturationOffset: -0.08,
+    climaxBehavior: { peakBrightness: 0.25, peakSaturation: 0.4 },
+  },
+
+  "dancininthestreet": {
+    preferredModes: ["concert_lighting", "tie_dye", "inferno"],
+    palette: { primary: 350, secondary: 55, saturation: 1.0 }, // magenta/gold
+    overlayBoost: ["BearParade", "LaserShow", "CrowdDance"],
+    moodKeywords: ["festival", "intense"],
+    overlayDensity: 1.4,
+    climaxBehavior: { peakSaturation: 0.55, flash: true, climaxDensityMult: 1.8 },
+  },
+
+  "drumsspace": {
+    preferredModes: ["cosmic_voyage", "crystal_cavern", "deep_ocean"],
+    palette: { primary: 260, secondary: 180, saturation: 0.5, brightness: 0.8 }, // deep indigo/teal
+    overlayBoost: ["DarkStarPortal", "SacredGeometry", "CosmicStarfield", "DrumCircle"],
+    overlaySuppress: ["BearParade", "VWBusParade", "CrowdDance", "SkeletonBand"],
+    moodKeywords: ["cosmic", "contemplative"],
+    overlayDensity: 0.3,
+    hueShift: -20,
+    saturationOffset: -0.12,
+    climaxBehavior: { peakBrightness: 0.2, peakSaturation: 0.4 },
+  },
+
+  "onemoresaturdaynight": {
+    preferredModes: ["concert_lighting", "inferno", "tie_dye"],
+    palette: { primary: 20, secondary: 320, saturation: 1.0 }, // warm orange/magenta
+    overlayBoost: ["BearParade", "ParticleExplosion", "LaserShow", "SkeletonBand"],
+    moodKeywords: ["festival", "intense"],
+    overlayDensity: 1.5,
+    climaxBehavior: { peakSaturation: 0.55, flash: true, climaxDensityMult: 1.8 },
+  },
 };
 
 // ─── Title Normalization ───
@@ -396,6 +535,36 @@ const SONG_ALIASES: Record<string, string> = {
   "casey": "caseyjones",
   "darkstar": "darkstar",
   "dark star": "darkstar",
+  // Cornell setlist aliases
+  "minglewood": "newminglewoodblues",
+  "newminglewood": "newminglewoodblues",
+  "minglewoodblues": "newminglewoodblues",
+  "elpaso": "elpaso",
+  "el paso": "elpaso",
+  "tleo": "theyloveeachother",
+  "theyloveechother": "theyloveeachother",
+  "jack": "jackstraw",
+  "lazy": "lazylightnin",
+  "lazylightning": "lazylightnin",
+  "lazylightnin": "lazylightnin",
+  "supplication": "supplication",
+  "bew": "browneyedwomen",
+  "browneyed": "browneyedwomen",
+  "browneyedwomen": "browneyedwomen",
+  "mama": "mamatried",
+  "mamatried": "mamatried",
+  "rowjimmy": "rowjimmy",
+  "row": "rowjimmy",
+  "dancin": "dancininthestreet",
+  "dancinginthestreet": "dancininthestreet",
+  "dancininthestreets": "dancininthestreet",
+  "drums": "drumsspace",
+  "space": "drumsspace",
+  "drumsspace": "drumsspace",
+  "drums space": "drumsspace",
+  "omsn": "onemoresaturdaynight",
+  "saturdaynight": "onemoresaturdaynight",
+  "onemore": "onemoresaturdaynight",
 };
 
 // ─── Lookup ───

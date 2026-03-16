@@ -66,6 +66,10 @@ export const FullscreenQuad: React.FC<Props> = ({
       uDrumOnset: { value: 0 },
       uDrumBeat: { value: 0 },
       uSpectralFlux: { value: 0 },
+      uVocalEnergy: { value: 0 },
+      uVocalPresence: { value: 0 },
+      uOtherEnergy: { value: 0 },
+      uOtherCentroid: { value: 0 },
       uSnapToMusicalTime: { value: 0 },
       ...extraUniforms,
     };
@@ -107,6 +111,10 @@ export const FullscreenQuad: React.FC<Props> = ({
   uniforms.uDrumOnset.value = smooth.drumOnset;
   uniforms.uDrumBeat.value = smooth.drumBeat;
   uniforms.uSpectralFlux.value = smooth.spectralFlux;
+  uniforms.uVocalEnergy.value = smooth.vocalEnergy;
+  uniforms.uVocalPresence.value = smooth.vocalPresence;
+  uniforms.uOtherEnergy.value = smooth.otherEnergy;
+  uniforms.uOtherCentroid.value = smooth.otherCentroid;
   uniforms.uSnapToMusicalTime.value = isLocked ? 1.0 : 0.0;
 
   const c = smooth.contrast;

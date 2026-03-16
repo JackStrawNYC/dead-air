@@ -20,7 +20,7 @@
  */
 import { Easing } from "remotion";
 import type { SectionBoundary, OverlayEntry, EnhancedFrameData, OverlayPhaseHint } from "./types";
-import { OVERLAY_BY_NAME, ALWAYS_ACTIVE } from "./overlay-registry";
+import { OVERLAY_REGISTRY, OVERLAY_BY_NAME, ALWAYS_ACTIVE } from "./overlay-registry";
 import { computeSmoothedEnergy } from "../utils/energy";
 import type { EnergyCalibration } from "../utils/energy";
 import { detectTexture } from "../utils/climax-state";
@@ -28,10 +28,12 @@ import { computeAudioSnapshot } from "../utils/audio-reactive";
 import { seededLCG as seededRandom } from "../utils/seededRandom";
 import { hashString } from "../utils/hash";
 import { getEraPreset } from "./era-presets";
+import { BAND_CONFIG } from "./band-config";
 import type { SongIdentity } from "./song-identities";
 import type { ShowArcModifiers } from "./show-arc";
 import type { DrumsSpaceSubPhase } from "../utils/drums-space-phase";
 import { DRUMS_SPACE_TREATMENTS } from "../utils/drums-space-phase";
+import type { StemSectionType } from "../utils/stem-features";
 
 // Eased crossfade function: replaces linear smoothstep with Remotion's
 // Easing.inOut(Easing.ease) for more organic overlay transitions.
@@ -78,28 +80,9 @@ export interface AccentConfig {
 
 /**
  * Overlays eligible for accent (beat-synced flash) treatment.
- * Expanded to include Dead iconography — stealies, bolts, bears, skeletons
- * should pulse with the music during peaks.
+ * Sourced from BandConfig for portability.
  */
-const ACCENT_ELIGIBLE = new Set([
-  // Reactive overlays
-  "ParticleExplosion",
-  "WallOfSound",
-  "LaserShow",
-  "LightningBoltOverlay",
-  "EmberRise",
-  "ThirteenPointBolt",
-  // Dead iconography — pulse on Garcia's attack, Bobby's chords
-  "BreathingStealie",
-  "StealYourFaceOff",
-  "SkullKaleidoscope",
-  "BearParade",
-  "SkeletonBand",
-  "VWBusParade",
-  "SkeletonRoses",
-  // Distortion
-  "VHSGlitch",
-]);
+const ACCENT_ELIGIBLE = new Set(BAND_CONFIG.accentEligibleOverlays);
 
 /** Energy-dependent accent tuning */
 const ACCENT_CONFIG: Record<string, AccentConfig | null> = {
@@ -152,30 +135,19 @@ const ENERGY_COUNTS: Record<string, { min: number; max: number }> = {
 };
 
 /** A-tier overlays: the only overlays allowed during peaks (high energy).
- *  Iconic Dead imagery that earns its moment — screen blend, low opacity. */
-export const A_TIER_OVERLAY_NAMES = new Set([
-  "BreathingStealie",
-  "ThirteenPointBolt",
-  "BearParade",
-]);
+ *  Iconic Dead imagery that earns its moment — screen blend, low opacity.
+ *  Derived from registry tier field (no drift from hardcoded names). */
+export const A_TIER_OVERLAY_NAMES = new Set(
+  OVERLAY_REGISTRY.filter((e) => e.tier === "A" && !e.alwaysActive).map((e) => e.name),
+);
 
 /**
  * Hero overlays — the most visually impactful character/reactive components.
  * One hero is guaranteed per rotation window (reserved slot) so viewers
  * always see concrete animated objects, not just abstract washes.
+ * Sourced from BandConfig for portability.
  */
-/**
- * Tier 1 heroes: the iconic Dead visuals that read instantly.
- * Trimmed to 8 — each one should land with weight, not compete for attention.
- */
-export const HERO_OVERLAY_NAMES = new Set([
-  // Core Dead icons — the ones everyone recognizes
-  "BreathingStealie", "ThirteenPointBolt", "StealYourFaceOff",
-  // Marching parades — the signature animated moments
-  "BearParade", "SkeletonBand", "MarchingTerrapins",
-  // Characters
-  "Bertha", "JerryGuitar",
-]);
+export const HERO_OVERLAY_NAMES = new Set(BAND_CONFIG.heroOverlays);
 
 /** Score penalty for overlays used in the previous window */
 const REPEAT_PENALTY = 0.6;
@@ -222,7 +194,7 @@ const TAG_TEXTURE_BONUS: Record<string, Partial<Record<string, number>>> = {
   psychedelic:    { ambient: +0.05, melodic: +0.05, building: +0.10, rhythmic: +0.10, peak: +0.10 },
   festival:       { rhythmic: +0.15, peak: +0.20, melodic: +0.05, ambient: -0.15 },
   contemplative:  { ambient: +0.10, sparse: +0.15, melodic: +0.05, peak: -0.15 },
-  "dead-culture": { ambient: +0.05, sparse: +0.05, melodic: +0.10, rhythmic: +0.10, peak: +0.15 },
+  [BAND_CONFIG.overlayTags.culture]: { ambient: +0.05, sparse: +0.05, melodic: +0.10, rhythmic: +0.10, peak: +0.15 },
   intense:        { peak: +0.15, rhythmic: +0.10, building: +0.05, ambient: -0.20, sparse: -0.15 },
   organic:        { ambient: +0.05, sparse: +0.05, melodic: +0.05 },
   mechanical:     { ambient: -0.15, sparse: -0.10, rhythmic: +0.05, peak: -0.10 },
@@ -232,25 +204,9 @@ const TAG_TEXTURE_BONUS: Record<string, Partial<Record<string, number>>> = {
 
 /**
  * Scene-specific overlay bias: certain overlays look better with certain shaders.
- * Boosts the selection score so cosmic_voyage gets CosmicStarfield,
- * concert_lighting gets LaserShow, etc.
+ * Sourced from BandConfig for portability.
  */
-const SCENE_OVERLAY_BIAS: Partial<Record<string, Record<string, number>>> = {
-  cosmic_voyage:    { CosmicStarfield: +0.25, DarkStarPortal: +0.20, SacredGeometry: +0.15 },
-  concert_lighting: { LaserShow: +0.25, WallOfSound: +0.20, ParticleExplosion: +0.15 },
-  deep_ocean:       { Fireflies: +0.20, BoxOfRain: +0.15, CosmicStarfield: +0.15 },
-  inferno:          { EmberRise: +0.25, ThirteenPointBolt: +0.20, ParticleExplosion: +0.15 },
-  aurora:           { CosmicStarfield: +0.20, SacredGeometry: +0.15, Fireflies: +0.15 },
-  tie_dye:          { TieDyeWash: +0.25, LavaLamp: +0.20, ChinaCatSunflower: +0.15 },
-  liquid_light:     { TieDyeWash: +0.20, FractalZoom: +0.15, MandalaGenerator: +0.15 },
-  vintage_film:     { VHSGlitch: +0.20, RoseOverlay: +0.15, SkeletonRoses: +0.10 },
-  crystal_cavern:   { SacredGeometry: +0.25, FractalZoom: +0.20, DarkStarPortal: +0.15 },
-  cosmic_dust:      { CosmicStarfield: +0.25, Fireflies: +0.20, SacredGeometry: +0.15 },
-  oil_projector:    { LavaLamp: +0.20, TieDyeWash: +0.15, MandalaGenerator: +0.15 },
-  particle_nebula:  { CosmicStarfield: +0.20, DarkStarPortal: +0.15 },
-  stark_minimal:    { RoseOverlay: +0.15, BreathingStealie: +0.10 },
-  lo_fi_grain:      { VHSGlitch: +0.20, RoseOverlay: +0.15, SkeletonRoses: +0.10 },
-};
+const SCENE_OVERLAY_BIAS = BAND_CONFIG.sceneOverlayBias;
 
 /** Set II = the journey. More cosmic/sacred, fewer artifacts. */
 const SET2_ADJUSTMENTS: Record<TextureGroup, number> = {
@@ -329,6 +285,7 @@ export function buildRotationSchedule(
   songIdentity?: SongIdentity,
   showArcModifiers?: ShowArcModifiers,
   drumsSpacePhase?: DrumsSpaceSubPhase,
+  stemSectionType?: StemSectionType,
 ): RotationSchedule {
   const trackHash = hashString(trackId) + (showSeed ?? 0);
 
@@ -450,6 +407,13 @@ export function buildRotationSchedule(
       targetCount = Math.min(targetCount, dsMaxOverlays);
     }
 
+    // Stem section modulation: vocal sections get breathing room, solos let shader carry
+    if (stemSectionType === "vocal") {
+      targetCount = Math.max(0, targetCount - 1);
+    } else if (stemSectionType === "solo") {
+      targetCount = Math.min(targetCount, 1);
+    }
+
     // Cap at pool size
     targetCount = Math.min(targetCount, poolEntries.length);
 
@@ -461,6 +425,9 @@ export function buildRotationSchedule(
     // Score each overlay for this window
     const scored = effectivePool.map((entry) => {
       let score = 0.5;
+
+      // Tier bonus: A-tier overlays get a scoring edge
+      if (entry.tier === "A") score += 0.15;
 
       // Energy band match (registry default)
       if (entry.energyBand !== "any") {
@@ -519,6 +486,24 @@ export function buildRotationSchedule(
           // Drums/Space: sacred geometry dominates, suppress reactive/family
           if (isDrumsSpace) {
             score += DRUMS_SPACE_ADJUSTMENTS[group];
+          }
+
+          // Stem-section scoring: tune overlay category to what's playing
+          if (stemSectionType) {
+            const stemGroup = resolveTextureGroup(entry.category);
+            if (stemGroup) {
+              if (stemSectionType === "vocal") {
+                // Vocals: breathing room, sacred/atmospheric shine
+                if (stemGroup === "wash") score += 0.10;
+                if (stemGroup === "sacred") score += 0.15;
+                if (stemGroup === "family") score -= 0.15;
+                if (stemGroup === "reactive") score -= 0.10;
+              } else if (stemSectionType === "solo") {
+                // Solo: character overlays shine
+                if (stemGroup === "family") score += 0.20;
+                if (stemGroup === "wash") score -= 0.10;
+              }
+            }
           }
 
           // Post-peak grace: after high→low/mid drop, favor sacred/contemplative

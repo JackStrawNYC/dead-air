@@ -13,6 +13,7 @@ Usage:
 """
 
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -20,9 +21,13 @@ import librosa
 import numpy as np
 from sklearn.cluster import AgglomerativeClustering
 
-DEFAULT_AUDIO_DIR = Path(__file__).resolve().parent.parent / "public" / "audio"
+# Support env var overrides for Docker (fall back to relative paths for local dev)
+_AUDIO_DIR_ENV = os.environ.get("DEAD_AIR_AUDIO_DIR")
+_DATA_DIR_ENV = os.environ.get("DEAD_AIR_DATA_DIR")
+
+DEFAULT_AUDIO_DIR = Path(_AUDIO_DIR_ENV) if _AUDIO_DIR_ENV else Path(__file__).resolve().parent.parent / "public" / "audio"
 DEFAULT_AUDIO = DEFAULT_AUDIO_DIR / "gd77-05-08s2t08.mp3"
-DEFAULT_OUTPUT = Path(__file__).resolve().parent.parent / "data" / "morning-dew-analysis.json"
+DEFAULT_OUTPUT = (Path(_DATA_DIR_ENV) if _DATA_DIR_ENV else Path(__file__).resolve().parent.parent / "data") / "morning-dew-analysis.json"
 
 SR = 22050
 HOP_LENGTH = 735  # 22050 / 30 = 735 samples per frame
@@ -112,11 +117,13 @@ def detect_sections(y: np.ndarray, sr: int, n_frames: int, rms_norm: np.ndarray)
 
 
 def analyze_stems(stems_dir: Path, n_frames: int) -> dict:
-    """Extract per-frame features from separated stems (bass, drums)."""
+    """Extract per-frame features from separated stems (bass, drums, vocals, other)."""
     result = {"available": False}
 
     bass_path = stems_dir / "bass.wav"
     drums_path = stems_dir / "drums.wav"
+    vocals_path = stems_dir / "vocals.wav"
+    other_path = stems_dir / "other.wav"
 
     if not bass_path.exists() or not drums_path.exists():
         print(f"Stems not found in {stems_dir}, skipping stem analysis")
@@ -148,6 +155,49 @@ def analyze_stems(stems_dir: Path, n_frames: int) -> dict:
         "stemTempo": round(drum_tempo_val, 1),
     }
     print(f"Stem analysis: bass RMS frames={len(bass_rms_norm)}, drum beats={len(drum_beat_set)}, tempo={drum_tempo_val:.1f}")
+
+    # ── Vocals stem ──
+    if vocals_path.exists():
+        print("Analyzing stem: vocals.wav ...")
+        y_vocals, _ = librosa.load(str(vocals_path), sr=SR, mono=True)
+        vocal_rms = librosa.feature.rms(y=y_vocals, hop_length=HOP_LENGTH)[0]
+        vocal_rms_norm = normalize(vocal_rms)
+        vocal_rms_norm = pad_or_trim_1d(vocal_rms_norm, n_frames)
+
+        # Dynamic presence threshold: P70 of non-zero vocal frames
+        nonzero_vocal = vocal_rms_norm[vocal_rms_norm > 0.01]
+        if len(nonzero_vocal) > 0:
+            vocal_threshold = float(np.percentile(nonzero_vocal, 70))
+        else:
+            vocal_threshold = 0.1
+        vocal_presence = vocal_rms_norm > vocal_threshold
+
+        result["vocalRms"] = vocal_rms_norm
+        result["vocalPresence"] = vocal_presence
+        result["vocalMean"] = round(float(vocal_rms_norm.mean()), 4)
+        print(f"  Vocal RMS frames={len(vocal_rms_norm)}, presence threshold={vocal_threshold:.3f}, presence ratio={vocal_presence.mean():.2%}")
+    else:
+        print(f"  vocals.wav not found in {stems_dir}, skipping vocal analysis")
+
+    # ── Other stem (guitar/keys) ──
+    if other_path.exists():
+        print("Analyzing stem: other.wav ...")
+        y_other, _ = librosa.load(str(other_path), sr=SR, mono=True)
+        other_rms = librosa.feature.rms(y=y_other, hop_length=HOP_LENGTH)[0]
+        other_rms_norm = normalize(other_rms)
+        other_rms_norm = pad_or_trim_1d(other_rms_norm, n_frames)
+
+        other_centroid = librosa.feature.spectral_centroid(y=y_other, sr=SR, hop_length=HOP_LENGTH)[0]
+        other_centroid_norm = normalize(other_centroid)
+        other_centroid_norm = pad_or_trim_1d(other_centroid_norm, n_frames)
+
+        result["otherRms"] = other_rms_norm
+        result["otherCentroid"] = other_centroid_norm
+        result["otherMean"] = round(float(other_rms_norm.mean()), 4)
+        print(f"  Other RMS frames={len(other_rms_norm)}, centroid frames={len(other_centroid_norm)}")
+    else:
+        print(f"  other.wav not found in {stems_dir}, skipping other analysis")
+
     return result
 
 
@@ -272,6 +322,12 @@ def analyze_track(audio_path: Path, output_path: Path, stems_dir: Path | None = 
             frame["stemBassRms"] = round(float(stem_data["bassRms"][i]), 4)
             frame["stemDrumOnset"] = round(float(stem_data["drumOnset"][i]), 4)
             frame["stemDrumBeat"] = i in stem_data["drumBeatSet"]
+            if "vocalRms" in stem_data:
+                frame["stemVocalRms"] = round(float(stem_data["vocalRms"][i]), 4)
+                frame["stemVocalPresence"] = bool(stem_data["vocalPresence"][i])
+            if "otherRms" in stem_data:
+                frame["stemOtherRms"] = round(float(stem_data["otherRms"][i]), 4)
+                frame["stemOtherCentroid"] = round(float(stem_data["otherCentroid"][i]), 4)
         frames.append(frame)
 
     meta = {
@@ -287,6 +343,10 @@ def analyze_track(audio_path: Path, output_path: Path, stems_dir: Path | None = 
     if stem_data and stem_data["available"]:
         meta["stemsAvailable"] = True
         meta["stemTempo"] = stem_data["stemTempo"]
+        if "vocalMean" in stem_data:
+            meta["stemVocalMean"] = stem_data["vocalMean"]
+        if "otherMean" in stem_data:
+            meta["stemOtherMean"] = stem_data["otherMean"]
 
     output = {
         "meta": meta,

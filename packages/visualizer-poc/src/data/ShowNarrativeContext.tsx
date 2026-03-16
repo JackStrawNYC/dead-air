@@ -29,9 +29,9 @@ export interface ShowNarrativeState {
   songPeakEnergies: number[];
   /** Current position in show arc (legacy 4-phase) */
   showPhase: ShowPhase;
-  /** Number of songs completed since Drums/Space ended (0 = not yet seen D/S) */
+  /** Number of songs completed since jam segment ended (0 = not yet seen jam segment) */
   postDrumsSpaceCount: number;
-  /** Whether Drums/Space has been encountered in this show */
+  /** Whether a jam segment (e.g. Drums/Space) has been encountered in this show */
   hasDrumsSpace: boolean;
   /** Enhanced 8-phase show arc phase */
   showArcPhase?: ShowArcPhase;

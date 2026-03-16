@@ -18,6 +18,7 @@ import type {
 } from "./types";
 import { SELECTABLE_REGISTRY, ALWAYS_ACTIVE } from "./overlay-registry";
 import type { SongIdentity } from "./song-identities";
+import { BAND_CONFIG } from "./band-config";
 
 // ─── Per-layer selection targets (sparse — let each visual moment breathe) ───
 const LAYER_TARGETS: Record<number, { min: number; max: number }> = {
@@ -211,9 +212,6 @@ function tagAffinity(tag: OverlayTag, profile: SongProfile): number {
           (1 - Math.min(profile.tempo / 160, 1)) * 0.5) *
         0.15
       );
-    case "dead-culture":
-      // Always mild positive
-      return 0.08;
     case "intense":
       // High peak energy ratio
       return profile.peakEnergyRatio * 0.15;
@@ -224,6 +222,7 @@ function tagAffinity(tag: OverlayTag, profile: SongProfile): number {
       // High sub-bass, mid energy
       return (profile.avgSub * 0.6 + (1 - Math.abs(profile.avgEnergy - 0.12) * 5) * 0.4) * 0.15;
     default:
+      if (tag === BAND_CONFIG.overlayTags.culture) return 0.08;
       return 0;
   }
 }
@@ -245,6 +244,9 @@ function scoreOverlay(
   if (entry.alwaysActive) return 1; // Always selected
 
   let score = 0.5; // Base score
+
+  // Tier bonus: A-tier overlays get a scoring edge
+  if (entry.tier === "A") score += 0.15;
 
   // Energy band match (+0.3 match, -0.2 opposite, 0 for "any")
   if (entry.energyBand !== "any") {

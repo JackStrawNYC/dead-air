@@ -33,6 +33,14 @@ export interface EnhancedFrameData {
   stemDrumOnset?: number;
   /** Stem-separated drum beat detected on this frame */
   stemDrumBeat?: boolean;
+  /** Stem-separated vocal RMS energy (from Demucs vocals.wav), 0-1 */
+  stemVocalRms?: number;
+  /** Vocal presence detected (singing above P70 threshold) */
+  stemVocalPresence?: boolean;
+  /** Stem-separated other (guitar/keys) RMS energy, 0-1 */
+  stemOtherRms?: number;
+  /** Stem-separated other spectral centroid (brightness), 0-1 */
+  stemOtherCentroid?: number;
 }
 
 /** Legacy frame data from POC (subset of EnhancedFrameData) */
@@ -71,6 +79,14 @@ export interface TrackMeta {
   totalFrames: number;
   tempo: number;
   sections: SectionBoundary[];
+  /** Whether stem separation data is available */
+  stemsAvailable?: boolean;
+  /** Tempo derived from drum stem beat tracking */
+  stemTempo?: number;
+  /** Mean vocal RMS across all frames */
+  stemVocalMean?: number;
+  /** Mean other (guitar/keys) RMS across all frames */
+  stemOtherMean?: number;
 }
 
 /** Complete analysis JSON for a single track */
@@ -215,17 +231,10 @@ export type OverlayCategory =
  *  retro: slight positive for variety
  *  aquatic: high sub-bass, mid energy
  */
-export type OverlayTag =
-  | "cosmic"
-  | "organic"
-  | "mechanical"
-  | "psychedelic"
-  | "festival"
-  | "contemplative"
-  | "dead-culture"
-  | "intense"
-  | "retro"
-  | "aquatic";
+/** Mood/affinity tag — string to support band-specific culture tags without type changes.
+ *  Well-known values: cosmic, organic, mechanical, psychedelic, festival,
+ *  contemplative, intense, retro, aquatic, plus band culture tags (e.g. "dead-culture"). */
+export type OverlayTag = string;
 
 /** Static metadata for a single overlay component */
 export interface OverlayEntry {
@@ -310,10 +319,10 @@ export interface ShowSetlist {
   taperInfo?: string;
   /** Explicit show-level PRNG seed (auto-derived from date+venue if omitted) */
   showSeed?: number;
-  /** Era classification for visual theming */
-  era?: "primal" | "classic" | "hiatus" | "touch_of_grey" | "revival";
-  /** Venue type for ambient theming */
-  venueType?: "theater" | "arena" | "amphitheater" | "festival" | "club" | "ballroom";
+  /** Era classification for visual theming (band-specific, e.g. "primal", "classic") */
+  era?: string;
+  /** Venue type for ambient theming (e.g. "theater", "arena", "amphitheater") */
+  venueType?: string;
   /** Tour name (e.g., "Spring 1977", "Fall 1989") */
   tourName?: string;
   /** All songs in order */

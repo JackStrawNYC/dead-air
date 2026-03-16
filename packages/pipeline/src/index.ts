@@ -4,7 +4,7 @@ export type { IngestOptions, IngestResult } from './ingest/index.js';
 
 // Audio analysis pipeline
 export { orchestrateAnalysis } from './audio/index.js';
-export type { AnalyzeOptions, AnalyzeResult } from './audio/index.js';
+export type { AnalyzeOptions, AnalyzeResult, ExecutionMode } from './audio/index.js';
 
 // Show research pipeline
 export { orchestrateResearch } from './research/index.js';

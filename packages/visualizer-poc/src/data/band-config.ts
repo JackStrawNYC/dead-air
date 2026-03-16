@@ -11,6 +11,8 @@
  *      based on config.overlayTags.culture
  */
 
+import type { EraPreset } from "./era-presets";
+
 // ─── Band Config Interface ───
 
 export interface EraDefinition {
@@ -52,6 +54,16 @@ export interface BandConfig {
     /** Tag used in overlay registry for artist-specific components */
     culture: string;
   };
+  /** Song titles that indicate jam/improv segments (e.g., Drums, Space) */
+  jamSegmentTitles: string[];
+  /** Overlay names eligible for accent (beat-synced flash) treatment */
+  accentEligibleOverlays: string[];
+  /** Hero overlays — the most visually impactful character/reactive components */
+  heroOverlays: string[];
+  /** Scene-specific overlay bias: boosts overlays that pair well with specific shaders */
+  sceneOverlayBias: Partial<Record<string, Record<string, number>>>;
+  /** Per-era visual presets keyed by era ID */
+  eraPresets: Record<string, EraPreset>;
 }
 
 // ─── Grateful Dead Configuration ───
@@ -192,6 +204,97 @@ export const GRATEFUL_DEAD_CONFIG: BandConfig = {
   overlayTags: {
     culture: "dead-culture",
   },
+
+  jamSegmentTitles: ["Drums", "Space", "Drums / Space", "Drums/Space"],
+
+  accentEligibleOverlays: [
+    // Reactive overlays
+    "ParticleExplosion",
+    "WallOfSound",
+    "LaserShow",
+    "LightningBoltOverlay",
+    "EmberRise",
+    "ThirteenPointBolt",
+    // Dead iconography — pulse on Garcia's attack, Bobby's chords
+    "BreathingStealie",
+    "StealYourFaceOff",
+    "SkullKaleidoscope",
+    "BearParade",
+    "SkeletonBand",
+    "VWBusParade",
+    "SkeletonRoses",
+    // Distortion
+    "VHSGlitch",
+  ],
+
+  heroOverlays: [
+    // Core Dead icons — the ones everyone recognizes
+    "BreathingStealie", "ThirteenPointBolt", "StealYourFaceOff",
+    // Marching parades — the signature animated moments
+    "BearParade", "SkeletonBand", "MarchingTerrapins",
+    // Characters
+    "Bertha", "JerryGuitar",
+  ],
+
+  sceneOverlayBias: {
+    cosmic_voyage:    { CosmicStarfield: +0.25, DarkStarPortal: +0.20, SacredGeometry: +0.15 },
+    concert_lighting: { LaserShow: +0.25, WallOfSound: +0.20, ParticleExplosion: +0.15 },
+    deep_ocean:       { Fireflies: +0.20, BoxOfRain: +0.15, CosmicStarfield: +0.15 },
+    inferno:          { EmberRise: +0.25, ThirteenPointBolt: +0.20, ParticleExplosion: +0.15 },
+    aurora:           { CosmicStarfield: +0.20, SacredGeometry: +0.15, Fireflies: +0.15 },
+    tie_dye:          { TieDyeWash: +0.25, LavaLamp: +0.20, ChinaCatSunflower: +0.15 },
+    liquid_light:     { TieDyeWash: +0.20, FractalZoom: +0.15, MandalaGenerator: +0.15 },
+    vintage_film:     { VHSGlitch: +0.20, RoseOverlay: +0.15, SkeletonRoses: +0.10 },
+    crystal_cavern:   { SacredGeometry: +0.25, FractalZoom: +0.20, DarkStarPortal: +0.15 },
+    cosmic_dust:      { CosmicStarfield: +0.25, Fireflies: +0.20, SacredGeometry: +0.15 },
+    oil_projector:    { LavaLamp: +0.20, TieDyeWash: +0.15, MandalaGenerator: +0.15 },
+    particle_nebula:  { CosmicStarfield: +0.20, DarkStarPortal: +0.15 },
+    stark_minimal:    { RoseOverlay: +0.15, BreathingStealie: +0.10 },
+    lo_fi_grain:      { VHSGlitch: +0.20, RoseOverlay: +0.15, SkeletonRoses: +0.10 },
+  },
+
+  eraPresets: {
+    primal: {
+      preferredModes: ["liquid_light", "oil_projector", "vintage_film"],
+      excludedModes: ["concert_lighting", "crystal_cavern"],
+      excludedOverlays: ["LaserShow"],
+      grainIntensity: 1.8,
+      colorTempShift: 8,
+      saturationOffset: -0.05,
+    },
+    classic: {
+      preferredModes: ["liquid_light", "tie_dye", "aurora", "oil_projector"],
+      excludedModes: ["stark_minimal"],
+      excludedOverlays: [],
+      grainIntensity: 1.2,
+      colorTempShift: 5,
+      saturationOffset: 0,
+    },
+    hiatus: {
+      preferredModes: ["concert_lighting", "cosmic_voyage", "deep_ocean"],
+      excludedModes: ["oil_projector"],
+      excludedOverlays: [],
+      grainIntensity: 1.0,
+      colorTempShift: -5,
+      saturationOffset: -0.03,
+    },
+    touch_of_grey: {
+      preferredModes: ["concert_lighting", "inferno", "tie_dye"],
+      excludedModes: ["oil_projector"],
+      excludedOverlays: [],
+      grainIntensity: 0.6,
+      colorTempShift: 0,
+      saturationOffset: 0.05,
+    },
+    revival: {
+      preferredModes: [],
+      excludedModes: [],
+      excludedOverlays: [],
+      grainIntensity: 0.4,
+      colorTempShift: 0,
+      saturationOffset: 0,
+    },
+  },
 };
 
 // ─── Active Config ───
@@ -233,4 +336,10 @@ export function getSeededLyric(seed: number): string {
 /** Get a random quote (deterministic given a seed) */
 export function getSeededQuote(seed: number): { text: string; attribution: string } {
   return BAND_CONFIG.quotes[Math.abs(seed) % BAND_CONFIG.quotes.length];
+}
+
+/** Check if a song title indicates a jam/improv segment (e.g., Drums, Space) */
+export function isJamSegmentTitle(title: string): boolean {
+  const lower = title.toLowerCase();
+  return BAND_CONFIG.jamSegmentTitles.some(t => lower.includes(t.toLowerCase()));
 }
