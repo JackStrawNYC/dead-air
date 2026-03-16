@@ -13,6 +13,7 @@
  */
 
 import { noiseGLSL } from "./noise";
+import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 
 export const particleNebulaVert = /* glsl */ `
 ${noiseGLSL}
@@ -103,51 +104,9 @@ void main() {
 export const particleNebulaFrag = /* glsl */ `
 precision highp float;
 
-// Film grain helper
-vec3 filmGrain(vec2 uv, float grainTime) {
-  float n = fract(sin(dot(uv * 1000.0, vec2(12.9898, 78.233)) + grainTime * 43758.5453) * 43758.5453);
-  n = (n - 0.5) * 2.0;
-  return n * vec3(1.0, 0.95, 0.85);
-}
+${noiseGLSL}
 
-// HSV-to-cosine hue correction
-float hsvToCosineHue(float h) { return 1.0 - h; }
-
-// Hue-preserving filmic tone curve (local copy — noiseGLSL not injected in this frag)
-vec3 cinematicGrade(vec3 col, float energy) {
-  float maxC = max(col.r, max(col.g, col.b));
-  vec3 hueRatio = col / max(maxC, 0.001);
-  float exposure = 1.2 + energy * 0.2;
-  float mapped = 1.0 - exp(-maxC * exposure);
-  col = hueRatio * mapped;
-  float luma = dot(col, vec3(0.2126, 0.7152, 0.0722));
-  float contrast = mix(0.95, 1.06, energy);
-  col = mix(vec3(luma), col, contrast);
-  return col;
-}
-
-uniform float uTime;
-uniform float uDynamicTime;
-uniform float uCentroid;
-uniform float uRms;
-uniform float uEnergy;
-uniform float uChromaHue;
-uniform float uPalettePrimary;
-uniform float uPaletteSecondary;
-uniform float uPaletteSaturation;
-uniform float uSectionProgress;
-uniform float uBeatSnap;
-uniform float uMusicalTime;
-uniform float uOnsetSnap;
-uniform float uBass;
-uniform float uHighs;
-uniform float uChromaShift;
-uniform float uAfterglowHue;
-uniform float uClimaxPhase;
-uniform float uClimaxIntensity;
-uniform float uCoherence;
-uniform float uFastEnergy;
-uniform float uDrumOnset;
+${sharedUniformsGLSL}
 
 varying vec3 vNormal;
 varying vec3 vWorldPos;

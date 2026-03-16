@@ -45,8 +45,8 @@ import { EraGrade } from "./components/EraGrade";
 import { EnergyEnvelope } from "./components/EnergyEnvelope";
 import { computeClimaxState, climaxModulation } from "./utils/climax-state";
 import { computeAudioSnapshot, buildBeatArray } from "./utils/audio-reactive";
-import { computeCoherence, resetCoherence } from "./utils/coherence";
-import { computeDrumsSpacePhase, resetDrumsSpacePhase } from "./utils/drums-space-phase";
+import { computeCoherence } from "./utils/coherence";
+import { computeDrumsSpacePhase } from "./utils/drums-space-phase";
 import { useShowNarrative } from "./data/ShowNarrativeContext";
 import { calibrateEnergy } from "./utils/energy";
 import { AudioSnapshotProvider } from "./data/AudioSnapshotContext";
@@ -305,7 +305,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
   const itState = computeITResponse(f, frameIdx);
 
   // Drums→Space phase detection
-  const drumsSpaceState = isDrumsSpace ? computeDrumsSpacePhase(audioSnapshot, isDrumsSpace) : null;
+  const drumsSpaceState = isDrumsSpace ? computeDrumsSpacePhase(f, frameIdx, isDrumsSpace) : null;
 
   const climaxState = computeClimaxState(f, frame, sections, audioSnapshot.energy);
   const climaxMod = climaxModulation(climaxState, songIdentity?.climaxBehavior);

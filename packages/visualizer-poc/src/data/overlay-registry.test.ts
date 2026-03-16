@@ -32,8 +32,8 @@ describe("overlay-registry integrity", () => {
     expect(unique.size).toBe(names.length);
   });
 
-  it("has exactly 48 entries (46 selectable + 2 always-active)", () => {
-    expect(OVERLAY_REGISTRY.length).toBe(48);
+  it("has exactly 59 entries (57 selectable + 2 always-active)", () => {
+    expect(OVERLAY_REGISTRY.length).toBe(59);
   });
 
   it("all entries have required fields", () => {

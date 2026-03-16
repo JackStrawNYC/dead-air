@@ -5,6 +5,8 @@
  */
 
 import { noiseGLSL } from "./noise";
+import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
+import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
 
 export const oilProjectorVert = /* glsl */ `
 varying vec2 vUv;
@@ -19,40 +21,9 @@ precision highp float;
 
 ${noiseGLSL}
 
-uniform float uTime;
-uniform float uDynamicTime;
-uniform float uBass;
-uniform float uRms;
-uniform float uCentroid;
-uniform float uHighs;
-uniform float uOnset;
-uniform float uBeat;
-uniform float uMids;
-uniform vec2 uResolution;
-uniform float uEnergy;
-uniform float uSectionProgress;
-uniform float uSectionIndex;
-uniform float uChromaHue;
-uniform float uFlatness;
-uniform float uPalettePrimary;
-uniform float uPaletteSecondary;
-uniform float uPaletteSaturation;
-uniform float uTempo;
-uniform float uOnsetSnap;
-uniform float uBeatSnap;
-uniform float uMusicalTime;
-uniform float uChromaShift;
-uniform float uAfterglowHue;
-uniform float uClimaxPhase;
-uniform float uClimaxIntensity;
-uniform vec4 uContrast0;
-uniform vec4 uContrast1;
-uniform float uCoherence;
-uniform float uFastEnergy;
-uniform float uFastBass;
-uniform float uDrumOnset;
-uniform float uDrumBeat;
-uniform float uSpectralFlux;
+${sharedUniformsGLSL}
+
+${buildPostProcessGLSL({ grainStrength: 'normal' })}
 
 varying vec2 vUv;
 
@@ -114,9 +85,11 @@ void main() {
   // === LAYER 1: Dark warm base (overhead projector glass) ===
   vec3 col = vec3(0.02, 0.015, 0.01);
 
-  // === LAYER 2: Primary oil blob (largest, slowest — with slow rotation) ===
+  // === LAYER 2: Primary oil blob (largest, slowest — with slow rotation + curl advection) ===
   float orbitAngle1 = uDynamicTime * 0.02;
   vec2 orbit1 = vec2(cos(orbitAngle1), sin(orbitAngle1)) * 0.08;
+  // Curl noise advection for organic, fluid blob motion
+  orbit1 += curlNoise(vec3(orbit1, uDynamicTime * 0.1)).xy * 0.2;
   vec3 blob1Pos = vec3(p * 0.5 + orbit1 + vec2(0.0, -uDynamicTime * 0.008), t * 0.3 + sectionSeed);
   // Warp for organic movement
   float w1x = fbm(blob1Pos + vec3(3.1, 7.2, 0.0));
@@ -128,9 +101,11 @@ void main() {
   vec3 col1 = 0.5 + 0.5 * cos(6.28318 * vec3(hue1, hue1 + 0.33, hue1 + 0.67));
   col1 *= mix(0.40, 0.95, energy);
 
-  // === LAYER 3: Secondary oil blob (smaller, offset — with counter-rotation) ===
+  // === LAYER 3: Secondary oil blob (smaller, offset — with counter-rotation + curl advection) ===
   float orbitAngle2 = -uDynamicTime * 0.025;
   vec2 orbit2 = vec2(cos(orbitAngle2), sin(orbitAngle2)) * 0.06;
+  // Curl noise advection for organic, fluid blob motion
+  orbit2 += curlNoise(vec3(orbit2 + 5.0, uDynamicTime * 0.1)).xy * 0.2;
   vec3 blob2Pos = vec3(p * 0.6 + orbit2 + vec2(0.3, -0.2 - uDynamicTime * 0.005), t * 0.35 + sectionSeed * 0.7);
   float w2x = fbm(blob2Pos + vec3(5.5, 2.1, 0.0));
   float w2y = fbm(blob2Pos + vec3(1.3, 6.8, 0.0));
@@ -141,8 +116,11 @@ void main() {
   vec3 col2 = 0.5 + 0.5 * cos(6.28318 * vec3(hue2, hue2 + 0.33, hue2 + 0.67));
   col2 *= mix(0.35, 0.85, energy);
 
-  // === LAYER 4: Tertiary blob (smallest, fastest, accent) ===
-  vec3 blob3Pos = vec3(p * 0.8 + vec2(-0.15, 0.25), t * 0.45 + sectionSeed * 1.3);
+  // === LAYER 4: Tertiary blob (smallest, fastest, accent + curl advection) ===
+  vec2 blob3Offset = vec2(-0.15, 0.25);
+  // Curl noise advection for organic, fluid blob motion
+  blob3Offset += curlNoise(vec3(blob3Offset + 10.0, uDynamicTime * 0.1)).xy * 0.2;
+  vec3 blob3Pos = vec3(p * 0.8 + blob3Offset, t * 0.45 + sectionSeed * 1.3);
   float w3x = fbm3(blob3Pos + vec3(2.7, 4.4, 0.0));
   float w3y = fbm3(blob3Pos + vec3(7.1, 3.2, 0.0));
   vec3 warped3 = vec3(p + vec2(w3x, w3y) * (0.25 + uHighs * 0.1), t * 0.4);
@@ -156,6 +134,31 @@ void main() {
   col += col1 * blob1 * 0.5;
   col += col2 * blob2 * 0.4;
   col += col3 * blob3 * 0.3;
+
+  // === KELVIN-HELMHOLTZ INSTABILITY: wavy mixing at blob interfaces ===
+  // Where two blobs of different colors meet, add ridged-noise turbulent mixing
+  {
+    // Blob 1-2 interface
+    float interface12 = blob1 - blob2;
+    float khWave12 = ridged4(vec3(p * 8.0, uDynamicTime * 0.3));
+    float mixZone12 = smoothstep(-0.05, 0.05, interface12 + khWave12 * 0.08);
+    float interfaceStrength12 = smoothstep(0.3, 0.0, abs(interface12)) * 0.15;
+    col += mix(col2, col1, mixZone12) * interfaceStrength12;
+
+    // Blob 2-3 interface
+    float interface23 = blob2 - blob3;
+    float khWave23 = ridged4(vec3(p * 8.0 + 3.7, uDynamicTime * 0.3));
+    float mixZone23 = smoothstep(-0.05, 0.05, interface23 + khWave23 * 0.08);
+    float interfaceStrength23 = smoothstep(0.3, 0.0, abs(interface23)) * 0.12;
+    col += mix(col3, col2, mixZone23) * interfaceStrength23;
+
+    // Blob 1-3 interface
+    float interface13 = blob1 - blob3;
+    float khWave13 = ridged4(vec3(p * 8.0 + 7.1, uDynamicTime * 0.3));
+    float mixZone13 = smoothstep(-0.05, 0.05, interface13 + khWave13 * 0.08);
+    float interfaceStrength13 = smoothstep(0.3, 0.0, abs(interface13)) * 0.12;
+    col += mix(col3, col1, mixZone13) * interfaceStrength13;
+  }
 
   // === EDGE HIGHLIGHTS: light-catching blob boundaries ===
   float edgeGlow1 = blobEdgeGlow(blob1, energy);

@@ -14,6 +14,7 @@
  */
 
 import { noiseGLSL } from "./noise";
+import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 
 export const smokeAndMirrorsVert = /* glsl */ `
 varying vec2 vUv;
@@ -28,60 +29,29 @@ precision highp float;
 
 ${noiseGLSL}
 
-uniform float uTime;
-uniform float uDynamicTime;
-uniform float uBass;
-uniform float uRms;
-uniform float uCentroid;
-uniform float uHighs;
-uniform float uOnset;
-uniform float uBeat;
-uniform float uMids;
-uniform vec2 uResolution;
-uniform float uEnergy;
-uniform float uSectionProgress;
-uniform float uSectionIndex;
-uniform float uChromaHue;
-uniform float uFlatness;
-uniform float uPalettePrimary;
-uniform float uPaletteSecondary;
-uniform float uPaletteSaturation;
-uniform float uTempo;
-uniform float uOnsetSnap;
-uniform float uBeatSnap;
-uniform float uMusicalTime;
-uniform float uChromaShift;
-uniform float uAfterglowHue;
-uniform float uClimaxPhase;
-uniform float uClimaxIntensity;
-uniform vec4 uContrast0;
-uniform vec4 uContrast1;
-uniform float uCoherence;
-uniform float uFastEnergy;
-uniform float uFastBass;
-uniform float uDrumOnset;
-uniform float uDrumBeat;
-uniform float uSpectralFlux;
-uniform float uSlowEnergy;
+${sharedUniformsGLSL}
 
 varying vec2 vUv;
 
 #define PI 3.14159265
 
-vec3 hsv2rgb(vec3 c) {
-  vec4 K = vec4(1.0, 2.0/3.0, 1.0/3.0, 3.0);
-  vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
-  return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
-}
-
-// Smoke density field (FBM-based with bass modulation)
-float smokeDensity(vec3 p, float bass, float time) {
+// Smoke density field (FBM + curl noise advection with bass modulation)
+float smokeDensity(vec3 p, float bass, float time, float energy) {
   // Upward drift
   p.y -= time * 0.3;
   p.x += sin(p.y * 0.5 + time * 0.2) * 0.3;
 
+  // Curl noise advection for fluid smoke motion (gated behind energy > 0.2)
+  if (energy > 0.2) {
+    vec3 curl = curlNoise(vec3(p.xy, time * 0.1));
+    p += curl * 0.25 * smoothstep(0.2, 0.6, energy);
+  }
+
   float d = fbm(p * 0.8);
   d += fbm3(p * 1.6 + 3.0) * 0.5;
+
+  // Curl noise density contribution
+  d += curlNoise(vec3(p.xy, time * 0.1)).z * 0.3;
 
   // Bass thickens fog
   d *= 0.5 + bass * 0.5;
@@ -127,18 +97,18 @@ void main() {
   float isClimax = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5);
   float climaxBoost = isClimax * uClimaxIntensity;
 
-  // === VOLUMETRIC FOG RAYMARCH (10 steps) ===
+  // === VOLUMETRIC FOG RAYMARCH (24 steps for denser volumetric smoke) ===
   vec3 fogAccum = vec3(0.0);
   float fogAlpha = 0.0;
-  float fogSteps = 10.0;
+  float fogSteps = 24.0;
 
-  for (int i = 0; i < 10; i++) {
+  for (int i = 0; i < 24; i++) {
     float fi = float(i);
-    float t = 0.5 + fi * 0.4;
+    float t = 0.3 + fi * 0.2;
     vec3 pos = ro + rd * t;
 
-    float density = smokeDensity(pos, bass, flowTime);
-    density *= 0.15; // thin out for accumulation
+    float density = smokeDensity(pos, bass, flowTime, energy);
+    density *= 0.08; // thinner per-step for more steps
 
     if (density > 0.001) {
       float alpha = density * (1.0 - fogAlpha);
@@ -185,11 +155,50 @@ void main() {
     float spec2 = pow(max(0.0, dot(reflect(rd, n2), lightDir)), 8.0 + highs * 24.0);
     float spec3 = pow(max(0.0, dot(reflect(rd, n3), lightDir)), 8.0 + highs * 24.0);
 
-    // Mirrors reflect a palette-tinted metallic color
+    // === REFLECTED RAY MARCH: secondary 8-step march through fog along reflected direction ===
+    vec3 reflectedFog1 = vec3(0.0);
+    vec3 reflectedFog2 = vec3(0.0);
+    vec3 reflectedFog3 = vec3(0.0);
+
+    if (mirror1 > 0.02) {
+      vec3 reflDir1 = reflect(rd, n1);
+      vec3 reflOrigin1 = ro + rd * 2.0;
+      for (int j = 0; j < 8; j++) {
+        float rt = 0.2 + float(j) * 0.3;
+        vec3 rpos = reflOrigin1 + reflDir1 * rt;
+        float rd1 = smokeDensity(rpos, bass, flowTime, energy) * 0.06;
+        vec3 rc = mix(fogTint * 0.25, mirrorTint * 0.15, float(j) / 8.0);
+        reflectedFog1 += rc * rd1;
+      }
+    }
+    if (mirror2 > 0.02) {
+      vec3 reflDir2 = reflect(rd, n2);
+      vec3 reflOrigin2 = ro + rd * 3.0;
+      for (int j = 0; j < 8; j++) {
+        float rt = 0.2 + float(j) * 0.3;
+        vec3 rpos = reflOrigin2 + reflDir2 * rt;
+        float rd2 = smokeDensity(rpos, bass, flowTime, energy) * 0.06;
+        vec3 rc = mix(fogTint * 0.2, mirrorTint * 0.12, float(j) / 8.0);
+        reflectedFog2 += rc * rd2;
+      }
+    }
+    if (mirror3 > 0.02) {
+      vec3 reflDir3 = reflect(rd, n3);
+      vec3 reflOrigin3 = ro + rd * 1.5;
+      for (int j = 0; j < 8; j++) {
+        float rt = 0.2 + float(j) * 0.3;
+        vec3 rpos = reflOrigin3 + reflDir3 * rt;
+        float rd3 = smokeDensity(rpos, bass, flowTime, energy) * 0.06;
+        vec3 rc = mix(fogTint * 0.2, mirrorTint * 0.1, float(j) / 8.0);
+        reflectedFog3 += rc * rd3;
+      }
+    }
+
+    // Mirrors reflect a palette-tinted metallic color + reflected fog
     vec3 mirrorColor = mix(vec3(0.7, 0.75, 0.8), mirrorTint, 0.3);
-    col += mirror1 * (mirrorColor * 0.3 + spec1 * vec3(1.0, 0.98, 0.95) * 0.6);
-    col += mirror2 * (mirrorColor * 0.25 + spec2 * vec3(1.0, 0.98, 0.95) * 0.5);
-    col += mirror3 * (mirrorColor * 0.2 + spec3 * vec3(1.0, 0.98, 0.95) * 0.4);
+    col += mirror1 * (mirrorColor * 0.3 + spec1 * vec3(1.0, 0.98, 0.95) * 0.6 + reflectedFog1);
+    col += mirror2 * (mirrorColor * 0.25 + spec2 * vec3(1.0, 0.98, 0.95) * 0.5 + reflectedFog2);
+    col += mirror3 * (mirrorColor * 0.2 + spec3 * vec3(1.0, 0.98, 0.95) * 0.4 + reflectedFog3);
   }
 
   // === AMBIENT FOG FLOOR: never pitch black ===

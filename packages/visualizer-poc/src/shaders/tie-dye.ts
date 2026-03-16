@@ -5,6 +5,7 @@
  */
 
 import { noiseGLSL } from "./noise";
+import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 
 export const tieDyeVert = /* glsl */ `
 varying vec2 vUv;
@@ -19,77 +20,30 @@ precision highp float;
 
 ${noiseGLSL}
 
-uniform float uTime;
-uniform float uDynamicTime;
-uniform float uBass;
-uniform float uRms;
-uniform float uCentroid;
-uniform float uHighs;
-uniform float uOnset;
-uniform float uBeat;
-uniform float uMids;
-uniform vec2 uResolution;
-uniform float uEnergy;
-uniform float uSectionProgress;
-uniform float uSectionIndex;
-uniform float uChromaHue;
-uniform float uFlatness;
-uniform float uPalettePrimary;
-uniform float uPaletteSecondary;
-uniform float uPaletteSaturation;
-uniform float uTempo;
-uniform float uOnsetSnap;
-uniform float uBeatSnap;
-uniform float uMusicalTime;
-uniform float uChromaShift;
-uniform float uAfterglowHue;
-uniform float uClimaxPhase;
-uniform float uClimaxIntensity;
-uniform vec4 uContrast0;
-uniform vec4 uContrast1;
-uniform float uCoherence;
-uniform float uFastEnergy;
-uniform float uFastBass;
-uniform float uDrumOnset;
-uniform float uDrumBeat;
-uniform float uSpectralFlux;
+${sharedUniformsGLSL}
 
 varying vec2 vUv;
 
 #define PI 3.14159265
 #define TAU 6.28318530
 
-vec3 hsv2rgb(vec3 c) {
-  vec4 K = vec4(1.0, 2.0/3.0, 1.0/3.0, 3.0);
-  vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
-  return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
-}
-
-float fbm3(vec3 p) {
-  float v = 0.0;
-  float a = 0.5;
-  for (int i = 0; i < 4; i++) {
-    v += a * snoise(p);
-    p *= 2.1;
-    a *= 0.5;
-  }
-  return v;
-}
-
 void main() {
   vec2 uv = (gl_FragCoord.xy - 0.5 * uResolution) / min(uResolution.x, uResolution.y);
-
-  // Radial coordinates
-  float r = length(uv);
-  float angle = atan(uv.y, uv.x);
 
   // Time-based rotation — bass drives swirl speed
   float t = uDynamicTime * 0.15 * (0.8 + uBass * 0.6 + uFastBass * 0.4);
   float bassSwirl = uBass * 1.5;
 
+  // === CURL NOISE UV WARPING: simulate fabric wrinkles ===
+  vec2 warpedUv = uv + curlNoise(vec3(uv * 2.0, uDynamicTime * 0.08)).xy * 0.15;
+
+  // Radial coordinates (using warped UVs for wrinkle distortion)
+  float r = length(warpedUv);
+  float angle = atan(warpedUv.y, warpedUv.x);
+
   // Domain warping — noise-based spiral distortion
-  float warp1 = fbm3(vec3(uv * 2.0 + t * 0.3, t * 0.2));
-  float warp2 = fbm3(vec3(uv * 1.5 - t * 0.2, t * 0.15 + 10.0));
+  float warp1 = fbm3(vec3(warpedUv * 2.0 + t * 0.3, t * 0.2));
+  float warp2 = fbm3(vec3(warpedUv * 1.5 - t * 0.2, t * 0.15 + 10.0));
 
   // Spiral pattern
   float spiral = angle / TAU + r * (3.0 + bassSwirl) + warp1 * 0.8 + t;
@@ -115,6 +69,10 @@ void main() {
   float val = 0.25 + pattern * 0.35 + uEnergy * 0.25;
 
   vec3 color = hsv2rgb(vec3(fract(hue), sat, val));
+
+  // === FABRIC TEXTURE: ridged noise for creases and folds ===
+  float fabric = ridged4(vec3(warpedUv * 3.0, uDynamicTime * 0.05));
+  color *= 0.85 + fabric * 0.3; // darken creases, brighten ridges
 
   // === SDF STEALIE: emerges from the tie-dye swirl ===
   {

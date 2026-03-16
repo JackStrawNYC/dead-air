@@ -19,7 +19,7 @@
  *   --resume      Skip tracks with existing output
  *   --track=ID    Render only one track
  *   --gl=angle    GPU backend (default: angle)
- *   --chunk=N     Frames per chunk for long songs (default: 4500)
+ *   --chunk=N     Frames per chunk for long songs (default: 3000)
  *   --preview     Render only first 300 frames (10s) to a separate preview file
  *   --show-date   Show date for output naming (default: from setlist.json)
  *   --data-dir    Data directory override (default: ROOT/data)
@@ -46,7 +46,7 @@ const args = process.argv.slice(2);
 const resume = args.includes("--resume");
 const draftMode = args.includes("--draft");
 const glArg = args.find((a) => a.startsWith("--gl="))?.split("=")[1] ?? "angle";
-const chunkSize = parseInt(args.find((a) => a.startsWith("--chunk="))?.split("=")[1] ?? "4500", 10);
+const chunkSize = parseInt(args.find((a) => a.startsWith("--chunk="))?.split("=")[1] ?? "3000", 10);
 const trackFilter = args.find((a) => a.startsWith("--track="))?.split("=")[1];
 const previewMode = args.includes("--preview");
 const showDateArg = args.find((a) => a.startsWith("--show-date="))?.split("=")[1];
@@ -224,6 +224,36 @@ function preflight(songs: SetlistEntry[], tracks: TimelineTrack[]): void {
   console.log(`  All ${songs.length} songs: analysis + audio + timeline ✓\n`);
 }
 
+// ─── Render retry logic ───
+
+const MAX_RETRIES = 3;
+const RETRY_BACKOFF_MS = [10_000, 20_000, 40_000]; // exponential backoff: 10s, 20s, 40s
+
+/**
+ * Execute a render command with retry logic (3 attempts, exponential backoff).
+ * Logs attempt number and error details on failure.
+ */
+function execWithRetry(cmd: string, opts: { cwd: string; stdio: "inherit" | "pipe" }, label: string): void {
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      execSync(cmd, opts);
+      return; // success
+    } catch (err: any) {
+      const errorMsg = err.stderr?.toString().slice(-500) || err.message || "Unknown error";
+      console.error(`  RENDER FAILED (attempt ${attempt}/${MAX_RETRIES}) [${label}]: ${errorMsg}`);
+
+      if (attempt < MAX_RETRIES) {
+        const waitMs = RETRY_BACKOFF_MS[attempt - 1];
+        console.log(`  Retrying in ${waitMs / 1000}s ...`);
+        execSync(`sleep ${waitMs / 1000}`);
+      } else {
+        console.error(`  All ${MAX_RETRIES} attempts failed for [${label}]. Aborting.`);
+        throw err;
+      }
+    }
+  }
+}
+
 // ─── Song rendering: video-only chunks + audio mux ───
 
 /**
@@ -259,7 +289,7 @@ function renderSong(
         `--frames=0-${totalFrames - 1}`,
         "--muted",
       ].join(" ");
-      execSync(cmd, { cwd: ROOT, stdio: "inherit" });
+      execWithRetry(cmd, { cwd: ROOT, stdio: "inherit" }, `${song.trackId} single-pass`);
     } else {
       console.log(`  RESUME: video-only already rendered`);
     }
@@ -288,7 +318,7 @@ function renderSong(
           `--frames=${start}-${end}`,
           "--muted",
         ].join(" ");
-        execSync(cmd, { cwd: ROOT, stdio: "inherit" });
+        execWithRetry(cmd, { cwd: ROOT, stdio: "inherit" }, `${song.trackId} chunk ${start}-${end}`);
       }
 
       chunks.push(chunkPath);

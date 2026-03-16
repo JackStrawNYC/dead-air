@@ -17,12 +17,12 @@
  * merging into SONG_IDENTITIES at init time based on BandConfig.
  */
 
-import type { VisualMode, ColorPalette, OverlayTag } from "./types";
+import type { VisualMode, ColorPalette, OverlayTag, TrackMeta, EnhancedFrameData } from "./types";
 import type { DrumsSpaceSubPhase } from "../utils/drums-space-phase";
 
 // ─── Types ───
 
-export type TransitionStyle = "dissolve" | "morph" | "flash" | "void";
+export type TransitionStyle = "dissolve" | "morph" | "flash" | "void" | "radial_wipe" | "distortion_morph" | "luminance_key";
 
 export interface ClimaxBehavior {
   /** Peak saturation offset (additive, default from climax-state) */
@@ -589,4 +589,102 @@ export function lookupSongIdentity(title: string): SongIdentity | undefined {
   }
 
   return undefined;
+}
+
+// ─── Fallback Identity Generation ───
+
+/**
+ * Generate a fallback identity from audio analysis when no curated identity exists.
+ * Derives visual parameters from the song's acoustic profile so that every song
+ * gets a reasonable visual personality even without manual curation.
+ *
+ * Heuristics:
+ * - Palette primary hue derived from spectral centroid (bright → warm, dark → cool)
+ * - Secondary hue is a triadic complement (+120 degrees)
+ * - Saturation from spectral flatness (tonal → saturated, noisy → desaturated)
+ * - Preferred modes from energy level and tempo
+ * - Mood keywords from combined acoustic features
+ */
+export function generateFallbackIdentity(
+  trackId: string,
+  title: string,
+  meta: TrackMeta,
+  frames: EnhancedFrameData[],
+): SongIdentity {
+  if (frames.length === 0) {
+    // Degenerate case: no frames — return a neutral identity
+    return {
+      preferredModes: ["liquid_light", "oil_projector"],
+      palette: { primary: 200, secondary: 320, saturation: 0.8 },
+      moodKeywords: [],
+    };
+  }
+
+  // 1. Compute average acoustic features across all frames
+  const avgEnergy = frames.reduce((sum, f) => sum + f.rms, 0) / frames.length;
+  const avgCentroid = frames.reduce((sum, f) => sum + f.centroid, 0) / frames.length;
+  const avgFlatness = frames.reduce((sum, f) => sum + f.flatness, 0) / frames.length;
+  const avgSub = frames.reduce((sum, f) => sum + f.sub, 0) / frames.length;
+  const tempo = meta.tempo;
+
+  // 2. Derive palette from centroid (bright songs = warm hue)
+  //    Map centroid 0-1 to hue degrees: low centroid → cool blue (216°), high → warm orange (29°)
+  const primaryHue = Math.round(216 - avgCentroid * 187); // 29° (warm) to 216° (cool)
+  //    Secondary: triadic complement (+120°)
+  const secondaryHue = (primaryHue + 120) % 360;
+  //    Saturation from flatness: tonal (low flatness) → high saturation
+  const saturation = 0.7 + (1.0 - avgFlatness) * 0.3;
+
+  // 3. Derive preferred modes from energy and tempo
+  const preferredModes: VisualMode[] = [];
+  if (avgEnergy > 0.25) {
+    preferredModes.push("liquid_light", "inferno");
+    if (tempo > 140) preferredModes.push("concert_lighting");
+  } else if (avgEnergy > 0.12) {
+    preferredModes.push("oil_projector", "cosmic_voyage");
+    if (avgSub > 0.3) preferredModes.push("deep_ocean");
+  } else {
+    preferredModes.push("aurora", "deep_ocean");
+    if (avgFlatness > 0.4) preferredModes.push("void_light");
+    else preferredModes.push("cosmic_dust");
+  }
+
+  // 4. Derive mood keywords
+  const keywords: OverlayTag[] = [];
+  if (avgEnergy > 0.25) keywords.push("intense", "energetic");
+  else if (avgEnergy > 0.12) keywords.push("flowing", "dynamic");
+  else keywords.push("contemplative", "ethereal");
+
+  if (avgSub > 0.3) keywords.push("deep");
+  if (avgCentroid > 0.5) keywords.push("bright");
+  if (avgFlatness > 0.4) keywords.push("textural");
+  if (tempo > 140) keywords.push("driving");
+  else if (tempo < 90) keywords.push("spacious");
+
+  // 5. Build the identity — no transition overrides or D/S shaders for fallbacks
+  return {
+    preferredModes,
+    palette: {
+      primary: primaryHue,
+      secondary: secondaryHue,
+      saturation,
+    },
+    moodKeywords: keywords,
+  };
+}
+
+/**
+ * Look up a curated song identity, falling back to auto-generation from audio data.
+ * Always returns a SongIdentity — either curated or derived from acoustic features.
+ *
+ * Use this when audio analysis data is available and you want guaranteed identity.
+ * For cases where audio data is not available, use `lookupSongIdentity()` instead.
+ */
+export function getOrGenerateSongIdentity(
+  trackId: string,
+  title: string,
+  meta: TrackMeta,
+  frames: EnhancedFrameData[],
+): SongIdentity {
+  return lookupSongIdentity(title) ?? generateFallbackIdentity(trackId, title, meta, frames);
 }

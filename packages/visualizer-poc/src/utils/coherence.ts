@@ -12,6 +12,10 @@
  *
  * Lock detection: score > 0.65 for 90 consecutive frames (3s).
  * Hysteresis: stays locked until score < 0.45 for 60 frames.
+ *
+ * DETERMINISTIC: pure function of frame data (no module-level state).
+ * Remotion renders frames out of order, so lock state is derived by
+ * scanning backward from the current frame and simulating hysteresis.
  */
 
 import type { EnhancedFrameData } from "../data/types";
@@ -144,32 +148,45 @@ function energySustain(
   return Math.max(0, Math.min(1, 1 - flux * 0.5));
 }
 
-// ─── Lock state tracking ───
-
-// Module-level state for lock hysteresis tracking
-let lockState = false;
-let framesAboveThreshold = 0;
-let framesBelowThreshold = 0;
-let lockStartFrame = -1;
+// ─── Lock detection constants ───
 
 const LOCK_ENTER_THRESHOLD = 0.65;
 const LOCK_EXIT_THRESHOLD = 0.45;
 const LOCK_ENTER_FRAMES = 90;  // 3 seconds at 30fps
 const LOCK_EXIT_FRAMES = 60;   // 2 seconds at 30fps
 
-/** Reset lock state (call between songs) */
-export function resetCoherence(): void {
-  lockState = false;
-  framesAboveThreshold = 0;
-  framesBelowThreshold = 0;
-  lockStartFrame = -1;
+/** Max frames to scan backward for lock state determination */
+const LOCK_SCAN_WINDOW = 300;
+
+// ─── Stateless helpers ───
+
+/**
+ * Compute raw coherence score for a single frame (weighted average of 4 signals).
+ * Pure function — no lock detection, no state.
+ */
+export function computeRawScore(
+  frames: EnhancedFrameData[],
+  idx: number,
+): number {
+  if (frames.length === 0) return 0;
+  const safeIdx = Math.min(Math.max(0, idx), frames.length - 1);
+
+  const chroma = chromaStability(frames, safeIdx, 30);
+  const beat = beatRegularity(frames, safeIdx, 60);
+  const density = spectralDensity(frames, safeIdx);
+  const sustain = energySustain(frames, safeIdx);
+
+  return chroma * 0.30 + beat * 0.25 + density * 0.25 + sustain * 0.20;
 }
 
 // ─── Main computation ───
 
 /**
  * Compute coherence score for a single frame.
- * Call once per frame in SongVisualizer.
+ *
+ * DETERMINISTIC: pure function of frame data (no module-level state).
+ * Scans backward from current frame to determine lock state via hysteresis
+ * simulation. Safe for Remotion's out-of-order frame rendering.
  */
 export function computeCoherence(
   frames: EnhancedFrameData[],
@@ -180,49 +197,46 @@ export function computeCoherence(
   }
 
   const safeIdx = Math.min(Math.max(0, idx), frames.length - 1);
+  const score = computeRawScore(frames, safeIdx);
 
-  // Weighted average of 4 signals
-  const chroma = chromaStability(frames, safeIdx, 30);
-  const beat = beatRegularity(frames, safeIdx, 60);
-  const density = spectralDensity(frames, safeIdx);
-  const sustain = energySustain(frames, safeIdx);
+  // Scan backward to determine lock state via hysteresis simulation
+  const scanStart = Math.max(0, safeIdx - LOCK_SCAN_WINDOW);
 
-  const score =
-    chroma * 0.30 +
-    beat * 0.25 +
-    density * 0.25 +
-    sustain * 0.20;
+  let locked = false;
+  let framesAbove = 0;
+  let framesBelow = 0;
+  let lockStart = -1;
 
-  // Hysteresis lock detection
-  if (score > LOCK_ENTER_THRESHOLD) {
-    framesAboveThreshold++;
-    framesBelowThreshold = 0;
-  } else if (score < LOCK_EXIT_THRESHOLD) {
-    framesBelowThreshold++;
-    framesAboveThreshold = 0;
-  } else {
-    // In between thresholds — don't change state
-    framesAboveThreshold = 0;
-    framesBelowThreshold = 0;
+  for (let i = scanStart; i <= safeIdx; i++) {
+    const s = computeRawScore(frames, i);
+
+    if (s > LOCK_ENTER_THRESHOLD) {
+      framesAbove++;
+      framesBelow = 0;
+    } else if (s < LOCK_EXIT_THRESHOLD) {
+      framesBelow++;
+      framesAbove = 0;
+    } else {
+      framesAbove = 0;
+      framesBelow = 0;
+    }
+
+    if (!locked && framesAbove >= LOCK_ENTER_FRAMES) {
+      locked = true;
+      lockStart = i - LOCK_ENTER_FRAMES + 1;
+    }
+
+    if (locked && framesBelow >= LOCK_EXIT_FRAMES) {
+      locked = false;
+      lockStart = -1;
+    }
   }
 
-  if (!lockState && framesAboveThreshold >= LOCK_ENTER_FRAMES) {
-    lockState = true;
-    lockStartFrame = safeIdx;
-  }
-
-  if (lockState && framesBelowThreshold >= LOCK_EXIT_FRAMES) {
-    lockState = false;
-    lockStartFrame = -1;
-  }
-
-  const lockDuration = lockState && lockStartFrame >= 0
-    ? safeIdx - lockStartFrame
-    : 0;
+  const lockDuration = locked && lockStart >= 0 ? safeIdx - lockStart : 0;
 
   return {
     score: Math.max(0, Math.min(1, score)),
-    isLocked: lockState,
+    isLocked: locked,
     lockDuration: Math.max(0, lockDuration),
   };
 }

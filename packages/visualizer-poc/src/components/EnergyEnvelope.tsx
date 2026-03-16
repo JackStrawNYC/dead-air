@@ -14,7 +14,7 @@ import React from "react";
 import { energyToFactor } from "../utils/energy";
 import type { EnergyCalibration } from "../utils/energy";
 import type { AudioSnapshot } from "../utils/audio-reactive";
-import { detectTexture, type ClimaxModulation } from "../utils/climax-state";
+import type { ClimaxModulation } from "../utils/climax-state";
 import { getSetTheme } from "../utils/set-theme";
 import { useShowContext } from "../data/ShowContext";
 import { getEraPreset } from "../data/era-presets";
@@ -74,88 +74,54 @@ export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod,
   // ── Multi-field modulations (gentle — felt, not seen) ──
   // Onset: percussive attacks create mild brightness punch
   const onsetBrightness = snapshot.onsetEnvelope * 0.15;    // +0-15%
-  // Flatness: tonal passages richer, noisy passages flatter
-  const flatnessSaturation = 0.02 - snapshot.flatness * 0.04; // +2% to -2%
 
-  const texture = detectTexture(snapshot, energy);
-
-  // Texture-aware saturation offset (gentle — Space subdued, not grayscale)
-  const textureSaturationOffset =
-    texture === "ambient" ? -0.03 :   // Space: slightly subdued
-    texture === "sparse" ? -0.02 :    // ballad intros: barely restrained
-    texture === "peak" ? +0.02 : 0;   // peaks: touch of saturation
-
-  // Era-specific color adjustments
+  // Era-specific color adjustments (hue shift only — saturation handled by GLSL)
   const eraPreset = getEraPreset(showCtx?.era ?? "");
   const eraColorTempShift = eraPreset?.colorTempShift ?? 0;
-  const eraSatOffset = eraPreset?.saturationOffset ?? 0;
 
-  // Psychedelic color strategy: saturate hard, brighten gently.
-  // Vivid colors come from high saturation + contrast, NOT high brightness.
-  // Saturation: 0.75 (quiet) → 1.25 (loud), capped at 1.40.
-  // Higher CSS saturation crushes dark-pixel non-dominant channels toward zero,
-  // making dark areas blacker and colors monochromatic (green-only at high energy).
-  // Keep saturation moderate; shaders provide color richness internally.
-  // Brightness: 0.92 (quiet) → 1.20 (loud) — fills the frame, never washes out
-  // Contrast:   0.95 (quiet) → 1.15 (loud) — punchy but not crushing
-  // Gate reactive CSS terms during quiet to prevent frame-to-frame jitter
+  // GLSL owns color grading (saturation + contrast via cinematicGrade).
+  // CSS handles brightness + hue only to avoid compound color crushing.
+  // Previous CSS saturate/contrast compounded with GLSL tone mapping:
+  //   0.70 × 0.75 = 0.525 effective saturation — too muted.
   const cssGate = factor; // 0 during quiet, 1 during loud (already smoothstep-based)
-  const saturation = Math.min(1.40, (0.75 + factor * 0.50 + flatnessSaturation * cssGate + textureSaturationOffset * cssGate + (climaxMod?.saturationOffset ?? 0) + eraSatOffset + (snapshot.drumOnset ?? 0) * 0.06 * cssGate) * counterpointSatMult * setTheme.saturationMult);
   const isClimaxPhase = (climaxMod?.brightnessOffset ?? 0) > 0.04;
   const brightCap = isClimaxPhase ? 1.50 : 1.25;
   const brightness = Math.min(brightCap, 0.92 + factor * 0.28 + onsetBrightness * 0.4 * cssGate + (climaxMod?.brightnessOffset ?? 0) + setTheme.brightnessOffset + (snapshot.fastEnergy ?? 0) * 0.12 * cssGate);
-  // Contrast: restrained range (0.97-1.10) to preserve GLSL stage flood + lifted blacks.
-  // High CSS contrast crushes dark values back toward black, undoing shader color work.
-  const contrast = Math.min(1.15, 0.95 + factor * 0.20 + (climaxMod?.contrastOffset ?? 0) * 0.5);
   // Bloom uses slow energy (drift, not pulse) — reduced to prevent white wash
   const bloomOpacity = slowFactor * 0.35 + (climaxMod?.bloomOffset ?? 0) * 0.5 + (snapshot.fastEnergy ?? 0) * 0.05;
 
-  // Drums/Space phase adjustments
-  let dsSatOffset = 0;
+  // Drums/Space phase adjustments (brightness + hue only — saturation/contrast handled by GLSL)
   let dsBrightOffset = 0;
   let dsHueOffset = 0;
-  let dsContrastOffset = 0;
   if (drumsSpacePhase === "space_ambient") {
-    dsSatOffset = -0.15;    // desaturated void
     dsBrightOffset = -0.10; // darkness
     dsHueOffset = 15;       // blue shift
   } else if (drumsSpacePhase === "drums_tribal") {
-    dsContrastOffset = 0.08; // primal punch
     dsHueOffset = 8;         // warmth shift
   }
 
   // Show narrative phase adjustments
-  let showSatOffset = 0;
   let showBrightOffset = 0;
   if (showPhase === "opening") {
     showBrightOffset = 0.03;  // show is fresh
-    showSatOffset = 0.05;
-  } else if (showPhase === "closing") {
-    showSatOffset = -0.05;    // bittersweet ending
   }
 
   // Song identity modifiers
-  const siSatOffset = songIdentity?.saturationOffset ?? 0;
   const siHueShift = songIdentity?.hueShift ?? 0;
-  const siPaletteSat = songIdentity?.palette?.saturation != null ? (songIdentity.palette.saturation - 1) * 0.2 : 0;
   const siPaletteBright = songIdentity?.palette?.brightness != null ? (songIdentity.palette.brightness - 1) * 0.2 : 0;
 
   // Show arc modifiers
-  const arcSatOffset = showArcModifiers?.saturationOffset ?? 0;
   const arcBrightOffset = showArcModifiers?.brightnessOffset ?? 0;
   const arcHueShift = showArcModifiers?.hueShift ?? 0;
 
   // IT luminance lift
   const itBrightLift = itLuminanceLift ?? 0;
 
-  // Vocal warmth: +15deg hue shift + +0.05 saturation during singing
+  // Vocal warmth: +15deg hue shift (saturation boost now handled by GLSL)
   const vocalHueShift = (vocalWarmth ?? 0) * 15;
-  const vocalSatBoost = (vocalWarmth ?? 0) * 0.05;
 
-  // Apply phase offsets + song identity + show arc + IT + vocal warmth
-  const finalSaturation = Math.min(1.40, Math.max(0.5, saturation + dsSatOffset + showSatOffset + siSatOffset + siPaletteSat + arcSatOffset + vocalSatBoost));
+  // Apply phase offsets + song identity + show arc + IT
   const finalBrightness = Math.min(brightCap, Math.max(0.55, brightness + dsBrightOffset + showBrightOffset + siPaletteBright + arcBrightOffset + itBrightLift));
-  const finalContrast = Math.min(1.20, Math.max(0.90, contrast + dsContrastOffset));
 
   // Guitar color temp: ±12deg hue shift based on Jerry's neck position
   const guitarHueShift = (guitarColorTemp ?? 0) * 12;
@@ -166,8 +132,8 @@ export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod,
   // Set-level warmth shift: Set 1 warm (+5deg), Set 2 cool (-8deg), Encore neutral (0)
   const totalHueShift = jamHueShift + setTheme.warmthShift + eraColorTempShift + dsHueOffset + siHueShift + arcHueShift + vocalHueShift + guitarHueShift;
   const filterStr = totalHueShift !== 0
-    ? `saturate(${finalSaturation.toFixed(3)}) brightness(${finalBrightness.toFixed(3)}) contrast(${finalContrast.toFixed(3)}) hue-rotate(${totalHueShift.toFixed(1)}deg)`
-    : `saturate(${finalSaturation.toFixed(3)}) brightness(${finalBrightness.toFixed(3)}) contrast(${finalContrast.toFixed(3)})`;
+    ? `brightness(${finalBrightness.toFixed(3)}) hue-rotate(${totalHueShift.toFixed(1)}deg)`
+    : `brightness(${finalBrightness.toFixed(3)})`;
 
   return (
     <div style={{ position: "absolute", inset: 0, filter: filterStr }}>

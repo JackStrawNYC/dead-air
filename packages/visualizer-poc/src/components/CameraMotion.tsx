@@ -61,10 +61,8 @@ function shakeHash(frame: number): { x: number; y: number } {
   return { x, y };
 }
 
-// Persisted transform for camera freeze (holds last computed values)
-let frozenTransform = { scale: 1.04, totalX: 0, totalY: 0 };
-
 export const CameraMotion: React.FC<Props> = ({ frames, children, jamEvolution, bass, cameraFreeze, drumsSpacePhase, fastEnergy, vocalPresence, isSolo, soloIntensity }) => {
+  const frozenTransform = React.useRef({ scale: 1.04, totalX: 0, totalY: 0 });
   const frame = useCurrentFrame();
   const idx = Math.min(Math.max(0, frame), frames.length - 1);
 
@@ -179,11 +177,11 @@ export const CameraMotion: React.FC<Props> = ({ frames, children, jamEvolution, 
 
   // Camera freeze: hold previous frame's transform during counterpoint freeze
   if (cameraFreeze) {
-    scale = frozenTransform.scale;
-    totalX = frozenTransform.totalX;
-    totalY = frozenTransform.totalY;
+    scale = frozenTransform.current.scale;
+    totalX = frozenTransform.current.totalX;
+    totalY = frozenTransform.current.totalY;
   } else {
-    frozenTransform = { scale, totalX, totalY };
+    frozenTransform.current = { scale, totalX, totalY };
   }
 
   return (

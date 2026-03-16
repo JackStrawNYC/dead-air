@@ -14,6 +14,8 @@
  */
 
 import { noiseGLSL } from "./noise";
+import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
+import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
 
 export const infernoVert = /* glsl */ `
 varying vec2 vUv;
@@ -28,42 +30,9 @@ precision highp float;
 
 ${noiseGLSL}
 
-uniform float uTime;
-uniform float uDynamicTime;
-uniform float uBass;
-uniform float uRms;
-uniform float uCentroid;
-uniform float uHighs;
-uniform float uOnset;
-uniform float uBeat;
-uniform float uMids;
-uniform vec2 uResolution;
-uniform float uEnergy;
-uniform float uSectionProgress;
-uniform float uSectionIndex;
-uniform float uChromaHue;
-uniform float uFlatness;
-uniform float uPalettePrimary;
-uniform float uPaletteSecondary;
-uniform float uPaletteSaturation;
-uniform float uTempo;
-uniform float uOnsetSnap;
-uniform float uBeatSnap;
-uniform float uMusicalTime;
-uniform float uChromaShift;
-uniform float uAfterglowHue;
-uniform float uClimaxPhase;
-uniform float uClimaxIntensity;
-uniform float uSlowEnergy;
-uniform vec4 uContrast0;
-uniform vec4 uContrast1;
-uniform float uJamDensity;
-uniform float uCoherence;
-uniform float uFastEnergy;
-uniform float uFastBass;
-uniform float uDrumOnset;
-uniform float uDrumBeat;
-uniform float uSpectralFlux;
+${sharedUniformsGLSL}
+
+${buildPostProcessGLSL({ halationEnabled: true, bloomThresholdOffset: -0.10, stageFloodEnabled: false })}
 
 varying vec2 vUv;
 
@@ -252,52 +221,8 @@ void main() {
   vec3 vigTint = flameColor * 0.03;
   col = mix(vigTint, col, vignette);
 
-  // === LIGHT LEAK ===
-  col += lightLeak(p, uDynamicTime, energy, uOnsetSnap);
-
-  // === CINEMATIC GRADE (tone map HDR → LDR before bloom) ===
-  // Hue-preserving mapping keeps fire orange, not white.
-  col = cinematicGrade(col, energy);
-
-  // === BLOOM: aggressive for fire (climax-amplified) ===
-  // Additive blend on LDR values. Screen blend goes negative with HDR (cyan on ANGLE).
-  float lum = dot(col, vec3(0.299, 0.587, 0.114));
-  float bloomThreshold = mix(0.3, 0.2, energy) - climaxBoost * 0.08;
-  float bloomAmount = max(0.0, lum - bloomThreshold) * (3.0 + climaxBoost * 2.0);
-  vec3 bloomColor = mix(col, vec3(1.0, 0.9, 0.7), 0.4);
-  vec3 bloom = bloomColor * bloomAmount * (0.5 + climaxBoost * 0.25);
-  col = col + bloom - col * bloom; // screen blend (safe: col is LDR from tone map)
-
-  // Skip stageFloodFill for inferno — ambient heat provides warm fire glow.
-  // stageFloodFill uses palette hues which can be cold/blue, wrong for fire.
-
-  // === ANAMORPHIC FLARE: horizontal light streak ===
-  col = anamorphicFlare(vUv, col, energy, uOnsetSnap);
-
-  // === HALATION: warm film bloom ===
-  col = halation(vUv, col, energy);
-
-  // === FILM GRAIN ===
-  float grainTime = floor(uTime * 15.0) / 15.0;
-  float grainIntensity = mix(0.04, 0.02, energy);
-  col += filmGrainRes(uv, grainTime, uResolution.y) * grainIntensity;
-
-  // ONSET SATURATION PULSE: push colors away from gray (psychedelic, not white)
-  float onsetPulse = step(0.5, uOnsetSnap) * uOnsetSnap;
-  float onsetLuma = dot(col, vec3(0.299, 0.587, 0.114));
-  col = mix(vec3(onsetLuma), col, 1.0 + onsetPulse * 1.0);
-  col *= 1.0 + onsetPulse * 0.12;
-
-  // ONSET CHROMATIC ABERRATION (directional fringing)
-  if (uOnsetSnap > 0.4) {
-    float caAmt = (uOnsetSnap - 0.4) * 0.22;
-    col = applyCA(col, vUv, caAmt);
-  }
-
-  // Lifted blacks (build-phase-aware: near true black during build for anticipation)
-  float isBuild = step(0.5, uClimaxPhase) * step(uClimaxPhase, 1.5);
-  float liftMult = mix(1.0, 0.15, isBuild * uClimaxIntensity);
-  col = max(col, vec3(0.06, 0.04, 0.04) * liftMult);
+  // === POST-PROCESSING (shared chain: bloom, flare, halation, grade, grain) ===
+  col = applyPostProcess(col, vUv, p);
 
   gl_FragColor = vec4(col, 1.0);
 }

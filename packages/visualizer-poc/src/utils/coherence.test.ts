@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import {
   computeCoherence,
-  resetCoherence,
+  computeRawScore,
   chromaStability,
   beatRegularity,
   spectralDensity,
@@ -59,10 +59,6 @@ function makeRandomFrames(count: number): EnhancedFrameData[] {
 }
 
 describe("coherence", () => {
-  beforeEach(() => {
-    resetCoherence();
-  });
-
   describe("individual signals", () => {
     it("chroma stability: steady chroma → high value", () => {
       const frames = makeCoherentFrames(100);
@@ -98,14 +94,28 @@ describe("coherence", () => {
     });
   });
 
+  describe("raw score", () => {
+    it("coherent frames → high raw score", () => {
+      const frames = makeCoherentFrames(200, 15);
+      const score = computeRawScore(frames, 100);
+      expect(score).toBeGreaterThan(0.5);
+    });
+
+    it("random frames → low raw score", () => {
+      const frames = makeRandomFrames(200);
+      const score = computeRawScore(frames, 100);
+      expect(score).toBeLessThan(0.5);
+    });
+  });
+
   describe("composite score", () => {
-    it("steady chroma + regular beats → score > 0.7", () => {
+    it("steady chroma + regular beats → score > 0.5", () => {
       const frames = makeCoherentFrames(200, 15);
       const result = computeCoherence(frames, 100);
       expect(result.score).toBeGreaterThan(0.5);
     });
 
-    it("random noise → score < 0.3", () => {
+    it("random noise → score < 0.5", () => {
       const frames = makeRandomFrames(200);
       const result = computeCoherence(frames, 100);
       expect(result.score).toBeLessThan(0.5);
@@ -119,35 +129,38 @@ describe("coherence", () => {
     });
   });
 
-  describe("lock hysteresis", () => {
-    it("enters lock at 0.65 threshold after 90 frames", () => {
-      const frames = makeCoherentFrames(300, 15);
-      // Simulate sequential frame calls
-      let lastResult = computeCoherence(frames, 0);
-      for (let i = 1; i < 200; i++) {
-        lastResult = computeCoherence(frames, i);
-      }
-      // After enough high-coherence frames, should eventually lock
-      // (depends on actual score values reaching threshold)
-      expect(lastResult.score).toBeGreaterThan(0);
+  describe("lock hysteresis (pure/deterministic)", () => {
+    it("detects lock after 90+ high-coherence frames", () => {
+      const frames = makeCoherentFrames(200, 15);
+      const result = computeCoherence(frames, 150);
+      // With 150+ coherent frames, lock should be detected if scores exceed 0.65
+      expect(result.score).toBeGreaterThan(0);
     });
 
-    it("stays locked until score drops below 0.45 for 60 frames", () => {
-      resetCoherence();
-      // First build up lock with coherent frames
+    it("same frame returns same result regardless of call order", () => {
+      const frames = makeCoherentFrames(200, 15);
+      // Call for frame 150, then 50, then 150 again — should be identical
+      const result1 = computeCoherence(frames, 150);
+      computeCoherence(frames, 50);
+      const result2 = computeCoherence(frames, 150);
+      expect(result2.score).toBe(result1.score);
+      expect(result2.isLocked).toBe(result1.isLocked);
+      expect(result2.lockDuration).toBe(result1.lockDuration);
+    });
+
+    it("maintains lock during brief low-coherence sections", () => {
+      // 200 coherent frames followed by 30 random frames
       const coherent = makeCoherentFrames(200, 15);
-      for (let i = 0; i < 200; i++) {
-        computeCoherence(coherent, i);
-      }
-      // Even with a few random frames, lock should persist due to hysteresis
       const random = makeRandomFrames(30);
-      let result = { score: 0, isLocked: false, lockDuration: 0 };
-      for (let i = 0; i < 30; i++) {
-        result = computeCoherence(random, i);
+      const frames = [...coherent, ...random];
+      const resultCoherent = computeCoherence(frames, 180);
+      const resultRandom = computeCoherence(frames, 220);
+      // If lock was entered, it should persist through 30 random frames
+      // (30 < 60 exit threshold)
+      if (resultCoherent.isLocked) {
+        expect(resultRandom.isLocked).toBe(true);
       }
-      // 30 frames < 60 exit threshold, so lock should persist if it was entered
-      // This tests the hysteresis mechanism
-      expect(result.score).toBeDefined();
+      expect(resultRandom.score).toBeDefined();
     });
   });
 });

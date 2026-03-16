@@ -5,6 +5,8 @@
  */
 
 import { noiseGLSL } from "./noise";
+import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
+import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
 
 export const cosmicDustVert = /* glsl */ `
 varying vec2 vUv;
@@ -19,50 +21,13 @@ precision highp float;
 
 ${noiseGLSL}
 
-uniform float uTime;
-uniform float uDynamicTime;
-uniform float uBass;
-uniform float uRms;
-uniform float uCentroid;
-uniform float uHighs;
-uniform float uOnset;
-uniform float uBeat;
-uniform float uMids;
-uniform vec2 uResolution;
-uniform float uEnergy;
-uniform float uSectionProgress;
-uniform float uSectionIndex;
-uniform float uChromaHue;
-uniform float uFlatness;
-uniform float uPalettePrimary;
-uniform float uPaletteSecondary;
-uniform float uPaletteSaturation;
-uniform float uTempo;
-uniform float uOnsetSnap;
-uniform float uBeatSnap;
-uniform float uMusicalTime;
-uniform float uChromaShift;
-uniform float uAfterglowHue;
-uniform float uClimaxPhase;
-uniform float uClimaxIntensity;
-uniform vec4 uContrast0;
-uniform vec4 uContrast1;
-uniform float uCoherence;
-uniform float uFastEnergy;
-uniform float uFastBass;
-uniform float uDrumOnset;
-uniform float uDrumBeat;
-uniform float uSpectralFlux;
+${sharedUniformsGLSL}
+
+${buildPostProcessGLSL({ grainStrength: 'normal' })}
 
 varying vec2 vUv;
 
 #define PI 3.14159265
-
-vec3 hsv2rgb(vec3 c) {
-  vec4 K = vec4(1.0, 2.0/3.0, 1.0/3.0, 3.0);
-  vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
-  return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
-}
 
 // Hash for star positions
 float hash(vec2 p) {
@@ -194,34 +159,8 @@ void main() {
   float vig = 1.0 - smoothstep(0.8, 1.6, length(uv));
   color *= 0.3 + vig * 0.7;
 
-  // === ANIMATED STAGE FLOOD: flowing palette noise in dark areas ===
-  color = stageFloodFill(color, uv, uDynamicTime, uEnergy, uPalettePrimary, uPaletteSecondary);
-
-  // === ANAMORPHIC FLARE: horizontal light streak ===
-  color = anamorphicFlare(vUv, color, uEnergy, uOnsetSnap);
-
-  // === HALATION: warm film bloom ===
-  color = halation(vUv, color, uEnergy);
-
-  // === CINEMATIC GRADE (ACES filmic tone mapping) ===
-  color = cinematicGrade(color, uEnergy);
-
-  // ONSET SATURATION PULSE: push colors away from gray (psychedelic, not white)
-  float onsetPulse = step(0.5, uOnsetSnap) * uOnsetSnap;
-  float onsetLuma = dot(color, vec3(0.299, 0.587, 0.114));
-  color = mix(vec3(onsetLuma), color, 1.0 + onsetPulse * 1.0);
-  color *= 1.0 + onsetPulse * 0.12;
-
-  // ONSET CHROMATIC ABERRATION (directional fringing)
-  if (uOnsetSnap > 0.4) {
-    float caAmt = (uOnsetSnap - 0.4) * 0.15;
-    color = applyCA(color, vUv, caAmt);
-  }
-
-  // Lifted blacks (build-phase-aware: near true black during build for anticipation)
-  float isBuild = step(0.5, uClimaxPhase) * step(uClimaxPhase, 1.5);
-  float liftMult = mix(1.0, 0.15, isBuild * uClimaxIntensity);
-  color = max(color, vec3(0.06, 0.05, 0.08) * liftMult);
+  // === POST-PROCESSING (shared chain) ===
+  color = applyPostProcess(color, vUv, uv);
 
   gl_FragColor = vec4(color, 1.0);
 }

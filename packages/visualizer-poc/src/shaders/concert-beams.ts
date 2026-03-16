@@ -6,6 +6,8 @@
  */
 
 import { noiseGLSL } from "./noise";
+import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
+import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
 
 export const concertBeamsVert = /* glsl */ `
 varying vec2 vUv;
@@ -20,39 +22,9 @@ precision highp float;
 
 ${noiseGLSL}
 
-uniform float uTime;
-uniform float uDynamicTime;
-uniform float uBass;
-uniform float uMids;
-uniform float uHighs;
-uniform float uOnset;
-uniform float uBeat;
-uniform float uRms;
-uniform float uCentroid;
-uniform vec2 uResolution;
-uniform float uEnergy;
-uniform float uSectionProgress;
-uniform float uSectionIndex;
-uniform float uChromaHue;
-uniform float uPalettePrimary;
-uniform float uPaletteSecondary;
-uniform float uPaletteSaturation;
-uniform float uTempo;
-uniform float uOnsetSnap;
-uniform float uBeatSnap;
-uniform float uMusicalTime;
-uniform float uChromaShift;
-uniform float uAfterglowHue;
-uniform float uClimaxPhase;
-uniform float uClimaxIntensity;
-uniform vec4 uContrast0;
-uniform vec4 uContrast1;
-uniform float uCoherence;
-uniform float uFastEnergy;
-uniform float uFastBass;
-uniform float uDrumOnset;
-uniform float uDrumBeat;
-uniform float uSpectralFlux;
+${sharedUniformsGLSL}
+
+${buildPostProcessGLSL({ halationEnabled: true, bloomThresholdOffset: -0.08 })}
 
 varying vec2 vUv;
 
@@ -212,48 +184,11 @@ void main() {
   vigTint *= 0.02;
   col = mix(vigTint, col, vig);
 
-  // === LIGHT LEAK ===
-  col += lightLeak(p, uDynamicTime, energy, uOnsetSnap) + uDrumOnset * 0.15 * vec3(1.0, 0.95, 0.85);
+  // Drum onset flash (scene-specific)
+  col += uDrumOnset * 0.15 * vec3(1.0, 0.95, 0.85);
 
-  // === BEAT PULSE: tempo-locked beam intensity ===
-  float bp = beatPulse(uMusicalTime);
-  col *= 1.0 + bp * 0.35 + climaxBoost * bp * 0.15;
-
-  // === BLOOM (climax-amplified) ===
-  float lum = dot(col, vec3(0.299, 0.587, 0.114));
-  float bloomThreshold = mix(0.45, 0.3, energy) - climaxBoost * 0.10;
-  float bloomAmount = max(0.0, lum - bloomThreshold) * (2.5 + climaxBoost * 1.5);
-  vec3 bloomColor = mix(col, vec3(1.0, 0.98, 0.95), 0.35);
-  vec3 bloom = bloomColor * bloomAmount * (0.3 + climaxBoost * 0.20);
-  col = col + bloom - col * bloom; // screen blend
-
-  // === ANIMATED STAGE FLOOD: flowing palette noise in dark areas ===
-  col = stageFloodFill(col, p, uDynamicTime, energy, uPalettePrimary, uPaletteSecondary);
-
-  // === ANAMORPHIC FLARE: horizontal light streak ===
-  col = anamorphicFlare(vUv, col, energy, uOnsetSnap);
-
-  // === HALATION: warm film bloom ===
-  col = halation(vUv, col, energy);
-
-  // === CINEMATIC GRADE (ACES filmic tone mapping) ===
-  col = cinematicGrade(col, energy);
-
-  // === FILM GRAIN ===
-  float grainTime = floor(uTime * 15.0) / 15.0;
-  float grainIntensity = mix(0.05, 0.015, energy);
-  col += filmGrainRes(uv, grainTime, uResolution.y) * grainIntensity;
-
-  // ONSET SATURATION PULSE: push colors away from gray (psychedelic, not white)
-  float onsetPulse = step(0.5, uOnsetSnap) * uOnsetSnap;
-  float onsetLuma = dot(col, vec3(0.299, 0.587, 0.114));
-  col = mix(vec3(onsetLuma), col, 1.0 + onsetPulse * 1.0);
-  col *= 1.0 + onsetPulse * 0.12;
-
-  // Lifted blacks (build-phase-aware: near true black during build for anticipation)
-  float isBuild = step(0.5, uClimaxPhase) * step(uClimaxPhase, 1.5);
-  float liftMult = mix(1.0, 0.15, isBuild * uClimaxIntensity);
-  col = max(col, vec3(0.06, 0.05, 0.08) * liftMult);
+  // === POST-PROCESSING (shared chain) ===
+  col = applyPostProcess(col, vUv, p);
 
   gl_FragColor = vec4(col, 1.0);
 }

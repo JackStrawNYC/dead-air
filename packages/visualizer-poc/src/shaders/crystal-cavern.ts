@@ -14,6 +14,8 @@
  */
 
 import { noiseGLSL } from "./noise";
+import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
+import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
 
 export const crystalCavernVert = /* glsl */ `
 precision highp float;
@@ -86,27 +88,11 @@ void main() {
 export const crystalCavernFrag = /* glsl */ `
 precision highp float;
 
-uniform float uTime;
-uniform float uDynamicTime;
-uniform float uEnergy;
-uniform float uOnsetSnap;
-uniform float uBass;
-uniform float uHighs;
-uniform float uPalettePrimary;
-uniform float uPaletteSecondary;
-uniform float uPaletteSaturation;
-uniform float uBeatSnap;
-uniform float uMusicalTime;
-uniform float uClimaxPhase;
-uniform float uClimaxIntensity;
-uniform vec4 uChroma0;
-uniform vec4 uChroma1;
-uniform vec4 uChroma2;
-uniform float uCoherence;
-uniform float uFastEnergy;
-uniform float uDrumOnset;
-
 ${noiseGLSL}
+
+${sharedUniformsGLSL}
+
+${buildPostProcessGLSL({ grainStrength: 'normal' })}
 
 varying vec3 vNormal;
 varying vec3 vWorldPos;
@@ -114,12 +100,6 @@ varying vec3 vViewDir;
 varying float vInstanceIndex;
 varying float vGlow;
 varying float vFresnel;
-
-vec3 hsv2rgb(vec3 c) {
-  vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
-  vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
-  return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
-}
 
 void main() {
   vec3 norm = normalize(vNormal);
@@ -184,32 +164,16 @@ void main() {
   col += beatKick;
   col += rim * glowColor * 0.4;
 
-  // Beat pulse — tempo-locked crystal intensity
-  float bp = beatPulse(uMusicalTime);
-  col *= 1.0 + bp * 0.20;
-
-  // ONSET SATURATION PULSE
-  float onsetPulse = step(0.5, uOnsetSnap) * uOnsetSnap;
-  float onsetLuma = dot(col, vec3(0.299, 0.587, 0.114));
-  col = mix(vec3(onsetLuma), col, 1.0 + onsetPulse * 1.0);
-  col *= 1.0 + onsetPulse * 0.12;
-
-  // === ANIMATED STAGE FLOOD ===
-  col = stageFloodFill(col, vWorldPos.xz * 0.3, uDynamicTime, uEnergy, uPalettePrimary, uPaletteSecondary);
-
-  // === CINEMATIC GRADE ===
-  col = cinematicGrade(col, uEnergy);
-
-  // Fog: distance-based
+  // Fog: distance-based (shader-specific, applied before post-proc)
   float fogDist = length(vWorldPos);
   float fog = 1.0 - exp(-fogDist * (0.08 - uEnergy * 0.03));
   vec3 fogColor = vec3(0.02, 0.03, 0.06);
   col = mix(col, fogColor, fog);
 
-  // Lifted blacks (build-phase-aware: near true black during build for anticipation)
-  float isBuild = step(0.5, uClimaxPhase) * step(uClimaxPhase, 1.5);
-  float liftMult = mix(1.0, 0.15, isBuild * uClimaxIntensity);
-  col = max(col, vec3(0.06, 0.05, 0.08) * liftMult);
+  // === POST-PROCESSING (shared chain) ===
+  vec2 screenUv = gl_FragCoord.xy / uResolution;
+  vec2 screenP = (screenUv - 0.5) * vec2(uResolution.x / uResolution.y, 1.0);
+  col = applyPostProcess(col, screenUv, screenP);
 
   gl_FragColor = vec4(col, 1.0);
 }

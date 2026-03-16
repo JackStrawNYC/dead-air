@@ -13,6 +13,8 @@
  */
 
 import { noiseGLSL } from "./noise";
+import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
+import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
 
 export const moltenGlassVert = /* glsl */ `
 varying vec2 vUv;
@@ -27,51 +29,13 @@ precision highp float;
 
 ${noiseGLSL}
 
-uniform float uTime;
-uniform float uDynamicTime;
-uniform float uBass;
-uniform float uRms;
-uniform float uCentroid;
-uniform float uHighs;
-uniform float uOnset;
-uniform float uBeat;
-uniform float uMids;
-uniform vec2 uResolution;
-uniform float uEnergy;
-uniform float uSectionProgress;
-uniform float uSectionIndex;
-uniform float uChromaHue;
-uniform float uFlatness;
-uniform float uPalettePrimary;
-uniform float uPaletteSecondary;
-uniform float uPaletteSaturation;
-uniform float uTempo;
-uniform float uOnsetSnap;
-uniform float uBeatSnap;
-uniform float uMusicalTime;
-uniform float uChromaShift;
-uniform float uAfterglowHue;
-uniform float uClimaxPhase;
-uniform float uClimaxIntensity;
-uniform vec4 uContrast0;
-uniform vec4 uContrast1;
-uniform float uCoherence;
-uniform float uFastEnergy;
-uniform float uFastBass;
-uniform float uDrumOnset;
-uniform float uDrumBeat;
-uniform float uSpectralFlux;
-uniform float uSlowEnergy;
+${sharedUniformsGLSL}
+
+${buildPostProcessGLSL({ grainStrength: 'normal' })}
 
 varying vec2 vUv;
 
 #define PI 3.14159265
-
-vec3 hsv2rgb(vec3 c) {
-  vec4 K = vec4(1.0, 2.0/3.0, 1.0/3.0, 3.0);
-  vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
-  return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
-}
 
 // 3-layer Voronoi with smooth cell transitions
 // Returns: x = min distance, y = second min, z = cell ID hash
@@ -179,15 +143,6 @@ void main() {
   float crackFlash = onset * 0.6 * cellEdge1 + uDrumOnset * 0.4 * cellEdge2;
   col += crackFlash * vec3(1.0, 0.9, 0.7);
 
-  // === CLIMAX REACTIVITY ===
-  float isClimax = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5);
-  float climaxBoost = isClimax * uClimaxIntensity;
-
-  // Beat pulse
-  float bp = beatPulse(uMusicalTime);
-  col *= 1.0 + bp * 0.25 + climaxBoost * bp * 0.15;
-  col *= 1.0 + uBeatSnap * 0.20 * (1.0 + climaxBoost * 0.4);
-
   // === SDF STEALIE: emerges from the molten glass ===
   {
     vec3 palCol1 = hsv2rgb(vec3(uPalettePrimary, 0.8, 1.0));
@@ -202,44 +157,8 @@ void main() {
   vignette = smoothstep(0.0, 1.0, vignette);
   col = mix(vec3(0.01, 0.008, 0.015), col, vignette);
 
-  // === LIGHT LEAK ===
-  col += lightLeak(dp, uDynamicTime, energy, uOnsetSnap);
-
-  // === BLOOM ===
-  float lum = dot(col, vec3(0.299, 0.587, 0.114));
-  float bloomThreshold = mix(0.45, 0.3, energy) - climaxBoost * 0.08;
-  float bloomAmount = max(0.0, lum - bloomThreshold) * (2.0 + climaxBoost * 1.5);
-  vec3 bloomColor = mix(col, vec3(1.0, 0.95, 0.9), 0.3);
-  vec3 bloom = bloomColor * bloomAmount * (0.3 + climaxBoost * 0.15);
-  col = col + bloom - col * bloom;
-
-  // === ANIMATED STAGE FLOOD ===
-  col = stageFloodFill(col, dp, uDynamicTime, energy, uPalettePrimary, uPaletteSecondary);
-
-  // === ANAMORPHIC FLARE ===
-  col = anamorphicFlare(vUv, col, energy, uOnsetSnap);
-
-  // === HALATION ===
-  col = halation(vUv, col, energy);
-
-  // === CINEMATIC GRADE (ACES filmic tone mapping) ===
-  col = cinematicGrade(col, energy);
-
-  // === FILM GRAIN ===
-  float grainTime = floor(uTime * 15.0) / 15.0;
-  float grainIntensity = mix(0.04, 0.02, energy);
-  col += filmGrainRes(uv, grainTime, uResolution.y) * grainIntensity;
-
-  // ONSET SATURATION PULSE
-  float onsetPulse = step(0.5, uOnsetSnap) * uOnsetSnap;
-  float onsetLuma = dot(col, vec3(0.299, 0.587, 0.114));
-  col = mix(vec3(onsetLuma), col, 1.0 + onsetPulse * 1.0);
-  col *= 1.0 + onsetPulse * 0.12;
-
-  // Lifted blacks
-  float isBuild = step(0.5, uClimaxPhase) * step(uClimaxPhase, 1.5);
-  float liftMult = mix(1.0, 0.15, isBuild * uClimaxIntensity);
-  col = max(col, vec3(0.06, 0.05, 0.08) * liftMult);
+  // === POST-PROCESSING ===
+  col = applyPostProcess(col, vUv, p);
 
   gl_FragColor = vec4(col, 1.0);
 }

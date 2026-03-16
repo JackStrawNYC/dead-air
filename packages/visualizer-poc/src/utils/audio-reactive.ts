@@ -55,6 +55,10 @@ export interface AudioSnapshot {
   otherEnergy: number;
   /** Smoothed other spectral centroid (guitar brightness) from stem separation (0-1, fallback overall centroid) */
   otherCentroid: number;
+  /** Rate of change of energy delta (second derivative, 30-frame windows) */
+  energyAcceleration: number;
+  /** Sustained energy direction: -1 falling, 0 stable, +1 rising */
+  energyTrend: number;
 }
 
 /**
@@ -238,6 +242,50 @@ export function computeSpectralFlux(
 }
 
 /**
+ * Compute energy acceleration (second derivative of energy).
+ * Uses 30-frame windows: compares energy delta at current frame vs 30 frames ago.
+ */
+export function computeEnergyAcceleration(
+  frames: EnhancedFrameData[],
+  idx: number,
+): number {
+  const W = 30;
+  if (idx < W * 2 || frames.length < W * 2) return 0;
+
+  // Current energy delta (recent 30 frames)
+  const recentEnergy = gaussianSmooth(frames, idx, (f) => f.rms, 15);
+  const pastEnergy = gaussianSmooth(frames, Math.max(0, idx - W), (f) => f.rms, 15);
+  const currentDelta = recentEnergy - pastEnergy;
+
+  // Previous energy delta (30 frames earlier)
+  const olderEnergy = gaussianSmooth(frames, Math.max(0, idx - W * 2), (f) => f.rms, 15);
+  const prevDelta = pastEnergy - olderEnergy;
+
+  return currentDelta - prevDelta;
+}
+
+/**
+ * Compute sustained energy trend direction.
+ * Returns -1 (falling), 0 (stable), +1 (rising).
+ * Uses 30-frame window comparing current vs past energy.
+ */
+export function computeEnergyTrend(
+  frames: EnhancedFrameData[],
+  idx: number,
+): number {
+  const W = 30;
+  if (idx < W || frames.length < W) return 0;
+
+  const current = gaussianSmooth(frames, idx, (f) => f.rms, 15);
+  const past = gaussianSmooth(frames, Math.max(0, idx - W), (f) => f.rms, 15);
+  const delta = current - past;
+
+  // Threshold for "stable" — small changes are noise
+  if (Math.abs(delta) < 0.01) return 0;
+  return delta > 0 ? 1 : -1;
+}
+
+/**
  * Pre-compute cumulative beat indices for O(1) musical time lookups.
  * Returns array of frame indices where beat=true.
  */
@@ -332,5 +380,7 @@ export function computeAudioSnapshot(
     otherCentroid: frames[idx].stemOtherCentroid != null
       ? gaussianSmooth(frames, idx, (f) => f.stemOtherCentroid ?? 0, 15)
       : gaussianSmooth(frames, idx, (f) => f.centroid, 15),
+    energyAcceleration: computeEnergyAcceleration(frames, idx),
+    energyTrend: computeEnergyTrend(frames, idx),
   };
 }

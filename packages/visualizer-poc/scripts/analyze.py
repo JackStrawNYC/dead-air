@@ -245,6 +245,47 @@ def analyze_track(audio_path: Path, output_path: Path, stems_dir: Path | None = 
     beat_set = set(int(b) for b in beat_frames)
     print(f"Tempo: {tempo_val:.1f} BPM | Beats: {len(beat_set)}")
 
+    # --- Adaptive beat tracking: per-frame local tempo ---
+    print("Computing local tempo (8s sliding window) ...")
+    onset_str = librosa.onset.onset_strength(y=y, sr=sr, hop_length=HOP_LENGTH)
+    win_frames = int(8 * FPS)  # 8 second window
+    local_tempo_arr = np.full(n_frames, tempo_val, dtype=np.float64)
+    beat_confidence_arr = np.zeros(n_frames, dtype=np.float64)
+    for i in range(0, n_frames, win_frames // 2):  # 50% overlap
+        lo_f = max(0, i - win_frames // 2)
+        hi_f = min(len(onset_str), i + win_frames // 2)
+        if hi_f - lo_f < FPS:  # minimum 1s window
+            continue
+        window_onset = onset_str[lo_f:hi_f]
+        try:
+            local_t = librosa.beat.tempo(onset_envelope=window_onset, sr=sr, hop_length=HOP_LENGTH)
+            lt = float(local_t[0]) if hasattr(local_t, '__len__') else float(local_t)
+            # Beat confidence: ratio of onset strength peak to mean (higher = clearer beat)
+            confidence = float(window_onset.max() / (window_onset.mean() + 1e-8))
+            confidence = min(1.0, confidence / 5.0)  # normalize to 0-1
+            # Fill the window with this local tempo
+            fill_lo = max(0, i)
+            fill_hi = min(n_frames, i + win_frames // 2)
+            local_tempo_arr[fill_lo:fill_hi] = lt
+            beat_confidence_arr[fill_lo:fill_hi] = confidence
+        except Exception:
+            pass
+    # Smooth local tempo with 2s Gaussian for stability
+    from scipy.ndimage import gaussian_filter1d
+    local_tempo_arr = gaussian_filter1d(local_tempo_arr, sigma=FPS)
+    local_tempo_arr = pad_or_trim_1d(local_tempo_arr, n_frames)
+    beat_confidence_arr = pad_or_trim_1d(beat_confidence_arr, n_frames)
+
+    # --- Downbeat detection ---
+    print("Detecting downbeats ...")
+    downbeat_set = set()
+    if len(beat_frames) >= 4:
+        # Estimate beats per measure from tempo (assume 4/4)
+        beats_per_measure = 4
+        for bi in range(0, len(beat_frames), beats_per_measure):
+            downbeat_set.add(int(beat_frames[bi]))
+    print(f"Local tempo range: {local_tempo_arr.min():.1f}-{local_tempo_arr.max():.1f} BPM | Downbeats: {len(downbeat_set)}")
+
     # --- STFT (shared for band energy + spectral contrast + flatness) ---
     print("Computing STFT ...")
     S = np.abs(librosa.stft(y, hop_length=HOP_LENGTH))
@@ -316,6 +357,9 @@ def analyze_track(audio_path: Path, output_path: Path, stems_dir: Path | None = 
             "chroma": [round(float(chroma[c, i]), 3) for c in range(12)],
             "contrast": [round(float(contrast_norm[c, i]), 3) for c in range(7)],
             "flatness": round(float(flatness_norm[i]), 4),
+            "localTempo": round(float(local_tempo_arr[i]), 1),
+            "beatConfidence": round(float(beat_confidence_arr[i]), 3),
+            "downbeat": i in downbeat_set,
         }
         # Add stem-specific fields when available
         if stem_data and stem_data["available"]:

@@ -7,11 +7,11 @@
  *   5=Nature/Cosmic, 6=Character, 7=Frame/Info (artifact), 8=Typography (info),
  *   9=HUD, 10=Distortion
  *
- * Curated 2026-03-16: 46 selectable + 2 always-active = 48 total.
+ * Curated 2026-03-16: 57 selectable + 2 always-active = 59 total.
  * Component files are preserved — any overlay can be restored by re-adding
  * its registry entry here.
  *
- * Tier: A=iconic/essential (13 total: 11 selectable + 2 always-active), B=solid rotation (35).
+ * Tier: A=iconic/essential (13 total: 11 selectable + 2 always-active), B=solid rotation (46).
  */
 import type { OverlayEntry } from "./types";
 
@@ -51,12 +51,24 @@ export const OVERLAY_REGISTRY: OverlayEntry[] = [
   { name: "WallOfSound",         layer: 3, category: "reactive", tags: ["intense", "festival"],          energyBand: "high", weight: 3, dutyCycle: 20, energyResponse: [0.15, 0.35, 2.0], tier: "B" },
   { name: "PhilZone",            layer: 3, category: "reactive", tags: ["dead-culture", "organic"],      energyBand: "mid",  weight: 2, dutyCycle: 100, energyResponse: [0.08, 0.20, 2.0], tier: "B" },
 
+  // ═══ Layer 4: Geometric / Physics (10) ═══
+  { name: "VoronoiFlow",       layer: 4, category: "geometric", tags: ["psychedelic", "organic"],        energyBand: "mid",  weight: 2, dutyCycle: 33, energyResponse: [0.05, 0.20, 1.8], tier: "B" },
+  { name: "PenroseTiling",     layer: 4, category: "geometric", tags: ["cosmic", "contemplative"],      energyBand: "mid",  weight: 2, dutyCycle: 33, energyResponse: [0.05, 0.20, 1.8], tier: "B" },
+  { name: "MoirePattern",      layer: 4, category: "geometric", tags: ["psychedelic", "mechanical"],    energyBand: "mid",  weight: 2, dutyCycle: 33, energyResponse: [0.05, 0.20, 1.8], tier: "B" },
+  { name: "OpArtPatterns",     layer: 4, category: "geometric", tags: ["psychedelic", "intense"],       energyBand: "mid",  weight: 2, dutyCycle: 33, energyResponse: [0.05, 0.20, 1.8], tier: "B" },
+  { name: "BatikPattern",      layer: 4, category: "geometric", tags: ["organic", "contemplative"],     energyBand: "mid",  weight: 2, dutyCycle: 33, energyResponse: [0.05, 0.20, 1.8], tier: "B" },
+  { name: "VortexSpiral",      layer: 4, category: "geometric", tags: ["psychedelic", "intense"],       energyBand: "mid",  weight: 2, dutyCycle: 33, energyResponse: [0.05, 0.20, 1.8], tier: "B" },
+  { name: "SpiralArms",        layer: 4, category: "geometric", tags: ["cosmic", "organic"],            energyBand: "mid",  weight: 2, dutyCycle: 33, energyResponse: [0.05, 0.20, 1.8], tier: "B" },
+  { name: "SunMandala",        layer: 4, category: "geometric", tags: ["cosmic", "contemplative"],      energyBand: "mid",  weight: 2, dutyCycle: 33, energyResponse: [0.05, 0.20, 1.8], tier: "B" },
+  { name: "MoireInterference", layer: 4, category: "geometric", tags: ["psychedelic", "mechanical"],    energyBand: "mid",  weight: 2, dutyCycle: 33, energyResponse: [0.05, 0.20, 1.8], tier: "B" },
+  { name: "LissajousCurves",   layer: 4, category: "geometric", tags: ["cosmic", "psychedelic"],        energyBand: "mid",  weight: 2, dutyCycle: 33, energyResponse: [0.05, 0.20, 1.8], tier: "B" },
+
   // ═══ Layer 5: Song References (3) ═══
   { name: "ChinaCatSunflower",layer: 5, category: "nature", tags: ["psychedelic", "dead-culture"], energyBand: "mid",  weight: 2, dutyCycle: 25, energyResponse: [0.05, 0.22, 1.5], tier: "B" },
   { name: "SugarMagnolia",    layer: 5, category: "nature", tags: ["organic", "dead-culture"],     energyBand: "mid",  weight: 2, dutyCycle: 100, energyResponse: [0.06, 0.25, 1.8], tier: "B" },
   { name: "BoxOfRain",        layer: 5, category: "nature", tags: ["organic", "dead-culture"],     energyBand: "low",  weight: 2, dutyCycle: 100, energyResponse: [0.0, 0.08, 2.5], tier: "B" },
 
-  // ═══ Layer 6: Character / Dead Culture (12) ═══
+  // ═══ Layer 6: Character / Dead Culture (13) ═══
   { name: "BearParade",       layer: 6, category: "character", tags: ["dead-culture", "festival"],     energyBand: "mid",  weight: 2, dutyCycle: 100, energyResponse: [0.06, 0.25, 1.5], tier: "A" },
   { name: "SkeletonBand",     layer: 6, category: "character", tags: ["dead-culture", "festival"],     energyBand: "mid",  weight: 2, dutyCycle: 100, energyResponse: [0.10, 0.30, 1.5], tier: "A" },
   { name: "MarchingTerrapins",layer: 6, category: "character", tags: ["dead-culture", "organic"],      energyBand: "mid",  weight: 2, dutyCycle: 100, energyResponse: [0.05, 0.20, 1.5], tier: "A" },
@@ -69,6 +81,7 @@ export const OVERLAY_REGISTRY: OverlayEntry[] = [
   { name: "DrumCircle",      layer: 6, category: "character", tags: ["dead-culture", "intense"],      energyBand: "mid",  weight: 2, dutyCycle: 100, energyResponse: [0.10, 0.30, 2.0], tier: "A" },
   { name: "DancingTerrapinOverlay", layer: 6, category: "character", tags: ["dead-culture", "organic"], energyBand: "mid", weight: 2, dutyCycle: 100, energyResponse: [0.05, 0.20, 1.5], tier: "B" },
   { name: "SkeletonCouple",  layer: 6, category: "character", tags: ["dead-culture", "contemplative"], energyBand: "low",  weight: 2, dutyCycle: 100, energyResponse: [0.0, 0.10, 2.0], tier: "B" },
+  { name: "DeadIcons",       layer: 6, category: "character", tags: ["dead-culture", "psychedelic"],  energyBand: "mid",  weight: 2, dutyCycle: 100, energyResponse: [0.05, 0.20, 1.5], tier: "B" },
 
   // ═══ Layer 7: Always-active info (hardcoded in SongVisualizer) ═══
   { name: "SongTitle",         layer: 7, category: "artifact", tags: ["dead-culture"],                  energyBand: "any",  weight: 1, alwaysActive: true, tier: "A" },
@@ -85,7 +98,7 @@ export const OVERLAY_REGISTRY: OverlayEntry[] = [
 
 /**
  * Registry of all selectable overlays — the curated pool.
- * 46 selectable + 2 always-active = 48 total.
+ * 57 selectable + 2 always-active = 59 total.
  * Component files preserved — any overlay can be restored by re-adding here.
  */
 export const SELECTABLE_REGISTRY = [...OVERLAY_REGISTRY];

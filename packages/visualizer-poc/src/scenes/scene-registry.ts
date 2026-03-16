@@ -62,6 +62,7 @@ import { AuroraScene } from "./AuroraScene";
 import { CrystalCavernScene } from "./CrystalCavernScene";
 import { FluidLightScene } from "./FluidLightScene";
 import { VoidLightScene } from "./VoidLightScene";
+import { Fluid2DScene } from "./Fluid2DScene";
 
 // ─── Scene Registry ───
 
@@ -146,6 +147,11 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     energyAffinity: "low",
     complement: "concert_lighting",
   },
+  fluid_2d: {
+    Component: Fluid2DScene,
+    energyAffinity: "any",
+    complement: "liquid_light",
+  },
 };
 
 // ─── Transition Affinity Map ───
@@ -168,6 +174,7 @@ export const TRANSITION_AFFINITY: Partial<Record<VisualMode, VisualMode[]>> = {
   crystal_cavern: ["deep_ocean", "aurora", "cosmic_dust"],
   fluid_light: ["liquid_light", "oil_projector", "tie_dye"],
   void_light: ["deep_ocean", "cosmic_voyage", "crystal_cavern"],
+  fluid_2d: ["liquid_light", "fluid_light", "oil_projector"],
 };
 
 // ─── Helper functions ───

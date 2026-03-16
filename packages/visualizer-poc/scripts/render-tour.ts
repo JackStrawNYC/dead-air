@@ -22,6 +22,36 @@ import { execSync } from "child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import { join, resolve } from "path";
 
+// ─── Render retry logic ───
+
+const MAX_RETRIES = 3;
+const RETRY_BACKOFF_MS = [10_000, 20_000, 40_000]; // exponential backoff: 10s, 20s, 40s
+
+/**
+ * Execute a render command with retry logic (3 attempts, exponential backoff).
+ * Logs attempt number and error details on failure.
+ */
+function execWithRetry(cmd: string, opts: { cwd: string; stdio: "inherit" | "pipe" }, label: string): void {
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      execSync(cmd, opts);
+      return; // success
+    } catch (err: any) {
+      const errorMsg = err.stderr?.toString().slice(-500) || err.message || "Unknown error";
+      console.error(`  RENDER FAILED (attempt ${attempt}/${MAX_RETRIES}) [${label}]: ${errorMsg}`);
+
+      if (attempt < MAX_RETRIES) {
+        const waitMs = RETRY_BACKOFF_MS[attempt - 1];
+        console.log(`  Retrying in ${waitMs / 1000}s ...`);
+        execSync(`sleep ${waitMs / 1000}`);
+      } else {
+        console.error(`  All ${MAX_RETRIES} attempts failed for [${label}]. Aborting.`);
+        throw err;
+      }
+    }
+  }
+}
+
 const ROOT = resolve(import.meta.dirname, "..");
 const OUT_DIR = join(ROOT, "out");
 const TOURS_DIR = join(OUT_DIR, "tours");
@@ -271,7 +301,7 @@ function main() {
       try {
         // Render video-only
         const videoOnly = join(tourDir, `${show.date}-${song.trackId}-video.mp4`);
-        execSync(
+        execWithRetry(
           [
             "npx remotion render",
             join(OUT_DIR, "bundle"),
@@ -283,6 +313,7 @@ function main() {
             "--muted",
           ].join(" "),
           { cwd: ROOT, stdio: "pipe" },
+          `${show.date} ${song.trackId}`,
         );
 
         // Mux audio if available

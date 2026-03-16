@@ -171,6 +171,79 @@ float sdVWBus(vec2 p) {
   return body;
 }
 
+// --- Dancing bear with animated walk cycle ---
+float sdDancingBear(vec2 p, float dancePhase) {
+  // Body: ellipse
+  float body = length(p * vec2(1.0, 1.3)) - 0.3;
+  // Head: circle offset up
+  float head = length(p - vec2(0.0, 0.35)) - 0.15;
+  // Ears: two small circles
+  float earL = length(p - vec2(-0.12, 0.48)) - 0.06;
+  float earR = length(p - vec2(0.12, 0.48)) - 0.06;
+  // Legs: animated with dancePhase
+  float legSwing = sin(dancePhase * 6.28) * 0.12;
+  vec2 legL = p - vec2(-0.12 + legSwing, -0.35);
+  vec2 legR = p - vec2(0.12 - legSwing, -0.35);
+  float legLD = length(legL * vec2(1.0, 0.5)) - 0.08;
+  float legRD = length(legR * vec2(1.0, 0.5)) - 0.08;
+  // Arms: animated opposite to legs
+  float armSwing = sin(dancePhase * 6.28 + 3.14) * 0.1;
+  vec2 armL = p - vec2(-0.28, 0.1 + armSwing);
+  vec2 armR = p - vec2(0.28, 0.1 - armSwing);
+  float armLD = length(armL * vec2(0.5, 1.0)) - 0.06;
+  float armRD = length(armR * vec2(0.5, 1.0)) - 0.06;
+  // Combine with smooth min
+  float d = min(body, head);
+  d = min(d, min(earL, earR));
+  d = min(d, min(legLD, legRD));
+  d = min(d, min(armLD, armRD));
+  return d;
+}
+
+// --- American Beauty rose with petal layers ---
+float sdAmericanBeautyRose(vec2 p) {
+  // Center bud
+  float bud = length(p) - 0.08;
+  // 5 petal layers at increasing radii
+  float petals = 1e10;
+  for (int i = 0; i < 5; i++) {
+    float fi = float(i);
+    float radius = 0.12 + fi * 0.06;
+    float petalCount = 5.0 + fi * 2.0;
+    float angle = atan(p.y, p.x) + fi * 0.3;
+    float petalShape = cos(angle * petalCount) * 0.03 * (1.0 + fi * 0.3);
+    float ring = abs(length(p) - radius + petalShape) - 0.02;
+    petals = min(petals, ring);
+  }
+  return min(bud, petals);
+}
+
+// --- Skull with animated jaw ---
+float sdAnimatedSkull(vec2 p, float jawOpen) {
+  // Cranium: slightly squashed circle
+  float cranium = length(p * vec2(1.0, 0.9) - vec2(0.0, 0.05)) - 0.3;
+  // Eye sockets: two holes
+  float eyeL = length(p - vec2(-0.1, 0.08)) - 0.07;
+  float eyeR = length(p - vec2(0.1, 0.08)) - 0.07;
+  // Nose: inverted triangle (heart shape)
+  vec2 np = p - vec2(0.0, -0.05);
+  float nose = max(abs(np.x) - 0.04, np.y + 0.02);
+  nose = min(nose, length(np + vec2(0.0, 0.03)) - 0.03);
+  // Jaw: drops down with jawOpen (0-1)
+  float jawDrop = jawOpen * 0.08;
+  vec2 jp = p - vec2(0.0, -0.22 - jawDrop);
+  float jaw = length(jp * vec2(1.0, 1.5)) - 0.18;
+  // Teeth: horizontal line between skull and jaw
+  float teeth = abs(p.y + 0.18 + jawDrop * 0.5) - 0.01;
+  teeth = max(teeth, abs(p.x) - 0.12);
+  // Combine: cranium minus eyes/nose, union jaw, add teeth edge
+  float skull = max(cranium, -min(eyeL, eyeR));
+  skull = max(skull, -nose);
+  skull = min(skull, jaw);
+  skull = min(skull, teeth);
+  return skull;
+}
+
 // --- Glow helper: smooth falloff around SDF ---
 vec3 sdfGlow(float d, vec3 color, float intensity, float spread) {
   float glow = intensity / (abs(d) / spread + 1.0);

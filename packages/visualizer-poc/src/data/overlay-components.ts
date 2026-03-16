@@ -5,7 +5,7 @@
  * Components with special props (SongTitle, ConcertInfo, SetlistScroll, FilmGrain)
  * are NOT included here — they remain hardcoded in SongVisualizer.tsx.
  *
- * 46 selectable keepers (2026-03-16). Component files preserved in src/components/.
+ * 57 selectable keepers (2026-03-16). Component files preserved in src/components/.
  */
 import React from "react";
 import type { EnhancedFrameData } from "./types";
@@ -43,12 +43,24 @@ import { EmberRise } from "../components/EmberRise";
 import { WallOfSound } from "../components/WallOfSound";
 import { PhilZone } from "../components/PhilZone";
 
+// ─── Layer 4: Geometric / Physics (10) ───
+import { VoronoiFlow } from "../components/VoronoiFlow";
+import { PenroseTiling } from "../components/PenroseTiling";
+import { MoirePattern } from "../components/MoirePattern";
+import { OpArtPatterns } from "../components/OpArtPatterns";
+import { BatikPattern } from "../components/BatikPattern";
+import { VortexSpiral } from "../components/VortexSpiral";
+import { SpiralArms } from "../components/SpiralArms";
+import { SunMandala } from "../components/SunMandala";
+import { MoireInterference } from "../components/MoireInterference";
+import { LissajousCurves } from "../components/LissajousCurves";
+
 // ─── Layer 5: Song References (3) ───
 import { ChinaCatSunflower } from "../components/ChinaCatSunflower";
 import { SugarMagnolia } from "../components/SugarMagnolia";
 import { BoxOfRain } from "../components/BoxOfRain";
 
-// ─── Layer 6: Character / Dead Culture (12) ───
+// ─── Layer 6: Character / Dead Culture (13) ───
 import { BearParade } from "../components/BearParade";
 import { SkeletonBand } from "../components/SkeletonBand";
 import { MarchingTerrapins } from "../components/MarchingTerrapins";
@@ -61,6 +73,7 @@ import { BobWeir } from "../components/BobWeir";
 import { DrumCircle } from "../components/DrumCircle";
 import { DancingTerrapinOverlay } from "../components/DancingTerrapinOverlay";
 import { SkeletonCouple } from "../components/SkeletonCouple";
+import { DeadIcons } from "../components/DeadIcons";
 
 // ─── Layer 7: Show Artifacts (3) ───
 import { VenueMarquee } from "../components/VenueMarquee";
@@ -116,6 +129,18 @@ export const OVERLAY_COMPONENTS: Record<string, OverlayComponentEntry> = {
   WallOfSound:         { Component: WallOfSound, layer: 3 },
   PhilZone:            { Component: PhilZone, layer: 3 },
 
+  // Layer 4: Geometric / Physics
+  VoronoiFlow:       { Component: VoronoiFlow, layer: 4 },
+  PenroseTiling:     { Component: PenroseTiling, layer: 4 },
+  MoirePattern:      { Component: MoirePattern, layer: 4 },
+  OpArtPatterns:     { Component: OpArtPatterns, layer: 4 },
+  BatikPattern:      { Component: BatikPattern, layer: 4 },
+  VortexSpiral:      { Component: VortexSpiral, layer: 4 },
+  SpiralArms:        { Component: SpiralArms, layer: 4 },
+  SunMandala:        { Component: SunMandala, layer: 4 },
+  MoireInterference: { Component: MoireInterference, layer: 4 },
+  LissajousCurves:   { Component: LissajousCurves, layer: 4 },
+
   // Layer 5: Song References
   ChinaCatSunflower: { Component: ChinaCatSunflower, layer: 5 },
   SugarMagnolia:     { Component: SugarMagnolia, layer: 5 },
@@ -134,6 +159,7 @@ export const OVERLAY_COMPONENTS: Record<string, OverlayComponentEntry> = {
   DrumCircle:        { Component: DrumCircle, layer: 6 },
   DancingTerrapinOverlay: { Component: DancingTerrapinOverlay, layer: 6 },
   SkeletonCouple:    { Component: SkeletonCouple, layer: 6 },
+  DeadIcons:         { Component: DeadIcons as React.ComponentType<{ frames: EnhancedFrameData[] }>, layer: 6 },
 
   // Layer 7: Show Artifacts
   VenueMarquee:      { Component: VenueMarquee, layer: 7 },

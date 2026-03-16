@@ -10,7 +10,7 @@ import { useCurrentFrame, useVideoConfig } from "remotion";
 import type { EnhancedFrameData, SectionBoundary, ColorPalette } from "../data/types";
 import { findCurrentSection } from "../utils/section-lookup";
 import { computeClimaxState, type ClimaxPhase } from "../utils/climax-state";
-import { computeAudioSnapshot as computeSnapshot, buildBeatArray as buildBeatArrayUtil, computeMusicalTime as computeMusicalTimeUtil, computeSpectralFlux } from "../utils/audio-reactive";
+import { computeAudioSnapshot as computeSnapshot, buildBeatArray as buildBeatArrayUtil, computeMusicalTime as computeMusicalTimeUtil, computeSpectralFlux, computeEnergyAcceleration, computeEnergyTrend } from "../utils/audio-reactive";
 import { energyGate } from "../utils/math";
 
 /** Audio data context passed to all Three.js children */
@@ -73,6 +73,12 @@ export interface AudioDataContext {
     otherEnergy: number;
     /** Smoothed other spectral centroid (guitar brightness) from stem separation (0-1) */
     otherCentroid: number;
+    /** Rate of change of energy delta (second derivative, 30-frame windows) */
+    energyAcceleration: number;
+    /** Sustained energy direction: -1 falling, 0 stable, +1 rising */
+    energyTrend: number;
+    /** Per-frame local tempo (BPM, smoothed from analysis data) */
+    localTempo: number;
   };
   /** Per-song palette primary hue (0-1 normalized) */
   palettePrimary: number;
@@ -378,6 +384,9 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
       vocalPresence,
       otherEnergy,
       otherCentroid,
+      energyAcceleration: computeEnergyAcceleration(frames, idx),
+      energyTrend: computeEnergyTrend(frames, idx),
+      localTempo: smoothValue(frames, idx, (f) => f.localTempo ?? (tempo ?? 120), 30),
     },
     palettePrimary,
     paletteSecondary,

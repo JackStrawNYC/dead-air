@@ -41,6 +41,12 @@ export interface EnhancedFrameData {
   stemOtherRms?: number;
   /** Stem-separated other spectral centroid (brightness), 0-1 */
   stemOtherCentroid?: number;
+  /** Per-frame local tempo (BPM, 8s sliding window) */
+  localTempo?: number;
+  /** Beat confidence: clarity of beat structure (0-1) */
+  beatConfidence?: number;
+  /** Whether this frame is a downbeat (first beat of measure) */
+  downbeat?: boolean;
 }
 
 /** Legacy frame data from POC (subset of EnhancedFrameData) */
@@ -112,7 +118,8 @@ export type VisualMode =
   | "aurora"
   | "crystal_cavern"
   | "fluid_light"
-  | "void_light";
+  | "void_light"
+  | "fluid_2d";
 
 /** Per-section mode override in setlist */
 export interface SectionOverride {

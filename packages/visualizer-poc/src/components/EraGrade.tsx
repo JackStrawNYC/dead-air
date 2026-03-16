@@ -24,30 +24,29 @@ interface EraGradeStyle {
   tintOpacity?: number;
 }
 
+// GLSL owns color grading (saturation + contrast via cinematicGrade + uEraSaturation).
+// CSS handles brightness-only + sepia tint to avoid compound color crushing.
 const ERA_GRADES: Record<Era, EraGradeStyle> = {
   primal: {
-    // Raised saturation 0.55→0.70 to prevent compound grayscale with EnergyEnvelope
-    filter: "saturate(0.70) sepia(0.20) contrast(1.03) brightness(0.97)",
+    filter: "brightness(0.97) sepia(0.15)",
     tintColor: "rgba(140, 90, 40, 0.05)",
     tintOpacity: 0.05,
   },
   classic: {
-    filter: "saturate(0.90) contrast(1.02) brightness(1.0)",
+    filter: "brightness(1.0)",
     tintColor: "rgba(180, 140, 80, 0.02)",
     tintOpacity: 0.02,
   },
   hiatus: {
-    // Removed hue-rotate — EnergyEnvelope no longer stacks hue-rotate
-    filter: "saturate(0.75) contrast(1.0) brightness(0.95)",
+    filter: "brightness(0.95)",
     tintColor: "rgba(60, 80, 120, 0.04)",
     tintOpacity: 0.04,
   },
   touch_of_grey: {
-    // Reduced contrast to prevent compound with EnergyEnvelope
-    filter: "saturate(1.15) contrast(1.06) brightness(1.01)",
+    filter: "brightness(1.01) contrast(1.02)",
   },
   revival: {
-    filter: "saturate(0.95) contrast(1.0) brightness(1.0)",
+    filter: "brightness(1.0)",
   },
 };
 

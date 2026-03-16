@@ -5,13 +5,18 @@
  *   drums_tribal → transition → space_ambient → reemergence
  *
  * Uses audio features (onset density, energy, flatness) and coherence signals
- * from computeAudioSnapshot() to classify the current sub-phase.
+ * to classify the current sub-phase.
+ *
+ * DETERMINISTIC: pure function of frame data (no module-level state).
+ * Scans backward 30 frames and classifies each, using majority vote
+ * for temporal stability. Safe for Remotion's out-of-order rendering.
  *
  * Per-phase visual treatment constants provide color/overlay guidance
  * to EnergyEnvelope, overlay-rotation, and CameraMotion.
  */
 
-import type { AudioSnapshot } from "./audio-reactive";
+import type { EnhancedFrameData } from "../data/types";
+import { computeRawScore } from "./coherence";
 
 export type DrumsSpaceSubPhase =
   | "drums_tribal"    // heavy percussion, rhythmic
@@ -95,104 +100,117 @@ const SPACE_BEAT_REGULARITY_MAX = 0.2;
 const REEMERGENCE_CHROMA_STABILITY_MIN = 0.5;
 const REEMERGENCE_FLATNESS_MAX = 0.35;
 
-// Smoothing: track recent phase history for stability
-let phaseHistory: DrumsSpaceSubPhase[] = [];
 const HISTORY_LEN = 30;
 
-/** Reset phase tracking between songs */
-export function resetDrumsSpacePhase(): void {
-  phaseHistory = [];
-}
+// ─── Stateless helpers ───
 
 /**
- * Detect current Drums/Space sub-phase from audio snapshot.
- * Returns null if the song is not a Drums/Space segment.
- *
- * Enhanced with coherence signals (beat regularity, chroma stability)
- * for more accurate phase boundary detection.
- *
- * @param snapshot - Current frame's audio snapshot
- * @param isDrumsSpace - Whether this song is identified as Drums/Space
+ * Classify a single frame's raw phase based on audio features.
+ * Pure function — no state dependencies.
  */
-export function computeDrumsSpacePhase(
-  snapshot: AudioSnapshot,
-  isDrumsSpace: boolean,
-): DrumsSpaceState | null {
-  if (!isDrumsSpace) return null;
-
-  const onset = snapshot.onsetEnvelope;
-  const energy = snapshot.energy;
-  const flatness = snapshot.flatness;
-
-  // Coherence signals (may be undefined if not computed)
-  const coherence = snapshot.coherence ?? 0;
-  // Use drum signals as proxy for beat regularity
-  const drumBeat = snapshot.drumBeat ?? 0;
-  // Use chroma stability as proxy via coherence score
-  const chromaStability = coherence;
-
-  // Classify raw phase with coherence-enhanced boundaries
-  let rawPhase: DrumsSpaceSubPhase;
-
+export function classifyRawPhase(
+  onset: number,
+  energy: number,
+  flatness: number,
+  drumBeat: number,
+  recentlySpace: boolean,
+  coherence: number,
+): DrumsSpaceSubPhase {
   if (
     onset > TRIBAL_ONSET_MIN &&
     energy > TRIBAL_ENERGY_MIN &&
     flatness < TRIBAL_FLATNESS_MAX &&
-    drumBeat > TRIBAL_BEAT_REGULARITY_MIN * 0.5 // relaxed — use drum beat as regularity proxy
+    drumBeat > TRIBAL_BEAT_REGULARITY_MIN * 0.5
   ) {
-    rawPhase = "drums_tribal";
-  } else if (
+    return "drums_tribal";
+  }
+
+  if (
     onset < SPACE_ONSET_MAX &&
     flatness > SPACE_FLATNESS_MIN &&
     energy < SPACE_ENERGY_MAX &&
     drumBeat < SPACE_BEAT_REGULARITY_MAX
   ) {
-    rawPhase = "space_ambient";
-  } else if (
-    phaseHistory.length > 0 &&
-    recentPhaseIs("space_ambient") &&
-    chromaStability > REEMERGENCE_CHROMA_STABILITY_MIN &&
+    return "space_ambient";
+  }
+
+  if (
+    recentlySpace &&
+    coherence > REEMERGENCE_CHROMA_STABILITY_MIN &&
     flatness < REEMERGENCE_FLATNESS_MAX
   ) {
-    // Band re-entering: chroma stability rising, flatness dropping from space
-    rawPhase = "reemergence";
-  } else if (onset > 0.2 && phaseHistory.length > 0 && recentPhaseIs("space_ambient")) {
-    // Onset rising from space — band re-entering (fallback)
-    rawPhase = "reemergence";
-  } else if (onset < TRANSITION_ONSET_MAX && energy < TRIBAL_ENERGY_MIN) {
-    // Onset dropping but not yet full space
-    rawPhase = "transition";
-  } else if (onset > TRIBAL_ONSET_MIN * 0.7) {
-    rawPhase = "drums_tribal";
-  } else {
-    rawPhase = "transition";
+    return "reemergence";
   }
 
-  // Push to history for smoothing
-  phaseHistory.push(rawPhase);
-  if (phaseHistory.length > HISTORY_LEN) {
-    phaseHistory.shift();
+  if (onset > 0.2 && recentlySpace) {
+    return "reemergence";
   }
 
-  // Use majority vote from recent history for stability
-  const stablePhase = majorityPhase(phaseHistory);
+  if (onset < TRANSITION_ONSET_MAX && energy < TRIBAL_ENERGY_MIN) {
+    return "transition";
+  }
 
-  // Compute phase progress based on how deep we are into the current phase
-  const phaseCount = countConsecutive(phaseHistory, stablePhase);
+  if (onset > TRIBAL_ONSET_MIN * 0.7) {
+    return "drums_tribal";
+  }
+
+  return "transition";
+}
+
+// ─── Main computation ───
+
+/**
+ * Detect current Drums/Space sub-phase from frame data.
+ * Returns null if the song is not a Drums/Space segment.
+ *
+ * Pure function — scans backward 30 frames, classifies each,
+ * and uses majority vote for temporal stability.
+ *
+ * @param frames Full frame array
+ * @param frameIdx Current frame index
+ * @param isDrumsSpace Whether this song is identified as Drums/Space
+ */
+export function computeDrumsSpacePhase(
+  frames: EnhancedFrameData[],
+  frameIdx: number,
+  isDrumsSpace: boolean,
+): DrumsSpaceState | null {
+  if (!isDrumsSpace) return null;
+  if (frames.length === 0) return null;
+
+  const safeIdx = Math.min(Math.max(0, frameIdx), frames.length - 1);
+  const lo = Math.max(0, safeIdx - HISTORY_LEN + 1);
+
+  // Classify each frame in the window
+  const classified: DrumsSpaceSubPhase[] = [];
+  for (let i = lo; i <= safeIdx; i++) {
+    const f = frames[i];
+    const onset = f.onset;
+    const energy = f.rms;
+    const flatness = f.flatness;
+    const drumBeat = (f.stemDrumBeat ? 1 : 0) || (f.beat ? 0.5 : 0);
+
+    // Check if recent classifications include space_ambient
+    const recentSlice = classified.slice(-15);
+    const recentlySpace = classified.length >= 5 &&
+      recentSlice.filter(p => p === "space_ambient").length > recentSlice.length * 0.4;
+
+    // Use coherence raw score as proxy for chroma stability
+    const coherence = computeRawScore(frames, i);
+
+    const phase = classifyRawPhase(onset, energy, flatness, drumBeat, recentlySpace, coherence);
+    classified.push(phase);
+  }
+
+  // Majority vote for stability
+  const stablePhase = majorityPhase(classified);
+  const phaseCount = countConsecutive(classified, stablePhase);
   const phaseProgress = Math.min(1, phaseCount / HISTORY_LEN);
 
   return {
     subPhase: stablePhase,
     phaseProgress,
   };
-}
-
-/** Check if recent history has been predominantly a given phase */
-function recentPhaseIs(phase: DrumsSpaceSubPhase): boolean {
-  if (phaseHistory.length < 5) return false;
-  const recent = phaseHistory.slice(-15);
-  const count = recent.filter((p) => p === phase).length;
-  return count > recent.length * 0.4;
 }
 
 /** Find the most common phase in history */

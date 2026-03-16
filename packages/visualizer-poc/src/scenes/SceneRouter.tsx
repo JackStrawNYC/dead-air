@@ -20,7 +20,52 @@ import { findCurrentSection } from "../utils/section-lookup";
 import type { SongIdentity } from "../data/song-identities";
 import type { StemSectionType } from "../utils/stem-features";
 
-const CROSSFADE_FRAMES = 30; // 1 second at 30fps — dramatic flash→blackout→eruption
+/**
+ * Dynamic crossfade duration based on energy context.
+ * Quiet→quiet: 240 frames (8s) — gentle dissolve
+ * Loud→loud:     8 frames     — hard cut
+ * Quiet→loud:   18 frames     — fast snap
+ * Loud→quiet:   50 frames     — moderate fade
+ * Mid (default): 30 frames    — standard crossfade
+ */
+function dynamicCrossfadeDuration(
+  frames: EnhancedFrameData[],
+  boundary: number,
+  lookback = 60,
+): number {
+  const lo = Math.max(0, boundary - lookback);
+  const hi = Math.min(frames.length - 1, boundary + lookback);
+
+  // Average energy before and after boundary
+  let beforeSum = 0, beforeCount = 0;
+  for (let i = lo; i < boundary && i < frames.length; i++) {
+    beforeSum += frames[i].rms;
+    beforeCount++;
+  }
+  let afterSum = 0, afterCount = 0;
+  for (let i = boundary; i <= hi; i++) {
+    afterSum += frames[i].rms;
+    afterCount++;
+  }
+
+  const beforeEnergy = beforeCount > 0 ? beforeSum / beforeCount : 0;
+  const afterEnergy = afterCount > 0 ? afterSum / afterCount : 0;
+
+  const QUIET = 0.08;
+  const LOUD = 0.20;
+
+  const beforeQuiet = beforeEnergy < QUIET;
+  const beforeLoud = beforeEnergy > LOUD;
+  const afterQuiet = afterEnergy < QUIET;
+  const afterLoud = afterEnergy > LOUD;
+
+  if (beforeQuiet && afterQuiet) return 240;   // gentle dissolve
+  if (beforeLoud && afterLoud) return 8;       // hard cut
+  if (beforeQuiet && afterLoud) return 18;     // fast snap
+  if (beforeLoud && afterQuiet) return 50;     // moderate fade
+  return 30;                                    // default
+}
+
 const BEAT_CROSSFADE_FRAMES = 30; // 1 second when beat-synced (15 before + 15 after)
 
 // Complement modes and energy pools are now in scene-registry.ts
@@ -287,7 +332,7 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
     if (prevMode !== currentMode) {
       const boundary = currentSection.frameStart;
       const beatFrame = findNearestBeat(frames, boundary - 30, boundary + 30);
-      const crossfadeLen = beatFrame !== null ? BEAT_CROSSFADE_FRAMES : CROSSFADE_FRAMES;
+      const crossfadeLen = beatFrame !== null ? BEAT_CROSSFADE_FRAMES : dynamicCrossfadeDuration(frames, boundary);
       const crossfadeStart = beatFrame !== null ? beatFrame - 30 : boundary;
       const distFromStart = frame - crossfadeStart;
 
@@ -311,7 +356,7 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
     if (nextMode !== currentMode) {
       const boundary = currentSection.frameEnd;
       const beatFrame = findNearestBeat(frames, boundary - 30, boundary + 30);
-      const crossfadeLen = beatFrame !== null ? BEAT_CROSSFADE_FRAMES : CROSSFADE_FRAMES;
+      const crossfadeLen = beatFrame !== null ? BEAT_CROSSFADE_FRAMES : dynamicCrossfadeDuration(frames, boundary);
       const crossfadeEnd = beatFrame !== null ? beatFrame + 30 : boundary;
       const distToEnd = crossfadeEnd - frame;
 

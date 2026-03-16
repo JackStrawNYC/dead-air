@@ -4,10 +4,20 @@
  * Sets uniforms from audio data each frame via useAudioData().
  */
 
-import React, { useMemo } from "react";
+import React, { useMemo, useRef } from "react";
 import * as THREE from "three";
 import { useAudioData } from "./AudioReactiveCanvas";
 import { useVideoConfig } from "remotion";
+import { useShowContext } from "../data/ShowContext";
+
+/** Era saturation values — previously in EraGrade CSS, now owned by GLSL */
+const ERA_SATURATION: Record<string, number> = {
+  primal: 0.70,
+  classic: 0.90,
+  hiatus: 0.75,
+  touch_of_grey: 1.15,
+  revival: 0.95,
+};
 
 interface Props {
   vertexShader: string;
@@ -22,6 +32,16 @@ export const FullscreenQuad: React.FC<Props> = ({
 }) => {
   const { time, beatDecay, smooth, palettePrimary, paletteSecondary, paletteSaturation, tempo, musicalTime, climaxPhase, climaxIntensity, jamDensity, coherence, dynamicTime, isLocked } = useAudioData();
   const { width, height } = useVideoConfig();
+  const showCtx = useShowContext();
+  const eraSaturation = ERA_SATURATION[showCtx?.era ?? ""] ?? 1.0;
+
+  // FFT texture: 64-bin DataTexture from 7-band contrast (padded)
+  const fftTextureRef = useRef<THREE.DataTexture | null>(null);
+  if (!fftTextureRef.current) {
+    const data = new Uint8Array(64);
+    fftTextureRef.current = new THREE.DataTexture(data, 64, 1, THREE.RedFormat);
+    fftTextureRef.current.needsUpdate = true;
+  }
 
   const uniforms = useMemo(() => {
     return {
@@ -71,6 +91,11 @@ export const FullscreenQuad: React.FC<Props> = ({
       uOtherEnergy: { value: 0 },
       uOtherCentroid: { value: 0 },
       uSnapToMusicalTime: { value: 0 },
+      uEraSaturation: { value: 1.0 },
+      uEnergyAccel: { value: 0 },
+      uEnergyTrend: { value: 0 },
+      uLocalTempo: { value: 120 },
+      uFFTTexture: { value: fftTextureRef.current },
       ...extraUniforms,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -116,6 +141,25 @@ export const FullscreenQuad: React.FC<Props> = ({
   uniforms.uOtherEnergy.value = smooth.otherEnergy;
   uniforms.uOtherCentroid.value = smooth.otherCentroid;
   uniforms.uSnapToMusicalTime.value = isLocked ? 1.0 : 0.0;
+  uniforms.uEraSaturation.value = eraSaturation;
+  uniforms.uEnergyAccel.value = smooth.energyAcceleration;
+  uniforms.uEnergyTrend.value = smooth.energyTrend;
+  uniforms.uLocalTempo.value = smooth.localTempo;
+
+  // Update FFT texture from 7-band contrast (padded to 64 bins)
+  if (fftTextureRef.current) {
+    const texData = fftTextureRef.current.image.data as Uint8Array;
+    const binsPerBand = Math.floor(64 / 7);
+    for (let band = 0; band < 7; band++) {
+      const val = Math.round((c[band] ?? 0) * 255);
+      const start = band * binsPerBand;
+      const end = band === 6 ? 64 : (band + 1) * binsPerBand;
+      for (let j = start; j < end; j++) {
+        texData[j] = val;
+      }
+    }
+    fftTextureRef.current.needsUpdate = true;
+  }
 
   const c = smooth.contrast;
   uniforms.uContrast0.value.set(c[0] ?? 0, c[1] ?? 0, c[2] ?? 0, c[3] ?? 0);
