@@ -92,7 +92,7 @@ void main() {
   float bgNoise = fbm3(bgQ);
   float bgHue = hsvToCosineHue(uPaletteSecondary) + bgNoise * 0.15;
   vec3 bgCol = palette(bgHue, vec3(0.4), vec3(0.3), vec3(1.0), vec3(bgHue, bgHue + 0.33, bgHue + 0.67));
-  bgCol *= mix(0.35, 0.72, energy);
+  bgCol *= mix(0.45, 0.72, energy);
 
   // ============ LAYER 2: Midground (hero) ============
   float warpStrength = (0.65 + slowE * 0.55) * complexity;
@@ -147,7 +147,7 @@ void main() {
   vec3 coolShift = vec3(0.90, 0.97, 1.10);
   midCol *= mix(coolShift, warmShift, energy);
 
-  float brightness = mix(0.45, 1.15, energy) + uFastEnergy * 0.15;
+  float brightness = mix(0.60, 1.15, energy) + uFastEnergy * 0.15;
   midCol *= brightness;
 
   // ============ LAYER 3: Foreground ============
@@ -242,14 +242,14 @@ void main() {
   col += sectionBloom * vec3(1.0, 0.98, 0.94);
 
   // Vignette (energy-driven)
-  float vigScale = mix(0.36, 0.30, energy);
+  float vigScale = mix(0.30, 0.24, energy);
   float vignette = 1.0 - dot(p * vigScale, p * vigScale);
   vignette = smoothstep(0.0, 1.0, vignette);
 
   // Colored vignette edges
   float vigHue = hsvToCosineHue(uPaletteSecondary);
   vec3 vigTint = 0.5 + 0.5 * cos(6.28318 * vec3(vigHue, vigHue + 0.33, vigHue + 0.67));
-  vigTint *= 0.03;
+  vigTint = max(vigTint * 0.03, vec3(0.05, 0.04, 0.06));
   col = mix(vigTint, col, vignette);
 
   // === POST-PROCESSING (shared chain) ===

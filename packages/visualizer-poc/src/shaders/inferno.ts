@@ -215,10 +215,10 @@ void main() {
   col += warmBase * fireLightStr;
 
   // === VIGNETTE (strong — fire falls off dramatically at edges) ===
-  float vigScale = mix(0.55, 0.40, energy);
+  float vigScale = mix(0.49, 0.34, energy);
   float vignette = 1.0 - dot(p * vigScale, p * vigScale);
   vignette = smoothstep(0.0, 0.8, vignette);
-  vec3 vigTint = flameColor * 0.03;
+  vec3 vigTint = max(flameColor * 0.03, vec3(0.05, 0.04, 0.06));
   col = mix(vigTint, col, vignette);
 
   // === POST-PROCESSING (shared chain: bloom, flare, halation, grade, grain) ===

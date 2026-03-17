@@ -157,7 +157,7 @@ void main() {
   // Stage silhouette — softened with wider smoothstep + noise edge
   float stageNoise = snoise(vec3(uv.x * 12.0, uDynamicTime * 0.15, 5.0)) * 0.02;
   float stageY = smoothstep(0.38, 0.22, uv.y + stageNoise);
-  col = mix(col, vec3(0.02, 0.015, 0.025), stageY * 0.70);
+  col = mix(col, vec3(0.04, 0.03, 0.05), stageY * 0.70);
 
   // === CROWD SILHOUETTE: wavy heads along bottom edge ===
   // Higher frequency + extra octave prevents visible repeating patterns at 1920px
@@ -166,7 +166,7 @@ void main() {
                + snoise(vec3(uv.x * 80.0, uDynamicTime * 0.05, 3.7)) * 0.004;
   crowdY += uDrumBeat * 0.005 * sin(uv.x * 15.0 + uDynamicTime);
   float crowdMask = smoothstep(crowdY + 0.01, crowdY - 0.01, uv.y);
-  col = mix(col, vec3(0.015, 0.012, 0.02), crowdMask * 0.85);
+  col = mix(col, vec3(0.035, 0.028, 0.04), crowdMask * 0.65);
 
   // Sparkle dust
   float sparkle = snoise(vec3(p * 30.0, uDynamicTime * 3.0));
@@ -174,14 +174,14 @@ void main() {
   col += sparkle * uHighs * 0.15 * vec3(1.0, 0.95, 0.9);
 
   // Vignette (energy-driven, no beat pulse)
-  float vigScale = mix(0.36, 0.35, energy);
+  float vigScale = mix(0.30, 0.29, energy);
   float vig = 1.0 - dot((uv - 0.5) * vigScale, (uv - 0.5) * vigScale);
   vig = smoothstep(0.0, 1.0, vig);
 
   // Colored vignette
   float vigHue = hsvToCosineHue(uPaletteSecondary);
   vec3 vigTint = 0.5 + 0.5 * cos(6.28318 * vec3(vigHue, vigHue + 0.33, vigHue + 0.67));
-  vigTint *= 0.02;
+  vigTint = max(vigTint * 0.02, vec3(0.05, 0.04, 0.06));
   col = mix(vigTint, col, vig);
 
   // Drum onset flash (scene-specific)

@@ -189,10 +189,10 @@ void main() {
   }
 
   // === VIGNETTE ===
-  float vigScale = mix(0.36, 0.30, energy);
+  float vigScale = mix(0.30, 0.24, energy);
   float vignette = 1.0 - dot(p * vigScale, p * vigScale);
   vignette = smoothstep(0.0, 1.0, vignette);
-  vec3 vigTint = waterColor * 0.04;
+  vec3 vigTint = max(waterColor * 0.04, vec3(0.05, 0.04, 0.06));
   col = mix(vigTint, col, vignette);
 
   // === POST-PROCESSING (shared chain) ===

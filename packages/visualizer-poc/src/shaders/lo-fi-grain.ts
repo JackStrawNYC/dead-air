@@ -96,7 +96,7 @@ void main() {
   col += scratch * vec3(1.0, 0.95, 0.85);
 
   // Strong vignette (16mm lens falloff)
-  float vig = 1.0 - dot(p * 0.55, p * 0.55);
+  float vig = 1.0 - dot(p * 0.49, p * 0.49);
   vig = smoothstep(-0.1, 0.8, vig);
   col *= 0.3 + vig * 0.7;
 

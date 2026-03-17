@@ -223,10 +223,10 @@ void main() {
   col -= starColor * 0.4 * auroraIntensity * curtainBrightness;
 
   // === VIGNETTE ===
-  float vigScale = mix(0.34, 0.28, energy);
+  float vigScale = mix(0.28, 0.22, energy);
   float vignette = 1.0 - dot(p * vigScale, p * vigScale);
   vignette = smoothstep(0.0, 1.0, vignette);
-  col = mix(vec3(0.0), col, vignette);
+  col = mix(vec3(0.04, 0.03, 0.05), col, vignette);
 
   // === POST-PROCESSING ===
   col = applyPostProcess(col, vUv, p);

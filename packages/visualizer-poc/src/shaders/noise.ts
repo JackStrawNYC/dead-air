@@ -218,7 +218,7 @@ float hsvToCosineHue(float h) { return 1.0 - h; }
 // Ensures no dead black voids — concerts are never pitch black.
 vec3 stageFloodFill(vec3 col, vec2 uv, float time, float energy, float palHue1, float palHue2) {
   // Activate even at very low energy — concerts are never pitch black
-  float gate = smoothstep(0.02, 0.15, energy);
+  float gate = smoothstep(0.0, 0.08, energy);
   if (gate < 0.01) return col;
   // Darkness mask: fill dim pixels (luma < 0.60 in pre-tonemap HDR range)
   float luma = dot(col, vec3(0.299, 0.587, 0.114));
@@ -241,8 +241,8 @@ vec3 stageFloodFill(vec3 col, vec2 uv, float time, float energy, float palHue1, 
   // Blend all three: primary + secondary + complementary
   vec3 floodColor = mix(c1, c2, pattern * 0.5 + 0.5);
   floodColor = mix(floodColor, c3, 0.15 + pattern * 0.1);
-  // Energy-scaled brightness: quiet=0.55, loud=0.75
-  floodColor *= mix(0.55, 0.75, gate);
+  // Energy-scaled brightness: quiet=0.65, loud=0.85
+  floodColor *= mix(0.65, 0.85, gate);
   // Gentle spatial variation (never kills to zero — range 0.85-1.1)
   floodColor *= 0.85 + 0.25 * clamp(pattern + 0.5, 0.0, 1.0);
   // Additive blend gated by darkness only: dark areas get lifted, bright areas unchanged
@@ -264,9 +264,9 @@ vec3 lightLeak(vec2 p, float time, float energy, float onsetSnap) {
   float leakAngle = time * 0.07;
   vec2 leakPos = vec2(cos(leakAngle), sin(leakAngle)) * 0.7;
   float dist = length(p - leakPos);
-  float leakStrength = energy * 0.5;
+  float leakStrength = max(0.15, energy * 0.5);
   float leak = smoothstep(0.8, 0.1, dist) * leakStrength;
-  vec3 leakColor = vec3(1.0, 0.7, 0.3) * leak * 0.12;
+  vec3 leakColor = vec3(1.0, 0.7, 0.3) * leak * 0.20;
   return leakColor;
 }
 
@@ -317,7 +317,7 @@ vec3 cinematicGrade(vec3 col, float energy) {
   vec3 hueRatio = col / max(maxC, 0.001);
 
   // Filmic tone curve on max channel: smooth shoulder rolloff
-  float exposure = 1.2 + energy * 0.2;
+  float exposure = 1.35 + energy * 0.15;
   float mapped = 1.0 - exp(-maxC * exposure);
 
   // Reconstruct color with preserved hue ratios

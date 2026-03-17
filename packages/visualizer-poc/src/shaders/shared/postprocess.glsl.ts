@@ -154,8 +154,8 @@ ${
   // Lifted blacks (build-phase aware)
   {
     float isBuild = step(0.5, uClimaxPhase) * step(uClimaxPhase, 1.5);
-    float liftMult = mix(1.0, 0.15, isBuild * uClimaxIntensity);
-    col = max(col, vec3(0.08, 0.06, 0.10) * liftMult);
+    float liftMult = mix(1.0, 0.40, isBuild * uClimaxIntensity);
+    col = max(col, vec3(0.09, 0.07, 0.11) * liftMult);
   }
 
   return col;

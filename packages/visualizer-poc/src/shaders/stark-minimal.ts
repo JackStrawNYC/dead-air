@@ -150,7 +150,7 @@ void main() {
   col += wipeEdge * vec3(0.4, 0.38, 0.35) * 0.5;
 
   // Subtle vignette
-  float vig = 1.0 - dot(p * 0.45, p * 0.45);
+  float vig = 1.0 - dot(p * 0.39, p * 0.39);
   vig = smoothstep(0.0, 1.0, vig);
   col *= mix(0.85, 1.0, vig);
 

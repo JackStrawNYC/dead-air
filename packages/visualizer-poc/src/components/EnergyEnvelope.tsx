@@ -88,7 +88,7 @@ export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod,
   const cssGate = factor; // 0 during quiet, 1 during loud (already smoothstep-based)
   const isClimaxPhase = (climaxMod?.brightnessOffset ?? 0) > 0.04;
   const brightCap = isClimaxPhase ? 1.50 : 1.25;
-  const brightness = Math.min(brightCap, 0.92 + factor * 0.28 + onsetBrightness * 0.4 * cssGate + (climaxMod?.brightnessOffset ?? 0) + setTheme.brightnessOffset + (snapshot.fastEnergy ?? 0) * 0.12 * cssGate);
+  const brightness = Math.min(brightCap, 0.96 + factor * 0.24 + onsetBrightness * 0.4 * cssGate + (climaxMod?.brightnessOffset ?? 0) + setTheme.brightnessOffset + (snapshot.fastEnergy ?? 0) * 0.12 * cssGate);
   // Bloom uses slow energy (drift, not pulse) — reduced to prevent white wash
   const bloomOpacity = slowFactor * 0.35 + (climaxMod?.bloomOffset ?? 0) * 0.5 + (snapshot.fastEnergy ?? 0) * 0.05;
 

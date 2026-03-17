@@ -206,7 +206,7 @@ void main() {
   col += noiseTex;
 
   // Vignette (lighter than most modes — fluid should fill the screen)
-  float vigDist = length(p * 0.35);
+  float vigDist = length(p * 0.29);
   float vignette = 1.0 - vigDist * vigDist;
   vignette = smoothstep(0.0, 1.0, vignette);
   col *= mix(0.7, 1.0, vignette);

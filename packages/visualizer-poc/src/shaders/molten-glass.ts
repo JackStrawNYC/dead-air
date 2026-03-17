@@ -152,10 +152,10 @@ void main() {
   }
 
   // === VIGNETTE ===
-  float vigScale = mix(0.36, 0.30, energy);
+  float vigScale = mix(0.30, 0.24, energy);
   float vignette = 1.0 - dot(dp * vigScale, dp * vigScale);
   vignette = smoothstep(0.0, 1.0, vignette);
-  col = mix(vec3(0.01, 0.008, 0.015), col, vignette);
+  col = mix(vec3(0.05, 0.04, 0.06), col, vignette);
 
   // === POST-PROCESSING ===
   col = applyPostProcess(col, vUv, p);

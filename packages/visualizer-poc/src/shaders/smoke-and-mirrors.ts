@@ -114,7 +114,7 @@ void main() {
       float alpha = density * (1.0 - fogAlpha);
 
       // Depth-varying color: warm near, cool far
-      vec3 smokeColor = mix(fogTint * 0.4, fogTint * 0.15, fi / fogSteps);
+      vec3 smokeColor = mix(fogTint * 0.55, fogTint * 0.25, fi / fogSteps);
 
       // Light scattering: brighter where density is lower (forward scattering)
       float scatter = exp(-density * 3.0) * energy * 0.3;
@@ -202,7 +202,7 @@ void main() {
   }
 
   // === AMBIENT FOG FLOOR: never pitch black ===
-  float ambientFog = 0.08 + slowE * 0.05;
+  float ambientFog = 0.12 + slowE * 0.06;
   col += fogTint * ambientFog * (1.0 - fogAlpha);
 
   // === BEAT PULSE ===
@@ -211,10 +211,10 @@ void main() {
   col *= 1.0 + uBeatSnap * 0.18 * (1.0 + climaxBoost * 0.4);
 
   // === VIGNETTE ===
-  float vigScale = mix(0.40, 0.32, energy);
+  float vigScale = mix(0.34, 0.26, energy);
   float vignette = 1.0 - dot(dp * vigScale, dp * vigScale);
   vignette = smoothstep(0.0, 1.0, vignette);
-  col = mix(vec3(0.01, 0.01, 0.02), col, vignette);
+  col = mix(vec3(0.05, 0.04, 0.06), col, vignette);
 
   // === LIGHT LEAK ===
   col += lightLeak(dp, uDynamicTime, energy, uOnsetSnap);
