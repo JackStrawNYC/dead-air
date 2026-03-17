@@ -48,6 +48,8 @@ interface Props {
   vocalWarmth?: number;
   /** Guitar color temperature -1 (cool) to +1 (warm) */
   guitarColorTemp?: number;
+  /** Dead air factor (0 = music playing, 1 = fully in dead air/applause) */
+  deadAirFactor?: number;
 }
 
 // Per-era bloom color — matches era grade for visual cohesion
@@ -60,7 +62,7 @@ const ERA_BLOOM: Record<string, string> = {
 };
 const DEFAULT_BLOOM = ERA_BLOOM.classic;
 
-export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod, jamColorTemp, calibration, counterpointSatMult = 1, setNumber, drumsSpacePhase, showPhase, songIdentity, showArcModifiers, itLuminanceLift, vocalWarmth, guitarColorTemp }) => {
+export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod, jamColorTemp, calibration, counterpointSatMult = 1, setNumber, drumsSpacePhase, showPhase, songIdentity, showArcModifiers, itLuminanceLift, vocalWarmth, guitarColorTemp, deadAirFactor = 0 }) => {
   const energy = snapshot.energy;
   const setTheme = getSetTheme(setNumber ?? 1);
   const low = calibration?.quietThreshold;
@@ -121,7 +123,11 @@ export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod,
   const vocalHueShift = (vocalWarmth ?? 0) * 15;
 
   // Apply phase offsets + song identity + show arc + IT
-  const finalBrightness = Math.min(brightCap, Math.max(0.55, brightness + dsBrightOffset + showBrightOffset + siPaletteBright + arcBrightOffset + itBrightLift));
+  const baseBrightness = Math.min(brightCap, Math.max(0.55, brightness + dsBrightOffset + showBrightOffset + siPaletteBright + arcBrightOffset + itBrightLift));
+  // During dead air, dim brightness toward 0.55 (minimum floor) and suppress bloom
+  const finalBrightness = deadAirFactor > 0
+    ? baseBrightness * (1 - deadAirFactor * 0.40)  // dim by up to 40% during dead air
+    : baseBrightness;
 
   // Guitar color temp: ±12deg hue shift based on Jerry's neck position
   const guitarHueShift = (guitarColorTemp ?? 0) * 12;
@@ -130,7 +136,8 @@ export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod,
   // Only applied during long jams. EraGrade + SongPalette handle base color character.
   const jamHueShift = jamColorTemp != null ? jamColorTemp * 35 : 0; // ±28 degrees max
   // Set-level warmth shift: Set 1 warm (+5deg), Set 2 cool (-8deg), Encore neutral (0)
-  const totalHueShift = jamHueShift + setTheme.warmthShift + eraColorTempShift + dsHueOffset + siHueShift + arcHueShift + vocalHueShift + guitarHueShift;
+  // Suppress hue shift during dead air so applause is neutral
+  const totalHueShift = (jamHueShift + setTheme.warmthShift + eraColorTempShift + dsHueOffset + siHueShift + arcHueShift + vocalHueShift + guitarHueShift) * (1 - deadAirFactor);
   const filterStr = totalHueShift !== 0
     ? `brightness(${finalBrightness.toFixed(3)}) hue-rotate(${totalHueShift.toFixed(1)}deg)`
     : `brightness(${finalBrightness.toFixed(3)})`;
@@ -148,7 +155,7 @@ export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod,
             backdropFilter: `blur(${(8 + slowFactor * 16).toFixed(1)}px) brightness(${(0.9 + factor * 0.3).toFixed(2)})`,
             WebkitBackdropFilter: `blur(${(8 + slowFactor * 16).toFixed(1)}px) brightness(${(0.9 + factor * 0.3).toFixed(2)})`,
             mixBlendMode: "screen",
-            opacity: 0.08 + slowFactor * 0.12,
+            opacity: (0.08 + slowFactor * 0.12) * (1 - deadAirFactor),
             pointerEvents: "none",
           }}
         />

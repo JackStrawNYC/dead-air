@@ -377,15 +377,23 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
   const mainScene = renderMode(currentMode, frames, sections, palette, tempo, undefined, jamDensity);
 
   // Dead air crossfade: transition to ambient shader after music ends
+  // Use a neutral desaturated palette so the song's personality doesn't bleed into applause
   if (deadAirMode && deadAirFactor !== undefined && deadAirFactor > 0) {
+    const deadAirPalette: typeof palette = { primary: 240, secondary: 240, saturation: 0.15, brightness: 0.6 };
+    const blendedPalette = deadAirFactor >= 1 ? deadAirPalette : {
+      primary: palette.primary + (deadAirPalette.primary - palette.primary) * deadAirFactor,
+      secondary: palette.secondary + (deadAirPalette.secondary - palette.secondary) * deadAirFactor,
+      saturation: (palette.saturation ?? 1) + ((deadAirPalette.saturation ?? 0.15) - (palette.saturation ?? 1)) * deadAirFactor,
+      brightness: (palette.brightness ?? 1) + ((deadAirPalette.brightness ?? 0.6) - (palette.brightness ?? 1)) * deadAirFactor,
+    };
     if (deadAirFactor >= 1) {
-      return <>{renderMode(deadAirMode, frames, sections, palette, tempo, undefined, 0.2)}</>;
+      return <>{renderMode(deadAirMode, frames, sections, deadAirPalette, tempo, undefined, 0.2)}</>;
     }
     return (
       <SceneCrossfade
         progress={deadAirFactor}
         outgoing={mainScene}
-        incoming={renderMode(deadAirMode, frames, sections, palette, tempo, undefined, 0.2)}
+        incoming={renderMode(deadAirMode, frames, sections, blendedPalette, tempo, undefined, 0.2)}
       />
     );
   }
