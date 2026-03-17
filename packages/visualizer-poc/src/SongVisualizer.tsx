@@ -470,7 +470,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
 
           {effectiveSongArt && (
             <SilentErrorBoundary name="SongArt">
-              <SongArtLayer src={staticFile(effectiveSongArt)} suppressionFactor={artSuppressionFactor * introFactor} hueRotation={hueRotation} energy={audioSnapshot.energy} climaxIntensity={climaxState.intensity} focusOpacity={focusState.artOpacity} segueIn={props.segueIn} artBlendMode={props.song.artBlendMode} />
+              <SongArtLayer src={staticFile(effectiveSongArt)} suppressionFactor={Math.max(artSuppressionFactor, 1 - introFactor)} hueRotation={hueRotation} energy={audioSnapshot.energy} climaxIntensity={climaxState.intensity} focusOpacity={focusState.artOpacity} segueIn={props.segueIn} artBlendMode={props.song.artBlendMode} introFactor={introFactor} />
             </SilentErrorBoundary>
           )}
 
@@ -548,7 +548,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
           )}
 
           {!isDeadAir && <ConcertInfo />}
-          {!isDeadAir && <SetlistScroll frames={f} currentSong={props.song.title} />}
+          {!isDeadAir && <SetlistScroll frames={f} currentSong={props.song.title} introFactor={introFactor} />}
 
           <SpecialPropsLayer
             songTitle={props.song.title}

@@ -28,9 +28,11 @@ interface SongArtProps {
   segueIn?: boolean;
   /** CSS mix-blend-mode override (default "screen") */
   artBlendMode?: string;
+  /** Intro factor 0-1: 0 = intro period (art-forward), 1 = engine fully open */
+  introFactor?: number;
 }
 
-export const SongArtLayer: React.FC<SongArtProps> = ({ src, suppressionFactor, hueRotation = 0, energy = 0, climaxIntensity = 0, focusOpacity = 1, segueIn = false, artBlendMode }) => {
+export const SongArtLayer: React.FC<SongArtProps> = ({ src, suppressionFactor, hueRotation = 0, energy = 0, climaxIntensity = 0, focusOpacity = 1, segueIn = false, artBlendMode, introFactor = 1 }) => {
   const frame = useCurrentFrame();
 
   // Suppress art during segue-in (first 10s) — let the crossfade breathe
@@ -45,11 +47,13 @@ export const SongArtLayer: React.FC<SongArtProps> = ({ src, suppressionFactor, h
     { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
   );
 
-  // Base target: full during intro, then settle to energy-reactive wash
+  // Base target: hold strong during intro period, then settle to energy-reactive wash
+  // When introFactor < 1, maintain higher base opacity (art is the star of the intro)
+  const introWash = introFactor < 1 ? 0.70 * (1 - introFactor) + energyWash * introFactor : energyWash;
   const baseOpacity = interpolate(
     frame,
     [0, ART_FULL_END, ART_FADE_END],
-    [0.70, 0.70, energyWash],
+    [0.70, 0.70, introWash],
     {
       extrapolateLeft: "clamp",
       extrapolateRight: "clamp",
@@ -59,9 +63,12 @@ export const SongArtLayer: React.FC<SongArtProps> = ({ src, suppressionFactor, h
 
   // Climax suppression: during climax/sustain, further suppress art
   const climaxSuppression = 1 - climaxIntensity * 0.7;
-  // Intro override: bypass focusOpacity during intro frames so the title card stays visible
-  const introOverride = frame < ART_FULL_END ? 1.0 : focusOpacity;
-  const artOpacity = baseOpacity * suppressionFactor * climaxSuppression * introOverride;
+  // Intro override: during intro period (introFactor < 1), keep art prominent
+  // by lerping focusOpacity toward 1.0. First 4s always full override.
+  const introBoost = frame < ART_FULL_END ? 1.0
+    : introFactor < 1 ? focusOpacity + (1.0 - focusOpacity) * (1 - introFactor)
+    : focusOpacity;
+  const artOpacity = baseOpacity * suppressionFactor * climaxSuppression * introBoost;
 
   if (artOpacity < 0.01) return null;
 

@@ -418,11 +418,12 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
   // Use a neutral desaturated palette so the song's personality doesn't bleed into applause
   if (deadAirMode && deadAirFactor !== undefined && deadAirFactor > 0) {
     const deadAirPalette: typeof palette = { primary: 240, secondary: 240, saturation: 0.15, brightness: 0.6 };
+    const basePalette = palette ?? { primary: 240, secondary: 240, saturation: 0.5, brightness: 0.8 };
     const blendedPalette = deadAirFactor >= 1 ? deadAirPalette : {
-      primary: palette.primary + (deadAirPalette.primary - palette.primary) * deadAirFactor,
-      secondary: palette.secondary + (deadAirPalette.secondary - palette.secondary) * deadAirFactor,
-      saturation: (palette.saturation ?? 1) + ((deadAirPalette.saturation ?? 0.15) - (palette.saturation ?? 1)) * deadAirFactor,
-      brightness: (palette.brightness ?? 1) + ((deadAirPalette.brightness ?? 0.6) - (palette.brightness ?? 1)) * deadAirFactor,
+      primary: basePalette.primary + (deadAirPalette.primary - basePalette.primary) * deadAirFactor,
+      secondary: basePalette.secondary + (deadAirPalette.secondary - basePalette.secondary) * deadAirFactor,
+      saturation: (basePalette.saturation ?? 1) + ((deadAirPalette.saturation ?? 0.15) - (basePalette.saturation ?? 1)) * deadAirFactor,
+      brightness: (basePalette.brightness ?? 1) + ((deadAirPalette.brightness ?? 0.6) - (basePalette.brightness ?? 1)) * deadAirFactor,
     };
     if (deadAirFactor >= 1) {
       return <>{renderMode(deadAirMode, frames, sections, deadAirPalette, tempo, undefined, 0.2)}</>;

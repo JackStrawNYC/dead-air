@@ -34,28 +34,35 @@ const TORN_CLIP_PATH =
 interface Props {
   frames: EnhancedFrameData[];
   currentSong?: string;
+  /** 0 = intro period (show setlist early), 1 = engine open (normal 30s delay) */
+  introFactor?: number;
 }
 
-export const SetlistScroll: React.FC<Props> = ({ frames, currentSong }) => {
+export const SetlistScroll: React.FC<Props> = ({ frames, currentSong, introFactor = 1 }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
   const ctx = useShowContext();
 
-  // Energy gate: evaluate once at the trigger frame, not per-frame.
-  // This prevents flashing when energy oscillates near the threshold during the display window.
-  const triggerIdx = Math.min(Math.max(0, DELAY), frames.length - 1);
-  let triggerEnergySum = 0;
-  let triggerCount = 0;
-  for (let i = Math.max(0, triggerIdx - 75); i <= Math.min(frames.length - 1, triggerIdx + 75); i++) {
-    triggerEnergySum += frames[i].rms;
-    triggerCount++;
+  // Intro mode: show setlist early (13-21s) on the right side, no energy gate
+  // Normal mode: show at 30s on the left side with energy gate
+  const isIntroSong = introFactor < 1;
+  const INTRO_DELAY = 390;  // 13s — after SongTitle + ConcertInfo clear
+  const effectiveDelay = isIntroSong ? INTRO_DELAY : DELAY;
+
+  // Energy gate: only apply for normal (non-intro) appearances
+  if (!isIntroSong) {
+    const triggerIdx = Math.min(Math.max(0, effectiveDelay), frames.length - 1);
+    let triggerEnergySum = 0;
+    let triggerCount = 0;
+    for (let i = Math.max(0, triggerIdx - 75); i <= Math.min(frames.length - 1, triggerIdx + 75); i++) {
+      triggerEnergySum += frames[i].rms;
+      triggerCount++;
+    }
+    const triggerEnergy = triggerCount > 0 ? triggerEnergySum / triggerCount : 0;
+    if (triggerEnergy > 0.28) return null;
   }
-  const triggerEnergy = triggerCount > 0 ? triggerEnergySum / triggerCount : 0;
 
-  // Gate on trigger-frame energy only (no flashing)
-  if (triggerEnergy > 0.28) return null;
-
-  const localFrame = frame - DELAY;
+  const localFrame = frame - effectiveDelay;
   const inWindow = localFrame >= 0 && localFrame < SHOW_DURATION;
   if (!inWindow) return null;
 
@@ -79,8 +86,8 @@ export const SetlistScroll: React.FC<Props> = ({ frames, currentSong }) => {
 
   if (opacity < 0.01) return null;
 
-  // Slide in from the left
-  const slideX = interpolate(localFrame, [0, FADE_IN_FRAMES], [-40, 0], {
+  // Slide in: from right during intro, from left normally
+  const slideX = interpolate(localFrame, [0, FADE_IN_FRAMES], [isIntroSong ? 40 : -40, 0], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
     easing: Easing.out(Easing.cubic),
@@ -148,7 +155,7 @@ export const SetlistScroll: React.FC<Props> = ({ frames, currentSong }) => {
         style={{
           position: "absolute",
           bottom: 40,
-          left: 24,
+          ...(isIntroSong ? { right: 24 } : { left: 24 }),
           opacity,
           transform: `translate(${slideX + jitterX}px, ${jitterY}px) rotate(${tiltAngle}deg)`,
           willChange: "transform, opacity",
