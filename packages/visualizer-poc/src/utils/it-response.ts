@@ -51,6 +51,10 @@ export interface ITVisualState {
   flashIntensity: number;
   /** Whether to trigger a visual state reset (new shader, new palette, new overlays) */
   triggerReset: boolean;
+  /** Strobe intensity during deep lock (0 = none, 0.3 = pulsing, beat-synced) */
+  strobeIntensity: number;
+  /** Time dilation factor for shader accumulation (1.0 = normal, 0.3 = slow-motion) */
+  timeDilation: number;
 }
 
 // ─── Constants ───
@@ -60,6 +64,12 @@ const BREAK_FLASH_FRAMES = 2;
 const BREAK_RECOVERY_FRAMES = 10;
 const LOCKED_OVERLAY_OPACITY = 0.05;
 const LOCKED_LUMINANCE_LIFT = 0.15;
+/** Frames of sustained lock before strobe kicks in (deep IT territory) */
+const DEEP_LOCK_FRAMES = 150; // 5 seconds
+/** Max strobe intensity during deep lock */
+const STROBE_MAX = 0.30;
+/** Time dilation factor during deep lock (slow-motion shader drift) */
+const LOCKED_TIME_DILATION = 0.3;
 
 // ─── Helpers ───
 
@@ -158,6 +168,8 @@ export function computeITResponse(
         snapToMusicalTime: false,
         flashIntensity,
         triggerReset: framesSinceUnlock === 0, // trigger on first frame of break
+        strobeIntensity: 0,
+        timeDilation: 1, // snap back to normal time on break
       };
     }
   }
@@ -181,10 +193,23 @@ export function computeITResponse(
         snapToMusicalTime: eased > 0.7,
         flashIntensity: 0,
         triggerReset: false,
+        strobeIntensity: 0,
+        timeDilation: 1,
       };
     }
 
-    // Fully locked
+    // Fully locked — check for deep lock (sustained IT → strobe + time dilation)
+    const deepLockProgress = Math.max(0, Math.min(1,
+      (framesSinceLock - LOCK_CONVERGENCE_FRAMES) / (DEEP_LOCK_FRAMES - LOCK_CONVERGENCE_FRAMES),
+    ));
+    // Strobe: beat-synced pulse during deep lock, using frame's onset strength
+    const onsetStrength = frames[idx]?.onset ?? 0;
+    const strobeIntensity = deepLockProgress > 0.5
+      ? STROBE_MAX * smoothstep((deepLockProgress - 0.5) * 2) * Math.min(1, onsetStrength * 3)
+      : 0;
+    // Time dilation: ramp toward slow-motion as lock deepens
+    const timeDilation = 1 - (1 - LOCKED_TIME_DILATION) * smoothstep(deepLockProgress);
+
     return {
       phase: "locked",
       convergenceProgress: 1,
@@ -195,6 +220,8 @@ export function computeITResponse(
       snapToMusicalTime: true,
       flashIntensity: 0,
       triggerReset: false,
+      strobeIntensity,
+      timeDilation,
     };
   }
 
@@ -213,5 +240,7 @@ function defaultState(): ITVisualState {
     snapToMusicalTime: false,
     flashIntensity: 0,
     triggerReset: false,
+    strobeIntensity: 0,
+    timeDilation: 1,
   };
 }

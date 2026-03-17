@@ -22,7 +22,7 @@ import type { DrumsSpaceSubPhase } from "../utils/drums-space-phase";
 
 // ─── Types ───
 
-export type TransitionStyle = "dissolve" | "morph" | "flash" | "void" | "radial_wipe" | "distortion_morph" | "luminance_key";
+export type TransitionStyle = "dissolve" | "morph" | "flash" | "void" | "radial_wipe" | "distortion_morph" | "luminance_key" | "kaleidoscope_dissolve" | "prismatic_split" | "chromatic_wipe";
 
 export interface ClimaxBehavior {
   /** Peak saturation offset (additive, default from climax-state) */

@@ -106,6 +106,9 @@ export function buildSongProfile(
       chromaSpread: 0,
       tempo: analysis.meta.tempo ?? 120,
       sectionCount: analysis.meta.sections?.length ?? 1,
+      avgVocalPresence: 0,
+      avgDrumEnergy: 0,
+      avgOtherCentroid: 0,
     };
   }
 
@@ -113,6 +116,7 @@ export function buildSongProfile(
   let sumRms = 0, sumCentroid = 0, sumFlatness = 0, sumSub = 0;
   let sumLow = 0, sumMid = 0, sumHigh = 0;
   let peakCount = 0;
+  let sumVocalPresence = 0, sumDrumEnergy = 0, sumOtherCentroid = 0;
   const chromaSums = new Array(12).fill(0);
 
   for (const f of frames) {
@@ -124,6 +128,9 @@ export function buildSongProfile(
     sumMid += f.mid;
     sumHigh += f.high;
     if (f.rms > 0.25) peakCount++;
+    sumVocalPresence += f.stemVocalPresence ? 1 : 0;
+    sumDrumEnergy += f.stemDrumOnset ?? 0;
+    sumOtherCentroid += f.stemOtherCentroid ?? 0;
     for (let c = 0; c < 12; c++) {
       chromaSums[c] += f.chroma[c];
     }
@@ -172,6 +179,9 @@ export function buildSongProfile(
     chromaSpread,
     tempo: analysis.meta.tempo ?? 120,
     sectionCount: analysis.meta.sections?.length ?? 1,
+    avgVocalPresence: sumVocalPresence / n,
+    avgDrumEnergy: sumDrumEnergy / n,
+    avgOtherCentroid: sumOtherCentroid / n,
   };
 }
 
@@ -187,34 +197,51 @@ function tagAffinity(tag: OverlayTag, profile: SongProfile): number {
       // High centroid, high chroma spread
       return (profile.avgCentroid * 0.5 + profile.chromaSpread * 0.5) * 0.15;
     case "organic":
-      // Low tempo, mid energy, high sub-bass
+      // Low tempo, mid energy, high sub-bass + vocal presence boost
+      // Songs with strong vocals feel more organic/human
       return (
-        ((1 - Math.min(profile.tempo / 200, 1)) * 0.3 +
-          (1 - Math.abs(profile.avgEnergy - 0.15) * 4) * 0.3 +
-          profile.avgSub * 0.4) *
+        ((1 - Math.min(profile.tempo / 200, 1)) * 0.25 +
+          (1 - Math.abs(profile.avgEnergy - 0.15) * 4) * 0.25 +
+          profile.avgSub * 0.3 +
+          profile.avgVocalPresence * 0.2) *
         0.15
       );
     case "mechanical":
-      // High tempo, strong beats
-      return (Math.min(profile.tempo / 160, 1) * 0.6 + profile.peakEnergyRatio * 0.4) * 0.15;
+      // High tempo, strong beats + drum energy from stems
+      return (
+        (Math.min(profile.tempo / 160, 1) * 0.4 +
+          profile.peakEnergyRatio * 0.3 +
+          Math.min(profile.avgDrumEnergy * 4, 1) * 0.3) *
+        0.15
+      );
     case "psychedelic":
-      // High flatness (noisy), high energy variance
-      return (profile.avgFlatness * 0.5 + Math.min(profile.energyVariance * 10, 1) * 0.5) * 0.15;
+      // High flatness (noisy), high energy variance + high guitar centroid (bright/effects-laden)
+      return (
+        (profile.avgFlatness * 0.35 +
+          Math.min(profile.energyVariance * 10, 1) * 0.35 +
+          profile.avgOtherCentroid * 0.3) *
+        0.15
+      );
     case "festival":
       // High energy, set 2 bonus
       return (
         (profile.avgEnergy * 3 * 0.6 + (profile.set === 2 ? 0.4 : 0)) * 0.15
       );
     case "contemplative":
-      // Low energy, low tempo
+      // Low energy, low tempo + high vocal presence (ballads)
       return (
-        ((1 - profile.avgEnergy * 3) * 0.5 +
-          (1 - Math.min(profile.tempo / 160, 1)) * 0.5) *
+        ((1 - profile.avgEnergy * 3) * 0.4 +
+          (1 - Math.min(profile.tempo / 160, 1)) * 0.35 +
+          profile.avgVocalPresence * 0.25) *
         0.15
       );
     case "intense":
-      // High peak energy ratio
-      return profile.peakEnergyRatio * 0.15;
+      // High peak energy ratio + drum energy
+      return (
+        (profile.peakEnergyRatio * 0.6 +
+          Math.min(profile.avgDrumEnergy * 4, 1) * 0.4) *
+        0.15
+      );
     case "retro":
       // Slight positive for variety
       return 0.05;

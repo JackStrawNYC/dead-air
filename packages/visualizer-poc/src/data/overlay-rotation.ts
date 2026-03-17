@@ -127,11 +127,15 @@ const CROSSFADE_FRAMES_DEFAULT = 120;
  * based on duty cycle metadata — if selected overlays have low duty cycles
  * (internal cycling), more are picked to ensure ~3 are visible at any frame.
  * Always-on heroes are prioritized first for guaranteed visibility.
+ *
+ * Density inverted at peaks: pre-peak dropout strips to void, then the climax
+ * floods in with maximum visual density (A-tier only). The contrast between
+ * dropout silence and peak flood creates the show's visceral impact.
  */
 const ENERGY_COUNTS: Record<string, { min: number; max: number }> = {
   low:  { min: 1,  max: 1 },   // quiet: one gentle wash, nothing more
   mid:  { min: 1,  max: 2 },   // moderate: one or two at most
-  high: { min: 0,  max: 1 },   // peaks: max 1 A-tier icon at low opacity
+  high: { min: 2,  max: 3 },   // peaks: flood with 2-3 A-tier overlays after dropout void
 };
 
 /** A-tier overlays: the only overlays allowed during peaks (high energy).

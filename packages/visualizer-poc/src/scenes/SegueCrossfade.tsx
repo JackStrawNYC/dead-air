@@ -174,6 +174,154 @@ export const SegueCrossfade: React.FC<Props> = ({ progress, outgoing, incoming, 
     );
   }
 
+  if (style === "kaleidoscope_dissolve") {
+    // Kaleidoscope: rotational symmetry dissolve — fragments rotate into place.
+    // Outgoing scene fractures and rotates out while incoming rotates in.
+    const eased = cubicEase(t);
+    const outOp = 1 - eased;
+    const inOp = eased;
+    // Rotation: outgoing rotates out, incoming rotates in
+    const rotationDeg = eased * 60; // 0 → 60 degrees
+    const scaleOut = 1 + eased * 0.3; // zoom out
+    const scaleIn = 1.3 - eased * 0.3; // zoom in to normal
+    // Clip polygon: hexagonal kaleidoscope facet
+    const hexRadius = 50 + eased * 25; // expanding hex
+    const hexPoints = Array.from({ length: 6 }, (_, i) => {
+      const a = (i * 60 - 30 + rotationDeg * 0.5) * Math.PI / 180;
+      return `${50 + hexRadius * Math.cos(a)}% ${50 + hexRadius * Math.sin(a)}%`;
+    }).join(", ");
+
+    return (
+      <div style={{ position: "relative", width: "100%", height: "100%" }}>
+        {outOp > 0.01 && (
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              opacity: outOp,
+              transform: `rotate(${rotationDeg.toFixed(1)}deg) scale(${scaleOut.toFixed(3)})`,
+            }}
+          >
+            {outgoing}
+          </div>
+        )}
+        {inOp > 0.01 && (
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              opacity: inOp,
+              transform: `rotate(${(-60 + rotationDeg).toFixed(1)}deg) scale(${scaleIn.toFixed(3)})`,
+              clipPath: `polygon(${hexPoints})`,
+            }}
+          >
+            {incoming}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  if (style === "prismatic_split") {
+    // Prismatic split: scene splits into RGB channels that slide apart.
+    // Outgoing separates into R/G/B strips, incoming assembles from strips.
+    const eased = ease(t);
+    const outOp = Math.max(0, 1 - eased * 1.5); // fades faster
+    const inOp = Math.max(0, eased * 1.5 - 0.5); // appears later
+    // Split offset: how far the color channels separate
+    const splitPx = Math.sin(t * Math.PI) * 4; // peaks at midpoint (% units)
+
+    return (
+      <div style={{ position: "relative", width: "100%", height: "100%", overflow: "hidden" }}>
+        {outOp > 0.01 && (
+          <>
+            {/* Red channel */}
+            <div
+              style={{
+                position: "absolute",
+                inset: 0,
+                opacity: outOp,
+                transform: `translateX(${splitPx.toFixed(2)}%)`,
+                mixBlendMode: "screen",
+                filter: "saturate(3) hue-rotate(-30deg)",
+              }}
+            >
+              {outgoing}
+            </div>
+            {/* Blue channel */}
+            <div
+              style={{
+                position: "absolute",
+                inset: 0,
+                opacity: outOp,
+                transform: `translateX(${(-splitPx).toFixed(2)}%)`,
+                mixBlendMode: "screen",
+                filter: "saturate(3) hue-rotate(90deg)",
+              }}
+            >
+              {outgoing}
+            </div>
+          </>
+        )}
+        {inOp > 0.01 && (
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              opacity: inOp,
+            }}
+          >
+            {incoming}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  if (style === "chromatic_wipe") {
+    // Chromatic wipe: diagonal gradient sweep with color fringing at the edge.
+    // A diagonal line sweeps from top-left to bottom-right, revealing incoming.
+    // The edge of the wipe has chromatic aberration (color fringe).
+    const eased = cubicEase(t);
+    // Diagonal progress: gradient angle at 135 degrees
+    const gradientStop = eased * 120 - 10; // -10% to 110%
+    const fringeWidth = 8; // % of screen for color fringe zone
+
+    return (
+      <div style={{ position: "relative", width: "100%", height: "100%" }}>
+        {/* Outgoing scene — fully visible underneath */}
+        <div style={{ position: "absolute", inset: 0 }}>
+          {outgoing}
+        </div>
+        {/* Incoming scene — revealed by diagonal gradient mask */}
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            maskImage: `linear-gradient(135deg, black ${gradientStop.toFixed(1)}%, transparent ${(gradientStop + fringeWidth).toFixed(1)}%)`,
+            WebkitMaskImage: `linear-gradient(135deg, black ${gradientStop.toFixed(1)}%, transparent ${(gradientStop + fringeWidth).toFixed(1)}%)`,
+          }}
+        >
+          {incoming}
+        </div>
+        {/* Chromatic fringe at wipe edge */}
+        {t > 0.05 && t < 0.95 && (
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              maskImage: `linear-gradient(135deg, transparent ${(gradientStop - 2).toFixed(1)}%, white ${gradientStop.toFixed(1)}%, white ${(gradientStop + fringeWidth * 0.5).toFixed(1)}%, transparent ${(gradientStop + fringeWidth).toFixed(1)}%)`,
+              WebkitMaskImage: `linear-gradient(135deg, transparent ${(gradientStop - 2).toFixed(1)}%, white ${gradientStop.toFixed(1)}%, white ${(gradientStop + fringeWidth * 0.5).toFixed(1)}%, transparent ${(gradientStop + fringeWidth).toFixed(1)}%)`,
+              backgroundColor: `hsla(${(eased * 360).toFixed(0)}, 80%, 60%, 0.15)`,
+              mixBlendMode: "screen",
+              pointerEvents: "none",
+            }}
+          />
+        )}
+      </div>
+    );
+  }
+
   // ─── Original opacity-based transitions ───
 
   let outOpacity: number;

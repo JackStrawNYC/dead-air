@@ -428,7 +428,11 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
             </SilentErrorBoundary>
           )}
 
-          {/* Lyrics disabled — LyricTriggerLayer and PoeticLyrics removed */}
+          {lyricTriggerWindows.length > 0 && (
+            <SilentErrorBoundary name="LyricTrigger">
+              <LyricTriggerLayer windows={lyricTriggerWindows} />
+            </SilentErrorBoundary>
+          )}
 
           <DynamicOverlayStack
             activeEntries={activeEntries}
@@ -460,6 +464,33 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
                 inset: 0,
                 backgroundColor: `rgba(255, 255, 255, ${itState.flashIntensity})`,
                 pointerEvents: "none",
+              }}
+            />
+          )}
+
+          {/* IT strobe — beat-synced pulse during deep coherence lock */}
+          {itState.strobeIntensity > 0.01 && (
+            <div
+              style={{
+                position: "absolute",
+                inset: 0,
+                backgroundColor: `rgba(255, 255, 255, ${itState.strobeIntensity.toFixed(3)})`,
+                pointerEvents: "none",
+                mixBlendMode: "overlay",
+              }}
+            />
+          )}
+
+          {/* Dead air ambient shimmer — ethereal glow when music ends */}
+          {deadAirFactor > 0.01 && (
+            <div
+              style={{
+                position: "absolute",
+                inset: 0,
+                pointerEvents: "none",
+                background: `radial-gradient(ellipse at ${50 + Math.sin(frame * 0.007) * 15}% ${50 + Math.cos(frame * 0.005) * 10}%, rgba(80, 60, 120, ${(0.15 * deadAirFactor).toFixed(3)}), transparent 70%)`,
+                mixBlendMode: "screen",
+                opacity: 0.6 + 0.4 * Math.sin(frame * 0.02),
               }}
             />
           )}

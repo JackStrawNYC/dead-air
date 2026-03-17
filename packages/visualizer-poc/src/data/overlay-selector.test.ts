@@ -185,6 +185,9 @@ describe("selectOverlays", () => {
     chromaSpread: 0.1,
     tempo: 120,
     sectionCount: 3,
+    avgVocalPresence: 0,
+    avgDrumEnergy: 0,
+    avgOtherCentroid: 0,
   };
 
   it("always includes always-active overlays", () => {
@@ -306,6 +309,9 @@ describe("A-tier scoring in selection", () => {
         chromaSpread: 0.1,
         tempo: 120,
         sectionCount: 3,
+        avgVocalPresence: 0,
+        avgDrumEnergy: 0,
+        avgOtherCentroid: 0,
       };
       const result = selectOverlays(profile, emptyHistory(), undefined, seed * 1000);
       const nonAlwaysActive = result.activeOverlays.filter(

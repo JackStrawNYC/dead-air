@@ -33,6 +33,24 @@ const ERA_SATURATION: Record<string, number> = {
   revival: 0.95,
 };
 
+/** Era brightness values — same as FullscreenQuad */
+const ERA_BRIGHTNESS: Record<string, number> = {
+  primal: 0.97,
+  classic: 1.0,
+  hiatus: 0.95,
+  touch_of_grey: 1.01,
+  revival: 1.0,
+};
+
+/** Era sepia tint strength — same as FullscreenQuad */
+const ERA_SEPIA: Record<string, number> = {
+  primal: 0.15,
+  classic: 0.0,
+  hiatus: 0.0,
+  touch_of_grey: 0.0,
+  revival: 0.0,
+};
+
 /** Simple passthrough vertex shader */
 const PASSTHROUGH_VERT = /* glsl */ `
 varying vec2 vUv;
@@ -128,6 +146,10 @@ function createBaseUniforms(
     uOtherCentroid: { value: 0 },
     uSnapToMusicalTime: { value: 0 },
     uEraSaturation: { value: 1.0 },
+    uEraBrightness: { value: 1.0 },
+    uEraSepia: { value: 0.0 },
+    uBloomThreshold: { value: 0.0 },
+    uLensDistortion: { value: 0.0 },
     uEnergyAccel: { value: 0 },
     uEnergyTrend: { value: 0 },
     uLocalTempo: { value: 120 },
@@ -152,7 +174,10 @@ export const MultiPassQuad: React.FC<Props> = ({
   const { width, height } = useVideoConfig();
   const currentFrame = useCurrentFrame();
   const showCtx = useShowContext();
-  const eraSaturation = ERA_SATURATION[showCtx?.era ?? ""] ?? 1.0;
+  const eraKey = showCtx?.era ?? "";
+  const eraSaturation = ERA_SATURATION[eraKey] ?? 1.0;
+  const eraBrightness = ERA_BRIGHTNESS[eraKey] ?? 1.0;
+  const eraSepia = ERA_SEPIA[eraKey] ?? 0.0;
   const gl = useThree((state) => state.gl);
 
   const lastRenderedFrame = useRef(-1);
@@ -293,6 +318,10 @@ export const MultiPassQuad: React.FC<Props> = ({
   u.uOtherCentroid.value = smooth.otherCentroid;
   u.uSnapToMusicalTime.value = isLocked ? 1.0 : 0.0;
   u.uEraSaturation.value = eraSaturation;
+  u.uEraBrightness.value = eraBrightness;
+  u.uEraSepia.value = eraSepia;
+  u.uBloomThreshold.value = -0.08 - smooth.energy * 0.12;
+  u.uLensDistortion.value = 0.02 + smooth.energy * 0.06;
   u.uEnergyAccel.value = smooth.energyAcceleration;
   u.uEnergyTrend.value = smooth.energyTrend;
   u.uLocalTempo.value = smooth.localTempo;

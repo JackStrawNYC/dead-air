@@ -30,6 +30,7 @@ import { execSync } from "child_process";
 import { createHash } from "crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync, rmSync } from "fs";
 import { join, resolve } from "path";
+import { cpus } from "os";
 
 const ROOT = resolve(import.meta.dirname, "..");
 const DATA_DIR = join(ROOT, "data");
@@ -78,6 +79,7 @@ const PRESETS: Record<string, RenderPreset> = {
   draft:   { width: 1280, height: 720,  concurrency: 6, skipGrain: true,  skipBloom: true,  label: "Draft (720p, no grain/bloom)" },
   preview: { width: 1920, height: 1080, concurrency: 4, skipGrain: false, skipBloom: false, label: "Preview (1080p, full quality)" },
   final:   { width: 1920, height: 1080, concurrency: 3, skipGrain: false, skipBloom: false, label: "Final (1080p, full quality, max fidelity)" },
+  "4k":    { width: 3840, height: 2160, concurrency: 2, skipGrain: false, skipBloom: false, label: "4K (2160p, full quality, reduced concurrency)" },
 };
 
 interface SetlistEntry {
@@ -284,7 +286,7 @@ function renderSong(
         videoOnlyPath,
         `--props=${analysisPath}`,
         `--gl=${glArg}`,
-        `--concurrency=${activePreset?.concurrency ?? 10}`,
+        `--concurrency=${adaptiveConcurrency}`,
         `--timeout=300000`,
         `--frames=0-${totalFrames - 1}`,
         "--muted",
@@ -313,7 +315,7 @@ function renderSong(
           chunkPath,
           `--props=${analysisPath}`,
           `--gl=${glArg}`,
-          `--concurrency=${activePreset?.concurrency ?? 10}`,
+          `--concurrency=${adaptiveConcurrency}`,
           `--timeout=300000`,
           `--frames=${start}-${end}`,
           "--muted",
@@ -549,7 +551,12 @@ function main() {
     process.env.RENDER_WIDTH = previewMode ? "1920" : "3840";
     process.env.RENDER_HEIGHT = previewMode ? "1080" : "2160";
   }
-  console.log(`Resolution: ${process.env.RENDER_WIDTH}x${process.env.RENDER_HEIGHT}`);
+  // Adaptive concurrency: scale based on resolution and available CPU cores
+  const numCores = cpus().length;
+  const renderWidth = parseInt(process.env.RENDER_WIDTH ?? "1920", 10);
+  const pixelScale = (renderWidth * parseInt(process.env.RENDER_HEIGHT ?? "1080", 10)) / (1920 * 1080);
+  const adaptiveConcurrency = activePreset?.concurrency ?? Math.max(1, Math.floor(numCores / pixelScale / 2));
+  console.log(`Resolution: ${process.env.RENDER_WIDTH}x${process.env.RENDER_HEIGHT} | Concurrency: ${adaptiveConcurrency} (${numCores} cores)`);
 
   const setlist = JSON.parse(readFileSync(join(DATA_DIR, "setlist.json"), "utf-8"));
   const timelinePath = join(DATA_DIR, "show-timeline.json");

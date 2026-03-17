@@ -286,6 +286,150 @@ def analyze_track(audio_path: Path, output_path: Path, stems_dir: Path | None = 
             downbeat_set.add(int(beat_frames[bi]))
     print(f"Local tempo range: {local_tempo_arr.min():.1f}-{local_tempo_arr.max():.1f} BPM | Downbeats: {len(downbeat_set)}")
 
+    # --- Melodic contour (pitch tracking via piptrack) ---
+    print("Extracting melodic contour ...")
+    pitches, magnitudes = librosa.piptrack(y=y, sr=sr, hop_length=HOP_LENGTH)
+    # Pick the pitch with highest magnitude per frame
+    melodic_pitch = np.zeros(pitches.shape[1])
+    melodic_confidence = np.zeros(pitches.shape[1])
+    for t in range(pitches.shape[1]):
+        mag_col = magnitudes[:, t]
+        idx_max = mag_col.argmax()
+        if mag_col[idx_max] > 0:
+            melodic_pitch[t] = pitches[idx_max, t]
+            melodic_confidence[t] = mag_col[idx_max]
+    # Convert Hz to MIDI-like 0-1 range (27.5 Hz = A0 = 0, 4186 Hz = C8 = 1)
+    melodic_pitch_norm = np.zeros_like(melodic_pitch)
+    nonzero = melodic_pitch > 0
+    if nonzero.any():
+        midi = 12 * np.log2(melodic_pitch[nonzero] / 440.0) + 69
+        melodic_pitch_norm[nonzero] = np.clip((midi - 21) / (108 - 21), 0, 1)
+    melodic_confidence_norm = normalize(melodic_confidence)
+    # Compute contour direction: +1 rising, -1 falling, 0 steady
+    melodic_direction = np.zeros(len(melodic_pitch_norm))
+    for t in range(1, len(melodic_pitch_norm)):
+        delta = melodic_pitch_norm[t] - melodic_pitch_norm[t - 1]
+        melodic_direction[t] = np.clip(delta * 20, -1, 1)  # amplify small changes
+    melodic_pitch_norm = pad_or_trim_1d(melodic_pitch_norm, n_frames)
+    melodic_confidence_norm = pad_or_trim_1d(melodic_confidence_norm, n_frames)
+    melodic_direction = pad_or_trim_1d(melodic_direction, n_frames)
+    print(f"Melodic contour: {np.count_nonzero(melodic_pitch_norm)} pitched frames / {n_frames} total")
+
+    # --- Chord progression detection (chroma-based) ---
+    print("Detecting chord progressions ...")
+    # Use 24 chord templates (12 major + 12 minor)
+    chord_names = []
+    note_names = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
+    major_template = np.array([1, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0], dtype=float)
+    minor_template = np.array([1, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0], dtype=float)
+    chord_templates = []
+    for i in range(12):
+        chord_templates.append(np.roll(major_template, i))
+        chord_names.append(f"{note_names[i]}")
+        chord_templates.append(np.roll(minor_template, i))
+        chord_names.append(f"{note_names[i]}m")
+    chord_templates = np.array(chord_templates)  # (24, 12)
+
+    # Smooth chroma over ~0.5s window for chord stability
+    chroma_smooth_win = max(1, int(FPS * 0.5))
+    chroma_smoothed = np.zeros_like(chroma)
+    for t in range(chroma.shape[1]):
+        lo_s = max(0, t - chroma_smooth_win // 2)
+        hi_s = min(chroma.shape[1], t + chroma_smooth_win // 2 + 1)
+        chroma_smoothed[:, t] = chroma[:, lo_s:hi_s].mean(axis=1)
+
+    chord_idx_arr = np.zeros(n_frames, dtype=int)
+    chord_confidence_arr = np.zeros(n_frames)
+    harmonic_tension_arr = np.zeros(n_frames)
+    for t in range(min(n_frames, chroma_smoothed.shape[1])):
+        frame_chroma = chroma_smoothed[:, t]
+        if frame_chroma.sum() < 0.01:
+            continue
+        frame_chroma_n = frame_chroma / (np.linalg.norm(frame_chroma) + 1e-8)
+        # Dot product with each template
+        scores = chord_templates @ frame_chroma_n
+        best_idx = scores.argmax()
+        chord_idx_arr[t] = best_idx
+        chord_confidence_arr[t] = float(scores[best_idx])
+
+    # Harmonic tension: rate of chord change over 2s window
+    tension_window = int(FPS * 2)
+    for t in range(n_frames):
+        lo_t = max(0, t - tension_window // 2)
+        hi_t = min(n_frames, t + tension_window // 2)
+        if hi_t - lo_t < 2:
+            continue
+        changes = np.sum(np.diff(chord_idx_arr[lo_t:hi_t]) != 0)
+        harmonic_tension_arr[t] = min(1.0, changes / (hi_t - lo_t))
+
+    # Convert chord indices to string labels for metadata
+    chord_label_arr = [chord_names[int(c)] for c in chord_idx_arr]
+    harmonic_tension_arr = pad_or_trim_1d(harmonic_tension_arr, n_frames)
+    chord_confidence_arr = pad_or_trim_1d(chord_confidence_arr, n_frames)
+    print(f"Chord detection: {len(set(chord_label_arr))} unique chords, avg tension={harmonic_tension_arr.mean():.3f}")
+
+    # --- Structural semantics (self-similarity matrix → section labels) ---
+    print("Computing structural semantics ...")
+    # Build self-similarity from MFCC features
+    mfcc_full = librosa.feature.mfcc(y=y, sr=sr, hop_length=HOP_LENGTH, n_mfcc=13)
+    # Downsample to ~2Hz for tractable similarity matrix
+    ds_factor = max(1, FPS // 2)
+    mfcc_ds = mfcc_full[:, ::ds_factor]
+    n_ds = mfcc_ds.shape[1]
+    # Cosine self-similarity
+    mfcc_norms = np.linalg.norm(mfcc_ds, axis=0, keepdims=True)
+    mfcc_unit = mfcc_ds / (mfcc_norms + 1e-8)
+    ssm = mfcc_unit.T @ mfcc_unit  # (n_ds, n_ds)
+
+    # Diagonal-band energy: high diagonal = repeating (verse/chorus), low = unique (bridge/solo)
+    section_type_arr = ["jam"] * n_frames
+    diag_energy = np.zeros(n_ds)
+    for lag in range(1, min(n_ds, int(30 * FPS / ds_factor))):  # up to 30s lags
+        diag = np.diagonal(ssm, offset=lag)
+        diag_energy[:len(diag)] += diag
+
+    if n_ds > 0:
+        diag_energy_norm = normalize(diag_energy)
+        # Combine with vocal presence for section classification
+        vocal_ds = np.zeros(n_ds)
+        if stem_data and stem_data["available"] and "vocalPresence" in stem_data:
+            vp = stem_data["vocalPresence"].astype(float)
+            vp_padded = pad_or_trim_1d(vp, n_frames)
+            for di in range(n_ds):
+                src_frame = di * ds_factor
+                end_frame = min(src_frame + ds_factor, n_frames)
+                vocal_ds[di] = float(vp_padded[src_frame:end_frame].mean())
+
+        for di in range(n_ds):
+            src_frame = di * ds_factor
+            end_frame = min(src_frame + ds_factor, n_frames)
+            has_vocals = vocal_ds[di] > 0.5 if stem_data and "vocalPresence" in (stem_data or {}) else False
+            repetition = diag_energy_norm[di]
+            local_e = float(rms_norm[src_frame:end_frame].mean()) if end_frame > src_frame else 0
+
+            if local_e < 0.08:
+                label = "intro" if src_frame < n_frames * 0.1 else "outro" if src_frame > n_frames * 0.85 else "bridge"
+            elif has_vocals and repetition > 0.6:
+                label = "chorus"
+            elif has_vocals:
+                label = "verse"
+            elif repetition > 0.5 and local_e > 0.25:
+                label = "chorus"
+            elif local_e > 0.4:
+                label = "solo"
+            elif repetition < 0.3:
+                label = "bridge"
+            else:
+                label = "jam"
+
+            for fi in range(src_frame, min(end_frame, n_frames)):
+                section_type_arr[fi] = label
+
+    # Count section type distribution
+    from collections import Counter
+    type_counts = Counter(section_type_arr)
+    print(f"Structural semantics: {dict(type_counts)}")
+
     # --- STFT (shared for band energy + spectral contrast + flatness) ---
     print("Computing STFT ...")
     S = np.abs(librosa.stft(y, hop_length=HOP_LENGTH))
@@ -360,6 +504,13 @@ def analyze_track(audio_path: Path, output_path: Path, stems_dir: Path | None = 
             "localTempo": round(float(local_tempo_arr[i]), 1),
             "beatConfidence": round(float(beat_confidence_arr[i]), 3),
             "downbeat": i in downbeat_set,
+            "melodicPitch": round(float(melodic_pitch_norm[i]), 4),
+            "melodicConfidence": round(float(melodic_confidence_norm[i]), 3),
+            "melodicDirection": round(float(melodic_direction[i]), 3),
+            "chordIndex": int(chord_idx_arr[i]),
+            "chordConfidence": round(float(chord_confidence_arr[i]), 3),
+            "harmonicTension": round(float(harmonic_tension_arr[i]), 3),
+            "sectionType": section_type_arr[i],
         }
         # Add stem-specific fields when available
         if stem_data and stem_data["available"]:

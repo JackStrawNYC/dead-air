@@ -63,6 +63,10 @@ import { CrystalCavernScene } from "./CrystalCavernScene";
 import { FluidLightScene } from "./FluidLightScene";
 import { VoidLightScene } from "./VoidLightScene";
 import { Fluid2DScene } from "./Fluid2DScene";
+import { SpectralAnalyzerScene } from "./SpectralAnalyzerScene";
+import { ParticleSwarmScene } from "./ParticleSwarmScene";
+import { CrystallineGrowthScene } from "./CrystallineGrowthScene";
+import { ClimaxSurgeScene } from "./ClimaxSurgeScene";
 
 // ─── Scene Registry ───
 
@@ -152,6 +156,26 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     energyAffinity: "any",
     complement: "liquid_light",
   },
+  spectral_analyzer: {
+    Component: SpectralAnalyzerScene,
+    energyAffinity: "high",
+    complement: "particle_swarm",
+  },
+  particle_swarm: {
+    Component: ParticleSwarmScene,
+    energyAffinity: "mid",
+    complement: "spectral_analyzer",
+  },
+  crystalline_growth: {
+    Component: CrystallineGrowthScene,
+    energyAffinity: "low",
+    complement: "climax_surge",
+  },
+  climax_surge: {
+    Component: ClimaxSurgeScene,
+    energyAffinity: "high",
+    complement: "inferno",
+  },
 };
 
 // ─── Transition Affinity Map ───
@@ -175,6 +199,10 @@ export const TRANSITION_AFFINITY: Partial<Record<VisualMode, VisualMode[]>> = {
   fluid_light: ["liquid_light", "oil_projector", "tie_dye"],
   void_light: ["deep_ocean", "cosmic_voyage", "crystal_cavern"],
   fluid_2d: ["liquid_light", "fluid_light", "oil_projector"],
+  spectral_analyzer: ["concert_lighting", "inferno", "climax_surge"],
+  particle_swarm: ["cosmic_dust", "particle_nebula", "aurora"],
+  crystalline_growth: ["crystal_cavern", "deep_ocean", "aurora"],
+  climax_surge: ["inferno", "concert_lighting", "spectral_analyzer"],
 };
 
 // ─── Helper functions ───

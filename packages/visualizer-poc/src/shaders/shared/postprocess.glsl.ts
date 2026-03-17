@@ -69,6 +69,10 @@ export function buildPostProcessGLSL(config: PostProcessConfig = {}): string {
 vec3 applyPostProcess(vec3 col, vec2 uv, vec2 p) {
   float energy = clamp(uEnergy, 0.0, 1.0);
 
+  // Lens distortion: barrel curvature driven by uLensDistortion uniform
+  uv = barrelDistort(uv, uLensDistortion);
+  p = (uv - 0.5) * vec2(uResolution.x / uResolution.y, 1.0);
+
   // Climax reactivity
   float isClimax = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5);
   float climaxBoost = isClimax * uClimaxIntensity;
@@ -83,10 +87,10 @@ ${
 }
 ${
   bloomEnabled
-    ? `  // Bloom: bright pixel self-illumination (climax-amplified)
+    ? `  // Bloom: bright pixel self-illumination (climax-amplified, energy-adaptive)
   {
     float lum = dot(col, vec3(0.299, 0.587, 0.114));
-    float bloomThreshold = mix(0.50, 0.42, energy) - climaxBoost * 0.10${bloomThresholdStr};
+    float bloomThreshold = mix(0.50, 0.42, energy) + uBloomThreshold - climaxBoost * 0.10${bloomThresholdStr};
     float bloomAmount = max(0.0, lum - bloomThreshold) * (2.5 + climaxBoost * 1.5);
     vec3 bloomColor = mix(col, vec3(1.0, 0.98, 0.95), 0.3);
     vec3 bloom = bloomColor * bloomAmount * (0.35 + climaxBoost * 0.20);
@@ -131,6 +135,20 @@ ${
 }
   // Cinematic grade (ACES filmic tone mapping)
   col = cinematicGrade(col, energy);
+
+  // Era brightness: per-era brightness adjustment (moved from CSS to GLSL)
+  col *= uEraBrightness;
+
+  // Era sepia tint: warm desaturation (moved from CSS sepia filter to GLSL)
+  {
+    float sepiaLuma = dot(col, vec3(0.299, 0.587, 0.114));
+    vec3 sepiaColor = vec3(
+      sepiaLuma * 1.2,
+      sepiaLuma * 1.0,
+      sepiaLuma * 0.8
+    );
+    col = mix(col, sepiaColor, uEraSepia);
+  }
 
   // Film grain: animated 2-frame hold
   {

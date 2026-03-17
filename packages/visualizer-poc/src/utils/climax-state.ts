@@ -25,6 +25,10 @@ export interface ClimaxState {
   intensity: number;
   /** true when in build phase approaching a high-energy section within 90 frames */
   anticipation: boolean;
+  /** true during a micro-climax (onset cluster peak within sustain phase) */
+  microClimax: boolean;
+  /** 0-1 micro-climax intensity for additive burst effects */
+  microClimaxIntensity: number;
 }
 
 export interface ClimaxModulation {
@@ -54,7 +58,7 @@ export function computeClimaxState(
   precomputedEnergy?: number,
 ): ClimaxState {
   if (frames.length === 0 || sections.length === 0) {
-    return { phase: "idle", intensity: 0, anticipation: false };
+    return { phase: "idle", intensity: 0, anticipation: false, microClimax: false, microClimaxIntensity: 0 };
   }
 
   // 1. Smoothed energy — use precomputed if available (saves one 150-frame Gaussian loop)
@@ -85,39 +89,93 @@ export function computeClimaxState(
       : 0;
   }
 
-  // 6. Phase rules
+  // 6. Onset density: detect peak timing within sections via onset clustering
+  // Instead of assuming first 20% = climax, find the actual onset cluster peak
+  let onsetDensity = 0;
+  if (currentSection) {
+    const windowR = 15; // ±0.5s window for onset density
+    let onsetSum = 0;
+    for (let i = Math.max(currentSection.frameStart, idx - windowR); i <= Math.min(currentSection.frameEnd, idx + windowR); i++) {
+      if (i >= 0 && i < frames.length) {
+        onsetSum += frames[i].onset;
+      }
+    }
+    onsetDensity = onsetSum / (2 * windowR + 1);
+  }
+
+  // 7. Phase rules (enhanced with onset-based peak detection)
   let phase: ClimaxPhase = "idle";
   let intensity = 0;
 
   const isHigh = currentSection?.energy === "high";
 
+  // Find the peak onset density position within the current high section
+  // This replaces the rigid "first 20%" rule with actual peak timing
+  let peakProgress = 0.2; // fallback to original behavior
+  if (isHigh && currentSection) {
+    const sLen = currentSection.frameEnd - currentSection.frameStart;
+    if (sLen > 30) {
+      // Scan section for onset density peak
+      let maxDensity = 0;
+      let maxDensityFrame = currentSection.frameStart;
+      const scanStep = Math.max(1, Math.floor(sLen / 30));
+      for (let si = currentSection.frameStart; si <= currentSection.frameEnd; si += scanStep) {
+        if (si >= frames.length) break;
+        let d = 0;
+        const lo = Math.max(currentSection.frameStart, si - 15);
+        const hi = Math.min(currentSection.frameEnd, si + 15);
+        for (let j = lo; j <= hi; j++) {
+          if (j >= 0 && j < frames.length) d += frames[j].onset;
+        }
+        d /= (hi - lo + 1);
+        if (d > maxDensity) {
+          maxDensity = d;
+          maxDensityFrame = si;
+        }
+      }
+      peakProgress = (maxDensityFrame - currentSection.frameStart) / sLen;
+      peakProgress = Math.max(0.05, Math.min(0.8, peakProgress)); // clamp to sane range
+    }
+  }
+
+  // Climax window: centered around the onset peak (±10% of section)
+  const climaxStart = Math.max(0, peakProgress - 0.10);
+  const climaxEnd = Math.min(1, peakProgress + 0.10);
+
   if (energy < 0.08) {
     // Idle: very low energy
     phase = "idle";
-    intensity = 1 - energy / 0.08; // 1 at silence, 0 at threshold
-  } else if (isHigh && sectionProgress < 0.20) {
-    // Climax: first 20% of a high-energy section
+    intensity = 1 - energy / 0.08;
+  } else if (isHigh && sectionProgress >= climaxStart && sectionProgress <= climaxEnd) {
+    // Climax: centered around onset density peak
+    const climaxWidth = climaxEnd - climaxStart;
+    const climaxLocalProgress = (sectionProgress - climaxStart) / climaxWidth;
     phase = "climax";
-    intensity = smoothstep(sectionProgress / 0.20); // ramp 0→1 over first 20%
-  } else if (isHigh && sectionProgress <= 0.85) {
-    // Sustain: middle of high-energy section
+    // Bell curve: peak at center of climax window
+    intensity = 1 - Math.abs(climaxLocalProgress - 0.5) * 1.2;
+    intensity = Math.max(0, Math.min(1, intensity));
+  } else if (isHigh && sectionProgress < climaxStart) {
+    // Build within high section (before the climax peak)
+    phase = "build";
+    intensity = smoothstep(sectionProgress / climaxStart);
+  } else if (isHigh && sectionProgress > climaxEnd && sectionProgress <= 0.85) {
+    // Sustain: after climax peak, middle of high-energy section
     phase = "sustain";
-    // Gentle arc: peak at 50% of section, ease at edges
-    const midProgress = (sectionProgress - 0.20) / 0.65; // 0→1 over 20%-85%
-    intensity = 1 - Math.abs(midProgress - 0.5) * 0.4; // 0.8→1.0→0.8
+    const sustainProgress = (sectionProgress - climaxEnd) / (0.85 - climaxEnd);
+    intensity = 1 - sustainProgress * 0.3; // gentle fade from 1.0 to 0.7
   } else if (isHigh && sectionProgress > 0.85) {
     // Release: last 15% of high-energy section
     phase = "release";
-    intensity = smoothstep(1 - (sectionProgress - 0.85) / 0.15); // 1→0
+    intensity = smoothstep(1 - (sectionProgress - 0.85) / 0.15);
   } else if (energy >= 0.08 && energy <= 0.25 && delta > 0.001) {
     // Build: moderate energy and rising
     phase = "build";
-    intensity = smoothstep((energy - 0.08) / 0.17); // 0→1 over 0.08-0.25
+    intensity = smoothstep((energy - 0.08) / 0.17);
   } else if (energy > 0.20 && delta < -0.001) {
     // Release: energy falling from high
     phase = "release";
-    intensity = smoothstep((energy - 0.08) / 0.17); // fades as energy drops
-    // Smooth ramp after leaving a high-energy section to avoid intensity pop
+    intensity = smoothstep((energy - 0.08) / 0.17);
+    // Smooth ramp after leaving a high-energy section
     if (prevSection?.energy === "high" && currentSection) {
       const framesSinceBoundary = idx - currentSection.frameStart;
       if (framesSinceBoundary < 30) {
@@ -130,18 +188,45 @@ export function computeClimaxState(
     intensity = smoothstep((energy - 0.08) / 0.17) * 0.5;
   }
 
-  // 7. Anticipation: in build AND next section is high AND within 150 frames (5s)
+  // 8. Anticipation: in build AND next section is high AND within 150 frames (5s)
   let anticipation = false;
   if (phase === "build" && nextSection?.energy === "high") {
     const distToNext = nextSection.frameStart - idx;
     if (distToNext > 0 && distToNext < 150) {
       anticipation = true;
-      // Override intensity to ramp up as we approach
       intensity = smoothstep(1 - distToNext / 150);
     }
   }
 
-  return { phase, intensity, anticipation };
+  // 9. Micro-climax detection: onset clusters within sustain phase
+  // When in sustain, detect local onset peaks for mini burst effects
+  let microClimax = false;
+  let microClimaxIntensity = 0;
+  if (phase === "sustain" && onsetDensity > 0.15) {
+    // Check if this is a local onset peak (higher than ±30 frame neighborhood)
+    const neighborWindow = 30;
+    let isLocalPeak = true;
+    for (let offset = -neighborWindow; offset <= neighborWindow; offset += 10) {
+      if (offset === 0) continue;
+      const checkIdx = idx + offset;
+      if (checkIdx < 0 || checkIdx >= frames.length) continue;
+      let neighborDensity = 0;
+      for (let j = Math.max(0, checkIdx - 15); j <= Math.min(frames.length - 1, checkIdx + 15); j++) {
+        neighborDensity += frames[j].onset;
+      }
+      neighborDensity /= 31;
+      if (neighborDensity > onsetDensity) {
+        isLocalPeak = false;
+        break;
+      }
+    }
+    if (isLocalPeak) {
+      microClimax = true;
+      microClimaxIntensity = Math.min(1, (onsetDensity - 0.15) / 0.15);
+    }
+  }
+
+  return { phase, intensity, anticipation, microClimax, microClimaxIntensity };
 }
 
 // ─── Musical Texture Detection ───

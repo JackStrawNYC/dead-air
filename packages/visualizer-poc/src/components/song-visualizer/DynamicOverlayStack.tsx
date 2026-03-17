@@ -27,12 +27,12 @@ interface OverlayComponentEntry {
 }
 
 /** Max concurrent overlays by energy level (hard cap after opacity sorting).
- *  Overlays are rare, sacred punctuation — the shader is the star.
- *  Peak = 0: shader owns the climax entirely. */
+ *  Pre-peak dropout strips to void → peaks flood with A-tier density.
+ *  The contrast between silence and flood creates the visceral impact. */
 const MAX_CONCURRENT: Record<string, number> = {
   quiet: 2,
-  mid: 2,
-  peak: 1,
+  mid: 3,
+  peak: 4,
 };
 
 interface Props {

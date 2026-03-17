@@ -21,12 +21,15 @@ import type { SongIdentity } from "../data/song-identities";
 import type { StemSectionType } from "../utils/stem-features";
 
 /**
- * Dynamic crossfade duration based on energy context.
+ * Dynamic crossfade duration based on energy context and spectral flux.
  * Quiet→quiet: 240 frames (8s) — gentle dissolve
  * Loud→loud:     8 frames     — hard cut
  * Quiet→loud:   18 frames     — fast snap
  * Loud→quiet:   50 frames     — moderate fade
  * Mid (default): 30 frames    — standard crossfade
+ *
+ * High spectral flux at the boundary compresses the duration by up to 50%,
+ * because rapid timbral change means the transition should be visually snappy.
  */
 function dynamicCrossfadeDuration(
   frames: EnhancedFrameData[],
@@ -59,11 +62,39 @@ function dynamicCrossfadeDuration(
   const afterQuiet = afterEnergy < QUIET;
   const afterLoud = afterEnergy > LOUD;
 
-  if (beforeQuiet && afterQuiet) return 240;   // gentle dissolve
-  if (beforeLoud && afterLoud) return 8;       // hard cut
-  if (beforeQuiet && afterLoud) return 18;     // fast snap
-  if (beforeLoud && afterQuiet) return 50;     // moderate fade
-  return 30;                                    // default
+  let baseDuration: number;
+  if (beforeQuiet && afterQuiet) baseDuration = 240;   // gentle dissolve
+  else if (beforeLoud && afterLoud) baseDuration = 8;  // hard cut
+  else if (beforeQuiet && afterLoud) baseDuration = 18; // fast snap
+  else if (beforeLoud && afterQuiet) baseDuration = 50; // moderate fade
+  else baseDuration = 30;                               // default
+
+  // Spectral flux compression: measure timbral change rate at the boundary.
+  // High flux = rapid spectral change = faster visual crossfade.
+  // Compute average spectral flux in a narrow window around the boundary.
+  const fluxWindow = 8;
+  const fluxLo = Math.max(1, boundary - fluxWindow);
+  const fluxHi = Math.min(frames.length - 1, boundary + fluxWindow);
+  let fluxSum = 0, fluxCount = 0;
+  for (let i = fluxLo; i <= fluxHi; i++) {
+    // Compute per-frame spectral flux from contrast vectors
+    const curr = frames[i].contrast;
+    const prev = frames[i - 1].contrast;
+    let l2 = 0;
+    for (let b = 0; b < 7; b++) {
+      const diff = curr[b] - prev[b];
+      l2 += diff * diff;
+    }
+    fluxSum += Math.sqrt(l2);
+    fluxCount++;
+  }
+  const avgFlux = fluxCount > 0 ? fluxSum / fluxCount : 0;
+
+  // Flux typically ranges 0-0.5. Above 0.15 is a significant timbral shift.
+  // Scale factor: 1.0 (no flux) down to 0.5 (high flux)
+  const fluxCompression = Math.max(0.5, 1 - Math.min(avgFlux / 0.3, 1) * 0.5);
+
+  return Math.max(4, Math.round(baseDuration * fluxCompression));
 }
 
 const BEAT_CROSSFADE_FRAMES = 30; // 1 second when beat-synced (15 before + 15 after)
@@ -75,7 +106,9 @@ const AUTO_VARIETY_MIN_SECTION = 2700; // 1.5 minutes at 30fps
 
 /**
  * Find nearest strong beat within a frame range for beat-synced transitions.
- * Returns the frame index of the strongest beat/onset, or null if none found.
+ * Prefers downbeats (first beat of measure) when beatConfidence is high,
+ * then falls back to regular beats and strong onsets.
+ * Returns the frame index of the best alignment point, or null if none found.
  */
 function findNearestBeat(
   frames: EnhancedFrameData[],
@@ -87,8 +120,13 @@ function findNearestBeat(
 
   for (let i = Math.max(0, searchStart); i < Math.min(frames.length, searchEnd); i++) {
     const f = frames[i];
-    // Prefer actual beat detections, then strong onsets
-    const score = (f.beat ? 1.0 : 0) + (f.onset > 0.7 ? f.onset * 0.5 : 0);
+    const confidence = f.beatConfidence ?? 0;
+    // Downbeats score highest when beat confidence is strong (>0.5)
+    // This snaps transitions to measure boundaries for musical phrasing
+    const downbeatBonus = (f.downbeat && confidence > 0.5) ? 2.0 * confidence : 0;
+    const beatScore = f.beat ? 1.0 : 0;
+    const onsetScore = f.onset > 0.7 ? f.onset * 0.5 : 0;
+    const score = downbeatBonus + beatScore + onsetScore;
     if (score > bestScore) {
       bestScore = score;
       bestFrame = i;

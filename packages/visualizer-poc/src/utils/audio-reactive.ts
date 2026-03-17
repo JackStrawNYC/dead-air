@@ -59,6 +59,30 @@ export interface AudioSnapshot {
   energyAcceleration: number;
   /** Sustained energy direction: -1 falling, 0 stable, +1 rising */
   energyTrend: number;
+  /** Per-frame local tempo (BPM, from analysis) */
+  localTempo: number;
+  /** Beat confidence (0-1 clarity of beat structure) */
+  beatConfidence: number;
+  /** Whether this frame is a downbeat */
+  downbeat: boolean;
+  /** Energy forecast: predicted energy 1-3s ahead (lookahead window) */
+  energyForecast: number;
+  /** Peak approaching signal: 0-1 ramp when energy is rising toward a peak */
+  peakApproaching: number;
+  /** Beat pattern stability: 0-1 how consistent beat spacing is */
+  beatStability: number;
+  /** Melodic pitch (0-1 MIDI-normalized), smoothed */
+  melodicPitch: number;
+  /** Melodic pitch confidence (0-1) */
+  melodicConfidence: number;
+  /** Melodic direction: +1 rising, -1 falling, 0 steady */
+  melodicDirection: number;
+  /** Chord index (0-23: 12 major + 12 minor) */
+  chordIndex: number;
+  /** Harmonic tension: rate of chord change (0-1) */
+  harmonicTension: number;
+  /** Section type label (verse, chorus, bridge, solo, jam, intro, outro) */
+  sectionType: string;
 }
 
 /**
@@ -338,6 +362,74 @@ export function computeMusicalTime(
 }
 
 /**
+ * Compute energy forecast: lookahead 1-3s ahead (30-90 frames).
+ * Returns smoothed energy from the future window.
+ * For offline rendering this is trivially available since we have all frames.
+ */
+export function computeEnergyForecast(
+  frames: EnhancedFrameData[],
+  idx: number,
+  lookaheadFrames = 60,
+): number {
+  const futureIdx = Math.min(frames.length - 1, idx + lookaheadFrames);
+  if (futureIdx <= idx) return 0;
+  return gaussianSmooth(frames, futureIdx, (f) => f.rms, 30);
+}
+
+/**
+ * Peak approaching signal: 0-1 ramp when energy is consistently rising
+ * toward a peak. Combines energy trend + forecast to predict imminent peaks.
+ */
+export function computePeakApproaching(
+  frames: EnhancedFrameData[],
+  idx: number,
+): number {
+  const currentEnergy = gaussianSmooth(frames, idx, (f) => f.rms, 30);
+  const forecast = computeEnergyForecast(frames, idx, 60);
+  const trend = computeEnergyTrend(frames, idx);
+
+  // Peak approaching when: energy is rising AND future energy is higher
+  if (trend <= 0 || forecast <= currentEnergy) return 0;
+
+  const riseAmount = forecast - currentEnergy;
+  // Scale to 0-1: a 0.15 rise in energy is considered a strong approaching peak
+  return Math.min(1, riseAmount / 0.15);
+}
+
+/**
+ * Beat pattern stability: how consistent the beat spacing is.
+ * Looks at the last 8 beats and measures variance in spacing.
+ * Returns 0 (erratic) to 1 (perfectly locked in).
+ */
+export function computeBeatStability(
+  frames: EnhancedFrameData[],
+  idx: number,
+): number {
+  // Collect recent beat positions
+  const beats: number[] = [];
+  const lookback = 240; // 8 seconds
+  for (let i = Math.max(0, idx - lookback); i <= idx; i++) {
+    if (frames[i].beat) beats.push(i);
+  }
+
+  if (beats.length < 3) return 0;
+
+  // Compute spacings between consecutive beats
+  const spacings: number[] = [];
+  for (let i = 1; i < beats.length; i++) {
+    spacings.push(beats[i] - beats[i - 1]);
+  }
+
+  // Mean and variance of spacings
+  const mean = spacings.reduce((a, b) => a + b, 0) / spacings.length;
+  const variance = spacings.reduce((a, s) => a + (s - mean) * (s - mean), 0) / spacings.length;
+  const cv = Math.sqrt(variance) / Math.max(mean, 1); // coefficient of variation
+
+  // Low cv = stable beats. cv of 0 = perfect, cv > 0.3 = unstable
+  return Math.max(0, 1 - cv / 0.3);
+}
+
+/**
  * Compute all audio snapshot fields in one call.
  * Two-pass loop strategy for performance:
  *   - Wide pass (window=60) for energy
@@ -382,5 +474,17 @@ export function computeAudioSnapshot(
       : gaussianSmooth(frames, idx, (f) => f.centroid, 15),
     energyAcceleration: computeEnergyAcceleration(frames, idx),
     energyTrend: computeEnergyTrend(frames, idx),
+    localTempo: frames[idx].localTempo ?? (tempo ?? 120),
+    beatConfidence: frames[idx].beatConfidence ?? 0,
+    downbeat: frames[idx].downbeat ?? false,
+    energyForecast: computeEnergyForecast(frames, idx, 60),
+    peakApproaching: computePeakApproaching(frames, idx),
+    beatStability: computeBeatStability(frames, idx),
+    melodicPitch: gaussianSmooth(frames, idx, (f) => f.melodicPitch ?? 0, 8),
+    melodicConfidence: gaussianSmooth(frames, idx, (f) => f.melodicConfidence ?? 0, 10),
+    melodicDirection: gaussianSmooth(frames, idx, (f) => f.melodicDirection ?? 0, 5),
+    chordIndex: frames[idx].chordIndex ?? 0,
+    harmonicTension: gaussianSmooth(frames, idx, (f) => f.harmonicTension ?? 0, 15),
+    sectionType: frames[idx].sectionType ?? "jam",
   };
 }

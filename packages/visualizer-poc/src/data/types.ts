@@ -47,6 +47,20 @@ export interface EnhancedFrameData {
   beatConfidence?: number;
   /** Whether this frame is a downbeat (first beat of measure) */
   downbeat?: boolean;
+  /** Melodic pitch (0-1 MIDI-normalized: 0=A0, 1=C8) */
+  melodicPitch?: number;
+  /** Melodic pitch confidence (0-1) */
+  melodicConfidence?: number;
+  /** Melodic direction: +1 rising, -1 falling, 0 steady */
+  melodicDirection?: number;
+  /** Chord index (0-23: 12 major + 12 minor) */
+  chordIndex?: number;
+  /** Chord detection confidence (0-1) */
+  chordConfidence?: number;
+  /** Harmonic tension: rate of chord change over 2s window (0-1) */
+  harmonicTension?: number;
+  /** Section type label (verse, chorus, bridge, solo, jam, intro, outro) */
+  sectionType?: string;
 }
 
 /** Legacy frame data from POC (subset of EnhancedFrameData) */
@@ -119,7 +133,11 @@ export type VisualMode =
   | "crystal_cavern"
   | "fluid_light"
   | "void_light"
-  | "fluid_2d";
+  | "fluid_2d"
+  | "spectral_analyzer"
+  | "particle_swarm"
+  | "crystalline_growth"
+  | "climax_surge";
 
 /** Per-section mode override in setlist */
 export interface SectionOverride {
@@ -290,6 +308,12 @@ export interface SongProfile {
   chromaSpread: number;
   tempo: number;
   sectionCount: number;
+  /** Average vocal presence across all frames (0-1, 0 if no stems) */
+  avgVocalPresence: number;
+  /** Average drum onset energy across all frames (0-1, 0 if no stems) */
+  avgDrumEnergy: number;
+  /** Average other (guitar/keys) centroid across all frames (0-1, 0 if no stems) */
+  avgOtherCentroid: number;
 }
 
 /** Per-overlay energy phase hint from Claude curation */

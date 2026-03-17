@@ -127,12 +127,76 @@ def main():
         global_offset += total_frames
         total_duration += track_duration
 
+    # ─── Show-level pacing analysis ───
+    print("\nComputing show-level pacing ...")
+
+    # Load per-track energy arrays for pacing analysis
+    track_energies = []
+    for entry in timeline_tracks:
+        if entry.get("missing"):
+            track_energies.append({"trackId": entry["trackId"], "avgEnergy": 0, "peakEnergy": 0, "energyVariance": 0})
+            continue
+        analysis_path = TRACKS_DIR / f"{entry['trackId']}-analysis.json"
+        if not analysis_path.exists():
+            track_energies.append({"trackId": entry["trackId"], "avgEnergy": 0, "peakEnergy": 0, "energyVariance": 0})
+            continue
+        with open(analysis_path) as af:
+            analysis = json.load(af)
+        rms_values = [f["rms"] for f in analysis["frames"]]
+        if len(rms_values) == 0:
+            track_energies.append({"trackId": entry["trackId"], "avgEnergy": 0, "peakEnergy": 0, "energyVariance": 0})
+            continue
+
+        import numpy as np_show
+        rms_arr = np_show.array(rms_values)
+        avg_e = float(rms_arr.mean())
+        peak_e = float(rms_arr.max())
+        var_e = float(rms_arr.var())
+        # Compute energy arc: split track into 10 bins for contour
+        n_bins = min(10, len(rms_values))
+        bin_size = max(1, len(rms_values) // n_bins)
+        energy_contour = []
+        for bi in range(n_bins):
+            start_b = bi * bin_size
+            end_b = min(start_b + bin_size, len(rms_values))
+            energy_contour.append(round(float(rms_arr[start_b:end_b].mean()), 3))
+
+        track_energies.append({
+            "trackId": entry["trackId"],
+            "avgEnergy": round(avg_e, 3),
+            "peakEnergy": round(peak_e, 3),
+            "energyVariance": round(var_e, 4),
+            "energyContour": energy_contour,
+        })
+
+    # Compute contrast between adjacent tracks (energy difference for pacing)
+    adjacency_contrast = []
+    for i in range(1, len(track_energies)):
+        prev = track_energies[i - 1]
+        curr = track_energies[i]
+        contrast_val = abs(curr["avgEnergy"] - prev["avgEnergy"])
+        adjacency_contrast.append({
+            "from": prev["trackId"],
+            "to": curr["trackId"],
+            "energyContrast": round(contrast_val, 3),
+            "direction": "up" if curr["avgEnergy"] > prev["avgEnergy"] else "down",
+        })
+
+    # Show-wide pacing score: average contrast (higher = more dynamic show)
+    avg_contrast = sum(c["energyContrast"] for c in adjacency_contrast) / max(1, len(adjacency_contrast))
+    print(f"Show pacing: avg contrast={avg_contrast:.3f}, {len(adjacency_contrast)} transitions")
+
     # Write show timeline
     timeline = {
         "date": setlist["date"],
         "totalFrames": global_offset,
         "totalDuration": round(total_duration, 2),
         "tracks": timeline_tracks,
+        "pacing": {
+            "trackEnergies": track_energies,
+            "adjacencyContrast": adjacency_contrast,
+            "avgContrast": round(avg_contrast, 3),
+        },
     }
 
     timeline_path = DATA_DIR / "show-timeline.json"

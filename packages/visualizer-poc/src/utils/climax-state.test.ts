@@ -38,6 +38,27 @@ function makeSnapshot(overrides: Partial<AudioSnapshot> = {}): AudioSnapshot {
     flatness: 0.2,
     spectralFlux: 0,
     musicalTime: 0,
+    fastEnergy: 0,
+    drumOnset: 0,
+    drumBeat: 0,
+    vocalEnergy: 0,
+    vocalPresence: 0,
+    otherEnergy: 0,
+    otherCentroid: 0,
+    energyAcceleration: 0,
+    energyTrend: 0,
+    localTempo: 120,
+    beatConfidence: 0,
+    downbeat: false,
+    energyForecast: 0,
+    peakApproaching: 0,
+    beatStability: 0,
+    melodicPitch: 0,
+    melodicConfidence: 0,
+    melodicDirection: 0,
+    chordIndex: 0,
+    harmonicTension: 0,
+    sectionType: "jam",
     ...overrides,
   };
 }
@@ -96,14 +117,14 @@ describe("computeClimaxState", () => {
 
 describe("climaxModulation", () => {
   it("produces zero offsets at idle with zero intensity", () => {
-    const mod = climaxModulation({ phase: "idle", intensity: 0, anticipation: false });
+    const mod = climaxModulation({ phase: "idle", intensity: 0, anticipation: false, microClimax: false, microClimaxIntensity: 0 });
     expect(mod.saturationOffset).toBeCloseTo(0, 3);
     expect(mod.brightnessOffset).toBeCloseTo(0, 3);
     expect(mod.overlayDensityMult).toBeCloseTo(1, 1);
   });
 
   it("produces positive offsets during climax", () => {
-    const mod = climaxModulation({ phase: "climax", intensity: 1, anticipation: false });
+    const mod = climaxModulation({ phase: "climax", intensity: 1, anticipation: false, microClimax: false, microClimaxIntensity: 0 });
     expect(mod.saturationOffset).toBeGreaterThan(0);
     expect(mod.brightnessOffset).toBeGreaterThan(0);
     expect(mod.bloomOffset).toBeGreaterThan(0);
@@ -111,7 +132,7 @@ describe("climaxModulation", () => {
   });
 
   it("produces deep desaturation and darkness during anticipation", () => {
-    const mod = climaxModulation({ phase: "build", intensity: 1, anticipation: true });
+    const mod = climaxModulation({ phase: "build", intensity: 1, anticipation: true, microClimax: false, microClimaxIntensity: 0 });
     expect(mod.saturationOffset).toBeLessThan(-0.3);
     expect(mod.brightnessOffset).toBeLessThan(-0.3);
   });

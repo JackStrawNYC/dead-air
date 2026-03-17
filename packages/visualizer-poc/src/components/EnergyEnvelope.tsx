@@ -132,12 +132,22 @@ export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod,
   // Guitar color temp: ±12deg hue shift based on Jerry's neck position
   const guitarHueShift = (guitarColorTemp ?? 0) * 12;
 
+  // Chroma-based harmonic color: dominant pitch class modulates hue
+  // chromaHue (0-360) maps the 12 pitch classes to the color wheel.
+  // We offset from the song identity's primary hue (or 0) so the shift is relative.
+  // Scaled to ±10 degrees — subtle harmonic color breathing.
+  const songPrimaryHue = songIdentity?.palette?.primary ?? 0;
+  const chromaDelta = snapshot.chromaHue - (songPrimaryHue % 360);
+  // Normalize to [-180, 180] range, then scale to ±10 degrees
+  const chromaNorm = ((chromaDelta + 540) % 360) - 180;
+  const chromaHueShift = chromaNorm * (10 / 180) * Math.min(1, energy * 5); // gate by energy to avoid drift in silence
+
   // Jam color temperature: warm shifts yellow, cool shifts blue (max ±12deg)
   // Only applied during long jams. EraGrade + SongPalette handle base color character.
   const jamHueShift = jamColorTemp != null ? jamColorTemp * 35 : 0; // ±28 degrees max
   // Set-level warmth shift: Set 1 warm (+5deg), Set 2 cool (-8deg), Encore neutral (0)
   // Suppress hue shift during dead air so applause is neutral
-  const totalHueShift = (jamHueShift + setTheme.warmthShift + eraColorTempShift + dsHueOffset + siHueShift + arcHueShift + vocalHueShift + guitarHueShift) * (1 - deadAirFactor);
+  const totalHueShift = (jamHueShift + setTheme.warmthShift + eraColorTempShift + dsHueOffset + siHueShift + arcHueShift + vocalHueShift + guitarHueShift + chromaHueShift) * (1 - deadAirFactor);
   const filterStr = totalHueShift !== 0
     ? `brightness(${finalBrightness.toFixed(3)}) hue-rotate(${totalHueShift.toFixed(1)}deg)`
     : `brightness(${finalBrightness.toFixed(3)})`;

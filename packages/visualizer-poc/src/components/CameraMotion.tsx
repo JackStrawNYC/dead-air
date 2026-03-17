@@ -40,6 +40,8 @@ const QUIET_SCALE = 1.08;
 const PEAK_SCALE = 1.03;
 const SHAKE_PX = 5;
 const SHAKE_DECAY_FRAMES = 12;
+const TILT_DEG = 2.0;         // Max rotational tilt on bass kicks
+const TILT_DECAY_FRAMES = 10; // Exponential decay for tilt
 
 /** Phase-driven camera parameters for long jams */
 const PHASE_CAMERA: Record<JamPhase, {
@@ -62,7 +64,7 @@ function shakeHash(frame: number): { x: number; y: number } {
 }
 
 export const CameraMotion: React.FC<Props> = ({ frames, children, jamEvolution, bass, cameraFreeze, drumsSpacePhase, fastEnergy, vocalPresence, isSolo, soloIntensity }) => {
-  const frozenTransform = React.useRef({ scale: 1.04, totalX: 0, totalY: 0 });
+  const frozenTransform = React.useRef({ scale: 1.04, totalX: 0, totalY: 0, tilt: 0 });
   const frame = useCurrentFrame();
   const idx = Math.min(Math.max(0, frame), frames.length - 1);
 
@@ -137,6 +139,23 @@ export const CameraMotion: React.FC<Props> = ({ frames, children, jamEvolution, 
     }
   }
 
+  // Rotational tilt on bass kicks: ±2deg with fast decay
+  // Scans backward for the most recent strong bass hit and applies
+  // a decaying tilt in a deterministic direction
+  let tiltDeg = 0;
+  for (let ago = 0; ago < TILT_DECAY_FRAMES; ago++) {
+    const checkIdx = idx - ago;
+    if (checkIdx < 0) break;
+    const f = frames[checkIdx];
+    const bassHit = (f.stemDrumOnset ?? f.onset) > 0.4 && (f.sub + f.low) > 0.3;
+    if (bassHit) {
+      const decay = Math.exp(-ago * 0.8);
+      const dir = shakeHash(checkIdx + 7777);
+      tiltDeg = dir.x * TILT_DEG * decay * egate;
+      break;
+    }
+  }
+
   // Bass-driven continuous micro-sway (energy-gated: true stillness in silence)
   const bassGate = egate;
   const bassAmp = (bass ?? 0) * 12.0 * bassGate;
@@ -180,9 +199,14 @@ export const CameraMotion: React.FC<Props> = ({ frames, children, jamEvolution, 
     scale = frozenTransform.current.scale;
     totalX = frozenTransform.current.totalX;
     totalY = frozenTransform.current.totalY;
+    tiltDeg = frozenTransform.current.tilt;
   } else {
-    frozenTransform.current = { scale, totalX, totalY };
+    frozenTransform.current = { scale, totalX, totalY, tilt: tiltDeg };
   }
+
+  // Edge DOF blur: subtle blur at edges during energy peaks
+  // Creates a depth-of-field feel — center stays sharp, edges soften
+  const dofBlur = Math.min(3, blendedEnergy * 8); // 0-3px blur at edges
 
   return (
     <div
@@ -196,12 +220,26 @@ export const CameraMotion: React.FC<Props> = ({ frames, children, jamEvolution, 
         style={{
           width: "100%",
           height: "100%",
-          transform: `scale(${scale.toFixed(4)}) translate(${totalX.toFixed(2)}px, ${totalY.toFixed(2)}px)`,
+          transform: `scale(${scale.toFixed(4)}) translate(${totalX.toFixed(2)}px, ${totalY.toFixed(2)}px) rotate(${tiltDeg.toFixed(3)}deg)`,
           willChange: "transform",
         }}
       >
         {children}
       </div>
+      {/* Edge DOF vignette: radial blur at screen edges during peaks */}
+      {dofBlur > 0.2 && (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            backdropFilter: `blur(${dofBlur.toFixed(1)}px)`,
+            WebkitBackdropFilter: `blur(${dofBlur.toFixed(1)}px)`,
+            maskImage: "radial-gradient(ellipse 60% 60% at 50% 50%, transparent 50%, black 100%)",
+            WebkitMaskImage: "radial-gradient(ellipse 60% 60% at 50% 50%, transparent 50%, black 100%)",
+            pointerEvents: "none",
+          }}
+        />
+      )}
     </div>
   );
 };

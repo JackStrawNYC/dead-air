@@ -24,29 +24,30 @@ interface EraGradeStyle {
   tintOpacity?: number;
 }
 
-// GLSL owns color grading (saturation + contrast via cinematicGrade + uEraSaturation).
-// CSS handles brightness-only + sepia tint to avoid compound color crushing.
+// GLSL now owns ALL color grading: saturation, contrast, brightness, and sepia
+// via cinematicGrade + uEraSaturation + uEraBrightness + uEraSepia.
+// CSS only handles the subtle tint overlay (mix-blend-mode: overlay).
 const ERA_GRADES: Record<Era, EraGradeStyle> = {
   primal: {
-    filter: "brightness(0.97) sepia(0.15)",
+    filter: "",
     tintColor: "rgba(140, 90, 40, 0.05)",
     tintOpacity: 0.05,
   },
   classic: {
-    filter: "brightness(1.0)",
+    filter: "",
     tintColor: "rgba(180, 140, 80, 0.02)",
     tintOpacity: 0.02,
   },
   hiatus: {
-    filter: "brightness(0.95)",
+    filter: "",
     tintColor: "rgba(60, 80, 120, 0.04)",
     tintOpacity: 0.04,
   },
   touch_of_grey: {
-    filter: "brightness(1.01) contrast(1.02)",
+    filter: "",
   },
   revival: {
-    filter: "brightness(1.0)",
+    filter: "",
   },
 };
 
@@ -66,26 +67,29 @@ export const EraGrade: React.FC<Props> = ({ children }) => {
     return <>{children}</>;
   }
 
+  // No CSS filter needed — GLSL handles brightness/sepia/saturation/contrast.
+  // Only the tint overlay remains for subtle era-specific color wash.
+  if (!gradeStyle.tintColor) {
+    return <>{children}</>;
+  }
+
   return (
     <div
       style={{
         position: "absolute",
         inset: 0,
-        filter: gradeStyle.filter,
       }}
     >
       {children}
-      {gradeStyle.tintColor && (
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            backgroundColor: gradeStyle.tintColor,
-            mixBlendMode: "overlay",
-            pointerEvents: "none",
-          }}
-        />
-      )}
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          backgroundColor: gradeStyle.tintColor,
+          mixBlendMode: "overlay",
+          pointerEvents: "none",
+        }}
+      />
     </div>
   );
 };

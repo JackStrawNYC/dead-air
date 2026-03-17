@@ -19,6 +19,24 @@ const ERA_SATURATION: Record<string, number> = {
   revival: 0.95,
 };
 
+/** Era brightness values — moved from EraGrade CSS to GLSL for unified grading */
+const ERA_BRIGHTNESS: Record<string, number> = {
+  primal: 0.97,
+  classic: 1.0,
+  hiatus: 0.95,
+  touch_of_grey: 1.01,
+  revival: 1.0,
+};
+
+/** Era sepia tint strength — moved from EraGrade CSS to GLSL */
+const ERA_SEPIA: Record<string, number> = {
+  primal: 0.15,
+  classic: 0.0,
+  hiatus: 0.0,
+  touch_of_grey: 0.0,
+  revival: 0.0,
+};
+
 interface Props {
   vertexShader: string;
   fragmentShader: string;
@@ -33,7 +51,10 @@ export const FullscreenQuad: React.FC<Props> = ({
   const { time, beatDecay, smooth, palettePrimary, paletteSecondary, paletteSaturation, tempo, musicalTime, climaxPhase, climaxIntensity, jamDensity, coherence, dynamicTime, isLocked } = useAudioData();
   const { width, height } = useVideoConfig();
   const showCtx = useShowContext();
-  const eraSaturation = ERA_SATURATION[showCtx?.era ?? ""] ?? 1.0;
+  const eraKey = showCtx?.era ?? "";
+  const eraSaturation = ERA_SATURATION[eraKey] ?? 1.0;
+  const eraBrightness = ERA_BRIGHTNESS[eraKey] ?? 1.0;
+  const eraSepia = ERA_SEPIA[eraKey] ?? 0.0;
 
   // FFT texture: 64-bin DataTexture from 7-band contrast (padded)
   const fftTextureRef = useRef<THREE.DataTexture | null>(null);
@@ -92,6 +113,10 @@ export const FullscreenQuad: React.FC<Props> = ({
       uOtherCentroid: { value: 0 },
       uSnapToMusicalTime: { value: 0 },
       uEraSaturation: { value: 1.0 },
+      uEraBrightness: { value: 1.0 },
+      uEraSepia: { value: 0.0 },
+      uBloomThreshold: { value: 0.0 },
+      uLensDistortion: { value: 0.0 },
       uEnergyAccel: { value: 0 },
       uEnergyTrend: { value: 0 },
       uLocalTempo: { value: 120 },
@@ -142,6 +167,14 @@ export const FullscreenQuad: React.FC<Props> = ({
   uniforms.uOtherCentroid.value = smooth.otherCentroid;
   uniforms.uSnapToMusicalTime.value = isLocked ? 1.0 : 0.0;
   uniforms.uEraSaturation.value = eraSaturation;
+  uniforms.uEraBrightness.value = eraBrightness;
+  uniforms.uEraSepia.value = eraSepia;
+  // Adaptive bloom threshold: lower at high energy (more bloom catches darker pixels)
+  // Range: -0.08 (quiet, conservative) to -0.20 (peak, generous bloom)
+  uniforms.uBloomThreshold.value = -0.08 - smooth.energy * 0.12;
+  // Lens distortion: subtle barrel curvature, stronger at peaks
+  // Range: 0.02 (rest) to 0.08 (peak)
+  uniforms.uLensDistortion.value = 0.02 + smooth.energy * 0.06;
   uniforms.uEnergyAccel.value = smooth.energyAcceleration;
   uniforms.uEnergyTrend.value = smooth.energyTrend;
   uniforms.uLocalTempo.value = smooth.localTempo;

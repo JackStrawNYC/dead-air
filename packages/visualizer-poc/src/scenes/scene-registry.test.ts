@@ -12,11 +12,12 @@ const ALL_MODES: VisualMode[] = [
   "particle_nebula", "stark_minimal", "tie_dye", "cosmic_dust", "vintage_film",
   "cosmic_voyage", "inferno", "deep_ocean", "aurora", "crystal_cavern",
   "fluid_light", "void_light", "fluid_2d",
+  "spectral_analyzer", "particle_swarm", "crystalline_growth", "climax_surge",
 ];
 
 describe("SCENE_REGISTRY", () => {
-  it("has exactly 17 registered modes", () => {
-    expect(Object.keys(SCENE_REGISTRY).length).toBe(17);
+  it("has exactly 21 registered modes", () => {
+    expect(Object.keys(SCENE_REGISTRY).length).toBe(21);
   });
 
   it("contains all expected modes", () => {
@@ -102,9 +103,9 @@ describe("getModesForEnergy", () => {
 });
 
 describe("getRegisteredModes", () => {
-  it("returns all 17 modes", () => {
+  it("returns all 21 modes", () => {
     const modes = getRegisteredModes();
-    expect(modes.length).toBe(17);
+    expect(modes.length).toBe(21);
     for (const mode of ALL_MODES) {
       expect(modes).toContain(mode);
     }

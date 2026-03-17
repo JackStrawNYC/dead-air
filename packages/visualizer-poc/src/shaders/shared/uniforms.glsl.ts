@@ -71,6 +71,12 @@ uniform float uPalettePrimary;
 uniform float uPaletteSecondary;
 uniform float uPaletteSaturation;
 uniform float uEraSaturation;
+uniform float uEraBrightness;
+uniform float uEraSepia;
+
+// ─── Post-Process Control ───
+uniform float uBloomThreshold;
+uniform float uLensDistortion;
 
 // ─── Spatial ───
 uniform vec2 uResolution;
