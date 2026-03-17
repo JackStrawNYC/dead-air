@@ -110,7 +110,12 @@ void main() {
   }
 
   // === VOLUMETRIC NEBULA: raymarched dust clouds (4-step accumulation) ===
-  vec3 nebColor1 = hsv2rgb(vec3(uPalettePrimary, 0.6 * uPaletteSaturation, 0.25));
+  // --- Phase 1: New uniform integrations ---
+  float chromaHueMod = uChromaHue * 0.25;
+  float chordHue = float(int(uChordIndex)) / 24.0 * 0.15;
+  float directionDrift = uMelodicDirection * 0.02;
+
+  vec3 nebColor1 = hsv2rgb(vec3(uPalettePrimary + chromaHueMod + chordHue, 0.6 * uPaletteSaturation, 0.25));
   vec3 nebColor2 = hsv2rgb(vec3(uPaletteSecondary, 0.5 * uPaletteSaturation, 0.20));
 
   vec3 nebulaMix = vec3(0.0);

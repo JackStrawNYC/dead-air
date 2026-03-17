@@ -58,9 +58,13 @@ void main() {
   float bgNoise = snoise(vec3(p * 3.0, t * 0.02)) * 0.008;
   col += vec3(bgNoise * 0.5, bgNoise * 0.3, bgNoise);
 
+  // --- Phase 1: New uniform integrations ---
+  float chromaHueMod = uChromaHue * 0.25;
+  float stabilityBoost = uBeatStability * 0.3;  // beat stability adds to light steadiness
+
   // ─── Primary drifting light point ───
-  // Position via slow simplex noise (coherence = stability)
-  float stability = 0.3 + uCoherence * 0.7; // high coherence = steadier
+  // Position via slow simplex noise (coherence + beat stability = stability)
+  float stability = 0.3 + uCoherence * 0.7 + stabilityBoost; // high coherence = steadier
   float driftSpeed = 0.08 / stability;
   vec2 lightPos = vec2(
     snoise(vec3(t * driftSpeed, 0.0, 0.0)) * 0.4,

@@ -54,6 +54,7 @@ vec2 hash2(float n) { return vec2(hash1(n), hash1(n + 17.37)); }
 
 void main() {
   vec2 uv = vUv;
+  uv = applyCameraCut(uv, uOnsetSnap, uBeatSnap, uEnergy, uCoherence, uClimaxPhase, uMusicalTime, uSectionIndex);
   vec2 aspect = vec2(uResolution.x / uResolution.y, 1.0);
   vec2 p = (uv - 0.5) * aspect;
 
@@ -66,6 +67,12 @@ void main() {
 
   float slowTime = uDynamicTime * 0.15;
 
+  // --- Phase 1: New uniform integrations ---
+  float directionFlow = uMelodicDirection * 0.05;  // melodic direction biases flow
+  float stabilityFlock = uBeatStability;             // high = tight flocks, low = scattered
+  float chromaHueMod = uChromaHue * 0.25;
+  float chordHue = float(int(uChordIndex)) / 24.0 * 0.15;
+
   // Background: deep space
   vec3 bgColor = mix(
     vec3(0.01, 0.01, 0.03),
@@ -75,13 +82,13 @@ void main() {
   vec3 col = bgColor;
 
   // Palette colors
-  float hue1 = uPalettePrimary;
-  float hue2 = uPaletteSecondary;
+  float hue1 = uPalettePrimary + chromaHueMod + chordHue;
+  float hue2 = uPaletteSecondary + chordHue * 0.5;
   float sat = mix(0.6, 1.0, energy) * uPaletteSaturation;
 
   // Swarm parameters modulated by audio
-  float separation = 0.15 + onset * 0.35;    // scatter on onset
-  float cohesion = 0.3 + vocalP * 0.4;       // pull together on vocals
+  float separation = 0.15 + onset * 0.35 + (1.0 - stabilityFlock) * 0.1;  // scatter on onset + low stability
+  float cohesion = 0.3 + vocalP * 0.4 + stabilityFlock * 0.15;            // pull together on vocals + stability
   float driftSpeed = 0.08 + uSlowEnergy * 0.12;
   float particleRadius = 0.008 + bass * 0.006;
 
@@ -172,6 +179,7 @@ void main() {
     vec3 col1 = hsv2rgb(vec3(hue1, sat, 1.0));
     vec3 col2 = hsv2rgb(vec3(hue2, sat, 1.0));
     col += iconEmergence(p, uTime, energy, bass, col1, col2, nf, uClimaxPhase, uSectionIndex) * 0.6;
+    col += heroIconEmergence(p, uTime, energy, bass, col1, col2, nf, uSectionIndex);
   }
 
   // Vignette

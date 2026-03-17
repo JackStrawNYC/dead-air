@@ -174,8 +174,8 @@ export const Root: React.FC = () => {
             component={SongVisualizerComponent}
             durationInFrames={DEFAULT_FRAMES}
             fps={30}
-            width={1920}
-            height={1080}
+            width={RENDER_WIDTH}
+            height={RENDER_HEIGHT}
             defaultProps={{
               song,
               segueIn,
@@ -215,8 +215,8 @@ export const Root: React.FC = () => {
         component={SetBreakCardComponent}
         durationInFrames={SET_BREAK_FRAMES}
         fps={30}
-        width={1920}
-        height={1080}
+        width={RENDER_WIDTH}
+        height={RENDER_HEIGHT}
         defaultProps={{
           venue: setlist.venue,
           date: formatDateLong(setlist.date),
@@ -232,8 +232,8 @@ export const Root: React.FC = () => {
         component={EndCardComponent}
         durationInFrames={END_CARD_FRAMES}
         fps={30}
-        width={1920}
-        height={1080}
+        width={RENDER_WIDTH}
+        height={RENDER_HEIGHT}
         defaultProps={{
           brandSrc: "assets/song-art/dead-air-brand.png",
           posterSrc: setlist.showPoster,

@@ -19,12 +19,16 @@ import type { ClimaxBehavior } from "../data/song-identities";
 
 export type ClimaxPhase = "idle" | "build" | "climax" | "sustain" | "release";
 
+export type AnticipationStage = "distant" | "approaching" | "imminent" | null;
+
 export interface ClimaxState {
   phase: ClimaxPhase;
   /** 0-1 progress within the current phase (for smooth interpolation) */
   intensity: number;
-  /** true when in build phase approaching a high-energy section within 90 frames */
+  /** true when in build phase approaching a high-energy section within 300 frames */
   anticipation: boolean;
+  /** Granular anticipation stage for extended arcs */
+  anticipationStage: AnticipationStage;
   /** true during a micro-climax (onset cluster peak within sustain phase) */
   microClimax: boolean;
   /** 0-1 micro-climax intensity for additive burst effects */
@@ -58,7 +62,7 @@ export function computeClimaxState(
   precomputedEnergy?: number,
 ): ClimaxState {
   if (frames.length === 0 || sections.length === 0) {
-    return { phase: "idle", intensity: 0, anticipation: false, microClimax: false, microClimaxIntensity: 0 };
+    return { phase: "idle", intensity: 0, anticipation: false, anticipationStage: null, microClimax: false, microClimaxIntensity: 0 };
   }
 
   // 1. Smoothed energy — use precomputed if available (saves one 150-frame Gaussian loop)
@@ -188,13 +192,27 @@ export function computeClimaxState(
     intensity = smoothstep((energy - 0.08) / 0.17) * 0.5;
   }
 
-  // 8. Anticipation: in build AND next section is high AND within 150 frames (5s)
+  // 8. Extended anticipation: in build AND next section is high AND within 300 frames (10s)
+  // Three stages: distant (300-150), approaching (150-60), imminent (60-0)
   let anticipation = false;
+  let anticipationStage: AnticipationStage = null;
   if (phase === "build" && nextSection?.energy === "high") {
     const distToNext = nextSection.frameStart - idx;
-    if (distToNext > 0 && distToNext < 150) {
+    if (distToNext > 0 && distToNext < 300) {
       anticipation = true;
-      intensity = smoothstep(1 - distToNext / 150);
+      if (distToNext >= 150) {
+        // Distant: 300-150 frames, 30% anticipation modifiers
+        anticipationStage = "distant";
+        intensity = smoothstep(1 - distToNext / 300) * 0.3;
+      } else if (distToNext >= 60) {
+        // Approaching: 150-60 frames, 60% anticipation modifiers
+        anticipationStage = "approaching";
+        intensity = smoothstep(1 - distToNext / 150) * 0.6;
+      } else {
+        // Imminent: 60-0 frames, 100% (original behavior)
+        anticipationStage = "imminent";
+        intensity = smoothstep(1 - distToNext / 60);
+      }
     }
   }
 
@@ -226,7 +244,7 @@ export function computeClimaxState(
     }
   }
 
-  return { phase, intensity, anticipation, microClimax, microClimaxIntensity };
+  return { phase, intensity, anticipation, anticipationStage, microClimax, microClimaxIntensity };
 }
 
 // ─── Musical Texture Detection ───

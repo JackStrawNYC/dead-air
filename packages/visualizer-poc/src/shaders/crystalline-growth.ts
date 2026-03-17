@@ -79,6 +79,7 @@ vec3 voronoi(vec2 p, float jitter) {
 
 void main() {
   vec2 uv = vUv;
+  uv = applyCameraCut(uv, uOnsetSnap, uBeatSnap, uEnergy, uCoherence, uClimaxPhase, uMusicalTime, uSectionIndex);
   vec2 aspect = vec2(uResolution.x / uResolution.y, 1.0);
   vec2 p = (uv - 0.5) * aspect;
 
@@ -90,6 +91,15 @@ void main() {
 
   float slowTime = uDynamicTime * 0.06;
 
+  // --- Phase 1: New uniform integrations ---
+  float vocalGlow = uVocalEnergy * 0.15;         // vocal warmth in crystal glow
+  float guitarGrowth = uOtherEnergy * 0.2;        // guitar drives growth rate
+  float accelGrowth = 1.0 + uEnergyAccel * 0.2;   // energy acceleration
+  float tensionFracture = uHarmonicTension * 0.3;  // tension drives fracture complexity
+  float stabilityLattice = uBeatStability;          // lattice regularity
+  float chromaHueMod = uChromaHue * 0.25;
+  float chordHue = float(int(uChordIndex)) / 24.0 * 0.15;
+
   // Background: deep obsidian
   vec3 col = mix(
     vec3(0.015, 0.01, 0.025),
@@ -97,8 +107,8 @@ void main() {
     uv.y
   );
 
-  // Crystal lattice scale: energy-driven density
-  float crystalScale = mix(3.0, 8.0, energy + slowE * 0.3);
+  // Crystal lattice scale: energy-driven density (accel + guitar boost)
+  float crystalScale = mix(3.0, 8.0, energy + slowE * 0.3 + guitarGrowth) * accelGrowth;
 
   // Crystal growth offset (slowly shifts the voronoi pattern)
   vec2 growthOffset = vec2(
@@ -122,8 +132,8 @@ void main() {
   float facetEdge2 = smoothstep(0.08, 0.0, v2.y) * 0.5;
 
   // Crystal colors from palette
-  float hue1 = uPalettePrimary;
-  float hue2 = uPaletteSecondary;
+  float hue1 = uPalettePrimary + chromaHueMod + chordHue;
+  float hue2 = uPaletteSecondary + chordHue * 0.5;
   float sat = mix(0.5, 1.0, energy) * uPaletteSaturation;
 
   // Per-cell color variation
@@ -148,8 +158,8 @@ void main() {
   float innerGlow = exp(-v1.x * 4.0) * energy * 0.4;
   col += crystalColor * innerGlow * (1.0 + bass * 0.5);
 
-  // Onset fracture: bright flash along crystal edges
-  float fractureFlash = onset * facetEdge * 2.0;
+  // Onset fracture: bright flash along crystal edges (tension amplifies)
+  float fractureFlash = onset * facetEdge * (2.0 + tensionFracture);
   col += vec3(1.0, 0.95, 0.9) * fractureFlash;
 
   // Deep noise layer: organic growth texture within crystals
@@ -171,6 +181,7 @@ void main() {
     vec3 c1 = hsv2rgb(vec3(hue1, sat, 1.0));
     vec3 c2 = hsv2rgb(vec3(hue2, sat, 1.0));
     col += iconEmergence(p, uTime, energy, bass, c1, c2, nf, uClimaxPhase, uSectionIndex) * 0.5;
+    col += heroIconEmergence(p, uTime, energy, bass, c1, c2, nf, uSectionIndex);
   }
 
   // Vignette

@@ -92,9 +92,21 @@ void main() {
   float slowE = clamp(uSlowEnergy, 0.0, 1.0);
   float chromaH = clamp(uChromaHue, 0.0, 1.0);
 
+  // --- Phase 1: New uniform integrations ---
+  float vocalWarmth = uVocalEnergy * 0.12;
+  float vocalSpot = uVocalPresence;
+  float guitarActivity = uOtherEnergy * 0.2;
+  float guitarTemp = uOtherCentroid;
+  float trendDrift = uEnergyTrend * 0.03;
+  float pitchCurtain = uMelodicPitch * 0.15;
+  float directionDrift = uMelodicDirection * 0.02;
+  float tensionTurb = uHarmonicTension * 0.3;
+  float chordHue = float(int(uChordIndex)) / 24.0 * 0.15;
+  float localTempoScale = uLocalTempo / 120.0;
+
   // === SLOW TIME: aurora should never feel rushed ===
   float slowTime = uDynamicTime * 0.08;
-  float driftSpeed = 0.03 + slowE * 0.02;
+  float driftSpeed = 0.03 + slowE * 0.02 + trendDrift;
 
   // === SKY background (dim but visible, not pitch black) ===
   vec3 skyColor = mix(
@@ -112,8 +124,8 @@ void main() {
   col += starColor * 0.4;
 
   // === AURORA COLORS from palette + chromaHue shift ===
-  float hue1 = uPalettePrimary + chromaH * 0.1;
-  float hue2 = uPaletteSecondary + chromaH * 0.08;
+  float hue1 = uPalettePrimary + chromaH * 0.1 + chordHue;
+  float hue2 = uPaletteSecondary + chromaH * 0.08 + chordHue * 0.5;
   float sat = mix(0.7, 1.0, slowE) * uPaletteSaturation;
 
   vec3 auroraColor1 = hsv2rgb(vec3(hue1, sat, 1.0));
@@ -171,8 +183,8 @@ void main() {
     pos.x += slowTime * driftSpeed * 10.0;
     pos.z += slowTime * driftSpeed * 5.0;
 
-    // FBM density with onset turbulence
-    float density = auroraFBM(pos * 0.3, max(onset, uDrumOnset) * 1.25);
+    // FBM density with onset turbulence + harmonic tension
+    float density = auroraFBM(pos * 0.3, max(onset, uDrumOnset) * 1.25 + tensionTurb);
 
     // Threshold: must exceed 0 to be visible
     density = smoothstep(-0.1, 0.4, density);

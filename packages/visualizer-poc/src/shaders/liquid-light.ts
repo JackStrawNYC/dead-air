@@ -55,6 +55,7 @@ float fbmFlat(vec3 p, float smoothness) {
 
 void main() {
   vec2 uv = vUv;
+  uv = applyCameraCut(uv, uOnsetSnap, uBeatSnap, uEnergy, uCoherence, uClimaxPhase, uMusicalTime, uSectionIndex);
   vec2 aspect = vec2(uResolution.x / uResolution.y, 1.0);
   vec2 p = (uv - 0.5) * aspect;
 
@@ -84,6 +85,35 @@ void main() {
   float t = uDynamicTime * 0.25 * tempoScale;
   float smoothness = 1.0 - uFlatness * 0.6;
 
+  // --- Phase 1: New uniform integrations ---
+  // Melodic pitch shifts warp center vertically
+  p.y += (uMelodicPitch - 0.5) * 0.06;
+  // Melodic direction biases drift: +1=upward, -1=downward
+  float driftBias = uMelodicDirection * 0.02;
+  p.y += driftBias * slowE;
+  // Chord changes micro-rotate palette hue
+  float chordHueShift = float(int(uChordIndex)) / 24.0 * 0.15;
+  // Harmonic tension drives warp strength
+  float tensionWarp = 1.0 + uHarmonicTension * 0.3;
+  // Section type modifies FBM behavior (jam=complex, space=slow)
+  float sectionMod = uSectionType == 7.0 ? 0.4 : (uSectionType == 5.0 ? 1.2 : 1.0);
+  // Energy forecast: anticipatory bloom widening
+  float forecastBloom = uEnergyForecast * 0.08;
+  // Peak approaching: pre-burst desaturation
+  float peakDesat = uPeakApproaching * 0.15;
+  // Beat stability: high=geometric, low=organic drift
+  float stabilityMix = uBeatStability;
+  // Stem: guitar intensity drives foreground
+  float guitarDrive = uOtherEnergy * 0.5;
+  // Stem: guitar temperature shifts warm/cool
+  float guitarTemp = uOtherCentroid;
+  // Energy acceleration for warp speed
+  float accelWarp = 1.0 + uEnergyAccel * 0.2;
+  // Energy trend for color temperature drift
+  float trendTemp = uEnergyTrend * 0.05;
+  // Local tempo replaces hardcoded tempo scale
+  tempoScale = uLocalTempo / 120.0;
+
   // Spectral contrast: constant spatial variation (no per-frame jitter)
   float contrastWarp = 0.8;
 
@@ -95,7 +125,7 @@ void main() {
   bgCol *= mix(0.45, 0.72, energy);
 
   // ============ LAYER 2: Midground (hero) ============
-  float warpStrength = (0.65 + slowE * 0.55) * complexity;
+  float warpStrength = (0.65 + slowE * 0.55) * complexity * tensionWarp * accelWarp * sectionMod;
   float tFlux = t * 0.2 + sectionSeed;
   vec3 q = vec3(p * 1.2 * sectionWarp, tFlux);
   float warpX = fbmFlat(q + vec3(1.7, 9.2, 0.0), smoothness);
@@ -108,7 +138,7 @@ void main() {
 
   // === CHROMATIC ABERRATION (aggressive) ===
   float caAmount = uBass * 0.08 + length(p) * 0.025 + uOnsetSnap * 0.06 + uDrumOnset * 0.10;
-  float hue = hsvToCosineHue(uPalettePrimary) + uChromaHue * 0.3 + t * 0.05;
+  float hue = hsvToCosineHue(uPalettePrimary) + uChromaHue * 0.25 + chordHueShift + t * 0.05 + trendTemp;
 
   // Palette compression: at quiet, raise floor so valleys have visible color (no black gaps).
   // At peak, full contrast range for vivid psychedelic color.
@@ -137,22 +167,24 @@ void main() {
   vec3 chromaInfluence = chromaColor(warped * 0.5, uChroma0, uChroma1, uChroma2, energy);
   midCol = mix(midCol, midCol + chromaInfluence * 0.6, 0.2);
 
-  // Palette saturation — vivid, not washed out
-  float sat = mix(0.92, 1.25, energy) * uPaletteSaturation * (1.0 - uFlatness * 0.08);
+  // Palette saturation — vivid, not washed out (with peak approaching desaturation)
+  float sat = mix(0.92, 1.25, energy) * uPaletteSaturation * (1.0 - uFlatness * 0.08) * (1.0 - peakDesat);
   vec3 midGray = vec3(dot(midCol, vec3(0.299, 0.587, 0.114)));
   midCol = mix(midGray, midCol, sat);
 
-  // Color temperature (warm at peaks, cool at rest)
+  // Color temperature (warm at peaks, cool at rest + guitar brightness influence)
   vec3 warmShift = vec3(1.10, 0.95, 0.88);
   vec3 coolShift = vec3(0.90, 0.97, 1.10);
-  midCol *= mix(coolShift, warmShift, energy);
+  midCol *= mix(coolShift, warmShift, energy + guitarTemp * 0.15);
+  // Vocal warmth tint
+  midCol += vec3(0.08, 0.04, 0.0) * uVocalEnergy * 0.15;
 
   float brightness = mix(0.60, 1.15, energy) + uFastEnergy * 0.15;
   midCol *= brightness;
 
   // ============ LAYER 3: Foreground ============
   float fgNoise = fbm3(vec3(warped * 3.0, t * 0.2 + sectionSeed * 1.7));
-  float fgIntensity = uHighs * 0.18 * complexity;
+  float fgIntensity = (uHighs * 0.18 + guitarDrive * 0.12) * complexity;
   vec3 fgCol = vec3(fgNoise * 0.5 + 0.5) * vec3(0.8, 0.9, 1.0) * fgIntensity;
 
   // ============ COMPOSITE (hero-dominant) ============
@@ -224,6 +256,7 @@ void main() {
     vec3 palCol2 = 0.5 + 0.5 * cos(6.28318 * vec3(stHue2, stHue2 + 0.33, stHue2 + 0.67));
     float nf = fbm3(vec3(p * 2.0, uDynamicTime * 0.1));
     col += stealieEmergence(p, uTime, energy, uBass, palCol1, palCol2, nf, uClimaxPhase);
+    col += heroIconEmergence(p, uTime, energy, uBass, palCol1, palCol2, nf, uSectionIndex);
   }
 
   // === CLIMAX REACTIVITY ===

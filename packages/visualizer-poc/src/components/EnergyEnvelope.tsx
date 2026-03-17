@@ -11,7 +11,6 @@
  */
 
 import React from "react";
-import { useCurrentFrame } from "remotion";
 import { energyToFactor } from "../utils/energy";
 import type { EnergyCalibration } from "../utils/energy";
 import type { AudioSnapshot } from "../utils/audio-reactive";
@@ -51,6 +50,10 @@ interface Props {
   guitarColorTemp?: number;
   /** Dead air factor (0 = music playing, 1 = fully in dead air/applause) */
   deadAirFactor?: number;
+  /** Narrative brightness offset (-0.2 to +0.2) from visual narrator */
+  narrativeBrightness?: number;
+  /** Narrative color temperature (-1 cool to +1 warm) from visual narrator */
+  narrativeTemperature?: number;
 }
 
 // Per-era bloom color — matches era grade for visual cohesion
@@ -63,22 +66,13 @@ const ERA_BLOOM: Record<string, string> = {
 };
 const DEFAULT_BLOOM = ERA_BLOOM.classic;
 
-export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod, jamColorTemp, calibration, counterpointSatMult = 1, setNumber, drumsSpacePhase, showPhase, songIdentity, showArcModifiers, itLuminanceLift, vocalWarmth, guitarColorTemp, deadAirFactor = 0 }) => {
+export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod, jamColorTemp, calibration, counterpointSatMult = 1, setNumber, drumsSpacePhase, showPhase, songIdentity, showArcModifiers, itLuminanceLift, vocalWarmth, guitarColorTemp, deadAirFactor = 0, narrativeBrightness = 0, narrativeTemperature = 0 }) => {
   const energy = snapshot.energy;
   const setTheme = getSetTheme(setNumber ?? 1);
   const low = calibration?.quietThreshold;
   const high = calibration?.loudThreshold;
   const factor = energyToFactor(energy, low, high); // 0 (quiet) → 1 (loud)
   const showCtx = useShowContext();
-  const frame = useCurrentFrame();
-
-  // Intro brightness damping: first ~20s (600 frames) starts much dimmer so art + text dominate.
-  // Ramps from 0.55 → 1.0 over 150 frames (5s) after the hold.
-  const INTRO_HOLD = 600;
-  const INTRO_RAMP = 150;
-  const titleSafe = frame < INTRO_HOLD ? 0.55
-    : frame < INTRO_HOLD + INTRO_RAMP ? 0.55 + 0.45 * ((frame - INTRO_HOLD) / INTRO_RAMP)
-    : 1.0;
 
   // Slow-moving energy for bloom — drifts, doesn't pulse
   const slowFactor = energyToFactor(snapshot.slowEnergy, low, high);
@@ -132,8 +126,8 @@ export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod,
   // Vocal warmth: +15deg hue shift (saturation boost now handled by GLSL)
   const vocalHueShift = (vocalWarmth ?? 0) * 15;
 
-  // Apply phase offsets + song identity + show arc + IT + title-safe damping
-  const baseBrightness = Math.min(brightCap, Math.max(0.55, (brightness + dsBrightOffset + showBrightOffset + siPaletteBright + arcBrightOffset + itBrightLift) * titleSafe));
+  // Apply phase offsets + song identity + show arc + IT + narrative
+  const baseBrightness = Math.min(brightCap, Math.max(0.55, brightness + dsBrightOffset + showBrightOffset + siPaletteBright + arcBrightOffset + itBrightLift + narrativeBrightness));
   // During dead air, dim brightness toward 0.55 (minimum floor) and suppress bloom
   const finalBrightness = deadAirFactor > 0
     ? baseBrightness * (1 - deadAirFactor * 0.40)  // dim by up to 40% during dead air
@@ -156,8 +150,10 @@ export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod,
   // Only applied during long jams. EraGrade + SongPalette handle base color character.
   const jamHueShift = jamColorTemp != null ? jamColorTemp * 35 : 0; // ±28 degrees max
   // Set-level warmth shift: Set 1 warm (+5deg), Set 2 cool (-8deg), Encore neutral (0)
+  // Narrative temperature: ±20deg hue shift (warm = positive, cool = negative)
+  const narrativeHueShift = narrativeTemperature * 20;
   // Suppress hue shift during dead air so applause is neutral
-  const totalHueShift = (jamHueShift + setTheme.warmthShift + eraColorTempShift + dsHueOffset + siHueShift + arcHueShift + vocalHueShift + guitarHueShift + chromaHueShift) * (1 - deadAirFactor);
+  const totalHueShift = (jamHueShift + setTheme.warmthShift + eraColorTempShift + dsHueOffset + siHueShift + arcHueShift + vocalHueShift + guitarHueShift + chromaHueShift + narrativeHueShift) * (1 - deadAirFactor);
   const filterStr = totalHueShift !== 0
     ? `brightness(${finalBrightness.toFixed(3)}) hue-rotate(${totalHueShift.toFixed(1)}deg)`
     : `brightness(${finalBrightness.toFixed(3)})`;

@@ -24,6 +24,7 @@ interface OverlayComponentEntry {
   Component: React.ComponentType<{ frames: EnhancedFrameData[] }>;
   layer: number;
   renderContext?: 'dom' | 'glsl';
+  blendMode?: "screen" | "overlay" | "multiply" | "soft-light" | "color-dodge" | "luminosity";
 }
 
 /** Max concurrent overlays by energy level (hard cap after opacity sorting).
@@ -137,10 +138,9 @@ export const DynamicOverlayStack: React.FC<Props> = ({
           inset: 0,
           opacity: gateOpacity,
           filter: hueRotation !== 0 ? `hue-rotate(${hueRotation.toFixed(1)}deg)` : undefined,
-          mixBlendMode: "screen",
         }}
       >
-        {domOverlays.map(({ name, entry: { Component }, opacity }) => (
+        {domOverlays.map(({ name, entry: { Component, blendMode }, opacity }) => (
           <div
             key={name}
             style={{
@@ -148,6 +148,7 @@ export const DynamicOverlayStack: React.FC<Props> = ({
               inset: 0,
               opacity,
               pointerEvents: "none",
+              mixBlendMode: blendMode ?? "screen",
             }}
           >
             <Suspense fallback={null}>

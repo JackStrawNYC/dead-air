@@ -117,14 +117,14 @@ describe("computeClimaxState", () => {
 
 describe("climaxModulation", () => {
   it("produces zero offsets at idle with zero intensity", () => {
-    const mod = climaxModulation({ phase: "idle", intensity: 0, anticipation: false, microClimax: false, microClimaxIntensity: 0 });
+    const mod = climaxModulation({ phase: "idle", intensity: 0, anticipation: false, anticipationStage: null, microClimax: false, microClimaxIntensity: 0 });
     expect(mod.saturationOffset).toBeCloseTo(0, 3);
     expect(mod.brightnessOffset).toBeCloseTo(0, 3);
     expect(mod.overlayDensityMult).toBeCloseTo(1, 1);
   });
 
   it("produces positive offsets during climax", () => {
-    const mod = climaxModulation({ phase: "climax", intensity: 1, anticipation: false, microClimax: false, microClimaxIntensity: 0 });
+    const mod = climaxModulation({ phase: "climax", intensity: 1, anticipation: false, anticipationStage: null, microClimax: false, microClimaxIntensity: 0 });
     expect(mod.saturationOffset).toBeGreaterThan(0);
     expect(mod.brightnessOffset).toBeGreaterThan(0);
     expect(mod.bloomOffset).toBeGreaterThan(0);
@@ -132,7 +132,7 @@ describe("climaxModulation", () => {
   });
 
   it("produces deep desaturation and darkness during anticipation", () => {
-    const mod = climaxModulation({ phase: "build", intensity: 1, anticipation: true, microClimax: false, microClimaxIntensity: 0 });
+    const mod = climaxModulation({ phase: "build", intensity: 1, anticipation: true, anticipationStage: "imminent", microClimax: false, microClimaxIntensity: 0 });
     expect(mod.saturationOffset).toBeLessThan(-0.3);
     expect(mod.brightnessOffset).toBeLessThan(-0.3);
   });

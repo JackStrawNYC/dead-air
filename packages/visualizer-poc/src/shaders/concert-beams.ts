@@ -58,11 +58,30 @@ float getContrastForBeam(int i) {
 
 void main() {
   vec2 uv = vUv;
+  uv = applyCameraCut(uv, uOnsetSnap, uBeatSnap, uEnergy, uCoherence, uClimaxPhase, uMusicalTime, uSectionIndex);
   vec2 aspect = vec2(uResolution.x / uResolution.y, 1.0);
   vec2 p = (uv - vec2(0.5, 0.0)) * aspect;
 
   float energy = clamp(uEnergy, 0.0, 1.0);
-  float tempoScale = uTempo / 120.0;
+  float tempoScale = uLocalTempo / 120.0;
+
+  // --- Phase 1: New uniform integrations ---
+  // Vocal warmth on center beams
+  float vocalWarmth = uVocalEnergy * 0.15;
+  // Guitar drives foreground beam intensity
+  float guitarIntensity = uOtherEnergy * 0.3;
+  // Guitar brightness shifts warm/cool
+  float guitarBrightness = uOtherCentroid;
+  // Energy acceleration drives sweep speed
+  float accelSweep = 1.0 + uEnergyAccel * 0.15;
+  // Melodic pitch shifts beam sweep center
+  float pitchSweep = (uMelodicPitch - 0.5) * 0.1;
+  // Beat stability: high=steady beams, low=erratic
+  float beamSteadiness = uBeatStability;
+  // Harmonic tension: beam angle complexity
+  float tensionAngle = uHarmonicTension * 0.2;
+  // Chord hue micro-rotation
+  float chordHue = float(int(uChordIndex)) / 24.0 * 0.15;
 
   // Bass camera shake
   float shakeX = snoise(vec3(uTime * 8.0, 1.0, 0.0)) * uBass * 0.003;
@@ -93,8 +112,8 @@ void main() {
     if (beamActive < 0.01) continue;
 
     float beamX = -aspect.x * 0.5 + beamSpacing * (fi + 1.0) + sin(uDynamicTime * 0.15 + fi * 0.7) * 0.08;
-    float sweepSpeed = mix(0.25, 0.6, energy) * tempoScale + uBass * 0.1;
-    float angle = PI * 0.5 + sin(uDynamicTime * sweepSpeed + beamPhase * 2.0) * mix(0.35, 0.70, energy + uFastEnergy * 0.15);
+    float sweepSpeed = mix(0.25, 0.6, energy) * tempoScale * accelSweep + uBass * 0.1;
+    float angle = PI * 0.5 + sin(uDynamicTime * sweepSpeed + beamPhase * 2.0 + pitchSweep) * mix(0.35, 0.70, energy + uFastEnergy * 0.15 + tensionAngle);
     float width = mix(0.03, 0.11, energy) + uMids * 0.04;
 
     float contrastBoost = getContrastForBeam(i) * 0.3;
@@ -105,7 +124,7 @@ void main() {
     float beamVal = beam(p, beamX, angle, width, intensity);
 
     // Beam color
-    float hue = hsvToCosineHue(uPalettePrimary) + uChromaHue * 0.3 + fi * 0.12 + sectionHueShift;
+    float hue = hsvToCosineHue(uPalettePrimary) + uChromaHue * 0.25 + chordHue + fi * 0.12 + sectionHueShift;
     vec3 beamCol = 0.5 + 0.5 * cos(6.28318 * (vec3(hue, hue + 0.33, hue + 0.67)));
 
     // Palette saturation
@@ -120,10 +139,14 @@ void main() {
       beamCol = mix(beamCol, mix(warmWhite, palTint, 0.3), 0.5);
     }
 
-    // Color temperature
+    // Color temperature (with guitar brightness + vocal warmth)
     vec3 warmShift = vec3(1.1, 0.95, 0.85);
     vec3 coolShift = vec3(0.88, 0.95, 1.1);
-    beamCol *= mix(coolShift, warmShift, energy);
+    beamCol *= mix(coolShift, warmShift, energy + guitarBrightness * 0.15);
+    // Vocal warmth on center beams
+    if (i == 3 || i == 4) {
+      beamCol += vec3(0.08, 0.04, 0.0) * vocalWarmth;
+    }
 
     // Directional chromatic aberration on beam color
     beamCol = applyCA(beamCol, vUv, caStrength);
@@ -186,6 +209,16 @@ void main() {
 
   // Drum onset flash (scene-specific)
   col += uDrumOnset * 0.15 * vec3(1.0, 0.95, 0.85);
+
+  // SDF hero icon
+  {
+    float nf = fbm3(vec3(p * 2.0, uDynamicTime * 0.1));
+    float heroHue1 = uPalettePrimary;
+    float heroHue2 = uPaletteSecondary;
+    vec3 c1 = hsv2rgb(vec3(heroHue1, uPaletteSaturation, 1.0));
+    vec3 c2 = hsv2rgb(vec3(heroHue2, uPaletteSaturation, 1.0));
+    col += heroIconEmergence(p, uTime, energy, uBass, c1, c2, nf, uSectionIndex);
+  }
 
   // === POST-PROCESSING (shared chain) ===
   col = applyPostProcess(col, vUv, p);

@@ -10,7 +10,8 @@ import { useCurrentFrame, useVideoConfig } from "remotion";
 import type { EnhancedFrameData, SectionBoundary, ColorPalette } from "../data/types";
 import { findCurrentSection } from "../utils/section-lookup";
 import { computeClimaxState, type ClimaxPhase } from "../utils/climax-state";
-import { computeAudioSnapshot as computeSnapshot, buildBeatArray as buildBeatArrayUtil, computeMusicalTime as computeMusicalTimeUtil, computeSpectralFlux, computeEnergyAcceleration, computeEnergyTrend } from "../utils/audio-reactive";
+import { computeHeroIconState } from "../utils/hero-icon";
+import { computeAudioSnapshot as computeSnapshot, buildBeatArray as buildBeatArrayUtil, computeMusicalTime as computeMusicalTimeUtil, computeSpectralFlux, computeEnergyAcceleration, computeEnergyTrend, computeEnergyForecast, computePeakApproaching, computeBeatStability } from "../utils/audio-reactive";
 import { energyGate } from "../utils/math";
 
 /** Audio data context passed to all Three.js children */
@@ -79,6 +80,22 @@ export interface AudioDataContext {
     energyTrend: number;
     /** Per-frame local tempo (BPM, smoothed from analysis data) */
     localTempo: number;
+    /** Melodic pitch (0-1 MIDI-normalized) */
+    melodicPitch: number;
+    /** Melodic direction: +1 rising, -1 falling, 0 steady */
+    melodicDirection: number;
+    /** Chord index (0-23: 12 major + 12 minor), discrete */
+    chordIndex: number;
+    /** Harmonic tension: rate of chord change (0-1) */
+    harmonicTension: number;
+    /** Section type encoded as float (0-7) */
+    sectionTypeFloat: number;
+    /** Energy forecast: smoothed future energy (0-1) */
+    energyForecast: number;
+    /** Peak approaching: 0-1 ramp when energy rising toward peak */
+    peakApproaching: number;
+    /** Beat stability: 0-1 consistency of beat spacing */
+    beatStability: number;
   };
   /** Per-song palette primary hue (0-1 normalized) */
   palettePrimary: number;
@@ -94,6 +111,10 @@ export interface AudioDataContext {
   climaxPhase: number;
   /** Climax intensity (0-1) within current phase */
   climaxIntensity: number;
+  /** Hero icon trigger: 1.0 when active during climax peaks, 0.0 otherwise */
+  heroTrigger: number;
+  /** Hero icon progress: 0-1 lifecycle intensity */
+  heroProgress: number;
   /** Jam density: normalized 0-1 from jam evolution system (0.5 = neutral) */
   jamDensity: number;
   /** Coherence: 0-1 band lock-in score */
@@ -239,6 +260,14 @@ function colorAfterglowHue(frames: EnhancedFrameData[], idx: number, decayFrames
 
 // buildBeatArray and computeMusicalTime are imported from ../utils/audio-reactive
 
+/** Encode section type string to float 0-7 for shader consumption */
+const SECTION_TYPE_MAP: Record<string, number> = {
+  intro: 0, verse: 1, chorus: 2, bridge: 3, solo: 4, jam: 5, outro: 6, space: 7,
+};
+function encodeSectionType(sectionType: string): number {
+  return SECTION_TYPE_MAP[sectionType] ?? 5; // default to "jam"
+}
+
 interface Props {
   frames: EnhancedFrameData[];
   children: React.ReactNode;
@@ -342,6 +371,7 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
   const climaxEnergy = smoothValue(frames, idx, (f) => f.rms, 60);
   const climaxState = computeClimaxState(frames, idx, sectionList, climaxEnergy);
   const climaxPhaseNum = phaseMap[climaxState.phase];
+  const heroIcon = computeHeroIconState(climaxPhaseNum, climaxState.intensity);
 
   const pal = palette ?? DEFAULT_PALETTE;
   // Energy-driven hue evolution: quiet = base palette, peak = +30° shift
@@ -349,6 +379,16 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
   const palettePrimary = pal.primary / 360 + energyHueShift;
   const paletteSecondary = pal.secondary / 360 + energyHueShift;
   const paletteSaturation = pal.saturation ?? 1;
+
+  // New audio snapshot fields — smoothed for shader consumption
+  const melodicPitch = smoothValue(frames, idx, (f) => f.melodicPitch ?? 0, 8);
+  const melodicDirection = smoothValue(frames, idx, (f) => f.melodicDirection ?? 0, 5);
+  const chordIndex = frames[idx].chordIndex ?? 0; // discrete, no smoothing
+  const harmonicTension = smoothValue(frames, idx, (f) => f.harmonicTension ?? 0, 15);
+  const sectionTypeFloat = encodeSectionType(frames[idx].sectionType ?? "jam");
+  const energyForecast = computeEnergyForecast(frames, idx);
+  const peakApproaching = computePeakApproaching(frames, idx);
+  const beatStabilityVal = computeBeatStability(frames, idx);
 
   const audioData: AudioDataContext = {
     frame: fd,
@@ -387,6 +427,14 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
       energyAcceleration: computeEnergyAcceleration(frames, idx),
       energyTrend: computeEnergyTrend(frames, idx),
       localTempo: smoothValue(frames, idx, (f) => f.localTempo ?? (tempo ?? 120), 30),
+      melodicPitch,
+      melodicDirection,
+      chordIndex,
+      harmonicTension,
+      sectionTypeFloat,
+      energyForecast,
+      peakApproaching,
+      beatStability: beatStabilityVal,
     },
     palettePrimary,
     paletteSecondary,
@@ -395,6 +443,8 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
     musicalTime: computeMusicalTimeUtil(beatArray, idx, fps, tempo ?? 120),
     climaxPhase: climaxPhaseNum,
     climaxIntensity: climaxState.intensity,
+    heroTrigger: heroIcon.trigger,
+    heroProgress: heroIcon.progress,
     jamDensity: jamDensity ?? 0.5,
     coherence: coherenceProp ?? 0,
     isLocked: isLockedProp ?? false,

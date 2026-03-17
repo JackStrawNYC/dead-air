@@ -670,4 +670,57 @@ vec3 iconEmergence(vec2 uv, float time, float energy, float bass,
   vec3 iconColor = mix(col1, col2, 0.5 + 0.5 * sin(time * 0.3));
   return iconColor * (glow * 0.5 + edge * 1.2);
 }
+
+// --- Hero Icon Emergence: fullscreen SDF icon at climax peaks ---
+// 1.2x viewport scale (vs 0.4x for regular iconEmergence).
+// Gated by uHeroIconTrigger + uHeroIconProgress uniforms.
+// Includes chromatic fringe for prismatic edge effect.
+vec3 heroIconEmergence(vec2 uv, float time, float energy, float bass,
+                       vec3 col1, vec3 col2, float noiseField, float sectionIndex) {
+  float gate = uHeroIconTrigger * uHeroIconProgress;
+  if (gate < 0.01) return vec3(0.0);
+
+  // Slow rotation
+  float angle = time * 0.04;
+  float ca = cos(angle); float sa = sin(angle);
+  vec2 rotUv = vec2(ca * uv.x - sa * uv.y, sa * uv.x + ca * uv.y);
+
+  // Full-screen scale: 1.2x viewport radius
+  float pulse = 1.0 + bass * 0.3;
+  vec2 scaledUv = rotUv / (1.2 * pulse);
+
+  // Select icon based on section index
+  float iconType = mod(sectionIndex, 4.0);
+  float d;
+  if (iconType < 1.0) {
+    d = sdStealie(scaledUv, 1.0);
+  } else if (iconType < 2.0) {
+    d = _ns_sdDancingBear(scaledUv, time * 0.5);
+  } else if (iconType < 3.0) {
+    d = _ns_sdRose(scaledUv);
+  } else {
+    d = _ns_sdSkull(scaledUv, 0.3 + bass * 0.4);
+  }
+
+  // Noise dissolution: stronger at lifecycle edges
+  float dissolveMask = 1.0 - smoothstep(0.3, 0.7, gate);
+  d += noiseField * 0.12 * (0.3 + 0.7 * dissolveMask);
+
+  // Wide glow (softer falloff than regular icon)
+  float glow = 1.0 / (1.0 + d * d * 100.0) * gate;
+
+  // Edge line
+  float edge = smoothstep(0.015, 0.0, abs(d)) * gate;
+
+  // Chromatic fringe: RGB separation along SDF boundary
+  vec3 fringe;
+  fringe.r = smoothstep(0.025, 0.0, abs(d + 0.008));
+  fringe.g = smoothstep(0.025, 0.0, abs(d));
+  fringe.b = smoothstep(0.025, 0.0, abs(d - 0.008));
+  fringe *= gate * 0.5;
+
+  // Color: blend palette with slow oscillation
+  vec3 iconColor = mix(col1, col2, 0.5 + 0.5 * sin(time * 0.2));
+  return iconColor * (glow * 0.8 + edge * 1.8) + fringe * iconColor;
+}
 `;

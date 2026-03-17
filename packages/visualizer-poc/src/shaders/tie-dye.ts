@@ -45,8 +45,9 @@ void main() {
   float warp1 = fbm3(vec3(warpedUv * 2.0 + t * 0.3, t * 0.2));
   float warp2 = fbm3(vec3(warpedUv * 1.5 - t * 0.2, t * 0.15 + 10.0));
 
-  // Spiral pattern
-  float spiral = angle / TAU + r * (3.0 + bassSwirl) + warp1 * 0.8 + t;
+  // Spiral pattern (harmonic tension drives spiral arm count)
+  float armCount = 3.0 + uHarmonicTension * 2.0;
+  float spiral = angle / TAU + r * (armCount + bassSwirl) + warp1 * 0.8 + t;
   float bands = sin(spiral * TAU * 3.0 + warp2 * TAU) * 0.5 + 0.5;
 
   // Radial rings
@@ -60,10 +61,11 @@ void main() {
   float hueRange = mod(uPaletteSecondary - uPalettePrimary + 0.5, 1.0) - 0.5;
   float hue = hueBase + pattern * hueRange + warp1 * 0.1;
 
-  // Chroma hue influence
-  hue = mix(hue, uChromaHue, 0.15);
+  // Chroma hue influence + chord shift
+  float chordHue = float(int(uChordIndex)) / 24.0 * 0.15;
+  hue = mix(hue, uChromaHue, 0.15) + chordHue;
 
-  float sat = 0.7 + pattern * 0.25;
+  float sat = 0.7 + pattern * 0.25 + uVocalEnergy * 0.12;
   sat *= uPaletteSaturation;
 
   float val = 0.25 + pattern * 0.35 + uEnergy * 0.25;
@@ -73,6 +75,27 @@ void main() {
   // === FABRIC TEXTURE: ridged noise for creases and folds ===
   float fabric = ridged4(vec3(warpedUv * 3.0, uDynamicTime * 0.05));
   color *= 0.85 + fabric * 0.3; // darken creases, brighten ridges
+
+  // === FOLD-LINE SDF: sharp tie-dye boundaries where fabric was tied ===
+  // Radial fold lines from center with energy-driven bleeding
+  {
+    float foldCount = 6.0;
+    float foldAngle = mod(angle * foldCount / TAU, 1.0);
+    // Sharp fold boundary (SDF of angular fold lines)
+    float foldSDF = abs(foldAngle - 0.5) * 2.0;
+    // Energy drives bleeding width: quiet = razor-sharp folds, loud = dye bleeds
+    float bleedWidth = 0.05 + clamp(uEnergy, 0.0, 1.0) * 0.15;
+    float foldEdge = smoothstep(bleedWidth, bleedWidth * 0.3, foldSDF);
+    // Concentric ring folds (where rubber bands were)
+    float ringFold = abs(sin(r * 8.0 + warp1 * 2.0));
+    float ringEdge = smoothstep(bleedWidth * 1.5, bleedWidth * 0.5, ringFold);
+    // Darken at fold boundaries (dye concentrates where fabric was tied)
+    float foldDarken = max(foldEdge, ringEdge) * 0.25;
+    color *= 1.0 - foldDarken;
+    // Color bleed: shift hue at fold boundaries
+    float hueShift = foldEdge * 0.08 + ringEdge * 0.05;
+    color = hsv2rgb(vec3(fract(hue + hueShift), sat, dot(color, vec3(0.299, 0.587, 0.114))));
+  }
 
   // === SDF STEALIE: emerges from the tie-dye swirl ===
   {

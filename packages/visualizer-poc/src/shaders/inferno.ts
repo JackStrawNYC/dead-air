@@ -77,7 +77,7 @@ float flameSDF(vec3 p, float bass, float highs, float onset) {
 
   // Noise displacement for fire shape
   vec3 np = p * 1.5;
-  np.y -= uDynamicTime * (1.2 + bass * 0.8);  // rise speed from bass
+  np.y -= uDynamicTime * (1.2 + bass * 0.8 + flamePitchHeight) * accelUpdraft;  // rise speed from bass + pitch + accel
   // Onset churns domain
   np.xy += onset * 0.3 * vec2(
     sin(p.z * 3.0 + uDynamicTime * 2.0),
@@ -91,6 +91,7 @@ float flameSDF(vec3 p, float bass, float highs, float onset) {
 
 void main() {
   vec2 uv = vUv;
+  uv = applyCameraCut(uv, uOnsetSnap, uBeatSnap, uEnergy, uCoherence, uClimaxPhase, uMusicalTime, uSectionIndex);
   vec2 aspect = vec2(uResolution.x / uResolution.y, 1.0);
   vec2 p = (uv - 0.5) * aspect;
 
@@ -99,6 +100,30 @@ void main() {
   float highs = clamp(uHighs, 0.0, 1.0);
   float onset = clamp(uOnsetSnap, 0.0, 1.0);
   float slowE = clamp(uSlowEnergy, 0.0, 1.0);
+
+  // --- Phase 1: New uniform integrations ---
+  // Vocal warmth tint in flame body
+  float vocalWarmth = uVocalEnergy * 0.15;
+  // Vocal presence drives inner glow spotlight
+  float vocalSpot = uVocalPresence * 0.2;
+  // Guitar drives tertiary flame activity
+  float guitarFlame = uOtherEnergy * 0.3;
+  // Guitar brightness shifts flame temperature
+  float guitarTemp = uOtherCentroid;
+  // Energy acceleration drives updraft speed
+  float accelUpdraft = 1.0 + uEnergyAccel * 0.25;
+  // Melodic pitch drives flame height
+  float flamePitchHeight = uMelodicPitch * 0.3;
+  // Melodic direction: flame lean
+  float flameLean = uMelodicDirection * 0.15;
+  // Harmonic tension: turbulence
+  float tensionTurb = uHarmonicTension * 0.4;
+  // Beat stability: regular fire vs chaotic
+  float fireRegularity = uBeatStability;
+  // Chroma hue modulation
+  float chromaHueMod = uChromaHue * 0.25;
+  // Chord hue shift
+  float chordHue = float(int(uChordIndex)) / 24.0 * 0.15;
 
   // === CLIMAX REACTIVITY ===
   float climaxPhase = uClimaxPhase;
@@ -119,10 +144,12 @@ void main() {
   vec3 camDir = normalize(vec3(shimmerUv.x * 0.8, 1.0, shimmerUv.y * 0.8));
 
   // === FLAME COLORS from palette ===
-  float hue1 = hsvToCosineHue(uPalettePrimary);
+  float hue1 = hsvToCosineHue(uPalettePrimary) + chromaHueMod + chordHue;
   vec3 flameColor = 0.5 + 0.5 * cos(6.28318 * vec3(hue1, hue1 + 0.33, hue1 + 0.67));
   // Warm bias: blend toward fire orange but let palette tint through
   flameColor = mix(flameColor, vec3(1.0, 0.5, 0.1), 0.25);
+  // Vocal warmth tint
+  flameColor += vec3(0.08, 0.04, 0.0) * vocalWarmth;
 
   float hue2 = hsvToCosineHue(uPaletteSecondary);
   vec3 coreColor = 0.5 + 0.5 * cos(6.28318 * vec3(hue2, hue2 + 0.33, hue2 + 0.67));
@@ -213,6 +240,14 @@ void main() {
   float fireLightStr = (0.06 + energy * 0.12) * (0.70 + fireNoise1 * 0.30);
   fireLightStr *= 1.0 + bass * 0.10;
   col += warmBase * fireLightStr;
+
+  // SDF hero icon
+  {
+    float nf = fbm3(vec3(p * 2.0, uDynamicTime * 0.1));
+    vec3 c1 = hsv2rgb(vec3(hue1, uPaletteSaturation, 1.0));
+    vec3 c2 = hsv2rgb(vec3(hue2, uPaletteSaturation, 1.0));
+    col += heroIconEmergence(p, uTime, energy, bass, c1, c2, nf, uSectionIndex);
+  }
 
   // === VIGNETTE (strong — fire falls off dramatically at edges) ===
   float vigScale = mix(0.49, 0.34, energy);

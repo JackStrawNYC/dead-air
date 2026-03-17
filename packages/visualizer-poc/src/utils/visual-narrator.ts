@@ -1,0 +1,175 @@
+/**
+ * Visual Narrator — synthesizes show arc + song identity + section + groove
+ * into a unified NarrativeDirective that shapes all visual systems.
+ *
+ * The narrator answers: "What should this moment look and feel like?"
+ * by combining:
+ *   - Show-level pacing (set 1 warmth → set 2 depth → encore party)
+ *   - Song identity (from song-identities.ts)
+ *   - Section type (verse/chorus/jam/space/solo)
+ *   - Groove state (pocket/driving/floating/freeform)
+ *   - Jam cycle phase (explore/build/peak/release)
+ *
+ * Returns small additive modifiers that compose with existing systems.
+ */
+
+import type { GrooveType } from "./groove-detector";
+import type { JamCyclePhase } from "./jam-cycles";
+
+export interface NarrativeDirective {
+  /** Overlay density multiplier (0-2) */
+  overlayDensityMult: number;
+  /** Saturation offset (-0.3 to +0.3) */
+  saturationOffset: number;
+  /** Brightness offset (-0.2 to +0.2) */
+  brightnessOffset: number;
+  /** Color temperature: -1 cool, 0 neutral, +1 warm */
+  temperature: number;
+  /** Abstraction level: 0 = representational (overlays), 1 = pure geometry (shaders only) */
+  abstractionLevel: number;
+  /** Hero event permission: whether fullscreen hero icons should fire */
+  heroPermitted: boolean;
+  /** Motion multiplier for drift/camera speed */
+  motionMult: number;
+}
+
+export interface NarrativeContext {
+  /** Set number (1, 2, 3=encore) */
+  setNumber: number;
+  /** Position within set (0-1) */
+  setProgress: number;
+  /** Current section type from analysis */
+  sectionType?: string;
+  /** Current groove classification */
+  grooveType?: GrooveType;
+  /** Current jam cycle phase (if in a jam section) */
+  jamPhase?: JamCyclePhase;
+  /** Whether jam is deepening (successive peaks climbing) */
+  jamDeepening?: boolean;
+  /** Current smoothed energy (0-1) */
+  energy: number;
+  /** Whether this is a Drums/Space section */
+  isDrumsSpace?: boolean;
+}
+
+/** Base narrative from show-level pacing */
+function showArcDirective(setNumber: number, setProgress: number): Partial<NarrativeDirective> {
+  if (setNumber === 1) {
+    // Set 1: warm opening, build familiarity
+    return {
+      temperature: 0.3 - setProgress * 0.2,
+      overlayDensityMult: 1.1 - setProgress * 0.2,
+      abstractionLevel: 0.2 + setProgress * 0.3,
+      saturationOffset: 0,
+      brightnessOffset: 0.02,
+    };
+  }
+  if (setNumber === 2) {
+    // Set 2: deep exploration, maximum abstraction mid-set
+    const abstractionPeak = 1 - Math.abs(setProgress - 0.5) * 2;
+    return {
+      temperature: -0.1,
+      overlayDensityMult: 0.6 + setProgress * 0.4,
+      abstractionLevel: 0.4 + abstractionPeak * 0.5,
+      saturationOffset: -0.03,
+      brightnessOffset: 0,
+    };
+  }
+  // Encore: party mode, full energy
+  return {
+    temperature: 0.5,
+    overlayDensityMult: 1.4,
+    abstractionLevel: 0.1,
+    saturationOffset: +0.1,
+    brightnessOffset: +0.05,
+  };
+}
+
+/** Drums/Space override: near-void, floating */
+function drumsSpaceDirective(): NarrativeDirective {
+  return {
+    overlayDensityMult: 0.1,
+    saturationOffset: -0.15,
+    brightnessOffset: -0.08,
+    temperature: -0.6,
+    abstractionLevel: 0.9,
+    heroPermitted: false,
+    motionMult: 0.3,
+  };
+}
+
+const DEFAULT: NarrativeDirective = {
+  overlayDensityMult: 1.0,
+  saturationOffset: 0,
+  brightnessOffset: 0,
+  temperature: 0,
+  abstractionLevel: 0.5,
+  heroPermitted: true,
+  motionMult: 1.0,
+};
+
+/**
+ * Compute the narrative directive for the current moment.
+ */
+export function computeNarrativeDirective(ctx: NarrativeContext): NarrativeDirective {
+  // Drums/Space override
+  if (ctx.isDrumsSpace) return drumsSpaceDirective();
+
+  // Start from show arc
+  const arc = showArcDirective(ctx.setNumber, ctx.setProgress);
+  const result: NarrativeDirective = { ...DEFAULT, ...arc, heroPermitted: true, motionMult: 1.0 };
+
+  // Section type modulation
+  if (ctx.sectionType === "space") {
+    result.overlayDensityMult *= 0.3;
+    result.saturationOffset -= 0.1;
+    result.motionMult *= 0.4;
+    result.heroPermitted = false;
+  } else if (ctx.sectionType === "jam") {
+    result.abstractionLevel = Math.min(1, result.abstractionLevel + 0.2);
+    result.overlayDensityMult *= 0.6;
+  } else if (ctx.sectionType === "chorus") {
+    result.overlayDensityMult *= 1.2;
+    result.saturationOffset += 0.05;
+  } else if (ctx.sectionType === "solo") {
+    result.motionMult *= 1.3;
+    result.saturationOffset += 0.08;
+    result.overlayDensityMult *= 0.5;
+  }
+
+  // Groove modulation
+  if (ctx.grooveType === "floating") {
+    result.temperature -= 0.3;
+    result.motionMult *= 0.4;
+    result.overlayDensityMult *= 0.3;
+  } else if (ctx.grooveType === "driving") {
+    result.motionMult *= 1.3;
+    result.temperature += 0.1;
+  } else if (ctx.grooveType === "freeform") {
+    result.abstractionLevel = Math.min(1, result.abstractionLevel + 0.3);
+  }
+
+  // Jam cycle modulation
+  if (ctx.jamPhase === "peak") {
+    result.saturationOffset += 0.1;
+    result.brightnessOffset += 0.05;
+    result.heroPermitted = true;
+  } else if (ctx.jamPhase === "explore") {
+    result.overlayDensityMult *= 0.5;
+    result.abstractionLevel = Math.min(1, result.abstractionLevel + 0.2);
+    result.heroPermitted = false;
+  } else if (ctx.jamPhase === "build" && ctx.jamDeepening) {
+    result.saturationOffset += 0.05;
+    result.motionMult *= 1.2;
+  }
+
+  // Clamp values
+  result.overlayDensityMult = Math.max(0, Math.min(2, result.overlayDensityMult));
+  result.saturationOffset = Math.max(-0.3, Math.min(0.3, result.saturationOffset));
+  result.brightnessOffset = Math.max(-0.2, Math.min(0.2, result.brightnessOffset));
+  result.temperature = Math.max(-1, Math.min(1, result.temperature));
+  result.abstractionLevel = Math.max(0, Math.min(1, result.abstractionLevel));
+  result.motionMult = Math.max(0.1, Math.min(2, result.motionMult));
+
+  return result;
+}

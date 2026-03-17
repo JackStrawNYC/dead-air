@@ -67,6 +67,10 @@ import { SpectralAnalyzerScene } from "./SpectralAnalyzerScene";
 import { ParticleSwarmScene } from "./ParticleSwarmScene";
 import { CrystallineGrowthScene } from "./CrystallineGrowthScene";
 import { ClimaxSurgeScene } from "./ClimaxSurgeScene";
+import { KaleidoscopeScene } from "./KaleidoscopeScene";
+import { FractalZoomScene } from "./FractalZoomScene";
+import { SacredGeometryScene } from "./SacredGeometryScene";
+import { ReactionDiffusionScene } from "./ReactionDiffusionScene";
 
 // ─── Scene Registry ───
 
@@ -176,6 +180,26 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     energyAffinity: "high",
     complement: "inferno",
   },
+  kaleidoscope: {
+    Component: KaleidoscopeScene,
+    energyAffinity: "mid",
+    complement: "sacred_geometry",
+  },
+  fractal_zoom: {
+    Component: FractalZoomScene,
+    energyAffinity: "any",
+    complement: "kaleidoscope",
+  },
+  sacred_geometry: {
+    Component: SacredGeometryScene,
+    energyAffinity: "low",
+    complement: "kaleidoscope",
+  },
+  reaction_diffusion: {
+    Component: ReactionDiffusionScene,
+    energyAffinity: "mid",
+    complement: "fluid_2d",
+  },
 };
 
 // ─── Transition Affinity Map ───
@@ -203,6 +227,10 @@ export const TRANSITION_AFFINITY: Partial<Record<VisualMode, VisualMode[]>> = {
   particle_swarm: ["cosmic_dust", "particle_nebula", "aurora"],
   crystalline_growth: ["crystal_cavern", "deep_ocean", "aurora"],
   climax_surge: ["inferno", "concert_lighting", "spectral_analyzer"],
+  kaleidoscope: ["tie_dye", "liquid_light", "sacred_geometry"],
+  fractal_zoom: ["kaleidoscope", "crystalline_growth", "cosmic_voyage"],
+  sacred_geometry: ["crystal_cavern", "aurora", "kaleidoscope"],
+  reaction_diffusion: ["fluid_2d", "oil_projector", "liquid_light"],
 };
 
 // ─── Helper functions ───

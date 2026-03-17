@@ -137,7 +137,11 @@ export type VisualMode =
   | "spectral_analyzer"
   | "particle_swarm"
   | "crystalline_growth"
-  | "climax_surge";
+  | "climax_surge"
+  | "kaleidoscope"
+  | "fractal_zoom"
+  | "sacred_geometry"
+  | "reaction_diffusion";
 
 /** Per-section mode override in setlist */
 export interface SectionOverride {
@@ -288,6 +292,8 @@ export interface OverlayEntry {
   energyResponse?: [threshold: number, peak: number, falloff: number];
   /** Quality tier: A=essential, B=good, C=archived (excluded from selection) */
   tier?: "A" | "B" | "C";
+  /** CSS mix-blend-mode for this overlay (default "screen") */
+  blendMode?: "screen" | "overlay" | "multiply" | "soft-light" | "color-dodge" | "luminosity";
 }
 
 /** Summary audio profile computed from a song's analysis frames.

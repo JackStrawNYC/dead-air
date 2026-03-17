@@ -48,7 +48,7 @@ export const FullscreenQuad: React.FC<Props> = ({
   fragmentShader,
   extraUniforms,
 }) => {
-  const { time, beatDecay, smooth, palettePrimary, paletteSecondary, paletteSaturation, tempo, musicalTime, climaxPhase, climaxIntensity, jamDensity, coherence, dynamicTime, isLocked } = useAudioData();
+  const { time, beatDecay, smooth, palettePrimary, paletteSecondary, paletteSaturation, tempo, musicalTime, climaxPhase, climaxIntensity, heroTrigger, heroProgress, jamDensity, coherence, dynamicTime, isLocked } = useAudioData();
   const { width, height } = useVideoConfig();
   const showCtx = useShowContext();
   const eraKey = showCtx?.era ?? "";
@@ -121,6 +121,16 @@ export const FullscreenQuad: React.FC<Props> = ({
       uEnergyTrend: { value: 0 },
       uLocalTempo: { value: 120 },
       uFFTTexture: { value: fftTextureRef.current },
+      uMelodicPitch: { value: 0 },
+      uMelodicDirection: { value: 0 },
+      uChordIndex: { value: 0 },
+      uHarmonicTension: { value: 0 },
+      uSectionType: { value: 5 },
+      uEnergyForecast: { value: 0 },
+      uPeakApproaching: { value: 0 },
+      uBeatStability: { value: 0.5 },
+      uHeroIconTrigger: { value: 0 },
+      uHeroIconProgress: { value: 0 },
       ...extraUniforms,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -178,6 +188,16 @@ export const FullscreenQuad: React.FC<Props> = ({
   uniforms.uEnergyAccel.value = smooth.energyAcceleration;
   uniforms.uEnergyTrend.value = smooth.energyTrend;
   uniforms.uLocalTempo.value = smooth.localTempo;
+  uniforms.uMelodicPitch.value = smooth.melodicPitch;
+  uniforms.uMelodicDirection.value = smooth.melodicDirection;
+  uniforms.uChordIndex.value = smooth.chordIndex;
+  uniforms.uHarmonicTension.value = smooth.harmonicTension;
+  uniforms.uSectionType.value = smooth.sectionTypeFloat;
+  uniforms.uEnergyForecast.value = smooth.energyForecast;
+  uniforms.uPeakApproaching.value = smooth.peakApproaching;
+  uniforms.uBeatStability.value = smooth.beatStability;
+  uniforms.uHeroIconTrigger.value = heroTrigger;
+  uniforms.uHeroIconProgress.value = heroProgress;
 
   const c = smooth.contrast;
 

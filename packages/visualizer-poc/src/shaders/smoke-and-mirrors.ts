@@ -81,13 +81,24 @@ void main() {
 
   float flowTime = uDynamicTime * 0.1;
 
+  // --- Phase 1: New uniform integrations ---
+  float vocalSpot = uVocalPresence * 0.25;     // vocal presence spotlight cone
+  float vocalWarmth = uVocalEnergy * 0.12;      // vocal warmth in fog
+  float trendExpand = uEnergyTrend * 0.04;      // energy trend expansion
+  float tensionTurb = uHarmonicTension * 0.35;  // harmonic tension turbulence
+  float pitchTemp = uMelodicPitch * 0.15;       // melodic pitch fog temperature
+  float peakDesat = uPeakApproaching * 0.15;    // peak approaching desaturation
+  float chromaHueMod = uChromaHue * 0.25;
+  float chordHue = float(int(uChordIndex)) / 24.0 * 0.15;
+
   // === RAY SETUP ===
   vec3 ro = vec3(0.0, 0.0, -2.0);
   vec3 rd = normalize(vec3(dp, 1.5));
 
   // === PALETTE COLORS ===
-  float hue1 = hsvToCosineHue(uPalettePrimary);
+  float hue1 = hsvToCosineHue(uPalettePrimary) + chromaHueMod + chordHue;
   vec3 fogTint = 0.5 + 0.5 * cos(6.28318 * vec3(hue1, hue1 + 0.33, hue1 + 0.67));
+  fogTint += vec3(0.06, 0.03, 0.0) * vocalWarmth; // vocal warmth in fog
   fogTint = mix(fogTint, vec3(0.4, 0.45, 0.5), 0.4); // push toward neutral smoke
 
   float hue2 = hsvToCosineHue(uPaletteSecondary);
@@ -199,6 +210,28 @@ void main() {
     col += mirror1 * (mirrorColor * 0.3 + spec1 * vec3(1.0, 0.98, 0.95) * 0.6 + reflectedFog1);
     col += mirror2 * (mirrorColor * 0.25 + spec2 * vec3(1.0, 0.98, 0.95) * 0.5 + reflectedFog2);
     col += mirror3 * (mirrorColor * 0.2 + spec3 * vec3(1.0, 0.98, 0.95) * 0.4 + reflectedFog3);
+  }
+
+  // === GOD RAYS: secondary in-scatter march from overhead light ===
+  {
+    vec3 lightPos = vec3(0.0 + vocalSpot * 0.3, 1.5, -1.0);
+    vec3 lightDir = normalize(lightPos - ro);
+    float godRayAccum = 0.0;
+    for (int g = 0; g < 12; g++) {
+      float gt = 0.4 + float(g) * 0.25;
+      vec3 gpos = ro + rd * gt;
+      vec3 toLightDir = normalize(lightPos - gpos);
+      // Sample fog density along light direction (in-scatter)
+      float lightDensity = smokeDensity(gpos + toLightDir * 0.3, bass, flowTime, energy);
+      float fogDen = smokeDensity(gpos, bass, flowTime, energy);
+      // In-scatter: light where fog is thin along light path but present at sample
+      float inscatter = fogDen * exp(-lightDensity * 3.0);
+      godRayAccum += inscatter * 0.04;
+    }
+    // Vocal spotlight: cone brightens toward vocal presence
+    float spotCone = smoothstep(0.4, 0.0, length(dp - vec2(0.0, 0.2))) * vocalSpot;
+    vec3 rayColor = mix(fogTint * 0.6, vec3(0.9, 0.85, 0.75), 0.3 + pitchTemp);
+    col += rayColor * godRayAccum * (1.0 + spotCone * 2.0 + climaxBoost * 0.5);
   }
 
   // === AMBIENT FOG FLOOR: never pitch black ===

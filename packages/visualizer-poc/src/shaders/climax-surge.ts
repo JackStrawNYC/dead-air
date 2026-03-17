@@ -53,6 +53,7 @@ varying vec2 vUv;
 
 void main() {
   vec2 uv = vUv;
+  uv = applyCameraCut(uv, uOnsetSnap, uBeatSnap, uEnergy, uCoherence, uClimaxPhase, uMusicalTime, uSectionIndex);
   vec2 aspect = vec2(uResolution.x / uResolution.y, 1.0);
   vec2 p = (uv - 0.5) * aspect;
 
@@ -66,6 +67,12 @@ void main() {
   float climaxI = uClimaxIntensity;
   float gate = isClimax * climaxI;
 
+  // --- Phase 1: New uniform integrations ---
+  float forecastRings = uEnergyForecast * 0.15;   // anticipatory ring expansion
+  float peakDesat = uPeakApproaching * 0.12;       // pre-burst desaturation
+  float chromaHueMod = uChromaHue * 0.25;
+  float chordHue = float(int(uChordIndex)) / 24.0 * 0.15;
+
   // Background: hot gradient when climax, dark otherwise
   vec3 bgColor = mix(
     vec3(0.02, 0.01, 0.03),
@@ -75,8 +82,8 @@ void main() {
   vec3 col = bgColor;
 
   // Palette
-  float hue1 = uPalettePrimary;
-  float hue2 = uPaletteSecondary;
+  float hue1 = uPalettePrimary + chromaHueMod + chordHue;
+  float hue2 = uPaletteSecondary + chordHue * 0.5;
   float sat = mix(0.7, 1.0, energy) * uPaletteSaturation;
 
   // Radial distance from center
@@ -166,6 +173,7 @@ void main() {
     vec3 c1 = hsv2rgb(vec3(hue1, sat, 1.0));
     vec3 c2 = hsv2rgb(vec3(hue2, sat, 1.0));
     col += stealieEmergence(p, uTime, energy, bass, c1, c2, nf, uClimaxPhase);
+    col += heroIconEmergence(p, uTime, energy, bass, c1, c2, nf, uSectionIndex);
   }
 
   // Vignette (subtle — this shader should be bright)

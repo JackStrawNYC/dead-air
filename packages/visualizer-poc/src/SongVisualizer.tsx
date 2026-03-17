@@ -66,6 +66,12 @@ import { computeITResponse } from "./utils/it-response";
 import { isSacredSegue, isJamSegmentTitle } from "./data/band-config";
 import { classifyStemSection, detectSolo, computeVocalWarmth, computeGuitarColorTemp } from "./utils/stem-features";
 import type { StemSectionType } from "./utils/stem-features";
+import { getSectionVocabulary } from "./utils/section-vocabulary";
+import { detectGroove, grooveModifiers } from "./utils/groove-detector";
+import { detectJamCycle } from "./utils/jam-cycles";
+import { computeNarrativeDirective } from "./utils/visual-narrator";
+import { endScreenOverlayMult } from "./utils/end-screen-zones";
+import { NowPlaying } from "./components/NowPlaying";
 
 // Extracted sub-components
 import { SongArtLayer } from "./components/song-visualizer/SongArtLayer";
@@ -322,7 +328,43 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
     ? Math.max(0, Math.min(1, (jamEvolution.densityMult - 0.75) / 0.5))
     : 0.5;
 
-  const combinedDensityMult = Math.max(0.75, climaxMod.overlayDensityMult * (jamEvolution.isLongJam ? jamEvolution.densityMult : 1));
+  // ─── Section vocabulary + groove + jam cycles + narrative directive ───
+  const currentSection = sections.find((s) => frameIdx >= s.frameStart && frameIdx < s.frameEnd);
+  const sectionType = f[frameIdx]?.sectionType ?? currentSection?.label;
+  const sectionVocab = getSectionVocabulary(sectionType);
+
+  const groove = detectGroove(
+    audioSnapshot.beatStability,
+    audioSnapshot.drumOnset,
+    audioSnapshot.energy,
+    audioSnapshot.flatness,
+  );
+  const grooveMods = grooveModifiers(groove);
+
+  const jamCycle = currentSection && (sectionType === "jam" || sectionType === "solo" || isDrumsSpace)
+    ? detectJamCycle(f, frameIdx, currentSection.frameStart, currentSection.frameEnd)
+    : null;
+
+  // Set progress: how far through the current set are we?
+  const totalSongsInSet = props.show?.songs.filter((s) => s.set === props.song.set).length ?? 1;
+  const trackNumber = props.song.trackNumber ?? 1;
+  const setProgress = Math.min(1, (trackNumber - 1 + frame / durationInFrames) / totalSongsInSet);
+
+  const narrativeDirective = computeNarrativeDirective({
+    setNumber: props.song.set,
+    setProgress,
+    sectionType,
+    grooveType: groove.type,
+    jamPhase: jamCycle?.phase,
+    jamDeepening: jamCycle?.isDeepening,
+    energy: audioSnapshot.energy,
+    isDrumsSpace,
+  });
+
+  // End screen overlay dimming (last 20s)
+  const endScreenMult = endScreenOverlayMult(frame, durationInFrames);
+
+  const combinedDensityMult = Math.max(0.75, climaxMod.overlayDensityMult * (jamEvolution.isLongJam ? jamEvolution.densityMult : 1) * sectionVocab.overlayDensityMult * narrativeDirective.overlayDensityMult * endScreenMult);
   const opacityMap = opacityMapBase ? applyDensityMult(opacityMapBase, combinedDensityMult, rotationSchedule!) : null;
 
   // ─── Media suppression ───
@@ -386,7 +428,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
       <div style={{ position: "absolute", inset: 0, opacity }}>
         <CameraMotion frames={f} jamEvolution={jamEvolution} bass={audioSnapshot.bass} cameraFreeze={counterpoint.cameraFreeze || itState.cameraLock || introFactor < 0.5} drumsSpacePhase={drumsSpaceState?.subPhase} fastEnergy={audioSnapshot.fastEnergy} vocalPresence={audioSnapshot.vocalPresence} isSolo={soloState.isSolo} soloIntensity={soloState.intensity}>
         <EraGrade>
-        <EnergyEnvelope snapshot={audioSnapshot} climaxMod={climaxMod} jamColorTemp={jamEvolution.isLongJam ? jamEvolution.colorTemperature : undefined} calibration={energyCalibration} counterpointSatMult={counterpoint.saturationMult} setNumber={props.song.set} drumsSpacePhase={drumsSpaceState?.subPhase} showPhase={narrative?.state.showPhase} songIdentity={songIdentity} showArcModifiers={showArcModifiers} itLuminanceLift={itState.luminanceLift} vocalWarmth={vocalWarmth} guitarColorTemp={guitarColorTemp} deadAirFactor={deadAirFactor}>
+        <EnergyEnvelope snapshot={audioSnapshot} climaxMod={climaxMod} jamColorTemp={jamEvolution.isLongJam ? jamEvolution.colorTemperature : undefined} calibration={energyCalibration} counterpointSatMult={counterpoint.saturationMult} setNumber={props.song.set} drumsSpacePhase={drumsSpaceState?.subPhase} showPhase={narrative?.state.showPhase} songIdentity={songIdentity} showArcModifiers={showArcModifiers} itLuminanceLift={itState.luminanceLift} vocalWarmth={vocalWarmth} guitarColorTemp={guitarColorTemp} deadAirFactor={deadAirFactor} narrativeBrightness={narrativeDirective.brightnessOffset + sectionVocab.brightnessOffset} narrativeTemperature={narrativeDirective.temperature + grooveMods.temperatureShift}>
           <div style={{ position: "absolute", inset: 0, opacity: focusState.shaderOpacity * (0.05 + 0.95 * introFactor) }}>
           <SilentErrorBoundary name="SceneRouter">
             {(() => {
@@ -522,6 +564,16 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
             fanReviews={fanReviewsData}
             showSeed={showSeed}
           />
+
+          {!isDeadAir && (
+            <SilentErrorBoundary name="NowPlaying">
+              <NowPlaying
+                title={props.song.title}
+                artist="Grateful Dead"
+                energy={audioSnapshot.energy}
+              />
+            </SilentErrorBoundary>
+          )}
         </EnergyEnvelope>
         </EraGrade>
         </CameraMotion>

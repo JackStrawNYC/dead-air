@@ -78,6 +78,20 @@ uniform float uEraSepia;
 uniform float uBloomThreshold;
 uniform float uLensDistortion;
 
+// ─── Melodic / Harmonic ───
+uniform float uMelodicPitch;
+uniform float uMelodicDirection;
+uniform float uChordIndex;
+uniform float uHarmonicTension;
+uniform float uSectionType;
+uniform float uEnergyForecast;
+uniform float uPeakApproaching;
+uniform float uBeatStability;
+
+// ─── Hero Icon ───
+uniform float uHeroIconTrigger;
+uniform float uHeroIconProgress;
+
 // ─── Spatial ───
 uniform vec2 uResolution;
 uniform vec2 uCamOffset;

@@ -69,7 +69,14 @@ void main() {
   vec2 p = (uv - 0.5) * aspect;
 
   float energy = clamp(uEnergy, 0.0, 1.0);
-  float tempoScale = uTempo / 120.0;
+  float tempoScale = uLocalTempo / 120.0;
+
+  // --- Phase 1: New uniform integrations ---
+  float vocalMerge = uVocalPresence * 0.2;      // vocal presence merges blobs
+  float guitarBlob = uOtherEnergy * 0.25;        // guitar drives tertiary blob
+  float directionConvect = uMelodicDirection * 0.02;  // melodic direction convection
+  float tensionMix = uHarmonicTension * 0.15;    // tension drives blob interface mixing
+  float chordHue = float(int(uChordIndex)) / 24.0 * 0.15;
   float sectionSeed = uSectionIndex * 4.3;
   float t = uDynamicTime * 0.06 * tempoScale; // Oil moves with purpose
 
@@ -85,12 +92,16 @@ void main() {
   // === LAYER 1: Dark warm base (overhead projector glass) ===
   vec3 col = vec3(0.02, 0.015, 0.01);
 
+  // === VERTICAL CONVECTION: bass-driven blob rising (hot oil rises) ===
+  float convectionSpeed = uBass * 0.015 + directionConvect;
+  vec2 convectionOffset = vec2(0.0, -convectionSpeed);
+
   // === LAYER 2: Primary oil blob (largest, slowest — with slow rotation + curl advection) ===
   float orbitAngle1 = uDynamicTime * 0.02;
   vec2 orbit1 = vec2(cos(orbitAngle1), sin(orbitAngle1)) * 0.08;
   // Curl noise advection for organic, fluid blob motion
   orbit1 += curlNoise(vec3(orbit1, uDynamicTime * 0.1)).xy * 0.2;
-  vec3 blob1Pos = vec3(p * 0.5 + orbit1 + vec2(0.0, -uDynamicTime * 0.008), t * 0.3 + sectionSeed);
+  vec3 blob1Pos = vec3(p * 0.5 + orbit1 + convectionOffset + vec2(0.0, -uDynamicTime * 0.008), t * 0.3 + sectionSeed);
   // Warp for organic movement
   float w1x = fbm(blob1Pos + vec3(3.1, 7.2, 0.0));
   float w1y = fbm(blob1Pos + vec3(8.4, 1.9, 0.0));
@@ -126,14 +137,28 @@ void main() {
   vec3 warped3 = vec3(p + vec2(w3x, w3y) * (0.25 + uHighs * 0.1), t * 0.4);
 
   float blob3 = oilBlob(warped3 * 1.0, 0.15);
-  float hue3 = hsvToCosineHue(uPalettePrimary) + 0.5; // Complementary
+  float hue3 = hsvToCosineHue(uPalettePrimary) + 0.5 + chordHue; // Complementary + chord shift
   vec3 col3 = 0.5 + 0.5 * cos(6.28318 * vec3(hue3, hue3 + 0.33, hue3 + 0.67));
-  col3 *= mix(0.28, 0.78, energy);
+  col3 *= mix(0.28, 0.78, energy + guitarBlob);
+
+  // === VOCAL MERGE: blobs merge when vocals are present ===
+  float mergeBlend = vocalMerge;
+  float blob1m = mix(blob1, max(blob1, blob2), mergeBlend);
+  float blob2m = mix(blob2, max(blob2, blob3), mergeBlend);
 
   // === COMPOSITE: additive blending (like real oil projector) ===
-  col += col1 * blob1 * 0.5;
-  col += col2 * blob2 * 0.4;
+  col += col1 * blob1m * 0.5;
+  col += col2 * blob2m * 0.4;
   col += col3 * blob3 * 0.3;
+
+  // === SURFACE TENSION MENISCUS: bright rim at blob edges ===
+  {
+    float edge1 = smoothstep(0.08, 0.02, abs(blob1 - 0.5));
+    float edge2 = smoothstep(0.08, 0.02, abs(blob2 - 0.5));
+    float edge3 = smoothstep(0.08, 0.02, abs(blob3 - 0.5));
+    float meniscus = (edge1 + edge2 * 0.8 + edge3 * 0.6) * 0.08;
+    col += meniscus * vec3(1.0, 0.95, 0.85) * (0.5 + energy * 0.5);
+  }
 
   // === KELVIN-HELMHOLTZ INSTABILITY: wavy mixing at blob interfaces ===
   // Where two blobs of different colors meet, add ridged-noise turbulent mixing

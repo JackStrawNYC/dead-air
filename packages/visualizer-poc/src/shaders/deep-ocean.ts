@@ -74,8 +74,17 @@ void main() {
   float onset = clamp(uOnsetSnap, 0.0, 1.0);
   float slowE = clamp(uSlowEnergy, 0.0, 1.0);
 
+  // --- Phase 1: New uniform integrations ---
+  float vocalBio = uVocalPresence * 0.3;  // vocal presence drives bioluminescence
+  float guitarTemp = uOtherCentroid;       // guitar brightness shifts temperature
+  float trendDrift = uEnergyTrend * 0.03;  // energy trend drifts current
+  float pitchRay = uMelodicPitch * 0.2;   // melodic pitch drives god ray angle
+  float tensionFog = uHarmonicTension * 0.2;  // tension drives fog turbulence
+  float chromaHueMod = uChromaHue * 0.25;
+  float chordHue = float(int(uChordIndex)) / 24.0 * 0.15;
+
   // === WATER COLORS from palette ===
-  float hue1 = hsvToCosineHue(uPalettePrimary);
+  float hue1 = hsvToCosineHue(uPalettePrimary) + chromaHueMod + chordHue;
   vec3 waterColor = 0.5 + 0.5 * cos(6.28318 * vec3(hue1, hue1 + 0.33, hue1 + 0.67));
   // Push towards deep blue-green
   waterColor = mix(waterColor, vec3(0.02, 0.15, 0.25), 0.5);
@@ -148,15 +157,15 @@ void main() {
   rays *= rayFade;
   col += causticColor * rays * 0.25;
 
-  // === DEPTH FOG: clears with energy ===
-  float fogDensity = mix(0.50, 0.18, energy);
+  // === DEPTH FOG: clears with energy (tension adds turbulence) ===
+  float fogDensity = mix(0.50, 0.18, energy) + tensionFog * 0.1;
   float fogNoise = fbm3(vec3(swayUv * 2.0, uDynamicTime * 0.05));
   float fog = fogDensity * (0.5 + fogNoise * 0.5);
   vec3 fogColor = mix(waterColor, causticColor, 0.2) * 0.20;
   col = mix(col, fogColor, fog * 0.6);
 
-  // === BIOLUMINESCENT PARTICLES: active during quiet ===
-  float quietness = smoothstep(0.35, 0.05, energy);
+  // === BIOLUMINESCENT PARTICLES: active during quiet + vocal presence ===
+  float quietness = smoothstep(0.35, 0.05, energy) + vocalBio;
   if (quietness > 0.01) {
     for (int j = 0; j < 6; j++) {
       float fj = float(j);
