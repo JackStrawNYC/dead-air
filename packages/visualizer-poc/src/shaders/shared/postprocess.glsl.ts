@@ -81,7 +81,7 @@ ${
   beatPulseEnabled
     ? `  // Beat pulse: tempo-locked brightness swell
   float bp = beatPulse(uMusicalTime);
-  col *= 1.0 + bp * 0.28 + climaxBoost * bp * 0.12;
+  col *= 1.0 + bp * 0.18 + climaxBoost * bp * 0.08;
 `
     : ""
 }
@@ -90,10 +90,10 @@ ${
     ? `  // Bloom: bright pixel self-illumination (climax-amplified, energy-adaptive)
   {
     float lum = dot(col, vec3(0.299, 0.587, 0.114));
-    float bloomThreshold = mix(0.50, 0.42, energy) + uBloomThreshold - climaxBoost * 0.10${bloomThresholdStr};
-    float bloomAmount = max(0.0, lum - bloomThreshold) * (2.5 + climaxBoost * 1.5);
+    float bloomThreshold = mix(0.58, 0.50, energy) + uBloomThreshold - climaxBoost * 0.06${bloomThresholdStr};
+    float bloomAmount = max(0.0, lum - bloomThreshold) * (1.8 + climaxBoost * 1.0);
     vec3 bloomColor = mix(col, vec3(1.0, 0.98, 0.95), 0.3);
-    vec3 bloom = bloomColor * bloomAmount * (0.35 + climaxBoost * 0.20);
+    vec3 bloom = bloomColor * bloomAmount * (0.25 + climaxBoost * 0.15);
     col = col + bloom - col * bloom; // screen blend
   }
 `
@@ -165,8 +165,8 @@ ${
   {
     float onsetPulse = step(0.5, max(uOnsetSnap, uDrumOnset)) * max(uOnsetSnap, uDrumOnset);
     float onsetLuma = dot(col, vec3(0.299, 0.587, 0.114));
-    col = mix(vec3(onsetLuma), col, 1.0 + onsetPulse * 1.0);
-    col *= 1.0 + onsetPulse * 0.12;
+    col = mix(vec3(onsetLuma), col, 1.0 + onsetPulse * 0.6);
+    col *= 1.0 + onsetPulse * 0.07;
   }
 
   // Lifted blacks (build-phase aware)

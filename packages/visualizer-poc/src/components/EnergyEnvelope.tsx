@@ -79,7 +79,7 @@ export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod,
 
   // ── Multi-field modulations (gentle — felt, not seen) ──
   // Onset: percussive attacks create mild brightness punch
-  const onsetBrightness = snapshot.onsetEnvelope * 0.15;    // +0-15%
+  const onsetBrightness = snapshot.onsetEnvelope * 0.08;    // +0-8% (reduced from 15% to prevent strobe fatigue)
 
   // Era-specific color adjustments (hue shift only — saturation handled by GLSL)
   const eraPreset = getEraPreset(showCtx?.era ?? "");
@@ -91,7 +91,7 @@ export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod,
   //   0.70 × 0.75 = 0.525 effective saturation — too muted.
   const cssGate = factor; // 0 during quiet, 1 during loud (already smoothstep-based)
   const isClimaxPhase = (climaxMod?.brightnessOffset ?? 0) > 0.04;
-  const brightCap = isClimaxPhase ? 1.50 : 1.25;
+  const brightCap = isClimaxPhase ? 1.35 : 1.20;
   const brightness = Math.min(brightCap, 0.96 + factor * 0.24 + onsetBrightness * 0.18 * cssGate + (climaxMod?.brightnessOffset ?? 0) + setTheme.brightnessOffset + (snapshot.fastEnergy ?? 0) * 0.05 * cssGate);
   // Bloom uses slow energy (drift, not pulse) — reduced to prevent white wash
   const bloomOpacity = slowFactor * 0.35 + (climaxMod?.bloomOffset ?? 0) * 0.5 + (snapshot.fastEnergy ?? 0) * 0.05;
