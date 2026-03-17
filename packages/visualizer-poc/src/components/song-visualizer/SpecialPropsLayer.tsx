@@ -7,7 +7,7 @@
  */
 
 import React from "react";
-import { interpolate } from "remotion";
+import { interpolate, useCurrentFrame } from "remotion";
 import { SongTitle } from "../SongTitle";
 import { FilmGrain } from "../FilmGrain";
 import { SongDNA } from "../SongDNA";
@@ -53,9 +53,24 @@ export const SpecialPropsLayer: React.FC<Props> = ({
 }) => {
   const showCtx = useShowContext();
   const eraGrainMult = getEraPreset(showCtx?.era ?? "")?.grainIntensity ?? 1.0;
+  const frame = useCurrentFrame();
+
+  // Dark scrim during intro window — bottom gradient for text readability
+  const SCRIM_HOLD = 600;
+  const SCRIM_FADE = 150;
+  const scrimOpacity = frame < SCRIM_HOLD ? 0.40
+    : frame < SCRIM_HOLD + SCRIM_FADE ? 0.40 * (1 - (frame - SCRIM_HOLD) / SCRIM_FADE)
+    : 0;
 
   return (
     <>
+      {scrimOpacity > 0.01 && (
+        <div style={{
+          position: "absolute", inset: 0, pointerEvents: "none",
+          background: `linear-gradient(to top, rgba(0,0,0,${(scrimOpacity * 0.9).toFixed(3)}) 0%, rgba(0,0,0,${(scrimOpacity * 0.4).toFixed(3)}) 35%, transparent 65%)`,
+          zIndex: 99,
+        }} />
+      )}
       <SongTitle
         title={songTitle}
         setNumber={setNumber}

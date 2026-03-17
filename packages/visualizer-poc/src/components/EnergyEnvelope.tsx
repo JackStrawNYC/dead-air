@@ -11,6 +11,7 @@
  */
 
 import React from "react";
+import { useCurrentFrame } from "remotion";
 import { energyToFactor } from "../utils/energy";
 import type { EnergyCalibration } from "../utils/energy";
 import type { AudioSnapshot } from "../utils/audio-reactive";
@@ -69,6 +70,15 @@ export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod,
   const high = calibration?.loudThreshold;
   const factor = energyToFactor(energy, low, high); // 0 (quiet) → 1 (loud)
   const showCtx = useShowContext();
+  const frame = useCurrentFrame();
+
+  // Intro brightness damping: first ~20s (600 frames) starts much dimmer so art + text dominate.
+  // Ramps from 0.55 → 1.0 over 150 frames (5s) after the hold.
+  const INTRO_HOLD = 600;
+  const INTRO_RAMP = 150;
+  const titleSafe = frame < INTRO_HOLD ? 0.55
+    : frame < INTRO_HOLD + INTRO_RAMP ? 0.55 + 0.45 * ((frame - INTRO_HOLD) / INTRO_RAMP)
+    : 1.0;
 
   // Slow-moving energy for bloom — drifts, doesn't pulse
   const slowFactor = energyToFactor(snapshot.slowEnergy, low, high);
@@ -88,7 +98,7 @@ export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod,
   const cssGate = factor; // 0 during quiet, 1 during loud (already smoothstep-based)
   const isClimaxPhase = (climaxMod?.brightnessOffset ?? 0) > 0.04;
   const brightCap = isClimaxPhase ? 1.50 : 1.25;
-  const brightness = Math.min(brightCap, 0.96 + factor * 0.24 + onsetBrightness * 0.4 * cssGate + (climaxMod?.brightnessOffset ?? 0) + setTheme.brightnessOffset + (snapshot.fastEnergy ?? 0) * 0.12 * cssGate);
+  const brightness = Math.min(brightCap, 0.96 + factor * 0.24 + onsetBrightness * 0.18 * cssGate + (climaxMod?.brightnessOffset ?? 0) + setTheme.brightnessOffset + (snapshot.fastEnergy ?? 0) * 0.05 * cssGate);
   // Bloom uses slow energy (drift, not pulse) — reduced to prevent white wash
   const bloomOpacity = slowFactor * 0.35 + (climaxMod?.bloomOffset ?? 0) * 0.5 + (snapshot.fastEnergy ?? 0) * 0.05;
 
@@ -122,8 +132,8 @@ export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod,
   // Vocal warmth: +15deg hue shift (saturation boost now handled by GLSL)
   const vocalHueShift = (vocalWarmth ?? 0) * 15;
 
-  // Apply phase offsets + song identity + show arc + IT
-  const baseBrightness = Math.min(brightCap, Math.max(0.55, brightness + dsBrightOffset + showBrightOffset + siPaletteBright + arcBrightOffset + itBrightLift));
+  // Apply phase offsets + song identity + show arc + IT + title-safe damping
+  const baseBrightness = Math.min(brightCap, Math.max(0.55, (brightness + dsBrightOffset + showBrightOffset + siPaletteBright + arcBrightOffset + itBrightLift) * titleSafe));
   // During dead air, dim brightness toward 0.55 (minimum floor) and suppress bloom
   const finalBrightness = deadAirFactor > 0
     ? baseBrightness * (1 - deadAirFactor * 0.40)  // dim by up to 40% during dead air

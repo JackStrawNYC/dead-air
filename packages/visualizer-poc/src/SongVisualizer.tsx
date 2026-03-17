@@ -355,6 +355,16 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
     : 0;
   const isDeadAir = deadAirFactor > 0.99;
 
+  // ─── Intro factor: art-forward cold open for first ~20s ───
+  // Segues skip this (previous song's visuals are already running).
+  // 0 = full intro suppression, 1 = engine fully open.
+  const INTRO_HOLD = 600;  // 20s at 30fps — art + text showcase
+  const INTRO_RAMP = 150;  // 5s smooth ramp to full visuals
+  const introFactor = props.segueIn ? 1
+    : frame < INTRO_HOLD ? 0
+    : frame < INTRO_HOLD + INTRO_RAMP ? (frame - INTRO_HOLD) / INTRO_RAMP
+    : 1;
+
   // ─── Fade in/out ───
   // Start fade-out 1 frame before the end of analyzed audio to ensure visuals are fully
   // gone by the time audio ends (analysis rounds up via ceil, creating a +1 frame mismatch)
@@ -374,10 +384,10 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
       <AudioSnapshotProvider snapshot={audioSnapshot}>
       <VisualizerErrorBoundary>
       <div style={{ position: "absolute", inset: 0, opacity }}>
-        <CameraMotion frames={f} jamEvolution={jamEvolution} bass={audioSnapshot.bass} cameraFreeze={counterpoint.cameraFreeze || itState.cameraLock} drumsSpacePhase={drumsSpaceState?.subPhase} fastEnergy={audioSnapshot.fastEnergy} vocalPresence={audioSnapshot.vocalPresence} isSolo={soloState.isSolo} soloIntensity={soloState.intensity}>
+        <CameraMotion frames={f} jamEvolution={jamEvolution} bass={audioSnapshot.bass} cameraFreeze={counterpoint.cameraFreeze || itState.cameraLock || introFactor < 0.5} drumsSpacePhase={drumsSpaceState?.subPhase} fastEnergy={audioSnapshot.fastEnergy} vocalPresence={audioSnapshot.vocalPresence} isSolo={soloState.isSolo} soloIntensity={soloState.intensity}>
         <EraGrade>
         <EnergyEnvelope snapshot={audioSnapshot} climaxMod={climaxMod} jamColorTemp={jamEvolution.isLongJam ? jamEvolution.colorTemperature : undefined} calibration={energyCalibration} counterpointSatMult={counterpoint.saturationMult} setNumber={props.song.set} drumsSpacePhase={drumsSpaceState?.subPhase} showPhase={narrative?.state.showPhase} songIdentity={songIdentity} showArcModifiers={showArcModifiers} itLuminanceLift={itState.luminanceLift} vocalWarmth={vocalWarmth} guitarColorTemp={guitarColorTemp} deadAirFactor={deadAirFactor}>
-          <div style={{ position: "absolute", inset: 0, opacity: focusState.shaderOpacity }}>
+          <div style={{ position: "absolute", inset: 0, opacity: focusState.shaderOpacity * (0.05 + 0.95 * introFactor) }}>
           <SilentErrorBoundary name="SceneRouter">
             {(() => {
               const sceneRouter = <SceneRouter frames={f} sections={sections} song={props.song} tempo={tempo} seed={showSeed} jamDensity={jamDensity} deadAirMode={deadAirFactor > 0 ? "cosmic_dust" : undefined} deadAirFactor={deadAirFactor > 0 ? deadAirFactor : undefined} era={props.show?.era} coherenceIsLocked={coherenceState.isLocked} drumsSpacePhase={drumsSpaceState?.subPhase} usedShaderModes={narrative?.state.usedShaderModes} songIdentity={songIdentity} stemSection={stemSection} />;
@@ -418,7 +428,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
 
           {effectiveSongArt && (
             <SilentErrorBoundary name="SongArt">
-              <SongArtLayer src={staticFile(effectiveSongArt)} suppressionFactor={artSuppressionFactor} hueRotation={hueRotation} energy={audioSnapshot.energy} climaxIntensity={climaxState.intensity} focusOpacity={focusState.artOpacity} segueIn={props.segueIn} artBlendMode={props.song.artBlendMode} />
+              <SongArtLayer src={staticFile(effectiveSongArt)} suppressionFactor={artSuppressionFactor * introFactor} hueRotation={hueRotation} energy={audioSnapshot.energy} climaxIntensity={climaxState.intensity} focusOpacity={focusState.artOpacity} segueIn={props.segueIn} artBlendMode={props.song.artBlendMode} />
             </SilentErrorBoundary>
           )}
 
@@ -437,7 +447,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
           <DynamicOverlayStack
             activeEntries={activeEntries}
             opacityMap={opacityMap}
-            mediaSuppression={mediaSuppression * (1 - deadAirFactor)}
+            mediaSuppression={Math.max(mediaSuppression * (1 - deadAirFactor), 1 - introFactor)}
             hueRotation={hueRotation}
             tempo={tempo}
             palette={props.song.palette}

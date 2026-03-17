@@ -268,6 +268,7 @@ function renderSong(
   analysisPath: string,
   outputPath: string,
   bundlePath: string,
+  adaptiveConcurrency: number,
 ): void {
   const chunksDir = join(SONGS_DIR, `${song.trackId}-chunks`);
   mkdirSync(chunksDir, { recursive: true });
@@ -637,7 +638,7 @@ function main() {
       console.log(`\n[${ (framesRendered / totalFrames * 100).toFixed(0) }%] Rendering: ${song.title} (${song.trackId}) — ${renderFrames} frames${previewMode ? " (PREVIEW)" : ""}`);
 
       const songStart = Date.now();
-      renderSong(song, renderFrames, analysisPath, outputPath, bundlePath);
+      renderSong(song, renderFrames, analysisPath, outputPath, bundlePath, adaptiveConcurrency);
       const songElapsed = (Date.now() - songStart) / 1000;
       const songFps = renderFrames / songElapsed;
 

@@ -189,9 +189,12 @@ export const Root: React.FC = () => {
               show: setlist,
             } satisfies SongVisualizerProps as Record<string, unknown>}
             calculateMetadata={async ({ props }) => {
-              const analysis = loadTrackAnalysis(song.trackId) as { meta?: { totalFrames?: number; sections?: unknown[] } } | null;
+              // Try bundle require first (dev/studio), then fall back to --props (CLI render)
+              let analysis = loadTrackAnalysis(song.trackId) as { meta?: { totalFrames?: number; sections?: unknown[] }; frames?: unknown[] } | null;
+              if (!analysis && (props as Record<string, unknown>).meta && (props as Record<string, unknown>).frames) {
+                analysis = safeParse(FlexibleTrackAnalysisSchema, { meta: (props as Record<string, unknown>).meta, frames: (props as Record<string, unknown>).frames });
+              }
               if (analysis?.meta) {
-                // Validate section overrides against actual section count
                 if (analysis.meta.sections) {
                   validateSectionOverrides(song, analysis.meta.sections.length);
                 }
