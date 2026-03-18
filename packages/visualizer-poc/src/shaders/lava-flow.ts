@@ -174,9 +174,6 @@ void main() {
     col = mix(col, magma, 0.3 * uClimaxIntensity);
   }
 
-  // --- Beat pulse ---
-  float bp = beatPulse(uMusicalTime);
-  col *= 1.0 + bp * 0.12;
 
   // --- SDF icon emergence ---
   {

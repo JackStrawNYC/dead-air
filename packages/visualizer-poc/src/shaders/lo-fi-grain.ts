@@ -104,9 +104,7 @@ void main() {
   float isClimax = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5);
   float climaxBoost = isClimax * uClimaxIntensity;
 
-  // === BEAT PULSE: tempo-locked warm glow (amplified) ===
-  float bp = beatPulse(uMusicalTime);
-  col *= 1.0 + bp * 0.22 + climaxBoost * bp * 0.10;
+  col *= 1.0 + climaxBoost * 0.05;
   col *= 1.0 + uBeatSnap * 0.18;
 
   // Lifted blacks (build-phase-aware: near true black during build for anticipation)

@@ -238,9 +238,7 @@ void main() {
   float ambientFog = 0.12 + slowE * 0.06;
   col += fogTint * ambientFog * (1.0 - fogAlpha);
 
-  // === BEAT PULSE ===
-  float bp = beatPulse(uMusicalTime);
-  col *= 1.0 + bp * 0.22 + climaxBoost * bp * 0.12;
+  col *= 1.0 + climaxBoost * 0.05;
   col *= 1.0 + uBeatSnap * 0.18 * (1.0 + climaxBoost * 0.4);
 
   // === VIGNETTE ===

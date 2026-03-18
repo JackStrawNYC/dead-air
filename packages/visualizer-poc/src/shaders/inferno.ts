@@ -184,9 +184,7 @@ void main() {
   // Add core bloom from emission — secondary palette color in hottest areas
   col += coreColor * pow(emission, 1.5) * 0.8;
 
-  // === BEAT PULSE: tempo-locked flame intensity ===
-  float bp = beatPulse(uMusicalTime);
-  col *= 1.0 + bp * 0.30 + climaxBoost * bp * 0.15;
+  col *= 1.0 + climaxBoost * 0.05;
 
   // === BEAT SNAP: sharp flame flare on transients ===
   col *= 1.0 + uBeatSnap * 0.25 * (1.0 + climaxBoost * 0.5);

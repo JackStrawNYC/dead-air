@@ -169,9 +169,6 @@ void main() {
   // Climax adds extra saturation and edge glow
   col += edgeColor * edgeMask * climaxBoost * 0.3;
 
-  // --- Beat pulse ---
-  float bp = beatPulse(uMusicalTime);
-  col *= 1.0 + bp * 0.12;
 
   // --- SDF icon emergence ---
   {

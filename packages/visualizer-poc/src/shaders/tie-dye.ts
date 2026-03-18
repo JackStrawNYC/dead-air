@@ -116,9 +116,6 @@ void main() {
   // Beat snap — sharp saturation kick on transients
   color *= 1.0 + uBeatSnap * 0.28 * (1.0 + climaxBoost * 0.4);
 
-  // Beat pulse — tempo-locked saturation boost
-  float bp = beatPulse(uMusicalTime);
-  color = mix(color, color * 1.3, bp * 0.35 + climaxBoost * bp * 0.15);
 
   // Vignette
   float vig = 1.0 - smoothstep(0.7, 1.5, r);

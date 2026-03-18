@@ -160,9 +160,6 @@ void main() {
   float climaxBoost = isClimax * uClimaxIntensity;
   col *= 1.0 + climaxBoost * 0.5;
 
-  // --- Beat pulse ---
-  float bp = beatPulse(uMusicalTime);
-  col *= 1.0 + bp * 0.15;
 
   // --- SDF icon emergence ---
   {

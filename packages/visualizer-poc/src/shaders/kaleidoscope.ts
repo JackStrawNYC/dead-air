@@ -198,9 +198,6 @@ void main() {
     col += patternColor * climaxPattern * climaxBoost * 0.3;
   }
 
-  // --- Beat pulse ---
-  float bp = beatPulse(uMusicalTime);
-  col *= 1.0 + bp * 0.15;
 
   // --- SDF icon emergence ---
   {

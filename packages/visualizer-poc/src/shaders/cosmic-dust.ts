@@ -155,9 +155,7 @@ void main() {
   shootTrail *= smoothstep(0.8, 0.0, length(uv - shootDir * 0.3));
   color += shootTrail * uOnsetSnap * 0.8 * (1.0 + climaxBoost * 0.5);
 
-  // Beat: pulse on nebula brightness (amplified + beat snap)
-  float bp = beatPulse(uMusicalTime);
-  color *= 1.0 + bp * 0.20 + climaxBoost * bp * 0.12;
+  color *= 1.0 + climaxBoost * 0.05;
   color *= 1.0 + max(uBeatSnap, uDrumBeat) * 0.20 * (1.0 + climaxBoost * 0.4);
 
   // Vignette — subtle

@@ -108,9 +108,6 @@ void main() {
     col *= 0.7 + uEnergy * 0.6;
   }
 
-  // Beat pulse: brief flash on beat
-  float beatFlash = beatPulse(uMusicalTime) * 0.15;
-  col += vec3(beatFlash);
 
   // Climax boost: extra brightness and saturation
   if (uClimaxPhase > 1.5) {

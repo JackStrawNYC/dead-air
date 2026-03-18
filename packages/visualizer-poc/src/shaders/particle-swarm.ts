@@ -169,9 +169,6 @@ void main() {
   vec3 nebulaColor = hsv2rgb(vec3(hue1 + nebulaVal * 0.1, 0.4, 1.0));
   col += nebulaColor * max(0.0, nebulaVal) * 0.06 * energy;
 
-  // Beat pulse glow
-  float bp = beatPulse(uMusicalTime);
-  col *= 1.0 + bp * 0.15;
 
   // SDF icon emergence
   {

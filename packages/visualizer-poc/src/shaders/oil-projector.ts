@@ -201,9 +201,8 @@ void main() {
   float climaxBoost = isClimax * uClimaxIntensity;
 
   // Blob overlap creates white-hot regions (additive)
-  float bp = beatPulse(uMusicalTime);
   float overlap = blob1 * blob2 * 0.15 + blob2 * blob3 * 0.1 + blob1 * blob3 * 0.1;
-  col += overlap * vec3(1.0, 0.95, 0.85) * energy * (1.0 + bp * 0.35 + climaxBoost * 0.20);
+  col += overlap * vec3(1.0, 0.95, 0.85) * energy * (1.0 + climaxBoost * 0.20);
 
   // === BEAT SNAP: blob brightness pulse ===
   col *= 1.0 + uBeatSnap * 0.25 * (1.0 + climaxBoost * 0.4);
