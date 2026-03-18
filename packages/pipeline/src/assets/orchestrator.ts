@@ -18,6 +18,7 @@ import { searchWikimediaImages, downloadWikimediaImage } from './wikimedia-clien
 import { searchFlickrImages, downloadFlickrImage } from './flickr-client.js';
 import { searchLocImages, downloadLocImage } from './loc-client.js';
 import { searchUcscArchive, downloadCalisphereImage } from './ucsc-archive-client.js';
+import { generateShowSongArt, type SongArtConfig } from './song-art-generator.js';
 
 const log = createLogger('assets:orchestrator');
 
@@ -724,7 +725,57 @@ export async function orchestrateAssetGeneration(
     }
   }
 
-  // 14. Update episode status
+  // 14. Generate per-song art (AI imagery for visualizer backgrounds)
+  if (!skipImages) {
+    try {
+      // Extract song configs from concert_audio segments
+      const songConfigs: SongArtConfig[] = [];
+      for (const seg of script.segments) {
+        if (seg.type === 'concert_audio' && seg.songName) {
+          const songKey = (seg.songName as string).toLowerCase().replace(/[^a-z0-9]/g, '');
+          songConfigs.push({
+            songTitle: seg.songName as string,
+            songKey,
+            palette: seg.visual?.colorPalette
+              ? { primary: parseInt(seg.visual.colorPalette[0], 10) || 0, secondary: parseInt(seg.visual.colorPalette[1], 10) || 180 }
+              : undefined,
+            avgEnergy: seg.visual?.visualIntensity ?? 0.5,
+          });
+        }
+      }
+
+      if (songConfigs.length > 0) {
+        log.info(`Generating song art for ${songConfigs.length} songs...`);
+        const songArtResult = await generateShowSongArt({
+          date: (episode.show_id as string) ?? '',
+          episodeId,
+          songs: songConfigs,
+          replicateToken,
+          xaiApiKey,
+          dataDir,
+          force,
+          concurrency: 2,
+        });
+
+        result.totalCost += songArtResult.totalCost;
+        result.totalAssets += songArtResult.generated + songArtResult.cached;
+        result.cachedAssets += songArtResult.cached;
+
+        logCost(db, {
+          episodeId,
+          operation: 'song-art',
+          service: 'replicate',
+          cost: songArtResult.totalCost,
+        });
+
+        log.info(`Song art: ${songArtResult.generated} generated, ${songArtResult.cached} cached, $${songArtResult.totalCost.toFixed(4)}`);
+      }
+    } catch (err) {
+      log.warn(`Song art generation error: ${(err as Error).message}`);
+    }
+  }
+
+  // 15. Update episode status
   const finalStatus =
     result.narrations.length === 0 && narrationKeys.length > 0
       ? 'failed'

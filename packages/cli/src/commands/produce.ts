@@ -37,6 +37,12 @@ export function registerProduceCommand(program: Command): void {
       'claude-sonnet-4-5-20250929',
     )
     .option('--lambda', 'Use AWS Lambda for rendering')
+    .option('--gl <renderer>', 'GL renderer: angle (GPU) or swiftshader (CPU)', 'angle')
+    .option('--render-concurrency <n>', 'Max parallel segment renders', parseInt)
+    .option('--frame-concurrency <n>', 'Parallel frame renders per segment', parseInt)
+    .option('--preview', 'Render at 720p for fast iteration')
+    .option('--no-cache', 'Skip analysis cache')
+    .option('--analysis-concurrency <n>', 'Parallel librosa analysis workers', parseInt)
     .action(
       async (
         date: string,
@@ -47,6 +53,12 @@ export function registerProduceCommand(program: Command): void {
           force?: boolean;
           model?: string;
           lambda?: boolean;
+          gl?: string;
+          renderConcurrency?: number;
+          frameConcurrency?: number;
+          preview?: boolean;
+          cache?: boolean;
+          analysisConcurrency?: number;
         },
       ) => {
         if (!isValidDate(date)) {
@@ -143,6 +155,8 @@ export function registerProduceCommand(program: Command): void {
               date,
               db,
               dataDir: config.paths.data,
+              noCache: options.cache === false,
+              analysisConcurrency: options.analysisConcurrency,
             });
             console.log(`  Segments: ${result.segmentCount} songs`);
             console.log(`  Duration: ${Math.round(result.totalDurationSec / 60)} min`);
@@ -232,7 +246,10 @@ export function registerProduceCommand(program: Command): void {
               episodeId,
               db,
               dataDir: config.paths.data,
-              concurrency: config.remotion.concurrency,
+              concurrency: options.renderConcurrency ?? config.remotion.concurrency,
+              frameConcurrency: options.frameConcurrency,
+              gl: (options.gl as 'angle' | 'swiftshader') ?? undefined,
+              preview: options.preview,
               lambda: options.lambda,
               lambdaRegion: config.aws.region,
             });

@@ -11,6 +11,7 @@ import { registerAnalyzeCommand } from './commands/analyze.js';
 import { registerResearchCommand } from './commands/research.js';
 import { registerScriptCommand } from './commands/script.js';
 import { registerGenerateAssetsCommand } from './commands/generate-assets.js';
+import { registerBatchCommand } from './commands/batch.js';
 
 const program = new Command();
 
@@ -36,5 +37,6 @@ registerProduceCommand(program);
 registerPreviewCommand(program);
 registerPublishCommand(program);
 registerStatusCommand(program);
+registerBatchCommand(program);
 
 program.parse();

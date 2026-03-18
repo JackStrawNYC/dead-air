@@ -1,5 +1,5 @@
 import type Database from 'better-sqlite3';
-import { existsSync, mkdirSync, writeFileSync, readdirSync } from 'fs';
+import { existsSync, mkdirSync, writeFileSync, readdirSync, readFileSync } from 'fs';
 import { resolve, extname } from 'path';
 import { createLogger } from '@dead-air/core';
 import type {
@@ -10,8 +10,15 @@ import type {
   SetlistSong,
 } from '@dead-air/core';
 import { getAudioInfo, detectSilence, splitAtBoundaries } from './ffmpeg.js';
-import { analyzeWithLibrosa, toSongAnalysis } from './librosa-sidecar.js';
+import { analyzeWithLibrosa, analyzeWithEnhancedLibrosaAsync, toSongAnalysis } from './librosa-sidecar.js';
+import type { EnhancedAnalysisOutput } from './librosa-sidecar.js';
 import type { ExecutionMode } from './docker-runner.js';
+import {
+  computeAnalysisCacheKey,
+  checkAnalysisCache,
+  loadAnalysisCache,
+  storeAnalysisCache,
+} from './analysis-cache.js';
 import {
   matchPreSegmentedFiles,
   buildSegmentsFromSilence,
@@ -28,6 +35,10 @@ export interface AnalyzeOptions {
   silenceThresholdDb?: number;
   skipLibrosa?: boolean;
   mode?: ExecutionMode;
+  /** Skip analysis cache (force re-analysis) */
+  noCache?: boolean;
+  /** Number of parallel analysis workers (default: 2) */
+  analysisConcurrency?: number;
 }
 
 export interface AnalyzeResult {
@@ -63,6 +74,8 @@ export async function orchestrateAnalysis(
     silenceThresholdDb = -35,
     skipLibrosa = false,
     mode,
+    noCache = false,
+    analysisConcurrency = 2,
   } = options;
 
   // 1. Look up show in DB
@@ -75,7 +88,12 @@ export async function orchestrateAnalysis(
     );
   }
 
-  const metadata = JSON.parse((show.metadata as string) ?? '{}');
+  let metadata: Record<string, unknown> = {};
+  try {
+    metadata = JSON.parse((show.metadata as string) ?? '{}');
+  } catch {
+    log.warn(`Corrupt metadata for show ${date}, using defaults`);
+  }
   const audioDir = resolve(dataDir, 'audio', date);
 
   if (!existsSync(audioDir)) {
@@ -97,7 +115,7 @@ export async function orchestrateAnalysis(
   if (show.setlist) {
     setlist = JSON.parse(show.setlist as string);
   } else if (metadata.archiveOrgDescription) {
-    setlist = parseSetlistFromDescription(metadata.archiveOrgDescription);
+    setlist = parseSetlistFromDescription(metadata.archiveOrgDescription as string);
   }
 
   // 4. Build song segments
@@ -141,29 +159,132 @@ export async function orchestrateAnalysis(
     segments = await matchPreSegmentedFiles(
       audioFiles,
       setlist,
-      metadata.archiveOrgDescription,
+      metadata.archiveOrgDescription as string | undefined,
     );
   }
 
   log.info(`${segments.length} song segments identified`);
 
-  // 5. Run librosa analysis on each segment
+  // Ensure analysis directory exists early (enhanced analysis writes per-track files)
+  const analysisDir = resolve(dataDir, 'analysis', date);
+  if (!existsSync(analysisDir)) {
+    mkdirSync(analysisDir, { recursive: true });
+  }
+
+  // 5. Run librosa analysis on each segment (with caching + parallelism)
   const perSongAnalysis: SongAnalysisData[] = [];
+  const enhancedResults: Map<string, EnhancedAnalysisOutput> = new Map();
 
   if (!skipLibrosa) {
-    for (let i = 0; i < segments.length; i++) {
-      const seg = segments[i];
-      log.info(
-        `Analyzing ${i + 1}/${segments.length}: ${seg.songName}`,
-      );
-      try {
-        const output = analyzeWithLibrosa(seg.filePath, undefined, mode);
-        perSongAnalysis.push(toSongAnalysis(seg.songName, output));
-      } catch (err) {
-        log.error(
-          `Failed to analyze ${seg.songName}: ${(err as Error).message}`,
-        );
+    const stemsBaseDir = resolve(dataDir, 'stems', date);
+
+    // Analyze a single segment (used by both sequential fallback and parallel pool)
+    async function analyzeSingleSegment(
+      seg: SongSegment,
+      index: number,
+    ): Promise<{ songName: string; enhanced?: EnhancedAnalysisOutput; coarse?: SongAnalysisData }> {
+      const segStemsDir = existsSync(resolve(stemsBaseDir, seg.songName))
+        ? resolve(stemsBaseDir, seg.songName)
+        : undefined;
+
+      // Check analysis cache
+      if (!noCache) {
+        const cacheKey = computeAnalysisCacheKey(seg.filePath, {
+          stems: segStemsDir ?? null,
+          type: 'enhanced',
+        });
+        const cached = checkAnalysisCache(dataDir, cacheKey);
+        if (cached.hit) {
+          const enhanced = loadAnalysisCache<EnhancedAnalysisOutput>(cached.filePath);
+          if (enhanced) {
+            log.info(`  [${index + 1}/${segments.length}] ${seg.songName} — cached`);
+            const coarse = toSongAnalysis(seg.songName, {
+              ok: true,
+              durationSec: enhanced.meta.duration,
+              tempo: [enhanced.meta.tempo],
+              energy: enhanced.frames.map((f) => (f.rms as number) ?? 0.2),
+              onsets: enhanced.frames
+                .map((f, idx) => (f.onset as number) > 0.5 ? idx / 30 : -1)
+                .filter((t) => t >= 0),
+              key: undefined,
+            });
+            return { songName: seg.songName, enhanced, coarse };
+          }
+          log.warn(`  [${index + 1}/${segments.length}] ${seg.songName} — cache corrupted, re-analyzing`);
+        }
       }
+
+      log.info(`  [${index + 1}/${segments.length}] ${seg.songName} — analyzing...`);
+
+      try {
+        const enhanced = await analyzeWithEnhancedLibrosaAsync(seg.filePath, segStemsDir, mode);
+
+        // Write full-resolution enhanced analysis
+        const trackAnalysisPath = resolve(analysisDir, `${seg.songName.replace(/[^a-zA-Z0-9]/g, '_')}-analysis.json`);
+        writeFileSync(trackAnalysisPath, JSON.stringify(enhanced));
+        log.info(`  [${index + 1}/${segments.length}] ${seg.songName} — ${enhanced.meta.totalFrames} frames`);
+
+        // Store in cache
+        if (!noCache) {
+          const cacheKey = computeAnalysisCacheKey(seg.filePath, {
+            stems: segStemsDir ?? null,
+            type: 'enhanced',
+          });
+          storeAnalysisCache(dataDir, cacheKey, enhanced);
+        }
+
+        const coarse = toSongAnalysis(seg.songName, {
+          ok: true,
+          durationSec: enhanced.meta.duration,
+          tempo: [enhanced.meta.tempo],
+          energy: enhanced.frames.map((f) => (f.rms as number) ?? 0.2),
+          onsets: enhanced.frames
+            .map((f, idx) => (f.onset as number) > 0.5 ? idx / 30 : -1)
+            .filter((t) => t >= 0),
+          key: undefined,
+        });
+
+        return { songName: seg.songName, enhanced, coarse };
+      } catch (enhancedErr) {
+        log.warn(`Enhanced analysis failed, falling back to basic: ${(enhancedErr as Error).message}`);
+        try {
+          const output = analyzeWithLibrosa(seg.filePath, undefined, mode);
+          return { songName: seg.songName, coarse: toSongAnalysis(seg.songName, output) };
+        } catch (err) {
+          log.error(`Failed to analyze ${seg.songName}: ${(err as Error).message}`);
+          return { songName: seg.songName };
+        }
+      }
+    }
+
+    // Parallel analysis with worker pool
+    const concurrency = Math.max(1, Math.min(analysisConcurrency, segments.length));
+    log.info(`Analysis: ${segments.length} segments, ${concurrency} parallel workers${noCache ? ' (cache disabled)' : ''}`);
+
+    const queue = segments.map((seg, i) => ({ seg, index: i }));
+    const results: Array<{ songName: string; enhanced?: EnhancedAnalysisOutput; coarse?: SongAnalysisData }> = [];
+
+    async function processQueue(): Promise<void> {
+      while (queue.length > 0) {
+        const item = queue.shift()!;
+        const result = await analyzeSingleSegment(item.seg, item.index);
+        results.push(result);
+      }
+    }
+
+    const workers = Array.from({ length: concurrency }, () => processQueue());
+    await Promise.all(workers);
+
+    // Sort results back to original order and collect
+    results.sort((a, b) => {
+      const idxA = segments.findIndex((s) => s.songName === a.songName);
+      const idxB = segments.findIndex((s) => s.songName === b.songName);
+      return idxA - idxB;
+    });
+
+    for (const result of results) {
+      if (result.enhanced) enhancedResults.set(result.songName, result.enhanced);
+      if (result.coarse) perSongAnalysis.push(result.coarse);
     }
   } else {
     log.info('Skipping librosa analysis (--skip-librosa)');
@@ -189,10 +310,6 @@ export async function orchestrateAnalysis(
   };
 
   // 8. Write JSON output
-  const analysisDir = resolve(dataDir, 'analysis', date);
-  if (!existsSync(analysisDir)) {
-    mkdirSync(analysisDir, { recursive: true });
-  }
   const analysisPath = resolve(analysisDir, 'analysis.json');
   writeFileSync(analysisPath, JSON.stringify(analysis, null, 2));
 

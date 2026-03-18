@@ -1,6 +1,10 @@
 export { buildCompositionProps } from './composition-builder.js';
 export type { EpisodeProps, SegmentProps, BuildOptions } from './composition-builder.js';
 
+export { matchSongName } from './song-matcher.js';
+export { resolveImages, resolveArchivalImages, interleaveArchival, padImages } from './image-resolver.js';
+export { findConcertAudio, findEnergyData, findOnsetFrames, findSpectralCentroid, findMusicBounds, findSmartExcerptStart, findColdOpenMoment } from './audio-lookup.js';
+
 export { renderEpisodeOnLambda } from './lambda-renderer.js';
 export type { LambdaRenderOptions, LambdaRenderResult } from './lambda-renderer.js';
 

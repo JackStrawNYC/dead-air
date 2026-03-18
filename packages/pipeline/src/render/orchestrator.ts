@@ -12,6 +12,9 @@ export interface RenderPipelineOptions {
   db: Database.Database;
   dataDir: string;
   concurrency?: number;
+  frameConcurrency?: number;
+  gl?: 'angle' | 'swiftshader';
+  preview?: boolean;
   skipPost?: boolean;
   dryRun?: boolean;
   lambda?: boolean;
@@ -33,6 +36,7 @@ export async function orchestrateRender(
 ): Promise<RenderPipelineResult> {
   const {
     episodeId, db, dataDir, concurrency = 4,
+    frameConcurrency, gl, preview = false,
     skipPost = false, dryRun = false,
     lambda = false, lambdaRegion, skipDeploy = false,
   } = options;
@@ -78,12 +82,15 @@ export async function orchestrateRender(
     renderCost = lambdaResult.cost;
     log.info(`Lambda render: ${lambdaResult.lambdasInvoked} lambdas, $${renderCost.toFixed(4)}`);
   } else {
-    log.info(`Step 2/4: Rendering locally (scene-by-scene, ${props.segments.length} segments, concurrency ${concurrency})...`);
+    log.info(`Step 2/4: Rendering locally (scene-by-scene, ${props.segments.length} segments${preview ? ', preview mode' : ''})...`);
     await renderScenes({
       props,
       dataDir,
       segmentIndex: 'all',
       concurrency,
+      frameConcurrency,
+      gl,
+      preview,
       force: false,
     });
     log.info('Step 2.5/4: Concatenating scenes...');

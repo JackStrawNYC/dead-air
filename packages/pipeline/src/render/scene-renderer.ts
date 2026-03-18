@@ -1,9 +1,9 @@
-import { resolve } from 'path';
-import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync, renameSync } from 'fs';
+import { resolve, dirname } from 'path';
+import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync, renameSync, symlinkSync, mkdtempSync, rmSync } from 'fs';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { createHash } from 'crypto';
-import { cpus } from 'os';
+import { cpus, freemem, tmpdir } from 'os';
 import { createLogger } from '@dead-air/core';
 import type { EpisodeProps } from './composition-builder.js';
 
@@ -171,6 +171,8 @@ export interface SceneRenderOptions {
   changedOnly?: boolean;
   /** Force re-render even if hash matches */
   force?: boolean;
+  /** Preview mode: render at 720p (scale 0.667) for fast iteration */
+  preview?: boolean;
 }
 
 export interface SceneRenderResult {
@@ -326,12 +328,73 @@ function buildMiniProps(
 }
 
 /**
- * Bundle the Remotion project once and return the serve URL.
- * Cached for reuse across all segment renders.
- * Composition selection happens per-segment in renderSingleSegment
- * since each mini-composition has different inputProps.
+ * Collect all asset file paths referenced in composition props.
+ * Paths are relative to dataDir.
  */
-async function bundleOnce(dataDir: string): Promise<string> {
+function collectAssetPaths(props: EpisodeProps): Set<string> {
+  const paths = new Set<string>();
+
+  // Composition-level audio
+  if (props.bgmSrc) paths.add(props.bgmSrc);
+  if (props.ambientBedSrc) paths.add(props.ambientBedSrc);
+  if (props.tensionDroneSrc) paths.add(props.tensionDroneSrc);
+
+  // Per-segment paths
+  for (const seg of props.segments) {
+    if ('audioSrc' in seg && seg.audioSrc) paths.add(seg.audioSrc as string);
+    if ('images' in seg && Array.isArray(seg.images)) {
+      for (const img of seg.images as string[]) paths.add(img);
+    }
+    if ('image' in seg && seg.image) paths.add(seg.image as string);
+    if ('media' in seg && seg.media) paths.add(seg.media as string);
+    if ('foleySrc' in seg && seg.foleySrc) paths.add(seg.foleySrc as string);
+    if ('concertBedSrc' in seg && seg.concertBedSrc) paths.add(seg.concertBedSrc as string);
+    if ('ambientAudioSrc' in seg && seg.ambientAudioSrc) paths.add(seg.ambientAudioSrc as string);
+    if ('ambientSrc' in seg && seg.ambientSrc) paths.add(seg.ambientSrc as string);
+  }
+
+  return paths;
+}
+
+/**
+ * Create a lightweight staging directory with symlinks to only the assets
+ * referenced in the composition props. Avoids bundling the entire dataDir
+ * (which can be 18GB+) as Remotion's publicDir.
+ */
+function createStagingDir(dataDir: string, props: EpisodeProps): string {
+  const stagingDir = mkdtempSync(resolve(tmpdir(), 'dead-air-stage-'));
+  const assetPaths = collectAssetPaths(props);
+
+  let linked = 0;
+  for (const relPath of assetPaths) {
+    const srcPath = resolve(dataDir, relPath);
+    if (!existsSync(srcPath)) continue;
+
+    const destPath = resolve(stagingDir, relPath);
+    const destDir = dirname(destPath);
+    if (!existsSync(destDir)) mkdirSync(destDir, { recursive: true });
+
+    try {
+      symlinkSync(srcPath, destPath);
+      linked++;
+    } catch {
+      // Symlink may fail if already exists or permission issue — non-critical
+    }
+  }
+
+  log.info(`Staging dir: ${linked} assets linked (avoiding full ${dataDir})`);
+  return stagingDir;
+}
+
+/**
+ * Bundle the Remotion project once and return the serve URL.
+ * Uses a staging directory with symlinks to avoid bundling the full dataDir.
+ * Returns { serveUrl, stagingDir } so caller can clean up.
+ */
+async function bundleOnce(
+  dataDir: string,
+  props: EpisodeProps,
+): Promise<{ serveUrl: string; stagingDir: string }> {
   const { bundle } = await import('@remotion/bundler');
 
   const entryPoint = resolve(
@@ -339,11 +402,13 @@ async function bundleOnce(dataDir: string): Promise<string> {
     '..', '..', '..', 'remotion', 'src', 'entry.ts',
   );
 
+  const stagingDir = createStagingDir(dataDir, props);
+
   log.info('Bundling Remotion project (once)...');
-  const serveUrl = await bundle({ entryPoint, publicDir: dataDir });
+  const serveUrl = await bundle({ entryPoint, publicDir: stagingDir });
   log.info('Bundle ready.');
 
-  return serveUrl;
+  return { serveUrl, stagingDir };
 }
 
 /**
@@ -357,6 +422,7 @@ async function renderChunk(
   outputPath: string,
   frameConcurrency: number,
   gl: 'angle' | 'swiftshader',
+  scale: number = 1,
 ): Promise<void> {
   const { renderMedia, selectComposition } = await import('@remotion/renderer');
 
@@ -371,13 +437,14 @@ async function renderChunk(
     composition,
     serveUrl,
     codec: 'h264',
-    crf: 18,
+    crf: scale < 1 ? 23 : 18, // Lower quality for preview
     outputLocation: outputPath,
     inputProps: miniProps as unknown as Record<string, unknown>,
     concurrency: frameConcurrency,
     everyNthFrame: 1,
     frameRange: [chunkStart, chunkEnd],
     timeoutInMilliseconds: 120_000,
+    scale,
     chromiumOptions: {
       disableWebSecurity: true,
       gl,
@@ -398,6 +465,7 @@ async function renderSingleSegment(
   serveUrl: string,
   frameConcurrency: number,
   gl: 'angle' | 'swiftshader',
+  scale: number = 1,
 ): Promise<SceneRenderResult> {
   const seg = props.segments[segIndex];
   const segType = seg.type;
@@ -431,7 +499,7 @@ async function renderSingleSegment(
 
   if (targetFrames <= MAX_FRAMES_PER_CHUNK) {
     // Small segment — render directly in one pass
-    await renderChunk(serveUrl, miniProps, startFrame, endFrame - 1, outputPath, frameConcurrency, gl);
+    await renderChunk(serveUrl, miniProps, startFrame, endFrame - 1, outputPath, frameConcurrency, gl, scale);
   } else {
     // Large segment — split into chunks to avoid Chrome OOM
     const numChunks = Math.ceil(targetFrames / MAX_FRAMES_PER_CHUNK);
@@ -446,7 +514,7 @@ async function renderSingleSegment(
       chunkPaths.push(chunkPath);
 
       log.info(`  [${paddedIdx}]   chunk ${c + 1}/${numChunks}: frames ${chunkStart}-${chunkEnd} (${chunkFrames}f)`);
-      await renderChunk(serveUrl, miniProps, chunkStart, chunkEnd, chunkPath, frameConcurrency, gl);
+      await renderChunk(serveUrl, miniProps, chunkStart, chunkEnd, chunkPath, frameConcurrency, gl, scale);
       log.info(`  [${paddedIdx}]   chunk ${c + 1}/${numChunks} ✓`);
     }
 
@@ -509,11 +577,12 @@ async function renderWithConcurrency(
   force: boolean,
   frameConcurrency: number,
   gl: 'angle' | 'swiftshader',
+  scale: number = 1,
 ): Promise<SceneRenderResult[]> {
-  // Bundle once, reuse for all segments
-  const serveUrl = await bundleOnce(dataDir);
+  // Bundle once with staging dir, reuse for all segments
+  const { serveUrl, stagingDir } = await bundleOnce(dataDir, props);
 
-  log.info(`Render config: ${concurrency} segment workers × ${frameConcurrency} frame threads, GL: ${gl}`);
+  log.info(`Render config: ${concurrency} segment workers × ${frameConcurrency} frame threads, GL: ${gl}${scale < 1 ? `, scale: ${scale} (preview)` : ''}`);
 
   // Load or create checkpoint
   let checkpoint = loadCheckpoint(dataDir, props.episodeId);
@@ -537,7 +606,7 @@ async function renderWithConcurrency(
   async function processNext(): Promise<void> {
     while (queue.length > 0) {
       const idx = queue.shift()!;
-      const result = await renderSingleSegment(props, idx, dataDir, force, serveUrl, frameConcurrency, gl);
+      const result = await renderSingleSegment(props, idx, dataDir, force, serveUrl, frameConcurrency, gl, scale);
       results.push(result);
 
       // Update checkpoint after each successful segment
@@ -552,8 +621,9 @@ async function renderWithConcurrency(
   const workers = Array.from({ length: Math.min(concurrency, queue.length) }, () => processNext());
   await Promise.all(workers);
 
-  // All segments complete — clear checkpoint
+  // All segments complete — clear checkpoint and staging dir
   clearCheckpoint(dataDir, props.episodeId);
+  try { rmSync(stagingDir, { recursive: true, force: true }); } catch { /* ignore */ }
 
   return results.sort((a, b) => a.segmentIndex - b.segmentIndex);
 }
@@ -562,17 +632,37 @@ async function renderWithConcurrency(
  * Render episode segments individually, then concat into final video.
  */
 export async function renderScenes(options: SceneRenderOptions): Promise<SceneRenderResult[]> {
-  const { props, dataDir, segmentIndex, changedOnly = false, force = false } = options;
+  const { props, dataDir, segmentIndex, changedOnly = false, force = false, preview = false } = options;
   const gl = options.gl ?? 'angle';
+  const scale = preview ? 0.667 : 1;
 
-  // ANGLE (GPU): frameConcurrency MUST be 1 — multiple GPU tabs deadlock on shared-memory Apple Silicon.
-  // SwiftShader (CPU): can use multiple frame threads safely, auto-computed from available cores.
+  // Auto-tune concurrency based on CPU cores and available memory
   const numCpus = cpus().length;
-  const concurrency = options.concurrency ?? (gl === 'angle' ? 2 : 4);
-  const frameConcurrency = options.frameConcurrency
-    ?? (gl === 'angle' ? 1 : Math.min(4, Math.max(1, Math.floor(numCpus / concurrency))));
+  const freeMemGB = freemem() / (1024 * 1024 * 1024);
+  let concurrency: number;
+  let frameConcurrency: number;
+
+  if (options.concurrency != null) {
+    concurrency = options.concurrency;
+  } else if (gl === 'angle') {
+    // GPU: memory-based — each Chrome tab with GPU uses ~4GB
+    concurrency = Math.max(1, Math.min(4, Math.floor(freeMemGB / 4)));
+  } else {
+    // SwiftShader (CPU): core-based
+    concurrency = Math.max(1, Math.min(6, Math.floor(numCpus / 2)));
+  }
+
+  if (options.frameConcurrency != null) {
+    frameConcurrency = options.frameConcurrency;
+  } else if (gl === 'angle') {
+    // ANGLE: frameConcurrency MUST be 1 — multiple GPU tabs deadlock on shared-memory Apple Silicon.
+    frameConcurrency = 1;
+  } else {
+    frameConcurrency = Math.min(4, Math.max(1, Math.floor(numCpus / concurrency)));
+  }
 
   log.info(`=== Scene-by-scene render: ${props.episodeId} (${props.segments.length} segments) ===`);
+  log.info(`Auto-tune: ${numCpus} CPUs, ${freeMemGB.toFixed(1)}GB free RAM → ${concurrency} workers × ${frameConcurrency} frame threads`);
 
   let indices: number[];
   if (segmentIndex === 'all') {
@@ -596,7 +686,7 @@ export async function renderScenes(options: SceneRenderOptions): Promise<SceneRe
     }
   }
 
-  const results = await renderWithConcurrency(props, indices, dataDir, concurrency, force, frameConcurrency, gl);
+  const results = await renderWithConcurrency(props, indices, dataDir, concurrency, force, frameConcurrency, gl, scale);
 
   const rendered = results.filter((r) => !r.skipped);
   const skipped = results.filter((r) => r.skipped);
