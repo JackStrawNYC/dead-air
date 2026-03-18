@@ -172,32 +172,6 @@ vec3 filmGrain(vec2 uv, float grainTime) {
   return n * vec3(1.0, 0.95, 0.85);
 }
 
-// --- S-curve color grading: hue-preserving tone mapping ---
-// Over-bright pixels become MORE SATURATED, not white.
-// Dark pixels get lifted to visible color during peaks (stage flood lights).
-vec3 sCurveGrade(vec3 col, float energy) {
-  // Hue-preserving normalization: scale down to 0-1 keeping color ratios
-  float maxC = max(col.r, max(col.g, col.b));
-  float excess = 0.0;
-  if (maxC > 1.0) {
-    excess = min(maxC - 1.0, 3.0);
-    col /= maxC; // preserve hue — (3.0, 0.5, 0.1) → (1.0, 0.17, 0.03) stays RED
-  }
-  col = max(col, vec3(0.0));
-  // S-curve: lifts shadows, compresses highlights, punches mids
-  vec3 curved = col * col * (3.0 - 2.0 * col);
-  float amount = mix(0.3, 0.6, energy);
-  col = mix(col, curved, amount);
-  // Highlight rolloff
-  col = 1.0 - exp(-col * (1.2 + energy * 0.3));
-  // Convert excess brightness to SATURATION BOOST (psychedelic color)
-  if (excess > 0.0) {
-    float luma = dot(col, vec3(0.299, 0.587, 0.114));
-    col = mix(vec3(luma), col, 1.0 + excess * 0.6);
-  }
-  return col;
-}
-
 // --- HSV to RGB conversion (standard) ---
 // Previously duplicated in 5+ shaders; now shared.
 vec3 hsv2rgb(vec3 c) {
@@ -326,7 +300,8 @@ vec3 cinematicGrade(vec3 col, float energy) {
   // Gentle contrast + era saturation: GLSL owns all color grading.
   // uEraSaturation plumbed from era data (default 1.0 for no era).
   float luma = dot(col, vec3(0.2126, 0.7152, 0.0722));
-  float contrast = mix(0.95, 1.06, energy);
+  float contrast = mix(0.95, 1.15, energy);
+  contrast *= 1.0 + uHarmonicTension * 0.08;
   col = mix(vec3(luma), col, contrast * uEraSaturation);
   return col;
 }
@@ -722,5 +697,35 @@ vec3 heroIconEmergence(vec2 uv, float time, float energy, float bass,
   // Color: blend palette with slow oscillation
   vec3 iconColor = mix(col1, col2, 0.5 + 0.5 * sin(time * 0.2));
   return iconColor * (glow * 0.8 + edge * 1.8) + fringe * iconColor;
+}
+
+// --- RGB to HSV conversion ---
+vec3 rgb2hsv(vec3 c) {
+  vec4 K = vec4(0.0, -1.0/3.0, 2.0/3.0, -1.0);
+  vec4 p = mix(vec4(c.bg, K.wz), vec4(c.gb, K.xy), step(c.b, c.g));
+  vec4 q = mix(vec4(p.xyw, c.r), vec4(c.r, p.yzx), step(p.x, c.r));
+  float d = q.x - min(q.w, q.y);
+  float e = 1.0e-10;
+  return vec3(abs(q.z + (q.w - q.y) / (6.0 * d + e)), d / (q.x + e), q.x);
+}
+
+// --- Palette Cycling: rotates all hues via RGB→HSV→rotate→HSV→RGB ---
+// speed: rotation speed (radians per unit time)
+vec3 paletteCycle(vec3 col, float speed) {
+  vec3 hsv = rgb2hsv(col);
+  hsv.x = fract(hsv.x + speed);
+  return hsv2rgb(hsv);
+}
+
+// --- Thermal Shimmer: heat-haze UV displacement ---
+// Returns displaced UV coordinates. Call at the start of post-processing.
+// Vertical bias (heat rises), layered sine waves.
+vec2 thermalShimmer(vec2 uv, float time, float energy, vec2 resolution) {
+  float intensity = energy * 0.003;
+  float wave1 = sin(uv.y * resolution.y * 0.05 + time * 3.0) * intensity;
+  float wave2 = sin(uv.y * resolution.y * 0.12 + time * 5.0 + 1.5) * intensity * 0.5;
+  float wave3 = sin(uv.x * resolution.x * 0.03 + time * 2.0) * intensity * 0.3;
+  // Vertical bias: displacement is primarily horizontal (heat shimmer)
+  return uv + vec2(wave1 + wave2, wave3 * 0.3);
 }
 `;

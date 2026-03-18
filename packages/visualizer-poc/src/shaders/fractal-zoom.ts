@@ -15,7 +15,7 @@ precision highp float;
 
 ${sharedUniformsGLSL}
 ${noiseGLSL}
-${buildPostProcessGLSL({ grainStrength: 'normal', bloomEnabled: true })}
+${buildPostProcessGLSL({ grainStrength: 'normal', bloomEnabled: true, anaglyphEnabled: true })}
 
 varying vec2 vUv;
 
@@ -47,7 +47,7 @@ vec3 fractalPalette(float t, float hueShift) {
 
 void main() {
   // Determine iteration count: 96 during climax, 64 normally
-  int maxIter = uIsClimax > 0.5 ? 96 : 64;
+  int maxIter = uClimaxPhase > 1.5 ? 96 : 64;
 
   // Zoom level: continuous exponential zoom
   float zoomSpeed = 0.1 * mix(1.0, -1.0, step(0.0, -uMelodicDirection));
@@ -109,11 +109,11 @@ void main() {
   }
 
   // Beat pulse: brief flash on beat
-  float beatFlash = uBeatPulse * 0.15;
+  float beatFlash = beatPulse(uMusicalTime) * 0.15;
   col += vec3(beatFlash);
 
   // Climax boost: extra brightness and saturation
-  if (uIsClimax > 0.5) {
+  if (uClimaxPhase > 1.5) {
     col *= 1.3;
     vec3 gray2 = vec3(dot(col, vec3(0.299, 0.587, 0.114)));
     col = mix(gray2, col, 1.4);

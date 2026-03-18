@@ -83,6 +83,10 @@ void main() {
   float curlSpeed = 0.15 + uSlowEnergy * 0.1;
   vec2 vel = curlVelocity(p * curlScale, t * curlSpeed) * 0.3;
 
+  // Harmonic tension: turbulence (cross-frequency curl perturbation)
+  float turbulence = uHarmonicTension * 0.15;
+  vel += curlVelocity(p * curlScale * 2.3 + 7.1, t * curlSpeed * 1.7) * turbulence;
+
   // Section variation: rotate velocity field per section
   float sectionAngle = uSectionIndex * 0.7;
   float ca = cos(sectionAngle);
@@ -114,13 +118,18 @@ void main() {
   vel += vec2(cos(musAngle), sin(musAngle)) * 0.005;
 
   // ─── Advection: read previous frame at velocity-offset position ───
-  float dt = 0.016; // ~1 frame timestep at 60fps
+  float dt = 1.0 / 30.0; // Fixed timestep for 30fps rendering
+
+  // MacCormack advection correction: forward + backward sampling
   vec2 advectedUV = uv - vel * dt;
-
-  // Clamp to screen bounds to prevent edge artifacts
   advectedUV = clamp(advectedUV, vec2(0.001), vec2(0.999));
+  vec3 forwardSample = texture2D(uPrevFrame, advectedUV).rgb;
 
-  vec3 prevColor = texture2D(uPrevFrame, advectedUV).rgb;
+  // Backward correction step (improves advection accuracy)
+  vec2 backUV = advectedUV + vel * dt;
+  backUV = clamp(backUV, vec2(0.001), vec2(0.999));
+  vec3 backSample = texture2D(uPrevFrame, backUV).rgb;
+  vec3 prevColor = forwardSample + 0.5 * (texture2D(uPrevFrame, uv).rgb - backSample);
 
   // ─── Diffusion: 5-tap blur of advected color ───
   // Higher energy = faster diffusion (wider blur kernel)
@@ -143,6 +152,28 @@ void main() {
 
   // Blend cardinal and diagonal samples
   diffused = mix(diffused, diagSamples, 0.3);
+
+  // ─── Vorticity confinement: amplify rotational structures ───
+  // Prevents diffusion from killing all the interesting swirls
+  float vortL = length(texture2D(uPrevFrame, clamp(advectedUV + vec2(-diff, 0.0), 0.001, 0.999)).rgb);
+  float vortR = length(texture2D(uPrevFrame, clamp(advectedUV + vec2(diff, 0.0), 0.001, 0.999)).rgb);
+  float vortD = length(texture2D(uPrevFrame, clamp(advectedUV + vec2(0.0, -diff), 0.001, 0.999)).rgb);
+  float vortU = length(texture2D(uPrevFrame, clamp(advectedUV + vec2(0.0, diff), 0.001, 0.999)).rgb);
+  vec2 vortGrad = vec2(vortR - vortL, vortU - vortD);
+  float vortLen = length(vortGrad);
+  if (vortLen > 0.001) {
+    vec2 vortDir = normalize(vortGrad);
+    // Perpendicular force amplifies rotation
+    vec2 vortForce = vec2(-vortDir.y, vortDir.x) * 0.02 * energy;
+    diffused.rg += vortForce * 0.5;
+  }
+
+  // ─── Buoyancy: bright areas rise ───
+  float brightness = dot(diffused, vec3(0.299, 0.587, 0.114));
+  float buoyancy = (brightness - 0.3) * 0.02 * energy;
+  vec2 buoyUV = advectedUV + vec2(0.0, buoyancy * dt);
+  buoyUV = clamp(buoyUV, vec2(0.001), vec2(0.999));
+  diffused = mix(diffused, texture2D(uPrevFrame, buoyUV).rgb, 0.15);
 
   // ─── Decay: slowly fade to prevent infinite accumulation ───
   // Faster decay at low energy (fluid dissipates when quiet)
@@ -182,6 +213,17 @@ void main() {
   float tertiaryHue = hsvToCosineHue(uPalettePrimary + 0.5);
   vec3 tertiaryColor = 0.5 + 0.5 * cos(6.28318 * (tertiaryHue + vec3(0.0, 0.33, 0.67)));
 
+  // Melodic pitch injection: orbiting point driven by pitch Y offset
+  float pitchY = uMelodicPitch * 0.4 - 0.2; // -0.2 to +0.2 vertical offset
+  vec2 melodyPos = vec2(
+    cos(t * 0.4 + uChordIndex * 3.0) * 0.35,
+    pitchY + sin(t * 0.35) * 0.15
+  );
+  float melodyMask = smoothstep(injectRadius * 0.6, 0.0, length(p - melodyPos));
+  float melodyInject = onsetTrigger * melodyMask * 0.5;
+  float melodyHue = uChordIndex + uChromaHue * 0.2;
+  vec3 melodyColor = 0.5 + 0.5 * cos(6.28318 * (melodyHue + vec3(0.0, 0.33, 0.67)));
+
   // ─── Compose: blend diffused fluid with injections ───
   vec3 col = diffused;
 
@@ -193,6 +235,9 @@ void main() {
 
   // Tertiary injection (edge, beat-driven)
   col += tertiaryColor * beatInject * edgeMask * 0.3;
+
+  // Melody injection (orbiting, pitch-driven)
+  col = mix(col, melodyColor, melodyInject * 0.35);
 
   // Vocal warmth: gentle warm tint when vocals are present
   float vocalWarmth = uVocalEnergy * uVocalPresence * 0.05;

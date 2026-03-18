@@ -31,7 +31,7 @@ ${sharedUniformsGLSL}
 
 ${noiseGLSL}
 
-${buildPostProcessGLSL({ halationEnabled: false, caEnabled: true })}
+${buildPostProcessGLSL({ halationEnabled: false, caEnabled: true, anaglyphEnabled: true })}
 
 varying vec2 vUv;
 

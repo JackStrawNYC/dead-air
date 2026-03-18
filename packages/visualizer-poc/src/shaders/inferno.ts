@@ -32,7 +32,7 @@ ${sharedUniformsGLSL}
 
 ${noiseGLSL}
 
-${buildPostProcessGLSL({ halationEnabled: true, bloomThresholdOffset: -0.10, stageFloodEnabled: false })}
+${buildPostProcessGLSL({ halationEnabled: true, bloomThresholdOffset: -0.10, stageFloodEnabled: false, thermalShimmerEnabled: true })}
 
 varying vec2 vUv;
 
@@ -64,7 +64,7 @@ float flameFBM(vec3 p, float bassAmp, float detailAmp) {
 }
 
 // --- Flame SDF: stretched sphere with noise displacement ---
-float flameSDF(vec3 p, float bass, float highs, float onset) {
+float flameSDF(vec3 p, float bass, float highs, float onset, float flamePitchHeight, float accelUpdraft) {
   // Bass stretches flame wider and flatter
   vec3 q = p;
   q.x += bass * 0.3 * sin(uDynamicTime * 1.5); // lateral flame lean
@@ -104,22 +104,10 @@ void main() {
   // --- Phase 1: New uniform integrations ---
   // Vocal warmth tint in flame body
   float vocalWarmth = uVocalEnergy * 0.15;
-  // Vocal presence drives inner glow spotlight
-  float vocalSpot = uVocalPresence * 0.2;
-  // Guitar drives tertiary flame activity
-  float guitarFlame = uOtherEnergy * 0.3;
-  // Guitar brightness shifts flame temperature
-  float guitarTemp = uOtherCentroid;
   // Energy acceleration drives updraft speed
   float accelUpdraft = 1.0 + uEnergyAccel * 0.25;
   // Melodic pitch drives flame height
   float flamePitchHeight = uMelodicPitch * 0.3;
-  // Melodic direction: flame lean
-  float flameLean = uMelodicDirection * 0.15;
-  // Harmonic tension: turbulence
-  float tensionTurb = uHarmonicTension * 0.4;
-  // Beat stability: regular fire vs chaotic
-  float fireRegularity = uBeatStability;
   // Chroma hue modulation
   float chromaHueMod = uChromaHue * 0.25;
   // Chord hue shift
@@ -170,7 +158,7 @@ void main() {
     if (t > MAX_DIST) break;
 
     vec3 pos = camPos + camDir * t;
-    float d = flameSDF(pos, bass, highs, max(onset, uDrumOnset));
+    float d = flameSDF(pos, bass, highs, max(onset, uDrumOnset), flamePitchHeight, accelUpdraft);
 
     // Accumulate glow based on proximity to fire surface
     // Tighter proximity zone (0.5) for defined fire shape with dark background
@@ -204,7 +192,6 @@ void main() {
   col *= 1.0 + uBeatSnap * 0.25 * (1.0 + climaxBoost * 0.5);
 
   // === RISING EMBERS: particle field (beat-reactive) ===
-  float emberCount = 5.0 + energy * 20.0 + uBeatSnap * 8.0;
   for (int j = 0; j < 8; j++) {
     float fj = float(j);
     float seed = fj * 7.13;

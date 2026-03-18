@@ -92,7 +92,7 @@ ${sharedUniformsGLSL}
 
 ${noiseGLSL}
 
-${buildPostProcessGLSL({ grainStrength: 'normal' })}
+${buildPostProcessGLSL({ grainStrength: 'normal', anaglyphEnabled: true })}
 
 varying vec3 vNormal;
 varying vec3 vWorldPos;

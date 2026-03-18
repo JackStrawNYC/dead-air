@@ -87,6 +87,7 @@ uniform float uSectionType;
 uniform float uEnergyForecast;
 uniform float uPeakApproaching;
 uniform float uBeatStability;
+uniform float uImprovisationScore;
 
 // ─── Hero Icon ───
 uniform float uHeroIconTrigger;
