@@ -24,7 +24,11 @@ export function registerIngestCommand(program: Command): void {
       'Preferred audio format: flac or mp3',
       'flac',
     )
-    .action(async (date: string, options: { skipAudio?: boolean; format?: string }) => {
+    .option(
+      '--archive-id <id>',
+      'Specific Archive.org identifier to ingest (skip auto-selection)',
+    )
+    .action(async (date: string, options: { skipAudio?: boolean; format?: string; archiveId?: string }) => {
       if (!isValidDate(date)) {
         console.error(
           `Error: Invalid date "${date}". Use YYYY-MM-DD format (e.g., 1977-05-08)`,
@@ -41,6 +45,7 @@ export function registerIngestCommand(program: Command): void {
           db,
           dataDir: config.paths.data,
           setlistfmApiKey: config.api.setlistfmKey,
+          identifier: options.archiveId,
           skipAudio: options.skipAudio,
           preferFormat: (options.format as 'flac' | 'mp3') ?? 'flac',
         });

@@ -37,11 +37,13 @@ export function runPipeline(opts: {
   from?: string;
   to?: string;
   force?: boolean;
+  identifier?: string;
 }): Job {
   const args = ['tsx', CLI_ENTRY, 'produce', opts.date];
   if (opts.from) args.push('--from', opts.from);
   if (opts.to) args.push('--to', opts.to);
   if (opts.force) args.push('--force');
+  if (opts.identifier) args.push('--archive-id', opts.identifier);
 
   const job = createJob({
     type: 'pipeline',
@@ -54,8 +56,9 @@ export function runPipeline(opts: {
   return job;
 }
 
-export function runIngest(date: string): Job {
+export function runIngest(date: string, identifier?: string): Job {
   const args = ['tsx', CLI_ENTRY, 'ingest', date];
+  if (identifier) args.push('--archive-id', identifier);
   const job = createJob({ type: 'ingest', showDate: date });
   spawnAndStream(job, 'npx', args);
   return job;

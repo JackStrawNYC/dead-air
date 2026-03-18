@@ -13,6 +13,8 @@ export interface ArchiveSearchResult {
   source: string;
   description: string;
   format: string[];
+  numReviews?: number;
+  avgRating?: number;
 }
 
 export interface ArchiveFile {
@@ -26,26 +28,41 @@ export interface ArchiveFile {
 
 // ── Search ──
 
+export interface SearchShowsOptions {
+  /** Exact date: YYYY-MM-DD */
+  date?: string;
+  /** Year: YYYY — returns all recordings for that year */
+  year?: number;
+  /** Free-text query — searches titles and descriptions */
+  query?: string;
+}
+
 /**
- * Search Archive.org for Grateful Dead recordings on a given date.
+ * Search Archive.org for Grateful Dead recordings.
+ * Accepts a string (date) for backwards compatibility, or an options object.
  */
 export async function searchShows(
-  date: string,
+  optsOrDate: string | SearchShowsOptions,
 ): Promise<ArchiveSearchResult[]> {
   await rateLimit();
 
-  const q = `collection:GratefulDead AND date:${date}`;
-  const params = new URLSearchParams({
-    q,
-    'fl[]': 'identifier,title,date,source,description,format',
-    output: 'json',
-    rows: '100',
-  });
+  const opts: SearchShowsOptions =
+    typeof optsOrDate === 'string' ? { date: optsOrDate } : optsOrDate;
 
-  // fl[] needs to be repeated for each field
-  const url = `https://archive.org/advancedsearch.php?q=${encodeURIComponent(q)}&fl[]=identifier&fl[]=title&fl[]=date&fl[]=source&fl[]=description&fl[]=format&output=json&rows=100`;
+  // Build query
+  let qParts = ['collection:GratefulDead'];
+  if (opts.date) qParts.push(`date:${opts.date}`);
+  if (opts.year) qParts.push(`year:${opts.year}`);
+  if (opts.query) qParts.push(`(title:*${opts.query}* OR description:*${opts.query}*)`);
+  const q = qParts.join(' AND ');
 
-  log.info(`Searching Archive.org for ${date}...`);
+  const rows = opts.year ? '500' : '100';
+  const fields = ['identifier', 'title', 'date', 'source', 'description', 'format', 'num_reviews', 'avg_rating'];
+  const flParams = fields.map((f) => `fl[]=${f}`).join('&');
+  const url = `https://archive.org/advancedsearch.php?q=${encodeURIComponent(q)}&${flParams}&output=json&rows=${rows}&sort[]=num_reviews+desc`;
+
+  const label = opts.date || (opts.year ? `year ${opts.year}` : opts.query || 'all');
+  log.info(`Searching Archive.org for ${label}...`);
 
   const res = await fetch(url);
   if (!res.ok) {
@@ -64,6 +81,8 @@ export async function searchShows(
         source?: string;
         description?: string | string[];
         format?: string | string[];
+        num_reviews?: number;
+        avg_rating?: number;
       }>;
     };
   };
@@ -84,7 +103,61 @@ export async function searchShows(
       : doc.format
         ? [doc.format]
         : [],
+    numReviews: doc.num_reviews,
+    avgRating: doc.avg_rating,
   }));
+}
+
+// ── Single Recording Metadata ──
+
+/**
+ * Fetch metadata for a single Archive.org recording by identifier.
+ */
+export async function getRecordingMetadata(
+  identifier: string,
+): Promise<ArchiveSearchResult> {
+  await rateLimit();
+
+  const url = `https://archive.org/metadata/${identifier}`;
+  log.info(`Fetching metadata for ${identifier}...`);
+
+  const res = await fetch(url);
+  if (!res.ok) {
+    throw new Error(
+      `Archive.org metadata failed for ${identifier}: ${res.status}`,
+    );
+  }
+
+  const data = (await res.json()) as {
+    metadata?: {
+      identifier?: string;
+      title?: string;
+      date?: string;
+      source?: string;
+      description?: string | string[];
+      format?: string | string[];
+      num_reviews?: string;
+      avg_rating?: string;
+    };
+  };
+
+  const meta = data.metadata ?? {};
+  return {
+    identifier: meta.identifier ?? identifier,
+    title: meta.title ?? '',
+    date: meta.date ?? '',
+    source: meta.source ?? '',
+    description: Array.isArray(meta.description)
+      ? meta.description.join(' ')
+      : (meta.description ?? ''),
+    format: Array.isArray(meta.format)
+      ? meta.format
+      : meta.format
+        ? [meta.format]
+        : [],
+    numReviews: meta.num_reviews ? parseInt(meta.num_reviews, 10) : undefined,
+    avgRating: meta.avg_rating ? parseFloat(meta.avg_rating) : undefined,
+  };
 }
 
 // ── File Listing ──

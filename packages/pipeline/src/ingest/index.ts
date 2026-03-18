@@ -2,7 +2,7 @@ import type Database from 'better-sqlite3';
 import { resolve } from 'path';
 import { createLogger } from '@dead-air/core';
 import type { ShowIngest, SetlistSong } from '@dead-air/core';
-import { searchShows, getRecordingFiles } from './archive-client.js';
+import { searchShows, getRecordingFiles, getRecordingMetadata } from './archive-client.js';
 import {
   rankRecordings,
   selectBestRecording,
@@ -24,6 +24,8 @@ export interface IngestOptions {
   dataDir: string;
   /** Setlist.fm API key (optional) */
   setlistfmApiKey?: string;
+  /** Specific Archive.org identifier to ingest (skips search + auto-select) */
+  identifier?: string;
   /** Skip audio download (metadata only) */
   skipAudio?: boolean;
   /** Preferred audio format */
@@ -51,20 +53,32 @@ export async function orchestrateIngest(
     db,
     dataDir,
     setlistfmApiKey,
+    identifier,
     skipAudio = false,
     preferFormat = 'flac',
   } = options;
 
-  // ── 1. Search Archive.org ──
-  const recordings = await searchShows(date);
-  if (recordings.length === 0) {
-    throw new Error(`No recordings found on Archive.org for ${date}`);
-  }
+  let best: RankedRecording;
 
-  // ── 2. Rank and select best recording ──
-  const best = selectBestRecording(recordings);
-  if (!best) {
-    throw new Error(`Could not select a recording for ${date}`);
+  if (identifier) {
+    // ── 1a. Direct identifier: fetch metadata and rank it ──
+    log.info(`Using specified identifier: ${identifier}`);
+    const meta = await getRecordingMetadata(identifier);
+    const ranked = rankRecordings([meta]);
+    best = ranked[0];
+  } else {
+    // ── 1b. Search Archive.org ──
+    const recordings = await searchShows({ date });
+    if (recordings.length === 0) {
+      throw new Error(`No recordings found on Archive.org for ${date}`);
+    }
+
+    // ── 2. Rank and select best recording ──
+    const selected = selectBestRecording(recordings);
+    if (!selected) {
+      throw new Error(`Could not select a recording for ${date}`);
+    }
+    best = selected;
   }
 
   // ── 3. Get file list ──
@@ -167,7 +181,8 @@ export async function orchestrateIngest(
 }
 
 // Re-export submodules
-export { searchShows, getRecordingFiles, getDownloadUrl } from './archive-client.js';
+export { searchShows, getRecordingFiles, getDownloadUrl, getRecordingMetadata } from './archive-client.js';
+export type { SearchShowsOptions } from './archive-client.js';
 export { rankRecordings, selectBestRecording, selectAudioFiles } from './recording-selector.js';
 export { fetchSetlist } from './setlist-client.js';
 export { fetchWeather } from './weather-client.js';

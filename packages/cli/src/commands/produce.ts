@@ -43,6 +43,7 @@ export function registerProduceCommand(program: Command): void {
     .option('--preview', 'Render at 720p for fast iteration')
     .option('--no-cache', 'Skip analysis cache')
     .option('--analysis-concurrency <n>', 'Parallel librosa analysis workers', parseInt)
+    .option('--archive-id <id>', 'Specific Archive.org identifier to ingest (skip auto-selection)')
     .action(
       async (
         date: string,
@@ -59,6 +60,7 @@ export function registerProduceCommand(program: Command): void {
           preview?: boolean;
           cache?: boolean;
           analysisConcurrency?: number;
+          archiveId?: string;
         },
       ) => {
         if (!isValidDate(date)) {
@@ -140,6 +142,7 @@ export function registerProduceCommand(program: Command): void {
               db,
               dataDir: config.paths.data,
               setlistfmApiKey: config.api.setlistfmKey,
+              identifier: options.archiveId,
             });
             console.log(`  Venue: ${result.venue?.name ?? 'unknown'}`);
             console.log(`  Recording: ${result.recording.identifier}`);

@@ -6,6 +6,8 @@ const log = createLogger('recording-selector');
 export interface RankedRecording extends ArchiveSearchResult {
   score: number;
   sourceType: 'SBD' | 'matrix' | 'AUD' | 'unknown';
+  numReviews?: number;
+  avgRating?: number;
 }
 
 /**
@@ -58,7 +60,16 @@ export function rankRecordings(
     if (rec.source && rec.source.length > 20) score += 5;
     if (rec.description && rec.description.length > 50) score += 5;
 
-    return { ...rec, score, sourceType };
+    // Review count bonus
+    if (rec.numReviews && rec.numReviews > 10) score += 15;
+    else if (rec.numReviews && rec.numReviews > 5) score += 10;
+    else if (rec.numReviews && rec.numReviews > 0) score += 5;
+
+    // Rating bonus
+    if (rec.avgRating && rec.avgRating >= 4.5) score += 10;
+    else if (rec.avgRating && rec.avgRating >= 4.0) score += 5;
+
+    return { ...rec, score, sourceType, numReviews: rec.numReviews, avgRating: rec.avgRating };
   });
 
   // Sort by score descending
