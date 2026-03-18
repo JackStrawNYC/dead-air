@@ -79,7 +79,7 @@ const PRESETS: Record<string, RenderPreset> = {
   draft:   { width: 1280, height: 720,  concurrency: 6, skipGrain: true,  skipBloom: true,  label: "Draft (720p, no grain/bloom)" },
   preview: { width: 1920, height: 1080, concurrency: 4, skipGrain: false, skipBloom: false, label: "Preview (1080p, full quality)" },
   final:   { width: 1920, height: 1080, concurrency: 3, skipGrain: false, skipBloom: false, label: "Final (1080p, full quality, max fidelity)" },
-  "4k":    { width: 3840, height: 2160, concurrency: 2, skipGrain: false, skipBloom: false, label: "4K (2160p, full quality, reduced concurrency)" },
+  "4k":    { width: 3840, height: 2160, concurrency: 4, skipGrain: false, skipBloom: false, label: "4K (2160p, full quality)" },
 };
 
 interface SetlistEntry {
@@ -556,7 +556,7 @@ function main() {
   const numCores = cpus().length;
   const renderWidth = parseInt(process.env.RENDER_WIDTH ?? "1920", 10);
   const pixelScale = (renderWidth * parseInt(process.env.RENDER_HEIGHT ?? "1080", 10)) / (1920 * 1080);
-  const adaptiveConcurrency = activePreset?.concurrency ?? Math.max(1, Math.floor(numCores / pixelScale / 2));
+  const adaptiveConcurrency = activePreset?.concurrency ?? Math.max(4, Math.floor(numCores / pixelScale));
   console.log(`Resolution: ${process.env.RENDER_WIDTH}x${process.env.RENDER_HEIGHT} | Concurrency: ${adaptiveConcurrency} (${numCores} cores)`);
 
   const setlist = JSON.parse(readFileSync(join(DATA_DIR, "setlist.json"), "utf-8"));

@@ -81,7 +81,7 @@ ${
   beatPulseEnabled
     ? `  // Beat pulse: tempo-locked brightness swell
   float bp = beatPulse(uMusicalTime);
-  col *= 1.0 + bp * 0.18 + climaxBoost * bp * 0.08;
+  col *= 1.0 + bp * 0.08 + climaxBoost * bp * 0.04;
 `
     : ""
 }
@@ -163,10 +163,10 @@ ${
 
   // Onset saturation pulse: push colors from gray
   {
-    float onsetPulse = step(0.5, max(uOnsetSnap, uDrumOnset)) * max(uOnsetSnap, uDrumOnset);
+    float onsetPulse = step(0.6, max(uOnsetSnap, uDrumOnset)) * max(uOnsetSnap, uDrumOnset);
     float onsetLuma = dot(col, vec3(0.299, 0.587, 0.114));
-    col = mix(vec3(onsetLuma), col, 1.0 + onsetPulse * 0.6);
-    col *= 1.0 + onsetPulse * 0.07;
+    col = mix(vec3(onsetLuma), col, 1.0 + onsetPulse * 0.25);
+    col *= 1.0 + onsetPulse * 0.03;
   }
 
   // Lifted blacks (build-phase aware)

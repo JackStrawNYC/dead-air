@@ -168,10 +168,10 @@ export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod,
           style={{
             position: "absolute",
             inset: 0,
-            backdropFilter: `blur(${(8 + slowFactor * 16).toFixed(1)}px) brightness(${(0.9 + factor * 0.3).toFixed(2)})`,
-            WebkitBackdropFilter: `blur(${(8 + slowFactor * 16).toFixed(1)}px) brightness(${(0.9 + factor * 0.3).toFixed(2)})`,
+            backdropFilter: `blur(${(8 + slowFactor * 12).toFixed(1)}px) brightness(${(0.92 + factor * 0.15).toFixed(2)})`,
+            WebkitBackdropFilter: `blur(${(8 + slowFactor * 12).toFixed(1)}px) brightness(${(0.92 + factor * 0.15).toFixed(2)})`,
             mixBlendMode: "screen",
-            opacity: (0.08 + slowFactor * 0.12) * (1 - deadAirFactor),
+            opacity: (0.05 + slowFactor * 0.07) * (1 - deadAirFactor),
             pointerEvents: "none",
           }}
         />

@@ -334,15 +334,15 @@ vec3 cinematicGrade(vec3 col, float energy) {
 // --- Anamorphic flare: horizontal light streak from bright areas ---
 vec3 anamorphicFlare(vec2 uv, vec3 col, float energy, float onset) {
   float luma = dot(col, vec3(0.2126, 0.7152, 0.0722));
-  float threshold = mix(0.45, 0.25, energy); // lower threshold catches more content
+  float threshold = mix(0.55, 0.38, energy); // conservative threshold to avoid white wash
   float bright = smoothstep(threshold, threshold + 0.3, luma);
   // Horizontal streak: wide Gaussian in X, narrow in Y
   float streak = bright * exp(-abs(uv.y - 0.5) * 6.0); // wider vertical spread
   streak *= (0.3 + energy * 0.7);
-  streak *= (1.0 + onset * 2.0);  // stronger onset punch
+  streak *= (1.0 + onset * 0.4);  // gentle onset accent
   // Warm cyan-white flare color (anamorphic coatings)
   vec3 flareColor = mix(vec3(0.6, 0.8, 1.0), vec3(1.0, 0.95, 0.9), energy);
-  return col + flareColor * streak * 0.25;
+  return col + flareColor * streak * 0.12;
 }
 
 // --- Directional chromatic aberration: lens-like color fringing ---
