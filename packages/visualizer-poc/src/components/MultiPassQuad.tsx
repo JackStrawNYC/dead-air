@@ -154,6 +154,17 @@ function createBaseUniforms(
     uEnergyTrend: { value: 0 },
     uLocalTempo: { value: 120 },
     uFFTTexture: { value: fftTexture },
+    uMelodicPitch: { value: 0 },
+    uMelodicDirection: { value: 0 },
+    uChordIndex: { value: 0 },
+    uHarmonicTension: { value: 0 },
+    uSectionType: { value: 5 },
+    uEnergyForecast: { value: 0 },
+    uPeakApproaching: { value: 0 },
+    uBeatStability: { value: 0.5 },
+    uImprovisationScore: { value: 0 },
+    uHeroIconTrigger: { value: 0 },
+    uHeroIconProgress: { value: 0 },
     ...(feedback ? { uPrevFrame: { value: null as THREE.Texture | null } } : {}),
     ...extraUniforms,
   };
@@ -169,7 +180,7 @@ export const MultiPassQuad: React.FC<Props> = ({
   const {
     time, beatDecay, smooth, palettePrimary, paletteSecondary,
     paletteSaturation, tempo, musicalTime, climaxPhase, climaxIntensity,
-    jamDensity, coherence, dynamicTime, isLocked,
+    heroTrigger, heroProgress, jamDensity, coherence, dynamicTime, isLocked,
   } = useAudioData();
   const { width, height } = useVideoConfig();
   const currentFrame = useCurrentFrame();
@@ -320,11 +331,22 @@ export const MultiPassQuad: React.FC<Props> = ({
   u.uEraSaturation.value = eraSaturation;
   u.uEraBrightness.value = eraBrightness;
   u.uEraSepia.value = eraSepia;
-  u.uBloomThreshold.value = -0.08 - smooth.energy * 0.12;
+  u.uBloomThreshold.value = -0.08 - smooth.energy * 0.18;
   u.uLensDistortion.value = 0.02 + smooth.energy * 0.06;
   u.uEnergyAccel.value = smooth.energyAcceleration;
   u.uEnergyTrend.value = smooth.energyTrend;
   u.uLocalTempo.value = smooth.localTempo;
+  u.uMelodicPitch.value = smooth.melodicPitch;
+  u.uMelodicDirection.value = smooth.melodicDirection;
+  u.uChordIndex.value = smooth.chordIndex;
+  u.uHarmonicTension.value = smooth.harmonicTension;
+  u.uSectionType.value = smooth.sectionTypeFloat;
+  u.uEnergyForecast.value = smooth.energyForecast;
+  u.uPeakApproaching.value = smooth.peakApproaching;
+  u.uBeatStability.value = smooth.beatStability;
+  u.uImprovisationScore.value = smooth.improvisationScore ?? 0;
+  u.uHeroIconTrigger.value = heroTrigger;
+  u.uHeroIconProgress.value = heroProgress;
 
   // Update FFT texture
   if (fftTextureRef.current) {

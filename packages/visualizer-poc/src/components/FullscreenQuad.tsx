@@ -129,6 +129,7 @@ export const FullscreenQuad: React.FC<Props> = ({
       uEnergyForecast: { value: 0 },
       uPeakApproaching: { value: 0 },
       uBeatStability: { value: 0.5 },
+      uImprovisationScore: { value: 0 },
       uHeroIconTrigger: { value: 0 },
       uHeroIconProgress: { value: 0 },
       ...extraUniforms,
@@ -181,7 +182,7 @@ export const FullscreenQuad: React.FC<Props> = ({
   uniforms.uEraSepia.value = eraSepia;
   // Adaptive bloom threshold: lower at high energy (more bloom catches darker pixels)
   // Range: -0.08 (quiet, conservative) to -0.20 (peak, generous bloom)
-  uniforms.uBloomThreshold.value = -0.08 - smooth.energy * 0.12;
+  uniforms.uBloomThreshold.value = -0.08 - smooth.energy * 0.18;
   // Lens distortion: subtle barrel curvature, stronger at peaks
   // Range: 0.02 (rest) to 0.08 (peak)
   uniforms.uLensDistortion.value = 0.02 + smooth.energy * 0.06;
@@ -196,6 +197,7 @@ export const FullscreenQuad: React.FC<Props> = ({
   uniforms.uEnergyForecast.value = smooth.energyForecast;
   uniforms.uPeakApproaching.value = smooth.peakApproaching;
   uniforms.uBeatStability.value = smooth.beatStability;
+  uniforms.uImprovisationScore.value = smooth.improvisationScore ?? 0;
   uniforms.uHeroIconTrigger.value = heroTrigger;
   uniforms.uHeroIconProgress.value = heroProgress;
 

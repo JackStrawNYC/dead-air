@@ -72,6 +72,9 @@ import { detectJamCycle } from "./utils/jam-cycles";
 import { computeNarrativeDirective } from "./utils/visual-narrator";
 import { endScreenOverlayMult } from "./utils/end-screen-zones";
 import { NowPlaying } from "./components/NowPlaying";
+import { SongPositionIndicator } from "./components/SongPositionIndicator";
+import { JamTimer } from "./components/JamTimer";
+import { UpNextTeaser } from "./components/UpNextTeaser";
 
 // Extracted sub-components
 import { SongArtLayer } from "./components/song-visualizer/SongArtLayer";
@@ -564,6 +567,46 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
             fanReviews={fanReviewsData}
             showSeed={showSeed}
           />
+
+          {/* Show context overlays */}
+          {!isDeadAir && props.show && (
+            <SilentErrorBoundary name="SongPosition">
+              <SongPositionIndicator
+                setNumber={props.song.set}
+                trackNumber={props.song.trackNumber ?? 1}
+                totalSongsInSet={totalSongsInSet}
+              />
+            </SilentErrorBoundary>
+          )}
+
+          {!isDeadAir && currentSection && (sectionType === "jam" || sectionType === "solo") && (
+            <SilentErrorBoundary name="JamTimer">
+              <JamTimer
+                sectionStartFrame={currentSection.frameStart}
+                sectionDurationFrames={currentSection.frameEnd - currentSection.frameStart}
+                energy={audioSnapshot.energy}
+              />
+            </SilentErrorBoundary>
+          )}
+
+          {!isDeadAir && (() => {
+            // Find the next song for UpNextTeaser
+            if (!props.show) return null;
+            const songs = props.show.songs;
+            const idx = songs.findIndex((s) => s.trackId === props.song.trackId);
+            const nextSong = idx >= 0 && idx < songs.length - 1 ? songs[idx + 1] : null;
+            const isLastInSet = !nextSong || nextSong.set !== props.song.set;
+            if (!nextSong || isLastInSet) return null;
+            return (
+              <SilentErrorBoundary name="UpNextTeaser">
+                <UpNextTeaser
+                  nextSongTitle={nextSong.title}
+                  isSegue={!!props.segueOut}
+                  isLastInSet={isLastInSet}
+                />
+              </SilentErrorBoundary>
+            );
+          })()}
 
           {!isDeadAir && (
             <SilentErrorBoundary name="NowPlaying">

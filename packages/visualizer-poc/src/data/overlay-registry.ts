@@ -40,6 +40,8 @@ export const OVERLAY_REGISTRY: OverlayEntry[] = [
   { name: "StainedGlass",     layer: 2, category: "sacred", tags: ["contemplative", "psychedelic"],    energyBand: "mid",  weight: 2, dutyCycle: 100, energyResponse: [0.05, 0.20, 1.8], tier: "B" },
   { name: "DreamCatcher",     layer: 2, category: "sacred", tags: ["contemplative", "organic"],        energyBand: "low",  weight: 2, dutyCycle: 100, energyResponse: [0.0, 0.08, 2.5], tier: "B" },
   { name: "StealieFade",      layer: 2, category: "sacred", tags: ["dead-culture", "contemplative"],   energyBand: "any",  weight: 2, dutyCycle: 100, energyResponse: [0.02, 0.12, 2.0], tier: "B" },
+  { name: "RoseGarden",       layer: 2, category: "sacred", tags: ["dead-culture", "organic"],          energyBand: "mid",  weight: 2, dutyCycle: 100, energyResponse: [0.05, 0.20, 1.8], tier: "A" },
+  { name: "StealYourFaceKaleidoscope", layer: 2, category: "sacred", tags: ["dead-culture", "psychedelic"], energyBand: "mid", weight: 3, dutyCycle: 100, energyResponse: [0.05, 0.22, 1.5], tier: "A" },
 
   // ═══ Layer 3: Song-reactive (4) ═══
   { name: "LightningBoltOverlay", layer: 3, category: "reactive", tags: ["dead-culture", "intense"],   energyBand: "high", weight: 3, dutyCycle: 100, energyResponse: [0.20, 0.35, 2.0], tier: "B" },
@@ -63,7 +65,8 @@ export const OVERLAY_REGISTRY: OverlayEntry[] = [
   { name: "MoireInterference", layer: 4, category: "geometric", tags: ["psychedelic", "mechanical"],    energyBand: "mid",  weight: 2, dutyCycle: 33, energyResponse: [0.05, 0.20, 1.8], tier: "B" },
   { name: "LissajousCurves",   layer: 4, category: "geometric", tags: ["cosmic", "psychedelic"],        energyBand: "mid",  weight: 2, dutyCycle: 33, energyResponse: [0.05, 0.20, 1.8], tier: "B" },
 
-  // ═══ Layer 5: Song References (3) ═══
+  // ═══ Layer 5: Song References + Dead Culture ═══
+  { name: "SunMoonMotif",     layer: 5, category: "nature", tags: ["cosmic", "dead-culture"],           energyBand: "any",  weight: 2, dutyCycle: 100, energyResponse: [0.03, 0.15, 2.0], tier: "B" },
   { name: "ChinaCatSunflower",layer: 5, category: "nature", tags: ["psychedelic", "dead-culture"], energyBand: "mid",  weight: 2, dutyCycle: 25, energyResponse: [0.05, 0.22, 1.5], tier: "B" },
   { name: "SugarMagnolia",    layer: 5, category: "nature", tags: ["organic", "dead-culture"],     energyBand: "mid",  weight: 2, dutyCycle: 100, energyResponse: [0.06, 0.25, 1.8], tier: "B" },
   { name: "BoxOfRain",        layer: 5, category: "nature", tags: ["organic", "dead-culture"],     energyBand: "low",  weight: 2, dutyCycle: 100, energyResponse: [0.0, 0.08, 2.5], tier: "B" },

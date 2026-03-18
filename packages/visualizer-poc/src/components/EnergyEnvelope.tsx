@@ -150,11 +150,14 @@ export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod,
   const chromaDelta = snapshot.chromaHue - (songPrimaryHue % 360);
   // Normalize to [-180, 180] range, then scale to ±10 degrees
   const chromaNorm = ((chromaDelta + 540) % 360) - 180;
-  const chromaHueShift = chromaNorm * (10 / 180) * Math.min(1, energy * 5); // gate by energy to avoid drift in silence
+  // Extra chroma shift during jams/solos (20deg vs 10deg)
+  const isJamOrSolo = jamColorTemp != null; // jamColorTemp only set for long jams
+  const chromaMaxDeg = isJamOrSolo ? 20 : 10;
+  const chromaHueShift = chromaNorm * (chromaMaxDeg / 180) * Math.min(1, energy * 5); // gate by energy to avoid drift in silence
 
   // Jam color temperature: warm shifts yellow, cool shifts blue (max ±12deg)
   // Only applied during long jams. EraGrade + SongPalette handle base color character.
-  const jamHueShift = jamColorTemp != null ? jamColorTemp * 35 : 0; // ±28 degrees max
+  const jamHueShift = jamColorTemp != null ? jamColorTemp * 50 : 0; // ±40 degrees max
   // Set-level warmth shift: Set 1 warm (+5deg), Set 2 cool (-8deg), Encore neutral (0)
   // Narrative temperature: ±20deg hue shift (warm = positive, cool = negative)
   const narrativeHueShift = narrativeTemperature * 20;

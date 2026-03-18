@@ -6,14 +6,9 @@
  * overlays and text should avoid or dim in these zones.
  */
 
-/** Check if we're in the YouTube end screen window (last 600 frames) */
-export function isEndScreenWindow(frame: number, totalFrames: number): boolean {
-  return frame >= totalFrames - 600;
-}
-
 /** Get end screen dimming factor (0 = no dimming, 1 = full dim).
  *  Ramps from 0 to 1 over the first 90 frames of the end screen window. */
-export function endScreenDimFactor(frame: number, totalFrames: number): number {
+function endScreenDimFactor(frame: number, totalFrames: number): number {
   const windowStart = totalFrames - 600;
   if (frame < windowStart) return 0;
   const progress = (frame - windowStart) / 90;

@@ -322,6 +322,286 @@ export const SegueCrossfade: React.FC<Props> = ({ progress, outgoing, incoming, 
     );
   }
 
+  if (style === "pixel_scatter") {
+    // Pixel scatter: outgoing scene fragments into rectangular tiles that scatter
+    // outward with rotation, revealing incoming behind.
+    const eased = cubicEase(t);
+    const outOp = Math.max(0, 1 - eased * 1.2);
+    const inOp = eased;
+
+    // Generate grid of fragment transforms
+    const cols = 6;
+    const rows = 4;
+    const fragments: React.ReactNode[] = [];
+
+    if (outOp > 0.01 && t > 0.02) {
+      for (let row = 0; row < rows; row++) {
+        for (let col = 0; col < cols; col++) {
+          const cx = (col + 0.5) / cols;
+          const cy = (row + 0.5) / rows;
+          // Direction away from center
+          const dx = cx - 0.5;
+          const dy = cy - 0.5;
+          // Scatter distance increases with progress
+          const scatter = eased * eased * 150; // px equivalent in %
+          const rot = eased * (((col + row * cols) % 7) - 3) * 30; // rotation degrees
+          const fragDelay = (col + row) / (cols + rows); // stagger
+          const fragProgress = Math.max(0, (eased - fragDelay * 0.3) / 0.7);
+          const translateX = dx * scatter * fragProgress;
+          const translateY = dy * scatter * fragProgress;
+          const fragOpacity = Math.max(0, 1 - fragProgress * 1.3);
+
+          if (fragOpacity < 0.02) continue;
+
+          fragments.push(
+            <div
+              key={`${row}-${col}`}
+              style={{
+                position: "absolute",
+                left: `${(col / cols * 100).toFixed(2)}%`,
+                top: `${(row / rows * 100).toFixed(2)}%`,
+                width: `${(100 / cols).toFixed(2)}%`,
+                height: `${(100 / rows).toFixed(2)}%`,
+                overflow: "hidden",
+                transform: `translate(${translateX.toFixed(1)}%, ${translateY.toFixed(1)}%) rotate(${rot.toFixed(1)}deg)`,
+                opacity: fragOpacity,
+              }}
+            >
+              <div
+                style={{
+                  position: "absolute",
+                  left: `${(-col / cols * 100).toFixed(2)}%`,
+                  top: `${(-row / rows * 100).toFixed(2)}%`,
+                  width: `${cols * 100}%`,
+                  height: `${rows * 100}%`,
+                }}
+              >
+                {outgoing}
+              </div>
+            </div>
+          );
+        }
+      }
+    }
+
+    return (
+      <div style={{ position: "relative", width: "100%", height: "100%", overflow: "hidden" }}>
+        {/* Incoming scene visible behind fragments */}
+        {inOp > 0.01 && (
+          <div style={{ position: "absolute", inset: 0, opacity: inOp }}>
+            {incoming}
+          </div>
+        )}
+        {/* Outgoing scene as scattered fragments */}
+        {t < 0.02 ? (
+          <div style={{ position: "absolute", inset: 0 }}>
+            {outgoing}
+          </div>
+        ) : (
+          fragments
+        )}
+      </div>
+    );
+  }
+
+  if (style === "interference_pattern") {
+    // Moire interference: concentric ring masks on both scenes with complementary spacing.
+    // As progress shifts ring spacing, moire interference creates psychedelic fringe at overlap.
+    const eased = cubicEase(t);
+    const outOp = Math.max(0, 1 - eased * 1.3);
+    const inOp = Math.min(1, eased * 1.3);
+
+    // Ring parameters
+    const ringFreqOut = 30 + t * 20; // increasing frequency
+    const ringFreqIn = 30 + (1 - t) * 20; // decreasing (complementary)
+    const ringPhase = t * Math.PI * 4; // phase shift creates interference
+
+    // Generate radial gradient ring masks as CSS
+    const ringMaskOut = `repeating-radial-gradient(circle at 50% 50%, black 0px, black ${(100 / ringFreqOut).toFixed(2)}%, transparent ${(100 / ringFreqOut).toFixed(2)}%, transparent ${(200 / ringFreqOut).toFixed(2)}%)`;
+    const ringMaskIn = `repeating-radial-gradient(circle at 50% 50%, transparent 0px, transparent ${(50 / ringFreqIn).toFixed(2)}%, black ${(50 / ringFreqIn).toFixed(2)}%, black ${(100 / ringFreqIn).toFixed(2)}%)`;
+
+    return (
+      <div style={{ position: "relative", width: "100%", height: "100%" }}>
+        {/* Outgoing scene with ring mask */}
+        {outOp > 0.01 && (
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              opacity: outOp,
+              maskImage: t > 0.1 && t < 0.9 ? ringMaskOut : undefined,
+              WebkitMaskImage: t > 0.1 && t < 0.9 ? ringMaskOut : undefined,
+            }}
+          >
+            {outgoing}
+          </div>
+        )}
+        {/* Incoming scene with complementary ring mask */}
+        {inOp > 0.01 && (
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              opacity: inOp,
+              maskImage: t > 0.1 && t < 0.9 ? ringMaskIn : undefined,
+              WebkitMaskImage: t > 0.1 && t < 0.9 ? ringMaskIn : undefined,
+            }}
+          >
+            {incoming}
+          </div>
+        )}
+        {/* Psychedelic fringe glow at overlap zone */}
+        {t > 0.15 && t < 0.85 && (
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              background: `radial-gradient(circle at 50% 50%, hsla(${(t * 720).toFixed(0)}, 60%, 50%, 0.08) 0%, transparent 70%)`,
+              mixBlendMode: "screen",
+              pointerEvents: "none",
+            }}
+          />
+        )}
+      </div>
+    );
+  }
+
+  if (style === "spiral_vortex") {
+    // Logarithmic spiral reveal: incoming scene revealed through a rotating
+    // logarithmic spiral SVG clip-path expanding from center.
+    const eased = cubicEase(t);
+    const outOp = 1 - eased;
+    const inOp = eased;
+    // Spiral parameters: radius grows, rotation accelerates with progress
+    const maxRadius = 80; // % coverage
+    const spiralRadius = eased * maxRadius;
+    const rotationDeg = eased * eased * 720; // quadratic acceleration
+
+    // Build spiral clip path as polygon points along a logarithmic spiral
+    const spiralPoints: string[] = [];
+    const segments = 60;
+    for (let i = 0; i <= segments; i++) {
+      const frac = i / segments;
+      const angle = frac * Math.PI * 6 + (rotationDeg * Math.PI) / 180;
+      const r = frac * spiralRadius;
+      const x = 50 + r * Math.cos(angle);
+      const y = 50 + r * Math.sin(angle);
+      spiralPoints.push(`${x.toFixed(2)}% ${y.toFixed(2)}%`);
+    }
+    // Close the spiral by connecting back through outer edge to fill
+    // Add corner points to ensure full coverage at high progress
+    if (eased > 0.5) {
+      spiralPoints.push("100% 100%", "100% 0%", "0% 0%", "0% 100%", "100% 100%");
+    }
+
+    return (
+      <div style={{ position: "relative", width: "100%", height: "100%" }}>
+        {/* Outgoing scene */}
+        {outOp > 0.01 && (
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              opacity: outOp,
+              transform: `rotate(${(-rotationDeg * 0.1).toFixed(1)}deg)`,
+              transformOrigin: "center center",
+            }}
+          >
+            {outgoing}
+          </div>
+        )}
+        {/* Incoming scene — revealed through expanding spiral */}
+        {inOp > 0.01 && (
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              clipPath: `circle(${spiralRadius.toFixed(1)}% at 50% 50%)`,
+            }}
+          >
+            {incoming}
+          </div>
+        )}
+        {/* Chromatic glow at leading edge */}
+        {t > 0.05 && t < 0.9 && (
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              clipPath: `circle(${(spiralRadius + 3).toFixed(1)}% at 50% 50%)`,
+              backgroundColor: `hsla(${(t * 360).toFixed(0)}, 70%, 60%, 0.1)`,
+              mixBlendMode: "screen",
+              pointerEvents: "none",
+            }}
+          />
+        )}
+      </div>
+    );
+  }
+
+  if (style === "feedback_dissolve") {
+    // Recursive zoom tunnel: outgoing scene falls into itself (shrinking scale echoes)
+    // while incoming emerges from the vanishing point.
+    const eased = cubicEase(t);
+    const outOp = 1 - eased;
+    const inOp = eased;
+    const echoCount = 5;
+
+    return (
+      <div style={{ position: "relative", width: "100%", height: "100%", overflow: "hidden" }}>
+        {/* Outgoing scene echoes (shrinking copies receding into center) */}
+        {Array.from({ length: echoCount }, (_, i) => {
+          const depth = (i + 1) / echoCount;
+          const echoScale = 1 - depth * eased * 0.8; // shrink toward center
+          const echoOpacity = outOp * (1 - depth * 0.7) * Math.max(0, 1 - eased * 1.5);
+          if (echoOpacity < 0.02 || echoScale < 0.05) return null;
+          return (
+            <div
+              key={i}
+              style={{
+                position: "absolute",
+                inset: 0,
+                opacity: echoOpacity,
+                transform: `scale(${echoScale.toFixed(4)})`,
+                transformOrigin: "center center",
+              }}
+            >
+              {outgoing}
+            </div>
+          );
+        })}
+        {/* Main outgoing scene */}
+        {outOp > 0.01 && (
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              opacity: outOp,
+              transform: `scale(${(1 - eased * 0.3).toFixed(4)})`,
+              transformOrigin: "center center",
+            }}
+          >
+            {outgoing}
+          </div>
+        )}
+        {/* Incoming scene — emerges from vanishing point */}
+        {inOp > 0.01 && (
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              opacity: inOp,
+              transform: `scale(${(0.3 + eased * 0.7).toFixed(4)})`,
+              transformOrigin: "center center",
+            }}
+          >
+            {incoming}
+          </div>
+        )}
+      </div>
+    );
+  }
+
   // ─── Original opacity-based transitions ───
 
   let outOpacity: number;

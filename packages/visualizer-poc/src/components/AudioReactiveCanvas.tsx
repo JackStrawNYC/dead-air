@@ -96,6 +96,8 @@ export interface AudioDataContext {
     peakApproaching: number;
     /** Beat stability: 0-1 consistency of beat spacing */
     beatStability: number;
+    /** Improvisation score: 0 = structured, 1 = highly improvisational */
+    improvisationScore: number;
   };
   /** Per-song palette primary hue (0-1 normalized) */
   palettePrimary: number;
@@ -435,6 +437,7 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
       energyForecast,
       peakApproaching,
       beatStability: beatStabilityVal,
+      improvisationScore: smoothValue(frames, idx, (f) => f.improvisationScore ?? 0, 30),
     },
     palettePrimary,
     paletteSecondary,

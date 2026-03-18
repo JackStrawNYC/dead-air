@@ -55,7 +55,12 @@ import { SunMandala } from "../components/SunMandala";
 import { MoireInterference } from "../components/MoireInterference";
 import { LissajousCurves } from "../components/LissajousCurves";
 
-// ─── Layer 5: Song References (3) ───
+// ─── Layer 2: Dead Culture additions (3) ───
+import { RoseGarden } from "../components/RoseGarden";
+import { StealYourFaceKaleidoscope } from "../components/StealYourFaceKaleidoscope";
+
+// ─── Layer 5: Song References (3) + Dead Culture ───
+import { SunMoonMotif } from "../components/SunMoonMotif";
 import { ChinaCatSunflower } from "../components/ChinaCatSunflower";
 import { SugarMagnolia } from "../components/SugarMagnolia";
 import { BoxOfRain } from "../components/BoxOfRain";
@@ -120,6 +125,8 @@ export const OVERLAY_COMPONENTS: Record<string, OverlayComponentEntry> = {
   StainedGlass:      { Component: StainedGlass, layer: 2 },
   DreamCatcher:      { Component: DreamCatcher, layer: 2 },
   StealieFade:       { Component: StealieFade, layer: 2 },
+  RoseGarden:        { Component: RoseGarden, layer: 2 },
+  StealYourFaceKaleidoscope: { Component: StealYourFaceKaleidoscope, layer: 2 },
 
   // Layer 3: Reactive
   LightningBoltOverlay: { Component: LightningBoltOverlay, layer: 3 },
@@ -141,7 +148,8 @@ export const OVERLAY_COMPONENTS: Record<string, OverlayComponentEntry> = {
   MoireInterference: { Component: MoireInterference, layer: 4 },
   LissajousCurves:   { Component: LissajousCurves, layer: 4 },
 
-  // Layer 5: Song References
+  // Layer 5: Song References + Dead Culture
+  SunMoonMotif:      { Component: SunMoonMotif, layer: 5 },
   ChinaCatSunflower: { Component: ChinaCatSunflower, layer: 5 },
   SugarMagnolia:     { Component: SugarMagnolia, layer: 5 },
   BoxOfRain:         { Component: BoxOfRain, layer: 5 },

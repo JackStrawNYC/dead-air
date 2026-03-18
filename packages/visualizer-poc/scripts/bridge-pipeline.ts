@@ -394,7 +394,7 @@ function bridge() {
   let timelineOffset = 0;
   const timelineTracks: Array<{ trackId: string; totalFrames: number; globalFrameStart: number; globalFrameEnd: number }> = [];
 
-  for (const { trackId, songAnalysis, segment } of trackMapping) {
+  for (const { trackId, songAnalysis, segment, song } of trackMapping) {
     if (!songAnalysis) {
       console.log(`  SKIP: No analysis for ${trackId}`);
       continue;
@@ -405,25 +405,35 @@ function bridge() {
     const totalFrames = Math.round(duration * fps);
     const tempo = songAnalysis.bpm[0] ?? 120;
 
-    // Generate per-frame analysis from pipeline's coarser data
-    const frames = generateFrameData(songAnalysis, totalFrames);
+    // Check for enhanced analysis from pipeline (full 28-field per-frame data)
+    const enhancedPath = join(pipelineDataDir, "analysis", showDate, `${song.songName.replace(/[^a-zA-Z0-9]/g, "_")}-analysis.json`);
+    let trackAnalysis: Record<string, unknown>;
 
-    // Generate sections (simple energy-based segmentation)
-    const sections = generateSections(frames, totalFrames);
-
-    const trackAnalysis = {
-      meta: {
-        source: `pipeline-bridge-${showDate}`,
-        duration,
-        fps,
-        sr: 44100,
-        hopLength: 512,
-        totalFrames,
-        tempo,
-        sections,
-      },
-      frames,
-    };
+    if (existsSync(enhancedPath)) {
+      // Enhanced data available — pass through directly
+      const enhanced = JSON.parse(readFileSync(enhancedPath, "utf-8"));
+      if (enhanced.frames?.[0]?.chroma) {
+        console.log(`  ✓ Enhanced data for ${trackId} (${enhanced.meta.totalFrames} frames, 28 fields/frame)`);
+        trackAnalysis = enhanced;
+      } else {
+        // Legacy enhanced format without chroma — fall back to generation
+        console.log(`  ⚠ Enhanced data lacks chroma for ${trackId}, generating from coarse data`);
+        const frames = generateFrameData(songAnalysis, totalFrames);
+        const sections = generateSections(frames, totalFrames);
+        trackAnalysis = {
+          meta: { source: `pipeline-bridge-${showDate}`, duration, fps, sr: 44100, hopLength: 512, totalFrames, tempo, sections },
+          frames,
+        };
+      }
+    } else {
+      // No enhanced data — generate from coarse pipeline data (legacy path)
+      const frames = generateFrameData(songAnalysis, totalFrames);
+      const sections = generateSections(frames, totalFrames);
+      trackAnalysis = {
+        meta: { source: `pipeline-bridge-${showDate}`, duration, fps, sr: 44100, hopLength: 512, totalFrames, tempo, sections },
+        frames,
+      };
+    }
 
     writeFileSync(
       join(tracksDir, `${trackId}-analysis.json`),

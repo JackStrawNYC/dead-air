@@ -368,6 +368,53 @@ def analyze_track(audio_path: Path, output_path: Path, stems_dir: Path | None = 
     chord_confidence_arr = pad_or_trim_1d(chord_confidence_arr, n_frames)
     print(f"Chord detection: {len(set(chord_label_arr))} unique chords, avg tension={harmonic_tension_arr.mean():.3f}")
 
+    # --- Improvisation score ---
+    # Composite score (0-1) from tempo variance (25%), harmonic novelty (25%),
+    # beat instability × energy (30%), harmonic tension (20%).
+    # Smoothed with 2s Gaussian window.
+    print("Computing improvisation score ...")
+    improv_window = int(3 * FPS)  # 3s analysis window
+    improv_arr = np.zeros(n_frames)
+    for i in range(n_frames):
+        lo_i = max(0, i - improv_window // 2)
+        hi_i = min(n_frames, i + improv_window // 2)
+        win_len = hi_i - lo_i
+        if win_len < FPS:
+            continue
+
+        # Tempo variance component
+        tempos = local_tempo_arr[lo_i:hi_i]
+        tempo_std = np.std(tempos) if len(tempos) > 2 else 0.0
+        tempo_var = min(1.0, tempo_std / 15.0)
+
+        # Harmonic novelty: chord change rate
+        chords_win = chord_idx_arr[lo_i:hi_i]
+        changes = np.sum(np.diff(chords_win) != 0)
+        changes_per_sec = changes / (win_len / FPS)
+        harm_novelty = min(1.0, changes_per_sec / 4.0)
+
+        # Beat instability × energy
+        beat_stab = np.mean(beat_confidence_arr[lo_i:hi_i])
+        avg_energy = np.mean(rms_norm[lo_i:hi_i])
+        beat_instab = (1.0 - beat_stab) * min(1.0, avg_energy * 3.0)
+
+        # Harmonic tension
+        avg_tension = np.mean(harmonic_tension_arr[lo_i:hi_i])
+
+        improv_arr[i] = (
+            tempo_var * 0.25 +
+            harm_novelty * 0.25 +
+            beat_instab * 0.30 +
+            avg_tension * 0.20
+        )
+
+    # Smooth with 2s Gaussian
+    from scipy.ndimage import gaussian_filter1d
+    improv_arr = gaussian_filter1d(improv_arr, sigma=FPS)
+    improv_arr = np.clip(improv_arr, 0.0, 1.0)
+    improv_arr = pad_or_trim_1d(improv_arr, n_frames)
+    print(f"Improvisation: mean={improv_arr.mean():.3f}, max={improv_arr.max():.3f}")
+
     # --- Structural semantics (self-similarity matrix → section labels) ---
     print("Computing structural semantics ...")
     # Build self-similarity from MFCC features
@@ -511,6 +558,7 @@ def analyze_track(audio_path: Path, output_path: Path, stems_dir: Path | None = 
             "chordConfidence": round(float(chord_confidence_arr[i]), 3),
             "harmonicTension": round(float(harmonic_tension_arr[i]), 3),
             "sectionType": section_type_arr[i],
+            "improvisationScore": round(float(improv_arr[i]), 3),
         }
         # Add stem-specific fields when available
         if stem_data and stem_data["available"]:
@@ -558,6 +606,24 @@ def analyze_track(audio_path: Path, output_path: Path, stems_dir: Path | None = 
 
 
 def main():
+    # --stdin-json mode: read JSON from stdin, write TrackAnalysis JSON to stdout
+    if "--stdin-json" in sys.argv:
+        import tempfile
+        input_data = json.loads(sys.stdin.read())
+        audio_path = Path(input_data["audioPath"])
+        stems_dir = Path(input_data["stemsDir"]) if input_data.get("stemsDir") else None
+        # Write to temp file, then output to stdout
+        with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as tmp:
+            tmp_path = Path(tmp.name)
+        try:
+            result = analyze_track(audio_path, tmp_path, stems_dir)
+            # Read and output the JSON to stdout
+            with open(tmp_path, "r") as f:
+                sys.stdout.write(f.read())
+        finally:
+            tmp_path.unlink(missing_ok=True)
+        return
+
     if len(sys.argv) >= 3:
         audio_path = Path(sys.argv[1])
         output_path = Path(sys.argv[2])
