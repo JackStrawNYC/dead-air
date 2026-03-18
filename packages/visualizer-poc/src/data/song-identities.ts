@@ -21,6 +21,8 @@ import { existsSync, readFileSync } from "fs";
 import { resolve, dirname } from "path";
 import type { VisualMode, ColorPalette, OverlayTag, TrackMeta, EnhancedFrameData } from "./types";
 import type { DrumsSpaceSubPhase } from "../utils/drums-space-phase";
+import { seeded } from "../utils/seededRandom";
+import { hashString } from "../utils/hash";
 
 // ─── JSON Override Layer ───
 // Dashboard edits write to data/song-identities.json; lookupSongIdentity checks it first.
@@ -59,7 +61,7 @@ export interface ClimaxBehavior {
 }
 
 export interface SongIdentity {
-  /** Preferred shader modes — weighted 3x in selection pool */
+  /** Preferred shader modes — show-seed selects a subset of 3 for 3x weight when pool >= 5 */
   preferredModes: VisualMode[];
   /** Color palette override */
   palette: ColorPalette;
@@ -93,7 +95,7 @@ export const SONG_IDENTITIES: Record<string, SongIdentity> = {
   // ══════════════════════════════════════════
 
   "bertha": {
-    preferredModes: ["concert_lighting", "tie_dye", "liquid_light", "fractal_flames"],
+    preferredModes: ["concert_lighting", "tie_dye", "liquid_light", "fractal_flames", "inferno", "lava_flow", "oil_projector"],
     palette: { primary: 15, secondary: 45, saturation: 0.95 }, // warm orange/gold
     overlayBoost: ["Bertha", "BearParade", "BreathingStealie"],
     moodKeywords: ["festival", "dead-culture"],
@@ -101,7 +103,7 @@ export const SONG_IDENTITIES: Record<string, SongIdentity> = {
   },
 
   "deal": {
-    preferredModes: ["concert_lighting", "inferno", "tie_dye", "fractal_flames"],
+    preferredModes: ["concert_lighting", "inferno", "tie_dye", "fractal_flames", "liquid_light", "electric_arc", "lava_flow"],
     palette: { primary: 10, secondary: 40, saturation: 1.0 }, // hot red/orange
     overlayBoost: ["ThirteenPointBolt", "ParticleExplosion"],
     moodKeywords: ["intense", "festival"],
@@ -109,7 +111,7 @@ export const SONG_IDENTITIES: Record<string, SongIdentity> = {
   },
 
   "sugaree": {
-    preferredModes: ["liquid_light", "oil_projector", "vintage_film"],
+    preferredModes: ["liquid_light", "oil_projector", "vintage_film", "aurora", "smoke_rings", "stained_glass", "lo_fi_grain"],
     palette: { primary: 30, secondary: 200, saturation: 0.85 }, // amber/sky blue
     overlayBoost: ["JerryGuitar", "RoseOverlay", "SacredGeometry"],
     overlaySuppress: ["LaserShow", "WallOfSound"],
@@ -119,7 +121,7 @@ export const SONG_IDENTITIES: Record<string, SongIdentity> = {
   },
 
   "althea": {
-    preferredModes: ["liquid_light", "oil_projector", "aurora", "feedback_recursion", "voronoi_flow", "aurora_curtains"],
+    preferredModes: ["liquid_light", "oil_projector", "aurora", "feedback_recursion", "voronoi_flow", "aurora_curtains", "stained_glass"],
     palette: { primary: 180, secondary: 280, saturation: 0.9 }, // teal/purple
     overlayBoost: ["SacredGeometry", "MandalaGenerator", "JerryGuitar"],
     moodKeywords: ["contemplative", "psychedelic"],
@@ -127,7 +129,7 @@ export const SONG_IDENTITIES: Record<string, SongIdentity> = {
   },
 
   "friendofthedevil": {
-    preferredModes: ["vintage_film", "lo_fi_grain", "oil_projector"],
+    preferredModes: ["vintage_film", "lo_fi_grain", "oil_projector", "smoke_rings", "ink_wash", "stained_glass", "aurora"],
     palette: { primary: 25, secondary: 160, saturation: 0.75 }, // warm gold/green
     overlayBoost: ["VWBusParade", "Fireflies", "SkeletonBand"],
     moodKeywords: ["organic", "retro"],
@@ -136,7 +138,7 @@ export const SONG_IDENTITIES: Record<string, SongIdentity> = {
   },
 
   "ripple": {
-    preferredModes: ["aurora", "deep_ocean", "crystal_cavern", "diffraction_rings", "stained_glass", "smoke_rings"],
+    preferredModes: ["aurora", "deep_ocean", "crystal_cavern", "diffraction_rings", "stained_glass", "smoke_rings", "aurora_curtains"],
     palette: { primary: 200, secondary: 270, saturation: 0.7, brightness: 0.95 }, // cool blue/lavender
     overlayBoost: ["Fireflies", "RoseOverlay", "BoxOfRain"],
     overlaySuppress: ["LaserShow", "ParticleExplosion", "WallOfSound"],
@@ -147,7 +149,7 @@ export const SONG_IDENTITIES: Record<string, SongIdentity> = {
   },
 
   "caseyjones": {
-    preferredModes: ["concert_lighting", "tie_dye", "inferno", "fractal_flames"],
+    preferredModes: ["concert_lighting", "tie_dye", "inferno", "fractal_flames", "liquid_light", "lava_flow", "electric_arc"],
     palette: { primary: 5, secondary: 50, saturation: 1.0 }, // red/yellow
     overlayBoost: ["VWBusParade", "BearParade", "ThirteenPointBolt"],
     moodKeywords: ["festival", "intense"],
@@ -155,7 +157,7 @@ export const SONG_IDENTITIES: Record<string, SongIdentity> = {
   },
 
   "unclejohnsband": {
-    preferredModes: ["liquid_light", "aurora", "oil_projector"],
+    preferredModes: ["liquid_light", "aurora", "oil_projector", "vintage_film", "stained_glass", "voronoi_flow", "smoke_rings"],
     palette: { primary: 40, secondary: 220, saturation: 0.85 }, // warm gold/blue
     overlayBoost: ["SacredGeometry", "JerryGuitar", "BreathingStealie"],
     moodKeywords: ["organic", "dead-culture"],
@@ -163,7 +165,7 @@ export const SONG_IDENTITIES: Record<string, SongIdentity> = {
   },
 
   "shakedownstreet": {
-    preferredModes: ["concert_lighting", "tie_dye", "inferno", "lava_flow"],
+    preferredModes: ["concert_lighting", "tie_dye", "inferno", "lava_flow", "liquid_light", "fractal_flames", "electric_arc"],
     palette: { primary: 290, secondary: 50, saturation: 1.0 }, // magenta/gold
     overlayBoost: ["BearParade", "SkeletonBand", "LaserShow"],
     moodKeywords: ["festival", "psychedelic"],
@@ -188,7 +190,7 @@ export const SONG_IDENTITIES: Record<string, SongIdentity> = {
   },
 
   "fireonthemountain": {
-    preferredModes: ["inferno", "liquid_light", "concert_lighting", "fractal_flames", "lava_flow"],
+    preferredModes: ["inferno", "liquid_light", "concert_lighting", "fractal_flames", "lava_flow", "solar_flare", "electric_arc"],
     palette: { primary: 10, secondary: 45, saturation: 1.0, brightness: 1.05 }, // deep red/fire
     overlayBoost: ["EmberRise", "ThirteenPointBolt", "ParticleExplosion"],
     moodKeywords: ["intense", "festival"],
@@ -197,7 +199,7 @@ export const SONG_IDENTITIES: Record<string, SongIdentity> = {
   },
 
   "scarletbegonias": {
-    preferredModes: ["tie_dye", "liquid_light", "concert_lighting", "fractal_flames", "plasma_field"],
+    preferredModes: ["tie_dye", "liquid_light", "concert_lighting", "fractal_flames", "plasma_field", "kaleidoscope", "oil_projector"],
     palette: { primary: 0, secondary: 330, saturation: 1.0 }, // scarlet red/rose
     overlayBoost: ["ChinaCatSunflower", "TieDyeWash", "BreathingStealie"],
     moodKeywords: ["psychedelic", "festival"],
@@ -206,7 +208,7 @@ export const SONG_IDENTITIES: Record<string, SongIdentity> = {
   },
 
   "eyesoftheworld": {
-    preferredModes: ["aurora", "cosmic_voyage", "liquid_light", "truchet_tiling", "stained_glass"],
+    preferredModes: ["aurora", "cosmic_voyage", "liquid_light", "truchet_tiling", "stained_glass", "voronoi_flow", "diffraction_rings"],
     palette: { primary: 170, secondary: 50, saturation: 0.9 }, // aquamarine/gold
     overlayBoost: ["CosmicStarfield", "SacredGeometry", "Fireflies"],
     overlaySuppress: ["WallOfSound"],
@@ -227,7 +229,7 @@ export const SONG_IDENTITIES: Record<string, SongIdentity> = {
   },
 
   "stellablue": {
-    preferredModes: ["deep_ocean", "cosmic_voyage", "aurora", "diffraction_rings", "smoke_rings"],
+    preferredModes: ["deep_ocean", "cosmic_voyage", "aurora", "diffraction_rings", "smoke_rings", "crystal_cavern", "aurora_curtains"],
     palette: { primary: 220, secondary: 280, saturation: 0.65, brightness: 0.88 }, // deep blue/violet
     overlayBoost: ["CosmicStarfield", "RoseOverlay", "Fireflies"],
     overlaySuppress: ["LaserShow", "ParticleExplosion", "CrowdDance"],
@@ -238,7 +240,7 @@ export const SONG_IDENTITIES: Record<string, SongIdentity> = {
   },
 
   "notfadeaway": {
-    preferredModes: ["concert_lighting", "inferno", "tie_dye", "fractal_flames", "electric_arc", "lava_flow"],
+    preferredModes: ["concert_lighting", "inferno", "tie_dye", "fractal_flames", "electric_arc", "lava_flow", "liquid_light"],
     palette: { primary: 20, secondary: 340, saturation: 1.0 }, // warm orange/magenta
     overlayBoost: ["BearParade", "SkeletonBand", "WallOfSound"],
     moodKeywords: ["festival", "intense"],
@@ -246,7 +248,7 @@ export const SONG_IDENTITIES: Record<string, SongIdentity> = {
   },
 
   "estimatedprophet": {
-    preferredModes: ["cosmic_voyage", "crystal_cavern", "inferno", "feedback_recursion", "electric_arc", "neural_web"],
+    preferredModes: ["cosmic_voyage", "crystal_cavern", "inferno", "feedback_recursion", "electric_arc", "neural_web", "fractal_zoom"],
     palette: { primary: 270, secondary: 30, saturation: 0.95 }, // deep purple/gold
     overlayBoost: ["DarkStarPortal", "SacredGeometry", "FractalZoom"],
     moodKeywords: ["cosmic", "intense"],
@@ -255,7 +257,7 @@ export const SONG_IDENTITIES: Record<string, SongIdentity> = {
   },
 
   "chinacatsunflower": {
-    preferredModes: ["tie_dye", "liquid_light", "oil_projector", "fractal_flames", "plasma_field"],
+    preferredModes: ["tie_dye", "liquid_light", "oil_projector", "fractal_flames", "plasma_field", "kaleidoscope", "concert_lighting"],
     palette: { primary: 50, secondary: 320, saturation: 1.0 }, // golden yellow/pink
     overlayBoost: ["ChinaCatSunflower", "TieDyeWash", "BearParade"],
     moodKeywords: ["psychedelic", "festival"],
@@ -263,7 +265,7 @@ export const SONG_IDENTITIES: Record<string, SongIdentity> = {
   },
 
   "iknowyourider": {
-    preferredModes: ["concert_lighting", "tie_dye", "liquid_light"],
+    preferredModes: ["concert_lighting", "tie_dye", "liquid_light", "fractal_flames", "inferno", "lava_flow", "oil_projector"],
     palette: { primary: 30, secondary: 350, saturation: 0.95 }, // amber/rose
     overlayBoost: ["BreathingStealie", "SkeletonBand"],
     moodKeywords: ["festival", "dead-culture"],
@@ -272,14 +274,14 @@ export const SONG_IDENTITIES: Record<string, SongIdentity> = {
   },
 
   "truckin": {
-    preferredModes: ["concert_lighting", "vintage_film", "tie_dye"],
+    preferredModes: ["concert_lighting", "vintage_film", "tie_dye", "liquid_light", "oil_projector", "fractal_flames", "lo_fi_grain"],
     palette: { primary: 35, secondary: 200, saturation: 0.9 }, // golden/blue
     overlayBoost: ["VWBusParade", "BearParade", "SkeletonBand"],
     moodKeywords: ["festival", "retro"],
   },
 
   "sugarmagnolia": {
-    preferredModes: ["tie_dye", "concert_lighting", "liquid_light"],
+    preferredModes: ["tie_dye", "concert_lighting", "liquid_light", "fractal_flames", "inferno", "lava_flow", "oil_projector"],
     palette: { primary: 340, secondary: 60, saturation: 1.0 }, // pink/golden
     overlayBoost: ["SugarMagnolia", "ChinaCatSunflower", "BearParade"],
     moodKeywords: ["festival", "organic"],
@@ -287,7 +289,7 @@ export const SONG_IDENTITIES: Record<string, SongIdentity> = {
   },
 
   "terrapinstation": {
-    preferredModes: ["cosmic_voyage", "crystal_cavern", "aurora", "truchet_tiling", "stained_glass", "aurora_curtains"],
+    preferredModes: ["cosmic_voyage", "crystal_cavern", "aurora", "truchet_tiling", "stained_glass", "aurora_curtains", "deep_ocean"],
     palette: { primary: 160, secondary: 280, saturation: 0.85 }, // sea green/purple
     overlayBoost: ["MarchingTerrapins", "DancingTerrapinOverlay", "SacredGeometry", "CosmicStarfield"],
     moodKeywords: ["cosmic", "organic"],
@@ -296,7 +298,7 @@ export const SONG_IDENTITIES: Record<string, SongIdentity> = {
   },
 
   "playingintheband": {
-    preferredModes: ["liquid_light", "cosmic_voyage", "tie_dye", "fractal_flames", "voronoi_flow", "neural_web"],
+    preferredModes: ["liquid_light", "cosmic_voyage", "tie_dye", "fractal_flames", "voronoi_flow", "neural_web", "kaleidoscope"],
     palette: { primary: 280, secondary: 60, saturation: 0.9 }, // purple/gold
     overlayBoost: ["FractalZoom", "MandalaGenerator", "DarkStarPortal"],
     moodKeywords: ["psychedelic", "cosmic"],
@@ -315,7 +317,7 @@ export const SONG_IDENTITIES: Record<string, SongIdentity> = {
   },
 
   "wharfrat": {
-    preferredModes: ["stark_minimal", "deep_ocean", "vintage_film", "diffraction_rings", "aurora_curtains"],
+    preferredModes: ["stark_minimal", "deep_ocean", "vintage_film", "diffraction_rings", "aurora_curtains", "ink_wash", "smoke_rings"],
     palette: { primary: 210, secondary: 150, saturation: 0.6, brightness: 0.88 }, // steel blue/sage
     overlayBoost: ["RoseOverlay", "Fireflies", "JerryGuitar"],
     overlaySuppress: ["LaserShow", "ParticleExplosion", "CrowdDance"],
@@ -328,7 +330,7 @@ export const SONG_IDENTITIES: Record<string, SongIdentity> = {
   },
 
   "birdsong": {
-    preferredModes: ["aurora", "cosmic_voyage", "crystal_cavern", "truchet_tiling", "voronoi_flow", "smoke_rings"],
+    preferredModes: ["aurora", "cosmic_voyage", "crystal_cavern", "truchet_tiling", "voronoi_flow", "smoke_rings", "stained_glass"],
     palette: { primary: 170, secondary: 60, saturation: 0.8 }, // teal/golden
     overlayBoost: ["Fireflies", "CosmicStarfield", "SacredGeometry"],
     overlaySuppress: ["WallOfSound"],
@@ -338,7 +340,7 @@ export const SONG_IDENTITIES: Record<string, SongIdentity> = {
   },
 
   "helpontheway": {
-    preferredModes: ["crystal_cavern", "cosmic_voyage", "liquid_light", "truchet_tiling"],
+    preferredModes: ["crystal_cavern", "cosmic_voyage", "liquid_light", "truchet_tiling", "aurora", "stained_glass", "voronoi_flow"],
     palette: { primary: 240, secondary: 30, saturation: 0.9 }, // royal blue/gold
     overlayBoost: ["SacredGeometry", "FractalZoom"],
     moodKeywords: ["cosmic", "intense"],
@@ -346,7 +348,7 @@ export const SONG_IDENTITIES: Record<string, SongIdentity> = {
   },
 
   "slipknot": {
-    preferredModes: ["inferno", "liquid_light", "concert_lighting", "fractal_flames"],
+    preferredModes: ["inferno", "liquid_light", "concert_lighting", "fractal_flames", "electric_arc", "lava_flow", "tie_dye"],
     palette: { primary: 10, secondary: 270, saturation: 1.0 }, // fire/purple
     overlayBoost: ["FractalZoom", "MandalaGenerator", "ParticleExplosion"],
     moodKeywords: ["intense", "psychedelic"],
@@ -356,7 +358,7 @@ export const SONG_IDENTITIES: Record<string, SongIdentity> = {
   },
 
   "franklinstower": {
-    preferredModes: ["concert_lighting", "tie_dye", "liquid_light"],
+    preferredModes: ["concert_lighting", "tie_dye", "liquid_light", "fractal_flames", "inferno", "lava_flow", "oil_projector"],
     palette: { primary: 45, secondary: 320, saturation: 0.95 }, // gold/magenta
     overlayBoost: ["BearParade", "BreathingStealie", "SkeletonBand"],
     moodKeywords: ["festival", "dead-culture"],
@@ -365,7 +367,7 @@ export const SONG_IDENTITIES: Record<string, SongIdentity> = {
   },
 
   "ststephen": {
-    preferredModes: ["concert_lighting", "inferno", "liquid_light", "fractal_flames", "electric_arc", "digital_rain"],
+    preferredModes: ["concert_lighting", "inferno", "liquid_light", "fractal_flames", "electric_arc", "digital_rain", "lava_flow"],
     palette: { primary: 300, secondary: 45, saturation: 0.95 }, // magenta/gold
     overlayBoost: ["SkeletonBand", "ThirteenPointBolt", "SacredGeometry"],
     moodKeywords: ["intense", "dead-culture"],
@@ -378,7 +380,7 @@ export const SONG_IDENTITIES: Record<string, SongIdentity> = {
   // ══════════════════════════════════════════
 
   "newminglewoodblues": {
-    preferredModes: ["concert_lighting", "inferno", "tie_dye"],
+    preferredModes: ["concert_lighting", "inferno", "tie_dye", "liquid_light", "fractal_flames", "electric_arc", "lava_flow"],
     palette: { primary: 15, secondary: 50, saturation: 1.0 }, // hot orange/gold
     overlayBoost: ["ThirteenPointBolt", "SkeletonBand"],
     moodKeywords: ["intense", "festival"],
@@ -387,7 +389,7 @@ export const SONG_IDENTITIES: Record<string, SongIdentity> = {
   },
 
   "loser": {
-    preferredModes: ["vintage_film", "oil_projector", "liquid_light"],
+    preferredModes: ["vintage_film", "oil_projector", "liquid_light", "lo_fi_grain", "aurora", "smoke_rings", "stained_glass"],
     palette: { primary: 30, secondary: 180, saturation: 0.7, brightness: 0.9 }, // amber/teal
     overlayBoost: ["JerryGuitar", "RoseOverlay", "SkeletonRoses"],
     overlaySuppress: ["LaserShow", "ParticleExplosion", "CrowdDance"],
@@ -398,7 +400,7 @@ export const SONG_IDENTITIES: Record<string, SongIdentity> = {
   },
 
   "elpaso": {
-    preferredModes: ["vintage_film", "lo_fi_grain"],
+    preferredModes: ["vintage_film", "lo_fi_grain", "oil_projector", "smoke_rings", "ink_wash", "stained_glass", "warp_field"],
     palette: { primary: 35, secondary: 160, saturation: 0.75 }, // warm gold/sage
     overlayBoost: ["VWBusParade", "Fireflies"],
     moodKeywords: ["retro", "organic"],
@@ -407,7 +409,7 @@ export const SONG_IDENTITIES: Record<string, SongIdentity> = {
   },
 
   "theyloveeachother": {
-    preferredModes: ["liquid_light", "tie_dye", "oil_projector"],
+    preferredModes: ["liquid_light", "tie_dye", "oil_projector", "concert_lighting", "fractal_flames", "kaleidoscope", "vintage_film"],
     palette: { primary: 340, secondary: 50, saturation: 0.95 }, // rose/golden
     overlayBoost: ["BreathingStealie", "BearParade"],
     moodKeywords: ["organic", "festival"],
@@ -416,7 +418,7 @@ export const SONG_IDENTITIES: Record<string, SongIdentity> = {
   },
 
   "jackstraw": {
-    preferredModes: ["concert_lighting", "inferno", "liquid_light", "digital_rain"],
+    preferredModes: ["concert_lighting", "inferno", "liquid_light", "digital_rain", "electric_arc", "fractal_flames", "tie_dye"],
     palette: { primary: 10, secondary: 300, saturation: 1.0 }, // red/purple
     overlayBoost: ["SkeletonBand", "ThirteenPointBolt", "LightningBoltOverlay"],
     moodKeywords: ["intense", "dead-culture"],
@@ -425,7 +427,7 @@ export const SONG_IDENTITIES: Record<string, SongIdentity> = {
   },
 
   "lazylightnin": {
-    preferredModes: ["tie_dye", "concert_lighting", "liquid_light"],
+    preferredModes: ["tie_dye", "concert_lighting", "liquid_light", "electric_arc", "fractal_flames", "kaleidoscope", "plasma_field"],
     palette: { primary: 55, secondary: 280, saturation: 1.0 }, // electric yellow/violet
     overlayBoost: ["LightningBoltOverlay", "TieDyeWash", "BearParade"],
     moodKeywords: ["psychedelic", "festival"],
@@ -435,7 +437,7 @@ export const SONG_IDENTITIES: Record<string, SongIdentity> = {
   },
 
   "supplication": {
-    preferredModes: ["inferno", "liquid_light", "concert_lighting"],
+    preferredModes: ["inferno", "liquid_light", "concert_lighting", "electric_arc", "fractal_flames", "lava_flow", "solar_flare"],
     palette: { primary: 5, secondary: 40, saturation: 1.0, brightness: 1.05 }, // deep red/fire
     overlayBoost: ["ParticleExplosion", "EmberRise", "FractalZoom"],
     moodKeywords: ["intense", "psychedelic"],
@@ -445,7 +447,7 @@ export const SONG_IDENTITIES: Record<string, SongIdentity> = {
   },
 
   "browneyedwomen": {
-    preferredModes: ["oil_projector", "vintage_film", "liquid_light"],
+    preferredModes: ["oil_projector", "vintage_film", "liquid_light", "lo_fi_grain", "smoke_rings", "aurora", "stained_glass"],
     palette: { primary: 25, secondary: 190, saturation: 0.85 }, // warm brown/teal
     overlayBoost: ["JerryGuitar", "BreathingStealie", "RoseOverlay"],
     moodKeywords: ["organic", "dead-culture"],
@@ -454,7 +456,7 @@ export const SONG_IDENTITIES: Record<string, SongIdentity> = {
   },
 
   "mamatried": {
-    preferredModes: ["vintage_film", "lo_fi_grain"],
+    preferredModes: ["vintage_film", "lo_fi_grain", "oil_projector", "smoke_rings", "ink_wash", "stained_glass", "warp_field"],
     palette: { primary: 40, secondary: 170, saturation: 0.7 }, // dusty gold/sage
     overlayBoost: ["VWBusParade", "JerryGuitar"],
     moodKeywords: ["retro", "organic"],
@@ -463,7 +465,7 @@ export const SONG_IDENTITIES: Record<string, SongIdentity> = {
   },
 
   "rowjimmy": {
-    preferredModes: ["deep_ocean", "aurora", "liquid_light", "diffraction_rings", "voronoi_flow", "smoke_rings"],
+    preferredModes: ["deep_ocean", "aurora", "liquid_light", "diffraction_rings", "voronoi_flow", "smoke_rings", "stained_glass"],
     palette: { primary: 210, secondary: 270, saturation: 0.65, brightness: 0.9 }, // ocean blue/lavender
     overlayBoost: ["Fireflies", "RoseOverlay", "SacredGeometry"],
     overlaySuppress: ["LaserShow", "ParticleExplosion", "CrowdDance"],
@@ -475,7 +477,7 @@ export const SONG_IDENTITIES: Record<string, SongIdentity> = {
   },
 
   "dancininthestreet": {
-    preferredModes: ["concert_lighting", "tie_dye", "inferno", "plasma_field"],
+    preferredModes: ["concert_lighting", "tie_dye", "inferno", "plasma_field", "liquid_light", "fractal_flames", "lava_flow"],
     palette: { primary: 350, secondary: 55, saturation: 1.0 }, // magenta/gold
     overlayBoost: ["BearParade", "LaserShow", "CrowdDance"],
     moodKeywords: ["festival", "intense"],
@@ -484,7 +486,7 @@ export const SONG_IDENTITIES: Record<string, SongIdentity> = {
   },
 
   "drumsspace": {
-    preferredModes: ["cosmic_voyage", "crystal_cavern", "deep_ocean", "feedback_recursion", "morphogenesis", "neural_web"],
+    preferredModes: ["cosmic_voyage", "crystal_cavern", "deep_ocean", "feedback_recursion", "morphogenesis", "neural_web", "void_light"],
     palette: { primary: 260, secondary: 180, saturation: 0.5, brightness: 0.8 }, // deep indigo/teal
     overlayBoost: ["DarkStarPortal", "SacredGeometry", "CosmicStarfield", "DrumCircle"],
     overlaySuppress: ["BearParade", "VWBusParade", "CrowdDance", "SkeletonBand"],
@@ -501,7 +503,7 @@ export const SONG_IDENTITIES: Record<string, SongIdentity> = {
   },
 
   "onemoresaturdaynight": {
-    preferredModes: ["concert_lighting", "inferno", "tie_dye", "lava_flow"],
+    preferredModes: ["concert_lighting", "inferno", "tie_dye", "lava_flow", "liquid_light", "fractal_flames", "electric_arc"],
     palette: { primary: 20, secondary: 320, saturation: 1.0 }, // warm orange/magenta
     overlayBoost: ["BearParade", "ParticleExplosion", "LaserShow", "SkeletonBand"],
     moodKeywords: ["festival", "intense"],
@@ -514,7 +516,7 @@ export const SONG_IDENTITIES: Record<string, SongIdentity> = {
   // ══════════════════════════════════════════
 
   "touchofgrey": {
-    preferredModes: ["concert_lighting", "tie_dye"],
+    preferredModes: ["concert_lighting", "tie_dye", "liquid_light", "fractal_flames", "inferno", "lava_flow", "solar_flare"],
     palette: { primary: 0, secondary: 200, saturation: 0.9 },
     overlayBoost: ["BearParade", "BreathingStealie"],
     moodKeywords: ["festival", "dead-culture"],
@@ -522,7 +524,7 @@ export const SONG_IDENTITIES: Record<string, SongIdentity> = {
   },
 
   "goingdowntheroad": {
-    preferredModes: ["concert_lighting", "inferno"],
+    preferredModes: ["concert_lighting", "inferno", "tie_dye", "liquid_light", "fractal_flames", "electric_arc", "lava_flow"],
     palette: { primary: 25, secondary: 350, saturation: 1.0 },
     overlayBoost: ["VWBusParade", "SkeletonBand", "BearParade"],
     moodKeywords: ["festival", "intense"],
@@ -531,7 +533,7 @@ export const SONG_IDENTITIES: Record<string, SongIdentity> = {
   },
 
   "mississippihalfstep": {
-    preferredModes: ["oil_projector", "vintage_film"],
+    preferredModes: ["oil_projector", "vintage_film", "lo_fi_grain", "smoke_rings", "liquid_light", "aurora", "stained_glass"],
     palette: { primary: 35, secondary: 180, saturation: 0.75 },
     overlayBoost: ["JerryGuitar", "Fireflies", "RoseOverlay"],
     moodKeywords: ["organic", "retro"],
@@ -540,7 +542,7 @@ export const SONG_IDENTITIES: Record<string, SongIdentity> = {
   },
 
   "weatherreportsuite": {
-    preferredModes: ["aurora", "cosmic_voyage", "crystal_cavern"],
+    preferredModes: ["aurora", "cosmic_voyage", "crystal_cavern", "deep_ocean", "diffraction_rings", "stained_glass", "aurora_curtains"],
     palette: { primary: 200, secondary: 300, saturation: 0.8 },
     overlayBoost: ["CosmicStarfield", "SacredGeometry", "Fireflies"],
     moodKeywords: ["cosmic", "contemplative"],
@@ -550,7 +552,7 @@ export const SONG_IDENTITIES: Record<string, SongIdentity> = {
   },
 
   "turnonthelovelight": {
-    preferredModes: ["concert_lighting", "inferno", "tie_dye"],
+    preferredModes: ["concert_lighting", "inferno", "tie_dye", "liquid_light", "electric_arc", "fractal_flames", "lava_flow"],
     palette: { primary: 50, secondary: 350, saturation: 1.0 },
     overlayBoost: ["LaserShow", "BearParade", "CrowdDance"],
     moodKeywords: ["festival", "intense"],
@@ -559,7 +561,7 @@ export const SONG_IDENTITIES: Record<string, SongIdentity> = {
   },
 
   "samsonanddelilah": {
-    preferredModes: ["concert_lighting", "inferno"],
+    preferredModes: ["concert_lighting", "inferno", "tie_dye", "electric_arc", "fractal_flames", "lava_flow", "solar_flare"],
     palette: { primary: 10, secondary: 40, saturation: 1.0 },
     overlayBoost: ["ThirteenPointBolt", "ParticleExplosion", "SkeletonBand"],
     moodKeywords: ["intense", "festival"],
@@ -567,7 +569,7 @@ export const SONG_IDENTITIES: Record<string, SongIdentity> = {
   },
 
   "johnnybjgoode": {
-    preferredModes: ["concert_lighting", "tie_dye"],
+    preferredModes: ["concert_lighting", "tie_dye", "liquid_light", "inferno", "fractal_flames", "lava_flow", "electric_arc"],
     palette: { primary: 45, secondary: 320, saturation: 1.0 },
     overlayBoost: ["JerryGuitar", "BearParade", "SkeletonBand"],
     moodKeywords: ["festival", "retro"],
@@ -576,7 +578,7 @@ export const SONG_IDENTITIES: Record<string, SongIdentity> = {
   },
 
   "usblues": {
-    preferredModes: ["concert_lighting", "vintage_film"],
+    preferredModes: ["concert_lighting", "vintage_film", "oil_projector", "liquid_light", "lo_fi_grain", "tie_dye", "smoke_rings"],
     palette: { primary: 220, secondary: 350, saturation: 0.85 },
     overlayBoost: ["JerryGuitar", "BreathingStealie"],
     moodKeywords: ["organic", "dead-culture"],
@@ -584,7 +586,7 @@ export const SONG_IDENTITIES: Record<string, SongIdentity> = {
   },
 
   "brokedownpalace": {
-    preferredModes: ["aurora", "deep_ocean", "stained_glass"],
+    preferredModes: ["aurora", "deep_ocean", "stained_glass", "crystal_cavern", "diffraction_rings", "aurora_curtains", "smoke_rings"],
     palette: { primary: 210, secondary: 280, saturation: 0.65, brightness: 0.9 },
     overlayBoost: ["RoseOverlay", "Fireflies", "SacredGeometry"],
     overlaySuppress: ["LaserShow", "ParticleExplosion", "CrowdDance"],
@@ -596,7 +598,7 @@ export const SONG_IDENTITIES: Record<string, SongIdentity> = {
   },
 
   "blackpeter": {
-    preferredModes: ["stark_minimal", "vintage_film"],
+    preferredModes: ["stark_minimal", "vintage_film", "deep_ocean", "aurora_curtains", "ink_wash", "diffraction_rings", "oil_projector"],
     palette: { primary: 200, secondary: 30, saturation: 0.55, brightness: 0.85 },
     overlayBoost: ["RoseOverlay", "JerryGuitar"],
     overlaySuppress: ["LaserShow", "CrowdDance"],
@@ -606,7 +608,7 @@ export const SONG_IDENTITIES: Record<string, SongIdentity> = {
   },
 
   "cumberlandblues": {
-    preferredModes: ["concert_lighting", "lo_fi_grain"],
+    preferredModes: ["concert_lighting", "lo_fi_grain", "vintage_film", "oil_projector", "tie_dye", "smoke_rings", "liquid_light"],
     palette: { primary: 30, secondary: 200, saturation: 0.8 },
     overlayBoost: ["JerryGuitar", "VWBusParade"],
     moodKeywords: ["retro", "organic"],
@@ -614,7 +616,7 @@ export const SONG_IDENTITIES: Record<string, SongIdentity> = {
   },
 
   "looselucy": {
-    preferredModes: ["tie_dye", "liquid_light"],
+    preferredModes: ["tie_dye", "liquid_light", "fractal_flames", "concert_lighting", "kaleidoscope", "plasma_field", "oil_projector"],
     palette: { primary: 300, secondary: 60, saturation: 1.0 },
     overlayBoost: ["TieDyeWash", "BearParade", "LavaLamp"],
     moodKeywords: ["psychedelic", "festival"],
@@ -623,7 +625,7 @@ export const SONG_IDENTITIES: Record<string, SongIdentity> = {
   },
 
   "direwolf": {
-    preferredModes: ["vintage_film", "oil_projector"],
+    preferredModes: ["vintage_film", "oil_projector", "lo_fi_grain", "smoke_rings", "aurora", "ink_wash", "stained_glass"],
     palette: { primary: 30, secondary: 160, saturation: 0.7 },
     overlayBoost: ["Fireflies", "RoseOverlay", "VWBusParade"],
     moodKeywords: ["organic", "retro"],
@@ -632,7 +634,7 @@ export const SONG_IDENTITIES: Record<string, SongIdentity> = {
   },
 
   "comesametime": {
-    preferredModes: ["aurora", "crystal_cavern"],
+    preferredModes: ["aurora", "crystal_cavern", "deep_ocean", "cosmic_voyage", "diffraction_rings", "stained_glass", "aurora_curtains"],
     palette: { primary: 180, secondary: 270, saturation: 0.75 },
     overlayBoost: ["CosmicStarfield", "Fireflies", "SacredGeometry"],
     moodKeywords: ["contemplative", "cosmic"],
@@ -641,7 +643,7 @@ export const SONG_IDENTITIES: Record<string, SongIdentity> = {
   },
 
   "itmusthavebeen": {
-    preferredModes: ["vintage_film", "ink_wash"],
+    preferredModes: ["vintage_film", "ink_wash", "oil_projector", "lo_fi_grain", "aurora", "smoke_rings", "stained_glass"],
     palette: { primary: 25, secondary: 200, saturation: 0.7, brightness: 0.9 },
     overlayBoost: ["RoseOverlay", "Fireflies"],
     moodKeywords: ["contemplative", "organic"],
@@ -799,6 +801,23 @@ export function lookupSongIdentity(title: string): SongIdentity | undefined {
   }
 
   return undefined;
+}
+
+/**
+ * Pick a song's base shader mode from its preferredModes using the show seed.
+ * Same show seed + same title → same mode. Different show seed → different mode.
+ * Falls back to defaultMode when no identity or empty preferredModes.
+ */
+export function resolveSongMode(
+  title: string,
+  defaultMode: VisualMode,
+  showSeed: number,
+): VisualMode {
+  const identity = lookupSongIdentity(title);
+  if (!identity?.preferredModes?.length) return defaultMode;
+  const rng = seeded(showSeed + hashString(title) + 0x50DE);
+  const idx = Math.floor(rng() * identity.preferredModes.length);
+  return identity.preferredModes[idx];
 }
 
 // ─── Fallback Identity Generation ───

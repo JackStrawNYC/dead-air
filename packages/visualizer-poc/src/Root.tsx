@@ -8,8 +8,9 @@ import { EndCard } from "./components/EndCard";
 import type { SetlistEntry, ShowSetlist, OverlaySchedule } from "./data/types";
 import { parseSetlist, safeParse, FlexibleTrackAnalysisSchema, OverlayScheduleSchema } from "./data/schemas";
 import { SELECTABLE_REGISTRY } from "./data/overlay-registry";
-import { formatDateLong } from "./data/ShowContext";
+import { formatDateLong, getShowSeed } from "./data/ShowContext";
 import { validateSectionOverrides } from "./scenes/SceneRouter";
+import { resolveSongMode } from "./data/song-identities";
 
 // ─── Dynamic show loading ───
 // Supports multi-show via --props='{"showId":"1972-08-27"}' or SHOW_ID env var.
@@ -70,6 +71,9 @@ try {
 
 
 const setlist = parseSetlist(setlistData);
+const showSeed = getShowSeed(setlist);
+const resolveMode = (song: SetlistEntry) =>
+  resolveSongMode(song.title, song.defaultMode, showSeed);
 
 const DEFAULT_FRAMES = 31417; // Morning Dew fallback
 const SET_BREAK_FRAMES = 300; // 10 seconds at 30fps
@@ -177,13 +181,13 @@ export const Root: React.FC = () => {
             width={RENDER_WIDTH}
             height={RENDER_HEIGHT}
             defaultProps={{
-              song,
+              song: { ...song, defaultMode: resolveMode(song) },
               segueIn,
               segueOut,
               segueFromPalette: segueIn ? prevSong?.palette : undefined,
               segueToPalette: segueOut ? nextSong?.palette : undefined,
-              segueFromMode: segueIn ? prevSong?.defaultMode : undefined,
-              segueToMode: segueOut ? nextSong?.defaultMode : undefined,
+              segueFromMode: segueIn && prevSong ? resolveMode(prevSong) : undefined,
+              segueToMode: segueOut && nextSong ? resolveMode(nextSong) : undefined,
               activeOverlays: getActiveOverlays(song.trackId),
               energyHints: getEnergyHints(song.trackId),
               show: setlist,
