@@ -10,12 +10,14 @@ import Assets from './pages/Assets';
 import Costs from './pages/Costs';
 import EpisodeDetail from './pages/EpisodeDetail';
 import SongIdentities from './pages/SongIdentities';
+import Discover from './pages/Discover';
 
 export default function App() {
   return (
     <Layout>
       <Routes>
         <Route path="/" element={<Home />} />
+        <Route path="/discover" element={<Discover />} />
         <Route path="/shows" element={<Shows />} />
         <Route path="/shows/:id" element={<ShowDetail />} />
         <Route path="/shows/:id/analysis" element={<ShowAnalysis />} />

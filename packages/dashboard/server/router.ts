@@ -6,9 +6,11 @@ import renderRouter from './routes/render.js';
 import assetsRouter from './routes/assets.js';
 import costsRouter from './routes/costs.js';
 import visualizerRouter from './routes/visualizer.js';
+import archiveRouter from './routes/archive.js';
 
 const router = Router();
 
+router.use('/archive', archiveRouter);
 router.use('/shows', showsRouter);
 router.use('/episodes', episodesRouter);
 router.use('/pipeline', pipelineRouter);

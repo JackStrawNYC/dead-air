@@ -25,3 +25,9 @@ export type { RenderPipelineOptions, RenderPipelineResult, EpisodeProps, Segment
 // Batch pipeline
 export { orchestrateBatch } from './batch/index.js';
 export type { BatchManifest, BatchOptions, BatchResult } from './batch/index.js';
+
+// Archive browsing
+export { searchShows, getRecordingFiles, getDownloadUrl } from './ingest/archive-client.js';
+export type { ArchiveSearchResult, ArchiveFile } from './ingest/archive-client.js';
+export { rankRecordings, selectAudioFiles, selectBestRecording } from './ingest/recording-selector.js';
+export type { RankedRecording } from './ingest/recording-selector.js';

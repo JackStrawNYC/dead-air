@@ -63,6 +63,34 @@ export const startVisualizerRender = (opts?: {
 }) =>
   request<{ jobId: string }>('/visualizer/render', { method: 'POST', body: JSON.stringify(opts || {}) });
 
+// Archive Discovery
+export interface ArchiveRecording {
+  identifier: string;
+  title: string;
+  date: string;
+  source: string;
+  description: string;
+  format: string[];
+  score: number;
+  sourceType: 'SBD' | 'matrix' | 'AUD' | 'unknown';
+}
+export interface ArchiveFileInfo {
+  name: string;
+  format: string;
+  size: string;
+  length?: string;
+  title?: string;
+  source: string;
+}
+export const searchArchive = (date: string) =>
+  request<{ recordings: ArchiveRecording[]; count: number }>(`/archive/search?date=${encodeURIComponent(date)}`);
+export const fetchArchiveFiles = (identifier: string) =>
+  request<{ files: ArchiveFileInfo[]; audioFiles: ArchiveFileInfo[]; totalSize: number }>(
+    `/archive/${encodeURIComponent(identifier)}/files`,
+  );
+export const startFullPipeline = (date: string) =>
+  request<{ jobId: string }>('/archive/ingest-and-run', { method: 'POST', body: JSON.stringify({ date }) });
+
 // Scene Registry & Song Identities
 export interface SceneMode {
   id: string;

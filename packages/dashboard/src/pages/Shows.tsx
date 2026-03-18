@@ -1,18 +1,11 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { fetchShows, ingestShow } from '../api';
-import { useJob } from '../hooks/useJob';
-import LogStream from '../components/LogStream';
+import { fetchShows } from '../api';
 import Skeleton from '../components/Skeleton';
-import { useToast } from '../hooks/useToast';
 
 export default function Shows() {
   const [shows, setShows] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [date, setDate] = useState('');
-  const [jobId, setJobId] = useState<string | null>(null);
-  const { log, done, result } = useJob(jobId);
-  const toast = useToast();
 
   const load = () => {
     setLoading(true);
@@ -21,28 +14,6 @@ export default function Shows() {
 
   useEffect(() => { load(); }, []);
 
-  // Reload shows when ingest completes
-  useEffect(() => {
-    if (done && result?.success) load();
-  }, [done, result]);
-
-  // Toast on ingest completion
-  useEffect(() => {
-    if (done && result) {
-      toast(result.success ? 'success' : 'error', result.success ? 'Ingest complete' : `Ingest failed: ${result.error || 'unknown error'}`);
-    }
-  }, [done, result]);
-
-  const handleIngest = async () => {
-    if (!date) return;
-    try {
-      const { jobId: id } = await ingestShow(date);
-      setJobId(id);
-    } catch (err: any) {
-      toast('error', err.message || 'Failed to start ingest');
-    }
-  };
-
   return (
     <div>
       <div className="page-header">
@@ -50,34 +21,16 @@ export default function Shows() {
         <p>Ingested Grateful Dead concerts from archive.org</p>
       </div>
 
-      {/* Ingest form */}
+      {/* Discover link */}
       <div className="card mb-16">
-        <div className="card-header">
-          <h3>Ingest New Show</h3>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <span style={{ color: 'var(--text-secondary)', fontSize: 14 }}>
+            Looking for a new show?
+          </span>
+          <Link to="/discover" className="btn btn-primary" style={{ fontSize: 13 }}>
+            Browse Archive.org &rarr;
+          </Link>
         </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <input
-            type="text"
-            placeholder="1977-05-08"
-            value={date}
-            onChange={e => setDate(e.target.value)}
-            style={{ width: 160, fontFamily: 'var(--font-mono)' }}
-            onKeyDown={e => e.key === 'Enter' && handleIngest()}
-          />
-          <button className="btn btn-primary" onClick={handleIngest} disabled={!date}>
-            Ingest
-          </button>
-        </div>
-        {jobId && (
-          <div className="mt-16">
-            <LogStream lines={log} maxHeight={200} />
-            {done && (
-              <div style={{ marginTop: 8, fontSize: 13, color: result?.success ? 'var(--green)' : 'var(--red)' }}>
-                {result?.success ? 'Ingest complete' : `Failed: ${result?.error}`}
-              </div>
-            )}
-          </div>
-        )}
       </div>
 
       {/* Shows list */}
@@ -89,7 +42,7 @@ export default function Shows() {
         {loading && shows.length === 0 ? (
           <Skeleton count={5} height={20} />
         ) : shows.length === 0 ? (
-          <p style={{ color: 'var(--text-muted)' }}>No shows ingested yet. Use the form above to ingest a show.</p>
+          <p style={{ color: 'var(--text-muted)' }}>No shows ingested yet. Browse Archive.org to discover and ingest a show.</p>
         ) : (
           <div className="table-wrap">
             <table>
