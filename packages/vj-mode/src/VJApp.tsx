@@ -4,23 +4,44 @@
  */
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { AudioAnalyzer } from "./audio/AudioAnalyzer";
+import { AudioAnalyzer, type AudioAnalyzerOptions } from "./audio/AudioAnalyzer";
 import { resetExtractor } from "./audio/FeatureExtractor";
 import { VJSceneCrossfade } from "./engine/VJSceneCrossfade";
 import { VJControlPanel } from "./ui/VJControlPanel";
 import { PerformanceMonitor } from "./ui/PerformanceMonitor";
+import { VJHeadsUpDisplay } from "./ui/VJHeadsUpDisplay";
 import { initKeyboardShortcuts } from "./ui/KeyboardShortcuts";
+import { RemoteBridge } from "./remote/RemoteBridge";
 import { useVJStore } from "./state/VJStore";
+import type { SmoothedAudioState } from "./audio/types";
 
-export const VJApp: React.FC = () => {
+interface VJAppProps {
+  /** Audio analyzer options (e.g. fftSize: 1024 for low latency) */
+  audioOptions?: AudioAnalyzerOptions;
+}
+
+export const VJApp: React.FC<VJAppProps> = ({ audioOptions }) => {
   const analyzerRef = useRef<AudioAnalyzer | null>(null);
   const audioElementRef = useRef<HTMLAudioElement | null>(null);
+  const remoteBridgeRef = useRef<RemoteBridge | null>(null);
   const [isReady, setIsReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [audioState, setAudioState] = useState<SmoothedAudioState | undefined>();
+  const [transitionProgress, setTransitionProgress] = useState(0);
+  const [isTransitioning, setIsTransitioning] = useState(false);
+
+  const handleAudioState = useCallback((state: SmoothedAudioState) => {
+    setAudioState(state);
+  }, []);
+
+  const handleTransitionState = useCallback((progress: number, transitioning: boolean) => {
+    setTransitionProgress(progress);
+    setIsTransitioning(transitioning);
+  }, []);
 
   // Initialize analyzer
   useEffect(() => {
-    analyzerRef.current = new AudioAnalyzer();
+    analyzerRef.current = new AudioAnalyzer(audioOptions);
     return () => {
       analyzerRef.current?.dispose();
       analyzerRef.current = null;
@@ -30,6 +51,27 @@ export const VJApp: React.FC = () => {
   // Initialize keyboard shortcuts
   useEffect(() => {
     return initKeyboardShortcuts();
+  }, []);
+
+  // Remote bridge — listen for C key to toggle, cleanup on unmount
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (e.key.toLowerCase() === "c" && !e.shiftKey && !e.ctrlKey && !e.altKey) {
+        if (remoteBridgeRef.current) {
+          remoteBridgeRef.current.disconnect();
+          remoteBridgeRef.current = null;
+        } else {
+          remoteBridgeRef.current = new RemoteBridge();
+          remoteBridgeRef.current.connect();
+        }
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => {
+      window.removeEventListener("keydown", handler);
+      remoteBridgeRef.current?.disconnect();
+    };
   }, []);
 
   const handleMicConnect = useCallback(async () => {
@@ -143,9 +185,18 @@ export const VJApp: React.FC = () => {
   return (
     <div style={{ width: "100%", height: "100%", position: "relative" }}>
       {analyzerRef.current && (
-        <VJSceneCrossfade analyzer={analyzerRef.current} />
+        <VJSceneCrossfade
+          analyzer={analyzerRef.current}
+          onAudioState={handleAudioState}
+          onTransitionState={handleTransitionState}
+        />
       )}
       <VJControlPanel onMicConnect={handleMicConnect} onFileSelect={handleFileSelect} />
+      <VJHeadsUpDisplay
+        audioState={audioState}
+        transitionProgress={transitionProgress}
+        isTransitioning={isTransitioning}
+      />
       <PerformanceMonitor />
     </div>
   );
