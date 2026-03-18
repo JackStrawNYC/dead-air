@@ -14,7 +14,7 @@ const ENERGY_COLORS: Record<string, string> = {
   any: "#888",
 };
 
-const LABEL_MAP: Record<VisualMode, string> = {
+const LABEL_MAP: Partial<Record<VisualMode, string>> = {
   liquid_light: "Liquid Light",
   oil_projector: "Oil Projector",
   concert_lighting: "Concert",
@@ -31,6 +31,10 @@ const LABEL_MAP: Record<VisualMode, string> = {
   crystal_cavern: "Crystal",
   fluid_light: "Fluid Light",
   void_light: "Void Light",
+  fractal_flames: "Fractal Flames",
+  feedback_recursion: "Feedback",
+  truchet_tiling: "Truchet",
+  diffraction_rings: "Diffraction",
 };
 
 export const ScenePicker: React.FC = () => {

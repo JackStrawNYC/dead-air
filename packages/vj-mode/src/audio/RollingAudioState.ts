@@ -245,11 +245,18 @@ export class RollingAudioState {
       contrast: this.contrastArray,
       sectionProgress,
       sectionIndex: this.sectionIndex,
-      stemBass: this.emaBass, // fallback: use main bass
-      vocalEnergy: 0,
-      vocalPresence: 0,
-      otherEnergy: 0,
-      otherCentroid: 0,
+      stemBass: this.emaBass,
+      // Approximate stem features from frequency bands:
+      // Vocals: tonal content in mid range (low flatness = tonal, mids = vocal range)
+      vocalEnergy: this.emaMids * Math.max(0, 1 - this.emaFlatness * 2) * 0.8,
+      // Vocal presence: sustained tonal mids with centroid in vocal range (0.2-0.5)
+      vocalPresence: this.emaMids > 0.1 && this.emaFlatness < 0.4 && this.emaCentroid > 0.15 && this.emaCentroid < 0.55
+        ? Math.min(1, this.emaMids * 1.5 * (1 - this.emaFlatness))
+        : 0,
+      // Other (guitar/keys): mid-high frequencies
+      otherEnergy: (this.emaMids * 0.4 + this.emaHighs * 0.6) * 0.7,
+      // Other centroid: normalized spectral centroid in non-bass range
+      otherCentroid: Math.min(1, this.emaCentroid * 1.2),
       musicalTime: this.musicalTimeAccum,
       tempo: beat.estimatedTempo,
       isBeat: beat.isBeat,

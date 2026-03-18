@@ -141,11 +141,22 @@ describe("RollingAudioState", () => {
     expect(result.dynamicTime).toBeCloseTo(0, 3);
   });
 
-  it("stem uniforms default to 0", () => {
+  it("stem uniforms default to 0 with silent input", () => {
     const result = state.update(makeRaw(), NO_BEAT, DT, 0);
     expect(result.vocalEnergy).toBe(0);
     expect(result.vocalPresence).toBe(0);
     expect(result.otherEnergy).toBe(0);
     expect(result.otherCentroid).toBe(0);
+  });
+
+  it("stem approximations respond to non-zero inputs", () => {
+    // Feed sustained tonal mid-range audio to trigger vocal approximation
+    for (let i = 0; i < 30; i++) {
+      state.update(makeRaw({ rms: 0.4, mids: 0.5, highs: 0.3, centroid: 0.35, flatness: 0.1 }), NO_BEAT, DT, i * DT);
+    }
+    const result = state.update(makeRaw({ rms: 0.4, mids: 0.5, highs: 0.3, centroid: 0.35, flatness: 0.1 }), NO_BEAT, DT, 30 * DT);
+    expect(result.vocalEnergy).toBeGreaterThan(0);
+    expect(result.otherEnergy).toBeGreaterThan(0);
+    expect(result.otherCentroid).toBeGreaterThan(0);
   });
 });

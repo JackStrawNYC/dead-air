@@ -2,16 +2,9 @@
  * FeatureExtractor — pure function: FFT Float32Array → RawAudioFeatures.
  * Zero allocations in the hot path (pre-allocated output object).
  *
- * FFT bins at 44100 Hz sample rate, 2048 FFT size:
- *   bin frequency = bin * sampleRate / fftSize
- *   bin 0 = 0 Hz, bin 1 = ~21.5 Hz, bin 1023 = ~22050 Hz
- *   Each bin spans ~21.5 Hz
- *
- * Band boundaries (at 44100 Hz):
- *   Sub-bass (0-100 Hz):   bins 0-4
- *   Low (100-400 Hz):      bins 5-18
- *   Mids (400-2000 Hz):    bins 19-92
- *   Highs (2000-8000 Hz):  bins 93-371
+ * Band boundaries are computed dynamically from binHz = sampleRate / fftSize.
+ * At 44100 Hz, 2048 FFT: binHz ≈ 21.5 Hz (46ms latency, good frequency detail).
+ * At 44100 Hz, 1024 FFT: binHz ≈ 43 Hz (23ms latency, snappier transients).
  */
 
 import type { RawAudioFeatures } from "./types";
