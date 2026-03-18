@@ -5,6 +5,7 @@
  * Two WebGLRenderTargets (A/B) swap each frame: renders main shader to A
  * with uPrevFrame=B, then swaps and blits to screen.
  *
+ * Supports runtime feedback decay control via fxFeedbackDecay from VJStore.
  * No Remotion dependencies — VJ mode is always sequential, no gap detection needed.
  */
 
@@ -13,6 +14,7 @@ import * as THREE from "three";
 import { useThree, useFrame } from "@react-three/fiber";
 import { useVJAudio } from "./VJAudioContext";
 import { createVJUniforms, mapToUniforms } from "./VJUniformBridge";
+import { useVJStore } from "../state/VJStore";
 
 interface Props {
   vertexShader: string;
@@ -74,7 +76,7 @@ export const VJFeedbackQuad: React.FC<Props> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Screen blit material (renders final target to screen)
+  // Screen blit material with decay uniform (renders final target to screen)
   const blitMaterial = useMemo(() => {
     return new THREE.ShaderMaterial({
       vertexShader: `
@@ -87,18 +89,20 @@ export const VJFeedbackQuad: React.FC<Props> = ({
       fragmentShader: `
         precision highp float;
         uniform sampler2D uTexture;
+        uniform float uDecay;
         varying vec2 vUv;
         void main() {
-          gl_FragColor = texture2D(uTexture, vUv);
+          gl_FragColor = texture2D(uTexture, vUv) * uDecay;
         }
       `,
       uniforms: {
         uTexture: { value: null as THREE.Texture | null },
+        uDecay: { value: decay },
       },
       depthWrite: false,
       depthTest: false,
     });
-  }, []);
+  }, [decay]);
 
   // Shared geometry for blit
   const geom = useMemo(() => new THREE.PlaneGeometry(2, 2), []);
@@ -114,6 +118,10 @@ export const VJFeedbackQuad: React.FC<Props> = ({
     // Update audio uniforms
     mapToUniforms(state, uniforms as ReturnType<typeof createVJUniforms>);
     uniforms.uResolution.value.set(size.width, size.height);
+
+    // Read feedback decay from store each frame
+    const storeDecay = useVJStore.getState().fxFeedbackDecay;
+    blitMaterial.uniforms.uDecay.value = storeDecay;
 
     const writeIdx = swapRef.current;
     const readIdx = 1 - writeIdx;

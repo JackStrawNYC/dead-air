@@ -42,28 +42,6 @@ const ENTRY = join(ROOT, "src", "entry.ts");
 const BUNDLE_DIR = join(OUT_DIR, "bundle");
 const BUNDLE_HASH_FILE = join(BUNDLE_DIR, ".source-hash");
 
-// Parse args
-const args = process.argv.slice(2);
-const resume = args.includes("--resume");
-const draftMode = args.includes("--draft");
-const glArg = args.find((a) => a.startsWith("--gl="))?.split("=")[1] ?? "angle";
-const chunkSize = parseInt(args.find((a) => a.startsWith("--chunk="))?.split("=")[1] ?? "3000", 10);
-const trackFilter = args.find((a) => a.startsWith("--track="))?.split("=")[1];
-const previewMode = args.includes("--preview");
-const showDateArg = args.find((a) => a.startsWith("--show-date="))?.split("=")[1];
-const dataDirArg = args.find((a) => a.startsWith("--data-dir="))?.split("=")[1];
-const seedArg = args.find((a) => a.startsWith("--seed="))?.split("=")[1];
-const presetArg = args.find((a) => a.startsWith("--preset="))?.split("=")[1];
-// Backwards-compatible: --draft maps to draft preset, --preview flag maps to preview preset
-const activePreset: RenderPreset | null = presetArg
-  ? PRESETS[presetArg] ?? null
-  : draftMode ? PRESETS.draft : null;
-const renderSeed = seedArg ? parseInt(seedArg, 10) : Date.now();
-const PREVIEW_FRAMES = parseInt(
-  args.find((a) => a.startsWith("--preview-seconds="))?.split("=")[1] ?? "15",
-  10,
-) * 30;
-
 // ─── Render Presets ───
 
 interface RenderPreset {
@@ -81,6 +59,33 @@ const PRESETS: Record<string, RenderPreset> = {
   final:   { width: 1920, height: 1080, concurrency: 3, skipGrain: false, skipBloom: false, label: "Final (1080p, full quality, max fidelity)" },
   "4k":    { width: 3840, height: 2160, concurrency: 4, skipGrain: false, skipBloom: false, label: "4K (2160p, full quality)" },
 };
+
+// Parse args
+const args = process.argv.slice(2);
+const resume = args.includes("--resume");
+const draftMode = args.includes("--draft");
+const glArg = args.find((a) => a.startsWith("--gl="))?.split("=")[1] ?? "angle";
+const chunkSize = parseInt(args.find((a) => a.startsWith("--chunk="))?.split("=")[1] ?? "3000", 10);
+const trackFilter = args.find((a) => a.startsWith("--track="))?.split("=")[1];
+const previewMode = args.includes("--preview");
+const showDateArg = args.find((a) => a.startsWith("--show-date="))?.split("=")[1];
+const dataDirArg = args.find((a) => a.startsWith("--data-dir="))?.split("=")[1];
+const seedArg = args.find((a) => a.startsWith("--seed="))?.split("=")[1];
+const presetArg = args.find((a) => a.startsWith("--preset="))?.split("=")[1];
+const concurrencyArg = args.find((a) => a.startsWith("--concurrency="))?.split("=")[1];
+// Backwards-compatible: --draft maps to draft preset, --preview flag maps to preview preset
+const activePreset: RenderPreset | null = presetArg
+  ? PRESETS[presetArg] ?? null
+  : draftMode ? PRESETS.draft : null;
+// --concurrency=N overrides preset concurrency
+if (activePreset && concurrencyArg) {
+  activePreset.concurrency = parseInt(concurrencyArg, 10);
+}
+const renderSeed = seedArg ? parseInt(seedArg, 10) : Date.now();
+const PREVIEW_FRAMES = parseInt(
+  args.find((a) => a.startsWith("--preview-seconds="))?.split("=")[1] ?? "15",
+  10,
+) * 30;
 
 interface SetlistEntry {
   trackId: string;

@@ -1,13 +1,5 @@
 import { useState } from 'react';
-
-const MODES = [
-  'concert_lighting',
-  'liquid_light',
-  'particle_nebula',
-  'oil_projector',
-  'lo_fi_grain',
-  'stark_minimal',
-];
+import type { SceneMode } from '../api';
 
 interface Song {
   trackId: string;
@@ -21,11 +13,37 @@ interface Song {
 
 interface SetlistEditorProps {
   songs: Song[];
+  modes?: SceneMode[];
   onChange: (songs: Song[]) => void;
 }
 
-export default function SetlistEditor({ songs, onChange }: SetlistEditorProps) {
+/** Group modes by energy affinity for the dropdown */
+function groupModesByEnergy(modes: SceneMode[]): Record<string, SceneMode[]> {
+  const groups: Record<string, SceneMode[]> = { high: [], mid: [], low: [], any: [] };
+  for (const m of modes) {
+    (groups[m.energyAffinity] ??= []).push(m);
+  }
+  return groups;
+}
+
+const ENERGY_LABELS: Record<string, string> = {
+  high: 'HIGH ENERGY',
+  mid: 'MID ENERGY',
+  low: 'LOW ENERGY',
+  any: 'ANY ENERGY',
+};
+
+const ENERGY_COLORS: Record<string, string> = {
+  high: '#ff5050',
+  mid: '#ffaa44',
+  low: '#44aaff',
+  any: '#aaa',
+};
+
+export default function SetlistEditor({ songs, modes, onChange }: SetlistEditorProps) {
   const [editIdx, setEditIdx] = useState<number | null>(null);
+
+  const grouped = modes ? groupModesByEnergy(modes) : null;
 
   const updateSong = (index: number, patch: Partial<Song>) => {
     const updated = songs.map((s, i) => (i === index ? { ...s, ...patch } : s));
@@ -85,12 +103,43 @@ export default function SetlistEditor({ songs, onChange }: SetlistEditorProps) {
                           value={song.defaultMode}
                           onChange={e => updateSong(globalIdx, { defaultMode: e.target.value })}
                           onClick={e => e.stopPropagation()}
+                          style={{ maxWidth: 200 }}
                         >
-                          {MODES.map(m => <option key={m} value={m}>{m}</option>)}
+                          {grouped ? (
+                            (['high', 'mid', 'low', 'any'] as const).map(band => {
+                              const group = grouped[band];
+                              if (!group || group.length === 0) return null;
+                              return (
+                                <optgroup key={band} label={ENERGY_LABELS[band]}>
+                                  {group.map(m => (
+                                    <option key={m.id} value={m.id}>{m.id}</option>
+                                  ))}
+                                </optgroup>
+                              );
+                            })
+                          ) : (
+                            <option value={song.defaultMode}>{song.defaultMode}</option>
+                          )}
                         </select>
                       ) : (
                         <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--blue)' }}>
                           {song.defaultMode}
+                          {modes && (() => {
+                            const mode = modes.find(m => m.id === song.defaultMode);
+                            if (!mode) return null;
+                            return (
+                              <span style={{
+                                marginLeft: 6,
+                                fontSize: 9,
+                                padding: '1px 4px',
+                                borderRadius: 3,
+                                backgroundColor: ENERGY_COLORS[mode.energyAffinity] + '33',
+                                color: ENERGY_COLORS[mode.energyAffinity],
+                              }}>
+                                {mode.energyAffinity}
+                              </span>
+                            );
+                          })()}
                         </span>
                       )}
                     </td>

@@ -64,11 +64,20 @@ export function runIngest(date: string): Job {
 export function runVisualizerRender(opts: {
   track?: string;
   resume?: boolean;
+  preset?: string;
+  preview?: boolean;
+  gl?: string;
+  concurrency?: number;
+  seed?: number;
 }): Job {
   const args = ['tsx', VISUALIZER_RENDER];
   if (opts.track) args.push(`--track=${opts.track}`);
   if (opts.resume) args.push('--resume');
-  args.push('--gl=angle');
+  if (opts.preset) args.push(`--preset=${opts.preset}`);
+  if (opts.preview) args.push('--preview');
+  if (opts.concurrency) args.push(`--concurrency=${opts.concurrency}`);
+  if (opts.seed) args.push(`--seed=${opts.seed}`);
+  args.push(`--gl=${opts.gl || 'angle'}`);
 
   const job = createJob({ type: 'render' });
   spawnAndStream(job, 'npx', args);

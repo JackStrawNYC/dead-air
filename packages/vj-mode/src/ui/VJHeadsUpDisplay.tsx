@@ -1,11 +1,12 @@
 /**
  * VJHeadsUpDisplay — minimal translucent HUD for VJ operator.
- * Shows scene name, energy meters, BPM, transition progress,
- * blackout/freeze/lock indicators, and MIDI status.
+ * Shows scene name, energy meters (BAS/MID/HI/ENR/COH), section progress,
+ * onset flash, BPM, transition progress, FX count, transition mode badge,
+ * and blackout/freeze/lock/auto/MIDI indicators.
  */
 
 import React from "react";
-import { useVJStore } from "../state/VJStore";
+import { useVJStore, type GrainStrength } from "../state/VJStore";
 import { VJ_SCENES } from "../scenes/scene-list";
 import { isMIDIActive } from "./MIDIController";
 import type { SmoothedAudioState } from "../audio/types";
@@ -32,6 +33,29 @@ const meterTrackStyle: React.CSSProperties = {
   overflow: "hidden",
 };
 
+/** Count active FX toggles */
+function countActiveFx(store: ReturnType<typeof useVJStore.getState>): number {
+  let count = 0;
+  if (store.fxBloom) count++;
+  if (store.fxFlare) count++;
+  if (store.fxHalation) count++;
+  if (store.fxCA) count++;
+  if (store.fxStageFlood) count++;
+  if (store.fxBeatPulse) count++;
+  if (store.fxCRT) count++;
+  if (store.fxAnaglyph) count++;
+  if (store.fxPaletteCycle) count++;
+  if (store.fxThermalShimmer) count++;
+  if (store.fxGrain !== "none") count++;
+  return count;
+}
+
+const TRANSITION_MODE_LABELS: Record<string, string> = {
+  linear: "LIN",
+  beat_synced: "SYNC",
+  beat_pumped: "PUMP",
+};
+
 export const VJHeadsUpDisplay: React.FC<Props> = ({
   audioState,
   transitionProgress = 0,
@@ -46,6 +70,7 @@ export const VJHeadsUpDisplay: React.FC<Props> = ({
   const hasFeedback = entry?.feedback ?? false;
   const midi = isMIDIActive();
   const bpm = audioState?.tempo ?? 0;
+  const fxCount = countActiveFx(store);
 
   return (
     <div
@@ -69,7 +94,7 @@ export const VJHeadsUpDisplay: React.FC<Props> = ({
         lineHeight: 1.4,
       }}
     >
-      {/* Scene name + affinity */}
+      {/* Scene name + affinity + feedback */}
       <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
         <span style={{ color: "#fff", fontWeight: 600 }}>
           {store.currentScene.replace(/_/g, " ")}
@@ -114,10 +139,47 @@ export const VJHeadsUpDisplay: React.FC<Props> = ({
         </div>
       </div>
 
+      {/* Energy + Coherence meters */}
+      <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+        <span style={{ width: "24px" }}>ENR</span>
+        <div style={meterTrackStyle}>
+          <div style={meterStyle(audioState?.energy ?? 0, "#88ff88")} />
+        </div>
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+        <span style={{ width: "24px" }}>COH</span>
+        <div style={meterTrackStyle}>
+          <div style={meterStyle(audioState?.coherence ?? 0, "#cc88ff")} />
+        </div>
+      </div>
+
+      {/* Section progress */}
+      <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+        <span style={{ width: "24px" }}>SEC</span>
+        <div style={meterTrackStyle}>
+          <div style={meterStyle(audioState?.sectionProgress ?? 0, "#ffff88")} />
+        </div>
+      </div>
+
+      {/* Onset flash indicator */}
+      {(audioState?.onset ?? 0) > 0.3 && (
+        <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+          <span style={{ width: "24px" }}>ONS</span>
+          <div
+            style={{
+              width: 8,
+              height: 8,
+              borderRadius: "50%",
+              backgroundColor: `rgba(255,255,255,${audioState?.onset ?? 0})`,
+            }}
+          />
+        </div>
+      )}
+
       {/* BPM */}
       <div>
         <span style={{ color: "rgba(255,255,255,0.5)" }}>BPM </span>
-        <span>{bpm > 40 ? bpm.toFixed(0) : "—"}</span>
+        <span>{bpm > 40 ? bpm.toFixed(0) : "\u2014"}</span>
       </div>
 
       {/* Transition progress */}
@@ -146,6 +208,28 @@ export const VJHeadsUpDisplay: React.FC<Props> = ({
         )}
         {midi && (
           <span style={{ color: "#88ff88" }}>MIDI</span>
+        )}
+        {/* Transition mode badge */}
+        <span style={{
+          fontSize: "8px",
+          padding: "1px 4px",
+          borderRadius: "3px",
+          backgroundColor: "rgba(100,200,255,0.2)",
+          color: "#8cf",
+        }}>
+          {TRANSITION_MODE_LABELS[store.transitionMode] ?? store.transitionMode}
+        </span>
+        {/* FX count badge */}
+        {fxCount > 0 && (
+          <span style={{
+            fontSize: "8px",
+            padding: "1px 4px",
+            borderRadius: "3px",
+            backgroundColor: "rgba(100,255,100,0.2)",
+            color: "#8f8",
+          }}>
+            FX:{fxCount}
+          </span>
         )}
       </div>
     </div>

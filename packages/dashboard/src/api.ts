@@ -57,5 +57,24 @@ export const saveChapters = (data: any) =>
 export const fetchOverlaySchedule = () => request<any>('/visualizer/overlay-schedule');
 export const saveOverlaySchedule = (data: any) =>
   request<any>('/visualizer/overlay-schedule', { method: 'PUT', body: JSON.stringify(data) });
-export const startVisualizerRender = (opts?: { track?: string; resume?: boolean }) =>
+export const startVisualizerRender = (opts?: {
+  track?: string; resume?: boolean; preset?: string;
+  preview?: boolean; gl?: string; concurrency?: number; seed?: number;
+}) =>
   request<{ jobId: string }>('/visualizer/render', { method: 'POST', body: JSON.stringify(opts || {}) });
+
+// Scene Registry & Song Identities
+export interface SceneMode {
+  id: string;
+  energyAffinity: 'low' | 'mid' | 'high' | 'any';
+  complement: string;
+}
+export const fetchSceneRegistry = () => request<{ modes: SceneMode[] }>('/visualizer/scene-registry');
+export const fetchRenderPresets = () => request<Record<string, {
+  width: number; height: number; concurrency: number;
+  skipGrain: boolean; skipBloom: boolean; label: string;
+}>>('/visualizer/render-presets');
+export const fetchSongIdentities = () => request<Record<string, any>>('/visualizer/song-identities');
+export const saveSongIdentities = (data: Record<string, any>) =>
+  request<any>('/visualizer/song-identities', { method: 'PUT', body: JSON.stringify(data) });
+export const fetchOverlayNames = () => request<string[]>('/visualizer/overlay-names');

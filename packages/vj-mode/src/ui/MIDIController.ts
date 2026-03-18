@@ -18,7 +18,7 @@ import { VJ_SCENE_LIST, VJ_SCENES } from "../scenes/scene-list";
 
 export interface MIDICCMapping {
   cc: number;
-  action: "jamDensity" | "palettePrimary" | "paletteSecondary" | "paletteSaturation" | "transitionSpeed" | "nextScene" | "cyclePalette" | "toggleAutoTransition" | "resolution" | "blackout" | "freeze";
+  action: "jamDensity" | "palettePrimary" | "paletteSecondary" | "paletteSaturation" | "transitionSpeed" | "nextScene" | "cyclePalette" | "toggleAutoTransition" | "resolution" | "blackout" | "freeze" | "toggleBloom" | "cycleGrain" | "toggleCRT" | "bloomThreshold" | "feedbackDecay" | "cycleTransitionMode" | "toggleFlare" | "toggleAnaglyph";
 }
 
 const DEFAULT_MAPPINGS: MIDICCMapping[] = [
@@ -32,6 +32,14 @@ const DEFAULT_MAPPINGS: MIDICCMapping[] = [
   { cc: 11, action: "freeze" },
   { cc: 14, action: "nextScene" },
   { cc: 15, action: "cyclePalette" },
+  { cc: 16, action: "toggleBloom" },
+  { cc: 17, action: "cycleGrain" },
+  { cc: 18, action: "toggleCRT" },
+  { cc: 19, action: "bloomThreshold" },
+  { cc: 20, action: "feedbackDecay" },
+  { cc: 21, action: "cycleTransitionMode" },
+  { cc: 22, action: "toggleFlare" },
+  { cc: 23, action: "toggleAnaglyph" },
   { cc: 64, action: "toggleAutoTransition" },
 ];
 
@@ -109,6 +117,42 @@ function handleMIDIMessage(event: MIDIMessageEvent): void {
     case "freeze":
       if (value > 64) {
         store.setFreeze(!store.freeze);
+      }
+      break;
+    case "toggleBloom":
+      if (value > 64) {
+        store.setFxBloom(!store.fxBloom);
+      }
+      break;
+    case "cycleGrain":
+      if (value > 64) {
+        store.cycleGrainStrength();
+      }
+      break;
+    case "toggleCRT":
+      if (value > 64) {
+        store.setFxCRT(!store.fxCRT);
+      }
+      break;
+    case "bloomThreshold":
+      store.setFxBloomThreshold(normalized);
+      break;
+    case "feedbackDecay":
+      store.setFxFeedbackDecay(0.8 + normalized * 0.2); // 0.80-1.00
+      break;
+    case "cycleTransitionMode":
+      if (value > 64) {
+        store.cycleTransitionMode();
+      }
+      break;
+    case "toggleFlare":
+      if (value > 64) {
+        store.setFxFlare(!store.fxFlare);
+      }
+      break;
+    case "toggleAnaglyph":
+      if (value > 64) {
+        store.setFxAnaglyph(!store.fxAnaglyph);
       }
       break;
   }

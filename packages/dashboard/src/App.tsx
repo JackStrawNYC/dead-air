@@ -9,6 +9,7 @@ import RenderMonitor from './pages/RenderMonitor';
 import Assets from './pages/Assets';
 import Costs from './pages/Costs';
 import EpisodeDetail from './pages/EpisodeDetail';
+import SongIdentities from './pages/SongIdentities';
 
 export default function App() {
   return (
@@ -18,6 +19,7 @@ export default function App() {
         <Route path="/shows" element={<Shows />} />
         <Route path="/shows/:id" element={<ShowDetail />} />
         <Route path="/shows/:id/analysis" element={<ShowAnalysis />} />
+        <Route path="/song-identities" element={<SongIdentities />} />
         <Route path="/pipeline" element={<Pipeline />} />
         <Route path="/pipeline/:date" element={<Pipeline />} />
         <Route path="/render" element={<RenderMonitor />} />

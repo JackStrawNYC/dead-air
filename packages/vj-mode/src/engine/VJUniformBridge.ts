@@ -5,6 +5,7 @@
 
 import * as THREE from "three";
 import type { SmoothedAudioState } from "../audio/types";
+import { useVJStore, type GrainStrength } from "../state/VJStore";
 
 export interface VJUniforms {
   uTime: THREE.IUniform<number>;
@@ -53,6 +54,20 @@ export interface VJUniforms {
   uOtherEnergy: THREE.IUniform<number>;
   uOtherCentroid: THREE.IUniform<number>;
   uSnapToMusicalTime: THREE.IUniform<number>;
+  // FX uniforms
+  uFxBloom: THREE.IUniform<number>;
+  uFxGrain: THREE.IUniform<number>;
+  uFxFlare: THREE.IUniform<number>;
+  uFxHalation: THREE.IUniform<number>;
+  uFxCA: THREE.IUniform<number>;
+  uFxStageFlood: THREE.IUniform<number>;
+  uFxBeatPulse: THREE.IUniform<number>;
+  uFxCRT: THREE.IUniform<number>;
+  uFxAnaglyph: THREE.IUniform<number>;
+  uFxPaletteCycle: THREE.IUniform<number>;
+  uFxThermalShimmer: THREE.IUniform<number>;
+  uFxBloomThreshold: THREE.IUniform<number>;
+  uFxFeedbackDecay: THREE.IUniform<number>;
   [key: string]: THREE.IUniform;
 }
 
@@ -105,6 +120,20 @@ export function createVJUniforms(width: number, height: number): VJUniforms {
     uOtherEnergy: { value: 0 },
     uOtherCentroid: { value: 0 },
     uSnapToMusicalTime: { value: 0 },
+    // FX uniforms
+    uFxBloom: { value: 0 },
+    uFxGrain: { value: 0 },
+    uFxFlare: { value: 0 },
+    uFxHalation: { value: 0 },
+    uFxCA: { value: 0 },
+    uFxStageFlood: { value: 0 },
+    uFxBeatPulse: { value: 0 },
+    uFxCRT: { value: 0 },
+    uFxAnaglyph: { value: 0 },
+    uFxPaletteCycle: { value: 0 },
+    uFxThermalShimmer: { value: 0 },
+    uFxBloomThreshold: { value: 0.5 },
+    uFxFeedbackDecay: { value: 0.97 },
   };
 }
 
@@ -168,4 +197,30 @@ export function mapToUniforms(state: SmoothedAudioState, u: VJUniforms): void {
   const camOffX = Math.sin(t * 3.7) * bassAmp * 0.5 + Math.sin(dt * 0.03 * Math.PI * 2) * 4;
   const camOffY = Math.cos(t * 2.3) * bassAmp * 0.3 + Math.cos(dt * 0.03 * Math.PI * 2 * 0.7 + 1.3) * 2.4;
   u.uCamOffset.value.set(camOffX, camOffY);
+
+  // FX uniforms from VJStore
+  const fx = useVJStore.getState();
+  u.uFxBloom.value = fx.fxBloom ? 1.0 : 0.0;
+  u.uFxGrain.value = grainToFloat(fx.fxGrain);
+  u.uFxFlare.value = fx.fxFlare ? 1.0 : 0.0;
+  u.uFxHalation.value = fx.fxHalation ? 1.0 : 0.0;
+  u.uFxCA.value = fx.fxCA ? 1.0 : 0.0;
+  u.uFxStageFlood.value = fx.fxStageFlood ? 1.0 : 0.0;
+  u.uFxBeatPulse.value = fx.fxBeatPulse ? 1.0 : 0.0;
+  u.uFxCRT.value = fx.fxCRT ? 1.0 : 0.0;
+  u.uFxAnaglyph.value = fx.fxAnaglyph ? 1.0 : 0.0;
+  u.uFxPaletteCycle.value = fx.fxPaletteCycle ? 1.0 : 0.0;
+  u.uFxThermalShimmer.value = fx.fxThermalShimmer ? 1.0 : 0.0;
+  u.uFxBloomThreshold.value = fx.fxBloomThreshold;
+  u.uFxFeedbackDecay.value = fx.fxFeedbackDecay;
+}
+
+/** Convert GrainStrength to float for shader uniform */
+function grainToFloat(strength: GrainStrength): number {
+  switch (strength) {
+    case "none": return 0.0;
+    case "low": return 0.33;
+    case "mid": return 0.66;
+    case "high": return 1.0;
+  }
 }

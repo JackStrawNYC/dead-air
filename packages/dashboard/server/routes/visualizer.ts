@@ -20,6 +20,15 @@ function writeJsonFile(path: string, data: unknown): void {
   writeFileSync(path, JSON.stringify(data, null, 2) + '\n', 'utf-8');
 }
 
+// ─── Render Presets ───
+
+const RENDER_PRESETS = {
+  draft:   { width: 1280, height: 720,  concurrency: 6, skipGrain: true,  skipBloom: true,  label: 'Draft (720p, no grain/bloom)' },
+  preview: { width: 1920, height: 1080, concurrency: 4, skipGrain: false, skipBloom: false, label: 'Preview (1080p, full quality)' },
+  final:   { width: 1920, height: 1080, concurrency: 3, skipGrain: false, skipBloom: false, label: 'Final (1080p, full quality, max fidelity)' },
+  '4k':    { width: 3840, height: 2160, concurrency: 4, skipGrain: false, skipBloom: false, label: '4K (2160p, full quality)' },
+};
+
 // GET /api/visualizer/setlist
 router.get('/setlist', (_req, res) => {
   const data = readJsonFile(resolve(VIZ_DATA, 'setlist.json'));
@@ -59,10 +68,42 @@ router.put('/overlay-schedule', (req, res) => {
   res.json({ ok: true });
 });
 
+// GET /api/visualizer/scene-registry (read-only)
+router.get('/scene-registry', (_req, res) => {
+  const data = readJsonFile(resolve(VIZ_DATA, 'scene-registry.json'));
+  if (!data) return res.status(404).json({ error: 'scene-registry.json not found. Run: npx tsx scripts/export-scene-registry.ts' });
+  res.json(data);
+});
+
+// GET /api/visualizer/render-presets (read-only)
+router.get('/render-presets', (_req, res) => {
+  res.json(RENDER_PRESETS);
+});
+
+// GET /api/visualizer/song-identities
+router.get('/song-identities', (_req, res) => {
+  const data = readJsonFile(resolve(VIZ_DATA, 'song-identities.json'));
+  if (!data) return res.status(404).json({ error: 'song-identities.json not found. Run: npx tsx scripts/export-song-identities.ts' });
+  res.json(data);
+});
+
+// PUT /api/visualizer/song-identities
+router.put('/song-identities', (req, res) => {
+  writeJsonFile(resolve(VIZ_DATA, 'song-identities.json'), req.body);
+  res.json({ ok: true });
+});
+
+// GET /api/visualizer/overlay-names (read-only)
+router.get('/overlay-names', (_req, res) => {
+  const data = readJsonFile(resolve(VIZ_DATA, 'overlay-names.json'));
+  if (!data) return res.status(404).json({ error: 'overlay-names.json not found. Run: npx tsx scripts/export-overlay-names.ts' });
+  res.json(data);
+});
+
 // POST /api/visualizer/render — spawn visualizer render
 router.post('/render', (req, res) => {
-  const { track, resume } = req.body || {};
-  const job = runVisualizerRender({ track, resume });
+  const { track, resume, preset, preview, gl, concurrency, seed } = req.body || {};
+  const job = runVisualizerRender({ track, resume, preset, preview, gl, concurrency, seed });
   res.json({ jobId: job.id });
 });
 

@@ -1,13 +1,15 @@
 /**
  * VJStore — Zustand store for VJ mode global state.
  * Controls scene, palette, audio source, transition, performance settings,
- * preset banks, recording state, and remote control status.
+ * FX (PostProcess), preset banks, recording state, and remote control status.
  */
 
 import { create } from "zustand";
 import type { VisualMode } from "@visualizer/data/types";
 
 export type AudioSource = "mic" | "file";
+export type TransitionModeType = "linear" | "beat_synced" | "beat_pumped";
+export type GrainStrength = "none" | "low" | "mid" | "high";
 
 /** Snapshot of VJ state that can be saved/recalled as a preset */
 export interface PresetBank {
@@ -19,6 +21,21 @@ export interface PresetBank {
   transitionSpeed: number;
   autoTransition: boolean;
   resolution: number;
+  // FX state
+  fxBloom: boolean;
+  fxGrain: GrainStrength;
+  fxFlare: boolean;
+  fxHalation: boolean;
+  fxCA: boolean;
+  fxStageFlood: boolean;
+  fxBeatPulse: boolean;
+  fxCRT: boolean;
+  fxAnaglyph: boolean;
+  fxPaletteCycle: boolean;
+  fxThermalShimmer: boolean;
+  fxBloomThreshold: number;
+  fxFeedbackDecay: number;
+  transitionMode: TransitionModeType;
 }
 
 interface VJState {
@@ -44,11 +61,28 @@ interface VJState {
   // UI
   showControls: boolean;
   showHUD: boolean;
+  showFXPanel: boolean;
 
   // VJ operator controls
   blackout: boolean;
   freeze: boolean;
   lockedScene: boolean;
+
+  // FX (PostProcess)
+  fxBloom: boolean;
+  fxGrain: GrainStrength;
+  fxFlare: boolean;
+  fxHalation: boolean;
+  fxCA: boolean;
+  fxStageFlood: boolean;
+  fxBeatPulse: boolean;
+  fxCRT: boolean;
+  fxAnaglyph: boolean;
+  fxPaletteCycle: boolean;
+  fxThermalShimmer: boolean;
+  fxBloomThreshold: number; // 0-1
+  fxFeedbackDecay: number;  // 0-1
+  transitionMode: TransitionModeType;
 
   // Preset banks (slots 1-9)
   presets: Record<number, PresetBank | null>;
@@ -75,12 +109,31 @@ interface VJState {
   setShowFPS: (show: boolean) => void;
   setShowControls: (show: boolean) => void;
   setShowHUD: (show: boolean) => void;
+  setShowFXPanel: (show: boolean) => void;
   setBlackout: (on: boolean) => void;
   setFreeze: (on: boolean) => void;
   setLockedScene: (locked: boolean) => void;
   cyclePresetPalette: () => void;
   nudgePrimaryHue: (delta: number) => void;
   nudgeSaturation: (delta: number) => void;
+
+  // FX actions
+  setFxBloom: (on: boolean) => void;
+  setFxGrain: (strength: GrainStrength) => void;
+  cycleGrainStrength: () => void;
+  setFxFlare: (on: boolean) => void;
+  setFxHalation: (on: boolean) => void;
+  setFxCA: (on: boolean) => void;
+  setFxStageFlood: (on: boolean) => void;
+  setFxBeatPulse: (on: boolean) => void;
+  setFxCRT: (on: boolean) => void;
+  setFxAnaglyph: (on: boolean) => void;
+  setFxPaletteCycle: (on: boolean) => void;
+  setFxThermalShimmer: (on: boolean) => void;
+  setFxBloomThreshold: (t: number) => void;
+  setFxFeedbackDecay: (d: number) => void;
+  setTransitionMode: (mode: TransitionModeType) => void;
+  cycleTransitionMode: () => void;
 
   // Preset actions
   savePreset: (slot: number) => void;
@@ -110,6 +163,9 @@ const PALETTE_PRESETS = [
 let presetIndex = 0;
 
 const PRESETS_STORAGE_KEY = "vj-preset-banks";
+
+const GRAIN_CYCLE: GrainStrength[] = ["none", "low", "mid", "high"];
+const TRANSITION_MODE_CYCLE: TransitionModeType[] = ["linear", "beat_synced", "beat_pumped"];
 
 /** Load presets from localStorage */
 function loadPresetsFromStorage(): Record<number, PresetBank | null> {
@@ -156,11 +212,28 @@ export const useVJStore = create<VJState>((set, get) => ({
   // UI defaults
   showControls: true,
   showHUD: false,
+  showFXPanel: false,
 
   // VJ operator defaults
   blackout: false,
   freeze: false,
   lockedScene: false,
+
+  // FX defaults (all off)
+  fxBloom: false,
+  fxGrain: "none",
+  fxFlare: false,
+  fxHalation: false,
+  fxCA: false,
+  fxStageFlood: false,
+  fxBeatPulse: false,
+  fxCRT: false,
+  fxAnaglyph: false,
+  fxPaletteCycle: false,
+  fxThermalShimmer: false,
+  fxBloomThreshold: 0.5,
+  fxFeedbackDecay: 0.97,
+  transitionMode: "linear",
 
   // Preset banks
   presets: loadPresetsFromStorage(),
@@ -187,6 +260,7 @@ export const useVJStore = create<VJState>((set, get) => ({
   setShowFPS: (show) => set({ showFPS: show }),
   setShowControls: (show) => set({ showControls: show }),
   setShowHUD: (show) => set({ showHUD: show }),
+  setShowFXPanel: (show) => set({ showFXPanel: show }),
   setBlackout: (on) => set({ blackout: on }),
   setFreeze: (on) => set({ freeze: on }),
   setLockedScene: (locked) => set({ lockedScene: locked }),
@@ -205,6 +279,30 @@ export const useVJStore = create<VJState>((set, get) => ({
       paletteSaturation: Math.max(0, Math.min(1, s.paletteSaturation + delta)),
     })),
 
+  // FX actions
+  setFxBloom: (on) => set({ fxBloom: on }),
+  setFxGrain: (strength) => set({ fxGrain: strength }),
+  cycleGrainStrength: () => set((s) => {
+    const idx = GRAIN_CYCLE.indexOf(s.fxGrain);
+    return { fxGrain: GRAIN_CYCLE[(idx + 1) % GRAIN_CYCLE.length] };
+  }),
+  setFxFlare: (on) => set({ fxFlare: on }),
+  setFxHalation: (on) => set({ fxHalation: on }),
+  setFxCA: (on) => set({ fxCA: on }),
+  setFxStageFlood: (on) => set({ fxStageFlood: on }),
+  setFxBeatPulse: (on) => set({ fxBeatPulse: on }),
+  setFxCRT: (on) => set({ fxCRT: on }),
+  setFxAnaglyph: (on) => set({ fxAnaglyph: on }),
+  setFxPaletteCycle: (on) => set({ fxPaletteCycle: on }),
+  setFxThermalShimmer: (on) => set({ fxThermalShimmer: on }),
+  setFxBloomThreshold: (t) => set({ fxBloomThreshold: Math.max(0, Math.min(1, t)) }),
+  setFxFeedbackDecay: (d) => set({ fxFeedbackDecay: Math.max(0, Math.min(1, d)) }),
+  setTransitionMode: (mode) => set({ transitionMode: mode }),
+  cycleTransitionMode: () => set((s) => {
+    const idx = TRANSITION_MODE_CYCLE.indexOf(s.transitionMode);
+    return { transitionMode: TRANSITION_MODE_CYCLE[(idx + 1) % TRANSITION_MODE_CYCLE.length] };
+  }),
+
   // Preset actions
   savePreset: (slot) => {
     const s = get();
@@ -217,6 +315,21 @@ export const useVJStore = create<VJState>((set, get) => ({
       transitionSpeed: s.transitionSpeed,
       autoTransition: s.autoTransition,
       resolution: s.resolution,
+      // FX state
+      fxBloom: s.fxBloom,
+      fxGrain: s.fxGrain,
+      fxFlare: s.fxFlare,
+      fxHalation: s.fxHalation,
+      fxCA: s.fxCA,
+      fxStageFlood: s.fxStageFlood,
+      fxBeatPulse: s.fxBeatPulse,
+      fxCRT: s.fxCRT,
+      fxAnaglyph: s.fxAnaglyph,
+      fxPaletteCycle: s.fxPaletteCycle,
+      fxThermalShimmer: s.fxThermalShimmer,
+      fxBloomThreshold: s.fxBloomThreshold,
+      fxFeedbackDecay: s.fxFeedbackDecay,
+      transitionMode: s.transitionMode,
     };
     const presets = { ...s.presets, [slot]: preset };
     persistPresetsToStorage(presets);
@@ -236,6 +349,21 @@ export const useVJStore = create<VJState>((set, get) => ({
       transitionSpeed: preset.transitionSpeed,
       autoTransition: preset.autoTransition,
       resolution: preset.resolution,
+      // FX state (with backwards-compat defaults for old presets)
+      fxBloom: preset.fxBloom ?? false,
+      fxGrain: preset.fxGrain ?? "none",
+      fxFlare: preset.fxFlare ?? false,
+      fxHalation: preset.fxHalation ?? false,
+      fxCA: preset.fxCA ?? false,
+      fxStageFlood: preset.fxStageFlood ?? false,
+      fxBeatPulse: preset.fxBeatPulse ?? false,
+      fxCRT: preset.fxCRT ?? false,
+      fxAnaglyph: preset.fxAnaglyph ?? false,
+      fxPaletteCycle: preset.fxPaletteCycle ?? false,
+      fxThermalShimmer: preset.fxThermalShimmer ?? false,
+      fxBloomThreshold: preset.fxBloomThreshold ?? 0.5,
+      fxFeedbackDecay: preset.fxFeedbackDecay ?? 0.97,
+      transitionMode: preset.transitionMode ?? "linear",
     });
   },
 

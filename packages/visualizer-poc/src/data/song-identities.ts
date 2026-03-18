@@ -17,8 +17,31 @@
  * merging into SONG_IDENTITIES at init time based on BandConfig.
  */
 
+import { existsSync, readFileSync } from "fs";
+import { resolve, dirname } from "path";
 import type { VisualMode, ColorPalette, OverlayTag, TrackMeta, EnhancedFrameData } from "./types";
 import type { DrumsSpaceSubPhase } from "../utils/drums-space-phase";
+
+// ─── JSON Override Layer ───
+// Dashboard edits write to data/song-identities.json; lookupSongIdentity checks it first.
+
+let jsonOverrides: Record<string, SongIdentity> | null = null;
+let jsonOverridesLoaded = false;
+
+function loadJsonOverrides(): Record<string, SongIdentity> | null {
+  if (jsonOverridesLoaded) return jsonOverrides;
+  jsonOverridesLoaded = true;
+  try {
+    // Works both at build-time (tsx scripts) and in bundled Remotion render
+    const jsonPath = resolve(__dirname, "../../data/song-identities.json");
+    if (existsSync(jsonPath)) {
+      jsonOverrides = JSON.parse(readFileSync(jsonPath, "utf-8"));
+    }
+  } catch {
+    // Silently fall through to TS defaults
+  }
+  return jsonOverrides;
+}
 
 // ─── Types ───
 
@@ -757,12 +780,19 @@ const SONG_ALIASES: Record<string, string> = {
 export function lookupSongIdentity(title: string): SongIdentity | undefined {
   const normalized = normalizeTitle(title);
 
-  // Direct match
+  // 1. Check JSON overrides first (dashboard-edited)
+  const overrides = loadJsonOverrides();
+  if (overrides) {
+    if (overrides[normalized]) return overrides[normalized];
+    const aliased = SONG_ALIASES[normalized];
+    if (aliased && overrides[aliased]) return overrides[aliased];
+  }
+
+  // 2. Fall back to TS defaults
   if (SONG_IDENTITIES[normalized]) {
     return SONG_IDENTITIES[normalized];
   }
 
-  // Alias match
   const aliased = SONG_ALIASES[normalized];
   if (aliased && SONG_IDENTITIES[aliased]) {
     return SONG_IDENTITIES[aliased];

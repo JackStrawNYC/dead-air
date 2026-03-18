@@ -4,20 +4,25 @@ import {
   fetchShow, fetchSetlist, saveSetlist,
   fetchChapters, saveChapters,
   fetchOverlaySchedule, saveOverlaySchedule,
-  startVisualizerRender,
+  startVisualizerRender, fetchSceneRegistry,
+  type SceneMode,
 } from '../api';
 import { useJob } from '../hooks/useJob';
 import SetlistEditor from '../components/SetlistEditor';
 import ChapterEditor from '../components/ChapterEditor';
 import OverlayScheduleEditor from '../components/OverlayScheduleEditor';
+import RenderSettings from '../components/RenderSettings';
 import LogStream from '../components/LogStream';
 
-type Tab = 'info' | 'setlist' | 'chapters' | 'overlays';
+type Tab = 'info' | 'setlist' | 'chapters' | 'overlays' | 'render';
 
 export default function ShowDetail() {
   const { id } = useParams<{ id: string }>();
   const [show, setShow] = useState<any>(null);
   const [tab, setTab] = useState<Tab>('info');
+
+  // Scene registry
+  const [sceneModes, setSceneModes] = useState<SceneMode[]>([]);
 
   // Setlist state
   const [setlistData, setSetlistData] = useState<any>(null);
@@ -43,6 +48,7 @@ export default function ShowDetail() {
       fetchSetlist().then(setSetlistData).catch(() => {});
       fetchChapters().then(setChaptersData).catch(() => {});
       fetchOverlaySchedule().then(setOverlaysData).catch(() => {});
+      fetchSceneRegistry().then(r => setSceneModes(r.modes)).catch(() => {});
     }
   }, [id]);
 
@@ -70,8 +76,8 @@ export default function ShowDetail() {
     setSaving(false);
   };
 
-  const handleRender = async () => {
-    const { jobId } = await startVisualizerRender({ resume: true });
+  const handleStartRender = async (opts: Parameters<typeof startVisualizerRender>[0]) => {
+    const { jobId } = await startVisualizerRender(opts);
     setRenderJobId(jobId);
   };
 
@@ -80,6 +86,7 @@ export default function ShowDetail() {
     { key: 'setlist', label: 'Setlist' },
     { key: 'chapters', label: 'Chapters' },
     { key: 'overlays', label: 'Overlays' },
+    { key: 'render', label: 'Render' },
   ];
 
   if (!show) return <div className="card" style={{ padding: 40 }}><p style={{ color: 'var(--text-muted)' }}>Loading...</p></div>;
@@ -105,10 +112,6 @@ export default function ShowDetail() {
             {t.label}
           </button>
         ))}
-        <div style={{ flex: 1 }} />
-        <button className="btn btn-primary" onClick={handleRender}>
-          Render Show
-        </button>
       </div>
 
       {/* Tab content */}
@@ -175,6 +178,7 @@ export default function ShowDetail() {
           </div>
           <SetlistEditor
             songs={setlistData.songs || []}
+            modes={sceneModes.length > 0 ? sceneModes : undefined}
             onChange={songs => {
               setSetlistData({ ...setlistData, songs });
               setSetlistDirty(true);
@@ -227,19 +231,15 @@ export default function ShowDetail() {
         </div>
       )}
 
-      {/* Render log */}
-      {renderJobId && (
-        <div className="card mt-16">
-          <div className="card-header">
-            <h3>Render Output</h3>
-            {renderDone && (
-              <span style={{ color: renderResult?.success ? 'var(--green)' : 'var(--red)', fontSize: 13 }}>
-                {renderResult?.success ? 'Complete' : `Failed: ${renderResult?.error}`}
-              </span>
-            )}
-          </div>
-          <LogStream lines={renderLog} maxHeight={300} />
-        </div>
+      {tab === 'render' && (
+        <RenderSettings
+          songs={setlistData?.songs || []}
+          onStartRender={handleStartRender}
+          renderJobId={renderJobId}
+          renderLog={renderLog}
+          renderDone={renderDone}
+          renderResult={renderResult}
+        />
       )}
     </div>
   );

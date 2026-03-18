@@ -7,6 +7,8 @@ import { useVJStore } from "../state/VJStore";
 import { ScenePicker } from "./ScenePicker";
 import { PalettePicker } from "./PalettePicker";
 import { AudioSourceSelector } from "./AudioSourceSelector";
+import { FXPanel } from "./FXPanel";
+import { TransitionModePicker } from "./TransitionModePicker";
 
 interface Props {
   onMicConnect: () => void;
@@ -21,6 +23,8 @@ export const VJControlPanel: React.FC<Props> = ({ onMicConnect, onFileSelect }) 
   const setTransitionSpeed = useVJStore((s) => s.setTransitionSpeed);
   const resolution = useVJStore((s) => s.resolution);
   const setResolution = useVJStore((s) => s.setResolution);
+  const jamDensity = useVJStore((s) => s.jamDensity);
+  const setJamDensity = useVJStore((s) => s.setJamDensity);
 
   if (!showControls) return null;
 
@@ -57,11 +61,15 @@ export const VJControlPanel: React.FC<Props> = ({ onMicConnect, onFileSelect }) 
       {/* Palette */}
       <PalettePicker />
 
+      {/* FX Panel */}
+      <FXPanel />
+
       {/* Transition */}
       <div style={{ marginBottom: 16 }}>
         <div style={{ fontSize: 11, color: "#888", marginBottom: 6, textTransform: "uppercase", letterSpacing: 1 }}>
           Transitions
         </div>
+        <TransitionModePicker />
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
           <label style={{ fontSize: 10, color: "#aaa", flex: 1 }}>Auto</label>
           <button
@@ -87,6 +95,24 @@ export const VJControlPanel: React.FC<Props> = ({ onMicConnect, onFileSelect }) 
             max={1000}
             value={transitionSpeed * 100}
             onChange={(e) => setTransitionSpeed(Number(e.target.value) / 100)}
+            style={{ width: "100%" }}
+          />
+        </div>
+      </div>
+
+      {/* Jam Density */}
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ fontSize: 11, color: "#888", marginBottom: 6, textTransform: "uppercase", letterSpacing: 1 }}>
+          Jam Density
+        </div>
+        <div>
+          <label style={{ fontSize: 10, color: "#aaa" }}>{(jamDensity * 100).toFixed(0)}%</label>
+          <input
+            type="range"
+            min={0}
+            max={100}
+            value={jamDensity * 100}
+            onChange={(e) => setJamDensity(Number(e.target.value) / 100)}
             style={{ width: "100%" }}
           />
         </div>
@@ -118,6 +144,10 @@ export const VJControlPanel: React.FC<Props> = ({ onMicConnect, onFileSelect }) 
         <div>Tab: Toggle auto-transition</div>
         <div>[ / ]: Transition speed</div>
         <div>P: Cycle palette</div>
+        <div>X: Toggle FX panel</div>
+        <div>D: Toggle bloom</div>
+        <div>V: Cycle grain</div>
+        <div>Shift+T: Cycle transition mode</div>
         <div>F: Fullscreen</div>
         <div>G: FPS counter</div>
         <div>M: Toggle mic/file</div>

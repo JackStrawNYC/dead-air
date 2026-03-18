@@ -26,6 +26,10 @@
  *   R          → Toggle recording
  *   Shift+R    → Toggle playback (if recording exists)
  *   C          → Toggle remote control
+ *   X          → Toggle FX panel
+ *   D          → Toggle bloom
+ *   V          → Cycle grain strength (N→L→M→H)
+ *   Shift+T    → Cycle transition mode (linear→beat_synced→beat_pumped)
  */
 
 import { useVJStore } from "../state/VJStore";
@@ -165,6 +169,33 @@ export function initKeyboardShortcuts(): () => void {
         // Shift+R: toggle playback
         if (e.shiftKey) {
           store.setIsPlaying(!store.isPlaying);
+        }
+        break;
+
+      case "T":
+        // Shift+T: cycle transition mode
+        if (e.shiftKey) {
+          store.cycleTransitionMode();
+        }
+        break;
+
+      case "x":
+      case "X":
+        // X: toggle FX panel
+        store.setShowFXPanel(!store.showFXPanel);
+        break;
+
+      case "d":
+        // D: toggle bloom
+        if (!e.shiftKey) {
+          store.setFxBloom(!store.fxBloom);
+        }
+        break;
+
+      case "v":
+        // V: cycle grain strength
+        if (!e.shiftKey) {
+          store.cycleGrainStrength();
         }
         break;
 

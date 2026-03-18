@@ -141,10 +141,13 @@ export const VJSceneCrossfade: React.FC<Props> = ({ analyzer, onAudioState, onTr
       }, now);
 
       if (decision) {
+        // Operator transitionMode override: if store has a non-default mode, use it
+        const operatorMode = useVJStore.getState().transitionMode;
+        const effectiveMode = operatorMode !== "linear" ? operatorMode : decision.transitionMode;
         engine.current.triggerTransition(
           decision.nextScene,
           decision.duration,
-          decision.transitionMode,
+          effectiveMode,
           decision.beatDuration,
         );
         showIntelligence.current.recordSceneUsage(decision.nextScene);
