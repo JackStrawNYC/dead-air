@@ -71,6 +71,21 @@ import { KaleidoscopeScene } from "./KaleidoscopeScene";
 import { FractalZoomScene } from "./FractalZoomScene";
 import { SacredGeometryScene } from "./SacredGeometryScene";
 import { ReactionDiffusionScene } from "./ReactionDiffusionScene";
+import { MandalaEngineScene } from "./MandalaEngineScene";
+import { FractalFlamesScene } from "./FractalFlamesScene";
+import { FeedbackRecursionScene } from "./FeedbackRecursionScene";
+import { TruchetTilingScene } from "./TruchetTilingScene";
+import { DiffractionRingsScene } from "./DiffractionRingsScene";
+import { PlasmaFieldScene } from "./PlasmaFieldScene";
+import { VoronoiFlowScene } from "./VoronoiFlowScene";
+import { StainedGlassScene } from "./StainedGlassScene";
+import { ElectricArcScene } from "./ElectricArcScene";
+import { MorphogenesisScene } from "./MorphogenesisScene";
+import { NeuralWebScene } from "./NeuralWebScene";
+import { SmokeRingsScene } from "./SmokeRingsScene";
+import { AuroraCurtainsScene } from "./AuroraCurtainsScene";
+import { DigitalRainScene } from "./DigitalRainScene";
+import { LavaFlowScene } from "./LavaFlowScene";
 
 // ─── Scene Registry ───
 
@@ -200,6 +215,82 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     energyAffinity: "mid",
     complement: "fluid_2d",
   },
+  mandala_engine: {
+    Component: MandalaEngineScene,
+    energyAffinity: "mid",
+    complement: "sacred_geometry",
+  },
+  fractal_flames: {
+    Component: FractalFlamesScene,
+    energyAffinity: "high",
+    complement: "deep_ocean",
+  },
+  feedback_recursion: {
+    Component: FeedbackRecursionScene,
+    energyAffinity: "any",
+    complement: "fractal_flames",
+  },
+  truchet_tiling: {
+    Component: TruchetTilingScene,
+    energyAffinity: "mid",
+    complement: "mandala_engine",
+  },
+  diffraction_rings: {
+    Component: DiffractionRingsScene,
+    energyAffinity: "low",
+    complement: "aurora",
+  },
+  plasma_field: {
+    Component: PlasmaFieldScene,
+    energyAffinity: "any",
+    complement: "diffraction_rings",
+  },
+  // Placeholder entries — scenes will be implemented in subsequent waves
+  voronoi_flow: {
+    Component: VoronoiFlowScene,
+    energyAffinity: "mid",
+    complement: "truchet_tiling",
+  },
+  electric_arc: {
+    Component: ElectricArcScene,
+    energyAffinity: "high",
+    complement: "aurora",
+  },
+  morphogenesis: {
+    Component: MorphogenesisScene,
+    energyAffinity: "mid",
+    complement: "reaction_diffusion",
+  },
+  stained_glass: {
+    Component: StainedGlassScene,
+    energyAffinity: "any",
+    complement: "sacred_geometry",
+  },
+  neural_web: {
+    Component: NeuralWebScene,
+    energyAffinity: "high",
+    complement: "fractal_flames",
+  },
+  smoke_rings: {
+    Component: SmokeRingsScene,
+    energyAffinity: "mid",
+    complement: "deep_ocean",
+  },
+  aurora_curtains: {
+    Component: AuroraCurtainsScene,
+    energyAffinity: "low",
+    complement: "concert_lighting",
+  },
+  digital_rain: {
+    Component: DigitalRainScene,
+    energyAffinity: "any",
+    complement: "stark_minimal",
+  },
+  lava_flow: {
+    Component: LavaFlowScene,
+    energyAffinity: "high",
+    complement: "crystal_cavern",
+  },
 };
 
 // ─── Transition Affinity Map ───
@@ -231,6 +322,21 @@ export const TRANSITION_AFFINITY: Partial<Record<VisualMode, VisualMode[]>> = {
   fractal_zoom: ["kaleidoscope", "crystalline_growth", "cosmic_voyage"],
   sacred_geometry: ["crystal_cavern", "aurora", "kaleidoscope"],
   reaction_diffusion: ["fluid_2d", "oil_projector", "liquid_light"],
+  mandala_engine: ["sacred_geometry", "kaleidoscope", "crystal_cavern"],
+  fractal_flames: ["inferno", "tie_dye", "liquid_light"],
+  feedback_recursion: ["liquid_light", "kaleidoscope", "fractal_zoom"],
+  truchet_tiling: ["sacred_geometry", "mandala_engine", "kaleidoscope"],
+  diffraction_rings: ["aurora", "crystal_cavern", "deep_ocean"],
+  plasma_field: ["tie_dye", "liquid_light", "diffraction_rings"],
+  voronoi_flow: ["truchet_tiling", "sacred_geometry", "stained_glass"],
+  stained_glass: ["sacred_geometry", "voronoi_flow", "crystal_cavern"],
+  electric_arc: ["inferno", "concert_lighting", "aurora"],
+  morphogenesis: ["reaction_diffusion", "fluid_2d", "voronoi_flow"],
+  neural_web: ["electric_arc", "fractal_flames", "feedback_recursion"],
+  smoke_rings: ["deep_ocean", "aurora", "oil_projector"],
+  aurora_curtains: ["aurora", "deep_ocean", "cosmic_voyage"],
+  digital_rain: ["stark_minimal", "lo_fi_grain", "concert_lighting"],
+  lava_flow: ["inferno", "electric_arc", "fractal_flames"],
 };
 
 // ─── Helper functions ───

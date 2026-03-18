@@ -8,13 +8,15 @@
     "build": "tsc --noEmit && vite build",
     "type-check": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "remote": "tsx src/remote/vj-remote-server.ts"
   },
   "dependencies": {
     "@react-three/fiber": "^8.18.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "three": "^0.183.1",
+    "ws": "^8.18.0",
     "zustand": "^5.0.0"
   },
   "devDependencies": {
@@ -24,6 +26,8 @@
     "@vitejs/plugin-react": "^4.3.0",
     "typescript": "^5.7.0",
     "vite": "^6.0.0",
+    "@types/ws": "^8.5.10",
+    "tsx": "^4.7.0",
     "vitest": "^4.0.18"
   }
 }

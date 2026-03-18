@@ -61,6 +61,8 @@ export interface EnhancedFrameData {
   harmonicTension?: number;
   /** Section type label (verse, chorus, bridge, solo, jam, intro, outro) */
   sectionType?: string;
+  /** Improvisation score: 0 = structured, 1 = highly improvisational */
+  improvisationScore?: number;
 }
 
 /** Legacy frame data from POC (subset of EnhancedFrameData) */
@@ -141,7 +143,22 @@ export type VisualMode =
   | "kaleidoscope"
   | "fractal_zoom"
   | "sacred_geometry"
-  | "reaction_diffusion";
+  | "reaction_diffusion"
+  | "mandala_engine"
+  | "fractal_flames"
+  | "feedback_recursion"
+  | "truchet_tiling"
+  | "diffraction_rings"
+  | "plasma_field"
+  | "voronoi_flow"
+  | "electric_arc"
+  | "morphogenesis"
+  | "stained_glass"
+  | "neural_web"
+  | "smoke_rings"
+  | "aurora_curtains"
+  | "digital_rain"
+  | "lava_flow";
 
 /** Per-section mode override in setlist */
 export interface SectionOverride {

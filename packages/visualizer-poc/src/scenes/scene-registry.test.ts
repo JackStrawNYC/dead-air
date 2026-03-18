@@ -14,11 +14,15 @@ const ALL_MODES: VisualMode[] = [
   "fluid_light", "void_light", "fluid_2d",
   "spectral_analyzer", "particle_swarm", "crystalline_growth", "climax_surge",
   "kaleidoscope", "fractal_zoom", "sacred_geometry", "reaction_diffusion",
+  "mandala_engine",
+  "fractal_flames", "feedback_recursion", "truchet_tiling", "diffraction_rings",
+  "plasma_field", "voronoi_flow", "electric_arc", "morphogenesis", "stained_glass",
+  "neural_web", "smoke_rings", "aurora_curtains", "digital_rain", "lava_flow",
 ];
 
 describe("SCENE_REGISTRY", () => {
-  it("has exactly 21 registered modes", () => {
-    expect(Object.keys(SCENE_REGISTRY).length).toBe(25);
+  it("has exactly 40 registered modes", () => {
+    expect(Object.keys(SCENE_REGISTRY).length).toBe(40);
   });
 
   it("contains all expected modes", () => {
@@ -59,6 +63,10 @@ describe("getComplement", () => {
     expect(getComplement("deep_ocean")).toBe("inferno");
     expect(getComplement("aurora")).toBe("tie_dye");
     expect(getComplement("crystal_cavern")).toBe("inferno");
+    expect(getComplement("fractal_flames")).toBe("deep_ocean");
+    expect(getComplement("feedback_recursion")).toBe("fractal_flames");
+    expect(getComplement("truchet_tiling")).toBe("mandala_engine");
+    expect(getComplement("diffraction_rings")).toBe("aurora");
   });
 
   it("returns the mode itself for unknown modes", () => {
@@ -104,9 +112,9 @@ describe("getModesForEnergy", () => {
 });
 
 describe("getRegisteredModes", () => {
-  it("returns all 21 modes", () => {
+  it("returns all 40 modes", () => {
     const modes = getRegisteredModes();
-    expect(modes.length).toBe(25);
+    expect(modes.length).toBe(40);
     for (const mode of ALL_MODES) {
       expect(modes).toContain(mode);
     }

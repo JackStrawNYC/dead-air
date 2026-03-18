@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VJ Remote Control</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: #111;
+      color: #eee;
+      padding: 16px;
+      min-height: 100vh;
+    }
+    h1 { font-size: 18px; margin-bottom: 8px; color: #aaa; }
+    h2 { font-size: 14px; margin: 12px 0 8px; color: #888; text-transform: uppercase; letter-spacing: 0.05em; }
+
+    .status {
+      display: flex; align-items: center; gap: 8px;
+      margin-bottom: 16px; font-size: 13px; color: #888;
+    }
+    .status-dot {
+      width: 10px; height: 10px; border-radius: 50%;
+      background: #f44; transition: background 0.3s;
+    }
+    .status-dot.connected { background: #4f4; }
+
+    .scene-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+      gap: 6px;
+      margin-bottom: 16px;
+    }
+    .scene-btn {
+      padding: 8px 4px;
+      background: #222;
+      border: 1px solid #333;
+      border-radius: 6px;
+      color: #ccc;
+      font-size: 11px;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.15s;
+      text-transform: lowercase;
+    }
+    .scene-btn:hover { background: #333; border-color: #555; }
+    .scene-btn.active { background: #2a4a6a; border-color: #4a8abf; color: #fff; }
+
+    .controls {
+      display: flex; flex-wrap: wrap; gap: 8px;
+      margin-bottom: 16px;
+    }
+    .ctrl-btn {
+      padding: 10px 16px;
+      background: #222;
+      border: 1px solid #444;
+      border-radius: 6px;
+      color: #ccc;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .ctrl-btn:hover { background: #333; }
+    .ctrl-btn.active { background: #6a2a2a; border-color: #bf4a4a; color: #fff; }
+
+    .slider-group {
+      display: flex; flex-direction: column; gap: 8px;
+      margin-bottom: 16px;
+    }
+    .slider-row {
+      display: flex; align-items: center; gap: 12px;
+    }
+    .slider-row label {
+      font-size: 12px; color: #888; min-width: 80px;
+    }
+    .slider-row input[type="range"] {
+      flex: 1; accent-color: #4a8abf;
+    }
+    .slider-row .value {
+      font-size: 12px; color: #aaa; min-width: 40px; text-align: right;
+    }
+
+    .preset-grid {
+      display: flex; gap: 6px; margin-bottom: 16px;
+    }
+    .preset-btn {
+      width: 40px; height: 40px;
+      background: #222;
+      border: 1px solid #333;
+      border-radius: 6px;
+      color: #888;
+      font-size: 16px;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: all 0.15s;
+    }
+    .preset-btn:hover { background: #333; border-color: #555; }
+    .preset-btn.has-preset { color: #4a8abf; border-color: #4a8abf; }
+
+    .meters {
+      display: flex; gap: 16px; margin-bottom: 16px;
+    }
+    .meter { flex: 1; }
+    .meter-label { font-size: 11px; color: #666; margin-bottom: 4px; }
+    .meter-bar {
+      height: 6px; background: #222; border-radius: 3px; overflow: hidden;
+    }
+    .meter-fill {
+      height: 100%; background: #4a8abf; border-radius: 3px;
+      transition: width 0.1s;
+    }
+  </style>
+</head>
+<body>
+  <h1>Dead Air VJ Remote</h1>
+
+  <div class="status">
+    <div class="status-dot" id="statusDot"></div>
+    <span id="statusText">Disconnected</span>
+  </div>
+
+  <div class="meters" id="meters">
+    <div class="meter">
+      <div class="meter-label">Energy</div>
+      <div class="meter-bar"><div class="meter-fill" id="energyMeter" style="width: 0%"></div></div>
+    </div>
+    <div class="meter">
+      <div class="meter-label">BPM</div>
+      <div class="meter-bar"><div class="meter-fill" id="bpmMeter" style="width: 0%"></div></div>
+    </div>
+  </div>
+
+  <h2>Scenes</h2>
+  <div class="scene-grid" id="sceneGrid"></div>
+
+  <h2>Controls</h2>
+  <div class="controls">
+    <button class="ctrl-btn" id="btnBlackout">Blackout</button>
+    <button class="ctrl-btn" id="btnFreeze">Freeze</button>
+    <button class="ctrl-btn" id="btnLock">Lock</button>
+    <button class="ctrl-btn" id="btnAutoTransition">Auto</button>
+    <button class="ctrl-btn" id="btnCyclePalette">Cycle Palette</button>
+  </div>
+
+  <h2>Palette</h2>
+  <div class="slider-group">
+    <div class="slider-row">
+      <label>Primary Hue</label>
+      <input type="range" id="sliderPrimary" min="0" max="360" value="210">
+      <span class="value" id="valPrimary">210</span>
+    </div>
+    <div class="slider-row">
+      <label>Secondary Hue</label>
+      <input type="range" id="sliderSecondary" min="0" max="360" value="270">
+      <span class="value" id="valSecondary">270</span>
+    </div>
+    <div class="slider-row">
+      <label>Saturation</label>
+      <input type="range" id="sliderSaturation" min="0" max="100" value="100">
+      <span class="value" id="valSaturation">1.00</span>
+    </div>
+  </div>
+
+  <h2>Presets</h2>
+  <div class="preset-grid" id="presetGrid"></div>
+
+  <script>
+    const WS_PORT = 9876;
+    const SCENES = [
+      "liquid_light", "oil_projector", "concert_lighting", "lo_fi_grain",
+      "tie_dye", "cosmic_dust", "vintage_film", "cosmic_voyage",
+      "inferno", "deep_ocean", "aurora", "crystal_cavern",
+      "fluid_light", "void_light", "particle_nebula", "stark_minimal",
+      "fractal_flames", "feedback_recursion", "truchet_tiling", "diffraction_rings",
+      "plasma_field", "voronoi_flow", "stained_glass", "electric_arc",
+      "morphogenesis", "neural_web", "smoke_rings", "aurora_curtains",
+      "digital_rain", "lava_flow"
+    ];
+
+    let ws = null;
+    let state = {
+      currentScene: "liquid_light",
+      palettePrimary: 210,
+      paletteSecondary: 270,
+      paletteSaturation: 1,
+      blackout: false,
+      freeze: false,
+      lockedScene: false,
+      autoTransition: true,
+    };
+
+    // Build scene grid
+    const sceneGrid = document.getElementById("sceneGrid");
+    SCENES.forEach(scene => {
+      const btn = document.createElement("button");
+      btn.className = "scene-btn";
+      btn.textContent = scene.replace(/_/g, " ");
+      btn.dataset.scene = scene;
+      btn.onclick = () => sendCommand({ action: "setScene", scene });
+      sceneGrid.appendChild(btn);
+    });
+
+    // Build preset grid
+    const presetGrid = document.getElementById("presetGrid");
+    for (let i = 1; i <= 9; i++) {
+      const btn = document.createElement("button");
+      btn.className = "preset-btn";
+      btn.textContent = i;
+      btn.onclick = () => sendCommand({ action: "recallPreset", slot: i });
+      btn.dataset.slot = i;
+      presetGrid.appendChild(btn);
+    }
+
+    // Control buttons
+    document.getElementById("btnBlackout").onclick = () => sendCommand({ action: "toggleBlackout" });
+    document.getElementById("btnFreeze").onclick = () => sendCommand({ action: "toggleFreeze" });
+    document.getElementById("btnLock").onclick = () => sendCommand({ action: "toggleAutoTransition" });
+    document.getElementById("btnAutoTransition").onclick = () => sendCommand({ action: "toggleAutoTransition" });
+    document.getElementById("btnCyclePalette").onclick = () => sendCommand({ action: "cyclePresetPalette" });
+
+    // Sliders
+    const sliderPrimary = document.getElementById("sliderPrimary");
+    const sliderSecondary = document.getElementById("sliderSecondary");
+    const sliderSaturation = document.getElementById("sliderSaturation");
+
+    sliderPrimary.oninput = () => {
+      const p = parseInt(sliderPrimary.value);
+      const s = parseInt(sliderSecondary.value);
+      document.getElementById("valPrimary").textContent = p;
+      sendCommand({ action: "setPalette", primary: p, secondary: s });
+    };
+    sliderSecondary.oninput = () => {
+      const p = parseInt(sliderPrimary.value);
+      const s = parseInt(sliderSecondary.value);
+      document.getElementById("valSecondary").textContent = s;
+      sendCommand({ action: "setPalette", primary: p, secondary: s });
+    };
+    sliderSaturation.oninput = () => {
+      const v = parseInt(sliderSaturation.value) / 100;
+      document.getElementById("valSaturation").textContent = v.toFixed(2);
+      sendCommand({ action: "setSaturation", value: v });
+    };
+
+    function sendCommand(cmd) {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: "command", payload: cmd }));
+      }
+    }
+
+    function updateUI() {
+      // Scene buttons
+      document.querySelectorAll(".scene-btn").forEach(btn => {
+        btn.classList.toggle("active", btn.dataset.scene === state.currentScene);
+      });
+
+      // Control buttons
+      document.getElementById("btnBlackout").classList.toggle("active", state.blackout);
+      document.getElementById("btnFreeze").classList.toggle("active", state.freeze);
+      document.getElementById("btnLock").classList.toggle("active", state.lockedScene);
+      document.getElementById("btnAutoTransition").classList.toggle("active", state.autoTransition);
+
+      // Sliders (only update if not being dragged)
+      if (document.activeElement !== sliderPrimary) {
+        sliderPrimary.value = state.palettePrimary;
+        document.getElementById("valPrimary").textContent = Math.round(state.palettePrimary);
+      }
+      if (document.activeElement !== sliderSecondary) {
+        sliderSecondary.value = state.paletteSecondary;
+        document.getElementById("valSecondary").textContent = Math.round(state.paletteSecondary);
+      }
+      if (document.activeElement !== sliderSaturation) {
+        sliderSaturation.value = Math.round(state.paletteSaturation * 100);
+        document.getElementById("valSaturation").textContent = state.paletteSaturation.toFixed(2);
+      }
+    }
+
+    function connect() {
+      ws = new WebSocket("ws://localhost:" + WS_PORT);
+
+      ws.onopen = () => {
+        document.getElementById("statusDot").classList.add("connected");
+        document.getElementById("statusText").textContent = "Connected";
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(event.data);
+          if (msg.type === "state_sync" && msg.payload) {
+            Object.assign(state, msg.payload);
+            updateUI();
+          } else if (msg.type === "state_delta" && msg.payload) {
+            Object.assign(state, msg.payload);
+            updateUI();
+          } else if (msg.type === "ping") {
+            ws.send(JSON.stringify({ type: "pong" }));
+          }
+        } catch (e) {}
+      };
+
+      ws.onclose = () => {
+        document.getElementById("statusDot").classList.remove("connected");
+        document.getElementById("statusText").textContent = "Disconnected — reconnecting...";
+        setTimeout(connect, 3000);
+      };
+
+      ws.onerror = () => {};
+    }
+
+    connect();
+    updateUI();
+  </script>
+</body>
+</html>

@@ -14,5 +14,6 @@
       "@visualizer/*": ["../visualizer-poc/src/*"]
     }
   },
-  "include": ["src/**/*"]
+  "include": ["src/**/*"],
+  "exclude": ["src/remote/vj-remote-server.ts"]
 }
