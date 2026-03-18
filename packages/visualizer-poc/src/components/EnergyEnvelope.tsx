@@ -54,6 +54,8 @@ interface Props {
   narrativeBrightness?: number;
   /** Narrative color temperature (-1 cool to +1 warm) from visual narrator */
   narrativeTemperature?: number;
+  /** Intro factor 0-1: 0 = intro period (suppress reactive brightness), 1 = engine fully open */
+  introFactor?: number;
 }
 
 // Per-era bloom color — matches era grade for visual cohesion
@@ -66,7 +68,7 @@ const ERA_BLOOM: Record<string, string> = {
 };
 const DEFAULT_BLOOM = ERA_BLOOM.classic;
 
-export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod, jamColorTemp, calibration, counterpointSatMult = 1, setNumber, drumsSpacePhase, showPhase, songIdentity, showArcModifiers, itLuminanceLift, vocalWarmth, guitarColorTemp, deadAirFactor = 0, narrativeBrightness = 0, narrativeTemperature = 0 }) => {
+export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod, jamColorTemp, calibration, counterpointSatMult = 1, setNumber, drumsSpacePhase, showPhase, songIdentity, showArcModifiers, itLuminanceLift, vocalWarmth, guitarColorTemp, deadAirFactor = 0, narrativeBrightness = 0, narrativeTemperature = 0, introFactor = 1 }) => {
   const energy = snapshot.energy;
   const setTheme = getSetTheme(setNumber ?? 1);
   const low = calibration?.quietThreshold;
@@ -77,9 +79,14 @@ export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod,
   // Slow-moving energy for bloom — drifts, doesn't pulse
   const slowFactor = energyToFactor(snapshot.slowEnergy, low, high);
 
+  // Intro damping: suppress ALL reactive brightness during intro so art/text shines
+  // introFactor 0 = full intro (no reactivity), 1 = engine fully open
+  const reactivity = introFactor;
+
   // ── Multi-field modulations (gentle — felt, not seen) ──
-  // Onset: percussive attacks create mild brightness punch
-  const onsetBrightness = snapshot.onsetEnvelope * 0.08;    // +0-8% (reduced from 15% to prevent strobe fatigue)
+  // Onset brightness: DISABLED — was a major strobe source even at low values.
+  // The onset energy still drives GLSL onset saturation (much more subtle).
+  const onsetBrightness = 0;
 
   // Era-specific color adjustments (hue shift only — saturation handled by GLSL)
   const eraPreset = getEraPreset(showCtx?.era ?? "");
@@ -91,10 +98,9 @@ export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod,
   //   0.70 × 0.75 = 0.525 effective saturation — too muted.
   const cssGate = factor; // 0 during quiet, 1 during loud (already smoothstep-based)
   const isClimaxPhase = (climaxMod?.brightnessOffset ?? 0) > 0.04;
-  const brightCap = isClimaxPhase ? 1.35 : 1.20;
-  const brightness = Math.min(brightCap, 0.96 + factor * 0.24 + onsetBrightness * 0.18 * cssGate + (climaxMod?.brightnessOffset ?? 0) + setTheme.brightnessOffset + (snapshot.fastEnergy ?? 0) * 0.05 * cssGate);
-  // Bloom uses slow energy (drift, not pulse) — reduced to prevent white wash
-  const bloomOpacity = slowFactor * 0.35 + (climaxMod?.bloomOffset ?? 0) * 0.5 + (snapshot.fastEnergy ?? 0) * 0.05;
+  const brightCap = isClimaxPhase ? 1.25 : 1.12;
+  // Gate all energy-reactive brightness by reactivity (0 during intro, 1 when engine open)
+  const brightness = Math.min(brightCap, 0.96 + factor * 0.16 * reactivity + (climaxMod?.brightnessOffset ?? 0) * reactivity + setTheme.brightnessOffset + (snapshot.fastEnergy ?? 0) * 0.03 * cssGate * reactivity);
 
   // Drums/Space phase adjustments (brightness + hue only — saturation/contrast handled by GLSL)
   let dsBrightOffset = 0;
@@ -162,20 +168,9 @@ export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod,
     <div style={{ position: "absolute", inset: 0, filter: filterStr }}>
       {children}
 
-      {/* Spatial bloom — backdrop-filter blurs bright pixels, screen blend adds glow */}
-      {!process.env.SKIP_BLOOM && (
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            backdropFilter: `blur(${(8 + slowFactor * 12).toFixed(1)}px) brightness(${(0.92 + factor * 0.15).toFixed(2)})`,
-            WebkitBackdropFilter: `blur(${(8 + slowFactor * 12).toFixed(1)}px) brightness(${(0.92 + factor * 0.15).toFixed(2)})`,
-            mixBlendMode: "screen",
-            opacity: (0.05 + slowFactor * 0.07) * (1 - deadAirFactor),
-            pointerEvents: "none",
-          }}
-        />
-      )}
+      {/* CSS backdrop bloom removed — was a major strobe source.
+          GLSL bloom + halation provide sufficient glow without the
+          frame-to-frame brightness pulsation that CSS backdrop-filter caused. */}
     </div>
   );
 };

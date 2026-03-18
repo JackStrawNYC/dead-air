@@ -264,9 +264,9 @@ vec3 lightLeak(vec2 p, float time, float energy, float onsetSnap) {
   float leakAngle = time * 0.07;
   vec2 leakPos = vec2(cos(leakAngle), sin(leakAngle)) * 0.7;
   float dist = length(p - leakPos);
-  float leakStrength = max(0.15, energy * 0.5);
+  float leakStrength = max(0.08, energy * 0.25);
   float leak = smoothstep(0.8, 0.1, dist) * leakStrength;
-  vec3 leakColor = vec3(1.0, 0.7, 0.3) * leak * 0.20;
+  vec3 leakColor = vec3(1.0, 0.7, 0.3) * leak * 0.10;
   return leakColor;
 }
 

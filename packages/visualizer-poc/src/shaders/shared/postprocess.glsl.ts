@@ -79,21 +79,22 @@ vec3 applyPostProcess(vec3 col, vec2 uv, vec2 p) {
 
 ${
   beatPulseEnabled
-    ? `  // Beat pulse: tempo-locked brightness swell
+    ? `  // Beat pulse: extremely subtle tempo-locked brightness swell
+  // Kept near-zero — visible strobe source even at low values
   float bp = beatPulse(uMusicalTime);
-  col *= 1.0 + bp * 0.08 + climaxBoost * bp * 0.04;
+  col *= 1.0 + bp * 0.02;
 `
     : ""
 }
 ${
   bloomEnabled
-    ? `  // Bloom: bright pixel self-illumination (climax-amplified, energy-adaptive)
+    ? `  // Bloom: bright pixel self-illumination (conservative to prevent white wash)
   {
     float lum = dot(col, vec3(0.299, 0.587, 0.114));
-    float bloomThreshold = mix(0.58, 0.50, energy) + uBloomThreshold - climaxBoost * 0.06${bloomThresholdStr};
-    float bloomAmount = max(0.0, lum - bloomThreshold) * (1.8 + climaxBoost * 1.0);
+    float bloomThreshold = mix(0.65, 0.55, energy) + uBloomThreshold${bloomThresholdStr};
+    float bloomAmount = max(0.0, lum - bloomThreshold) * (1.2 + climaxBoost * 0.5);
     vec3 bloomColor = mix(col, vec3(1.0, 0.98, 0.95), 0.3);
-    vec3 bloom = bloomColor * bloomAmount * (0.25 + climaxBoost * 0.15);
+    vec3 bloom = bloomColor * bloomAmount * (0.15 + climaxBoost * 0.08);
     col = col + bloom - col * bloom; // screen blend
   }
 `
@@ -161,12 +162,12 @@ ${
 }
   }
 
-  // Onset saturation pulse: push colors from gray
+  // Onset saturation pulse: gentle color push (no brightness boost)
   {
-    float onsetPulse = step(0.6, max(uOnsetSnap, uDrumOnset)) * max(uOnsetSnap, uDrumOnset);
+    float onsetPulse = step(0.7, max(uOnsetSnap, uDrumOnset)) * max(uOnsetSnap, uDrumOnset);
     float onsetLuma = dot(col, vec3(0.299, 0.587, 0.114));
-    col = mix(vec3(onsetLuma), col, 1.0 + onsetPulse * 0.25);
-    col *= 1.0 + onsetPulse * 0.03;
+    col = mix(vec3(onsetLuma), col, 1.0 + onsetPulse * 0.15);
+    // Brightness boost removed — was a strobe source
   }
 
   // Lifted blacks (build-phase aware)
