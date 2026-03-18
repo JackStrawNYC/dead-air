@@ -86,6 +86,15 @@ import { SmokeRingsScene } from "./SmokeRingsScene";
 import { AuroraCurtainsScene } from "./AuroraCurtainsScene";
 import { DigitalRainScene } from "./DigitalRainScene";
 import { LavaFlowScene } from "./LavaFlowScene";
+// Phase 9 Wave 2: 8 new scenes
+import { MyceliumNetworkScene } from "./MyceliumNetworkScene";
+import { InkWashScene } from "./InkWashScene";
+import { CoralReefScene } from "./CoralReefScene";
+import { SolarFlareScene } from "./SolarFlareScene";
+import { GalaxySpiralScene } from "./GalaxySpiralScene";
+import { WarpFieldScene } from "./WarpFieldScene";
+import { SignalDecayScene } from "./SignalDecayScene";
+import { DatabendScene } from "./DatabendScene";
 
 // ─── Scene Registry ───
 
@@ -291,6 +300,47 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     energyAffinity: "high",
     complement: "crystal_cavern",
   },
+  // Phase 9 Wave 2: 8 new scenes
+  mycelium_network: {
+    Component: MyceliumNetworkScene,
+    energyAffinity: "mid",
+    complement: "neural_web",
+  },
+  ink_wash: {
+    Component: InkWashScene,
+    energyAffinity: "low",
+    complement: "stark_minimal",
+  },
+  coral_reef: {
+    Component: CoralReefScene,
+    energyAffinity: "low",
+    complement: "deep_ocean",
+  },
+  solar_flare: {
+    Component: SolarFlareScene,
+    energyAffinity: "high",
+    complement: "inferno",
+  },
+  galaxy_spiral: {
+    Component: GalaxySpiralScene,
+    energyAffinity: "any",
+    complement: "cosmic_voyage",
+  },
+  warp_field: {
+    Component: WarpFieldScene,
+    energyAffinity: "mid",
+    complement: "diffraction_rings",
+  },
+  signal_decay: {
+    Component: SignalDecayScene,
+    energyAffinity: "any",
+    complement: "digital_rain",
+  },
+  databend: {
+    Component: DatabendScene,
+    energyAffinity: "high",
+    complement: "lo_fi_grain",
+  },
 };
 
 // ─── Transition Affinity Map ───
@@ -337,6 +387,15 @@ export const TRANSITION_AFFINITY: Partial<Record<VisualMode, VisualMode[]>> = {
   aurora_curtains: ["aurora", "deep_ocean", "cosmic_voyage"],
   digital_rain: ["stark_minimal", "lo_fi_grain", "concert_lighting"],
   lava_flow: ["inferno", "electric_arc", "fractal_flames"],
+  // Phase 9 Wave 2: 8 new scenes
+  mycelium_network: ["morphogenesis", "neural_web", "reaction_diffusion"],
+  ink_wash: ["stark_minimal", "vintage_film", "deep_ocean"],
+  coral_reef: ["deep_ocean", "aurora", "crystal_cavern"],
+  solar_flare: ["inferno", "electric_arc", "lava_flow"],
+  galaxy_spiral: ["cosmic_voyage", "cosmic_dust", "particle_nebula"],
+  warp_field: ["diffraction_rings", "cosmic_voyage", "void_light"],
+  signal_decay: ["digital_rain", "lo_fi_grain", "vintage_film"],
+  databend: ["digital_rain", "signal_decay", "lo_fi_grain"],
 };
 
 // ─── Helper functions ───

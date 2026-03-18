@@ -85,6 +85,16 @@ import { VenueMarquee } from "../components/VenueMarquee";
 import { TapeTrader } from "../components/TapeTrader";
 import { TourPosterGallery } from "../components/TourPosterGallery";
 
+// ─── Phase 9 Wave 3: New Overlays ───
+import { RainDrops } from "../components/RainDrops";
+import { FogBank } from "../components/FogBank";
+import { TidalPool } from "../components/TidalPool";
+import { VineGrowth } from "../components/VineGrowth";
+import { PhilLesh } from "../components/PhilLesh";
+import { DrummersDuo } from "../components/DrummersDuo";
+import { BassWaveform } from "../components/BassWaveform";
+import { TicketStub } from "../components/TicketStub";
+
 // ─── Layer 10: Distortion (1) ───
 import { VHSGlitch } from "../components/VHSGlitch";
 
@@ -176,4 +186,14 @@ export const OVERLAY_COMPONENTS: Record<string, OverlayComponentEntry> = {
 
   // Layer 10: Distortion
   VHSGlitch:           { Component: VHSGlitch, layer: 10 },
+
+  // Phase 9 Wave 3: New Overlays
+  RainDrops:           { Component: RainDrops, layer: 1 },
+  FogBank:             { Component: FogBank, layer: 1 },
+  TidalPool:           { Component: TidalPool, layer: 5 },
+  VineGrowth:          { Component: VineGrowth, layer: 5 },
+  PhilLesh:            { Component: PhilLesh, layer: 6 },
+  DrummersDuo:         { Component: DrummersDuo, layer: 6 },
+  BassWaveform:        { Component: BassWaveform, layer: 3 },
+  TicketStub:          { Component: TicketStub as React.ComponentType<{ frames: EnhancedFrameData[] }>, layer: 7 },
 };

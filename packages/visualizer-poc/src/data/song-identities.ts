@@ -22,7 +22,7 @@ import type { DrumsSpaceSubPhase } from "../utils/drums-space-phase";
 
 // ─── Types ───
 
-export type TransitionStyle = "dissolve" | "morph" | "flash" | "void" | "radial_wipe" | "distortion_morph" | "luminance_key" | "kaleidoscope_dissolve" | "prismatic_split" | "chromatic_wipe" | "feedback_dissolve" | "spiral_vortex" | "interference_pattern" | "pixel_scatter";
+export type TransitionStyle = "dissolve" | "morph" | "flash" | "void" | "radial_wipe" | "distortion_morph" | "luminance_key" | "kaleidoscope_dissolve" | "prismatic_split" | "chromatic_wipe" | "feedback_dissolve" | "spiral_vortex" | "interference_pattern" | "pixel_scatter" | "vine_grow" | "particle_scatter" | "gravity_well" | "curtain_rise";
 
 export interface ClimaxBehavior {
   /** Peak saturation offset (additive, default from climax-state) */
@@ -485,6 +485,146 @@ export const SONG_IDENTITIES: Record<string, SongIdentity> = {
     overlayDensity: 1.5,
     climaxBehavior: { peakSaturation: 0.55, flash: true, climaxDensityMult: 1.8 },
   },
+
+  // ══════════════════════════════════════════
+  // Phase 9 Wave 5: 15 New Song Identities
+  // ══════════════════════════════════════════
+
+  "touchofgrey": {
+    preferredModes: ["concert_lighting", "tie_dye"],
+    palette: { primary: 0, secondary: 200, saturation: 0.9 },
+    overlayBoost: ["BearParade", "BreathingStealie"],
+    moodKeywords: ["festival", "dead-culture"],
+    climaxBehavior: { peakSaturation: 0.5, flash: true },
+  },
+
+  "goingdowntheroad": {
+    preferredModes: ["concert_lighting", "inferno"],
+    palette: { primary: 25, secondary: 350, saturation: 1.0 },
+    overlayBoost: ["VWBusParade", "SkeletonBand", "BearParade"],
+    moodKeywords: ["festival", "intense"],
+    overlayDensity: 1.3,
+    climaxBehavior: { peakSaturation: 0.5, flash: true },
+  },
+
+  "mississippihalfstep": {
+    preferredModes: ["oil_projector", "vintage_film"],
+    palette: { primary: 35, secondary: 180, saturation: 0.75 },
+    overlayBoost: ["JerryGuitar", "Fireflies", "RoseOverlay"],
+    moodKeywords: ["organic", "retro"],
+    overlayDensity: 0.6,
+    saturationOffset: -0.05,
+  },
+
+  "weatherreportsuite": {
+    preferredModes: ["aurora", "cosmic_voyage", "crystal_cavern"],
+    palette: { primary: 200, secondary: 300, saturation: 0.8 },
+    overlayBoost: ["CosmicStarfield", "SacredGeometry", "Fireflies"],
+    moodKeywords: ["cosmic", "contemplative"],
+    overlayDensity: 0.6,
+    hueShift: -8,
+    climaxBehavior: { peakBrightness: 0.25, peakSaturation: 0.5 },
+  },
+
+  "turnonthelovelight": {
+    preferredModes: ["concert_lighting", "inferno", "tie_dye"],
+    palette: { primary: 50, secondary: 350, saturation: 1.0 },
+    overlayBoost: ["LaserShow", "BearParade", "CrowdDance"],
+    moodKeywords: ["festival", "intense"],
+    overlayDensity: 1.5,
+    climaxBehavior: { peakSaturation: 0.55, flash: true, climaxDensityMult: 1.8 },
+  },
+
+  "samsonanddelilah": {
+    preferredModes: ["concert_lighting", "inferno"],
+    palette: { primary: 10, secondary: 40, saturation: 1.0 },
+    overlayBoost: ["ThirteenPointBolt", "ParticleExplosion", "SkeletonBand"],
+    moodKeywords: ["intense", "festival"],
+    climaxBehavior: { peakSaturation: 0.55, flash: true },
+  },
+
+  "johnnybjgoode": {
+    preferredModes: ["concert_lighting", "tie_dye"],
+    palette: { primary: 45, secondary: 320, saturation: 1.0 },
+    overlayBoost: ["JerryGuitar", "BearParade", "SkeletonBand"],
+    moodKeywords: ["festival", "retro"],
+    overlayDensity: 1.2,
+    climaxBehavior: { flash: true },
+  },
+
+  "usblues": {
+    preferredModes: ["concert_lighting", "vintage_film"],
+    palette: { primary: 220, secondary: 350, saturation: 0.85 },
+    overlayBoost: ["JerryGuitar", "BreathingStealie"],
+    moodKeywords: ["organic", "dead-culture"],
+    overlayDensity: 0.8,
+  },
+
+  "brokedownpalace": {
+    preferredModes: ["aurora", "deep_ocean", "stained_glass"],
+    palette: { primary: 210, secondary: 280, saturation: 0.65, brightness: 0.9 },
+    overlayBoost: ["RoseOverlay", "Fireflies", "SacredGeometry"],
+    overlaySuppress: ["LaserShow", "ParticleExplosion", "CrowdDance"],
+    moodKeywords: ["contemplative", "organic"],
+    overlayDensity: 0.4,
+    hueShift: -8,
+    saturationOffset: -0.08,
+    climaxBehavior: { peakBrightness: 0.3, peakSaturation: 0.45 },
+  },
+
+  "blackpeter": {
+    preferredModes: ["stark_minimal", "vintage_film"],
+    palette: { primary: 200, secondary: 30, saturation: 0.55, brightness: 0.85 },
+    overlayBoost: ["RoseOverlay", "JerryGuitar"],
+    overlaySuppress: ["LaserShow", "CrowdDance"],
+    moodKeywords: ["contemplative", "organic"],
+    overlayDensity: 0.4,
+    saturationOffset: -0.1,
+  },
+
+  "cumberlandblues": {
+    preferredModes: ["concert_lighting", "lo_fi_grain"],
+    palette: { primary: 30, secondary: 200, saturation: 0.8 },
+    overlayBoost: ["JerryGuitar", "VWBusParade"],
+    moodKeywords: ["retro", "organic"],
+    overlayDensity: 0.7,
+  },
+
+  "looselucy": {
+    preferredModes: ["tie_dye", "liquid_light"],
+    palette: { primary: 300, secondary: 60, saturation: 1.0 },
+    overlayBoost: ["TieDyeWash", "BearParade", "LavaLamp"],
+    moodKeywords: ["psychedelic", "festival"],
+    overlayDensity: 1.0,
+    climaxBehavior: { peakSaturation: 0.5 },
+  },
+
+  "direwolf": {
+    preferredModes: ["vintage_film", "oil_projector"],
+    palette: { primary: 30, secondary: 160, saturation: 0.7 },
+    overlayBoost: ["Fireflies", "RoseOverlay", "VWBusParade"],
+    moodKeywords: ["organic", "retro"],
+    overlayDensity: 0.5,
+    saturationOffset: -0.06,
+  },
+
+  "comesametime": {
+    preferredModes: ["aurora", "crystal_cavern"],
+    palette: { primary: 180, secondary: 270, saturation: 0.75 },
+    overlayBoost: ["CosmicStarfield", "Fireflies", "SacredGeometry"],
+    moodKeywords: ["contemplative", "cosmic"],
+    overlayDensity: 0.5,
+    hueShift: -5,
+  },
+
+  "itmusthavebeen": {
+    preferredModes: ["vintage_film", "ink_wash"],
+    palette: { primary: 25, secondary: 200, saturation: 0.7, brightness: 0.9 },
+    overlayBoost: ["RoseOverlay", "Fireflies"],
+    moodKeywords: ["contemplative", "organic"],
+    overlayDensity: 0.5,
+    saturationOffset: -0.05,
+  },
 };
 
 // ─── Title Normalization ───
@@ -570,6 +710,41 @@ const SONG_ALIASES: Record<string, string> = {
   "omsn": "onemoresaturdaynight",
   "saturdaynight": "onemoresaturdaynight",
   "onemore": "onemoresaturdaynight",
+  // Phase 9 Wave 5 aliases
+  "touchofgrey": "touchofgrey",
+  "touch": "touchofgrey",
+  "grey": "touchofgrey",
+  "goingdowntheroad": "goingdowntheroad",
+  "gdtrfb": "goingdowntheroad",
+  "goingdowntheroadfeelinbad": "goingdowntheroad",
+  "mississippihalfstep": "mississippihalfstep",
+  "halfstep": "mississippihalfstep",
+  "mississippi": "mississippihalfstep",
+  "weatherreportsuite": "weatherreportsuite",
+  "weatherreport": "weatherreportsuite",
+  "wrs": "weatherreportsuite",
+  "turnonthelovelight": "turnonthelovelight",
+  "lovelight": "turnonthelovelight",
+  "totll": "turnonthelovelight",
+  "samsonanddelilah": "samsonanddelilah",
+  "samson": "samsonanddelilah",
+  "johnnybjgoode": "johnnybjgoode",
+  "johnnybgoode": "johnnybjgoode",
+  "johnny": "johnnybjgoode",
+  "usblues": "usblues",
+  "brokedownpalace": "brokedownpalace",
+  "brokedown": "brokedownpalace",
+  "blackpeter": "blackpeter",
+  "cumberlandblues": "cumberlandblues",
+  "cumberland": "cumberlandblues",
+  "looselucy": "looselucy",
+  "lucy": "looselucy",
+  "direwolf": "direwolf",
+  "dire": "direwolf",
+  "comesametime": "comesametime",
+  "itmusthavebeen": "itmusthavebeen",
+  "itmusthavebeentheroses": "itmusthavebeen",
+  "roses": "itmusthavebeen",
 };
 
 // ─── Lookup ───
@@ -643,13 +818,13 @@ export function generateFallbackIdentity(
   // 3. Derive preferred modes from energy and tempo
   const preferredModes: VisualMode[] = [];
   if (avgEnergy > 0.25) {
-    preferredModes.push("liquid_light", "inferno", "electric_arc", "plasma_field");
+    preferredModes.push("liquid_light", "inferno", "electric_arc", "plasma_field", "solar_flare", "databend");
     if (tempo > 140) preferredModes.push("concert_lighting");
   } else if (avgEnergy > 0.12) {
-    preferredModes.push("oil_projector", "cosmic_voyage", "voronoi_flow", "morphogenesis");
+    preferredModes.push("oil_projector", "cosmic_voyage", "voronoi_flow", "morphogenesis", "galaxy_spiral", "warp_field", "mycelium_network");
     if (avgSub > 0.3) preferredModes.push("deep_ocean");
   } else {
-    preferredModes.push("aurora", "deep_ocean", "stained_glass");
+    preferredModes.push("aurora", "deep_ocean", "stained_glass", "ink_wash", "coral_reef");
     if (avgFlatness > 0.4) preferredModes.push("void_light");
     else preferredModes.push("cosmic_dust");
   }

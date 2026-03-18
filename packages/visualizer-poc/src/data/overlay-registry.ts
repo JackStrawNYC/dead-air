@@ -97,6 +97,16 @@ export const OVERLAY_REGISTRY: OverlayEntry[] = [
   // ═══ Layer 10: Distortion (1) + always-active ═══
   { name: "VHSGlitch",           layer: 10, category: "distortion", tags: ["retro", "psychedelic"],       energyBand: "mid",  weight: 2, dutyCycle: 100, energyResponse: [0.15, 0.35, 2.5], tier: "A" },
   { name: "FilmGrain",           layer: 10, category: "distortion", tags: ["retro"],                      energyBand: "any",  weight: 1, alwaysActive: true, tier: "A" },
+
+  // ═══ Phase 9 Wave 3: New Overlays (8) ═══
+  { name: "RainDrops",       layer: 1, category: "atmospheric", tags: ["organic", "contemplative"],      energyBand: "low",  weight: 1, dutyCycle: 100, energyResponse: [0.0, 0.05, 2.5], tier: "B" },
+  { name: "FogBank",         layer: 1, category: "atmospheric", tags: ["organic", "contemplative"],      energyBand: "low",  weight: 1, dutyCycle: 100, energyResponse: [0.0, 0.08, 2.5], tier: "B" },
+  { name: "TidalPool",      layer: 5, category: "nature",      tags: ["organic", "aquatic"],             energyBand: "mid",  weight: 2, dutyCycle: 50,  energyResponse: [0.05, 0.18, 2.0], tier: "B" },
+  { name: "VineGrowth",     layer: 5, category: "nature",      tags: ["organic", "psychedelic"],         energyBand: "mid",  weight: 2, dutyCycle: 60,  energyResponse: [0.05, 0.20, 1.8], tier: "B" },
+  { name: "PhilLesh",       layer: 6, category: "character",   tags: ["dead-culture", "organic"],        energyBand: "mid",  weight: 2, dutyCycle: 100, energyResponse: [0.05, 0.20, 1.5], tier: "B" },
+  { name: "DrummersDuo",    layer: 6, category: "character",   tags: ["dead-culture", "intense"],        energyBand: "mid",  weight: 2, dutyCycle: 100, energyResponse: [0.10, 0.30, 2.0], tier: "B" },
+  { name: "BassWaveform",   layer: 3, category: "reactive",    tags: ["intense", "organic"],             energyBand: "mid",  weight: 2, dutyCycle: 100, energyResponse: [0.08, 0.22, 1.8], tier: "B" },
+  { name: "TicketStub",     layer: 7, category: "artifact",    tags: ["dead-culture", "retro"],          energyBand: "any",  weight: 1, dutyCycle: 15,  energyResponse: [0.0, 0.05, 3.0], tier: "B" },
 ];
 
 /**

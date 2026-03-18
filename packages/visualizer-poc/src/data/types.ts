@@ -158,7 +158,15 @@ export type VisualMode =
   | "smoke_rings"
   | "aurora_curtains"
   | "digital_rain"
-  | "lava_flow";
+  | "lava_flow"
+  | "mycelium_network"
+  | "ink_wash"
+  | "coral_reef"
+  | "solar_flare"
+  | "galaxy_spiral"
+  | "warp_field"
+  | "signal_decay"
+  | "databend";
 
 /** Per-section mode override in setlist */
 export interface SectionOverride {

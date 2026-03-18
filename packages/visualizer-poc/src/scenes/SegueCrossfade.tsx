@@ -602,6 +602,275 @@ export const SegueCrossfade: React.FC<Props> = ({ progress, outgoing, incoming, 
     );
   }
 
+  if (style === "vine_grow") {
+    // Vine tendrils grow from edges inward covering outgoing.
+    // At center they part to reveal incoming.
+    const eased = cubicEase(t);
+    const outOp = 1 - eased;
+    const inOp = eased;
+    // Vine coverage: grows from edges toward center
+    const coverage = eased * 100; // percentage
+    // Use inset gradient mask to simulate vine coverage from all edges
+    const insetPx = Math.max(0, 50 - coverage) ; // shrinking reveal window
+
+    return (
+      <div style={{ position: "relative", width: "100%", height: "100%" }}>
+        {/* Outgoing scene */}
+        {outOp > 0.01 && (
+          <div style={{ position: "absolute", inset: 0, opacity: outOp }}>
+            {outgoing}
+          </div>
+        )}
+        {/* Incoming scene revealed through center gap */}
+        {inOp > 0.01 && (
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              opacity: inOp,
+              maskImage: `radial-gradient(ellipse ${(coverage * 0.8).toFixed(1)}% ${(coverage * 0.8).toFixed(1)}% at 50% 50%, black 0%, transparent 100%)`,
+              WebkitMaskImage: `radial-gradient(ellipse ${(coverage * 0.8).toFixed(1)}% ${(coverage * 0.8).toFixed(1)}% at 50% 50%, black 0%, transparent 100%)`,
+            }}
+          >
+            {incoming}
+          </div>
+        )}
+        {/* Green vine overlay at edges */}
+        {t > 0.05 && t < 0.95 && (
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              background: `radial-gradient(ellipse 60% 60% at 50% 50%, transparent 0%, hsla(120, 40%, 20%, ${Math.sin(t * Math.PI) * 0.08}) 100%)`,
+              pointerEvents: "none",
+            }}
+          />
+        )}
+      </div>
+    );
+  }
+
+  if (style === "particle_scatter") {
+    // Outgoing disintegrates into circular particles with physics drift.
+    const eased = cubicEase(t);
+    const outOp = Math.max(0, 1 - eased * 1.3);
+    const inOp = eased;
+
+    // Particles: more organic circles than pixel_scatter's rectangles
+    const cols = 8;
+    const rows = 6;
+    const particles: React.ReactNode[] = [];
+
+    if (outOp > 0.01 && t > 0.02) {
+      for (let row = 0; row < rows; row++) {
+        for (let col = 0; col < cols; col++) {
+          const cx = (col + 0.5) / cols;
+          const cy = (row + 0.5) / rows;
+          const dx = cx - 0.5;
+          const dy = cy - 0.5;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          const fragDelay = dist * 0.5; // closer to center scatters later
+          const fragProgress = Math.max(0, (eased - fragDelay) / (1 - fragDelay + 0.01));
+          const scatter = fragProgress * fragProgress * 200;
+          const translateX = dx * scatter;
+          const translateY = dy * scatter + fragProgress * fragProgress * 50; // gravity
+          const fragOpacity = Math.max(0, 1 - fragProgress * 1.4);
+          const scale = 1 - fragProgress * 0.5;
+
+          if (fragOpacity < 0.02) continue;
+
+          particles.push(
+            <div
+              key={`${row}-${col}`}
+              style={{
+                position: "absolute",
+                left: `${(col / cols * 100).toFixed(2)}%`,
+                top: `${(row / rows * 100).toFixed(2)}%`,
+                width: `${(100 / cols).toFixed(2)}%`,
+                height: `${(100 / rows).toFixed(2)}%`,
+                overflow: "hidden",
+                borderRadius: "50%",
+                transform: `translate(${translateX.toFixed(1)}%, ${translateY.toFixed(1)}%) scale(${scale.toFixed(3)})`,
+                opacity: fragOpacity,
+              }}
+            >
+              <div
+                style={{
+                  position: "absolute",
+                  left: `${(-col / cols * 100).toFixed(2)}%`,
+                  top: `${(-row / rows * 100).toFixed(2)}%`,
+                  width: `${cols * 100}%`,
+                  height: `${rows * 100}%`,
+                }}
+              >
+                {outgoing}
+              </div>
+            </div>
+          );
+        }
+      }
+    }
+
+    return (
+      <div style={{ position: "relative", width: "100%", height: "100%", overflow: "hidden" }}>
+        {inOp > 0.01 && (
+          <div style={{ position: "absolute", inset: 0, opacity: inOp }}>
+            {incoming}
+          </div>
+        )}
+        {t < 0.02 ? (
+          <div style={{ position: "absolute", inset: 0 }}>
+            {outgoing}
+          </div>
+        ) : (
+          particles
+        )}
+      </div>
+    );
+  }
+
+  if (style === "gravity_well") {
+    // Outgoing scales toward center singularity. Flash at max compression.
+    // Incoming expands outward from singularity.
+    const eased = cubicEase(t);
+
+    const isCompressing = t < 0.5;
+    const compressionProgress = isCompressing ? t / 0.5 : 1;
+    const expansionProgress = isCompressing ? 0 : (t - 0.5) / 0.5;
+
+    const outScale = isCompressing ? 1 - cubicEase(compressionProgress) * 0.95 : 0.05;
+    const outOp = isCompressing ? 1 : 0;
+    const inScale = isCompressing ? 0.05 : 0.05 + cubicEase(expansionProgress) * 0.95;
+    const inOp = isCompressing ? 0 : 1;
+
+    // Flash at singularity (t ≈ 0.5)
+    const flashIntensity = Math.exp(-((t - 0.5) * (t - 0.5)) / 0.005) * 0.4;
+
+    return (
+      <div style={{ position: "relative", width: "100%", height: "100%", overflow: "hidden" }}>
+        {outOp > 0.01 && outScale > 0.02 && (
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              transform: `scale(${outScale.toFixed(4)})`,
+              transformOrigin: "center center",
+              opacity: outOp,
+              borderRadius: isCompressing && compressionProgress > 0.7 ? "50%" : undefined,
+              overflow: "hidden",
+            }}
+          >
+            {outgoing}
+          </div>
+        )}
+        {inOp > 0.01 && inScale > 0.02 && (
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              transform: `scale(${inScale.toFixed(4)})`,
+              transformOrigin: "center center",
+              opacity: inOp,
+            }}
+          >
+            {incoming}
+          </div>
+        )}
+        {/* Singularity flash */}
+        {flashIntensity > 0.01 && (
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              background: `radial-gradient(circle at 50% 50%, rgba(255, 255, 255, ${flashIntensity}) 0%, transparent 50%)`,
+              pointerEvents: "none",
+            }}
+          />
+        )}
+      </div>
+    );
+  }
+
+  if (style === "curtain_rise") {
+    // Two curtain panels slide apart from center with fabric fold shadows.
+    const eased = cubicEase(t);
+    const outOp = 1 - eased;
+    const inOp = eased;
+    // Curtain opening: panels slide from center to edges
+    const openPercent = eased * 55; // each panel slides 55% of width
+
+    return (
+      <div style={{ position: "relative", width: "100%", height: "100%" }}>
+        {/* Incoming scene behind curtains */}
+        {inOp > 0.01 && (
+          <div style={{ position: "absolute", inset: 0, opacity: inOp }}>
+            {incoming}
+          </div>
+        )}
+        {/* Left curtain panel */}
+        {outOp > 0.01 && (
+          <div
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              width: "50%",
+              height: "100%",
+              overflow: "hidden",
+              transform: `translateX(${-openPercent.toFixed(1)}%)`,
+            }}
+          >
+            <div style={{ position: "absolute", inset: 0, width: "200%" }}>
+              {outgoing}
+            </div>
+            {/* Fabric fold shadow */}
+            <div
+              style={{
+                position: "absolute",
+                top: 0,
+                right: 0,
+                width: 30,
+                height: "100%",
+                background: `linear-gradient(to left, rgba(0,0,0,${0.3 * outOp}), transparent)`,
+                pointerEvents: "none",
+              }}
+            />
+          </div>
+        )}
+        {/* Right curtain panel */}
+        {outOp > 0.01 && (
+          <div
+            style={{
+              position: "absolute",
+              top: 0,
+              right: 0,
+              width: "50%",
+              height: "100%",
+              overflow: "hidden",
+              transform: `translateX(${openPercent.toFixed(1)}%)`,
+            }}
+          >
+            <div style={{ position: "absolute", inset: 0, left: "-100%", width: "200%" }}>
+              {outgoing}
+            </div>
+            {/* Fabric fold shadow */}
+            <div
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                width: 30,
+                height: "100%",
+                background: `linear-gradient(to right, rgba(0,0,0,${0.3 * outOp}), transparent)`,
+                pointerEvents: "none",
+              }}
+            />
+          </div>
+        )}
+      </div>
+    );
+  }
+
   // ─── Original opacity-based transitions ───
 
   let outOpacity: number;

@@ -35,6 +35,26 @@ import { smokeRingsVert, smokeRingsFrag } from "@visualizer/shaders/smoke-rings"
 import { auroraCurtainsVert, auroraCurtainsFrag } from "@visualizer/shaders/aurora-curtains";
 import { digitalRainVert, digitalRainFrag } from "@visualizer/shaders/digital-rain";
 import { lavaFlowVert, lavaFlowFrag } from "@visualizer/shaders/lava-flow";
+// Phase 9 Wave 1: 10 missing VJ modes
+import { fluid2DVert, fluid2DFrag } from "@visualizer/shaders/fluid-2d";
+import { spectralAnalyzerVert, spectralAnalyzerFrag } from "@visualizer/shaders/spectral-analyzer";
+import { particleSwarmVert, particleSwarmFrag } from "@visualizer/shaders/particle-swarm";
+import { crystallineGrowthVert, crystallineGrowthFrag } from "@visualizer/shaders/crystalline-growth";
+import { climaxSurgeVert, climaxSurgeFrag } from "@visualizer/shaders/climax-surge";
+import { kaleidoscopeVert, kaleidoscopeFrag } from "@visualizer/shaders/kaleidoscope";
+import { fractalZoomVert, fractalZoomFrag } from "@visualizer/shaders/fractal-zoom";
+import { sacredGeometryVert, sacredGeometryFrag } from "@visualizer/shaders/sacred-geometry";
+import { reactionDiffusionVert, reactionDiffusionFrag } from "@visualizer/shaders/reaction-diffusion";
+import { mandalaEngineVert, mandalaEngineFrag } from "@visualizer/shaders/mandala-engine";
+// Phase 9 Wave 2: 8 new shaders
+import { myceliumNetworkVert, myceliumNetworkFrag } from "@visualizer/shaders/mycelium-network";
+import { inkWashVert, inkWashFrag } from "@visualizer/shaders/ink-wash";
+import { coralReefVert, coralReefFrag } from "@visualizer/shaders/coral-reef";
+import { solarFlareVert, solarFlareFrag } from "@visualizer/shaders/solar-flare";
+import { galaxySpiralVert, galaxySpiralFrag } from "@visualizer/shaders/galaxy-spiral";
+import { warpFieldVert, warpFieldFrag } from "@visualizer/shaders/warp-field";
+import { signalDecayVert, signalDecayFrag } from "@visualizer/shaders/signal-decay";
+import { databendVert, databendFrag } from "@visualizer/shaders/databend";
 
 // InstancedMesh scenes (ParticleNebula, CrystalCavern) need custom adapters
 // For now, use simpler fullscreen-quad shaders; custom 3D scenes added later
@@ -269,6 +289,141 @@ export const VJ_SCENES: Partial<Record<VisualMode, VJSceneEntry>> = {
     fragmentShader: lavaFlowFrag,
     feedback: true,
   },
+  // Phase 9 Wave 1: 10 missing VJ modes
+  fluid_2d: {
+    Component: createVJFeedbackScene(fluid2DVert, fluid2DFrag, "VJFluid2D", 0.96),
+    energyAffinity: "any",
+    complement: "liquid_light",
+    vertexShader: fluid2DVert,
+    fragmentShader: fluid2DFrag,
+    feedback: true,
+  },
+  spectral_analyzer: {
+    Component: createVJScene(spectralAnalyzerVert, spectralAnalyzerFrag, "VJSpectralAnalyzer"),
+    energyAffinity: "high",
+    complement: "particle_swarm",
+    vertexShader: spectralAnalyzerVert,
+    fragmentShader: spectralAnalyzerFrag,
+  },
+  particle_swarm: {
+    Component: createVJScene(particleSwarmVert, particleSwarmFrag, "VJParticleSwarm"),
+    energyAffinity: "mid",
+    complement: "spectral_analyzer",
+    vertexShader: particleSwarmVert,
+    fragmentShader: particleSwarmFrag,
+  },
+  crystalline_growth: {
+    Component: createVJFeedbackScene(crystallineGrowthVert, crystallineGrowthFrag, "VJCrystallineGrowth", 0.98),
+    energyAffinity: "low",
+    complement: "climax_surge",
+    vertexShader: crystallineGrowthVert,
+    fragmentShader: crystallineGrowthFrag,
+    feedback: true,
+  },
+  climax_surge: {
+    Component: createVJScene(climaxSurgeVert, climaxSurgeFrag, "VJClimaxSurge"),
+    energyAffinity: "high",
+    complement: "inferno",
+    vertexShader: climaxSurgeVert,
+    fragmentShader: climaxSurgeFrag,
+  },
+  kaleidoscope: {
+    Component: createVJScene(kaleidoscopeVert, kaleidoscopeFrag, "VJKaleidoscope"),
+    energyAffinity: "mid",
+    complement: "sacred_geometry",
+    vertexShader: kaleidoscopeVert,
+    fragmentShader: kaleidoscopeFrag,
+  },
+  fractal_zoom: {
+    Component: createVJScene(fractalZoomVert, fractalZoomFrag, "VJFractalZoom"),
+    energyAffinity: "any",
+    complement: "kaleidoscope",
+    vertexShader: fractalZoomVert,
+    fragmentShader: fractalZoomFrag,
+  },
+  sacred_geometry: {
+    Component: createVJScene(sacredGeometryVert, sacredGeometryFrag, "VJSacredGeometry"),
+    energyAffinity: "low",
+    complement: "kaleidoscope",
+    vertexShader: sacredGeometryVert,
+    fragmentShader: sacredGeometryFrag,
+  },
+  reaction_diffusion: {
+    Component: createVJFeedbackScene(reactionDiffusionVert, reactionDiffusionFrag, "VJReactionDiffusion", 0.97),
+    energyAffinity: "mid",
+    complement: "fluid_2d",
+    vertexShader: reactionDiffusionVert,
+    fragmentShader: reactionDiffusionFrag,
+    feedback: true,
+  },
+  mandala_engine: {
+    Component: createVJScene(mandalaEngineVert, mandalaEngineFrag, "VJMandalaEngine"),
+    energyAffinity: "mid",
+    complement: "sacred_geometry",
+    vertexShader: mandalaEngineVert,
+    fragmentShader: mandalaEngineFrag,
+  },
+  // Phase 9 Wave 2: 8 new shaders
+  mycelium_network: {
+    Component: createVJFeedbackScene(myceliumNetworkVert, myceliumNetworkFrag, "VJMyceliumNetwork", 0.97),
+    energyAffinity: "mid",
+    complement: "neural_web",
+    vertexShader: myceliumNetworkVert,
+    fragmentShader: myceliumNetworkFrag,
+    feedback: true,
+  },
+  ink_wash: {
+    Component: createVJFeedbackScene(inkWashVert, inkWashFrag, "VJInkWash", 0.985),
+    energyAffinity: "low",
+    complement: "stark_minimal",
+    vertexShader: inkWashVert,
+    fragmentShader: inkWashFrag,
+    feedback: true,
+  },
+  coral_reef: {
+    Component: createVJScene(coralReefVert, coralReefFrag, "VJCoralReef"),
+    energyAffinity: "low",
+    complement: "deep_ocean",
+    vertexShader: coralReefVert,
+    fragmentShader: coralReefFrag,
+  },
+  solar_flare: {
+    Component: createVJFeedbackScene(solarFlareVert, solarFlareFrag, "VJSolarFlare", 0.94),
+    energyAffinity: "high",
+    complement: "inferno",
+    vertexShader: solarFlareVert,
+    fragmentShader: solarFlareFrag,
+    feedback: true,
+  },
+  galaxy_spiral: {
+    Component: createVJScene(galaxySpiralVert, galaxySpiralFrag, "VJGalaxySpiral"),
+    energyAffinity: "any",
+    complement: "cosmic_voyage",
+    vertexShader: galaxySpiralVert,
+    fragmentShader: galaxySpiralFrag,
+  },
+  warp_field: {
+    Component: createVJScene(warpFieldVert, warpFieldFrag, "VJWarpField"),
+    energyAffinity: "mid",
+    complement: "diffraction_rings",
+    vertexShader: warpFieldVert,
+    fragmentShader: warpFieldFrag,
+  },
+  signal_decay: {
+    Component: createVJFeedbackScene(signalDecayVert, signalDecayFrag, "VJSignalDecay", 0.91),
+    energyAffinity: "any",
+    complement: "digital_rain",
+    vertexShader: signalDecayVert,
+    fragmentShader: signalDecayFrag,
+    feedback: true,
+  },
+  databend: {
+    Component: createVJScene(databendVert, databendFrag, "VJDatabend"),
+    energyAffinity: "high",
+    complement: "lo_fi_grain",
+    vertexShader: databendVert,
+    fragmentShader: databendFrag,
+  },
 };
 
 /** Ordered list of all scenes (for shader warming and scene picker) */
@@ -311,4 +466,24 @@ export const SCENE_MODES: VisualMode[] = [
   "aurora_curtains",
   "digital_rain",
   "lava_flow",
+  // Phase 9 Wave 1: 10 missing modes
+  "fluid_2d",
+  "spectral_analyzer",
+  "particle_swarm",
+  "crystalline_growth",
+  "climax_surge",
+  "kaleidoscope",
+  "fractal_zoom",
+  "sacred_geometry",
+  "reaction_diffusion",
+  "mandala_engine",
+  // Phase 9 Wave 2: 8 new shaders
+  "mycelium_network",
+  "ink_wash",
+  "coral_reef",
+  "solar_flare",
+  "galaxy_spiral",
+  "warp_field",
+  "signal_decay",
+  "databend",
 ];

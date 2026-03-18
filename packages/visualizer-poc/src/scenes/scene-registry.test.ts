@@ -18,11 +18,13 @@ const ALL_MODES: VisualMode[] = [
   "fractal_flames", "feedback_recursion", "truchet_tiling", "diffraction_rings",
   "plasma_field", "voronoi_flow", "electric_arc", "morphogenesis", "stained_glass",
   "neural_web", "smoke_rings", "aurora_curtains", "digital_rain", "lava_flow",
+  "mycelium_network", "ink_wash", "coral_reef", "solar_flare",
+  "galaxy_spiral", "warp_field", "signal_decay", "databend",
 ];
 
 describe("SCENE_REGISTRY", () => {
-  it("has exactly 40 registered modes", () => {
-    expect(Object.keys(SCENE_REGISTRY).length).toBe(40);
+  it("has exactly 48 registered modes", () => {
+    expect(Object.keys(SCENE_REGISTRY).length).toBe(48);
   });
 
   it("contains all expected modes", () => {
@@ -112,9 +114,9 @@ describe("getModesForEnergy", () => {
 });
 
 describe("getRegisteredModes", () => {
-  it("returns all 40 modes", () => {
+  it("returns all 48 modes", () => {
     const modes = getRegisteredModes();
-    expect(modes.length).toBe(40);
+    expect(modes.length).toBe(48);
     for (const mode of ALL_MODES) {
       expect(modes).toContain(mode);
     }
