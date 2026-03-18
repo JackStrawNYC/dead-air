@@ -9,6 +9,8 @@ import * as THREE from "three";
 import { useAudioData } from "./AudioReactiveCanvas";
 import { useVideoConfig } from "remotion";
 import { useShowContext } from "../data/ShowContext";
+import { deriveFilmStock } from "../utils/show-film-stock";
+import { getVenueProfile } from "../utils/venue-profiles";
 
 /** Era saturation values — previously in EraGrade CSS, now owned by GLSL */
 const ERA_SATURATION: Record<string, number> = {
@@ -55,6 +57,8 @@ export const FullscreenQuad: React.FC<Props> = ({
   const eraSaturation = ERA_SATURATION[eraKey] ?? 1.0;
   const eraBrightness = ERA_BRIGHTNESS[eraKey] ?? 1.0;
   const eraSepia = ERA_SEPIA[eraKey] ?? 0.0;
+  const filmStock = deriveFilmStock(showCtx?.showSeed ?? 0);
+  const venueProfile = getVenueProfile(showCtx?.venueType ?? "");
 
   // FFT texture: 64-bin DataTexture from 7-band contrast (padded)
   const fftTextureRef = useRef<THREE.DataTexture | null>(null);
@@ -132,6 +136,12 @@ export const FullscreenQuad: React.FC<Props> = ({
       uImprovisationScore: { value: 0 },
       uHeroIconTrigger: { value: 0 },
       uHeroIconProgress: { value: 0 },
+      uShowWarmth: { value: 0 },
+      uShowContrast: { value: 1 },
+      uShowSaturation: { value: 0 },
+      uShowGrain: { value: 1 },
+      uShowBloom: { value: 1 },
+      uVenueVignette: { value: 0.5 },
       ...extraUniforms,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -200,6 +210,12 @@ export const FullscreenQuad: React.FC<Props> = ({
   uniforms.uImprovisationScore.value = smooth.improvisationScore ?? 0;
   uniforms.uHeroIconTrigger.value = heroTrigger;
   uniforms.uHeroIconProgress.value = heroProgress;
+  uniforms.uShowWarmth.value = filmStock.warmth + venueProfile.warmth;
+  uniforms.uShowContrast.value = filmStock.contrast;
+  uniforms.uShowSaturation.value = filmStock.saturation;
+  uniforms.uShowGrain.value = filmStock.grain * venueProfile.grainMult;
+  uniforms.uShowBloom.value = filmStock.bloom * venueProfile.bloomMult;
+  uniforms.uVenueVignette.value = venueProfile.vignette;
 
   const c = smooth.contrast;
 

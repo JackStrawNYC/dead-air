@@ -71,6 +71,7 @@ import { detectGroove, grooveModifiers } from "./utils/groove-detector";
 import { detectJamCycle } from "./utils/jam-cycles";
 import { computeNarrativeDirective } from "./utils/visual-narrator";
 import { endScreenOverlayMult } from "./utils/end-screen-zones";
+import { getVenueProfile } from "./utils/venue-profiles";
 import { NowPlaying } from "./components/NowPlaying";
 import { SongPositionIndicator } from "./components/SongPositionIndicator";
 import { JamTimer } from "./components/JamTimer";
@@ -367,7 +368,8 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
   // End screen overlay dimming (last 20s)
   const endScreenMult = endScreenOverlayMult(frame, durationInFrames);
 
-  const combinedDensityMult = Math.max(0.75, climaxMod.overlayDensityMult * (jamEvolution.isLongJam ? jamEvolution.densityMult : 1) * sectionVocab.overlayDensityMult * narrativeDirective.overlayDensityMult * endScreenMult);
+  const venueProfile = getVenueProfile(props.show?.venueType ?? "");
+  const combinedDensityMult = Math.max(0.75, climaxMod.overlayDensityMult * (jamEvolution.isLongJam ? jamEvolution.densityMult : 1) * sectionVocab.overlayDensityMult * narrativeDirective.overlayDensityMult * endScreenMult * venueProfile.overlayDensityMult);
   const opacityMap = opacityMapBase ? applyDensityMult(opacityMapBase, combinedDensityMult, rotationSchedule!) : null;
 
   // ─── Media suppression ───

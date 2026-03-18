@@ -23,6 +23,8 @@ import { useFrame, useThree } from "@react-three/fiber";
 import { useVideoConfig, useCurrentFrame } from "remotion";
 import { useAudioData } from "./AudioReactiveCanvas";
 import { useShowContext } from "../data/ShowContext";
+import { deriveFilmStock } from "../utils/show-film-stock";
+import { getVenueProfile } from "../utils/venue-profiles";
 
 /** Era saturation values — same as FullscreenQuad */
 const ERA_SATURATION: Record<string, number> = {
@@ -165,6 +167,12 @@ function createBaseUniforms(
     uImprovisationScore: { value: 0 },
     uHeroIconTrigger: { value: 0 },
     uHeroIconProgress: { value: 0 },
+    uShowWarmth: { value: 0 },
+    uShowContrast: { value: 1 },
+    uShowSaturation: { value: 0 },
+    uShowGrain: { value: 1 },
+    uShowBloom: { value: 1 },
+    uVenueVignette: { value: 0.5 },
     ...(feedback ? { uPrevFrame: { value: null as THREE.Texture | null } } : {}),
     ...extraUniforms,
   };
@@ -189,6 +197,8 @@ export const MultiPassQuad: React.FC<Props> = ({
   const eraSaturation = ERA_SATURATION[eraKey] ?? 1.0;
   const eraBrightness = ERA_BRIGHTNESS[eraKey] ?? 1.0;
   const eraSepia = ERA_SEPIA[eraKey] ?? 0.0;
+  const filmStock = deriveFilmStock(showCtx?.showSeed ?? 0);
+  const venueProfile = getVenueProfile(showCtx?.venueType ?? "");
   const gl = useThree((state) => state.gl);
 
   const lastRenderedFrame = useRef(-1);
@@ -347,6 +357,12 @@ export const MultiPassQuad: React.FC<Props> = ({
   u.uImprovisationScore.value = smooth.improvisationScore ?? 0;
   u.uHeroIconTrigger.value = heroTrigger;
   u.uHeroIconProgress.value = heroProgress;
+  u.uShowWarmth.value = filmStock.warmth + venueProfile.warmth;
+  u.uShowContrast.value = filmStock.contrast;
+  u.uShowSaturation.value = filmStock.saturation;
+  u.uShowGrain.value = filmStock.grain * venueProfile.grainMult;
+  u.uShowBloom.value = filmStock.bloom * venueProfile.bloomMult;
+  u.uVenueVignette.value = venueProfile.vignette;
 
   // Update FFT texture
   if (fftTextureRef.current) {

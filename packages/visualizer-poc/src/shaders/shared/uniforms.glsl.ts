@@ -93,6 +93,16 @@ uniform float uImprovisationScore;
 uniform float uHeroIconTrigger;
 uniform float uHeroIconProgress;
 
+// ─── Show Film Stock ───
+uniform float uShowWarmth;
+uniform float uShowContrast;
+uniform float uShowSaturation;
+uniform float uShowGrain;
+uniform float uShowBloom;
+
+// ─── Venue Profile ───
+uniform float uVenueVignette;
+
 // ─── Spatial ───
 uniform vec2 uResolution;
 uniform vec2 uCamOffset;

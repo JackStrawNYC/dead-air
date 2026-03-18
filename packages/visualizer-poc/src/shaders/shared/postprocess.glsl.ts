@@ -114,7 +114,7 @@ ${
     float bloomThreshold = mix(0.60, 0.45, energy) + uBloomThreshold${bloomThresholdStr};
     float bloomAmount = max(0.0, lum - bloomThreshold) * (1.2 + climaxBoost * 0.5);
     vec3 bloomColor = mix(col, vec3(1.0, 0.98, 0.95), 0.3);
-    vec3 bloom = bloomColor * bloomAmount * (0.18 + energy * 0.06 + climaxBoost * 0.12);
+    vec3 bloom = bloomColor * bloomAmount * (0.18 + energy * 0.06 + climaxBoost * 0.12) * uShowBloom;
     col = col + bloom - col * bloom; // screen blend
   }
 `
@@ -201,6 +201,19 @@ ${
   // Cinematic grade (ACES filmic tone mapping)
   col = cinematicGrade(col, energy);
 
+  // Venue vignette: edge darkening scaled by venue type
+  {
+    float vig = 1.0 - dot(p * 0.9, p * 0.9);
+    vig = smoothstep(0.0, 1.0, vig);
+    col *= mix(1.0, vig, uVenueVignette);
+  }
+
+  // Show warmth: seed-derived color temperature shift
+  {
+    float w = uShowWarmth;
+    col *= vec3(1.0 + w, 1.0, 1.0 - w);
+  }
+
   // Era brightness: per-era brightness adjustment (moved from CSS to GLSL)
   col *= uEraBrightness;
 
@@ -228,7 +241,7 @@ ${
     float grainIntensity = ${grainExpr};
 ${
   grainStrength !== "none"
-    ? `    col += filmGrainRes(uv, grainTime, uResolution.y) * grainIntensity;`
+    ? `    col += filmGrainRes(uv, grainTime, uResolution.y) * grainIntensity * uShowGrain;`
     : ""
 }
   }
@@ -246,6 +259,12 @@ ${
     float isBuild = step(0.5, uClimaxPhase) * step(uClimaxPhase, 1.5);
     float liftMult = mix(1.0, 0.40, isBuild * uClimaxIntensity);
     col = max(col, vec3(0.09, 0.07, 0.11) * liftMult);
+  }
+
+  // Show contrast: seed-derived curve
+  {
+    float mid = 0.18;
+    col = mid + (col - mid) * uShowContrast;
   }
 
   return col;
