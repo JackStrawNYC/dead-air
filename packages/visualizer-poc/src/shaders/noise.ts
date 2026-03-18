@@ -302,7 +302,7 @@ vec3 cinematicGrade(vec3 col, float energy) {
   float luma = dot(col, vec3(0.2126, 0.7152, 0.0722));
   float contrast = mix(0.95, 1.15, energy);
   contrast *= 1.0 + uHarmonicTension * 0.08;
-  col = mix(vec3(luma), col, contrast * uEraSaturation);
+  col = mix(vec3(luma), col, contrast * uEraSaturation + uShowSaturation);
   return col;
 }
 

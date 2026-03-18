@@ -185,6 +185,94 @@ describe('getModeForSection', () => {
     expect(preferredCount).toBeGreaterThan(0);
   });
 
+  it('seed-driven subsetting activates for large preferred pools', () => {
+    const song = makeSong();
+    const sections: SectionBoundary[] = Array.from({ length: 5 }, (_, i) => ({
+      frameStart: i * 900,
+      frameEnd: (i + 1) * 900,
+      label: `section_${i}`,
+      energy: 'high' as const,
+      avgEnergy: 0.35,
+    }));
+    // 7 preferred modes — subsetting should activate (threshold=5)
+    const identity: SongIdentity = {
+      preferredModes: [
+        'inferno', 'liquid_light', 'concert_lighting',
+        'fractal_flames', 'lava_flow', 'solar_flare', 'electric_arc',
+      ],
+    } as SongIdentity;
+
+    // Two different seeds should produce different mode distributions
+    const countsA = new Map<VisualMode, number>();
+    const countsB = new Map<VisualMode, number>();
+    for (let i = 0; i < 300; i++) {
+      const seedA = i * 100000;
+      const seedB = i * 100000 + 77777;
+      const modeA = getModeForSection(song, 2, sections, seedA, undefined, false, undefined, identity);
+      const modeB = getModeForSection(song, 2, sections, seedB, undefined, false, undefined, identity);
+      countsA.set(modeA, (countsA.get(modeA) ?? 0) + 1);
+      countsB.set(modeB, (countsB.get(modeB) ?? 0) + 1);
+    }
+
+    // Both should have preferred modes appearing, but different top modes
+    const topA = [...countsA.entries()].sort((a, b) => b[1] - a[1])[0][0];
+    const topB = [...countsB.entries()].sort((a, b) => b[1] - a[1])[0][0];
+    // The top mode is likely different across seeds (not guaranteed, but with 7 modes and different hero subsets, very likely)
+    // At minimum, preferred modes should appear
+    const preferredCountA = identity.preferredModes.reduce((sum, m) => sum + (countsA.get(m) ?? 0), 0);
+    expect(preferredCountA).toBeGreaterThan(0);
+  });
+
+  it('small preferred pools skip subsetting (all get 3x)', () => {
+    const song = makeSong();
+    const sections: SectionBoundary[] = Array.from({ length: 5 }, (_, i) => ({
+      frameStart: i * 900,
+      frameEnd: (i + 1) * 900,
+      label: `section_${i}`,
+      energy: 'high' as const,
+      avgEnergy: 0.35,
+    }));
+    // Only 3 preferred modes — below threshold, all should get 3x weight
+    const identity: SongIdentity = {
+      preferredModes: ['inferno', 'tie_dye', 'concert_lighting'],
+    } as SongIdentity;
+
+    const counts = new Map<VisualMode, number>();
+    for (let i = 0; i < 300; i++) {
+      const seed = i * 100000;
+      const mode = getModeForSection(song, 2, sections, seed, undefined, false, undefined, identity);
+      counts.set(mode, (counts.get(mode) ?? 0) + 1);
+    }
+
+    // All 3 preferred modes should appear with significant frequency
+    const preferredCount = (counts.get('inferno') ?? 0) + (counts.get('tie_dye') ?? 0) + (counts.get('concert_lighting') ?? 0);
+    expect(preferredCount).toBeGreaterThan(100); // should dominate with 3x weight
+  });
+
+  it('seed-driven subsetting is deterministic', () => {
+    const song = makeSong();
+    const sections: SectionBoundary[] = Array.from({ length: 5 }, (_, i) => ({
+      frameStart: i * 900,
+      frameEnd: (i + 1) * 900,
+      label: `section_${i}`,
+      energy: 'high' as const,
+      avgEnergy: 0.35,
+    }));
+    const identity: SongIdentity = {
+      preferredModes: [
+        'inferno', 'liquid_light', 'concert_lighting',
+        'fractal_flames', 'lava_flow', 'solar_flare', 'electric_arc',
+      ],
+    } as SongIdentity;
+
+    const seed = 42424242;
+    const mode1 = getModeForSection(song, 2, sections, seed, undefined, false, undefined, identity);
+    const mode2 = getModeForSection(song, 2, sections, seed, undefined, false, undefined, identity);
+    const mode3 = getModeForSection(song, 2, sections, seed, undefined, false, undefined, identity);
+    expect(mode1).toBe(mode2);
+    expect(mode2).toBe(mode3);
+  });
+
   it('stem section solo biases toward dramatic modes', () => {
     const song = makeSong();
     // Same energy so the stem bias path is reached

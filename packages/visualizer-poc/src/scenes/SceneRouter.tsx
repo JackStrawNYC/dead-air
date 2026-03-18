@@ -15,7 +15,7 @@ import type {
   SetlistEntry,
   ColorPalette,
 } from "../data/types";
-import { seededLCG as seededRandom } from "../utils/seededRandom";
+import { seededLCG as seededRandom, seededShuffle } from "../utils/seededRandom";
 import { findCurrentSection } from "../utils/section-lookup";
 import type { SongIdentity } from "../data/song-identities";
 import type { StemSectionType } from "../utils/stem-features";
@@ -263,12 +263,21 @@ export function getModeForSection(
         if (unused.length > 0) filteredPool = unused;
       }
 
-      // Song identity preferred modes: weight 3x in selection pool
+      // Song identity preferred modes: show-seed selects a subset for 3x weight
       if (songIdentity?.preferredModes?.length) {
         const preferred = songIdentity.preferredModes.filter((m) => filteredPool.includes(m));
         if (preferred.length > 0) {
-          // Add preferred modes 2 extra times (3x total weight)
-          filteredPool = [...filteredPool, ...preferred, ...preferred];
+          const SUBSET_THRESHOLD = 5;
+          const HERO_COUNT = 3;
+          let heroModes: typeof preferred;
+          if (preferred.length >= SUBSET_THRESHOLD && seed !== undefined) {
+            const shuffled = seededShuffle(preferred, seed + 0x4D0DE);
+            heroModes = shuffled.slice(0, HERO_COUNT);
+          } else {
+            heroModes = preferred;
+          }
+          // Hero modes get 3x weight; remaining preferred stay at 1x (already in filteredPool)
+          filteredPool = [...filteredPool, ...heroModes, ...heroModes];
         }
       }
 
