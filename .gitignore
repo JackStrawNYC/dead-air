@@ -12,3 +12,4 @@ out/
 # YouTube OAuth credentials
 **/client_secret*.json
 **/token.json
+*.log
