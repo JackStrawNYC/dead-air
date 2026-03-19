@@ -20,6 +20,8 @@ precision highp float;
 
 ${sharedUniformsGLSL}
 
+uniform sampler2D uPrevFrame;
+
 ${noiseGLSL}
 
 varying vec2 vUv;
@@ -87,7 +89,7 @@ void main() {
   // === FOLD-LINE SDF: sharp tie-dye boundaries where fabric was tied ===
   // Radial fold lines from center with energy-driven bleeding
   {
-    float foldCount = 6.0;
+    float foldCount = 6.0 * (1.0 + uJamDensity * 0.4);
     float foldAngle = mod(angle * foldCount / TAU, 1.0);
     // Sharp fold boundary (SDF of angular fold lines)
     float foldSDF = abs(foldAngle - 0.5) * 2.0;
@@ -121,8 +123,9 @@ void main() {
   float flash = max(uOnsetSnap, uDrumOnset) * 0.9 * smoothstep(0.6, 0.0, r) * (1.0 + climaxBoost * 0.5);
   color += flash;
 
-  // Beat snap — sharp saturation kick on transients
-  color *= 1.0 + uBeatSnap * 0.28 * (1.0 + climaxBoost * 0.4);
+  // Beat snap — sharp saturation kick on transients (confidence-gated)
+  float effectiveBeat = uBeatSnap * smoothstep(0.3, 0.7, uBeatConfidence);
+  color *= 1.0 + effectiveBeat * 0.28 * (1.0 + climaxBoost * 0.4);
 
 
   // Vignette
@@ -160,6 +163,17 @@ void main() {
   float isBuild = step(0.5, uClimaxPhase) * step(uClimaxPhase, 1.5);
   float liftMult = mix(1.0, 0.15, isBuild * uClimaxIntensity);
   color = max(color, vec3(0.06, 0.05, 0.08) * liftMult);
+
+  // Feedback trails: section-type-aware decay
+  vec3 prev = texture2D(uPrevFrame, vUv).rgb;
+  float sJam_fb = smoothstep(4.5, 5.5, uSectionType) * (1.0 - step(5.5, uSectionType));
+  float sSpace_fb = smoothstep(6.5, 7.5, uSectionType);
+  float sChorus_fb = smoothstep(1.5, 2.5, uSectionType) * (1.0 - step(2.5, uSectionType));
+  float energy_fb = clamp(uEnergy, 0.0, 1.0);
+  float baseDecay = mix(0.93, 0.93 - 0.07, energy_fb);
+  float feedbackDecay = baseDecay + sJam_fb * 0.04 + sSpace_fb * 0.06 - sChorus_fb * 0.06;
+  feedbackDecay = clamp(feedbackDecay, 0.80, 0.97);
+  color = max(color, prev * feedbackDecay);
 
   gl_FragColor = vec4(color, 1.0);
 }

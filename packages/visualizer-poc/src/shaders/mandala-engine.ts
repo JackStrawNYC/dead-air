@@ -76,8 +76,9 @@ void main() {
   float angle = atan(p.y, p.x);
   float radius = length(p);
 
-  // Downbeat pulse: expand ring radius on measure start
-  float downbeatPulse = uDownbeat * 0.12;
+  // Downbeat pulse: expand ring radius on measure start (confidence-gated)
+  float effectiveDownbeat = uDownbeat * uBeatConfidence;
+  float downbeatPulse = effectiveDownbeat * 0.12;
   radius -= downbeatPulse; // brief expansion on downbeat
 
   // Bass-driven rotation
@@ -98,7 +99,8 @@ void main() {
   vec2 polarP = vec2(foldedAngle * 2.0, radius);
 
   // Melodic pitch controls complexity (more FBM octaves at high pitch)
-  float complexity = 2.0 + uMelodicPitch * 4.0 + energy * 2.0;
+  float melInfluence = uMelodicPitch * uMelodicConfidence;
+  float complexity = 2.0 + melInfluence * 4.0 + energy * 2.0;
   float warpAmount = 0.3 + uHarmonicTension * 0.5;
 
   vec3 warpSeed = vec3(polarP * complexity, t * 0.15);
@@ -112,7 +114,8 @@ void main() {
   float fftRadiusMod = radius > 0.5 ? fftBass * 0.15
                      : radius > 0.25 ? fftMid * 0.12
                      : fftHigh * 0.10;
-  float ringCount = max(1.0, 3.0 + energy * 5.0 + uMelodicPitch * 3.0 + sectionRingMod + uHarmonicTension * 2.0);
+  float ringMod = 1.0 + uJamDensity * 0.5;
+  float ringCount = max(1.0, (3.0 + energy * 5.0 + uMelodicPitch * 3.0 + sectionRingMod + uHarmonicTension * 2.0) * ringMod);
   float ringPattern = sin((warpedP.y + fftRadiusMod) * ringCount * PI) * 0.5 + 0.5;
 
   // Petal shape: angular modulation

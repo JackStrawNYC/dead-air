@@ -5,7 +5,7 @@
 
 import React from "react";
 import { AudioReactiveCanvas } from "../components/AudioReactiveCanvas";
-import { FullscreenQuad } from "../components/FullscreenQuad";
+import { MultiPassQuad } from "../components/MultiPassQuad";
 import { reactionDiffusionVert, reactionDiffusionFrag } from "../shaders/reaction-diffusion";
 import type { EnhancedFrameData, SectionBoundary, ColorPalette } from "../data/types";
 
@@ -21,9 +21,10 @@ interface Props {
 export const ReactionDiffusionScene: React.FC<Props> = ({ frames, sections, palette, tempo, style, jamDensity }) => {
   return (
     <AudioReactiveCanvas frames={frames} sections={sections} palette={palette} tempo={tempo} style={style} jamDensity={jamDensity}>
-      <FullscreenQuad
+      <MultiPassQuad
         vertexShader={reactionDiffusionVert}
         fragmentShader={reactionDiffusionFrag}
+        feedback
       />
     </AudioReactiveCanvas>
   );

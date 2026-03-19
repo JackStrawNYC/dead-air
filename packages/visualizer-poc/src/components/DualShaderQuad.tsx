@@ -15,6 +15,7 @@ import { useShowContext } from "../data/ShowContext";
 import { deriveFilmStock, type FilmStockParams } from "../utils/show-film-stock";
 import { getVenueProfile, type VenueProfile } from "../utils/venue-profiles";
 import { compute3DCamera } from "../utils/camera-3d";
+import { useSceneConfig } from "../scenes/SceneConfigContext";
 import { dualBlendVert, dualBlendFrag } from "../shaders/dual-blend";
 
 /** Era values — same as FullscreenQuad */
@@ -84,7 +85,7 @@ function createSceneUniforms(width: number, height: number): Record<string, THRE
     uOtherEnergy: { value: 0 }, uOtherCentroid: { value: 0 },
     uSnapToMusicalTime: { value: 0 },
     uEraSaturation: { value: 1.0 }, uEraBrightness: { value: 1.0 }, uEraSepia: { value: 0.0 },
-    uBloomThreshold: { value: 0.0 }, uLensDistortion: { value: 0.0 },
+    uBloomThreshold: { value: 0.0 }, uLensDistortion: { value: 0.0 }, uGradingIntensity: { value: 1.0 },
     uEnergyAccel: { value: 0 }, uEnergyTrend: { value: 0 }, uLocalTempo: { value: 120 },
     uFFTTexture: { value: new THREE.DataTexture(new Uint8Array(64), 64, 1, THREE.RedFormat) },
     uMelodicPitch: { value: 0 }, uMelodicDirection: { value: 0 },
@@ -92,7 +93,7 @@ function createSceneUniforms(width: number, height: number): Record<string, THRE
     uSectionType: { value: 5 }, uEnergyForecast: { value: 0 },
     uPeakApproaching: { value: 0 }, uBeatStability: { value: 0.5 },
     uImprovisationScore: { value: 0 },
-    uDownbeat: { value: 0 }, uBeatConfidence: { value: 0.5 },
+    uDownbeat: { value: 0 }, uBeatConfidence: { value: 0.5 }, uMelodicConfidence: { value: 0.5 },
     uHeroIconTrigger: { value: 0 }, uHeroIconProgress: { value: 0 },
     uShowWarmth: { value: 0 }, uShowContrast: { value: 1 },
     uShowSaturation: { value: 0 }, uShowGrain: { value: 1 }, uShowBloom: { value: 1 },
@@ -116,6 +117,7 @@ function syncUniforms(
   eraSaturation: number, eraBrightness: number, eraSepia: number,
   filmStock: FilmStockParams, venueProfile: VenueProfile,
   width: number, height: number,
+  gradingIntensity = 1.0,
 ) {
   u.uTime.value = time;
   u.uDynamicTime.value = dynamicTime;
@@ -162,6 +164,7 @@ function syncUniforms(
   u.uEraSepia.value = eraSepia;
   u.uBloomThreshold.value = -0.08 - (smooth.energy as number) * 0.18;
   u.uLensDistortion.value = 0.02 + (smooth.energy as number) * 0.06;
+  u.uGradingIntensity.value = gradingIntensity;
   u.uEnergyAccel.value = smooth.energyAcceleration;
   u.uEnergyTrend.value = smooth.energyTrend;
   u.uLocalTempo.value = smooth.localTempo;
@@ -176,6 +179,7 @@ function syncUniforms(
   u.uImprovisationScore.value = smooth.improvisationScore ?? 0;
   u.uDownbeat.value = smooth.downbeat;
   u.uBeatConfidence.value = smooth.beatConfidence;
+  u.uMelodicConfidence.value = smooth.melodicConfidence ?? 0.5;
   u.uHeroIconTrigger.value = heroTrigger;
   u.uHeroIconProgress.value = heroProgress;
   u.uShowWarmth.value = filmStock.warmth + venueProfile.warmth;
@@ -224,6 +228,7 @@ export const DualShaderQuad: React.FC<Props> = ({
     heroTrigger, heroProgress, jamDensity, coherence, dynamicTime, isLocked,
   } = useAudioData();
   const { width, height } = useVideoConfig();
+  const sceneConfig = useSceneConfig();
   const showCtx = useShowContext();
   const eraKey = showCtx?.era ?? "";
   const eraSaturation = ERA_SATURATION[eraKey] ?? 1.0;
@@ -312,7 +317,7 @@ export const DualShaderQuad: React.FC<Props> = ({
     tempo, musicalTime, climaxPhase, climaxIntensity,
     heroTrigger, heroProgress, jamDensity, coherence, isLocked,
     eraSaturation, eraBrightness, eraSepia,
-    filmStock, venueProfile, width, height,
+    filmStock, venueProfile, width, height, sceneConfig.gradingIntensity,
   ] as const;
 
   // Update uniforms for both scenes

@@ -96,6 +96,7 @@ void main() {
   float fftMid = texture2D(uFFTTexture, vec2(0.36, 0.5)).r;
   float fftHigh = texture2D(uFFTTexture, vec2(0.78, 0.5)).r;
 
+  float jamDetail = 1.0 + uJamDensity * 0.5;
   float slowTime = uDynamicTime * 0.06;
 
   // --- Section type modulation (0=intro,1=verse,2=chorus,3=bridge,4=solo,5=jam,6=outro,7=space) ---
@@ -174,7 +175,7 @@ void main() {
 
     // Accumulate density: Gaussian splat from iterated point to pixel
     float dist = length(pt - p * 2.0);
-    float splatRadius = 0.08 + slowE * 0.05;
+    float splatRadius = (0.08 + slowE * 0.05) * jamDetail;
     float contrib = exp(-dist * dist / (splatRadius * splatRadius));
     density += contrib;
     colorAccum += contrib * colorIndex;

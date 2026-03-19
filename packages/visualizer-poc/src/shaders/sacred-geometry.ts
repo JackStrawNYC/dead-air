@@ -40,6 +40,7 @@ export const sacredGeometryFrag = /* glsl */ `
 precision highp float;
 
 ${sharedUniformsGLSL}
+uniform sampler2D uPrevFrame;
 
 ${noiseGLSL}
 
@@ -75,7 +76,9 @@ void main() {
   float slowE = clamp(uSlowEnergy, 0.0, 1.0);
   float tension = clamp(uHarmonicTension, 0.0, 1.0);
   float stability = clamp(uBeatStability, 0.0, 1.0);
-  float melodicPitch = clamp(uMelodicPitch, 0.0, 1.0);
+  float melInfluence = uMelodicPitch * uMelodicConfidence;
+  float melodicPitch = clamp(melInfluence, 0.0, 1.0);
+  float effectiveBeat = uBeatSnap * smoothstep(0.3, 0.7, uBeatConfidence);
 
   float slowTime = uDynamicTime * 0.04;
 
@@ -105,7 +108,7 @@ void main() {
 
   // --- Slow rotation (section-modulated) ---
   float angle = slowTime * 0.5 * sectionRotSpeed + energy * 0.1;
-  float bp = beatPulse(uMusicalTime);
+  float bp = beatPulse(uMusicalTime) * smoothstep(0.3, 0.7, uBeatConfidence);
   angle += bp * 0.02;
   float ca = cos(angle);
   float sa = sin(angle);
@@ -128,7 +131,8 @@ void main() {
   vec2 wp = p + warp;
 
   // --- Flower of Life: 7 circle centers on hex lattice ---
-  float baseRadius = 0.2;
+  float latticeDensity = 1.0 + uJamDensity * 0.3;
+  float baseRadius = 0.2 / latticeDensity;
   float hexR = baseRadius; // distance from center to surrounding circle centers
 
   // Center + 6 surrounding positions
@@ -289,6 +293,16 @@ void main() {
 
   // --- Post-processing ---
   col = applyPostProcess(col, vUv, p);
+
+  // Feedback trails: section-type-aware decay
+  vec3 prev = texture2D(uPrevFrame, vUv).rgb;
+  float sJam_fb = smoothstep(4.5, 5.5, uSectionType) * (1.0 - step(5.5, uSectionType));
+  float sSpace_fb = smoothstep(6.5, 7.5, uSectionType);
+  float sChorus_fb = smoothstep(1.5, 2.5, uSectionType) * (1.0 - step(2.5, uSectionType));
+  float baseDecay_fb = mix(0.91, 0.91 - 0.07, energy);
+  float feedbackDecay = baseDecay_fb + sJam_fb * 0.04 + sSpace_fb * 0.06 - sChorus_fb * 0.06;
+  feedbackDecay = clamp(feedbackDecay, 0.80, 0.97);
+  col = max(col, prev * feedbackDecay);
 
   gl_FragColor = vec4(col, 1.0);
 }

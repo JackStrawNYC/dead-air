@@ -12,6 +12,7 @@ import { useShowContext } from "../data/ShowContext";
 import { deriveFilmStock } from "../utils/show-film-stock";
 import { getVenueProfile } from "../utils/venue-profiles";
 import { compute3DCamera } from "../utils/camera-3d";
+import { useSceneConfig } from "../scenes/SceneConfigContext";
 
 /** Era saturation values — previously in EraGrade CSS, now owned by GLSL */
 const ERA_SATURATION: Record<string, number> = {
@@ -53,6 +54,7 @@ export const FullscreenQuad: React.FC<Props> = ({
 }) => {
   const { time, beatDecay, smooth, palettePrimary, paletteSecondary, paletteSaturation, tempo, musicalTime, climaxPhase, climaxIntensity, heroTrigger, heroProgress, jamDensity, coherence, dynamicTime, isLocked } = useAudioData();
   const { width, height } = useVideoConfig();
+  const sceneConfig = useSceneConfig();
   const showCtx = useShowContext();
   const eraKey = showCtx?.era ?? "";
   const eraSaturation = ERA_SATURATION[eraKey] ?? 1.0;
@@ -122,6 +124,7 @@ export const FullscreenQuad: React.FC<Props> = ({
       uEraSepia: { value: 0.0 },
       uBloomThreshold: { value: 0.0 },
       uLensDistortion: { value: 0.0 },
+      uGradingIntensity: { value: 1.0 },
       uEnergyAccel: { value: 0 },
       uEnergyTrend: { value: 0 },
       uLocalTempo: { value: 120 },
@@ -137,6 +140,7 @@ export const FullscreenQuad: React.FC<Props> = ({
       uImprovisationScore: { value: 0 },
       uDownbeat: { value: 0 },
       uBeatConfidence: { value: 0.5 },
+      uMelodicConfidence: { value: 0.5 },
       uHeroIconTrigger: { value: 0 },
       uHeroIconProgress: { value: 0 },
       uShowWarmth: { value: 0 },
@@ -204,6 +208,7 @@ export const FullscreenQuad: React.FC<Props> = ({
   // Lens distortion: subtle barrel curvature, stronger at peaks
   // Range: 0.02 (rest) to 0.08 (peak)
   uniforms.uLensDistortion.value = 0.02 + smooth.energy * 0.06;
+  uniforms.uGradingIntensity.value = sceneConfig.gradingIntensity;
   uniforms.uEnergyAccel.value = smooth.energyAcceleration;
   uniforms.uEnergyTrend.value = smooth.energyTrend;
   uniforms.uLocalTempo.value = smooth.localTempo;
@@ -218,6 +223,7 @@ export const FullscreenQuad: React.FC<Props> = ({
   uniforms.uImprovisationScore.value = smooth.improvisationScore ?? 0;
   uniforms.uDownbeat.value = smooth.downbeat;
   uniforms.uBeatConfidence.value = smooth.beatConfidence;
+  uniforms.uMelodicConfidence.value = smooth.melodicConfidence ?? 0.5;
   uniforms.uHeroIconTrigger.value = heroTrigger;
   uniforms.uHeroIconProgress.value = heroProgress;
   uniforms.uShowWarmth.value = filmStock.warmth + venueProfile.warmth;

@@ -86,8 +86,10 @@ void main() {
   float energy = clamp(uEnergy, 0.0, 1.0);
   float bass = clamp(uBass, 0.0, 1.0);
   float mids = clamp(uMids, 0.0, 1.0);
+  float effectiveBeat = uBeatSnap * smoothstep(0.3, 0.7, uBeatConfidence);
   float drumOnset = clamp(uDrumOnset, 0.0, 1.0);
-  float melodicPitch = clamp(uMelodicPitch, 0.0, 1.0);
+  float melInfluence = uMelodicPitch * uMelodicConfidence;
+  float melodicPitch = clamp(melInfluence, 0.0, 1.0);
   float stability = clamp(uBeatStability, 0.0, 1.0);
   float vocalPres = clamp(uVocalPresence, 0.0, 1.0);
 
@@ -115,7 +117,8 @@ void main() {
   float chaos = mix(0.5, 2.0, 1.0 - stability) + sectionChaosMod + fftMid * 0.3;
 
   // --- Number of arcs from energy + drum onset (section-modulated) ---
-  int arcCount = max(1, 3 + int(energy * 4.0) + int(drumOnset * 3.0) + int(sectionArcMod) + int(fftHigh * 2.0));
+  float arcDensity = 1.0 + uJamDensity * 0.5;
+  int arcCount = max(1, int(float(3 + int(energy * 4.0) + int(drumOnset * 3.0) + int(sectionArcMod) + int(fftHigh * 2.0)) * arcDensity));
 
   // --- Arc color from melodic pitch ---
   float arcHue = mix(0.0, 0.65, melodicPitch) + chromaHueMod + chordHue;
@@ -178,9 +181,9 @@ void main() {
     }
   }
 
-  // --- Drum onset flash ---
+  // --- Drum onset flash (confidence-gated) ---
   if (drumOnset > 0.5) {
-    col += vec3(0.3, 0.25, 0.4) * drumOnset * 0.4;
+    col += vec3(0.3, 0.25, 0.4) * drumOnset * 0.4 * smoothstep(0.3, 0.7, uBeatConfidence);
   }
 
   // --- Feedback trail (persistence) ---

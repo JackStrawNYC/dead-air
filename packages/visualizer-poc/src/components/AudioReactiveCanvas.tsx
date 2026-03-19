@@ -9,7 +9,7 @@ import { ThreeCanvas } from "@remotion/three";
 import { useCurrentFrame, useVideoConfig } from "remotion";
 import type { EnhancedFrameData, SectionBoundary, ColorPalette } from "../data/types";
 import { findCurrentSection } from "../utils/section-lookup";
-import { computeClimaxState, type ClimaxPhase } from "../utils/climax-state";
+import { computeClimaxState, climaxModulation, type ClimaxPhase } from "../utils/climax-state";
 import { computeHeroIconState } from "../utils/hero-icon";
 import { computeAudioSnapshot as computeSnapshot, buildBeatArray as buildBeatArrayUtil, computeMusicalTime as computeMusicalTimeUtil, computeSpectralFlux, computeEnergyAcceleration, computeEnergyTrend, computeEnergyForecast, computePeakApproaching, computeBeatStability } from "../utils/audio-reactive";
 import { energyGate } from "../utils/math";
@@ -103,6 +103,8 @@ export interface AudioDataContext {
     downbeat: number;
     /** Beat confidence: consistency of beat detection (0-1) */
     beatConfidence: number;
+    /** Melodic confidence: reliability of pitch tracking (0-1) */
+    melodicConfidence: number;
   };
   /** Per-song palette primary hue (0-1 normalized) */
   palettePrimary: number;
@@ -378,6 +380,8 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
   const climaxEnergy = smoothValue(frames, idx, (f) => f.rms, 60);
   const climaxState = computeClimaxState(frames, idx, sectionList, climaxEnergy);
   const climaxPhaseNum = phaseMap[climaxState.phase];
+  const climaxMod = climaxModulation(climaxState);
+  const climaxSpeedMult = climaxMod.shaderSpeedMult;
   const heroPermitted = useHeroPermitted();
   const heroIcon = heroPermitted !== false
     ? computeHeroIconState(climaxPhaseNum, climaxState.intensity)
@@ -401,6 +405,7 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
   const beatStabilityVal = computeBeatStability(frames, idx);
   const downbeatPulse = transientEnvelope(frames, idx, (f) => (f.downbeat ? 1 : 0), 12) * egate;
   const beatConfidenceSmooth = smoothValue(frames, idx, (f) => f.beatConfidence ?? 0.5, 20);
+  const melodicConfidenceSmooth = smoothValue(frames, idx, (f) => f.melodicConfidence ?? 0.5, 20);
 
   const audioData: AudioDataContext = {
     frame: fd,
@@ -450,6 +455,7 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
       improvisationScore: smoothValue(frames, idx, (f) => f.improvisationScore ?? 0, 30),
       downbeat: downbeatPulse,
       beatConfidence: beatConfidenceSmooth,
+      melodicConfidence: melodicConfidenceSmooth,
     },
     palettePrimary,
     paletteSecondary,
@@ -463,9 +469,9 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
     jamDensity: jamDensity ?? 0.5,
     coherence: coherenceProp ?? 0,
     isLocked: isLockedProp ?? false,
-    dynamicTime: snapToMusicalTimeProp
+    dynamicTime: (snapToMusicalTimeProp
       ? computeMusicalTimeUtil(beatArray, idx, fps, tempo ?? 120) / (tempo ?? 120) * 60
-      : (dynamicTimeLookup[idx] ?? (idx / fps)),
+      : (dynamicTimeLookup[idx] ?? (idx / fps))) * climaxSpeedMult,
   };
 
   return (

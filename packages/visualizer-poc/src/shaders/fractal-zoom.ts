@@ -14,6 +14,7 @@ export const fractalZoomFrag = /* glsl */ `
 precision highp float;
 
 ${sharedUniformsGLSL}
+uniform sampler2D uPrevFrame;
 ${noiseGLSL}
 ${buildPostProcessGLSL({ grainStrength: 'normal', bloomEnabled: true, anaglyphEnabled: true })}
 
@@ -46,8 +47,13 @@ vec3 fractalPalette(float t, float hueShift) {
 }
 
 void main() {
+  float zoomDensity = 1.0 + (uJamDensity - 0.5) * 0.6;
   // Determine iteration count: 96 during climax, 64 normally
-  int maxIter = uClimaxPhase > 1.5 ? 96 : 64;
+  int maxIter = uClimaxPhase > 1.5 ? 96 : int(64.0 * zoomDensity);
+
+  // Beat confidence gating for zoom reactivity
+  float effectiveBeat = uBeatSnap * smoothstep(0.3, 0.7, uBeatConfidence);
+  float melInfluence = uMelodicPitch * uMelodicConfidence;
 
   // Zoom level: continuous exponential zoom
   float zoomSpeed = 0.1 * mix(1.0, -1.0, step(0.0, -uMelodicDirection));
@@ -68,8 +74,8 @@ void main() {
   float soloSpeedMult = smoothstep(3.5, 4.5, sectionT) * (1.0 - step(4.5, sectionT)) * 0.3 + 1.0; // solo: 1.3x
   zoomSpeed *= jamSpeedMult * spaceSpeedMult * soloSpeedMult;
 
-  // Zoom smoothness: high beatStability = steady, low = jittery
-  float jitter = (1.0 - uBeatStability) * 0.02 * coherenceJitterMult;
+  // Zoom smoothness: high beatStability = steady, low = jittery (confidence-gated)
+  float jitter = (1.0 - uBeatStability) * 0.02 * coherenceJitterMult * smoothstep(0.3, 0.7, uBeatConfidence);
   float jitterX = snoise(vec2(uDynamicTime * 3.7, 0.0)) * jitter;
   float jitterY = snoise(vec2(0.0, uDynamicTime * 3.7)) * jitter;
 
@@ -80,7 +86,7 @@ void main() {
   );
 
   // Melodic pitch shifts zoom target Y
-  center.y += (uMelodicPitch - 0.5) * 0.01;
+  center.y += (melInfluence - 0.5) * 0.01;
 
   // Map UV to complex plane centered on zoom target
   vec2 uv = vUv * 2.0 - 1.0;
@@ -138,6 +144,16 @@ void main() {
 
   // Apply shared post-processing chain
   col = applyPostProcess(col, vUv);
+
+  // Feedback trails: section-type-aware decay
+  vec3 prev = texture2D(uPrevFrame, vUv).rgb;
+  float sJam_fb = smoothstep(4.5, 5.5, uSectionType) * (1.0 - step(5.5, uSectionType));
+  float sSpace_fb = smoothstep(6.5, 7.5, uSectionType);
+  float sChorus_fb = smoothstep(1.5, 2.5, uSectionType) * (1.0 - step(2.5, uSectionType));
+  float baseDecay_fb = mix(0.94, 0.94 - 0.07, energy);
+  float feedbackDecay = baseDecay_fb + sJam_fb * 0.04 + sSpace_fb * 0.06 - sChorus_fb * 0.06;
+  feedbackDecay = clamp(feedbackDecay, 0.80, 0.97);
+  col = max(col, prev * feedbackDecay);
 
   gl_FragColor = vec4(col, 1.0);
 }

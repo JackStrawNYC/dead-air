@@ -100,6 +100,7 @@ void main() {
   float highs = clamp(uHighs, 0.0, 1.0);
   float onset = clamp(uOnsetSnap, 0.0, 1.0);
   float slowE = clamp(uSlowEnergy, 0.0, 1.0);
+  float effectiveBeat = uBeatSnap * smoothstep(0.3, 0.7, uBeatConfidence);
 
   // --- Phase 1: New uniform integrations ---
   // Vocal warmth tint in flame body
@@ -107,7 +108,8 @@ void main() {
   // Energy acceleration drives updraft speed (section-modulated below)
   float accelUpdraft = 1.0 + uEnergyAccel * 0.25;
   // Melodic pitch drives flame height
-  float flamePitchHeight = uMelodicPitch * 0.3;
+  float melInfluence = uMelodicPitch * uMelodicConfidence;
+  float flamePitchHeight = melInfluence * 0.3;
   // Chroma hue modulation
   float chromaHueMod = uChromaHue * 0.25;
   // Chord hue shift
@@ -131,7 +133,7 @@ void main() {
 
   // === HEAT SHIMMER: UV distortion from onset hits ===
   vec2 shimmerUv = p;
-  float shimmerStrength = onset * 0.08 + bass * 0.02 + uBeatSnap * 0.05 + uFastEnergy * 0.06;
+  float shimmerStrength = onset * 0.08 + bass * 0.02 + effectiveBeat * 0.05 + uFastEnergy * 0.06;
   shimmerUv += shimmerStrength * vec2(
     snoise(vec3(p * 8.0, uDynamicTime * 2.0)),
     snoise(vec3(p * 8.0 + 50.0, uDynamicTime * 2.0 + 30.0))
@@ -196,8 +198,8 @@ void main() {
 
   col *= 1.0 + climaxBoost * 0.05;
 
-  // === BEAT SNAP: sharp flame flare on transients ===
-  col *= 1.0 + uBeatSnap * 0.25 * (1.0 + climaxBoost * 0.5);
+  // === BEAT SNAP: sharp flame flare on transients (confidence-gated) ===
+  col *= 1.0 + effectiveBeat * 0.25 * (1.0 + climaxBoost * 0.5);
 
   // === RISING EMBERS: particle field (beat-reactive) ===
   for (int j = 0; j < 8; j++) {

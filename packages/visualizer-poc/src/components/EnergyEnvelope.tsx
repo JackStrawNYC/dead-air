@@ -152,8 +152,11 @@ export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod,
   const soloBrightLift = isSolo ? (soloIntensity * 0.10) : 0;
   const vocalBrightLift = (vocalWarmth ?? 0) * 0.06;
 
+  // Energy-adaptive brightness floor: quiet passages approach black, loud passages stay at current floor.
+  // energy < 0.03 → floor at 0.08 (near black). energy > 0.20 → floor at 0.55 (current).
+  const energyFloor = 0.08 + Math.min(1, Math.max(0, (energy - 0.03) / 0.17)) * 0.47;
   // Apply phase offsets + song identity + show arc + IT + narrative + solo + vocal + harmonic
-  const baseBrightness = Math.min(brightCap, Math.max(0.55, brightness + dsBrightOffset + showBrightOffset + siPaletteBright + arcBrightOffset + itBrightLift + narrativeBrightness + soloBrightLift + vocalBrightLift + harmonicBrightness + brightnessCounterpoint));
+  const baseBrightness = Math.min(brightCap, Math.max(energyFloor, brightness + dsBrightOffset + showBrightOffset + siPaletteBright + arcBrightOffset + itBrightLift + narrativeBrightness + soloBrightLift + vocalBrightLift + harmonicBrightness + brightnessCounterpoint));
   // During dead air, dim brightness toward 0.55 (minimum floor) and suppress bloom
   const finalBrightness = deadAirFactor > 0
     ? baseBrightness * (1 - deadAirFactor * 0.40)  // dim by up to 40% during dead air

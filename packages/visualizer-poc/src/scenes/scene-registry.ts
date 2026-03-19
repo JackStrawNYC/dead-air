@@ -21,6 +21,7 @@ import React from "react";
 import type { EnhancedFrameData, SectionBoundary, ColorPalette, VisualMode } from "../data/types";
 import { getEraPreset } from "../data/era-presets";
 import type { SceneTransitionStyle } from "../utils/transition-selector";
+import { SceneConfigProvider } from "./SceneConfigContext";
 
 // ─── Scene Component Interface ───
 
@@ -47,6 +48,8 @@ export interface SceneRegistryEntry {
   preferredTransitionIn?: SceneTransitionStyle;
   /** Preferred transition style when leaving this scene */
   preferredTransitionOut?: SceneTransitionStyle;
+  /** Post-process grading intensity (0-1, default 1.0). Lower = more raw color. */
+  gradingIntensity?: number;
 }
 
 // ─── Lazy imports for code splitting ───
@@ -112,6 +115,7 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     Component: LiquidLightScene,
     energyAffinity: "high",
     complement: "oil_projector",
+    gradingIntensity: 0.75,
   },
   oil_projector: {
     Component: OilProjectorScene,
@@ -123,6 +127,7 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     energyAffinity: "high",
     complement: "lo_fi_grain",
     preferredTransitionIn: "flash",
+    gradingIntensity: 0.5,
   },
   lo_fi_grain: {
     Component: LoFiGrainScene,
@@ -143,6 +148,7 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     Component: TieDyeScene,
     energyAffinity: "high",
     complement: "vintage_film",
+    gradingIntensity: 0.75,
   },
   cosmic_dust: {
     Component: CosmicDustScene,
@@ -165,6 +171,7 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     energyAffinity: "high",
     complement: "cosmic_voyage",
     preferredTransitionIn: "flash",
+    gradingIntensity: 0.7,
   },
   deep_ocean: {
     Component: DeepOceanScene,
@@ -218,11 +225,13 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     Component: ClimaxSurgeScene,
     energyAffinity: "high",
     complement: "inferno",
+    gradingIntensity: 0.5,
   },
   kaleidoscope: {
     Component: KaleidoscopeScene,
     energyAffinity: "mid",
     complement: "sacred_geometry",
+    gradingIntensity: 0.8,
   },
   fractal_zoom: {
     Component: FractalZoomScene,
@@ -250,6 +259,7 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     Component: FractalFlamesScene,
     energyAffinity: "high",
     complement: "deep_ocean",
+    gradingIntensity: 0.7,
   },
   feedback_recursion: {
     Component: FeedbackRecursionScene,
@@ -282,6 +292,7 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     energyAffinity: "high",
     complement: "aurora",
     preferredTransitionIn: "distortion",
+    gradingIntensity: 0.6,
   },
   morphogenesis: {
     Component: MorphogenesisScene,
@@ -317,6 +328,7 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     Component: LavaFlowScene,
     energyAffinity: "high",
     complement: "crystal_cavern",
+    gradingIntensity: 0.65,
   },
   // Phase 9 Wave 2: 8 new scenes
   mycelium_network: {
@@ -338,6 +350,7 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     Component: SolarFlareScene,
     energyAffinity: "high",
     complement: "inferno",
+    gradingIntensity: 0.6,
   },
   galaxy_spiral: {
     Component: GalaxySpiralScene,
@@ -485,9 +498,16 @@ export function renderScene(
 ): React.ReactNode {
   const entry = SCENE_REGISTRY[mode];
   if (!entry) {
-    // Fallback to liquid_light for unknown modes
     const fallback = SCENE_REGISTRY.liquid_light;
     return React.createElement(fallback.Component, props);
+  }
+  const gi = entry.gradingIntensity;
+  if (gi !== undefined && gi < 1.0) {
+    return React.createElement(
+      SceneConfigProvider,
+      { value: { gradingIntensity: gi } },
+      React.createElement(entry.Component, props),
+    );
   }
   return React.createElement(entry.Component, props);
 }

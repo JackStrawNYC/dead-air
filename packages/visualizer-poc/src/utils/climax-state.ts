@@ -42,6 +42,12 @@ export interface ClimaxModulation {
   bloomOffset: number;
   contrastOffset: number;
   overlayDensityMult: number;
+  /** Shader animation speed multiplier (1.0 normal, up to 1.3 at peak) */
+  shaderSpeedMult: number;
+  /** Camera drama level (0 normal, 1 extreme — widens FOV, faster orbits) */
+  cameraDrama: number;
+  /** Force dual-shader composition at peak */
+  forceDualShader: boolean;
 }
 
 // ─── Phase Detection ───
@@ -274,24 +280,24 @@ export function detectTexture(snapshot: AudioSnapshot, energy: number): MusicalT
  *  when combined with other brightness drivers (fastEnergy, IT lift, counterpoint). */
 const PHASE_TARGETS: Record<
   ClimaxPhase,
-  { sat: number; bright: number; vig: number; bloom: number; contrast: number; density: number }
+  { sat: number; bright: number; vig: number; bloom: number; contrast: number; density: number; speed: number; drama: number; forceDual: boolean }
 > = {
-  idle:    { sat: -0.10, bright: -0.04, vig: -0.04, bloom: -0.05, contrast: -0.03, density: 0.70 },
-  build:   { sat: +0.25, bright: +0.02, vig: -0.02, bloom: 0.10, contrast: +0.10, density: 1.10 },
-  climax:  { sat: +0.60, bright: +0.10, vig: -0.08, bloom: 0.15, contrast: +0.15, density: 1.60 },
-  sustain: { sat: +0.35, bright: +0.08, vig: -0.06, bloom: 0.10, contrast: +0.10, density: 1.40 },
-  release: { sat: -0.10, bright: -0.05, vig: -0.03, bloom: 0,    contrast: -0.03, density: 0.50 },
+  idle:    { sat: -0.10, bright: -0.04, vig: -0.04, bloom: -0.05, contrast: -0.03, density: 0.70, speed: 1.0, drama: 0.0, forceDual: false },
+  build:   { sat: +0.25, bright: +0.02, vig: -0.02, bloom: 0.10, contrast: +0.10, density: 1.10, speed: 1.1, drama: 0.2, forceDual: false },
+  climax:  { sat: +0.60, bright: +0.10, vig: -0.08, bloom: 0.15, contrast: +0.15, density: 1.60, speed: 1.3, drama: 0.7, forceDual: true  },
+  sustain: { sat: +0.35, bright: +0.08, vig: -0.06, bloom: 0.10, contrast: +0.10, density: 1.40, speed: 1.2, drama: 0.5, forceDual: true  },
+  release: { sat: -0.10, bright: -0.05, vig: -0.03, bloom: 0,    contrast: -0.03, density: 0.50, speed: 0.9, drama: 0.1, forceDual: false },
 };
 
 /** Anticipation sub-state overrides — dramatic darkness before the drop.
  *  bright: -0.40 = house lights dimming. The inhale before the scream. */
-const ANTICIPATION = { sat: -0.30, bright: -0.20, vig: +0.12, bloom: -0.10, contrast: -0.15, density: 0.20 };
+const ANTICIPATION = { sat: -0.30, bright: -0.20, vig: +0.12, bloom: -0.10, contrast: -0.15, density: 0.20, speed: 1.0, drama: 0.0, forceDual: false };
 
 /** Build phase start values (intensity interpolates from start → target) */
-const BUILD_START = { sat: 0, bright: 0, vig: 0, bloom: 0, contrast: 0, density: 0.95 };
+const BUILD_START = { sat: 0, bright: 0, vig: 0, bloom: 0, contrast: 0, density: 0.95, speed: 1.0, drama: 0.0, forceDual: false };
 
 /** Release phase start values (intensity interpolates from start → target) */
-const RELEASE_START = { sat: +0.02, bright: +0.005, vig: +0.02, bloom: 0.01, contrast: +0.02, density: 1.0 };
+const RELEASE_START = { sat: +0.02, bright: +0.005, vig: +0.02, bloom: 0.01, contrast: +0.02, density: 1.0, speed: 1.1, drama: 0.3, forceDual: false };
 
 /**
  * Map a ClimaxState to additive visual modifiers.
@@ -310,6 +316,9 @@ export function climaxModulation(state: ClimaxState, behavior?: ClimaxBehavior):
       bloomOffset: lerp(0, ANTICIPATION.bloom, t),
       contrastOffset: lerp(0, ANTICIPATION.contrast, t),
       overlayDensityMult: lerp(1, ANTICIPATION.density, t),
+      shaderSpeedMult: lerp(1, ANTICIPATION.speed, t),
+      cameraDrama: lerp(0, ANTICIPATION.drama, t),
+      forceDualShader: ANTICIPATION.forceDual,
     };
   }
 
@@ -325,6 +334,9 @@ export function climaxModulation(state: ClimaxState, behavior?: ClimaxBehavior):
       bloomOffset: lerp(BUILD_START.bloom, target.bloom, t),
       contrastOffset: lerp(BUILD_START.contrast, target.contrast, t),
       overlayDensityMult: lerp(BUILD_START.density, target.density, t),
+      shaderSpeedMult: lerp(BUILD_START.speed, target.speed, t),
+      cameraDrama: lerp(BUILD_START.drama, target.drama, t),
+      forceDualShader: target.forceDual && t > 0.8,
     };
   }
 
@@ -336,6 +348,9 @@ export function climaxModulation(state: ClimaxState, behavior?: ClimaxBehavior):
       bloomOffset: lerp(RELEASE_START.bloom, target.bloom, t),
       contrastOffset: lerp(RELEASE_START.contrast, target.contrast, t),
       overlayDensityMult: lerp(RELEASE_START.density, target.density, t),
+      shaderSpeedMult: lerp(RELEASE_START.speed, target.speed, t),
+      cameraDrama: lerp(RELEASE_START.drama, target.drama, t),
+      forceDualShader: false,
     };
   }
 
@@ -347,6 +362,9 @@ export function climaxModulation(state: ClimaxState, behavior?: ClimaxBehavior):
     bloomOffset: target.bloom * t,
     contrastOffset: target.contrast * t,
     overlayDensityMult: lerp(1, target.density, t),
+    shaderSpeedMult: lerp(1, target.speed, t),
+    cameraDrama: lerp(0, target.drama, t),
+    forceDualShader: target.forceDual && t > 0.5,
   };
 
   // Apply per-song ClimaxBehavior overrides during climax/sustain phases

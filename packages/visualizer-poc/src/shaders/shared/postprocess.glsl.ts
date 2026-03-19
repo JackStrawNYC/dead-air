@@ -100,6 +100,11 @@ ${
   float isClimax = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5);
   float climaxBoost = isClimax * uClimaxIntensity;
 
+  // Adaptive grading intensity: per-shader base, stripped during climax peaks
+  float gi = uGradingIntensity;
+  float climaxRaw = isClimax * uClimaxIntensity * step(uGradingIntensity, 0.99);
+  gi = mix(gi, max(0.25, gi * 0.3), climaxRaw);
+
 ${
   beatPulseEnabled
     ? `  // Beat pulse: extremely subtle tempo-locked brightness swell
@@ -118,7 +123,7 @@ ${
     float bloomAmount = max(0.0, lum - bloomThreshold) * (1.2 + climaxBoost * 0.4);
     vec3 bloomColor = mix(col, vec3(1.0, 0.98, 0.95), 0.3);
     // Cap bloom intensity to prevent blowout during climax stacking
-    vec3 bloom = bloomColor * min(bloomAmount, 0.45) * (0.16 + energy * 0.05 + climaxBoost * 0.08) * uShowBloom;
+    vec3 bloom = bloomColor * min(bloomAmount, 0.45) * (0.16 + energy * 0.05 + climaxBoost * 0.08) * uShowBloom * gi;
     col = col + bloom - col * bloom; // screen blend
   }
 `
@@ -126,13 +131,17 @@ ${
 }
 ${
   stageFloodEnabled
-    ? `  // Stage flood fill: palette noise in dark areas
-  col = stageFloodFill(col, p, uDynamicTime, energy, uPalettePrimary, uPaletteSecondary);
+    ? `  // Stage flood fill: palette noise in dark areas (scaled by grading intensity)
+  {
+    vec3 preFlood = col;
+    col = stageFloodFill(col, p, uDynamicTime, energy, uPalettePrimary, uPaletteSecondary);
+    col = mix(preFlood, col, gi);
+  }
 `
     : ""
 }
-  // Light leak: warm amber glow
-  col += lightLeak(p, uDynamicTime, energy, uOnsetSnap);
+  // Light leak: warm amber glow (scaled by grading intensity)
+  col += lightLeak(p, uDynamicTime, energy, uOnsetSnap) * gi;
 
 ${
   flareEnabled
@@ -143,8 +152,12 @@ ${
 }
 ${
   halationEnabled
-    ? `  // Halation: warm film glow
-  col = halation(uv, col, energy);
+    ? `  // Halation: warm film glow (scaled by grading intensity)
+  {
+    vec3 preHalation = col;
+    col = halation(uv, col, energy);
+    col = mix(preHalation, col, gi);
+  }
 `
     : ""
 }
@@ -286,12 +299,16 @@ ${
     // Brightness boost removed — was a strobe source
   }
 
-  // Lifted blacks (build-phase aware)
+  // Lifted blacks (build-phase + energy aware)
   {
     float isBuild = step(0.5, uClimaxPhase) * step(uClimaxPhase, 1.5);
     float liftMult = mix(1.0, 0.40, isBuild * uClimaxIntensity);
-    col = max(col, vec3(0.09, 0.07, 0.11) * liftMult);
+    float liftGate = smoothstep(0.04, 0.12, energy);
+    col = max(col, vec3(0.09, 0.07, 0.11) * liftMult * liftGate);
   }
+
+  // Darkness texture: subtle micro-noise during near-black passages
+  col += darknessTexture(uv, uTime, energy);
 
   // Show contrast: seed-derived curve
   {

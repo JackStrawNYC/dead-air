@@ -37,6 +37,8 @@ precision highp float;
 
 ${sharedUniformsGLSL}
 
+uniform sampler2D uPrevFrame;
+
 ${noiseGLSL}
 
 ${buildPostProcessGLSL({ grainStrength: "normal", bloomEnabled: true, halationEnabled: true, paletteCycleEnabled: true })}
@@ -59,7 +61,8 @@ void main() {
   float slowE = clamp(uSlowEnergy, 0.0, 1.0);
   float stability = clamp(uBeatStability, 0.0, 1.0);
   float tension = clamp(uHarmonicTension, 0.0, 1.0);
-  float melodicPitch = clamp(uMelodicPitch, 0.0, 1.0);
+  float melInfluence = uMelodicPitch * uMelodicConfidence;
+  float melodicPitch = clamp(melInfluence, 0.0, 1.0);
   float melodicDir = clamp(uMelodicDirection, -1.0, 1.0);
 
   // 7-band spectral: sub, low, low-mid, mid, upper-mid, presence, brilliance
@@ -88,7 +91,8 @@ void main() {
   // --- Segment count from beat stability ---
   // High stability (tight groove) = clean 6-8 fold symmetry
   // Low stability (free jazz, rubato) = fractured 3-4 segments
-  float numSegments = mix(3.0, 8.0, stability);
+  float foldMod = 1.0 + uJamDensity * 0.3;
+  float numSegments = mix(3.0, 8.0, stability) * foldMod;
   // Onset can temporarily fracture the segment count
   numSegments -= onset * 2.0;
 
@@ -144,8 +148,9 @@ void main() {
   // --- Radial UV folding ---
   float radius = length(centered);
   float angle = atan(centered.y, centered.x);
-  // Extra fold rotation on downbeat (measure start emphasis)
-  angle += uDownbeat * 0.3;
+  // Extra fold rotation on downbeat (measure start emphasis, confidence-gated)
+  float effectiveBeat = uBeatSnap * smoothstep(0.3, 0.7, uBeatConfidence);
+  angle += uDownbeat * smoothstep(0.3, 0.7, uBeatConfidence) * 0.3;
 
   // Mirror fold within each segment
   float a = mod(angle, segAngle);
@@ -252,6 +257,16 @@ void main() {
 
   // --- Post-processing ---
   col = applyPostProcess(col, vUv, p);
+
+  // Feedback trails: section-type-aware decay
+  vec3 prev = texture2D(uPrevFrame, vUv).rgb;
+  float sJam_fb = smoothstep(4.5, 5.5, uSectionType) * (1.0 - step(5.5, uSectionType));
+  float sSpace_fb = smoothstep(6.5, 7.5, uSectionType);
+  float sChorus_fb = smoothstep(1.5, 2.5, uSectionType) * (1.0 - step(2.5, uSectionType));
+  float baseDecay = mix(0.92, 0.92 - 0.07, energy);
+  float feedbackDecay = baseDecay + sJam_fb * 0.04 + sSpace_fb * 0.06 - sChorus_fb * 0.06;
+  feedbackDecay = clamp(feedbackDecay, 0.80, 0.97);
+  col = max(col, prev * feedbackDecay);
 
   gl_FragColor = vec4(col, 1.0);
 }

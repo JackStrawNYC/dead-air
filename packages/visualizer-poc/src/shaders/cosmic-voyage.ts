@@ -29,6 +29,8 @@ precision highp float;
 
 ${sharedUniformsGLSL}
 
+uniform sampler2D uPrevFrame;
+
 ${noiseGLSL}
 
 ${buildPostProcessGLSL({ halationEnabled: false, caEnabled: true, anaglyphEnabled: true })}
@@ -280,6 +282,16 @@ void main() {
 
   // === POST-PROCESSING ===
   col = applyPostProcess(col, vUv, p);
+
+  // Feedback trails: section-type-aware decay
+  vec3 prev = texture2D(uPrevFrame, vUv).rgb;
+  float sJam_fb = smoothstep(4.5, 5.5, uSectionType) * (1.0 - step(5.5, uSectionType));
+  float sSpace_fb = smoothstep(6.5, 7.5, uSectionType);
+  float sChorus_fb = smoothstep(1.5, 2.5, uSectionType) * (1.0 - step(2.5, uSectionType));
+  float baseDecay = mix(0.95, 0.95 - 0.07, energy);
+  float feedbackDecay = baseDecay + sJam_fb * 0.04 + sSpace_fb * 0.06 - sChorus_fb * 0.06;
+  feedbackDecay = clamp(feedbackDecay, 0.80, 0.97);
+  col = max(col, prev * feedbackDecay);
 
   gl_FragColor = vec4(col, 1.0);
 }

@@ -77,6 +77,7 @@ uniform float uEraSepia;
 // ─── Post-Process Control ───
 uniform float uBloomThreshold;
 uniform float uLensDistortion;
+uniform float uGradingIntensity;
 
 // ─── Melodic / Harmonic ───
 uniform float uMelodicPitch;
@@ -89,6 +90,7 @@ uniform float uPeakApproaching;
 uniform float uBeatStability;
 uniform float uDownbeat;
 uniform float uBeatConfidence;
+uniform float uMelodicConfidence;
 uniform float uImprovisationScore;
 
 // ─── Hero Icon ───

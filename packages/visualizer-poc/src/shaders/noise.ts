@@ -191,12 +191,12 @@ float hsvToCosineHue(float h) { return 1.0 - h; }
 // Additive blend gated by darkness: lifts dark pixels, transparent on bright ones.
 // Ensures no dead black voids — concerts are never pitch black.
 vec3 stageFloodFill(vec3 col, vec2 uv, float time, float energy, float palHue1, float palHue2) {
-  // Activate even at very low energy — concerts are never pitch black
-  float gate = smoothstep(0.0, 0.08, energy);
+  // Activate only above moderate energy — allow true darkness in quiet passages
+  float gate = smoothstep(0.08, 0.18, energy);
   if (gate < 0.01) return col;
-  // Darkness mask: fill dim pixels (luma < 0.60 in pre-tonemap HDR range)
+  // Darkness mask: tighter range so flood only fills truly dark pixels
   float luma = dot(col, vec3(0.299, 0.587, 0.114));
-  float darkness = smoothstep(0.60, 0.05, luma);
+  float darkness = smoothstep(0.35, 0.05, luma);
   if (darkness < 0.01) return col;
   // Three-layer flowing noise: organic patterns
   float slowT = time * 0.12;
@@ -729,6 +729,18 @@ vec2 thermalShimmer(vec2 uv, float time, float energy, vec2 resolution) {
   float wave3 = sin(uv.x * resolution.x * 0.03 + time * 2.0) * intensity * 0.3;
   // Vertical bias: displacement is primarily horizontal (heat shimmer)
   return uv + vec2(wave1 + wave2, wave3 * 0.3);
+}
+
+// --- Darkness texture: subtle micro-noise that replaces brightness floors ---
+// Prevents "dead monitor" appearance during near-black passages without
+// preventing true darkness. Only visible when energy is very low.
+vec3 darknessTexture(vec2 uv, float time, float energy) {
+  float darkGate = smoothstep(0.08, 0.02, energy);
+  if (darkGate < 0.01) return vec3(0.0);
+  float n = snoise(vec3(uv * 1.5, time * 0.05)) * 0.5 + 0.5;
+  float sparkle = pow(max(0.0, snoise(vec3(uv * 8.0, time * 0.3))), 4.0);
+  vec3 tex = vec3(0.02, 0.01, 0.04) * n + vec3(0.04, 0.03, 0.06) * sparkle;
+  return tex * darkGate;
 }
 
 // --- 3D Camera Ray Setup ---

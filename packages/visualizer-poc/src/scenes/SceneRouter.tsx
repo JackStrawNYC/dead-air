@@ -443,12 +443,19 @@ function averageEnergy(frames: EnhancedFrameData[], start: number, end: number):
   return sum / (hi - lo);
 }
 
-/** Select GPU blend mode based on energy context */
-function selectDualBlendMode(energy: number, sectionEnergy?: string): DualBlendMode {
-  if (energy < 0.08) return "additive";      // quiet: layered glow, ethereal
-  if (energy > 0.25) return "noise_dissolve"; // peak: organic morphing
-  if (sectionEnergy === "low") return "depth_aware"; // ambient: pseudo-3D layering
-  return "luminance_key";                     // mid: bright areas of one show through other
+/** Select GPU blend mode based on energy context, climax phase, and section type */
+function selectDualBlendMode(
+  energy: number,
+  sectionEnergy?: string,
+  climaxPhase?: number,
+  sectionType?: string,
+): DualBlendMode {
+  if (climaxPhase !== undefined && climaxPhase >= 2 && climaxPhase <= 3) return "noise_dissolve";
+  if (sectionType === "jam" || sectionType === "solo") return "depth_aware";
+  if (energy > 0.25) return "luminance_key";
+  if (energy < 0.08) return "additive";
+  if (sectionEnergy === "low") return "depth_aware";
+  return "luminance_key";
 }
 
 /** Render a scene for a given mode (delegates to scene registry) */
@@ -563,13 +570,30 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
   const sectionLen = currentSection ? currentSection.frameEnd - currentSection.frameStart : 0;
   const frameEnergy = frames[Math.min(frame, frames.length - 1)]?.rms ?? 0;
 
-  if (setNumber !== undefined && setNumber >= 2 && sectionLen >= AUTO_VARIETY_MIN_SECTION) {
-    const complementMode = getComplement(currentMode);
+  // Climax force: high-energy section + high frame energy = peak moment
+  const climaxForceDual = currentSection?.energy === "high" && frameEnergy > 0.20;
+
+  // Dual-shader activation: set 2+ always, set 1 for jams/solos/moderate+ energy, or climax force
+  const shouldDual = climaxForceDual || (sectionLen >= AUTO_VARIETY_MIN_SECTION && (
+    frameEnergy > 0.12 ||
+    stemSection === "jam" || stemSection === "solo" ||
+    (setNumber !== undefined && setNumber >= 2)
+  ));
+  if (shouldDual) {
+    // Prefer transition affinity pool for secondary shader selection
+    const affinityPool = TRANSITION_AFFINITY[currentMode];
+    const rng = seededRandom((seed ?? 0) + currentSectionIdx * 13);
+    const secondaryMode = affinityPool && affinityPool.length > 0
+      ? affinityPool[Math.floor(rng() * affinityPool.length)]
+      : getComplement(currentMode);
     const stringsA = getShaderStrings(currentMode);
-    const stringsB = getShaderStrings(complementMode);
+    const stringsB = getShaderStrings(secondaryMode);
 
     if (stringsA && stringsB) {
-      const blendMode = selectDualBlendMode(frameEnergy, currentSection?.energy);
+      // Get climax phase from frame data for blend mode selection
+      const frameData = frames[Math.min(frame, frames.length - 1)];
+      const frameSectionType = frameData?.sectionType;
+      const blendMode = selectDualBlendMode(frameEnergy, currentSection?.energy, undefined, frameSectionType);
       // Asymmetric blend: primary dominates (0.25-0.45), energy pushes toward equal mix
       const sectionProgress = currentSection
         ? (frame - currentSection.frameStart) / Math.max(1, sectionLen)

@@ -64,6 +64,7 @@ void main() {
 
   float energy = clamp(uEnergy, 0.0, 1.0);
   float tempoScale = uLocalTempo / 120.0;
+  float effectiveBeat = uBeatSnap * smoothstep(0.3, 0.7, uBeatConfidence);
 
   // --- Phase 1: New uniform integrations ---
   // Vocal warmth on center beams
@@ -75,7 +76,8 @@ void main() {
   // Energy acceleration drives sweep speed
   float accelSweep = 1.0 + uEnergyAccel * 0.15;
   // Melodic pitch shifts beam sweep center
-  float pitchSweep = (uMelodicPitch - 0.5) * 0.1;
+  float melInfluence = uMelodicPitch * uMelodicConfidence;
+  float pitchSweep = (melInfluence - 0.5) * 0.1;
   // Beat stability: high=steady beams, low=erratic
   float beamSteadiness = uBeatStability;
   // Harmonic tension: beam angle complexity
@@ -170,7 +172,7 @@ void main() {
   float climaxBoost = isClimax * climaxI;
 
   // === BEAT SNAP: strobe-like flash on hard transients ===
-  float strobeKick = max(uBeatSnap, uDrumBeat) * 0.60 * (1.0 + climaxBoost * 0.5);
+  float strobeKick = max(effectiveBeat, uDrumBeat) * 0.60 * (1.0 + climaxBoost * 0.5);
   col += strobeKick * vec3(1.0, 0.95, 0.85);
 
   // === COLOR AFTERGLOW ===

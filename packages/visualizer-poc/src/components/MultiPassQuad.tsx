@@ -26,6 +26,7 @@ import { useShowContext } from "../data/ShowContext";
 import { deriveFilmStock } from "../utils/show-film-stock";
 import { getVenueProfile } from "../utils/venue-profiles";
 import { compute3DCamera } from "../utils/camera-3d";
+import { useSceneConfig } from "../scenes/SceneConfigContext";
 
 /** Era saturation values — same as FullscreenQuad */
 const ERA_SATURATION: Record<string, number> = {
@@ -153,6 +154,7 @@ function createBaseUniforms(
     uEraSepia: { value: 0.0 },
     uBloomThreshold: { value: 0.0 },
     uLensDistortion: { value: 0.0 },
+    uGradingIntensity: { value: 1.0 },
     uEnergyAccel: { value: 0 },
     uEnergyTrend: { value: 0 },
     uLocalTempo: { value: 120 },
@@ -168,6 +170,7 @@ function createBaseUniforms(
     uImprovisationScore: { value: 0 },
     uDownbeat: { value: 0 },
     uBeatConfidence: { value: 0.5 },
+    uMelodicConfidence: { value: 0.5 },
     uHeroIconTrigger: { value: 0 },
     uHeroIconProgress: { value: 0 },
     uShowWarmth: { value: 0 },
@@ -200,6 +203,7 @@ export const MultiPassQuad: React.FC<Props> = ({
   } = useAudioData();
   const { width, height } = useVideoConfig();
   const currentFrame = useCurrentFrame();
+  const sceneConfig = useSceneConfig();
   const showCtx = useShowContext();
   const eraKey = showCtx?.era ?? "";
   const eraSaturation = ERA_SATURATION[eraKey] ?? 1.0;
@@ -351,6 +355,7 @@ export const MultiPassQuad: React.FC<Props> = ({
   u.uEraSepia.value = eraSepia;
   u.uBloomThreshold.value = -0.08 - smooth.energy * 0.18;
   u.uLensDistortion.value = 0.02 + smooth.energy * 0.06;
+  u.uGradingIntensity.value = sceneConfig.gradingIntensity;
   u.uEnergyAccel.value = smooth.energyAcceleration;
   u.uEnergyTrend.value = smooth.energyTrend;
   u.uLocalTempo.value = smooth.localTempo;
@@ -365,6 +370,7 @@ export const MultiPassQuad: React.FC<Props> = ({
   u.uImprovisationScore.value = smooth.improvisationScore ?? 0;
   u.uDownbeat.value = smooth.downbeat;
   u.uBeatConfidence.value = smooth.beatConfidence;
+  u.uMelodicConfidence.value = smooth.melodicConfidence ?? 0.5;
   u.uHeroIconTrigger.value = heroTrigger;
   u.uHeroIconProgress.value = heroProgress;
   u.uShowWarmth.value = filmStock.warmth + venueProfile.warmth;
