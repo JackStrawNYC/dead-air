@@ -106,7 +106,9 @@ const BEAT_CROSSFADE_FRAMES = 30; // 1 second when beat-synced (15 before + 15 a
 // Complement modes and energy pools are now in scene-registry.ts
 
 // Minimum section duration (in frames) to qualify for auto-variety
-const AUTO_VARIETY_MIN_SECTION = 2700; // 1.5 minutes at 30fps
+// Lowered from 2700 (1.5 min) to 1200 (40s) so 5-minute songs get scene transitions.
+// Previous threshold meant only 10+ minute songs got within-song variety.
+const AUTO_VARIETY_MIN_SECTION = 1200; // 40 seconds at 30fps
 
 /**
  * Find nearest strong beat within a frame range for beat-synced transitions.
@@ -370,7 +372,9 @@ export function getModeForSection(
     const sectionLen = section ? section.frameEnd - section.frameStart : 0;
     const totalLen = sections[sections.length - 1]?.frameEnd ?? 0;
 
-    if (totalLen > 5400 && sectionLen > AUTO_VARIETY_MIN_SECTION && sectionIndex % 2 === 1) {
+    // Removed odd-section-only restriction (was: sectionIndex % 2 === 1) and lowered
+    // total length from 5400 (3 min) to 3600 (2 min) so more songs get visual variety.
+    if (totalLen > 3600 && sectionLen > AUTO_VARIETY_MIN_SECTION && sectionIndex > 0) {
       const affinityPool = TRANSITION_AFFINITY[song.defaultMode];
       if (affinityPool && affinityPool.length > 0) {
         const rng = seededRandom((seed ?? 0) + sectionIndex * 7919);

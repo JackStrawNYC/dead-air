@@ -432,7 +432,10 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
     songsCompleted: narrative?.state.songsCompleted ?? 0,
   }, isEncore);
 
-  const combinedDensityMult = Math.max(0.15, climaxMod.overlayDensityMult * (jamEvolution.isLongJam ? jamEvolution.densityMult : 1) * sectionVocab.overlayDensityMult * narrativeDirective.overlayDensityMult * endScreenMult * venueProfile.overlayDensityMult * crowdDensityMult * fatigue.densityMult);
+  // Floor raised from 0.15 → 0.25 to prevent multiplicative stacking from making
+  // overlays invisible. Worst case: drums_space(0.3) × space(0.25) × narrative(0.3)
+  // × fatigue(0.65) = 0.015 — without the floor this kills all overlay visibility.
+  const combinedDensityMult = Math.max(0.25, climaxMod.overlayDensityMult * (jamEvolution.isLongJam ? jamEvolution.densityMult : 1) * sectionVocab.overlayDensityMult * narrativeDirective.overlayDensityMult * endScreenMult * venueProfile.overlayDensityMult * crowdDensityMult * fatigue.densityMult);
   const opacityMap = opacityMapBase ? applyDensityMult(opacityMapBase, combinedDensityMult, rotationSchedule!) : null;
 
   // ─── Media suppression ───
@@ -494,7 +497,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
       <AudioSnapshotProvider snapshot={audioSnapshot}>
       <VisualizerErrorBoundary>
       <div style={{ position: "absolute", inset: 0, opacity }}>
-        <CameraMotion frames={f} jamEvolution={jamEvolution} bass={audioSnapshot.bass} cameraFreeze={counterpoint.cameraFreeze || itState.cameraLock || introFactor < 0.5} drumsSpacePhase={drumsSpaceState?.subPhase} fastEnergy={audioSnapshot.fastEnergy} vocalPresence={audioSnapshot.vocalPresence} isSolo={soloState.isSolo} soloIntensity={soloState.intensity} grooveMotionMult={grooveMods.motionMult * fatigue.motionMult} groovePulseMult={grooveMods.pulseMult} sectionDriftMult={sectionVocab.driftSpeedMult}>
+        <CameraMotion frames={f} jamEvolution={jamEvolution} bass={audioSnapshot.bass} cameraFreeze={counterpoint.cameraFreeze || itState.cameraLock || introFactor < 0.5} drumsSpacePhase={drumsSpaceState?.subPhase} fastEnergy={audioSnapshot.fastEnergy} vocalPresence={audioSnapshot.vocalPresence} isSolo={soloState.isSolo} soloIntensity={soloState.intensity} grooveMotionMult={grooveMods.motionMult * fatigue.motionMult} groovePulseMult={grooveMods.pulseMult} sectionDriftMult={sectionVocab.driftSpeedMult} cameraSteadiness={sectionVocab.cameraSteadiness}>
         <EraGrade>
         <EnergyEnvelope snapshot={audioSnapshot} climaxMod={climaxMod} jamColorTemp={jamEvolution.isLongJam ? jamEvolution.colorTemperature : undefined} calibration={energyCalibration} counterpointSatMult={counterpoint.saturationMult} brightnessCounterpoint={counterpoint.brightnessCounterpoint} drumsSpacePhase={drumsSpaceState?.subPhase} showPhase={narrative?.state.showPhase} songIdentity={songIdentity} showArcModifiers={showArcModifiers} itLuminanceLift={itState.luminanceLift} vocalWarmth={vocalWarmth} guitarColorTemp={guitarColorTemp} deadAirFactor={deadAirFactor} narrativeBrightness={narrativeDirective.brightnessOffset + sectionVocab.brightnessOffset + fatigue.brightnessOffset} narrativeTemperature={narrativeDirective.temperature + grooveMods.temperatureShift} introFactor={introFactor} isSolo={soloState.isSolo} soloIntensity={soloState.intensity} harmonicBrightness={harmonicResponse.brightnessOffset} harmonicSatMult={harmonicResponse.saturationMult} modalHueShift={modalColor.hueShift} modalSatOffset={modalColor.satOffset + fatigue.saturationOffset}>
           <div style={{ position: "absolute", inset: 0, opacity: focusState.shaderOpacity * (0.05 + 0.95 * introFactor) }}>
@@ -595,7 +598,8 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
             />
           )}
 
-          {/* IT strobe — beat-synced pulse during deep coherence lock */}
+          {/* IT strobe — beat-synced pulse during deep coherence lock.
+              Uses soft-light blend (gentler than overlay) to avoid harsh white flashes. */}
           {itState.strobeIntensity > 0.01 && (
             <div
               style={{
@@ -603,7 +607,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
                 inset: 0,
                 backgroundColor: `rgba(255, 255, 255, ${itState.strobeIntensity.toFixed(3)})`,
                 pointerEvents: "none",
-                mixBlendMode: "overlay",
+                mixBlendMode: "soft-light",
               }}
             />
           )}

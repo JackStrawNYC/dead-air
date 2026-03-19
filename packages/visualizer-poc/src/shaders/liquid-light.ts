@@ -95,8 +95,8 @@ void main() {
   float chordHueShift = float(int(uChordIndex)) / 24.0 * 0.15;
   // Harmonic tension drives warp strength
   float tensionWarp = 1.0 + uHarmonicTension * 0.3;
-  // Section type modifies FBM behavior (jam=complex, space=slow)
-  float sectionMod = uSectionType == 7.0 ? 0.4 : (uSectionType == 5.0 ? 1.2 : 1.0);
+  // Section type modifies FBM behavior: 0=intro,1=verse,2=chorus,3=bridge,4=solo,5=jam,6=outro,7=space
+  float sectionMod = uSectionType > 6.5 ? 0.4 : (uSectionType > 4.5 && uSectionType < 5.5 ? 1.2 : 1.0);
   // Energy forecast: anticipatory bloom widening
   float forecastBloom = uEnergyForecast * 0.08;
   // Peak approaching: pre-burst desaturation

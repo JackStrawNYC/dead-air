@@ -40,6 +40,9 @@ interface Props {
   groovePulseMult?: number;
   /** Section drift speed multiplier — scales drift amplitude */
   sectionDriftMult?: number;
+  /** Camera steadiness from section vocabulary: 0 = handheld chaos, 1 = locked tripod.
+   *  Scales shake/jolt amplitude — verses/space steady, jams/solos loose. */
+  cameraSteadiness?: number;
 }
 
 const QUIET_SCALE = 1.08;
@@ -69,7 +72,7 @@ function shakeHash(frame: number): { x: number; y: number } {
   return { x, y };
 }
 
-export const CameraMotion: React.FC<Props> = ({ frames, children, jamEvolution, bass, cameraFreeze, drumsSpacePhase, fastEnergy, vocalPresence, isSolo, soloIntensity, grooveMotionMult = 1, groovePulseMult = 1, sectionDriftMult = 1 }) => {
+export const CameraMotion: React.FC<Props> = ({ frames, children, jamEvolution, bass, cameraFreeze, drumsSpacePhase, fastEnergy, vocalPresence, isSolo, soloIntensity, grooveMotionMult = 1, groovePulseMult = 1, sectionDriftMult = 1, cameraSteadiness = 0.5 }) => {
   const frozenTransform = React.useRef({ scale: 1.04, totalX: 0, totalY: 0, tilt: 0 });
   const frame = useCurrentFrame();
   const idx = Math.min(Math.max(0, frame), frames.length - 1);
@@ -133,6 +136,11 @@ export const CameraMotion: React.FC<Props> = ({ frames, children, jamEvolution, 
   // Apply groovePulseMult to beat shake
   shakeX *= groovePulseMult;
   shakeY *= groovePulseMult;
+
+  // Apply section-vocabulary camera steadiness: 1.0 = tripod (20% shake), 0.0 = handheld (100%)
+  const steadinessDampen = 1 - cameraSteadiness * 0.8;
+  shakeX *= steadinessDampen;
+  shakeY *= steadinessDampen;
 
   // Onset jolt: sharp camera punch on transient attacks (prefer stemDrumOnset when available)
   const ONSET_JOLT_PX = 8;

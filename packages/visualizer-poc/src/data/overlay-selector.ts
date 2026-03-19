@@ -38,14 +38,17 @@ const MAX_TOTAL_WEIGHT = 8;
 
 // ─── Cross-Song Memory ───
 
-/** How many previous songs to remember for variety penalties */
-const LOOKBACK_DEPTH = 4;
+/** How many previous songs to remember for variety penalties.
+ *  Increased from 4 → 8 to cover a full set and prevent mid-show repetition. */
+const LOOKBACK_DEPTH = 8;
 
-/** Graduated recency penalties: N-1 = 50%, N-2 = 35%, N-3 = 20%, N-4 = 10% */
-const RECENCY_PENALTIES = [0.50, 0.35, 0.20, 0.10];
+/** Graduated recency penalties: stronger for recent songs, gentle for older.
+ *  N-1 raised from 0.50 → 0.70 to prevent adjacent-song overlay repeats. */
+const RECENCY_PENALTIES = [0.70, 0.55, 0.40, 0.30, 0.20, 0.12, 0.06, 0.03];
 
-/** No overlay should appear in more than this fraction of songs */
-const MAX_FREQUENCY_RATIO = 0.40;
+/** No overlay should appear in more than this fraction of songs.
+ *  Reduced from 0.40 → 0.25 so an overlay appears in at most ~3 out of 12 songs. */
+const MAX_FREQUENCY_RATIO = 0.25;
 
 /** Score penalty when an overlay exceeds the frequency cap */
 const FREQUENCY_CAP_PENALTY = 0.35;

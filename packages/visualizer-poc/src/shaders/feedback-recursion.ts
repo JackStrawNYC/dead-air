@@ -67,12 +67,21 @@ void main() {
   float vocalWarmth = uVocalEnergy * 0.1;
   float accelBoost = 1.0 + uEnergyAccel * 0.12;
 
-  // --- Recursion parameters ---
-  // Scale: zoom inward 2-5% per frame, driven by energy
-  float scaleAmount = 1.0 - (0.02 + energy * 0.03) * accelBoost;
+  // --- Section type modulation (0=intro,1=verse,2=chorus,3=bridge,4=solo,5=jam,6=outro,7=space) ---
+  float sectionT = uSectionType;
+  float sJam = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
+  float sSpace = smoothstep(6.5, 7.5, sectionT);
+  float sSolo = smoothstep(3.5, 4.5, sectionT) * (1.0 - step(4.5, sectionT));
+  // Jam: deeper recursion, more rotation. Space: shallow, slow. Solo: dramatic zoom.
+  float sectionScaleMod = mix(1.0, 1.4, sJam) * mix(1.0, 0.3, sSpace) * mix(1.0, 1.5, sSolo);
+  float sectionRotMod = mix(1.0, 1.5, sJam) * mix(1.0, 0.2, sSpace);
 
-  // Rotation: bass drives twist
-  float rotAmount = (bass * 0.03 + 0.005) * sign(sin(slowTime * 0.2));
+  // --- Recursion parameters ---
+  // Scale: zoom inward 2-5% per frame, driven by energy (section-modulated)
+  float scaleAmount = 1.0 - (0.02 + energy * 0.03) * accelBoost * sectionScaleMod;
+
+  // Rotation: bass drives twist (section-modulated)
+  float rotAmount = (bass * 0.03 + 0.005) * sign(sin(slowTime * 0.2)) * sectionRotMod;
   // Stability affects regularity: unstable = jittery rotation
   rotAmount += (1.0 - stability) * sin(uTime * 7.0) * 0.01;
 

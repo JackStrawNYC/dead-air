@@ -87,13 +87,13 @@ describe("pushHistory", () => {
     expect(h.frequency.get("A")).toBe(1);
   });
 
-  it("maintains lookback depth of 4", () => {
+  it("maintains lookback depth of 8", () => {
     let h = emptyHistory();
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < 10; i++) {
       h = pushHistory(h, [`overlay_${i}`]);
     }
-    expect(h.recentSongs.length).toBe(4);
-    expect(h.songCount).toBe(6);
+    expect(h.recentSongs.length).toBe(8);
+    expect(h.songCount).toBe(10);
   });
 
   it("accumulates frequency across songs", () => {

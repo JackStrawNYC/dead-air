@@ -100,12 +100,15 @@ void main() {
   }
 
   // --- Section type modulation ---
+  // Mapping: 0=intro, 1=verse, 2=chorus, 3=bridge, 4=solo, 5=jam, 6=outro, 7=space
   float sectionT = uSectionType;
-  // Jam (7.0): +2 segments, 1.3x rotation speed
-  float jamFactor = smoothstep(6.5, 7.5, sectionT);
+  float jamFactor = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
   numSegments += jamFactor * 2.0;
-  // Space (5.0): -1 segment, 0.5x speed (handled below in rotation)
-  float spaceFactor = smoothstep(5.5, 4.5, sectionT) * step(4.5, sectionT);
+  float spaceFactor = smoothstep(6.5, 7.5, sectionT);
+  float chorusFactor = smoothstep(1.5, 2.5, sectionT) * (1.0 - step(2.5, sectionT));
+  float soloFactor = smoothstep(3.5, 4.5, sectionT) * (1.0 - step(4.5, sectionT));
+  numSegments += chorusFactor * 1.0; // chorus: +1 segment for energy
+  numSegments -= spaceFactor * 1.0;  // space: -1 segment for calm
 
   numSegments = max(numSegments, 2.0);
   float segAngle = TAU / numSegments;
@@ -120,9 +123,11 @@ void main() {
   // --- Rotation direction from melodic contour ---
   // Ascending melody = clockwise drift, descending = counter-clockwise
   float rotSpeed = 0.04 + energy * 0.03;
-  // Jam: 1.3x rotation speed; Space: 0.5x rotation speed
+  // Section-driven speed: jam 1.3x, chorus 1.15x, solo 1.2x, space 0.5x
   rotSpeed *= mix(1.0, 1.3, jamFactor);
   rotSpeed *= mix(1.0, 0.5, spaceFactor);
+  rotSpeed *= mix(1.0, 1.15, chorusFactor);
+  rotSpeed *= mix(1.0, 1.2, soloFactor);
   float rotAngle = slowTime * rotSpeed * sign(melodicDir + 0.001);
   float cosR = cos(rotAngle);
   float sinR = sin(rotAngle);

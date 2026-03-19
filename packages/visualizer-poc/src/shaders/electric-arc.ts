@@ -95,12 +95,21 @@ void main() {
   float chromaHueMod = uChromaHue * 0.15;
   float chordHue = float(int(uChordIndex)) / 24.0 * 0.1;
 
-  // --- Arc parameters ---
-  float arcThickness = 0.004 + bass * 0.008;
-  float chaos = mix(0.5, 2.0, 1.0 - stability); // unstable = chaotic
+  // --- Section type modulation (0=intro,1=verse,2=chorus,3=bridge,4=solo,5=jam,6=outro,7=space) ---
+  float sectionT = uSectionType;
+  float sJam = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
+  float sSpace = smoothstep(6.5, 7.5, sectionT);
+  float sSolo = smoothstep(3.5, 4.5, sectionT) * (1.0 - step(4.5, sectionT));
+  // Jam: more arcs, thicker, more chaos. Space: single dim arc. Solo: focused bright arcs.
+  float sectionArcMod = mix(0.0, 3.0, sJam) + mix(0.0, -2.0, sSpace) + mix(0.0, 1.0, sSolo);
+  float sectionChaosMod = mix(0.0, 0.5, sJam) + mix(0.0, -0.3, sSpace);
 
-  // --- Number of arcs from energy + drum onset ---
-  int arcCount = 3 + int(energy * 4.0) + int(drumOnset * 3.0);
+  // --- Arc parameters (section-modulated) ---
+  float arcThickness = 0.004 + bass * 0.008 + sJam * 0.003;
+  float chaos = mix(0.5, 2.0, 1.0 - stability) + sectionChaosMod;
+
+  // --- Number of arcs from energy + drum onset (section-modulated) ---
+  int arcCount = max(1, 3 + int(energy * 4.0) + int(drumOnset * 3.0) + int(sectionArcMod));
 
   // --- Arc color from melodic pitch ---
   float arcHue = mix(0.0, 0.65, melodicPitch) + chromaHueMod + chordHue;

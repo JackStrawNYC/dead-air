@@ -111,10 +111,11 @@ ${
     ? `  // Bloom: bright pixel self-illumination (boosted for psychedelic intensity)
   {
     float lum = dot(col, vec3(0.299, 0.587, 0.114));
-    float bloomThreshold = mix(0.60, 0.45, energy) + uBloomThreshold${bloomThresholdStr};
-    float bloomAmount = max(0.0, lum - bloomThreshold) * (1.2 + climaxBoost * 0.5);
+    float bloomThreshold = max(0.30, mix(0.60, 0.45, energy) + uBloomThreshold${bloomThresholdStr});
+    float bloomAmount = max(0.0, lum - bloomThreshold) * (1.2 + climaxBoost * 0.4);
     vec3 bloomColor = mix(col, vec3(1.0, 0.98, 0.95), 0.3);
-    vec3 bloom = bloomColor * bloomAmount * (0.18 + energy * 0.06 + climaxBoost * 0.12) * uShowBloom;
+    // Cap bloom intensity to prevent blowout during climax stacking
+    vec3 bloom = bloomColor * min(bloomAmount, 0.45) * (0.16 + energy * 0.05 + climaxBoost * 0.08) * uShowBloom;
     col = col + bloom - col * bloom; // screen blend
   }
 `

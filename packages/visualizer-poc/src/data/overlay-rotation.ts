@@ -86,9 +86,9 @@ const ACCENT_ELIGIBLE = new Set(BAND_CONFIG.accentEligibleOverlays);
 
 /** Energy-dependent accent tuning */
 const ACCENT_CONFIG: Record<string, AccentConfig | null> = {
-  high: { onsetThreshold: 0.25, peakOpacity: 1.0,  decayFrames: 24 },
-  mid:  { onsetThreshold: 0.35, peakOpacity: 0.80, decayFrames: 18 },
-  low:  { onsetThreshold: 0.45, peakOpacity: 0.50, decayFrames: 12 },
+  high: { onsetThreshold: 0.25, peakOpacity: 0.75, decayFrames: 20 },
+  mid:  { onsetThreshold: 0.35, peakOpacity: 0.60, decayFrames: 15 },
+  low:  { onsetThreshold: 0.45, peakOpacity: 0.40, decayFrames: 10 },
 };
 
 // ─── Constants ───
@@ -99,9 +99,9 @@ const ACCENT_CONFIG: Record<string, AccentConfig | null> = {
  * Peaks rotate faster for visual energy.
  */
 const WINDOW_FRAMES_BY_ENERGY: Record<string, number> = {
-  low:  5400,  // 3 minutes — overlays are rare, sacred punctuation
-  mid:  2700,  // 90 seconds — each overlay earns its time
-  high: 1800,  // 60 seconds — restrained even at peaks
+  low:  3600,  // 2 minutes — prevents 3-minute single-overlay stagnation
+  mid:  2100,  // 70 seconds — tighter rotation for visual variety
+  high: 1500,  // 50 seconds — energetic but not jarring
 };
 const WINDOW_FRAMES_DEFAULT = 900;
 
@@ -898,6 +898,9 @@ export function getOverlayOpacities(
   }
 
   // ─── Energy response curves: continuous per-overlay modulation ───
+  // Floor raised from 0.3 → 0.5 and sqrt-smoothed to eliminate strobe pulsation.
+  // Old range 30-100% caused visible flicker on every transient; new range 50-100%
+  // maintains responsiveness without jarring per-frame opacity swings.
   if (frames && frames.length > 0) {
     const frameIdx = Math.min(frame, frames.length - 1);
     const energy = computeSmoothedEnergy(frames, frameIdx);
@@ -917,7 +920,9 @@ export function getOverlayOpacities(
         const overshoot = (energy - peak) * falloff;
         response = Math.max(0.3, 1 - overshoot);
       }
-      result[name] = (result[name] ?? 0) * (0.3 + response * 0.7);
+      // Sqrt smoothing compresses the response curve, reducing transient spikes
+      const smoothedResponse = Math.sqrt(response);
+      result[name] = (result[name] ?? 0) * (0.5 + smoothedResponse * 0.5);
     }
   }
 

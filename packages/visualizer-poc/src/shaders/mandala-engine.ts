@@ -48,6 +48,16 @@ void main() {
   float energy = clamp(uEnergy, 0.0, 1.0);
   float t = uDynamicTime;
 
+  // --- Section type modulation (0=intro,1=verse,2=chorus,3=bridge,4=solo,5=jam,6=outro,7=space) ---
+  float sectionT = uSectionType;
+  float sJam = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
+  float sSpace = smoothstep(6.5, 7.5, sectionT);
+  float sChorus = smoothstep(1.5, 2.5, sectionT) * (1.0 - step(2.5, sectionT));
+  // Jam: faster rotation, more rings. Space: still, minimal. Chorus: extra petals.
+  float sectionRotMod = mix(1.0, 1.4, sJam) * mix(1.0, 0.15, sSpace) * mix(1.0, 1.2, sChorus);
+  float sectionRingMod = mix(0.0, 3.0, sJam) + mix(0.0, -2.0, sSpace) + mix(0.0, 1.0, sChorus);
+  t *= sectionRotMod;
+
   // ─── N-fold symmetry from chord index ───
   // Map chord index (0-23) to 3-12 petals
   float rawN = mod(uChordIndex, 12.0);
@@ -90,7 +100,7 @@ void main() {
 
   // ─── Petal ring pattern ───
   // Concentric rings modulated by angle
-  float ringCount = 3.0 + energy * 5.0 + uMelodicPitch * 3.0;
+  float ringCount = max(1.0, 3.0 + energy * 5.0 + uMelodicPitch * 3.0 + sectionRingMod);
   float ringPattern = sin(warpedP.y * ringCount * PI) * 0.5 + 0.5;
 
   // Petal shape: angular modulation

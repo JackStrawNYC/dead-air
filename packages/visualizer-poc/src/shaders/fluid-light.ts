@@ -99,9 +99,19 @@ void main() {
 
   float t = uDynamicTime;
 
+  // --- Section type modulation (0=intro,1=verse,2=chorus,3=bridge,4=solo,5=jam,6=outro,7=space) ---
+  float sectionT = uSectionType;
+  float sJam = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
+  float sSpace = smoothstep(6.5, 7.5, sectionT);
+  float sChorus = smoothstep(1.5, 2.5, sectionT) * (1.0 - step(2.5, sectionT));
+  // Jam: more blobs, faster flow. Space: fewer blobs, glacial. Chorus: medium density, vibrant.
+  float sectionBlobMod = mix(0.0, 2.0, sJam) + mix(0.0, -2.0, sSpace) + mix(0.0, 1.0, sChorus);
+  float sectionSpeedMod = mix(1.0, 1.3, sJam) * mix(1.0, 0.4, sSpace) * mix(1.0, 1.1, sChorus);
+  t *= sectionSpeedMod;
+
   // ─── Blob field ───
-  // 3-8 metaball-like blobs via smooth-min
-  int blobCount = 3 + int(uJamDensity * 5.0);
+  // 3-8 metaball-like blobs via smooth-min (section-modulated)
+  int blobCount = 3 + int(uJamDensity * 5.0 + sectionBlobMod);
   float blobField = 10.0;
   vec3 blobColor = vec3(0.0);
   float totalWeight = 0.0;

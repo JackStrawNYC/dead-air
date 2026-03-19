@@ -69,11 +69,20 @@ void main() {
 
   float slowTime = uDynamicTime * 0.04;
 
-  // --- Gray-Scott analog parameters ---
+  // --- Section type modulation (0=intro,1=verse,2=chorus,3=bridge,4=solo,5=jam,6=outro,7=space) ---
+  float sectionT = uSectionType;
+  float sJam = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
+  float sSpace = smoothstep(6.5, 7.5, sectionT);
+  float sChorus = smoothstep(1.5, 2.5, sectionT) * (1.0 - step(2.5, sectionT));
+  // Jam: more spots, faster morphing. Space: sparse, near-frozen. Chorus: stripe-dominant.
+  float sectionFeedMod = mix(0.0, 0.02, sJam) + mix(0.0, -0.01, sSpace);
+  float sectionKillMod = mix(0.0, -0.01, sJam) + mix(0.0, 0.015, sChorus);
+
+  // --- Gray-Scott analog parameters (section-modulated) ---
   // Feed rate: controls spot density (more feed = more spots)
-  float f = 0.02 + slowE * 0.04;
+  float f = 0.02 + slowE * 0.04 + sectionFeedMod;
   // Kill rate: controls spots vs stripes (higher k = stripes)
-  float k = 0.05 + tension * 0.02;
+  float k = 0.05 + tension * 0.02 + sectionKillMod;
 
   // --- Coherence morphology ---
   float coherence = clamp(uCoherence, 0.0, 1.0);

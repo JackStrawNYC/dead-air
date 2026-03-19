@@ -95,8 +95,16 @@ void main() {
   float vertShift = (melodicPitch - 0.5) * 0.08;
   p.y -= vertShift;
 
-  // --- Slow rotation ---
-  float angle = slowTime * 0.5 + energy * 0.1;
+  // --- Section type modulation (0=intro,1=verse,2=chorus,3=bridge,4=solo,5=jam,6=outro,7=space) ---
+  float sectionT = uSectionType;
+  float sJam = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
+  float sSpace = smoothstep(6.5, 7.5, sectionT);
+  float sSolo = smoothstep(3.5, 4.5, sectionT) * (1.0 - step(4.5, sectionT));
+  // Jam: faster rotation, looser edges. Space: near-still, sharp sacred forms. Solo: pulsing radii.
+  float sectionRotSpeed = mix(1.0, 1.5, sJam) * mix(1.0, 0.2, sSpace) * mix(1.0, 1.2, sSolo);
+
+  // --- Slow rotation (section-modulated) ---
+  float angle = slowTime * 0.5 * sectionRotSpeed + energy * 0.1;
   float bp = beatPulse(uMusicalTime);
   angle += bp * 0.02;
   float ca = cos(angle);
@@ -137,7 +145,8 @@ void main() {
   float edgeWidth = px * mix(3.0, 1.5, smoothstep(0.3, 0.7, coherence));
 
   // Bass pulse on radius
-  float radiusPulse = 1.0 + bass * 0.08;
+  float radiusPulse = 1.0 + bass * 0.08 + sSolo * 0.06; // solo: extra pulsing radii
+  edgeWidth *= mix(1.0, 1.5, sJam) * mix(1.0, 0.6, sSpace); // jam: softer, space: sharper
 
   // --- Progressive construction: energy controls visibility ---
   // energy 0.0 → only center circle (index 0)

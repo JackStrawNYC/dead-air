@@ -114,6 +114,16 @@ void main() {
   // === CAUSTIC LIGHT PATTERNS: multiple overlapping layers ===
   float causticSharpness = 0.5 + highs * 0.5;
 
+  // --- Section type modulation (0=intro,1=verse,2=chorus,3=bridge,4=solo,5=jam,6=outro,7=space) ---
+  float sectionT = uSectionType;
+  float sJam = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
+  float sSpace = smoothstep(6.5, 7.5, sectionT);
+  float sVerse = smoothstep(0.5, 1.5, sectionT) * (1.0 - step(1.5, sectionT));
+  // Jam: murky depth, more turbulence. Space: pristine stillness. Verse: gentle current.
+  causticSharpness *= mix(1.0, 0.6, sJam) * mix(1.0, 1.4, sSpace);
+  swayUv.x += sJam * 0.03 * sin(uDynamicTime * 0.3); // extra lateral current in jams
+  swayUv *= mix(1.0, 0.97, sSpace); // barely perceptible drift in space
+
   // === CLIMAX REACTIVITY ===
   float climaxPhase = uClimaxPhase;
   float climaxI = uClimaxIntensity;

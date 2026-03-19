@@ -93,9 +93,18 @@ void main() {
 
   float slowTime = uDynamicTime * 0.06;
 
-  // Audio-driven parameters
-  float rotSpeed = 0.3 + bass * 0.8;
-  float pointBright = 0.3 + energy * 0.7;
+  // --- Section type modulation (0=intro,1=verse,2=chorus,3=bridge,4=solo,5=jam,6=outro,7=space) ---
+  float sectionT = uSectionType;
+  float sJam = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
+  float sSpace = smoothstep(6.5, 7.5, sectionT);
+  float sSolo = smoothstep(3.5, 4.5, sectionT) * (1.0 - step(4.5, sectionT));
+  // Jam: faster rotation, brighter points. Space: frozen attractor. Solo: dramatic brightness.
+  float sectionRotMod = mix(1.0, 1.5, sJam) * mix(1.0, 0.2, sSpace) * mix(1.0, 1.3, sSolo);
+  float sectionBrightMod = mix(0.0, 0.2, sJam) + mix(0.0, -0.15, sSpace) + mix(0.0, 0.25, sSolo);
+
+  // Audio-driven parameters (section-modulated)
+  float rotSpeed = (0.3 + bass * 0.8) * sectionRotMod;
+  float pointBright = 0.3 + energy * 0.7 + sectionBrightMod;
   float affineScale = 0.5 + melodicPitch * 0.3;
   float variationMix = tension;
   float chordHue = float(int(uChordIndex)) / 24.0;

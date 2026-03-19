@@ -61,11 +61,12 @@ void main() {
                             : coherence < 0.3 ? mix(1.0, 2.0, (0.3 - coherence) / 0.3)
                             : 1.0;
 
-  // Section type: jam (7.0) → 1.5x zoom speed, space (5.0) → 0.4x zoom speed
+  // Section type: 0=intro, 1=verse, 2=chorus, 3=bridge, 4=solo, 5=jam, 6=outro, 7=space
   float sectionT = uSectionType;
-  float jamSpeedMult = smoothstep(6.5, 7.5, sectionT) * 0.5 + 1.0; // 1.0 → 1.5
-  float spaceSpeedMult = 1.0 - smoothstep(4.5, 5.5, sectionT) * step(sectionT, 5.5) * 0.6; // 1.0 → 0.4
-  zoomSpeed *= jamSpeedMult * spaceSpeedMult;
+  float jamSpeedMult = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT)) * 0.5 + 1.0; // jam: 1.5x
+  float spaceSpeedMult = 1.0 - smoothstep(6.5, 7.5, sectionT) * 0.6; // space: 0.4x
+  float soloSpeedMult = smoothstep(3.5, 4.5, sectionT) * (1.0 - step(4.5, sectionT)) * 0.3 + 1.0; // solo: 1.3x
+  zoomSpeed *= jamSpeedMult * spaceSpeedMult * soloSpeedMult;
 
   // Zoom smoothness: high beatStability = steady, low = jittery
   float jitter = (1.0 - uBeatStability) * 0.02 * coherenceJitterMult;

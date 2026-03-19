@@ -104,7 +104,7 @@ void main() {
   // --- Phase 1: New uniform integrations ---
   // Vocal warmth tint in flame body
   float vocalWarmth = uVocalEnergy * 0.15;
-  // Energy acceleration drives updraft speed
+  // Energy acceleration drives updraft speed (section-modulated below)
   float accelUpdraft = 1.0 + uEnergyAccel * 0.25;
   // Melodic pitch drives flame height
   float flamePitchHeight = uMelodicPitch * 0.3;
@@ -112,6 +112,16 @@ void main() {
   float chromaHueMod = uChromaHue * 0.25;
   // Chord hue shift
   float chordHue = float(int(uChordIndex)) / 24.0 * 0.15;
+
+  // --- Section type modulation (0=intro,1=verse,2=chorus,3=bridge,4=solo,5=jam,6=outro,7=space) ---
+  float sectionT = uSectionType;
+  float sJam = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
+  float sSpace = smoothstep(6.5, 7.5, sectionT);
+  float sChorus = smoothstep(1.5, 2.5, sectionT) * (1.0 - step(2.5, sectionT));
+  float sSolo = smoothstep(3.5, 4.5, sectionT) * (1.0 - step(4.5, sectionT));
+  // Jam: taller, faster flames. Space: embers only, slow drift. Chorus: wider, brighter.
+  float sectionRiseSpeed = mix(1.0, 1.4, sJam) * mix(1.0, 0.3, sSpace) * mix(1.0, 1.2, sChorus);
+  float sectionSpread = mix(1.0, 1.3, sChorus) * mix(1.0, 0.5, sSpace);
 
   // === CLIMAX REACTIVITY ===
   float climaxPhase = uClimaxPhase;
@@ -158,7 +168,7 @@ void main() {
     if (t > MAX_DIST) break;
 
     vec3 pos = camPos + camDir * t;
-    float d = flameSDF(pos, bass, highs, max(onset, uDrumOnset), flamePitchHeight, accelUpdraft);
+    float d = flameSDF(pos, bass * sectionSpread, highs, max(onset, uDrumOnset), flamePitchHeight, accelUpdraft * sectionRiseSpeed);
 
     // Accumulate glow based on proximity to fire surface
     // Tighter proximity zone (0.5) for defined fire shape with dark background

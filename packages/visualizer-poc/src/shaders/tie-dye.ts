@@ -30,9 +30,17 @@ varying vec2 vUv;
 void main() {
   vec2 uv = (gl_FragCoord.xy - 0.5 * uResolution) / min(uResolution.x, uResolution.y);
 
-  // Time-based rotation — bass drives swirl speed
-  float t = uDynamicTime * 0.15 * (0.8 + uBass * 0.6 + uFastBass * 0.4);
-  float bassSwirl = uBass * 1.5;
+  // --- Section type modulation (0=intro,1=verse,2=chorus,3=bridge,4=solo,5=jam,6=outro,7=space) ---
+  float sectionT = uSectionType;
+  float sJam = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
+  float sSpace = smoothstep(6.5, 7.5, sectionT);
+  float sChorus = smoothstep(1.5, 2.5, sectionT) * (1.0 - step(2.5, sectionT));
+  // Jam: faster swirl, more dye bleeding. Space: frozen fabric. Chorus: vivid, pulsing.
+  float sectionSpeed = mix(1.0, 1.4, sJam) * mix(1.0, 0.3, sSpace) * mix(1.0, 1.15, sChorus);
+
+  // Time-based rotation — bass drives swirl speed (section-modulated)
+  float t = uDynamicTime * 0.15 * (0.8 + uBass * 0.6 + uFastBass * 0.4) * sectionSpeed;
+  float bassSwirl = uBass * 1.5 * mix(1.0, 1.3, sJam) * mix(1.0, 0.2, sSpace);
 
   // === CURL NOISE UV WARPING: simulate fabric wrinkles ===
   vec2 warpedUv = uv + curlNoise(vec3(uv * 2.0, uDynamicTime * 0.08)).xy * 0.15;

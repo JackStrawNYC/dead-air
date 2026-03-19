@@ -269,15 +269,17 @@ export function detectTexture(snapshot: AudioSnapshot, energy: number): MusicalT
 
 /** Per-phase target values — concert-grade visual intensity.
  *  Climax = VIVID SATURATED COLOR, not white blowout.
- *  Push saturation hard, keep brightness restrained. */
+ *  Push saturation hard, keep brightness restrained.
+ *  Brightness values halved (0.20→0.10, 0.15→0.08) to prevent strobe pulsation
+ *  when combined with other brightness drivers (fastEnergy, IT lift, counterpoint). */
 const PHASE_TARGETS: Record<
   ClimaxPhase,
   { sat: number; bright: number; vig: number; bloom: number; contrast: number; density: number }
 > = {
   idle:    { sat: -0.10, bright: -0.04, vig: -0.04, bloom: -0.05, contrast: -0.03, density: 0.70 },
   build:   { sat: +0.25, bright: +0.02, vig: -0.02, bloom: 0.10, contrast: +0.10, density: 1.10 },
-  climax:  { sat: +0.60, bright: +0.20, vig: -0.08, bloom: 0.15, contrast: +0.15, density: 1.60 },
-  sustain: { sat: +0.35, bright: +0.15, vig: -0.06, bloom: 0.10, contrast: +0.10, density: 1.40 },
+  climax:  { sat: +0.60, bright: +0.10, vig: -0.08, bloom: 0.15, contrast: +0.15, density: 1.60 },
+  sustain: { sat: +0.35, bright: +0.08, vig: -0.06, bloom: 0.10, contrast: +0.10, density: 1.40 },
   release: { sat: -0.10, bright: -0.05, vig: -0.03, bloom: 0,    contrast: -0.03, density: 0.50 },
 };
 

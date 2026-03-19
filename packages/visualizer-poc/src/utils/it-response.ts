@@ -86,8 +86,10 @@ const MEDIUM_END = 150;     // 5 seconds
 const DEEP_END = 300;       // 10 seconds
 // Beyond DEEP_END = transcendent
 
-/** Max strobe intensity during deep lock */
-const STROBE_MAX = 0.30;
+/** Max strobe intensity during deep lock.
+ *  Reduced from 0.30 → 0.12 to prevent harsh white flashes.
+ *  At 0.30 with overlay blend mode, every onset was a visible strobe pulse. */
+const STROBE_MAX = 0.12;
 /** Time dilation factor during deep lock (slow-motion shader drift) */
 const LOCKED_TIME_DILATION = 0.3;
 /** Transcendent time dilation (maximum slow-motion) */
@@ -303,8 +305,9 @@ export function computeITResponse(
         const deepProgress = Math.max(0, Math.min(1,
           (framesSinceLock - MEDIUM_END) / (DEEP_END - MEDIUM_END),
         ));
-        strobeIntensity = deepProgress > 0.3
-          ? STROBE_MAX * smoothstep((deepProgress - 0.3) / 0.7) * Math.min(1, onsetStrength * 3)
+        // Gate strobe to only fire on significant onsets (>0.15) to suppress noise
+        strobeIntensity = deepProgress > 0.3 && onsetStrength > 0.15
+          ? STROBE_MAX * smoothstep((deepProgress - 0.3) / 0.7) * Math.min(1, (onsetStrength - 0.15) * 3.5)
           : 0;
         timeDilation = 1 - (1 - LOCKED_TIME_DILATION) * smoothstep(deepProgress);
         break;
@@ -316,7 +319,10 @@ export function computeITResponse(
         snapToMusicalTime = true;
         overlayOpacity = 0;
         timeDilation = TRANSCENDENT_TIME_DILATION;
-        strobeIntensity = STROBE_MAX * Math.min(1, onsetStrength * 3);
+        // Gate strobe to only fire on significant onsets (>0.15)
+        strobeIntensity = onsetStrength > 0.15
+          ? STROBE_MAX * Math.min(1, (onsetStrength - 0.15) * 3.5)
+          : 0;
         forceTranscendentShader = true;
         break;
     }

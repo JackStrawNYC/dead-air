@@ -110,7 +110,10 @@ export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod,
   const isClimaxPhase = (climaxMod?.brightnessOffset ?? 0) > 0.04;
   const brightCap = isClimaxPhase ? 1.40 : 1.25;
   // Gate all energy-reactive brightness by reactivity (0 during intro, 1 when engine open)
-  const brightness = Math.min(brightCap, 0.96 + factor * 0.16 * reactivity + (climaxMod?.brightnessOffset ?? 0) * reactivity + (snapshot.fastEnergy ?? 0) * 0.12 * cssGate * reactivity);
+  // fastEnergy multiplier reduced from 0.12 → 0.03 to eliminate strobe pulsation.
+  // The 8-frame Gaussian responds to every transient; at 0.12 it caused frame-to-frame
+  // brightness swings of ±0.06 which were visibly jarring. At 0.03 it's felt, not seen.
+  const brightness = Math.min(brightCap, 0.96 + factor * 0.16 * reactivity + (climaxMod?.brightnessOffset ?? 0) * reactivity + (snapshot.fastEnergy ?? 0) * 0.03 * reactivity);
 
   // Drums/Space phase adjustments (brightness + hue only — saturation/contrast handled by GLSL)
   let dsBrightOffset = 0;
