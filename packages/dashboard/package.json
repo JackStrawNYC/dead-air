@@ -8,12 +8,15 @@
     "build": "vite build && tsc -p tsconfig.server.json",
     "preview": "vite preview",
     "server": "tsx server/index.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "type-check": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.server.json"
   },
   "dependencies": {
     "@dead-air/core": "workspace:*",
     "@dead-air/pipeline": "workspace:*",
     "express": "^4.21.0",
+    "zod": "^4.3.6",
     "cors": "^2.8.5",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
@@ -29,6 +32,7 @@
     "concurrently": "^9.0.0",
     "tsx": "^4.19.0",
     "typescript": "^5.7.0",
+    "vitest": "^4.0.18",
     "vite": "^6.0.0"
   }
 }

@@ -34,6 +34,12 @@ interface Props {
   isSolo?: boolean;
   /** Solo intensity (0-1) for dramatic zoom */
   soloIntensity?: number;
+  /** Groove motion multiplier — scales drift amplitude and Hz */
+  grooveMotionMult?: number;
+  /** Groove pulse multiplier — scales shake intensity */
+  groovePulseMult?: number;
+  /** Section drift speed multiplier — scales drift amplitude */
+  sectionDriftMult?: number;
 }
 
 const QUIET_SCALE = 1.08;
@@ -63,7 +69,7 @@ function shakeHash(frame: number): { x: number; y: number } {
   return { x, y };
 }
 
-export const CameraMotion: React.FC<Props> = ({ frames, children, jamEvolution, bass, cameraFreeze, drumsSpacePhase, fastEnergy, vocalPresence, isSolo, soloIntensity }) => {
+export const CameraMotion: React.FC<Props> = ({ frames, children, jamEvolution, bass, cameraFreeze, drumsSpacePhase, fastEnergy, vocalPresence, isSolo, soloIntensity, grooveMotionMult = 1, groovePulseMult = 1, sectionDriftMult = 1 }) => {
   const frozenTransform = React.useRef({ scale: 1.04, totalX: 0, totalY: 0, tilt: 0 });
   const frame = useCurrentFrame();
   const idx = Math.min(Math.max(0, frame), frames.length - 1);
@@ -96,10 +102,12 @@ export const CameraMotion: React.FC<Props> = ({ frames, children, jamEvolution, 
     scale = phaseZoom * 0.6 + energyScale * 0.4;
 
     // Sinusoidal lateral drift — energy-gated: near-still in silence
+    // grooveMotionMult + sectionDriftMult amplify drift amplitude and frequency
     const time = frame / 30; // seconds
     const driftGate = 0.05 + 0.95 * egate;
-    driftX = Math.sin(time * phaseParams.driftHz * Math.PI * 2) * phaseParams.driftAmp * driftGate;
-    driftY = Math.cos(time * phaseParams.driftHz * Math.PI * 2 * 0.7 + 1.3) * phaseParams.driftAmp * 0.6 * driftGate;
+    const combinedDriftMult = grooveMotionMult * sectionDriftMult;
+    driftX = Math.sin(time * phaseParams.driftHz * grooveMotionMult * Math.PI * 2) * phaseParams.driftAmp * combinedDriftMult * driftGate;
+    driftY = Math.cos(time * phaseParams.driftHz * grooveMotionMult * Math.PI * 2 * 0.7 + 1.3) * phaseParams.driftAmp * 0.6 * combinedDriftMult * driftGate;
   } else {
     // Short songs: existing energy-only behavior
     scale = energyScale;
@@ -121,6 +129,10 @@ export const CameraMotion: React.FC<Props> = ({ frames, children, jamEvolution, 
       break; // use the most recent beat
     }
   }
+
+  // Apply groovePulseMult to beat shake
+  shakeX *= groovePulseMult;
+  shakeY *= groovePulseMult;
 
   // Onset jolt: sharp camera punch on transient attacks (prefer stemDrumOnset when available)
   const ONSET_JOLT_PX = 8;

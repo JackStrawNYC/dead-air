@@ -1,15 +1,19 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { fetchEpisodes, fetchSegments } from '../api';
+import type { Episode, SegmentResponse } from '../types';
 import { useRenderProgress } from '../hooks/useRenderProgress';
+import StatCard from '../components/StatCard';
 import SegmentGrid from '../components/SegmentGrid';
+import { useToast } from '../hooks/useToast';
 
 export default function RenderMonitor() {
   const { episodeId: paramId } = useParams<{ episodeId?: string }>();
-  const [episodes, setEpisodes] = useState<any[]>([]);
+  const [episodes, setEpisodes] = useState<Episode[]>([]);
   const [episodeId, setEpisodeId] = useState(paramId || '');
-  const [segments, setSegments] = useState<any>(null);
+  const [segments, setSegments] = useState<SegmentResponse | null>(null);
   const [polling, setPolling] = useState(false);
+  const toast = useToast();
 
   const { completed, total, connected, done } = useRenderProgress(polling ? episodeId : null);
 
@@ -19,13 +23,17 @@ export default function RenderMonitor() {
   }, [done]);
 
   useEffect(() => {
-    fetchEpisodes().then(setEpisodes).catch(() => {});
+    fetchEpisodes().then(setEpisodes).catch((e) => { toast('error', 'Failed to load episodes'); });
   }, []);
 
   const loadSegments = async () => {
     if (!episodeId) return;
-    const data = await fetchSegments(episodeId);
-    setSegments(data);
+    try {
+      const data = await fetchSegments(episodeId);
+      setSegments(data);
+    } catch (e) {
+      toast('error', 'Failed to load segments');
+    }
   };
 
   useEffect(() => {
@@ -80,28 +88,10 @@ export default function RenderMonitor() {
         <>
           {/* Summary stats */}
           <div className="grid-4 mb-16">
-            <div className="card">
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Segments</div>
-              <div style={{ fontSize: 28, fontFamily: 'var(--font-mono)', fontWeight: 700 }}>{segments.total}</div>
-            </div>
-            <div className="card">
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Completed</div>
-              <div style={{ fontSize: 28, fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--green)' }}>
-                {segments.completed}
-              </div>
-            </div>
-            <div className="card">
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Raw MP4</div>
-              <div style={{ fontSize: 20, fontFamily: 'var(--font-mono)', fontWeight: 700, color: segments.hasRaw ? 'var(--green)' : 'var(--text-muted)' }}>
-                {segments.hasRaw ? 'Ready' : 'Pending'}
-              </div>
-            </div>
-            <div className="card">
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Final MP4</div>
-              <div style={{ fontSize: 20, fontFamily: 'var(--font-mono)', fontWeight: 700, color: segments.hasFinal ? 'var(--green)' : 'var(--text-muted)' }}>
-                {segments.hasFinal ? 'Ready' : 'Pending'}
-              </div>
-            </div>
+            <StatCard label="Segments" value={segments.total} fontSize={28} />
+            <StatCard label="Completed" value={segments.completed} color="var(--green)" fontSize={28} />
+            <StatCard label="Raw MP4" value={segments.hasRaw ? 'Ready' : 'Pending'} color={segments.hasRaw ? 'var(--green)' : 'var(--text-muted)'} fontSize={20} />
+            <StatCard label="Final MP4" value={segments.hasFinal ? 'Ready' : 'Pending'} color={segments.hasFinal ? 'var(--green)' : 'var(--text-muted)'} fontSize={20} />
           </div>
 
           {/* Segment grid */}

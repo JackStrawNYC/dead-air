@@ -4,27 +4,44 @@ import { fetchShowResearch, fetchShowAnalysis } from '../api';
 import Skeleton from '../components/Skeleton';
 import EnergyWaveform from '../components/EnergyWaveform';
 import ResearchViewer from '../components/ResearchViewer';
+import { useToast } from '../hooks/useToast';
 
 type Tab = 'research' | 'waveform' | 'songs';
 
+interface AnalysisSong {
+  title?: string;
+  trackId?: string;
+  bpm?: number;
+  key?: string;
+  energy?: number[];
+  avgEnergy?: number;
+  duration?: number;
+}
+
+interface AnalysisData {
+  songs?: AnalysisSong[];
+  [key: string]: unknown;
+}
+
 export default function ShowAnalysis() {
   const { id } = useParams<{ id: string }>();
-  const [research, setResearch] = useState<any>(null);
-  const [analysis, setAnalysis] = useState<any>(null);
+  const [research, setResearch] = useState<Record<string, unknown> | null>(null);
+  const [analysis, setAnalysis] = useState<AnalysisData | null>(null);
   const [tab, setTab] = useState<Tab>('research');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const toast = useToast();
 
   useEffect(() => {
     if (!id) return;
     setLoading(true);
     setError(null);
     Promise.all([
-      fetchShowResearch(id).catch(() => null),
-      fetchShowAnalysis(id).catch(() => null),
+      fetchShowResearch(id).catch((e) => { toast('error', 'Failed to load research'); return null; }),
+      fetchShowAnalysis(id).catch((e) => { toast('error', 'Failed to load analysis'); return null; }),
     ]).then(([r, a]) => {
       setResearch(r);
-      setAnalysis(a);
+      setAnalysis(a as AnalysisData | null);
       if (!r && !a) setError('No research or analysis data found for this show.');
       setLoading(false);
     });
@@ -117,7 +134,7 @@ export default function ShowAnalysis() {
                     </tr>
                   </thead>
                   <tbody>
-                    {analysis.songs.map((song: any, i: number) => (
+                    {analysis.songs.map((song, i) => (
                       <tr key={i}>
                         <td style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-muted)' }}>{i + 1}</td>
                         <td>{song.title || song.trackId || `Track ${i + 1}`}</td>

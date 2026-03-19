@@ -42,7 +42,7 @@ describe("computeNarrativeDirective", () => {
     expect(result.abstractionLevel).toBeGreaterThan(0.7);
   });
 
-  it("encore (set 3): party mode with warm temperature and saturation boost", () => {
+  it("encore (set 3): party mode with warm temperature and boosted saturation", () => {
     const ctx: NarrativeContext = {
       setNumber: 3,
       setProgress: 0.5,
@@ -50,7 +50,8 @@ describe("computeNarrativeDirective", () => {
     };
     const result = computeNarrativeDirective(ctx);
     expect(result.temperature).toBe(0.5);
-    expect(result.saturationOffset).toBeGreaterThan(0);
+    expect(result.saturationOffset).toBeGreaterThanOrEqual(0.15);
+    expect(result.brightnessOffset).toBeGreaterThanOrEqual(0.10);
   });
 
   it("space section: sparse overlays and no heroes", () => {
@@ -124,8 +125,8 @@ describe("computeNarrativeDirective", () => {
       const result = computeNarrativeDirective(ctx);
       expect(result.overlayDensityMult).toBeGreaterThanOrEqual(0);
       expect(result.overlayDensityMult).toBeLessThanOrEqual(2);
-      expect(result.saturationOffset).toBeGreaterThanOrEqual(-0.3);
-      expect(result.saturationOffset).toBeLessThanOrEqual(0.3);
+      expect(result.saturationOffset).toBeGreaterThanOrEqual(-0.5);
+      expect(result.saturationOffset).toBeLessThanOrEqual(0.5);
       expect(result.abstractionLevel).toBeGreaterThanOrEqual(0);
       expect(result.abstractionLevel).toBeLessThanOrEqual(1);
       expect(result.motionMult).toBeGreaterThanOrEqual(0.1);

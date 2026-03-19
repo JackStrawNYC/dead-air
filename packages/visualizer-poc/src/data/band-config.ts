@@ -70,7 +70,7 @@ export interface BandConfig {
 
 export const GRATEFUL_DEAD_CONFIG: BandConfig = {
   bandName: "Grateful Dead",
-  musicians: ["Jerry Garcia", "Bob Weir", "Phil Lesh", "Bill Kreutzmann", "Mickey Hart", "Keith Godchaux", "Donna Godchaux", "Brent Mydland", "Vince Welnick"],
+  musicians: ["Jerry Garcia", "Bob Weir", "Phil Lesh", "Bill Kreutzmann", "Mickey Hart", "Keith Godchaux", "Donna Godchaux", "Brent Mydland", "Vince Welnick", "Tom Constanten", "Bruce Hornsby", "Robert Hunter"],
 
   eras: [
     {
@@ -101,6 +101,21 @@ export const GRATEFUL_DEAD_CONFIG: BandConfig = {
         textTransform: "none",
         color: "rgba(255, 255, 255, 0.9)",
         subtitleColor: "rgba(255, 255, 255, 0.45)",
+      },
+    },
+    {
+      id: "brent_era",
+      label: "Brent Era",
+      yearRange: [1980, 1986],
+      colorGrade: "saturate(1.10) contrast(1.05) brightness(1.0)",
+      bloomColor: "rgba(255, 180, 220, 0.07)",
+      typography: {
+        fontFamily: "'Inter', system-ui, sans-serif",
+        fontWeight: 500,
+        letterSpacing: "0.03em",
+        textTransform: "none",
+        color: "rgba(255, 255, 255, 0.9)",
+        subtitleColor: "rgba(255, 255, 255, 0.48)",
       },
     },
     {
@@ -161,6 +176,14 @@ export const GRATEFUL_DEAD_CONFIG: BandConfig = {
     ["Drums", "Space"],
     ["Drums / Space", "Morning Dew"],
     ["Not Fade Away", "Going Down the Road Feeling Bad"],
+    ["Bird Song", "Let It Grow"],
+    ["Terrapin Station", "Playing in the Band"],
+    ["Eyes of the World", "Stella Blue"],
+    ["The Other One", "Morning Dew"],
+    ["He's Gone", "Truckin'"],
+    ["Truckin'", "The Other One"],
+    ["Scarlet Begonias", "Touch of Grey"],
+    ["Let It Grow", "Drums"],
   ],
 
   lyrics: [
@@ -186,6 +209,21 @@ export const GRATEFUL_DEAD_CONFIG: BandConfig = {
     "The bus came by and I got on, that's when it all began",
     "Ain't no time to hate, barely time to wait",
     "Saint Stephen with a rose, in and out of the garden he goes",
+    "Standing on the moon with nothing left to do",
+    "A friend of the devil is a friend of mine",
+    "Estimated time of arrival",
+    "Set out running but I take my time",
+    "Sugar magnolia, blossoms blooming",
+    "Loose Lucy is my delight",
+    "I need a miracle every day",
+    "Row Jimmy row, gonna get there I don't know",
+    "Must have been the roses",
+    "What I want to know is, are you kind?",
+    "Fare you well, fare you well, I love you more than words can tell",
+    "Dark star crashes, pouring its light into ashes",
+    "Please don't dominate the rap, Jack",
+    "I will get by, I will survive",
+    "Truckin' got my chips cashed in",
   ],
 
   quotes: [
@@ -197,6 +235,15 @@ export const GRATEFUL_DEAD_CONFIG: BandConfig = {
     { text: "Too much of a good thing is just about right.", attribution: "Jerry Garcia" },
     { text: "Once in a while you can get shown the light in the strangest of places if you look at it right.", attribution: "Jerry Garcia" },
     { text: "The music never stopped.", attribution: "Bob Weir" },
+    { text: "Something about the Grateful Dead—it was like a musical organism, this living, breathing thing.", attribution: "Phil Lesh" },
+    { text: "We used to play with the audience. We'd take them up and bring them down.", attribution: "Phil Lesh" },
+    { text: "The bass is the foundation. Without the bass, there is no house.", attribution: "Phil Lesh" },
+    { text: "If you get confused, listen to the music play.", attribution: "Robert Hunter" },
+    { text: "In the land of the night, the ship of the sun is drawn by the Grateful Dead.", attribution: "Robert Hunter" },
+    { text: "I'm basically a rhythm player. My goal is to keep the pulse of the song going.", attribution: "Bill Kreutzmann" },
+    { text: "The drum is the heartbeat. It's life, it's breathing, it's the pulse.", attribution: "Mickey Hart" },
+    { text: "Rhythm is the soul of life. The whole universe revolves in rhythm.", attribution: "Mickey Hart" },
+    { text: "A long strange trip is right. It was the strangest, most improbable story in rock 'n' roll history.", attribution: "Dennis McNally" },
   ],
 
   venueTypes: ["theater", "arena", "amphitheater", "festival", "club", "ballroom"],
@@ -305,6 +352,14 @@ export const GRATEFUL_DEAD_CONFIG: BandConfig = {
       grainIntensity: 1.2,
       colorTempShift: 5,
       saturationOffset: 0,
+    },
+    brent_era: {
+      preferredModes: ["concert_lighting", "liquid_light", "tie_dye", "inferno", "electric_arc", "fractal_flames", "plasma_field", "lava_flow", "kaleidoscope", "solar_flare"],
+      excludedModes: ["stark_minimal", "void_light"],
+      excludedOverlays: [],
+      grainIntensity: 0.8,
+      colorTempShift: 3,
+      saturationOffset: 0.03,
     },
     hiatus: {
       preferredModes: ["concert_lighting", "cosmic_voyage", "deep_ocean", "diffraction_rings", "morphogenesis", "voronoi_flow", "digital_rain", "neural_web", "signal_decay", "databend", "warp_field"],

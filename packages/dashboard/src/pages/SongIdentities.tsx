@@ -4,8 +4,10 @@ import {
   fetchSceneRegistry, fetchOverlayNames,
   type SceneMode,
 } from '../api';
+import type { SongIdentity } from '../types';
 import HueSlider from '../components/HueSlider';
 import TagMultiSelect from '../components/TagMultiSelect';
+import { useToast } from '../hooks/useToast';
 
 const TRANSITION_STYLES = [
   'dissolve', 'morph', 'flash', 'void', 'radial_wipe', 'distortion_morph',
@@ -17,24 +19,25 @@ const TRANSITION_STYLES = [
 const DRUMS_SPACE_PHASES = ['intro', 'drums_peak', 'transition', 'space_ambient', 'space_peak', 'reentry'];
 
 export default function SongIdentities() {
-  const [identities, setIdentities] = useState<Record<string, any>>({});
+  const [identities, setIdentities] = useState<Record<string, SongIdentity>>({});
   const [selectedSong, setSelectedSong] = useState<string | null>(null);
   const [sceneModes, setSceneModes] = useState<SceneMode[]>([]);
   const [overlayNames, setOverlayNames] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const toast = useToast();
 
   useEffect(() => {
-    fetchSongIdentities().then(setIdentities).catch(() => {});
-    fetchSceneRegistry().then(r => setSceneModes(r.modes)).catch(() => {});
-    fetchOverlayNames().then(setOverlayNames).catch(() => {});
+    fetchSongIdentities().then(setIdentities).catch((e) => { toast('error', 'Failed to load song identities'); });
+    fetchSceneRegistry().then(r => setSceneModes(r.modes)).catch((e) => { toast('error', 'Failed to load scene registry'); });
+    fetchOverlayNames().then(setOverlayNames).catch((e) => { toast('error', 'Failed to load overlay names'); });
   }, []);
 
   const songKeys = Object.keys(identities).sort();
   const current = selectedSong ? identities[selectedSong] : null;
 
-  const updateField = (field: string, value: any) => {
+  const updateField = (field: string, value: string | number | boolean | string[] | undefined) => {
     if (!selectedSong) return;
     setIdentities(prev => ({
       ...prev,
@@ -49,19 +52,19 @@ export default function SongIdentities() {
       ...prev,
       [selectedSong]: {
         ...prev[selectedSong],
-        palette: { ...prev[selectedSong].palette, [field]: value },
+        palette: { ...prev[selectedSong].palette!, [field]: value },
       },
     }));
     setDirty(true);
   };
 
-  const updateClimaxBehavior = (field: string, value: any) => {
+  const updateClimaxBehavior = (field: string, value: number | boolean) => {
     if (!selectedSong || !current) return;
     setIdentities(prev => ({
       ...prev,
       [selectedSong]: {
         ...prev[selectedSong],
-        climaxBehavior: { ...(prev[selectedSong].climaxBehavior || {}), [field]: value },
+        climaxBehavior: { ...(prev[selectedSong].climaxBehavior || {} as Record<string, unknown>), [field]: value } as SongIdentity['climaxBehavior'],
       },
     }));
     setDirty(true);
@@ -69,13 +72,19 @@ export default function SongIdentities() {
 
   const updateDrumsSpaceShader = (phase: string, mode: string) => {
     if (!selectedSong) return;
-    setIdentities(prev => ({
-      ...prev,
-      [selectedSong]: {
-        ...prev[selectedSong],
-        drumsSpaceShaders: { ...(prev[selectedSong].drumsSpaceShaders || {}), [phase]: mode || undefined },
-      },
-    }));
+    setIdentities(prev => {
+      const existing = prev[selectedSong].drumsSpaceShaders || {};
+      const updated = { ...existing };
+      if (mode) {
+        updated[phase] = mode;
+      } else {
+        delete updated[phase];
+      }
+      return {
+        ...prev,
+        [selectedSong]: { ...prev[selectedSong], drumsSpaceShaders: updated },
+      };
+    });
     setDirty(true);
   };
 
@@ -299,14 +308,14 @@ export default function SongIdentities() {
               <h4 style={{ color: 'var(--text-muted)', fontSize: 11, textTransform: 'uppercase', marginBottom: 8 }}>Hue & Saturation Shift</h4>
               <div className="grid-2">
                 <div>
-                  <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>Hue Shift (°)</label>
+                  <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>Hue Shift</label>
                   <input
                     type="range" min={-180} max={180}
                     value={current.hueShift ?? 0}
                     onChange={e => updateField('hueShift', Number(e.target.value))}
                     style={{ width: '100%' }}
                   />
-                  <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{current.hueShift ?? 0}°</span>
+                  <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{current.hueShift ?? 0}</span>
                 </div>
                 <div>
                   <label style={{ fontSize: 11, color: 'var(--text-muted)' }}>Saturation Offset</label>

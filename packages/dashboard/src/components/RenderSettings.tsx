@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { fetchRenderPresets } from '../api';
 import LogStream from './LogStream';
+import { useToast } from '../hooks/useToast';
 
 interface RenderPreset {
   width: number;
@@ -31,6 +32,7 @@ interface Props {
 const GL_BACKENDS = ['angle', 'egl', 'swangle', 'swiftshader'];
 
 export default function RenderSettings({ songs, onStartRender, renderJobId, renderLog, renderDone, renderResult }: Props) {
+  const toast = useToast();
   const [presets, setPresets] = useState<Record<string, RenderPreset>>({});
   const [selectedPreset, setSelectedPreset] = useState('preview');
   const [track, setTrack] = useState('');
@@ -41,7 +43,7 @@ export default function RenderSettings({ songs, onStartRender, renderJobId, rend
   const [starting, setStarting] = useState(false);
 
   useEffect(() => {
-    fetchRenderPresets().then(setPresets).catch(() => {});
+    fetchRenderPresets().then(setPresets).catch(() => { toast('error', 'Failed to load render presets'); });
   }, []);
 
   const activePreset = presets[selectedPreset];

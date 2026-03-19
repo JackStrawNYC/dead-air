@@ -433,6 +433,22 @@ export function selectOverlays(
     }
   }
 
+  // Force-include top-1 boosted overlay from song identity (if not already present)
+  if (songIdentity?.overlayBoost?.length) {
+    const boostedScored = songIdentity.overlayBoost
+      .map((name) => {
+        const s = scored.find((sc) => sc.entry.name === name);
+        return s ? { name, score: s.score } : null;
+      })
+      .filter((x): x is { name: string; score: number } => x !== null && !selected.has(x.name) && !excludeSet.has(x.name))
+      .sort((a, b) => b.score - a.score);
+    if (boostedScored.length > 0) {
+      selected.add(boostedScored[0].name);
+      const entry = SELECTABLE_REGISTRY.find((e) => e.name === boostedScored[0].name);
+      if (entry) totalWeight += entry.weight;
+    }
+  }
+
   // Remove excludes (safety — shouldn't have been added)
   for (const name of excludeSet) {
     selected.delete(name);
@@ -456,6 +472,7 @@ export function selectOverlays(
 export function selectOverlaysForShow(
   songs: { song: SetlistEntry; analysis: TrackAnalysis }[],
   showSeed?: number,
+  songIdentities?: Map<string, SongIdentity>,
 ): Record<string, SelectionResult & { title: string }> {
   const results: Record<string, SelectionResult & { title: string }> = {};
   let history = emptyHistory();
@@ -463,7 +480,8 @@ export function selectOverlaysForShow(
   for (const { song, analysis } of songs) {
     const profile = buildSongProfile(song, analysis);
     const overrides = song.overlayOverrides;
-    const result = selectOverlays(profile, history, overrides, showSeed);
+    const identity = songIdentities?.get(song.title);
+    const result = selectOverlays(profile, history, overrides, showSeed, identity);
 
     results[song.trackId] = {
       ...result,

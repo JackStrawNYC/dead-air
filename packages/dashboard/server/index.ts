@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { type Request, type Response, type NextFunction } from 'express';
 import cors from 'cors';
 import { resolve } from 'path';
 import { loadConfig } from './config.js';
@@ -24,6 +24,14 @@ app.use('/files', (_req, res, next) => {
 // Health check
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', uptime: process.uptime() });
+});
+
+// Global error handler — catches unhandled errors and sanitizeParam rejections
+app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
+  console.error('[dashboard] Unhandled error:', err);
+  const status = (err as { status?: number }).status || 500;
+  const message = err instanceof Error ? err.message : 'Internal server error';
+  res.status(status).json({ error: message });
 });
 
 // Initialize

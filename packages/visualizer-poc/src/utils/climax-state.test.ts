@@ -131,10 +131,12 @@ describe("climaxModulation", () => {
     expect(mod.overlayDensityMult).toBeGreaterThan(1);
   });
 
-  it("produces deep desaturation and darkness during anticipation", () => {
+  it("produces desaturation and dimming during anticipation (not void)", () => {
     const mod = climaxModulation({ phase: "build", intensity: 1, anticipation: true, anticipationStage: "imminent", microClimax: false, microClimaxIntensity: 0 });
-    expect(mod.saturationOffset).toBeLessThan(-0.3);
-    expect(mod.brightnessOffset).toBeLessThan(-0.3);
+    expect(mod.saturationOffset).toBeLessThan(-0.2);
+    expect(mod.brightnessOffset).toBeLessThan(-0.15);
+    // Density stays above zero (ethereal, not void)
+    expect(mod.overlayDensityMult).toBeGreaterThan(0);
   });
 });
 

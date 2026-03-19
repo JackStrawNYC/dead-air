@@ -7,9 +7,12 @@
  * lush. Bass isolation lets low frequencies own the visual field.
  *
  * Think like a VJ: the most powerful moments come from contrast, not agreement.
+ *
+ * DETERMINISTIC: pure function of frame data (no module-level state).
+ * Scans backward to derive state, safe for Remotion's out-of-order rendering.
  */
 
-import type { AudioSnapshot } from "./audio-reactive";
+import type { EnhancedFrameData } from "../data/types";
 import type { ClimaxPhase } from "./climax-state";
 
 export interface CounterpointModulation {
@@ -21,111 +24,129 @@ export interface CounterpointModulation {
   cameraFreeze: boolean;
   /** Frames remaining in camera freeze (countdown) */
   cameraFreezeFrames: number;
+  /** Brightness counterpoint (-0.1..+0.1): brief dim on transients, recovery over 20 frames */
+  brightnessCounterpoint: number;
 }
-
-// ─── State for multi-frame tracking ───
-
-/** Frames of consecutive low energy for quiet flooding detection */
-let consecutiveLowFrames = 0;
-/** Frame of last peak desaturation trigger */
-let lastDesatFrame = -999;
-/** Remaining camera freeze frames */
-let freezeFramesRemaining = 0;
 
 const DESAT_RECOVERY_FRAMES = 45;  // 1.5s recovery
 const QUIET_FLOOD_THRESHOLD = 60;  // 2s of consecutive quiet
 const FREEZE_DURATION = 10;        // frames to hold camera still
-
-/**
- * Reset counterpoint state (call when starting a new song).
- */
-export function resetCounterpoint(): void {
-  consecutiveLowFrames = 0;
-  lastDesatFrame = -999;
-  freezeFramesRemaining = 0;
-}
+const BRIGHTNESS_RECOVERY_FRAMES = 20; // recovery from brightness dip
 
 /**
  * Compute counterpoint modulation for the current frame.
  *
- * @param snapshot - Current audio snapshot
+ * Pure function — derives all state by scanning backward through frames.
+ * No module-level mutable state. Safe for Remotion's parallel rendering.
+ *
+ * @param frames - Full frame array
+ * @param frameIdx - Current frame index
  * @param climaxPhase - Current climax phase
- * @param frame - Current frame number
  */
 export function computeCounterpoint(
-  snapshot: AudioSnapshot,
+  frames: EnhancedFrameData[],
+  frameIdx: number,
   climaxPhase: ClimaxPhase,
-  frame: number,
 ): CounterpointModulation {
+  if (frames.length === 0 || frameIdx < 0) {
+    return { saturationMult: 1, overlayInversion: 0, cameraFreeze: false, cameraFreezeFrames: 0, brightnessCounterpoint: 0 };
+  }
+
+  const idx = Math.min(frameIdx, frames.length - 1);
+  const f = frames[idx];
+
   let saturationMult = 1.0;
   let overlayInversion = 0;
   let cameraFreeze = false;
+  let cameraFreezeFrames = 0;
+  let brightnessCounterpoint = 0;
 
   // ─── 1. Peak desaturation ───
-  // When energy > 0.35 AND onsetEnvelope > 0.6, push saturation to 0.5.
-  // The loudest moment goes stark. Recovery over 45 frames (1.5s).
-  // Creates the "time stops" feeling.
-  if (snapshot.energy > 0.35 && snapshot.onsetEnvelope > 0.6) {
-    lastDesatFrame = frame;
+  // Scan backward to find most recent peak desaturation trigger.
+  // When energy > 0.35 AND onset > 0.6 → push saturation to 0.5.
+  // Recovery over 45 frames (1.5s). Creates "time stops" feeling.
+  let lastDesatFrame = -999;
+  for (let i = idx; i >= Math.max(0, idx - DESAT_RECOVERY_FRAMES); i--) {
+    if (frames[i].rms > 0.35 && frames[i].onset > 0.6) {
+      lastDesatFrame = i;
+      break;
+    }
   }
 
-  const framesSinceDesat = frame - lastDesatFrame;
-  if (framesSinceDesat < DESAT_RECOVERY_FRAMES) {
-    // Smoothstep recovery: 0.5 at trigger → 1.0 after recovery
+  const framesSinceDesat = idx - lastDesatFrame;
+  if (framesSinceDesat >= 0 && framesSinceDesat < DESAT_RECOVERY_FRAMES) {
     const t = framesSinceDesat / DESAT_RECOVERY_FRAMES;
     const smooth = t * t * (3 - 2 * t);
     saturationMult = 0.5 + 0.5 * smooth;
   }
 
   // ─── 2. Quiet flooding ───
-  // When energy < 0.08 for >60 consecutive frames, push saturation to 1.3.
-  // Silence should feel lush, not empty.
-  if (snapshot.energy < 0.08) {
-    consecutiveLowFrames++;
-  } else {
-    consecutiveLowFrames = 0;
+  // Scan backward to count consecutive low-energy frames.
+  // When quiet for >60 frames, push saturation to 1.3. Silence feels lush.
+  let consecutiveLowFrames = 0;
+  for (let i = idx; i >= 0; i--) {
+    if (frames[i].rms < 0.08) {
+      consecutiveLowFrames++;
+    } else {
+      break;
+    }
   }
 
   if (consecutiveLowFrames > QUIET_FLOOD_THRESHOLD) {
-    // Smooth ramp up to 1.3 over 30 frames after threshold
     const floodProgress = Math.min(1, (consecutiveLowFrames - QUIET_FLOOD_THRESHOLD) / 30);
     const floodMult = 1.0 + 0.3 * floodProgress;
-    // Only apply if we're not also recovering from a desat
     if (saturationMult >= 0.95) {
       saturationMult = floodMult;
     }
   }
 
   // ─── 3. Bass isolation ───
-  // When bass > 0.5 AND highs < 0.15, kill overlays.
-  // Let the shader fill the visual field. The bass should own the frame.
-  if (snapshot.bass > 0.5 && snapshot.highs < 0.15) {
+  // When bass > 0.5 AND highs < 0.15, suppress overlays.
+  // Let the shader fill the visual field. The bass owns the frame.
+  if (f.low > 0.5 && f.high < 0.15) {
     overlayInversion = 0.8;
-  } else if (snapshot.bass > 0.4 && snapshot.highs < 0.2) {
-    // Gentle ramp for less extreme cases
+  } else if (f.low > 0.4 && f.high < 0.2) {
     overlayInversion = 0.3;
   }
 
   // ─── 4. Downbeat freeze ───
-  // During climax, on strong beats, freeze camera for 10 frames.
-  // The visual holds its breath with the music.
-  if (freezeFramesRemaining > 0) {
-    freezeFramesRemaining--;
-    cameraFreeze = true;
+  // During climax, scan backward for recent strong beat hits.
+  // If one occurred within FREEZE_DURATION frames, freeze camera.
+  if (climaxPhase === "climax" || climaxPhase === "sustain") {
+    for (let i = idx; i >= Math.max(0, idx - FREEZE_DURATION); i--) {
+      const fr = frames[i];
+      const beatDecayProxy = fr.beat ? 1.0 : 0;
+      if (beatDecayProxy > 0.5 && fr.onset > 0.5) {
+        cameraFreezeFrames = FREEZE_DURATION - (idx - i);
+        cameraFreeze = cameraFreezeFrames > 0;
+        break;
+      }
+    }
   }
 
-  if (climaxPhase === "climax" || climaxPhase === "sustain") {
-    // Use beatDecay as beat proxy: high value means recent beat hit
-    if (snapshot.beatDecay > 0.8 && snapshot.onsetEnvelope > 0.5) {
-      freezeFramesRemaining = FREEZE_DURATION;
-      cameraFreeze = true;
+  // ─── 5. Brightness counterpoint ───
+  // On energy transients (energy > 0.35, onset > 0.5), brief dim of -0.08.
+  // Recovery over 20 frames via smoothstep. Creates drama on loud hits.
+  let lastTransientFrame = -999;
+  for (let i = idx; i >= Math.max(0, idx - BRIGHTNESS_RECOVERY_FRAMES); i--) {
+    if (frames[i].rms > 0.35 && frames[i].onset > 0.5) {
+      lastTransientFrame = i;
+      break;
     }
+  }
+
+  const framesSinceTransient = idx - lastTransientFrame;
+  if (framesSinceTransient >= 0 && framesSinceTransient < BRIGHTNESS_RECOVERY_FRAMES) {
+    const t = framesSinceTransient / BRIGHTNESS_RECOVERY_FRAMES;
+    const smooth = t * t * (3 - 2 * t);
+    brightnessCounterpoint = -0.08 * (1 - smooth);
   }
 
   return {
     saturationMult,
     overlayInversion,
     cameraFreeze,
-    cameraFreezeFrames: freezeFramesRemaining,
+    cameraFreezeFrames: Math.max(0, cameraFreezeFrames),
+    brightnessCounterpoint,
   };
 }

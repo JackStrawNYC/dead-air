@@ -3,18 +3,20 @@ import { existsSync, readdirSync, statSync } from 'fs';
 import { resolve, extname } from 'path';
 import { getDb } from '../db.js';
 import { loadConfig } from '../config.js';
+import type { AssetRow } from '../types.js';
+import { safeJsonParse } from '../utils.js';
 
 const router = Router();
 
 // GET /api/assets/:episodeId — list assets for an episode
 router.get('/:episodeId', (req, res) => {
   const db = getDb();
-  const dbAssets = db.prepare(`
+  const dbAssets = (db.prepare(`
     SELECT id, type, service, file_path, cost, metadata, created_at
     FROM assets WHERE episode_id = ? ORDER BY type, created_at
-  `).all(req.params.episodeId).map((a: any) => ({
+  `).all(req.params.episodeId) as AssetRow[]).map((a) => ({
     ...a,
-    metadata: a.metadata ? JSON.parse(a.metadata) : {},
+    metadata: safeJsonParse(a.metadata, {}),
   }));
 
   // Also scan filesystem for assets not in DB

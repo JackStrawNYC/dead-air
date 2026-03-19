@@ -7,33 +7,36 @@ import {
   startVisualizerRender, fetchSceneRegistry,
   type SceneMode,
 } from '../api';
+import type { Show, SetlistSong } from '../types';
 import { useJob } from '../hooks/useJob';
 import SetlistEditor from '../components/SetlistEditor';
 import ChapterEditor from '../components/ChapterEditor';
 import OverlayScheduleEditor from '../components/OverlayScheduleEditor';
 import RenderSettings from '../components/RenderSettings';
 import LogStream from '../components/LogStream';
+import { useToast } from '../hooks/useToast';
 
 type Tab = 'info' | 'setlist' | 'chapters' | 'overlays' | 'render';
 
 export default function ShowDetail() {
   const { id } = useParams<{ id: string }>();
-  const [show, setShow] = useState<any>(null);
+  const [show, setShow] = useState<Show | null>(null);
   const [tab, setTab] = useState<Tab>('info');
+  const toast = useToast();
 
   // Scene registry
   const [sceneModes, setSceneModes] = useState<SceneMode[]>([]);
 
-  // Setlist state
-  const [setlistData, setSetlistData] = useState<any>(null);
+  // Setlist state — shape is { songs: Song[] } from visualizer data
+  const [setlistData, setSetlistData] = useState<Record<string, unknown> | null>(null);
   const [setlistDirty, setSetlistDirty] = useState(false);
 
-  // Chapters state
-  const [chaptersData, setChaptersData] = useState<any>(null);
+  // Chapters state — shape is { chapters: Chapter[] }
+  const [chaptersData, setChaptersData] = useState<Record<string, unknown> | null>(null);
   const [chaptersDirty, setChaptersDirty] = useState(false);
 
-  // Overlays state
-  const [overlaysData, setOverlaysData] = useState<any>(null);
+  // Overlays state — shape is { songs: Record<string, SongOverlays> }
+  const [overlaysData, setOverlaysData] = useState<Record<string, unknown> | null>(null);
   const [overlaysDirty, setOverlaysDirty] = useState(false);
 
   // Render job
@@ -44,11 +47,11 @@ export default function ShowDetail() {
 
   useEffect(() => {
     if (id) {
-      fetchShow(id).then(setShow);
-      fetchSetlist().then(setSetlistData).catch(() => {});
-      fetchChapters().then(setChaptersData).catch(() => {});
-      fetchOverlaySchedule().then(setOverlaysData).catch(() => {});
-      fetchSceneRegistry().then(r => setSceneModes(r.modes)).catch(() => {});
+      fetchShow(id).then(setShow).catch((e) => { toast('error', 'Failed to load show'); });
+      fetchSetlist().then(setSetlistData).catch((e) => { toast('error', 'Failed to load setlist'); });
+      fetchChapters().then(setChaptersData).catch((e) => { toast('error', 'Failed to load chapters'); });
+      fetchOverlaySchedule().then(setOverlaysData).catch((e) => { toast('error', 'Failed to load overlays'); });
+      fetchSceneRegistry().then(r => setSceneModes(r.modes)).catch((e) => { toast('error', 'Failed to load scene registry'); });
     }
   }, [id]);
 
@@ -71,7 +74,7 @@ export default function ShowDetail() {
   const handleSaveOverlays = async () => {
     if (!overlaysData) return;
     setSaving(true);
-    await saveOverlaySchedule({ ...overlaysData, songs: overlaysData.songs });
+    await saveOverlaySchedule({ ...overlaysData, songs: (overlaysData as Record<string, unknown>).songs });
     setOverlaysDirty(false);
     setSaving(false);
   };
@@ -127,7 +130,7 @@ export default function ShowDetail() {
               <h4 style={{ color: 'var(--text-muted)', fontSize: 11, textTransform: 'uppercase', marginBottom: 4 }}>Catalog</h4>
               <p style={{ fontFamily: 'var(--font-mono)', fontSize: 13 }}>Score: {show.catalog_score?.toFixed(1) || 'N/A'}</p>
               <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                Archive ID: {show.recording_id || show.metadata?.archiveOrgId || 'N/A'}
+                Archive ID: {show.recording_id || (show.metadata as Record<string, unknown>)?.archiveOrgId as string || 'N/A'}
               </p>
             </div>
           </div>
@@ -135,7 +138,7 @@ export default function ShowDetail() {
             <div className="mt-24">
               <h4 style={{ color: 'var(--text-muted)', fontSize: 11, textTransform: 'uppercase', marginBottom: 8 }}>Setlist ({show.setlist.length} songs)</h4>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                {show.setlist.map((s: any, i: number) => (
+                {show.setlist.map((s, i) => (
                   <span
                     key={i}
                     style={{
@@ -147,7 +150,7 @@ export default function ShowDetail() {
                       fontFamily: 'var(--font-mono)',
                     }}
                   >
-                    {s.songName || s.title || s}
+                    {s.songName || s.title || String(s)}
                   </span>
                 ))}
               </div>
@@ -177,7 +180,7 @@ export default function ShowDetail() {
             </button>
           </div>
           <SetlistEditor
-            songs={setlistData.songs || []}
+            songs={(setlistData?.songs ?? []) as never[]}
             modes={sceneModes.length > 0 ? sceneModes : undefined}
             onChange={songs => {
               setSetlistData({ ...setlistData, songs });
@@ -200,7 +203,7 @@ export default function ShowDetail() {
             </button>
           </div>
           <ChapterEditor
-            chapters={chaptersData.chapters || []}
+            chapters={(chaptersData?.chapters ?? []) as never[]}
             onChange={chapters => {
               setChaptersData({ ...chaptersData, chapters });
               setChaptersDirty(true);
@@ -222,7 +225,7 @@ export default function ShowDetail() {
             </button>
           </div>
           <OverlayScheduleEditor
-            songs={overlaysData.songs || {}}
+            songs={(overlaysData?.songs ?? {}) as never}
             onChange={songs => {
               setOverlaysData({ ...overlaysData, songs });
               setOverlaysDirty(true);
@@ -233,7 +236,7 @@ export default function ShowDetail() {
 
       {tab === 'render' && (
         <RenderSettings
-          songs={setlistData?.songs || []}
+          songs={(setlistData?.songs ?? []) as never[]}
           onStartRender={handleStartRender}
           renderJobId={renderJobId}
           renderLog={renderLog}

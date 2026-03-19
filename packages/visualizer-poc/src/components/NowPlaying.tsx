@@ -6,14 +6,20 @@ interface Props {
   title: string;
   artist?: string;
   energy?: number;
+  /** Sacred segue: delay appearance to 40s with gentler fade */
+  isSacredSegue?: boolean;
 }
 
-export const NowPlaying: React.FC<Props> = ({ title, artist, energy = 0 }) => {
+export const NowPlaying: React.FC<Props> = ({ title, artist, energy = 0, isSacredSegue }) => {
   const frame = useCurrentFrame();
   const { height } = useVideoConfig();
 
-  // Hidden during first 300 frames, fade in over 90 frames
-  const fadeIn = interpolate(frame, [300, 390], [0, 1], {
+  // Sacred segues: delay to frame 1200 (40s) with 120-frame fade
+  // Normal: appear at frame 300 with 90-frame fade
+  const fadeStart = isSacredSegue ? 1200 : 300;
+  const fadeDuration = isSacredSegue ? 120 : 90;
+
+  const fadeIn = interpolate(frame, [fadeStart, fadeStart + fadeDuration], [0, 1], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
     easing: Easing.out(Easing.cubic),

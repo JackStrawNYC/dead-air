@@ -8,6 +8,7 @@ import {
 } from '@dead-air/pipeline';
 import { getConfig } from '@dead-air/core';
 import { runPipeline } from '../jobs/job-runner.js';
+import { ArchiveIngestBody, validateBody } from '../schemas.js';
 
 const router = Router();
 
@@ -43,8 +44,9 @@ router.get('/search', async (req, res) => {
     });
     const recordings = rankRecordings(results);
     res.json({ recordings, count: recordings.length });
-  } catch (err: any) {
-    res.status(502).json({ error: err.message || 'Archive.org search failed' });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Archive.org search failed';
+    res.status(502).json({ error: message });
   }
 });
 
@@ -74,8 +76,9 @@ router.get('/calendar', async (req, res) => {
     }
     calendarCache.set(yearNum, { dates, ts: Date.now() });
     res.json({ dates });
-  } catch (err: any) {
-    res.status(502).json({ error: err.message || 'Calendar fetch failed' });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Calendar fetch failed';
+    res.status(502).json({ error: message });
   }
 });
 
@@ -97,8 +100,9 @@ router.get('/setlist', async (req, res) => {
       venue: result.venue,
       tour: result.tour,
     });
-  } catch (err: any) {
-    res.status(502).json({ error: err.message || 'Setlist fetch failed' });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Setlist fetch failed';
+    res.status(502).json({ error: message });
   }
 });
 
@@ -111,18 +115,17 @@ router.get('/:identifier/files', async (req, res) => {
     const audioFiles = selectAudioFiles(files, 'flac');
     const totalSize = audioFiles.reduce((sum, f) => sum + (parseInt(f.size, 10) || 0), 0);
     res.json({ files, audioFiles, totalSize });
-  } catch (err: any) {
-    res.status(502).json({ error: err.message || 'Failed to fetch recording files' });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Failed to fetch recording files';
+    res.status(502).json({ error: message });
   }
 });
 
 // POST /api/archive/ingest-and-run — trigger full pipeline for a date
 router.post('/ingest-and-run', (req, res) => {
-  const { date, identifier } = req.body;
-  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-    return res.status(400).json({ error: 'Invalid date format (YYYY-MM-DD)' });
-  }
-
+  const parsed = validateBody(ArchiveIngestBody, req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error });
+  const { date, identifier } = parsed.data;
   const job = runPipeline({ date, identifier });
   res.json({ jobId: job.id });
 });

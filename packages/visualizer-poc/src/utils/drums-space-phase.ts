@@ -1,8 +1,8 @@
 /**
- * Drums→Space Phase Detection.
+ * Drums->Space Phase Detection.
  *
- * Detects the characteristic Drums→Space arc within a single song:
- *   drums_tribal → transition → space_ambient → reemergence
+ * Detects the characteristic Drums->Space arc within a single song:
+ *   drums_tribal -> transition -> space_ambient/space_textural/space_melodic -> reemergence
  *
  * Uses audio features (onset density, energy, flatness) and coherence signals
  * to classify the current sub-phase.
@@ -21,7 +21,9 @@ import { computeRawScore } from "./coherence";
 export type DrumsSpaceSubPhase =
   | "drums_tribal"    // heavy percussion, rhythmic
   | "transition"      // percussion thinning, space emerging
-  | "space_ambient"   // full Space — minimal percussion, maximum atmosphere
+  | "space_ambient"   // full Space -- minimal percussion, maximum atmosphere
+  | "space_textural"  // percussive Space effects (onset + flatness)
+  | "space_melodic"   // guitar/keys returning in Space (tonal, low energy)
   | "reemergence";    // band gradually re-entering
 
 export interface DrumsSpaceState {
@@ -29,9 +31,11 @@ export interface DrumsSpaceState {
   subPhase: DrumsSpaceSubPhase;
   /** Progress within current sub-phase (0-1) */
   phaseProgress: number;
+  /** Reemergence progress (0-1): time spent in reemergence, for progressive brightening */
+  reemergenceProgress: number;
 }
 
-// ─── Per-Phase Visual Treatment Constants ───
+// --- Per-Phase Visual Treatment Constants ---
 
 export interface DrumsSpaceVisualTreatment {
   /** Additive contrast offset */
@@ -47,6 +51,15 @@ export interface DrumsSpaceVisualTreatment {
   /** Overlay categories allowed (empty = none) */
   allowedOverlayCategories: string[];
 }
+
+const NEUTRAL_TREATMENT: DrumsSpaceVisualTreatment = {
+  contrastOffset: 0,
+  saturationOffset: 0,
+  brightnessOffset: 0,
+  hueShift: 0,
+  maxOverlays: 3,
+  allowedOverlayCategories: ["atmospheric", "sacred", "reactive", "character"],
+};
 
 export const DRUMS_SPACE_TREATMENTS: Record<DrumsSpaceSubPhase, DrumsSpaceVisualTreatment> = {
   drums_tribal: {
@@ -73,6 +86,22 @@ export const DRUMS_SPACE_TREATMENTS: Record<DrumsSpaceSubPhase, DrumsSpaceVisual
     maxOverlays: 0,
     allowedOverlayCategories: [],
   },
+  space_textural: {
+    contrastOffset: 0,
+    saturationOffset: -0.15,   // slightly brighter than space_ambient
+    brightnessOffset: -0.10,
+    hueShift: 18,              // blue shift
+    maxOverlays: 1,
+    allowedOverlayCategories: ["reactive"],
+  },
+  space_melodic: {
+    contrastOffset: 0,
+    saturationOffset: -0.08,   // warmer than ambient
+    brightnessOffset: -0.05,
+    hueShift: 8,               // warm shift (guitar/keys returning)
+    maxOverlays: 1,
+    allowedOverlayCategories: ["sacred"],
+  },
   reemergence: {
     contrastOffset: 0.05,
     saturationOffset: -0.05,   // progressive re-saturation
@@ -82,6 +111,52 @@ export const DRUMS_SPACE_TREATMENTS: Record<DrumsSpaceSubPhase, DrumsSpaceVisual
     allowedOverlayCategories: ["atmospheric", "sacred"],
   },
 };
+
+/**
+ * Get interpolated visual treatment based on phase progress.
+ * Early in a phase (progress < 0.3): blend 70% neutral + 30% phase treatment.
+ * Late in a phase (progress >= 0.7): full phase treatment.
+ * In between: linear interpolation.
+ *
+ * Reemergence has enhanced treatment: brightness ramps from -0.10 to +0.10
+ * and maxOverlays ramps from 1 to 3 over reemergenceProgress.
+ */
+export function getDrumsSpaceTreatment(state: DrumsSpaceState): DrumsSpaceVisualTreatment {
+  const phaseTreatment = DRUMS_SPACE_TREATMENTS[state.subPhase];
+  const progress = state.phaseProgress;
+
+  // Compute blend factor: 0-0.3 maps to 0.3, 0.3-0.7 interpolates, 0.7+ maps to 1.0
+  let blendFactor: number;
+  if (progress < 0.3) {
+    blendFactor = 0.3;
+  } else if (progress >= 0.7) {
+    blendFactor = 1.0;
+  } else {
+    blendFactor = 0.3 + (progress - 0.3) / 0.4 * 0.7;
+  }
+
+  const lerp = (neutral: number, phase: number) => neutral + (phase - neutral) * blendFactor;
+
+  const treatment: DrumsSpaceVisualTreatment = {
+    contrastOffset: lerp(NEUTRAL_TREATMENT.contrastOffset, phaseTreatment.contrastOffset),
+    saturationOffset: lerp(NEUTRAL_TREATMENT.saturationOffset, phaseTreatment.saturationOffset),
+    brightnessOffset: lerp(NEUTRAL_TREATMENT.brightnessOffset, phaseTreatment.brightnessOffset),
+    hueShift: lerp(NEUTRAL_TREATMENT.hueShift, phaseTreatment.hueShift),
+    maxOverlays: Math.round(lerp(NEUTRAL_TREATMENT.maxOverlays, phaseTreatment.maxOverlays)),
+    allowedOverlayCategories: blendFactor > 0.5 ? phaseTreatment.allowedOverlayCategories : NEUTRAL_TREATMENT.allowedOverlayCategories,
+  };
+
+  // Reemergence enhancement: progressive brightening + overlay ramp
+  if (state.subPhase === "reemergence" && state.reemergenceProgress > 0) {
+    const rp = state.reemergenceProgress;
+    // Brightness ramps from -0.10 to +0.10 over reemergence
+    treatment.brightnessOffset = -0.10 + 0.20 * rp;
+    // maxOverlays ramps from 1 to 3
+    treatment.maxOverlays = Math.round(1 + 2 * rp);
+  }
+
+  return treatment;
+}
 
 // Phase detection thresholds
 const TRIBAL_ONSET_MIN = 0.4;
@@ -101,12 +176,13 @@ const REEMERGENCE_CHROMA_STABILITY_MIN = 0.5;
 const REEMERGENCE_FLATNESS_MAX = 0.35;
 
 const HISTORY_LEN = 30;
+const REEMERGENCE_RAMP_FRAMES = 150; // 5 seconds to full reemergence
 
-// ─── Stateless helpers ───
+// --- Stateless helpers ---
 
 /**
  * Classify a single frame's raw phase based on audio features.
- * Pure function — no state dependencies.
+ * Pure function -- no state dependencies.
  */
 export function classifyRawPhase(
   onset: number,
@@ -115,6 +191,7 @@ export function classifyRawPhase(
   drumBeat: number,
   recentlySpace: boolean,
   coherence: number,
+  centroid?: number,
 ): DrumsSpaceSubPhase {
   if (
     onset > TRIBAL_ONSET_MIN &&
@@ -125,13 +202,24 @@ export function classifyRawPhase(
     return "drums_tribal";
   }
 
+  // Space sub-types: textural vs melodic vs pure ambient
   if (
     onset < SPACE_ONSET_MAX &&
-    flatness > SPACE_FLATNESS_MIN &&
     energy < SPACE_ENERGY_MAX &&
     drumBeat < SPACE_BEAT_REGULARITY_MAX
   ) {
-    return "space_ambient";
+    // Space textural: percussive effects in Space
+    if (onset > 0.08 && flatness > 0.3) {
+      return "space_textural";
+    }
+    // Space melodic: tonal content returning (guitar/keys)
+    if (flatness < 0.3 && energy < 0.15 && (centroid ?? 0) > 0.35) {
+      return "space_melodic";
+    }
+    // Pure ambient Space
+    if (flatness > SPACE_FLATNESS_MIN) {
+      return "space_ambient";
+    }
   }
 
   if (
@@ -157,13 +245,13 @@ export function classifyRawPhase(
   return "transition";
 }
 
-// ─── Main computation ───
+// --- Main computation ---
 
 /**
  * Detect current Drums/Space sub-phase from frame data.
  * Returns null if the song is not a Drums/Space segment.
  *
- * Pure function — scans backward 30 frames, classifies each,
+ * Pure function -- scans backward 30 frames, classifies each,
  * and uses majority vote for temporal stability.
  *
  * @param frames Full frame array
@@ -189,16 +277,18 @@ export function computeDrumsSpacePhase(
     const energy = f.rms;
     const flatness = f.flatness;
     const drumBeat = (f.stemDrumBeat ? 1 : 0) || (f.beat ? 0.5 : 0);
+    const centroid = f.centroid;
 
-    // Check if recent classifications include space_ambient
+    // Check if recent classifications include any space sub-type
     const recentSlice = classified.slice(-15);
+    const spacePhases: DrumsSpaceSubPhase[] = ["space_ambient", "space_textural", "space_melodic"];
     const recentlySpace = classified.length >= 5 &&
-      recentSlice.filter(p => p === "space_ambient").length > recentSlice.length * 0.4;
+      recentSlice.filter(p => spacePhases.includes(p)).length > recentSlice.length * 0.4;
 
     // Use coherence raw score as proxy for chroma stability
     const coherence = computeRawScore(frames, i);
 
-    const phase = classifyRawPhase(onset, energy, flatness, drumBeat, recentlySpace, coherence);
+    const phase = classifyRawPhase(onset, energy, flatness, drumBeat, recentlySpace, coherence, centroid);
     classified.push(phase);
   }
 
@@ -207,9 +297,29 @@ export function computeDrumsSpacePhase(
   const phaseCount = countConsecutive(classified, stablePhase);
   const phaseProgress = Math.min(1, phaseCount / HISTORY_LEN);
 
+  // Compute reemergence progress: scan backward for consecutive reemergence frames
+  let reemergenceProgress = 0;
+  if (stablePhase === "reemergence") {
+    let reemergenceFrames = 0;
+    for (let i = safeIdx; i >= 0; i--) {
+      // Re-classify each frame to check for reemergence
+      const f = frames[i];
+      const onset = f.onset;
+      const energy = f.rms;
+      const flatness = f.flatness;
+      // If energy/onset suggest we're no longer in reemergence territory, stop
+      if (onset < 0.05 && flatness > SPACE_FLATNESS_MIN && energy < SPACE_ENERGY_MAX) break;
+      if (onset > TRIBAL_ONSET_MIN && energy > TRIBAL_ENERGY_MIN) break;
+      reemergenceFrames++;
+      if (reemergenceFrames >= REEMERGENCE_RAMP_FRAMES) break;
+    }
+    reemergenceProgress = Math.min(1, reemergenceFrames / REEMERGENCE_RAMP_FRAMES);
+  }
+
   return {
     subPhase: stablePhase,
     phaseProgress,
+    reemergenceProgress,
   };
 }
 

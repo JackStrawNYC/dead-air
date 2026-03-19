@@ -103,8 +103,16 @@ void main() {
   float sa = sin(angle);
   p = mat2(ca, -sa, sa, ca) * p;
 
-  // --- Noise warp (low stability = more distortion) ---
-  float warpAmount = (1.0 - stability) * 0.06;
+  // --- Coherence morphology ---
+  float coherence = clamp(uCoherence, 0.0, 1.0);
+  // High coherence: sharp edges, perfect circle placement (reduce warp)
+  // Low coherence: wobbly placement, soft edges (amplify warp)
+  float coherenceWarpMult = coherence > 0.7 ? mix(1.0, 0.2, (coherence - 0.7) / 0.3)
+                          : coherence < 0.3 ? mix(1.0, 2.5, (0.3 - coherence) / 0.3)
+                          : 1.0;
+
+  // --- Noise warp (low stability = more distortion, coherence modulates) ---
+  float warpAmount = (1.0 - stability) * 0.06 * coherenceWarpMult;
   vec2 warp = vec2(
     snoise(vec3(p * 3.0, slowTime * 0.5)),
     snoise(vec3(p * 3.0 + 100.0, slowTime * 0.5))
@@ -125,6 +133,8 @@ void main() {
 
   // --- FFT-driven radius modulation per circle ---
   float px = 1.0 / uResolution.y; // pixel size for anti-aliasing
+  // Coherence sharpness: high = crisp edges, low = soft/wobbly edges
+  float edgeWidth = px * mix(3.0, 1.5, smoothstep(0.3, 0.7, coherence));
 
   // Bass pulse on radius
   float radiusPulse = 1.0 + bass * 0.08;
@@ -167,8 +177,8 @@ void main() {
     // SDF circle
     float sdf = sdCircle(wp - centers[i], modRadius);
 
-    // Bright edge line
-    float edge = smoothstep(px * 2.0, 0.0, abs(sdf)) * visibility;
+    // Bright edge line (coherence controls sharpness)
+    float edge = smoothstep(edgeWidth, 0.0, abs(sdf)) * visibility;
 
     // Per-circle hue variation
     float circleHue = mix(hue1, hue2, fi / 6.0);

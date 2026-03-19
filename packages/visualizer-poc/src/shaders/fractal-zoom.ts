@@ -53,8 +53,22 @@ void main() {
   float zoomSpeed = 0.1 * mix(1.0, -1.0, step(0.0, -uMelodicDirection));
   float zoom = pow(2.0, uDynamicTime * zoomSpeed);
 
+  // Coherence-driven zoom control
+  float coherence = clamp(uCoherence, 0.0, 1.0);
+  // High coherence: smooth zoom (reduce jitter multiplier)
+  // Low coherence: amplify zoom jitter 2x
+  float coherenceJitterMult = coherence > 0.7 ? mix(1.0, 0.3, (coherence - 0.7) / 0.3)
+                            : coherence < 0.3 ? mix(1.0, 2.0, (0.3 - coherence) / 0.3)
+                            : 1.0;
+
+  // Section type: jam (7.0) → 1.5x zoom speed, space (5.0) → 0.4x zoom speed
+  float sectionT = uSectionType;
+  float jamSpeedMult = smoothstep(6.5, 7.5, sectionT) * 0.5 + 1.0; // 1.0 → 1.5
+  float spaceSpeedMult = 1.0 - smoothstep(4.5, 5.5, sectionT) * step(sectionT, 5.5) * 0.6; // 1.0 → 0.4
+  zoomSpeed *= jamSpeedMult * spaceSpeedMult;
+
   // Zoom smoothness: high beatStability = steady, low = jittery
-  float jitter = (1.0 - uBeatStability) * 0.02;
+  float jitter = (1.0 - uBeatStability) * 0.02 * coherenceJitterMult;
   float jitterX = snoise(vec2(uDynamicTime * 3.7, 0.0)) * jitter;
   float jitterY = snoise(vec2(0.0, uDynamicTime * 3.7)) * jitter;
 

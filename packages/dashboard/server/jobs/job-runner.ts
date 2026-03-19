@@ -22,7 +22,7 @@ const STAGE_PATTERNS: Array<[RegExp, string]> = [
   [/stage: (\w+)/i, '$1'],
 ];
 
-function detectStage(line: string): string | null {
+export function detectStage(line: string): string | null {
   for (const [pattern, stage] of STAGE_PATTERNS) {
     const match = line.match(pattern);
     if (match) {

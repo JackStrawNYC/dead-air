@@ -1,11 +1,17 @@
 /**
- * SceneCrossfade — flash→blackout→eruption transition between scenes.
- * 30-frame (1s) dramatic transition: white blast, near-blackout, eruption.
- * Replaces the old gentle 90-frame crossfade with an event-like transition.
+ * SceneCrossfade -- within-song transition between shader scenes.
+ *
+ * Supports 5 styles:
+ *   - flash (default): white blast -> blackout -> eruption (30 frames)
+ *   - dissolve: simple opacity crossfade over full duration
+ *   - morph: both scenes visible at 50% for middle third, smooth in/out
+ *   - void: fade to black then fade in (no white flash)
+ *   - distortion: horizontal scanline displacement during transition
  */
 
 import React from "react";
 import { interpolate, Easing, useCurrentFrame } from "remotion";
+import type { SceneTransitionStyle } from "../utils/transition-selector";
 
 interface Props {
   /** Progress through the crossfade: 0 = fully outgoing, 1 = fully incoming */
@@ -14,41 +20,12 @@ interface Props {
   incoming: React.ReactNode;
   /** Frame index of the beat to flash on (beat-synced transition) */
   flashFrame?: number;
+  /** Transition style (default: "flash") */
+  style?: SceneTransitionStyle;
 }
 
-export const SceneCrossfade: React.FC<Props> = ({ progress, outgoing, incoming, flashFrame }) => {
+export const SceneCrossfade: React.FC<Props> = ({ progress, outgoing, incoming, flashFrame, style = "flash" }) => {
   const frame = useCurrentFrame();
-
-  // 30-frame transition broken into 3 phases:
-  // Flash (0-2/30 = 0-0.067): white blast, screen blend, rapid decay
-  // Blackout (2-10/30 = 0.067-0.333): near-black overlay
-  // Eruption (10-30/30 = 0.333-1.0): incoming scene smoothstep in, darkness fades
-
-  // Flash phase: white blast at transition start
-  const flashIntensity = interpolate(progress, [0, 0.033, 0.067], [0, 0.8, 0], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
-
-  // Blackout phase: near-black overlay during transition
-  const blackoutOpacity = interpolate(progress, [0.033, 0.067, 0.333, 1.0], [0, 0.8, 0.56, 0], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-    easing: Easing.out(Easing.ease),
-  });
-
-  // Outgoing scene: hard cut after flash
-  const outOpacity = interpolate(progress, [0, 0.067], [1, 0], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
-
-  // Incoming scene: eruption from blackout
-  const inOpacity = interpolate(progress, [0.333, 1.0], [0, 1], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-    easing: Easing.out(Easing.cubic),
-  });
 
   // Beat flash (additional, on top of transition flash)
   let beatFlash = 0;
@@ -59,58 +36,158 @@ export const SceneCrossfade: React.FC<Props> = ({ progress, outgoing, incoming, 
     }
   }
 
+  // --- Dissolve style ---
+  if (style === "dissolve") {
+    return (
+      <div style={{ position: "relative", width: "100%", height: "100%" }}>
+        {(1 - progress) > 0.01 && (
+          <div style={{ position: "absolute", inset: 0, opacity: 1 - progress }}>
+            {outgoing}
+          </div>
+        )}
+        {progress > 0.01 && (
+          <div style={{ position: "absolute", inset: 0, opacity: progress }}>
+            {incoming}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // --- Morph style ---
+  if (style === "morph") {
+    // Both scenes visible at 50% for middle third
+    const outOpacity = interpolate(progress, [0, 0.33, 0.67, 1], [1, 0.5, 0.5, 0], {
+      extrapolateLeft: "clamp", extrapolateRight: "clamp",
+    });
+    const inOpacity = interpolate(progress, [0, 0.33, 0.67, 1], [0, 0.5, 0.5, 1], {
+      extrapolateLeft: "clamp", extrapolateRight: "clamp",
+    });
+    return (
+      <div style={{ position: "relative", width: "100%", height: "100%" }}>
+        {outOpacity > 0.01 && (
+          <div style={{ position: "absolute", inset: 0, opacity: outOpacity }}>
+            {outgoing}
+          </div>
+        )}
+        {inOpacity > 0.01 && (
+          <div style={{ position: "absolute", inset: 0, opacity: inOpacity }}>
+            {incoming}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // --- Void style ---
+  if (style === "void") {
+    // Fade to black then fade in (no white flash)
+    const outOpacity = interpolate(progress, [0, 0.45], [1, 0], {
+      extrapolateLeft: "clamp", extrapolateRight: "clamp",
+    });
+    const inOpacity = interpolate(progress, [0.55, 1], [0, 1], {
+      extrapolateLeft: "clamp", extrapolateRight: "clamp",
+      easing: Easing.out(Easing.cubic),
+    });
+    const blackOpacity = interpolate(progress, [0.3, 0.5, 0.7], [0, 0.9, 0], {
+      extrapolateLeft: "clamp", extrapolateRight: "clamp",
+    });
+    return (
+      <div style={{ position: "relative", width: "100%", height: "100%" }}>
+        {outOpacity > 0.01 && (
+          <div style={{ position: "absolute", inset: 0, opacity: outOpacity }}>
+            {outgoing}
+          </div>
+        )}
+        {inOpacity > 0.01 && (
+          <div style={{ position: "absolute", inset: 0, opacity: inOpacity }}>
+            {incoming}
+          </div>
+        )}
+        {blackOpacity > 0.01 && (
+          <div style={{ position: "absolute", inset: 0, backgroundColor: "#000", opacity: blackOpacity, pointerEvents: "none" }} />
+        )}
+      </div>
+    );
+  }
+
+  // --- Distortion style ---
+  if (style === "distortion") {
+    const outOpacity = interpolate(progress, [0, 0.5], [1, 0], {
+      extrapolateLeft: "clamp", extrapolateRight: "clamp",
+    });
+    const inOpacity = interpolate(progress, [0.5, 1], [0, 1], {
+      extrapolateLeft: "clamp", extrapolateRight: "clamp",
+    });
+    // Scanline displacement peaks at midpoint
+    const displacementIntensity = interpolate(progress, [0, 0.5, 1], [0, 1, 0], {
+      extrapolateLeft: "clamp", extrapolateRight: "clamp",
+    });
+    const displacement = Math.sin(frame * 0.3) * displacementIntensity * 20;
+    return (
+      <div style={{ position: "relative", width: "100%", height: "100%" }}>
+        {outOpacity > 0.01 && (
+          <div style={{
+            position: "absolute", inset: 0, opacity: outOpacity,
+            transform: displacementIntensity > 0.05 ? `translateX(${(-displacement).toFixed(1)}px)` : undefined,
+          }}>
+            {outgoing}
+          </div>
+        )}
+        {inOpacity > 0.01 && (
+          <div style={{
+            position: "absolute", inset: 0, opacity: inOpacity,
+            transform: displacementIntensity > 0.05 ? `translateX(${displacement.toFixed(1)}px)` : undefined,
+          }}>
+            {incoming}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // --- Flash style (default) ---
+  // 30-frame transition broken into 3 phases:
+  // Flash (0-0.067): white blast, screen blend, rapid decay
+  // Blackout (0.067-0.333): near-black overlay
+  // Eruption (0.333-1.0): incoming scene smoothstep in, darkness fades
+  const flashIntensity = interpolate(progress, [0, 0.033, 0.067], [0, 0.8, 0], {
+    extrapolateLeft: "clamp", extrapolateRight: "clamp",
+  });
+
+  const blackoutOpacity = interpolate(progress, [0.033, 0.067, 0.333, 1.0], [0, 0.8, 0.56, 0], {
+    extrapolateLeft: "clamp", extrapolateRight: "clamp",
+    easing: Easing.out(Easing.ease),
+  });
+
+  const outOpacity = interpolate(progress, [0, 0.067], [1, 0], {
+    extrapolateLeft: "clamp", extrapolateRight: "clamp",
+  });
+
+  const inOpacity = interpolate(progress, [0.333, 1.0], [0, 1], {
+    extrapolateLeft: "clamp", extrapolateRight: "clamp",
+    easing: Easing.out(Easing.cubic),
+  });
+
   const totalFlash = Math.min(1, flashIntensity + beatFlash);
 
   return (
     <div style={{ position: "relative", width: "100%", height: "100%" }}>
-      {/* Outgoing scene */}
       {outOpacity > 0.01 && (
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            opacity: outOpacity,
-          }}
-        >
+        <div style={{ position: "absolute", inset: 0, opacity: outOpacity }}>
           {outgoing}
         </div>
       )}
-      {/* Incoming scene */}
       {inOpacity > 0.01 && (
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            opacity: inOpacity,
-          }}
-        >
+        <div style={{ position: "absolute", inset: 0, opacity: inOpacity }}>
           {incoming}
         </div>
       )}
-      {/* Blackout overlay */}
       {blackoutOpacity > 0.01 && (
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            backgroundColor: "#000",
-            opacity: blackoutOpacity,
-            pointerEvents: "none",
-          }}
-        />
+        <div style={{ position: "absolute", inset: 0, backgroundColor: "#000", opacity: blackoutOpacity, pointerEvents: "none" }} />
       )}
-      {/* Flash overlay (screen blend) */}
       {totalFlash > 0.01 && (
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            backgroundColor: "#fff",
-            opacity: totalFlash,
-            mixBlendMode: "screen",
-            pointerEvents: "none",
-          }}
-        />
+        <div style={{ position: "absolute", inset: 0, backgroundColor: "#fff", opacity: totalFlash, mixBlendMode: "screen", pointerEvents: "none" }} />
       )}
     </div>
   );

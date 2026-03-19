@@ -75,6 +75,23 @@ void main() {
   // Kill rate: controls spots vs stripes (higher k = stripes)
   float k = 0.05 + tension * 0.02;
 
+  // --- Coherence morphology ---
+  float coherence = clamp(uCoherence, 0.0, 1.0);
+  // High coherence: stabilize feed/kill (lock to clean Turing pattern)
+  if (coherence > 0.7) {
+    float lockAmount = (coherence - 0.7) / 0.3;
+    f = mix(f, 0.04, lockAmount * 0.5);  // converge toward stable pattern
+    k = mix(k, 0.06, lockAmount * 0.5);
+  }
+  // Low coherence: add per-region noise to feed/kill (organic chaos)
+  if (coherence < 0.3) {
+    float chaosAmount = (0.3 - coherence) / 0.3;
+    float fNoise = snoise(vec3(p * 2.0, slowTime * 0.5)) * 0.02 * chaosAmount;
+    float kNoise = snoise(vec3(p * 2.0 + 50.0, slowTime * 0.5)) * 0.015 * chaosAmount;
+    f += fNoise;
+    k += kNoise;
+  }
+
   // --- New uniform integrations ---
   float chromaHueMod = uChromaHue * 0.3;
   float chordHue = float(int(uChordIndex)) / 24.0 * 0.2;

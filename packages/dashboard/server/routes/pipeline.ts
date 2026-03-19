@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { runPipeline, cancelJob } from '../jobs/job-runner.js';
 import { getJob, getAllJobs, addClient, removeClient } from '../jobs/job-store.js';
+import { PipelineRunBody, validateBody } from '../schemas.js';
 
 const router = Router();
 
@@ -10,7 +11,9 @@ router.post('/:date/run', (req, res) => {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
     return res.status(400).json({ error: 'Invalid date format' });
   }
-  const { from, to, force } = req.body || {};
+  const parsed = validateBody(PipelineRunBody, req.body || {});
+  if (!parsed.success) return res.status(400).json({ error: parsed.error });
+  const { from, to, force } = parsed.data;
   const job = runPipeline({ date, from, to, force });
   res.json({ jobId: job.id, episodeId: job.episodeId });
 });

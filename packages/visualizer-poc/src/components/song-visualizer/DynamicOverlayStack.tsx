@@ -52,6 +52,8 @@ interface Props {
   usedOverlayIds?: Set<string>;
   /** IT response overlay opacity multiplier (1.0 = normal, 0.05 = locked) */
   itOverlayOverride?: number;
+  /** Counterpoint overlay inversion (0-1): 0.8 = multiply opacities by 0.2 during bass isolation */
+  counterpointOverlayInversion?: number;
 }
 
 export const DynamicOverlayStack: React.FC<Props> = ({
@@ -66,6 +68,7 @@ export const DynamicOverlayStack: React.FC<Props> = ({
   energyLevel = "mid",
   usedOverlayIds,
   itOverlayOverride = 1,
+  counterpointOverlayInversion = 0,
 }) => {
   const frame = useCurrentFrame();
 
@@ -73,7 +76,8 @@ export const DynamicOverlayStack: React.FC<Props> = ({
   const maxConcurrent = MAX_CONCURRENT[energyLevel] ?? 4;
   const withOpacity = activeEntries
     .map(([name, entry]) => {
-      let op = Math.min(1, (opacityMap ? (opacityMap[name] ?? 0) : 1) * mediaSuppression * focusSuppression * itOverlayOverride);
+      const inversionMult = 1 - counterpointOverlayInversion;
+      let op = Math.min(1, (opacityMap ? (opacityMap[name] ?? 0) : 1) * mediaSuppression * focusSuppression * itOverlayOverride * inversionMult);
       // Cross-song dedup: deprioritize overlays already shown earlier in the show
       if (usedOverlayIds && usedOverlayIds.has(name)) {
         op *= 0.4; // reduce but don't eliminate — variety, not exclusion

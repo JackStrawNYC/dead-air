@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { readdirSync, statSync, existsSync, createReadStream } from 'fs';
 import { resolve } from 'path';
 import { loadConfig } from '../config.js';
+import { sanitizeParam } from '../utils.js';
 
 const router = Router();
 
@@ -14,8 +15,9 @@ interface SegmentInfo {
 
 // GET /api/render/:episodeId/segments — segment completion status
 router.get('/:episodeId/segments', (req, res) => {
+  const episodeId = sanitizeParam(req.params.episodeId);
   const config = loadConfig();
-  const scenesDir = resolve(config.paths.renders, req.params.episodeId, 'scenes');
+  const scenesDir = resolve(config.paths.renders, episodeId, 'scenes');
 
   if (!existsSync(scenesDir)) {
     return res.json({ segments: [], total: 0, completed: 0 });
@@ -32,8 +34,8 @@ router.get('/:episodeId/segments', (req, res) => {
   }).sort((a, b) => a.index - b.index);
 
   // Check for final output
-  const rawPath = resolve(config.paths.renders, req.params.episodeId, 'episode-raw.mp4');
-  const finalPath = resolve(config.paths.renders, req.params.episodeId, 'episode.mp4');
+  const rawPath = resolve(config.paths.renders, episodeId, 'episode-raw.mp4');
+  const finalPath = resolve(config.paths.renders, episodeId, 'episode.mp4');
 
   res.json({
     segments,
@@ -46,9 +48,10 @@ router.get('/:episodeId/segments', (req, res) => {
 
 // GET /api/render/:episodeId/output — stream MP4 download
 router.get('/:episodeId/output', (req, res) => {
+  const episodeId = sanitizeParam(req.params.episodeId);
   const config = loadConfig();
-  const finalPath = resolve(config.paths.renders, req.params.episodeId, 'episode.mp4');
-  const rawPath = resolve(config.paths.renders, req.params.episodeId, 'episode-raw.mp4');
+  const finalPath = resolve(config.paths.renders, episodeId, 'episode.mp4');
+  const rawPath = resolve(config.paths.renders, episodeId, 'episode-raw.mp4');
   const filePath = existsSync(finalPath) ? finalPath : existsSync(rawPath) ? rawPath : null;
 
   if (!filePath) {
@@ -59,15 +62,16 @@ router.get('/:episodeId/output', (req, res) => {
   res.writeHead(200, {
     'Content-Type': 'video/mp4',
     'Content-Length': stat.size,
-    'Content-Disposition': `attachment; filename="${req.params.episodeId}.mp4"`,
+    'Content-Disposition': `attachment; filename="${episodeId}.mp4"`,
   });
   createReadStream(filePath).pipe(res);
 });
 
 // GET /api/render/:episodeId/progress — SSE progress stream (polls fs every 2s)
 router.get('/:episodeId/progress', (req, res) => {
+  const episodeId = sanitizeParam(req.params.episodeId);
   const config = loadConfig();
-  const scenesDir = resolve(config.paths.renders, req.params.episodeId, 'scenes');
+  const scenesDir = resolve(config.paths.renders, episodeId, 'scenes');
 
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
@@ -92,7 +96,7 @@ router.get('/:episodeId/progress', (req, res) => {
 
     if (completed !== lastCompleted) {
       lastCompleted = completed;
-      const rawExists = existsSync(resolve(config.paths.renders, req.params.episodeId, 'episode-raw.mp4'));
+      const rawExists = existsSync(resolve(config.paths.renders, episodeId, 'episode-raw.mp4'));
       res.write(`event: progress\ndata: ${JSON.stringify({ completed, total: files.length, rawDone: rawExists })}\n\n`);
 
       if (rawExists) {

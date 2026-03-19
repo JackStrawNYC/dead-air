@@ -13,6 +13,8 @@ describe("getSectionVocabulary", () => {
     const v = getSectionVocabulary("chorus");
     expect(v.overlayDensityMult).toBe(1.3);
     expect(v.cutsPermitted).toBe(true);
+    expect(v.saturationOffset).toBe(0.15);
+    expect(v.brightnessOffset).toBe(0.06);
   });
 
   it("returns jam vocabulary", () => {
@@ -23,14 +25,17 @@ describe("getSectionVocabulary", () => {
 
   it("returns space vocabulary with negative saturation offset", () => {
     const v = getSectionVocabulary("space");
-    expect(v.overlayDensityMult).toBe(0.2);
+    expect(v.overlayDensityMult).toBe(0.25);
     expect(v.cutsPermitted).toBe(false);
     expect(v.saturationOffset).toBe(-0.12);
+    expect(v.brightnessOffset).toBe(-0.03);
   });
 
-  it("returns solo vocabulary with high drift speed", () => {
+  it("returns solo vocabulary with high drift speed and boosted saturation", () => {
     const v = getSectionVocabulary("solo");
     expect(v.driftSpeedMult).toBe(1.5);
+    expect(v.saturationOffset).toBe(0.20);
+    expect(v.brightnessOffset).toBe(0.06);
   });
 
   it("returns default vocabulary for undefined section type", () => {

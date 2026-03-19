@@ -7,7 +7,7 @@
 import React from "react";
 import { useCurrentFrame } from "remotion";
 import { SceneCrossfade } from "./SceneCrossfade";
-import { renderScene, getComplement, getModesForEnergy, TRANSITION_AFFINITY } from "./scene-registry";
+import { renderScene, getComplement, getModesForEnergy, TRANSITION_AFFINITY, SCENE_REGISTRY } from "./scene-registry";
 import type {
   EnhancedFrameData,
   SectionBoundary,
@@ -21,6 +21,7 @@ import { type SongIdentity, getShowModesForSong } from "../data/song-identities"
 import type { StemSectionType } from "../utils/stem-features";
 import { detectChordMood } from "../utils/chord-mood";
 import { estimateImprovisationScore } from "../utils/improv-detector";
+import { selectTransitionStyle } from "../utils/transition-selector";
 
 /**
  * Dynamic crossfade duration based on energy context and spectral flux.
@@ -195,6 +196,10 @@ interface Props {
   songDuration?: number;
   /** Effective palette (chroma-blended) — overrides song.palette when provided */
   palette?: ColorPalette;
+  /** Segue in from previous song */
+  segueIn?: boolean;
+  /** Sacred segue: suppress first within-song scene crossfade for 90 frames */
+  isSacredSegueIn?: boolean;
 }
 
 /** Determine the visual mode for a given section index.
@@ -406,6 +411,16 @@ export function getDrumsSpaceMode(phase: string, seed?: number, songIdentity?: S
   }
 }
 
+/** Average energy (rms) over a frame range */
+function averageEnergy(frames: EnhancedFrameData[], start: number, end: number): number {
+  const lo = Math.max(0, start);
+  const hi = Math.min(frames.length, end);
+  if (hi <= lo) return 0;
+  let sum = 0;
+  for (let i = lo; i < hi; i++) sum += frames[i].rms;
+  return sum / (hi - lo);
+}
+
 /** Render a scene for a given mode (delegates to scene registry) */
 function renderMode(
   mode: VisualMode,
@@ -419,7 +434,7 @@ function renderMode(
   return renderScene(mode, { frames, sections, palette, tempo, style, jamDensity });
 }
 
-export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, seed, jamDensity, deadAirMode, deadAirFactor, era, coherenceIsLocked, usedShaderModes, drumsSpacePhase, songIdentity, stemSection, songDuration, palette: paletteProp }) => {
+export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, seed, jamDensity, deadAirMode, deadAirFactor, era, coherenceIsLocked, usedShaderModes, drumsSpacePhase, songIdentity, stemSection, songDuration, palette: paletteProp, segueIn, isSacredSegueIn }) => {
   const frame = useCurrentFrame();
   const palette = paletteProp ?? song.palette;
 
@@ -442,8 +457,12 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
   const nextSectionIdx = currentSectionIdx + 1;
   const prevSectionIdx = currentSectionIdx - 1;
 
+  // Sacred segue: suppress first within-song scene crossfade for 90 frames (3s)
+  // This prevents a jarring shader switch right as the segue lands
+  const suppressCrossfade = isSacredSegueIn && frame < 90;
+
   // Crossfade INTO this section (from previous) — beat-synced when possible
-  if (prevSectionIdx >= 0) {
+  if (prevSectionIdx >= 0 && !suppressCrossfade) {
     const prevMode = getModeForSection(song, prevSectionIdx, sections, seed, era, false, usedShaderModes, songIdentity, stemSection, frames, songDuration);
     if (prevMode !== currentMode) {
       const boundary = currentSection.frameStart;
@@ -454,12 +473,20 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
 
       if (distFromStart >= 0 && distFromStart < crossfadeLen) {
         const progress = distFromStart / crossfadeLen;
+        // Compute energy before/after boundary for transition style selection
+        const energyBefore = prevSectionIdx >= 0 && sections[prevSectionIdx] ? averageEnergy(frames, sections[prevSectionIdx].frameStart, boundary) : 0;
+        const energyAfter = currentSection ? averageEnergy(frames, boundary, currentSection.frameEnd) : 0;
+        const sectionLabel = currentSection ? (frames[boundary]?.sectionType ?? undefined) : undefined;
+        const scenePreferredOut = SCENE_REGISTRY[prevMode]?.preferredTransitionOut;
+        const scenePreferredIn = SCENE_REGISTRY[currentMode]?.preferredTransitionIn;
+        const transitionStyle = selectTransitionStyle(energyBefore, energyAfter, sectionLabel, scenePreferredIn, scenePreferredOut);
         return (
           <SceneCrossfade
             progress={progress}
             outgoing={renderMode(prevMode, frames, sections, palette, tempo, undefined, jamDensity)}
             incoming={renderMode(currentMode, frames, sections, palette, tempo, undefined, jamDensity)}
             flashFrame={beatFrame !== null ? beatFrame : undefined}
+            style={transitionStyle}
           />
         );
       }
@@ -478,12 +505,20 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
 
       if (distToEnd >= 0 && distToEnd < crossfadeLen) {
         const progress = 1 - distToEnd / crossfadeLen;
+        const energyBefore = currentSection ? averageEnergy(frames, currentSection.frameStart, boundary) : 0;
+        const nextSection = sections[nextSectionIdx];
+        const energyAfter = nextSection ? averageEnergy(frames, boundary, nextSection.frameEnd) : 0;
+        const sectionLabel = nextSection ? (frames[boundary]?.sectionType ?? undefined) : undefined;
+        const scenePreferredOutB = SCENE_REGISTRY[currentMode]?.preferredTransitionOut;
+        const scenePreferredInB = SCENE_REGISTRY[nextMode]?.preferredTransitionIn;
+        const transitionStyle = selectTransitionStyle(energyBefore, energyAfter, sectionLabel, scenePreferredInB, scenePreferredOutB);
         return (
           <SceneCrossfade
             progress={progress}
             outgoing={renderMode(currentMode, frames, sections, palette, tempo, undefined, jamDensity)}
             incoming={renderMode(nextMode, frames, sections, palette, tempo, undefined, jamDensity)}
             flashFrame={beatFrame !== null ? beatFrame : undefined}
+            style={transitionStyle}
           />
         );
       }

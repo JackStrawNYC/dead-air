@@ -1,191 +1,198 @@
-import { describe, it, expect, beforeEach } from "vitest";
-import {
-  computeCounterpoint,
-  resetCounterpoint,
-} from "./visual-counterpoint";
-import type { AudioSnapshot } from "./audio-reactive";
+import { describe, it, expect } from "vitest";
+import { computeCounterpoint } from "./visual-counterpoint";
+import type { EnhancedFrameData } from "../data/types";
 
-function makeSnapshot(overrides: Partial<AudioSnapshot> = {}): AudioSnapshot {
+/** Create a minimal frame with sensible defaults */
+function makeFrame(overrides: Partial<EnhancedFrameData> = {}): EnhancedFrameData {
   return {
-    energy: 0.2,
-    slowEnergy: 0.15,
-    bass: 0.3,
-    mids: 0.25,
-    highs: 0.2,
-    onsetEnvelope: 0.1,
-    beatDecay: 0.0,
-    chromaHue: 180,
+    rms: 0.2,
     centroid: 0.3,
     flatness: 0.05,
-    spectralFlux: 0.1,
-    musicalTime: 0,
-    fastEnergy: 0,
-    drumOnset: 0,
-    drumBeat: 0,
-    vocalEnergy: 0,
-    vocalPresence: 0,
-    otherEnergy: 0,
-    otherCentroid: 0,
-    energyAcceleration: 0,
-    energyTrend: 0,
-    localTempo: 120,
-    beatConfidence: 0,
+    sub: 0.1,
+    low: 0.3,
+    mid: 0.25,
+    high: 0.2,
+    contrast: [0, 0, 0, 0, 0, 0, 0],
+    chroma: [0.5, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1],
+    onset: 0.1,
+    beat: false,
     downbeat: false,
-    energyForecast: 0,
-    peakApproaching: 0,
-    beatStability: 0,
+    beatConfidence: 0,
+    stemVocalPresence: false,
+    stemDrumOnset: 0,
+    stemDrumBeat: false,
+    stemOtherCentroid: 0,
     melodicPitch: 0,
     melodicConfidence: 0,
     melodicDirection: 0,
     chordIndex: 0,
     harmonicTension: 0,
     sectionType: "jam",
+    energyForecast: 0,
+    peakApproaching: 0,
+    beatStability: 0,
     ...overrides,
-  };
+  } as EnhancedFrameData;
+}
+
+/** Create an array of N frames with the same properties */
+function makeFrames(count: number, overrides: Partial<EnhancedFrameData> = {}): EnhancedFrameData[] {
+  return Array.from({ length: count }, () => makeFrame(overrides));
 }
 
 describe("computeCounterpoint", () => {
-  beforeEach(() => {
-    resetCounterpoint();
-  });
-
-  // ─── Peak desaturation ───
+  // --- Peak desaturation ---
 
   it("triggers peak desaturation when energy > 0.35 and onset > 0.6", () => {
-    const snap = makeSnapshot({ energy: 0.5, onsetEnvelope: 0.8 });
-    const result = computeCounterpoint(snap, "idle", 100);
+    const frames = [makeFrame({ rms: 0.5, onset: 0.8 })];
+    const result = computeCounterpoint(frames, 0, "idle");
     expect(result.saturationMult).toBeLessThan(1.0);
     expect(result.saturationMult).toBeCloseTo(0.5, 1);
   });
 
   it("recovers saturation over time after peak desaturation", () => {
-    // Trigger desaturation
-    const peakSnap = makeSnapshot({ energy: 0.5, onsetEnvelope: 0.8 });
-    computeCounterpoint(peakSnap, "idle", 100);
+    // Frame 0: peak, frames 1-50: quiet
+    const frames = [
+      makeFrame({ rms: 0.5, onset: 0.8 }),
+      ...makeFrames(50, { rms: 0.1, onset: 0.1 }),
+    ];
 
     // 20 frames later: partially recovered
-    const quietSnap = makeSnapshot({ energy: 0.1, onsetEnvelope: 0.1 });
-    const mid = computeCounterpoint(quietSnap, "idle", 120);
+    const mid = computeCounterpoint(frames, 20, "idle");
     expect(mid.saturationMult).toBeGreaterThan(0.5);
     expect(mid.saturationMult).toBeLessThan(1.0);
 
-    // 45+ frames later: fully recovered
-    const late = computeCounterpoint(quietSnap, "idle", 200);
+    // 46+ frames later: fully recovered
+    const late = computeCounterpoint(frames, 46, "idle");
     expect(late.saturationMult).toBeCloseTo(1.0, 1);
   });
 
   it("does NOT trigger desaturation when only energy is high", () => {
-    const snap = makeSnapshot({ energy: 0.5, onsetEnvelope: 0.3 });
-    const result = computeCounterpoint(snap, "idle", 100);
+    const frames = [makeFrame({ rms: 0.5, onset: 0.3 })];
+    const result = computeCounterpoint(frames, 0, "idle");
     expect(result.saturationMult).toBeCloseTo(1.0, 1);
   });
 
-  // ─── Quiet flooding ───
+  // --- Quiet flooding ---
 
   it("triggers quiet flooding after 60+ consecutive low-energy frames", () => {
-    const quietSnap = makeSnapshot({ energy: 0.05 });
-    // Feed 90 consecutive quiet frames (past the 60-frame threshold)
-    let result;
-    for (let i = 0; i < 90; i++) {
-      result = computeCounterpoint(quietSnap, "idle", i);
-    }
-    expect(result!.saturationMult).toBeGreaterThan(1.0);
-    expect(result!.saturationMult).toBeLessThanOrEqual(1.3);
+    const frames = makeFrames(90, { rms: 0.05 });
+    const result = computeCounterpoint(frames, 89, "idle");
+    expect(result.saturationMult).toBeGreaterThan(1.0);
+    expect(result.saturationMult).toBeLessThanOrEqual(1.3);
   });
 
   it("resets quiet flooding on any non-quiet frame", () => {
-    const quietSnap = makeSnapshot({ energy: 0.05 });
-    // Build up 50 quiet frames
-    for (let i = 0; i < 50; i++) {
-      computeCounterpoint(quietSnap, "idle", i);
-    }
-    // One loud frame resets the counter
-    const loudSnap = makeSnapshot({ energy: 0.3 });
-    computeCounterpoint(loudSnap, "idle", 50);
-
-    // 20 more quiet frames shouldn't trigger flooding (total = 20, not 70)
-    let result;
-    for (let i = 51; i < 71; i++) {
-      result = computeCounterpoint(quietSnap, "idle", i);
-    }
-    expect(result!.saturationMult).toBeCloseTo(1.0, 1);
+    // 50 quiet, 1 loud, 20 quiet
+    const frames = [
+      ...makeFrames(50, { rms: 0.05 }),
+      makeFrame({ rms: 0.3 }),
+      ...makeFrames(20, { rms: 0.05 }),
+    ];
+    // At frame 70: only 20 quiet frames since the loud one — shouldn't flood
+    const result = computeCounterpoint(frames, 70, "idle");
+    expect(result.saturationMult).toBeCloseTo(1.0, 1);
   });
 
-  // ─── Bass isolation ───
+  // --- Bass isolation ---
 
   it("triggers strong overlay inversion during bass isolation", () => {
-    const snap = makeSnapshot({ bass: 0.6, highs: 0.1 });
-    const result = computeCounterpoint(snap, "idle", 100);
+    const frames = [makeFrame({ low: 0.6, high: 0.1 })];
+    const result = computeCounterpoint(frames, 0, "idle");
     expect(result.overlayInversion).toBeCloseTo(0.8, 1);
   });
 
   it("triggers gentle overlay inversion for moderate bass", () => {
-    const snap = makeSnapshot({ bass: 0.45, highs: 0.15 });
-    const result = computeCounterpoint(snap, "idle", 100);
+    const frames = [makeFrame({ low: 0.45, high: 0.15 })];
+    const result = computeCounterpoint(frames, 0, "idle");
     expect(result.overlayInversion).toBeCloseTo(0.3, 1);
   });
 
   it("no overlay inversion when bass is low or highs are present", () => {
-    const snap = makeSnapshot({ bass: 0.2, highs: 0.4 });
-    const result = computeCounterpoint(snap, "idle", 100);
+    const frames = [makeFrame({ low: 0.2, high: 0.4 })];
+    const result = computeCounterpoint(frames, 0, "idle");
     expect(result.overlayInversion).toBe(0);
   });
 
-  // ─── Downbeat freeze ───
+  // --- Downbeat freeze ---
 
   it("freezes camera during climax on strong beat", () => {
-    const snap = makeSnapshot({ beatDecay: 0.9, onsetEnvelope: 0.7 });
-    const result = computeCounterpoint(snap, "climax", 100);
+    const frames = [makeFrame({ beat: true, onset: 0.7 })];
+    const result = computeCounterpoint(frames, 0, "climax");
     expect(result.cameraFreeze).toBe(true);
     expect(result.cameraFreezeFrames).toBeGreaterThan(0);
   });
 
   it("freezes camera during sustain on strong beat", () => {
-    const snap = makeSnapshot({ beatDecay: 0.9, onsetEnvelope: 0.7 });
-    const result = computeCounterpoint(snap, "sustain", 100);
+    const frames = [makeFrame({ beat: true, onset: 0.7 })];
+    const result = computeCounterpoint(frames, 0, "sustain");
     expect(result.cameraFreeze).toBe(true);
   });
 
   it("does NOT freeze camera during idle/build/release", () => {
-    const snap = makeSnapshot({ beatDecay: 0.9, onsetEnvelope: 0.7 });
+    const frames = [makeFrame({ beat: true, onset: 0.7 })];
     for (const phase of ["idle", "build", "release"] as const) {
-      resetCounterpoint();
-      const result = computeCounterpoint(snap, phase, 100);
+      const result = computeCounterpoint(frames, 0, phase);
       expect(result.cameraFreeze).toBe(false);
     }
   });
 
-  it("camera freeze persists for multiple frames then releases", () => {
-    // Trigger freeze
-    const beatSnap = makeSnapshot({ beatDecay: 0.9, onsetEnvelope: 0.7 });
-    computeCounterpoint(beatSnap, "climax", 100);
+  it("camera freeze persists for nearby frames", () => {
+    // Beat at frame 0, check frame 5 (within FREEZE_DURATION)
+    const frames = [
+      makeFrame({ beat: true, onset: 0.7 }),
+      ...makeFrames(14),
+    ];
+    const f5 = computeCounterpoint(frames, 5, "climax");
+    expect(f5.cameraFreeze).toBe(true);
 
-    // Subsequent quiet frames should still show freeze (countdown)
-    const quietSnap = makeSnapshot();
-    const f1 = computeCounterpoint(quietSnap, "idle", 101);
-    expect(f1.cameraFreeze).toBe(true);
-
-    // After 10+ frames, freeze should end
-    for (let i = 102; i < 115; i++) {
-      computeCounterpoint(quietSnap, "idle", i);
-    }
-    const late = computeCounterpoint(quietSnap, "idle", 115);
-    expect(late.cameraFreeze).toBe(false);
+    // Beyond freeze duration
+    const f12 = computeCounterpoint(frames, 12, "climax");
+    expect(f12.cameraFreeze).toBe(false);
   });
 
-  // ─── Reset ───
+  // --- Brightness counterpoint ---
 
-  it("resetCounterpoint clears all state", () => {
-    // Build up state
-    const quietSnap = makeSnapshot({ energy: 0.05 });
-    for (let i = 0; i < 70; i++) {
-      computeCounterpoint(quietSnap, "idle", i);
-    }
+  it("triggers brightness dip on energy transients", () => {
+    const frames = [makeFrame({ rms: 0.5, onset: 0.7 })];
+    const result = computeCounterpoint(frames, 0, "idle");
+    expect(result.brightnessCounterpoint).toBeLessThan(0);
+    expect(result.brightnessCounterpoint).toBeCloseTo(-0.08, 2);
+  });
 
-    resetCounterpoint();
+  it("recovers brightness after transient", () => {
+    const frames = [
+      makeFrame({ rms: 0.5, onset: 0.7 }),
+      ...makeFrames(25, { rms: 0.1, onset: 0.1 }),
+    ];
+    // Midway through recovery
+    const mid = computeCounterpoint(frames, 10, "idle");
+    expect(mid.brightnessCounterpoint).toBeLessThan(0);
+    expect(mid.brightnessCounterpoint).toBeGreaterThan(-0.08);
 
-    // After reset, no flooding should be active
-    const result = computeCounterpoint(quietSnap, "idle", 100);
-    expect(result.saturationMult).toBeCloseTo(1.0, 1);
+    // Fully recovered
+    const late = computeCounterpoint(frames, 21, "idle");
+    expect(late.brightnessCounterpoint).toBeCloseTo(0, 2);
+  });
+
+  // --- Determinism ---
+
+  it("is deterministic — same inputs produce same outputs", () => {
+    const frames = [
+      ...makeFrames(50, { rms: 0.05 }),
+      makeFrame({ rms: 0.5, onset: 0.8 }),
+      ...makeFrames(30),
+    ];
+    const r1 = computeCounterpoint(frames, 50, "climax");
+    const r2 = computeCounterpoint(frames, 50, "climax");
+    expect(r1).toEqual(r2);
+  });
+
+  it("returns neutral values for empty frames", () => {
+    const result = computeCounterpoint([], 0, "idle");
+    expect(result.saturationMult).toBe(1);
+    expect(result.overlayInversion).toBe(0);
+    expect(result.cameraFreeze).toBe(false);
+    expect(result.brightnessCounterpoint).toBe(0);
   });
 });

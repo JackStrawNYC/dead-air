@@ -81,9 +81,9 @@ const GROOVE_MODIFIERS: Record<GrooveType, GrooveVisualModifiers> = {
   },
   driving: {
     temperatureShift: +0.1,
-    motionMult: 1.4,
+    motionMult: 1.6,
     regularity: 0.6,
-    pulseMult: 1.5,
+    pulseMult: 1.8,
   },
   floating: {
     temperatureShift: -0.4,

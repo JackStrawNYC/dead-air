@@ -1,30 +1,35 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { fetchEpisodes, fetchAssets } from '../api';
+import type { Episode, AssetResponse } from '../types';
 import AssetCard from '../components/AssetCard';
+import { useToast } from '../hooks/useToast';
 
 export default function Assets() {
   const { episodeId: paramId } = useParams<{ episodeId?: string }>();
-  const [episodes, setEpisodes] = useState<any[]>([]);
+  const [episodes, setEpisodes] = useState<Episode[]>([]);
   const [episodeId, setEpisodeId] = useState(paramId || '');
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<AssetResponse | null>(null);
   const [filter, setFilter] = useState<string>('all');
+  const toast = useToast();
 
   useEffect(() => {
-    fetchEpisodes().then(setEpisodes).catch(() => {});
+    fetchEpisodes().then(setEpisodes).catch((e) => { toast('error', 'Failed to load episodes'); });
   }, []);
 
   useEffect(() => {
     if (episodeId) {
-      fetchAssets(episodeId).then(setData).catch(() => setData(null));
+      fetchAssets(episodeId)
+        .then(setData)
+        .catch((e) => { toast('error', 'Failed to load assets'); setData(null); });
     }
   }, [episodeId]);
 
   const allAssets = [
-    ...(data?.dbAssets || []).map((a: any) => ({
+    ...(data?.dbAssets || []).map((a) => ({
       type: a.type, path: a.file_path, service: a.service, cost: a.cost,
     })),
-    ...(data?.fsAssets || []).map((a: any) => ({
+    ...(data?.fsAssets || []).map((a) => ({
       type: a.type, path: a.path, size: a.size,
     })),
   ];

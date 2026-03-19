@@ -35,6 +35,8 @@ interface Props {
   narrationData: Record<string, { listenFor: string[]; context?: string }> | null;
   fanReviews: FanReview[];
   showSeed?: number;
+  /** Sacred segue: delay title card and song stats by 30 seconds */
+  suppressIntro?: boolean;
 }
 
 export const SpecialPropsLayer: React.FC<Props> = ({
@@ -50,17 +52,27 @@ export const SpecialPropsLayer: React.FC<Props> = ({
   narrationData,
   fanReviews,
   showSeed,
+  suppressIntro,
 }) => {
   const showCtx = useShowContext();
   const eraGrainMult = getEraPreset(showCtx?.era ?? "")?.grainIntensity ?? 1.0;
   const frame = useCurrentFrame();
 
+  // Sacred segue intro suppression: delay title card and stats by 30 seconds (900 frames)
+  const introDelay = suppressIntro ? 900 : 0;
+  const adjustedFrame = frame - introDelay;
+
   // Dark scrim during intro window — bottom gradient for text readability
   const SCRIM_HOLD = 600;
   const SCRIM_FADE = 150;
-  const scrimOpacity = frame < SCRIM_HOLD ? 0.40
-    : frame < SCRIM_HOLD + SCRIM_FADE ? 0.40 * (1 - (frame - SCRIM_HOLD) / SCRIM_FADE)
+  const scrimFrame = suppressIntro ? adjustedFrame : frame;
+  const scrimOpacity = scrimFrame < 0 ? 0
+    : scrimFrame < SCRIM_HOLD ? 0.40
+    : scrimFrame < SCRIM_HOLD + SCRIM_FADE ? 0.40 * (1 - (scrimFrame - SCRIM_HOLD) / SCRIM_FADE)
     : 0;
+
+  // When suppressing intro, don't render title/stats until delay passes
+  const showIntroElements = !suppressIntro || frame >= introDelay;
 
   return (
     <>
@@ -71,13 +83,15 @@ export const SpecialPropsLayer: React.FC<Props> = ({
           zIndex: 99,
         }} />
       )}
-      <SongTitle
-        title={songTitle}
-        setNumber={setNumber}
-        trackNumber={trackNumber}
-        isSegue={isSegue}
-      />
-      {songStats && songStats[trackId] && (
+      {showIntroElements && (
+        <SongTitle
+          title={songTitle}
+          setNumber={setNumber}
+          trackNumber={trackNumber}
+          isSegue={isSegue}
+        />
+      )}
+      {showIntroElements && songStats && songStats[trackId] && (
         <SilentErrorBoundary name="SongDNA">
           <SongDNA stats={songStats[trackId]} />
         </SilentErrorBoundary>

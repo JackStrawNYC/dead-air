@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { getDb } from '../db.js';
+import type { CostTotalRow } from '../types.js';
 
 const router = Router();
 
@@ -7,7 +8,7 @@ const router = Router();
 router.get('/', (_req, res) => {
   const db = getDb();
 
-  const totalCost = db.prepare('SELECT COALESCE(SUM(cost), 0) as total FROM cost_log').get() as any;
+  const totalCost = db.prepare('SELECT COALESCE(SUM(cost), 0) as total FROM cost_log').get() as CostTotalRow;
 
   const byService = db.prepare(`
     SELECT service, COUNT(*) as count, COALESCE(SUM(cost), 0) as total
@@ -44,7 +45,7 @@ router.get('/:episodeId', (req, res) => {
 
   const total = db.prepare(
     'SELECT COALESCE(SUM(cost), 0) as total FROM cost_log WHERE episode_id = ?'
-  ).get(req.params.episodeId) as any;
+  ).get(req.params.episodeId) as CostTotalRow;
 
   const byService = db.prepare(`
     SELECT service, COUNT(*) as count, COALESCE(SUM(cost), 0) as total

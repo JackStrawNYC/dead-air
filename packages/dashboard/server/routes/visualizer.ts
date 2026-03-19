@@ -3,6 +3,15 @@ import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { runVisualizerRender } from '../jobs/job-runner.js';
+import { safeJsonParse } from '../utils.js';
+import {
+  VisualizerRenderBody,
+  SetlistBody,
+  ChaptersBody,
+  OverlayScheduleBody,
+  SongIdentitiesBody,
+  validateBody,
+} from '../schemas.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -13,7 +22,7 @@ const router = Router();
 
 function readJsonFile(path: string): unknown {
   if (!existsSync(path)) return null;
-  return JSON.parse(readFileSync(path, 'utf-8'));
+  return safeJsonParse(readFileSync(path, 'utf-8'), null);
 }
 
 function writeJsonFile(path: string, data: unknown): void {
@@ -38,7 +47,9 @@ router.get('/setlist', (_req, res) => {
 
 // PUT /api/visualizer/setlist
 router.put('/setlist', (req, res) => {
-  writeJsonFile(resolve(VIZ_DATA, 'setlist.json'), req.body);
+  const parsed = validateBody(SetlistBody, req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error });
+  writeJsonFile(resolve(VIZ_DATA, 'setlist.json'), parsed.data);
   res.json({ ok: true });
 });
 
@@ -51,7 +62,9 @@ router.get('/chapters', (_req, res) => {
 
 // PUT /api/visualizer/chapters
 router.put('/chapters', (req, res) => {
-  writeJsonFile(resolve(VIZ_DATA, 'show-context.json'), req.body);
+  const parsed = validateBody(ChaptersBody, req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error });
+  writeJsonFile(resolve(VIZ_DATA, 'show-context.json'), parsed.data);
   res.json({ ok: true });
 });
 
@@ -64,7 +77,9 @@ router.get('/overlay-schedule', (_req, res) => {
 
 // PUT /api/visualizer/overlay-schedule
 router.put('/overlay-schedule', (req, res) => {
-  writeJsonFile(resolve(VIZ_DATA, 'overlay-schedule.json'), req.body);
+  const parsed = validateBody(OverlayScheduleBody, req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error });
+  writeJsonFile(resolve(VIZ_DATA, 'overlay-schedule.json'), parsed.data);
   res.json({ ok: true });
 });
 
@@ -89,7 +104,9 @@ router.get('/song-identities', (_req, res) => {
 
 // PUT /api/visualizer/song-identities
 router.put('/song-identities', (req, res) => {
-  writeJsonFile(resolve(VIZ_DATA, 'song-identities.json'), req.body);
+  const parsed = validateBody(SongIdentitiesBody, req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error });
+  writeJsonFile(resolve(VIZ_DATA, 'song-identities.json'), parsed.data);
   res.json({ ok: true });
 });
 
@@ -102,7 +119,9 @@ router.get('/overlay-names', (_req, res) => {
 
 // POST /api/visualizer/render — spawn visualizer render
 router.post('/render', (req, res) => {
-  const { track, resume, preset, preview, gl, concurrency, seed } = req.body || {};
+  const parsed = validateBody(VisualizerRenderBody, req.body || {});
+  if (!parsed.success) return res.status(400).json({ error: parsed.error });
+  const { track, resume, preset, preview, gl, concurrency, seed } = parsed.data;
   const job = runVisualizerRender({ track, resume, preset, preview, gl, concurrency, seed });
   res.json({ jobId: job.id });
 });

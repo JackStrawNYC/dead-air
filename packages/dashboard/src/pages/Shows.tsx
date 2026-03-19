@@ -1,15 +1,21 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { fetchShows } from '../api';
+import type { Show } from '../types';
 import Skeleton from '../components/Skeleton';
+import { useToast } from '../hooks/useToast';
 
 export default function Shows() {
-  const [shows, setShows] = useState<any[]>([]);
+  const [shows, setShows] = useState<Show[]>([]);
   const [loading, setLoading] = useState(true);
+  const toast = useToast();
 
   const load = () => {
     setLoading(true);
-    fetchShows().then(setShows).finally(() => setLoading(false));
+    fetchShows()
+      .then(setShows)
+      .catch((e) => { toast('error', 'Failed to load shows'); })
+      .finally(() => setLoading(false));
   };
 
   useEffect(() => { load(); }, []);

@@ -90,6 +90,13 @@ void main() {
   // --- Global wave scale from bass ---
   float waveScale = (2.0 + bass * 3.0) * accelBoost;
 
+  // --- Coherence-driven phase control ---
+  float coherence = clamp(uCoherence, 0.0, 1.0);
+  // High coherence: sync wave phases (harmonic unity)
+  float phaseSyncAmount = coherence > 0.7 ? (coherence - 0.7) / 0.3 : 0.0;
+  // Low coherence: randomize phases (dissonance tears the pattern)
+  float phaseRandomAmount = coherence < 0.3 ? (0.3 - coherence) / 0.3 : 0.0;
+
   // --- 12-layer plasma summation driven by chroma bins ---
   float plasma = 0.0;
   float totalWeight = 0.0;
@@ -104,6 +111,14 @@ void main() {
 
     // Phase offset from time + pitch class position
     float phase = slowTime * (1.0 + fi * 0.13) + fi * TAU / 12.0;
+
+    // Coherence: sync phases toward a common base (harmonic unity)
+    float commonPhase = slowTime * 1.0;
+    phase = mix(phase, commonPhase, phaseSyncAmount * 0.7);
+
+    // Coherence: randomize phases (dissonance tears the pattern apart)
+    float randomPhase = snoise(vec2(fi * 7.3, slowTime * 2.0)) * TAU;
+    phase = mix(phase, phase + randomPhase * 0.5, phaseRandomAmount);
 
     // Harmonic tension adds turbulence to wave frequencies
     float turbulence = tension * sin(slowTime * 3.0 + fi * 1.7) * 0.5;

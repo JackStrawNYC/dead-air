@@ -903,11 +903,68 @@ export function generateFallbackIdentity(
   if (tempo > 140) keywords.push("driving");
   else if (tempo < 90) keywords.push("spacious");
 
-  // 5. Build the identity — no transition overrides or D/S shaders for fallbacks
+  // 5. Compute peak energy ratio + dominant chroma index
+  let peakCount = 0;
+  const chromaSums = new Array(12).fill(0);
+  for (const frame of frames) {
+    if (frame.rms > 0.25) peakCount++;
+    for (let c = 0; c < 12; c++) {
+      chromaSums[c] += frame.chroma[c];
+    }
+  }
+  const peakEnergyRatio = peakCount / frames.length;
+  let dominantChromaIdx = 0;
+  for (let c = 1; c < 12; c++) {
+    if (chromaSums[c] > chromaSums[dominantChromaIdx]) dominantChromaIdx = c;
+  }
+
+  // 6. Derive overlay density from energy
+  const overlayDensity: number = avgEnergy > 0.25 ? 1.4 : avgEnergy < 0.12 ? 0.5 : 0.8;
+
+  // 7. Derive climax behavior from peak energy ratio
+  const climaxBehavior: SongIdentity["climaxBehavior"] = peakEnergyRatio > 0.4
+    ? { peakSaturation: 0.6, peakBrightness: 0.25, flash: true, climaxDensityMult: 1.6 }
+    : peakEnergyRatio > 0.2
+    ? { peakSaturation: 0.5, peakBrightness: 0.15, flash: true }
+    : { peakSaturation: 0.4, peakBrightness: 0.1 };
+
+  // 8. Derive hue shift from dominant chroma (-15 to +15 degrees)
+  const hueShift = Math.round((dominantChromaIdx / 12) * 30 - 15);
+
+  // 9. Derive saturation offset from flatness
+  const saturationOffset: number = avgFlatness > 0.4 ? -0.05 : avgFlatness < 0.15 ? 0.05 : 0;
+
+  // 10. Derive overlay boost from mood keywords
+  const overlayBoost: string[] = [];
+  if (keywords.includes("contemplative" as OverlayTag) || keywords.includes("ethereal" as OverlayTag)) {
+    overlayBoost.push("Fireflies", "RoseOverlay", "DreamCatcher");
+  }
+  if (keywords.includes("intense" as OverlayTag) || keywords.includes("energetic" as OverlayTag)) {
+    overlayBoost.push("ParticleExplosion", "WallOfSound", "EmberRise");
+  }
+  if (keywords.includes("deep" as OverlayTag)) {
+    overlayBoost.push("DarkStarPortal", "CosmicStarfield");
+  }
+
+  // 11. Derive overlay suppress from energy anti-match
+  const overlaySuppress: string[] = [];
+  if (avgEnergy > 0.25) {
+    overlaySuppress.push("Fireflies", "RoseOverlay");
+  } else if (avgEnergy < 0.12) {
+    overlaySuppress.push("LaserShow", "ParticleExplosion");
+  }
+
+  // 12. Build the identity
   return {
     preferredModes,
     palette: chromaPalette,
     moodKeywords: keywords,
+    overlayDensity,
+    climaxBehavior,
+    hueShift,
+    saturationOffset,
+    overlayBoost: overlayBoost.length > 0 ? overlayBoost : undefined,
+    overlaySuppress: overlaySuppress.length > 0 ? overlaySuppress : undefined,
   };
 }
 

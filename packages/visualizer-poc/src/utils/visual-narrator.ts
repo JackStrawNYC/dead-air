@@ -61,7 +61,7 @@ function showArcDirective(setNumber: number, setProgress: number): Partial<Narra
       overlayDensityMult: 1.1 - setProgress * 0.2,
       abstractionLevel: 0.2 + setProgress * 0.3,
       saturationOffset: 0,
-      brightnessOffset: 0.02,
+      brightnessOffset: 0.05,
     };
   }
   if (setNumber === 2) {
@@ -80,8 +80,8 @@ function showArcDirective(setNumber: number, setProgress: number): Partial<Narra
     temperature: 0.5,
     overlayDensityMult: 1.4,
     abstractionLevel: 0.1,
-    saturationOffset: +0.1,
-    brightnessOffset: +0.05,
+    saturationOffset: +0.15,
+    brightnessOffset: +0.10,
   };
 }
 
@@ -89,8 +89,8 @@ function showArcDirective(setNumber: number, setProgress: number): Partial<Narra
 function drumsSpaceDirective(): NarrativeDirective {
   return {
     overlayDensityMult: 0.1,
-    saturationOffset: -0.15,
-    brightnessOffset: -0.08,
+    saturationOffset: -0.10,
+    brightnessOffset: -0.04,
     temperature: -0.6,
     abstractionLevel: 0.9,
     heroPermitted: false,
@@ -130,10 +130,10 @@ export function computeNarrativeDirective(ctx: NarrativeContext): NarrativeDirec
     result.overlayDensityMult *= 0.6;
   } else if (ctx.sectionType === "chorus") {
     result.overlayDensityMult *= 1.2;
-    result.saturationOffset += 0.05;
+    result.saturationOffset += 0.10;
   } else if (ctx.sectionType === "solo") {
     result.motionMult *= 1.3;
-    result.saturationOffset += 0.08;
+    result.saturationOffset += 0.15;
     result.overlayDensityMult *= 0.5;
   }
 
@@ -151,22 +151,22 @@ export function computeNarrativeDirective(ctx: NarrativeContext): NarrativeDirec
 
   // Jam cycle modulation
   if (ctx.jamPhase === "peak") {
-    result.saturationOffset += 0.1;
-    result.brightnessOffset += 0.05;
+    result.saturationOffset += 0.25;
+    result.brightnessOffset += 0.15;
     result.heroPermitted = true;
   } else if (ctx.jamPhase === "explore") {
     result.overlayDensityMult *= 0.5;
     result.abstractionLevel = Math.min(1, result.abstractionLevel + 0.2);
     result.heroPermitted = false;
   } else if (ctx.jamPhase === "build" && ctx.jamDeepening) {
-    result.saturationOffset += 0.05;
+    result.saturationOffset += 0.12;
     result.motionMult *= 1.2;
   }
 
   // Clamp values
   result.overlayDensityMult = Math.max(0, Math.min(2, result.overlayDensityMult));
-  result.saturationOffset = Math.max(-0.3, Math.min(0.3, result.saturationOffset));
-  result.brightnessOffset = Math.max(-0.2, Math.min(0.2, result.brightnessOffset));
+  result.saturationOffset = Math.max(-0.5, Math.min(0.5, result.saturationOffset));
+  result.brightnessOffset = Math.max(-0.4, Math.min(0.4, result.brightnessOffset));
   result.temperature = Math.max(-1, Math.min(1, result.temperature));
   result.abstractionLevel = Math.max(0, Math.min(1, result.abstractionLevel));
   result.motionMult = Math.max(0.1, Math.min(2, result.motionMult));

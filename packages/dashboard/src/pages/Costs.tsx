@@ -1,20 +1,24 @@
 import { useState, useEffect } from 'react';
 import { fetchCosts, fetchEpisodeCosts, fetchEpisodes } from '../api';
+import type { CostSummary, EpisodeCosts, Episode, ServiceCost, CostEntry } from '../types';
+import StatCard from '../components/StatCard';
 import CostChart from '../components/CostChart';
 import Skeleton from '../components/Skeleton';
+import { useToast } from '../hooks/useToast';
 
 export default function Costs() {
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<CostSummary | null>(null);
   const [loading, setLoading] = useState(true);
-  const [episodes, setEpisodes] = useState<any[]>([]);
+  const [episodes, setEpisodes] = useState<Episode[]>([]);
   const [selectedEpisode, setSelectedEpisode] = useState('');
-  const [episodeCosts, setEpisodeCosts] = useState<any>(null);
+  const [episodeCosts, setEpisodeCosts] = useState<EpisodeCosts | null>(null);
   const [drillLoading, setDrillLoading] = useState(false);
+  const toast = useToast();
 
   useEffect(() => {
     Promise.all([
-      fetchCosts().catch(() => null),
-      fetchEpisodes().catch(() => []),
+      fetchCosts().catch((e) => { toast('error', 'Failed to load costs'); return null; }),
+      fetchEpisodes().catch((e) => { toast('error', 'Failed to load episodes'); return [] as Episode[]; }),
     ]).then(([c, e]) => {
       setData(c);
       setEpisodes(e);
@@ -30,7 +34,7 @@ export default function Costs() {
     setDrillLoading(true);
     fetchEpisodeCosts(selectedEpisode)
       .then(setEpisodeCosts)
-      .catch(() => setEpisodeCosts(null))
+      .catch((e) => { toast('error', 'Failed to load episode costs'); setEpisodeCosts(null); })
       .finally(() => setDrillLoading(false));
   }, [selectedEpisode]);
 
@@ -61,35 +65,20 @@ export default function Costs() {
 
       {/* Total */}
       <div className="grid-3 mb-16">
-        <div className="card">
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Total Spend</div>
-          <div style={{ fontSize: 32, fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--amber)' }}>
-            ${data.totalCost.toFixed(2)}
-          </div>
-        </div>
-        <div className="card">
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Services</div>
-          <div style={{ fontSize: 32, fontFamily: 'var(--font-mono)', fontWeight: 700 }}>
-            {data.byService.length}
-          </div>
-        </div>
-        <div className="card">
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Episodes</div>
-          <div style={{ fontSize: 32, fontFamily: 'var(--font-mono)', fontWeight: 700 }}>
-            {data.byEpisode.length}
-          </div>
-        </div>
+        <StatCard label="Total Spend" value={`$${data.totalCost.toFixed(2)}`} color="var(--amber)" />
+        <StatCard label="Services" value={data.byService.length} />
+        <StatCard label="Episodes" value={data.byEpisode.length} />
       </div>
 
       {/* Charts */}
       <div className="grid-2 mb-16">
         <div className="card">
           <div className="card-header"><h3>By Service</h3></div>
-          <CostChart data={data.byService.map((s: any) => ({ label: s.service, value: s.total }))} />
+          <CostChart data={data.byService.map((s) => ({ label: s.service, value: s.total }))} />
         </div>
         <div className="card">
           <div className="card-header"><h3>By Episode</h3></div>
-          <CostChart data={data.byEpisode.map((e: any) => ({ label: e.episode_id, value: e.total }))} />
+          <CostChart data={data.byEpisode.map((e) => ({ label: e.episode_id, value: e.total }))} />
         </div>
       </div>
 
@@ -123,7 +112,7 @@ export default function Costs() {
             </div>
             <div className="grid-2">
               <div>
-                <CostChart data={(episodeCosts.byService || []).map((s: any) => ({ label: s.service, value: s.total }))} height={150} />
+                <CostChart data={(episodeCosts.byService || []).map((s) => ({ label: s.service, value: s.total }))} height={150} />
               </div>
               <div className="table-wrap">
                 <table>
@@ -131,7 +120,7 @@ export default function Costs() {
                     <tr><th>Service</th><th>Ops</th><th>Cost</th></tr>
                   </thead>
                   <tbody>
-                    {(episodeCosts.byService || []).map((s: any) => (
+                    {(episodeCosts.byService || []).map((s) => (
                       <tr key={s.service}>
                         <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{s.service}</td>
                         <td style={{ fontSize: 12 }}>{s.count}</td>
@@ -159,7 +148,7 @@ export default function Costs() {
               </tr>
             </thead>
             <tbody>
-              {data.byService.map((s: any) => (
+              {data.byService.map((s) => (
                 <tr key={s.service}>
                   <td style={{ fontFamily: 'var(--font-mono)' }}>{s.service}</td>
                   <td>{s.count}</td>
@@ -188,7 +177,7 @@ export default function Costs() {
               </tr>
             </thead>
             <tbody>
-              {data.recentEntries.map((e: any, i: number) => (
+              {data.recentEntries.map((e, i) => (
                 <tr key={i}>
                   <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{e.episode_id}</td>
                   <td style={{ fontSize: 12 }}>{e.service}</td>

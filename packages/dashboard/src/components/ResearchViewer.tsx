@@ -1,7 +1,32 @@
 import { useState } from 'react';
 
+interface ResearchSong {
+  title?: string;
+  trackId?: string;
+  history?: string;
+  significance?: string;
+  listenFor?: Array<string | { timestamp?: string; description?: string; text?: string }>;
+}
+
+interface ResearchReview {
+  rating?: number;
+  source?: string;
+  text?: string;
+  summary?: string;
+  content?: string;
+}
+
+interface ResearchData {
+  tourContext?: string;
+  bandContext?: string;
+  historicalContext?: string;
+  venueContext?: string;
+  songs?: ResearchSong[];
+  reviews?: ResearchReview[];
+}
+
 interface ResearchViewerProps {
-  data: any;
+  data: ResearchData;
 }
 
 export default function ResearchViewer({ data }: ResearchViewerProps) {
@@ -34,7 +59,7 @@ export default function ResearchViewer({ data }: ResearchViewerProps) {
             Song Research ({data.songs.length})
           </h4>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            {data.songs.map((song: any, i: number) => (
+            {data.songs.map((song, i) => (
               <div
                 key={i}
                 style={{
@@ -66,7 +91,7 @@ export default function ResearchViewer({ data }: ResearchViewerProps) {
                       <div style={{ marginTop: 8 }}>
                         <span style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Listen For:</span>
                         <ul style={{ paddingLeft: 16, marginTop: 4 }}>
-                          {song.listenFor.map((item: any, li: number) => (
+                          {song.listenFor.map((item, li) => (
                             <li key={li} style={{ marginBottom: 4, fontSize: 12 }}>
                               {typeof item === 'string' ? item : (
                                 <>
@@ -98,7 +123,7 @@ export default function ResearchViewer({ data }: ResearchViewerProps) {
             Archive Reviews ({data.reviews.length})
           </h4>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {data.reviews.map((review: any, i: number) => (
+            {data.reviews.map((review, i) => (
               <div
                 key={i}
                 style={{

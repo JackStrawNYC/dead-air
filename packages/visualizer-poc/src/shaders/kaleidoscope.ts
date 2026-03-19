@@ -86,6 +86,27 @@ void main() {
   float numSegments = mix(3.0, 8.0, stability);
   // Onset can temporarily fracture the segment count
   numSegments -= onset * 2.0;
+
+  // --- Coherence morphology ---
+  float coherence = clamp(uCoherence, 0.0, 1.0);
+  // High coherence: lock segment count to nearest integer (stable kaleidoscope)
+  if (coherence > 0.7) {
+    numSegments = floor(numSegments + 0.5);
+  }
+  // Low coherence: add segment jitter (±0.5 sine wobble)
+  if (coherence < 0.3) {
+    float jitterAmt = (0.3 - coherence) / 0.3;
+    numSegments += sin(slowTime * 7.0) * 0.5 * jitterAmt;
+  }
+
+  // --- Section type modulation ---
+  float sectionT = uSectionType;
+  // Jam (7.0): +2 segments, 1.3x rotation speed
+  float jamFactor = smoothstep(6.5, 7.5, sectionT);
+  numSegments += jamFactor * 2.0;
+  // Space (5.0): -1 segment, 0.5x speed (handled below in rotation)
+  float spaceFactor = smoothstep(5.5, 4.5, sectionT) * step(4.5, sectionT);
+
   numSegments = max(numSegments, 2.0);
   float segAngle = TAU / numSegments;
 
@@ -99,6 +120,9 @@ void main() {
   // --- Rotation direction from melodic contour ---
   // Ascending melody = clockwise drift, descending = counter-clockwise
   float rotSpeed = 0.04 + energy * 0.03;
+  // Jam: 1.3x rotation speed; Space: 0.5x rotation speed
+  rotSpeed *= mix(1.0, 1.3, jamFactor);
+  rotSpeed *= mix(1.0, 0.5, spaceFactor);
   float rotAngle = slowTime * rotSpeed * sign(melodicDir + 0.001);
   float cosR = cos(rotAngle);
   float sinR = sin(rotAngle);

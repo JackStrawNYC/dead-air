@@ -75,8 +75,8 @@ describe("grooveModifiers", () => {
   it("half confidence produces halfway between neutral and base", () => {
     const state: GrooveState = { type: "driving", confidence: 0.5 };
     const mods = grooveModifiers(state);
-    // motionMult base is 1.4, neutral is 1.0 → at 0.5: 1 + (1.4-1)*0.5 = 1.2
-    expect(mods.motionMult).toBeCloseTo(1.2);
+    // motionMult base is 1.6, neutral is 1.0 → at 0.5: 1 + (1.6-1)*0.5 = 1.3
+    expect(mods.motionMult).toBeCloseTo(1.3);
     // temperatureShift base is 0.1 → at 0.5: 0.1 * 0.5 = 0.05
     expect(mods.temperatureShift).toBeCloseTo(0.05);
   });

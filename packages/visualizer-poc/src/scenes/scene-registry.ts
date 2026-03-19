@@ -20,6 +20,7 @@
 import React from "react";
 import type { EnhancedFrameData, SectionBoundary, ColorPalette, VisualMode } from "../data/types";
 import { getEraPreset } from "../data/era-presets";
+import type { SceneTransitionStyle } from "../utils/transition-selector";
 
 // ─── Scene Component Interface ───
 
@@ -42,6 +43,10 @@ export interface SceneRegistryEntry {
   energyAffinity: "low" | "mid" | "high" | "any";
   /** Complementary mode for auto-variety */
   complement: VisualMode;
+  /** Preferred transition style when entering this scene */
+  preferredTransitionIn?: SceneTransitionStyle;
+  /** Preferred transition style when leaving this scene */
+  preferredTransitionOut?: SceneTransitionStyle;
 }
 
 // ─── Lazy imports for code splitting ───
@@ -113,6 +118,7 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     Component: ConcertLightingScene,
     energyAffinity: "high",
     complement: "lo_fi_grain",
+    preferredTransitionIn: "flash",
   },
   lo_fi_grain: {
     Component: LoFiGrainScene,
@@ -148,21 +154,25 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     Component: CosmicVoyageScene,
     energyAffinity: "low",
     complement: "concert_lighting",
+    preferredTransitionIn: "void",
   },
   inferno: {
     Component: InfernoScene,
     energyAffinity: "high",
     complement: "cosmic_voyage",
+    preferredTransitionIn: "flash",
   },
   deep_ocean: {
     Component: DeepOceanScene,
     energyAffinity: "low",
     complement: "inferno",
+    preferredTransitionIn: "void",
   },
   aurora: {
     Component: AuroraScene,
     energyAffinity: "low",
     complement: "tie_dye",
+    preferredTransitionIn: "dissolve",
   },
   crystal_cavern: {
     Component: CrystalCavernScene,
@@ -178,6 +188,7 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     Component: VoidLightScene,
     energyAffinity: "low",
     complement: "concert_lighting",
+    preferredTransitionIn: "void",
   },
   fluid_2d: {
     Component: Fluid2DScene,
@@ -213,11 +224,13 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     Component: FractalZoomScene,
     energyAffinity: "any",
     complement: "kaleidoscope",
+    preferredTransitionIn: "morph",
   },
   sacred_geometry: {
     Component: SacredGeometryScene,
     energyAffinity: "low",
     complement: "kaleidoscope",
+    preferredTransitionIn: "dissolve",
   },
   reaction_diffusion: {
     Component: ReactionDiffusionScene,
@@ -264,6 +277,7 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     Component: ElectricArcScene,
     energyAffinity: "high",
     complement: "aurora",
+    preferredTransitionIn: "distortion",
   },
   morphogenesis: {
     Component: MorphogenesisScene,

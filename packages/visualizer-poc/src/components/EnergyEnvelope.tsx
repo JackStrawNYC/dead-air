@@ -65,6 +65,8 @@ interface Props {
   modalHueShift?: number;
   /** Modal analysis saturation offset (-0.10 to +0.08) */
   modalSatOffset?: number;
+  /** Brightness counterpoint (-0.1..+0.1): brief dim on transients for drama */
+  brightnessCounterpoint?: number;
 }
 
 // Per-era bloom color — matches era grade for visual cohesion
@@ -77,7 +79,7 @@ const ERA_BLOOM: Record<string, string> = {
 };
 const DEFAULT_BLOOM = ERA_BLOOM.classic;
 
-export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod, jamColorTemp, calibration, counterpointSatMult = 1, drumsSpacePhase, showPhase, songIdentity, showArcModifiers, itLuminanceLift, vocalWarmth, guitarColorTemp, deadAirFactor = 0, narrativeBrightness = 0, narrativeTemperature = 0, introFactor = 1, isSolo = false, soloIntensity = 0, harmonicBrightness = 0, harmonicSatMult = 1, modalHueShift = 0, modalSatOffset = 0 }) => {
+export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod, jamColorTemp, calibration, counterpointSatMult = 1, brightnessCounterpoint = 0, drumsSpacePhase, showPhase, songIdentity, showArcModifiers, itLuminanceLift, vocalWarmth, guitarColorTemp, deadAirFactor = 0, narrativeBrightness = 0, narrativeTemperature = 0, introFactor = 1, isSolo = false, soloIntensity = 0, harmonicBrightness = 0, harmonicSatMult = 1, modalHueShift = 0, modalSatOffset = 0 }) => {
   const energy = snapshot.energy;
   const low = calibration?.quietThreshold;
   const high = calibration?.loudThreshold;
@@ -146,7 +148,7 @@ export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod,
   const vocalBrightLift = (vocalWarmth ?? 0) * 0.06;
 
   // Apply phase offsets + song identity + show arc + IT + narrative + solo + vocal + harmonic
-  const baseBrightness = Math.min(brightCap, Math.max(0.55, brightness + dsBrightOffset + showBrightOffset + siPaletteBright + arcBrightOffset + itBrightLift + narrativeBrightness + soloBrightLift + vocalBrightLift + harmonicBrightness));
+  const baseBrightness = Math.min(brightCap, Math.max(0.55, brightness + dsBrightOffset + showBrightOffset + siPaletteBright + arcBrightOffset + itBrightLift + narrativeBrightness + soloBrightLift + vocalBrightLift + harmonicBrightness + brightnessCounterpoint));
   // During dead air, dim brightness toward 0.55 (minimum floor) and suppress bloom
   const finalBrightness = deadAirFactor > 0
     ? baseBrightness * (1 - deadAirFactor * 0.40)  // dim by up to 40% during dead air

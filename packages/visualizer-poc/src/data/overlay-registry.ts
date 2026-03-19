@@ -54,16 +54,16 @@ export const OVERLAY_REGISTRY: OverlayEntry[] = [
   { name: "PhilZone",            layer: 3, category: "reactive", tags: ["dead-culture", "organic"],      energyBand: "mid",  weight: 2, dutyCycle: 100, energyResponse: [0.08, 0.20, 2.0], tier: "B" },
 
   // ═══ Layer 4: Geometric / Physics (10) ═══
-  { name: "VoronoiFlow",       layer: 4, category: "geometric", tags: ["psychedelic", "organic"],        energyBand: "mid",  weight: 2, dutyCycle: 33, energyResponse: [0.05, 0.20, 1.8], tier: "B" },
-  { name: "PenroseTiling",     layer: 4, category: "geometric", tags: ["cosmic", "contemplative"],      energyBand: "mid",  weight: 2, dutyCycle: 33, energyResponse: [0.05, 0.20, 1.8], tier: "B" },
-  { name: "MoirePattern",      layer: 4, category: "geometric", tags: ["psychedelic", "mechanical"],    energyBand: "mid",  weight: 2, dutyCycle: 33, energyResponse: [0.05, 0.20, 1.8], tier: "B" },
-  { name: "OpArtPatterns",     layer: 4, category: "geometric", tags: ["psychedelic", "intense"],       energyBand: "mid",  weight: 2, dutyCycle: 33, energyResponse: [0.05, 0.20, 1.8], tier: "B" },
-  { name: "BatikPattern",      layer: 4, category: "geometric", tags: ["organic", "contemplative"],     energyBand: "mid",  weight: 2, dutyCycle: 33, energyResponse: [0.05, 0.20, 1.8], tier: "B" },
-  { name: "VortexSpiral",      layer: 4, category: "geometric", tags: ["psychedelic", "intense"],       energyBand: "mid",  weight: 2, dutyCycle: 33, energyResponse: [0.05, 0.20, 1.8], tier: "B" },
-  { name: "SpiralArms",        layer: 4, category: "geometric", tags: ["cosmic", "organic"],            energyBand: "mid",  weight: 2, dutyCycle: 33, energyResponse: [0.05, 0.20, 1.8], tier: "B" },
-  { name: "SunMandala",        layer: 4, category: "geometric", tags: ["cosmic", "contemplative"],      energyBand: "mid",  weight: 2, dutyCycle: 33, energyResponse: [0.05, 0.20, 1.8], tier: "B" },
-  { name: "MoireInterference", layer: 4, category: "geometric", tags: ["psychedelic", "mechanical"],    energyBand: "mid",  weight: 2, dutyCycle: 33, energyResponse: [0.05, 0.20, 1.8], tier: "B" },
-  { name: "LissajousCurves",   layer: 4, category: "geometric", tags: ["cosmic", "psychedelic"],        energyBand: "mid",  weight: 2, dutyCycle: 33, energyResponse: [0.05, 0.20, 1.8], tier: "B" },
+  { name: "VoronoiFlow",       layer: 4, category: "geometric", tags: ["psychedelic", "organic"],        energyBand: "mid",  weight: 2, dutyCycle: 33, energyResponse: [0.08, 0.25, 2.0], tier: "B" },
+  { name: "PenroseTiling",     layer: 4, category: "geometric", tags: ["cosmic", "contemplative"],      energyBand: "low",  weight: 2, dutyCycle: 33, energyResponse: [0.03, 0.15, 2.5], tier: "A" },
+  { name: "MoirePattern",      layer: 4, category: "geometric", tags: ["psychedelic", "mechanical"],    energyBand: "mid",  weight: 2, dutyCycle: 33, energyResponse: [0.10, 0.30, 1.5], tier: "B" },
+  { name: "OpArtPatterns",     layer: 4, category: "geometric", tags: ["psychedelic", "intense"],       energyBand: "high", weight: 2, dutyCycle: 33, energyResponse: [0.15, 0.35, 1.2], tier: "B" },
+  { name: "BatikPattern",      layer: 4, category: "geometric", tags: ["organic", "contemplative"],     energyBand: "low",  weight: 2, dutyCycle: 33, energyResponse: [0.05, 0.20, 2.0], tier: "B" },
+  { name: "VortexSpiral",      layer: 4, category: "geometric", tags: ["psychedelic", "intense"],       energyBand: "high", weight: 2, dutyCycle: 33, energyResponse: [0.12, 0.30, 1.3], tier: "B" },
+  { name: "SpiralArms",        layer: 4, category: "geometric", tags: ["cosmic", "organic"],            energyBand: "mid",  weight: 2, dutyCycle: 33, energyResponse: [0.08, 0.25, 1.8], tier: "B" },
+  { name: "SunMandala",        layer: 4, category: "geometric", tags: ["cosmic", "contemplative"],      energyBand: "low",  weight: 2, dutyCycle: 33, energyResponse: [0.05, 0.18, 2.2], tier: "A" },
+  { name: "MoireInterference", layer: 4, category: "geometric", tags: ["psychedelic", "mechanical"],    energyBand: "high", weight: 2, dutyCycle: 33, energyResponse: [0.10, 0.30, 1.5], tier: "B" },
+  { name: "LissajousCurves",   layer: 4, category: "geometric", tags: ["cosmic", "psychedelic"],        energyBand: "mid",  weight: 2, dutyCycle: 33, energyResponse: [0.08, 0.22, 1.8], tier: "B" },
 
   // ═══ Layer 5: Song References + Dead Culture ═══
   { name: "SunMoonMotif",     layer: 5, category: "nature", tags: ["cosmic", "dead-culture"],           energyBand: "any",  weight: 2, dutyCycle: 100, energyResponse: [0.03, 0.15, 2.0], tier: "B" },
