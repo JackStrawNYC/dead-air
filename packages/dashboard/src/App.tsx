@@ -11,6 +11,9 @@ import Costs from './pages/Costs';
 import EpisodeDetail from './pages/EpisodeDetail';
 import SongIdentities from './pages/SongIdentities';
 import Discover from './pages/Discover';
+import Produce from './pages/Produce';
+import AssetReview from './pages/AssetReview';
+import Batch from './pages/Batch';
 
 export default function App() {
   return (
@@ -18,6 +21,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/discover" element={<Discover />} />
+        <Route path="/produce" element={<Produce />} />
         <Route path="/shows" element={<Shows />} />
         <Route path="/shows/:id" element={<ShowDetail />} />
         <Route path="/shows/:id/analysis" element={<ShowAnalysis />} />
@@ -30,6 +34,8 @@ export default function App() {
         <Route path="/assets/:episodeId" element={<Assets />} />
         <Route path="/costs" element={<Costs />} />
         <Route path="/episodes/:id" element={<EpisodeDetail />} />
+        <Route path="/asset-review/:episodeId" element={<AssetReview />} />
+        <Route path="/batch" element={<Batch />} />
       </Routes>
     </Layout>
   );

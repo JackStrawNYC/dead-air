@@ -1,31 +1,41 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { fetchEpisode, fetchEpisodeCosts, fetchAssets } from '../api';
+import { fetchEpisode, fetchEpisodeCosts, fetchAssets, fetchSegments, getRenderOutputUrl, rerenderEpisode } from '../api';
+import type { Episode, EpisodeCosts, AssetResponse, SegmentResponse } from '../types';
 import Skeleton from '../components/Skeleton';
 import AssetCard from '../components/AssetCard';
 import CostChart from '../components/CostChart';
+import PresetSelector from '../components/PresetSelector';
+import { useToast } from '../hooks/useToast';
 
 type Tab = 'info' | 'assets' | 'costs';
 
 export default function EpisodeDetail() {
   const { id } = useParams<{ id: string }>();
-  const [episode, setEpisode] = useState<any>(null);
-  const [costs, setCosts] = useState<any>(null);
-  const [assets, setAssets] = useState<any>(null);
+  const [episode, setEpisode] = useState<Episode | null>(null);
+  const [costs, setCosts] = useState<EpisodeCosts | null>(null);
+  const [assets, setAssets] = useState<AssetResponse | null>(null);
+  const [segments, setSegments] = useState<SegmentResponse | null>(null);
   const [tab, setTab] = useState<Tab>('info');
   const [loading, setLoading] = useState(true);
+  const [showRerender, setShowRerender] = useState(false);
+  const [rerenderPreset, setRerenderPreset] = useState('preview');
+  const [rerendering, setRerendering] = useState(false);
+  const toast = useToast();
 
   useEffect(() => {
     if (!id) return;
     setLoading(true);
     Promise.all([
-      fetchEpisode(id).catch(() => null),
-      fetchEpisodeCosts(id).catch(() => null),
-      fetchAssets(id).catch(() => null),
-    ]).then(([ep, c, a]) => {
-      setEpisode(ep);
+      fetchEpisode(id).catch((e) => { toast('error', 'Failed to load episode'); return null; }),
+      fetchEpisodeCosts(id).catch((e) => { toast('error', 'Failed to load costs'); return null; }),
+      fetchAssets(id).catch((e) => { toast('error', 'Failed to load assets'); return null; }),
+      fetchSegments(id).catch(() => null),
+    ]).then(([epData, c, a, segs]) => {
+      setEpisode(epData ? (epData as { episode: Episode }).episode : null);
       setCosts(c);
       setAssets(a);
+      setSegments(segs);
       setLoading(false);
     });
   }, [id]);
@@ -62,10 +72,10 @@ export default function EpisodeDetail() {
   }
 
   const allAssets = [
-    ...(assets?.dbAssets || []).map((a: any) => ({
+    ...(assets?.dbAssets || []).map((a) => ({
       type: a.type, path: a.file_path, service: a.service, cost: a.cost,
     })),
-    ...(assets?.fsAssets || []).map((a: any) => ({
+    ...(assets?.fsAssets || []).map((a) => ({
       type: a.type, path: a.path, size: a.size,
     })),
   ];
@@ -101,39 +111,106 @@ export default function EpisodeDetail() {
       </div>
 
       {tab === 'info' && (
-        <div className="card">
-          <div className="grid-2">
-            <div>
-              <h4 style={{ color: 'var(--text-muted)', fontSize: 11, textTransform: 'uppercase', marginBottom: 8 }}>Details</h4>
-              <table>
-                <tbody>
-                  {[
-                    ['Status', episode.status || 'draft'],
-                    ['Progress', episode.progress != null ? `${episode.progress}%` : 'N/A'],
-                    ['Duration', episode.duration_frames ? `${Math.round(episode.duration_frames / 30)}s (${episode.duration_frames} frames)` : 'N/A'],
-                    ['Show Date', episode.show_date || 'N/A'],
-                  ].map(([label, value]) => (
-                    <tr key={label}>
-                      <td style={{ color: 'var(--text-muted)', fontSize: 12, padding: '4px 12px 4px 0' }}>{label}</td>
-                      <td style={{ fontFamily: 'var(--font-mono)', fontSize: 13 }}>{value}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <div>
-              <h4 style={{ color: 'var(--text-muted)', fontSize: 11, textTransform: 'uppercase', marginBottom: 8 }}>Links</h4>
-              {episode.youtube_url && (
-                <a href={episode.youtube_url} target="_blank" rel="noreferrer" style={{ fontSize: 13 }}>
-                  YouTube
+        <div>
+          {/* Video player */}
+          {segments && (segments.hasFinal || segments.hasRaw) && id && (
+            <div className="card mb-16">
+              <div className="card-header">
+                <h3>Video Preview</h3>
+                <a
+                  href={getRenderOutputUrl(id)}
+                  download
+                  className="btn btn-secondary"
+                  style={{ fontSize: 11, padding: '4px 12px' }}
+                >
+                  Download MP4
                 </a>
-              )}
-              <div className="mt-16" style={{ display: 'flex', gap: 8 }}>
-                <Link to={`/render/${episode.id}`} className="btn btn-secondary">Render Monitor</Link>
-                <Link to={`/assets/${episode.id}`} className="btn btn-secondary">Full Assets</Link>
+              </div>
+              <video
+                controls
+                style={{
+                  width: '100%',
+                  maxHeight: 400,
+                  background: '#000',
+                  borderRadius: 'var(--radius)',
+                }}
+                src={getRenderOutputUrl(id)}
+              />
+            </div>
+          )}
+
+          <div className="card mb-16">
+            <div className="grid-2">
+              <div>
+                <h4 style={{ color: 'var(--text-muted)', fontSize: 11, textTransform: 'uppercase', marginBottom: 8 }}>Details</h4>
+                <table>
+                  <tbody>
+                    {[
+                      ['Status', episode.status || 'draft'],
+                      ['Progress', episode.progress != null ? `${episode.progress}%` : 'N/A'],
+                      ['Duration', episode.duration_frames ? `${Math.round(episode.duration_frames / 30)}s (${episode.duration_frames} frames)` : 'N/A'],
+                      ['Show Date', episode.show_date || 'N/A'],
+                      ['Total Cost', episode.total_cost != null ? `$${episode.total_cost.toFixed(2)}` : 'N/A'],
+                    ].map(([label, value]) => (
+                      <tr key={label}>
+                        <td style={{ color: 'var(--text-muted)', fontSize: 12, padding: '4px 12px 4px 0' }}>{label}</td>
+                        <td style={{ fontFamily: 'var(--font-mono)', fontSize: 13 }}>{value}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div>
+                <h4 style={{ color: 'var(--text-muted)', fontSize: 11, textTransform: 'uppercase', marginBottom: 8 }}>Links</h4>
+                {episode.youtube_url && (
+                  <a href={episode.youtube_url} target="_blank" rel="noreferrer" style={{ fontSize: 13 }}>
+                    YouTube
+                  </a>
+                )}
+                <div className="mt-16" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <Link to={`/render/${episode.id}`} className="btn btn-secondary">Render Monitor</Link>
+                  <Link to={`/assets/${episode.id}`} className="btn btn-secondary">Full Assets</Link>
+                  <Link to={`/asset-review/${episode.id}`} className="btn btn-secondary">Asset Review</Link>
+                  <button className="btn btn-primary" onClick={() => setShowRerender(!showRerender)}>
+                    {showRerender ? 'Cancel' : 'Re-Render'}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
+
+          {/* Re-render modal */}
+          {showRerender && id && (
+            <div className="card mb-16">
+              <div className="card-header">
+                <h3>Re-Render Episode</h3>
+              </div>
+              <div style={{ marginBottom: 12 }}>
+                <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 8, textTransform: 'uppercase' }}>
+                  Render Preset
+                </label>
+                <PresetSelector value={rerenderPreset} onChange={setRerenderPreset} />
+              </div>
+              <button
+                className="btn btn-primary"
+                disabled={rerendering}
+                onClick={async () => {
+                  setRerendering(true);
+                  try {
+                    const res = await rerenderEpisode(id, { preset: rerenderPreset, force: true });
+                    toast('success', `Re-render started (job ${res.jobId})`);
+                    setShowRerender(false);
+                  } catch (err) {
+                    toast('error', err instanceof Error ? err.message : 'Re-render failed');
+                  } finally {
+                    setRerendering(false);
+                  }
+                }}
+              >
+                {rerendering ? 'Starting...' : 'Start Re-Render'}
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -170,7 +247,7 @@ export default function EpisodeDetail() {
             </div>
             <div className="card">
               <div className="card-header"><h3>By Service</h3></div>
-              <CostChart data={(costs.byService || []).map((s: any) => ({ label: s.service, value: s.total }))} />
+              <CostChart data={(costs.byService || []).map((s) => ({ label: s.service, value: s.total }))} />
             </div>
           </div>
           {costs.entries && costs.entries.length > 0 && (
@@ -187,7 +264,7 @@ export default function EpisodeDetail() {
                     </tr>
                   </thead>
                   <tbody>
-                    {costs.entries.map((e: any, i: number) => (
+                    {costs.entries.map((e, i) => (
                       <tr key={i}>
                         <td style={{ fontSize: 12 }}>{e.service}</td>
                         <td style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-secondary)' }}>{e.operation}</td>

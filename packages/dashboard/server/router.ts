@@ -7,6 +7,9 @@ import assetsRouter from './routes/assets.js';
 import costsRouter from './routes/costs.js';
 import visualizerRouter from './routes/visualizer.js';
 import archiveRouter from './routes/archive.js';
+import preflightRouter from './routes/preflight.js';
+import assetReviewRouter from './routes/asset-review.js';
+import batchRouter from './routes/batch.js';
 
 const router = Router();
 
@@ -18,5 +21,8 @@ router.use('/render', renderRouter);
 router.use('/assets', assetsRouter);
 router.use('/costs', costsRouter);
 router.use('/visualizer', visualizerRouter);
+router.use('/preflight', preflightRouter);
+router.use('/asset-review', assetReviewRouter);
+router.use('/batch', batchRouter);
 
 export default router;

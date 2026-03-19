@@ -1,3 +1,9 @@
+import type {
+  Show, Episode, Job, CostSummary, EpisodeCosts,
+  AssetResponse, SegmentResponse, SongIdentity,
+  PreflightResult, Batch,
+} from './types';
+
 const BASE = '/api';
 
 async function request<T>(path: string, opts?: RequestInit): Promise<T> {
@@ -13,50 +19,50 @@ async function request<T>(path: string, opts?: RequestInit): Promise<T> {
 }
 
 // Shows
-export const fetchShows = () => request<any[]>('/shows');
-export const fetchShow = (id: string) => request<any>(`/shows/${encodeURIComponent(id)}`);
+export const fetchShows = () => request<Show[]>('/shows');
+export const fetchShow = (id: string) => request<Show>(`/shows/${encodeURIComponent(id)}`);
 export const ingestShow = (date: string) =>
   request<{ jobId: string }>('/shows/ingest', { method: 'POST', body: JSON.stringify({ date }) });
-export const fetchShowResearch = (id: string) => request<any>(`/shows/${encodeURIComponent(id)}/research`);
-export const fetchShowAnalysis = (id: string) => request<any>(`/shows/${encodeURIComponent(id)}/analysis`);
-export const fetchShowScript = (id: string) => request<any>(`/shows/${encodeURIComponent(id)}/script`);
+export const fetchShowResearch = (id: string) => request<Record<string, unknown>>(`/shows/${encodeURIComponent(id)}/research`);
+export const fetchShowAnalysis = (id: string) => request<Record<string, unknown>>(`/shows/${encodeURIComponent(id)}/analysis`);
+export const fetchShowScript = (id: string) => request<Record<string, unknown>>(`/shows/${encodeURIComponent(id)}/script`);
 
 // Episodes
-export const fetchEpisodes = () => request<any[]>('/episodes');
-export const fetchEpisode = (id: string) => request<any>(`/episodes/${encodeURIComponent(id)}`);
+export const fetchEpisodes = () => request<Episode[]>('/episodes');
+export const fetchEpisode = (id: string) => request<{ episode: Episode; costs: unknown[]; assets: unknown[] }>(`/episodes/${encodeURIComponent(id)}`);
 
 // Pipeline
 export const runPipeline = (date: string, opts?: { from?: string; to?: string; force?: boolean }) =>
   request<{ jobId: string }>(`/pipeline/${date}/run`, { method: 'POST', body: JSON.stringify(opts || {}) });
-export const fetchJobs = () => request<any[]>('/pipeline/jobs');
+export const fetchJobs = () => request<Job[]>('/pipeline/jobs');
 export const cancelJob = (jobId: string) =>
   request<{ cancelled: boolean }>(`/pipeline/jobs/${jobId}/cancel`, { method: 'POST' });
 
 // Render
 export const fetchSegments = (episodeId: string) =>
-  request<any>(`/render/${encodeURIComponent(episodeId)}/segments`);
+  request<SegmentResponse>(`/render/${encodeURIComponent(episodeId)}/segments`);
 export const getRenderOutputUrl = (episodeId: string) =>
   `${BASE}/render/${encodeURIComponent(episodeId)}/output`;
 
 // Assets
 export const fetchAssets = (episodeId: string) =>
-  request<any>(`/assets/${encodeURIComponent(episodeId)}`);
+  request<AssetResponse>(`/assets/${encodeURIComponent(episodeId)}`);
 
 // Costs
-export const fetchCosts = () => request<any>('/costs');
+export const fetchCosts = () => request<CostSummary>('/costs');
 export const fetchEpisodeCosts = (episodeId: string) =>
-  request<any>(`/costs/${encodeURIComponent(episodeId)}`);
+  request<EpisodeCosts>(`/costs/${encodeURIComponent(episodeId)}`);
 
 // Visualizer
-export const fetchSetlist = () => request<any>('/visualizer/setlist');
-export const saveSetlist = (data: any) =>
-  request<any>('/visualizer/setlist', { method: 'PUT', body: JSON.stringify(data) });
-export const fetchChapters = () => request<any>('/visualizer/chapters');
-export const saveChapters = (data: any) =>
-  request<any>('/visualizer/chapters', { method: 'PUT', body: JSON.stringify(data) });
-export const fetchOverlaySchedule = () => request<any>('/visualizer/overlay-schedule');
-export const saveOverlaySchedule = (data: any) =>
-  request<any>('/visualizer/overlay-schedule', { method: 'PUT', body: JSON.stringify(data) });
+export const fetchSetlist = () => request<Record<string, unknown>>('/visualizer/setlist');
+export const saveSetlist = (data: Record<string, unknown>) =>
+  request<{ ok: boolean }>('/visualizer/setlist', { method: 'PUT', body: JSON.stringify(data) });
+export const fetchChapters = () => request<Record<string, unknown>>('/visualizer/chapters');
+export const saveChapters = (data: Record<string, unknown>) =>
+  request<{ ok: boolean }>('/visualizer/chapters', { method: 'PUT', body: JSON.stringify(data) });
+export const fetchOverlaySchedule = () => request<Record<string, unknown>>('/visualizer/overlay-schedule');
+export const saveOverlaySchedule = (data: Record<string, unknown>) =>
+  request<{ ok: boolean }>('/visualizer/overlay-schedule', { method: 'PUT', body: JSON.stringify(data) });
 export const startVisualizerRender = (opts?: {
   track?: string; resume?: boolean; preset?: string;
   preview?: boolean; gl?: string; concurrency?: number; seed?: number;
@@ -111,6 +117,40 @@ export const startFullPipeline = (date: string, identifier?: string) =>
     body: JSON.stringify({ date, ...(identifier && { identifier }) }),
   });
 
+// Preflight
+export const fetchPreflight = (date: string) =>
+  request<PreflightResult>(`/preflight/${encodeURIComponent(date)}`);
+
+// Asset Review
+export const fetchAssetReview = (episodeId: string) =>
+  request<{ segments: Array<{ index: number; assets: Array<{ type: string; filePath: string; service?: string; prompt?: string }> }> }>(
+    `/asset-review/${encodeURIComponent(episodeId)}`,
+  );
+export const regenerateAsset = (episodeId: string, opts: { assetId?: string; segmentIndex?: number; type?: string }) =>
+  request<{ jobId: string }>(`/asset-review/${encodeURIComponent(episodeId)}/regenerate`, {
+    method: 'POST', body: JSON.stringify(opts),
+  });
+export const approveAssets = (episodeId: string) =>
+  request<{ ok: boolean }>(`/asset-review/${encodeURIComponent(episodeId)}/approve`, {
+    method: 'POST', body: JSON.stringify({ episodeId }),
+  });
+
+// Batch
+export const createBatch = (opts: { dates: string[]; preset?: string; force?: boolean }) =>
+  request<{ batchId: string }>('/batch', { method: 'POST', body: JSON.stringify(opts) });
+export const fetchBatches = () => request<Batch[]>('/batch');
+export const fetchBatch = (id: string) => request<Batch>(`/batch/${encodeURIComponent(id)}`);
+export const retryBatch = (id: string) =>
+  request<{ ok: boolean }>(`/batch/${encodeURIComponent(id)}/retry`, { method: 'POST' });
+export const cancelBatch = (id: string) =>
+  request<{ ok: boolean }>(`/batch/${encodeURIComponent(id)}/cancel`, { method: 'POST' });
+
+// Re-render
+export const rerenderEpisode = (id: string, opts?: { preset?: string; seed?: number; force?: boolean }) =>
+  request<{ jobId: string }>(`/episodes/${encodeURIComponent(id)}/rerender`, {
+    method: 'POST', body: JSON.stringify(opts || {}),
+  });
+
 // Scene Registry & Song Identities
 export interface SceneMode {
   id: string;
@@ -122,7 +162,7 @@ export const fetchRenderPresets = () => request<Record<string, {
   width: number; height: number; concurrency: number;
   skipGrain: boolean; skipBloom: boolean; label: string;
 }>>('/visualizer/render-presets');
-export const fetchSongIdentities = () => request<Record<string, any>>('/visualizer/song-identities');
-export const saveSongIdentities = (data: Record<string, any>) =>
-  request<any>('/visualizer/song-identities', { method: 'PUT', body: JSON.stringify(data) });
+export const fetchSongIdentities = () => request<Record<string, SongIdentity>>('/visualizer/song-identities');
+export const saveSongIdentities = (data: Record<string, SongIdentity>) =>
+  request<{ ok: boolean }>('/visualizer/song-identities', { method: 'PUT', body: JSON.stringify(data) });
 export const fetchOverlayNames = () => request<string[]>('/visualizer/overlay-names');

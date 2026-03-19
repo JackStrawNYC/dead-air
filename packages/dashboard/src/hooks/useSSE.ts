@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 
 interface SSEMessage {
   event: string;
-  data: any;
+  data: Record<string, unknown>;
 }
 
 export function useSSE(url: string | null) {
@@ -33,6 +33,7 @@ export function useSSE(url: string | null) {
 
     es.addEventListener('log', handleEvent('log'));
     es.addEventListener('stage', handleEvent('stage'));
+    es.addEventListener('stage-timing', handleEvent('stage-timing'));
     es.addEventListener('done', handleEvent('done'));
     es.addEventListener('progress', handleEvent('progress'));
     es.addEventListener('ping', () => {}); // keepalive

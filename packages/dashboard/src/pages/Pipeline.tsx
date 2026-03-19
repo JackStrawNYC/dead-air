@@ -1,42 +1,39 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { runPipeline, fetchShows, fetchJobs, cancelJob as apiCancelJob } from '../api';
+import type { Show, Job } from '../types';
+import { formatElapsed } from '../utils/format';
 import { useJob } from '../hooks/useJob';
 import StageButton from '../components/StageButton';
 import LogStream from '../components/LogStream';
 import SegmentGrid from '../components/SegmentGrid';
 import ConfirmDialog from '../components/ConfirmDialog';
+import PreflightChecks from '../components/PreflightChecks';
+import StageTracker from '../components/StageTracker';
 import { useToast } from '../hooks/useToast';
 
 const STAGES = ['ingest', 'analyze', 'research', 'script', 'generate', 'render'];
 
-function formatDuration(start: string, end?: string): string {
-  const ms = (end ? new Date(end).getTime() : Date.now()) - new Date(start).getTime();
-  const secs = Math.floor(ms / 1000);
-  if (secs < 60) return `${secs}s`;
-  const mins = Math.floor(secs / 60);
-  return `${mins}m ${secs % 60}s`;
-}
-
 export default function Pipeline() {
   const { date: paramDate } = useParams<{ date?: string }>();
-  const [shows, setShows] = useState<any[]>([]);
+  const [shows, setShows] = useState<Show[]>([]);
   const [date, setDate] = useState(paramDate || '');
   const [customDate, setCustomDate] = useState('');
   const [fromStage, setFromStage] = useState('');
   const [toStage, setToStage] = useState('');
   const [force, setForce] = useState(false);
   const [jobId, setJobId] = useState<string | null>(null);
-  const [recentJobs, setRecentJobs] = useState<any[]>([]);
-  const { log, currentStage, result, connected, done } = useJob(jobId);
+  const [recentJobs, setRecentJobs] = useState<Job[]>([]);
+  const { log, logEntries, currentStage, stageTimings, result, connected, done } = useJob(jobId);
   const [confirmCancel, setConfirmCancel] = useState(false);
+  const [preflightOk, setPreflightOk] = useState(true);
   const toast = useToast();
 
   const effectiveDate = date === '__custom' ? customDate : date;
 
   useEffect(() => {
-    fetchShows().then(setShows).catch(() => {});
-    fetchJobs().then(setRecentJobs).catch(() => {});
+    fetchShows().then(setShows).catch((e) => { toast('error', 'Failed to load shows'); });
+    fetchJobs().then(setRecentJobs).catch((e) => { toast('error', 'Failed to load jobs'); });
   }, []);
 
   const completedStages = STAGES.filter(s => {
@@ -46,7 +43,7 @@ export default function Pipeline() {
 
   const handleRun = async () => {
     if (!effectiveDate) return;
-    const opts: any = {};
+    const opts: { from?: string; to?: string; force?: boolean } = {};
     if (fromStage) opts.from = fromStage;
     if (toStage) opts.to = toStage;
     if (force) opts.force = true;
@@ -54,9 +51,13 @@ export default function Pipeline() {
     setJobId(id);
   };
 
-  const handleRetry = (job: any) => {
+  const handleRetry = (job: Job) => {
     if (job.showDate) setDate(job.showDate);
-    if (job.currentStage) setFromStage(job.currentStage);
+    if (job.failedStage) {
+      setFromStage(job.failedStage);
+    } else if (job.currentStage) {
+      setFromStage(job.currentStage);
+    }
   };
 
   const handleCancel = async () => {
@@ -129,7 +130,7 @@ export default function Pipeline() {
 
           <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, paddingBottom: 2 }}>
             <button className="btn btn-primary" onClick={handleRun} disabled={!effectiveDate || (jobId != null && !done)}>
-              Run
+              {result && !result.success && done ? `Resume from ${fromStage || 'start'}` : 'Run'}
             </button>
             {jobId && !done && (
               <button className="btn btn-danger" onClick={() => setConfirmCancel(true)}>Cancel</button>
@@ -138,32 +139,29 @@ export default function Pipeline() {
         </div>
       </div>
 
+      {/* Preflight checks */}
+      {effectiveDate && !jobId && (
+        <div className="card mb-16">
+          <PreflightChecks
+            date={effectiveDate}
+            fromStage={fromStage}
+            toStage={toStage}
+            onResult={setPreflightOk}
+          />
+        </div>
+      )}
+
       {/* Stage progress */}
       {jobId && (
         <div className="card mb-16">
-          <div className="card-header">
-            <h3>Stage Progress</h3>
-            {connected ? (
-              <span className="badge badge-running">Connected</span>
-            ) : done ? (
-              <span className={`badge ${result?.success ? 'badge-done' : 'badge-failed'}`}>
-                {result?.success ? 'Done' : 'Failed'}
-              </span>
-            ) : (
-              <span className="badge badge-queued">Disconnected</span>
-            )}
-          </div>
-          <div style={{ display: 'flex', gap: 6 }}>
-            {STAGES.map(stage => (
-              <StageButton
-                key={stage}
-                stage={stage}
-                current={currentStage}
-                completed={completedStages}
-                onClick={() => setFromStage(stage)}
-              />
-            ))}
-          </div>
+          <StageTracker
+            currentStage={currentStage}
+            stageTimings={stageTimings}
+            logEntries={logEntries}
+            result={result}
+            done={done}
+            connected={connected}
+          />
           {/* Inline render progress */}
           {currentStage === 'render' && !done && (
             <div style={{ marginTop: 12 }}>
@@ -221,7 +219,7 @@ export default function Pipeline() {
                       </span>
                     </td>
                     <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-muted)' }}>
-                      {formatDuration(j.startedAt, j.finishedAt)}
+                      {formatElapsed(j.startedAt, j.finishedAt)}
                     </td>
                     <td style={{ fontSize: 12, color: 'var(--text-muted)' }}>
                       {new Date(j.startedAt).toLocaleTimeString()}
@@ -233,7 +231,7 @@ export default function Pipeline() {
                           style={{ padding: '2px 8px', fontSize: 11 }}
                           onClick={e => { e.stopPropagation(); handleRetry(j); }}
                         >
-                          Retry
+                          {j.failedStage ? `Resume from ${j.failedStage}` : 'Retry'}
                         </button>
                       )}
                     </td>

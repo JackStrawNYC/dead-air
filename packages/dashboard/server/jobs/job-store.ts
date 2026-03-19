@@ -1,6 +1,11 @@
 import type { ChildProcess } from 'child_process';
 import type { Response } from 'express';
 
+export interface StageTiming {
+  startedAt: string;
+  finishedAt?: string;
+}
+
 export interface Job {
   id: string;
   type: 'pipeline' | 'render' | 'ingest';
@@ -9,6 +14,8 @@ export interface Job {
   status: 'running' | 'done' | 'failed' | 'cancelled';
   stages?: string[];
   currentStage?: string;
+  failedStage?: string;
+  stageTimings: Record<string, StageTiming>;
   log: string[];
   startedAt: string;
   finishedAt?: string;
@@ -36,6 +43,7 @@ export function createJob(opts: {
     showDate: opts.showDate,
     status: 'running',
     stages: opts.stages,
+    stageTimings: {},
     log: [],
     startedAt: new Date().toISOString(),
     clients: new Set(),
@@ -65,14 +73,30 @@ export function appendLog(job: Job, line: string): void {
 }
 
 export function setStage(job: Job, stage: string): void {
+  const now = new Date().toISOString();
+  // Close previous stage timing
+  if (job.currentStage && job.stageTimings[job.currentStage]) {
+    job.stageTimings[job.currentStage].finishedAt = now;
+  }
+  // Open new stage timing
+  job.stageTimings[stage] = { startedAt: now };
   job.currentStage = stage;
   broadcast(job, 'stage', { stage });
+  broadcast(job, 'stage-timing', { stage, timings: job.stageTimings });
 }
 
 export function finishJob(job: Job, success: boolean, error?: string): void {
   job.status = success ? 'done' : 'failed';
   job.finishedAt = new Date().toISOString();
   if (error) job.error = error;
+  // Track which stage failed for resume
+  if (!success && job.currentStage) {
+    job.failedStage = job.currentStage;
+  }
+  // Close final stage timing
+  if (job.currentStage && job.stageTimings[job.currentStage]) {
+    job.stageTimings[job.currentStage].finishedAt = job.finishedAt;
+  }
   broadcast(job, 'done', { success, error });
   // Close all SSE connections after done event
   setTimeout(() => {
@@ -91,6 +115,7 @@ export function addClient(job: Job, res: Response): void {
   }
   if (job.currentStage) {
     res.write(`event: stage\ndata: ${JSON.stringify({ stage: job.currentStage })}\n\n`);
+    res.write(`event: stage-timing\ndata: ${JSON.stringify({ stage: job.currentStage, timings: job.stageTimings })}\n\n`);
   }
   if (job.status === 'done' || job.status === 'failed') {
     res.write(`event: done\ndata: ${JSON.stringify({ success: job.status === 'done', error: job.error })}\n\n`);

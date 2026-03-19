@@ -1,31 +1,40 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { fetchShows, fetchEpisodes, fetchJobs, fetchCosts } from '../api';
+import type { Show, Episode, Job, CostSummary } from '../types';
+import { relativeTime } from '../utils/format';
+import StatCard from '../components/StatCard';
 import Skeleton from '../components/Skeleton';
+import { useToast } from '../hooks/useToast';
 
-function relativeTime(dateStr: string): string {
-  const secs = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
-  if (secs < 60) return `${secs}s ago`;
-  const mins = Math.floor(secs / 60);
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  return `${Math.floor(hrs / 24)}d ago`;
-}
+type EpisodeFilter = 'all' | 'rendered' | 'published' | 'failed';
 
 export default function Home() {
-  const [shows, setShows] = useState<any[] | null>(null);
-  const [episodes, setEpisodes] = useState<any[] | null>(null);
-  const [jobs, setJobs] = useState<any[] | null>(null);
-  const [costs, setCosts] = useState<any>(null);
+  const [shows, setShows] = useState<Show[] | null>(null);
+  const [episodes, setEpisodes] = useState<Episode[] | null>(null);
+  const [jobs, setJobs] = useState<Job[] | null>(null);
+  const [costs, setCosts] = useState<CostSummary | null>(null);
   const [loading, setLoading] = useState(true);
+  const [episodeFilter, setEpisodeFilter] = useState<EpisodeFilter>('all');
+  const toast = useToast();
+
+  const filteredEpisodes = useMemo(() => {
+    if (!episodes) return [];
+    if (episodeFilter === 'all') return episodes;
+    return episodes.filter(ep => {
+      if (episodeFilter === 'rendered') return ep.status === 'rendered' || ep.status === 'published';
+      if (episodeFilter === 'published') return ep.status === 'published';
+      if (episodeFilter === 'failed') return ep.status === 'failed';
+      return true;
+    });
+  }, [episodes, episodeFilter]);
 
   useEffect(() => {
     Promise.all([
-      fetchShows().catch(() => []),
-      fetchEpisodes().catch(() => []),
-      fetchJobs().catch(() => []),
-      fetchCosts().catch(() => null),
+      fetchShows().catch((e) => { toast('error', 'Failed to load shows'); return [] as Show[]; }),
+      fetchEpisodes().catch((e) => { toast('error', 'Failed to load episodes'); return [] as Episode[]; }),
+      fetchJobs().catch((e) => { toast('error', 'Failed to load jobs'); return [] as Job[]; }),
+      fetchCosts().catch((e) => { toast('error', 'Failed to load costs'); return null; }),
     ]).then(([s, e, j, c]) => {
       setShows(s);
       setEpisodes(e);
@@ -55,26 +64,10 @@ export default function Home() {
           </>
         ) : (
           <>
-            <div className="card">
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Shows</div>
-              <div style={{ fontSize: 32, fontFamily: 'var(--font-mono)', fontWeight: 700 }}>{shows?.length || 0}</div>
-            </div>
-            <div className="card">
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Episodes</div>
-              <div style={{ fontSize: 32, fontFamily: 'var(--font-mono)', fontWeight: 700 }}>{episodes?.length || 0}</div>
-            </div>
-            <div className="card">
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Total Spend</div>
-              <div style={{ fontSize: 32, fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--amber)' }}>
-                ${costs?.totalCost?.toFixed(2) || '0.00'}
-              </div>
-            </div>
-            <div className="card">
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Active Jobs</div>
-              <div style={{ fontSize: 32, fontFamily: 'var(--font-mono)', fontWeight: 700, color: activeJobs > 0 ? 'var(--green)' : 'var(--text-muted)' }}>
-                {activeJobs}
-              </div>
-            </div>
+            <StatCard label="Shows" value={shows?.length || 0} />
+            <StatCard label="Episodes" value={episodes?.length || 0} />
+            <StatCard label="Total Spend" value={`$${costs?.totalCost?.toFixed(2) || '0.00'}`} color="var(--amber)" />
+            <StatCard label="Active Jobs" value={activeJobs} color={activeJobs > 0 ? 'var(--green)' : 'var(--text-muted)'} />
           </>
         )}
       </div>
@@ -85,8 +78,9 @@ export default function Home() {
           <h3>Quick Actions</h3>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
+          <Link to="/produce" className="btn btn-primary">Produce</Link>
           <Link to="/shows" className="btn btn-secondary">Shows</Link>
-          <Link to="/pipeline" className="btn btn-primary">Pipeline</Link>
+          <Link to="/pipeline" className="btn btn-secondary">Pipeline</Link>
           <Link to="/render" className="btn btn-secondary">Renders</Link>
         </div>
       </div>
@@ -131,14 +125,26 @@ export default function Home() {
         </div>
       )}
 
-      {/* Episode cards */}
+      {/* Episode cards with filter */}
       {episodes && episodes.length > 0 && (
         <div className="card">
           <div className="card-header">
-            <h3>Episodes</h3>
+            <h3>Episodes ({filteredEpisodes.length})</h3>
+            <div style={{ display: 'flex', gap: 4 }}>
+              {(['all', 'rendered', 'published', 'failed'] as const).map(f => (
+                <button
+                  key={f}
+                  className={`btn ${episodeFilter === f ? 'btn-primary' : 'btn-secondary'}`}
+                  style={{ padding: '2px 8px', fontSize: 11 }}
+                  onClick={() => setEpisodeFilter(f)}
+                >
+                  {f}
+                </button>
+              ))}
+            </div>
           </div>
           <div className="grid-3">
-            {episodes.map(ep => (
+            {filteredEpisodes.map(ep => (
               <Link
                 key={ep.id}
                 to={`/episodes/${ep.id}`}
@@ -150,15 +156,26 @@ export default function Home() {
               >
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                   <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: 14 }}>{ep.id}</span>
-                  <span className={`badge badge-${ep.status === 'published' ? 'published' : ep.status === 'rendered' ? 'done' : 'queued'}`}>
+                  <span className={`badge badge-${ep.status === 'published' ? 'published' : ep.status === 'rendered' ? 'done' : ep.status === 'failed' ? 'failed' : 'queued'}`}>
                     {ep.status || 'draft'}
                   </span>
                 </div>
-                <div style={{ fontSize: 13, marginBottom: 8 }} className="truncate">
+                <div style={{ fontSize: 13, marginBottom: 4 }} className="truncate">
                   {ep.title || ep.venue || 'Untitled'}
                 </div>
+                {ep.show_date && (
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', marginBottom: 4 }}>
+                    {ep.show_date}
+                  </div>
+                )}
+                {ep.duration_seconds != null && (
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                    {Math.round(ep.duration_seconds / 60)}m
+                    {ep.total_cost != null && <span> · ${ep.total_cost.toFixed(2)}</span>}
+                  </div>
+                )}
                 {ep.progress != null && (
-                  <div style={{ background: 'var(--bg-base)', borderRadius: 3, height: 4, overflow: 'hidden' }}>
+                  <div style={{ marginTop: 6, background: 'var(--bg-base)', borderRadius: 3, height: 4, overflow: 'hidden' }}>
                     <div style={{
                       width: `${Math.min(100, ep.progress)}%`, height: '100%',
                       background: 'var(--amber)', borderRadius: 3,
@@ -166,7 +183,7 @@ export default function Home() {
                   </div>
                 )}
                 {ep.youtube_url && (
-                  <div style={{ marginTop: 8, fontSize: 11, color: 'var(--text-muted)' }}>
+                  <div style={{ marginTop: 6, fontSize: 11, color: 'var(--green)' }}>
                     YouTube published
                   </div>
                 )}
