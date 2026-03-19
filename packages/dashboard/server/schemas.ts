@@ -26,6 +26,27 @@ export const ArchiveIngestBody = z.object({
   identifier: z.string().optional(),
 });
 
+// ─── Bridge ───
+
+export const BridgeRunBody = z.object({
+  dataDir: z.string().optional(),
+});
+
+export const BridgeOverrideBody = z.object({
+  songOverrides: z.record(z.string(), z.object({
+    defaultMode: z.string().optional(),
+    palette: z.object({
+      primary: z.number().optional(),
+      secondary: z.number().optional(),
+    }).optional(),
+  })).optional(),
+  chapterOverrides: z.array(z.object({
+    index: z.number(),
+    text: z.string(),
+  })).optional(),
+  setBreakDuration: z.number().min(0).max(60).optional(),
+});
+
 // ─── Visualizer ───
 
 export const VisualizerRenderBody = z.object({
@@ -36,6 +57,11 @@ export const VisualizerRenderBody = z.object({
   gl: z.enum(['angle', 'egl', 'swiftshader', 'swangle', 'vulkan']).optional(),
   concurrency: z.number().int().min(1).max(16).optional(),
   seed: z.number().int().optional(),
+  noIntro: z.boolean().optional(),
+  noEndCard: z.boolean().optional(),
+  noChapters: z.boolean().optional(),
+  noSetBreaks: z.boolean().optional(),
+  setBreakSeconds: z.number().int().min(0).max(60).optional(),
 });
 
 export const SetlistBody = z.object({
@@ -88,6 +114,9 @@ export const BatchCreateBody = z.object({
   dates: z.array(dateString).min(1).max(100),
   preset: z.string().optional(),
   force: z.boolean().optional(),
+  mode: z.enum(['full', 'render-only', 'bridge-and-render']).optional(),
+  seed: z.number().int().optional(),
+  concurrency: z.number().int().min(1).max(16).optional(),
 });
 
 export const BatchRetryBody = z.object({
@@ -100,6 +129,16 @@ export const RerenderBody = z.object({
   preset: z.string().optional(),
   seed: z.number().int().optional(),
   force: z.boolean().optional(),
+});
+
+// ─── Publish ───
+
+export const PublishBody = z.object({
+  title: z.string().min(1).max(100),
+  description: z.string().optional(),
+  tags: z.array(z.string()).optional(),
+  privacyStatus: z.enum(['public', 'unlisted', 'private']).optional(),
+  scheduledAt: z.string().optional(),
 });
 
 // ─── Validate Helper ───

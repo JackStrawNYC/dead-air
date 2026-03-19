@@ -1,5 +1,5 @@
 import type { Response } from 'express';
-import { runPipeline } from './job-runner.js';
+import { runPipeline, runBridge, runVisualizerRender } from './job-runner.js';
 import { getJob } from './job-store.js';
 import type { Job } from './job-store.js';
 
@@ -10,12 +10,17 @@ export interface BatchShowStatus {
   error?: string;
 }
 
+export type BatchMode = 'full' | 'render-only' | 'bridge-and-render';
+
 export interface Batch {
   id: string;
   status: 'running' | 'done' | 'failed' | 'cancelled';
   dates: string[];
   preset?: string;
   force?: boolean;
+  mode: BatchMode;
+  seed?: number;
+  concurrency?: number;
   shows: BatchShowStatus[];
   createdAt: string;
   finishedAt?: string;
@@ -29,6 +34,9 @@ export function createBatch(opts: {
   dates: string[];
   preset?: string;
   force?: boolean;
+  mode?: BatchMode;
+  seed?: number;
+  concurrency?: number;
 }): Batch {
   const id = `batch-${++batchCounter}-${Date.now().toString(36)}`;
   const batch: Batch = {
@@ -37,6 +45,9 @@ export function createBatch(opts: {
     dates: opts.dates,
     preset: opts.preset,
     force: opts.force,
+    mode: opts.mode || 'full',
+    seed: opts.seed,
+    concurrency: opts.concurrency,
     shows: opts.dates.map(date => ({ date, status: 'pending' })),
     createdAt: new Date().toISOString(),
     clients: new Set(),
@@ -123,6 +134,7 @@ function serializeBatch(batch: Batch) {
     status: batch.status,
     dates: batch.dates,
     preset: batch.preset,
+    mode: batch.mode,
     shows: batch.shows,
     createdAt: batch.createdAt,
     finishedAt: batch.finishedAt,
@@ -139,22 +151,54 @@ async function processBatch(batch: Batch): Promise<void> {
     broadcastBatch(batch, 'state', serializeBatch(batch));
 
     try {
-      const job = runPipeline({
-        date: show.date,
-        force: batch.force,
-      });
-      show.jobId = job.id;
-      broadcastBatch(batch, 'state', serializeBatch(batch));
-
-      // Wait for job to complete
-      await waitForJob(job);
-
-      const finalJob = getJob(job.id);
-      if (finalJob?.status === 'done') {
-        show.status = 'done';
+      if (batch.mode === 'render-only') {
+        // Render only — skip pipeline and bridge
+        const job = runVisualizerRender({
+          preset: batch.preset,
+          seed: batch.seed,
+          concurrency: batch.concurrency,
+        });
+        show.jobId = job.id;
+        broadcastBatch(batch, 'state', serializeBatch(batch));
+        await waitForJob(job);
+        const finalJob = getJob(job.id);
+        show.status = finalJob?.status === 'done' ? 'done' : 'failed';
+        if (show.status === 'failed') show.error = finalJob?.error || 'Render failed';
+      } else if (batch.mode === 'bridge-and-render') {
+        // Bridge then render
+        const bridgeJob = runBridge({ date: show.date });
+        show.jobId = bridgeJob.id;
+        broadcastBatch(batch, 'state', serializeBatch(batch));
+        await waitForJob(bridgeJob);
+        const finalBridge = getJob(bridgeJob.id);
+        if (finalBridge?.status !== 'done') {
+          show.status = 'failed';
+          show.error = finalBridge?.error || 'Bridge failed';
+        } else {
+          const renderJob = runVisualizerRender({
+            preset: batch.preset,
+            seed: batch.seed,
+            concurrency: batch.concurrency,
+          });
+          show.jobId = renderJob.id;
+          broadcastBatch(batch, 'state', serializeBatch(batch));
+          await waitForJob(renderJob);
+          const finalRender = getJob(renderJob.id);
+          show.status = finalRender?.status === 'done' ? 'done' : 'failed';
+          if (show.status === 'failed') show.error = finalRender?.error || 'Render failed';
+        }
       } else {
-        show.status = 'failed';
-        show.error = finalJob?.error || 'Pipeline failed';
+        // Full pipeline (default)
+        const job = runPipeline({
+          date: show.date,
+          force: batch.force,
+        });
+        show.jobId = job.id;
+        broadcastBatch(batch, 'state', serializeBatch(batch));
+        await waitForJob(job);
+        const finalJob = getJob(job.id);
+        show.status = finalJob?.status === 'done' ? 'done' : 'failed';
+        if (show.status === 'failed') show.error = finalJob?.error || 'Pipeline failed';
       }
     } catch (err) {
       show.status = 'failed';

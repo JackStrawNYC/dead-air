@@ -3,7 +3,7 @@ import type { StageTiming } from '../types';
 import type { LogEntry } from '../hooks/useJob';
 import { formatElapsed } from '../utils/format';
 
-const STAGES = ['ingest', 'analyze', 'research', 'script', 'generate', 'render'];
+const STAGES = ['ingest', 'analyze', 'research', 'script', 'generate', 'bridge', 'render'];
 
 const STAGE_LABELS: Record<string, string> = {
   ingest: 'Ingest',
@@ -11,6 +11,7 @@ const STAGE_LABELS: Record<string, string> = {
   research: 'Research',
   script: 'Script',
   generate: 'Generate',
+  bridge: 'Bridge',
   render: 'Render',
 };
 

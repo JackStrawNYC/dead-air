@@ -1,16 +1,22 @@
 import { useState, useEffect } from 'react';
 import { createBatch, fetchBatches, fetchBatch, retryBatch, cancelBatch } from '../api';
-import type { Batch as BatchType } from '../types';
+import type { Batch as BatchType, BatchMode } from '../types';
 import { useToast } from '../hooks/useToast';
 import { useSSE } from '../hooks/useSSE';
+import { useNotifications } from '../hooks/useNotifications';
 import { formatElapsed, relativeTime } from '../utils/format';
+import PresetSelector from '../components/PresetSelector';
 
 export default function Batch() {
   const toast = useToast();
+  const { requestPermission, notify } = useNotifications();
 
   // Create form
   const [dateInput, setDateInput] = useState('');
   const [force, setForce] = useState(false);
+  const [mode, setMode] = useState<BatchMode>('full');
+  const [preset, setPreset] = useState('preview');
+  const [seedInput, setSeedInput] = useState('');
   const [creating, setCreating] = useState(false);
 
   // Batch list
@@ -28,6 +34,7 @@ export default function Batch() {
   // Load batches on mount
   useEffect(() => {
     loadBatches();
+    requestPermission();
   }, []);
 
   // Update active batch from SSE
@@ -35,7 +42,16 @@ export default function Batch() {
     const stateMessages = messages.filter(m => m.event === 'state' || m.event === 'done');
     if (stateMessages.length > 0) {
       const latest = stateMessages[stateMessages.length - 1];
-      setActiveBatch(latest.data as unknown as BatchType);
+      const batchData = latest.data as unknown as BatchType;
+      setActiveBatch(batchData);
+      // Notify on batch completion
+      if (latest.event === 'done') {
+        const doneCount = batchData.shows.filter(s => s.status === 'done').length;
+        notify(
+          'Batch Complete',
+          `${doneCount}/${batchData.shows.length} shows completed`,
+        );
+      }
     }
   }, [messages]);
 
@@ -64,9 +80,15 @@ export default function Batch() {
 
     setCreating(true);
     try {
-      const res = await createBatch({ dates, force: force || undefined });
+      const res = await createBatch({
+        dates,
+        force: force || undefined,
+        mode,
+        preset: mode !== 'full' ? preset : undefined,
+        seed: seedInput ? parseInt(seedInput, 10) : undefined,
+      });
       setActiveBatchId(res.batchId);
-      toast('success', `Batch created with ${dates.length} shows`);
+      toast('success', `Batch created with ${dates.length} shows (${mode})`);
       setDateInput('');
       loadBatches();
     } catch (err) {
@@ -143,6 +165,33 @@ export default function Batch() {
         <div className="card-header">
           <h3>Create Batch</h3>
         </div>
+
+        {/* Mode selector */}
+        <div style={{ marginBottom: 12 }}>
+          <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 6, textTransform: 'uppercase' }}>
+            Batch Mode
+          </label>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {([
+              { value: 'full', label: 'Full Pipeline', desc: 'Ingest + Analyze + Produce + Render' },
+              { value: 'render-only', label: 'Render Only', desc: 'Uses existing pipeline output' },
+              { value: 'bridge-and-render', label: 'Bridge & Render', desc: 'Bridge + Render (skip pipeline)' },
+            ] as const).map(opt => (
+              <button
+                key={opt.value}
+                className={`btn ${mode === opt.value ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => setMode(opt.value)}
+                style={{ textAlign: 'left', padding: '8px 12px' }}
+              >
+                <div style={{ fontWeight: 600, fontSize: 12 }}>{opt.label}</div>
+                <div style={{ fontSize: 10, color: mode === opt.value ? 'inherit' : 'var(--text-muted)', opacity: 0.8 }}>
+                  {opt.desc}
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+
         <div style={{ marginBottom: 12 }}>
           <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 4, textTransform: 'uppercase' }}>
             Dates (one per line, comma-separated, or semicolon-separated)
@@ -165,6 +214,27 @@ export default function Batch() {
             }}
           />
         </div>
+
+        {/* Options for render modes */}
+        {mode !== 'full' && (
+          <div style={{ display: 'flex', gap: 12, marginBottom: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+            <div>
+              <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>PRESET</label>
+              <PresetSelector value={preset} onChange={setPreset} />
+            </div>
+            <div>
+              <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>SEED</label>
+              <input
+                type="number"
+                placeholder="Optional"
+                value={seedInput}
+                onChange={e => setSeedInput(e.target.value)}
+                style={{ width: 100, fontFamily: 'var(--font-mono)', fontSize: 12 }}
+              />
+            </div>
+          </div>
+        )}
+
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <label style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 4 }}>
             <input type="checkbox" checked={force} onChange={e => setForce(e.target.checked)} />
@@ -181,9 +251,14 @@ export default function Batch() {
         <div className="card mb-16">
           <div className="card-header">
             <h3>Batch {activeBatch.id}</h3>
-            <span className={`badge badge-${activeBatch.status === 'running' ? 'running' : activeBatch.status === 'done' ? 'done' : 'failed'}`}>
-              {activeBatch.status}
-            </span>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              {activeBatch.mode && activeBatch.mode !== 'full' && (
+                <span className="badge badge-queued">{activeBatch.mode}</span>
+              )}
+              <span className={`badge badge-${activeBatch.status === 'running' ? 'running' : activeBatch.status === 'done' ? 'done' : 'failed'}`}>
+                {activeBatch.status}
+              </span>
+            </div>
           </div>
 
           {/* Progress bar */}
@@ -290,6 +365,7 @@ export default function Batch() {
               <thead>
                 <tr>
                   <th>Batch</th>
+                  <th>Mode</th>
                   <th>Shows</th>
                   <th>Status</th>
                   <th>Created</th>
@@ -301,6 +377,13 @@ export default function Batch() {
                 {batches.map(b => (
                   <tr key={b.id} onClick={() => handleViewBatch(b.id)} style={{ cursor: 'pointer' }}>
                     <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{b.id}</td>
+                    <td style={{ fontSize: 11 }}>
+                      {b.mode && b.mode !== 'full' ? (
+                        <span className="badge badge-queued">{b.mode}</span>
+                      ) : (
+                        <span style={{ color: 'var(--text-muted)' }}>full</span>
+                      )}
+                    </td>
                     <td style={{ fontSize: 12 }}>
                       {b.shows.filter(s => s.status === 'done').length}/{b.dates.length}
                     </td>

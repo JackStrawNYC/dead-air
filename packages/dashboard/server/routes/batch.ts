@@ -17,8 +17,8 @@ router.post('/', (req, res) => {
   const parsed = validateBody(BatchCreateBody, req.body || {});
   if (!parsed.success) return res.status(400).json({ error: parsed.error });
 
-  const { dates, preset, force } = parsed.data;
-  const batch = createBatch({ dates, preset, force });
+  const { dates, preset, force, mode, seed, concurrency } = parsed.data;
+  const batch = createBatch({ dates, preset, force, mode, seed, concurrency });
   res.json({ batchId: batch.id });
 });
 
@@ -38,6 +38,7 @@ router.get('/:id', (req, res) => {
     status: batch.status,
     dates: batch.dates,
     preset: batch.preset,
+    mode: batch.mode,
     shows: batch.shows,
     createdAt: batch.createdAt,
     finishedAt: batch.finishedAt,

@@ -73,6 +73,11 @@ const dataDirArg = args.find((a) => a.startsWith("--data-dir="))?.split("=")[1];
 const seedArg = args.find((a) => a.startsWith("--seed="))?.split("=")[1];
 const presetArg = args.find((a) => a.startsWith("--preset="))?.split("=")[1];
 const concurrencyArg = args.find((a) => a.startsWith("--concurrency="))?.split("=")[1];
+const noIntro = args.includes("--no-intro");
+const noEndCard = args.includes("--no-end-card");
+const noChapters = args.includes("--no-chapters");
+const noSetBreaks = args.includes("--no-set-breaks");
+const setBreakSecArg = args.find((a) => a.startsWith("--set-break-sec="))?.split("=")[1];
 // Backwards-compatible: --draft maps to draft preset, --preview flag maps to preview preset
 const activePreset: RenderPreset | null = presetArg
   ? PRESETS[presetArg] ?? null
@@ -411,7 +416,8 @@ function renderSetBreak(bundlePath: string): string {
     return outputPath;
   }
 
-  console.log("\nRendering set break (10s) ...");
+  const breakDuration = setBreakSecArg ? parseInt(setBreakSecArg, 10) : 10;
+  console.log(`\nRendering set break (${breakDuration}s) ...`);
   const cmd = [
     "npx remotion render",
     bundlePath,
@@ -490,14 +496,14 @@ function concatShow(
 
   for (const { path, set, trackId } of rendered) {
     // Insert set break between sets
-    if (set !== prevSet && prevSet !== 0 && set !== 0) {
+    if (set !== prevSet && prevSet !== 0 && set !== 0 && !noSetBreaks) {
       const breakPath = renderSetBreak(bundlePath);
       entries.push(`file '${breakPath}'`);
       console.log(`  Inserted set break between set ${prevSet} and set ${set}`);
     }
 
     // Insert "before" chapter cards (skip for segue-into songs — music flows continuously)
-    if (trackId && !segueIntoSet.has(trackId)) {
+    if (!noChapters && trackId && !segueIntoSet.has(trackId)) {
       const beforeIndices = chaptersBefore.get(trackId);
       if (beforeIndices) {
         for (const idx of beforeIndices) {
@@ -507,7 +513,7 @@ function concatShow(
           console.log(`  Inserted chapter ${idx} before ${trackId}`);
         }
       }
-    } else if (trackId && segueIntoSet.has(trackId)) {
+    } else if (!noChapters && trackId && segueIntoSet.has(trackId)) {
       const beforeIndices = chaptersBefore.get(trackId);
       if (beforeIndices?.length) {
         console.log(`  SEGUE: skipped ${beforeIndices.length} chapter card(s) before ${trackId}`);
@@ -517,7 +523,7 @@ function concatShow(
     entries.push(`file '${path}'`);
 
     // Insert "after" chapter cards (after this song)
-    if (trackId) {
+    if (!noChapters && trackId) {
       const afterIndices = chaptersAfter.get(trackId);
       if (afterIndices) {
         for (const idx of afterIndices) {
@@ -614,7 +620,7 @@ function main() {
   const startTime = Date.now();
   let framesRendered = 0;
 
-  if (!trackFilter && !previewMode) {
+  if (!trackFilter && !previewMode && !noIntro) {
     const introPath = renderShowIntro(bundlePath);
     if (introPath) {
       rendered.push({ path: introPath, set: 0 });
@@ -658,7 +664,7 @@ function main() {
     }
   }
 
-  if (!trackFilter && !previewMode) {
+  if (!trackFilter && !previewMode && !noEndCard) {
     const endCardPath = renderEndCard(bundlePath);
     rendered.push({ path: endCardPath, set: 0 });
   }

@@ -10,6 +10,8 @@ import archiveRouter from './routes/archive.js';
 import preflightRouter from './routes/preflight.js';
 import assetReviewRouter from './routes/asset-review.js';
 import batchRouter from './routes/batch.js';
+import bridgeRouter from './routes/bridge.js';
+import publishRouter from './routes/publish.js';
 
 const router = Router();
 
@@ -24,5 +26,7 @@ router.use('/visualizer', visualizerRouter);
 router.use('/preflight', preflightRouter);
 router.use('/asset-review', assetReviewRouter);
 router.use('/batch', batchRouter);
+router.use('/bridge', bridgeRouter);
+router.use('/publish', publishRouter);
 
 export default router;

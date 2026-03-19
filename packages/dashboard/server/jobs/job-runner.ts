@@ -11,6 +11,7 @@ const __dirname = dirname(__filename);
 const MONOREPO_ROOT = resolve(__dirname, '..', '..', '..', '..');
 const CLI_ENTRY = resolve(MONOREPO_ROOT, 'packages/cli/src/index.ts');
 const VISUALIZER_RENDER = resolve(MONOREPO_ROOT, 'packages/visualizer-poc/scripts/render-show.ts');
+const BRIDGE_PIPELINE = resolve(MONOREPO_ROOT, 'packages/visualizer-poc/scripts/bridge-pipeline.ts');
 
 const STAGE_PATTERNS: Array<[RegExp, string]> = [
   [/ingesting show/i, 'ingest'],
@@ -19,6 +20,7 @@ const STAGE_PATTERNS: Array<[RegExp, string]> = [
   [/generating script/i, 'script'],
   [/generating assets/i, 'generate'],
   [/rendering episode/i, 'render'],
+  [/bridge pipeline/i, 'bridge'],
   [/stage: (\w+)/i, '$1'],
 ];
 
@@ -64,6 +66,23 @@ export function runIngest(date: string, identifier?: string): Job {
   return job;
 }
 
+export function runBridge(opts: {
+  date: string;
+  dataDir?: string;
+}): Job {
+  const args = ['tsx', BRIDGE_PIPELINE, `--date=${opts.date}`];
+  if (opts.dataDir) args.push(`--data-dir=${opts.dataDir}`);
+
+  const job = createJob({
+    type: 'bridge',
+    showDate: opts.date,
+    stages: ['bridge'],
+  });
+
+  spawnAndStream(job, 'npx', args);
+  return job;
+}
+
 export function runVisualizerRender(opts: {
   track?: string;
   resume?: boolean;
@@ -72,6 +91,11 @@ export function runVisualizerRender(opts: {
   gl?: string;
   concurrency?: number;
   seed?: number;
+  noIntro?: boolean;
+  noEndCard?: boolean;
+  noChapters?: boolean;
+  noSetBreaks?: boolean;
+  setBreakSeconds?: number;
 }): Job {
   const args = ['tsx', VISUALIZER_RENDER];
   if (opts.track) args.push(`--track=${opts.track}`);
@@ -81,6 +105,11 @@ export function runVisualizerRender(opts: {
   if (opts.concurrency) args.push(`--concurrency=${opts.concurrency}`);
   if (opts.seed) args.push(`--seed=${opts.seed}`);
   args.push(`--gl=${opts.gl || 'angle'}`);
+  if (opts.noIntro) args.push('--no-intro');
+  if (opts.noEndCard) args.push('--no-end-card');
+  if (opts.noChapters) args.push('--no-chapters');
+  if (opts.noSetBreaks) args.push('--no-set-breaks');
+  if (opts.setBreakSeconds != null) args.push(`--set-break-sec=${opts.setBreakSeconds}`);
 
   const job = createJob({ type: 'render' });
   spawnAndStream(job, 'npx', args);

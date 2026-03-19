@@ -11,6 +11,7 @@ import ConfirmDialog from '../components/ConfirmDialog';
 import PreflightChecks from '../components/PreflightChecks';
 import StageTracker from '../components/StageTracker';
 import { useToast } from '../hooks/useToast';
+import { useNotifications } from '../hooks/useNotifications';
 
 const STAGES = ['ingest', 'analyze', 'research', 'script', 'generate', 'render'];
 
@@ -28,13 +29,25 @@ export default function Pipeline() {
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [preflightOk, setPreflightOk] = useState(true);
   const toast = useToast();
+  const { requestPermission, notify } = useNotifications();
 
   const effectiveDate = date === '__custom' ? customDate : date;
 
   useEffect(() => {
     fetchShows().then(setShows).catch((e) => { toast('error', 'Failed to load shows'); });
     fetchJobs().then(setRecentJobs).catch((e) => { toast('error', 'Failed to load jobs'); });
+    requestPermission();
   }, []);
+
+  // Notify on job completion
+  useEffect(() => {
+    if (done && result) {
+      notify(
+        result.success ? 'Pipeline Complete' : 'Pipeline Failed',
+        result.success ? `Job ${jobId} finished` : `Job ${jobId} failed: ${result.error}`,
+      );
+    }
+  }, [done, result]);
 
   const completedStages = STAGES.filter(s => {
     if (!currentStage) return false;

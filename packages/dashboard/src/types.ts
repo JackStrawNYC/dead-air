@@ -92,11 +92,14 @@ export interface BatchShowStatus {
   error?: string;
 }
 
+export type BatchMode = 'full' | 'render-only' | 'bridge-and-render';
+
 export interface Batch {
   id: string;
   status: 'running' | 'done' | 'failed' | 'cancelled';
   dates: string[];
   preset?: string;
+  mode?: BatchMode;
   shows: BatchShowStatus[];
   createdAt: string;
   finishedAt?: string;

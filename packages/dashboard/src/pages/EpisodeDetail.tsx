@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { fetchEpisode, fetchEpisodeCosts, fetchAssets, fetchSegments, getRenderOutputUrl, rerenderEpisode } from '../api';
+import { fetchEpisode, fetchEpisodeCosts, fetchAssets, fetchSegments, getRenderOutputUrl, rerenderEpisode, getYoutubeAuthUrl, getYoutubeAuthStatus, publishEpisode } from '../api';
 import type { Episode, EpisodeCosts, AssetResponse, SegmentResponse } from '../types';
 import Skeleton from '../components/Skeleton';
 import AssetCard from '../components/AssetCard';
@@ -21,6 +21,12 @@ export default function EpisodeDetail() {
   const [showRerender, setShowRerender] = useState(false);
   const [rerenderPreset, setRerenderPreset] = useState('preview');
   const [rerendering, setRerendering] = useState(false);
+  const [showPublish, setShowPublish] = useState(false);
+  const [ytAuthenticated, setYtAuthenticated] = useState(false);
+  const [publishTitle, setPublishTitle] = useState('');
+  const [publishDescription, setPublishDescription] = useState('');
+  const [publishPrivacy, setPublishPrivacy] = useState<'unlisted' | 'public' | 'private'>('unlisted');
+  const [publishing, setPublishing] = useState(false);
   const toast = useToast();
 
   useEffect(() => {
@@ -31,11 +37,18 @@ export default function EpisodeDetail() {
       fetchEpisodeCosts(id).catch((e) => { toast('error', 'Failed to load costs'); return null; }),
       fetchAssets(id).catch((e) => { toast('error', 'Failed to load assets'); return null; }),
       fetchSegments(id).catch(() => null),
-    ]).then(([epData, c, a, segs]) => {
-      setEpisode(epData ? (epData as { episode: Episode }).episode : null);
+      getYoutubeAuthStatus().catch(() => ({ authenticated: false })),
+    ]).then(([epData, c, a, segs, authStatus]) => {
+      const ep = epData ? (epData as { episode: Episode }).episode : null;
+      setEpisode(ep);
       setCosts(c);
       setAssets(a);
       setSegments(segs);
+      setYtAuthenticated(authStatus?.authenticated ?? false);
+      if (ep) {
+        setPublishTitle(ep.title || `Dead Air — ${ep.show_date || ep.id}`);
+        setPublishDescription(`Grateful Dead ${ep.show_date || ''} — ${ep.venue || ''}, ${ep.city || ''}`);
+      }
       setLoading(false);
     });
   }, [id]);
@@ -174,6 +187,9 @@ export default function EpisodeDetail() {
                   <button className="btn btn-primary" onClick={() => setShowRerender(!showRerender)}>
                     {showRerender ? 'Cancel' : 'Re-Render'}
                   </button>
+                  <button className="btn btn-secondary" onClick={() => setShowPublish(!showPublish)}>
+                    {showPublish ? 'Cancel' : 'Publish to YouTube'}
+                  </button>
                 </div>
               </div>
             </div>
@@ -209,6 +225,99 @@ export default function EpisodeDetail() {
               >
                 {rerendering ? 'Starting...' : 'Start Re-Render'}
               </button>
+            </div>
+          )}
+
+          {/* Publish to YouTube */}
+          {showPublish && id && (
+            <div className="card mb-16">
+              <div className="card-header">
+                <h3>Publish to YouTube</h3>
+              </div>
+
+              {!ytAuthenticated ? (
+                <div>
+                  <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>
+                    YouTube account not connected. Connect to enable publishing.
+                  </p>
+                  <button
+                    className="btn btn-primary"
+                    onClick={async () => {
+                      try {
+                        const { url } = await getYoutubeAuthUrl();
+                        window.open(url, '_blank');
+                      } catch (err) {
+                        toast('error', err instanceof Error ? err.message : 'Failed to get auth URL. Set YOUTUBE_CREDENTIALS env var.');
+                      }
+                    }}
+                  >
+                    Connect YouTube
+                  </button>
+                </div>
+              ) : (
+                <div>
+                  <div style={{ marginBottom: 12 }}>
+                    <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>TITLE</label>
+                    <input
+                      type="text"
+                      value={publishTitle}
+                      onChange={e => setPublishTitle(e.target.value)}
+                      maxLength={100}
+                      style={{ width: '100%', fontSize: 13 }}
+                    />
+                  </div>
+                  <div style={{ marginBottom: 12 }}>
+                    <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>DESCRIPTION</label>
+                    <textarea
+                      value={publishDescription}
+                      onChange={e => setPublishDescription(e.target.value)}
+                      style={{
+                        width: '100%', minHeight: 60, fontSize: 12,
+                        background: 'var(--bg-base)', color: 'var(--text-primary)',
+                        border: '1px solid var(--border)', borderRadius: 'var(--radius)',
+                        padding: 8, resize: 'vertical',
+                      }}
+                    />
+                  </div>
+                  <div style={{ marginBottom: 12 }}>
+                    <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>PRIVACY</label>
+                    <select
+                      value={publishPrivacy}
+                      onChange={e => setPublishPrivacy(e.target.value as 'public' | 'unlisted' | 'private')}
+                      style={{ width: 140 }}
+                    >
+                      <option value="unlisted">Unlisted</option>
+                      <option value="public">Public</option>
+                      <option value="private">Private</option>
+                    </select>
+                  </div>
+                  <button
+                    className="btn btn-primary"
+                    disabled={publishing || !publishTitle}
+                    onClick={async () => {
+                      setPublishing(true);
+                      try {
+                        const result = await publishEpisode(id, {
+                          title: publishTitle,
+                          description: publishDescription,
+                          privacyStatus: publishPrivacy,
+                        });
+                        toast('success', `Published! ${result.url}`);
+                        setShowPublish(false);
+                        // Refresh episode data to show youtube_url
+                        const epData = await fetchEpisode(id);
+                        setEpisode((epData as { episode: Episode }).episode);
+                      } catch (err) {
+                        toast('error', err instanceof Error ? err.message : 'Publish failed');
+                      } finally {
+                        setPublishing(false);
+                      }
+                    }}
+                  >
+                    {publishing ? 'Uploading...' : 'Upload to YouTube'}
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>

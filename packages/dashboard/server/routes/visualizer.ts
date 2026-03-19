@@ -121,8 +121,8 @@ router.get('/overlay-names', (_req, res) => {
 router.post('/render', (req, res) => {
   const parsed = validateBody(VisualizerRenderBody, req.body || {});
   if (!parsed.success) return res.status(400).json({ error: parsed.error });
-  const { track, resume, preset, preview, gl, concurrency, seed } = parsed.data;
-  const job = runVisualizerRender({ track, resume, preset, preview, gl, concurrency, seed });
+  const { track, resume, preset, preview, gl, concurrency, seed, noIntro, noEndCard, noChapters, noSetBreaks, setBreakSeconds } = parsed.data;
+  const job = runVisualizerRender({ track, resume, preset, preview, gl, concurrency, seed, noIntro, noEndCard, noChapters, noSetBreaks, setBreakSeconds });
   res.json({ jobId: job.id });
 });
 

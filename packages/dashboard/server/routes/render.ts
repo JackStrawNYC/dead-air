@@ -1,8 +1,14 @@
 import { Router } from 'express';
 import { readdirSync, statSync, existsSync, createReadStream } from 'fs';
-import { resolve } from 'path';
+import { resolve, dirname } from 'path';
+import { fileURLToPath } from 'url';
 import { loadConfig } from '../config.js';
 import { sanitizeParam } from '../utils.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const MONOREPO_ROOT = resolve(__dirname, '..', '..', '..', '..');
+const VIZ_OUT = resolve(MONOREPO_ROOT, 'packages/visualizer-poc/out/songs');
 
 const router = Router();
 
@@ -65,6 +71,24 @@ router.get('/:episodeId/output', (req, res) => {
     'Content-Disposition': `attachment; filename="${episodeId}.mp4"`,
   });
   createReadStream(filePath).pipe(res);
+});
+
+// GET /api/render/preview/:trackId — serve preview MP4
+router.get('/preview/:trackId', (req, res) => {
+  const trackId = sanitizeParam(req.params.trackId);
+  const previewPath = resolve(VIZ_OUT, `${trackId}-preview.mp4`);
+
+  if (!existsSync(previewPath)) {
+    return res.status(404).json({ error: 'Preview not found' });
+  }
+
+  const stat = statSync(previewPath);
+  res.writeHead(200, {
+    'Content-Type': 'video/mp4',
+    'Content-Length': stat.size,
+    'Content-Disposition': `inline; filename="${trackId}-preview.mp4"`,
+  });
+  createReadStream(previewPath).pipe(res);
 });
 
 // GET /api/render/:episodeId/progress — SSE progress stream (polls fs every 2s)

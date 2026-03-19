@@ -1,7 +1,7 @@
 import type {
   Show, Episode, Job, CostSummary, EpisodeCosts,
   AssetResponse, SegmentResponse, SongIdentity,
-  PreflightResult, Batch,
+  PreflightResult, Batch, BatchMode,
 } from './types';
 
 const BASE = '/api';
@@ -66,6 +66,8 @@ export const saveOverlaySchedule = (data: Record<string, unknown>) =>
 export const startVisualizerRender = (opts?: {
   track?: string; resume?: boolean; preset?: string;
   preview?: boolean; gl?: string; concurrency?: number; seed?: number;
+  noIntro?: boolean; noEndCard?: boolean; noChapters?: boolean;
+  noSetBreaks?: boolean; setBreakSeconds?: number;
 }) =>
   request<{ jobId: string }>('/visualizer/render', { method: 'POST', body: JSON.stringify(opts || {}) });
 
@@ -136,7 +138,10 @@ export const approveAssets = (episodeId: string) =>
   });
 
 // Batch
-export const createBatch = (opts: { dates: string[]; preset?: string; force?: boolean }) =>
+export const createBatch = (opts: {
+  dates: string[]; preset?: string; force?: boolean;
+  mode?: BatchMode; seed?: number; concurrency?: number;
+}) =>
   request<{ batchId: string }>('/batch', { method: 'POST', body: JSON.stringify(opts) });
 export const fetchBatches = () => request<Batch[]>('/batch');
 export const fetchBatch = (id: string) => request<Batch>(`/batch/${encodeURIComponent(id)}`);
@@ -166,3 +171,47 @@ export const fetchSongIdentities = () => request<Record<string, SongIdentity>>('
 export const saveSongIdentities = (data: Record<string, SongIdentity>) =>
   request<{ ok: boolean }>('/visualizer/song-identities', { method: 'PUT', body: JSON.stringify(data) });
 export const fetchOverlayNames = () => request<string[]>('/visualizer/overlay-names');
+
+// Bridge
+export const runBridge = (date: string, opts?: { dataDir?: string }) =>
+  request<{ jobId: string }>(`/pipeline/${date}/bridge`, { method: 'POST', body: JSON.stringify(opts || {}) });
+export const fetchBridgeOutput = (date: string) =>
+  request<{ setlist: Record<string, unknown>; timeline: Record<string, unknown>; context: Record<string, unknown> }>(
+    `/bridge/${date}/output`,
+  );
+export const overrideBridge = (date: string, overrides: Record<string, unknown>) =>
+  request<{ ok: boolean }>(`/bridge/${date}/override`, { method: 'POST', body: JSON.stringify(overrides) });
+
+// Preview
+export const getPreviewUrl = (trackId: string) =>
+  `${BASE}/render/preview/${encodeURIComponent(trackId)}`;
+
+// Cost Estimate
+export const fetchCostEstimate = (opts: { songs?: number; duration?: number; preset?: string }) => {
+  const params = new URLSearchParams();
+  if (opts.songs) params.set('songs', String(opts.songs));
+  if (opts.duration) params.set('duration', String(opts.duration));
+  if (opts.preset) params.set('preset', opts.preset);
+  return request<{
+    totalEstimate: number;
+    fixedCost: number;
+    perSongCost: number;
+    byService: Array<{ service: string; total: number }>;
+    confidence: string;
+    basedOnEpisodes: number;
+    songs: number;
+  }>(`/costs/estimate?${params}`);
+};
+
+// Publish
+export const getYoutubeAuthUrl = () => request<{ url: string }>('/publish/auth-url');
+export const getYoutubeAuthStatus = () => request<{ authenticated: boolean }>('/publish/auth-status');
+export const exchangeYoutubeCode = (code: string) =>
+  request<{ ok: boolean }>('/publish/auth-callback', { method: 'POST', body: JSON.stringify({ code }) });
+export const publishEpisode = (episodeId: string, opts: {
+  title: string; description?: string; tags?: string[];
+  privacyStatus?: string; scheduledAt?: string;
+}) =>
+  request<{ videoId: string; url: string }>(`/publish/${encodeURIComponent(episodeId)}`, {
+    method: 'POST', body: JSON.stringify(opts),
+  });

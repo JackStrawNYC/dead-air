@@ -8,7 +8,7 @@ export interface StageTiming {
 
 export interface Job {
   id: string;
-  type: 'pipeline' | 'render' | 'ingest';
+  type: 'pipeline' | 'render' | 'ingest' | 'bridge' | 'preview';
   episodeId?: string;
   showDate?: string;
   status: 'running' | 'done' | 'failed' | 'cancelled';

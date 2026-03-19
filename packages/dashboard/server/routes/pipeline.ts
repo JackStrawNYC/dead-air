@@ -1,7 +1,7 @@
 import { Router } from 'express';
-import { runPipeline, cancelJob } from '../jobs/job-runner.js';
+import { runPipeline, runBridge, cancelJob } from '../jobs/job-runner.js';
 import { getJob, getAllJobs, addClient, removeClient } from '../jobs/job-store.js';
-import { PipelineRunBody, validateBody } from '../schemas.js';
+import { PipelineRunBody, BridgeRunBody, validateBody } from '../schemas.js';
 
 const router = Router();
 
@@ -16,6 +16,18 @@ router.post('/:date/run', (req, res) => {
   const { from, to, force } = parsed.data;
   const job = runPipeline({ date, from, to, force });
   res.json({ jobId: job.id, episodeId: job.episodeId });
+});
+
+// POST /api/pipeline/:date/bridge — trigger bridge pipeline
+router.post('/:date/bridge', (req, res) => {
+  const { date } = req.params;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    return res.status(400).json({ error: 'Invalid date format' });
+  }
+  const parsed = validateBody(BridgeRunBody, req.body || {});
+  if (!parsed.success) return res.status(400).json({ error: parsed.error });
+  const job = runBridge({ date, dataDir: parsed.data.dataDir });
+  res.json({ jobId: job.id });
 });
 
 // GET /api/pipeline/jobs — list all jobs
