@@ -23,6 +23,9 @@ import { applySetShaderFilter } from "../utils/set-theme";
 import { detectChordMood } from "../utils/chord-mood";
 import { estimateImprovisationScore } from "../utils/improv-detector";
 import { selectTransitionStyle } from "../utils/transition-selector";
+import { getShaderStrings } from "../shaders/shader-strings";
+import { DualShaderScene } from "./DualShaderScene";
+import type { DualBlendMode } from "../components/DualShaderQuad";
 
 /**
  * Dynamic crossfade duration based on energy context and spectral flux.
@@ -436,6 +439,14 @@ function averageEnergy(frames: EnhancedFrameData[], start: number, end: number):
   return sum / (hi - lo);
 }
 
+/** Select GPU blend mode based on energy context */
+function selectDualBlendMode(energy: number, sectionEnergy?: string): DualBlendMode {
+  if (energy < 0.08) return "additive";      // quiet: layered glow, ethereal
+  if (energy > 0.25) return "noise_dissolve"; // peak: organic morphing
+  if (sectionEnergy === "low") return "depth_aware"; // ambient: pseudo-3D layering
+  return "luminance_key";                     // mid: bright areas of one show through other
+}
+
 /** Render a scene for a given mode (delegates to scene registry) */
 function renderMode(
   mode: VisualMode,
@@ -540,7 +551,41 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
     }
   }
 
-  const mainScene = renderMode(currentMode, frames, sections, palette, tempo, undefined, jamDensity);
+  // ─── Dual-shader composition for set 2+ ───
+  // Two shaders run simultaneously on the GPU, composited via blend modes.
+  // Creates psychedelic depth that a single shader can't achieve.
+  // Only activates when both shaders support GLSL string extraction.
+  let mainScene: React.ReactNode;
+  const sectionLen = currentSection ? currentSection.frameEnd - currentSection.frameStart : 0;
+  const frameEnergy = frames[Math.min(frame, frames.length - 1)]?.rms ?? 0;
+
+  if (setNumber !== undefined && setNumber >= 2 && sectionLen >= AUTO_VARIETY_MIN_SECTION) {
+    const complementMode = getComplement(currentMode);
+    const stringsA = getShaderStrings(currentMode);
+    const stringsB = getShaderStrings(complementMode);
+
+    if (stringsA && stringsB) {
+      const blendMode = selectDualBlendMode(frameEnergy, currentSection?.energy);
+      // Asymmetric blend: primary dominates (0.25-0.45), energy pushes toward equal mix
+      const sectionProgress = currentSection
+        ? (frame - currentSection.frameStart) / Math.max(1, sectionLen)
+        : 0;
+      const blendProgress = 0.25 + frameEnergy * 0.20 + Math.sin(sectionProgress * Math.PI) * 0.08;
+
+      mainScene = (
+        <DualShaderScene
+          frames={frames} sections={sections} palette={palette} tempo={tempo} jamDensity={jamDensity}
+          vertA={stringsA.vert} fragA={stringsA.frag}
+          vertB={stringsB.vert} fragB={stringsB.frag}
+          blendMode={blendMode} blendProgress={Math.min(0.50, blendProgress)}
+        />
+      );
+    } else {
+      mainScene = renderMode(currentMode, frames, sections, palette, tempo, undefined, jamDensity);
+    }
+  } else {
+    mainScene = renderMode(currentMode, frames, sections, palette, tempo, undefined, jamDensity);
+  }
 
   // Dead air crossfade: transition to ambient shader after music ends
   // Use a neutral desaturated palette so the song's personality doesn't bleed into applause

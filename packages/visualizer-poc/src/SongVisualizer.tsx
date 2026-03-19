@@ -490,10 +490,10 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
     props.show?.songs.length ?? 0,
   );
 
-  // Floor raised from 0.15 → 0.25 to prevent multiplicative stacking from making
-  // overlays invisible. Worst case: drums_space(0.3) × space(0.25) × narrative(0.3)
-  // × fatigue(0.65) = 0.015 — without the floor this kills all overlay visibility.
-  const combinedDensityMult = Math.max(0.25, climaxMod.overlayDensityMult * (jamEvolution.isLongJam ? jamEvolution.densityMult : 1) * sectionVocab.overlayDensityMult * narrativeDirective.overlayDensityMult * endScreenMult * venueProfile.overlayDensityMult * crowdDensityMult * fatigue.densityMult * stemInterplay.densityMult * peakOfShow.densityMult * tempoLock.overlayBreathing * crowdEnergy.densityMult);
+  // Floor at 0.40 prevents 11 stacked multipliers from collapsing overlay visibility.
+  // Quiet sections (56% of song duration) need overlays at ≥7% effective opacity
+  // to maintain psychedelic texture during a 3-hour show.
+  const combinedDensityMult = Math.max(0.40, climaxMod.overlayDensityMult * (jamEvolution.isLongJam ? jamEvolution.densityMult : 1) * sectionVocab.overlayDensityMult * narrativeDirective.overlayDensityMult * endScreenMult * venueProfile.overlayDensityMult * crowdDensityMult * fatigue.densityMult * stemInterplay.densityMult * peakOfShow.densityMult * tempoLock.overlayBreathing * crowdEnergy.densityMult);
   const opacityMap = opacityMapBase ? applyDensityMult(opacityMapBase, combinedDensityMult, rotationSchedule!) : null;
 
   // ─── Lyric trigger suppression ───
@@ -536,9 +536,10 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
   const fadeIn = props.segueIn ? 1 : interpolate(frame, [0, FADE_FRAMES], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
   const fadeOutStart = durationInFrames - FADE_FRAMES - 1;
   const fadeOut = props.segueOut ? 1 : interpolate(frame, [fadeOutStart, durationInFrames - 1], [1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-  // Progressive dim during dead air: after crossfade completes, fade toward 20% over remaining applause
+  // Progressive dim during dead air: after crossfade completes, fade toward 40% over remaining applause.
+  // Applause is emotionally charged — keep enough atmosphere for the poster bookend + shimmer.
   const deadAirDim = isDeadAir
-    ? Math.max(0.20, 1 - (frame - musicEndFrame - DEAD_AIR_CROSSFADE) / (durationInFrames - musicEndFrame - DEAD_AIR_CROSSFADE) * 0.80)
+    ? Math.max(0.40, 1 - (frame - musicEndFrame - DEAD_AIR_CROSSFADE) / (durationInFrames - musicEndFrame - DEAD_AIR_CROSSFADE) * 0.60)
     : 1;
   const opacity = Math.min(fadeIn, fadeOut) * deadAirDim;
 

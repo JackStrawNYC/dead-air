@@ -111,7 +111,7 @@ describe("computeFatigueDampening", () => {
       songsCompleted: 25,
     };
     const result = computeFatigueDampening(extreme);
-    expect(result.densityMult).toBeGreaterThanOrEqual(0.65);
+    expect(result.densityMult).toBeGreaterThanOrEqual(0.80);
     expect(result.densityMult).toBeLessThanOrEqual(1);
     expect(result.motionMult).toBeGreaterThanOrEqual(0.7);
     expect(result.motionMult).toBeLessThanOrEqual(1);

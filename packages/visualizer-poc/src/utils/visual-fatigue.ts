@@ -22,7 +22,7 @@ export interface FatigueInput {
 }
 
 export interface FatigueDampening {
-  /** Overlay density multiplier (0.65-1.0) — reduces visual clutter */
+  /** Overlay density multiplier (0.80-1.0) — gentle dampening preserves vibrancy */
   densityMult: number;
   /** Motion speed multiplier (0.7-1.0) — slows camera/drift */
   motionMult: number;
@@ -94,7 +94,7 @@ export function computeFatigueDampening(
   const dampenAmount = clamp((fatiguePressure - 0.5) * 2, 0, 1);
 
   return {
-    densityMult: lerp(1.0, 0.65, dampenAmount),
+    densityMult: lerp(1.0, 0.80, dampenAmount),
     motionMult: lerp(1.0, 0.7, dampenAmount),
     saturationOffset: lerp(0, -0.08, dampenAmount),
     brightnessOffset: lerp(0, -0.05, dampenAmount),
