@@ -41,13 +41,15 @@ try {
 }
 
 // Import all track analysis files
+// Uses static require path prefix for default show so Webpack can resolve via require.context.
 const analysisCache: Record<string, unknown> = {};
 function loadTrackAnalysis(trackId: string) {
   if (analysisCache[trackId]) return analysisCache[trackId];
   try {
-    const dataDir = (!showId || showId === "cornell-77") ? "../data" : `../data/shows/${showId}`;
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const data = require(`${dataDir}/tracks/${trackId}-analysis.json`);
+    const data = (!showId || showId === "cornell-77")
+      ? require(`../data/tracks/${trackId}-analysis.json`)
+      : require(`../data/shows/${showId}/tracks/${trackId}-analysis.json`);
     const validated = safeParse(FlexibleTrackAnalysisSchema, data);
     analysisCache[trackId] = validated;
     return validated;
