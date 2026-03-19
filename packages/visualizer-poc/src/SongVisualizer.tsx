@@ -63,6 +63,7 @@ import { lookupSongIdentity } from "./data/song-identities";
 import { computeShowArcPhase, getShowArcModifiers } from "./data/show-arc";
 import type { ShowArcPhase } from "./data/show-arc";
 import { computeTourModifiers, applyTourModifiers } from "./utils/tour-position";
+import { getSetTheme, applySetModifiers } from "./utils/set-theme";
 import { computeITResponse } from "./utils/it-response";
 import { isSacredSegue, isJamSegmentTitle } from "./data/band-config";
 import { classifyStemSection, detectSolo, computeVocalWarmth, computeGuitarColorTemp } from "./utils/stem-features";
@@ -210,9 +211,14 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
     [props.show?.nightInRun, props.show?.totalNights, props.show?.daysOff],
   );
 
+  const setTheme = useMemo(
+    () => getSetTheme(props.song.set),
+    [props.song.set],
+  );
+
   const showArcModifiers = useMemo(
-    () => showArcPhase ? applyTourModifiers(getShowArcModifiers(showArcPhase), tourModifiers) : undefined,
-    [showArcPhase, tourModifiers],
+    () => showArcPhase ? applyTourModifiers(applySetModifiers(getShowArcModifiers(showArcPhase), setTheme), tourModifiers) : undefined,
+    [showArcPhase, setTheme, tourModifiers],
   );
 
   // ─── Sacred segue detection ───
@@ -452,7 +458,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
       <div style={{ position: "absolute", inset: 0, opacity }}>
         <CameraMotion frames={f} jamEvolution={jamEvolution} bass={audioSnapshot.bass} cameraFreeze={counterpoint.cameraFreeze || itState.cameraLock || introFactor < 0.5} drumsSpacePhase={drumsSpaceState?.subPhase} fastEnergy={audioSnapshot.fastEnergy} vocalPresence={audioSnapshot.vocalPresence} isSolo={soloState.isSolo} soloIntensity={soloState.intensity}>
         <EraGrade>
-        <EnergyEnvelope snapshot={audioSnapshot} climaxMod={climaxMod} jamColorTemp={jamEvolution.isLongJam ? jamEvolution.colorTemperature : undefined} calibration={energyCalibration} counterpointSatMult={counterpoint.saturationMult} setNumber={props.song.set} drumsSpacePhase={drumsSpaceState?.subPhase} showPhase={narrative?.state.showPhase} songIdentity={songIdentity} showArcModifiers={showArcModifiers} itLuminanceLift={itState.luminanceLift} vocalWarmth={vocalWarmth} guitarColorTemp={guitarColorTemp} deadAirFactor={deadAirFactor} narrativeBrightness={narrativeDirective.brightnessOffset + sectionVocab.brightnessOffset} narrativeTemperature={narrativeDirective.temperature + grooveMods.temperatureShift} introFactor={introFactor}>
+        <EnergyEnvelope snapshot={audioSnapshot} climaxMod={climaxMod} jamColorTemp={jamEvolution.isLongJam ? jamEvolution.colorTemperature : undefined} calibration={energyCalibration} counterpointSatMult={counterpoint.saturationMult} drumsSpacePhase={drumsSpaceState?.subPhase} showPhase={narrative?.state.showPhase} songIdentity={songIdentity} showArcModifiers={showArcModifiers} itLuminanceLift={itState.luminanceLift} vocalWarmth={vocalWarmth} guitarColorTemp={guitarColorTemp} deadAirFactor={deadAirFactor} narrativeBrightness={narrativeDirective.brightnessOffset + sectionVocab.brightnessOffset} narrativeTemperature={narrativeDirective.temperature + grooveMods.temperatureShift} introFactor={introFactor}>
           <div style={{ position: "absolute", inset: 0, opacity: focusState.shaderOpacity * (0.05 + 0.95 * introFactor) }}>
           <SilentErrorBoundary name="SceneRouter">
             {(() => {

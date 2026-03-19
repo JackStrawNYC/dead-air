@@ -1,46 +1,116 @@
 import { describe, it, expect } from "vitest";
-import { getSetTheme } from "./set-theme";
+import { getSetTheme, applySetModifiers } from "./set-theme";
+import type { ShowArcModifiers } from "../data/show-arc";
 
 describe("getSetTheme", () => {
   it("returns warm, punchy theme for set 1", () => {
     const theme = getSetTheme(1);
-    expect(theme.saturationMult).toBe(1.10);
     expect(theme.warmthShift).toBe(5);
     expect(theme.brightnessOffset).toBe(0.03);
+    expect(theme.saturationOffset).toBe(0.02);
+    expect(theme.densityMult).toBe(1.05);
+    expect(theme.windowDurationMult).toBe(0.95);
+    expect(theme.abstractionOffset).toBe(0);
+    expect(theme.overlayBias.character).toBe(0.08);
+    expect(theme.overlayBias.atmospheric).toBe(0.05);
+    expect(theme.overlayBias.sacred).toBe(-0.03);
   });
 
-  it("returns cool, ethereal theme for set 2", () => {
+  it("returns cool, psychedelic theme for set 2", () => {
     const theme = getSetTheme(2);
-    expect(theme.saturationMult).toBe(0.90);
     expect(theme.warmthShift).toBe(-8);
     expect(theme.brightnessOffset).toBe(-0.05);
+    expect(theme.saturationOffset).toBe(-0.03);
+    expect(theme.densityMult).toBe(0.90);
+    expect(theme.windowDurationMult).toBe(1.15);
+    expect(theme.abstractionOffset).toBe(0.10);
+    expect(theme.overlayBias.sacred).toBe(0.10);
+    expect(theme.overlayBias.geometric).toBe(0.08);
+    expect(theme.overlayBias.nature).toBe(0.06);
+    expect(theme.overlayBias.character).toBe(-0.10);
   });
 
-  it("returns subdued, intimate theme for encore (set 3)", () => {
+  it("returns intimate theme for encore (set 3)", () => {
     const theme = getSetTheme(3);
-    expect(theme.saturationMult).toBe(0.85);
-    expect(theme.warmthShift).toBe(0);
-    expect(theme.brightnessOffset).toBe(-0.08);
+    expect(theme.warmthShift).toBe(3);
+    expect(theme.brightnessOffset).toBe(-0.04);
+    expect(theme.saturationOffset).toBe(-0.01);
+    expect(theme.densityMult).toBe(0.85);
+    expect(theme.windowDurationMult).toBe(0.90);
+    expect(theme.abstractionOffset).toBe(0);
+    expect(theme.overlayBias.character).toBe(0.10);
+    expect(theme.overlayBias.atmospheric).toBe(0.08);
+    expect(theme.overlayBias.sacred).toBe(0.03);
+    expect(theme.overlayBias.reactive).toBe(-0.05);
   });
 
   it("returns neutral theme for unknown set number", () => {
     const theme = getSetTheme(99);
-    expect(theme.saturationMult).toBe(1.0);
     expect(theme.warmthShift).toBe(0);
     expect(theme.brightnessOffset).toBe(0);
+    expect(theme.saturationOffset).toBe(0);
+    expect(theme.densityMult).toBe(1);
+    expect(theme.windowDurationMult).toBe(1);
+    expect(theme.abstractionOffset).toBe(0);
+    expect(Object.keys(theme.overlayBias)).toHaveLength(0);
   });
 
   it("returns neutral theme for set 0", () => {
     const theme = getSetTheme(0);
-    expect(theme.saturationMult).toBe(1.0);
+    expect(theme.densityMult).toBe(1);
     expect(theme.warmthShift).toBe(0);
-    expect(theme.brightnessOffset).toBe(0);
   });
 
   it("returns neutral theme for negative set number", () => {
     const theme = getSetTheme(-1);
-    expect(theme.saturationMult).toBe(1.0);
+    expect(theme.densityMult).toBe(1);
     expect(theme.warmthShift).toBe(0);
-    expect(theme.brightnessOffset).toBe(0);
+  });
+});
+
+describe("applySetModifiers", () => {
+  const BASE: ShowArcModifiers = {
+    overlayBias: { character: 0.10, sacred: 0.05 },
+    densityMult: 1.2,
+    windowDurationMult: 0.8,
+    saturationOffset: 0.05,
+    brightnessOffset: 0.03,
+    hueShift: 5,
+    abstractionLevel: 0.1,
+  };
+
+  it("composes set 1 modifiers into base", () => {
+    const result = applySetModifiers(BASE, getSetTheme(1));
+    // Multiplicative
+    expect(result.densityMult).toBeCloseTo(1.2 * 1.05);
+    expect(result.windowDurationMult).toBeCloseTo(0.8 * 0.95);
+    // Additive
+    expect(result.saturationOffset).toBeCloseTo(0.05 + 0.02);
+    expect(result.brightnessOffset).toBeCloseTo(0.03 + 0.03);
+    expect(result.hueShift).toBeCloseTo(5 + 5);
+    // Abstraction clamped
+    expect(result.abstractionLevel).toBeCloseTo(0.1 + 0);
+    // Overlay bias merged
+    expect(result.overlayBias.character).toBeCloseTo(0.10 + 0.08);
+    expect(result.overlayBias.sacred).toBeCloseTo(0.05 + (-0.03));
+    expect(result.overlayBias.atmospheric).toBeCloseTo(0.05);
+  });
+
+  it("composes set 2 modifiers — abstraction clamped to 1", () => {
+    const highAbstraction: ShowArcModifiers = { ...BASE, abstractionLevel: 0.95 };
+    const result = applySetModifiers(highAbstraction, getSetTheme(2));
+    expect(result.abstractionLevel).toBe(1.0); // clamped: 0.95 + 0.10
+  });
+
+  it("composes neutral set without changing base", () => {
+    const result = applySetModifiers(BASE, getSetTheme(99));
+    expect(result.densityMult).toBe(BASE.densityMult);
+    expect(result.windowDurationMult).toBe(BASE.windowDurationMult);
+    expect(result.saturationOffset).toBe(BASE.saturationOffset);
+    expect(result.brightnessOffset).toBe(BASE.brightnessOffset);
+    expect(result.hueShift).toBe(BASE.hueShift);
+    expect(result.abstractionLevel).toBe(BASE.abstractionLevel);
+    expect(result.overlayBias.character).toBe(0.10);
+    expect(result.overlayBias.sacred).toBe(0.05);
   });
 });

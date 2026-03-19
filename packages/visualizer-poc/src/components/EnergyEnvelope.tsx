@@ -15,7 +15,6 @@ import { energyToFactor } from "../utils/energy";
 import type { EnergyCalibration } from "../utils/energy";
 import type { AudioSnapshot } from "../utils/audio-reactive";
 import type { ClimaxModulation } from "../utils/climax-state";
-import { getSetTheme } from "../utils/set-theme";
 import { useShowContext } from "../data/ShowContext";
 import { getEraPreset } from "../data/era-presets";
 import type { SongIdentity } from "../data/song-identities";
@@ -32,8 +31,6 @@ interface Props {
   calibration?: EnergyCalibration;
   /** Counterpoint saturation multiplier (0.4-1.3) */
   counterpointSatMult?: number;
-  /** Set number (1, 2, or 3=encore) for set-level color theming */
-  setNumber?: number;
   /** Drums/Space sub-phase for phase-specific color adjustments */
   drumsSpacePhase?: string;
   /** Show narrative phase for show-level arc modulation */
@@ -68,9 +65,8 @@ const ERA_BLOOM: Record<string, string> = {
 };
 const DEFAULT_BLOOM = ERA_BLOOM.classic;
 
-export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod, jamColorTemp, calibration, counterpointSatMult = 1, setNumber, drumsSpacePhase, showPhase, songIdentity, showArcModifiers, itLuminanceLift, vocalWarmth, guitarColorTemp, deadAirFactor = 0, narrativeBrightness = 0, narrativeTemperature = 0, introFactor = 1 }) => {
+export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod, jamColorTemp, calibration, counterpointSatMult = 1, drumsSpacePhase, showPhase, songIdentity, showArcModifiers, itLuminanceLift, vocalWarmth, guitarColorTemp, deadAirFactor = 0, narrativeBrightness = 0, narrativeTemperature = 0, introFactor = 1 }) => {
   const energy = snapshot.energy;
-  const setTheme = getSetTheme(setNumber ?? 1);
   const low = calibration?.quietThreshold;
   const high = calibration?.loudThreshold;
   const factor = energyToFactor(energy, low, high); // 0 (quiet) → 1 (loud)
@@ -100,7 +96,7 @@ export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod,
   const isClimaxPhase = (climaxMod?.brightnessOffset ?? 0) > 0.04;
   const brightCap = isClimaxPhase ? 1.25 : 1.12;
   // Gate all energy-reactive brightness by reactivity (0 during intro, 1 when engine open)
-  const brightness = Math.min(brightCap, 0.96 + factor * 0.16 * reactivity + (climaxMod?.brightnessOffset ?? 0) * reactivity + setTheme.brightnessOffset + (snapshot.fastEnergy ?? 0) * 0.03 * cssGate * reactivity);
+  const brightness = Math.min(brightCap, 0.96 + factor * 0.16 * reactivity + (climaxMod?.brightnessOffset ?? 0) * reactivity + (snapshot.fastEnergy ?? 0) * 0.03 * cssGate * reactivity);
 
   // Drums/Space phase adjustments (brightness + hue only — saturation/contrast handled by GLSL)
   let dsBrightOffset = 0;
@@ -158,11 +154,10 @@ export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod,
   // Jam color temperature: warm shifts yellow, cool shifts blue (max ±12deg)
   // Only applied during long jams. EraGrade + SongPalette handle base color character.
   const jamHueShift = jamColorTemp != null ? jamColorTemp * 50 : 0; // ±40 degrees max
-  // Set-level warmth shift: Set 1 warm (+5deg), Set 2 cool (-8deg), Encore neutral (0)
   // Narrative temperature: ±20deg hue shift (warm = positive, cool = negative)
   const narrativeHueShift = narrativeTemperature * 20;
   // Suppress hue shift during dead air so applause is neutral
-  const totalHueShift = (jamHueShift + setTheme.warmthShift + eraColorTempShift + dsHueOffset + siHueShift + arcHueShift + vocalHueShift + guitarHueShift + chromaHueShift + narrativeHueShift) * (1 - deadAirFactor);
+  const totalHueShift = (jamHueShift + eraColorTempShift + dsHueOffset + siHueShift + arcHueShift + vocalHueShift + guitarHueShift + chromaHueShift + narrativeHueShift) * (1 - deadAirFactor);
   const filterStr = totalHueShift !== 0
     ? `brightness(${finalBrightness.toFixed(3)}) hue-rotate(${totalHueShift.toFixed(1)}deg)`
     : `brightness(${finalBrightness.toFixed(3)})`;
