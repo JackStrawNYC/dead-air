@@ -302,7 +302,9 @@ vec3 cinematicGrade(vec3 col, float energy) {
   float luma = dot(col, vec3(0.2126, 0.7152, 0.0722));
   float contrast = mix(0.95, 1.15, energy);
   contrast *= 1.0 + uHarmonicTension * 0.08;
-  col = mix(vec3(luma), col, contrast * uEraSaturation + uShowSaturation);
+  float isClimaxGrade = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5);
+  float climaxSat = isClimaxGrade * uClimaxIntensity * 0.50;
+  col = mix(vec3(luma), col, contrast * uEraSaturation + uShowSaturation + climaxSat);
   return col;
 }
 
@@ -662,7 +664,7 @@ vec3 heroIconEmergence(vec2 uv, float time, float energy, float bass,
 
   // Full-screen scale: 1.2x viewport radius
   float pulse = 1.0 + bass * 0.3;
-  vec2 scaledUv = rotUv / (1.2 * pulse);
+  vec2 scaledUv = rotUv / (1.6 * pulse);
 
   // Select icon based on section index
   float iconType = mod(sectionIndex, 4.0);
@@ -682,7 +684,7 @@ vec3 heroIconEmergence(vec2 uv, float time, float energy, float bass,
   d += noiseField * 0.12 * (0.3 + 0.7 * dissolveMask);
 
   // Wide glow (softer falloff than regular icon)
-  float glow = 1.0 / (1.0 + d * d * 100.0) * gate;
+  float glow = 1.0 / (1.0 + d * d * 60.0) * gate;
 
   // Edge line
   float edge = smoothstep(0.015, 0.0, abs(d)) * gate;
@@ -692,7 +694,7 @@ vec3 heroIconEmergence(vec2 uv, float time, float energy, float bass,
   fringe.r = smoothstep(0.025, 0.0, abs(d + 0.008));
   fringe.g = smoothstep(0.025, 0.0, abs(d));
   fringe.b = smoothstep(0.025, 0.0, abs(d - 0.008));
-  fringe *= gate * 0.5;
+  fringe *= gate * 0.75;
 
   // Color: blend palette with slow oscillation
   vec3 iconColor = mix(col1, col2, 0.5 + 0.5 * sin(time * 0.2));

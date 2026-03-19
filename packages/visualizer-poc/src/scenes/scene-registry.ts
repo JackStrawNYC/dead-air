@@ -411,7 +411,7 @@ export const TRANSITION_AFFINITY: Partial<Record<VisualMode, VisualMode[]>> = {
   reaction_diffusion: ["fluid_2d", "oil_projector", "liquid_light"],
   mandala_engine: ["sacred_geometry", "kaleidoscope", "crystal_cavern"],
   fractal_flames: ["inferno", "tie_dye", "liquid_light"],
-  feedback_recursion: ["liquid_light", "kaleidoscope", "fractal_zoom"],
+  feedback_recursion: ["liquid_light", "kaleidoscope", "fractal_zoom", "reaction_diffusion", "morphogenesis", "fractal_flames", "neural_web", "sacred_geometry"],
   truchet_tiling: ["sacred_geometry", "mandala_engine", "kaleidoscope"],
   diffraction_rings: ["aurora", "crystal_cavern", "deep_ocean"],
   plasma_field: ["tie_dye", "liquid_light", "diffraction_rings"],

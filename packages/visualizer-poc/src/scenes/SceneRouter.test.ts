@@ -415,7 +415,7 @@ describe('getModeForSection', () => {
     expect(feedbackCount).toBeGreaterThan(controlFeedbackCount);
   });
 
-  it('medium song (420s) has no duration bias', () => {
+  it('medium song (350s) has no duration bias', () => {
     const song = makeSong();
     const sections: SectionBoundary[] = Array.from({ length: 5 }, (_, i) => ({
       frameStart: i * 900,
@@ -425,10 +425,10 @@ describe('getModeForSection', () => {
       avgEnergy: 0.35,
     }));
 
-    // Medium duration should produce same results as no duration
+    // Duration below 360s threshold should produce same results as no duration
     for (let i = 0; i < 50; i++) {
       const seed = i * 100000;
-      const withDuration = getModeForSection(song, 2, sections, seed, undefined, false, undefined, undefined, undefined, undefined, 420);
+      const withDuration = getModeForSection(song, 2, sections, seed, undefined, false, undefined, undefined, undefined, undefined, 350);
       const withoutDuration = getModeForSection(song, 2, sections, seed);
       expect(withDuration).toBe(withoutDuration);
     }

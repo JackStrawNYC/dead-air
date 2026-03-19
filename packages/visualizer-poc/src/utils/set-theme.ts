@@ -62,7 +62,7 @@ const SET_THEMES: Record<number, SetTheme> = {
     windowDurationMult: 1.15,
     abstractionOffset: 0.10,
     overlayBias: { sacred: +0.10, geometric: +0.08, nature: +0.06, character: -0.10 },
-    boostedModes: ["cosmic_voyage", "deep_ocean", "sacred_geometry", "fractal_zoom", "reaction_diffusion", "kaleidoscope", "morphogenesis", "feedback_recursion", "mycelium_network"],
+    boostedModes: ["cosmic_voyage", "deep_ocean", "sacred_geometry", "fractal_zoom", "reaction_diffusion", "kaleidoscope", "morphogenesis", "feedback_recursion", "feedback_recursion", "mycelium_network"],
     suppressedModes: [], // all modes available in set 2
     cameraSteadinessOffset: -0.15, // looser/more organic camera
   },
@@ -119,9 +119,16 @@ export function applySetShaderFilter(
   let filtered = modes.filter((m) => !suppressedSet.has(m));
   if (filtered.length === 0) filtered = modes; // fallback: don't empty the pool
 
-  // Boost preferred modes: add duplicates for 2x weight
-  const boostedSet = new Set(theme.boostedModes);
-  const boosted = filtered.filter((m) => boostedSet.has(m));
+  // Boost preferred modes: count-based so duplicates in boostedModes produce extra weight
+  const boostCount = new Map<VisualMode, number>();
+  for (const m of theme.boostedModes) {
+    boostCount.set(m, (boostCount.get(m) ?? 0) + 1);
+  }
+  const boosted: VisualMode[] = [];
+  for (const m of filtered) {
+    const count = boostCount.get(m) ?? 0;
+    for (let i = 0; i < count; i++) boosted.push(m);
+  }
   return [...filtered, ...boosted];
 }
 

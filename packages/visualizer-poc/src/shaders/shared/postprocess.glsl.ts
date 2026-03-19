@@ -204,7 +204,8 @@ ${
     float caGate = smoothstep(0.15, 0.35, energy);
     float caAnticipation = uPeakApproaching * 0.008;
     float caAmount = (uBass * 0.006 + uRms * 0.003 + uOnsetSnap * 0.04 + caAnticipation) * caGate;
-    caAmount = min(caAmount, 0.05);
+    caAmount += climaxBoost * 0.004;
+    caAmount = min(caAmount, 0.05 + climaxBoost * 0.01);
     col = applyCA(col, uv, caAmount);
   }
 `
@@ -281,7 +282,7 @@ ${
   {
     float onsetPulse = step(0.7, max(uOnsetSnap, uDrumOnset)) * max(uOnsetSnap, uDrumOnset);
     float onsetLuma = dot(col, vec3(0.299, 0.587, 0.114));
-    col = mix(vec3(onsetLuma), col, 1.0 + onsetPulse * 0.15);
+    col = mix(vec3(onsetLuma), col, 1.0 + onsetPulse * (0.15 + climaxBoost * 0.25));
     // Brightness boost removed — was a strobe source
   }
 

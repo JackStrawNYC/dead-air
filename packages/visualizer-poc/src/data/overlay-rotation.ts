@@ -112,8 +112,8 @@ const WINDOW_FRAMES_DEFAULT = 900;
  */
 const CROSSFADE_FRAMES_BY_ENERGY: Record<string, number> = {
   low:  270,   // 9 seconds — glacial tides
-  mid:  150,   // 5 seconds — smooth transitions
-  high: 90,    // 3 seconds — still unhurried at peaks
+  mid:  120,   // 4 seconds — snappier transitions
+  high: 60,    // 2 seconds — fast crossfade at peaks
 };
 const CROSSFADE_FRAMES_DEFAULT = 120;
 

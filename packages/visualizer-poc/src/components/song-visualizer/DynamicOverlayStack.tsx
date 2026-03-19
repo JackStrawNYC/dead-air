@@ -72,12 +72,19 @@ export const DynamicOverlayStack: React.FC<Props> = ({
 }) => {
   const frame = useCurrentFrame();
 
+  // Beat-synced overlay opacity pulse
+  const frameIdx = Math.min(frame, frames.length - 1);
+  const currentFrameData = frames[frameIdx];
+  const beatPulse = currentFrameData?.beat ? 0.12 : 0;
+  const onsetPulse = (currentFrameData?.onset ?? 0) > 0.5 ? (currentFrameData.onset ?? 0) * 0.08 : 0;
+  const overlayPulse = 1.0 + beatPulse + onsetPulse;
+
   // Compute opacities and apply hard cap on concurrent overlays
   const maxConcurrent = MAX_CONCURRENT[energyLevel] ?? 4;
   const withOpacity = activeEntries
     .map(([name, entry]) => {
       const inversionMult = 1 - counterpointOverlayInversion;
-      let op = Math.min(1, (opacityMap ? (opacityMap[name] ?? 0) : 1) * mediaSuppression * focusSuppression * itOverlayOverride * inversionMult);
+      let op = Math.min(1, (opacityMap ? (opacityMap[name] ?? 0) : 1) * mediaSuppression * focusSuppression * itOverlayOverride * inversionMult * overlayPulse);
       // Cross-song dedup: deprioritize overlays already shown earlier in the show
       if (usedOverlayIds && usedOverlayIds.has(name)) {
         op *= 0.4; // reduce but don't eliminate — variety, not exclusion
@@ -144,7 +151,13 @@ export const DynamicOverlayStack: React.FC<Props> = ({
           filter: hueRotation !== 0 ? `hue-rotate(${hueRotation.toFixed(1)}deg)` : undefined,
         }}
       >
-        {domOverlays.map(({ name, entry: { Component, blendMode }, opacity }) => (
+        {domOverlays.map(({ name, entry: { Component, blendMode, layer }, opacity }) => {
+          // Per-layer parallax drift: deeper layers drift slower, surface layers faster
+          const layerDriftFactor = 0.5 + (layer / 10) * 1.0;
+          const parallaxTime = frame / 30;
+          const parallaxX = Math.sin(parallaxTime * 0.08) * 3 * layerDriftFactor;
+          const parallaxY = Math.cos(parallaxTime * 0.06 + 1.3) * 2 * layerDriftFactor;
+          return (
           <div
             key={name}
             style={{
@@ -153,6 +166,7 @@ export const DynamicOverlayStack: React.FC<Props> = ({
               opacity,
               pointerEvents: "none",
               mixBlendMode: blendMode ?? "screen",
+              transform: `translate(${parallaxX.toFixed(2)}px, ${parallaxY.toFixed(2)}px)`,
             }}
           >
             <Suspense fallback={null}>
@@ -161,7 +175,8 @@ export const DynamicOverlayStack: React.FC<Props> = ({
               </SilentErrorBoundary>
             </Suspense>
           </div>
-        ))}
+          );
+        })}
       </div>
     </SongPaletteProvider>
     </TempoProvider>

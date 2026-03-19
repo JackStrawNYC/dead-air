@@ -78,7 +78,7 @@ const LOCK_CONVERGENCE_FRAMES = 15;
 const BREAK_FLASH_FRAMES = 2;
 const BREAK_RECOVERY_FRAMES = 10;
 const LOCKED_OVERLAY_OPACITY = 0.05;
-const LOCKED_LUMINANCE_LIFT = 0.15;
+const LOCKED_LUMINANCE_LIFT = 0.22;
 
 // Lock depth tier thresholds (frames since lock start)
 const SHALLOW_END = 90;     // 3 seconds
@@ -89,7 +89,7 @@ const DEEP_END = 300;       // 10 seconds
 /** Max strobe intensity during deep lock.
  *  Reduced from 0.30 → 0.12 to prevent harsh white flashes.
  *  At 0.30 with overlay blend mode, every onset was a visible strobe pulse. */
-const STROBE_MAX = 0.12;
+const STROBE_MAX = 0.20;
 /** Time dilation factor during deep lock (slow-motion shader drift) */
 const LOCKED_TIME_DILATION = 0.3;
 /** Transcendent time dilation (maximum slow-motion) */
@@ -197,8 +197,8 @@ export function computeITResponse(
       // Breaking: sudden drop -- flash + reset
       if (framesSinceUnlock < BREAK_FLASH_FRAMES + BREAK_RECOVERY_FRAMES) {
         let flashIntensity = 0;
-        if (framesSinceUnlock === 0) flashIntensity = 0.4;
-        else if (framesSinceUnlock === 1) flashIntensity = 0.2;
+        if (framesSinceUnlock === 0) flashIntensity = 0.65;
+        else if (framesSinceUnlock === 1) flashIntensity = 0.35;
 
         const recoveryProgress = Math.max(0, framesSinceUnlock - BREAK_FLASH_FRAMES) / BREAK_RECOVERY_FRAMES;
         // Flash hue: use dominant chroma at the break point for chromatic burst

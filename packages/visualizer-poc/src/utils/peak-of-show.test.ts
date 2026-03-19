@@ -55,14 +55,14 @@ describe("detectPeakOfShow", () => {
     const frames = makeFrames(300, 0.5, 0.05);
     const result = detectPeakOfShow(frames, 150, [0.01], false, 12, 20);
     expect(result.brightnessBoost).toBeGreaterThanOrEqual(0);
-    expect(result.brightnessBoost).toBeLessThanOrEqual(0.08);
+    expect(result.brightnessBoost).toBeLessThanOrEqual(0.20);
   });
 
   it("saturation boost is within expected range", () => {
     const frames = makeFrames(300, 0.5, 0.05);
     const result = detectPeakOfShow(frames, 150, [0.01], false, 12, 20);
     expect(result.saturationBoost).toBeGreaterThanOrEqual(0);
-    expect(result.saturationBoost).toBeLessThanOrEqual(0.12);
+    expect(result.saturationBoost).toBeLessThanOrEqual(0.35);
   });
 
   it("handles too few frames", () => {

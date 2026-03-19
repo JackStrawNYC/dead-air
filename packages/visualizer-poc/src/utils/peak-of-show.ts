@@ -11,9 +11,9 @@
  *   When score exceeds threshold AND exceeds all previous song peaks,
  *   enter "transcendent" visual state.
  *
- * Visual treatment (applied for ~5 seconds):
- *   - Golden luminance boost (+0.08 brightness)
- *   - Saturation push (+0.12)
+ * Visual treatment (applied for ~7 seconds):
+ *   - Golden luminance boost (+0.20 brightness)
+ *   - Saturation push (+0.35)
  *   - Overlay density suppressed to 0.5 (clear the visual field)
  *   - Camera enters slow, reverent drift
  *   - Color convergence toward warm gold
@@ -28,9 +28,9 @@ export interface PeakOfShowState {
   isActive: boolean;
   /** Intensity of the peak moment (0-1, ramps up then down) */
   intensity: number;
-  /** Brightness boost during peak (+0.08 max) */
+  /** Brightness boost during peak (+0.20 max) */
   brightnessBoost: number;
-  /** Saturation boost during peak (+0.12 max) */
+  /** Saturation boost during peak (+0.35 max) */
   saturationBoost: number;
   /** Overlay density multiplier (1.0 normally, 0.5 during peak) */
   densityMult: number;
@@ -47,12 +47,12 @@ const NEUTRAL: PeakOfShowState = {
   motionMult: 1,
 };
 
-// Duration of the peak visual treatment in frames (5 seconds at 30fps)
-const PEAK_DURATION = 150;
+// Duration of the peak visual treatment in frames (7 seconds at 30fps)
+const PEAK_DURATION = 210;
 // Ramp-up time (1 second)
 const RAMP_UP = 30;
-// Ramp-down time (2.5 seconds)
-const RAMP_DOWN = 75;
+// Ramp-down time (4 seconds)
+const RAMP_DOWN = 120;
 
 /**
  * Compute a peak-of-show score for a given frame.
@@ -122,8 +122,8 @@ export function detectPeakOfShow(
   return {
     isActive: intensity > 0.01,
     intensity,
-    brightnessBoost: intensity * 0.08,
-    saturationBoost: intensity * 0.12,
+    brightnessBoost: intensity * 0.20,
+    saturationBoost: intensity * 0.35,
     densityMult: 1 - intensity * 0.5,   // 1.0 → 0.5
     motionMult: 1 - intensity * 0.4,    // 1.0 → 0.6
   };

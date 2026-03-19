@@ -337,7 +337,7 @@ export function getModeForSection(
         // Improvisation bias: high improv biases toward fluid/generative shaders
         const improvScore = estimateImprovisationScore(frames, section.frameStart);
         if (improvScore > 0.6) {
-          const improvModes: VisualMode[] = ["fluid_2d", "fractal_zoom", "reaction_diffusion", "kaleidoscope", "mandala_engine"];
+          const improvModes: VisualMode[] = ["fluid_2d", "fractal_zoom", "reaction_diffusion", "kaleidoscope", "mandala_engine", "feedback_recursion"];
           const improvMatches = improvModes.filter((m) => filteredPool.includes(m));
           if (improvMatches.length > 0) {
             filteredPool = [...filteredPool, ...improvMatches, ...improvMatches]; // 3x weight
@@ -356,14 +356,18 @@ export function getModeForSection(
           if (matches.length > 0) {
             filteredPool = [...filteredPool, ...matches, ...matches];
           }
-        } else if (songDuration > 600) {
+        } else if (songDuration > 360) {
           const feedbackModes: VisualMode[] = [
             "feedback_recursion", "reaction_diffusion", "morphogenesis",
             "fractal_zoom", "kaleidoscope", "mandala_engine", "neural_web", "voronoi_flow",
           ];
           const matches = feedbackModes.filter((m) => filteredPool.includes(m));
           if (matches.length > 0) {
-            filteredPool = [...filteredPool, ...matches, ...matches];
+            // Graduated weight: >480s = 2× (double boost), 360-480s = 1× (single boost)
+            filteredPool = [...filteredPool, ...matches];
+            if (songDuration > 480) {
+              filteredPool = [...filteredPool, ...matches];
+            }
           }
         }
       }

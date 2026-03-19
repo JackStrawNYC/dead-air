@@ -193,7 +193,7 @@ void main() {
     float nf = fbm3(vec3(p * 2.0, slowTime));
     vec3 c1 = hsv2rgb(vec3(arcHue, sat, 1.0));
     vec3 c2 = hsv2rgb(vec3(arcHue + 0.3, sat, 1.0));
-    col += iconEmergence(p, uTime, energy, bass, c1, c2, nf, uClimaxPhase, uSectionIndex) * 0.4;
+    col += heroIconEmergence(p, uTime, energy, bass, c1, c2, nf, uSectionIndex);
   }
 
   // --- Vignette ---

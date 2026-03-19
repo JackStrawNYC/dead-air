@@ -203,7 +203,7 @@ export const SONG_IDENTITIES: Record<string, SongIdentity> = {
   },
 
   "scarletbegonias": {
-    preferredModes: ["tie_dye", "liquid_light", "concert_lighting", "fractal_flames", "plasma_field", "kaleidoscope", "oil_projector"],
+    preferredModes: ["tie_dye", "liquid_light", "concert_lighting", "fractal_flames", "feedback_recursion", "plasma_field", "kaleidoscope", "oil_projector"],
     palette: { primary: 0, secondary: 330, saturation: 1.0 }, // scarlet red/rose
     overlayBoost: ["ChinaCatSunflower", "TieDyeWash", "BreathingStealie"],
     moodKeywords: ["psychedelic", "festival"],
@@ -212,7 +212,7 @@ export const SONG_IDENTITIES: Record<string, SongIdentity> = {
   },
 
   "eyesoftheworld": {
-    preferredModes: ["aurora", "cosmic_voyage", "liquid_light", "truchet_tiling", "stained_glass", "voronoi_flow", "diffraction_rings"],
+    preferredModes: ["aurora", "cosmic_voyage", "liquid_light", "feedback_recursion", "truchet_tiling", "stained_glass", "voronoi_flow", "diffraction_rings"],
     palette: { primary: 170, secondary: 50, saturation: 0.9 }, // aquamarine/gold
     overlayBoost: ["CosmicStarfield", "SacredGeometry", "Fireflies"],
     overlaySuppress: ["WallOfSound"],
@@ -222,7 +222,7 @@ export const SONG_IDENTITIES: Record<string, SongIdentity> = {
   },
 
   "morningdew": {
-    preferredModes: ["stark_minimal", "crystal_cavern", "deep_ocean", "mandala_engine", "diffraction_rings", "stained_glass", "aurora_curtains"],
+    preferredModes: ["stark_minimal", "crystal_cavern", "deep_ocean", "feedback_recursion", "mandala_engine", "diffraction_rings", "stained_glass", "aurora_curtains"],
     palette: { primary: 210, secondary: 30, saturation: 0.7, brightness: 0.9 }, // dawn blue/amber
     overlayBoost: ["RoseOverlay", "Fireflies", "SacredGeometry"],
     overlaySuppress: ["BearParade", "VWBusParade", "LaserShow"],
@@ -233,7 +233,7 @@ export const SONG_IDENTITIES: Record<string, SongIdentity> = {
   },
 
   "stellablue": {
-    preferredModes: ["deep_ocean", "cosmic_voyage", "aurora", "diffraction_rings", "smoke_rings", "crystal_cavern", "aurora_curtains"],
+    preferredModes: ["deep_ocean", "cosmic_voyage", "aurora", "feedback_recursion", "diffraction_rings", "smoke_rings", "crystal_cavern", "aurora_curtains"],
     palette: { primary: 220, secondary: 280, saturation: 0.65, brightness: 0.88 }, // deep blue/violet
     overlayBoost: ["CosmicStarfield", "RoseOverlay", "Fireflies"],
     overlaySuppress: ["LaserShow", "ParticleExplosion", "CrowdDance"],
@@ -293,7 +293,7 @@ export const SONG_IDENTITIES: Record<string, SongIdentity> = {
   },
 
   "terrapinstation": {
-    preferredModes: ["cosmic_voyage", "crystal_cavern", "aurora", "truchet_tiling", "stained_glass", "aurora_curtains", "deep_ocean"],
+    preferredModes: ["cosmic_voyage", "crystal_cavern", "aurora", "feedback_recursion", "truchet_tiling", "stained_glass", "aurora_curtains", "deep_ocean"],
     palette: { primary: 160, secondary: 280, saturation: 0.85 }, // sea green/purple
     overlayBoost: ["MarchingTerrapins", "DancingTerrapinOverlay", "SacredGeometry", "CosmicStarfield"],
     moodKeywords: ["cosmic", "organic"],
@@ -302,7 +302,7 @@ export const SONG_IDENTITIES: Record<string, SongIdentity> = {
   },
 
   "playingintheband": {
-    preferredModes: ["liquid_light", "cosmic_voyage", "tie_dye", "fractal_flames", "voronoi_flow", "neural_web", "kaleidoscope"],
+    preferredModes: ["liquid_light", "cosmic_voyage", "tie_dye", "fractal_flames", "feedback_recursion", "voronoi_flow", "neural_web", "kaleidoscope"],
     palette: { primary: 280, secondary: 60, saturation: 0.9 }, // purple/gold
     overlayBoost: ["FractalZoom", "MandalaGenerator", "DarkStarPortal"],
     moodKeywords: ["psychedelic", "cosmic"],
@@ -334,7 +334,7 @@ export const SONG_IDENTITIES: Record<string, SongIdentity> = {
   },
 
   "birdsong": {
-    preferredModes: ["aurora", "cosmic_voyage", "crystal_cavern", "truchet_tiling", "voronoi_flow", "smoke_rings", "stained_glass"],
+    preferredModes: ["aurora", "cosmic_voyage", "crystal_cavern", "feedback_recursion", "truchet_tiling", "voronoi_flow", "smoke_rings", "stained_glass"],
     palette: { primary: 170, secondary: 60, saturation: 0.8 }, // teal/golden
     overlayBoost: ["Fireflies", "CosmicStarfield", "SacredGeometry"],
     overlaySuppress: ["WallOfSound"],
@@ -344,7 +344,7 @@ export const SONG_IDENTITIES: Record<string, SongIdentity> = {
   },
 
   "helpontheway": {
-    preferredModes: ["crystal_cavern", "cosmic_voyage", "liquid_light", "truchet_tiling", "aurora", "stained_glass", "voronoi_flow"],
+    preferredModes: ["crystal_cavern", "cosmic_voyage", "liquid_light", "feedback_recursion", "truchet_tiling", "aurora", "stained_glass", "voronoi_flow"],
     palette: { primary: 240, secondary: 30, saturation: 0.9 }, // royal blue/gold
     overlayBoost: ["SacredGeometry", "FractalZoom"],
     moodKeywords: ["cosmic", "intense"],
@@ -469,7 +469,7 @@ export const SONG_IDENTITIES: Record<string, SongIdentity> = {
   },
 
   "rowjimmy": {
-    preferredModes: ["deep_ocean", "aurora", "liquid_light", "diffraction_rings", "voronoi_flow", "smoke_rings", "stained_glass"],
+    preferredModes: ["deep_ocean", "aurora", "liquid_light", "feedback_recursion", "diffraction_rings", "voronoi_flow", "smoke_rings", "stained_glass"],
     palette: { primary: 210, secondary: 270, saturation: 0.65, brightness: 0.9 }, // ocean blue/lavender
     overlayBoost: ["Fireflies", "RoseOverlay", "SacredGeometry"],
     overlaySuppress: ["LaserShow", "ParticleExplosion", "CrowdDance"],
@@ -546,7 +546,7 @@ export const SONG_IDENTITIES: Record<string, SongIdentity> = {
   },
 
   "weatherreportsuite": {
-    preferredModes: ["aurora", "cosmic_voyage", "crystal_cavern", "deep_ocean", "diffraction_rings", "stained_glass", "aurora_curtains"],
+    preferredModes: ["aurora", "cosmic_voyage", "crystal_cavern", "deep_ocean", "feedback_recursion", "diffraction_rings", "stained_glass", "aurora_curtains"],
     palette: { primary: 200, secondary: 300, saturation: 0.8 },
     overlayBoost: ["CosmicStarfield", "SacredGeometry", "Fireflies"],
     moodKeywords: ["cosmic", "contemplative"],
