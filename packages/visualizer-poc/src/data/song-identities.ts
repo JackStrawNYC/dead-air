@@ -23,6 +23,7 @@ import type { VisualMode, ColorPalette, OverlayTag, TrackMeta, EnhancedFrameData
 import type { DrumsSpaceSubPhase } from "../utils/drums-space-phase";
 import { seeded, seededShuffle } from "../utils/seededRandom";
 import { hashString } from "../utils/hash";
+import { deriveChromaPalette } from "../utils/chroma-palette";
 
 // ─── JSON Override Layer ───
 // Dashboard edits write to data/song-identities.json; lookupSongIdentity checks it first.
@@ -873,13 +874,8 @@ export function generateFallbackIdentity(
   const avgSub = frames.reduce((sum, f) => sum + f.sub, 0) / frames.length;
   const tempo = meta.tempo;
 
-  // 2. Derive palette from centroid (bright songs = warm hue)
-  //    Map centroid 0-1 to hue degrees: low centroid → cool blue (216°), high → warm orange (29°)
-  const primaryHue = Math.round(216 - avgCentroid * 187); // 29° (warm) to 216° (cool)
-  //    Secondary: triadic complement (+120°)
-  const secondaryHue = (primaryHue + 120) % 360;
-  //    Saturation from flatness: tonal (low flatness) → high saturation
-  const saturation = 0.7 + (1.0 - avgFlatness) * 0.3;
+  // 2. Derive palette from chroma content (musically-meaningful colors)
+  const chromaPalette = deriveChromaPalette(frames);
 
   // 3. Derive preferred modes from energy and tempo
   const preferredModes: VisualMode[] = [];
@@ -910,11 +906,7 @@ export function generateFallbackIdentity(
   // 5. Build the identity — no transition overrides or D/S shaders for fallbacks
   return {
     preferredModes,
-    palette: {
-      primary: primaryHue,
-      secondary: secondaryHue,
-      saturation,
-    },
+    palette: chromaPalette,
     moodKeywords: keywords,
   };
 }

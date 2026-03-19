@@ -5,12 +5,12 @@ import { ShowIntro } from "./components/ShowIntro";
 import { ChapterCard } from "./components/ChapterCard";
 import { SetBreakCard } from "./components/SetBreakCard";
 import { EndCard } from "./components/EndCard";
-import type { SetlistEntry, ShowSetlist, OverlaySchedule } from "./data/types";
+import type { SetlistEntry, ShowSetlist, OverlaySchedule, ColorPalette } from "./data/types";
 import { parseSetlist, safeParse, FlexibleTrackAnalysisSchema, OverlayScheduleSchema } from "./data/schemas";
 import { SELECTABLE_REGISTRY } from "./data/overlay-registry";
 import { formatDateLong, getShowSeed } from "./data/ShowContext";
 import { validateSectionOverrides } from "./scenes/SceneRouter";
-import { resolveSongMode } from "./data/song-identities";
+import { resolveSongMode, lookupSongIdentity } from "./data/song-identities";
 
 // ─── Dynamic show loading ───
 // Supports multi-show via --props='{"showId":"1972-08-27"}' or SHOW_ID env var.
@@ -110,6 +110,13 @@ function getActiveOverlays(trackId: string): string[] | undefined {
   return SELECTABLE_REGISTRY.map((e) => e.name).filter((n) => !WEBGL_OVERLAYS.has(n));
 }
 
+/** Get effective palette for a song: setlist JSON > curated identity */
+function getEffectivePalette(song: SetlistEntry): ColorPalette | undefined {
+  if (song.palette) return song.palette;
+  const identity = lookupSongIdentity(song.title);
+  return identity?.palette;
+}
+
 /** Get per-overlay energy phase hints for a given trackId */
 function getEnergyHints(trackId: string): Record<string, import("./data/types").OverlayPhaseHint> | undefined {
   return overlaySchedule?.songs[trackId]?.energyHints;
@@ -184,8 +191,8 @@ export const Root: React.FC = () => {
               song: { ...song, defaultMode: resolveMode(song) },
               segueIn,
               segueOut,
-              segueFromPalette: segueIn ? prevSong?.palette : undefined,
-              segueToPalette: segueOut ? nextSong?.palette : undefined,
+              segueFromPalette: segueIn ? getEffectivePalette(prevSong!) : undefined,
+              segueToPalette: segueOut ? getEffectivePalette(nextSong!) : undefined,
               segueFromMode: segueIn && prevSong ? resolveMode(prevSong) : undefined,
               segueToMode: segueOut && nextSong ? resolveMode(nextSong) : undefined,
               activeOverlays: getActiveOverlays(song.trackId),

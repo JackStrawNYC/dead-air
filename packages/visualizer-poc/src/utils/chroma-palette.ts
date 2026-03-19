@@ -72,7 +72,7 @@ export function deriveChromaPalette(frames: EnhancedFrameData[]): ColorPalette {
   // Max entropy for 12 bins = log2(12) ≈ 3.585
   const maxEntropy = Math.log2(12);
   const normalizedEntropy = entropy / maxEntropy;
-  const saturation = 0.95 - normalizedEntropy * 0.4; // peaked → 0.95, flat → 0.55
+  const saturation = Math.max(0.55, Math.min(0.95, 0.95 - normalizedEntropy * 0.4));
 
   return { primary: primaryHue, secondary: secondaryHue, saturation };
 }
