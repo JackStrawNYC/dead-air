@@ -11,6 +11,7 @@
 import React, { createContext, useContext, useRef, useCallback, useMemo } from "react";
 import type { VisualMode } from "./types";
 import type { ShowArcPhase } from "./show-arc";
+import { computeShowPhase } from "../utils/show-narrative-precompute";
 
 export type ShowPhase = "opening" | "deepening" | "peak_show" | "closing";
 
@@ -48,16 +49,6 @@ export interface ShowNarrativeContextValue {
 }
 
 const NarrativeCtx = createContext<ShowNarrativeContextValue | null>(null);
-
-/** Determine show phase based on song position within setlist */
-function computeShowPhase(songsCompleted: number, totalSongs: number): ShowPhase {
-  if (totalSongs <= 0) return "opening";
-  if (songsCompleted <= 1) return "opening";
-  const midpoint = Math.floor(totalSongs / 2);
-  if (songsCompleted < midpoint) return "deepening";
-  if (songsCompleted < totalSongs - 2) return "peak_show";
-  return "closing";
-}
 
 // ─── Provider ───
 

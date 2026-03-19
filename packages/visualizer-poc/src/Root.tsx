@@ -11,6 +11,9 @@ import { SELECTABLE_REGISTRY } from "./data/overlay-registry";
 import { formatDateLong, getShowSeed } from "./data/ShowContext";
 import { validateSectionOverrides } from "./scenes/SceneRouter";
 import { resolveSongMode, lookupSongIdentity } from "./data/song-identities";
+import { precomputeNarrativeStates } from "./utils/show-narrative-precompute";
+import type { PrecomputedNarrative } from "./utils/show-narrative-precompute";
+import { isJamSegmentTitle } from "./data/band-config";
 
 // ─── Dynamic show loading ───
 // Supports multi-show via --props='{"showId":"1972-08-27"}' or SHOW_ID env var.
@@ -76,6 +79,20 @@ const setlist = parseSetlist(setlistData);
 const showSeed = getShowSeed(setlist);
 const resolveMode = (song: SetlistEntry) =>
   resolveSongMode(song.title, song.defaultMode, showSeed);
+
+// ─── Pre-compute cross-song narrative state ───
+// Each song gets the accumulated state from all songs rendered before it.
+// This enables show-arc awareness, fatigue tracking, and shader variety
+// enforcement even though each Composition renders in a separate process.
+const narrativeStates: PrecomputedNarrative[] = precomputeNarrativeStates(
+  setlist.songs,
+  (trackId: string) => {
+    const analysis = loadTrackAnalysis(trackId) as { frames?: Array<{ rms: number; flatness?: number }> } | null;
+    return analysis?.frames ?? null;
+  },
+  (song) => resolveSongMode(song.title, song.defaultMode as import("./data/types").VisualMode, showSeed),
+  isJamSegmentTitle,
+);
 
 const DEFAULT_FRAMES = 31417; // Morning Dew fallback
 const SET_BREAK_FRAMES = 300; // 10 seconds at 30fps
@@ -200,6 +217,7 @@ export const Root: React.FC = () => {
               activeOverlays: getActiveOverlays(song.trackId),
               energyHints: getEnergyHints(song.trackId),
               show: setlist,
+              narrativeState: narrativeStates[i],
             } satisfies SongVisualizerProps as Record<string, unknown>}
             calculateMetadata={async ({ props }) => {
               // Try bundle require first (dev/studio), then fall back to --props (CLI render)

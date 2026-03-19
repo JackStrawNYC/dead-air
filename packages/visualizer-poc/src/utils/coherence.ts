@@ -128,7 +128,7 @@ function spectralDensity(
   if (frames.length === 0 || idx < 0 || idx >= frames.length) return 0;
 
   const contrast = frames[idx].contrast;
-  if (!contrast || contrast.length === 0) return 0;
+  if (!contrast) return 0;
 
   const mean = contrast.reduce((s, v) => s + v, 0) / contrast.length;
   // Normalize: typical contrast values are 0-1 range

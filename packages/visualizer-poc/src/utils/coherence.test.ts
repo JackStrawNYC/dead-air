@@ -48,11 +48,11 @@ function makeRandomFrames(count: number): EnhancedFrameData[] {
   };
 
   return Array.from({ length: count }, () => {
-    const chroma = Array.from({ length: 12 }, () => rng());
+    const chroma = Array.from({ length: 12 }, () => rng()) as [number, number, number, number, number, number, number, number, number, number, number, number];
     return makeFrame({
       chroma,
       beat: rng() > 0.85,
-      contrast: Array.from({ length: 7 }, () => rng() * 0.2),
+      contrast: Array.from({ length: 7 }, () => rng() * 0.2) as [number, number, number, number, number, number, number],
       rms: rng() * 0.3,
     });
   });

@@ -82,7 +82,15 @@ import { UpNextTeaser } from "./components/UpNextTeaser";
 import { computeHarmonicResponse } from "./utils/harmonic-response";
 import { detectModalColor } from "./utils/modal-color";
 import { computeFatigueDampening } from "./utils/visual-fatigue";
+import { detectStemInterplay } from "./utils/stem-interplay";
+import { detectPhrase } from "./utils/phrase-detector";
+import { detectPeakOfShow } from "./utils/peak-of-show";
+import { computeTempoLock } from "./utils/tempo-lock";
+import type { PrecomputedNarrative, PrevSongContext } from "./utils/show-narrative-precompute";
+import { computeAfterJamQuality } from "./utils/after-jam-quality";
+import { computeCrowdEnergy } from "./utils/crowd-energy";
 import { IntroQuote } from "./components/IntroQuote";
+import { LyricFragment } from "./components/LyricFragment";
 
 // Extracted sub-components
 import { SongArtLayer } from "./components/song-visualizer/SongArtLayer";
@@ -130,6 +138,8 @@ export interface SongVisualizerProps {
   segueFromMode?: VisualMode;
   /** Visual mode of the next song (for segue crossfade) */
   segueToMode?: VisualMode;
+  /** Pre-computed cross-song narrative state (from Root.tsx module scope) */
+  narrativeState?: PrecomputedNarrative;
 }
 
 export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
@@ -137,7 +147,23 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
   const frame = useCurrentFrame();
 
   // ─── Show narrative arc (cross-song state) ───
-  const narrative = useShowNarrative();
+  // Precomputed narrative from Root.tsx takes priority (works in both Studio and CLI).
+  // Falls back to live context provider if available (future Remotion Studio wrapper).
+  const liveNarrative = useShowNarrative();
+  const narrative = useMemo(() => {
+    if (props.narrativeState) {
+      return {
+        state: {
+          ...props.narrativeState,
+          // Fields expected by downstream but not tracked in precompute
+          usedOverlayIds: new Set<string>(),
+          showArcPhase: undefined,
+        },
+        actions: { recordSong: () => {} },
+      };
+    }
+    return liveNarrative;
+  }, [props.narrativeState, liveNarrative]);
 
   // ─── Data loading & analysis ───
   const analysis = loadAnalysis(props as unknown as Record<string, unknown>);
@@ -224,6 +250,10 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
     () => showArcPhase ? applyTourModifiers(applySetModifiers(getShowArcModifiers(showArcPhase), setTheme), tourModifiers) : undefined,
     [showArcPhase, setTheme, tourModifiers],
   );
+
+  // ─── Suite continuity (multi-song suites like Help>Slip>Frank) ───
+  const suiteInfo = props.narrativeState?.suiteInfo ?? null;
+  const isInSuiteMiddle = suiteInfo?.inSuite && !suiteInfo.isSuiteStart;
 
   // ─── Sacred segue detection ───
   const isSacredSegueIn = useMemo(() => {
@@ -334,6 +364,8 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
   const soloState = detectSolo(audioSnapshot);
   const vocalWarmth = computeVocalWarmth(audioSnapshot);
   const guitarColorTemp = computeGuitarColorTemp(audioSnapshot);
+  const stemInterplay = detectStemInterplay(f, frameIdx);
+  const phraseState = detectPhrase(f, frameIdx, tempo);
 
   // Coherence detection — "IT" detector
   const coherenceState = computeCoherence(f, frameIdx);
@@ -373,6 +405,14 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
     audioSnapshot.flatness,
   );
   const grooveMods = grooveModifiers(groove);
+
+  // Tempo-locked visual rhythms (gated by groove type)
+  const tempoLock = computeTempoLock(
+    audioSnapshot.musicalTime,
+    groove.type,
+    audioSnapshot.beatStability,
+    audioSnapshot.energy,
+  );
 
   const jamCycle = currentSection && (sectionType === "jam" || sectionType === "solo" || isDrumsSpace)
     ? detectJamCycle(f, frameIdx, currentSection.frameStart, currentSection.frameEnd)
@@ -432,10 +472,37 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
     songsCompleted: narrative?.state.songsCompleted ?? 0,
   }, isEncore);
 
+  // ─── Crowd Energy Simulation (audience momentum across the show) ───
+  const crowdEnergy = useMemo(
+    () => computeCrowdEnergy(
+      narrative?.state.songPeakEnergies ?? [],
+      props.song.set,
+      narrative?.state.songsCompleted ?? 0,
+      currentSongAvgEnergy,
+    ),
+    [narrative?.state.songPeakEnergies, props.song.set, narrative?.state.songsCompleted, currentSongAvgEnergy],
+  );
+
+  // ─── After-Jam Silence Quality (intro atmosphere from previous song) ───
+  const afterJamMods = useMemo(
+    () => computeAfterJamQuality(props.narrativeState?.prevSongContext ?? null),
+    [props.narrativeState?.prevSongContext],
+  );
+
+  // ─── Peak-of-Show Recognition (THE moment) ───
+  const peakOfShow = detectPeakOfShow(
+    f,
+    frameIdx,
+    props.narrativeState?.songPeakScores ?? [],
+    props.narrativeState?.peakOfShowFired ?? false,
+    narrative?.state.songsCompleted ?? 0,
+    props.show?.songs.length ?? 0,
+  );
+
   // Floor raised from 0.15 → 0.25 to prevent multiplicative stacking from making
   // overlays invisible. Worst case: drums_space(0.3) × space(0.25) × narrative(0.3)
   // × fatigue(0.65) = 0.015 — without the floor this kills all overlay visibility.
-  const combinedDensityMult = Math.max(0.25, climaxMod.overlayDensityMult * (jamEvolution.isLongJam ? jamEvolution.densityMult : 1) * sectionVocab.overlayDensityMult * narrativeDirective.overlayDensityMult * endScreenMult * venueProfile.overlayDensityMult * crowdDensityMult * fatigue.densityMult);
+  const combinedDensityMult = Math.max(0.25, climaxMod.overlayDensityMult * (jamEvolution.isLongJam ? jamEvolution.densityMult : 1) * sectionVocab.overlayDensityMult * narrativeDirective.overlayDensityMult * endScreenMult * venueProfile.overlayDensityMult * crowdDensityMult * fatigue.densityMult * stemInterplay.densityMult * peakOfShow.densityMult * tempoLock.overlayBreathing * crowdEnergy.densityMult);
   const opacityMap = opacityMapBase ? applyDensityMult(opacityMapBase, combinedDensityMult, rotationSchedule!) : null;
 
   // ─── Media suppression ───
@@ -473,7 +540,8 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
   // 0 = full intro suppression, 1 = engine fully open.
   const INTRO_HOLD = 600;  // 20s at 30fps — art + text showcase
   const INTRO_RAMP = 150;  // 5s smooth ramp to full visuals
-  const introFactor = props.segueIn ? 1
+  // Suite middle songs skip intro hold (continuous flow within suite)
+  const introFactor = (props.segueIn || isInSuiteMiddle) ? 1
     : frame < INTRO_HOLD ? 0
     : frame < INTRO_HOLD + INTRO_RAMP ? (frame - INTRO_HOLD) / INTRO_RAMP
     : 1;
@@ -497,13 +565,13 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
       <AudioSnapshotProvider snapshot={audioSnapshot}>
       <VisualizerErrorBoundary>
       <div style={{ position: "absolute", inset: 0, opacity }}>
-        <CameraMotion frames={f} jamEvolution={jamEvolution} bass={audioSnapshot.bass} cameraFreeze={counterpoint.cameraFreeze || itState.cameraLock || introFactor < 0.5} drumsSpacePhase={drumsSpaceState?.subPhase} fastEnergy={audioSnapshot.fastEnergy} vocalPresence={audioSnapshot.vocalPresence} isSolo={soloState.isSolo} soloIntensity={soloState.intensity} grooveMotionMult={grooveMods.motionMult * fatigue.motionMult} groovePulseMult={grooveMods.pulseMult} sectionDriftMult={sectionVocab.driftSpeedMult} cameraSteadiness={sectionVocab.cameraSteadiness}>
+        <CameraMotion frames={f} jamEvolution={jamEvolution} bass={audioSnapshot.bass} cameraFreeze={counterpoint.cameraFreeze || itState.cameraLock || introFactor < 0.5} drumsSpacePhase={drumsSpaceState?.subPhase} fastEnergy={audioSnapshot.fastEnergy} vocalPresence={audioSnapshot.vocalPresence} isSolo={soloState.isSolo} soloIntensity={soloState.intensity} grooveMotionMult={grooveMods.motionMult * fatigue.motionMult * stemInterplay.motionMult * peakOfShow.motionMult * crowdEnergy.motionMult} groovePulseMult={grooveMods.pulseMult * phraseState.zoomBreathing * tempoLock.zoomPulse} sectionDriftMult={sectionVocab.driftSpeedMult} cameraSteadiness={Math.max(0, Math.min(1, sectionVocab.cameraSteadiness + setTheme.cameraSteadinessOffset))}>
         <EraGrade>
-        <EnergyEnvelope snapshot={audioSnapshot} climaxMod={climaxMod} jamColorTemp={jamEvolution.isLongJam ? jamEvolution.colorTemperature : undefined} calibration={energyCalibration} counterpointSatMult={counterpoint.saturationMult} brightnessCounterpoint={counterpoint.brightnessCounterpoint} drumsSpacePhase={drumsSpaceState?.subPhase} showPhase={narrative?.state.showPhase} songIdentity={songIdentity} showArcModifiers={showArcModifiers} itLuminanceLift={itState.luminanceLift} vocalWarmth={vocalWarmth} guitarColorTemp={guitarColorTemp} deadAirFactor={deadAirFactor} narrativeBrightness={narrativeDirective.brightnessOffset + sectionVocab.brightnessOffset + fatigue.brightnessOffset} narrativeTemperature={narrativeDirective.temperature + grooveMods.temperatureShift} introFactor={introFactor} isSolo={soloState.isSolo} soloIntensity={soloState.intensity} harmonicBrightness={harmonicResponse.brightnessOffset} harmonicSatMult={harmonicResponse.saturationMult} modalHueShift={modalColor.hueShift} modalSatOffset={modalColor.satOffset + fatigue.saturationOffset}>
+        <EnergyEnvelope snapshot={audioSnapshot} climaxMod={climaxMod} jamColorTemp={jamEvolution.isLongJam ? jamEvolution.colorTemperature : undefined} calibration={energyCalibration} counterpointSatMult={counterpoint.saturationMult} brightnessCounterpoint={counterpoint.brightnessCounterpoint} drumsSpacePhase={drumsSpaceState?.subPhase} showPhase={narrative?.state.showPhase} songIdentity={songIdentity} showArcModifiers={showArcModifiers} itLuminanceLift={itState.luminanceLift} vocalWarmth={vocalWarmth} guitarColorTemp={guitarColorTemp} deadAirFactor={deadAirFactor} narrativeBrightness={narrativeDirective.brightnessOffset + sectionVocab.brightnessOffset + fatigue.brightnessOffset + phraseState.brightnessBreathing + peakOfShow.brightnessBoost + crowdEnergy.energyBaselineOffset} narrativeTemperature={narrativeDirective.temperature + grooveMods.temperatureShift} introFactor={introFactor} isSolo={soloState.isSolo} soloIntensity={soloState.intensity} harmonicBrightness={harmonicResponse.brightnessOffset} harmonicSatMult={harmonicResponse.saturationMult} modalHueShift={modalColor.hueShift} modalSatOffset={modalColor.satOffset + fatigue.saturationOffset + phraseState.saturationBreathing + peakOfShow.saturationBoost}>
           <div style={{ position: "absolute", inset: 0, opacity: focusState.shaderOpacity * (0.05 + 0.95 * introFactor) }}>
           <SilentErrorBoundary name="SceneRouter">
             {(() => {
-              const sceneRouter = <SceneRouter frames={f} sections={sections} song={props.song} tempo={tempo} seed={showSeed} jamDensity={jamDensity} deadAirMode={deadAirFactor > 0 ? "cosmic_dust" : undefined} deadAirFactor={deadAirFactor > 0 ? deadAirFactor : undefined} era={props.show?.era} coherenceIsLocked={coherenceState.isLocked} drumsSpacePhase={drumsSpaceState?.subPhase} usedShaderModes={narrative?.state.usedShaderModes} songIdentity={songIdentity} stemSection={stemSection} songDuration={analysis?.meta?.duration} palette={effectivePalette} segueIn={props.segueIn} isSacredSegueIn={isSacredSegueIn} />;
+              const sceneRouter = <SceneRouter frames={f} sections={sections} song={props.song} tempo={tempo} seed={showSeed} jamDensity={jamDensity} deadAirMode={deadAirFactor > 0 ? "cosmic_dust" : undefined} deadAirFactor={deadAirFactor > 0 ? deadAirFactor : undefined} era={props.show?.era} coherenceIsLocked={coherenceState.isLocked} drumsSpacePhase={drumsSpaceState?.subPhase} usedShaderModes={narrative?.state.usedShaderModes} songIdentity={songIdentity} stemSection={stemSection} songDuration={analysis?.meta?.duration} palette={effectivePalette} segueIn={props.segueIn} isSacredSegueIn={isSacredSegueIn} isInSuiteMiddle={!!isInSuiteMiddle} setNumber={props.song.set} />;
               const palette = effectivePalette;
 
               // Segue IN crossfade: smooth dual-render dissolve from previous song's shader
@@ -626,19 +694,23 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
             />
           )}
 
-          {/* Intro ambient shimmer — warm glow during between-song breathing room */}
-          {introFactor < 0.5 && !props.segueIn && (
-            <div
-              style={{
-                position: "absolute",
-                inset: 0,
-                pointerEvents: "none",
-                background: `radial-gradient(ellipse at ${50 + Math.sin(frame * 0.003) * 12}% ${55 + Math.cos(frame * 0.004) * 8}%, rgba(120, 80, 60, 0.08), transparent 65%)`,
-                mixBlendMode: "screen",
-                opacity: (0.5 + 0.3 * Math.sin(frame * 0.015)) * (1 - introFactor * 2),
-              }}
-            />
-          )}
+          {/* Intro ambient shimmer — atmosphere colored by what just happened */}
+          {introFactor < 0.5 && !props.segueIn && (() => {
+            const sc = afterJamMods.shimmerColor ?? { r: 120, g: 80, b: 60 };
+            const speed = afterJamMods.shimmerSpeed;
+            return (
+              <div
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  pointerEvents: "none",
+                  background: `radial-gradient(ellipse at ${50 + Math.sin(frame * 0.003 * speed) * 12}% ${55 + Math.cos(frame * 0.004 * speed) * 8}%, rgba(${sc.r}, ${sc.g}, ${sc.b}, 0.08), transparent 65%)`,
+                  mixBlendMode: "screen",
+                  opacity: (0.5 + 0.3 * Math.sin(frame * 0.015 * speed)) * (1 - introFactor * 2),
+                }}
+              />
+            );
+          })()}
 
           {/* IntroQuote — meditative band quote during intro hold */}
           {introFactor < 0.8 && showSeed !== undefined && (
@@ -648,6 +720,22 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
                 trackNumber={props.song.trackNumber ?? 1}
                 segueIn={props.segueIn}
                 isFirstSong={(props.song.trackNumber ?? 1) === 1 && props.song.set === 1}
+              />
+            </SilentErrorBoundary>
+          )}
+
+          {/* Lyric fragments — visual poetry at emotional peaks */}
+          {!isDeadAir && showSeed !== undefined && introFactor > 0.8 && (
+            <SilentErrorBoundary name="LyricFragment">
+              <LyricFragment
+                showSeed={showSeed}
+                trackId={props.song.trackId}
+                climaxPhase={climaxState.phase}
+                energy={audioSnapshot.energy}
+                isLocked={coherenceState.isLocked}
+                isDrumsSpace={isDrumsSpace}
+                isSegue={!!props.segueIn && frame < FADE_FRAMES}
+                introFactor={introFactor}
               />
             </SilentErrorBoundary>
           )}

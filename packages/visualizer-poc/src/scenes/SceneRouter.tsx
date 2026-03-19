@@ -19,6 +19,7 @@ import { seededLCG as seededRandom } from "../utils/seededRandom";
 import { findCurrentSection } from "../utils/section-lookup";
 import { type SongIdentity, getShowModesForSong } from "../data/song-identities";
 import type { StemSectionType } from "../utils/stem-features";
+import { applySetShaderFilter } from "../utils/set-theme";
 import { detectChordMood } from "../utils/chord-mood";
 import { estimateImprovisationScore } from "../utils/improv-detector";
 import { selectTransitionStyle } from "../utils/transition-selector";
@@ -202,6 +203,10 @@ interface Props {
   segueIn?: boolean;
   /** Sacred segue: suppress first within-song scene crossfade for 90 frames */
   isSacredSegueIn?: boolean;
+  /** Suite continuity: suppress first scene crossfade for suite-middle songs */
+  isInSuiteMiddle?: boolean;
+  /** Set number for set-position shader filtering */
+  setNumber?: number;
 }
 
 /** Determine the visual mode for a given section index.
@@ -223,6 +228,7 @@ export function getModeForSection(
   stemSection?: StemSectionType,
   frames?: EnhancedFrameData[],
   songDuration?: number,
+  setNumber?: number,
 ): VisualMode {
   // Explicit override always wins
   const override = song.sectionOverrides?.find((o) => o.sectionIndex === sectionIndex);
@@ -230,7 +236,7 @@ export function getModeForSection(
 
   // Coherence lock: hold current shader during peak moments
   if (coherenceIsLocked && sectionIndex > 0) {
-    return getModeForSection(song, sectionIndex - 1, sections, seed, era, false, usedShaderModes, songIdentity, stemSection, frames, songDuration);
+    return getModeForSection(song, sectionIndex - 1, sections, seed, era, false, usedShaderModes, songIdentity, stemSection, frames, songDuration, setNumber);
   }
 
   // Seeded variation with affinity-aware morphing
@@ -239,7 +245,7 @@ export function getModeForSection(
     if (section) {
       const prevSection = sectionIndex > 0 ? sections[sectionIndex - 1] : null;
       const prevMode = sectionIndex > 0
-        ? getModeForSection(song, sectionIndex - 1, sections, seed, era, false, usedShaderModes, songIdentity, undefined, frames, songDuration)
+        ? getModeForSection(song, sectionIndex - 1, sections, seed, era, false, usedShaderModes, songIdentity, undefined, frames, songDuration, setNumber)
         : song.defaultMode;
 
       // Energy transition detection: pick from affinity map when energy changes
@@ -359,6 +365,11 @@ export function getModeForSection(
         }
       }
 
+      // Set position intelligence: boost/suppress shaders per set
+      if (setNumber !== undefined) {
+        filteredPool = applySetShaderFilter(filteredPool, setNumber);
+      }
+
       const rng = seededRandom(seed + sectionIndex * 7919);
       const idx = Math.floor(rng() * filteredPool.length);
       return filteredPool[idx];
@@ -438,7 +449,7 @@ function renderMode(
   return renderScene(mode, { frames, sections, palette, tempo, style, jamDensity });
 }
 
-export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, seed, jamDensity, deadAirMode, deadAirFactor, era, coherenceIsLocked, usedShaderModes, drumsSpacePhase, songIdentity, stemSection, songDuration, palette: paletteProp, segueIn, isSacredSegueIn }) => {
+export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, seed, jamDensity, deadAirMode, deadAirFactor, era, coherenceIsLocked, usedShaderModes, drumsSpacePhase, songIdentity, stemSection, songDuration, palette: paletteProp, segueIn, isSacredSegueIn, isInSuiteMiddle, setNumber }) => {
   const frame = useCurrentFrame();
   const palette = paletteProp ?? song.palette;
 
@@ -455,19 +466,19 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
     return <>{renderMode(dsMode, frames, sections, palette, tempo, undefined, jamDensity)}</>;
   }
 
-  const currentMode = getModeForSection(song, currentSectionIdx, sections, seed, era, coherenceIsLocked, usedShaderModes, songIdentity, stemSection, frames, songDuration);
+  const currentMode = getModeForSection(song, currentSectionIdx, sections, seed, era, coherenceIsLocked, usedShaderModes, songIdentity, stemSection, frames, songDuration, setNumber);
   const currentSection = sections[currentSectionIdx];
 
   const nextSectionIdx = currentSectionIdx + 1;
   const prevSectionIdx = currentSectionIdx - 1;
 
-  // Sacred segue: suppress first within-song scene crossfade for 90 frames (3s)
-  // This prevents a jarring shader switch right as the segue lands
-  const suppressCrossfade = isSacredSegueIn && frame < 90;
+  // Sacred segue or suite middle: suppress first within-song scene crossfade for 90 frames (3s)
+  // This prevents a jarring shader switch right as the segue/suite transition lands
+  const suppressCrossfade = (isSacredSegueIn || isInSuiteMiddle) && frame < 90;
 
   // Crossfade INTO this section (from previous) — beat-synced when possible
   if (prevSectionIdx >= 0 && !suppressCrossfade) {
-    const prevMode = getModeForSection(song, prevSectionIdx, sections, seed, era, false, usedShaderModes, songIdentity, stemSection, frames, songDuration);
+    const prevMode = getModeForSection(song, prevSectionIdx, sections, seed, era, false, usedShaderModes, songIdentity, stemSection, frames, songDuration, setNumber);
     if (prevMode !== currentMode) {
       const boundary = currentSection.frameStart;
       const beatFrame = findNearestBeat(frames, boundary - 30, boundary + 30);
@@ -499,7 +510,7 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
 
   // Crossfade OUT of this section (to next) — beat-synced when possible
   if (nextSectionIdx < sections.length) {
-    const nextMode = getModeForSection(song, nextSectionIdx, sections, seed, era, false, usedShaderModes, songIdentity, stemSection, frames, songDuration);
+    const nextMode = getModeForSection(song, nextSectionIdx, sections, seed, era, false, usedShaderModes, songIdentity, stemSection, frames, songDuration, setNumber);
     if (nextMode !== currentMode) {
       const boundary = currentSection.frameEnd;
       const beatFrame = findNearestBeat(frames, boundary - 30, boundary + 30);

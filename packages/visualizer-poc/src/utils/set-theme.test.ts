@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { getSetTheme, applySetModifiers } from "./set-theme";
+import { getSetTheme, applySetModifiers, applySetShaderFilter } from "./set-theme";
 import type { ShowArcModifiers } from "../data/show-arc";
+import type { VisualMode } from "../data/types";
 
 describe("getSetTheme", () => {
   it("returns warm, punchy theme for set 1", () => {
@@ -66,6 +67,26 @@ describe("getSetTheme", () => {
     expect(theme.densityMult).toBe(1);
     expect(theme.warmthShift).toBe(0);
   });
+
+  it("set 1 has boosted structured modes and positive camera steadiness", () => {
+    const theme = getSetTheme(1);
+    expect(theme.boostedModes).toContain("concert_lighting");
+    expect(theme.suppressedModes.length).toBeGreaterThan(0);
+    expect(theme.cameraSteadinessOffset).toBeGreaterThan(0);
+  });
+
+  it("set 2 has boosted psychedelic modes and negative camera steadiness", () => {
+    const theme = getSetTheme(2);
+    expect(theme.boostedModes).toContain("sacred_geometry");
+    expect(theme.suppressedModes.length).toBe(0); // all modes available
+    expect(theme.cameraSteadinessOffset).toBeLessThan(0);
+  });
+
+  it("encore has golden warmth and high camera steadiness", () => {
+    const theme = getSetTheme(3);
+    expect(theme.boostedModes).toContain("oil_projector");
+    expect(theme.cameraSteadinessOffset).toBeGreaterThan(0);
+  });
 });
 
 describe("applySetModifiers", () => {
@@ -112,5 +133,44 @@ describe("applySetModifiers", () => {
     expect(result.abstractionLevel).toBe(BASE.abstractionLevel);
     expect(result.overlayBias.character).toBe(0.10);
     expect(result.overlayBias.sacred).toBe(0.05);
+  });
+});
+
+describe("applySetShaderFilter", () => {
+  it("boosts set 1 modes and suppresses abstract modes", () => {
+    const pool: VisualMode[] = ["concert_lighting", "cosmic_dust", "tie_dye", "aurora"];
+    const filtered = applySetShaderFilter(pool, 1);
+    // concert_lighting, tie_dye, aurora are boosted (appear 2x each)
+    expect(filtered.filter((m) => m === "concert_lighting").length).toBe(2);
+    expect(filtered.filter((m) => m === "tie_dye").length).toBe(2);
+    // cosmic_dust is suppressed (set 1 suppressedModes)
+    expect(filtered).not.toContain("cosmic_dust");
+  });
+
+  it("set 2 boosts psychedelic modes without suppressing any", () => {
+    const pool: VisualMode[] = ["cosmic_voyage", "concert_lighting", "sacred_geometry"];
+    const filtered = applySetShaderFilter(pool, 2);
+    expect(filtered.filter((m) => m === "cosmic_voyage").length).toBe(2);
+    expect(filtered.filter((m) => m === "sacred_geometry").length).toBe(2);
+    expect(filtered).toContain("concert_lighting");
+  });
+
+  it("encore suppresses harsh modes", () => {
+    const pool: VisualMode[] = ["oil_projector", "databend", "vintage_film"];
+    const filtered = applySetShaderFilter(pool, 3);
+    expect(filtered).not.toContain("databend");
+    expect(filtered).toContain("oil_projector");
+  });
+
+  it("does not empty pool when all modes suppressed", () => {
+    const pool: VisualMode[] = ["cosmic_dust", "void_light"];
+    const filtered = applySetShaderFilter(pool, 1);
+    expect(filtered.length).toBeGreaterThan(0);
+  });
+
+  it("returns unchanged for unknown set", () => {
+    const pool: VisualMode[] = ["concert_lighting", "tie_dye"];
+    const filtered = applySetShaderFilter(pool, 99);
+    expect(filtered).toEqual(pool);
   });
 });

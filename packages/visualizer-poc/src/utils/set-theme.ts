@@ -12,7 +12,7 @@
 
 import { clamp } from "./math";
 import type { ShowArcModifiers } from "../data/show-arc";
-import type { OverlayCategory } from "../data/types";
+import type { OverlayCategory, VisualMode } from "../data/types";
 
 export interface SetTheme {
   /** Hue-rotate offset in degrees (positive = warm, negative = cool) */
@@ -29,10 +29,17 @@ export interface SetTheme {
   abstractionOffset: number;
   /** Per-category overlay score bias */
   overlayBias: Partial<Record<OverlayCategory, number>>;
+  /** Shader modes boosted for this set (2x weight in pool) */
+  boostedModes: VisualMode[];
+  /** Shader modes suppressed for this set (removed from pool unless only option) */
+  suppressedModes: VisualMode[];
+  /** Camera steadiness bias: positive = steadier, negative = looser */
+  cameraSteadinessOffset: number;
 }
 
 const SET_THEMES: Record<number, SetTheme> = {
   // Set 1: warm, punchy — high-energy rock, crowd engagement
+  // Structured/bright shaders, steady camera, no deep psychedelia
   1: {
     warmthShift: 5,
     brightnessOffset: 0.03,
@@ -41,8 +48,12 @@ const SET_THEMES: Record<number, SetTheme> = {
     windowDurationMult: 0.95,
     abstractionOffset: 0,
     overlayBias: { character: +0.08, atmospheric: +0.05, sacred: -0.03 },
+    boostedModes: ["concert_lighting", "tie_dye", "inferno", "aurora", "electric_arc", "lava_flow"],
+    suppressedModes: ["cosmic_dust", "void_light", "morphogenesis", "reaction_diffusion"],
+    cameraSteadinessOffset: 0.15, // steadier during set 1
   },
   // Set 2: cool, ethereal — exploratory jams, psychedelic depths
+  // Unlock all psychedelic/abstract shaders, looser camera
   2: {
     warmthShift: -8,
     brightnessOffset: -0.05,
@@ -51,8 +62,11 @@ const SET_THEMES: Record<number, SetTheme> = {
     windowDurationMult: 1.15,
     abstractionOffset: 0.10,
     overlayBias: { sacred: +0.10, geometric: +0.08, nature: +0.06, character: -0.10 },
+    boostedModes: ["cosmic_voyage", "deep_ocean", "sacred_geometry", "fractal_zoom", "reaction_diffusion", "kaleidoscope", "morphogenesis", "feedback_recursion", "mycelium_network"],
+    suppressedModes: [], // all modes available in set 2
+    cameraSteadinessOffset: -0.15, // looser/more organic camera
   },
-  // Encore (set 3): subdued, intimate — final statement
+  // Encore (set 3): golden warmth, intimate camera, hero overlays
   3: {
     warmthShift: 3,
     brightnessOffset: -0.04,
@@ -61,6 +75,9 @@ const SET_THEMES: Record<number, SetTheme> = {
     windowDurationMult: 0.90,
     abstractionOffset: 0,
     overlayBias: { character: +0.10, atmospheric: +0.08, sacred: +0.03, reactive: -0.05 },
+    boostedModes: ["oil_projector", "vintage_film", "aurora", "stained_glass", "smoke_rings"],
+    suppressedModes: ["stark_minimal", "digital_rain", "signal_decay", "databend"],
+    cameraSteadinessOffset: 0.20, // intimate, steady
   },
 };
 
@@ -73,6 +90,9 @@ const NEUTRAL: SetTheme = {
   windowDurationMult: 1,
   abstractionOffset: 0,
   overlayBias: {},
+  boostedModes: [],
+  suppressedModes: [],
+  cameraSteadinessOffset: 0,
 };
 
 /**
@@ -81,6 +101,28 @@ const NEUTRAL: SetTheme = {
  */
 export function getSetTheme(setNumber: number): SetTheme {
   return SET_THEMES[setNumber] ?? NEUTRAL;
+}
+
+/**
+ * Apply set-level shader pool filtering to a candidate mode list.
+ * Boosts preferred modes (adds duplicates) and removes suppressed modes.
+ */
+export function applySetShaderFilter(
+  modes: VisualMode[],
+  setNumber: number,
+): VisualMode[] {
+  const theme = SET_THEMES[setNumber];
+  if (!theme) return modes;
+
+  // Remove suppressed modes (unless they're the only option)
+  const suppressedSet = new Set(theme.suppressedModes);
+  let filtered = modes.filter((m) => !suppressedSet.has(m));
+  if (filtered.length === 0) filtered = modes; // fallback: don't empty the pool
+
+  // Boost preferred modes: add duplicates for 2x weight
+  const boostedSet = new Set(theme.boostedModes);
+  const boosted = filtered.filter((m) => boostedSet.has(m));
+  return [...filtered, ...boosted];
 }
 
 /**
