@@ -387,6 +387,12 @@ export interface ShowSetlist {
   venueType?: string;
   /** Tour name (e.g., "Spring 1977", "Fall 1989") */
   tourName?: string;
+  /** 1-based night in consecutive run (e.g. night 3 of a 4-night stand) */
+  nightInRun?: number;
+  /** Total nights in this run */
+  totalNights?: number;
+  /** Days since last show (0 = consecutive) */
+  daysOff?: number;
   /** All songs in order */
   songs: SetlistEntry[];
   /** Path to show intro poster art (relative to public/) */

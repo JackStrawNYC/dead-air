@@ -164,6 +164,9 @@ export const ShowSetlistSchema = z.object({
   era: EraSchema.optional(),
   venueType: VenueTypeSchema.optional(),
   tourName: z.string().optional(),
+  nightInRun: z.number().int().min(1).optional(),
+  totalNights: z.number().int().min(1).optional(),
+  daysOff: z.number().int().min(0).optional(),
   songs: z.array(SetlistEntrySchema).min(1),
   showPoster: z.string().optional(),
 });

@@ -62,6 +62,7 @@ import { computeCounterpoint, resetCounterpoint } from "./utils/visual-counterpo
 import { lookupSongIdentity } from "./data/song-identities";
 import { computeShowArcPhase, getShowArcModifiers } from "./data/show-arc";
 import type { ShowArcPhase } from "./data/show-arc";
+import { computeTourModifiers, applyTourModifiers } from "./utils/tour-position";
 import { computeITResponse } from "./utils/it-response";
 import { isSacredSegue, isJamSegmentTitle } from "./data/band-config";
 import { classifyStemSection, detectSolo, computeVocalWarmth, computeGuitarColorTemp } from "./utils/stem-features";
@@ -72,7 +73,7 @@ import { detectJamCycle } from "./utils/jam-cycles";
 import { computeNarrativeDirective } from "./utils/visual-narrator";
 import { endScreenOverlayMult } from "./utils/end-screen-zones";
 import { getVenueProfile } from "./utils/venue-profiles";
-import { deriveChromaPalette, blendChromaPalette } from "./utils/chroma-palette";
+import { deriveChromaPalette } from "./utils/chroma-palette";
 import { NowPlaying } from "./components/NowPlaying";
 import { SongPositionIndicator } from "./components/SongPositionIndicator";
 import { JamTimer } from "./components/JamTimer";
@@ -176,16 +177,13 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
     [props.song.title],
   );
 
-  // ─── Audio-derived palette ───
-  const chromaPalette = useMemo(
-    () => analysis ? deriveChromaPalette(analysis.frames) : undefined,
-    [analysis],
-  );
-  const manualPalette = props.song.palette ?? songIdentity?.palette;
-  const effectivePalette = useMemo(
-    () => chromaPalette ? blendChromaPalette(manualPalette, chromaPalette, 0.25) : manualPalette,
-    [manualPalette, chromaPalette],
-  );
+  // ─── Effective palette (setlist > curated identity > chroma-derived) ───
+  const effectivePalette = useMemo((): ColorPalette | undefined => {
+    if (props.song.palette) return props.song.palette;
+    if (songIdentity?.palette) return songIdentity.palette;
+    if (analysis?.frames?.length) return deriveChromaPalette(analysis.frames);
+    return undefined;
+  }, [props.song.palette, songIdentity, analysis]);
 
   // ─── Show arc phase ───
   const showArcPhase = useMemo((): ShowArcPhase | undefined => {
@@ -203,9 +201,18 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
     });
   }, [props.show, props.song.set, props.song.trackNumber, isDrumsSpace, narrative?.state?.songsCompleted, narrative?.state?.postDrumsSpaceCount]);
 
+  const tourModifiers = useMemo(
+    () => computeTourModifiers({
+      nightInRun: props.show?.nightInRun,
+      totalNights: props.show?.totalNights,
+      daysOff: props.show?.daysOff,
+    }),
+    [props.show?.nightInRun, props.show?.totalNights, props.show?.daysOff],
+  );
+
   const showArcModifiers = useMemo(
-    () => showArcPhase ? getShowArcModifiers(showArcPhase) : undefined,
-    [showArcPhase],
+    () => showArcPhase ? applyTourModifiers(getShowArcModifiers(showArcPhase), tourModifiers) : undefined,
+    [showArcPhase, tourModifiers],
   );
 
   // ─── Sacred segue detection ───
