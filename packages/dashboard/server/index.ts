@@ -1,6 +1,8 @@
 import express, { type Request, type Response, type NextFunction } from 'express';
 import cors from 'cors';
 import { resolve } from 'path';
+import { statfsSync, readdirSync, statSync } from 'fs';
+import { join } from 'path';
 import { loadConfig } from './config.js';
 import { getDb } from './db.js';
 import router from './router.js';
@@ -21,9 +23,37 @@ app.use('/files', (_req, res, next) => {
   express.static(config.paths.data)(_req, res, next);
 });
 
-// Health check
+// Health check with disk info
+function dirSize(dirPath: string): number {
+  let total = 0;
+  try {
+    for (const entry of readdirSync(dirPath, { withFileTypes: true })) {
+      const fullPath = join(dirPath, entry.name);
+      if (entry.isDirectory()) {
+        total += dirSize(fullPath);
+      } else {
+        try { total += statSync(fullPath).size; } catch {}
+      }
+    }
+  } catch {}
+  return total;
+}
+
 app.get('/api/health', (_req, res) => {
-  res.json({ status: 'ok', uptime: process.uptime() });
+  const cfg = loadConfig();
+  let diskFree = 0;
+  try {
+    const stats = statfsSync(cfg.paths.data);
+    diskFree = stats.bfree * stats.bsize;
+  } catch {}
+
+  res.json({
+    status: 'ok',
+    uptime: process.uptime(),
+    diskFree,
+    renderDirSize: dirSize(cfg.paths.renders),
+    dataDirSize: dirSize(cfg.paths.data),
+  });
 });
 
 // Global error handler — catches unhandled errors and sanitizeParam rejections

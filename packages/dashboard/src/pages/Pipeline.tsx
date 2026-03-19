@@ -13,7 +13,7 @@ import StageTracker from '../components/StageTracker';
 import { useToast } from '../hooks/useToast';
 import { useNotifications } from '../hooks/useNotifications';
 
-const STAGES = ['ingest', 'analyze', 'research', 'script', 'generate', 'render'];
+const STAGES = ['ingest', 'analyze', 'research', 'script', 'generate', 'bridge', 'render'];
 
 export default function Pipeline() {
   const { date: paramDate } = useParams<{ date?: string }>();

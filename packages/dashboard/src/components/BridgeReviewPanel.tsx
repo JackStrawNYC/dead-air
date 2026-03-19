@@ -6,9 +6,10 @@ interface BridgeReviewPanelProps {
   date: string;
   onAcceptRender: () => void;
   onPreviewFirst: () => void;
+  onSongsLoaded?: (songs: SongEntry[]) => void;
 }
 
-interface SongEntry {
+export interface SongEntry {
   trackId: string;
   title: string;
   defaultMode?: string;
@@ -22,7 +23,7 @@ interface ChapterEntry {
   after?: string;
 }
 
-export default function BridgeReviewPanel({ date, onAcceptRender, onPreviewFirst }: BridgeReviewPanelProps) {
+export default function BridgeReviewPanel({ date, onAcceptRender, onPreviewFirst, onSongsLoaded }: BridgeReviewPanelProps) {
   const toast = useToast();
   const [loading, setLoading] = useState(true);
   const [songs, setSongs] = useState<SongEntry[]>([]);
@@ -37,7 +38,9 @@ export default function BridgeReviewPanel({ date, onAcceptRender, onPreviewFirst
       fetchSceneRegistry().catch(() => ({ modes: [] })),
     ]).then(([output, registry]) => {
       const setlist = output.setlist as { songs?: SongEntry[] } | null;
-      setSongs(setlist?.songs ?? []);
+      const loadedSongs = setlist?.songs ?? [];
+      setSongs(loadedSongs);
+      if (onSongsLoaded && loadedSongs.length > 0) onSongsLoaded(loadedSongs);
       const ctx = output.context as { chapters?: ChapterEntry[]; setBreakDuration?: number } | null;
       setChapters(ctx?.chapters ?? []);
       if (ctx?.setBreakDuration) setSetBreakDuration(ctx.setBreakDuration);

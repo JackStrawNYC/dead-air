@@ -246,6 +246,19 @@ export default function EpisodeDetail() {
                       try {
                         const { url } = await getYoutubeAuthUrl();
                         window.open(url, '_blank');
+                        // Poll for auth completion every 2s
+                        const poll = setInterval(async () => {
+                          try {
+                            const status = await getYoutubeAuthStatus();
+                            if (status.authenticated) {
+                              clearInterval(poll);
+                              setYtAuthenticated(true);
+                              toast('success', 'YouTube connected');
+                            }
+                          } catch {}
+                        }, 2000);
+                        // Stop polling after 5 minutes
+                        setTimeout(() => clearInterval(poll), 300000);
                       } catch (err) {
                         toast('error', err instanceof Error ? err.message : 'Failed to get auth URL. Set YOUTUBE_CREDENTIALS env var.');
                       }

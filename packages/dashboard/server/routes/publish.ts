@@ -27,6 +27,30 @@ router.get('/auth-status', (_req, res) => {
   res.json({ authenticated: hasToken() });
 });
 
+// GET /api/publish/oauth-callback — handle Google OAuth redirect
+router.get('/oauth-callback', async (req, res) => {
+  const code = req.query.code as string | undefined;
+  if (!code) {
+    res.status(400).send(`<!DOCTYPE html><html><body style="font-family:system-ui;padding:40px;text-align:center">
+      <h2 style="color:#e74c3c">OAuth Error</h2><p>No authorization code received.</p>
+    </body></html>`);
+    return;
+  }
+  try {
+    await exchangeCode(code);
+    res.send(`<!DOCTYPE html><html><body style="font-family:system-ui;padding:40px;text-align:center">
+      <h2 style="color:#27ae60">YouTube Connected</h2>
+      <p>Authentication successful. You can close this window.</p>
+      <script>window.close()</script>
+    </body></html>`);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'OAuth exchange failed';
+    res.status(500).send(`<!DOCTYPE html><html><body style="font-family:system-ui;padding:40px;text-align:center">
+      <h2 style="color:#e74c3c">OAuth Error</h2><p>${msg}</p>
+    </body></html>`);
+  }
+});
+
 // POST /api/publish/auth-callback — exchange OAuth code for token
 router.post('/auth-callback', async (req, res) => {
   const { code } = req.body;

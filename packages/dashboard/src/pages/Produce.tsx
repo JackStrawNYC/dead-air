@@ -25,6 +25,7 @@ import PresetSelector from '../components/PresetSelector';
 import StageTracker from '../components/StageTracker';
 import SegmentGrid from '../components/SegmentGrid';
 import BridgeReviewPanel from '../components/BridgeReviewPanel';
+import type { SongEntry } from '../components/BridgeReviewPanel';
 import CompositionControls from '../components/CompositionControls';
 import type { CompositionOptions } from '../components/CompositionControls';
 import CostEstimate from '../components/CostEstimate';
@@ -95,6 +96,7 @@ export default function Produce() {
   const [previewJobId, setPreviewJobId] = useState<string | null>(null);
   const previewJob = useJob(previewJobId);
   const [previewTrackId, setPreviewTrackId] = useState('');
+  const [bridgeSongs, setBridgeSongs] = useState<SongEntry[]>([]);
 
   // Render job
   const [renderJobId, setRenderJobId] = useState<string | null>(null);
@@ -304,7 +306,7 @@ export default function Produce() {
 
   // ── Render ──
 
-  const STAGES_LIST = ['ingest', 'analyze', 'research', 'script', 'generate', 'render'];
+  const STAGES_LIST = ['ingest', 'analyze', 'research', 'script', 'generate', 'bridge', 'render'];
 
   // Estimate song count from setlist
   const songCount = setlistPreview?.songs?.length || 12;
@@ -621,6 +623,14 @@ export default function Produce() {
             onPreviewFirst={() => {
               completeStep('bridge-review', 'preview');
             }}
+            onSongsLoaded={(songs) => {
+              setBridgeSongs(songs);
+              // Auto-select a mid-setlist track for preview
+              if (songs.length > 0 && !previewTrackId) {
+                const midIdx = Math.floor(songs.length / 2);
+                setPreviewTrackId(songs[midIdx].trackId);
+              }
+            }}
           />
         </div>
       )}
@@ -640,16 +650,31 @@ export default function Produce() {
                   TRACK TO PREVIEW
                 </label>
                 <div style={{ display: 'flex', gap: 8 }}>
-                  <input
-                    type="text"
-                    placeholder="e.g., s1t05"
-                    value={previewTrackId}
-                    onChange={e => setPreviewTrackId(e.target.value)}
-                    style={{ width: 120, fontFamily: 'var(--font-mono)', fontSize: 12 }}
-                  />
+                  {bridgeSongs.length > 0 ? (
+                    <select
+                      value={previewTrackId}
+                      onChange={e => setPreviewTrackId(e.target.value)}
+                      style={{ width: 260, fontFamily: 'var(--font-mono)', fontSize: 12 }}
+                    >
+                      <option value="">Select track...</option>
+                      {bridgeSongs.map(s => (
+                        <option key={s.trackId} value={s.trackId}>
+                          {s.trackId} — {s.title}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      type="text"
+                      placeholder="e.g., s1t05"
+                      value={previewTrackId}
+                      onChange={e => setPreviewTrackId(e.target.value)}
+                      style={{ width: 120, fontFamily: 'var(--font-mono)', fontSize: 12 }}
+                    />
+                  )}
                   <button
                     className="btn btn-primary"
-                    onClick={() => handleStartPreview(previewTrackId || 's1t05')}
+                    onClick={() => handleStartPreview(previewTrackId)}
                     disabled={!previewTrackId}
                   >
                     Render Preview

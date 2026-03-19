@@ -215,3 +215,13 @@ export const publishEpisode = (episodeId: string, opts: {
   request<{ videoId: string; url: string }>(`/publish/${encodeURIComponent(episodeId)}`, {
     method: 'POST', body: JSON.stringify(opts),
   });
+
+// Health
+export interface HealthResponse {
+  status: string;
+  uptime: number;
+  diskFree: number;
+  renderDirSize: number;
+  dataDirSize: number;
+}
+export const fetchHealth = () => request<HealthResponse>('/health');

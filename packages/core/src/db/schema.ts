@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 export const CREATE_TABLES_SQL = `
 -- Shows: Grateful Dead concert metadata from archive.org
@@ -80,7 +80,24 @@ CREATE TABLE IF NOT EXISTS analytics (
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Jobs: Pipeline job history (metadata only, not log lines)
+CREATE TABLE IF NOT EXISTS jobs (
+  id TEXT PRIMARY KEY,
+  type TEXT NOT NULL,
+  episode_id TEXT,
+  show_date TEXT,
+  status TEXT NOT NULL DEFAULT 'running',
+  current_stage TEXT,
+  failed_stage TEXT,
+  stages TEXT,
+  error TEXT,
+  started_at DATETIME NOT NULL,
+  finished_at DATETIME
+);
+
 -- Indexes
+CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status);
+CREATE INDEX IF NOT EXISTS idx_jobs_show_date ON jobs(show_date);
 CREATE INDEX IF NOT EXISTS idx_episodes_show_id ON episodes(show_id);
 CREATE INDEX IF NOT EXISTS idx_episodes_status ON episodes(status);
 CREATE INDEX IF NOT EXISTS idx_assets_episode_id ON assets(episode_id);

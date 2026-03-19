@@ -1,5 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import type { ReactNode } from 'react';
+import DiskStatus from './DiskStatus';
 
 const NAV_ITEMS = [
   {
@@ -65,6 +66,7 @@ export default function Layout({ children }: { children: ReactNode }) {
             </NavLink>
           ))}
         </div>
+        <DiskStatus />
       </nav>
       <main className="main-content">
         {children}
