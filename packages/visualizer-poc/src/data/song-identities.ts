@@ -17,8 +17,6 @@
  * merging into SONG_IDENTITIES at init time based on BandConfig.
  */
 
-import { existsSync, readFileSync } from "fs";
-import { resolve, dirname } from "path";
 import type { VisualMode, ColorPalette, OverlayTag, TrackMeta, EnhancedFrameData } from "./types";
 import type { DrumsSpaceSubPhase } from "../utils/drums-space-phase";
 import { seeded, seededShuffle } from "../utils/seededRandom";
@@ -27,6 +25,7 @@ import { deriveChromaPalette } from "../utils/chroma-palette";
 
 // ─── JSON Override Layer ───
 // Dashboard edits write to data/song-identities.json; lookupSongIdentity checks it first.
+// Uses dynamic require to avoid webpack bundling 'fs' in the browser context.
 
 let jsonOverrides: Record<string, SongIdentity> | null = null;
 let jsonOverridesLoaded = false;
@@ -35,13 +34,17 @@ function loadJsonOverrides(): Record<string, SongIdentity> | null {
   if (jsonOverridesLoaded) return jsonOverrides;
   jsonOverridesLoaded = true;
   try {
-    // Works both at build-time (tsx scripts) and in bundled Remotion render
-    const jsonPath = resolve(__dirname, "../../data/song-identities.json");
-    if (existsSync(jsonPath)) {
-      jsonOverrides = JSON.parse(readFileSync(jsonPath, "utf-8"));
+    // Dynamic require so webpack doesn't try to bundle 'fs' and 'path'
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const fs = typeof require !== "undefined" ? require("fs") : null;
+    const path = typeof require !== "undefined" ? require("path") : null;
+    if (!fs || !path) return jsonOverrides;
+    const jsonPath = path.resolve(__dirname, "../../data/song-identities.json");
+    if (fs.existsSync(jsonPath)) {
+      jsonOverrides = JSON.parse(fs.readFileSync(jsonPath, "utf-8"));
     }
   } catch {
-    // Silently fall through to TS defaults
+    // Silently fall through to TS defaults (expected in browser/Remotion bundle)
   }
   return jsonOverrides;
 }
