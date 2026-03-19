@@ -99,6 +99,126 @@ interface SceneVideoLayerProps {
   climaxPhase?: string;
   /** Whether band is in coherence "locked in" state — suppresses videos */
   isLocked?: boolean;
+  /** Beat snap value for beat-synced video cuts and opacity flashes (0-1) */
+  beatSnap?: number;
+  /** Current section type for context-aware blend modes */
+  sectionType?: string;
+}
+
+// ─── Context-Adaptive Opacity (pure function) ───
+
+/**
+ * Compute video opacity based on context — replaces simple inverse-energy.
+ * @param energy Current energy level (0-1)
+ * @param isCurated Whether this is song-specific curated media
+ * @param sectionType Current section type label
+ * @param climaxPhase Current climax phase string
+ * @param beatSnap Current beat snap value (0-1)
+ */
+export function computeVideoOpacity(
+  energy: number,
+  isCurated: boolean,
+  sectionType?: string,
+  climaxPhase?: string,
+  beatSnap?: number,
+): number {
+  const snap = beatSnap ?? 0;
+
+  // Climax + curated: video as star of the show
+  if (isCurated && (climaxPhase === "climax" || climaxPhase === "sustain")) {
+    return 0.80;
+  }
+
+  // Peak + curated: rhythmic beat flash visibility
+  if (isCurated && energy > 0.30) {
+    const beatFlash = snap > 0.3 ? 0.60 * snap : 0;
+    return Math.max(0.15, beatFlash);
+  }
+
+  // Peak + general: stay hidden (preserve shader prominence)
+  if (!isCurated && energy > 0.30) {
+    return 0.03;
+  }
+
+  // Build sections: video intensifies WITH energy
+  if (sectionType === "build" || climaxPhase === "build") {
+    return 0.40 + energy * 0.50;
+  }
+
+  // Quiet (energy < 0.08): video prominent
+  if (energy < 0.08) {
+    return 0.70;
+  }
+
+  // Mid energy default: gentle mid-range presence
+  return 0.50 - energy * 0.30;
+}
+
+// ─── Context-Aware Blend Modes (pure function) ───
+
+export type VideoBlendMode = "screen" | "multiply" | "overlay" | "color-burn";
+
+/**
+ * Select CSS blend mode based on context.
+ * @param isImage Whether media is an image (always screen for Ken Burns)
+ * @param energy Current energy level (0-1)
+ * @param sectionType Current section type label
+ * @param climaxPhase Current climax phase string
+ */
+export function selectVideoBlendMode(
+  isImage: boolean,
+  energy: number,
+  sectionType?: string,
+  climaxPhase?: string,
+): VideoBlendMode {
+  // Images always use screen (preserve Ken Burns warmth)
+  if (isImage) return "screen";
+
+  // Climax: saturated psychedelic intensity
+  if (climaxPhase === "climax" || climaxPhase === "sustain") {
+    return "color-burn";
+  }
+
+  // Dark verse moments: film-negative effect
+  if ((sectionType === "verse" || sectionType === "intro") && energy < 0.15) {
+    return "multiply";
+  }
+
+  // Punchy high energy (non-climax): contrast punch
+  if (energy > 0.25) {
+    return "overlay";
+  }
+
+  // Atmospheric/quiet: warm additive
+  return "screen";
+}
+
+// ─── Video-First Moment Detection ───
+
+/**
+ * Detect if current moment should be a "video IS the visual" moment.
+ * True when curated video exists AND climax phase active.
+ */
+export function isVideoFirstMoment(
+  isCurated: boolean,
+  energy: number,
+  climaxPhase?: string,
+): boolean {
+  if (!isCurated) return false;
+  if (energy < 0.3) return false;
+  return climaxPhase === "climax" || climaxPhase === "sustain";
+}
+
+// ─── Beat-Synced Cut Interval ───
+
+/**
+ * Compute beat-synced cut interval in frames.
+ * Only active when energy > 0.20 AND enough clips available.
+ */
+export function computeBeatCutInterval(energy: number): number {
+  if (energy <= 0.20) return Infinity;
+  // 150 frames (5s) at quiet → 30 frames (1s) at peak
+  return Math.round(150 - energy * 120);
 }
 
 // ─── Section scoring (shared logic) ───
@@ -106,15 +226,24 @@ interface SceneVideoLayerProps {
 function scoreSections(
   sections: SectionBoundary[],
   frames: EnhancedFrameData[],
+  forCurated: boolean = false,
 ): { section: SectionBoundary; idx: number; score: number }[] {
   const totalFrames = sections[sections.length - 1]?.frameEnd ?? 0;
   const musicEnd = findMusicEnd(frames, totalFrames);
 
   return sections.map((section, idx) => {
     let score = 0;
-    if (section.energy === "low") score += 3;
-    else if (section.energy === "mid") score += 2;
-    else score += 1;
+    if (forCurated) {
+      // Curated media prefers high-energy sections (dramatic visibility)
+      if (section.energy === "high") score += 4;
+      else if (section.energy === "mid") score += 3;
+      else score += 2;
+    } else {
+      // General media prefers quiet sections (unchanged behavior)
+      if (section.energy === "low") score += 3;
+      else if (section.energy === "mid") score += 2;
+      else score += 1;
+    }
 
     const sectionLen = section.frameEnd - section.frameStart;
     score += Math.min(2, sectionLen / 3000);
@@ -217,9 +346,12 @@ export function computeMediaWindows(
     return [];
   }
 
-  // Score sections by suitability for media display
-  const scored = scoreSections(sections, frames);
+  // Score sections: curated media prefers high-energy, general prefers quiet
+  const hasCurated = items.some((m) => m.priority <= 1);
+  const scored = scoreSections(sections, frames, false);
+  const scoredForCurated = hasCurated ? scoreSections(sections, frames, true) : scored;
   scored.sort((a, b) => b.score - a.score);
+  scoredForCurated.sort((a, b) => b.score - a.score);
 
   const totalFrames = sections[sections.length - 1].frameEnd;
   // Scale max windows by song duration:
@@ -329,6 +461,8 @@ export const SceneVideoLayer: React.FC<SceneVideoLayerProps> = ({
   suppressedRanges,
   climaxPhase,
   isLocked,
+  beatSnap,
+  sectionType,
 }) => {
   const frame = useCurrentFrame();
 
@@ -563,13 +697,9 @@ export const SceneVideoLayer: React.FC<SceneVideoLayerProps> = ({
     );
   }
 
-  // General (priority 2-3): visible atmospheric layer, blended with shader
-  let maxOpacity = isImage ? 0.45 : 0.65;
-  // During climax phase: force video opacity to max 30% (shader should dominate)
-  if (climaxPhase === "climax" || climaxPhase === "sustain") {
-    maxOpacity = Math.min(maxOpacity, 0.30);
-  }
-  const opacity = fadeEnvelope * energyBoost * maxOpacity;
+  // General (priority 2-3): context-adaptive blending
+  const contextOpacity = computeVideoOpacity(energy, false, sectionType, climaxPhase, beatSnap);
+  const opacity = fadeEnvelope * contextOpacity;
 
   const generalContent = isImage ? (
     <ImageMediaDisplay
@@ -592,10 +722,8 @@ export const SceneVideoLayer: React.FC<SceneVideoLayerProps> = ({
     </Sequence>
   );
 
-  // Use screen blend mode for videos during build/release phases
-  const blendMode = (!isImage && (climaxPhase === "build" || climaxPhase === "release"))
-    ? "screen" as const
-    : "screen" as const;
+  // Context-aware blend mode
+  const blendMode = selectVideoBlendMode(isImage, energy, sectionType, climaxPhase);
 
   return (
     <div

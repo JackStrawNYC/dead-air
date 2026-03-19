@@ -11,6 +11,7 @@ import { useVideoConfig } from "remotion";
 import { useShowContext } from "../data/ShowContext";
 import { deriveFilmStock } from "../utils/show-film-stock";
 import { getVenueProfile } from "../utils/venue-profiles";
+import { compute3DCamera } from "../utils/camera-3d";
 
 /** Era saturation values — previously in EraGrade CSS, now owned by GLSL */
 const ERA_SATURATION: Record<string, number> = {
@@ -142,6 +143,11 @@ export const FullscreenQuad: React.FC<Props> = ({
       uShowGrain: { value: 1 },
       uShowBloom: { value: 1 },
       uVenueVignette: { value: 0.5 },
+      uCamPos: { value: new THREE.Vector3(0, 0, -3.5) },
+      uCamTarget: { value: new THREE.Vector3(0, 0, 0) },
+      uCamFov: { value: 50 },
+      uCamDof: { value: 0 },
+      uCamFocusDist: { value: 3 },
       ...extraUniforms,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -216,6 +222,20 @@ export const FullscreenQuad: React.FC<Props> = ({
   uniforms.uShowGrain.value = filmStock.grain * venueProfile.grainMult;
   uniforms.uShowBloom.value = filmStock.bloom * venueProfile.bloomMult;
   uniforms.uVenueVignette.value = venueProfile.vignette;
+
+  // 3D Camera
+  const cam3d = compute3DCamera(
+    time, dynamicTime, smooth.energy, smooth.bass,
+    smooth.fastEnergy, smooth.vocalPresence, smooth.drumOnset,
+    smooth.sectionProgress, smooth.sectionIndex,
+    climaxPhase, climaxIntensity,
+    smooth.beatStability, smooth.beatSnap,
+  );
+  uniforms.uCamPos.value.set(cam3d.position[0], cam3d.position[1], cam3d.position[2]);
+  uniforms.uCamTarget.value.set(cam3d.target[0], cam3d.target[1], cam3d.target[2]);
+  uniforms.uCamFov.value = cam3d.fov;
+  uniforms.uCamDof.value = cam3d.dofStrength;
+  uniforms.uCamFocusDist.value = cam3d.focusDistance;
 
   const c = smooth.contrast;
 

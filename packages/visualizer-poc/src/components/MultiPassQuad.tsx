@@ -25,6 +25,7 @@ import { useAudioData } from "./AudioReactiveCanvas";
 import { useShowContext } from "../data/ShowContext";
 import { deriveFilmStock } from "../utils/show-film-stock";
 import { getVenueProfile } from "../utils/venue-profiles";
+import { compute3DCamera } from "../utils/camera-3d";
 
 /** Era saturation values — same as FullscreenQuad */
 const ERA_SATURATION: Record<string, number> = {
@@ -173,6 +174,11 @@ function createBaseUniforms(
     uShowGrain: { value: 1 },
     uShowBloom: { value: 1 },
     uVenueVignette: { value: 0.5 },
+    uCamPos: { value: new THREE.Vector3(0, 0, -3.5) },
+    uCamTarget: { value: new THREE.Vector3(0, 0, 0) },
+    uCamFov: { value: 50 },
+    uCamDof: { value: 0 },
+    uCamFocusDist: { value: 3 },
     ...(feedback ? { uPrevFrame: { value: null as THREE.Texture | null } } : {}),
     ...extraUniforms,
   };
@@ -363,6 +369,20 @@ export const MultiPassQuad: React.FC<Props> = ({
   u.uShowGrain.value = filmStock.grain * venueProfile.grainMult;
   u.uShowBloom.value = filmStock.bloom * venueProfile.bloomMult;
   u.uVenueVignette.value = venueProfile.vignette;
+
+  // 3D Camera
+  const cam3d = compute3DCamera(
+    time, dynamicTime, smooth.energy, smooth.bass,
+    smooth.fastEnergy, smooth.vocalPresence, smooth.drumOnset,
+    smooth.sectionProgress, smooth.sectionIndex,
+    climaxPhase, climaxIntensity,
+    smooth.beatStability, smooth.beatSnap,
+  );
+  u.uCamPos.value.set(cam3d.position[0], cam3d.position[1], cam3d.position[2]);
+  u.uCamTarget.value.set(cam3d.target[0], cam3d.target[1], cam3d.target[2]);
+  u.uCamFov.value = cam3d.fov;
+  u.uCamDof.value = cam3d.dofStrength;
+  u.uCamFocusDist.value = cam3d.focusDistance;
 
   // Update FFT texture
   if (fftTextureRef.current) {

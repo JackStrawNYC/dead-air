@@ -103,6 +103,13 @@ uniform float uShowBloom;
 // ─── Venue Profile ───
 uniform float uVenueVignette;
 
+// ─── 3D Camera ───
+uniform vec3 uCamPos;
+uniform vec3 uCamTarget;
+uniform float uCamFov;
+uniform float uCamDof;
+uniform float uCamFocusDist;
+
 // ─── Spatial ───
 uniform vec2 uResolution;
 uniform vec2 uCamOffset;

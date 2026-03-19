@@ -100,6 +100,10 @@ import { GalaxySpiralScene } from "./GalaxySpiralScene";
 import { WarpFieldScene } from "./WarpFieldScene";
 import { SignalDecayScene } from "./SignalDecayScene";
 import { DatabendScene } from "./DatabendScene";
+// Tier 1: Volumetric Raymarching Shaders
+import { VolumetricCloudsScene } from "./VolumetricCloudsScene";
+import { VolumetricSmokeScene } from "./VolumetricSmokeScene";
+import { VolumetricNebulaScene } from "./VolumetricNebulaScene";
 
 // ─── Scene Registry ───
 
@@ -355,6 +359,25 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     energyAffinity: "high",
     complement: "lo_fi_grain",
   },
+  // Tier 1: Volumetric Raymarching Shaders
+  volumetric_clouds: {
+    Component: VolumetricCloudsScene,
+    energyAffinity: "low",
+    complement: "volumetric_smoke",
+    preferredTransitionIn: "dissolve",
+  },
+  volumetric_smoke: {
+    Component: VolumetricSmokeScene,
+    energyAffinity: "mid",
+    complement: "concert_lighting",
+    preferredTransitionIn: "void",
+  },
+  volumetric_nebula: {
+    Component: VolumetricNebulaScene,
+    energyAffinity: "any",
+    complement: "cosmic_voyage",
+    preferredTransitionIn: "dissolve",
+  },
 };
 
 // ─── Transition Affinity Map ───
@@ -410,6 +433,10 @@ export const TRANSITION_AFFINITY: Partial<Record<VisualMode, VisualMode[]>> = {
   warp_field: ["diffraction_rings", "cosmic_voyage", "void_light"],
   signal_decay: ["digital_rain", "lo_fi_grain", "vintage_film"],
   databend: ["digital_rain", "signal_decay", "lo_fi_grain"],
+  // Tier 1: Volumetric Raymarching Shaders
+  volumetric_clouds: ["aurora", "deep_ocean", "cosmic_voyage"],
+  volumetric_smoke: ["concert_lighting", "smoke_rings", "lo_fi_grain"],
+  volumetric_nebula: ["cosmic_voyage", "particle_nebula", "galaxy_spiral"],
 };
 
 // ─── Helper functions ───

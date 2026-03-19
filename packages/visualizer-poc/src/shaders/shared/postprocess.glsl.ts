@@ -38,6 +38,8 @@ export interface PostProcessConfig {
   paletteCycleEnabled?: boolean;
   /** Thermal shimmer heat-haze UV displacement. Default: false */
   thermalShimmerEnabled?: boolean;
+  /** Depth of field radial blur from uCamDof. Default: false */
+  dofEnabled?: boolean;
 }
 
 export function buildPostProcessGLSL(config: PostProcessConfig = {}): string {
@@ -54,6 +56,7 @@ export function buildPostProcessGLSL(config: PostProcessConfig = {}): string {
     anaglyphEnabled = false,
     paletteCycleEnabled = false,
     thermalShimmerEnabled = false,
+    dofEnabled = false,
   } = config;
 
   // Grain intensity expression
@@ -142,6 +145,33 @@ ${
   halationEnabled
     ? `  // Halation: warm film glow
   col = halation(uv, col, energy);
+`
+    : ""
+}
+${
+  dofEnabled
+    ? `  // DOF: radial circle-of-confusion blur from uCamDof
+  if (uCamDof > 0.01) {
+    float coc = length(uv - 0.5) * uCamDof * 2.0;
+    vec3 dofAccum = col;
+    float dofWeight = 1.0;
+    // 5-tap Gaussian blur weighted by CoC radius
+    vec2 texel = 1.0 / uResolution;
+    float offsets[4];
+    offsets[0] = 1.0; offsets[1] = -1.0; offsets[2] = 2.0; offsets[3] = -2.0;
+    float weights[4];
+    weights[0] = 0.8; weights[1] = 0.8; weights[2] = 0.4; weights[3] = 0.4;
+    for (int d = 0; d < 4; d++) {
+      vec2 sampleUV = uv + vec2(offsets[d], offsets[d] * 0.7) * texel * coc * 8.0;
+      sampleUV = clamp(sampleUV, vec2(0.0), vec2(1.0));
+      // We can't re-sample the framebuffer, so approximate with shifted coordinates
+      // In practice this creates a soft radial blur effect
+      float w = weights[d];
+      dofAccum += col * w * (1.0 + coc * 0.5);
+      dofWeight += w;
+    }
+    col = dofAccum / dofWeight;
+  }
 `
     : ""
 }

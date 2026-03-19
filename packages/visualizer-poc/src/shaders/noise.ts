@@ -728,4 +728,17 @@ vec2 thermalShimmer(vec2 uv, float time, float energy, vec2 resolution) {
   // Vertical bias: displacement is primarily horizontal (heat shimmer)
   return uv + vec2(wave1 + wave2, wave3 * 0.3);
 }
+
+// --- 3D Camera Ray Setup ---
+// Constructs ray origin (ro) and direction (rd) from uCamPos/uCamTarget/uCamFov uniforms.
+// uv: screen UV (0-1), aspect: vec2(width/height, 1.0)
+void setupCameraRay(vec2 uv, vec2 aspect, out vec3 ro, out vec3 rd) {
+  ro = uCamPos;
+  vec3 forward = normalize(uCamTarget - uCamPos);
+  vec3 right = normalize(cross(forward, vec3(0.0, 1.0, 0.0)));
+  vec3 up = cross(right, forward);
+  float fovScale = tan(radians(uCamFov) * 0.5);
+  vec2 sp = (uv - 0.5) * aspect;
+  rd = normalize(forward + right * sp.x * fovScale + up * sp.y * fovScale);
+}
 `;

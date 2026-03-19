@@ -166,7 +166,10 @@ export type VisualMode =
   | "galaxy_spiral"
   | "warp_field"
   | "signal_decay"
-  | "databend";
+  | "databend"
+  | "volumetric_clouds"
+  | "volumetric_smoke"
+  | "volumetric_nebula";
 
 /** Per-section mode override in setlist */
 export interface SectionOverride {
