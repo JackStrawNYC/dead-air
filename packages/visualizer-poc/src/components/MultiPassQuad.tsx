@@ -138,6 +138,8 @@ function createBaseUniforms(
     uChroma2: { value: new THREE.Vector4(0, 0, 0, 0) },
     uCamOffset: { value: new THREE.Vector2(0, 0) },
     uJamDensity: { value: 0.5 },
+    uJamPhase: { value: -1 },
+    uJamProgress: { value: 0 },
     uCoherence: { value: 0 },
     uFastEnergy: { value: 0 },
     uFastBass: { value: 0 },
@@ -199,7 +201,7 @@ export const MultiPassQuad: React.FC<Props> = ({
   const {
     time, beatDecay, smooth, palettePrimary, paletteSecondary,
     paletteSaturation, tempo, musicalTime, climaxPhase, climaxIntensity,
-    heroTrigger, heroProgress, jamDensity, coherence, dynamicTime, isLocked,
+    heroTrigger, heroProgress, jamDensity, jamPhase, jamProgress, coherence, dynamicTime, isLocked,
   } = useAudioData();
   const { width, height } = useVideoConfig();
   const currentFrame = useCurrentFrame();
@@ -337,6 +339,8 @@ export const MultiPassQuad: React.FC<Props> = ({
   u.uClimaxPhase.value = climaxPhase;
   u.uClimaxIntensity.value = climaxIntensity;
   u.uJamDensity.value = jamDensity;
+  u.uJamPhase.value = jamPhase;
+  u.uJamProgress.value = jamProgress;
   u.uCoherence.value = coherence;
   u.uSlowEnergy.value = smooth.slowEnergy;
   u.uStemBass.value = smooth.stemBass;

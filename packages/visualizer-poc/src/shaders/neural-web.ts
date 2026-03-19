@@ -101,7 +101,17 @@ void main() {
 
   // --- Feedback blend (previous frame provides trailing glow) ---
   vec4 prev = texture2D(uPrevFrame, vUv);
-  col += prev.rgb * 0.94 * (0.8 + energy * 0.2);
+  float feedbackDecay = 0.94;
+  // Jam phase feedback: exploration=long trails, building=moderate, peak=max persistence, resolution=clearing
+  if (uJamPhase >= 0.0) {
+    float jpExplore = step(-0.5, uJamPhase) * step(uJamPhase, 0.5);
+    float jpBuild   = step(0.5, uJamPhase) * step(uJamPhase, 1.5);
+    float jpPeak    = step(1.5, uJamPhase) * step(uJamPhase, 2.5);
+    float jpResolve = step(2.5, uJamPhase);
+    feedbackDecay += jpExplore * 0.03 + jpBuild * 0.01 + jpPeak * 0.05 - jpResolve * 0.04;
+    feedbackDecay = clamp(feedbackDecay, 0.80, 0.97);
+  }
+  col += prev.rgb * feedbackDecay * (0.8 + energy * 0.2);
 
   // --- Draw axon connections ---
   float axonThickness = 0.002 + bass * 0.004;

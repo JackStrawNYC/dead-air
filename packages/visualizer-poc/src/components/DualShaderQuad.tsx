@@ -77,7 +77,8 @@ function createSceneUniforms(width: number, height: number): Record<string, THRE
     uChroma1: { value: new THREE.Vector4(0, 0, 0, 0) },
     uChroma2: { value: new THREE.Vector4(0, 0, 0, 0) },
     uCamOffset: { value: new THREE.Vector2(0, 0) },
-    uJamDensity: { value: 0.5 }, uCoherence: { value: 0 },
+    uJamDensity: { value: 0.5 }, uJamPhase: { value: -1 }, uJamProgress: { value: 0 },
+    uCoherence: { value: 0 },
     uFastEnergy: { value: 0 }, uFastBass: { value: 0 },
     uDrumOnset: { value: 0 }, uDrumBeat: { value: 0 },
     uSpectralFlux: { value: 0 },
@@ -113,7 +114,7 @@ function syncUniforms(
   tempo: number, musicalTime: number,
   climaxPhase: number, climaxIntensity: number,
   heroTrigger: number, heroProgress: number,
-  jamDensity: number, coherence: number, isLocked: boolean,
+  jamDensity: number, jamPhase: number, jamProgress: number, coherence: number, isLocked: boolean,
   eraSaturation: number, eraBrightness: number, eraSepia: number,
   filmStock: FilmStockParams, venueProfile: VenueProfile,
   width: number, height: number,
@@ -146,6 +147,8 @@ function syncUniforms(
   u.uClimaxPhase.value = climaxPhase;
   u.uClimaxIntensity.value = climaxIntensity;
   u.uJamDensity.value = jamDensity;
+  u.uJamPhase.value = jamPhase;
+  u.uJamProgress.value = jamProgress;
   u.uCoherence.value = coherence;
   u.uSlowEnergy.value = smooth.slowEnergy;
   u.uStemBass.value = smooth.stemBass;
@@ -225,7 +228,7 @@ export const DualShaderQuad: React.FC<Props> = ({
   const {
     time, beatDecay, smooth, palettePrimary, paletteSecondary,
     paletteSaturation, tempo, musicalTime, climaxPhase, climaxIntensity,
-    heroTrigger, heroProgress, jamDensity, coherence, dynamicTime, isLocked,
+    heroTrigger, heroProgress, jamDensity, jamPhase, jamProgress, coherence, dynamicTime, isLocked,
   } = useAudioData();
   const { width, height } = useVideoConfig();
   const sceneConfig = useSceneConfig();
@@ -315,7 +318,7 @@ export const DualShaderQuad: React.FC<Props> = ({
     time, dynamicTime, beatDecay, smooth,
     palettePrimary, paletteSecondary, paletteSaturation,
     tempo, musicalTime, climaxPhase, climaxIntensity,
-    heroTrigger, heroProgress, jamDensity, coherence, isLocked,
+    heroTrigger, heroProgress, jamDensity, jamPhase, jamProgress, coherence, isLocked,
     eraSaturation, eraBrightness, eraSepia,
     filmStock, venueProfile, width, height, sceneConfig.gradingIntensity,
   ] as const;

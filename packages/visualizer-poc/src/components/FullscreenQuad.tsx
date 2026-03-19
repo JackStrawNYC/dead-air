@@ -52,7 +52,7 @@ export const FullscreenQuad: React.FC<Props> = ({
   fragmentShader,
   extraUniforms,
 }) => {
-  const { time, beatDecay, smooth, palettePrimary, paletteSecondary, paletteSaturation, tempo, musicalTime, climaxPhase, climaxIntensity, heroTrigger, heroProgress, jamDensity, coherence, dynamicTime, isLocked } = useAudioData();
+  const { time, beatDecay, smooth, palettePrimary, paletteSecondary, paletteSaturation, tempo, musicalTime, climaxPhase, climaxIntensity, heroTrigger, heroProgress, jamDensity, coherence, dynamicTime, isLocked, jamPhase, jamProgress } = useAudioData();
   const { width, height } = useVideoConfig();
   const sceneConfig = useSceneConfig();
   const showCtx = useShowContext();
@@ -108,6 +108,8 @@ export const FullscreenQuad: React.FC<Props> = ({
       uChroma2: { value: new THREE.Vector4(0, 0, 0, 0) },
       uCamOffset: { value: new THREE.Vector2(0, 0) },
       uJamDensity: { value: 0.5 },
+      uJamPhase: { value: -1 },
+      uJamProgress: { value: 0 },
       uCoherence: { value: 0 },
       uFastEnergy: { value: 0 },
       uFastBass: { value: 0 },
@@ -186,6 +188,8 @@ export const FullscreenQuad: React.FC<Props> = ({
   uniforms.uClimaxPhase.value = climaxPhase;
   uniforms.uClimaxIntensity.value = climaxIntensity;
   uniforms.uJamDensity.value = jamDensity;
+  uniforms.uJamPhase.value = jamPhase;
+  uniforms.uJamProgress.value = jamProgress;
   uniforms.uCoherence.value = coherence;
   uniforms.uSlowEnergy.value = smooth.slowEnergy;
   uniforms.uStemBass.value = smooth.stemBass;

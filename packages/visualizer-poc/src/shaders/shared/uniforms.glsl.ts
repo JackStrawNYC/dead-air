@@ -66,6 +66,10 @@ uniform float uClimaxIntensity;
 uniform float uCoherence;
 uniform float uJamDensity;
 
+// ─── Jam Evolution ───
+uniform float uJamPhase;    // 0=exploration, 1=building, 2=peak_space, 3=resolution (-1=not a jam)
+uniform float uJamProgress; // 0-1 progress within current jam phase
+
 // ─── Palette / Color ───
 uniform float uPalettePrimary;
 uniform float uPaletteSecondary;

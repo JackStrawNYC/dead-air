@@ -14,6 +14,7 @@ import { computeHeroIconState } from "../utils/hero-icon";
 import { computeAudioSnapshot as computeSnapshot, buildBeatArray as buildBeatArrayUtil, computeMusicalTime as computeMusicalTimeUtil, computeSpectralFlux, computeEnergyAcceleration, computeEnergyTrend, computeEnergyForecast, computePeakApproaching, computeBeatStability } from "../utils/audio-reactive";
 import { energyGate } from "../utils/math";
 import { useHeroPermitted } from "../data/HeroPermittedContext";
+import { useJamPhase } from "../data/JamPhaseContext";
 
 /** Audio data context passed to all Three.js children */
 export interface AudioDataContext {
@@ -132,6 +133,10 @@ export interface AudioDataContext {
   isLocked: boolean;
   /** Dynamic time: accumulates proportionally to energy (freezes in silence, full speed at peaks) */
   dynamicTime: number;
+  /** Jam phase index: 0=exploration, 1=building, 2=peak_space, 3=resolution, -1=not a long jam */
+  jamPhase: number;
+  /** Jam phase progress: 0-1 within current jam phase */
+  jamProgress: number;
 }
 
 const AudioCtx = createContext<AudioDataContext | null>(null);
@@ -383,6 +388,7 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
   const climaxMod = climaxModulation(climaxState);
   const climaxSpeedMult = climaxMod.shaderSpeedMult;
   const heroPermitted = useHeroPermitted();
+  const jamPhaseCtx = useJamPhase();
   const heroIcon = heroPermitted !== false
     ? computeHeroIconState(climaxPhaseNum, climaxState.intensity)
     : { trigger: 0, progress: 0 };
@@ -472,6 +478,8 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
     dynamicTime: (snapToMusicalTimeProp
       ? computeMusicalTimeUtil(beatArray, idx, fps, tempo ?? 120) / (tempo ?? 120) * 60
       : (dynamicTimeLookup[idx] ?? (idx / fps))) * climaxSpeedMult,
+    jamPhase: jamPhaseCtx.phase,
+    jamProgress: jamPhaseCtx.progress,
   };
 
   return (

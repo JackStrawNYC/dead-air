@@ -128,6 +128,15 @@ void main() {
 
   // Sample previous frame with decay
   float decayRate = mix(0.92, 0.98, slowE) + fftHigh * 0.02;
+  // Jam phase feedback: exploration=long trails, building=moderate, peak=max persistence, resolution=clearing
+  if (uJamPhase >= 0.0) {
+    float jpExplore = step(-0.5, uJamPhase) * step(uJamPhase, 0.5);
+    float jpBuild   = step(0.5, uJamPhase) * step(uJamPhase, 1.5);
+    float jpPeak    = step(1.5, uJamPhase) * step(uJamPhase, 2.5);
+    float jpResolve = step(2.5, uJamPhase);
+    decayRate += jpExplore * 0.03 + jpBuild * 0.01 + jpPeak * 0.05 - jpResolve * 0.04;
+    decayRate = clamp(decayRate, 0.80, 0.97);
+  }
   vec3 feedback = texture2D(uPrevFrame, feedbackUv).rgb * decayRate;
 
   // --- Current frame seed pattern ---

@@ -12,7 +12,9 @@
  * evolve their character over time rather than looping the same treatment.
  */
 
-import type { EnhancedFrameData } from "../data/types";
+import type { EnhancedFrameData, VisualMode } from "../data/types";
+import type { SongIdentity } from "../data/song-identities";
+import { seededLCG } from "./seededRandom";
 
 export type JamPhase = "exploration" | "building" | "peak_space" | "resolution";
 
@@ -175,4 +177,143 @@ function computeDensityMult(phase: JamPhase, progress: number): number {
     case "resolution":
       return 1.25 - progress * 0.30;      // gradual thinning
   }
+}
+
+// ─── Jam Phase Boundaries ───
+
+export interface JamPhaseBoundaries {
+  /** Frame where exploration ends / building begins */
+  explorationEnd: number;
+  /** Frame where building ends / peak_space begins */
+  buildingEnd: number;
+  /** Frame where peak_space ends / resolution begins */
+  peakSpaceEnd: number;
+  /** Total frames */
+  totalFrames: number;
+}
+
+/**
+ * Compute the frame-number boundaries between jam phases.
+ * Deterministic for a given frames array — can be memoized per song.
+ */
+export function getJamPhaseBoundaries(
+  frames: EnhancedFrameData[],
+  isDrumsSpace = false,
+): JamPhaseBoundaries | null {
+  const totalFrames = frames.length;
+  const threshold = isDrumsSpace ? DRUMS_SPACE_THRESHOLD : LONG_JAM_THRESHOLD;
+  if (totalFrames < threshold) return null;
+
+  const windowSize = FPS * 30;
+  const energyContour = computeEnergyContour(frames, windowSize);
+  const peakFrame = findPeakRegion(energyContour);
+  const peakProgress = peakFrame / Math.max(1, totalFrames - 1);
+
+  const explorationEndP = peakProgress * 0.3;
+  const buildingEndP = peakProgress * 0.85;
+  const peakSpaceEndP = Math.min(1, peakProgress + (1 - peakProgress) * 0.35);
+
+  return {
+    explorationEnd: Math.round(explorationEndP * (totalFrames - 1)),
+    buildingEnd: Math.round(buildingEndP * (totalFrames - 1)),
+    peakSpaceEnd: Math.round(peakSpaceEndP * (totalFrames - 1)),
+    totalFrames,
+  };
+}
+
+// ─── Jam Phase Shader Pools ───
+// Each phase maps to shaders that match its emotional character.
+// Pools are curated for the Grateful Dead psychedelic experience:
+//   exploration: ambient, mysterious, generative — the band is searching
+//   building:    flowing, complex, intensifying — energy is rising
+//   peak_space:  intense, transcendent, feedback-heavy — the peak moment
+//   resolution:  calming, organic, thinning — return to earth
+
+export const JAM_PHASE_SHADER_POOLS: Record<JamPhase, VisualMode[]> = {
+  exploration: [
+    "deep_ocean", "cosmic_dust", "aurora", "morphogenesis", "void_light",
+    "cosmic_voyage", "ink_wash", "aurora_curtains", "volumetric_clouds",
+    "volumetric_nebula", "smoke_rings", "coral_reef",
+  ],
+  building: [
+    "liquid_light", "fluid_2d", "reaction_diffusion", "kaleidoscope",
+    "neural_web", "warp_field", "plasma_field", "oil_projector",
+    "fluid_light", "mycelium_network", "volumetric_smoke",
+  ],
+  peak_space: [
+    "feedback_recursion", "fractal_flames", "electric_arc", "inferno",
+    "fractal_zoom", "sacred_geometry", "lava_flow", "solar_flare",
+    "climax_surge", "mandala_engine", "tie_dye",
+  ],
+  resolution: [
+    "tie_dye", "stained_glass", "oil_projector", "cosmic_voyage",
+    "mycelium_network", "diffraction_rings", "aurora", "deep_ocean",
+    "ink_wash", "vintage_film", "voronoi_flow",
+  ],
+};
+
+/** Numeric encoding of jam phases for GLSL uniforms */
+export const JAM_PHASE_INDEX: Record<JamPhase, number> = {
+  exploration: 0,
+  building: 1,
+  peak_space: 2,
+  resolution: 3,
+};
+
+/**
+ * Select a shader mode for a given jam phase.
+ * Respects song identity preferred modes (intersects with phase pool).
+ * Deterministic via seed — same show seed + phase = same shader.
+ */
+export function getJamPhaseMode(
+  phase: JamPhase,
+  seed: number,
+  songIdentity?: SongIdentity,
+  currentDefault?: VisualMode,
+): VisualMode {
+  const pool = JAM_PHASE_SHADER_POOLS[phase];
+  const rng = seededLCG(seed + JAM_PHASE_INDEX[phase] * 7717);
+
+  // Intersect with song identity preferred modes for coherence
+  let candidates: VisualMode[] = pool;
+  if (songIdentity?.preferredModes && songIdentity.preferredModes.length > 0) {
+    const preferred = new Set(songIdentity.preferredModes);
+    const intersection = pool.filter((m) => preferred.has(m));
+    if (intersection.length >= 2) {
+      // Use intersection but also keep 2 phase-native picks for variety
+      const phaseOnly = pool.filter((m) => !preferred.has(m));
+      const extraPicks = phaseOnly.slice(0, 2);
+      candidates = [...intersection, ...extraPicks];
+    }
+  }
+
+  // Avoid repeating the current default mode if possible
+  if (currentDefault && candidates.length > 1) {
+    const filtered = candidates.filter((m) => m !== currentDefault);
+    if (filtered.length > 0) candidates = filtered;
+  }
+
+  return candidates[Math.floor(rng() * candidates.length)];
+}
+
+/**
+ * Get all 4 jam phase modes for a song at once (for precomputation).
+ * Ensures no two adjacent phases use the same shader.
+ */
+export function getJamPhaseSequence(
+  seed: number,
+  songIdentity?: SongIdentity,
+  songDefault?: VisualMode,
+): Record<JamPhase, VisualMode> {
+  const phases: JamPhase[] = ["exploration", "building", "peak_space", "resolution"];
+  const result: Partial<Record<JamPhase, VisualMode>> = {};
+  let prevMode: VisualMode | undefined = songDefault;
+
+  for (const phase of phases) {
+    const mode = getJamPhaseMode(phase, seed, songIdentity, prevMode);
+    result[phase] = mode;
+    prevMode = mode;
+  }
+
+  return result as Record<JamPhase, VisualMode>;
 }

@@ -178,6 +178,15 @@ void main() {
   // ─── Decay: slowly fade to prevent infinite accumulation ───
   // Faster decay at low energy (fluid dissipates when quiet)
   float decayRate = mix(0.988, 0.997, energy);
+  // Jam phase feedback: exploration=long trails, building=moderate, peak=max persistence, resolution=clearing
+  if (uJamPhase >= 0.0) {
+    float jpExplore = step(-0.5, uJamPhase) * step(uJamPhase, 0.5);
+    float jpBuild   = step(0.5, uJamPhase) * step(uJamPhase, 1.5);
+    float jpPeak    = step(1.5, uJamPhase) * step(uJamPhase, 2.5);
+    float jpResolve = step(2.5, uJamPhase);
+    decayRate += jpExplore * 0.03 + jpBuild * 0.01 + jpPeak * 0.05 - jpResolve * 0.04;
+    decayRate = clamp(decayRate, 0.80, 0.97);
+  }
   diffused *= decayRate;
 
   // ─── Color injection: palette-colored dye on beats/onsets ───

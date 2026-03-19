@@ -291,6 +291,15 @@ void main() {
   float baseDecay = mix(0.95, 0.95 - 0.07, energy);
   float feedbackDecay = baseDecay + sJam_fb * 0.04 + sSpace_fb * 0.06 - sChorus_fb * 0.06;
   feedbackDecay = clamp(feedbackDecay, 0.80, 0.97);
+  // Jam phase feedback: exploration=long trails, building=moderate, peak=max persistence, resolution=clearing
+  if (uJamPhase >= 0.0) {
+    float jpExplore = step(-0.5, uJamPhase) * step(uJamPhase, 0.5);
+    float jpBuild   = step(0.5, uJamPhase) * step(uJamPhase, 1.5);
+    float jpPeak    = step(1.5, uJamPhase) * step(uJamPhase, 2.5);
+    float jpResolve = step(2.5, uJamPhase);
+    feedbackDecay += jpExplore * 0.03 + jpBuild * 0.01 + jpPeak * 0.05 - jpResolve * 0.04;
+    feedbackDecay = clamp(feedbackDecay, 0.80, 0.97);
+  }
   col = max(col, prev * feedbackDecay);
 
   gl_FragColor = vec4(col, 1.0);
