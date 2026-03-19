@@ -27,6 +27,8 @@ export interface SongStats {
   firstPlayed: string;
   lastPlayed: string;
   notable?: string;
+  gapShows?: number;
+  lastPlayedDate?: string;
 }
 
 export interface SongDNAProps {
@@ -135,6 +137,35 @@ export const SongDNA: React.FC<SongDNAProps> = ({
         >
           {stats.firstPlayed} — {stats.lastPlayed}
         </div>
+
+        {/* Gap count / Bustout badge */}
+        {stats.gapShows != null && stats.gapShows > 0 && (
+          <div
+            style={{
+              fontFamily: `${mono}, monospace`,
+              fontSize: stats.gapShows >= 50 ? 13 : 12,
+              fontWeight: stats.gapShows >= 50 ? 400 : 300,
+              color: stats.gapShows >= 50
+                ? "#f5c842"
+                : "rgba(200, 190, 170, 0.8)",
+              marginTop: 8,
+              letterSpacing: stats.gapShows >= 50 ? 3 : 1,
+              textTransform: "uppercase",
+              ...(stats.gapShows >= 50 ? {
+                padding: "4px 10px",
+                border: "1px solid rgba(245, 200, 66, 0.6)",
+                borderRadius: 2,
+                boxShadow: `0 0 ${8 + Math.sin(frame * 0.08) * 4}px rgba(245, 200, 66, ${0.25 + Math.sin(frame * 0.08) * 0.15})`,
+                textShadow: "0 0 8px rgba(245, 200, 66, 0.5)",
+                display: "inline-block",
+              } : {}),
+            }}
+          >
+            {stats.gapShows >= 50
+              ? `BUSTOUT — ${stats.gapShows} show gap`
+              : `${stats.gapShows} show gap`}
+          </div>
+        )}
 
         {/* Notable fact */}
         {stats.notable && (

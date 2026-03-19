@@ -255,6 +255,8 @@ export const SongStatsEntrySchema = z.object({
   firstPlayed: z.string(),
   lastPlayed: z.string(),
   notable: z.string().optional(),
+  gapShows: z.number().int().nonnegative().optional(),
+  lastPlayedDate: z.string().optional(),
 });
 
 export const SongStatsSchema = z.object({

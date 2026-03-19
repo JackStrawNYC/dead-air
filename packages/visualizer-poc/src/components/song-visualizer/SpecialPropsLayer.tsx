@@ -107,6 +107,43 @@ export const SpecialPropsLayer: React.FC<Props> = ({
           />
         </SilentErrorBoundary>
       )}
+      {/* Reel change marks — first 8 frames of set opener */}
+      {trackNumber === 1 && frame < 8 && (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            pointerEvents: "none",
+            zIndex: 95,
+          }}
+        >
+          {/* Brief dark flash */}
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              backgroundColor: `rgba(0, 0, 0, ${frame < 3 ? 0.6 - frame * 0.15 : 0.15 - (frame - 3) * 0.03})`,
+            }}
+          />
+          {/* Sprocket hole pattern on right edge */}
+          {frame < 6 && Array.from({ length: 4 }, (_, i) => (
+            <div
+              key={i}
+              style={{
+                position: "absolute",
+                right: 8,
+                top: `${15 + i * 22}%`,
+                width: 12,
+                height: 18,
+                borderRadius: 3,
+                border: "2px solid rgba(255, 255, 255, 0.12)",
+                backgroundColor: "rgba(0, 0, 0, 0.3)",
+                opacity: 0.5 - frame * 0.08,
+              }}
+            />
+          ))}
+        </div>
+      )}
       {!process.env.SKIP_GRAIN && (
         <FilmGrain opacity={interpolate(
           energy, [0.03, 0.30], [0.10, 0.04],

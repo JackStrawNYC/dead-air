@@ -95,6 +95,14 @@ import { DrummersDuo } from "../components/DrummersDuo";
 import { BassWaveform } from "../components/BassWaveform";
 import { TicketStub } from "../components/TicketStub";
 
+// ─── Dead Culture Iconography (6) ───
+import { SkullRoses } from "../components/SkullRoses";
+import { EgyptianEye } from "../components/EgyptianEye";
+import { TerrapinStation } from "../components/TerrapinStation";
+import { SunflowerStealie } from "../components/SunflowerStealie";
+import { CosmicEagle } from "../components/CosmicEagle";
+import { WaveOfLight } from "../components/WaveOfLight";
+
 // ─── Layer 10: Distortion (1) ───
 import { VHSGlitch } from "../components/VHSGlitch";
 
@@ -196,4 +204,12 @@ export const OVERLAY_COMPONENTS: Record<string, OverlayComponentEntry> = {
   DrummersDuo:         { Component: DrummersDuo, layer: 6 },
   BassWaveform:        { Component: BassWaveform, layer: 3 },
   TicketStub:          { Component: TicketStub as React.ComponentType<{ frames: EnhancedFrameData[] }>, layer: 7 },
+
+  // Dead Culture Iconography
+  SkullRoses:          { Component: SkullRoses, layer: 2 },
+  EgyptianEye:         { Component: EgyptianEye, layer: 2 },
+  TerrapinStation:     { Component: TerrapinStation, layer: 6 },
+  SunflowerStealie:    { Component: SunflowerStealie, layer: 2 },
+  CosmicEagle:         { Component: CosmicEagle, layer: 5 },
+  WaveOfLight:         { Component: WaveOfLight, layer: 3 },
 };

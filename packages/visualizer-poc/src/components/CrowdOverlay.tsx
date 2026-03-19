@@ -142,6 +142,32 @@ export const CrowdOverlay: React.FC<Props> = ({ moments }) => {
               </radialGradient>
             </defs>
             <rect x="0" y="0" width="1920" height="1080" fill={`url(#${gradId})`} />
+            {/* Floating lighter flames — 15 teardrops rising from bottom */}
+            {Array.from({ length: 15 }, (_, i) => {
+              const lx = 200 + hashSeed(m.frameStart + i * 31) * 1520;
+              const flickerPhase = hashSeed(m.frameStart + i * 47) * Math.PI * 2;
+              const speed = 0.8 + hashSeed(m.frameStart + i * 53) * 0.6;
+              const elapsed = frame - m.frameStart;
+              const ly = 1080 - elapsed * speed * 1.2 - hashSeed(m.frameStart + i * 67) * 200;
+              if (ly < -50 || ly > 1100) return null;
+              const flickerScale = 0.7 + Math.sin(elapsed * 0.15 + flickerPhase) * 0.3;
+              const flameOpacity = opacity * 0.6 * flickerScale;
+              const flameColor = hslToRgb(
+                (30 + hashSeed(m.frameStart + i * 71) * 20) % 360,
+                80,
+                55 + hashSeed(m.frameStart + i * 79) * 15,
+              );
+              return (
+                <g key={i} transform={`translate(${lx}, ${ly}) scale(${flickerScale})`}>
+                  <path
+                    d="M0,-12 C-4,-6 -5,0 -3,4 C-1,7 1,7 3,4 C5,0 4,-6 0,-12Z"
+                    fill={flameColor}
+                    opacity={flameOpacity}
+                  />
+                  <ellipse cx="0" cy="5" rx="2" ry="1.5" fill="white" opacity={flameOpacity * 0.4} />
+                </g>
+              );
+            })}
           </svg>,
         );
         break;
@@ -284,6 +310,27 @@ export const CrowdOverlay: React.FC<Props> = ({ moments }) => {
           );
         }
 
+        // Chromatic aberration pulse — 9-frame red/blue split after flash
+        const caProgress = frame - m.peakFrame;
+        if (caProgress >= 2 && caProgress < 11) {
+          const caDecay = 1 - (caProgress - 2) / 9;
+          const caOffset = Math.round(3 * caDecay);
+          if (caOffset > 0) {
+            layers.push(
+              <div
+                key={`holyshit-ca-${m.frameStart}`}
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  pointerEvents: "none",
+                  mixBlendMode: "screen",
+                  boxShadow: `${caOffset}px 0 0 rgba(255, 50, 50, ${(0.08 * caDecay).toFixed(3)}), ${-caOffset}px 0 0 rgba(50, 50, 255, ${(0.08 * caDecay).toFixed(3)})`,
+                }}
+              />,
+            );
+          }
+        }
+
         // Warm glow aftermath with SVG radialGradient
         const afterGlow = interpolate(
           frame,
@@ -331,11 +378,10 @@ export const CrowdOverlay: React.FC<Props> = ({ moments }) => {
         const opacity = momentOpacity * 0.25 * intensity;
         const glowHeight = 30 + momentOpacity * 20; // 30-50% from bottom
         const gradId = `singalong-grad-${m.frameStart}`;
+        const vignetteGradId = `singalong-vignette-${m.frameStart}`;
         const warmColor = hslToRgb(warmHue, 75, glowLightness);
         const midWarmColor = hslToRgb(warmHue, 60, glowLightness * 0.7);
-        // glowHeight is 30-50 (percent), map to SVG y1/y2 coordinates
-        const glowTop = 1080 * (1 - (glowHeight + 20) / 100);
-        const glowMid = 1080 * (1 - glowHeight / 100);
+        const vignetteColor = hslToRgb(40, 60, 45); // warm golden-hour amber
 
         layers.push(
           <svg
@@ -357,8 +403,15 @@ export const CrowdOverlay: React.FC<Props> = ({ moments }) => {
                 <stop offset={`${glowHeight}%`} stopColor={midWarmColor} stopOpacity={opacity * 0.3} />
                 <stop offset={`${glowHeight + 20}%`} stopColor="black" stopOpacity={0} />
               </linearGradient>
+              {/* Golden-hour vignette from edges */}
+              <radialGradient id={vignetteGradId} cx="50%" cy="50%" r="50%">
+                <stop offset="55%" stopColor="black" stopOpacity={0} />
+                <stop offset="85%" stopColor={vignetteColor} stopOpacity={opacity * 0.5} />
+                <stop offset="100%" stopColor={vignetteColor} stopOpacity={opacity * 0.7} />
+              </radialGradient>
             </defs>
             <rect x="0" y="0" width="1920" height="1080" fill={`url(#${gradId})`} />
+            <rect x="0" y="0" width="1920" height="1080" fill={`url(#${vignetteGradId})`} />
           </svg>,
         );
         break;

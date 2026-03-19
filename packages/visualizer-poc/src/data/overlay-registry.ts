@@ -107,6 +107,14 @@ export const OVERLAY_REGISTRY: OverlayEntry[] = [
   { name: "DrummersDuo",    layer: 6, category: "character",   tags: ["dead-culture", "intense"],        energyBand: "mid",  weight: 2, dutyCycle: 100, energyResponse: [0.10, 0.30, 2.0], tier: "B" },
   { name: "BassWaveform",   layer: 3, category: "reactive",    tags: ["intense", "organic"],             energyBand: "mid",  weight: 2, dutyCycle: 100, energyResponse: [0.08, 0.22, 1.8], tier: "B" },
   { name: "TicketStub",     layer: 7, category: "artifact",    tags: ["dead-culture", "retro"],          energyBand: "any",  weight: 1, dutyCycle: 15,  energyResponse: [0.0, 0.05, 3.0], tier: "B" },
+
+  // ═══ Dead Culture Iconography (6) ═══
+  { name: "SkullRoses",          layer: 2, category: "sacred",    tags: ["dead-culture", "organic"],        energyBand: "any",  weight: 3, dutyCycle: 100, energyResponse: [0.02, 0.18, 1.5], tier: "A" },
+  { name: "EgyptianEye",         layer: 2, category: "sacred",    tags: ["dead-culture", "cosmic"],         energyBand: "mid",  weight: 2, dutyCycle: 100, energyResponse: [0.05, 0.20, 1.8], tier: "B" },
+  { name: "TerrapinStation",     layer: 6, category: "character", tags: ["dead-culture", "organic"],        energyBand: "mid",  weight: 2, dutyCycle: 100, energyResponse: [0.05, 0.20, 1.5], tier: "A" },
+  { name: "SunflowerStealie",    layer: 2, category: "sacred",    tags: ["dead-culture", "psychedelic"],    energyBand: "any",  weight: 3, dutyCycle: 100, energyResponse: [0.03, 0.18, 1.5], tier: "A" },
+  { name: "CosmicEagle",         layer: 5, category: "nature",    tags: ["dead-culture", "cosmic"],         energyBand: "mid",  weight: 2, dutyCycle: 100, energyResponse: [0.05, 0.18, 2.0], tier: "B" },
+  { name: "WaveOfLight",         layer: 3, category: "reactive",  tags: ["psychedelic", "cosmic"],          energyBand: "mid",  weight: 2, dutyCycle: 100, energyResponse: [0.05, 0.22, 1.8], tier: "B" },
 ];
 
 /**

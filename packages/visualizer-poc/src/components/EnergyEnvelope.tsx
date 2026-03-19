@@ -53,6 +53,18 @@ interface Props {
   narrativeTemperature?: number;
   /** Intro factor 0-1: 0 = intro period (suppress reactive brightness), 1 = engine fully open */
   introFactor?: number;
+  /** Whether a solo is detected */
+  isSolo?: boolean;
+  /** Solo intensity (0-1) */
+  soloIntensity?: number;
+  /** Harmonic response brightness offset (-0.04 to +0.06) */
+  harmonicBrightness?: number;
+  /** Harmonic response saturation multiplier (0.92-1.08) */
+  harmonicSatMult?: number;
+  /** Modal analysis hue shift in degrees (-40 to +25) */
+  modalHueShift?: number;
+  /** Modal analysis saturation offset (-0.10 to +0.08) */
+  modalSatOffset?: number;
 }
 
 // Per-era bloom color — matches era grade for visual cohesion
@@ -65,7 +77,7 @@ const ERA_BLOOM: Record<string, string> = {
 };
 const DEFAULT_BLOOM = ERA_BLOOM.classic;
 
-export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod, jamColorTemp, calibration, counterpointSatMult = 1, drumsSpacePhase, showPhase, songIdentity, showArcModifiers, itLuminanceLift, vocalWarmth, guitarColorTemp, deadAirFactor = 0, narrativeBrightness = 0, narrativeTemperature = 0, introFactor = 1 }) => {
+export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod, jamColorTemp, calibration, counterpointSatMult = 1, drumsSpacePhase, showPhase, songIdentity, showArcModifiers, itLuminanceLift, vocalWarmth, guitarColorTemp, deadAirFactor = 0, narrativeBrightness = 0, narrativeTemperature = 0, introFactor = 1, isSolo = false, soloIntensity = 0, harmonicBrightness = 0, harmonicSatMult = 1, modalHueShift = 0, modalSatOffset = 0 }) => {
   const energy = snapshot.energy;
   const low = calibration?.quietThreshold;
   const high = calibration?.loudThreshold;
@@ -94,9 +106,9 @@ export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod,
   //   0.70 × 0.75 = 0.525 effective saturation — too muted.
   const cssGate = factor; // 0 during quiet, 1 during loud (already smoothstep-based)
   const isClimaxPhase = (climaxMod?.brightnessOffset ?? 0) > 0.04;
-  const brightCap = isClimaxPhase ? 1.25 : 1.12;
+  const brightCap = isClimaxPhase ? 1.40 : 1.25;
   // Gate all energy-reactive brightness by reactivity (0 during intro, 1 when engine open)
-  const brightness = Math.min(brightCap, 0.96 + factor * 0.16 * reactivity + (climaxMod?.brightnessOffset ?? 0) * reactivity + (snapshot.fastEnergy ?? 0) * 0.03 * cssGate * reactivity);
+  const brightness = Math.min(brightCap, 0.96 + factor * 0.16 * reactivity + (climaxMod?.brightnessOffset ?? 0) * reactivity + (snapshot.fastEnergy ?? 0) * 0.12 * cssGate * reactivity);
 
   // Drums/Space phase adjustments (brightness + hue only — saturation/contrast handled by GLSL)
   let dsBrightOffset = 0;
@@ -105,7 +117,8 @@ export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod,
     dsBrightOffset = -0.10; // darkness
     dsHueOffset = 15;       // blue shift
   } else if (drumsSpacePhase === "drums_tribal") {
-    dsHueOffset = 8;         // warmth shift
+    dsBrightOffset = +0.06;  // primal energy glow
+    dsHueOffset = 12;        // warmth shift
   }
 
   // Show narrative phase adjustments
@@ -125,11 +138,15 @@ export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod,
   // IT luminance lift
   const itBrightLift = itLuminanceLift ?? 0;
 
-  // Vocal warmth: +15deg hue shift (saturation boost now handled by GLSL)
-  const vocalHueShift = (vocalWarmth ?? 0) * 15;
+  // Vocal warmth: +25deg hue shift + brightness (saturation boost now handled by GLSL)
+  const vocalHueShift = (vocalWarmth ?? 0) * 25;
 
-  // Apply phase offsets + song identity + show arc + IT + narrative
-  const baseBrightness = Math.min(brightCap, Math.max(0.55, brightness + dsBrightOffset + showBrightOffset + siPaletteBright + arcBrightOffset + itBrightLift + narrativeBrightness));
+  // Solo brightness + vocal brightness
+  const soloBrightLift = isSolo ? (soloIntensity * 0.10) : 0;
+  const vocalBrightLift = (vocalWarmth ?? 0) * 0.06;
+
+  // Apply phase offsets + song identity + show arc + IT + narrative + solo + vocal + harmonic
+  const baseBrightness = Math.min(brightCap, Math.max(0.55, brightness + dsBrightOffset + showBrightOffset + siPaletteBright + arcBrightOffset + itBrightLift + narrativeBrightness + soloBrightLift + vocalBrightLift + harmonicBrightness));
   // During dead air, dim brightness toward 0.55 (minimum floor) and suppress bloom
   const finalBrightness = deadAirFactor > 0
     ? baseBrightness * (1 - deadAirFactor * 0.40)  // dim by up to 40% during dead air
@@ -156,11 +173,16 @@ export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod,
   const jamHueShift = jamColorTemp != null ? jamColorTemp * 50 : 0; // ±40 degrees max
   // Narrative temperature: ±20deg hue shift (warm = positive, cool = negative)
   const narrativeHueShift = narrativeTemperature * 20;
+  // Solo hue warmth: +20deg shift when solo is active
+  const soloHueShift = isSolo ? soloIntensity * 20 : 0;
   // Suppress hue shift during dead air so applause is neutral
-  const totalHueShift = (jamHueShift + eraColorTempShift + dsHueOffset + siHueShift + arcHueShift + vocalHueShift + guitarHueShift + chromaHueShift + narrativeHueShift) * (1 - deadAirFactor);
+  const totalHueShift = (jamHueShift + eraColorTempShift + dsHueOffset + siHueShift + arcHueShift + vocalHueShift + guitarHueShift + chromaHueShift + narrativeHueShift + soloHueShift + modalHueShift) * (1 - deadAirFactor);
+  // Combined saturation: counterpoint * harmonic * modal (convert modalSatOffset to multiplier)
+  const combinedSatMult = counterpointSatMult * harmonicSatMult * (1 + modalSatOffset);
+  const satFilter = Math.abs(combinedSatMult - 1) > 0.01 ? ` saturate(${combinedSatMult.toFixed(3)})` : "";
   const filterStr = totalHueShift !== 0
-    ? `brightness(${finalBrightness.toFixed(3)}) hue-rotate(${totalHueShift.toFixed(1)}deg)`
-    : `brightness(${finalBrightness.toFixed(3)})`;
+    ? `brightness(${finalBrightness.toFixed(3)}) hue-rotate(${totalHueShift.toFixed(1)}deg)${satFilter}`
+    : `brightness(${finalBrightness.toFixed(3)})${satFilter}`;
 
   return (
     <div style={{ position: "absolute", inset: 0, filter: filterStr }}>
