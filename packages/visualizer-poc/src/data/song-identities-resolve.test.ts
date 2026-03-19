@@ -1,7 +1,52 @@
 import { describe, it, expect } from "vitest";
-import { resolveSongMode } from "./song-identities";
+import { resolveSongMode, getShowModesForSong } from "./song-identities";
 import { lookupSongIdentity } from "./song-identities";
 import type { VisualMode } from "./types";
+
+describe("getShowModesForSong", () => {
+  it("returns same subset for same seed + title (deterministic)", () => {
+    const preferred: VisualMode[] = [
+      "cosmic_voyage", "deep_ocean", "crystal_cavern",
+      "mandala_engine", "feedback_recursion", "morphogenesis", "neural_web",
+    ];
+    const a = getShowModesForSong(preferred, 42, "Dark Star");
+    const b = getShowModesForSong(preferred, 42, "Dark Star");
+    expect(a).toEqual(b);
+  });
+
+  it("narrows 7 preferred to 4 show modes", () => {
+    const preferred: VisualMode[] = [
+      "cosmic_voyage", "deep_ocean", "crystal_cavern",
+      "mandala_engine", "feedback_recursion", "morphogenesis", "neural_web",
+    ];
+    const result = getShowModesForSong(preferred, 42, "Dark Star");
+    expect(result).toHaveLength(4);
+    for (const m of result) {
+      expect(preferred).toContain(m);
+    }
+  });
+
+  it("returns all modes when preferredModes.length <= count", () => {
+    const preferred: VisualMode[] = ["inferno", "tie_dye", "aurora"];
+    const result = getShowModesForSong(preferred, 42, "Bertha");
+    expect(result).toHaveLength(3);
+    expect(new Set(result)).toEqual(new Set(preferred));
+  });
+
+  it("different seeds produce different subsets across 20 seeds", () => {
+    const preferred: VisualMode[] = [
+      "cosmic_voyage", "deep_ocean", "crystal_cavern",
+      "mandala_engine", "feedback_recursion", "morphogenesis", "neural_web",
+    ];
+    const subsets = new Set<string>();
+    for (let seed = 0; seed < 20; seed++) {
+      const subset = getShowModesForSong(preferred, seed, "Dark Star");
+      subsets.add(subset.sort().join(","));
+    }
+    // With 7-choose-4 = 35 possible combos, 20 seeds should produce ≥5 distinct subsets
+    expect(subsets.size).toBeGreaterThanOrEqual(5);
+  });
+});
 
 describe("resolveSongMode", () => {
   it("returns the same mode for the same title + seed (deterministic)", () => {
@@ -34,20 +79,35 @@ describe("resolveSongMode", () => {
     }
   });
 
+  it("result is always one of the 4 show modes (defaultMode alignment)", () => {
+    const identity = lookupSongIdentity("Dark Star");
+    expect(identity).toBeDefined();
+
+    for (let seed = 0; seed < 100; seed++) {
+      const showModes = getShowModesForSong(identity!.preferredModes, seed, "Dark Star");
+      const mode = resolveSongMode("Dark Star", "cosmic_voyage", seed);
+      expect(showModes).toContain(mode);
+    }
+  });
+
   it("different titles with the same seed produce different modes", () => {
     const seed = 12345;
     const darkStar = resolveSongMode("Dark Star", "cosmic_voyage", seed);
     const bertha = resolveSongMode("Bertha", "concert_lighting", seed);
-    // Different songs should (usually) resolve differently — hash decorrelation
-    // We test with specific titles known to have different preferredModes pools
-    // If by extreme coincidence they match, the test still verifies the function runs
     expect(typeof darkStar).toBe("string");
     expect(typeof bertha).toBe("string");
-    // With different preferredModes pools the odds of collision are low
-    // but we verify both are valid modes from their respective pools
     const darkStarIdentity = lookupSongIdentity("Dark Star");
     const berthaIdentity = lookupSongIdentity("Bertha");
     expect(darkStarIdentity!.preferredModes).toContain(darkStar);
     expect(berthaIdentity!.preferredModes).toContain(bertha);
+  });
+
+  it("cross-show variety: 20 seeds produce ≥5 distinct modes for Dark Star", () => {
+    const modes = new Set<VisualMode>();
+    for (let seed = 0; seed < 20; seed++) {
+      modes.add(resolveSongMode("Dark Star", "cosmic_voyage", seed));
+    }
+    // Dark Star has 7 preferred, each seed narrows to 4, then picks 1 — should vary
+    expect(modes.size).toBeGreaterThanOrEqual(5);
   });
 });

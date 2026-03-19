@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { EnhancedFrameData, SectionBoundary, SetlistEntry, VisualMode } from '../data/types';
-import type { SongIdentity } from '../data/song-identities';
+import { type SongIdentity, getShowModesForSong } from '../data/song-identities';
 import {
   validateSectionOverrides,
   getModeForSection,
@@ -158,43 +158,7 @@ describe('getModeForSection', () => {
     expect(typeof mode).toBe('string');
   });
 
-  it('song identity preferred modes get weighted', () => {
-    const song = makeSong();
-    // Use same energy for all sections so the "no energy change" path is taken
-    const sections: SectionBoundary[] = Array.from({ length: 5 }, (_, i) => ({
-      frameStart: i * 900,
-      frameEnd: (i + 1) * 900,
-      label: `section_${i}`,
-      energy: 'high' as const,
-      avgEnergy: 0.35,
-    }));
-    const identity: SongIdentity = {
-      preferredModes: ['inferno', 'tie_dye'], // both are high-energy modes
-    };
-
-    // Run many seeds — use wide spacing for LCG decorrelation
-    const counts = new Map<VisualMode, number>();
-    for (let i = 0; i < 200; i++) {
-      const seed = i * 100000;
-      const mode = getModeForSection(song, 2, sections, seed, undefined, false, undefined, identity);
-      counts.set(mode, (counts.get(mode) ?? 0) + 1);
-    }
-
-    // With 3x weighting, preferred modes should appear frequently
-    const preferredCount = (counts.get('inferno') ?? 0) + (counts.get('tie_dye') ?? 0);
-    expect(preferredCount).toBeGreaterThan(0);
-  });
-
-  it('seed-driven subsetting activates for large preferred pools', () => {
-    const song = makeSong();
-    const sections: SectionBoundary[] = Array.from({ length: 5 }, (_, i) => ({
-      frameStart: i * 900,
-      frameEnd: (i + 1) * 900,
-      label: `section_${i}`,
-      energy: 'high' as const,
-      avgEnergy: 0.35,
-    }));
-    // 7 preferred modes — subsetting should activate (threshold=5)
+  it('preferred-first pool: show modes dominate selection (≥70%)', () => {
     const identity: SongIdentity = {
       preferredModes: [
         'inferno', 'liquid_light', 'concert_lighting',
@@ -202,29 +166,36 @@ describe('getModeForSection', () => {
       ],
     } as SongIdentity;
 
-    // Two different seeds should produce different mode distributions
-    const countsA = new Map<VisualMode, number>();
-    const countsB = new Map<VisualMode, number>();
-    for (let i = 0; i < 300; i++) {
-      const seedA = i * 100000;
-      const seedB = i * 100000 + 77777;
-      const modeA = getModeForSection(song, 2, sections, seedA, undefined, false, undefined, identity);
-      const modeB = getModeForSection(song, 2, sections, seedB, undefined, false, undefined, identity);
-      countsA.set(modeA, (countsA.get(modeA) ?? 0) + 1);
-      countsB.set(modeB, (countsB.get(modeB) ?? 0) + 1);
+    // Test across multiple shows (seeds), each with many sections
+    let showModeHits = 0;
+    let total = 0;
+
+    for (let showSeed = 0; showSeed < 20; showSeed++) {
+      const seed = showSeed * 100000;
+      const song = makeSong({ title: 'Dark Star' });
+      const sections: SectionBoundary[] = Array.from({ length: 10 }, (_, i) => ({
+        frameStart: i * 900,
+        frameEnd: (i + 1) * 900,
+        label: `section_${i}`,
+        energy: 'high' as const,
+        avgEnergy: 0.35,
+      }));
+      const showModes = getShowModesForSong(identity.preferredModes, seed, 'Dark Star');
+      const showModeSet = new Set(showModes);
+
+      for (let si = 0; si < 10; si++) {
+        const mode = getModeForSection(song, si, sections, seed, undefined, false, undefined, identity);
+        if (showModeSet.has(mode as VisualMode)) showModeHits++;
+        total++;
+      }
     }
 
-    // Both should have preferred modes appearing, but different top modes
-    const topA = [...countsA.entries()].sort((a, b) => b[1] - a[1])[0][0];
-    const topB = [...countsB.entries()].sort((a, b) => b[1] - a[1])[0][0];
-    // The top mode is likely different across seeds (not guaranteed, but with 7 modes and different hero subsets, very likely)
-    // At minimum, preferred modes should appear
-    const preferredCountA = identity.preferredModes.reduce((sum, m) => sum + (countsA.get(m) ?? 0), 0);
-    expect(preferredCountA).toBeGreaterThan(0);
+    // Show modes should appear ≥70% of the time (they have 5x weight each = ~80% expected)
+    expect(showModeHits / total).toBeGreaterThanOrEqual(0.70);
   });
 
-  it('small preferred pools skip subsetting (all get 3x)', () => {
-    const song = makeSong();
+  it('small preferred pools: all modes dominate (no narrowing needed)', () => {
+    const song = makeSong({ title: 'Test Song' });
     const sections: SectionBoundary[] = Array.from({ length: 5 }, (_, i) => ({
       frameStart: i * 900,
       frameEnd: (i + 1) * 900,
@@ -232,7 +203,7 @@ describe('getModeForSection', () => {
       energy: 'high' as const,
       avgEnergy: 0.35,
     }));
-    // Only 3 preferred modes — below threshold, all should get 3x weight
+    // Only 3 preferred modes — all become show modes
     const identity: SongIdentity = {
       preferredModes: ['inferno', 'tie_dye', 'concert_lighting'],
     } as SongIdentity;
@@ -244,13 +215,13 @@ describe('getModeForSection', () => {
       counts.set(mode, (counts.get(mode) ?? 0) + 1);
     }
 
-    // All 3 preferred modes should appear with significant frequency
+    // All 3 preferred modes should dominate since they all become show modes with 5x weight
     const preferredCount = (counts.get('inferno') ?? 0) + (counts.get('tie_dye') ?? 0) + (counts.get('concert_lighting') ?? 0);
-    expect(preferredCount).toBeGreaterThan(100); // should dominate with 3x weight
+    expect(preferredCount).toBeGreaterThan(200); // should dominate with 5x weight
   });
 
-  it('seed-driven subsetting is deterministic', () => {
-    const song = makeSong();
+  it('preferred-first pool is deterministic', () => {
+    const song = makeSong({ title: 'Dark Star' });
     const sections: SectionBoundary[] = Array.from({ length: 5 }, (_, i) => ({
       frameStart: i * 900,
       frameEnd: (i + 1) * 900,
@@ -271,6 +242,26 @@ describe('getModeForSection', () => {
     const mode3 = getModeForSection(song, 2, sections, seed, undefined, false, undefined, identity);
     expect(mode1).toBe(mode2);
     expect(mode2).toBe(mode3);
+  });
+
+  it('fallback: songs without preferredModes use full registry pool', () => {
+    const song = makeSong({ title: 'Unknown Jam' });
+    const sections: SectionBoundary[] = Array.from({ length: 5 }, (_, i) => ({
+      frameStart: i * 900,
+      frameEnd: (i + 1) * 900,
+      label: `section_${i}`,
+      energy: 'high' as const,
+      avgEnergy: 0.35,
+    }));
+
+    // No songIdentity → full registry pool
+    const modes = new Set<VisualMode>();
+    for (let i = 0; i < 200; i++) {
+      const seed = i * 100000;
+      modes.add(getModeForSection(song, 2, sections, seed));
+    }
+    // Should get variety from the full registry
+    expect(modes.size).toBeGreaterThan(3);
   });
 
   it('stem section solo biases toward dramatic modes', () => {
@@ -352,6 +343,114 @@ describe('getModeForSection', () => {
 
     const mode = getModeForSection(song, 1, sections, 42, undefined, false, undefined, undefined, undefined, frames);
     expect(typeof mode).toBe('string');
+  });
+
+  it('short song (180s) biases toward structured modes', () => {
+    const song = makeSong();
+    const sections: SectionBoundary[] = Array.from({ length: 5 }, (_, i) => ({
+      frameStart: i * 900,
+      frameEnd: (i + 1) * 900,
+      label: `section_${i}`,
+      energy: 'high' as const,
+      avgEnergy: 0.35,
+    }));
+
+    const structuredModes = new Set([
+      'concert_lighting', 'vintage_film', 'lo_fi_grain',
+      'stark_minimal', 'tie_dye', 'inferno', 'oil_projector',
+    ]);
+
+    let structuredCount = 0;
+    const total = 300;
+    for (let i = 0; i < total; i++) {
+      const seed = i * 100000;
+      const mode = getModeForSection(song, 2, sections, seed, undefined, false, undefined, undefined, undefined, undefined, 180);
+      if (structuredModes.has(mode)) structuredCount++;
+    }
+
+    // Without duration bias (control)
+    let controlStructuredCount = 0;
+    for (let i = 0; i < total; i++) {
+      const seed = i * 100000;
+      const mode = getModeForSection(song, 2, sections, seed);
+      if (structuredModes.has(mode)) controlStructuredCount++;
+    }
+
+    // Short song should have more structured modes than no-bias baseline
+    expect(structuredCount).toBeGreaterThan(controlStructuredCount);
+  });
+
+  it('extended jam (900s) biases toward feedback/generative modes', () => {
+    const song = makeSong();
+    const sections: SectionBoundary[] = Array.from({ length: 5 }, (_, i) => ({
+      frameStart: i * 900,
+      frameEnd: (i + 1) * 900,
+      label: `section_${i}`,
+      energy: 'high' as const,
+      avgEnergy: 0.35,
+    }));
+
+    const feedbackModes = new Set([
+      'feedback_recursion', 'reaction_diffusion', 'morphogenesis',
+      'fractal_zoom', 'kaleidoscope', 'mandala_engine', 'neural_web', 'voronoi_flow',
+    ]);
+
+    let feedbackCount = 0;
+    const total = 300;
+    for (let i = 0; i < total; i++) {
+      const seed = i * 100000;
+      const mode = getModeForSection(song, 2, sections, seed, undefined, false, undefined, undefined, undefined, undefined, 900);
+      if (feedbackModes.has(mode)) feedbackCount++;
+    }
+
+    // Without duration bias (control)
+    let controlFeedbackCount = 0;
+    for (let i = 0; i < total; i++) {
+      const seed = i * 100000;
+      const mode = getModeForSection(song, 2, sections, seed);
+      if (feedbackModes.has(mode)) controlFeedbackCount++;
+    }
+
+    // Extended jam should have more feedback modes than no-bias baseline
+    expect(feedbackCount).toBeGreaterThan(controlFeedbackCount);
+  });
+
+  it('medium song (420s) has no duration bias', () => {
+    const song = makeSong();
+    const sections: SectionBoundary[] = Array.from({ length: 5 }, (_, i) => ({
+      frameStart: i * 900,
+      frameEnd: (i + 1) * 900,
+      label: `section_${i}`,
+      energy: 'high' as const,
+      avgEnergy: 0.35,
+    }));
+
+    // Medium duration should produce same results as no duration
+    for (let i = 0; i < 50; i++) {
+      const seed = i * 100000;
+      const withDuration = getModeForSection(song, 2, sections, seed, undefined, false, undefined, undefined, undefined, undefined, 420);
+      const withoutDuration = getModeForSection(song, 2, sections, seed);
+      expect(withDuration).toBe(withoutDuration);
+    }
+  });
+
+  it('undefined duration has no bias (backward compat)', () => {
+    const song = makeSong();
+    const sections: SectionBoundary[] = Array.from({ length: 5 }, (_, i) => ({
+      frameStart: i * 900,
+      frameEnd: (i + 1) * 900,
+      label: `section_${i}`,
+      energy: 'high' as const,
+      avgEnergy: 0.35,
+    }));
+
+    // undefined duration should produce same results as explicit no-duration call
+    for (let i = 0; i < 50; i++) {
+      const seed = i * 100000;
+      const withUndefined = getModeForSection(song, 2, sections, seed, undefined, false, undefined, undefined, undefined, undefined, undefined);
+      const withoutParam = getModeForSection(song, 2, sections, seed);
+      expect(withUndefined).toBe(withoutParam);
+    }
   });
 
   it('auto-variety kicks in for long songs with odd-numbered sections', () => {

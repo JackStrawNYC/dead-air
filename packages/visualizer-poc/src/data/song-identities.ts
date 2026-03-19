@@ -21,7 +21,7 @@ import { existsSync, readFileSync } from "fs";
 import { resolve, dirname } from "path";
 import type { VisualMode, ColorPalette, OverlayTag, TrackMeta, EnhancedFrameData } from "./types";
 import type { DrumsSpaceSubPhase } from "../utils/drums-space-phase";
-import { seeded } from "../utils/seededRandom";
+import { seeded, seededShuffle } from "../utils/seededRandom";
 import { hashString } from "../utils/hash";
 
 // ─── JSON Override Layer ───
@@ -61,7 +61,7 @@ export interface ClimaxBehavior {
 }
 
 export interface SongIdentity {
-  /** Preferred shader modes — show-seed selects a subset of 3 for 3x weight when pool >= 5 */
+  /** Preferred shader modes — show-seed narrows to 4 "show modes" that dominate selection (~80%) */
   preferredModes: VisualMode[];
   /** Color palette override */
   palette: ColorPalette;
@@ -804,8 +804,25 @@ export function lookupSongIdentity(title: string): SongIdentity | undefined {
 }
 
 /**
+ * Narrow a song's preferred modes to a show-specific subset.
+ * From 7 preferred → `count` "show modes" per song per show.
+ * Deterministic: same seed + title = same subset every time.
+ */
+export function getShowModesForSong(
+  preferredModes: VisualMode[],
+  showSeed: number,
+  songTitle: string,
+  count = 4,
+): VisualMode[] {
+  if (preferredModes.length <= count) return [...preferredModes];
+  return seededShuffle(preferredModes, showSeed + hashString(songTitle) + 0x50DE)
+    .slice(0, count);
+}
+
+/**
  * Pick a song's base shader mode from its preferredModes using the show seed.
  * Same show seed + same title → same mode. Different show seed → different mode.
+ * Picks from the narrowed show-mode subset (4 of 7) for stronger show-to-show variety.
  * Falls back to defaultMode when no identity or empty preferredModes.
  */
 export function resolveSongMode(
@@ -815,9 +832,9 @@ export function resolveSongMode(
 ): VisualMode {
   const identity = lookupSongIdentity(title);
   if (!identity?.preferredModes?.length) return defaultMode;
-  const rng = seeded(showSeed + hashString(title) + 0x50DE);
-  const idx = Math.floor(rng() * identity.preferredModes.length);
-  return identity.preferredModes[idx];
+  const showModes = getShowModesForSong(identity.preferredModes, showSeed, title);
+  const rng = seeded(showSeed + hashString(title) + 0x50DF); // different salt than shuffle
+  return showModes[Math.floor(rng() * showModes.length)];
 }
 
 // ─── Fallback Identity Generation ───

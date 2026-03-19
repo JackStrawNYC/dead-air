@@ -15,9 +15,9 @@ import type {
   SetlistEntry,
   ColorPalette,
 } from "../data/types";
-import { seededLCG as seededRandom, seededShuffle } from "../utils/seededRandom";
+import { seededLCG as seededRandom } from "../utils/seededRandom";
 import { findCurrentSection } from "../utils/section-lookup";
-import type { SongIdentity } from "../data/song-identities";
+import { type SongIdentity, getShowModesForSong } from "../data/song-identities";
 import type { StemSectionType } from "../utils/stem-features";
 import { detectChordMood } from "../utils/chord-mood";
 import { estimateImprovisationScore } from "../utils/improv-detector";
@@ -191,6 +191,10 @@ interface Props {
   songIdentity?: SongIdentity;
   /** Stem-derived section type for mode bias */
   stemSection?: StemSectionType;
+  /** Total song duration in seconds for duration-aware shader routing */
+  songDuration?: number;
+  /** Effective palette (chroma-blended) — overrides song.palette when provided */
+  palette?: ColorPalette;
 }
 
 /** Determine the visual mode for a given section index.
@@ -211,6 +215,7 @@ export function getModeForSection(
   songIdentity?: SongIdentity,
   stemSection?: StemSectionType,
   frames?: EnhancedFrameData[],
+  songDuration?: number,
 ): VisualMode {
   // Explicit override always wins
   const override = song.sectionOverrides?.find((o) => o.sectionIndex === sectionIndex);
@@ -218,7 +223,7 @@ export function getModeForSection(
 
   // Coherence lock: hold current shader during peak moments
   if (coherenceIsLocked && sectionIndex > 0) {
-    return getModeForSection(song, sectionIndex - 1, sections, seed, era, false, usedShaderModes, songIdentity, stemSection, frames);
+    return getModeForSection(song, sectionIndex - 1, sections, seed, era, false, usedShaderModes, songIdentity, stemSection, frames, songDuration);
   }
 
   // Seeded variation with affinity-aware morphing
@@ -227,7 +232,7 @@ export function getModeForSection(
     if (section) {
       const prevSection = sectionIndex > 0 ? sections[sectionIndex - 1] : null;
       const prevMode = sectionIndex > 0
-        ? getModeForSection(song, sectionIndex - 1, sections, seed, era, false, usedShaderModes, songIdentity, undefined, frames)
+        ? getModeForSection(song, sectionIndex - 1, sections, seed, era, false, usedShaderModes, songIdentity, undefined, frames, songDuration)
         : song.defaultMode;
 
       // Energy transition detection: pick from affinity map when energy changes
@@ -241,6 +246,13 @@ export function getModeForSection(
           const energySet = new Set(energyPool);
           let candidates = affinityPool.filter((m) => energySet.has(m));
           if (candidates.length === 0) candidates = affinityPool;
+
+          // Preferred mode awareness: intersect with preferred modes first
+          if (songIdentity?.preferredModes?.length && seed !== undefined) {
+            const preferredSet = new Set(songIdentity.preferredModes);
+            const preferredCandidates = candidates.filter((m) => preferredSet.has(m));
+            if (preferredCandidates.length > 0) candidates = preferredCandidates;
+          }
 
           // Prefer modes not yet used in this show (variety enforcement)
           if (usedShaderModes && usedShaderModes.size > 0) {
@@ -263,22 +275,22 @@ export function getModeForSection(
         if (unused.length > 0) filteredPool = unused;
       }
 
-      // Song identity preferred modes: show-seed selects a subset for 3x weight
-      if (songIdentity?.preferredModes?.length) {
-        const preferred = songIdentity.preferredModes.filter((m) => filteredPool.includes(m));
-        if (preferred.length > 0) {
-          const SUBSET_THRESHOLD = 5;
-          const HERO_COUNT = 3;
-          let heroModes: typeof preferred;
-          if (preferred.length >= SUBSET_THRESHOLD && seed !== undefined) {
-            const shuffled = seededShuffle(preferred, seed + 0x4D0DE);
-            heroModes = shuffled.slice(0, HERO_COUNT);
-          } else {
-            heroModes = preferred;
-          }
-          // Hero modes get 3x weight; remaining preferred stay at 1x (already in filteredPool)
-          filteredPool = [...filteredPool, ...heroModes, ...heroModes];
-        }
+      // Preferred-first pool: start from show modes, add remaining preferred + registry splash
+      if (songIdentity?.preferredModes?.length && seed !== undefined) {
+        const showModes = getShowModesForSong(songIdentity.preferredModes, seed, song.title);
+        const showModeSet = new Set(showModes);
+        const remainingPreferred = songIdentity.preferredModes.filter((m) => !showModeSet.has(m));
+        // Registry splash: 2 energy-matched modes not in preferred for surprise variety
+        const preferredSet = new Set(songIdentity.preferredModes);
+        const registrySplash = filteredPool
+          .filter((m) => !preferredSet.has(m))
+          .slice(0, 2);
+        // Build weighted pool: showModes×5 + remainingPreferred×1 + registrySplash×1
+        const weightedPool: VisualMode[] = [];
+        for (const m of showModes) { for (let i = 0; i < 5; i++) weightedPool.push(m); }
+        for (const m of remainingPreferred) { weightedPool.push(m); }
+        for (const m of registrySplash) { weightedPool.push(m); }
+        if (weightedPool.length > 0) filteredPool = weightedPool;
       }
 
       // Stem section bias: solo prefers dramatic modes, vocal prefers warm modes
@@ -313,6 +325,29 @@ export function getModeForSection(
           const improvMatches = improvModes.filter((m) => filteredPool.includes(m));
           if (improvMatches.length > 0) {
             filteredPool = [...filteredPool, ...improvMatches, ...improvMatches]; // 3x weight
+          }
+        }
+      }
+
+      // Duration bias: short songs → structured, extended jams → feedback/generative
+      if (songDuration !== undefined) {
+        if (songDuration < 300) {
+          const structuredModes: VisualMode[] = [
+            "concert_lighting", "vintage_film", "lo_fi_grain",
+            "stark_minimal", "tie_dye", "inferno", "oil_projector",
+          ];
+          const matches = structuredModes.filter((m) => filteredPool.includes(m));
+          if (matches.length > 0) {
+            filteredPool = [...filteredPool, ...matches, ...matches];
+          }
+        } else if (songDuration > 600) {
+          const feedbackModes: VisualMode[] = [
+            "feedback_recursion", "reaction_diffusion", "morphogenesis",
+            "fractal_zoom", "kaleidoscope", "mandala_engine", "neural_web", "voronoi_flow",
+          ];
+          const matches = feedbackModes.filter((m) => filteredPool.includes(m));
+          if (matches.length > 0) {
+            filteredPool = [...filteredPool, ...matches, ...matches];
           }
         }
       }
@@ -384,9 +419,9 @@ function renderMode(
   return renderScene(mode, { frames, sections, palette, tempo, style, jamDensity });
 }
 
-export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, seed, jamDensity, deadAirMode, deadAirFactor, era, coherenceIsLocked, usedShaderModes, drumsSpacePhase, songIdentity, stemSection }) => {
+export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, seed, jamDensity, deadAirMode, deadAirFactor, era, coherenceIsLocked, usedShaderModes, drumsSpacePhase, songIdentity, stemSection, songDuration, palette: paletteProp }) => {
   const frame = useCurrentFrame();
-  const palette = song.palette;
+  const palette = paletteProp ?? song.palette;
 
   if (sections.length === 0) {
     return <>{renderMode(song.defaultMode, frames, sections, palette, tempo, undefined, jamDensity)}</>;
@@ -401,7 +436,7 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
     return <>{renderMode(dsMode, frames, sections, palette, tempo, undefined, jamDensity)}</>;
   }
 
-  const currentMode = getModeForSection(song, currentSectionIdx, sections, seed, era, coherenceIsLocked, usedShaderModes, songIdentity, stemSection, frames);
+  const currentMode = getModeForSection(song, currentSectionIdx, sections, seed, era, coherenceIsLocked, usedShaderModes, songIdentity, stemSection, frames, songDuration);
   const currentSection = sections[currentSectionIdx];
 
   const nextSectionIdx = currentSectionIdx + 1;
@@ -409,7 +444,7 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
 
   // Crossfade INTO this section (from previous) — beat-synced when possible
   if (prevSectionIdx >= 0) {
-    const prevMode = getModeForSection(song, prevSectionIdx, sections, seed, era, false, usedShaderModes, songIdentity, stemSection, frames);
+    const prevMode = getModeForSection(song, prevSectionIdx, sections, seed, era, false, usedShaderModes, songIdentity, stemSection, frames, songDuration);
     if (prevMode !== currentMode) {
       const boundary = currentSection.frameStart;
       const beatFrame = findNearestBeat(frames, boundary - 30, boundary + 30);
@@ -433,7 +468,7 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
 
   // Crossfade OUT of this section (to next) — beat-synced when possible
   if (nextSectionIdx < sections.length) {
-    const nextMode = getModeForSection(song, nextSectionIdx, sections, seed, era, false, usedShaderModes, songIdentity, stemSection, frames);
+    const nextMode = getModeForSection(song, nextSectionIdx, sections, seed, era, false, usedShaderModes, songIdentity, stemSection, frames, songDuration);
     if (nextMode !== currentMode) {
       const boundary = currentSection.frameEnd;
       const beatFrame = findNearestBeat(frames, boundary - 30, boundary + 30);

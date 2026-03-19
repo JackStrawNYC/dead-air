@@ -72,6 +72,7 @@ import { detectJamCycle } from "./utils/jam-cycles";
 import { computeNarrativeDirective } from "./utils/visual-narrator";
 import { endScreenOverlayMult } from "./utils/end-screen-zones";
 import { getVenueProfile } from "./utils/venue-profiles";
+import { deriveChromaPalette, blendChromaPalette } from "./utils/chroma-palette";
 import { NowPlaying } from "./components/NowPlaying";
 import { SongPositionIndicator } from "./components/SongPositionIndicator";
 import { JamTimer } from "./components/JamTimer";
@@ -175,6 +176,17 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
     [props.song.title],
   );
 
+  // ─── Audio-derived palette ───
+  const chromaPalette = useMemo(
+    () => analysis ? deriveChromaPalette(analysis.frames) : undefined,
+    [analysis],
+  );
+  const manualPalette = props.song.palette ?? songIdentity?.palette;
+  const effectivePalette = useMemo(
+    () => chromaPalette ? blendChromaPalette(manualPalette, chromaPalette, 0.25) : manualPalette,
+    [manualPalette, chromaPalette],
+  );
+
   // ─── Show arc phase ───
   const showArcPhase = useMemo((): ShowArcPhase | undefined => {
     if (!props.show) return undefined;
@@ -241,12 +253,12 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
   // ─── Palette hue rotation ───
   const hueRotation = useMemo(() => {
     return computeSegueHueRotation(
-      props.song.palette,
+      effectivePalette,
       !!props.segueIn, !!props.segueOut,
       props.segueFromPalette, props.segueToPalette,
       frame, durationInFrames, FADE_FRAMES,
     );
-  }, [props.song.palette, props.segueIn, props.segueOut, props.segueFromPalette, props.segueToPalette, frame, durationInFrames]);
+  }, [effectivePalette, props.segueIn, props.segueOut, props.segueFromPalette, props.segueToPalette, frame, durationInFrames]);
 
   // ─── Media resolution ───
   const resolvedMedia = useMemo(() => {
@@ -437,8 +449,8 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
           <div style={{ position: "absolute", inset: 0, opacity: focusState.shaderOpacity * (0.05 + 0.95 * introFactor) }}>
           <SilentErrorBoundary name="SceneRouter">
             {(() => {
-              const sceneRouter = <SceneRouter frames={f} sections={sections} song={props.song} tempo={tempo} seed={showSeed} jamDensity={jamDensity} deadAirMode={deadAirFactor > 0 ? "cosmic_dust" : undefined} deadAirFactor={deadAirFactor > 0 ? deadAirFactor : undefined} era={props.show?.era} coherenceIsLocked={coherenceState.isLocked} drumsSpacePhase={drumsSpaceState?.subPhase} usedShaderModes={narrative?.state.usedShaderModes} songIdentity={songIdentity} stemSection={stemSection} />;
-              const palette = props.song.palette;
+              const sceneRouter = <SceneRouter frames={f} sections={sections} song={props.song} tempo={tempo} seed={showSeed} jamDensity={jamDensity} deadAirMode={deadAirFactor > 0 ? "cosmic_dust" : undefined} deadAirFactor={deadAirFactor > 0 ? deadAirFactor : undefined} era={props.show?.era} coherenceIsLocked={coherenceState.isLocked} drumsSpacePhase={drumsSpaceState?.subPhase} usedShaderModes={narrative?.state.usedShaderModes} songIdentity={songIdentity} stemSection={stemSection} songDuration={analysis?.meta?.duration} palette={effectivePalette} />;
+              const palette = effectivePalette;
 
               // Segue IN crossfade: smooth dual-render dissolve from previous song's shader
               if (props.segueIn && props.segueFromMode && props.segueFromMode !== props.song.defaultMode && frame < FADE_FRAMES) {
@@ -497,7 +509,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
             mediaSuppression={Math.max(mediaSuppression * (1 - deadAirFactor), 1 - introFactor)}
             hueRotation={hueRotation}
             tempo={tempo}
-            palette={props.song.palette}
+            palette={effectivePalette}
             usedOverlayIds={narrative?.state.usedOverlayIds}
             frames={f}
             focusSuppression={focusState.overlayOpacity}
@@ -507,7 +519,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
 
           {crowdMoments.length > 0 && (
             <SilentErrorBoundary name="CrowdOverlay">
-              <SongPaletteProvider palette={props.song.palette}>
+              <SongPaletteProvider palette={effectivePalette}>
                 <CrowdOverlay moments={crowdMoments} />
               </SongPaletteProvider>
             </SilentErrorBoundary>
@@ -562,7 +574,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
             trackId={props.song.trackId}
             isSegue={!!(props.segueIn && !comesFromDrumsSpace)}
             energy={audioSnapshot.energy}
-            palette={props.song.palette}
+            palette={effectivePalette}
             songStats={songStatsData}
             milestonesMap={milestonesMap}
             narrationData={narrationData}
