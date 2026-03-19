@@ -166,6 +166,8 @@ function createBaseUniforms(
     uPeakApproaching: { value: 0 },
     uBeatStability: { value: 0.5 },
     uImprovisationScore: { value: 0 },
+    uDownbeat: { value: 0 },
+    uBeatConfidence: { value: 0.5 },
     uHeroIconTrigger: { value: 0 },
     uHeroIconProgress: { value: 0 },
     uShowWarmth: { value: 0 },
@@ -361,6 +363,8 @@ export const MultiPassQuad: React.FC<Props> = ({
   u.uPeakApproaching.value = smooth.peakApproaching;
   u.uBeatStability.value = smooth.beatStability;
   u.uImprovisationScore.value = smooth.improvisationScore ?? 0;
+  u.uDownbeat.value = smooth.downbeat;
+  u.uBeatConfidence.value = smooth.beatConfidence;
   u.uHeroIconTrigger.value = heroTrigger;
   u.uHeroIconProgress.value = heroProgress;
   u.uShowWarmth.value = filmStock.warmth + venueProfile.warmth;

@@ -91,6 +91,11 @@ void main() {
   float stability = clamp(uBeatStability, 0.0, 1.0);
   float vocalPres = clamp(uVocalPresence, 0.0, 1.0);
 
+  // 7-band spectral: sub, low, low-mid, mid, upper-mid, presence, brilliance
+  float fftBass = texture2D(uFFTTexture, vec2(0.07, 0.5)).r;
+  float fftMid = texture2D(uFFTTexture, vec2(0.36, 0.5)).r;
+  float fftHigh = texture2D(uFFTTexture, vec2(0.78, 0.5)).r;
+
   float slowTime = uDynamicTime * 0.08;
   float chromaHueMod = uChromaHue * 0.15;
   float chordHue = float(int(uChordIndex)) / 24.0 * 0.1;
@@ -104,12 +109,13 @@ void main() {
   float sectionArcMod = mix(0.0, 3.0, sJam) + mix(0.0, -2.0, sSpace) + mix(0.0, 1.0, sSolo);
   float sectionChaosMod = mix(0.0, 0.5, sJam) + mix(0.0, -0.3, sSpace);
 
-  // --- Arc parameters (section-modulated) ---
-  float arcThickness = 0.004 + bass * 0.008 + sJam * 0.003;
-  float chaos = mix(0.5, 2.0, 1.0 - stability) + sectionChaosMod;
+  // --- Arc parameters (section-modulated, FFT-driven) ---
+  // FFT bass → arc thickness, FFT mids → branching, FFT highs → flash intensity
+  float arcThickness = 0.004 + bass * 0.008 + sJam * 0.003 + fftBass * 0.004;
+  float chaos = mix(0.5, 2.0, 1.0 - stability) + sectionChaosMod + fftMid * 0.3;
 
   // --- Number of arcs from energy + drum onset (section-modulated) ---
-  int arcCount = max(1, 3 + int(energy * 4.0) + int(drumOnset * 3.0) + int(sectionArcMod));
+  int arcCount = max(1, 3 + int(energy * 4.0) + int(drumOnset * 3.0) + int(sectionArcMod) + int(fftHigh * 2.0));
 
   // --- Arc color from melodic pitch ---
   float arcHue = mix(0.0, 0.65, melodicPitch) + chromaHueMod + chordHue;

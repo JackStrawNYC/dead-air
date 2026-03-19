@@ -67,6 +67,8 @@ interface Props {
   modalSatOffset?: number;
   /** Brightness counterpoint (-0.1..+0.1): brief dim on transients for drama */
   brightnessCounterpoint?: number;
+  /** Narrative saturation offset from visual narrator (-0.3 to +0.3) */
+  narrativeSatOffset?: number;
 }
 
 // Per-era bloom color — matches era grade for visual cohesion
@@ -79,7 +81,7 @@ const ERA_BLOOM: Record<string, string> = {
 };
 const DEFAULT_BLOOM = ERA_BLOOM.classic;
 
-export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod, jamColorTemp, calibration, counterpointSatMult = 1, brightnessCounterpoint = 0, drumsSpacePhase, showPhase, songIdentity, showArcModifiers, itLuminanceLift, vocalWarmth, guitarColorTemp, deadAirFactor = 0, narrativeBrightness = 0, narrativeTemperature = 0, introFactor = 1, isSolo = false, soloIntensity = 0, harmonicBrightness = 0, harmonicSatMult = 1, modalHueShift = 0, modalSatOffset = 0 }) => {
+export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod, jamColorTemp, calibration, counterpointSatMult = 1, brightnessCounterpoint = 0, drumsSpacePhase, showPhase, songIdentity, showArcModifiers, itLuminanceLift, vocalWarmth, guitarColorTemp, deadAirFactor = 0, narrativeBrightness = 0, narrativeTemperature = 0, introFactor = 1, isSolo = false, soloIntensity = 0, harmonicBrightness = 0, harmonicSatMult = 1, modalHueShift = 0, modalSatOffset = 0, narrativeSatOffset = 0 }) => {
   const energy = snapshot.energy;
   const low = calibration?.quietThreshold;
   const high = calibration?.loudThreshold;
@@ -182,8 +184,8 @@ export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod,
   const soloHueShift = isSolo ? soloIntensity * 20 : 0;
   // Suppress hue shift during dead air so applause is neutral
   const totalHueShift = (jamHueShift + eraColorTempShift + dsHueOffset + siHueShift + arcHueShift + vocalHueShift + guitarHueShift + chromaHueShift + narrativeHueShift + soloHueShift + modalHueShift) * (1 - deadAirFactor);
-  // Combined saturation: counterpoint * harmonic * modal (convert modalSatOffset to multiplier)
-  const combinedSatMult = counterpointSatMult * harmonicSatMult * (1 + modalSatOffset);
+  // Combined saturation: counterpoint * harmonic * modal * narrative (convert offsets to multipliers)
+  const combinedSatMult = counterpointSatMult * harmonicSatMult * (1 + modalSatOffset) * (1 + narrativeSatOffset);
   const satFilter = Math.abs(combinedSatMult - 1) > 0.01 ? ` saturate(${combinedSatMult.toFixed(3)})` : "";
   const filterStr = totalHueShift !== 0
     ? `brightness(${finalBrightness.toFixed(3)}) hue-rotate(${totalHueShift.toFixed(1)}deg)${satFilter}`

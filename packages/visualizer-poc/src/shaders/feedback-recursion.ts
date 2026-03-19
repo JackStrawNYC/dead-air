@@ -61,6 +61,11 @@ void main() {
   float stability = clamp(uBeatStability, 0.0, 1.0);
   float melodicPitch = clamp(uMelodicPitch, 0.0, 1.0);
 
+  // 7-band spectral: sub, low, low-mid, mid, upper-mid, presence, brilliance
+  float fftBass = texture2D(uFFTTexture, vec2(0.07, 0.5)).r;
+  float fftMid = texture2D(uFFTTexture, vec2(0.36, 0.5)).r;
+  float fftHigh = texture2D(uFFTTexture, vec2(0.78, 0.5)).r;
+
   float slowTime = uDynamicTime * 0.05;
   float chromaHueMod = uChromaHue * 0.2;
   float chordHue = float(int(uChordIndex)) / 24.0 * 0.15;
@@ -78,7 +83,8 @@ void main() {
 
   // --- Recursion parameters ---
   // Scale: zoom inward 2-5% per frame, driven by energy (section-modulated)
-  float scaleAmount = 1.0 - (0.02 + energy * 0.03) * accelBoost * sectionScaleMod;
+  // FFT bass → deeper tunnel zoom; FFT highs → longer trail decay
+  float scaleAmount = 1.0 - (0.02 + energy * 0.03 + fftBass * 0.015) * accelBoost * sectionScaleMod;
 
   // Rotation: bass drives twist (section-modulated)
   float rotAmount = (bass * 0.03 + 0.005) * sign(sin(slowTime * 0.2)) * sectionRotMod;
@@ -121,7 +127,7 @@ void main() {
   feedbackUv = clamp(feedbackUv, vec2(0.001), vec2(0.999));
 
   // Sample previous frame with decay
-  float decayRate = mix(0.92, 0.98, slowE);
+  float decayRate = mix(0.92, 0.98, slowE) + fftHigh * 0.02;
   vec3 feedback = texture2D(uPrevFrame, feedbackUv).rgb * decayRate;
 
   // --- Current frame seed pattern ---

@@ -91,6 +91,11 @@ void main() {
   float melodicPitch = clamp(uMelodicPitch, 0.0, 1.0);
   float beatSnap = clamp(uBeatSnap, 0.0, 1.0);
 
+  // 7-band spectral: sub, low, low-mid, mid, upper-mid, presence, brilliance
+  float fftBass = texture2D(uFFTTexture, vec2(0.07, 0.5)).r;
+  float fftMid = texture2D(uFFTTexture, vec2(0.36, 0.5)).r;
+  float fftHigh = texture2D(uFFTTexture, vec2(0.78, 0.5)).r;
+
   float slowTime = uDynamicTime * 0.06;
 
   // --- Section type modulation (0=intro,1=verse,2=chorus,3=bridge,4=solo,5=jam,6=outro,7=space) ---
@@ -103,9 +108,10 @@ void main() {
   float sectionBrightMod = mix(0.0, 0.2, sJam) + mix(0.0, -0.15, sSpace) + mix(0.0, 0.25, sSolo);
 
   // Audio-driven parameters (section-modulated)
-  float rotSpeed = (0.3 + bass * 0.8) * sectionRotMod;
-  float pointBright = 0.3 + energy * 0.7 + sectionBrightMod;
-  float affineScale = 0.5 + melodicPitch * 0.3;
+  // FFT bands: bass → base height, mids → turbulence, highs → fine detail
+  float rotSpeed = (0.3 + bass * 0.8 + fftMid * 0.2) * sectionRotMod;
+  float pointBright = 0.3 + energy * 0.7 + sectionBrightMod + fftBass * 0.15;
+  float affineScale = 0.5 + melodicPitch * 0.3 + fftHigh * 0.1;
   float variationMix = tension;
   float chordHue = float(int(uChordIndex)) / 24.0;
   float colorCycle = slowTime * 0.5 + beatSnap * 0.3;

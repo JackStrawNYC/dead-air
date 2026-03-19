@@ -161,8 +161,9 @@ void main() {
   float stepSize = mix(0.15, 0.1, energy);
 
   // Aurora exists in a constrained vertical band
-  float bandLow = mix(2.0, 1.0, energy);
-  float bandHigh = mix(3.5, 5.0, energy);
+  // Melodic pitch lifts the curtain higher; melodic direction drifts band position
+  float bandLow = mix(2.0, 1.0, energy) - pitchCurtain;
+  float bandHigh = mix(3.5, 5.0, energy) + pitchCurtain + directionDrift;
 
   for (int i = 0; i < 40; i++) {
     if (i >= maxSteps) break;

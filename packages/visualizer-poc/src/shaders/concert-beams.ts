@@ -82,6 +82,8 @@ void main() {
   float tensionAngle = uHarmonicTension * 0.2;
   // Chord hue micro-rotation
   float chordHue = float(int(uChordIndex)) / 24.0 * 0.15;
+  // Downbeat flash: beam intensity bump on measure start
+  float downbeatFlash = uDownbeat * 0.15;
 
   // Bass camera shake
   float shakeX = snoise(vec3(uTime * 8.0, 1.0, 0.0)) * uBass * 0.003;
@@ -118,7 +120,7 @@ void main() {
 
     float contrastBoost = getContrastForBeam(i) * 0.3;
     // Snappy beat for intensity
-    float intensity = (0.5 + uRms * 0.5 + contrastBoost) * beamActive;
+    float intensity = (0.5 + uRms * 0.5 + contrastBoost + downbeatFlash) * beamActive;
 
     // Single beam evaluation (simplified from per-channel chromatic aberration)
     float beamVal = beam(p, beamX, angle, width, intensity);

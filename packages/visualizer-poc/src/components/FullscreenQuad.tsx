@@ -135,6 +135,8 @@ export const FullscreenQuad: React.FC<Props> = ({
       uPeakApproaching: { value: 0 },
       uBeatStability: { value: 0.5 },
       uImprovisationScore: { value: 0 },
+      uDownbeat: { value: 0 },
+      uBeatConfidence: { value: 0.5 },
       uHeroIconTrigger: { value: 0 },
       uHeroIconProgress: { value: 0 },
       uShowWarmth: { value: 0 },
@@ -214,6 +216,8 @@ export const FullscreenQuad: React.FC<Props> = ({
   uniforms.uPeakApproaching.value = smooth.peakApproaching;
   uniforms.uBeatStability.value = smooth.beatStability;
   uniforms.uImprovisationScore.value = smooth.improvisationScore ?? 0;
+  uniforms.uDownbeat.value = smooth.downbeat;
+  uniforms.uBeatConfidence.value = smooth.beatConfidence;
   uniforms.uHeroIconTrigger.value = heroTrigger;
   uniforms.uHeroIconProgress.value = heroProgress;
   uniforms.uShowWarmth.value = filmStock.warmth + venueProfile.warmth;

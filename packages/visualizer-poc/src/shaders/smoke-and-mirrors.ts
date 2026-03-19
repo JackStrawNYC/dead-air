@@ -214,7 +214,8 @@ void main() {
 
   // === GOD RAYS: secondary in-scatter march from overhead light ===
   {
-    vec3 lightPos = vec3(0.0 + vocalSpot * 0.3, 1.5, -1.0);
+    // Melodic pitch shifts beam angle; tension adds turbulence to god rays
+    vec3 lightPos = vec3(pitchTemp * 0.8 + vocalSpot * 0.3, 1.5, -1.0);
     vec3 lightDir = normalize(lightPos - ro);
     float godRayAccum = 0.0;
     for (int g = 0; g < 12; g++) {
@@ -222,7 +223,7 @@ void main() {
       vec3 gpos = ro + rd * gt;
       vec3 toLightDir = normalize(lightPos - gpos);
       // Sample fog density along light direction (in-scatter)
-      float lightDensity = smokeDensity(gpos + toLightDir * 0.3, bass, flowTime, energy);
+      float lightDensity = smokeDensity(gpos + toLightDir * 0.3, bass, flowTime, energy) + tensionTurb * 0.1;
       float fogDen = smokeDensity(gpos, bass, flowTime, energy);
       // In-scatter: light where fog is thin along light path but present at sample
       float inscatter = fogDen * exp(-lightDensity * 3.0);
@@ -240,6 +241,9 @@ void main() {
 
   col *= 1.0 + climaxBoost * 0.05;
   col *= 1.0 + uBeatSnap * 0.18 * (1.0 + climaxBoost * 0.4);
+  // Peak approaching: subtle desaturation toward white (pre-peak tension)
+  float colLum = dot(col, vec3(0.299, 0.587, 0.114));
+  col = mix(col, vec3(colLum), peakDesat);
 
   // === VIGNETTE ===
   float vigScale = mix(0.34, 0.26, energy);

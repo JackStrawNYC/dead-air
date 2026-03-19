@@ -80,8 +80,9 @@ void main() {
   vec2 uv = (gl_FragCoord.xy - 0.5 * uResolution) / min(uResolution.x, uResolution.y);
   float t = uDynamicTime * 0.08;
 
-  // Slow cosmic drift
-  vec2 drift = vec2(t * 0.1, t * 0.05);
+  // Slow cosmic drift (melodic direction shifts drift)
+  float melDir = uMelodicDirection * 0.02;
+  vec2 drift = vec2(t * 0.1 + melDir, t * 0.05);
   vec2 starUv = uv + drift;
 
   // Star layers at different depths (parallax: different speeds per layer)
@@ -113,10 +114,12 @@ void main() {
   // --- Phase 1: New uniform integrations ---
   float chromaHueMod = uChromaHue * 0.25;
   float chordHue = float(int(uChordIndex)) / 24.0 * 0.15;
-  float directionDrift = uMelodicDirection * 0.02;
+  float pitchBright = uMelodicPitch * 0.15;
+  float tensionDensity = clamp(uHarmonicTension, 0.0, 1.0) * 0.15;
+  float peakGlow = clamp(uPeakApproaching, 0.0, 1.0) * 0.12;
 
-  vec3 nebColor1 = hsv2rgb(vec3(uPalettePrimary + chromaHueMod + chordHue, 0.6 * uPaletteSaturation, 0.25));
-  vec3 nebColor2 = hsv2rgb(vec3(uPaletteSecondary, 0.5 * uPaletteSaturation, 0.20));
+  vec3 nebColor1 = hsv2rgb(vec3(uPalettePrimary + chromaHueMod + chordHue, 0.6 * uPaletteSaturation, 0.25 + pitchBright));
+  vec3 nebColor2 = hsv2rgb(vec3(uPaletteSecondary, 0.5 * uPaletteSaturation, 0.20 + peakGlow));
 
   vec3 nebulaMix = vec3(0.0);
   float nebAlpha = 0.0;
@@ -125,7 +128,7 @@ void main() {
     float depth = 0.8 + fs * 0.4;
     vec2 sampleUv = uv * (0.6 + fs * 0.15) + drift * (0.5 - fs * 0.1);
     float density = nebula(sampleUv, uDynamicTime + fs * 50.0);
-    density = smoothstep(0.25, 0.7, density);
+    density = smoothstep(0.25 - tensionDensity, 0.7, density);
     float layerAlpha = density * 0.3 * (1.0 - nebAlpha);
     vec3 layerColor = mix(nebColor1, nebColor2, fs / 3.0 + density * 0.2);
     // Depth-dependent brightness (further = dimmer)

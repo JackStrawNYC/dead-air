@@ -62,6 +62,11 @@ void main() {
   float melodicPitch = clamp(uMelodicPitch, 0.0, 1.0);
   float melodicDir = clamp(uMelodicDirection, -1.0, 1.0);
 
+  // 7-band spectral: sub, low, low-mid, mid, upper-mid, presence, brilliance
+  float fftBass = texture2D(uFFTTexture, vec2(0.07, 0.5)).r;
+  float fftMid = texture2D(uFFTTexture, vec2(0.36, 0.5)).r;
+  float fftHigh = texture2D(uFFTTexture, vec2(0.78, 0.5)).r;
+
   float slowTime = uDynamicTime * 0.08;
 
   // --- Phase 1 uniform integrations ---
@@ -139,6 +144,8 @@ void main() {
   // --- Radial UV folding ---
   float radius = length(centered);
   float angle = atan(centered.y, centered.x);
+  // Extra fold rotation on downbeat (measure start emphasis)
+  angle += uDownbeat * 0.3;
 
   // Mirror fold within each segment
   float a = mod(angle, segAngle);
@@ -186,7 +193,7 @@ void main() {
   // Chroma hue modulation: live harmonic content colors the pattern
   hue += uChromaHue * 0.15 * sin(colorMix * TAU);
 
-  float brightness = 0.4 + energy * 0.6 + forecastGlow;
+  float brightness = 0.4 + energy * 0.6 + forecastGlow + fftBass * 0.12;
   brightness *= accelBoost;
   vec3 patternColor = hsv2rgb(vec3(hue, sat, brightness));
 
@@ -196,7 +203,8 @@ void main() {
 
   // --- Edge highlights: bright lines at fold boundaries ---
   float foldEdge = abs(a - segAngle * 0.5);
-  float edgeLine = smoothstep(0.03, 0.0, foldEdge / max(radius, 0.01));
+  float edgeThreshold = 0.03 - fftHigh * 0.015; // highs → sharper edges
+  float edgeLine = smoothstep(max(edgeThreshold, 0.005), 0.0, foldEdge / max(radius, 0.01));
   vec3 edgeColor = hsv2rgb(vec3(hue2 + chromaHueMod, sat * 0.8, 1.0));
   col += edgeColor * edgeLine * (0.2 + energy * 0.4);
 

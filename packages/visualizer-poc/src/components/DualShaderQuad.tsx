@@ -92,6 +92,7 @@ function createSceneUniforms(width: number, height: number): Record<string, THRE
     uSectionType: { value: 5 }, uEnergyForecast: { value: 0 },
     uPeakApproaching: { value: 0 }, uBeatStability: { value: 0.5 },
     uImprovisationScore: { value: 0 },
+    uDownbeat: { value: 0 }, uBeatConfidence: { value: 0.5 },
     uHeroIconTrigger: { value: 0 }, uHeroIconProgress: { value: 0 },
     uShowWarmth: { value: 0 }, uShowContrast: { value: 1 },
     uShowSaturation: { value: 0 }, uShowGrain: { value: 1 }, uShowBloom: { value: 1 },
@@ -173,6 +174,8 @@ function syncUniforms(
   u.uPeakApproaching.value = smooth.peakApproaching;
   u.uBeatStability.value = smooth.beatStability;
   u.uImprovisationScore.value = smooth.improvisationScore ?? 0;
+  u.uDownbeat.value = smooth.downbeat;
+  u.uBeatConfidence.value = smooth.beatConfidence;
   u.uHeroIconTrigger.value = heroTrigger;
   u.uHeroIconProgress.value = heroProgress;
   u.uShowWarmth.value = filmStock.warmth + venueProfile.warmth;

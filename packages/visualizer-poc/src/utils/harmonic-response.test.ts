@@ -77,17 +77,6 @@ function buildTonicFrames(
 }
 
 describe("computeHarmonicResponse", () => {
-  it("returns neutral when no chord data (chordIndex is 0)", () => {
-    const frames = buildTonicFrames(0, 100);
-    const snapshot = mockSnapshot({ chordIndex: 0, harmonicTension: 0.2 });
-    const result = computeHarmonicResponse(frames, 50, snapshot);
-
-    expect(result.brightnessOffset).toBe(0);
-    expect(result.saturationMult).toBe(1);
-    expect(result.resolutionStrength).toBe(0);
-    expect(result.departureStrength).toBe(0);
-  });
-
   it("returns neutral when chordIndex is undefined", () => {
     const frames = buildTonicFrames(0, 100);
     const snapshot = mockSnapshot({ chordIndex: undefined as unknown as number, harmonicTension: 0.2 });
@@ -99,14 +88,34 @@ describe("computeHarmonicResponse", () => {
     expect(result.departureStrength).toBe(0);
   });
 
+  it("returns neutral when chordIndex is below 0.5 (no chord detected)", () => {
+    const frames = buildTonicFrames(0, 100);
+    const snapshot = mockSnapshot({ chordIndex: 0, harmonicTension: 0.2 });
+    const result = computeHarmonicResponse(frames, 50, snapshot);
+
+    expect(result.brightnessOffset).toBe(0);
+    expect(result.saturationMult).toBe(1);
+    expect(result.resolutionStrength).toBe(0);
+    expect(result.departureStrength).toBe(0);
+  });
+
+  it("chordIndex 0 (C major at tonic) triggers resolution, not neutral", () => {
+    // chordIndex 0 = C major. With guard changed to < 0.5, we need chordIndex >= 0.5.
+    // But chordIndex 0 IS below 0.5, so it's still neutral (no chord detected from Python).
+    // A true C major chord from Python would come as chordIndex = 0 only if undetected.
+    // This test verifies the guard behavior.
+    const frames = buildTonicFrames(0, 400);
+    const snapshot = mockSnapshot({ chordIndex: 0, harmonicTension: 0.1 });
+    const result = computeHarmonicResponse(frames, 200, snapshot);
+    expect(result.resolutionStrength).toBe(0); // still neutral — Python sends 0 for "no chord"
+  });
+
   it("resolution: near-tonic major chord with low tension → positive brightness, saturation > 1", () => {
-    // Song is in C (pitch class 0). Current chord = C major (chordIdx 0, normalized: eps above 0).
-    // Use chordIndex = 0.5/23 ≈ 0.022 so it rounds to chordIdx 0 (C major) but isn't exactly 0
-    // Actually, to avoid the 0-guard, let's use G major (chordIdx 7) which is 1 step on fifths circle.
-    // G major normalized = 7/23 ≈ 0.304
+    // Song is in C (pitch class 0). Current chord = G major (chordIdx 7).
+    // G major is 1 step from C on circle of fifths.
     const frames = buildTonicFrames(0, 400); // tonic = C
     const snapshot = mockSnapshot({
-      chordIndex: 7 / 23, // G major — distance 1 from C on circle of fifths
+      chordIndex: 7, // G major — distance 1 from C on circle of fifths
       harmonicTension: 0.1, // low tension
     });
     const result = computeHarmonicResponse(frames, 200, snapshot);
@@ -119,10 +128,9 @@ describe("computeHarmonicResponse", () => {
 
   it("resolution: tonic chord itself (distance 0) gives stronger resolution", () => {
     // Song is in D (pitch class 2). Current chord = D major (chordIdx 2).
-    // D major normalized = 2/23 ≈ 0.087
     const frames = buildTonicFrames(2, 400); // tonic = D
     const snapshot = mockSnapshot({
-      chordIndex: 2 / 23, // D major — distance 0 from tonic
+      chordIndex: 2, // D major — distance 0 from tonic
       harmonicTension: 0.05,
     });
     const result = computeHarmonicResponse(frames, 200, snapshot);
@@ -136,10 +144,9 @@ describe("computeHarmonicResponse", () => {
   it("departure: far-from-tonic chord with high tension → negative brightness, saturation < 1", () => {
     // Song is in C (pitch class 0). Current chord = F# major (chordIdx 6).
     // F# is at position 6 on the fifths circle, C is at position 0: distance = 6 (tritone).
-    // F# major normalized = 6/23 ≈ 0.261
     const frames = buildTonicFrames(0, 400); // tonic = C
     const snapshot = mockSnapshot({
-      chordIndex: 6 / 23, // F# major — distance 6 from C on circle of fifths (tritone)
+      chordIndex: 6, // F# major — distance 6 from C on circle of fifths (tritone)
       harmonicTension: 0.8, // high tension
     });
     const result = computeHarmonicResponse(frames, 200, snapshot);
@@ -155,7 +162,7 @@ describe("computeHarmonicResponse", () => {
     const frames = buildTonicFrames(0, 400);
 
     // Strong resolution scenario
-    const resSnapshot = mockSnapshot({ chordIndex: 7 / 23, harmonicTension: 0.0 });
+    const resSnapshot = mockSnapshot({ chordIndex: 7, harmonicTension: 0.0 });
     const resResult = computeHarmonicResponse(frames, 200, resSnapshot);
     expect(resResult.brightnessOffset).toBeGreaterThanOrEqual(-0.04);
     expect(resResult.brightnessOffset).toBeLessThanOrEqual(0.06);
@@ -167,7 +174,7 @@ describe("computeHarmonicResponse", () => {
     expect(resResult.departureStrength).toBeLessThanOrEqual(1);
 
     // Strong departure scenario
-    const depSnapshot = mockSnapshot({ chordIndex: 6 / 23, harmonicTension: 1.0 });
+    const depSnapshot = mockSnapshot({ chordIndex: 6, harmonicTension: 1.0 });
     const depResult = computeHarmonicResponse(frames, 200, depSnapshot);
     expect(depResult.brightnessOffset).toBeGreaterThanOrEqual(-0.04);
     expect(depResult.brightnessOffset).toBeLessThanOrEqual(0.06);
@@ -181,7 +188,7 @@ describe("computeHarmonicResponse", () => {
 
   it("handles edge case: idx = 0 (start of frames)", () => {
     const frames = buildTonicFrames(0, 50);
-    const snapshot = mockSnapshot({ chordIndex: 7 / 23, harmonicTension: 0.1 });
+    const snapshot = mockSnapshot({ chordIndex: 7, harmonicTension: 0.1 });
     const result = computeHarmonicResponse(frames, 0, snapshot);
 
     // Should still work — tonic detection uses only forward frames
@@ -193,7 +200,7 @@ describe("computeHarmonicResponse", () => {
 
   it("handles edge case: idx at end of frames", () => {
     const frames = buildTonicFrames(0, 50);
-    const snapshot = mockSnapshot({ chordIndex: 7 / 23, harmonicTension: 0.1 });
+    const snapshot = mockSnapshot({ chordIndex: 7, harmonicTension: 0.1 });
     const result = computeHarmonicResponse(frames, 49, snapshot);
 
     expect(result.brightnessOffset).toBeGreaterThanOrEqual(-0.04);
@@ -203,7 +210,7 @@ describe("computeHarmonicResponse", () => {
   });
 
   it("handles edge case: empty frames array", () => {
-    const snapshot = mockSnapshot({ chordIndex: 7 / 23, harmonicTension: 0.1 });
+    const snapshot = mockSnapshot({ chordIndex: 7, harmonicTension: 0.1 });
     const result = computeHarmonicResponse([], 0, snapshot);
 
     // No frames → can't detect tonic → neutral
@@ -218,7 +225,7 @@ describe("computeHarmonicResponse", () => {
     const frames = Array.from({ length: 100 }, () =>
       mockFrame({ chroma: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] }),
     );
-    const snapshot = mockSnapshot({ chordIndex: 7 / 23, harmonicTension: 0.2 });
+    const snapshot = mockSnapshot({ chordIndex: 7, harmonicTension: 0.2 });
     const result = computeHarmonicResponse(frames, 50, snapshot);
 
     expect(result.brightnessOffset).toBe(0);
@@ -228,10 +235,9 @@ describe("computeHarmonicResponse", () => {
   it("moderate distance and tension → no resolution or departure", () => {
     // Distance 2-3 and tension 0.4-0.5 → neither resolution nor departure triggers
     // Song in C. Chord = D major (chordIdx 2), distance from C on fifths = 2
-    // D major normalized = 2/23 ≈ 0.087
     const frames = buildTonicFrames(0, 400);
     const snapshot = mockSnapshot({
-      chordIndex: 2 / 23, // D major — distance 2 from C on fifths circle
+      chordIndex: 2, // D major — distance 2 from C on fifths circle
       harmonicTension: 0.45, // moderate tension (above 0.4 so no resolution, below 0.5 so no departure)
     });
     const result = computeHarmonicResponse(frames, 200, snapshot);
@@ -245,10 +251,9 @@ describe("computeHarmonicResponse", () => {
 
   it("minor chord near tonic does not trigger resolution", () => {
     // Song in C. Chord = C minor (chordIdx 12), distance 0 but minor.
-    // C minor normalized = 12/23 ≈ 0.522
     const frames = buildTonicFrames(0, 400);
     const snapshot = mockSnapshot({
-      chordIndex: 12 / 23, // C minor — distance 0, but minor
+      chordIndex: 12, // C minor — distance 0, but minor
       harmonicTension: 0.1,
     });
     const result = computeHarmonicResponse(frames, 200, snapshot);

@@ -116,12 +116,12 @@ export function computeHarmonicResponse(
   snapshot: AudioSnapshot,
 ): HarmonicResponse {
   // Bail to neutral if no chord data
-  if (snapshot.chordIndex === undefined || snapshot.chordIndex === 0) {
+  if (snapshot.chordIndex === undefined || snapshot.chordIndex < 0.5) {
     return { ...NEUTRAL };
   }
 
-  // Denormalize chordIndex from 0-1 float to 0-23 integer
-  const chordIdx = Math.round(snapshot.chordIndex * 23);
+  // chordIndex arrives as raw 0-23 integer from Python (0-11 major, 12-23 minor)
+  const chordIdx = Math.round(snapshot.chordIndex);
   const rootPitchClass = chordIdx % 12;
   const isMajor = chordIdx < 12;
   const tension = snapshot.harmonicTension;

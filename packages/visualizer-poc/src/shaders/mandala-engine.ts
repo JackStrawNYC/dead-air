@@ -46,6 +46,10 @@ void main() {
   vec2 p = (uv - 0.5) * vec2(aspect, 1.0);
 
   float energy = clamp(uEnergy, 0.0, 1.0);
+  // 7-band spectral: sub, low, low-mid, mid, upper-mid, presence, brilliance
+  float fftBass = texture2D(uFFTTexture, vec2(0.07, 0.5)).r;
+  float fftMid = texture2D(uFFTTexture, vec2(0.36, 0.5)).r;
+  float fftHigh = texture2D(uFFTTexture, vec2(0.78, 0.5)).r;
   float t = uDynamicTime;
 
   // --- Section type modulation (0=intro,1=verse,2=chorus,3=bridge,4=solo,5=jam,6=outro,7=space) ---
@@ -71,6 +75,10 @@ void main() {
   // ─── Polar coordinates with rotation ───
   float angle = atan(p.y, p.x);
   float radius = length(p);
+
+  // Downbeat pulse: expand ring radius on measure start
+  float downbeatPulse = uDownbeat * 0.12;
+  radius -= downbeatPulse; // brief expansion on downbeat
 
   // Bass-driven rotation
   float rotation = t * 0.2 + uBass * 1.5 + uStemBass * 0.8;
@@ -99,9 +107,13 @@ void main() {
   vec2 warpedP = polarP + vec2(warp1, warp2) * warpAmount;
 
   // ─── Petal ring pattern ───
-  // Concentric rings modulated by angle
-  float ringCount = max(1.0, 3.0 + energy * 5.0 + uMelodicPitch * 3.0 + sectionRingMod);
-  float ringPattern = sin(warpedP.y * ringCount * PI) * 0.5 + 0.5;
+  // Concentric rings modulated by angle + FFT per-band radius
+  // Outer ring responds to bass, middle to mids, inner to highs
+  float fftRadiusMod = radius > 0.5 ? fftBass * 0.15
+                     : radius > 0.25 ? fftMid * 0.12
+                     : fftHigh * 0.10;
+  float ringCount = max(1.0, 3.0 + energy * 5.0 + uMelodicPitch * 3.0 + sectionRingMod + uHarmonicTension * 2.0);
+  float ringPattern = sin((warpedP.y + fftRadiusMod) * ringCount * PI) * 0.5 + 0.5;
 
   // Petal shape: angular modulation
   float petalShape = cos(warpedP.x * N) * 0.5 + 0.5;
@@ -114,9 +126,11 @@ void main() {
   float falloff = 1.0 - smoothstep(0.3, 0.8, radius);
   pattern *= falloff;
 
-  // ─── Color from palette + chroma hue ───
-  float hue1 = hsvToCosineHue(uPalettePrimary) + uChromaHue * 0.15;
-  float hue2 = hsvToCosineHue(uPaletteSecondary) + uChromaShift * 0.1;
+  // ─── Color from palette + chroma hue + chord hue ───
+  float chordHue = float(int(uChordIndex)) / 24.0 * 0.12;
+  float peakGlow = clamp(uPeakApproaching, 0.0, 1.0);
+  float hue1 = hsvToCosineHue(uPalettePrimary) + uChromaHue * 0.15 + chordHue;
+  float hue2 = hsvToCosineHue(uPaletteSecondary) + uChromaShift * 0.1 + chordHue * 0.5;
 
   vec3 color1 = 0.5 + 0.5 * cos(TAU * (hue1 + vec3(0.0, 0.33, 0.67)));
   vec3 color2 = 0.5 + 0.5 * cos(TAU * (hue2 + vec3(0.0, 0.33, 0.67)));
@@ -137,8 +151,8 @@ void main() {
   float bg = fbm3(vec3(p * 2.0, t * 0.1)) * 0.03;
   col = mix(vec3(bg), col, smoothstep(0.0, 0.15, pattern));
 
-  // Energy brightness
-  col *= 0.6 + energy * 0.6;
+  // Energy brightness + peak approaching ramp
+  col *= 0.6 + energy * 0.6 + peakGlow * 0.15;
 
   // ─── Stealie emergence during climax ───
   float noiseField = fbm3(vec3(p * 2.0, t * 0.15));

@@ -14,6 +14,8 @@ import type { VisualMode } from "../data/types";
 import type { ShowPhase } from "../data/ShowNarrativeContext";
 import { detectSuite } from "./suite-detector";
 import type { SuiteInfo } from "./suite-detector";
+import { SELECTABLE_REGISTRY } from "../data/overlay-registry";
+import { lookupSongIdentity } from "../data/song-identities";
 
 export interface PrecomputedNarrative {
   /** Songs completed before this one */
@@ -40,6 +42,8 @@ export interface PrecomputedNarrative {
   suiteInfo: SuiteInfo;
   /** Context about the previous song (for after-jam silence quality) */
   prevSongContext: PrevSongContext | null;
+  /** Predicted overlay IDs from previous songs (for cross-song dedup) */
+  predictedOverlayIds: string[];
 }
 
 export interface PrevSongContext {
@@ -110,6 +114,7 @@ export function precomputeNarrativeStates(
   let hasHadCoherenceLock = false;
   const usedShaderModes = new Map<VisualMode, number>();
   let prevSongContext: PrevSongContext | null = null;
+  const accumulatedOverlayIds = new Set<string>();
 
   for (let i = 0; i < songs.length; i++) {
     // Suite detection for this song position
@@ -131,6 +136,7 @@ export function precomputeNarrativeStates(
       peakOfShowFired,
       suiteInfo,
       prevSongContext,
+      predictedOverlayIds: [...accumulatedOverlayIds],
     });
 
     // --- Compute this song's contribution for the NEXT song ---
@@ -200,6 +206,29 @@ export function precomputeNarrativeStates(
     // Shader mode tracking
     const mode = resolveMode(songs[i]);
     usedShaderModes.set(mode, (usedShaderModes.get(mode) ?? 0) + 1);
+
+    // Predict overlays for cross-song dedup: score each overlay by tag match
+    const songIdentity = lookupSongIdentity(songs[i].title);
+    if (songIdentity) {
+      const moodTags = new Set(songIdentity.moodKeywords ?? []);
+      const scored: { name: string; score: number }[] = [];
+      for (const entry of SELECTABLE_REGISTRY) {
+        let score = 0;
+        if (entry.energyBand === (songIdentity.overlayDensity != null && songIdentity.overlayDensity > 1 ? "high" : "low")) {
+          score += 2;
+        }
+        for (const tag of entry.tags) {
+          if (moodTags.has(tag as never)) score += 1;
+        }
+        if (songIdentity.overlayBoost?.includes(entry.name)) score += 3;
+        scored.push({ name: entry.name, score });
+      }
+      scored.sort((a, b) => b.score - a.score);
+      const top20 = scored.slice(0, 20);
+      for (const { name } of top20) {
+        accumulatedOverlayIds.add(name);
+      }
+    }
 
     // Build prev song context for the next song
     prevSongContext = {

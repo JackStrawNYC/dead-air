@@ -120,15 +120,20 @@ void main() {
   vec3 halfVec2 = normalize(lightDir2 + viewDir);
   float spec2 = pow(max(0.0, dot(norm, halfVec2)), specPow) * 0.5;
 
-  // Base crystal color from palette + instance index
-  float hue = uPalettePrimary + mod(vInstanceIndex * 0.0833, 1.0) * 0.3;
-  float sat = 0.6 * uPaletteSaturation;
+  // Harmonic chord hue shifts crystal refraction color
+  float chordHue = float(int(uChordIndex)) / 24.0 * 0.12;
+  float tensionSharp = clamp(uHarmonicTension, 0.0, 1.0);
+  float melPitch = clamp(uMelodicPitch, 0.0, 1.0);
+
+  // Base crystal color from palette + instance index + chord hue
+  float hue = uPalettePrimary + mod(vInstanceIndex * 0.0833, 1.0) * 0.3 + chordHue;
+  float sat = (0.6 + tensionSharp * 0.15) * uPaletteSaturation;
   vec3 baseColor = hsv2rgb(vec3(hue, sat, 0.4 + ndotl1 * 0.4));
 
   // === INTERNAL GLOW: palette-colored light from crystal core ===
   float chromaIdx = mod(vInstanceIndex, 12.0);
   float chromaHue = chromaIdx / 12.0;
-  vec3 glowColor = hsv2rgb(vec3(chromaHue, 0.8, 1.0));
+  vec3 glowColor = hsv2rgb(vec3(chromaHue + chordHue, 0.8, 0.85 + melPitch * 0.15));
 
   float emissive = vGlow * (uEnergy + uFastEnergy * 0.8) * 1.5;
   // Internal glow: brighter at crystal center (approximated by inverse Fresnel)
