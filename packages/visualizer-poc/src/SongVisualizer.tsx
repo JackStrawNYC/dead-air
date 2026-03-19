@@ -8,8 +8,7 @@
  * Architecture:
  *   SongVisualizer (orchestrator)
  *   ├─ SceneRouter (base shader)
- *   ├─ SongArtLayer (poster with Ken Burns)
- *   ├─ SceneVideoLayer (atmospheric AI videos)
+ *   ├─ SongArtLayer (poster with Ken Burns + dead air bookend)
  *   ├─ LyricTriggerLayer (word-synced curated visuals)
  *   ├─ PoeticLyrics (flowing text)
  *   ├─ DynamicOverlayStack (5-20 rotation overlays)
@@ -35,7 +34,6 @@ import type { OverlayPhaseHint } from "./data/types";
 import { ShowContextProvider, getShowSeed } from "./data/ShowContext";
 import { VisualizerErrorBoundary } from "./components/VisualizerErrorBoundary";
 import { SilentErrorBoundary } from "./components/SilentErrorBoundary";
-import { SceneVideoLayer, computeMediaWindows } from "./components/SceneVideoLayer";
 import { LyricTriggerLayer } from "./components/LyricTriggerLayer";
 import { PoeticLyrics } from "./components/PoeticLyrics";
 import { resolveLyricTriggers, loadAlignmentWords } from "./data/lyric-trigger-resolver";
@@ -322,8 +320,6 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
   }, [props.song.songArt, props.song.artVariantCount, showSeed]);
 
   const effectiveSongArt = variantArt ?? props.song.songArt ?? resolvedMedia?.songArt ?? undefined;
-  const effectiveMedia = (props.song.sceneVideos?.length) ? undefined : resolvedMedia?.media;
-  const effectiveLegacyVideos = (props.song.sceneVideos?.length) ? props.song.sceneVideos : undefined;
 
   // ─── Lyrics ───
   const alignmentWords = useMemo(
@@ -334,11 +330,6 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
   const lyricTriggerWindows = useMemo(() => {
     return resolveLyricTriggers(props.song.title, alignmentWords, 30);
   }, [props.song.title, alignmentWords]);
-
-  const triggerSuppressedRanges = useMemo(
-    () => lyricTriggerWindows.map((w) => ({ start: w.frameStart, end: w.frameEnd })),
-    [lyricTriggerWindows],
-  );
 
   // ─── No-data fallback ───
   if (!analysis || analysis.frames.length === 0) {
@@ -505,24 +496,17 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
   const combinedDensityMult = Math.max(0.25, climaxMod.overlayDensityMult * (jamEvolution.isLongJam ? jamEvolution.densityMult : 1) * sectionVocab.overlayDensityMult * narrativeDirective.overlayDensityMult * endScreenMult * venueProfile.overlayDensityMult * crowdDensityMult * fatigue.densityMult * stemInterplay.densityMult * peakOfShow.densityMult * tempoLock.overlayBreathing * crowdEnergy.densityMult);
   const opacityMap = opacityMapBase ? applyDensityMult(opacityMapBase, combinedDensityMult, rotationSchedule!) : null;
 
-  // ─── Media suppression ───
-  const mediaWindows = useMemo(
-    () => computeMediaWindows(effectiveLegacyVideos, effectiveMedia, sections, f, props.song.trackId, showSeed),
-    [effectiveLegacyVideos, effectiveMedia, sections, f, props.song.trackId, showSeed],
-  );
-  const activeMediaWindow = mediaWindows.find((w) => frame >= w.frameStart - 150 && frame < w.frameEnd + 150);
+  // ─── Lyric trigger suppression ───
   const activeLyricTrigger = lyricTriggerWindows.find((w) => frame >= w.frameStart - 150 && frame < w.frameEnd + 120);
-  const mediaSuppression = computeMediaSuppression(frame, activeMediaWindow, activeLyricTrigger);
+  const mediaSuppression = computeMediaSuppression(frame, activeLyricTrigger);
 
-  const SUPPRESS_FADE = 90;
   const artSuppressionFactor = useMemo(
-    () => computeArtSuppressionFactor(frame, activeMediaWindow, activeLyricTrigger, SUPPRESS_FADE),
-    [frame, activeMediaWindow, activeLyricTrigger],
+    () => computeArtSuppressionFactor(frame, activeLyricTrigger),
+    [frame, activeLyricTrigger],
   );
 
   // ─── Visual focus system ───
-  const isVideoActive = !!activeMediaWindow && frame >= activeMediaWindow.frameStart && frame < activeMediaWindow.frameEnd;
-  const focusState = computeVisualFocus(climaxState.phase, climaxState.intensity, isVideoActive, frame);
+  const focusState = computeVisualFocus(climaxState.phase, climaxState.intensity, frame);
 
   // Derive energy level hint for overlay hard cap
   const energyLevel: "quiet" | "mid" | "peak" = audioSnapshot.energy < 0.10 ? "quiet" : audioSnapshot.energy > 0.25 ? "peak" : "mid";
@@ -612,13 +596,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
 
           {effectiveSongArt && (
             <SilentErrorBoundary name="SongArt">
-              <SongArtLayer src={staticFile(effectiveSongArt)} suppressionFactor={Math.max(artSuppressionFactor, 1 - introFactor)} hueRotation={hueRotation} energy={audioSnapshot.energy} climaxIntensity={climaxState.intensity} focusOpacity={focusState.artOpacity} segueIn={props.segueIn} artBlendMode={props.song.artBlendMode} introFactor={introFactor} />
-            </SilentErrorBoundary>
-          )}
-
-          {(effectiveLegacyVideos || effectiveMedia) && (
-            <SilentErrorBoundary name="SceneVideos">
-              <SceneVideoLayer videos={effectiveLegacyVideos} media={effectiveMedia} sections={sections} frames={f} trackId={props.song.trackId} showSeed={showSeed} hueRotation={hueRotation} suppressedRanges={triggerSuppressedRanges} climaxPhase={climaxState.phase} isLocked={coherenceState.isLocked} />
+              <SongArtLayer src={staticFile(effectiveSongArt)} suppressionFactor={Math.max(artSuppressionFactor, 1 - introFactor)} hueRotation={hueRotation} energy={audioSnapshot.energy} climaxIntensity={climaxState.intensity} focusOpacity={focusState.artOpacity} segueIn={props.segueIn} artBlendMode={props.song.artBlendMode} introFactor={introFactor} deadAirFactor={deadAirFactor} />
             </SilentErrorBoundary>
           )}
 

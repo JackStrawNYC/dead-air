@@ -2,14 +2,14 @@
  * Visual Focus System — focal layer hierarchy.
  *
  * Directs the viewer's eye by modulating layer opacities based on
- * climax phase and media state. During climax, the shader IS the moment —
+ * climax phase. During climax, the shader IS the moment —
  * everything else gets out of the way. During release, art comes back
  * as emotional anchor. During idle, gentle breathing keeps the eye engaged.
  */
 
 import type { ClimaxPhase } from "./climax-state";
 
-export type FocalLayer = "shader" | "art" | "video" | "overlay" | "text";
+export type FocalLayer = "shader" | "art" | "overlay" | "text";
 
 export interface VisualFocusState {
   shaderOpacity: number;    // 0.6-1.0
@@ -32,14 +32,6 @@ const PHASE_FOCUS: Record<ClimaxPhase, VisualFocusState> = {
   idle:    { shaderOpacity: 0.85, artOpacity: 0.25, overlayOpacity: 0.20, grainOpacity: 1.0 },
 };
 
-/** Focus state when a scene video is actively playing */
-const VIDEO_ACTIVE_FOCUS: VisualFocusState = {
-  shaderOpacity: 0.4,
-  artOpacity: 0.0,
-  overlayOpacity: 0.50,
-  grainOpacity: 0.7,
-};
-
 function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
 }
@@ -58,13 +50,11 @@ function lerpState(a: VisualFocusState, b: VisualFocusState, t: number): VisualF
  *
  * @param phase - Current climax phase
  * @param intensity - 0-1 intensity within the phase (for smooth interpolation)
- * @param isVideoActive - Whether a scene video is currently playing
  * @param frame - Current frame number (for idle breathing cycle)
  */
 export function computeVisualFocus(
   phase: ClimaxPhase,
   intensity: number,
-  isVideoActive: boolean,
   frame: number,
 ): VisualFocusState {
   // Start with phase-driven focus
@@ -86,11 +76,6 @@ export function computeVisualFocus(
   if (phase === "build" || phase === "release") {
     const idleFocus = PHASE_FOCUS.idle;
     state = lerpState(idleFocus, state, intensity);
-  }
-
-  // Video override: when scene video is active, suppress everything else
-  if (isVideoActive) {
-    state = lerpState(state, VIDEO_ACTIVE_FOCUS, 0.8);
   }
 
   return state;

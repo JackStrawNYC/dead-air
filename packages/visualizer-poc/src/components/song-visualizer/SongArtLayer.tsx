@@ -4,6 +4,9 @@
  * Visual foundation: intro full-opacity title card (4s), then settles
  * to energy-reactive background wash. Quiet passages: art rises.
  * Peak energy: art fades, shader visuals dominate.
+ *
+ * Dead air bookend: poster reappears gently after the music ends,
+ * serving as a "that was [song]" title card during applause/tuning.
  */
 
 import React from "react";
@@ -30,9 +33,11 @@ interface SongArtProps {
   artBlendMode?: string;
   /** Intro factor 0-1: 0 = intro period (art-forward), 1 = engine fully open */
   introFactor?: number;
+  /** Dead air factor 0-1: 0 = music playing, 1 = fully in dead air (post-music) */
+  deadAirFactor?: number;
 }
 
-export const SongArtLayer: React.FC<SongArtProps> = ({ src, suppressionFactor, hueRotation = 0, energy = 0, climaxIntensity = 0, focusOpacity = 1, segueIn = false, artBlendMode, introFactor = 1 }) => {
+export const SongArtLayer: React.FC<SongArtProps> = ({ src, suppressionFactor, hueRotation = 0, energy = 0, climaxIntensity = 0, focusOpacity = 1, segueIn = false, artBlendMode, introFactor = 1, deadAirFactor = 0 }) => {
   const frame = useCurrentFrame();
 
   // Suppress art during segue-in (first 10s) — let the crossfade breathe
@@ -70,7 +75,11 @@ export const SongArtLayer: React.FC<SongArtProps> = ({ src, suppressionFactor, h
     : focusOpacity;
   const artOpacity = baseOpacity * suppressionFactor * climaxSuppression * introBoost;
 
-  if (artOpacity < 0.01) return null;
+  // Dead air reappearance: poster returns as "that was [song]" bookend
+  const deadAirOpacity = deadAirFactor * 0.55;
+  const finalOpacity = Math.max(artOpacity, deadAirOpacity);
+
+  if (finalOpacity < 0.01) return null;
 
   // Slow Ken Burns zoom + drift throughout
   const scale = interpolate(
@@ -92,7 +101,7 @@ export const SongArtLayer: React.FC<SongArtProps> = ({ src, suppressionFactor, h
       style={{
         position: "absolute",
         inset: 0,
-        opacity: artOpacity,
+        opacity: finalOpacity,
         mixBlendMode: (artBlendMode ?? "screen") as React.CSSProperties["mixBlendMode"],
         overflow: "hidden",
         filter: [
