@@ -90,6 +90,8 @@ void main() {
   float tension = clamp(uHarmonicTension, 0.0, 1.0);
   float melodicPitch = clamp(uMelodicPitch, 0.0, 1.0);
   float beatSnap = clamp(uBeatSnap, 0.0, 1.0);
+  float beatStability = clamp(uBeatStability, 0.0, 1.0);
+  float transformJitter = (1.0 - beatStability) * 0.15;
 
   // 7-band spectral: sub, low, low-mid, mid, upper-mid, presence, brilliance
   float fftBass = texture2D(uFFTTexture, vec2(0.07, 0.5)).r;
@@ -112,7 +114,7 @@ void main() {
   // FFT bands: bass → base height, mids → turbulence, highs → fine detail
   float rotSpeed = (0.3 + bass * 0.8 + fftMid * 0.2) * sectionRotMod;
   float pointBright = 0.3 + energy * 0.7 + sectionBrightMod + fftBass * 0.15;
-  float affineScale = 0.5 + melodicPitch * 0.3 + fftHigh * 0.1;
+  float affineScale = 0.5 + melodicPitch * 0.3 + fftHigh * 0.1 + transformJitter * 0.2;
   float variationMix = tension;
   float chordHue = float(int(uChordIndex)) / 24.0;
   float colorCycle = slowTime * 0.5 + beatSnap * 0.3;

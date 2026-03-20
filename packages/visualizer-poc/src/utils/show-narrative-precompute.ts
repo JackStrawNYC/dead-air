@@ -15,7 +15,7 @@ import type { ShowPhase } from "../data/ShowNarrativeContext";
 import { detectSuite } from "./suite-detector";
 import type { SuiteInfo } from "./suite-detector";
 import { SELECTABLE_REGISTRY } from "../data/overlay-registry";
-import { lookupSongIdentity } from "../data/song-identities";
+import { lookupSongIdentity, getOrGenerateSongIdentity } from "../data/song-identities";
 import { TRANSITION_AFFINITY } from "../scenes/scene-registry";
 import { seededLCG as seededRandom } from "./seededRandom";
 import { hashString } from "./hash";
@@ -238,7 +238,9 @@ export function precomputeNarrativeStates(
     }
 
     // Predict overlays for cross-song dedup: score each overlay by tag match
-    const songIdentity = lookupSongIdentity(songs[i].title);
+    const songIdentity = frames && frames.length > 0
+      ? getOrGenerateSongIdentity(songs[i].trackId, songs[i].title, { tempo: 120, totalFrames: frames.length, duration: frames.length / 30, sections: [] } as never, frames as never)
+      : lookupSongIdentity(songs[i].title);
     if (songIdentity) {
       const moodTags = new Set(songIdentity.moodKeywords ?? []);
       const scored: { name: string; score: number }[] = [];

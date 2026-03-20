@@ -123,7 +123,7 @@ void main() {
 
   // Specular (Blinn-Phong with sharpness from highs)
   vec3 halfVec1 = normalize(lightDir1 + viewDir);
-  float specPow = 32.0 + uHighs * 64.0;
+  float specPow = (32.0 + uHighs * 64.0) * mix(0.6, 1.0, beatStability);
   float spec1 = pow(max(0.0, dot(norm, halfVec1)), specPow);
 
   vec3 halfVec2 = normalize(lightDir2 + viewDir);
@@ -133,6 +133,7 @@ void main() {
   float chordHue = float(int(uChordIndex)) / 24.0 * 0.12;
   float tensionSharp = clamp(uHarmonicTension, 0.0, 1.0);
   float melPitch = clamp(uMelodicPitch, 0.0, 1.0);
+  float beatStability = clamp(uBeatStability, 0.0, 1.0);
 
   // Base crystal color from palette + instance index + chord hue
   float hue = uPalettePrimary + mod(vInstanceIndex * 0.0833, 1.0) * 0.3 + chordHue;

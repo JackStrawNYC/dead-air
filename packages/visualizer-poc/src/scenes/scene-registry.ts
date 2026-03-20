@@ -37,6 +37,9 @@ export interface SceneProps {
 
 export type SceneComponent = React.ComponentType<SceneProps>;
 
+/** Spectral family: timbral character classification for spectral-categorical routing */
+export type SpectralFamily = "warm" | "bright" | "textural" | "tonal" | "cosmic";
+
 export interface SceneRegistryEntry {
   /** The React component for this scene */
   Component: SceneComponent;
@@ -50,6 +53,8 @@ export interface SceneRegistryEntry {
   preferredTransitionOut?: SceneTransitionStyle;
   /** Post-process grading intensity (0-1, default 1.0). Lower = more raw color. */
   gradingIntensity?: number;
+  /** Spectral family for timbral routing. Omitted = versatile (accepts any family). */
+  spectralFamily?: SpectralFamily;
 }
 
 // ─── Lazy imports for code splitting ───
@@ -111,6 +116,7 @@ import { VolumetricNebulaScene } from "./VolumetricNebulaScene";
 // ─── Scene Registry ───
 
 export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
+  // ─── Versatile (no spectralFamily): accept any timbral context ───
   liquid_light: {
     Component: LiquidLightScene,
     energyAffinity: "high",
@@ -122,22 +128,26 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     energyAffinity: "mid",
     complement: "liquid_light",
   },
+  // ─── Bright: high centroid, punchy ───
   concert_lighting: {
     Component: ConcertLightingScene,
     energyAffinity: "high",
     complement: "lo_fi_grain",
     preferredTransitionIn: "flash",
     gradingIntensity: 0.5,
+    spectralFamily: "bright",
   },
   lo_fi_grain: {
     Component: LoFiGrainScene,
     energyAffinity: "mid",
     complement: "concert_lighting",
   },
+  // ─── Cosmic: mid-range, wide spread ───
   particle_nebula: {
     Component: ParticleNebulaScene,
     energyAffinity: "low",
     complement: "cosmic_dust",
+    spectralFamily: "cosmic",
   },
   stark_minimal: {
     Component: StarkMinimalScene,
@@ -154,6 +164,7 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     Component: CosmicDustScene,
     energyAffinity: "low",
     complement: "particle_nebula",
+    spectralFamily: "cosmic",
   },
   vintage_film: {
     Component: VintageFilmScene,
@@ -165,6 +176,7 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     energyAffinity: "low",
     complement: "concert_lighting",
     preferredTransitionIn: "void",
+    spectralFamily: "cosmic",
   },
   inferno: {
     Component: InfernoScene,
@@ -172,23 +184,27 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     complement: "cosmic_voyage",
     preferredTransitionIn: "flash",
     gradingIntensity: 0.7,
+    spectralFamily: "warm",
   },
   deep_ocean: {
     Component: DeepOceanScene,
     energyAffinity: "low",
     complement: "inferno",
     preferredTransitionIn: "void",
+    spectralFamily: "warm",
   },
   aurora: {
     Component: AuroraScene,
     energyAffinity: "low",
     complement: "tie_dye",
     preferredTransitionIn: "dissolve",
+    spectralFamily: "tonal",
   },
   crystal_cavern: {
     Component: CrystalCavernScene,
     energyAffinity: "low",
     complement: "inferno",
+    spectralFamily: "tonal",
   },
   fluid_light: {
     Component: FluidLightScene,
@@ -200,16 +216,19 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     energyAffinity: "low",
     complement: "concert_lighting",
     preferredTransitionIn: "void",
+    spectralFamily: "cosmic",
   },
   fluid_2d: {
     Component: Fluid2DScene,
     energyAffinity: "any",
     complement: "liquid_light",
+    spectralFamily: "textural",
   },
   spectral_analyzer: {
     Component: SpectralAnalyzerScene,
     energyAffinity: "high",
     complement: "particle_swarm",
+    spectralFamily: "bright",
   },
   particle_swarm: {
     Component: ParticleSwarmScene,
@@ -226,12 +245,14 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     energyAffinity: "high",
     complement: "inferno",
     gradingIntensity: 0.5,
+    spectralFamily: "bright",
   },
   kaleidoscope: {
     Component: KaleidoscopeScene,
     energyAffinity: "mid",
     complement: "sacred_geometry",
     gradingIntensity: 0.8,
+    spectralFamily: "tonal",
   },
   fractal_zoom: {
     Component: FractalZoomScene,
@@ -244,16 +265,19 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     energyAffinity: "low",
     complement: "kaleidoscope",
     preferredTransitionIn: "dissolve",
+    spectralFamily: "tonal",
   },
   reaction_diffusion: {
     Component: ReactionDiffusionScene,
     energyAffinity: "mid",
     complement: "fluid_2d",
+    spectralFamily: "textural",
   },
   mandala_engine: {
     Component: MandalaEngineScene,
     energyAffinity: "mid",
     complement: "sacred_geometry",
+    spectralFamily: "tonal",
   },
   fractal_flames: {
     Component: FractalFlamesScene,
@@ -265,23 +289,26 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     Component: FeedbackRecursionScene,
     energyAffinity: "any",
     complement: "fractal_flames",
+    spectralFamily: "textural",
   },
   truchet_tiling: {
     Component: TruchetTilingScene,
     energyAffinity: "mid",
     complement: "mandala_engine",
+    spectralFamily: "tonal",
   },
   diffraction_rings: {
     Component: DiffractionRingsScene,
     energyAffinity: "low",
     complement: "aurora",
+    spectralFamily: "tonal",
   },
   plasma_field: {
     Component: PlasmaFieldScene,
     energyAffinity: "any",
     complement: "diffraction_rings",
+    spectralFamily: "tonal",
   },
-  // Placeholder entries — scenes will be implemented in subsequent waves
   voronoi_flow: {
     Component: VoronoiFlowScene,
     energyAffinity: "mid",
@@ -293,31 +320,37 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     complement: "aurora",
     preferredTransitionIn: "distortion",
     gradingIntensity: 0.6,
+    spectralFamily: "bright",
   },
   morphogenesis: {
     Component: MorphogenesisScene,
     energyAffinity: "mid",
     complement: "reaction_diffusion",
+    spectralFamily: "textural",
   },
   stained_glass: {
     Component: StainedGlassScene,
     energyAffinity: "any",
     complement: "sacred_geometry",
+    spectralFamily: "tonal",
   },
   neural_web: {
     Component: NeuralWebScene,
     energyAffinity: "high",
     complement: "fractal_flames",
+    spectralFamily: "textural",
   },
   smoke_rings: {
     Component: SmokeRingsScene,
     energyAffinity: "mid",
     complement: "deep_ocean",
+    spectralFamily: "warm",
   },
   aurora_curtains: {
     Component: AuroraCurtainsScene,
     energyAffinity: "low",
     complement: "concert_lighting",
+    spectralFamily: "tonal",
   },
   digital_rain: {
     Component: DigitalRainScene,
@@ -329,12 +362,14 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     energyAffinity: "high",
     complement: "crystal_cavern",
     gradingIntensity: 0.65,
+    spectralFamily: "warm",
   },
   // Phase 9 Wave 2: 8 new scenes
   mycelium_network: {
     Component: MyceliumNetworkScene,
     energyAffinity: "mid",
     complement: "neural_web",
+    spectralFamily: "textural",
   },
   ink_wash: {
     Component: InkWashScene,
@@ -345,32 +380,38 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     Component: CoralReefScene,
     energyAffinity: "low",
     complement: "deep_ocean",
+    spectralFamily: "warm",
   },
   solar_flare: {
     Component: SolarFlareScene,
     energyAffinity: "high",
     complement: "inferno",
     gradingIntensity: 0.6,
+    spectralFamily: "bright",
   },
   galaxy_spiral: {
     Component: GalaxySpiralScene,
     energyAffinity: "any",
     complement: "cosmic_voyage",
+    spectralFamily: "cosmic",
   },
   warp_field: {
     Component: WarpFieldScene,
     energyAffinity: "mid",
     complement: "diffraction_rings",
+    spectralFamily: "cosmic",
   },
   signal_decay: {
     Component: SignalDecayScene,
     energyAffinity: "any",
     complement: "digital_rain",
+    spectralFamily: "textural",
   },
   databend: {
     Component: DatabendScene,
     energyAffinity: "high",
     complement: "lo_fi_grain",
+    spectralFamily: "bright",
   },
   // Tier 1: Volumetric Raymarching Shaders
   volumetric_clouds: {
@@ -378,18 +419,21 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     energyAffinity: "low",
     complement: "volumetric_smoke",
     preferredTransitionIn: "dissolve",
+    spectralFamily: "cosmic",
   },
   volumetric_smoke: {
     Component: VolumetricSmokeScene,
     energyAffinity: "mid",
     complement: "concert_lighting",
     preferredTransitionIn: "void",
+    spectralFamily: "cosmic",
   },
   volumetric_nebula: {
     Component: VolumetricNebulaScene,
     energyAffinity: "any",
     complement: "cosmic_voyage",
     preferredTransitionIn: "dissolve",
+    spectralFamily: "cosmic",
   },
 };
 
@@ -489,6 +533,24 @@ export function getModesForEnergy(energy: "low" | "mid" | "high", era?: string, 
   }
 
   return modes;
+}
+
+/** Get modes appropriate for a given energy level AND spectral family.
+ *  Soft filter: if spectral filtering leaves < 2 candidates, falls back to energy-only pool. */
+export function getModesForEnergyAndSpectral(
+  energy: "low" | "mid" | "high",
+  spectralFamily?: SpectralFamily,
+  era?: string,
+  defaultMode?: VisualMode,
+): VisualMode[] {
+  const base = getModesForEnergy(energy, era, defaultMode);
+  if (!spectralFamily) return base;
+
+  const filtered = base.filter((m) => {
+    const f = SCENE_REGISTRY[m]?.spectralFamily;
+    return !f || f === spectralFamily; // undefined = versatile
+  });
+  return filtered.length >= 2 ? filtered : base;
 }
 
 /** Render a scene by mode ID */

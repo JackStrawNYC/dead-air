@@ -256,6 +256,13 @@ ${
   // Cinematic grade (ACES filmic tone mapping)
   col = cinematicGrade(col, energy);
 
+  // Show saturation: seed-derived color richness
+  {
+    float satBoost = uShowSaturation;
+    float satLuma = dot(col, vec3(0.299, 0.587, 0.114));
+    col = mix(vec3(satLuma), col, 1.0 + satBoost);
+  }
+
   // Venue vignette: edge darkening scaled by venue type
   {
     float vig = 1.0 - dot(p * 0.9, p * 0.9);

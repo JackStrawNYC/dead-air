@@ -62,6 +62,7 @@ void main() {
   float slowE = clamp(uSlowEnergy, 0.0, 1.0);
   float tension = clamp(uHarmonicTension, 0.0, 1.0);
   float melodicPitch = clamp(uMelodicPitch, 0.0, 1.0);
+  float beatStability = clamp(uBeatStability, 0.0, 1.0);
 
   float slowTime = uDynamicTime * 0.05;
   float chromaHueMod = uChromaHue * 0.2;
@@ -85,7 +86,7 @@ void main() {
   // --- Curl noise advection on cell lookup ---
   float flowSpeed = (0.3 + slowE * 1.2) * accelBoost * sectionFlowSpeed;
   vec3 curl = curlNoise(vec3(p * 1.5, slowTime * flowSpeed));
-  cellUv += curl.xy * 0.4;
+  cellUv += curl.xy * mix(0.55, 0.25, beatStability);
 
   // --- Voronoi computation ---
   vec2 cellId = floor(cellUv);

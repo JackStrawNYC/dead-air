@@ -298,7 +298,7 @@ function renderSong(
         `--props=${analysisPath}`,
         `--gl=${glArg}`,
         `--concurrency=${adaptiveConcurrency}`,
-        `--timeout=300000`,
+        `--timeout=600000`,
         `--frames=0-${totalFrames - 1}`,
         "--muted",
       ].join(" ");
@@ -327,7 +327,7 @@ function renderSong(
           `--props=${analysisPath}`,
           `--gl=${glArg}`,
           `--concurrency=${adaptiveConcurrency}`,
-          `--timeout=300000`,
+          `--timeout=600000`,
           `--frames=${start}-${end}`,
           "--muted",
         ].join(" ");
@@ -383,7 +383,7 @@ function renderShowIntro(bundlePath: string): string | null {
     "ShowIntro",
     outputPath,
     `--gl=${glArg}`,
-    `--timeout=300000`,
+    `--timeout=600000`,
     `--concurrency=2`,
   ].join(" ");
 
@@ -405,7 +405,7 @@ function renderEndCard(bundlePath: string): string {
     "EndCard",
     outputPath,
     `--gl=${glArg}`,
-    `--timeout=300000`,
+    `--timeout=600000`,
   ].join(" ");
 
   execSync(cmd, { cwd: ROOT, stdio: "inherit" });
@@ -427,7 +427,7 @@ function renderSetBreak(bundlePath: string): string {
     "SetBreak",
     outputPath,
     `--gl=${glArg}`,
-    `--timeout=300000`,
+    `--timeout=600000`,
   ].join(" ");
 
   execSync(cmd, { cwd: ROOT, stdio: "inherit" });
@@ -449,7 +449,7 @@ function renderChapterCard(index: number, bundlePath: string): string {
     `Chapter-${index}`,
     outputPath,
     `--gl=${glArg}`,
-    `--timeout=300000`,
+    `--timeout=600000`,
   ].join(" ");
 
   execSync(cmd, { cwd: ROOT, stdio: "inherit" });

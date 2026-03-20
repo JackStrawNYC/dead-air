@@ -23,12 +23,14 @@ import { applySetShaderFilter } from "../utils/set-theme";
 import { detectChordMood } from "../utils/chord-mood";
 import { estimateImprovisationScore } from "../utils/improv-detector";
 import { selectTransitionStyle } from "../utils/transition-selector";
+import { getSectionSpectralFamily } from "../utils/spectral-section";
 import { getShaderStrings } from "../shaders/shader-strings";
 import { DualShaderScene } from "./DualShaderScene";
 import type { DualBlendMode } from "../components/DualShaderQuad";
 import type { JamEvolution, JamPhaseBoundaries } from "../utils/jam-evolution";
 import { getJamPhaseMode, JAM_PHASE_INDEX } from "../utils/jam-evolution";
 import type { JamCycleState } from "../utils/jam-cycles";
+import type { InterplayMode } from "../utils/stem-interplay";
 
 /**
  * Dynamic crossfade duration based on energy context and spectral flux.
@@ -227,6 +229,8 @@ interface Props {
   climaxPhase?: number;
   /** Track number within the show for per-song shader variety */
   trackNumber?: number;
+  /** Stem interplay mode for dual-shader composition awareness */
+  stemInterplayMode?: InterplayMode;
 }
 
 /**
@@ -244,15 +248,18 @@ function applyRecencyWeighting(
 ): VisualMode[] {
   if (usedShaderModes.size === 0) return pool;
 
-  // Build weighted pool: modes used recently get fewer copies, unused get max copies
-  const MAX_COPIES = 4;
+  // Build weighted pool: aggressively penalize recently-used modes, boost fresh ones.
+  // This breaks the "big 4" convergence where the same high-energy shaders
+  // recirculate via tight affinity pools.
+  const MAX_COPIES = 6;
+  const FRESH_BONUS = 2; // Extra copies for never-used modes
   const weighted: VisualMode[] = [];
 
   for (const mode of pool) {
     const count = usedShaderModes.get(mode) ?? 0;
     if (count === 0) {
-      // Never used — max weight
-      for (let i = 0; i < MAX_COPIES; i++) weighted.push(mode);
+      // Never used — strong boost to break convergence
+      for (let i = 0; i < MAX_COPIES + FRESH_BONUS; i++) weighted.push(mode);
       continue;
     }
 
@@ -260,10 +267,16 @@ function applyRecencyWeighting(
     const lastUsed = shaderModeLastUsed?.get(mode) ?? 0;
     const songDistance = Math.max(1, currentSongIdx - lastUsed);
 
+    // Hard cooldown: modes used in last 2 songs get minimal representation
+    if (songDistance <= 2) {
+      weighted.push(mode); // 1 copy only — still selectable but heavily de-weighted
+      continue;
+    }
+
     // Frequency penalty: 1/count (used once=1.0, twice=0.5, three=0.33)
     const freqFactor = 1 / count;
     // Recency bonus: modes used long ago recover toward full weight
-    // distance 1 → 0.33, distance 3 → 0.60, distance 6 → 0.75, distance 12+ → 0.86+
+    // distance 3 → 0.60, distance 6 → 0.75, distance 12+ → 0.86+
     const recencyFactor = 1 - 1 / (1 + songDistance * 0.5);
 
     // Combined weight: 0→1 scale, then map to copy count (min 1)
@@ -340,6 +353,18 @@ export function getModeForSection(
             candidates = applyRecencyWeighting(candidates, usedShaderModes, shaderModeLastUsed, trackNumber ?? 0);
           }
 
+          // Spectral-categorical filtering: match shader to section timbral character
+          if (frames && section) {
+            const spectralFamily = getSectionSpectralFamily(frames, section.frameStart, section.frameEnd);
+            if (spectralFamily) {
+              const spectralFiltered = candidates.filter((m) => {
+                const f = SCENE_REGISTRY[m]?.spectralFamily;
+                return !f || f === spectralFamily; // undefined = versatile, accepts any
+              });
+              if (spectralFiltered.length >= 2) candidates = spectralFiltered; // soft filter
+            }
+          }
+
           const rng = seededRandom(seed + (trackNumber ?? 0) * 31337 + sectionIndex * 7919);
           return candidates[Math.floor(rng() * candidates.length)];
         }
@@ -373,18 +398,36 @@ export function getModeForSection(
         if (weightedPool.length > 0) filteredPool = weightedPool;
       }
 
-      // Stem section bias: solo prefers dramatic modes, vocal prefers warm modes
+      // Stem section bias: route shaders by what the band is doing
       if (stemSection === "solo") {
         const dramaticModes: VisualMode[] = ["inferno", "concert_lighting", "liquid_light"];
         const dramatic = dramaticModes.filter((m) => filteredPool.includes(m));
         if (dramatic.length > 0) {
-          filteredPool = [...filteredPool, ...dramatic, ...dramatic];
+          filteredPool = [...filteredPool, ...dramatic, ...dramatic]; // 3x weight
         }
       } else if (stemSection === "vocal") {
         const warmModes: VisualMode[] = ["oil_projector", "vintage_film", "aurora"];
         const warm = warmModes.filter((m) => filteredPool.includes(m));
         if (warm.length > 0) {
-          filteredPool = [...filteredPool, ...warm, ...warm];
+          filteredPool = [...filteredPool, ...warm, ...warm]; // 3x weight
+        }
+      } else if (stemSection === "jam") {
+        const generativeModes: VisualMode[] = ["feedback_recursion", "reaction_diffusion", "fractal_zoom", "kaleidoscope", "mandala_engine", "voronoi_flow"];
+        const generative = generativeModes.filter((m) => filteredPool.includes(m));
+        if (generative.length > 0) {
+          filteredPool = [...filteredPool, ...generative, ...generative]; // 3x weight
+        }
+      } else if (stemSection === "instrumental") {
+        const midModes: VisualMode[] = ["aurora", "voronoi_flow", "oil_projector", "tie_dye", "crystal_cavern"];
+        const mid = midModes.filter((m) => filteredPool.includes(m));
+        if (mid.length > 0) {
+          filteredPool = [...filteredPool, ...mid]; // 2x weight
+        }
+      } else if (stemSection === "quiet") {
+        const ambientModes: VisualMode[] = ["cosmic_dust", "deep_ocean", "void_light", "morphogenesis", "cosmic_voyage"];
+        const ambient = ambientModes.filter((m) => filteredPool.includes(m));
+        if (ambient.length > 0) {
+          filteredPool = [...filteredPool, ...ambient, ...ambient]; // 3x weight
         }
       }
 
@@ -439,6 +482,18 @@ export function getModeForSection(
       // Set position intelligence: boost/suppress shaders per set
       if (setNumber !== undefined) {
         filteredPool = applySetShaderFilter(filteredPool, setNumber);
+      }
+
+      // Spectral-categorical filtering: match shader to section timbral character
+      if (frames && section) {
+        const spectralFamily = getSectionSpectralFamily(frames, section.frameStart, section.frameEnd);
+        if (spectralFamily) {
+          const spectralFiltered = filteredPool.filter((m) => {
+            const f = SCENE_REGISTRY[m]?.spectralFamily;
+            return !f || f === spectralFamily;
+          });
+          if (spectralFiltered.length >= 2) filteredPool = spectralFiltered;
+        }
       }
 
       const rng = seededRandom(seed + (trackNumber ?? 0) * 31337 + sectionIndex * 7919);
@@ -535,7 +590,7 @@ function renderMode(
   return renderScene(mode, { frames, sections, palette, tempo, style, jamDensity });
 }
 
-export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, seed, jamDensity, deadAirMode, deadAirFactor, era, coherenceIsLocked, usedShaderModes, shaderModeLastUsed, drumsSpacePhase, songIdentity, stemSection, songDuration, palette: paletteProp, segueIn, isSacredSegueIn, isInSuiteMiddle, setNumber, jamEvolution, jamPhaseBoundaries, jamCycle, jamPhaseShaders, climaxPhase: climaxPhaseProp, trackNumber }) => {
+export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, seed, jamDensity, deadAirMode, deadAirFactor, era, coherenceIsLocked, usedShaderModes, shaderModeLastUsed, drumsSpacePhase, songIdentity, stemSection, songDuration, palette: paletteProp, segueIn, isSacredSegueIn, isInSuiteMiddle, setNumber, jamEvolution, jamPhaseBoundaries, jamCycle, jamPhaseShaders, climaxPhase: climaxPhaseProp, trackNumber, stemInterplayMode }) => {
   const frame = useCurrentFrame();
   const palette = paletteProp ?? song.palette;
 
@@ -751,8 +806,12 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
   // Cooldown: every 3rd section forced single for visual contrast
   const dualCooldown = currentSectionIdx > 0 && currentSectionIdx % 3 === 0;
 
-  // Dual-shader activation: sufficient length + moderate energy, or jam/solo stem
-  const shouldDual = !dualCooldown && (climaxForceDual || (sectionLen >= 600 && (
+  // Stem interplay modulation: tight-lock encourages dual composition, solo-spotlight suppresses it
+  const interplayForceDual = stemInterplayMode === "tight-lock";
+  const interplaySuppressDual = stemInterplayMode === "solo-spotlight";
+
+  // Dual-shader activation: sufficient length + moderate energy, or jam/solo stem, or tight-lock interplay
+  const shouldDual = !dualCooldown && !interplaySuppressDual && (climaxForceDual || interplayForceDual || (sectionLen >= 600 && (
     frameEnergy > 0.12 ||
     stemSection === "jam" || stemSection === "solo"
   )));

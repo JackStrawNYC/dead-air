@@ -105,6 +105,8 @@ void main() {
 
   // Energy brightens stars (section-modulated)
   stars *= (0.7 + uEnergy * 0.6 + uFastEnergy * 0.2) * starBrightMod;
+  // Beat stability: unstable → star shimmer boost
+  stars *= 1.0 + (1.0 - beatStability) * 0.2 * sin(uTime * 8.0 + uv.x * 30.0);
 
   // === STAR GLOW: diffraction spikes (4-point cross) on bright stars ===
   float spikeStar = starField(parallax1, 30.0, 1.0);
@@ -126,6 +128,7 @@ void main() {
   float pitchBright = uMelodicPitch * 0.15;
   float tensionDensity = clamp(uHarmonicTension, 0.0, 1.0) * 0.15;
   float peakGlow = clamp(uPeakApproaching, 0.0, 1.0) * 0.12;
+  float beatStability = clamp(uBeatStability, 0.0, 1.0);
 
   vec3 nebColor1 = hsv2rgb(vec3(uPalettePrimary + chromaHueMod + chordHue, 0.6 * uPaletteSaturation, 0.25 + pitchBright));
   vec3 nebColor2 = hsv2rgb(vec3(uPaletteSecondary, 0.5 * uPaletteSaturation, 0.20 + peakGlow));

@@ -60,7 +60,7 @@ import { CameraMotion } from "./components/CameraMotion";
 import { computeVisualFocus } from "./utils/visual-focus";
 import { findMusicEnd } from "./utils/music-end";
 import { computeCounterpoint } from "./utils/visual-counterpoint";
-import { lookupSongIdentity } from "./data/song-identities";
+import { lookupSongIdentity, getOrGenerateSongIdentity } from "./data/song-identities";
 import { computeShowArcPhase, getShowArcModifiers } from "./data/show-arc";
 import type { ShowArcPhase } from "./data/show-arc";
 import { computeTourModifiers, applyTourModifiers } from "./utils/tour-position";
@@ -207,10 +207,13 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
     [analysis],
   );
 
-  // ─── Song identity ───
+  // ─── Song identity (curated → auto-generated from audio analysis) ───
   const songIdentity = useMemo(
-    () => lookupSongIdentity(props.song.title),
-    [props.song.title],
+    () =>
+      analysis?.frames?.length && analysis?.meta
+        ? getOrGenerateSongIdentity(props.song.trackId, props.song.title, analysis.meta, analysis.frames)
+        : lookupSongIdentity(props.song.title),
+    [props.song.trackId, props.song.title, analysis],
   );
 
   // ─── Effective palette (setlist > curated identity > chroma-derived) ───
@@ -610,7 +613,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
           <SilentErrorBoundary name="SceneRouter">
             {(() => {
               const climaxPhaseMap: Record<string, number> = { idle: 0, build: 1, climax: 2, sustain: 3, release: 4 };
-              const sceneRouter = <SceneRouter frames={f} sections={sections} song={props.song} tempo={tempo} seed={showSeed} jamDensity={jamDensity} deadAirMode={deadAirFactor > 0 ? "cosmic_dust" : undefined} deadAirFactor={deadAirFactor > 0 ? deadAirFactor : undefined} era={props.show?.era} coherenceIsLocked={coherenceState.isLocked} drumsSpacePhase={drumsSpaceState?.subPhase} usedShaderModes={narrative?.state.usedShaderModes} shaderModeLastUsed={narrative?.state.shaderModeLastUsed} songIdentity={songIdentity} stemSection={stemSection} songDuration={analysis?.meta?.duration} palette={effectivePalette} segueIn={props.segueIn} isSacredSegueIn={isSacredSegueIn} isInSuiteMiddle={!!isInSuiteMiddle} setNumber={props.song.set} jamEvolution={jamEvolution} jamPhaseBoundaries={jamPhaseBoundaries} jamCycle={jamCycle} jamPhaseShaders={jamPhaseShaders} climaxPhase={climaxPhaseMap[climaxState.phase] ?? 0} trackNumber={props.song.trackNumber ?? 1} />;
+              const sceneRouter = <SceneRouter frames={f} sections={sections} song={props.song} tempo={tempo} seed={showSeed} jamDensity={jamDensity} deadAirMode={deadAirFactor > 0 ? "cosmic_dust" : undefined} deadAirFactor={deadAirFactor > 0 ? deadAirFactor : undefined} era={props.show?.era} coherenceIsLocked={coherenceState.isLocked} drumsSpacePhase={drumsSpaceState?.subPhase} usedShaderModes={narrative?.state.usedShaderModes} shaderModeLastUsed={narrative?.state.shaderModeLastUsed} songIdentity={songIdentity} stemSection={stemSection} songDuration={analysis?.meta?.duration} palette={effectivePalette} segueIn={props.segueIn} isSacredSegueIn={isSacredSegueIn} isInSuiteMiddle={!!isInSuiteMiddle} setNumber={props.song.set} jamEvolution={jamEvolution} jamPhaseBoundaries={jamPhaseBoundaries} jamCycle={jamCycle} jamPhaseShaders={jamPhaseShaders} climaxPhase={climaxPhaseMap[climaxState.phase] ?? 0} trackNumber={props.song.trackNumber ?? 1} stemInterplayMode={stemInterplay.mode} />;
               const palette = effectivePalette;
 
               // Segue IN crossfade: smooth dual-render dissolve from previous song's shader

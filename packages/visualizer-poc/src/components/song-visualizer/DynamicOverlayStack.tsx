@@ -33,7 +33,7 @@ interface OverlayComponentEntry {
 const MAX_CONCURRENT: Record<string, number> = {
   quiet: 3,
   mid: 6,
-  peak: 10,
+  peak: 7,
 };
 
 interface Props {
@@ -178,8 +178,10 @@ export const DynamicOverlayStack: React.FC<Props> = ({
           // Per-layer parallax drift: deeper layers drift slower, surface layers faster
           const layerDriftFactor = 0.5 + (layer / 10) * 1.0;
           const parallaxTime = frame / 30;
-          const parallaxX = Math.sin(parallaxTime * 0.08) * 3 * layerDriftFactor;
-          const parallaxY = Math.cos(parallaxTime * 0.06 + 1.3) * 2 * layerDriftFactor;
+          // Skip parallax transform for barely-visible overlays (saves composite cost)
+          const applyParallax = opacity >= 0.3;
+          const parallaxX = applyParallax ? Math.sin(parallaxTime * 0.08) * 3 * layerDriftFactor : 0;
+          const parallaxY = applyParallax ? Math.cos(parallaxTime * 0.06 + 1.3) * 2 * layerDriftFactor : 0;
           return (
           <div
             key={name}
@@ -189,7 +191,7 @@ export const DynamicOverlayStack: React.FC<Props> = ({
               opacity,
               pointerEvents: "none",
               mixBlendMode: blendMode ?? "screen",
-              transform: `translate(${parallaxX.toFixed(2)}px, ${parallaxY.toFixed(2)}px)`,
+              transform: applyParallax ? `translate(${parallaxX.toFixed(2)}px, ${parallaxY.toFixed(2)}px)` : undefined,
             }}
           >
             <Suspense fallback={null}>

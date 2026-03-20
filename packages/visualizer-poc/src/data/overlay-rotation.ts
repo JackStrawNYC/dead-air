@@ -34,6 +34,9 @@ import type { ShowArcModifiers } from "./show-arc";
 import type { DrumsSpaceSubPhase } from "../utils/drums-space-phase";
 import { DRUMS_SPACE_TREATMENTS } from "../utils/drums-space-phase";
 import type { StemSectionType } from "../utils/stem-features";
+import { buildWindowsFromSections, markDropoutWindows } from "./overlay-windows";
+import { scoreOverlayForWindow, type ScoringContext } from "./overlay-scoring";
+import { selectOverlaysForWindow, HERO_OVERLAY_NAMES as _HERO_OVERLAY_NAMES } from "./overlay-selection";
 
 // Eased crossfade function: replaces linear smoothstep with Remotion's
 // Easing.inOut(Easing.ease) for more organic overlay transitions.
@@ -101,18 +104,6 @@ const ACCENT_CONFIG: Record<string, AccentConfig | null> = {
 // ─── Constants ───
 
 /**
- * Window duration in frames by energy.
- * Quiet passages rotate every 60s to prevent visual stagnation.
- * Peaks rotate faster for visual energy.
- */
-const WINDOW_FRAMES_BY_ENERGY: Record<string, number> = {
-  low:  1800,  // 1 minute — faster rotation for visual variety
-  mid:  1200,  // 40 seconds — snappy rotation
-  high: 900,   // 30 seconds — energetic turnover
-};
-const WINDOW_FRAMES_DEFAULT = 900;
-
-/**
  * Crossfade duration at window boundaries, energy-scaled.
  * Quiet transitions are glacial (20s). Peak transitions are snappy (6s).
  * Matches the tempo of the music's own dynamics.
@@ -152,128 +143,20 @@ export const A_TIER_OVERLAY_NAMES = new Set(
   OVERLAY_REGISTRY.filter((e) => e.tier === "A" && !e.alwaysActive).map((e) => e.name),
 );
 
-/**
- * Hero overlays — the most visually impactful character/reactive components.
- * One hero is guaranteed per rotation window (reserved slot) so viewers
- * always see concrete animated objects, not just abstract washes.
- * Sourced from BandConfig for portability.
- */
-export const HERO_OVERLAY_NAMES = new Set(BAND_CONFIG.heroOverlays);
-
-/** Score penalty for overlays used in the previous window */
-const REPEAT_PENALTY = 0.6;
-
-/** Score bonus for overlays from a short previous window (encourages persistence) */
-const CARRYOVER_BONUS = 0.2;
-
-/** Windows shorter than this get carryover instead of repeat-penalty (30 seconds) */
-const MIN_WINDOW_FOR_ROTATION = 900;
+/** Re-export from overlay-selection for backwards compatibility */
+export const HERO_OVERLAY_NAMES = _HERO_OVERLAY_NAMES;
 
 /**
  * Pre-peak dropout: overlay count cap for the window immediately before a
  * higher-energy section. Strips the visual field to complete void so the
- * peak floods in with maximum contrast. Like pulling the kick drum out
- * of the mix right before the drop.
+ * peak floods in with maximum contrast.
  */
 const DROPOUT_MAX_OVERLAYS = 0;
-
-// ─── Texture × Category routing (Dead-authentic) ───
-// 5 groups tuned to what a Grateful Dead show actually feels like:
-// Sacred geometry owns Space/Drums. Bears and skeletons welcome during songs.
-// Festival energy at peaks. Set II goes deeper. Post-peak grace after the void.
-
-const AMBIENT_WASH = new Set(["atmospheric", "nature"]);       // background canvas
-const COSMIC_SACRED = new Set(["sacred"]);                      // inner journey
-const ENERGY_REACTIVE = new Set(["reactive", "geometric", "distortion"]); // the pulse
-const DEAD_FAMILY = new Set(["character"]);                     // bears, skeletons, crowd
-const SHOW_NARRATIVE = new Set(["artifact", "info", "hud"]);   // posters, text, HUD
-
-type TextureGroup = "wash" | "sacred" | "reactive" | "family" | "narrative";
-
-const TEXTURE_GROUP_SCORE: Record<string, Record<TextureGroup, number>> = {
-  ambient:  { wash: +0.25, sacred: +0.45, reactive: -0.30, family: +0.05, narrative: -0.50 },
-  sparse:   { wash: +0.20, sacred: +0.25, reactive: -0.20, family: +0.10, narrative: -0.40 },
-  melodic:  { wash: +0.10, sacred: +0.05, reactive:  0.00, family: +0.25, narrative: +0.10 },
-  building: { wash: +0.05, sacred: +0.10, reactive: +0.15, family: +0.20, narrative: -0.05 },
-  rhythmic: { wash:  0.00, sacred:  0.00, reactive: +0.20, family: +0.30, narrative: -0.15 },
-  peak:     { wash: -0.05, sacred: +0.10, reactive: +0.25, family: +0.35, narrative: -0.35 },
-};
-
-/** Tag-based texture scoring — tags carry rich Dead-specific signal */
-const TAG_TEXTURE_BONUS: Record<string, Partial<Record<string, number>>> = {
-  cosmic:         { ambient: +0.15, sparse: +0.10, peak: -0.05 },
-  psychedelic:    { ambient: +0.05, melodic: +0.05, building: +0.10, rhythmic: +0.10, peak: +0.10 },
-  festival:       { rhythmic: +0.15, peak: +0.20, melodic: +0.05, ambient: -0.15 },
-  contemplative:  { ambient: +0.10, sparse: +0.15, melodic: +0.05, peak: -0.15 },
-  [BAND_CONFIG.overlayTags.culture]: { ambient: +0.05, sparse: +0.05, melodic: +0.10, rhythmic: +0.10, peak: +0.15 },
-  intense:        { peak: +0.15, rhythmic: +0.10, building: +0.05, ambient: -0.20, sparse: -0.15 },
-  organic:        { ambient: +0.05, sparse: +0.05, melodic: +0.05 },
-  mechanical:     { ambient: -0.15, sparse: -0.10, rhythmic: +0.05, peak: -0.10 },
-  retro:          { ambient: -0.10, melodic: +0.05, sparse: -0.05 },
-  aquatic:        { ambient: +0.05, sparse: +0.10, peak: -0.10 },
-};
-
-/**
- * Scene-specific overlay bias: certain overlays look better with certain shaders.
- * Sourced from BandConfig for portability.
- */
-const SCENE_OVERLAY_BIAS = BAND_CONFIG.sceneOverlayBias;
-
-/** Set II = the journey. More cosmic/sacred, fewer artifacts. */
-const SET2_ADJUSTMENTS: Record<TextureGroup, number> = {
-  sacred:    +0.10,
-  wash:      +0.05,
-  narrative: -0.15,
-  reactive:   0.00,
-  family:    -0.05,
-};
-
-/** Post-peak grace: after high→low/mid drop, favor sacred/contemplative overlays */
-const POST_PEAK_GRACE: Record<TextureGroup, number> = {
-  sacred:    +0.20,
-  wash:      +0.10,
-  family:    +0.05,   // keep fun objects — bears are welcome after peaks too
-  reactive:  -0.25,
-  narrative: -0.30,
-};
-
-/**
- * Drums/Space adjustments — the psychedelic centerpiece.
- * During Drums: high onset energy would normally trigger peak/reactive overlays,
- * but we want sacred/cosmic geometry instead. The primal percussion should be
- * accompanied by inner-journey visuals, not party energy.
- * During Space: pure ambient/sparse — minimal overlays, maximum shader.
- */
-const DRUMS_SPACE_ADJUSTMENTS: Record<TextureGroup, number> = {
-  sacred:    +0.40,   // Sacred geometry dominates — mandalas, stealies, cosmic portals
-  wash:      +0.15,   // Atmospheric backgrounds welcome
-  reactive:  -0.30,   // Suppress reactive/geometric — this isn't a dance party
-  family:    -0.35,   // No dancing bears during Drums/Space — save them for songs
-  narrative: -0.50,   // No info overlays during the inner journey
-};
-
-/** Tag bonuses/penalties during post-peak grace windows */
-const POST_PEAK_TAG_BONUS: Record<string, number> = {
-  contemplative: +0.10,
-  intense:       -0.15,
-};
-
-// smoothstepEased defined above (Easing.inOut for overlay crossfades)
 
 /** Parse set number from trackId format "s{set}t{track}" */
 function parseSetNumber(trackId: string): number {
   const match = trackId.match(/^s(\d+)t/);
   return match ? parseInt(match[1], 10) : 1;
-}
-
-/** Resolve an overlay's category to a texture group */
-function resolveTextureGroup(category: string): TextureGroup | null {
-  if (AMBIENT_WASH.has(category)) return "wash";
-  if (COSMIC_SACRED.has(category)) return "sacred";
-  if (ENERGY_REACTIVE.has(category)) return "reactive";
-  if (DEAD_FAMILY.has(category)) return "family";
-  if (SHOW_NARRATIVE.has(category)) return "narrative";
-  return null;
 }
 
 // ─── Schedule Builder ───
@@ -339,44 +222,11 @@ export function buildRotationSchedule(
     ? allPoolEntries.filter((e) => !eraExcluded.has(e.name))
     : allPoolEntries;
 
-  // 3. Subdivide sections into energy-aware windows, aligned to section boundaries
-  const windows: RotationWindow[] = [];
-  for (const section of sections) {
-    const sectionLen = section.frameEnd - section.frameStart;
-    const targetWindowFrames = Math.round(
-      (WINDOW_FRAMES_BY_ENERGY[section.energy] ?? WINDOW_FRAMES_DEFAULT) * windowDurationScale,
-    );
-    const windowCount = Math.max(1, Math.round(sectionLen / targetWindowFrames));
-    const windowLen = Math.floor(sectionLen / windowCount);
+  // 3. Build windows from sections + mark dropout windows
+  const windows = buildWindowsFromSections(sections, windowDurationScale);
+  markDropoutWindows(windows);
 
-    for (let w = 0; w < windowCount; w++) {
-      const frameStart = section.frameStart + w * windowLen;
-      const frameEnd = w === windowCount - 1
-        ? section.frameEnd
-        : frameStart + windowLen;
-      windows.push({
-        frameStart,
-        frameEnd,
-        overlays: [], // filled below
-        energy: section.energy,
-      });
-    }
-  }
-
-  // 4. Identify pre-peak dropout windows
-  //    The last window before a jump to higher energy gets flagged.
-  //    This creates visual silence → climax contrast.
-  const energyRank: Record<string, number> = { low: 0, mid: 1, high: 2 };
-  for (let wi = 0; wi < windows.length - 1; wi++) {
-    const currentRank = energyRank[windows[wi].energy];
-    const nextRank = energyRank[windows[wi + 1].energy];
-    // Only dropout when jumping UP at least 1 level (low→mid, low→high, mid→high)
-    if (nextRank > currentRank) {
-      windows[wi].isDropout = true;
-    }
-  }
-
-  // 5. Select overlays per window
+  // 4. Select overlays per window
   let previousWindowOverlays = new Set<string>();
   let previousWindowFrames = 0;
   let previousWindowEnergy: string | null = null;
@@ -428,11 +278,15 @@ export function buildRotationSchedule(
       targetCount = Math.min(targetCount, dsMaxOverlays);
     }
 
-    // Stem section modulation: vocal sections get breathing room, solos let shader carry
+    // Stem section modulation: adjust overlay density by what the band is doing
     if (stemSectionType === "vocal") {
       targetCount = Math.max(0, targetCount - 1);
     } else if (stemSectionType === "solo") {
       targetCount = Math.min(targetCount, 1);
+    } else if (stemSectionType === "quiet") {
+      targetCount = Math.max(0, targetCount - 2);
+    } else if (stemSectionType === "jam") {
+      targetCount = Math.min(targetCount + 1, poolEntries.length);
     }
 
     // Cap at pool size
@@ -443,268 +297,31 @@ export function buildRotationSchedule(
       ? poolEntries.filter((e) => A_TIER_OVERLAY_NAMES.has(e.name))
       : poolEntries;
 
-    // Score each overlay for this window
-    const scored = effectivePool.map((entry) => {
-      let score = 0.5;
-
-      // Tier bonus: A-tier overlays get a scoring edge
-      if (entry.tier === "A") score += 0.15;
-
-      // Energy band match (registry default)
-      if (entry.energyBand !== "any") {
-        if (entry.energyBand === window.energy) {
-          score += 0.3;
-        } else {
-          const rank = { low: 0, mid: 1, high: 2 };
-          const dist = Math.abs(rank[entry.energyBand] - rank[window.energy]);
-          score -= dist * 0.15;
-        }
-      }
-
-      // Per-song energy phase hint (from Claude curation) — overrides registry default
-      // This is stronger than the registry energyBand because it's song-specific
-      const phaseHint = energyHints?.[entry.name];
-      if (phaseHint) {
-        if (phaseHint === window.energy) {
-          score += 0.35; // strong match — Claude says this overlay belongs here
-        } else {
-          const rank = { low: 0, mid: 1, high: 2 };
-          const dist = Math.abs(rank[phaseHint] - rank[window.energy]);
-          score -= dist * 0.20; // stronger penalty than registry mismatch
-        }
-      }
-
-      // Weight preference by energy
-      if (window.energy === "low" && entry.weight === 1) score += 0.2;
-      if (window.energy === "high" && entry.weight >= 2) score += 0.15;
-      if (window.energy === "low" && entry.weight === 3) score -= 0.25;
-
-      // Dropout windows: prefer atmospheric/sacred layers (1-2) — the quietest visuals
-      if (window.isDropout) {
-        if (entry.layer <= 2) score += 0.4;
-        else score -= 0.3;
-      }
-
-      // Texture × category routing (Dead-authentic):
-      // Sacred geometry for Space, bears for songs, festival energy at peaks
-      if (windowTexture) {
-        const group = resolveTextureGroup(entry.category);
-        if (group) {
-          score += TEXTURE_GROUP_SCORE[windowTexture]?.[group] ?? 0;
-
-          // Tag-based texture bonus: cosmic, psychedelic, festival, etc.
-          if (entry.tags) {
-            for (const tag of entry.tags) {
-              score += TAG_TEXTURE_BONUS[tag]?.[windowTexture] ?? 0;
-            }
-          }
-
-          // Set II deepening: more sacred/cosmic, fewer artifacts
-          if (setNumber >= 2) {
-            score += SET2_ADJUSTMENTS[group];
-          }
-
-          // Drums/Space: sacred geometry dominates, suppress reactive/family
-          if (isDrumsSpace) {
-            score += DRUMS_SPACE_ADJUSTMENTS[group];
-          }
-
-          // Stem-section scoring: tune overlay category to what's playing
-          if (stemSectionType) {
-            const stemGroup = resolveTextureGroup(entry.category);
-            if (stemGroup) {
-              if (stemSectionType === "vocal") {
-                // Vocals: breathing room, sacred/atmospheric shine
-                if (stemGroup === "wash") score += 0.10;
-                if (stemGroup === "sacred") score += 0.15;
-                if (stemGroup === "family") score -= 0.15;
-                if (stemGroup === "reactive") score -= 0.10;
-              } else if (stemSectionType === "solo") {
-                // Solo: character overlays shine
-                if (stemGroup === "family") score += 0.20;
-                if (stemGroup === "wash") score -= 0.10;
-              }
-            }
-          }
-
-          // Post-peak grace: after high→low/mid drop, favor sacred/contemplative
-          if (previousWindowEnergy === "high" && (window.energy === "low" || window.energy === "mid")) {
-            score += POST_PEAK_GRACE[group];
-            if (entry.tags) {
-              for (const tag of entry.tags) {
-                score += POST_PEAK_TAG_BONUS[tag] ?? 0;
-              }
-            }
-          }
-        }
-      }
-
-      // Scene-specific overlay bias: boost overlays that pair well with the shader
-      score += SCENE_OVERLAY_BIAS[mode ?? ""]?.[entry.name] ?? 0;
-
-      // Song identity overlay boost/suppress
-      if (songIdentity) {
-        if (songIdentity.overlayBoost?.includes(entry.name)) {
-          score += 0.30;
-        }
-        if (songIdentity.overlaySuppress?.includes(entry.name)) {
-          score -= 0.40;
-        }
-        // Mood keyword tag bonuses
-        if (songIdentity.moodKeywords && entry.tags) {
-          for (const tag of entry.tags) {
-            if (songIdentity.moodKeywords.includes(tag)) {
-              score += 0.15;
-            }
-          }
-        }
-      }
-
-      // Show arc overlay bias (per-category)
-      if (showArcModifiers?.overlayBias) {
-        const group = resolveTextureGroup(entry.category);
-        if (group) {
-          // Map texture groups to overlay categories for bias lookup
-          const categoryBias = showArcModifiers.overlayBias[entry.category];
-          if (categoryBias !== undefined) {
-            score += categoryBias;
-          }
-        }
-      }
-
-      // Carryover vs repeat: if previous window was too short for the overlay
-      // to register visually, encourage it to persist instead of penalizing
-      if (previousWindowOverlays.has(entry.name)) {
-        if (previousWindowFrames < MIN_WINDOW_FOR_ROTATION) {
-          score += CARRYOVER_BONUS;
-        } else {
-          score -= REPEAT_PENALTY;
-        }
-      }
-
-      // Deterministic jitter
-      score += rng() * 0.1;
-
-      return { entry, score };
-    });
-
-    // Sort by score descending
-    scored.sort((a, b) => b.score - a.score);
-
-    // ── Hero guarantee: reserve slots for concrete Dead-themed animated objects ──
-    // Without this, the scoring system picks abstract washes/geometry every time.
-    // Skip entirely when targetCount is 0 (peak/dropout = shader owns the moment).
-    const selected: OverlayEntry[] = [];
-    const selectedNames = new Set<string>();
-    const usedLayers = new Set<number>();
-
-    // Hero guarantee: prioritize always-on heroes first, then cycled heroes.
-    // Always-on heroes (dutyCycle 100) guarantee something is visible at every frame.
-    // Cycled heroes add variety when their internal timing aligns.
-    const heroScored = scored.filter((s) => HERO_OVERLAY_NAMES.has(s.entry.name));
-    const alwaysOnHeroes = heroScored.filter((s) => (s.entry.dutyCycle ?? 50) >= 80);
-    const cycledHeroes = heroScored.filter((s) => (s.entry.dutyCycle ?? 50) < 80);
-    const heroSlots = targetCount > 0 ? Math.min(1, heroScored.length) : 0;
-
-    // Pick at least 1 always-on hero first (guaranteed visibility)
-    let herosPicked = 0;
-    for (const hero of alwaysOnHeroes) {
-      if (herosPicked >= heroSlots) break;
-      if (!selectedNames.has(hero.entry.name) && !usedLayers.has(hero.entry.layer)) {
-        selected.push(hero.entry);
-        selectedNames.add(hero.entry.name);
-        usedLayers.add(hero.entry.layer);
-        herosPicked++;
-      }
-    }
-    // Fill remaining hero slots with cycled heroes for variety
-    for (const hero of cycledHeroes) {
-      if (herosPicked >= heroSlots) break;
-      if (!selectedNames.has(hero.entry.name) && !usedLayers.has(hero.entry.layer)) {
-        selected.push(hero.entry);
-        selectedNames.add(hero.entry.name);
-        usedLayers.add(hero.entry.layer);
-        herosPicked++;
-      }
-    }
-
-    // ── Duty-cycle-aware count adjustment ──
-    // If we're picking mostly cycled components (low duty cycle), pick more
-    // to compensate. Target: ~2-3 overlays visible at any given frame.
-    const TARGET_VISIBLE = 1;
-    const avgDutyCycle = selected.length > 0
-      ? selected.reduce((sum, e) => sum + (e.dutyCycle ?? 50), 0) / selected.length
-      : 50;
-    if (avgDutyCycle < 60 && !isDrumsSpace && !window.isDropout) {
-      const adjustedCount = Math.ceil(TARGET_VISIBLE / (avgDutyCycle / 100));
-      targetCount = Math.max(targetCount, Math.min(adjustedCount, poolEntries.length));
-    }
-
-    // ── Fill remaining slots with layer-diverse picks ──
-    const byLayer = new Map<number, typeof scored>();
-    for (const s of scored) {
-      if (selectedNames.has(s.entry.name)) continue;
-      const layerList = byLayer.get(s.entry.layer) ?? [];
-      layerList.push(s);
-      byLayer.set(s.entry.layer, layerList);
-    }
-
-    // Sort layers by their top candidate's score
-    const layerOrder = Array.from(byLayer.entries())
-      .map(([layer, candidates]) => ({ layer, topScore: candidates[0].score }))
-      .sort((a, b) => b.topScore - a.topScore);
-
-    // Pick one from each layer for diversity
-    const minLayers = Math.min(2, layerOrder.length, targetCount);
-    for (const { layer } of layerOrder) {
-      if (selected.length >= targetCount) break;
-      if (usedLayers.size >= minLayers && selected.length >= minLayers) break;
-
-      const candidates = byLayer.get(layer)!;
-      for (const c of candidates) {
-        if (!selectedNames.has(c.entry.name)) {
-          selected.push(c.entry);
-          selectedNames.add(c.entry.name);
-          usedLayers.add(c.entry.layer);
-          break;
-        }
-      }
-    }
-
-    // Fill remaining slots with tag diversity + category balance
-    // Penalize overlays with heavy tag overlap or duplicate categories
-    const selectedTags = new Set<string>();
-    const selectedCategories = new Map<string, number>();
-    for (const sel of selected) {
-      for (const tag of sel.tags) selectedTags.add(tag);
-      selectedCategories.set(sel.category, (selectedCategories.get(sel.category) ?? 0) + 1);
-    }
-    const diversitySorted = scored
-      .filter((s) => !selectedNames.has(s.entry.name))
-      .map((s) => {
-        let adjScore = s.score;
-        // Tag overlap penalty
-        let tagOverlap = 0;
-        for (const tag of s.entry.tags) {
-          if (selectedTags.has(tag)) tagOverlap++;
-        }
-        if (tagOverlap >= 2) adjScore -= 0.15 * (tagOverlap - 1);
-        // Category duplication penalty
-        const catCount = selectedCategories.get(s.entry.category) ?? 0;
-        if (catCount >= 1) adjScore -= 0.20 * catCount;
-        return { ...s, score: adjScore };
-      })
+    // Score each overlay for this window via extracted scoring module
+    const scoringCtx: ScoringContext = {
+      windowEnergy: window.energy,
+      windowTexture,
+      isDropout: window.isDropout ?? false,
+      previousWindowOverlays,
+      previousWindowFrames,
+      previousWindowEnergy,
+      setNumber,
+      isDrumsSpace: isDrumsSpace ?? false,
+      stemSectionType,
+      mode,
+      songIdentity,
+      showArcModifiers,
+      energyHints,
+    };
+    const scored = effectivePool
+      .map((entry) => ({ entry, score: scoreOverlayForWindow(entry, scoringCtx, rng) }))
       .sort((a, b) => b.score - a.score);
-    for (const s of diversitySorted) {
-      if (selected.length >= targetCount) break;
-      selected.push(s.entry);
-      selectedNames.add(s.entry.name);
-      for (const tag of s.entry.tags) selectedTags.add(tag);
-      selectedCategories.set(s.entry.category, (selectedCategories.get(s.entry.category) ?? 0) + 1);
-    }
+
+    // Select overlays via extracted selection module (hero guarantee + diversity)
+    const selected = selectOverlaysForWindow(scored, targetCount, isDrumsSpace ?? false, window.isDropout ?? false, poolEntries);
 
     window.overlays = selected.map((e) => e.name);
-    previousWindowOverlays = selectedNames;
+    previousWindowOverlays = new Set(selected.map((e) => e.name));
     previousWindowFrames = windowFrames;
     previousWindowEnergy = window.energy;
   }

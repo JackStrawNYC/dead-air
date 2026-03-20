@@ -40,6 +40,9 @@ uniform float uDrumOnset;
 uniform float uDrumBeat;
 uniform float uSpectralFlux;
 uniform float uSectionType;
+uniform float uMelodicPitch;
+uniform float uHarmonicTension;
+uniform float uBeatStability;
 
 attribute float aRadius;
 attribute float aTheta;
@@ -74,6 +77,8 @@ void main() {
   float bp = beatPulse(uMusicalTime);
   minorR *= 1.0 + max(uBeatSnap, uDrumBeat) * 0.20;
   minorR *= 1.0 + uOnsetSnap * 0.08 + uDrumOnset * 0.12;
+  // Melodic pitch lifts orbit radius (higher melody = wider nebula)
+  minorR *= 1.0 + clamp(uMelodicPitch, 0.0, 1.0) * 0.15;
 
   // Tempo-aware toroidal orbit (section-modulated)
   float orbitSpeed = (mix(0.02, 0.06, energy) + uMids * 0.04) * tempoScale * (1.0 + bp * 0.20) * orbitSpeedMod;
@@ -145,10 +150,15 @@ void main() {
   float ndotl = max(0.0, dot(norm, lightDir));
   float diffuse = ndotl * 0.7;
 
-  // Specular (Blinn-Phong)
+  // Specular (Blinn-Phong) — tension sharpens highlights
   vec3 halfVec = normalize(lightDir + viewDir);
+  float tension = clamp(uHarmonicTension, 0.0, 1.0);
   float specPow = 16.0 + uHighs * 32.0;
-  float spec = pow(max(0.0, dot(norm, halfVec)), specPow) * (0.3 + uHighs * 0.4);
+  float spec = pow(max(0.0, dot(norm, halfVec)), specPow) * (0.3 + uHighs * 0.4) * mix(0.7, 1.3, tension);
+
+  // Beat stability sharpens diffuse lighting (stable=crisp, unstable=soft)
+  float beatStab = clamp(uBeatStability, 0.0, 1.0);
+  diffuse *= mix(0.7, 1.0, beatStab);
 
   // Ambient
   float ambient = 0.15 + vEnergy * 0.1;

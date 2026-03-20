@@ -100,6 +100,8 @@ void main() {
   float tension = clamp(uHarmonicTension, 0.0, 1.0);
   float stemBass = clamp(uStemBass, 0.0, 1.0);
   float chromaHueMod = uChromaHue * 0.05;
+  float melodicPitch = clamp(uMelodicPitch, 0.0, 1.0);
+  float beatStability = clamp(uBeatStability, 0.0, 1.0);
 
   float slowTime = uDynamicTime * 0.03;
 
@@ -127,7 +129,7 @@ void main() {
   // --- Magma layer (underneath) ---
   float magmaNoise = fbm6(vec3(flowP * 3.0, slowTime * 0.5));
   float magmaPressure = (bass * 0.6 + energy * 0.4) * magmaPressureMod;
-  float magmaTemp = magmaNoise * 0.5 + magmaPressure * 0.5;
+  float magmaTemp = magmaNoise * 0.5 + magmaPressure * 0.5 + melodicPitch * 0.15;
   magmaTemp = clamp(magmaTemp, 0.0, 1.0);
 
   float hueShift = uPalettePrimary - 0.0 + chromaHueMod;
@@ -135,7 +137,7 @@ void main() {
 
   // --- Crust layer ---
   float edgeDist;
-  float crustScale = (4.0 + tension * 3.0) * crackFreqMod;
+  float crustScale = (4.0 + tension * 3.0) * crackFreqMod * mix(0.8, 1.2, beatStability);
   float crustCell = voronoi(flowP * crustScale + slowTime * 0.1, edgeDist);
 
   // Cracks: thin lines between voronoi cells

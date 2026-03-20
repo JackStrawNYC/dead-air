@@ -110,6 +110,7 @@ void main() {
   float tensionTurb = uHarmonicTension * 0.3;
   float chordHue = float(int(uChordIndex)) / 24.0 * 0.15;
   float localTempoScale = uLocalTempo / 120.0;
+  float beatStability = clamp(uBeatStability, 0.0, 1.0);
 
   // === SLOW TIME: aurora should never feel rushed ===
   float slowTime = uDynamicTime * 0.08;
@@ -182,8 +183,8 @@ void main() {
     // Constrain to aurora band (skip steps outside)
     if (pos.y < bandLow || pos.y > bandHigh) continue;
 
-    // Curtain sway from bass
-    float swayAmt = bass * 0.4 + uFastBass * 0.25;
+    // Curtain sway from bass (dampened by beat stability: tight groove=steady curtains)
+    float swayAmt = (bass * 0.4 + uFastBass * 0.25) * mix(1.0, 0.4, beatStability);
     pos.x += swayAmt * sin(pos.y * 2.0 + slowTime * 0.5);
     pos.z += swayAmt * 0.5 * cos(pos.y * 1.5 + slowTime * 0.3);
 

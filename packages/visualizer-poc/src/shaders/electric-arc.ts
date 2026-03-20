@@ -92,6 +92,7 @@ void main() {
   float melodicPitch = clamp(melInfluence, 0.0, 1.0);
   float stability = clamp(uBeatStability, 0.0, 1.0);
   float vocalPres = clamp(uVocalPresence, 0.0, 1.0);
+  float tension = clamp(uHarmonicTension, 0.0, 1.0);
 
   // 7-band spectral: sub, low, low-mid, mid, upper-mid, presence, brilliance
   float fftBass = texture2D(uFFTTexture, vec2(0.07, 0.5)).r;
@@ -114,7 +115,7 @@ void main() {
   // --- Arc parameters (section-modulated, FFT-driven) ---
   // FFT bass → arc thickness, FFT mids → branching, FFT highs → flash intensity
   float arcThickness = 0.004 + bass * 0.008 + sJam * 0.003 + fftBass * 0.004;
-  float chaos = mix(0.5, 2.0, 1.0 - stability) + sectionChaosMod + fftMid * 0.3;
+  float chaos = mix(0.5, 2.0, 1.0 - stability) + sectionChaosMod + fftMid * 0.3 + tension * 0.4;
 
   // --- Number of arcs from energy + drum onset (section-modulated) ---
   float arcDensity = 1.0 + uJamDensity * 0.5;

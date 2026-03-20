@@ -226,31 +226,42 @@ export const MultiPassQuad: React.FC<Props> = ({
     fftTextureRef.current.needsUpdate = true;
   }
 
-  // Render targets: A + B for ping-pong, optional feedback buffer
-  const targets = useMemo(() => {
+  // Render targets: A + B for ping-pong, optional feedback buffer.
+  // Uses useRef + useEffect so old targets dispose BEFORE new ones allocate,
+  // preventing ~235MB GPU VRAM spike on resolution changes (e.g. 1080p→4K).
+  const targetsRef = useRef<{
+    a: THREE.WebGLRenderTarget;
+    b: THREE.WebGLRenderTarget;
+    feedback: THREE.WebGLRenderTarget | null;
+  } | null>(null);
+
+  useEffect(() => {
+    // Dispose old targets first (before allocating new ones)
+    if (targetsRef.current) {
+      targetsRef.current.a.dispose();
+      targetsRef.current.b.dispose();
+      targetsRef.current.feedback?.dispose();
+    }
     const opts: THREE.RenderTargetOptions = {
       type: THREE.HalfFloatType,
       minFilter: THREE.LinearFilter,
       magFilter: THREE.LinearFilter,
       format: THREE.RGBAFormat,
     };
-    return {
+    targetsRef.current = {
       a: new THREE.WebGLRenderTarget(width, height, opts),
       b: new THREE.WebGLRenderTarget(width, height, opts),
       feedback: feedback
         ? new THREE.WebGLRenderTarget(width, height, opts)
         : null,
     };
-  }, [width, height, feedback]);
-
-  // Cleanup render targets
-  useEffect(() => {
     return () => {
-      targets.a.dispose();
-      targets.b.dispose();
-      targets.feedback?.dispose();
+      targetsRef.current?.a.dispose();
+      targetsRef.current?.b.dispose();
+      targetsRef.current?.feedback?.dispose();
+      targetsRef.current = null;
     };
-  }, [targets]);
+  }, [width, height, feedback]);
 
   // Camera for offscreen rendering
   const camera = useMemo(
@@ -438,6 +449,9 @@ export const MultiPassQuad: React.FC<Props> = ({
   useFrame(() => {
     // Gap detection: reset feedback on non-sequential frames (Remotion seeking)
     const gap = Math.abs(currentFrame - lastRenderedFrame.current) > 1;
+    const targets = targetsRef.current;
+    if (!targets) return;
+
     if (feedback && gap && targets.feedback) {
       gl.setRenderTarget(targets.feedback);
       gl.clear();
