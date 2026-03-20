@@ -174,10 +174,12 @@ describe("getOverlayOpacities", () => {
   it("returns opacity 1 at window midpoint (no crossfade)", () => {
     const sections = makeSections([{ start: 0, end: 1800, energy: "mid" }]);
     const schedule = buildRotationSchedule(TEST_OVERLAYS, sections, "s1t01");
-    const midFrame = 900;
+    // Pick a frame clearly in the middle of the first window (not at a boundary)
+    const firstWindow = schedule.windows[0];
+    const midFrame = Math.floor((firstWindow.frameStart + firstWindow.frameEnd) / 2);
     const opacities = getOverlayOpacities(midFrame, schedule);
     // All assigned overlays should be at full opacity mid-window
-    for (const name of schedule.windows[0]?.overlays ?? []) {
+    for (const name of firstWindow?.overlays ?? []) {
       expect(opacities[name]).toBe(1);
     }
   });

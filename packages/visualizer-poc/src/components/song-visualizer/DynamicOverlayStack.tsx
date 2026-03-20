@@ -16,7 +16,7 @@ import { SilentErrorBoundary } from "../SilentErrorBoundary";
 import { SongPaletteProvider } from "../../data/SongPaletteContext";
 import { TempoProvider } from "../../data/TempoContext";
 import type { EnhancedFrameData, ColorPalette } from "../../data/types";
-import { A_TIER_OVERLAY_NAMES } from "../../data/overlay-rotation";
+
 
 const OVERLAY_GATE_END = 180;  // 6s — overlays hidden until intro elements clear
 
@@ -31,9 +31,9 @@ interface OverlayComponentEntry {
  *  Pre-peak dropout strips to void → peaks flood with A-tier density.
  *  The contrast between silence and flood creates the visceral impact. */
 const MAX_CONCURRENT: Record<string, number> = {
-  quiet: 2,
-  mid: 4,
-  peak: 6,
+  quiet: 3,
+  mid: 6,
+  peak: 10,
 };
 
 interface Props {
@@ -92,8 +92,6 @@ export const DynamicOverlayStack: React.FC<Props> = ({
       return { name, entry, opacity: op };
     })
     .filter((o) => o.opacity > 0.01)
-    // At peak energy, only A-tier overlays (iconic Dead imagery) are allowed
-    .filter((o) => energyLevel !== "peak" || A_TIER_OVERLAY_NAMES.has(o.name))
     .sort((a, b) => b.opacity - a.opacity)
     .slice(0, maxConcurrent);
 

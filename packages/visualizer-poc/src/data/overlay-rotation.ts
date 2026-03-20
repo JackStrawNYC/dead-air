@@ -37,7 +37,14 @@ import type { StemSectionType } from "../utils/stem-features";
 
 // Eased crossfade function: replaces linear smoothstep with Remotion's
 // Easing.inOut(Easing.ease) for more organic overlay transitions.
-const easedCrossfade = Easing.inOut(Easing.ease);
+// Fallback to cubic smoothstep if Remotion Easing isn't available (vitest).
+const easedCrossfade = (() => {
+  try {
+    const fn = Easing.inOut(Easing.ease);
+    if (typeof fn === "function") return fn;
+  } catch { /* vitest environment */ }
+  return (t: number) => t * t * (3 - 2 * t); // smoothstep fallback
+})();
 function smoothstepEased(edge0: number, edge1: number, x: number): number {
   const t = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)));
   return easedCrossfade(t);
@@ -99,9 +106,9 @@ const ACCENT_CONFIG: Record<string, AccentConfig | null> = {
  * Peaks rotate faster for visual energy.
  */
 const WINDOW_FRAMES_BY_ENERGY: Record<string, number> = {
-  low:  3600,  // 2 minutes — prevents 3-minute single-overlay stagnation
-  mid:  2100,  // 70 seconds — tighter rotation for visual variety
-  high: 1500,  // 50 seconds — energetic but not jarring
+  low:  1800,  // 1 minute — faster rotation for visual variety
+  mid:  1200,  // 40 seconds — snappy rotation
+  high: 900,   // 30 seconds — energetic turnover
 };
 const WINDOW_FRAMES_DEFAULT = 900;
 
@@ -111,9 +118,9 @@ const WINDOW_FRAMES_DEFAULT = 900;
  * Matches the tempo of the music's own dynamics.
  */
 const CROSSFADE_FRAMES_BY_ENERGY: Record<string, number> = {
-  low:  270,   // 9 seconds — glacial tides
-  mid:  120,   // 4 seconds — snappier transitions
-  high: 60,    // 2 seconds — fast crossfade at peaks
+  low:  150,   // 5 seconds — organic tides
+  mid:  90,    // 3 seconds — snappy transitions
+  high: 45,    // 1.5 seconds — fast crossfade at peaks
 };
 const CROSSFADE_FRAMES_DEFAULT = 120;
 
@@ -133,9 +140,9 @@ const CROSSFADE_FRAMES_DEFAULT = 120;
  * dropout silence and peak flood creates the show's visceral impact.
  */
 const ENERGY_COUNTS: Record<string, { min: number; max: number }> = {
-  low:  { min: 1,  max: 1 },   // quiet: one gentle wash, nothing more
-  mid:  { min: 1,  max: 2 },   // moderate: one or two at most
-  high: { min: 2,  max: 3 },   // peaks: flood with 2-3 A-tier overlays after dropout void
+  low:  { min: 1,  max: 2 },   // quiet: gentle wash with optional second layer
+  mid:  { min: 2,  max: 3 },   // moderate: two or three for texture depth
+  high: { min: 3,  max: 5 },   // peaks: flood with A-tier overlays after dropout void
 };
 
 /** A-tier overlays: the only overlays allowed during peaks (high energy).
@@ -157,7 +164,7 @@ export const HERO_OVERLAY_NAMES = new Set(BAND_CONFIG.heroOverlays);
 const REPEAT_PENALTY = 0.6;
 
 /** Score bonus for overlays from a short previous window (encourages persistence) */
-const CARRYOVER_BONUS = 0.4;
+const CARRYOVER_BONUS = 0.2;
 
 /** Windows shorter than this get carryover instead of repeat-penalty (30 seconds) */
 const MIN_WINDOW_FOR_ROTATION = 900;

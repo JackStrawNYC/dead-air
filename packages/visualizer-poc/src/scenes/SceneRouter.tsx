@@ -695,12 +695,14 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
   const climaxForceDual = (climaxPhaseProp !== undefined && climaxPhaseProp >= 2 && climaxPhaseProp <= 3 && frameEnergy > 0.08)
     || (currentSection?.energy === "high" && frameEnergy > 0.12);
 
-  // Dual-shader activation: any section with sufficient length + energy, jam/solo stem, or set 2+
-  const shouldDual = climaxForceDual || (sectionLen >= AUTO_VARIETY_MIN_SECTION && (
-    frameEnergy > 0.06 ||
-    stemSection === "jam" || stemSection === "solo" ||
-    (setNumber !== undefined && setNumber >= 2)
-  ));
+  // Cooldown: every 3rd section forced single for visual contrast
+  const dualCooldown = currentSectionIdx > 0 && currentSectionIdx % 3 === 0;
+
+  // Dual-shader activation: sufficient length + moderate energy, or jam/solo stem
+  const shouldDual = !dualCooldown && (climaxForceDual || (sectionLen >= 600 && (
+    frameEnergy > 0.12 ||
+    stemSection === "jam" || stemSection === "solo"
+  )));
   if (shouldDual) {
     // Prefer transition affinity pool for secondary shader selection
     const affinityPool = TRANSITION_AFFINITY[currentMode];
@@ -720,7 +722,7 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
       const sectionProgress = currentSection
         ? (frame - currentSection.frameStart) / Math.max(1, sectionLen)
         : 0;
-      const blendProgress = 0.25 + frameEnergy * 0.20 + Math.sin(sectionProgress * Math.PI) * 0.08;
+      const blendProgress = 0.20 + frameEnergy * 0.25 + Math.sin(sectionProgress * Math.PI) * 0.10;
 
       mainScene = (
         <DualShaderScene

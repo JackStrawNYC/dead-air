@@ -49,9 +49,9 @@ interface Props {
 
 const QUIET_SCALE = 1.12;
 const PEAK_SCALE = 1.02;
-const SHAKE_PX = 15;
-const SHAKE_DECAY_FRAMES = 12;
-const TILT_DEG = 4.0;         // Max rotational tilt on bass kicks
+const SHAKE_PX = 40;
+const SHAKE_DECAY_FRAMES = 24;
+const TILT_DEG = 6.0;         // Max rotational tilt on bass kicks
 const TILT_DECAY_FRAMES = 10; // Exponential decay for tilt
 
 /** Phase-driven camera parameters for long jams */
@@ -152,6 +152,13 @@ export const CameraMotion: React.FC<Props> = ({ frames, children, jamEvolution, 
   const steadinessDampen = 1 - cameraSteadiness * 0.8;
   shakeX *= steadinessDampen;
   shakeY *= steadinessDampen;
+
+  // Secondary harmonic: cross-modulated frequency for richer, less robotic motion
+  if (Math.abs(shakeX) + Math.abs(shakeY) > 0.5) {
+    const harmDir = shakeHash(idx + 5501);
+    shakeX += harmDir.x * SHAKE_PX * 0.25 * Math.sin(frame * 0.057 * Math.PI * 2) * egate;
+    shakeY += harmDir.y * SHAKE_PX * 0.25 * Math.cos(frame * 0.057 * Math.PI * 2) * egate;
+  }
 
   // Onset jolt: sharp camera punch on transient attacks (prefer stemDrumOnset when available)
   const ONSET_JOLT_PX = 8;

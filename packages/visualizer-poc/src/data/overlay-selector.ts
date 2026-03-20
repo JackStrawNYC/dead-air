@@ -51,7 +51,7 @@ const RECENCY_PENALTIES = [0.70, 0.55, 0.40, 0.30, 0.20, 0.12, 0.06, 0.03];
 const MAX_FREQUENCY_RATIO = 0.25;
 
 /** Score penalty when an overlay exceeds the frequency cap */
-const FREQUENCY_CAP_PENALTY = 0.35;
+const FREQUENCY_CAP_PENALTY = 0.50;
 
 /**
  * Cross-song memory for variety enforcement.
@@ -326,8 +326,8 @@ function scoreOverlay(
     }
   }
 
-  // Deterministic jitter (0-0.08)
-  score += rng() * 0.08;
+  // Deterministic jitter (0-0.15) — wider spread for more per-song randomization
+  score += rng() * 0.15;
 
   return Math.max(0, Math.min(1, score));
 }

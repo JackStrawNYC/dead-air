@@ -94,6 +94,7 @@ import { IntroQuote } from "./components/IntroQuote";
 import { LyricFragment } from "./components/LyricFragment";
 import { WaveformOverlay } from "./components/WaveformOverlay";
 import { GuitarStrings } from "./components/GuitarStrings";
+import { MeshDeformationGrid } from "./components/MeshDeformationGrid";
 
 // Extracted sub-components
 import { SongArtLayer } from "./components/song-visualizer/SongArtLayer";
@@ -624,6 +625,18 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
             })()}
           </SilentErrorBoundary>
           </div>
+
+          {introFactor > 0.5 && !isDeadAir && (
+            <SilentErrorBoundary name="MeshDeformationGrid">
+              <MeshDeformationGrid
+                frames={f}
+                sections={sections}
+                palette={effectivePalette}
+                tempo={tempo}
+                opacity={focusState.shaderOpacity * introFactor * (0.3 + audioSnapshot.energy * 0.7)}
+              />
+            </SilentErrorBoundary>
+          )}
 
           {effectiveSongArt && (
             <SilentErrorBoundary name="SongArt">
