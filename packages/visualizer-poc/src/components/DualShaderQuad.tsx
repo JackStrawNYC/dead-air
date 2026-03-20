@@ -90,7 +90,7 @@ function createSceneUniforms(width: number, height: number): Record<string, THRE
     uEnergyAccel: { value: 0 }, uEnergyTrend: { value: 0 }, uLocalTempo: { value: 120 },
     uFFTTexture: { value: new THREE.DataTexture(new Uint8Array(64), 64, 1, THREE.RedFormat) },
     uMelodicPitch: { value: 0 }, uMelodicDirection: { value: 0 },
-    uChordIndex: { value: 0 }, uHarmonicTension: { value: 0 },
+    uChordIndex: { value: 0 }, uHarmonicTension: { value: 0 }, uChordConfidence: { value: 0.5 },
     uSectionType: { value: 5 }, uEnergyForecast: { value: 0 },
     uPeakApproaching: { value: 0 }, uBeatStability: { value: 0.5 },
     uImprovisationScore: { value: 0 },
@@ -177,6 +177,7 @@ function syncUniforms(
   u.uMelodicDirection.value = smooth.melodicDirection;
   u.uChordIndex.value = smooth.chordIndex;
   u.uHarmonicTension.value = smooth.harmonicTension;
+  u.uChordConfidence.value = smooth.chordConfidence;
   u.uSectionType.value = smooth.sectionTypeFloat;
   u.uEnergyForecast.value = smooth.energyForecast;
   u.uPeakApproaching.value = smooth.peakApproaching;

@@ -88,6 +88,7 @@ uniform float uMelodicPitch;
 uniform float uMelodicDirection;
 uniform float uChordIndex;
 uniform float uHarmonicTension;
+uniform float uChordConfidence;
 uniform float uSectionType;
 uniform float uEnergyForecast;
 uniform float uPeakApproaching;

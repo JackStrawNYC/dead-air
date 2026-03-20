@@ -81,6 +81,8 @@ export interface AudioSnapshot {
   chordIndex: number;
   /** Harmonic tension: rate of chord change (0-1) */
   harmonicTension: number;
+  /** Chord detection confidence (0-1) */
+  chordConfidence: number;
   /** Section type label (verse, chorus, bridge, solo, jam, intro, outro) */
   sectionType: string;
 }
@@ -485,6 +487,7 @@ export function computeAudioSnapshot(
     melodicDirection: gaussianSmooth(frames, idx, (f) => f.melodicDirection ?? 0, 5),
     chordIndex: frames[idx].chordIndex ?? 0,
     harmonicTension: gaussianSmooth(frames, idx, (f) => f.harmonicTension ?? 0, 15),
+    chordConfidence: gaussianSmooth(frames, idx, (f) => f.chordConfidence ?? 0.5, 10),
     sectionType: frames[idx].sectionType ?? "jam",
   };
 }

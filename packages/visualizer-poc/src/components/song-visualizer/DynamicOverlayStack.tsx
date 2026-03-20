@@ -140,6 +140,7 @@ export const DynamicOverlayStack: React.FC<Props> = ({
             pointerEvents: "none",
             mixBlendMode: "screen",
             filter: desatFilter,
+            contain: "layout style paint",
           }}
         >
           {glslOverlays.map(({ name, entry: { Component }, opacity }) => (
@@ -150,6 +151,8 @@ export const DynamicOverlayStack: React.FC<Props> = ({
                 inset: 0,
                 opacity,
                 pointerEvents: "none",
+                contain: "layout style paint",
+                willChange: "opacity",
               }}
             >
               <Suspense fallback={null}>
@@ -172,6 +175,7 @@ export const DynamicOverlayStack: React.FC<Props> = ({
             hueRotation !== 0 ? `hue-rotate(${hueRotation.toFixed(1)}deg)` : "",
             desatFilter ?? "",
           ].filter(Boolean).join(" ") || undefined,
+          contain: "layout style paint",
         }}
       >
         {domOverlays.map(({ name, entry: { Component, blendMode, layer }, opacity }) => {
@@ -192,6 +196,8 @@ export const DynamicOverlayStack: React.FC<Props> = ({
               pointerEvents: "none",
               mixBlendMode: blendMode ?? "screen",
               transform: applyParallax ? `translate(${parallaxX.toFixed(2)}px, ${parallaxY.toFixed(2)}px)` : undefined,
+              contain: "layout style paint",
+              willChange: "opacity, transform",
             }}
           >
             <Suspense fallback={null}>

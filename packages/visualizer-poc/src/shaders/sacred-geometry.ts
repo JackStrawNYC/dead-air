@@ -84,7 +84,8 @@ void main() {
 
   // --- Uniform integrations ---
   float chromaHueMod = uChromaHue * 0.3;
-  float chordHue = float(int(uChordIndex)) / 24.0 * 0.12;
+  float chordConf = smoothstep(0.3, 0.6, uChordConfidence);
+  float chordHue = float(int(uChordIndex)) / 24.0 * 0.12 * chordConf;
   float vocalGlow = uVocalEnergy * 0.1;
 
   // --- Background ---

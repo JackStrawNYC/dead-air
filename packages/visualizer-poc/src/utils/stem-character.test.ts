@@ -38,6 +38,7 @@ function makeSnapshot(overrides: Partial<AudioSnapshot> = {}): AudioSnapshot {
     melodicDirection: 0,
     chordIndex: 0,
     harmonicTension: 0.2,
+    chordConfidence: 0.5,
     sectionType: "verse",
     ...overrides,
   };

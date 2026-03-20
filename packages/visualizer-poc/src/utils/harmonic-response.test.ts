@@ -56,6 +56,7 @@ function mockSnapshot(overrides: Partial<AudioSnapshot> = {}): AudioSnapshot {
     melodicDirection: 0,
     chordIndex: 0,
     harmonicTension: 0.3,
+    chordConfidence: 0.5,
     sectionType: "jam",
     ...overrides,
   };

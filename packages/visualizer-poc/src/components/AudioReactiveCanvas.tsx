@@ -91,6 +91,8 @@ export interface AudioDataContext {
     chordIndex: number;
     /** Harmonic tension: rate of chord change (0-1) */
     harmonicTension: number;
+    /** Chord detection confidence (0-1) */
+    chordConfidence: number;
     /** Section type encoded as float (0-7) */
     sectionTypeFloat: number;
     /** Energy forecast: smoothed future energy (0-1) */
@@ -409,6 +411,7 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
   const melodicDirection = smoothValue(frames, idx, (f) => f.melodicDirection ?? 0, 5);
   const chordIndex = frames[idx].chordIndex ?? 0; // discrete, no smoothing
   const harmonicTension = smoothValue(frames, idx, (f) => f.harmonicTension ?? 0, 15);
+  const chordConfidence = smoothValue(frames, idx, (f) => f.chordConfidence ?? 0.5, 10);
   const sectionTypeFloat = encodeSectionType(frames[idx].sectionType ?? "jam");
   const energyForecast = computeEnergyForecast(frames, idx);
   const peakApproaching = computePeakApproaching(frames, idx);
@@ -458,6 +461,7 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
       melodicDirection,
       chordIndex,
       harmonicTension,
+      chordConfidence,
       sectionTypeFloat,
       energyForecast,
       peakApproaching,

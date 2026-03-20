@@ -165,6 +165,7 @@ function createBaseUniforms(
     uMelodicDirection: { value: 0 },
     uChordIndex: { value: 0 },
     uHarmonicTension: { value: 0 },
+    uChordConfidence: { value: 0.5 },
     uSectionType: { value: 5 },
     uEnergyForecast: { value: 0 },
     uPeakApproaching: { value: 0 },
@@ -379,6 +380,7 @@ export const MultiPassQuad: React.FC<Props> = ({
   u.uMelodicDirection.value = smooth.melodicDirection;
   u.uChordIndex.value = smooth.chordIndex;
   u.uHarmonicTension.value = smooth.harmonicTension;
+  u.uChordConfidence.value = smooth.chordConfidence;
   u.uSectionType.value = smooth.sectionTypeFloat;
   u.uEnergyForecast.value = smooth.energyForecast;
   u.uPeakApproaching.value = smooth.peakApproaching;

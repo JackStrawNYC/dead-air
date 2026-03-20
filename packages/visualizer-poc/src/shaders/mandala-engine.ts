@@ -131,7 +131,8 @@ void main() {
   pattern *= falloff;
 
   // ─── Color from palette + chroma hue + chord hue ───
-  float chordHue = float(int(uChordIndex)) / 24.0 * 0.12;
+  float chordConf = smoothstep(0.3, 0.6, uChordConfidence);
+  float chordHue = float(int(uChordIndex)) / 24.0 * 0.12 * chordConf;
   float peakGlow = clamp(uPeakApproaching, 0.0, 1.0);
   float hue1 = hsvToCosineHue(uPalettePrimary) + uChromaHue * 0.15 + chordHue;
   float hue2 = hsvToCosineHue(uPaletteSecondary) + uChromaShift * 0.1 + chordHue * 0.5;

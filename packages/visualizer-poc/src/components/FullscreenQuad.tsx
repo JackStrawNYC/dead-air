@@ -135,6 +135,7 @@ export const FullscreenQuad: React.FC<Props> = ({
       uMelodicDirection: { value: 0 },
       uChordIndex: { value: 0 },
       uHarmonicTension: { value: 0 },
+      uChordConfidence: { value: 0.5 },
       uSectionType: { value: 5 },
       uEnergyForecast: { value: 0 },
       uPeakApproaching: { value: 0 },
@@ -221,6 +222,7 @@ export const FullscreenQuad: React.FC<Props> = ({
   uniforms.uMelodicDirection.value = smooth.melodicDirection;
   uniforms.uChordIndex.value = smooth.chordIndex;
   uniforms.uHarmonicTension.value = smooth.harmonicTension;
+  uniforms.uChordConfidence.value = smooth.chordConfidence;
   uniforms.uSectionType.value = smooth.sectionTypeFloat;
   uniforms.uEnergyForecast.value = smooth.energyForecast;
   uniforms.uPeakApproaching.value = smooth.peakApproaching;

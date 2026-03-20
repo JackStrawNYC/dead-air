@@ -40,6 +40,14 @@ export interface PostProcessConfig {
   thermalShimmerEnabled?: boolean;
   /** Depth of field radial blur from uCamDof. Default: false */
   dofEnabled?: boolean;
+  /** Lens barrel distortion. Default: true */
+  lensDistortionEnabled?: boolean;
+  /** Beat-locked micro-displacement jolt. Default: true */
+  beatJoltEnabled?: boolean;
+  /** Light leak warm amber glow. Default: true */
+  lightLeakEnabled?: boolean;
+  /** Era brightness + sepia grading. Default: true */
+  eraGradingEnabled?: boolean;
 }
 
 export function buildPostProcessGLSL(config: PostProcessConfig = {}): string {
@@ -57,6 +65,10 @@ export function buildPostProcessGLSL(config: PostProcessConfig = {}): string {
     paletteCycleEnabled = false,
     thermalShimmerEnabled = false,
     dofEnabled = false,
+    lensDistortionEnabled = true,
+    beatJoltEnabled = true,
+    lightLeakEnabled = true,
+    eraGradingEnabled = true,
   } = config;
 
   // Grain intensity expression
@@ -92,14 +104,23 @@ ${
 `
     : ""
 }
-  // Lens distortion: barrel curvature driven by uLensDistortion uniform
+${
+  lensDistortionEnabled
+    ? `  // Lens distortion: barrel curvature driven by uLensDistortion uniform
   uv = barrelDistort(uv, uLensDistortion);
   p = (uv - 0.5) * vec2(uResolution.x / uResolution.y, 1.0);
-
-  // Beat-locked micro-displacement: the whole frame SNAPS on confident beats
+`
+    : ""
+}
+${
+  beatJoltEnabled
+    ? `  // Beat-locked micro-displacement: the whole frame SNAPS on confident beats
   float beatJolt = beatPulse(uMusicalTime) * smoothstep(0.4, 0.8, uBeatConfidence) * 0.003;
   uv += vec2(beatJolt * sin(uMusicalTime * 6.28), beatJolt * cos(uMusicalTime * 3.14));
   p = (uv - 0.5) * vec2(uResolution.x / uResolution.y, 1.0);
+`
+    : ""
+}
 
   // Climax reactivity
   float isClimax = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5);
@@ -150,8 +171,13 @@ ${
 `
     : ""
 }
-  // Light leak: warm amber glow (scaled by grading intensity)
+${
+  lightLeakEnabled
+    ? `  // Light leak: warm amber glow (scaled by grading intensity)
   col += lightLeak(p, uDynamicTime, energy, uOnsetSnap) * gi;
+`
+    : ""
+}
 
 ${
   flareEnabled
@@ -276,7 +302,9 @@ ${
     col *= vec3(1.0 + w, 1.0, 1.0 - w);
   }
 
-  // Era brightness: per-era brightness adjustment (moved from CSS to GLSL)
+${
+  eraGradingEnabled
+    ? `  // Era brightness: per-era brightness adjustment (moved from CSS to GLSL)
   col *= uEraBrightness;
 
   // Era sepia tint: warm desaturation (moved from CSS sepia filter to GLSL)
@@ -289,6 +317,9 @@ ${
     );
     col = mix(col, sepiaColor, uEraSepia);
   }
+`
+    : ""
+}
 
 ${
   paletteCycleEnabled

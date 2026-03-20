@@ -64,10 +64,17 @@ void main() {
   float tension = clamp(uHarmonicTension, 0.0, 1.0);
   float pitch = clamp(uMelodicPitch, 0.0, 1.0);
 
+  // Section-type gates
+  float sectionT = uSectionType;
+  float sJam = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
+  float sSpace = smoothstep(6.5, 7.5, sectionT);
+  float sChorus = smoothstep(1.5, 2.5, sectionT) * (1.0 - step(2.5, sectionT));
+  float sSolo = smoothstep(3.5, 4.5, sectionT) * (1.0 - step(4.5, sectionT));
+
   float isClimax = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5);
   float climaxBoost = isClimax * clamp(uClimaxIntensity, 0.0, 1.0);
 
-  float flowTime = uDynamicTime * (0.03 + slowE * 0.02);
+  float flowTime = uDynamicTime * (0.03 + slowE * 0.02) * (1.0 + sJam * 0.5 - sSpace * 0.4);
 
   // === PALETTE ===
   float hue1 = hsvToCosineHue(uPalettePrimary);
@@ -83,7 +90,7 @@ void main() {
   vec3 nebulaBaseColor = mix(lowTensionColor, highTensionColor, tension);
 
   // Pitch → nebula scale (high pitch = fine detail, low = broad)
-  float nebulaScale = mix(0.4, 1.2, 1.0 - pitch);
+  float nebulaScale = mix(0.4, 1.2, 1.0 - pitch) * (1.0 + sJam * 0.3 - sSpace * 0.3 + sSolo * 0.2);
 
   // === RAY SETUP (from 3D camera uniforms) ===
   vec3 ro, rd;
@@ -112,7 +119,8 @@ void main() {
 
     float density = ridged * 0.6 + broad * 0.4;
 
-    // Bass density boost
+    // Bass density boost + section modulation
+    density += sJam * 0.15 - sSpace * 0.1;
     density *= 0.6 + bass * 0.5;
 
     // Drum onset flash
@@ -124,7 +132,7 @@ void main() {
       float alpha = density * (1.0 - nebulaAlpha);
 
       // Emission color varies with depth and ridged pattern
-      vec3 emission = mix(nebulaBaseColor, emissionTint * 0.8, ridged * tension);
+      vec3 emission = mix(nebulaBaseColor, emissionTint * 0.8, ridged * tension) * (1.0 + sChorus * 0.25);
 
       // Self-illumination: denser regions glow
       emission *= (1.0 + density * 8.0 * energy);
