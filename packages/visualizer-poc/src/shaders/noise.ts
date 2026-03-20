@@ -196,7 +196,7 @@ vec3 stageFloodFill(vec3 col, vec2 uv, float time, float energy, float palHue1, 
   if (gate < 0.01) return col;
   // Darkness mask: tighter range so flood only fills truly dark pixels
   float luma = dot(col, vec3(0.299, 0.587, 0.114));
-  float darkness = smoothstep(0.35, 0.05, luma);
+  float darkness = smoothstep(0.15, 0.02, luma);
   if (darkness < 0.01) return col;
   // Three-layer flowing noise: organic patterns
   float slowT = time * 0.12;
@@ -216,7 +216,7 @@ vec3 stageFloodFill(vec3 col, vec2 uv, float time, float energy, float palHue1, 
   vec3 floodColor = mix(c1, c2, pattern * 0.5 + 0.5);
   floodColor = mix(floodColor, c3, 0.15 + pattern * 0.1);
   // Energy-scaled brightness: quiet=0.65, loud=0.85
-  floodColor *= mix(0.65, 0.85, gate);
+  floodColor *= mix(0.35, 0.55, gate);
   // Gentle spatial variation (never kills to zero — range 0.85-1.1)
   floodColor *= 0.85 + 0.25 * clamp(pattern + 0.5, 0.0, 1.0);
   // Additive blend gated by darkness only: dark areas get lifted, bright areas unchanged
@@ -260,7 +260,7 @@ vec3 halation(vec2 uv, vec3 col, float energy) {
   float bloom = smoothstep(0.35, 0.9, lum);
   // Stronger warm halo (film stock red channel bleed)
   vec3 haloColor = vec3(1.0, 0.65, 0.35);
-  float strength = bloom * (0.05 + energy * 0.04);
+  float strength = bloom * (0.03 + energy * 0.02);
   // Edge warmth: brighter halation near screen edges (lens vignette inverse)
   float edgeDist = length(uv - 0.5) * 1.4;
   strength *= (1.0 + edgeDist * 0.3);
@@ -291,7 +291,7 @@ vec3 cinematicGrade(vec3 col, float energy) {
   vec3 hueRatio = col / max(maxC, 0.001);
 
   // Filmic tone curve on max channel: smooth shoulder rolloff
-  float exposure = 1.35 + energy * 0.15;
+  float exposure = 1.8 + energy * 0.25;
   float mapped = 1.0 - exp(-maxC * exposure);
 
   // Reconstruct color with preserved hue ratios
@@ -303,7 +303,7 @@ vec3 cinematicGrade(vec3 col, float energy) {
   float contrast = mix(0.95, 1.15, energy);
   contrast *= 1.0 + uHarmonicTension * 0.08;
   float isClimaxGrade = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5);
-  float climaxSat = isClimaxGrade * uClimaxIntensity * 0.50;
+  float climaxSat = isClimaxGrade * uClimaxIntensity * 0.70;
   col = mix(vec3(luma), col, contrast * uEraSaturation + uShowSaturation + climaxSat);
   return col;
 }

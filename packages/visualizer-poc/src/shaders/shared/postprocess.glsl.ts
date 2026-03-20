@@ -329,7 +329,7 @@ ${
     // Build: gentle lift (0.40). Climax/sustain: stronger lift (0.55) to prevent darkness trap.
     float liftMult = mix(1.0, 0.40, isBuild * uClimaxIntensity) + isClimaxOrSustain * uClimaxIntensity * 0.15;
     float liftGate = smoothstep(0.04, 0.12, energy);
-    col = max(col, vec3(0.09, 0.07, 0.11) * liftMult * liftGate);
+    col = max(col, vec3(0.04, 0.03, 0.05) * liftMult * liftGate);
   }
 
   // Darkness texture: subtle micro-noise during near-black passages
@@ -349,7 +349,7 @@ ${
   // climax moments will NEVER be darker than this floor.
   {
     float climaxLuma = dot(col, vec3(0.299, 0.587, 0.114));
-    float minLuma = isClimax * uClimaxIntensity * 0.12; // floor: ~12% luminance at full climax
+    float minLuma = isClimax * uClimaxIntensity * 0.06; // floor: ~6% luminance at full climax
     if (climaxLuma < minLuma && minLuma > 0.01) {
       float lift = (minLuma - climaxLuma) / max(0.01, 1.0 - climaxLuma);
       col = col + (vec3(1.0) - col) * lift * 0.6; // gentle lift preserving color ratios

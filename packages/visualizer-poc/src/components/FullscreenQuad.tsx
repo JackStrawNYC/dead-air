@@ -16,11 +16,11 @@ import { useSceneConfig } from "../scenes/SceneConfigContext";
 
 /** Era saturation values — previously in EraGrade CSS, now owned by GLSL */
 const ERA_SATURATION: Record<string, number> = {
-  primal: 0.70,
-  classic: 0.90,
-  hiatus: 0.75,
-  touch_of_grey: 1.15,
-  revival: 0.95,
+  primal: 0.85,
+  classic: 0.95,
+  hiatus: 0.88,
+  touch_of_grey: 1.10,
+  revival: 0.98,
 };
 
 /** Era brightness values — moved from EraGrade CSS to GLSL for unified grading */
