@@ -13,7 +13,7 @@ import type { EnhancedFrameData } from "../data/types";
 import { energyGate } from "./math";
 
 export interface AudioSnapshot {
-  /** Gaussian-smoothed RMS energy (window=60, ~2s) */
+  /** Gaussian-smoothed RMS energy (window=25, ~0.8s) */
   energy: number;
   /** Slow-moving energy for ambient modulation (window=180, ~6s) — drifts, doesn't pulse */
   slowEnergy: number;
@@ -23,7 +23,7 @@ export interface AudioSnapshot {
   mids: number;
   /** Highs: smoothed (window=5) */
   highs: number;
-  /** Fast-attack / slow-decay onset transient envelope (release=18 frames) */
+  /** Fast-attack / slow-decay onset transient envelope (release=10 frames) */
   onsetEnvelope: number;
   /** Exponential falloff from last beat (halfLife=15) */
   beatDecay: number;
@@ -445,7 +445,7 @@ export function computeAudioSnapshot(
   fps?: number,
   tempo?: number,
 ): AudioSnapshot {
-  const energy = gaussianSmooth(frames, idx, (f) => f.rms, 60);
+  const energy = gaussianSmooth(frames, idx, (f) => f.rms, 25);
   const egate = energyGate(energy);
 
   return {
@@ -454,14 +454,14 @@ export function computeAudioSnapshot(
     bass: gaussianSmooth(frames, idx, (f) => (f.sub + f.low) * 0.5, 10),
     mids: gaussianSmooth(frames, idx, (f) => f.mid, 8),
     highs: gaussianSmooth(frames, idx, (f) => f.high, 5),
-    onsetEnvelope: onsetEnvelope(frames, idx, 18) * egate,
+    onsetEnvelope: onsetEnvelope(frames, idx, 10) * egate,
     beatDecay: beatDecay(frames, idx, 15) * egate,
     chromaHue: smoothedChromaHue(frames, idx, 15),
     centroid: gaussianSmooth(frames, idx, (f) => f.centroid, 18),
     flatness: gaussianSmooth(frames, idx, (f) => f.flatness, 15),
     spectralFlux: computeSpectralFlux(frames, idx, 8),
     fastEnergy: gaussianSmooth(frames, idx, (f) => f.rms, 8),
-    drumOnset: onsetEnvelopeGeneric(frames, idx, (f) => f.stemDrumOnset ?? 0, 12) * egate,
+    drumOnset: onsetEnvelopeGeneric(frames, idx, (f) => f.stemDrumOnset ?? 0, 8) * egate,
     drumBeat: beatDecayGeneric(frames, idx, (f) => f.stemDrumBeat ?? false, 12) * egate,
     musicalTime: (beatArray && fps && tempo) ? computeMusicalTime(beatArray, idx, fps, tempo) : 0,
     vocalEnergy: gaussianSmooth(frames, idx, (f) => f.stemVocalRms ?? 0, 12),

@@ -110,12 +110,12 @@ export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod,
   //   0.70 × 0.75 = 0.525 effective saturation — too muted.
   const cssGate = factor; // 0 during quiet, 1 during loud (already smoothstep-based)
   const isClimaxPhase = (climaxMod?.brightnessOffset ?? 0) > 0.04;
-  const brightCap = isClimaxPhase ? 1.40 : 1.25;
+  const brightCap = isClimaxPhase ? 1.55 : 1.30;
   // Gate all energy-reactive brightness by reactivity (0 during intro, 1 when engine open)
-  // fastEnergy multiplier reduced from 0.12 → 0.03 to eliminate strobe pulsation.
-  // The 8-frame Gaussian responds to every transient; at 0.12 it caused frame-to-frame
-  // brightness swings of ±0.06 which were visibly jarring. At 0.03 it's felt, not seen.
-  const brightness = Math.min(brightCap, 0.96 + factor * 0.16 * reactivity + (climaxMod?.brightnessOffset ?? 0) * reactivity + (snapshot.fastEnergy ?? 0) * 0.03 * reactivity);
+  // fastEnergy at 0.08 with beatStability gating: only fires on real beats, not noise.
+  // Beat-gated: stability 0.2→full punch at 0.5, graceful fade at low confidence.
+  const transientPunch = (snapshot.fastEnergy ?? 0) * 0.08 * Math.min(1, (snapshot.beatStability ?? 0.5) + 0.3);
+  const brightness = Math.min(brightCap, 0.96 + factor * 0.16 * reactivity + (climaxMod?.brightnessOffset ?? 0) * reactivity + transientPunch * reactivity);
 
   // Drums/Space phase adjustments (brightness + hue only — saturation/contrast handled by GLSL)
   let dsBrightOffset = 0;
@@ -152,9 +152,9 @@ export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod,
   const soloBrightLift = isSolo ? (soloIntensity * 0.10) : 0;
   const vocalBrightLift = (vocalWarmth ?? 0) * 0.06;
 
-  // Energy-adaptive brightness floor: quiet passages approach black, loud passages stay at current floor.
-  // energy < 0.03 → floor at 0.08 (near black). energy > 0.20 → floor at 0.55 (current).
-  const energyFloor = 0.08 + Math.min(1, Math.max(0, (energy - 0.03) / 0.17)) * 0.47;
+  // Energy-adaptive brightness floor: wide dynamic range.
+  // energy < 0.05 → floor at 0.08 (near black). energy 0.20 → 0.24. energy > 0.35 → 0.40.
+  const energyFloor = 0.08 + Math.min(1, Math.max(0, (energy - 0.05) / 0.30)) * 0.32;
   // Apply phase offsets + song identity + show arc + IT + narrative + solo + vocal + harmonic
   const baseBrightness = Math.min(brightCap, Math.max(energyFloor, brightness + dsBrightOffset + showBrightOffset + siPaletteBright + arcBrightOffset + itBrightLift + narrativeBrightness + soloBrightLift + vocalBrightLift + harmonicBrightness + brightnessCounterpoint));
   // During dead air, dim brightness toward 0.55 (minimum floor) and suppress bloom

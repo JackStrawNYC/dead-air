@@ -67,6 +67,7 @@ void main() {
   float tension = clamp(uHarmonicTension, 0.0, 1.0);
   float stability = clamp(uBeatStability, 0.0, 1.0);
   float melodicDir = clamp(uMelodicDirection, -1.0, 1.0);
+  float effectiveBeat = uBeatSnap * smoothstep(0.3, 0.7, uBeatConfidence);
 
   float slowTime = uDynamicTime * 0.04;
 
@@ -117,9 +118,10 @@ void main() {
   // --- Melodic flow: shift pattern direction ---
   patternUv += vec2(melodicDir * slowTime * 0.5, slowTime * 0.3);
 
-  // --- Onset disruption ripples ---
+  // --- Onset disruption ripples + beat-synced pulse ---
   float distFromCenter = length(p);
   float ripple = onset * sin(distFromCenter * 20.0 - uTime * 8.0) * exp(-distFromCenter * 3.0);
+  ripple += effectiveBeat * sin(distFromCenter * 12.0) * exp(-distFromCenter * 2.0) * 0.5;
   patternUv += vec2(ripple * 0.15);
 
   // --- Layer 1: Low frequency FBM (base Turing pattern) ---

@@ -96,21 +96,31 @@ ${
   uv = barrelDistort(uv, uLensDistortion);
   p = (uv - 0.5) * vec2(uResolution.x / uResolution.y, 1.0);
 
+  // Beat-locked micro-displacement: the whole frame SNAPS on confident beats
+  float beatJolt = beatPulse(uMusicalTime) * smoothstep(0.4, 0.8, uBeatConfidence) * 0.003;
+  uv += vec2(beatJolt * sin(uMusicalTime * 6.28), beatJolt * cos(uMusicalTime * 3.14));
+  p = (uv - 0.5) * vec2(uResolution.x / uResolution.y, 1.0);
+
   // Climax reactivity
   float isClimax = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5);
   float climaxBoost = isClimax * uClimaxIntensity;
 
-  // Adaptive grading intensity: per-shader base, stripped during climax peaks
+  // Adaptive grading intensity: per-shader base, modestly reduced during climax peaks
+  // Previous: stripped to 25% — killed stage flood, light leak, halation at peak moments.
+  // Now: floor at 70% so grading effects stay vibrant during the most intense moments.
   float gi = uGradingIntensity;
   float climaxRaw = isClimax * uClimaxIntensity * step(uGradingIntensity, 0.99);
-  gi = mix(gi, max(0.25, gi * 0.3), climaxRaw);
+  gi = mix(gi, max(0.70, gi * 0.75), climaxRaw);
 
 ${
   beatPulseEnabled
-    ? `  // Beat pulse: extremely subtle tempo-locked brightness swell
-  // Kept near-zero — visible strobe source even at low values
+    ? `  // Beat pulse: visible tempo-locked brightness + saturation swell
   float bp = beatPulse(uMusicalTime);
-  col *= 1.0 + bp * 0.02;
+  float bpGated = bp * smoothstep(0.3, 0.7, uBeatConfidence); // only fire on confident beats
+  col *= 1.0 + bpGated * 0.06;  // 3× stronger than before
+  // Beat saturation punch: color pops on beats
+  float bpLuma = dot(col, vec3(0.299, 0.587, 0.114));
+  col = mix(vec3(bpLuma), col, 1.0 + bpGated * 0.12); // +12% saturation on beats
 `
     : ""
 }
@@ -119,7 +129,7 @@ ${
     ? `  // Bloom: bright pixel self-illumination (boosted for psychedelic intensity)
   {
     float lum = dot(col, vec3(0.299, 0.587, 0.114));
-    float bloomThreshold = max(0.30, mix(0.60, 0.45, energy) + uBloomThreshold${bloomThresholdStr});
+    float bloomThreshold = max(0.20, mix(0.60, 0.45, energy) + uBloomThreshold${bloomThresholdStr} - uEnergyForecast * 0.15);
     float bloomAmount = max(0.0, lum - bloomThreshold) * (1.2 + climaxBoost * 0.4);
     vec3 bloomColor = mix(col, vec3(1.0, 0.98, 0.95), 0.3);
     // Cap bloom intensity to prevent blowout during climax stacking
@@ -296,13 +306,28 @@ ${
     float onsetPulse = step(0.7, max(uOnsetSnap, uDrumOnset)) * max(uOnsetSnap, uDrumOnset);
     float onsetLuma = dot(col, vec3(0.299, 0.587, 0.114));
     col = mix(vec3(onsetLuma), col, 1.0 + onsetPulse * (0.15 + climaxBoost * 0.25));
-    // Brightness boost removed — was a strobe source
   }
 
-  // Lifted blacks (build-phase + energy aware)
+  // Onset hue punch: color rotates on strong transients
+  {
+    float hueKick = max(uOnsetSnap, uDrumOnset) * smoothstep(0.15, 0.35, energy) * 0.08;
+    float hkAngle = hueKick * 6.28;
+    float hkCos = cos(hkAngle);
+    float hkSin = sin(hkAngle);
+    mat3 hkRot = mat3(
+      hkCos, -hkSin, 0.0,
+      hkSin, hkCos, 0.0,
+      0.0, 0.0, 1.0
+    );
+    col = max(vec3(0.0), hkRot * col);
+  }
+
+  // Lifted blacks (active during build, climax, AND sustain — prevents pure black at peak moments)
   {
     float isBuild = step(0.5, uClimaxPhase) * step(uClimaxPhase, 1.5);
-    float liftMult = mix(1.0, 0.40, isBuild * uClimaxIntensity);
+    float isClimaxOrSustain = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5);
+    // Build: gentle lift (0.40). Climax/sustain: stronger lift (0.55) to prevent darkness trap.
+    float liftMult = mix(1.0, 0.40, isBuild * uClimaxIntensity) + isClimaxOrSustain * uClimaxIntensity * 0.15;
     float liftGate = smoothstep(0.04, 0.12, energy);
     col = max(col, vec3(0.09, 0.07, 0.11) * liftMult * liftGate);
   }
@@ -314,6 +339,21 @@ ${
   {
     float mid = 0.18;
     col = mid + (col - mid) * uShowContrast;
+  }
+
+  // ─── CLIMAX BRIGHTNESS GUARANTEE ───
+  // Structural safeguard: prevents any combination of stacked modifiers from
+  // producing darkness during peak musical moments. During climax/sustain,
+  // enforces a minimum luminance that scales with intensity.
+  // This is the last line of defense — no matter what upstream modifiers do,
+  // climax moments will NEVER be darker than this floor.
+  {
+    float climaxLuma = dot(col, vec3(0.299, 0.587, 0.114));
+    float minLuma = isClimax * uClimaxIntensity * 0.12; // floor: ~12% luminance at full climax
+    if (climaxLuma < minLuma && minLuma > 0.01) {
+      float lift = (minLuma - climaxLuma) / max(0.01, 1.0 - climaxLuma);
+      col = col + (vec3(1.0) - col) * lift * 0.6; // gentle lift preserving color ratios
+    }
   }
 
   return col;

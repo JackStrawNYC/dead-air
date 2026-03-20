@@ -509,7 +509,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
   // Floor at 0.40 prevents 11 stacked multipliers from collapsing overlay visibility.
   // Quiet sections (56% of song duration) need overlays at ≥7% effective opacity
   // to maintain psychedelic texture during a 3-hour show.
-  const combinedDensityMult = Math.max(0.40, climaxMod.overlayDensityMult * (jamEvolution.isLongJam ? jamEvolution.densityMult : 1) * sectionVocab.overlayDensityMult * narrativeDirective.overlayDensityMult * endScreenMult * venueProfile.overlayDensityMult * crowdDensityMult * fatigue.densityMult * stemInterplay.densityMult * peakOfShow.densityMult * tempoLock.overlayBreathing * crowdEnergy.densityMult * (0.7 + 0.3 * narrativeDirective.abstractionLevel));
+  const combinedDensityMult = Math.max(0.15, climaxMod.overlayDensityMult * (jamEvolution.isLongJam ? jamEvolution.densityMult : 1) * sectionVocab.overlayDensityMult * narrativeDirective.overlayDensityMult * endScreenMult * venueProfile.overlayDensityMult * crowdDensityMult * fatigue.densityMult * stemInterplay.densityMult * peakOfShow.densityMult * tempoLock.overlayBreathing * crowdEnergy.densityMult * (0.7 + 0.3 * narrativeDirective.abstractionLevel));
   const opacityMap = opacityMapBase ? applyDensityMult(opacityMapBase, combinedDensityMult, rotationSchedule!) : null;
 
   // ─── Lyric trigger suppression ───
@@ -536,15 +536,21 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
   const isDeadAir = deadAirFactor > 0.99;
 
   // ─── Intro factor: art-forward cold open for first ~20s ───
-  // Segues skip this (previous song's visuals are already running).
-  // 0 = full intro suppression, 1 = engine fully open.
+  // 0 = full intro suppression (art dominates), 1 = engine fully open.
   const INTRO_HOLD = 600;  // 20s at 30fps — art + text showcase
   const INTRO_RAMP = 150;  // 5s smooth ramp to full visuals
   // Suite middle songs skip intro hold (continuous flow within suite)
-  const introFactor = (props.segueIn || isInSuiteMiddle) ? 1
+  // Segue-in songs get a mini intro: 3s crossfade breathing, then art showcase 5-15s
+  const introFactor = props.segueIn
+      ? (frame < 90 ? 1                                        // 0-3s: full shader (crossfade)
+        : frame < 150 ? 1 - 0.95 * ((frame - 90) / 60)         // 3-5s: dim to 5%
+        : frame < 450 ? 0.05                                    // 5-15s: art showcase (shader barely visible)
+        : frame < 600 ? 0.05 + 0.95 * ((frame - 450) / 150)    // 15-20s: ramp back
+        : 1)
+    : isInSuiteMiddle ? 1
     : frame < INTRO_HOLD ? 0
-    : frame < INTRO_HOLD + INTRO_RAMP ? (frame - INTRO_HOLD) / INTRO_RAMP
-    : 1;
+      : frame < INTRO_HOLD + INTRO_RAMP ? (frame - INTRO_HOLD) / INTRO_RAMP
+      : 1;
 
   // ─── Fade in/out ───
   // Start fade-out 1 frame before the end of analyzed audio to ensure visuals are fully
@@ -574,7 +580,8 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
           <div style={{ position: "absolute", inset: 0, opacity: focusState.shaderOpacity * (0.05 + 0.95 * introFactor) }}>
           <SilentErrorBoundary name="SceneRouter">
             {(() => {
-              const sceneRouter = <SceneRouter frames={f} sections={sections} song={props.song} tempo={tempo} seed={showSeed} jamDensity={jamDensity} deadAirMode={deadAirFactor > 0 ? "cosmic_dust" : undefined} deadAirFactor={deadAirFactor > 0 ? deadAirFactor : undefined} era={props.show?.era} coherenceIsLocked={coherenceState.isLocked} drumsSpacePhase={drumsSpaceState?.subPhase} usedShaderModes={narrative?.state.usedShaderModes} songIdentity={songIdentity} stemSection={stemSection} songDuration={analysis?.meta?.duration} palette={effectivePalette} segueIn={props.segueIn} isSacredSegueIn={isSacredSegueIn} isInSuiteMiddle={!!isInSuiteMiddle} setNumber={props.song.set} jamEvolution={jamEvolution} jamPhaseBoundaries={jamPhaseBoundaries} jamCycle={jamCycle} jamPhaseShaders={jamPhaseShaders} />;
+              const climaxPhaseMap: Record<string, number> = { idle: 0, build: 1, climax: 2, sustain: 3, release: 4 };
+              const sceneRouter = <SceneRouter frames={f} sections={sections} song={props.song} tempo={tempo} seed={showSeed} jamDensity={jamDensity} deadAirMode={deadAirFactor > 0 ? "cosmic_dust" : undefined} deadAirFactor={deadAirFactor > 0 ? deadAirFactor : undefined} era={props.show?.era} coherenceIsLocked={coherenceState.isLocked} drumsSpacePhase={drumsSpaceState?.subPhase} usedShaderModes={narrative?.state.usedShaderModes} songIdentity={songIdentity} stemSection={stemSection} songDuration={analysis?.meta?.duration} palette={effectivePalette} segueIn={props.segueIn} isSacredSegueIn={isSacredSegueIn} isInSuiteMiddle={!!isInSuiteMiddle} setNumber={props.song.set} jamEvolution={jamEvolution} jamPhaseBoundaries={jamPhaseBoundaries} jamCycle={jamCycle} jamPhaseShaders={jamPhaseShaders} climaxPhase={climaxPhaseMap[climaxState.phase] ?? 0} />;
               const palette = effectivePalette;
 
               // Segue IN crossfade: smooth dual-render dissolve from previous song's shader

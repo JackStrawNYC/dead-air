@@ -76,10 +76,11 @@ void main() {
   float angle = atan(p.y, p.x);
   float radius = length(p);
 
-  // Downbeat pulse: expand ring radius on measure start (confidence-gated)
+  // Beat-locked radius pulse: expand on beats, confidence-gated
+  float effectiveBeat = uBeatSnap * smoothstep(0.3, 0.7, uBeatConfidence);
   float effectiveDownbeat = uDownbeat * uBeatConfidence;
   float downbeatPulse = effectiveDownbeat * 0.12;
-  radius -= downbeatPulse; // brief expansion on downbeat
+  radius -= downbeatPulse + effectiveBeat * 0.06; // expansion on downbeat + beats
 
   // Bass-driven rotation
   float rotation = t * 0.2 + uBass * 1.5 + uStemBass * 0.8;

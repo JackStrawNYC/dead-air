@@ -104,7 +104,7 @@ void main() {
   bgColor *= 0.85 + bgNoise * 0.3;
   vec3 col = bgColor;
 
-  float activeBeamCount = 3.0 + energy * 5.0;
+  float activeBeamCount = 3.0 + energy * 5.0 + uJamDensity * 2.0;
   float beamSpacing = aspect.x / float(NUM_BEAMS + 1);
   float sectionHueShift = mod(uSectionIndex * 0.15, 1.0);
 

@@ -32,7 +32,7 @@ export interface AudioDataContext {
     mids: number;
     highs: number;
     onset: number;
-    /** Rolling energy: 60-frame (~2s) RMS window, tracks actual loudness envelope */
+    /** Rolling energy: 25-frame (~0.8s) RMS window, tracks actual loudness envelope */
     energy: number;
     /** Position within current section (0-1) */
     sectionProgress: number;
@@ -332,7 +332,7 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
       const localEnergy = eCount > 0 ? eSum / eCount : 0;
       const t = Math.max(0, Math.min(1, (localEnergy - quietThresh) / range));
       const factor = t * t * (3 - 2 * t); // smoothstep
-      const speed = 0.01 + factor * 0.99; // 1% at quiet → 100% at peak
+      const speed = 0.12 + factor * 0.88; // 12% at quiet → 100% at peak
       accum += dt * speed;
       lookup[i] = accum;
     }
@@ -342,14 +342,14 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
   const sectionList = sections ?? [];
   const { sectionIndex, sectionProgress } = findCurrentSection(sectionList, idx);
 
-  const energy = smoothValue(frames, idx, (f) => f.rms, 60);
+  const energy = smoothValue(frames, idx, (f) => f.rms, 25);
   const egate = energyGate(energy);
   const chromaHue = smoothValue(frames, idx, (f) => dominantChromaHue(f.chroma), 15);
   const contrast = smoothContrast(frames, idx, 12);
   const flatness = smoothValue(frames, idx, (f) => f.flatness, 15);
 
   // Snappy transient envelopes: fast attack, slow exponential release, energy-gated
-  const onsetSnap = transientEnvelope(frames, idx, (f) => f.onset, 18) * egate;
+  const onsetSnap = transientEnvelope(frames, idx, (f) => f.onset, 10) * egate;
   const beatSnap = transientEnvelope(frames, idx, (f) => (f.beat ? 1 : 0), 15) * egate;
 
   // Stem-separated bass: use stemBassRms if available, else fallback to (sub+low)/2
@@ -365,7 +365,7 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
   // Fast-responding signals for transient punch
   const fastEnergy = smoothValue(frames, idx, (f) => f.rms, 8);
   const fastBass = smoothValue(frames, idx, (f) => f.sub + f.low, 6) * 0.5;
-  const drumOnset = transientEnvelope(frames, idx, (f) => f.stemDrumOnset ?? 0, 12) * egate;
+  const drumOnset = transientEnvelope(frames, idx, (f) => f.stemDrumOnset ?? 0, 8) * egate;
   const drumBeat = transientEnvelope(frames, idx, (f) => (f.stemDrumBeat ? 1 : 0), 12) * egate;
   const spectralFlux = computeSpectralFlux(frames, idx, 8);
 
@@ -382,7 +382,7 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
 
   // Climax state for shader uniforms
   const phaseMap: Record<ClimaxPhase, number> = { idle: 0, build: 1, climax: 2, sustain: 3, release: 4 };
-  const climaxEnergy = smoothValue(frames, idx, (f) => f.rms, 60);
+  const climaxEnergy = smoothValue(frames, idx, (f) => f.rms, 25);
   const climaxState = computeClimaxState(frames, idx, sectionList, climaxEnergy);
   const climaxPhaseNum = phaseMap[climaxState.phase];
   const climaxMod = climaxModulation(climaxState);
@@ -475,9 +475,13 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
     jamDensity: jamDensity ?? 0.5,
     coherence: coherenceProp ?? 0,
     isLocked: isLockedProp ?? false,
-    dynamicTime: (snapToMusicalTimeProp
-      ? computeMusicalTimeUtil(beatArray, idx, fps, tempo ?? 120) / (tempo ?? 120) * 60
-      : (dynamicTimeLookup[idx] ?? (idx / fps))) * climaxSpeedMult,
+    dynamicTime: (() => {
+      const baseDT = snapToMusicalTimeProp
+        ? computeMusicalTimeUtil(beatArray, idx, fps, tempo ?? 120) / (tempo ?? 120) * 60
+        : (dynamicTimeLookup[idx] ?? (idx / fps));
+      const fluxMult = 1.0 + Math.min(0.3, spectralFlux * 0.8);
+      return baseDT * climaxSpeedMult * fluxMult;
+    })(),
     jamPhase: jamPhaseCtx.phase,
     jamProgress: jamPhaseCtx.progress,
   };

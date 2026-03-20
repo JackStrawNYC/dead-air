@@ -221,6 +221,8 @@ interface Props {
   jamCycle?: JamCycleState | null;
   /** Precomputed shader mode for each jam phase (deterministic via seed) */
   jamPhaseShaders?: Record<string, VisualMode>;
+  /** Current climax phase (0=idle, 1=build, 2=climax, 3=sustain, 4=release) for dual-shader forcing */
+  climaxPhase?: number;
 }
 
 /** Determine the visual mode for a given section index.
@@ -482,7 +484,7 @@ function renderMode(
   return renderScene(mode, { frames, sections, palette, tempo, style, jamDensity });
 }
 
-export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, seed, jamDensity, deadAirMode, deadAirFactor, era, coherenceIsLocked, usedShaderModes, drumsSpacePhase, songIdentity, stemSection, songDuration, palette: paletteProp, segueIn, isSacredSegueIn, isInSuiteMiddle, setNumber, jamEvolution, jamPhaseBoundaries, jamCycle, jamPhaseShaders }) => {
+export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, seed, jamDensity, deadAirMode, deadAirFactor, era, coherenceIsLocked, usedShaderModes, drumsSpacePhase, songIdentity, stemSection, songDuration, palette: paletteProp, segueIn, isSacredSegueIn, isInSuiteMiddle, setNumber, jamEvolution, jamPhaseBoundaries, jamCycle, jamPhaseShaders, climaxPhase: climaxPhaseProp }) => {
   const frame = useCurrentFrame();
   const palette = paletteProp ?? song.palette;
 
@@ -685,8 +687,9 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
   const sectionLen = currentSection ? currentSection.frameEnd - currentSection.frameStart : 0;
   const frameEnergy = frames[Math.min(frame, frames.length - 1)]?.rms ?? 0;
 
-  // Climax force: high-energy section + high frame energy = peak moment
-  const climaxForceDual = currentSection?.energy === "high" && frameEnergy > 0.20;
+  // Climax force: any section during climax/sustain phase with energy > 0.15
+  const climaxForceDual = (climaxPhaseProp !== undefined && climaxPhaseProp >= 2 && climaxPhaseProp <= 3 && frameEnergy > 0.15)
+    || (currentSection?.energy === "high" && frameEnergy > 0.20);
 
   // Dual-shader activation: set 2+ always, set 1 for jams/solos/moderate+ energy, or climax force
   const shouldDual = climaxForceDual || (sectionLen >= AUTO_VARIETY_MIN_SECTION && (

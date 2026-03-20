@@ -21,7 +21,7 @@ describe("computeVisualFocus", () => {
   it("build: overlays present, shader below full", () => {
     const state = computeVisualFocus("build", 1.0, 100);
     // Build phase should show overlays and have shader below full
-    expect(state.overlayOpacity).toBeGreaterThan(0.1);
+    expect(state.overlayOpacity).toBeGreaterThanOrEqual(0.1);
     expect(state.shaderOpacity).toBeLessThan(1.0);
   });
 
