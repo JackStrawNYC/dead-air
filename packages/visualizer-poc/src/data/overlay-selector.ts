@@ -30,7 +30,7 @@ const LAYER_TARGETS: Record<number, { min: number; max: number }> = {
   5:  { min: 0, max: 1 },   // Nature/Cosmic
   6:  { min: 0, max: 1 },   // Characters
   7:  { min: 0, max: 1 },   // Frame/Info
-  8:  { min: 0, max: 1 },   // Typography
+  8:  { min: 0, max: 0 },   // Typography — no overlays assigned
   9:  { min: 0, max: 1 },   // HUD — music visualization
   10: { min: 0, max: 1 },   // Distortion
 };

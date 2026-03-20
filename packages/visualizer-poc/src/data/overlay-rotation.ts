@@ -968,6 +968,8 @@ export function getOverlayOpacities(
   }
 
   // ─── Silence breathing: progressive overlay withdrawal during sustained quiet ───
+  // Uses a wide ramp (50%-100% of window) to prevent boundary flicker.
+  // The smoothstep easing ensures organic fade rather than binary on/off.
   if (frames && frames.length > 0) {
     const frameIdx = Math.min(frame, frames.length - 1);
     const QUIET_THRESHOLD = 0.03;
@@ -976,9 +978,12 @@ export function getOverlayOpacities(
     for (let f = Math.max(0, frameIdx - QUIET_WINDOW); f <= frameIdx; f++) {
       if (frames[f].rms < QUIET_THRESHOLD) quietFrames++;
     }
-    if (quietFrames > QUIET_WINDOW * 0.8) {
-      const quietDepth = (quietFrames - QUIET_WINDOW * 0.8) / (QUIET_WINDOW * 0.2);
-      const withdrawMult = 1 - quietDepth * 0.6; // Down to 40% opacity
+    const quietRatio = quietFrames / QUIET_WINDOW;
+    // Smoothstep ramp from 50% to 100% quiet — gradual onset, no boundary flicker
+    if (quietRatio > 0.5) {
+      const t = Math.min(1, (quietRatio - 0.5) / 0.5);
+      const eased = t * t * (3 - 2 * t); // smoothstep
+      const withdrawMult = 1 - eased * 0.6; // 1.0 → 0.4
       for (const name of Object.keys(result)) {
         if (schedule.alwaysActive.includes(name)) continue;
         result[name] = (result[name] ?? 0) * Math.max(0.1, withdrawMult);
@@ -986,15 +991,28 @@ export function getOverlayOpacities(
     }
   }
 
-  // ─── Beat anticipation builds: subtle opacity boost during energy ramps ───
-  if (frames && frame > 5 && frame < frames.length - 1) {
+  // ─── Beat anticipation builds: smoothed opacity boost during energy ramps ───
+  // Uses 5-frame smoothed energy slope to avoid single-frame jitter.
+  if (frames && frame > 8 && frame < frames.length - 1) {
     const frameIdx = Math.min(frame, frames.length - 1);
-    const e0 = frames[Math.max(0, frameIdx - 3)]?.rms ?? 0;
-    const e1 = frames[Math.max(0, frameIdx - 1)]?.rms ?? 0;
-    const e2 = frames[frameIdx]?.rms ?? 0;
-    const rising = e2 > e1 && e1 > e0 && (e2 - e0) > 0.08;
-    if (rising) {
-      const anticipationBoost = Math.min(0.10, (e2 - e0) * 0.5);
+    // Compute smoothed energy over 3-frame windows for stable slope detection
+    const avg = (a: number, b: number, c: number) => (a + b + c) / 3;
+    const e_early = avg(
+      frames[Math.max(0, frameIdx - 5)]?.rms ?? 0,
+      frames[Math.max(0, frameIdx - 4)]?.rms ?? 0,
+      frames[Math.max(0, frameIdx - 3)]?.rms ?? 0,
+    );
+    const e_late = avg(
+      frames[Math.max(0, frameIdx - 1)]?.rms ?? 0,
+      frames[frameIdx]?.rms ?? 0,
+      frames[Math.min(frames.length - 1, frameIdx + 1)]?.rms ?? 0,
+    );
+    const slope = e_late - e_early;
+    if (slope > 0.06) {
+      // Smoothstep the boost for frame-coherent transitions
+      const rawBoost = Math.min(0.10, slope * 0.5);
+      const t = Math.min(1, (slope - 0.06) / 0.12);
+      const anticipationBoost = rawBoost * t * t * (3 - 2 * t);
       for (const name of Object.keys(result)) {
         result[name] = Math.min(1, (result[name] ?? 0) + anticipationBoost);
       }
