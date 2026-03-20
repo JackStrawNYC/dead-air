@@ -25,10 +25,10 @@ export interface VisualFocusState {
  *  so idle at 0.35 yields effective overlay ≈ 0.35 * rotation * density ≈ 0.10-0.15.
  *  This keeps overlays present as psychedelic texture without washing out shaders. */
 const PHASE_FOCUS: Record<ClimaxPhase, VisualFocusState> = {
-  climax:  { shaderOpacity: 1.0,  artOpacity: 0.0,  overlayOpacity: 0.05, grainOpacity: 0.5 },
-  sustain: { shaderOpacity: 0.95, artOpacity: 0.0,  overlayOpacity: 0.05, grainOpacity: 0.6 },
-  build:   { shaderOpacity: 0.85, artOpacity: 0.12, overlayOpacity: 0.10, grainOpacity: 0.8 },
-  release: { shaderOpacity: 0.75, artOpacity: 0.35, overlayOpacity: 0.15, grainOpacity: 1.0 },
+  climax:  { shaderOpacity: 1.0,  artOpacity: 0.0,  overlayOpacity: 0.25, grainOpacity: 0.5 },
+  sustain: { shaderOpacity: 0.95, artOpacity: 0.0,  overlayOpacity: 0.20, grainOpacity: 0.6 },
+  build:   { shaderOpacity: 0.85, artOpacity: 0.12, overlayOpacity: 0.15, grainOpacity: 0.8 },
+  release: { shaderOpacity: 0.75, artOpacity: 0.35, overlayOpacity: 0.20, grainOpacity: 1.0 },
   idle:    { shaderOpacity: 0.85, artOpacity: 0.25, overlayOpacity: 0.35, grainOpacity: 1.0 },
 };
 

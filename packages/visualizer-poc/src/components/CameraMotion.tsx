@@ -47,11 +47,11 @@ interface Props {
   cameraDrama?: number;
 }
 
-const QUIET_SCALE = 1.08;
-const PEAK_SCALE = 1.03;
-const SHAKE_PX = 5;
+const QUIET_SCALE = 1.12;
+const PEAK_SCALE = 1.02;
+const SHAKE_PX = 15;
 const SHAKE_DECAY_FRAMES = 12;
-const TILT_DEG = 2.0;         // Max rotational tilt on bass kicks
+const TILT_DEG = 4.0;         // Max rotational tilt on bass kicks
 const TILT_DECAY_FRAMES = 10; // Exponential decay for tilt
 
 /** Phase-driven camera parameters for long jams */

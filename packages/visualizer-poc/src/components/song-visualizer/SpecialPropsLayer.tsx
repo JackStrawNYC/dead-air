@@ -63,8 +63,8 @@ export const SpecialPropsLayer: React.FC<Props> = ({
   const adjustedFrame = frame - introDelay;
 
   // Dark scrim during intro window — bottom gradient for text readability
-  const SCRIM_HOLD = 600;
-  const SCRIM_FADE = 150;
+  const SCRIM_HOLD = 750;
+  const SCRIM_FADE = 270;
   const scrimFrame = suppressIntro ? adjustedFrame : frame;
   const scrimOpacity = scrimFrame < 0 ? 0
     : scrimFrame < SCRIM_HOLD ? 0.55

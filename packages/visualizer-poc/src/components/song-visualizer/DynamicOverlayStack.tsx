@@ -32,8 +32,8 @@ interface OverlayComponentEntry {
  *  The contrast between silence and flood creates the visceral impact. */
 const MAX_CONCURRENT: Record<string, number> = {
   quiet: 2,
-  mid: 3,
-  peak: 4,
+  mid: 4,
+  peak: 6,
 };
 
 interface Props {
