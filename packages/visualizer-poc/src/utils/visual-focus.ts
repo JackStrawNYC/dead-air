@@ -24,12 +24,16 @@ export interface VisualFocusState {
  *  during quiet sections (56% of song duration). Screen blend adds brightness,
  *  so idle at 0.35 yields effective overlay ≈ 0.35 * rotation * density ≈ 0.10-0.15.
  *  This keeps overlays present as psychedelic texture without washing out shaders. */
+/** Focus rules by climax phase — shader IS the show at peaks.
+ *  Climax: shader owns everything. Overlays near-zero so color is pure.
+ *  Idle: overlays at 0.25 (was 0.35) — let darkness breathe.
+ *  Release: warm afterglow, overlays return as emotional texture. */
 const PHASE_FOCUS: Record<ClimaxPhase, VisualFocusState> = {
-  climax:  { shaderOpacity: 1.0,  artOpacity: 0.0,  overlayOpacity: 0.25, grainOpacity: 0.5 },
-  sustain: { shaderOpacity: 0.95, artOpacity: 0.0,  overlayOpacity: 0.20, grainOpacity: 0.6 },
-  build:   { shaderOpacity: 0.85, artOpacity: 0.12, overlayOpacity: 0.15, grainOpacity: 0.8 },
-  release: { shaderOpacity: 0.75, artOpacity: 0.35, overlayOpacity: 0.20, grainOpacity: 1.0 },
-  idle:    { shaderOpacity: 0.85, artOpacity: 0.25, overlayOpacity: 0.35, grainOpacity: 1.0 },
+  climax:  { shaderOpacity: 1.0,  artOpacity: 0.0,  overlayOpacity: 0.10, grainOpacity: 0.5 },
+  sustain: { shaderOpacity: 0.95, artOpacity: 0.0,  overlayOpacity: 0.15, grainOpacity: 0.6 },
+  build:   { shaderOpacity: 0.85, artOpacity: 0.12, overlayOpacity: 0.12, grainOpacity: 0.8 },
+  release: { shaderOpacity: 0.75, artOpacity: 0.35, overlayOpacity: 0.25, grainOpacity: 1.0 },
+  idle:    { shaderOpacity: 0.85, artOpacity: 0.25, overlayOpacity: 0.25, grainOpacity: 1.0 },
 };
 
 function lerp(a: number, b: number, t: number): number {
@@ -66,8 +70,17 @@ export function computeVisualFocus(
     const breathT = (Math.sin(frame * Math.PI * 2 / 240) + 1) * 0.5;
     state = {
       ...state,
-      artOpacity: lerp(0.35, 0.50, breathT),
+      artOpacity: lerp(0.30, 0.45, breathT),
       shaderOpacity: lerp(0.80, 0.90, 1 - breathT),
+    };
+  }
+
+  // Climax pulse: overlays breathe slightly even during climax (prevents dead flat look)
+  if (phase === "climax" || phase === "sustain") {
+    const pulseT = (Math.sin(frame * Math.PI * 2 / 120) + 1) * 0.5; // 4s cycle
+    state = {
+      ...state,
+      overlayOpacity: state.overlayOpacity + pulseT * 0.05, // subtle 5% breathing
     };
   }
 

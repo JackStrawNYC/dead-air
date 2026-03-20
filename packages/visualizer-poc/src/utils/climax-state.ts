@@ -286,7 +286,7 @@ const PHASE_TARGETS: Record<
   build:   { sat: -0.15, bright: +0.02, vig: -0.02, bloom: 0.10, contrast: +0.10, density: 1.10, speed: 1.2, drama: 0.2, forceDual: false },
   climax:  { sat: +0.80, bright: +0.10, vig: -0.08, bloom: 0.15, contrast: +0.15, density: 1.60, speed: 1.6, drama: 0.9, forceDual: true  },
   sustain: { sat: +0.50, bright: +0.08, vig: -0.06, bloom: 0.10, contrast: +0.10, density: 1.40, speed: 1.4, drama: 0.7, forceDual: true  },
-  release: { sat: -0.20, bright: -0.05, vig: -0.03, bloom: 0,    contrast: -0.03, density: 0.50, speed: 0.9, drama: 0.1, forceDual: false },
+  release: { sat: +0.15, bright: -0.02, vig: -0.01, bloom: 0.03, contrast: +0.02, density: 0.60, speed: 0.9, drama: 0.1, forceDual: false },
 };
 
 /** Anticipation sub-state overrides — dramatic darkness before the drop.
@@ -297,7 +297,7 @@ const ANTICIPATION = { sat: -0.30, bright: -0.20, vig: +0.12, bloom: -0.10, cont
 const BUILD_START = { sat: 0, bright: 0, vig: 0, bloom: 0, contrast: 0, density: 0.95, speed: 1.0, drama: 0.0, forceDual: false };
 
 /** Release phase start values (intensity interpolates from start → target) */
-const RELEASE_START = { sat: +0.02, bright: +0.005, vig: +0.02, bloom: 0.01, contrast: +0.02, density: 1.0, speed: 1.1, drama: 0.3, forceDual: false };
+const RELEASE_START = { sat: +0.30, bright: +0.04, vig: -0.04, bloom: 0.08, contrast: +0.08, density: 1.20, speed: 1.2, drama: 0.5, forceDual: false };
 
 /**
  * Map a ClimaxState to additive visual modifiers.

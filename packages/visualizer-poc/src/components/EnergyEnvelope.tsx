@@ -41,6 +41,10 @@ interface Props {
   showArcModifiers?: ShowArcModifiers;
   /** IT response luminance lift (additive brightness) */
   itLuminanceLift?: number;
+  /** IT saturation surge multiplier (1.0 = normal, up to 2.5 at transcendent lock) */
+  itSaturationSurge?: number;
+  /** IT vignette pull (0 = normal, 0.3 = tight tunnel focus) */
+  itVignettePull?: number;
   /** Vocal warmth factor 0-1 (from stem-features) */
   vocalWarmth?: number;
   /** Guitar color temperature -1 (cool) to +1 (warm) */
@@ -69,6 +73,14 @@ interface Props {
   brightnessCounterpoint?: number;
   /** Narrative saturation offset from visual narrator (-0.3 to +0.3) */
   narrativeSatOffset?: number;
+  /** Stem character hue shift: Jerry=+30 (gold), Phil=-40 (indigo), drums=+15 */
+  stemCharacterHue?: number;
+  /** Stem character saturation mult: 0.9-1.3 */
+  stemCharacterSat?: number;
+  /** Stem character brightness offset: -0.05 to +0.08 */
+  stemCharacterBright?: number;
+  /** Stem character temperature: -1 (Phil/cool) to +1 (Jerry/warm) */
+  stemCharacterTemp?: number;
 }
 
 // Per-era bloom color — matches era grade for visual cohesion
@@ -81,7 +93,7 @@ const ERA_BLOOM: Record<string, string> = {
 };
 const DEFAULT_BLOOM = ERA_BLOOM.classic;
 
-export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod, jamColorTemp, calibration, counterpointSatMult = 1, brightnessCounterpoint = 0, drumsSpacePhase, showPhase, songIdentity, showArcModifiers, itLuminanceLift, vocalWarmth, guitarColorTemp, deadAirFactor = 0, narrativeBrightness = 0, narrativeTemperature = 0, introFactor = 1, isSolo = false, soloIntensity = 0, harmonicBrightness = 0, harmonicSatMult = 1, modalHueShift = 0, modalSatOffset = 0, narrativeSatOffset = 0 }) => {
+export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod, jamColorTemp, calibration, counterpointSatMult = 1, brightnessCounterpoint = 0, drumsSpacePhase, showPhase, songIdentity, showArcModifiers, itLuminanceLift, itSaturationSurge = 1, itVignettePull = 0, vocalWarmth, guitarColorTemp, deadAirFactor = 0, narrativeBrightness = 0, narrativeTemperature = 0, introFactor = 1, isSolo = false, soloIntensity = 0, harmonicBrightness = 0, harmonicSatMult = 1, modalHueShift = 0, modalSatOffset = 0, narrativeSatOffset = 0, stemCharacterHue = 0, stemCharacterSat = 1, stemCharacterBright = 0, stemCharacterTemp = 0 }) => {
   const energy = snapshot.energy;
   const low = calibration?.quietThreshold;
   const high = calibration?.loudThreshold;
@@ -152,11 +164,12 @@ export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod,
   const soloBrightLift = isSolo ? (soloIntensity * 0.10) : 0;
   const vocalBrightLift = (vocalWarmth ?? 0) * 0.06;
 
-  // Energy-adaptive brightness floor: wide dynamic range.
-  // energy < 0.05 → floor at 0.08 (near black). energy 0.20 → 0.24. energy > 0.35 → 0.40.
-  const energyFloor = 0.08 + Math.min(1, Math.max(0, (energy - 0.05) / 0.30)) * 0.32;
-  // Apply phase offsets + song identity + show arc + IT + narrative + solo + vocal + harmonic
-  const baseBrightness = Math.min(brightCap, Math.max(energyFloor, brightness + dsBrightOffset + showBrightOffset + siPaletteBright + arcBrightOffset + itBrightLift + narrativeBrightness + soloBrightLift + vocalBrightLift + harmonicBrightness + brightnessCounterpoint));
+  // Energy-adaptive brightness floor: TRUE darkness in silence, vivid at peaks.
+  // energy=0 → 0.02 (near black). energy 0.10 → 0.10. energy 0.30 → 0.35.
+  // The key is silence should be DARK — psychedelic visuals need contrast.
+  const energyFloor = 0.02 + Math.min(1, Math.max(0, (energy - 0.03) / 0.27)) * 0.33;
+  // Apply phase offsets + song identity + show arc + IT + narrative + solo + vocal + harmonic + stem character
+  const baseBrightness = Math.min(brightCap, Math.max(energyFloor, brightness + dsBrightOffset + showBrightOffset + siPaletteBright + arcBrightOffset + itBrightLift + narrativeBrightness + soloBrightLift + vocalBrightLift + harmonicBrightness + brightnessCounterpoint + stemCharacterBright));
   // During dead air, dim brightness toward 0.55 (minimum floor) and suppress bloom
   const finalBrightness = deadAirFactor > 0
     ? baseBrightness * (1 - deadAirFactor * 0.40)  // dim by up to 40% during dead air
@@ -185,22 +198,25 @@ export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod,
   const narrativeHueShift = narrativeTemperature * 20;
   // Solo hue warmth: +20deg shift when solo is active
   const soloHueShift = isSolo ? soloIntensity * 20 : 0;
+  // Stem character hue + temperature: musician personality colors the whole frame
+  const stemTempHue = stemCharacterTemp * 15; // ±15deg from musician temperature
   // Suppress hue shift during dead air so applause is neutral
-  const totalHueShift = (jamHueShift + eraColorTempShift + dsHueOffset + siHueShift + arcHueShift + vocalHueShift + guitarHueShift + chromaHueShift + narrativeHueShift + soloHueShift + modalHueShift) * (1 - deadAirFactor);
-  // Combined saturation: counterpoint * harmonic * modal * narrative (convert offsets to multipliers)
-  const combinedSatMult = counterpointSatMult * harmonicSatMult * (1 + modalSatOffset) * (1 + narrativeSatOffset);
+  const totalHueShift = (jamHueShift + eraColorTempShift + dsHueOffset + siHueShift + arcHueShift + vocalHueShift + guitarHueShift + chromaHueShift + narrativeHueShift + soloHueShift + modalHueShift + stemCharacterHue + stemTempHue) * (1 - deadAirFactor);
+  // Combined saturation: counterpoint * harmonic * modal * narrative * IT surge * stem character
+  const combinedSatMult = counterpointSatMult * harmonicSatMult * (1 + modalSatOffset) * (1 + narrativeSatOffset) * itSaturationSurge * stemCharacterSat;
   const satFilter = Math.abs(combinedSatMult - 1) > 0.01 ? ` saturate(${combinedSatMult.toFixed(3)})` : "";
   const filterStr = totalHueShift !== 0
     ? `brightness(${finalBrightness.toFixed(3)}) hue-rotate(${totalHueShift.toFixed(1)}deg)${satFilter}`
     : `brightness(${finalBrightness.toFixed(3)})${satFilter}`;
 
-  return (
-    <div style={{ position: "absolute", inset: 0, filter: filterStr }}>
-      {children}
+  // IT vignette tunnel focus: inset box-shadow creates cinematic tunnel effect during coherence lock
+  const vignetteStyle = itVignettePull > 0.01
+    ? { boxShadow: `inset 0 0 ${Math.round(80 + itVignettePull * 200)}px ${Math.round(itVignettePull * 120)}px rgba(0,0,0,${(itVignettePull * 1.5).toFixed(2)})` }
+    : undefined;
 
-      {/* CSS backdrop bloom removed — was a major strobe source.
-          GLSL bloom + halation provide sufficient glow without the
-          frame-to-frame brightness pulsation that CSS backdrop-filter caused. */}
+  return (
+    <div style={{ position: "absolute", inset: 0, filter: filterStr, ...vignetteStyle }}>
+      {children}
     </div>
   );
 };

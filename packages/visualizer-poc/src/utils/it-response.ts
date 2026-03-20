@@ -70,6 +70,14 @@ export interface ITVisualState {
   lockDepth: LockDepth;
   /** Whether to force a transcendent shader (sacred_geometry/fractal_zoom) */
   forceTranscendentShader: boolean;
+  /** Saturation surge multiplier (1.0 = normal, up to 2.5 at deep lock) */
+  saturationSurge: number;
+  /** Camera snap-zoom intensity (0 = normal, 1.0 = max zoom punch) */
+  snapZoom: number;
+  /** Hero icon eruption trigger (true = fire fullscreen icon at lock start) */
+  heroEruption: boolean;
+  /** Vignette tightening during lock (0 = normal, 0.3 = tight tunnel focus) */
+  vignettePull: number;
 }
 
 // --- Constants ---
@@ -78,7 +86,7 @@ const LOCK_CONVERGENCE_FRAMES = 15;
 const BREAK_FLASH_FRAMES = 2;
 const BREAK_RECOVERY_FRAMES = 10;
 const LOCKED_OVERLAY_OPACITY = 0.05;
-const LOCKED_LUMINANCE_LIFT = 0.22;
+const LOCKED_LUMINANCE_LIFT = 0.28;
 
 // Lock depth tier thresholds (frames since lock start)
 const SHALLOW_END = 90;     // 3 seconds
@@ -87,9 +95,9 @@ const DEEP_END = 300;       // 10 seconds
 // Beyond DEEP_END = transcendent
 
 /** Max strobe intensity during deep lock.
- *  Reduced from 0.30 → 0.12 to prevent harsh white flashes.
- *  At 0.30 with overlay blend mode, every onset was a visible strobe pulse. */
-const STROBE_MAX = 0.20;
+ *  0.25 gives visible beat-synced pulse without harsh white flashes.
+ *  Gated to onset>0.15 so only real hits trigger. */
+const STROBE_MAX = 0.25;
 /** Time dilation factor during deep lock (slow-motion shader drift) */
 const LOCKED_TIME_DILATION = 0.3;
 /** Transcendent time dilation (maximum slow-motion) */
@@ -219,6 +227,10 @@ export function computeITResponse(
           flashHue: breakHue,
           lockDepth: "shallow",
           forceTranscendentShader: false,
+          saturationSurge: 1 + 1.5 * (1 - smoothstep(recoveryProgress)), // 2.5x→1x surge on break
+          snapZoom: framesSinceUnlock < 3 ? 0.8 : 0, // snap zoom on break frame
+          heroEruption: false,
+          vignettePull: 0,
         };
       }
     } else {
@@ -232,16 +244,20 @@ export function computeITResponse(
           convergenceProgress: 0,
           targetHue,
           overlayOpacityOverride: LOCKED_OVERLAY_OPACITY + (1 - LOCKED_OVERLAY_OPACITY) * eased,
-          cameraLock: framesSinceUnlock < 30, // camera releases at frame 30
+          cameraLock: framesSinceUnlock < 30,
           luminanceLift: LOCKED_LUMINANCE_LIFT * (1 - eased),
           snapToMusicalTime: false,
           flashIntensity: 0,
           triggerReset: false,
           strobeIntensity: 0,
-          timeDilation: 1 - (1 - LOCKED_TIME_DILATION) * (1 - eased) * 0.3, // ease back toward 1.0
+          timeDilation: 1 - (1 - LOCKED_TIME_DILATION) * (1 - eased) * 0.3,
           flashHue: 0,
           lockDepth: "shallow",
           forceTranscendentShader: false,
+          saturationSurge: 1 + 0.5 * (1 - eased), // gentle fade from 1.5x→1x
+          snapZoom: 0,
+          heroEruption: false,
+          vignettePull: 0,
         };
       }
     }
@@ -271,6 +287,10 @@ export function computeITResponse(
         flashHue: 0,
         lockDepth: "shallow",
         forceTranscendentShader: false,
+        saturationSurge: 1 + 0.8 * eased, // ramp to 1.8x during convergence
+        snapZoom: eased > 0.7 ? (eased - 0.7) * 2 : 0, // gentle zoom pull-in
+        heroEruption: eased > 0.95, // fire hero icon at convergence completion
+        vignettePull: eased * 0.15, // start tightening focus
       };
     }
 
@@ -285,45 +305,60 @@ export function computeITResponse(
     let strobeIntensity = 0;
     let timeDilation = 1.0;
     let forceTranscendentShader = false;
+    let saturationSurge = 1.8; // base lock saturation boost
+    let snapZoom = 0;
+    let vignettePull = 0.15;
 
     switch (lockDepth) {
       case "shallow":
-        // Camera freeze + overlay reduce (basic lock)
+        // Camera freeze + overlay reduce + initial saturation surge
         overlayOpacity = LOCKED_OVERLAY_OPACITY;
+        saturationSurge = 1.8;
+        vignettePull = 0.15;
         break;
 
       case "medium":
-        // + luminance lift + musical time snap
+        // + luminance lift + musical time snap + stronger saturation
         luminanceLift = LOCKED_LUMINANCE_LIFT;
         snapToMusicalTime = true;
+        saturationSurge = 2.0;
+        vignettePull = 0.20;
+        // Periodic zoom pulse on strong beats (every ~2s)
+        snapZoom = onsetStrength > 0.3 ? 0.3 * onsetStrength : 0;
         break;
 
       case "deep": {
-        // + strobe + time dilation
+        // + strobe + time dilation + maximum saturation surge
         luminanceLift = LOCKED_LUMINANCE_LIFT;
         snapToMusicalTime = true;
+        saturationSurge = 2.3;
+        vignettePull = 0.25;
         const deepProgress = Math.max(0, Math.min(1,
           (framesSinceLock - MEDIUM_END) / (DEEP_END - MEDIUM_END),
         ));
-        // Gate strobe to only fire on significant onsets (>0.15) to suppress noise
         strobeIntensity = deepProgress > 0.3 && onsetStrength > 0.15
           ? STROBE_MAX * smoothstep((deepProgress - 0.3) / 0.7) * Math.min(1, (onsetStrength - 0.15) * 3.5)
           : 0;
         timeDilation = 1 - (1 - LOCKED_TIME_DILATION) * smoothstep(deepProgress);
+        // Snap zoom on strong transients during deep lock
+        snapZoom = onsetStrength > 0.25 ? 0.5 * onsetStrength : 0;
         break;
       }
 
       case "transcendent":
-        // Maximum: force sacred shaders, overlay -> 0, max time dilation
+        // Maximum: force sacred shaders, overlay -> 0, max everything
         luminanceLift = LOCKED_LUMINANCE_LIFT;
         snapToMusicalTime = true;
         overlayOpacity = 0;
         timeDilation = TRANSCENDENT_TIME_DILATION;
-        // Gate strobe to only fire on significant onsets (>0.15)
+        saturationSurge = 2.5; // peak saturation — colors should be VIVID
+        vignettePull = 0.30; // tight tunnel focus on the shader
         strobeIntensity = onsetStrength > 0.15
           ? STROBE_MAX * Math.min(1, (onsetStrength - 0.15) * 3.5)
           : 0;
         forceTranscendentShader = true;
+        // Snap zoom on every strong onset during transcendence
+        snapZoom = onsetStrength > 0.2 ? 0.7 * onsetStrength : 0;
         break;
     }
 
@@ -342,6 +377,10 @@ export function computeITResponse(
       flashHue: 0,
       lockDepth,
       forceTranscendentShader,
+      saturationSurge,
+      snapZoom,
+      heroEruption: false,
+      vignettePull,
     };
   }
 
@@ -365,5 +404,9 @@ function defaultState(): ITVisualState {
     flashHue: 0,
     lockDepth: "shallow",
     forceTranscendentShader: false,
+    saturationSurge: 1,
+    snapZoom: 0,
+    heroEruption: false,
+    vignettePull: 0,
   };
 }

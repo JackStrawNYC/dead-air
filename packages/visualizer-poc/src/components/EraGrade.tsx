@@ -1,55 +1,24 @@
 /**
- * EraGrade — per-era post-processing via CSS filters.
- * Wraps children in a div with era-appropriate color grading.
- * Consumes era from ShowContext. No-op when era is unset.
+ * EraGrade — per-era film stock emulation via CSS filters + overlays.
  *
- * Era aesthetics:
- *   primal      (1965-67) — warm sepia, heavy desaturation, 16mm home movie
- *   classic     (1968-79) — neutral warm, gentle saturation, golden-era clarity
- *   hiatus      (1975-76) — cool muted tones, slight blue push
- *   touch_of_grey (1987-90) — vivid saturated, punchy contrast, stadium-era
- *   revival     (1991-95) — clean neutral, subtle warmth
+ * Now powered by the film-stock system for authentic era-specific looks:
+ *   primal (1965-67)      — Kodachrome 16mm: sepia warmth, crushed blacks, heavy grain
+ *   classic (1968-79)     — Ektachrome E-6: vivid, green shadows, warm highlights
+ *   brent_era (1980-86)   — Betacam SP: clean, slight pink, minimal grain
+ *   hiatus (1975-76)      — 16mm Reversal: cool muted, blue push
+ *   touch_of_grey (1987-90) — U-Matic/Betacam: punchy, saturated, neon-capable
+ *   revival (1991-95)     — DV/Hi8: neutral, mild noise, taper aesthetic
+ *
+ * Applies 3 layers:
+ *   1. CSS filter (brightness, contrast, sepia, saturation)
+ *   2. Shadow tint overlay (multiply blend)
+ *   3. Highlight tint overlay (screen blend)
+ *   4. Mid-tone tint overlay (overlay blend)
  */
 
 import React, { useMemo } from "react";
 import { useShowContext } from "../data/ShowContext";
-
-type Era = "primal" | "classic" | "hiatus" | "touch_of_grey" | "revival";
-
-interface EraGradeStyle {
-  /** CSS filter string */
-  filter: string;
-  /** Optional background tint (applied via mix-blend-mode overlay) */
-  tintColor?: string;
-  tintOpacity?: number;
-}
-
-// GLSL now owns ALL color grading: saturation, contrast, brightness, and sepia
-// via cinematicGrade + uEraSaturation + uEraBrightness + uEraSepia.
-// CSS only handles the subtle tint overlay (mix-blend-mode: overlay).
-const ERA_GRADES: Record<Era, EraGradeStyle> = {
-  primal: {
-    filter: "",
-    tintColor: "rgba(140, 90, 40, 0.05)",
-    tintOpacity: 0.05,
-  },
-  classic: {
-    filter: "",
-    tintColor: "rgba(180, 140, 80, 0.02)",
-    tintOpacity: 0.02,
-  },
-  hiatus: {
-    filter: "",
-    tintColor: "rgba(60, 80, 120, 0.04)",
-    tintOpacity: 0.04,
-  },
-  touch_of_grey: {
-    filter: "",
-  },
-  revival: {
-    filter: "",
-  },
-};
+import { getFilmStock, type FilmStockProfile } from "../utils/film-stock";
 
 interface Props {
   children: React.ReactNode;
@@ -58,18 +27,23 @@ interface Props {
 export const EraGrade: React.FC<Props> = ({ children }) => {
   const ctx = useShowContext();
 
-  const gradeStyle = useMemo((): EraGradeStyle | null => {
-    if (!ctx?.era || !(ctx.era in ERA_GRADES)) return null;
-    return ERA_GRADES[ctx.era as Era];
+  const filmStock = useMemo((): FilmStockProfile | null => {
+    if (!ctx?.era) return null;
+    return getFilmStock(ctx.era);
   }, [ctx?.era]);
 
-  if (!gradeStyle) {
+  if (!filmStock) {
     return <>{children}</>;
   }
 
-  // No CSS filter needed — GLSL handles brightness/sepia/saturation/contrast.
-  // Only the tint overlay remains for subtle era-specific color wash.
-  if (!gradeStyle.tintColor) {
+  const hasFilter = filmStock.cssFilter.length > 0;
+  const hasTint = filmStock.tintOpacity > 0;
+  const hasShadow = filmStock.shadowTintOpacity > 0;
+  const hasHighlight = filmStock.highlightTintOpacity > 0;
+  const hasBlackLift = filmStock.blackPointLift > 0;
+
+  // No visual effects at all — pass through
+  if (!hasFilter && !hasTint && !hasShadow && !hasHighlight && !hasBlackLift) {
     return <>{children}</>;
   }
 
@@ -78,18 +52,64 @@ export const EraGrade: React.FC<Props> = ({ children }) => {
       style={{
         position: "absolute",
         inset: 0,
+        filter: hasFilter ? filmStock.cssFilter : undefined,
       }}
     >
       {children}
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          backgroundColor: gradeStyle.tintColor,
-          mixBlendMode: "overlay",
-          pointerEvents: "none",
-        }}
-      />
+
+      {/* Shadow tint: affects dark areas via multiply blend */}
+      {hasShadow && (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            background: `linear-gradient(180deg, transparent 30%, ${filmStock.shadowTint} 100%)`,
+            mixBlendMode: "multiply",
+            pointerEvents: "none",
+            opacity: filmStock.shadowTintOpacity,
+          }}
+        />
+      )}
+
+      {/* Highlight tint: affects bright areas via screen blend */}
+      {hasHighlight && (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            background: `radial-gradient(ellipse at 50% 40%, ${filmStock.highlightTint}, transparent 70%)`,
+            mixBlendMode: "screen",
+            pointerEvents: "none",
+            opacity: filmStock.highlightTintOpacity,
+          }}
+        />
+      )}
+
+      {/* Mid-tone tint: overall color cast via overlay blend */}
+      {hasTint && (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            backgroundColor: filmStock.tintColor,
+            mixBlendMode: "overlay",
+            pointerEvents: "none",
+          }}
+        />
+      )}
+
+      {/* Black point lift: lifted blacks (milky shadows) characteristic of older film */}
+      {hasBlackLift && (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            backgroundColor: `rgba(30, 28, 25, ${filmStock.blackPointLift.toFixed(3)})`,
+            mixBlendMode: "lighten",
+            pointerEvents: "none",
+          }}
+        />
+      )}
     </div>
   );
 };

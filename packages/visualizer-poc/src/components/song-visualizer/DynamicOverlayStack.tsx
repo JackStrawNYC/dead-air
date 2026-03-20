@@ -54,6 +54,8 @@ interface Props {
   itOverlayOverride?: number;
   /** Counterpoint overlay inversion (0-1): 0.8 = multiply opacities by 0.2 during bass isolation */
   counterpointOverlayInversion?: number;
+  /** Climax desaturation (0-1): 1.0 = full monochrome overlays during climax so shader owns color */
+  climaxDesaturation?: number;
 }
 
 export const DynamicOverlayStack: React.FC<Props> = ({
@@ -69,6 +71,7 @@ export const DynamicOverlayStack: React.FC<Props> = ({
   usedOverlayIds,
   itOverlayOverride = 1,
   counterpointOverlayInversion = 0,
+  climaxDesaturation = 0,
 }) => {
   const frame = useCurrentFrame();
 
@@ -106,6 +109,11 @@ export const DynamicOverlayStack: React.FC<Props> = ({
     { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: Easing.out(Easing.cubic) },
   );
 
+  // Climax desaturation: during peak moments, overlays go monochrome so shader owns color
+  const desatFilter = climaxDesaturation > 0.01
+    ? `saturate(${(1 - climaxDesaturation * 0.85).toFixed(3)})`
+    : undefined;
+
   return (
     <TempoProvider tempo={tempo}>
     <SongPaletteProvider palette={palette}>
@@ -118,6 +126,7 @@ export const DynamicOverlayStack: React.FC<Props> = ({
             opacity: gateOpacity,
             pointerEvents: "none",
             mixBlendMode: "screen",
+            filter: desatFilter,
           }}
         >
           {glslOverlays.map(({ name, entry: { Component }, opacity }) => (
@@ -146,7 +155,10 @@ export const DynamicOverlayStack: React.FC<Props> = ({
           position: "absolute",
           inset: 0,
           opacity: gateOpacity,
-          filter: hueRotation !== 0 ? `hue-rotate(${hueRotation.toFixed(1)}deg)` : undefined,
+          filter: [
+            hueRotation !== 0 ? `hue-rotate(${hueRotation.toFixed(1)}deg)` : "",
+            desatFilter ?? "",
+          ].filter(Boolean).join(" ") || undefined,
         }}
       >
         {domOverlays.map(({ name, entry: { Component, blendMode, layer }, opacity }) => {

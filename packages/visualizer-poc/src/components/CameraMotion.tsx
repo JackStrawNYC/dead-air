@@ -45,6 +45,8 @@ interface Props {
   cameraSteadiness?: number;
   /** Climax camera drama level (0 normal, 0-1 extreme — widens zoom, faster shakes) */
   cameraDrama?: number;
+  /** IT snap zoom intensity (0-1): transient zoom punch during coherence lock */
+  itSnapZoom?: number;
 }
 
 const QUIET_SCALE = 1.12;
@@ -74,7 +76,7 @@ function shakeHash(frame: number): { x: number; y: number } {
   return { x, y };
 }
 
-export const CameraMotion: React.FC<Props> = ({ frames, children, jamEvolution, bass, cameraFreeze, drumsSpacePhase, fastEnergy, vocalPresence, isSolo, soloIntensity, grooveMotionMult = 1, groovePulseMult = 1, sectionDriftMult = 1, cameraSteadiness = 0.5, cameraDrama = 0 }) => {
+export const CameraMotion: React.FC<Props> = ({ frames, children, jamEvolution, bass, cameraFreeze, drumsSpacePhase, fastEnergy, vocalPresence, isSolo, soloIntensity, grooveMotionMult = 1, groovePulseMult = 1, sectionDriftMult = 1, cameraSteadiness = 0.5, cameraDrama = 0, itSnapZoom = 0 }) => {
   const frozenTransform = React.useRef({ scale: 1.04, totalX: 0, totalY: 0, tilt: 0 });
   const frame = useCurrentFrame();
   const idx = Math.min(Math.max(0, frame), frames.length - 1);
@@ -227,6 +229,11 @@ export const CameraMotion: React.FC<Props> = ({ frames, children, jamEvolution, 
   // Solo zoom: dramatic slow push during solos (up to 1.5% zoom)
   if (isSolo && soloIntensity && soloIntensity > 0) {
     scale *= 1 + soloIntensity * 0.015;
+  }
+
+  // IT snap zoom: rapid zoom punch during coherence lock (up to 4% zoom on transients)
+  if (itSnapZoom > 0) {
+    scale *= 1 + itSnapZoom * 0.04;
   }
 
   let totalX = shakeX + driftX;

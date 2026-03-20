@@ -95,6 +95,7 @@ import { LyricFragment } from "./components/LyricFragment";
 import { WaveformOverlay } from "./components/WaveformOverlay";
 import { GuitarStrings } from "./components/GuitarStrings";
 import { MeshDeformationGrid } from "./components/MeshDeformationGrid";
+import { computeStemCharacter } from "./utils/stem-character";
 
 // Extracted sub-components
 import { SongArtLayer } from "./components/song-visualizer/SongArtLayer";
@@ -363,6 +364,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
   const guitarColorTemp = computeGuitarColorTemp(audioSnapshot);
   const stemInterplay = detectStemInterplay(f, frameIdx);
   const phraseState = detectPhrase(f, frameIdx, tempo);
+  const stemCharacter = computeStemCharacter(audioSnapshot);
 
   // Coherence detection — "IT" detector
   const coherenceState = computeCoherence(f, frameIdx);
@@ -510,10 +512,16 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
     props.show?.songs.length ?? 0,
   );
 
-  // Floor at 0.40 prevents 11 stacked multipliers from collapsing overlay visibility.
-  // Quiet sections (56% of song duration) need overlays at ≥7% effective opacity
-  // to maintain psychedelic texture during a 3-hour show.
-  const combinedDensityMult = Math.max(0.15, climaxMod.overlayDensityMult * (jamEvolution.isLongJam ? jamEvolution.densityMult : 1) * sectionVocab.overlayDensityMult * narrativeDirective.overlayDensityMult * endScreenMult * venueProfile.overlayDensityMult * crowdDensityMult * fatigue.densityMult * stemInterplay.densityMult * peakOfShow.densityMult * tempoLock.overlayBreathing * crowdEnergy.densityMult * (0.7 + 0.3 * narrativeDirective.abstractionLevel));
+  // Geometric mean protection: instead of a hard floor, use additive rescue.
+  // This prevents 11 multipliers from collapsing to zero while allowing
+  // genuine near-darkness in quiet passages. The floor is 0.03 (barely visible)
+  // so silence is truly dark, but peaks can flood to 1.5+.
+  const rawDensityMult = climaxMod.overlayDensityMult * (jamEvolution.isLongJam ? jamEvolution.densityMult : 1) * sectionVocab.overlayDensityMult * narrativeDirective.overlayDensityMult * endScreenMult * venueProfile.overlayDensityMult * crowdDensityMult * fatigue.densityMult * stemInterplay.densityMult * peakOfShow.densityMult * tempoLock.overlayBreathing * crowdEnergy.densityMult * stemCharacter.overlayDensityMult * (0.7 + 0.3 * narrativeDirective.abstractionLevel);
+  // Additive rescue: if product collapsed below 0.10 due to stacked multipliers,
+  // blend toward the average of the two strongest multipliers
+  const combinedDensityMult = rawDensityMult < 0.10
+    ? Math.max(0.03, rawDensityMult + (0.10 - rawDensityMult) * 0.5)
+    : rawDensityMult;
   const opacityMap = opacityMapBase ? applyDensityMult(opacityMapBase, combinedDensityMult, rotationSchedule!) : null;
 
   // ─── Lyric trigger suppression ───
@@ -580,9 +588,9 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
       <PeakOfShowProvider value={peakOfShow.intensity}>
       <VisualizerErrorBoundary>
       <div style={{ position: "absolute", inset: 0, opacity }}>
-        <CameraMotion frames={f} jamEvolution={jamEvolution} bass={audioSnapshot.bass} cameraFreeze={counterpoint.cameraFreeze || itState.cameraLock || introFactor < 0.5} drumsSpacePhase={drumsSpaceState?.subPhase} fastEnergy={audioSnapshot.fastEnergy} vocalPresence={audioSnapshot.vocalPresence} isSolo={soloState.isSolo} soloIntensity={soloState.intensity} grooveMotionMult={grooveMods.motionMult * fatigue.motionMult * stemInterplay.motionMult * peakOfShow.motionMult * crowdEnergy.motionMult * narrativeDirective.motionMult} groovePulseMult={grooveMods.pulseMult * phraseState.zoomBreathing * tempoLock.zoomPulse * regularityStabilityMod} sectionDriftMult={sectionVocab.driftSpeedMult} cameraSteadiness={Math.max(0, Math.min(1, sectionVocab.cameraSteadiness + setTheme.cameraSteadinessOffset))} cameraDrama={climaxMod.cameraDrama}>
+        <CameraMotion frames={f} jamEvolution={jamEvolution} bass={audioSnapshot.bass} cameraFreeze={counterpoint.cameraFreeze || itState.cameraLock || introFactor < 0.5} drumsSpacePhase={drumsSpaceState?.subPhase} fastEnergy={audioSnapshot.fastEnergy} vocalPresence={audioSnapshot.vocalPresence} isSolo={soloState.isSolo} soloIntensity={soloState.intensity} grooveMotionMult={grooveMods.motionMult * fatigue.motionMult * stemInterplay.motionMult * peakOfShow.motionMult * crowdEnergy.motionMult * narrativeDirective.motionMult * stemCharacter.motionMult} groovePulseMult={grooveMods.pulseMult * phraseState.zoomBreathing * tempoLock.zoomPulse * regularityStabilityMod} sectionDriftMult={sectionVocab.driftSpeedMult} cameraSteadiness={Math.max(0, Math.min(1, sectionVocab.cameraSteadiness + setTheme.cameraSteadinessOffset))} cameraDrama={climaxMod.cameraDrama} itSnapZoom={itState.snapZoom}>
         <EraGrade>
-        <EnergyEnvelope snapshot={audioSnapshot} climaxMod={climaxMod} jamColorTemp={jamEvolution.isLongJam ? jamEvolution.colorTemperature : undefined} calibration={energyCalibration} counterpointSatMult={counterpoint.saturationMult} brightnessCounterpoint={counterpoint.brightnessCounterpoint} drumsSpacePhase={drumsSpaceState?.subPhase} showPhase={narrative?.state.showPhase} songIdentity={songIdentity} showArcModifiers={showArcModifiers} itLuminanceLift={itState.luminanceLift} vocalWarmth={vocalWarmth} guitarColorTemp={guitarColorTemp} deadAirFactor={deadAirFactor} narrativeBrightness={narrativeDirective.brightnessOffset + sectionVocab.brightnessOffset + fatigue.brightnessOffset + phraseState.brightnessBreathing + peakOfShow.brightnessBoost + crowdEnergy.energyBaselineOffset} narrativeTemperature={narrativeDirective.temperature + grooveMods.temperatureShift + (grooveMods.regularity > 0.6 ? 0.05 : grooveMods.regularity < 0.3 ? -0.05 : 0)} introFactor={introFactor} isSolo={soloState.isSolo} soloIntensity={soloState.intensity} harmonicBrightness={harmonicResponse.brightnessOffset} harmonicSatMult={harmonicResponse.saturationMult} modalHueShift={modalColor.hueShift} modalSatOffset={modalColor.satOffset + fatigue.saturationOffset + phraseState.saturationBreathing + peakOfShow.saturationBoost} narrativeSatOffset={narrativeDirective.saturationOffset}>
+        <EnergyEnvelope snapshot={audioSnapshot} climaxMod={climaxMod} jamColorTemp={jamEvolution.isLongJam ? jamEvolution.colorTemperature : undefined} calibration={energyCalibration} counterpointSatMult={counterpoint.saturationMult} brightnessCounterpoint={counterpoint.brightnessCounterpoint} drumsSpacePhase={drumsSpaceState?.subPhase} showPhase={narrative?.state.showPhase} songIdentity={songIdentity} showArcModifiers={showArcModifiers} itLuminanceLift={itState.luminanceLift} itSaturationSurge={itState.saturationSurge} itVignettePull={itState.vignettePull} vocalWarmth={vocalWarmth} guitarColorTemp={guitarColorTemp} deadAirFactor={deadAirFactor} narrativeBrightness={narrativeDirective.brightnessOffset + sectionVocab.brightnessOffset + fatigue.brightnessOffset + phraseState.brightnessBreathing + peakOfShow.brightnessBoost + crowdEnergy.energyBaselineOffset} narrativeTemperature={narrativeDirective.temperature + grooveMods.temperatureShift + (grooveMods.regularity > 0.6 ? 0.05 : grooveMods.regularity < 0.3 ? -0.05 : 0)} introFactor={introFactor} isSolo={soloState.isSolo} soloIntensity={soloState.intensity} harmonicBrightness={harmonicResponse.brightnessOffset} harmonicSatMult={harmonicResponse.saturationMult} modalHueShift={modalColor.hueShift} modalSatOffset={modalColor.satOffset + fatigue.saturationOffset + phraseState.saturationBreathing + peakOfShow.saturationBoost} narrativeSatOffset={narrativeDirective.saturationOffset} stemCharacterHue={stemCharacter.hueShift} stemCharacterSat={stemCharacter.saturationMult} stemCharacterBright={stemCharacter.brightnessOffset} stemCharacterTemp={stemCharacter.temperature}>
           <div style={{ position: "absolute", inset: 0, opacity: focusState.shaderOpacity * (0.15 + 0.85 * introFactor) }}>
           <SilentErrorBoundary name="SceneRouter">
             {(() => {
@@ -663,6 +671,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
             energyLevel={energyLevel}
             itOverlayOverride={itState.overlayOpacityOverride}
             counterpointOverlayInversion={counterpoint.overlayInversion}
+            climaxDesaturation={climaxState.phase === "climax" ? climaxState.intensity : climaxState.phase === "sustain" ? climaxState.intensity * 0.6 : 0}
           />
 
           {!isDeadAir && introFactor > 0.5 && (

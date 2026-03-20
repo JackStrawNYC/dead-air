@@ -7,7 +7,9 @@ describe("computeVisualFocus", () => {
     const state = computeVisualFocus("climax", 1.0, 100);
     expect(state.shaderOpacity).toBe(1.0);
     expect(state.artOpacity).toBe(0.0); // art fully suppressed during climax
-    expect(state.overlayOpacity).toBe(0.25); // overlays visible during climax
+    // Overlays near-zero during climax (0.10 base + up to 0.05 pulse breathing)
+    expect(state.overlayOpacity).toBeLessThanOrEqual(0.20);
+    expect(state.overlayOpacity).toBeGreaterThan(0);
     expect(state.grainOpacity).toBeLessThanOrEqual(0.5);
   });
 
@@ -15,13 +17,15 @@ describe("computeVisualFocus", () => {
     const state = computeVisualFocus("sustain", 1.0, 100);
     expect(state.shaderOpacity).toBeGreaterThanOrEqual(0.85);
     expect(state.artOpacity).toBe(0.0); // art fully suppressed during sustain
-    expect(state.overlayOpacity).toBe(0.20); // overlays visible during sustain
+    // Overlays minimal during sustain (0.15 base + up to 0.05 pulse breathing)
+    expect(state.overlayOpacity).toBeLessThanOrEqual(0.25);
+    expect(state.overlayOpacity).toBeGreaterThan(0);
   });
 
   it("build: overlays present, shader below full", () => {
     const state = computeVisualFocus("build", 1.0, 100);
     // Build phase should show overlays and have shader below full
-    expect(state.overlayOpacity).toBeGreaterThanOrEqual(0.15);
+    expect(state.overlayOpacity).toBeGreaterThanOrEqual(0.10);
     expect(state.shaderOpacity).toBeLessThan(1.0);
   });
 
