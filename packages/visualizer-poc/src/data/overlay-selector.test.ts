@@ -339,7 +339,7 @@ describe("curated overlay pool", () => {
     expect(names).toContain("WallOfSound");
   });
 
-  it("has 86 total overlays (84 selectable + 2 always-active)", () => {
-    expect(OVERLAY_REGISTRY.length).toBe(86);
+  it("has 354 total overlays (352 selectable + 2 always-active)", () => {
+    expect(OVERLAY_REGISTRY.length).toBe(354);
   });
 });

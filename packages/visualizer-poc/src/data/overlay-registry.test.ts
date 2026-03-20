@@ -32,8 +32,8 @@ describe("overlay-registry integrity", () => {
     expect(unique.size).toBe(names.length);
   });
 
-  it("has exactly 86 entries (84 selectable + 2 always-active)", () => {
-    expect(OVERLAY_REGISTRY.length).toBe(86);
+  it("has exactly 354 entries (352 selectable + 2 always-active)", () => {
+    expect(OVERLAY_REGISTRY.length).toBe(354);
   });
 
   it("all entries have required fields", () => {
@@ -64,7 +64,7 @@ describe("overlay-registry integrity", () => {
 
   it("populated layers include 1, 2, 3, 5, 6, 7, 10", () => {
     const layers = new Set(OVERLAY_REGISTRY.map((e) => e.layer));
-    for (const l of [1, 2, 3, 5, 6, 7, 9, 10]) {
+    for (const l of [1, 2, 3, 4, 5, 6, 7, 9, 10]) {
       expect(layers.has(l)).toBe(true);
     }
   });
