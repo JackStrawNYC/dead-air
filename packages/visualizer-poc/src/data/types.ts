@@ -320,6 +320,12 @@ export interface OverlayEntry {
   energyResponse?: [threshold: number, peak: number, falloff: number];
   /** Quality tier: A=essential, B=good, C=archived (excluded from selection) */
   tier?: "A" | "B" | "C";
+  /** Visual complexity: 1=simple/subtle, 2=moderate, 3=busy/complex.
+   *  Defaults to weight value if not set. Used to cap total visual complexity per song. */
+  complexity?: 1 | 2 | 3;
+  /** Selection rarity (0-1, default 1.0). Values < 1.0 add a random gate:
+   *  the overlay only passes if rng() < rarity, creating "surprise" appearances. */
+  rarity?: number;
   /** CSS mix-blend-mode for this overlay (default "screen") */
   blendMode?: "screen" | "overlay" | "multiply" | "soft-light" | "color-dodge" | "luminosity";
 }

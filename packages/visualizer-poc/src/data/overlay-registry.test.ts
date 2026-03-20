@@ -95,11 +95,17 @@ describe("overlay-registry integrity", () => {
 });
 
 describe("SELECTABLE_REGISTRY", () => {
-  it("equals OVERLAY_REGISTRY contents", () => {
-    expect(SELECTABLE_REGISTRY.length).toBe(OVERLAY_REGISTRY.length);
-    for (let i = 0; i < OVERLAY_REGISTRY.length; i++) {
-      expect(SELECTABLE_REGISTRY[i].name).toBe(OVERLAY_REGISTRY[i].name);
+  it("contains only A+B tier overlays (excludes C-tier)", () => {
+    expect(SELECTABLE_REGISTRY.length).toBe(
+      OVERLAY_REGISTRY.filter((e) => e.tier !== "C").length,
+    );
+    for (const entry of SELECTABLE_REGISTRY) {
+      expect(entry.tier).not.toBe("C");
     }
+  });
+
+  it("is smaller than OVERLAY_REGISTRY (C-tier archived)", () => {
+    expect(SELECTABLE_REGISTRY.length).toBeLessThan(OVERLAY_REGISTRY.length);
   });
 });
 

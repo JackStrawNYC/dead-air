@@ -671,12 +671,36 @@ export function buildRotationSchedule(
       }
     }
 
-    // Fill remaining slots from top scores overall
-    for (const s of scored) {
+    // Fill remaining slots with tag diversity + category balance
+    // Penalize overlays with heavy tag overlap or duplicate categories
+    const selectedTags = new Set<string>();
+    const selectedCategories = new Map<string, number>();
+    for (const sel of selected) {
+      for (const tag of sel.tags) selectedTags.add(tag);
+      selectedCategories.set(sel.category, (selectedCategories.get(sel.category) ?? 0) + 1);
+    }
+    const diversitySorted = scored
+      .filter((s) => !selectedNames.has(s.entry.name))
+      .map((s) => {
+        let adjScore = s.score;
+        // Tag overlap penalty
+        let tagOverlap = 0;
+        for (const tag of s.entry.tags) {
+          if (selectedTags.has(tag)) tagOverlap++;
+        }
+        if (tagOverlap >= 2) adjScore -= 0.15 * (tagOverlap - 1);
+        // Category duplication penalty
+        const catCount = selectedCategories.get(s.entry.category) ?? 0;
+        if (catCount >= 1) adjScore -= 0.20 * catCount;
+        return { ...s, score: adjScore };
+      })
+      .sort((a, b) => b.score - a.score);
+    for (const s of diversitySorted) {
       if (selected.length >= targetCount) break;
-      if (selectedNames.has(s.entry.name)) continue;
       selected.push(s.entry);
       selectedNames.add(s.entry.name);
+      for (const tag of s.entry.tags) selectedTags.add(tag);
+      selectedCategories.set(s.entry.category, (selectedCategories.get(s.entry.category) ?? 0) + 1);
     }
 
     window.overlays = selected.map((e) => e.name);
@@ -940,6 +964,40 @@ export function getOverlayOpacities(
       // Sqrt smoothing compresses the response curve, reducing transient spikes
       const smoothedResponse = Math.sqrt(response);
       result[name] = (result[name] ?? 0) * (0.5 + smoothedResponse * 0.5);
+    }
+  }
+
+  // ─── Silence breathing: progressive overlay withdrawal during sustained quiet ───
+  if (frames && frames.length > 0) {
+    const frameIdx = Math.min(frame, frames.length - 1);
+    const QUIET_THRESHOLD = 0.03;
+    const QUIET_WINDOW = 90; // 3 seconds at 30fps
+    let quietFrames = 0;
+    for (let f = Math.max(0, frameIdx - QUIET_WINDOW); f <= frameIdx; f++) {
+      if (frames[f].rms < QUIET_THRESHOLD) quietFrames++;
+    }
+    if (quietFrames > QUIET_WINDOW * 0.8) {
+      const quietDepth = (quietFrames - QUIET_WINDOW * 0.8) / (QUIET_WINDOW * 0.2);
+      const withdrawMult = 1 - quietDepth * 0.6; // Down to 40% opacity
+      for (const name of Object.keys(result)) {
+        if (schedule.alwaysActive.includes(name)) continue;
+        result[name] = (result[name] ?? 0) * Math.max(0.1, withdrawMult);
+      }
+    }
+  }
+
+  // ─── Beat anticipation builds: subtle opacity boost during energy ramps ───
+  if (frames && frame > 5 && frame < frames.length - 1) {
+    const frameIdx = Math.min(frame, frames.length - 1);
+    const e0 = frames[Math.max(0, frameIdx - 3)]?.rms ?? 0;
+    const e1 = frames[Math.max(0, frameIdx - 1)]?.rms ?? 0;
+    const e2 = frames[frameIdx]?.rms ?? 0;
+    const rising = e2 > e1 && e1 > e0 && (e2 - e0) > 0.08;
+    if (rising) {
+      const anticipationBoost = Math.min(0.10, (e2 - e0) * 0.5);
+      for (const name of Object.keys(result)) {
+        result[name] = Math.min(1, (result[name] ?? 0) + anticipationBoost);
+      }
     }
   }
 

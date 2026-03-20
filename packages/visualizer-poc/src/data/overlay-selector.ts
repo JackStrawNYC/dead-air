@@ -19,6 +19,7 @@ import type {
 import { SELECTABLE_REGISTRY, ALWAYS_ACTIVE } from "./overlay-registry";
 import type { SongIdentity } from "./song-identities";
 import { BAND_CONFIG } from "./band-config";
+import type { ShowArcModifiers } from "./show-arc";
 
 // ─── Per-layer selection targets (sparse — let each visual moment breathe) ───
 const LAYER_TARGETS: Record<number, { min: number; max: number }> = {
@@ -29,12 +30,12 @@ const LAYER_TARGETS: Record<number, { min: number; max: number }> = {
   5:  { min: 0, max: 1 },   // Nature/Cosmic
   6:  { min: 0, max: 1 },   // Characters
   7:  { min: 0, max: 1 },   // Frame/Info
-  8:  { min: 0, max: 0 },   // Typography — skip
-  9:  { min: 0, max: 0 },   // HUD — skip
+  8:  { min: 0, max: 1 },   // Typography
+  9:  { min: 0, max: 1 },   // HUD — music visualization
   10: { min: 0, max: 1 },   // Distortion
 };
 
-const MAX_TOTAL_WEIGHT = 8;
+const MAX_TOTAL_WEIGHT = 10;
 
 // ─── Cross-Song Memory ───
 
@@ -270,6 +271,7 @@ function scoreOverlay(
   history: OverlayHistory,
   rng: () => number,
   songIdentity?: SongIdentity,
+  showArcModifiers?: ShowArcModifiers,
 ): number {
   if (entry.alwaysActive) return 1; // Always selected
 
@@ -293,6 +295,16 @@ function scoreOverlay(
   // Tag affinity (sum of tag scores)
   for (const tag of entry.tags) {
     score += tagAffinity(tag, profile);
+  }
+
+  // Energy response curve match: overlays whose peak aligns with song energy score higher
+  if (entry.energyResponse) {
+    const [threshold, peak] = entry.energyResponse;
+    const dist = Math.abs(profile.avgEnergy - peak);
+    score += 0.10 - dist * 0.3;
+    if (profile.avgEnergy < threshold) {
+      score -= 0.15;
+    }
   }
 
   // Weight penalty: heavy overlays slightly penalized, subtle slightly boosted
@@ -326,6 +338,19 @@ function scoreOverlay(
     }
   }
 
+  // Show arc overlay category bias
+  if (showArcModifiers?.overlayBias) {
+    const bias = showArcModifiers.overlayBias[entry.category];
+    if (bias) score += bias;
+  }
+
+  // Surprise rarity gate: overlays with rarity < 1.0 have a random chance of suppression
+  if (entry.rarity !== undefined && entry.rarity < 1.0) {
+    if (rng() > entry.rarity) {
+      score *= 0.1;
+    }
+  }
+
   // Deterministic jitter (0-0.15) — wider spread for more per-song randomization
   score += rng() * 0.15;
 
@@ -353,6 +378,7 @@ export function selectOverlays(
   overrides?: OverlayOverrides,
   showSeed?: number,
   songIdentity?: SongIdentity,
+  showArcModifiers?: ShowArcModifiers,
 ): SelectionResult {
   // Backwards compat: wrap bare Set in a single-song history
   const resolvedHistory: OverlayHistory = history instanceof Set
@@ -364,7 +390,7 @@ export function selectOverlays(
   // Score all overlays
   const scored: ScoredOverlay[] = SELECTABLE_REGISTRY.map((entry) => ({
     entry,
-    score: scoreOverlay(entry, profile, resolvedHistory, rng, songIdentity),
+    score: scoreOverlay(entry, profile, resolvedHistory, rng, songIdentity, showArcModifiers),
   }));
 
   // Group by layer
@@ -436,6 +462,26 @@ export function selectOverlays(
     }
   }
 
+  // Dead culture guarantee: at least 1 culture-tagged overlay per song
+  const hasCulture = Array.from(selected).some((name) => {
+    const entry = SELECTABLE_REGISTRY.find((e) => e.name === name);
+    return entry?.tags.includes(BAND_CONFIG.overlayTags.culture);
+  });
+  if (!hasCulture) {
+    const cultureCandidate = scored
+      .filter(
+        (s) =>
+          s.entry.tags.includes(BAND_CONFIG.overlayTags.culture) &&
+          !selected.has(s.entry.name) &&
+          !excludeSet.has(s.entry.name),
+      )
+      .sort((a, b) => b.score - a.score)[0];
+    if (cultureCandidate) {
+      selected.add(cultureCandidate.entry.name);
+      totalWeight += cultureCandidate.entry.weight;
+    }
+  }
+
   // Force-include top-1 boosted overlay from song identity (if not already present)
   if (songIdentity?.overlayBoost?.length) {
     const boostedScored = songIdentity.overlayBoost
@@ -457,7 +503,34 @@ export function selectOverlays(
     selected.delete(name);
   }
 
-  // Apply targetCount override if specified
+  // Complexity cap: prevent visual overload from too many busy overlays
+  const MAX_COMPLEXITY = 18;
+  const forceIncluded = new Set(overrides?.include ?? []);
+  let totalComplexity = 0;
+  for (const name of selected) {
+    const entry = SELECTABLE_REGISTRY.find((e) => e.name === name);
+    totalComplexity += entry?.complexity ?? entry?.weight ?? 2;
+  }
+  while (totalComplexity > MAX_COMPLEXITY && selected.size > 2) {
+    // Find lowest-scoring removable overlay (not always-active, not force-included)
+    let worstName: string | null = null;
+    let worstScore = Infinity;
+    for (const name of selected) {
+      const entry = SELECTABLE_REGISTRY.find((e) => e.name === name);
+      if (entry?.alwaysActive || forceIncluded.has(name)) continue;
+      const s = scored.find((sc) => sc.entry.name === name);
+      if (s && s.score < worstScore) {
+        worstScore = s.score;
+        worstName = name;
+      }
+    }
+    if (!worstName) break;
+    const removedEntry = SELECTABLE_REGISTRY.find((e) => e.name === worstName);
+    totalComplexity -= removedEntry?.complexity ?? removedEntry?.weight ?? 2;
+    totalWeight -= removedEntry?.weight ?? 0;
+    selected.delete(worstName);
+  }
+
   const activeOverlays = Array.from(selected);
 
   return {
@@ -476,6 +549,7 @@ export function selectOverlaysForShow(
   songs: { song: SetlistEntry; analysis: TrackAnalysis }[],
   showSeed?: number,
   songIdentities?: Map<string, SongIdentity>,
+  showArcModifiers?: ShowArcModifiers,
 ): Record<string, SelectionResult & { title: string }> {
   const results: Record<string, SelectionResult & { title: string }> = {};
   let history = emptyHistory();
@@ -484,7 +558,7 @@ export function selectOverlaysForShow(
     const profile = buildSongProfile(song, analysis);
     const overrides = song.overlayOverrides;
     const identity = songIdentities?.get(song.title);
-    const result = selectOverlays(profile, history, overrides, showSeed, identity);
+    const result = selectOverlays(profile, history, overrides, showSeed, identity, showArcModifiers);
 
     results[song.trackId] = {
       ...result,
