@@ -41,7 +41,7 @@ uniform sampler2D uPrevFrame;
 
 ${noiseGLSL}
 
-${buildPostProcessGLSL({ grainStrength: "normal", bloomEnabled: true, caEnabled: true, halationEnabled: true })}
+${buildPostProcessGLSL({ grainStrength: "normal", bloomEnabled: true, caEnabled: true, halationEnabled: true, dofEnabled: true })}
 
 varying vec2 vUv;
 
@@ -87,7 +87,8 @@ void main() {
   float scaleAmount = 1.0 - (0.02 + energy * 0.03 + fftBass * 0.015) * accelBoost * sectionScaleMod;
 
   // Rotation: bass drives twist (section-modulated)
-  float rotAmount = (bass * 0.03 + 0.005) * sign(sin(slowTime * 0.2)) * sectionRotMod;
+  float stemBass = clamp(uStemBass, 0.0, 1.0);
+  float rotAmount = (bass * 0.03 + stemBass * 0.015 + 0.005) * sign(sin(slowTime * 0.2)) * sectionRotMod; // Phil's bass deepens the twist
   // Stability affects regularity: unstable = jittery rotation
   rotAmount += (1.0 - stability) * sin(uTime * 7.0) * 0.01;
 

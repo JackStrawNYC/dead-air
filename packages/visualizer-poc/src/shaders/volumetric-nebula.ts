@@ -25,7 +25,7 @@ void main() {
 }
 `;
 
-const postProcess = buildPostProcessGLSL({ bloomThresholdOffset: -0.1, caEnabled: true });
+const postProcess = buildPostProcessGLSL({ bloomThresholdOffset: -0.1, caEnabled: true, dofEnabled: true });
 
 export const volumetricNebulaFrag = /* glsl */ `
 precision highp float;

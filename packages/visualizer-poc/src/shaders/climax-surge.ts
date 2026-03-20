@@ -142,7 +142,8 @@ void main() {
     float rayAngle = mod(angle * rayCount / (2.0 * PI) + slowTime * 2.0, 1.0);
     float ray = pow(abs(sin(rayAngle * PI)), 20.0);
     float rayFade = exp(-dist * 2.5);
-    float rayIntensity = ray * rayFade * (drumOnset * 0.8 + energy * 0.3);
+    float stemDrums = clamp(uStemDrums, 0.0, 1.0);
+    float rayIntensity = ray * rayFade * (drumOnset * 0.8 + energy * 0.3 + stemDrums * 0.4); // drums intensify starburst
     vec3 rayColor = hsv2rgb(vec3(hue2 + 0.1, sat * 0.7, 1.0));
     col += rayColor * rayIntensity * (0.3 + gate * 0.5);
   }

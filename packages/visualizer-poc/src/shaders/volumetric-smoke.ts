@@ -80,12 +80,17 @@ void main() {
   float isClimax = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5);
   float climaxBoost = isClimax * clamp(uClimaxIntensity, 0.0, 1.0);
 
+  // === ADVANCED AUDIO UNIFORMS ===
+  float tension = clamp(uHarmonicTension, 0.0, 1.0);
+  float melodicPitch = clamp(uMelodicPitch, 0.0, 1.0);
+  float chordHue = float(int(uChordIndex)) / 24.0 * 0.12;
+
   float flowTime = uDynamicTime * (0.06 + slowE * 0.04) * mix(1.0, 1.3, sJam) * mix(1.0, 0.5, sSpace);
 
-  // === PALETTE ===
-  float hue1 = hsvToCosineHue(uPalettePrimary);
+  // === PALETTE (chord-shifted) ===
+  float hue1 = hsvToCosineHue(uPalettePrimary) + chordHue;
   vec3 smokeTint = 0.5 + 0.5 * cos(6.28318 * vec3(hue1, hue1 + 0.33, hue1 + 0.67));
-  smokeTint = mix(smokeTint, vec3(0.4, 0.42, 0.45), 0.5); // push toward grey smoke
+  smokeTint = mix(smokeTint, vec3(0.4, 0.42, 0.45), 0.5 - tension * 0.12); // tension adds color to smoke
 
   float hue2 = hsvToCosineHue(uPaletteSecondary);
   vec3 spotlightTint = 0.5 + 0.5 * cos(6.28318 * vec3(hue2, hue2 + 0.33, hue2 + 0.67));
@@ -93,7 +98,7 @@ void main() {
   // === 3 SPOTLIGHT POSITIONS (seeded from sectionIndex) ===
   vec3 spotPos[3];
   vec3 spotDir[3];
-  float spotAngle = 0.35 * mix(1.0, 1.2, sJam) * mix(1.0, 0.8, sSpace); // cone half-angle
+  float spotAngle = 0.35 * mix(1.0, 1.2, sJam) * mix(1.0, 0.8, sSpace) * (1.0 + tension * 0.15); // tension widens spotlight cones
 
   spotPos[0] = vec3(hash1(sectionIdx * 1.1) * 4.0 - 2.0, 3.0, hash1(sectionIdx * 2.3) * 2.0 - 1.0);
   spotPos[1] = vec3(hash1(sectionIdx * 3.7) * 4.0 - 2.0, 3.5, hash1(sectionIdx * 4.1) * 2.0 - 1.0);
@@ -110,8 +115,8 @@ void main() {
   setupCameraRay(uv, aspect, ro, rd);
 
   // === VOLUMETRIC SMOKE RAYMARCH (24-40 steps) ===
-  int steps = int(mix(24.0, 40.0, energy)) + int(sJam * 6.0) - int(sSpace * 6.0);
-  float stepSize = 0.15;
+  int steps = int(mix(24.0, 40.0, energy)) + int(sJam * 6.0) - int(sSpace * 6.0) + int(tension * 4.0); // tension adds detail
+  float stepSize = 0.15 - melodicPitch * 0.02; // higher pitch = finer steps
 
   vec3 smokeAccum = vec3(0.0);
   float smokeAlpha = 0.0;
@@ -125,8 +130,8 @@ void main() {
 
     float density = smokeDens(pos, bass, flowTime, energy);
 
-    // Drum onset smoke bursts
-    density += drumOnset * 0.4 * exp(-fi * 0.15);
+    // Drum onset smoke bursts + stem drums boost
+    density += (drumOnset * 0.4 + uStemDrums * 0.2) * exp(-fi * 0.15);
 
     density *= 0.07;
 

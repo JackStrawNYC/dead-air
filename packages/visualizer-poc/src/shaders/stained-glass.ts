@@ -141,13 +141,15 @@ void main() {
     dispersion.b = edgeProximity * onset * 0.6;
   }
 
-  // --- Rose window spotlight (vocal presence) ---
+  // --- Rose window spotlight (vocal presence + stem vocals) ---
+  float stemVocals = clamp(uStemVocals, 0.0, 1.0);
+  float vocalTotal = max(vocalPres, stemVocals); // strongest vocal signal wins
   float roseSpot = 0.0;
-  if (vocalPres > 0.3) {
+  if (vocalTotal > 0.3) {
     float r = length(p);
     float angle = atan(p.y, p.x);
     float rosePattern = 0.5 + 0.5 * sin(angle * 6.0 + slowTime);
-    roseSpot = (1.0 - smoothstep(0.0, 0.4, r)) * rosePattern * vocalPres;
+    roseSpot = (1.0 - smoothstep(0.0, 0.4, r)) * rosePattern * vocalTotal;
   }
 
   // --- Combine ---

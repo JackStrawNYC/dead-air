@@ -7,7 +7,7 @@
       "fractal_flames",
       "inferno",
       "lava_flow",
-      "oil_projector"
+      "fluid_light"
     ],
     "palette": {
       "primary": 15,
@@ -36,7 +36,7 @@
       "fractal_flames",
       "climax_surge",
       "electric_arc",
-      "volumetric_smoke"
+      "fluid_light"
     ],
     "palette": {
       "primary": 10,
@@ -120,7 +120,7 @@
       "oil_projector",
       "smoke_rings",
       "ink_wash",
-      "stained_glass",
+      "coral_reef",
       "aurora"
     ],
     "palette": {
@@ -145,9 +145,9 @@
       "aurora",
       "deep_ocean",
       "crystal_cavern",
-      "diffraction_rings",
+      "cosmic_dust",
       "stained_glass",
-      "smoke_rings",
+      "sacred_geometry",
       "volumetric_nebula"
     ],
     "palette": {
@@ -182,7 +182,7 @@
       "fractal_flames",
       "solar_flare",
       "lava_flow",
-      "volumetric_clouds"
+      "fluid_light"
     ],
     "palette": {
       "primary": 5,
@@ -237,7 +237,7 @@
       "lava_flow",
       "liquid_light",
       "fractal_flames",
-      "electric_arc"
+      "signal_decay"
     ],
     "palette": {
       "primary": 290,
@@ -265,8 +265,8 @@
       "crystal_cavern",
       "mandala_engine",
       "feedback_recursion",
-      "morphogenesis",
-      "volumetric_clouds"
+      "sacred_geometry",
+      "galaxy_spiral"
     ],
     "palette": {
       "primary": 260,
@@ -305,7 +305,7 @@
       "fractal_flames",
       "lava_flow",
       "solar_flare",
-      "volumetric_smoke"
+      "fluid_light"
     ],
     "palette": {
       "primary": 10,
@@ -339,7 +339,7 @@
       "feedback_recursion",
       "plasma_field",
       "kaleidoscope",
-      "oil_projector"
+      "fractal_zoom"
     ],
     "palette": {
       "primary": 0,
@@ -367,8 +367,8 @@
       "liquid_light",
       "feedback_recursion",
       "truchet_tiling",
-      "stained_glass",
-      "voronoi_flow",
+      "galaxy_spiral",
+      "fractal_zoom",
       "volumetric_clouds"
     ],
     "palette": {
@@ -401,8 +401,8 @@
       "deep_ocean",
       "feedback_recursion",
       "mandala_engine",
-      "diffraction_rings",
-      "stained_glass",
+      "cosmic_dust",
+      "sacred_geometry",
       "volumetric_smoke"
     ],
     "palette": {
@@ -440,10 +440,10 @@
       "cosmic_voyage",
       "aurora",
       "feedback_recursion",
-      "diffraction_rings",
-      "smoke_rings",
+      "particle_nebula",
+      "sacred_geometry",
       "crystal_cavern",
-      "aurora_curtains"
+      "galaxy_spiral"
     ],
     "palette": {
       "primary": 220,
@@ -477,7 +477,7 @@
       "fractal_flames",
       "electric_arc",
       "lava_flow",
-      "volumetric_clouds"
+      "fluid_light"
     ],
     "palette": {
       "primary": 20,
@@ -505,7 +505,7 @@
       "inferno",
       "feedback_recursion",
       "electric_arc",
-      "neural_web",
+      "fractal_zoom",
       "volumetric_smoke"
     ],
     "palette": {
@@ -589,7 +589,7 @@
       "vintage_film",
       "plasma_field",
       "solar_flare",
-      "oil_projector",
+      "particle_swarm",
       "fractal_flames",
       "volumetric_smoke"
     ],
@@ -616,7 +616,7 @@
       "fractal_flames",
       "inferno",
       "lava_flow",
-      "warp_field"
+      "fluid_light"
     ],
     "palette": {
       "primary": 340,
@@ -644,8 +644,8 @@
       "aurora",
       "feedback_recursion",
       "truchet_tiling",
-      "stained_glass",
-      "aurora_curtains",
+      "fractal_zoom",
+      "galaxy_spiral",
       "deep_ocean"
     ],
     "palette": {
@@ -676,7 +676,7 @@
       "tie_dye",
       "fractal_flames",
       "feedback_recursion",
-      "voronoi_flow",
+      "fractal_zoom",
       "neural_web",
       "kaleidoscope"
     ],
@@ -708,7 +708,7 @@
       "mandala_engine",
       "feedback_recursion",
       "electric_arc",
-      "digital_rain"
+      "signal_decay"
     ],
     "palette": {
       "primary": 350,
@@ -737,9 +737,9 @@
       "stark_minimal",
       "deep_ocean",
       "vintage_film",
-      "diffraction_rings",
+      "crystalline_growth",
       "aurora_curtains",
-      "ink_wash",
+      "sacred_geometry",
       "smoke_rings"
     ],
     "palette": {
@@ -778,9 +778,9 @@
       "crystal_cavern",
       "feedback_recursion",
       "truchet_tiling",
-      "voronoi_flow",
+      "fractal_zoom",
       "smoke_rings",
-      "stained_glass"
+      "particle_nebula"
     ],
     "palette": {
       "primary": 170,
@@ -813,7 +813,7 @@
       "feedback_recursion",
       "truchet_tiling",
       "aurora",
-      "stained_glass",
+      "fractal_zoom",
       "volumetric_nebula"
     ],
     "palette": {
@@ -839,7 +839,7 @@
       "fractal_flames",
       "electric_arc",
       "lava_flow",
-      "tie_dye"
+      "signal_decay"
     ],
     "palette": {
       "primary": 10,
@@ -959,7 +959,7 @@
       "lo_fi_grain",
       "aurora",
       "smoke_rings",
-      "stained_glass"
+      "coral_reef"
     ],
     "palette": {
       "primary": 30,
@@ -992,7 +992,7 @@
       "oil_projector",
       "smoke_rings",
       "ink_wash",
-      "stained_glass",
+      "coral_reef",
       "warp_field"
     ],
     "palette": {
@@ -1019,7 +1019,7 @@
       "databend",
       "fractal_flames",
       "kaleidoscope",
-      "vintage_film"
+      "particle_swarm"
     ],
     "palette": {
       "primary": 340,
@@ -1044,7 +1044,7 @@
       "concert_lighting",
       "inferno",
       "climax_surge",
-      "digital_rain",
+      "signal_decay",
       "electric_arc",
       "fractal_flames",
       "reaction_diffusion"
@@ -1141,7 +1141,7 @@
       "lo_fi_grain",
       "smoke_rings",
       "aurora",
-      "stained_glass"
+      "coral_reef"
     ],
     "palette": {
       "primary": 25,
@@ -1169,7 +1169,7 @@
       "oil_projector",
       "smoke_rings",
       "ink_wash",
-      "stained_glass",
+      "coral_reef",
       "warp_field"
     ],
     "palette": {
@@ -1194,8 +1194,8 @@
       "aurora",
       "liquid_light",
       "feedback_recursion",
-      "diffraction_rings",
-      "voronoi_flow",
+      "crystalline_growth",
+      "sacred_geometry",
       "smoke_rings",
       "stained_glass"
     ],
@@ -1235,7 +1235,7 @@
       "plasma_field",
       "liquid_light",
       "fractal_flames",
-      "lava_flow"
+      "fluid_light"
     ],
     "palette": {
       "primary": 350,
@@ -1264,9 +1264,9 @@
       "crystal_cavern",
       "deep_ocean",
       "feedback_recursion",
-      "morphogenesis",
-      "neural_web",
-      "void_light"
+      "void_light",
+      "galaxy_spiral",
+      "signal_decay"
     ],
     "palette": {
       "primary": 260,
@@ -1401,7 +1401,7 @@
       "smoke_rings",
       "liquid_light",
       "aurora",
-      "stained_glass"
+      "coral_reef"
     ],
     "palette": {
       "primary": 35,
@@ -1428,8 +1428,8 @@
       "deep_ocean",
       "feedback_recursion",
       "diffraction_rings",
-      "stained_glass",
-      "aurora_curtains"
+      "sacred_geometry",
+      "particle_nebula"
     ],
     "palette": {
       "primary": 200,
@@ -1547,7 +1547,7 @@
       "vintage_film",
       "oil_projector",
       "databend",
-      "lo_fi_grain",
+      "particle_swarm",
       "reaction_diffusion",
       "volumetric_nebula"
     ],
@@ -1573,8 +1573,8 @@
       "stained_glass",
       "crystal_cavern",
       "diffraction_rings",
-      "aurora_curtains",
-      "smoke_rings"
+      "crystalline_growth",
+      "sacred_geometry"
     ],
     "palette": {
       "primary": 210,
@@ -1610,8 +1610,8 @@
       "vintage_film",
       "deep_ocean",
       "aurora_curtains",
-      "ink_wash",
-      "diffraction_rings",
+      "crystalline_growth",
+      "cosmic_dust",
       "oil_projector"
     ],
     "palette": {
@@ -1640,7 +1640,7 @@
       "concert_lighting",
       "lo_fi_grain",
       "vintage_film",
-      "morphogenesis",
+      "particle_swarm",
       "tie_dye",
       "smoke_rings",
       "databend"
@@ -1668,7 +1668,7 @@
       "solar_flare",
       "kaleidoscope",
       "plasma_field",
-      "fluid_2d"
+      "particle_swarm"
     ],
     "palette": {
       "primary": 300,
@@ -1697,7 +1697,7 @@
       "smoke_rings",
       "aurora",
       "ink_wash",
-      "stained_glass"
+      "coral_reef"
     ],
     "palette": {
       "primary": 30,
@@ -1723,8 +1723,8 @@
       "deep_ocean",
       "cosmic_voyage",
       "diffraction_rings",
-      "stained_glass",
-      "aurora_curtains"
+      "sacred_geometry",
+      "cosmic_dust"
     ],
     "palette": {
       "primary": 180,

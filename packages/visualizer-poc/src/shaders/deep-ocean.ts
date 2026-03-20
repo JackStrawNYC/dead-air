@@ -32,7 +32,7 @@ ${sharedUniformsGLSL}
 
 ${noiseGLSL}
 
-${buildPostProcessGLSL({ grainStrength: 'normal' })}
+${buildPostProcessGLSL({ grainStrength: 'normal', dofEnabled: true })}
 
 varying vec2 vUv;
 
@@ -156,7 +156,8 @@ void main() {
 
   // === GOD RAYS: vertical light shafts from above (beat-reactive) ===
   float bpH = beatPulseHalf(uMusicalTime);
-  float rayIntensity = (0.3 + bass * 0.5 + uFastEnergy * 0.2) * (1.0 + bpH * 0.25 + uBeatSnap * 0.30 + climaxBoost * 0.20);
+  float stemBass = clamp(uStemBass, 0.0, 1.0);
+  float rayIntensity = (0.3 + bass * 0.5 + stemBass * 0.3 + uFastEnergy * 0.2) * (1.0 + bpH * 0.25 + uBeatSnap * 0.30 + climaxBoost * 0.20); // Phil's bass rumbles the deep
   float rayX = swayUv.x * 3.0 + bass * sin(uDynamicTime * 0.3) * 0.5;
   float ray1 = smoothstep(0.8, 1.0, sin(rayX * 2.0 + uDynamicTime * 0.5)) * rayIntensity;
   float ray2 = smoothstep(0.85, 1.0, sin(rayX * 3.5 + uDynamicTime * 0.4 + 1.0)) * rayIntensity * 0.7;
@@ -168,7 +169,7 @@ void main() {
   col += causticColor * rays * 0.25;
 
   // === DEPTH FOG: clears with energy (tension adds turbulence) ===
-  float fogDensity = mix(0.50, 0.18, energy) + tensionFog * 0.1;
+  float fogDensity = mix(0.50, 0.18, energy) + tensionFog * 0.1 + stemBass * 0.08; // bass thickens depth fog
   float fogNoise = fbm3(vec3(swayUv * 2.0, uDynamicTime * 0.05));
   float fog = fogDensity * (0.5 + fogNoise * 0.5);
   vec3 fogColor = mix(waterColor, causticColor, 0.2) * 0.20;

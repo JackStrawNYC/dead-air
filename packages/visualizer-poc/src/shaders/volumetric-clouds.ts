@@ -25,7 +25,7 @@ void main() {
 }
 `;
 
-const postProcess = buildPostProcessGLSL({ grainStrength: "light", halationEnabled: true });
+const postProcess = buildPostProcessGLSL({ grainStrength: "light", halationEnabled: true, dofEnabled: true });
 
 export const volumetricCloudsFrag = /* glsl */ `
 precision highp float;
@@ -80,12 +80,17 @@ void main() {
   float sChorus = smoothstep(1.5, 2.5, sectionT) * (1.0 - step(2.5, sectionT));
   float sSolo = smoothstep(3.5, 4.5, sectionT) * (1.0 - step(4.5, sectionT));
 
+  // === ADVANCED AUDIO UNIFORMS ===
+  float tension = clamp(uHarmonicTension, 0.0, 1.0);
+  float melodicPitch = clamp(uMelodicPitch, 0.0, 1.0);
+  float chordHue = float(int(uChordIndex)) / 24.0 * 0.12;
+
   float flowTime = uDynamicTime * (0.08 + slowE * 0.04) * mix(1.0, 1.4, sJam) * mix(1.0, 0.4, sSpace);
 
-  // === PALETTE ===
-  float hue1 = hsvToCosineHue(uPalettePrimary);
+  // === PALETTE (chord-shifted) ===
+  float hue1 = hsvToCosineHue(uPalettePrimary) + chordHue;
   vec3 cloudTint = 0.5 + 0.5 * cos(6.28318 * vec3(hue1, hue1 + 0.33, hue1 + 0.67));
-  cloudTint = mix(cloudTint, vec3(0.85, 0.88, 0.92), 0.5); // push toward white clouds
+  cloudTint = mix(cloudTint, vec3(0.85, 0.88, 0.92), 0.5 - tension * 0.15); // tension adds color saturation
 
   float hue2 = hsvToCosineHue(uPaletteSecondary);
   vec3 skyTint = 0.5 + 0.5 * cos(6.28318 * vec3(hue2, hue2 + 0.33, hue2 + 0.67));
@@ -104,9 +109,9 @@ void main() {
   vec3 sunDir = normalize(sunPos - ro);
 
   // === VOLUMETRIC CLOUD RAYMARCH ===
-  // Energy-gated steps: 24 cheap at quiet, 48 rich at peaks
-  int steps = int(mix(24.0, 48.0, energy)) + int(sJam * 8.0) - int(sSpace * 8.0);
-  float stepSize = 0.18;
+  // Energy-gated steps: 24 cheap at quiet, 48 rich at peaks; tension adds detail
+  int steps = int(mix(24.0, 48.0, energy)) + int(sJam * 8.0) - int(sSpace * 8.0) + int(tension * 4.0);
+  float stepSize = 0.18 - melodicPitch * 0.03; // higher pitch = finer step = denser clouds
 
   vec3 cloudAccum = vec3(0.0);
   float cloudAlpha = 0.0;
@@ -121,6 +126,8 @@ void main() {
 
     // Drum onset density spikes
     density += drumOnset * 0.3 * exp(-fi * 0.1);
+    // Vocal presence thickens clouds at high energy
+    density += uStemVocals * 0.15 * smoothstep(0.4, 0.7, energy);
 
     // Climax parts clouds
     density *= (1.0 - cloudPart);

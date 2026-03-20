@@ -112,7 +112,8 @@ void main() {
 
   // Audio-driven parameters (section-modulated)
   // FFT bands: bass → base height, mids → turbulence, highs → fine detail
-  float rotSpeed = (0.3 + bass * 0.8 + fftMid * 0.2) * sectionRotMod;
+  float stemDrums = clamp(uStemDrums, 0.0, 1.0);
+  float rotSpeed = (0.3 + bass * 0.8 + fftMid * 0.2 + stemDrums * 0.4) * sectionRotMod; // drums accelerate rotation
   float pointBright = 0.3 + energy * 0.7 + sectionBrightMod + fftBass * 0.15;
   float affineScale = 0.5 + melodicPitch * 0.3 + fftHigh * 0.1 + transformJitter * 0.2;
   float variationMix = tension;

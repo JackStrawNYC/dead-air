@@ -170,7 +170,8 @@ void main() {
     if (t > MAX_DIST) break;
 
     vec3 pos = camPos + camDir * t;
-    float d = flameSDF(pos, bass * sectionSpread, highs, max(onset, uDrumOnset), flamePitchHeight, accelUpdraft * sectionRiseSpeed);
+    float stemDrumHit = clamp(uStemDrums, 0.0, 1.0);
+    float d = flameSDF(pos, bass * sectionSpread, highs, max(onset, uDrumOnset) + stemDrumHit * 0.15, flamePitchHeight, accelUpdraft * sectionRiseSpeed);
 
     // Accumulate glow based on proximity to fire surface
     // Tighter proximity zone (0.5) for defined fire shape with dark background
