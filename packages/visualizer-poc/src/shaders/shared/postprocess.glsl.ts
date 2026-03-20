@@ -117,10 +117,10 @@ ${
     ? `  // Beat pulse: visible tempo-locked brightness + saturation swell
   float bp = beatPulse(uMusicalTime);
   float bpGated = bp * smoothstep(0.3, 0.7, uBeatConfidence); // only fire on confident beats
-  col *= 1.0 + bpGated * 0.06;  // 3× stronger than before
+  col *= 1.0 + bpGated * 0.12;  // doubled for visible rhythm
   // Beat saturation punch: color pops on beats
   float bpLuma = dot(col, vec3(0.299, 0.587, 0.114));
-  col = mix(vec3(bpLuma), col, 1.0 + bpGated * 0.12); // +12% saturation on beats
+  col = mix(vec3(bpLuma), col, 1.0 + bpGated * 0.20); // +20% saturation on beats
 `
     : ""
 }
@@ -226,7 +226,7 @@ ${
   {
     float caGate = smoothstep(0.15, 0.35, energy);
     float caAnticipation = uPeakApproaching * 0.008;
-    float caAmount = (uBass * 0.006 + uRms * 0.003 + uOnsetSnap * 0.04 + caAnticipation) * caGate;
+    float caAmount = (uBass * 0.012 + uRms * 0.006 + uOnsetSnap * 0.06 + caAnticipation) * caGate;
     caAmount += climaxBoost * 0.004;
     caAmount = min(caAmount, 0.05 + climaxBoost * 0.01);
     col = applyCA(col, uv, caAmount);
@@ -329,7 +329,7 @@ ${
     // Build: gentle lift (0.40). Climax/sustain: stronger lift (0.55) to prevent darkness trap.
     float liftMult = mix(1.0, 0.40, isBuild * uClimaxIntensity) + isClimaxOrSustain * uClimaxIntensity * 0.15;
     float liftGate = smoothstep(0.04, 0.12, energy);
-    col = max(col, vec3(0.04, 0.03, 0.05) * liftMult * liftGate);
+    col = max(col, vec3(0.06, 0.05, 0.07) * liftMult * liftGate);
   }
 
   // Darkness texture: subtle micro-noise during near-black passages
@@ -349,10 +349,10 @@ ${
   // climax moments will NEVER be darker than this floor.
   {
     float climaxLuma = dot(col, vec3(0.299, 0.587, 0.114));
-    float minLuma = isClimax * uClimaxIntensity * 0.06; // floor: ~6% luminance at full climax
+    float minLuma = isClimax * uClimaxIntensity * 0.04; // floor: ~4% luminance at full climax
     if (climaxLuma < minLuma && minLuma > 0.01) {
       float lift = (minLuma - climaxLuma) / max(0.01, 1.0 - climaxLuma);
-      col = col + (vec3(1.0) - col) * lift * 0.6; // gentle lift preserving color ratios
+      col = col + (vec3(1.0) - col) * lift * 0.4; // gentle lift preserving color ratios
     }
   }
 

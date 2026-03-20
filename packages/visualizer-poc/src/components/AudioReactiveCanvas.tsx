@@ -345,15 +345,15 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
   const sectionList = sections ?? [];
   const { sectionIndex, sectionProgress } = findCurrentSection(sectionList, idx);
 
-  const energy = smoothValue(frames, idx, (f) => f.rms, 25);
+  const energy = smoothValue(frames, idx, (f) => f.rms, 15);
   const egate = energyGate(energy);
   const chromaHue = smoothValue(frames, idx, (f) => dominantChromaHue(f.chroma), 15);
   const contrast = smoothContrast(frames, idx, 12);
   const flatness = smoothValue(frames, idx, (f) => f.flatness, 15);
 
   // Snappy transient envelopes: fast attack, slow exponential release, energy-gated
-  const onsetSnap = transientEnvelope(frames, idx, (f) => f.onset, 10) * egate;
-  const beatSnap = transientEnvelope(frames, idx, (f) => (f.beat ? 1 : 0), 15) * egate;
+  const onsetSnap = transientEnvelope(frames, idx, (f) => f.onset, 10) * Math.max(0.35, egate);
+  const beatSnap = transientEnvelope(frames, idx, (f) => (f.beat ? 1 : 0), 15) * Math.max(0.35, egate);
 
   // Stem-separated bass: use stemBassRms if available, else fallback to (sub+low)/2
   const hasStemBass = frames[idx].stemBassRms != null;
@@ -368,8 +368,8 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
   // Fast-responding signals for transient punch
   const fastEnergy = smoothValue(frames, idx, (f) => f.rms, 8);
   const fastBass = smoothValue(frames, idx, (f) => f.sub + f.low, 6) * 0.5;
-  const drumOnset = transientEnvelope(frames, idx, (f) => f.stemDrumOnset ?? 0, 8) * egate;
-  const drumBeat = transientEnvelope(frames, idx, (f) => (f.stemDrumBeat ? 1 : 0), 12) * egate;
+  const drumOnset = transientEnvelope(frames, idx, (f) => f.stemDrumOnset ?? 0, 8) * Math.max(0.45, egate);
+  const drumBeat = transientEnvelope(frames, idx, (f) => (f.stemDrumBeat ? 1 : 0), 12) * Math.max(0.45, egate);
   const spectralFlux = computeSpectralFlux(frames, idx, 8);
 
   // Stem-separated vocal + other features
@@ -413,7 +413,7 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
   const energyForecast = computeEnergyForecast(frames, idx);
   const peakApproaching = computePeakApproaching(frames, idx);
   const beatStabilityVal = computeBeatStability(frames, idx);
-  const downbeatPulse = transientEnvelope(frames, idx, (f) => (f.downbeat ? 1 : 0), 12) * egate;
+  const downbeatPulse = transientEnvelope(frames, idx, (f) => (f.downbeat ? 1 : 0), 12) * Math.max(0.4, egate);
   const beatConfidenceSmooth = smoothValue(frames, idx, (f) => f.beatConfidence ?? 0.5, 20);
   const melodicConfidenceSmooth = smoothValue(frames, idx, (f) => f.melodicConfidence ?? 0.5, 20);
 
@@ -421,11 +421,11 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
     frame: fd,
     frameIndex: idx,
     time: frameIdx / fps,
-    beatDecay: beatDecay(frames, idx) * egate,
+    beatDecay: beatDecay(frames, idx) * Math.max(0.4, egate),
     smooth: {
       rms: smoothValue(frames, idx, (f) => f.rms, 12),
       centroid: smoothValue(frames, idx, (f) => f.centroid, 18),
-      bass: smoothValue(frames, idx, (f) => f.sub + f.low, 24) * 0.5 * (0.3 + 0.7 * egate),
+      bass: smoothValue(frames, idx, (f) => f.sub + f.low, 12) * 0.5 * (0.6 + 0.4 * egate),
       mids: smoothValue(frames, idx, (f) => f.mid, 8),
       highs: smoothValue(frames, idx, (f) => f.high, 3),
       onset: smoothValue(frames, idx, (f) => f.onset, 6),

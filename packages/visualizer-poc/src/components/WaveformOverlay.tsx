@@ -12,11 +12,11 @@ import { useCurrentFrame, useVideoConfig, interpolate } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
 import { useSongPalette } from "../data/SongPaletteContext";
 
-const BAR_COUNT = 64;
-const SMOOTHING_FRAMES = 8;
-const HEIGHT_PCT = 13; // bottom 13% of screen
-const MIN_OPACITY = 0.10;
-const MAX_OPACITY = 0.22;
+const BAR_COUNT = 128;
+const SMOOTHING_FRAMES = 6;
+const HEIGHT_PCT = 25; // bottom 25% of screen
+const MIN_OPACITY = 0.20;
+const MAX_OPACITY = 0.50;
 
 interface Props {
   frames: EnhancedFrameData[];
@@ -106,13 +106,16 @@ export const WaveformOverlay: React.FC<Props> = ({ frames }) => {
           extrapolateRight: "clamp",
         });
 
+        // Per-band brightness: sub darker, highs brighter
+        const bandLightness = band === "sub" ? 40 : band === "low" ? 50 : band === "mid" ? 60 : 70;
+
         return (
           <div
             key={i}
             style={{
               width: barWidth - 1,
               height: `${Math.min(100, height)}%`,
-              background: `linear-gradient(to top, hsla(${hue}, 60%, 55%, 0.8), hsla(${hue}, 60%, 55%, 0.1))`,
+              background: `linear-gradient(to top, hsla(${hue}, 70%, ${bandLightness}%, 0.85), hsla(${hue}, 60%, ${bandLightness}%, 0.1))`,
               borderRadius: "1px 1px 0 0",
               transition: "height 0.1s ease-out",
             }}

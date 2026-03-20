@@ -92,6 +92,8 @@ import { computeAfterJamQuality } from "./utils/after-jam-quality";
 import { computeCrowdEnergy } from "./utils/crowd-energy";
 import { IntroQuote } from "./components/IntroQuote";
 import { LyricFragment } from "./components/LyricFragment";
+import { WaveformOverlay } from "./components/WaveformOverlay";
+import { GuitarStrings } from "./components/GuitarStrings";
 
 // Extracted sub-components
 import { SongArtLayer } from "./components/song-visualizer/SongArtLayer";
@@ -584,7 +586,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
           <SilentErrorBoundary name="SceneRouter">
             {(() => {
               const climaxPhaseMap: Record<string, number> = { idle: 0, build: 1, climax: 2, sustain: 3, release: 4 };
-              const sceneRouter = <SceneRouter frames={f} sections={sections} song={props.song} tempo={tempo} seed={showSeed} jamDensity={jamDensity} deadAirMode={deadAirFactor > 0 ? "cosmic_dust" : undefined} deadAirFactor={deadAirFactor > 0 ? deadAirFactor : undefined} era={props.show?.era} coherenceIsLocked={coherenceState.isLocked} drumsSpacePhase={drumsSpaceState?.subPhase} usedShaderModes={narrative?.state.usedShaderModes} songIdentity={songIdentity} stemSection={stemSection} songDuration={analysis?.meta?.duration} palette={effectivePalette} segueIn={props.segueIn} isSacredSegueIn={isSacredSegueIn} isInSuiteMiddle={!!isInSuiteMiddle} setNumber={props.song.set} jamEvolution={jamEvolution} jamPhaseBoundaries={jamPhaseBoundaries} jamCycle={jamCycle} jamPhaseShaders={jamPhaseShaders} climaxPhase={climaxPhaseMap[climaxState.phase] ?? 0} />;
+              const sceneRouter = <SceneRouter frames={f} sections={sections} song={props.song} tempo={tempo} seed={showSeed} jamDensity={jamDensity} deadAirMode={deadAirFactor > 0 ? "cosmic_dust" : undefined} deadAirFactor={deadAirFactor > 0 ? deadAirFactor : undefined} era={props.show?.era} coherenceIsLocked={coherenceState.isLocked} drumsSpacePhase={drumsSpaceState?.subPhase} usedShaderModes={narrative?.state.usedShaderModes} songIdentity={songIdentity} stemSection={stemSection} songDuration={analysis?.meta?.duration} palette={effectivePalette} segueIn={props.segueIn} isSacredSegueIn={isSacredSegueIn} isInSuiteMiddle={!!isInSuiteMiddle} setNumber={props.song.set} jamEvolution={jamEvolution} jamPhaseBoundaries={jamPhaseBoundaries} jamCycle={jamCycle} jamPhaseShaders={jamPhaseShaders} climaxPhase={climaxPhaseMap[climaxState.phase] ?? 0} trackNumber={props.song.trackNumber ?? 1} />;
               const palette = effectivePalette;
 
               // Segue IN crossfade: smooth dual-render dissolve from previous song's shader
@@ -649,6 +651,20 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
             itOverlayOverride={itState.overlayOpacityOverride}
             counterpointOverlayInversion={counterpoint.overlayInversion}
           />
+
+          {!isDeadAir && introFactor > 0.5 && (
+            <SilentErrorBoundary name="WaveformOverlay">
+              <SongPaletteProvider palette={effectivePalette}>
+                <WaveformOverlay frames={f} />
+              </SongPaletteProvider>
+            </SilentErrorBoundary>
+          )}
+
+          {!isDeadAir && introFactor > 0.5 && (
+            <SilentErrorBoundary name="GuitarStrings">
+              <GuitarStrings frames={f} />
+            </SilentErrorBoundary>
+          )}
 
           {crowdMoments.length > 0 && (
             <SilentErrorBoundary name="CrowdOverlay">

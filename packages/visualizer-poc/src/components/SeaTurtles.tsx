@@ -16,7 +16,7 @@ const NUM_TURTLES = 3;
 
 interface TurtleData {
   baseY: number;
-  size: number;
+  sizeBase: number;
   speed: number;
   waveAmp: number;
   waveFreq: number;
@@ -32,7 +32,7 @@ function generateTurtles(seed: number): TurtleData[] {
   const rng = seeded(seed);
   return Array.from({ length: NUM_TURTLES }, () => ({
     baseY: 0.25 + rng() * 0.5,
-    size: 30 + rng() * 25,
+    sizeBase: 30 + rng() * 25,
     speed: 0.6 + rng() * 0.8,
     waveAmp: 20 + rng() * 40,
     waveFreq: 0.008 + rng() * 0.012,
@@ -124,7 +124,8 @@ export const SeaTurtles: React.FC<Props> = ({ frames }) => {
           const shellColor = `hsl(${t.shellHue}, 55%, 40%)`;
           const shellHighlight = `hsl(${t.shellHue}, 70%, 60%)`;
           const bodyColor = `hsl(${t.bodyHue}, 50%, 35%)`;
-          const s = t.size;
+          const resScale = height / 1080;
+          const s = t.sizeBase * resScale;
 
           // Shell hexagon layout
           const hexR = s * 0.18;

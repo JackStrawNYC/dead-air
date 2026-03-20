@@ -40,8 +40,9 @@ interface SongArtProps {
 export const SongArtLayer: React.FC<SongArtProps> = ({ src, suppressionFactor, hueRotation = 0, energy = 0, climaxIntensity = 0, focusOpacity = 1, segueIn = false, artBlendMode, introFactor = 1, deadAirFactor = 0 }) => {
   const frame = useCurrentFrame();
 
-  // Suppress art during segue-in (first 10s) — let the crossfade breathe
-  if (segueIn && frame < ART_FADE_END) return null;
+  // Suppress art briefly during segue-in crossfade (3s), then fade in over 2s
+  if (segueIn && frame < 90) return null;
+  const segueFade = segueIn && frame < 150 ? (frame - 90) / 60 : 1;
 
   // Energy-reactive wash: quiet → 0.40, peak → 0.10
   // Art visible during quiet passages, fades as shaders take over
@@ -77,7 +78,7 @@ export const SongArtLayer: React.FC<SongArtProps> = ({ src, suppressionFactor, h
 
   // Dead air reappearance: poster returns as "that was [song]" bookend
   const deadAirOpacity = deadAirFactor * 0.55;
-  const finalOpacity = Math.max(artOpacity, deadAirOpacity);
+  const finalOpacity = Math.max(artOpacity, deadAirOpacity) * segueFade;
 
   if (finalOpacity < 0.01) return null;
 
@@ -102,10 +103,10 @@ export const SongArtLayer: React.FC<SongArtProps> = ({ src, suppressionFactor, h
         position: "absolute",
         inset: 0,
         opacity: finalOpacity,
-        mixBlendMode: (artBlendMode ?? "screen") as React.CSSProperties["mixBlendMode"],
+        mixBlendMode: (introFactor < 0.5 ? "normal" : (artBlendMode ?? "screen")) as React.CSSProperties["mixBlendMode"],
         overflow: "hidden",
         filter: [
-          frame < ART_FADE_END ? "brightness(0.7) contrast(0.8)" : "",
+          frame < ART_FADE_END && introFactor >= 0.5 ? "brightness(0.7) contrast(0.8)" : "",
           hueRotation !== 0 ? `hue-rotate(${hueRotation.toFixed(1)}deg)` : "",
         ].filter(Boolean).join(" ") || undefined,
       }}

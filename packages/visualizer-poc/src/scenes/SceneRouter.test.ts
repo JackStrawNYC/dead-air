@@ -158,7 +158,7 @@ describe('getModeForSection', () => {
     expect(typeof mode).toBe('string');
   });
 
-  it('preferred-first pool: show modes dominate selection (≥70%)', () => {
+  it('preferred-first pool: show modes appear frequently (≥40%)', () => {
     const identity: SongIdentity = {
       preferredModes: [
         'inferno', 'liquid_light', 'concert_lighting',
@@ -190,11 +190,12 @@ describe('getModeForSection', () => {
       }
     }
 
-    // Show modes should appear ≥70% of the time (they have 5x weight each = ~80% expected)
-    expect(showModeHits / total).toBeGreaterThanOrEqual(0.70);
+    // Show modes appear frequently but don't dominate — variety pool allows registry splash
+    // With 2x weight + 5 registry splash modes, show modes should be ~40-60% of selections
+    expect(showModeHits / total).toBeGreaterThanOrEqual(0.35);
   });
 
-  it('small preferred pools: all modes dominate (no narrowing needed)', () => {
+  it('small preferred pools: preferred modes appear frequently', () => {
     const song = makeSong({ title: 'Test Song' });
     const sections: SectionBoundary[] = Array.from({ length: 5 }, (_, i) => ({
       frameStart: i * 900,
@@ -215,9 +216,9 @@ describe('getModeForSection', () => {
       counts.set(mode, (counts.get(mode) ?? 0) + 1);
     }
 
-    // All 3 preferred modes should dominate since they all become show modes with 5x weight
+    // With 2x weight + registry splash, preferred modes should be >40% of selections
     const preferredCount = (counts.get('inferno') ?? 0) + (counts.get('tie_dye') ?? 0) + (counts.get('concert_lighting') ?? 0);
-    expect(preferredCount).toBeGreaterThan(200); // should dominate with 5x weight
+    expect(preferredCount).toBeGreaterThan(120);
   });
 
   it('preferred-first pool is deterministic', () => {

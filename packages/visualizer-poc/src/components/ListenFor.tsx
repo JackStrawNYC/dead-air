@@ -39,7 +39,10 @@ const FADE_DURATION = 30;   // 1s fade out
 
 export const ListenFor: React.FC<ListenForProps> = ({ items, context, trackNumberInSet }) => {
   const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
+  const { fps, height } = useVideoConfig();
+
+  // Resolution scaling (designed at 1080p)
+  const s = height / 1080;
   const palette = useSongPalette();
 
   if (items.length === 0) return null;
@@ -59,7 +62,7 @@ export const ListenFor: React.FC<ListenForProps> = ({ items, context, trackNumbe
     config: { damping: 18, mass: 0.6, stiffness: 100 },
   });
 
-  const translateX = interpolate(slideProgress, [0, 1], [40, 0]);
+  const translateX = interpolate(slideProgress, [0, 1], [40 * s, 0]);
 
   // Fade out
   const fadeOut = interpolate(
@@ -77,8 +80,8 @@ export const ListenFor: React.FC<ListenForProps> = ({ items, context, trackNumbe
     <div
       style={{
         position: "absolute",
-        bottom: 140,
-        right: 80,
+        bottom: 140 * s,
+        right: 80 * s,
         opacity,
         transform: `translateX(${translateX}px)`,
         pointerEvents: "none",
@@ -87,26 +90,26 @@ export const ListenFor: React.FC<ListenForProps> = ({ items, context, trackNumbe
     >
       <div
         style={{
-          minWidth: 240,
-          maxWidth: 380,
-          padding: "16px 22px",
+          minWidth: 240 * s,
+          maxWidth: 380 * s,
+          padding: `${16 * s}px ${22 * s}px`,
           background: "rgba(10, 10, 10, 0.25)",
-          backdropFilter: "blur(12px)",
-          WebkitBackdropFilter: "blur(12px)",
-          borderLeft: `3px solid ${accent}`,
-          borderRadius: 2,
+          backdropFilter: `blur(${12 * s}px)`,
+          WebkitBackdropFilter: `blur(${12 * s}px)`,
+          borderLeft: `${3 * s}px solid ${accent}`,
+          borderRadius: 2 * s,
         }}
       >
         {/* Label */}
         <div
           style={{
             fontFamily: `${mono}, monospace`,
-            fontSize: 11,
+            fontSize: 11 * s,
             fontWeight: 400,
-            letterSpacing: 4,
+            letterSpacing: 4 * s,
             textTransform: "uppercase",
             color: "rgba(160, 152, 136, 0.8)",
-            marginBottom: 10,
+            marginBottom: 10 * s,
           }}
         >
           Listen For
@@ -118,13 +121,13 @@ export const ListenFor: React.FC<ListenForProps> = ({ items, context, trackNumbe
             key={i}
             style={{
               fontFamily: `${cormorant}, Georgia, serif`,
-              fontSize: 16,
+              fontSize: 16 * s,
               fontWeight: 300,
               color: "rgba(240, 235, 225, 0.9)",
-              textShadow: "0 2px 6px rgba(0,0,0,0.5)",
+              textShadow: `0 ${2 * s}px ${6 * s}px rgba(0,0,0,0.5)`,
               lineHeight: 1.45,
-              marginBottom: i < displayItems.length - 1 ? 8 : 0,
-              paddingLeft: 14,
+              marginBottom: i < displayItems.length - 1 ? 8 * s : 0,
+              paddingLeft: 14 * s,
               position: "relative",
             }}
           >
@@ -147,11 +150,11 @@ export const ListenFor: React.FC<ListenForProps> = ({ items, context, trackNumbe
           <div
             style={{
               fontFamily: `${cormorant}, Georgia, serif`,
-              fontSize: 14,
+              fontSize: 14 * s,
               fontWeight: 300,
               fontStyle: "italic",
               color: accent,
-              marginTop: 12,
+              marginTop: 12 * s,
               lineHeight: 1.4,
               opacity: 0.75,
             }}

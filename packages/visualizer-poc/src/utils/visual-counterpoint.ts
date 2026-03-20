@@ -125,8 +125,10 @@ export function computeCounterpoint(
   }
 
   // ─── 5. Brightness counterpoint ───
-  // On energy transients (energy > 0.35, onset > 0.5), brief dim of -0.08.
-  // Recovery over 20 frames via smoothstep. Creates drama on loud hits.
+  // On energy transients (energy > 0.35, onset > 0.5):
+  //   - During idle/build/release: brief dim of -0.06 for drama
+  //   - During climax/sustain: brief BOOST of +0.06 to reinforce peak moments
+  // Recovery over 20 frames via smoothstep.
   let lastTransientFrame = -999;
   for (let i = idx; i >= Math.max(0, idx - BRIGHTNESS_RECOVERY_FRAMES); i--) {
     if (frames[i].rms > 0.35 && frames[i].onset > 0.5) {
@@ -139,7 +141,10 @@ export function computeCounterpoint(
   if (framesSinceTransient >= 0 && framesSinceTransient < BRIGHTNESS_RECOVERY_FRAMES) {
     const t = framesSinceTransient / BRIGHTNESS_RECOVERY_FRAMES;
     const smooth = t * t * (3 - 2 * t);
-    brightnessCounterpoint = -0.08 * (1 - smooth);
+    // During climax/sustain: boost brightness on transients instead of dimming
+    const isClimaxSustain = climaxPhase === "climax" || climaxPhase === "sustain";
+    const magnitude = isClimaxSustain ? 0.06 : -0.06;
+    brightnessCounterpoint = magnitude * (1 - smooth);
   }
 
   return {

@@ -125,7 +125,7 @@ function computeSourceHash(): string {
     join(ROOT, "src", "components", "FilmGrain.tsx"),
     join(ROOT, "src", "components", "FullscreenQuad.tsx"),
     join(ROOT, "src", "components", "AudioReactiveCanvas.tsx"),
-    join(ROOT, "src", "components", "SceneVideoLayer.tsx"),
+
     join(ROOT, "src", "shaders", "liquid-light.ts"),
     join(ROOT, "src", "shaders", "concert-beams.ts"),
     join(ROOT, "src", "shaders", "noise.ts"),
@@ -383,6 +383,8 @@ function renderShowIntro(bundlePath: string): string | null {
     "ShowIntro",
     outputPath,
     `--gl=${glArg}`,
+    `--timeout=300000`,
+    `--concurrency=2`,
   ].join(" ");
 
   execSync(cmd, { cwd: ROOT, stdio: "inherit" });
@@ -403,6 +405,7 @@ function renderEndCard(bundlePath: string): string {
     "EndCard",
     outputPath,
     `--gl=${glArg}`,
+    `--timeout=300000`,
   ].join(" ");
 
   execSync(cmd, { cwd: ROOT, stdio: "inherit" });
@@ -424,6 +427,7 @@ function renderSetBreak(bundlePath: string): string {
     "SetBreak",
     outputPath,
     `--gl=${glArg}`,
+    `--timeout=300000`,
   ].join(" ");
 
   execSync(cmd, { cwd: ROOT, stdio: "inherit" });
@@ -445,6 +449,7 @@ function renderChapterCard(index: number, bundlePath: string): string {
     `Chapter-${index}`,
     outputPath,
     `--gl=${glArg}`,
+    `--timeout=300000`,
   ].join(" ");
 
   execSync(cmd, { cwd: ROOT, stdio: "inherit" });
@@ -621,9 +626,14 @@ function main() {
   let framesRendered = 0;
 
   if (!trackFilter && !previewMode && !noIntro) {
-    const introPath = renderShowIntro(bundlePath);
-    if (introPath) {
-      rendered.push({ path: introPath, set: 0 });
+    try {
+      const introPath = renderShowIntro(bundlePath);
+      if (introPath) {
+        rendered.push({ path: introPath, set: 0 });
+      }
+    } catch (e) {
+      console.warn("\n⚠ Show intro render failed (OffthreadVideo timeout at 4K) — skipping intro");
+      console.warn("  Re-run with --no-intro to skip, or render intro separately at 1080p\n");
     }
   }
 
@@ -665,8 +675,12 @@ function main() {
   }
 
   if (!trackFilter && !previewMode && !noEndCard) {
-    const endCardPath = renderEndCard(bundlePath);
-    rendered.push({ path: endCardPath, set: 0 });
+    try {
+      const endCardPath = renderEndCard(bundlePath);
+      rendered.push({ path: endCardPath, set: 0 });
+    } catch (e) {
+      console.warn("\n⚠ End card render failed — skipping");
+    }
   }
 
   if (!trackFilter && !previewMode && rendered.length > 1) {

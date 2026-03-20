@@ -157,7 +157,7 @@ describe("computeCounterpoint", () => {
     const frames = [makeFrame({ rms: 0.5, onset: 0.7 })];
     const result = computeCounterpoint(frames, 0, "idle");
     expect(result.brightnessCounterpoint).toBeLessThan(0);
-    expect(result.brightnessCounterpoint).toBeCloseTo(-0.08, 2);
+    expect(result.brightnessCounterpoint).toBeCloseTo(-0.06, 2);
   });
 
   it("recovers brightness after transient", () => {
@@ -168,11 +168,21 @@ describe("computeCounterpoint", () => {
     // Midway through recovery
     const mid = computeCounterpoint(frames, 10, "idle");
     expect(mid.brightnessCounterpoint).toBeLessThan(0);
-    expect(mid.brightnessCounterpoint).toBeGreaterThan(-0.08);
+    expect(mid.brightnessCounterpoint).toBeGreaterThan(-0.06);
 
     // Fully recovered
     const late = computeCounterpoint(frames, 21, "idle");
     expect(late.brightnessCounterpoint).toBeCloseTo(0, 2);
+  });
+
+  it("flips brightness to BOOST during climax/sustain", () => {
+    const frames = [makeFrame({ rms: 0.5, onset: 0.7 })];
+    const climaxResult = computeCounterpoint(frames, 0, "climax");
+    expect(climaxResult.brightnessCounterpoint).toBeGreaterThan(0);
+    expect(climaxResult.brightnessCounterpoint).toBeCloseTo(0.06, 2);
+
+    const sustainResult = computeCounterpoint(frames, 0, "sustain");
+    expect(sustainResult.brightnessCounterpoint).toBeGreaterThan(0);
   });
 
   // --- Determinism ---

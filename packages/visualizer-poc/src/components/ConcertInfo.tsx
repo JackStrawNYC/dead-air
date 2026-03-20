@@ -30,6 +30,9 @@ export const ConcertInfo: React.FC<Props> = ({
   const ctx = useShowContext();
   const palette = useSongPalette();
 
+  // Resolution scaling (designed at 1080p)
+  const s = height / 1080;
+
   const venue = (venueProp ?? ctx?.venue ?? "VENUE").toUpperCase();
   const date = (dateProp ?? ctx?.date ?? "DATE").toUpperCase();
   const bandName = ctx?.bandName ?? "GRATEFUL DEAD";
@@ -96,12 +99,12 @@ export const ConcertInfo: React.FC<Props> = ({
           {/* Band name */}
           <div
             style={{
-              fontSize: 52,
+              fontSize: 52 * s,
               fontWeight: 900,
               fontFamily: "serif",
-              letterSpacing: 12,
+              letterSpacing: 12 * s,
               color: `hsl(${hue1}, 100%, 65%)`,
-              textShadow: `0 0 20px hsl(${hue1}, 100%, 50%), 0 0 40px hsl(${hue2}, 100%, 50%), 0 0 60px hsl(${hue1}, 80%, 40%)`,
+              textShadow: `0 0 ${20 * s}px hsl(${hue1}, 100%, 50%), 0 0 ${40 * s}px hsl(${hue2}, 100%, 50%), 0 0 ${60 * s}px hsl(${hue1}, 80%, 40%)`,
               textTransform: "uppercase",
             }}
           >
@@ -111,13 +114,13 @@ export const ConcertInfo: React.FC<Props> = ({
           {/* Venue */}
           <div
             style={{
-              fontSize: 20,
+              fontSize: 20 * s,
               fontWeight: 600,
               fontFamily: "serif",
-              letterSpacing: 6,
+              letterSpacing: 6 * s,
               color: `hsl(${hue2}, 90%, 70%)`,
-              textShadow: `0 0 12px hsl(${hue2}, 100%, 50%)`,
-              marginTop: 12,
+              textShadow: `0 0 ${12 * s}px hsl(${hue2}, 100%, 50%)`,
+              marginTop: 12 * s,
             }}
           >
             {venue}
@@ -126,13 +129,13 @@ export const ConcertInfo: React.FC<Props> = ({
           {/* Date */}
           <div
             style={{
-              fontSize: 18,
+              fontSize: 18 * s,
               fontWeight: 400,
               fontFamily: "monospace",
-              letterSpacing: 4,
+              letterSpacing: 4 * s,
               color: `hsl(${(hue1 + 180) % 360}, 80%, 70%)`,
-              textShadow: `0 0 10px hsl(${(hue1 + 180) % 360}, 100%, 50%)`,
-              marginTop: 6,
+              textShadow: `0 0 ${10 * s}px hsl(${(hue1 + 180) % 360}, 100%, 50%)`,
+              marginTop: 6 * s,
             }}
           >
             {date}
@@ -142,14 +145,14 @@ export const ConcertInfo: React.FC<Props> = ({
           {songTitle && (
             <div
               style={{
-                fontSize: 28,
+                fontSize: 28 * s,
                 fontWeight: 700,
                 fontFamily: "serif",
                 fontStyle: "italic",
-                letterSpacing: 3,
+                letterSpacing: 3 * s,
                 color: `hsl(${(hue1 + 90) % 360}, 100%, 75%)`,
-                textShadow: `0 0 15px hsl(${(hue1 + 90) % 360}, 100%, 55%)`,
-                marginTop: 16,
+                textShadow: `0 0 ${15 * s}px hsl(${(hue1 + 90) % 360}, 100%, 55%)`,
+                marginTop: 16 * s,
               }}
             >
               {songTitle}
@@ -159,10 +162,10 @@ export const ConcertInfo: React.FC<Props> = ({
           {/* Decorative line */}
           <div
             style={{
-              width: 200,
-              height: 2,
+              width: 200 * s,
+              height: 2 * s,
               background: `linear-gradient(90deg, transparent, hsl(${hue1}, 100%, 65%), transparent)`,
-              marginTop: 10,
+              marginTop: 10 * s,
               opacity: 0.6,
             }}
           />
@@ -173,31 +176,31 @@ export const ConcertInfo: React.FC<Props> = ({
       <div
         style={{
           position: "absolute",
-          bottom: 20,
-          left: 20,
+          bottom: 20 * s,
+          left: 20 * s,
           opacity: ticketOpacity,
           transform: "rotate(-3deg)",
-          filter: "drop-shadow(0 0 8px rgba(255,200,100,0.3))",
+          filter: `drop-shadow(0 0 ${8 * s}px rgba(255,200,100,0.3))`,
         }}
       >
         <div
           style={{
-            border: "1.5px solid rgba(255, 200, 100, 0.6)",
-            borderRadius: 4,
-            padding: "8px 14px",
+            border: `${1.5 * s}px solid rgba(255, 200, 100, 0.6)`,
+            borderRadius: 4 * s,
+            padding: `${8 * s}px ${14 * s}px`,
             background: "rgba(0, 0, 0, 0.25)",
             fontFamily: "monospace",
-            fontSize: 10,
+            fontSize: 10 * s,
             color: "rgba(255, 200, 100, 0.8)",
             lineHeight: 1.6,
-            minWidth: 140,
+            minWidth: 140 * s,
           }}
         >
-          <div style={{ fontSize: 7, letterSpacing: 3, opacity: 0.6 }}>ADMIT ONE</div>
-          <div style={{ fontWeight: 700, fontSize: 11, marginTop: 2 }}>{bandName}</div>
-          <div style={{ fontSize: 9, opacity: 0.8 }}>{venue.split(",")[0]}</div>
-          <div style={{ fontSize: 9, opacity: 0.7 }}>{date}</div>
-          <div style={{ borderTop: "1px dashed rgba(255,200,100,0.3)", marginTop: 4, paddingTop: 3, fontSize: 8, opacity: 0.5 }}>
+          <div style={{ fontSize: 7 * s, letterSpacing: 3 * s, opacity: 0.6 }}>ADMIT ONE</div>
+          <div style={{ fontWeight: 700, fontSize: 11 * s, marginTop: 2 * s }}>{bandName}</div>
+          <div style={{ fontSize: 9 * s, opacity: 0.8 }}>{venue.split(",")[0]}</div>
+          <div style={{ fontSize: 9 * s, opacity: 0.7 }}>{date}</div>
+          <div style={{ borderTop: `${1 * s}px dashed rgba(255,200,100,0.3)`, marginTop: 4 * s, paddingTop: 3 * s, fontSize: 8 * s, opacity: 0.5 }}>
             NO. {ticketNumber} &nbsp; GA
           </div>
         </div>

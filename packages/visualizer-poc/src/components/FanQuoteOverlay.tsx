@@ -7,7 +7,7 @@
  */
 
 import React from "react";
-import { useCurrentFrame, interpolate, Easing } from "remotion";
+import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
 
 export interface FanReview {
   text: string;
@@ -30,6 +30,10 @@ const TOTAL_FRAMES = SLIDE_IN_FRAMES + HOLD_FRAMES + SLIDE_OUT_FRAMES;
 
 export const FanQuoteOverlay: React.FC<Props> = ({ reviews, trackNumber, seed = 0 }) => {
   const frame = useCurrentFrame();
+  const { height } = useVideoConfig();
+
+  // Resolution scaling (designed at 1080p)
+  const s = height / 1080;
 
   // Only show every 3rd song
   if (trackNumber % 3 !== 0) return null;
@@ -46,7 +50,7 @@ export const FanQuoteOverlay: React.FC<Props> = ({ reviews, trackNumber, seed = 
   const slideY = interpolate(
     localFrame,
     [0, SLIDE_IN_FRAMES, SLIDE_IN_FRAMES + HOLD_FRAMES, TOTAL_FRAMES],
-    [40, 0, 0, 40],
+    [40 * s, 0, 0, 40 * s],
     {
       extrapolateLeft: "clamp",
       extrapolateRight: "clamp",
@@ -70,34 +74,34 @@ export const FanQuoteOverlay: React.FC<Props> = ({ reviews, trackNumber, seed = 
     <div
       style={{
         position: "absolute",
-        bottom: 80,
+        bottom: 80 * s,
         left: "50%",
         transform: `translateX(-50%) translateY(${slideY}px)`,
         opacity,
         pointerEvents: "none",
         zIndex: 90,
-        maxWidth: 600,
+        maxWidth: 600 * s,
       }}
     >
       <div
         style={{
           background: "rgba(0, 0, 0, 0.25)",
-          backdropFilter: "blur(12px)",
-          WebkitBackdropFilter: "blur(12px)",
-          borderRadius: 12,
-          padding: "20px 28px",
-          border: "1px solid rgba(255, 255, 255, 0.12)",
+          backdropFilter: `blur(${12 * s}px)`,
+          WebkitBackdropFilter: `blur(${12 * s}px)`,
+          borderRadius: 12 * s,
+          padding: `${20 * s}px ${28 * s}px`,
+          border: `${1 * s}px solid rgba(255, 255, 255, 0.12)`,
         }}
       >
         <div
           style={{
             color: "rgba(255, 255, 255, 0.85)",
-            fontSize: 18,
+            fontSize: 18 * s,
             fontFamily: "'Cormorant Garamond', Georgia, serif",
             fontStyle: "italic",
             fontWeight: 400,
             lineHeight: 1.5,
-            marginBottom: 12,
+            marginBottom: 12 * s,
           }}
         >
           "{displayText}"
@@ -105,7 +109,7 @@ export const FanQuoteOverlay: React.FC<Props> = ({ reviews, trackNumber, seed = 
         <div
           style={{
             color: "rgba(255, 255, 255, 0.5)",
-            fontSize: 13,
+            fontSize: 13 * s,
             fontFamily: "Inter, system-ui, sans-serif",
             fontWeight: 400,
           }}

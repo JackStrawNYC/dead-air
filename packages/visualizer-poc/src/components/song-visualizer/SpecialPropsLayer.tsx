@@ -67,8 +67,8 @@ export const SpecialPropsLayer: React.FC<Props> = ({
   const SCRIM_FADE = 150;
   const scrimFrame = suppressIntro ? adjustedFrame : frame;
   const scrimOpacity = scrimFrame < 0 ? 0
-    : scrimFrame < SCRIM_HOLD ? 0.40
-    : scrimFrame < SCRIM_HOLD + SCRIM_FADE ? 0.40 * (1 - (scrimFrame - SCRIM_HOLD) / SCRIM_FADE)
+    : scrimFrame < SCRIM_HOLD ? 0.55
+    : scrimFrame < SCRIM_HOLD + SCRIM_FADE ? 0.55 * (1 - (scrimFrame - SCRIM_HOLD) / SCRIM_FADE)
     : 0;
 
   // When suppressing intro, don't render title/stats until delay passes
@@ -79,7 +79,7 @@ export const SpecialPropsLayer: React.FC<Props> = ({
       {scrimOpacity > 0.01 && (
         <div style={{
           position: "absolute", inset: 0, pointerEvents: "none",
-          background: `linear-gradient(to top, rgba(0,0,0,${(scrimOpacity * 0.9).toFixed(3)}) 0%, rgba(0,0,0,${(scrimOpacity * 0.4).toFixed(3)}) 35%, transparent 65%)`,
+          background: `linear-gradient(to top, rgba(0,0,0,${(scrimOpacity * 0.95).toFixed(3)}) 0%, rgba(0,0,0,${(scrimOpacity * 0.6).toFixed(3)}) 40%, rgba(0,0,0,${(scrimOpacity * 0.2).toFixed(3)}) 70%, transparent 90%)`,
           zIndex: 99,
         }} />
       )}

@@ -55,7 +55,10 @@ export const MilestoneCard: React.FC<MilestoneCardProps> = ({
   colorAccent,
 }) => {
   const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
+  const { fps, height } = useVideoConfig();
+
+  // Resolution scaling (designed at 1080p)
+  const s = height / 1080;
 
   const accent = colorAccent ?? TYPE_ACCENT[milestone.type] ?? "#d4a853";
   const label = TYPE_LABEL[milestone.type] ?? "MILESTONE";
@@ -67,7 +70,7 @@ export const MilestoneCard: React.FC<MilestoneCardProps> = ({
     config: { damping: 18, mass: 0.6, stiffness: 100 },
   });
 
-  const translateX = interpolate(slideProgress, [0, 1], [-40, 0]);
+  const translateX = interpolate(slideProgress, [0, 1], [-40 * s, 0]);
 
   // Fade out
   const fadeOut = interpolate(
@@ -86,8 +89,8 @@ export const MilestoneCard: React.FC<MilestoneCardProps> = ({
     <div
       style={{
         position: "absolute",
-        bottom: 180,
-        left: 80,
+        bottom: 180 * s,
+        left: 80 * s,
         opacity,
         transform: `translateX(${translateX}px)`,
         pointerEvents: "none",
@@ -96,26 +99,26 @@ export const MilestoneCard: React.FC<MilestoneCardProps> = ({
     >
       <div
         style={{
-          minWidth: 240,
-          maxWidth: 420,
-          padding: "16px 24px",
+          minWidth: 240 * s,
+          maxWidth: 420 * s,
+          padding: `${16 * s}px ${24 * s}px`,
           background: "rgba(10, 10, 10, 0.25)",
-          backdropFilter: "blur(12px)",
-          WebkitBackdropFilter: "blur(12px)",
-          borderTop: `3px solid ${accent}`,
-          borderRadius: 2,
+          backdropFilter: `blur(${12 * s}px)`,
+          WebkitBackdropFilter: `blur(${12 * s}px)`,
+          borderTop: `${3 * s}px solid ${accent}`,
+          borderRadius: 2 * s,
         }}
       >
         {/* Type label */}
         <div
           style={{
             fontFamily: `${mono}, monospace`,
-            fontSize: 11,
+            fontSize: 11 * s,
             fontWeight: 400,
-            letterSpacing: 4,
+            letterSpacing: 4 * s,
             textTransform: "uppercase",
             color: "rgba(160, 152, 136, 0.8)",
-            marginBottom: 10,
+            marginBottom: 10 * s,
           }}
         >
           {label}
@@ -125,10 +128,10 @@ export const MilestoneCard: React.FC<MilestoneCardProps> = ({
         <div
           style={{
             fontFamily: `${cormorant}, Georgia, serif`,
-            fontSize: 28,
+            fontSize: 28 * s,
             fontWeight: 600,
             color: "rgba(245, 240, 232, 0.95)",
-            textShadow: "0 2px 8px rgba(0,0,0,0.6)",
+            textShadow: `0 ${2 * s}px ${8 * s}px rgba(0,0,0,0.6)`,
             lineHeight: 1.2,
           }}
         >
@@ -139,11 +142,11 @@ export const MilestoneCard: React.FC<MilestoneCardProps> = ({
         <div
           style={{
             fontFamily: `${cormorant}, Georgia, serif`,
-            fontSize: 15,
+            fontSize: 15 * s,
             fontWeight: 300,
             fontStyle: "italic",
             color: accent,
-            marginTop: 10,
+            marginTop: 10 * s,
             lineHeight: 1.4,
             opacity: 0.85,
           }}

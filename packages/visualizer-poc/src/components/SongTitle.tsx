@@ -6,7 +6,7 @@
  */
 
 import React, { useMemo } from "react";
-import { interpolate, useCurrentFrame } from "remotion";
+import { interpolate, useCurrentFrame, useVideoConfig } from "remotion";
 import { useShowContext } from "../data/ShowContext";
 
 interface Props {
@@ -86,7 +86,11 @@ const DEFAULT_TYPO: EraTypography = ERA_TYPOGRAPHY.classic;
 
 export const SongTitle: React.FC<Props> = ({ title, setNumber, trackNumber, isSegue }) => {
   const frame = useCurrentFrame();
+  const { height } = useVideoConfig();
   const ctx = useShowContext();
+
+  // Resolution scaling (designed at 1080p)
+  const s = height / 1080;
 
   const typo = useMemo((): EraTypography => {
     if (!ctx?.era || !(ctx.era in ERA_TYPOGRAPHY)) return DEFAULT_TYPO;
@@ -107,7 +111,7 @@ export const SongTitle: React.FC<Props> = ({ title, setNumber, trackNumber, isSe
     const slideX = interpolate(
       frame,
       [0, SEGUE_FADE_IN],
-      [-20, 0],
+      [-20 * s, 0],
       { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
     );
 
@@ -115,8 +119,8 @@ export const SongTitle: React.FC<Props> = ({ title, setNumber, trackNumber, isSe
       <div
         style={{
           position: "absolute",
-          bottom: 60,
-          left: 60,
+          bottom: 60 * s,
+          left: 60 * s,
           opacity: segueOpacity,
           transform: `translateX(${slideX}px)`,
           pointerEvents: "none",
@@ -126,10 +130,10 @@ export const SongTitle: React.FC<Props> = ({ title, setNumber, trackNumber, isSe
         <div
           style={{
             color: "rgba(255, 255, 255, 0.85)",
-            fontSize: 28,
+            fontSize: 28 * s,
             fontFamily: typo.titleFont,
             fontWeight: typo.titleWeight,
-            textShadow: "0 2px 16px rgba(0,0,0,0.7)",
+            textShadow: `0 ${2 * s}px ${16 * s}px rgba(0,0,0,0.7)`,
           }}
         >
           {title}
@@ -150,7 +154,7 @@ export const SongTitle: React.FC<Props> = ({ title, setNumber, trackNumber, isSe
   const translateY = interpolate(
     frame,
     [0, FADE_IN],
-    [10, 0],
+    [10 * s, 0],
     { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
   );
 
@@ -158,7 +162,7 @@ export const SongTitle: React.FC<Props> = ({ title, setNumber, trackNumber, isSe
     <div
       style={{
         position: "absolute",
-        bottom: 150,
+        bottom: 150 * s,
         left: 0,
         right: 0,
         display: "flex",
@@ -173,12 +177,12 @@ export const SongTitle: React.FC<Props> = ({ title, setNumber, trackNumber, isSe
       <div
         style={{
           color: "rgba(255, 255, 255, 0.4)",
-          fontSize: 16,
+          fontSize: 16 * s,
           fontFamily: typo.labelFont,
           fontWeight: 400,
           letterSpacing: typo.labelLetterSpacing,
           textTransform: "uppercase",
-          marginBottom: 8,
+          marginBottom: 8 * s,
         }}
       >
         Set {setNumber} · Track {trackNumber}
@@ -186,10 +190,10 @@ export const SongTitle: React.FC<Props> = ({ title, setNumber, trackNumber, isSe
       <div
         style={{
           color: "rgba(255, 255, 255, 0.85)",
-          fontSize: typo.titleSize,
+          fontSize: typo.titleSize * s,
           fontFamily: typo.titleFont,
           fontWeight: typo.titleWeight,
-          textShadow: "0 2px 20px rgba(0,0,0,0.8)",
+          textShadow: `0 ${2 * s}px ${20 * s}px rgba(0,0,0,0.8)`,
         }}
       >
         {title}

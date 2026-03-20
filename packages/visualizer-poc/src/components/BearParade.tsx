@@ -26,8 +26,8 @@ const BEAR_COLORS = [
 ];
 
 const NUM_BEARS = 5;
-const BEAR_SPACING = 200;    // px between bears
-const BEAR_SIZE = 140;
+const BEAR_SPACING_BASE = 200;    // px between bears at 1080p
+const BEAR_SIZE_BASE = 140;       // px at 1080p — scales with resolution
 
 const MARCH_CONFIG: MarchConfig = {
   enterThreshold: 0.06,    // low threshold — bears should appear often
@@ -76,6 +76,11 @@ export const BearParade: React.FC<Props> = ({ frames }) => {
   const tempoFactor = useTempoFactor();
 
   const energy = snap.energy;
+
+  // Scale bears proportionally with resolution (designed at 1080p)
+  const resScale = height / 1080;
+  const BEAR_SIZE = Math.round(BEAR_SIZE_BASE * resScale);
+  const BEAR_SPACING = Math.round(BEAR_SPACING_BASE * resScale);
 
   const marchWindows = React.useMemo(
     () => precomputeMarchWindows(frames, MARCH_CONFIG),

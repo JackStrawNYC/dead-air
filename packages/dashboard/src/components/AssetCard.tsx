@@ -16,6 +16,16 @@ export default function AssetCard({ type, path, size, service, cost }: AssetCard
   const isAudio = type === 'audio';
   const isVideo = type === 'video';
 
+  // Normalize absolute paths to relative for /files/ serving
+  // e.g. /Users/.../dead-air/data/assets/ep-xxx/foo.jpg → assets/ep-xxx/foo.jpg
+  let fileSrc: string;
+  if (path.startsWith('/')) {
+    const dataIdx = path.indexOf('/data/');
+    fileSrc = dataIdx >= 0 ? `/files${path.slice(dataIdx + 5)}` : `/files/${path}`;
+  } else {
+    fileSrc = `/files/${path}`;
+  }
+
   const handleCopyPath = (e: React.MouseEvent) => {
     e.stopPropagation();
     navigator.clipboard.writeText(path).catch(() => {});
@@ -36,7 +46,7 @@ export default function AssetCard({ type, path, size, service, cost }: AssetCard
         {isImage && (
           <div style={{ height: 120, background: 'var(--bg-base)', overflow: 'hidden' }}>
             <img
-              src={`/files/${path}`}
+              src={fileSrc}
               alt={filename}
               style={{ width: '100%', height: '100%', objectFit: 'cover' }}
               onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
@@ -46,7 +56,7 @@ export default function AssetCard({ type, path, size, service, cost }: AssetCard
         {isVideo && (
           <div style={{ height: 120, background: 'var(--bg-base)', overflow: 'hidden' }}>
             <video
-              src={`/files/${path}`}
+              src={fileSrc}
               style={{ width: '100%', height: '100%', objectFit: 'cover' }}
               muted
               preload="metadata"
@@ -55,7 +65,7 @@ export default function AssetCard({ type, path, size, service, cost }: AssetCard
         )}
         {isAudio && (
           <div style={{ padding: '12px', background: 'var(--bg-base)' }}>
-            <audio controls src={`/files/${path}`} style={{ width: '100%', height: 32 }} preload="none" />
+            <audio controls src={fileSrc} style={{ width: '100%', height: 32 }} preload="none" />
           </div>
         )}
         <div style={{ padding: '10px 12px' }}>
@@ -99,14 +109,14 @@ export default function AssetCard({ type, path, size, service, cost }: AssetCard
         >
           {isImage && (
             <img
-              src={`/files/${path}`}
+              src={fileSrc}
               alt={filename}
               style={{ maxWidth: '90vw', maxHeight: '90vh', objectFit: 'contain', borderRadius: 'var(--radius-lg)' }}
             />
           )}
           {isVideo && (
             <video
-              src={`/files/${path}`}
+              src={fileSrc}
               controls
               autoPlay
               style={{ maxWidth: '90vw', maxHeight: '90vh', borderRadius: 'var(--radius-lg)' }}

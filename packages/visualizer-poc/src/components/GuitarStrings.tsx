@@ -4,15 +4,12 @@
  * (sub, low, mid, high, centroid, rms). Vibration uses sine waves with
  * amplitude from the frequency value. Thin SVG paths with neon colors.
  * More vibration during loud passages.
- * Appears periodically (every 60s, visible 18s).
+ * Stem-driven: appears when guitar energy is high during solos/jams.
  */
 
 import React from "react";
-import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
+import { useCurrentFrame, useVideoConfig, interpolate } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
-
-const CYCLE = 1800;    // 60 seconds at 30fps
-const DURATION = 540;  // 18 seconds visible
 
 const STRING_COLORS = [
   "#FF0066",  // sub — hot pink
@@ -60,14 +57,30 @@ export const GuitarStrings: React.FC<Props> = ({ frames }) => {
   }
   const energy = eCount > 0 ? eSum / eCount : 0;
 
-  // Periodic visibility
-  const cycleFrame = frame % CYCLE;
-  if (cycleFrame >= DURATION) return null;
-
-  const progress = cycleFrame / DURATION;
-
-  // Staggered fade in/out per string
+  // Stem-driven visibility: show when guitar (stemOtherRms) is high
+  // AND section type is solo or jam
   const fd = frames[idx];
+  const guitarEnergy = fd.stemOtherRms ?? (fd.mid + fd.high) * 0.5;
+  const sectionType = fd.sectionType ?? "";
+  const isSoloOrJam = sectionType === "solo" || sectionType === "jam";
+
+  // Smooth guitar energy over 30 frames for stable visibility
+  let guitarSmooth = 0;
+  let gCount = 0;
+  for (let i = Math.max(0, idx - 30); i <= Math.min(frames.length - 1, idx); i++) {
+    guitarSmooth += frames[i].stemOtherRms ?? (frames[i].mid + frames[i].high) * 0.5;
+    gCount++;
+  }
+  guitarSmooth = gCount > 0 ? guitarSmooth / gCount : 0;
+
+  // Visibility gate: guitar energy threshold + section type
+  // High guitar energy (>0.15) in solo/jam sections triggers appearance
+  // Lower threshold (>0.25) allows appearance in any section for very prominent guitar
+  const guitarGate = isSoloOrJam
+    ? Math.max(0, Math.min(1, (guitarSmooth - 0.10) / 0.15))  // 0.10-0.25 ramp
+    : Math.max(0, Math.min(1, (guitarSmooth - 0.20) / 0.15)); // 0.20-0.35 ramp (stricter outside solo/jam)
+
+  if (guitarGate < 0.01) return null;
 
   // Layout: strings spread vertically across middle of screen
   const topMargin = height * 0.25;
@@ -81,33 +94,14 @@ export const GuitarStrings: React.FC<Props> = ({ frames }) => {
   });
 
   return (
-    <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden" }}>
+    <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden", opacity: guitarGate }}>
       <svg width={width} height={height}>
         {STRING_BANDS.map((band, s) => {
-          // Staggered timing: each string fades in 0.5s apart
-          const staggerOffset = s * 0.04; // 0 to 0.20
-          const fadeIn = interpolate(
-            progress,
-            [staggerOffset, staggerOffset + 0.08],
-            [0, 1],
-            { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: Easing.out(Easing.cubic) },
-          );
-          const fadeOutStart = 0.85 + (5 - s) * 0.02; // reverse stagger out
-          const fadeOut = interpolate(
-            progress,
-            [fadeOutStart, Math.min(fadeOutStart + 0.08, 1)],
-            [1, 0],
-            { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: Easing.in(Easing.cubic) },
-          );
-          const stringOpacity = Math.min(fadeIn, fadeOut);
-
-          if (stringOpacity < 0.01) return null;
-
           const baseY = topMargin + s * stringSpacing;
           const bandValue = fd[band];
 
-          // Vibration amplitude driven by band value + energy
-          const maxAmp = interpolate(energy, [0.02, 0.3], [5, 35], {
+          // Vibration amplitude driven by band value + energy (increased range)
+          const maxAmp = interpolate(energy, [0.02, 0.3], [8, 50], {
             extrapolateLeft: "clamp",
             extrapolateRight: "clamp",
           });
@@ -151,7 +145,6 @@ export const GuitarStrings: React.FC<Props> = ({ frames }) => {
           return (
             <g
               key={s}
-              opacity={stringOpacity}
               style={{
                 filter: `drop-shadow(0 0 ${glowSize}px ${glow}) drop-shadow(0 0 ${glowSize * 2}px ${glow})`,
               }}

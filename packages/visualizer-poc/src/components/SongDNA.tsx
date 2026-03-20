@@ -45,7 +45,10 @@ export const SongDNA: React.FC<SongDNAProps> = ({
   colorAccent = "#d4a853",
 }) => {
   const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
+  const { fps, height } = useVideoConfig();
+
+  // Resolution scaling (designed at 1080p)
+  const s = height / 1080;
 
   if (!stats || stats.timesPlayed === null) return null;
 
@@ -56,7 +59,7 @@ export const SongDNA: React.FC<SongDNAProps> = ({
     config: { damping: 18, mass: 0.6, stiffness: 100 },
   });
 
-  const translateX = interpolate(slideProgress, [0, 1], [40, 0]);
+  const translateX = interpolate(slideProgress, [0, 1], [40 * s, 0]);
 
   // Fade out
   const fadeOut = interpolate(
@@ -75,8 +78,8 @@ export const SongDNA: React.FC<SongDNAProps> = ({
     <div
       style={{
         position: "absolute",
-        top: 100,
-        right: 80,
+        top: 100 * s,
+        right: 80 * s,
         opacity,
         transform: `translateX(${translateX}px)`,
         pointerEvents: "none",
@@ -85,26 +88,26 @@ export const SongDNA: React.FC<SongDNAProps> = ({
     >
       <div
         style={{
-          minWidth: 200,
-          maxWidth: 320,
-          padding: "16px 22px",
+          minWidth: 200 * s,
+          maxWidth: 320 * s,
+          padding: `${16 * s}px ${22 * s}px`,
           background: "rgba(10, 10, 10, 0.25)",
-          backdropFilter: "blur(8px)",
-          WebkitBackdropFilter: "blur(8px)",
-          borderLeft: `2px solid ${colorAccent}`,
-          borderRadius: 2,
+          backdropFilter: `blur(${8 * s}px)`,
+          WebkitBackdropFilter: `blur(${8 * s}px)`,
+          borderLeft: `${2 * s}px solid ${colorAccent}`,
+          borderRadius: 2 * s,
         }}
       >
         {/* Label */}
         <div
           style={{
             fontFamily: `${mono}, monospace`,
-            fontSize: 11,
+            fontSize: 11 * s,
             fontWeight: 400,
-            letterSpacing: 4,
+            letterSpacing: 4 * s,
             textTransform: "uppercase",
             color: "rgba(160, 152, 136, 0.8)",
-            marginBottom: 10,
+            marginBottom: 10 * s,
           }}
         >
           Song DNA
@@ -114,10 +117,10 @@ export const SongDNA: React.FC<SongDNAProps> = ({
         <div
           style={{
             fontFamily: `${cormorant}, Georgia, serif`,
-            fontSize: 26,
+            fontSize: 26 * s,
             fontWeight: 600,
             color: "rgba(245, 240, 232, 0.95)",
-            textShadow: "0 2px 8px rgba(0,0,0,0.6)",
+            textShadow: `0 ${2 * s}px ${8 * s}px rgba(0,0,0,0.6)`,
             lineHeight: 1.2,
           }}
         >
@@ -128,11 +131,11 @@ export const SongDNA: React.FC<SongDNAProps> = ({
         <div
           style={{
             fontFamily: `${mono}, monospace`,
-            fontSize: 14,
+            fontSize: 14 * s,
             fontWeight: 300,
             color: "rgba(160, 152, 136, 0.7)",
-            marginTop: 6,
-            letterSpacing: 1,
+            marginTop: 6 * s,
+            letterSpacing: 1 * s,
           }}
         >
           {stats.firstPlayed} — {stats.lastPlayed}
@@ -143,20 +146,20 @@ export const SongDNA: React.FC<SongDNAProps> = ({
           <div
             style={{
               fontFamily: `${mono}, monospace`,
-              fontSize: stats.gapShows >= 50 ? 13 : 12,
+              fontSize: (stats.gapShows >= 50 ? 13 : 12) * s,
               fontWeight: stats.gapShows >= 50 ? 400 : 300,
               color: stats.gapShows >= 50
                 ? "#f5c842"
                 : "rgba(200, 190, 170, 0.8)",
-              marginTop: 8,
-              letterSpacing: stats.gapShows >= 50 ? 3 : 1,
+              marginTop: 8 * s,
+              letterSpacing: (stats.gapShows >= 50 ? 3 : 1) * s,
               textTransform: "uppercase",
               ...(stats.gapShows >= 50 ? {
-                padding: "4px 10px",
-                border: "1px solid rgba(245, 200, 66, 0.6)",
-                borderRadius: 2,
-                boxShadow: `0 0 ${8 + Math.sin(frame * 0.08) * 4}px rgba(245, 200, 66, ${0.25 + Math.sin(frame * 0.08) * 0.15})`,
-                textShadow: "0 0 8px rgba(245, 200, 66, 0.5)",
+                padding: `${4 * s}px ${10 * s}px`,
+                border: `${1 * s}px solid rgba(245, 200, 66, 0.6)`,
+                borderRadius: 2 * s,
+                boxShadow: `0 0 ${(8 + Math.sin(frame * 0.08) * 4) * s}px rgba(245, 200, 66, ${0.25 + Math.sin(frame * 0.08) * 0.15})`,
+                textShadow: `0 0 ${8 * s}px rgba(245, 200, 66, 0.5)`,
                 display: "inline-block",
               } : {}),
             }}
@@ -172,11 +175,11 @@ export const SongDNA: React.FC<SongDNAProps> = ({
           <div
             style={{
               fontFamily: `${cormorant}, Georgia, serif`,
-              fontSize: 15,
+              fontSize: 15 * s,
               fontWeight: 300,
               fontStyle: "italic",
               color: colorAccent,
-              marginTop: 10,
+              marginTop: 10 * s,
               lineHeight: 1.4,
               opacity: 0.85,
             }}

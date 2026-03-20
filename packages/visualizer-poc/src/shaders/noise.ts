@@ -192,11 +192,11 @@ float hsvToCosineHue(float h) { return 1.0 - h; }
 // Ensures no dead black voids — concerts are never pitch black.
 vec3 stageFloodFill(vec3 col, vec2 uv, float time, float energy, float palHue1, float palHue2) {
   // Activate only above moderate energy — allow true darkness in quiet passages
-  float gate = smoothstep(0.08, 0.18, energy);
+  float gate = smoothstep(0.03, 0.12, energy);
   if (gate < 0.01) return col;
   // Darkness mask: tighter range so flood only fills truly dark pixels
   float luma = dot(col, vec3(0.299, 0.587, 0.114));
-  float darkness = smoothstep(0.15, 0.02, luma);
+  float darkness = smoothstep(0.22, 0.04, luma);
   if (darkness < 0.01) return col;
   // Three-layer flowing noise: organic patterns
   float slowT = time * 0.12;
@@ -216,7 +216,7 @@ vec3 stageFloodFill(vec3 col, vec2 uv, float time, float energy, float palHue1, 
   vec3 floodColor = mix(c1, c2, pattern * 0.5 + 0.5);
   floodColor = mix(floodColor, c3, 0.15 + pattern * 0.1);
   // Energy-scaled brightness: quiet=0.65, loud=0.85
-  floodColor *= mix(0.35, 0.55, gate);
+  floodColor *= mix(0.42, 0.62, gate);
   // Gentle spatial variation (never kills to zero — range 0.85-1.1)
   floodColor *= 0.85 + 0.25 * clamp(pattern + 0.5, 0.0, 1.0);
   // Additive blend gated by darkness only: dark areas get lifted, bright areas unchanged

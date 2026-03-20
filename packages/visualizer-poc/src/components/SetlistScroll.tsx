@@ -93,6 +93,9 @@ export const SetlistScroll: React.FC<Props> = ({ frames, currentSong, introFacto
     easing: Easing.out(Easing.cubic),
   });
 
+  // Resolution scaling (designed at 1080p)
+  const s = height / 1080;
+
   // Seeded jitter for authentic handwritten feel (static per song, not per-frame)
   const rng = seeded((ctx?.dateSeed ?? 1977) * 313);
   const jitterX = (rng() - 0.5) * 1.2;
@@ -119,7 +122,7 @@ export const SetlistScroll: React.FC<Props> = ({ frames, currentSong, introFacto
         key={song}
         style={{
           fontFamily: "'Courier New', Courier, monospace",
-          fontSize: 13,
+          fontSize: 13 * s,
           lineHeight: 1.7,
           color: isActive ? "#FFD700" : "rgba(60, 45, 30, 0.85)",
           fontWeight: isActive ? 700 : 400,
@@ -135,9 +138,9 @@ export const SetlistScroll: React.FC<Props> = ({ frames, currentSong, introFacto
           <span
             style={{
               position: "absolute",
-              left: -14,
+              left: -14 * s,
               top: 0,
-              fontSize: 12,
+              fontSize: 12 * s,
               color: "#FFD700",
             }}
           >
@@ -154,8 +157,8 @@ export const SetlistScroll: React.FC<Props> = ({ frames, currentSong, introFacto
       <div
         style={{
           position: "absolute",
-          bottom: 40,
-          ...(isIntroSong ? { right: 24 } : { left: 24 }),
+          bottom: 40 * s,
+          ...(isIntroSong ? { right: 24 * s } : { left: 24 * s }),
           opacity,
           transform: `translate(${slideX + jitterX}px, ${jitterY}px) rotate(${tiltAngle}deg)`,
           willChange: "transform, opacity",
@@ -164,25 +167,25 @@ export const SetlistScroll: React.FC<Props> = ({ frames, currentSong, introFacto
         {/* Paper background */}
         <div
           style={{
-            background: "rgba(245, 235, 210, 0.88)",
-            padding: "18px 22px 14px 26px",
-            borderRadius: 2,
+            background: "rgba(245, 235, 210, 0.92)",
+            padding: `${18 * s}px ${22 * s}px ${14 * s}px ${26 * s}px`,
+            borderRadius: 2 * s,
             clipPath: TORN_CLIP_PATH,
-            boxShadow: "2px 3px 12px rgba(0, 0, 0, 0.35)",
-            minWidth: 200,
-            maxWidth: 240,
+            boxShadow: `${2 * s}px ${3 * s}px ${12 * s}px rgba(0, 0, 0, 0.45)`,
+            minWidth: 200 * s,
+            maxWidth: 240 * s,
           }}
         >
           {/* Header */}
           <div
             style={{
               fontFamily: "'Courier New', Courier, monospace",
-              fontSize: 10,
+              fontSize: 10 * s,
               fontWeight: 700,
-              letterSpacing: 3,
+              letterSpacing: 3 * s,
               color: "rgba(80, 60, 40, 0.7)",
               textTransform: "uppercase",
-              marginBottom: 2,
+              marginBottom: 2 * s,
             }}
           >
             {ctx ? `${ctx.venueShort} ${ctx.dateShort}` : "Dead Air"}
@@ -209,12 +212,12 @@ export const SetlistScroll: React.FC<Props> = ({ frames, currentSong, introFacto
                 <div
                   style={{
                     fontFamily: "Georgia, serif",
-                    fontSize: 10,
+                    fontSize: 10 * s,
                     fontWeight: 700,
                     fontStyle: "italic",
                     color: "rgba(100, 70, 40, 0.6)",
-                    marginBottom: 2,
-                    letterSpacing: 1,
+                    marginBottom: 2 * s,
+                    letterSpacing: 1 * s,
                   }}
                 >
                   {set.label}
