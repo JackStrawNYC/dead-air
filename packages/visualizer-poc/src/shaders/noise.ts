@@ -277,6 +277,16 @@ vec3 acesToneMap(vec3 x) {
   return clamp((x * (a * x + b)) / (x * (c * x + d) + e), 0.0, 1.0);
 }
 
+// --- RGB to HSV conversion ---
+vec3 rgb2hsv(vec3 c) {
+  vec4 K = vec4(0.0, -1.0/3.0, 2.0/3.0, -1.0);
+  vec4 p = mix(vec4(c.bg, K.wz), vec4(c.gb, K.xy), step(c.b, c.g));
+  vec4 q = mix(vec4(p.xyw, c.r), vec4(c.r, p.yzx), step(p.x, c.r));
+  float d = q.x - min(q.w, q.y);
+  float e = 1.0e-10;
+  return vec3(abs(q.z + (q.w - q.y) / (6.0 * d + e)), d / (q.x + e), q.x);
+}
+
 // --- Harmonic palette cycling: chord-driven hue modulation ---
 // Maps chord index (0-23) to target hue via circle-of-fifths color wheel.
 // Major chords shift warm, minor chords shift cool.
@@ -766,16 +776,6 @@ vec3 heroIconEmergence(vec2 uv, float time, float energy, float bass,
   // Color: blend palette with slow oscillation
   vec3 iconColor = mix(col1, col2, 0.5 + 0.5 * sin(time * 0.2));
   return iconColor * (glow * 0.8 + edge * 1.8) + fringe * iconColor;
-}
-
-// --- RGB to HSV conversion ---
-vec3 rgb2hsv(vec3 c) {
-  vec4 K = vec4(0.0, -1.0/3.0, 2.0/3.0, -1.0);
-  vec4 p = mix(vec4(c.bg, K.wz), vec4(c.gb, K.xy), step(c.b, c.g));
-  vec4 q = mix(vec4(p.xyw, c.r), vec4(c.r, p.yzx), step(p.x, c.r));
-  float d = q.x - min(q.w, q.y);
-  float e = 1.0e-10;
-  return vec3(abs(q.z + (q.w - q.y) / (6.0 * d + e)), d / (q.x + e), q.x);
 }
 
 // --- Palette Cycling: rotates all hues via RGB→HSV→rotate→HSV→RGB ---
