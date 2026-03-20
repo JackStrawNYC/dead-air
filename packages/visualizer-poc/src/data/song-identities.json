@@ -1,8 +1,8 @@
 {
   "bertha": {
     "preferredModes": [
-      "concert_lighting",
-      "tie_dye",
+      "spectral_analyzer",
+      "reaction_diffusion",
       "liquid_light",
       "fractal_flames",
       "inferno",
@@ -30,13 +30,13 @@
   },
   "deal": {
     "preferredModes": [
-      "concert_lighting",
+      "neural_web",
       "inferno",
       "tie_dye",
       "fractal_flames",
-      "liquid_light",
+      "climax_surge",
       "electric_arc",
-      "lava_flow"
+      "volumetric_smoke"
     ],
     "palette": {
       "primary": 10,
@@ -59,12 +59,12 @@
   "sugaree": {
     "preferredModes": [
       "liquid_light",
-      "oil_projector",
+      "truchet_tiling",
       "vintage_film",
       "aurora",
       "smoke_rings",
       "stained_glass",
-      "lo_fi_grain"
+      "volumetric_nebula"
     ],
     "palette": {
       "primary": 30,
@@ -90,12 +90,12 @@
   "althea": {
     "preferredModes": [
       "liquid_light",
-      "oil_projector",
+      "warp_field",
       "aurora",
       "feedback_recursion",
       "voronoi_flow",
       "aurora_curtains",
-      "stained_glass"
+      "volumetric_clouds"
     ],
     "palette": {
       "primary": 180,
@@ -148,7 +148,7 @@
       "diffraction_rings",
       "stained_glass",
       "smoke_rings",
-      "aurora_curtains"
+      "volumetric_nebula"
     ],
     "palette": {
       "primary": 200,
@@ -177,12 +177,12 @@
   "caseyjones": {
     "preferredModes": [
       "concert_lighting",
-      "tie_dye",
+      "kaleidoscope",
       "inferno",
       "fractal_flames",
-      "liquid_light",
+      "solar_flare",
       "lava_flow",
-      "electric_arc"
+      "volumetric_clouds"
     ],
     "palette": {
       "primary": 5,
@@ -205,7 +205,7 @@
   },
   "unclejohnsband": {
     "preferredModes": [
-      "liquid_light",
+      "databend",
       "aurora",
       "oil_projector",
       "vintage_film",
@@ -231,8 +231,8 @@
   },
   "shakedownstreet": {
     "preferredModes": [
-      "concert_lighting",
-      "tie_dye",
+      "neural_web",
+      "mandala_engine",
       "inferno",
       "lava_flow",
       "liquid_light",
@@ -266,7 +266,7 @@
       "mandala_engine",
       "feedback_recursion",
       "morphogenesis",
-      "neural_web"
+      "volumetric_clouds"
     ],
     "palette": {
       "primary": 260,
@@ -301,11 +301,11 @@
     "preferredModes": [
       "inferno",
       "liquid_light",
-      "concert_lighting",
+      "neural_web",
       "fractal_flames",
       "lava_flow",
       "solar_flare",
-      "electric_arc"
+      "volumetric_smoke"
     ],
     "palette": {
       "primary": 10,
@@ -332,9 +332,9 @@
   },
   "scarletbegonias": {
     "preferredModes": [
-      "tie_dye",
+      "reaction_diffusion",
       "liquid_light",
-      "concert_lighting",
+      "solar_flare",
       "fractal_flames",
       "feedback_recursion",
       "plasma_field",
@@ -369,7 +369,7 @@
       "truchet_tiling",
       "stained_glass",
       "voronoi_flow",
-      "diffraction_rings"
+      "volumetric_clouds"
     ],
     "palette": {
       "primary": 170,
@@ -403,7 +403,7 @@
       "mandala_engine",
       "diffraction_rings",
       "stained_glass",
-      "aurora_curtains"
+      "volumetric_smoke"
     ],
     "palette": {
       "primary": 210,
@@ -471,13 +471,13 @@
   },
   "notfadeaway": {
     "preferredModes": [
-      "concert_lighting",
+      "neural_web",
       "inferno",
       "tie_dye",
       "fractal_flames",
       "electric_arc",
       "lava_flow",
-      "liquid_light"
+      "volumetric_clouds"
     ],
     "palette": {
       "primary": 20,
@@ -506,7 +506,7 @@
       "feedback_recursion",
       "electric_arc",
       "neural_web",
-      "fractal_zoom"
+      "volumetric_smoke"
     ],
     "palette": {
       "primary": 270,
@@ -531,13 +531,13 @@
   },
   "chinacatsunflower": {
     "preferredModes": [
-      "tie_dye",
-      "liquid_light",
+      "mandala_engine",
+      "solar_flare",
       "oil_projector",
       "fractal_flames",
       "plasma_field",
       "kaleidoscope",
-      "concert_lighting"
+      "volumetric_nebula"
     ],
     "palette": {
       "primary": 50,
@@ -557,8 +557,8 @@
   },
   "iknowyourider": {
     "preferredModes": [
-      "concert_lighting",
-      "tie_dye",
+      "solar_flare",
+      "kaleidoscope",
       "liquid_light",
       "fractal_flames",
       "inferno",
@@ -587,11 +587,11 @@
     "preferredModes": [
       "concert_lighting",
       "vintage_film",
-      "tie_dye",
-      "liquid_light",
+      "plasma_field",
+      "solar_flare",
       "oil_projector",
       "fractal_flames",
-      "lo_fi_grain"
+      "volumetric_smoke"
     ],
     "palette": {
       "primary": 35,
@@ -612,11 +612,11 @@
     "preferredModes": [
       "tie_dye",
       "concert_lighting",
-      "liquid_light",
+      "climax_surge",
       "fractal_flames",
       "inferno",
       "lava_flow",
-      "oil_projector"
+      "warp_field"
     ],
     "palette": {
       "primary": 340,
@@ -671,7 +671,7 @@
   },
   "playingintheband": {
     "preferredModes": [
-      "liquid_light",
+      "databend",
       "cosmic_voyage",
       "tie_dye",
       "fractal_flames",
@@ -704,7 +704,7 @@
     "preferredModes": [
       "inferno",
       "concert_lighting",
-      "liquid_light",
+      "neural_web",
       "mandala_engine",
       "feedback_recursion",
       "electric_arc",
@@ -814,7 +814,7 @@
       "truchet_tiling",
       "aurora",
       "stained_glass",
-      "voronoi_flow"
+      "volumetric_nebula"
     ],
     "palette": {
       "primary": 240,
@@ -834,8 +834,8 @@
   "slipknot": {
     "preferredModes": [
       "inferno",
-      "liquid_light",
-      "concert_lighting",
+      "neural_web",
+      "spectral_analyzer",
       "fractal_flames",
       "electric_arc",
       "lava_flow",
@@ -864,13 +864,13 @@
   },
   "franklinstower": {
     "preferredModes": [
-      "concert_lighting",
-      "tie_dye",
+      "spectral_analyzer",
+      "plasma_field",
       "liquid_light",
       "fractal_flames",
       "inferno",
       "lava_flow",
-      "oil_projector"
+      "volumetric_smoke"
     ],
     "palette": {
       "primary": 45,
@@ -896,11 +896,11 @@
     "preferredModes": [
       "concert_lighting",
       "inferno",
-      "liquid_light",
+      "climax_surge",
       "fractal_flames",
       "electric_arc",
       "digital_rain",
-      "lava_flow"
+      "volumetric_nebula"
     ],
     "palette": {
       "primary": 300,
@@ -926,8 +926,8 @@
     "preferredModes": [
       "concert_lighting",
       "inferno",
-      "tie_dye",
-      "liquid_light",
+      "kaleidoscope",
+      "climax_surge",
       "fractal_flames",
       "electric_arc",
       "lava_flow"
@@ -954,7 +954,7 @@
   "loser": {
     "preferredModes": [
       "vintage_film",
-      "oil_projector",
+      "fluid_2d",
       "liquid_light",
       "lo_fi_grain",
       "aurora",
@@ -1015,8 +1015,8 @@
     "preferredModes": [
       "liquid_light",
       "tie_dye",
-      "oil_projector",
-      "concert_lighting",
+      "truchet_tiling",
+      "databend",
       "fractal_flames",
       "kaleidoscope",
       "vintage_film"
@@ -1043,11 +1043,11 @@
     "preferredModes": [
       "concert_lighting",
       "inferno",
-      "liquid_light",
+      "climax_surge",
       "digital_rain",
       "electric_arc",
       "fractal_flames",
-      "tie_dye"
+      "reaction_diffusion"
     ],
     "palette": {
       "primary": 10,
@@ -1071,13 +1071,13 @@
   },
   "lazylightnin": {
     "preferredModes": [
-      "tie_dye",
+      "reaction_diffusion",
       "concert_lighting",
-      "liquid_light",
+      "solar_flare",
       "electric_arc",
       "fractal_flames",
       "kaleidoscope",
-      "plasma_field"
+      "volumetric_nebula"
     ],
     "palette": {
       "primary": 55,
@@ -1103,7 +1103,7 @@
     "preferredModes": [
       "inferno",
       "liquid_light",
-      "concert_lighting",
+      "spectral_analyzer",
       "electric_arc",
       "fractal_flames",
       "lava_flow",
@@ -1137,7 +1137,7 @@
     "preferredModes": [
       "oil_projector",
       "vintage_film",
-      "liquid_light",
+      "databend",
       "lo_fi_grain",
       "smoke_rings",
       "aurora",
@@ -1229,8 +1229,8 @@
   },
   "dancininthestreet": {
     "preferredModes": [
-      "concert_lighting",
-      "tie_dye",
+      "databend",
+      "mandala_engine",
       "inferno",
       "plasma_field",
       "liquid_light",
@@ -1305,9 +1305,9 @@
   },
   "onemoresaturdaynight": {
     "preferredModes": [
-      "concert_lighting",
+      "databend",
       "inferno",
-      "tie_dye",
+      "mandala_engine",
       "lava_flow",
       "liquid_light",
       "fractal_flames",
@@ -1338,8 +1338,8 @@
   "touchofgrey": {
     "preferredModes": [
       "concert_lighting",
-      "tie_dye",
-      "liquid_light",
+      "reaction_diffusion",
+      "climax_surge",
       "fractal_flames",
       "inferno",
       "lava_flow",
@@ -1365,9 +1365,9 @@
   },
   "goingdowntheroad": {
     "preferredModes": [
-      "concert_lighting",
+      "databend",
       "inferno",
-      "tie_dye",
+      "reaction_diffusion",
       "liquid_light",
       "fractal_flames",
       "electric_arc",
@@ -1395,7 +1395,7 @@
   },
   "mississippihalfstep": {
     "preferredModes": [
-      "oil_projector",
+      "mycelium_network",
       "vintage_film",
       "lo_fi_grain",
       "smoke_rings",
@@ -1456,11 +1456,11 @@
     "preferredModes": [
       "concert_lighting",
       "inferno",
-      "tie_dye",
-      "liquid_light",
+      "kaleidoscope",
+      "databend",
       "electric_arc",
       "fractal_flames",
-      "lava_flow"
+      "volumetric_nebula"
     ],
     "palette": {
       "primary": 50,
@@ -1485,7 +1485,7 @@
   },
   "samsonanddelilah": {
     "preferredModes": [
-      "concert_lighting",
+      "neural_web",
       "inferno",
       "tie_dye",
       "electric_arc",
@@ -1514,8 +1514,8 @@
   },
   "johnnybjgoode": {
     "preferredModes": [
-      "concert_lighting",
-      "tie_dye",
+      "spectral_analyzer",
+      "mandala_engine",
       "liquid_light",
       "inferno",
       "fractal_flames",
@@ -1546,10 +1546,10 @@
       "concert_lighting",
       "vintage_film",
       "oil_projector",
-      "liquid_light",
+      "databend",
       "lo_fi_grain",
-      "tie_dye",
-      "smoke_rings"
+      "reaction_diffusion",
+      "volumetric_nebula"
     ],
     "palette": {
       "primary": 220,
@@ -1640,10 +1640,10 @@
       "concert_lighting",
       "lo_fi_grain",
       "vintage_film",
-      "oil_projector",
+      "morphogenesis",
       "tie_dye",
       "smoke_rings",
-      "liquid_light"
+      "databend"
     ],
     "palette": {
       "primary": 30,
@@ -1665,10 +1665,10 @@
       "tie_dye",
       "liquid_light",
       "fractal_flames",
-      "concert_lighting",
+      "solar_flare",
       "kaleidoscope",
       "plasma_field",
-      "oil_projector"
+      "fluid_2d"
     ],
     "palette": {
       "primary": 300,
@@ -1751,7 +1751,7 @@
       "lo_fi_grain",
       "aurora",
       "smoke_rings",
-      "stained_glass"
+      "volumetric_clouds"
     ],
     "palette": {
       "primary": 25,

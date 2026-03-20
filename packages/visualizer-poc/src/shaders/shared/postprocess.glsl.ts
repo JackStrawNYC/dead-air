@@ -199,9 +199,12 @@ ${
 }
 ${
   dofEnabled
-    ? `  // DOF: radial circle-of-confusion blur from uCamDof
+    ? `  // DOF: radial circle-of-confusion blur from uCamDof + uCamFocusDist
   if (uCamDof > 0.01) {
-    float coc = length(uv - 0.5) * uCamDof * 2.0;
+    // Focus ring: sharp at normalized focal radius, blur increases away from it
+    float focalRadius = clamp((uCamFocusDist - 2.0) / 3.0, 0.0, 1.0) * 0.4;
+    float screenDist = length(uv - 0.5);
+    float coc = abs(screenDist - focalRadius) * uCamDof * 2.0;
     vec3 dofAccum = col;
     float dofWeight = 1.0;
     // 5-tap Gaussian blur weighted by CoC radius
