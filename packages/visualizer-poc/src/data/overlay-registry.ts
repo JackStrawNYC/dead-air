@@ -7,7 +7,7 @@
  *   5=Nature/Cosmic, 6=Character, 7=Frame/Info (artifact), 8=Typography (info),
  *   9=HUD, 10=Distortion
  *
- * Curated 2026-03-16: 57 selectable + 2 always-active = 59 total.
+ * Curated 2026-03-20: 84 selectable + 2 always-active = 86 total.
  * Component files are preserved — any overlay can be restored by re-adding
  * its registry entry here.
  *
@@ -115,11 +115,23 @@ export const OVERLAY_REGISTRY: OverlayEntry[] = [
   { name: "SunflowerStealie",    layer: 2, category: "sacred",    tags: ["dead-culture", "psychedelic"],    energyBand: "any",  weight: 3, dutyCycle: 100, energyResponse: [0.03, 0.18, 1.5], tier: "A" },
   { name: "CosmicEagle",         layer: 5, category: "nature",    tags: ["dead-culture", "cosmic"],         energyBand: "mid",  weight: 2, dutyCycle: 100, energyResponse: [0.05, 0.18, 2.0], tier: "B" },
   { name: "WaveOfLight",         layer: 3, category: "reactive",  tags: ["psychedelic", "cosmic"],          energyBand: "mid",  weight: 2, dutyCycle: 100, energyResponse: [0.05, 0.22, 1.8], tier: "B" },
+
+  // ═══ Layer 9: Music Visualization HUD (10) ═══
+  { name: "VUMeters",              layer: 9, category: "hud", tags: ["retro", "mechanical"],       energyBand: "any", weight: 1, dutyCycle: 100, energyResponse: [0.0, 0.12, 2.0], tier: "B" },
+  { name: "Oscilloscope",          layer: 9, category: "hud", tags: ["retro", "mechanical"],       energyBand: "any", weight: 1, dutyCycle: 100, energyResponse: [0.0, 0.12, 2.0], tier: "B" },
+  { name: "SpectrumAnalyzer",      layer: 9, category: "hud", tags: ["retro", "mechanical"],       energyBand: "any", weight: 2, dutyCycle: 100, energyResponse: [0.0, 0.15, 1.8], tier: "B" },
+  { name: "PianoRoll",             layer: 9, category: "hud", tags: ["organic", "contemplative"],  energyBand: "any", weight: 2, dutyCycle: 100, energyResponse: [0.0, 0.12, 2.0], tier: "B" },
+  { name: "Seismograph",           layer: 9, category: "hud", tags: ["retro", "organic"],          energyBand: "low", weight: 1, dutyCycle: 100, energyResponse: [0.0, 0.10, 2.5], tier: "B" },
+  { name: "Oscillator",            layer: 9, category: "hud", tags: ["psychedelic", "mechanical"], energyBand: "mid", weight: 2, dutyCycle: 35,  energyResponse: [0.03, 0.18, 1.5], tier: "B" },
+  { name: "RadialSpectrum",        layer: 9, category: "hud", tags: ["psychedelic", "cosmic"],     energyBand: "any", weight: 2, dutyCycle: 100, energyResponse: [0.0, 0.15, 1.8], tier: "B" },
+  { name: "BeatGrid",              layer: 9, category: "hud", tags: ["cosmic", "mechanical"],      energyBand: "low", weight: 1, dutyCycle: 100, energyResponse: [0.0, 0.08, 2.5], tier: "B" },
+  { name: "StemSeparation",        layer: 9, category: "hud", tags: ["organic", "mechanical"],     energyBand: "any", weight: 2, dutyCycle: 100, energyResponse: [0.02, 0.15, 1.8], tier: "B" },
+  { name: "WaterfallSpectrogram",  layer: 9, category: "hud", tags: ["retro", "mechanical"],       energyBand: "low", weight: 1, dutyCycle: 100, energyResponse: [0.0, 0.10, 2.5], tier: "B" },
 ];
 
 /**
  * Registry of all selectable overlays — the curated pool.
- * 57 selectable + 2 always-active = 59 total.
+ * 84 selectable + 2 always-active = 86 total.
  * Component files preserved — any overlay can be restored by re-adding here.
  */
 export const SELECTABLE_REGISTRY = [...OVERLAY_REGISTRY];

@@ -5,7 +5,7 @@
  * Components with special props (SongTitle, ConcertInfo, SetlistScroll, FilmGrain)
  * are NOT included here — they remain hardcoded in SongVisualizer.tsx.
  *
- * 57 selectable keepers (2026-03-16). Component files preserved in src/components/.
+ * 84 selectable keepers (2026-03-20). Component files preserved in src/components/.
  */
 import React from "react";
 import type { EnhancedFrameData } from "./types";
@@ -103,6 +103,18 @@ import { SunflowerStealie } from "../components/SunflowerStealie";
 import { CosmicEagle } from "../components/CosmicEagle";
 import { WaveOfLight } from "../components/WaveOfLight";
 
+// ─── Layer 9: Music Visualization HUD (10) ───
+import { VUMeters } from "../components/VUMeters";
+import { Oscilloscope } from "../components/Oscilloscope";
+import { SpectrumAnalyzer } from "../components/SpectrumAnalyzer";
+import { PianoRoll } from "../components/PianoRoll";
+import { Seismograph } from "../components/Seismograph";
+import { Oscillator } from "../components/Oscillator";
+import { RadialSpectrum } from "../components/RadialSpectrum";
+import { BeatGrid } from "../components/BeatGrid";
+import { StemSeparation } from "../components/StemSeparation";
+import { WaterfallSpectrogram } from "../components/WaterfallSpectrogram";
+
 // ─── Layer 10: Distortion (1) ───
 import { VHSGlitch } from "../components/VHSGlitch";
 
@@ -191,6 +203,18 @@ export const OVERLAY_COMPONENTS: Record<string, OverlayComponentEntry> = {
   VenueMarquee:      { Component: VenueMarquee, layer: 7 },
   TapeTrader:        { Component: TapeTrader, layer: 7 },
   TourPosterGallery: { Component: TourPosterGallery, layer: 7 },
+
+  // Layer 9: Music Visualization HUD
+  VUMeters:              { Component: VUMeters, layer: 9 },
+  Oscilloscope:          { Component: Oscilloscope, layer: 9 },
+  SpectrumAnalyzer:      { Component: SpectrumAnalyzer, layer: 9 },
+  PianoRoll:             { Component: PianoRoll, layer: 9 },
+  Seismograph:           { Component: Seismograph, layer: 9 },
+  Oscillator:            { Component: Oscillator, layer: 9 },
+  RadialSpectrum:        { Component: RadialSpectrum, layer: 9 },
+  BeatGrid:              { Component: BeatGrid, layer: 9 },
+  StemSeparation:        { Component: StemSeparation, layer: 9 },
+  WaterfallSpectrogram:  { Component: WaterfallSpectrogram, layer: 9 },
 
   // Layer 10: Distortion
   VHSGlitch:           { Component: VHSGlitch, layer: 10 },
