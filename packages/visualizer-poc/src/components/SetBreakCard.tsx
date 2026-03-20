@@ -113,6 +113,31 @@ export const SetBreakCard: React.FC<SetBreakCardProps> = ({
     { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
   );
 
+  // Ambient cosmic backdrop: slow-drifting gradient + star particles
+  const gradientX = interpolate(frame, [0, total], [40, 60], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const gradientY = interpolate(frame, [0, total], [45, 55], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const gradientOpacity = interpolate(
+    frame, [0, FADE_IN * 0.8, FADE_IN + HOLD * 0.5, total - FADE_OUT * 0.5, total], [0, 0.35, 0.45, 0.35, 0],
+    { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
+  );
+
+  // Deterministic star positions (seeded by setNumber for variety)
+  const starCount = 24;
+  const starSeed = (setNumber ?? 1) * 7919;
+  const stars = Array.from({ length: starCount }, (_, i) => {
+    const hash = ((starSeed + i * 31337) * 2654435761) >>> 0;
+    const x = (hash % 1000) / 10;
+    const y = ((hash >> 10) % 1000) / 10;
+    const size = 1 + (hash % 3);
+    const phase = (hash % 628) / 100; // 0-6.28 for twinkle offset
+    const starAlpha = interpolate(
+      frame, [0, total], [0, Math.PI * 2],
+      { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
+    );
+    const twinkle = 0.15 + 0.25 * Math.sin(starAlpha * 1.5 + phase);
+    return { x, y, size, alpha: twinkle * opacity };
+  });
+
   return (
     <div
       style={{
@@ -123,8 +148,43 @@ export const SetBreakCard: React.FC<SetBreakCardProps> = ({
         alignItems: "center",
         justifyContent: "center",
         position: "relative",
+        overflow: "hidden",
       }}
     >
+      {/* Cosmic ambient gradient */}
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          background: `radial-gradient(ellipse at ${gradientX}% ${gradientY}%, rgba(40, 20, 80, ${gradientOpacity}) 0%, rgba(15, 8, 40, ${gradientOpacity * 0.6}) 40%, transparent 70%)`,
+          pointerEvents: "none",
+        }}
+      />
+      {/* Second gradient layer for depth */}
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          background: `radial-gradient(ellipse at ${100 - gradientX}% ${100 - gradientY}%, rgba(20, 40, 80, ${gradientOpacity * 0.5}) 0%, transparent 50%)`,
+          pointerEvents: "none",
+        }}
+      />
+      {/* Star particles */}
+      {stars.map((star, i) => (
+        <div
+          key={i}
+          style={{
+            position: "absolute",
+            left: `${star.x}%`,
+            top: `${star.y}%`,
+            width: star.size,
+            height: star.size,
+            borderRadius: "50%",
+            backgroundColor: `rgba(200, 190, 255, ${star.alpha})`,
+            pointerEvents: "none",
+          }}
+        />
+      ))}
       <div
         style={{
           display: "flex",

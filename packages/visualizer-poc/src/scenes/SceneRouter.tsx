@@ -195,6 +195,8 @@ interface Props {
   coherenceIsLocked?: boolean;
   /** Map of shader modes already used in this show (for variety enforcement) */
   usedShaderModes?: Map<VisualMode, number>;
+  /** Song index when each shader mode was last used (for recency decay) */
+  shaderModeLastUsed?: Map<VisualMode, number>;
   /** Drums/Space sub-phase override for forced shader selection */
   drumsSpacePhase?: string;
   /** Per-song visual identity for preferred modes and D/S shader overrides */
@@ -227,6 +229,52 @@ interface Props {
   trackNumber?: number;
 }
 
+/**
+ * Apply recency-weighted scoring to a shader mode pool.
+ * Instead of binary "used/unused" filtering, penalizes modes based on how recently
+ * and how frequently they were used. Modes used many songs ago get nearly full weight.
+ *
+ * @returns Weighted pool where less-recently-used modes appear more often
+ */
+function applyRecencyWeighting(
+  pool: VisualMode[],
+  usedShaderModes: Map<VisualMode, number>,
+  shaderModeLastUsed: Map<VisualMode, number> | undefined,
+  currentSongIdx: number,
+): VisualMode[] {
+  if (usedShaderModes.size === 0) return pool;
+
+  // Build weighted pool: modes used recently get fewer copies, unused get max copies
+  const MAX_COPIES = 4;
+  const weighted: VisualMode[] = [];
+
+  for (const mode of pool) {
+    const count = usedShaderModes.get(mode) ?? 0;
+    if (count === 0) {
+      // Never used — max weight
+      for (let i = 0; i < MAX_COPIES; i++) weighted.push(mode);
+      continue;
+    }
+
+    // Recency: how many songs ago was this mode last used?
+    const lastUsed = shaderModeLastUsed?.get(mode) ?? 0;
+    const songDistance = Math.max(1, currentSongIdx - lastUsed);
+
+    // Frequency penalty: 1/count (used once=1.0, twice=0.5, three=0.33)
+    const freqFactor = 1 / count;
+    // Recency bonus: modes used long ago recover toward full weight
+    // distance 1 → 0.33, distance 3 → 0.60, distance 6 → 0.75, distance 12+ → 0.86+
+    const recencyFactor = 1 - 1 / (1 + songDistance * 0.5);
+
+    // Combined weight: 0→1 scale, then map to copy count (min 1)
+    const weight = freqFactor * recencyFactor;
+    const copies = Math.max(1, Math.round(weight * MAX_COPIES));
+    for (let i = 0; i < copies; i++) weighted.push(mode);
+  }
+
+  return weighted.length > 0 ? weighted : pool;
+}
+
 /** Determine the visual mode for a given section index.
  *  Priority: explicit sectionOverrides > seeded variation > energy-aware affinity morphing > defaultMode.
  *
@@ -248,6 +296,7 @@ export function getModeForSection(
   songDuration?: number,
   setNumber?: number,
   trackNumber?: number,
+  shaderModeLastUsed?: Map<VisualMode, number>,
 ): VisualMode {
   // Explicit override always wins
   const override = song.sectionOverrides?.find((o) => o.sectionIndex === sectionIndex);
@@ -255,7 +304,7 @@ export function getModeForSection(
 
   // Coherence lock: hold current shader during peak moments
   if (coherenceIsLocked && sectionIndex > 0) {
-    return getModeForSection(song, sectionIndex - 1, sections, seed, era, false, usedShaderModes, songIdentity, stemSection, frames, songDuration, setNumber, trackNumber);
+    return getModeForSection(song, sectionIndex - 1, sections, seed, era, false, usedShaderModes, songIdentity, stemSection, frames, songDuration, setNumber, trackNumber, shaderModeLastUsed);
   }
 
   // Seeded variation with affinity-aware morphing
@@ -264,7 +313,7 @@ export function getModeForSection(
     if (section) {
       const prevSection = sectionIndex > 0 ? sections[sectionIndex - 1] : null;
       const prevMode = sectionIndex > 0
-        ? getModeForSection(song, sectionIndex - 1, sections, seed, era, false, usedShaderModes, songIdentity, undefined, frames, songDuration, setNumber, trackNumber)
+        ? getModeForSection(song, sectionIndex - 1, sections, seed, era, false, usedShaderModes, songIdentity, undefined, frames, songDuration, setNumber, trackNumber, shaderModeLastUsed)
         : song.defaultMode;
 
       // Energy transition detection: pick from affinity map when energy changes
@@ -286,10 +335,9 @@ export function getModeForSection(
             if (preferredCandidates.length > 0) candidates = preferredCandidates;
           }
 
-          // Prefer modes not yet used in this show (variety enforcement)
+          // Recency-weighted variety: penalize recently/frequently used modes
           if (usedShaderModes && usedShaderModes.size > 0) {
-            const unused = candidates.filter((m) => !usedShaderModes.has(m));
-            if (unused.length > 0) candidates = unused;
+            candidates = applyRecencyWeighting(candidates, usedShaderModes, shaderModeLastUsed, trackNumber ?? 0);
           }
 
           const rng = seededRandom(seed + (trackNumber ?? 0) * 31337 + sectionIndex * 7919);
@@ -300,11 +348,10 @@ export function getModeForSection(
       // No energy change: use energy-appropriate mode pool with seeded selection
       const pool = getModesForEnergy(section.energy, era, song.defaultMode);
 
-      // Prefer modes not yet used in show (strict: no repeats until pool exhausted)
+      // Recency-weighted variety: penalize recently/frequently used modes
       let filteredPool = pool;
       if (usedShaderModes && usedShaderModes.size > 0) {
-        const unused = pool.filter((m) => !usedShaderModes.has(m));
-        if (unused.length > 0) filteredPool = unused;
+        filteredPool = applyRecencyWeighting(pool, usedShaderModes, shaderModeLastUsed, trackNumber ?? 0);
       }
 
       // Preferred-first pool: show modes + preferred + generous registry splash
@@ -488,7 +535,7 @@ function renderMode(
   return renderScene(mode, { frames, sections, palette, tempo, style, jamDensity });
 }
 
-export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, seed, jamDensity, deadAirMode, deadAirFactor, era, coherenceIsLocked, usedShaderModes, drumsSpacePhase, songIdentity, stemSection, songDuration, palette: paletteProp, segueIn, isSacredSegueIn, isInSuiteMiddle, setNumber, jamEvolution, jamPhaseBoundaries, jamCycle, jamPhaseShaders, climaxPhase: climaxPhaseProp, trackNumber }) => {
+export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, seed, jamDensity, deadAirMode, deadAirFactor, era, coherenceIsLocked, usedShaderModes, shaderModeLastUsed, drumsSpacePhase, songIdentity, stemSection, songDuration, palette: paletteProp, segueIn, isSacredSegueIn, isInSuiteMiddle, setNumber, jamEvolution, jamPhaseBoundaries, jamCycle, jamPhaseShaders, climaxPhase: climaxPhaseProp, trackNumber }) => {
   const frame = useCurrentFrame();
   const palette = paletteProp ?? song.palette;
 
@@ -505,7 +552,7 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
     return <>{renderMode(dsMode, frames, sections, palette, tempo, undefined, jamDensity)}</>;
   }
 
-  const currentMode = getModeForSection(song, currentSectionIdx, sections, seed, era, coherenceIsLocked, usedShaderModes, songIdentity, stemSection, frames, songDuration, setNumber, trackNumber);
+  const currentMode = getModeForSection(song, currentSectionIdx, sections, seed, era, coherenceIsLocked, usedShaderModes, songIdentity, stemSection, frames, songDuration, setNumber, trackNumber, shaderModeLastUsed);
   const currentSection = sections[currentSectionIdx];
 
   // ─── JAM PHASE SHADER TRANSITIONS ───
@@ -595,13 +642,19 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
         const stringsB = getShaderStrings(secondaryMode);
         if (stringsA && stringsB) {
           const blendMode = selectDualBlendMode(frameEnergy, currentSection?.energy, undefined, "jam");
-          const blendProgress = 0.20 + frameEnergy * 0.15 + Math.sin(jamEvolution.phaseProgress * Math.PI) * 0.10;
+          // Phase ramp: blend builds over first 15% of phase (not instant)
+          const phaseRamp = Math.min(1, jamEvolution.phaseProgress / 0.15);
+          const baseJamBlend = 0.10 + frameEnergy * 0.20;
+          const arcJamBlend = Math.sin(jamEvolution.phaseProgress * Math.PI) * 0.12;
+          const jamFrameData = frames[Math.min(frame, frames.length - 1)];
+          const jamBeatPulse = (jamFrameData?.beat ? 0.12 : 0) * Math.max(0.3, frameEnergy);
+          const blendProgress = (baseJamBlend + arcJamBlend + jamBeatPulse) * phaseRamp;
           return (
             <DualShaderScene
               frames={frames} sections={sections} palette={palette} tempo={tempo} jamDensity={jamDensity}
               vertA={stringsA.vert} fragA={stringsA.frag}
               vertB={stringsB.vert} fragB={stringsB.frag}
-              blendMode={blendMode} blendProgress={Math.min(0.45, blendProgress)}
+              blendMode={blendMode} blendProgress={Math.min(0.50, blendProgress)}
             />
           );
         }
@@ -621,7 +674,7 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
 
   // Crossfade INTO this section (from previous) — beat-synced when possible
   if (prevSectionIdx >= 0 && !suppressCrossfade) {
-    const prevMode = getModeForSection(song, prevSectionIdx, sections, seed, era, false, usedShaderModes, songIdentity, stemSection, frames, songDuration, setNumber, trackNumber);
+    const prevMode = getModeForSection(song, prevSectionIdx, sections, seed, era, false, usedShaderModes, songIdentity, stemSection, frames, songDuration, setNumber, trackNumber, shaderModeLastUsed);
     if (prevMode !== currentMode) {
       const boundary = currentSection.frameStart;
       const beatFrame = findNearestBeat(frames, boundary - 30, boundary + 30);
@@ -653,7 +706,7 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
 
   // Crossfade OUT of this section (to next) — beat-synced when possible
   if (nextSectionIdx < sections.length) {
-    const nextMode = getModeForSection(song, nextSectionIdx, sections, seed, era, false, usedShaderModes, songIdentity, stemSection, frames, songDuration, setNumber, trackNumber);
+    const nextMode = getModeForSection(song, nextSectionIdx, sections, seed, era, false, usedShaderModes, songIdentity, stemSection, frames, songDuration, setNumber, trackNumber, shaderModeLastUsed);
     if (nextMode !== currentMode) {
       const boundary = currentSection.frameEnd;
       const beatFrame = findNearestBeat(frames, boundary - 30, boundary + 30);
@@ -718,18 +771,27 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
       const frameData = frames[Math.min(frame, frames.length - 1)];
       const frameSectionType = frameData?.sectionType;
       const blendMode = selectDualBlendMode(frameEnergy, currentSection?.energy, undefined, frameSectionType);
-      // Asymmetric blend: primary dominates (0.25-0.45), energy pushes toward equal mix
+      // Asymmetric blend with beat pulse: primary dominates at rest,
+      // secondary punches through on beats for dynamic contrast (not mush)
       const sectionProgress = currentSection
         ? (frame - currentSection.frameStart) / Math.max(1, sectionLen)
         : 0;
-      const blendProgress = 0.20 + frameEnergy * 0.25 + Math.sin(sectionProgress * Math.PI) * 0.10;
+      // Ramp up over first 20% of section (don't start at full blend)
+      const sectionRamp = Math.min(1, sectionProgress / 0.2);
+      // Base blend: lower floor (0.10) so primary strongly dominates at rest
+      const baseBlend = 0.10 + frameEnergy * 0.30;
+      // Section arc: peak blend at section midpoint
+      const arcBlend = Math.sin(sectionProgress * Math.PI) * 0.12;
+      // Beat pulse: brief spike on beats for rhythmic contrast
+      const beatPulse = (frameData?.beat ? 0.15 : 0) * Math.max(0.3, frameEnergy);
+      const blendProgress = (baseBlend + arcBlend + beatPulse) * sectionRamp;
 
       mainScene = (
         <DualShaderScene
           frames={frames} sections={sections} palette={palette} tempo={tempo} jamDensity={jamDensity}
           vertA={stringsA.vert} fragA={stringsA.frag}
           vertB={stringsB.vert} fragB={stringsB.frag}
-          blendMode={blendMode} blendProgress={Math.min(0.50, blendProgress)}
+          blendMode={blendMode} blendProgress={Math.min(0.55, blendProgress)}
         />
       );
     } else {

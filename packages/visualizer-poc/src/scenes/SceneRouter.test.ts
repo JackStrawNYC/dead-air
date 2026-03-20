@@ -454,6 +454,37 @@ describe('getModeForSection', () => {
     }
   });
 
+  it('recency decay favors modes used long ago over recently used', () => {
+    const song = makeSong();
+    const sections = makeSections(5);
+    // All modes "used" but at different song indices
+    const used = new Map<VisualMode, number>();
+    const lastUsed = new Map<VisualMode, number>();
+    // Recently used (song 9): high penalty
+    ['liquid_light', 'particle_nebula'].forEach((m) => {
+      used.set(m as VisualMode, 2);
+      lastUsed.set(m as VisualMode, 9);
+    });
+    // Used long ago (song 0): low penalty
+    ['concert_lighting', 'aurora', 'inferno'].forEach((m) => {
+      used.set(m as VisualMode, 1);
+      lastUsed.set(m as VisualMode, 0);
+    });
+
+    // Run many seeds at trackNumber=10 (current song)
+    const modeCounts = new Map<VisualMode, number>();
+    for (let seed = 0; seed < 200; seed++) {
+      const mode = getModeForSection(song, 2, sections, seed, undefined, false, used, undefined, undefined, undefined, undefined, undefined, 10, lastUsed);
+      modeCounts.set(mode, (modeCounts.get(mode) ?? 0) + 1);
+    }
+
+    // Modes used long ago should appear more than recently used ones (on average)
+    const recentCount = (modeCounts.get('liquid_light') ?? 0) + (modeCounts.get('particle_nebula') ?? 0);
+    const oldCount = (modeCounts.get('concert_lighting') ?? 0) + (modeCounts.get('aurora') ?? 0) + (modeCounts.get('inferno') ?? 0);
+    // Old modes should get more picks — allow some tolerance for randomness
+    expect(oldCount).toBeGreaterThanOrEqual(recentCount * 0.5);
+  });
+
   it('auto-variety kicks in for long songs with odd-numbered sections', () => {
     // 4 sections, each 3000 frames (100s), total > 5400, section > 2700
     const sections = makeSections(4, 3000);

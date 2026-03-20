@@ -264,6 +264,30 @@ describe("precomputeNarrativeStates", () => {
     expect(states[2].itLockCount).toBe(2); // songs 0+1 had locks
   });
 
+  it("tracks shaderModeLastUsed with song indices", () => {
+    const songs = [
+      makeSong("s1t01", "Bertha"),
+      makeSong("s1t02", "Scarlet"),
+      makeSong("s1t03", "Fire"),
+    ];
+
+    let callCount = 0;
+    const modes: VisualMode[] = ["liquid_light", "inferno", "liquid_light"];
+    const resolveMode = () => modes[callCount++];
+
+    const states = precomputeNarrativeStates(songs, noopLoadFrames, resolveMode, noopIsJam);
+
+    // Song 0: no previous modes
+    expect(states[0].shaderModeLastUsed.size).toBe(0);
+
+    // Song 1: liquid_light last used at song 0
+    expect(states[1].shaderModeLastUsed.get("liquid_light")).toBe(0);
+
+    // Song 2: inferno last used at song 1, liquid_light still at song 0
+    expect(states[2].shaderModeLastUsed.get("inferno")).toBe(1);
+    expect(states[2].shaderModeLastUsed.get("liquid_light")).toBe(0);
+  });
+
   it("predicts multiple shader modes for songs with frames", () => {
     const songs = [
       makeSong("s1t01", "Bertha"),

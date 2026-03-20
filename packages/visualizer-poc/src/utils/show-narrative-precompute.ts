@@ -39,6 +39,8 @@ export interface PrecomputedNarrative {
   itLockCount: number;
   /** Shader modes used by previous songs (for variety enforcement) */
   usedShaderModes: Map<VisualMode, number>;
+  /** Song index when each shader mode was last used (for recency decay) */
+  shaderModeLastUsed: Map<VisualMode, number>;
   /** Composite peak-of-show scores from previous songs (for peak recognition) */
   songPeakScores: number[];
   /** Whether peak-of-show has already fired in this show */
@@ -119,6 +121,7 @@ export function precomputeNarrativeStates(
   let hasHadCoherenceLock = false;
   let itLockCount = 0;
   const usedShaderModes = new Map<VisualMode, number>();
+  const shaderModeLastUsed = new Map<VisualMode, number>();
   let prevSongContext: PrevSongContext | null = null;
   const accumulatedOverlayIds = new Set<string>();
 
@@ -139,6 +142,7 @@ export function precomputeNarrativeStates(
       hasHadCoherenceLock,
       itLockCount,
       usedShaderModes: new Map(usedShaderModes),
+      shaderModeLastUsed: new Map(shaderModeLastUsed),
       songPeakScores: [...songPeakScores],
       peakOfShowFired,
       suiteInfo,
@@ -214,6 +218,7 @@ export function precomputeNarrativeStates(
     // Shader mode tracking: predict multiple modes per song from energy profile + affinity
     const primaryMode = resolveMode(songs[i]);
     usedShaderModes.set(primaryMode, (usedShaderModes.get(primaryMode) ?? 0) + 1);
+    shaderModeLastUsed.set(primaryMode, i);
     // Simulate section-based mode variation: songs with higher energy or longer duration
     // are likely to use affinity-pool modes in addition to the primary mode
     const affinityPool = TRANSITION_AFFINITY[primaryMode];
@@ -228,6 +233,7 @@ export function precomputeNarrativeStates(
       for (let s = 0; s < Math.min(estimatedSections - 1, availableAffinity.length); s++) {
         const pick = availableAffinity[Math.floor(rng() * availableAffinity.length)];
         usedShaderModes.set(pick, (usedShaderModes.get(pick) ?? 0) + 1);
+        shaderModeLastUsed.set(pick, i);
       }
     }
 

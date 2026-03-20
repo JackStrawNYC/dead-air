@@ -26,6 +26,8 @@ export interface ShowNarrativeState {
   hasHadCoherenceLock: boolean;
   /** Running tally of shader modes used (for variety enforcement) */
   usedShaderModes: Map<VisualMode, number>;
+  /** Song index when each shader mode was last used (for recency decay) */
+  shaderModeLastUsed: Map<VisualMode, number>;
   /** Per-song peak energy values for show arc awareness */
   songPeakEnergies: number[];
   /** Current position in show arc (legacy 4-phase) */
@@ -66,6 +68,7 @@ export const ShowNarrativeProvider: React.FC<ProviderProps> = ({ totalSongs, ini
     usedOverlayIds: initialState?.usedOverlayIds ?? new Set(),
     hasHadCoherenceLock: initialState?.hasHadCoherenceLock ?? false,
     usedShaderModes: initialState?.usedShaderModes ?? new Map(),
+    shaderModeLastUsed: initialState?.shaderModeLastUsed ?? new Map(),
     songPeakEnergies: initialState?.songPeakEnergies ?? [],
     showPhase: initialState?.showPhase ?? "opening",
     postDrumsSpaceCount: initialState?.postDrumsSpaceCount ?? 0,
