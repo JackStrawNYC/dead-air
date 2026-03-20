@@ -236,4 +236,52 @@ describe("precomputeNarrativeStates", () => {
     expect(states[1].songPeakEnergies).toEqual([]);
     expect(states[1].showEnergyBaseline).toBe(0);
   });
+
+  it("tracks itLockCount across songs with coherence", () => {
+    const songs = [
+      makeSong("s1t01", "Bertha"),
+      makeSong("s1t02", "Scarlet"),
+      makeSong("s1t03", "Fire"),
+    ];
+
+    // Songs 0 and 1 have high coherence (rms>0.15, flatness<0.25)
+    const highCoherenceFrames = makeFrames(300, 0.25, 0.1);
+    const lowCoherenceFrames = makeFrames(300, 0.05, 0.8);
+
+    const states = precomputeNarrativeStates(
+      songs,
+      (trackId) => {
+        if (trackId === "s1t01") return highCoherenceFrames;
+        if (trackId === "s1t02") return highCoherenceFrames;
+        return lowCoherenceFrames;
+      },
+      noopResolveMode,
+      noopIsJam,
+    );
+
+    expect(states[0].itLockCount).toBe(0);
+    expect(states[1].itLockCount).toBe(1); // song 0 had a lock
+    expect(states[2].itLockCount).toBe(2); // songs 0+1 had locks
+  });
+
+  it("predicts multiple shader modes for songs with frames", () => {
+    const songs = [
+      makeSong("s1t01", "Bertha"),
+      makeSong("s1t02", "Scarlet"),
+    ];
+
+    // 5 minutes of frames → estimatedSections = 5, so 4 affinity modes predicted
+    const fiveMinFrames = makeFrames(9000, 0.20);
+
+    const states = precomputeNarrativeStates(
+      songs,
+      (trackId) => trackId === "s1t01" ? fiveMinFrames : null,
+      noopResolveMode,
+      noopIsJam,
+    );
+
+    // Song 1 should have primary mode + some affinity modes from song 0
+    const totalModes = Array.from(states[1].usedShaderModes.values()).reduce((a, b) => a + b, 0);
+    expect(totalModes).toBeGreaterThan(1); // more than just the primary mode
+  });
 });

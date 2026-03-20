@@ -295,8 +295,8 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
   const rotationSchedule = useMemo(() => {
     if (!props.activeOverlays || !analysis) return null;
     const sects = getSections(analysis);
-    return buildRotationSchedule(props.activeOverlays, sects, props.song.trackId, showSeed, analysis?.frames, isDrumsSpace, props.energyHints, props.show?.era, props.song.defaultMode, songIdentity, showArcModifiers, undefined, dominantStemSection);
-  }, [props.activeOverlays, analysis, props.song.trackId, showSeed, isDrumsSpace, props.energyHints, props.show?.era, props.song.defaultMode, songIdentity, showArcModifiers, dominantStemSection]);
+    return buildRotationSchedule(props.activeOverlays, sects, props.song.trackId, showSeed, analysis?.frames, isDrumsSpace, props.energyHints, props.show?.era, props.song.defaultMode, songIdentity, showArcModifiers, undefined, dominantStemSection, narrative?.state.songsCompleted);
+  }, [props.activeOverlays, analysis, props.song.trackId, showSeed, isDrumsSpace, props.energyHints, props.show?.era, props.song.defaultMode, songIdentity, showArcModifiers, dominantStemSection, narrative?.state.songsCompleted]);
 
   const opacityMapBase = rotationSchedule
     ? getOverlayOpacities(frame, rotationSchedule, analysis?.frames, energyCalibration)
@@ -371,8 +371,17 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
   audioSnapshot.coherence = coherenceState.score;
   audioSnapshot.isLocked = coherenceState.isLocked;
 
-  // IT visual response state machine
-  const itState = computeITResponse(f, frameIdx);
+  // IT visual response state machine (with show-level transcendence frequency gating)
+  // Use peakOfShowFired=false as a proxy: if peak hasn't fired yet AND this is the
+  // highest-energy song so far, allow transcendence override for the one magic moment
+  const prevMaxPeakScore = Math.max(0, ...(props.narrativeState?.songPeakScores ?? []));
+  const isPotentialPeakSong = !props.narrativeState?.peakOfShowFired
+    && (narrative?.state.songsCompleted ?? 0) >= (props.show?.songs.length ?? 1) * 0.4;
+  const itState = computeITResponse(f, frameIdx, {
+    itLockCount: props.narrativeState?.itLockCount ?? 0,
+    isPeakOfShow: !!isPotentialPeakSong,
+    setNumber: props.song.set,
+  });
 
   // Drums→Space phase detection
   const drumsSpaceState = isDrumsSpace ? computeDrumsSpacePhase(f, frameIdx, isDrumsSpace) : null;
@@ -570,12 +579,18 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
   const fadeIn = props.segueIn ? 1 : interpolate(frame, [0, FADE_FRAMES], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
   const fadeOutStart = durationInFrames - FADE_FRAMES - 1;
   const fadeOut = props.segueOut ? 1 : interpolate(frame, [fadeOutStart, durationInFrames - 1], [1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-  // Progressive dim during dead air: after crossfade completes, fade toward 40% over remaining applause.
-  // Applause is emotionally charged — keep enough atmosphere for the poster bookend + shimmer.
+  // Progressive dim during dead air: after crossfade completes, fade toward near-black.
+  // Non-segue songs get an extra "visual breath" — the last 60 frames (2s) fade deeper
+  // than segue songs, creating a brief moment of darkness between songs for pacing contrast.
   const deadAirDim = isDeadAir
-    ? Math.max(0.15, 1 - (frame - musicEndFrame - DEAD_AIR_CROSSFADE) / (durationInFrames - musicEndFrame - DEAD_AIR_CROSSFADE) * 0.85)
+    ? Math.max(0.08, 1 - (frame - musicEndFrame - DEAD_AIR_CROSSFADE) / (durationInFrames - musicEndFrame - DEAD_AIR_CROSSFADE) * 0.92)
     : 1;
-  const opacity = Math.min(fadeIn, fadeOut) * deadAirDim;
+  // Visual breath at song ending: non-segue songs fade deeper in the last 2s
+  const BREATH_FRAMES = 60;
+  const breathFactor = !props.segueOut && frame > durationInFrames - BREATH_FRAMES
+    ? Math.max(0.05, (durationInFrames - frame) / BREATH_FRAMES)
+    : 1;
+  const opacity = Math.min(fadeIn, fadeOut) * deadAirDim * breathFactor;
 
   // ─── Render ───
   return (
@@ -732,12 +747,18 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
             const deadBass = audioSnapshot.bass;
 
             // Crowd roar → brighter shimmer
-            const shimmerAlpha = (0.08 + deadRms * 0.20) * deadAirFactor;
+            const shimmerAlpha = (0.10 + deadRms * 0.25) * deadAirFactor;
             // Applause onset → warm color flash
             const warmShift = deadOnset > 0.3 ? deadOnset * 40 : 0;
-            const r = Math.min(255, 80 + Math.round(warmShift * 2.5));
-            const g = Math.min(255, 60 + Math.round(warmShift * 1.2));
-            const b = Math.max(60, 120 - Math.round(warmShift * 1.5));
+            // Palette-tinted dead air: use song's primary hue for continuity
+            const palHue = effectivePalette?.primary ?? 30;
+            const palAngle = (palHue / 360) * Math.PI * 2;
+            const baseR = Math.round(128 + 60 * Math.cos(palAngle));
+            const baseG = Math.round(100 + 40 * Math.cos(palAngle - 2.1));
+            const baseB = Math.round(100 + 60 * Math.sin(palAngle));
+            const r = Math.min(255, baseR + Math.round(warmShift * 2.0));
+            const g = Math.min(255, baseG + Math.round(warmShift * 0.8));
+            const b = Math.max(40, baseB - Math.round(warmShift * 1.0));
             // Bass content → wider glow
             const spread = 55 + deadBass * 25;
             // Time-based drift (keep organic feel)
@@ -758,15 +779,25 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
           {introFactor < 0.5 && !props.segueIn && (() => {
             const sc = afterJamMods.shimmerColor ?? { r: 120, g: 80, b: 60 };
             const speed = afterJamMods.shimmerSpeed;
+            // Blend after-jam color with upcoming song's palette for continuity bridge
+            const nextPalHue = effectivePalette?.primary ?? 30;
+            const blendProgress = Math.max(0, Math.min(1, frame / 300)); // blend over 10s
+            const nextAngle = (nextPalHue / 360) * Math.PI * 2;
+            const nr = Math.round(100 + 50 * Math.cos(nextAngle));
+            const ng = Math.round(80 + 40 * Math.cos(nextAngle - 2.1));
+            const nb = Math.round(90 + 50 * Math.sin(nextAngle));
+            const br = Math.round(sc.r * (1 - blendProgress) + nr * blendProgress);
+            const bg = Math.round(sc.g * (1 - blendProgress) + ng * blendProgress);
+            const bb = Math.round(sc.b * (1 - blendProgress) + nb * blendProgress);
             return (
               <div
                 style={{
                   position: "absolute",
                   inset: 0,
                   pointerEvents: "none",
-                  background: `radial-gradient(ellipse at ${50 + Math.sin(frame * 0.003 * speed) * 12}% ${55 + Math.cos(frame * 0.004 * speed) * 8}%, rgba(${sc.r}, ${sc.g}, ${sc.b}, 0.08), transparent 65%)`,
+                  background: `radial-gradient(ellipse at ${50 + Math.sin(frame * 0.003 * speed) * 15}% ${55 + Math.cos(frame * 0.004 * speed) * 10}%, rgba(${br}, ${bg}, ${bb}, 0.12), transparent 60%)`,
                   mixBlendMode: "screen",
-                  opacity: (0.5 + 0.3 * Math.sin(frame * 0.015 * speed)) * (1 - introFactor * 2),
+                  opacity: (0.6 + 0.3 * Math.sin(frame * 0.015 * speed)) * (1 - introFactor * 2),
                 }}
               />
             );

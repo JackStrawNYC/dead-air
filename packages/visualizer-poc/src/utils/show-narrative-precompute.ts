@@ -16,6 +16,9 @@ import { detectSuite } from "./suite-detector";
 import type { SuiteInfo } from "./suite-detector";
 import { SELECTABLE_REGISTRY } from "../data/overlay-registry";
 import { lookupSongIdentity } from "../data/song-identities";
+import { TRANSITION_AFFINITY } from "../scenes/scene-registry";
+import { seededLCG as seededRandom } from "./seededRandom";
+import { hashString } from "./hash";
 
 export interface PrecomputedNarrative {
   /** Songs completed before this one */
@@ -32,6 +35,8 @@ export interface PrecomputedNarrative {
   postDrumsSpaceCount: number;
   /** Whether any song has had high coherence (IT lock) */
   hasHadCoherenceLock: boolean;
+  /** Count of songs that had coherence locks (for transcendence frequency gating) */
+  itLockCount: number;
   /** Shader modes used by previous songs (for variety enforcement) */
   usedShaderModes: Map<VisualMode, number>;
   /** Composite peak-of-show scores from previous songs (for peak recognition) */
@@ -112,6 +117,7 @@ export function precomputeNarrativeStates(
   let hasDrumsSpace = false;
   let postDrumsSpaceCount = 0;
   let hasHadCoherenceLock = false;
+  let itLockCount = 0;
   const usedShaderModes = new Map<VisualMode, number>();
   let prevSongContext: PrevSongContext | null = null;
   const accumulatedOverlayIds = new Set<string>();
@@ -131,6 +137,7 @@ export function precomputeNarrativeStates(
       hasDrumsSpace,
       postDrumsSpaceCount,
       hasHadCoherenceLock,
+      itLockCount,
       usedShaderModes: new Map(usedShaderModes),
       songPeakScores: [...songPeakScores],
       peakOfShowFired,
@@ -191,6 +198,7 @@ export function precomputeNarrativeStates(
       if (highCoherenceFrames > frames.length / 30 * 0.1) {
         hasHadCoherenceLock = true;
         thisSongHadCoherence = true;
+        itLockCount++;
       }
     }
 
@@ -203,9 +211,25 @@ export function precomputeNarrativeStates(
       postDrumsSpaceCount++;
     }
 
-    // Shader mode tracking
-    const mode = resolveMode(songs[i]);
-    usedShaderModes.set(mode, (usedShaderModes.get(mode) ?? 0) + 1);
+    // Shader mode tracking: predict multiple modes per song from energy profile + affinity
+    const primaryMode = resolveMode(songs[i]);
+    usedShaderModes.set(primaryMode, (usedShaderModes.get(primaryMode) ?? 0) + 1);
+    // Simulate section-based mode variation: songs with higher energy or longer duration
+    // are likely to use affinity-pool modes in addition to the primary mode
+    const affinityPool = TRANSITION_AFFINITY[primaryMode];
+    if (affinityPool && affinityPool.length > 0 && frames && frames.length > 0) {
+      // Estimate how many sections this song will have (longer songs = more modes)
+      const durationSec = frames.length / 30;
+      const estimatedSections = Math.max(1, Math.min(5, Math.floor(durationSec / 60)));
+      // Pick seeded affinity modes for variety tracking
+      const songSeed = hashString(songs[i].trackId + songs[i].title);
+      const rng = seededRandom(songSeed);
+      const availableAffinity = affinityPool.filter((m) => m !== primaryMode);
+      for (let s = 0; s < Math.min(estimatedSections - 1, availableAffinity.length); s++) {
+        const pick = availableAffinity[Math.floor(rng() * availableAffinity.length)];
+        usedShaderModes.set(pick, (usedShaderModes.get(pick) ?? 0) + 1);
+      }
+    }
 
     // Predict overlays for cross-song dedup: score each overlay by tag match
     const songIdentity = lookupSongIdentity(songs[i].title);

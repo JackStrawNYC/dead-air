@@ -297,8 +297,16 @@ export function buildRotationSchedule(
   showArcModifiers?: ShowArcModifiers,
   drumsSpacePhase?: DrumsSpaceSubPhase,
   stemSectionType?: StemSectionType,
+  /** Songs completed so far in the show (for fatigue-aware rotation timing) */
+  songsCompleted?: number,
 ): RotationSchedule {
   const trackHash = hashString(trackId) + (showSeed ?? 0);
+
+  // Fatigue-aware rotation: after 60+ minutes (~8 songs), slow rotation by up to 40%
+  // to reduce perceived overlay repetition in the back half of the show.
+  // Early show: windowScale = 1.0 (normal speed). Late show: windowScale = 1.4 (40% longer windows).
+  const showProgress = songsCompleted != null ? Math.min(1, songsCompleted / 20) : 0;
+  const windowDurationScale = 1.0 + showProgress * 0.4; // 1.0 → 1.4
 
   // 1. Separate always-active from rotation pool
   const alwaysActiveSet = new Set(ALWAYS_ACTIVE);
@@ -335,7 +343,9 @@ export function buildRotationSchedule(
   const windows: RotationWindow[] = [];
   for (const section of sections) {
     const sectionLen = section.frameEnd - section.frameStart;
-    const targetWindowFrames = WINDOW_FRAMES_BY_ENERGY[section.energy] ?? WINDOW_FRAMES_DEFAULT;
+    const targetWindowFrames = Math.round(
+      (WINDOW_FRAMES_BY_ENERGY[section.energy] ?? WINDOW_FRAMES_DEFAULT) * windowDurationScale,
+    );
     const windowCount = Math.max(1, Math.round(sectionLen / targetWindowFrames));
     const windowLen = Math.floor(sectionLen / windowCount);
 

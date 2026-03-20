@@ -109,6 +109,20 @@ const RELEASING_FRAMES = 90;
 const SUDDEN_BREAK_SCORE_DROP = 0.3;
 const SUDDEN_BREAK_WINDOW = 15;
 
+/** Max transcendent locks per set before gating to "deep" tier */
+const MAX_TRANSCENDENT_PER_SET = 1;
+
+// --- Show context for frequency gating ---
+
+export interface ITShowContext {
+  /** Number of songs that had coherence locks before this song */
+  itLockCount: number;
+  /** Whether peak-of-show has been detected (allows override) */
+  isPeakOfShow: boolean;
+  /** Current set number (1, 2, 3+) */
+  setNumber: number;
+}
+
 // --- Helpers ---
 
 /** Find dominant chroma hue (0-360) from frame data */
@@ -144,10 +158,12 @@ function getLockDepth(framesSinceLock: number): LockDepth {
  *
  * @param frames Full frame array
  * @param frameIdx Current frame index
+ * @param showContext Optional show-level context for transcendence frequency gating
  */
 export function computeITResponse(
   frames: EnhancedFrameData[],
   frameIdx: number,
+  showContext?: ITShowContext,
 ): ITVisualState {
   if (frames.length === 0 || frameIdx < 0) {
     return defaultState();
@@ -294,8 +310,23 @@ export function computeITResponse(
       };
     }
 
-    // Fully locked -- graduated depth
-    const lockDepth = getLockDepth(framesSinceLock);
+    // Fully locked -- graduated depth (with frequency gating)
+    let lockDepth = getLockDepth(framesSinceLock);
+
+    // Frequency gating: cap transcendent locks per set to preserve their magic.
+    // Peak-of-show gets an override — the single most important moment always transcends.
+    if (lockDepth === "transcendent" && showContext && !showContext.isPeakOfShow) {
+      // Each set gets MAX_TRANSCENDENT_PER_SET transcendent locks
+      // itLockCount tracks ALL coherence locks in show so far;
+      // for a typical 2-set show with 2-4 locks per set, gating kicks in after the first
+      const locksThisSet = showContext.setNumber <= 1
+        ? showContext.itLockCount
+        : Math.max(0, showContext.itLockCount - MAX_TRANSCENDENT_PER_SET); // set 2+ gets fresh budget
+      if (locksThisSet >= MAX_TRANSCENDENT_PER_SET) {
+        lockDepth = "deep"; // demote to deep — still powerful, but not maximum
+      }
+    }
+
     const onsetStrength = frames[idx]?.onset ?? 0;
 
     // Compute depth-specific values
