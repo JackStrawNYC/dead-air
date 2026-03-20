@@ -33,7 +33,7 @@ uniform sampler2D uPrevFrame;
 
 ${noiseGLSL}
 
-${buildPostProcessGLSL({ grainStrength: 'normal' })}
+${buildPostProcessGLSL({ grainStrength: 'normal', bloomEnabled: true, halationEnabled: true })}
 
 varying vec2 vUv;
 
@@ -79,23 +79,41 @@ void main() {
   float highs = clamp(uHighs, 0.0, 1.0);
   float onset = clamp(uOnsetSnap, 0.0, 1.0);
   float slowE = clamp(uSlowEnergy, 0.0, 1.0);
+  float tension = clamp(uHarmonicTension, 0.0, 1.0);
+  float melodicPitch = clamp(uMelodicPitch, 0.0, 1.0);
+  float chordConf = smoothstep(0.3, 0.6, uChordConfidence);
+  float chordHue = float(int(uChordIndex)) / 24.0 * 0.12 * chordConf;
+  float otherEnergy = clamp(uOtherEnergy, 0.0, 1.0);
+
+  // === SECTION-TYPE MODULATION ===
+  float sectionT = uSectionType;
+  float sJam = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
+  float sSpace = smoothstep(6.5, 7.5, sectionT);
+  float sChorus = smoothstep(1.5, 2.5, sectionT) * (1.0 - step(2.5, sectionT));
+  // Jam: faster flow, more warp. Space: nearly still. Chorus: brighter refraction.
+  float sectionFlowMod = mix(1.0, 1.5, sJam) * mix(1.0, 0.3, sSpace);
+  float sectionWarpMod = mix(1.0, 1.3, sJam) * mix(1.0, 0.5, sSpace);
+  float sectionBrightMod = mix(1.0, 1.1, sJam) * mix(1.0, 0.7, sSpace) * mix(1.0, 1.2, sChorus);
 
   // === BARREL DISTORTION: glass curvature ===
   vec2 distUv = barrelDistort(uv, 0.15);
   vec2 dp = (distUv - 0.5) * aspect;
 
   // === SLOW MOLTEN FLOW: bass drives flow speed ===
-  float flowTime = uDynamicTime * (0.08 + bass * 0.04);
+  float flowTime = uDynamicTime * (0.08 + bass * 0.04) * sectionFlowMod;
   float tempoScale = uTempo / 120.0;
 
   // Domain warping for organic molten movement
   vec2 warpedP = dp;
   float w1 = fbm3(vec3(dp * 1.5, flowTime * 0.3));
   float w2 = fbm3(vec3(dp * 1.5 + 5.0, flowTime * 0.25));
-  warpedP += vec2(w1, w2) * (0.25 + slowE * 0.15);
+  warpedP += vec2(w1, w2) * (0.25 + slowE * 0.15) * sectionWarpMod;
+  // Tension adds turbulent warp; melodicPitch controls detail frequency
+  warpedP += vec2(sin(flowTime + tension * 3.0), cos(flowTime * 1.3)) * tension * 0.06;
 
-  // === VORONOI LAYER 1: Large glass cells ===
-  vec3 v1 = voronoi3(warpedP, flowTime, 3.0);
+  // === VORONOI LAYER 1: Large glass cells (melodic pitch adjusts scale) ===
+  float cellScale1 = 3.0 + melodicPitch * 0.8; // high pitch = finer cells
+  vec3 v1 = voronoi3(warpedP, flowTime, cellScale1);
   float cellEdge1 = smoothstep(0.05, 0.02 + highs * 0.02, v1.y - v1.x);
 
   // === VORONOI LAYER 2: Medium cells ===
@@ -107,9 +125,9 @@ void main() {
   float cellEdge3 = smoothstep(0.08, 0.04, v3.y - v3.x);
 
   // === CELL COLORS: palette-driven per cell ===
-  float hue1 = uPalettePrimary + v1.z * 0.3 + uChromaHue * 0.15;
-  float hue2 = uPaletteSecondary + v2.z * 0.2;
-  float sat = mix(0.6, 0.95, energy) * uPaletteSaturation;
+  float hue1 = uPalettePrimary + v1.z * 0.3 + uChromaHue * 0.15 + chordHue;
+  float hue2 = uPaletteSecondary + v2.z * 0.2 + chordHue * 0.5;
+  float sat = mix(0.6, 0.95, energy + otherEnergy * 0.1) * uPaletteSaturation;
 
   vec3 cellColor1 = hsv2rgb(vec3(hue1, sat, mix(0.35, 0.75, energy)));
   vec3 cellColor2 = hsv2rgb(vec3(hue2, sat * 0.9, mix(0.30, 0.65, energy)));
@@ -130,10 +148,10 @@ void main() {
   ) / 0.01;
   vec3 normal = normalize(vec3(-grad * 2.0, 1.0));
   float ndotl = max(0.0, dot(normal, lightDir));
-  float specular = pow(ndotl, 12.0 + highs * 20.0);
+  float specular = pow(ndotl, 12.0 + highs * 20.0 + tension * 10.0);
 
-  // Refraction highlights along cell edges
-  float edgeHighlight = cellEdge1 * specular * (0.5 + energy * 0.5);
+  // Refraction highlights along cell edges (section brightness + tension sharpens)
+  float edgeHighlight = cellEdge1 * specular * (0.5 + energy * 0.5) * sectionBrightMod;
   col += vec3(1.0, 0.95, 0.85) * edgeHighlight * 0.6;
 
   // === BASS PULSE: cell boundaries glow on bass ===

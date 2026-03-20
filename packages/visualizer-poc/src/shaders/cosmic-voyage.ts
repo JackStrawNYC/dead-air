@@ -130,7 +130,7 @@ void main() {
   float tile = 0.92;
   // Jam density reduces dark matter absorption → denser nebula at peaks
   // At neutral density (0.5) the multiplier is 1.0, preserving original behavior.
-  float stemOther = clamp(uStemOther, 0.0, 1.0);
+  float stemOther = clamp(uOtherEnergy, 0.0, 1.0);
   float darkmatter = mix(0.15, 0.05, bass) * mix(1.3, 0.7, uJamDensity) * (1.0 - stemOther * 0.2); // guitar textures thin dark matter
   float distfading = 0.78;
   float saturation = 0.92;

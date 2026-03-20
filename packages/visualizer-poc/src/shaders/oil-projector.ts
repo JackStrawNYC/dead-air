@@ -23,7 +23,7 @@ ${sharedUniformsGLSL}
 
 ${noiseGLSL}
 
-${buildPostProcessGLSL({ grainStrength: 'normal' })}
+${buildPostProcessGLSL({ grainStrength: 'normal', halationEnabled: true })}
 
 varying vec2 vUv;
 

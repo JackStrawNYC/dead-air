@@ -64,6 +64,11 @@ void main() {
   float bass = clamp(uBass, 0.0, 1.0);
   float onset = clamp(uOnsetSnap, 0.0, 1.0);
   float drumOnset = clamp(uDrumOnset, 0.0, 1.0);
+  float tension = clamp(uHarmonicTension, 0.0, 1.0);
+  float melodicPitch = clamp(uMelodicPitch, 0.0, 1.0);
+  float stemDrums = clamp(uStemDrums, 0.0, 1.0);
+  float chordConf = smoothstep(0.3, 0.6, uChordConfidence);
+  float chordHue = float(int(uChordIndex)) / 24.0 * 0.10 * chordConf;
 
   // --- Section-type modulation (0=intro,1=verse,2=chorus,3=bridge,4=solo,5=jam,6=outro,7=space) ---
   float sectionT = uSectionType;
@@ -103,9 +108,9 @@ void main() {
     float dx = abs(p.x - centerX);
     if (dx > barWidth * 2.0) continue; // early skip
 
-    // Band energy with onset spike
+    // Band energy with onset spike + stem drums amplify transients
     float bandEnergy = getBand(i);
-    bandEnergy += onset * 0.3;
+    bandEnergy += onset * 0.3 + stemDrums * 0.15;
     bandEnergy += bp * 0.15;
     bandEnergy = clamp(bandEnergy, 0.0, 1.0);
 
@@ -120,14 +125,14 @@ void main() {
                * smoothstep(barTop, barTop - 0.005, p.y);
     float bar = barMask * barY;
 
-    // Color: hue mapped across frequency spectrum using palette
-    float hue = mix(uPalettePrimary, uPaletteSecondary, fi / float(NUM_BARS - 1));
-    float sat = mix(0.7, 1.0, bandEnergy) * uPaletteSaturation;
+    // Color: hue mapped across frequency spectrum using palette + chord shift
+    float hue = mix(uPalettePrimary, uPaletteSecondary, fi / float(NUM_BARS - 1)) + chordHue;
+    float sat = mix(0.7, 1.0, bandEnergy) * uPaletteSaturation + tension * 0.1;
     vec3 barColor = hsv2rgb(vec3(hue, sat, 1.0));
 
-    // Brightness: brighter at top of bar (energy peak)
+    // Brightness: brighter at top of bar (energy peak), melodic pitch warms top
     float heightGrad = (p.y - barBottom) / max(barHeight, 0.001);
-    float brightness = mix(0.5, 1.2, clamp(heightGrad, 0.0, 1.0));
+    float brightness = mix(0.5, 1.2 + melodicPitch * 0.2, clamp(heightGrad, 0.0, 1.0));
     brightness *= 0.6 + bandEnergy * 0.6;
 
     col += barColor * bar * brightness;

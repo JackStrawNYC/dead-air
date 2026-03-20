@@ -90,6 +90,12 @@ void main() {
   float beatSnap = clamp(uBeatSnap, 0.0, 1.0);
   float melodicPitch = clamp(uMelodicPitch, 0.0, 1.0);
 
+  float stability = clamp(uBeatStability, 0.0, 1.0);
+  float stemDrums = clamp(uStemDrums, 0.0, 1.0);
+  float otherEnergy = clamp(uOtherEnergy, 0.0, 1.0);
+  float chordConf = smoothstep(0.3, 0.6, uChordConfidence);
+  float chordHue = float(int(uChordIndex)) / 24.0 * 0.12 * chordConf;
+
   float slowTime = uDynamicTime * 0.04;
   float chromaHueMod = uChromaHue * 0.15;
 
@@ -123,7 +129,8 @@ void main() {
   col += prev.rgb * feedbackDecay * (0.8 + energy * 0.2);
 
   // --- Draw axon connections ---
-  float axonThickness = 0.002 + bass * 0.004;
+  // Beat stability: stable = clean axons, unstable = jittery thickness
+  float axonThickness = 0.002 + bass * 0.004 + (1.0 - stability) * 0.002;
 
   for (int i = 0; i < 8; i++) {
     float fi = float(i);
@@ -140,13 +147,13 @@ void main() {
       float signalPos = fract(slowTime * 2.0 * propagationMod + fi * 0.13);
       vec2 signalPt = mix(nodeA, nodeB, signalPos);
       float signalDist = length(p - signalPt);
-      float signal = exp(-signalDist * 80.0) * energy;
+      float signal = exp(-signalDist * 80.0) * (energy + otherEnergy * 0.2);
 
-      // Firing cascade from drum onset
-      float firePhase = fract(drumOnset * 3.0 * firingRateMod + fi * 0.17);
-      float firePulse = exp(-firePhase * 4.0) * drumOnset * firingRateMod;
+      // Firing cascade from drum onset + stem drums amplify cascade
+      float firePhase = fract((drumOnset + stemDrums * 0.5) * 3.0 * firingRateMod + fi * 0.17);
+      float firePulse = exp(-firePhase * 4.0) * (drumOnset + stemDrums * 0.3) * firingRateMod;
 
-      float hue = uPalettePrimary + melodicPitch * 0.15 + chromaHueMod + fi * 0.05;
+      float hue = uPalettePrimary + melodicPitch * 0.15 + chromaHueMod + chordHue + fi * 0.05;
       float sat = mix(0.5, 1.0, energy) * uPaletteSaturation;
       float val = signal * 0.8 + firePulse * 0.5;
 
@@ -172,7 +179,7 @@ void main() {
   // Synchronous pulse on beat
   float syncPulse = beatSnap * 0.5;
 
-  float nodeHue = uPalettePrimary + nodeId * 0.1 + chromaHueMod;
+  float nodeHue = uPalettePrimary + nodeId * 0.1 + chromaHueMod + chordHue;
   float nodeSat = mix(0.4, 1.0, energy) * uPaletteSaturation;
   float nodeVal = nodeGlow + isFiring * 0.8 + syncPulse * 0.3;
 

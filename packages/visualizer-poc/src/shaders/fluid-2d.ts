@@ -48,7 +48,7 @@ ${noiseGLSL}
 // Feedback texture from MultiPassQuad (previous frame's output)
 uniform sampler2D uPrevFrame;
 
-${buildPostProcessGLSL({ grainStrength: 'light', flareEnabled: false })}
+${buildPostProcessGLSL({ grainStrength: 'light', flareEnabled: false, bloomEnabled: true, halationEnabled: true })}
 
 varying vec2 vUv;
 

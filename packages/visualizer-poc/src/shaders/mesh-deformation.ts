@@ -35,11 +35,14 @@ void main() {
 
   float t = uDynamicTime * speedMult;
 
+  // Tension → displacement chaos (high tension = more erratic deformation)
+  float tensionChaos = uHarmonicTension * sin(pos.x * 8.0 + pos.y * 5.0 + t * 4.0) * 0.06;
+
   // Bass → horizontal sine wave displacement
   float bassWave = sin(pos.y * 4.0 + t * 2.5) * uBass * 0.15;
 
   // Treble/highs → vertical ripple
-  float trebleRipple = sin(pos.x * 6.0 + t * 3.2) * uHighs * 0.10;
+  float trebleRipple = sin(pos.x * 6.0 + t * 3.2) * uHighs * 0.10 + tensionChaos;
 
   // Combined displacement with energy scaling
   float disp = (bassWave + trebleRipple) * (0.3 + uEnergy * 0.7);
@@ -76,8 +79,9 @@ vec3 hsv2rgb(vec3 c) {
 
 void main() {
   // Palette-tinted luminosity based on displacement magnitude
-  float hue = uPalettePrimary + vDisplacement * 0.15;
-  float sat = 0.4 + uPaletteSaturation * 0.3;
+  float chordHue = floor(uChordIndex) / 24.0 * 0.10;
+  float hue = uPalettePrimary + vDisplacement * 0.15 + chordHue + uMelodicPitch * 0.08;
+  float sat = 0.4 + uPaletteSaturation * 0.3 + uHarmonicTension * 0.15;
   float val = 0.6 + vDisplacement * 2.0;
 
   vec3 color = hsv2rgb(vec3(hue, sat, val));

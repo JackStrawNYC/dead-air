@@ -68,7 +68,8 @@ void main() {
 
   float slowTime = uDynamicTime * 0.05;
   float chromaHueMod = uChromaHue * 0.2;
-  float chordHue = float(int(uChordIndex)) / 24.0 * 0.15;
+  float chordConf = smoothstep(0.3, 0.6, uChordConfidence);
+  float chordHue = float(int(uChordIndex)) / 24.0 * 0.15 * chordConf;
   float vocalWarmth = uVocalEnergy * 0.1;
   float accelBoost = 1.0 + uEnergyAccel * 0.12;
 

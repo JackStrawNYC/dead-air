@@ -68,7 +68,13 @@ void main() {
   float stemBass = clamp(uStemBass, 0.0, 1.0);
   float vocalPresence = clamp(uVocalPresence, 0.0, 1.0);
   float slowEnergy = clamp(uSlowEnergy, 0.0, 1.0);
+  float otherEnergy = clamp(uOtherEnergy, 0.0, 1.0);
   float chromaHueMod = uChromaHue * 0.2;
+
+  float tension = clamp(uHarmonicTension, 0.0, 1.0);
+  float chordConf = smoothstep(0.3, 0.6, uChordConfidence);
+  float chordHue = float(int(uChordIndex)) / 24.0 * 0.12 * chordConf;
+  float stability = clamp(uBeatStability, 0.0, 1.0);
 
   float slowTime = uDynamicTime * 0.05;
 
@@ -90,7 +96,7 @@ void main() {
   // --- Ring parameters ---
   int ringCount = 3 + int(energy * 3.0 * sectionRingCount); // 3-6 rings, section-modulated
   float ringScale = (0.08 + bass * 0.06) * sectionRingScale;
-  float ringThickness = 0.006 + stemBass * 0.008;
+  float ringThickness = 0.006 + stemBass * 0.008 + (1.0 - stability) * 0.004; // unstable beats widen rings
 
   // --- Draw rings ---
   for (int i = 0; i < MAX_RINGS; i++) {
@@ -111,15 +117,16 @@ void main() {
     float majorR = ringScale * perspective * (1.0 + fi * 0.08);
     float minorR = ringThickness * perspective;
 
-    // Torus field
-    float d = smokeRingField(p, center, majorR, minorR, slowTime + fi);
+    // Torus field — tension warps ring shape
+    float tensionWarp = tension * sin(slowTime * 2.0 + fi * 3.14) * 0.01;
+    float d = smokeRingField(p, center + vec2(tensionWarp), majorR, minorR, slowTime + fi);
 
     // Volumetric glow
     float glow = exp(-max(d, 0.0) * 30.0) * 0.5;
     float edge = smoothstep(0.01, 0.0, d) * 0.7;
 
     // Color per ring
-    float hue = uPalettePrimary + fi * 0.05 + chromaHueMod + vocalPresence * 0.1;
+    float hue = uPalettePrimary + fi * 0.05 + chromaHueMod + vocalPresence * 0.1 + chordHue; // chord shifts ring hue
     float sat = mix(0.3, 0.8, energy) * uPaletteSaturation;
     float val = (glow + edge) * perspective;
 
@@ -138,7 +145,7 @@ void main() {
 
   // --- Background fog ---
   float fog = fbm(p * 2.0 + vec2(slowTime * 0.1, 0.0)) * 0.08;
-  col += vec3(fog * 0.3, fog * 0.2, fog * 0.4) * energy;
+  col += vec3(fog * 0.3, fog * 0.2, fog * 0.4) * (energy + otherEnergy * 0.15);
 
   // --- Collision glow at ring intersections ---
   float collisionGlow = 0.0;
