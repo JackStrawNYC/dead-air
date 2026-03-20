@@ -51,6 +51,13 @@ void main() {
 
   float t = uDynamicTime;
 
+  // === SECTION-TYPE MODULATION ===
+  float sectionT = uSectionType;
+  float sJam = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
+  float sSpace = smoothstep(6.5, 7.5, sectionT);
+  float sChorus = smoothstep(1.5, 2.5, sectionT) * (1.0 - step(2.5, sectionT));
+  float sSolo = smoothstep(3.5, 4.5, sectionT) * (1.0 - step(4.5, sectionT));
+
   // ─── Deep near-black background ───
   vec3 col = vec3(0.01, 0.008, 0.015);
 
@@ -65,7 +72,7 @@ void main() {
   // ─── Primary drifting light point ───
   // Position via slow simplex noise (coherence + beat stability = stability)
   float stability = 0.3 + uCoherence * 0.7 + stabilityBoost; // high coherence = steadier
-  float driftSpeed = 0.08 / stability;
+  float driftSpeed = (0.08 / stability) * mix(1.0, 1.6, sJam) * mix(1.0, 0.3, sSpace);
   vec2 lightPos = vec2(
     snoise(vec3(t * driftSpeed, 0.0, 0.0)) * 0.4,
     snoise(vec3(0.0, t * driftSpeed, 10.0)) * 0.3
@@ -75,10 +82,10 @@ void main() {
   float dist = length(p - lightPos);
 
   // Glow radius: bass-driven
-  float glowRadius = 0.08 + uBass * 0.15;
+  float glowRadius = (0.08 + uBass * 0.15) * mix(1.0, 1.5, sJam) * mix(1.0, 0.6, sSpace) * mix(1.0, 1.3, sChorus);
 
   // Intensity from energy
-  float lightIntensity = uEnergy * 3.0;
+  float lightIntensity = uEnergy * 3.0 * mix(1.0, 1.2, sChorus) * mix(1.0, 0.5, sSpace);
 
   // Inverse-square falloff (physically motivated)
   float glow = lightIntensity / (1.0 + dist * dist / (glowRadius * glowRadius));
@@ -134,6 +141,13 @@ void main() {
 
   // ─── NO stage flood fill — void should be dark ───
   // ─── NO bloom — darkness is the point ───
+
+  // === DEAD ICONOGRAPHY ===
+  float _nf = snoise(vec3(p * 2.0, uTime * 0.1));
+  vec3 _vc1 = hsv2rgb(vec3(uPalettePrimary, 0.6, 0.8));
+  vec3 _vc2 = hsv2rgb(vec3(uPaletteSecondary, 0.6, 0.8));
+  col += iconEmergence(p, uTime, uEnergy, uBass, _vc1, _vc2, _nf, uClimaxPhase, uSectionIndex);
+  col += heroIconEmergence(p, uTime, uEnergy, uBass, _vc1, _vc2, _nf, uSectionIndex);
 
   // Minimal tone mapping (keep dark areas dark)
   col = max(col, vec3(0.0));

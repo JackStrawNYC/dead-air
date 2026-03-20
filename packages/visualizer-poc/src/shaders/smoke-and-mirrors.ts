@@ -79,7 +79,7 @@ void main() {
   vec2 distUv = barrelDistort(uv, 0.1);
   vec2 dp = (distUv - 0.5) * aspect;
 
-  float flowTime = uDynamicTime * 0.1;
+  float flowTime = uDynamicTime * 0.1 * mix(1.0, 1.3, sJam) * mix(1.0, 0.5, sSpace);
 
   // --- Phase 1: New uniform integrations ---
   float vocalSpot = uVocalPresence * 0.25;     // vocal presence spotlight cone
@@ -90,6 +90,13 @@ void main() {
   float peakDesat = uPeakApproaching * 0.15;    // peak approaching desaturation
   float chromaHueMod = uChromaHue * 0.25;
   float chordHue = float(int(uChordIndex)) / 24.0 * 0.15;
+
+  // === SECTION-TYPE MODULATION ===
+  float sectionT = uSectionType;
+  float sJam = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
+  float sSpace = smoothstep(6.5, 7.5, sectionT);
+  float sChorus = smoothstep(1.5, 2.5, sectionT) * (1.0 - step(2.5, sectionT));
+  float sSolo = smoothstep(3.5, 4.5, sectionT) * (1.0 - step(4.5, sectionT));
 
   // === RAY SETUP ===
   vec3 ro = vec3(0.0, 0.0, -2.0);
@@ -284,6 +291,11 @@ void main() {
   float onsetLuma = dot(col, vec3(0.299, 0.587, 0.114));
   col = mix(vec3(onsetLuma), col, 1.0 + onsetPulse * 1.0);
   col *= 1.0 + onsetPulse * 0.12;
+
+  // === DEAD ICONOGRAPHY ===
+  float _nf = snoise(vec3(p * 2.0, uTime * 0.1));
+  col += iconEmergence(p, uTime, energy, uBass, fogTint, mirrorTint, _nf, uClimaxPhase, uSectionIndex);
+  col += heroIconEmergence(p, uTime, energy, uBass, fogTint, mirrorTint, _nf, uSectionIndex);
 
   // Lifted blacks
   float isBuild = step(0.5, uClimaxPhase) * step(uClimaxPhase, 1.5);

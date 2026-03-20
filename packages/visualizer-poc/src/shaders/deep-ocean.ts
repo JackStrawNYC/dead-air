@@ -214,6 +214,11 @@ void main() {
   vec3 vigTint = max(waterColor * 0.04, vec3(0.05, 0.04, 0.06));
   col = mix(vigTint, col, vignette);
 
+  // === DEAD ICONOGRAPHY ===
+  float _nf = snoise(vec3(p * 2.0, uTime * 0.1));
+  col += iconEmergence(p, uTime, energy, uBass, waterColor, causticColor, _nf, uClimaxPhase, uSectionIndex);
+  col += heroIconEmergence(p, uTime, energy, uBass, waterColor, causticColor, _nf, uSectionIndex);
+
   // === POST-PROCESSING (shared chain) ===
   col = applyPostProcess(col, vUv, p);
 

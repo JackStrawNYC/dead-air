@@ -115,7 +115,7 @@ const BEAT_CROSSFADE_FRAMES = 30; // 1 second when beat-synced (15 before + 15 a
 // Minimum section duration (in frames) to qualify for auto-variety
 // Lowered from 2700 (1.5 min) to 1200 (40s) so 5-minute songs get scene transitions.
 // Previous threshold meant only 10+ minute songs got within-song variety.
-const AUTO_VARIETY_MIN_SECTION = 1200; // 40 seconds at 30fps
+const AUTO_VARIETY_MIN_SECTION = 750; // 25 seconds at 30fps
 
 /**
  * Find nearest strong beat within a frame range for beat-synced transitions.
@@ -545,7 +545,7 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
       // Not at a phase boundary — render the phase shader.
       // During jam cycle peaks, use DualShaderQuad to blend current phase shader
       // with the NEXT phase's shader for sub-cycle visual climaxes.
-      if (jamCycle && jamCycle.phase === "peak" && jamCycle.progress > 0.3) {
+      if (jamCycle && (jamCycle.phase === "peak" || (jamCycle.phase === "build" && jamCycle.progress > 0.6)) && jamCycle.progress > 0.2) {
         // Find the next phase's shader for the sub-cycle peak blend
         const phaseOrder: string[] = ["exploration", "building", "peak_space", "resolution"];
         const currentPhaseIdx = phaseOrder.indexOf(jamEvolution.phase);
@@ -580,7 +580,7 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
 
       // Standard jam phase render (with dual-shader composition if energy warrants)
       const frameEnergy = frames[Math.min(frame, frames.length - 1)]?.rms ?? 0;
-      const jamShouldDual = frameEnergy > 0.10 || jamEvolution.phase === "peak_space" || jamEvolution.phase === "building";
+      const jamShouldDual = frameEnergy > 0.05 || jamEvolution.phase === "peak_space" || jamEvolution.phase === "building" || jamEvolution.phase === "exploration";
       if (jamShouldDual) {
         const affinityPool = TRANSITION_AFFINITY[jpMode];
         const rng = seededRandom((seed ?? 0) + JAM_PHASE_INDEX[jamEvolution.phase] * 31);
@@ -687,13 +687,13 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
   const sectionLen = currentSection ? currentSection.frameEnd - currentSection.frameStart : 0;
   const frameEnergy = frames[Math.min(frame, frames.length - 1)]?.rms ?? 0;
 
-  // Climax force: any section during climax/sustain phase with energy > 0.15
-  const climaxForceDual = (climaxPhaseProp !== undefined && climaxPhaseProp >= 2 && climaxPhaseProp <= 3 && frameEnergy > 0.15)
-    || (currentSection?.energy === "high" && frameEnergy > 0.20);
+  // Climax force: any section during climax/sustain phase, or high-energy sections
+  const climaxForceDual = (climaxPhaseProp !== undefined && climaxPhaseProp >= 2 && climaxPhaseProp <= 3 && frameEnergy > 0.08)
+    || (currentSection?.energy === "high" && frameEnergy > 0.12);
 
-  // Dual-shader activation: set 2+ always, set 1 for jams/solos/moderate+ energy, or climax force
+  // Dual-shader activation: any section with sufficient length + energy, jam/solo stem, or set 2+
   const shouldDual = climaxForceDual || (sectionLen >= AUTO_VARIETY_MIN_SECTION && (
-    frameEnergy > 0.12 ||
+    frameEnergy > 0.06 ||
     stemSection === "jam" || stemSection === "solo" ||
     (setNumber !== undefined && setNumber >= 2)
   ));

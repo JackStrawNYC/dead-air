@@ -158,6 +158,13 @@ void main() {
   vignette = smoothstep(0.0, 1.0, vignette);
   col = mix(vec3(0.02, 0.01, 0.03), col, vignette);
 
+  // === DEAD ICONOGRAPHY ===
+  float _nf = snoise(vec3(p * 2.0, uTime * 0.1));
+  vec3 _ic1 = hsv2rgb(vec3(uPalettePrimary, 0.8, 0.9));
+  vec3 _ic2 = hsv2rgb(vec3(uPaletteSecondary, 0.8, 0.9));
+  col += iconEmergence(p, uTime, energy, uBass, _ic1, _ic2, _nf, uClimaxPhase, uSectionIndex);
+  col += heroIconEmergence(p, uTime, energy, uBass, _ic1, _ic2, _nf, uSectionIndex);
+
   // Post-processing
   col = applyPostProcess(col, vUv, p);
 

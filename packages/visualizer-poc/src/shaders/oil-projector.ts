@@ -259,6 +259,11 @@ void main() {
     col = applyCA(col, vUv, caAmt);
   }
 
+  // === DEAD ICONOGRAPHY ===
+  float _nf = snoise(vec3(p * 2.0, uTime * 0.1));
+  col += iconEmergence(p, uTime, energy, uBass, col1, col2, _nf, uClimaxPhase, uSectionIndex);
+  col += heroIconEmergence(p, uTime, energy, uBass, col1, col2, _nf, uSectionIndex);
+
   // Lifted blacks (build-phase-aware: near true black during build for anticipation)
   float isBuild = step(0.5, uClimaxPhase) * step(uClimaxPhase, 1.5);
   float liftMult = mix(1.0, 0.15, isBuild * uClimaxIntensity);

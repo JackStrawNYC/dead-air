@@ -54,20 +54,23 @@ const NarrativeCtx = createContext<ShowNarrativeContextValue | null>(null);
 
 interface ProviderProps {
   totalSongs: number;
+  /** Seed provider with precomputed state from prior songs (CLI mode) */
+  initialState?: Partial<ShowNarrativeState>;
   children: React.ReactNode;
 }
 
-export const ShowNarrativeProvider: React.FC<ProviderProps> = ({ totalSongs, children }) => {
+export const ShowNarrativeProvider: React.FC<ProviderProps> = ({ totalSongs, initialState, children }) => {
   const stateRef = useRef<ShowNarrativeState>({
-    showEnergyBaseline: 0,
-    songsCompleted: 0,
-    usedOverlayIds: new Set(),
-    hasHadCoherenceLock: false,
-    usedShaderModes: new Map(),
-    songPeakEnergies: [],
-    showPhase: "opening",
-    postDrumsSpaceCount: 0,
-    hasDrumsSpace: false,
+    showEnergyBaseline: initialState?.showEnergyBaseline ?? 0,
+    songsCompleted: initialState?.songsCompleted ?? 0,
+    usedOverlayIds: initialState?.usedOverlayIds ?? new Set(),
+    hasHadCoherenceLock: initialState?.hasHadCoherenceLock ?? false,
+    usedShaderModes: initialState?.usedShaderModes ?? new Map(),
+    songPeakEnergies: initialState?.songPeakEnergies ?? [],
+    showPhase: initialState?.showPhase ?? "opening",
+    postDrumsSpaceCount: initialState?.postDrumsSpaceCount ?? 0,
+    hasDrumsSpace: initialState?.hasDrumsSpace ?? false,
+    showArcPhase: initialState?.showArcPhase,
   });
 
   const recordSong = useCallback((

@@ -165,6 +165,11 @@ void main() {
   float vig = 1.0 - smoothstep(0.8, 1.6, length(uv));
   color *= 0.3 + vig * 0.7;
 
+  // === DEAD ICONOGRAPHY ===
+  float _nf = snoise(vec3(uv * 2.0, uTime * 0.1));
+  color += iconEmergence(uv, uTime, energy, uBass, nebColor1, nebColor2, _nf, uClimaxPhase, uSectionIndex);
+  color += heroIconEmergence(uv, uTime, energy, uBass, nebColor1, nebColor2, _nf, uSectionIndex);
+
   // === POST-PROCESSING (shared chain) ===
   color = applyPostProcess(color, vUv, uv);
 

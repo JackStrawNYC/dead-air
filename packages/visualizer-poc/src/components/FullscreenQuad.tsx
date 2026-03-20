@@ -52,7 +52,7 @@ export const FullscreenQuad: React.FC<Props> = ({
   fragmentShader,
   extraUniforms,
 }) => {
-  const { time, beatDecay, smooth, palettePrimary, paletteSecondary, paletteSaturation, tempo, musicalTime, climaxPhase, climaxIntensity, heroTrigger, heroProgress, jamDensity, coherence, dynamicTime, isLocked, jamPhase, jamProgress } = useAudioData();
+  const { time, beatDecay, smooth, palettePrimary, paletteSecondary, paletteSaturation, tempo, musicalTime, climaxPhase, climaxIntensity, heroTrigger, heroProgress, jamDensity, coherence, dynamicTime, isLocked, jamPhase, jamProgress, peakOfShow } = useAudioData();
   const { width, height } = useVideoConfig();
   const sceneConfig = useSceneConfig();
   const showCtx = useShowContext();
@@ -143,6 +143,7 @@ export const FullscreenQuad: React.FC<Props> = ({
       uDownbeat: { value: 0 },
       uBeatConfidence: { value: 0.5 },
       uMelodicConfidence: { value: 0.5 },
+      uPeakOfShow: { value: 0 },
       uHeroIconTrigger: { value: 0 },
       uHeroIconProgress: { value: 0 },
       uShowWarmth: { value: 0 },
@@ -228,6 +229,7 @@ export const FullscreenQuad: React.FC<Props> = ({
   uniforms.uDownbeat.value = smooth.downbeat;
   uniforms.uBeatConfidence.value = smooth.beatConfidence;
   uniforms.uMelodicConfidence.value = smooth.melodicConfidence ?? 0.5;
+  uniforms.uPeakOfShow.value = peakOfShow;
   uniforms.uHeroIconTrigger.value = heroTrigger;
   uniforms.uHeroIconProgress.value = heroProgress;
   uniforms.uShowWarmth.value = filmStock.warmth + venueProfile.warmth;

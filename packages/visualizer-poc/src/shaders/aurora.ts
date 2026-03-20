@@ -92,6 +92,13 @@ void main() {
   float slowE = clamp(uSlowEnergy, 0.0, 1.0);
   float chromaH = clamp(uChromaHue, 0.0, 1.0);
 
+  // === SECTION-TYPE MODULATION ===
+  float sectionT = uSectionType;
+  float sJam = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
+  float sSpace = smoothstep(6.5, 7.5, sectionT);
+  float sChorus = smoothstep(1.5, 2.5, sectionT) * (1.0 - step(2.5, sectionT));
+  float sSolo = smoothstep(3.5, 4.5, sectionT) * (1.0 - step(4.5, sectionT));
+
   // --- Phase 1: New uniform integrations ---
   float vocalWarmth = uVocalEnergy * 0.12;
   float vocalSpot = uVocalPresence;
@@ -106,7 +113,7 @@ void main() {
 
   // === SLOW TIME: aurora should never feel rushed ===
   float slowTime = uDynamicTime * 0.08;
-  float driftSpeed = 0.03 + slowE * 0.02 + trendDrift;
+  float driftSpeed = (0.03 + slowE * 0.02 + trendDrift) * mix(1.0, 1.4, sJam) * mix(1.0, 0.4, sSpace) * mix(1.0, 1.15, sChorus);
 
   // === SKY background (dim but visible, not pitch black) ===
   vec3 skyColor = mix(
@@ -140,14 +147,14 @@ void main() {
   // Jam density expands step budget and coverage during peak jams
   // At neutral density (0.5) this produces 24 base steps, matching original behavior.
   int maxSteps = int(mix(16.0, 32.0, uJamDensity)) + int(energy * 8.0);
-  float verticalCoverage = mix(0.15, 0.7, energy + uFastEnergy * 0.15) * mix(0.8, 1.2, uJamDensity);
+  float verticalCoverage = mix(0.15, 0.7, energy + uFastEnergy * 0.15) * mix(0.8, 1.2, uJamDensity) * mix(1.0, 1.3, sJam) * mix(1.0, 0.5, sSpace);
   // === CLIMAX REACTIVITY ===
   float climaxPhase = uClimaxPhase;
   float climaxI = uClimaxIntensity;
   float isClimax = step(1.5, climaxPhase) * step(climaxPhase, 3.5);
   float climaxBoost = isClimax * climaxI;
 
-  float curtainBrightness = mix(0.25, 0.80, energy) * mix(0.7, 1.3, uJamDensity);
+  float curtainBrightness = mix(0.25, 0.80, energy) * mix(0.7, 1.3, uJamDensity) + sChorus * 0.15 + sSolo * 0.10 - sSpace * 0.15;
   curtainBrightness += onset * 0.5;
   float bpH = beatPulseHalf(uMusicalTime);
   curtainBrightness += bpH * 0.20 + max(uBeatSnap, uDrumBeat) * 0.25;

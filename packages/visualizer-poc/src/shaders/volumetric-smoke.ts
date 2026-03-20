@@ -70,10 +70,17 @@ void main() {
   float vocalE = clamp(uVocalEnergy, 0.0, 1.0);
   float sectionIdx = uSectionIndex;
 
+  // === SECTION-TYPE MODULATION ===
+  float sectionT = uSectionType;
+  float sJam = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
+  float sSpace = smoothstep(6.5, 7.5, sectionT);
+  float sChorus = smoothstep(1.5, 2.5, sectionT) * (1.0 - step(2.5, sectionT));
+  float sSolo = smoothstep(3.5, 4.5, sectionT) * (1.0 - step(4.5, sectionT));
+
   float isClimax = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5);
   float climaxBoost = isClimax * clamp(uClimaxIntensity, 0.0, 1.0);
 
-  float flowTime = uDynamicTime * (0.06 + slowE * 0.04);
+  float flowTime = uDynamicTime * (0.06 + slowE * 0.04) * mix(1.0, 1.3, sJam) * mix(1.0, 0.5, sSpace);
 
   // === PALETTE ===
   float hue1 = hsvToCosineHue(uPalettePrimary);
@@ -86,7 +93,7 @@ void main() {
   // === 3 SPOTLIGHT POSITIONS (seeded from sectionIndex) ===
   vec3 spotPos[3];
   vec3 spotDir[3];
-  float spotAngle = 0.35; // cone half-angle
+  float spotAngle = 0.35 * mix(1.0, 1.2, sJam) * mix(1.0, 0.8, sSpace); // cone half-angle
 
   spotPos[0] = vec3(hash1(sectionIdx * 1.1) * 4.0 - 2.0, 3.0, hash1(sectionIdx * 2.3) * 2.0 - 1.0);
   spotPos[1] = vec3(hash1(sectionIdx * 3.7) * 4.0 - 2.0, 3.5, hash1(sectionIdx * 4.1) * 2.0 - 1.0);
@@ -103,7 +110,7 @@ void main() {
   setupCameraRay(uv, aspect, ro, rd);
 
   // === VOLUMETRIC SMOKE RAYMARCH (24-40 steps) ===
-  int steps = int(mix(24.0, 40.0, energy));
+  int steps = int(mix(24.0, 40.0, energy)) + int(sJam * 6.0) - int(sSpace * 6.0);
   float stepSize = 0.15;
 
   vec3 smokeAccum = vec3(0.0);
@@ -190,6 +197,11 @@ void main() {
   float onsetPulse = step(0.5, uOnsetSnap) * uOnsetSnap;
   float onsetLuma = dot(col, vec3(0.299, 0.587, 0.114));
   col = mix(vec3(onsetLuma), col, 1.0 + onsetPulse * 0.8);
+
+  // === DEAD ICONOGRAPHY ===
+  float _nf = snoise(vec3(p * 2.0, uTime * 0.1));
+  col += iconEmergence(p, uTime, energy, uBass, smokeTint, spotlightTint, _nf, uClimaxPhase, uSectionIndex);
+  col += heroIconEmergence(p, uTime, energy, uBass, smokeTint, spotlightTint, _nf, uSectionIndex);
 
   // Lifted blacks
   float isBuild = step(0.5, uClimaxPhase) * step(uClimaxPhase, 1.5);

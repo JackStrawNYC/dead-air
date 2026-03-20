@@ -45,12 +45,13 @@ import { computeClimaxState, climaxModulation } from "./utils/climax-state";
 import { computeAudioSnapshot, buildBeatArray } from "./utils/audio-reactive";
 import { computeCoherence } from "./utils/coherence";
 import { computeDrumsSpacePhase } from "./utils/drums-space-phase";
-import { useShowNarrative } from "./data/ShowNarrativeContext";
+import { useShowNarrative, ShowNarrativeProvider } from "./data/ShowNarrativeContext";
 import { calibrateEnergy } from "./utils/energy";
 import { AudioSnapshotProvider } from "./data/AudioSnapshotContext";
 import { HeroPermittedProvider } from "./data/HeroPermittedContext";
 import { computeJamEvolution, getJamPhaseBoundaries, getJamPhaseSequence, JAM_PHASE_INDEX } from "./utils/jam-evolution";
 import { JamPhaseProvider } from "./data/JamPhaseContext";
+import { PeakOfShowProvider } from "./data/PeakOfShowContext";
 import { computeMediaSuppression, computeArtSuppressionFactor } from "./utils/media-suppression";
 import { computeSegueHueRotation } from "./utils/segue-blend";
 import { detectCrowdMoments } from "./data/crowd-detector";
@@ -568,10 +569,12 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
   // ─── Render ───
   return (
     <div style={{ width, height, position: "relative", overflow: "hidden", background: "#000" }}>
+      <ShowNarrativeProvider totalSongs={props.show?.songs.length ?? 1} initialState={props.narrativeState ? { ...props.narrativeState, usedOverlayIds: new Set(props.narrativeState.predictedOverlayIds ?? []) } : undefined}>
       <ShowContextProvider show={props.show}>
       <AudioSnapshotProvider snapshot={audioSnapshot}>
       <HeroPermittedProvider permitted={narrativeDirective.heroPermitted}>
       <JamPhaseProvider value={{ phase: jamEvolution.isLongJam ? JAM_PHASE_INDEX[jamEvolution.phase] : -1, progress: jamEvolution.phaseProgress }}>
+      <PeakOfShowProvider value={peakOfShow.intensity}>
       <VisualizerErrorBoundary>
       <div style={{ position: "absolute", inset: 0, opacity }}>
         <CameraMotion frames={f} jamEvolution={jamEvolution} bass={audioSnapshot.bass} cameraFreeze={counterpoint.cameraFreeze || itState.cameraLock || introFactor < 0.5} drumsSpacePhase={drumsSpaceState?.subPhase} fastEnergy={audioSnapshot.fastEnergy} vocalPresence={audioSnapshot.vocalPresence} isSolo={soloState.isSolo} soloIntensity={soloState.intensity} grooveMotionMult={grooveMods.motionMult * fatigue.motionMult * stemInterplay.motionMult * peakOfShow.motionMult * crowdEnergy.motionMult * narrativeDirective.motionMult} groovePulseMult={grooveMods.pulseMult * phraseState.zoomBreathing * tempoLock.zoomPulse * regularityStabilityMod} sectionDriftMult={sectionVocab.driftSpeedMult} cameraSteadiness={Math.max(0, Math.min(1, sectionVocab.cameraSteadiness + setTheme.cameraSteadinessOffset))} cameraDrama={climaxMod.cameraDrama}>
@@ -833,6 +836,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
         </CameraMotion>
       </div>
       </VisualizerErrorBoundary>
+      </PeakOfShowProvider>
       </JamPhaseProvider>
       </HeroPermittedProvider>
 
@@ -843,6 +847,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
       />
       </AudioSnapshotProvider>
       </ShowContextProvider>
+      </ShowNarrativeProvider>
     </div>
   );
 };

@@ -142,6 +142,14 @@ void main() {
   float vignette = 1.0 - smoothstep(0.4, 0.85, dist);
   col *= vignette;
 
+  // === DEAD ICONOGRAPHY ===
+  vec2 _fp = (vUv - 0.5) * vec2(uResolution.x / uResolution.y, 1.0);
+  float _nf = snoise(vec3(_fp * 2.0, uTime * 0.1));
+  vec3 _fc1 = fractalPalette(0.3, hueShift);
+  vec3 _fc2 = fractalPalette(0.7, hueShift);
+  col += iconEmergence(_fp, uTime, energy, uBass, _fc1, _fc2, _nf, uClimaxPhase, uSectionIndex);
+  col += heroIconEmergence(_fp, uTime, energy, uBass, _fc1, _fc2, _nf, uSectionIndex);
+
   // Apply shared post-processing chain
   col = applyPostProcess(col, vUv);
 

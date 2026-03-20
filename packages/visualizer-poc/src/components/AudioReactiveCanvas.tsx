@@ -15,6 +15,7 @@ import { computeAudioSnapshot as computeSnapshot, buildBeatArray as buildBeatArr
 import { energyGate } from "../utils/math";
 import { useHeroPermitted } from "../data/HeroPermittedContext";
 import { useJamPhase } from "../data/JamPhaseContext";
+import { usePeakOfShow } from "../data/PeakOfShowContext";
 
 /** Audio data context passed to all Three.js children */
 export interface AudioDataContext {
@@ -137,6 +138,8 @@ export interface AudioDataContext {
   jamPhase: number;
   /** Jam phase progress: 0-1 within current jam phase */
   jamProgress: number;
+  /** Peak-of-show intensity: 0 = not in peak, 1 = peak transcendence */
+  peakOfShow: number;
 }
 
 const AudioCtx = createContext<AudioDataContext | null>(null);
@@ -389,6 +392,7 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
   const climaxSpeedMult = climaxMod.shaderSpeedMult;
   const heroPermitted = useHeroPermitted();
   const jamPhaseCtx = useJamPhase();
+  const peakOfShowIntensity = usePeakOfShow();
   const heroIcon = heroPermitted !== false
     ? computeHeroIconState(climaxPhaseNum, climaxState.intensity)
     : { trigger: 0, progress: 0 };
@@ -484,6 +488,7 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
     })(),
     jamPhase: jamPhaseCtx.phase,
     jamProgress: jamPhaseCtx.progress,
+    peakOfShow: peakOfShowIntensity,
   };
 
   return (

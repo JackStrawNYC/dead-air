@@ -72,7 +72,14 @@ void main() {
   float tension = clamp(uHarmonicTension, 0.0, 1.0);
   float chromaHueMod = uChromaHue * 0.25;
 
-  float slowTime = uDynamicTime * 0.03;
+  // === SECTION-TYPE MODULATION ===
+  float sectionT = uSectionType;
+  float sJam = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
+  float sSpace = smoothstep(6.5, 7.5, sectionT);
+  float sChorus = smoothstep(1.5, 2.5, sectionT) * (1.0 - step(2.5, sectionT));
+  float sSolo = smoothstep(3.5, 4.5, sectionT) * (1.0 - step(4.5, sectionT));
+
+  float slowTime = uDynamicTime * 0.03 * mix(1.0, 1.5, sJam) * mix(1.0, 0.3, sSpace);
 
   // --- Sky background gradient ---
   float skyGrad = smoothstep(-0.5, 0.3, p.y);

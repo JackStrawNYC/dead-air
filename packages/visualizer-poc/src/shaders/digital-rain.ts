@@ -91,11 +91,18 @@ void main() {
   float chordIndex = uChordIndex;
   float chromaHueMod = uChromaHue * 0.15;
 
+  // === SECTION-TYPE MODULATION ===
+  float sectionT = uSectionType;
+  float sJam = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
+  float sSpace = smoothstep(6.5, 7.5, sectionT);
+  float sChorus = smoothstep(1.5, 2.5, sectionT) * (1.0 - step(2.5, sectionT));
+  float sSolo = smoothstep(3.5, 4.5, sectionT) * (1.0 - step(4.5, sectionT));
+
   float slowTime = uDynamicTime;
 
   // --- Column parameters ---
-  float columnWidth = mix(0.03, 0.02, bass);
-  float fallSpeed = 0.3 + energy * 0.5;
+  float columnWidth = mix(0.03, 0.02, bass) * mix(1.0, 0.8, sJam) * mix(1.0, 1.5, sSpace);
+  float fallSpeed = (0.3 + energy * 0.5) * mix(1.0, 1.5, sJam) * mix(1.0, 0.3, sSpace) * mix(1.0, 1.2, sChorus);
   float glyphSize = columnWidth * 0.9;
 
   vec3 col = vec3(0.005, 0.008, 0.005); // dark green-tinted background

@@ -157,6 +157,11 @@ void main() {
   col *= 1.0 + climaxBoost * 0.2;
   col *= 1.0 + uBeatSnap * 0.10 * (1.0 + climaxBoost * 0.3);
 
+  // === DEAD ICONOGRAPHY ===
+  float _nf = snoise(vec3(p * 2.0, uTime * 0.1));
+  col += iconEmergence(p, uTime, energy, uBass, nebulaTint, emissionTint, _nf, uClimaxPhase, uSectionIndex);
+  col += heroIconEmergence(p, uTime, energy, uBass, nebulaTint, emissionTint, _nf, uSectionIndex);
+
   // === POST PROCESS ===
   col = applyPostProcess(col, uv, p);
 

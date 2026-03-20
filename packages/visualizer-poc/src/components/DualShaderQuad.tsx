@@ -95,6 +95,7 @@ function createSceneUniforms(width: number, height: number): Record<string, THRE
     uPeakApproaching: { value: 0 }, uBeatStability: { value: 0.5 },
     uImprovisationScore: { value: 0 },
     uDownbeat: { value: 0 }, uBeatConfidence: { value: 0.5 }, uMelodicConfidence: { value: 0.5 },
+    uPeakOfShow: { value: 0 },
     uHeroIconTrigger: { value: 0 }, uHeroIconProgress: { value: 0 },
     uShowWarmth: { value: 0 }, uShowContrast: { value: 1 },
     uShowSaturation: { value: 0 }, uShowGrain: { value: 1 }, uShowBloom: { value: 1 },
@@ -119,6 +120,7 @@ function syncUniforms(
   filmStock: FilmStockParams, venueProfile: VenueProfile,
   width: number, height: number,
   gradingIntensity = 1.0,
+  peakOfShow = 0,
 ) {
   u.uTime.value = time;
   u.uDynamicTime.value = dynamicTime;
@@ -183,6 +185,7 @@ function syncUniforms(
   u.uDownbeat.value = smooth.downbeat;
   u.uBeatConfidence.value = smooth.beatConfidence;
   u.uMelodicConfidence.value = smooth.melodicConfidence ?? 0.5;
+  u.uPeakOfShow.value = peakOfShow;
   u.uHeroIconTrigger.value = heroTrigger;
   u.uHeroIconProgress.value = heroProgress;
   u.uShowWarmth.value = filmStock.warmth + venueProfile.warmth;
@@ -228,7 +231,7 @@ export const DualShaderQuad: React.FC<Props> = ({
   const {
     time, beatDecay, smooth, palettePrimary, paletteSecondary,
     paletteSaturation, tempo, musicalTime, climaxPhase, climaxIntensity,
-    heroTrigger, heroProgress, jamDensity, jamPhase, jamProgress, coherence, dynamicTime, isLocked,
+    heroTrigger, heroProgress, jamDensity, jamPhase, jamProgress, coherence, dynamicTime, isLocked, peakOfShow,
   } = useAudioData();
   const { width, height } = useVideoConfig();
   const sceneConfig = useSceneConfig();
@@ -320,7 +323,7 @@ export const DualShaderQuad: React.FC<Props> = ({
     tempo, musicalTime, climaxPhase, climaxIntensity,
     heroTrigger, heroProgress, jamDensity, jamPhase, jamProgress, coherence, isLocked,
     eraSaturation, eraBrightness, eraSepia,
-    filmStock, venueProfile, width, height, sceneConfig.gradingIntensity,
+    filmStock, venueProfile, width, height, sceneConfig.gradingIntensity, peakOfShow,
   ] as const;
 
   // Update uniforms for both scenes

@@ -34,7 +34,15 @@ void main() {
   float energy = clamp(uEnergy, 0.0, 1.0);
   float tempoScale = uTempo / 120.0;
   float sectionSeed = uSectionIndex * 5.7;
-  float t = uDynamicTime * 0.07 * tempoScale; // Purposeful movement
+
+  // === SECTION-TYPE MODULATION ===
+  float sectionT = uSectionType;
+  float sJam = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
+  float sSpace = smoothstep(6.5, 7.5, sectionT);
+  float sChorus = smoothstep(1.5, 2.5, sectionT) * (1.0 - step(2.5, sectionT));
+  float sSolo = smoothstep(3.5, 4.5, sectionT) * (1.0 - step(4.5, sectionT));
+
+  float t = uDynamicTime * 0.07 * tempoScale * mix(1.0, 1.3, sJam) * mix(1.0, 0.5, sSpace); // Purposeful movement
 
   // Subtle gate weave (projector instability)
   float weaveX = snoise(vec3(uTime * 2.0, 0.0, sectionSeed)) * 0.001;
@@ -85,7 +93,7 @@ void main() {
 
   // === HEAVY FILM GRAIN: 2-frame hold, much stronger than other modes ===
   float grainTime = floor(uTime * 15.0) / 15.0;
-  float grainIntensity = mix(0.14, 0.08, energy) + uFastEnergy * 0.04; // Much heavier grain
+  float grainIntensity = (mix(0.14, 0.08, energy) + uFastEnergy * 0.04) * mix(1.0, 0.8, sJam) * mix(1.0, 1.4, sSpace); // Much heavier grain
   col += filmGrainRes(uv, grainTime, uResolution.y) * grainIntensity;
 
   // Gate scratch (vertical line that occasionally appears)
@@ -132,6 +140,11 @@ void main() {
     float caAmt = (uOnsetSnap - 0.4) * 0.15;
     col = applyCA(col, vUv, caAmt);
   }
+
+  // === DEAD ICONOGRAPHY ===
+  float _nf = snoise(vec3(p * 2.0, uTime * 0.1));
+  col += iconEmergence(p, uTime, energy, uBass, midCol, palTint, _nf, uClimaxPhase, uSectionIndex);
+  col += heroIconEmergence(p, uTime, energy, uBass, midCol, palTint, _nf, uSectionIndex);
 
   // === HALATION: warm film bloom ===
   col = halation(vUv, col, energy);

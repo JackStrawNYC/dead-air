@@ -277,6 +277,43 @@ vec3 acesToneMap(vec3 x) {
   return clamp((x * (a * x + b)) / (x * (c * x + d) + e), 0.0, 1.0);
 }
 
+// --- Harmonic palette cycling: chord-driven hue modulation ---
+// Maps chord index (0-23) to target hue via circle-of-fifths color wheel.
+// Major chords shift warm, minor chords shift cool.
+// Strength scaled by harmonic tension (chord change rate) and energy.
+vec3 harmonicPaletteCycle(vec3 col, float chordIndex, float tension, float energy) {
+  // Circle-of-fifths hue: root note (0-11) maps to color wheel position
+  // C→0, G→1/12, D→2/12, A→3/12, E→4/12, B→5/12, F#→6/12,
+  // C#→7/12, Ab→8/12, Eb→9/12, Bb→10/12, F→11/12
+  float root = mod(chordIndex, 12.0);
+  // Map chromatic pitch to circle-of-fifths position: (root * 7) mod 12
+  float fifthsPos = mod(root * 7.0, 12.0) / 12.0;
+  float isMinor = step(12.0, chordIndex);
+
+  // Minor: shift hue 0.08 cooler (toward blue)
+  float targetHue = fifthsPos + isMinor * 0.08;
+
+  // Convert pixel to HSV, rotate hue toward target
+  vec3 hsv = rgb2hsv(col);
+
+  // Signed shortest-arc hue distance
+  float hueDiff = fract(targetHue - hsv.x + 0.5) - 0.5;
+
+  // Modulation strength: tension drives it, energy gates it
+  // Low tension (stable harmony) = gentle drift; high tension (key changes) = strong shift
+  float strength = (0.04 + tension * 0.12) * smoothstep(0.10, 0.30, energy);
+  // Minor chords get slightly stronger pull (more dramatic color)
+  strength *= 1.0 + isMinor * 0.3;
+
+  // Apply hue rotation
+  hsv.x = fract(hsv.x + hueDiff * strength);
+  // Minor chords: subtle desaturation (melancholy); major: slight saturation boost
+  hsv.y *= 1.0 + (1.0 - isMinor * 2.0) * tension * 0.06;
+  hsv.y = clamp(hsv.y, 0.0, 1.0);
+
+  return hsv2rgb(hsv);
+}
+
 // Full cinematic grade: hue-preserving filmic tone curve + energy-driven contrast.
 // Should be the LAST color transform before film grain — compresses all additive effects.
 // Hue-preserving: tone-maps the max channel, scales others proportionally.
@@ -297,6 +334,9 @@ vec3 cinematicGrade(vec3 col, float energy) {
   // Reconstruct color with preserved hue ratios
   col = hueRatio * mapped;
 
+  // Harmonic palette cycling: chord-driven hue modulation (before contrast/sat)
+  col = harmonicPaletteCycle(col, uChordIndex, uHarmonicTension, energy);
+
   // Gentle contrast + era saturation: GLSL owns all color grading.
   // uEraSaturation plumbed from era data (default 1.0 for no era).
   float luma = dot(col, vec3(0.2126, 0.7152, 0.0722));
@@ -305,6 +345,28 @@ vec3 cinematicGrade(vec3 col, float energy) {
   float isClimaxGrade = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5);
   float climaxSat = isClimaxGrade * uClimaxIntensity * 0.70;
   col = mix(vec3(luma), col, contrast * uEraSaturation + uShowSaturation + climaxSat);
+
+  // === PEAK-OF-SHOW TRANSCENDENCE ===
+  // One-time, per-show moment: golden glow + saturation surge + luminance bloom.
+  // uPeakOfShow ramps 0→1→0 over ~7 seconds. Applied after all other grading
+  // so the transcendent glow sits on top of the established look.
+  if (uPeakOfShow > 0.01) {
+    float pk = uPeakOfShow;
+    // Golden hue convergence: shift all colors toward warm gold (hue ~0.11)
+    vec3 peakHSV = rgb2hsv(col);
+    float goldHue = 0.11; // warm golden amber
+    float hDist = fract(goldHue - peakHSV.x + 0.5) - 0.5;
+    peakHSV.x = fract(peakHSV.x + hDist * pk * 0.25);
+    // Saturation surge: push toward vivid
+    peakHSV.y = min(1.0, peakHSV.y * (1.0 + pk * 0.40));
+    // Luminance bloom: lift midtones toward bright
+    peakHSV.z = min(1.0, peakHSV.z + pk * 0.12);
+    col = hsv2rgb(peakHSV);
+    // Warm additive glow (screen blend of golden light)
+    vec3 goldenGlow = vec3(1.0, 0.85, 0.55) * pk * 0.08;
+    col = col + goldenGlow - col * goldenGlow; // screen blend
+  }
+
   return col;
 }
 
@@ -435,11 +497,13 @@ float sdStealie(vec2 p, float radius) {
 //   col2     — shader's secondary palette color
 //   noiseField — shader's own FBM/noise value at this pixel (for dissolution)
 vec3 stealieEmergence(vec2 uv, float time, float energy, float bass, vec3 col1, vec3 col2, float noiseField, float climaxPhase) {
-  // Climax gate: only during climax (2) or sustain (3)
+  // Two-tier gating: subtle ambient shimmer + full climax emergence
   float climaxGate = smoothstep(1.5, 2.5, climaxPhase);
-  // Energy gate: lowered so stealie appears during climax (max energy ~0.465)
   float energyGate = smoothstep(0.35, 0.55, energy);
-  float gate = energyGate * climaxGate;
+  float fullGate = energyGate * climaxGate;
+  // Ambient: faint ghostly presence when energy > 0.20, no climax needed
+  float ambientGate = smoothstep(0.20, 0.45, energy) * 0.12;
+  float gate = max(fullGate, ambientGate);
   if (gate < 0.001) return vec3(0.0);
 
   // Slow rotation
@@ -605,10 +669,13 @@ float _ns_sdSkull(vec2 p, float jawOpen) {
 //   sectionIndex — uSectionIndex for icon variety
 vec3 iconEmergence(vec2 uv, float time, float energy, float bass,
                     vec3 col1, vec3 col2, float noiseField, float climaxPhase, float sectionIndex) {
-  // Only show during climax phases with sufficient energy
+  // Two-tier gating: subtle ambient shimmer + full climax emergence
   float climaxGate = smoothstep(1.5, 2.5, climaxPhase);
   float energyGate = smoothstep(0.35, 0.55, energy);
-  float gate = energyGate * climaxGate;
+  float fullGate = energyGate * climaxGate;
+  // Ambient: faint ghostly presence when energy > 0.20, no climax needed
+  float ambientGate = smoothstep(0.20, 0.45, energy) * 0.12;
+  float gate = max(fullGate, ambientGate);
   if (gate < 0.001) return vec3(0.0);
 
   // Slow rotation

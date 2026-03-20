@@ -173,6 +173,7 @@ function createBaseUniforms(
     uDownbeat: { value: 0 },
     uBeatConfidence: { value: 0.5 },
     uMelodicConfidence: { value: 0.5 },
+    uPeakOfShow: { value: 0 },
     uHeroIconTrigger: { value: 0 },
     uHeroIconProgress: { value: 0 },
     uShowWarmth: { value: 0 },
@@ -201,7 +202,7 @@ export const MultiPassQuad: React.FC<Props> = ({
   const {
     time, beatDecay, smooth, palettePrimary, paletteSecondary,
     paletteSaturation, tempo, musicalTime, climaxPhase, climaxIntensity,
-    heroTrigger, heroProgress, jamDensity, jamPhase, jamProgress, coherence, dynamicTime, isLocked,
+    heroTrigger, heroProgress, jamDensity, jamPhase, jamProgress, coherence, dynamicTime, isLocked, peakOfShow,
   } = useAudioData();
   const { width, height } = useVideoConfig();
   const currentFrame = useCurrentFrame();
@@ -375,6 +376,7 @@ export const MultiPassQuad: React.FC<Props> = ({
   u.uDownbeat.value = smooth.downbeat;
   u.uBeatConfidence.value = smooth.beatConfidence;
   u.uMelodicConfidence.value = smooth.melodicConfidence ?? 0.5;
+  u.uPeakOfShow.value = peakOfShow;
   u.uHeroIconTrigger.value = heroTrigger;
   u.uHeroIconProgress.value = heroProgress;
   u.uShowWarmth.value = filmStock.warmth + venueProfile.warmth;

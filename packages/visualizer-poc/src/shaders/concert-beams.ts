@@ -66,6 +66,13 @@ void main() {
   float tempoScale = uLocalTempo / 120.0;
   float effectiveBeat = uBeatSnap * smoothstep(0.3, 0.7, uBeatConfidence);
 
+  // === SECTION-TYPE MODULATION ===
+  float sectionT = uSectionType;
+  float sJam = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
+  float sSpace = smoothstep(6.5, 7.5, sectionT);
+  float sChorus = smoothstep(1.5, 2.5, sectionT) * (1.0 - step(2.5, sectionT));
+  float sSolo = smoothstep(3.5, 4.5, sectionT) * (1.0 - step(4.5, sectionT));
+
   // --- Phase 1: New uniform integrations ---
   // Vocal warmth on center beams
   float vocalWarmth = uVocalEnergy * 0.15;
@@ -104,7 +111,7 @@ void main() {
   bgColor *= 0.85 + bgNoise * 0.3;
   vec3 col = bgColor;
 
-  float activeBeamCount = 3.0 + energy * 5.0 + uJamDensity * 2.0;
+  float activeBeamCount = (3.0 + energy * 5.0 + uJamDensity * 2.0) * mix(1.0, 1.3, sJam) * mix(1.0, 0.5, sSpace) * mix(1.0, 1.2, sChorus);
   float beamSpacing = aspect.x / float(NUM_BEAMS + 1);
   float sectionHueShift = mod(uSectionIndex * 0.15, 1.0);
 
@@ -116,7 +123,7 @@ void main() {
     if (beamActive < 0.01) continue;
 
     float beamX = -aspect.x * 0.5 + beamSpacing * (fi + 1.0) + sin(uDynamicTime * 0.15 + fi * 0.7) * 0.08;
-    float sweepSpeed = mix(0.25, 0.6, energy) * tempoScale * accelSweep + uBass * 0.1;
+    float sweepSpeed = (mix(0.25, 0.6, energy) * tempoScale * accelSweep + uBass * 0.1) * mix(1.0, 1.3, sJam) * mix(1.0, 0.4, sSpace);
     float angle = PI * 0.5 + sin(uDynamicTime * sweepSpeed + beamPhase * 2.0 + pitchSweep) * mix(0.35, 0.70, energy + uFastEnergy * 0.15 + tensionAngle);
     float width = mix(0.03, 0.11, energy) + uMids * 0.04;
 
@@ -162,7 +169,7 @@ void main() {
   float hazeNoise = fbm3(vec3(p * 2.0 + 50.0, uDynamicTime * 0.08));
   float secHue = hsvToCosineHue(uPaletteSecondary) + hazeNoise * 0.15;
   vec3 hazeColor = 0.5 + 0.5 * cos(6.28318 * vec3(secHue, secHue + 0.33, secHue + 0.67));
-  float hazeAmount = (0.03 + energy * 0.05) * (0.5 + hazeNoise * 0.5);
+  float hazeAmount = (0.03 + energy * 0.05) * (0.5 + hazeNoise * 0.5) * mix(1.0, 1.5, sJam) * mix(1.0, 0.3, sSpace);
   col += hazeColor * hazeAmount;
 
   // === CLIMAX REACTIVITY ===

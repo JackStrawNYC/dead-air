@@ -128,7 +128,14 @@ void main() {
   float onset = clamp(uOnsetSnap, 0.0, 1.0);
   float mids = clamp(uMids, 0.0, 1.0);
 
-  float slowTime = uDynamicTime * 0.06;
+  // === SECTION-TYPE MODULATION ===
+  float sectionT = uSectionType;
+  float sJam = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
+  float sSpace = smoothstep(6.5, 7.5, sectionT);
+  float sChorus = smoothstep(1.5, 2.5, sectionT) * (1.0 - step(2.5, sectionT));
+  float sSolo = smoothstep(3.5, 4.5, sectionT) * (1.0 - step(4.5, sectionT));
+
+  float slowTime = uDynamicTime * 0.06 * mix(1.0, 1.4, sJam) * mix(1.0, 0.5, sSpace);
   float chromaHueMod = uChromaHue * 0.2;
   float chordHue = float(int(uChordIndex)) / 24.0 * 0.15;
 
@@ -149,7 +156,7 @@ void main() {
 
   // --- Water wave distortion ---
   // Beat stability controls wave regularity
-  float waveFreq = mix(3.0, 8.0, 1.0 - stability);
+  float waveFreq = mix(3.0, 8.0, 1.0 - stability) * mix(1.0, 1.3, sJam) * mix(1.0, 0.6, sSpace);
   float waveSway = sin(p.x * waveFreq + uDynamicTime * 0.8) * 0.02 * (1.0 + bass * 0.5);
   vec2 waterP = p + vec2(0.0, waveSway);
 

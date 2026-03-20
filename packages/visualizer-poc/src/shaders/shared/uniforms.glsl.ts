@@ -97,6 +97,9 @@ uniform float uBeatConfidence;
 uniform float uMelodicConfidence;
 uniform float uImprovisationScore;
 
+// ─── Peak-of-Show ───
+uniform float uPeakOfShow;
+
 // ─── Hero Icon ───
 uniform float uHeroIconTrigger;
 uniform float uHeroIconProgress;

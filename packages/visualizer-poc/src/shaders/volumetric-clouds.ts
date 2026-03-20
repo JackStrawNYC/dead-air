@@ -73,7 +73,14 @@ void main() {
   float climaxPhase = uClimaxPhase;
   float climaxIntensity = clamp(uClimaxIntensity, 0.0, 1.0);
 
-  float flowTime = uDynamicTime * (0.08 + slowE * 0.04);
+  // === SECTION-TYPE MODULATION ===
+  float sectionT = uSectionType;
+  float sJam = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
+  float sSpace = smoothstep(6.5, 7.5, sectionT);
+  float sChorus = smoothstep(1.5, 2.5, sectionT) * (1.0 - step(2.5, sectionT));
+  float sSolo = smoothstep(3.5, 4.5, sectionT) * (1.0 - step(4.5, sectionT));
+
+  float flowTime = uDynamicTime * (0.08 + slowE * 0.04) * mix(1.0, 1.4, sJam) * mix(1.0, 0.4, sSpace);
 
   // === PALETTE ===
   float hue1 = hsvToCosineHue(uPalettePrimary);
@@ -98,7 +105,7 @@ void main() {
 
   // === VOLUMETRIC CLOUD RAYMARCH ===
   // Energy-gated steps: 24 cheap at quiet, 48 rich at peaks
-  int steps = int(mix(24.0, 48.0, energy));
+  int steps = int(mix(24.0, 48.0, energy)) + int(sJam * 8.0) - int(sSpace * 8.0);
   float stepSize = 0.18;
 
   vec3 cloudAccum = vec3(0.0);
@@ -118,7 +125,7 @@ void main() {
     // Climax parts clouds
     density *= (1.0 - cloudPart);
 
-    density *= 0.06;
+    density *= 0.06 * mix(1.0, 1.2, sJam) * mix(1.0, 0.6, sSpace);
 
     if (density > 0.001) {
       float alpha = density * (1.0 - cloudAlpha);
@@ -167,6 +174,11 @@ void main() {
 
   // Beat pulse
   col *= 1.0 + uBeatSnap * 0.12 * (1.0 + climaxBoost * 0.3);
+
+  // === DEAD ICONOGRAPHY ===
+  float _nf = snoise(vec3(p * 2.0, uTime * 0.1));
+  col += iconEmergence(p, uTime, energy, uBass, cloudTint, skyTint, _nf, uClimaxPhase, uSectionIndex);
+  col += heroIconEmergence(p, uTime, energy, uBass, cloudTint, skyTint, _nf, uSectionIndex);
 
   // === POST PROCESS ===
   col = applyPostProcess(col, uv, p);
