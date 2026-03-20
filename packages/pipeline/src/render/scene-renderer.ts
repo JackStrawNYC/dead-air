@@ -402,10 +402,11 @@ async function bundleOnce(
     '..', '..', '..', 'remotion', 'src', 'entry.ts',
   );
 
-  const stagingDir = createStagingDir(dataDir, props);
+  // Use full dataDir as publicDir — staging symlinks can break bundler asset resolution
+  const stagingDir = dataDir;
 
   log.info('Bundling Remotion project (once)...');
-  const serveUrl = await bundle({ entryPoint, publicDir: stagingDir });
+  const serveUrl = await bundle({ entryPoint, publicDir: dataDir });
   log.info('Bundle ready.');
 
   return { serveUrl, stagingDir };
@@ -426,11 +427,17 @@ async function renderChunk(
 ): Promise<void> {
   const { renderMedia, selectComposition } = await import('@remotion/renderer');
 
+  // Pass resolution env vars through to the Remotion browser context
+  const envVariables: Record<string, string> = {};
+  if (process.env.RENDER_WIDTH) envVariables.RENDER_WIDTH = process.env.RENDER_WIDTH;
+  if (process.env.RENDER_HEIGHT) envVariables.RENDER_HEIGHT = process.env.RENDER_HEIGHT;
+
   // Fresh composition selection per chunk (fresh browser avoids OOM accumulation)
   const composition = await selectComposition({
     serveUrl,
     id: 'Episode',
     inputProps: miniProps as unknown as Record<string, unknown>,
+    envVariables,
   });
 
   await renderMedia({
@@ -449,6 +456,7 @@ async function renderChunk(
       disableWebSecurity: true,
       gl,
     },
+    envVariables,
   });
 }
 
@@ -621,9 +629,9 @@ async function renderWithConcurrency(
   const workers = Array.from({ length: Math.min(concurrency, queue.length) }, () => processNext());
   await Promise.all(workers);
 
-  // All segments complete — clear checkpoint and staging dir
+  // All segments complete — clear checkpoint
   clearCheckpoint(dataDir, props.episodeId);
-  try { rmSync(stagingDir, { recursive: true, force: true }); } catch { /* ignore */ }
+  // Note: stagingDir === dataDir now, do NOT rmSync it
 
   return results.sort((a, b) => a.segmentIndex - b.segmentIndex);
 }
@@ -634,7 +642,9 @@ async function renderWithConcurrency(
 export async function renderScenes(options: SceneRenderOptions): Promise<SceneRenderResult[]> {
   const { props, dataDir, segmentIndex, changedOnly = false, force = false, preview = false } = options;
   const gl = options.gl ?? 'angle';
-  const scale = preview ? 0.667 : 1;
+  // 4K: RENDER_WIDTH=3840 → scale 2.0; preview: scale 0.667; default: 1.0
+  const renderWidth = parseInt(process.env.RENDER_WIDTH ?? '1920', 10);
+  const scale = preview ? 0.667 : renderWidth / 1920;
 
   // Auto-tune concurrency based on CPU cores and available memory
   const numCpus = cpus().length;

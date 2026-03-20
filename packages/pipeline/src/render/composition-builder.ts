@@ -391,41 +391,22 @@ export async function buildCompositionProps(options: BuildOptions): Promise<Epis
         songName: seg.songName,
         audioSrc,
         startFrom: computedStartFrom,
-        images: padImages(images, concertDurationFrames),
+        images: [], // Pure psychedelic shader visuals — no images during concert
         mood,
         colorPalette,
         energyData,
         onsetFrames,
         spectralCentroid,
-        textLines: seg.textLines?.map((l) => ({
-          text: l.text,
-          displayDuration: l.displayDuration,
-          style: l.style,
-        })),
+        // No textLines — song title/DNA handled by visualizer overlays
         songDNA,
         ...(foleySrc ? { foleySrc, foleyVolume } : {}),
       } as SegmentProps);
 
       lastConcertAudioSrc = audioSrc;
       lastConcertStartFrom = computedStartFrom + concertDurationFrames;
-    } else if (seg.type === 'context_text' && seg.textLines) {
-      const totalSec = seg.textLines.reduce((sum, l) => sum + l.displayDuration, 0);
-      const ctxDurationFrames = Math.ceil(totalSec * FPS);
-
-      segments.push({
-        type: 'context_text',
-        durationInFrames: ctxDurationFrames,
-        textLines: seg.textLines.map((l) => ({
-          text: l.text,
-          displayDuration: l.displayDuration,
-          style: l.style,
-        })),
-        images: padImages(images, ctxDurationFrames),
-        mood,
-        colorPalette,
-        ambientAudioSrc: lastConcertAudioSrc || undefined,
-        ambientStartFrom: lastConcertAudioSrc ? lastConcertStartFrom : undefined,
-      });
+    } else if (seg.type === 'context_text') {
+      // Skip context_text segments — pure psychedelic experience, no fact cards
+      continue;
     }
   }
 
