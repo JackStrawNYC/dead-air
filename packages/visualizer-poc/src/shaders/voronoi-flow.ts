@@ -68,12 +68,22 @@ void main() {
   float chordHue = float(int(uChordIndex)) / 24.0 * 0.15;
   float accelBoost = 1.0 + uEnergyAccel * 0.1;
 
-  // --- Cell density from energy ---
-  float cellScale = mix(3.0, 8.0, energy);
+  // --- Section-type modulation (0=intro,1=verse,2=chorus,3=bridge,4=solo,5=jam,6=outro,7=space) ---
+  float sectionT = uSectionType;
+  float sJam = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
+  float sSpace = smoothstep(6.5, 7.5, sectionT);
+  float sChorus = smoothstep(1.5, 2.5, sectionT) * (1.0 - step(2.5, sectionT));
+  // Jam: more cells, faster flow, brighter edges. Space: fewer cells, slow drift, dim. Chorus: vibrant glow.
+  float sectionCellDensity = mix(1.0, 1.4, sJam) * mix(1.0, 0.6, sSpace);
+  float sectionFlowSpeed = mix(1.0, 1.5, sJam) * mix(1.0, 0.3, sSpace) * mix(1.0, 1.1, sChorus);
+  float sectionEdgeGlow = mix(1.0, 1.4, sJam) * mix(1.0, 0.5, sSpace) * mix(1.0, 1.2, sChorus);
+
+  // --- Cell density from energy (section-modulated) ---
+  float cellScale = mix(3.0, 8.0, energy) * sectionCellDensity;
   vec2 cellUv = p * cellScale;
 
   // --- Curl noise advection on cell lookup ---
-  float flowSpeed = (0.3 + slowE * 1.2) * accelBoost;
+  float flowSpeed = (0.3 + slowE * 1.2) * accelBoost * sectionFlowSpeed;
   vec3 curl = curlNoise(vec3(p * 1.5, slowTime * flowSpeed));
   cellUv += curl.xy * 0.4;
 
@@ -143,7 +153,7 @@ void main() {
 
   // Extra glow on sharp edges
   float glowMask = 1.0 - smoothstep(0.0, borderThickness * 3.0, edgeDist);
-  col += edgeColor * glowMask * 0.2 * bass;
+  col += edgeColor * glowMask * 0.2 * bass * sectionEdgeGlow;
 
   // --- Climax boost ---
   float isClimax = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5);

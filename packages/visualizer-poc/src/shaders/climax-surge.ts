@@ -63,6 +63,15 @@ void main() {
   float drumOnset = clamp(uDrumOnset, 0.0, 1.0);
   float fastE = clamp(uFastEnergy, 0.0, 1.0);
 
+  // Section-type modulation
+  float sectionT = uSectionType;
+  float sJam = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
+  float sSpace = smoothstep(6.5, 7.5, sectionT);
+  float sChorus = smoothstep(1.5, 2.5, sectionT) * (1.0 - step(2.5, sectionT));
+  float explosionSpeedMod = mix(1.0, 1.4, sJam) * mix(1.0, 0.4, sSpace) * mix(1.0, 1.15, sChorus);
+  float ringCountMod = mix(1.0, 1.3, sJam) * mix(1.0, 0.6, sSpace) * mix(1.0, 1.1, sChorus);
+  float particleDensityMod = mix(1.0, 1.5, sJam) * mix(1.0, 0.5, sSpace) * mix(1.0, 1.2, sChorus);
+
   float isClimax = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5);
   float climaxI = uClimaxIntensity;
   float gate = isClimax * climaxI;
@@ -92,11 +101,11 @@ void main() {
 
   // ═══ SHOCKWAVE RINGS ═══
   // Multiple expanding rings, each spawned at a different beat
-  float slowTime = uDynamicTime * 0.2;
+  float slowTime = uDynamicTime * 0.2 * explosionSpeedMod;
   for (int i = 0; i < NUM_RINGS; i++) {
     float fi = float(i);
     // Ring timing: staggered based on musical time
-    float ringTime = fract(uMusicalTime * 0.25 - fi * 0.125);
+    float ringTime = fract(uMusicalTime * 0.25 * ringCountMod - fi * 0.125);
     float ringRadius = ringTime * 1.2; // expands outward
     float ringWidth = 0.02 + bass * 0.015;
 
@@ -146,8 +155,8 @@ void main() {
       float fi = float(i);
       float seed = fi * 13.7;
       float debrisAngle = fract(sin(seed) * 43758.5453) * 2.0 * PI;
-      float debrisSpeed = fract(sin(seed + 7.0) * 23421.6312) * 0.5 + 0.3;
-      float debrisTime = fract(uMusicalTime * 0.5 - fi * 0.05);
+      float debrisSpeed = (fract(sin(seed + 7.0) * 23421.6312) * 0.5 + 0.3) * explosionSpeedMod;
+      float debrisTime = fract(uMusicalTime * 0.5 * particleDensityMod - fi * 0.05);
       float debrisRadius = debrisTime * debrisSpeed * 1.5;
       vec2 debrisPos = vec2(cos(debrisAngle), sin(debrisAngle)) * debrisRadius;
       float debrisDist = length(p - debrisPos);

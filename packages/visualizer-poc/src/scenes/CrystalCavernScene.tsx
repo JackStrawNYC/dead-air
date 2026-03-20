@@ -49,6 +49,7 @@ const CrystalSystem: React.FC = () => {
       uFastEnergy: { value: 0 },
       uDrumBeat: { value: 0 },
       uDrumOnset: { value: 0 },
+      uSectionType: { value: 5 },
     };
 
     const mat = new THREE.ShaderMaterial({
@@ -110,6 +111,7 @@ const CrystalSystem: React.FC = () => {
   material.uniforms.uFastEnergy.value = smooth.fastEnergy;
   material.uniforms.uDrumBeat.value = smooth.drumBeat;
   material.uniforms.uDrumOnset.value = smooth.drumOnset;
+  material.uniforms.uSectionType.value = smooth.sectionTypeFloat;
 
   const ch = smooth.chroma;
   material.uniforms.uChroma0.value.set(ch[0] ?? 0, ch[1] ?? 0, ch[2] ?? 0, ch[3] ?? 0);

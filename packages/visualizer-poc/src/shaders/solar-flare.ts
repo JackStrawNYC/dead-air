@@ -129,6 +129,16 @@ void main() {
   float chromaHueMod = uChromaHue * 0.1;
   float chordHue = float(int(uChordIndex)) / 24.0 * 0.08;
 
+  // --- Section-type modulation (0=intro,1=verse,2=chorus,3=bridge,4=solo,5=jam,6=outro,7=space) ---
+  float sectionT = uSectionType;
+  float sJam = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
+  float sSpace = smoothstep(6.5, 7.5, sectionT);
+  float sChorus = smoothstep(1.5, 2.5, sectionT) * (1.0 - step(2.5, sectionT));
+  // Jam: more intense flares, smaller cells (denser granulation). Space: calm surface, larger cells. Chorus: brighter corona.
+  float sectionFlareIntensity = mix(1.0, 1.4, sJam) * mix(1.0, 0.4, sSpace) * mix(1.0, 1.15, sChorus);
+  float sectionCellSize = mix(1.0, 0.75, sJam) * mix(1.0, 1.4, sSpace);
+  float sectionEruption = mix(1.0, 1.3, sJam) * mix(1.0, 0.3, sSpace);
+
   vec2 texel = 1.0 / uResolution;
 
   // --- Read previous plasma state ---
@@ -141,7 +151,7 @@ void main() {
   float newMagnetic = magneticStrength * 0.96;
 
   // --- Solar granulation ---
-  float cellSize = 0.06 + bass * 0.04; // bass controls cell size
+  float cellSize = (0.06 + bass * 0.04) * sectionCellSize; // bass controls cell size, section-modulated
   float granular = granulation(p, cellSize);
 
   // Animate granulation: cells slowly evolve
@@ -183,10 +193,10 @@ void main() {
     );
 
     float flareDist = length(p - flareCenter);
-    float flareRadius = 0.1 + onset * 0.15 + fastEnergy * 0.1;
+    float flareRadius = (0.1 + onset * 0.15 + fastEnergy * 0.1) * sectionEruption;
 
     // Explosive temperature injection
-    float flareHeat = smoothstep(flareRadius, flareRadius * 0.1, flareDist) * onset;
+    float flareHeat = smoothstep(flareRadius, flareRadius * 0.1, flareDist) * onset * sectionFlareIntensity;
     newTemp = max(newTemp, flareHeat * 0.9);
 
     // Magnetic disruption
@@ -295,7 +305,7 @@ void main() {
   // --- Corona: extended atmosphere glow ---
   float coronaDist = length(p);
   float corona = 1.0 / (1.0 + coronaDist * coronaDist * 8.0);
-  corona *= energy * 0.3;
+  corona *= energy * 0.3 * mix(1.0, 1.2, sChorus);
   vec3 coronaColor = hsv2rgb(vec3(hue2 + 0.05, sat * 0.3, 1.0));
   col += coronaColor * corona;
 

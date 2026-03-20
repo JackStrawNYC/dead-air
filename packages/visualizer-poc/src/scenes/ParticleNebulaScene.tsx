@@ -78,6 +78,7 @@ const ParticleSystem: React.FC = () => {
       uDrumOnset: { value: 0 },
       uDrumBeat: { value: 0 },
       uSpectralFlux: { value: 0 },
+      uSectionType: { value: 5 },
     };
 
     const mat = new THREE.ShaderMaterial({
@@ -131,6 +132,7 @@ const ParticleSystem: React.FC = () => {
   material.uniforms.uDrumOnset.value = smooth.drumOnset;
   material.uniforms.uDrumBeat.value = smooth.drumBeat;
   material.uniforms.uSpectralFlux.value = smooth.spectralFlux;
+  material.uniforms.uSectionType.value = smooth.sectionTypeFloat;
 
   // Camera orbit with bass shake
   const sectionProgress = smooth.sectionProgress;

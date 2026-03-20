@@ -102,7 +102,17 @@ void main() {
   float chromaHueMod = uChromaHue * 0.05;
 
   float slowTime = uDynamicTime * 0.03;
-  float flowSpeed = 0.02 + stemBass * 0.04;
+
+  // Section-type modulation
+  float sectionT = uSectionType;
+  float sJam = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
+  float sSpace = smoothstep(6.5, 7.5, sectionT);
+  float sChorus = smoothstep(1.5, 2.5, sectionT) * (1.0 - step(2.5, sectionT));
+  float crackFreqMod = mix(1.0, 1.4, sJam) * mix(1.0, 0.6, sSpace) * mix(1.0, 1.1, sChorus);
+  float magmaPressureMod = mix(1.0, 1.3, sJam) * mix(1.0, 0.5, sSpace) * mix(1.0, 1.2, sChorus);
+  float flowSpeedMod = mix(1.0, 1.5, sJam) * mix(1.0, 0.35, sSpace) * mix(1.0, 1.15, sChorus);
+
+  float flowSpeed = (0.02 + stemBass * 0.04) * flowSpeedMod;
   float viscosity = mix(1.0, 0.3, tension);
 
   // --- Feedback: previous frame provides cooling/persistence ---
@@ -116,7 +126,7 @@ void main() {
 
   // --- Magma layer (underneath) ---
   float magmaNoise = fbm6(vec3(flowP * 3.0, slowTime * 0.5));
-  float magmaPressure = bass * 0.6 + energy * 0.4;
+  float magmaPressure = (bass * 0.6 + energy * 0.4) * magmaPressureMod;
   float magmaTemp = magmaNoise * 0.5 + magmaPressure * 0.5;
   magmaTemp = clamp(magmaTemp, 0.0, 1.0);
 
@@ -125,7 +135,7 @@ void main() {
 
   // --- Crust layer ---
   float edgeDist;
-  float crustScale = 4.0 + tension * 3.0;
+  float crustScale = (4.0 + tension * 3.0) * crackFreqMod;
   float crustCell = voronoi(flowP * crustScale + slowTime * 0.1, edgeDist);
 
   // Cracks: thin lines between voronoi cells

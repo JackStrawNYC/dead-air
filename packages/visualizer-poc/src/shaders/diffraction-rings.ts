@@ -112,15 +112,24 @@ void main() {
   float chordHue = float(int(uChordIndex)) / 24.0;
   float accelBoost = 1.0 + uEnergyAccel * 0.1;
 
+  // Section-type modulation
+  float sectionT = uSectionType;
+  float sJam = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
+  float sSpace = smoothstep(6.5, 7.5, sectionT);
+  float sChorus = smoothstep(1.5, 2.5, sectionT) * (1.0 - step(2.5, sectionT));
+  float ringSpacingMod = mix(1.0, 1.3, sJam) * mix(1.0, 0.6, sSpace) * mix(1.0, 1.1, sChorus);
+  float sourceCountMod = mix(1.0, 1.4, sJam) * mix(1.0, 0.5, sSpace) * mix(1.0, 1.2, sChorus);
+  float rippleSpeedMod = mix(1.0, 1.5, sJam) * mix(1.0, 0.35, sSpace) * mix(1.0, 1.15, sChorus);
+
   // --- Background ---
   vec3 col = vec3(0.01, 0.008, 0.015);
 
   // --- Interference source positions ---
-  // Number of sources scales with energy (3-5)
-  float numSources = 3.0 + energy * 2.0;
+  // Number of sources scales with energy (3-5, section-modulated)
+  float numSources = (3.0 + energy * 2.0) * sourceCountMod;
 
-  // Ring spacing from bass (wider rings at high bass)
-  float ringSpacing = 0.5 + bass * 1.5;
+  // Ring spacing from bass (wider rings at high bass, section-modulated)
+  float ringSpacing = (0.5 + bass * 1.5) * ringSpacingMod;
 
   // Film thickness from melodic pitch
   float filmThickness = 0.8 + melodicPitch * 1.2;
@@ -203,7 +212,7 @@ void main() {
   // --- Onset ripple injection ---
   if (onset > 0.2) {
     float rippleDist = length(p);
-    float ripple = sin(rippleDist * 30.0 - uTime * 8.0) * exp(-rippleDist * 2.0);
+    float ripple = sin(rippleDist * 30.0 - uTime * 8.0 * rippleSpeedMod) * exp(-rippleDist * 2.0);
     vec3 rippleColor = thinFilmColor(rippleDist * 60.0, filmThickness);
     col += rippleColor * ripple * onset * 0.5;
   }

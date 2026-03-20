@@ -113,6 +113,15 @@ void main() {
   float chromaHueMod = uChromaHue * 0.08;
   float chordHue = float(int(uChordIndex)) / 24.0 * 0.05;
 
+  // Section-type modulation
+  float sectionT = uSectionType;
+  float sJam = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
+  float sSpace = smoothstep(6.5, 7.5, sectionT);
+  float sChorus = smoothstep(1.5, 2.5, sectionT) * (1.0 - step(2.5, sectionT));
+  float bleedRateMod = mix(1.0, 1.4, sJam) * mix(1.0, 0.4, sSpace) * mix(1.0, 1.1, sChorus);
+  float strokeSpeedMod = mix(1.0, 1.3, sJam) * mix(1.0, 0.5, sSpace) * mix(1.0, 1.15, sChorus);
+  float mountainSpeedMod = mix(1.0, 1.5, sJam) * mix(1.0, 0.3, sSpace) * mix(1.0, 1.1, sChorus);
+
   vec2 texel = 1.0 / uResolution;
 
   // --- Read previous frame state ---
@@ -126,7 +135,7 @@ void main() {
   float newInk = inkDensity * decayRate;
 
   // --- Ink diffusion / bleeding ---
-  float bleedSpeed = 0.02 + slowE * 0.04;
+  float bleedSpeed = (0.02 + slowE * 0.04) * bleedRateMod;
   float neighborInk = bleedKernel(uv, texel, wetness);
 
   // Bleed: ink moves from dense areas to sparse areas (diffusion)
@@ -167,7 +176,7 @@ void main() {
   // --- Calligraphic strokes from vocal presence ---
   if (vocalPresence > 0.1) {
     // Stroke follows melodic direction
-    float strokeAngle = melodicDir * PI * 0.25 + slowTime * 0.5;
+    float strokeAngle = melodicDir * PI * 0.25 + slowTime * 0.5 * strokeSpeedMod;
     vec2 strokeDir = vec2(cos(strokeAngle), sin(strokeAngle));
 
     // Stroke position drifts slowly
@@ -206,7 +215,7 @@ void main() {
 
   // --- Mountain silhouettes from ink pooling ---
   // Low-frequency noise creates distant mountain shapes
-  float mountainNoise = fbm(vec3(p.x * 2.0, 0.0, slowTime * 0.1));
+  float mountainNoise = fbm(vec3(p.x * 2.0, 0.0, slowTime * 0.1 * mountainSpeedMod));
   float mountainLine = smoothstep(0.02, 0.0, abs(p.y - mountainNoise * 0.3 + 0.1));
   float mountainFill = smoothstep(0.0, -0.15, p.y - mountainNoise * 0.3 + 0.1);
   float mountainInk = (mountainLine * 0.3 + mountainFill * 0.1) * slowE;

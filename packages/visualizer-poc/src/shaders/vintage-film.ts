@@ -80,6 +80,16 @@ void main() {
   vec2 uv = vUv + weave;
   vec2 centered = (gl_FragCoord.xy - 0.5 * uResolution) / min(uResolution.x, uResolution.y);
 
+  // --- Section-type modulation (0=intro,1=verse,2=chorus,3=bridge,4=solo,5=jam,6=outro,7=space) ---
+  float sectionT = uSectionType;
+  float sJam = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
+  float sSpace = smoothstep(6.5, 7.5, sectionT);
+  float sChorus = smoothstep(1.5, 2.5, sectionT) * (1.0 - step(2.5, sectionT));
+  // Jam: more flicker, heavier grain, frequent leaks. Space: stable, clean, rare leaks. Chorus: bright leaks.
+  float sectionFlicker = mix(1.0, 1.5, sJam) * mix(1.0, 0.3, sSpace);
+  float sectionGrain = mix(1.0, 1.4, sJam) * mix(1.0, 0.5, sSpace);
+  float sectionLeakFreq = mix(1.0, 1.3, sJam) * mix(1.0, 0.4, sSpace) * mix(1.0, 1.2, sChorus);
+
   // Base scene — warm amber abstract shapes (as if projected concert footage)
   float dt = uDynamicTime;
   float n1 = snoise(vec3(centered * 1.5 + dt * 0.1, dt * 0.05));
@@ -115,7 +125,7 @@ void main() {
   vec3 leakColor1 = hsv2rgb(vec3(0.08, 0.8, 1.0)); // Orange
   vec3 leakColor2 = hsv2rgb(vec3(0.95, 0.6, 0.9)); // Red-magenta
 
-  float leakIntensity = 0.15 + uEnergy * 0.25;
+  float leakIntensity = (0.15 + uEnergy * 0.25) * sectionLeakFreq;
   color += leakColor1 * leak1 * leakIntensity;
   color += leakColor2 * leak2 * leakIntensity * 0.6;
 
@@ -151,7 +161,7 @@ void main() {
   // Bayer-dithered film grain (blue-noise approximation — less harsh than hash grain)
   float grainTime = floor(t * 15.0) / 15.0;
   float bayerN = bayerGrain(gl_FragCoord.xy, grainTime);
-  color += bayerN * vec3(1.0, 0.95, 0.85) * (0.05 + uSpectralFlux * 0.03);
+  color += bayerN * vec3(1.0, 0.95, 0.85) * (0.05 + uSpectralFlux * 0.03) * sectionGrain;
 
   // Vertical scratches — random thin lines
   float scratch = smoothstep(0.001, 0.0, abs(uv.x - hash(floor(t * 3.0)) ));
@@ -169,7 +179,7 @@ void main() {
 
   // Beat-triggered gate flicker (projector stutter — amplified)
   float bp = beatPulse(uMusicalTime);
-  float gateFlicker = 1.0 - bp * 0.15 - max(uBeatSnap, uDrumBeat) * 0.14;
+  float gateFlicker = 1.0 - (bp * 0.15 + max(uBeatSnap, uDrumBeat) * 0.14) * sectionFlicker;
   color *= gateFlicker;
 
   // Vignette — heavy, like a projector hotspot

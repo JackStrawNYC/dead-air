@@ -46,7 +46,18 @@ void main() {
   float energy = clamp(uEnergy, 0.0, 1.0);
   float tempoScale = uTempo / 120.0;
   float sectionSeed = uSectionIndex * 3.14;
-  float t = uDynamicTime * 0.08 * tempoScale;
+
+  // --- Section-type modulation (0=intro,1=verse,2=chorus,3=bridge,4=solo,5=jam,6=outro,7=space) ---
+  float sectionT = uSectionType;
+  float sJam = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
+  float sSpace = smoothstep(6.5, 7.5, sectionT);
+  float sChorus = smoothstep(1.5, 2.5, sectionT) * (1.0 - step(2.5, sectionT));
+  // Jam: faster motion, more complexity. Space: near-still, stark. Chorus: brighter accents.
+  float sectionSpeed = mix(1.0, 1.4, sJam) * mix(1.0, 0.3, sSpace) * mix(1.0, 1.1, sChorus);
+  float sectionAccent = mix(1.0, 1.3, sJam) * mix(1.0, 0.5, sSpace) * mix(1.0, 1.2, sChorus);
+  float sectionComplexity = mix(1.0, 1.4, sJam) * mix(1.0, 0.5, sSpace);
+
+  float t = uDynamicTime * 0.08 * tempoScale * sectionSpeed;
 
   // Deep black background with subtle warm gradient
   float bgGrad = 1.0 - length(p) * 0.3;
@@ -77,7 +88,7 @@ void main() {
   accentCol = mix(accentGray, accentCol, uPaletteSaturation * 0.7); // Reduced saturation
 
   col += circleEdge * vec3(0.5, 0.48, 0.45) * 0.4; // Thin white circle outline
-  col += circleFill * accentCol * energy; // Subtle accent fill
+  col += circleFill * accentCol * energy * sectionAccent; // Subtle accent fill, section-modulated
 
   // === CLIMAX REACTIVITY ===
   float isClimax = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5);
@@ -140,13 +151,13 @@ void main() {
 
   // === SLOW NOISE FIELD: very subtle background texture ===
   float noiseField = fbm(vec3(p * 2.0, t * 0.2 + sectionSeed));
-  col += noiseField * 0.015 * vec3(0.8, 0.75, 0.7);
+  col += noiseField * 0.015 * vec3(0.8, 0.75, 0.7) * sectionComplexity;
 
   // === CENTROID-DRIVEN GLOW: brighter when treble-heavy + climax ===
   float centroidGlow = uCentroid * 0.04 + climaxBoost * 0.03;
   float glowDist = length(p);
   float glow = exp(-glowDist * 4.0) * centroidGlow;
-  col += glow * accentCol;
+  col += glow * accentCol * sectionAccent;
 
   // === SECTION TRANSITION: horizontal wipe line ===
   float edgeDist = min(uSectionProgress, 1.0 - uSectionProgress);

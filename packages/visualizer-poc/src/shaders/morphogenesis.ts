@@ -70,10 +70,19 @@ void main() {
   float chromaHueMod = uChromaHue * 0.15;
   float chordHue = float(int(uChordIndex)) / 24.0 * 0.15;
 
+  // Section-type modulation
+  float sectionT = uSectionType;
+  float sJam = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
+  float sSpace = smoothstep(6.5, 7.5, sectionT);
+  float sChorus = smoothstep(1.5, 2.5, sectionT) * (1.0 - step(2.5, sectionT));
+  float reactionRateMod = mix(1.0, 1.4, sJam) * mix(1.0, 0.4, sSpace) * mix(1.0, 1.1, sChorus);
+  float patternScaleMod = mix(1.0, 1.3, sJam) * mix(1.0, 0.7, sSpace) * mix(1.0, 1.2, sChorus);
+  float diffusionSpeedMod = mix(1.0, 1.5, sJam) * mix(1.0, 0.5, sSpace) * mix(1.0, 1.15, sChorus);
+
   // --- Reaction-diffusion parameters ---
-  float dt = 0.8 + energy * 1.5; // reaction rate from energy
-  float Da = 0.21 + bass * 0.08; // activator diffusion (larger = bigger spots)
-  float Di = 0.05 + mids * 0.12; // inhibitor diffusion (ratio to Da determines pattern)
+  float dt = (0.8 + energy * 1.5) * reactionRateMod; // reaction rate from energy
+  float Da = (0.21 + bass * 0.08) * patternScaleMod; // activator diffusion (larger = bigger spots)
+  float Di = (0.05 + mids * 0.12) * diffusionSpeedMod; // inhibitor diffusion (ratio to Da determines pattern)
   float f = 0.035 + tension * 0.015; // feed rate
   float k = 0.060 + (1.0 - mids) * 0.008; // kill rate
 

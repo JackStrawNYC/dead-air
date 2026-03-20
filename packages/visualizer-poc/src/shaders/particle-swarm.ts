@@ -67,6 +67,15 @@ void main() {
 
   float slowTime = uDynamicTime * 0.15;
 
+  // Section-type modulation
+  float sectionT = uSectionType;
+  float sJam = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
+  float sSpace = smoothstep(6.5, 7.5, sectionT);
+  float sChorus = smoothstep(1.5, 2.5, sectionT) * (1.0 - step(2.5, sectionT));
+  float separationMod = mix(1.0, 1.4, sJam) * mix(1.0, 0.5, sSpace) * mix(1.0, 1.1, sChorus);
+  float swirlMod = mix(1.0, 1.5, sJam) * mix(1.0, 0.35, sSpace) * mix(1.0, 1.15, sChorus);
+  float burstMod = mix(1.0, 1.3, sJam) * mix(1.0, 0.5, sSpace) * mix(1.0, 1.2, sChorus);
+
   // --- Phase 1: New uniform integrations ---
   float directionFlow = uMelodicDirection * 0.05;  // melodic direction biases flow
   float stabilityFlock = uBeatStability;             // high = tight flocks, low = scattered
@@ -86,10 +95,10 @@ void main() {
   float hue2 = uPaletteSecondary + chordHue * 0.5;
   float sat = mix(0.6, 1.0, energy) * uPaletteSaturation;
 
-  // Swarm parameters modulated by audio
-  float separation = 0.15 + onset * 0.35 + (1.0 - stabilityFlock) * 0.1;  // scatter on onset + low stability
+  // Swarm parameters modulated by audio (section-modulated)
+  float separation = (0.15 + onset * 0.35 + (1.0 - stabilityFlock) * 0.1) * separationMod;  // scatter on onset + low stability
   float cohesion = 0.3 + vocalP * 0.4 + stabilityFlock * 0.15;            // pull together on vocals + stability
-  float driftSpeed = 0.08 + uSlowEnergy * 0.12;
+  float driftSpeed = (0.08 + uSlowEnergy * 0.12) * swirlMod;
   float particleRadius = 0.008 + bass * 0.006;
 
   // Global flow direction (curl noise at macro scale)
@@ -98,11 +107,11 @@ void main() {
     snoise(vec3(0.0, slowTime * 0.3, 7.0))
   ) * driftSpeed;
 
-  // Drum impulse: directional kick
+  // Drum impulse: directional kick (section-modulated burst)
   vec2 drumKick = vec2(
     snoise(vec3(floor(uMusicalTime) * 13.7, 0.0, 0.0)),
     snoise(vec3(0.0, floor(uMusicalTime) * 7.3, 0.0))
-  ) * drumOnset * 0.15;
+  ) * drumOnset * 0.15 * burstMod;
 
   // Accumulate particle density
   float density = 0.0;

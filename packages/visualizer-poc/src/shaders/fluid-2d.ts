@@ -77,10 +77,19 @@ void main() {
   float energy = clamp(uEnergy, 0.0, 1.0);
   float t = uDynamicTime;
 
+  // Section-type modulation
+  float sectionT = uSectionType;
+  float sJam = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
+  float sSpace = smoothstep(6.5, 7.5, sectionT);
+  float sChorus = smoothstep(1.5, 2.5, sectionT) * (1.0 - step(2.5, sectionT));
+  float curlComplexMod = mix(1.0, 1.4, sJam) * mix(1.0, 0.5, sSpace) * mix(1.0, 1.1, sChorus);
+  float flowSpeedMod = mix(1.0, 1.3, sJam) * mix(1.0, 0.4, sSpace) * mix(1.0, 1.15, sChorus);
+  float injectRateMod = mix(1.0, 1.5, sJam) * mix(1.0, 0.5, sSpace) * mix(1.0, 1.2, sChorus);
+
   // ─── Velocity field from curl noise + audio forces ───
   // Curl noise scale increases with jam density (more complex at high density)
-  float curlScale = mix(2.0, 4.5, uJamDensity);
-  float curlSpeed = 0.15 + uSlowEnergy * 0.1;
+  float curlScale = mix(2.0, 4.5, uJamDensity) * curlComplexMod;
+  float curlSpeed = (0.15 + uSlowEnergy * 0.1) * flowSpeedMod;
   vec2 vel = curlVelocity(p * curlScale, t * curlSpeed) * 0.3;
 
   // Harmonic tension: turbulence (cross-frequency curl perturbation)
@@ -197,8 +206,8 @@ void main() {
   // Onset trigger: combine onset snap and drum onset
   float onsetTrigger = max(uOnsetSnap, uDrumOnset);
 
-  // Injection strength
-  float inject = onsetTrigger * injectMask;
+  // Injection strength (section-modulated)
+  float inject = onsetTrigger * injectMask * injectRateMod;
 
   // Injection color from palette
   float injectHue = hsvToCosineHue(uPalettePrimary) + uChromaHue * 0.1;

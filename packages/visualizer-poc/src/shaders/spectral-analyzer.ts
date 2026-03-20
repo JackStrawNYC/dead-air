@@ -65,6 +65,16 @@ void main() {
   float onset = clamp(uOnsetSnap, 0.0, 1.0);
   float drumOnset = clamp(uDrumOnset, 0.0, 1.0);
 
+  // --- Section-type modulation (0=intro,1=verse,2=chorus,3=bridge,4=solo,5=jam,6=outro,7=space) ---
+  float sectionT = uSectionType;
+  float sJam = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
+  float sSpace = smoothstep(6.5, 7.5, sectionT);
+  float sChorus = smoothstep(1.5, 2.5, sectionT) * (1.0 - step(2.5, sectionT));
+  // Jam: wider bars, taller, more glow. Space: narrow, short, dim. Chorus: bright, wide spread.
+  float sectionBarWidth = mix(1.0, 1.3, sJam) * mix(1.0, 0.6, sSpace) * mix(1.0, 1.2, sChorus);
+  float sectionBarHeight = mix(1.0, 1.4, sJam) * mix(1.0, 0.5, sSpace) * mix(1.0, 1.15, sChorus);
+  float sectionGlow = mix(1.0, 1.5, sJam) * mix(1.0, 0.5, sSpace) * mix(1.0, 1.2, sChorus);
+
   // Background: deep dark with subtle gradient
   vec3 bgColor = mix(
     vec3(0.02, 0.01, 0.04),
@@ -77,7 +87,7 @@ void main() {
   vec3 col = bgColor;
 
   // Bar geometry
-  float barWidth = 0.06 + uBeatSnap * 0.015;
+  float barWidth = (0.06 + uBeatSnap * 0.015) * sectionBarWidth;
   float barSpacing = aspect.x / float(NUM_BARS);
   float barStart = -aspect.x * 0.5 + barSpacing * 0.5;
   float floorY = -0.35;
@@ -99,8 +109,8 @@ void main() {
     bandEnergy += bp * 0.15;
     bandEnergy = clamp(bandEnergy, 0.0, 1.0);
 
-    // Bar height
-    float barHeight = bandEnergy * 0.65;
+    // Bar height (section-modulated)
+    float barHeight = bandEnergy * 0.65 * sectionBarHeight;
 
     // Bar shape: soft rectangle
     float barMask = smoothstep(barWidth, barWidth - 0.008, dx);
@@ -126,7 +136,7 @@ void main() {
     float glowDist = max(dx - barWidth, 0.0);
     float glowY = smoothstep(barBottom - 0.02, barBottom, p.y)
                 * smoothstep(barTop + 0.08, barTop - 0.02, p.y);
-    float glow = exp(-glowDist * 30.0) * glowY * bandEnergy * 0.35;
+    float glow = exp(-glowDist * 30.0) * glowY * bandEnergy * 0.35 * sectionGlow;
     vec3 glowColor = hsv2rgb(vec3(hue + 0.05, sat * 0.6, 1.0));
     col += glowColor * glow;
 

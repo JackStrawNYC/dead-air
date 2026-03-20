@@ -78,8 +78,19 @@ void main() {
   float chromaHueMod = uChromaHue * 0.2;
   float chordHue = float(int(uChordIndex)) / 24.0 * 0.15;
 
+  // --- Section-type modulation (0=intro,1=verse,2=chorus,3=bridge,4=solo,5=jam,6=outro,7=space) ---
+  float sectionT = uSectionType;
+  float sJam = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
+  float sSpace = smoothstep(6.5, 7.5, sectionT);
+  float sChorus = smoothstep(1.5, 2.5, sectionT) * (1.0 - step(2.5, sectionT));
+  // Jam: denser tessellation, faster light, thinner leading. Space: sparse, slow, wide leading. Chorus: brighter light, wider tiles.
+  float sectionTileScale = mix(1.0, 1.3, sJam) * mix(1.0, 0.6, sSpace);
+  float sectionLightSpeed = mix(1.0, 1.4, sJam) * mix(1.0, 0.4, sSpace) * mix(1.0, 1.15, sChorus);
+  float sectionLeadWidth = mix(1.0, 0.7, sJam) * mix(1.0, 1.5, sSpace);
+  float sectionLightBright = mix(1.0, 1.1, sJam) * mix(1.0, 0.6, sSpace) * mix(1.0, 1.2, sChorus);
+
   // --- Tile scale from energy ---
-  float tileScale = mix(4.0, 10.0, energy);
+  float tileScale = mix(4.0, 10.0, energy) * sectionTileScale;
 
   // --- Warp from harmonic tension ---
   vec2 warped = p;
@@ -97,7 +108,7 @@ void main() {
   float dist = length(cellGv);
   float hexDist = max(abs(cellGv.x), abs(cellGv.y * 0.577 + cellGv.x * 0.5));
   float borderDist = 0.5 - max(abs(cellGv.x), (abs(cellGv.y) + abs(cellGv.x)) * 0.577);
-  float leadWidth = 0.04 + tension * 0.02;
+  float leadWidth = (0.04 + tension * 0.02) * sectionLeadWidth;
   float leadMask = 1.0 - smoothstep(0.0, leadWidth, borderDist);
 
   // --- Tile color ---
@@ -111,10 +122,10 @@ void main() {
 
   // --- Light source ---
   // Drifting light position (like sunlight moving across stained glass)
-  float lightAngle = slowTime * 0.3 + melodicDir * 0.5;
+  float lightAngle = slowTime * 0.3 * sectionLightSpeed + melodicDir * 0.5;
   vec2 lightPos = vec2(sin(lightAngle) * 0.5, cos(lightAngle * 0.7) * 0.4);
   float lightDist = length(p - lightPos);
-  float lightIntensity = (0.5 + bass * 1.0) / (1.0 + lightDist * 2.5);
+  float lightIntensity = (0.5 + bass * 1.0) / (1.0 + lightDist * 2.5) * sectionLightBright;
 
   // Apply light transmission through tiles
   tileColor *= 0.4 + lightIntensity * 1.5;

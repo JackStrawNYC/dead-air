@@ -71,13 +71,25 @@ void main() {
   float chromaHueMod = uChromaHue * 0.2;
 
   float slowTime = uDynamicTime * 0.05;
-  float riseSpeed = 0.03 + slowEnergy * 0.04;
+
+  // --- Section-type modulation (0=intro,1=verse,2=chorus,3=bridge,4=solo,5=jam,6=outro,7=space) ---
+  float sectionT = uSectionType;
+  float sJam = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
+  float sSpace = smoothstep(6.5, 7.5, sectionT);
+  float sChorus = smoothstep(1.5, 2.5, sectionT) * (1.0 - step(2.5, sectionT));
+  // Jam: faster rise, more rings, denser. Space: slow drift, sparse. Chorus: wider, brighter rings.
+  float sectionRiseSpeed = mix(1.0, 1.4, sJam) * mix(1.0, 0.35, sSpace) * mix(1.0, 1.1, sChorus);
+  float sectionRingCount = mix(1.0, 1.4, sJam) * mix(1.0, 0.6, sSpace);
+  float sectionRingScale = mix(1.0, 1.3, sJam) * mix(1.0, 0.7, sSpace) * mix(1.0, 1.2, sChorus);
+  float sectionCollision = mix(1.0, 1.5, sJam) * mix(1.0, 0.5, sSpace);
+
+  float riseSpeed = (0.03 + slowEnergy * 0.04) * sectionRiseSpeed;
 
   vec3 col = vec3(0.008, 0.006, 0.012); // dark background
 
   // --- Ring parameters ---
-  int ringCount = 3 + int(energy * 3.0); // 3-6 rings
-  float ringScale = 0.08 + bass * 0.06;
+  int ringCount = 3 + int(energy * 3.0 * sectionRingCount); // 3-6 rings, section-modulated
+  float ringScale = (0.08 + bass * 0.06) * sectionRingScale;
   float ringThickness = 0.006 + stemBass * 0.008;
 
   // --- Draw rings ---
@@ -140,7 +152,7 @@ void main() {
     float nearBoth = exp(-length(p - mix(c1, c2, 0.5)) * 15.0);
     collisionGlow += overlap * nearBoth * 10.0;
   }
-  col += hsv2rgb(vec3(uPaletteSecondary, 0.6, collisionGlow * energy * 0.5));
+  col += hsv2rgb(vec3(uPaletteSecondary, 0.6, collisionGlow * energy * 0.5 * sectionCollision));
 
   // --- Climax boost ---
   float isClimax = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5);

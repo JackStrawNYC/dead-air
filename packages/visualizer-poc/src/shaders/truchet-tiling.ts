@@ -126,6 +126,16 @@ void main() {
   float chordHue = float(int(uChordIndex)) / 24.0 * 0.15;
   float accelBoost = 1.0 + uEnergyAccel * 0.12;
 
+  // --- Section-type modulation (0=intro,1=verse,2=chorus,3=bridge,4=solo,5=jam,6=outro,7=space) ---
+  float sectionT = uSectionType;
+  float sJam = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
+  float sSpace = smoothstep(6.5, 7.5, sectionT);
+  float sChorus = smoothstep(1.5, 2.5, sectionT) * (1.0 - step(2.5, sectionT));
+  // Jam: faster flow, thicker arcs, denser cells. Space: slow, thin, sparse. Chorus: vibrant, moderate.
+  float sectionFlowSpeed = mix(1.0, 1.5, sJam) * mix(1.0, 0.35, sSpace) * mix(1.0, 1.15, sChorus);
+  float sectionThickness = mix(1.0, 1.3, sJam) * mix(1.0, 0.6, sSpace) * mix(1.0, 1.1, sChorus);
+  float sectionDensity = mix(1.0, 1.4, sJam) * mix(1.0, 0.6, sSpace);
+
   // --- Domain warp from harmonic tension ---
   vec2 warped = p;
   if (tension > 0.1) {
@@ -133,11 +143,11 @@ void main() {
     warped += curl.xy * tension * 0.08;
   }
 
-  // --- Line thickness from bass ---
-  float baseThickness = 0.02 + bass * 0.04;
+  // --- Line thickness from bass (section-modulated) ---
+  float baseThickness = (0.02 + bass * 0.04) * sectionThickness;
 
-  // --- Flow speed from energy ---
-  float flowSpeed = (0.3 + energy * 1.5) * accelBoost;
+  // --- Flow speed from energy (section-modulated) ---
+  float flowSpeed = (0.3 + energy * 1.5) * accelBoost * sectionFlowSpeed;
   float flowSeed = slowTime * flowSpeed;
 
   // --- Palette ---
@@ -152,8 +162,8 @@ void main() {
     uv.y
   );
 
-  // --- Layer 1: Primary grid ---
-  float gridDensity = mix(6.0, 14.0, energy);
+  // --- Layer 1: Primary grid (section-modulated density) ---
+  float gridDensity = mix(6.0, 14.0, energy) * sectionDensity;
   vec3 layer1 = truchetLayer(warped, gridDensity, flowSeed,
     baseThickness, hue1, sat, 0.7 + energy * 0.3, energy, onset);
   col += layer1;

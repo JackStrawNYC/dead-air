@@ -80,9 +80,18 @@ void main() {
   vec2 uv = (gl_FragCoord.xy - 0.5 * uResolution) / min(uResolution.x, uResolution.y);
   float t = uDynamicTime * 0.08;
 
+  // Section-type modulation
+  float sectionT = uSectionType;
+  float sJam = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
+  float sSpace = smoothstep(6.5, 7.5, sectionT);
+  float sChorus = smoothstep(1.5, 2.5, sectionT) * (1.0 - step(2.5, sectionT));
+  float driftSpeedMod = mix(1.0, 1.4, sJam) * mix(1.0, 0.35, sSpace) * mix(1.0, 1.1, sChorus);
+  float starBrightMod = mix(1.0, 1.3, sJam) * mix(1.0, 0.6, sSpace) * mix(1.0, 1.2, sChorus);
+  float shootFreqMod = mix(1.0, 1.5, sJam) * mix(1.0, 0.4, sSpace) * mix(1.0, 1.15, sChorus);
+
   // Slow cosmic drift (melodic direction shifts drift)
   float melDir = uMelodicDirection * 0.02;
-  vec2 drift = vec2(t * 0.1 + melDir, t * 0.05);
+  vec2 drift = vec2(t * 0.1 * driftSpeedMod + melDir, t * 0.05 * driftSpeedMod);
   vec2 starUv = uv + drift;
 
   // Star layers at different depths (parallax: different speeds per layer)
@@ -94,8 +103,8 @@ void main() {
   stars += starField(parallax2, 50.0, 0.7) * 0.3;
   stars += starField(parallax3, 80.0, 0.5) * 0.15;
 
-  // Energy brightens stars
-  stars *= 0.7 + uEnergy * 0.6 + uFastEnergy * 0.2;
+  // Energy brightens stars (section-modulated)
+  stars *= (0.7 + uEnergy * 0.6 + uFastEnergy * 0.2) * starBrightMod;
 
   // === STAR GLOW: diffraction spikes (4-point cross) on bright stars ===
   float spikeStar = starField(parallax1, 30.0, 1.0);
@@ -151,8 +160,8 @@ void main() {
   float isClimax = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5);
   float climaxBoost = isClimax * uClimaxIntensity;
 
-  // Onset: shooting star flash (amplified)
-  float shootAngle = uTime * 0.5 + uSectionIndex * 2.0;
+  // Onset: shooting star flash (amplified, section-modulated)
+  float shootAngle = uTime * 0.5 * shootFreqMod + uSectionIndex * 2.0;
   vec2 shootDir = vec2(cos(shootAngle), sin(shootAngle));
   float shootTrail = smoothstep(0.02, 0.0, abs(dot(uv - shootDir * 0.3, vec2(-shootDir.y, shootDir.x))));
   shootTrail *= smoothstep(0.8, 0.0, length(uv - shootDir * 0.3));

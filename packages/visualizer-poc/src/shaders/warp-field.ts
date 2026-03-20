@@ -124,9 +124,19 @@ void main() {
   float forecastGlow = clamp(uEnergyForecast, 0.0, 1.0) * 0.08;
   float peakApproach = clamp(uPeakApproaching, 0.0, 1.0);
 
+  // --- Section-type modulation (0=intro,1=verse,2=chorus,3=bridge,4=solo,5=jam,6=outro,7=space) ---
+  float sectionT = uSectionType;
+  float sJam = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
+  float sSpace = smoothstep(6.5, 7.5, sectionT);
+  float sChorus = smoothstep(1.5, 2.5, sectionT) * (1.0 - step(2.5, sectionT));
+  // Jam: stronger lensing, more grid distortion, faster streaks. Space: gentle, calm. Chorus: bright, wide.
+  float sectionLensing = mix(1.0, 1.4, sJam) * mix(1.0, 0.5, sSpace) * mix(1.0, 1.1, sChorus);
+  float sectionGridDistort = mix(1.0, 1.3, sJam) * mix(1.0, 0.5, sSpace);
+  float sectionStreakSpeed = mix(1.0, 1.5, sJam) * mix(1.0, 0.3, sSpace) * mix(1.0, 1.2, sChorus);
+
   // --- Warp parameters ---
   // Primary mass at center
-  float warpStrength = 0.02 + energy * 0.08 + tension * 0.04;
+  float warpStrength = (0.02 + energy * 0.08 + tension * 0.04) * sectionLensing;
 
   // Climax singularity: extreme compression then re-expansion
   float climaxPhase = uClimaxPhase;
@@ -163,8 +173,8 @@ void main() {
   float gridScale = 6.0;
   float gridLineWidth = 0.02;
 
-  // Grid on lensed coordinates shows curvature
-  float gridIntensity = spaceTimeGrid(lensedP * gridScale, gridLineWidth);
+  // Grid on lensed coordinates shows curvature (section-modulated distortion)
+  float gridIntensity = spaceTimeGrid(lensedP * gridScale * sectionGridDistort, gridLineWidth);
 
   // Finer sub-grid
   float subGrid = spaceTimeGrid(lensedP * gridScale * 4.0, 0.01) * 0.3;
@@ -188,7 +198,7 @@ void main() {
   // Star streaking near the mass (tangential elongation)
   float streakFactor = smoothstep(0.3, 0.05, distToCenter);
   float streakAngle = atan(p.y, p.x);
-  float streak = exp(-abs(sin(streakAngle * 3.0 + uDynamicTime * 0.3)) * 20.0) * streakFactor;
+  float streak = exp(-abs(sin(streakAngle * 3.0 + uDynamicTime * 0.3 * sectionStreakSpeed)) * 20.0) * streakFactor;
   stars += streak * 0.3 * energy;
 
   // --- Einstein ring: bright ring at the photon sphere ---

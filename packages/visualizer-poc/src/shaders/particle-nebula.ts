@@ -39,6 +39,7 @@ uniform float uFastBass;
 uniform float uDrumOnset;
 uniform float uDrumBeat;
 uniform float uSpectralFlux;
+uniform float uSectionType;
 
 attribute float aRadius;
 attribute float aTheta;
@@ -56,18 +57,26 @@ void main() {
   float energy = clamp(uEnergy, 0.0, 1.0);
   float tempoScale = uTempo / 120.0;
 
+  // Section-type modulation
+  float sectionT = uSectionType;
+  float sJam = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
+  float sSpace = smoothstep(6.5, 7.5, sectionT);
+  float sChorus = smoothstep(1.5, 2.5, sectionT) * (1.0 - step(2.5, sectionT));
+  float orbitSpeedMod = mix(1.0, 1.4, sJam) * mix(1.0, 0.4, sSpace) * mix(1.0, 1.1, sChorus);
+  float particleScaleMod = mix(1.0, 1.3, sJam) * mix(1.0, 0.6, sSpace) * mix(1.0, 1.2, sChorus);
+
   // Toroidal flow field: particles orbit a torus
   // Bass expands the torus major radius
   float majorR = 2.0 + uBass * 1.0 + energy * 0.5;
-  float minorR = aRadius * mix(0.3, 1.2, energy);
+  float minorR = aRadius * mix(0.3, 1.2, energy) * particleScaleMod;
 
   // Beat pulse for orbit modulation
   float bp = beatPulse(uMusicalTime);
   minorR *= 1.0 + max(uBeatSnap, uDrumBeat) * 0.20;
   minorR *= 1.0 + uOnsetSnap * 0.08 + uDrumOnset * 0.12;
 
-  // Tempo-aware toroidal orbit
-  float orbitSpeed = (mix(0.02, 0.06, energy) + uMids * 0.04) * tempoScale * (1.0 + bp * 0.20);
+  // Tempo-aware toroidal orbit (section-modulated)
+  float orbitSpeed = (mix(0.02, 0.06, energy) + uMids * 0.04) * tempoScale * (1.0 + bp * 0.20) * orbitSpeedMod;
   float theta = aTheta + uDynamicTime * orbitSpeed * (0.5 + aRandom * 0.5);
   float phi = aPhi + uDynamicTime * orbitSpeed * 0.3 * (aRandom - 0.5);
 
@@ -82,8 +91,8 @@ void main() {
   float noiseDisp = snoise(vec3(pos * 0.3 + uDynamicTime * 0.08)) * 0.3;
   pos += normalize(pos) * noiseDisp;
 
-  // Per-instance size from energy
-  float baseScale = mix(0.04, 0.12, energy) + uRms * 0.04 + aRandom * 0.03;
+  // Per-instance size from energy (section-modulated)
+  float baseScale = (mix(0.04, 0.12, energy) + uRms * 0.04 + aRandom * 0.03) * particleScaleMod;
 
   // Transform through instanceMatrix (position/rotation/scale baked in scene)
   vec4 worldPos = instanceMatrix * vec4(pos, 1.0);
@@ -116,6 +125,13 @@ varying float vEnergy;
 varying float vOnsetSnap;
 
 void main() {
+  // Section-type modulation (fragment brightness)
+  float sectionT = uSectionType;
+  float sJam = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
+  float sSpace = smoothstep(6.5, 7.5, sectionT);
+  float sChorus = smoothstep(1.5, 2.5, sectionT) * (1.0 - step(2.5, sectionT));
+  float brightnessMod = mix(1.0, 1.3, sJam) * mix(1.0, 0.6, sSpace) * mix(1.0, 1.2, sChorus);
+
   // === PHONG SHADING with moving point light ===
   vec3 norm = normalize(vNormal);
 
@@ -157,8 +173,8 @@ void main() {
   vec3 gray = vec3(dot(baseColor, vec3(0.299, 0.587, 0.114)));
   baseColor = mix(gray, baseColor, sat);
 
-  // Composite lighting
-  vec3 rgb = baseColor * (ambient + diffuse) + vec3(1.0, 0.98, 0.95) * spec;
+  // Composite lighting (section-modulated brightness)
+  vec3 rgb = (baseColor * (ambient + diffuse) + vec3(1.0, 0.98, 0.95) * spec) * brightnessMod;
 
   // === CLIMAX REACTIVITY ===
   float isClimax = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5);

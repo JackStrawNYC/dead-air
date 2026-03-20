@@ -105,6 +105,15 @@ void main() {
   vec3 norm = normalize(vNormal);
   vec3 viewDir = normalize(vViewDir);
 
+  // Section-type modulation
+  float sectionT = uSectionType;
+  float sJam = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
+  float sSpace = smoothstep(6.5, 7.5, sectionT);
+  float sChorus = smoothstep(1.5, 2.5, sectionT) * (1.0 - step(2.5, sectionT));
+  float glowIntensityMod = mix(1.0, 1.4, sJam) * mix(1.0, 0.5, sSpace) * mix(1.0, 1.2, sChorus);
+  float specSharpMod = mix(1.0, 1.3, sJam) * mix(1.0, 0.7, sSpace) * mix(1.0, 1.15, sChorus);
+  float flashMod = mix(1.0, 1.5, sJam) * mix(1.0, 0.4, sSpace) * mix(1.0, 1.1, sChorus);
+
   // === TWO-LIGHT SETUP for crystal depth ===
   vec3 lightDir1 = normalize(vec3(0.3, 1.0, 0.5));
   vec3 lightDir2 = normalize(vec3(-0.5, -0.3, 0.8));
@@ -135,7 +144,7 @@ void main() {
   float chromaHue = chromaIdx / 12.0;
   vec3 glowColor = hsv2rgb(vec3(chromaHue + chordHue, 0.8, 0.85 + melPitch * 0.15));
 
-  float emissive = vGlow * (uEnergy + uFastEnergy * 0.8) * 1.5;
+  float emissive = vGlow * (uEnergy + uFastEnergy * 0.8) * 1.5 * glowIntensityMod;
   // Internal glow: brighter at crystal center (approximated by inverse Fresnel)
   float internalGlow = (1.0 - vFresnel) * emissive;
 
@@ -151,7 +160,7 @@ void main() {
   float climaxBoost = isClimax * uClimaxIntensity;
 
   // Onset: facet flash (bright white spike on transient)
-  float flash = max(uOnsetSnap, uDrumOnset) * 0.7 * (1.0 + climaxBoost * 0.5);
+  float flash = max(uOnsetSnap, uDrumOnset) * 0.7 * (1.0 + climaxBoost * 0.5) * flashMod;
   // Make flash stronger on facets facing the viewer
   float facetFlash = flash * pow(max(0.0, dot(norm, viewDir)), 4.0);
 
@@ -164,7 +173,7 @@ void main() {
   // === COMPOSITE ===
   vec3 col = baseColor * (0.15 + ndotl1 * 0.5 + ndotl2 * 0.2);
   col += fresnelMix;
-  col += vec3(1.0, 0.98, 0.95) * (spec1 + spec2) * (0.3 + uHighs * 0.3);
+  col += vec3(1.0, 0.98, 0.95) * (spec1 + spec2) * (0.3 + uHighs * 0.3) * specSharpMod;
   col += facetFlash * vec3(1.0, 0.95, 0.9);
   col += beatKick;
   col += rim * glowColor * 0.4;

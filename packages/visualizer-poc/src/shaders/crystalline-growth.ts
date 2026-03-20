@@ -91,6 +91,15 @@ void main() {
 
   float slowTime = uDynamicTime * 0.06;
 
+  // Section-type modulation
+  float sectionT = uSectionType;
+  float sJam = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
+  float sSpace = smoothstep(6.5, 7.5, sectionT);
+  float sChorus = smoothstep(1.5, 2.5, sectionT) * (1.0 - step(2.5, sectionT));
+  float growthRateMod = mix(1.0, 1.4, sJam) * mix(1.0, 0.4, sSpace) * mix(1.0, 1.1, sChorus);
+  float branchCountMod = mix(1.0, 1.3, sJam) * mix(1.0, 0.6, sSpace) * mix(1.0, 1.2, sChorus);
+  float fractureSpeedMod = mix(1.0, 1.5, sJam) * mix(1.0, 0.3, sSpace) * mix(1.0, 1.15, sChorus);
+
   // --- Phase 1: New uniform integrations ---
   float vocalGlow = uVocalEnergy * 0.15;         // vocal warmth in crystal glow
   float guitarGrowth = uOtherEnergy * 0.2;        // guitar drives growth rate
@@ -108,12 +117,12 @@ void main() {
   );
 
   // Crystal lattice scale: energy-driven density (accel + guitar boost)
-  float crystalScale = mix(3.0, 8.0, energy + slowE * 0.3 + guitarGrowth) * accelGrowth;
+  float crystalScale = mix(3.0, 8.0, energy + slowE * 0.3 + guitarGrowth) * accelGrowth * branchCountMod;
 
   // Crystal growth offset (slowly shifts the voronoi pattern)
   vec2 growthOffset = vec2(
-    sin(slowTime * 0.7) * 0.5,
-    cos(slowTime * 0.5) * 0.3
+    sin(slowTime * 0.7 * growthRateMod) * 0.5,
+    cos(slowTime * 0.5 * growthRateMod) * 0.3
   );
 
   // Bass pulse: crystals breathe
@@ -159,7 +168,7 @@ void main() {
   col += crystalColor * innerGlow * (1.0 + bass * 0.5);
 
   // Onset fracture: bright flash along crystal edges (tension amplifies)
-  float fractureFlash = onset * facetEdge * (2.0 + tensionFracture);
+  float fractureFlash = onset * facetEdge * (2.0 + tensionFracture) * fractureSpeedMod;
   col += vec3(1.0, 0.95, 0.9) * fractureFlash;
 
   // Deep noise layer: organic growth texture within crystals

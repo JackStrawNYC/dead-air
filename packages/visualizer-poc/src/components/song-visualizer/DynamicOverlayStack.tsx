@@ -75,32 +75,45 @@ export const DynamicOverlayStack: React.FC<Props> = ({
 }) => {
   const frame = useCurrentFrame();
 
-  // Beat-synced overlay opacity pulse
+  // Enhanced beat-synced overlay opacity pulse with drum-stem and section awareness
   const frameIdx = Math.min(frame, frames.length - 1);
   const currentFrameData = frames[frameIdx];
-  const beatPulse = currentFrameData?.beat ? 0.12 : 0;
-  const onsetPulse = (currentFrameData?.onset ?? 0) > 0.5 ? (currentFrameData.onset ?? 0) * 0.08 : 0;
-  const overlayPulse = 1.0 + beatPulse + onsetPulse;
+  const sectionType = currentFrameData?.sectionType ?? "verse";
+  // Section-aware pulse intensity: jams get bigger pulses, space gets minimal
+  const pulseScale = sectionType === "jam" || sectionType === "solo" ? 1.5
+    : sectionType === "space" ? 0.3
+    : sectionType === "chorus" ? 1.2
+    : 1.0;
+  const beatPulse = currentFrameData?.beat ? 0.18 * pulseScale : 0;
+  // Drum-stem pulse: more responsive to actual drum hits vs generic onset
+  const drumPulse = (currentFrameData?.stemDrumOnset ?? 0) > 0.3
+    ? (currentFrameData.stemDrumOnset ?? 0) * 0.12 * pulseScale : 0;
+  const onsetPulse = (currentFrameData?.onset ?? 0) > 0.5
+    ? (currentFrameData.onset ?? 0) * 0.10 * pulseScale : 0;
+  const overlayPulse = 1.0 + beatPulse + Math.max(drumPulse, onsetPulse);
 
   // Compute opacities and apply hard cap on concurrent overlays
   const maxConcurrent = MAX_CONCURRENT[energyLevel] ?? 4;
-  const withOpacity = activeEntries
-    .map(([name, entry]) => {
-      const inversionMult = 1 - counterpointOverlayInversion;
-      let op = Math.min(1, (opacityMap ? (opacityMap[name] ?? 0) : 1) * mediaSuppression * focusSuppression * itOverlayOverride * inversionMult * overlayPulse);
-      // Cross-song dedup: deprioritize overlays already shown earlier in the show
-      if (usedOverlayIds && usedOverlayIds.has(name)) {
-        op *= 0.4; // reduce but don't eliminate — variety, not exclusion
-      }
-      return { name, entry, opacity: op };
-    })
-    .filter((o) => o.opacity > 0.01)
-    .sort((a, b) => b.opacity - a.opacity)
-    .slice(0, maxConcurrent);
+  const inversionMult = 1 - counterpointOverlayInversion;
+  const baseMult = mediaSuppression * focusSuppression * itOverlayOverride * inversionMult * overlayPulse;
 
-  // Separate DOM overlays from GLSL overlays
-  const domOverlays = withOpacity.filter((o) => (o.entry.renderContext ?? 'dom') === 'dom');
-  const glslOverlays = withOpacity.filter((o) => o.entry.renderContext === 'glsl');
+  // Single-pass: compute opacity, filter, sort, split DOM/GLSL in one loop
+  const scored: { name: string; entry: OverlayComponentEntry; opacity: number }[] = [];
+  for (let i = 0; i < activeEntries.length; i++) {
+    const [name, entry] = activeEntries[i];
+    let op = Math.min(1, (opacityMap ? (opacityMap[name] ?? 0) : 1) * baseMult);
+    if (usedOverlayIds && usedOverlayIds.has(name)) op *= 0.4;
+    if (op > 0.01) scored.push({ name, entry, opacity: op });
+  }
+  scored.sort((a, b) => b.opacity - a.opacity);
+  const withOpacity = scored.length > maxConcurrent ? scored.slice(0, maxConcurrent) : scored;
+
+  // Single-pass DOM/GLSL split (avoids two .filter() calls)
+  const domOverlays: typeof withOpacity = [];
+  const glslOverlays: typeof withOpacity = [];
+  for (const item of withOpacity) {
+    ((item.entry.renderContext ?? 'dom') === 'dom' ? domOverlays : glslOverlays).push(item);
+  }
 
   const gateOpacity = interpolate(
     frame,

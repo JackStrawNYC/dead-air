@@ -78,7 +78,17 @@ void main() {
   float tensionMix = uHarmonicTension * 0.15;    // tension drives blob interface mixing
   float chordHue = float(int(uChordIndex)) / 24.0 * 0.15;
   float sectionSeed = uSectionIndex * 4.3;
-  float t = uDynamicTime * 0.06 * tempoScale; // Oil moves with purpose
+
+  // Section-type modulation
+  float sectionT = uSectionType;
+  float sJam = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
+  float sSpace = smoothstep(6.5, 7.5, sectionT);
+  float sChorus = smoothstep(1.5, 2.5, sectionT) * (1.0 - step(2.5, sectionT));
+  float morphSpeedMod = mix(1.0, 1.4, sJam) * mix(1.0, 0.4, sSpace) * mix(1.0, 1.1, sChorus);
+  float saturationMod = mix(1.0, 1.15, sJam) * mix(1.0, 0.7, sSpace) * mix(1.0, 1.2, sChorus);
+  float blobSizeMod = mix(1.0, 1.3, sJam) * mix(1.0, 0.6, sSpace) * mix(1.0, 1.15, sChorus);
+
+  float t = uDynamicTime * 0.06 * tempoScale * morphSpeedMod; // Oil moves with purpose
 
   // Bass camera shake (gentle — projector on a table)
   float shakeX = snoise(vec3(uTime * 4.0, 0.0, sectionSeed)) * uBass * 0.002;
@@ -107,7 +117,7 @@ void main() {
   float w1y = fbm(blob1Pos + vec3(8.4, 1.9, 0.0));
   vec3 warped1 = vec3(p + vec2(w1x, w1y) * (0.4 + uBass * 0.2 + uFastBass * 0.15), t * 0.25);
 
-  float blob1 = oilBlob(warped1 * 0.7, 0.05);
+  float blob1 = oilBlob(warped1 * 0.7 / blobSizeMod, 0.05);
   float hue1 = hsvToCosineHue(uPalettePrimary) + uChromaHue * 0.2;
   vec3 col1 = 0.5 + 0.5 * cos(6.28318 * vec3(hue1, hue1 + 0.33, hue1 + 0.67));
   col1 *= mix(0.40, 0.95, energy);
@@ -122,7 +132,7 @@ void main() {
   float w2y = fbm(blob2Pos + vec3(1.3, 6.8, 0.0));
   vec3 warped2 = vec3(p + vec2(w2x, w2y) * (0.35 + uMids * 0.15), t * 0.3);
 
-  float blob2 = oilBlob(warped2 * 0.8, 0.1);
+  float blob2 = oilBlob(warped2 * 0.8 / blobSizeMod, 0.1);
   float hue2 = hsvToCosineHue(uPaletteSecondary) + uChromaHue * 0.15 + 0.15;
   vec3 col2 = 0.5 + 0.5 * cos(6.28318 * vec3(hue2, hue2 + 0.33, hue2 + 0.67));
   col2 *= mix(0.35, 0.85, energy);
@@ -136,7 +146,7 @@ void main() {
   float w3y = fbm3(blob3Pos + vec3(7.1, 3.2, 0.0));
   vec3 warped3 = vec3(p + vec2(w3x, w3y) * (0.25 + uHighs * 0.1), t * 0.4);
 
-  float blob3 = oilBlob(warped3 * 1.0, 0.15);
+  float blob3 = oilBlob(warped3 * 1.0 / blobSizeMod, 0.15);
   float hue3 = hsvToCosineHue(uPalettePrimary) + 0.5 + chordHue; // Complementary + chord shift
   vec3 col3 = 0.5 + 0.5 * cos(6.28318 * vec3(hue3, hue3 + 0.33, hue3 + 0.67));
   col3 *= mix(0.28, 0.78, energy + guitarBlob);
@@ -207,10 +217,10 @@ void main() {
   // === BEAT SNAP: blob brightness pulse ===
   col *= 1.0 + uBeatSnap * 0.25 * (1.0 + climaxBoost * 0.4);
 
-  // Palette saturation
+  // Palette saturation (section-modulated)
   float lum = dot(col, vec3(0.299, 0.587, 0.114));
   vec3 gray = vec3(lum);
-  col = mix(gray, col, mix(0.7, 1.0, uPaletteSaturation));
+  col = mix(gray, col, mix(0.7, 1.0, uPaletteSaturation) * saturationMod);
 
   // === EDGE DARKENING: circular mask (projector lens falloff) ===
   float lensDist = length(p);

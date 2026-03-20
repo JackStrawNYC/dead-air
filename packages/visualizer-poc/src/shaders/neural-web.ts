@@ -93,8 +93,17 @@ void main() {
   float slowTime = uDynamicTime * 0.04;
   float chromaHueMod = uChromaHue * 0.15;
 
+  // Section-type modulation
+  float sectionT = uSectionType;
+  float sJam = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
+  float sSpace = smoothstep(6.5, 7.5, sectionT);
+  float sChorus = smoothstep(1.5, 2.5, sectionT) * (1.0 - step(2.5, sectionT));
+  float firingRateMod = mix(1.0, 1.5, sJam) * mix(1.0, 0.4, sSpace) * mix(1.0, 1.15, sChorus);
+  float propagationMod = mix(1.0, 1.4, sJam) * mix(1.0, 0.35, sSpace) * mix(1.0, 1.1, sChorus);
+  float nodeDensityMod = mix(1.0, 1.3, sJam) * mix(1.0, 0.6, sSpace) * mix(1.0, 1.2, sChorus);
+
   // --- Network grid ---
-  float gridSize = mix(0.15, 0.08, tension);
+  float gridSize = mix(0.15, 0.08, tension) / nodeDensityMod;
   float branchFactor = 0.5 + mids * 0.5;
 
   vec3 col = vec3(0.01, 0.008, 0.02); // dark background
@@ -128,14 +137,14 @@ void main() {
 
     if (axon < 0.01) {
       // Signal pulse traveling along axon
-      float signalPos = fract(slowTime * 2.0 + fi * 0.13);
+      float signalPos = fract(slowTime * 2.0 * propagationMod + fi * 0.13);
       vec2 signalPt = mix(nodeA, nodeB, signalPos);
       float signalDist = length(p - signalPt);
       float signal = exp(-signalDist * 80.0) * energy;
 
       // Firing cascade from drum onset
-      float firePhase = fract(drumOnset * 3.0 + fi * 0.17);
-      float firePulse = exp(-firePhase * 4.0) * drumOnset;
+      float firePhase = fract(drumOnset * 3.0 * firingRateMod + fi * 0.17);
+      float firePulse = exp(-firePhase * 4.0) * drumOnset * firingRateMod;
 
       float hue = uPalettePrimary + melodicPitch * 0.15 + chromaHueMod + fi * 0.05;
       float sat = mix(0.5, 1.0, energy) * uPaletteSaturation;
