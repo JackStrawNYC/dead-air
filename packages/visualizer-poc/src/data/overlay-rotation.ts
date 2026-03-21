@@ -227,6 +227,10 @@ export function buildRotationSchedule(
   markDropoutWindows(windows);
 
   // 4. Select overlays per window
+  // Breathing room: let the shader establish itself before any overlays appear.
+  // First 10 seconds (300 frames @ 30fps) are overlay-free unless it's a segue.
+  const INTRO_BREATHING_FRAMES = 300;
+
   let previousWindowOverlays = new Set<string>();
   let previousWindowFrames = 0;
   let previousWindowEnergy: string | null = null;
@@ -236,6 +240,12 @@ export function buildRotationSchedule(
     const window = windows[wi];
     const windowFrames = window.frameEnd - window.frameStart;
     const rng = seededRandom(trackHash + wi * 7919); // unique seed per window
+
+    // Intro breathing room: no overlays in the first 10 seconds
+    if (window.frameEnd <= INTRO_BREATHING_FRAMES) {
+      window.overlays = [];
+      continue;
+    }
 
     const energyRange = ENERGY_COUNTS[window.energy] ?? ENERGY_COUNTS.mid;
     let targetCount = energyRange.min + Math.floor(rng() * (energyRange.max - energyRange.min + 1));
