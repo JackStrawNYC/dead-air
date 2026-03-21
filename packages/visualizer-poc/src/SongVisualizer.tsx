@@ -690,27 +690,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
             climaxDesaturation={climaxState.phase === "climax" ? climaxState.intensity : climaxState.phase === "sustain" ? climaxState.intensity * 0.6 : 0}
           />
 
-          {!isDeadAir && introFactor > 0.5 && (
-            <SilentErrorBoundary name="WaveformOverlay">
-              <SongPaletteProvider palette={effectivePalette}>
-                <WaveformOverlay frames={f} />
-              </SongPaletteProvider>
-            </SilentErrorBoundary>
-          )}
-
-          {!isDeadAir && introFactor > 0.5 && (
-            <SilentErrorBoundary name="GuitarStrings">
-              <GuitarStrings frames={f} />
-            </SilentErrorBoundary>
-          )}
-
-          {crowdMoments.length > 0 && (
-            <SilentErrorBoundary name="CrowdOverlay">
-              <SongPaletteProvider palette={effectivePalette}>
-                <CrowdOverlay moments={crowdMoments} />
-              </SongPaletteProvider>
-            </SilentErrorBoundary>
-          )}
+          {/* WaveformOverlay, GuitarStrings, CrowdOverlay disabled — shader owns the visual */}
 
           {/* IT flash — chromatic burst on coherence break */}
           {itState.flashIntensity > 0.01 && (

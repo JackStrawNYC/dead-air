@@ -283,36 +283,29 @@ describe("selectOverlaysForShow", () => {
 
 // ─── Atmospheric Overlay Selection ───
 
-describe("atmospheric overlay selection", () => {
-  it("selectable overlays appear across multiple selections", () => {
-    let totalSelected = 0;
-    for (let seed = 0; seed < 20; seed++) {
-      const profile: SongProfile = {
-        trackId: `s1t${String(seed).padStart(2, "0")}`,
-        title: `Test ${seed}`,
-        set: 1,
-        avgEnergy: 0.15,
-        energyVariance: 0.01,
-        dominantEnergyBand: "mid",
-        peakEnergyRatio: 0.3,
-        avgCentroid: 0.3,
-        avgFlatness: 0.05,
-        avgSub: 0.2,
-        chromaSpread: 0.1,
-        tempo: 120,
-        sectionCount: 3,
-        avgVocalPresence: 0,
-        avgDrumEnergy: 0,
-        avgOtherCentroid: 0,
-      };
-      const result = selectOverlays(profile, emptyHistory(), undefined, seed * 1000);
-      const nonAlwaysActive = result.activeOverlays.filter(
-        (n) => n !== "SongTitle" && n !== "FilmGrain",
-      );
-      totalSelected += nonAlwaysActive.length;
-    }
-
-    expect(totalSelected).toBeGreaterThan(0);
+describe("essential overlay selection", () => {
+  it("always-active overlays are always selected", () => {
+    const profile: SongProfile = {
+      trackId: "s1t01",
+      title: "Test",
+      set: 1,
+      avgEnergy: 0.15,
+      energyVariance: 0.01,
+      dominantEnergyBand: "mid",
+      peakEnergyRatio: 0.3,
+      avgCentroid: 0.3,
+      avgFlatness: 0.05,
+      avgSub: 0.2,
+      chromaSpread: 0.1,
+      tempo: 120,
+      sectionCount: 3,
+      avgVocalPresence: 0,
+      avgDrumEnergy: 0,
+      avgOtherCentroid: 0,
+    };
+    const result = selectOverlays(profile, emptyHistory(), undefined, 42);
+    expect(result.activeOverlays).toContain("SongTitle");
+    expect(result.activeOverlays).toContain("FilmGrain");
   });
 });
 
