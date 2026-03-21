@@ -90,9 +90,9 @@ export const OVERLAY_REGISTRY: OverlayEntry[] = [
   { name: "SongTitle",         layer: 7, category: "artifact", tags: ["dead-culture"],                  energyBand: "any",  weight: 1, alwaysActive: true, tier: "A" },
 
   // ═══ Layer 7: Show Artifacts (3) ═══
-  { name: "VenueMarquee",     layer: 7, category: "artifact", tags: ["dead-culture", "retro"],          energyBand: "any",  weight: 1, dutyCycle: 20, energyResponse: [0.0, 0.05, 3.0], tier: "B" },
-  { name: "TapeTrader",       layer: 7, category: "artifact", tags: ["dead-culture", "retro"],          energyBand: "any",  weight: 1, dutyCycle: 15, energyResponse: [0.0, 0.05, 3.0], tier: "B" },
-  { name: "TourPosterGallery", layer: 7, category: "artifact", tags: ["dead-culture", "retro"],         energyBand: "any",  weight: 1, dutyCycle: 20, energyResponse: [0.0, 0.05, 3.0], tier: "B" },
+  { name: "VenueMarquee",     layer: 7, category: "artifact", tags: ["dead-culture", "retro"],          energyBand: "any",  weight: 1, dutyCycle: 20, energyResponse: [0.0, 0.05, 3.0], tier: "C" },
+  { name: "TapeTrader",       layer: 7, category: "artifact", tags: ["dead-culture", "retro"],          energyBand: "any",  weight: 1, dutyCycle: 15, energyResponse: [0.0, 0.05, 3.0], tier: "C" },
+  { name: "TourPosterGallery", layer: 7, category: "artifact", tags: ["dead-culture", "retro"],         energyBand: "any",  weight: 1, dutyCycle: 20, energyResponse: [0.0, 0.05, 3.0], tier: "C" },
 
   // ═══ Layer 10: Distortion (1) + always-active ═══
   { name: "VHSGlitch",           layer: 10, category: "distortion", tags: ["retro", "psychedelic"],       energyBand: "mid",  weight: 2, dutyCycle: 100, energyResponse: [0.15, 0.35, 2.5], tier: "A" },

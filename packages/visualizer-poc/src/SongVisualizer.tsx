@@ -802,78 +802,20 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
             );
           })()}
 
-          {/* IntroQuote — meditative band quote during intro hold */}
-          {introFactor < 0.8 && showSeed !== undefined && (
-            <SilentErrorBoundary name="IntroQuote">
-              <IntroQuote
-                showSeed={showSeed}
-                trackNumber={props.song.trackNumber ?? 1}
-                segueIn={props.segueIn}
-                isFirstSong={(props.song.trackNumber ?? 1) === 1 && props.song.set === 1}
-              />
-            </SilentErrorBoundary>
-          )}
+          {/* IntroQuote disabled — only song cards, setlist, concert info */}
 
           {/* Lyrics disabled — pure visual experience */}
 
           {!isDeadAir && <ConcertInfo />}
           {!isDeadAir && <SetlistScroll frames={f} currentSong={props.song.title} introFactor={introFactor} />}
 
-          <SpecialPropsLayer
-            songTitle={props.song.title}
-            setNumber={props.song.set}
-            trackNumber={props.song.trackNumber}
-            trackId={props.song.trackId}
-            isSegue={!!(props.segueIn && !comesFromDrumsSpace)}
-            energy={audioSnapshot.energy}
-            palette={effectivePalette}
-            songStats={songStatsData}
-            milestonesMap={milestonesMap}
-            narrationData={narrationData}
-            fanReviews={fanReviewsData}
-            showSeed={showSeed}
-            suppressIntro={isSacredSegueIn}
-          />
+          {/* SpecialPropsLayer disabled — no narration/facts/stats/reviews */}
 
-          {/* Show context overlays */}
-          {!isDeadAir && props.show && (
-            <SilentErrorBoundary name="SongPosition">
-              <SongPositionIndicator
-                setNumber={props.song.set}
-                trackNumber={props.song.trackNumber ?? 1}
-                totalSongsInSet={totalSongsInSet}
-              />
-            </SilentErrorBoundary>
-          )}
+          {/* SongPositionIndicator disabled — clean visual field */}
 
-          {!isDeadAir && currentSection && (sectionType === "jam" || sectionType === "solo") && (
-            <SilentErrorBoundary name="JamTimer">
-              <JamTimer
-                sectionStartFrame={currentSection.frameStart}
-                sectionDurationFrames={currentSection.frameEnd - currentSection.frameStart}
-                energy={audioSnapshot.energy}
-              />
-            </SilentErrorBoundary>
-          )}
+          {/* JamTimer disabled — clean visual field */}
 
-          {!isDeadAir && (() => {
-            // Find the next song for UpNextTeaser
-            if (!props.show) return null;
-            const songs = props.show.songs;
-            const idx = songs.findIndex((s) => s.trackId === props.song.trackId);
-            const nextSong = idx >= 0 && idx < songs.length - 1 ? songs[idx + 1] : null;
-            const isLastInSet = !nextSong || nextSong.set !== props.song.set;
-            if (!nextSong || isLastInSet) return null;
-            return (
-              <SilentErrorBoundary name="UpNextTeaser">
-                <UpNextTeaser
-                  nextSongTitle={nextSong.title}
-                  isSegue={!!props.segueOut}
-                  isLastInSet={isLastInSet}
-                />
-              </SilentErrorBoundary>
-            );
-          })()}
+          {/* UpNextTeaser disabled — clean visual field */}
 
           {!isDeadAir && (
             <SilentErrorBoundary name="NowPlaying">

@@ -573,7 +573,8 @@ export const OVERLAY_COMPONENTS: Record<string, OverlayComponentEntry> = {
   FrostCrystals:           { Component: FrostCrystals, layer: 1 },
   GalaxyArm:               { Component: GalaxyArm, layer: 1 },
   GameOfLife:              { Component: GameOfLife, layer: 4 },
-  GarciaQuotes:            { Component: GarciaQuotes, layer: 7 },
+  // GarciaQuotes disabled — only song cards, setlist, concert info
+  // GarciaQuotes:            { Component: GarciaQuotes, layer: 7 },
   GearWorks:               { Component: GearWorks, layer: 4 },
   GeyserEruption:          { Component: GeyserEruption, layer: 3 },
   GothicArch:              { Component: GothicArch, layer: 4 },
@@ -611,7 +612,8 @@ export const OVERLAY_COMPONENTS: Record<string, OverlayComponentEntry> = {
   // LyricFlash disabled — pure visual experience
   // LyricFlash:              { Component: LyricFlash, layer: 7 },
   Macrame:                 { Component: Macrame, layer: 2 },
-  MantraScroll:            { Component: MantraScroll, layer: 7 },
+  // MantraScroll disabled — only song cards, setlist, concert info
+  // MantraScroll:            { Component: MantraScroll, layer: 7 },
   MarqueeLights:           { Component: MarqueeLights, layer: 7 },
   MatrixRain:              { Component: MatrixRain, layer: 1 },
   MemphisDesign:           { Component: MemphisDesign, layer: 4 },
