@@ -18,7 +18,12 @@ export const HERO_OVERLAY_NAMES = new Set(BAND_CONFIG.heroOverlays);
 
 /**
  * Select overlays for a window from scored candidates.
- * Implements hero guarantee, duty-cycle compensation, layer diversity, and tag balance.
+ * Implements song-specific hero guarantee, layer diversity, and tag balance.
+ *
+ * The songHero (first overlay from overlayOverrides.include) gets absolute
+ * priority — it appears in every window and at peak energy gets the screen
+ * to itself (hero-only window). This ensures Dead iconography is always
+ * the visual anchor, not lost in a crowd of competing overlays.
  *
  * @returns Selected overlay entries (ordered by priority)
  */
@@ -28,37 +33,42 @@ export function selectOverlaysForWindow(
   isDrumsSpace: boolean,
   isDropout: boolean,
   poolEntries: OverlayEntry[],
+  songHero?: string,
+  windowEnergy?: string,
 ): OverlayEntry[] {
-  // Hero guarantee: reserve slots for concrete animated objects.
-  // Skip entirely when targetCount is 0 (peak/dropout = shader owns the moment).
+  // Hero guarantee: the song's designated hero ALWAYS gets the first slot.
+  // At high energy, the hero gets the window to itself — no competition.
   const selected: OverlayEntry[] = [];
   const selectedNames = new Set<string>();
   const usedLayers = new Set<number>();
 
-  const heroScored = scored.filter((s) => HERO_OVERLAY_NAMES.has(s.entry.name));
-  const alwaysOnHeroes = heroScored.filter((s) => (s.entry.dutyCycle ?? 50) >= 80);
-  const cycledHeroes = heroScored.filter((s) => (s.entry.dutyCycle ?? 50) < 80);
-  const heroSlots = targetCount > 0 ? Math.min(1, heroScored.length) : 0;
-
-  // Pick at least 1 always-on hero first (guaranteed visibility)
-  let herosPicked = 0;
-  for (const hero of alwaysOnHeroes) {
-    if (herosPicked >= heroSlots) break;
-    if (!selectedNames.has(hero.entry.name) && !usedLayers.has(hero.entry.layer)) {
-      selected.push(hero.entry);
-      selectedNames.add(hero.entry.name);
-      usedLayers.add(hero.entry.layer);
-      herosPicked++;
+  // Song-specific hero: first priority — always present when targetCount > 0
+  if (songHero && targetCount > 0) {
+    const heroCandidate = scored.find((s) => s.entry.name === songHero);
+    if (heroCandidate) {
+      selected.push(heroCandidate.entry);
+      selectedNames.add(heroCandidate.entry.name);
+      usedLayers.add(heroCandidate.entry.layer);
+      // At high energy, hero owns the window — no other overlays
+      if (windowEnergy === "high") {
+        return selected;
+      }
     }
   }
-  // Fill remaining hero slots with cycled heroes for variety
-  for (const hero of cycledHeroes) {
-    if (herosPicked >= heroSlots) break;
-    if (!selectedNames.has(hero.entry.name) && !usedLayers.has(hero.entry.layer)) {
-      selected.push(hero.entry);
-      selectedNames.add(hero.entry.name);
-      usedLayers.add(hero.entry.layer);
-      herosPicked++;
+
+  // If no song hero, fall back to generic hero pool
+  if (selected.length === 0 && targetCount > 0) {
+    const heroScored = scored.filter((s) => HERO_OVERLAY_NAMES.has(s.entry.name));
+    const alwaysOnHeroes = heroScored.filter((s) => (s.entry.dutyCycle ?? 50) >= 80);
+    const cycledHeroes = heroScored.filter((s) => (s.entry.dutyCycle ?? 50) < 80);
+
+    for (const hero of [...alwaysOnHeroes, ...cycledHeroes]) {
+      if (selected.length >= 1) break;
+      if (!selectedNames.has(hero.entry.name) && !usedLayers.has(hero.entry.layer)) {
+        selected.push(hero.entry);
+        selectedNames.add(hero.entry.name);
+        usedLayers.add(hero.entry.layer);
+      }
     }
   }
 

@@ -298,8 +298,10 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
   const rotationSchedule = useMemo(() => {
     if (!props.activeOverlays || !analysis) return null;
     const sects = getSections(analysis);
-    return buildRotationSchedule(props.activeOverlays, sects, props.song.trackId, showSeed, analysis?.frames, isDrumsSpace, props.energyHints, props.show?.era, props.song.defaultMode, songIdentity, showArcModifiers, undefined, dominantStemSection, narrative?.state.songsCompleted);
-  }, [props.activeOverlays, analysis, props.song.trackId, showSeed, isDrumsSpace, props.energyHints, props.show?.era, props.song.defaultMode, songIdentity, showArcModifiers, dominantStemSection, narrative?.state.songsCompleted]);
+    // Song hero: first overlay from overlayOverrides.include gets absolute priority
+    const songHero = props.song.overlayOverrides?.include?.[0];
+    return buildRotationSchedule(props.activeOverlays, sects, props.song.trackId, showSeed, analysis?.frames, isDrumsSpace, props.energyHints, props.show?.era, props.song.defaultMode, songIdentity, showArcModifiers, undefined, dominantStemSection, narrative?.state.songsCompleted, songHero);
+  }, [props.activeOverlays, analysis, props.song.trackId, showSeed, isDrumsSpace, props.energyHints, props.show?.era, props.song.defaultMode, songIdentity, showArcModifiers, dominantStemSection, narrative?.state.songsCompleted, props.song.overlayOverrides]);
 
   const opacityMapBase = rotationSchedule
     ? getOverlayOpacities(frame, rotationSchedule, analysis?.frames, energyCalibration)

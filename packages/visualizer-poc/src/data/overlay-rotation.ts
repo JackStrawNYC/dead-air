@@ -182,6 +182,8 @@ export function buildRotationSchedule(
   stemSectionType?: StemSectionType,
   /** Songs completed so far in the show (for fatigue-aware rotation timing) */
   songsCompleted?: number,
+  /** Song's designated hero overlay — first overlay from overlayOverrides.include */
+  songHero?: string,
 ): RotationSchedule {
   const trackHash = hashString(trackId) + (showSeed ?? 0);
 
@@ -328,7 +330,7 @@ export function buildRotationSchedule(
       .sort((a, b) => b.score - a.score);
 
     // Select overlays via extracted selection module (hero guarantee + diversity)
-    const selected = selectOverlaysForWindow(scored, targetCount, isDrumsSpace ?? false, window.isDropout ?? false, poolEntries);
+    const selected = selectOverlaysForWindow(scored, targetCount, isDrumsSpace ?? false, window.isDropout ?? false, poolEntries, songHero, window.energy);
 
     window.overlays = selected.map((e) => e.name);
     previousWindowOverlays = new Set(selected.map((e) => e.name));
