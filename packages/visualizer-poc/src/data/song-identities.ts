@@ -362,8 +362,8 @@ export function generateFallbackIdentity(
     if (chromaSums[c] > chromaSums[dominantChromaIdx]) dominantChromaIdx = c;
   }
 
-  // 6. Derive overlay density from energy
-  const overlayDensity: number = avgEnergy > 0.25 ? 1.4 : avgEnergy < 0.12 ? 0.5 : 0.8;
+  // 6. Derive overlay density from energy — restrained: less is more
+  const overlayDensity: number = avgEnergy > 0.25 ? 0.9 : avgEnergy < 0.12 ? 0.4 : 0.6;
 
   // 7. Derive climax behavior from peak energy ratio
   const climaxBehavior: SongIdentity["climaxBehavior"] = peakEnergyRatio > 0.4
@@ -378,24 +378,70 @@ export function generateFallbackIdentity(
   // 9. Derive saturation offset from flatness
   const saturationOffset: number = avgFlatness > 0.4 ? -0.05 : avgFlatness < 0.15 ? 0.05 : 0;
 
-  // 10. Derive overlay boost from mood keywords
-  const overlayBoost: string[] = [];
-  if (keywords.includes("contemplative" as OverlayTag) || keywords.includes("ethereal" as OverlayTag)) {
-    overlayBoost.push("Fireflies", "RoseOverlay", "DreamCatcher");
-  }
-  if (keywords.includes("intense" as OverlayTag) || keywords.includes("energetic" as OverlayTag)) {
-    overlayBoost.push("ParticleExplosion", "WallOfSound", "EmberRise");
-  }
-  if (keywords.includes("deep" as OverlayTag)) {
-    overlayBoost.push("DarkStarPortal", "CosmicStarfield");
-  }
+  // 10. Derive overlay boost from audio character — Dead iconography matched to song feel
+  //
+  // Stem analysis: compute avg vocal/drum/guitar presence across the song
+  const avgVocal = frames.reduce((s, f) => s + (f.stemVocalRms ?? 0), 0) / frames.length;
+  const avgDrums = frames.reduce((s, f) => s + (f.stemDrumOnset ?? 0), 0) / frames.length;
+  const avgGuitar = frames.reduce((s, f) => s + (f.stemOtherRms ?? 0), 0) / frames.length;
+  const avgBass = frames.reduce((s, f) => s + (f.stemBassRms ?? 0), 0) / frames.length;
 
-  // 11. Derive overlay suppress from energy anti-match
-  const overlaySuppress: string[] = [];
+  const overlayBoost: string[] = [];
+
+  // High energy rockers: bolt/lightning/pyrotechnics
+  if (avgEnergy > 0.25 && tempo > 120) {
+    overlayBoost.push("ThirteenPointBolt", "StealYourFaceOff", "LightningBoltOverlay");
+    if (avgDrums > 0.15) overlayBoost.push("Pyrotechnics");
+  }
+  // High energy party songs: bears + lasers + skeleton band
+  if (avgEnergy > 0.20 && tempo > 110) {
+    overlayBoost.push("BearParade", "LaserShow", "SkeletonBand");
+  }
+  // Guitar-forward / Jerry songs: spotlight + stealie kaleidoscope
+  if (avgGuitar > 0.15 && avgVocal > 0.08) {
+    overlayBoost.push("JerrySpotlight", "StealYourFaceKaleidoscope");
+  }
+  // Groove/jam songs: terrapins march, skull kaleidoscope
+  if (avgEnergy > 0.12 && avgEnergy < 0.25 && avgBass > 0.12) {
+    overlayBoost.push("MarchingTerrapins", "DancingTerrapinOverlay", "SkullKaleidoscope");
+  }
+  // Contemplative / ballads: breathing stealie, skeleton roses, skeleton couple
+  if (avgEnergy < 0.15) {
+    overlayBoost.push("BreathingStealie", "SkeletonRoses", "SkeletonCouple", "StealieFade");
+    if (avgVocal > 0.06) overlayBoost.push("JerrySpotlight");
+  }
+  // Cosmic / spacey: dark star portal, rainbow
+  if (avgFlatness > 0.35 && avgEnergy < 0.20) {
+    overlayBoost.push("DarkStarPortal", "RainbowArc", "PrismRainbow");
+  }
+  // Deep bass presence: wall of sound, fog laser
+  if (avgBass > 0.20) {
+    overlayBoost.push("WallOfSound", "FogLaser");
+  }
+  // Country/folk (low tempo, mid energy, vocal): sunflower stealie
+  if (tempo < 120 && avgVocal > 0.08 && avgEnergy < 0.20) {
+    overlayBoost.push("SunflowerStealie");
+  }
+  // Always include at least one sacred Dead icon
+  if (overlayBoost.length === 0) {
+    overlayBoost.push("BreathingStealie", "StealieFade");
+  }
+  // Deduplicate
+  const uniqueBoost = [...new Set(overlayBoost)];
+
+  // 11. Derive overlay suppress — keep HUD/spectral overlays out, suppress energy mismatches
+  const overlaySuppress: string[] = [
+    // HUD overlays should almost never appear via identity boost
+    "SpectrumAnalyzer", "VUMeters", "Oscilloscope", "RadialSpectrum",
+    "PianoRoll", "StemSeparation", "WaterfallSpectrogram",
+  ];
+  // Suppress high-energy overlays for quiet songs
+  if (avgEnergy < 0.12) {
+    overlaySuppress.push("LaserShow", "Pyrotechnics", "SpotlightFollow", "LightningBoltOverlay");
+  }
+  // Suppress contemplative overlays for rockers
   if (avgEnergy > 0.25) {
-    overlaySuppress.push("Fireflies", "RoseOverlay");
-  } else if (avgEnergy < 0.12) {
-    overlaySuppress.push("LaserShow", "ParticleExplosion");
+    overlaySuppress.push("SkeletonCouple", "StealieFade", "RainbowArc");
   }
 
   // 12. Build the identity
@@ -407,7 +453,7 @@ export function generateFallbackIdentity(
     climaxBehavior,
     hueShift,
     saturationOffset,
-    overlayBoost: overlayBoost.length > 0 ? overlayBoost : undefined,
+    overlayBoost: uniqueBoost.length > 0 ? uniqueBoost : undefined,
     overlaySuppress: overlaySuppress.length > 0 ? overlaySuppress : undefined,
   };
 }
