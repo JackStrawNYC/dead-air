@@ -28,12 +28,12 @@ interface OverlayComponentEntry {
 }
 
 /** Max concurrent overlays by energy level (hard cap after opacity sorting).
- *  Pre-peak dropout strips to void → peaks flood with A-tier density.
- *  The contrast between silence and flood creates the visceral impact. */
+ *  Restrained counts keep the visual field tasteful — let shaders breathe.
+ *  Dead iconography and atmosphere > visual density. */
 const MAX_CONCURRENT: Record<string, number> = {
-  quiet: 3,
-  mid: 6,
-  peak: 7,
+  quiet: 2,
+  mid: 3,
+  peak: 4,
 };
 
 interface Props {

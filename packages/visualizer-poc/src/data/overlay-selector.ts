@@ -35,7 +35,7 @@ const LAYER_TARGETS: Record<number, { min: number; max: number }> = {
   10: { min: 0, max: 1 },   // Distortion
 };
 
-const MAX_TOTAL_WEIGHT = 10;
+const MAX_TOTAL_WEIGHT = 6;
 
 // ─── Cross-Song Memory ───
 
@@ -253,7 +253,7 @@ function tagAffinity(tag: OverlayTag, profile: SongProfile): number {
       // High sub-bass, mid energy
       return (profile.avgSub * 0.6 + (1 - Math.abs(profile.avgEnergy - 0.12) * 5) * 0.4) * 0.15;
     default:
-      if (tag === BAND_CONFIG.overlayTags.culture) return 0.08;
+      if (tag === BAND_CONFIG.overlayTags.culture) return 0.25;
       return 0;
   }
 }

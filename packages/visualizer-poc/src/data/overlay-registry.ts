@@ -72,18 +72,18 @@ export const OVERLAY_REGISTRY: OverlayEntry[] = [
   { name: "BoxOfRain",        layer: 5, category: "nature", tags: ["organic", "dead-culture"],     energyBand: "low",  weight: 2, dutyCycle: 100, energyResponse: [0.0, 0.08, 2.5], tier: "B" },
 
   // ═══ Layer 6: Character / Dead Culture (13) ═══
-  { name: "BearParade",       layer: 6, category: "character", tags: ["dead-culture", "festival"],     energyBand: "mid",  weight: 2, dutyCycle: 100, energyResponse: [0.06, 0.25, 1.5], tier: "A" },
-  { name: "SkeletonBand",     layer: 6, category: "character", tags: ["dead-culture", "festival"],     energyBand: "mid",  weight: 2, dutyCycle: 100, energyResponse: [0.10, 0.30, 1.5], tier: "A" },
-  { name: "MarchingTerrapins",layer: 6, category: "character", tags: ["dead-culture", "organic"],      energyBand: "mid",  weight: 2, dutyCycle: 100, energyResponse: [0.05, 0.20, 1.5], tier: "A" },
-  { name: "Bertha",           layer: 6, category: "character", tags: ["dead-culture"],                 energyBand: "mid",  weight: 3, dutyCycle: 100, energyResponse: [0.02, 0.20, 1.8], tier: "A" },
+  { name: "BearParade",       layer: 6, category: "character", tags: ["dead-culture", "festival"],     energyBand: "any",  weight: 3, dutyCycle: 100, energyResponse: [0.03, 0.18, 1.5], tier: "A" },
+  { name: "SkeletonBand",     layer: 6, category: "character", tags: ["dead-culture", "festival"],     energyBand: "any",  weight: 3, dutyCycle: 100, energyResponse: [0.05, 0.22, 1.5], tier: "A" },
+  { name: "MarchingTerrapins",layer: 6, category: "character", tags: ["dead-culture", "organic"],      energyBand: "any",  weight: 3, dutyCycle: 100, energyResponse: [0.03, 0.18, 1.5], tier: "A" },
+  { name: "Bertha",           layer: 6, category: "character", tags: ["dead-culture"],                 energyBand: "any",  weight: 3, dutyCycle: 100, energyResponse: [0.02, 0.15, 1.8], tier: "A" },
   { name: "JerryGuitar",      layer: 6, category: "character", tags: ["dead-culture", "organic"],      energyBand: "mid",  weight: 2, dutyCycle: 100, energyResponse: [0.05, 0.20, 1.5], tier: "B" },
   { name: "VWBusParade",      layer: 6, category: "character", tags: ["dead-culture", "festival"],     energyBand: "low",  weight: 2, dutyCycle: 100, energyResponse: [0.04, 0.18, 2.0], tier: "B" },
   { name: "CosmicCharlie",    layer: 6, category: "character", tags: ["dead-culture", "cosmic"],       energyBand: "mid",  weight: 2, dutyCycle: 100, energyResponse: [0.04, 0.18, 1.8], tier: "B" },
-  { name: "JerrySpotlight",  layer: 6, category: "character", tags: ["dead-culture", "organic"],      energyBand: "mid",  weight: 2, dutyCycle: 100, energyResponse: [0.10, 0.25, 1.5], tier: "B" },
+  { name: "JerrySpotlight",  layer: 6, category: "character", tags: ["dead-culture", "organic"],      energyBand: "any",  weight: 3, dutyCycle: 100, energyResponse: [0.05, 0.20, 1.5], tier: "A" },
   { name: "BobWeir",         layer: 6, category: "character", tags: ["dead-culture", "organic"],      energyBand: "mid",  weight: 2, dutyCycle: 100, energyResponse: [0.08, 0.20, 1.5], tier: "B" },
   { name: "DrumCircle",      layer: 6, category: "character", tags: ["dead-culture", "intense"],      energyBand: "mid",  weight: 2, dutyCycle: 100, energyResponse: [0.10, 0.30, 2.0], tier: "A" },
-  { name: "DancingTerrapinOverlay", layer: 6, category: "character", tags: ["dead-culture", "organic"], energyBand: "mid", weight: 2, dutyCycle: 100, energyResponse: [0.05, 0.20, 1.5], tier: "B" },
-  { name: "SkeletonCouple",  layer: 6, category: "character", tags: ["dead-culture", "contemplative"], energyBand: "low",  weight: 2, dutyCycle: 100, energyResponse: [0.0, 0.10, 2.0], tier: "B" },
+  { name: "DancingTerrapinOverlay", layer: 6, category: "character", tags: ["dead-culture", "organic"], energyBand: "any", weight: 3, dutyCycle: 100, energyResponse: [0.03, 0.18, 1.5], tier: "A" },
+  { name: "SkeletonCouple",  layer: 6, category: "character", tags: ["dead-culture", "contemplative"], energyBand: "any",  weight: 3, dutyCycle: 100, energyResponse: [0.02, 0.12, 2.0], tier: "A" },
   { name: "DeadIcons",       layer: 6, category: "character", tags: ["dead-culture", "psychedelic"],  energyBand: "mid",  weight: 2, dutyCycle: 100, energyResponse: [0.05, 0.20, 1.5], tier: "B" },
 
   // ═══ Layer 7: Always-active info (hardcoded in SongVisualizer) ═══
@@ -117,16 +117,16 @@ export const OVERLAY_REGISTRY: OverlayEntry[] = [
   { name: "WaveOfLight",         layer: 3, category: "reactive",  tags: ["psychedelic", "cosmic"],          energyBand: "mid",  weight: 2, dutyCycle: 100, energyResponse: [0.05, 0.22, 1.8], tier: "B" },
 
   // ═══ Layer 9: Music Visualization HUD (10) ═══
-  { name: "VUMeters",              layer: 9, category: "hud", tags: ["retro", "mechanical"],       energyBand: "any", weight: 1, dutyCycle: 100, energyResponse: [0.0, 0.12, 2.0], tier: "B" },
-  { name: "Oscilloscope",          layer: 9, category: "hud", tags: ["retro", "mechanical"],       energyBand: "any", weight: 1, dutyCycle: 100, energyResponse: [0.0, 0.12, 2.0], tier: "B" },
-  { name: "SpectrumAnalyzer",      layer: 9, category: "hud", tags: ["retro", "mechanical"],       energyBand: "any", weight: 2, dutyCycle: 100, energyResponse: [0.0, 0.15, 1.8], tier: "B" },
-  { name: "PianoRoll",             layer: 9, category: "hud", tags: ["organic", "contemplative"],  energyBand: "any", weight: 2, dutyCycle: 100, energyResponse: [0.0, 0.12, 2.0], tier: "B" },
-  { name: "Seismograph",           layer: 9, category: "hud", tags: ["retro", "organic"],          energyBand: "low", weight: 1, dutyCycle: 100, energyResponse: [0.0, 0.10, 2.5], tier: "B" },
-  { name: "Oscillator",            layer: 9, category: "hud", tags: ["psychedelic", "mechanical"], energyBand: "mid", weight: 2, dutyCycle: 35,  energyResponse: [0.03, 0.18, 1.5], tier: "B" },
-  { name: "RadialSpectrum",        layer: 9, category: "hud", tags: ["psychedelic", "cosmic"],     energyBand: "any", weight: 2, dutyCycle: 100, energyResponse: [0.0, 0.15, 1.8], tier: "B" },
-  { name: "BeatGrid",              layer: 9, category: "hud", tags: ["cosmic", "mechanical"],      energyBand: "low", weight: 1, dutyCycle: 100, energyResponse: [0.0, 0.08, 2.5], tier: "B" },
-  { name: "StemSeparation",        layer: 9, category: "hud", tags: ["organic", "mechanical"],     energyBand: "any", weight: 2, dutyCycle: 100, energyResponse: [0.02, 0.15, 1.8], tier: "B" },
-  { name: "WaterfallSpectrogram",  layer: 9, category: "hud", tags: ["retro", "mechanical"],       energyBand: "low", weight: 1, dutyCycle: 100, energyResponse: [0.0, 0.10, 2.5], tier: "B" },
+  { name: "VUMeters",              layer: 9, category: "hud", tags: ["retro", "mechanical"],       energyBand: "high", weight: 1, dutyCycle: 30, energyResponse: [0.15, 0.25, 2.0], tier: "C" },
+  { name: "Oscilloscope",          layer: 9, category: "hud", tags: ["retro", "mechanical"],       energyBand: "high", weight: 1, dutyCycle: 30, energyResponse: [0.15, 0.25, 2.0], tier: "C" },
+  { name: "SpectrumAnalyzer",      layer: 9, category: "hud", tags: ["retro", "mechanical"],       energyBand: "high", weight: 1, dutyCycle: 30, energyResponse: [0.15, 0.25, 1.8], tier: "C" },
+  { name: "PianoRoll",             layer: 9, category: "hud", tags: ["organic", "contemplative"],  energyBand: "mid", weight: 1, dutyCycle: 25, energyResponse: [0.10, 0.20, 2.0], tier: "C" },
+  { name: "Seismograph",           layer: 9, category: "hud", tags: ["retro", "organic"],          energyBand: "low", weight: 1, dutyCycle: 25, energyResponse: [0.05, 0.15, 2.5], tier: "C" },
+  { name: "Oscillator",            layer: 9, category: "hud", tags: ["psychedelic", "mechanical"], energyBand: "mid", weight: 1, dutyCycle: 25, energyResponse: [0.08, 0.20, 1.5], tier: "C" },
+  { name: "RadialSpectrum",        layer: 9, category: "hud", tags: ["psychedelic", "cosmic"],     energyBand: "high", weight: 1, dutyCycle: 25, energyResponse: [0.10, 0.20, 1.8], tier: "C" },
+  { name: "BeatGrid",              layer: 9, category: "hud", tags: ["cosmic", "mechanical"],      energyBand: "low", weight: 1, dutyCycle: 25, energyResponse: [0.05, 0.12, 2.5], tier: "C" },
+  { name: "StemSeparation",        layer: 9, category: "hud", tags: ["organic", "mechanical"],     energyBand: "high", weight: 1, dutyCycle: 25, energyResponse: [0.10, 0.20, 1.8], tier: "C" },
+  { name: "WaterfallSpectrogram",  layer: 9, category: "hud", tags: ["retro", "mechanical"],       energyBand: "low", weight: 1, dutyCycle: 25, energyResponse: [0.05, 0.15, 2.5], tier: "C" },
 
   // ═══ Remaining Library (269) ═══
   { name: "Abacus",                  layer: 9, category: "hud", tags: ["retro","mechanical"], energyBand: "any", weight: 1, dutyCycle: 100, energyResponse: [0,0.12,2], tier: "C" },
