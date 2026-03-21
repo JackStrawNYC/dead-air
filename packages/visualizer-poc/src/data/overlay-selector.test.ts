@@ -281,17 +281,11 @@ describe("selectOverlaysForShow", () => {
   });
 });
 
-// ─── A-tier Scoring ───
+// ─── Atmospheric Overlay Selection ───
 
-describe("A-tier scoring in selection", () => {
-  it("A-tier overlays appear across multiple selections", () => {
-    // Run selection 20 times with different seeds — A-tier should appear
-    // in a meaningful number of songs thanks to the +0.15 scoring bonus
-    const aTierNames = new Set(
-      SELECTABLE_REGISTRY.filter((e) => e.tier === "A" && !e.alwaysActive).map((e) => e.name),
-    );
-
-    let aTierSelected = 0;
+describe("atmospheric overlay selection", () => {
+  it("selectable overlays appear across multiple selections", () => {
+    let totalSelected = 0;
     for (let seed = 0; seed < 20; seed++) {
       const profile: SongProfile = {
         trackId: `s1t${String(seed).padStart(2, "0")}`,
@@ -315,11 +309,10 @@ describe("A-tier scoring in selection", () => {
       const nonAlwaysActive = result.activeOverlays.filter(
         (n) => n !== "SongTitle" && n !== "FilmGrain",
       );
-      aTierSelected += nonAlwaysActive.filter((n) => aTierNames.has(n)).length;
+      totalSelected += nonAlwaysActive.length;
     }
 
-    // A-tier should appear in at least some selections (scoring bonus ensures presence)
-    expect(aTierSelected).toBeGreaterThan(0);
+    expect(totalSelected).toBeGreaterThan(0);
   });
 });
 

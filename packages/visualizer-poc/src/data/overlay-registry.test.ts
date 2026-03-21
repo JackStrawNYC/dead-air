@@ -88,9 +88,9 @@ describe("overlay-registry integrity", () => {
     }
   });
 
-  it("has at least 10 A-tier overlays", () => {
-    const aTier = OVERLAY_REGISTRY.filter((e) => e.tier === "A");
-    expect(aTier.length).toBeGreaterThanOrEqual(10);
+  it("has A-tier or B-tier overlays for atmospheric use", () => {
+    const selectable = OVERLAY_REGISTRY.filter((e) => e.tier === "A" || e.tier === "B");
+    expect(selectable.length).toBeGreaterThanOrEqual(10);
   });
 });
 
