@@ -670,11 +670,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
             </SilentErrorBoundary>
           )}
 
-          {lyricTriggerWindows.length > 0 && (
-            <SilentErrorBoundary name="LyricTrigger">
-              <LyricTriggerLayer windows={lyricTriggerWindows} />
-            </SilentErrorBoundary>
-          )}
+          {/* Lyrics disabled — pure visual experience */}
 
           <DynamicOverlayStack
             activeEntries={activeEntries}
@@ -818,21 +814,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
             </SilentErrorBoundary>
           )}
 
-          {/* Lyric fragments — visual poetry at emotional peaks */}
-          {!isDeadAir && showSeed !== undefined && introFactor > 0.8 && (
-            <SilentErrorBoundary name="LyricFragment">
-              <LyricFragment
-                showSeed={showSeed}
-                trackId={props.song.trackId}
-                climaxPhase={climaxState.phase}
-                energy={audioSnapshot.energy}
-                isLocked={coherenceState.isLocked}
-                isDrumsSpace={isDrumsSpace}
-                isSegue={!!props.segueIn && frame < FADE_FRAMES}
-                introFactor={introFactor}
-              />
-            </SilentErrorBoundary>
-          )}
+          {/* Lyrics disabled — pure visual experience */}
 
           {!isDeadAir && <ConcertInfo />}
           {!isDeadAir && <SetlistScroll frames={f} currentSong={props.song.title} introFactor={introFactor} />}

@@ -321,7 +321,7 @@ export function getModeForSection(
   }
 
   // Seeded variation with affinity-aware morphing
-  if (seed !== undefined && !song.sectionOverrides?.length) {
+  if (seed !== undefined) {
     const section = sections[sectionIndex];
     if (section) {
       const prevSection = sectionIndex > 0 ? sections[sectionIndex - 1] : null;

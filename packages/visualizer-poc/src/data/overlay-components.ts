@@ -608,7 +608,8 @@ export const OVERLAY_COMPONENTS: Record<string, OverlayComponentEntry> = {
   LorenzAttractor:         { Component: LorenzAttractor, layer: 4 },
   LotScene:                { Component: LotScene, layer: 6 },
   LotusOpen:               { Component: LotusOpen, layer: 5 },
-  LyricFlash:              { Component: LyricFlash, layer: 7 },
+  // LyricFlash disabled — pure visual experience
+  // LyricFlash:              { Component: LyricFlash, layer: 7 },
   Macrame:                 { Component: Macrame, layer: 2 },
   MantraScroll:            { Component: MantraScroll, layer: 7 },
   MarqueeLights:           { Component: MarqueeLights, layer: 7 },
@@ -667,7 +668,8 @@ export const OVERLAY_COMPONENTS: Record<string, OverlayComponentEntry> = {
   RainOnGlass:             { Component: RainOnGlass, layer: 1 },
   RainbowArc:              { Component: RainbowArc, layer: 1 },
   Rainsplash:              { Component: Rainsplash, layer: 1 },
-  RansomNote:              { Component: RansomNote, layer: 7 },
+  // RansomNote disabled — pure visual experience
+  // RansomNote:              { Component: RansomNote, layer: 7 },
   ReactionDiffusion:       { Component: ReactionDiffusion, layer: 1 },
   RetroTV:                 { Component: RetroTV, layer: 7 },
   RippleLotus:             { Component: RippleLotus, layer: 1 },
