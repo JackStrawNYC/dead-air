@@ -36,6 +36,8 @@ export const NowPlaying: React.FC<Props> = ({ title, artist, energy = 0, isSacre
   const artistSize = responsiveFontSize(22, height);
   const padding = responsiveSize(3, height);
 
+  const backdropPad = responsiveSize(12, height);
+
   return (
     <div
       style={{
@@ -46,17 +48,21 @@ export const NowPlaying: React.FC<Props> = ({ title, artist, energy = 0, isSacre
         pointerEvents: "none",
         display: "flex",
         flexDirection: "column",
-        gap: responsiveSize(4, height),
+        gap: responsiveSize(2, height),
+        background: "linear-gradient(135deg, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.4) 100%)",
+        padding: `${backdropPad}px ${backdropPad * 1.5}px`,
+        borderRadius: responsiveSize(4, height),
+        backdropFilter: "blur(8px)",
       }}
     >
       <div
         style={{
-          fontFamily: "'Cormorant Garamond', serif",
+          fontFamily: "'Helvetica Neue', Arial, sans-serif",
           fontSize: titleSize,
-          fontWeight: 600,
-          color: "rgba(255, 255, 255, 0.95)",
-          textShadow: "0 2px 8px rgba(0,0,0,0.8), 0 0 20px rgba(0,0,0,0.5)",
-          letterSpacing: "0.02em",
+          fontWeight: 700,
+          color: "rgba(255, 255, 255, 1.0)",
+          textShadow: "0 2px 4px rgba(0,0,0,0.6)",
+          letterSpacing: "0.01em",
         }}
       >
         {title}
@@ -64,13 +70,11 @@ export const NowPlaying: React.FC<Props> = ({ title, artist, energy = 0, isSacre
       {artist && (
         <div
           style={{
-            fontFamily: "'Cormorant Garamond', serif",
+            fontFamily: "'Helvetica Neue', Arial, sans-serif",
             fontSize: artistSize,
             fontWeight: 400,
-            color: "rgba(255, 255, 255, 0.75)",
-            textShadow: "0 1px 3px rgba(0,0,0,0.5)",
-            letterSpacing: "0.03em",
-            fontStyle: "italic",
+            color: "rgba(255, 255, 255, 0.85)",
+            letterSpacing: "0.02em",
           }}
         >
           {artist}
