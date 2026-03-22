@@ -56,7 +56,7 @@ export const NowPlaying: React.FC<Props> = ({ title, artist, energy = 0, isSacre
     >
       <div
         style={{
-          fontFamily: "'Helvetica Neue', Arial, sans-serif",
+          fontFamily: "'Cormorant Garamond', Georgia, serif",
           fontSize: titleSize,
           fontWeight: 700,
           color: "rgba(255, 255, 255, 1.0)",
@@ -69,7 +69,7 @@ export const NowPlaying: React.FC<Props> = ({ title, artist, energy = 0, isSacre
       {artist && (
         <div
           style={{
-            fontFamily: "'Helvetica Neue', Arial, sans-serif",
+            fontFamily: "'Cormorant Garamond', Georgia, serif",
             fontSize: artistSize,
             fontWeight: 400,
             color: "rgba(255, 255, 255, 0.85)",

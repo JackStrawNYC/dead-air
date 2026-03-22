@@ -121,7 +121,7 @@ export const SetlistScroll: React.FC<Props> = ({ frames, currentSong, introFacto
       <div
         key={song}
         style={{
-          fontFamily: "'Helvetica Neue', Arial, sans-serif",
+          fontFamily: "'Courier New', Courier, monospace",
           fontSize: 24 * s,
           lineHeight: 1.6,
           color: isActive ? "#FFD700" : "rgba(255, 255, 255, 0.8)",
