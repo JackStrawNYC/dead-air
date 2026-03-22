@@ -112,6 +112,19 @@ import { DatabendScene } from "./DatabendScene";
 import { VolumetricCloudsScene } from "./VolumetricCloudsScene";
 import { VolumetricSmokeScene } from "./VolumetricSmokeScene";
 import { VolumetricNebulaScene } from "./VolumetricNebulaScene";
+import { RiverScene } from "./RiverScene";
+import { SpaceTravelScene } from "./SpaceTravelScene";
+import { MountainFireScene } from "./MountainFireScene";
+import { FlowerFieldScene } from "./FlowerFieldScene";
+import { ForestScene } from "./ForestScene";
+import { OceanScene } from "./OceanScene";
+import { DesertRoadScene } from "./DesertRoadScene";
+import { CampfireScene } from "./CampfireScene";
+import { RainStreetScene } from "./RainStreetScene";
+// Environment scenes
+import { AuroraSkyScene } from "./AuroraSkyScene";
+import { StormScene } from "./StormScene";
+import { CanyonScene } from "./CanyonScene";
 
 // ─── Scene Registry ───
 
@@ -435,6 +448,83 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     preferredTransitionIn: "dissolve",
     spectralFamily: "cosmic",
   },
+  river: {
+    Component: RiverScene,
+    energyAffinity: "any",
+    complement: "inferno",
+    preferredTransitionIn: "dissolve",
+    spectralFamily: "tonal",
+  },
+  space_travel: {
+    Component: SpaceTravelScene,
+    energyAffinity: "any",
+    complement: "deep_ocean",
+    spectralFamily: "cosmic",
+    preferredTransitionIn: "dissolve",
+  },
+  mountain_fire: {
+    Component: MountainFireScene,
+    energyAffinity: "mid",
+    complement: "deep_ocean",
+    gradingIntensity: 0.7,
+    spectralFamily: "warm",
+  },
+  flower_field: {
+    Component: FlowerFieldScene,
+    energyAffinity: "mid",
+    complement: "deep_ocean",
+    preferredTransitionIn: "dissolve",
+    spectralFamily: "bright",
+  },
+  forest: {
+    Component: ForestScene,
+    energyAffinity: "low",
+    complement: "inferno",
+    spectralFamily: "tonal",
+  },
+  ocean: {
+    Component: OceanScene,
+    energyAffinity: "any",
+    complement: "desert_road",
+    spectralFamily: "cosmic",
+  },
+  desert_road: {
+    Component: DesertRoadScene,
+    energyAffinity: "mid",
+    complement: "deep_ocean",
+    spectralFamily: "warm",
+  },
+  campfire: {
+    Component: CampfireScene,
+    energyAffinity: "low",
+    complement: "electric_arc",
+    spectralFamily: "warm",
+  },
+  rain_street: {
+    Component: RainStreetScene,
+    energyAffinity: "low",
+    complement: "inferno",
+    spectralFamily: "tonal",
+  },
+  // Environment scenes
+  aurora_sky: {
+    Component: AuroraSkyScene,
+    energyAffinity: "any",
+    complement: "inferno",
+    spectralFamily: "cosmic",
+  },
+  storm: {
+    Component: StormScene,
+    energyAffinity: "high",
+    complement: "aurora",
+    spectralFamily: "textural",
+  },
+  canyon: {
+    Component: CanyonScene,
+    energyAffinity: "mid",
+    complement: "cosmic_voyage",
+    spectralFamily: "tonal",
+  },
 };
 
 // ─── Transition Affinity Map ───
@@ -494,6 +584,19 @@ export const TRANSITION_AFFINITY: Partial<Record<VisualMode, VisualMode[]>> = {
   volumetric_clouds: ["aurora", "deep_ocean", "cosmic_voyage"],
   volumetric_smoke: ["concert_lighting", "smoke_rings", "lo_fi_grain"],
   volumetric_nebula: ["cosmic_voyage", "particle_nebula", "galaxy_spiral"],
+  river: ["deep_ocean", "aurora", "coral_reef", "volumetric_clouds"],
+  space_travel: ["cosmic_voyage", "aurora", "volumetric_nebula", "void_light"],
+  mountain_fire: ["inferno", "lava_flow", "deep_ocean", "aurora"],
+  flower_field: ["aurora", "coral_reef", "tie_dye", "sacred_geometry"],
+  forest: ["aurora", "deep_ocean", "coral_reef", "volumetric_clouds"],
+  ocean: ["deep_ocean", "aurora", "river", "coral_reef"],
+  desert_road: ["inferno", "lava_flow", "mountain_fire", "smoke_rings"],
+  campfire: ["aurora", "smoke_rings", "volumetric_smoke", "lava_flow"],
+  rain_street: ["deep_ocean", "ink_wash", "aurora_curtains", "digital_rain"],
+  // Environment scenes
+  aurora_sky: ["aurora", "cosmic_voyage", "deep_ocean", "volumetric_nebula"],
+  storm: ["electric_arc", "inferno", "concert_lighting", "rain_street"],
+  canyon: ["deep_ocean", "aurora", "sacred_geometry", "crystal_cavern"],
 };
 
 // ─── Helper functions ───

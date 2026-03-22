@@ -169,7 +169,19 @@ export type VisualMode =
   | "databend"
   | "volumetric_clouds"
   | "volumetric_smoke"
-  | "volumetric_nebula";
+  | "volumetric_nebula"
+  | "river"
+  | "space_travel"
+  | "mountain_fire"
+  | "forest"
+  | "flower_field"
+  | "desert_road"
+  | "ocean"
+  | "campfire"
+  | "rain_street"
+  | "aurora_sky"
+  | "storm"
+  | "canyon";
 
 /** Per-section mode override in setlist */
 export interface SectionOverride {
