@@ -49,10 +49,9 @@ export const NowPlaying: React.FC<Props> = ({ title, artist, energy = 0, isSacre
         display: "flex",
         flexDirection: "column",
         gap: responsiveSize(2, height),
-        background: "linear-gradient(135deg, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.4) 100%)",
-        padding: `${backdropPad}px ${backdropPad * 1.5}px`,
-        borderRadius: responsiveSize(4, height),
-        backdropFilter: "blur(8px)",
+        background: "rgba(0, 0, 0, 0.75)",
+        padding: `${backdropPad}px ${backdropPad * 1.8}px`,
+        borderRadius: responsiveSize(6, height),
       }}
     >
       <div

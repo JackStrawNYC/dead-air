@@ -121,16 +121,16 @@ export const SetlistScroll: React.FC<Props> = ({ frames, currentSong, introFacto
       <div
         key={song}
         style={{
-          fontFamily: "'Courier New', Courier, monospace",
+          fontFamily: "'Helvetica Neue', Arial, sans-serif",
           fontSize: 24 * s,
           lineHeight: 1.6,
-          color: isActive ? "#FFD700" : "rgba(40, 30, 20, 0.95)",
-          fontWeight: isActive ? 700 : 500,
+          color: isActive ? "#FFD700" : "rgba(255, 255, 255, 0.8)",
+          fontWeight: isActive ? 700 : 400,
           textShadow: isActive
             ? "0 0 8px rgba(255, 215, 0, 0.7), 0 0 16px rgba(255, 180, 0, 0.4)"
-            : "0 1px 2px rgba(0,0,0,0.3)",
+            : "none",
           transform: `translateX(${lineJitter}px)`,
-          letterSpacing: 0.4,
+          letterSpacing: 0.3,
           position: "relative",
         }}
       >
@@ -167,13 +167,11 @@ export const SetlistScroll: React.FC<Props> = ({ frames, currentSong, introFacto
         {/* Paper background */}
         <div
           style={{
-            background: "rgba(245, 235, 210, 0.92)",
-            padding: `${18 * s}px ${22 * s}px ${14 * s}px ${26 * s}px`,
-            borderRadius: 2 * s,
-            clipPath: TORN_CLIP_PATH,
-            boxShadow: `${2 * s}px ${3 * s}px ${12 * s}px rgba(0, 0, 0, 0.45)`,
-            minWidth: 280 * s,
-            maxWidth: 360 * s,
+            background: "rgba(0, 0, 0, 0.75)",
+            padding: `${20 * s}px ${26 * s}px ${16 * s}px ${30 * s}px`,
+            borderRadius: 8 * s,
+            minWidth: 300 * s,
+            maxWidth: 400 * s,
           }}
         >
           {/* Header */}
@@ -183,7 +181,7 @@ export const SetlistScroll: React.FC<Props> = ({ frames, currentSong, introFacto
               fontSize: 18 * s,
               fontWeight: 700,
               letterSpacing: 3 * s,
-              color: "rgba(60, 40, 25, 0.85)",
+              color: "rgba(255, 255, 255, 0.6)",
               textTransform: "uppercase",
               marginBottom: 2 * s,
             }}
@@ -196,7 +194,7 @@ export const SetlistScroll: React.FC<Props> = ({ frames, currentSong, introFacto
             style={{
               width: "100%",
               height: 1,
-              background: "rgba(80, 60, 40, 0.25)",
+              background: "rgba(255, 255, 255, 0.15)",
               marginBottom: 6,
             }}
           />
@@ -215,7 +213,7 @@ export const SetlistScroll: React.FC<Props> = ({ frames, currentSong, introFacto
                     fontSize: 10 * s,
                     fontWeight: 700,
                     fontStyle: "italic",
-                    color: "rgba(100, 70, 40, 0.6)",
+                    color: "rgba(255, 255, 255, 0.5)",
                     marginBottom: 2 * s,
                     letterSpacing: 1 * s,
                   }}
