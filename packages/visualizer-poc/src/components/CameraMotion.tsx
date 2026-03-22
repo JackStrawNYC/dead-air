@@ -51,10 +51,10 @@ interface Props {
 
 const QUIET_SCALE = 1.12;
 const PEAK_SCALE = 1.02;
-const SHAKE_PX = 40;
-const SHAKE_DECAY_FRAMES = 24;
-const TILT_DEG = 6.0;         // Max rotational tilt on bass kicks
-const TILT_DECAY_FRAMES = 10; // Exponential decay for tilt
+const SHAKE_PX = 8;            // Subtle — felt not seen
+const SHAKE_DECAY_FRAMES = 12;
+const TILT_DEG = 1.5;         // Gentle tilt, not seasickness
+const TILT_DECAY_FRAMES = 8;
 
 /** Phase-driven camera parameters for long jams */
 const PHASE_CAMERA: Record<JamPhase, {
@@ -163,8 +163,8 @@ export const CameraMotion: React.FC<Props> = ({ frames, children, jamEvolution, 
   }
 
   // Onset jolt: sharp camera punch on transient attacks (prefer stemDrumOnset when available)
-  const ONSET_JOLT_PX = 8;
-  const ONSET_JOLT_DECAY = 8;
+  const ONSET_JOLT_PX = 3;
+  const ONSET_JOLT_DECAY = 6;
   for (let ago = 0; ago < ONSET_JOLT_DECAY; ago++) {
     const checkIdx = idx - ago;
     if (checkIdx < 0) break;
