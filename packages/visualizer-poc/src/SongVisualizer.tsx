@@ -788,30 +788,23 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
 
           {/* Lyrics disabled — pure visual experience */}
 
-          {!isDeadAir && <ConcertInfo />}
-          {!isDeadAir && <SetlistScroll frames={f} currentSong={props.song.title} introFactor={introFactor} />}
-
-          {/* SpecialPropsLayer disabled — no narration/facts/stats/reviews */}
-
-          {/* SongPositionIndicator disabled — clean visual field */}
-
-          {/* JamTimer disabled — clean visual field */}
-
-          {/* UpNextTeaser disabled — clean visual field */}
-
-          {!isDeadAir && (
-            <SilentErrorBoundary name="NowPlaying">
-              <NowPlaying
-                title={props.song.title}
-                artist="Grateful Dead"
-                energy={audioSnapshot.energy}
-                isSacredSegue={isSacredSegueIn}
-              />
-            </SilentErrorBoundary>
-          )}
         </EnergyEnvelope>
         </EraGrade>
         </CameraMotion>
+
+        {/* Text elements rendered OUTSIDE CameraMotion to prevent CSS transform blur */}
+        {!isDeadAir && <ConcertInfo />}
+        {!isDeadAir && <SetlistScroll frames={f} currentSong={props.song.title} introFactor={introFactor} />}
+        {!isDeadAir && (
+          <SilentErrorBoundary name="NowPlaying">
+            <NowPlaying
+              title={props.song.title}
+              artist="Grateful Dead"
+              energy={audioSnapshot.energy}
+              isSacredSegue={isSacredSegueIn}
+            />
+          </SilentErrorBoundary>
+        )}
       </div>
       </VisualizerErrorBoundary>
       </PeakOfShowProvider>
