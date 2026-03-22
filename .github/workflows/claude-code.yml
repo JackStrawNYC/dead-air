@@ -1,0 +1,90 @@
+name: Claude Code
+
+on:
+  workflow_dispatch:
+    inputs:
+      task:
+        description: 'What to do'
+        required: true
+        type: choice
+        options:
+          - prompt
+          - test
+          - render
+      prompt:
+        description: 'Freeform prompt for Claude Code (used when task=prompt)'
+        required: false
+        type: string
+      show_date:
+        description: 'Show date to render, e.g. 1977-05-08 (used when task=render)'
+        required: false
+        type: string
+      render_preset:
+        description: 'Render quality preset'
+        required: false
+        type: choice
+        default: 'preview'
+        options:
+          - draft
+          - preview
+          - final
+          - 4k
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.4
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # --- Task: Run tests ---
+      - name: Run tests
+        if: inputs.task == 'test'
+        run: |
+          pnpm --filter @dead-air/visualizer-poc test
+          pnpm --filter @dead-air/vj-mode test
+          pnpm --filter @dead-air/pipeline test
+          pnpm --filter @dead-air/core test
+
+      # --- Task: Render a show ---
+      - name: Render show
+        if: inputs.task == 'render'
+        env:
+          RENDER_PRESET: ${{ inputs.render_preset }}
+          SHOW_DATE: ${{ inputs.show_date }}
+        run: |
+          if [ -z "$SHOW_DATE" ]; then
+            echo "::error::show_date is required for render task"
+            exit 1
+          fi
+          npx tsx packages/cli/src/index.ts produce "$SHOW_DATE" --preset "$RENDER_PRESET"
+
+      # --- Task: Claude Code prompt ---
+      - name: Run Claude Code
+        if: inputs.task == 'prompt'
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: ${{ inputs.prompt }}
+          allowed_tools: "Bash,Read,Write,Edit,Glob,Grep"
