@@ -12,6 +12,8 @@
 import React from "react";
 import { Img, useCurrentFrame, interpolate, Easing } from "remotion";
 
+const clampOpts = { extrapolateLeft: "clamp" as const, extrapolateRight: "clamp" as const };
+
 const ART_FULL_END = 120;      // 4s at 30fps — full opacity title card
 const ART_FADE_END = 300;      // 10s — fade to background wash level
 
@@ -106,7 +108,16 @@ export const SongArtLayer: React.FC<SongArtProps> = ({ src, suppressionFactor, h
         mixBlendMode: (introFactor < 0.5 ? "normal" : (artBlendMode ?? "screen")) as React.CSSProperties["mixBlendMode"],
         overflow: "hidden",
         filter: [
-          frame < ART_FADE_END && introFactor >= 0.5 ? "brightness(0.7) contrast(0.8)" : "",
+          // Energy-adaptive color correction: brighter art at peaks, darker at quiet
+          // Previously hardcoded brightness(0.7) contrast(0.8) — made intros muddy
+          (() => {
+            const artBright = interpolate(energy, [0, 0.15, 0.30], [0.65, 0.75, 0.85], clampOpts);
+            const artContrast = interpolate(energy, [0, 0.15, 0.30], [0.75, 0.85, 0.95], clampOpts);
+            // During intro (introFactor < 0.5), use consistent values instead of harsh 0.7
+            const b = introFactor < 0.5 ? 0.85 : artBright;
+            const c = introFactor < 0.5 ? 0.90 : artContrast;
+            return `brightness(${b.toFixed(3)}) contrast(${c.toFixed(3)})`;
+          })(),
           hueRotation !== 0 ? `hue-rotate(${hueRotation.toFixed(1)}deg)` : "",
         ].filter(Boolean).join(" ") || undefined,
       }}

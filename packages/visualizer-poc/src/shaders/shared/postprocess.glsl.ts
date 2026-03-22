@@ -48,6 +48,8 @@ export interface PostProcessConfig {
   lightLeakEnabled?: boolean;
   /** Era brightness + sepia grading. Default: true */
   eraGradingEnabled?: boolean;
+  /** Temporal frame blending for motion coherence (requires feedback/uPrevFrame). Default: false */
+  temporalBlendEnabled?: boolean;
 }
 
 export function buildPostProcessGLSL(config: PostProcessConfig = {}): string {
@@ -69,6 +71,7 @@ export function buildPostProcessGLSL(config: PostProcessConfig = {}): string {
     beatJoltEnabled = true,
     lightLeakEnabled = true,
     eraGradingEnabled = true,
+    temporalBlendEnabled = false,
   } = config;
 
   // Grain intensity expression
@@ -147,14 +150,16 @@ ${
 }
 ${
   bloomEnabled
-    ? `  // Bloom: bright pixel self-illumination (boosted for psychedelic intensity)
+    ? `  // Bloom: bright pixel self-illumination (dynamic cap breathes with energy)
   {
     float lum = dot(col, vec3(0.299, 0.587, 0.114));
     float bloomThreshold = max(0.20, mix(0.60, 0.45, energy) + uBloomThreshold${bloomThresholdStr} - uEnergyForecast * 0.15);
     float bloomAmount = max(0.0, lum - bloomThreshold) * (1.2 + climaxBoost * 0.4);
     vec3 bloomColor = mix(col, vec3(1.0, 0.98, 0.95), 0.3);
-    // Cap bloom intensity to prevent blowout during climax stacking
-    vec3 bloom = bloomColor * min(bloomAmount, 0.45) * (0.16 + energy * 0.05 + climaxBoost * 0.08) * uShowBloom * gi;
+    // Dynamic bloom cap: scales with energy + climax (0.45 quiet → 0.70 peak)
+    // Previously hard-capped at 0.45, suppressing the moments that should feel most vivid
+    float bloomCap = 0.45 + energy * 0.15 + climaxBoost * 0.25;
+    vec3 bloom = bloomColor * min(bloomAmount, bloomCap) * (0.16 + energy * 0.08 + climaxBoost * 0.12) * uShowBloom * gi;
     col = col + bloom - col * bloom; // screen blend
   }
 `
@@ -285,6 +290,43 @@ ${
   // Cinematic grade (ACES filmic tone mapping)
   col = cinematicGrade(col, energy);
 
+  // ─── Envelope modulations (moved from CSS to GLSL) ───
+  // Applied AFTER cinematic grade so lifted blacks (below) runs on correct values.
+  // Previously CSS brightness crushed pixels BEFORE GLSL, causing near-black at silence.
+  col *= uEnvelopeBrightness;
+
+  // Envelope saturation: luma-preserving mix
+  {
+    float envLuma = dot(col, vec3(0.299, 0.587, 0.114));
+    col = mix(vec3(envLuma), col, uEnvelopeSaturation);
+  }
+
+  // Envelope hue rotation (same rotation matrix pattern as onset hue punch)
+  if (abs(uEnvelopeHue) > 0.001) {
+    float ehCos = cos(uEnvelopeHue);
+    float ehSin = sin(uEnvelopeHue);
+    mat3 ehRot = mat3(
+      ehCos, -ehSin, 0.0,
+      ehSin, ehCos, 0.0,
+      0.0, 0.0, 1.0
+    );
+    col = max(vec3(0.0), ehRot * col);
+  }
+
+${
+  temporalBlendEnabled
+    ? `  // Temporal frame blending: gentle accumulation for motion coherence
+  // Only active when feedback buffer (uPrevFrame) is available.
+  // Blends 12-18% of previous frame for smooth procedural motion at 30fps.
+  {
+    vec3 prevCol = texture2D(uPrevFrame, uv).rgb;
+    // More blending at low energy (smooth drift), less at high energy (preserve transients)
+    float motionBlend = 0.12 + energy * 0.06;
+    col = mix(col, prevCol, motionBlend);
+  }
+`
+    : ""
+}
   // Show saturation: seed-derived color richness
   {
     float satBoost = uShowSaturation;

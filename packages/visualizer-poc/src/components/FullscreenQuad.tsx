@@ -2,10 +2,14 @@
  * FullscreenQuad — renders a PlaneGeometry(2,2) with a custom ShaderMaterial.
  * Designed for fullscreen fragment shaders (Liquid Light, Concert Beams).
  * Sets uniforms from audio data each frame via useAudioData().
+ *
+ * Includes automatic FXAA post-pass: renders to offscreen target,
+ * applies FXAA anti-aliasing, then displays the final result.
  */
 
-import React, { useMemo, useRef } from "react";
+import React, { useMemo, useRef, useEffect } from "react";
 import * as THREE from "three";
+import { useFrame, useThree } from "@react-three/fiber";
 import { useAudioData } from "./AudioReactiveCanvas";
 import { useVideoConfig } from "remotion";
 import { useShowContext } from "../data/ShowContext";
@@ -13,6 +17,8 @@ import { deriveFilmStock } from "../utils/show-film-stock";
 import { getVenueProfile } from "../utils/venue-profiles";
 import { compute3DCamera } from "../utils/camera-3d";
 import { useSceneConfig } from "../scenes/SceneConfigContext";
+import { useEnvelopeValues } from "../data/EnvelopeContext";
+import { fxaaVert, fxaaFrag } from "../shaders/shared/fxaa.glsl";
 
 /** Era saturation values — previously in EraGrade CSS, now owned by GLSL */
 const ERA_SATURATION: Record<string, number> = {
@@ -41,6 +47,25 @@ const ERA_SEPIA: Record<string, number> = {
   revival: 0.0,
 };
 
+/** Passthrough vertex shader for output mesh */
+const PASSTHROUGH_VERT = /* glsl */ `
+varying vec2 vUv;
+void main() {
+  vUv = uv;
+  gl_Position = vec4(position, 1.0);
+}
+`;
+
+/** Final output shader: samples uInputTexture */
+const OUTPUT_FRAG = /* glsl */ `
+precision highp float;
+uniform sampler2D uInputTexture;
+varying vec2 vUv;
+void main() {
+  gl_FragColor = texture2D(uInputTexture, vUv);
+}
+`;
+
 interface Props {
   vertexShader: string;
   fragmentShader: string;
@@ -55,6 +80,7 @@ export const FullscreenQuad: React.FC<Props> = ({
   const { time, beatDecay, smooth, palettePrimary, paletteSecondary, paletteSaturation, tempo, musicalTime, climaxPhase, climaxIntensity, heroTrigger, heroProgress, jamDensity, coherence, dynamicTime, isLocked, jamPhase, jamProgress, peakOfShow } = useAudioData();
   const { width, height } = useVideoConfig();
   const sceneConfig = useSceneConfig();
+  const envelope = useEnvelopeValues();
   const showCtx = useShowContext();
   const eraKey = showCtx?.era ?? "";
   const eraSaturation = ERA_SATURATION[eraKey] ?? 1.0;
@@ -62,6 +88,7 @@ export const FullscreenQuad: React.FC<Props> = ({
   const eraSepia = ERA_SEPIA[eraKey] ?? 0.0;
   const filmStock = deriveFilmStock(showCtx?.showSeed ?? 0);
   const venueProfile = getVenueProfile(showCtx?.venueType ?? "");
+  const gl = useThree((state) => state.gl);
 
   // FFT texture: 64-bin DataTexture from 7-band contrast (padded)
   const fftTextureRef = useRef<THREE.DataTexture | null>(null);
@@ -70,6 +97,40 @@ export const FullscreenQuad: React.FC<Props> = ({
     fftTextureRef.current = new THREE.DataTexture(data, 64, 1, THREE.RedFormat);
     fftTextureRef.current.needsUpdate = true;
   }
+
+  // Render targets for FXAA post-pass
+  const targetsRef = useRef<{
+    main: THREE.WebGLRenderTarget;
+    fxaa: THREE.WebGLRenderTarget;
+  } | null>(null);
+
+  useEffect(() => {
+    if (targetsRef.current) {
+      targetsRef.current.main.dispose();
+      targetsRef.current.fxaa.dispose();
+    }
+    const opts: THREE.RenderTargetOptions = {
+      type: THREE.HalfFloatType,
+      minFilter: THREE.LinearFilter,
+      magFilter: THREE.LinearFilter,
+      format: THREE.RGBAFormat,
+    };
+    targetsRef.current = {
+      main: new THREE.WebGLRenderTarget(width, height, opts),
+      fxaa: new THREE.WebGLRenderTarget(width, height, opts),
+    };
+    return () => {
+      targetsRef.current?.main.dispose();
+      targetsRef.current?.fxaa.dispose();
+      targetsRef.current = null;
+    };
+  }, [width, height]);
+
+  // Camera for offscreen rendering
+  const camera = useMemo(
+    () => new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1),
+    [],
+  );
 
   const uniforms = useMemo(() => {
     return {
@@ -158,10 +219,57 @@ export const FullscreenQuad: React.FC<Props> = ({
       uCamFov: { value: 50 },
       uCamDof: { value: 0 },
       uCamFocusDist: { value: 3 },
+      uEnvelopeBrightness: { value: 1 },
+      uEnvelopeSaturation: { value: 1 },
+      uEnvelopeHue: { value: 0 },
       ...extraUniforms,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Main pass scene (offscreen)
+  const mainPass = useMemo(() => {
+    const scene = new THREE.Scene();
+    const geo = new THREE.PlaneGeometry(2, 2);
+    const mat = new THREE.ShaderMaterial({
+      vertexShader,
+      fragmentShader,
+      uniforms,
+      depthWrite: false,
+      depthTest: false,
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    scene.add(mesh);
+    return { scene, mesh, material: mat };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // FXAA pass
+  const fxaaPass = useMemo(() => {
+    const scene = new THREE.Scene();
+    const geo = new THREE.PlaneGeometry(2, 2);
+    const fxaaUniforms = {
+      uInputTexture: { value: null as THREE.Texture | null },
+      uResolution: { value: new THREE.Vector2(width, height) },
+    };
+    const mat = new THREE.ShaderMaterial({
+      vertexShader: fxaaVert,
+      fragmentShader: fxaaFrag,
+      uniforms: fxaaUniforms,
+      depthWrite: false,
+      depthTest: false,
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    scene.add(mesh);
+    return { scene, uniforms: fxaaUniforms };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Output uniforms for the visible mesh
+  const outputUniforms = useMemo(
+    () => ({ uInputTexture: { value: null as THREE.Texture | null } }),
+    [],
+  );
 
   uniforms.uTime.value = time;
   uniforms.uDynamicTime.value = dynamicTime;
@@ -208,11 +316,7 @@ export const FullscreenQuad: React.FC<Props> = ({
   uniforms.uEraSaturation.value = eraSaturation;
   uniforms.uEraBrightness.value = eraBrightness;
   uniforms.uEraSepia.value = eraSepia;
-  // Adaptive bloom threshold: lower at high energy (more bloom catches darker pixels)
-  // Range: -0.08 (quiet, conservative) to -0.20 (peak, generous bloom)
   uniforms.uBloomThreshold.value = -0.08 - smooth.energy * 0.18;
-  // Lens distortion: subtle barrel curvature, stronger at peaks
-  // Range: 0.02 (rest) to 0.08 (peak)
   uniforms.uLensDistortion.value = 0.02 + smooth.energy * 0.06;
   uniforms.uGradingIntensity.value = sceneConfig.gradingIntensity;
   uniforms.uEnergyAccel.value = smooth.energyAcceleration;
@@ -240,6 +344,9 @@ export const FullscreenQuad: React.FC<Props> = ({
   uniforms.uShowGrain.value = filmStock.grain * venueProfile.grainMult;
   uniforms.uShowBloom.value = filmStock.bloom * venueProfile.bloomMult;
   uniforms.uVenueVignette.value = venueProfile.vignette;
+  uniforms.uEnvelopeBrightness.value = envelope.brightness;
+  uniforms.uEnvelopeSaturation.value = envelope.saturation;
+  uniforms.uEnvelopeHue.value = envelope.hue;
 
   // 3D Camera
   const cam3d = compute3DCamera(
@@ -281,19 +388,40 @@ export const FullscreenQuad: React.FC<Props> = ({
   uniforms.uChroma2.value.set(ch[8] ?? 0, ch[9] ?? 0, ch[10] ?? 0, ch[11] ?? 0);
 
   // Camera offset: approximate CameraMotion's drift for parallax
-  // Bass-driven sway + slow sinusoidal drift
   const bassAmp = smooth.bass * 12.0;
   const camOffX = Math.sin(time * 3.7) * bassAmp * 0.5 + Math.sin(dynamicTime * 0.03 * Math.PI * 2) * 4;
   const camOffY = Math.cos(time * 2.3) * bassAmp * 0.3 + Math.cos(dynamicTime * 0.03 * Math.PI * 2 * 0.7 + 1.3) * 2.4;
   uniforms.uCamOffset.value.set(camOffX, camOffY);
 
+  // ── Render pipeline: main shader → FXAA → output ──
+  useFrame(() => {
+    const targets = targetsRef.current;
+    if (!targets) return;
+
+    // Pass 0: Main shader → render target
+    gl.setRenderTarget(targets.main);
+    gl.clear();
+    gl.render(mainPass.scene, camera);
+
+    // Pass 1: FXAA anti-aliasing
+    fxaaPass.uniforms.uInputTexture.value = targets.main.texture;
+    fxaaPass.uniforms.uResolution.value.set(width, height);
+    gl.setRenderTarget(targets.fxaa);
+    gl.clear();
+    gl.render(fxaaPass.scene, camera);
+
+    // Set final texture on the visible output mesh
+    outputUniforms.uInputTexture.value = targets.fxaa.texture;
+    gl.setRenderTarget(null);
+  }, -1);
+
   return (
     <mesh>
       <planeGeometry args={[2, 2]} />
       <shaderMaterial
-        vertexShader={vertexShader}
-        fragmentShader={fragmentShader}
-        uniforms={uniforms}
+        vertexShader={PASSTHROUGH_VERT}
+        fragmentShader={OUTPUT_FRAG}
+        uniforms={outputUniforms}
         depthWrite={false}
         depthTest={false}
       />

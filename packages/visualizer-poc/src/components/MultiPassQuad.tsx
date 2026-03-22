@@ -27,6 +27,8 @@ import { deriveFilmStock } from "../utils/show-film-stock";
 import { getVenueProfile } from "../utils/venue-profiles";
 import { compute3DCamera } from "../utils/camera-3d";
 import { useSceneConfig } from "../scenes/SceneConfigContext";
+import { useEnvelopeValues } from "../data/EnvelopeContext";
+import { fxaaVert, fxaaFrag } from "../shaders/shared/fxaa.glsl";
 
 /** Era saturation values — same as FullscreenQuad */
 const ERA_SATURATION: Record<string, number> = {
@@ -188,6 +190,9 @@ function createBaseUniforms(
     uCamFov: { value: 50 },
     uCamDof: { value: 0 },
     uCamFocusDist: { value: 3 },
+    uEnvelopeBrightness: { value: 1 },
+    uEnvelopeSaturation: { value: 1 },
+    uEnvelopeHue: { value: 0 },
     ...(feedback ? { uPrevFrame: { value: null as THREE.Texture | null } } : {}),
     ...extraUniforms,
   };
@@ -208,6 +213,7 @@ export const MultiPassQuad: React.FC<Props> = ({
   const { width, height } = useVideoConfig();
   const currentFrame = useCurrentFrame();
   const sceneConfig = useSceneConfig();
+  const envelope = useEnvelopeValues();
   const showCtx = useShowContext();
   const eraKey = showCtx?.era ?? "";
   const eraSaturation = ERA_SATURATION[eraKey] ?? 1.0;
@@ -234,6 +240,7 @@ export const MultiPassQuad: React.FC<Props> = ({
     a: THREE.WebGLRenderTarget;
     b: THREE.WebGLRenderTarget;
     feedback: THREE.WebGLRenderTarget | null;
+    fxaa: THREE.WebGLRenderTarget;
   } | null>(null);
 
   useEffect(() => {
@@ -242,6 +249,7 @@ export const MultiPassQuad: React.FC<Props> = ({
       targetsRef.current.a.dispose();
       targetsRef.current.b.dispose();
       targetsRef.current.feedback?.dispose();
+      targetsRef.current.fxaa.dispose();
     }
     const opts: THREE.RenderTargetOptions = {
       type: THREE.HalfFloatType,
@@ -255,11 +263,13 @@ export const MultiPassQuad: React.FC<Props> = ({
       feedback: feedback
         ? new THREE.WebGLRenderTarget(width, height, opts)
         : null,
+      fxaa: new THREE.WebGLRenderTarget(width, height, opts),
     };
     return () => {
       targetsRef.current?.a.dispose();
       targetsRef.current?.b.dispose();
       targetsRef.current?.feedback?.dispose();
+      targetsRef.current?.fxaa.dispose();
       targetsRef.current = null;
     };
   }, [width, height, feedback]);
@@ -313,6 +323,47 @@ export const MultiPassQuad: React.FC<Props> = ({
       scene.add(mesh);
       return { scene, mesh, material: mat, uniforms };
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Dedicated copy pass: trivial passthrough shader for feedback buffer copy.
+  // Replaces the previous approach of re-rendering the last post-pass (~10x cheaper).
+  const copyPass = useMemo(() => {
+    const scene = new THREE.Scene();
+    const geo = new THREE.PlaneGeometry(2, 2);
+    const copyUniforms = {
+      uInputTexture: { value: null as THREE.Texture | null },
+    };
+    const mat = new THREE.ShaderMaterial({
+      vertexShader: PASSTHROUGH_VERT,
+      fragmentShader: OUTPUT_FRAG,
+      uniforms: copyUniforms,
+      depthWrite: false,
+      depthTest: false,
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    scene.add(mesh);
+    return { scene, uniforms: copyUniforms };
+  }, []);
+
+  // FXAA anti-aliasing pass (runs after all post-passes, before feedback copy)
+  const fxaaPass = useMemo(() => {
+    const scene = new THREE.Scene();
+    const geo = new THREE.PlaneGeometry(2, 2);
+    const fxaaUniforms = {
+      uInputTexture: { value: null as THREE.Texture | null },
+      uResolution: { value: new THREE.Vector2(width, height) },
+    };
+    const mat = new THREE.ShaderMaterial({
+      vertexShader: PASSTHROUGH_VERT,
+      fragmentShader: fxaaFrag,
+      uniforms: fxaaUniforms,
+      depthWrite: false,
+      depthTest: false,
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    scene.add(mesh);
+    return { scene, uniforms: fxaaUniforms };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -398,6 +449,9 @@ export const MultiPassQuad: React.FC<Props> = ({
   u.uShowGrain.value = filmStock.grain * venueProfile.grainMult;
   u.uShowBloom.value = filmStock.bloom * venueProfile.bloomMult;
   u.uVenueVignette.value = venueProfile.vignette;
+  u.uEnvelopeBrightness.value = envelope.brightness;
+  u.uEnvelopeSaturation.value = envelope.saturation;
+  u.uEnvelopeHue.value = envelope.hue;
 
   // 3D Camera
   const cam3d = compute3DCamera(
@@ -497,32 +551,27 @@ export const MultiPassQuad: React.FC<Props> = ({
       writeTarget = tmp;
     }
 
-    // Determine which target has the final output
-    const finalTarget =
+    // Determine which target has the pre-FXAA final output
+    const preFxaaTarget =
       postPassObjects.length > 0 ? readTarget : targets.a;
 
-    // Copy final output to feedback buffer
+    // Copy pre-FXAA output to feedback buffer (feedback sees unaliased content)
     if (feedback && targets.feedback) {
-      // Use a blit copy
-      const currentRT = gl.getRenderTarget();
+      copyPass.uniforms.uInputTexture.value = preFxaaTarget.texture;
       gl.setRenderTarget(targets.feedback);
-      // Render the final target's texture to feedback
-      // Reuse the last post pass scene or create a simple copy
-      if (postPassObjects.length > 0) {
-        const lastPass = postPassObjects[postPassObjects.length - 1];
-        lastPass.uniforms.uInputTexture.value = finalTarget.texture;
-        gl.render(lastPass.scene, camera);
-      } else {
-        // No post passes: copy main output to feedback
-        // We need a copy scene for this
-        mainPass.uniforms.uPrevFrame && (mainPass.uniforms.uPrevFrame.value = null);
-        gl.render(mainPass.scene, camera);
-      }
-      gl.setRenderTarget(currentRT);
+      gl.clear();
+      gl.render(copyPass.scene, camera);
     }
 
+    // FXAA anti-aliasing: final quality pass
+    fxaaPass.uniforms.uInputTexture.value = preFxaaTarget.texture;
+    fxaaPass.uniforms.uResolution.value.set(width, height);
+    gl.setRenderTarget(targets.fxaa);
+    gl.clear();
+    gl.render(fxaaPass.scene, camera);
+
     // Set final texture on the visible output mesh
-    outputUniforms.uInputTexture.value = finalTarget.texture;
+    outputUniforms.uInputTexture.value = targets.fxaa.texture;
 
     gl.setRenderTarget(null);
     lastRenderedFrame.current = currentFrame;

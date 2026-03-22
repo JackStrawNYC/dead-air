@@ -122,6 +122,11 @@ uniform float uCamFov;
 uniform float uCamDof;
 uniform float uCamFocusDist;
 
+// ─── Envelope (from EnergyEnvelope — moved from CSS to GLSL) ───
+uniform float uEnvelopeBrightness; // energy-reactive brightness (0.02–1.55)
+uniform float uEnvelopeSaturation; // combined saturation multiplier
+uniform float uEnvelopeHue;        // total hue shift in radians
+
 // ─── Spatial ───
 uniform vec2 uResolution;
 uniform vec2 uCamOffset;

@@ -40,6 +40,7 @@ ${buildPostProcessGLSL({
   caEnabled: true,
   paletteCycleEnabled: true,
   grainStrength: "light",
+  temporalBlendEnabled: true,
 })}
 
 varying vec2 vUv;

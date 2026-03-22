@@ -17,6 +17,8 @@ import { getVenueProfile, type VenueProfile } from "../utils/venue-profiles";
 import { compute3DCamera } from "../utils/camera-3d";
 import { useSceneConfig } from "../scenes/SceneConfigContext";
 import { dualBlendVert, dualBlendFrag } from "../shaders/dual-blend";
+import { useEnvelopeValues } from "../data/EnvelopeContext";
+import { fxaaVert, fxaaFrag } from "../shaders/shared/fxaa.glsl";
 
 /** Era values — same as FullscreenQuad */
 const ERA_SATURATION: Record<string, number> = { primal: 0.70, classic: 0.90, hiatus: 0.75, touch_of_grey: 1.15, revival: 0.95 };
@@ -103,6 +105,7 @@ function createSceneUniforms(width: number, height: number): Record<string, THRE
     uCamPos: { value: new THREE.Vector3(0, 0, -3.5) },
     uCamTarget: { value: new THREE.Vector3(0, 0, 0) },
     uCamFov: { value: 50 }, uCamDof: { value: 0 }, uCamFocusDist: { value: 3 },
+    uEnvelopeBrightness: { value: 1 }, uEnvelopeSaturation: { value: 1 }, uEnvelopeHue: { value: 0 },
   };
 }
 
@@ -121,6 +124,7 @@ function syncUniforms(
   width: number, height: number,
   gradingIntensity = 1.0,
   peakOfShow = 0,
+  envelope: { brightness: number; saturation: number; hue: number } = { brightness: 1, saturation: 1, hue: 0 },
 ) {
   u.uTime.value = time;
   u.uDynamicTime.value = dynamicTime;
@@ -195,6 +199,9 @@ function syncUniforms(
   u.uShowGrain.value = filmStock.grain * venueProfile.grainMult;
   u.uShowBloom.value = filmStock.bloom * venueProfile.bloomMult;
   u.uVenueVignette.value = venueProfile.vignette;
+  u.uEnvelopeBrightness.value = envelope.brightness;
+  u.uEnvelopeSaturation.value = envelope.saturation;
+  u.uEnvelopeHue.value = envelope.hue;
 
   // 3D Camera
   const cam3d = compute3DCamera(
@@ -236,6 +243,7 @@ export const DualShaderQuad: React.FC<Props> = ({
   } = useAudioData();
   const { width, height } = useVideoConfig();
   const sceneConfig = useSceneConfig();
+  const envelope = useEnvelopeValues();
   const showCtx = useShowContext();
   const eraKey = showCtx?.era ?? "";
   const eraSaturation = ERA_SATURATION[eraKey] ?? 1.0;
@@ -256,11 +264,12 @@ export const DualShaderQuad: React.FC<Props> = ({
     return {
       a: new THREE.WebGLRenderTarget(width, height, opts),
       b: new THREE.WebGLRenderTarget(width, height, opts),
+      fxaa: new THREE.WebGLRenderTarget(width, height, opts),
     };
   }, [width, height]);
 
   useEffect(() => {
-    return () => { targets.a.dispose(); targets.b.dispose(); };
+    return () => { targets.a.dispose(); targets.b.dispose(); targets.fxaa.dispose(); };
   }, [targets]);
 
   const camera = useMemo(() => new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1), []);
@@ -317,6 +326,26 @@ export const DualShaderQuad: React.FC<Props> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // FXAA pass
+  const fxaaPass = useMemo(() => {
+    const scene = new THREE.Scene();
+    const geo = new THREE.PlaneGeometry(2, 2);
+    const fxaaUniforms = {
+      uInputTexture: { value: null as THREE.Texture | null },
+      uResolution: { value: new THREE.Vector2(width, height) },
+    };
+    const mat = new THREE.ShaderMaterial({
+      vertexShader: PASSTHROUGH_VERT,
+      fragmentShader: fxaaFrag,
+      uniforms: fxaaUniforms,
+      depthWrite: false,
+      depthTest: false,
+    });
+    scene.add(new THREE.Mesh(geo, mat));
+    return { scene, uniforms: fxaaUniforms };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Per-frame render pipeline
   const syncArgs = [
     time, dynamicTime, beatDecay, smooth,
@@ -324,7 +353,7 @@ export const DualShaderQuad: React.FC<Props> = ({
     tempo, musicalTime, climaxPhase, climaxIntensity,
     heroTrigger, heroProgress, jamDensity, jamPhase, jamProgress, coherence, isLocked,
     eraSaturation, eraBrightness, eraSepia,
-    filmStock, venueProfile, width, height, sceneConfig.gradingIntensity, peakOfShow,
+    filmStock, venueProfile, width, height, sceneConfig.gradingIntensity, peakOfShow, envelope,
   ] as const;
 
   // Update uniforms for both scenes
@@ -350,12 +379,19 @@ export const DualShaderQuad: React.FC<Props> = ({
     compositePass.uniforms.uSceneA.value = targets.a.texture;
     compositePass.uniforms.uSceneB.value = targets.b.texture;
 
-    // Render composite to a temporary target, then blit to output
-    gl.setRenderTarget(targets.a); // reuse target A for final composite
+    // Render composite to target A (reuse after scenes read)
+    gl.setRenderTarget(targets.a);
     gl.clear();
     gl.render(compositePass.scene, camera);
 
-    outputUniforms.uInputTexture.value = targets.a.texture;
+    // FXAA anti-aliasing
+    fxaaPass.uniforms.uInputTexture.value = targets.a.texture;
+    fxaaPass.uniforms.uResolution.value.set(width, height);
+    gl.setRenderTarget(targets.fxaa);
+    gl.clear();
+    gl.render(fxaaPass.scene, camera);
+
+    outputUniforms.uInputTexture.value = targets.fxaa.texture;
     gl.setRenderTarget(null);
   }, -1);
 

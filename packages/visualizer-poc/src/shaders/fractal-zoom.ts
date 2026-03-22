@@ -16,7 +16,7 @@ precision highp float;
 ${sharedUniformsGLSL}
 uniform sampler2D uPrevFrame;
 ${noiseGLSL}
-${buildPostProcessGLSL({ grainStrength: 'normal', bloomEnabled: true, anaglyphEnabled: true })}
+${buildPostProcessGLSL({ grainStrength: 'normal', bloomEnabled: true, anaglyphEnabled: true, temporalBlendEnabled: true })}
 
 varying vec2 vUv;
 

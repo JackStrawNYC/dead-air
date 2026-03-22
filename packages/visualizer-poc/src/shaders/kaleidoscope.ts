@@ -41,7 +41,7 @@ uniform sampler2D uPrevFrame;
 
 ${noiseGLSL}
 
-${buildPostProcessGLSL({ grainStrength: "normal", bloomEnabled: true, halationEnabled: true, paletteCycleEnabled: true })}
+${buildPostProcessGLSL({ grainStrength: "normal", bloomEnabled: true, halationEnabled: true, paletteCycleEnabled: true, temporalBlendEnabled: true })}
 
 varying vec2 vUv;
 

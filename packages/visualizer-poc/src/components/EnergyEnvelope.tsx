@@ -19,6 +19,7 @@ import { useShowContext } from "../data/ShowContext";
 import { getEraPreset } from "../data/era-presets";
 import type { SongIdentity } from "../data/song-identities";
 import type { ShowArcModifiers } from "../data/show-arc";
+import { EnvelopeProvider } from "../data/EnvelopeContext";
 
 interface Props {
   /** Pre-computed audio snapshot from SongVisualizer (shared, not recomputed) */
@@ -204,10 +205,14 @@ export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod,
   const totalHueShift = (jamHueShift + eraColorTempShift + dsHueOffset + siHueShift + arcHueShift + vocalHueShift + guitarHueShift + chromaHueShift + narrativeHueShift + soloHueShift + modalHueShift + stemCharacterHue + stemTempHue) * (1 - deadAirFactor);
   // Combined saturation: counterpoint * harmonic * modal * narrative * IT surge * stem character
   const combinedSatMult = counterpointSatMult * harmonicSatMult * (1 + modalSatOffset) * (1 + narrativeSatOffset) * itSaturationSurge * stemCharacterSat;
-  const satFilter = Math.abs(combinedSatMult - 1) > 0.01 ? ` saturate(${combinedSatMult.toFixed(3)})` : "";
-  const filterStr = totalHueShift !== 0
-    ? `brightness(${finalBrightness.toFixed(3)}) hue-rotate(${totalHueShift.toFixed(1)}deg)${satFilter}`
-    : `brightness(${finalBrightness.toFixed(3)})${satFilter}`;
+
+  // Envelope values passed to GLSL via EnvelopeContext (no longer CSS filters).
+  // Hue converted from degrees to radians for GLSL rotation matrix.
+  const envelopeValues = {
+    brightness: finalBrightness,
+    saturation: combinedSatMult,
+    hue: totalHueShift * (Math.PI / 180),
+  };
 
   // IT vignette tunnel focus: inset box-shadow creates cinematic tunnel effect during coherence lock
   const vignetteStyle = itVignettePull > 0.01
@@ -215,8 +220,10 @@ export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod,
     : undefined;
 
   return (
-    <div style={{ position: "absolute", inset: 0, filter: filterStr, ...vignetteStyle }}>
+    <EnvelopeProvider value={envelopeValues}>
+    <div style={{ position: "absolute", inset: 0, ...vignetteStyle }}>
       {children}
     </div>
+    </EnvelopeProvider>
   );
 };
