@@ -70,15 +70,15 @@ export function compute3DCamera(
   // Vocal presence also dampens shake
   const vocalShakeDampen = vocalPresence > 0.3 ? 0.8 : 1.0;
 
-  const shakeX = Math.sin(time * 3.7) * bass * 0.15 * shakeDampen * vocalShakeDampen;
-  const shakeY = Math.cos(time * 2.3) * bass * 0.1 * shakeDampen * vocalShakeDampen;
-  const shakeZ = Math.sin(time * 4.1) * bass * 0.08 * shakeDampen * vocalShakeDampen;
+  const shakeX = Math.sin(time * 3.7) * bass * 0.06 * shakeDampen * vocalShakeDampen;
+  const shakeY = Math.cos(time * 2.3) * bass * 0.04 * shakeDampen * vocalShakeDampen;
+  const shakeZ = Math.sin(time * 4.1) * bass * 0.03 * shakeDampen * vocalShakeDampen;
 
   // === Drum jolt ===
-  // Sharp impulse on strong onsets (exponential decay handled by frame smoothing)
-  const joltX = drumOnset > 0.5 ? (drumOnset - 0.5) * 0.2 * Math.sin(time * 7.3) : 0;
-  const joltY = drumOnset > 0.5 ? (drumOnset - 0.5) * 0.15 * Math.cos(time * 5.1) : 0;
-  const joltZ = drumOnset > 0.5 ? (drumOnset - 0.5) * 0.1 * Math.sin(time * 6.7) : 0;
+  // Subtle impulse — felt not seen
+  const joltX = drumOnset > 0.5 ? (drumOnset - 0.5) * 0.08 * Math.sin(time * 7.3) : 0;
+  const joltY = drumOnset > 0.5 ? (drumOnset - 0.5) * 0.06 * Math.cos(time * 5.1) : 0;
+  const joltZ = drumOnset > 0.5 ? (drumOnset - 0.5) * 0.04 * Math.sin(time * 6.7) : 0;
 
   // === Final position ===
   const position: [number, number, number] = [

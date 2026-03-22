@@ -27,13 +27,13 @@ export const NowPlaying: React.FC<Props> = ({ title, artist, energy = 0, isSacre
 
   if (fadeIn < 0.01) return null;
 
-  // Base opacity — prominent enough to read, not overpowering
-  const baseOpacity = 0.65;
-  const energyPulse = energy * 0.10;
-  const opacity = Math.min(0.85, (baseOpacity + energyPulse) * fadeIn);
+  // Base opacity — clearly readable against any shader
+  const baseOpacity = 0.85;
+  const energyPulse = energy * 0.05;
+  const opacity = Math.min(0.95, (baseOpacity + energyPulse) * fadeIn);
 
-  const titleSize = responsiveFontSize(30, height);
-  const artistSize = responsiveFontSize(20, height);
+  const titleSize = responsiveFontSize(38, height);
+  const artistSize = responsiveFontSize(22, height);
   const padding = responsiveSize(3, height);
 
   return (
@@ -55,7 +55,7 @@ export const NowPlaying: React.FC<Props> = ({ title, artist, energy = 0, isSacre
           fontSize: titleSize,
           fontWeight: 600,
           color: "rgba(255, 255, 255, 0.95)",
-          textShadow: "0 1px 4px rgba(0,0,0,0.6)",
+          textShadow: "0 2px 8px rgba(0,0,0,0.8), 0 0 20px rgba(0,0,0,0.5)",
           letterSpacing: "0.02em",
         }}
       >
