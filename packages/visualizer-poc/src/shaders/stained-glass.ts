@@ -142,7 +142,7 @@ void main() {
   }
 
   // --- Rose window spotlight (vocal presence + stem vocals) ---
-  float stemVocals = clamp(uStemVocals, 0.0, 1.0);
+  float stemVocals = clamp(uVocalEnergy, 0.0, 1.0);
   float vocalTotal = max(vocalPres, stemVocals); // strongest vocal signal wins
   float roseSpot = 0.0;
   if (vocalTotal > 0.3) {

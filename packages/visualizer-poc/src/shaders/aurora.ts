@@ -155,7 +155,7 @@ void main() {
   float isClimax = step(1.5, climaxPhase) * step(climaxPhase, 3.5);
   float climaxBoost = isClimax * climaxI;
 
-  float stemVocals = clamp(uStemVocals, 0.0, 1.0);
+  float stemVocals = clamp(uVocalEnergy, 0.0, 1.0);
   float curtainBrightness = mix(0.25, 0.80, energy) * mix(0.7, 1.3, uJamDensity) + sChorus * 0.15 + sSolo * 0.10 - sSpace * 0.15;
   curtainBrightness += onset * 0.5;
   curtainBrightness += stemVocals * 0.20; // vocal presence lifts aurora brightness

@@ -12,7 +12,7 @@
  *   uEnergy              -> warp field strength
  *   uBass                -> gravitational wave amplitude
  *   uBeatSnap            -> wave pulse origin
- *   uStemVocals          -> secondary lens mass
+ *   uVocalEnergy          -> secondary lens mass
  *   uHarmonicTension     -> space-time curvature
  *   uImprovisationScore  -> field instability
  *   uClimaxPhase         -> singularity collapse + re-expansion

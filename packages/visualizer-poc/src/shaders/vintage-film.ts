@@ -125,7 +125,7 @@ void main() {
   vec3 leakColor1 = hsv2rgb(vec3(0.08, 0.8, 1.0)); // Orange
   vec3 leakColor2 = hsv2rgb(vec3(0.95, 0.6, 0.9)); // Red-magenta
 
-  float stemVocals = clamp(uStemVocals, 0.0, 1.0);
+  float stemVocals = clamp(uVocalEnergy, 0.0, 1.0);
   float leakIntensity = (0.15 + uEnergy * 0.25 + stemVocals * 0.15) * sectionLeakFreq; // vocals widen light leaks
   color += leakColor1 * leak1 * leakIntensity;
   color += leakColor2 * leak2 * leakIntensity * 0.6;

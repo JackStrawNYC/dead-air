@@ -127,7 +127,7 @@ void main() {
     // Drum onset density spikes
     density += drumOnset * 0.3 * exp(-fi * 0.1);
     // Vocal presence thickens clouds at high energy
-    density += uStemVocals * 0.15 * smoothstep(0.4, 0.7, energy);
+    density += uVocalEnergy * 0.15 * smoothstep(0.4, 0.7, energy);
 
     // Climax parts clouds
     density *= (1.0 - cloudPart);
