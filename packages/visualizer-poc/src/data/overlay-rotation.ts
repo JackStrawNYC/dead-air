@@ -304,10 +304,8 @@ export function buildRotationSchedule(
     // Cap at pool size
     targetCount = Math.min(targetCount, poolEntries.length);
 
-    // At high energy, only A-tier overlays are eligible (iconic Dead imagery)
-    const effectivePool = window.energy === "high"
-      ? poolEntries.filter((e) => A_TIER_OVERLAY_NAMES.has(e.name))
-      : poolEntries;
+    // At high energy, prefer Dead-culture overlays but allow all selectable
+    const effectivePool = poolEntries;
 
     // Score each overlay for this window via extracted scoring module
     const scoringCtx: ScoringContext = {
