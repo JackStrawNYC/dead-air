@@ -363,14 +363,17 @@ ${
     col = max(vec3(0.0), hkRot * col);
   }
 
-  // Lifted blacks (active during build, climax, AND sustain — prevents pure black at peak moments)
+  // Lifted blacks — ALWAYS active. A Dead show never goes dark.
+  // Permanent floor ensures psychedelic color flow even during quiet passages.
   {
     float isBuild = step(0.5, uClimaxPhase) * step(uClimaxPhase, 1.5);
     float isClimaxOrSustain = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5);
-    // Build: gentle lift (0.40). Climax/sustain: stronger lift (0.55) to prevent darkness trap.
     float liftMult = mix(1.0, 0.40, isBuild * uClimaxIntensity) + isClimaxOrSustain * uClimaxIntensity * 0.15;
-    float liftGate = smoothstep(0.04, 0.12, energy);
-    col = max(col, vec3(0.06, 0.05, 0.07) * liftMult * liftGate);
+    // Always-on base floor — no energy gate. Quiet passages get warm ambient glow.
+    float alwaysFloor = 0.08;
+    // Energy-reactive boost on top of the floor
+    float energyBoost = smoothstep(0.02, 0.10, energy) * 0.12;
+    col = max(col, vec3(0.10, 0.08, 0.12) * (alwaysFloor + energyBoost + liftMult));
   }
 
   // Darkness texture: subtle micro-noise during near-black passages

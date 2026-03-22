@@ -122,7 +122,7 @@ export const SetlistScroll: React.FC<Props> = ({ frames, currentSong, introFacto
         key={song}
         style={{
           fontFamily: "'Courier New', Courier, monospace",
-          fontSize: 13 * s,
+          fontSize: 18 * s,
           lineHeight: 1.7,
           color: isActive ? "#FFD700" : "rgba(60, 45, 30, 0.85)",
           fontWeight: isActive ? 700 : 400,
@@ -180,7 +180,7 @@ export const SetlistScroll: React.FC<Props> = ({ frames, currentSong, introFacto
           <div
             style={{
               fontFamily: "'Courier New', Courier, monospace",
-              fontSize: 10 * s,
+              fontSize: 14 * s,
               fontWeight: 700,
               letterSpacing: 3 * s,
               color: "rgba(80, 60, 40, 0.7)",
