@@ -103,6 +103,10 @@ import { SunflowerStealie } from "../components/SunflowerStealie";
 import { CosmicEagle } from "../components/CosmicEagle";
 import { WaveOfLight } from "../components/WaveOfLight";
 
+// ─── New Dead Culture Overlays ───
+import { Roses } from "../components/Roses";
+import { LightningBolt } from "../components/LightningBolt";
+
 // ─── Layer 9: Music Visualization HUD (10) ───
 import { VUMeters } from "../components/VUMeters";
 import { Oscilloscope } from "../components/Oscilloscope";
@@ -780,4 +784,8 @@ export const OVERLAY_COMPONENTS: Record<string, OverlayComponentEntry> = {
   SunflowerStealie:    { Component: SunflowerStealie, layer: 2 },
   CosmicEagle:         { Component: CosmicEagle, layer: 5 },
   WaveOfLight:         { Component: WaveOfLight, layer: 3 },
+
+  // New Dead Culture Overlays
+  Roses:               { Component: Roses, layer: 2 },
+  LightningBolt:       { Component: LightningBolt, layer: 3 },
 };

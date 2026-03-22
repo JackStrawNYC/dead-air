@@ -116,6 +116,10 @@ export const OVERLAY_REGISTRY: OverlayEntry[] = [
   { name: "CosmicEagle",         layer: 5, category: "nature",    tags: ["dead-culture", "cosmic"],         energyBand: "mid",  weight: 2, dutyCycle: 100, energyResponse: [0.05, 0.18, 2.0], tier: "C" },
   { name: "WaveOfLight",         layer: 3, category: "reactive",  tags: ["psychedelic", "cosmic"],          energyBand: "mid",  weight: 2, dutyCycle: 100, energyResponse: [0.05, 0.22, 1.8], tier: "C" },
 
+  // ═══ New Dead Culture Overlays ═══
+  { name: "Roses",              layer: 2, category: "sacred",    tags: ["dead-culture", "organic"],        energyBand: "any",  weight: 2, dutyCycle: 100, energyResponse: [0.02, 0.15, 1.5], tier: "A" },
+  { name: "LightningBolt",     layer: 3, category: "reactive",  tags: ["dead-culture", "intense"],        energyBand: "high", weight: 2, dutyCycle: 20,  energyResponse: [0.20, 0.40, 2.0], tier: "A" },
+
   // ═══ Layer 9: Music Visualization HUD (10) ═══
   { name: "VUMeters",              layer: 9, category: "hud", tags: ["retro", "mechanical"],       energyBand: "high", weight: 1, dutyCycle: 30, energyResponse: [0.15, 0.25, 2.0], tier: "C" },
   { name: "Oscilloscope",          layer: 9, category: "hud", tags: ["retro", "mechanical"],       energyBand: "high", weight: 1, dutyCycle: 30, energyResponse: [0.15, 0.25, 2.0], tier: "C" },

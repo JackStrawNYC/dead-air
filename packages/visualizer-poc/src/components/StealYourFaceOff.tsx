@@ -1,38 +1,27 @@
 /**
  * StealYourFaceOff -- The Stealie shattering apart and reforming.
- * Complete Steal Your Face (circle + lightning bolt + horizontal line).
- * Over 8 seconds, pieces separate and drift apart (fragments move outward).
- * Then over 4 seconds, pieces magnetically pull back together.
- * Fragment rotation and drift speed driven by energy.
- * Neon colors with heavy glow. Appears every 90s for 14s.
- * Dramatic breakup/reform cycle.
+ * Energy-reactive: calm = intact, building = vibrating, peak = full shatter.
+ * No timer-based cycles -- renders whenever active (rotation engine controls timing).
+ * Shatter on high onset, reform magnetically as energy drops.
+ * ChromaHue-driven neon palette. Bolt glows with onset flashes.
  */
 
 import React from "react";
 import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
+import { useAudioSnapshot } from "./parametric/audio-helpers";
 import { seeded } from "../utils/seededRandom";
 
 interface Fragment {
-  /** SVG path or shape identifier */
   id: string;
-  /** Drift direction angle */
   driftAngle: number;
-  /** Drift distance multiplier */
   driftDistance: number;
-  /** Rotation speed */
   rotSpeed: number;
-  /** Rotation direction */
   rotDir: number;
-  /** Scale jitter */
   scaleJitter: number;
+  /** How much this fragment vibrates during build-up */
+  vibrateAmp: number;
 }
-
-const CYCLE = 2700; // 90 seconds at 30fps
-const DURATION = 420; // 14 seconds at 30fps
-const BREAK_DURATION = 240; // 8 seconds: breaking apart
-const REFORM_DURATION = 120; // 4 seconds: reforming
-// Remaining 2 seconds: hold complete at start
 
 function generateFragments(seed: number): Fragment[] {
   const rng = seeded(seed);
@@ -50,11 +39,37 @@ function generateFragments(seed: number): Fragment[] {
   return ids.map((id) => ({
     id,
     driftAngle: rng() * Math.PI * 2,
-    driftDistance: 80 + rng() * 200,
-    rotSpeed: (rng() - 0.5) * 4,
+    driftDistance: 100 + rng() * 250,
+    rotSpeed: (rng() - 0.5) * 5,
     rotDir: rng() > 0.5 ? 1 : -1,
-    scaleJitter: 0.9 + rng() * 0.2,
+    scaleJitter: 0.85 + rng() * 0.3,
+    vibrateAmp: 1 + rng() * 3,
   }));
+}
+
+/** Onset peak tracker — detects when to trigger shatter */
+function computeShatterState(
+  energy: number,
+  onsetEnvelope: number,
+  fastEnergy: number,
+): { shatterProgress: number; isBuilding: boolean } {
+  // Three zones:
+  // Calm (energy < 0.15): intact stealie
+  // Building (0.15 < energy < 0.4): vibrating fragments
+  // Peak (energy > 0.4 OR high onset): full shatter
+
+  const peakSignal = Math.max(
+    interpolate(energy, [0.3, 0.7], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" }),
+    interpolate(onsetEnvelope, [0.4, 0.9], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" }),
+    interpolate(fastEnergy, [0.35, 0.65], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" }),
+  );
+
+  const isBuilding = energy > 0.12 && peakSignal < 0.5;
+
+  return {
+    shatterProgress: peakSignal,
+    isBuilding,
+  };
 }
 
 interface Props {
@@ -64,56 +79,16 @@ interface Props {
 export const StealYourFaceOff: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
-
-  const idx = Math.min(Math.max(0, frame), frames.length - 1);
-  let eSum = 0;
-  let eCount = 0;
-  for (let i = Math.max(0, idx - 75); i <= Math.min(frames.length - 1, idx + 75); i++) {
-    eSum += frames[i].rms;
-    eCount++;
-  }
-  const energy = eCount > 0 ? eSum / eCount : 0;
+  const snap = useAudioSnapshot(frames);
 
   const fragments = React.useMemo(() => generateFragments(19_770_508), []);
 
-  const cycleFrame = frame % CYCLE;
-  if (cycleFrame >= DURATION) return null;
+  const { energy, onsetEnvelope, fastEnergy, chromaHue, beatDecay } = snap;
 
-  const progress = cycleFrame / DURATION;
+  const { shatterProgress, isBuilding } = computeShatterState(energy, onsetEnvelope, fastEnergy);
 
-  // Master opacity: fade in / fade out
-  const masterOpacity = interpolate(progress, [0, 0.05, 0.9, 1], [0, 0.9, 0.9, 0], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
-
-  if (masterOpacity < 0.01) return null;
-
-  // Phase: 0-60 frames hold, 60-300 break apart, 300-420 reform
-  const holdEnd = 60;
-  const breakEnd = holdEnd + BREAK_DURATION;
-
-  let shatterProgress: number; // 0 = intact, 1 = fully shattered
-  if (cycleFrame < holdEnd) {
-    shatterProgress = 0;
-  } else if (cycleFrame < breakEnd) {
-    // Breaking apart: ease out for dramatic initial burst
-    shatterProgress = interpolate(cycleFrame, [holdEnd, breakEnd], [0, 1], {
-      extrapolateLeft: "clamp",
-      extrapolateRight: "clamp",
-      easing: Easing.out(Easing.cubic),
-    });
-  } else {
-    // Reforming: ease in for magnetic pull
-    shatterProgress = interpolate(cycleFrame, [breakEnd, breakEnd + REFORM_DURATION], [1, 0], {
-      extrapolateLeft: "clamp",
-      extrapolateRight: "clamp",
-      easing: Easing.in(Easing.cubic),
-    });
-  }
-
-  // Energy amplifies drift distance and rotation speed
-  const energyMult = interpolate(energy, [0.05, 0.3], [0.6, 1.5], {
+  // Master opacity — always visible when rotation engine renders us, dimmer when very quiet
+  const masterOpacity = interpolate(energy, [0.02, 0.1, 0.3], [0.5, 0.75, 0.95], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
@@ -122,34 +97,77 @@ export const StealYourFaceOff: React.FC<Props> = ({ frames }) => {
   const cy = height / 2;
   const baseSize = Math.min(width, height) * 0.25;
 
-  // Neon color cycling
-  const hueBase = (frame * 0.5) % 360;
-  const mainColor = `hsl(${hueBase}, 100%, 65%)`;
-  const boltColor = `hsl(${(hueBase + 120) % 360}, 100%, 70%)`;
-  const accentColor = `hsl(${(hueBase + 240) % 360}, 90%, 60%)`;
-  const glowColor = `hsla(${hueBase}, 100%, 70%, 0.6)`;
+  // ChromaHue-driven neon palette
+  const hue = chromaHue;
+  const mainColor = `hsl(${hue}, 100%, 65%)`;
+  const boltColor = `hsl(${(hue + 120) % 360}, 100%, 70%)`;
+  const accentColor = `hsl(${(hue + 240) % 360}, 90%, 60%)`;
+  const glowColor = `hsla(${hue}, 100%, 70%, 0.6)`;
+  const boltGlowColor = `hsla(${(hue + 120) % 360}, 100%, 75%, 0.8)`;
 
-  // Render a fragment with its shatter transform
+  // Bolt onset flash intensity
+  const boltFlash = interpolate(onsetEnvelope, [0.2, 0.8], [0, 1], {
+    extrapolateLeft: "clamp", extrapolateRight: "clamp",
+  });
+
+  // Render a fragment with energy-reactive transforms
   const renderFragment = (fragIdx: number, children: React.ReactNode) => {
     const frag = fragments[fragIdx];
-    const dx = Math.cos(frag.driftAngle) * frag.driftDistance * shatterProgress * energyMult;
-    const dy = Math.sin(frag.driftAngle) * frag.driftDistance * shatterProgress * energyMult;
-    const rot = shatterProgress * frag.rotSpeed * energyMult * 180 * frag.rotDir;
-    const scale = 1 + (frag.scaleJitter - 1) * shatterProgress;
+
+    // Direct energy-driven drift distance (no 5s averaging)
+    const drift = shatterProgress;
+
+    // Magnetic reform: ease-in cubic for the pull-back feel
+    const magneticDrift = drift < 0.5
+      ? drift * 2  // linear push out
+      : Easing.out(Easing.cubic)(drift); // smooth settle at full shatter
+
+    const dx = Math.cos(frag.driftAngle) * frag.driftDistance * magneticDrift;
+    const dy = Math.sin(frag.driftAngle) * frag.driftDistance * magneticDrift;
+    const rot = drift * frag.rotSpeed * 180 * frag.rotDir;
+    const scale = 1 + (frag.scaleJitter - 1) * drift;
+
+    // Vibration during build-up — fragments jitter in place
+    let vibeX = 0;
+    let vibeY = 0;
+    if (isBuilding && drift < 0.3) {
+      const vibeIntensity = interpolate(energy, [0.12, 0.35], [0, 1], {
+        extrapolateLeft: "clamp", extrapolateRight: "clamp",
+      });
+      vibeX = Math.sin(frame * 0.8 + fragIdx * 2.1) * frag.vibrateAmp * vibeIntensity;
+      vibeY = Math.cos(frame * 0.9 + fragIdx * 1.7) * frag.vibrateAmp * vibeIntensity;
+    }
 
     return (
-      <g key={frag.id} transform={`translate(${dx}, ${dy}) rotate(${rot}) scale(${scale})`}>
+      <g
+        key={frag.id}
+        transform={`translate(${dx + vibeX}, ${dy + vibeY}) rotate(${rot}) scale(${scale})`}
+        style={{
+          transition: drift < 0.1 ? "transform 0.15s ease-out" : undefined,
+        }}
+      >
         {children}
       </g>
     );
   };
 
+  // Whole-stealie breathing scale when calm
+  const breathe = shatterProgress < 0.1
+    ? 1 + Math.sin(frame * 0.03) * 0.015 + beatDecay * 0.02
+    : 1;
+
+  // Glow intensity scales with energy
+  const glowRadius1 = 10 + energy * 15 + boltFlash * 8;
+  const glowRadius2 = 20 + energy * 30 + boltFlash * 16;
+
   return (
     <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden" }}>
       <svg width={width} height={height} style={{ opacity: masterOpacity }}>
         <g
-          transform={`translate(${cx}, ${cy}) scale(${baseSize / 100})`}
-          style={{ filter: `drop-shadow(0 0 12px ${glowColor}) drop-shadow(0 0 24px ${glowColor})` }}
+          transform={`translate(${cx}, ${cy}) scale(${(baseSize / 100) * breathe})`}
+          style={{
+            filter: `drop-shadow(0 0 ${glowRadius1}px ${glowColor}) drop-shadow(0 0 ${glowRadius2}px ${glowColor})`,
+          }}
         >
           {/* Fragment 0: Outer ring */}
           {renderFragment(0, (
@@ -166,7 +184,7 @@ export const StealYourFaceOff: React.FC<Props> = ({ frames }) => {
             <path
               d="M -88 0 A 88 88 0 0 1 88 0 L -88 0 Z"
               fill={accentColor}
-              opacity={0.15}
+              opacity={0.12 + energy * 0.08}
             />
           ))}
 
@@ -175,7 +193,7 @@ export const StealYourFaceOff: React.FC<Props> = ({ frames }) => {
             <path
               d="M -88 0 A 88 88 0 0 0 88 0 L -88 0 Z"
               fill={mainColor}
-              opacity={0.08}
+              opacity={0.06 + energy * 0.06}
             />
           ))}
 
@@ -184,27 +202,41 @@ export const StealYourFaceOff: React.FC<Props> = ({ frames }) => {
             <line x1={-94} y1={0} x2={94} y2={0} stroke={mainColor} strokeWidth={3} />
           ))}
 
-          {/* Fragment 5: Upper lightning bolt */}
+          {/* Fragment 5: Upper lightning bolt — glows with onset */}
           {renderFragment(5, (
-            <polygon
-              points="0,-88 -12,-18 8,-18"
-              fill={boltColor}
-            />
+            <g style={{
+              filter: boltFlash > 0.1
+                ? `drop-shadow(0 0 ${8 + boltFlash * 20}px ${boltGlowColor})`
+                : undefined,
+            }}>
+              <polygon
+                points="0,-88 -12,-18 8,-18"
+                fill={boltColor}
+                opacity={0.8 + boltFlash * 0.2}
+              />
+            </g>
           ))}
 
-          {/* Fragment 6: Lower lightning bolt */}
+          {/* Fragment 6: Lower lightning bolt — glows with onset */}
           {renderFragment(6, (
-            <polygon
-              points="-22,88 18,5 -4,5"
-              fill={boltColor}
-            />
+            <g style={{
+              filter: boltFlash > 0.1
+                ? `drop-shadow(0 0 ${8 + boltFlash * 20}px ${boltGlowColor})`
+                : undefined,
+            }}>
+              <polygon
+                points="-22,88 18,5 -4,5"
+                fill={boltColor}
+                opacity={0.8 + boltFlash * 0.2}
+              />
+            </g>
           ))}
 
           {/* Fragment 7: Left eye */}
           {renderFragment(7, (
             <>
               <circle cx={-32} cy={-24} r={18} fill="none" stroke={mainColor} strokeWidth={3} />
-              <circle cx={-32} cy={-24} r={8} fill={mainColor} opacity={0.3} />
+              <circle cx={-32} cy={-24} r={8} fill={mainColor} opacity={0.2 + energy * 0.15} />
             </>
           ))}
 
@@ -212,9 +244,18 @@ export const StealYourFaceOff: React.FC<Props> = ({ frames }) => {
           {renderFragment(8, (
             <>
               <circle cx={32} cy={-24} r={18} fill="none" stroke={mainColor} strokeWidth={3} />
-              <circle cx={32} cy={-24} r={8} fill={mainColor} opacity={0.3} />
+              <circle cx={32} cy={-24} r={8} fill={mainColor} opacity={0.2 + energy * 0.15} />
             </>
           ))}
+
+          {/* Center bolt glow flash on strong onsets */}
+          {boltFlash > 0.3 && (
+            <ellipse
+              cx={0} cy={0} rx={20 + boltFlash * 15} ry={60 + boltFlash * 20}
+              fill={boltGlowColor}
+              opacity={boltFlash * 0.15}
+            />
+          )}
         </g>
       </svg>
     </div>

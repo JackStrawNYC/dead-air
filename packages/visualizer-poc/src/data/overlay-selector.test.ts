@@ -321,7 +321,7 @@ describe("curated overlay pool", () => {
     expect(names).toContain("WallOfSound");
   });
 
-  it("has 354 total overlays in full registry", () => {
-    expect(OVERLAY_REGISTRY.length).toBe(354);
+  it("has 356 total overlays in full registry", () => {
+    expect(OVERLAY_REGISTRY.length).toBe(356);
   });
 });
