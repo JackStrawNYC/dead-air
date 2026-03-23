@@ -226,9 +226,9 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
   const effectivePalette = useMemo((): ColorPalette | undefined => {
     if (songIdentity?.palette) return songIdentity.palette;
     if (props.song.palette) return props.song.palette;
-    if (analysis?.frames?.length) return deriveChromaPalette(analysis.frames);
+    if (analysis?.frames?.length) return deriveChromaPalette(analysis.frames, showSeed);
     return undefined;
-  }, [props.song.palette, songIdentity, analysis]);
+  }, [props.song.palette, songIdentity, analysis, showSeed]);
 
   // ─── Show arc phase ───
   const showArcPhase = useMemo((): ShowArcPhase | undefined => {

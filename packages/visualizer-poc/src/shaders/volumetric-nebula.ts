@@ -25,7 +25,7 @@ void main() {
 }
 `;
 
-const postProcess = buildPostProcessGLSL({ bloomThresholdOffset: -0.1, caEnabled: true, dofEnabled: true });
+const postProcess = buildPostProcessGLSL({ bloomThresholdOffset: -0.1, caEnabled: true, dofEnabled: true, temporalBlendEnabled: true });
 
 export const volumetricNebulaFrag = /* glsl */ `
 precision highp float;
@@ -89,8 +89,11 @@ void main() {
   vec3 highTensionColor = nebulaTint * vec3(1.2, 0.5, 1.0); // reds/purples
   vec3 nebulaBaseColor = mix(lowTensionColor, highTensionColor, tension);
 
+  // Space score → nebula expansion
+  float spaceExpand = 1.0 + uSpaceScore * 0.3;
+
   // Pitch → nebula scale (high pitch = fine detail, low = broad)
-  float nebulaScale = mix(0.4, 1.2, 1.0 - pitch) * (1.0 + sJam * 0.3 - sSpace * 0.3 + sSolo * 0.2);
+  float nebulaScale = mix(0.4, 1.2, 1.0 - pitch) * (1.0 + sJam * 0.3 - sSpace * 0.3 + sSolo * 0.2) / spaceExpand;
 
   // === RAY SETUP (from 3D camera uniforms) ===
   vec3 ro, rd;
@@ -169,6 +172,9 @@ void main() {
   float _nf = snoise(vec3(p * 2.0, uTime * 0.1));
   col += iconEmergence(p, uTime, energy, uBass, nebulaTint, emissionTint, _nf, uClimaxPhase, uSectionIndex);
   col += heroIconEmergence(p, uTime, energy, uBass, nebulaTint, emissionTint, _nf, uSectionIndex);
+
+  // Semantic: cosmic → expand nebula brightness
+  col *= 1.0 + uSemanticCosmic * 0.18;
 
   // === POST PROCESS ===
   col = applyPostProcess(col, uv, p);

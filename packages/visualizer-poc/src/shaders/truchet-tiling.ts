@@ -146,8 +146,11 @@ void main() {
   // --- Line thickness from bass (section-modulated) ---
   float baseThickness = (0.02 + bass * 0.04) * sectionThickness;
 
+  // Tempo derivative → tile rotation rate
+  float tempoAccel = 1.0 + uTempoDerivative * 0.3;
+
   // --- Flow speed from energy (section-modulated) ---
-  float flowSpeed = (0.3 + energy * 1.5) * accelBoost * sectionFlowSpeed;
+  float flowSpeed = (0.3 + energy * 1.5) * accelBoost * sectionFlowSpeed * tempoAccel;
   float flowSeed = slowTime * flowSpeed;
 
   // --- Palette ---

@@ -29,6 +29,8 @@ void main() {
 export const desertRoadFrag = /* glsl */ `
 precision highp float;
 
+uniform float uSectionType;
+
 varying vec2 vUv;
 varying vec3 vWorldPos;
 varying vec3 vNormal;
@@ -38,14 +40,31 @@ float hash(vec2 p) {
 }
 
 void main() {
+  // Section-type modulation
+  float sType = uSectionType;
+  float jamBoost = smoothstep(4.5, 5.5, sType);      // jam=5: heat shimmer intensifies
+  float spaceHush = smoothstep(6.5, 7.5, sType);      // space=7: moonlit stillness
+  float chorusVibe = smoothstep(2.5, 3.5, sType) * (1.0 - smoothstep(3.5, 4.5, sType)); // chorus=3: vivid sunset tones
+  float soloFocus = smoothstep(3.5, 4.5, sType) * (1.0 - smoothstep(4.5, 5.5, sType));  // solo=4: long shadows
+
   // Asphalt texture from world-space noise
   float noise = hash(floor(vWorldPos.xz * 8.0)) * 0.04;
   vec3 asphalt = vec3(0.08, 0.07, 0.06) + noise;
 
-  // Basic directional lighting
+  // Basic directional lighting — solo pushes shadows longer/darker
   vec3 lightDir = normalize(vec3(0.2, 1.0, -0.5));
   float diffuse = max(dot(vNormal, lightDir), 0.0) * 0.3 + 0.7;
+  diffuse *= 1.0 - soloFocus * 0.25; // solo: deeper shadows
   asphalt *= diffuse;
+
+  // Space: cool moonlit blue tint
+  asphalt = mix(asphalt, asphalt * vec3(0.7, 0.75, 1.0), spaceHush * 0.4);
+
+  // Chorus: warm sunset reflection on asphalt
+  asphalt += vec3(0.04, 0.02, 0.005) * chorusVibe;
+
+  // Jam: heat shimmer brightens surface slightly
+  asphalt += vec3(0.02, 0.015, 0.01) * jamBoost;
 
   gl_FragColor = vec4(asphalt, 1.0);
 }
@@ -55,6 +74,8 @@ void main() {
 export const desertGroundFrag = /* glsl */ `
 precision highp float;
 
+uniform float uSectionType;
+
 varying vec2 vUv;
 varying vec3 vWorldPos;
 
@@ -63,8 +84,20 @@ float hash(vec2 p) {
 }
 
 void main() {
+  // Section-type modulation
+  float sType = uSectionType;
+  float spaceHush = smoothstep(6.5, 7.5, sType);      // space=7: moonlit
+  float chorusVibe = smoothstep(2.5, 3.5, sType) * (1.0 - smoothstep(3.5, 4.5, sType)); // chorus=3: golden
+
   float n = hash(floor(vWorldPos.xz * 2.0)) * 0.15;
   vec3 sand = vec3(0.55, 0.42, 0.28) * (0.6 + n);
+
+  // Space: cool moonlit desert floor
+  sand = mix(sand, sand * vec3(0.6, 0.65, 0.9), spaceHush * 0.5);
+
+  // Chorus: vivid warm golden sand
+  sand += vec3(0.08, 0.05, 0.01) * chorusVibe;
+
   gl_FragColor = vec4(sand, 1.0);
 }
 `;
@@ -73,10 +106,18 @@ void main() {
 export const mesaFrag = /* glsl */ `
 precision highp float;
 
+uniform float uSectionType;
+
 varying vec3 vWorldPos;
 varying vec3 vNormal;
 
 void main() {
+  // Section-type modulation
+  float sType = uSectionType;
+  float spaceHush = smoothstep(6.5, 7.5, sType);      // space=7: moonlit stillness
+  float chorusVibe = smoothstep(2.5, 3.5, sType) * (1.0 - smoothstep(3.5, 4.5, sType)); // chorus=3: vivid sunset
+  float soloFocus = smoothstep(3.5, 4.5, sType) * (1.0 - smoothstep(4.5, 5.5, sType));  // solo=4: long shadows
+
   // Layered sandstone bands
   float bands = sin(vWorldPos.y * 3.0) * 0.5 + 0.5;
   vec3 redRock = mix(
@@ -85,10 +126,17 @@ void main() {
     bands
   );
 
-  // Simple lighting
+  // Simple lighting — solo deepens shadows
   vec3 lightDir = normalize(vec3(0.3, 1.0, -0.3));
   float diffuse = max(dot(vNormal, lightDir), 0.0) * 0.4 + 0.6;
+  diffuse *= 1.0 - soloFocus * 0.2;
   redRock *= diffuse;
+
+  // Space: cool moonlit rock
+  redRock = mix(redRock, redRock * vec3(0.65, 0.7, 1.0), spaceHush * 0.4);
+
+  // Chorus: warm sunset glow on rock faces
+  redRock += vec3(0.06, 0.02, 0.0) * chorusVibe;
 
   gl_FragColor = vec4(redRock, 1.0);
 }

@@ -24,7 +24,7 @@ ${sharedUniformsGLSL}
 
 ${noiseGLSL}
 
-${buildPostProcessGLSL({ halationEnabled: true, bloomThresholdOffset: -0.08 })}
+${buildPostProcessGLSL({ halationEnabled: true, bloomThresholdOffset: -0.08, temporalBlendEnabled: true })}
 
 varying vec2 vUv;
 
@@ -230,6 +230,13 @@ void main() {
     vec3 c2 = hsv2rgb(vec3(heroHue2, uPaletteSaturation, 1.0));
     col += heroIconEmergence(p, uTime, energy, uBass, c1, c2, nf, uSectionIndex);
   }
+
+  // Timbral brightness → color temperature (bright timbre → cooler beams)
+  float timbralTemp = mix(0.0, 0.3, uTimbralBrightness);
+  col = mix(col, col * vec3(0.7, 0.85, 1.0), timbralTemp);
+
+  // Semantic: triumphant → golden beam boost
+  col = mix(col, col * vec3(1.15, 1.08, 0.9), uSemanticTriumphant * 0.3);
 
   // === POST-PROCESSING (shared chain) ===
   col = applyPostProcess(col, vUv, p);

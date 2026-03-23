@@ -150,6 +150,9 @@ void main() {
   col += iconEmergence(_fp, uTime, energy, uBass, _fc1, _fc2, _nf, uClimaxPhase, uSectionIndex);
   col += heroIconEmergence(_fp, uTime, energy, uBass, _fc1, _fc2, _nf, uSectionIndex);
 
+  // Semantic: psychedelic → deeper zoom color cycling
+  col *= 1.0 + uSemanticPsychedelic * 0.15;
+
   // Apply shared post-processing chain
   col = applyPostProcess(col, vUv);
 

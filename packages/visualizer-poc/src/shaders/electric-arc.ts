@@ -217,6 +217,10 @@ void main() {
     col += heroIconEmergence(p, uTime, energy, bass, c1, c2, nf, uSectionIndex);
   }
 
+  // Timbral brightness → arc color temperature
+  float arcTemp = mix(0.0, 0.25, uTimbralBrightness);
+  col = mix(col, col * vec3(0.75, 0.88, 1.0), arcTemp);
+
   // --- Vignette ---
   float vigScale = mix(0.25, 0.18, energy);
   float vignette = 1.0 - dot(p * vigScale, p * vigScale);

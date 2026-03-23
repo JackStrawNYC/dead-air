@@ -32,7 +32,7 @@ ${sharedUniformsGLSL}
 
 ${noiseGLSL}
 
-${buildPostProcessGLSL({ halationEnabled: true, bloomThresholdOffset: -0.10, stageFloodEnabled: false, thermalShimmerEnabled: true })}
+${buildPostProcessGLSL({ halationEnabled: true, bloomThresholdOffset: -0.10, stageFloodEnabled: false, thermalShimmerEnabled: true, temporalBlendEnabled: true })}
 
 varying vec2 vUv;
 
@@ -247,12 +247,19 @@ void main() {
     col += heroIconEmergence(p, uTime, energy, bass, c1, c2, nf, uSectionIndex);
   }
 
+  // Dynamic range → flame contrast
+  float flameContrast = mix(0.8, 1.3, uDynamicRange);
+  col = mix(vec3(dot(col, vec3(0.299, 0.587, 0.114))), col, flameContrast);
+
   // === VIGNETTE (strong — fire falls off dramatically at edges) ===
   float vigScale = mix(0.49, 0.34, energy);
   float vignette = 1.0 - dot(p * vigScale, p * vigScale);
   vignette = smoothstep(0.0, 0.8, vignette);
   vec3 vigTint = max(flameColor * 0.03, vec3(0.05, 0.04, 0.06));
   col = mix(vigTint, col, vignette);
+
+  // Semantic: aggressive → intensify flames
+  col *= 1.0 + uSemanticAggressive * 0.2;
 
   // === POST-PROCESSING (shared chain: bloom, flare, halation, grade, grain) ===
   col = applyPostProcess(col, vUv, p);

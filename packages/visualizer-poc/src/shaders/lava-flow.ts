@@ -197,6 +197,10 @@ void main() {
   }
 
 
+  // Dynamic range → lava contrast
+  float lavaContrast = mix(0.85, 1.25, uDynamicRange);
+  col = mix(vec3(dot(col, vec3(0.299, 0.587, 0.114))), col, lavaContrast);
+
   // --- SDF icon emergence ---
   {
     float nf = fbm3(vec3(p * 2.0, slowTime));

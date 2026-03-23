@@ -135,6 +135,16 @@ uniform float uTimbralBrightness;
 uniform float uTimbralFlux;
 uniform float uVocalPitch;
 
+// ─── Semantic Labels (CLAP) ───
+uniform float uSemanticPsychedelic;
+uniform float uSemanticCosmic;
+uniform float uSemanticChaotic;
+uniform float uSemanticAggressive;
+uniform float uSemanticTender;
+uniform float uSemanticAmbient;
+uniform float uSemanticRhythmic;
+uniform float uSemanticTriumphant;
+
 // ─── Spatial ───
 uniform vec2 uResolution;
 uniform vec2 uCamOffset;

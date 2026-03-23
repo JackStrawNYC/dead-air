@@ -1,4 +1,6 @@
 import type { EnhancedFrameData, ColorPalette } from "../data/types";
+import { seeded } from "./seededRandom";
+import { hashString } from "./hash";
 
 const DEFAULT_PALETTE: ColorPalette = { primary: 270, secondary: 180, saturation: 0.8 };
 
@@ -10,7 +12,7 @@ const DEFAULT_PALETTE: ColorPalette = { primary: 270, secondary: 180, saturation
  * circular distance from primary (or triadic fallback). Saturation reflects
  * chroma entropy: peaked → 0.95, flat → 0.55.
  */
-export function deriveChromaPalette(frames: EnhancedFrameData[]): ColorPalette {
+export function deriveChromaPalette(frames: EnhancedFrameData[], showSeed?: number): ColorPalette {
   if (frames.length === 0) return DEFAULT_PALETTE;
 
   // Average 12 chroma bins across all frames
@@ -74,5 +76,17 @@ export function deriveChromaPalette(frames: EnhancedFrameData[]): ColorPalette {
   const normalizedEntropy = entropy / maxEntropy;
   const saturation = Math.max(0.55, Math.min(0.95, 0.95 - normalizedEntropy * 0.4));
 
-  return { primary: primaryHue, secondary: secondaryHue, saturation };
+  let primary = primaryHue;
+  let secondary = secondaryHue;
+  let sat = saturation;
+
+  // Seed-based jitter (±25° hue, ±0.08 saturation) to break palette convergence across shows
+  if (showSeed !== undefined) {
+    const rng = seeded(showSeed + hashString("palette"));
+    primary = ((primary + (rng() - 0.5) * 50) % 360 + 360) % 360;
+    secondary = ((secondary + (rng() - 0.5) * 40) % 360 + 360) % 360;
+    sat = Math.max(0.45, Math.min(1.0, sat + (rng() - 0.5) * 0.16));
+  }
+
+  return { primary, secondary, saturation: sat };
 }

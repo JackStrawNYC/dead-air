@@ -228,6 +228,14 @@ export const FullscreenQuad: React.FC<Props> = ({
       uTimbralBrightness: { value: 0.5 },
       uTimbralFlux: { value: 0 },
       uVocalPitch: { value: 0 },
+      uSemanticPsychedelic: { value: 0 },
+      uSemanticCosmic: { value: 0 },
+      uSemanticChaotic: { value: 0 },
+      uSemanticAggressive: { value: 0 },
+      uSemanticTender: { value: 0 },
+      uSemanticAmbient: { value: 0 },
+      uSemanticRhythmic: { value: 0 },
+      uSemanticTriumphant: { value: 0 },
       ...extraUniforms,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -359,6 +367,14 @@ export const FullscreenQuad: React.FC<Props> = ({
   uniforms.uTimbralBrightness.value = smooth.timbralBrightness ?? 0.5;
   uniforms.uTimbralFlux.value = smooth.timbralFlux ?? 0;
   uniforms.uVocalPitch.value = smooth.vocalPitch ?? 0;
+  uniforms.uSemanticPsychedelic.value = smooth.semanticPsychedelic ?? 0;
+  uniforms.uSemanticCosmic.value = smooth.semanticCosmic ?? 0;
+  uniforms.uSemanticChaotic.value = smooth.semanticChaotic ?? 0;
+  uniforms.uSemanticAggressive.value = smooth.semanticAggressive ?? 0;
+  uniforms.uSemanticTender.value = smooth.semanticTender ?? 0;
+  uniforms.uSemanticAmbient.value = smooth.semanticAmbient ?? 0;
+  uniforms.uSemanticRhythmic.value = smooth.semanticRhythmic ?? 0;
+  uniforms.uSemanticTriumphant.value = smooth.semanticTriumphant ?? 0;
 
   // 3D Camera
   const cam3d = compute3DCamera(

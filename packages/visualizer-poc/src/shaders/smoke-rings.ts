@@ -34,6 +34,7 @@ ${buildPostProcessGLSL({
   bloomEnabled: true,
   halationEnabled: true,
   grainStrength: "normal",
+  temporalBlendEnabled: true,
 })}
 
 varying vec2 vUv;
@@ -89,6 +90,9 @@ void main() {
   float sectionRingScale = mix(1.0, 1.3, sJam) * mix(1.0, 0.7, sSpace) * mix(1.0, 1.2, sChorus);
   float sectionCollision = mix(1.0, 1.5, sJam) * mix(1.0, 0.5, sSpace);
 
+  // Vocal pitch → vertical drift modulation
+  float vocalDrift = mix(-0.1, 0.15, uVocalPitch);
+
   float riseSpeed = (0.03 + slowEnergy * 0.04) * sectionRiseSpeed;
 
   vec3 col = vec3(0.008, 0.006, 0.012); // dark background
@@ -106,10 +110,10 @@ void main() {
     // Each ring rises at a different phase
     float phase = fract(slowTime * riseSpeed + fi * 0.167);
 
-    // Ring center: rises from bottom, drifts horizontally
+    // Ring center: rises from bottom, drifts horizontally + vocal pitch vertical offset
     vec2 center = vec2(
       sin(fi * 2.7 + slowTime * 0.3) * 0.15,
-      -0.4 + phase * 0.8
+      -0.4 + phase * 0.8 + vocalDrift
     );
 
     // Ring scales as it rises (perspective)

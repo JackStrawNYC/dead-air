@@ -130,9 +130,12 @@ void main() {
   );
   vec2 centered = p - warpCenter;
 
+  // Tempo derivative → kaleidoscope rotation rate
+  float tempoAccel = 1.0 + uTempoDerivative * 0.4;
+
   // --- Rotation direction from melodic contour ---
   // Ascending melody = clockwise drift, descending = counter-clockwise
-  float rotSpeed = 0.04 + energy * 0.03;
+  float rotSpeed = (0.04 + energy * 0.03) * tempoAccel;
   // Section-driven speed: jam 1.3x, chorus 1.15x, solo 1.2x, space 0.5x
   rotSpeed *= mix(1.0, 1.3, jamFactor);
   rotSpeed *= mix(1.0, 0.5, spaceFactor);
@@ -255,6 +258,10 @@ void main() {
   float vignette = 1.0 - dot(p * vigScale, p * vigScale);
   vignette = smoothstep(0.0, 1.0, vignette);
   col = mix(vec3(0.01, 0.008, 0.02), col, vignette);
+
+  // Semantic: psychedelic → increase fold depth + chromatic shift
+  float psychBoost = uSemanticPsychedelic * 0.4;
+  col = mix(col, col * vec3(1.0 + psychBoost * 0.2, 1.0, 1.0 + psychBoost * 0.15), psychBoost);
 
   // --- Post-processing ---
   col = applyPostProcess(col, vUv, p);

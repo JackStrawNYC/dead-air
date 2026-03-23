@@ -82,8 +82,11 @@ void main() {
   float downbeatPulse = effectiveDownbeat * 0.12;
   radius -= downbeatPulse + effectiveBeat * 0.06; // expansion on downbeat + beats
 
+  // Tempo derivative → rotation acceleration
+  float tempoAccel = 1.0 + uTempoDerivative * 0.5;
+
   // Bass-driven rotation
-  float rotation = t * 0.2 + uBass * 1.5 + uStemBass * 0.8;
+  float rotation = t * 0.2 * tempoAccel + uBass * 1.5 + uStemBass * 0.8;
   angle += rotation;
 
   // Fold angle into N-fold symmetry

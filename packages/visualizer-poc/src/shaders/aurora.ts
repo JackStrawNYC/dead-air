@@ -156,7 +156,7 @@ void main() {
   float climaxBoost = isClimax * climaxI;
 
   float stemVocals = clamp(uVocalEnergy, 0.0, 1.0);
-  float curtainBrightness = mix(0.25, 0.80, energy) * mix(0.7, 1.3, uJamDensity) + sChorus * 0.15 + sSolo * 0.10 - sSpace * 0.15;
+  float curtainBrightness = mix(0.25, 0.80, energy) * mix(0.7, 1.3, uJamDensity) * spaceSpread + sChorus * 0.15 + sSolo * 0.10 - sSpace * 0.15;
   curtainBrightness += onset * 0.5;
   curtainBrightness += stemVocals * 0.20; // vocal presence lifts aurora brightness
   float bpH = beatPulseHalf(uMusicalTime);
@@ -170,10 +170,16 @@ void main() {
   vec4 auroraAcc = vec4(0.0);
   float stepSize = mix(0.15, 0.1, energy);
 
+  // Vocal pitch → aurora vertical lift
+  float vocalLift = (uVocalPitch - 0.5) * 0.3;
+
+  // Space score → aurora spread
+  float spaceSpread = 1.0 + uSpaceScore * 0.4;
+
   // Aurora exists in a constrained vertical band
-  // Melodic pitch lifts the curtain higher; melodic direction drifts band position
-  float bandLow = mix(2.0, 1.0, energy) - pitchCurtain;
-  float bandHigh = mix(3.5, 5.0, energy) + pitchCurtain + directionDrift;
+  // Melodic pitch lifts the curtain higher; melodic direction drifts band position; vocal pitch lifts
+  float bandLow = mix(2.0, 1.0, energy) - pitchCurtain + vocalLift;
+  float bandHigh = mix(3.5, 5.0, energy) + pitchCurtain + directionDrift + vocalLift;
 
   for (int i = 0; i < 40; i++) {
     if (i >= maxSteps) break;
@@ -250,6 +256,11 @@ void main() {
   float vignette = 1.0 - dot(p * vigScale, p * vigScale);
   vignette = smoothstep(0.0, 1.0, vignette);
   col = mix(vec3(0.04, 0.03, 0.05), col, vignette);
+
+  // Semantic: ambient → pastel desaturation
+  float ambientDesat = uSemanticAmbient * 0.15;
+  float ambLuma = dot(col, vec3(0.299, 0.587, 0.114));
+  col = mix(col, vec3(ambLuma) * vec3(0.95, 0.98, 1.0), ambientDesat);
 
   // === POST-PROCESSING ===
   col = applyPostProcess(col, vUv, p);

@@ -361,6 +361,10 @@ void main() {
     col += iconEmergence(p, uTime, energy, bass, c1, c2, nf, uClimaxPhase, uSectionIndex) * 0.5;
   }
 
+  // Timbral brightness → corona color temperature
+  float coronaTemp = mix(0.0, 0.2, uTimbralBrightness);
+  col = mix(col, col * vec3(0.8, 0.9, 1.0), coronaTemp);
+
   // --- Vignette ---
   float bgR = 0.02;
   float bgG = 0.01;

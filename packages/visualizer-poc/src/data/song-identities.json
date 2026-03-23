@@ -74,7 +74,7 @@
     "overlayBoost": [
       "JerryGuitar",
       "RoseOverlay",
-      "SacredGeometry"
+      "AmericanBeauty"
     ],
     "overlaySuppress": [
       "LaserShow",
@@ -131,7 +131,7 @@
     "overlayBoost": [
       "VWBusParade",
       "Fireflies",
-      "SkeletonBand"
+      "SkeletonCouple"
     ],
     "moodKeywords": [
       "organic",
@@ -378,6 +378,7 @@
     },
     "overlayBoost": [
       "CosmicStarfield",
+      "EgyptianEye",
       "SacredGeometry",
       "Fireflies"
     ],
@@ -414,7 +415,7 @@
     "overlayBoost": [
       "RoseOverlay",
       "Fireflies",
-      "SacredGeometry"
+      "RoseGarden"
     ],
     "overlaySuppress": [
       "BearParade",
@@ -515,6 +516,7 @@
     },
     "overlayBoost": [
       "DarkStarPortal",
+      "TarotReveal",
       "SacredGeometry",
       "FractalZoom"
     ],
@@ -790,7 +792,7 @@
     "overlayBoost": [
       "Fireflies",
       "CosmicStarfield",
-      "SacredGeometry"
+      "MushroomForest"
     ],
     "overlaySuppress": [
       "WallOfSound"
@@ -1002,7 +1004,7 @@
     },
     "overlayBoost": [
       "VWBusParade",
-      "Fireflies"
+      "LighterWave"
     ],
     "moodKeywords": [
       "retro",
@@ -1028,7 +1030,7 @@
     },
     "overlayBoost": [
       "BreathingStealie",
-      "BearParade"
+      "SkeletonCouple"
     ],
     "moodKeywords": [
       "organic",
@@ -1087,7 +1089,7 @@
     "overlayBoost": [
       "LightningBoltOverlay",
       "TieDyeWash",
-      "BearParade"
+      "CosmicCharlie"
     ],
     "moodKeywords": [
       "psychedelic",
@@ -1151,7 +1153,7 @@
     "overlayBoost": [
       "JerryGuitar",
       "BreathingStealie",
-      "RoseOverlay"
+      "AmericanBeauty"
     ],
     "moodKeywords": [
       "organic",
@@ -1322,7 +1324,7 @@
       "BearParade",
       "ParticleExplosion",
       "LaserShow",
-      "SkeletonBand"
+      "DrummersDuo"
     ],
     "moodKeywords": [
       "festival",
@@ -1351,7 +1353,7 @@
       "saturation": 0.9
     },
     "overlayBoost": [
-      "BearParade",
+      "SkeletonCouple",
       "BreathingStealie"
     ],
     "moodKeywords": [
@@ -1380,8 +1382,8 @@
     },
     "overlayBoost": [
       "VWBusParade",
-      "SkeletonBand",
-      "BearParade"
+      "DrumCircle",
+      "MarchingTerrapins"
     ],
     "moodKeywords": [
       "festival",
@@ -1410,8 +1412,8 @@
     },
     "overlayBoost": [
       "JerryGuitar",
-      "Fireflies",
-      "RoseOverlay"
+      "BoxOfRain",
+      "RoseGarden"
     ],
     "moodKeywords": [
       "organic",
@@ -1438,7 +1440,7 @@
     },
     "overlayBoost": [
       "CosmicStarfield",
-      "SacredGeometry",
+      "DarkStarPortal",
       "Fireflies"
     ],
     "moodKeywords": [
@@ -1501,7 +1503,7 @@
     "overlayBoost": [
       "ThirteenPointBolt",
       "ParticleExplosion",
-      "SkeletonBand"
+      "DrumCircle"
     ],
     "moodKeywords": [
       "intense",
@@ -1583,9 +1585,9 @@
       "brightness": 0.9
     },
     "overlayBoost": [
-      "RoseOverlay",
+      "Roses",
       "Fireflies",
-      "SacredGeometry"
+      "RoseGarden"
     ],
     "overlaySuppress": [
       "LaserShow",
@@ -1677,7 +1679,7 @@
     },
     "overlayBoost": [
       "TieDyeWash",
-      "BearParade",
+      "CosmicCharlie",
       "LavaLamp"
     ],
     "moodKeywords": [
@@ -1705,8 +1707,8 @@
       "saturation": 0.7
     },
     "overlayBoost": [
-      "Fireflies",
-      "RoseOverlay",
+      "MushroomForest",
+      "Roses",
       "VWBusParade"
     ],
     "moodKeywords": [
@@ -1733,8 +1735,8 @@
     },
     "overlayBoost": [
       "CosmicStarfield",
-      "Fireflies",
-      "SacredGeometry"
+      "LighterWave",
+      "EgyptianEye"
     ],
     "moodKeywords": [
       "contemplative",
@@ -1760,8 +1762,8 @@
       "brightness": 0.9
     },
     "overlayBoost": [
-      "RoseOverlay",
-      "Fireflies"
+      "AmericanBeauty",
+      "LighterWave"
     ],
     "moodKeywords": [
       "contemplative",

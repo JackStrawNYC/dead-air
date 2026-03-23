@@ -25,7 +25,7 @@ void main() {
 }
 `;
 
-const postProcess = buildPostProcessGLSL({ grainStrength: "light", halationEnabled: true, dofEnabled: true });
+const postProcess = buildPostProcessGLSL({ grainStrength: "light", halationEnabled: true, dofEnabled: true, temporalBlendEnabled: true });
 
 export const volumetricCloudsFrag = /* glsl */ `
 precision highp float;

@@ -31,6 +31,7 @@ uniform float uMelodicPitch;
 uniform float uFlatness;
 uniform float uSlowEnergy;
 uniform float uBeatSnap;
+uniform float uSectionType;
 
 varying vec2 vUv;
 varying float vWaveHeight;
@@ -87,24 +88,38 @@ float oceanWave(vec2 pos, float time, float waveFreq, float waveAmp, float storm
 void main() {
   vUv = uv;
 
+  // Section-type modulation
+  float sType = uSectionType;
+  float jamBoost = smoothstep(4.5, 5.5, sType);      // jam=5: choppy waves/whitecaps
+  float spaceHush = smoothstep(6.5, 7.5, sType);      // space=7: glass-calm
+  float chorusVibe = smoothstep(2.5, 3.5, sType) * (1.0 - smoothstep(3.5, 4.5, sType)); // chorus=3: rolling swells
+  float soloFocus = smoothstep(3.5, 4.5, sType) * (1.0 - smoothstep(4.5, 5.5, sType));  // solo=4: deep current focus
+
   float energy = clamp(uEnergy, 0.0, 1.0);
   float bass = clamp(uBass, 0.0, 1.0);
   float storminess = clamp(energy + bass * 0.3, 0.0, 1.5);
   float melodicP = clamp(uMelodicPitch, 0.0, 1.0);
 
-  float waveTime = uDynamicTime * (0.3 + energy * 0.4);
-  float waveFreq = mix(1.5, 4.0, energy) + melodicP * 2.0;
-  float waveAmp = mix(0.1, 2.5, storminess);
+  // Jam: choppier/faster, Space: glassy still, Chorus: rolling swells
+  float waveSpeedMod = 1.0 + jamBoost * 0.4 - spaceHush * 0.6 + chorusVibe * 0.15;
+  float waveTime = uDynamicTime * (0.3 + energy * 0.4) * waveSpeedMod;
+  float waveFreq = mix(1.5, 4.0, energy) + melodicP * 2.0 + jamBoost * 1.5 - spaceHush * 1.0;
+  float waveAmpMod = 1.0 + jamBoost * 0.4 + chorusVibe * 0.2 - spaceHush * 0.7;
+  float waveAmp = mix(0.1, 2.5, storminess) * waveAmpMod;
 
   vec3 pos = position;
   float h = oceanWave(pos.xz * 0.01, waveTime, waveFreq, waveAmp, storminess);
 
-  // Add chop detail from flatness
-  float chop = snoise2d(pos.xz * 0.05 + uDynamicTime * 0.2) * uFlatness * 0.3;
+  // Add chop detail from flatness — jam increases chop
+  float chopMod = 1.0 + jamBoost * 0.5 - spaceHush * 0.5;
+  float chop = snoise2d(pos.xz * 0.05 + uDynamicTime * 0.2) * uFlatness * 0.3 * chopMod;
   h += chop;
 
   // Beat snap adds a quick vertical pulse
   h += uBeatSnap * 0.15;
+
+  // Solo: deep current — long-period undulation
+  h += sin(pos.x * 0.5 + uDynamicTime * 0.15) * soloFocus * bass * 0.8;
 
   pos.y += h;
   vWaveHeight = h;
@@ -135,6 +150,7 @@ uniform float uPaletteSecondary;
 uniform float uPaletteSaturation;
 uniform float uDynamicTime;
 uniform vec3 uCelestialPos;
+uniform float uSectionType;
 
 varying vec2 vUv;
 varying float vWaveHeight;
@@ -148,17 +164,28 @@ vec3 hsv2rgb(vec3 c) {
 }
 
 void main() {
+  // Section-type modulation
+  float sType = uSectionType;
+  float jamBoost = smoothstep(4.5, 5.5, sType);      // jam=5: choppy waves/whitecaps
+  float spaceHush = smoothstep(6.5, 7.5, sType);      // space=7: glass-calm
+  float chorusVibe = smoothstep(2.5, 3.5, sType) * (1.0 - smoothstep(3.5, 4.5, sType)); // chorus=3: rolling swells
+  float soloFocus = smoothstep(3.5, 4.5, sType) * (1.0 - smoothstep(4.5, 5.5, sType));  // solo=4: deep current focus
+
   float energy = clamp(uEnergy, 0.0, 1.0);
   float storminess = clamp(energy + uBass * 0.3, 0.0, 1.5);
   float chromaH = clamp(uChromaHue, 0.0, 1.0);
   float onset = clamp(uOnsetSnap, 0.0, 1.0);
 
-  // Deep water color
+  // Deep water color — space=darker/calmer, jam=greener storm tones
   float hue = uPalettePrimary + chromaH * 0.05;
   float sat = mix(0.5, 0.9, uSlowEnergy) * uPaletteSaturation;
   vec3 calmDeep = hsv2rgb(vec3(hue, sat, mix(0.06, 0.18, uSlowEnergy)));
   vec3 stormDeep = vec3(0.08, 0.12, 0.10);
-  vec3 waterColor = mix(calmDeep, stormDeep, storminess * 0.7);
+  float stormMix = storminess * 0.7 + jamBoost * 0.2 - spaceHush * 0.3;
+  vec3 waterColor = mix(calmDeep, stormDeep, clamp(stormMix, 0.0, 1.0));
+
+  // Space: deeper, darker, more mysterious blue
+  waterColor = mix(waterColor, vec3(0.02, 0.04, 0.10), spaceHush * 0.4);
 
   // Surface shading: lighter crests, darker troughs
   float maxWaveH = mix(0.5, 2.5, storminess);
@@ -173,9 +200,10 @@ void main() {
   vec3 reflectColor = mix(vec3(0.05, 0.08, 0.15), vec3(0.2, 0.25, 0.35), uSlowEnergy);
   col = mix(col, reflectColor, fresnel * 0.6);
 
-  // Foam on crests triggered by onset
+  // Foam on crests triggered by onset — jam=more whitecaps, space=none
   float foamMask = smoothstep(maxWaveH * 0.5, maxWaveH, vWaveHeight);
-  float foamAmount = foamMask * (onset * 0.8 + storminess * 0.5 + energy * 0.3);
+  float foamBoost = 1.0 + jamBoost * 0.5 - spaceHush * 0.8;
+  float foamAmount = foamMask * (onset * 0.8 + storminess * 0.5 + energy * 0.3) * clamp(foamBoost, 0.0, 2.0);
   foamAmount = clamp(foamAmount, 0.0, 1.0);
   col = mix(col, vec3(0.85, 0.9, 0.95), foamAmount * 0.7);
 
@@ -197,6 +225,12 @@ void main() {
   celestialReflect *= (0.5 + 0.5 * sin(vWorldPos.z * 0.3 + uDynamicTime * 0.5));
   float celestialBrightness = mix(0.9, 0.15, storminess);
   col += vec3(1.0, 0.92, 0.7) * celestialReflect * celestialBrightness * 0.3;
+
+  // Chorus: sparkling highlight on surface
+  col += vec3(0.06, 0.08, 0.12) * chorusVibe * surfaceShade * 0.5;
+
+  // Solo: deep current focus — darker troughs, subtle deep blue undertone
+  col += vec3(0.0, 0.02, 0.06) * soloFocus * (1.0 - surfaceShade) * 0.5;
 
   // Distance fog toward horizon
   float dist = length(vWorldPos.xz) * 0.005;

@@ -14,6 +14,7 @@ uniform float uEnergy;
 uniform float uBeat;
 uniform float uBass;
 uniform float uChromaHue;
+uniform float uSectionType;
 
 attribute float aLifetime;
 attribute float aSeed;
@@ -24,21 +25,31 @@ varying float vSeed;
 varying float vHeight;
 
 void main() {
+  // Section-type modulation
+  float sType = uSectionType;
+  float jamBoost = smoothstep(4.5, 5.5, sType);      // jam=5: faster sparks, wider flame
+  float spaceHush = smoothstep(6.5, 7.5, sType);      // space=7: still embers, dim
+  float chorusVibe = smoothstep(2.5, 3.5, sType) * (1.0 - smoothstep(3.5, 4.5, sType)); // chorus=3: bright/dancing
+  float soloFocus = smoothstep(3.5, 4.5, sType) * (1.0 - smoothstep(4.5, 5.5, sType));  // solo=4: tall focused
+
   // Lifetime fraction: 0 = just spawned, 1 = expired
-  float life = mod(uTime * (0.4 + aSeed * 0.3) + aPhase, 1.0);
+  float speedMod = 1.0 + jamBoost * 0.5 - spaceHush * 0.4;
+  float life = mod(uTime * (0.4 + aSeed * 0.3) * speedMod + aPhase, 1.0);
   vLifeFrac = life;
   vSeed = aSeed;
 
-  // Fire height scales with energy
-  float maxHeight = mix(1.5, 5.0, uEnergy);
+  // Fire height scales with energy — solo=tall, jam=wide, space=short
+  float heightMod = 1.0 + soloFocus * 0.4 + jamBoost * 0.15 - spaceHush * 0.5;
+  float maxHeight = mix(1.5, 5.0, uEnergy) * heightMod;
 
   // Particle rises from base
   vec3 pos = position;
   pos.y += life * maxHeight;
 
-  // Drift sideways with noise-like wobble
-  float wobbleX = sin(life * 6.28 + aSeed * 43.7 + uTime * 2.0) * 0.3 * (0.5 + aSeed);
-  float wobbleZ = cos(life * 5.13 + aSeed * 17.3 + uTime * 1.7) * 0.3 * (0.5 + aSeed);
+  // Drift sideways with noise-like wobble — jam=wider, solo=narrow
+  float widthMod = 1.0 + jamBoost * 0.6 - soloFocus * 0.4;
+  float wobbleX = sin(life * 6.28 + aSeed * 43.7 + uTime * 2.0) * 0.3 * (0.5 + aSeed) * widthMod;
+  float wobbleZ = cos(life * 5.13 + aSeed * 17.3 + uTime * 1.7) * 0.3 * (0.5 + aSeed) * widthMod;
   pos.x += wobbleX * life;
   pos.z += wobbleZ * life;
 
@@ -50,7 +61,9 @@ void main() {
   vec4 mvPos = modelViewMatrix * vec4(pos, 1.0);
 
   // Size: larger at base, smaller at top; pulse with beat
-  float baseSize = mix(8.0, 20.0, uEnergy) * (1.0 - life * 0.7);
+  // Chorus=dancing bigger particles, space=smaller embers
+  float sizeMod = 1.0 + chorusVibe * 0.3 - spaceHush * 0.3;
+  float baseSize = mix(8.0, 20.0, uEnergy) * (1.0 - life * 0.7) * sizeMod;
   float beatPulse = 1.0 + uBeat * 0.4;
   gl_PointSize = baseSize * beatPulse * (300.0 / -mvPos.z);
 
@@ -64,12 +77,20 @@ precision highp float;
 
 uniform float uEnergy;
 uniform float uChromaHue;
+uniform float uSectionType;
 
 varying float vLifeFrac;
 varying float vSeed;
 varying float vHeight;
 
 void main() {
+  // Section-type modulation
+  float sType = uSectionType;
+  float jamBoost = smoothstep(4.5, 5.5, sType);      // jam=5
+  float spaceHush = smoothstep(6.5, 7.5, sType);      // space=7
+  float chorusVibe = smoothstep(2.5, 3.5, sType) * (1.0 - smoothstep(3.5, 4.5, sType)); // chorus=3
+  float soloFocus = smoothstep(3.5, 4.5, sType) * (1.0 - smoothstep(4.5, 5.5, sType));  // solo=4
+
   // Circular point
   vec2 center = gl_PointCoord - 0.5;
   float dist = length(center);
@@ -98,7 +119,12 @@ void main() {
   alpha *= smoothstep(0.0, 0.05, vLifeFrac);
 
   // Intensity boost with energy
-  col *= mix(0.6, 2.0, uEnergy);
+  float intensityMod = 1.0 + chorusVibe * 0.4 + jamBoost * 0.2 - spaceHush * 0.5;
+  col *= mix(0.6, 2.0, uEnergy) * intensityMod;
+
+  // Space: dim to ember glow, Solo: focused warm core
+  alpha *= 1.0 - spaceHush * 0.4;
+  col += vec3(0.1, 0.05, 0.0) * soloFocus * 0.3;
 
   gl_FragColor = vec4(col, alpha * 0.85);
 }

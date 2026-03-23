@@ -82,14 +82,17 @@ void main() {
   float sectionScaleMod = mix(1.0, 1.4, sJam) * mix(1.0, 0.3, sSpace) * mix(1.0, 1.5, sSolo);
   float sectionRotMod = mix(1.0, 1.5, sJam) * mix(1.0, 0.2, sSpace) * (1.0 + uPeakApproaching * 0.3);
 
+  // Timbral flux → feedback distortion rate
+  float feedbackFlux = 1.0 + uTimbralFlux * 0.6;
+
   // --- Recursion parameters ---
   // Scale: zoom inward 2-5% per frame, driven by energy (section-modulated)
   // FFT bass → deeper tunnel zoom; FFT highs → longer trail decay
   float scaleAmount = 1.0 - (0.02 + energy * 0.03 + fftBass * 0.015) * accelBoost * sectionScaleMod;
 
-  // Rotation: bass drives twist (section-modulated)
+  // Rotation: bass drives twist (section-modulated), timbral flux accelerates
   float stemBass = clamp(uStemBass, 0.0, 1.0);
-  float rotAmount = (bass * 0.03 + stemBass * 0.015 + 0.005) * sign(sin(slowTime * 0.2)) * sectionRotMod; // Phil's bass deepens the twist
+  float rotAmount = (bass * 0.03 + stemBass * 0.015 + 0.005) * sign(sin(slowTime * 0.2)) * sectionRotMod * feedbackFlux; // Phil's bass deepens the twist
   // Stability affects regularity: unstable = jittery rotation
   rotAmount += (1.0 - stability) * sin(uTime * 7.0) * 0.01;
 
@@ -205,6 +208,9 @@ void main() {
   float vignette = 1.0 - dot(p * vigScale, p * vigScale);
   vignette = smoothstep(0.0, 1.0, vignette);
   col *= vignette;
+
+  // Semantic: chaotic → increase feedback distortion
+  col *= 1.0 + uSemanticChaotic * 0.12;
 
   // --- Post-processing ---
   col = applyPostProcess(col, vUv, p);

@@ -29,6 +29,8 @@ void main() {
 export const forestFrag = /* glsl */ `
 precision highp float;
 
+uniform float uSectionType;
+
 varying vec2 vUv;
 varying vec3 vWorldPos;
 varying vec3 vNormal;
@@ -49,6 +51,13 @@ float noise(vec2 p) {
 }
 
 void main() {
+  // Section-type modulation
+  float sType = uSectionType;
+  float jamBoost = smoothstep(4.5, 5.5, sType);      // jam=5: dense canopy sway
+  float spaceHush = smoothstep(6.5, 7.5, sType);      // space=7: foggy stillness
+  float chorusVibe = smoothstep(2.5, 3.5, sType) * (1.0 - smoothstep(3.5, 4.5, sType)); // chorus=3: dappled sunlight
+  float soloFocus = smoothstep(3.5, 4.5, sType) * (1.0 - smoothstep(4.5, 5.5, sType));  // solo=4: single shaft of light
+
   // Leaf litter texture from layered noise
   float n1 = noise(vWorldPos.xz * 1.5);
   float n2 = noise(vWorldPos.xz * 4.0 + 20.0) * 0.5;
@@ -64,7 +73,21 @@ void main() {
   // Basic directional lighting
   vec3 lightDir = normalize(vec3(0.3, 1.0, -0.2));
   float diffuse = max(dot(vNormal, lightDir), 0.0) * 0.3 + 0.7;
+
+  // Chorus: dappled sunlight brightens floor patches
+  diffuse += chorusVibe * 0.15 * noise(vWorldPos.xz * 2.5);
+
+  // Solo: concentrated single bright area, darker elsewhere
+  float soloSpot = smoothstep(0.3, 0.0, length(vWorldPos.xz * 0.1));
+  diffuse *= mix(1.0, 0.7 + soloSpot * 0.6, soloFocus);
+
   col *= diffuse;
+
+  // Space: muted fog-washed tones
+  col = mix(col, col * vec3(0.8, 0.85, 0.9) + vec3(0.01, 0.015, 0.02), spaceHush * 0.4);
+
+  // Jam: warmer, denser leaf litter
+  col += vec3(0.005, 0.003, 0.0) * jamBoost;
 
   gl_FragColor = vec4(col, 1.0);
 }
@@ -99,6 +122,8 @@ void main() {
 export const canopyFrag = /* glsl */ `
 precision highp float;
 
+uniform float uSectionType;
+
 varying vec2 vUv;
 
 float hash(vec2 p) {
@@ -117,14 +142,29 @@ float noise(vec2 p) {
 }
 
 void main() {
+  // Section-type modulation
+  float sType = uSectionType;
+  float jamBoost = smoothstep(4.5, 5.5, sType);      // jam=5: dense canopy
+  float spaceHush = smoothstep(6.5, 7.5, sType);      // space=7: foggy, thick canopy
+  float chorusVibe = smoothstep(2.5, 3.5, sType) * (1.0 - smoothstep(3.5, 4.5, sType)); // chorus=3: more gaps for sunlight
+  float soloFocus = smoothstep(3.5, 4.5, sType) * (1.0 - smoothstep(4.5, 5.5, sType));  // solo=4: single opening
+
   vec2 uv = vUv * 4.0;
   float n = noise(uv * 2.0);
   n += noise(uv * 5.0 + 20.0) * 0.5;
   n += noise(uv * 11.0 + 50.0) * 0.25;
   n /= 1.75;
 
-  float alpha = smoothstep(0.4, 0.55, n);
+  // Density threshold: jam/space=denser canopy, chorus/solo=more gaps
+  float densityThreshold = 0.4 + jamBoost * 0.08 + spaceHush * 0.06 - chorusVibe * 0.1 - soloFocus * 0.05;
+  float alpha = smoothstep(densityThreshold, densityThreshold + 0.15, n);
   vec3 canopyColor = vec3(0.02, 0.04, 0.02);
+
+  // Chorus: sunlight-touched green
+  canopyColor += vec3(0.005, 0.015, 0.003) * chorusVibe;
+
+  // Space: muted gray-green fog tone
+  canopyColor = mix(canopyColor, vec3(0.03, 0.04, 0.035), spaceHush * 0.5);
 
   gl_FragColor = vec4(canopyColor, alpha * 0.85);
 }

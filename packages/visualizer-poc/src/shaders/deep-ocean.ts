@@ -155,10 +155,13 @@ void main() {
   col += causticColor * caustic * 0.55;
 
   // === GOD RAYS: vertical light shafts from above (beat-reactive) ===
+  // Vocal pitch → god-ray angle modulation
+  float vocalAngle = (uVocalPitch - 0.5) * 0.15;
+
   float bpH = beatPulseHalf(uMusicalTime);
   float stemBass = clamp(uStemBass, 0.0, 1.0);
   float rayIntensity = (0.3 + bass * 0.5 + stemBass * 0.3 + uFastEnergy * 0.2) * (1.0 + bpH * 0.25 + uBeatSnap * 0.30 + climaxBoost * 0.20); // Phil's bass rumbles the deep
-  float rayX = swayUv.x * 3.0 + bass * sin(uDynamicTime * 0.3) * 0.5;
+  float rayX = swayUv.x * 3.0 + bass * sin(uDynamicTime * 0.3) * 0.5 + vocalAngle;
   float ray1 = smoothstep(0.8, 1.0, sin(rayX * 2.0 + uDynamicTime * 0.5)) * rayIntensity;
   float ray2 = smoothstep(0.85, 1.0, sin(rayX * 3.5 + uDynamicTime * 0.4 + 1.0)) * rayIntensity * 0.7;
   float ray3 = smoothstep(0.9, 1.0, sin(rayX * 1.5 + uDynamicTime * 0.6 + 2.5)) * rayIntensity * 0.5;
@@ -219,6 +222,9 @@ void main() {
   float _nf = snoise(vec3(p * 2.0, uTime * 0.1));
   col += iconEmergence(p, uTime, energy, uBass, waterColor, causticColor, _nf, uClimaxPhase, uSectionIndex);
   col += heroIconEmergence(p, uTime, energy, uBass, waterColor, causticColor, _nf, uSectionIndex);
+
+  // Semantic: tender → soften caustics
+  col = mix(col, col * 0.92 + vec3(0.03, 0.04, 0.06), uSemanticTender * 0.25);
 
   // === POST-PROCESSING (shared chain) ===
   col = applyPostProcess(col, vUv, p);

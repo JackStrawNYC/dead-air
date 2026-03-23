@@ -313,6 +313,15 @@ ${
     col = max(vec3(0.0), ehRot * col);
   }
 
+  // Semantic color grading: psychedelic boosts saturation, tender softens
+  {
+    float semanticSat = uSemanticPsychedelic * 0.08 - uSemanticTender * 0.06;
+    float semanticWarmth = uSemanticAggressive * 0.04 - uSemanticCosmic * 0.03;
+    float semLuma = dot(col, vec3(0.299, 0.587, 0.114));
+    col = mix(vec3(semLuma), col, 1.0 + semanticSat);
+    col = mix(col, col * vec3(1.0 + semanticWarmth, 1.0, 1.0 - semanticWarmth), 0.5);
+  }
+
 ${
   temporalBlendEnabled
     ? `  // Temporal frame blending: gentle accumulation for motion coherence

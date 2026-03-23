@@ -111,9 +111,11 @@ void main() {
   float sectionBrightMod = mix(0.0, 0.2, sJam) + mix(0.0, -0.15, sSpace) + mix(0.0, 0.25, sSolo);
 
   // Audio-driven parameters (section-modulated)
+  // Timbral flux → mutation rate
+  float fluxMutation = 1.0 + uTimbralFlux * 0.8;
   // FFT bands: bass → base height, mids → turbulence, highs → fine detail
   float stemDrums = clamp(uStemDrums, 0.0, 1.0);
-  float rotSpeed = (0.3 + bass * 0.8 + fftMid * 0.2 + stemDrums * 0.4) * sectionRotMod; // drums accelerate rotation
+  float rotSpeed = (0.3 + bass * 0.8 + fftMid * 0.2 + stemDrums * 0.4) * sectionRotMod * fluxMutation; // drums accelerate rotation, timbral flux mutates
   float pointBright = 0.3 + energy * 0.7 + sectionBrightMod + fftBass * 0.15;
   float affineScale = 0.5 + melodicPitch * 0.3 + fftHigh * 0.1 + transformJitter * 0.2;
   float variationMix = tension;

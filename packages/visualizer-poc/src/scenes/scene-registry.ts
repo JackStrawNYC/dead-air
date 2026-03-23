@@ -135,11 +135,13 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     energyAffinity: "high",
     complement: "oil_projector",
     gradingIntensity: 0.75,
+    spectralFamily: "warm",
   },
   oil_projector: {
     Component: OilProjectorScene,
     energyAffinity: "mid",
     complement: "liquid_light",
+    spectralFamily: "warm",
   },
   // ─── Bright: high centroid, punchy ───
   concert_lighting: {
@@ -166,6 +168,7 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     Component: StarkMinimalScene,
     energyAffinity: "low",
     complement: "liquid_light",
+    spectralFamily: "tonal",
   },
   tie_dye: {
     Component: TieDyeScene,
@@ -247,6 +250,7 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     Component: ParticleSwarmScene,
     energyAffinity: "mid",
     complement: "spectral_analyzer",
+    spectralFamily: "bright",
   },
   crystalline_growth: {
     Component: CrystallineGrowthScene,
@@ -272,6 +276,7 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     energyAffinity: "any",
     complement: "kaleidoscope",
     preferredTransitionIn: "morph",
+    spectralFamily: "tonal",
   },
   sacred_geometry: {
     Component: SacredGeometryScene,
@@ -326,6 +331,7 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     Component: VoronoiFlowScene,
     energyAffinity: "mid",
     complement: "truchet_tiling",
+    spectralFamily: "textural",
   },
   electric_arc: {
     Component: ElectricArcScene,

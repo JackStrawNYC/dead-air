@@ -836,12 +836,14 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
 
   const nextSectionIdx = currentSectionIdx + 1;
   const prevSectionIdx = currentSectionIdx - 1;
+  const frameEnergy = frames[Math.min(frame, frames.length - 1)]?.rms ?? 0;
 
   // Sacred segue or suite middle: suppress first within-song scene crossfade for 90 frames (3s)
   // This prevents a jarring shader switch right as the segue/suite transition lands
   const suppressCrossfade = (isSacredSegueIn || isInSuiteMiddle) && frame < 90;
 
   // Crossfade INTO this section (from previous) — beat-synced when possible
+  // High energy delta transitions (>0.15) use DualShaderQuad for organic GPU blending
   if (prevSectionIdx >= 0 && !suppressCrossfade) {
     const prevMode = getModeForSection(song, prevSectionIdx, sections, seed, era, false, usedShaderModes, songIdentity, stemSection, frames, songDuration, setNumber, trackNumber, shaderModeLastUsed);
     if (prevMode !== currentMode) {
@@ -856,6 +858,30 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
         // Compute energy before/after boundary for transition style selection
         const energyBefore = prevSectionIdx >= 0 && sections[prevSectionIdx] ? averageEnergy(frames, sections[prevSectionIdx].frameStart, boundary) : 0;
         const energyAfter = currentSection ? averageEnergy(frames, boundary, currentSection.frameEnd) : 0;
+
+        // High energy delta: use DualShaderQuad for organic GPU blend (60 frames)
+        const energyDelta = Math.abs(energyAfter - energyBefore);
+        if (energyDelta > 0.15) {
+          const stringsA = getShaderStrings(prevMode);
+          const stringsB = getShaderStrings(currentMode);
+          if (stringsA && stringsB) {
+            const GPU_CROSSFADE_LEN = 60;
+            const gpuDistFromStart = frame - crossfadeStart;
+            if (gpuDistFromStart >= 0 && gpuDistFromStart < GPU_CROSSFADE_LEN) {
+              const gpuProgress = gpuDistFromStart / GPU_CROSSFADE_LEN;
+              const blendMode = selectDualBlendMode(frameEnergy, currentSection?.energy, undefined);
+              return (
+                <DualShaderScene
+                  frames={frames} sections={sections} palette={palette} tempo={tempo} jamDensity={jamDensity}
+                  vertA={stringsA.vert} fragA={stringsA.frag}
+                  vertB={stringsB.vert} fragB={stringsB.frag}
+                  blendMode={blendMode} blendProgress={gpuProgress}
+                />
+              );
+            }
+          }
+        }
+
         const sectionLabel = currentSection ? (frames[boundary]?.sectionType ?? undefined) : undefined;
         const scenePreferredOut = SCENE_REGISTRY[prevMode]?.preferredTransitionOut;
         const scenePreferredIn = SCENE_REGISTRY[currentMode]?.preferredTransitionIn;
@@ -874,6 +900,7 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
   }
 
   // Crossfade OUT of this section (to next) — beat-synced when possible
+  // High energy delta transitions use DualShaderQuad for organic GPU blending
   if (nextSectionIdx < sections.length) {
     const nextMode = getModeForSection(song, nextSectionIdx, sections, seed, era, false, usedShaderModes, songIdentity, stemSection, frames, songDuration, setNumber, trackNumber, shaderModeLastUsed);
     if (nextMode !== currentMode) {
@@ -888,6 +915,30 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
         const energyBefore = currentSection ? averageEnergy(frames, currentSection.frameStart, boundary) : 0;
         const nextSection = sections[nextSectionIdx];
         const energyAfter = nextSection ? averageEnergy(frames, boundary, nextSection.frameEnd) : 0;
+
+        // High energy delta: use DualShaderQuad for organic GPU blend
+        const energyDeltaOut = Math.abs(energyAfter - energyBefore);
+        if (energyDeltaOut > 0.15) {
+          const stringsA = getShaderStrings(currentMode);
+          const stringsB = getShaderStrings(nextMode);
+          if (stringsA && stringsB) {
+            const GPU_CROSSFADE_LEN = 60;
+            const gpuDistToEnd = crossfadeEnd - frame;
+            if (gpuDistToEnd >= 0 && gpuDistToEnd < GPU_CROSSFADE_LEN) {
+              const gpuProgress = 1 - gpuDistToEnd / GPU_CROSSFADE_LEN;
+              const blendMode = selectDualBlendMode(frameEnergy, currentSection?.energy, undefined);
+              return (
+                <DualShaderScene
+                  frames={frames} sections={sections} palette={palette} tempo={tempo} jamDensity={jamDensity}
+                  vertA={stringsA.vert} fragA={stringsA.frag}
+                  vertB={stringsB.vert} fragB={stringsB.frag}
+                  blendMode={blendMode} blendProgress={gpuProgress}
+                />
+              );
+            }
+          }
+        }
+
         const sectionLabel = nextSection ? (frames[boundary]?.sectionType ?? undefined) : undefined;
         const scenePreferredOutB = SCENE_REGISTRY[currentMode]?.preferredTransitionOut;
         const scenePreferredInB = SCENE_REGISTRY[nextMode]?.preferredTransitionIn;
@@ -905,37 +956,56 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
     }
   }
 
-  // ─── Dual-shader composition for set 2+ ───
+  // ─── Dual-shader composition ───
   // Two shaders run simultaneously on the GPU, composited via blend modes.
   // Creates psychedelic depth that a single shader can't achieve.
-  // Only activates when both shaders support GLSL string extraction.
+  // Activates for: high-energy sections, jam/solo stems, tight-lock interplay,
+  // solo-spotlight focus (subtle), and Set 1 at higher energy thresholds.
   let mainScene: React.ReactNode;
   const sectionLen = currentSection ? currentSection.frameEnd - currentSection.frameStart : 0;
-  const frameEnergy = frames[Math.min(frame, frames.length - 1)]?.rms ?? 0;
+
+  // Set-aware energy thresholds: Set 1 requires higher energy, Set 2+ standard
+  const isSet1 = setNumber === 1;
+  const dualEnergyThreshold = isSet1 ? 0.18 : 0.12;
+  const dualBlendCap = isSet1 ? 0.35 : 0.55;
 
   // Climax force: any section during climax/sustain phase, or high-energy sections
   const climaxForceDual = (climaxPhaseProp !== undefined && climaxPhaseProp >= 2 && climaxPhaseProp <= 3 && frameEnergy > 0.08)
-    || (currentSection?.energy === "high" && frameEnergy > 0.12);
+    || (currentSection?.energy === "high" && frameEnergy > dualEnergyThreshold);
 
   // Cooldown: every 3rd section forced single for visual contrast
   const dualCooldown = currentSectionIdx > 0 && currentSectionIdx % 3 === 0;
 
-  // Stem interplay modulation: tight-lock encourages dual composition, solo-spotlight suppresses it
+  // Stem interplay modulation: tight-lock encourages dual composition
   const interplayForceDual = stemInterplayMode === "tight-lock";
-  const interplaySuppressDual = stemInterplayMode === "solo-spotlight";
+  const isSoloSpotlight = stemInterplayMode === "solo-spotlight";
 
   // Dual-shader activation: sufficient length + moderate energy, or jam/solo stem, or tight-lock interplay
-  const shouldDual = !dualCooldown && !interplaySuppressDual && (climaxForceDual || interplayForceDual || (sectionLen >= 600 && (
-    frameEnergy > 0.12 ||
+  const shouldDual = !dualCooldown && !isSoloSpotlight && (climaxForceDual || interplayForceDual || (sectionLen >= 600 && (
+    frameEnergy > dualEnergyThreshold ||
     stemSection === "jam" || stemSection === "solo"
   )));
-  if (shouldDual) {
+
+  // Solo-spotlight dual: subtle focus blend instead of full suppression
+  const shouldSoloSpotlightDual = isSoloSpotlight && !dualCooldown && sectionLen >= 300 && frameEnergy > 0.06;
+
+  if (shouldDual || shouldSoloSpotlightDual) {
     // Prefer transition affinity pool for secondary shader selection
     const affinityPool = TRANSITION_AFFINITY[currentMode];
     const rng = seededRandom((seed ?? 0) + currentSectionIdx * 13);
-    const secondaryMode = affinityPool && affinityPool.length > 0
-      ? affinityPool[Math.floor(rng() * affinityPool.length)]
-      : getComplement(currentMode);
+
+    let secondaryMode: VisualMode;
+    if (shouldSoloSpotlightDual) {
+      // Solo spotlight: blend a focus-appropriate shader (stark, void, aurora)
+      const soloPool: VisualMode[] = ["stark_minimal", "void_light", "aurora", "deep_ocean"];
+      const soloFiltered = soloPool.filter((m) => m !== currentMode);
+      secondaryMode = soloFiltered[Math.floor(rng() * soloFiltered.length)] ?? getComplement(currentMode);
+    } else {
+      secondaryMode = affinityPool && affinityPool.length > 0
+        ? affinityPool[Math.floor(rng() * affinityPool.length)]
+        : getComplement(currentMode);
+    }
+
     const stringsA = getShaderStrings(currentMode);
     const stringsB = getShaderStrings(secondaryMode);
 
@@ -951,20 +1021,29 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
         : 0;
       // Ramp up over first 20% of section (don't start at full blend)
       const sectionRamp = Math.min(1, sectionProgress / 0.2);
-      // Base blend: lower floor (0.10) so primary strongly dominates at rest
-      const baseBlend = 0.10 + frameEnergy * 0.30;
-      // Section arc: peak blend at section midpoint
-      const arcBlend = Math.sin(sectionProgress * Math.PI) * 0.12;
-      // Beat pulse: brief spike on beats for rhythmic contrast
-      const beatPulse = (frameData?.beat ? 0.15 : 0) * Math.max(0.3, frameEnergy);
-      const blendProgress = (baseBlend + arcBlend + beatPulse) * sectionRamp;
+
+      let blendProgress: number;
+      if (shouldSoloSpotlightDual) {
+        // Solo spotlight: subtle 20-30% blend for visual focus effect
+        const soloBaseBlend = 0.15 + frameEnergy * 0.15;
+        const soloBeatPulse = (frameData?.beat ? 0.08 : 0) * Math.max(0.3, frameEnergy);
+        blendProgress = (soloBaseBlend + soloBeatPulse) * sectionRamp;
+        blendProgress = Math.min(0.30, blendProgress);
+      } else {
+        // Standard dual-shader blend
+        const baseBlend = 0.10 + frameEnergy * 0.30;
+        const arcBlend = Math.sin(sectionProgress * Math.PI) * 0.12;
+        const beatPulse = (frameData?.beat ? 0.15 : 0) * Math.max(0.3, frameEnergy);
+        blendProgress = (baseBlend + arcBlend + beatPulse) * sectionRamp;
+        blendProgress = Math.min(dualBlendCap, blendProgress);
+      }
 
       mainScene = (
         <DualShaderScene
           frames={frames} sections={sections} palette={palette} tempo={tempo} jamDensity={jamDensity}
           vertA={stringsA.vert} fragA={stringsA.frag}
           vertB={stringsB.vert} fragB={stringsB.frag}
-          blendMode={blendMode} blendProgress={Math.min(0.55, blendProgress)}
+          blendMode={blendMode} blendProgress={blendProgress}
         />
       );
     } else {

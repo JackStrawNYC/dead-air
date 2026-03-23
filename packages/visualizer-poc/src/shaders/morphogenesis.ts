@@ -80,8 +80,11 @@ void main() {
   float patternScaleMod = mix(1.0, 1.3, sJam) * mix(1.0, 0.7, sSpace) * mix(1.0, 1.2, sChorus);
   float diffusionSpeedMod = mix(1.0, 1.5, sJam) * mix(1.0, 0.5, sSpace) * mix(1.0, 1.15, sChorus);
 
+  // Timbral flux → reaction mutation rate
+  float morphFlux = 1.0 + uTimbralFlux * 0.5;
+
   // --- Reaction-diffusion parameters ---
-  float dt = (0.8 + energy * 1.5) * reactionRateMod; // reaction rate from energy
+  float dt = (0.8 + energy * 1.5) * reactionRateMod * morphFlux; // reaction rate from energy, modulated by timbral flux
   float Da = (0.21 + bass * 0.08) * patternScaleMod; // activator diffusion (larger = bigger spots)
   float Di = (0.05 + mids * 0.12) * diffusionSpeedMod; // inhibitor diffusion (ratio to Da determines pattern)
   float f = 0.035 + tension * 0.015; // feed rate

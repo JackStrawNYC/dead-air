@@ -98,25 +98,37 @@ precision highp float;
 uniform float uEnergy;
 uniform vec3 uFireColor;
 uniform float uLayerDepth; // 0 = nearest (darkest), 1 = farthest (lighter)
+uniform float uSectionType;
 
 varying vec2 vUv;
 varying float vEdgeDist;
 
 void main() {
+  // Section-type modulation
+  float sType = uSectionType;
+  float jamBoost = smoothstep(4.5, 5.5, sType);      // jam=5: eruption intensity
+  float spaceHush = smoothstep(6.5, 7.5, sType);      // space=7: smoldering embers
+  float chorusVibe = smoothstep(2.5, 3.5, sType) * (1.0 - smoothstep(3.5, 4.5, sType)); // chorus=3: full blaze
+  float soloFocus = smoothstep(3.5, 4.5, sType) * (1.0 - smoothstep(4.5, 5.5, sType));  // solo=4: lava river focus
+
   float energy = clamp(uEnergy, 0.0, 1.0);
+  float fireIntensityMod = 1.0 + jamBoost * 0.5 + chorusVibe * 0.3 - spaceHush * 0.6;
 
   // Dark silhouette colors with depth layering
   vec3 nearColor = vec3(0.005, 0.004, 0.012);
   vec3 farColor = vec3(0.015, 0.012, 0.025);
   vec3 baseColor = mix(nearColor, farColor, uLayerDepth);
 
-  // Fire illumination on mountain face
-  vec3 fireIllum = uFireColor * energy * 0.08;
+  // Fire illumination on mountain face — modulated by section type
+  vec3 fireIllum = uFireColor * energy * 0.08 * fireIntensityMod;
   baseColor += fireIllum * mix(0.15, 0.5, uLayerDepth);
 
-  // Rim lighting near mountain edge (top)
-  float rimGlow = (1.0 - vEdgeDist) * energy;
+  // Rim lighting near mountain edge (top) — jam/chorus amplify rim glow
+  float rimGlow = (1.0 - vEdgeDist) * energy * fireIntensityMod;
   vec3 rimColor = uFireColor * rimGlow * 0.4;
+
+  // Solo: focused lava glow concentrated in nearest ridge
+  rimColor += uFireColor * soloFocus * 0.15 * (1.0 - uLayerDepth);
 
   vec3 col = baseColor + rimColor;
   gl_FragColor = vec4(col, 1.0);
@@ -134,6 +146,7 @@ uniform float uEnergy;
 uniform float uBass;
 uniform float uBeatSnap;
 uniform float uClimaxIntensity;
+uniform float uSectionType;
 
 attribute float aPhase;
 attribute float aSpeed;
@@ -144,14 +157,24 @@ varying float vHeight;
 varying float vAlpha;
 
 void main() {
+  // Section-type modulation
+  float sType = uSectionType;
+  float jamBoost = smoothstep(4.5, 5.5, sType);      // jam=5: eruption intensity
+  float spaceHush = smoothstep(6.5, 7.5, sType);      // space=7: smoldering embers
+  float chorusVibe = smoothstep(2.5, 3.5, sType) * (1.0 - smoothstep(3.5, 4.5, sType)); // chorus=3: full blaze
+  float soloFocus = smoothstep(3.5, 4.5, sType) * (1.0 - smoothstep(4.5, 5.5, sType));  // solo=4: lava river focus
+
   vec3 pos = position;
 
   float energy = clamp(uEnergy, 0.0, 1.0);
-  float fireHeight = mix(1.0, 12.0, energy);
-  float fireWidth = mix(2.0, 6.0, energy);
+  // Jam=inferno height, chorus=full blaze, space=smoldering, solo=concentrated
+  float heightMod = 1.0 + jamBoost * 0.5 + chorusVibe * 0.3 - spaceHush * 0.5 + soloFocus * 0.2;
+  float fireHeight = mix(1.0, 12.0, energy) * heightMod;
+  float fireWidth = mix(2.0, 6.0, energy) * (1.0 + jamBoost * 0.3 - soloFocus * 0.3);
 
-  // Life cycle: particles rise and respawn
-  float life = fract(aPhase + uDynamicTime * aSpeed * 0.15);
+  // Life cycle: particles rise and respawn — jam=faster cycling
+  float speedMod = 1.0 + jamBoost * 0.3 - spaceHush * 0.4;
+  float life = fract(aPhase + uDynamicTime * aSpeed * 0.15 * speedMod);
   vLife = life;
 
   // Rise from base
@@ -171,10 +194,11 @@ void main() {
   pos.y += uBeatSnap * 0.3;
   pos.x += uBeatSnap * sin(aPhase * 30.0) * 0.2;
 
-  // Fade over lifetime
+  // Fade over lifetime — space dims, chorus brightens
   vAlpha = (1.0 - life) * (1.0 - life * 0.5);
   vAlpha *= energy;
   vAlpha *= 1.0 + uClimaxIntensity * 0.4;
+  vAlpha *= 1.0 + chorusVibe * 0.3 - spaceHush * 0.4;
 
   vec4 mvPos = modelViewMatrix * vec4(pos, 1.0);
   float baseSize = aSize * (4.0 + energy * 8.0);
@@ -189,6 +213,7 @@ precision highp float;
 uniform float uChromaHue;
 uniform float uPalettePrimary;
 uniform float uPaletteSaturation;
+uniform float uSectionType;
 
 varying float vLife;
 varying float vHeight;
@@ -201,6 +226,13 @@ vec3 hsv2rgb(vec3 c) {
 }
 
 void main() {
+  // Section-type modulation
+  float sType = uSectionType;
+  float jamBoost = smoothstep(4.5, 5.5, sType);      // jam=5: eruption intensity
+  float spaceHush = smoothstep(6.5, 7.5, sType);      // space=7: smoldering embers
+  float chorusVibe = smoothstep(2.5, 3.5, sType) * (1.0 - smoothstep(3.5, 4.5, sType)); // chorus=3: full blaze
+  float soloFocus = smoothstep(3.5, 4.5, sType) * (1.0 - smoothstep(4.5, 5.5, sType));  // solo=4: lava river focus
+
   float dist = length(gl_PointCoord - 0.5);
   if (dist > 0.5) discard;
   float alpha = smoothstep(0.5, 0.05, dist) * vAlpha;
@@ -228,6 +260,14 @@ void main() {
   float coreDist = length(gl_PointCoord - 0.5);
   float core = smoothstep(0.3, 0.0, coreDist);
   col += vec3(1.0, 0.9, 0.5) * core * 0.3;
+
+  // Section modulation on fire color intensity
+  // Jam: eruption white-hot, Chorus: vibrant full blaze
+  col *= 1.0 + jamBoost * 0.3 + chorusVibe * 0.2;
+  // Space: dim smoldering, desaturated toward deep red
+  col = mix(col, baseCol * 0.4, spaceHush * 0.5);
+  // Solo: focused lava glow — warm concentrated core
+  col += vec3(0.15, 0.05, 0.0) * soloFocus * core * 0.5;
 
   gl_FragColor = vec4(col, alpha);
 }

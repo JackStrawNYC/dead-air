@@ -179,9 +179,12 @@ void main() {
   col += beatKick;
   col += rim * glowColor * 0.4;
 
+  // Space score → cavern openness
+  float spaceOpen = 1.0 + uSpaceScore * 0.25;
+
   // Fog: distance-based (shader-specific, applied before post-proc)
   float fogDist = length(vWorldPos);
-  float fog = 1.0 - exp(-fogDist * (0.08 - uEnergy * 0.03));
+  float fog = 1.0 - exp(-fogDist * (0.08 - uEnergy * 0.03) / spaceOpen);
   vec3 fogColor = vec3(0.02, 0.03, 0.06);
   col = mix(col, fogColor, fog);
 
