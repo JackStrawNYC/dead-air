@@ -82,10 +82,10 @@ const PHASE_MODIFIERS: Record<ShowArcPhase, ShowArcModifiers> = {
       character: +0.05,
       atmospheric: +0.05,
     },
-    densityMult: 1.1,
+    densityMult: 1.4,           // boosted: lights come back on
     windowDurationMult: 0.9,
-    saturationOffset: 0.08,    // bold visual statement
-    brightnessOffset: 0.04,
+    saturationOffset: 0.12,    // boosted: bold visual statement
+    brightnessOffset: 0.06,    // boosted: room lights up
     hueShift: -5,              // slight cool shift — deeper territory
     abstractionLevel: 0.4,
   },

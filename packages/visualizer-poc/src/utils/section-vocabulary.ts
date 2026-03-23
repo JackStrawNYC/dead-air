@@ -107,6 +107,61 @@ export function getSectionVocabulary(sectionType: string | undefined): SectionVo
   return VOCABULARIES[sectionType.toLowerCase()] ?? DEFAULT_VOCABULARY;
 }
 
+/**
+ * Compose section vocabulary with jam cycle phase for within-jam evolution.
+ * Static vocabularies feel flat during 10-minute jams; this modulates them
+ * based on the current build→peak→release sub-cycle.
+ */
+export function composeSectionWithJamCycle(
+  vocab: SectionVocabulary,
+  jamPhase: string | undefined,
+  jamProgress: number,
+): SectionVocabulary {
+  if (!jamPhase) return vocab;
+
+  switch (jamPhase) {
+    case "explore":
+      // Sparser, cooler — listening to each other
+      return {
+        ...vocab,
+        overlayDensityMult: vocab.overlayDensityMult * (0.7 + jamProgress * 0.1),
+        driftSpeedMult: vocab.driftSpeedMult * 0.8,
+        saturationOffset: vocab.saturationOffset - 0.05,
+        brightnessOffset: vocab.brightnessOffset - 0.02,
+      };
+    case "build":
+      // Ramping up — progressive intensification
+      return {
+        ...vocab,
+        overlayDensityMult: vocab.overlayDensityMult * (0.9 + jamProgress * 0.4),
+        driftSpeedMult: vocab.driftSpeedMult * (1.0 + jamProgress * 0.3),
+        saturationOffset: vocab.saturationOffset + jamProgress * 0.10,
+        brightnessOffset: vocab.brightnessOffset + jamProgress * 0.03,
+      };
+    case "peak":
+      // Dense, vivid — the moment
+      return {
+        ...vocab,
+        overlayDensityMult: vocab.overlayDensityMult * 1.4,
+        driftSpeedMult: vocab.driftSpeedMult * 1.3,
+        saturationOffset: vocab.saturationOffset + 0.12,
+        brightnessOffset: vocab.brightnessOffset + 0.04,
+        cutsPermitted: true,
+      };
+    case "release":
+      // Thinning out — exhale
+      return {
+        ...vocab,
+        overlayDensityMult: vocab.overlayDensityMult * (1.0 - jamProgress * 0.4),
+        driftSpeedMult: vocab.driftSpeedMult * (1.1 - jamProgress * 0.3),
+        saturationOffset: vocab.saturationOffset - jamProgress * 0.06,
+        brightnessOffset: vocab.brightnessOffset - jamProgress * 0.02,
+      };
+    default:
+      return vocab;
+  }
+}
+
 /** Blend between two vocabularies (for smooth section transitions) */
 export function blendVocabularies(
   a: SectionVocabulary,

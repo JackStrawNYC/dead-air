@@ -43,6 +43,14 @@ const GROOVE_LOCK: Record<GrooveType, number> = {
   floating: 0.0,
 };
 
+/** Groove type → zoom pulse amplitude (visible, groove-appropriate scaling) */
+const GROOVE_ZOOM_AMP: Record<GrooveType, number> = {
+  pocket: 0.005,
+  driving: 0.008,
+  freeform: 0.002,
+  floating: 0,
+};
+
 /**
  * Compute tempo-locked visual modulations.
  *
@@ -57,12 +65,16 @@ export function computeTempoLock(
   beatStability: number,
   energy: number,
 ): TempoLockState {
-  // No lock for very low beat stability or near-silence
-  if (beatStability < 0.2 || energy < 0.05) return NEUTRAL;
+  // No lock for near-silence
+  if (energy < 0.03) return NEUTRAL;
+
+  // Smooth stability gate: ramps from 0 at stability=0.1 to 1 at stability=0.4
+  // (replaces hard cliff at 0.2 which caused jarring on/off behavior)
+  const stabilityGate = Math.max(0, Math.min(1, (beatStability - 0.1) / 0.3));
 
   const baseLock = GROOVE_LOCK[grooveType] ?? 0;
-  // Scale lock by beat stability (unstable beats → less lock)
-  const lockStrength = baseLock * Math.min(1, beatStability / 0.6);
+  // Scale lock by beat stability gate (smooth ramp, not cliff)
+  const lockStrength = baseLock * stabilityGate * Math.min(1, beatStability / 0.6);
 
   if (lockStrength < 0.01) return NEUTRAL;
 
@@ -78,10 +90,11 @@ export function computeTempoLock(
   const breathRaw = Math.cos(musicalTime * Math.PI); // half-bar sinusoid
   const overlayBreathing = 1 + breathRaw * breathAmp * lockStrength;
 
-  // Zoom pulse: subtle beat-locked zoom (0.2% max, decays from beat hit)
+  // Zoom pulse: groove-typed beat-locked zoom (decays from beat hit)
   // Sharp attack on beat, exponential decay within beat
   const beatAttack = Math.exp(-beatPhase * 4); // fast decay from beat
-  const zoomAmp = 0.002 * lockStrength * Math.min(1, energy * 3);
+  const grooveZoomAmp = GROOVE_ZOOM_AMP[grooveType] ?? 0.002;
+  const zoomAmp = grooveZoomAmp * lockStrength * Math.min(1, energy * 3);
   const zoomPulse = 1 + beatAttack * zoomAmp;
 
   return {

@@ -391,6 +391,14 @@ ${
     col = mix(vec3(onsetLuma), col, 1.0 + onsetPulse * (0.15 + climaxBoost * 0.25));
   }
 
+  // Improvisation bloom: jams glow when the band is exploring
+  {
+    float improv = smoothstep(0.4, 0.8, uImprovisationScore);
+    col *= 1.0 + improv * 0.12;
+    float improvLuma = dot(col, vec3(0.299, 0.587, 0.114));
+    col = mix(vec3(improvLuma), col, 1.0 + improv * 0.15);
+  }
+
   // Onset hue punch: color rotates on strong transients
   {
     float hueKick = max(uOnsetSnap, uDrumOnset) * smoothstep(0.15, 0.35, energy) * 0.08;
@@ -403,6 +411,16 @@ ${
       0.0, 0.0, 1.0
     );
     col = max(vec3(0.0), hkRot * col);
+  }
+
+  // Melodic hue breathing: pitch contour → subtle color drift (±4%)
+  {
+    float melGate = smoothstep(0.1, 0.3, energy) * uMelodicConfidence;
+    float melHue = (uMelodicPitch - 0.5) * 0.08 * melGate;
+    float mhCos = cos(melHue * 6.28);
+    float mhSin = sin(melHue * 6.28);
+    mat3 mhRot = mat3(mhCos,-mhSin,0.0, mhSin,mhCos,0.0, 0.0,0.0,1.0);
+    col = max(vec3(0.0), mhRot * col);
   }
 
   // Lifted blacks — ALWAYS active. A Dead show never goes dark.

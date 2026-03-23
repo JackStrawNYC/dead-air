@@ -12,6 +12,7 @@
  */
 
 import type { EraPreset } from "./era-presets";
+import type { TransitionStyle } from "./song-identities";
 
 // ─── Band Config Interface ───
 
@@ -387,6 +388,30 @@ export const GRATEFUL_DEAD_CONFIG: BandConfig = {
     },
   },
 };
+
+// ─── Sacred Segue Transition Styles ───
+// Curated visual transitions for the most iconic song pairings.
+// Key format: "from_title_lower→to_title_lower"
+export const SACRED_SEGUE_TRANSITIONS: Record<string, TransitionStyle> = {
+  "scarlet begonias→fire on the mountain": "distortion_morph",
+  "china cat sunflower→i know you rider": "kaleidoscope_dissolve",
+  "help on the way→slipknot!": "interference_pattern",
+  "slipknot!→franklin's tower": "flash",
+  "the other one→wharf rat": "void",
+  "drums→space": "void",
+  "drums / space→morning dew": "spiral_vortex",
+  "the other one→morning dew": "morph",
+  "estimated prophet→eyes of the world": "morph",
+  "not fade away→going down the road feeling bad": "flash",
+  "he's gone→truckin'": "dissolve",
+  "truckin'→the other one": "distortion_morph",
+};
+
+/** Look up a curated transition style for a sacred segue pair */
+export function getSacredSegueTransition(fromTitle: string, toTitle: string): TransitionStyle | undefined {
+  const key = `${fromTitle.toLowerCase()}→${toTitle.toLowerCase()}`;
+  return SACRED_SEGUE_TRANSITIONS[key];
+}
 
 // ─── Active Config ───
 

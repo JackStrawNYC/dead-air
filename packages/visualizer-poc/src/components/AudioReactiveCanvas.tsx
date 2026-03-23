@@ -16,6 +16,7 @@ import { energyGate } from "../utils/math";
 import { useHeroPermitted } from "../data/HeroPermittedContext";
 import { useJamPhase } from "../data/JamPhaseContext";
 import { usePeakOfShow } from "../data/PeakOfShowContext";
+import { useTimeDilation } from "../data/TimeDilationContext";
 
 /** Audio data context passed to all Three.js children */
 export interface AudioDataContext {
@@ -395,6 +396,7 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
   const heroPermitted = useHeroPermitted();
   const jamPhaseCtx = useJamPhase();
   const peakOfShowIntensity = usePeakOfShow();
+  const spaceTimeDilation = useTimeDilation();
   const heroIcon = heroPermitted !== false
     ? computeHeroIconState(climaxPhaseNum, climaxState.intensity)
     : { trigger: 0, progress: 0 };
@@ -488,7 +490,7 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
         ? computeMusicalTimeUtil(beatArray, idx, fps, tempo ?? 120) / (tempo ?? 120) * 60
         : (dynamicTimeLookup[idx] ?? (idx / fps));
       const fluxMult = 1.0 + Math.min(0.3, spectralFlux * 0.8);
-      return baseDT * climaxSpeedMult * fluxMult;
+      return baseDT * climaxSpeedMult * fluxMult * spaceTimeDilation;
     })(),
     jamPhase: jamPhaseCtx.phase,
     jamProgress: jamPhaseCtx.progress,

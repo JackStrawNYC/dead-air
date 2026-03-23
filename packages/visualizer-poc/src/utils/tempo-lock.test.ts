@@ -75,7 +75,7 @@ describe("computeTempoLock", () => {
       expect(r.overlayBreathing).toBeGreaterThan(0.85);
       expect(r.overlayBreathing).toBeLessThan(1.15);
       expect(r.zoomPulse).toBeGreaterThanOrEqual(1);
-      expect(r.zoomPulse).toBeLessThan(1.005);
+      expect(r.zoomPulse).toBeLessThan(1.01);
       expect(r.beatPhase).toBeGreaterThanOrEqual(0);
       expect(r.beatPhase).toBeLessThan(1);
       expect(r.barPhase).toBeGreaterThanOrEqual(0);

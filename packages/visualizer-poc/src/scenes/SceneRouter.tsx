@@ -231,6 +231,10 @@ interface Props {
   trackNumber?: number;
   /** Stem interplay mode for dual-shader composition awareness */
   stemInterplayMode?: InterplayMode;
+  /** Dominant stem musician for shader pool bias */
+  stemDominant?: string;
+  /** Force transcendent shader (from IT response deep coherence lock) */
+  itForceTranscendentShader?: boolean;
 }
 
 /**
@@ -310,6 +314,7 @@ export function getModeForSection(
   setNumber?: number,
   trackNumber?: number,
   shaderModeLastUsed?: Map<VisualMode, number>,
+  stemDominant?: string,
 ): VisualMode {
   // Explicit override always wins
   const override = song.sectionOverrides?.find((o) => o.sectionIndex === sectionIndex);
@@ -431,6 +436,27 @@ export function getModeForSection(
         }
       }
 
+      // Stem dominant musician bias: who's driving → which shaders feel right
+      if (stemDominant === "jerry") {
+        const jerryModes: VisualMode[] = ["kaleidoscope", "fractal_zoom", "sacred_geometry", "aurora"];
+        const matches = jerryModes.filter((m) => filteredPool.includes(m));
+        if (matches.length > 0) {
+          for (let i = 0; i < 2; i++) filteredPool = [...filteredPool, ...matches]; // 2.5x weight
+        }
+      } else if (stemDominant === "phil") {
+        const philModes: VisualMode[] = ["deep_ocean", "cosmic_voyage", "neural_web", "cosmic_dust"];
+        const matches = philModes.filter((m) => filteredPool.includes(m));
+        if (matches.length > 0) {
+          for (let i = 0; i < 2; i++) filteredPool = [...filteredPool, ...matches];
+        }
+      } else if (stemDominant === "drums") {
+        const drumsModes: VisualMode[] = ["mandala_engine", "reaction_diffusion", "electric_arc", "inferno"];
+        const matches = drumsModes.filter((m) => filteredPool.includes(m));
+        if (matches.length > 0) {
+          for (let i = 0; i < 2; i++) filteredPool = [...filteredPool, ...matches];
+        }
+      }
+
       // Chord mood bias: weight mood-matching modes 2x when confidence > 0.3
       if (frames && section) {
         const moodResult = detectChordMood(frames, section.frameStart);
@@ -547,6 +573,14 @@ export function getDrumsSpaceMode(phase: string, seed?: number, songIdentity?: S
       const pool: VisualMode[] = ["deep_ocean", "cosmic_dust", "crystal_cavern", "void_light", "morphogenesis"];
       return pool[Math.floor(rng() * pool.length)];
     }
+    case "space_textural": {
+      const pool: VisualMode[] = ["sacred_geometry", "fractal_zoom", "mandala_engine", "morphogenesis"];
+      return pool[Math.floor(rng() * pool.length)];
+    }
+    case "space_melodic": {
+      const pool: VisualMode[] = ["kaleidoscope", "aurora", "sacred_geometry", "crystal_cavern"];
+      return pool[Math.floor(rng() * pool.length)];
+    }
     case "reemergence": return rng() > 0.5 ? "concert_lighting" : "liquid_light";
     default: return "cosmic_voyage";
   }
@@ -590,7 +624,7 @@ function renderMode(
   return renderScene(mode, { frames, sections, palette, tempo, style, jamDensity });
 }
 
-export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, seed, jamDensity, deadAirMode, deadAirFactor, era, coherenceIsLocked, usedShaderModes, shaderModeLastUsed, drumsSpacePhase, songIdentity, stemSection, songDuration, palette: paletteProp, segueIn, isSacredSegueIn, isInSuiteMiddle, setNumber, jamEvolution, jamPhaseBoundaries, jamCycle, jamPhaseShaders, climaxPhase: climaxPhaseProp, trackNumber, stemInterplayMode }) => {
+export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, seed, jamDensity, deadAirMode, deadAirFactor, era, coherenceIsLocked, usedShaderModes, shaderModeLastUsed, drumsSpacePhase, songIdentity, stemSection, songDuration, palette: paletteProp, segueIn, isSacredSegueIn, isInSuiteMiddle, setNumber, jamEvolution, jamPhaseBoundaries, jamCycle, jamPhaseShaders, climaxPhase: climaxPhaseProp, trackNumber, stemInterplayMode, stemDominant, itForceTranscendentShader }) => {
   const frame = useCurrentFrame();
   const palette = paletteProp ?? song.palette;
 
@@ -601,13 +635,21 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
   // Find current section
   const { sectionIndex: currentSectionIdx } = findCurrentSection(sections, frame);
 
+  // IT transcendent shader forcing: deep coherence lock → meditative shader pool
+  if (itForceTranscendentShader) {
+    const transcendentPool: VisualMode[] = ["sacred_geometry", "fractal_zoom", "kaleidoscope", "mandala_engine", "cosmic_voyage"];
+    const rng = seededRandom((seed ?? 0) + frame * 7);
+    const dsMode = transcendentPool[Math.floor(rng() * transcendentPool.length)];
+    return <>{renderMode(dsMode, frames, sections, palette, tempo, undefined, jamDensity)}</>;
+  }
+
   // Drums/Space phase override: force specific shaders per sub-phase
   if (drumsSpacePhase) {
     const dsMode = getDrumsSpaceMode(drumsSpacePhase, seed, songIdentity);
     return <>{renderMode(dsMode, frames, sections, palette, tempo, undefined, jamDensity)}</>;
   }
 
-  const currentMode = getModeForSection(song, currentSectionIdx, sections, seed, era, coherenceIsLocked, usedShaderModes, songIdentity, stemSection, frames, songDuration, setNumber, trackNumber, shaderModeLastUsed);
+  const currentMode = getModeForSection(song, currentSectionIdx, sections, seed, era, coherenceIsLocked, usedShaderModes, songIdentity, stemSection, frames, songDuration, setNumber, trackNumber, shaderModeLastUsed, stemDominant);
   const currentSection = sections[currentSectionIdx];
 
   // ─── JAM PHASE SHADER TRANSITIONS ───

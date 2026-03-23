@@ -66,10 +66,10 @@ import type { ShowArcPhase } from "./data/show-arc";
 import { computeTourModifiers, applyTourModifiers } from "./utils/tour-position";
 import { getSetTheme, applySetModifiers } from "./utils/set-theme";
 import { computeITResponse } from "./utils/it-response";
-import { isSacredSegue, isJamSegmentTitle } from "./data/band-config";
+import { isSacredSegue, isJamSegmentTitle, getSacredSegueTransition } from "./data/band-config";
 import { classifyStemSection, detectSolo, computeVocalWarmth, computeGuitarColorTemp } from "./utils/stem-features";
 import type { StemSectionType } from "./utils/stem-features";
-import { getSectionVocabulary } from "./utils/section-vocabulary";
+import { getSectionVocabulary, composeSectionWithJamCycle } from "./utils/section-vocabulary";
 import { detectGroove, grooveModifiers } from "./utils/groove-detector";
 import { detectJamCycle } from "./utils/jam-cycles";
 import { computeNarrativeDirective } from "./utils/visual-narrator";
@@ -96,6 +96,7 @@ import { WaveformOverlay } from "./components/WaveformOverlay";
 import { GuitarStrings } from "./components/GuitarStrings";
 import { MeshDeformationGrid } from "./components/MeshDeformationGrid";
 import { computeStemCharacter } from "./utils/stem-character";
+import { TimeDilationProvider } from "./data/TimeDilationContext";
 
 // Extracted sub-components
 import { SongArtLayer } from "./components/song-visualizer/SongArtLayer";
@@ -394,7 +395,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
   const drumsSpaceState = isDrumsSpace ? computeDrumsSpacePhase(f, frameIdx, isDrumsSpace) : null;
 
   const climaxState = computeClimaxState(f, frame, sections, audioSnapshot.energy);
-  const climaxMod = climaxModulation(climaxState, songIdentity?.climaxBehavior);
+  const climaxMod = climaxModulation(climaxState, songIdentity?.climaxBehavior, stemCharacter.dominant);
   const counterpoint = computeCounterpoint(f, frameIdx, climaxState.phase);
 
   const jamEvolution = useMemo(
@@ -424,7 +425,6 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
   // ─── Section vocabulary + groove + jam cycles + narrative directive ───
   const currentSection = sections.find((s) => frameIdx >= s.frameStart && frameIdx < s.frameEnd);
   const sectionType = f[frameIdx]?.sectionType ?? currentSection?.label;
-  const sectionVocab = getSectionVocabulary(sectionType);
 
   const groove = detectGroove(
     audioSnapshot.beatStability,
@@ -446,6 +446,10 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
   const jamCycle = currentSection && (sectionType === "jam" || sectionType === "solo" || isDrumsSpace)
     ? detectJamCycle(f, frameIdx, currentSection.frameStart, currentSection.frameEnd)
     : null;
+
+  // Compose section vocabulary with jam cycle phase for within-jam evolution
+  const sectionVocabBase = getSectionVocabulary(sectionType);
+  const sectionVocab = composeSectionWithJamCycle(sectionVocabBase, jamCycle?.phase, jamCycle?.progress ?? 0);
 
   // Set progress: how far through the current set are we?
   const totalSongsInSet = props.show?.songs.filter((s) => s.set === props.song.set).length ?? 1;
@@ -594,6 +598,29 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
     : 1;
   const opacity = Math.min(fadeIn, fadeOut) * deadAirDim * breathFactor;
 
+  // ─── Space time dilation: Space phases get transcendently slow shaders ───
+  const spaceTimeDilation = drumsSpaceState?.subPhase === "space_ambient" ? 0.25
+    : drumsSpaceState?.subPhase === "space_textural" ? 0.4
+    : drumsSpaceState?.subPhase === "space_melodic" ? 0.5
+    : 1.0;
+
+  // ─── Sacred segue curated transition style lookup ───
+  const sacredSegueInTransition = useMemo(() => {
+    if (!isSacredSegueIn || !props.show) return undefined;
+    const songs = props.show.songs;
+    const idx = songs.findIndex((s) => s.trackId === props.song.trackId);
+    if (idx <= 0) return undefined;
+    return getSacredSegueTransition(songs[idx - 1].title, props.song.title);
+  }, [isSacredSegueIn, props.show, props.song.trackId, props.song.title]);
+
+  const sacredSegueOutTransition = useMemo(() => {
+    if (!isSacredSegueOut || !props.show) return undefined;
+    const songs = props.show.songs;
+    const idx = songs.findIndex((s) => s.trackId === props.song.trackId);
+    if (idx < 0 || idx >= songs.length - 1) return undefined;
+    return getSacredSegueTransition(props.song.title, songs[idx + 1].title);
+  }, [isSacredSegueOut, props.show, props.song.trackId, props.song.title]);
+
   // ─── Render ───
   return (
     <div style={{ width, height, position: "relative", overflow: "hidden", background: "#000" }}>
@@ -603,6 +630,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
       <HeroPermittedProvider permitted={narrativeDirective.heroPermitted}>
       <JamPhaseProvider value={{ phase: jamEvolution.isLongJam ? JAM_PHASE_INDEX[jamEvolution.phase] : -1, progress: jamEvolution.phaseProgress }}>
       <PeakOfShowProvider value={peakOfShow.intensity}>
+      <TimeDilationProvider value={spaceTimeDilation}>
       <VisualizerErrorBoundary>
       <div style={{ position: "absolute", inset: 0, opacity }}>
         <CameraMotion frames={f} jamEvolution={jamEvolution} bass={audioSnapshot.bass} cameraFreeze={counterpoint.cameraFreeze || itState.cameraLock || introFactor < 0.5} drumsSpacePhase={drumsSpaceState?.subPhase} fastEnergy={audioSnapshot.fastEnergy} vocalPresence={audioSnapshot.vocalPresence} isSolo={soloState.isSolo} soloIntensity={soloState.intensity} grooveMotionMult={grooveMods.motionMult * fatigue.motionMult * stemInterplay.motionMult * peakOfShow.motionMult * crowdEnergy.motionMult * narrativeDirective.motionMult * stemCharacter.motionMult} groovePulseMult={grooveMods.pulseMult * phraseState.zoomBreathing * tempoLock.zoomPulse * regularityStabilityMod} sectionDriftMult={sectionVocab.driftSpeedMult} cameraSteadiness={Math.max(0, Math.min(1, sectionVocab.cameraSteadiness + setTheme.cameraSteadinessOffset))} cameraDrama={climaxMod.cameraDrama} itSnapZoom={itState.snapZoom}>
@@ -612,7 +640,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
           <SilentErrorBoundary name="SceneRouter">
             {(() => {
               const climaxPhaseMap: Record<string, number> = { idle: 0, build: 1, climax: 2, sustain: 3, release: 4 };
-              const sceneRouter = <SceneRouter frames={f} sections={sections} song={props.song} tempo={tempo} seed={showSeed} jamDensity={jamDensity} deadAirMode={deadAirFactor > 0 ? "cosmic_dust" : undefined} deadAirFactor={deadAirFactor > 0 ? deadAirFactor : undefined} era={props.show?.era} coherenceIsLocked={coherenceState.isLocked} drumsSpacePhase={drumsSpaceState?.subPhase} usedShaderModes={narrative?.state.usedShaderModes} shaderModeLastUsed={narrative?.state.shaderModeLastUsed} songIdentity={songIdentity} stemSection={stemSection} songDuration={analysis?.meta?.duration} palette={effectivePalette} segueIn={props.segueIn} isSacredSegueIn={isSacredSegueIn} isInSuiteMiddle={!!isInSuiteMiddle} setNumber={props.song.set} jamEvolution={jamEvolution} jamPhaseBoundaries={jamPhaseBoundaries} jamCycle={jamCycle} jamPhaseShaders={jamPhaseShaders} climaxPhase={climaxPhaseMap[climaxState.phase] ?? 0} trackNumber={props.song.trackNumber ?? 1} stemInterplayMode={stemInterplay.mode} />;
+              const sceneRouter = <SceneRouter frames={f} sections={sections} song={props.song} tempo={tempo} seed={showSeed} jamDensity={jamDensity} deadAirMode={deadAirFactor > 0 ? "cosmic_dust" : undefined} deadAirFactor={deadAirFactor > 0 ? deadAirFactor : undefined} era={props.show?.era} coherenceIsLocked={coherenceState.isLocked} drumsSpacePhase={drumsSpaceState?.subPhase} usedShaderModes={narrative?.state.usedShaderModes} shaderModeLastUsed={narrative?.state.shaderModeLastUsed} songIdentity={songIdentity} stemSection={stemSection} songDuration={analysis?.meta?.duration} palette={effectivePalette} segueIn={props.segueIn} isSacredSegueIn={isSacredSegueIn} isInSuiteMiddle={!!isInSuiteMiddle} setNumber={props.song.set} jamEvolution={jamEvolution} jamPhaseBoundaries={jamPhaseBoundaries} jamCycle={jamCycle} jamPhaseShaders={jamPhaseShaders} climaxPhase={climaxPhaseMap[climaxState.phase] ?? 0} trackNumber={props.song.trackNumber ?? 1} stemInterplayMode={stemInterplay.mode} stemDominant={stemCharacter.dominant} itForceTranscendentShader={itState.forceTranscendentShader} />;
               const palette = effectivePalette;
 
               // Segue IN crossfade: smooth dual-render dissolve from previous song's shader
@@ -620,7 +648,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
               const segueInFrames = isSacredSegueIn ? Math.round(FADE_FRAMES * 1.5) : FADE_FRAMES;
               if (props.segueIn && props.segueFromMode && props.segueFromMode !== props.song.defaultMode && frame < segueInFrames) {
                 const progress = frame / segueInFrames;
-                const segueStyle = songIdentity?.transitionIn ?? (isSacredSegueIn ? "morph" : "dissolve");
+                const segueStyle = songIdentity?.transitionIn ?? sacredSegueInTransition ?? (isSacredSegueIn ? "morph" : "dissolve");
                 return (
                   <SegueCrossfade
                     progress={progress}
@@ -635,7 +663,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
               const segueOutFrames = isSacredSegueOut ? Math.round(FADE_FRAMES * 1.5) : FADE_FRAMES;
               if (props.segueOut && props.segueToMode && props.segueToMode !== props.song.defaultMode && frame > durationInFrames - segueOutFrames) {
                 const progress = (frame - (durationInFrames - segueOutFrames)) / segueOutFrames;
-                const segueStyle = songIdentity?.transitionOut ?? (isSacredSegueOut ? "morph" : "dissolve");
+                const segueStyle = songIdentity?.transitionOut ?? sacredSegueOutTransition ?? (isSacredSegueOut ? "morph" : "dissolve");
                 return (
                   <SegueCrossfade
                     progress={progress}
@@ -804,6 +832,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
         )}
       </div>
       </VisualizerErrorBoundary>
+      </TimeDilationProvider>
       </PeakOfShowProvider>
       </JamPhaseProvider>
       </HeroPermittedProvider>

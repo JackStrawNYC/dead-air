@@ -299,11 +299,20 @@ const BUILD_START = { sat: 0, bright: 0, vig: 0, bloom: 0, contrast: 0, density:
 /** Release phase start values (intensity interpolates from start → target) */
 const RELEASE_START = { sat: +0.30, bright: +0.04, vig: -0.04, bloom: 0.08, contrast: +0.08, density: 1.20, speed: 1.2, drama: 0.5, forceDual: false };
 
+/** Musician-specific peak character: each dominant stem colors the climax differently */
+const STEM_CLIMAX_CHARACTER: Record<string, { sat: number; bright: number; drama: number }> = {
+  jerry:  { sat: +0.15, bright: +0.04, drama: 1.0 },
+  phil:   { sat: +0.10, bright: -0.02, drama: 0.6 },
+  drums:  { sat: +0.08, bright: +0.02, drama: 0.8 },
+  vocals: { sat: +0.05, bright: +0.06, drama: 0.4 },
+  bobby:  { sat: +0.06, bright: +0.03, drama: 0.7 },
+};
+
 /**
  * Map a ClimaxState to additive visual modifiers.
  * All values are small offsets that compose with EnergyEnvelope's existing modulation.
  */
-export function climaxModulation(state: ClimaxState, behavior?: ClimaxBehavior): ClimaxModulation {
+export function climaxModulation(state: ClimaxState, behavior?: ClimaxBehavior, stemDominant?: string): ClimaxModulation {
   const { phase, intensity, anticipation } = state;
 
   // Anticipation overrides build modulation
@@ -377,6 +386,16 @@ export function climaxModulation(state: ClimaxState, behavior?: ClimaxBehavior):
     }
     if (behavior.climaxDensityMult !== undefined) {
       result.overlayDensityMult = lerp(1, behavior.climaxDensityMult, t);
+    }
+  }
+
+  // Musician-specific peak character: Jerry=golden, Phil=indigo, drums=amber
+  if (stemDominant && (phase === "climax" || phase === "sustain")) {
+    const stemChar = STEM_CLIMAX_CHARACTER[stemDominant];
+    if (stemChar) {
+      result.saturationOffset += stemChar.sat * t;
+      result.brightnessOffset += stemChar.bright * t;
+      result.cameraDrama = lerp(result.cameraDrama, stemChar.drama, t * 0.5);
     }
   }
 
