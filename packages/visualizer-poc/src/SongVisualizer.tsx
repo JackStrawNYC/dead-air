@@ -618,8 +618,8 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
 
   // ─── Intro factor: art-forward cold open for first ~20s ───
   // 0 = full intro suppression (art dominates), 1 = engine fully open.
-  const INTRO_HOLD = 600;  // 20s at 30fps — art + text showcase
-  const INTRO_RAMP = 360;  // 12s smooth ramp to full visuals
+  const INTRO_HOLD = 750;  // 25s at 30fps — art + text showcase
+  const INTRO_RAMP = 270;  // 9s smooth ramp to full visuals
   // Suite middle songs skip intro hold (continuous flow within suite)
   // Segue-in songs get a mini intro: 3s crossfade breathing, then art showcase 5-15s
   const introFactor = props.segueIn

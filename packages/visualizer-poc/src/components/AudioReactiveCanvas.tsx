@@ -373,7 +373,7 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
       const localEnergy = eCount > 0 ? eSum / eCount : 0;
       const t = Math.max(0, Math.min(1, (localEnergy - quietThresh) / range));
       const factor = t * t * (3 - 2 * t); // smoothstep
-      const speed = (0.10 + factor * 0.80) * tempoScale; // 10% at quiet → 90% at peak, scaled by tempo
+      const speed = (0.12 + factor * 0.88) * tempoScale; // 12% at quiet → 100% at peak, scaled by tempo
       accum += dt * speed;
       lookup[i] = accum;
     }
@@ -554,7 +554,7 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
       const baseDT = snapToMusicalTimeProp
         ? computeMusicalTimeUtil(beatArray, idx, fps, tempo ?? 120) / (tempo ?? 120) * 60
         : (dynamicTimeLookup[idx] ?? (idx / fps));
-      const fluxMult = 1.0 + Math.min(0.15, spectralFlux * 0.4);
+      const fluxMult = 1.0 + Math.min(0.3, spectralFlux * 0.8);
       return baseDT * climaxSpeedMult * fluxMult * spaceTimeDilation;
     })(),
     jamPhase: jamPhaseCtx.phase,
