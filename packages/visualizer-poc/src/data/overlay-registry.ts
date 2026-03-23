@@ -7,11 +7,11 @@
  *   5=Nature/Cosmic, 6=Character, 7=Frame/Info (artifact), 8=Typography (info),
  *   9=HUD, 10=Distortion
  *
- * Curated 2026-03-22: 356 total entries (27 A + 24 B + 305 C-archived).
- * SELECTABLE_REGISTRY filters to A+B only (51 active overlays).
+ * Curated 2026-03-22: 356 total entries (30 A + 33 B + 293 C-archived).
+ * SELECTABLE_REGISTRY filters to A+B only (63 active overlays).
  * Component files are preserved — any overlay can be restored by promoting to B.
  *
- * Tier: A=iconic/essential (27), B=solid rotation (24), C=archived (305).
+ * Tier: A=iconic/essential (30), B=solid rotation (33), C=archived (293).
  */
 import type { OverlayEntry } from "./types";
 
@@ -44,14 +44,14 @@ export const OVERLAY_REGISTRY: OverlayEntry[] = [
   { name: "StealYourFaceKaleidoscope", layer: 2, category: "sacred", tags: ["dead-culture", "psychedelic"], energyBand: "mid", weight: 3, dutyCycle: 100, energyResponse: [0.05, 0.22, 1.5], tier: "A" },
 
   // ═══ Layer 3: Song-reactive (4) ═══
-  { name: "LightningBoltOverlay", layer: 3, category: "reactive", tags: ["dead-culture", "intense"],   energyBand: "high", weight: 3, dutyCycle: 100, energyResponse: [0.20, 0.35, 2.0], tier: "C" },
+  { name: "LightningBoltOverlay", layer: 3, category: "reactive", tags: ["dead-culture", "intense"],   energyBand: "high", weight: 3, dutyCycle: 100, energyResponse: [0.20, 0.35, 2.0], tier: "A" },
   { name: "ParticleExplosion",   layer: 3, category: "reactive", tags: ["intense", "psychedelic"],       energyBand: "high", weight: 3, dutyCycle: 12, energyResponse: [0.20, 0.40, 2.5], tier: "C" },
   { name: "LaserShow",           layer: 3, category: "reactive", tags: ["festival", "intense"],          energyBand: "high", weight: 3, dutyCycle: 100, energyResponse: [0.15, 0.30, 1.5], tier: "C" },
   { name: "EmberRise",           layer: 3, category: "reactive", tags: ["intense", "organic"],           energyBand: "mid",  weight: 2, dutyCycle: 100, energyResponse: [0.10, 0.25, 1.8], tier: "C" },
 
   // ═══ Layer 3: Reactive — WallOfSound + PhilZone ═══
-  { name: "WallOfSound",         layer: 3, category: "reactive", tags: ["intense", "festival"],          energyBand: "high", weight: 3, dutyCycle: 20, energyResponse: [0.15, 0.35, 2.0], tier: "C" },
-  { name: "PhilZone",            layer: 3, category: "reactive", tags: ["dead-culture", "organic"],      energyBand: "mid",  weight: 2, dutyCycle: 100, energyResponse: [0.08, 0.20, 2.0], tier: "C" },
+  { name: "WallOfSound",         layer: 3, category: "reactive", tags: ["intense", "festival"],          energyBand: "high", weight: 3, dutyCycle: 50, energyResponse: [0.15, 0.35, 2.0], tier: "A" },
+  { name: "PhilZone",            layer: 3, category: "reactive", tags: ["dead-culture", "organic"],      energyBand: "mid",  weight: 2, dutyCycle: 100, energyResponse: [0.08, 0.20, 2.0], tier: "B" },
 
   // ═══ Layer 4: Geometric / Physics (10) ═══
   { name: "VoronoiFlow",       layer: 4, category: "geometric", tags: ["psychedelic", "organic"],        energyBand: "mid",  weight: 2, dutyCycle: 33, energyResponse: [0.08, 0.25, 2.0], tier: "C" },
@@ -84,7 +84,7 @@ export const OVERLAY_REGISTRY: OverlayEntry[] = [
   { name: "DrumCircle",      layer: 6, category: "character", tags: ["dead-culture", "intense"],      energyBand: "mid",  weight: 2, dutyCycle: 100, energyResponse: [0.03, 0.18, 1.5], tier: "B" },
   { name: "DancingTerrapinOverlay", layer: 6, category: "character", tags: ["dead-culture", "organic"], energyBand: "any", weight: 3, dutyCycle: 100, energyResponse: [0.03, 0.18, 1.5], tier: "A" },
   { name: "SkeletonCouple",  layer: 6, category: "character", tags: ["dead-culture", "contemplative"], energyBand: "any",  weight: 3, dutyCycle: 100, energyResponse: [0.03, 0.18, 1.5], tier: "A" },
-  { name: "DeadIcons",       layer: 6, category: "character", tags: ["dead-culture", "psychedelic"],  energyBand: "mid",  weight: 2, dutyCycle: 100, energyResponse: [0.05, 0.20, 1.5], tier: "C" },
+  { name: "DeadIcons",       layer: 6, category: "character", tags: ["dead-culture", "psychedelic"],  energyBand: "mid",  weight: 2, dutyCycle: 100, energyResponse: [0.03, 0.18, 1.5], tier: "B" },
 
   // ═══ Layer 7: Always-active info (hardcoded in SongVisualizer) ═══
   { name: "SongTitle",         layer: 7, category: "artifact", tags: ["dead-culture"],                  energyBand: "any",  weight: 1, alwaysActive: true, tier: "B" },
@@ -136,7 +136,7 @@ export const OVERLAY_REGISTRY: OverlayEntry[] = [
   { name: "Abacus",                  layer: 9, category: "hud", tags: ["retro","mechanical"], energyBand: "any", weight: 1, dutyCycle: 100, energyResponse: [0,0.12,2], tier: "C" },
   { name: "AlchemySymbols",          layer: 2, category: "sacred", tags: ["cosmic","contemplative"], energyBand: "mid", weight: 2, dutyCycle: 100, energyResponse: [0.04,0.18,2], tier: "C" },
   { name: "Altimeter",               layer: 9, category: "hud", tags: ["retro","mechanical"], energyBand: "any", weight: 1, dutyCycle: 100, energyResponse: [0,0.12,2], tier: "C" },
-  { name: "AmericanBeauty",          layer: 1, category: "atmospheric", tags: ["organic","contemplative"], energyBand: "low", weight: 1, dutyCycle: 100, energyResponse: [0,0.08,2.5], tier: "C" },
+  { name: "AmericanBeauty",          layer: 1, category: "atmospheric", tags: ["organic","dead-culture"], energyBand: "low", weight: 3, dutyCycle: 100, energyResponse: [0.02,0.15,1.8], tier: "A" },
   { name: "Amplifier",               layer: 9, category: "hud", tags: ["retro","mechanical"], energyBand: "any", weight: 1, dutyCycle: 100, energyResponse: [0,0.12,2], tier: "C" },
   { name: "Anemone",                 layer: 5, category: "nature", tags: ["organic","contemplative"], energyBand: "mid", weight: 2, dutyCycle: 100, energyResponse: [0.03,0.15,2], tier: "C" },
   { name: "Anvil",                   layer: 3, category: "reactive", tags: ["intense","festival"], energyBand: "high", weight: 2, dutyCycle: 33, energyResponse: [0.15,0.3,2], tier: "C" },
@@ -161,7 +161,7 @@ export const OVERLAY_REGISTRY: OverlayEntry[] = [
   { name: "CactusGarden",            layer: 5, category: "nature", tags: ["organic","contemplative"], energyBand: "mid", weight: 2, dutyCycle: 100, energyResponse: [0.03,0.15,2], tier: "C" },
   { name: "CampfireSparks",          layer: 3, category: "reactive", tags: ["intense","festival"], energyBand: "high", weight: 2, dutyCycle: 33, energyResponse: [0.15,0.3,2], tier: "C" },
   { name: "CandleFlicker",           layer: 1, category: "atmospheric", tags: ["organic","contemplative"], energyBand: "low", weight: 1, dutyCycle: 100, energyResponse: [0,0.08,2.5], tier: "C" },
-  { name: "CarouselHorses",          layer: 6, category: "character", tags: ["dead-culture","festival"], energyBand: "mid", weight: 2, dutyCycle: 100, energyResponse: [0.05,0.2,1.5], tier: "C" },
+  { name: "CarouselHorses",          layer: 6, category: "character", tags: ["dead-culture","festival"], energyBand: "mid", weight: 2, dutyCycle: 100, energyResponse: [0.03,0.18,1.5], tier: "B" },
   { name: "CassetteReels",           layer: 7, category: "artifact", tags: ["retro","dead-culture"], energyBand: "any", weight: 2, dutyCycle: 50, energyResponse: [0.02,0.12,2], tier: "B" },
   { name: "Caterpillar",             layer: 5, category: "nature", tags: ["organic","contemplative"], energyBand: "mid", weight: 2, dutyCycle: 100, energyResponse: [0.03,0.15,2], tier: "C" },
   { name: "Cathedral",               layer: 4, category: "geometric", tags: ["mechanical","psychedelic"], energyBand: "mid", weight: 2, dutyCycle: 33, energyResponse: [0.08,0.25,2], tier: "C" },
@@ -273,7 +273,7 @@ export const OVERLAY_REGISTRY: OverlayEntry[] = [
   { name: "MushroomForest",       layer: 5, category: "nature", tags: ["psychedelic","organic","dead-culture"], energyBand: "any", weight: 3, dutyCycle: 100, energyResponse: [0.02,0.15,1.8], tier: "A" },
   { name: "NebulaCloud",          layer: 1, category: "atmospheric", tags: ["cosmic","contemplative"], energyBand: "low", weight: 1, dutyCycle: 100, energyResponse: [0.02,0.12,0.25], tier: "C" },
   { name: "NeonCarousel",            layer: 1, category: "atmospheric", tags: ["organic","contemplative"], energyBand: "low", weight: 1, dutyCycle: 100, energyResponse: [0,0.08,2.5], tier: "C" },
-  { name: "NeonSign",             layer: 7, category: "artifact", tags: ["retro","festival","dead-culture"], energyBand: "high", weight: 2, dutyCycle: 50, energyResponse: [0.04,0.2,0.3], tier: "C" },
+  { name: "NeonSign",             layer: 7, category: "artifact", tags: ["retro","festival","dead-culture"], energyBand: "high", weight: 2, dutyCycle: 50, energyResponse: [0.02,0.12,2], tier: "B" },
   { name: "NeuralNetwork",           layer: 4, category: "geometric", tags: ["mechanical","psychedelic"], energyBand: "mid", weight: 2, dutyCycle: 33, energyResponse: [0.08,0.25,2], tier: "C" },
   { name: "NewtonsCradle",           layer: 4, category: "geometric", tags: ["mechanical","psychedelic"], energyBand: "mid", weight: 2, dutyCycle: 33, energyResponse: [0.08,0.25,2], tier: "C" },
   { name: "NixieTubes",              layer: 9, category: "hud", tags: ["retro","mechanical"], energyBand: "any", weight: 1, dutyCycle: 100, energyResponse: [0,0.12,2], tier: "C" },
@@ -287,7 +287,7 @@ export const OVERLAY_REGISTRY: OverlayEntry[] = [
   { name: "Paisley",                 layer: 4, category: "geometric", tags: ["mechanical","psychedelic"], energyBand: "mid", weight: 2, dutyCycle: 33, energyResponse: [0.08,0.25,2], tier: "C" },
   { name: "PaperAirplanes",          layer: 1, category: "atmospheric", tags: ["organic","contemplative"], energyBand: "low", weight: 1, dutyCycle: 100, energyResponse: [0,0.08,2.5], tier: "C" },
   { name: "PaperCranes",             layer: 5, category: "nature", tags: ["organic","contemplative"], energyBand: "mid", weight: 2, dutyCycle: 100, energyResponse: [0.03,0.15,2], tier: "C" },
-  { name: "PeaceSignShower",         layer: 2, category: "sacred", tags: ["cosmic","contemplative"], energyBand: "mid", weight: 2, dutyCycle: 100, energyResponse: [0.04,0.18,2], tier: "C" },
+  { name: "PeaceSignShower",         layer: 2, category: "sacred", tags: ["cosmic","contemplative"], energyBand: "mid", weight: 2, dutyCycle: 100, energyResponse: [0.02,0.15,1.8], tier: "B" },
   { name: "Peacock",                 layer: 5, category: "nature", tags: ["organic","contemplative"], energyBand: "mid", weight: 2, dutyCycle: 100, energyResponse: [0.03,0.15,2], tier: "C" },
   { name: "PendulumWave",            layer: 4, category: "geometric", tags: ["mechanical","psychedelic"], energyBand: "mid", weight: 2, dutyCycle: 33, energyResponse: [0.08,0.25,2], tier: "C" },
   { name: "PhoenixWings",            layer: 5, category: "nature", tags: ["organic","contemplative"], energyBand: "mid", weight: 2, dutyCycle: 100, energyResponse: [0.03,0.15,2], tier: "C" },
@@ -341,14 +341,14 @@ export const OVERLAY_REGISTRY: OverlayEntry[] = [
   { name: "SolarEclipse",            layer: 1, category: "atmospheric", tags: ["organic","contemplative"], energyBand: "low", weight: 1, dutyCycle: 100, energyResponse: [0,0.08,2.5], tier: "C" },
   { name: "SolarFlare",              layer: 1, category: "atmospheric", tags: ["organic","contemplative"], energyBand: "low", weight: 1, dutyCycle: 100, energyResponse: [0,0.08,2.5], tier: "C" },
   { name: "SongReactiveEffects",     layer: 3, category: "reactive", tags: ["intense","festival"], energyBand: "high", weight: 2, dutyCycle: 33, energyResponse: [0.15,0.3,2], tier: "C" },
-  { name: "SpaceDrums",              layer: 2, category: "sacred", tags: ["cosmic","contemplative"], energyBand: "mid", weight: 2, dutyCycle: 100, energyResponse: [0.04,0.18,2], tier: "C" },
+  { name: "SpaceDrums",              layer: 2, category: "sacred", tags: ["cosmic","dead-culture"], energyBand: "mid", weight: 2, dutyCycle: 100, energyResponse: [0.02,0.15,1.8], tier: "B" },
   { name: "SpiderWeb",               layer: 5, category: "nature", tags: ["organic","contemplative"], energyBand: "mid", weight: 2, dutyCycle: 100, energyResponse: [0.03,0.15,2], tier: "C" },
   { name: "SpinningTop",             layer: 4, category: "geometric", tags: ["mechanical","psychedelic"], energyBand: "mid", weight: 2, dutyCycle: 33, energyResponse: [0.08,0.25,2], tier: "C" },
   { name: "SpiritWisps",             layer: 1, category: "atmospheric", tags: ["organic","contemplative"], energyBand: "low", weight: 1, dutyCycle: 100, energyResponse: [0,0.08,2.5], tier: "C" },
   { name: "Spirograph",              layer: 4, category: "geometric", tags: ["mechanical","psychedelic"], energyBand: "mid", weight: 2, dutyCycle: 33, energyResponse: [0.08,0.25,2], tier: "C" },
-  { name: "SpotlightFollow",         layer: 3, category: "reactive", tags: ["intense","festival"], energyBand: "high", weight: 2, dutyCycle: 33, energyResponse: [0.15,0.3,2], tier: "C" },
+  { name: "SpotlightFollow",         layer: 3, category: "reactive", tags: ["intense","festival"], energyBand: "high", weight: 2, dutyCycle: 50, energyResponse: [0.15,0.3,2], tier: "B" },
   { name: "StageDive",               layer: 6, category: "character", tags: ["dead-culture","festival"], energyBand: "mid", weight: 2, dutyCycle: 100, energyResponse: [0.05,0.2,1.5], tier: "C" },
-  { name: "StageLights",             layer: 3, category: "reactive", tags: ["intense","festival"], energyBand: "high", weight: 2, dutyCycle: 33, energyResponse: [0.15,0.3,2], tier: "C" },
+  { name: "StageLights",             layer: 3, category: "reactive", tags: ["intense","festival"], energyBand: "high", weight: 2, dutyCycle: 50, energyResponse: [0.15,0.3,2], tier: "B" },
   { name: "StalactiteCave",          layer: 1, category: "atmospheric", tags: ["organic","contemplative"], energyBand: "low", weight: 1, dutyCycle: 100, energyResponse: [0,0.08,2.5], tier: "C" },
   { name: "StampCollection",         layer: 7, category: "artifact", tags: ["retro","dead-culture"], energyBand: "any", weight: 1, dutyCycle: 20, energyResponse: [0,0.05,3], tier: "C" },
   { name: "SteamTrain",              layer: 4, category: "geometric", tags: ["mechanical","psychedelic"], energyBand: "mid", weight: 2, dutyCycle: 33, energyResponse: [0.08,0.25,2], tier: "C" },
@@ -359,7 +359,7 @@ export const OVERLAY_REGISTRY: OverlayEntry[] = [
   { name: "SynthPatch",              layer: 9, category: "hud", tags: ["retro","mechanical"], energyBand: "any", weight: 1, dutyCycle: 100, energyResponse: [0,0.12,2], tier: "C" },
   { name: "Tambourine",              layer: 3, category: "reactive", tags: ["intense","festival"], energyBand: "high", weight: 2, dutyCycle: 33, energyResponse: [0.15,0.3,2], tier: "C" },
   { name: "TapestryWeave",           layer: 2, category: "sacred", tags: ["cosmic","contemplative"], energyBand: "mid", weight: 2, dutyCycle: 100, energyResponse: [0.04,0.18,2], tier: "C" },
-  { name: "TarotReveal",          layer: 2, category: "sacred", tags: ["psychedelic","contemplative","dead-culture"], energyBand: "mid", weight: 2, dutyCycle: 25, energyResponse: [0.02,0.15,0.3], tier: "C" },
+  { name: "TarotReveal",          layer: 2, category: "sacred", tags: ["psychedelic","contemplative","dead-culture"], energyBand: "mid", weight: 2, dutyCycle: 50, energyResponse: [0.02,0.15,1.8], tier: "B" },
   { name: "TelescopeView",           layer: 1, category: "atmospheric", tags: ["organic","contemplative"], energyBand: "low", weight: 1, dutyCycle: 100, energyResponse: [0,0.08,2.5], tier: "C" },
   { name: "TerminalPrompt",          layer: 7, category: "artifact", tags: ["retro","dead-culture"], energyBand: "any", weight: 1, dutyCycle: 20, energyResponse: [0,0.05,3], tier: "C" },
   { name: "TeslaCoil",               layer: 3, category: "reactive", tags: ["intense","festival"], energyBand: "high", weight: 2, dutyCycle: 33, energyResponse: [0.15,0.3,2], tier: "C" },
