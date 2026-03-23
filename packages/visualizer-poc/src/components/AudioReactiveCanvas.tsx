@@ -347,15 +347,20 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
   // Pre-compute cumulative beat array (once per song, avoids O(n) per frame)
   const beatArray = useMemo(() => buildBeatArrayUtil(frames), [frames]);
 
-  // Dynamic time accumulator: advances proportionally to energy.
+  // Dynamic time accumulator: advances proportionally to energy AND tempo.
   // Auto-calibrated to song's own percentiles so the quietest 20% of the song
   // runs at near-zero speed and only the loudest passages reach full speed.
+  // Tempo-scaled: 90 BPM blues runs ~75% speed of 120 BPM rock.
   const dynamicTimeLookup = useMemo(() => {
     // Auto-calibrate: P15 = quiet threshold, P85 = loud threshold
     const samples = frames.filter((_, i) => i % 5 === 0).map(f => f.rms).sort((a, b) => a - b);
     const quietThresh = samples[Math.floor(samples.length * 0.15)] ?? 0.05;
     const loudThresh = samples[Math.floor(samples.length * 0.85)] ?? 0.35;
     const range = Math.max(0.05, loudThresh - quietThresh);
+
+    // Tempo scaling: normalize to 120 BPM baseline, clamp 0.6-1.2x
+    const bpm = tempo ?? 120;
+    const tempoScale = Math.max(0.6, Math.min(1.2, bpm / 120));
 
     const dt = 1 / fps;
     const lookup = new Float64Array(frames.length);
@@ -367,13 +372,15 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
       for (let j = lo; j <= hi; j++) { eSum += frames[j].rms; eCount++; }
       const localEnergy = eCount > 0 ? eSum / eCount : 0;
       const t = Math.max(0, Math.min(1, (localEnergy - quietThresh) / range));
-      const factor = t * t * (3 - 2 * t); // smoothstep
-      const speed = 0.08 + factor * 0.72; // 8% at quiet → 80% at peak (calmer pacing)
+      // Softer curve: cube root grows slowly at low energy, still reaches 1 at peak.
+      // This prevents mid-energy passages from running at near-max speed.
+      const factor = Math.pow(t, 0.6); // gentler than smoothstep — mid-energy = ~60% not ~80%
+      const speed = (0.06 + factor * 0.64) * tempoScale; // 6% at quiet → 70% at peak, scaled by tempo
       accum += dt * speed;
       lookup[i] = accum;
     }
     return lookup;
-  }, [frames, fps]);
+  }, [frames, fps, tempo]);
 
   const sectionList = sections ?? [];
   const { sectionIndex, sectionProgress } = findCurrentSection(sectionList, idx);
