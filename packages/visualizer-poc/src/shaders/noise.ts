@@ -507,14 +507,11 @@ float sdStealie(vec2 p, float radius) {
 //   col2     — shader's secondary palette color
 //   noiseField — shader's own FBM/noise value at this pixel (for dissolution)
 vec3 stealieEmergence(vec2 uv, float time, float energy, float bass, vec3 col1, vec3 col2, float noiseField, float climaxPhase) {
-  // Two-tier gating: subtle ambient shimmer + full climax emergence
+  // Climax-only: icons emerge during peak moments, no ambient ghosting
   float climaxGate = smoothstep(1.5, 2.5, climaxPhase);
   float energyGate = smoothstep(0.35, 0.55, energy);
-  float fullGate = energyGate * climaxGate;
-  // Ambient: faint ghostly presence when energy > 0.20, no climax needed
-  float ambientGate = smoothstep(0.20, 0.45, energy) * 0.12;
-  float gate = max(fullGate, ambientGate);
-  if (gate < 0.001) return vec3(0.0);
+  float gate = energyGate * climaxGate;
+  if (gate < 0.01) return vec3(0.0);
 
   // Slow rotation
   float angle = time * 0.08;
@@ -679,14 +676,11 @@ float _ns_sdSkull(vec2 p, float jawOpen) {
 //   sectionIndex — uSectionIndex for icon variety
 vec3 iconEmergence(vec2 uv, float time, float energy, float bass,
                     vec3 col1, vec3 col2, float noiseField, float climaxPhase, float sectionIndex) {
-  // Two-tier gating: subtle ambient shimmer + full climax emergence
+  // Climax-only: icons emerge during peak moments, no ambient ghosting
   float climaxGate = smoothstep(1.5, 2.5, climaxPhase);
   float energyGate = smoothstep(0.35, 0.55, energy);
-  float fullGate = energyGate * climaxGate;
-  // Ambient: faint ghostly presence when energy > 0.20, no climax needed
-  float ambientGate = smoothstep(0.20, 0.45, energy) * 0.12;
-  float gate = max(fullGate, ambientGate);
-  if (gate < 0.001) return vec3(0.0);
+  float gate = energyGate * climaxGate;
+  if (gate < 0.01) return vec3(0.0);
 
   // Slow rotation
   float angle = time * 0.06;
