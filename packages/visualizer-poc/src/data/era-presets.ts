@@ -22,6 +22,14 @@ export interface EraPreset {
   grainIntensity: number;
   colorTempShift: number;
   saturationOffset: number;
+  /** Era-level overlay density multiplier (0.5-1.5) */
+  overlayDensityMult?: number;
+  /** Warm/cool color temperature bounds [warm, cool] */
+  colorTempRange?: [number, number];
+  /** Maximum dual-shader composition blend (0-0.55) */
+  maxDualBlend?: number;
+  /** Era-appropriate transition styles */
+  preferredTransitions?: string[];
 }
 
 import { BAND_CONFIG } from "./band-config";

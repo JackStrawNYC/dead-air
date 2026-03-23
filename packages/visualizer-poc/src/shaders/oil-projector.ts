@@ -84,7 +84,7 @@ void main() {
   float sJam = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
   float sSpace = smoothstep(6.5, 7.5, sectionT);
   float sChorus = smoothstep(1.5, 2.5, sectionT) * (1.0 - step(2.5, sectionT));
-  float morphSpeedMod = mix(1.0, 1.4, sJam) * mix(1.0, 0.4, sSpace) * mix(1.0, 1.1, sChorus);
+  float morphSpeedMod = mix(1.0, 1.4, sJam) * mix(1.0, 0.4, sSpace) * mix(1.0, 1.1, sChorus) * (1.0 + uPeakApproaching * 0.3);
   float saturationMod = mix(1.0, 1.15, sJam) * mix(1.0, 0.7, sSpace) * mix(1.0, 1.2, sChorus);
   float blobSizeMod = mix(1.0, 1.3, sJam) * mix(1.0, 0.6, sSpace) * mix(1.0, 1.15, sChorus);
 

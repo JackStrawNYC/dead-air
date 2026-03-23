@@ -31,6 +31,8 @@ import type { JamEvolution, JamPhaseBoundaries } from "../utils/jam-evolution";
 import { getJamPhaseMode, JAM_PHASE_INDEX } from "../utils/jam-evolution";
 import type { JamCycleState } from "../utils/jam-cycles";
 import type { InterplayMode } from "../utils/stem-interplay";
+import type { ReactiveState } from "../utils/reactive-triggers";
+import { computeSemanticProfile, extractSemanticScores } from "../utils/semantic-router";
 
 /**
  * Dynamic crossfade duration based on energy context and spectral flux.
@@ -235,6 +237,8 @@ interface Props {
   stemDominant?: string;
   /** Force transcendent shader (from IT response deep coherence lock) */
   itForceTranscendentShader?: boolean;
+  /** Reactive trigger state from mid-section audio analysis */
+  reactiveState?: ReactiveState;
 }
 
 /**
@@ -478,6 +482,24 @@ export function getModeForSection(
         }
       }
 
+      // Narrative arc bias: weight shaders by song's story arc type
+      if (songIdentity?.narrativeArc) {
+        const arc = songIdentity.narrativeArc;
+        if (arc === "meditative_journey" || arc === "elegy") {
+          const ambientModes: VisualMode[] = ["aurora", "deep_ocean", "cosmic_dust", "void_light", "morphogenesis", "cosmic_voyage", "oil_projector"];
+          const ambientMatches = ambientModes.filter((m) => filteredPool.includes(m));
+          if (ambientMatches.length > 0) {
+            filteredPool = [...filteredPool, ...ambientMatches]; // 2x weight
+          }
+        } else if (arc === "jam_vehicle") {
+          const generativeModes: VisualMode[] = ["feedback_recursion", "reaction_diffusion", "fractal_zoom", "kaleidoscope", "mandala_engine", "voronoi_flow"];
+          const generativeMatches = generativeModes.filter((m) => filteredPool.includes(m));
+          if (generativeMatches.length > 0) {
+            filteredPool = [...filteredPool, ...generativeMatches]; // 2x weight
+          }
+        }
+      }
+
       // Duration bias: short songs → structured, extended jams → feedback/generative
       if (songDuration !== undefined) {
         if (songDuration < 300) {
@@ -519,6 +541,31 @@ export function getModeForSection(
             return !f || f === spectralFamily;
           });
           if (spectralFiltered.length >= 2) filteredPool = spectralFiltered;
+        }
+      }
+
+      // Semantic bias: if CLAP semantic data is available, weight matching shaders 2x
+      if (frames && section) {
+        const midFrame = Math.min(Math.floor((section.frameStart + section.frameEnd) / 2), frames.length - 1);
+        const semanticScores = extractSemanticScores({
+          semanticPsychedelic: frames[midFrame].semantic_psychedelic,
+          semanticAggressive: frames[midFrame].semantic_aggressive,
+          semanticTender: frames[midFrame].semantic_tender,
+          semanticCosmic: frames[midFrame].semantic_cosmic,
+          semanticRhythmic: frames[midFrame].semantic_rhythmic,
+          semanticAmbient: frames[midFrame].semantic_ambient,
+          semanticChaotic: frames[midFrame].semantic_chaotic,
+          semanticTriumphant: frames[midFrame].semantic_triumphant,
+        });
+        if (semanticScores) {
+          const profile = computeSemanticProfile(semanticScores);
+          if (profile.dominantConfidence > 0.4 && profile.preferredShaders.length > 0) {
+            const semanticMatches = profile.preferredShaders.filter((m) => filteredPool.includes(m));
+            if (semanticMatches.length > 0) {
+              // Add at 2x weight
+              filteredPool = [...filteredPool, ...semanticMatches, ...semanticMatches];
+            }
+          }
         }
       }
 
@@ -624,7 +671,7 @@ function renderMode(
   return renderScene(mode, { frames, sections, palette, tempo, style, jamDensity });
 }
 
-export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, seed, jamDensity, deadAirMode, deadAirFactor, era, coherenceIsLocked, usedShaderModes, shaderModeLastUsed, drumsSpacePhase, songIdentity, stemSection, songDuration, palette: paletteProp, segueIn, isSacredSegueIn, isInSuiteMiddle, setNumber, jamEvolution, jamPhaseBoundaries, jamCycle, jamPhaseShaders, climaxPhase: climaxPhaseProp, trackNumber, stemInterplayMode, stemDominant, itForceTranscendentShader }) => {
+export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, seed, jamDensity, deadAirMode, deadAirFactor, era, coherenceIsLocked, usedShaderModes, shaderModeLastUsed, drumsSpacePhase, songIdentity, stemSection, songDuration, palette: paletteProp, segueIn, isSacredSegueIn, isInSuiteMiddle, setNumber, jamEvolution, jamPhaseBoundaries, jamCycle, jamPhaseShaders, climaxPhase: climaxPhaseProp, trackNumber, stemInterplayMode, stemDominant, itForceTranscendentShader, reactiveState }) => {
   const frame = useCurrentFrame();
   const palette = paletteProp ?? song.palette;
 
@@ -647,6 +694,31 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
   if (drumsSpacePhase) {
     const dsMode = getDrumsSpaceMode(drumsSpacePhase, seed, songIdentity);
     return <>{renderMode(dsMode, frames, sections, palette, tempo, undefined, jamDensity)}</>;
+  }
+
+  // ─── REACTIVE TRIGGER: mid-section shader swap on audio events ───
+  // Fast 15-frame crossfade into reactive shader, then hold, then crossfade back.
+  // Coherence lock always wins (suppressed upstream). Dual shader disabled during hold.
+  if (reactiveState?.isTriggered && !coherenceIsLocked && reactiveState.suggestedModes.length > 0) {
+    const rng = seededRandom((seed ?? 0) + frame * 11 + (reactiveState.triggerType?.length ?? 0));
+    const reactiveMode = reactiveState.suggestedModes[Math.floor(rng() * reactiveState.suggestedModes.length)];
+    const regularMode = getModeForSection(song, currentSectionIdx, sections, seed, era, false, usedShaderModes, songIdentity, stemSection, frames, songDuration, setNumber, trackNumber, shaderModeLastUsed, stemDominant);
+    const REACTIVE_CROSSFADE = 15;
+    const age = reactiveState.triggerAge;
+
+    if (age < REACTIVE_CROSSFADE) {
+      // Crossfade in
+      const progress = age / REACTIVE_CROSSFADE;
+      return (
+        <SceneCrossfade
+          progress={progress}
+          outgoing={renderMode(regularMode, frames, sections, palette, tempo, undefined, jamDensity)}
+          incoming={renderMode(reactiveMode, frames, sections, palette, tempo, undefined, jamDensity)}
+        />
+      );
+    }
+    // During hold — render reactive shader
+    return <>{renderMode(reactiveMode, frames, sections, palette, tempo, undefined, jamDensity)}</>;
   }
 
   const currentMode = getModeForSection(song, currentSectionIdx, sections, seed, era, coherenceIsLocked, usedShaderModes, songIdentity, stemSection, frames, songDuration, setNumber, trackNumber, shaderModeLastUsed, stemDominant);

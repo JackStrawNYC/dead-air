@@ -110,6 +110,36 @@ export interface AudioDataContext {
     beatConfidence: number;
     /** Melodic confidence: reliability of pitch tracking (0-1) */
     melodicConfidence: number;
+    /** Tempo rate of change: -1 decelerating, 0 steady, +1 accelerating */
+    tempoDerivative: number;
+    /** Dynamic range: 0 compressed, 1 open/wide */
+    dynamicRange: number;
+    /** Space passage score: 0-1 composite */
+    spaceScore: number;
+    /** Timbral brightness: 0 dark, 1 bright */
+    timbralBrightness: number;
+    /** Timbral flux: 0-1 rate of timbral change */
+    timbralFlux: number;
+    /** Vocal pitch from isolated vocal stem (0-1 MIDI-normalized) */
+    vocalPitch: number;
+    /** Vocal pitch confidence from isolated vocal stem (0-1) */
+    vocalPitchConfidence: number;
+    /** CLAP semantic: psychedelic (0-1) */
+    semanticPsychedelic: number;
+    /** CLAP semantic: aggressive (0-1) */
+    semanticAggressive: number;
+    /** CLAP semantic: tender (0-1) */
+    semanticTender: number;
+    /** CLAP semantic: cosmic (0-1) */
+    semanticCosmic: number;
+    /** CLAP semantic: rhythmic (0-1) */
+    semanticRhythmic: number;
+    /** CLAP semantic: ambient (0-1) */
+    semanticAmbient: number;
+    /** CLAP semantic: chaotic (0-1) */
+    semanticChaotic: number;
+    /** CLAP semantic: triumphant (0-1) */
+    semanticTriumphant: number;
   };
   /** Per-song palette primary hue (0-1 normalized) */
   palettePrimary: number;
@@ -421,6 +451,21 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
   const downbeatPulse = transientEnvelope(frames, idx, (f) => (f.downbeat ? 1 : 0), 12) * Math.max(0.4, egate);
   const beatConfidenceSmooth = smoothValue(frames, idx, (f) => f.beatConfidence ?? 0.5, 20);
   const melodicConfidenceSmooth = smoothValue(frames, idx, (f) => f.melodicConfidence ?? 0.5, 20);
+  const tempoDerivativeSmooth = smoothValue(frames, idx, (f) => f.tempoDerivative ?? 0, 10);
+  const dynamicRangeSmooth = smoothValue(frames, idx, (f) => f.dynamicRange ?? 0.5, 15);
+  const spaceScoreSmooth = smoothValue(frames, idx, (f) => f.spaceScore ?? 0, 20);
+  const timbralBrightnessSmooth = smoothValue(frames, idx, (f) => f.timbralBrightness ?? 0.5, 12);
+  const timbralFluxSmooth = smoothValue(frames, idx, (f) => f.timbralFlux ?? 0, 8);
+  const vocalPitchSmooth = smoothValue(frames, idx, (f) => f.vocalPitch ?? 0, 8);
+  const vocalPitchConfidenceSmooth = smoothValue(frames, idx, (f) => f.vocalPitchConfidence ?? 0, 10);
+  const semanticPsychedelicSmooth = smoothValue(frames, idx, (f) => f.semantic_psychedelic ?? 0, 15);
+  const semanticAggressiveSmooth = smoothValue(frames, idx, (f) => f.semantic_aggressive ?? 0, 15);
+  const semanticTenderSmooth = smoothValue(frames, idx, (f) => f.semantic_tender ?? 0, 15);
+  const semanticCosmicSmooth = smoothValue(frames, idx, (f) => f.semantic_cosmic ?? 0, 15);
+  const semanticRhythmicSmooth = smoothValue(frames, idx, (f) => f.semantic_rhythmic ?? 0, 15);
+  const semanticAmbientSmooth = smoothValue(frames, idx, (f) => f.semantic_ambient ?? 0, 15);
+  const semanticChaoticSmooth = smoothValue(frames, idx, (f) => f.semantic_chaotic ?? 0, 15);
+  const semanticTriumphantSmooth = smoothValue(frames, idx, (f) => f.semantic_triumphant ?? 0, 15);
 
   const audioData: AudioDataContext = {
     frame: fd,
@@ -472,6 +517,21 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
       downbeat: downbeatPulse,
       beatConfidence: beatConfidenceSmooth,
       melodicConfidence: melodicConfidenceSmooth,
+      tempoDerivative: tempoDerivativeSmooth,
+      dynamicRange: dynamicRangeSmooth,
+      spaceScore: spaceScoreSmooth,
+      timbralBrightness: timbralBrightnessSmooth,
+      timbralFlux: timbralFluxSmooth,
+      vocalPitch: vocalPitchSmooth,
+      vocalPitchConfidence: vocalPitchConfidenceSmooth,
+      semanticPsychedelic: semanticPsychedelicSmooth,
+      semanticAggressive: semanticAggressiveSmooth,
+      semanticTender: semanticTenderSmooth,
+      semanticCosmic: semanticCosmicSmooth,
+      semanticRhythmic: semanticRhythmicSmooth,
+      semanticAmbient: semanticAmbientSmooth,
+      semanticChaotic: semanticChaoticSmooth,
+      semanticTriumphant: semanticTriumphantSmooth,
     },
     palettePrimary,
     paletteSecondary,

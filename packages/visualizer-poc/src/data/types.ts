@@ -63,6 +63,36 @@ export interface EnhancedFrameData {
   sectionType?: string;
   /** Improvisation score: 0 = structured, 1 = highly improvisational */
   improvisationScore?: number;
+  /** Tempo rate of change: -1 decelerating, 0 steady, +1 accelerating */
+  tempoDerivative?: number;
+  /** Dynamic range: 0 compressed, 1 open/wide (peak/RMS ratio per 1s window) */
+  dynamicRange?: number;
+  /** Space passage score: 0-1 composite (low energy + high flatness + low beat confidence + no vocals) */
+  spaceScore?: number;
+  /** Timbral brightness: 0 dark/acoustic, 1 bright/electric (high MFCC ratio) */
+  timbralBrightness?: number;
+  /** Timbral flux: 0-1 rate of timbral change (L2 norm of MFCC deltas) */
+  timbralFlux?: number;
+  /** Vocal pitch from isolated vocal stem (0-1 MIDI-normalized) */
+  vocalPitch?: number;
+  /** Vocal pitch confidence from isolated vocal stem (0-1) */
+  vocalPitchConfidence?: number;
+  /** CLAP semantic score: psychedelic (0-1) */
+  semantic_psychedelic?: number;
+  /** CLAP semantic score: aggressive (0-1) */
+  semantic_aggressive?: number;
+  /** CLAP semantic score: tender (0-1) */
+  semantic_tender?: number;
+  /** CLAP semantic score: cosmic (0-1) */
+  semantic_cosmic?: number;
+  /** CLAP semantic score: rhythmic (0-1) */
+  semantic_rhythmic?: number;
+  /** CLAP semantic score: ambient (0-1) */
+  semantic_ambient?: number;
+  /** CLAP semantic score: chaotic (0-1) */
+  semantic_chaotic?: number;
+  /** CLAP semantic score: triumphant (0-1) */
+  semantic_triumphant?: number;
 }
 
 /** Legacy frame data from POC (subset of EnhancedFrameData) */
@@ -338,6 +368,10 @@ export interface OverlayEntry {
   /** Selection rarity (0-1, default 1.0). Values < 1.0 add a random gate:
    *  the overlay only passes if rng() < rarity, creating "surprise" appearances. */
   rarity?: number;
+  /** Audio affinity: AudioSnapshot field name → score weight (-1 to 1).
+   *  Positive = overlay thrives with high values. Negative = suppressed.
+   *  e.g. { spectralFlux: 0.8, energy: 0.5, vocalPresence: -0.3 } */
+  audioAffinity?: Partial<Record<string, number>>;
   /** CSS mix-blend-mode for this overlay (default "screen") */
   blendMode?: "screen" | "overlay" | "multiply" | "soft-light" | "color-dodge" | "luminosity";
 }

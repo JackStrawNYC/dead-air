@@ -85,6 +85,36 @@ export interface AudioSnapshot {
   chordConfidence: number;
   /** Section type label (verse, chorus, bridge, solo, jam, intro, outro) */
   sectionType: string;
+  /** Tempo rate of change: -1 decelerating, 0 steady, +1 accelerating */
+  tempoDerivative: number;
+  /** Dynamic range: 0 compressed, 1 open/wide */
+  dynamicRange: number;
+  /** Space passage score: 0-1 composite */
+  spaceScore: number;
+  /** Timbral brightness: 0 dark, 1 bright (high MFCC ratio) */
+  timbralBrightness: number;
+  /** Timbral flux: 0-1 rate of timbral change */
+  timbralFlux: number;
+  /** Vocal pitch from isolated vocal stem (0-1 MIDI-normalized) */
+  vocalPitch: number;
+  /** Vocal pitch confidence from isolated vocal stem (0-1) */
+  vocalPitchConfidence: number;
+  /** CLAP semantic: psychedelic (0-1) */
+  semanticPsychedelic: number;
+  /** CLAP semantic: aggressive (0-1) */
+  semanticAggressive: number;
+  /** CLAP semantic: tender (0-1) */
+  semanticTender: number;
+  /** CLAP semantic: cosmic (0-1) */
+  semanticCosmic: number;
+  /** CLAP semantic: rhythmic (0-1) */
+  semanticRhythmic: number;
+  /** CLAP semantic: ambient (0-1) */
+  semanticAmbient: number;
+  /** CLAP semantic: chaotic (0-1) */
+  semanticChaotic: number;
+  /** CLAP semantic: triumphant (0-1) */
+  semanticTriumphant: number;
 }
 
 /**
@@ -482,12 +512,27 @@ export function computeAudioSnapshot(
     energyForecast: computeEnergyForecast(frames, idx, 60),
     peakApproaching: computePeakApproaching(frames, idx),
     beatStability: computeBeatStability(frames, idx),
-    melodicPitch: gaussianSmooth(frames, idx, (f) => f.melodicPitch ?? 0, 8),
-    melodicConfidence: gaussianSmooth(frames, idx, (f) => f.melodicConfidence ?? 0, 10),
-    melodicDirection: gaussianSmooth(frames, idx, (f) => f.melodicDirection ?? 0, 5),
+    melodicPitch: gaussianSmooth(frames, idx, (f) => f.melodicPitch ?? 0, 4),
+    melodicConfidence: gaussianSmooth(frames, idx, (f) => f.melodicConfidence ?? 0, 5),
+    melodicDirection: gaussianSmooth(frames, idx, (f) => f.melodicDirection ?? 0, 3),
     chordIndex: frames[idx].chordIndex ?? 0,
-    harmonicTension: gaussianSmooth(frames, idx, (f) => f.harmonicTension ?? 0, 15),
-    chordConfidence: gaussianSmooth(frames, idx, (f) => f.chordConfidence ?? 0.5, 10),
+    harmonicTension: gaussianSmooth(frames, idx, (f) => f.harmonicTension ?? 0, 6),
+    chordConfidence: gaussianSmooth(frames, idx, (f) => f.chordConfidence ?? 0.5, 5),
     sectionType: frames[idx].sectionType ?? "jam",
+    tempoDerivative: gaussianSmooth(frames, idx, (f) => f.tempoDerivative ?? 0, 10),
+    dynamicRange: gaussianSmooth(frames, idx, (f) => f.dynamicRange ?? 0.5, 15),
+    spaceScore: gaussianSmooth(frames, idx, (f) => f.spaceScore ?? 0, 20),
+    timbralBrightness: gaussianSmooth(frames, idx, (f) => f.timbralBrightness ?? 0.5, 12),
+    timbralFlux: gaussianSmooth(frames, idx, (f) => f.timbralFlux ?? 0, 8),
+    vocalPitch: gaussianSmooth(frames, idx, (f) => f.vocalPitch ?? 0, 4),
+    vocalPitchConfidence: gaussianSmooth(frames, idx, (f) => f.vocalPitchConfidence ?? 0, 10),
+    semanticPsychedelic: gaussianSmooth(frames, idx, (f) => f.semantic_psychedelic ?? 0, 15),
+    semanticAggressive: gaussianSmooth(frames, idx, (f) => f.semantic_aggressive ?? 0, 15),
+    semanticTender: gaussianSmooth(frames, idx, (f) => f.semantic_tender ?? 0, 15),
+    semanticCosmic: gaussianSmooth(frames, idx, (f) => f.semantic_cosmic ?? 0, 15),
+    semanticRhythmic: gaussianSmooth(frames, idx, (f) => f.semantic_rhythmic ?? 0, 15),
+    semanticAmbient: gaussianSmooth(frames, idx, (f) => f.semantic_ambient ?? 0, 15),
+    semanticChaotic: gaussianSmooth(frames, idx, (f) => f.semantic_chaotic ?? 0, 15),
+    semanticTriumphant: gaussianSmooth(frames, idx, (f) => f.semantic_triumphant ?? 0, 15),
   };
 }

@@ -80,7 +80,7 @@ void main() {
   float sSolo = smoothstep(3.5, 4.5, sectionT) * (1.0 - step(4.5, sectionT));
   // Jam: deeper recursion, more rotation. Space: shallow, slow. Solo: dramatic zoom.
   float sectionScaleMod = mix(1.0, 1.4, sJam) * mix(1.0, 0.3, sSpace) * mix(1.0, 1.5, sSolo);
-  float sectionRotMod = mix(1.0, 1.5, sJam) * mix(1.0, 0.2, sSpace);
+  float sectionRotMod = mix(1.0, 1.5, sJam) * mix(1.0, 0.2, sSpace) * (1.0 + uPeakApproaching * 0.3);
 
   // --- Recursion parameters ---
   // Scale: zoom inward 2-5% per frame, driven by energy (section-modulated)

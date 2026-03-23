@@ -222,6 +222,12 @@ export const FullscreenQuad: React.FC<Props> = ({
       uEnvelopeBrightness: { value: 1 },
       uEnvelopeSaturation: { value: 1 },
       uEnvelopeHue: { value: 0 },
+      uTempoDerivative: { value: 0 },
+      uDynamicRange: { value: 0.5 },
+      uSpaceScore: { value: 0 },
+      uTimbralBrightness: { value: 0.5 },
+      uTimbralFlux: { value: 0 },
+      uVocalPitch: { value: 0 },
       ...extraUniforms,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -347,6 +353,12 @@ export const FullscreenQuad: React.FC<Props> = ({
   uniforms.uEnvelopeBrightness.value = envelope.brightness;
   uniforms.uEnvelopeSaturation.value = envelope.saturation;
   uniforms.uEnvelopeHue.value = envelope.hue;
+  uniforms.uTempoDerivative.value = smooth.tempoDerivative ?? 0;
+  uniforms.uDynamicRange.value = smooth.dynamicRange ?? 0.5;
+  uniforms.uSpaceScore.value = smooth.spaceScore ?? 0;
+  uniforms.uTimbralBrightness.value = smooth.timbralBrightness ?? 0.5;
+  uniforms.uTimbralFlux.value = smooth.timbralFlux ?? 0;
+  uniforms.uVocalPitch.value = smooth.vocalPitch ?? 0;
 
   // 3D Camera
   const cam3d = compute3DCamera(

@@ -114,7 +114,7 @@ void main() {
 
   // === SLOW TIME: aurora should never feel rushed ===
   float slowTime = uDynamicTime * 0.08;
-  float driftSpeed = (0.03 + slowE * 0.02 + trendDrift) * mix(1.0, 1.4, sJam) * mix(1.0, 0.4, sSpace) * mix(1.0, 1.15, sChorus);
+  float driftSpeed = (0.03 + slowE * 0.02 + trendDrift) * mix(1.0, 1.4, sJam) * mix(1.0, 0.4, sSpace) * mix(1.0, 1.15, sChorus) * (1.0 + uPeakApproaching * 0.3);
 
   // === SKY background (dim but visible, not pitch black) ===
   vec3 skyColor = mix(

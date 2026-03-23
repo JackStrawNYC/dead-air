@@ -34,6 +34,7 @@ import type { ShowArcModifiers } from "./show-arc";
 import type { DrumsSpaceSubPhase } from "../utils/drums-space-phase";
 import { DRUMS_SPACE_TREATMENTS } from "../utils/drums-space-phase";
 import type { StemSectionType } from "../utils/stem-features";
+import type { ReactiveState } from "../utils/reactive-triggers";
 import { buildWindowsFromSections, markDropoutWindows } from "./overlay-windows";
 import { scoreOverlayForWindow, type ScoringContext } from "./overlay-scoring";
 import { selectOverlaysForWindow, HERO_OVERLAY_NAMES as _HERO_OVERLAY_NAMES } from "./overlay-selection";
@@ -451,6 +452,7 @@ export function getOverlayOpacities(
   schedule: RotationSchedule,
   frames?: EnhancedFrameData[],
   calibration?: EnergyCalibration,
+  reactiveState?: ReactiveState,
 ): Record<string, number> {
   const result: Record<string, number> = {};
 
@@ -615,6 +617,29 @@ export function getOverlayOpacities(
         if (schedule.alwaysActive.includes(name)) continue;
         result[name] = (result[name] ?? 0) * Math.max(0.1, withdrawMult);
       }
+    }
+  }
+
+  // ─── Reactive trigger overlay injection ───
+  // When a trigger is active, inject its overlays with fade-in/hold/fade-out.
+  if (reactiveState?.isTriggered && reactiveState.overlayInjections.length > 0) {
+    const REACTIVE_FADE_IN = 10;
+    const REACTIVE_HOLD = 120; // 4s
+    const REACTIVE_FADE_OUT = 15;
+    const age = reactiveState.triggerAge;
+    let reactiveOpacity: number;
+    if (age < REACTIVE_FADE_IN) {
+      reactiveOpacity = age / REACTIVE_FADE_IN;
+    } else if (age < REACTIVE_FADE_IN + REACTIVE_HOLD) {
+      reactiveOpacity = 1;
+    } else if (age < REACTIVE_FADE_IN + REACTIVE_HOLD + REACTIVE_FADE_OUT) {
+      reactiveOpacity = 1 - (age - REACTIVE_FADE_IN - REACTIVE_HOLD) / REACTIVE_FADE_OUT;
+    } else {
+      reactiveOpacity = 0;
+    }
+    reactiveOpacity *= reactiveState.triggerStrength;
+    for (const name of reactiveState.overlayInjections) {
+      result[name] = Math.max(result[name] ?? 0, reactiveOpacity);
     }
   }
 

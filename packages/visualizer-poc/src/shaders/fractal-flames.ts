@@ -107,7 +107,7 @@ void main() {
   float sSpace = smoothstep(6.5, 7.5, sectionT);
   float sSolo = smoothstep(3.5, 4.5, sectionT) * (1.0 - step(4.5, sectionT));
   // Jam: faster rotation, brighter points. Space: frozen attractor. Solo: dramatic brightness.
-  float sectionRotMod = mix(1.0, 1.5, sJam) * mix(1.0, 0.2, sSpace) * mix(1.0, 1.3, sSolo);
+  float sectionRotMod = mix(1.0, 1.5, sJam) * mix(1.0, 0.2, sSpace) * mix(1.0, 1.3, sSolo) * (1.0 + uPeakApproaching * 0.3);
   float sectionBrightMod = mix(0.0, 0.2, sJam) + mix(0.0, -0.15, sSpace) + mix(0.0, 0.25, sSolo);
 
   // Audio-driven parameters (section-modulated)

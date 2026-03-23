@@ -122,7 +122,7 @@ void main() {
   float sChorus = smoothstep(1.5, 2.5, sectionT) * (1.0 - step(2.5, sectionT));
   float sSolo = smoothstep(3.5, 4.5, sectionT) * (1.0 - step(4.5, sectionT));
   // Jam: taller, faster flames. Space: embers only, slow drift. Chorus: wider, brighter.
-  float sectionRiseSpeed = mix(1.0, 1.4, sJam) * mix(1.0, 0.3, sSpace) * mix(1.0, 1.2, sChorus);
+  float sectionRiseSpeed = mix(1.0, 1.4, sJam) * mix(1.0, 0.3, sSpace) * mix(1.0, 1.2, sChorus) * (1.0 + uPeakApproaching * 0.3);
   float sectionSpread = mix(1.0, 1.3, sChorus) * mix(1.0, 0.5, sSpace);
 
   // === CLIMAX REACTIVITY ===

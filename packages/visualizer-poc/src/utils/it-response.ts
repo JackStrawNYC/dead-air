@@ -415,7 +415,34 @@ export function computeITResponse(
     };
   }
 
-  // Normal state
+  // Normal state — with pre-lock gradual ramp when coherence is building
+  const coherenceScore = current.score;
+  if (coherenceScore > 0.4) {
+    // Pre-lock ramp: subtle visual shift as band approaches lock-in
+    const preRamp = Math.min(1, (coherenceScore - 0.4) / 0.25);
+    const eased = smoothstep(preRamp);
+    return {
+      phase: "normal",
+      convergenceProgress: 0,
+      targetHue,
+      overlayOpacityOverride: 1 - eased * 0.15,
+      cameraLock: false,
+      luminanceLift: eased * 0.04,
+      snapToMusicalTime: false,
+      flashIntensity: 0,
+      triggerReset: false,
+      strobeIntensity: 0,
+      timeDilation: 1 - eased * 0.1,
+      flashHue: 0,
+      lockDepth: "shallow",
+      forceTranscendentShader: false,
+      saturationSurge: 1 + eased * 0.3,
+      snapZoom: 0,
+      heroEruption: false,
+      vignettePull: eased * 0.05,
+    };
+  }
+
   return defaultState();
 }
 

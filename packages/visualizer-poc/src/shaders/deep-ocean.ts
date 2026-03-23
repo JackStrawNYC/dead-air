@@ -105,7 +105,7 @@ void main() {
   swayUv.x += uDynamicTime * 0.05;
 
   // Surface chop from energy: quiet = glassy, loud = churning
-  float chop = energy * 0.04 + uFastBass * 0.03;
+  float chop = (energy * 0.04 + uFastBass * 0.03) * (1.0 + uPeakApproaching * 0.3);
   swayUv += chop * vec2(
     snoise(vec3(p * 6.0, uDynamicTime * 1.5)),
     snoise(vec3(p * 6.0 + 50.0, uDynamicTime * 1.5))

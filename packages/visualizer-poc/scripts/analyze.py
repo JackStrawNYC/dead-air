@@ -472,6 +472,9 @@ def analyze_track(audio_path: Path, output_path: Path, stems_dir: Path | None = 
             for fi in range(src_frame, min(end_frame, n_frames)):
                 section_type_arr[fi] = label
 
+    # --- Space score override: when spaceScore > 0.6 contiguously, override sectionType to "space" ---
+    # (computed after space_score below, applied after section_type_arr is built)
+
     # Count section type distribution
     from collections import Counter
     type_counts = Counter(section_type_arr)
@@ -532,6 +535,114 @@ def analyze_track(audio_path: Path, output_path: Path, stems_dir: Path | None = 
     if stems_dir is not None:
         stem_data = analyze_stems(stems_dir, n_frames)
 
+    # --- Level 2: Deep audio features ---
+
+    # Tempo derivative: rate of tempo change (-1 to +1)
+    print("Computing tempo derivative ...")
+    tempo_derivative_arr = np.gradient(local_tempo_arr)
+    tempo_derivative_arr = gaussian_filter1d(tempo_derivative_arr, sigma=FPS)  # 1s Gaussian
+    # Normalize: ±10 BPM/s → ±1
+    tempo_derivative_arr = np.clip(tempo_derivative_arr / 10.0, -1.0, 1.0)
+    tempo_derivative_arr = pad_or_trim_1d(tempo_derivative_arr, n_frames)
+
+    # Dynamic range: peak/RMS ratio per 1s window (0-1)
+    print("Computing dynamic range ...")
+    dynamic_range_arr = np.zeros(n_frames)
+    dr_window = FPS  # 1 second
+    for i in range(n_frames):
+        lo_dr = max(0, i - dr_window // 2)
+        hi_dr = min(len(rms), i + dr_window // 2)
+        if hi_dr <= lo_dr:
+            continue
+        win_rms = rms[lo_dr:hi_dr]  # use raw rms, not normalized
+        peak_val = win_rms.max()
+        mean_val = win_rms.mean()
+        if mean_val > 1e-8:
+            ratio = peak_val / mean_val
+            # Typical ratio 1-10, normalize to 0-1
+            dynamic_range_arr[i] = min(1.0, (ratio - 1.0) / 9.0)
+    dynamic_range_arr = pad_or_trim_1d(dynamic_range_arr, n_frames)
+
+    # Space score: composite (0-1) — weighted: low energy(.3) + high flatness(.25) + low beat confidence(.25) + no vocals(.2)
+    print("Computing space score ...")
+    space_score_arr = np.zeros(n_frames)
+    for i in range(n_frames):
+        energy_comp = max(0, 1.0 - rms_norm[i] * 4.0)  # low energy → high
+        flatness_comp = flatness_norm[i]  # high flatness → high
+        beat_comp = max(0, 1.0 - beat_confidence_arr[i] * 2.0)  # low beat confidence → high
+        vocal_comp = 1.0  # default: no vocals
+        if stem_data and stem_data["available"] and "vocalPresence" in stem_data:
+            vocal_comp = 0.0 if bool(stem_data["vocalPresence"][i]) else 1.0
+        space_score_arr[i] = energy_comp * 0.3 + flatness_comp * 0.25 + beat_comp * 0.25 + vocal_comp * 0.2
+    space_score_arr = np.clip(space_score_arr, 0.0, 1.0)
+    space_score_arr = pad_or_trim_1d(space_score_arr, n_frames)
+
+    # Space score override: when spaceScore > 0.6 contiguously for >= 2s, override sectionType to "space"
+    SPACE_THRESHOLD = 0.6
+    SPACE_MIN_FRAMES = int(2 * FPS)  # 2 seconds contiguous
+    in_space = False
+    space_start = 0
+    for i in range(n_frames):
+        if space_score_arr[i] > SPACE_THRESHOLD:
+            if not in_space:
+                in_space = True
+                space_start = i
+        else:
+            if in_space and (i - space_start) >= SPACE_MIN_FRAMES:
+                for fi in range(space_start, i):
+                    section_type_arr[fi] = "space"
+            in_space = False
+    # Handle trailing space
+    if in_space and (n_frames - space_start) >= SPACE_MIN_FRAMES:
+        for fi in range(space_start, n_frames):
+            section_type_arr[fi] = "space"
+
+    # Timbral brightness: high MFCC bins / total ratio (0-1)
+    print("Computing timbral brightness ...")
+    mfcc_brightness = librosa.feature.mfcc(y=y, sr=sr, hop_length=HOP_LENGTH, n_mfcc=20)
+    # High MFCC bins (10-19) vs total energy
+    high_mfcc = np.abs(mfcc_brightness[10:, :]).sum(axis=0)
+    total_mfcc = np.abs(mfcc_brightness).sum(axis=0) + 1e-8
+    timbral_brightness_arr = normalize(high_mfcc / total_mfcc)
+    timbral_brightness_arr = pad_or_trim_1d(timbral_brightness_arr, n_frames)
+
+    # Timbral flux: L2 norm of MFCC deltas (0-1)
+    print("Computing timbral flux ...")
+    mfcc_delta = np.diff(mfcc_brightness, axis=1)
+    timbral_flux_raw = np.linalg.norm(mfcc_delta, axis=0)
+    timbral_flux_arr = normalize(timbral_flux_raw)
+    # Pad to n_frames (diff loses 1 frame)
+    timbral_flux_arr = np.concatenate([[0], timbral_flux_arr])
+    timbral_flux_arr = pad_or_trim_1d(timbral_flux_arr, n_frames)
+
+    # Vocal pitch isolation: piptrack on vocal stem
+    vocal_pitch_arr = np.zeros(n_frames)
+    vocal_pitch_conf_arr = np.zeros(n_frames)
+    vocals_path = (stems_dir / "vocals.wav") if stems_dir else Path("nonexistent")
+    if stem_data and stem_data["available"] and vocals_path.exists():
+        print("Extracting vocal melody (piptrack on vocal stem) ...")
+        y_vocals_pitch, _ = librosa.load(str(vocals_path), sr=SR, mono=True)
+        vp_pitches, vp_mags = librosa.piptrack(y=y_vocals_pitch, sr=SR, hop_length=HOP_LENGTH)
+        for t in range(min(vp_pitches.shape[1], n_frames)):
+            mag_col = vp_mags[:, t]
+            idx_max = mag_col.argmax()
+            if mag_col[idx_max] > 0:
+                hz = vp_pitches[idx_max, t]
+                if hz > 0:
+                    midi = 12 * np.log2(hz / 440.0) + 69
+                    vocal_pitch_arr[t] = np.clip((midi - 21) / (108 - 21), 0, 1)
+                    vocal_pitch_conf_arr[t] = mag_col[idx_max]
+        vocal_pitch_conf_arr = normalize(vocal_pitch_conf_arr)
+        vocal_pitch_arr = pad_or_trim_1d(vocal_pitch_arr, n_frames)
+        vocal_pitch_conf_arr = pad_or_trim_1d(vocal_pitch_conf_arr, n_frames)
+        print(f"Vocal pitch: {np.count_nonzero(vocal_pitch_arr)} pitched frames / {n_frames} total")
+
+    space_count = sum(1 for s in section_type_arr if s == "space")
+    print(f"Level 2 features: tempoDerivative range=[{tempo_derivative_arr.min():.3f}, {tempo_derivative_arr.max():.3f}], "
+          f"dynamicRange mean={dynamic_range_arr.mean():.3f}, spaceScore mean={space_score_arr.mean():.3f}, "
+          f"space frames={space_count}, timbralBrightness mean={timbral_brightness_arr.mean():.3f}, "
+          f"timbralFlux mean={timbral_flux_arr.mean():.3f}")
+
     # --- Build output ---
     print("Building JSON ...")
     frames = []
@@ -559,6 +670,13 @@ def analyze_track(audio_path: Path, output_path: Path, stems_dir: Path | None = 
             "harmonicTension": round(float(harmonic_tension_arr[i]), 3),
             "sectionType": section_type_arr[i],
             "improvisationScore": round(float(improv_arr[i]), 3),
+            "tempoDerivative": round(float(tempo_derivative_arr[i]), 4),
+            "dynamicRange": round(float(dynamic_range_arr[i]), 4),
+            "spaceScore": round(float(space_score_arr[i]), 4),
+            "timbralBrightness": round(float(timbral_brightness_arr[i]), 4),
+            "timbralFlux": round(float(timbral_flux_arr[i]), 4),
+            "vocalPitch": round(float(vocal_pitch_arr[i]), 4),
+            "vocalPitchConfidence": round(float(vocal_pitch_conf_arr[i]), 4),
         }
         # Add stem-specific fields when available
         if stem_data and stem_data["available"]:
@@ -590,6 +708,26 @@ def analyze_track(audio_path: Path, output_path: Path, stems_dir: Path | None = 
             meta["stemVocalMean"] = stem_data["vocalMean"]
         if "otherMean" in stem_data:
             meta["stemOtherMean"] = stem_data["otherMean"]
+
+    # --- Level 3: CLAP semantic analysis (optional — graceful fallback) ---
+    try:
+        from semantic_analysis import load_clap_model, compute_text_embeddings, analyze_audio_semantic, SEMANTIC_PROBES
+        print("Running CLAP semantic analysis ...")
+        clap_model = load_clap_model()
+        text_embeds = compute_text_embeddings(clap_model, SEMANTIC_PROBES)
+        semantic_scores, _ = analyze_audio_semantic(str(audio_path), clap_model, text_embeds)
+        # Merge 8 semantic scores per frame
+        semantic_categories = list(semantic_scores.keys())
+        for i in range(n_frames):
+            for cat in semantic_categories:
+                scores_list = semantic_scores[cat]
+                if i < len(scores_list):
+                    frames[i][f"semantic_{cat}"] = round(float(scores_list[i]), 4)
+        print(f"CLAP semantic analysis: {len(semantic_categories)} categories merged into {n_frames} frames")
+    except ImportError:
+        print("CLAP not available (laion-clap not installed), skipping semantic analysis")
+    except Exception as e:
+        print(f"CLAP semantic analysis failed (graceful fallback): {e}")
 
     output = {
         "meta": meta,

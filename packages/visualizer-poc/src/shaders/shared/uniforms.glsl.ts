@@ -127,6 +127,14 @@ uniform float uEnvelopeBrightness; // energy-reactive brightness (0.02–1.55)
 uniform float uEnvelopeSaturation; // combined saturation multiplier
 uniform float uEnvelopeHue;        // total hue shift in radians
 
+// ─── Deep Audio (Level 2) ───
+uniform float uTempoDerivative;
+uniform float uDynamicRange;
+uniform float uSpaceScore;
+uniform float uTimbralBrightness;
+uniform float uTimbralFlux;
+uniform float uVocalPitch;
+
 // ─── Spatial ───
 uniform vec2 uResolution;
 uniform vec2 uCamOffset;

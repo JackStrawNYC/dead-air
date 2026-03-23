@@ -24,8 +24,10 @@ import { SceneCrossfade } from "./scenes/SceneCrossfade";
 import { SegueCrossfade } from "./scenes/SegueCrossfade";
 import { renderScene } from "./scenes/scene-registry";
 import { OVERLAY_COMPONENTS } from "./data/overlay-components";
-import { buildRotationSchedule, getOverlayOpacities } from "./data/overlay-rotation";
-import type { RotationSchedule } from "./data/overlay-rotation";
+import { buildRotationSchedule } from "./data/overlay-rotation";
+import { computeContinuousOverlays, type ContinuousOverlayConfig } from "./utils/continuous-overlay";
+import { SELECTABLE_REGISTRY, ALWAYS_ACTIVE } from "./data/overlay-registry";
+import { getEraPreset } from "./data/era-presets";
 import { ConcertInfo } from "./components/ConcertInfo";
 import { SetlistScroll } from "./components/SetlistScroll";
 import { loadAnalysis, getSections } from "./data/analysis-loader";
@@ -97,6 +99,7 @@ import { GuitarStrings } from "./components/GuitarStrings";
 import { MeshDeformationGrid } from "./components/MeshDeformationGrid";
 import { computeStemCharacter } from "./utils/stem-character";
 import { TimeDilationProvider } from "./data/TimeDilationContext";
+import { computeReactiveTriggers } from "./utils/reactive-triggers";
 
 // Extracted sub-components
 import { SongArtLayer } from "./components/song-visualizer/SongArtLayer";
@@ -117,10 +120,10 @@ const FADE_FRAMES = 90; // 3 seconds at 30fps
 function applyDensityMult(
   opacities: Record<string, number>,
   mult: number,
-  schedule: RotationSchedule,
+  alwaysActiveNames: string[],
 ): Record<string, number> {
   if (mult === 1) return opacities;
-  const alwaysSet = new Set(schedule.alwaysActive);
+  const alwaysSet = new Set(alwaysActiveNames);
   const result: Record<string, number> = {};
   for (const [name, opacity] of Object.entries(opacities)) {
     result[name] = alwaysSet.has(name) ? opacity : opacity * mult;
@@ -297,7 +300,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
     return sorted[0]?.[0] as StemSectionType | undefined;
   }, [analysis?.frames, analysis?.meta?.tempo]);
 
-  // ─── Overlay scheduling ───
+  // ─── Overlay scheduling (legacy — kept for rollback) ───
   const rotationSchedule = useMemo(() => {
     if (!props.activeOverlays || !analysis) return null;
     const sects = getSections(analysis);
@@ -306,9 +309,39 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
     return buildRotationSchedule(props.activeOverlays, sects, props.song.trackId, showSeed, analysis?.frames, isDrumsSpace, props.energyHints, props.show?.era, props.song.defaultMode, songIdentity, showArcModifiers, undefined, dominantStemSection, narrative?.state.songsCompleted, songHero);
   }, [props.activeOverlays, analysis, props.song.trackId, showSeed, isDrumsSpace, props.energyHints, props.show?.era, props.song.defaultMode, songIdentity, showArcModifiers, dominantStemSection, narrative?.state.songsCompleted, props.song.overlayOverrides]);
 
-  const opacityMapBase = rotationSchedule
-    ? getOverlayOpacities(frame, rotationSchedule, analysis?.frames, energyCalibration)
-    : null;
+  // ─── Continuous overlay config (replaces window scheduling) ───
+  const overlayConfig = useMemo((): ContinuousOverlayConfig | null => {
+    if (!props.activeOverlays || !analysis) return null;
+    // Build pool: all selectable overlays minus always-active, filtered by era
+    const alwaysActiveSet = new Set(ALWAYS_ACTIVE);
+    const poolNames = new Set(props.activeOverlays.filter((n) => !alwaysActiveSet.has(n)));
+    let pool = SELECTABLE_REGISTRY.filter((e) => poolNames.has(e.name));
+    const eraPreset = props.show?.era ? getEraPreset(props.show.era) : null;
+    if (eraPreset) {
+      const excluded = new Set(eraPreset.excludedOverlays);
+      pool = pool.filter((e) => !excluded.has(e.name));
+    }
+    const songHero = props.song.overlayOverrides?.include?.[0];
+    return {
+      pool,
+      alwaysActive: props.activeOverlays.filter((n) => alwaysActiveSet.has(n)),
+      trackId: props.song.trackId,
+      showSeed: showSeed ?? 0,
+      songIdentity,
+      showArcModifiers,
+      energyHints: props.energyHints,
+      isDrumsSpace,
+      dominantStemSection,
+      mode: props.song.defaultMode,
+      songHero,
+      songsCompleted: narrative?.state.songsCompleted,
+      setNumber: props.song.set,
+      era: props.show?.era,
+    };
+  }, [props.activeOverlays, analysis, props.song.trackId, showSeed, isDrumsSpace, props.energyHints, props.show?.era, props.song.defaultMode, songIdentity, showArcModifiers, dominantStemSection, narrative?.state.songsCompleted, props.song.overlayOverrides, props.song.set]);
+
+  // opacityMapBase computed after reactiveState (below) for reactive overlay injection
+  let opacityMapBase: Record<string, number> | null = null;
 
   // ─── Palette hue rotation ───
   const hueRotation = useMemo(() => {
@@ -397,6 +430,27 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
   const climaxState = computeClimaxState(f, frame, sections, audioSnapshot.energy);
   const climaxMod = climaxModulation(climaxState, songIdentity?.climaxBehavior, stemCharacter.dominant);
   const counterpoint = computeCounterpoint(f, frameIdx, climaxState.phase);
+
+  // ─── Reactive triggers (mid-section audio-responsive structural changes) ───
+  const currentSectionForTrigger = sections.find((s) => frameIdx >= s.frameStart && frameIdx < s.frameEnd);
+  const inSectionBoundaryZone = currentSectionForTrigger
+    ? (frameIdx - currentSectionForTrigger.frameStart < 60 || currentSectionForTrigger.frameEnd - frameIdx < 60)
+    : false;
+  const reactiveState = computeReactiveTriggers(
+    f, frameIdx,
+    currentSectionForTrigger?.frameStart ?? 0,
+    currentSectionForTrigger?.frameEnd ?? f.length,
+    tempo,
+    coherenceState.isLocked,
+    inSectionBoundaryZone,
+    climaxState.phase === "climax" || climaxState.phase === "sustain",
+  );
+
+  // Compute overlay opacities via continuous engine (per-frame scoring)
+  const continuousResult = overlayConfig
+    ? computeContinuousOverlays(overlayConfig, f, frameIdx, audioSnapshot, reactiveState)
+    : null;
+  opacityMapBase = continuousResult?.opacities ?? null;
 
   const jamEvolution = useMemo(
     () => computeJamEvolution(f, frame, isDrumsSpace),
@@ -537,7 +591,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
   const rawDensityMult = climaxMod.overlayDensityMult * (jamEvolution.isLongJam ? jamEvolution.densityMult : 1) * sectionVocab.overlayDensityMult * narrativeDirective.overlayDensityMult * endScreenMult * venueProfile.overlayDensityMult * crowdDensityMult * fatigue.densityMult * stemInterplay.densityMult * peakOfShow.densityMult * tempoLock.overlayBreathing * crowdEnergy.densityMult * stemCharacter.overlayDensityMult * (0.7 + 0.3 * narrativeDirective.abstractionLevel);
   // Hard floor: overlays never go below 15% density (except end screen)
   const combinedDensityMult = endScreenMult < 0.01 ? 0 : Math.max(0.15, rawDensityMult);
-  const opacityMap = opacityMapBase ? applyDensityMult(opacityMapBase, combinedDensityMult, rotationSchedule!) : null;
+  const opacityMap = opacityMapBase ? applyDensityMult(opacityMapBase, combinedDensityMult, continuousResult?.alwaysActive ?? rotationSchedule?.alwaysActive ?? []) : null;
 
   // ─── Lyric trigger suppression ───
   const activeLyricTrigger = lyricTriggerWindows.find((w) => frame >= w.frameStart - 150 && frame < w.frameEnd + 120);
@@ -640,7 +694,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
           <SilentErrorBoundary name="SceneRouter">
             {(() => {
               const climaxPhaseMap: Record<string, number> = { idle: 0, build: 1, climax: 2, sustain: 3, release: 4 };
-              const sceneRouter = <SceneRouter frames={f} sections={sections} song={props.song} tempo={tempo} seed={showSeed} jamDensity={jamDensity} deadAirMode={deadAirFactor > 0 ? "cosmic_dust" : undefined} deadAirFactor={deadAirFactor > 0 ? deadAirFactor : undefined} era={props.show?.era} coherenceIsLocked={coherenceState.isLocked} drumsSpacePhase={drumsSpaceState?.subPhase} usedShaderModes={narrative?.state.usedShaderModes} shaderModeLastUsed={narrative?.state.shaderModeLastUsed} songIdentity={songIdentity} stemSection={stemSection} songDuration={analysis?.meta?.duration} palette={effectivePalette} segueIn={props.segueIn} isSacredSegueIn={isSacredSegueIn} isInSuiteMiddle={!!isInSuiteMiddle} setNumber={props.song.set} jamEvolution={jamEvolution} jamPhaseBoundaries={jamPhaseBoundaries} jamCycle={jamCycle} jamPhaseShaders={jamPhaseShaders} climaxPhase={climaxPhaseMap[climaxState.phase] ?? 0} trackNumber={props.song.trackNumber ?? 1} stemInterplayMode={stemInterplay.mode} stemDominant={stemCharacter.dominant} itForceTranscendentShader={itState.forceTranscendentShader} />;
+              const sceneRouter = <SceneRouter frames={f} sections={sections} song={props.song} tempo={tempo} seed={showSeed} jamDensity={jamDensity} deadAirMode={deadAirFactor > 0 ? "cosmic_dust" : undefined} deadAirFactor={deadAirFactor > 0 ? deadAirFactor : undefined} era={props.show?.era} coherenceIsLocked={coherenceState.isLocked} drumsSpacePhase={drumsSpaceState?.subPhase} usedShaderModes={narrative?.state.usedShaderModes} shaderModeLastUsed={narrative?.state.shaderModeLastUsed} songIdentity={songIdentity} stemSection={stemSection} songDuration={analysis?.meta?.duration} palette={effectivePalette} segueIn={props.segueIn} isSacredSegueIn={isSacredSegueIn} isInSuiteMiddle={!!isInSuiteMiddle} setNumber={props.song.set} jamEvolution={jamEvolution} jamPhaseBoundaries={jamPhaseBoundaries} jamCycle={jamCycle} jamPhaseShaders={jamPhaseShaders} climaxPhase={climaxPhaseMap[climaxState.phase] ?? 0} trackNumber={props.song.trackNumber ?? 1} stemInterplayMode={stemInterplay.mode} stemDominant={stemCharacter.dominant} itForceTranscendentShader={itState.forceTranscendentShader} reactiveState={reactiveState} />;
               const palette = effectivePalette;
 
               // Segue IN crossfade: smooth dual-render dissolve from previous song's shader

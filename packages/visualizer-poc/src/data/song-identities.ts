@@ -65,6 +65,25 @@ export interface ClimaxBehavior {
   climaxDensityMult?: number;
 }
 
+/** Narrative arc type — shapes visual pacing throughout the song */
+export type NarrativeArc =
+  | "build_to_climax"
+  | "meditative_journey"
+  | "story_arc"
+  | "energy_cycle"
+  | "elegy"
+  | "celebration"
+  | "jam_vehicle";
+
+export interface VisualPacing {
+  /** Extra intro breathing frames (default 300) */
+  introBreathingFrames?: number;
+  /** Build rate: 0.5=slow, 1=normal, 2=fast */
+  buildRate?: number;
+  /** Climax visual style */
+  climaxStyle?: "explosive" | "transcendent" | "sustained" | "subtle";
+}
+
 export interface SongIdentity {
   /** Preferred shader modes — show-seed narrows to 4 "show modes" that dominate selection (~80%) */
   preferredModes: VisualMode[];
@@ -90,6 +109,12 @@ export interface SongIdentity {
   hueShift?: number;
   /** Additive saturation offset for EnergyEnvelope */
   saturationOffset?: number;
+  /** Song narrative arc — shapes overlay density and shader routing */
+  narrativeArc?: NarrativeArc;
+  /** Thematic tags describing the song's story/mood */
+  thematicTags?: string[];
+  /** Visual pacing overrides */
+  visualPacing?: VisualPacing;
 }
 
 // ─── Song Identity Registry (loaded from JSON) ───
@@ -215,6 +240,81 @@ const SONG_ALIASES: Record<string, string> = {
   "itmusthavebeen": "itmusthavebeen",
   "itmusthavebeentheroses": "itmusthavebeen",
   "roses": "itmusthavebeen",
+  // Fix 3: 50+ new song aliases
+  "hesgone": "hesgone",
+  "hes gone": "hesgone",
+  "gone": "hesgone",
+  "letitgrow": "letitgrow",
+  "let it grow": "letitgrow",
+  "themusicneverstopped": "themusicneverstopped",
+  "musicneverstopped": "themusicneverstopped",
+  "tmns": "themusicneverstopped",
+  "cassidy": "cassidy",
+  "rambleonrose": "rambleonrose",
+  "ramble": "rambleonrose",
+  "tennesseejed": "tennesseejed",
+  "jed": "tennesseejed",
+  "meandmyuncle": "meandmyuncle",
+  "uncle": "meandmyuncle",
+  "bigriver": "bigriver",
+  "theeleven": "theeleven",
+  "eleven": "theeleven",
+  "atticsofmylife": "atticsofmylife",
+  "attics": "atticsofmylife",
+  "shipoffools": "shipoffools",
+  "ship": "shipoffools",
+  "peggyo": "peggyo",
+  "peggy": "peggyo",
+  "chinadoll": "chinadoll",
+  "blackmuddyriver": "blackmuddyriver",
+  "muddy": "blackmuddyriver",
+  "mexicaliblues": "mexicaliblues",
+  "mexicali": "mexicaliblues",
+  "bigrailroadblues": "bigrailroadblues",
+  "railroad": "bigrailroadblues",
+  "candyman": "candyman",
+  "hightime": "hightime",
+  "tolaymedown": "tolaymedown",
+  "laymedown": "tolaymedown",
+  "standingonthemoon": "standingonthemoon",
+  "standing": "standingonthemoon",
+  "somanyroads": "somanyroads",
+  "daysbetween": "daysbetween",
+  "days": "daysbetween",
+  "liberty": "liberty",
+  "foolishheart": "foolishheart",
+  "victimorthecrime": "victimorthecrime",
+  "victim": "victimorthecrime",
+  "crazyfingers": "crazyfingers",
+  "herecomessunshine": "herecomessunshine",
+  "sunshine": "herecomessunshine",
+  "missionintherain": "missionintherain",
+  "mission": "missionintherain",
+  "crypticalenvelopment": "crypticalenvelopment",
+  "cryptical": "crypticalenvelopment",
+  "thatsitfortheotherone": "thatsitfortheotherone",
+  "cosmiccharlie": "cosmiccharlie",
+  "alligator": "alligator",
+  "caution": "caution",
+  "cautiondontsteponthetrax": "caution",
+  "newpotatocaboose": "newpotatocaboose",
+  "potato": "newpotatocaboose",
+  "clementine": "clementine",
+  "mountainsofthemoon": "mountainsofthemoon",
+  "mountains": "mountainsofthemoon",
+  "dupreesdiamondblues": "dupreesdiamondblues",
+  "duprees": "dupreesdiamondblues",
+  "sageandspirit": "sageandspirit",
+  "sage": "sageandspirit",
+  "ikoiko": "ikoiko",
+  "iko": "ikoiko",
+  "wangdangdoodle": "wangdangdoodle",
+  "staggerlee": "staggerlee",
+  "stagger": "staggerlee",
+  "sambaintherain": "sambaintherain",
+  "samba": "sambaintherain",
+  "prideofcucamonga": "prideofcucamonga",
+  "cucamonga": "prideofcucamonga",
 };
 
 // ─── Lookup ───

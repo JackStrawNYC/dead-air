@@ -69,7 +69,7 @@ void main() {
   float melodicDir = clamp(uMelodicDirection, -1.0, 1.0);
   float effectiveBeat = uBeatSnap * smoothstep(0.3, 0.7, uBeatConfidence);
 
-  float slowTime = uDynamicTime * 0.04;
+  float slowTime = uDynamicTime * 0.04 * (1.0 + uPeakApproaching * 0.3);
 
   // --- Section type modulation (0=intro,1=verse,2=chorus,3=bridge,4=solo,5=jam,6=outro,7=space) ---
   float sectionT = uSectionType;

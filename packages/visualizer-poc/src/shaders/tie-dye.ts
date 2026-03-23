@@ -38,7 +38,7 @@ void main() {
   float sSpace = smoothstep(6.5, 7.5, sectionT);
   float sChorus = smoothstep(1.5, 2.5, sectionT) * (1.0 - step(2.5, sectionT));
   // Jam: faster swirl, more dye bleeding. Space: frozen fabric. Chorus: vivid, pulsing.
-  float sectionSpeed = mix(1.0, 1.4, sJam) * mix(1.0, 0.3, sSpace) * mix(1.0, 1.15, sChorus);
+  float sectionSpeed = mix(1.0, 1.4, sJam) * mix(1.0, 0.3, sSpace) * mix(1.0, 1.15, sChorus) * (1.0 + uPeakApproaching * 0.3);
 
   // Time-based rotation — bass drives swirl speed (section-modulated)
   float t = uDynamicTime * 0.15 * (0.8 + uBass * 0.6 + uFastBass * 0.4) * sectionSpeed;

@@ -123,7 +123,7 @@ void main() {
     if (beamActive < 0.01) continue;
 
     float beamX = -aspect.x * 0.5 + beamSpacing * (fi + 1.0) + sin(uDynamicTime * 0.15 + fi * 0.7) * 0.08;
-    float sweepSpeed = (mix(0.25, 0.6, energy) * tempoScale * accelSweep + uBass * 0.1) * mix(1.0, 1.3, sJam) * mix(1.0, 0.4, sSpace);
+    float sweepSpeed = (mix(0.25, 0.6, energy) * tempoScale * accelSweep + uBass * 0.1) * mix(1.0, 1.3, sJam) * mix(1.0, 0.4, sSpace) * (1.0 + uPeakApproaching * 0.3);
     float angle = PI * 0.5 + sin(uDynamicTime * sweepSpeed + beamPhase * 2.0 + pitchSweep) * mix(0.35, 0.70, energy + uFastEnergy * 0.15 + tensionAngle);
     float width = mix(0.03, 0.11, energy) + uMids * 0.04;
 

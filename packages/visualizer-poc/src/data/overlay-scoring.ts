@@ -12,6 +12,7 @@ import type { SongIdentity } from "./song-identities";
 import type { ShowArcModifiers } from "./show-arc";
 import type { StemSectionType } from "../utils/stem-features";
 import { BAND_CONFIG } from "./band-config";
+import type { SemanticProfile } from "../utils/semantic-router";
 
 // ─── Texture × Category routing (Dead-authentic) ───
 
@@ -108,6 +109,8 @@ export interface ScoringContext {
   songIdentity?: SongIdentity;
   showArcModifiers?: ShowArcModifiers;
   energyHints?: Record<string, OverlayPhaseHint>;
+  /** Semantic profile from CLAP analysis for category bias */
+  semanticProfile?: SemanticProfile;
 }
 
 /**
@@ -258,6 +261,14 @@ export function scoreOverlayForWindow(
       score += CARRYOVER_BONUS;
     } else {
       score -= REPEAT_PENALTY;
+    }
+  }
+
+  // Semantic profile bias: CLAP-derived category preferences
+  if (ctx.semanticProfile && ctx.semanticProfile.dominantConfidence > 0.3) {
+    const catBias = ctx.semanticProfile.overlayBiases[entry.category];
+    if (catBias !== undefined) {
+      score += catBias;
     }
   }
 

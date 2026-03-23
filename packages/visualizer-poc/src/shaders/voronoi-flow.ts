@@ -76,7 +76,7 @@ void main() {
   float sChorus = smoothstep(1.5, 2.5, sectionT) * (1.0 - step(2.5, sectionT));
   // Jam: more cells, faster flow, brighter edges. Space: fewer cells, slow drift, dim. Chorus: vibrant glow.
   float sectionCellDensity = mix(1.0, 1.4, sJam) * mix(1.0, 0.6, sSpace);
-  float sectionFlowSpeed = mix(1.0, 1.5, sJam) * mix(1.0, 0.3, sSpace) * mix(1.0, 1.1, sChorus);
+  float sectionFlowSpeed = mix(1.0, 1.5, sJam) * mix(1.0, 0.3, sSpace) * mix(1.0, 1.1, sChorus) * (1.0 + uPeakApproaching * 0.3);
   float sectionEdgeGlow = mix(1.0, 1.4, sJam) * mix(1.0, 0.5, sSpace) * mix(1.0, 1.2, sChorus);
 
   // --- Cell density from energy (section-modulated) ---
