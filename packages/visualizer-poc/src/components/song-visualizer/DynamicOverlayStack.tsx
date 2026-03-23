@@ -27,13 +27,12 @@ interface OverlayComponentEntry {
   blendMode?: "screen" | "overlay" | "multiply" | "soft-light" | "color-dodge" | "luminosity";
 }
 
-/** Max concurrent overlays by energy level (hard cap after opacity sorting).
- *  Restrained counts keep the visual field tasteful — let shaders breathe.
- *  Dead iconography and atmosphere > visual density. */
+/** Max concurrent overlays by energy level.
+ *  Dead iconography should be PROMINENT — bears, stealies, bolts visible always. */
 const MAX_CONCURRENT: Record<string, number> = {
-  quiet: 3,
-  mid: 5,
-  peak: 6,
+  quiet: 5,
+  mid: 8,
+  peak: 10,
 };
 
 interface Props {
@@ -95,13 +94,15 @@ export const DynamicOverlayStack: React.FC<Props> = ({
   // Compute opacities and apply hard cap on concurrent overlays
   const maxConcurrent = MAX_CONCURRENT[energyLevel] ?? 4;
   const inversionMult = 1 - counterpointOverlayInversion;
-  const baseMult = mediaSuppression * focusSuppression * itOverlayOverride * inversionMult * overlayPulse;
+  // Boost overlay visibility: Dead icons must be clearly visible, not ghosted
+  const baseMult = Math.min(1.0, mediaSuppression * focusSuppression * itOverlayOverride * inversionMult * overlayPulse * 1.8);
 
   // Single-pass: compute opacity, filter, sort, split DOM/GLSL in one loop
   const scored: { name: string; entry: OverlayComponentEntry; opacity: number }[] = [];
   for (let i = 0; i < activeEntries.length; i++) {
     const [name, entry] = activeEntries[i];
-    let op = Math.min(1, (opacityMap ? (opacityMap[name] ?? 0) : 1) * baseMult);
+    // Minimum 0.08 opacity for all scheduled overlays — Dead icons always faintly visible
+    let op = Math.min(1, (opacityMap ? Math.max(0.08, opacityMap[name] ?? 0) : 1) * baseMult);
     if (usedOverlayIds && usedOverlayIds.has(name)) op *= 0.4;
     if (op > 0.01) scored.push({ name, entry, opacity: op });
   }
