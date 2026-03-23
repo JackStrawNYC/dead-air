@@ -32,7 +32,6 @@
   },
   "deal": {
     "preferredModes": [
-      "neural_web",
       "inferno",
       "tie_dye",
       "fractal_flames",
@@ -157,7 +156,6 @@
       "crystal_cavern",
       "cosmic_dust",
       "stained_glass",
-      "sacred_geometry",
       "volumetric_nebula"
     ],
     "palette": {
@@ -217,7 +215,6 @@
   },
   "unclejohnsband": {
     "preferredModes": [
-      "databend",
       "aurora",
       "oil_projector",
       "vintage_film",
@@ -245,13 +242,12 @@
   },
   "shakedownstreet": {
     "preferredModes": [
-      "neural_web",
       "mandala_engine",
       "inferno",
       "lava_flow",
       "liquid_light",
       "fractal_flames",
-      "neon_grid"
+      "kaleidoscope"
     ],
     "palette": {
       "primary": 290,
@@ -279,10 +275,9 @@
       "cosmic_voyage",
       "deep_ocean",
       "crystal_cavern",
-      "cellular_automata",
       "feedback_recursion",
-      "sacred_geometry",
-      "galaxy_spiral"
+      "galaxy_spiral",
+      "volumetric_nebula"
     ],
     "palette": {
       "primary": 260,
@@ -427,7 +422,6 @@
       "feedback_recursion",
       "mandala_engine",
       "cosmic_dust",
-      "sacred_geometry",
       "volumetric_smoke"
     ],
     "palette": {
@@ -468,7 +462,6 @@
       "aurora",
       "feedback_recursion",
       "warm_nebula",
-      "sacred_geometry",
       "crystal_cavern",
       "galaxy_spiral"
     ],
@@ -505,8 +498,7 @@
       "tie_dye",
       "kaleidoscope",
       "liquid_light",
-      "neon_grid",
-      "cellular_automata"
+      "inferno"
     ],
     "palette": {
       "primary": 40,
@@ -686,7 +678,6 @@
       "crystal_cavern",
       "aurora",
       "feedback_recursion",
-      "truchet_tiling",
       "fractal_zoom",
       "galaxy_spiral",
       "deep_ocean"
@@ -754,8 +745,7 @@
       "reaction_diffusion",
       "feedback_recursion",
       "mandala_engine",
-      "electric_arc",
-      "cellular_automata"
+      "electric_arc"
     ],
     "palette": {
       "primary": 350,
@@ -825,7 +815,6 @@
       "aurora",
       "aurora_sky",
       "volumetric_clouds",
-      "sacred_geometry",
       "prism_refraction",
       "cosmic_voyage"
     ],
@@ -862,7 +851,6 @@
       "cosmic_voyage",
       "liquid_light",
       "feedback_recursion",
-      "truchet_tiling",
       "aurora",
       "fractal_zoom",
       "volumetric_nebula"
@@ -887,12 +875,11 @@
   "slipknot": {
     "preferredModes": [
       "inferno",
-      "neural_web",
       "spectral_analyzer",
       "fractal_flames",
       "electric_arc",
       "lava_flow",
-      "signal_decay"
+      "liquid_light"
     ],
     "palette": {
       "primary": 10,
@@ -956,7 +943,6 @@
       "climax_surge",
       "fractal_flames",
       "electric_arc",
-      "digital_rain",
       "volumetric_nebula"
     ],
     "palette": {
@@ -1081,11 +1067,10 @@
     "preferredModes": [
       "liquid_light",
       "tie_dye",
-      "truchet_tiling",
-      "databend",
       "fractal_flames",
       "kaleidoscope",
-      "particle_swarm"
+      "particle_swarm",
+      "feedback_recursion"
     ],
     "palette": {
       "primary": 340,
@@ -1112,7 +1097,6 @@
       "concert_lighting",
       "inferno",
       "climax_surge",
-      "signal_decay",
       "electric_arc",
       "fractal_flames",
       "reaction_diffusion"
@@ -1211,7 +1195,6 @@
     "preferredModes": [
       "oil_projector",
       "vintage_film",
-      "databend",
       "lo_fi_grain",
       "smoke_rings",
       "aurora",
@@ -1273,7 +1256,6 @@
       "liquid_light",
       "feedback_recursion",
       "crystalline_growth",
-      "sacred_geometry",
       "smoke_rings",
       "stained_glass"
     ],
@@ -1309,13 +1291,12 @@
   },
   "dancininthestreet": {
     "preferredModes": [
-      "databend",
       "mandala_engine",
       "inferno",
-      "neon_grid",
       "liquid_light",
       "fractal_flames",
-      "fluid_light"
+      "fluid_light",
+      "concert_lighting"
     ],
     "palette": {
       "primary": 350,
@@ -1347,8 +1328,7 @@
       "deep_ocean",
       "feedback_recursion",
       "void_light",
-      "galaxy_spiral",
-      "signal_decay"
+      "galaxy_spiral"
     ],
     "palette": {
       "primary": 240,
@@ -1389,7 +1369,6 @@
   },
   "onemoresaturdaynight": {
     "preferredModes": [
-      "databend",
       "inferno",
       "mandala_engine",
       "lava_flow",
@@ -1453,7 +1432,6 @@
   },
   "goingdowntheroad": {
     "preferredModes": [
-      "databend",
       "inferno",
       "reaction_diffusion",
       "liquid_light",
@@ -1520,7 +1498,6 @@
       "deep_ocean",
       "feedback_recursion",
       "diffraction_rings",
-      "sacred_geometry",
       "bioluminescence"
     ],
     "palette": {
@@ -1551,7 +1528,6 @@
       "concert_lighting",
       "inferno",
       "kaleidoscope",
-      "databend",
       "electric_arc",
       "fractal_flames",
       "volumetric_nebula"
@@ -1582,12 +1558,11 @@
   "samsonanddelilah": {
     "preferredModes": [
       "concert_lighting",
-      "databend",
       "climax_surge",
       "electric_arc",
       "fractal_flames",
       "bioluminescence",
-      "neon_grid"
+      "liquid_light"
     ],
     "palette": {
       "primary": 350,
@@ -1646,7 +1621,6 @@
       "concert_lighting",
       "vintage_film",
       "oil_projector",
-      "databend",
       "particle_swarm",
       "reaction_diffusion",
       "volumetric_nebula"
@@ -1675,8 +1649,7 @@
       "stained_glass",
       "crystal_cavern",
       "diffraction_rings",
-      "crystalline_growth",
-      "sacred_geometry"
+      "crystalline_growth"
     ],
     "palette": {
       "primary": 210,
@@ -1748,8 +1721,7 @@
       "vintage_film",
       "particle_swarm",
       "tie_dye",
-      "smoke_rings",
-      "databend"
+      "smoke_rings"
     ],
     "palette": {
       "primary": 30,
@@ -1835,7 +1807,6 @@
       "deep_ocean",
       "cosmic_voyage",
       "diffraction_rings",
-      "sacred_geometry",
       "warm_nebula"
     ],
     "palette": {
@@ -1893,7 +1864,6 @@
       "smoke_rings",
       "volumetric_nebula",
       "aurora_curtains",
-      "sacred_geometry",
       "warm_nebula"
     ],
     "palette": {
@@ -1923,7 +1893,6 @@
   },
   "letitgrow": {
     "preferredModes": [
-      "sacred_geometry",
       "mandala_engine",
       "liquid_mandala",
       "flower_field",
@@ -1963,7 +1932,6 @@
     "preferredModes": [
       "inferno",
       "electric_arc",
-      "neon_grid",
       "concert_lighting",
       "fractal_flames",
       "tie_dye",
@@ -2107,8 +2075,7 @@
       "deep_ocean",
       "smoke_rings",
       "storm",
-      "volumetric_smoke",
-      "signal_decay"
+      "volumetric_smoke"
     ],
     "palette": {
       "primary": 230,
@@ -2179,7 +2146,6 @@
       "concert_lighting",
       "deep_ocean",
       "inferno",
-      "neon_grid",
       "electric_arc"
     ],
     "palette": {
@@ -2282,7 +2248,6 @@
   "thewheel": {
     "preferredModes": [
       "mandala_engine",
-      "sacred_geometry",
       "liquid_mandala",
       "kaleidoscope",
       "fractal_zoom",
@@ -2322,7 +2287,6 @@
       "kaleidoscope",
       "liquid_mandala",
       "flower_field",
-      "neon_grid",
       "inferno"
     ],
     "palette": {
@@ -2357,7 +2321,6 @@
       "concert_lighting",
       "electric_arc",
       "inferno",
-      "neon_grid",
       "climax_surge",
       "fractal_flames",
       "tie_dye"
@@ -2391,7 +2354,6 @@
   "promisedland": {
     "preferredModes": [
       "desert_road",
-      "neon_grid",
       "concert_lighting",
       "inferno",
       "electric_arc",
@@ -2428,7 +2390,6 @@
       "concert_lighting",
       "tie_dye",
       "inferno",
-      "neon_grid",
       "electric_arc",
       "fractal_flames",
       "climax_surge",
@@ -2464,7 +2425,6 @@
   },
   "themusicneverstopped": {
     "preferredModes": [
-      "neon_grid",
       "spectral_analyzer",
       "concert_lighting",
       "tie_dye",
@@ -2647,7 +2607,6 @@
   },
   "feellikeastranger": {
     "preferredModes": [
-      "neon_grid",
       "concert_lighting",
       "spectral_analyzer",
       "tie_dye",
@@ -2686,11 +2645,10 @@
     "preferredModes": [
       "inferno",
       "lava_flow",
-      "databend",
       "electric_arc",
       "concert_lighting",
       "fractal_flames",
-      "neon_grid"
+      "liquid_light"
     ],
     "palette": {
       "primary": 20,
@@ -2797,8 +2755,7 @@
       "aurora",
       "prism_refraction",
       "liquid_mandala",
-      "kaleidoscope",
-      "sacred_geometry"
+      "kaleidoscope"
     ],
     "palette": {
       "primary": 50,
@@ -2830,12 +2787,11 @@
   "newspeedwayboogie": {
     "preferredModes": [
       "concert_lighting",
-      "databend",
       "inferno",
       "electric_arc",
       "storm",
-      "signal_decay",
-      "neon_grid"
+      "liquid_light",
+      "fractal_flames"
     ],
     "palette": {
       "primary": 0,

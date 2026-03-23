@@ -217,7 +217,11 @@ export type VisualMode =
   | "neon_grid"
   | "warm_nebula"
   | "prism_refraction"
-  | "cellular_automata";
+  | "cellular_automata"
+  | "acid_melt"
+  | "blacklight_glow"
+  | "spinning_spiral"
+  | "liquid_projector";
 
 /** Per-section mode override in setlist */
 export interface SectionOverride {

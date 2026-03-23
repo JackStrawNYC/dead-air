@@ -26,11 +26,12 @@ const ALL_MODES: VisualMode[] = [
   "campfire", "rain_street", "aurora_sky", "storm", "canyon",
   "liquid_mandala", "bioluminescence", "neon_grid", "warm_nebula",
   "prism_refraction", "cellular_automata",
+  "acid_melt", "blacklight_glow", "spinning_spiral", "liquid_projector",
 ];
 
 describe("SCENE_REGISTRY", () => {
   it("has exactly 69 registered modes", () => {
-    expect(Object.keys(SCENE_REGISTRY).length).toBe(69);
+    expect(Object.keys(SCENE_REGISTRY).length).toBe(73);
   });
 
   it("contains all expected modes", () => {
@@ -122,7 +123,7 @@ describe("getModesForEnergy", () => {
 describe("getRegisteredModes", () => {
   it("returns all 69 modes", () => {
     const modes = getRegisteredModes();
-    expect(modes.length).toBe(69);
+    expect(modes.length).toBe(73);
     for (const mode of ALL_MODES) {
       expect(modes).toContain(mode);
     }

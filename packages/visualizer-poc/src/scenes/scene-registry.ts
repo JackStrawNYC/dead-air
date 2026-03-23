@@ -132,6 +132,11 @@ import { NeonGridScene } from "./NeonGridScene";
 import { WarmNebulaScene } from "./WarmNebulaScene";
 import { PrismRefractionScene } from "./PrismRefractionScene";
 import { CellularAutomataScene } from "./CellularAutomataScene";
+// Dead-native shaders
+import { AcidMeltScene } from "./AcidMeltScene";
+import { BlacklightGlowScene } from "./BlacklightGlowScene";
+import { SpinningSpiralScene } from "./SpinningSpiralScene";
+import { LiquidProjectorScene } from "./LiquidProjectorScene";
 
 // ─── Scene Registry ───
 
@@ -578,6 +583,33 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     complement: "reaction_diffusion",
     spectralFamily: "textural",
   },
+  // Dead-native shaders
+  acid_melt: {
+    Component: AcidMeltScene,
+    energyAffinity: "any",
+    complement: "liquid_light",
+    gradingIntensity: 0.8,
+    spectralFamily: "warm",
+  },
+  blacklight_glow: {
+    Component: BlacklightGlowScene,
+    energyAffinity: "mid",
+    complement: "bioluminescence",
+    spectralFamily: "bright",
+  },
+  spinning_spiral: {
+    Component: SpinningSpiralScene,
+    energyAffinity: "any",
+    complement: "kaleidoscope",
+    spectralFamily: "tonal",
+  },
+  liquid_projector: {
+    Component: LiquidProjectorScene,
+    energyAffinity: "mid",
+    complement: "oil_projector",
+    gradingIntensity: 0.75,
+    spectralFamily: "warm",
+  },
 };
 
 // ─── Transition Affinity Map ───
@@ -657,6 +689,11 @@ export const TRANSITION_AFFINITY: Partial<Record<VisualMode, VisualMode[]>> = {
   warm_nebula: ["deep_ocean", "aurora", "volumetric_clouds", "campfire"],
   prism_refraction: ["diffraction_rings", "crystal_cavern", "aurora", "kaleidoscope"],
   cellular_automata: ["reaction_diffusion", "morphogenesis", "voronoi_flow", "truchet_tiling"],
+  // Dead-native shaders
+  acid_melt: ["liquid_light", "oil_projector", "tie_dye", "feedback_recursion"],
+  blacklight_glow: ["bioluminescence", "deep_ocean", "void_light", "cosmic_dust"],
+  spinning_spiral: ["kaleidoscope", "fractal_zoom", "mandala_engine", "tie_dye"],
+  liquid_projector: ["oil_projector", "liquid_light", "smoke_rings", "vintage_film"],
 };
 
 // ─── Helper functions ───
