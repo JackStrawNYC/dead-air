@@ -678,7 +678,7 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
 
   // IT transcendent shader forcing: deep coherence lock → meditative shader pool
   if (itForceTranscendentShader) {
-    const transcendentPool: VisualMode[] = ["sacred_geometry", "fractal_zoom", "kaleidoscope", "mandala_engine", "cosmic_voyage"];
+    const transcendentPool: VisualMode[] = ["fractal_zoom", "kaleidoscope", "mandala_engine", "cosmic_voyage", "aurora"];
     const rng = seededRandom((seed ?? 0) + frame * 7);
     const dsMode = transcendentPool[Math.floor(rng() * transcendentPool.length)];
     return <>{renderMode(dsMode, frames, sections, palette, tempo, undefined, jamDensity)}</>;

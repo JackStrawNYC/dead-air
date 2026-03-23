@@ -753,7 +753,8 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
 
           {/* Lyrics disabled — pure visual experience */}
 
-          <DynamicOverlayStack
+          {/* DEBUG: overlays disabled to isolate circle source */}
+          {false && <DynamicOverlayStack
             activeEntries={activeEntries}
             opacityMap={opacityMap}
             mediaSuppression={Math.max(mediaSuppression * (1 - deadAirFactor), Math.max(0.4, introFactor))}
@@ -767,7 +768,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
             itOverlayOverride={itState.overlayOpacityOverride}
             counterpointOverlayInversion={counterpoint.overlayInversion}
             climaxDesaturation={climaxState.phase === "climax" ? climaxState.intensity : climaxState.phase === "sustain" ? climaxState.intensity * 0.6 : 0}
-          />
+          />}
 
           {/* WaveformOverlay, GuitarStrings, CrowdOverlay disabled — shader owns the visual */}
 
