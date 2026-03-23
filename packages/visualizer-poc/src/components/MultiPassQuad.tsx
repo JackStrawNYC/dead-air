@@ -30,6 +30,9 @@ import { useSceneConfig } from "../scenes/SceneConfigContext";
 import { useEnvelopeValues } from "../data/EnvelopeContext";
 import { fxaaVert, fxaaFrag } from "../shaders/shared/fxaa.glsl";
 
+/** Reusable Color for save/restore clear color */
+const _clearColor = new THREE.Color();
+
 /** Era saturation values — same as FullscreenQuad */
 const ERA_SATURATION: Record<string, number> = {
   primal: 0.85,
@@ -369,10 +372,12 @@ export const MultiPassQuad: React.FC<Props> = ({
 
   // Output material ref (for the visible mesh)
   const outputMaterialRef = useRef<THREE.ShaderMaterial>(null);
-  const outputUniforms = useMemo(
-    () => ({ uInputTexture: { value: null as THREE.Texture | null } }),
-    [],
-  );
+  // Initialize with a 1x1 dark texture to prevent black frame on mount
+  const outputUniforms = useMemo(() => {
+    const initTex = new THREE.DataTexture(new Uint8Array([5, 3, 8, 255]), 1, 1);
+    initTex.needsUpdate = true;
+    return { uInputTexture: { value: initTex as THREE.Texture | null } };
+  }, []);
 
   // ── Update all uniforms (mirrors FullscreenQuad) ──
   const u = mainPass.uniforms;
@@ -509,8 +514,13 @@ export const MultiPassQuad: React.FC<Props> = ({
     if (!targets) return;
 
     if (feedback && gap && targets.feedback) {
+      // Clear with very dark (not pure black) to prevent black-flash on seek
+      gl.getClearColor(_clearColor);
+      const prevAlpha = gl.getClearAlpha();
+      gl.setClearColor(0x050308, 1);
       gl.setRenderTarget(targets.feedback);
       gl.clear();
+      gl.setClearColor(_clearColor, prevAlpha);
       gl.setRenderTarget(null);
     }
 

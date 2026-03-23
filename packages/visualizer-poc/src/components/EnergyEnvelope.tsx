@@ -165,15 +165,15 @@ export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod,
   const soloBrightLift = isSolo ? (soloIntensity * 0.10) : 0;
   const vocalBrightLift = (vocalWarmth ?? 0) * 0.06;
 
-  // Energy-adaptive brightness floor: TRUE darkness in silence, vivid at peaks.
-  // energy=0 → 0.02 (near black). energy 0.10 → 0.10. energy 0.30 → 0.35.
-  // The key is silence should be DARK — psychedelic visuals need contrast.
-  const energyFloor = 0.02 + Math.min(1, Math.max(0, (energy - 0.03) / 0.27)) * 0.33;
+  // Energy-adaptive brightness floor: visible even in silence, vivid at peaks.
+  // energy=0 → 0.12 (dim but visible). energy 0.10 → 0.20. energy 0.30 → 0.42.
+  // Raised from 0.02 to 0.12 to prevent black-space during quiet passages.
+  const energyFloor = 0.12 + Math.min(1, Math.max(0, (energy - 0.03) / 0.27)) * 0.30;
   // Apply phase offsets + song identity + show arc + IT + narrative + solo + vocal + harmonic + stem character
   const baseBrightness = Math.min(brightCap, Math.max(energyFloor, brightness + dsBrightOffset + showBrightOffset + siPaletteBright + arcBrightOffset + itBrightLift + narrativeBrightness + soloBrightLift + vocalBrightLift + harmonicBrightness + brightnessCounterpoint + stemCharacterBright));
-  // During dead air, dim brightness toward 0.55 (minimum floor) and suppress bloom
+  // During dead air, dim brightness gently — stay visible, not black
   const finalBrightness = deadAirFactor > 0
-    ? baseBrightness * (1 - deadAirFactor * 0.40)  // dim by up to 40% during dead air
+    ? baseBrightness * (1 - deadAirFactor * 0.25)  // dim by up to 25% during dead air
     : baseBrightness;
 
   // Guitar color temp: ±12deg hue shift based on Jerry's neck position

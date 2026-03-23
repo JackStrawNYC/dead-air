@@ -279,11 +279,12 @@ export const FullscreenQuad: React.FC<Props> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Output uniforms for the visible mesh
-  const outputUniforms = useMemo(
-    () => ({ uInputTexture: { value: null as THREE.Texture | null } }),
-    [],
-  );
+  // Initialize with a 1x1 dark texture to prevent black frame on mount
+  const outputUniforms = useMemo(() => {
+    const initTex = new THREE.DataTexture(new Uint8Array([5, 3, 8, 255]), 1, 1);
+    initTex.needsUpdate = true;
+    return { uInputTexture: { value: initTex as THREE.Texture | null } };
+  }, []);
 
   uniforms.uTime.value = time;
   uniforms.uDynamicTime.value = dynamicTime;
