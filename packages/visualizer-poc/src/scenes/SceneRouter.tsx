@@ -393,17 +393,11 @@ export function getModeForSection(
         const showModes = getShowModesForSong(songIdentity.preferredModes, seed, song.title);
         const showModeSet = new Set(showModes);
         const remainingPreferred = songIdentity.preferredModes.filter((m) => !showModeSet.has(m));
-        // Registry splash: 5 energy-matched modes not in preferred for surprise variety
-        const preferredSet = new Set(songIdentity.preferredModes);
-        const registrySplash = filteredPool
-          .filter((m) => !preferredSet.has(m))
-          .slice(0, 5);
-        // Build weighted pool: showModes×2 + remainingPreferred×2 + registrySplash×1
-        // Lower show-mode weight prevents pool concentration across songs with shared preferredModes
+        // Strict preferred-only pool: song identity controls the visual.
+        // No registry splash — curated modes only, no random off-brand shaders.
         const weightedPool: VisualMode[] = [];
-        for (const m of showModes) { for (let i = 0; i < 2; i++) weightedPool.push(m); }
+        for (const m of showModes) { for (let i = 0; i < 3; i++) weightedPool.push(m); }
         for (const m of remainingPreferred) { for (let i = 0; i < 2; i++) weightedPool.push(m); }
-        for (const m of registrySplash) { weightedPool.push(m); }
         if (weightedPool.length > 0) filteredPool = weightedPool;
       }
 
