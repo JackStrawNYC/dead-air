@@ -372,10 +372,8 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
       for (let j = lo; j <= hi; j++) { eSum += frames[j].rms; eCount++; }
       const localEnergy = eCount > 0 ? eSum / eCount : 0;
       const t = Math.max(0, Math.min(1, (localEnergy - quietThresh) / range));
-      // Softer curve: cube root grows slowly at low energy, still reaches 1 at peak.
-      // This prevents mid-energy passages from running at near-max speed.
-      const factor = Math.pow(t, 0.6); // gentler than smoothstep — mid-energy = ~60% not ~80%
-      const speed = (0.06 + factor * 0.64) * tempoScale; // 6% at quiet → 70% at peak, scaled by tempo
+      const factor = t * t * (3 - 2 * t); // smoothstep
+      const speed = (0.10 + factor * 0.80) * tempoScale; // 10% at quiet → 90% at peak, scaled by tempo
       accum += dt * speed;
       lookup[i] = accum;
     }

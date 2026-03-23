@@ -165,10 +165,9 @@ export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod,
   const soloBrightLift = isSolo ? (soloIntensity * 0.10) : 0;
   const vocalBrightLift = (vocalWarmth ?? 0) * 0.06;
 
-  // Energy-adaptive brightness floor: visible even in silence, vivid at peaks.
-  // energy=0 → 0.12 (dim but visible). energy 0.10 → 0.20. energy 0.30 → 0.42.
-  // Raised from 0.02 to 0.12 to prevent black-space during quiet passages.
-  const energyFloor = 0.12 + Math.min(1, Math.max(0, (energy - 0.03) / 0.27)) * 0.30;
+  // Energy-adaptive brightness floor: dim in silence, vivid at peaks.
+  // energy=0 → 0.06 (very dim). energy 0.10 → 0.14. energy 0.30 → 0.38.
+  const energyFloor = 0.06 + Math.min(1, Math.max(0, (energy - 0.03) / 0.27)) * 0.32;
   // Apply phase offsets + song identity + show arc + IT + narrative + solo + vocal + harmonic + stem character
   const baseBrightness = Math.min(brightCap, Math.max(energyFloor, brightness + dsBrightOffset + showBrightOffset + siPaletteBright + arcBrightOffset + itBrightLift + narrativeBrightness + soloBrightLift + vocalBrightLift + harmonicBrightness + brightnessCounterpoint + stemCharacterBright));
   // During dead air, dim brightness gently — stay visible, not black
