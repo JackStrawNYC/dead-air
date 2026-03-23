@@ -984,27 +984,28 @@
   "newminglewoodblues": {
     "preferredModes": [
       "concert_lighting",
-      "inferno",
-      "kaleidoscope",
-      "climax_surge",
-      "fractal_flames",
-      "electric_arc",
-      "lava_flow"
+      "oil_projector",
+      "liquid_light",
+      "smoke_rings",
+      "tie_dye",
+      "vintage_film",
+      "electric_arc"
     ],
     "palette": {
       "primary": 15,
       "secondary": 50,
-      "saturation": 1
+      "saturation": 0.90
     },
     "overlayBoost": [
       "ThirteenPointBolt",
-      "SkeletonBand"
+      "SkeletonBand",
+      "SpeakerStack"
     ],
     "moodKeywords": [
       "intense",
-      "festival"
+      "dead-culture"
     ],
-    "overlayDensity": 1.2,
+    "overlayDensity": 0.8,
     "climaxBehavior": {
       "peakSaturation": 0.5,
       "flash": true
