@@ -216,10 +216,12 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
     [props.song.trackId, props.song.title, analysis],
   );
 
-  // ─── Effective palette (setlist > curated identity > chroma-derived) ───
+  // ─── Effective palette (curated identity > setlist > chroma-derived) ───
+  // Curated identities are hand-tuned for mood accuracy and take priority
+  // over setlist palette overrides which may be generic.
   const effectivePalette = useMemo((): ColorPalette | undefined => {
-    if (props.song.palette) return props.song.palette;
     if (songIdentity?.palette) return songIdentity.palette;
+    if (props.song.palette) return props.song.palette;
     if (analysis?.frames?.length) return deriveChromaPalette(analysis.frames);
     return undefined;
   }, [props.song.palette, songIdentity, analysis]);
@@ -526,16 +528,11 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
     props.show?.songs.length ?? 0,
   );
 
-  // Geometric mean protection: instead of a hard floor, use additive rescue.
-  // This prevents 11 multipliers from collapsing to zero while allowing
-  // genuine near-darkness in quiet passages. The floor is 0.03 (barely visible)
-  // so silence is truly dark, but peaks can flood to 1.5+.
+  // Overlay density: product of all modifiers, hard-clamped to ensure visibility.
+  // Dead iconography (bears, stealies, roses) must always be perceptible.
   const rawDensityMult = climaxMod.overlayDensityMult * (jamEvolution.isLongJam ? jamEvolution.densityMult : 1) * sectionVocab.overlayDensityMult * narrativeDirective.overlayDensityMult * endScreenMult * venueProfile.overlayDensityMult * crowdDensityMult * fatigue.densityMult * stemInterplay.densityMult * peakOfShow.densityMult * tempoLock.overlayBreathing * crowdEnergy.densityMult * stemCharacter.overlayDensityMult * (0.7 + 0.3 * narrativeDirective.abstractionLevel);
-  // Additive rescue: if product collapsed below 0.10 due to stacked multipliers,
-  // blend toward the average of the two strongest multipliers
-  const combinedDensityMult = rawDensityMult < 0.10
-    ? Math.max(0.03, rawDensityMult + (0.10 - rawDensityMult) * 0.5)
-    : rawDensityMult;
+  // Hard floor: overlays never go below 15% density (except end screen)
+  const combinedDensityMult = endScreenMult < 0.01 ? 0 : Math.max(0.15, rawDensityMult);
   const opacityMap = opacityMapBase ? applyDensityMult(opacityMapBase, combinedDensityMult, rotationSchedule!) : null;
 
   // ─── Lyric trigger suppression ───

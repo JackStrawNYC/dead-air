@@ -412,10 +412,10 @@ ${
     float isClimaxOrSustain = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5);
     float liftMult = mix(1.0, 0.40, isBuild * uClimaxIntensity) + isClimaxOrSustain * uClimaxIntensity * 0.15;
     // Always-on base floor — no energy gate. Quiet passages get warm ambient glow.
-    float alwaysFloor = 0.08;
-    // Energy-reactive boost on top of the floor
-    float energyBoost = smoothstep(0.02, 0.10, energy) * 0.12;
-    col = max(col, vec3(0.10, 0.08, 0.12) * (alwaysFloor + energyBoost + liftMult));
+    float alwaysFloor = 0.15;
+    // Energy-reactive boost on top of the floor (wider gate, stronger boost)
+    float energyBoost = smoothstep(0.005, 0.15, energy) * 0.20;
+    col = max(col, vec3(0.12, 0.10, 0.14) * (alwaysFloor + energyBoost + liftMult));
   }
 
   // Darkness texture: subtle micro-noise during near-black passages
@@ -435,10 +435,10 @@ ${
   // climax moments will NEVER be darker than this floor.
   {
     float climaxLuma = dot(col, vec3(0.299, 0.587, 0.114));
-    float minLuma = isClimax * uClimaxIntensity * 0.04; // floor: ~4% luminance at full climax
+    float minLuma = isClimax * uClimaxIntensity * 0.06; // floor: ~6% luminance at full climax
     if (climaxLuma < minLuma && minLuma > 0.01) {
       float lift = (minLuma - climaxLuma) / max(0.01, 1.0 - climaxLuma);
-      col = col + (vec3(1.0) - col) * lift * 0.4; // gentle lift preserving color ratios
+      col = col + (vec3(1.0) - col) * lift; // full lift preserving color ratios
     }
   }
 

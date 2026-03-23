@@ -31,9 +31,9 @@ interface OverlayComponentEntry {
  *  Restrained counts keep the visual field tasteful — let shaders breathe.
  *  Dead iconography and atmosphere > visual density. */
 const MAX_CONCURRENT: Record<string, number> = {
-  quiet: 2,
-  mid: 3,
-  peak: 4,
+  quiet: 3,
+  mid: 5,
+  peak: 6,
 };
 
 interface Props {
