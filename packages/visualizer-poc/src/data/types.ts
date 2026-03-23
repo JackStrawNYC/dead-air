@@ -211,7 +211,13 @@ export type VisualMode =
   | "rain_street"
   | "aurora_sky"
   | "storm"
-  | "canyon";
+  | "canyon"
+  | "liquid_mandala"
+  | "bioluminescence"
+  | "neon_grid"
+  | "warm_nebula"
+  | "prism_refraction"
+  | "cellular_automata";
 
 /** Per-section mode override in setlist */
 export interface SectionOverride {

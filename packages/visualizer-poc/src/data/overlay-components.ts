@@ -107,6 +107,20 @@ import { WaveOfLight } from "../components/WaveOfLight";
 import { Roses } from "../components/Roses";
 import { LightningBolt } from "../components/LightningBolt";
 
+// ─── New Overlays ───
+import { TapingSection } from "../components/TapingSection";
+import { CommunityCircle } from "../components/CommunityCircle";
+import { GratefulMandala } from "../components/GratefulMandala";
+import { SpaceTimeLattice } from "../components/SpaceTimeLattice";
+import { UnitySpiral } from "../components/UnitySpiral";
+import { DarkStarAscent } from "../components/DarkStarAscent";
+import { CampfireCircle } from "../components/CampfireCircle";
+import { SpeakerStack } from "../components/SpeakerStack";
+import { PsychedelicEye } from "../components/PsychedelicEye";
+import { GoldenRoad } from "../components/GoldenRoad";
+import { NeonDeadSign } from "../components/NeonDeadSign";
+import { SetlistPaper } from "../components/SetlistPaper";
+
 // ─── Layer 9: Music Visualization HUD (10) ───
 import { VUMeters } from "../components/VUMeters";
 import { Oscilloscope } from "../components/Oscilloscope";
@@ -788,4 +802,18 @@ export const OVERLAY_COMPONENTS: Record<string, OverlayComponentEntry> = {
   // New Dead Culture Overlays
   Roses:               { Component: Roses, layer: 2 },
   LightningBolt:       { Component: LightningBolt, layer: 3 },
+
+  // New Overlays
+  TapingSection:       { Component: TapingSection, layer: 7 },
+  CommunityCircle:     { Component: CommunityCircle, layer: 6 },
+  GratefulMandala:     { Component: GratefulMandala, layer: 2 },
+  SpaceTimeLattice:    { Component: SpaceTimeLattice, layer: 4 },
+  UnitySpiral:         { Component: UnitySpiral, layer: 2 },
+  DarkStarAscent:      { Component: DarkStarAscent, layer: 2 },
+  CampfireCircle:      { Component: CampfireCircle, layer: 6 },
+  SpeakerStack:        { Component: SpeakerStack, layer: 4 },
+  PsychedelicEye:      { Component: PsychedelicEye, layer: 2 },
+  GoldenRoad:          { Component: GoldenRoad, layer: 5 },
+  NeonDeadSign:        { Component: NeonDeadSign, layer: 7 },
+  SetlistPaper:        { Component: SetlistPaper as React.ComponentType<{ frames: EnhancedFrameData[] }>, layer: 7 },
 };

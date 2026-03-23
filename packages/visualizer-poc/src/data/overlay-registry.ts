@@ -401,6 +401,20 @@ export const OVERLAY_REGISTRY: OverlayEntry[] = [
   { name: "ZenRipples",              layer: 1, category: "atmospheric", tags: ["organic","contemplative"], energyBand: "low", weight: 1, dutyCycle: 100, energyResponse: [0,0.08,2.5], tier: "C" },
   { name: "Zeppelin",                layer: 1, category: "atmospheric", tags: ["organic","contemplative"], energyBand: "low", weight: 1, dutyCycle: 100, energyResponse: [0,0.08,2.5], tier: "C" },
   { name: "ZodiacWheel",             layer: 2, category: "sacred", tags: ["cosmic","contemplative"], energyBand: "mid", weight: 2, dutyCycle: 100, energyResponse: [0.04,0.18,2], tier: "C" },
+
+  // ═══ New Overlays ═══
+  { name: "TapingSection",          layer: 7, category: "artifact",    tags: ["dead-culture", "retro"],           energyBand: "mid",  weight: 1, dutyCycle: 50,  energyResponse: [0.05, 0.15, 2.0], tier: "B" },
+  { name: "CommunityCircle",        layer: 6, category: "character",   tags: ["dead-culture", "festival"],        energyBand: "mid",  weight: 2, dutyCycle: 60,  energyResponse: [0.08, 0.20, 1.8], tier: "B" },
+  { name: "GratefulMandala",        layer: 2, category: "sacred",      tags: ["dead-culture", "psychedelic"],      energyBand: "any",  weight: 3, dutyCycle: 100, energyResponse: [0.03, 0.15, 1.5], tier: "A" },
+  { name: "SpaceTimeLattice",       layer: 4, category: "geometric",   tags: ["cosmic", "psychedelic"],            energyBand: "mid",  weight: 2, dutyCycle: 50,  energyResponse: [0.05, 0.20, 2.0], tier: "B" },
+  { name: "UnitySpiral",            layer: 2, category: "sacred",      tags: ["cosmic", "dead-culture"],           energyBand: "low",  weight: 2, dutyCycle: 80,  energyResponse: [0.02, 0.12, 2.0], tier: "B" },
+  { name: "DarkStarAscent",         layer: 2, category: "sacred",      tags: ["dead-culture", "cosmic"],           energyBand: "low",  weight: 3, dutyCycle: 100, energyResponse: [0.02, 0.15, 1.8], tier: "A" },
+  { name: "CampfireCircle",         layer: 6, category: "character",   tags: ["dead-culture", "contemplative"],    energyBand: "low",  weight: 1, dutyCycle: 60,  energyResponse: [0.0, 0.10, 2.5], tier: "B" },
+  { name: "SpeakerStack",           layer: 4, category: "geometric",   tags: ["intense", "dead-culture"],          energyBand: "high", weight: 3, dutyCycle: 50,  energyResponse: [0.15, 0.30, 2.0], tier: "A" },
+  { name: "PsychedelicEye",         layer: 2, category: "sacred",      tags: ["psychedelic", "cosmic"],            energyBand: "any",  weight: 3, dutyCycle: 100, energyResponse: [0.03, 0.15, 1.5], tier: "A" },
+  { name: "GoldenRoad",             layer: 5, category: "nature",      tags: ["dead-culture", "organic"],          energyBand: "low",  weight: 1, dutyCycle: 60,  energyResponse: [0.02, 0.12, 2.0], tier: "B" },
+  { name: "NeonDeadSign",           layer: 7, category: "artifact",    tags: ["dead-culture", "retro"],            energyBand: "mid",  weight: 1, dutyCycle: 40,  energyResponse: [0.05, 0.15, 2.0], tier: "B" },
+  { name: "SetlistPaper",           layer: 7, category: "artifact",    tags: ["dead-culture", "retro"],            energyBand: "low",  weight: 1, dutyCycle: 30,  energyResponse: [0.0, 0.08, 2.5], tier: "B" },
 ];
 
 /**

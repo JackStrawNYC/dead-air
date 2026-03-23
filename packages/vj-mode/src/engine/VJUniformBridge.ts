@@ -54,6 +54,49 @@ export interface VJUniforms {
   uOtherEnergy: THREE.IUniform<number>;
   uOtherCentroid: THREE.IUniform<number>;
   uSnapToMusicalTime: THREE.IUniform<number>;
+  // Melodic/harmonic
+  uMelodicPitch: THREE.IUniform<number>;
+  uMelodicDirection: THREE.IUniform<number>;
+  uMelodicConfidence: THREE.IUniform<number>;
+  uChordIndex: THREE.IUniform<number>;
+  uChordConfidence: THREE.IUniform<number>;
+  uHarmonicTension: THREE.IUniform<number>;
+  // Section/structure
+  uSectionType: THREE.IUniform<number>;
+  uEnergyForecast: THREE.IUniform<number>;
+  uPeakApproaching: THREE.IUniform<number>;
+  uBeatStability: THREE.IUniform<number>;
+  uBeatConfidence: THREE.IUniform<number>;
+  uDownbeat: THREE.IUniform<number>;
+  uImprovisationScore: THREE.IUniform<number>;
+  uJamPhase: THREE.IUniform<number>;
+  // Deep audio
+  uTempoDerivative: THREE.IUniform<number>;
+  uDynamicRange: THREE.IUniform<number>;
+  uSpaceScore: THREE.IUniform<number>;
+  uTimbralBrightness: THREE.IUniform<number>;
+  uTimbralFlux: THREE.IUniform<number>;
+  uVocalPitch: THREE.IUniform<number>;
+  // Energy acceleration
+  uEnergyAccel: THREE.IUniform<number>;
+  // Envelope (from CSS-level grading)
+  uEnvelopeBrightness: THREE.IUniform<number>;
+  uEnvelopeSaturation: THREE.IUniform<number>;
+  uEnvelopeHue: THREE.IUniform<number>;
+  // Era/show
+  uEraSaturation: THREE.IUniform<number>;
+  uEraBrightness: THREE.IUniform<number>;
+  uEraSepia: THREE.IUniform<number>;
+  uShowWarmth: THREE.IUniform<number>;
+  uShowContrast: THREE.IUniform<number>;
+  uShowSaturation: THREE.IUniform<number>;
+  uShowGrain: THREE.IUniform<number>;
+  uShowBloom: THREE.IUniform<number>;
+  uVenueVignette: THREE.IUniform<number>;
+  // Post-process
+  uBloomThreshold: THREE.IUniform<number>;
+  uLensDistortion: THREE.IUniform<number>;
+  uGradingIntensity: THREE.IUniform<number>;
   // FX uniforms
   uFxBloom: THREE.IUniform<number>;
   uFxGrain: THREE.IUniform<number>;
@@ -120,6 +163,49 @@ export function createVJUniforms(width: number, height: number): VJUniforms {
     uOtherEnergy: { value: 0 },
     uOtherCentroid: { value: 0 },
     uSnapToMusicalTime: { value: 0 },
+    // Melodic/harmonic
+    uMelodicPitch: { value: 0.5 },
+    uMelodicDirection: { value: 0 },
+    uMelodicConfidence: { value: 0 },
+    uChordIndex: { value: 0 },
+    uChordConfidence: { value: 0 },
+    uHarmonicTension: { value: 0 },
+    // Section/structure
+    uSectionType: { value: 1 },
+    uEnergyForecast: { value: 0.5 },
+    uPeakApproaching: { value: 0 },
+    uBeatStability: { value: 0.5 },
+    uBeatConfidence: { value: 0.5 },
+    uDownbeat: { value: 0 },
+    uImprovisationScore: { value: 0 },
+    uJamPhase: { value: -1 },
+    // Deep audio
+    uTempoDerivative: { value: 0 },
+    uDynamicRange: { value: 0.5 },
+    uSpaceScore: { value: 0 },
+    uTimbralBrightness: { value: 0.5 },
+    uTimbralFlux: { value: 0 },
+    uVocalPitch: { value: 0 },
+    // Energy acceleration
+    uEnergyAccel: { value: 0 },
+    // Envelope
+    uEnvelopeBrightness: { value: 1 },
+    uEnvelopeSaturation: { value: 1 },
+    uEnvelopeHue: { value: 0 },
+    // Era/show
+    uEraSaturation: { value: 1 },
+    uEraBrightness: { value: 1 },
+    uEraSepia: { value: 0 },
+    uShowWarmth: { value: 0 },
+    uShowContrast: { value: 1 },
+    uShowSaturation: { value: 1 },
+    uShowGrain: { value: 0 },
+    uShowBloom: { value: 0 },
+    uVenueVignette: { value: 0 },
+    // Post-process
+    uBloomThreshold: { value: 0.5 },
+    uLensDistortion: { value: 0 },
+    uGradingIntensity: { value: 1 },
     // FX uniforms
     uFxBloom: { value: 0 },
     uFxGrain: { value: 0 },
@@ -178,6 +264,44 @@ export function mapToUniforms(state: SmoothedAudioState, u: VJUniforms): void {
   u.uOtherEnergy.value = state.otherEnergy;
   u.uOtherCentroid.value = state.otherCentroid;
   u.uSnapToMusicalTime.value = state.isLocked ? 1.0 : 0.0;
+
+  // Melodic/harmonic — derive from spectral data where possible
+  // In VJ mode, approximate from centroid/chroma since no offline analysis
+  u.uMelodicPitch.value = Math.min(1, state.centroid / 4000); // normalize centroid to 0-1
+  u.uMelodicDirection.value = 0; // no offline melodic direction in real-time
+  u.uMelodicConfidence.value = state.energy > 0.05 ? 0.5 : 0; // moderate confidence when music playing
+  u.uChordIndex.value = Math.floor(state.chromaHue / 30) % 12; // approximate from chroma
+  u.uChordConfidence.value = state.energy > 0.05 ? 0.4 : 0;
+  u.uHarmonicTension.value = state.spectralFlux * 2; // flux as tension proxy
+
+  // Section/structure — derive from energy patterns
+  u.uSectionType.value = 1; // default to verse; real-time can't detect sections
+  u.uEnergyForecast.value = state.slowEnergy;
+  u.uPeakApproaching.value = state.energy > 0.7 ? (state.energy - 0.7) / 0.3 : 0;
+  u.uBeatStability.value = state.isBeat ? Math.min(1, 0.5 + state.energy) : 0.3;
+  u.uBeatConfidence.value = state.isBeat ? 0.7 : 0.3;
+  u.uDownbeat.value = 0;
+  u.uImprovisationScore.value = state.spectralFlux > 0.3 ? state.spectralFlux : 0;
+  u.uJamPhase.value = -1; // no jam phase detection in real-time
+
+  // Deep audio — derive from Web Audio features
+  u.uTempoDerivative.value = 0; // stable tempo assumed
+  u.uDynamicRange.value = Math.min(1, state.energy * 2);
+  u.uSpaceScore.value = state.energy < 0.05 ? 0.8 : 0;
+  u.uTimbralBrightness.value = Math.min(1, state.centroid / 3000);
+  u.uTimbralFlux.value = state.spectralFlux;
+  u.uVocalPitch.value = 0; // no vocal detection in real-time
+
+  // Energy acceleration
+  u.uEnergyAccel.value = state.fastEnergy - state.slowEnergy;
+
+  // Envelope — pass-through (VJ mode doesn't have CSS envelope)
+  u.uEnvelopeBrightness.value = 1;
+  u.uEnvelopeSaturation.value = 1;
+  u.uEnvelopeHue.value = 0;
+
+  // Era/show — defaults (no show context in VJ mode)
+  // These stay at their initial values unless overridden by song identity
 
   // Contrast packed into vec4s
   const c = state.contrast;

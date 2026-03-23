@@ -55,6 +55,29 @@ import { galaxySpiralVert, galaxySpiralFrag } from "@visualizer/shaders/galaxy-s
 import { warpFieldVert, warpFieldFrag } from "@visualizer/shaders/warp-field";
 import { signalDecayVert, signalDecayFrag } from "@visualizer/shaders/signal-decay";
 import { databendVert, databendFrag } from "@visualizer/shaders/databend";
+// Volumetric + Environment scenes
+import { volumetricCloudsVert, volumetricCloudsFrag } from "@visualizer/shaders/volumetric-clouds";
+import { volumetricSmokeVert, volumetricSmokeFrag } from "@visualizer/shaders/volumetric-smoke";
+import { volumetricNebulaVert, volumetricNebulaFrag } from "@visualizer/shaders/volumetric-nebula";
+import { riverVert, riverFrag } from "@visualizer/shaders/river";
+import { spaceTravelVert, spaceTravelFrag } from "@visualizer/shaders/space-travel";
+import { mountainSilhouetteVert as mountainFireVert, mountainSilhouetteFrag as mountainFireFrag } from "@visualizer/shaders/mountain-fire";
+import { flowerFieldVert, flowerFieldFrag } from "@visualizer/shaders/flower-field";
+import { forestVert, forestFrag } from "@visualizer/shaders/forest";
+import { oceanWaterVert as oceanVert, oceanWaterFrag as oceanFrag } from "@visualizer/shaders/ocean";
+import { desertRoadVert, desertRoadFrag } from "@visualizer/shaders/desert-road";
+import { campfireVert, campfireFrag } from "@visualizer/shaders/campfire";
+import { rainStreetVert, rainStreetFrag } from "@visualizer/shaders/rain-street";
+import { auroraSkyVert, auroraSkyFrag } from "@visualizer/shaders/aurora-sky";
+import { stormVert, stormFrag } from "@visualizer/shaders/storm";
+import { canyonVert, canyonFrag } from "@visualizer/shaders/canyon";
+// New shaders
+import { liquidMandalaVert, liquidMandalaFrag } from "@visualizer/shaders/liquid-mandala";
+import { bioluminescenceVert, bioluminescenceFrag } from "@visualizer/shaders/bioluminescence";
+import { neonGridVert, neonGridFrag } from "@visualizer/shaders/neon-grid";
+import { warmNebulaVert, warmNebulaFrag } from "@visualizer/shaders/warm-nebula";
+import { prismRefractionVert, prismRefractionFrag } from "@visualizer/shaders/prism-refraction";
+import { cellularAutomataVert, cellularAutomataFrag } from "@visualizer/shaders/cellular-automata";
 
 // InstancedMesh scenes (ParticleNebula, CrystalCavern) need custom adapters
 // For now, use simpler fullscreen-quad shaders; custom 3D scenes added later
@@ -424,6 +447,168 @@ export const VJ_SCENES: Partial<Record<VisualMode, VJSceneEntry>> = {
     vertexShader: databendVert,
     fragmentShader: databendFrag,
   },
+  // Volumetric + Environment scenes
+  volumetric_clouds: {
+    Component: createVJFeedbackScene(volumetricCloudsVert, volumetricCloudsFrag, "VJVolumetricClouds", 0.96),
+    energyAffinity: "low",
+    complement: "volumetric_smoke",
+    vertexShader: volumetricCloudsVert,
+    fragmentShader: volumetricCloudsFrag,
+    feedback: true,
+  },
+  volumetric_smoke: {
+    Component: createVJFeedbackScene(volumetricSmokeVert, volumetricSmokeFrag, "VJVolumetricSmoke", 0.95),
+    energyAffinity: "mid",
+    complement: "concert_lighting",
+    vertexShader: volumetricSmokeVert,
+    fragmentShader: volumetricSmokeFrag,
+    feedback: true,
+  },
+  volumetric_nebula: {
+    Component: createVJFeedbackScene(volumetricNebulaVert, volumetricNebulaFrag, "VJVolumetricNebula", 0.97),
+    energyAffinity: "any",
+    complement: "cosmic_voyage",
+    vertexShader: volumetricNebulaVert,
+    fragmentShader: volumetricNebulaFrag,
+    feedback: true,
+  },
+  river: {
+    Component: createVJFeedbackScene(riverVert, riverFrag, "VJRiver", 0.96),
+    energyAffinity: "any",
+    complement: "inferno",
+    vertexShader: riverVert,
+    fragmentShader: riverFrag,
+    feedback: true,
+  },
+  space_travel: {
+    Component: createVJScene(spaceTravelVert, spaceTravelFrag, "VJSpaceTravel"),
+    energyAffinity: "any",
+    complement: "deep_ocean",
+    vertexShader: spaceTravelVert,
+    fragmentShader: spaceTravelFrag,
+  },
+  mountain_fire: {
+    Component: createVJScene(mountainFireVert, mountainFireFrag, "VJMountainFire"),
+    energyAffinity: "mid",
+    complement: "deep_ocean",
+    vertexShader: mountainFireVert,
+    fragmentShader: mountainFireFrag,
+  },
+  flower_field: {
+    Component: createVJScene(flowerFieldVert, flowerFieldFrag, "VJFlowerField"),
+    energyAffinity: "mid",
+    complement: "deep_ocean",
+    vertexShader: flowerFieldVert,
+    fragmentShader: flowerFieldFrag,
+  },
+  forest: {
+    Component: createVJScene(forestVert, forestFrag, "VJForest"),
+    energyAffinity: "low",
+    complement: "inferno",
+    vertexShader: forestVert,
+    fragmentShader: forestFrag,
+  },
+  ocean: {
+    Component: createVJFeedbackScene(oceanVert, oceanFrag, "VJOcean", 0.96),
+    energyAffinity: "any",
+    complement: "desert_road",
+    vertexShader: oceanVert,
+    fragmentShader: oceanFrag,
+    feedback: true,
+  },
+  desert_road: {
+    Component: createVJScene(desertRoadVert, desertRoadFrag, "VJDesertRoad"),
+    energyAffinity: "mid",
+    complement: "deep_ocean",
+    vertexShader: desertRoadVert,
+    fragmentShader: desertRoadFrag,
+  },
+  campfire: {
+    Component: createVJScene(campfireVert, campfireFrag, "VJCampfire"),
+    energyAffinity: "low",
+    complement: "electric_arc",
+    vertexShader: campfireVert,
+    fragmentShader: campfireFrag,
+  },
+  rain_street: {
+    Component: createVJFeedbackScene(rainStreetVert, rainStreetFrag, "VJRainStreet", 0.95),
+    energyAffinity: "low",
+    complement: "inferno",
+    vertexShader: rainStreetVert,
+    fragmentShader: rainStreetFrag,
+    feedback: true,
+  },
+  aurora_sky: {
+    Component: createVJScene(auroraSkyVert, auroraSkyFrag, "VJAuroraSky"),
+    energyAffinity: "any",
+    complement: "inferno",
+    vertexShader: auroraSkyVert,
+    fragmentShader: auroraSkyFrag,
+  },
+  storm: {
+    Component: createVJFeedbackScene(stormVert, stormFrag, "VJStorm", 0.93),
+    energyAffinity: "high",
+    complement: "aurora",
+    vertexShader: stormVert,
+    fragmentShader: stormFrag,
+    feedback: true,
+  },
+  canyon: {
+    Component: createVJScene(canyonVert, canyonFrag, "VJCanyon"),
+    energyAffinity: "mid",
+    complement: "cosmic_voyage",
+    vertexShader: canyonVert,
+    fragmentShader: canyonFrag,
+  },
+  // New shaders
+  liquid_mandala: {
+    Component: createVJFeedbackScene(liquidMandalaVert, liquidMandalaFrag, "VJLiquidMandala", 0.93),
+    energyAffinity: "mid",
+    complement: "sacred_geometry",
+    vertexShader: liquidMandalaVert,
+    fragmentShader: liquidMandalaFrag,
+    feedback: true,
+  },
+  bioluminescence: {
+    Component: createVJFeedbackScene(bioluminescenceVert, bioluminescenceFrag, "VJBioluminescence", 0.95),
+    energyAffinity: "high",
+    complement: "mycelium_network",
+    vertexShader: bioluminescenceVert,
+    fragmentShader: bioluminescenceFrag,
+    feedback: true,
+  },
+  neon_grid: {
+    Component: createVJFeedbackScene(neonGridVert, neonGridFrag, "VJNeonGrid", 0.92),
+    energyAffinity: "high",
+    complement: "concert_lighting",
+    vertexShader: neonGridVert,
+    fragmentShader: neonGridFrag,
+    feedback: true,
+  },
+  warm_nebula: {
+    Component: createVJFeedbackScene(warmNebulaVert, warmNebulaFrag, "VJWarmNebula", 0.96),
+    energyAffinity: "low",
+    complement: "deep_ocean",
+    vertexShader: warmNebulaVert,
+    fragmentShader: warmNebulaFrag,
+    feedback: true,
+  },
+  prism_refraction: {
+    Component: createVJFeedbackScene(prismRefractionVert, prismRefractionFrag, "VJPrismRefraction", 0.94),
+    energyAffinity: "any",
+    complement: "diffraction_rings",
+    vertexShader: prismRefractionVert,
+    fragmentShader: prismRefractionFrag,
+    feedback: true,
+  },
+  cellular_automata: {
+    Component: createVJFeedbackScene(cellularAutomataVert, cellularAutomataFrag, "VJCellularAutomata", 0.96),
+    energyAffinity: "mid",
+    complement: "reaction_diffusion",
+    vertexShader: cellularAutomataVert,
+    fragmentShader: cellularAutomataFrag,
+    feedback: true,
+  },
 };
 
 /** Ordered list of all scenes (for shader warming and scene picker) */
@@ -486,4 +671,27 @@ export const SCENE_MODES: VisualMode[] = [
   "warp_field",
   "signal_decay",
   "databend",
+  // Volumetric + Environment
+  "volumetric_clouds",
+  "volumetric_smoke",
+  "volumetric_nebula",
+  "river",
+  "space_travel",
+  "mountain_fire",
+  "flower_field",
+  "forest",
+  "ocean",
+  "desert_road",
+  "campfire",
+  "rain_street",
+  "aurora_sky",
+  "storm",
+  "canyon",
+  // New shaders
+  "liquid_mandala",
+  "bioluminescence",
+  "neon_grid",
+  "warm_nebula",
+  "prism_refraction",
+  "cellular_automata",
 ];

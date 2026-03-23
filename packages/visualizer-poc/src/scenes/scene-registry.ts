@@ -125,6 +125,13 @@ import { RainStreetScene } from "./RainStreetScene";
 import { AuroraSkyScene } from "./AuroraSkyScene";
 import { StormScene } from "./StormScene";
 import { CanyonScene } from "./CanyonScene";
+// New shaders
+import { LiquidMandalaScene } from "./LiquidMandalaScene";
+import { BioluminescenceScene } from "./BioluminescenceScene";
+import { NeonGridScene } from "./NeonGridScene";
+import { WarmNebulaScene } from "./WarmNebulaScene";
+import { PrismRefractionScene } from "./PrismRefractionScene";
+import { CellularAutomataScene } from "./CellularAutomataScene";
 
 // ─── Scene Registry ───
 
@@ -531,6 +538,46 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     complement: "cosmic_voyage",
     spectralFamily: "tonal",
   },
+  // New shaders
+  liquid_mandala: {
+    Component: LiquidMandalaScene,
+    energyAffinity: "mid",
+    complement: "sacred_geometry",
+    gradingIntensity: 0.8,
+    spectralFamily: "warm",
+  },
+  bioluminescence: {
+    Component: BioluminescenceScene,
+    energyAffinity: "high",
+    complement: "mycelium_network",
+    spectralFamily: "bright",
+  },
+  neon_grid: {
+    Component: NeonGridScene,
+    energyAffinity: "high",
+    complement: "concert_lighting",
+    gradingIntensity: 0.6,
+    spectralFamily: "bright",
+  },
+  warm_nebula: {
+    Component: WarmNebulaScene,
+    energyAffinity: "low",
+    complement: "deep_ocean",
+    preferredTransitionIn: "dissolve",
+    spectralFamily: "cosmic",
+  },
+  prism_refraction: {
+    Component: PrismRefractionScene,
+    energyAffinity: "any",
+    complement: "diffraction_rings",
+    spectralFamily: "tonal",
+  },
+  cellular_automata: {
+    Component: CellularAutomataScene,
+    energyAffinity: "mid",
+    complement: "reaction_diffusion",
+    spectralFamily: "textural",
+  },
 };
 
 // ─── Transition Affinity Map ───
@@ -603,6 +650,13 @@ export const TRANSITION_AFFINITY: Partial<Record<VisualMode, VisualMode[]>> = {
   aurora_sky: ["aurora", "cosmic_voyage", "deep_ocean", "volumetric_nebula"],
   storm: ["electric_arc", "inferno", "concert_lighting", "rain_street"],
   canyon: ["deep_ocean", "aurora", "sacred_geometry", "crystal_cavern"],
+  // New shaders
+  liquid_mandala: ["sacred_geometry", "kaleidoscope", "mandala_engine", "tie_dye"],
+  bioluminescence: ["mycelium_network", "deep_ocean", "coral_reef", "aurora"],
+  neon_grid: ["concert_lighting", "electric_arc", "spectral_analyzer", "digital_rain"],
+  warm_nebula: ["deep_ocean", "aurora", "volumetric_clouds", "campfire"],
+  prism_refraction: ["diffraction_rings", "crystal_cavern", "aurora", "kaleidoscope"],
+  cellular_automata: ["reaction_diffusion", "morphogenesis", "voronoi_flow", "truchet_tiling"],
 };
 
 // ─── Helper functions ───
