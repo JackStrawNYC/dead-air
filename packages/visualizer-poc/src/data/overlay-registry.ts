@@ -32,7 +32,7 @@ export const OVERLAY_REGISTRY: OverlayEntry[] = [
   { name: "StealYourFaceOff",  layer: 2, category: "sacred", tags: ["dead-culture", "intense"],        energyBand: "high", weight: 3, dutyCycle: 100, energyResponse: [0.15, 0.35, 2.0], tier: "A" },
   { name: "SkullKaleidoscope", layer: 2, category: "sacred", tags: ["dead-culture", "psychedelic"],    energyBand: "mid",  weight: 3, dutyCycle: 100, energyResponse: [0.05, 0.22, 1.5], tier: "A" },
   { name: "SkeletonRoses",     layer: 2, category: "sacred", tags: ["dead-culture", "organic"],        energyBand: "any",  weight: 3, dutyCycle: 100, energyResponse: [0.02, 0.15, 1.8], tier: "A" },
-  { name: "SacredGeometry",    layer: 2, category: "sacred", tags: ["cosmic", "contemplative"],        energyBand: "mid",  weight: 2, dutyCycle: 50, energyResponse: [0.05, 0.18, 2.0], tier: "B" },
+  { name: "SacredGeometry",    layer: 2, category: "sacred", tags: ["cosmic", "contemplative"],        energyBand: "mid",  weight: 2, dutyCycle: 50, energyResponse: [0.05, 0.18, 2.0], tier: "C" },
   { name: "DarkStarPortal",    layer: 2, category: "sacred", tags: ["cosmic", "dead-culture"],          energyBand: "mid",  weight: 3, dutyCycle: 100, energyResponse: [0.03, 0.18, 1.5], tier: "A" },
   { name: "FractalZoom",       layer: 2, category: "sacred", tags: ["psychedelic", "cosmic"],           energyBand: "mid",  weight: 2, dutyCycle: 100, energyResponse: [0.05, 0.25, 2.0], tier: "B" },
   { name: "MandalaGenerator",  layer: 2, category: "sacred", tags: ["cosmic", "contemplative"],        energyBand: "mid",  weight: 2, dutyCycle: 100, energyResponse: [0.04, 0.20, 1.8], tier: "C" },

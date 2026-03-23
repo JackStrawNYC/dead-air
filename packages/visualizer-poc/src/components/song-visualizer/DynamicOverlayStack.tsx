@@ -101,8 +101,7 @@ export const DynamicOverlayStack: React.FC<Props> = ({
   const scored: { name: string; entry: OverlayComponentEntry; opacity: number }[] = [];
   for (let i = 0; i < activeEntries.length; i++) {
     const [name, entry] = activeEntries[i];
-    // Minimum 0.08 opacity for all scheduled overlays — Dead icons always faintly visible
-    let op = Math.min(1, (opacityMap ? Math.max(0.08, opacityMap[name] ?? 0) : 1) * baseMult);
+    let op = Math.min(1, (opacityMap ? (opacityMap[name] ?? 0) : 1) * baseMult);
     if (usedOverlayIds && usedOverlayIds.has(name)) op *= 0.4;
     if (op > 0.01) scored.push({ name, entry, opacity: op });
   }
