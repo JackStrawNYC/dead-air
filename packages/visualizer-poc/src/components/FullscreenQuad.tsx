@@ -56,13 +56,17 @@ void main() {
 }
 `;
 
-/** Final output shader: samples uInputTexture */
+/** Final output shader: samples uInputTexture with minimum luminance floor.
+ *  "Music Leads" guarantee: the shader NEVER outputs pure black. */
 const OUTPUT_FRAG = /* glsl */ `
 precision highp float;
 uniform sampler2D uInputTexture;
 varying vec2 vUv;
 void main() {
-  gl_FragColor = texture2D(uInputTexture, vUv);
+  vec4 col = texture2D(uInputTexture, vUv);
+  // Minimum luminance floor: dark purple ambient glow, never pure black
+  col.rgb = max(col.rgb, vec3(0.12, 0.09, 0.16));
+  gl_FragColor = col;
 }
 `;
 
