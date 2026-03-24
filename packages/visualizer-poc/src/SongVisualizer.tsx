@@ -618,17 +618,17 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
     : 0;
   const isDeadAir = deadAirFactor > 0.99;
 
-  // ─── Intro factor: art-forward cold open for first ~20s ───
+  // ─── Intro factor: brief art card then shader takes over ───
   // 0 = full intro suppression (art dominates), 1 = engine fully open.
-  const INTRO_HOLD = 750;  // 25s at 30fps — art + text showcase
-  const INTRO_RAMP = 270;  // 9s smooth ramp to full visuals
+  const INTRO_HOLD = 300;  // 10s at 30fps — quick art card
+  const INTRO_RAMP = 150;  // 5s smooth ramp to full visuals (full shader by 15s)
   // Suite middle songs skip intro hold (continuous flow within suite)
-  // Segue-in songs get a mini intro: 3s crossfade breathing, then art showcase 5-15s
+  // Segue-in songs get a mini intro: 3s crossfade breathing, then brief art showcase
   const introFactor = props.segueIn
       ? (frame < 90 ? 1                                                                              // 0-3s: full shader (crossfade)
-        : frame < 150 ? 1 - 0.50 * ((frame - 90) / 60)                                              // 3-5s: dim to 50%
-        : frame < INTRO_HOLD - INTRO_RAMP ? 0.50                                                     // 5-16s: art showcase (shader visible backdrop)
-        : frame < INTRO_HOLD ? 0.50 + 0.50 * ((frame - (INTRO_HOLD - INTRO_RAMP)) / INTRO_RAMP)     // 16-25s: ramp back
+        : frame < 150 ? 1 - 0.30 * ((frame - 90) / 60)                                              // 3-5s: dim to 70%
+        : frame < INTRO_HOLD - INTRO_RAMP ? 0.70                                                     // 5-5s: art showcase (shader visible backdrop)
+        : frame < INTRO_HOLD ? 0.70 + 0.30 * ((frame - (INTRO_HOLD - INTRO_RAMP)) / INTRO_RAMP)     // 5-10s: ramp back
         : 1)
     : isInSuiteMiddle ? 1
     : frame < INTRO_HOLD ? 0
@@ -679,7 +679,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
 
   // ─── Render ───
   return (
-    <div style={{ width, height, position: "relative", overflow: "hidden", background: "#000" }}>
+    <div style={{ width, height, position: "relative", overflow: "hidden", background: "#080812" }}>
       <ShowNarrativeProvider totalSongs={props.show?.songs.length ?? 1} initialState={props.narrativeState ? { ...props.narrativeState, usedOverlayIds: new Set(props.narrativeState.predictedOverlayIds ?? []) } : undefined}>
       <ShowContextProvider show={props.show}>
       <AudioSnapshotProvider snapshot={audioSnapshot}>
@@ -692,7 +692,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
         <CameraMotion frames={f} jamEvolution={jamEvolution} bass={audioSnapshot.bass} cameraFreeze={counterpoint.cameraFreeze || itState.cameraLock || introFactor < 0.5} drumsSpacePhase={drumsSpaceState?.subPhase} fastEnergy={audioSnapshot.fastEnergy} vocalPresence={audioSnapshot.vocalPresence} isSolo={soloState.isSolo} soloIntensity={soloState.intensity} grooveMotionMult={grooveMods.motionMult * fatigue.motionMult * stemInterplay.motionMult * peakOfShow.motionMult * crowdEnergy.motionMult * narrativeDirective.motionMult * stemCharacter.motionMult} groovePulseMult={grooveMods.pulseMult * phraseState.zoomBreathing * tempoLock.zoomPulse * regularityStabilityMod} sectionDriftMult={sectionVocab.driftSpeedMult} cameraSteadiness={Math.max(0, Math.min(1, sectionVocab.cameraSteadiness + setTheme.cameraSteadinessOffset))} cameraDrama={climaxMod.cameraDrama} itSnapZoom={itState.snapZoom}>
         <EraGrade>
         <EnergyEnvelope snapshot={audioSnapshot} climaxMod={climaxMod} jamColorTemp={jamEvolution.isLongJam ? jamEvolution.colorTemperature : undefined} calibration={energyCalibration} counterpointSatMult={counterpoint.saturationMult} brightnessCounterpoint={counterpoint.brightnessCounterpoint} drumsSpacePhase={drumsSpaceState?.subPhase} showPhase={narrative?.state.showPhase} songIdentity={songIdentity} showArcModifiers={showArcModifiers} itLuminanceLift={itState.luminanceLift} itSaturationSurge={itState.saturationSurge} itVignettePull={itState.vignettePull} vocalWarmth={vocalWarmth} guitarColorTemp={guitarColorTemp} deadAirFactor={deadAirFactor} narrativeBrightness={narrativeDirective.brightnessOffset + sectionVocab.brightnessOffset + fatigue.brightnessOffset + phraseState.brightnessBreathing + peakOfShow.brightnessBoost + crowdEnergy.energyBaselineOffset} narrativeTemperature={narrativeDirective.temperature + grooveMods.temperatureShift + (grooveMods.regularity > 0.6 ? 0.05 : grooveMods.regularity < 0.3 ? -0.05 : 0)} introFactor={introFactor} isSolo={soloState.isSolo} soloIntensity={soloState.intensity} harmonicBrightness={harmonicResponse.brightnessOffset} harmonicSatMult={harmonicResponse.saturationMult} modalHueShift={modalColor.hueShift} modalSatOffset={modalColor.satOffset + fatigue.saturationOffset + phraseState.saturationBreathing + peakOfShow.saturationBoost} narrativeSatOffset={narrativeDirective.saturationOffset} stemCharacterHue={stemCharacter.hueShift} stemCharacterSat={stemCharacter.saturationMult} stemCharacterBright={stemCharacter.brightnessOffset} stemCharacterTemp={stemCharacter.temperature}>
-          <div style={{ position: "absolute", inset: 0, opacity: focusState.shaderOpacity * (0.50 + 0.50 * introFactor) }}>
+          <div style={{ position: "absolute", inset: 0, opacity: focusState.shaderOpacity * (0.70 + 0.30 * introFactor) }}>
           <SilentErrorBoundary name="SceneRouter">
             {(() => {
               const climaxPhaseMap: Record<string, number> = { idle: 0, build: 1, climax: 2, sustain: 3, release: 4 };

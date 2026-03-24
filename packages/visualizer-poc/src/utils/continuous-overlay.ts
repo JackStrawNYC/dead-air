@@ -60,8 +60,8 @@ const JITTER_EPOCH_FRAMES = 15;
 const QUIET_THRESHOLD = 0.03;
 /** Quiet window for silence breathing (frames) */
 const QUIET_WINDOW = 90;
-/** Intro breathing room: no overlays in first N frames (20s — let the shader establish) */
-const INTRO_BREATHING_FRAMES = 600;
+/** Intro breathing room: no overlays in first N frames (10s — then bears can join) */
+const INTRO_BREATHING_FRAMES = 300;
 
 /** Accent-eligible overlays from BandConfig */
 const ACCENT_ELIGIBLE = new Set(BAND_CONFIG.accentEligibleOverlays);
