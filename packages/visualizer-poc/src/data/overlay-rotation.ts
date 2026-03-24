@@ -1,16 +1,15 @@
 /**
- * Overlay Rotation Engine — temporal overlay management.
+ * Overlay Rotation Engine — temporal overlay management (LEGACY).
  *
- * Tuned for the Dead's visual philosophy: restraint during quiet passages,
- * visual silence before peaks, full flood at climax. The music leads.
+ * "The Music Leads" philosophy: pure shader art by default, overlays earn
+ * their moment. Most of the show is ONE shader breathing with the music.
  *
  * Key design principles:
- *   - 5x dynamic range: quiet passages have gentle presence, peaks flood vivid
- *   - Pre-peak dropout: strip to 1 overlay before climax → contrast without void
+ *   - Pure shader at low energy: zero overlays, let the shader own the screen
+ *   - Overlays appear only at mid-high energy: 0-1 at mid, 1-2 at peaks
+ *   - Pre-peak dropout: strip to void before climax → devastating contrast
  *   - Energy-scaled crossfades: organic in Space (15s), snappy at peaks (4s)
- *   - Overlay count range: 2-3 during quiet, 4-5 at climax
- *   - Accent overlays: Dead iconography pulses on beats at ALL energy levels
- *   - Always alive: even silence has a faint atmospheric wash
+ *   - 20-second intro breathing: shader establishes before any overlay appears
  *
  * Two exports:
  *   buildRotationSchedule() — called once per song via useMemo

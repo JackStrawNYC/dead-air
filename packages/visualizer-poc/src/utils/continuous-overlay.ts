@@ -60,8 +60,8 @@ const JITTER_EPOCH_FRAMES = 15;
 const QUIET_THRESHOLD = 0.03;
 /** Quiet window for silence breathing (frames) */
 const QUIET_WINDOW = 90;
-/** Intro breathing room: no overlays in first N frames */
-const INTRO_BREATHING_FRAMES = 300;
+/** Intro breathing room: no overlays in first N frames (20s — let the shader establish) */
+const INTRO_BREATHING_FRAMES = 600;
 
 /** Accent-eligible overlays from BandConfig */
 const ACCENT_ELIGIBLE = new Set(BAND_CONFIG.accentEligibleOverlays);
@@ -73,11 +73,11 @@ const ACCENT_CONFIG: Record<string, { onsetThreshold: number; peakOpacity: numbe
   low:  { onsetThreshold: 0.45, peakOpacity: 0.40, decayFrames: 10 },
 };
 
-/** Energy count ranges */
+/** Energy count ranges — "Music Leads" philosophy: pure shader by default */
 const ENERGY_COUNTS: Record<string, { min: number; max: number }> = {
-  low:  { min: 1, max: 1 },
-  mid:  { min: 1, max: 2 },
-  high: { min: 2, max: 3 },
+  low:  { min: 0, max: 0 },   // quiet: pure shader — let it breathe alone
+  mid:  { min: 0, max: 1 },   // moderate: maybe one atmospheric wash
+  high: { min: 1, max: 2 },   // peaks: overlays earn their moment
 };
 
 // ─── Types ───
@@ -325,10 +325,10 @@ function applySilenceBreathing(
     if (frames[f].rms < QUIET_THRESHOLD) quietFrames++;
   }
   const quietRatio = quietFrames / QUIET_WINDOW;
-  if (quietRatio > 0.5) {
-    const t = Math.min(1, (quietRatio - 0.5) / 0.5);
+  if (quietRatio > 0.3) {
+    const t = Math.min(1, (quietRatio - 0.3) / 0.7);
     const eased = t * t * (3 - 2 * t);
-    const withdrawMult = 1 - eased * 0.6;
+    const withdrawMult = 1 - eased * 0.85; // near full suppression
     const alwaysSet = new Set(alwaysActive);
     for (const name of Object.keys(result)) {
       if (alwaysSet.has(name)) continue;
