@@ -30,9 +30,9 @@ interface OverlayComponentEntry {
 /** Max concurrent overlays by energy level.
  *  "Music Leads" philosophy: pure shader by default, overlays earn their moment. */
 const MAX_CONCURRENT: Record<string, number> = {
-  quiet: 1,
-  mid: 2,
-  peak: 3,
+  quiet: 2,
+  mid: 3,
+  peak: 4,
 };
 
 interface Props {

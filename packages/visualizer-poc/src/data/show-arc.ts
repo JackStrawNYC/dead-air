@@ -62,7 +62,7 @@ const PHASE_MODIFIERS: Record<ShowArcPhase, ShowArcModifiers> = {
 
   set1_deepening: {
     overlayBias: {
-      character: -0.15,    // shaders take over — no bears in deepening
+      character: -0.05,    // shaders lead, bears still welcome
       sacred: +0.10,
       geometric: +0.05,
       reactive: 0,
@@ -95,7 +95,7 @@ const PHASE_MODIFIERS: Record<ShowArcPhase, ShowArcModifiers> = {
       sacred: +0.25,       // mandalas, geometry dominate
       geometric: +0.15,
       nature: +0.15,       // cosmic/nature imagery
-      character: -0.30,    // deep abstraction — no characters
+      character: -0.15,    // deep abstraction — fewer characters but not zero
     },
     densityMult: 0.7,
     windowDurationMult: 1.5,   // slower rotation — let things breathe
@@ -126,7 +126,7 @@ const PHASE_MODIFIERS: Record<ShowArcPhase, ShowArcModifiers> = {
     overlayBias: {
       sacred: +0.15,
       atmospheric: +0.10,
-      character: -0.10,    // still abstract, rebuilding slowly
+      character: +0.05,    // gently reintroduce — bears welcome back
       reactive: -0.15,     // still rebuilding
     },
     densityMult: 0.6,

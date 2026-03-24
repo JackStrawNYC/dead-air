@@ -140,5 +140,19 @@ export function selectOverlaysForWindow(
     selectedCategories.set(s.entry.category, (selectedCategories.get(s.entry.category) ?? 0) + 1);
   }
 
+  // ─── Dead Icon Preference: bias toward Dead-culture overlays when room exists ───
+  // Not a hard guarantee (no forced replacement), but if we have room and no
+  // Dead icon is present, add one. Bears/stealies should show up naturally.
+  const DEAD_CULTURE_TAG = BAND_CONFIG.overlayTags.culture;
+  const hasDeadIcon = selected.some((e) => e.tags.includes(DEAD_CULTURE_TAG));
+  if (!hasDeadIcon && selected.length < targetCount && scored.length > 0) {
+    const deadCandidate = scored.find(
+      (s) => !selectedNames.has(s.entry.name) && s.entry.tags.includes(DEAD_CULTURE_TAG),
+    );
+    if (deadCandidate) {
+      selected.push(deadCandidate.entry);
+    }
+  }
+
   return selected;
 }

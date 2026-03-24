@@ -73,11 +73,11 @@ const ACCENT_CONFIG: Record<string, { onsetThreshold: number; peakOpacity: numbe
   low:  { onsetThreshold: 0.45, peakOpacity: 0.40, decayFrames: 10 },
 };
 
-/** Energy count ranges — "Music Leads" philosophy: pure shader by default */
+/** Energy count ranges — "Music Leads" philosophy: shader leads, overlays support */
 const ENERGY_COUNTS: Record<string, { min: number; max: number }> = {
-  low:  { min: 0, max: 0 },   // quiet: pure shader — let it breathe alone
-  mid:  { min: 0, max: 1 },   // moderate: maybe one atmospheric wash
-  high: { min: 1, max: 2 },   // peaks: overlays earn their moment
+  low:  { min: 0, max: 1 },   // quiet: maybe one subtle layer — bears can breathe here
+  mid:  { min: 1, max: 2 },   // moderate: one or two for texture depth
+  high: { min: 1, max: 3 },   // peaks: overlays earn their moment
 };
 
 // ─── Types ───
