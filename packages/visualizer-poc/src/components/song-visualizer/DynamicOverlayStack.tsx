@@ -30,9 +30,9 @@ interface OverlayComponentEntry {
 /** Max concurrent overlays by energy level.
  *  Dead iconography should be PROMINENT — bears, stealies, bolts visible always. */
 const MAX_CONCURRENT: Record<string, number> = {
-  quiet: 3,
-  mid: 5,
-  peak: 7,
+  quiet: 1,
+  mid: 2,
+  peak: 3,
 };
 
 interface Props {

@@ -10,7 +10,7 @@ import { parseSetlist, safeParse, FlexibleTrackAnalysisSchema, OverlayScheduleSc
 import { SELECTABLE_REGISTRY } from "./data/overlay-registry";
 import { formatDateLong, getShowSeed } from "./data/ShowContext";
 import { validateSectionOverrides } from "./scenes/SceneRouter";
-import { resolveSongMode, lookupSongIdentity } from "./data/song-identities";
+import { resolveSongMode, lookupSongIdentity, buildShowShaderPool } from "./data/song-identities";
 import { precomputeNarrativeStates } from "./utils/show-narrative-precompute";
 import type { PrecomputedNarrative } from "./utils/show-narrative-precompute";
 import { isJamSegmentTitle } from "./data/band-config";
@@ -79,6 +79,13 @@ const setlist = parseSetlist(setlistData);
 const showSeed = getShowSeed(setlist);
 const resolveMode = (song: SetlistEntry) =>
   resolveSongMode(song.title, song.defaultMode, showSeed);
+
+// ─── Show-level shader pool ───
+// Commit to ~12 shaders for the entire show — a real VJ's visual palette.
+const showShaderPool = buildShowShaderPool(
+  setlist.songs.map((s) => ({ title: s.title, defaultMode: resolveMode(s) })),
+  showSeed,
+);
 
 // ─── Pre-compute cross-song narrative state ───
 // Each song gets the accumulated state from all songs rendered before it.
@@ -218,6 +225,7 @@ export const Root: React.FC = () => {
               energyHints: getEnergyHints(song.trackId),
               show: setlist,
               narrativeState: narrativeStates[i],
+              showShaderPool,
             } satisfies SongVisualizerProps as Record<string, unknown>}
             calculateMetadata={async ({ props }) => {
               // Try bundle require first (dev/studio), then fall back to --props (CLI render)

@@ -132,9 +132,9 @@ const CROSSFADE_FRAMES_DEFAULT = 120;
  * dropout silence and peak flood creates the show's visceral impact.
  */
 const ENERGY_COUNTS: Record<string, { min: number; max: number }> = {
-  low:  { min: 1,  max: 1 },   // quiet: single atmospheric layer, let the shader breathe
-  mid:  { min: 1,  max: 2 },   // moderate: one or two for texture depth
-  high: { min: 2,  max: 3 },   // peaks: tasteful A-tier density, not a firehose
+  low:  { min: 0,  max: 0 },   // quiet: pure shader — let it breathe alone
+  mid:  { min: 0,  max: 1 },   // moderate: maybe one atmospheric wash
+  high: { min: 1,  max: 2 },   // peaks: overlays earn their moment
 };
 
 /** A-tier overlays: the only overlays allowed during peaks (high energy).
@@ -232,7 +232,7 @@ export function buildRotationSchedule(
   // 4. Select overlays per window
   // Breathing room: let the shader establish itself before any overlays appear.
   // First 10 seconds (300 frames @ 30fps) are overlay-free unless it's a segue.
-  const INTRO_BREATHING_FRAMES = 300;
+  const INTRO_BREATHING_FRAMES = 600;
 
   let previousWindowOverlays = new Set<string>();
   let previousWindowFrames = 0;
@@ -609,10 +609,10 @@ export function getOverlayOpacities(
     }
     const quietRatio = quietFrames / QUIET_WINDOW;
     // Smoothstep ramp from 50% to 100% quiet — gradual onset, no boundary flicker
-    if (quietRatio > 0.5) {
-      const t = Math.min(1, (quietRatio - 0.5) / 0.5);
+    if (quietRatio > 0.3) {
+      const t = Math.min(1, (quietRatio - 0.3) / 0.7);
       const eased = t * t * (3 - 2 * t); // smoothstep
-      const withdrawMult = 1 - eased * 0.6; // 1.0 → 0.4
+      const withdrawMult = 1 - eased * 0.85; // 1.0 → 0.15 (near full suppression)
       for (const name of Object.keys(result)) {
         if (schedule.alwaysActive.includes(name)) continue;
         result[name] = (result[name] ?? 0) * Math.max(0.1, withdrawMult);

@@ -149,6 +149,8 @@ export interface SongVisualizerProps {
   segueToMode?: VisualMode;
   /** Pre-computed cross-song narrative state (from Root.tsx module scope) */
   narrativeState?: PrecomputedNarrative;
+  /** Show-level shader pool (~12 modes) — constrains SceneRouter to a coherent visual palette */
+  showShaderPool?: VisualMode[];
 }
 
 export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
@@ -588,9 +590,9 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
 
   // Overlay density: product of all modifiers, hard-clamped to ensure visibility.
   // Dead iconography (bears, stealies, roses) must always be perceptible.
-  const rawDensityMult = climaxMod.overlayDensityMult * (jamEvolution.isLongJam ? jamEvolution.densityMult : 1) * sectionVocab.overlayDensityMult * narrativeDirective.overlayDensityMult * endScreenMult * venueProfile.overlayDensityMult * crowdDensityMult * fatigue.densityMult * stemInterplay.densityMult * peakOfShow.densityMult * tempoLock.overlayBreathing * crowdEnergy.densityMult * stemCharacter.overlayDensityMult * (0.7 + 0.3 * narrativeDirective.abstractionLevel);
-  // Hard floor: overlays never go below 15% density (except end screen)
-  const combinedDensityMult = endScreenMult < 0.01 ? 0 : Math.max(0.15, rawDensityMult);
+  const rawDensityMult = climaxMod.overlayDensityMult * (jamEvolution.isLongJam ? jamEvolution.densityMult : 1) * sectionVocab.overlayDensityMult * narrativeDirective.overlayDensityMult * endScreenMult * venueProfile.overlayDensityMult * crowdDensityMult * fatigue.densityMult * stemInterplay.densityMult * peakOfShow.densityMult * tempoLock.overlayBreathing * crowdEnergy.densityMult * stemCharacter.overlayDensityMult * (1.0 - 0.7 * narrativeDirective.abstractionLevel);
+  // Overlays can go to actual zero — the shader IS the show
+  const combinedDensityMult = endScreenMult < 0.01 ? 0 : Math.max(0, rawDensityMult);
   const opacityMap = opacityMapBase ? applyDensityMult(opacityMapBase, combinedDensityMult, continuousResult?.alwaysActive ?? rotationSchedule?.alwaysActive ?? []) : null;
 
   // ─── Lyric trigger suppression ───
@@ -694,7 +696,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
           <SilentErrorBoundary name="SceneRouter">
             {(() => {
               const climaxPhaseMap: Record<string, number> = { idle: 0, build: 1, climax: 2, sustain: 3, release: 4 };
-              const sceneRouter = <SceneRouter frames={f} sections={sections} song={props.song} tempo={tempo} seed={showSeed} jamDensity={jamDensity} deadAirMode={deadAirFactor > 0 ? "cosmic_dust" : undefined} deadAirFactor={deadAirFactor > 0 ? deadAirFactor : undefined} era={props.show?.era} coherenceIsLocked={coherenceState.isLocked} drumsSpacePhase={drumsSpaceState?.subPhase} usedShaderModes={narrative?.state.usedShaderModes} shaderModeLastUsed={narrative?.state.shaderModeLastUsed} songIdentity={songIdentity} stemSection={stemSection} songDuration={analysis?.meta?.duration} palette={effectivePalette} segueIn={props.segueIn} isSacredSegueIn={isSacredSegueIn} isInSuiteMiddle={!!isInSuiteMiddle} setNumber={props.song.set} jamEvolution={jamEvolution} jamPhaseBoundaries={jamPhaseBoundaries} jamCycle={jamCycle} jamPhaseShaders={jamPhaseShaders} climaxPhase={climaxPhaseMap[climaxState.phase] ?? 0} trackNumber={props.song.trackNumber ?? 1} stemInterplayMode={stemInterplay.mode} stemDominant={stemCharacter.dominant} itForceTranscendentShader={itState.forceTranscendentShader} reactiveState={reactiveState} />;
+              const sceneRouter = <SceneRouter frames={f} sections={sections} song={props.song} tempo={tempo} seed={showSeed} jamDensity={jamDensity} deadAirMode={deadAirFactor > 0 ? "cosmic_dust" : undefined} deadAirFactor={deadAirFactor > 0 ? deadAirFactor : undefined} era={props.show?.era} coherenceIsLocked={coherenceState.isLocked} drumsSpacePhase={drumsSpaceState?.subPhase} usedShaderModes={narrative?.state.usedShaderModes} shaderModeLastUsed={narrative?.state.shaderModeLastUsed} songIdentity={songIdentity} stemSection={stemSection} songDuration={analysis?.meta?.duration} palette={effectivePalette} segueIn={props.segueIn} isSacredSegueIn={isSacredSegueIn} isInSuiteMiddle={!!isInSuiteMiddle} setNumber={props.song.set} jamEvolution={jamEvolution} jamPhaseBoundaries={jamPhaseBoundaries} jamCycle={jamCycle} jamPhaseShaders={jamPhaseShaders} climaxPhase={climaxPhaseMap[climaxState.phase] ?? 0} trackNumber={props.song.trackNumber ?? 1} stemInterplayMode={stemInterplay.mode} stemDominant={stemCharacter.dominant} itForceTranscendentShader={itState.forceTranscendentShader} reactiveState={reactiveState} showShaderPool={props.showShaderPool} />;
               const palette = effectivePalette;
 
               // Segue IN crossfade: smooth dual-render dissolve from previous song's shader

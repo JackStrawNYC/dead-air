@@ -13,9 +13,9 @@ import type { RotationWindow } from "./overlay-rotation";
  * Peaks rotate faster for visual energy.
  */
 const WINDOW_FRAMES_BY_ENERGY: Record<string, number> = {
-  low:  1800,  // 1 minute
-  mid:  1200,  // 40 seconds
-  high: 900,   // 30 seconds
+  low:  3600,  // 2 minutes — let the shader establish
+  mid:  2400,  // 80 seconds
+  high: 1200,  // 40 seconds
 };
 const WINDOW_FRAMES_DEFAULT = 900;
 

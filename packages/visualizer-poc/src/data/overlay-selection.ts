@@ -140,29 +140,5 @@ export function selectOverlaysForWindow(
     selectedCategories.set(s.entry.category, (selectedCategories.get(s.entry.category) ?? 0) + 1);
   }
 
-  // ─── Dead Icon Floor: guarantee at least 1 dead-culture overlay per window ───
-  // Without this, renders can show zero Dead icons for extended periods,
-  // making the visualizer look like generic abstract art.
-  const DEAD_CULTURE_TAG = BAND_CONFIG.overlayTags.culture;
-  const hasDeadIcon = selected.some((e) => e.tags.includes(DEAD_CULTURE_TAG));
-  if (!hasDeadIcon && targetCount > 0 && scored.length > 0) {
-    const deadCandidate = scored.find(
-      (s) => !selectedNames.has(s.entry.name) && s.entry.tags.includes(DEAD_CULTURE_TAG),
-    );
-    if (deadCandidate) {
-      if (selected.length >= targetCount && selected.length > 1) {
-        // Replace lowest-scoring non-hero selection
-        for (let i = selected.length - 1; i >= 0; i--) {
-          if (selected[i].name !== songHero && !HERO_OVERLAY_NAMES.has(selected[i].name)) {
-            selected[i] = deadCandidate.entry;
-            break;
-          }
-        }
-      } else {
-        selected.push(deadCandidate.entry);
-      }
-    }
-  }
-
   return selected;
 }

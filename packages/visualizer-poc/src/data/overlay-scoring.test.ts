@@ -80,4 +80,18 @@ describe("scoreOverlayForWindow", () => {
     const highLayer = scoreOverlayForWindow(makeEntry({ layer: 8 }), makeCtx({ isDropout: true }), fixedRng);
     expect(lowLayer).toBeGreaterThan(highLayer);
   });
+
+  it("penalizes character overlays at low energy", () => {
+    const charLow = scoreOverlayForWindow(
+      makeEntry({ category: "character" }),
+      makeCtx({ windowEnergy: "low" }),
+      fixedRng,
+    );
+    const charMid = scoreOverlayForWindow(
+      makeEntry({ category: "character" }),
+      makeCtx({ windowEnergy: "mid" }),
+      fixedRng,
+    );
+    expect(charLow).toBeLessThan(charMid);
+  });
 });
