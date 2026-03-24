@@ -78,8 +78,8 @@ export const SongArtLayer: React.FC<SongArtProps> = ({ src, suppressionFactor, h
     : focusOpacity;
   const artOpacity = baseOpacity * suppressionFactor * climaxSuppression * introBoost;
 
-  // Dead air reappearance: poster returns as "that was [song]" bookend
-  const deadAirOpacity = deadAirFactor * 0.55;
+  // Dead air reappearance: poster returns prominently as "that was [song]" bookend
+  const deadAirOpacity = deadAirFactor * 0.85;
   const finalOpacity = Math.max(artOpacity, deadAirOpacity) * segueFade;
 
   if (finalOpacity < 0.01) return null;

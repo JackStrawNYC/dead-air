@@ -690,11 +690,11 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
         <CameraMotion frames={f} jamEvolution={jamEvolution} bass={audioSnapshot.bass} cameraFreeze={counterpoint.cameraFreeze || itState.cameraLock || introFactor < 0.5} drumsSpacePhase={drumsSpaceState?.subPhase} fastEnergy={audioSnapshot.fastEnergy} vocalPresence={audioSnapshot.vocalPresence} isSolo={soloState.isSolo} soloIntensity={soloState.intensity} grooveMotionMult={grooveMods.motionMult * fatigue.motionMult * stemInterplay.motionMult * peakOfShow.motionMult * crowdEnergy.motionMult * narrativeDirective.motionMult * stemCharacter.motionMult} groovePulseMult={grooveMods.pulseMult * phraseState.zoomBreathing * tempoLock.zoomPulse * regularityStabilityMod} sectionDriftMult={sectionVocab.driftSpeedMult} cameraSteadiness={Math.max(0, Math.min(1, sectionVocab.cameraSteadiness + setTheme.cameraSteadinessOffset))} cameraDrama={climaxMod.cameraDrama} itSnapZoom={itState.snapZoom}>
         <EraGrade>
         <EnergyEnvelope snapshot={audioSnapshot} climaxMod={climaxMod} jamColorTemp={jamEvolution.isLongJam ? jamEvolution.colorTemperature : undefined} calibration={energyCalibration} counterpointSatMult={counterpoint.saturationMult} brightnessCounterpoint={counterpoint.brightnessCounterpoint} drumsSpacePhase={drumsSpaceState?.subPhase} showPhase={narrative?.state.showPhase} songIdentity={songIdentity} showArcModifiers={showArcModifiers} itLuminanceLift={itState.luminanceLift} itSaturationSurge={itState.saturationSurge} itVignettePull={itState.vignettePull} vocalWarmth={vocalWarmth} guitarColorTemp={guitarColorTemp} deadAirFactor={deadAirFactor} narrativeBrightness={narrativeDirective.brightnessOffset + sectionVocab.brightnessOffset + fatigue.brightnessOffset + phraseState.brightnessBreathing + peakOfShow.brightnessBoost + crowdEnergy.energyBaselineOffset} narrativeTemperature={narrativeDirective.temperature + grooveMods.temperatureShift + (grooveMods.regularity > 0.6 ? 0.05 : grooveMods.regularity < 0.3 ? -0.05 : 0)} introFactor={introFactor} isSolo={soloState.isSolo} soloIntensity={soloState.intensity} harmonicBrightness={harmonicResponse.brightnessOffset} harmonicSatMult={harmonicResponse.saturationMult} modalHueShift={modalColor.hueShift} modalSatOffset={modalColor.satOffset + fatigue.saturationOffset + phraseState.saturationBreathing + peakOfShow.saturationBoost} narrativeSatOffset={narrativeDirective.saturationOffset} stemCharacterHue={stemCharacter.hueShift} stemCharacterSat={stemCharacter.saturationMult} stemCharacterBright={stemCharacter.brightnessOffset} stemCharacterTemp={stemCharacter.temperature}>
-          <div style={{ position: "absolute", inset: 0, opacity: focusState.shaderOpacity * (0.15 + 0.85 * introFactor) }}>
+          <div style={{ position: "absolute", inset: 0, opacity: focusState.shaderOpacity * (0.15 + 0.85 * introFactor) * (1 - deadAirFactor * 0.9) }}>
           <SilentErrorBoundary name="SceneRouter">
             {(() => {
               const climaxPhaseMap: Record<string, number> = { idle: 0, build: 1, climax: 2, sustain: 3, release: 4 };
-              const sceneRouter = <SceneRouter frames={f} sections={sections} song={props.song} tempo={tempo} seed={showSeed} jamDensity={jamDensity} deadAirMode={deadAirFactor > 0 ? "cosmic_dust" : undefined} deadAirFactor={deadAirFactor > 0 ? deadAirFactor : undefined} era={props.show?.era} coherenceIsLocked={coherenceState.isLocked} drumsSpacePhase={drumsSpaceState?.subPhase} usedShaderModes={narrative?.state.usedShaderModes} shaderModeLastUsed={narrative?.state.shaderModeLastUsed} songIdentity={songIdentity} stemSection={stemSection} songDuration={analysis?.meta?.duration} palette={effectivePalette} segueIn={props.segueIn} isSacredSegueIn={isSacredSegueIn} isInSuiteMiddle={!!isInSuiteMiddle} setNumber={props.song.set} jamEvolution={jamEvolution} jamPhaseBoundaries={jamPhaseBoundaries} jamCycle={jamCycle} jamPhaseShaders={jamPhaseShaders} climaxPhase={climaxPhaseMap[climaxState.phase] ?? 0} trackNumber={props.song.trackNumber ?? 1} stemInterplayMode={stemInterplay.mode} stemDominant={stemCharacter.dominant} itForceTranscendentShader={itState.forceTranscendentShader} reactiveState={reactiveState} />;
+              const sceneRouter = <SceneRouter frames={f} sections={sections} song={props.song} tempo={tempo} seed={showSeed} jamDensity={jamDensity} deadAirMode={undefined} deadAirFactor={undefined} era={props.show?.era} coherenceIsLocked={coherenceState.isLocked} drumsSpacePhase={drumsSpaceState?.subPhase} usedShaderModes={narrative?.state.usedShaderModes} shaderModeLastUsed={narrative?.state.shaderModeLastUsed} songIdentity={songIdentity} stemSection={stemSection} songDuration={analysis?.meta?.duration} palette={effectivePalette} segueIn={props.segueIn} isSacredSegueIn={isSacredSegueIn} isInSuiteMiddle={!!isInSuiteMiddle} setNumber={props.song.set} jamEvolution={jamEvolution} jamPhaseBoundaries={jamPhaseBoundaries} jamCycle={jamCycle} jamPhaseShaders={jamPhaseShaders} climaxPhase={climaxPhaseMap[climaxState.phase] ?? 0} trackNumber={props.song.trackNumber ?? 1} stemInterplayMode={stemInterplay.mode} stemDominant={stemCharacter.dominant} itForceTranscendentShader={itState.forceTranscendentShader} reactiveState={reactiveState} />;
               const palette = effectivePalette;
 
               // Segue IN crossfade: smooth dual-render dissolve from previous song's shader
@@ -756,7 +756,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
           <DynamicOverlayStack
             activeEntries={activeEntries}
             opacityMap={opacityMap}
-            mediaSuppression={Math.max(mediaSuppression * (1 - deadAirFactor), Math.max(0.4, introFactor))}
+            mediaSuppression={isDeadAir ? 0 : Math.max(mediaSuppression * (1 - deadAirFactor), Math.max(0.4, introFactor))}
             hueRotation={hueRotation}
             tempo={tempo}
             palette={effectivePalette}
@@ -800,40 +800,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
             />
           )}
 
-          {/* Dead air ambient shimmer — audio-reactive glow when music ends */}
-          {deadAirFactor > 0.01 && (() => {
-            const deadRms = audioSnapshot.energy;
-            const deadOnset = audioSnapshot.onsetEnvelope;
-            const deadBass = audioSnapshot.bass;
-
-            // Crowd roar → brighter shimmer
-            const shimmerAlpha = (0.10 + deadRms * 0.25) * deadAirFactor;
-            // Applause onset → warm color flash
-            const warmShift = deadOnset > 0.3 ? deadOnset * 40 : 0;
-            // Palette-tinted dead air: use song's primary hue for continuity
-            const palHue = effectivePalette?.primary ?? 30;
-            const palAngle = (palHue / 360) * Math.PI * 2;
-            const baseR = Math.round(128 + 60 * Math.cos(palAngle));
-            const baseG = Math.round(100 + 40 * Math.cos(palAngle - 2.1));
-            const baseB = Math.round(100 + 60 * Math.sin(palAngle));
-            const r = Math.min(255, baseR + Math.round(warmShift * 2.0));
-            const g = Math.min(255, baseG + Math.round(warmShift * 0.8));
-            const b = Math.max(40, baseB - Math.round(warmShift * 1.0));
-            // Bass content → wider glow
-            const spread = 55 + deadBass * 25;
-            // Time-based drift (keep organic feel)
-            const cx = 50 + Math.sin(frame * 0.007) * (10 + deadRms * 8);
-            const cy = 50 + Math.cos(frame * 0.005) * (8 + deadBass * 5);
-
-            return (
-              <div style={{
-                position: "absolute", inset: 0, pointerEvents: "none",
-                background: `radial-gradient(ellipse at ${cx}% ${cy}%, rgba(${r}, ${g}, ${b}, ${shimmerAlpha.toFixed(3)}), transparent ${spread.toFixed(0)}%)`,
-                mixBlendMode: "screen",
-                opacity: 0.6 + 0.4 * Math.sin(frame * 0.02) + deadRms * 0.15,
-              }} />
-            );
-          })()}
+          {/* Dead air: no shimmer, no psychedelic effects — just fade to art + dark */}
 
           {/* Intro ambient shimmer — atmosphere colored by what just happened */}
           {introFactor < 0.5 && !props.segueIn && (() => {
