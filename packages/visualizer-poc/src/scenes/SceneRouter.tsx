@@ -961,11 +961,10 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
   let mainScene: React.ReactNode;
   const sectionLen = currentSection ? currentSection.frameEnd - currentSection.frameStart : 0;
 
-  // Dual-shader composition DISABLED — secondary shaders (especially fractal_zoom)
-  // produce black regions that darken the primary shader. "Music Leads" = one shader.
+  // Set-aware energy thresholds: Set 1 requires higher energy, Set 2+ standard
   const isSet1 = setNumber === 1;
-  const dualEnergyThreshold = 999; // effectively disabled
-  const dualBlendCap = 0;
+  const dualEnergyThreshold = isSet1 ? 0.18 : 0.12;
+  const dualBlendCap = isSet1 ? 0.35 : 0.55;
 
   // Climax force: any section during climax/sustain phase, or high-energy sections
   const climaxForceDual = (climaxPhaseProp !== undefined && climaxPhaseProp >= 2 && climaxPhaseProp <= 3 && frameEnergy > 0.08)

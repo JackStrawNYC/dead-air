@@ -376,7 +376,7 @@ export const MultiPassQuad: React.FC<Props> = ({
   const outputMaterialRef = useRef<THREE.ShaderMaterial>(null);
   // Initialize with a 1x1 dark texture to prevent black frame on mount
   const outputUniforms = useMemo(() => {
-    const initTex = new THREE.DataTexture(new Uint8Array([5, 3, 8, 255]), 1, 1);
+    const initTex = new THREE.DataTexture(new Uint8Array([26, 20, 40, 255]), 1, 1);
     initTex.needsUpdate = true;
     return { uInputTexture: { value: initTex as THREE.Texture | null } };
   }, []);
@@ -516,10 +516,10 @@ export const MultiPassQuad: React.FC<Props> = ({
     if (!targets) return;
 
     if (feedback && gap && targets.feedback) {
-      // Clear with very dark (not pure black) to prevent black-flash on seek
+      // Clear with visible dark tone so feedback shaders don't cold-start from black
       gl.getClearColor(_clearColor);
       const prevAlpha = gl.getClearAlpha();
-      gl.setClearColor(0x050308, 1);
+      gl.setClearColor(0x1a1428, 1);
       gl.setRenderTarget(targets.feedback);
       gl.clear();
       gl.setClearColor(_clearColor, prevAlpha);
@@ -589,7 +589,6 @@ export const MultiPassQuad: React.FC<Props> = ({
     lastRenderedFrame.current = currentFrame;
   }, -1); // Run before R3F's default render (priority -1)
 
-  // Visible output mesh: displays the final render target
   return (
     <mesh>
       <planeGeometry args={[2, 2]} />

@@ -30,10 +30,10 @@ export interface VisualFocusState {
  *  Release: warm afterglow, overlays return as emotional texture. */
 const PHASE_FOCUS: Record<ClimaxPhase, VisualFocusState> = {
   climax:  { shaderOpacity: 1.0,  artOpacity: 0.0,  overlayOpacity: 0.10, grainOpacity: 0.5 },
-  sustain: { shaderOpacity: 0.95, artOpacity: 0.0,  overlayOpacity: 0.15, grainOpacity: 0.6 },
-  build:   { shaderOpacity: 0.85, artOpacity: 0.12, overlayOpacity: 0.12, grainOpacity: 0.8 },
-  release: { shaderOpacity: 0.75, artOpacity: 0.35, overlayOpacity: 0.25, grainOpacity: 1.0 },
-  idle:    { shaderOpacity: 0.85, artOpacity: 0.25, overlayOpacity: 0.25, grainOpacity: 1.0 },
+  sustain: { shaderOpacity: 1.0,  artOpacity: 0.0,  overlayOpacity: 0.15, grainOpacity: 0.6 },
+  build:   { shaderOpacity: 0.95, artOpacity: 0.0,  overlayOpacity: 0.15, grainOpacity: 0.8 },
+  release: { shaderOpacity: 0.90, artOpacity: 0.10, overlayOpacity: 0.25, grainOpacity: 1.0 },
+  idle:    { shaderOpacity: 0.95, artOpacity: 0.05, overlayOpacity: 0.30, grainOpacity: 1.0 },
 };
 
 function lerp(a: number, b: number, t: number): number {
@@ -70,8 +70,8 @@ export function computeVisualFocus(
     const breathT = (Math.sin(frame * Math.PI * 2 / 240) + 1) * 0.5;
     state = {
       ...state,
-      artOpacity: lerp(0.30, 0.45, breathT),
-      shaderOpacity: lerp(0.80, 0.90, 1 - breathT),
+      artOpacity: lerp(0.03, 0.08, breathT),
+      shaderOpacity: lerp(0.92, 0.98, 1 - breathT),
     };
   }
 

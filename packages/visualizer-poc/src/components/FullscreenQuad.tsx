@@ -285,7 +285,7 @@ export const FullscreenQuad: React.FC<Props> = ({
 
   // Initialize with a 1x1 dark texture to prevent black frame on mount
   const outputUniforms = useMemo(() => {
-    const initTex = new THREE.DataTexture(new Uint8Array([5, 3, 8, 255]), 1, 1);
+    const initTex = new THREE.DataTexture(new Uint8Array([26, 20, 40, 255]), 1, 1);
     initTex.needsUpdate = true;
     return { uInputTexture: { value: initTex as THREE.Texture | null } };
   }, []);
