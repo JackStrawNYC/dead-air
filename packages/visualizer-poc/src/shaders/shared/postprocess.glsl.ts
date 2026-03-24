@@ -432,17 +432,17 @@ ${
     col = max(vec3(0.0), mhRot * col);
   }
 
-  // Lifted blacks — ALWAYS active. The shader IS the show, never go dark.
-  // "Music Leads" philosophy: visible ambient glow at all times.
+  // Lifted blacks — ALWAYS active. A Dead show never goes dark.
+  // Permanent floor ensures psychedelic color flow even during quiet passages.
   {
     float isBuild = step(0.5, uClimaxPhase) * step(uClimaxPhase, 1.5);
     float isClimaxOrSustain = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5);
-    float liftMult = mix(1.0, 0.70, isBuild * uClimaxIntensity) + isClimaxOrSustain * uClimaxIntensity * 0.15;
-    // Strong base floor — shader must ALWAYS be visible
-    float alwaysFloor = 0.55;
-    // Energy-reactive boost on top of the floor
-    float energyBoost = smoothstep(0.005, 0.15, energy) * 0.25;
-    col = max(col, vec3(0.14, 0.11, 0.18) * (alwaysFloor + energyBoost + liftMult));
+    float liftMult = mix(1.0, 0.40, isBuild * uClimaxIntensity) + isClimaxOrSustain * uClimaxIntensity * 0.15;
+    // Always-on base floor — no energy gate. Quiet passages get warm ambient glow.
+    float alwaysFloor = 0.15;
+    // Energy-reactive boost on top of the floor (wider gate, stronger boost)
+    float energyBoost = smoothstep(0.005, 0.15, energy) * 0.20;
+    col = max(col, vec3(0.12, 0.10, 0.14) * (alwaysFloor + energyBoost + liftMult));
   }
 
   // Darkness texture: subtle micro-noise during near-black passages

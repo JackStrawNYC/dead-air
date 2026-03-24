@@ -56,17 +56,13 @@ void main() {
 }
 `;
 
-/** Final output shader: samples uInputTexture with minimum luminance floor.
- *  "Music Leads" guarantee: the shader NEVER outputs pure black. */
+/** Final output shader: samples uInputTexture */
 const OUTPUT_FRAG = /* glsl */ `
 precision highp float;
 uniform sampler2D uInputTexture;
 varying vec2 vUv;
 void main() {
-  vec4 col = texture2D(uInputTexture, vUv);
-  // Minimum luminance floor: dark purple ambient glow, never pure black
-  col.rgb = max(col.rgb, vec3(0.06, 0.05, 0.08));
-  gl_FragColor = col;
+  gl_FragColor = texture2D(uInputTexture, vUv);
 }
 `;
 
@@ -285,7 +281,7 @@ export const FullscreenQuad: React.FC<Props> = ({
 
   // Initialize with a 1x1 dark texture to prevent black frame on mount
   const outputUniforms = useMemo(() => {
-    const initTex = new THREE.DataTexture(new Uint8Array([26, 20, 40, 255]), 1, 1);
+    const initTex = new THREE.DataTexture(new Uint8Array([5, 3, 8, 255]), 1, 1);
     initTex.needsUpdate = true;
     return { uInputTexture: { value: initTex as THREE.Texture | null } };
   }, []);

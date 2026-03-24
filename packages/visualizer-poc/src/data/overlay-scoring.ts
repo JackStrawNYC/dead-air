@@ -155,11 +155,6 @@ export function scoreOverlayForWindow(
   if (ctx.windowEnergy === "high" && entry.weight >= 2) score += 0.15;
   if (ctx.windowEnergy === "low" && entry.weight === 3) score -= 0.25;
 
-  // Character overlays slightly penalized at low energy — shader leads, icons support
-  if (ctx.windowEnergy === "low" && entry.category === "character") {
-    score -= 0.10;
-  }
-
   // Dropout windows: prefer atmospheric/sacred layers
   if (ctx.isDropout) {
     if (entry.layer <= 2) score += 0.4;

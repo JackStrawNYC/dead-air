@@ -212,12 +212,12 @@ describe("computeContinuousOverlays", () => {
       expect(nonAlwaysActive).toHaveLength(0);
     });
 
-    it("shows pool overlays after intro breathing at high energy", () => {
+    it("shows pool overlays after intro breathing (frame 300+)", () => {
       const config = makeConfig();
-      const frames = makeFrames(900, 0.30);
-      const snapshot = makeSnapshot({ energy: 0.30 });
+      const frames = makeFrames(600);
+      const snapshot = makeSnapshot({ energy: 0.15 });
 
-      const result = computeContinuousOverlays(config, frames, 700, snapshot);
+      const result = computeContinuousOverlays(config, frames, 400, snapshot);
 
       const poolOverlays = Object.keys(result.opacities).filter(
         (name) => !config.alwaysActive.includes(name),
@@ -291,10 +291,10 @@ describe("computeContinuousOverlays", () => {
       const pool = makePool(20);
       pool[5] = makeEntry({ name: "HeroOverlay", layer: 6, category: "character", tags: ["dead-culture"] });
       const config = makeConfig({ pool, songHero: "HeroOverlay" });
-      const frames = makeFrames(900, 0.30);
-      const snapshot = makeSnapshot({ energy: 0.30 });
+      const frames = makeFrames(600, 0.15);
+      const snapshot = makeSnapshot({ energy: 0.15 });
 
-      const result = computeContinuousOverlays(config, frames, 700, snapshot);
+      const result = computeContinuousOverlays(config, frames, 400, snapshot);
 
       expect(result.opacities["HeroOverlay"]).toBeDefined();
       expect(result.opacities["HeroOverlay"]).toBeGreaterThan(0);
@@ -334,7 +334,7 @@ describe("computeContinuousOverlays", () => {
   describe("reactive injection", () => {
     it("injects reactive overlays when trigger is active", () => {
       const config = makeConfig();
-      const frames = makeFrames(900);
+      const frames = makeFrames(600);
       const snapshot = makeSnapshot();
       const reactiveState = {
         isTriggered: true,
@@ -346,7 +346,7 @@ describe("computeContinuousOverlays", () => {
         cooldownRemaining: 0,
       };
 
-      const result = computeContinuousOverlays(config, frames, 700, snapshot, reactiveState);
+      const result = computeContinuousOverlays(config, frames, 400, snapshot, reactiveState);
 
       expect(result.opacities["ReactiveOverlay"]).toBeDefined();
       expect(result.opacities["ReactiveOverlay"]).toBeGreaterThan(0);

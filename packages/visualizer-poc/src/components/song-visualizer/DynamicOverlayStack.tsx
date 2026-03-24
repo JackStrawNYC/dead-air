@@ -28,11 +28,11 @@ interface OverlayComponentEntry {
 }
 
 /** Max concurrent overlays by energy level.
- *  "Music Leads" philosophy: pure shader by default, overlays earn their moment. */
+ *  Dead iconography should be PROMINENT — bears, stealies, bolts visible always. */
 const MAX_CONCURRENT: Record<string, number> = {
-  quiet: 2,
-  mid: 3,
-  peak: 4,
+  quiet: 3,
+  mid: 5,
+  peak: 7,
 };
 
 interface Props {

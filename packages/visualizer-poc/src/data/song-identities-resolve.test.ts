@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { resolveSongMode, getShowModesForSong, buildShowShaderPool } from "./song-identities";
+import { resolveSongMode, getShowModesForSong } from "./song-identities";
 import { lookupSongIdentity } from "./song-identities";
 import type { VisualMode } from "./types";
 
@@ -109,50 +109,5 @@ describe("resolveSongMode", () => {
     }
     // Dark Star has 7 preferred, each seed narrows to 4, then picks 1 — should vary
     expect(modes.size).toBeGreaterThanOrEqual(5);
-  });
-});
-
-describe("buildShowShaderPool", () => {
-  const testSongs: Array<{ title: string; defaultMode: VisualMode }> = [
-    { title: "Dark Star", defaultMode: "cosmic_voyage" },
-    { title: "Bertha", defaultMode: "concert_lighting" },
-    { title: "Scarlet Begonias", defaultMode: "tie_dye" },
-    { title: "Fire on the Mountain", defaultMode: "inferno" },
-    { title: "Truckin'", defaultMode: "oil_projector" },
-    { title: "Eyes of the World", defaultMode: "aurora" },
-    { title: "China Cat Sunflower", defaultMode: "kaleidoscope" },
-    { title: "Playing in the Band", defaultMode: "feedback_recursion" },
-  ];
-
-  it("returns 8-12 modes by default", () => {
-    const pool = buildShowShaderPool(testSongs, 42);
-    expect(pool.length).toBeGreaterThanOrEqual(8);
-    expect(pool.length).toBeLessThanOrEqual(12);
-  });
-
-  it("is deterministic (same seed = same pool)", () => {
-    const a = buildShowShaderPool(testSongs, 42);
-    const b = buildShowShaderPool(testSongs, 42);
-    expect(a).toEqual(b);
-  });
-
-  it("varies with different seeds", () => {
-    const pools = new Set<string>();
-    for (let seed = 0; seed < 20; seed++) {
-      pools.add(buildShowShaderPool(testSongs, seed).sort().join(","));
-    }
-    expect(pools.size).toBeGreaterThanOrEqual(2);
-  });
-
-  it("includes each song's defaultMode", () => {
-    const pool = buildShowShaderPool(testSongs, 42);
-    const poolSet = new Set(pool);
-    // Most default modes should be in the pool (they have ref count from their song)
-    let included = 0;
-    for (const song of testSongs) {
-      if (poolSet.has(song.defaultMode)) included++;
-    }
-    // At least half the default modes should survive pruning
-    expect(included).toBeGreaterThanOrEqual(testSongs.length / 2);
   });
 });

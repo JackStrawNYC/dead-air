@@ -85,13 +85,11 @@ describe("buildRotationSchedule", () => {
     }
   });
 
-  it("assigns overlays to each window at high energy", () => {
-    const sections = makeSections([{ start: 0, end: 1800, energy: "high" }]);
+  it("assigns overlays to each window", () => {
+    const sections = makeSections([{ start: 0, end: 1800, energy: "mid" }]);
     const schedule = buildRotationSchedule(TEST_OVERLAYS, sections, "s1t01");
-    // High energy windows get 1-2 overlays
-    const nonIntroWindows = schedule.windows.filter((w) => w.frameEnd > 600);
-    for (const w of nonIntroWindows) {
-      expect(w.overlays.length).toBeGreaterThanOrEqual(0);
+    for (const w of schedule.windows) {
+      expect(w.overlays.length).toBeGreaterThan(0);
     }
   });
 

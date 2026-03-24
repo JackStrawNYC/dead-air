@@ -1,15 +1,16 @@
 /**
- * Overlay Rotation Engine — temporal overlay management (LEGACY).
+ * Overlay Rotation Engine — temporal overlay management.
  *
- * "The Music Leads" philosophy: pure shader art by default, overlays earn
- * their moment. Most of the show is ONE shader breathing with the music.
+ * Tuned for the Dead's visual philosophy: restraint during quiet passages,
+ * visual silence before peaks, full flood at climax. The music leads.
  *
  * Key design principles:
- *   - Pure shader at low energy: zero overlays, let the shader own the screen
- *   - Overlays appear only at mid-high energy: 0-1 at mid, 1-2 at peaks
- *   - Pre-peak dropout: strip to void before climax → devastating contrast
+ *   - 5x dynamic range: quiet passages have gentle presence, peaks flood vivid
+ *   - Pre-peak dropout: strip to 1 overlay before climax → contrast without void
  *   - Energy-scaled crossfades: organic in Space (15s), snappy at peaks (4s)
- *   - 20-second intro breathing: shader establishes before any overlay appears
+ *   - Overlay count range: 2-3 during quiet, 4-5 at climax
+ *   - Accent overlays: Dead iconography pulses on beats at ALL energy levels
+ *   - Always alive: even silence has a faint atmospheric wash
  *
  * Two exports:
  *   buildRotationSchedule() — called once per song via useMemo
@@ -131,9 +132,9 @@ const CROSSFADE_FRAMES_DEFAULT = 120;
  * dropout silence and peak flood creates the show's visceral impact.
  */
 const ENERGY_COUNTS: Record<string, { min: number; max: number }> = {
-  low:  { min: 0,  max: 1 },   // quiet: maybe one subtle layer — bears can breathe here
+  low:  { min: 1,  max: 1 },   // quiet: single atmospheric layer, let the shader breathe
   mid:  { min: 1,  max: 2 },   // moderate: one or two for texture depth
-  high: { min: 1,  max: 3 },   // peaks: overlays earn their moment
+  high: { min: 2,  max: 3 },   // peaks: tasteful A-tier density, not a firehose
 };
 
 /** A-tier overlays: the only overlays allowed during peaks (high energy).
@@ -608,10 +609,10 @@ export function getOverlayOpacities(
     }
     const quietRatio = quietFrames / QUIET_WINDOW;
     // Smoothstep ramp from 50% to 100% quiet — gradual onset, no boundary flicker
-    if (quietRatio > 0.3) {
-      const t = Math.min(1, (quietRatio - 0.3) / 0.7);
+    if (quietRatio > 0.5) {
+      const t = Math.min(1, (quietRatio - 0.5) / 0.5);
       const eased = t * t * (3 - 2 * t); // smoothstep
-      const withdrawMult = 1 - eased * 0.85; // 1.0 → 0.15 (near full suppression)
+      const withdrawMult = 1 - eased * 0.6; // 1.0 → 0.4
       for (const name of Object.keys(result)) {
         if (schedule.alwaysActive.includes(name)) continue;
         result[name] = (result[name] ?? 0) * Math.max(0.1, withdrawMult);

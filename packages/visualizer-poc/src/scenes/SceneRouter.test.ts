@@ -719,19 +719,4 @@ describe('spectral-categorical routing in getModeForSection', () => {
     expect(warmModes.size).toBeGreaterThan(0);
     expect(brightModes.size).toBeGreaterThan(0);
   });
-
-  it('constrains mode selection to showShaderPool when provided', () => {
-    const song = makeSong();
-    const sections = makeSections(5, 1200);
-    const showPool: VisualMode[] = ['aurora', 'deep_ocean', 'cosmic_dust'];
-
-    for (let si = 0; si < sections.length; si++) {
-      const mode = getModeForSection(
-        song, si, sections, 42, undefined, false,
-        undefined, undefined, undefined, undefined, undefined,
-        undefined, undefined, undefined, undefined, showPool,
-      );
-      expect(showPool).toContain(mode);
-    }
-  });
 });
