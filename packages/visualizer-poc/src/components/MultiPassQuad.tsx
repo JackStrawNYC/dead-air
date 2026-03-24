@@ -76,7 +76,7 @@ uniform sampler2D uInputTexture;
 varying vec2 vUv;
 void main() {
   vec4 col = texture2D(uInputTexture, vUv);
-  col.rgb = max(col.rgb, vec3(0.12, 0.09, 0.16));
+  col.rgb = max(col.rgb, vec3(0.28, 0.22, 0.35));
   gl_FragColor = col;
 }
 `;

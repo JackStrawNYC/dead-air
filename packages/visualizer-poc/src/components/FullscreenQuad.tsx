@@ -65,7 +65,7 @@ varying vec2 vUv;
 void main() {
   vec4 col = texture2D(uInputTexture, vUv);
   // Minimum luminance floor: dark purple ambient glow, never pure black
-  col.rgb = max(col.rgb, vec3(0.12, 0.09, 0.16));
+  col.rgb = max(col.rgb, vec3(0.28, 0.22, 0.35));
   gl_FragColor = col;
 }
 `;
