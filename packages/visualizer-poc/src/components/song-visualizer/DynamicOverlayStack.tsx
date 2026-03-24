@@ -30,9 +30,9 @@ interface OverlayComponentEntry {
 /** Max concurrent overlays by energy level.
  *  Dead iconography should be PROMINENT — bears, stealies, bolts visible always. */
 const MAX_CONCURRENT: Record<string, number> = {
-  quiet: 5,
-  mid: 8,
-  peak: 10,
+  quiet: 3,
+  mid: 5,
+  peak: 7,
 };
 
 interface Props {
@@ -95,7 +95,7 @@ export const DynamicOverlayStack: React.FC<Props> = ({
   const maxConcurrent = MAX_CONCURRENT[energyLevel] ?? 4;
   const inversionMult = 1 - counterpointOverlayInversion;
   // Boost overlay visibility: Dead icons must be clearly visible, not ghosted
-  const baseMult = Math.min(1.0, mediaSuppression * focusSuppression * itOverlayOverride * inversionMult * overlayPulse * 1.8);
+  const baseMult = Math.min(1.0, mediaSuppression * focusSuppression * itOverlayOverride * inversionMult * overlayPulse);
 
   // Single-pass: compute opacity, filter, sort, split DOM/GLSL in one loop
   const scored: { name: string; entry: OverlayComponentEntry; opacity: number }[] = [];

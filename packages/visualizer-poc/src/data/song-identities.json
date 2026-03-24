@@ -67,7 +67,8 @@
       "aurora",
       "smoke_rings",
       "stained_glass",
-      "volumetric_nebula"
+      "volumetric_nebula",
+      "liquid_projector"
     ],
     "palette": {
       "primary": 30,
@@ -100,7 +101,8 @@
       "feedback_recursion",
       "voronoi_flow",
       "aurora_curtains",
-      "volumetric_clouds"
+      "volumetric_clouds",
+      "spinning_spiral"
     ],
     "palette": {
       "primary": 180,
@@ -128,7 +130,8 @@
       "smoke_rings",
       "ink_wash",
       "coral_reef",
-      "warm_nebula"
+      "warm_nebula",
+      "liquid_projector"
     ],
     "palette": {
       "primary": 25,
@@ -156,7 +159,8 @@
       "crystal_cavern",
       "cosmic_dust",
       "stained_glass",
-      "volumetric_nebula"
+      "volumetric_nebula",
+      "liquid_projector"
     ],
     "palette": {
       "primary": 200,
@@ -247,7 +251,8 @@
       "lava_flow",
       "liquid_light",
       "fractal_flames",
-      "kaleidoscope"
+      "kaleidoscope",
+      "acid_melt"
     ],
     "palette": {
       "primary": 290,
@@ -277,7 +282,8 @@
       "crystal_cavern",
       "feedback_recursion",
       "galaxy_spiral",
-      "volumetric_nebula"
+      "volumetric_nebula",
+      "blacklight_glow"
     ],
     "palette": {
       "primary": 260,
@@ -354,7 +360,8 @@
       "feedback_recursion",
       "plasma_field",
       "kaleidoscope",
-      "fractal_zoom"
+      "fractal_zoom",
+      "acid_melt"
     ],
     "palette": {
       "primary": 0,
@@ -386,7 +393,8 @@
       "bioluminescence",
       "galaxy_spiral",
       "fractal_zoom",
-      "volumetric_clouds"
+      "volumetric_clouds",
+      "spinning_spiral"
     ],
     "palette": {
       "primary": 170,
@@ -463,7 +471,8 @@
       "feedback_recursion",
       "warm_nebula",
       "crystal_cavern",
-      "galaxy_spiral"
+      "galaxy_spiral",
+      "blacklight_glow"
     ],
     "palette": {
       "primary": 220,
@@ -564,7 +573,8 @@
       "fractal_flames",
       "plasma_field",
       "kaleidoscope",
-      "liquid_mandala"
+      "liquid_mandala",
+      "acid_melt"
     ],
     "palette": {
       "primary": 50,
@@ -649,7 +659,8 @@
       "liquid_mandala",
       "concert_lighting",
       "flower_field",
-      "prism_refraction"
+      "prism_refraction",
+      "spinning_spiral"
     ],
     "palette": {
       "primary": 340,
@@ -714,7 +725,8 @@
       "morphogenesis",
       "void_light",
       "kaleidoscope",
-      "volumetric_nebula"
+      "volumetric_nebula",
+      "acid_melt"
     ],
     "palette": {
       "primary": 280,
@@ -745,7 +757,8 @@
       "reaction_diffusion",
       "feedback_recursion",
       "mandala_engine",
-      "electric_arc"
+      "electric_arc",
+      "acid_melt"
     ],
     "palette": {
       "primary": 350,
@@ -816,7 +829,8 @@
       "aurora_sky",
       "volumetric_clouds",
       "prism_refraction",
-      "cosmic_voyage"
+      "cosmic_voyage",
+      "spinning_spiral"
     ],
     "palette": {
       "primary": 200,
@@ -1007,7 +1021,8 @@
       "lo_fi_grain",
       "aurora",
       "smoke_rings",
-      "coral_reef"
+      "coral_reef",
+      "liquid_projector"
     ],
     "palette": {
       "primary": 30,
@@ -1198,7 +1213,8 @@
       "lo_fi_grain",
       "smoke_rings",
       "aurora",
-      "coral_reef"
+      "coral_reef",
+      "liquid_projector"
     ],
     "palette": {
       "primary": 25,
@@ -1748,7 +1764,8 @@
       "solar_flare",
       "kaleidoscope",
       "plasma_field",
-      "liquid_mandala"
+      "liquid_mandala",
+      "acid_melt"
     ],
     "palette": {
       "primary": 300,
@@ -1779,7 +1796,8 @@
       "smoke_rings",
       "aurora",
       "ink_wash",
-      "coral_reef"
+      "coral_reef",
+      "liquid_projector"
     ],
     "palette": {
       "primary": 30,
@@ -2075,7 +2093,8 @@
       "deep_ocean",
       "smoke_rings",
       "storm",
-      "volumetric_smoke"
+      "volumetric_smoke",
+      "blacklight_glow"
     ],
     "palette": {
       "primary": 230,
@@ -2468,7 +2487,8 @@
       "prism_refraction",
       "aurora_curtains",
       "warp_field",
-      "volumetric_nebula"
+      "volumetric_nebula",
+      "blacklight_glow"
     ],
     "palette": {
       "primary": 180,
@@ -2504,7 +2524,8 @@
       "deep_ocean",
       "void_light",
       "space_travel",
-      "aurora"
+      "aurora",
+      "blacklight_glow"
     ],
     "palette": {
       "primary": 210,

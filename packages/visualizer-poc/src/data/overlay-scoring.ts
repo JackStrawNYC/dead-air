@@ -230,7 +230,7 @@ export function scoreOverlayForWindow(
   // Song identity overlay boost/suppress
   if (ctx.songIdentity) {
     if (ctx.songIdentity.overlayBoost?.includes(entry.name)) {
-      score += 0.30;
+      score += 0.50;
     }
     if (ctx.songIdentity.overlaySuppress?.includes(entry.name)) {
       score -= 0.40;
