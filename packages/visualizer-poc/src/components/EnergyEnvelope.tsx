@@ -165,10 +165,10 @@ export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod,
   const soloBrightLift = isSolo ? (soloIntensity * 0.10) : 0;
   const vocalBrightLift = (vocalWarmth ?? 0) * 0.06;
 
-  // Energy-adaptive brightness floor: TRUE darkness in silence, vivid at peaks.
-  // energy=0 → 0.02 (near black). energy 0.10 → 0.10. energy 0.30 → 0.35.
-  // The key is silence should be DARK — psychedelic visuals need contrast.
-  const energyFloor = 0.02 + Math.min(1, Math.max(0, (energy - 0.03) / 0.27)) * 0.33;
+  // Energy-adaptive brightness floor: shader always visible, brighter at peaks.
+  // energy=0 → 0.45 (dim but visible). energy 0.10 → 0.55. energy 0.30 → 0.75.
+  // "Music Leads" philosophy: the shader IS the show — never go black.
+  const energyFloor = 0.45 + Math.min(1, Math.max(0, (energy - 0.03) / 0.27)) * 0.30;
   // Apply phase offsets + song identity + show arc + IT + narrative + solo + vocal + harmonic + stem character
   const baseBrightness = Math.min(brightCap, Math.max(energyFloor, brightness + dsBrightOffset + showBrightOffset + siPaletteBright + arcBrightOffset + itBrightLift + narrativeBrightness + soloBrightLift + vocalBrightLift + harmonicBrightness + brightnessCounterpoint + stemCharacterBright));
   // During dead air, dim brightness toward 0.55 (minimum floor) and suppress bloom
