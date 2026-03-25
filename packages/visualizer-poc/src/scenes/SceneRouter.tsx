@@ -324,6 +324,11 @@ export function getModeForSection(
   const override = song.sectionOverrides?.find((o) => o.sectionIndex === sectionIndex);
   if (override) return override.mode;
 
+  // Feedback shader cold-start guard: feedback shaders (kaleidoscope, fractal_zoom, etc.)
+  // need ~2 minutes of sequential frame accumulation to build brightness. For the first
+  // 3 sections, filter them out so songs start with visible, non-feedback shaders.
+  const avoidFeedback = sectionIndex <= 2;
+
   // Coherence lock: hold current shader during peak moments
   if (coherenceIsLocked && sectionIndex > 0) {
     return getModeForSection(song, sectionIndex - 1, sections, seed, era, false, usedShaderModes, songIdentity, stemSection, frames, songDuration, setNumber, trackNumber, shaderModeLastUsed);
@@ -372,6 +377,12 @@ export function getModeForSection(
               });
               if (spectralFiltered.length >= 2) candidates = spectralFiltered; // soft filter
             }
+          }
+
+          // Filter feedback shaders from early sections (cold-start produces black)
+          if (avoidFeedback) {
+            const nonFeedback = candidates.filter((m) => !SCENE_REGISTRY[m]?.usesFeedback);
+            if (nonFeedback.length > 0) candidates = nonFeedback;
           }
 
           const rng = seededRandom(seed + (trackNumber ?? 0) * 31337 + sectionIndex * 7919);
@@ -561,6 +572,12 @@ export function getModeForSection(
             }
           }
         }
+      }
+
+      // Filter feedback shaders from early sections (cold-start produces black)
+      if (avoidFeedback) {
+        const nonFeedback = filteredPool.filter((m) => !SCENE_REGISTRY[m]?.usesFeedback);
+        if (nonFeedback.length > 0) filteredPool = nonFeedback;
       }
 
       const rng = seededRandom(seed + (trackNumber ?? 0) * 31337 + sectionIndex * 7919);

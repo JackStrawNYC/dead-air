@@ -55,6 +55,8 @@ export interface SceneRegistryEntry {
   gradingIntensity?: number;
   /** Spectral family for timbral routing. Omitted = versatile (accepts any family). */
   spectralFamily?: SpectralFamily;
+  /** Whether this shader uses MultiPassQuad feedback (slow cold-start from black) */
+  usesFeedback?: boolean;
 }
 
 // ─── Lazy imports for code splitting ───
@@ -148,6 +150,7 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     complement: "oil_projector",
     gradingIntensity: 0.75,
     spectralFamily: "warm",
+    usesFeedback: true,
   },
   oil_projector: {
     Component: OilProjectorScene,
@@ -187,6 +190,7 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     energyAffinity: "high",
     complement: "vintage_film",
     gradingIntensity: 0.75,
+    usesFeedback: true,
   },
   cosmic_dust: {
     Component: CosmicDustScene,
@@ -205,6 +209,7 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     complement: "concert_lighting",
     preferredTransitionIn: "void",
     spectralFamily: "cosmic",
+    usesFeedback: true,
   },
   inferno: {
     Component: InfernoScene,
@@ -251,6 +256,7 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     energyAffinity: "any",
     complement: "liquid_light",
     spectralFamily: "textural",
+    usesFeedback: true,
   },
   spectral_analyzer: {
     Component: SpectralAnalyzerScene,
@@ -282,6 +288,7 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     complement: "sacred_geometry",
     gradingIntensity: 0.8,
     spectralFamily: "tonal",
+    usesFeedback: true,
   },
   fractal_zoom: {
     Component: FractalZoomScene,
@@ -289,6 +296,7 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     complement: "kaleidoscope",
     preferredTransitionIn: "morph",
     spectralFamily: "tonal",
+    usesFeedback: true,
   },
   sacred_geometry: {
     Component: SacredGeometryScene,
@@ -296,12 +304,14 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     complement: "kaleidoscope",
     preferredTransitionIn: "dissolve",
     spectralFamily: "tonal",
+    usesFeedback: true,
   },
   reaction_diffusion: {
     Component: ReactionDiffusionScene,
     energyAffinity: "mid",
     complement: "fluid_2d",
     spectralFamily: "textural",
+    usesFeedback: true,
   },
   mandala_engine: {
     Component: MandalaEngineScene,
@@ -314,12 +324,14 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     energyAffinity: "high",
     complement: "deep_ocean",
     gradingIntensity: 0.7,
+    usesFeedback: true,
   },
   feedback_recursion: {
     Component: FeedbackRecursionScene,
     energyAffinity: "any",
     complement: "fractal_flames",
     spectralFamily: "textural",
+    usesFeedback: true,
   },
   truchet_tiling: {
     Component: TruchetTilingScene,
@@ -338,6 +350,7 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     energyAffinity: "any",
     complement: "diffraction_rings",
     spectralFamily: "tonal",
+    usesFeedback: true,
   },
   voronoi_flow: {
     Component: VoronoiFlowScene,
@@ -352,12 +365,14 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     preferredTransitionIn: "distortion",
     gradingIntensity: 0.6,
     spectralFamily: "bright",
+    usesFeedback: true,
   },
   morphogenesis: {
     Component: MorphogenesisScene,
     energyAffinity: "mid",
     complement: "reaction_diffusion",
     spectralFamily: "textural",
+    usesFeedback: true,
   },
   stained_glass: {
     Component: StainedGlassScene,
@@ -370,6 +385,7 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     energyAffinity: "high",
     complement: "fractal_flames",
     spectralFamily: "textural",
+    usesFeedback: true,
   },
   smoke_rings: {
     Component: SmokeRingsScene,
@@ -394,6 +410,7 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     complement: "crystal_cavern",
     gradingIntensity: 0.65,
     spectralFamily: "warm",
+    usesFeedback: true,
   },
   // Phase 9 Wave 2: 8 new scenes
   mycelium_network: {
@@ -401,11 +418,13 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     energyAffinity: "mid",
     complement: "neural_web",
     spectralFamily: "textural",
+    usesFeedback: true,
   },
   ink_wash: {
     Component: InkWashScene,
     energyAffinity: "low",
     complement: "stark_minimal",
+    usesFeedback: true,
   },
   coral_reef: {
     Component: CoralReefScene,
@@ -419,6 +438,7 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     complement: "inferno",
     gradingIntensity: 0.6,
     spectralFamily: "bright",
+    usesFeedback: true,
   },
   galaxy_spiral: {
     Component: GalaxySpiralScene,
@@ -437,6 +457,7 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     energyAffinity: "any",
     complement: "digital_rain",
     spectralFamily: "textural",
+    usesFeedback: true,
   },
   databend: {
     Component: DatabendScene,
@@ -550,12 +571,14 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     complement: "sacred_geometry",
     gradingIntensity: 0.8,
     spectralFamily: "warm",
+    usesFeedback: true,
   },
   bioluminescence: {
     Component: BioluminescenceScene,
     energyAffinity: "high",
     complement: "mycelium_network",
     spectralFamily: "bright",
+    usesFeedback: true,
   },
   neon_grid: {
     Component: NeonGridScene,
@@ -563,6 +586,7 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     complement: "concert_lighting",
     gradingIntensity: 0.6,
     spectralFamily: "bright",
+    usesFeedback: true,
   },
   warm_nebula: {
     Component: WarmNebulaScene,
@@ -570,18 +594,21 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     complement: "deep_ocean",
     preferredTransitionIn: "dissolve",
     spectralFamily: "cosmic",
+    usesFeedback: true,
   },
   prism_refraction: {
     Component: PrismRefractionScene,
     energyAffinity: "any",
     complement: "diffraction_rings",
     spectralFamily: "tonal",
+    usesFeedback: true,
   },
   cellular_automata: {
     Component: CellularAutomataScene,
     energyAffinity: "mid",
     complement: "reaction_diffusion",
     spectralFamily: "textural",
+    usesFeedback: true,
   },
   // Dead-native shaders
   acid_melt: {
@@ -590,18 +617,21 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     complement: "liquid_light",
     gradingIntensity: 0.8,
     spectralFamily: "warm",
+    usesFeedback: true,
   },
   blacklight_glow: {
     Component: BlacklightGlowScene,
     energyAffinity: "mid",
     complement: "bioluminescence",
     spectralFamily: "bright",
+    usesFeedback: true,
   },
   spinning_spiral: {
     Component: SpinningSpiralScene,
     energyAffinity: "any",
     complement: "kaleidoscope",
     spectralFamily: "tonal",
+    usesFeedback: true,
   },
   liquid_projector: {
     Component: LiquidProjectorScene,
@@ -609,6 +639,7 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     complement: "oil_projector",
     gradingIntensity: 0.75,
     spectralFamily: "warm",
+    usesFeedback: true,
   },
 };
 

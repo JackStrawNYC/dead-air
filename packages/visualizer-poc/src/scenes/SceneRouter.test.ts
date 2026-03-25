@@ -400,15 +400,15 @@ describe('getModeForSection', () => {
     const total = 300;
     for (let i = 0; i < total; i++) {
       const seed = i * 100000;
-      const mode = getModeForSection(song, 2, sections, seed, undefined, false, undefined, undefined, undefined, undefined, 900);
+      const mode = getModeForSection(song, 3, sections, seed, undefined, false, undefined, undefined, undefined, undefined, 900);
       if (feedbackModes.has(mode)) feedbackCount++;
     }
 
-    // Without duration bias (control)
+    // Without duration bias (control) — also section 3 to avoid feedback cold-start filter
     let controlFeedbackCount = 0;
     for (let i = 0; i < total; i++) {
       const seed = i * 100000;
-      const mode = getModeForSection(song, 2, sections, seed);
+      const mode = getModeForSection(song, 3, sections, seed);
       if (feedbackModes.has(mode)) controlFeedbackCount++;
     }
 
