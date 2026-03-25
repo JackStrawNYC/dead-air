@@ -89,10 +89,10 @@ describe('validateSectionOverrides', () => {
 
 describe('getModeForSection', () => {
   it('returns defaultMode with no overrides, no seed', () => {
-    const song = makeSong({ defaultMode: 'cosmic_voyage' });
+    const song = makeSong({ defaultMode: 'oil_projector' }); // non-feedback shader
     const sections = makeSections(3);
     const mode = getModeForSection(song, 0, sections);
-    expect(mode).toBe('cosmic_voyage');
+    expect(mode).toBe('oil_projector');
   });
 
   it('explicit override wins over everything', () => {

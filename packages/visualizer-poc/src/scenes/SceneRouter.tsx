@@ -406,9 +406,14 @@ export function getModeForSection(
         const remainingPreferred = songIdentity.preferredModes.filter((m) => !showModeSet.has(m));
         // Strict preferred-only pool: song identity controls the visual.
         // No registry splash — curated modes only, no random off-brand shaders.
-        const weightedPool: VisualMode[] = [];
+        let weightedPool: VisualMode[] = [];
         for (const m of showModes) { for (let i = 0; i < 3; i++) weightedPool.push(m); }
         for (const m of remainingPreferred) { for (let i = 0; i < 2; i++) weightedPool.push(m); }
+        // Filter feedback shaders from early sections (cold-start produces black)
+        if (avoidFeedback) {
+          const nonFb = weightedPool.filter((m) => !SCENE_REGISTRY[m]?.usesFeedback);
+          if (nonFb.length > 0) weightedPool = nonFb;
+        }
         if (weightedPool.length > 0) filteredPool = weightedPool;
       }
 
@@ -596,8 +601,12 @@ export function getModeForSection(
     // Removed odd-section-only restriction (was: sectionIndex % 2 === 1) and lowered
     // total length from 5400 (3 min) to 3600 (2 min) so more songs get visual variety.
     if (totalLen > 3600 && sectionLen > AUTO_VARIETY_MIN_SECTION && sectionIndex > 0) {
-      const affinityPool = TRANSITION_AFFINITY[song.defaultMode];
+      let affinityPool = TRANSITION_AFFINITY[song.defaultMode];
       if (affinityPool && affinityPool.length > 0) {
+        if (avoidFeedback) {
+          const nonFb = affinityPool.filter((m) => !SCENE_REGISTRY[m]?.usesFeedback);
+          if (nonFb.length > 0) affinityPool = nonFb;
+        }
         const rng = seededRandom((seed ?? 0) + (trackNumber ?? 0) * 31337 + sectionIndex * 7919);
         return affinityPool[Math.floor(rng() * affinityPool.length)];
       }
@@ -605,6 +614,11 @@ export function getModeForSection(
     }
   }
 
+  // Final fallback: if defaultMode is a feedback shader and we're in early sections,
+  // use its complement instead (which is always a non-feedback shader)
+  if (avoidFeedback && SCENE_REGISTRY[song.defaultMode]?.usesFeedback) {
+    return SCENE_REGISTRY[song.defaultMode].complement;
+  }
   return song.defaultMode;
 }
 
