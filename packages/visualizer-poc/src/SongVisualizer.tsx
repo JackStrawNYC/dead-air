@@ -616,12 +616,10 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
     : 0;
   const isDeadAir = deadAirFactor > 0.99;
 
-  // ─── Intro factor: art-forward hold until shader warms up ───
-  // Feedback shaders need ~2 min to build brightness from cold start.
-  // Keep art dominant until the shader has accumulated enough to look good.
+  // ─── Intro factor: art-forward cold open for first ~20s ───
   // 0 = full intro suppression (art dominates), 1 = engine fully open.
-  const INTRO_HOLD = 3600;  // 2 min at 30fps — art stays until shader is warm
-  const INTRO_RAMP = 900;   // 30s gradual crossfade from art to shader
+  const INTRO_HOLD = 750;  // 25s at 30fps — art + text showcase
+  const INTRO_RAMP = 270;  // 9s smooth ramp to full visuals
   // Suite middle songs skip intro hold (continuous flow within suite)
   // Segue-in songs get a mini intro: 3s crossfade breathing, then art showcase 5-15s
   const introFactor = props.segueIn
@@ -758,13 +756,13 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
           <DynamicOverlayStack
             activeEntries={activeEntries}
             opacityMap={opacityMap}
-            mediaSuppression={isDeadAir ? 0 : Math.max(mediaSuppression * (1 - deadAirFactor), 0.85)}
+            mediaSuppression={Math.max(mediaSuppression * (1 - deadAirFactor), Math.max(0.4, introFactor))}
             hueRotation={hueRotation}
             tempo={tempo}
             palette={effectivePalette}
             usedOverlayIds={narrative?.state.usedOverlayIds}
             frames={f}
-            focusSuppression={Math.max(focusState.overlayOpacity, 0.70)}
+            focusSuppression={focusState.overlayOpacity}
             energyLevel={energyLevel}
             itOverlayOverride={itState.overlayOpacityOverride}
             counterpointOverlayInversion={counterpoint.overlayInversion}
