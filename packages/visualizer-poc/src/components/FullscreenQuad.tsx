@@ -281,9 +281,26 @@ export const FullscreenQuad: React.FC<Props> = ({
 
   // Initialize with a 1x1 dark texture to prevent black frame on mount
   const outputUniforms = useMemo(() => {
-    const initTex = new THREE.DataTexture(new Uint8Array([5, 3, 8, 255]), 1, 1);
+    const initTex = new THREE.DataTexture(new Uint8Array([255, 0, 255, 255]), 1, 1); // DEBUG: bright magenta to test if init texture is showing
     initTex.needsUpdate = true;
     return { uInputTexture: { value: initTex as THREE.Texture | null } };
+  }, []);
+
+  // Output pass: renders final texture to screen with orthographic camera
+  const outputPass = useMemo(() => {
+    const scene = new THREE.Scene();
+    const geo = new THREE.PlaneGeometry(2, 2);
+    const mat = new THREE.ShaderMaterial({
+      vertexShader: PASSTHROUGH_VERT,
+      fragmentShader: OUTPUT_FRAG,
+      uniforms: outputUniforms,
+      depthWrite: false,
+      depthTest: false,
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    scene.add(mesh);
+    return { scene };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   uniforms.uTime.value = time;
@@ -441,19 +458,15 @@ export const FullscreenQuad: React.FC<Props> = ({
 
     // Set final texture on the visible output mesh
     outputUniforms.uInputTexture.value = targets.fxaa.texture;
+
+    // Render output pass directly to screen with orthographic camera
+    // R3F's scene camera is perspective — clip-space quads need orthographic
     gl.setRenderTarget(null);
+    gl.autoClear = false; // prevent R3F from clearing our output
+    gl.render(outputPass.scene, camera);
+    gl.autoClear = true;
   }, -1);
 
-  return (
-    <mesh>
-      <planeGeometry args={[2, 2]} />
-      <shaderMaterial
-        vertexShader={PASSTHROUGH_VERT}
-        fragmentShader={OUTPUT_FRAG}
-        uniforms={outputUniforms}
-        depthWrite={false}
-        depthTest={false}
-      />
-    </mesh>
-  );
+  // Return empty group — actual rendering is done manually in useFrame
+  return <group />;
 };

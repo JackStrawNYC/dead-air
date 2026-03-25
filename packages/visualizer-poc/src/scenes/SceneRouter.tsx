@@ -886,7 +886,7 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
 
         // High energy delta: use DualShaderQuad for organic GPU blend (60 frames)
         const energyDelta = Math.abs(energyAfter - energyBefore);
-        if (energyDelta > 0.15) {
+        if (false && energyDelta > 0.15) { // DISABLED: DualShaderScene causes GLSL compile failures
           const stringsA = getShaderStrings(prevMode);
           const stringsB = getShaderStrings(currentMode);
           if (stringsA && stringsB) {
@@ -943,7 +943,7 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
 
         // High energy delta: use DualShaderQuad for organic GPU blend
         const energyDeltaOut = Math.abs(energyAfter - energyBefore);
-        if (energyDeltaOut > 0.15) {
+        if (false && energyDeltaOut > 0.15) { // DISABLED: DualShaderScene causes GLSL compile failures
           const stringsA = getShaderStrings(currentMode);
           const stringsB = getShaderStrings(nextMode);
           if (stringsA && stringsB) {
