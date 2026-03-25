@@ -205,7 +205,7 @@ void main() {
   col = mix(col, treeColor, trees * step(groundLine, uv.y));
 
   // Post-processing
-  col = applyPostProcess(col, uv);
+  vec2 pp = uv * 2.0 - 1.0; col = applyPostProcess(col, uv, pp);
 
   gl_FragColor = vec4(col, 1.0);
 }

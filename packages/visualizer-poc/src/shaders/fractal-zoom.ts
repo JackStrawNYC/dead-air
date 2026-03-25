@@ -76,8 +76,8 @@ void main() {
 
   // Zoom smoothness: high beatStability = steady, low = jittery (confidence-gated)
   float jitter = (1.0 - uBeatStability) * 0.02 * coherenceJitterMult * smoothstep(0.3, 0.7, uBeatConfidence);
-  float jitterX = snoise(vec2(uDynamicTime * 3.7, 0.0)) * jitter;
-  float jitterY = snoise(vec2(0.0, uDynamicTime * 3.7)) * jitter;
+  float jitterX = snoise(vec3(uDynamicTime * 3.7, 0.0, 0.0)) * jitter;
+  float jitterY = snoise(vec3(0.0, uDynamicTime * 3.7, 0.0)) * jitter;
 
   // Slowly drifting zoom center offset
   vec2 center = vec2(
@@ -154,7 +154,8 @@ void main() {
   col *= 1.0 + uSemanticPsychedelic * 0.15;
 
   // Apply shared post-processing chain
-  col = applyPostProcess(col, vUv);
+  vec2 p = vUv * 2.0 - 1.0;
+  col = applyPostProcess(col, vUv, p);
 
   // Feedback trails: section-type-aware decay
   vec3 prev = texture2D(uPrevFrame, vUv).rgb;

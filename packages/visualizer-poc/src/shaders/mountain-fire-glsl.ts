@@ -171,7 +171,7 @@ void main() {
   groundCol += vec3(0.15, 0.05, 0.01) * exp(-abs(p.x) * 3.0) * fireIntensity * 0.3;
   col = mix(col, groundCol, step(uv.y, groundY));
 
-  col = applyPostProcess(col, uv);
+  vec2 pp = uv * 2.0 - 1.0; col = applyPostProcess(col, uv, pp);
   gl_FragColor = vec4(col, 1.0);
 }
 `;

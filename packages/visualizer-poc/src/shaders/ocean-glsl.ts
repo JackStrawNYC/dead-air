@@ -160,7 +160,7 @@ void main() {
   float sprayNoise = fbm(vec3(p.x * 5.0 + t * 0.3, sprayY * 10.0, t * 0.2));
   col = mix(col, vec3(0.8, 0.85, 0.9), spray * sprayNoise * 0.3);
 
-  col = applyPostProcess(col, uv);
+  vec2 pp = uv * 2.0 - 1.0; col = applyPostProcess(col, uv, pp);
   gl_FragColor = vec4(col, 1.0);
 }
 `;

@@ -184,7 +184,7 @@ void main() {
   col = mix(col, vec3(0.08, 0.06, 0.04), poleMask);
 
   // Post-processing
-  col = applyPostProcess(col, uv);
+  vec2 pp = uv * 2.0 - 1.0; col = applyPostProcess(col, uv, pp);
 
   gl_FragColor = vec4(col, 1.0);
 }

@@ -162,7 +162,7 @@ void main() {
   float mistNoise = fbm(vec3(p.x * 3.0 + t * 0.1, mistY * 5.0, t * 0.15));
   col = mix(col, vec3(0.7, 0.75, 0.8), mist * mistNoise * 0.4);
 
-  col = applyPostProcess(col, uv);
+  vec2 pp = uv * 2.0 - 1.0; col = applyPostProcess(col, uv, pp);
   gl_FragColor = vec4(col, 1.0);
 }
 `;
