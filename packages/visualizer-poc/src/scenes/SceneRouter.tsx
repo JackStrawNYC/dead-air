@@ -1006,13 +1006,16 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
   const isSoloSpotlight = stemInterplayMode === "solo-spotlight";
 
   // Dual-shader activation: sufficient length + moderate energy, or jam/solo stem, or tight-lock interplay
-  const shouldDual = !dualCooldown && !isSoloSpotlight && (climaxForceDual || interplayForceDual || (sectionLen >= 600 && (
+  // Dual-shader DISABLED: arbitrary shader pairs cause GLSL compile failures
+  // (missing noise functions, wrong argument types, undeclared variables).
+  // Single shader per section is more reliable and still looks great.
+  const shouldDual = false && !dualCooldown && !isSoloSpotlight && (climaxForceDual || interplayForceDual || (sectionLen >= 600 && (
     frameEnergy > dualEnergyThreshold ||
     stemSection === "jam" || stemSection === "solo"
   )));
 
   // Solo-spotlight dual: subtle focus blend instead of full suppression
-  const shouldSoloSpotlightDual = isSoloSpotlight && !dualCooldown && sectionLen >= 300 && frameEnergy > 0.06;
+  const shouldSoloSpotlightDual = false; // disabled with dual-shader
 
   if (shouldDual || shouldSoloSpotlightDual) {
     // Prefer transition affinity pool for secondary shader selection

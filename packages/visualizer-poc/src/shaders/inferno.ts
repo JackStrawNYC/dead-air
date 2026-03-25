@@ -32,7 +32,7 @@ ${sharedUniformsGLSL}
 
 ${noiseGLSL}
 
-${buildPostProcessGLSL({ halationEnabled: true, bloomThresholdOffset: -0.10, stageFloodEnabled: false, thermalShimmerEnabled: true, temporalBlendEnabled: true })}
+${buildPostProcessGLSL({ halationEnabled: true, bloomThresholdOffset: -0.10, stageFloodEnabled: false, thermalShimmerEnabled: true })}
 
 varying vec2 vUv;
 

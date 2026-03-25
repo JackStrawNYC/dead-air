@@ -71,8 +71,11 @@ export function buildPostProcessGLSL(config: PostProcessConfig = {}): string {
     beatJoltEnabled = true,
     lightLeakEnabled = true,
     eraGradingEnabled = true,
-    temporalBlendEnabled = false,
+    temporalBlendEnabled: _temporalBlendIgnored = false,
   } = config;
+  // FORCE DISABLE: temporalBlend causes shader compile failures on FullscreenQuad
+  // shaders that don't have uPrevFrame uniform. Safe to disable — visual effect is subtle.
+  const temporalBlendEnabled = false;
 
   // Grain intensity expression
   let grainExpr: string;

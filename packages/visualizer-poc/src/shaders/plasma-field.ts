@@ -119,7 +119,7 @@ void main() {
     phase = mix(phase, commonPhase, phaseSyncAmount * 0.7);
 
     // Coherence: randomize phases (dissonance tears the pattern apart)
-    float randomPhase = snoise(vec2(fi * 7.3, slowTime * 2.0)) * TAU;
+    float randomPhase = snoise(vec3(fi * 7.3, slowTime * 2.0, 0.0)) * TAU;
     phase = mix(phase, phase + randomPhase * 0.5, phaseRandomAmount);
 
     // Harmonic tension adds turbulence to wave frequencies

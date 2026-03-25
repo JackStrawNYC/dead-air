@@ -24,7 +24,7 @@ ${sharedUniformsGLSL}
 
 ${noiseGLSL}
 
-${buildPostProcessGLSL({ halationEnabled: true, bloomThresholdOffset: -0.08, temporalBlendEnabled: true })}
+${buildPostProcessGLSL({ halationEnabled: true, bloomThresholdOffset: -0.08 })}
 
 varying vec2 vUv;
 
