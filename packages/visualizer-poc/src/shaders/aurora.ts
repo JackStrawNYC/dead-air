@@ -156,8 +156,6 @@ void main() {
   float climaxBoost = isClimax * climaxI;
 
   float stemVocals = clamp(uVocalEnergy, 0.0, 1.0);
-  // Space score → aurora spread (must be declared before use in curtainBrightness)
-  float spaceSpread = 1.0 + uSpaceScore * 0.4;
   float curtainBrightness = mix(0.25, 0.80, energy) * mix(0.7, 1.3, uJamDensity) * spaceSpread + sChorus * 0.15 + sSolo * 0.10 - sSpace * 0.15;
   curtainBrightness += onset * 0.5;
   curtainBrightness += stemVocals * 0.20; // vocal presence lifts aurora brightness
@@ -174,6 +172,9 @@ void main() {
 
   // Vocal pitch → aurora vertical lift
   float vocalLift = (uVocalPitch - 0.5) * 0.3;
+
+  // Space score → aurora spread
+  float spaceSpread = 1.0 + uSpaceScore * 0.4;
 
   // Aurora exists in a constrained vertical band
   // Melodic pitch lifts the curtain higher; melodic direction drifts band position; vocal pitch lifts

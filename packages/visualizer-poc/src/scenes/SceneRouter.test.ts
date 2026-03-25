@@ -89,10 +89,10 @@ describe('validateSectionOverrides', () => {
 
 describe('getModeForSection', () => {
   it('returns defaultMode with no overrides, no seed', () => {
-    const song = makeSong({ defaultMode: 'oil_projector' }); // non-feedback shader
+    const song = makeSong({ defaultMode: 'cosmic_voyage' });
     const sections = makeSections(3);
     const mode = getModeForSection(song, 0, sections);
-    expect(mode).toBe('oil_projector');
+    expect(mode).toBe('cosmic_voyage');
   });
 
   it('explicit override wins over everything', () => {
@@ -400,15 +400,15 @@ describe('getModeForSection', () => {
     const total = 300;
     for (let i = 0; i < total; i++) {
       const seed = i * 100000;
-      const mode = getModeForSection(song, 3, sections, seed, undefined, false, undefined, undefined, undefined, undefined, 900);
+      const mode = getModeForSection(song, 2, sections, seed, undefined, false, undefined, undefined, undefined, undefined, 900);
       if (feedbackModes.has(mode)) feedbackCount++;
     }
 
-    // Without duration bias (control) — also section 3 to avoid feedback cold-start filter
+    // Without duration bias (control)
     let controlFeedbackCount = 0;
     for (let i = 0; i < total; i++) {
       const seed = i * 100000;
-      const mode = getModeForSection(song, 3, sections, seed);
+      const mode = getModeForSection(song, 2, sections, seed);
       if (feedbackModes.has(mode)) controlFeedbackCount++;
     }
 

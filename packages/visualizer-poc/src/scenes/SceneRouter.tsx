@@ -324,11 +324,6 @@ export function getModeForSection(
   const override = song.sectionOverrides?.find((o) => o.sectionIndex === sectionIndex);
   if (override) return override.mode;
 
-  // Feedback shader cold-start guard: feedback shaders (kaleidoscope, fractal_zoom, etc.)
-  // need ~2 minutes of sequential frame accumulation to build brightness. For the first
-  // 3 sections, filter them out so songs start with visible, non-feedback shaders.
-  const avoidFeedback = sectionIndex <= 2;
-
   // Coherence lock: hold current shader during peak moments
   if (coherenceIsLocked && sectionIndex > 0) {
     return getModeForSection(song, sectionIndex - 1, sections, seed, era, false, usedShaderModes, songIdentity, stemSection, frames, songDuration, setNumber, trackNumber, shaderModeLastUsed);
@@ -379,12 +374,6 @@ export function getModeForSection(
             }
           }
 
-          // Filter feedback shaders from early sections (cold-start produces black)
-          if (avoidFeedback) {
-            const nonFeedback = candidates.filter((m) => !SCENE_REGISTRY[m]?.usesFeedback);
-            if (nonFeedback.length > 0) candidates = nonFeedback;
-          }
-
           const rng = seededRandom(seed + (trackNumber ?? 0) * 31337 + sectionIndex * 7919);
           return candidates[Math.floor(rng() * candidates.length)];
         }
@@ -406,14 +395,9 @@ export function getModeForSection(
         const remainingPreferred = songIdentity.preferredModes.filter((m) => !showModeSet.has(m));
         // Strict preferred-only pool: song identity controls the visual.
         // No registry splash — curated modes only, no random off-brand shaders.
-        let weightedPool: VisualMode[] = [];
+        const weightedPool: VisualMode[] = [];
         for (const m of showModes) { for (let i = 0; i < 3; i++) weightedPool.push(m); }
         for (const m of remainingPreferred) { for (let i = 0; i < 2; i++) weightedPool.push(m); }
-        // Filter feedback shaders from early sections (cold-start produces black)
-        if (avoidFeedback) {
-          const nonFb = weightedPool.filter((m) => !SCENE_REGISTRY[m]?.usesFeedback);
-          if (nonFb.length > 0) weightedPool = nonFb;
-        }
         if (weightedPool.length > 0) filteredPool = weightedPool;
       }
 
@@ -579,12 +563,6 @@ export function getModeForSection(
         }
       }
 
-      // Filter feedback shaders from early sections (cold-start produces black)
-      if (avoidFeedback) {
-        const nonFeedback = filteredPool.filter((m) => !SCENE_REGISTRY[m]?.usesFeedback);
-        if (nonFeedback.length > 0) filteredPool = nonFeedback;
-      }
-
       const rng = seededRandom(seed + (trackNumber ?? 0) * 31337 + sectionIndex * 7919);
       const idx = Math.floor(rng() * filteredPool.length);
       return filteredPool[idx];
@@ -601,12 +579,8 @@ export function getModeForSection(
     // Removed odd-section-only restriction (was: sectionIndex % 2 === 1) and lowered
     // total length from 5400 (3 min) to 3600 (2 min) so more songs get visual variety.
     if (totalLen > 3600 && sectionLen > AUTO_VARIETY_MIN_SECTION && sectionIndex > 0) {
-      let affinityPool = TRANSITION_AFFINITY[song.defaultMode];
+      const affinityPool = TRANSITION_AFFINITY[song.defaultMode];
       if (affinityPool && affinityPool.length > 0) {
-        if (avoidFeedback) {
-          const nonFb = affinityPool.filter((m) => !SCENE_REGISTRY[m]?.usesFeedback);
-          if (nonFb.length > 0) affinityPool = nonFb;
-        }
         const rng = seededRandom((seed ?? 0) + (trackNumber ?? 0) * 31337 + sectionIndex * 7919);
         return affinityPool[Math.floor(rng() * affinityPool.length)];
       }
@@ -614,11 +588,6 @@ export function getModeForSection(
     }
   }
 
-  // Final fallback: if defaultMode is a feedback shader and we're in early sections,
-  // use its complement instead (which is always a non-feedback shader)
-  if (avoidFeedback && SCENE_REGISTRY[song.defaultMode]?.usesFeedback) {
-    return SCENE_REGISTRY[song.defaultMode].complement;
-  }
   return song.defaultMode;
 }
 
@@ -886,7 +855,7 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
 
         // High energy delta: use DualShaderQuad for organic GPU blend (60 frames)
         const energyDelta = Math.abs(energyAfter - energyBefore);
-        if (false && energyDelta > 0.15) { // DISABLED: DualShaderScene causes GLSL compile failures
+        if (energyDelta > 0.15) {
           const stringsA = getShaderStrings(prevMode);
           const stringsB = getShaderStrings(currentMode);
           if (stringsA && stringsB) {
@@ -943,7 +912,7 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
 
         // High energy delta: use DualShaderQuad for organic GPU blend
         const energyDeltaOut = Math.abs(energyAfter - energyBefore);
-        if (false && energyDeltaOut > 0.15) { // DISABLED: DualShaderScene causes GLSL compile failures
+        if (energyDeltaOut > 0.15) {
           const stringsA = getShaderStrings(currentMode);
           const stringsB = getShaderStrings(nextMode);
           if (stringsA && stringsB) {
@@ -1006,16 +975,13 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
   const isSoloSpotlight = stemInterplayMode === "solo-spotlight";
 
   // Dual-shader activation: sufficient length + moderate energy, or jam/solo stem, or tight-lock interplay
-  // Dual-shader DISABLED: arbitrary shader pairs cause GLSL compile failures
-  // (missing noise functions, wrong argument types, undeclared variables).
-  // Single shader per section is more reliable and still looks great.
-  const shouldDual = false && !dualCooldown && !isSoloSpotlight && (climaxForceDual || interplayForceDual || (sectionLen >= 600 && (
+  const shouldDual = !dualCooldown && !isSoloSpotlight && (climaxForceDual || interplayForceDual || (sectionLen >= 600 && (
     frameEnergy > dualEnergyThreshold ||
     stemSection === "jam" || stemSection === "solo"
   )));
 
   // Solo-spotlight dual: subtle focus blend instead of full suppression
-  const shouldSoloSpotlightDual = false; // disabled with dual-shader
+  const shouldSoloSpotlightDual = isSoloSpotlight && !dualCooldown && sectionLen >= 300 && frameEnergy > 0.06;
 
   if (shouldDual || shouldSoloSpotlightDual) {
     // Prefer transition affinity pool for secondary shader selection
