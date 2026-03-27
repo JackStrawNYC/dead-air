@@ -22,8 +22,8 @@ import { fxaaVert, fxaaFrag } from "../shaders/shared/fxaa.glsl";
 
 /** Era saturation values — previously in EraGrade CSS, now owned by GLSL */
 const ERA_SATURATION: Record<string, number> = {
-  primal: 0.85,
-  classic: 0.95,
+  primal: 0.90,
+  classic: 1.05,
   hiatus: 0.88,
   touch_of_grey: 1.10,
   revival: 0.98,

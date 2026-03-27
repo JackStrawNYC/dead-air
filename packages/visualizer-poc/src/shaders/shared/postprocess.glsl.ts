@@ -415,7 +415,12 @@ ${
     ? `  // Palette cycling: energy-driven hue rotation
   col = paletteCycle(col, uEnergy * 2.0 * uTime * 0.01);
 `
-    : ""
+    : `  // Jam-gated rainbow cycling: psychedelic hue rotation during jams even on non-cycling shaders
+  if (uJamPhase >= 1.0) {
+    float jamCycleSpeed = mix(0.003, 0.008, smoothstep(1.0, 2.0, uJamPhase)) * energy;
+    col = paletteCycle(col, jamCycleSpeed * uTime);
+  }
+`
 }
   // Film grain: animated 2-frame hold
   {

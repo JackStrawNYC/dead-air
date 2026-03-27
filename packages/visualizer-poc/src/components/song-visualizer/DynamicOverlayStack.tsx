@@ -83,12 +83,12 @@ export const DynamicOverlayStack: React.FC<Props> = ({
     : sectionType === "space" ? 0.3
     : sectionType === "chorus" ? 1.2
     : 1.0;
-  const beatPulse = currentFrameData?.beat ? 0.18 * pulseScale : 0;
-  // Drum-stem pulse: more responsive to actual drum hits vs generic onset
+  const beatPulse = currentFrameData?.beat ? 0.30 * pulseScale : 0;
+  // Drum-stem pulse: punchy response to actual drum hits
   const drumPulse = (currentFrameData?.stemDrumOnset ?? 0) > 0.3
-    ? (currentFrameData.stemDrumOnset ?? 0) * 0.12 * pulseScale : 0;
+    ? (currentFrameData.stemDrumOnset ?? 0) * 0.22 * pulseScale : 0;
   const onsetPulse = (currentFrameData?.onset ?? 0) > 0.5
-    ? (currentFrameData.onset ?? 0) * 0.10 * pulseScale : 0;
+    ? (currentFrameData.onset ?? 0) * 0.18 * pulseScale : 0;
   const overlayPulse = 1.0 + beatPulse + Math.max(drumPulse, onsetPulse);
 
   // Compute opacities and apply hard cap on concurrent overlays
@@ -190,8 +190,8 @@ export const DynamicOverlayStack: React.FC<Props> = ({
           const parallaxTime = frame / 30;
           // Skip parallax transform for barely-visible overlays (saves composite cost)
           const applyParallax = opacity >= 0.3;
-          const parallaxX = applyParallax ? Math.sin(parallaxTime * 0.08) * 3 * layerDriftFactor : 0;
-          const parallaxY = applyParallax ? Math.cos(parallaxTime * 0.06 + 1.3) * 2 * layerDriftFactor : 0;
+          const parallaxX = applyParallax ? Math.sin(parallaxTime * 0.12) * 8 * layerDriftFactor : 0;
+          const parallaxY = applyParallax ? Math.cos(parallaxTime * 0.09 + 1.3) * 6 * layerDriftFactor : 0;
           return (
           <div
             key={name}
