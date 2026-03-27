@@ -41,7 +41,7 @@ const ERA_BRIGHTNESS: Record<string, number> = {
 /** Era sepia tint strength — moved from EraGrade CSS to GLSL */
 const ERA_SEPIA: Record<string, number> = {
   primal: 0.15,
-  classic: 0.0,
+  classic: 0.06,
   hiatus: 0.0,
   touch_of_grey: 0.0,
   revival: 0.0,
