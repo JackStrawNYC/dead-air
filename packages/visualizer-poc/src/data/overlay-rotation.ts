@@ -230,9 +230,9 @@ export function buildRotationSchedule(
   markDropoutWindows(windows);
 
   // 4. Select overlays per window
-  // Breathing room: let the shader establish itself before any overlays appear.
-  // First 10 seconds (300 frames @ 30fps) are overlay-free unless it's a segue.
-  const INTRO_BREATHING_FRAMES = 300;
+  // Brief breathing room: shader establishes, then Dead icons arrive fast.
+  // 3 seconds (90 frames @ 30fps) — the show starts NOW.
+  const INTRO_BREATHING_FRAMES = 90;
 
   let previousWindowOverlays = new Set<string>();
   let previousWindowFrames = 0;

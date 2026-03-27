@@ -143,6 +143,8 @@ export const DynamicOverlayStack: React.FC<Props> = ({
             mixBlendMode: "screen",
             filter: desatFilter,
             contain: "layout style paint",
+            transform: "scale(1.5)",
+            transformOrigin: "center center",
           }}
         >
           {glslOverlays.map(({ name, entry: { Component }, opacity }) => (
@@ -167,7 +169,7 @@ export const DynamicOverlayStack: React.FC<Props> = ({
         </div>
       )}
 
-      {/* DOM overlays — rendered above GLSL overlays */}
+      {/* DOM overlays — rendered above GLSL overlays, scaled up for prominence */}
       <div
         style={{
           position: "absolute",
@@ -178,6 +180,8 @@ export const DynamicOverlayStack: React.FC<Props> = ({
             desatFilter ?? "",
           ].filter(Boolean).join(" ") || undefined,
           contain: "layout style paint",
+          transform: "scale(1.5)",
+          transformOrigin: "center center",
         }}
       >
         {domOverlays.map(({ name, entry: { Component, blendMode, layer }, opacity }) => {
