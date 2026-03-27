@@ -337,10 +337,12 @@ export function getModeForSection(
         ? getModeForSection(song, sectionIndex - 1, sections, seed, era, false, usedShaderModes, songIdentity, undefined, frames, songDuration, setNumber, trackNumber, shaderModeLastUsed)
         : song.defaultMode;
 
-      // Energy transition detection: pick from affinity map when energy changes
+      // Visual evolution: change shader on energy transitions OR every 3rd section
+      // to prevent the visual from stagnating during long same-energy stretches
       const energyChanged = prevSection && prevSection.energy !== section.energy;
+      const periodicChange = sectionIndex > 0 && sectionIndex % 3 === 0;
 
-      if (energyChanged) {
+      if (energyChanged || periodicChange) {
         const affinityPool = TRANSITION_AFFINITY[prevMode];
         if (affinityPool && affinityPool.length > 0) {
           // Filter by energy affinity and era
@@ -402,13 +404,13 @@ export function getModeForSection(
 
       // Stem section bias: route shaders by what the band is doing
       if (stemSection === "solo") {
-        const dramaticModes: VisualMode[] = ["inferno", "concert_lighting", "liquid_light"];
+        const dramaticModes: VisualMode[] = ["inferno", "liquid_light", "fractal_flames", "electric_arc"];
         const dramatic = dramaticModes.filter((m) => filteredPool.includes(m));
         if (dramatic.length > 0) {
           filteredPool = [...filteredPool, ...dramatic, ...dramatic]; // 3x weight
         }
       } else if (stemSection === "vocal") {
-        const warmModes: VisualMode[] = ["oil_projector", "vintage_film", "aurora"];
+        const warmModes: VisualMode[] = ["oil_projector", "stained_glass", "aurora"];
         const warm = warmModes.filter((m) => filteredPool.includes(m));
         if (warm.length > 0) {
           filteredPool = [...filteredPool, ...warm, ...warm]; // 3x weight

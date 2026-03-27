@@ -18,7 +18,7 @@ import { TempoProvider } from "../../data/TempoContext";
 import type { EnhancedFrameData, ColorPalette } from "../../data/types";
 
 
-const OVERLAY_GATE_END = 180;  // 6s — overlays hidden until intro elements clear
+const OVERLAY_GATE_END = 60;  // 2s — Dead iconography should be present almost immediately
 
 interface OverlayComponentEntry {
   Component: React.ComponentType<{ frames: EnhancedFrameData[] }>;
@@ -126,7 +126,7 @@ export const DynamicOverlayStack: React.FC<Props> = ({
 
   // Climax desaturation: during peak moments, overlays go monochrome so shader owns color
   const desatFilter = climaxDesaturation > 0.01
-    ? `saturate(${(1 - climaxDesaturation * 0.85).toFixed(3)})`
+    ? `saturate(${(1 - climaxDesaturation * 0.40).toFixed(3)})`
     : undefined;
 
   return (

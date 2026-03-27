@@ -504,17 +504,17 @@ ${
     col = max(vec3(0.0), mhRot * col);
   }
 
-  // Lifted blacks — ALWAYS active. A Dead show never goes dark.
-  // Permanent floor ensures psychedelic color flow even during quiet passages.
+  // Lifted blacks — subtle warm floor. Deep blacks allowed for contrast,
+  // but never pure zero (concerts have ambient stage wash).
   {
     float isBuild = step(0.5, uClimaxPhase) * step(uClimaxPhase, 1.5);
     float isClimaxOrSustain = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5);
     float liftMult = mix(1.0, 0.40, isBuild * uClimaxIntensity) + isClimaxOrSustain * uClimaxIntensity * 0.15;
-    // Always-on base floor — no energy gate. Quiet passages get warm ambient glow.
-    float alwaysFloor = 0.35;
-    // Energy-reactive boost on top of the floor (wider gate, stronger boost)
-    float energyBoost = smoothstep(0.005, 0.15, energy) * 0.25;
-    col = max(col, vec3(0.18, 0.15, 0.22) * (alwaysFloor + energyBoost + liftMult));
+    // Low floor — allow deep blacks for contrast, just prevent pure void
+    float alwaysFloor = 0.10;
+    // Energy-reactive boost: quiet = dark, loud = lifted
+    float energyBoost = smoothstep(0.005, 0.15, energy) * 0.15;
+    col = max(col, vec3(0.08, 0.06, 0.10) * (alwaysFloor + energyBoost + liftMult));
   }
 
   // Darkness texture: subtle micro-noise during near-black passages
