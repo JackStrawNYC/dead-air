@@ -95,7 +95,9 @@ export const DynamicOverlayStack: React.FC<Props> = ({
   const maxConcurrent = MAX_CONCURRENT[energyLevel] ?? 4;
   const inversionMult = 1 - counterpointOverlayInversion;
   // Boost overlay visibility: Dead icons must be clearly visible, not ghosted
-  const baseMult = Math.min(1.0, mediaSuppression * focusSuppression * itOverlayOverride * inversionMult * overlayPulse);
+  // Floor at 0.35 so compound multiplication never makes overlays invisible
+  const rawMult = mediaSuppression * focusSuppression * itOverlayOverride * inversionMult * overlayPulse;
+  const baseMult = Math.min(1.0, Math.max(0.35, rawMult));
 
   // Single-pass: compute opacity, filter, sort, split DOM/GLSL in one loop
   const scored: { name: string; entry: OverlayComponentEntry; opacity: number }[] = [];

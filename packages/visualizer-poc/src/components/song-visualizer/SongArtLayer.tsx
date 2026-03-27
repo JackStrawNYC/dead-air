@@ -47,11 +47,11 @@ export const SongArtLayer: React.FC<SongArtProps> = ({ src, suppressionFactor, h
   const segueFade = segueIn && frame < 150 ? (frame - 90) / 60 : 1;
 
   // Energy-reactive wash: quiet → 0.40, peak → 0.10
-  // Art visible during quiet passages, fades as shaders take over
+  // Art visible throughout — real imagery grounds the psychedelic visuals
   const energyWash = interpolate(
     energy,
     [0.03, 0.20, 0.40],
-    [0.50, 0.30, 0.12],
+    [0.55, 0.40, 0.25],
     { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
   );
 

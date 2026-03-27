@@ -14,8 +14,9 @@
       "defaultMode": "fractal_flames",
       "audioFile": "gd77-05-08s1t02.mp3",
       "palette": {
-        "primary": 15,
-        "secondary": 45
+        "primary": 20,
+        "secondary": 200,
+        "saturation": 1.0
       },
       "songArt": "assets/song-art/s1t02.png",
       "overlayOverrides": {
@@ -33,8 +34,9 @@
       "defaultMode": "liquid_light",
       "audioFile": "gd77-05-08s1t03.mp3",
       "palette": {
-        "primary": 220,
-        "secondary": 280
+        "primary": 270,
+        "secondary": 45,
+        "saturation": 0.95
       },
       "songArt": "assets/song-art/s1t03.png",
       "overlayOverrides": {
@@ -52,8 +54,9 @@
       "defaultMode": "lava_flow",
       "audioFile": "gd77-05-08s1t04.mp3",
       "palette": {
-        "primary": 30,
-        "secondary": 60
+        "primary": 25,
+        "secondary": 180,
+        "saturation": 0.9
       },
       "songArt": "assets/song-art/s1t04.png",
       "overlayOverrides": {
@@ -71,7 +74,8 @@
       "audioFile": "gd77-05-08s1t05.mp3",
       "palette": {
         "primary": 330,
-        "secondary": 200
+        "secondary": 120,
+        "saturation": 1.0
       },
       "songArt": "assets/song-art/s1t05.png",
       "overlayOverrides": {
@@ -89,8 +93,9 @@
       "defaultMode": "inferno",
       "audioFile": "gd77-05-08s1t06.mp3",
       "palette": {
-        "primary": 120,
-        "secondary": 240
+        "primary": 15,
+        "secondary": 240,
+        "saturation": 1.0
       },
       "songArt": "assets/song-art/s1t06.png",
       "overlayOverrides": {
@@ -108,8 +113,9 @@
       "defaultMode": "electric_arc",
       "audioFile": "gd77-05-08s1t07.mp3",
       "palette": {
-        "primary": 10,
-        "secondary": 40
+        "primary": 0,
+        "secondary": 220,
+        "saturation": 1.0
       },
       "songArt": "assets/song-art/s1t07.png",
       "overlayOverrides": {
@@ -128,7 +134,8 @@
       "audioFile": "gd77-05-08s1t08.mp3",
       "palette": {
         "primary": 280,
-        "secondary": 60
+        "secondary": 50,
+        "saturation": 1.0
       },
       "songArt": "assets/song-art/s1t08.png",
       "segueInto": true,
@@ -146,9 +153,9 @@
       "defaultMode": "feedback_recursion",
       "audioFile": "gd77-05-08s1t09.mp3",
       "palette": {
-        "primary": 20,
-        "secondary": 50,
-        "saturation": 0.9
+        "primary": 260,
+        "secondary": 30,
+        "saturation": 0.95
       },
       "songArt": "assets/song-art/s1t09.png",
       "overlayOverrides": {
@@ -166,8 +173,9 @@
       "defaultMode": "stained_glass",
       "audioFile": "gd77-05-08s1t10.mp3",
       "palette": {
-        "primary": 25,
-        "secondary": 210
+        "primary": 30,
+        "secondary": 300,
+        "saturation": 0.95
       },
       "songArt": "assets/song-art/s1t10.png",
       "overlayOverrides": {
@@ -185,8 +193,9 @@
       "defaultMode": "oil_projector",
       "audioFile": "gd77-05-08s1t11.mp3",
       "palette": {
-        "primary": 35,
-        "secondary": 60
+        "primary": 40,
+        "secondary": 190,
+        "saturation": 0.9
       },
       "songArt": "assets/song-art/s1t11.png",
       "overlayOverrides": {
@@ -203,8 +212,9 @@
       "defaultMode": "deep_ocean",
       "audioFile": "gd77-05-08s1t12.mp3",
       "palette": {
-        "primary": 180,
-        "secondary": 240
+        "primary": 195,
+        "secondary": 330,
+        "saturation": 0.85
       },
       "songArt": "assets/song-art/s1t12.png",
       "overlayOverrides": {
@@ -222,8 +232,9 @@
       "defaultMode": "mandala_engine",
       "audioFile": "gd77-05-08s1t13.mp3",
       "palette": {
-        "primary": 300,
-        "secondary": 60
+        "primary": 310,
+        "secondary": 60,
+        "saturation": 1.0
       },
       "songArt": "assets/song-art/s1t13.png",
       "overlayOverrides": {
@@ -242,8 +253,8 @@
       "audioFile": "gd77-05-08s2t02.mp3",
       "palette": {
         "primary": 0,
-        "secondary": 30,
-        "saturation": 0.9
+        "secondary": 150,
+        "saturation": 1.0
       },
       "songArt": "assets/song-art/s2t02.png",
       "segueInto": true,
@@ -263,8 +274,8 @@
       "audioFile": "gd77-05-08s2t03.mp3",
       "palette": {
         "primary": 15,
-        "secondary": 45,
-        "saturation": 0.85
+        "secondary": 270,
+        "saturation": 1.0
       },
       "songArt": "assets/song-art/s2t03.png",
       "overlayOverrides": {
@@ -283,7 +294,8 @@
       "audioFile": "gd77-05-08s2t04.mp3",
       "palette": {
         "primary": 260,
-        "secondary": 190
+        "secondary": 120,
+        "saturation": 0.85
       },
       "songArt": "assets/song-art/s2t04.png",
       "overlayOverrides": {
@@ -302,7 +314,8 @@
       "audioFile": "gd77-05-08s2t05.mp3",
       "palette": {
         "primary": 160,
-        "secondary": 280
+        "secondary": 340,
+        "saturation": 1.0
       },
       "songArt": "assets/song-art/s2t05.png",
       "segueInto": true,
@@ -322,7 +335,8 @@
       "audioFile": "gd77-05-08s2t06.mp3",
       "palette": {
         "primary": 350,
-        "secondary": 30
+        "secondary": 170,
+        "saturation": 1.0
       },
       "songArt": "assets/song-art/s2t06.png",
       "segueInto": true,
@@ -342,7 +356,8 @@
       "audioFile": "gd77-05-08s2t07.mp3",
       "palette": {
         "primary": 240,
-        "secondary": 180
+        "secondary": 60,
+        "saturation": 0.8
       },
       "songArt": "assets/song-art/s2t07.png",
       "segueInto": true,
@@ -361,7 +376,7 @@
       "audioFile": "gd77-05-08s2t08.mp3",
       "palette": {
         "primary": 200,
-        "secondary": 270,
+        "secondary": 30,
         "saturation": 0.85
       },
       "songArt": "assets/song-art/s2t08.png",
@@ -381,7 +396,8 @@
       "audioFile": "gd77-05-08s2t09.mp3",
       "palette": {
         "primary": 50,
-        "secondary": 330
+        "secondary": 280,
+        "saturation": 1.0
       },
       "songArt": "assets/song-art/s2t09.png",
       "overlayOverrides": {
