@@ -32,8 +32,8 @@ export const morphogenesisFrag = /* glsl */ `
 precision highp float;
 
 ${sharedUniformsGLSL}
-
 uniform sampler2D uPrevFrame;
+
 
 ${noiseGLSL}
 

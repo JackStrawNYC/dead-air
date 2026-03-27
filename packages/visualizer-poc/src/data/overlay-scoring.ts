@@ -124,8 +124,13 @@ export function scoreOverlayForWindow(
 ): number {
   let score = 0.5;
 
-  // Tier bonus
-  if (entry.tier === "A") score += 0.15;
+  // Tier bonus — A-tier Dead imagery is the star
+  if (entry.tier === "A") score += 0.25;
+
+  // Dead-culture tag bonus: all Dead-themed overlays get a universal boost
+  if (entry.tags?.includes(BAND_CONFIG.overlayTags.culture)) {
+    score += 0.10;
+  }
 
   // Energy band match
   if (entry.energyBand !== "any") {

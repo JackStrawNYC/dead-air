@@ -221,8 +221,8 @@ export function computeITResponse(
       // Breaking: sudden drop -- flash + reset
       if (framesSinceUnlock < BREAK_FLASH_FRAMES + BREAK_RECOVERY_FRAMES) {
         let flashIntensity = 0;
-        if (framesSinceUnlock === 0) flashIntensity = 0.65;
-        else if (framesSinceUnlock === 1) flashIntensity = 0.35;
+        if (framesSinceUnlock === 0) flashIntensity = 0.85;
+        else if (framesSinceUnlock === 1) flashIntensity = 0.50;
 
         const recoveryProgress = Math.max(0, framesSinceUnlock - BREAK_FLASH_FRAMES) / BREAK_RECOVERY_FRAMES;
         // Flash hue: use dominant chroma at the break point for chromatic burst

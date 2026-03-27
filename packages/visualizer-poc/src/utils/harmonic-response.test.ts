@@ -180,10 +180,10 @@ describe("computeHarmonicResponse", () => {
     // Strong resolution scenario
     const resSnapshot = mockSnapshot({ chordIndex: 7, harmonicTension: 0.0 });
     const resResult = computeHarmonicResponse(frames, 200, resSnapshot);
-    expect(resResult.brightnessOffset).toBeGreaterThanOrEqual(-0.04);
-    expect(resResult.brightnessOffset).toBeLessThanOrEqual(0.06);
-    expect(resResult.saturationMult).toBeGreaterThanOrEqual(0.92);
-    expect(resResult.saturationMult).toBeLessThanOrEqual(1.08);
+    expect(resResult.brightnessOffset).toBeGreaterThanOrEqual(-0.08);
+    expect(resResult.brightnessOffset).toBeLessThanOrEqual(0.12);
+    expect(resResult.saturationMult).toBeGreaterThanOrEqual(0.85);
+    expect(resResult.saturationMult).toBeLessThanOrEqual(1.15);
     expect(resResult.resolutionStrength).toBeGreaterThanOrEqual(0);
     expect(resResult.resolutionStrength).toBeLessThanOrEqual(1);
     expect(resResult.departureStrength).toBeGreaterThanOrEqual(0);
@@ -192,10 +192,10 @@ describe("computeHarmonicResponse", () => {
     // Strong departure scenario
     const depSnapshot = mockSnapshot({ chordIndex: 6, harmonicTension: 1.0 });
     const depResult = computeHarmonicResponse(frames, 200, depSnapshot);
-    expect(depResult.brightnessOffset).toBeGreaterThanOrEqual(-0.04);
-    expect(depResult.brightnessOffset).toBeLessThanOrEqual(0.06);
-    expect(depResult.saturationMult).toBeGreaterThanOrEqual(0.92);
-    expect(depResult.saturationMult).toBeLessThanOrEqual(1.08);
+    expect(depResult.brightnessOffset).toBeGreaterThanOrEqual(-0.08);
+    expect(depResult.brightnessOffset).toBeLessThanOrEqual(0.12);
+    expect(depResult.saturationMult).toBeGreaterThanOrEqual(0.85);
+    expect(depResult.saturationMult).toBeLessThanOrEqual(1.15);
     expect(depResult.resolutionStrength).toBeGreaterThanOrEqual(0);
     expect(depResult.resolutionStrength).toBeLessThanOrEqual(1);
     expect(depResult.departureStrength).toBeGreaterThanOrEqual(0);

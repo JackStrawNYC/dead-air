@@ -132,9 +132,9 @@ const CROSSFADE_FRAMES_DEFAULT = 120;
  * dropout silence and peak flood creates the show's visceral impact.
  */
 const ENERGY_COUNTS: Record<string, { min: number; max: number }> = {
-  low:  { min: 1,  max: 1 },   // quiet: single atmospheric layer, let the shader breathe
-  mid:  { min: 1,  max: 2 },   // moderate: one or two for texture depth
-  high: { min: 2,  max: 3 },   // peaks: tasteful A-tier density, not a firehose
+  low:  { min: 2,  max: 2 },   // quiet: gentle wash, Dead iconography always present
+  mid:  { min: 2,  max: 3 },   // moderate: texture depth with character overlays
+  high: { min: 3,  max: 5 },   // peaks: vivid Dead imagery flood
 };
 
 /** A-tier overlays: the only overlays allowed during peaks (high energy).

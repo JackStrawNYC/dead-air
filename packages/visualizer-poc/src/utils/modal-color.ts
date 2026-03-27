@@ -13,8 +13,8 @@
 import type { EnhancedFrameData } from "../data/types";
 
 export interface ModalColorResult {
-  hueShift: number; // degrees (-40 to +25)
-  satOffset: number; // -0.10 to +0.08
+  hueShift: number; // degrees (-60 to +37)
+  satOffset: number; // -0.13 to +0.104
   mode: string | null; // detected mode name or null
   confidence: number; // 0-1
 }
@@ -40,15 +40,15 @@ const MODE_TEMPLATES: Record<string, readonly number[]> = {
   locrian: [1, 1, 0, 1, 0, 1, 1, 0, 1, 0, 1, 0],
 };
 
-/** Mode → visual color mapping */
+/** Mode → visual color mapping (1.5x hue, 1.3x saturation for perceptible shifts) */
 const MODE_COLORS: Record<string, { hueShift: number; satOffset: number }> = {
-  ionian: { hueShift: 10, satOffset: 0.05 },
-  dorian: { hueShift: -20, satOffset: 0.03 },
-  phrygian: { hueShift: -40, satOffset: 0.05 },
-  lydian: { hueShift: 25, satOffset: 0.06 },
-  mixolydian: { hueShift: 15, satOffset: 0.08 },
-  aeolian: { hueShift: -30, satOffset: -0.03 },
-  locrian: { hueShift: 0, satOffset: -0.1 },
+  ionian: { hueShift: 15, satOffset: 0.065 },
+  dorian: { hueShift: -30, satOffset: 0.039 },
+  phrygian: { hueShift: -60, satOffset: 0.065 },
+  lydian: { hueShift: 37, satOffset: 0.078 },
+  mixolydian: { hueShift: 22, satOffset: 0.104 },
+  aeolian: { hueShift: -45, satOffset: -0.039 },
+  locrian: { hueShift: 0, satOffset: -0.13 },
 };
 
 /**

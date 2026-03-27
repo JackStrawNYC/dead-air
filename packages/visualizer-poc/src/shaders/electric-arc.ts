@@ -32,8 +32,8 @@ export const electricArcFrag = /* glsl */ `
 precision highp float;
 
 ${sharedUniformsGLSL}
-
 uniform sampler2D uPrevFrame;
+
 
 ${noiseGLSL}
 

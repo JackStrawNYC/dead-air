@@ -14,9 +14,9 @@ import type { EnhancedFrameData } from "../data/types";
 import type { AudioSnapshot } from "./audio-reactive";
 
 export interface HarmonicResponse {
-  /** Brightness offset applied to the scene (-0.04 to +0.06) */
+  /** Brightness offset applied to the scene (-0.08 to +0.12) */
   brightnessOffset: number;
-  /** Saturation multiplier applied to the scene (0.92 to 1.08) */
+  /** Saturation multiplier applied to the scene (0.85 to 1.15) */
   saturationMult: number;
   /** Strength of resolution feeling (0-1) */
   resolutionStrength: number;
@@ -155,15 +155,15 @@ export function computeHarmonicResponse(
     departureStrength = Math.min(1, Math.max(0, departureStrength));
   }
 
-  // Interpolate brightness offset: resolution → +0.06, departure → -0.04
-  const brightnessOffset = resolutionStrength * 0.06 - departureStrength * 0.04;
+  // Interpolate brightness offset: resolution → +0.12, departure → -0.08
+  const brightnessOffset = resolutionStrength * 0.12 - departureStrength * 0.08;
 
-  // Interpolate saturation multiplier: resolution → 1.08, departure → 0.92
-  const saturationMult = 1 + resolutionStrength * 0.08 - departureStrength * 0.08;
+  // Interpolate saturation multiplier: resolution → 1.15, departure → 0.85
+  const saturationMult = 1 + resolutionStrength * 0.15 - departureStrength * 0.15;
 
   return {
-    brightnessOffset: Math.max(-0.04, Math.min(0.06, brightnessOffset)),
-    saturationMult: Math.max(0.92, Math.min(1.08, saturationMult)),
+    brightnessOffset: Math.max(-0.08, Math.min(0.12, brightnessOffset)),
+    saturationMult: Math.max(0.85, Math.min(1.15, saturationMult)),
     resolutionStrength,
     departureStrength,
   };

@@ -155,13 +155,13 @@ function findPeakRegion(contour: number[]): number {
 function computeColorTemperature(phase: JamPhase, progress: number): number {
   switch (phase) {
     case "exploration":
-      return -0.4 + progress * 0.2;       // -0.4 → -0.2 (cool, slowly warming)
+      return -0.6 + progress * 0.2;       // -0.6 → -0.4 (deep cool, slowly warming)
     case "building":
-      return -0.2 + progress * 0.7;       // -0.2 → +0.5 (warming steadily)
+      return -0.4 + progress * 0.9;       // -0.4 → +0.5 (warming steadily)
     case "peak_space":
-      return 0.5 + progress * 0.3;        // +0.5 → +0.8 (hot)
+      return 0.5 + progress * 0.5;        // +0.5 → +1.0 (scorching hot)
     case "resolution":
-      return 0.8 - progress * 1.0;        // +0.8 → -0.2 (cooling down)
+      return 1.0 - progress * 1.4;        // +1.0 → -0.4 (cooling down)
   }
 }
 
@@ -169,13 +169,13 @@ function computeColorTemperature(phase: JamPhase, progress: number): number {
 function computeDensityMult(phase: JamPhase, progress: number): number {
   switch (phase) {
     case "exploration":
-      return 0.85 + progress * 0.10;      // gentle presence from the start
+      return 0.50 + progress * 0.20;      // sparse: let the shader breathe
     case "building":
-      return 0.90 + progress * 0.20;      // filling steadily
+      return 0.70 + progress * 0.40;      // filling steadily toward flood
     case "peak_space":
-      return 1.10 + progress * 0.15;      // dense, maximum
+      return 1.20 + progress * 0.30;      // flood: maximum iconic overlay density
     case "resolution":
-      return 1.25 - progress * 0.30;      // gradual thinning
+      return 1.50 - progress * 0.55;      // gradual thinning back to earth
   }
 }
 

@@ -32,8 +32,8 @@ export const myceliumNetworkFrag = /* glsl */ `
 precision highp float;
 
 ${sharedUniformsGLSL}
-
 uniform sampler2D uPrevFrame;
+
 
 ${noiseGLSL}
 

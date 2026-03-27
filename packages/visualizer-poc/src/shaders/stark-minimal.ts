@@ -70,16 +70,16 @@ void main() {
   // Breathing circle — radius tied to RMS (smoothstep eased)
   float breathPhase = sin(t * 2.0);
   float easedBreath = breathPhase * breathPhase * (3.0 - 2.0 * abs(breathPhase)) * sign(breathPhase);
-  float circleR = 0.15 + (uRms + uFastEnergy * 0.5) * 0.12 + easedBreath * 0.04 + pitchRadius;
-  float circleDist = sdCircle(p, circleR);
-  float circleEdge = smoothstep(px, 0.0, abs(circleDist));
-  float circleFill = smoothstep(0.02, 0.0, circleDist) * 0.03;
-
   // --- Phase 1: New uniform integrations ---
   float chromaHueMod = uChromaHue * 0.25;
   float chordHue = float(int(uChordIndex)) / 24.0 * 0.15;
   float stabilityGeo = uBeatStability;  // high=geometric, low=organic
   float pitchRadius = uMelodicPitch * 0.05;  // melodic pitch affects circle radius
+
+  float circleR = 0.15 + (uRms + uFastEnergy * 0.5) * 0.12 + easedBreath * 0.04 + pitchRadius;
+  float circleDist = sdCircle(p, circleR);
+  float circleEdge = smoothstep(px, 0.0, abs(circleDist));
+  float circleFill = smoothstep(0.02, 0.0, circleDist) * 0.03;
 
   // Accent color from palette (used sparingly)
   float acHue = hsvToCosineHue(uPalettePrimary) + chromaHueMod + chordHue;

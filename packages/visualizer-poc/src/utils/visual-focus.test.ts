@@ -3,22 +3,22 @@ import { computeVisualFocus } from "./visual-focus";
 import type { ClimaxPhase } from "./climax-state";
 
 describe("computeVisualFocus", () => {
-  it("climax: shader at full, art gone, overlays at minimal opacity", () => {
+  it("climax: shader at full, art gone, overlays present for Dead iconography", () => {
     const state = computeVisualFocus("climax", 1.0, 100);
     expect(state.shaderOpacity).toBe(1.0);
     expect(state.artOpacity).toBe(0.0); // art fully suppressed during climax
-    // Overlays near-zero during climax (0.10 base + up to 0.05 pulse breathing)
-    expect(state.overlayOpacity).toBeLessThanOrEqual(0.20);
+    // Overlays visible during climax (0.50 base + up to 0.05 pulse breathing)
+    expect(state.overlayOpacity).toBeLessThanOrEqual(0.60);
     expect(state.overlayOpacity).toBeGreaterThan(0);
     expect(state.grainOpacity).toBeLessThanOrEqual(0.5);
   });
 
-  it("sustain: shader near full, overlays at minimal opacity", () => {
+  it("sustain: shader near full, overlays present", () => {
     const state = computeVisualFocus("sustain", 1.0, 100);
     expect(state.shaderOpacity).toBeGreaterThanOrEqual(0.85);
     expect(state.artOpacity).toBe(0.0); // art fully suppressed during sustain
-    // Overlays minimal during sustain (0.15 base + up to 0.05 pulse breathing)
-    expect(state.overlayOpacity).toBeLessThanOrEqual(0.25);
+    // Overlays present during sustain (0.55 base + up to 0.05 pulse breathing)
+    expect(state.overlayOpacity).toBeLessThanOrEqual(0.65);
     expect(state.overlayOpacity).toBeGreaterThan(0);
   });
 

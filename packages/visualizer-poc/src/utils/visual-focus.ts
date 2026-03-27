@@ -29,11 +29,11 @@ export interface VisualFocusState {
  *  Idle: overlays at 0.25 (was 0.35) — let darkness breathe.
  *  Release: warm afterglow, overlays return as emotional texture. */
 const PHASE_FOCUS: Record<ClimaxPhase, VisualFocusState> = {
-  climax:  { shaderOpacity: 1.0,  artOpacity: 0.0,  overlayOpacity: 0.10, grainOpacity: 0.5 },
-  sustain: { shaderOpacity: 0.95, artOpacity: 0.0,  overlayOpacity: 0.15, grainOpacity: 0.6 },
-  build:   { shaderOpacity: 0.85, artOpacity: 0.12, overlayOpacity: 0.12, grainOpacity: 0.8 },
-  release: { shaderOpacity: 0.75, artOpacity: 0.35, overlayOpacity: 0.25, grainOpacity: 1.0 },
-  idle:    { shaderOpacity: 0.85, artOpacity: 0.25, overlayOpacity: 0.25, grainOpacity: 1.0 },
+  climax:  { shaderOpacity: 1.0,  artOpacity: 0.0,  overlayOpacity: 0.50, grainOpacity: 0.5 },
+  sustain: { shaderOpacity: 0.95, artOpacity: 0.0,  overlayOpacity: 0.55, grainOpacity: 0.6 },
+  build:   { shaderOpacity: 0.85, artOpacity: 0.12, overlayOpacity: 0.60, grainOpacity: 0.8 },
+  release: { shaderOpacity: 0.75, artOpacity: 0.35, overlayOpacity: 0.70, grainOpacity: 1.0 },
+  idle:    { shaderOpacity: 0.85, artOpacity: 0.25, overlayOpacity: 0.70, grainOpacity: 1.0 },
 };
 
 function lerp(a: number, b: number, t: number): number {

@@ -79,6 +79,7 @@ float nebula(vec2 uv, float t) {
 void main() {
   vec2 uv = (gl_FragCoord.xy - 0.5 * uResolution) / min(uResolution.x, uResolution.y);
   float t = uDynamicTime * 0.08;
+  float energy = clamp(uEnergy, 0.0, 1.0);
 
   // Section-type modulation
   float sectionT = uSectionType;

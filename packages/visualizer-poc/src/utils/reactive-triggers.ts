@@ -41,7 +41,7 @@ export interface ReactiveState {
 // ─── Constants ───
 
 const HOLD_FRAMES = 120;     // 4s — how long a trigger stays active
-const COOLDOWN_FRAMES = 300; // 10s — minimum gap between triggers
+const COOLDOWN_FRAMES = 180; // 6s — tighter gap between triggers for more "oh shit" moments
 const SCAN_FRAMES = 600;     // 20s — backward scan window for baseline
 
 // ─── Trigger → Visual Mappings ───

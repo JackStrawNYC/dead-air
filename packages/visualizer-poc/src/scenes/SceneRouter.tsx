@@ -25,7 +25,6 @@ import { estimateImprovisationScore } from "../utils/improv-detector";
 import { selectTransitionStyle } from "../utils/transition-selector";
 import { getSectionSpectralFamily } from "../utils/spectral-section";
 import { getShaderStrings } from "../shaders/shader-strings";
-import { DualShaderScene } from "./DualShaderScene";
 import type { DualBlendMode } from "../components/DualShaderQuad";
 import type { JamEvolution, JamPhaseBoundaries } from "../utils/jam-evolution";
 import { getJamPhaseMode, JAM_PHASE_INDEX } from "../utils/jam-evolution";
@@ -780,14 +779,7 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
               undefined,
               "jam",
             );
-            return (
-              <DualShaderScene
-                frames={frames} sections={sections} palette={palette} tempo={tempo} jamDensity={jamDensity}
-                vertA={stringsA.vert} fragA={stringsA.frag}
-                vertB={stringsB.vert} fragB={stringsB.frag}
-                blendMode={blendMode} blendProgress={Math.min(0.40, peakBlend)}
-              />
-            );
+            return <>{renderMode(jpMode, frames, sections, palette, tempo, undefined, jamDensity)}</>;
           }
         }
       }
@@ -812,14 +804,7 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
           const jamFrameData = frames[Math.min(frame, frames.length - 1)];
           const jamBeatPulse = (jamFrameData?.beat ? 0.12 : 0) * Math.max(0.3, frameEnergy);
           const blendProgress = (baseJamBlend + arcJamBlend + jamBeatPulse) * phaseRamp;
-          return (
-            <DualShaderScene
-              frames={frames} sections={sections} palette={palette} tempo={tempo} jamDensity={jamDensity}
-              vertA={stringsA.vert} fragA={stringsA.frag}
-              vertB={stringsB.vert} fragB={stringsB.frag}
-              blendMode={blendMode} blendProgress={Math.min(0.50, blendProgress)}
-            />
-          );
+          return <>{renderMode(jpMode, frames, sections, palette, tempo, undefined, jamDensity)}</>;
         }
       }
 
@@ -863,15 +848,7 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
             const gpuDistFromStart = frame - crossfadeStart;
             if (gpuDistFromStart >= 0 && gpuDistFromStart < GPU_CROSSFADE_LEN) {
               const gpuProgress = gpuDistFromStart / GPU_CROSSFADE_LEN;
-              const blendMode = selectDualBlendMode(frameEnergy, currentSection?.energy, undefined);
-              return (
-                <DualShaderScene
-                  frames={frames} sections={sections} palette={palette} tempo={tempo} jamDensity={jamDensity}
-                  vertA={stringsA.vert} fragA={stringsA.frag}
-                  vertB={stringsB.vert} fragB={stringsB.frag}
-                  blendMode={blendMode} blendProgress={gpuProgress}
-                />
-              );
+              return <>{renderMode(currentMode, frames, sections, palette, tempo, undefined, jamDensity)}</>;
             }
           }
         }
@@ -920,15 +897,7 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
             const gpuDistToEnd = crossfadeEnd - frame;
             if (gpuDistToEnd >= 0 && gpuDistToEnd < GPU_CROSSFADE_LEN) {
               const gpuProgress = 1 - gpuDistToEnd / GPU_CROSSFADE_LEN;
-              const blendMode = selectDualBlendMode(frameEnergy, currentSection?.energy, undefined);
-              return (
-                <DualShaderScene
-                  frames={frames} sections={sections} palette={palette} tempo={tempo} jamDensity={jamDensity}
-                  vertA={stringsA.vert} fragA={stringsA.frag}
-                  vertB={stringsB.vert} fragB={stringsB.frag}
-                  blendMode={blendMode} blendProgress={gpuProgress}
-                />
-              );
+              return <>{renderMode(currentMode, frames, sections, palette, tempo, undefined, jamDensity)}</>;
             }
           }
         }
@@ -1032,14 +1001,7 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
         blendProgress = Math.min(dualBlendCap, blendProgress);
       }
 
-      mainScene = (
-        <DualShaderScene
-          frames={frames} sections={sections} palette={palette} tempo={tempo} jamDensity={jamDensity}
-          vertA={stringsA.vert} fragA={stringsA.frag}
-          vertB={stringsB.vert} fragB={stringsB.frag}
-          blendMode={blendMode} blendProgress={blendProgress}
-        />
-      );
+      mainScene = renderMode(currentMode, frames, sections, palette, tempo, undefined, jamDensity);
     } else {
       mainScene = renderMode(currentMode, frames, sections, palette, tempo, undefined, jamDensity);
     }

@@ -37,8 +37,8 @@ export const signalDecayFrag = /* glsl */ `
 precision highp float;
 
 ${sharedUniformsGLSL}
-
 uniform sampler2D uPrevFrame;
+
 
 ${noiseGLSL}
 

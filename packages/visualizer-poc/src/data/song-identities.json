@@ -424,19 +424,19 @@
   },
   "morningdew": {
     "preferredModes": [
+      "deep_ocean",
       "stark_minimal",
       "crystal_cavern",
-      "deep_ocean",
       "feedback_recursion",
-      "mandala_engine",
+      "volumetric_smoke",
       "cosmic_dust",
-      "volumetric_smoke"
+      "inferno"
     ],
     "palette": {
-      "primary": 210,
-      "secondary": 30,
-      "saturation": 0.7,
-      "brightness": 0.9
+      "primary": 200,
+      "secondary": 15,
+      "saturation": 0.55,
+      "brightness": 0.75
     },
     "overlayBoost": [
       "RoseOverlay",
@@ -502,12 +502,12 @@
   },
   "notfadeaway": {
     "preferredModes": [
-      "concert_lighting",
-      "spectral_analyzer",
-      "tie_dye",
+      "mandala_engine",
       "kaleidoscope",
-      "liquid_light",
-      "inferno"
+      "tie_dye",
+      "inferno",
+      "sacred_geometry",
+      "fractal_zoom"
     ],
     "palette": {
       "primary": 40,
@@ -532,19 +532,19 @@
   },
   "estimatedprophet": {
     "preferredModes": [
-      "cosmic_voyage",
-      "crystal_cavern",
+      "storm",
       "void_light",
       "feedback_recursion",
-      "morphogenesis",
+      "cosmic_voyage",
       "fractal_zoom",
       "volumetric_smoke",
+      "morphogenesis",
       "bioluminescence"
     ],
     "palette": {
-      "primary": 270,
-      "secondary": 200,
-      "saturation": 0.75
+      "primary": 260,
+      "secondary": 180,
+      "saturation": 0.65
     },
     "overlayBoost": [
       "DarkStarPortal",
@@ -1270,16 +1270,16 @@
       "deep_ocean",
       "aurora",
       "liquid_light",
-      "feedback_recursion",
+      "bioluminescence",
       "crystalline_growth",
       "smoke_rings",
-      "stained_glass"
+      "coral_reef"
     ],
     "palette": {
-      "primary": 180,
-      "secondary": 300,
-      "saturation": 0.60,
-      "brightness": 0.88
+      "primary": 195,
+      "secondary": 280,
+      "saturation": 0.55,
+      "brightness": 0.82
     },
     "overlayBoost": [
       "Fireflies",
@@ -1307,12 +1307,12 @@
   },
   "dancininthestreet": {
     "preferredModes": [
+      "neon_grid",
       "mandala_engine",
       "inferno",
-      "liquid_light",
       "fractal_flames",
       "fluid_light",
-      "concert_lighting"
+      "electric_arc"
     ],
     "palette": {
       "primary": 350,

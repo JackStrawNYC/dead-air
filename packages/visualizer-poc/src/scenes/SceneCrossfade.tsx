@@ -36,74 +36,29 @@ export const SceneCrossfade: React.FC<Props> = ({ progress, outgoing, incoming, 
     }
   }
 
-  // --- Dissolve style ---
-  if (style === "dissolve") {
+  // --- Dissolve/Morph style ---
+  // Only render ONE scene at a time to prevent WebGL feedback loop
+  // from dual FullscreenQuad render targets on ANGLE backend.
+  if (style === "dissolve" || style === "morph") {
     return (
       <div style={{ position: "relative", width: "100%", height: "100%" }}>
-        {(1 - progress) > 0.01 && (
-          <div style={{ position: "absolute", inset: 0, opacity: 1 - progress }}>
-            {outgoing}
-          </div>
-        )}
-        {progress > 0.01 && (
-          <div style={{ position: "absolute", inset: 0, opacity: progress }}>
-            {incoming}
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  // --- Morph style ---
-  if (style === "morph") {
-    // Both scenes visible at 50% for middle third
-    const outOpacity = interpolate(progress, [0, 0.33, 0.67, 1], [1, 0.5, 0.5, 0], {
-      extrapolateLeft: "clamp", extrapolateRight: "clamp",
-    });
-    const inOpacity = interpolate(progress, [0, 0.33, 0.67, 1], [0, 0.5, 0.5, 1], {
-      extrapolateLeft: "clamp", extrapolateRight: "clamp",
-    });
-    return (
-      <div style={{ position: "relative", width: "100%", height: "100%" }}>
-        {outOpacity > 0.01 && (
-          <div style={{ position: "absolute", inset: 0, opacity: outOpacity }}>
-            {outgoing}
-          </div>
-        )}
-        {inOpacity > 0.01 && (
-          <div style={{ position: "absolute", inset: 0, opacity: inOpacity }}>
-            {incoming}
-          </div>
-        )}
+        <div style={{ position: "absolute", inset: 0 }}>
+          {progress < 0.5 ? outgoing : incoming}
+        </div>
       </div>
     );
   }
 
   // --- Void style ---
   if (style === "void") {
-    // Fade to black then fade in (no white flash)
-    const outOpacity = interpolate(progress, [0, 0.45], [1, 0], {
-      extrapolateLeft: "clamp", extrapolateRight: "clamp",
-    });
-    const inOpacity = interpolate(progress, [0.55, 1], [0, 1], {
-      extrapolateLeft: "clamp", extrapolateRight: "clamp",
-      easing: Easing.out(Easing.cubic),
-    });
     const blackOpacity = interpolate(progress, [0.3, 0.5, 0.7], [0, 0.9, 0], {
       extrapolateLeft: "clamp", extrapolateRight: "clamp",
     });
     return (
       <div style={{ position: "relative", width: "100%", height: "100%" }}>
-        {outOpacity > 0.01 && (
-          <div style={{ position: "absolute", inset: 0, opacity: outOpacity }}>
-            {outgoing}
-          </div>
-        )}
-        {inOpacity > 0.01 && (
-          <div style={{ position: "absolute", inset: 0, opacity: inOpacity }}>
-            {incoming}
-          </div>
-        )}
+        <div style={{ position: "absolute", inset: 0 }}>
+          {progress < 0.5 ? outgoing : incoming}
+        </div>
         {blackOpacity > 0.01 && (
           <div style={{ position: "absolute", inset: 0, backgroundColor: "#000", opacity: blackOpacity, pointerEvents: "none" }} />
         )}
@@ -113,35 +68,18 @@ export const SceneCrossfade: React.FC<Props> = ({ progress, outgoing, incoming, 
 
   // --- Distortion style ---
   if (style === "distortion") {
-    const outOpacity = interpolate(progress, [0, 0.5], [1, 0], {
-      extrapolateLeft: "clamp", extrapolateRight: "clamp",
-    });
-    const inOpacity = interpolate(progress, [0.5, 1], [0, 1], {
-      extrapolateLeft: "clamp", extrapolateRight: "clamp",
-    });
-    // Scanline displacement peaks at midpoint
     const displacementIntensity = interpolate(progress, [0, 0.5, 1], [0, 1, 0], {
       extrapolateLeft: "clamp", extrapolateRight: "clamp",
     });
     const displacement = Math.sin(frame * 0.3) * displacementIntensity * 20;
     return (
       <div style={{ position: "relative", width: "100%", height: "100%" }}>
-        {outOpacity > 0.01 && (
-          <div style={{
-            position: "absolute", inset: 0, opacity: outOpacity,
-            transform: displacementIntensity > 0.05 ? `translateX(${(-displacement).toFixed(1)}px)` : undefined,
-          }}>
-            {outgoing}
-          </div>
-        )}
-        {inOpacity > 0.01 && (
-          <div style={{
-            position: "absolute", inset: 0, opacity: inOpacity,
+        <div style={{
+            position: "absolute", inset: 0,
             transform: displacementIntensity > 0.05 ? `translateX(${displacement.toFixed(1)}px)` : undefined,
           }}>
-            {incoming}
-          </div>
-        )}
+          {progress < 0.5 ? outgoing : incoming}
+        </div>
       </div>
     );
   }
@@ -173,16 +111,9 @@ export const SceneCrossfade: React.FC<Props> = ({ progress, outgoing, incoming, 
 
   return (
     <div style={{ position: "relative", width: "100%", height: "100%" }}>
-      {outOpacity > 0.01 && (
-        <div style={{ position: "absolute", inset: 0, opacity: outOpacity }}>
-          {outgoing}
-        </div>
-      )}
-      {inOpacity > 0.01 && (
-        <div style={{ position: "absolute", inset: 0, opacity: inOpacity }}>
-          {incoming}
-        </div>
-      )}
+      <div style={{ position: "absolute", inset: 0 }}>
+        {progress < 0.333 ? outgoing : incoming}
+      </div>
       {blackoutOpacity > 0.01 && (
         <div style={{ position: "absolute", inset: 0, backgroundColor: "#000", opacity: blackoutOpacity, pointerEvents: "none" }} />
       )}

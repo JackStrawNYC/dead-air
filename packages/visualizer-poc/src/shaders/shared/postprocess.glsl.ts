@@ -145,6 +145,12 @@ ${
   // Beat saturation punch: color pops on beats
   float bpLuma = dot(col, vec3(0.299, 0.587, 0.114));
   col = mix(vec3(bpLuma), col, 1.0 + bpGated * 0.20); // +20% saturation on beats
+  // Downbeat brightness flash: +12% on strong downbeats (measure starts)
+  {
+    float downbeat = step(0.0, uMusicalTime) * smoothstep(0.05, 0.0, fract(uMusicalTime));
+    float downbeatGated = downbeat * smoothstep(0.5, 0.8, uBeatConfidence);
+    col *= 1.0 + downbeatGated * 0.12;
+  }
 `
     : ""
 }
@@ -439,10 +445,10 @@ ${
     float isClimaxOrSustain = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5);
     float liftMult = mix(1.0, 0.40, isBuild * uClimaxIntensity) + isClimaxOrSustain * uClimaxIntensity * 0.15;
     // Always-on base floor — no energy gate. Quiet passages get warm ambient glow.
-    float alwaysFloor = 0.15;
+    float alwaysFloor = 0.35;
     // Energy-reactive boost on top of the floor (wider gate, stronger boost)
-    float energyBoost = smoothstep(0.005, 0.15, energy) * 0.20;
-    col = max(col, vec3(0.12, 0.10, 0.14) * (alwaysFloor + energyBoost + liftMult));
+    float energyBoost = smoothstep(0.005, 0.15, energy) * 0.25;
+    col = max(col, vec3(0.18, 0.15, 0.22) * (alwaysFloor + energyBoost + liftMult));
   }
 
   // Darkness texture: subtle micro-noise during near-black passages
@@ -466,6 +472,17 @@ ${
     if (climaxLuma < minLuma && minLuma > 0.01) {
       float lift = (minLuma - climaxLuma) / max(0.01, 1.0 - climaxLuma);
       col = col + (vec3(1.0) - col) * lift; // full lift preserving color ratios
+    }
+  }
+
+  // Universal brightness floor: no pixel EVER goes below this after all processing.
+  // Catches all compound multiplication edge cases across the entire pipeline.
+  {
+    float finalLuma = dot(col, vec3(0.299, 0.587, 0.114));
+    float universalFloor = 0.06;
+    if (finalLuma < universalFloor) {
+      float lift = (universalFloor - finalLuma) / max(0.01, 1.0 - finalLuma);
+      col = col + (vec3(1.0) - col) * lift;
     }
   }
 

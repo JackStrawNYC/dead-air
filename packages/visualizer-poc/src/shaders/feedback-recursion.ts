@@ -36,8 +36,8 @@ export const feedbackRecursionFrag = /* glsl */ `
 precision highp float;
 
 ${sharedUniformsGLSL}
-
 uniform sampler2D uPrevFrame;
+
 
 ${noiseGLSL}
 

@@ -7,6 +7,7 @@
 
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
+import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
 
 export const vintageFilmVert = /* glsl */ `
 varying vec2 vUv;
@@ -22,6 +23,7 @@ precision highp float;
 ${sharedUniformsGLSL}
 
 ${noiseGLSL}
+${buildPostProcessGLSL({ grainStrength: "heavy", bloomEnabled: true, halationEnabled: true })}
 
 varying vec2 vUv;
 
@@ -75,6 +77,7 @@ float bayerGrain(vec2 fragCoord, float time) {
 }
 
 void main() {
+  float energy = clamp(uEnergy, 0.0, 1.0);
   float t = uTime;
   vec2 weave = gateWeave(t, uOnsetSnap) * (1.0 + uBeatSnap * 2.0);
   vec2 uv = vUv + weave;
@@ -221,10 +224,9 @@ void main() {
   color += iconEmergence(centered, uTime, energy, uBass, warm, palColor, _nf, uClimaxPhase, uSectionIndex);
   color += heroIconEmergence(centered, uTime, energy, uBass, warm, palColor, _nf, uSectionIndex);
 
-  // Lifted blacks (build-phase-aware: near true black during build for anticipation)
-  float isBuild = step(0.5, uClimaxPhase) * step(uClimaxPhase, 1.5);
-  float liftMult = mix(1.0, 0.15, isBuild * uClimaxIntensity);
-  color = max(color, vec3(0.06, 0.05, 0.08) * liftMult);
+  // Shared post-processing chain (lifted blacks, envelope brightness, grading)
+  vec2 p = centered;
+  color = applyPostProcess(color, vUv, p);
 
   gl_FragColor = vec4(color, 1.0);
 }

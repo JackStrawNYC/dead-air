@@ -121,9 +121,9 @@ export const CameraMotion: React.FC<Props> = ({ frames, children, jamEvolution, 
   }
 
   // Climax camera drama: widen zoom and amplify drift during peak moments
-  scale = scale + cameraDrama * 0.06; // up to +6% zoom at peak drama
-  driftX *= 1 + cameraDrama * 0.5;
-  driftY *= 1 + cameraDrama * 0.5;
+  scale = scale + cameraDrama * 0.10; // up to +10% zoom at peak drama
+  driftX *= 1 + cameraDrama * 0.8;
+  driftY *= 1 + cameraDrama * 0.8;
 
   // Micro-shake on beat hits (prefer stemDrumBeat when available)
   let shakeX = 0;
@@ -146,9 +146,9 @@ export const CameraMotion: React.FC<Props> = ({ frames, children, jamEvolution, 
   shakeX *= groovePulseMult;
   shakeY *= groovePulseMult;
 
-  // Climax drama amplifies shake by up to 100%
-  shakeX *= 1 + cameraDrama * 1.0;
-  shakeY *= 1 + cameraDrama * 1.0;
+  // Climax drama amplifies shake by up to 150%
+  shakeX *= 1 + cameraDrama * 1.5;
+  shakeY *= 1 + cameraDrama * 1.5;
 
   // Apply section-vocabulary camera steadiness: 1.0 = tripod (20% shake), 0.0 = handheld (100%)
   const steadinessDampen = 1 - cameraSteadiness * 0.8;
@@ -233,7 +233,7 @@ export const CameraMotion: React.FC<Props> = ({ frames, children, jamEvolution, 
 
   // IT snap zoom: rapid zoom punch during coherence lock (up to 4% zoom on transients)
   if (itSnapZoom > 0) {
-    scale *= 1 + itSnapZoom * 0.04;
+    scale *= 1 + itSnapZoom * 0.08;
   }
 
   let totalX = shakeX + driftX;

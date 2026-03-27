@@ -33,15 +33,20 @@ export function computeHeroIconState(
   climaxPhaseNum: number,
   climaxIntensity: number,
 ): HeroIconState {
-  // Only active during climax (2) or sustain (3) with high intensity
-  const isActive = climaxPhaseNum >= 2 && climaxPhaseNum <= 3 && climaxIntensity > 0.7;
+  // Active during climax (2) or sustain (3) with moderate intensity,
+  // or during build (1) at extreme intensity — hero icons are the MOMENT
+  const isClimaxActive = climaxPhaseNum >= 2 && climaxPhaseNum <= 3 && climaxIntensity > 0.5;
+  const isBuildExtreme = climaxPhaseNum === 1 && climaxIntensity > 0.85;
+  const isActive = isClimaxActive || isBuildExtreme;
 
   if (!isActive) {
     return { trigger: 0, progress: 0 };
   }
 
-  // Remap intensity 0.7-1.0 → 0-1 for smooth lifecycle
-  const progress = Math.min(1, (climaxIntensity - 0.7) / 0.3);
+  // Remap intensity to 0-1 for smooth lifecycle
+  const threshold = isBuildExtreme ? 0.85 : 0.5;
+  const range = 1.0 - threshold;
+  const progress = Math.min(1, (climaxIntensity - threshold) / range);
 
   return { trigger: 1, progress };
 }

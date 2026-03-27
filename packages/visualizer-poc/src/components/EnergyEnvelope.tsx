@@ -62,13 +62,13 @@ interface Props {
   isSolo?: boolean;
   /** Solo intensity (0-1) */
   soloIntensity?: number;
-  /** Harmonic response brightness offset (-0.04 to +0.06) */
+  /** Harmonic response brightness offset (-0.08 to +0.12) */
   harmonicBrightness?: number;
-  /** Harmonic response saturation multiplier (0.92-1.08) */
+  /** Harmonic response saturation multiplier (0.85-1.15) */
   harmonicSatMult?: number;
-  /** Modal analysis hue shift in degrees (-40 to +25) */
+  /** Modal analysis hue shift in degrees (-60 to +37) */
   modalHueShift?: number;
-  /** Modal analysis saturation offset (-0.10 to +0.08) */
+  /** Modal analysis saturation offset (-0.13 to +0.104) */
   modalSatOffset?: number;
   /** Brightness counterpoint (-0.1..+0.1): brief dim on transients for drama */
   brightnessCounterpoint?: number;
@@ -165,10 +165,10 @@ export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod,
   const soloBrightLift = isSolo ? (soloIntensity * 0.10) : 0;
   const vocalBrightLift = (vocalWarmth ?? 0) * 0.06;
 
-  // Energy-adaptive brightness floor: TRUE darkness in silence, vivid at peaks.
-  // energy=0 → 0.02 (near black). energy 0.10 → 0.10. energy 0.30 → 0.35.
-  // The key is silence should be DARK — psychedelic visuals need contrast.
-  const energyFloor = 0.02 + Math.min(1, Math.max(0, (energy - 0.03) / 0.27)) * 0.33;
+  // Energy-adaptive brightness floor: quiet passages always visible, peaks vivid.
+  // energy=0 → 0.60. energy 0.10 → 0.70. energy 0.30 → 0.85.
+  // Every song must show visuals — mellow songs like Loser get warm ambient brightness.
+  const energyFloor = 0.60 + Math.min(1, Math.max(0, (energy - 0.03) / 0.27)) * 0.30;
   // Apply phase offsets + song identity + show arc + IT + narrative + solo + vocal + harmonic + stem character
   const baseBrightness = Math.min(brightCap, Math.max(energyFloor, brightness + dsBrightOffset + showBrightOffset + siPaletteBright + arcBrightOffset + itBrightLift + narrativeBrightness + soloBrightLift + vocalBrightLift + harmonicBrightness + brightnessCounterpoint + stemCharacterBright));
   // During dead air, dim brightness toward 0.55 (minimum floor) and suppress bloom
@@ -187,14 +187,14 @@ export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod,
   const chromaDelta = snapshot.chromaHue - (songPrimaryHue % 360);
   // Normalize to [-180, 180] range, then scale to ±10 degrees
   const chromaNorm = ((chromaDelta + 540) % 360) - 180;
-  // Extra chroma shift during jams/solos (20deg vs 10deg)
+  // Extra chroma shift during jams/solos (40deg vs 20deg) — visible harmonic breathing
   const isJamOrSolo = jamColorTemp != null; // jamColorTemp only set for long jams
-  const chromaMaxDeg = isJamOrSolo ? 20 : 10;
+  const chromaMaxDeg = isJamOrSolo ? 40 : 20;
   const chromaHueShift = chromaNorm * (chromaMaxDeg / 180) * Math.min(1, energy * 5); // gate by energy to avoid drift in silence
 
   // Jam color temperature: warm shifts yellow, cool shifts blue (max ±12deg)
   // Only applied during long jams. EraGrade + SongPalette handle base color character.
-  const jamHueShift = jamColorTemp != null ? jamColorTemp * 50 : 0; // ±40 degrees max
+  const jamHueShift = jamColorTemp != null ? jamColorTemp * 70 : 0; // ±70 degrees max — big visible arc
   // Narrative temperature: ±20deg hue shift (warm = positive, cool = negative)
   const narrativeHueShift = narrativeTemperature * 20;
   // Solo hue warmth: +20deg shift when solo is active

@@ -34,7 +34,7 @@ ${buildPostProcessGLSL({
   bloomEnabled: true,
   halationEnabled: true,
   grainStrength: "normal",
-  temporalBlendEnabled: true,
+  temporalBlendEnabled: false,
 })}
 
 varying vec2 vUv;

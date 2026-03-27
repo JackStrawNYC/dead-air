@@ -47,6 +47,7 @@ vec3 fractalPalette(float t, float hueShift) {
 }
 
 void main() {
+  float energy = clamp(uEnergy, 0.0, 1.0);
   float zoomDensity = 1.0 + (uJamDensity - 0.5) * 0.6;
   // Determine iteration count: 96 during climax, 64 normally
   int maxIter = uClimaxPhase > 1.5 ? 96 : int(64.0 * zoomDensity);

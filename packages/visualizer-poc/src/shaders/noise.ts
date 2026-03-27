@@ -660,6 +660,41 @@ float _ns_sdSkull(vec2 p, float jawOpen) {
   return skull;
 }
 
+// Terrapin turtle SDF — shell + head + flippers
+float _ns_sdTerrapin(vec2 p) {
+  // Shell: rounded dome (ellipse)
+  float shell = length(p * vec2(1.0, 1.4)) - 0.32;
+  // Shell pattern: concentric hex cells
+  float shellRings = abs(length(p * vec2(1.0, 1.4)) - 0.22) - 0.02;
+  shellRings = min(shellRings, abs(length(p * vec2(1.0, 1.4)) - 0.14) - 0.015);
+  float shellDetail = min(shell, shellRings);
+  // Head: circle poking out front
+  float head = length(p - vec2(0.0, 0.32)) - 0.10;
+  // Eyes: two dots
+  float eyeL = length(p - vec2(-0.05, 0.37)) - 0.025;
+  float eyeR = length(p - vec2(0.05, 0.37)) - 0.025;
+  // Front flippers
+  vec2 fL = p - vec2(-0.28, 0.10);
+  float flipperL = length(fL * vec2(0.7, 1.2)) - 0.07;
+  vec2 fR = p - vec2(0.28, 0.10);
+  float flipperR = length(fR * vec2(0.7, 1.2)) - 0.07;
+  // Rear flippers
+  vec2 rL = p - vec2(-0.22, -0.22);
+  float rearL = length(rL * vec2(0.8, 1.0)) - 0.055;
+  vec2 rR = p - vec2(0.22, -0.22);
+  float rearR = length(rR * vec2(0.8, 1.0)) - 0.055;
+  // Tail
+  vec2 tp = p - vec2(0.0, -0.32);
+  float tail = length(tp * vec2(2.0, 1.0)) - 0.04;
+  // Combine
+  float d = min(shellDetail, head);
+  d = min(d, min(eyeL, eyeR));
+  d = min(d, min(flipperL, flipperR));
+  d = min(d, min(rearL, rearR));
+  d = min(d, tail);
+  return d;
+}
+
 // --- Icon emergence: SDF icon that materializes from noise field ---
 // Selects icon type based on section index for variety per section.
 // Returns additive light contribution (vec3) to blend with col += result.
@@ -676,9 +711,9 @@ float _ns_sdSkull(vec2 p, float jawOpen) {
 //   sectionIndex — uSectionIndex for icon variety
 vec3 iconEmergence(vec2 uv, float time, float energy, float bass,
                     vec3 col1, vec3 col2, float noiseField, float climaxPhase, float sectionIndex) {
-  // Climax-only: icons emerge during peak moments, no ambient ghosting
-  float climaxGate = smoothstep(1.5, 2.5, climaxPhase);
-  float energyGate = smoothstep(0.35, 0.55, energy);
+  // Icons emerge during build and peak moments — lower gate so they're the STAR
+  float climaxGate = smoothstep(0.5, 1.5, climaxPhase);
+  float energyGate = smoothstep(0.15, 0.35, energy);
   float gate = energyGate * climaxGate;
   if (gate < 0.01) return vec3(0.0);
 
@@ -689,10 +724,10 @@ vec3 iconEmergence(vec2 uv, float time, float energy, float bass,
 
   // Bass pulse
   float pulse = 1.0 + bass * 0.6;
-  vec2 scaledUv = rotUv / (0.4 * pulse);
+  vec2 scaledUv = rotUv / (0.7 * pulse);
 
-  // Select icon based on section index
-  float iconType = mod(sectionIndex, 4.0);
+  // Select icon based on section index (6 icon types)
+  float iconType = mod(sectionIndex, 6.0);
   float d;
   if (iconType < 1.0) {
     d = sdStealie(scaledUv, 1.0);
@@ -700,8 +735,12 @@ vec3 iconEmergence(vec2 uv, float time, float energy, float bass,
     d = _ns_sdDancingBear(scaledUv, time * 0.5);
   } else if (iconType < 3.0) {
     d = _ns_sdRose(scaledUv);
-  } else {
+  } else if (iconType < 4.0) {
     d = _ns_sdSkull(scaledUv, 0.3 + bass * 0.4);
+  } else if (iconType < 5.0) {
+    d = _ns_sdBolt(scaledUv);
+  } else {
+    d = _ns_sdTerrapin(scaledUv);
   }
 
   // Noise dissolution
@@ -733,12 +772,12 @@ vec3 heroIconEmergence(vec2 uv, float time, float energy, float bass,
   float ca = cos(angle); float sa = sin(angle);
   vec2 rotUv = vec2(ca * uv.x - sa * uv.y, sa * uv.x + ca * uv.y);
 
-  // Full-screen scale: 1.2x viewport radius
+  // Full-screen scale: 2.0x viewport radius — truly fullscreen iconic moment
   float pulse = 1.0 + bass * 0.3;
-  vec2 scaledUv = rotUv / (1.6 * pulse);
+  vec2 scaledUv = rotUv / (2.0 * pulse);
 
-  // Select icon based on section index
-  float iconType = mod(sectionIndex, 4.0);
+  // Select icon based on section index (6 icon types)
+  float iconType = mod(sectionIndex, 6.0);
   float d;
   if (iconType < 1.0) {
     d = sdStealie(scaledUv, 1.0);
@@ -746,8 +785,12 @@ vec3 heroIconEmergence(vec2 uv, float time, float energy, float bass,
     d = _ns_sdDancingBear(scaledUv, time * 0.5);
   } else if (iconType < 3.0) {
     d = _ns_sdRose(scaledUv);
-  } else {
+  } else if (iconType < 4.0) {
     d = _ns_sdSkull(scaledUv, 0.3 + bass * 0.4);
+  } else if (iconType < 5.0) {
+    d = _ns_sdBolt(scaledUv);
+  } else {
+    d = _ns_sdTerrapin(scaledUv);
   }
 
   // Noise dissolution: stronger at lifecycle edges
