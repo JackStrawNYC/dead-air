@@ -524,11 +524,11 @@ ${
   {
     float emberGate = smoothstep(0.08, 0.02, energy); // only when very quiet (dead air)
     if (emberGate > 0.01) {
-      // Rising particle field from noise
+      // Rising particle field from cheap hash noise (no snoise — 4K perf)
       vec2 emberUV = uv * vec2(3.0, 2.0);
       emberUV.y -= uTime * 0.15; // particles rise upward
-      float ember = snoise(vec3(emberUV * 4.0, uTime * 0.3));
-      ember = smoothstep(0.5, 0.8, ember); // threshold to sparse particles
+      float ember = fract(sin(dot(floor(emberUV * 4.0), vec2(12.9898, 78.233)) + floor(uTime * 2.0)) * 43758.5453);
+      ember = smoothstep(0.7, 0.9, ember); // threshold to sparse particles
       // Warm orange glow
       vec3 emberColor = vec3(1.0, 0.6, 0.2) * ember * 0.12 * emberGate;
       // Pulse with whatever RMS exists (crowd noise)
