@@ -11,7 +11,7 @@
       "title": "New Minglewood Blues",
       "set": 1,
       "trackNumber": 1,
-      "defaultMode": "concert_lighting",
+      "defaultMode": "fractal_flames",
       "audioFile": "gd77-05-08s1t02.mp3",
       "palette": {
         "primary": 15,
@@ -30,7 +30,7 @@
       "title": "Loser",
       "set": 1,
       "trackNumber": 2,
-      "defaultMode": "vintage_film",
+      "defaultMode": "liquid_light",
       "audioFile": "gd77-05-08s1t03.mp3",
       "palette": {
         "primary": 220,
@@ -49,7 +49,7 @@
       "title": "El Paso",
       "set": 1,
       "trackNumber": 3,
-      "defaultMode": "vintage_film",
+      "defaultMode": "lava_flow",
       "audioFile": "gd77-05-08s1t04.mp3",
       "palette": {
         "primary": 30,
@@ -124,7 +124,7 @@
       "title": "Lazy Lightnin'",
       "set": 1,
       "trackNumber": 7,
-      "defaultMode": "electric_arc",
+      "defaultMode": "plasma_field",
       "audioFile": "gd77-05-08s1t08.mp3",
       "palette": {
         "primary": 280,
@@ -143,7 +143,7 @@
       "title": "Supplication",
       "set": 1,
       "trackNumber": 8,
-      "defaultMode": "electric_arc",
+      "defaultMode": "feedback_recursion",
       "audioFile": "gd77-05-08s1t09.mp3",
       "palette": {
         "primary": 20,
@@ -163,7 +163,7 @@
       "title": "Brown Eyed Women",
       "set": 1,
       "trackNumber": 9,
-      "defaultMode": "oil_projector",
+      "defaultMode": "stained_glass",
       "audioFile": "gd77-05-08s1t10.mp3",
       "palette": {
         "primary": 25,
@@ -182,7 +182,7 @@
       "title": "Mama Tried",
       "set": 1,
       "trackNumber": 10,
-      "defaultMode": "vintage_film",
+      "defaultMode": "oil_projector",
       "audioFile": "gd77-05-08s1t11.mp3",
       "palette": {
         "primary": 35,
@@ -219,7 +219,7 @@
       "title": "Dancin' in the Street",
       "set": 1,
       "trackNumber": 12,
-      "defaultMode": "neon_grid",
+      "defaultMode": "mandala_engine",
       "audioFile": "gd77-05-08s1t13.mp3",
       "palette": {
         "primary": 300,
@@ -279,7 +279,7 @@
       "title": "Estimated Prophet",
       "set": 2,
       "trackNumber": 3,
-      "defaultMode": "storm",
+      "defaultMode": "morphogenesis",
       "audioFile": "gd77-05-08s2t04.mp3",
       "palette": {
         "primary": 260,
@@ -298,7 +298,7 @@
       "title": "St. Stephen",
       "set": 2,
       "trackNumber": 4,
-      "defaultMode": "electric_arc",
+      "defaultMode": "sacred_geometry",
       "audioFile": "gd77-05-08s2t05.mp3",
       "palette": {
         "primary": 160,
@@ -318,7 +318,7 @@
       "title": "Not Fade Away",
       "set": 2,
       "trackNumber": 5,
-      "defaultMode": "mandala_engine",
+      "defaultMode": "kaleidoscope",
       "audioFile": "gd77-05-08s2t06.mp3",
       "palette": {
         "primary": 350,
@@ -338,7 +338,7 @@
       "title": "Drums / Space",
       "set": 2,
       "trackNumber": 6,
-      "defaultMode": "sacred_geometry",
+      "defaultMode": "cosmic_voyage",
       "audioFile": "gd77-05-08s2t07.mp3",
       "palette": {
         "primary": 240,
@@ -357,10 +357,10 @@
       "title": "Morning Dew",
       "set": 2,
       "trackNumber": 7,
-      "defaultMode": "deep_ocean",
+      "defaultMode": "aurora",
       "audioFile": "gd77-05-08s2t08.mp3",
       "palette": {
-        "primary": 30,
+        "primary": 200,
         "secondary": 270,
         "saturation": 0.85
       },
@@ -377,7 +377,7 @@
       "title": "One More Saturday Night",
       "set": 2,
       "trackNumber": 8,
-      "defaultMode": "concert_lighting",
+      "defaultMode": "fractal_zoom",
       "audioFile": "gd77-05-08s2t09.mp3",
       "palette": {
         "primary": 50,
