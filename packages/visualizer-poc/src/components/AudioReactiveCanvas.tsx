@@ -11,6 +11,7 @@ import type { EnhancedFrameData, SectionBoundary, ColorPalette } from "../data/t
 import { findCurrentSection } from "../utils/section-lookup";
 import { computeClimaxState, climaxModulation, type ClimaxPhase } from "../utils/climax-state";
 import { computeHeroIconState } from "../utils/hero-icon";
+import { detectPhilBomb } from "../utils/phil-bomb";
 import { computeAudioSnapshot as computeSnapshot, buildBeatArray as buildBeatArrayUtil, computeMusicalTime as computeMusicalTimeUtil, computeSpectralFlux, computeEnergyAcceleration, computeEnergyTrend, computeEnergyForecast, computePeakApproaching, computeBeatStability } from "../utils/audio-reactive";
 import { energyGate } from "../utils/math";
 import { useHeroPermitted } from "../data/HeroPermittedContext";
@@ -140,6 +141,8 @@ export interface AudioDataContext {
     semanticChaotic: number;
     /** CLAP semantic: triumphant (0-1) */
     semanticTriumphant: number;
+    /** Phil Bomb shockwave intensity (0-1) */
+    philBombWave: number;
   };
   /** Per-song palette primary hue (0-1 normalized) */
   palettePrimary: number;
@@ -436,6 +439,8 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
     ? computeHeroIconState(climaxPhaseNum, climaxState.intensity)
     : { trigger: 0, progress: 0 };
 
+  const philBombWave = detectPhilBomb(frames, idx);
+
   const pal = palette ?? DEFAULT_PALETTE;
   // Energy-driven hue evolution: quiet = base palette, peak = +30° shift
   const energyHueShift = energy * (30 / 360);
@@ -537,6 +542,7 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
       semanticAmbient: semanticAmbientSmooth,
       semanticChaotic: semanticChaoticSmooth,
       semanticTriumphant: semanticTriumphantSmooth,
+      philBombWave,
     },
     palettePrimary,
     paletteSecondary,

@@ -236,6 +236,7 @@ export const FullscreenQuad: React.FC<Props> = ({
       uSemanticAmbient: { value: 0 },
       uSemanticRhythmic: { value: 0 },
       uSemanticTriumphant: { value: 0 },
+      uPhilBombWave: { value: 0 },
       ...extraUniforms,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -376,6 +377,7 @@ export const FullscreenQuad: React.FC<Props> = ({
   uniforms.uSemanticAmbient.value = smooth.semanticAmbient ?? 0;
   uniforms.uSemanticRhythmic.value = smooth.semanticRhythmic ?? 0;
   uniforms.uSemanticTriumphant.value = smooth.semanticTriumphant ?? 0;
+  uniforms.uPhilBombWave.value = smooth.philBombWave ?? 0;
 
   // 3D Camera
   const cam3d = compute3DCamera(

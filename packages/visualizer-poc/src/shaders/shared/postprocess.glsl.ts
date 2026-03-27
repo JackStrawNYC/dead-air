@@ -99,6 +99,19 @@ export function buildPostProcessGLSL(config: PostProcessConfig = {}): string {
 vec3 applyPostProcess(vec3 col, vec2 uv, vec2 p) {
   float energy = clamp(uEnergy, 0.0, 1.0);
 
+  // Phil Bomb shockwave: radial UV warp from bass transients
+  if (uPhilBombWave > 0.01) {
+    vec2 bombCenter = vec2(0.5);
+    vec2 bombDir = uv - bombCenter;
+    float bombDist = length(bombDir);
+    float bombWave = uPhilBombWave;
+    // Radial ripple: peaks at dist ~0.3, outward displacement
+    float bombRipple = sin(bombDist * 15.0 - bombWave * 10.0) * 0.5 + 0.5;
+    float bombDisplacement = bombWave * bombRipple * 0.035 * smoothstep(0.0, 0.4, bombDist);
+    uv += normalize(bombDir + vec2(0.001)) * bombDisplacement;
+    p = (uv - 0.5) * vec2(uResolution.x / uResolution.y, 1.0);
+  }
+
 ${
   thermalShimmerEnabled
     ? `  // Thermal shimmer: heat-haze UV displacement (before lens distortion)
@@ -337,6 +350,22 @@ ${
     vec3 prevCol = texture2D(uPrevFrame, uv).rgb;
     // More blending at low energy (smooth drift), less at high energy (preserve transients)
     float motionBlend = 0.12 + energy * 0.06;
+    // Psychedelic trails: hue-rotate feedback during jams for acid-trail effect
+    if (uJamPhase >= 0.0) {
+      // Progressive: 5deg at exploration, 10deg at peak_space
+      float trailHueDeg = mix(5.0, 10.0, smoothstep(0.0, 2.0, uJamPhase));
+      float trailRad = trailHueDeg * 0.01745329;
+      float trCos = cos(trailRad);
+      float trSin = sin(trailRad);
+      mat3 trailRot = mat3(
+        trCos, -trSin, 0.0,
+        trSin, trCos, 0.0,
+        0.0, 0.0, 1.0
+      );
+      prevCol = max(vec3(0.0), trailRot * prevCol);
+      // Slightly increase blend during jams for more visible trails
+      motionBlend += 0.04 * smoothstep(0.0, 2.0, uJamPhase);
+    }
     col = mix(col, prevCol, motionBlend);
   }
 `
@@ -414,6 +443,41 @@ ${
     col = mix(vec3(improvLuma), col, 1.0 + improv * 0.15);
   }
 
+  // Sacred geometry: flower-of-life pattern, beat-locked, jam/solo gated
+  {
+    // Active during jams (sectionType ~5) and solos (sectionType ~4), or any long jam
+    float sgJam = smoothstep(3.5, 4.5, uSectionType) * smoothstep(uSectionType, 6.5, 5.5);
+    float sgFromJamPhase = step(0.0, uJamPhase); // also during detected long jams
+    float sgGate = clamp(sgJam + sgFromJamPhase, 0.0, 1.0) * smoothstep(0.3, 0.6, uBeatConfidence);
+    if (sgGate > 0.01) {
+      // Flower of life: hexagonal grid of overlapping circles
+      vec2 sgUV = p * 2.5;
+      // Hex grid transformation
+      float hexH = 1.732;
+      vec2 hx = vec2(sgUV.x + sgUV.y / hexH, sgUV.y * 2.0 / hexH);
+      vec2 hFrac = fract(hx) - 0.5;
+      float circle = length(hFrac);
+      // 6 surrounding petal circles
+      float petals = 1.0;
+      for (int pi = 0; pi < 6; pi++) {
+        float a = float(pi) * 1.0472; // 60 degrees
+        petals = min(petals, length(hFrac - 0.5 * vec2(cos(a), sin(a))));
+      }
+      float sgSDF = min(circle, petals);
+      float sgRing = smoothstep(0.02, 0.0, abs(sgSDF - 0.42));
+      // Beat pulse: geometry breathes with musical time
+      float sgPulse = beatPulse(uMusicalTime) * uBeatConfidence;
+      float sgIntensity = (0.04 + sgPulse * 0.04) * sgGate; // 4-8% additive
+      // Palette-tinted sacred glow
+      vec3 sgColor = mix(
+        vec3(0.7, 0.6, 1.0),
+        vec3(1.0, 0.85, 0.6),
+        0.5 + 0.5 * sin(uTime * 0.15)
+      );
+      col += sgColor * sgRing * sgIntensity;
+    }
+  }
+
   // Onset hue punch: color rotates on strong transients
   {
     float hueKick = max(uOnsetSnap, uDrumOnset) * smoothstep(0.15, 0.35, energy) * 0.08;
@@ -453,6 +517,23 @@ ${
 
   // Darkness texture: subtle micro-noise during near-black passages
   col += darknessTexture(uv, uTime, energy);
+
+  // Crowd roar embers: warm rising particles during dead air / very low energy
+  {
+    float emberGate = smoothstep(0.08, 0.02, energy); // only when very quiet (dead air)
+    if (emberGate > 0.01) {
+      // Rising particle field from noise
+      vec2 emberUV = uv * vec2(3.0, 2.0);
+      emberUV.y -= uTime * 0.15; // particles rise upward
+      float ember = snoise(vec3(emberUV * 4.0, uTime * 0.3));
+      ember = smoothstep(0.5, 0.8, ember); // threshold to sparse particles
+      // Warm orange glow
+      vec3 emberColor = vec3(1.0, 0.6, 0.2) * ember * 0.12 * emberGate;
+      // Pulse with whatever RMS exists (crowd noise)
+      emberColor *= 0.7 + uRms * 3.0;
+      col += emberColor;
+    }
+  }
 
   // Show contrast: seed-derived curve
   {

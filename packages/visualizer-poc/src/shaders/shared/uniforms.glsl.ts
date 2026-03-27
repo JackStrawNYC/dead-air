@@ -135,6 +135,9 @@ uniform float uTimbralBrightness;
 uniform float uTimbralFlux;
 uniform float uVocalPitch;
 
+// ─── Effects ───
+uniform float uPhilBombWave;
+
 // ─── Semantic Labels (CLAP) ───
 uniform float uSemanticPsychedelic;
 uniform float uSemanticCosmic;

@@ -173,7 +173,7 @@ export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod,
   const baseBrightness = Math.min(brightCap, Math.max(energyFloor, brightness + dsBrightOffset + showBrightOffset + siPaletteBright + arcBrightOffset + itBrightLift + narrativeBrightness + soloBrightLift + vocalBrightLift + harmonicBrightness + brightnessCounterpoint + stemCharacterBright));
   // During dead air, dim brightness toward 0.55 (minimum floor) and suppress bloom
   const finalBrightness = deadAirFactor > 0
-    ? baseBrightness * (1 - deadAirFactor * 0.40)  // dim by up to 40% during dead air
+    ? baseBrightness * (1 - deadAirFactor * 0.20)  // dim by up to 20% during dead air (crowd energy warmth)
     : baseBrightness;
 
   // Guitar color temp: ±12deg hue shift based on Jerry's neck position
@@ -201,8 +201,10 @@ export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod,
   const soloHueShift = isSolo ? soloIntensity * 20 : 0;
   // Stem character hue + temperature: musician personality colors the whole frame
   const stemTempHue = stemCharacterTemp * 15; // ±15deg from musician temperature
-  // Suppress hue shift during dead air so applause is neutral
-  const totalHueShift = (jamHueShift + eraColorTempShift + dsHueOffset + siHueShift + arcHueShift + vocalHueShift + guitarHueShift + chromaHueShift + narrativeHueShift + soloHueShift + modalHueShift + stemCharacterHue + stemTempHue) * (1 - deadAirFactor);
+  // Dead air warm hue: +20° toward orange/amber (crowd energy warmth)
+  const deadAirWarmth = deadAirFactor * 20;
+  // Partially preserve hue during dead air (50% suppression instead of full)
+  const totalHueShift = (jamHueShift + eraColorTempShift + dsHueOffset + siHueShift + arcHueShift + vocalHueShift + guitarHueShift + chromaHueShift + narrativeHueShift + soloHueShift + modalHueShift + stemCharacterHue + stemTempHue + deadAirWarmth) * (1 - deadAirFactor * 0.5);
   // Combined saturation: counterpoint * harmonic * modal * narrative * IT surge * stem character
   const combinedSatMult = counterpointSatMult * harmonicSatMult * (1 + modalSatOffset) * (1 + narrativeSatOffset) * itSaturationSurge * stemCharacterSat;
 

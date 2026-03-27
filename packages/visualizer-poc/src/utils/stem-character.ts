@@ -28,11 +28,12 @@
  */
 
 import type { AudioSnapshot } from "./audio-reactive";
+import type { EnhancedFrameData } from "../data/types";
 
 export interface StemCharacter {
   /** Dominant musician driving the visual character */
   dominant: "jerry" | "phil" | "drums" | "bobby" | "vocals" | "ensemble";
-  /** Hue shift in degrees: Jerry=+30 (golden), Phil=-40 (indigo), drums=+15 (amber) */
+  /** Hue shift in degrees: Jerry=+60 (golden hour), Phil=-40 (indigo), drums=+15 (amber) */
   hueShift: number;
   /** Saturation modifier: 0.9-1.3 */
   saturationMult: number;
@@ -97,10 +98,10 @@ export function computeStemCharacter(snapshot: AudioSnapshot): StemCharacter {
     const jerryConf = Math.min(1, guitarRatio * centroid * 3);
     return {
       dominant: "jerry",
-      hueShift: 30 * jerryConf,         // golden warmth
-      saturationMult: 1 + 0.20 * jerryConf,  // vivid during Jerry leads
-      brightnessOffset: 0.06 * jerryConf,     // bright glow
-      temperature: 0.8 * jerryConf,     // very warm
+      hueShift: 60 * jerryConf,         // GOLDEN HOUR: drench in warm amber
+      saturationMult: 1 + 0.40 * jerryConf,  // vivid golden during Jerry leads
+      brightnessOffset: 0.08 * jerryConf,     // brighter glow
+      temperature: 1.0 * jerryConf,     // maximum warm
       overlayDensityMult: 0.9,          // let the shader glow
       motionMult: 1 + 0.15 * jerryConf, // fluid, floating
       confidence: jerryConf,
@@ -166,4 +167,52 @@ function neutralCharacter(): StemCharacter {
     motionMult: 1,
     confidence: 0,
   };
+}
+
+/**
+ * Detect sustained stem dominance over a window.
+ * Returns the fraction of frames where each stem dominated.
+ */
+export function computeSustainedDominance(
+  frames: EnhancedFrameData[],
+  idx: number,
+  window = 30,
+): { dominant: string; fraction: number } {
+  if (frames.length === 0) return { dominant: "ensemble", fraction: 0 };
+
+  const counts: Record<string, number> = {};
+  let total = 0;
+
+  for (let i = Math.max(0, idx - window); i <= idx && i < frames.length; i++) {
+    const f = frames[i];
+    const vocal = f.stemVocalRms ?? 0;
+    const guitar = f.stemOtherRms ?? 0;
+    const bass = f.stemBassRms ?? 0;
+    const drums = f.stemDrumOnset ?? 0;
+    const sum = vocal + guitar + bass + drums;
+    if (sum < 0.05) continue;
+
+    const guitarRatio = guitar / sum;
+    const bassRatio = bass / sum;
+    const drumRatio = drums / sum;
+
+    let dom = "ensemble";
+    if (vocal > 0.15) dom = "vocals";
+    else if (guitarRatio > 0.35) dom = "guitar";
+    else if (bassRatio > 0.35) dom = "phil";
+    else if (drumRatio > 0.35) dom = "drums";
+
+    counts[dom] = (counts[dom] ?? 0) + 1;
+    total++;
+  }
+
+  if (total === 0) return { dominant: "ensemble", fraction: 0 };
+
+  let best = "ensemble";
+  let bestCount = 0;
+  for (const [k, v] of Object.entries(counts)) {
+    if (v > bestCount) { best = k; bestCount = v; }
+  }
+
+  return { dominant: best, fraction: bestCount / total };
 }
