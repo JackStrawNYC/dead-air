@@ -457,12 +457,14 @@ ${
       vec2 hx = vec2(sgUV.x + sgUV.y / hexH, sgUV.y * 2.0 / hexH);
       vec2 hFrac = fract(hx) - 0.5;
       float circle = length(hFrac);
-      // 6 surrounding petal circles
-      float petals = 1.0;
-      for (int pi = 0; pi < 6; pi++) {
-        float a = float(pi) * 1.0472; // 60 degrees
-        petals = min(petals, length(hFrac - 0.5 * vec2(cos(a), sin(a))));
-      }
+      // 6 surrounding petal circles (unrolled, precomputed offsets for GPU perf)
+      float petals = min(
+        min(length(hFrac - vec2(0.5, 0.0)), length(hFrac - vec2(0.25, 0.433))),
+        min(length(hFrac - vec2(-0.25, 0.433)), length(hFrac - vec2(-0.5, 0.0)))
+      );
+      petals = min(petals, min(
+        length(hFrac - vec2(-0.25, -0.433)), length(hFrac - vec2(0.25, -0.433))
+      ));
       float sgSDF = min(circle, petals);
       float sgRing = smoothstep(0.02, 0.0, abs(sgSDF - 0.42));
       // Beat pulse: geometry breathes with musical time
