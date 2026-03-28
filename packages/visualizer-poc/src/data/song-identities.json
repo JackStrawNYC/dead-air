@@ -532,13 +532,13 @@
   },
   "estimatedprophet": {
     "preferredModes": [
-      "storm",
+      "deep_ocean",
+      "aurora",
       "void_light",
-      "feedback_recursion",
       "cosmic_voyage",
-      "fractal_zoom",
-      "volumetric_smoke",
-      "morphogenesis",
+      "liquid_light",
+      "oil_projector",
+      "smoke_rings",
       "bioluminescence"
     ],
     "palette": {

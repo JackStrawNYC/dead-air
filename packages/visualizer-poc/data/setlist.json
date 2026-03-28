@@ -195,7 +195,7 @@
       "title": "Estimated Prophet",
       "set": 2,
       "trackNumber": 3,
-      "defaultMode": "aurora",
+      "defaultMode": "deep_ocean",
       "audioFile": "gd77-05-08s2t04.mp3",
       "palette": { "primary": 260, "secondary": 120, "saturation": 0.85 },
       "songArt": "assets/song-art/s2t04.png",
