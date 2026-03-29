@@ -69,7 +69,7 @@ import { computeTourModifiers, applyTourModifiers } from "./utils/tour-position"
 import { getSetTheme, applySetModifiers } from "./utils/set-theme";
 import { computeITResponse } from "./utils/it-response";
 import { isSacredSegue, isJamSegmentTitle, getSacredSegueTransition } from "./data/band-config";
-import { classifyStemSection, detectSolo, computeVocalWarmth, computeGuitarColorTemp } from "./utils/stem-features";
+import { classifyStemSection, detectSolo } from "./utils/stem-features";
 import type { StemSectionType } from "./utils/stem-features";
 import { getSectionVocabulary, composeSectionWithJamCycle } from "./utils/section-vocabulary";
 import { detectGroove, grooveModifiers } from "./utils/groove-detector";
@@ -82,8 +82,6 @@ import { NowPlaying } from "./components/NowPlaying";
 import { SongPositionIndicator } from "./components/SongPositionIndicator";
 import { JamTimer } from "./components/JamTimer";
 import { UpNextTeaser } from "./components/UpNextTeaser";
-import { computeHarmonicResponse } from "./utils/harmonic-response";
-import { detectModalColor } from "./utils/modal-color";
 import { computeFatigueDampening } from "./utils/visual-fatigue";
 import { detectStemInterplay } from "./utils/stem-interplay";
 import { detectPhrase } from "./utils/phrase-detector";
@@ -97,7 +95,7 @@ import { LyricFragment } from "./components/LyricFragment";
 import { WaveformOverlay } from "./components/WaveformOverlay";
 import { GuitarStrings } from "./components/GuitarStrings";
 import { MeshDeformationGrid } from "./components/MeshDeformationGrid";
-import { computeStemCharacter, computeSustainedDominance } from "./utils/stem-character";
+import { computeStemCharacter } from "./utils/stem-character";
 import { TimeDilationProvider } from "./data/TimeDilationContext";
 import { computeReactiveTriggers } from "./utils/reactive-triggers";
 
@@ -401,17 +399,13 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
   // Stem-derived features (per-frame)
   const stemSection = classifyStemSection(audioSnapshot);
   const soloState = detectSolo(audioSnapshot);
-  const vocalWarmth = computeVocalWarmth(audioSnapshot);
-  const guitarColorTemp = computeGuitarColorTemp(audioSnapshot);
+  // vocalWarmth and guitarColorTemp removed — were only feeding EnergyEnvelope hue modifiers (now stripped)
   const stemInterplay = detectStemInterplay(f, frameIdx);
   const phraseState = detectPhrase(f, frameIdx, tempo);
   const stemCharacter = computeStemCharacter(audioSnapshot);
 
   // Jerry's Golden Hour: when Jerry has dominated for 30+ frames, amplify golden warmth
-  const sustainedDom = computeSustainedDominance(f, frameIdx, 30);
-  const jerryGoldenHour = stemCharacter.dominant === "jerry" && sustainedDom.dominant === "guitar" && sustainedDom.fraction > 0.7;
-  const effectiveStemHue = jerryGoldenHour ? stemCharacter.hueShift * 1.0 : stemCharacter.hueShift; // already 60 from the boosted values
-  const effectiveStemSat = jerryGoldenHour ? Math.min(1.5, stemCharacter.saturationMult * 1.15) : stemCharacter.saturationMult;
+  // effectiveStemHue/Sat removed — were only feeding EnergyEnvelope hue modifiers (now stripped)
 
   // Coherence detection — "IT" detector
   const coherenceState = computeCoherence(f, frameIdx);
@@ -527,9 +521,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
     isDrumsSpace,
   });
 
-  // ─── Harmonic response + modal coloring (per-frame) ───
-  const harmonicResponse = computeHarmonicResponse(f, frameIdx, audioSnapshot);
-  const modalColor = detectModalColor(f, frameIdx, sectionType);
+  // harmonicResponse and modalColor removed — were only feeding EnergyEnvelope hue modifiers (now stripped)
 
   // End screen overlay dimming (last 20s)
   const endScreenMult = endScreenOverlayMult(frame, durationInFrames);
@@ -592,11 +584,27 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
     props.show?.songs.length ?? 0,
   );
 
-  // Overlay density: product of all modifiers, hard-clamped to ensure visibility.
-  // Dead iconography (bears, stealies, roses) must always be perceptible.
-  const rawDensityMult = climaxMod.overlayDensityMult * (jamEvolution.isLongJam ? jamEvolution.densityMult : 1) * sectionVocab.overlayDensityMult * narrativeDirective.overlayDensityMult * endScreenMult * venueProfile.overlayDensityMult * crowdDensityMult * fatigue.densityMult * stemInterplay.densityMult * peakOfShow.densityMult * tempoLock.overlayBreathing * crowdEnergy.densityMult * stemCharacter.overlayDensityMult * (0.7 + 0.3 * narrativeDirective.abstractionLevel);
-  // Hard floor: overlays never go below 15% density (except end screen)
-  const combinedDensityMult = endScreenMult < 0.01 ? 0 : Math.max(0.15, rawDensityMult);
+  // Overlay density: use the most relevant 1-2 factors for current context.
+  // Previous 12-factor product collapsed to near-zero (0.85^12 = 0.14).
+  // Now: pick the dominant context, apply it directly.
+  let rawDensityMult = 1.0;
+  if (endScreenMult < 0.01) {
+    rawDensityMult = 0;
+  } else if (peakOfShow.densityMult < 0.8) {
+    // Peak of show: clear the field for transcendence
+    rawDensityMult = peakOfShow.densityMult;
+  } else if (climaxMod.overlayDensityMult > 1.2) {
+    // Climax: boost overlays
+    rawDensityMult = climaxMod.overlayDensityMult;
+  } else if (jamEvolution.isLongJam) {
+    // Long jam: use jam density
+    rawDensityMult = jamEvolution.densityMult;
+  } else {
+    // Normal: section vocabulary is the right authority
+    rawDensityMult = sectionVocab.overlayDensityMult;
+  }
+  // Floor at 0.40 — overlays should be visible when present
+  const combinedDensityMult = endScreenMult < 0.01 ? 0 : Math.max(0.40, rawDensityMult);
   const opacityMap = opacityMapBase ? applyDensityMult(opacityMapBase, combinedDensityMult, continuousResult?.alwaysActive ?? rotationSchedule?.alwaysActive ?? []) : null;
 
   // ─── Lyric trigger suppression ───
@@ -695,7 +703,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
       <div style={{ position: "absolute", inset: 0, opacity }}>
         <CameraMotion frames={f} jamEvolution={jamEvolution} bass={audioSnapshot.bass} cameraFreeze={counterpoint.cameraFreeze || itState.cameraLock || introFactor < 0.5} drumsSpacePhase={drumsSpaceState?.subPhase} fastEnergy={audioSnapshot.fastEnergy} vocalPresence={audioSnapshot.vocalPresence} isSolo={soloState.isSolo} soloIntensity={soloState.intensity} grooveMotionMult={grooveMods.motionMult * fatigue.motionMult * stemInterplay.motionMult * peakOfShow.motionMult * crowdEnergy.motionMult * narrativeDirective.motionMult * stemCharacter.motionMult} groovePulseMult={grooveMods.pulseMult * phraseState.zoomBreathing * tempoLock.zoomPulse * regularityStabilityMod} sectionDriftMult={sectionVocab.driftSpeedMult} cameraSteadiness={Math.max(0, Math.min(1, sectionVocab.cameraSteadiness + setTheme.cameraSteadinessOffset))} cameraDrama={climaxMod.cameraDrama} itSnapZoom={itState.snapZoom}>
         <EraGrade>
-        <EnergyEnvelope snapshot={audioSnapshot} climaxMod={climaxMod} jamColorTemp={jamEvolution.isLongJam ? jamEvolution.colorTemperature : undefined} calibration={energyCalibration} counterpointSatMult={counterpoint.saturationMult} brightnessCounterpoint={counterpoint.brightnessCounterpoint} drumsSpacePhase={drumsSpaceState?.subPhase} showPhase={narrative?.state.showPhase} songIdentity={songIdentity} showArcModifiers={showArcModifiers} itLuminanceLift={itState.luminanceLift} itSaturationSurge={itState.saturationSurge} itVignettePull={itState.vignettePull} vocalWarmth={vocalWarmth} guitarColorTemp={guitarColorTemp} deadAirFactor={deadAirFactor} narrativeBrightness={narrativeDirective.brightnessOffset + sectionVocab.brightnessOffset + fatigue.brightnessOffset + phraseState.brightnessBreathing + peakOfShow.brightnessBoost + crowdEnergy.energyBaselineOffset} narrativeTemperature={narrativeDirective.temperature + grooveMods.temperatureShift + (grooveMods.regularity > 0.6 ? 0.05 : grooveMods.regularity < 0.3 ? -0.05 : 0)} introFactor={introFactor} isSolo={soloState.isSolo} soloIntensity={soloState.intensity} harmonicBrightness={harmonicResponse.brightnessOffset} harmonicSatMult={harmonicResponse.saturationMult} modalHueShift={modalColor.hueShift} modalSatOffset={modalColor.satOffset + fatigue.saturationOffset + phraseState.saturationBreathing + peakOfShow.saturationBoost} narrativeSatOffset={narrativeDirective.saturationOffset} stemCharacterHue={effectiveStemHue} stemCharacterSat={effectiveStemSat} stemCharacterBright={stemCharacter.brightnessOffset} stemCharacterTemp={stemCharacter.temperature}>
+        <EnergyEnvelope snapshot={audioSnapshot} climaxMod={climaxMod} calibration={energyCalibration} drumsSpacePhase={drumsSpaceState?.subPhase} itLuminanceLift={itState.luminanceLift} itSaturationSurge={itState.saturationSurge} itVignettePull={itState.vignettePull} deadAirFactor={deadAirFactor} introFactor={introFactor}>
           <div style={{ position: "absolute", inset: 0, opacity: focusState.shaderOpacity * (0.45 + 0.55 * introFactor) * (1 - deadAirFactor) }}>
           <SilentErrorBoundary name="SceneRouter">
             {(() => {

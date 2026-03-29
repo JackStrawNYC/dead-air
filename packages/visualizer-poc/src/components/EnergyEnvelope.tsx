@@ -1,13 +1,12 @@
 /**
  * EnergyEnvelope — continuous visual modulation based on audio energy.
  *
- * Wraps children inside EraGrade and applies per-frame CSS filters + bloom
- * based on the pre-computed AudioSnapshot. All modulations are subtle
- * (10-20% range) so they compose cleanly with EraGrade's per-era color grading.
- * Vignette is handled exclusively by GLSL shaders to avoid double-vignette.
+ * Drives brightness, saturation, and hue via GLSL uniforms (EnvelopeContext).
+ * Stripped to essentials: energy-driven brightness with real dynamic range,
+ * drums/space hue shifts, IT coherence lock saturation surge.
  *
- * Quiet passages: cooler, slightly desaturated
- * Loud passages:  warmer, saturated, warm bloom
+ * Quiet passages: dark (30% brightness)
+ * Loud passages:  bright (100%+), with climax boost
  */
 
 import React from "react";
@@ -15,10 +14,6 @@ import { energyToFactor } from "../utils/energy";
 import type { EnergyCalibration } from "../utils/energy";
 import type { AudioSnapshot } from "../utils/audio-reactive";
 import type { ClimaxModulation } from "../utils/climax-state";
-import { useShowContext } from "../data/ShowContext";
-import { getEraPreset } from "../data/era-presets";
-import type { SongIdentity } from "../data/song-identities";
-import type { ShowArcModifiers } from "../data/show-arc";
 import { EnvelopeProvider } from "../data/EnvelopeContext";
 
 interface Props {
@@ -26,197 +21,70 @@ interface Props {
   snapshot: AudioSnapshot;
   children: React.ReactNode;
   climaxMod?: ClimaxModulation;
-  /** Jam evolution color temperature (-1 cool to +1 warm). Only set for long jams. */
-  jamColorTemp?: number;
   /** Per-song energy calibration (auto-derived from recording percentiles) */
   calibration?: EnergyCalibration;
-  /** Counterpoint saturation multiplier (0.4-1.3) */
-  counterpointSatMult?: number;
   /** Drums/Space sub-phase for phase-specific color adjustments */
   drumsSpacePhase?: string;
-  /** Show narrative phase for show-level arc modulation */
-  showPhase?: string;
-  /** Per-song visual identity for hue/saturation modifiers */
-  songIdentity?: SongIdentity;
-  /** Show arc modifiers for phase-level color modulation */
-  showArcModifiers?: ShowArcModifiers;
   /** IT response luminance lift (additive brightness) */
   itLuminanceLift?: number;
   /** IT saturation surge multiplier (1.0 = normal, up to 2.5 at transcendent lock) */
   itSaturationSurge?: number;
   /** IT vignette pull (0 = normal, 0.3 = tight tunnel focus) */
   itVignettePull?: number;
-  /** Vocal warmth factor 0-1 (from stem-features) */
-  vocalWarmth?: number;
-  /** Guitar color temperature -1 (cool) to +1 (warm) */
-  guitarColorTemp?: number;
   /** Dead air factor (0 = music playing, 1 = fully in dead air/applause) */
   deadAirFactor?: number;
-  /** Narrative brightness offset (-0.2 to +0.2) from visual narrator */
-  narrativeBrightness?: number;
-  /** Narrative color temperature (-1 cool to +1 warm) from visual narrator */
-  narrativeTemperature?: number;
   /** Intro factor 0-1: 0 = intro period (suppress reactive brightness), 1 = engine fully open */
   introFactor?: number;
-  /** Whether a solo is detected */
-  isSolo?: boolean;
-  /** Solo intensity (0-1) */
-  soloIntensity?: number;
-  /** Harmonic response brightness offset (-0.08 to +0.12) */
-  harmonicBrightness?: number;
-  /** Harmonic response saturation multiplier (0.85-1.15) */
-  harmonicSatMult?: number;
-  /** Modal analysis hue shift in degrees (-60 to +37) */
-  modalHueShift?: number;
-  /** Modal analysis saturation offset (-0.13 to +0.104) */
-  modalSatOffset?: number;
-  /** Brightness counterpoint (-0.1..+0.1): brief dim on transients for drama */
-  brightnessCounterpoint?: number;
-  /** Narrative saturation offset from visual narrator (-0.3 to +0.3) */
-  narrativeSatOffset?: number;
-  /** Stem character hue shift: Jerry=+30 (gold), Phil=-40 (indigo), drums=+15 */
-  stemCharacterHue?: number;
-  /** Stem character saturation mult: 0.9-1.3 */
-  stemCharacterSat?: number;
-  /** Stem character brightness offset: -0.05 to +0.08 */
-  stemCharacterBright?: number;
-  /** Stem character temperature: -1 (Phil/cool) to +1 (Jerry/warm) */
-  stemCharacterTemp?: number;
 }
 
-// Per-era bloom color — matches era grade for visual cohesion
-const ERA_BLOOM: Record<string, string> = {
-  primal:        "rgba(200,150,80,0.18)",    // amber warmth, 16mm film
-  classic:       "rgba(255,220,180,0.15)",   // golden-era warm
-  hiatus:        "rgba(120,160,220,0.12)",   // cool blue, restrained
-  touch_of_grey: "rgba(255,245,230,0.20)",   // bright white, stadium punch
-  revival:       "rgba(220,200,170,0.14)",   // neutral warm
-};
-const DEFAULT_BLOOM = ERA_BLOOM.classic;
-
-export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod, jamColorTemp, calibration, counterpointSatMult = 1, brightnessCounterpoint = 0, drumsSpacePhase, showPhase, songIdentity, showArcModifiers, itLuminanceLift, itSaturationSurge = 1, itVignettePull = 0, vocalWarmth, guitarColorTemp, deadAirFactor = 0, narrativeBrightness = 0, narrativeTemperature = 0, introFactor = 1, isSolo = false, soloIntensity = 0, harmonicBrightness = 0, harmonicSatMult = 1, modalHueShift = 0, modalSatOffset = 0, narrativeSatOffset = 0, stemCharacterHue = 0, stemCharacterSat = 1, stemCharacterBright = 0, stemCharacterTemp = 0 }) => {
+export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod, calibration, drumsSpacePhase, itLuminanceLift = 0, itSaturationSurge = 1, itVignettePull = 0, deadAirFactor = 0, introFactor = 1 }) => {
   const energy = snapshot.energy;
   const low = calibration?.quietThreshold;
   const high = calibration?.loudThreshold;
   const factor = energyToFactor(energy, low, high); // 0 (quiet) → 1 (loud)
-  const showCtx = useShowContext();
-
-  // Slow-moving energy for bloom — drifts, doesn't pulse
-  const slowFactor = energyToFactor(snapshot.slowEnergy, low, high);
 
   // Intro damping: suppress ALL reactive brightness during intro so art/text shines
-  // introFactor 0 = full intro (no reactivity), 1 = engine fully open
   const reactivity = introFactor;
 
-  // ── Multi-field modulations (gentle — felt, not seen) ──
-  // Onset brightness: DISABLED — was a major strobe source even at low values.
-  // The onset energy still drives GLSL onset saturation (much more subtle).
-  const onsetBrightness = 0;
-
-  // Era-specific color adjustments (hue shift only — saturation handled by GLSL)
-  const eraPreset = getEraPreset(showCtx?.era ?? "");
-  const eraColorTempShift = eraPreset?.colorTempShift ?? 0;
-
-  // GLSL owns color grading (saturation + contrast via cinematicGrade).
-  // CSS handles brightness + hue only to avoid compound color crushing.
-  // Previous CSS saturate/contrast compounded with GLSL tone mapping:
-  //   0.70 × 0.75 = 0.525 effective saturation — too muted.
-  const cssGate = factor; // 0 during quiet, 1 during loud (already smoothstep-based)
+  // ── Brightness: real dynamic range ──
+  // Quiet (factor=0) → 0.30 brightness. Loud (factor=1) → 1.0 brightness.
+  // Climax can push above 1.0 up to cap. This is the core visual dynamic range.
   const isClimaxPhase = (climaxMod?.brightnessOffset ?? 0) > 0.04;
-  const brightCap = isClimaxPhase ? 1.55 : 1.30;
-  // Gate all energy-reactive brightness by reactivity (0 during intro, 1 when engine open)
-  // fastEnergy at 0.08 with beatStability gating: only fires on real beats, not noise.
-  // Beat-gated: stability 0.2→full punch at 0.5, graceful fade at low confidence.
+  const brightCap = isClimaxPhase ? 1.45 : 1.20;
   const transientPunch = (snapshot.fastEnergy ?? 0) * 0.08 * Math.min(1, (snapshot.beatStability ?? 0.5) + 0.3);
-  const brightness = Math.min(brightCap, 0.96 + factor * 0.16 * reactivity + (climaxMod?.brightnessOffset ?? 0) * reactivity + transientPunch * reactivity);
+  const brightness = 0.30 + factor * 0.70 * reactivity + (climaxMod?.brightnessOffset ?? 0) * reactivity + transientPunch * reactivity;
 
-  // Drums/Space phase adjustments (brightness + hue only — saturation/contrast handled by GLSL)
+  // Drums/Space phase adjustments
   let dsBrightOffset = 0;
   let dsHueOffset = 0;
   if (drumsSpacePhase === "space_ambient") {
-    dsBrightOffset = -0.10; // darkness
+    dsBrightOffset = -0.10;
     dsHueOffset = 15;       // blue shift
   } else if (drumsSpacePhase === "drums_tribal") {
-    dsBrightOffset = +0.06;  // primal energy glow
-    dsHueOffset = 12;        // warmth shift
+    dsBrightOffset = +0.06;
+    dsHueOffset = 12;       // warmth shift
   }
 
-  // Show narrative phase adjustments
-  let showBrightOffset = 0;
-  if (showPhase === "opening") {
-    showBrightOffset = 0.03;  // show is fresh
-  }
-
-  // Song identity modifiers
-  const siHueShift = songIdentity?.hueShift ?? 0;
-  const siPaletteBright = songIdentity?.palette?.brightness != null ? (songIdentity.palette.brightness - 1) * 0.2 : 0;
-
-  // Show arc modifiers
-  const arcBrightOffset = showArcModifiers?.brightnessOffset ?? 0;
-  const arcHueShift = showArcModifiers?.hueShift ?? 0;
-
-  // IT luminance lift
-  const itBrightLift = itLuminanceLift ?? 0;
-
-  // Vocal warmth: +25deg hue shift + brightness (saturation boost now handled by GLSL)
-  const vocalHueShift = (vocalWarmth ?? 0) * 25;
-
-  // Solo brightness + vocal brightness
-  const soloBrightLift = isSolo ? (soloIntensity * 0.10) : 0;
-  const vocalBrightLift = (vocalWarmth ?? 0) * 0.06;
-
-  // Energy-adaptive brightness floor: quiet passages always visible, peaks vivid.
-  // energy=0 → 0.60. energy 0.10 → 0.70. energy 0.30 → 0.85.
-  // Every song must show visuals — mellow songs like Loser get warm ambient brightness.
-  const energyFloor = 0.60 + Math.min(1, Math.max(0, (energy - 0.03) / 0.27)) * 0.30;
-  // Apply phase offsets + song identity + show arc + IT + narrative + solo + vocal + harmonic + stem character
-  const baseBrightness = Math.min(brightCap, Math.max(energyFloor, brightness + dsBrightOffset + showBrightOffset + siPaletteBright + arcBrightOffset + itBrightLift + narrativeBrightness + soloBrightLift + vocalBrightLift + harmonicBrightness + brightnessCounterpoint + stemCharacterBright));
-  // During dead air, dim brightness toward 0.55 (minimum floor) and suppress bloom
+  // Final brightness: floor at 0.15 (safety only), cap at brightCap
+  const baseBrightness = Math.min(brightCap, Math.max(0.15, brightness + dsBrightOffset + itLuminanceLift));
   const finalBrightness = deadAirFactor > 0
-    ? baseBrightness * (1 - deadAirFactor * 0.20)  // dim by up to 20% during dead air (crowd energy warmth)
+    ? baseBrightness * (1 - deadAirFactor * 0.40)  // dim significantly during dead air
     : baseBrightness;
 
-  // Guitar color temp: ±12deg hue shift based on Jerry's neck position
-  const guitarHueShift = (guitarColorTemp ?? 0) * 12;
+  // Palette sovereignty: only drums/space hue + dead air warmth
+  const totalHueShift = (dsHueOffset + deadAirFactor * 20) * (1 - deadAirFactor * 0.5);
 
-  // Chroma-based harmonic color: dominant pitch class modulates hue
-  // chromaHue (0-360) maps the 12 pitch classes to the color wheel.
-  // We offset from the song identity's primary hue (or 0) so the shift is relative.
-  // Scaled to ±10 degrees — subtle harmonic color breathing.
-  const songPrimaryHue = songIdentity?.palette?.primary ?? 0;
-  const chromaDelta = snapshot.chromaHue - (songPrimaryHue % 360);
-  // Normalize to [-180, 180] range, then scale to ±10 degrees
-  const chromaNorm = ((chromaDelta + 540) % 360) - 180;
-  // Extra chroma shift during jams/solos (40deg vs 20deg) — visible harmonic breathing
-  const isJamOrSolo = jamColorTemp != null; // jamColorTemp only set for long jams
-  const chromaMaxDeg = isJamOrSolo ? 40 : 20;
-  const chromaHueShift = chromaNorm * (chromaMaxDeg / 180) * Math.min(1, energy * 5); // gate by energy to avoid drift in silence
+  // Saturation: only IT surge (coherence lock is worth honoring)
+  const combinedSatMult = itSaturationSurge;
 
-  // Jam color temperature: warm shifts yellow, cool shifts blue (max ±12deg)
-  // Only applied during long jams. EraGrade + SongPalette handle base color character.
-  const jamHueShift = jamColorTemp != null ? jamColorTemp * 70 : 0; // ±70 degrees max — big visible arc
-  // Narrative temperature: ±20deg hue shift (warm = positive, cool = negative)
-  const narrativeHueShift = narrativeTemperature * 20;
-  // Solo hue warmth: +20deg shift when solo is active
-  const soloHueShift = isSolo ? soloIntensity * 20 : 0;
-  // Stem character hue + temperature: musician personality colors the whole frame
-  const stemTempHue = stemCharacterTemp * 15; // ±15deg from musician temperature
-  // Dead air warm hue: +20° toward orange/amber (crowd energy warmth)
-  const deadAirWarmth = deadAirFactor * 20;
-  // Partially preserve hue during dead air (50% suppression instead of full)
-  const totalHueShift = (jamHueShift + eraColorTempShift + dsHueOffset + siHueShift + arcHueShift + vocalHueShift + guitarHueShift + chromaHueShift + narrativeHueShift + soloHueShift + modalHueShift + stemCharacterHue + stemTempHue + deadAirWarmth) * (1 - deadAirFactor * 0.5);
-  // Combined saturation: counterpoint * harmonic * modal * narrative * IT surge * stem character
-  const combinedSatMult = counterpointSatMult * harmonicSatMult * (1 + modalSatOffset) * (1 + narrativeSatOffset) * itSaturationSurge * stemCharacterSat;
-
-  // Envelope values passed to GLSL via EnvelopeContext (no longer CSS filters).
-  // Hue converted from degrees to radians for GLSL rotation matrix.
+  // Envelope values passed to GLSL via EnvelopeContext
   const envelopeValues = {
     brightness: finalBrightness,
     saturation: combinedSatMult,
     hue: totalHueShift * (Math.PI / 180),
   };
 
-  // IT vignette tunnel focus: inset box-shadow creates cinematic tunnel effect during coherence lock
+  // IT vignette tunnel focus
   const vignetteStyle = itVignettePull > 0.01
     ? { boxShadow: `inset 0 0 ${Math.round(80 + itVignettePull * 200)}px ${Math.round(itVignettePull * 120)}px rgba(0,0,0,${(itVignettePull * 1.5).toFixed(2)})` }
     : undefined;

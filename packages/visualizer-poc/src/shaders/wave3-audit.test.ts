@@ -63,23 +63,13 @@ describe("Fix 3: PostProcess conditional compilation", () => {
     expect(glsl).not.toContain("barrelDistort");
   });
 
-  it("includes beat jolt by default", () => {
+  it("does not include beat jolt by default (stripped)", () => {
     const glsl = buildPostProcessGLSL();
-    expect(glsl).toContain("beatJolt");
-  });
-
-  it("excludes beat jolt when disabled", () => {
-    const glsl = buildPostProcessGLSL({ beatJoltEnabled: false });
     expect(glsl).not.toContain("beatJolt");
   });
 
-  it("includes light leak by default", () => {
+  it("does not include light leak by default (stripped)", () => {
     const glsl = buildPostProcessGLSL();
-    expect(glsl).toContain("lightLeak");
-  });
-
-  it("excludes light leak when disabled", () => {
-    const glsl = buildPostProcessGLSL({ lightLeakEnabled: false });
     expect(glsl).not.toContain("lightLeak");
   });
 
