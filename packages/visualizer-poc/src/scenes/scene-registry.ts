@@ -284,7 +284,7 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     spectralFamily: "tonal",
   },
   fractal_zoom: {
-    Component: FractalZoomScene,
+    Component: LiquidLightScene, // Redirected: fractal_zoom renders as liquid_light (Mandelbrot looks bad fullscreen)
     energyAffinity: "any",
     complement: "kaleidoscope",
     preferredTransitionIn: "morph",
