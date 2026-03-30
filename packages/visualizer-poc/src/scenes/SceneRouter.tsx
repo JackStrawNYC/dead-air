@@ -241,12 +241,11 @@ interface Props {
 }
 
 /**
- * Apply light recency tiebreaking to a shader mode pool.
- * Recency only breaks ties — it never overrides song identity preference.
- * Modes used in the last 2 songs get 1 copy; all others get 2 copies.
- * Never-used modes get NO bonus (variety for variety's sake produces bad results).
+ * Apply recency-weighted scoring to a shader mode pool.
+ * Instead of binary "used/unused" filtering, penalizes modes based on how recently
+ * and how frequently they were used. Modes used many songs ago get nearly full weight.
  *
- * @returns Pool with light recency tiebreaking applied
+ * @returns Weighted pool where less-recently-used modes appear more often
  */
 function applyRecencyWeighting(
   pool: VisualMode[],
@@ -256,14 +255,40 @@ function applyRecencyWeighting(
 ): VisualMode[] {
   if (usedShaderModes.size === 0) return pool;
 
+  // Build weighted pool: aggressively penalize recently-used modes, boost fresh ones.
+  // This breaks the "big 4" convergence where the same high-energy shaders
+  // recirculate via tight affinity pools.
+  const MAX_COPIES = 6;
+  const FRESH_BONUS = 2; // Extra copies for never-used modes
   const weighted: VisualMode[] = [];
 
   for (const mode of pool) {
-    const lastUsed = shaderModeLastUsed?.get(mode) ?? -1;
-    const songDistance = lastUsed >= 0 ? Math.max(1, currentSongIdx - lastUsed) : 999;
+    const count = usedShaderModes.get(mode) ?? 0;
+    if (count === 0) {
+      // Never used — strong boost to break convergence
+      for (let i = 0; i < MAX_COPIES + FRESH_BONUS; i++) weighted.push(mode);
+      continue;
+    }
 
-    // Light cooldown: modes used in last 2 songs get 1 copy, others get 2
-    const copies = songDistance <= 2 ? 1 : 2;
+    // Recency: how many songs ago was this mode last used?
+    const lastUsed = shaderModeLastUsed?.get(mode) ?? 0;
+    const songDistance = Math.max(1, currentSongIdx - lastUsed);
+
+    // Hard cooldown: modes used in last 2 songs get minimal representation
+    if (songDistance <= 2) {
+      weighted.push(mode); // 1 copy only — still selectable but heavily de-weighted
+      continue;
+    }
+
+    // Frequency penalty: 1/count (used once=1.0, twice=0.5, three=0.33)
+    const freqFactor = 1 / count;
+    // Recency bonus: modes used long ago recover toward full weight
+    // distance 3 → 0.60, distance 6 → 0.75, distance 12+ → 0.86+
+    const recencyFactor = 1 - 1 / (1 + songDistance * 0.5);
+
+    // Combined weight: 0→1 scale, then map to copy count (min 1)
+    const weight = freqFactor * recencyFactor;
+    const copies = Math.max(1, Math.round(weight * MAX_COPIES));
     for (let i = 0; i < copies; i++) weighted.push(mode);
   }
 
@@ -326,14 +351,11 @@ export function getModeForSection(
           let candidates = affinityPool.filter((m) => energySet.has(m));
           if (candidates.length === 0) candidates = affinityPool;
 
-          // Preferred modes get 3x weight in affinity pool
-          if (songIdentity?.preferredModes?.length) {
+          // Preferred mode awareness: intersect with preferred modes first
+          if (songIdentity?.preferredModes?.length && seed !== undefined) {
             const preferredSet = new Set(songIdentity.preferredModes);
             const preferredCandidates = candidates.filter((m) => preferredSet.has(m));
-            if (preferredCandidates.length > 0) {
-              // Boost preferred modes that are also in the affinity pool
-              for (const m of preferredCandidates) candidates.push(m, m); // 3x total
-            }
+            if (preferredCandidates.length > 0) candidates = preferredCandidates;
           }
 
           // Recency-weighted variety: penalize recently/frequently used modes
@@ -367,16 +389,17 @@ export function getModeForSection(
         filteredPool = applyRecencyWeighting(pool, usedShaderModes, shaderModeLastUsed, trackNumber ?? 0);
       }
 
-      // Preferred modes get 3x weight but energy pool stays available.
-      // Default mode always included at 2x as reliable fallback.
+      // Preferred-first pool: show modes + preferred + generous registry splash
       if (songIdentity?.preferredModes?.length && seed !== undefined) {
-        const weightedPool: VisualMode[] = [...filteredPool]; // keep energy pool at 1x
-        for (const m of songIdentity.preferredModes) {
-          weightedPool.push(m, m, m); // 3x weight
-        }
-        // Default mode as reliable fallback (fills screen, uses palette)
-        weightedPool.push(song.defaultMode, song.defaultMode);
-        filteredPool = weightedPool;
+        const showModes = getShowModesForSong(songIdentity.preferredModes, seed, song.title);
+        const showModeSet = new Set(showModes);
+        const remainingPreferred = songIdentity.preferredModes.filter((m) => !showModeSet.has(m));
+        // Strict preferred-only pool: song identity controls the visual.
+        // No registry splash — curated modes only, no random off-brand shaders.
+        const weightedPool: VisualMode[] = [];
+        for (const m of showModes) { for (let i = 0; i < 3; i++) weightedPool.push(m); }
+        for (const m of remainingPreferred) { for (let i = 0; i < 2; i++) weightedPool.push(m); }
+        if (weightedPool.length > 0) filteredPool = weightedPool;
       }
 
       // Stem section bias: route shaders by what the band is doing

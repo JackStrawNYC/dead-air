@@ -19,7 +19,7 @@
 
 import React, { useMemo, useRef, useEffect } from "react";
 import * as THREE from "three";
-import { staticFile, useCurrentFrame, useVideoConfig, interpolate } from "remotion";
+import { staticFile, useCurrentFrame, useVideoConfig, interpolate, delayRender, continueRender } from "remotion";
 import { SceneRouter } from "./scenes/SceneRouter";
 import { SceneCrossfade } from "./scenes/SceneCrossfade";
 import { SegueCrossfade } from "./scenes/SegueCrossfade";
@@ -237,17 +237,53 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
     [songIdentity, durationInFrames, showSeed, props.song.trackId],
   );
 
-  // Load icon textures on demand, cache in a ref
-  const iconTextureCache = useRef<Map<string, THREE.Texture>>(new Map());
-  const currentIconRef = useRef<{ path: string; texture: THREE.Texture | null }>({ path: "", texture: null });
+  // Pre-load ALL icon textures at mount time using delayRender.
+  // This blocks Remotion's frame capture until every texture is loaded,
+  // so the GLSL overlay pass always has a texture ready.
+  const iconTextureMap = useRef<Map<string, THREE.Texture>>(new Map());
+  const [iconTexturesReady, setIconTexturesReady] = React.useState(false);
 
-  // Clean up textures on unmount
   useEffect(() => {
+    const uniquePaths = [...new Set(iconSchedule)].filter(Boolean);
+    if (uniquePaths.length === 0) {
+      setIconTexturesReady(true);
+      return;
+    }
+
+    const handle = delayRender("Loading icon overlay textures");
+    const loader = new THREE.TextureLoader();
+    let loaded = 0;
+
+    for (const iconPath of uniquePaths) {
+      loader.load(
+        staticFile(iconPath),
+        (tex) => {
+          tex.minFilter = THREE.LinearFilter;
+          tex.magFilter = THREE.LinearFilter;
+          iconTextureMap.current.set(iconPath, tex);
+          loaded++;
+          if (loaded >= uniquePaths.length) {
+            setIconTexturesReady(true);
+            continueRender(handle);
+          }
+        },
+        undefined,
+        () => {
+          // Texture failed to load — continue without it
+          loaded++;
+          if (loaded >= uniquePaths.length) {
+            setIconTexturesReady(true);
+            continueRender(handle);
+          }
+        },
+      );
+    }
+
     return () => {
-      iconTextureCache.current.forEach((tex) => tex.dispose());
-      iconTextureCache.current.clear();
+      iconTextureMap.current.forEach((tex) => tex.dispose());
+      iconTextureMap.current.clear();
     };
-  }, []);
+  }, [iconSchedule]);
 
   // ─── Show arc phase ───
   const showArcPhase = useMemo((): ShowArcPhase | undefined => {
@@ -713,32 +749,15 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
   // ─── Icon overlay state (per-frame) ───
   const iconState = getIconForFrame(iconSchedule, frame, audioSnapshot.energy);
 
-  // Load texture for current icon (lazy, cached)
-  if (iconState.iconPath && iconState.iconPath !== currentIconRef.current.path) {
-    const cached = iconTextureCache.current.get(iconState.iconPath);
-    if (cached) {
-      currentIconRef.current = { path: iconState.iconPath, texture: cached };
-    } else {
-      // Load async — texture will appear on next frame
-      currentIconRef.current = { path: iconState.iconPath, texture: null };
-      try {
-        const loader = new THREE.TextureLoader();
-        loader.load(staticFile(iconState.iconPath), (tex) => {
-          tex.minFilter = THREE.LinearFilter;
-          tex.magFilter = THREE.LinearFilter;
-          iconTextureCache.current.set(iconState.iconPath, tex);
-          currentIconRef.current = { path: iconState.iconPath, texture: tex };
-        });
-      } catch {
-        // Texture load failed — continue without icon
-      }
-    }
-  }
+  // Look up pre-loaded texture (loaded at mount via delayRender)
+  const currentIconTexture = iconTexturesReady && iconState.iconPath
+    ? iconTextureMap.current.get(iconState.iconPath) ?? null
+    : null;
 
-  const iconOverlayValue = useMemo(() => ({
-    texture: currentIconRef.current.texture,
-    opacity: iconState.opacity * (1 - deadAirFactor), // fade out during dead air
-  }), [currentIconRef.current.texture, iconState.opacity, deadAirFactor]);
+  const iconOverlayValue = {
+    texture: currentIconTexture,
+    opacity: currentIconTexture ? iconState.opacity * (1 - deadAirFactor) : 0,
+  };
 
   // ─── Render ───
   return (
