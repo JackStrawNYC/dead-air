@@ -181,9 +181,9 @@ void main() {
   // ─── Sample shader background ───
   vec3 bg = texture2D(uBackgroundTexture, uv).rgb;
 
-  // ─── Noise dissolve for transitions between images ───
-  float dissolveNoise = snoise(vec3(p * 2.5, uDynamicTime * 0.08)) * 0.5 + 0.5;
-  float dissolveThreshold = smoothstep(0.0, 1.0, uOpacity * 1.4 - dissolveNoise * 0.5);
+  // ─── Noise dissolve for smooth organic transitions between images ───
+  float dissolveNoise = snoise(vec3(p * 1.5, uDynamicTime * 0.05)) * 0.5 + 0.5;
+  float dissolveThreshold = smoothstep(0.0, 1.0, uOpacity * 1.2 - dissolveNoise * 0.3);
 
   // ─── Image-primary compositing ───
   // The image IS the visual. Black areas of the image let the shader through.

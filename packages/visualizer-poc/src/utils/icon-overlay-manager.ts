@@ -337,6 +337,8 @@ export function getIconForFrame(
   if (schedule.length === 0) return { iconPath: "", opacity: 0 };
 
   const WINDOW_FRAMES = 360; // 12 seconds per icon
+  const FADE_IN_FRAMES = 90;  // 3s smooth fade-in
+  const FADE_OUT_FRAMES = 90; // 3s smooth fade-out (crossfade overlap)
 
   const windowIdx = Math.min(
     schedule.length - 1,
@@ -352,18 +354,21 @@ export function getIconForFrame(
     ? 0.30 : 0;
 
   // Energy modulation within the section presence range
-  // Quiet within a verse = slightly less; loud within a verse = full presence
   const energyMod = 0.85 + energy * 0.15;
 
   const baseOpacity = Math.min(1.0, (sectionPresence + climaxBoost) * energyMod);
 
-  // Quick fade-in at start of each window (1.5 seconds)
-  const FADE_IN_FRAMES = 45;
-  const fadeIn = Math.min(1.0, frameInWindow / FADE_IN_FRAMES);
+  // Smooth eased fade-in and fade-out for organic transitions
+  const fadeInT = Math.min(1.0, frameInWindow / FADE_IN_FRAMES);
+  const fadeIn = fadeInT * fadeInT * (3 - 2 * fadeInT); // smoothstep
+  const framesLeft = WINDOW_FRAMES - frameInWindow;
+  const isLastWindow = windowIdx >= schedule.length - 1;
+  const fadeOutT = isLastWindow ? 1.0 : Math.min(1.0, framesLeft / FADE_OUT_FRAMES);
+  const fadeOut = fadeOutT * fadeOutT * (3 - 2 * fadeOutT); // smoothstep
 
   return {
     iconPath: schedule[windowIdx],
-    opacity: baseOpacity * fadeIn,
+    opacity: baseOpacity * fadeIn * fadeOut,
   };
 }
 
