@@ -17,7 +17,8 @@
  *   └─ AudioLayer (song audio + crowd ambience)
  */
 
-import React, { useMemo } from "react";
+import React, { useMemo, useRef, useEffect } from "react";
+import * as THREE from "three";
 import { staticFile, useCurrentFrame, useVideoConfig, interpolate } from "remotion";
 import { SceneRouter } from "./scenes/SceneRouter";
 import { SceneCrossfade } from "./scenes/SceneCrossfade";
@@ -98,6 +99,8 @@ import { MeshDeformationGrid } from "./components/MeshDeformationGrid";
 import { computeStemCharacter } from "./utils/stem-character";
 import { TimeDilationProvider } from "./data/TimeDilationContext";
 import { computeReactiveTriggers } from "./utils/reactive-triggers";
+import { IconOverlayProvider } from "./data/IconOverlayContext";
+import { buildIconSchedule, getIconForFrame } from "./utils/icon-overlay-manager";
 
 // Extracted sub-components
 import { SongArtLayer } from "./components/song-visualizer/SongArtLayer";
@@ -227,6 +230,24 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
     if (analysis?.frames?.length) return deriveChromaPalette(analysis.frames, showSeed);
     return undefined;
   }, [props.song.palette, songIdentity, analysis, showSeed]);
+
+  // ─── Icon overlay schedule (image-based Dead icons rendered through GLSL) ───
+  const iconSchedule = useMemo(
+    () => buildIconSchedule(songIdentity, durationInFrames, showSeed ?? 0, props.song.trackId),
+    [songIdentity, durationInFrames, showSeed, props.song.trackId],
+  );
+
+  // Load icon textures on demand, cache in a ref
+  const iconTextureCache = useRef<Map<string, THREE.Texture>>(new Map());
+  const currentIconRef = useRef<{ path: string; texture: THREE.Texture | null }>({ path: "", texture: null });
+
+  // Clean up textures on unmount
+  useEffect(() => {
+    return () => {
+      iconTextureCache.current.forEach((tex) => tex.dispose());
+      iconTextureCache.current.clear();
+    };
+  }, []);
 
   // ─── Show arc phase ───
   const showArcPhase = useMemo((): ShowArcPhase | undefined => {
@@ -689,12 +710,43 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
     return getSacredSegueTransition(props.song.title, songs[idx + 1].title);
   }, [isSacredSegueOut, props.show, props.song.trackId, props.song.title]);
 
+  // ─── Icon overlay state (per-frame) ───
+  const iconState = getIconForFrame(iconSchedule, frame, audioSnapshot.energy);
+
+  // Load texture for current icon (lazy, cached)
+  if (iconState.iconPath && iconState.iconPath !== currentIconRef.current.path) {
+    const cached = iconTextureCache.current.get(iconState.iconPath);
+    if (cached) {
+      currentIconRef.current = { path: iconState.iconPath, texture: cached };
+    } else {
+      // Load async — texture will appear on next frame
+      currentIconRef.current = { path: iconState.iconPath, texture: null };
+      try {
+        const loader = new THREE.TextureLoader();
+        loader.load(staticFile(iconState.iconPath), (tex) => {
+          tex.minFilter = THREE.LinearFilter;
+          tex.magFilter = THREE.LinearFilter;
+          iconTextureCache.current.set(iconState.iconPath, tex);
+          currentIconRef.current = { path: iconState.iconPath, texture: tex };
+        });
+      } catch {
+        // Texture load failed — continue without icon
+      }
+    }
+  }
+
+  const iconOverlayValue = useMemo(() => ({
+    texture: currentIconRef.current.texture,
+    opacity: iconState.opacity * (1 - deadAirFactor), // fade out during dead air
+  }), [currentIconRef.current.texture, iconState.opacity, deadAirFactor]);
+
   // ─── Render ───
   return (
     <div style={{ width, height, position: "relative", overflow: "hidden", background: "#000" }}>
       <ShowNarrativeProvider totalSongs={props.show?.songs.length ?? 1} initialState={props.narrativeState ? { ...props.narrativeState, usedOverlayIds: new Set(props.narrativeState.predictedOverlayIds ?? []) } : undefined}>
       <ShowContextProvider show={props.show}>
       <AudioSnapshotProvider snapshot={audioSnapshot}>
+      <IconOverlayProvider value={iconOverlayValue}>
       <HeroPermittedProvider permitted={narrativeDirective.heroPermitted}>
       <JamPhaseProvider value={{ phase: jamEvolution.isLongJam ? JAM_PHASE_INDEX[jamEvolution.phase] : -1, progress: jamEvolution.phaseProgress }}>
       <PeakOfShowProvider value={peakOfShow.intensity}>
@@ -905,6 +957,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
       </PeakOfShowProvider>
       </JamPhaseProvider>
       </HeroPermittedProvider>
+      </IconOverlayProvider>
 
       <AudioLayer
         audioFile={props.song.audioFile}

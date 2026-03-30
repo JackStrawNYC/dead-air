@@ -19,6 +19,8 @@ import { compute3DCamera } from "../utils/camera-3d";
 import { useSceneConfig } from "../scenes/SceneConfigContext";
 import { useEnvelopeValues } from "../data/EnvelopeContext";
 import { fxaaVert, fxaaFrag } from "../shaders/shared/fxaa.glsl";
+import { useIconOverlay } from "../data/IconOverlayContext";
+import { noiseGLSL } from "../shaders/noise";
 
 /** Era saturation values — previously in EraGrade CSS, now owned by GLSL */
 const ERA_SATURATION: Record<string, number> = {
@@ -66,6 +68,76 @@ void main() {
 }
 `;
 
+/** Icon overlay composite shader — screen blends an image icon over the shader output */
+const ICON_OVERLAY_FRAG = /* glsl */ `
+precision highp float;
+
+${noiseGLSL}
+
+uniform sampler2D uIconTexture;
+uniform sampler2D uBackgroundTexture;
+uniform vec2 uResolution;
+uniform float uTime;
+uniform float uDynamicTime;
+uniform float uEnergy;
+uniform float uBass;
+uniform float uOnsetSnap;
+uniform float uSlowEnergy;
+uniform float uFastEnergy;
+uniform float uMusicalTime;
+uniform float uBeatConfidence;
+uniform float uOpacity;
+uniform float uPalettePrimary;
+
+varying vec2 vUv;
+
+void main() {
+  vec2 uv = vUv;
+  float aspect = uResolution.x / uResolution.y;
+  vec2 p = (uv - 0.5) * vec2(aspect, 1.0);
+
+  // Audio-reactive UV domain warp
+  float warpIntensity = uSlowEnergy * 0.06 + uFastEnergy * 0.03;
+  float warpX = snoise(vec3(p * 2.0, uDynamicTime * 0.15)) * warpIntensity;
+  float warpY = snoise(vec3(p * 2.0 + 100.0, uDynamicTime * 0.15)) * warpIntensity;
+
+  // Beat pulse micro-zoom
+  float bp = beatPulse(uMusicalTime) * smoothstep(0.3, 0.6, uBeatConfidence);
+  float beatScale = 1.0 - bp * 0.015;
+  vec2 beatUV = (uv - 0.5) * beatScale + 0.5;
+
+  // Onset jolt
+  float jolt = uOnsetSnap * 0.008;
+  vec2 joltOffset = vec2(sin(uTime * 7.3) * jolt, cos(uTime * 5.1) * jolt);
+
+  // Slow drift
+  vec2 drift = vec2(sin(uDynamicTime * 0.04) * 0.01, cos(uDynamicTime * 0.03) * 0.008);
+
+  vec2 warpedUV = beatUV + vec2(warpX, warpY) + joltOffset + drift;
+  vec4 iconColor = texture2D(uIconTexture, clamp(warpedUV, 0.0, 1.0));
+
+  // Noise dissolve
+  float dissolveNoise = snoise(vec3(p * 3.0, uDynamicTime * 0.1)) * 0.5 + 0.5;
+  float dissolveThreshold = smoothstep(0.0, 1.0, uOpacity * 1.3 - dissolveNoise * 0.4);
+
+  float iconLuma = dot(iconColor.rgb, vec3(0.299, 0.587, 0.114));
+
+  // Screen blend with background
+  vec3 bg = texture2D(uBackgroundTexture, uv).rgb;
+  vec3 screenBlend = 1.0 - (1.0 - bg) * (1.0 - iconColor.rgb);
+
+  float blendFactor = dissolveThreshold * iconLuma;
+
+  // Subtle palette tint
+  float palHue = uPalettePrimary * 6.28318;
+  vec3 tint = hsv2rgb(vec3(palHue / 6.28318, 0.15, 1.0));
+  vec3 tintedIcon = mix(screenBlend, screenBlend * tint, 0.08 * uEnergy);
+
+  vec3 finalColor = mix(bg, tintedIcon, blendFactor);
+  gl_FragColor = vec4(finalColor, 1.0);
+}
+`;
+
 interface Props {
   vertexShader: string;
   fragmentShader: string;
@@ -82,6 +154,7 @@ export const FullscreenQuad: React.FC<Props> = ({
   const sceneConfig = useSceneConfig();
   const envelope = useEnvelopeValues();
   const showCtx = useShowContext();
+  const iconOverlay = useIconOverlay();
   const eraKey = showCtx?.era ?? "";
   const eraSaturation = ERA_SATURATION[eraKey] ?? 1.0;
   const eraBrightness = ERA_BRIGHTNESS[eraKey] ?? 1.0;
@@ -98,15 +171,17 @@ export const FullscreenQuad: React.FC<Props> = ({
     fftTextureRef.current.needsUpdate = true;
   }
 
-  // Render targets for FXAA post-pass
+  // Render targets for FXAA post-pass + icon overlay
   const targetsRef = useRef<{
     main: THREE.WebGLRenderTarget;
+    iconOverlay: THREE.WebGLRenderTarget;
     fxaa: THREE.WebGLRenderTarget;
   } | null>(null);
 
   useEffect(() => {
     if (targetsRef.current) {
       targetsRef.current.main.dispose();
+      targetsRef.current.iconOverlay.dispose();
       targetsRef.current.fxaa.dispose();
     }
     const opts: THREE.RenderTargetOptions = {
@@ -117,10 +192,12 @@ export const FullscreenQuad: React.FC<Props> = ({
     };
     targetsRef.current = {
       main: new THREE.WebGLRenderTarget(width, height, opts),
+      iconOverlay: new THREE.WebGLRenderTarget(width, height, opts),
       fxaa: new THREE.WebGLRenderTarget(width, height, opts),
     };
     return () => {
       targetsRef.current?.main.dispose();
+      targetsRef.current?.iconOverlay.dispose();
       targetsRef.current?.fxaa.dispose();
       targetsRef.current = null;
     };
@@ -280,6 +357,38 @@ export const FullscreenQuad: React.FC<Props> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Icon overlay composite pass (between main shader and FXAA)
+  const iconPass = useMemo(() => {
+    const scene = new THREE.Scene();
+    const geo = new THREE.PlaneGeometry(2, 2);
+    const iconUniforms = {
+      uIconTexture: { value: null as THREE.Texture | null },
+      uBackgroundTexture: { value: null as THREE.Texture | null },
+      uResolution: { value: new THREE.Vector2(width, height) },
+      uTime: { value: 0 },
+      uDynamicTime: { value: 0 },
+      uEnergy: { value: 0 },
+      uBass: { value: 0 },
+      uOnsetSnap: { value: 0 },
+      uSlowEnergy: { value: 0 },
+      uFastEnergy: { value: 0 },
+      uMusicalTime: { value: 0 },
+      uBeatConfidence: { value: 0.5 },
+      uOpacity: { value: 0 },
+      uPalettePrimary: { value: 0 },
+    };
+    const mat = new THREE.ShaderMaterial({
+      vertexShader: PASSTHROUGH_VERT,
+      fragmentShader: ICON_OVERLAY_FRAG,
+      uniforms: iconUniforms,
+      depthWrite: false,
+      depthTest: false,
+    });
+    scene.add(new THREE.Mesh(geo, mat));
+    return { scene, uniforms: iconUniforms };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Initialize with a 1x1 dark texture to prevent black frame on mount
   const outputUniforms = useMemo(() => {
     const initTex = new THREE.DataTexture(new Uint8Array([5, 3, 8, 255]), 1, 1);
@@ -424,7 +533,7 @@ export const FullscreenQuad: React.FC<Props> = ({
   const camOffY = Math.cos(time * 2.3) * bassAmp * 0.3 + Math.cos(dynamicTime * 0.03 * Math.PI * 2 * 0.7 + 1.3) * 2.4;
   uniforms.uCamOffset.value.set(camOffX, camOffY);
 
-  // ── Render pipeline: main shader → FXAA → output ──
+  // ── Render pipeline: main shader → [icon overlay] → FXAA → output ──
   useFrame(() => {
     const targets = targetsRef.current;
     if (!targets) return;
@@ -434,8 +543,33 @@ export const FullscreenQuad: React.FC<Props> = ({
     gl.clear();
     gl.render(mainPass.scene, camera);
 
-    // Pass 1: FXAA anti-aliasing
-    fxaaPass.uniforms.uInputTexture.value = targets.main.texture;
+    // Pass 1: Icon overlay composite (if active)
+    // Composites the image icon into the shader output via screen blend + noise dissolve.
+    // Skipped when no icon texture or zero opacity — zero GPU cost when inactive.
+    let postShaderTexture = targets.main.texture;
+    if (iconOverlay.texture && iconOverlay.opacity > 0.01) {
+      iconPass.uniforms.uIconTexture.value = iconOverlay.texture;
+      iconPass.uniforms.uBackgroundTexture.value = targets.main.texture;
+      iconPass.uniforms.uResolution.value.set(width, height);
+      iconPass.uniforms.uTime.value = time;
+      iconPass.uniforms.uDynamicTime.value = dynamicTime;
+      iconPass.uniforms.uEnergy.value = smooth.energy;
+      iconPass.uniforms.uBass.value = smooth.bass;
+      iconPass.uniforms.uOnsetSnap.value = smooth.onsetSnap;
+      iconPass.uniforms.uSlowEnergy.value = smooth.slowEnergy;
+      iconPass.uniforms.uFastEnergy.value = smooth.fastEnergy;
+      iconPass.uniforms.uMusicalTime.value = musicalTime;
+      iconPass.uniforms.uBeatConfidence.value = smooth.beatConfidence;
+      iconPass.uniforms.uOpacity.value = iconOverlay.opacity;
+      iconPass.uniforms.uPalettePrimary.value = palettePrimary;
+      gl.setRenderTarget(targets.iconOverlay);
+      gl.clear();
+      gl.render(iconPass.scene, camera);
+      postShaderTexture = targets.iconOverlay.texture;
+    }
+
+    // Pass 2: FXAA anti-aliasing
+    fxaaPass.uniforms.uInputTexture.value = postShaderTexture;
     fxaaPass.uniforms.uResolution.value.set(width, height);
     gl.setRenderTarget(targets.fxaa);
     gl.clear();
