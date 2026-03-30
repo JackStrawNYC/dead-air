@@ -643,7 +643,7 @@ export const TRANSITION_AFFINITY: Partial<Record<VisualMode, VisualMode[]>> = {
   reaction_diffusion: ["fluid_2d", "oil_projector", "liquid_light"],
   mandala_engine: ["sacred_geometry", "kaleidoscope", "crystal_cavern"],
   fractal_flames: ["inferno", "tie_dye", "liquid_light"],
-  feedback_recursion: ["liquid_light", "kaleidoscope", "fractal_zoom", "reaction_diffusion", "morphogenesis", "fractal_flames", "neural_web", "sacred_geometry"],
+  feedback_recursion: ["liquid_light", "kaleidoscope", "reaction_diffusion", "morphogenesis", "fractal_flames", "neural_web", "sacred_geometry"],
   truchet_tiling: ["sacred_geometry", "mandala_engine", "kaleidoscope"],
   diffraction_rings: ["aurora", "crystal_cavern", "deep_ocean"],
   plasma_field: ["tie_dye", "liquid_light", "diffraction_rings"],
@@ -692,7 +692,7 @@ export const TRANSITION_AFFINITY: Partial<Record<VisualMode, VisualMode[]>> = {
   // Dead-native shaders
   acid_melt: ["liquid_light", "oil_projector", "tie_dye", "feedback_recursion"],
   blacklight_glow: ["bioluminescence", "deep_ocean", "void_light", "cosmic_dust"],
-  spinning_spiral: ["kaleidoscope", "fractal_zoom", "mandala_engine", "tie_dye"],
+  spinning_spiral: ["kaleidoscope", "mandala_engine", "tie_dye"],
   liquid_projector: ["oil_projector", "liquid_light", "smoke_rings", "vintage_film"],
 };
 

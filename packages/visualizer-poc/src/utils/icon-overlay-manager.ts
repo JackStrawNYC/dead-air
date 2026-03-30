@@ -325,24 +325,18 @@ export function getIconForFrame(
   );
   const frameInWindow = frame - windowIdx * WINDOW_FRAMES;
 
-  // Base opacity: image is the primary visual, always prominent.
-  // Range: 0.75 (quiet) to 1.0 (loud)
-  const baseOpacity = 0.75 + energy * 0.25;
+  // Image is the primary visual — always at full strength.
+  // Only fade in at the very start of a new image (noise dissolve handles the rest).
+  // NEVER fade out — hold until the next image takes over.
+  const baseOpacity = 0.80 + energy * 0.20;
 
-  // Dissolve in at start of window
-  let transitionFactor = 1.0;
-  if (frameInWindow < TRANSITION_FRAMES) {
-    transitionFactor = frameInWindow / TRANSITION_FRAMES;
-  }
-  // Dissolve out at end of window (if not last window)
-  const framesLeft = WINDOW_FRAMES - frameInWindow;
-  if (windowIdx < schedule.length - 1 && framesLeft < TRANSITION_FRAMES) {
-    transitionFactor = Math.min(transitionFactor, framesLeft / TRANSITION_FRAMES);
-  }
+  // Quick fade-in at start of each window (1.5 seconds)
+  const FADE_IN_FRAMES = 45;
+  const fadeIn = Math.min(1.0, frameInWindow / FADE_IN_FRAMES);
 
   return {
     iconPath: schedule[windowIdx],
-    opacity: baseOpacity * transitionFactor,
+    opacity: baseOpacity * fadeIn,
   };
 }
 
