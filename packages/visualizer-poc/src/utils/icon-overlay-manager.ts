@@ -119,6 +119,142 @@ const ICON_CATALOG: IconEntry[] = [
       "assets/dead-icons/bertha-v3.png",
     ],
   },
+
+  // ── Batch 2 ──
+  {
+    id: "jerry-guitar",
+    tags: ["dead_culture", "intense", "contemplative"],
+    variants: [
+      "assets/dead-icons/jerry-guitar-v1.png",
+      "assets/dead-icons/jerry-guitar-v2.png",
+      "assets/dead-icons/jerry-guitar-v3.png",
+    ],
+  },
+  {
+    id: "wall-of-sound",
+    tags: ["dead_culture", "intense", "festival"],
+    variants: [
+      "assets/dead-icons/wall-of-sound-v1.png",
+      "assets/dead-icons/wall-of-sound-v2.png",
+    ],
+  },
+  {
+    id: "tiedye",
+    tags: ["dead_culture", "psychedelic", "festival", "organic"],
+    variants: [
+      "assets/dead-icons/tiedye-v1.png",
+      "assets/dead-icons/tiedye-v2.png",
+      "assets/dead-icons/tiedye-v3.png",
+    ],
+  },
+  {
+    id: "vw-bus",
+    tags: ["dead_culture", "festival", "organic"],
+    variants: [
+      "assets/dead-icons/vw-bus-v1.png",
+      "assets/dead-icons/vw-bus-v2.png",
+    ],
+  },
+  {
+    id: "mushrooms",
+    tags: ["psychedelic", "organic", "cosmic"],
+    variants: [
+      "assets/dead-icons/mushrooms-v1.png",
+      "assets/dead-icons/mushrooms-v2.png",
+      "assets/dead-icons/mushrooms-v3.png",
+    ],
+  },
+  {
+    id: "uncle-sam",
+    tags: ["dead_culture", "intense", "celebration"],
+    variants: [
+      "assets/dead-icons/uncle-sam-v1.png",
+      "assets/dead-icons/uncle-sam-v2.png",
+    ],
+  },
+  {
+    id: "skeleton-tophat",
+    tags: ["dead_culture", "celebration", "contemplative"],
+    variants: [
+      "assets/dead-icons/skeleton-tophat-v1.png",
+      "assets/dead-icons/skeleton-tophat-v2.png",
+      "assets/dead-icons/skeleton-tophat-v3.png",
+    ],
+  },
+  {
+    id: "scarlet-fire",
+    tags: ["dead_culture", "intense", "psychedelic"],
+    variants: [
+      "assets/dead-icons/scarlet-fire-v1.png",
+      "assets/dead-icons/scarlet-fire-v2.png",
+      "assets/dead-icons/scarlet-fire-v3.png",
+    ],
+  },
+  {
+    id: "cosmic-eye",
+    tags: ["cosmic", "psychedelic", "contemplative"],
+    variants: [
+      "assets/dead-icons/cosmic-eye-v1.png",
+      "assets/dead-icons/cosmic-eye-v2.png",
+    ],
+  },
+  {
+    id: "aoxomoxoa",
+    tags: ["dead_culture", "psychedelic", "cosmic"],
+    variants: [
+      "assets/dead-icons/aoxomoxoa-v1.png",
+      "assets/dead-icons/aoxomoxoa-v2.png",
+      "assets/dead-icons/aoxomoxoa-v3.png",
+    ],
+  },
+  {
+    id: "drums",
+    tags: ["dead_culture", "intense", "organic"],
+    variants: [
+      "assets/dead-icons/drums-v1.png",
+      "assets/dead-icons/drums-v2.png",
+    ],
+  },
+  {
+    id: "skeleton-band-full",
+    tags: ["dead_culture", "celebration", "festival"],
+    variants: [
+      "assets/dead-icons/skeleton-band-full-v1.png",
+      "assets/dead-icons/skeleton-band-full-v2.png",
+    ],
+  },
+  {
+    id: "jester",
+    tags: ["dead_culture", "psychedelic", "cosmic"],
+    variants: [
+      "assets/dead-icons/jester-v1.png",
+      "assets/dead-icons/jester-v2.png",
+    ],
+  },
+  {
+    id: "owl",
+    tags: ["cosmic", "contemplative", "organic"],
+    variants: [
+      "assets/dead-icons/owl-v1.png",
+      "assets/dead-icons/owl-v2.png",
+    ],
+  },
+  {
+    id: "lightning-storm",
+    tags: ["dead_culture", "intense", "cosmic"],
+    variants: [
+      "assets/dead-icons/lightning-storm-v1.png",
+      "assets/dead-icons/lightning-storm-v2.png",
+    ],
+  },
+  {
+    id: "sugaree",
+    tags: ["dead_culture", "contemplative", "tender"],
+    variants: [
+      "assets/dead-icons/sugaree-v1.png",
+      "assets/dead-icons/sugaree-v2.png",
+    ],
+  },
 ];
 
 /**
