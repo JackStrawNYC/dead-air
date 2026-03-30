@@ -687,21 +687,21 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
     : 0;
   const isDeadAir = deadAirFactor > 0.99;
 
-  // ─── Intro factor: art-forward cold open for first ~20s ───
-  // 0 = full intro suppression (art dominates), 1 = engine fully open.
-  const INTRO_HOLD = 750;  // 25s at 30fps — art + text showcase
-  const INTRO_RAMP = 270;  // 9s smooth ramp to full visuals
-  // Suite middle songs skip intro hold (continuous flow within suite)
-  // Segue-in songs get a mini intro: 3s crossfade breathing, then art showcase 5-15s
+  // ─── Intro factor: art visible for ~18s, shader ramps up alongside ───
+  // 0 = art dominates (shader suppressed), 1 = shader fully open.
+  // Art fades on its own via suppressionFactor; introFactor controls shader ramp-up.
+  const INTRO_FULL = 150;  // 5s at 30fps — art is hero, shader at 20%
+  const INTRO_RAMP = 390;  // 13s ramp — shader goes from 20% to 100% (5s-18s)
+  // Suite middle songs skip intro (continuous flow within suite)
+  // Segue-in songs: shader leads the crossfade, art comes in briefly then fades
   const introFactor = props.segueIn
-      ? (frame < 90 ? 1                                                                              // 0-3s: full shader (crossfade)
-        : frame < 150 ? 1 - 0.85 * ((frame - 90) / 60)                                              // 3-5s: dim to 15%
-        : frame < INTRO_HOLD - INTRO_RAMP ? 0.15                                                     // 5-16s: art showcase (shader subtle backdrop)
-        : frame < INTRO_HOLD ? 0.15 + 0.85 * ((frame - (INTRO_HOLD - INTRO_RAMP)) / INTRO_RAMP)     // 16-25s: ramp back
+      ? (frame < 90 ? 1                                                              // 0-3s: full shader (crossfade)
+        : frame < 150 ? 1 - 0.60 * ((frame - 90) / 60)                              // 3-5s: dim to 40%
+        : frame < 450 ? 0.40 + 0.60 * ((frame - 150) / 300)                         // 5-15s: ramp back to full
         : 1)
     : isInSuiteMiddle ? 1
-    : frame < INTRO_HOLD ? 0
-      : frame < INTRO_HOLD + INTRO_RAMP ? (frame - INTRO_HOLD) / INTRO_RAMP
+    : frame < INTRO_FULL ? 0.20                                                      // 0-5s: shader at 20% (art hero)
+      : frame < INTRO_FULL + INTRO_RAMP ? 0.20 + 0.80 * ((frame - INTRO_FULL) / INTRO_RAMP)  // 5-18s: shader ramps 20%→100%
       : 1;
 
   // ─── Fade in/out ───
@@ -832,7 +832,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
 
           {effectiveSongArt && (
             <SilentErrorBoundary name="SongArt">
-              <SongArtLayer src={staticFile(effectiveSongArt)} suppressionFactor={Math.max(artSuppressionFactor, 1 - introFactor)} hueRotation={hueRotation} energy={audioSnapshot.energy} climaxIntensity={climaxState.intensity} focusOpacity={focusState.artOpacity} segueIn={props.segueIn} artBlendMode={props.song.artBlendMode} introFactor={introFactor} deadAirFactor={deadAirFactor} />
+              <SongArtLayer src={staticFile(effectiveSongArt)} suppressionFactor={artSuppressionFactor} hueRotation={hueRotation} energy={audioSnapshot.energy} climaxIntensity={climaxState.intensity} focusOpacity={focusState.artOpacity} segueIn={props.segueIn} artBlendMode={props.song.artBlendMode} introFactor={Math.min(1, introFactor * 1.2)} deadAirFactor={deadAirFactor} />
             </SilentErrorBoundary>
           )}
 
