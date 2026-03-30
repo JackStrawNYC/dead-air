@@ -337,12 +337,11 @@ export function getModeForSection(
         ? getModeForSection(song, sectionIndex - 1, sections, seed, era, false, usedShaderModes, songIdentity, undefined, frames, songDuration, setNumber, trackNumber, shaderModeLastUsed)
         : song.defaultMode;
 
-      // Visual evolution: change shader on energy transitions OR every 3rd section
-      // to prevent the visual from stagnating during long same-energy stretches
+      // Visual evolution: change shader on energy transitions only
+      // Periodic changes caused glitchy cuts — let the music drive transitions
       const energyChanged = prevSection && prevSection.energy !== section.energy;
-      const periodicChange = sectionIndex > 0 && sectionIndex % 3 === 0;
 
-      if (energyChanged || periodicChange) {
+      if (energyChanged) {
         const affinityPool = TRANSITION_AFFINITY[prevMode];
         if (affinityPool && affinityPool.length > 0) {
           // Filter by energy affinity and era
