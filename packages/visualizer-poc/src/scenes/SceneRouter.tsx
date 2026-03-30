@@ -326,13 +326,14 @@ export function getModeForSection(
           let candidates = affinityPool.filter((m) => energySet.has(m));
           if (candidates.length === 0) candidates = affinityPool;
 
-          // Identity-first: hard gate to preferred modes only
+          // Preferred modes get 3x weight in affinity pool
           if (songIdentity?.preferredModes?.length) {
             const preferredSet = new Set(songIdentity.preferredModes);
             const preferredCandidates = candidates.filter((m) => preferredSet.has(m));
-            // Use preferred modes exclusively; fall back to full candidates only if none match
-            if (preferredCandidates.length > 0) candidates = preferredCandidates;
-            else candidates = [...songIdentity.preferredModes]; // prefer identity over affinity pool
+            if (preferredCandidates.length > 0) {
+              // Boost preferred modes that are also in the affinity pool
+              for (const m of preferredCandidates) candidates.push(m, m); // 3x total
+            }
           }
 
           // Recency-weighted variety: penalize recently/frequently used modes
@@ -366,11 +367,16 @@ export function getModeForSection(
         filteredPool = applyRecencyWeighting(pool, usedShaderModes, shaderModeLastUsed, trackNumber ?? 0);
       }
 
-      // Identity-first: song identity's preferred modes ARE the pool.
-      // Non-preferred modes are never selected when preferred modes exist.
+      // Preferred modes get 3x weight but energy pool stays available.
+      // Default mode always included at 2x as reliable fallback.
       if (songIdentity?.preferredModes?.length && seed !== undefined) {
-        const preferredPool: VisualMode[] = [...songIdentity.preferredModes];
-        if (preferredPool.length > 0) filteredPool = preferredPool;
+        const weightedPool: VisualMode[] = [...filteredPool]; // keep energy pool at 1x
+        for (const m of songIdentity.preferredModes) {
+          weightedPool.push(m, m, m); // 3x weight
+        }
+        // Default mode as reliable fallback (fills screen, uses palette)
+        weightedPool.push(song.defaultMode, song.defaultMode);
+        filteredPool = weightedPool;
       }
 
       // Stem section bias: route shaders by what the band is doing

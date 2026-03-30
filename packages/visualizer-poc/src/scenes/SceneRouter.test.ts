@@ -216,9 +216,9 @@ describe('getModeForSection', () => {
       counts.set(mode, (counts.get(mode) ?? 0) + 1);
     }
 
-    // With 2x weight + registry splash, preferred modes should be >40% of selections
+    // With 3x weight in mixed pool, preferred modes should be >25% of selections
     const preferredCount = (counts.get('inferno') ?? 0) + (counts.get('tie_dye') ?? 0) + (counts.get('concert_lighting') ?? 0);
-    expect(preferredCount).toBeGreaterThan(120);
+    expect(preferredCount).toBeGreaterThan(75);
   });
 
   it('preferred-first pool is deterministic', () => {
