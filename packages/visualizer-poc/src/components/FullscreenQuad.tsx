@@ -191,16 +191,18 @@ void main() {
   //
   // imgLuma controls the blend: where the image is bright, it's the hero.
   // Where the image is dark/black, the shader shows through as atmosphere.
-  float imgPresence = imgLuma * dissolveThreshold;
+  // Boosted: raise the luma floor so mid-tone imagery stays visible, not just bright whites
+  float boostedLuma = smoothstep(0.05, 0.4, imgLuma);
+  float imgPresence = boostedLuma * dissolveThreshold;
 
   // Subtle palette tint to unify image with song color
   vec3 tint = hsv2rgb(vec3(uPalettePrimary, 0.20, 1.0));
   vec3 tintedImg = mix(imgColor.rgb, imgColor.rgb * tint, 0.15);
 
   // Composite: image over shader, weighted by image brightness
-  // At imgPresence=1.0: 85% image, 15% shader bleed (image is hero)
-  // At imgPresence=0.0: 100% shader (black areas of image)
-  vec3 finalColor = mix(bg, tintedImg, imgPresence * 0.85);
+  // At imgPresence=1.0: 95% image (Dead imagery is the STAR)
+  // At imgPresence=0.0: 100% shader (truly black areas of image only)
+  vec3 finalColor = mix(bg, tintedImg, imgPresence * 0.95);
 
   // Energy-reactive brightness on the image (louder = more vivid)
   finalColor *= 0.85 + uEnergy * 0.30;

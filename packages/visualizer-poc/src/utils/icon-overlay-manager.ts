@@ -313,14 +313,14 @@ export function buildIconSchedule(
  * sectionType encoding: 0=intro, 1=verse, 2=chorus, 3=bridge, 4=solo, 5=jam, 6=outro, 7=space
  */
 function sectionIconPresence(sectionType: number): number {
-  if (sectionType < 0.5) return 0.65;  // intro: building up
-  if (sectionType < 1.5) return 0.80;  // verse: strong (structured, viewer needs anchor)
-  if (sectionType < 2.5) return 0.85;  // chorus: strongest (emotional peak of structure)
-  if (sectionType < 3.5) return 0.70;  // bridge: transitional
-  if (sectionType < 4.5) return 0.45;  // solo: shader more prominent but icons still visible
-  if (sectionType < 5.5) return 0.40;  // jam: shader breathes but icons hold presence
-  if (sectionType < 6.5) return 0.55;  // outro: fading
-  return 0.30;                          // space: low but still there
+  if (sectionType < 0.5) return 0.75;  // intro: building up
+  if (sectionType < 1.5) return 0.90;  // verse: strong — Dead imagery IS the show
+  if (sectionType < 2.5) return 0.95;  // chorus: strongest
+  if (sectionType < 3.5) return 0.80;  // bridge: transitional
+  if (sectionType < 4.5) return 0.65;  // solo: shader more prominent but icons clearly visible
+  if (sectionType < 5.5) return 0.60;  // jam: shader breathes but icons hold strong
+  if (sectionType < 6.5) return 0.70;  // outro: fading
+  return 0.45;                          // space: reduced but still present
 }
 
 /**
