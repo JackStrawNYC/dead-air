@@ -189,9 +189,9 @@ export function getIconForFrame(
   );
   const frameInWindow = frame - windowIdx * WINDOW_FRAMES;
 
-  // Base opacity: energy-scaled (quiet = subtle, loud = visible)
-  // Range: 0.15 (quiet) to 0.55 (loud) — never dominant, always atmospheric
-  const baseOpacity = 0.15 + energy * 0.40;
+  // Base opacity: energy-scaled. Visible enough to actually see.
+  // Range: 0.45 (quiet) to 0.85 (loud)
+  const baseOpacity = 0.45 + energy * 0.40;
 
   // Dissolve in at start of window
   let transitionFactor = 1.0;
