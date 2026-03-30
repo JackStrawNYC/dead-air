@@ -104,7 +104,7 @@ describe("getModesForEnergy", () => {
   it("returns low-energy modes", () => {
     const modes = getModesForEnergy("low");
     expect(modes).toContain("particle_nebula");
-    expect(modes).toContain("stark_minimal");
+    // stark_minimal blocklisted from auto-selection (too sparse)
     expect(modes).toContain("cosmic_dust");
     expect(modes).toContain("cosmic_voyage");
     expect(modes).toContain("deep_ocean");

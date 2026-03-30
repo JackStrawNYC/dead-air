@@ -181,18 +181,22 @@ void main() {
 
   float iconLuma = dot(iconColor.rgb, vec3(0.299, 0.587, 0.114));
 
-  // Screen blend with background
   vec3 bg = texture2D(uBackgroundTexture, uv).rgb;
-  vec3 screenBlend = 1.0 - (1.0 - bg) * (1.0 - iconColor.rgb);
 
+  // Hybrid blend: darken background where icon is visible, then add icon.
+  // This makes icons visible against ANY background (bright or dark).
   float blendFactor = dissolveThreshold * iconLuma;
 
-  // Subtle palette tint
-  vec3 tint = hsv2rgb(vec3(uPalettePrimary, 0.15, 1.0));
-  vec3 tintedIcon = mix(screenBlend, screenBlend * tint, 0.08 * uEnergy);
+  // Dim the background behind the icon (creates visual "space" for the icon)
+  float bgDim = 1.0 - blendFactor * 0.5;
+  vec3 dimmedBg = bg * bgDim;
 
-  vec3 finalColor = mix(bg, tintedIcon, blendFactor);
-  gl_FragColor = vec4(finalColor, 1.0);
+  // Add icon color on top (additive, clamped)
+  vec3 tint = hsv2rgb(vec3(uPalettePrimary, 0.15, 1.0));
+  vec3 tintedIcon = mix(iconColor.rgb, iconColor.rgb * tint, 0.12 * uEnergy);
+  vec3 finalColor = dimmedBg + tintedIcon * blendFactor * 0.85;
+
+  gl_FragColor = vec4(min(finalColor, vec3(1.0)), 1.0);
 }
 `;
 

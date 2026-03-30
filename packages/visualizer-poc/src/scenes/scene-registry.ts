@@ -706,9 +706,16 @@ export function getComplement(mode: VisualMode): VisualMode {
 /** Get modes appropriate for a given energy level, with optional era filtering.
  *  Era preferred modes get 3x weight, excluded modes are removed.
  *  Song's defaultMode is always included as fallback. */
+// Shaders that look bad as full-screen auto-selected visuals.
+// Still available for explicit sectionOverrides and song identity preferredModes.
+const AUTO_SELECT_BLOCKLIST: Set<VisualMode> = new Set([
+  "fractal_zoom",    // tiny Mandelbrot on flat solid background
+  "stark_minimal",   // too sparse for general use
+]);
+
 export function getModesForEnergy(energy: "low" | "mid" | "high", era?: string, defaultMode?: VisualMode): VisualMode[] {
   let modes = (Object.entries(SCENE_REGISTRY) as [VisualMode, SceneRegistryEntry][])
-    .filter(([, entry]) => entry.energyAffinity === energy || entry.energyAffinity === "any")
+    .filter(([mode, entry]) => (entry.energyAffinity === energy || entry.energyAffinity === "any") && !AUTO_SELECT_BLOCKLIST.has(mode))
     .map(([mode]) => mode);
 
   const eraPreset = era ? getEraPreset(era) : null;
