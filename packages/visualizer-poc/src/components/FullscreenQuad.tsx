@@ -155,46 +155,55 @@ void main() {
   float aspect = uResolution.x / uResolution.y;
   vec2 p = (uv - 0.5) * vec2(aspect, 1.0);
 
-  // Audio-reactive UV domain warp
-  float warpIntensity = uSlowEnergy * 0.06 + uFastEnergy * 0.03;
-  float warpX = snoise(vec3(p * 2.0, uDynamicTime * 0.15)) * warpIntensity;
-  float warpY = snoise(vec3(p * 2.0 + 100.0, uDynamicTime * 0.15)) * warpIntensity;
+  // ─── Audio-reactive UV domain warp (the image breathes with the music) ───
+  float warpIntensity = uSlowEnergy * 0.08 + uFastEnergy * 0.04;
+  float warpX = snoise(vec3(p * 1.5, uDynamicTime * 0.12)) * warpIntensity;
+  float warpY = snoise(vec3(p * 1.5 + 100.0, uDynamicTime * 0.12)) * warpIntensity;
 
-  // Beat pulse micro-zoom
+  // Beat pulse: image breathes with the rhythm
   float bp = beatPulse(uMusicalTime) * smoothstep(0.3, 0.6, uBeatConfidence);
-  float beatScale = 1.0 - bp * 0.015;
+  float beatScale = 1.0 - bp * 0.02;
   vec2 beatUV = (uv - 0.5) * beatScale + 0.5;
 
-  // Onset jolt
-  float jolt = uOnsetSnap * 0.008;
+  // Slow Ken Burns drift
+  vec2 drift = vec2(sin(uDynamicTime * 0.03) * 0.015, cos(uDynamicTime * 0.025) * 0.012);
+
+  // Onset jolt on transients
+  float jolt = uOnsetSnap * 0.01;
   vec2 joltOffset = vec2(sin(uTime * 7.3) * jolt, cos(uTime * 5.1) * jolt);
 
-  // Slow drift
-  vec2 drift = vec2(sin(uDynamicTime * 0.04) * 0.01, cos(uDynamicTime * 0.03) * 0.008);
-
   vec2 warpedUV = beatUV + vec2(warpX, warpY) + joltOffset + drift;
-  vec4 iconColor = texture2D(uIconTexture, clamp(warpedUV, 0.0, 1.0));
 
-  // Noise dissolve
-  float dissolveNoise = snoise(vec3(p * 3.0, uDynamicTime * 0.1)) * 0.5 + 0.5;
-  float dissolveThreshold = smoothstep(0.0, 1.0, uOpacity * 1.3 - dissolveNoise * 0.4);
+  // ─── Sample image (fills the full frame) ───
+  vec4 imgColor = texture2D(uIconTexture, clamp(warpedUV, 0.0, 1.0));
+  float imgLuma = dot(imgColor.rgb, vec3(0.299, 0.587, 0.114));
 
-  float iconLuma = dot(iconColor.rgb, vec3(0.299, 0.587, 0.114));
-
+  // ─── Sample shader background ───
   vec3 bg = texture2D(uBackgroundTexture, uv).rgb;
 
-  // Hybrid blend: darken background where icon is visible, then add icon.
-  // This makes icons visible against ANY background (bright or dark).
-  float blendFactor = dissolveThreshold * iconLuma;
+  // ─── Noise dissolve for transitions between images ───
+  float dissolveNoise = snoise(vec3(p * 2.5, uDynamicTime * 0.08)) * 0.5 + 0.5;
+  float dissolveThreshold = smoothstep(0.0, 1.0, uOpacity * 1.4 - dissolveNoise * 0.5);
 
-  // Dim the background behind the icon (creates visual "space" for the icon)
-  float bgDim = 1.0 - blendFactor * 0.5;
-  vec3 dimmedBg = bg * bgDim;
+  // ─── Image-primary compositing ───
+  // The image IS the visual. Black areas of the image let the shader through.
+  // Bright areas of the image dominate. The shader fills negative space.
+  //
+  // imgLuma controls the blend: where the image is bright, it's the hero.
+  // Where the image is dark/black, the shader shows through as atmosphere.
+  float imgPresence = imgLuma * dissolveThreshold;
 
-  // Add icon color on top (additive, clamped)
-  vec3 tint = hsv2rgb(vec3(uPalettePrimary, 0.15, 1.0));
-  vec3 tintedIcon = mix(iconColor.rgb, iconColor.rgb * tint, 0.12 * uEnergy);
-  vec3 finalColor = dimmedBg + tintedIcon * blendFactor * 0.85;
+  // Subtle palette tint to unify image with song color
+  vec3 tint = hsv2rgb(vec3(uPalettePrimary, 0.20, 1.0));
+  vec3 tintedImg = mix(imgColor.rgb, imgColor.rgb * tint, 0.15);
+
+  // Composite: image over shader, weighted by image brightness
+  // At imgPresence=1.0: 85% image, 15% shader bleed (image is hero)
+  // At imgPresence=0.0: 100% shader (black areas of image)
+  vec3 finalColor = mix(bg, tintedImg, imgPresence * 0.85);
+
+  // Energy-reactive brightness on the image (louder = more vivid)
+  finalColor *= 0.85 + uEnergy * 0.30;
 
   gl_FragColor = vec4(min(finalColor, vec3(1.0)), 1.0);
 }

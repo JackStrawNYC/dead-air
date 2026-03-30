@@ -272,7 +272,7 @@ export function buildIconSchedule(
   showSeed: number,
   trackId: string,
 ): string[] {
-  const WINDOW_FRAMES = 600; // 20 seconds per icon
+  const WINDOW_FRAMES = 360; // 12 seconds per icon
   const windowCount = Math.max(1, Math.ceil(durationFrames / WINDOW_FRAMES));
 
   // Score icons by mood keyword overlap with song identity
@@ -325,9 +325,9 @@ export function getIconForFrame(
   );
   const frameInWindow = frame - windowIdx * WINDOW_FRAMES;
 
-  // Base opacity: energy-scaled. Visible enough to actually see.
-  // Range: 0.45 (quiet) to 0.85 (loud)
-  const baseOpacity = 0.45 + energy * 0.40;
+  // Base opacity: image is the primary visual, always prominent.
+  // Range: 0.75 (quiet) to 1.0 (loud)
+  const baseOpacity = 0.75 + energy * 0.25;
 
   // Dissolve in at start of window
   let transitionFactor = 1.0;
