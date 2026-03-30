@@ -2,13 +2,17 @@
  * Configurable GLSL post-processing chain builder.
  * Generates an `applyPostProcess(vec3 col, vec2 uv, vec2 p)` function.
  *
- * Stripped to 5 core stages for clean, contrasty output:
+ * 8-stage chain — essential visual richness without the mud:
  *   1. Beat pulse (tempo-locked brightness swell)
- *   2. Bloom (single instance, higher threshold)
- *   3. Cinematic grade (ACES filmic tone mapping)
- *   4. Envelope modulations (brightness/saturation/hue from EnergyEnvelope)
- *   5. Film grain (era-appropriate, resolution-aware)
+ *   2. Bloom (energy-reactive threshold)
+ *   3. Stage flood fill (palette noise in dark areas)
+ *   4. Halation (warm film glow)
+ *   5. Chromatic aberration (energy-gated)
+ *   6. Cinematic grade (ACES filmic tone mapping)
+ *   7. Envelope modulations (brightness/saturation/hue)
+ *   8. Film grain (era-appropriate, resolution-aware)
  *
+ * Also: show warmth/contrast, venue vignette, era grading.
  * Optional: lens distortion, temporal blending (feedback shaders only).
  */
 
@@ -60,6 +64,9 @@ export function buildPostProcessGLSL(config: PostProcessConfig = {}): string {
     lensDistortionEnabled = true,
     eraGradingEnabled = true,
     temporalBlendEnabled = false,
+    halationEnabled = true,
+    stageFloodEnabled = true,
+    caEnabled = true,
   } = config;
 
   // Grain intensity expression
@@ -126,15 +133,41 @@ ${
 }
 ${
   bloomEnabled
-    ? `  // Bloom: single instance, higher threshold for cleaner output
+    ? `  // Bloom: self-illumination with energy-reactive threshold
   {
     float lum = dot(col, vec3(0.299, 0.587, 0.114));
-    float bloomThreshold = max(0.35, mix(0.70, 0.55, energy) + uBloomThreshold${bloomThresholdStr});
-    float bloomAmount = max(0.0, lum - bloomThreshold) * (1.0 + climaxBoost * 0.3);
+    float bloomThreshold = max(0.20, mix(0.60, 0.45, energy) + uBloomThreshold${bloomThresholdStr});
+    float bloomAmount = max(0.0, lum - bloomThreshold) * (1.2 + climaxBoost * 0.4);
     vec3 bloomColor = mix(col, vec3(1.0, 0.98, 0.95), 0.3);
-    float bloomCap = 0.35 + energy * 0.10 + climaxBoost * 0.15;
-    vec3 bloom = bloomColor * min(bloomAmount, bloomCap) * (0.12 + energy * 0.06) * uShowBloom;
+    float bloomCap = 0.45 + energy * 0.15 + climaxBoost * 0.20;
+    vec3 bloom = bloomColor * min(bloomAmount, bloomCap) * (0.14 + energy * 0.08) * uShowBloom;
     col = col + bloom - col * bloom; // screen blend
+  }
+`
+    : ""
+}
+${
+  stageFloodEnabled
+    ? `  // Stage flood fill: palette noise in dark areas (concert venue ambient light)
+  col = stageFloodFill(col, p, uDynamicTime, energy, uPalettePrimary, uPaletteSecondary);
+`
+    : ""
+}
+${
+  halationEnabled
+    ? `  // Halation: warm film glow (light bleeding through film stock)
+  col = halation(uv, col, energy);
+`
+    : ""
+}
+${
+  caEnabled
+    ? `  // Chromatic aberration: energy-gated with safety cap
+  {
+    float caGate = smoothstep(0.15, 0.35, energy);
+    float caAmount = (uBass * 0.012 + uRms * 0.006 + uOnsetSnap * 0.06) * caGate;
+    caAmount = min(caAmount, 0.05);
+    col = applyCA(col, uv, caAmount);
   }
 `
     : ""
@@ -194,6 +227,18 @@ ${
     float vig = 1.0 - dot(p * 0.9, p * 0.9);
     vig = smoothstep(0.0, 1.0, vig);
     col *= mix(1.0, vig, uVenueVignette);
+  }
+
+  // Show warmth: seed-derived color temperature
+  {
+    float w = uShowWarmth;
+    col *= vec3(1.0 + w, 1.0, 1.0 - w);
+  }
+
+  // Show contrast: seed-derived curve
+  {
+    float mid = 0.18;
+    col = mid + (col - mid) * uShowContrast;
   }
 
 ${
