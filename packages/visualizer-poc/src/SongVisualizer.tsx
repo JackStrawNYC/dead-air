@@ -743,8 +743,11 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
     return getSacredSegueTransition(props.song.title, songs[idx + 1].title);
   }, [isSacredSegueOut, props.show, props.song.trackId, props.song.title]);
 
-  // ─── Icon overlay state (per-frame) ───
-  const iconState = getIconForFrame(iconSchedule, frame, audioSnapshot.energy);
+  // ─── Icon overlay state (per-frame, section-aware) ───
+  const sectionTypeMap: Record<string, number> = { intro: 0, verse: 1, chorus: 2, bridge: 3, solo: 4, jam: 5, outro: 6, space: 7 };
+  const sectionTypeFloat = sectionTypeMap[audioSnapshot.sectionType] ?? 1;
+  const climaxPhaseNum = { idle: 0, build: 1, climax: 2, sustain: 3, release: 4 }[climaxState.phase] ?? 0;
+  const iconState = getIconForFrame(iconSchedule, frame, audioSnapshot.energy, sectionTypeFloat, climaxPhaseNum);
 
   // Look up pre-loaded texture (loaded at mount via delayRender)
   const currentIconTexture = iconTexturesReady && iconState.iconPath

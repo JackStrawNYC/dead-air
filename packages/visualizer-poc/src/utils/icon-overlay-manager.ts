@@ -306,18 +306,37 @@ export function buildIconSchedule(
 }
 
 /**
+ * Section type → icon presence.
+ * Icons are the visual hero during structured parts.
+ * Shader breathes during jams/solos/space.
+ *
+ * sectionType encoding: 0=intro, 1=verse, 2=chorus, 3=bridge, 4=solo, 5=jam, 6=outro, 7=space
+ */
+function sectionIconPresence(sectionType: number): number {
+  if (sectionType < 0.5) return 0.60;  // intro: moderate (building up)
+  if (sectionType < 1.5) return 0.80;  // verse: strong (structured, viewer needs anchor)
+  if (sectionType < 2.5) return 0.85;  // chorus: strongest (emotional peak of structure)
+  if (sectionType < 3.5) return 0.70;  // bridge: moderate (transitional)
+  if (sectionType < 4.5) return 0.25;  // solo: shader takes over (let Jerry shred)
+  if (sectionType < 5.5) return 0.15;  // jam: shader breathes (improvisation is visual)
+  if (sectionType < 6.5) return 0.50;  // outro: fading presence
+  return 0.10;                          // space: almost gone (ambient shader)
+}
+
+/**
  * Get the current icon path and target opacity for a given frame.
- * Handles smooth transitions between rotation windows.
+ * Opacity driven by section type: imagery during structure, shader during jams.
  */
 export function getIconForFrame(
   schedule: string[],
   frame: number,
   energy: number,
+  sectionType?: number,
+  climaxPhase?: number,
 ): { iconPath: string; opacity: number } {
   if (schedule.length === 0) return { iconPath: "", opacity: 0 };
 
-  const WINDOW_FRAMES = 600; // 20 seconds
-  const TRANSITION_FRAMES = 90; // 3 second dissolve
+  const WINDOW_FRAMES = 360; // 12 seconds per icon
 
   const windowIdx = Math.min(
     schedule.length - 1,
@@ -325,10 +344,18 @@ export function getIconForFrame(
   );
   const frameInWindow = frame - windowIdx * WINDOW_FRAMES;
 
-  // Image is the primary visual — always at full strength.
-  // Only fade in at the very start of a new image (noise dissolve handles the rest).
-  // NEVER fade out — hold until the next image takes over.
-  const baseOpacity = 0.80 + energy * 0.20;
+  // Section-aware base opacity
+  const sectionPresence = sectionIconPresence(sectionType ?? 1); // default to verse
+
+  // Climax override: imagery comes back hard during climax (phase 2-3)
+  const climaxBoost = (climaxPhase !== undefined && climaxPhase >= 2 && climaxPhase <= 3)
+    ? 0.30 : 0;
+
+  // Energy modulation within the section presence range
+  // Quiet within a verse = slightly less; loud within a verse = full presence
+  const energyMod = 0.85 + energy * 0.15;
+
+  const baseOpacity = Math.min(1.0, (sectionPresence + climaxBoost) * energyMod);
 
   // Quick fade-in at start of each window (1.5 seconds)
   const FADE_IN_FRAMES = 45;
