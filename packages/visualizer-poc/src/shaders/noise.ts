@@ -337,8 +337,8 @@ vec3 cinematicGrade(vec3 col, float energy) {
   float maxC = max(col.r, max(col.g, col.b));
   vec3 hueRatio = col / max(maxC, 0.001);
 
-  // Filmic tone curve on max channel: smooth shoulder rolloff
-  float exposure = 1.8 + energy * 0.25;
+  // Filmic tone curve: high exposure so shaders stay bright and vivid
+  float exposure = 3.5 + energy * 0.5;
   float mapped = 1.0 - exp(-maxC * exposure);
 
   // Reconstruct color with preserved hue ratios
