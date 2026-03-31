@@ -313,14 +313,14 @@ export function buildIconSchedule(
  * sectionType encoding: 0=intro, 1=verse, 2=chorus, 3=bridge, 4=solo, 5=jam, 6=outro, 7=space
  */
 function sectionIconPresence(sectionType: number): number {
-  if (sectionType < 0.5) return 0.75;  // intro: building up
-  if (sectionType < 1.5) return 0.90;  // verse: strong — Dead imagery IS the show
-  if (sectionType < 2.5) return 0.95;  // chorus: strongest
-  if (sectionType < 3.5) return 0.80;  // bridge: transitional
-  if (sectionType < 4.5) return 0.65;  // solo: shader more prominent but icons clearly visible
-  if (sectionType < 5.5) return 0.60;  // jam: shader breathes but icons hold strong
-  if (sectionType < 6.5) return 0.70;  // outro: fading
-  return 0.45;                          // space: reduced but still present
+  if (sectionType < 0.5) return 0.40;  // intro: shader establishes, icons drift in
+  if (sectionType < 1.5) return 0.45;  // verse: icons as ghostly complement
+  if (sectionType < 2.5) return 0.55;  // chorus: icons emerge more during emotional peaks
+  if (sectionType < 3.5) return 0.40;  // bridge: transitional
+  if (sectionType < 4.5) return 0.30;  // solo: shader IS the solo
+  if (sectionType < 5.5) return 0.25;  // jam: shader owns the psychedelic journey
+  if (sectionType < 6.5) return 0.35;  // outro: icons return gently
+  return 0.15;                          // space: near-invisible, pure shader
 }
 
 /**
@@ -336,9 +336,9 @@ export function getIconForFrame(
 ): { iconPath: string; opacity: number } {
   if (schedule.length === 0) return { iconPath: "", opacity: 0 };
 
-  const WINDOW_FRAMES = 360; // 12 seconds per icon
-  const FADE_IN_FRAMES = 90;  // 3s smooth fade-in
-  const FADE_OUT_FRAMES = 90; // 3s smooth fade-out (crossfade overlap)
+  const WINDOW_FRAMES = 900; // 30 seconds per icon — slow, unhurried evolution
+  const FADE_IN_FRAMES = 150;  // 5s smooth fade-in
+  const FADE_OUT_FRAMES = 150; // 5s smooth fade-out (gentle crossfade)
 
   const windowIdx = Math.min(
     schedule.length - 1,
