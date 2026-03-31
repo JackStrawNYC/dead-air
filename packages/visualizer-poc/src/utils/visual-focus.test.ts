@@ -22,17 +22,17 @@ describe("computeVisualFocus", () => {
     expect(state.overlayOpacity).toBeGreaterThan(0);
   });
 
-  it("build: overlays present, shader below full", () => {
+  it("build: overlays present, shader at full", () => {
     const state = computeVisualFocus("build", 1.0, 100);
-    // Build phase should show overlays and have shader below full
+    // Build phase: shader always at full, overlays present
     expect(state.overlayOpacity).toBeGreaterThanOrEqual(0.10);
-    expect(state.shaderOpacity).toBeLessThan(1.0);
+    expect(state.shaderOpacity).toBe(1.0);
   });
 
   it("release: art comes back as emotional anchor, overlays gentle", () => {
     const state = computeVisualFocus("release", 1.0, 100);
     expect(state.artOpacity).toBeGreaterThanOrEqual(0.3);
-    expect(state.shaderOpacity).toBeLessThanOrEqual(0.75);
+    expect(state.shaderOpacity).toBe(1.0);
     expect(state.grainOpacity).toBeGreaterThanOrEqual(0.9);
   });
 

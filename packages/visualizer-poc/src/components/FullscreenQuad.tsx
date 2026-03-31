@@ -202,8 +202,8 @@ void main() {
   // At iconBlend=0.0: 100% shader (most of the frame)
   vec3 finalColor = mix(bg, tintedImg, iconBlend * 0.45);
 
-  // Energy-reactive brightness on the image (louder = more vivid)
-  finalColor *= 0.85 + uEnergy * 0.30;
+  // Energy adds a touch of brightness, but never darkens
+  finalColor *= 1.0 + uEnergy * 0.15;
 
   gl_FragColor = vec4(min(finalColor, vec3(1.0)), 1.0);
 }
@@ -361,7 +361,7 @@ export const FullscreenQuad: React.FC<Props> = ({
       uShowSaturation: { value: 0 },
       uShowGrain: { value: 1 },
       uShowBloom: { value: 1 },
-      uVenueVignette: { value: 0.5 },
+      uVenueVignette: { value: 0.2 },
       uCamPos: { value: new THREE.Vector3(0, 0, -3.5) },
       uCamTarget: { value: new THREE.Vector3(0, 0, 0) },
       uCamFov: { value: 50 },
