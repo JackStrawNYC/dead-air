@@ -313,14 +313,14 @@ export function buildIconSchedule(
  * sectionType encoding: 0=intro, 1=verse, 2=chorus, 3=bridge, 4=solo, 5=jam, 6=outro, 7=space
  */
 function sectionIconPresence(sectionType: number): number {
-  if (sectionType < 0.5) return 0.30;  // intro: shader establishes, icons drift in
-  if (sectionType < 1.5) return 0.35;  // verse: ghostly Dead watermark
-  if (sectionType < 2.5) return 0.40;  // chorus: icons emerge slightly at emotional peaks
-  if (sectionType < 3.5) return 0.30;  // bridge: transitional
-  if (sectionType < 4.5) return 0.20;  // solo: shader IS the solo
-  if (sectionType < 5.5) return 0.15;  // jam: shader owns the psychedelic journey
-  if (sectionType < 6.5) return 0.25;  // outro: icons return gently
-  return 0.08;                          // space: near-invisible, pure shader
+  if (sectionType < 0.5) return 0.50;  // intro
+  if (sectionType < 1.5) return 0.60;  // verse: Dead imagery clearly visible
+  if (sectionType < 2.5) return 0.70;  // chorus: icons prominent at peaks
+  if (sectionType < 3.5) return 0.50;  // bridge
+  if (sectionType < 4.5) return 0.40;  // solo: shader forward, icons present
+  if (sectionType < 5.5) return 0.35;  // jam: shader dominant, icons ghostly
+  if (sectionType < 6.5) return 0.45;  // outro
+  return 0.20;                          // space: minimal
 }
 
 /**
