@@ -710,15 +710,8 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
   // Progressive dim during dead air: after crossfade completes, fade toward near-black.
   // Non-segue songs get an extra "visual breath" — the last 60 frames (2s) fade deeper
   // than segue songs, creating a brief moment of darkness between songs for pacing contrast.
-  const deadAirDim = isDeadAir
-    ? Math.max(0.65, 1 - (frame - musicEndFrame - DEAD_AIR_CROSSFADE) / (durationInFrames - musicEndFrame - DEAD_AIR_CROSSFADE) * 0.35)
-    : 1;
-  // Visual breath at song ending: gentle fade, never dark
-  const BREATH_FRAMES = 60;
-  const breathFactor = !props.segueOut && frame > durationInFrames - BREATH_FRAMES
-    ? Math.max(0.60, (durationInFrames - frame) / BREATH_FRAMES)
-    : 1;
-  const opacity = Math.min(fadeIn, fadeOut) * deadAirDim * breathFactor;
+  // No dimming. Shader stays bright, song art fades in over it during dead air.
+  const opacity = Math.min(fadeIn, fadeOut);
 
   // ─── Space time dilation: Space phases get transcendently slow shaders ───
   const spaceTimeDilation = drumsSpaceState?.subPhase === "space_ambient" ? 0.25
