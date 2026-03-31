@@ -28,16 +28,20 @@
       "flash": true
     },
     "narrativeArc": "energy_cycle",
-    "thematicTags": ["rocker", "party", "hot"]
+    "thematicTags": [
+      "rocker",
+      "party",
+      "hot"
+    ]
   },
   "deal": {
     "preferredModes": [
       "inferno",
       "tie_dye",
       "fractal_flames",
-      "climax_surge",
-      "electric_arc",
-      "fluid_light"
+      "fluid_light",
+      "liquid_light",
+      "oil_projector"
     ],
     "palette": {
       "primary": 10,
@@ -57,7 +61,11 @@
       "flash": true
     },
     "narrativeArc": "energy_cycle",
-    "thematicTags": ["rocker", "intense", "driving"]
+    "thematicTags": [
+      "rocker",
+      "intense",
+      "driving"
+    ]
   },
   "sugaree": {
     "preferredModes": [
@@ -91,18 +99,22 @@
     "overlayDensity": 0.7,
     "hueShift": 5,
     "narrativeArc": "build_to_climax",
-    "thematicTags": ["tender", "jam", "soulful"]
+    "thematicTags": [
+      "tender",
+      "jam",
+      "soulful"
+    ]
   },
   "althea": {
     "preferredModes": [
       "liquid_light",
       "prism_refraction",
       "aurora",
-      "feedback_recursion",
       "voronoi_flow",
       "aurora_curtains",
       "volumetric_clouds",
-      "spinning_spiral"
+      "spinning_spiral",
+      "oil_projector"
     ],
     "palette": {
       "primary": 180,
@@ -120,7 +132,11 @@
     ],
     "overlayDensity": 0.8,
     "narrativeArc": "build_to_climax",
-    "thematicTags": ["dreamy", "psychedelic", "flowing"]
+    "thematicTags": [
+      "dreamy",
+      "psychedelic",
+      "flowing"
+    ]
   },
   "friendofthedevil": {
     "preferredModes": [
@@ -150,7 +166,11 @@
     "overlayDensity": 0.6,
     "saturationOffset": -0.05,
     "narrativeArc": "energy_cycle",
-    "thematicTags": ["folk", "playful", "retro"]
+    "thematicTags": [
+      "folk",
+      "playful",
+      "retro"
+    ]
   },
   "ripple": {
     "preferredModes": [
@@ -215,7 +235,11 @@
       "peakSaturation": 0.5
     },
     "narrativeArc": "energy_cycle",
-    "thematicTags": ["rocker", "party", "driving"]
+    "thematicTags": [
+      "rocker",
+      "party",
+      "driving"
+    ]
   },
   "unclejohnsband": {
     "preferredModes": [
@@ -242,7 +266,11 @@
     ],
     "overlayDensity": 0.8,
     "narrativeArc": "build_to_climax",
-    "thematicTags": ["philosophical", "organic", "communal"]
+    "thematicTags": [
+      "philosophical",
+      "organic",
+      "communal"
+    ]
   },
   "shakedownstreet": {
     "preferredModes": [
@@ -273,17 +301,21 @@
       "climaxDensityMult": 1.8
     },
     "narrativeArc": "energy_cycle",
-    "thematicTags": ["funk", "groove", "psychedelic"]
+    "thematicTags": [
+      "funk",
+      "groove",
+      "psychedelic"
+    ]
   },
   "darkstar": {
     "preferredModes": [
       "cosmic_voyage",
       "deep_ocean",
       "crystal_cavern",
-      "feedback_recursion",
       "galaxy_spiral",
       "volumetric_nebula",
-      "blacklight_glow"
+      "blacklight_glow",
+      "liquid_light"
     ],
     "palette": {
       "primary": 260,
@@ -314,7 +346,11 @@
     },
     "transitionOut": "void",
     "narrativeArc": "meditative_journey",
-    "thematicTags": ["cosmic", "void", "transcendent"]
+    "thematicTags": [
+      "cosmic",
+      "void",
+      "transcendent"
+    ]
   },
   "fireonthemountain": {
     "preferredModes": [
@@ -349,7 +385,11 @@
     },
     "transitionIn": "morph",
     "narrativeArc": "build_to_climax",
-    "thematicTags": ["fire", "building", "psychedelic"]
+    "thematicTags": [
+      "fire",
+      "building",
+      "psychedelic"
+    ]
   },
   "scarletbegonias": {
     "preferredModes": [
@@ -357,11 +397,11 @@
       "liquid_light",
       "solar_flare",
       "fractal_flames",
-      "feedback_recursion",
       "plasma_field",
       "kaleidoscope",
-      "fractal_zoom",
-      "acid_melt"
+      "acid_melt",
+      "oil_projector",
+      "tie_dye"
     ],
     "palette": {
       "primary": 0,
@@ -382,19 +422,23 @@
       "peakSaturation": 0.5
     },
     "narrativeArc": "energy_cycle",
-    "thematicTags": ["psychedelic", "joyous", "colorful"]
+    "thematicTags": [
+      "psychedelic",
+      "joyous",
+      "colorful"
+    ]
   },
   "eyesoftheworld": {
     "preferredModes": [
       "aurora",
       "cosmic_voyage",
       "liquid_light",
-      "feedback_recursion",
       "bioluminescence",
       "galaxy_spiral",
-      "fractal_zoom",
       "volumetric_clouds",
-      "spinning_spiral"
+      "spinning_spiral",
+      "oil_projector",
+      "tie_dye"
     ],
     "palette": {
       "primary": 170,
@@ -420,17 +464,21 @@
       "peakSaturation": 0.45
     },
     "narrativeArc": "build_to_climax",
-    "thematicTags": ["cosmic", "soaring", "jam"]
+    "thematicTags": [
+      "cosmic",
+      "soaring",
+      "jam"
+    ]
   },
   "morningdew": {
     "preferredModes": [
       "deep_ocean",
       "stark_minimal",
       "crystal_cavern",
-      "feedback_recursion",
       "volumetric_smoke",
       "cosmic_dust",
-      "inferno"
+      "inferno",
+      "liquid_light"
     ],
     "palette": {
       "primary": 200,
@@ -461,18 +509,22 @@
       "climaxDensityMult": 0.5
     },
     "narrativeArc": "build_to_climax",
-    "thematicTags": ["apocalyptic", "tender", "devastating"]
+    "thematicTags": [
+      "apocalyptic",
+      "tender",
+      "devastating"
+    ]
   },
   "stellablue": {
     "preferredModes": [
       "deep_ocean",
       "cosmic_voyage",
       "aurora",
-      "feedback_recursion",
       "warm_nebula",
       "crystal_cavern",
       "galaxy_spiral",
-      "blacklight_glow"
+      "blacklight_glow",
+      "liquid_light"
     ],
     "palette": {
       "primary": 220,
@@ -498,7 +550,11 @@
     "hueShift": -10,
     "saturationOffset": -0.1,
     "narrativeArc": "meditative_journey",
-    "thematicTags": ["cosmic", "lonesome", "tender"]
+    "thematicTags": [
+      "cosmic",
+      "lonesome",
+      "tender"
+    ]
   },
   "notfadeaway": {
     "preferredModes": [
@@ -507,7 +563,7 @@
       "tie_dye",
       "inferno",
       "sacred_geometry",
-      "fractal_zoom"
+      "liquid_light"
     ],
     "palette": {
       "primary": 40,
@@ -528,7 +584,11 @@
       "flash": true
     },
     "narrativeArc": "energy_cycle",
-    "thematicTags": ["anthem", "hypnotic", "building"]
+    "thematicTags": [
+      "anthem",
+      "hypnotic",
+      "building"
+    ]
   },
   "estimatedprophet": {
     "preferredModes": [
@@ -557,13 +617,17 @@
       "intense"
     ],
     "climaxBehavior": {
-      "peakBrightness": 0.20,
+      "peakBrightness": 0.2,
       "peakSaturation": 0.45
     },
     "overlayDensity": 0.5,
     "transitionOut": "flash",
     "narrativeArc": "build_to_climax",
-    "thematicTags": ["prophetic", "spacey", "mystical"]
+    "thematicTags": [
+      "prophetic",
+      "spacey",
+      "mystical"
+    ]
   },
   "chinacatsunflower": {
     "preferredModes": [
@@ -592,7 +656,11 @@
     ],
     "transitionOut": "morph",
     "narrativeArc": "energy_cycle",
-    "thematicTags": ["psychedelic", "colorful", "playful"]
+    "thematicTags": [
+      "psychedelic",
+      "colorful",
+      "playful"
+    ]
   },
   "iknowyourider": {
     "preferredModes": [
@@ -622,7 +690,11 @@
       "flash": true
     },
     "narrativeArc": "energy_cycle",
-    "thematicTags": ["rocker", "country", "warm"]
+    "thematicTags": [
+      "rocker",
+      "country",
+      "warm"
+    ]
   },
   "truckin": {
     "preferredModes": [
@@ -649,18 +721,22 @@
       "retro"
     ],
     "narrativeArc": "energy_cycle",
-    "thematicTags": ["road", "retro", "anthem"]
+    "thematicTags": [
+      "road",
+      "retro",
+      "anthem"
+    ]
   },
   "sugarmagnolia": {
     "preferredModes": [
       "tie_dye",
       "kaleidoscope",
-      "fractal_zoom",
       "liquid_mandala",
       "concert_lighting",
       "flower_field",
       "prism_refraction",
-      "spinning_spiral"
+      "spinning_spiral",
+      "liquid_light"
     ],
     "palette": {
       "primary": 340,
@@ -681,17 +757,21 @@
       "flash": true
     },
     "narrativeArc": "energy_cycle",
-    "thematicTags": ["joyous", "psychedelic", "celebratory"]
+    "thematicTags": [
+      "joyous",
+      "psychedelic",
+      "celebratory"
+    ]
   },
   "terrapinstation": {
     "preferredModes": [
       "cosmic_voyage",
       "crystal_cavern",
       "aurora",
-      "feedback_recursion",
-      "fractal_zoom",
       "galaxy_spiral",
-      "deep_ocean"
+      "deep_ocean",
+      "liquid_light",
+      "oil_projector"
     ],
     "palette": {
       "primary": 160,
@@ -714,24 +794,28 @@
       "peakSaturation": 0.5
     },
     "narrativeArc": "build_to_climax",
-    "thematicTags": ["epic", "cosmic", "narrative"]
+    "thematicTags": [
+      "epic",
+      "cosmic",
+      "narrative"
+    ]
   },
   "playingintheband": {
     "preferredModes": [
       "cosmic_voyage",
-      "feedback_recursion",
-      "fractal_zoom",
       "galaxy_spiral",
-      "morphogenesis",
       "void_light",
       "kaleidoscope",
       "volumetric_nebula",
-      "acid_melt"
+      "acid_melt",
+      "liquid_light",
+      "oil_projector",
+      "tie_dye"
     ],
     "palette": {
       "primary": 280,
       "secondary": 180,
-      "saturation": 0.70
+      "saturation": 0.7
     },
     "overlayBoost": [
       "FractalZoom",
@@ -748,17 +832,21 @@
     },
     "transitionOut": "morph",
     "narrativeArc": "build_to_climax",
-    "thematicTags": ["expansive", "spacey", "jam"]
+    "thematicTags": [
+      "expansive",
+      "spacey",
+      "jam"
+    ]
   },
   "theotherone": {
     "preferredModes": [
       "kaleidoscope",
-      "fractal_zoom",
       "reaction_diffusion",
-      "feedback_recursion",
       "mandala_engine",
-      "electric_arc",
-      "acid_melt"
+      "acid_melt",
+      "liquid_light",
+      "oil_projector",
+      "tie_dye"
     ],
     "palette": {
       "primary": 350,
@@ -782,7 +870,11 @@
     },
     "transitionOut": "flash",
     "narrativeArc": "energy_cycle",
-    "thematicTags": ["chaotic", "psychedelic", "intense"]
+    "thematicTags": [
+      "chaotic",
+      "psychedelic",
+      "intense"
+    ]
   },
   "wharfrat": {
     "preferredModes": [
@@ -797,7 +889,7 @@
     "palette": {
       "primary": 40,
       "secondary": 20,
-      "saturation": 0.60,
+      "saturation": 0.6,
       "brightness": 0.85
     },
     "overlayBoost": [
@@ -811,7 +903,7 @@
     ],
     "overlayDensity": 0.5,
     "climaxBehavior": {
-      "peakSaturation": 0.30,
+      "peakSaturation": 0.3,
       "peakBrightness": 0.15
     },
     "narrativeArc": "build_to_climax",
@@ -849,7 +941,7 @@
     ],
     "climaxBehavior": {
       "peakSaturation": 0.45,
-      "peakBrightness": 0.20,
+      "peakBrightness": 0.2,
       "flash": true
     },
     "narrativeArc": "build_to_climax",
@@ -864,10 +956,10 @@
       "crystal_cavern",
       "cosmic_voyage",
       "liquid_light",
-      "feedback_recursion",
       "aurora",
-      "fractal_zoom",
-      "volumetric_nebula"
+      "volumetric_nebula",
+      "oil_projector",
+      "tie_dye"
     ],
     "palette": {
       "primary": 240,
@@ -884,16 +976,20 @@
     ],
     "transitionOut": "morph",
     "narrativeArc": "build_to_climax",
-    "thematicTags": ["epic", "intense", "building"]
+    "thematicTags": [
+      "epic",
+      "intense",
+      "building"
+    ]
   },
   "slipknot": {
     "preferredModes": [
       "inferno",
       "spectral_analyzer",
       "fractal_flames",
-      "electric_arc",
       "lava_flow",
-      "liquid_light"
+      "liquid_light",
+      "oil_projector"
     ],
     "palette": {
       "primary": 10,
@@ -916,7 +1012,11 @@
       "flash": true
     },
     "narrativeArc": "energy_cycle",
-    "thematicTags": ["intense", "driving", "psychedelic"]
+    "thematicTags": [
+      "intense",
+      "driving",
+      "psychedelic"
+    ]
   },
   "franklinstower": {
     "preferredModes": [
@@ -948,16 +1048,20 @@
       "peakSaturation": 0.5
     },
     "narrativeArc": "energy_cycle",
-    "thematicTags": ["building", "joyous", "hot"]
+    "thematicTags": [
+      "building",
+      "joyous",
+      "hot"
+    ]
   },
   "ststephen": {
     "preferredModes": [
       "concert_lighting",
       "inferno",
-      "climax_surge",
       "fractal_flames",
-      "electric_arc",
-      "volumetric_nebula"
+      "volumetric_nebula",
+      "liquid_light",
+      "oil_projector"
     ],
     "palette": {
       "primary": 300,
@@ -979,7 +1083,11 @@
     },
     "transitionOut": "flash",
     "narrativeArc": "energy_cycle",
-    "thematicTags": ["intense", "triumphant", "driving"]
+    "thematicTags": [
+      "intense",
+      "triumphant",
+      "driving"
+    ]
   },
   "newminglewoodblues": {
     "preferredModes": [
@@ -988,8 +1096,8 @@
       "kaleidoscope",
       "liquid_light",
       "fractal_flames",
-      "electric_arc",
-      "oil_projector"
+      "oil_projector",
+      "tie_dye"
     ],
     "palette": {
       "primary": 15,
@@ -1011,7 +1119,11 @@
       "flash": true
     },
     "narrativeArc": "energy_cycle",
-    "thematicTags": ["rocker", "party", "hot"]
+    "thematicTags": [
+      "rocker",
+      "party",
+      "hot"
+    ]
   },
   "loser": {
     "preferredModes": [
@@ -1048,7 +1160,11 @@
     "hueShift": -3,
     "saturationOffset": -0.05,
     "narrativeArc": "meditative_journey",
-    "thematicTags": ["tender", "storytelling", "contemplative"]
+    "thematicTags": [
+      "tender",
+      "storytelling",
+      "contemplative"
+    ]
   },
   "elpaso": {
     "preferredModes": [
@@ -1076,7 +1192,11 @@
     "overlayDensity": 0.5,
     "saturationOffset": -0.08,
     "narrativeArc": "energy_cycle",
-    "thematicTags": ["country", "western", "storytelling"]
+    "thematicTags": [
+      "country",
+      "western",
+      "storytelling"
+    ]
   },
   "theyloveeachother": {
     "preferredModes": [
@@ -1085,7 +1205,7 @@
       "fractal_flames",
       "kaleidoscope",
       "particle_swarm",
-      "feedback_recursion"
+      "oil_projector"
     ],
     "palette": {
       "primary": 340,
@@ -1105,16 +1225,20 @@
       "peakSaturation": 0.45
     },
     "narrativeArc": "energy_cycle",
-    "thematicTags": ["joyous", "psychedelic", "groovy"]
+    "thematicTags": [
+      "joyous",
+      "psychedelic",
+      "groovy"
+    ]
   },
   "jackstraw": {
     "preferredModes": [
       "concert_lighting",
       "inferno",
-      "climax_surge",
-      "electric_arc",
       "fractal_flames",
-      "reaction_diffusion"
+      "reaction_diffusion",
+      "liquid_light",
+      "oil_projector"
     ],
     "palette": {
       "primary": 10,
@@ -1136,17 +1260,21 @@
       "flash": true
     },
     "narrativeArc": "energy_cycle",
-    "thematicTags": ["driving", "intense", "storytelling"]
+    "thematicTags": [
+      "driving",
+      "intense",
+      "storytelling"
+    ]
   },
   "lazylightnin": {
     "preferredModes": [
       "reaction_diffusion",
       "concert_lighting",
       "solar_flare",
-      "electric_arc",
       "fractal_flames",
       "kaleidoscope",
-      "volumetric_nebula"
+      "volumetric_nebula",
+      "liquid_light"
     ],
     "palette": {
       "primary": 55,
@@ -1168,17 +1296,21 @@
     },
     "transitionOut": "morph",
     "narrativeArc": "energy_cycle",
-    "thematicTags": ["psychedelic", "electric", "driving"]
+    "thematicTags": [
+      "psychedelic",
+      "electric",
+      "driving"
+    ]
   },
   "supplication": {
     "preferredModes": [
       "inferno",
       "liquid_light",
       "spectral_analyzer",
-      "electric_arc",
       "fractal_flames",
       "lava_flow",
-      "solar_flare"
+      "solar_flare",
+      "oil_projector"
     ],
     "palette": {
       "primary": 5,
@@ -1204,7 +1336,11 @@
     },
     "transitionIn": "morph",
     "narrativeArc": "build_to_climax",
-    "thematicTags": ["intense", "building", "explosive"]
+    "thematicTags": [
+      "intense",
+      "building",
+      "explosive"
+    ]
   },
   "browneyedwomen": {
     "preferredModes": [
@@ -1235,7 +1371,11 @@
       "peakSaturation": 0.45
     },
     "narrativeArc": "energy_cycle",
-    "thematicTags": ["organic", "storytelling", "warm"]
+    "thematicTags": [
+      "organic",
+      "storytelling",
+      "warm"
+    ]
   },
   "mamatried": {
     "preferredModes": [
@@ -1263,7 +1403,11 @@
     "overlayDensity": 0.5,
     "saturationOffset": -0.06,
     "narrativeArc": "energy_cycle",
-    "thematicTags": ["country", "retro", "fun"]
+    "thematicTags": [
+      "country",
+      "retro",
+      "fun"
+    ]
   },
   "rowjimmy": {
     "preferredModes": [
@@ -1303,7 +1447,11 @@
       "peakSaturation": 0.4
     },
     "narrativeArc": "meditative_journey",
-    "thematicTags": ["contemplative", "gentle", "organic"]
+    "thematicTags": [
+      "contemplative",
+      "gentle",
+      "organic"
+    ]
   },
   "dancininthestreet": {
     "preferredModes": [
@@ -1312,7 +1460,7 @@
       "inferno",
       "fractal_flames",
       "fluid_light",
-      "electric_arc"
+      "liquid_light"
     ],
     "palette": {
       "primary": 350,
@@ -1335,16 +1483,20 @@
       "climaxDensityMult": 1.8
     },
     "narrativeArc": "energy_cycle",
-    "thematicTags": ["party", "intense", "dance"]
+    "thematicTags": [
+      "party",
+      "intense",
+      "dance"
+    ]
   },
   "drumsspace": {
     "preferredModes": [
       "cosmic_voyage",
       "crystal_cavern",
       "deep_ocean",
-      "feedback_recursion",
       "void_light",
-      "galaxy_spiral"
+      "galaxy_spiral",
+      "liquid_light"
     ],
     "palette": {
       "primary": 240,
@@ -1381,7 +1533,11 @@
       "transition": "voronoi_flow"
     },
     "narrativeArc": "meditative_journey",
-    "thematicTags": ["cosmic", "primal", "void"]
+    "thematicTags": [
+      "cosmic",
+      "primal",
+      "void"
+    ]
   },
   "onemoresaturdaynight": {
     "preferredModes": [
@@ -1390,7 +1546,7 @@
       "lava_flow",
       "liquid_light",
       "fractal_flames",
-      "electric_arc"
+      "oil_projector"
     ],
     "palette": {
       "primary": 20,
@@ -1414,17 +1570,21 @@
       "climaxDensityMult": 1.8
     },
     "narrativeArc": "energy_cycle",
-    "thematicTags": ["party", "rocker", "hot"]
+    "thematicTags": [
+      "party",
+      "rocker",
+      "hot"
+    ]
   },
   "touchofgrey": {
     "preferredModes": [
       "concert_lighting",
       "reaction_diffusion",
-      "climax_surge",
       "fractal_flames",
       "inferno",
       "lava_flow",
-      "solar_flare"
+      "solar_flare",
+      "liquid_light"
     ],
     "palette": {
       "primary": 0,
@@ -1444,7 +1604,11 @@
       "flash": true
     },
     "narrativeArc": "energy_cycle",
-    "thematicTags": ["anthem", "resilient", "catchy"]
+    "thematicTags": [
+      "anthem",
+      "resilient",
+      "catchy"
+    ]
   },
   "goingdowntheroad": {
     "preferredModes": [
@@ -1452,8 +1616,8 @@
       "reaction_diffusion",
       "liquid_light",
       "fractal_flames",
-      "electric_arc",
-      "lava_flow"
+      "lava_flow",
+      "oil_projector"
     ],
     "palette": {
       "primary": 25,
@@ -1475,7 +1639,11 @@
       "flash": true
     },
     "narrativeArc": "energy_cycle",
-    "thematicTags": ["driving", "festival", "anthem"]
+    "thematicTags": [
+      "driving",
+      "festival",
+      "anthem"
+    ]
   },
   "mississippihalfstep": {
     "preferredModes": [
@@ -1504,7 +1672,11 @@
     "overlayDensity": 0.6,
     "saturationOffset": -0.05,
     "narrativeArc": "build_to_climax",
-    "thematicTags": ["organic", "storytelling", "warm"]
+    "thematicTags": [
+      "organic",
+      "storytelling",
+      "warm"
+    ]
   },
   "weatherreportsuite": {
     "preferredModes": [
@@ -1512,9 +1684,9 @@
       "cosmic_voyage",
       "crystal_cavern",
       "deep_ocean",
-      "feedback_recursion",
       "diffraction_rings",
-      "bioluminescence"
+      "bioluminescence",
+      "liquid_light"
     ],
     "palette": {
       "primary": 200,
@@ -1537,16 +1709,20 @@
       "peakSaturation": 0.5
     },
     "narrativeArc": "build_to_climax",
-    "thematicTags": ["cosmic", "building", "ethereal"]
+    "thematicTags": [
+      "cosmic",
+      "building",
+      "ethereal"
+    ]
   },
   "turnonthelovelight": {
     "preferredModes": [
       "concert_lighting",
       "inferno",
       "kaleidoscope",
-      "electric_arc",
       "fractal_flames",
-      "volumetric_nebula"
+      "volumetric_nebula",
+      "liquid_light"
     ],
     "palette": {
       "primary": 50,
@@ -1569,16 +1745,20 @@
       "climaxDensityMult": 1.8
     },
     "narrativeArc": "energy_cycle",
-    "thematicTags": ["party", "intense", "dance"]
+    "thematicTags": [
+      "party",
+      "intense",
+      "dance"
+    ]
   },
   "samsonanddelilah": {
     "preferredModes": [
       "concert_lighting",
-      "climax_surge",
-      "electric_arc",
       "fractal_flames",
       "bioluminescence",
-      "liquid_light"
+      "liquid_light",
+      "oil_projector",
+      "tie_dye"
     ],
     "palette": {
       "primary": 350,
@@ -1599,7 +1779,11 @@
       "flash": true
     },
     "narrativeArc": "energy_cycle",
-    "thematicTags": ["heavy", "primal", "driving"]
+    "thematicTags": [
+      "heavy",
+      "primal",
+      "driving"
+    ]
   },
   "johnnybjgoode": {
     "preferredModes": [
@@ -1609,7 +1793,7 @@
       "inferno",
       "fractal_flames",
       "lava_flow",
-      "electric_arc"
+      "oil_projector"
     ],
     "palette": {
       "primary": 45,
@@ -1630,7 +1814,11 @@
       "flash": true
     },
     "narrativeArc": "energy_cycle",
-    "thematicTags": ["rocker", "party", "retro"]
+    "thematicTags": [
+      "rocker",
+      "party",
+      "retro"
+    ]
   },
   "usblues": {
     "preferredModes": [
@@ -1656,7 +1844,11 @@
     ],
     "overlayDensity": 0.8,
     "narrativeArc": "energy_cycle",
-    "thematicTags": ["organic", "philosophical", "groovy"]
+    "thematicTags": [
+      "organic",
+      "philosophical",
+      "groovy"
+    ]
   },
   "brokedownpalace": {
     "preferredModes": [
@@ -1695,7 +1887,11 @@
       "peakSaturation": 0.45
     },
     "narrativeArc": "meditative_journey",
-    "thematicTags": ["tender", "farewell", "nostalgic"]
+    "thematicTags": [
+      "tender",
+      "farewell",
+      "nostalgic"
+    ]
   },
   "blackpeter": {
     "preferredModes": [
@@ -1728,7 +1924,11 @@
     "overlayDensity": 0.4,
     "saturationOffset": -0.1,
     "narrativeArc": "meditative_journey",
-    "thematicTags": ["dark", "tender", "contemplative"]
+    "thematicTags": [
+      "dark",
+      "tender",
+      "contemplative"
+    ]
   },
   "cumberlandblues": {
     "preferredModes": [
@@ -1754,7 +1954,11 @@
     ],
     "overlayDensity": 0.7,
     "narrativeArc": "energy_cycle",
-    "thematicTags": ["country", "driving", "fun"]
+    "thematicTags": [
+      "country",
+      "driving",
+      "fun"
+    ]
   },
   "looselucy": {
     "preferredModes": [
@@ -1786,7 +1990,11 @@
       "peakSaturation": 0.5
     },
     "narrativeArc": "energy_cycle",
-    "thematicTags": ["psychedelic", "funky", "colorful"]
+    "thematicTags": [
+      "psychedelic",
+      "funky",
+      "colorful"
+    ]
   },
   "direwolf": {
     "preferredModes": [
@@ -1816,7 +2024,11 @@
     "overlayDensity": 0.5,
     "saturationOffset": -0.06,
     "narrativeArc": "energy_cycle",
-    "thematicTags": ["folk", "dark", "storytelling"]
+    "thematicTags": [
+      "folk",
+      "dark",
+      "storytelling"
+    ]
   },
   "comesametime": {
     "preferredModes": [
@@ -1844,7 +2056,11 @@
     "overlayDensity": 0.5,
     "hueShift": -5,
     "narrativeArc": "meditative_journey",
-    "thematicTags": ["cosmic", "contemplative", "gentle"]
+    "thematicTags": [
+      "cosmic",
+      "contemplative",
+      "gentle"
+    ]
   },
   "itmusthavebeen": {
     "preferredModes": [
@@ -1873,7 +2089,11 @@
     "overlayDensity": 0.5,
     "saturationOffset": -0.05,
     "narrativeArc": "meditative_journey",
-    "thematicTags": ["tender", "nostalgic", "organic"]
+    "thematicTags": [
+      "tender",
+      "nostalgic",
+      "organic"
+    ]
   },
   "hesgone": {
     "preferredModes": [
@@ -1916,8 +2136,8 @@
       "flower_field",
       "aurora",
       "kaleidoscope",
-      "fractal_zoom",
-      "stained_glass"
+      "stained_glass",
+      "liquid_light"
     ],
     "palette": {
       "primary": 120,
@@ -1936,7 +2156,7 @@
     ],
     "climaxBehavior": {
       "peakSaturation": 0.45,
-      "peakBrightness": 0.20,
+      "peakBrightness": 0.2,
       "flash": true
     },
     "narrativeArc": "build_to_climax",
@@ -1949,11 +2169,11 @@
   "cassidy": {
     "preferredModes": [
       "inferno",
-      "electric_arc",
       "concert_lighting",
       "fractal_flames",
       "tie_dye",
-      "climax_surge"
+      "liquid_light",
+      "oil_projector"
     ],
     "palette": {
       "primary": 10,
@@ -1970,7 +2190,7 @@
       "festival"
     ],
     "climaxBehavior": {
-      "peakSaturation": 0.50,
+      "peakSaturation": 0.5,
       "peakBrightness": 0.25,
       "flash": true
     },
@@ -2028,7 +2248,7 @@
     "palette": {
       "primary": 30,
       "secondary": 175,
-      "saturation": 0.80
+      "saturation": 0.8
     },
     "overlayBoost": [
       "CampfireCircle",
@@ -2040,7 +2260,7 @@
       "retro"
     ],
     "climaxBehavior": {
-      "peakSaturation": 0.30
+      "peakSaturation": 0.3
     },
     "narrativeArc": "energy_cycle",
     "thematicTags": [
@@ -2062,8 +2282,8 @@
     "palette": {
       "primary": 270,
       "secondary": 200,
-      "saturation": 0.70,
-      "brightness": 0.90
+      "saturation": 0.7,
+      "brightness": 0.9
     },
     "overlayBoost": [
       "SpiritWisps",
@@ -2077,7 +2297,7 @@
     "overlayDensity": 0.6,
     "climaxBehavior": {
       "peakSaturation": 0.25,
-      "peakBrightness": 0.10
+      "peakBrightness": 0.1
     },
     "narrativeArc": "meditative_journey",
     "thematicTags": [
@@ -2092,9 +2312,9 @@
       "ink_wash",
       "deep_ocean",
       "smoke_rings",
-      "storm",
       "volumetric_smoke",
-      "blacklight_glow"
+      "blacklight_glow",
+      "liquid_light"
     ],
     "palette": {
       "primary": 230,
@@ -2165,7 +2385,7 @@
       "concert_lighting",
       "deep_ocean",
       "inferno",
-      "electric_arc"
+      "liquid_light"
     ],
     "palette": {
       "primary": 220,
@@ -2182,7 +2402,7 @@
       "festival"
     ],
     "climaxBehavior": {
-      "peakSaturation": 0.40,
+      "peakSaturation": 0.4,
       "flash": true
     },
     "narrativeArc": "energy_cycle",
@@ -2206,7 +2426,7 @@
       "primary": 210,
       "secondary": 200,
       "saturation": 0.65,
-      "brightness": 0.90
+      "brightness": 0.9
     },
     "overlayBoost": [
       "RainDrops",
@@ -2255,7 +2475,7 @@
     ],
     "overlayDensity": 0.6,
     "climaxBehavior": {
-      "peakSaturation": 0.30
+      "peakSaturation": 0.3
     },
     "narrativeArc": "build_to_climax",
     "thematicTags": [
@@ -2269,14 +2489,14 @@
       "mandala_engine",
       "liquid_mandala",
       "kaleidoscope",
-      "fractal_zoom",
       "aurora",
-      "cosmic_voyage"
+      "cosmic_voyage",
+      "liquid_light"
     ],
     "palette": {
       "primary": 45,
       "secondary": 280,
-      "saturation": 0.80
+      "saturation": 0.8
     },
     "overlayBoost": [
       "GratefulMandala",
@@ -2289,7 +2509,7 @@
       "cosmic"
     ],
     "climaxBehavior": {
-      "peakSaturation": 0.40,
+      "peakSaturation": 0.4,
       "peakBrightness": 0.18
     },
     "narrativeArc": "meditative_journey",
@@ -2311,7 +2531,7 @@
     "palette": {
       "primary": 30,
       "secondary": 55,
-      "saturation": 0.90
+      "saturation": 0.9
     },
     "overlayBoost": [
       "BearParade",
@@ -2325,7 +2545,7 @@
     ],
     "climaxBehavior": {
       "peakSaturation": 0.45,
-      "peakBrightness": 0.20,
+      "peakBrightness": 0.2,
       "flash": true
     },
     "narrativeArc": "energy_cycle",
@@ -2338,11 +2558,11 @@
   "greateststory": {
     "preferredModes": [
       "concert_lighting",
-      "electric_arc",
       "inferno",
-      "climax_surge",
       "fractal_flames",
-      "tie_dye"
+      "tie_dye",
+      "liquid_light",
+      "oil_projector"
     ],
     "palette": {
       "primary": 5,
@@ -2359,7 +2579,7 @@
       "festival"
     ],
     "climaxBehavior": {
-      "peakSaturation": 0.50,
+      "peakSaturation": 0.5,
       "peakBrightness": 0.25,
       "flash": true
     },
@@ -2375,14 +2595,14 @@
       "desert_road",
       "concert_lighting",
       "inferno",
-      "electric_arc",
-      "climax_surge",
-      "fractal_flames"
+      "fractal_flames",
+      "liquid_light",
+      "oil_projector"
     ],
     "palette": {
       "primary": 45,
       "secondary": 5,
-      "saturation": 0.90
+      "saturation": 0.9
     },
     "overlayBoost": [
       "SpeakerStack",
@@ -2409,10 +2629,10 @@
       "concert_lighting",
       "tie_dye",
       "inferno",
-      "electric_arc",
       "fractal_flames",
-      "climax_surge",
-      "liquid_light"
+      "liquid_light",
+      "oil_projector",
+      "aurora"
     ],
     "palette": {
       "primary": 330,
@@ -2447,15 +2667,15 @@
       "spectral_analyzer",
       "concert_lighting",
       "tie_dye",
-      "electric_arc",
       "prism_refraction",
       "liquid_light",
-      "kaleidoscope"
+      "kaleidoscope",
+      "oil_projector"
     ],
     "palette": {
       "primary": 310,
       "secondary": 180,
-      "saturation": 0.90
+      "saturation": 0.9
     },
     "overlayBoost": [
       "NeonDeadSign",
@@ -2468,7 +2688,7 @@
       "psychedelic"
     ],
     "climaxBehavior": {
-      "peakSaturation": 0.50,
+      "peakSaturation": 0.5,
       "peakBrightness": 0.22,
       "flash": true
     },
@@ -2493,7 +2713,7 @@
     "palette": {
       "primary": 180,
       "secondary": 270,
-      "saturation": 0.80
+      "saturation": 0.8
     },
     "overlayBoost": [
       "SacredGeometry",
@@ -2530,7 +2750,7 @@
     "palette": {
       "primary": 210,
       "secondary": 240,
-      "saturation": 0.60,
+      "saturation": 0.6,
       "brightness": 0.85
     },
     "overlayBoost": [
@@ -2594,16 +2814,16 @@
     "preferredModes": [
       "ocean",
       "deep_ocean",
-      "storm",
       "river",
       "volumetric_clouds",
       "aurora_curtains",
-      "aurora"
+      "aurora",
+      "liquid_light"
     ],
     "palette": {
       "primary": 200,
       "secondary": 40,
-      "saturation": 0.80
+      "saturation": 0.8
     },
     "overlayBoost": [
       "WaveOfLight",
@@ -2615,7 +2835,7 @@
       "contemplative"
     ],
     "climaxBehavior": {
-      "peakSaturation": 0.40,
+      "peakSaturation": 0.4,
       "peakBrightness": 0.18,
       "flash": true
     },
@@ -2631,14 +2851,14 @@
       "concert_lighting",
       "spectral_analyzer",
       "tie_dye",
-      "electric_arc",
       "prism_refraction",
-      "liquid_light"
+      "liquid_light",
+      "oil_projector"
     ],
     "palette": {
       "primary": 320,
       "secondary": 170,
-      "saturation": 0.90
+      "saturation": 0.9
     },
     "overlayBoost": [
       "NeonDeadSign",
@@ -2652,7 +2872,7 @@
     ],
     "climaxBehavior": {
       "peakSaturation": 0.45,
-      "peakBrightness": 0.20,
+      "peakBrightness": 0.2,
       "flash": true
     },
     "narrativeArc": "energy_cycle",
@@ -2666,10 +2886,10 @@
     "preferredModes": [
       "inferno",
       "lava_flow",
-      "electric_arc",
       "concert_lighting",
       "fractal_flames",
-      "liquid_light"
+      "liquid_light",
+      "oil_projector"
     ],
     "palette": {
       "primary": 20,
@@ -2702,15 +2922,15 @@
       "oil_projector",
       "smoke_rings",
       "liquid_light",
-      "feedback_recursion",
       "voronoi_flow",
       "liquid_mandala",
-      "vintage_film"
+      "vintage_film",
+      "tie_dye"
     ],
     "palette": {
       "primary": 280,
       "secondary": 120,
-      "saturation": 0.80
+      "saturation": 0.8
     },
     "overlayBoost": [
       "PsychedelicEye",
@@ -2735,18 +2955,18 @@
   },
   "blackthroatedwind": {
     "preferredModes": [
-      "storm",
       "desert_road",
       "rain_street",
       "smoke_rings",
       "volumetric_smoke",
       "deep_ocean",
-      "ink_wash"
+      "ink_wash",
+      "liquid_light"
     ],
     "palette": {
       "primary": 35,
       "secondary": 185,
-      "saturation": 0.70
+      "saturation": 0.7
     },
     "overlayBoost": [
       "RainDrops",
@@ -2781,7 +3001,7 @@
     "palette": {
       "primary": 50,
       "secondary": 195,
-      "saturation": 0.90
+      "saturation": 0.9
     },
     "overlayBoost": [
       "GoldenRoad",
@@ -2795,7 +3015,7 @@
     ],
     "climaxBehavior": {
       "peakSaturation": 0.45,
-      "peakBrightness": 0.20,
+      "peakBrightness": 0.2,
       "flash": true
     },
     "narrativeArc": "build_to_climax",
@@ -2809,16 +3029,16 @@
     "preferredModes": [
       "concert_lighting",
       "inferno",
-      "electric_arc",
-      "storm",
       "liquid_light",
-      "fractal_flames"
+      "fractal_flames",
+      "oil_projector",
+      "tie_dye"
     ],
     "palette": {
       "primary": 0,
       "secondary": 0,
-      "saturation": 0.60,
-      "brightness": 0.80
+      "saturation": 0.6,
+      "brightness": 0.8
     },
     "overlayBoost": [
       "SpeakerStack",
@@ -2830,7 +3050,7 @@
       "retro"
     ],
     "climaxBehavior": {
-      "peakBrightness": 0.20,
+      "peakBrightness": 0.2,
       "flash": true
     },
     "narrativeArc": "energy_cycle",
@@ -2839,7 +3059,7 @@
       "rocker",
       "aggressive"
     ],
-    "saturationOffset": -0.10
+    "saturationOffset": -0.1
   },
   "foolishheart": {
     "preferredModes": [
@@ -2854,7 +3074,7 @@
     "palette": {
       "primary": 345,
       "secondary": 210,
-      "saturation": 0.80
+      "saturation": 0.8
     },
     "overlayBoost": [
       "Roses",
@@ -2903,7 +3123,7 @@
     ],
     "overlayDensity": 0.5,
     "climaxBehavior": {
-      "peakSaturation": 0.30
+      "peakSaturation": 0.3
     },
     "narrativeArc": "energy_cycle",
     "thematicTags": [
