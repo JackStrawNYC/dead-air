@@ -24,7 +24,7 @@ interface Props {
   style?: SceneTransitionStyle;
 }
 
-export const SceneCrossfade: React.FC<Props> = ({ progress, outgoing, incoming, flashFrame, style = "flash" }) => {
+export const SceneCrossfade: React.FC<Props> = ({ progress, outgoing, incoming, flashFrame, style = "dissolve" }) => {
   const frame = useCurrentFrame();
 
   // Beat flash (additional, on top of transition flash)
