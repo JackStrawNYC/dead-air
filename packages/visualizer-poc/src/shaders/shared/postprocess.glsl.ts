@@ -65,7 +65,7 @@ export function buildPostProcessGLSL(config: PostProcessConfig = {}): string {
     eraGradingEnabled = true,
     temporalBlendEnabled = false,
     halationEnabled = true,
-    stageFloodEnabled = true,
+    stageFloodEnabled = false,
     caEnabled = true,
   } = config;
 
@@ -139,7 +139,7 @@ ${
     float bloomThreshold = max(0.20, mix(0.60, 0.45, energy) + uBloomThreshold${bloomThresholdStr});
     float bloomAmount = max(0.0, lum - bloomThreshold) * (1.2 + climaxBoost * 0.4);
     vec3 bloomColor = mix(col, vec3(1.0, 0.98, 0.95), 0.3);
-    float bloomCap = 0.45 + energy * 0.15 + climaxBoost * 0.20;
+    float bloomCap = 0.35 + energy * 0.10 + climaxBoost * 0.15;
     vec3 bloom = bloomColor * min(bloomAmount, bloomCap) * (0.14 + energy * 0.08) * uShowBloom;
     col = col + bloom - col * bloom; // screen blend
   }

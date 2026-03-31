@@ -396,7 +396,7 @@ export function getModeForSection(
         // Strict preferred-only pool: song identity controls the visual.
         // No registry splash — curated modes only, no random off-brand shaders.
         const weightedPool: VisualMode[] = [];
-        for (const m of showModes) { for (let i = 0; i < 3; i++) weightedPool.push(m); }
+        for (const m of showModes) { for (let i = 0; i < 5; i++) weightedPool.push(m); }
         for (const m of remainingPreferred) { for (let i = 0; i < 2; i++) weightedPool.push(m); }
         if (weightedPool.length > 0) filteredPool = weightedPool;
       }

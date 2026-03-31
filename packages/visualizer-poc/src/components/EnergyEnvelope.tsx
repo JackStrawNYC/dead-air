@@ -46,13 +46,12 @@ export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod,
   // Intro damping: suppress ALL reactive brightness during intro so art/text shines
   const reactivity = introFactor;
 
-  // ── Brightness: psychedelic visuals should ALWAYS be vivid ──
-  // Quiet (factor=0) → 0.75 brightness. Loud (factor=1) → 1.10 brightness.
-  // The shader should never go dark — Dead shows have constant visual energy.
+  // ── Brightness: always vivid, peaks brighter ──
+  // Floor 0.70, ceiling 1.15. Quiet is 70% bright, loud is 115%. Never dark.
   const isClimaxPhase = (climaxMod?.brightnessOffset ?? 0) > 0.04;
-  const brightCap = isClimaxPhase ? 1.45 : 1.20;
-  const transientPunch = (snapshot.fastEnergy ?? 0) * 0.08 * Math.min(1, (snapshot.beatStability ?? 0.5) + 0.3);
-  const brightness = 0.75 + factor * 0.35 * reactivity + (climaxMod?.brightnessOffset ?? 0) * reactivity + transientPunch * reactivity;
+  const brightCap = isClimaxPhase ? 1.30 : 1.15;
+  const transientPunch = (snapshot.fastEnergy ?? 0) * 0.06 * Math.min(1, (snapshot.beatStability ?? 0.5) + 0.3);
+  const brightness = 0.70 + factor * 0.30 * reactivity + (climaxMod?.brightnessOffset ?? 0) * reactivity + transientPunch * reactivity;
 
   // Drums/Space phase adjustments
   let dsBrightOffset = 0;
@@ -65,8 +64,8 @@ export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod,
     dsHueOffset = 12;       // warmth shift
   }
 
-  // Final brightness: floor at 0.65 — visuals NEVER go dark
-  const baseBrightness = Math.min(brightCap, Math.max(0.65, brightness + dsBrightOffset + itLuminanceLift));
+  // Final brightness: floor at 0.70 — visuals NEVER go dark
+  const baseBrightness = Math.min(brightCap, Math.max(0.70, brightness + dsBrightOffset + itLuminanceLift));
   const finalBrightness = deadAirFactor > 0
     ? baseBrightness * (1 - deadAirFactor * 0.40)  // dim significantly during dead air
     : baseBrightness;

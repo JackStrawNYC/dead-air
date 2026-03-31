@@ -65,7 +65,7 @@ const FILM_STOCKS: Record<string, FilmStockProfile> = {
   },
   classic: {
     name: "Ektachrome E-6",
-    cssFilter: "saturate(1.08) contrast(1.04) brightness(1.01)",
+    cssFilter: "",
     tintColor: "rgba(200, 160, 80, 0.03)",
     tintOpacity: 0.03,
     shadowTint: "rgba(30, 50, 40, 0.06)",

@@ -156,7 +156,7 @@ void main() {
   vec2 p = (uv - 0.5) * vec2(aspect, 1.0);
 
   // ─── Audio-reactive UV domain warp (the image breathes with the music) ───
-  float warpIntensity = uSlowEnergy * 0.08 + uFastEnergy * 0.04;
+  float warpIntensity = uSlowEnergy * 0.04 + uFastEnergy * 0.02;
   float warpX = snoise(vec3(p * 1.5, uDynamicTime * 0.12)) * warpIntensity;
   float warpY = snoise(vec3(p * 1.5 + 100.0, uDynamicTime * 0.12)) * warpIntensity;
 
@@ -193,14 +193,14 @@ void main() {
   // Only the brightest parts of the icon emerge — the rest lets shader dominate.
   float iconBlend = smoothstep(0.15, 0.6, imgLuma) * dissolveThreshold;
 
-  // Palette tint to unify icon with song color
-  vec3 tint = hsv2rgb(vec3(uPalettePrimary, 0.25, 1.0));
-  vec3 tintedImg = mix(imgColor.rgb, imgColor.rgb * tint, 0.20);
+  // Palette tint to unify icon with song color world
+  vec3 tint = hsv2rgb(vec3(uPalettePrimary, 0.30, 1.0));
+  vec3 tintedImg = mix(imgColor.rgb, imgColor.rgb * tint, 0.35);
 
   // Composite: shader is hero, icon is ghostly complement
-  // At iconBlend=1.0: 45% icon blended over shader (visible but not dominant)
+  // At iconBlend=1.0: 30% icon — recognizable but never dominant
   // At iconBlend=0.0: 100% shader (most of the frame)
-  vec3 finalColor = mix(bg, tintedImg, iconBlend * 0.45);
+  vec3 finalColor = mix(bg, tintedImg, iconBlend * 0.30);
 
   // Energy adds a touch of brightness, but never darkens
   finalColor *= 1.0 + uEnergy * 0.15;

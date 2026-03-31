@@ -313,14 +313,14 @@ export function buildIconSchedule(
  * sectionType encoding: 0=intro, 1=verse, 2=chorus, 3=bridge, 4=solo, 5=jam, 6=outro, 7=space
  */
 function sectionIconPresence(sectionType: number): number {
-  if (sectionType < 0.5) return 0.40;  // intro: shader establishes, icons drift in
-  if (sectionType < 1.5) return 0.45;  // verse: icons as ghostly complement
-  if (sectionType < 2.5) return 0.55;  // chorus: icons emerge more during emotional peaks
-  if (sectionType < 3.5) return 0.40;  // bridge: transitional
-  if (sectionType < 4.5) return 0.30;  // solo: shader IS the solo
-  if (sectionType < 5.5) return 0.25;  // jam: shader owns the psychedelic journey
-  if (sectionType < 6.5) return 0.35;  // outro: icons return gently
-  return 0.15;                          // space: near-invisible, pure shader
+  if (sectionType < 0.5) return 0.30;  // intro: shader establishes, icons drift in
+  if (sectionType < 1.5) return 0.35;  // verse: ghostly Dead watermark
+  if (sectionType < 2.5) return 0.40;  // chorus: icons emerge slightly at emotional peaks
+  if (sectionType < 3.5) return 0.30;  // bridge: transitional
+  if (sectionType < 4.5) return 0.20;  // solo: shader IS the solo
+  if (sectionType < 5.5) return 0.15;  // jam: shader owns the psychedelic journey
+  if (sectionType < 6.5) return 0.25;  // outro: icons return gently
+  return 0.08;                          // space: near-invisible, pure shader
 }
 
 /**
@@ -336,7 +336,7 @@ export function getIconForFrame(
 ): { iconPath: string; opacity: number } {
   if (schedule.length === 0) return { iconPath: "", opacity: 0 };
 
-  const WINDOW_FRAMES = 900; // 30 seconds per icon — slow, unhurried evolution
+  const WINDOW_FRAMES = 600; // 20 seconds per icon — unhurried but not stagnant
   const FADE_IN_FRAMES = 150;  // 5s smooth fade-in
   const FADE_OUT_FRAMES = 150; // 5s smooth fade-out (gentle crossfade)
 
@@ -349,9 +349,9 @@ export function getIconForFrame(
   // Section-aware base opacity
   const sectionPresence = sectionIconPresence(sectionType ?? 1); // default to verse
 
-  // Climax override: imagery comes back hard during climax (phase 2-3)
+  // Climax: icons recede, shader owns the peak moment
   const climaxBoost = (climaxPhase !== undefined && climaxPhase >= 2 && climaxPhase <= 3)
-    ? 0.30 : 0;
+    ? 0.15 : 0;
 
   // Energy modulation within the section presence range
   const energyMod = 0.85 + energy * 0.15;

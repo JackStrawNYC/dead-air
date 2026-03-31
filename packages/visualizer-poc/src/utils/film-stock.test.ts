@@ -14,7 +14,7 @@ describe("getFilmStock", () => {
     const stock = getFilmStock("classic");
     expect(stock).not.toBeNull();
     expect(stock!.name).toBe("Ektachrome E-6");
-    expect(stock!.cssFilter).toContain("saturate");
+    expect(stock!.cssFilter).toBe("");
   });
 
   it("returns Betacam for brent era", () => {

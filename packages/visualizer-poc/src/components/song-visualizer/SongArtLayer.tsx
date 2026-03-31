@@ -47,21 +47,12 @@ export const SongArtLayer: React.FC<SongArtProps> = ({ src, suppressionFactor, h
   const segueFade = segueIn && frame < 150 ? (frame - 90) / 60 : 1;
 
   // Energy-reactive wash: quiet → 0.40, peak → 0.10
-  // Art visible throughout — real imagery grounds the psychedelic visuals
-  const energyWash = interpolate(
-    energy,
-    [0.03, 0.20, 0.40],
-    [0.55, 0.40, 0.25],
-    { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
-  );
-
-  // Base target: hold strong during intro period, then settle to energy-reactive wash
-  // When introFactor < 1, maintain higher base opacity (art is the star of the intro)
-  const introWash = introFactor < 1 ? 0.70 * (1 - introFactor) + energyWash * introFactor : energyWash;
+  // Art is intro title card only — gone after 12s, shader owns the song body
+  const introTarget = introFactor < 1 ? 0.70 * (1 - introFactor) : 0;
   const baseOpacity = interpolate(
     frame,
     [0, ART_FULL_END, ART_FADE_END],
-    [0.70, 0.70, introWash],
+    [0.70, 0.70, introTarget],
     {
       extrapolateLeft: "clamp",
       extrapolateRight: "clamp",
