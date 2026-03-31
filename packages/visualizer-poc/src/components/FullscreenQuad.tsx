@@ -152,60 +152,19 @@ vec3 hsv2rgb(vec3 c){
 
 void main() {
   vec2 uv = vUv;
-  float aspect = uResolution.x / uResolution.y;
-  vec2 p = (uv - 0.5) * vec2(aspect, 1.0);
 
-  // ─── Audio-reactive UV domain warp (the image breathes with the music) ───
-  float warpIntensity = uSlowEnergy * 0.04 + uFastEnergy * 0.02;
-  float warpX = snoise(vec3(p * 1.5, uDynamicTime * 0.12)) * warpIntensity;
-  float warpY = snoise(vec3(p * 1.5 + 100.0, uDynamicTime * 0.12)) * warpIntensity;
-
-  // Beat pulse: image breathes with the rhythm
-  float bp = beatPulse(uMusicalTime) * smoothstep(0.3, 0.6, uBeatConfidence);
-  float beatScale = 1.0 - bp * 0.02;
-  vec2 beatUV = (uv - 0.5) * beatScale + 0.5;
-
-  // Slow Ken Burns drift
-  vec2 drift = vec2(sin(uDynamicTime * 0.03) * 0.015, cos(uDynamicTime * 0.025) * 0.012);
-
-  // Onset jolt on transients
-  float jolt = uOnsetSnap * 0.01;
-  vec2 joltOffset = vec2(sin(uTime * 7.3) * jolt, cos(uTime * 5.1) * jolt);
-
-  vec2 warpedUV = beatUV + vec2(warpX, warpY) + joltOffset + drift;
-
-  // ─── Sample image (fills the full frame) ───
-  vec4 imgColor = texture2D(uIconTexture, clamp(warpedUV, 0.0, 1.0));
-  float imgLuma = dot(imgColor.rgb, vec3(0.299, 0.587, 0.114));
-
-  // ─── Sample shader background ───
+  // Sample the shader (the actual visual)
   vec3 bg = texture2D(uBackgroundTexture, uv).rgb;
 
-  // ─── Noise dissolve for smooth organic transitions between images ───
-  float dissolveNoise = snoise(vec3(p * 1.5, uDynamicTime * 0.05)) * 0.5 + 0.5;
-  float dissolveThreshold = smoothstep(0.0, 1.0, uOpacity * 1.2 - dissolveNoise * 0.3);
+  // Sample the icon image
+  vec2 iconUV = uv + vec2(sin(uDynamicTime * 0.03) * 0.01, cos(uDynamicTime * 0.025) * 0.008);
+  vec4 imgColor = texture2D(uIconTexture, clamp(iconUV, 0.0, 1.0));
 
-  // ─── Image-primary compositing ───
-  // The image IS the visual. Black areas of the image let the shader through.
-  // Bright areas of the image dominate. The shader fills negative space.
-  //
-  // Shader IS the psychedelic light show. Icons float through like ghosts in liquid light.
-  // Only the brightest parts of the icon emerge — the rest lets shader dominate.
-  float iconBlend = smoothstep(0.15, 0.6, imgLuma) * dissolveThreshold;
+  // Simple screen blend at 20% opacity. That's it.
+  vec3 screenBlend = 1.0 - (1.0 - bg) * (1.0 - imgColor.rgb);
+  vec3 finalColor = mix(bg, screenBlend, uOpacity * 0.20);
 
-  // Palette tint to unify icon with song color world
-  vec3 tint = hsv2rgb(vec3(uPalettePrimary, 0.30, 1.0));
-  vec3 tintedImg = mix(imgColor.rgb, imgColor.rgb * tint, 0.35);
-
-  // Composite: shader is hero, icon is ghostly complement
-  // At iconBlend=1.0: 30% icon — recognizable but never dominant
-  // At iconBlend=0.0: 100% shader (most of the frame)
-  vec3 finalColor = mix(bg, tintedImg, iconBlend * 0.30);
-
-  // Energy adds a touch of brightness, but never darkens
-  finalColor *= 1.0 + uEnergy * 0.15;
-
-  gl_FragColor = vec4(min(finalColor, vec3(1.0)), 1.0);
+  gl_FragColor = vec4(finalColor, 1.0);
 }
 `;
 

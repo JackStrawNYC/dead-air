@@ -94,92 +94,36 @@ export function buildPostProcessGLSL(config: PostProcessConfig = {}): string {
 vec3 applyPostProcess(vec3 col, vec2 uv, vec2 p) {
   float energy = clamp(uEnergy, 0.0, 1.0);
 
-  // Phil Bomb shockwave: radial UV warp from bass transients
-  if (uPhilBombWave > 0.01) {
-    vec2 bombCenter = vec2(0.5);
-    vec2 bombDir = uv - bombCenter;
-    float bombDist = length(bombDir);
-    float bombWave = uPhilBombWave;
-    float bombRipple = sin(bombDist * 15.0 - bombWave * 10.0) * 0.5 + 0.5;
-    float bombDisplacement = bombWave * bombRipple * 0.035 * smoothstep(0.0, 0.4, bombDist);
-    uv += normalize(bombDir + vec2(0.001)) * bombDisplacement;
-    p = (uv - 0.5) * vec2(uResolution.x / uResolution.y, 1.0);
-  }
-
-${
-  lensDistortionEnabled
-    ? `  // Lens distortion: barrel curvature driven by uLensDistortion uniform
-  uv = barrelDistort(uv, uLensDistortion);
-  p = (uv - 0.5) * vec2(uResolution.x / uResolution.y, 1.0);
-`
-    : ""
-}
-
-  // Climax reactivity
-  float isClimax = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5);
-  float climaxBoost = isClimax * uClimaxIntensity;
-
 ${
   beatPulseEnabled
-    ? `  // Beat pulse: tempo-locked brightness + saturation swell
+    ? `  // Beat pulse: brightness swell on confident beats
   float bp = beatPulse(uMusicalTime);
   float bpGated = bp * smoothstep(0.3, 0.7, uBeatConfidence);
-  col *= 1.0 + bpGated * 0.12;
-  // Beat saturation punch
-  float bpLuma = dot(col, vec3(0.299, 0.587, 0.114));
-  col = mix(vec3(bpLuma), col, 1.0 + bpGated * 0.20);
+  col *= 1.0 + bpGated * 0.10;
 `
     : ""
 }
 ${
   bloomEnabled
-    ? `  // Bloom: self-illumination with energy-reactive threshold
+    ? `  // Bloom: gentle self-illumination
   {
     float lum = dot(col, vec3(0.299, 0.587, 0.114));
-    float bloomThreshold = max(0.20, mix(0.60, 0.45, energy) + uBloomThreshold${bloomThresholdStr});
-    float bloomAmount = max(0.0, lum - bloomThreshold) * (1.2 + climaxBoost * 0.4);
-    vec3 bloomColor = mix(col, vec3(1.0, 0.98, 0.95), 0.3);
-    float bloomCap = 0.35 + energy * 0.10 + climaxBoost * 0.15;
-    vec3 bloom = bloomColor * min(bloomAmount, bloomCap) * (0.14 + energy * 0.08) * uShowBloom;
-    col = col + bloom - col * bloom; // screen blend
-  }
-`
-    : ""
-}
-${
-  stageFloodEnabled
-    ? `  // Stage flood fill: palette noise in dark areas (concert venue ambient light)
-  col = stageFloodFill(col, p, uDynamicTime, energy, uPalettePrimary, uPaletteSecondary);
-`
-    : ""
-}
-${
-  halationEnabled
-    ? `  // Halation: warm film glow (light bleeding through film stock)
-  col = halation(uv, col, energy);
-`
-    : ""
-}
-${
-  caEnabled
-    ? `  // Chromatic aberration: energy-gated with safety cap
-  {
-    float caGate = smoothstep(0.15, 0.35, energy);
-    float caAmount = (uBass * 0.012 + uRms * 0.006 + uOnsetSnap * 0.06) * caGate;
-    caAmount = min(caAmount, 0.05);
-    col = applyCA(col, uv, caAmount);
+    float bloomThreshold = mix(0.55, 0.40, energy) + uBloomThreshold${bloomThresholdStr};
+    float bloomAmount = max(0.0, lum - bloomThreshold);
+    vec3 bloom = mix(col, vec3(1.0, 0.98, 0.95), 0.3) * min(bloomAmount, 0.30) * 0.12 * uShowBloom;
+    col = col + bloom - col * bloom;
   }
 `
     : ""
 }
 
-  // Cinematic grade (ACES filmic tone mapping)
+  // Cinematic grade (ACES tone mapping)
   col = cinematicGrade(col, energy);
 
-  // ─── Envelope modulations (brightness/saturation/hue from EnergyEnvelope) ───
+  // Envelope brightness (the ONE knob)
   col *= uEnvelopeBrightness;
 
-  // Envelope saturation: luma-preserving mix
+  // Envelope saturation
   {
     float envLuma = dot(col, vec3(0.299, 0.587, 0.114));
     col = mix(vec3(envLuma), col, uEnvelopeSaturation);
@@ -189,56 +133,26 @@ ${
   if (abs(uEnvelopeHue) > 0.001) {
     float ehCos = cos(uEnvelopeHue);
     float ehSin = sin(uEnvelopeHue);
-    mat3 ehRot = mat3(
-      ehCos, -ehSin, 0.0,
-      ehSin, ehCos, 0.0,
-      0.0, 0.0, 1.0
-    );
+    mat3 ehRot = mat3(ehCos, -ehSin, 0.0, ehSin, ehCos, 0.0, 0.0, 0.0, 1.0);
     col = max(vec3(0.0), ehRot * col);
   }
 
 ${
   temporalBlendEnabled
-    ? `  // Temporal frame blending: gentle accumulation for feedback shaders
+    ? `  // Temporal frame blending (feedback shaders only)
   {
     vec3 prevCol = texture2D(uPrevFrame, uv).rgb;
-    float motionBlend = 0.12 + energy * 0.06;
-    if (uJamPhase >= 0.0) {
-      float trailHueDeg = mix(5.0, 10.0, smoothstep(0.0, 2.0, uJamPhase));
-      float trailRad = trailHueDeg * 0.01745329;
-      float trCos = cos(trailRad);
-      float trSin = sin(trailRad);
-      mat3 trailRot = mat3(
-        trCos, -trSin, 0.0,
-        trSin, trCos, 0.0,
-        0.0, 0.0, 1.0
-      );
-      prevCol = max(vec3(0.0), trailRot * prevCol);
-      motionBlend += 0.04 * smoothstep(0.0, 2.0, uJamPhase);
-    }
-    col = mix(col, prevCol, motionBlend);
+    col = mix(col, prevCol, 0.12 + energy * 0.06);
   }
 `
     : ""
 }
 
-  // Venue vignette: edge darkening scaled by venue type
+  // Gentle vignette
   {
     float vig = 1.0 - dot(p * 0.9, p * 0.9);
     vig = smoothstep(0.0, 1.0, vig);
-    col *= mix(1.0, vig, uVenueVignette);
-  }
-
-  // Show warmth: seed-derived color temperature
-  {
-    float w = uShowWarmth;
-    col *= vec3(1.0 + w, 1.0, 1.0 - w);
-  }
-
-  // Show contrast: seed-derived curve
-  {
-    float mid = 0.18;
-    col = mid + (col - mid) * uShowContrast;
+    col *= mix(1.0, vig, 0.2);
   }
 
 ${

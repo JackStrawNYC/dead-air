@@ -46,12 +46,8 @@ export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod,
   // Intro damping: suppress ALL reactive brightness during intro so art/text shines
   const reactivity = introFactor;
 
-  // ── Brightness: always vivid, peaks brighter ──
-  // Floor 0.70, ceiling 1.15. Quiet is 70% bright, loud is 115%. Never dark.
-  const isClimaxPhase = (climaxMod?.brightnessOffset ?? 0) > 0.04;
-  const brightCap = isClimaxPhase ? 1.30 : 1.15;
-  const transientPunch = (snapshot.fastEnergy ?? 0) * 0.06 * Math.min(1, (snapshot.beatStability ?? 0.5) + 0.3);
-  const brightness = 0.70 + factor * 0.30 * reactivity + (climaxMod?.brightnessOffset ?? 0) * reactivity + transientPunch * reactivity;
+  // ── One brightness knob. That's it. ──
+  const brightness = 0.80 + factor * 0.20;
 
   // Drums/Space phase adjustments
   let dsBrightOffset = 0;
@@ -64,10 +60,10 @@ export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod,
     dsHueOffset = 12;       // warmth shift
   }
 
-  // Final brightness: floor at 0.70 — visuals NEVER go dark
-  const baseBrightness = Math.min(brightCap, Math.max(0.70, brightness + dsBrightOffset + itLuminanceLift));
+  // Simple: brightness is brightness. Dead air dims slightly.
+  const baseBrightness = Math.max(0.75, brightness);
   const finalBrightness = deadAirFactor > 0
-    ? baseBrightness * (1 - deadAirFactor * 0.40)  // dim significantly during dead air
+    ? baseBrightness * (1 - deadAirFactor * 0.15)
     : baseBrightness;
 
   // Palette sovereignty: only drums/space hue + dead air warmth

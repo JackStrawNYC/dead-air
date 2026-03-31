@@ -53,9 +53,9 @@ describe("Fix 2: uChordConfidence uniform", () => {
 });
 
 describe("Fix 3: PostProcess conditional compilation", () => {
-  it("includes lens distortion by default", () => {
+  it("includes cinematic grade by default", () => {
     const glsl = buildPostProcessGLSL();
-    expect(glsl).toContain("barrelDistort");
+    expect(glsl).toContain("cinematicGrade");
   });
 
   it("excludes lens distortion when disabled", () => {
