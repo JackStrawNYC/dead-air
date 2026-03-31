@@ -147,6 +147,7 @@ export const VisualModeSchema = z.enum([
   "aurora_sky", "storm", "canyon",
   "liquid_mandala", "bioluminescence", "neon_grid",
   "warm_nebula", "prism_refraction", "cellular_automata",
+  "spinning_spiral",
 ]);
 
 export const ColorPaletteSchema = z.object({
