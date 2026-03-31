@@ -319,14 +319,8 @@ export function getModeForSection(
   shaderModeLastUsed?: Map<VisualMode, number>,
   stemDominant?: string,
 ): VisualMode {
-  // Explicit override always wins
-  const override = song.sectionOverrides?.find((o) => o.sectionIndex === sectionIndex);
-  if (override) return override.mode;
-
-  // Coherence lock: hold current shader during peak moments
-  if (coherenceIsLocked && sectionIndex > 0) {
-    return getModeForSection(song, sectionIndex - 1, sections, seed, era, false, usedShaderModes, songIdentity, stemSection, frames, songDuration, setNumber, trackNumber, shaderModeLastUsed);
-  }
+  // SIMPLE: always use the song's default mode. No switching, no pools, no broken shaders.
+  return song.defaultMode;
 
   // Seeded variation with affinity-aware morphing
   if (seed !== undefined) {
