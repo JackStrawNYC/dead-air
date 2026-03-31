@@ -812,7 +812,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
           </div>
 
           {/* Song art: visible during intro only, then gone. GLSL icons own the visual after. */}
-          {effectiveSongArt && introFactor < 0.95 && (
+          {effectiveSongArt && (introFactor < 0.95 || deadAirFactor > 0.01) && (
             <SilentErrorBoundary name="SongArt">
               <SongArtLayer src={staticFile(effectiveSongArt)} suppressionFactor={artSuppressionFactor} hueRotation={hueRotation} energy={audioSnapshot.energy} climaxIntensity={climaxState.intensity} focusOpacity={focusState.artOpacity} segueIn={props.segueIn} artBlendMode={props.song.artBlendMode} introFactor={Math.min(1, introFactor * 1.5)} deadAirFactor={deadAirFactor} />
             </SilentErrorBoundary>

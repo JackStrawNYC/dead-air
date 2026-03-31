@@ -96,7 +96,7 @@ export const SongArtLayer: React.FC<SongArtProps> = ({ src, suppressionFactor, h
         position: "absolute",
         inset: 0,
         opacity: finalOpacity,
-        mixBlendMode: (introFactor < 0.5 ? "normal" : (artBlendMode ?? "screen")) as React.CSSProperties["mixBlendMode"],
+        mixBlendMode: (introFactor < 0.5 || deadAirFactor > 0.5 ? "normal" : (artBlendMode ?? "screen")) as React.CSSProperties["mixBlendMode"],
         overflow: "hidden",
         filter: [
           // Energy-adaptive color correction: brighter art at peaks, darker at quiet
