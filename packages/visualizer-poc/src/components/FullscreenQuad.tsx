@@ -161,9 +161,15 @@ void main() {
   iconUV += vec2(sin(uDynamicTime * 0.03) * 0.01, cos(uDynamicTime * 0.025) * 0.008);
   vec4 imgColor = texture2D(uIconTexture, clamp(iconUV, 0.0, 1.0));
 
-  // Screen blend: icons float through the shader as ghostly Dead imagery
-  vec3 screenBlend = 1.0 - (1.0 - bg) * (1.0 - imgColor.rgb);
-  vec3 finalColor = mix(bg, screenBlend, uOpacity);
+  // Overlay blend: icons visible on both bright and dark shader backgrounds
+  // Dark shader areas: icon adds light (like screen)
+  // Bright shader areas: icon darkens/tints (like multiply)
+  vec3 overlayBlend = vec3(
+    bg.r < 0.5 ? 2.0 * bg.r * imgColor.r : 1.0 - 2.0 * (1.0 - bg.r) * (1.0 - imgColor.r),
+    bg.g < 0.5 ? 2.0 * bg.g * imgColor.g : 1.0 - 2.0 * (1.0 - bg.g) * (1.0 - imgColor.g),
+    bg.b < 0.5 ? 2.0 * bg.b * imgColor.b : 1.0 - 2.0 * (1.0 - bg.b) * (1.0 - imgColor.b)
+  );
+  vec3 finalColor = mix(bg, overlayBlend, uOpacity * 0.7);
 
   gl_FragColor = vec4(finalColor, 1.0);
 }
