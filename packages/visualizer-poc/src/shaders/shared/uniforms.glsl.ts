@@ -40,10 +40,13 @@ uniform float uSnapToMusicalTime;
 uniform float uDrumOnset;
 uniform float uDrumBeat;
 uniform float uStemBass;
+uniform float uStemDrums;
+uniform float uStemDrumOnset;
 
 // ─── Vocal / Other Stem ───
 uniform float uVocalEnergy;
 uniform float uVocalPresence;
+uniform float uStemVocalRms;
 uniform float uOtherEnergy;
 uniform float uOtherCentroid;
 

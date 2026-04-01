@@ -687,10 +687,10 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
     : 0;
   const isDeadAir = deadAirFactor > 0.99;
 
-  // ─── Intro factor: art visible ~12s, then GLSL icons take over ───
+  // ─── Intro factor: song card visible ~15s, then shader takes over ───
   // 0 = art dominates (shader suppressed), 1 = shader + icons fully open.
-  const INTRO_FULL = 120;  // 4s at 30fps — art is hero, shader at 15%
-  const INTRO_RAMP = 240;  // 8s ramp — shader goes from 15% to 100% (4s-12s)
+  const INTRO_FULL = 450;  // 15s at 30fps — song card is hero
+  const INTRO_RAMP = 150;  // 5s ramp — shader fades in (15s-20s)
   const introFactor = props.segueIn
       ? (frame < 90 ? 1                                                              // 0-3s: full shader (crossfade)
         : frame < 150 ? 1 - 0.50 * ((frame - 90) / 60)                              // 3-5s: dim to 50%

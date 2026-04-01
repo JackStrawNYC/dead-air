@@ -270,6 +270,9 @@ export const FullscreenQuad: React.FC<Props> = ({
       uClimaxIntensity: { value: 0 },
       uSlowEnergy: { value: 0 },
       uStemBass: { value: 0 },
+      uStemDrums: { value: 0 },
+      uStemDrumOnset: { value: 0 },
+      uStemVocalRms: { value: 0 },
       uContrast0: { value: new THREE.Vector4(0, 0, 0, 0) },
       uContrast1: { value: new THREE.Vector4(0, 0, 0, 0) },
       uChroma0: { value: new THREE.Vector4(0, 0, 0, 0) },
@@ -459,6 +462,9 @@ export const FullscreenQuad: React.FC<Props> = ({
   uniforms.uCoherence.value = coherence;
   uniforms.uSlowEnergy.value = smooth.slowEnergy;
   uniforms.uStemBass.value = smooth.stemBass;
+  uniforms.uStemDrums.value = smooth.drumOnset; // drums energy = drum onset
+  uniforms.uStemDrumOnset.value = smooth.drumOnset;
+  uniforms.uStemVocalRms.value = smooth.vocalEnergy;
   uniforms.uFastEnergy.value = smooth.fastEnergy;
   uniforms.uFastBass.value = smooth.fastBass;
   uniforms.uDrumOnset.value = smooth.drumOnset;
