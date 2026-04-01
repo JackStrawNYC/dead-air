@@ -75,6 +75,13 @@ void main() {
   float onset = clamp(uOnsetSnap, 0.0, 1.0);
   float slowE = clamp(uSlowEnergy, 0.0, 1.0);
 
+  // === SECTION-TYPE MODULATION (must be before any usage) ===
+  float sectionT = uSectionType;
+  float sJam = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
+  float sSpace = smoothstep(6.5, 7.5, sectionT);
+  float sChorus = smoothstep(1.5, 2.5, sectionT) * (1.0 - step(2.5, sectionT));
+  float sSolo = smoothstep(3.5, 4.5, sectionT) * (1.0 - step(4.5, sectionT));
+
   // === BARREL DISTORTION ===
   vec2 distUv = barrelDistort(uv, 0.1);
   vec2 dp = (distUv - 0.5) * aspect;
@@ -82,21 +89,14 @@ void main() {
   float flowTime = uDynamicTime * 0.1 * mix(1.0, 1.3, sJam) * mix(1.0, 0.5, sSpace);
 
   // --- Phase 1: New uniform integrations ---
-  float vocalSpot = uVocalPresence * 0.25;     // vocal presence spotlight cone
-  float vocalWarmth = uVocalEnergy * 0.12;      // vocal warmth in fog
-  float trendExpand = uEnergyTrend * 0.04;      // energy trend expansion
-  float tensionTurb = uHarmonicTension * 0.35;  // harmonic tension turbulence
-  float pitchTemp = uMelodicPitch * 0.15;       // melodic pitch fog temperature
-  float peakDesat = uPeakApproaching * 0.15;    // peak approaching desaturation
+  float vocalSpot = uVocalPresence * 0.25;
+  float vocalWarmth = uVocalEnergy * 0.12;
+  float trendExpand = uEnergyTrend * 0.04;
+  float tensionTurb = uHarmonicTension * 0.35;
+  float pitchTemp = uMelodicPitch * 0.15;
+  float peakDesat = uPeakApproaching * 0.15;
   float chromaHueMod = uChromaHue * 0.25;
   float chordHue = float(int(uChordIndex)) / 24.0 * 0.15;
-
-  // === SECTION-TYPE MODULATION ===
-  float sectionT = uSectionType;
-  float sJam = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
-  float sSpace = smoothstep(6.5, 7.5, sectionT);
-  float sChorus = smoothstep(1.5, 2.5, sectionT) * (1.0 - step(2.5, sectionT));
-  float sSolo = smoothstep(3.5, 4.5, sectionT) * (1.0 - step(4.5, sectionT));
 
   // === RAY SETUP ===
   vec3 ro = vec3(0.0, 0.0, -2.0);
