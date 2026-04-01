@@ -705,8 +705,12 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
   // Start fade-out 1 frame before the end of analyzed audio to ensure visuals are fully
   // gone by the time audio ends (analysis rounds up via ceil, creating a +1 frame mismatch)
   const fadeIn = props.segueIn ? 1 : interpolate(frame, [0, FADE_FRAMES], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-  const fadeOutStart = durationInFrames - FADE_FRAMES - 1;
-  const fadeOut = props.segueOut ? 1 : interpolate(frame, [fadeOutStart, durationInFrames - 1], [1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  // Fade out 10 seconds after music ends (not at end of video) to cut dead air
+  const DEAD_AIR_BOOKEND = 300; // 10 seconds of song art bookend, then fade
+  const effectiveFadeOutStart = musicEndFrame < durationInFrames
+    ? musicEndFrame + DEAD_AIR_BOOKEND
+    : durationInFrames - FADE_FRAMES - 1;
+  const fadeOut = props.segueOut ? 1 : interpolate(frame, [effectiveFadeOutStart, effectiveFadeOutStart + FADE_FRAMES], [1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
   // Progressive dim during dead air: after crossfade completes, fade toward near-black.
   // Non-segue songs get an extra "visual breath" — the last 60 frames (2s) fade deeper
   // than segue songs, creating a brief moment of darkness between songs for pacing contrast.

@@ -319,7 +319,30 @@ export function getModeForSection(
   shaderModeLastUsed?: Map<VisualMode, number>,
   stemDominant?: string,
 ): VisualMode {
-  // SIMPLE: always use the song's default mode. No switching, no pools, no broken shaders.
+  // Explicit override always wins
+  const override = song.sectionOverrides?.find((o) => o.sectionIndex === sectionIndex);
+  if (override) return override.mode;
+
+  // Section 0 always uses default
+  if (sectionIndex === 0) return song.defaultMode;
+
+  // Coherence lock: hold current shader
+  if (coherenceIsLocked) {
+    return getModeForSection(song, sectionIndex - 1, sections, seed, era, false, usedShaderModes, songIdentity, stemSection, frames, songDuration, setNumber, trackNumber, shaderModeLastUsed);
+  }
+
+  // Switch shader on energy transitions for visual evolution
+  const section = sections[sectionIndex];
+  const prevSection = sectionIndex > 0 ? sections[sectionIndex - 1] : null;
+  if (section && prevSection && prevSection.energy !== section.energy && seed !== undefined) {
+    // Pick from song identity preferred modes if available
+    if (songIdentity?.preferredModes?.length) {
+      const rng = seededRandom(seed + (trackNumber ?? 0) * 31337 + sectionIndex * 7919);
+      const pool = songIdentity.preferredModes.filter((m) => m !== song.defaultMode);
+      if (pool.length > 0) return pool[Math.floor(rng() * pool.length)];
+    }
+  }
+
   return song.defaultMode;
 
   // Seeded variation with affinity-aware morphing
