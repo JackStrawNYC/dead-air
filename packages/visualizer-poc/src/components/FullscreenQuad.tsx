@@ -156,8 +156,9 @@ void main() {
   // Sample the shader (the actual visual)
   vec3 bg = texture2D(uBackgroundTexture, uv).rgb;
 
-  // Sample the icon image
-  vec2 iconUV = uv + vec2(sin(uDynamicTime * 0.03) * 0.01, cos(uDynamicTime * 0.025) * 0.008);
+  // Sample the icon image — zoom out slightly so icons aren't so tight on frame
+  vec2 iconUV = (uv - 0.5) * 0.75 + 0.5; // 75% zoom = more breathing room
+  iconUV += vec2(sin(uDynamicTime * 0.03) * 0.01, cos(uDynamicTime * 0.025) * 0.008);
   vec4 imgColor = texture2D(uIconTexture, clamp(iconUV, 0.0, 1.0));
 
   // Screen blend: icons float through the shader as ghostly Dead imagery
