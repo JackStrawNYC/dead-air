@@ -19,7 +19,7 @@
 
 import React, { useMemo, useRef, useEffect } from "react";
 import * as THREE from "three";
-import { staticFile, useCurrentFrame, useVideoConfig, interpolate, delayRender, continueRender } from "remotion";
+import { staticFile, useCurrentFrame, useVideoConfig, interpolate, delayRender, continueRender, Img } from "remotion";
 import { SceneRouter } from "./scenes/SceneRouter";
 import { SceneCrossfade } from "./scenes/SceneCrossfade";
 import { SegueCrossfade } from "./scenes/SegueCrossfade";
@@ -823,13 +823,29 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
             </SilentErrorBoundary>
           )}
 
-          {/* SVG overlays disabled — GLSL icon overlay system is the primary Dead imagery now.
-              The Grok-generated images rendered through the shader pipeline are higher quality
-              and have proper visual hierarchy (image fills frame, shader fills negative space).
-              Keeping the DynamicOverlayStack code intact for potential re-enable. */}
-          {/* <DynamicOverlayStack ... /> */}
-
-          {/* WaveformOverlay, GuitarStrings, CrowdOverlay disabled — shader owns the visual */}
+          {/* Dead imagery: CSS-composited icon overlay (GLSL TextureLoader fails in headless) */}
+          {iconState.iconPath && introFactor > 0.5 && deadAirFactor < 0.5 && (
+            <div
+              style={{
+                position: "absolute",
+                inset: 0,
+                opacity: iconState.opacity * (1 - deadAirFactor) * 0.85,
+                mixBlendMode: "overlay",
+                pointerEvents: "none",
+              }}
+            >
+              <Img
+                src={staticFile(iconState.iconPath)}
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "cover",
+                  objectPosition: "center",
+                  transform: `translate(${Math.sin(frame / 900) * 1.5}%, ${Math.cos(frame / 700) * 1}%)`,
+                }}
+              />
+            </div>
+          )}
 
           {/* IT flash — chromatic burst on coherence break */}
           {itState.flashIntensity > 0.01 && (
