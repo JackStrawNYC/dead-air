@@ -156,8 +156,8 @@ void main() {
   // Sample the shader (the actual visual)
   vec3 bg = texture2D(uBackgroundTexture, uv).rgb;
 
-  // Sample the icon image — zoom out slightly so icons aren't so tight on frame
-  vec2 iconUV = (uv - 0.5) * 0.75 + 0.5; // 75% zoom = more breathing room
+  // Sample the icon image — zoom out so icons have breathing room
+  vec2 iconUV = (uv - 0.5) * 1.4 + 0.5; // 1.4x = zoomed out, more space around edges
   iconUV += vec2(sin(uDynamicTime * 0.03) * 0.01, cos(uDynamicTime * 0.025) * 0.008);
   vec4 imgColor = texture2D(uIconTexture, clamp(iconUV, 0.0, 1.0));
 
