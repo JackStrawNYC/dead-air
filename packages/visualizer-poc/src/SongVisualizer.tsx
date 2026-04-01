@@ -705,13 +705,9 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
   // Start fade-out 1 frame before the end of analyzed audio to ensure visuals are fully
   // gone by the time audio ends (analysis rounds up via ceil, creating a +1 frame mismatch)
   const fadeIn = props.segueIn ? 1 : interpolate(frame, [0, FADE_FRAMES], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-  // Fade out 20 seconds after music ends — song art bookend, then gentle fade
-  const DEAD_AIR_BOOKEND = 600; // 20 seconds of song art bookend
-  const DEAD_AIR_FADE = 150; // 5 second gentle fade (not abrupt)
-  const effectiveFadeOutStart = musicEndFrame < durationInFrames
-    ? musicEndFrame + DEAD_AIR_BOOKEND
-    : durationInFrames - FADE_FRAMES - 1;
-  const fadeOut = props.segueOut ? 1 : interpolate(frame, [effectiveFadeOutStart, effectiveFadeOutStart + DEAD_AIR_FADE], [1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  // Song art bookend stays until the composition ends — no early fadeout
+  // Just a quick 1-second fade at the very last frames
+  const fadeOut = props.segueOut ? 1 : interpolate(frame, [durationInFrames - 30, durationInFrames - 1], [1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
   // Progressive dim during dead air: after crossfade completes, fade toward near-black.
   // Non-segue songs get an extra "visual breath" — the last 60 frames (2s) fade deeper
   // than segue songs, creating a brief moment of darkness between songs for pacing contrast.
@@ -823,7 +819,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
             </SilentErrorBoundary>
           )}
 
-          {/* Dead imagery: CSS-composited icon overlay (GLSL TextureLoader fails in headless) */}
+          {/* Dead imagery: CSS-composited icon overlay */}
           {iconState.iconPath && introFactor > 0.5 && deadAirFactor < 0.5 && (
             <div
               style={{
@@ -832,6 +828,8 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
                 opacity: iconState.opacity * (1 - deadAirFactor) * 0.85,
                 mixBlendMode: "overlay",
                 pointerEvents: "none",
+                maskImage: "radial-gradient(ellipse 70% 70% at 50% 50%, black 40%, transparent 100%)",
+                WebkitMaskImage: "radial-gradient(ellipse 70% 70% at 50% 50%, black 40%, transparent 100%)",
               }}
             >
               <Img
