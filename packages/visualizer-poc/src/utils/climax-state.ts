@@ -283,10 +283,10 @@ const PHASE_TARGETS: Record<
   { sat: number; bright: number; vig: number; bloom: number; contrast: number; density: number; speed: number; drama: number; forceDual: boolean }
 > = {
   idle:    { sat: -0.10, bright: -0.04, vig: -0.04, bloom: -0.05, contrast: -0.03, density: 0.70, speed: 1.0, drama: 0.0, forceDual: false },
-  build:   { sat: -0.15, bright: +0.02, vig: -0.02, bloom: 0.10, contrast: +0.10, density: 1.10, speed: 1.2, drama: 0.2, forceDual: true  },
-  climax:  { sat: +0.80, bright: +0.18, vig: -0.08, bloom: 0.15, contrast: +0.15, density: 1.60, speed: 1.6, drama: 0.9, forceDual: true  },
-  sustain: { sat: +0.50, bright: +0.14, vig: -0.06, bloom: 0.10, contrast: +0.10, density: 1.40, speed: 1.4, drama: 0.7, forceDual: true  },
-  release: { sat: +0.15, bright: -0.02, vig: -0.01, bloom: 0.03, contrast: +0.02, density: 0.60, speed: 0.9, drama: 0.1, forceDual: false },
+  build:   { sat: -0.15, bright: +0.02, vig: -0.02, bloom: 0.10, contrast: +0.10, density: 1.10, speed: 1.05, drama: 0.2, forceDual: false },
+  climax:  { sat: +0.80, bright: +0.18, vig: -0.08, bloom: 0.15, contrast: +0.15, density: 1.60, speed: 1.15, drama: 0.4, forceDual: false },
+  sustain: { sat: +0.50, bright: +0.14, vig: -0.06, bloom: 0.10, contrast: +0.10, density: 1.40, speed: 1.10, drama: 0.3, forceDual: false },
+  release: { sat: +0.15, bright: -0.02, vig: -0.01, bloom: 0.03, contrast: +0.02, density: 0.60, speed: 0.95, drama: 0.1, forceDual: false },
 };
 
 /** Anticipation sub-state overrides — dramatic darkness before the drop.

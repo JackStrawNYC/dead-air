@@ -11,7 +11,7 @@
       "title": "New Minglewood Blues",
       "set": 1,
       "trackNumber": 1,
-      "defaultMode": "liquid_light",
+      "defaultMode": "tie_dye",
       "audioFile": "gd77-05-08s1t02.mp3",
       "palette": {
         "primary": 20,
@@ -33,7 +33,7 @@
       "title": "Loser",
       "set": 1,
       "trackNumber": 2,
-      "defaultMode": "oil_projector",
+      "defaultMode": "stained_glass",
       "audioFile": "gd77-05-08s1t03.mp3",
       "palette": {
         "primary": 270,
@@ -55,7 +55,7 @@
       "title": "El Paso",
       "set": 1,
       "trackNumber": 3,
-      "defaultMode": "lava_flow",
+      "defaultMode": "cosmic_voyage",
       "audioFile": "gd77-05-08s1t04.mp3",
       "palette": {
         "primary": 25,
@@ -76,7 +76,7 @@
       "title": "They Love Each Other",
       "set": 1,
       "trackNumber": 4,
-      "defaultMode": "tie_dye",
+      "defaultMode": "coral_reef",
       "audioFile": "gd77-05-08s1t05.mp3",
       "palette": {
         "primary": 330,
@@ -98,7 +98,7 @@
       "title": "Jack Straw",
       "set": 1,
       "trackNumber": 5,
-      "defaultMode": "liquid_light",
+      "defaultMode": "aurora_curtains",
       "audioFile": "gd77-05-08s1t06.mp3",
       "palette": {
         "primary": 15,
@@ -120,7 +120,7 @@
       "title": "Deal",
       "set": 1,
       "trackNumber": 6,
-      "defaultMode": "plasma_field",
+      "defaultMode": "tie_dye",
       "audioFile": "gd77-05-08s1t07.mp3",
       "palette": {
         "primary": 0,
@@ -141,7 +141,7 @@
       "title": "Lazy Lightnin'",
       "set": 1,
       "trackNumber": 7,
-      "defaultMode": "aurora_curtains",
+      "defaultMode": "plasma_field",
       "audioFile": "gd77-05-08s1t08.mp3",
       "palette": {
         "primary": 280,
@@ -163,7 +163,7 @@
       "title": "Supplication",
       "set": 1,
       "trackNumber": 8,
-      "defaultMode": "deep_ocean",
+      "defaultMode": "stained_glass",
       "audioFile": "gd77-05-08s1t09.mp3",
       "palette": {
         "primary": 260,
@@ -185,7 +185,7 @@
       "title": "Brown Eyed Women",
       "set": 1,
       "trackNumber": 9,
-      "defaultMode": "stained_glass",
+      "defaultMode": "liquid_light",
       "audioFile": "gd77-05-08s1t10.mp3",
       "palette": {
         "primary": 30,
@@ -250,7 +250,7 @@
       "title": "Dancin' in the Street",
       "set": 1,
       "trackNumber": 12,
-      "defaultMode": "tie_dye",
+      "defaultMode": "cosmic_voyage",
       "audioFile": "gd77-05-08s1t13.mp3",
       "palette": {
         "primary": 310,
@@ -272,7 +272,7 @@
       "title": "Scarlet Begonias",
       "set": 2,
       "trackNumber": 1,
-      "defaultMode": "liquid_light",
+      "defaultMode": "coral_reef",
       "audioFile": "gd77-05-08s2t02.mp3",
       "palette": {
         "primary": 0,
@@ -295,7 +295,7 @@
       "title": "Fire on the Mountain",
       "set": 2,
       "trackNumber": 2,
-      "defaultMode": "inferno",
+      "defaultMode": "lava_flow",
       "audioFile": "gd77-05-08s2t03.mp3",
       "palette": {
         "primary": 15,
@@ -317,7 +317,7 @@
       "title": "Estimated Prophet",
       "set": 2,
       "trackNumber": 3,
-      "defaultMode": "cosmic_voyage",
+      "defaultMode": "deep_ocean",
       "audioFile": "gd77-05-08s2t04.mp3",
       "palette": {
         "primary": 260,
@@ -339,7 +339,7 @@
       "title": "St. Stephen",
       "set": 2,
       "trackNumber": 4,
-      "defaultMode": "sacred_geometry",
+      "defaultMode": "mandala_engine",
       "audioFile": "gd77-05-08s2t05.mp3",
       "palette": {
         "primary": 160,
@@ -362,7 +362,7 @@
       "title": "Not Fade Away",
       "set": 2,
       "trackNumber": 5,
-      "defaultMode": "mandala_engine",
+      "defaultMode": "aurora_curtains",
       "audioFile": "gd77-05-08s2t06.mp3",
       "palette": {
         "primary": 350,
@@ -385,7 +385,7 @@
       "title": "Drums / Space",
       "set": 2,
       "trackNumber": 6,
-      "defaultMode": "cosmic_voyage",
+      "defaultMode": "sacred_geometry",
       "audioFile": "gd77-05-08s2t07.mp3",
       "palette": {
         "primary": 240,
@@ -407,7 +407,7 @@
       "title": "Morning Dew",
       "set": 2,
       "trackNumber": 7,
-      "defaultMode": "aurora",
+      "defaultMode": "smoke_rings",
       "audioFile": "gd77-05-08s2t08.mp3",
       "palette": {
         "primary": 200,
@@ -429,7 +429,7 @@
       "title": "One More Saturday Night",
       "set": 2,
       "trackNumber": 8,
-      "defaultMode": "fractal_flames",
+      "defaultMode": "kaleidoscope",
       "audioFile": "gd77-05-08s2t09.mp3",
       "palette": {
         "primary": 50,

@@ -560,7 +560,7 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
       const baseDT = snapToMusicalTimeProp
         ? computeMusicalTimeUtil(beatArray, idx, fps, tempo ?? 120) / (tempo ?? 120) * 60
         : (dynamicTimeLookup[idx] ?? (idx / fps));
-      const fluxMult = 1.0 + Math.min(0.3, spectralFlux * 0.8);
+      const fluxMult = 1.0 + Math.min(0.1, spectralFlux * 0.2);
       return baseDT * climaxSpeedMult * fluxMult * spaceTimeDilation;
     })(),
     jamPhase: jamPhaseCtx.phase,
