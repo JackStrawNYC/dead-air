@@ -272,7 +272,7 @@ export function buildIconSchedule(
   showSeed: number,
   trackId: string,
 ): string[] {
-  const WINDOW_FRAMES = 360; // 12 seconds per icon
+  const WINDOW_FRAMES = 600; // 20 seconds per icon — matches getIconForFrame
   const windowCount = Math.max(1, Math.ceil(durationFrames / WINDOW_FRAMES));
 
   // Score icons by mood keyword overlap with song identity

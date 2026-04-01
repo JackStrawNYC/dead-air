@@ -163,7 +163,7 @@ void main() {
 
   // Screen blend: icons float through the shader as ghostly Dead imagery
   vec3 screenBlend = 1.0 - (1.0 - bg) * (1.0 - imgColor.rgb);
-  vec3 finalColor = mix(bg, screenBlend, uOpacity * 0.50);
+  vec3 finalColor = mix(bg, screenBlend, uOpacity);
 
   gl_FragColor = vec4(finalColor, 1.0);
 }
