@@ -85,6 +85,9 @@ float fbm(vec3 p) {
   return value;
 }
 
+// vec2 overload: promotes to vec3 with z=0
+float fbm(vec2 p) { return fbm(vec3(p, 0.0)); }
+
 // --- 6-octave FBM for richer detail ---
 float fbm6(vec3 p) {
   float value = 0.0;

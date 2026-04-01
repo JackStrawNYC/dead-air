@@ -825,7 +825,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
               style={{
                 position: "absolute",
                 inset: 0,
-                opacity: Math.min(1.0, iconState.opacity * (1 - deadAirFactor) * 1.0),
+                opacity: iconState.opacity * (1 - deadAirFactor) * 0.75,
                 mixBlendMode: "overlay",
                 pointerEvents: "none",
                 maskImage: "radial-gradient(ellipse 70% 70% at 50% 50%, black 40%, transparent 100%)",

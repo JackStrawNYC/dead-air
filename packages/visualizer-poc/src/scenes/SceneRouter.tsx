@@ -331,9 +331,21 @@ export function getModeForSection(
     return getModeForSection(song, sectionIndex - 1, sections, seed, era, false, usedShaderModes, songIdentity, stemSection, frames, songDuration, setNumber, trackNumber, shaderModeLastUsed);
   }
 
-  // Within-song shader switching DISABLED — too many shaders have compilation
-  // bugs (missing uniforms, forward refs, wrong function signatures).
-  // One shader per song is stable and looks good.
+  // Switch shader on energy transitions from safe whitelist
+  const SAFE_SHADERS: VisualMode[] = [
+    "liquid_light", "oil_projector", "tie_dye", "aurora", "inferno",
+    "deep_ocean", "stained_glass", "plasma_field", "cosmic_voyage",
+    "lava_flow", "aurora_curtains", "sacred_geometry", "mandala_engine",
+    "fractal_flames", "kaleidoscope", "fractal_zoom", "galaxy_spiral",
+    "spinning_spiral", "smoke_rings", "coral_reef",
+  ];
+  const section = sections[sectionIndex];
+  const prevSection = sectionIndex > 0 ? sections[sectionIndex - 1] : null;
+  if (section && prevSection && prevSection.energy !== section.energy && seed !== undefined) {
+    const rng = seededRandom(seed + (trackNumber ?? 0) * 31337 + sectionIndex * 7919);
+    const pool = SAFE_SHADERS.filter((m) => m !== song.defaultMode);
+    if (pool.length > 0) return pool[Math.floor(rng() * pool.length)];
+  }
 
   return song.defaultMode;
 
