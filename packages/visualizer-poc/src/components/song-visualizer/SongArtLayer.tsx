@@ -14,8 +14,8 @@ import { Img, useCurrentFrame, interpolate, Easing } from "remotion";
 
 const clampOpts = { extrapolateLeft: "clamp" as const, extrapolateRight: "clamp" as const };
 
-const ART_FULL_END = 120;      // 4s at 30fps — full opacity title card
-const ART_FADE_END = 300;      // 10s — fade to background wash level
+const ART_FULL_END = 450;      // 15s at 30fps — song card fills screen
+const ART_FADE_END = 600;      // 20s — crossfade to shader complete
 
 interface SongArtProps {
   src: string;
@@ -48,11 +48,11 @@ export const SongArtLayer: React.FC<SongArtProps> = ({ src, suppressionFactor, h
 
   // Energy-reactive wash: quiet → 0.40, peak → 0.10
   // Art is intro title card only — gone after 12s, shader owns the song body
-  const introTarget = introFactor < 1 ? 0.70 * (1 - introFactor) : 0;
+  const introTarget = introFactor < 1 ? 0.95 * (1 - introFactor) : 0;
   const baseOpacity = interpolate(
     frame,
     [0, ART_FULL_END, ART_FADE_END],
-    [0.70, 0.70, introTarget],
+    [0.95, 0.95, introTarget],
     {
       extrapolateLeft: "clamp",
       extrapolateRight: "clamp",
@@ -67,7 +67,10 @@ export const SongArtLayer: React.FC<SongArtProps> = ({ src, suppressionFactor, h
   const introBoost = frame < ART_FULL_END ? 1.0
     : introFactor < 1 ? focusOpacity + (1.0 - focusOpacity) * (1 - introFactor)
     : focusOpacity;
-  const artOpacity = baseOpacity * suppressionFactor * climaxSuppression * introBoost;
+  // During intro (first 15s), art is the hero — no suppression
+  const artOpacity = introFactor < 0.5
+    ? baseOpacity  // Full brightness during song card
+    : baseOpacity * suppressionFactor * climaxSuppression * introBoost;
 
   // Dead air reappearance: poster returns prominently as bookend
   const deadAirOpacity = deadAirFactor * 0.85;
@@ -105,8 +108,8 @@ export const SongArtLayer: React.FC<SongArtProps> = ({ src, suppressionFactor, h
             const artBright = interpolate(energy, [0, 0.15, 0.30], [0.65, 0.75, 0.85], clampOpts);
             const artContrast = interpolate(energy, [0, 0.15, 0.30], [0.75, 0.85, 0.95], clampOpts);
             // During intro (introFactor < 0.5), use consistent values instead of harsh 0.7
-            const b = introFactor < 0.5 ? 0.85 : artBright;
-            const c = introFactor < 0.5 ? 0.90 : artContrast;
+            const b = introFactor < 0.5 ? 1.0 : artBright;
+            const c = introFactor < 0.5 ? 1.0 : artContrast;
             return `brightness(${b.toFixed(3)}) contrast(${c.toFixed(3)})`;
           })(),
           hueRotation !== 0 ? `hue-rotate(${hueRotation.toFixed(1)}deg)` : "",

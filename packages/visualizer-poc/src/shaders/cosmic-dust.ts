@@ -104,6 +104,9 @@ void main() {
   stars += starField(parallax2, 50.0, 0.7) * 0.3;
   stars += starField(parallax3, 80.0, 0.5) * 0.15;
 
+  // Beat stability (must be before star shimmer)
+  float beatStability = clamp(uBeatStability, 0.0, 1.0);
+
   // Energy brightens stars (section-modulated)
   stars *= (0.7 + uEnergy * 0.6 + uFastEnergy * 0.2) * starBrightMod;
   // Beat stability: unstable → star shimmer boost
@@ -129,7 +132,6 @@ void main() {
   float pitchBright = uMelodicPitch * 0.15;
   float tensionDensity = clamp(uHarmonicTension, 0.0, 1.0) * 0.15;
   float peakGlow = clamp(uPeakApproaching, 0.0, 1.0) * 0.12;
-  float beatStability = clamp(uBeatStability, 0.0, 1.0);
 
   vec3 nebColor1 = hsv2rgb(vec3(uPalettePrimary + chromaHueMod + chordHue, 0.6 * uPaletteSaturation, 0.25 + pitchBright));
   vec3 nebColor2 = hsv2rgb(vec3(uPaletteSecondary, 0.5 * uPaletteSaturation, 0.20 + peakGlow));
