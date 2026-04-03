@@ -10,6 +10,7 @@
 import React, { useMemo } from "react";
 import {
   Audio,
+  Img,
   OffthreadVideo,
   staticFile,
   useCurrentFrame,
@@ -127,8 +128,12 @@ export const ShowIntro: React.FC<ShowIntroProps> = ({
 
   return (
     <div style={{ width, height, position: "relative", overflow: "hidden", background: "#000" }}>
-      {/* Layer 1: Clean dark background (brand video handles the visual) */}
+      {/* Layer 1: Show poster as intro backdrop */}
       <div style={{ position: "absolute", inset: 0, opacity: sceneOpacity, overflow: "hidden", background: "#0a0812" }}>
+        <Img
+          src={staticFile("assets/song-art/show-poster.png")}
+          style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center" }}
+        />
         {/* Bottom vignette for legibility */}
         <div
           style={{
