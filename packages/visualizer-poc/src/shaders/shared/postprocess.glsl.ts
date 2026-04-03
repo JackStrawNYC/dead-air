@@ -67,6 +67,7 @@ export function buildPostProcessGLSL(config: PostProcessConfig = {}): string {
     halationEnabled = true,
     stageFloodEnabled = false,
     caEnabled = true,
+    lightLeakEnabled = true,
   } = config;
 
   // Grain intensity expression
@@ -104,6 +105,14 @@ ${
     : ""
 }
 ${
+  lensDistortionEnabled
+    ? `  // Lens distortion: subtle barrel warp before bloom
+  uv = barrelDistort(uv, uLensDistortion);
+  p = (uv - 0.5) * vec2(uResolution.x / uResolution.y, 1.0);
+`
+    : ""
+}
+${
   bloomEnabled
     ? `  // Bloom: gentle self-illumination
   {
@@ -113,6 +122,32 @@ ${
     vec3 bloom = mix(col, vec3(1.0, 0.98, 0.95), 0.3) * min(bloomAmount, 0.30) * 0.12 * uShowBloom;
     col = col + bloom - col * bloom;
   }
+`
+    : ""
+}
+${
+  caEnabled
+    ? `  // Chromatic aberration: energy-gated lens fringing
+  {
+    float caGate = smoothstep(0.15, 0.35, energy);
+    float caAmount = (uBass * 0.008 + uRms * 0.004 + uOnsetSnap * 0.03) * caGate;
+    caAmount = min(caAmount, 0.03);
+    col = applyCA(col, uv, caAmount);
+  }
+`
+    : ""
+}
+${
+  halationEnabled
+    ? `  // Halation: warm film glow around bright areas
+  col = halation(uv, col, energy);
+`
+    : ""
+}
+${
+  lightLeakEnabled
+    ? `  // Light leak: drifting warm amber glow (subtle)
+  col += lightLeak(p, uDynamicTime, energy, uOnsetSnap) * 0.7;
 `
     : ""
 }

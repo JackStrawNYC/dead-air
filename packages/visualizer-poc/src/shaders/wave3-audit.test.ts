@@ -68,8 +68,13 @@ describe("Fix 3: PostProcess conditional compilation", () => {
     expect(glsl).not.toContain("beatJolt");
   });
 
-  it("does not include light leak by default (stripped)", () => {
+  it("includes light leak by default (restored cinematic effect)", () => {
     const glsl = buildPostProcessGLSL();
+    expect(glsl).toContain("lightLeak");
+  });
+
+  it("excludes light leak when disabled", () => {
+    const glsl = buildPostProcessGLSL({ lightLeakEnabled: false });
     expect(glsl).not.toContain("lightLeak");
   });
 
