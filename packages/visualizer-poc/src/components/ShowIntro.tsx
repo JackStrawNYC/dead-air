@@ -127,12 +127,8 @@ export const ShowIntro: React.FC<ShowIntroProps> = ({
 
   return (
     <div style={{ width, height, position: "relative", overflow: "hidden", background: "#000" }}>
-      {/* Layer 1: Cosmic voyage scene (behind video, fades in during crossfade) */}
-      <div style={{ position: "absolute", inset: 0, opacity: sceneOpacity, overflow: "hidden" }}>
-        <CosmicVoyageScene
-          frames={syntheticFrames}
-          palette={palette}
-        />
+      {/* Layer 1: Clean dark background (brand video handles the visual) */}
+      <div style={{ position: "absolute", inset: 0, opacity: sceneOpacity, overflow: "hidden", background: "#0a0812" }}>
         {/* Bottom vignette for legibility */}
         <div
           style={{
