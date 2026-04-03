@@ -24,6 +24,7 @@
  *   --show-date   Show date for output naming (default: from setlist.json)
  *   --data-dir    Data directory override (default: ROOT/data)
  *   --seed        PRNG seed for generative variation (default: timestamp)
+ *   --fps=N       Render fps (30 or 60; analysis is interpolated from 30fps)
  */
 
 import { execSync } from "child_process";
@@ -78,6 +79,7 @@ const noEndCard = args.includes("--no-end-card");
 const noChapters = args.includes("--no-chapters");
 const noSetBreaks = args.includes("--no-set-breaks");
 const setBreakSecArg = args.find((a) => a.startsWith("--set-break-sec="))?.split("=")[1];
+const fpsArg = args.find((a) => a.startsWith("--fps="))?.split("=")[1];
 // Backwards-compatible: --draft maps to draft preset, --preview flag maps to preview preset
 const activePreset: RenderPreset | null = presetArg
   ? PRESETS[presetArg] ?? null
@@ -87,10 +89,11 @@ if (activePreset && concurrencyArg) {
   activePreset.concurrency = parseInt(concurrencyArg, 10);
 }
 const renderSeed = seedArg ? parseInt(seedArg, 10) : Date.now();
+const previewFps = fpsArg ? parseInt(fpsArg, 10) : 30;
 const PREVIEW_FRAMES = parseInt(
   args.find((a) => a.startsWith("--preview-seconds="))?.split("=")[1] ?? "15",
   10,
-) * 30;
+) * previewFps;
 
 interface SetlistEntry {
   trackId: string;
@@ -556,6 +559,13 @@ function concatShow(
 // ─── Main ───
 
 function main() {
+  // Apply fps override (analysis data stays at 30fps, Root.tsx scales frame counts)
+  const renderFps = fpsArg ? parseInt(fpsArg, 10) : 30;
+  process.env.RENDER_FPS = String(renderFps);
+  if (renderFps !== 30) {
+    console.log(`FPS: ${renderFps} (analysis interpolated from 30fps)`);
+  }
+
   // Apply preset or legacy resolution logic
   if (activePreset) {
     process.env.RENDER_WIDTH = String(activePreset.width);
@@ -617,7 +627,7 @@ function main() {
   }
 
   console.log(`\nRendering ${songsToRender.length} track(s) with gl=${glArg}, chunk=${chunkSize}`);
-  console.log(`Total frames: ${totalFrames.toLocaleString()} (${(totalFrames / 30 / 60).toFixed(1)} min of video)`);
+  console.log(`Total frames: ${totalFrames.toLocaleString()} (${(totalFrames / renderFps / 60).toFixed(1)} min of video at ${renderFps}fps)`);
   console.log(`Strategy: video-only chunks + original audio mux`);
   console.log("=".repeat(60));
 

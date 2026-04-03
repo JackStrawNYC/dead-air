@@ -562,36 +562,36 @@ describe('dynamicCrossfadeDuration', () => {
     expect(duration).toBeLessThanOrEqual(240);
   });
 
-  it('loud→loud returns ~8 (hard cut)', () => {
+  it('loud→loud returns ~24 (hard cut)', () => {
     const frames = Array.from({ length: 200 }, () => mockFrame({ rms: 0.35 }));
     const duration = dynamicCrossfadeDuration(frames, 100);
-    expect(duration).toBeGreaterThanOrEqual(4); // minimum is 4
-    expect(duration).toBeLessThanOrEqual(8);
+    expect(duration).toBeGreaterThanOrEqual(12); // minimum is 12
+    expect(duration).toBeLessThanOrEqual(24);
   });
 
-  it('quiet→loud returns ~18 (fast snap)', () => {
+  it('quiet→loud returns ~36 (fast snap)', () => {
     const frames = Array.from({ length: 200 }, (_, i) =>
       mockFrame({ rms: i < 100 ? 0.03 : 0.35 }),
     );
     const duration = dynamicCrossfadeDuration(frames, 100);
-    expect(duration).toBeGreaterThanOrEqual(4);
-    expect(duration).toBeLessThanOrEqual(18);
+    expect(duration).toBeGreaterThanOrEqual(12);
+    expect(duration).toBeLessThanOrEqual(36);
   });
 
-  it('loud→quiet returns ~50 (moderate fade)', () => {
+  it('loud→quiet returns ~60 (moderate fade)', () => {
     const frames = Array.from({ length: 200 }, (_, i) =>
       mockFrame({ rms: i < 100 ? 0.35 : 0.03 }),
     );
     const duration = dynamicCrossfadeDuration(frames, 100);
-    expect(duration).toBeGreaterThanOrEqual(25);
-    expect(duration).toBeLessThanOrEqual(50);
+    expect(duration).toBeGreaterThanOrEqual(30);
+    expect(duration).toBeLessThanOrEqual(60);
   });
 
-  it('mid energy returns ~30 (default)', () => {
+  it('mid energy returns ~45 (default)', () => {
     const frames = Array.from({ length: 200 }, () => mockFrame({ rms: 0.12 }));
     const duration = dynamicCrossfadeDuration(frames, 100);
-    expect(duration).toBeGreaterThanOrEqual(15);
-    expect(duration).toBeLessThanOrEqual(30);
+    expect(duration).toBeGreaterThanOrEqual(20);
+    expect(duration).toBeLessThanOrEqual(45);
   });
 
   it('high spectral flux compresses duration', () => {
@@ -615,7 +615,7 @@ describe('dynamicCrossfadeDuration', () => {
     expect(highFluxDuration).toBeLessThan(lowFluxDuration);
   });
 
-  it('never returns less than 4', () => {
+  it('never returns less than 12', () => {
     const frames = Array.from({ length: 200 }, (_, i) =>
       mockFrame({
         rms: 0.35,
@@ -625,7 +625,7 @@ describe('dynamicCrossfadeDuration', () => {
       }),
     );
     const duration = dynamicCrossfadeDuration(frames, 100);
-    expect(duration).toBeGreaterThanOrEqual(4);
+    expect(duration).toBeGreaterThanOrEqual(12);
   });
 });
 

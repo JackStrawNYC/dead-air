@@ -20,6 +20,7 @@ import { isJamSegmentTitle } from "./data/band-config";
 // Falls back to data/ root (Cornell '77) for backward compatibility.
 const RENDER_WIDTH = parseInt(process.env.RENDER_WIDTH ?? "1920", 10);
 const RENDER_HEIGHT = parseInt(process.env.RENDER_HEIGHT ?? "1080", 10);
+const RENDER_FPS = parseInt(process.env.RENDER_FPS ?? "30", 10);
 
 const inputProps = getInputProps() as Record<string, unknown>;
 const showId = (inputProps.showId as string) ?? process.env.SHOW_ID ?? "";
@@ -94,11 +95,12 @@ const narrativeStates: PrecomputedNarrative[] = precomputeNarrativeStates(
   isJamSegmentTitle,
 );
 
-const DEFAULT_FRAMES = 31417; // Morning Dew fallback
-const SET_BREAK_FRAMES = 300; // 10 seconds at 30fps
-const SHOW_INTRO_FRAMES = 465; // ~15.5s at 30fps (7s video + 2s crossfade + 5s poster hold + 1.5s fade)
-const CHAPTER_CARD_FRAMES = 180; // 6 seconds at 30fps
-const END_CARD_FRAMES = 360;     // 12 seconds at 30fps
+const FPS_SCALE = RENDER_FPS / 30; // 1.0 at 30fps, 2.0 at 60fps
+const DEFAULT_FRAMES = Math.round(31417 * FPS_SCALE); // Morning Dew fallback
+const SET_BREAK_FRAMES = Math.round(300 * FPS_SCALE); // 10 seconds
+const SHOW_INTRO_FRAMES = Math.round(465 * FPS_SCALE); // ~15.5s (7s video + 2s crossfade + 5s poster hold + 1.5s fade)
+const CHAPTER_CARD_FRAMES = Math.round(180 * FPS_SCALE); // 6 seconds
+const END_CARD_FRAMES = Math.round(360 * FPS_SCALE);     // 12 seconds
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const SongVisualizerComponent = SongVisualizer as React.ComponentType<any>;
@@ -163,7 +165,7 @@ export const Root: React.FC = () => {
           id="ShowIntro"
           component={ShowIntroComponent}
           durationInFrames={SHOW_INTRO_FRAMES}
-          fps={30}
+          fps={RENDER_FPS}
           width={RENDER_WIDTH}
           height={RENDER_HEIGHT}
           defaultProps={{
@@ -183,7 +185,7 @@ export const Root: React.FC = () => {
           id={`Chapter-${i}`}
           component={ChapterCardComponent}
           durationInFrames={CHAPTER_CARD_FRAMES}
-          fps={30}
+          fps={RENDER_FPS}
           width={RENDER_WIDTH}
           height={RENDER_HEIGHT}
           defaultProps={{ text: ch.text, stats: ch.stats }}
@@ -203,7 +205,7 @@ export const Root: React.FC = () => {
             id={song.trackId}
             component={SongVisualizerComponent}
             durationInFrames={DEFAULT_FRAMES}
-            fps={30}
+            fps={RENDER_FPS}
             width={RENDER_WIDTH}
             height={RENDER_HEIGHT}
             defaultProps={{
@@ -230,7 +232,7 @@ export const Root: React.FC = () => {
                   validateSectionOverrides(song, analysis.meta.sections.length);
                 }
                 return {
-                  durationInFrames: analysis.meta.totalFrames ?? DEFAULT_FRAMES,
+                  durationInFrames: Math.round((analysis.meta.totalFrames ?? DEFAULT_FRAMES) * FPS_SCALE),
                   props: { ...props, analysis },
                 };
               }
@@ -245,7 +247,7 @@ export const Root: React.FC = () => {
         id="SetBreak"
         component={SetBreakCardComponent}
         durationInFrames={SET_BREAK_FRAMES}
-        fps={30}
+        fps={RENDER_FPS}
         width={RENDER_WIDTH}
         height={RENDER_HEIGHT}
         defaultProps={{
@@ -262,7 +264,7 @@ export const Root: React.FC = () => {
         id="EndCard"
         component={EndCardComponent}
         durationInFrames={END_CARD_FRAMES}
-        fps={30}
+        fps={RENDER_FPS}
         width={RENDER_WIDTH}
         height={RENDER_HEIGHT}
         defaultProps={{
@@ -279,7 +281,7 @@ export const Root: React.FC = () => {
           id="MorningDew"
           component={SongVisualizerComponent}
           durationInFrames={DEFAULT_FRAMES}
-          fps={30}
+          fps={RENDER_FPS}
           width={RENDER_WIDTH}
           height={RENDER_HEIGHT}
           defaultProps={{
@@ -292,7 +294,7 @@ export const Root: React.FC = () => {
             const analysis = loadTrackAnalysis("s2t08") as { meta?: { totalFrames?: number } } | null;
             if (analysis?.meta) {
               return {
-                durationInFrames: analysis.meta.totalFrames ?? DEFAULT_FRAMES,
+                durationInFrames: Math.round((analysis.meta.totalFrames ?? DEFAULT_FRAMES) * FPS_SCALE),
                 props: { ...props, analysis },
               };
             }

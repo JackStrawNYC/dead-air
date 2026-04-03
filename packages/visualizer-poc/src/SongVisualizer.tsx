@@ -153,8 +153,10 @@ export interface SongVisualizerProps {
 }
 
 export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
-  const { width, height, durationInFrames } = useVideoConfig();
+  const { width, height, durationInFrames, fps } = useVideoConfig();
   const frame = useCurrentFrame();
+  // Map render frame to analysis frame index (analysis is always at 30fps)
+  const analysisFrameScale = 30 / fps; // 1.0 at 30fps, 0.5 at 60fps
 
   // ─── Show narrative arc (cross-song state) ───
   // Precomputed narrative from Root.tsx takes priority (works in both Studio and CLI).
@@ -251,32 +253,36 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
     }
 
     const handle = delayRender("Loading icon overlay textures");
-    const loader = new THREE.TextureLoader();
     let loaded = 0;
 
+    const checkDone = () => {
+      if (loaded >= uniquePaths.length) {
+        setIconTexturesReady(true);
+        continueRender(handle);
+      }
+    };
+
     for (const iconPath of uniquePaths) {
-      loader.load(
-        staticFile(iconPath),
-        (tex) => {
-          tex.minFilter = THREE.LinearFilter;
-          tex.magFilter = THREE.LinearFilter;
-          iconTextureMap.current.set(iconPath, tex);
-          loaded++;
-          if (loaded >= uniquePaths.length) {
-            setIconTexturesReady(true);
-            continueRender(handle);
-          }
-        },
-        undefined,
-        () => {
-          // Texture failed to load — continue without it
-          loaded++;
-          if (loaded >= uniquePaths.length) {
-            setIconTexturesReady(true);
-            continueRender(handle);
-          }
-        },
-      );
+      // Use HTML Image element first (works in Remotion's headless Chrome),
+      // then create THREE.Texture from the loaded image. This avoids
+      // THREE.TextureLoader's internal loader which fails silently in headless.
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => {
+        const tex = new THREE.Texture(img);
+        tex.needsUpdate = true;
+        tex.minFilter = THREE.LinearFilter;
+        tex.magFilter = THREE.LinearFilter;
+        iconTextureMap.current.set(iconPath, tex);
+        loaded++;
+        checkDone();
+      };
+      img.onerror = () => {
+        // Texture failed to load — continue without it
+        loaded++;
+        checkDone();
+      };
+      img.src = staticFile(iconPath);
     }
 
     return () => {
@@ -450,7 +456,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
 
   const crowdMoments = useMemo(() => detectCrowdMoments(f), [f]);
   const beatArray = useMemo(() => buildBeatArray(f), [f]);
-  const frameIdx = Math.min(Math.max(0, frame), f.length - 1);
+  const frameIdx = Math.min(Math.max(0, Math.floor(frame * analysisFrameScale)), f.length - 1);
   const audioSnapshot = computeAudioSnapshot(f, frameIdx, beatArray, 30, tempo);
 
   // Stem-derived features (per-frame)
@@ -484,7 +490,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
   // Drums→Space phase detection
   const drumsSpaceState = isDrumsSpace ? computeDrumsSpacePhase(f, frameIdx, isDrumsSpace) : null;
 
-  const climaxState = computeClimaxState(f, frame, sections, audioSnapshot.energy);
+  const climaxState = computeClimaxState(f, frameIdx, sections, audioSnapshot.energy);
   const climaxMod = climaxModulation(climaxState, songIdentity?.climaxBehavior, stemCharacter.dominant);
   const counterpoint = computeCounterpoint(f, frameIdx, climaxState.phase);
 
@@ -510,9 +516,9 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
   opacityMapBase = continuousResult?.opacities ?? null;
 
   const jamEvolution = useMemo(
-    () => computeJamEvolution(f, frame, isDrumsSpace),
+    () => computeJamEvolution(f, frameIdx, isDrumsSpace),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [f, Math.floor(frame / 30), isDrumsSpace],
+    [f, Math.floor(frameIdx / 30), isDrumsSpace],
   );
 
   // Normalize densityMult (0.75-1.25) to shader-friendly 0-1 range (0.5 = neutral)
@@ -819,17 +825,35 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
             </SilentErrorBoundary>
           )}
 
+          {/* Dynamic overlay stack: 5-20 rotation overlays with per-frame opacity */}
+          <SilentErrorBoundary name="DynamicOverlayStack">
+            <DynamicOverlayStack
+              activeEntries={activeEntries}
+              opacityMap={opacityMap}
+              mediaSuppression={mediaSuppression}
+              hueRotation={hueRotation}
+              tempo={tempo}
+              palette={effectivePalette}
+              frames={f}
+              focusSuppression={1}
+              energyLevel={energyLevel}
+              itOverlayOverride={1}
+              counterpointOverlayInversion={0}
+              climaxDesaturation={0}
+            />
+          </SilentErrorBoundary>
+
           {/* Dead imagery: CSS-composited icon overlay */}
           {iconState.iconPath && introFactor > 0.5 && deadAirFactor < 0.5 && (
             <div
               style={{
                 position: "absolute",
                 inset: 0,
-                opacity: iconState.opacity * (1 - deadAirFactor) * 0.75,
-                mixBlendMode: "overlay",
+                opacity: iconState.opacity * (1 - deadAirFactor),
+                mixBlendMode: "screen",
                 pointerEvents: "none",
-                maskImage: "radial-gradient(ellipse 70% 70% at 50% 50%, black 40%, transparent 100%)",
-                WebkitMaskImage: "radial-gradient(ellipse 70% 70% at 50% 50%, black 40%, transparent 100%)",
+                maskImage: "radial-gradient(ellipse 90% 90% at 50% 50%, black 70%, transparent 100%)",
+                WebkitMaskImage: "radial-gradient(ellipse 90% 90% at 50% 50%, black 70%, transparent 100%)",
               }}
             >
               <Img

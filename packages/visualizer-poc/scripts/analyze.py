@@ -218,6 +218,7 @@ def analyze_track(audio_path: Path, output_path: Path, stems_dir: Path | None = 
     y, sr = librosa.load(str(audio_path), sr=SR, mono=True)
     duration = len(y) / sr
     n_frames = int(np.ceil(duration * FPS))
+    stem_data = None  # initialized here; populated later if stems_dir is provided
     print(f"Duration: {duration:.1f}s | Frames: {n_frames} | SR: {sr}")
 
     # --- RMS energy ---
@@ -314,6 +315,12 @@ def analyze_track(audio_path: Path, output_path: Path, stems_dir: Path | None = 
     melodic_confidence_norm = pad_or_trim_1d(melodic_confidence_norm, n_frames)
     melodic_direction = pad_or_trim_1d(melodic_direction, n_frames)
     print(f"Melodic contour: {np.count_nonzero(melodic_pitch_norm)} pitched frames / {n_frames} total")
+
+    # --- Chroma CQT (compute early — needed by chord detection below) ---
+    # Note: chroma is also used later for pad/trim alignment. We assign it here
+    # so chord detection has it available, and it gets pad_or_trim_2d'd later.
+    print("Computing chroma CQT (early pass for chord detection) ...")
+    chroma = librosa.feature.chroma_cqt(y=y, sr=sr, hop_length=HOP_LENGTH)
 
     # --- Chord progression detection (chroma-based) ---
     print("Detecting chord progressions ...")
@@ -493,8 +500,7 @@ def analyze_track(audio_path: Path, output_path: Path, stems_dir: Path | None = 
     high = normalize(band_energy(S, freqs, 2000, 8000))
 
     # --- Chroma CQT (12 pitch classes) ---
-    print("Computing chroma CQT ...")
-    chroma = librosa.feature.chroma_cqt(y=y, sr=sr, hop_length=HOP_LENGTH)
+    # (already computed earlier for chord detection — reusing)
     # chroma shape: (12, n_chroma_frames) — already 0-1 range
 
     # --- Spectral contrast (7 bands) ---
@@ -710,24 +716,28 @@ def analyze_track(audio_path: Path, output_path: Path, stems_dir: Path | None = 
             meta["stemOtherMean"] = stem_data["otherMean"]
 
     # --- Level 3: CLAP semantic analysis (optional — graceful fallback) ---
-    try:
-        from semantic_analysis import load_clap_model, compute_text_embeddings, analyze_audio_semantic, SEMANTIC_PROBES
-        print("Running CLAP semantic analysis ...")
-        clap_model = load_clap_model()
-        text_embeds = compute_text_embeddings(clap_model, SEMANTIC_PROBES)
-        semantic_scores, _ = analyze_audio_semantic(str(audio_path), clap_model, text_embeds)
-        # Merge 8 semantic scores per frame
-        semantic_categories = list(semantic_scores.keys())
-        for i in range(n_frames):
-            for cat in semantic_categories:
-                scores_list = semantic_scores[cat]
-                if i < len(scores_list):
-                    frames[i][f"semantic_{cat}"] = round(float(scores_list[i]), 4)
-        print(f"CLAP semantic analysis: {len(semantic_categories)} categories merged into {n_frames} frames")
-    except ImportError:
-        print("CLAP not available (laion-clap not installed), skipping semantic analysis")
-    except Exception as e:
-        print(f"CLAP semantic analysis failed (graceful fallback): {e}")
+    # Skip with SKIP_CLAP=1 env var for faster analysis when CLAP model is unavailable
+    if os.environ.get("SKIP_CLAP") != "1":
+        try:
+            from semantic_analysis import load_clap_model, compute_text_embeddings, analyze_audio_semantic, SEMANTIC_PROBES
+            print("Running CLAP semantic analysis ...")
+            clap_model = load_clap_model()
+            text_embeds = compute_text_embeddings(clap_model, SEMANTIC_PROBES)
+            semantic_scores, _ = analyze_audio_semantic(str(audio_path), clap_model, text_embeds)
+            # Merge 8 semantic scores per frame
+            semantic_categories = list(semantic_scores.keys())
+            for i in range(n_frames):
+                for cat in semantic_categories:
+                    scores_list = semantic_scores[cat]
+                    if i < len(scores_list):
+                        frames[i][f"semantic_{cat}"] = round(float(scores_list[i]), 4)
+            print(f"CLAP semantic analysis: {len(semantic_categories)} categories merged into {n_frames} frames")
+        except ImportError:
+            print("CLAP not available (laion-clap not installed), skipping semantic analysis")
+        except Exception as e:
+            print(f"CLAP semantic analysis failed (graceful fallback): {e}")
+    else:
+        print("CLAP semantic analysis skipped (SKIP_CLAP=1)")
 
     output = {
         "meta": meta,

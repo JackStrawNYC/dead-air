@@ -272,7 +272,7 @@ export function buildIconSchedule(
   showSeed: number,
   trackId: string,
 ): string[] {
-  const WINDOW_FRAMES = 600; // 20 seconds per icon — matches getIconForFrame
+  const WINDOW_FRAMES = 1800; // 60 seconds per icon — matches getIconForFrame
   const windowCount = Math.max(1, Math.ceil(durationFrames / WINDOW_FRAMES));
 
   // Score icons by mood keyword overlap with song identity
@@ -313,14 +313,14 @@ export function buildIconSchedule(
  * sectionType encoding: 0=intro, 1=verse, 2=chorus, 3=bridge, 4=solo, 5=jam, 6=outro, 7=space
  */
 function sectionIconPresence(sectionType: number): number {
-  if (sectionType < 0.5) return 0.50;  // intro
-  if (sectionType < 1.5) return 0.60;  // verse: Dead imagery clearly visible
-  if (sectionType < 2.5) return 0.70;  // chorus: icons prominent at peaks
-  if (sectionType < 3.5) return 0.50;  // bridge
-  if (sectionType < 4.5) return 0.40;  // solo: shader forward, icons present
-  if (sectionType < 5.5) return 0.35;  // jam: shader dominant, icons ghostly
-  if (sectionType < 6.5) return 0.45;  // outro
-  return 0.20;                          // space: minimal
+  if (sectionType < 0.5) return 0.70;  // intro
+  if (sectionType < 1.5) return 0.85;  // verse: Dead imagery clearly visible
+  if (sectionType < 2.5) return 0.95;  // chorus: icons prominent at peaks
+  if (sectionType < 3.5) return 0.75;  // bridge
+  if (sectionType < 4.5) return 0.65;  // solo: shader forward, icons present
+  if (sectionType < 5.5) return 0.55;  // jam: shader dominant, icons ghostly
+  if (sectionType < 6.5) return 0.65;  // outro
+  return 0.40;                          // space: minimal
 }
 
 /**
@@ -336,9 +336,9 @@ export function getIconForFrame(
 ): { iconPath: string; opacity: number } {
   if (schedule.length === 0) return { iconPath: "", opacity: 0 };
 
-  const WINDOW_FRAMES = 600; // 20 seconds per icon — unhurried but not stagnant
-  const FADE_IN_FRAMES = 150;  // 5s smooth fade-in
-  const FADE_OUT_FRAMES = 150; // 5s smooth fade-out (gentle crossfade)
+  const WINDOW_FRAMES = 1800; // 60 seconds per icon — unhurried, iconic presence
+  const FADE_IN_FRAMES = 300;  // 10s smooth fade-in
+  const FADE_OUT_FRAMES = 300; // 10s smooth fade-out (gentle crossfade)
 
   const windowIdx = Math.min(
     schedule.length - 1,

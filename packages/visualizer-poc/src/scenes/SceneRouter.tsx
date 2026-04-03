@@ -35,11 +35,11 @@ import { computeSemanticProfile, extractSemanticScores } from "../utils/semantic
 
 /**
  * Dynamic crossfade duration based on energy context and spectral flux.
- * Quiet→quiet: 240 frames (8s) — gentle dissolve
- * Loud→loud:     8 frames     — hard cut
- * Quiet→loud:   18 frames     — fast snap
- * Loud→quiet:   50 frames     — moderate fade
- * Mid (default): 30 frames    — standard crossfade
+ * Quiet→quiet: 720 frames (24s) — gentle dissolve
+ * Loud→loud:    72 frames (2.4s) — hard cut
+ * Quiet→loud:  108 frames (3.6s) — fast snap
+ * Loud→quiet:  180 frames (6s)   — moderate fade
+ * Mid (default): 135 frames (4.5s) — standard crossfade
  *
  * High spectral flux at the boundary compresses the duration by up to 50%,
  * because rapid timbral change means the transition should be visually snappy.
@@ -77,11 +77,11 @@ export function dynamicCrossfadeDuration(
   const afterLoud = afterEnergy > LOUD;
 
   let baseDuration: number;
-  if (beforeQuiet && afterQuiet) baseDuration = 240;   // gentle dissolve
-  else if (beforeLoud && afterLoud) baseDuration = 24;  // hard cut
-  else if (beforeQuiet && afterLoud) baseDuration = 36; // fast snap
-  else if (beforeLoud && afterQuiet) baseDuration = 60; // moderate fade
-  else baseDuration = 45;                               // default
+  if (beforeQuiet && afterQuiet) baseDuration = 720;   // gentle dissolve
+  else if (beforeLoud && afterLoud) baseDuration = 72;  // hard cut
+  else if (beforeQuiet && afterLoud) baseDuration = 108; // fast snap
+  else if (beforeLoud && afterQuiet) baseDuration = 180; // moderate fade
+  else baseDuration = 135;                               // default
 
   // Spectral flux compression: measure timbral change rate at the boundary.
   // High flux = rapid spectral change = faster visual crossfade.
@@ -108,10 +108,10 @@ export function dynamicCrossfadeDuration(
   // Scale factor: 1.0 (no flux) down to 0.5 (high flux)
   const fluxCompression = Math.max(0.7, 1 - Math.min(avgFlux / 0.3, 1) * 0.5);
 
-  return Math.max(12, Math.round(baseDuration * fluxCompression));
+  return Math.max(36, Math.round(baseDuration * fluxCompression));
 }
 
-const BEAT_CROSSFADE_FRAMES = 30; // 1 second when beat-synced (15 before + 15 after)
+const BEAT_CROSSFADE_FRAMES = 90; // 3 seconds when beat-synced (45 before + 45 after)
 
 // Complement modes and energy pools are now in scene-registry.ts
 
@@ -319,35 +319,31 @@ export function getModeForSection(
   shaderModeLastUsed?: Map<VisualMode, number>,
   stemDominant?: string,
 ): VisualMode {
-  // Explicit override always wins
-  const override = song.sectionOverrides?.find((o) => o.sectionIndex === sectionIndex);
-  if (override) return override.mode;
-
-  // Section 0 always uses default
-  if (sectionIndex === 0) return song.defaultMode;
-
-  // Coherence lock: hold current shader
-  if (coherenceIsLocked) {
-    return getModeForSection(song, sectionIndex - 1, sections, seed, era, false, usedShaderModes, songIdentity, stemSection, frames, songDuration, setNumber, trackNumber, shaderModeLastUsed);
-  }
-
-  // Switch shader on energy transitions from safe whitelist
-  const SAFE_SHADERS: VisualMode[] = [
+  // Safe shaders whitelist — validate chosen mode at the end
+  const SAFE_SHADERS: Set<VisualMode> = new Set([
     "liquid_light", "oil_projector", "tie_dye", "aurora", "inferno",
     "deep_ocean", "stained_glass", "plasma_field", "cosmic_voyage",
     "lava_flow", "aurora_curtains", "sacred_geometry", "mandala_engine",
     "fractal_flames", "kaleidoscope", "fractal_zoom", "galaxy_spiral",
     "spinning_spiral", "smoke_rings", "coral_reef",
-  ];
-  const section = sections[sectionIndex];
-  const prevSection = sectionIndex > 0 ? sections[sectionIndex - 1] : null;
-  if (section && prevSection && prevSection.energy !== section.energy && seed !== undefined) {
-    const rng = seededRandom(seed + (trackNumber ?? 0) * 31337 + sectionIndex * 7919);
-    const pool = SAFE_SHADERS.filter((m) => m !== song.defaultMode);
-    if (pool.length > 0) return pool[Math.floor(rng() * pool.length)];
-  }
+    "river", "forest", "mountain_fire", "space_travel", "ocean",
+    "campfire", "rain_street", "aurora_sky", "storm", "canyon",
+    "flower_field", "desert_road",
+  ]);
+  const validateSafe = (mode: VisualMode): VisualMode =>
+    SAFE_SHADERS.has(mode) ? mode : song.defaultMode;
 
-  return song.defaultMode;
+  // Explicit override always wins
+  const override = song.sectionOverrides?.find((o) => o.sectionIndex === sectionIndex);
+  if (override) return validateSafe(override.mode);
+
+  // Section 0 always uses default
+  if (sectionIndex === 0) return validateSafe(song.defaultMode);
+
+  // Coherence lock: hold current shader
+  if (coherenceIsLocked) {
+    return getModeForSection(song, sectionIndex - 1, sections, seed, era, false, usedShaderModes, songIdentity, stemSection, frames, songDuration, setNumber, trackNumber, shaderModeLastUsed);
+  }
 
   // Seeded variation with affinity-aware morphing
   if (seed !== undefined) {
@@ -396,7 +392,7 @@ export function getModeForSection(
           }
 
           const rng = seededRandom(seed + (trackNumber ?? 0) * 31337 + sectionIndex * 7919);
-          return candidates[Math.floor(rng() * candidates.length)];
+          return validateSafe(candidates[Math.floor(rng() * candidates.length)]);
         }
       }
 
@@ -586,7 +582,7 @@ export function getModeForSection(
 
       const rng = seededRandom(seed + (trackNumber ?? 0) * 31337 + sectionIndex * 7919);
       const idx = Math.floor(rng() * filteredPool.length);
-      return filteredPool[idx];
+      return validateSafe(filteredPool[idx]);
     }
   }
 
@@ -603,13 +599,13 @@ export function getModeForSection(
       const affinityPool = TRANSITION_AFFINITY[song.defaultMode];
       if (affinityPool && affinityPool.length > 0) {
         const rng = seededRandom((seed ?? 0) + (trackNumber ?? 0) * 31337 + sectionIndex * 7919);
-        return affinityPool[Math.floor(rng() * affinityPool.length)];
+        return validateSafe(affinityPool[Math.floor(rng() * affinityPool.length)]);
       }
-      return getComplement(song.defaultMode);
+      return validateSafe(getComplement(song.defaultMode));
     }
   }
 
-  return song.defaultMode;
+  return validateSafe(song.defaultMode);
 }
 
 /** Map Drums/Space sub-phase to forced shader mode */

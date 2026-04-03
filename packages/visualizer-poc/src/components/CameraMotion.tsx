@@ -49,12 +49,12 @@ interface Props {
   itSnapZoom?: number;
 }
 
-const QUIET_SCALE = 1.12;
-const PEAK_SCALE = 1.02;
-const SHAKE_PX = 8;            // Subtle — felt not seen
-const SHAKE_DECAY_FRAMES = 18;
-const TILT_DEG = 1.5;         // Gentle tilt, not seasickness
-const TILT_DECAY_FRAMES = 8;
+const QUIET_SCALE = 1.06;
+const PEAK_SCALE = 1.01;
+const SHAKE_PX = 2;            // Barely perceptible — felt not seen
+const SHAKE_DECAY_FRAMES = 30;
+const TILT_DEG = 0.4;         // Gentle tilt, not seasickness
+const TILT_DECAY_FRAMES = 20;
 
 /** Phase-driven camera parameters for long jams */
 const PHASE_CAMERA: Record<JamPhase, {
@@ -158,13 +158,13 @@ export const CameraMotion: React.FC<Props> = ({ frames, children, jamEvolution, 
   // Secondary harmonic: cross-modulated frequency for richer, less robotic motion
   if (Math.abs(shakeX) + Math.abs(shakeY) > 0.5) {
     const harmDir = shakeHash(idx + 5501);
-    shakeX += harmDir.x * SHAKE_PX * 0.25 * Math.sin(frame * 0.057 * Math.PI * 2) * egate;
-    shakeY += harmDir.y * SHAKE_PX * 0.25 * Math.cos(frame * 0.057 * Math.PI * 2) * egate;
+    shakeX += harmDir.x * SHAKE_PX * 0.08 * Math.sin(frame * 0.057 * Math.PI * 2) * egate;
+    shakeY += harmDir.y * SHAKE_PX * 0.08 * Math.cos(frame * 0.057 * Math.PI * 2) * egate;
   }
 
   // Onset jolt: sharp camera punch on transient attacks (prefer stemDrumOnset when available)
-  const ONSET_JOLT_PX = 3;
-  const ONSET_JOLT_DECAY = 6;
+  const ONSET_JOLT_PX = 1;
+  const ONSET_JOLT_DECAY = 15;
   for (let ago = 0; ago < ONSET_JOLT_DECAY; ago++) {
     const checkIdx = idx - ago;
     if (checkIdx < 0) break;
@@ -198,7 +198,7 @@ export const CameraMotion: React.FC<Props> = ({ frames, children, jamEvolution, 
 
   // Bass-driven continuous micro-sway (energy-gated: true stillness in silence)
   const bassGate = egate;
-  const bassAmp = (bass ?? 0) * 12.0 * bassGate;
+  const bassAmp = (bass ?? 0) * 3.0 * bassGate;
   const bassT = frame / 30;
   shakeX += Math.sin(bassT * 3.7) * bassAmp * 0.5;
   shakeY += Math.cos(bassT * 2.3) * bassAmp * 0.3;
