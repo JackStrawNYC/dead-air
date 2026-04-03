@@ -78,10 +78,10 @@ export function dynamicCrossfadeDuration(
 
   let baseDuration: number;
   if (beforeQuiet && afterQuiet) baseDuration = 240;   // gentle dissolve
-  else if (beforeLoud && afterLoud) baseDuration = 8;  // hard cut
-  else if (beforeQuiet && afterLoud) baseDuration = 18; // fast snap
-  else if (beforeLoud && afterQuiet) baseDuration = 50; // moderate fade
-  else baseDuration = 30;                               // default
+  else if (beforeLoud && afterLoud) baseDuration = 24;  // hard cut
+  else if (beforeQuiet && afterLoud) baseDuration = 36; // fast snap
+  else if (beforeLoud && afterQuiet) baseDuration = 60; // moderate fade
+  else baseDuration = 45;                               // default
 
   // Spectral flux compression: measure timbral change rate at the boundary.
   // High flux = rapid spectral change = faster visual crossfade.
@@ -106,9 +106,9 @@ export function dynamicCrossfadeDuration(
 
   // Flux typically ranges 0-0.5. Above 0.15 is a significant timbral shift.
   // Scale factor: 1.0 (no flux) down to 0.5 (high flux)
-  const fluxCompression = Math.max(0.5, 1 - Math.min(avgFlux / 0.3, 1) * 0.5);
+  const fluxCompression = Math.max(0.7, 1 - Math.min(avgFlux / 0.3, 1) * 0.5);
 
-  return Math.max(4, Math.round(baseDuration * fluxCompression));
+  return Math.max(12, Math.round(baseDuration * fluxCompression));
 }
 
 const BEAT_CROSSFADE_FRAMES = 30; // 1 second when beat-synced (15 before + 15 after)

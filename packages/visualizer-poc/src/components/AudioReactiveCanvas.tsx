@@ -393,7 +393,7 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
   const flatness = smoothValue(frames, idx, (f) => f.flatness, 15);
 
   // Snappy transient envelopes: fast attack, slow exponential release, energy-gated
-  const onsetSnap = transientEnvelope(frames, idx, (f) => f.onset, 10) * Math.max(0.35, egate);
+  const onsetSnap = transientEnvelope(frames, idx, (f) => f.onset, 18) * Math.max(0.35, egate);
   const beatSnap = transientEnvelope(frames, idx, (f) => (f.beat ? 1 : 0), 15) * Math.max(0.35, egate);
 
   // Stem-separated bass: use stemBassRms if available, else fallback to (sub+low)/2
@@ -407,10 +407,10 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
   const afterglowHue = colorAfterglowHue(frames, idx);
 
   // Fast-responding signals for transient punch
-  const fastEnergy = smoothValue(frames, idx, (f) => f.rms, 8);
-  const fastBass = smoothValue(frames, idx, (f) => f.sub + f.low, 6) * 0.5;
+  const fastEnergy = smoothValue(frames, idx, (f) => f.rms, 15);
+  const fastBass = smoothValue(frames, idx, (f) => f.sub + f.low, 10) * 0.5;
   const drumOnset = transientEnvelope(frames, idx, (f) => f.stemDrumOnset ?? 0, 8) * Math.max(0.45, egate);
-  const drumBeat = transientEnvelope(frames, idx, (f) => (f.stemDrumBeat ? 1 : 0), 12) * Math.max(0.45, egate);
+  const drumBeat = transientEnvelope(frames, idx, (f) => (f.stemDrumBeat ? 1 : 0), 18) * Math.max(0.45, egate);
   const spectralFlux = computeSpectralFlux(frames, idx, 8);
 
   // Stem-separated vocal + other features
@@ -450,7 +450,7 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
 
   // New audio snapshot fields — smoothed for shader consumption
   const melodicPitch = smoothValue(frames, idx, (f) => f.melodicPitch ?? 0, 8);
-  const melodicDirection = smoothValue(frames, idx, (f) => f.melodicDirection ?? 0, 5);
+  const melodicDirection = smoothValue(frames, idx, (f) => f.melodicDirection ?? 0, 12);
   const chordIndex = frames[idx].chordIndex ?? 0; // discrete, no smoothing
   const harmonicTension = smoothValue(frames, idx, (f) => f.harmonicTension ?? 0, 15);
   const chordConfidence = smoothValue(frames, idx, (f) => f.chordConfidence ?? 0.5, 10);
@@ -486,9 +486,9 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
       rms: smoothValue(frames, idx, (f) => f.rms, 12),
       centroid: smoothValue(frames, idx, (f) => f.centroid, 18),
       bass: smoothValue(frames, idx, (f) => f.sub + f.low, 12) * 0.5 * (0.6 + 0.4 * egate),
-      mids: smoothValue(frames, idx, (f) => f.mid, 8),
-      highs: smoothValue(frames, idx, (f) => f.high, 3),
-      onset: smoothValue(frames, idx, (f) => f.onset, 6),
+      mids: smoothValue(frames, idx, (f) => f.mid, 12),
+      highs: smoothValue(frames, idx, (f) => f.high, 10),
+      onset: smoothValue(frames, idx, (f) => f.onset, 12),
       energy,
       sectionProgress,
       sectionIndex,
@@ -560,7 +560,7 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
       const baseDT = snapToMusicalTimeProp
         ? computeMusicalTimeUtil(beatArray, idx, fps, tempo ?? 120) / (tempo ?? 120) * 60
         : (dynamicTimeLookup[idx] ?? (idx / fps));
-      const fluxMult = 1.0 + Math.min(0.1, spectralFlux * 0.2);
+      const fluxMult = 1.0 + Math.min(0.04, spectralFlux * 0.1);
       return baseDT * climaxSpeedMult * fluxMult * spaceTimeDilation;
     })(),
     jamPhase: jamPhaseCtx.phase,

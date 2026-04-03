@@ -99,7 +99,7 @@ ${
     ? `  // Beat pulse: brightness swell on confident beats
   float bp = beatPulse(uMusicalTime);
   float bpGated = bp * smoothstep(0.3, 0.7, uBeatConfidence);
-  col *= 1.0 + bpGated * 0.10;
+  col *= 1.0 + bpGated * 0.06;
 `
     : ""
 }

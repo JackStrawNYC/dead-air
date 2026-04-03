@@ -39,10 +39,12 @@ export const SceneCrossfade: React.FC<Props> = ({ progress, outgoing, incoming, 
   // --- Dissolve/Morph style ---
   // Only render ONE scene at a time to prevent WebGL feedback loop
   // from dual FullscreenQuad render targets on ANGLE backend.
+  // Smooth dissolve: opacity dips to 70% at midpoint via sine curve, never fully black.
   if (style === "dissolve" || style === "morph") {
+    const dip = 1.0 - Math.sin(progress * Math.PI) * 0.3;
     return (
       <div style={{ position: "relative", width: "100%", height: "100%" }}>
-        <div style={{ position: "absolute", inset: 0 }}>
+        <div style={{ position: "absolute", inset: 0, opacity: dip }}>
           {progress < 0.5 ? outgoing : incoming}
         </div>
       </div>

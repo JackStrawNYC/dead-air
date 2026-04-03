@@ -52,7 +52,7 @@ interface Props {
 const QUIET_SCALE = 1.12;
 const PEAK_SCALE = 1.02;
 const SHAKE_PX = 8;            // Subtle — felt not seen
-const SHAKE_DECAY_FRAMES = 12;
+const SHAKE_DECAY_FRAMES = 18;
 const TILT_DEG = 1.5;         // Gentle tilt, not seasickness
 const TILT_DECAY_FRAMES = 8;
 
@@ -134,7 +134,7 @@ export const CameraMotion: React.FC<Props> = ({ frames, children, jamEvolution, 
     const f = frames[checkIdx];
     const hasBeat = (f.stemDrumBeat != null ? f.stemDrumBeat : f.beat) && (f.stemDrumOnset ?? f.onset) > 0.25;
     if (hasBeat) {
-      const decay = Math.exp(-ago * 0.7);
+      const decay = Math.exp(-ago * 0.4);
       const dir = shakeHash(checkIdx);
       shakeX += dir.x * SHAKE_PX * decay * egate;
       shakeY += dir.y * SHAKE_PX * decay * egate;
@@ -171,7 +171,7 @@ export const CameraMotion: React.FC<Props> = ({ frames, children, jamEvolution, 
     const f = frames[checkIdx];
     const onsetVal = f.stemDrumOnset ?? f.onset;
     if (onsetVal > 0.5) {
-      const decay = Math.exp(-ago * 1.2);
+      const decay = Math.exp(-ago * 0.7);
       const dir = shakeHash(checkIdx + 9973);
       shakeX += dir.x * ONSET_JOLT_PX * onsetVal * decay * egate;
       shakeY += dir.y * ONSET_JOLT_PX * onsetVal * decay * egate;
@@ -189,7 +189,7 @@ export const CameraMotion: React.FC<Props> = ({ frames, children, jamEvolution, 
     const f = frames[checkIdx];
     const bassHit = (f.stemDrumOnset ?? f.onset) > 0.4 && (f.sub + f.low) > 0.3;
     if (bassHit) {
-      const decay = Math.exp(-ago * 0.8);
+      const decay = Math.exp(-ago * 0.5);
       const dir = shakeHash(checkIdx + 7777);
       tiltDeg = dir.x * TILT_DEG * decay * egate;
       break;
