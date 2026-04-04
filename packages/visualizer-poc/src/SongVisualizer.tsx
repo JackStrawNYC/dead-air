@@ -828,32 +828,8 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
           {/* DynamicOverlayStack DISABLED — SVG overlays look cheap, destroy visual quality */}
           {/* The shader + subtle AI art silhouettes are the visual. No SVG blobs. */}
 
-          {/* Dead imagery: subtle silhouette overlay — felt not scrutinized */}
-          {iconState.iconPath && introFactor > 0.5 && deadAirFactor < 0.5 && (
-            <div
-              style={{
-                position: "absolute",
-                inset: 0,
-                opacity: iconState.opacity * (1 - deadAirFactor) * 0.25,
-                mixBlendMode: "soft-light",
-                pointerEvents: "none",
-                filter: "saturate(0.3) contrast(1.2)",
-                maskImage: "radial-gradient(ellipse 85% 85% at 50% 50%, black 50%, transparent 100%)",
-                WebkitMaskImage: "radial-gradient(ellipse 85% 85% at 50% 50%, black 50%, transparent 100%)",
-              }}
-            >
-              <Img
-                src={staticFile(iconState.iconPath)}
-                style={{
-                  width: "100%",
-                  height: "100%",
-                  objectFit: "cover",
-                  objectPosition: "center",
-                  transform: `translate(${Math.sin(frame / 900) * 1.5}%, ${Math.cos(frame / 700) * 1}%)`,
-                }}
-              />
-            </div>
-          )}
+          {/* AI image overlay REMOVED — makes viewers think "AI slop" and adds visual noise.
+              Dead identity comes from song card (intro/bookend) and the shader itself. */}
 
           {/* IT flash — chromatic burst on coherence break */}
           {itState.flashIntensity > 0.01 && (
