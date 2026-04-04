@@ -98,6 +98,11 @@ void main() {
   p += uCamOffset * 0.0005;
 
   float t = uDynamicTime;
+  float energy = clamp(uEnergy, 0.0, 1.0);
+
+  // --- Domain warping for organic liquid movement ---
+  vec2 domainP = p;
+  domainP += vec2(fbm3(vec3(p * 0.5 * (1.0 + energy * 0.5), t * 0.05)), fbm3(vec3(p * 0.5 * (1.0 + energy * 0.5) + 100.0, t * 0.05))) * 0.3;
 
   // --- Section type modulation (0=intro,1=verse,2=chorus,3=bridge,4=solo,5=jam,6=outro,7=space) ---
   float sectionT = uSectionType;
@@ -163,10 +168,10 @@ void main() {
   float gradient = length(vec2(dx, dy));
   float rings = smoothstep(0.0, 2.0, gradient) * 1.5;
 
-  // ─── Diffusion (treble-driven color bleed) ───
+  // ─── Diffusion (treble-driven color bleed) — fbm6 for rich detail ───
   float diffusion = 0.5 + uHighs * 1.5;
-  vec2 advectedUv = advect(p, t, 4);
-  float diffuseNoise = fbm(vec3(advectedUv * diffusion, t * 0.3));
+  vec2 advectedUv = advect(domainP, t, 4);
+  float diffuseNoise = fbm6(vec3(advectedUv * diffusion * (1.0 + energy * 0.5), t * 0.3));
 
   // ─── Compose layers ───
   // Base: blob field coloring
@@ -181,14 +186,23 @@ void main() {
   vec3 diffuseColor = paletteColor(uPaletteSecondary + diffuseNoise * 0.2, uPaletteSaturation * 0.8);
   col = mix(col, diffuseColor, diffuseNoise * 0.15 * uHighs);
 
+  // --- Secondary depth layer: organic subsurface light ---
+  float subsurfaceNoise = fbm6(vec3(domainP * 1.8 + 300.0, t * 0.06));
+  vec3 subsurfColor = mix(
+    paletteColor(uPalettePrimary + 0.2, uPaletteSaturation * 0.6),
+    paletteColor(uPaletteSecondary + 0.1, uPaletteSaturation * 0.5),
+    subsurfaceNoise
+  );
+  col += subsurfColor * 0.3 * energy * 0.5;
+
   // Energy-driven warmth
-  col *= 0.7 + uEnergy * 0.6;
+  col *= 0.7 + energy * 0.6;
 
   // ─── Stage flood fill (no dead black) ───
   col = stageFloodFill(col, uv, t, uEnergy, uPalettePrimary, uPaletteSecondary);
 
   // ─── Stealie emergence during climax ───
-  float noiseField = fbm(vec3(p * 2.0, t * 0.2));
+  float noiseField = fbm6(vec3(p * 2.0, t * 0.2));
   vec3 col1 = paletteColor(uPalettePrimary, uPaletteSaturation);
   vec3 col2 = paletteColor(uPaletteSecondary, uPaletteSaturation);
   col += stealieEmergence(p, t, uEnergy, uBass, col1, col2, noiseField, uClimaxPhase);

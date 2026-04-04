@@ -119,17 +119,21 @@ void main() {
   float flowSpeed = (0.02 + stemBass * 0.04) * flowSpeedMod;
   float viscosity = mix(1.0, 0.3, tension);
 
+  // --- Domain warping for organic lava movement ---
+  vec2 domainP = p;
+  domainP += vec2(fbm3(vec3(p * 0.5 * (1.0 + energy * 0.5), uDynamicTime * 0.05)), fbm3(vec3(p * 0.5 * (1.0 + energy * 0.5) + 100.0, uDynamicTime * 0.05))) * 0.3;
+
   // --- Feedback: previous frame provides cooling/persistence ---
   vec4 prev = texture2D(uPrevFrame, vUv);
 
   // --- Flow displacement ---
-  vec2 flowP = p + vec2(
-    fbm3(vec3(p * 2.0, slowTime * flowSpeed)) * 0.1,
-    fbm3(vec3(p * 2.0 + 50.0, slowTime * flowSpeed)) * 0.1
+  vec2 flowP = domainP + vec2(
+    fbm3(vec3(domainP * 2.0, slowTime * flowSpeed)) * 0.1,
+    fbm3(vec3(domainP * 2.0 + 50.0, slowTime * flowSpeed)) * 0.1
   ) * viscosity;
 
-  // --- Magma layer (underneath) ---
-  float magmaNoise = fbm6(vec3(flowP * 3.0, slowTime * 0.5));
+  // --- Magma layer (underneath) --- fbm6 for deep geological detail
+  float magmaNoise = fbm6(vec3(flowP * 3.0 * (1.0 + energy * 0.5), slowTime * 0.5));
   float magmaPressure = (bass * 0.6 + energy * 0.4) * magmaPressureMod;
   float magmaTemp = magmaNoise * 0.5 + magmaPressure * 0.5 + melodicPitch * 0.15;
   magmaTemp = clamp(magmaTemp, 0.0, 1.0);
@@ -161,10 +165,20 @@ void main() {
   float crackGlow = exp(-edgeDist * 30.0) * magmaPressure;
   col += magmaColor(crackGlow * 0.8 + 0.2, hueShift) * crackGlow * 0.5;
 
-  // --- Surface heat shimmer ---
-  float shimmer = sin(p.x * 30.0 + slowTime * 5.0 + fbm(p * 5.0) * 10.0) * 0.5 + 0.5;
+  // --- Surface heat shimmer --- fbm6 for depth
+  float shimmerNoise = fbm6(vec3(domainP * 5.0 * (1.0 + energy * 0.5), slowTime * 0.8));
+  float shimmer = sin(domainP.x * 30.0 + slowTime * 5.0 + shimmerNoise * 10.0) * 0.5 + 0.5;
   shimmer *= energy * 0.1;
   col += vec3(shimmer * 0.3, shimmer * 0.15, 0.0);
+
+  // --- Secondary depth layer: subsurface magma glow using both palettes ---
+  float subsurfLava = fbm6(vec3(flowP * 2.0 + 400.0, slowTime * 0.25));
+  vec3 subsurfColor = mix(
+    magmaColor(subsurfLava * 0.6 + 0.2, hueShift),
+    hsv2rgb(vec3(uPaletteSecondary + chromaHueMod, 0.8 * uPaletteSaturation, 0.5)),
+    subsurfLava * 0.4
+  );
+  col += subsurfColor * 0.3 * magmaPressure;
 
   // --- Drum hit eruption flash ---
   if (drumOnset > 0.5) {

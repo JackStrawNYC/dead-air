@@ -114,6 +114,10 @@ void main() {
   float chromaHueMod = uChromaHue * 0.08;
   float chordHue = float(int(uChordIndex)) / 24.0 * 0.05;
 
+  // --- Domain warping for organic ink bleeding ---
+  vec2 domainP = p;
+  domainP += vec2(fbm3(vec3(p * 0.5 * (1.0 + energy * 0.5), uDynamicTime * 0.05)), fbm3(vec3(p * 0.5 * (1.0 + energy * 0.5) + 100.0, uDynamicTime * 0.05))) * 0.3;
+
   // Section-type modulation
   float sectionT = uSectionType;
   float sJam = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
@@ -215,10 +219,10 @@ void main() {
   }
 
   // --- Mountain silhouettes from ink pooling ---
-  // Low-frequency noise creates distant mountain shapes
-  float mountainNoise = fbm(vec3(p.x * 2.0, 0.0, slowTime * 0.1 * mountainSpeedMod));
-  float mountainLine = smoothstep(0.02, 0.0, abs(p.y - mountainNoise * 0.3 + 0.1));
-  float mountainFill = smoothstep(0.0, -0.15, p.y - mountainNoise * 0.3 + 0.1);
+  // Low-frequency noise creates distant mountain shapes — fbm6 for richer terrain
+  float mountainNoise = fbm6(vec3(domainP.x * 2.0 * (1.0 + energy * 0.5), 0.0, slowTime * 0.1 * mountainSpeedMod));
+  float mountainLine = smoothstep(0.02, 0.0, abs(domainP.y - mountainNoise * 0.3 + 0.1));
+  float mountainFill = smoothstep(0.0, -0.15, domainP.y - mountainNoise * 0.3 + 0.1);
   float mountainInk = (mountainLine * 0.3 + mountainFill * 0.1) * slowE;
   newInk = max(newInk, mountainInk);
 
@@ -281,9 +285,20 @@ void main() {
   // Darken edges where ink concentration changes rapidly
   col -= vec3(edgeDetect * 0.4) * inkOpacity;
 
-  // --- Negative space shimmer: faint energy in empty areas ---
+  // --- Negative space and secondary layers ---
   float emptySpace = 1.0 - inkOpacity;
-  float shimmer = snoise(vec3(p * 8.0, uDynamicTime * 0.5)) * 0.02;
+
+  // --- Secondary depth layer: subtle watercolor undertone using both palettes ---
+  float watercolorLayer = fbm6(vec3(domainP * 3.0 * (1.0 + energy * 0.5) + 200.0, slowTime * 0.3));
+  vec3 watercolorTint = mix(
+    hsv2rgb(vec3(hue1 + 0.1, sat * 2.0, 0.15)),
+    hsv2rgb(vec3(hue2 + 0.05, sat * 2.5, 0.12)),
+    watercolorLayer
+  );
+  col += watercolorTint * emptySpace * 0.3 * (0.3 + energy * 0.4);
+
+  // --- Negative space shimmer: faint energy in empty areas ---
+  float shimmer = snoise(vec3(domainP * 8.0, uDynamicTime * 0.5)) * 0.02;
   col += vec3(shimmer * emptySpace * energy);
 
   // --- Climax boost ---

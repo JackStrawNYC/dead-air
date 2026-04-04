@@ -90,13 +90,17 @@ void main() {
   float sectionLeadWidth = mix(1.0, 0.7, sJam) * mix(1.0, 1.5, sSpace);
   float sectionLightBright = mix(1.0, 1.1, sJam) * mix(1.0, 0.6, sSpace) * mix(1.0, 1.2, sChorus);
 
+  // --- Domain warping for organic flow ---
+  vec2 domainP = p;
+  domainP += vec2(fbm3(vec3(p * 0.5 * (1.0 + energy * 0.5), uDynamicTime * 0.05)), fbm3(vec3(p * 0.5 * (1.0 + energy * 0.5) + 100.0, uDynamicTime * 0.05))) * 0.3;
+
   // --- Tile scale from energy ---
   float tileScale = mix(4.0, 10.0, energy) * sectionTileScale;
 
   // --- Warp from harmonic tension ---
-  vec2 warped = p;
+  vec2 warped = domainP;
   if (tension > 0.05) {
-    vec3 curl = curlNoise(vec3(p * 3.0, slowTime * 0.5));
+    vec3 curl = curlNoise(vec3(domainP * 3.0, slowTime * 0.5));
     warped += curl.xy * tension * 0.06;
   }
 
@@ -153,12 +157,24 @@ void main() {
     roseSpot = (1.0 - smoothstep(0.0, 0.4, r)) * rosePattern * vocalTotal;
   }
 
+  // --- Secondary depth layer: flowing light caustic underneath tiles ---
+  float depthLayer = fbm6(vec3(domainP * 3.0 * (1.0 + energy * 0.5), slowTime * 0.4));
+  vec3 depthColor = mix(
+    hsv2rgb(vec3(hue1 + 0.15, sat * 0.5, 0.4)),
+    hsv2rgb(vec3(hue2 + 0.1, sat * 0.6, 0.5)),
+    depthLayer
+  );
+
   // --- Combine ---
   vec3 leadColor = vec3(0.02, 0.015, 0.01); // dark oxidized lead
   vec3 col = mix(tileColor + dispersion, leadColor, leadMask);
 
-  // Rose window additive glow
+  // Blend secondary depth layer at 30%
+  col = mix(col, col + depthColor * lightIntensity, 0.3);
+
+  // Rose window additive glow — uses both palette colors
   col += hsv2rgb(vec3(hue2, sat * 0.7, 1.0)) * roseSpot * 0.3;
+  col += hsv2rgb(vec3(hue1 + 0.3, sat * 0.5, 0.8)) * roseSpot * 0.15;
 
   // --- Climax boost ---
   float isClimax = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5);

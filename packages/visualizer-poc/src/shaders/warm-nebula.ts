@@ -127,13 +127,17 @@ void main() {
     uv.y * 0.8 + slowE * 0.2
   );
 
+  // === Domain warping for organic cloud morphology ===
+  vec2 domainP = p;
+  domainP += vec2(fbm3(vec3(p * 0.5 * (1.0 + energy * 0.5), uDynamicTime * 0.05)), fbm3(vec3(p * 0.5 * (1.0 + energy * 0.5) + 100.0, uDynamicTime * 0.05))) * 0.3;
+
   // === 4-LAYER FBM NEBULA CLOUDS ===
 
   // Bass breathing: gentle cloud scale pulse
   float breathe = 1.0 + bass * 0.06;
 
   // Layer 1: Large slow clouds (primary structure)
-  vec3 cloudPos1 = vec3(p * 1.2 * breathe, driftTime * 0.3);
+  vec3 cloudPos1 = vec3(domainP * 1.2 * breathe, driftTime * 0.3);
   cloudPos1.y += vertShift;
   // Coherence-modulated warp
   cloudPos1.xy += vec2(
@@ -143,24 +147,24 @@ void main() {
   float cloud1 = fbm6(cloudPos1) * 0.5 + 0.5;
   cloud1 = smoothstep(0.25, 0.75, cloud1);
 
-  // Layer 2: Medium clouds (secondary detail)
-  vec3 cloudPos2 = vec3(p * 2.5 * breathe + 20.0, driftTime * 0.5 + 10.0);
+  // Layer 2: Medium clouds (secondary detail) — energy-responsive frequency
+  vec3 cloudPos2 = vec3(domainP * 2.5 * breathe * (1.0 + energy * 0.5) + 20.0, driftTime * 0.5 + 10.0);
   cloudPos2.y += vertShift * 0.7;
   cloudPos2.xy += vec2(
-    snoise(vec3(p * 1.5 + 30.0, driftTime * 0.25)),
-    snoise(vec3(p * 1.5 + 80.0, driftTime * 0.25))
+    snoise(vec3(domainP * 1.5 + 30.0, driftTime * 0.25)),
+    snoise(vec3(domainP * 1.5 + 80.0, driftTime * 0.25))
   ) * 0.10 * coherenceWarpMult;
-  float cloud2 = fbm(cloudPos2) * 0.5 + 0.5;
+  float cloud2 = fbm6(cloudPos2) * 0.5 + 0.5;
   cloud2 = smoothstep(0.3, 0.7, cloud2);
 
   // Layer 3: Small fast wisps (fine detail)
-  vec3 cloudPos3 = vec3(p * 5.0 * breathe + 40.0, driftTime * 0.8 + 25.0);
+  vec3 cloudPos3 = vec3(domainP * 5.0 * breathe + 40.0, driftTime * 0.8 + 25.0);
   cloudPos3.y += vertShift * 0.4;
   float cloud3 = fbm3(cloudPos3) * 0.5 + 0.5;
   cloud3 = smoothstep(0.35, 0.65, cloud3);
 
   // Layer 4: Very large background glow (ultra-slow drift)
-  vec3 cloudPos4 = vec3(p * 0.6, driftTime * 0.1 + 50.0);
+  vec3 cloudPos4 = vec3(domainP * 0.6, driftTime * 0.1 + 50.0);
   float cloud4 = fbm3(cloudPos4) * 0.5 + 0.5;
   cloud4 = smoothstep(0.2, 0.8, cloud4);
 
@@ -224,6 +228,11 @@ void main() {
     col += dustColor2 * sparkle2 * dustBright * 0.18;
     col += dustColor3 * sparkle3 * dustBright * 0.12;
   }
+
+  // === SECONDARY LAYER: deep warm underglow using both palette colors ===
+  float underglowNoise = fbm6(vec3(domainP * 1.8 + 500.0, driftTime * 0.2));
+  vec3 underglowColor = mix(warmCopper * 0.6, warmRose * 0.5, underglowNoise);
+  col += underglowColor * 0.3 * densityMod * (0.5 + slowE * 0.5);
 
   // === ONSET WARM FLASH ===
   {

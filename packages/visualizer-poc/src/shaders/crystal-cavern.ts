@@ -114,6 +114,14 @@ void main() {
   float specSharpMod = mix(1.0, 1.3, sJam) * mix(1.0, 0.7, sSpace) * mix(1.0, 1.15, sChorus);
   float flashMod = mix(1.0, 1.5, sJam) * mix(1.0, 0.4, sSpace) * mix(1.0, 1.1, sChorus);
 
+  // === Domain warping for organic refraction patterns ===
+  vec2 screenUvDw = gl_FragCoord.xy / uResolution;
+  vec2 screenPDw = (screenUvDw - 0.5) * vec2(uResolution.x / uResolution.y, 1.0);
+  vec2 refrWarp = vec2(
+    fbm3(vec3(screenPDw * 0.5 * (1.0 + clamp(uEnergy, 0.0, 1.0) * 0.5), uDynamicTime * 0.05)),
+    fbm3(vec3(screenPDw * 0.5 * (1.0 + clamp(uEnergy, 0.0, 1.0) * 0.5) + 100.0, uDynamicTime * 0.05))
+  ) * 0.3;
+
   // === TWO-LIGHT SETUP for crystal depth ===
   vec3 lightDir1 = normalize(vec3(0.3, 1.0, 0.5));
   vec3 lightDir2 = normalize(vec3(-0.5, -0.3, 0.8));
@@ -151,10 +159,21 @@ void main() {
 
   // === FRESNEL REFLECTION/REFRACTION ===
   // High Fresnel = reflective surface, low = see internal glow
-  vec3 reflectColor = vec3(0.6, 0.7, 0.9) * (0.3 + uEnergy * 0.3);
+  // Secondary palette color for reflection tinting
+  float secHue = uPaletteSecondary + chordHue * 0.5;
+  vec3 reflectColor = mix(vec3(0.6, 0.7, 0.9), hsv2rgb(vec3(secHue, 0.3, 0.8)), 0.3) * (0.3 + uEnergy * 0.3);
   vec3 refractColor = glowColor * internalGlow;
 
   vec3 fresnelMix = mix(refractColor, reflectColor, vFresnel * (0.5 + uEnergy * 0.3));
+
+  // === SECONDARY DEPTH LAYER: internal crystal caustics ===
+  float causticsNoise = fbm6(vec3(vWorldPos.xy * 3.0 * (1.0 + uEnergy * 0.5) + refrWarp, uDynamicTime * 0.08));
+  vec3 causticsColor = mix(
+    hsv2rgb(vec3(hue + 0.1, sat * 0.6, 0.5)),
+    hsv2rgb(vec3(secHue + 0.15, sat * 0.5, 0.6)),
+    causticsNoise
+  );
+  fresnelMix += causticsColor * (1.0 - vFresnel) * 0.3 * uEnergy;
 
   // === CLIMAX REACTIVITY ===
   float isClimax = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5);

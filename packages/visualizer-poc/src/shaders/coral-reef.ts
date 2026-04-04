@@ -154,11 +154,15 @@ void main() {
   float depthGrad = smoothstep(-0.5, 0.5, p.y);
   vec3 col = mix(deepWater, shallowWater, depthGrad);
 
+  // --- Domain warping for organic underwater feel ---
+  vec2 domainP = p;
+  domainP += vec2(fbm3(vec3(p * 0.5 * (1.0 + energy * 0.5), uDynamicTime * 0.05)), fbm3(vec3(p * 0.5 * (1.0 + energy * 0.5) + 100.0, uDynamicTime * 0.05))) * 0.3;
+
   // --- Water wave distortion ---
   // Beat stability controls wave regularity
   float waveFreq = mix(3.0, 8.0, 1.0 - stability) * mix(1.0, 1.3, sJam) * mix(1.0, 0.6, sSpace);
-  float waveSway = sin(p.x * waveFreq + uDynamicTime * 0.8) * 0.02 * (1.0 + bass * 0.5);
-  vec2 waterP = p + vec2(0.0, waveSway);
+  float waveSway = sin(domainP.x * waveFreq + uDynamicTime * 0.8) * 0.02 * (1.0 + bass * 0.5);
+  vec2 waterP = domainP + vec2(0.0, waveSway);
 
   // Deep water pressure pulse from stem bass
   float pressurePulse = stemBass * sin(uDynamicTime * 1.5 - length(waterP) * 4.0) * 0.01;
@@ -308,9 +312,18 @@ void main() {
     col += vec3(0.3, 0.5, 0.6) * particle * 0.06;
   }
 
+  // --- Secondary depth layer: deep bioluminescent current ---
+  float deepCurrent = fbm6(vec3(waterP * 2.5 * (1.0 + energy * 0.5), uDynamicTime * 0.04 + 50.0));
+  vec3 deepCurrentColor = mix(
+    hsv2rgb(vec3(hue2 + 0.3, sat * 0.4, 0.3)),
+    hsv2rgb(vec3(hue1 + 0.5, sat * 0.5, 0.4)),
+    deepCurrent
+  );
+  col += deepCurrentColor * 0.3 * (1.0 - depthGrad) * energy;
+
   // --- Deep water fog ---
   float fogDensity = mix(0.4, 0.15, energy);
-  float fogNoise = fbm3(vec3(waterP * 2.0, uDynamicTime * 0.03));
+  float fogNoise = fbm6(vec3(waterP * 2.0 * (1.0 + energy * 0.5), uDynamicTime * 0.03));
   float fog = fogDensity * (0.5 + fogNoise * 0.5);
   vec3 fogColor = mix(deepWater, shallowWater, 0.3) * 0.3;
   col = mix(col, fogColor, fog * 0.4);

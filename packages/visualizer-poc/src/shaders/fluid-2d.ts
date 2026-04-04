@@ -77,6 +77,10 @@ void main() {
   float energy = clamp(uEnergy, 0.0, 1.0);
   float t = uDynamicTime;
 
+  // --- Domain warping for organic turbulence ---
+  vec2 domainP = p;
+  domainP += vec2(fbm3(vec3(p * 0.5 * (1.0 + energy * 0.5), t * 0.05)), fbm3(vec3(p * 0.5 * (1.0 + energy * 0.5) + 100.0, t * 0.05))) * 0.3;
+
   // Section-type modulation
   float sectionT = uSectionType;
   float sJam = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
@@ -264,8 +268,14 @@ void main() {
   // Energy-driven brightness boost (prevents dead-looking fluid at peaks)
   col *= 0.85 + energy * 0.3;
 
+  // --- Secondary visual layer: deep turbulent structure ---
+  float turbLayer = fbm6(vec3(domainP * 2.0 * (1.0 + energy * 0.5), t * 0.08));
+  float secondaryHueBlend = hsvToCosineHue(uPaletteSecondary + turbLayer * 0.15);
+  vec3 turbColor = 0.5 + 0.5 * cos(6.28318 * (secondaryHueBlend + vec3(0.0, 0.33, 0.67)));
+  col += turbColor * turbLayer * 0.3 * energy * 0.3;
+
   // Subtle noise overlay for texture (prevents banding in smooth gradients)
-  float noiseTex = snoise(vec3(p * 8.0, t * 0.5)) * 0.015;
+  float noiseTex = snoise(vec3(domainP * 8.0, t * 0.5)) * 0.015;
   col += noiseTex;
 
   // Vignette (lighter than most modes — fluid should fill the screen)

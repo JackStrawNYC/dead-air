@@ -82,6 +82,9 @@ void main() {
 
   float slowTime = uDynamicTime * 0.04;
 
+  // --- Domain warping for flowing sacred energy ---
+  p += vec2(fbm3(vec3(p * 0.5 * (1.0 + energy * 0.5), uDynamicTime * 0.05)), fbm3(vec3(p * 0.5 * (1.0 + energy * 0.5) + 100.0, uDynamicTime * 0.05))) * 0.3;
+
   // --- Uniform integrations ---
   float chromaHueMod = uChromaHue * 0.3;
   float chordConf = smoothstep(0.3, 0.6, uChordConfidence);
@@ -270,6 +273,11 @@ void main() {
       }
     }
   }
+
+  // --- Secondary layer: flowing energy field beneath geometry ---
+  float energyFieldNoise = fbm6(vec3(wp * 3.0 * (1.0 + energy * 0.5), slowTime * 0.3));
+  vec3 energyFieldColor = mix(primaryColor * 0.3, secondaryColor * 0.4, energyFieldNoise);
+  col += energyFieldColor * (1.0 - circleField) * 0.3 * energy;
 
   // --- Onset flash on geometry ---
   col += vec3(1.0, 0.97, 0.92) * circleField * onset * 1.5;

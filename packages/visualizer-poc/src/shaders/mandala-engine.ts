@@ -46,6 +46,10 @@ void main() {
   vec2 p = (uv - 0.5) * vec2(aspect, 1.0);
 
   float energy = clamp(uEnergy, 0.0, 1.0);
+
+  // --- Domain warping for organic mandala feel ---
+  p += vec2(fbm3(vec3(p * 0.5 * (1.0 + energy * 0.5), uDynamicTime * 0.05)), fbm3(vec3(p * 0.5 * (1.0 + energy * 0.5) + 100.0, uDynamicTime * 0.05))) * 0.3;
+
   // 7-band spectral: sub, low, low-mid, mid, upper-mid, presence, brilliance
   float fftBass = texture2D(uFFTTexture, vec2(0.07, 0.5)).r;
   float fftMid = texture2D(uFFTTexture, vec2(0.36, 0.5)).r;
@@ -107,9 +111,9 @@ void main() {
   float complexity = 2.0 + melInfluence * 4.0 + energy * 2.0;
   float warpAmount = 0.3 + uHarmonicTension * 0.5;
 
-  vec3 warpSeed = vec3(polarP * complexity, t * 0.15);
-  float warp1 = fbm(warpSeed);
-  float warp2 = fbm(warpSeed + vec3(5.2, 1.3, 2.7));
+  vec3 warpSeed = vec3(polarP * complexity * (1.0 + energy * 0.5), t * 0.15);
+  float warp1 = fbm6(warpSeed);
+  float warp2 = fbm6(warpSeed + vec3(5.2, 1.3, 2.7));
   vec2 warpedP = polarP + vec2(warp1, warp2) * warpAmount;
 
   // ─── Petal ring pattern ───
@@ -154,6 +158,11 @@ void main() {
   // Petal center glow
   float petalGlow = pow(petalShape, 4.0) * ringPattern;
   col += color1 * petalGlow * 0.4;
+
+  // --- Secondary organic overlay: flowing energy underneath geometry ---
+  float organicLayer = fbm6(vec3(p * 2.5 + vec2(t * 0.08, t * 0.06), t * 0.12));
+  vec3 organicColor = mix(color1 * 0.4, color2 * 0.5, organicLayer);
+  col += organicColor * (1.0 - pattern) * 0.3 * energy;
 
   // ─── Background: dark with subtle FBM texture ───
   float bg = fbm3(vec3(p * 2.0, t * 0.1)) * 0.03;

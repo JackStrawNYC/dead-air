@@ -51,10 +51,10 @@ float torusSDF(vec2 p, vec2 center, float majorR, float minorR) {
 }
 
 // Smooth torus field with FBM displacement
-float smokeRingField(vec2 p, vec2 center, float majorR, float minorR, float time) {
+float smokeRingField(vec2 p, vec2 center, float majorR, float minorR, float time, float energyMod) {
   float d = torusSDF(p, center, majorR, minorR);
-  // FBM displacement for smoke-like edges
-  float disp = fbm3(vec3(p * 4.0, time * 0.5)) * 0.03;
+  // FBM6 displacement for rich smoke-like edges with energy-responsive detail
+  float disp = fbm6(vec3(p * 4.0 * (1.0 + energyMod * 0.5), time * 0.5)) * 0.03;
   d += disp;
   return d;
 }
@@ -97,6 +97,10 @@ void main() {
 
   vec3 col = vec3(0.008, 0.006, 0.012); // dark background
 
+  // --- Domain warping for volumetric depth ---
+  vec2 domainP = p;
+  domainP += vec2(fbm3(vec3(p * 0.5 * (1.0 + energy * 0.5), uDynamicTime * 0.05)), fbm3(vec3(p * 0.5 * (1.0 + energy * 0.5) + 100.0, uDynamicTime * 0.05))) * 0.3;
+
   // --- Ring parameters ---
   int ringCount = 3 + int(energy * 3.0 * sectionRingCount); // 3-6 rings, section-modulated
   float ringScale = (0.08 + bass * 0.06) * sectionRingScale;
@@ -123,7 +127,7 @@ void main() {
 
     // Torus field — tension warps ring shape
     float tensionWarp = tension * sin(slowTime * 2.0 + fi * 3.14) * 0.01;
-    float d = smokeRingField(p, center + vec2(tensionWarp), majorR, minorR, slowTime + fi);
+    float d = smokeRingField(domainP, center + vec2(tensionWarp), majorR, minorR, slowTime + fi, energy);
 
     // Volumetric glow
     float glow = exp(-max(d, 0.0) * 30.0) * 0.5;
@@ -147,9 +151,18 @@ void main() {
     col += ringColor + scatterColor;
   }
 
-  // --- Background fog ---
-  float fog = fbm(p * 2.0 + vec2(slowTime * 0.1, 0.0)) * 0.08;
+  // --- Background fog (fbm6 for volumetric depth) ---
+  float fog = fbm6(vec3(domainP * 2.0 * (1.0 + energy * 0.5) + vec2(slowTime * 0.1, 0.0), slowTime * 0.2)) * 0.08;
   col += vec3(fog * 0.3, fog * 0.2, fog * 0.4) * (energy + otherEnergy * 0.15);
+
+  // --- Secondary volumetric layer: atmospheric depth haze ---
+  float hazeLayer = fbm6(vec3(domainP * 1.5 + 200.0, slowTime * 0.15));
+  vec3 hazeColor = mix(
+    hsv2rgb(vec3(uPalettePrimary + 0.1, 0.3, 0.15)),
+    hsv2rgb(vec3(uPaletteSecondary + 0.05, 0.25, 0.12)),
+    hazeLayer
+  );
+  col += hazeColor * 0.3 * (0.4 + energy * 0.3);
 
   // --- Collision glow at ring intersections ---
   float collisionGlow = 0.0;

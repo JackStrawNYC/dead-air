@@ -130,6 +130,10 @@ void main() {
   float chromaHueMod = uChromaHue * 0.1;
   float chordHue = float(int(uChordIndex)) / 24.0 * 0.08;
 
+  // --- Domain warping for organic plasma movement ---
+  vec2 domainP = p;
+  domainP += vec2(fbm3(vec3(p * 0.5 * (1.0 + energy * 0.5), uDynamicTime * 0.05)), fbm3(vec3(p * 0.5 * (1.0 + energy * 0.5) + 100.0, uDynamicTime * 0.05))) * 0.3;
+
   // --- Section-type modulation (0=intro,1=verse,2=chorus,3=bridge,4=solo,5=jam,6=outro,7=space) ---
   float sectionT = uSectionType;
   float sJam = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
@@ -153,10 +157,10 @@ void main() {
 
   // --- Solar granulation ---
   float cellSize = (0.06 + bass * 0.04) * sectionCellSize; // bass controls cell size, section-modulated
-  float granular = granulation(p, cellSize);
+  float granular = granulation(domainP, cellSize);
 
   // Animate granulation: cells slowly evolve
-  float granularAnim = granulation(p + vec2(slowTime * 0.3, slowTime * 0.2), cellSize * 1.1);
+  float granularAnim = granulation(domainP + vec2(slowTime * 0.3, slowTime * 0.2), cellSize * 1.1);
   granular = mix(granular, granularAnim, 0.3);
 
   // Granulation heats the plasma
@@ -180,8 +184,8 @@ void main() {
   float tensionBuildup = forecast * 0.02;
   newMagnetic += tensionBuildup;
 
-  // Magnetic field noise: twisted field lines
-  float magNoise = fbm(vec3(p * 5.0 + vec2(slowTime * 0.5, 0.0), slowTime * 0.3));
+  // Magnetic field noise: twisted field lines — fbm6 for rich detail
+  float magNoise = fbm6(vec3(domainP * 5.0 * (1.0 + energy * 0.5) + vec2(slowTime * 0.5, 0.0), slowTime * 0.3));
   newMagnetic += abs(magNoise) * 0.01 * energy;
 
   // --- Flare eruption on onset ---
@@ -304,11 +308,20 @@ void main() {
   }
 
   // --- Corona: extended atmosphere glow ---
-  float coronaDist = length(p);
+  float coronaDist = length(domainP);
   float corona = 1.0 / (1.0 + coronaDist * coronaDist * 8.0);
   corona *= energy * 0.3 * mix(1.0, 1.2, sChorus);
   vec3 coronaColor = hsv2rgb(vec3(hue2 + 0.05, sat * 0.3, 1.0));
   col += coronaColor * corona;
+
+  // --- Secondary depth layer: chromospheric plasma using both palettes ---
+  float chromoLayer = fbm6(vec3(domainP * 4.0 * (1.0 + energy * 0.5) + 300.0, slowTime * 0.4));
+  vec3 chromoColor = mix(
+    hsv2rgb(vec3(hue1 + 0.05, sat * 0.6, 0.4)),
+    hsv2rgb(vec3(hue2 + 0.1, sat * 0.5, 0.5)),
+    chromoLayer
+  );
+  col += chromoColor * 0.3 * energy * (0.5 + newTemp * 0.5);
 
   // --- Sunspot regions: dark, magnetically active ---
   for (int i = 0; i < 2; i++) {
