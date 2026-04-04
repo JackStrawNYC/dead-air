@@ -590,7 +590,7 @@ export const FullscreenQuad: React.FC<Props> = ({
     // Composites the image icon into the shader output via screen blend + noise dissolve.
     // Skipped when no icon texture or zero opacity — zero GPU cost when inactive.
     let postShaderTexture = targets.main.texture;
-    if (iconOverlay.texture && iconOverlay.opacity > 0.01) {
+    if (false && iconOverlay.texture && iconOverlay.opacity > 0.01) { // DISABLED — AI art looks bad
       iconPass.uniforms.uIconTexture.value = iconOverlay.texture;
       iconPass.uniforms.uBackgroundTexture.value = targets.main.texture;
       iconPass.uniforms.uResolution.value.set(width, height);

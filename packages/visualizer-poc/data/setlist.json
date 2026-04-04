@@ -11,7 +11,7 @@
       "title": "The Promised Land",
       "set": 1,
       "trackNumber": 1,
-      "defaultMode": "warm_nebula",
+      "defaultMode": "aurora_curtains",
       "audioFile": "veneta-72/gd72-08-27d1t02.mp3",
       "palette": {
         "primary": 200,
@@ -25,7 +25,7 @@
       "title": "Sugaree",
       "set": 1,
       "trackNumber": 2,
-      "defaultMode": "oil_projector",
+      "defaultMode": "stained_glass",
       "audioFile": "veneta-72/gd72-08-27d1t03.mp3",
       "palette": {
         "primary": 35,
@@ -39,7 +39,7 @@
       "title": "Me And My Uncle",
       "set": 1,
       "trackNumber": 3,
-      "defaultMode": "smoke_rings",
+      "defaultMode": "aurora",
       "audioFile": "veneta-72/gd72-08-27d1t04.mp3",
       "palette": {
         "primary": 0,
@@ -67,7 +67,7 @@
       "title": "Black Throated Wind",
       "set": 1,
       "trackNumber": 5,
-      "defaultMode": "coral_reef",
+      "defaultMode": "stained_glass",
       "audioFile": "veneta-72/gd72-08-27d1t06.mp3",
       "palette": {
         "primary": 50,
@@ -82,7 +82,7 @@
       "title": "China Cat Sunflower",
       "set": 1,
       "trackNumber": 6,
-      "defaultMode": "warm_nebula",
+      "defaultMode": "deep_ocean",
       "audioFile": "veneta-72/gd72-08-27d1t07.mp3",
       "palette": {
         "primary": 15,
@@ -97,7 +97,7 @@
       "title": "I Know You Rider",
       "set": 1,
       "trackNumber": 7,
-      "defaultMode": "liquid_light",
+      "defaultMode": "cosmic_voyage",
       "audioFile": "veneta-72/gd72-08-27d1t08.mp3",
       "palette": {
         "primary": 25,
@@ -111,7 +111,7 @@
       "title": "Mexicali Blues",
       "set": 1,
       "trackNumber": 8,
-      "defaultMode": "liquid_light",
+      "defaultMode": "aurora",
       "audioFile": "veneta-72/gd72-08-27d1t09.mp3",
       "palette": {
         "primary": 330,
@@ -125,7 +125,7 @@
       "title": "Bertha",
       "set": 1,
       "trackNumber": 9,
-      "defaultMode": "coral_reef",
+      "defaultMode": "liquid_light",
       "audioFile": "veneta-72/gd72-08-27d1t10.mp3",
       "palette": {
         "primary": 270,
@@ -139,7 +139,7 @@
       "title": "Playing In The Band",
       "set": 2,
       "trackNumber": 1,
-      "defaultMode": "volumetric_smoke",
+      "defaultMode": "aurora",
       "audioFile": "veneta-72/gd72-08-27d2t02.mp3",
       "palette": {
         "primary": 15,
@@ -153,7 +153,7 @@
       "title": "He's Gone",
       "set": 2,
       "trackNumber": 2,
-      "defaultMode": "deep_ocean",
+      "defaultMode": "oil_projector",
       "audioFile": "veneta-72/gd72-08-27d2t03.mp3",
       "palette": {
         "primary": 200,
@@ -167,7 +167,7 @@
       "title": "Jack Straw",
       "set": 2,
       "trackNumber": 3,
-      "defaultMode": "stained_glass",
+      "defaultMode": "liquid_light",
       "audioFile": "veneta-72/gd72-08-27d2t04.mp3",
       "palette": {
         "primary": 50,
@@ -181,7 +181,7 @@
       "title": "Bird Song",
       "set": 2,
       "trackNumber": 4,
-      "defaultMode": "volumetric_nebula",
+      "defaultMode": "aurora",
       "audioFile": "veneta-72/gd72-08-27d2t05.mp3",
       "palette": {
         "primary": 240,
@@ -195,7 +195,7 @@
       "title": "Greatest Story Ever Told",
       "set": 2,
       "trackNumber": 5,
-      "defaultMode": "cosmic_voyage",
+      "defaultMode": "deep_ocean",
       "audioFile": "veneta-72/gd72-08-27d2t06.mp3",
       "palette": {
         "primary": 260,
@@ -209,7 +209,7 @@
       "title": "Dark Star",
       "set": 3,
       "trackNumber": 1,
-      "defaultMode": "cosmic_voyage",
+      "defaultMode": "liquid_light",
       "audioFile": "veneta-72/gd72-08-27d3t01.mp3",
       "palette": {
         "primary": 260,
@@ -224,7 +224,7 @@
       "title": "El Paso",
       "set": 3,
       "trackNumber": 2,
-      "defaultMode": "stained_glass",
+      "defaultMode": "oil_projector",
       "audioFile": "veneta-72/gd72-08-27d3t02.mp3",
       "palette": {
         "primary": 25,
@@ -238,7 +238,7 @@
       "title": "Sing Me Back Home",
       "set": 3,
       "trackNumber": 3,
-      "defaultMode": "warm_nebula",
+      "defaultMode": "smoke_rings",
       "audioFile": "veneta-72/gd72-08-27d3t03.mp3",
       "palette": {
         "primary": 195,
@@ -252,7 +252,7 @@
       "title": "Sugar Magnolia",
       "set": 3,
       "trackNumber": 4,
-      "defaultMode": "stained_glass",
+      "defaultMode": "cosmic_voyage",
       "audioFile": "veneta-72/gd72-08-27d3t04.mp3",
       "palette": {
         "primary": 310,
@@ -266,7 +266,7 @@
       "title": "Casey Jones",
       "set": 3,
       "trackNumber": 5,
-      "defaultMode": "stained_glass",
+      "defaultMode": "oil_projector",
       "audioFile": "veneta-72/gd72-08-27d3t05.mp3",
       "palette": {
         "primary": 20,
@@ -280,7 +280,7 @@
       "title": "One More Saturday Night",
       "set": 3,
       "trackNumber": 6,
-      "defaultMode": "liquid_light",
+      "defaultMode": "cosmic_voyage",
       "audioFile": "veneta-72/gd72-08-27d3t06.mp3",
       "palette": {
         "primary": 50,
@@ -294,7 +294,7 @@
       "title": "And We Bid You Goodnight",
       "set": 3,
       "trackNumber": 7,
-      "defaultMode": "aurora",
+      "defaultMode": "stained_glass",
       "audioFile": "veneta-72/gd72-08-27d3t07.mp3",
       "palette": {
         "primary": 165,
