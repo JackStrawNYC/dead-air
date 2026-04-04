@@ -81,6 +81,10 @@ void main() {
 
   float slowTime = uDynamicTime * 0.03;
 
+  // --- Domain warping + energy-responsive detail ---
+  vec2 domainWarpOff = vec2(fbm3(vec3(p * 0.5, uDynamicTime * 0.05)), fbm3(vec3(p * 0.5 + 100.0, uDynamicTime * 0.05))) * 0.3;
+  float detailMod = 1.0 + energy * 0.5;
+
   // --- Uniform integrations ---
   float chromaHueMod = uChromaHue * 0.3;
   float chordConf = smoothstep(0.3, 0.6, uChordConfidence);
@@ -158,7 +162,7 @@ void main() {
         snoise(vec3(dp * 2.5 + fi * 10.0 + 50.0, slowTime * 0.3))
       ) * warpStr;
 
-      float noiseField = fbm(vec3((dp + warp) * 4.0, slowTime * 0.2 + fi * 5.0));
+      float noiseField = fbm6(vec3((dp + warp) * 4.0 * detailMod, slowTime * 0.2 + fi * 5.0));
       noiseField = noiseField * 0.5 + 0.5; // remap to 0-1
 
       // Threshold to create shape boundaries

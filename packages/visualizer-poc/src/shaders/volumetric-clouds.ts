@@ -46,10 +46,10 @@ float cloudDensity(vec3 p, float bass, float time) {
   p.x += time * 0.4;
   p.z += time * 0.15;
 
-  // 3-scale FBM layers
-  float d = fbm(p * 0.3) * 0.6;
+  // 3-scale FBM layers (primary 6-octave for rich detail)
+  float d = fbm6(p * 0.3) * 0.6;
   d += fbm3(p * 0.6 + 2.0) * 0.3;
-  d += fbm(p * 1.2 + 5.0) * 0.1;
+  d += fbm6(p * 1.2 + 5.0) * 0.1;
 
   // Bass billows
   d *= 0.7 + bass * 0.5;
@@ -109,8 +109,9 @@ void main() {
   vec3 sunDir = normalize(sunPos - ro);
 
   // === VOLUMETRIC CLOUD RAYMARCH ===
-  // Energy-gated steps: 24 cheap at quiet, 48 rich at peaks; tension adds detail
-  int steps = int(mix(24.0, 48.0, energy)) + int(sJam * 8.0) - int(sSpace * 8.0) + int(tension * 4.0);
+  // Energy-responsive steps: 24 cheap at quiet, 48 rich at peaks; tension adds detail
+  float energyDetail = 1.0 + energy * 0.5;
+  int steps = int(mix(24.0, 48.0, energy) * energyDetail * 0.8) + int(sJam * 8.0) - int(sSpace * 8.0) + int(tension * 4.0);
   float stepSize = 0.18 - melodicPitch * 0.03; // higher pitch = finer step = denser clouds
 
   vec3 cloudAccum = vec3(0.0);
@@ -178,6 +179,11 @@ void main() {
   float skyGrad = smoothstep(-0.1, 0.6, rd.y);
   vec3 skyColor = mix(vec3(0.15, 0.12, 0.2), skyTint * 0.4, skyGrad);
   col = mix(skyColor, col, cloudAlpha);
+
+  // --- Secondary glow layer: palette-tinted atmospheric haze ---
+  float glowNoise = fbm3(vec3(p * 2.0, flowTime * 0.15));
+  vec3 glowCol = mix(cloudTint, skyTint, glowNoise * 0.5 + 0.5) * 0.06;
+  col += glowCol * (0.3 + energy * 0.2);
 
   // Beat pulse
   col *= 1.0 + uBeatSnap * 0.12 * (1.0 + climaxBoost * 0.3);

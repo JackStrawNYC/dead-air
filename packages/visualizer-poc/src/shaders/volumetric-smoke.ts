@@ -49,7 +49,7 @@ float smokeDens(vec3 p, float bass, float time, float energy) {
     p += curl * 0.3 * smoothstep(0.2, 0.6, energy);
   }
 
-  float d = fbm(p * 0.7);
+  float d = fbm6(p * 0.7);
   d += fbm3(p * 1.4 + 4.0) * 0.4;
 
   // Bass thickens
@@ -114,8 +114,9 @@ void main() {
   vec3 ro, rd;
   setupCameraRay(uv, aspect, ro, rd);
 
-  // === VOLUMETRIC SMOKE RAYMARCH (24-40 steps) ===
-  int steps = int(mix(24.0, 40.0, energy)) + int(sJam * 6.0) - int(sSpace * 6.0) + int(tension * 4.0); // tension adds detail
+  // === VOLUMETRIC SMOKE RAYMARCH (energy-responsive 24-40 steps) ===
+  float energyDetail = 1.0 + energy * 0.5;
+  int steps = int(mix(24.0, 40.0, energy) * energyDetail * 0.85) + int(sJam * 6.0) - int(sSpace * 6.0) + int(tension * 4.0); // tension adds detail
   float stepSize = 0.15 - melodicPitch * 0.02; // higher pitch = finer steps
 
   vec3 smokeAccum = vec3(0.0);
@@ -168,6 +169,11 @@ void main() {
   // === AMBIENT FOG FLOOR ===
   float ambientFog = 0.08 + slowE * 0.04;
   col += smokeTint * ambientFog * (1.0 - smokeAlpha);
+
+  // --- Secondary glow layer: palette-tinted ambient light ---
+  float glowNoise = fbm3(vec3(p * 2.0, flowTime * 0.12));
+  vec3 glowCol = mix(smokeTint, spotlightTint, glowNoise * 0.5 + 0.5) * 0.05;
+  col += glowCol * (0.3 + energy * 0.2);
 
   // Beat + climax
   col *= 1.0 + climaxBoost * 0.15;

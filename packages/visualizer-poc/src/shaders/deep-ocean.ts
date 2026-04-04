@@ -74,6 +74,10 @@ void main() {
   float onset = clamp(uOnsetSnap, 0.0, 1.0);
   float slowE = clamp(uSlowEnergy, 0.0, 1.0);
 
+  // --- Domain warping + energy-responsive detail ---
+  vec2 domainWarpOff = vec2(fbm3(vec3(p * 0.5, uDynamicTime * 0.05)), fbm3(vec3(p * 0.5 + 100.0, uDynamicTime * 0.05))) * 0.3;
+  float detailMod = 1.0 + energy * 0.5;
+
   // --- Phase 1: New uniform integrations ---
   float vocalBio = uVocalPresence * 0.3;  // vocal presence drives bioluminescence
   float guitarTemp = uOtherCentroid;       // guitar brightness shifts temperature

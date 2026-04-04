@@ -82,6 +82,10 @@ void main() {
 
   float slowTime = uDynamicTime * 0.03 * mix(1.0, 1.5, sJam) * mix(1.0, 0.3, sSpace);
 
+  // --- Domain warping + energy detail ---
+  vec2 warpedP = p + vec2(fbm3(vec3(p * 0.5, uDynamicTime * 0.05)), fbm3(vec3(p * 0.5 + 100.0, uDynamicTime * 0.05))) * 0.3;
+  float detailMod = 1.0 + energy * 0.5;
+
   // --- Sky background gradient ---
   float skyGrad = smoothstep(-0.5, 0.3, p.y);
   vec3 skyLow = vec3(0.005, 0.008, 0.02);
@@ -107,7 +111,7 @@ void main() {
 
   // Layer 3: subtle background shimmer
   float c3 = auroraCurtain(p + vec2(-0.15, 0.03), slowTime * 0.6, foldComplexity * 0.7, curtainHeight * 1.2, 0.15, PI);
-  float n3 = fbm(p * 2.0 + slowTime * 0.2) * 0.5 + 0.5;
+  float n3 = fbm6(p * 2.0 * detailMod + slowTime * 0.2) * 0.5 + 0.5;
   float hue3 = mix(hue1, hue2, 0.5) + 0.1;
   vec3 layer3 = hsv2rgb(vec3(hue3, 0.4 * uPaletteSaturation, c3 * n3 * slowEnergy * 0.4));
 

@@ -68,6 +68,10 @@ void main() {
 
   float energy = clamp(uEnergy, 0.0, 1.0);
 
+  // --- Domain warping for organic variation ---
+  vec2 domainWarpOffset = vec2(fbm3(vec3(p * 0.5, uDynamicTime * 0.05)), fbm3(vec3(p * 0.5 + 100.0, uDynamicTime * 0.05))) * 0.3;
+  float detailMod = 1.0 + energy * 0.5;
+
   // === PATTERN STABILITY: FBM domain uses ONLY dynamicTime and slowEnergy ===
   // Audio-reactive features (bass, highs, onset) only affect post-FBM rendering.
   // This prevents frame-to-frame audio jitter from moving the FBM pattern.
@@ -128,7 +132,7 @@ void main() {
   // ============ LAYER 2: Midground (hero) ============
   float warpStrength = (0.65 + slowE * 0.55) * complexity * tensionWarp * accelWarp * sectionMod;
   float tFlux = t * 0.2 + sectionSeed;
-  vec3 q = vec3(p * 1.2 * sectionWarp, tFlux);
+  vec3 q = vec3((p + domainWarpOffset * 0.15) * 1.2 * sectionWarp, tFlux);
   float warpX = fbmFlat(q + vec3(1.7, 9.2, 0.0), smoothness);
   float warpY = fbmFlat(q + vec3(8.3, 2.8, 0.0), smoothness);
   vec2 warp1 = vec2(warpX, warpY) * warpStrength;

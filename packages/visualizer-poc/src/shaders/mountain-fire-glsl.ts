@@ -93,6 +93,14 @@ void main() {
 
   float fireIntensity = energy * (1.0 + jamMod * 0.5) * (1.0 - spaceMod * 0.6);
 
+  // --- Domain warping + palette ---
+  vec2 warpedP = p + vec2(fbm3(vec3(p * 0.5, t * 0.05)), fbm3(vec3(p * 0.5 + 100.0, t * 0.05))) * 0.3;
+  float detailMod = 1.0 + energy * 0.5;
+  float palHue1 = uPalettePrimary + hueShift * 0.12;
+  float palHue2 = uPaletteSecondary + hueShift * 0.08;
+  vec3 palCol1 = hsv2rgb(vec3(palHue1, 0.8 * uPaletteSaturation, 0.9));
+  vec3 palCol2 = hsv2rgb(vec3(palHue2, 0.7 * uPaletteSaturation, 0.85));
+
   // --- Sky ---
   float skyGrad = uv.y;
   vec3 skyTop = mix(vec3(0.05, 0.03, 0.1), vec3(0.15, 0.03, 0.02), slowE);
@@ -142,7 +150,7 @@ void main() {
   float fireBehindY = baseY + ridge3H;
   float fireZone = smoothstep(fireBehindY - 0.05, fireBehindY + 0.15, uv.y) *
                    smoothstep(fireBehindY + 0.25 + fireIntensity * 0.15, fireBehindY, uv.y);
-  float fireNoise = fbm(vec3(p.x * 3.0, (uv.y - fireBehindY) * 4.0 - t * 2.0, t * 0.5));
+  float fireNoise = fbm6(vec3(p.x * 3.0 * detailMod, (uv.y - fireBehindY) * 4.0 - t * 2.0, t * 0.5));
   float fireMask = fireZone * fireNoise * (1.0 - ridge2) * (1.0 - ridge1); // only visible in gaps
 
   float h = 0.04 + hueShift * 0.12;
@@ -158,7 +166,7 @@ void main() {
 
   // --- Smoke ---
   float smokeY = uv.y - baseY - ridge3H;
-  float smokeNoise = fbm(vec3(p.x * 2.0 + t * 0.2, smokeY * 2.0 - t * 0.4, t * 0.15));
+  float smokeNoise = fbm6(vec3(p.x * 2.0 * detailMod + t * 0.2, smokeY * 2.0 - t * 0.4, t * 0.15));
   float smokeMask = smoothstep(0.0, 0.15, smokeY) * smoothstep(0.4, 0.05, smokeY);
   smokeMask *= exp(-abs(p.x) * 2.0);
   float smoke = smokeNoise * smokeMask * (flatness * 0.3 + fireIntensity * 0.2) * 0.4;
@@ -170,6 +178,12 @@ void main() {
   vec3 groundCol = vec3(0.02, 0.01, 0.01);
   groundCol += vec3(0.15, 0.05, 0.01) * exp(-abs(p.x) * 3.0) * fireIntensity * 0.3;
   col = mix(col, groundCol, step(uv.y, groundY));
+
+  // --- Secondary visual layer: atmospheric fire glow (30% blend) ---
+  float atmosNoise = fbm3(vec3(warpedP * 2.0, t * 0.1));
+  vec3 atmosCol = mix(palCol1, palCol2, atmosNoise * 0.5 + 0.5) * 0.1;
+  float atmosMask = smoothstep(baseY - 0.05, baseY + 0.3, uv.y) * fireIntensity;
+  col += atmosCol * atmosMask * 0.3;
 
   vec2 pp = uv * 2.0 - 1.0; col = applyPostProcess(col, uv, pp);
   gl_FragColor = vec4(col, 1.0);

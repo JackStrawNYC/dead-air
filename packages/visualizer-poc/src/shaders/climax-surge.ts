@@ -102,6 +102,11 @@ void main() {
   // ═══ SHOCKWAVE RINGS ═══
   // Multiple expanding rings, each spawned at a different beat
   float slowTime = uDynamicTime * 0.2 * explosionSpeedMod;
+
+  // --- Domain warping + energy-responsive detail ---
+  vec2 domainWarpOff = vec2(fbm3(vec3(p * 0.5, uDynamicTime * 0.05)), fbm3(vec3(p * 0.5 + 100.0, uDynamicTime * 0.05))) * 0.3;
+  float detailMod = 1.0 + energy * 0.5;
+
   for (int i = 0; i < NUM_RINGS; i++) {
     float fi = float(i);
     // Ring timing: staggered based on musical time

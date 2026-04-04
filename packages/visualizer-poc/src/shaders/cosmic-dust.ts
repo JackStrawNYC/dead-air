@@ -81,6 +81,10 @@ void main() {
   float t = uDynamicTime * 0.08;
   float energy = clamp(uEnergy, 0.0, 1.0);
 
+  // --- Domain warping + energy-responsive detail ---
+  vec2 domainWarpOff = vec2(fbm3(vec3(uv * 0.5, uDynamicTime * 0.05)), fbm3(vec3(uv * 0.5 + 100.0, uDynamicTime * 0.05))) * 0.3;
+  float detailMod = 1.0 + energy * 0.5;
+
   // Section-type modulation
   float sectionT = uSectionType;
   float sJam = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));

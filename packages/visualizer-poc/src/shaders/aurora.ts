@@ -112,6 +112,10 @@ void main() {
   float localTempoScale = uLocalTempo / 120.0;
   float beatStability = clamp(uBeatStability, 0.0, 1.0);
 
+  // --- Domain warping + energy detail ---
+  vec2 warpedP = p + vec2(fbm3(vec3(p * 0.5, uDynamicTime * 0.05)), fbm3(vec3(p * 0.5 + 100.0, uDynamicTime * 0.05))) * 0.3;
+  float detailMod = 1.0 + energy * 0.5;
+
   // === SLOW TIME: aurora should never feel rushed ===
   float slowTime = uDynamicTime * 0.08;
   float driftSpeed = (0.03 + slowE * 0.02 + trendDrift) * mix(1.0, 1.4, sJam) * mix(1.0, 0.4, sSpace) * mix(1.0, 1.15, sChorus) * (1.0 + uPeakApproaching * 0.3);

@@ -101,7 +101,8 @@ void main() {
 
   // === VOLUMETRIC NEBULA RAYMARCH (32-64 steps) ===
   // Emission + absorption model: accumulate color AND opacity separately
-  int steps = int(mix(32.0, 64.0, smoothstep(0.2, 0.6, energy)));
+  float energyDetail = 1.0 + energy * 0.5;
+  int steps = int(mix(32.0, 64.0, smoothstep(0.2, 0.6, energy)) * energyDetail * 0.8);
   float stepSize = 0.12;
 
   vec3 nebulaAccum = vec3(0.0);
@@ -163,6 +164,11 @@ void main() {
   float bgStars = starField(rd * 20.0 + vec3(flowTime * 0.01));
   vec3 bgColor = vec3(0.02, 0.02, 0.05) + vec3(0.8, 0.85, 1.0) * bgStars * 0.3 * (1.0 - nebulaAlpha);
   col = mix(bgColor, col, nebulaAlpha);
+
+  // --- Secondary glow layer: palette-tinted emission haze ---
+  float glowNoise = fbm3(vec3(p * 2.0, flowTime * 0.15));
+  vec3 glowCol = mix(nebulaTint, emissionTint, glowNoise * 0.5 + 0.5) * 0.05;
+  col += glowCol * (0.3 + energy * 0.2);
 
   // Beat + climax
   col *= 1.0 + climaxBoost * 0.2;

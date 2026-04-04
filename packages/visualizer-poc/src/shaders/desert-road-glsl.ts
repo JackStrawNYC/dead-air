@@ -100,6 +100,12 @@ void main() {
   float speed = energy * (1.0 + jamMod * 0.5) * (1.0 - spaceMod * 0.8);
   float horizon = 0.45 + pitch * 0.05;
 
+  // --- Domain warping + palette ---
+  vec2 warpedP = p + vec2(fbm3(vec3(p * 0.5, t * 0.05)), fbm3(vec3(p * 0.5 + 100.0, t * 0.05))) * 0.3;
+  float detailMod = 1.0 + energy * 0.5;
+  vec3 palCol1 = hsv2rgb(vec3(uPalettePrimary + hueShift * 0.1, 0.7 * uPaletteSaturation, 0.9));
+  vec3 palCol2 = hsv2rgb(vec3(uPaletteSecondary + hueShift * 0.08, 0.6 * uPaletteSaturation, 0.85));
+
   // --- Heat shimmer (UV distortion below horizon) ---
   float shimmerAmt = bass * 0.006 + energy * 0.003;
   float depthFromHorizon = max(0.0, horizon - uv.y);
@@ -166,8 +172,8 @@ void main() {
   float edgeLines = (edgeLineL + edgeLineR) * below * step(0.01, roadDepth);
   col = mix(col, vec3(0.8, 0.8, 0.75), edgeLines * 0.5);
 
-  // --- Dust ---
-  float dustNoise = fbm(vec3(p.x * 3.0, p.y * 2.0 - t * 0.5 * speed, t * 0.3));
+  // --- Dust (6-octave rich detail) ---
+  float dustNoise = fbm6(vec3(p.x * 3.0 * detailMod, p.y * 2.0 - t * 0.5 * speed, t * 0.3));
   float dustMask = below * smoothstep(0.0, 0.15, depth) * (0.1 + onset * 0.4 + energy * 0.2);
   float dust = dustNoise * dustMask * 0.15;
   col = mix(col, vec3(0.6, 0.5, 0.35), dust);
@@ -182,6 +188,12 @@ void main() {
   float poleHeight = horizon + 0.08 * (1.0 - depth * 2.0);
   poleMask *= step(shimmerUV.y, poleHeight);
   col = mix(col, vec3(0.08, 0.06, 0.04), poleMask);
+
+  // --- Secondary visual layer: heat mirage color (30% blend) ---
+  float mirageNoise = fbm3(vec3(warpedP * 4.0, t * 0.12));
+  vec3 mirageCol = mix(palCol1, palCol2, mirageNoise * 0.5 + 0.5) * 0.08;
+  float mirageMask = below * smoothstep(0.0, 0.1, depth) * smoothstep(0.3, 0.05, depth);
+  col += mirageCol * mirageMask * 0.3 * energy;
 
   // Post-processing
   vec2 pp = uv * 2.0 - 1.0; col = applyPostProcess(col, uv, pp);

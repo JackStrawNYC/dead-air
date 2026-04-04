@@ -84,6 +84,9 @@ void main() {
   float highs = clamp(uHighs, 0.0, 1.0);
   float onset = clamp(uOnsetSnap, 0.0, 1.0);
 
+  // --- Energy-responsive detail ---
+  float detailMod = 1.0 + energy * 0.5;
+
   // === CAMERA SETUP ===
   float driftSpeed = 0.12 + energy * 0.15 + uFastEnergy * 0.06;
   float camT = uDynamicTime * driftSpeed;

@@ -83,10 +83,20 @@ void main() {
   float seaState = slowE * (1.0 + jamMod * 0.5) * (1.0 - spaceMod * 0.6);
   float horizon = 0.52;
 
+  // --- Domain warping for organic variation ---
+  vec2 warpedP = p + vec2(fbm3(vec3(p * 0.5, t * 0.05)), fbm3(vec3(p * 0.5 + 100.0, t * 0.05))) * 0.3;
+  float detailMod = 1.0 + energy * 0.5;
+
+  // --- Palette colors ---
+  float palHue1 = uPalettePrimary + hueShift * 0.1;
+  float palHue2 = uPaletteSecondary + hueShift * 0.08;
+  vec3 palCol1 = hsv2rgb(vec3(palHue1, 0.7 * uPaletteSaturation, 0.9));
+  vec3 palCol2 = hsv2rgb(vec3(palHue2, 0.6 * uPaletteSaturation, 0.85));
+
   // --- Sky ---
   float skyT = smoothstep(horizon, 1.0, uv.y);
   vec3 skyLow = mix(vec3(0.6, 0.7, 0.8), vec3(0.8, 0.6, 0.4), pitch * 0.5);
-  vec3 skyHigh = vec3(0.25, 0.35, 0.6 + hueShift * 0.1);
+  vec3 skyHigh = mix(vec3(0.25, 0.35, 0.6 + hueShift * 0.1), palCol2 * 0.4, 0.2);
 
   vec3 sky = mix(skyLow, skyHigh, skyT);
 
@@ -95,8 +105,8 @@ void main() {
   float sunGlow = exp(-sunDist * 6.0) * (0.4 + slowE * 0.3);
   sky += vec3(0.5, 0.35, 0.15) * sunGlow;
 
-  // Clouds
-  float cloudNoise = fbm(vec3(uv.x * 4.0 + t * 0.015, uv.y * 2.5, t * 0.03));
+  // Clouds (6-octave for rich detail)
+  float cloudNoise = fbm6(vec3(uv.x * 4.0 + t * 0.015, uv.y * 2.5, t * 0.03));
   float cloudMask = smoothstep(0.42, 0.55, cloudNoise) * smoothstep(horizon + 0.05, 0.95, uv.y);
   sky = mix(sky, vec3(0.9, 0.88, 0.85), cloudMask * 0.35);
 
@@ -117,9 +127,9 @@ void main() {
   // Wave displacement
   float wave = waveHeight(wavePos, t, seaState, bass);
 
-  // Ocean color (deep blue → teal, hue-shifted)
-  vec3 deepColor = vec3(0.02, 0.06, 0.12 + hueShift * 0.05);
-  vec3 shallowColor = vec3(0.05, 0.15, 0.2 + hueShift * 0.1);
+  // Ocean color (deep blue → teal, hue-shifted, palette-tinted)
+  vec3 deepColor = mix(vec3(0.02, 0.06, 0.12 + hueShift * 0.05), palCol1 * 0.15, 0.2);
+  vec3 shallowColor = mix(vec3(0.05, 0.15, 0.2 + hueShift * 0.1), palCol2 * 0.2, 0.15);
   vec3 waterColor = mix(shallowColor, deepColor, depth);
 
   // Wave-driven brightness
@@ -157,8 +167,14 @@ void main() {
   // --- Spray/mist near horizon ---
   float sprayY = abs(uv.y - horizon);
   float spray = exp(-sprayY * 20.0) * (vocalPres * 0.2 + onset * 0.15) * seaState;
-  float sprayNoise = fbm(vec3(p.x * 5.0 + t * 0.3, sprayY * 10.0, t * 0.2));
+  float sprayNoise = fbm6(vec3(p.x * 5.0 + t * 0.3, sprayY * 10.0, t * 0.2));
   col = mix(col, vec3(0.8, 0.85, 0.9), spray * sprayNoise * 0.3);
+
+  // --- Secondary visual layer: subsurface light (30% blend) ---
+  float subsurfNoise = fbm3(vec3(warpedP * 3.0 * detailMod, t * 0.15));
+  vec3 subsurfColor = mix(palCol1, palCol2, subsurfNoise * 0.5 + 0.5) * 0.15;
+  float subsurfMask = step(uv.y, horizon) * smoothstep(0.0, 0.15, depth);
+  col += subsurfColor * subsurfMask * 0.3 * energy;
 
   vec2 pp = uv * 2.0 - 1.0; col = applyPostProcess(col, uv, pp);
   gl_FragColor = vec4(col, 1.0);

@@ -127,6 +127,10 @@ void main() {
   float effectiveBeat = uBeatSnap * smoothstep(0.3, 0.7, uBeatConfidence);
   float slowTime = uDynamicTime * 0.04;
 
+  // --- Domain warping + energy-responsive detail ---
+  vec2 domainWarpOff = vec2(fbm3(vec3(p * 0.5, uDynamicTime * 0.05)), fbm3(vec3(p * 0.5 + 100.0, uDynamicTime * 0.05))) * 0.3;
+  float detailMod = 1.0 + energy * 0.5;
+
   // --- Audio integrations ---
   float chromaHueMod = uChromaHue * 0.25;
   float chordHue = float(int(uChordIndex)) / 24.0 * 0.2;

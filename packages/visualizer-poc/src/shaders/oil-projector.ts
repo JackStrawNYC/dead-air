@@ -90,14 +90,18 @@ void main() {
 
   float t = uDynamicTime * 0.06 * tempoScale * morphSpeedMod; // Oil moves with purpose
 
+  // --- Domain warping for organic variation ---
+  vec2 domainWarpOff = vec2(fbm3(vec3(p * 0.5, uDynamicTime * 0.05)), fbm3(vec3(p * 0.5 + 100.0, uDynamicTime * 0.05))) * 0.3;
+  float detailMod = 1.0 + energy * 0.5;
+
   // Bass camera shake (gentle — projector on a table)
   float shakeX = snoise(vec3(uTime * 4.0, 0.0, sectionSeed)) * uBass * 0.002;
   float shakeY = snoise(vec3(0.0, uTime * 4.0, sectionSeed)) * uBass * 0.002;
   p += vec2(shakeX, shakeY);
 
-  // === GLASS IMPERFECTION: Voronoi-based refractive warp ===
+  // === GLASS IMPERFECTION: Voronoi-based refractive warp + domain warp ===
   vec2 glassInfo = glassWarp(p * 1.5 + 0.5, uDynamicTime);
-  p += (glassInfo.x - 0.5) * 0.015; // subtle UV warp from glass texture
+  p += (glassInfo.x - 0.5) * 0.015 + domainWarpOff * 0.1; // subtle UV warp from glass texture + domain warp
 
   // === LAYER 1: Dark warm base (overhead projector glass) ===
   vec3 col = vec3(0.02, 0.015, 0.01);

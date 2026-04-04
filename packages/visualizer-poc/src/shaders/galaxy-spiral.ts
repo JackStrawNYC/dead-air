@@ -126,6 +126,10 @@ void main() {
 
   float slowTime = uDynamicTime * 0.05;
 
+  // --- Domain warping + energy-responsive detail ---
+  vec2 domainWarpOff = vec2(fbm3(vec3(p * 0.5, uDynamicTime * 0.05)), fbm3(vec3(p * 0.5 + 100.0, uDynamicTime * 0.05))) * 0.3;
+  float detailMod = 1.0 + energy * 0.5;
+
   // Phase 1 uniform integrations
   float chromaHueMod = uChromaHue * 0.2;
   float chordHue = float(int(uChordIndex)) / 24.0 * 0.12;
@@ -193,7 +197,7 @@ void main() {
   vec3 starTint = mix(starColorCool, starColorWarm, melodicPitch);
 
   // --- Nebula emission in arms ---
-  float nebulaFBM = fbm(vec3(tilted * 4.0 + rotation * 0.5, slowTime * 0.3));
+  float nebulaFBM = fbm6(vec3(tilted * 4.0 * detailMod + rotation * 0.5, slowTime * 0.3));
   nebulaFBM = smoothstep(0.1, 0.6, nebulaFBM * 0.5 + 0.5);
   float nebulaIntensity = armIntensity * nebulaFBM * 0.6;
 

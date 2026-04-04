@@ -221,11 +221,16 @@ void main() {
 }
 `;
 
-/** Canopy alpha fragment shader */
+/** Canopy alpha fragment shader — rich leaf detail with light filtering */
 export const canopyFrag = /* glsl */ `
 precision highp float;
 
+uniform float uDynamicTime;
+uniform float uEnergy;
 uniform float uSectionType;
+uniform float uPalettePrimary;
+uniform float uPaletteSecondary;
+uniform float uPaletteSaturation;
 
 varying vec2 vUv;
 
@@ -244,27 +249,66 @@ float noise(vec2 p) {
   return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
 }
 
+// 6-octave FBM for rich canopy pattern
+float fbm6_canopy(vec2 p) {
+  float val = 0.0;
+  float amp = 0.5;
+  float freq = 1.0;
+  for (int i = 0; i < 6; i++) {
+    val += amp * noise(p * freq);
+    freq *= 2.1;
+    amp *= 0.48;
+  }
+  return val;
+}
+
+vec3 hsv2rgb(vec3 c) {
+  vec4 K = vec4(1.0, 2.0/3.0, 1.0/3.0, 3.0);
+  vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
+  return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
+}
+
 void main() {
+  float energy = clamp(uEnergy, 0.0, 1.0);
+  float energyFreq = 1.0 + energy * 0.5;
+
   // Section-type modulation
   float sType = uSectionType;
-  float jamBoost = smoothstep(4.5, 5.5, sType);      // jam=5: dense canopy
-  float spaceHush = smoothstep(6.5, 7.5, sType);      // space=7: foggy, thick canopy
-  float chorusVibe = smoothstep(2.5, 3.5, sType) * (1.0 - smoothstep(3.5, 4.5, sType)); // chorus=3: more gaps for sunlight
-  float soloFocus = smoothstep(3.5, 4.5, sType) * (1.0 - smoothstep(4.5, 5.5, sType));  // solo=4: single opening
+  float jamBoost = smoothstep(4.5, 5.5, sType);
+  float spaceHush = smoothstep(6.5, 7.5, sType);
+  float chorusVibe = smoothstep(2.5, 3.5, sType) * (1.0 - smoothstep(3.5, 4.5, sType));
+  float soloFocus = smoothstep(3.5, 4.5, sType) * (1.0 - smoothstep(4.5, 5.5, sType));
 
   vec2 uv = vUv * 4.0;
-  float n = noise(uv * 2.0);
-  n += noise(uv * 5.0 + 20.0) * 0.5;
-  n += noise(uv * 11.0 + 50.0) * 0.25;
-  n /= 1.75;
+  // Domain warp for organic leaf clusters
+  float warp = noise(uv * 0.8 + uDynamicTime * 0.01) * 0.3;
+  vec2 warpedUV = uv + vec2(warp, -warp * 0.6);
+
+  // Rich 6-octave canopy pattern
+  float n = fbm6_canopy(warpedUV * energyFreq);
+
+  // Secondary leaf layer for depth (blended at 30%)
+  float n2 = fbm6_canopy(warpedUV * 1.5 + vec2(15.0, 8.0));
 
   // Density threshold: jam/space=denser canopy, chorus/solo=more gaps
   float densityThreshold = 0.4 + jamBoost * 0.08 + spaceHush * 0.06 - chorusVibe * 0.1 - soloFocus * 0.05;
   float alpha = smoothstep(densityThreshold, densityThreshold + 0.15, n);
-  vec3 canopyColor = vec3(0.02, 0.04, 0.02);
+  // Secondary layer adds depth
+  alpha = max(alpha, smoothstep(densityThreshold + 0.05, densityThreshold + 0.2, n2) * 0.3);
 
-  // Chorus: sunlight-touched green
-  canopyColor += vec3(0.005, 0.015, 0.003) * chorusVibe;
+  // Canopy base color with palette influence
+  vec3 canopyBase = vec3(0.02, 0.04, 0.02);
+  vec3 paletteTint = hsv2rgb(vec3(uPalettePrimary, uPaletteSaturation * 0.2, 0.04));
+  vec3 canopyColor = mix(canopyBase, paletteTint, 0.15);
+
+  // Leaf variation: some leaves lighter (secondary palette)
+  vec3 lightLeaf = hsv2rgb(vec3(uPaletteSecondary, uPaletteSaturation * 0.25, 0.06));
+  float leafVar = noise(uv * 3.0);
+  canopyColor = mix(canopyColor, lightLeaf, leafVar * 0.2);
+
+  // Chorus: sunlight filtering through — golden-green patches
+  float sunPatch = noise(uv * 1.5 + uDynamicTime * 0.005) * chorusVibe;
+  canopyColor += vec3(0.008, 0.02, 0.005) * sunPatch;
 
   // Space: muted gray-green fog tone
   canopyColor = mix(canopyColor, vec3(0.03, 0.04, 0.035), spaceHush * 0.5);

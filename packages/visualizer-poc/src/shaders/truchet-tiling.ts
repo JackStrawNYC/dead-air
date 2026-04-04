@@ -122,6 +122,11 @@ void main() {
   float stability = clamp(uBeatStability, 0.0, 1.0);
 
   float slowTime = uDynamicTime * 0.04;
+
+  // --- Domain warping + energy-responsive detail ---
+  vec2 domainWarpOff = vec2(fbm3(vec3(p * 0.5, uDynamicTime * 0.05)), fbm3(vec3(p * 0.5 + 100.0, uDynamicTime * 0.05))) * 0.3;
+  float detailMod = 1.0 + energy * 0.5;
+
   float chromaHueMod = uChromaHue * 0.2;
   float chordHue = float(int(uChordIndex)) / 24.0 * 0.15;
   float accelBoost = 1.0 + uEnergyAccel * 0.12;

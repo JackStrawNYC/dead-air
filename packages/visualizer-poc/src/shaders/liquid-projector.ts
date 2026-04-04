@@ -88,6 +88,10 @@ void main() {
   // Time: very slow — oils drift, they don't snap
   float t = uDynamicTime * 0.04 * tempoScale * convectMod * peakMod;
 
+  // --- Domain warping + energy-responsive detail ---
+  vec2 domainWarpOff = vec2(fbm3(vec3(p * 0.5, uDynamicTime * 0.05)), fbm3(vec3(p * 0.5 + 100.0, uDynamicTime * 0.05))) * 0.3;
+  float detailMod = 1.0 + energy * 0.5;
+
   // --- Audio integration ---
   float vocalWarmth = uVocalPresence * 0.15;
   float chordHue = float(int(uChordIndex)) / 24.0 * 0.12;
@@ -112,8 +116,8 @@ void main() {
   // ===========================================================
   vec3 layer1Pos = vec3(p * 0.4 + convection * 0.5, t * 0.2 + sectionSeed);
   // Domain warp for organic flow
-  float w1a = fbm(layer1Pos + vec3(2.3, 8.1, 0.0));
-  float w1b = fbm(layer1Pos + vec3(7.4, 1.6, 0.0));
+  float w1a = fbm6(layer1Pos + vec3(2.3, 8.1, 0.0));
+  float w1b = fbm6(layer1Pos + vec3(7.4, 1.6, 0.0));
   vec3 warped1 = vec3(p + vec2(w1a, w1b) * (0.5 + slowE * 0.3), t * 0.15);
   // Curl noise advection — oil flows, doesn't teleport
   warped1.xy += curlNoise(vec3(warped1.xy * 0.8, uDynamicTime * driftSpeed)).xy * 0.12;

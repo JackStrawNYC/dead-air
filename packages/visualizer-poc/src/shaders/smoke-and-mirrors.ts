@@ -47,7 +47,7 @@ float smokeDensity(vec3 p, float bass, float time, float energy) {
     p += curl * 0.25 * smoothstep(0.2, 0.6, energy);
   }
 
-  float d = fbm(p * 0.8);
+  float d = fbm6(p * 0.8);
   d += fbm3(p * 1.6 + 3.0) * 0.5;
 
   // Curl noise density contribution
@@ -87,6 +87,10 @@ void main() {
   vec2 dp = (distUv - 0.5) * aspect;
 
   float flowTime = uDynamicTime * 0.1 * mix(1.0, 1.3, sJam) * mix(1.0, 0.5, sSpace);
+
+  // --- Domain warping + energy-responsive detail ---
+  vec2 domainWarpOff = vec2(fbm3(vec3(dp * 0.5, uDynamicTime * 0.05)), fbm3(vec3(dp * 0.5 + 100.0, uDynamicTime * 0.05))) * 0.3;
+  float detailMod = 1.0 + energy * 0.5;
 
   // --- Phase 1: New uniform integrations ---
   float vocalSpot = uVocalPresence * 0.25;

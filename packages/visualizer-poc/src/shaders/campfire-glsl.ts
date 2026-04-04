@@ -136,6 +136,16 @@ void main() {
 
   float fireEnergy = energy * (1.0 + jamMod * 0.4 + chorusMod * 0.2) * (1.0 - spaceMod * 0.7);
 
+  // --- Domain warping for organic variation ---
+  vec2 warpedP = p + vec2(fbm3(vec3(p * 0.5, t * 0.05)), fbm3(vec3(p * 0.5 + 100.0, t * 0.05))) * 0.3;
+  float detailMod = 1.0 + energy * 0.5;
+
+  // --- Palette colors ---
+  float palHue1 = uPalettePrimary + hueShift * 0.1;
+  float palHue2 = uPaletteSecondary + hueShift * 0.08;
+  vec3 palCol1 = hsv2rgb(vec3(palHue1, 0.8 * uPaletteSaturation, 0.9));
+  vec3 palCol2 = hsv2rgb(vec3(palHue2, 0.7 * uPaletteSaturation, 0.85));
+
   // --- Sky gradient (dark blue-purple to warm horizon) ---
   float skyGrad = uv.y;
   vec3 skyTop = vec3(0.02, 0.02, 0.06);
@@ -184,13 +194,15 @@ void main() {
   vec3 emberColor = hsv2rgb(vec3(h + 0.02, 0.9, 1.0));
   col += emberColor * emberVal * (0.5 + fireEnergy * 0.5);
 
-  // --- Smoke (above fire, subtle) ---
+  // --- Smoke (above fire, 6-octave rich detail) ---
   float smokeY = uv.y - groundLine - 0.1;
   float smokeDensity = (vocal * 0.5 + flatness * 0.3 + 0.1) * (1.0 - spaceMod * 0.5);
-  float smokeNoise = fbm(vec3(p.x * 2.0, smokeY * 1.5 - t * 0.3, t * 0.2));
+  float smokeNoise = fbm6(vec3(p.x * 2.0 * detailMod, smokeY * 1.5 - t * 0.3, t * 0.2));
   float smokeMask = smoothstep(0.0, 0.3, smokeY) * smoothstep(0.6, 0.1, smokeY) * exp(-abs(p.x) * 3.0);
   float smoke = smokeNoise * smokeMask * smokeDensity * 0.3;
-  col = mix(col, vec3(0.15, 0.12, 0.1), smoke);
+  // Palette-tinted smoke
+  vec3 smokeColor = mix(vec3(0.15, 0.12, 0.1), palCol2 * 0.15, 0.15);
+  col = mix(col, smokeColor, smoke);
 
   // --- Tree silhouettes ---
   float tree1 = treeSilhouette(uv, 0.12, 0.55, 0.08, 1.0);
@@ -203,6 +215,12 @@ void main() {
   float rimLight = exp(-length(vec2(p.x, uv.y - groundLine)) * 2.0) * fireEnergy * 0.15;
   treeColor += vec3(0.3, 0.1, 0.02) * rimLight;
   col = mix(col, treeColor, trees * step(groundLine, uv.y));
+
+  // --- Secondary visual layer: ambient heat shimmer (30% blend) ---
+  float heatNoise = fbm3(vec3(warpedP * 4.0, t * 0.2));
+  vec3 heatCol = mix(palCol1, palCol2, heatNoise * 0.5 + 0.5) * 0.12;
+  float heatMask = smoothstep(groundLine, groundLine + 0.3, uv.y) * exp(-abs(p.x) * 2.0);
+  col += heatCol * heatMask * 0.3 * fireEnergy;
 
   // Post-processing
   vec2 pp = uv * 2.0 - 1.0; col = applyPostProcess(col, uv, pp);
