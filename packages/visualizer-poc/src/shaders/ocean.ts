@@ -176,8 +176,11 @@ void main() {
   float chromaH = clamp(uChromaHue, 0.0, 1.0);
   float onset = clamp(uOnsetSnap, 0.0, 1.0);
 
+  float energyFreq = 1.0 + energy * 0.5;
+
   // Deep water color — space=darker/calmer, jam=greener storm tones
   float hue = uPalettePrimary + chromaH * 0.05;
+  float hue2 = uPaletteSecondary + chromaH * 0.04;
   float sat = mix(0.5, 0.9, uSlowEnergy) * uPaletteSaturation;
   vec3 calmDeep = hsv2rgb(vec3(hue, sat, mix(0.06, 0.18, uSlowEnergy)));
   vec3 stormDeep = vec3(0.08, 0.12, 0.10);
@@ -194,26 +197,60 @@ void main() {
   vec3 troughColor = waterColor * 0.5;
   vec3 col = mix(troughColor, crestColor, surfaceShade);
 
+  // === SUBSURFACE SCATTERING LAYER (secondary at 30%) ===
+  // Domain-warped caustic pattern beneath surface
+  vec2 causticBase = vWorldPos.xz * 0.04 * energyFreq;
+  float causticWarp = snoise2d(causticBase * 0.5 + uDynamicTime * 0.03) * 0.3;
+  float causticPattern = snoise2d((causticBase + causticWarp) * 2.0 + uDynamicTime * 0.05);
+  causticPattern = pow(max(0.0, causticPattern * 0.5 + 0.5), 3.0);
+  vec3 subsurfaceColor = hsv2rgb(vec3(hue2, sat * 0.6, 0.3)) * causticPattern;
+  col += subsurfaceColor * 0.3 * (1.0 - surfaceShade);
+
   // Fresnel reflection
   vec3 viewDir = normalize(cameraPosition - vWorldPos);
   float fresnel = pow(1.0 - max(dot(viewDir, vNormal), 0.0), 3.0);
-  vec3 reflectColor = mix(vec3(0.05, 0.08, 0.15), vec3(0.2, 0.25, 0.35), uSlowEnergy);
+  // Reflection uses both palette colors
+  vec3 reflectColor = mix(
+    hsv2rgb(vec3(hue, sat * 0.3, 0.12)),
+    hsv2rgb(vec3(hue2, sat * 0.25, 0.25)),
+    uSlowEnergy
+  );
   col = mix(col, reflectColor, fresnel * 0.6);
 
-  // Foam on crests triggered by onset — jam=more whitecaps, space=none
+  // === FOAM: rich multi-layer detail ===
   float foamMask = smoothstep(maxWaveH * 0.5, maxWaveH, vWaveHeight);
   float foamBoost = 1.0 + jamBoost * 0.5 - spaceHush * 0.8;
   float foamAmount = foamMask * (onset * 0.8 + storminess * 0.5 + energy * 0.3) * clamp(foamBoost, 0.0, 2.0);
+
+  // Primary foam noise — high detail FBM pattern
+  float foamNoise1 = snoise2d(vWorldPos.xz * 0.08 * energyFreq + uDynamicTime * 0.1);
+  float foamNoise2 = snoise2d(vWorldPos.xz * 0.25 * energyFreq + uDynamicTime * 0.15 + 10.0);
+  float foamTexture = foamNoise1 * 0.5 + foamNoise2 * 0.3;
+  foamAmount *= smoothstep(-0.1, 0.3, foamTexture);
+
+  // Secondary foam: trailing wisps and lace patterns
+  float foamWisp = snoise2d(vWorldPos.xz * 0.5 * energyFreq - uDynamicTime * 0.08);
+  float foamLace = pow(max(0.0, foamWisp), 4.0) * energy * 0.3;
+  foamAmount += foamLace * foamMask;
   foamAmount = clamp(foamAmount, 0.0, 1.0);
-  col = mix(col, vec3(0.85, 0.9, 0.95), foamAmount * 0.7);
+
+  // Foam edges are translucent, cores are bright
+  vec3 foamCol = mix(vec3(0.7, 0.75, 0.8), vec3(0.92, 0.95, 1.0), smoothstep(0.3, 0.8, foamAmount));
+  col = mix(col, foamCol, foamAmount * 0.7);
 
   // Bioluminescence during vocal presence
   if (uVocalPresence > 0.1) {
     float bioGate = smoothstep(0.1, 0.5, uVocalPresence) * (1.0 - storminess * 0.7);
-    float bioPattern = sin(vWorldPos.x * 0.5 + uDynamicTime * 0.3) *
-                       cos(vWorldPos.z * 0.7 + uDynamicTime * 0.2);
+    // Domain-warped bio pattern for organic shapes
+    float bioWarp = snoise2d(vWorldPos.xz * 0.1 + uDynamicTime * 0.04) * 0.5;
+    float bioPattern = sin(vWorldPos.x * 0.5 + bioWarp + uDynamicTime * 0.3) *
+                       cos(vWorldPos.z * 0.7 - bioWarp + uDynamicTime * 0.2);
     bioPattern = smoothstep(0.3, 0.8, bioPattern * 0.5 + 0.5);
-    vec3 bioColor = mix(vec3(0.1, 0.5, 0.9), vec3(0.0, 0.8, 0.6), bioPattern);
+    vec3 bioColor = mix(
+      hsv2rgb(vec3(hue, 0.8, 0.9)),
+      hsv2rgb(vec3(hue2, 0.7, 0.8)),
+      bioPattern
+    );
     col += bioColor * bioPattern * bioGate * 0.25;
   }
 
@@ -222,7 +259,9 @@ void main() {
   float reflectStretch = 8.0 + storminess * 12.0;
   float reflectDist = sqrt(reflectX * reflectX * 0.01 + pow(vWorldPos.z * 0.02, 2.0));
   float celestialReflect = exp(-reflectDist * reflectDist * reflectStretch * 0.01);
-  celestialReflect *= (0.5 + 0.5 * sin(vWorldPos.z * 0.3 + uDynamicTime * 0.5));
+  // Rippled reflection breakup
+  float reflRipple = snoise2d(vWorldPos.xz * 0.06 + uDynamicTime * 0.15) * 0.15;
+  celestialReflect *= (0.5 + 0.5 * sin(vWorldPos.z * 0.3 + uDynamicTime * 0.5 + reflRipple * 5.0));
   float celestialBrightness = mix(0.9, 0.15, storminess);
   col += vec3(1.0, 0.92, 0.7) * celestialReflect * celestialBrightness * 0.3;
 
@@ -232,10 +271,14 @@ void main() {
   // Solo: deep current focus — darker troughs, subtle deep blue undertone
   col += vec3(0.0, 0.02, 0.06) * soloFocus * (1.0 - surfaceShade) * 0.5;
 
-  // Distance fog toward horizon
+  // Distance fog toward horizon — palette-tinted
   float dist = length(vWorldPos.xz) * 0.005;
   float fog = 1.0 - exp(-dist * dist);
-  vec3 fogColor = mix(waterColor, vec3(0.05, 0.06, 0.08), 0.5);
+  vec3 fogColor = mix(
+    hsv2rgb(vec3(hue, sat * 0.15, 0.06)),
+    hsv2rgb(vec3(hue2, sat * 0.1, 0.08)),
+    0.5
+  );
   col = mix(col, fogColor, clamp(fog, 0.0, 0.7));
 
   gl_FragColor = vec4(col, 1.0);
@@ -281,22 +324,34 @@ void main() {
   float slowE = clamp(uSlowEnergy, 0.0, 1.0);
   float storminess = clamp(energy + 0.3, 0.0, 1.5);
   float chromaH = clamp(uChromaHue, 0.0, 1.0);
+  float energyFreq = 1.0 + energy * 0.5;
 
   float hue1 = uPaletteSecondary + chromaH * 0.08;
+  float hue2 = uPalettePrimary + chromaH * 0.05;
   float sat = mix(0.5, 0.9, slowE) * uPaletteSaturation;
 
   vec3 horizonColor = hsv2rgb(vec3(hue1, sat * 0.6, mix(0.15, 0.35, slowE)));
-  vec3 deepSkyColor = vec3(0.01, 0.01, 0.04);
+  vec3 deepSkyColor = mix(vec3(0.01, 0.01, 0.04), hsv2rgb(vec3(hue2, sat * 0.2, 0.03)), 0.2);
   horizonColor = mix(horizonColor, vec3(0.08, 0.06, 0.12), storminess * 0.5);
 
   // Gradient: horizon at bottom of sky quad, deep space at top
   float skyGradient = uv.y;
   vec3 col = mix(horizonColor, deepSkyColor, skyGradient);
 
-  // Stars: visible during calm
+  // === CLOUD LAYER: secondary layer for atmospheric depth (30%) ===
+  float slowTime = uDynamicTime * 0.15;
+  vec2 cloudUV = uv * vec2(2.0, 1.0) * energyFreq;
+  float cloudWarp = sin(cloudUV.x * 1.5 + slowTime * 0.02) * 0.08;
+  float cloudDensity = sin(cloudUV.x * 3.0 + cloudWarp + slowTime * 0.03)
+                     * sin(cloudUV.y * 5.0 + slowTime * 0.02);
+  cloudDensity = smoothstep(0.2, 0.6, cloudDensity * 0.5 + 0.5);
+  float cloudMask = smoothstep(0.0, 0.3, uv.y) * smoothstep(0.7, 0.4, uv.y);
+  vec3 cloudColor = mix(horizonColor * 0.4, vec3(0.06, 0.05, 0.08), 0.5);
+  col = mix(col, cloudColor, cloudDensity * cloudMask * 0.3 * storminess);
+
+  // Stars: visible during calm — two layers for depth
   float starVisibility = smoothstep(0.4, 0.0, storminess);
   if (starVisibility > 0.01) {
-    float slowTime = uDynamicTime * 0.15;
     vec2 starUv = uv + slowTime * 0.005;
     float starH = fract(sin(dot(floor(starUv * 100.0), vec2(127.1, 311.7))) * 43758.5453);
     float starH2 = fract(sin(dot(floor(starUv * 100.0), vec2(269.5, 183.3))) * 43758.5453);
@@ -306,11 +361,21 @@ void main() {
     float twinkle = 0.6 + 0.4 * sin(uTime * 1.5 + starH * 50.0);
     float star = hasStar * twinkle * smoothstep(0.03, 0.005, starDist);
     col += vec3(0.8, 0.85, 1.0) * star * 0.5 * starVisibility;
+
+    // Second deeper star layer
+    vec2 starUv2 = uv + slowTime * 0.003 + 7.0;
+    float sh2 = fract(sin(dot(floor(starUv2 * 150.0), vec2(127.1, 311.7))) * 43758.5453);
+    float sh22 = fract(sin(dot(floor(starUv2 * 150.0), vec2(269.5, 183.3))) * 43758.5453);
+    vec2 sf2 = fract(starUv2 * 150.0);
+    float sd2 = length(sf2 - vec2(sh2, sh22));
+    float star2 = step(0.78, sh2) * twinkle * smoothstep(0.02, 0.003, sd2);
+    col += vec3(0.7, 0.75, 0.9) * star2 * 0.25 * starVisibility;
   }
 
-  // Horizon glow band at bottom
+  // Horizon glow band at bottom — richer with palette bleed
   float horizonGlow = exp(-pow((uv.y) * 8.0, 2.0));
-  col += horizonColor * horizonGlow * 0.3;
+  vec3 glowColor = mix(horizonColor, hsv2rgb(vec3(hue2, sat * 0.4, 0.3)), 0.3);
+  col += glowColor * horizonGlow * 0.3;
 
   gl_FragColor = vec4(col, 1.0);
 }

@@ -150,8 +150,9 @@ vec4 nebulaClouds(vec3 rayPos, vec3 rayDir, float nebulaTime, float density,
     // Slow drift through nebula field
     pos.z += nebulaTime;
 
-    // FBM density with turbulence from harmonic tension
-    float n = fbm(pos * 0.3 + turbulence * 0.2);
+    // Domain-warped FBM density with turbulence from harmonic tension
+    vec3 warpOff = vec3(fbm3(pos * 0.2 + 5.0), fbm3(pos * 0.2 + 15.0), 0.0) * 0.4;
+    float n = fbm6(pos * 0.3 + warpOff + turbulence * 0.2);
     n += fbm3(pos * 0.7 + 10.0) * 0.3;
 
     // Density threshold
@@ -249,6 +250,10 @@ void main() {
   warpFactor += climaxBoost * 0.4;
   warpFactor = clamp(warpFactor, 0.0, 2.0);
 
+  // --- Domain warping + detail ---
+  vec2 warpedP = p + vec2(fbm3(vec3(p * 0.5, uDynamicTime * 0.05)), fbm3(vec3(p * 0.5 + 100.0, uDynamicTime * 0.05))) * 0.3;
+  float detailMod = 1.0 + energy * 0.5;
+
   // === TIME ===
   float travelTime = uDynamicTime * baseSpeed * 2.0;
   float slowTime = uDynamicTime * 0.1;
@@ -269,15 +274,32 @@ void main() {
   float bpHalf = beatPulseHalf(uMusicalTime);
   float beatP = bpFull * 0.5 + max(uBeat, drumBeat) * 0.5;
 
+  // === ENERGY-RESPONSIVE DETAIL ===
+  float energyFreq = 1.0 + energy * 0.5;
+
   // === DEEP SPACE BACKGROUND ===
-  // Dark blue/purple void — never pure black
+  // Dark blue/purple void — never pure black, palette-influenced
   vec3 skyBase = mix(
     vec3(0.005, 0.008, 0.025),   // deep indigo
     vec3(0.015, 0.01, 0.04),      // deep purple
-    0.5 + 0.5 * sin(slowTime * 0.2 + p.x * 0.5)
+    0.5 + 0.5 * sin(slowTime * 0.2 + rolledP.x * 0.5)
   );
+  // Palette secondary tints the void
+  skyBase = mix(skyBase, hsv2rgb(vec3(uPaletteSecondary, 0.2, 0.02)), 0.15);
   // Energy lifts the void slightly
   skyBase *= 1.0 + energy * 0.3;
+
+  // === SECONDARY COSMIC DUST LAYER (30% blend for depth) ===
+  float cosmicDustWarp = snoise(vec3(rolledP * 0.5 * energyFreq, slowTime * 0.05)) * 0.3;
+  float cosmicDust = snoise(vec3((rolledP + cosmicDustWarp) * 1.5, slowTime * 0.08));
+  cosmicDust = smoothstep(0.1, 0.5, cosmicDust * 0.5 + 0.5);
+  vec3 dustColor = mix(
+    hsv2rgb(vec3(uPalettePrimary, 0.3, 0.03)),
+    hsv2rgb(vec3(uPaletteSecondary, 0.25, 0.02)),
+    cosmicDust
+  );
+  skyBase += dustColor * cosmicDust * 0.3;
+
   vec3 col = skyBase;
 
   // === STAR FIELD: multiple depth layers ===
@@ -447,6 +469,15 @@ void main() {
 
     col += iconEmergence(rolledP, uTime, energy, bass, iconCol1, iconCol2, nf, climaxPhase, uSectionIndex) * 0.6;
     col += heroIconEmergence(rolledP, uTime, energy, bass, iconCol1, iconCol2, nf, uSectionIndex);
+  }
+
+  // --- Secondary visual layer: cosmic color wash (30% blend) ---
+  {
+    float cosmicWash = fbm3(vec3(warpedP * 2.0 * detailMod, slowTime * 0.2));
+    vec3 washCol1 = hsv2rgb(vec3(uPalettePrimary, 0.5, 0.3));
+    vec3 washCol2 = hsv2rgb(vec3(uPaletteSecondary, 0.4, 0.25));
+    vec3 washColor = mix(washCol1, washCol2, cosmicWash * 0.5 + 0.5);
+    col += washColor * 0.3 * (0.1 + energy * 0.15);
   }
 
   // === DEPTH FOG: subtle blue haze at edges for infinite depth feel ===

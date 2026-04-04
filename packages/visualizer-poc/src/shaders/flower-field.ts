@@ -65,16 +65,25 @@ float sdFlower(vec2 p, float petalCount, float bloomAmount, float petalPhase) {
   float r = length(p);
   float a = atan(p.y, p.x);
 
-  // Center bud: always present
+  // Center bud: always present with pistil detail
   float bud = r - 0.04;
+  // Inner pistil ring for detail
+  float pistil = abs(r - 0.025) - 0.004;
 
   // Petals: lobes that spread outward with bloomAmount
   float petalSpread = mix(0.02, 0.12, bloomAmount);
   float petalWidth = mix(0.6, 1.0, bloomAmount);
   float petalR = petalSpread * (0.5 + 0.5 * pow(max(0.0, cos((a + petalPhase) * petalCount)), petalWidth));
+  // Secondary petal detail: serrated edges on open blooms
+  float serration = sin(a * petalCount * 3.0 + petalPhase * 2.0) * 0.008 * bloomAmount;
+  petalR += serration;
+  // Petal vein detail: radial lines visible in open petals
+  float veinAngle = abs(sin((a + petalPhase) * petalCount * 0.5)) * 0.005 * bloomAmount;
+  petalR -= veinAngle;
 
   // Combine: smooth union of bud and petals
   float flower = min(bud, r - 0.035 - petalR);
+  flower = min(flower, pistil * mix(1.0, 0.5, bloomAmount));
   return flower;
 }
 
@@ -149,6 +158,10 @@ void main() {
   float isClimax = step(1.5, climaxPhase) * step(climaxPhase, 3.5);
   float climaxBoost = isClimax * climaxI;
 
+  // --- Domain warping + detail ---
+  vec2 warpedP = p + vec2(fbm3(vec3(p * 0.5, uDynamicTime * 0.05)), fbm3(vec3(p * 0.5 + 100.0, uDynamicTime * 0.05))) * 0.3;
+  float detailMod = 1.0 + energy * 0.5;
+
   // === TIME ===
   float slowTime = uDynamicTime * 0.08;
   // Camera slowly pans across the field
@@ -167,6 +180,8 @@ void main() {
   float burstPhase = onset * 0.4;
   bloomState = min(1.0, bloomState + burstPhase);
 
+  float energyFreq = 1.0 + energy * 0.5;
+
   // === BACKGROUND: warm gradient sky (golden hour feel) ===
   float skyGrad = smoothstep(-0.3, 0.6, p.y);
   // Warm pastels at rest, vibrant at peaks
@@ -176,10 +191,14 @@ void main() {
   skyBottom = mix(skyBottom, vec3(1.0, 0.85, 0.55), vocalWarmth * 0.3);
   vec3 sky = mix(skyBottom, skyTop, skyGrad);
 
-  // Subtle cloud wisps
-  float cloudNoise = fbm3(vec3(p.x * 2.0 + camX * 0.5, p.y * 3.0, slowTime * 0.3));
+  // Rich cloud wisps — domain-warped FBM6 for painterly feel
+  float cloudWarp = fbm3(vec3(p.x * 0.8 + camX * 0.2, p.y * 0.5, slowTime * 0.1)) * 0.2;
+  float cloudNoise = fbm6(vec3((p.x * 2.0 + camX * 0.5 + cloudWarp) * energyFreq, p.y * 3.0, slowTime * 0.3));
   float cloudMask = smoothstep(0.2, 0.5, p.y) * smoothstep(0.7, 0.4, p.y);
-  sky += vec3(1.0, 0.97, 0.92) * cloudNoise * cloudMask * 0.08;
+  sky += vec3(1.0, 0.97, 0.92) * cloudNoise * cloudMask * 0.1;
+  // Secondary cloud layer: distant soft haze (30%)
+  float distantCloud = fbm3(vec3(p.x * 0.6 - camX * 0.1, p.y * 1.5 + 5.0, slowTime * 0.15));
+  sky += vec3(0.98, 0.95, 0.88) * smoothstep(0.2, 0.6, distantCloud) * cloudMask * 0.3 * 0.06;
 
   vec3 col = sky;
 
@@ -198,13 +217,19 @@ void main() {
   vec3 stemColor = mix(vec3(0.25, 0.55, 0.20), vec3(0.35, 0.70, 0.25), energy * 0.5);
   vec3 leafColor = mix(vec3(0.20, 0.50, 0.18), vec3(0.30, 0.65, 0.22), slowE);
 
-  // === GRASS/STEMS LAYER at bottom ===
+  // === GRASS/STEMS LAYER at bottom — rich with domain warping ===
   float grassLine = -0.25 + snoise(vec3(p.x * 3.0 + camX, 0.0, slowTime * 0.2)) * 0.06;
   float grassMask = smoothstep(grassLine + 0.05, grassLine - 0.02, p.y);
   // Grass sways with bass
-  float grassSway = bass * 0.02 * sin(p.x * 8.0 + uTime * 2.0);
-  float grassNoise = fbm3(vec3((p.x + grassSway + camX) * 6.0, p.y * 10.0, slowTime * 0.5));
+  float grassSway = bass * 0.02 * sin(p.x * 8.0 + uDynamicTime * 2.0);
+  // Domain-warped grass texture (fbm6 for rich detail)
+  float grassWarp = snoise(vec3(p.x * 2.0 + camX, p.y * 1.5, slowTime * 0.1)) * 0.15;
+  float grassNoise = fbm6(vec3((p.x + grassSway + camX + grassWarp) * 6.0 * energyFreq, p.y * 10.0, slowTime * 0.5));
   vec3 grassCol = mix(stemColor * 0.7, stemColor, grassNoise * 0.5 + 0.5);
+  // Secondary wildflower undergrowth (30% blend)
+  float wildflowerNoise = snoise(vec3((p.x + camX) * 15.0, p.y * 20.0, slowTime * 0.3));
+  vec3 wildflowerCol = mix(petalColor1 * 0.4, petalColor2 * 0.3, wildflowerNoise * 0.5 + 0.5);
+  grassCol = mix(grassCol, wildflowerCol, smoothstep(0.6, 0.8, wildflowerNoise) * 0.3);
   col = mix(col, grassCol, grassMask * 0.85);
 
   // === FLOWER FIELD: grid of stylized flowers ===
@@ -350,6 +375,12 @@ void main() {
   vignette = smoothstep(0.0, 1.0, vignette);
   vec3 vigColor = mix(vec3(0.15, 0.10, 0.05), vec3(0.0), 0.5);
   col = mix(vigColor, col, vignette);
+
+  // --- Secondary visual layer: pollen haze (30% blend) ---
+  float pollenNoise = fbm3(vec3(warpedP * 3.0 * detailMod, slowTime * 0.3));
+  vec3 pollenCol = mix(petalColor1, petalColor2, pollenNoise * 0.5 + 0.5) * 0.08;
+  float pollenMask = smoothstep(-0.15, 0.2, p.y) * (1.0 - grassMask);
+  col += pollenCol * pollenMask * 0.3 * energy;
 
   // === ART NOUVEAU BORDER GLOW ===
   // Subtle warm border evocative of poster frame edges

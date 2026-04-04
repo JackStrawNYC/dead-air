@@ -124,6 +124,10 @@ void main() {
 
   float slowTime = uDynamicTime * 0.12;
 
+  // --- Domain warping + detail ---
+  vec2 warpedP = p + vec2(fbm3(vec3(p * 0.5, uDynamicTime * 0.05)), fbm3(vec3(p * 0.5 + 100.0, uDynamicTime * 0.05))) * 0.3;
+  float detailMod = 1.0 + energy * 0.5;
+
   // === RAIN INTENSITY: massive dynamic range ===
   float rainIntensity = mix(0.05, 1.0, energy);
   rainIntensity *= mix(1.0, 1.5, sJam) * mix(1.0, 0.05, sSpace) * mix(1.0, 0.7, sSolo);
@@ -142,15 +146,24 @@ void main() {
   neonColor1 = mix(neonColor1, vec3(0.9, 0.2, 0.5), 0.2);  // magenta hint
   neonColor2 = mix(neonColor2, vec3(0.2, 0.5, 0.9), 0.2);  // cyan hint
 
-  // === SKY: dark overcast night ===
+  float energyFreq = 1.0 + energy * 0.5;
+
+  // === SKY: dark overcast night — domain-warped clouds for richness ===
   vec3 skyColor = mix(
     vec3(0.02, 0.02, 0.035),
     vec3(0.04, 0.035, 0.05),
     smoothstep(0.0, 0.5, uv.y)
   );
-  // Slight cloud texture
-  float clouds = fbm(vec3(p.x * 1.5, p.y * 0.8 + slowTime * 0.05, slowTime * 0.1));
+  // Palette-tinted sky undertone
+  skyColor = mix(skyColor, hsv2rgb(vec3(uPaletteSecondary + chromaH * 0.05, 0.1, 0.03)), 0.15);
+  // Domain-warped cloud texture (fbm6 for rich detail)
+  vec3 cloudWarpPos = vec3(p.x * 0.5, p.y * 0.3, slowTime * 0.03);
+  float cloudWarp = fbm3(cloudWarpPos) * 0.3;
+  float clouds = fbm6(vec3(p.x * 1.5 * energyFreq + cloudWarp, p.y * 0.8 + slowTime * 0.05, slowTime * 0.1));
   skyColor += vec3(0.015) * smoothstep(-0.1, 0.3, clouds) * smoothstep(0.2, 0.5, uv.y);
+  // Secondary cloud layer for depth (30%)
+  float cloudLayer2 = fbm3(vec3(p.x * 0.8 - slowTime * 0.02, p.y * 0.5 + 5.0, slowTime * 0.08));
+  skyColor += vec3(0.01, 0.008, 0.012) * smoothstep(0.0, 0.4, cloudLayer2) * smoothstep(0.3, 0.6, uv.y) * 0.3;
 
   vec3 col = skyColor;
 
@@ -195,21 +208,32 @@ void main() {
   float puddleNoise = snoise(vec3(p.x * 4.0, p.y * 6.0, 2.5));
   float puddleArea = smoothstep(0.1, 0.3, puddleNoise) * isStreet;
 
-  // Puddle reflections: mirror the scene above with distortion
+  // Puddle reflections: mirror the scene above with domain-warped distortion
   vec2 reflUV = vec2(p.x, -p.y + 2.0 * horizonY);
-  float reflDistort = snoise(vec3(reflUV * 5.0, uTime * 0.5)) * 0.02;
-  reflUV += reflDistort;
+  // Multi-frequency ripple distortion for shimmer
+  float reflDistort = snoise(vec3(reflUV * 5.0 * energyFreq, uDynamicTime * 0.5)) * 0.02;
+  float reflDistort2 = snoise(vec3(reflUV * 12.0 * energyFreq, uDynamicTime * 0.8 + 3.0)) * 0.008;
+  reflUV += reflDistort + reflDistort2;
+  // Rain impact shimmer: high-frequency ripple breakup
+  float shimmer = snoise(vec3(p * 20.0 * energyFreq, uDynamicTime * 2.0)) * 0.004 * energy;
+  reflUV += shimmer;
 
   // Reflected lamp glow in puddles
   vec3 puddleRefl = vec3(0.0);
   puddleRefl += lampGlow(reflUV, lamp1Pos, lampColor1, lampIntensity * 0.5);
   puddleRefl += lampGlow(reflUV, lamp2Pos, lampColor2, lampIntensity * 0.35);
 
-  // Neon reflections in wet surface
+  // Neon reflections in wet surface — both palette colors
   float neonRefl1 = smoothstep(0.5, 0.0, length(reflUV - vec2(-0.2, 0.15)));
   float neonRefl2 = smoothstep(0.5, 0.0, length(reflUV - vec2(0.3, 0.2)));
   puddleRefl += neonColor1 * neonRefl1 * 0.15 * slowE;
   puddleRefl += neonColor2 * neonRefl2 * 0.12 * slowE;
+
+  // === SHIMMER HIGHLIGHT LAYER: specular rain-on-surface sparkle (30%) ===
+  float shimmerNoise = snoise(vec3(p * 30.0 * energyFreq, uDynamicTime * 1.5));
+  float shimmerSparkle = pow(max(0.0, shimmerNoise), 6.0) * energy;
+  vec3 shimmerColor = mix(neonColor1, neonColor2, snoise(vec3(p * 5.0, uDynamicTime * 0.3)) * 0.5 + 0.5);
+  puddleRefl += shimmerColor * shimmerSparkle * 0.3;
 
   // Wet surface: mix of dark street + reflections
   float wetness = mix(0.2, 0.6, energy) + puddleArea * 0.3;
@@ -269,7 +293,7 @@ void main() {
   float fogAmount = vocalRms * 0.3 + bass * 0.15 + 0.05;
   fogAmount *= mix(1.0, 0.3, sSpace);
   float fogHeight = smoothstep(horizonY - 0.15, horizonY + 0.08, p.y) * smoothstep(horizonY + 0.15, horizonY + 0.03, p.y);
-  float fogNoise = fbm(vec3(p.x * 2.0 + slowTime * 0.3, p.y * 3.0, slowTime * 0.15));
+  float fogNoise = fbm6(vec3(p.x * 2.0 * detailMod + slowTime * 0.3, p.y * 3.0, slowTime * 0.15));
   float fog = fogHeight * (0.3 + 0.7 * smoothstep(-0.2, 0.3, fogNoise)) * fogAmount;
 
   // Fog picks up nearby light colors
@@ -282,10 +306,16 @@ void main() {
 
   // === SDF ICON EMERGENCE ===
   {
-    float nf = fbm(vec3(p * 2.0, slowTime));
+    float nf = fbm6(vec3(p * 2.0, slowTime));
     vec3 iconLight = iconEmergence(p, uTime, energy, bass, neonColor1, neonColor2, nf, uClimaxPhase, uSectionIndex);
     col += iconLight * 0.5;
   }
+
+  // --- Secondary visual layer: wet neon reflection shimmer (30% blend) ---
+  float refShimmer = fbm3(vec3(warpedP * 5.0 * detailMod, uDynamicTime * 0.2));
+  vec3 refCol = mix(neonColor1, neonColor2, refShimmer * 0.5 + 0.5) * 0.06;
+  float refMask = isStreet * energy;
+  col += refCol * refMask * 0.3;
 
   // === VIGNETTE: strong noir vignette ===
   float vigScale = mix(0.40, 0.28, energy);

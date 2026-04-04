@@ -71,32 +71,52 @@ void main() {
 }
 `;
 
-// --- Fire particle fragment shader ---
+// --- Fire particle fragment shader — rich ember glow with heat distortion ---
 export const fireParticleFrag = /* glsl */ `
 precision highp float;
 
+uniform float uTime;
+uniform float uDynamicTime;
 uniform float uEnergy;
 uniform float uChromaHue;
 uniform float uSectionType;
+uniform float uPalettePrimary;
+uniform float uPaletteSecondary;
+uniform float uPaletteSaturation;
 
 varying float vLifeFrac;
 varying float vSeed;
 varying float vHeight;
 
+vec3 hsv2rgb(vec3 c) {
+  vec4 K = vec4(1.0, 2.0/3.0, 1.0/3.0, 3.0);
+  vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
+  return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
+}
+
 void main() {
+  float energy = clamp(uEnergy, 0.0, 1.0);
+  float energyFreq = 1.0 + energy * 0.5;
+
   // Section-type modulation
   float sType = uSectionType;
-  float jamBoost = smoothstep(4.5, 5.5, sType);      // jam=5
-  float spaceHush = smoothstep(6.5, 7.5, sType);      // space=7
-  float chorusVibe = smoothstep(2.5, 3.5, sType) * (1.0 - smoothstep(3.5, 4.5, sType)); // chorus=3
-  float soloFocus = smoothstep(3.5, 4.5, sType) * (1.0 - smoothstep(4.5, 5.5, sType));  // solo=4
+  float jamBoost = smoothstep(4.5, 5.5, sType);
+  float spaceHush = smoothstep(6.5, 7.5, sType);
+  float chorusVibe = smoothstep(2.5, 3.5, sType) * (1.0 - smoothstep(3.5, 4.5, sType));
+  float soloFocus = smoothstep(3.5, 4.5, sType) * (1.0 - smoothstep(4.5, 5.5, sType));
 
-  // Circular point
+  // Circular point with energy-responsive detail
   vec2 center = gl_PointCoord - 0.5;
   float dist = length(center);
   if (dist > 0.5) discard;
 
   float alpha = smoothstep(0.5, 0.1, dist);
+
+  // Internal ember texture — simulated heat turbulence
+  float angle = atan(center.y, center.x);
+  float internalFlicker = sin(angle * 3.0 * energyFreq + vSeed * 20.0 + uDynamicTime * 5.0) * 0.1;
+  internalFlicker += sin(angle * 7.0 + vSeed * 50.0 - uDynamicTime * 3.0) * 0.05;
+  alpha *= 0.9 + internalFlicker;
 
   // Color gradient: deep red at base -> orange -> yellow -> white at tip
   vec3 deepRed = vec3(0.8, 0.1, 0.0);
@@ -109,6 +129,11 @@ void main() {
   col = mix(col, yellow, smoothstep(0.2, 0.5, t));
   col = mix(col, white, smoothstep(0.4, 0.8, t));
 
+  // Palette color influence for show variety
+  vec3 palPrimary = hsv2rgb(vec3(uPalettePrimary, uPaletteSaturation * 0.5, 1.0));
+  vec3 palSecondary = hsv2rgb(vec3(uPaletteSecondary, uPaletteSaturation * 0.4, 0.9));
+  col = mix(col, col * palPrimary, 0.1);
+
   // Slight chroma hue accent
   col.r += uChromaHue * 0.05;
   col.g += (1.0 - uChromaHue) * 0.03;
@@ -120,7 +145,17 @@ void main() {
 
   // Intensity boost with energy
   float intensityMod = 1.0 + chorusVibe * 0.4 + jamBoost * 0.2 - spaceHush * 0.5;
-  col *= mix(0.6, 2.0, uEnergy) * intensityMod;
+  col *= mix(0.6, 2.0, energy) * intensityMod;
+
+  // === EMBER GLOW: secondary radial warmth layer (30% blend) ===
+  float glowDist = smoothstep(0.5, 0.0, dist);
+  vec3 emberGlow = mix(palSecondary, vec3(1.0, 0.6, 0.15), glowDist);
+  emberGlow *= pow(glowDist, 1.5) * energy * 0.6;
+  col += emberGlow * 0.3;
+
+  // Hot core intensification
+  float coreBrightness = pow(smoothstep(0.2, 0.0, dist), 2.0);
+  col += vec3(1.0, 0.95, 0.8) * coreBrightness * 0.25 * energy;
 
   // Space: dim to ember glow, Solo: focused warm core
   alpha *= 1.0 - spaceHush * 0.4;
@@ -176,22 +211,51 @@ void main() {
 }
 `;
 
-// --- Ember particle fragment shader ---
+// --- Ember particle fragment shader — pulsing heat glow ---
 export const emberParticleFrag = /* glsl */ `
 precision highp float;
+
+uniform float uTime;
+uniform float uDynamicTime;
+uniform float uEnergy;
+uniform float uPalettePrimary;
+uniform float uPaletteSecondary;
+uniform float uPaletteSaturation;
 
 varying float vLifeFrac;
 varying float vSeed;
 
+vec3 hsv2rgb(vec3 c) {
+  vec4 K = vec4(1.0, 2.0/3.0, 1.0/3.0, 3.0);
+  vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
+  return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
+}
+
 void main() {
+  float energy = clamp(uEnergy, 0.0, 1.0);
   vec2 center = gl_PointCoord - 0.5;
   float dist = length(center);
   if (dist > 0.5) discard;
 
   float alpha = smoothstep(0.5, 0.0, dist);
 
-  // Bright orange-yellow ember
-  vec3 col = mix(vec3(1.0, 0.6, 0.1), vec3(1.0, 0.9, 0.3), vSeed);
+  // Bright orange-yellow ember with palette influence
+  vec3 warmEmber = mix(vec3(1.0, 0.6, 0.1), vec3(1.0, 0.9, 0.3), vSeed);
+  vec3 palTint = hsv2rgb(vec3(uPalettePrimary, uPaletteSaturation * 0.3, 1.0));
+  vec3 col = mix(warmEmber, palTint, 0.1);
+
+  // Pulsing glow — embers throb with inner heat
+  float pulse = 0.85 + 0.15 * sin(uDynamicTime * 4.0 + vSeed * 30.0);
+  col *= pulse;
+
+  // Hot white-hot core at center
+  float coreBright = smoothstep(0.2, 0.0, dist);
+  col += vec3(1.0, 0.95, 0.85) * coreBright * 0.3 * energy;
+
+  // Secondary warmth halo (30% blend)
+  vec3 haloColor = hsv2rgb(vec3(uPaletteSecondary, uPaletteSaturation * 0.4, 0.8));
+  float halo = smoothstep(0.5, 0.15, dist) * (1.0 - smoothstep(0.15, 0.0, dist));
+  col += haloColor * halo * 0.3;
 
   // Fade over lifetime
   alpha *= smoothstep(1.0, 0.5, vLifeFrac);
@@ -242,23 +306,45 @@ void main() {
 }
 `;
 
-// --- Smoke particle fragment shader ---
+// --- Smoke particle fragment shader — volumetric wispy smoke ---
 export const smokeParticleFrag = /* glsl */ `
 precision highp float;
+
+uniform float uDynamicTime;
+uniform float uEnergy;
+uniform float uPaletteSecondary;
+uniform float uPaletteSaturation;
 
 varying float vLifeFrac;
 varying float vAlpha;
 
+vec3 hsv2rgb(vec3 c) {
+  vec4 K = vec4(1.0, 2.0/3.0, 1.0/3.0, 3.0);
+  vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
+  return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
+}
+
 void main() {
+  float energy = clamp(uEnergy, 0.0, 1.0);
   vec2 center = gl_PointCoord - 0.5;
   float dist = length(center);
   if (dist > 0.5) discard;
 
-  // Soft circular falloff
-  float alpha = smoothstep(0.5, 0.1, dist) * vAlpha;
+  // Soft circular falloff with wispy edge detail
+  float angle = atan(center.y, center.x);
+  float edgeWisp = sin(angle * 5.0 + vLifeFrac * 10.0 + uDynamicTime * 0.5) * 0.04;
+  float adjustedDist = dist + edgeWisp;
+  float alpha = smoothstep(0.5, 0.1, adjustedDist) * vAlpha;
 
-  // Gray-white smoke
+  // Gray-white smoke with subtle warm undertone from fire below
   vec3 col = mix(vec3(0.3, 0.28, 0.25), vec3(0.5, 0.48, 0.45), vLifeFrac);
+  // Fire-lit underside: warm glow at base, cool gray at top
+  vec3 fireUnderglow = vec3(0.25, 0.12, 0.04) * (1.0 - vLifeFrac) * energy;
+  col += fireUnderglow * 0.3;
+
+  // Palette tint for variety
+  vec3 palTint = hsv2rgb(vec3(uPaletteSecondary, uPaletteSaturation * 0.08, 0.4));
+  col = mix(col, palTint, 0.1 * vLifeFrac);
 
   gl_FragColor = vec4(col, alpha * 0.25);
 }

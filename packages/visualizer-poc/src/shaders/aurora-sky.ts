@@ -74,18 +74,23 @@ float mountainSilhouette(float x, float time) {
 mat2 auroraRot = mat2(0.80, 0.60, -0.60, 0.80);
 
 float auroraCurtainFBM(vec3 p, float complexity, float turbulence) {
-  int octaves = 3 + int(complexity * 4.0);
+  int octaves = 4 + int(complexity * 4.0);
   float val = 0.0;
   float amp = 0.5;
   float freq = 1.0;
-  for (int i = 0; i < 7; i++) {
+  // Domain warp for organic curtain folds
+  float warpX = snoise(p * 0.3 + vec3(7.0, 0.0, 3.0)) * 0.3;
+  float warpZ = snoise(p * 0.25 + vec3(0.0, 11.0, 5.0)) * 0.25;
+  p.x += warpX;
+  p.z += warpZ;
+  for (int i = 0; i < 8; i++) {
     if (i >= octaves) break;
     val += amp * snoise(p * freq);
     p.xz = auroraRot * p.xz;
     p.y *= 1.15;
     p.x += turbulence * 0.15 * float(i);
-    freq *= 2.2;
-    amp *= 0.48;
+    freq *= 2.15;
+    amp *= 0.46;
   }
   return val;
 }
@@ -111,9 +116,14 @@ void main() {
   float sChorus = smoothstep(1.5, 2.5, sectionT) * (1.0 - step(2.5, sectionT));
   float sSolo = smoothstep(3.5, 4.5, sectionT) * (1.0 - step(4.5, sectionT));
 
+  // --- Domain warping + detail ---
+  vec2 warpedP = p + vec2(fbm3(vec3(p * 0.5, uDynamicTime * 0.05)), fbm3(vec3(p * 0.5 + 100.0, uDynamicTime * 0.05))) * 0.3;
+  float detailMod = 1.0 + energy * 0.5;
+
   // --- Timing ---
   float slowTime = uDynamicTime * 0.06;
   float driftSpeed = (0.04 + slowE * 0.03) * mix(1.0, 2.0, sJam) * mix(1.0, 0.3, sSpace);
+  float energyFreq = 1.0 + energy * 0.5;
 
   // === SKY GRADIENT: deep night sky ===
   vec3 skyColor = mix(
@@ -187,8 +197,12 @@ void main() {
 
     // Curtain density from FBM
     // Vertically stretch: multiply y to create vertical curtain structure
-    vec3 curtainPos = vec3(pos.x * 0.4, pos.y * 2.5, pos.z * 0.5);
+    vec3 curtainPos = vec3(pos.x * 0.4 * energyFreq, pos.y * 2.5, pos.z * 0.5);
     float density = auroraCurtainFBM(curtainPos, flux, onset * 1.0 + uHarmonicTension * 0.2);
+
+    // Secondary fine-detail curtain fold layer (30% blend)
+    float fineDetail = auroraCurtainFBM(curtainPos * 2.5 + vec3(20.0, 0.0, 10.0), flux * 0.5, 0.0);
+    density += fineDetail * 0.3;
 
     density = smoothstep(-0.15, 0.35, density);
 
@@ -255,6 +269,12 @@ void main() {
   // Faint aurora glow on mountain tops
   mountainCol += auroraGreen * auroraIntensity * 0.03 * smoothstep(mountainY - 0.02, mountainY, p.y + 0.5);
   col = mix(col, mountainCol, mountainMask);
+
+  // --- Secondary visual layer: atmospheric color shimmer (30% blend) ---
+  float shimmerNoise = fbm3(vec3(warpedP * 3.0 * detailMod, slowTime * 0.3));
+  vec3 shimmerCol = mix(auroraGreen, auroraPurple, shimmerNoise * 0.5 + 0.5) * 0.08;
+  float shimmerMask = smoothstep(-0.1, 0.3, p.y) * (1.0 - mountainMask);
+  col += shimmerCol * shimmerMask * 0.3 * energy;
 
   // === VIGNETTE ===
   float vigScale = mix(0.25, 0.20, energy);

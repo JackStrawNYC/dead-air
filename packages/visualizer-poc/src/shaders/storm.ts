@@ -46,6 +46,11 @@ float stormCloudFBM(vec3 p, int octaves) {
   float val = 0.0;
   float amp = 0.5;
   float freq = 1.0;
+  // Domain warp for turbulent cloud structure
+  float wx = snoise(p * 0.25 + vec3(5.0, 0.0, 3.0)) * 0.35;
+  float wz = snoise(p * 0.2 + vec3(0.0, 7.0, 11.0)) * 0.3;
+  p.x += wx;
+  p.z += wz;
   for (int i = 0; i < 8; i++) {
     if (i >= octaves) break;
     val += amp * snoise(p * freq);
@@ -151,6 +156,12 @@ void main() {
   float slowTime = uDynamicTime * 0.1;
   float cloudSpeed = (0.05 + energy * 0.08 + flux * 0.04) * mix(1.0, 1.6, sJam) * mix(1.0, 0.3, sSpace);
 
+  // --- Domain warping + palette ---
+  vec2 warpedP = p + vec2(fbm3(vec3(p * 0.5, uDynamicTime * 0.05)), fbm3(vec3(p * 0.5 + 100.0, uDynamicTime * 0.05))) * 0.3;
+  float detailMod = 1.0 + energy * 0.5;
+  vec3 palCol1 = hsv2rgb(vec3(uPalettePrimary, 0.7 * uPaletteSaturation, 0.8));
+  vec3 palCol2 = hsv2rgb(vec3(uPaletteSecondary, 0.6 * uPaletteSaturation, 0.75));
+
   // === CLIMAX ===
   float isClimax = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5);
   float climaxBoost = isClimax * uClimaxIntensity;
@@ -161,31 +172,44 @@ void main() {
   // === CLOUD LAYER: top 60% ===
   float cloudY = smoothstep(-0.1, 0.15, p.y); // clouds exist above this line
 
+  float energyFreq = 1.0 + energy * 0.5;
+
   if (cloudY > 0.01) {
-    // Cloud density from layered FBM
+    // Cloud density from layered FBM — energy-responsive frequency
     int cloudOctaves = 4 + int(energy * 2.0) + int(sJam * 2.0);
-    vec3 cloudPos = vec3(p.x * 1.5, p.y * 0.8 + slowTime * cloudSpeed, slowTime * cloudSpeed * 0.3);
+    vec3 cloudPos = vec3(p.x * 1.5 * energyFreq, p.y * 0.8 + slowTime * cloudSpeed, slowTime * cloudSpeed * 0.3);
     float cloudDensity = stormCloudFBM(cloudPos, cloudOctaves);
 
-    // Second layer: slower, larger scale
+    // Second layer: slower, larger scale for massive cloud structure
     float cloudDensity2 = stormCloudFBM(cloudPos * 0.4 + vec3(10.0, slowTime * cloudSpeed * 0.2, 5.0), cloudOctaves - 1);
 
-    float cloud = smoothstep(-0.1, 0.4, cloudDensity) * 0.7 + smoothstep(-0.05, 0.3, cloudDensity2) * 0.3;
+    // Third layer: fine detail wisps at cloud edges (30% secondary layer)
+    float cloudWisps = stormCloudFBM(cloudPos * 3.0 + vec3(30.0, 0.0, 15.0), min(cloudOctaves, 5));
+    float wispMask = smoothstep(0.2, 0.5, cloudDensity) * (1.0 - smoothstep(0.5, 0.8, cloudDensity));
+
+    float cloud = smoothstep(-0.1, 0.4, cloudDensity) * 0.6
+                + smoothstep(-0.05, 0.3, cloudDensity2) * 0.25
+                + smoothstep(0.1, 0.5, cloudWisps) * wispMask * 0.3;
     cloud *= cloudY;
 
-    // Cloud color: dark gray with subtle purple/blue glow
-    vec3 cloudColor = vec3(0.03, 0.025, 0.04);
+    // Cloud color: palette-tinted with subtle purple/blue glow
+    vec3 cloudColor = mix(vec3(0.03, 0.025, 0.04), palCol1 * 0.05, 0.2);
     // Purple underglow from ambient electrical charge
     float purpleGlow = slowE * 0.08 + energy * 0.04;
-    cloudColor += vec3(0.04, 0.01, 0.06) * purpleGlow;
+    cloudColor += mix(vec3(0.04, 0.01, 0.06), palCol2 * 0.08, 0.15) * purpleGlow;
     // Jam: more purple rumble
     cloudColor += vec3(0.03, 0.01, 0.05) * sJam * 0.3;
 
     col = mix(col, cloudColor, cloud);
 
-    // Cloud edge highlights (subtle)
+    // Cloud edge highlights — rich multi-tone
     float edgeLight = smoothstep(0.3, 0.5, cloudDensity) * (1.0 - smoothstep(0.5, 0.7, cloudDensity));
-    col += vec3(0.06, 0.04, 0.08) * edgeLight * cloud * (0.3 + energy * 0.4);
+    vec3 edgeColor = mix(vec3(0.06, 0.04, 0.08), palCol2 * 0.1, 0.2);
+    col += edgeColor * edgeLight * cloud * (0.3 + energy * 0.4);
+
+    // Cloud depth: darker cores, lighter edges for volumetric feel
+    float coreDepth = smoothstep(0.5, 0.8, cloudDensity);
+    col -= vec3(0.01, 0.008, 0.015) * coreDepth * cloud;
   }
 
   // === LIGHTNING ===
@@ -284,6 +308,12 @@ void main() {
   float vignette = 1.0 - dot(p * vigScale, p * vigScale);
   vignette = smoothstep(0.0, 1.0, vignette);
   col = mix(vec3(0.005, 0.005, 0.01), col, vignette);
+
+  // --- Secondary visual layer: atmospheric electrical field (30% blend) ---
+  float elecNoise = fbm3(vec3(warpedP * 3.0 * detailMod, uDynamicTime * 0.15));
+  vec3 elecCol = mix(palCol1, palCol2, elecNoise * 0.5 + 0.5) * 0.08;
+  float elecMask = smoothstep(-0.1, 0.2, p.y) * energy;
+  col += elecCol * elecMask * 0.3;
 
   // === DARKNESS TEXTURE ===
   col += darknessTexture(uv, uTime, energy);

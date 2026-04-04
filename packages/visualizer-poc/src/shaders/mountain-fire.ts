@@ -114,18 +114,36 @@ void main() {
   float energy = clamp(uEnergy, 0.0, 1.0);
   float fireIntensityMod = 1.0 + jamBoost * 0.5 + chorusVibe * 0.3 - spaceHush * 0.6;
 
+  float energyFreq = 1.0 + energy * 0.5;
+
   // Dark silhouette colors with depth layering
   vec3 nearColor = vec3(0.005, 0.004, 0.012);
   vec3 farColor = vec3(0.015, 0.012, 0.025);
   vec3 baseColor = mix(nearColor, farColor, uLayerDepth);
 
+  // === LAVA VEIN TEXTURE: molten cracks across mountain face ===
+  float veinNoise = sin(vUv.y * 40.0 * energyFreq + vUv.x * 15.0) * 0.5 + 0.5;
+  float veinFine = sin(vUv.y * 80.0 + vUv.x * 25.0 + 3.0) * 0.5 + 0.5;
+  float veinMask = pow(veinNoise * veinFine, 3.0) * energy * (1.0 - uLayerDepth * 0.7);
+  // Lava glow in veins: deep orange-red with palette influence
+  vec3 lavaColor = uFireColor * 1.5;
+  lavaColor = mix(lavaColor, vec3(1.0, 0.4, 0.05), 0.3);
+  baseColor += lavaColor * veinMask * 0.2 * fireIntensityMod;
+
   // Fire illumination on mountain face — modulated by section type
   vec3 fireIllum = uFireColor * energy * 0.08 * fireIntensityMod;
   baseColor += fireIllum * mix(0.15, 0.5, uLayerDepth);
 
+  // === SECONDARY DEPTH LAYER: atmospheric haze between mountain layers (30%) ===
+  float hazeFactor = uLayerDepth * 0.3;
+  vec3 hazeColor = uFireColor * 0.15 + vec3(0.02, 0.01, 0.03);
+  baseColor = mix(baseColor, hazeColor, hazeFactor * energy);
+
   // Rim lighting near mountain edge (top) — jam/chorus amplify rim glow
   float rimGlow = (1.0 - vEdgeDist) * energy * fireIntensityMod;
   vec3 rimColor = uFireColor * rimGlow * 0.4;
+  // Rim gets richer with a secondary hot-white edge
+  rimColor += vec3(1.0, 0.85, 0.5) * pow(rimGlow, 2.0) * 0.15;
 
   // Solo: focused lava glow concentrated in nearest ridge
   rimColor += uFireColor * soloFocus * 0.15 * (1.0 - uLayerDepth);
@@ -439,7 +457,9 @@ void main() {
   float slowE = clamp(uSlowEnergy, 0.0, 1.0);
   float energy = clamp(uEnergy, 0.0, 1.0);
 
-  // Sky gradient: deep blue/purple at rest → red/orange at peaks
+  float energyFreq = 1.0 + energy * 0.5;
+
+  // Sky gradient: deep blue/purple at rest -> red/orange at peaks
   vec3 skyQuiet = vec3(0.01, 0.015, 0.06);
   vec3 skyMid = vec3(0.06, 0.02, 0.04);
   vec3 skyHot = vec3(0.15, 0.04, 0.02);
@@ -448,8 +468,21 @@ void main() {
   vec3 col = mix(skyQuiet, skyMid, skyMix);
   col = mix(col, skyHot, smoothstep(0.5, 1.0, energy));
 
+  // === VOLCANIC ASH/SMOKE CLOUDS: secondary atmospheric layer (30%) ===
+  float cloudSeed = vUv.x * 3.0 * energyFreq + slowTime * 0.08;
+  float ashCloud = sin(cloudSeed) * sin(vUv.y * 4.0 + slowTime * 0.05);
+  ashCloud += sin(cloudSeed * 2.3 + 5.0) * sin(vUv.y * 7.0 - slowTime * 0.03) * 0.4;
+  ashCloud = smoothstep(0.1, 0.6, ashCloud * 0.5 + 0.5);
+  float ashMask = smoothstep(0.0, 0.4, vUv.y) * smoothstep(0.8, 0.5, vUv.y);
+  vec3 ashColor = mix(vec3(0.04, 0.02, 0.03), skyHot * 0.3, energy * 0.5);
+  col = mix(col, ashColor, ashCloud * ashMask * 0.3 * energy);
+
   // Darker at top
   col *= mix(0.6, 1.0, smoothstep(1.0, 0.0, vUv.y));
+
+  // === FIRE GLOW on horizon: warm underlight from eruption ===
+  float horizonGlow = exp(-pow(vUv.y * 6.0, 2.0));
+  col += skyHot * horizonGlow * energy * 0.15;
 
   // Stars visible during quiet
   float starFade = 1.0 - smoothstep(0.15, 0.6, energy);
