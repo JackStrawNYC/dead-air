@@ -71,6 +71,10 @@ void main() {
   float fftHigh = texture2D(uFFTTexture, vec2(0.78, 0.5)).r;
 
   float slowTime = uDynamicTime * 0.08;
+  float energyFreq = 1.0 + energy * 0.5;
+
+  // --- Domain warping: organic displacement before folding ---
+  p += vec2(fbm3(vec3(p * 0.5 * energyFreq, uDynamicTime * 0.05)), fbm3(vec3(p * 0.5 * energyFreq + 100.0, uDynamicTime * 0.05))) * 0.3;
 
   // --- Phase 1 uniform integrations ---
   float vocalWarmth = uVocalEnergy * 0.12;
@@ -168,10 +172,10 @@ void main() {
   float warpAmp = (0.3 + bass * 0.8 + tension * 0.4) * accelBoost;
   float warpFreq = 2.0 + tension * 2.0 + otherShimmer;
 
-  // Multi-layer domain warp: fold coordinates through noise space
-  vec3 warpInput = vec3(folded * warpFreq, slowTime * 0.6);
-  float warp1 = fbm(warpInput) * warpAmp;
-  float warp2 = fbm(warpInput + vec3(warp1 * 1.5, warp1 * 0.7, 0.3)) * warpAmp * 0.6;
+  // Multi-layer domain warp: fold coordinates through noise space (fbm6 for rich primary pattern)
+  vec3 warpInput = vec3(folded * warpFreq * energyFreq, slowTime * 0.6);
+  float warp1 = fbm6(warpInput) * warpAmp;
+  float warp2 = fbm6(warpInput + vec3(warp1 * 1.5, warp1 * 0.7, 0.3)) * warpAmp * 0.6;
 
   vec2 warped = folded + vec2(warp1, warp2);
 
@@ -190,8 +194,8 @@ void main() {
   float hue2 = uPaletteSecondary + chordHue * 0.5;
   float sat = mix(0.4, 1.0, energy) * uPaletteSaturation;
 
-  // Pattern layers: overlapping noise fields in warped space
-  float pattern1 = fbm(vec3(warped * 3.0, slowTime * 0.4));
+  // Pattern layers: overlapping noise fields in warped space (fbm6 for primary)
+  float pattern1 = fbm6(vec3(warped * 3.0 * energyFreq, slowTime * 0.4));
   float pattern2 = fbm3(vec3(warped * 5.0 + 20.0, slowTime * 0.7));
   float pattern3 = snoise(vec3(warped * 8.0 + 40.0, slowTime * 1.2));
 
@@ -221,6 +225,11 @@ void main() {
   float centerGlow = exp(-radius * radius * 20.0);
   vec3 coreColor = hsv2rgb(vec3(hue1 + vocalWarmth, sat, 1.0));
   col += coreColor * centerGlow * (0.3 + bass * 0.5);
+
+  // --- Secondary depth layer: secondary palette underpainting ---
+  float depthWarp = fbm6(vec3(warped * 1.5 + vec2(slowTime * 0.03), slowTime * 0.04 + 60.0));
+  vec3 depthCol = hsv2rgb(vec3(hue2 + depthWarp * 0.12, sat * 0.5, 0.2 + depthWarp * 0.15));
+  col = mix(col, col + depthCol, 0.3);
 
   // --- Ridged detail layer: sharp crystalline edges in the pattern ---
   float ridged = ridged4(vec3(warped * 4.0, slowTime * 0.3));

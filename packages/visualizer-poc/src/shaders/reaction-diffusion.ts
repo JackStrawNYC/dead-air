@@ -70,6 +70,10 @@ void main() {
   float effectiveBeat = uBeatSnap * smoothstep(0.3, 0.7, uBeatConfidence);
 
   float slowTime = uDynamicTime * 0.04 * (1.0 + uPeakApproaching * 0.3);
+  float energyFreq = 1.0 + energy * 0.5;
+
+  // --- Domain warping: organic displacement ---
+  p += vec2(fbm3(vec3(p * 0.5 * energyFreq, uDynamicTime * 0.05)), fbm3(vec3(p * 0.5 * energyFreq + 100.0, uDynamicTime * 0.05))) * 0.3;
 
   // --- Section type modulation (0=intro,1=verse,2=chorus,3=bridge,4=solo,5=jam,6=outro,7=space) ---
   float sectionT = uSectionType;
@@ -124,17 +128,17 @@ void main() {
   ripple += effectiveBeat * sin(distFromCenter * 12.0) * exp(-distFromCenter * 2.0) * 0.5;
   patternUv += vec2(ripple * 0.15);
 
-  // --- Layer 1: Low frequency FBM (base Turing pattern) ---
+  // --- Layer 1: Low frequency FBM (base Turing pattern, fbm6 for rich primary) ---
   // Domain warp creates the organic reaction-diffusion flow
-  vec2 warped1 = domainWarp(patternUv, 1.0, 0.8 * mix(0.5, 1.0, 1.0 - stability), slowTime * 0.7);
+  vec2 warped1 = domainWarp(patternUv, 1.0 * energyFreq, 0.8 * mix(0.5, 1.0, 1.0 - stability), slowTime * 0.7);
   float lowFBM = fbm6(vec3(warped1, slowTime * 0.3));
 
-  // --- Layer 2: Mid frequency FBM (detail structure) ---
-  vec2 warped2 = domainWarp(patternUv * 2.0, 1.5, 0.4, slowTime * 1.1);
-  float midFBM = fbm3(vec3(warped2, slowTime * 0.5 + 3.7));
+  // --- Layer 2: Mid frequency FBM (detail structure, fbm6 for depth) ---
+  vec2 warped2 = domainWarp(patternUv * 2.0, 1.5 * energyFreq, 0.4, slowTime * 1.1);
+  float midFBM = fbm6(vec3(warped2, slowTime * 0.5 + 3.7));
 
   // --- Layer 3: High frequency FBM (micro-texture) ---
-  float highFBM = fbm3(vec3(patternUv * 5.0 + vec2(midFBM * 0.3), slowTime * 0.9 + 7.1));
+  float highFBM = fbm3(vec3(patternUv * 5.0 * energyFreq + vec2(midFBM * 0.3), slowTime * 0.9 + 7.1));
 
   // --- Combine layers into Turing-like pattern ---
   // Mix between spots and stripes based on kill rate analog
@@ -187,6 +191,11 @@ void main() {
 
   // High-frequency micro-texture adds depth
   col += cellColor * highFBM * 0.08 * stableCellMask;
+
+  // --- Secondary depth layer: fbm6 organic undertone between cells ---
+  float depthField = fbm6(vec3(patternUv * 0.8 + vec2(slowTime * 0.03), slowTime * 0.05 + 55.0));
+  vec3 depthColor = hsv2rgb(vec3(hue2 + depthField * 0.1, sat * 0.4, 0.1 + depthField * 0.12));
+  col = mix(col, col + depthColor, 0.3 * (1.0 - stableCellMask));
 
   // --- Onset disruption flash ---
   float disruptionGlow = onset * exp(-distFromCenter * 2.0) * 1.5;

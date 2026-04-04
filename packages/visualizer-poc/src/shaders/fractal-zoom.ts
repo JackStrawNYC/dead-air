@@ -48,6 +48,7 @@ vec3 fractalPalette(float t, float hueShift) {
 
 void main() {
   float energy = clamp(uEnergy, 0.0, 1.0);
+  float energyFreq = 1.0 + energy * 0.5;
   float zoomDensity = 1.0 + (uJamDensity - 0.5) * 0.6;
   // Determine iteration count: 96 during climax, 64 normally
   int maxIter = uClimaxPhase > 1.5 ? 96 : int(64.0 * zoomDensity);
@@ -112,14 +113,24 @@ void main() {
 
   // Color mapping
   float hueShift = uChromaHue / 360.0 + float(uChordIndex) * 0.083;
+  // Domain warp the fractal coordinates for organic feel
+  vec2 warpedPos = pos + vec2(fbm3(vec3(pos * 0.5 * energyFreq, uDynamicTime * 0.05)), fbm3(vec3(pos * 0.5 * energyFreq + 100.0, uDynamicTime * 0.05))) * 0.002 / max(zoom * 0.001, 0.0001);
   vec3 col;
 
   if (s < 0.0) {
-    // Inside the set: dark with subtle energy glow
-    col = vec3(0.01) + vec3(uEnergy * 0.05, 0.0, uEnergy * 0.02);
+    // Inside the set: organic nebula from fbm6 instead of flat dark
+    float nebulaVal = fbm6(vec3(pos * 2.0 * energyFreq, uDynamicTime * 0.03));
+    vec3 nebPrimary = hsv2rgb(vec3(uPalettePrimary + nebulaVal * 0.1, 0.6 * uPaletteSaturation, 0.08 + nebulaVal * 0.06));
+    vec3 nebSecondary = hsv2rgb(vec3(uPaletteSecondary + nebulaVal * 0.08, 0.4 * uPaletteSaturation, 0.04 + nebulaVal * 0.04));
+    col = mix(nebPrimary, nebSecondary, nebulaVal * 0.5 + 0.5) + vec3(uEnergy * 0.03);
   } else {
     float t = s / float(maxIter);
     col = fractalPalette(t * 3.0 + uDynamicTime * 0.02, hueShift);
+
+    // Dual palette blending: primary for outer, secondary for deep iterations
+    vec3 palPrimary = hsv2rgb(vec3(uPalettePrimary + t * 0.15, 0.8 * uPaletteSaturation, 0.8));
+    vec3 palSecondary = hsv2rgb(vec3(uPaletteSecondary + t * 0.1, 0.7 * uPaletteSaturation, 0.7));
+    col = mix(col, mix(palPrimary, palSecondary, t), 0.35);
 
     // Bass drives saturation pulse
     float bassPulse = uBass * 0.4;
@@ -128,6 +139,11 @@ void main() {
 
     // Energy drives brightness
     col *= 0.7 + uEnergy * 0.6;
+
+    // Secondary depth layer: fbm6 nebular glow underneath the fractal
+    float depthGlow = fbm6(vec3(pos * 0.8, uDynamicTime * 0.02 + 55.0));
+    vec3 depthCol = hsv2rgb(vec3(uPaletteSecondary + depthGlow * 0.1, 0.5 * uPaletteSaturation, 0.12 + depthGlow * 0.1));
+    col += depthCol * 0.3;
   }
 
 

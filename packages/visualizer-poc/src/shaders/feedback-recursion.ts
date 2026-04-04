@@ -72,6 +72,10 @@ void main() {
   float chordHue = float(int(uChordIndex)) / 24.0 * 0.15 * chordConf;
   float vocalWarmth = uVocalEnergy * 0.1;
   float accelBoost = 1.0 + uEnergyAccel * 0.12;
+  float energyFreq = 1.0 + energy * 0.5;
+
+  // --- Domain warping: organic distortion of feedback space ---
+  p += vec2(fbm3(vec3(p * 0.5 * energyFreq, uDynamicTime * 0.05)), fbm3(vec3(p * 0.5 * energyFreq + 100.0, uDynamicTime * 0.05))) * 0.3;
 
   // --- Section type modulation (0=intro,1=verse,2=chorus,3=bridge,4=solo,5=jam,6=outro,7=space) ---
   float sectionT = uSectionType;
@@ -162,12 +166,17 @@ void main() {
   vec3 seedColor1 = hsv2rgb(vec3(hue1, sat, 1.0));
   vec3 seedColor2 = hsv2rgb(vec3(hue2, sat * 0.8, 0.8));
 
-  // Noise texture for organic variation
-  float noiseVal = fbm3(vec3(p * 4.0 + seedDrift, slowTime * 0.8));
+  // Noise texture for organic variation (fbm6 for rich primary pattern)
+  float noiseVal = fbm6(vec3(p * 4.0 * energyFreq + seedDrift, slowTime * 0.8));
   float patternMix = noiseVal * 0.5 + 0.5;
 
   vec3 seedPattern = mix(seedColor1, seedColor2, patternMix) * radialGlow * 0.3;
   seedPattern += seedColor1 * rings * 0.2;
+
+  // --- Secondary warmth layer: dual-palette depth underneath recursion ---
+  float warmthField = fbm6(vec3(p * 1.5 + vec2(slowTime * 0.03, -slowTime * 0.02), slowTime * 0.04 + 44.0));
+  vec3 warmthColor = hsv2rgb(vec3(hue2 + warmthField * 0.1, sat * 0.5, 0.15 + warmthField * 0.12));
+  seedPattern = mix(seedPattern, seedPattern + warmthColor, 0.3);
 
   // Vocal warmth adds to seed
   seedPattern += seedColor2 * vocalWarmth * radialGlow;

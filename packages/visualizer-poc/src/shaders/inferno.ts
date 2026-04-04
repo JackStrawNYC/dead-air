@@ -131,6 +131,10 @@ void main() {
   float isClimax = step(1.5, climaxPhase) * step(climaxPhase, 3.5);
   float climaxBoost = isClimax * climaxI;
 
+  // --- Domain warping: organic fire distortion ---
+  float energyFreq = 1.0 + energy * 0.5;
+  p += vec2(fbm3(vec3(p * 0.5 * energyFreq, uDynamicTime * 0.05)), fbm3(vec3(p * 0.5 * energyFreq + 100.0, uDynamicTime * 0.05))) * 0.3;
+
   // === HEAT SHIMMER: UV distortion from onset hits ===
   vec2 shimmerUv = p;
   float shimmerStrength = onset * 0.08 + bass * 0.02 + effectiveBeat * 0.05 + uFastEnergy * 0.06;
@@ -231,8 +235,8 @@ void main() {
   // The fire SDF only hits at specific angles — most of the screen misses it.
   // This wide noise-based glow ensures every pixel reads as warm firelight.
   // Must produce col > 0.5 to dominate over screen-blended overlays.
-  float fireNoise1 = fbm3(vec3(p * 0.6, uDynamicTime * 0.05)) * 0.5 + 0.5;
-  float fireNoise2 = snoise(vec3(p * 2.0 + 20.0, uDynamicTime * 0.08)) * 0.5 + 0.5;
+  float fireNoise1 = fbm6(vec3(p * 0.6 * energyFreq, uDynamicTime * 0.05)) * 0.5 + 0.5;
+  float fireNoise2 = fbm6(vec3(p * 2.0 * energyFreq + 20.0, uDynamicTime * 0.08)) * 0.5 + 0.5;
   vec3 warmBase = mix(flameColor, coreColor, fireNoise2 * 0.3);
   // Ambient firelight: subtle warmth, not a wash
   float fireLightStr = (0.06 + energy * 0.12) * (0.70 + fireNoise1 * 0.30);
@@ -246,6 +250,11 @@ void main() {
     vec3 c2 = hsv2rgb(vec3(hue2, uPaletteSaturation, 1.0));
     col += heroIconEmergence(p, uTime, energy, bass, c1, c2, nf, uSectionIndex);
   }
+
+  // --- Secondary depth layer: deep ember field from secondary palette ---
+  float emberDepth = fbm6(vec3(p * 1.2 + vec2(uDynamicTime * 0.02, -uDynamicTime * 0.015), uDynamicTime * 0.03 + 88.0));
+  vec3 emberDeepColor = hsv2rgb(vec3(hue2 + emberDepth * 0.08, uPaletteSaturation * 0.5, 0.08 + emberDepth * 0.1));
+  col = mix(col, col + emberDeepColor, 0.3);
 
   // Dynamic range → flame contrast
   float flameContrast = mix(0.8, 1.3, uDynamicRange);

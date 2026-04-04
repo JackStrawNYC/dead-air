@@ -111,6 +111,10 @@ void main() {
   float chromaHueMod = uChromaHue * 0.15;
   float chordHue = float(int(uChordIndex)) / 24.0;
   float accelBoost = 1.0 + uEnergyAccel * 0.1;
+  float energyFreq = 1.0 + energy * 0.5;
+
+  // --- Domain warping: organic optical distortion ---
+  p += vec2(fbm3(vec3(p * 0.5 * energyFreq, uDynamicTime * 0.05)), fbm3(vec3(p * 0.5 * energyFreq + 100.0, uDynamicTime * 0.05))) * 0.3;
 
   // Section-type modulation
   float sectionT = uSectionType;
@@ -121,8 +125,12 @@ void main() {
   float sourceCountMod = mix(1.0, 1.4, sJam) * mix(1.0, 0.5, sSpace) * mix(1.0, 1.2, sChorus);
   float rippleSpeedMod = mix(1.0, 1.5, sJam) * mix(1.0, 0.35, sSpace) * mix(1.0, 1.15, sChorus);
 
-  // --- Background ---
+  // --- Background: fbm6 optical substrate for depth ---
   vec3 col = vec3(0.01, 0.008, 0.015);
+  float opticalField = fbm6(vec3(p * 2.0 * energyFreq, slowTime * 0.15));
+  vec3 optPrimary = hsv2rgb(vec3(uPalettePrimary + opticalField * 0.08, 0.2 * uPaletteSaturation, 0.02 + opticalField * 0.03));
+  vec3 optSecondary = hsv2rgb(vec3(uPaletteSecondary + opticalField * 0.06, 0.15 * uPaletteSaturation, 0.015 + opticalField * 0.02));
+  col += mix(optPrimary, optSecondary, opticalField * 0.5 + 0.5);
 
   // --- Interference source positions ---
   // Number of sources scales with energy (3-5, section-modulated)
@@ -217,12 +225,19 @@ void main() {
     col += rippleColor * ripple * onset * 0.5;
   }
 
-  // --- Palette tinting ---
+  // --- Palette tinting (dual palette) ---
   float hue1 = uPalettePrimary + chromaHueMod;
   float hue2 = uPaletteSecondary;
   float sat = uPaletteSaturation;
-  vec3 tint = hsv2rgb(vec3(hue1, sat * 0.3, 1.0));
-  col *= mix(vec3(1.0), tint, 0.2);
+  vec3 tint1 = hsv2rgb(vec3(hue1, sat * 0.3, 1.0));
+  vec3 tint2 = hsv2rgb(vec3(hue2, sat * 0.25, 0.9));
+  float tintMix = fbm3(vec3(p * 1.5, slowTime * 0.1));
+  col *= mix(vec3(1.0), mix(tint1, tint2, tintMix * 0.5 + 0.5), 0.25);
+
+  // --- Secondary depth layer: fbm6 iridescent undertone ---
+  float iridescentField = fbm6(vec3(p * 1.2 + vec2(slowTime * 0.03), slowTime * 0.05 + 77.0));
+  vec3 iridescentColor = hsv2rgb(vec3(hue2 + iridescentField * 0.15, sat * 0.5, 0.1 + iridescentField * 0.12));
+  col = mix(col, col + iridescentColor, 0.3);
 
   // --- Climax boost ---
   float isClimax = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5);

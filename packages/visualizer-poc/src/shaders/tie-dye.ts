@@ -44,6 +44,10 @@ void main() {
   float t = uDynamicTime * 0.15 * (0.8 + uBass * 0.6 + uFastBass * 0.4) * sectionSpeed;
   float bassSwirl = uBass * 1.5 * mix(1.0, 1.3, sJam) * mix(1.0, 0.2, sSpace);
 
+  // === DOMAIN WARPING: deep organic displacement ===
+  float energyFreq = 1.0 + uEnergy * 0.5;
+  uv += vec2(fbm3(vec3(uv * 0.5 * energyFreq, uDynamicTime * 0.05)), fbm3(vec3(uv * 0.5 * energyFreq + 100.0, uDynamicTime * 0.05))) * 0.3;
+
   // === CURL NOISE UV WARPING: simulate fabric wrinkles ===
   vec2 warpedUv = uv + curlNoise(vec3(uv * 2.0, uDynamicTime * 0.08)).xy * 0.15;
 
@@ -51,9 +55,9 @@ void main() {
   float r = length(warpedUv);
   float angle = atan(warpedUv.y, warpedUv.x);
 
-  // Domain warping — noise-based spiral distortion
-  float warp1 = fbm3(vec3(warpedUv * 2.0 + t * 0.3, t * 0.2));
-  float warp2 = fbm3(vec3(warpedUv * 1.5 - t * 0.2, t * 0.15 + 10.0));
+  // Domain warping — noise-based spiral distortion (fbm6 for rich primary pattern)
+  float warp1 = fbm6(vec3(warpedUv * 2.0 * energyFreq + t * 0.3, t * 0.2));
+  float warp2 = fbm6(vec3(warpedUv * 1.5 * energyFreq - t * 0.2, t * 0.15 + 10.0));
 
   // Spiral pattern (harmonic tension drives spiral arm count)
   float armCount = 3.0 + uHarmonicTension * 2.0;
@@ -81,6 +85,12 @@ void main() {
   float val = 0.25 + pattern * 0.35 + uEnergy * 0.25;
 
   vec3 color = hsv2rgb(vec3(fract(hue), sat, val));
+
+  // === SECONDARY DEPTH LAYER: ghostly undertone from secondary palette ===
+  float depthNoise = fbm6(vec3(warpedUv * 1.8 + vec2(uDynamicTime * 0.03, -uDynamicTime * 0.02), uDynamicTime * 0.04 + 50.0));
+  float depthHue = uPaletteSecondary + depthNoise * 0.15;
+  vec3 depthColor = hsv2rgb(vec3(fract(depthHue), sat * 0.6, 0.3 + depthNoise * 0.25));
+  color = mix(color, color + depthColor, 0.3);
 
   // === FABRIC TEXTURE: ridged noise for creases and folds ===
   float fabric = ridged4(vec3(warpedUv * 3.0, uDynamicTime * 0.05));

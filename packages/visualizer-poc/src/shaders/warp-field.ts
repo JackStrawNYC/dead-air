@@ -117,6 +117,10 @@ void main() {
   float beatSnap = clamp(uBeatSnap, 0.0, 1.0);
 
   float slowTime = uDynamicTime * 0.05;
+  float energyFreq = 1.0 + energy * 0.5;
+
+  // --- Domain warping: space-time fabric distortion ---
+  p += vec2(fbm3(vec3(p * 0.5 * energyFreq, uDynamicTime * 0.05)), fbm3(vec3(p * 0.5 * energyFreq + 100.0, uDynamicTime * 0.05))) * 0.3;
 
   // Phase 1 uniform integrations
   float chromaHueMod = uChromaHue * 0.18;
@@ -207,12 +211,12 @@ void main() {
   float einsteinRing = smoothstep(0.02, 0.0, ringDist) * (0.3 + energy * 0.5 + singularity * 0.8);
   vec3 ringColor = hsv2rgb(vec3(hue1 + 0.1, sat, 1.0));
 
-  // --- Accretion disk: thin glowing disk around primary mass ---
+  // --- Accretion disk: thin glowing disk around primary mass (fbm6 for detail) ---
   float diskAngle = atan(p.y, p.x) + uDynamicTime * 0.2;
   float diskRadius = distToCenter;
   float diskMask = smoothstep(0.04, 0.06, diskRadius) * smoothstep(0.25, 0.15, diskRadius);
   float diskThickness = smoothstep(0.015, 0.0, abs(p.y * cos(0.3) - p.x * sin(0.3) * 0.1)); // tilted
-  float diskNoise = fbm3(vec3(diskAngle * 2.0, diskRadius * 10.0, slowTime * 0.5));
+  float diskNoise = fbm6(vec3(diskAngle * 2.0 * energyFreq, diskRadius * 10.0, slowTime * 0.5));
   float disk = diskMask * diskThickness * (0.5 + diskNoise * 0.5);
   vec3 diskColor = hsv2rgb(vec3(hue2 + 0.05, sat * 0.9, 0.8 + energy * 0.2));
 
@@ -220,9 +224,15 @@ void main() {
   float waveVis = abs(wave) * 15.0;
   vec3 waveColor = hsv2rgb(vec3(hue1 + 0.2, sat * 0.5, 0.3)) * waveVis;
 
-  // --- Background: deep space gradient ---
+  // --- Background: deep space gradient with fbm6 nebula ---
   float bgGrad = smoothstep(1.5, 0.0, distToCenter);
   vec3 bgColor = hsv2rgb(vec3(uPalettePrimary + 0.2, 0.15, 0.01)) * bgGrad;
+
+  // Deep space nebula: fbm6 for cosmic depth
+  float nebulaField = fbm6(vec3(lensedP * 1.5 * energyFreq, slowTime * 0.08));
+  vec3 nebulaPrimary = hsv2rgb(vec3(hue1 + nebulaField * 0.1, sat * 0.3, 0.02 + nebulaField * 0.04));
+  vec3 nebulaSecondary = hsv2rgb(vec3(hue2 + nebulaField * 0.08, sat * 0.25, 0.015 + nebulaField * 0.03));
+  bgColor += mix(nebulaPrimary, nebulaSecondary, nebulaField * 0.5 + 0.5);
 
   // --- Compose ---
   vec3 col = bgColor;
@@ -250,6 +260,11 @@ void main() {
   // Lensing brightness amplification near mass
   float magnification = 1.0 + proximity * energy * 0.4;
   col *= magnification;
+
+  // --- Secondary depth layer: secondary palette cosmic wash ---
+  float cosmicDepth = fbm6(vec3(lensedP * 1.0 + vec2(slowTime * 0.03), slowTime * 0.04 + 99.0));
+  vec3 cosmicColor = hsv2rgb(vec3(hue2 + cosmicDepth * 0.1, sat * 0.35, 0.05 + cosmicDepth * 0.08));
+  col = mix(col, col + cosmicColor, 0.3);
 
   // Peak approach glow
   col *= 1.0 + peakApproach * 0.12 + forecastGlow;

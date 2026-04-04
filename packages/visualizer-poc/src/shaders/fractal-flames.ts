@@ -100,6 +100,10 @@ void main() {
 
   float jamDetail = 1.0 + uJamDensity * 0.5;
   float slowTime = uDynamicTime * 0.06;
+  float energyFreq = 1.0 + energy * 0.5;
+
+  // --- Domain warping: organic space distortion ---
+  p += vec2(fbm3(vec3(p * 0.5 * energyFreq, uDynamicTime * 0.05)), fbm3(vec3(p * 0.5 * energyFreq + 100.0, uDynamicTime * 0.05))) * 0.3;
 
   // --- Section type modulation (0=intro,1=verse,2=chorus,3=bridge,4=solo,5=jam,6=outro,7=space) ---
   float sectionT = uSectionType;
@@ -219,9 +223,14 @@ void main() {
   }
   vec3 col = max(flameColor, prevColor * decayRate);
 
-  // --- Background: subtle noise field ---
-  float bgNoise = fbm3(vec3(p * 3.0, slowTime * 0.3)) * 0.03;
+  // --- Background: rich noise field (fbm6 for depth) ---
+  float bgNoise = fbm6(vec3(p * 3.0 * energyFreq, slowTime * 0.3)) * 0.05;
   col = max(col, vec3(bgNoise * 0.5, bgNoise * 0.3, bgNoise * 0.6));
+
+  // --- Secondary depth layer: ghostly secondary palette wash ---
+  float depthField = fbm6(vec3(p * 1.5 + vec2(slowTime * 0.03), slowTime * 0.05 + 42.0));
+  vec3 depthColor = hsv2rgb(vec3(hue2 + depthField * 0.1, sat * 0.4, 0.15 + depthField * 0.15));
+  col = mix(col, col + depthColor, 0.3);
 
   // --- Climax boost ---
   float isClimax = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5);

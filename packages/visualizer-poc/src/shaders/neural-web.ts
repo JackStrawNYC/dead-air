@@ -100,6 +100,10 @@ void main() {
 
   float slowTime = uDynamicTime * 0.04;
   float chromaHueMod = uChromaHue * 0.15;
+  float energyFreq = 1.0 + energy * 0.5;
+
+  // --- Domain warping: organic neural-field distortion ---
+  p += vec2(fbm3(vec3(p * 0.5 * energyFreq, uDynamicTime * 0.05)), fbm3(vec3(p * 0.5 * energyFreq + 100.0, uDynamicTime * 0.05))) * 0.3;
 
   // Section-type modulation
   float sectionT = uSectionType;
@@ -115,6 +119,12 @@ void main() {
   float branchFactor = 0.5 + mids * 0.5;
 
   vec3 col = vec3(0.01, 0.008, 0.02); // dark background
+
+  // --- Organic neural substrate: fbm6 field beneath the network ---
+  float substrateField = fbm6(vec3(p * 2.0 * energyFreq, slowTime * 0.2));
+  vec3 substratePrimary = hsv2rgb(vec3(uPalettePrimary + substrateField * 0.08, 0.25 * uPaletteSaturation, 0.03 + substrateField * 0.04));
+  vec3 substrateSecondary = hsv2rgb(vec3(uPaletteSecondary + substrateField * 0.06, 0.2 * uPaletteSaturation, 0.02 + substrateField * 0.03));
+  col += mix(substratePrimary, substrateSecondary, substrateField * 0.5 + 0.5) * (0.6 + energy * 0.3);
 
   // --- Feedback blend (previous frame provides trailing glow) ---
   vec4 prev = texture2D(uPrevFrame, vUv);
@@ -187,6 +197,11 @@ void main() {
 
   vec3 nodeColor = hsv2rgb(vec3(nodeHue, nodeSat, min(nodeVal, 1.0)));
   col += nodeColor * nodeGlow;
+
+  // --- Secondary depth layer: fbm6 synaptic-field glow ---
+  float synapticDepth = fbm6(vec3(p * 1.5 + vec2(slowTime * 0.04, -slowTime * 0.03), slowTime * 0.06 + 66.0));
+  vec3 synapticColor = hsv2rgb(vec3(uPaletteSecondary + synapticDepth * 0.12, 0.4 * uPaletteSaturation, 0.08 + synapticDepth * 0.1));
+  col = mix(col, col + synapticColor, 0.3);
 
   // --- Global firing flash on strong drum hits ---
   if (drumOnset > 0.6) {

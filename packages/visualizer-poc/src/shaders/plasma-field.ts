@@ -88,6 +88,10 @@ void main() {
   float chordHue = float(int(uChordIndex)) / 24.0 * 0.15;
   float accelBoost = 1.0 + uEnergyAccel * 0.1;
 
+  // --- Domain warping: organic space distortion ---
+  float energyFreq = 1.0 + energy * 0.5;
+  p += vec2(fbm3(vec3(p * 0.5 * energyFreq, uDynamicTime * 0.05)), fbm3(vec3(p * 0.5 * energyFreq + 100.0, uDynamicTime * 0.05))) * 0.3;
+
   // --- Global wave scale from bass ---
   float waveScale = (2.0 + bass * 3.0) * accelBoost;
 
@@ -134,10 +138,14 @@ void main() {
   // Normalize
   plasma /= max(totalWeight, 1.0);
 
-  // --- Additional crossing waves for richness ---
+  // --- Additional crossing waves for richness (fbm6 primary pattern) ---
   float crossWave1 = sin(p.x * waveScale * 1.5 + p.y * waveScale * 2.0 + slowTime * 2.0);
   float crossWave2 = cos(p.y * waveScale * 1.8 - p.x * waveScale * 1.2 + slowTime * 1.7);
   plasma += (crossWave1 + crossWave2) * 0.15 * energy;
+
+  // --- Deep FBM overlay for organic richness ---
+  float deepPlasma = fbm6(vec3(p * waveScale * 0.4 * energyFreq, slowTime * 0.25));
+  plasma += deepPlasma * 0.35;
 
   // --- Radial modulation ---
   float r = length(p);
@@ -155,6 +163,11 @@ void main() {
   float brightness = 0.4 + energy * 0.5 + abs(plasma) * 0.3;
 
   vec3 col = hsv2rgb(vec3(hue, sat, brightness));
+
+  // --- Secondary depth layer: warped secondary palette undertone ---
+  float depthWarp = fbm6(vec3(p * 1.2 + vec2(slowTime * 0.04), slowTime * 0.06 + 33.0));
+  vec3 depthColor = hsv2rgb(vec3(hue2 + depthWarp * 0.12, sat * 0.5, 0.25 + depthWarp * 0.2));
+  col = mix(col, col + depthColor, 0.3);
 
   // --- Beat snap color inversion flash ---
   if (beatSnap > 0.3) {

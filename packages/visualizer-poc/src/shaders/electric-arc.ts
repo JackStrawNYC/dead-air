@@ -103,6 +103,10 @@ void main() {
   float slowTime = uDynamicTime * 0.08;
   float chromaHueMod = uChromaHue * 0.15;
   float chordHue = float(int(uChordIndex)) / 24.0 * 0.1;
+  float energyFreq = 1.0 + energy * 0.5;
+
+  // --- Domain warping: electric field distortion ---
+  p += vec2(fbm3(vec3(p * 0.5 * energyFreq, uDynamicTime * 0.05)), fbm3(vec3(p * 0.5 * energyFreq + 100.0, uDynamicTime * 0.05))) * 0.3;
 
   // --- Section type modulation (0=intro,1=verse,2=chorus,3=bridge,4=solo,5=jam,6=outro,7=space) ---
   float sectionT = uSectionType;
@@ -133,9 +137,14 @@ void main() {
 
   float sat = mix(0.4, 0.9, energy) * uPaletteSaturation;
 
-  // --- Background: dark with subtle ambient ---
+  // --- Background: dark with subtle ambient + fbm6 electric atmosphere ---
   vec3 col = vec3(0.005, 0.005, 0.015);
   col += vec3(0.01, 0.005, 0.02) * (1.0 - length(p) * 0.5);
+  // Electric atmosphere: fbm6 for deep field texture
+  float atmosField = fbm6(vec3(p * 2.5 * energyFreq, slowTime * 0.15));
+  vec3 atmosPrimary = hsv2rgb(vec3(uPalettePrimary + atmosField * 0.08, 0.3 * uPaletteSaturation, 0.04 + atmosField * 0.03));
+  vec3 atmosSecondary = hsv2rgb(vec3(uPaletteSecondary + atmosField * 0.06, 0.2 * uPaletteSaturation, 0.02 + atmosField * 0.02));
+  col += mix(atmosPrimary, atmosSecondary, atmosField * 0.5 + 0.5) * (0.5 + energy * 0.3);
 
   // --- Render arcs ---
   for (int i = 0; i < 10; i++) {
@@ -183,6 +192,11 @@ void main() {
       col += glowColor * branchGlow * mids * 0.2;
     }
   }
+
+  // --- Secondary depth layer: fbm6 electromagnetic shimmer ---
+  float emField = fbm6(vec3(p * 1.8 + vec2(slowTime * 0.04, -slowTime * 0.03), slowTime * 0.06 + 77.0));
+  vec3 emColor = hsv2rgb(vec3(uPaletteSecondary + emField * 0.12, 0.5 * uPaletteSaturation, 0.1 + emField * 0.12));
+  col = mix(col, col + emColor, 0.3);
 
   // --- Drum onset flash (confidence-gated) ---
   if (drumOnset > 0.5) {
