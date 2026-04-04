@@ -1,0 +1,144 @@
+{
+  "showDate": "1972-08-27",
+  "totalFrames": 354936,
+  "tracks": [
+    {
+      "trackId": "d1t01",
+      "globalFrameStart": 0,
+      "globalFrameEnd": 5282,
+      "totalFrames": 10763
+    },
+    {
+      "trackId": "d1t02",
+      "globalFrameStart": 5282,
+      "globalFrameEnd": 11802,
+      "totalFrames": 6520
+    },
+    {
+      "trackId": "d1t03",
+      "globalFrameStart": 11802,
+      "globalFrameEnd": 28501,
+      "totalFrames": 16699
+    },
+    {
+      "trackId": "d1t04",
+      "globalFrameStart": 28501,
+      "globalFrameEnd": 34735,
+      "totalFrames": 6234
+    },
+    {
+      "trackId": "d1t05",
+      "globalFrameStart": 34735,
+      "globalFrameEnd": 45547,
+      "totalFrames": 10812
+    },
+    {
+      "trackId": "d1t06",
+      "globalFrameStart": 45547,
+      "globalFrameEnd": 62517,
+      "totalFrames": 16970
+    },
+    {
+      "trackId": "d1t07",
+      "globalFrameStart": 62517,
+      "globalFrameEnd": 76773,
+      "totalFrames": 14256
+    },
+    {
+      "trackId": "d1t08",
+      "globalFrameStart": 76773,
+      "globalFrameEnd": 92079,
+      "totalFrames": 15306
+    },
+    {
+      "trackId": "d1t09",
+      "globalFrameStart": 92079,
+      "globalFrameEnd": 98829,
+      "totalFrames": 6750
+    },
+    {
+      "trackId": "d1t10",
+      "globalFrameStart": 98829,
+      "globalFrameEnd": 109419,
+      "totalFrames": 10590
+    },
+    {
+      "trackId": "d2t01",
+      "globalFrameStart": 109419,
+      "globalFrameEnd": 114241,
+      "totalFrames": 4822
+    },
+    {
+      "trackId": "d2t02",
+      "globalFrameStart": 114241,
+      "globalFrameEnd": 150524,
+      "totalFrames": 36283
+    },
+    {
+      "trackId": "d2t03",
+      "globalFrameStart": 150524,
+      "globalFrameEnd": 168536,
+      "totalFrames": 18012
+    },
+    {
+      "trackId": "d2t04",
+      "globalFrameStart": 168536,
+      "globalFrameEnd": 179362,
+      "totalFrames": 10826
+    },
+    {
+      "trackId": "d2t05",
+      "globalFrameStart": 179362,
+      "globalFrameEnd": 203888,
+      "totalFrames": 24526
+    },
+    {
+      "trackId": "d2t06",
+      "globalFrameStart": 203888,
+      "globalFrameEnd": 214586,
+      "totalFrames": 10698
+    },
+    {
+      "trackId": "d3t01",
+      "globalFrameStart": 214586,
+      "globalFrameEnd": 271659,
+      "totalFrames": 57073
+    },
+    {
+      "trackId": "d3t02",
+      "globalFrameStart": 271659,
+      "globalFrameEnd": 280344,
+      "totalFrames": 8685
+    },
+    {
+      "trackId": "d3t03",
+      "globalFrameStart": 280344,
+      "globalFrameEnd": 302330,
+      "totalFrames": 21986
+    },
+    {
+      "trackId": "d3t04",
+      "globalFrameStart": 302330,
+      "globalFrameEnd": 323099,
+      "totalFrames": 20769
+    },
+    {
+      "trackId": "d3t05",
+      "globalFrameStart": 323099,
+      "globalFrameEnd": 335713,
+      "totalFrames": 12614
+    },
+    {
+      "trackId": "d3t06",
+      "globalFrameStart": 335713,
+      "globalFrameEnd": 344053,
+      "totalFrames": 8340
+    },
+    {
+      "trackId": "d3t07",
+      "globalFrameStart": 344053,
+      "globalFrameEnd": 349455,
+      "totalFrames": 5402
+    }
+  ]
+}
