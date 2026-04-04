@@ -119,6 +119,10 @@ void main() {
   float improv = clamp(uImprovisationScore, 0.0, 1.0);
 
   float slowTime = uDynamicTime * 0.05;
+  float energyDetail = 1.0 + energy * 0.5;
+
+  // === DOMAIN WARPING: organic UV distortion ===
+  p += vec2(fbm3(vec3(p * 0.5 * energyDetail, uDynamicTime * 0.05)), fbm3(vec3(p * 0.5 * energyDetail + 100.0, uDynamicTime * 0.05))) * 0.3;
 
   // Phase 1 uniform integrations
   float chromaHueMod = uChromaHue * 0.15;
@@ -166,10 +170,10 @@ void main() {
   corruptedUV = fract(corruptedUV); // wrap
 
   // --- The "original" image: flowing colorful content ---
-  // Layer 1: smooth gradient base
+  // Layer 1: smooth gradient base (fbm6 for rich detail, energy-responsive frequency)
   vec3 baseContent = vec3(0.0);
-  float grad1 = fbm(vec3(corruptedUV * 3.0, slowTime * 0.3));
-  float grad2 = snoise(vec3(corruptedUV * 5.0 + 15.0, slowTime * 0.5));
+  float grad1 = fbm6(vec3(corruptedUV * 3.0 * energyDetail, slowTime * 0.3));
+  float grad2 = fbm3(vec3(corruptedUV * 5.0 * energyDetail + 15.0, slowTime * 0.5));
   baseContent = hsv2rgb(vec3(hue1 + grad1 * 0.2, sat, 0.4 + grad1 * 0.3));
   vec3 layer2Color = hsv2rgb(vec3(hue2 + grad2 * 0.15, sat * 0.8, 0.3 + grad2 * 0.2));
   baseContent = mix(baseContent, layer2Color, smoothstep(-0.2, 0.2, grad2));
@@ -258,6 +262,17 @@ void main() {
     ));
     col = mix(col, shuffledColor, shuffleGate * corruption * 0.4);
   }
+
+  // === SECONDARY VISUAL LAYER: flowing organic substrate beneath corruption ===
+  float subNoise = fbm6(vec3(p * 2.0 * energyDetail + 200.0, slowTime * 0.2));
+  float subHue1 = hue1 + subNoise * 0.15;
+  float subHue2 = hue2 - subNoise * 0.1;
+  vec3 subLayer = mix(
+    hsv2rgb(vec3(subHue1, sat * 0.7, 0.3 + subNoise * 0.2)),
+    hsv2rgb(vec3(subHue2, sat * 0.6, 0.25 + subNoise * 0.15)),
+    subNoise * 0.5 + 0.5
+  );
+  col = mix(col, col + subLayer * 0.15, 0.3);
 
   // --- Climax boost ---
   float isClimax = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5);

@@ -66,6 +66,10 @@ void main() {
   float vocalP = clamp(uVocalPresence, 0.0, 1.0);
 
   float slowTime = uDynamicTime * 0.15;
+  float energyDetail = 1.0 + energy * 0.5;
+
+  // === DOMAIN WARPING: organic UV distortion ===
+  p += vec2(fbm3(vec3(p * 0.5 * energyDetail, uDynamicTime * 0.05)), fbm3(vec3(p * 0.5 * energyDetail + 100.0, uDynamicTime * 0.05))) * 0.3;
 
   // Section-type modulation
   float sectionT = uSectionType;
@@ -173,10 +177,21 @@ void main() {
     col += avgColor * brightness;
   }
 
-  // Ambient noise field: subtle flowing nebula behind particles
-  float nebulaVal = fbm3(vec3(p * 2.0, slowTime * 0.3));
-  vec3 nebulaColor = hsv2rgb(vec3(hue1 + nebulaVal * 0.1, 0.4, 1.0));
+  // Ambient noise field: rich flowing nebula behind particles (fbm6 + dual palette)
+  float nebulaVal = fbm6(vec3(p * 2.0 * energyDetail, slowTime * 0.3));
+  vec3 nebulaColor1 = hsv2rgb(vec3(hue1 + nebulaVal * 0.1, 0.4, 1.0));
+  vec3 nebulaColor2 = hsv2rgb(vec3(hue2 + nebulaVal * 0.15, 0.35, 0.9));
+  vec3 nebulaColor = mix(nebulaColor1, nebulaColor2, nebulaVal * 0.5 + 0.5);
   col += nebulaColor * max(0.0, nebulaVal) * 0.06 * energy;
+
+  // === SECONDARY LAYER: flowing cosmic substrate ===
+  float cosmicVal = fbm6(vec3(p * 1.2 * energyDetail + 70.0, slowTime * 0.15));
+  vec3 cosmicColor = mix(
+    hsv2rgb(vec3(hue1 + 0.1, sat * 0.5, 0.3)),
+    hsv2rgb(vec3(hue2 - 0.05, sat * 0.4, 0.25)),
+    cosmicVal * 0.5 + 0.5
+  );
+  col = mix(col, col + cosmicColor * (0.04 + energy * 0.04), 0.3);
 
 
   // SDF icon emergence

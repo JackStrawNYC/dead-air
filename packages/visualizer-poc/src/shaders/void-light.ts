@@ -50,6 +50,11 @@ void main() {
   vec2 p = (uv - 0.5) * vec2(aspect, 1.0);
 
   float t = uDynamicTime;
+  float energy_clamped = clamp(uEnergy, 0.0, 1.0);
+  float energyDetail = 1.0 + energy_clamped * 0.5;
+
+  // === DOMAIN WARPING: subtle organic UV distortion ===
+  p += vec2(fbm3(vec3(p * 0.5 * energyDetail, uDynamicTime * 0.05)), fbm3(vec3(p * 0.5 * energyDetail + 100.0, uDynamicTime * 0.05))) * 0.3;
 
   // === SECTION-TYPE MODULATION ===
   float sectionT = uSectionType;
@@ -58,12 +63,18 @@ void main() {
   float sChorus = smoothstep(1.5, 2.5, sectionT) * (1.0 - step(2.5, sectionT));
   float sSolo = smoothstep(3.5, 4.5, sectionT) * (1.0 - step(4.5, sectionT));
 
-  // ─── Deep near-black background ───
+  // ─── Deep near-black background with fbm6 texture ───
   vec3 col = vec3(0.01, 0.008, 0.015);
 
-  // Subtle background texture (barely visible noise)
-  float bgNoise = snoise(vec3(p * 3.0, t * 0.02)) * 0.008;
-  col += vec3(bgNoise * 0.5, bgNoise * 0.3, bgNoise);
+  // Rich background texture (fbm6 for depth, energy-responsive, dual palette)
+  float bgNoise = fbm6(vec3(p * 3.0 * energyDetail, t * 0.02));
+  col += vec3(bgNoise * 0.5, bgNoise * 0.3, bgNoise) * 0.008;
+  // Dual palette nebula glow in the void
+  float voidHue1 = hsvToCosineHue(uPalettePrimary);
+  float voidHue2 = hsvToCosineHue(uPaletteSecondary);
+  vec3 voidCol1 = 0.5 + 0.5 * cos(6.28318 * vec3(voidHue1, voidHue1 + 0.33, voidHue1 + 0.67));
+  vec3 voidCol2 = 0.5 + 0.5 * cos(6.28318 * vec3(voidHue2, voidHue2 + 0.33, voidHue2 + 0.67));
+  col += mix(voidCol1, voidCol2, bgNoise * 0.5 + 0.5) * 0.008 * (0.5 + bgNoise * 0.5);
 
   // --- Phase 1: New uniform integrations ---
   float chromaHueMod = uChromaHue * 0.25;
@@ -133,6 +144,11 @@ void main() {
       col += eColor * eGlow;
     }
   }
+
+  // === SECONDARY LAYER: deep cosmic drift beneath the light points ===
+  float cosmicNoise = fbm6(vec3(p * 1.5 * energyDetail + 80.0, t * 0.015));
+  vec3 cosmicLayer = mix(voidCol1, voidCol2, cosmicNoise * 0.5 + 0.5);
+  col = mix(col, col + cosmicLayer * 0.015 * (0.5 + cosmicNoise * 0.5), 0.3);
 
   // ─── Heavy film grain (0.06-0.08 range — much more than other shaders) ───
   float grainTime = floor(uTime * 15.0) / 15.0;

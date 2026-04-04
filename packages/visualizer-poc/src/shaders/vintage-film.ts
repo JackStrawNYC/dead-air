@@ -93,23 +93,27 @@ void main() {
   float sectionGrain = mix(1.0, 1.4, sJam) * mix(1.0, 0.5, sSpace);
   float sectionLeakFreq = mix(1.0, 1.3, sJam) * mix(1.0, 0.4, sSpace) * mix(1.0, 1.2, sChorus);
 
-  // Base scene — warm amber abstract shapes (as if projected concert footage)
+  float energyDetail = 1.0 + energy * 0.5;
+
+  // === DOMAIN WARPING: organic UV distortion ===
+  centered += vec2(fbm3(vec3(centered * 0.5 * energyDetail, uDynamicTime * 0.05)), fbm3(vec3(centered * 0.5 * energyDetail + 100.0, uDynamicTime * 0.05))) * 0.3;
+
+  // Base scene — warm amber abstract shapes with fbm6 (rich detail, energy-responsive)
   float dt = uDynamicTime;
-  float n1 = snoise(vec3(centered * 1.5 + dt * 0.1, dt * 0.05));
-  float n2 = snoise(vec3(centered * 3.0 - dt * 0.08, dt * 0.03 + 5.0));
-  float n3 = snoise(vec3(centered * 0.8 + dt * 0.15, dt * 0.07 + 10.0));
+  float scene = fbm6(vec3(centered * 1.5 * energyDetail, dt * 0.05));
+  float scene2 = fbm3(vec3(centered * 3.0 * energyDetail - dt * 0.08, dt * 0.03 + 5.0));
+  float sceneBlend = scene * 0.6 + scene2 * 0.4;
+  sceneBlend = sceneBlend * 0.5 + 0.5;
 
-  float scene = n1 * 0.5 + n2 * 0.3 + n3 * 0.2;
-  scene = scene * 0.5 + 0.5;
-
-  // Warm vintage color grading — amber/sepia tones
+  // Warm vintage color grading — amber/sepia tones with DUAL palette
   vec3 warm = vec3(0.95, 0.8, 0.5);
   vec3 cool = vec3(0.3, 0.25, 0.4);
-  vec3 color = mix(cool, warm, scene);
+  vec3 color = mix(cool, warm, sceneBlend);
 
-  // Palette influence
+  // Dual palette influence
   vec3 palColor = hsv2rgb(vec3(uPalettePrimary, 0.4 * uPaletteSaturation, 0.6));
-  color = mix(color, palColor, 0.25);
+  vec3 palColor2 = hsv2rgb(vec3(uPaletteSecondary, 0.35 * uPaletteSaturation, 0.5));
+  color = mix(color, mix(palColor, palColor2, scene * 0.5 + 0.5), 0.25);
 
   // Audio reactivity — energy drives brightness
   color *= 0.30 + uEnergy * 0.50 + uRms * 0.2;
@@ -142,6 +146,12 @@ void main() {
   float sprocketMask = mix(1.0, 0.0,
     (1.0 - sprocketEdge) * hole * 0.3);
   color *= sprocketMask;
+
+  // === SECONDARY LAYER: organic film-like substrate ===
+  float subNoise = fbm6(vec3(centered * 1.8 * energyDetail + 60.0, dt * 0.03));
+  vec3 subWarm = mix(palColor, palColor2, subNoise * 0.5 + 0.5);
+  vec3 subLayer = subWarm * (0.05 + energy * 0.04) * (0.5 + subNoise * 0.5);
+  color = mix(color, color + subLayer, 0.3);
 
   // === HALATION: warm film bloom ===
   color = halation(vUv, color, uEnergy);

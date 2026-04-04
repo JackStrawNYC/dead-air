@@ -62,6 +62,10 @@ void main() {
   vec2 aspect = vec2(uResolution.x / uResolution.y, 1.0);
   vec2 p = (uv - vec2(0.5, 0.0)) * aspect;
 
+  // === DOMAIN WARPING: organic UV distortion ===
+  float energyDetail = 1.0 + clamp(uEnergy, 0.0, 1.0) * 0.5;
+  p += vec2(fbm3(vec3(p * 0.5 * energyDetail, uDynamicTime * 0.05)), fbm3(vec3(p * 0.5 * energyDetail + 100.0, uDynamicTime * 0.05))) * 0.3;
+
   float energy = clamp(uEnergy, 0.0, 1.0);
   float tempoScale = uLocalTempo / 120.0;
   float effectiveBeat = uBeatSnap * smoothstep(0.3, 0.7, uBeatConfidence);
@@ -106,9 +110,13 @@ void main() {
   float bgHue = hsvToCosineHue(uPalettePrimary) + uDynamicTime * 0.02;
   vec3 bgColor = 0.5 + 0.5 * cos(6.28318 * (vec3(bgHue, bgHue + 0.33, bgHue + 0.67) + vec3(0.0, 0.1, 0.2)));
   bgColor *= 0.08 + uRms * 0.12;
-  // FBM noise to break flat background banding
-  float bgNoise = fbm3(vec3(p * 3.0, uDynamicTime * 0.1));
+  // FBM6 noise to break flat background banding (rich detail, energy-responsive)
+  float bgNoise = fbm6(vec3(p * 3.0 * energyDetail, uDynamicTime * 0.1));
   bgColor *= 0.85 + bgNoise * 0.3;
+  // Secondary palette wash in background
+  float secBgHue = hsvToCosineHue(uPaletteSecondary) + uDynamicTime * 0.015;
+  vec3 secBgColor = 0.5 + 0.5 * cos(6.28318 * (vec3(secBgHue, secBgHue + 0.33, secBgHue + 0.67)));
+  bgColor += secBgColor * 0.03 * (0.5 + bgNoise * 0.5);
   vec3 col = bgColor;
 
   float activeBeamCount = (3.0 + energy * 5.0 + uJamDensity * 2.0) * mix(1.0, 1.3, sJam) * mix(1.0, 0.5, sSpace) * mix(1.0, 1.2, sChorus);
@@ -165,8 +173,18 @@ void main() {
     col += beamCol * beamVal * 0.85;
   }
 
+  // === SECONDARY LAYER: volumetric light wash (blended at 30%) ===
+  float volNoise = fbm6(vec3(p * 1.5 * energyDetail, uDynamicTime * 0.04));
+  float volHue1 = hsvToCosineHue(uPalettePrimary) + volNoise * 0.2;
+  float volHue2 = hsvToCosineHue(uPaletteSecondary) + volNoise * 0.15;
+  vec3 volColor1 = 0.5 + 0.5 * cos(6.28318 * vec3(volHue1, volHue1 + 0.33, volHue1 + 0.67));
+  vec3 volColor2 = 0.5 + 0.5 * cos(6.28318 * vec3(volHue2, volHue2 + 0.33, volHue2 + 0.67));
+  vec3 volLayer = mix(volColor1, volColor2, volNoise * 0.5 + 0.5) * (0.08 + energy * 0.12);
+  float volMask = smoothstep(0.0, 0.5, uv.y) * (1.0 - smoothstep(0.7, 1.0, uv.y));
+  col = mix(col, col + volLayer * volMask, 0.3);
+
   // === ATMOSPHERIC HAZE: fbm-driven secondary palette color between beams ===
-  float hazeNoise = fbm3(vec3(p * 2.0 + 50.0, uDynamicTime * 0.08));
+  float hazeNoise = fbm6(vec3(p * 2.0 * energyDetail + 50.0, uDynamicTime * 0.08));
   float secHue = hsvToCosineHue(uPaletteSecondary) + hazeNoise * 0.15;
   vec3 hazeColor = 0.5 + 0.5 * cos(6.28318 * vec3(secHue, secHue + 0.33, secHue + 0.67));
   float hazeAmount = (0.03 + energy * 0.05) * (0.5 + hazeNoise * 0.5) * mix(1.0, 1.5, sJam) * mix(1.0, 0.3, sSpace);

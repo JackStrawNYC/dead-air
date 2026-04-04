@@ -99,13 +99,23 @@ void main() {
   float sSolo = smoothstep(3.5, 4.5, sectionT) * (1.0 - step(4.5, sectionT));
 
   float slowTime = uDynamicTime;
+  float energyDetail = 1.0 + energy * 0.5;
+
+  // === DOMAIN WARPING: organic UV distortion for psychedelic feel ===
+  p += vec2(fbm3(vec3(p * 0.5 * energyDetail, uDynamicTime * 0.05)), fbm3(vec3(p * 0.5 * energyDetail + 100.0, uDynamicTime * 0.05))) * 0.3;
 
   // --- Column parameters ---
   float columnWidth = mix(0.03, 0.02, bass) * mix(1.0, 0.8, sJam) * mix(1.0, 1.5, sSpace);
   float fallSpeed = (0.3 + energy * 0.5) * mix(1.0, 1.5, sJam) * mix(1.0, 0.3, sSpace) * mix(1.0, 1.2, sChorus);
   float glyphSize = columnWidth * 0.9;
 
-  vec3 col = vec3(0.005, 0.008, 0.005); // dark green-tinted background
+  // Background: deep with fbm6 texture and dual palette colors
+  float bgDetail = fbm6(vec3(p * 2.0 * energyDetail, slowTime * 0.03));
+  float bgHue1 = hsvToCosineHue(uPalettePrimary);
+  float bgHue2 = hsvToCosineHue(uPaletteSecondary);
+  vec3 bgCol1 = 0.5 + 0.5 * cos(6.28318 * vec3(bgHue1, bgHue1 + 0.33, bgHue1 + 0.67));
+  vec3 bgCol2 = 0.5 + 0.5 * cos(6.28318 * vec3(bgHue2, bgHue2 + 0.33, bgHue2 + 0.67));
+  vec3 col = vec3(0.005, 0.008, 0.005) + mix(bgCol1, bgCol2, bgDetail * 0.5 + 0.5) * 0.02;
 
   // --- Cascading columns ---
   float numColumns = 1.0 / columnWidth;
@@ -153,14 +163,20 @@ void main() {
   // Column density varies
   float density = step(0.3 - energy * 0.2, colSeed);
 
-  // Color
+  // Color — dual palette with smooth blending
   float hue = uPalettePrimary + chromaHueMod;
+  float hue2 = uPaletteSecondary + chromaHueMod * 0.5;
   float sat = mix(0.6, 1.0, mids) * uPaletteSaturation;
   float val = glyph * (trailFade + headGlow) * density * mids;
 
-  // Head character is white-green
-  vec3 glyphColor = mix(
+  // Head character is white-tinted, body uses dual palette
+  vec3 bodyColor = mix(
     hsv2rgb(vec3(hue, sat, val)),
+    hsv2rgb(vec3(hue2, sat * 0.9, val * 0.8)),
+    trailDist * 0.6
+  );
+  vec3 glyphColor = mix(
+    bodyColor,
     vec3(val * 1.2),
     headGlow * 0.5
   );
@@ -182,6 +198,15 @@ void main() {
   float bgFade = fract(slowTime * 0.05 + bgColSeed * 5.0);
   bgFade = smoothstep(0.5, 0.0, bgFade);
   col += hsv2rgb(vec3(hue + 0.05, sat * 0.5, bgGlyph * bgFade * 0.08));
+
+  // === SECONDARY LAYER: flowing organic nebula behind the rain ===
+  float nebulaVal = fbm6(vec3(p * 1.5 * energyDetail + 50.0, slowTime * 0.02));
+  float nebHue1 = hsvToCosineHue(uPalettePrimary) + nebulaVal * 0.15;
+  float nebHue2 = hsvToCosineHue(uPaletteSecondary) + nebulaVal * 0.1;
+  vec3 nebCol1 = 0.5 + 0.5 * cos(6.28318 * vec3(nebHue1, nebHue1 + 0.33, nebHue1 + 0.67));
+  vec3 nebCol2 = 0.5 + 0.5 * cos(6.28318 * vec3(nebHue2, nebHue2 + 0.33, nebHue2 + 0.67));
+  vec3 nebulaLayer = mix(nebCol1, nebCol2, nebulaVal * 0.5 + 0.5) * (0.04 + energy * 0.06);
+  col = mix(col, col + nebulaLayer, 0.3);
 
   // --- Beat-synced glitch flash ---
   if (beatSnap > 0.5) {

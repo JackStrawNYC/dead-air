@@ -43,34 +43,40 @@ void main() {
   float sSolo = smoothstep(3.5, 4.5, sectionT) * (1.0 - step(4.5, sectionT));
 
   float t = uDynamicTime * 0.07 * tempoScale * mix(1.0, 1.3, sJam) * mix(1.0, 0.5, sSpace); // Purposeful movement
+  float energyDetail = 1.0 + energy * 0.5;
+
+  // === DOMAIN WARPING: organic UV distortion ===
+  p += vec2(fbm3(vec3(p * 0.5 * energyDetail, uDynamicTime * 0.05)), fbm3(vec3(p * 0.5 * energyDetail + 100.0, uDynamicTime * 0.05))) * 0.3;
 
   // Subtle gate weave (projector instability)
   float weaveX = snoise(vec3(uTime * 2.0, 0.0, sectionSeed)) * 0.001;
   float weaveY = snoise(vec3(0.0, uTime * 3.0, sectionSeed)) * 0.0008;
   p += vec2(weaveX, weaveY);
 
-  // === LAYER 1: Warm base wash ===
-  float baseNoise = fbm(vec3(p * 0.6, t * 0.5 + sectionSeed));
+  // === LAYER 1: Warm base wash (fbm6 for rich detail) ===
+  float baseNoise = fbm6(vec3(p * 0.6 * energyDetail, t * 0.5 + sectionSeed));
   float warmHue = hsvToCosineHue(uPalettePrimary + 0.05); // Push slightly warm
   vec3 baseCol = vec3(0.12, 0.08, 0.05); // Dark warm brown
   baseCol += vec3(0.08, 0.06, 0.03) * (baseNoise * 0.5 + 0.5);
 
-  // === LAYER 2: Slow organic blobs ===
-  vec3 q = vec3(p * 0.8, t * 0.3 + sectionSeed);
-  float warpX = fbm(q + vec3(1.3, 5.7, 0.0));
-  float warpY = fbm(q + vec3(4.1, 2.3, 0.0));
+  // === LAYER 2: Slow organic blobs (fbm6 for primary pattern) ===
+  vec3 q = vec3(p * 0.8 * energyDetail, t * 0.3 + sectionSeed);
+  float warpX = fbm3(q + vec3(1.3, 5.7, 0.0));
+  float warpY = fbm3(q + vec3(4.1, 2.3, 0.0));
   vec2 warped = p + vec2(warpX, warpY) * (0.3 + uBass * 0.15);
 
-  float n = fbm(vec3(warped * 0.7, t * 0.4 + sectionSeed * 0.3));
+  float n = fbm6(vec3(warped * 0.7 * energyDetail, t * 0.4 + sectionSeed * 0.3));
 
-  // Warm amber-to-brown palette
+  // Warm amber-to-brown palette with DUAL palette colors
   vec3 warmA = vec3(0.15, 0.10, 0.06);
   vec3 warmB = vec3(0.25, 0.15, 0.08);
   vec3 midCol = mix(warmA, warmB, n * 0.5 + 0.5);
 
-  // Subtle palette tinting
+  // Dual palette tinting — primary and secondary colors
   vec3 palTint = 0.5 + 0.5 * cos(6.28318 * vec3(warmHue, warmHue + 0.33, warmHue + 0.67));
-  midCol = mix(midCol, palTint * 0.3, 0.15 * uPaletteSaturation);
+  float secHue = hsvToCosineHue(uPaletteSecondary + 0.03);
+  vec3 palTint2 = 0.5 + 0.5 * cos(6.28318 * vec3(secHue, secHue + 0.33, secHue + 0.67));
+  midCol = mix(midCol, mix(palTint, palTint2, n * 0.5 + 0.5) * 0.3, 0.15 * uPaletteSaturation);
 
   // Energy brightens the warm tones
   float brightness = mix(0.12, 0.72, energy) + uRms * 0.15;
@@ -81,8 +87,14 @@ void main() {
   float fgIntensity = uHighs * 0.08;
   vec3 fgCol = vec3(fgNoise * 0.5 + 0.5) * vec3(1.0, 0.9, 0.75) * fgIntensity;
 
-  // === COMPOSITE ===
+  // === SECONDARY LAYER: deep organic substrate with dual palette ===
+  float subNoise = fbm6(vec3(p * 1.2 * energyDetail + 80.0, t * 0.25));
+  vec3 subColor = mix(palTint, palTint2, subNoise * 0.5 + 0.5) * (0.06 + energy * 0.04);
+  vec3 subLayer = subColor * (0.5 + subNoise * 0.5);
+
+  // === COMPOSITE (secondary layer blended at 30%) ===
   vec3 col = baseCol * 0.3 + midCol * 0.55 + fgCol * 0.15;
+  col = mix(col, col + subLayer, 0.3);
 
   // Desaturate significantly (lo-fi look)
   float lum = dot(col, vec3(0.299, 0.587, 0.114));

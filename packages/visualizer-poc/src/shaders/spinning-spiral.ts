@@ -74,6 +74,10 @@ void main() {
   float fftHigh = texture2D(uFFTTexture, vec2(0.78, 0.5)).r;
 
   float slowTime = uDynamicTime * 0.1;
+  float energyDetail = 1.0 + energy * 0.5;
+
+  // === DOMAIN WARPING: organic UV distortion ===
+  p += vec2(fbm3(vec3(p * 0.5 * energyDetail, uDynamicTime * 0.05)), fbm3(vec3(p * 0.5 * energyDetail + 100.0, uDynamicTime * 0.05))) * 0.3;
 
   // --- Phase 1 uniform integrations ---
   float vocalWarmth = uVocalEnergy * 0.1;
@@ -96,12 +100,15 @@ void main() {
   // --- Coherence morphology ---
   float coherence = clamp(uCoherence, 0.0, 1.0);
 
-  // --- Background: deep psychedelic void ---
+  // --- Background: deep psychedelic void with dual palette nebula ---
+  float bgNebula = fbm6(vec3(p * 1.5 * energyDetail, slowTime * 0.08));
+  vec3 bgPrimary = hsv2rgb(vec3(uPalettePrimary, 0.3 * uPaletteSaturation, 0.04));
+  vec3 bgSecondary = hsv2rgb(vec3(uPaletteSecondary, 0.25 * uPaletteSaturation, 0.03));
   vec3 col = mix(
     vec3(0.01, 0.005, 0.02),
     vec3(0.02, 0.01, 0.03),
     uv.y
-  );
+  ) + mix(bgPrimary, bgSecondary, bgNebula * 0.5 + 0.5) * (0.5 + bgNebula * 0.5);
 
   // --- Polar coordinates ---
   float r = length(p);
@@ -154,11 +161,11 @@ void main() {
   // Downbeat emphasis: extra rotation kick
   rotation += uDownbeat * smoothstep(0.3, 0.7, uBeatConfidence) * 0.25;
 
-  // --- FBM noise warps the spiral edges for organic feel ---
+  // --- FBM6 noise warps the spiral edges for organic feel (energy-responsive detail) ---
   float warpAmp = 0.15 + tension * 0.3 + bass * 0.2;
-  vec3 warpInput = vec3(p * 2.5, slowTime * 0.5);
-  float warp1 = fbm(warpInput) * warpAmp;
-  float warp2 = fbm(warpInput + vec3(3.7, 1.2, 0.0)) * warpAmp * 0.7;
+  vec3 warpInput = vec3(p * 2.5 * energyDetail, slowTime * 0.5);
+  float warp1 = fbm6(warpInput) * warpAmp;
+  float warp2 = fbm6(warpInput + vec3(3.7, 1.2, 0.0)) * warpAmp * 0.7;
 
   // Warp the polar coordinates
   float warpedTheta = theta + warp1 * 1.5;
@@ -244,6 +251,13 @@ void main() {
   // --- Ridged noise detail on spiral surface ---
   float ridged = ridged4(vec3(p * 3.0 + vec2(warp1, warp2), slowTime * 0.3));
   col += spiralColor * ridged * 0.08 * fftHigh;
+
+  // === SECONDARY LAYER: deep cosmic flow beneath spiral ===
+  float cosmicNoise = fbm6(vec3(p * 1.8 * energyDetail + 90.0, slowTime * 0.12));
+  vec3 cosCol1 = hsv2rgb(vec3(fract(hueBase + 0.2), sat * 0.5, 0.2));
+  vec3 cosCol2 = hsv2rgb(vec3(fract(uPaletteSecondary + 0.1), sat * 0.4, 0.15));
+  vec3 cosmicLayer = mix(cosCol1, cosCol2, cosmicNoise * 0.5 + 0.5) * (0.5 + cosmicNoise * 0.5);
+  col = mix(col, col + cosmicLayer * 0.1, 0.3 * radialFade);
 
   // --- Peak approaching: anticipatory glow ---
   col *= 1.0 + peakApproach * 0.15;

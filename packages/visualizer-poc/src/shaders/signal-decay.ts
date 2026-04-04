@@ -139,6 +139,10 @@ void main() {
   float peakApproach = clamp(uPeakApproaching, 0.0, 1.0);
 
   float slowTime = uDynamicTime * 0.05;
+  float energyDetail = 1.0 + energy * 0.5;
+
+  // === DOMAIN WARPING: organic UV distortion ===
+  p += vec2(fbm3(vec3(p * 0.5 * energyDetail, uDynamicTime * 0.05)), fbm3(vec3(p * 0.5 * energyDetail + 100.0, uDynamicTime * 0.05))) * 0.3;
 
   // Phase 1 uniform integrations
   float chromaHueMod = uChromaHue * 0.15;
@@ -195,9 +199,9 @@ void main() {
   // The signal being transmitted: colored noise patterns modulated by audio
   vec3 transmitted = vec3(0.0);
 
-  // Base content: flowing palette-colored noise (what we're "watching")
-  float content1 = fbm(vec3(tornUV * 3.0, slowTime * 0.4));
-  float content2 = snoise(vec3(tornUV * 6.0 + 20.0, slowTime * 0.8));
+  // Base content: rich flowing palette-colored noise (fbm6 + energy-responsive detail)
+  float content1 = fbm6(vec3(tornUV * 3.0 * energyDetail, slowTime * 0.4));
+  float content2 = fbm3(vec3(tornUV * 6.0 * energyDetail + 20.0, slowTime * 0.8));
   vec3 contentColor = hsv2rgb(vec3(hue1, sat, 0.5 + content1 * 0.3));
   vec3 contentColor2 = hsv2rgb(vec3(hue2, sat * 0.8, 0.4 + content2 * 0.2));
   transmitted = mix(contentColor, contentColor2, content2 * 0.5 + 0.5);
@@ -252,6 +256,17 @@ void main() {
   vec3 prevVisual = texture2D(uPrevFrame, uv).rgb;
   // Remove state data from visual (state encoded in RG, visual is full RGB)
   col = mix(prevVisual * 0.3, col, 0.7 + signalState * 0.3);
+
+  // === SECONDARY LAYER: psychedelic signal bleed underneath the decay ===
+  float bleedNoise = fbm6(vec3(p * 2.0 * energyDetail + 120.0, slowTime * 0.15));
+  float bleedHue1 = hue1 + bleedNoise * 0.2;
+  float bleedHue2 = hue2 - bleedNoise * 0.15;
+  vec3 bleedLayer = mix(
+    hsv2rgb(vec3(bleedHue1, sat * 0.7, 0.25 + bleedNoise * 0.15)),
+    hsv2rgb(vec3(bleedHue2, sat * 0.6, 0.2 + bleedNoise * 0.1)),
+    bleedNoise * 0.5 + 0.5
+  );
+  col = mix(col, col + bleedLayer * 0.12, 0.3);
 
   // --- Climax boost ---
   float isClimax = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5);

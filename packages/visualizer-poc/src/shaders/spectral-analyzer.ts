@@ -61,6 +61,11 @@ void main() {
   vec2 p = (uv - 0.5) * aspect;
 
   float energy = clamp(uEnergy, 0.0, 1.0);
+  float energyDetail = 1.0 + energy * 0.5;
+
+  // === DOMAIN WARPING: organic UV distortion ===
+  p += vec2(fbm3(vec3(p * 0.5 * energyDetail, uDynamicTime * 0.05)), fbm3(vec3(p * 0.5 * energyDetail + 100.0, uDynamicTime * 0.05))) * 0.3;
+
   float bass = clamp(uBass, 0.0, 1.0);
   float onset = clamp(uOnsetSnap, 0.0, 1.0);
   float drumOnset = clamp(uDrumOnset, 0.0, 1.0);
@@ -80,12 +85,18 @@ void main() {
   float sectionBarHeight = mix(1.0, 1.4, sJam) * mix(1.0, 0.5, sSpace) * mix(1.0, 1.15, sChorus);
   float sectionGlow = mix(1.0, 1.5, sJam) * mix(1.0, 0.5, sSpace) * mix(1.0, 1.2, sChorus);
 
-  // Background: deep dark with subtle gradient
+  // Background: rich textured dark with fbm6 nebula and dual palette
+  float bgNoise = fbm6(vec3(p * 2.0 * energyDetail, uDynamicTime * 0.03));
+  float bgHue1 = hsvToCosineHue(uPalettePrimary);
+  float bgHue2 = hsvToCosineHue(uPaletteSecondary);
+  vec3 bgPal1 = 0.5 + 0.5 * cos(6.28318 * vec3(bgHue1, bgHue1 + 0.33, bgHue1 + 0.67));
+  vec3 bgPal2 = 0.5 + 0.5 * cos(6.28318 * vec3(bgHue2, bgHue2 + 0.33, bgHue2 + 0.67));
   vec3 bgColor = mix(
     vec3(0.02, 0.01, 0.04),
     vec3(0.06, 0.04, 0.08),
     uv.y
   );
+  bgColor += mix(bgPal1, bgPal2, bgNoise * 0.5 + 0.5) * 0.02 * (0.5 + bgNoise * 0.5);
   // Energy-driven background glow
   bgColor += vec3(0.02, 0.01, 0.03) * energy;
 
@@ -154,6 +165,16 @@ void main() {
       col += barColor * reflBar * 0.4;
     }
   }
+
+  // === SECONDARY LAYER: flowing energy field behind bars ===
+  float fieldNoise = fbm6(vec3(p * 1.5 * energyDetail + 60.0, uDynamicTime * 0.02));
+  vec3 fieldColor = mix(
+    hsv2rgb(vec3(uPalettePrimary + fieldNoise * 0.15, uPaletteSaturation * 0.5, 0.25)),
+    hsv2rgb(vec3(uPaletteSecondary + fieldNoise * 0.1, uPaletteSaturation * 0.4, 0.2)),
+    fieldNoise * 0.5 + 0.5
+  );
+  float fieldMask = smoothstep(floorY - 0.1, floorY + 0.3, p.y);
+  col = mix(col, col + fieldColor * 0.08 * fieldMask, 0.3);
 
   // Horizontal scan line (concert LED look)
   float scanline = sin(p.y * 200.0 + uDynamicTime * 2.0) * 0.02;

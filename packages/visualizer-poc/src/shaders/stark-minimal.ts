@@ -58,6 +58,10 @@ void main() {
   float sectionComplexity = mix(1.0, 1.4, sJam) * mix(1.0, 0.5, sSpace);
 
   float t = uDynamicTime * 0.08 * tempoScale * sectionSpeed;
+  float energyDetail = 1.0 + energy * 0.5;
+
+  // === DOMAIN WARPING: gentle organic UV distortion ===
+  p += vec2(fbm3(vec3(p * 0.5 * energyDetail, uDynamicTime * 0.05)), fbm3(vec3(p * 0.5 * energyDetail + 100.0, uDynamicTime * 0.05))) * 0.3;
 
   // Deep black background with subtle warm gradient
   float bgGrad = 1.0 - length(p) * 0.3;
@@ -149,9 +153,20 @@ void main() {
   float crossV = smoothstep(px, 0.0, abs(p.x)) * smoothstep(0.06, 0.04, abs(p.y));
   col += (crossH + crossV) * vec3(0.2, 0.19, 0.17) * 0.15;
 
-  // === SLOW NOISE FIELD: very subtle background texture ===
-  float noiseField = fbm(vec3(p * 2.0, t * 0.2 + sectionSeed));
+  // === SLOW NOISE FIELD: rich background texture (fbm6 + dual palette + energy-responsive) ===
+  float noiseField = fbm6(vec3(p * 2.0 * energyDetail, t * 0.2 + sectionSeed));
   col += noiseField * 0.015 * vec3(0.8, 0.75, 0.7) * sectionComplexity;
+  // Secondary palette wash in the noise field
+  float secAccentHue = hsvToCosineHue(uPaletteSecondary) + noiseField * 0.1;
+  vec3 secAccent = 0.5 + 0.5 * cos(6.28318 * vec3(secAccentHue, secAccentHue + 0.33, secAccentHue + 0.67));
+  col += secAccent * 0.008 * (0.5 + noiseField * 0.5) * sectionComplexity;
+
+  // === SECONDARY LAYER: flowing organic field beneath geometry ===
+  float orgNoise = fbm6(vec3(p * 1.5 * energyDetail + 50.0, t * 0.15));
+  vec3 orgCol1 = 0.5 + 0.5 * cos(6.28318 * vec3(acHue + 0.15, acHue + 0.48, acHue + 0.82));
+  vec3 orgCol2 = secAccent;
+  vec3 orgLayer = mix(orgCol1, orgCol2, orgNoise * 0.5 + 0.5) * 0.02 * (0.5 + orgNoise * 0.5);
+  col = mix(col, col + orgLayer, 0.3);
 
   // === CENTROID-DRIVEN GLOW: brighter when treble-heavy + climax ===
   float centroidGlow = uCentroid * 0.04 + climaxBoost * 0.03;

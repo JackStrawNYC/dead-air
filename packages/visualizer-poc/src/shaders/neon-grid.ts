@@ -75,6 +75,10 @@ void main() {
   float fftHigh = texture2D(uFFTTexture, vec2(0.78, 0.5)).r;
 
   float slowTime = uDynamicTime * 0.06;
+  float energyDetail = 1.0 + energy * 0.5;
+
+  // === DOMAIN WARPING: organic distortion to break the rigid grid feel ===
+  p += vec2(fbm3(vec3(p * 0.5 * energyDetail, uDynamicTime * 0.05)), fbm3(vec3(p * 0.5 * energyDetail + 100.0, uDynamicTime * 0.05))) * 0.3;
 
   // --- Uniform integrations ---
   float chromaHueMod = uChromaHue * 0.25;
@@ -104,7 +108,7 @@ void main() {
   float isClimax = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5);
   float climaxBoost = isClimax * uClimaxIntensity;
 
-  // --- Background: dark with horizon gradient ---
+  // --- Background: dark with horizon gradient + fbm6 nebula texture ---
   // Synthwave sunset: dark purple base, warm horizon glow
   vec3 bgDark = vec3(0.01, 0.005, 0.03);
   vec3 bgHorizon = vec3(0.06, 0.01, 0.08) + vec3(0.04, 0.01, 0.02) * energy;
@@ -112,9 +116,18 @@ void main() {
   float horizonGrad = exp(-pow((uv.y - horizonLine) * 3.0, 2.0));
   vec3 col = mix(bgDark, bgHorizon, horizonGrad * 0.6);
 
-  // Subtle sky gradient above horizon
+  // FBM6 sky nebula texture with dual palette
+  float skyNebula = fbm6(vec3(p * 2.0 * energyDetail, slowTime * 0.15));
+  float skyHue1 = hsvToCosineHue(uPalettePrimary);
+  float skyHue2 = hsvToCosineHue(uPaletteSecondary);
+  vec3 skyCol1 = 0.5 + 0.5 * cos(6.28318 * vec3(skyHue1, skyHue1 + 0.33, skyHue1 + 0.67));
+  vec3 skyCol2 = 0.5 + 0.5 * cos(6.28318 * vec3(skyHue2, skyHue2 + 0.33, skyHue2 + 0.67));
+  vec3 nebulaTint = mix(skyCol1, skyCol2, skyNebula * 0.5 + 0.5);
+
+  // Subtle sky gradient above horizon with nebula
   float skyGlow = smoothstep(horizonLine, horizonLine + 0.3, uv.y);
   col += vec3(0.015, 0.005, 0.025) * skyGlow * (0.3 + slowE * 0.4);
+  col += nebulaTint * 0.03 * skyGlow * (0.5 + skyNebula * 0.5) * energy;
 
   // --- Palette colors ---
   float hue1 = uPalettePrimary + chromaHueMod + chordHue;
@@ -261,6 +274,12 @@ void main() {
     float reflFade = exp(-reflDepth * 0.12) * 0.08;
     col += neonPurple * reflVert * reflFade * aboveHorizon * energy;
   }
+
+  // === SECONDARY LAYER: volumetric fog between grid and horizon ===
+  float fogNoise = fbm6(vec3(p * 1.5 * energyDetail + 150.0, slowTime * 0.2));
+  vec3 fogColor = mix(neonCyan, neonPurple, fogNoise * 0.5 + 0.5);
+  float fogMask = smoothstep(horizonLine, horizonLine - 0.25, uv.y) * gridMask;
+  col = mix(col, col + fogColor * 0.06 * (0.5 + fogNoise * 0.5), 0.3 * fogMask);
 
   // --- Peak approaching anticipation ---
   col *= 1.0 + peakApproach * 0.12;
