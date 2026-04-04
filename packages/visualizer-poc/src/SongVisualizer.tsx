@@ -825,23 +825,8 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
             </SilentErrorBoundary>
           )}
 
-          {/* Dynamic overlay stack: 5-20 rotation overlays with per-frame opacity */}
-          <SilentErrorBoundary name="DynamicOverlayStack">
-            <DynamicOverlayStack
-              activeEntries={activeEntries}
-              opacityMap={opacityMap}
-              mediaSuppression={mediaSuppression}
-              hueRotation={hueRotation}
-              tempo={tempo}
-              palette={effectivePalette}
-              frames={f}
-              focusSuppression={1}
-              energyLevel={energyLevel}
-              itOverlayOverride={1}
-              counterpointOverlayInversion={0}
-              climaxDesaturation={0}
-            />
-          </SilentErrorBoundary>
+          {/* DynamicOverlayStack DISABLED — SVG overlays look cheap, destroy visual quality */}
+          {/* The shader + subtle AI art silhouettes are the visual. No SVG blobs. */}
 
           {/* Dead imagery: subtle silhouette overlay — felt not scrutinized */}
           {iconState.iconPath && introFactor > 0.5 && deadAirFactor < 0.5 && (

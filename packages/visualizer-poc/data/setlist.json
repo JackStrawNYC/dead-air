@@ -7,24 +7,10 @@
   "venueType": "festival",
   "songs": [
     {
-      "trackId": "d1t01",
+      "trackId": "d1t02",
       "title": "The Promised Land",
       "set": 1,
       "trackNumber": 1,
-      "defaultMode": "tie_dye",
-      "audioFile": "veneta-72/gd72-08-27d1t01.mp3",
-      "palette": {
-        "primary": 30,
-        "secondary": 210,
-        "saturation": 1.0
-      },
-      "songArt": "assets/song-art/veneta-72/d1t01.png"
-    },
-    {
-      "trackId": "d1t02",
-      "title": "Sugaree",
-      "set": 1,
-      "trackNumber": 2,
       "defaultMode": "liquid_light",
       "audioFile": "veneta-72/gd72-08-27d1t02.mp3",
       "palette": {
@@ -36,9 +22,9 @@
     },
     {
       "trackId": "d1t03",
-      "title": "Me And My Uncle",
+      "title": "Sugaree",
       "set": 1,
-      "trackNumber": 3,
+      "trackNumber": 2,
       "defaultMode": "oil_projector",
       "audioFile": "veneta-72/gd72-08-27d1t03.mp3",
       "palette": {
@@ -50,10 +36,10 @@
     },
     {
       "trackId": "d1t04",
-      "title": "Deal",
+      "title": "Me And My Uncle",
       "set": 1,
-      "trackNumber": 4,
-      "defaultMode": "concert_lighting",
+      "trackNumber": 3,
+      "defaultMode": "smoke_rings",
       "audioFile": "veneta-72/gd72-08-27d1t04.mp3",
       "palette": {
         "primary": 0,
@@ -64,9 +50,9 @@
     },
     {
       "trackId": "d1t05",
-      "title": "Black Throated Wind",
+      "title": "Deal",
       "set": 1,
-      "trackNumber": 5,
+      "trackNumber": 4,
       "defaultMode": "smoke_rings",
       "audioFile": "veneta-72/gd72-08-27d1t05.mp3",
       "palette": {
@@ -78,10 +64,10 @@
     },
     {
       "trackId": "d1t06",
-      "title": "China Cat Sunflower",
+      "title": "Black Throated Wind",
       "set": 1,
-      "trackNumber": 6,
-      "defaultMode": "kaleidoscope",
+      "trackNumber": 5,
+      "defaultMode": "coral_reef",
       "audioFile": "veneta-72/gd72-08-27d1t06.mp3",
       "palette": {
         "primary": 50,
@@ -93,10 +79,10 @@
     },
     {
       "trackId": "d1t07",
-      "title": "I Know You Rider",
+      "title": "China Cat Sunflower",
       "set": 1,
-      "trackNumber": 7,
-      "defaultMode": "spinning_spiral",
+      "trackNumber": 6,
+      "defaultMode": "warm_nebula",
       "audioFile": "veneta-72/gd72-08-27d1t07.mp3",
       "palette": {
         "primary": 15,
@@ -107,9 +93,9 @@
     },
     {
       "trackId": "d1t08",
-      "title": "Mexicali Blues",
+      "title": "I Know You Rider",
       "set": 1,
-      "trackNumber": 8,
+      "trackNumber": 7,
       "defaultMode": "liquid_light",
       "audioFile": "veneta-72/gd72-08-27d1t08.mp3",
       "palette": {
@@ -121,9 +107,9 @@
     },
     {
       "trackId": "d1t09",
-      "title": "Bertha",
+      "title": "Mexicali Blues",
       "set": 1,
-      "trackNumber": 9,
+      "trackNumber": 8,
       "defaultMode": "liquid_light",
       "audioFile": "veneta-72/gd72-08-27d1t09.mp3",
       "palette": {
@@ -135,10 +121,10 @@
     },
     {
       "trackId": "d1t10",
-      "title": "Playing In The Band",
-      "set": 2,
-      "trackNumber": 1,
-      "defaultMode": "feedback_recursion",
+      "title": "Bertha",
+      "set": 1,
+      "trackNumber": 9,
+      "defaultMode": "coral_reef",
       "audioFile": "veneta-72/gd72-08-27d1t10.mp3",
       "palette": {
         "primary": 270,
@@ -149,9 +135,9 @@
     },
     {
       "trackId": "d2t01",
-      "title": "He's Gone",
+      "title": "Playing In The Band",
       "set": 2,
-      "trackNumber": 2,
+      "trackNumber": 1,
       "defaultMode": "aurora_curtains",
       "audioFile": "veneta-72/gd72-08-27d2t01.mp3",
       "palette": {
@@ -163,9 +149,9 @@
     },
     {
       "trackId": "d2t02",
-      "title": "Jack Straw",
+      "title": "He's Gone",
       "set": 2,
-      "trackNumber": 3,
+      "trackNumber": 2,
       "defaultMode": "liquid_light",
       "audioFile": "veneta-72/gd72-08-27d2t02.mp3",
       "palette": {
@@ -177,9 +163,9 @@
     },
     {
       "trackId": "d2t03",
-      "title": "Bird Song",
+      "title": "Jack Straw",
       "set": 2,
-      "trackNumber": 4,
+      "trackNumber": 3,
       "defaultMode": "deep_ocean",
       "audioFile": "veneta-72/gd72-08-27d2t03.mp3",
       "palette": {
@@ -191,9 +177,9 @@
     },
     {
       "trackId": "d2t04",
-      "title": "Greatest Story Ever Told",
+      "title": "Bird Song",
       "set": 2,
-      "trackNumber": 5,
+      "trackNumber": 4,
       "defaultMode": "stained_glass",
       "audioFile": "veneta-72/gd72-08-27d2t04.mp3",
       "palette": {
@@ -205,10 +191,10 @@
     },
     {
       "trackId": "d2t05",
-      "title": "Drums / Space",
+      "title": "Greatest Story Ever Told",
       "set": 2,
-      "trackNumber": 6,
-      "defaultMode": "sacred_geometry",
+      "trackNumber": 5,
+      "defaultMode": "aurora",
       "audioFile": "veneta-72/gd72-08-27d2t05.mp3",
       "palette": {
         "primary": 240,
@@ -236,7 +222,7 @@
       "title": "Dark Star (cont.)",
       "set": 3,
       "trackNumber": 2,
-      "defaultMode": "volumetric_nebula",
+      "defaultMode": "cosmic_voyage",
       "audioFile": "veneta-72/gd72-08-27d3t01.mp3",
       "palette": {
         "primary": 260,
@@ -279,7 +265,7 @@
       "title": "Sugar Magnolia",
       "set": 3,
       "trackNumber": 5,
-      "defaultMode": "bioluminescence",
+      "defaultMode": "stained_glass",
       "audioFile": "veneta-72/gd72-08-27d3t04.mp3",
       "palette": {
         "primary": 310,
@@ -293,7 +279,7 @@
       "title": "Casey Jones",
       "set": 3,
       "trackNumber": 6,
-      "defaultMode": "tie_dye",
+      "defaultMode": "stained_glass",
       "audioFile": "veneta-72/gd72-08-27d3t05.mp3",
       "palette": {
         "primary": 20,
@@ -321,7 +307,7 @@
       "title": "And We Bid You Goodnight",
       "set": 3,
       "trackNumber": 8,
-      "defaultMode": "prism_refraction",
+      "defaultMode": "aurora",
       "audioFile": "veneta-72/gd72-08-27d3t07.mp3",
       "palette": {
         "primary": 165,
