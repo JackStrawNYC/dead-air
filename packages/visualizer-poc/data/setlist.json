@@ -134,24 +134,10 @@
       "songArt": "assets/song-art/veneta-72/d1t10.png"
     },
     {
-      "trackId": "d2t01",
+      "trackId": "d2t02",
       "title": "Playing In The Band",
       "set": 2,
       "trackNumber": 1,
-      "defaultMode": "aurora_curtains",
-      "audioFile": "veneta-72/gd72-08-27d2t01.mp3",
-      "palette": {
-        "primary": 180,
-        "secondary": 310,
-        "saturation": 0.85
-      },
-      "songArt": "assets/song-art/veneta-72/d2t01.png"
-    },
-    {
-      "trackId": "d2t02",
-      "title": "He's Gone",
-      "set": 2,
-      "trackNumber": 2,
       "defaultMode": "liquid_light",
       "audioFile": "veneta-72/gd72-08-27d2t02.mp3",
       "palette": {
@@ -163,9 +149,9 @@
     },
     {
       "trackId": "d2t03",
-      "title": "Jack Straw",
+      "title": "He's Gone",
       "set": 2,
-      "trackNumber": 3,
+      "trackNumber": 2,
       "defaultMode": "deep_ocean",
       "audioFile": "veneta-72/gd72-08-27d2t03.mp3",
       "palette": {
@@ -177,9 +163,9 @@
     },
     {
       "trackId": "d2t04",
-      "title": "Bird Song",
+      "title": "Jack Straw",
       "set": 2,
-      "trackNumber": 4,
+      "trackNumber": 3,
       "defaultMode": "stained_glass",
       "audioFile": "veneta-72/gd72-08-27d2t04.mp3",
       "palette": {
@@ -191,9 +177,9 @@
     },
     {
       "trackId": "d2t05",
-      "title": "Greatest Story Ever Told",
+      "title": "Bird Song",
       "set": 2,
-      "trackNumber": 5,
+      "trackNumber": 4,
       "defaultMode": "aurora",
       "audioFile": "veneta-72/gd72-08-27d2t05.mp3",
       "palette": {
@@ -205,9 +191,9 @@
     },
     {
       "trackId": "d2t06",
-      "title": "Dark Star",
-      "set": 3,
-      "trackNumber": 1,
+      "title": "Greatest Story Ever Told",
+      "set": 2,
+      "trackNumber": 5,
       "defaultMode": "cosmic_voyage",
       "audioFile": "veneta-72/gd72-08-27d2t06.mp3",
       "palette": {
@@ -219,9 +205,9 @@
     },
     {
       "trackId": "d3t01",
-      "title": "Dark Star (cont.)",
+      "title": "Dark Star",
       "set": 3,
-      "trackNumber": 2,
+      "trackNumber": 1,
       "defaultMode": "cosmic_voyage",
       "audioFile": "veneta-72/gd72-08-27d3t01.mp3",
       "palette": {
@@ -236,7 +222,7 @@
       "trackId": "d3t02",
       "title": "El Paso",
       "set": 3,
-      "trackNumber": 3,
+      "trackNumber": 2,
       "defaultMode": "stained_glass",
       "audioFile": "veneta-72/gd72-08-27d3t02.mp3",
       "palette": {
@@ -250,7 +236,7 @@
       "trackId": "d3t03",
       "title": "Sing Me Back Home",
       "set": 3,
-      "trackNumber": 4,
+      "trackNumber": 3,
       "defaultMode": "warm_nebula",
       "audioFile": "veneta-72/gd72-08-27d3t03.mp3",
       "palette": {
@@ -264,7 +250,7 @@
       "trackId": "d3t04",
       "title": "Sugar Magnolia",
       "set": 3,
-      "trackNumber": 5,
+      "trackNumber": 4,
       "defaultMode": "stained_glass",
       "audioFile": "veneta-72/gd72-08-27d3t04.mp3",
       "palette": {
@@ -278,7 +264,7 @@
       "trackId": "d3t05",
       "title": "Casey Jones",
       "set": 3,
-      "trackNumber": 6,
+      "trackNumber": 5,
       "defaultMode": "stained_glass",
       "audioFile": "veneta-72/gd72-08-27d3t05.mp3",
       "palette": {
@@ -292,7 +278,7 @@
       "trackId": "d3t06",
       "title": "One More Saturday Night",
       "set": 3,
-      "trackNumber": 7,
+      "trackNumber": 6,
       "defaultMode": "liquid_light",
       "audioFile": "veneta-72/gd72-08-27d3t06.mp3",
       "palette": {
@@ -306,7 +292,7 @@
       "trackId": "d3t07",
       "title": "And We Bid You Goodnight",
       "set": 3,
-      "trackNumber": 8,
+      "trackNumber": 7,
       "defaultMode": "aurora",
       "audioFile": "veneta-72/gd72-08-27d3t07.mp3",
       "palette": {

@@ -1,6 +1,6 @@
 {
   "showDate": "1972-08-27",
-  "totalFrames": 344173,
+  "totalFrames": 339351,
   "tracks": [
     {
       "trackId": "d1t02",
@@ -55,12 +55,6 @@
       "globalFrameStart": 98829,
       "globalFrameEnd": 109419,
       "totalFrames": 10590
-    },
-    {
-      "trackId": "d2t01",
-      "globalFrameStart": 109419,
-      "globalFrameEnd": 114241,
-      "totalFrames": 4822
     },
     {
       "trackId": "d2t02",
