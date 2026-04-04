@@ -326,6 +326,7 @@ export function getModeForSection(
     "lava_flow", "aurora_curtains", "sacred_geometry", "mandala_engine",
     "fractal_flames", "kaleidoscope", "fractal_zoom", "galaxy_spiral",
     "spinning_spiral", "smoke_rings", "coral_reef",
+    "volumetric_clouds", "volumetric_smoke", "volumetric_nebula",
     "river", "forest", "mountain_fire", "space_travel", "ocean",
     "campfire", "rain_street", "aurora_sky", "storm", "canyon",
     "flower_field", "desert_road",

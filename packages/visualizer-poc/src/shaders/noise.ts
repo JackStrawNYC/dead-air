@@ -340,9 +340,12 @@ vec3 cinematicGrade(vec3 col, float energy) {
   float maxC = max(col.r, max(col.g, col.b));
   vec3 hueRatio = col / max(maxC, 0.001);
 
-  // Filmic tone curve: high exposure so shaders stay bright and vivid
-  float exposure = 3.5 + energy * 0.5;
+  // Filmic tone curve: higher exposure for vivid bright areas
+  float exposure = 4.0 + energy * 1.0;
   float mapped = 1.0 - exp(-maxC * exposure);
+
+  // S-curve contrast: deeper blacks, brighter highlights
+  mapped = mapped * mapped * (3.0 - 2.0 * mapped); // smoothstep S-curve
 
   // Reconstruct color with preserved hue ratios
   col = hueRatio * mapped;
@@ -353,11 +356,11 @@ vec3 cinematicGrade(vec3 col, float energy) {
   // Gentle contrast + era saturation: GLSL owns all color grading.
   // uEraSaturation plumbed from era data (default 1.0 for no era).
   float luma = dot(col, vec3(0.2126, 0.7152, 0.0722));
-  float contrast = mix(0.95, 1.15, energy);
+  float contrast = mix(1.05, 1.35, energy);
   contrast *= 1.0 + uHarmonicTension * 0.08;
   float isClimaxGrade = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5);
   float climaxSat = isClimaxGrade * uClimaxIntensity * 0.70;
-  col = mix(vec3(luma), col, contrast * uEraSaturation + uShowSaturation + climaxSat);
+  col = mix(vec3(luma), col, contrast * uEraSaturation * 1.15 + uShowSaturation + climaxSat);
 
   // === PEAK-OF-SHOW TRANSCENDENCE ===
   // One-time, per-show moment: golden glow + saturation surge + luminance bloom.

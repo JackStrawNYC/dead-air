@@ -138,7 +138,7 @@
       "title": "Playing In The Band",
       "set": 2,
       "trackNumber": 1,
-      "defaultMode": "liquid_light",
+      "defaultMode": "volumetric_smoke",
       "audioFile": "veneta-72/gd72-08-27d2t02.mp3",
       "palette": {
         "primary": 15,
@@ -180,7 +180,7 @@
       "title": "Bird Song",
       "set": 2,
       "trackNumber": 4,
-      "defaultMode": "aurora",
+      "defaultMode": "volumetric_nebula",
       "audioFile": "veneta-72/gd72-08-27d2t05.mp3",
       "palette": {
         "primary": 240,

@@ -114,12 +114,14 @@ ${
 }
 ${
   bloomEnabled
-    ? `  // Bloom: gentle self-illumination
+    ? `  // Bloom: vivid self-illumination
   {
     float lum = dot(col, vec3(0.299, 0.587, 0.114));
-    float bloomThreshold = mix(0.55, 0.40, energy) + uBloomThreshold${bloomThresholdStr};
+    float bloomThreshold = mix(0.45, 0.30, energy) + uBloomThreshold${bloomThresholdStr};
     float bloomAmount = max(0.0, lum - bloomThreshold);
-    vec3 bloom = mix(col, vec3(1.0, 0.98, 0.95), 0.3) * min(bloomAmount, 0.30) * 0.12 * uShowBloom;
+    vec3 bloomColor = mix(col, vec3(1.0, 0.95, 0.90), 0.4);
+    float bloomCap = 0.40 + energy * 0.20;
+    vec3 bloom = bloomColor * min(bloomAmount, bloomCap) * (0.18 + energy * 0.12) * uShowBloom;
     col = col + bloom - col * bloom;
   }
 `
@@ -152,6 +154,13 @@ ${
     : ""
 }
 
+  // Simulated feedback: gentle color persistence without requiring uPrevFrame
+  {
+    float feedbackStr = 0.15 * energy; // more feedback at higher energy
+    vec3 shifted = col * vec3(1.01, 0.99, 1.02); // very slight color shift
+    col = mix(col, shifted, feedbackStr);
+  }
+
   // Cinematic grade (ACES tone mapping)
   col = cinematicGrade(col, energy);
 
@@ -183,11 +192,24 @@ ${
     : ""
 }
 
-  // Gentle vignette
+  // Dramatic vignette
   {
     float vig = 1.0 - dot(p * 0.9, p * 0.9);
     vig = smoothstep(0.0, 1.0, vig);
-    col *= mix(1.0, vig, 0.2);
+    col *= mix(1.0, vig, 0.35);
+  }
+
+  // Blacks crush: push near-black toward true black for contrast
+  {
+    float crushLuma = dot(col, vec3(0.299, 0.587, 0.114));
+    float crushFactor = smoothstep(0.0, 0.15, crushLuma);
+    col *= crushFactor * 0.3 + 0.7;
+  }
+
+  // Color persistence: saturated highlights glow with lingering warmth
+  {
+    float highlightMask = smoothstep(0.5, 0.9, dot(col, vec3(0.299, 0.587, 0.114)));
+    col = mix(col, col * vec3(1.05, 1.0, 0.95), highlightMask * 0.3 * energy);
   }
 
 ${

@@ -113,8 +113,8 @@ void main() {
   orbit1 += curlNoise(vec3(orbit1, uDynamicTime * 0.1)).xy * 0.2;
   vec3 blob1Pos = vec3(p * 0.5 + orbit1 + convectionOffset + vec2(0.0, -uDynamicTime * 0.008), t * 0.3 + sectionSeed);
   // Warp for organic movement
-  float w1x = fbm(blob1Pos + vec3(3.1, 7.2, 0.0));
-  float w1y = fbm(blob1Pos + vec3(8.4, 1.9, 0.0));
+  float w1x = fbm6(blob1Pos + vec3(3.1, 7.2, 0.0));
+  float w1y = fbm6(blob1Pos + vec3(8.4, 1.9, 0.0));
   vec3 warped1 = vec3(p + vec2(w1x, w1y) * (0.4 + uBass * 0.2 + uFastBass * 0.15), t * 0.25);
 
   float blob1 = oilBlob(warped1 * 0.7 / blobSizeMod, 0.05);
@@ -128,8 +128,8 @@ void main() {
   // Curl noise advection for organic, fluid blob motion
   orbit2 += curlNoise(vec3(orbit2 + 5.0, uDynamicTime * 0.1)).xy * 0.2;
   vec3 blob2Pos = vec3(p * 0.6 + orbit2 + vec2(0.3, -0.2 - uDynamicTime * 0.005), t * 0.35 + sectionSeed * 0.7);
-  float w2x = fbm(blob2Pos + vec3(5.5, 2.1, 0.0));
-  float w2y = fbm(blob2Pos + vec3(1.3, 6.8, 0.0));
+  float w2x = fbm6(blob2Pos + vec3(5.5, 2.1, 0.0));
+  float w2y = fbm6(blob2Pos + vec3(1.3, 6.8, 0.0));
   vec3 warped2 = vec3(p + vec2(w2x, w2y) * (0.35 + uMids * 0.15), t * 0.3);
 
   float blob2 = oilBlob(warped2 * 0.8 / blobSizeMod, 0.1);
