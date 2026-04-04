@@ -118,7 +118,7 @@ const BEAT_CROSSFADE_FRAMES = 90; // 3 seconds when beat-synced (45 before + 45 
 // Minimum section duration (in frames) to qualify for auto-variety
 // Lowered from 2700 (1.5 min) to 1200 (40s) so 5-minute songs get scene transitions.
 // Previous threshold meant only 10+ minute songs got within-song variety.
-const AUTO_VARIETY_MIN_SECTION = 750; // 25 seconds at 30fps
+const AUTO_VARIETY_MIN_SECTION = 2700; // 90 seconds at 30fps — unhurried, not frantic
 
 /**
  * Find nearest strong beat within a frame range for beat-synced transitions.
@@ -337,9 +337,13 @@ export function getModeForSection(
   const override = song.sectionOverrides?.find((o) => o.sectionIndex === sectionIndex);
   if (override) return validateSafe(override.mode);
 
-  // ONE shader per song. No within-song switching. Flow, not chaos.
-  // Visual variety comes from different shaders across songs (10 shaders, 22 songs).
-  return validateSafe(song.defaultMode);
+  // Section 0 always uses default
+  if (sectionIndex === 0) return validateSafe(song.defaultMode);
+
+  // Coherence lock: hold current shader
+  if (coherenceIsLocked) {
+    return getModeForSection(song, sectionIndex - 1, sections, seed, era, false, usedShaderModes, songIdentity, stemSection, frames, songDuration, setNumber, trackNumber, shaderModeLastUsed);
+  }
 
   // Seeded variation with affinity-aware morphing
   if (seed !== undefined) {

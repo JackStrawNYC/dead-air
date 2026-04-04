@@ -157,7 +157,7 @@ export const SetlistScroll: React.FC<Props> = ({ frames, currentSong, introFacto
       <div
         style={{
           position: "absolute",
-          bottom: 40 * s,
+          top: 40 * s,
           ...(isIntroSong ? { right: 24 * s } : { left: 24 * s }),
           opacity,
           transform: `translate(${slideX + jitterX}px, ${jitterY}px) rotate(${tiltAngle}deg)`,

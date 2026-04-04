@@ -957,8 +957,8 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
         </CameraMotion>
 
         {/* Text elements rendered OUTSIDE CameraMotion to prevent CSS transform blur */}
-        {/* ConcertInfo and SetlistScroll DISABLED — too much UI clutter for YouTube */}
-        {/* NowPlaying badge is the only text on screen */}
+        {!isDeadAir && <ConcertInfo />}
+        {!isDeadAir && <SetlistScroll frames={f} currentSong={props.song.title} introFactor={introFactor} />}
         {!isDeadAir && (
           <SilentErrorBoundary name="NowPlaying">
             <NowPlaying
