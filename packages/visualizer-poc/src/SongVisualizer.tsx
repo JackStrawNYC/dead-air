@@ -825,8 +825,20 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
             </SilentErrorBoundary>
           )}
 
-          {/* DynamicOverlayStack DISABLED — SVG overlays look cheap, destroy visual quality */}
-          {/* The shader + subtle AI art silhouettes are the visual. No SVG blobs. */}
+          <DynamicOverlayStack
+            activeEntries={activeEntries}
+            opacityMap={opacityMap}
+            mediaSuppression={mediaSuppression}
+            hueRotation={hueRotation}
+            tempo={tempo}
+            palette={effectivePalette}
+            frames={f}
+            focusSuppression={1}
+            energyLevel={energyLevel}
+            itOverlayOverride={1}
+            counterpointOverlayInversion={0}
+            climaxDesaturation={0}
+          />
 
           {/* AI image overlay REMOVED — makes viewers think "AI slop" and adds visual noise.
               Dead identity comes from song card (intro/bookend) and the shader itself. */}

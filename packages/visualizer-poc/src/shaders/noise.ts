@@ -467,26 +467,33 @@ float _ns_sdBox(vec2 p, vec2 b) {
   return length(max(d, 0.0)) + min(max(d.x, d.y), 0.0);
 }
 
-// Lightning bolt SDF (simplified 13-point bolt shape)
+// Lightning bolt SDF — continuous zigzag with taper (wider top, narrow bottom)
 float _ns_sdBolt(vec2 p) {
-  // Zigzag bolt: 3 segments approximated as rotated boxes
+  // Zigzag bolt: 3 segments approximated as rotated boxes, connected
   float d = 1e10;
-  // Top segment
+  // Top segment (widest)
   vec2 p1 = p - vec2(0.0, 0.25);
-  float seg1 = _ns_sdBox(vec2(p1.x * 0.9 + p1.y * 0.4, -p1.x * 0.4 + p1.y * 0.9), vec2(0.04, 0.18));
+  float seg1 = _ns_sdBox(vec2(p1.x * 0.9 + p1.y * 0.4, -p1.x * 0.4 + p1.y * 0.9), vec2(0.05, 0.18));
   d = min(d, seg1);
-  // Middle segment
+  // Middle segment (medium width)
   vec2 p2 = p - vec2(0.0, 0.0);
   float seg2 = _ns_sdBox(vec2(p2.x * 0.9 - p2.y * 0.4, p2.x * 0.4 + p2.y * 0.9), vec2(0.04, 0.16));
   d = min(d, seg2);
-  // Bottom segment
+  // Bottom segment (narrowest — taper)
   vec2 p3 = p - vec2(0.0, -0.25);
-  float seg3 = _ns_sdBox(vec2(p3.x * 0.9 + p3.y * 0.4, -p3.x * 0.4 + p3.y * 0.9), vec2(0.04, 0.18));
+  float seg3 = _ns_sdBox(vec2(p3.x * 0.9 + p3.y * 0.4, -p3.x * 0.4 + p3.y * 0.9), vec2(0.03, 0.18));
   d = min(d, seg3);
+  // Connecting joints: small circles at segment junctions to unify shape
+  float joint1 = length(p - vec2(0.0, 0.12)) - 0.045;
+  float joint2 = length(p - vec2(0.0, -0.12)) - 0.038;
+  d = min(d, min(joint1, joint2));
+  // Thin connecting spine through center for continuity
+  float spine = _ns_sdBox(p, vec2(0.015, 0.43));
+  d = min(d, spine);
   return d;
 }
 
-// Steal Your Face SDF: outer ring + dividing line + bolt
+// Steal Your Face SDF: outer ring + dividing line + bolt + skull detail
 float sdStealie(vec2 p, float radius) {
   // Outer ring
   float ring = abs(length(p) - radius) - radius * 0.08;
@@ -498,6 +505,16 @@ float sdStealie(vec2 p, float radius) {
   float bolt = _ns_sdBolt(p * (1.0 / radius));
   // Combine: ring OR divider OR bolt, masked to circle
   float shape = min(ring, min(divider, bolt * radius));
+  // Eye sockets — two circles in upper half
+  float eyeL = length(p - vec2(-0.25, 0.15) * radius) - radius * 0.12;
+  float eyeR = length(p - vec2(0.25, 0.15) * radius) - radius * 0.12;
+  float eyes = min(eyeL, eyeR);
+  // Nose — inverted triangle below eyes
+  float nose = max(abs(p.x) - radius * 0.05, p.y + radius * 0.05);
+  // Teeth line — thin horizontal stripe below divider
+  float teethLine = abs(p.y + radius * 0.15) - radius * 0.012;
+  teethLine = max(teethLine, abs(p.x) - radius * 0.3);
+  shape = min(shape, min(eyes, min(nose, teethLine)));
   return shape;
 }
 
@@ -593,60 +610,116 @@ vec2 applyCameraCut(vec2 uv, float onset, float beat, float energy, float cohere
 // overlay-sdf.ts equivalents. Used by iconEmergence() below.
 // ═══════════════════════════════════════════════════════════
 
-// Dancing bear with animated walk cycle
+// Dancing bear with animated walk cycle, paw details, and rounded features
 float _ns_sdDancingBear(vec2 p, float dancePhase) {
-  // Body: ellipse
-  float body = length(p * vec2(1.0, 1.3)) - 0.3;
+  // Body: ellipse (slightly rounder)
+  float body = length(p * vec2(1.0, 1.2)) - 0.32;
   // Head: circle offset up
-  float head = length(p - vec2(0.0, 0.35)) - 0.15;
-  // Ears: two small circles
-  float earL = length(p - vec2(-0.12, 0.48)) - 0.06;
-  float earR = length(p - vec2(0.12, 0.48)) - 0.06;
+  float head = length(p - vec2(0.0, 0.35)) - 0.16;
+  // Ears: larger, rounder circles
+  float earL = length(p - vec2(-0.13, 0.50)) - 0.08;
+  float earR = length(p - vec2(0.13, 0.50)) - 0.08;
+  // Inner ear detail
+  float earInnerL = length(p - vec2(-0.13, 0.50)) - 0.04;
+  float earInnerR = length(p - vec2(0.13, 0.50)) - 0.04;
+  // Snout: small circle on face
+  float snout = length(p - vec2(0.0, 0.30)) - 0.06;
+  // Eyes: small dots
+  float eyeL = length(p - vec2(-0.06, 0.38)) - 0.025;
+  float eyeR = length(p - vec2(0.06, 0.38)) - 0.025;
   // Legs: animated with dancePhase
   float legSwing = sin(dancePhase * 6.28) * 0.12;
   vec2 legL = p - vec2(-0.12 + legSwing, -0.35);
   vec2 legR = p - vec2(0.12 - legSwing, -0.35);
   float legLD = length(legL * vec2(1.0, 0.5)) - 0.08;
   float legRD = length(legR * vec2(1.0, 0.5)) - 0.08;
+  // Paw circles at feet
+  float pawL = length(p - vec2(-0.12 + legSwing, -0.44)) - 0.05;
+  float pawR = length(p - vec2(0.12 - legSwing, -0.44)) - 0.05;
   // Arms: animated opposite to legs
   float armSwing = sin(dancePhase * 6.28 + 3.14) * 0.1;
   vec2 armL = p - vec2(-0.28, 0.1 + armSwing);
   vec2 armR = p - vec2(0.28, 0.1 - armSwing);
   float armLD = length(armL * vec2(0.5, 1.0)) - 0.06;
   float armRD = length(armR * vec2(0.5, 1.0)) - 0.06;
+  // Hand paw circles at arm tips
+  float handL = length(p - vec2(-0.34, 0.1 + armSwing)) - 0.04;
+  float handR = length(p - vec2(0.34, 0.1 - armSwing)) - 0.04;
+  // Belly button: small circle on body center
+  float belly = abs(length(p - vec2(0.0, -0.05)) - 0.04) - 0.008;
   // Combine
   float d = min(body, head);
   d = min(d, min(earL, earR));
+  d = min(d, min(earInnerL, earInnerR));
+  d = min(d, snout);
+  d = min(d, min(eyeL, eyeR));
   d = min(d, min(legLD, legRD));
+  d = min(d, min(pawL, pawR));
   d = min(d, min(armLD, armRD));
+  d = min(d, min(handL, handR));
+  d = min(d, belly);
   return d;
 }
 
-// American Beauty rose with layered petals
+// American Beauty rose with polar petal geometry, stem, and leaves
 float _ns_sdRose(vec2 p) {
-  // Center bud
-  float bud = length(p) - 0.08;
-  // 5 petal layers at increasing radii
+  // Stem: vertical line below the bud
+  float stem = max(abs(p.x) - 0.012, -(p.y + 0.05));
+  stem = max(stem, p.y + 0.45);
+  // Left leaf: offset ellipse with pointed tip
+  vec2 leafL = p - vec2(-0.08, -0.25);
+  float aL = 0.6; // tilt angle
+  vec2 rotL = vec2(leafL.x * cos(aL) + leafL.y * sin(aL), -leafL.x * sin(aL) + leafL.y * cos(aL));
+  float leafLD = length(rotL * vec2(1.0, 2.5)) - 0.05;
+  // Right leaf: mirrored
+  vec2 leafR = p - vec2(0.08, -0.30);
+  float aR = -0.6;
+  vec2 rotR = vec2(leafR.x * cos(aR) + leafR.y * sin(aR), -leafR.x * sin(aR) + leafR.y * cos(aR));
+  float leafRD = length(rotR * vec2(1.0, 2.5)) - 0.05;
+  // Leaf veins (center lines)
+  float veinL = abs(rotL.x) - 0.004;
+  veinL = max(veinL, leafLD + 0.01);
+  float veinR = abs(rotR.x) - 0.004;
+  veinR = max(veinR, leafRD + 0.01);
+  // Center bud: tight spiral
+  float bud = length(p) - 0.06;
+  // Petal layers using polar modulation for organic shape
   float petals = 1e10;
+  float angle = atan(p.y, p.x);
+  float r = length(p);
   for (int i = 0; i < 5; i++) {
     float fi = float(i);
-    float radius = 0.12 + fi * 0.06;
-    float petalCount = 5.0 + fi * 2.0;
-    float angle = atan(p.y, p.x) + fi * 0.3;
-    float petalShape = cos(angle * petalCount) * 0.03 * (1.0 + fi * 0.3);
-    float ring = abs(length(p) - radius + petalShape) - 0.02;
+    float petalR = 0.10 + fi * 0.055;
+    float petalCount = 5.0 + fi;
+    float petalOffset = fi * 0.4; // rotate each layer
+    // Angular modulation creates petal scallops
+    float petalShape = cos((angle + petalOffset) * petalCount) * (0.025 + fi * 0.008);
+    float ring = abs(r - petalR - petalShape) - (0.015 + fi * 0.003);
     petals = min(petals, ring);
   }
-  return min(bud, petals);
+  // Combine bud + petals + stem + leaves
+  float flower = min(bud, petals);
+  float d = min(flower, min(stem, min(leafLD, leafRD)));
+  d = min(d, min(veinL, veinR));
+  return d;
 }
 
-// Skull with animated jaw
+// Skull with animated jaw, cheekbones, brow ridge, individual teeth
 float _ns_sdSkull(vec2 p, float jawOpen) {
   // Cranium: slightly squashed circle
   float cranium = length(p * vec2(1.0, 0.9) - vec2(0.0, 0.05)) - 0.3;
+  // Brow ridge: thick horizontal line above eyes
+  float brow = _ns_sdBox(p - vec2(0.0, 0.16), vec2(0.22, 0.018));
   // Eye sockets: two holes
   float eyeL = length(p - vec2(-0.1, 0.08)) - 0.07;
   float eyeR = length(p - vec2(0.1, 0.08)) - 0.07;
+  // Cheekbone ridges: arched lines flanking the nose
+  vec2 chkL = p - vec2(-0.18, -0.02);
+  float cheekL = abs(length(chkL) - 0.08) - 0.008;
+  cheekL = max(cheekL, -chkL.x); // only right half of arc
+  vec2 chkR = p - vec2(0.18, -0.02);
+  float cheekR = abs(length(chkR) - 0.08) - 0.008;
+  cheekR = max(cheekR, chkR.x); // only left half of arc
   // Nose: inverted triangle (heart shape)
   vec2 np = p - vec2(0.0, -0.05);
   float nose = max(abs(np.x) - 0.04, np.y + 0.02);
@@ -655,48 +728,92 @@ float _ns_sdSkull(vec2 p, float jawOpen) {
   float jawDrop = jawOpen * 0.08;
   vec2 jp = p - vec2(0.0, -0.22 - jawDrop);
   float jaw = length(jp * vec2(1.0, 1.5)) - 0.18;
-  // Teeth: horizontal line between skull and jaw
-  float teeth = abs(p.y + 0.18 + jawDrop * 0.5) - 0.01;
-  teeth = max(teeth, abs(p.x) - 0.12);
-  // Combine: cranium minus eyes/nose, union jaw, add teeth edge
+  // Individual teeth: 5 tooth segments instead of single line
+  float teethRow = 1e10;
+  float teethY = p.y + 0.18 + jawDrop * 0.5;
+  for (int t = 0; t < 5; t++) {
+    float ft = float(t);
+    float tx = (ft - 2.0) * 0.045; // spread 5 teeth across mouth
+    float tooth = _ns_sdBox(p - vec2(tx, -0.18 - jawDrop * 0.5), vec2(0.015, 0.018));
+    teethRow = min(teethRow, tooth);
+  }
+  // Combine: cranium minus eyes/nose, union jaw, add detail
   float skull = max(cranium, -min(eyeL, eyeR));
   skull = max(skull, -nose);
   skull = min(skull, jaw);
-  skull = min(skull, teeth);
+  skull = min(skull, teethRow);
+  skull = min(skull, brow);
+  skull = min(skull, min(cheekL, cheekR));
   return skull;
 }
 
-// Terrapin turtle SDF — shell + head + flippers
+// Terrapin turtle SDF — shell with hex scutes, head, flippers with claws
 float _ns_sdTerrapin(vec2 p) {
   // Shell: rounded dome (ellipse)
   float shell = length(p * vec2(1.0, 1.4)) - 0.32;
-  // Shell pattern: concentric hex cells
-  float shellRings = abs(length(p * vec2(1.0, 1.4)) - 0.22) - 0.02;
-  shellRings = min(shellRings, abs(length(p * vec2(1.0, 1.4)) - 0.14) - 0.015);
-  float shellDetail = min(shell, shellRings);
+  // Hexagonal scute pattern on shell (replaces concentric rings)
+  // Use hex grid via quantized coordinates
+  vec2 sp = p * vec2(1.0, 1.4) * 6.0; // scale for hex cells
+  vec2 hexId = vec2(sp.x + sp.y * 0.577, sp.y * 1.155); // skew to hex
+  vec2 hexFrac = fract(hexId) - 0.5;
+  float hexDist = max(abs(hexFrac.x), abs(hexFrac.y * 0.866 + hexFrac.x * 0.5));
+  float hexEdge = abs(hexDist - 0.4) - 0.04;
+  // Mask hex pattern to shell interior only
+  float shellInterior = length(p * vec2(1.0, 1.4)) - 0.28;
+  float scutes = max(hexEdge, shellInterior);
+  float shellDetail = min(shell, scutes);
+  // Central scute (larger pentagon in center)
+  float centerScute = abs(length(p * vec2(1.0, 1.4)) - 0.08) - 0.015;
+  shellDetail = min(shellDetail, centerScute);
   // Head: circle poking out front
   float head = length(p - vec2(0.0, 0.32)) - 0.10;
-  // Eyes: two dots
+  // Eyes: outer circles
   float eyeL = length(p - vec2(-0.05, 0.37)) - 0.025;
   float eyeR = length(p - vec2(0.05, 0.37)) - 0.025;
+  // Pupils: smaller circles inside eyes
+  float pupilL = length(p - vec2(-0.05, 0.37)) - 0.012;
+  float pupilR = length(p - vec2(0.05, 0.37)) - 0.012;
   // Front flippers
   vec2 fL = p - vec2(-0.28, 0.10);
   float flipperL = length(fL * vec2(0.7, 1.2)) - 0.07;
   vec2 fR = p - vec2(0.28, 0.10);
   float flipperR = length(fR * vec2(0.7, 1.2)) - 0.07;
+  // Front flipper claws: 3 small lines at each flipper tip
+  float clawsL = 1e10;
+  float clawsR = 1e10;
+  for (int c = 0; c < 3; c++) {
+    float fc = float(c) - 1.0;
+    vec2 clL = p - vec2(-0.35, 0.10 + fc * 0.03);
+    clawsL = min(clawsL, _ns_sdBox(clL, vec2(0.025, 0.004)));
+    vec2 clR = p - vec2(0.35, 0.10 + fc * 0.03);
+    clawsR = min(clawsR, _ns_sdBox(clR, vec2(0.025, 0.004)));
+  }
   // Rear flippers
   vec2 rL = p - vec2(-0.22, -0.22);
   float rearL = length(rL * vec2(0.8, 1.0)) - 0.055;
   vec2 rR = p - vec2(0.22, -0.22);
   float rearR = length(rR * vec2(0.8, 1.0)) - 0.055;
+  // Rear flipper claws
+  float rClawsL = 1e10;
+  float rClawsR = 1e10;
+  for (int c = 0; c < 3; c++) {
+    float fc = float(c) - 1.0;
+    vec2 rcL = p - vec2(-0.28, -0.22 + fc * 0.025);
+    rClawsL = min(rClawsL, _ns_sdBox(rcL, vec2(0.02, 0.003)));
+    vec2 rcR = p - vec2(0.28, -0.22 + fc * 0.025);
+    rClawsR = min(rClawsR, _ns_sdBox(rcR, vec2(0.02, 0.003)));
+  }
   // Tail
   vec2 tp = p - vec2(0.0, -0.32);
   float tail = length(tp * vec2(2.0, 1.0)) - 0.04;
   // Combine
   float d = min(shellDetail, head);
   d = min(d, min(eyeL, eyeR));
+  d = min(d, min(pupilL, pupilR));
   d = min(d, min(flipperL, flipperR));
+  d = min(d, min(clawsL, clawsR));
   d = min(d, min(rearL, rearR));
+  d = min(d, min(rClawsL, rClawsR));
   d = min(d, tail);
   return d;
 }
@@ -730,7 +847,7 @@ vec3 iconEmergence(vec2 uv, float time, float energy, float bass,
 
   // Bass pulse
   float pulse = 1.0 + bass * 0.6;
-  vec2 scaledUv = rotUv / (0.7 * pulse);
+  vec2 scaledUv = rotUv / (1.0 * pulse);
 
   // Select icon based on section index (6 icon types)
   float iconType = mod(sectionIndex, 6.0);

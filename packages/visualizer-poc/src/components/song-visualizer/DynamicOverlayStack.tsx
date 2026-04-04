@@ -80,24 +80,24 @@ export const DynamicOverlayStack: React.FC<Props> = ({
   const sectionType = currentFrameData?.sectionType ?? "verse";
   // Section-aware pulse intensity: jams get bigger pulses, space gets minimal
   const pulseScale = sectionType === "jam" || sectionType === "solo" ? 1.5
-    : sectionType === "space" ? 0.3
+    : sectionType === "space" ? 1.3
     : sectionType === "chorus" ? 1.2
     : 1.0;
-  const beatPulse = currentFrameData?.beat ? 0.12 * pulseScale : 0;
+  const beatPulse = currentFrameData?.beat ? 0.08 * pulseScale : 0;
   // Drum-stem pulse: gentle response to drum hits
   const drumPulse = (currentFrameData?.stemDrumOnset ?? 0) > 0.3
-    ? (currentFrameData.stemDrumOnset ?? 0) * 0.08 * pulseScale : 0;
+    ? (currentFrameData.stemDrumOnset ?? 0) * 0.05 * pulseScale : 0;
   const onsetPulse = (currentFrameData?.onset ?? 0) > 0.5
-    ? (currentFrameData.onset ?? 0) * 0.06 * pulseScale : 0;
+    ? (currentFrameData.onset ?? 0) * 0.04 * pulseScale : 0;
   const overlayPulse = 1.0 + beatPulse + Math.max(drumPulse, onsetPulse);
 
   // Compute opacities and apply hard cap on concurrent overlays
   const maxConcurrent = MAX_CONCURRENT[energyLevel] ?? 4;
   const inversionMult = 1 - counterpointOverlayInversion;
-  // Boost overlay visibility: Dead icons must be clearly visible, not ghosted
-  // Floor at 0.35 so compound multiplication never makes overlays invisible
+  // Overlay visibility: allow overlays to go subtle when suppressed
+  // Floor at 0.12 so compound multiplication can reduce but never fully kills overlays
   const rawMult = mediaSuppression * focusSuppression * itOverlayOverride * inversionMult * overlayPulse;
-  const baseMult = Math.min(1.0, Math.max(0.35, rawMult));
+  const baseMult = Math.min(1.0, Math.max(0.12, rawMult));
 
   // Single-pass: compute opacity, filter, sort, split DOM/GLSL in one loop
   const scored: { name: string; entry: OverlayComponentEntry; opacity: number }[] = [];
@@ -140,11 +140,9 @@ export const DynamicOverlayStack: React.FC<Props> = ({
             inset: 0,
             opacity: gateOpacity,
             pointerEvents: "none",
-            mixBlendMode: "soft-light",
+            mixBlendMode: "screen",
             filter: desatFilter,
             contain: "layout style paint",
-            transform: "scale(1.5)",
-            transformOrigin: "center center",
           }}
         >
           {glslOverlays.map(({ name, entry: { Component }, opacity }) => (
@@ -180,8 +178,6 @@ export const DynamicOverlayStack: React.FC<Props> = ({
             desatFilter ?? "",
           ].filter(Boolean).join(" ") || undefined,
           contain: "layout style paint",
-          transform: "scale(1.5)",
-          transformOrigin: "center center",
         }}
       >
         {domOverlays.map(({ name, entry: { Component, blendMode, layer }, opacity }) => {
@@ -200,7 +196,7 @@ export const DynamicOverlayStack: React.FC<Props> = ({
               inset: 0,
               opacity,
               pointerEvents: "none",
-              mixBlendMode: blendMode ?? "soft-light",
+              mixBlendMode: blendMode ?? "screen",
               transform: applyParallax ? `translate(${parallaxX.toFixed(2)}px, ${parallaxY.toFixed(2)}px)` : undefined,
               contain: "layout style paint",
               willChange: "opacity, transform",
