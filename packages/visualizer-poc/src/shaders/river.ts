@@ -185,37 +185,56 @@ void main() {
   vec3 waterColor = mix(deepColor, shallowColor, depthFactor * 0.7);
   waterColor = mix(waterColor, midColor, clamp(vDisplacement * 0.3 + 0.35, 0.0, 1.0));
 
+  // === DOMAIN-WARPED SUBSURFACE CAUSTICS (secondary layer at 30%) ===
+  float energyFreq = 1.0 + energy * 0.5;
+  vec3 warpPos = vec3(vWorldPos.xz * 0.15 * energyFreq, uDynamicTime * 0.08);
+  float warpOffset = fbm3(warpPos) * 0.4;
+  vec3 causticPos = vec3(vWorldPos.x * 0.2 + warpOffset, vWorldPos.z * 0.2 - warpOffset, uDynamicTime * 0.12);
+  float caustics = fbm6(causticPos * energyFreq);
+  caustics = pow(max(0.0, caustics * 0.5 + 0.5), 2.0);
+  vec3 causticColor = mix(shallowColor, vec3(0.4, 0.6, 0.8), 0.5) * caustics;
+  waterColor += causticColor * 0.3 * (1.0 - depthFactor);
+
   // === FRESNEL REFLECTION ===
   vec3 viewDir = normalize(uCameraPosition - vWorldPos);
   vec3 N = normalize(vNormal);
   float fresnel = pow(1.0 - max(dot(viewDir, N), 0.0), 3.0);
   fresnel = mix(0.1, 0.8, fresnel);
 
-  // Sky reflection color
+  // Sky reflection color — domain-warped for rippled reflection
+  vec3 reflWarpPos = vec3(vWorldPos.xz * 0.03, uDynamicTime * 0.05);
+  float reflWarp = fbm3(reflWarpPos) * 0.15;
   vec3 skyColor = mix(
     vec3(0.02, 0.04, 0.1),
     vec3(0.08, 0.12, 0.25),
-    0.5 + 0.5 * N.y
+    0.5 + 0.5 * N.y + reflWarp
   );
+  // Secondary palette sky tint
+  skyColor = mix(skyColor, hsv2rgb(vec3(hue2, sat * 0.3, 0.2)), 0.15);
   // Moon/melodic glow in reflection
   skyColor += vec3(0.3, 0.35, 0.5) * melPitch * 0.3;
 
   waterColor = mix(waterColor, skyColor, fresnel);
 
   // === SURFACE SPARKLE: energy + highs driven ===
-  vec3 sparklePos = vec3(vWorldPos.xz * 0.5, uTime * 0.3);
+  vec3 sparklePos = vec3(vWorldPos.xz * 0.5, uDynamicTime * 0.3);
   float sparkleNoise = snoise(sparklePos);
   float sparkleThreshold = mix(0.88, 0.55, energy + highs * 0.3);
   float sparkle = smoothstep(sparkleThreshold, sparkleThreshold + 0.04, sparkleNoise);
   sparkle *= mix(0.3, 1.0, energy) * (0.4 + highs * 0.6);
-  waterColor += vec3(0.9, 0.92, 1.0) * sparkle * 0.4;
+  // Sparkle picks up both palette colors
+  vec3 sparkleColor = mix(vec3(0.9, 0.92, 1.0), hsv2rgb(vec3(hue1, sat * 0.3, 1.0)), 0.2);
+  waterColor += sparkleColor * sparkle * 0.4;
 
-  // === FOAM at wave crests ===
+  // === FOAM at wave crests — richer with fbm6 ===
   vec3 foamColor = vec3(0.85, 0.9, 0.95);
   float foam = vFoamFactor;
-  // Extra foam noise
-  float foamNoise = fbm(vec3(vWorldPos.xz * 0.3, uDynamicTime * 0.2));
+  // High-detail foam noise
+  float foamNoise = fbm6(vec3(vWorldPos.xz * 0.3 * energyFreq, uDynamicTime * 0.2));
   foam *= smoothstep(0.2, 0.6, foamNoise);
+  // Secondary foam detail layer for lace-like texture
+  float foamDetail = fbm3(vec3(vWorldPos.xz * 1.2 * energyFreq, uDynamicTime * 0.15 + 5.0));
+  foam += smoothstep(0.55, 0.75, foamDetail) * energy * 0.25;
   foam = clamp(foam, 0.0, 1.0);
   waterColor = mix(waterColor, foamColor, foam * 0.7);
 
@@ -233,10 +252,14 @@ void main() {
   float climaxBoost = isClimax * climaxI;
   waterColor *= 1.0 + climaxBoost * 0.35;
 
-  // === DEPTH FOG at distance (subtle) ===
+  // === DEPTH FOG at distance (layered for richness) ===
   float fogDist = length(uCameraPosition - vWorldPos);
   float fogAmount = 1.0 - exp(-fogDist * 0.015 * mix(1.5, 0.5, energy));
-  vec3 fogColor = mix(vec3(0.02, 0.04, 0.08), vec3(0.05, 0.08, 0.15), 0.5);
+  vec3 fogColor = mix(
+    hsv2rgb(vec3(hue1, sat * 0.2, 0.06)),
+    hsv2rgb(vec3(hue2, sat * 0.15, 0.12)),
+    0.5 + 0.3 * sin(vWorldPos.x * 0.01)
+  );
   waterColor = mix(waterColor, fogColor, clamp(fogAmount, 0.0, 0.7));
 
   gl_FragColor = vec4(waterColor, 1.0);
