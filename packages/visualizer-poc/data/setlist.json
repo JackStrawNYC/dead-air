@@ -1,451 +1,335 @@
 {
-  "date": "1977-05-08",
-  "venue": "Barton Hall, Cornell University, Ithaca, NY",
+  "date": "1972-08-27",
+  "venue": "Old Renaissance Faire Grounds, Veneta, OR",
   "bandName": "Grateful Dead",
-  "taperInfo": "SBD > Master Reel > Cassette \u2014 Betty Boards",
-  "era": "classic",
-  "venueType": "arena",
+  "taperInfo": "SBD > Pacific High Studios Master > CD \u2014 Sunshine Daydream",
+  "era": "primal",
+  "venueType": "festival",
   "songs": [
     {
-      "trackId": "s1t02",
-      "title": "New Minglewood Blues",
+      "trackId": "d1t01",
+      "title": "The Promised Land",
       "set": 1,
       "trackNumber": 1,
       "defaultMode": "tie_dye",
-      "audioFile": "gd77-05-08s1t02.mp3",
+      "audioFile": "veneta-72/gd72-08-27d1t01.mp3",
       "palette": {
-        "primary": 20,
-        "secondary": 200,
+        "primary": 30,
+        "secondary": 210,
         "saturation": 1.0
       },
-      "songArt": "assets/song-art/s1t02.png",
-      "overlayOverrides": {
-        "include": [
-          "BearParade",
-          "LightningBoltOverlay",
-          "SkeletonBand",
-          "ThirteenPointBolt"
-        ]
-      }
+      "songArt": "assets/song-art/veneta-72/d1t01.png"
     },
     {
-      "trackId": "s1t03",
-      "title": "Loser",
+      "trackId": "d1t02",
+      "title": "Sugaree",
       "set": 1,
       "trackNumber": 2,
-      "defaultMode": "stained_glass",
-      "audioFile": "gd77-05-08s1t03.mp3",
+      "defaultMode": "liquid_light",
+      "audioFile": "veneta-72/gd72-08-27d1t02.mp3",
       "palette": {
-        "primary": 270,
-        "secondary": 45,
-        "saturation": 0.95
-      },
-      "songArt": "assets/song-art/s1t03.png",
-      "overlayOverrides": {
-        "include": [
-          "StealYourFaceOff",
-          "Roses",
-          "BreathingStealie",
-          "SkullKaleidoscope"
-        ]
-      }
-    },
-    {
-      "trackId": "s1t04",
-      "title": "El Paso",
-      "set": 1,
-      "trackNumber": 3,
-      "defaultMode": "cosmic_voyage",
-      "audioFile": "gd77-05-08s1t04.mp3",
-      "palette": {
-        "primary": 25,
-        "secondary": 180,
+        "primary": 200,
+        "secondary": 40,
         "saturation": 0.9
       },
-      "songArt": "assets/song-art/s1t04.png",
-      "overlayOverrides": {
-        "include": [
-          "LightningBoltOverlay",
-          "BearParade",
-          "BreathingStealie"
-        ]
-      }
+      "songArt": "assets/song-art/veneta-72/d1t02.png"
     },
     {
-      "trackId": "s1t05",
-      "title": "They Love Each Other",
+      "trackId": "d1t03",
+      "title": "Me And My Uncle",
       "set": 1,
-      "trackNumber": 4,
-      "defaultMode": "coral_reef",
-      "audioFile": "gd77-05-08s1t05.mp3",
+      "trackNumber": 3,
+      "defaultMode": "oil_projector",
+      "audioFile": "veneta-72/gd72-08-27d1t03.mp3",
       "palette": {
-        "primary": 330,
-        "secondary": 120,
-        "saturation": 1.0
+        "primary": 35,
+        "secondary": 190,
+        "saturation": 0.85
       },
-      "songArt": "assets/song-art/s1t05.png",
-      "overlayOverrides": {
-        "include": [
-          "Roses",
-          "BearParade",
-          "BreathingStealie",
-          "TieDyeWash"
-        ]
-      }
+      "songArt": "assets/song-art/veneta-72/d1t03.png"
     },
     {
-      "trackId": "s1t06",
-      "title": "Jack Straw",
-      "set": 1,
-      "trackNumber": 5,
-      "defaultMode": "aurora",
-      "audioFile": "gd77-05-08s1t06.mp3",
-      "palette": {
-        "primary": 15,
-        "secondary": 240,
-        "saturation": 1.0
-      },
-      "songArt": "assets/song-art/s1t06.png",
-      "overlayOverrides": {
-        "include": [
-          "SkeletonBand",
-          "LightningBoltOverlay",
-          "StealYourFaceOff",
-          "ThirteenPointBolt"
-        ]
-      }
-    },
-    {
-      "trackId": "s1t07",
+      "trackId": "d1t04",
       "title": "Deal",
       "set": 1,
-      "trackNumber": 6,
-      "defaultMode": "tie_dye",
-      "audioFile": "gd77-05-08s1t07.mp3",
+      "trackNumber": 4,
+      "defaultMode": "concert_lighting",
+      "audioFile": "veneta-72/gd72-08-27d1t04.mp3",
       "palette": {
         "primary": 0,
         "secondary": 220,
         "saturation": 1.0
       },
-      "songArt": "assets/song-art/s1t07.png",
-      "overlayOverrides": {
-        "include": [
-          "LightningBoltOverlay",
-          "SkeletonBand",
-          "BearParade"
-        ]
-      }
+      "songArt": "assets/song-art/veneta-72/d1t04.png"
     },
     {
-      "trackId": "s1t08",
-      "title": "Lazy Lightnin'",
+      "trackId": "d1t05",
+      "title": "Black Throated Wind",
       "set": 1,
-      "trackNumber": 7,
-      "defaultMode": "plasma_field",
-      "audioFile": "gd77-05-08s1t08.mp3",
-      "palette": {
-        "primary": 280,
-        "secondary": 50,
-        "saturation": 1.0
-      },
-      "songArt": "assets/song-art/s1t08.png",
-      "segueInto": true,
-      "overlayOverrides": {
-        "include": [
-          "BearParade",
-          "ThirteenPointBolt",
-          "LightningBoltOverlay"
-        ]
-      }
-    },
-    {
-      "trackId": "s1t09",
-      "title": "Supplication",
-      "set": 1,
-      "trackNumber": 8,
-      "defaultMode": "stained_glass",
-      "audioFile": "gd77-05-08s1t09.mp3",
-      "palette": {
-        "primary": 260,
-        "secondary": 30,
-        "saturation": 0.95
-      },
-      "songArt": "assets/song-art/s1t09.png",
-      "overlayOverrides": {
-        "include": [
-          "StealYourFaceOff",
-          "LightningBoltOverlay",
-          "SkullKaleidoscope",
-          "DarkStarPortal"
-        ]
-      }
-    },
-    {
-      "trackId": "s1t10",
-      "title": "Brown Eyed Women",
-      "set": 1,
-      "trackNumber": 9,
-      "defaultMode": "liquid_light",
-      "audioFile": "gd77-05-08s1t10.mp3",
-      "palette": {
-        "primary": 30,
-        "secondary": 300,
-        "saturation": 0.95
-      },
-      "songArt": "assets/song-art/s1t10.png",
-      "overlayOverrides": {
-        "include": [
-          "Roses",
-          "BreathingStealie",
-          "BearParade",
-          "Fireflies"
-        ]
-      }
-    },
-    {
-      "trackId": "s1t11",
-      "title": "Mama Tried",
-      "set": 1,
-      "trackNumber": 10,
-      "defaultMode": "oil_projector",
-      "audioFile": "gd77-05-08s1t11.mp3",
-      "palette": {
-        "primary": 40,
-        "secondary": 190,
-        "saturation": 0.9
-      },
-      "songArt": "assets/song-art/s1t11.png",
-      "overlayOverrides": {
-        "include": [
-          "BreathingStealie",
-          "BearParade",
-          "Roses"
-        ]
-      }
-    },
-    {
-      "trackId": "s1t12",
-      "title": "Row Jimmy",
-      "set": 1,
-      "trackNumber": 11,
-      "defaultMode": "aurora",
-      "audioFile": "gd77-05-08s1t12.mp3",
-      "palette": {
-        "primary": 195,
-        "secondary": 330,
-        "saturation": 0.85
-      },
-      "songArt": "assets/song-art/s1t12.png",
-      "overlayOverrides": {
-        "include": [
-          "MarchingTerrapins",
-          "Roses",
-          "Fireflies",
-          "BreathingStealie"
-        ]
-      }
-    },
-    {
-      "trackId": "s1t13",
-      "title": "Dancin' in the Street",
-      "set": 1,
-      "trackNumber": 12,
-      "defaultMode": "cosmic_voyage",
-      "audioFile": "gd77-05-08s1t13.mp3",
-      "palette": {
-        "primary": 310,
-        "secondary": 60,
-        "saturation": 1.0
-      },
-      "songArt": "assets/song-art/s1t13.png",
-      "overlayOverrides": {
-        "include": [
-          "BearParade",
-          "SkeletonBand",
-          "StealYourFaceOff",
-          "TieDyeWash"
-        ]
-      }
-    },
-    {
-      "trackId": "s2t02",
-      "title": "Scarlet Begonias",
-      "set": 2,
-      "trackNumber": 1,
-      "defaultMode": "coral_reef",
-      "audioFile": "gd77-05-08s2t02.mp3",
-      "palette": {
-        "primary": 0,
-        "secondary": 150,
-        "saturation": 1.0
-      },
-      "songArt": "assets/song-art/s2t02.png",
-      "segueInto": true,
-      "overlayOverrides": {
-        "include": [
-          "Roses",
-          "BearParade",
-          "BreathingStealie",
-          "TieDyeWash"
-        ]
-      }
-    },
-    {
-      "trackId": "s2t03",
-      "title": "Fire on the Mountain",
-      "set": 2,
-      "trackNumber": 2,
-      "defaultMode": "lava_flow",
-      "audioFile": "gd77-05-08s2t03.mp3",
-      "palette": {
-        "primary": 15,
-        "secondary": 270,
-        "saturation": 1.0
-      },
-      "songArt": "assets/song-art/s2t03.png",
-      "overlayOverrides": {
-        "include": [
-          "StealYourFaceOff",
-          "LightningBoltOverlay",
-          "SkeletonBand",
-          "ThirteenPointBolt"
-        ]
-      }
-    },
-    {
-      "trackId": "s2t04",
-      "title": "Estimated Prophet",
-      "set": 2,
-      "trackNumber": 3,
-      "defaultMode": "deep_ocean",
-      "audioFile": "gd77-05-08s2t04.mp3",
-      "palette": {
-        "primary": 260,
-        "secondary": 120,
-        "saturation": 0.85
-      },
-      "songArt": "assets/song-art/s2t04.png",
-      "overlayOverrides": {
-        "include": [
-          "MarchingTerrapins",
-          "BreathingStealie",
-          "DarkStarPortal",
-          "SkullKaleidoscope"
-        ]
-      }
-    },
-    {
-      "trackId": "s2t05",
-      "title": "St. Stephen",
-      "set": 2,
-      "trackNumber": 4,
-      "defaultMode": "mandala_engine",
-      "audioFile": "gd77-05-08s2t05.mp3",
-      "palette": {
-        "primary": 160,
-        "secondary": 340,
-        "saturation": 1.0
-      },
-      "songArt": "assets/song-art/s2t05.png",
-      "segueInto": true,
-      "overlayOverrides": {
-        "include": [
-          "SkeletonBand",
-          "LightningBoltOverlay",
-          "StealYourFaceOff",
-          "BearParade"
-        ]
-      }
-    },
-    {
-      "trackId": "s2t06",
-      "title": "Not Fade Away",
-      "set": 2,
       "trackNumber": 5,
-      "defaultMode": "aurora_curtains",
-      "audioFile": "gd77-05-08s2t06.mp3",
-      "palette": {
-        "primary": 350,
-        "secondary": 170,
-        "saturation": 1.0
-      },
-      "songArt": "assets/song-art/s2t06.png",
-      "segueInto": true,
-      "overlayOverrides": {
-        "include": [
-          "BearParade",
-          "SkeletonBand",
-          "ThirteenPointBolt",
-          "BreathingStealie"
-        ]
-      }
-    },
-    {
-      "trackId": "s2t07",
-      "title": "Drums / Space",
-      "set": 2,
-      "trackNumber": 6,
-      "defaultMode": "sacred_geometry",
-      "audioFile": "gd77-05-08s2t07.mp3",
-      "palette": {
-        "primary": 240,
-        "secondary": 60,
-        "saturation": 0.8
-      },
-      "songArt": "assets/song-art/s2t07.png",
-      "segueInto": true,
-      "overlayOverrides": {
-        "include": [
-          "BreathingStealie",
-          "DarkStarPortal",
-          "CosmicStarfield"
-        ]
-      }
-    },
-    {
-      "trackId": "s2t08",
-      "title": "Morning Dew",
-      "set": 2,
-      "trackNumber": 7,
       "defaultMode": "smoke_rings",
-      "audioFile": "gd77-05-08s2t08.mp3",
+      "audioFile": "veneta-72/gd72-08-27d1t05.mp3",
       "palette": {
-        "primary": 200,
-        "secondary": 30,
+        "primary": 220,
+        "secondary": 340,
         "saturation": 0.85
       },
-      "songArt": "assets/song-art/s2t08.png",
-      "overlayOverrides": {
-        "include": [
-          "StealYourFaceOff",
-          "Roses",
-          "BreathingStealie",
-          "Fireflies"
-        ]
-      }
+      "songArt": "assets/song-art/veneta-72/d1t05.png"
     },
     {
-      "trackId": "s2t09",
-      "title": "One More Saturday Night",
-      "set": 2,
-      "trackNumber": 8,
+      "trackId": "d1t06",
+      "title": "China Cat Sunflower",
+      "set": 1,
+      "trackNumber": 6,
       "defaultMode": "kaleidoscope",
-      "audioFile": "gd77-05-08s2t09.mp3",
+      "audioFile": "veneta-72/gd72-08-27d1t06.mp3",
       "palette": {
         "primary": 50,
         "secondary": 280,
         "saturation": 1.0
       },
-      "songArt": "assets/song-art/s2t09.png",
-      "overlayOverrides": {
-        "include": [
-          "BearParade",
-          "SkeletonBand",
-          "StealYourFaceOff",
-          "TieDyeWash"
-        ]
-      }
+      "segueInto": true,
+      "songArt": "assets/song-art/veneta-72/d1t06.png"
+    },
+    {
+      "trackId": "d1t07",
+      "title": "I Know You Rider",
+      "set": 1,
+      "trackNumber": 7,
+      "defaultMode": "spinning_spiral",
+      "audioFile": "veneta-72/gd72-08-27d1t07.mp3",
+      "palette": {
+        "primary": 15,
+        "secondary": 270,
+        "saturation": 1.0
+      },
+      "songArt": "assets/song-art/veneta-72/d1t07.png"
+    },
+    {
+      "trackId": "d1t08",
+      "title": "Mexicali Blues",
+      "set": 1,
+      "trackNumber": 8,
+      "defaultMode": "liquid_light",
+      "audioFile": "veneta-72/gd72-08-27d1t08.mp3",
+      "palette": {
+        "primary": 25,
+        "secondary": 180,
+        "saturation": 0.9
+      },
+      "songArt": "assets/song-art/veneta-72/d1t08.png"
+    },
+    {
+      "trackId": "d1t09",
+      "title": "Bertha",
+      "set": 1,
+      "trackNumber": 9,
+      "defaultMode": "liquid_light",
+      "audioFile": "veneta-72/gd72-08-27d1t09.mp3",
+      "palette": {
+        "primary": 330,
+        "secondary": 120,
+        "saturation": 1.0
+      },
+      "songArt": "assets/song-art/veneta-72/d1t09.png"
+    },
+    {
+      "trackId": "d1t10",
+      "title": "Playing In The Band",
+      "set": 2,
+      "trackNumber": 1,
+      "defaultMode": "feedback_recursion",
+      "audioFile": "veneta-72/gd72-08-27d1t10.mp3",
+      "palette": {
+        "primary": 270,
+        "secondary": 60,
+        "saturation": 1.0
+      },
+      "songArt": "assets/song-art/veneta-72/d1t10.png"
+    },
+    {
+      "trackId": "d2t01",
+      "title": "He's Gone",
+      "set": 2,
+      "trackNumber": 2,
+      "defaultMode": "aurora_curtains",
+      "audioFile": "veneta-72/gd72-08-27d2t01.mp3",
+      "palette": {
+        "primary": 180,
+        "secondary": 310,
+        "saturation": 0.85
+      },
+      "songArt": "assets/song-art/veneta-72/d2t01.png"
+    },
+    {
+      "trackId": "d2t02",
+      "title": "Jack Straw",
+      "set": 2,
+      "trackNumber": 3,
+      "defaultMode": "inferno",
+      "audioFile": "veneta-72/gd72-08-27d2t02.mp3",
+      "palette": {
+        "primary": 15,
+        "secondary": 240,
+        "saturation": 1.0
+      },
+      "songArt": "assets/song-art/veneta-72/d2t02.png"
+    },
+    {
+      "trackId": "d2t03",
+      "title": "Bird Song",
+      "set": 2,
+      "trackNumber": 4,
+      "defaultMode": "deep_ocean",
+      "audioFile": "veneta-72/gd72-08-27d2t03.mp3",
+      "palette": {
+        "primary": 200,
+        "secondary": 30,
+        "saturation": 0.9
+      },
+      "songArt": "assets/song-art/veneta-72/d2t03.png"
+    },
+    {
+      "trackId": "d2t04",
+      "title": "Greatest Story Ever Told",
+      "set": 2,
+      "trackNumber": 5,
+      "defaultMode": "electric_arc",
+      "audioFile": "veneta-72/gd72-08-27d2t04.mp3",
+      "palette": {
+        "primary": 50,
+        "secondary": 300,
+        "saturation": 1.0
+      },
+      "songArt": "assets/song-art/veneta-72/d2t04.png"
+    },
+    {
+      "trackId": "d2t05",
+      "title": "Drums / Space",
+      "set": 2,
+      "trackNumber": 6,
+      "defaultMode": "sacred_geometry",
+      "audioFile": "veneta-72/gd72-08-27d2t05.mp3",
+      "palette": {
+        "primary": 240,
+        "secondary": 60,
+        "saturation": 0.8
+      },
+      "songArt": "assets/song-art/veneta-72/d2t05.png"
+    },
+    {
+      "trackId": "d2t06",
+      "title": "Dark Star",
+      "set": 3,
+      "trackNumber": 1,
+      "defaultMode": "cosmic_voyage",
+      "audioFile": "veneta-72/gd72-08-27d2t06.mp3",
+      "palette": {
+        "primary": 260,
+        "secondary": 120,
+        "saturation": 0.85
+      },
+      "songArt": "assets/song-art/veneta-72/d2t06.png"
+    },
+    {
+      "trackId": "d3t01",
+      "title": "Dark Star (cont.)",
+      "set": 3,
+      "trackNumber": 2,
+      "defaultMode": "volumetric_nebula",
+      "audioFile": "veneta-72/gd72-08-27d3t01.mp3",
+      "palette": {
+        "primary": 260,
+        "secondary": 120,
+        "saturation": 0.85
+      },
+      "segueInto": true,
+      "songArt": "assets/song-art/veneta-72/d3t01.png"
+    },
+    {
+      "trackId": "d3t02",
+      "title": "El Paso",
+      "set": 3,
+      "trackNumber": 3,
+      "defaultMode": "stained_glass",
+      "audioFile": "veneta-72/gd72-08-27d3t02.mp3",
+      "palette": {
+        "primary": 25,
+        "secondary": 180,
+        "saturation": 0.9
+      },
+      "songArt": "assets/song-art/veneta-72/d3t02.png"
+    },
+    {
+      "trackId": "d3t03",
+      "title": "Sing Me Back Home",
+      "set": 3,
+      "trackNumber": 4,
+      "defaultMode": "warm_nebula",
+      "audioFile": "veneta-72/gd72-08-27d3t03.mp3",
+      "palette": {
+        "primary": 195,
+        "secondary": 330,
+        "saturation": 0.8
+      },
+      "songArt": "assets/song-art/veneta-72/d3t03.png"
+    },
+    {
+      "trackId": "d3t04",
+      "title": "Sugar Magnolia",
+      "set": 3,
+      "trackNumber": 5,
+      "defaultMode": "bioluminescence",
+      "audioFile": "veneta-72/gd72-08-27d3t04.mp3",
+      "palette": {
+        "primary": 310,
+        "secondary": 60,
+        "saturation": 1.0
+      },
+      "songArt": "assets/song-art/veneta-72/d3t04.png"
+    },
+    {
+      "trackId": "d3t05",
+      "title": "Casey Jones",
+      "set": 3,
+      "trackNumber": 6,
+      "defaultMode": "neon_grid",
+      "audioFile": "veneta-72/gd72-08-27d3t05.mp3",
+      "palette": {
+        "primary": 20,
+        "secondary": 200,
+        "saturation": 1.0
+      },
+      "songArt": "assets/song-art/veneta-72/d3t05.png"
+    },
+    {
+      "trackId": "d3t06",
+      "title": "One More Saturday Night",
+      "set": 3,
+      "trackNumber": 7,
+      "defaultMode": "liquid_light",
+      "audioFile": "veneta-72/gd72-08-27d3t06.mp3",
+      "palette": {
+        "primary": 50,
+        "secondary": 280,
+        "saturation": 1.0
+      },
+      "songArt": "assets/song-art/veneta-72/d3t06.png"
+    },
+    {
+      "trackId": "d3t07",
+      "title": "And We Bid You Goodnight",
+      "set": 3,
+      "trackNumber": 8,
+      "defaultMode": "prism_refraction",
+      "audioFile": "veneta-72/gd72-08-27d3t07.mp3",
+      "palette": {
+        "primary": 165,
+        "secondary": 340,
+        "saturation": 0.75
+      },
+      "songArt": "assets/song-art/veneta-72/d3t07.png"
     }
   ],
-  "showPoster": "assets/song-art/show-poster.png"
+  "showPoster": "assets/song-art/veneta-72/show-poster.png"
 }

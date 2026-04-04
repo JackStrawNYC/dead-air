@@ -147,7 +147,8 @@ export const VisualModeSchema = z.enum([
   "aurora_sky", "storm", "canyon",
   "liquid_mandala", "bioluminescence", "neon_grid",
   "warm_nebula", "prism_refraction", "cellular_automata",
-  "spinning_spiral",
+  "spinning_spiral", "acid_melt", "blacklight_glow", "liquid_projector",
+  "smoke_and_mirrors", "molten_glass",
 ]);
 
 export const ColorPaletteSchema = z.object({
@@ -178,7 +179,7 @@ export const OverlayOverridesSchema = z.object({
 });
 
 export const SetlistEntrySchema = z.object({
-  trackId: z.string().regex(/^s\d+t\d+$/, "Track ID must match s{set}t{track} format"),
+  trackId: z.string().regex(/^[sd]\d+t\d+$/, "Track ID must match s{set}t{track} or d{disc}t{track} format"),
   title: z.string().min(1),
   set: z.number().int().min(1).max(3),
   trackNumber: z.number().int().min(1),
@@ -196,7 +197,7 @@ export const SetlistEntrySchema = z.object({
 export const EraSchema = z.enum(["primal", "classic", "hiatus", "touch_of_grey", "revival"]);
 
 export const VenueTypeSchema = z.enum([
-  "theater", "arena", "amphitheater", "festival", "club", "ballroom",
+  "theater", "arena", "amphitheater", "festival", "club", "ballroom", "outdoor",
 ]);
 
 export const ShowSetlistSchema = z.object({
