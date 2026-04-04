@@ -337,13 +337,9 @@ export function getModeForSection(
   const override = song.sectionOverrides?.find((o) => o.sectionIndex === sectionIndex);
   if (override) return validateSafe(override.mode);
 
-  // Section 0 always uses default
-  if (sectionIndex === 0) return validateSafe(song.defaultMode);
-
-  // Coherence lock: hold current shader
-  if (coherenceIsLocked) {
-    return getModeForSection(song, sectionIndex - 1, sections, seed, era, false, usedShaderModes, songIdentity, stemSection, frames, songDuration, setNumber, trackNumber, shaderModeLastUsed);
-  }
+  // ONE shader per song. No within-song switching. Flow, not chaos.
+  // Visual variety comes from different shaders across songs (10 shaders, 22 songs).
+  return validateSafe(song.defaultMode);
 
   // Seeded variation with affinity-aware morphing
   if (seed !== undefined) {
