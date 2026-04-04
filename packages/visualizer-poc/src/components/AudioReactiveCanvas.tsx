@@ -561,7 +561,8 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
         ? computeMusicalTimeUtil(beatArray, idx, fps, tempo ?? 120) / (tempo ?? 120) * 60
         : (dynamicTimeLookup[idx] ?? (idx / fps));
       const fluxMult = 1.0 + Math.min(0.04, spectralFlux * 0.1);
-      return baseDT * climaxSpeedMult * fluxMult * spaceTimeDilation;
+      // Global 30% slowdown — lava lamp feel, not seizure
+      return baseDT * 0.7 * climaxSpeedMult * fluxMult * spaceTimeDilation;
     })(),
     jamPhase: jamPhaseCtx.phase,
     jamProgress: jamPhaseCtx.progress,

@@ -843,17 +843,18 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
             />
           </SilentErrorBoundary>
 
-          {/* Dead imagery: CSS-composited icon overlay */}
+          {/* Dead imagery: subtle silhouette overlay — felt not scrutinized */}
           {iconState.iconPath && introFactor > 0.5 && deadAirFactor < 0.5 && (
             <div
               style={{
                 position: "absolute",
                 inset: 0,
-                opacity: iconState.opacity * (1 - deadAirFactor),
-                mixBlendMode: "screen",
+                opacity: iconState.opacity * (1 - deadAirFactor) * 0.25,
+                mixBlendMode: "soft-light",
                 pointerEvents: "none",
-                maskImage: "radial-gradient(ellipse 90% 90% at 50% 50%, black 70%, transparent 100%)",
-                WebkitMaskImage: "radial-gradient(ellipse 90% 90% at 50% 50%, black 70%, transparent 100%)",
+                filter: "saturate(0.3) contrast(1.2)",
+                maskImage: "radial-gradient(ellipse 85% 85% at 50% 50%, black 50%, transparent 100%)",
+                WebkitMaskImage: "radial-gradient(ellipse 85% 85% at 50% 50%, black 50%, transparent 100%)",
               }}
             >
               <Img

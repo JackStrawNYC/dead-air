@@ -166,7 +166,7 @@
       "title": "Jack Straw",
       "set": 2,
       "trackNumber": 3,
-      "defaultMode": "inferno",
+      "defaultMode": "liquid_light",
       "audioFile": "veneta-72/gd72-08-27d2t02.mp3",
       "palette": {
         "primary": 15,
@@ -194,7 +194,7 @@
       "title": "Greatest Story Ever Told",
       "set": 2,
       "trackNumber": 5,
-      "defaultMode": "electric_arc",
+      "defaultMode": "stained_glass",
       "audioFile": "veneta-72/gd72-08-27d2t04.mp3",
       "palette": {
         "primary": 50,
@@ -293,7 +293,7 @@
       "title": "Casey Jones",
       "set": 3,
       "trackNumber": 6,
-      "defaultMode": "neon_grid",
+      "defaultMode": "tie_dye",
       "audioFile": "veneta-72/gd72-08-27d3t05.mp3",
       "palette": {
         "primary": 20,
