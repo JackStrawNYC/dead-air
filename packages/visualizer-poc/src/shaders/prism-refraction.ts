@@ -3,7 +3,7 @@
  * Rainbow dispersion, holographic iridescence, chromatic channel offsets.
  *
  * Visual aesthetic:
- *   - Quiet: dark scene with faint prism outline, subtle internal glow
+ *   - Quiet: near-black with faint prism outline, barely-there prismatic glimmers
  *   - Building: light beam appears, spectral bands begin to separate
  *   - Peak: full ROYGBIV dispersion fan, caustic reflections, holographic shimmer
  *   - Release: bands collapse, prism dims, iridescence lingers
@@ -100,10 +100,14 @@ void main() {
   float melodicPitch = clamp(melInfluence, 0.0, 1.0);
   float effectiveBeat = uBeatSnap * smoothstep(0.3, 0.7, uBeatConfidence);
 
-  float slowTime = uDynamicTime * 0.03;
+  // Energy-squared for nonlinear brightness scaling (dark at quiet, bright at peaks)
+  float energy2 = energy * energy;
 
-  // --- Domain warping + energy-responsive detail ---
-  vec2 domainWarpOff = vec2(fbm3(vec3(p * 0.5, uDynamicTime * 0.05)), fbm3(vec3(p * 0.5 + 100.0, uDynamicTime * 0.05))) * 0.3;
+  // SLOWED: halved all time multipliers
+  float slowTime = uDynamicTime * 0.015;
+
+  // --- Domain warping + energy-responsive detail (halved time) ---
+  vec2 domainWarpOff = vec2(fbm3(vec3(p * 0.5, uDynamicTime * 0.025)), fbm3(vec3(p * 0.5 + 100.0, uDynamicTime * 0.025))) * 0.3;
   float detailMod = 1.0 + energy * 0.5;
 
   // --- Uniform integrations ---
@@ -130,10 +134,12 @@ void main() {
                           : coherence < 0.3 ? mix(1.0, 0.4, (0.3 - coherence) / 0.3)
                           : 1.0;
 
-  // --- Background: deep dark with subtle gradient ---
+  // --- [DARKEN] Background: very dark base, scales with energy squared ---
+  // [LOWER BLACK FLOOR] Was 0.01, 0.008, 0.012
+  vec3 blackFloor = vec3(0.003, 0.002, 0.005);
   vec3 col = mix(
-    vec3(0.008, 0.005, 0.018),
-    vec3(0.02, 0.015, 0.035),
+    blackFloor,
+    blackFloor + vec3(0.01, 0.007, 0.02) * energy2,
     uv.y * 0.8 + 0.1
   );
 
@@ -141,19 +147,19 @@ void main() {
   float vertShift = (melodicPitch - 0.5) * 0.06;
   p.y -= vertShift;
 
-  // --- Slow rotation ---
-  float angle = slowTime * 0.3 + energy * 0.05;
+  // --- Slow rotation (halved speed) ---
+  float angle = slowTime * 0.15 + energy * 0.025;
   float bp = beatPulse(uMusicalTime) * smoothstep(0.3, 0.7, uBeatConfidence);
-  angle += bp * 0.015;
+  angle += bp * 0.008;
   float ca = cos(angle);
   float sa = sin(angle);
   vec2 rp = mat2(ca, -sa, sa, ca) * p;
 
-  // --- Noise warp (stability-driven, coherence-modulated) ---
+  // --- Noise warp (stability-driven, coherence-modulated, halved time) ---
   float warpAmount = (1.0 - stability) * 0.04 / coherenceClarity;
   vec2 warp = vec2(
-    snoise(vec3(rp * 3.5, slowTime * 0.4)),
-    snoise(vec3(rp * 3.5 + 100.0, slowTime * 0.4))
+    snoise(vec3(rp * 3.5, slowTime * 0.2)),
+    snoise(vec3(rp * 3.5 + 100.0, slowTime * 0.2))
   ) * warpAmount;
   vec2 wp = rp + warp;
 
@@ -169,10 +175,11 @@ void main() {
   float isClimax = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5);
   float climaxBoost = isClimax * uClimaxIntensity;
 
-  // --- Palette colors ---
+  // --- Palette colors (saturation scales with energy: faint at quiet, full ROYGBIV at peaks) ---
   float hue1 = uPalettePrimary + chromaHueMod + chordHue;
   float hue2 = uPaletteSecondary + chordHue * 0.5;
-  float sat = mix(0.5, 0.95, energy) * uPaletteSaturation;
+  // [REDUCE SATURATION AT QUIET] Floor from 0.15 to 0.08
+  float sat = mix(0.08, 0.95, energy2) * uPaletteSaturation;
 
   vec3 primaryColor = hsv2rgb(vec3(hue1, sat, 1.0));
   vec3 secondaryColor = hsv2rgb(vec3(hue2, sat, 1.0));
@@ -189,9 +196,10 @@ void main() {
   // Only draw beam on the entry side (before prism)
   float beamSide = dot(wp - vec2(-0.05, 0.0), beamDir);
   float beam = smoothstep(beamWidth, 0.0, beamDist) * smoothstep(0.0, -0.05, beamSide);
-  beam *= (0.3 + energy * 0.7 + onset * 0.5);
+  // Beam brightness scales with energy squared -- faint glimmer at quiet
+  beam *= (0.05 + energy2 * 0.7 + onset * 0.5);
 
-  // Beam color: warm white
+  // Beam color: warm white, energy-gated
   vec3 beamColor = vec3(1.0, 0.97, 0.92) * beam * 0.8;
   col += beamColor;
 
@@ -226,16 +234,18 @@ void main() {
       float sharpness = mix(8.0, 25.0, highs * coherenceClarity);
       float bandStrength = exp(-pow((normalizedAngle - bandCenter) * sharpness, 2.0));
 
-      // Spectral color for this band
+      // Spectral color for this band, saturation scales with energy
       vec3 bandColor = wavelengthToRGB(fi / 6.0);
+      // Desaturate toward gray at low energy (faint prismatic glimmers)
+      bandColor = mix(vec3(dot(bandColor, vec3(0.299, 0.587, 0.114))), bandColor, mix(0.2, 1.0, energy2));
       bandColor *= sectionVividness;
 
       // Distance falloff: beams extend outward
       float falloff = exp(-exitDist * mix(3.0, 1.5, energy));
       falloff *= (1.0 + fftSample * 0.4);
 
-      // Width of each band ray
-      float bandIntensity = bandStrength * falloff * (0.4 + energy * 0.6 + climaxBoost * 0.3);
+      // Width of each band ray -- energy squared gates brightness
+      float bandIntensity = bandStrength * falloff * (0.04 + energy2 * 0.6 + climaxBoost * 0.3);
       bandIntensity *= coherenceClarity;
 
       col += bandColor * bandIntensity * 0.6;
@@ -248,47 +258,47 @@ void main() {
     caStrength *= coherenceClarity;
     vec2 caDir = normalize(wp + vec2(0.001));
     vec3 caCol;
-    // Sample accumulated color with per-channel UV offsets
-    float rSample = snoise(vec3((wp + caDir * caStrength) * 4.0, slowTime));
-    float bSample = snoise(vec3((wp - caDir * caStrength) * 4.0, slowTime));
-    float gSample = snoise(vec3(wp * 4.0, slowTime));
-    caCol = vec3(rSample, gSample, bSample) * 0.02 * energy;
+    // Sample accumulated color with per-channel UV offsets (halved time)
+    float rSample = snoise(vec3((wp + caDir * caStrength) * 4.0, slowTime * 0.5));
+    float bSample = snoise(vec3((wp - caDir * caStrength) * 4.0, slowTime * 0.5));
+    float gSample = snoise(vec3(wp * 4.0, slowTime * 0.5));
+    caCol = vec3(rSample, gSample, bSample) * 0.02 * energy2;
     col += caCol;
   }
 
   // --- Prism body rendering ---
   {
-    // Prism edge glow
-    float edgeGlow = smoothstep(px * 3.0, 0.0, abs(prismDist)) * (0.5 + energy * 0.5 + vocalGlow);
+    // Prism edge glow -- energy-squared gating
+    float edgeGlow = smoothstep(px * 3.0, 0.0, abs(prismDist)) * (0.05 + energy2 * 0.5 + vocalGlow);
     vec3 edgeColor = mix(primaryColor, vec3(1.0, 0.98, 0.95), 0.4);
     col += edgeColor * edgeGlow * 0.6;
 
     // Prism interior
     if (prismDist < 0.0) {
-      // Crystal interior: subtle refraction pattern
-      float interiorGlow = smoothstep(0.0, -0.05, prismDist) * 0.15;
+      // Crystal interior: subtle refraction pattern, dimmer at quiet
+      float interiorGlow = smoothstep(0.0, -0.05, prismDist) * mix(0.03, 0.15, energy2);
 
-      // Caustic patterns inside prism (tension-driven)
-      float caustic1 = abs(snoise(vec3(wp * 12.0, slowTime * 2.0)));
-      float caustic2 = abs(snoise(vec3(wp * 18.0 + 50.0, slowTime * 1.5)));
+      // Caustic patterns inside prism (tension-driven, halved time)
+      float caustic1 = abs(snoise(vec3(wp * 12.0, slowTime * 1.0)));
+      float caustic2 = abs(snoise(vec3(wp * 18.0 + 50.0, slowTime * 0.75)));
       float caustics = (caustic1 * 0.6 + caustic2 * 0.4) * tension * coherenceClarity;
 
-      // Internal reflections: more complex at high tension
+      // Internal reflections: more complex at high tension (halved time)
       float internalReflect = 0.0;
       if (tension > 0.2) {
-        float reflAngle = atan(wp.y, wp.x) * 3.0 + slowTime;
+        float reflAngle = atan(wp.y, wp.x) * 3.0 + slowTime * 0.5;
         internalReflect = pow(abs(sin(reflAngle * 2.0 + caustic1 * PI)), 4.0);
         internalReflect *= smoothstep(0.2, 0.6, tension) * 0.3;
       }
 
       vec3 crystalColor = mix(primaryColor, secondaryColor, caustics);
       crystalColor += vec3(0.6, 0.7, 1.0) * caustics * 0.4;
-      col += crystalColor * (interiorGlow + caustics * 0.15 + internalReflect * 0.2);
-      col += vec3(1.0, 0.97, 0.9) * bass * interiorGlow * 0.3;
+      col += crystalColor * (interiorGlow + caustics * 0.15 * energy2 + internalReflect * 0.2 * energy2);
+      col += vec3(1.0, 0.97, 0.9) * bass * interiorGlow * 0.2 * energy;
     }
 
-    // Outer crystal glow (wider, softer)
-    float outerGlow = exp(-abs(prismDist) * 15.0) * (0.2 + energy * 0.3 + bass * 0.2);
+    // Outer crystal glow (wider, softer) -- energy-squared gating
+    float outerGlow = exp(-abs(prismDist) * 15.0) * (0.03 + energy2 * 0.3 + bass * 0.15 * energy);
     col += mix(primaryColor, secondaryColor, 0.5) * outerGlow * 0.15;
   }
 
@@ -298,15 +308,15 @@ void main() {
     float cosViewAngle = 1.0 - length(wp) * 0.8;
     cosViewAngle = clamp(cosViewAngle, 0.0, 1.0);
 
-    // Film thickness varies with position and time
-    float thickness = 2.0 + snoise(vec3(wp * 6.0, slowTime * 0.5)) * 0.5;
+    // Film thickness varies with position and time (halved time)
+    float thickness = 2.0 + snoise(vec3(wp * 6.0, slowTime * 0.25)) * 0.5;
     thickness += energy * 0.3;
 
     vec3 iridescence = thinFilmIridescence(cosViewAngle, thickness);
 
-    // Only apply near prism surface
+    // Only apply near prism surface -- gated by energy squared
     float iridescenceMask = exp(-abs(prismDist) * 20.0);
-    iridescenceMask *= (0.15 + energy * 0.2 + highs * 0.15);
+    iridescenceMask *= (0.03 + energy2 * 0.2 + highs * 0.12 * energy);
     // Space: frozen iridescence is more visible
     iridescenceMask *= mix(1.0, 1.5, sSpace);
 
@@ -317,20 +327,22 @@ void main() {
   {
     float scatter = (1.0 - stability) * (1.0 - coherence) * 0.15;
     if (scatter > 0.01) {
-      float n1 = snoise(vec3(wp * 8.0, slowTime * 3.0));
-      float n2 = snoise(vec3(wp * 15.0 + 40.0, slowTime * 2.0));
+      float n1 = snoise(vec3(wp * 8.0, slowTime * 1.5));
+      float n2 = snoise(vec3(wp * 15.0 + 40.0, slowTime * 1.0));
       float sparkle = pow(max(0.0, n1), 3.0) * 0.5 + pow(max(0.0, n2), 5.0) * 0.5;
       vec3 scatterColor = wavelengthToRGB(fract(n1 * 0.5 + 0.5 + chromaHueMod));
-      col += scatterColor * sparkle * scatter * energy;
+      // Desaturate scatter at low energy
+      scatterColor = mix(vec3(dot(scatterColor, vec3(0.299, 0.587, 0.114))), scatterColor, energy);
+      col += scatterColor * sparkle * scatter * energy2;
     }
   }
 
-  // --- Onset flash through prism ---
+  // --- Onset flash through prism (scaled down at quiet) ---
   {
     float flashMask = exp(-abs(prismDist) * 8.0);
-    col += vec3(1.0, 0.98, 0.94) * onset * flashMask * 1.2;
-    // Also brighten spectral bands on onset
-    col += vec3(0.3, 0.25, 0.2) * onset * 0.3;
+    col += vec3(1.0, 0.98, 0.94) * onset * flashMask * (0.3 + energy * 0.9);
+    // Also brighten spectral bands on onset, gated by energy
+    col += vec3(0.3, 0.25, 0.2) * onset * 0.2 * energy;
   }
 
   // --- Climax boost ---
@@ -344,11 +356,17 @@ void main() {
     col += heroIconEmergence(p, uTime, energy, bass, c1, c2, nf, uSectionIndex);
   }
 
+  // === ATMOSPHERIC DEPTH ===
+  float fogNoise_ad = fbm3(vec3(p * 0.5, uDynamicTime * 0.012));
+  float fogDensity_ad = mix(0.35, 0.02, energy);
+  vec3 fogColor_ad = vec3(0.01, 0.008, 0.015);
+  col = mix(col, fogColor_ad, fogDensity_ad * (0.5 + fogNoise_ad * 0.5));
+
   // --- Vignette ---
   float vigScale = mix(0.30, 0.22, energy);
   float vignette = 1.0 - dot(p * vigScale, p * vigScale);
   vignette = smoothstep(0.0, 1.0, vignette);
-  col = mix(vec3(0.008, 0.005, 0.018), col, vignette);
+  col = mix(blackFloor, col, vignette);
 
   // --- Post-processing ---
   col = applyPostProcess(col, vUv, p);

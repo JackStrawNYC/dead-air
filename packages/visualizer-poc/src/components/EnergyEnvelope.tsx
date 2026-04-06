@@ -47,7 +47,7 @@ export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod,
   const reactivity = introFactor;
 
   // ── One brightness knob. That's it. ──
-  const brightness = 0.80 + Math.sqrt(factor) * 0.20;
+  const brightness = 0.80 + Math.sqrt(factor) * 0.20 * reactivity;
 
   // Drums/Space phase adjustments
   let dsBrightOffset = 0;

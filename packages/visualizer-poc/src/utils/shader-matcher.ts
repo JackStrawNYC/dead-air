@@ -28,29 +28,29 @@ export interface SongAudioProfile {
 }
 
 const CALM_SHADERS: VisualMode[] = [
-  "aurora", "deep_ocean", "cosmic_dust", "aurora_curtains", "crystal_cavern",
-  "warm_nebula", "coral_reef", "ink_wash", "particle_nebula", "void_light",
-  "diffraction_rings", "cosmic_voyage",
+  "aurora", "deep_ocean", "cosmic_dust", "protean_clouds", "cosmic_voyage",
+  "protean_clouds", "deep_ocean", "deep_ocean", "cosmic_voyage", "void_light",
+  "deep_ocean", "cosmic_voyage",
 ];
 
 const ENERGETIC_SHADERS: VisualMode[] = [
-  "tie_dye", "inferno", "concert_lighting", "lava_flow", "electric_arc",
-  "solar_flare", "neon_grid", "climax_surge", "databend", "neural_web",
-  "spectral_analyzer", "fluid_light",
+  "protean_clouds", "inferno", "inferno", "inferno", "inferno",
+  "inferno", "inferno", "inferno", "cosmic_voyage", "cosmic_voyage",
+  "deep_ocean", "fluid_light",
 ];
 
 const MEDIUM_SHADERS: VisualMode[] = [
-  "liquid_light", "oil_projector", "stained_glass", "mandala_engine",
-  "kaleidoscope", "smoke_rings", "sacred_geometry", "liquid_mandala",
-  "voronoi_flow", "plasma_field", "prism_refraction", "spinning_spiral",
-  "liquid_projector", "truchet_tiling", "morphogenesis", "warp_field",
-  "lo_fi_grain", "vintage_film", "crystalline_growth",
+  "protean_clouds", "protean_clouds", "protean_clouds", "mandala_engine",
+  "cosmic_voyage", "protean_clouds", "cosmic_voyage", "liquid_mandala",
+  "protean_clouds", "protean_clouds", "deep_ocean", "protean_clouds",
+  "protean_clouds", "cosmic_voyage", "deep_ocean", "cosmic_voyage",
+  "lo_fi_grain", "vintage_film", "cosmic_voyage",
 ];
 
 const PSYCHEDELIC_SHADERS: VisualMode[] = [
-  "feedback_recursion", "fractal_flames", "acid_melt", "bioluminescence",
-  "blacklight_glow", "cellular_automata", "reaction_diffusion",
-  "mycelium_network", "signal_decay", "digital_rain",
+  "cosmic_voyage", "cosmic_voyage", "protean_clouds", "deep_ocean",
+  "protean_clouds", "deep_ocean", "deep_ocean",
+  "deep_ocean", "deep_ocean", "cosmic_voyage",
 ];
 
 /**

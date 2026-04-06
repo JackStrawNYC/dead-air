@@ -405,7 +405,7 @@ export function generateFallbackIdentity(
   if (frames.length === 0) {
     // Degenerate case: no frames — return a neutral identity
     return {
-      preferredModes: ["liquid_light", "oil_projector"],
+      preferredModes: ["protean_clouds", "deep_ocean"],
       palette: { primary: 200, secondary: 320, saturation: 0.8 },
       moodKeywords: [],
     };
@@ -421,18 +421,14 @@ export function generateFallbackIdentity(
   // 2. Derive palette from chroma content (musically-meaningful colors)
   const chromaPalette = deriveChromaPalette(frames);
 
-  // 3. Derive preferred modes from energy and tempo
+  // 3. Derive preferred modes — ONLY quality volumetric shaders
   const preferredModes: VisualMode[] = [];
   if (avgEnergy > 0.25) {
-    preferredModes.push("liquid_light", "inferno", "electric_arc", "plasma_field", "solar_flare", "databend");
-    if (tempo > 140) preferredModes.push("concert_lighting");
+    preferredModes.push("protean_clouds", "inferno", "cosmic_voyage");
   } else if (avgEnergy > 0.12) {
-    preferredModes.push("oil_projector", "cosmic_voyage", "voronoi_flow", "morphogenesis", "galaxy_spiral", "warp_field", "mycelium_network");
-    if (avgSub > 0.3) preferredModes.push("deep_ocean");
+    preferredModes.push("protean_clouds", "cosmic_voyage", "deep_ocean", "volumetric_nebula");
   } else {
-    preferredModes.push("aurora", "deep_ocean", "stained_glass", "ink_wash", "coral_reef");
-    if (avgFlatness > 0.4) preferredModes.push("void_light");
-    else preferredModes.push("cosmic_dust");
+    preferredModes.push("protean_clouds", "deep_ocean", "volumetric_nebula");
   }
 
   // 4. Derive mood keywords

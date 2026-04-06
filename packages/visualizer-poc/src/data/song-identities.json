@@ -1,13 +1,13 @@
 {
   "bertha": {
     "preferredModes": [
-      "spectral_analyzer",
-      "reaction_diffusion",
-      "liquid_light",
-      "fractal_flames",
-      "inferno",
-      "lava_flow",
-      "fluid_light"
+      "protean_clouds",
+      "fire_mountain_smoke",
+      "st_stephen_lightning",
+      "deep_ocean",
+      "aurora",
+      "volumetric_clouds",
+      "cosmic_voyage"
     ],
     "palette": {
       "primary": 15,
@@ -36,12 +36,13 @@
   },
   "deal": {
     "preferredModes": [
-      "inferno",
-      "tie_dye",
-      "fractal_flames",
-      "fluid_light",
-      "liquid_light",
-      "oil_projector"
+      "fire_mountain_smoke",
+      "protean_clouds",
+      "st_stephen_lightning",
+      "deep_ocean",
+      "aurora",
+      "volumetric_clouds",
+      "cosmic_voyage"
     ],
     "palette": {
       "primary": 10,
@@ -69,14 +70,12 @@
   },
   "sugaree": {
     "preferredModes": [
-      "liquid_light",
-      "warm_nebula",
-      "vintage_film",
+      "protean_clouds",
+      "nimitz_aurora",
+      "scarlet_golden_haze",
+      "protean_clouds",
       "aurora",
-      "smoke_rings",
-      "stained_glass",
-      "volumetric_nebula",
-      "liquid_projector"
+      "protean_clouds"
     ],
     "palette": {
       "primary": 30,
@@ -107,14 +106,11 @@
   },
   "althea": {
     "preferredModes": [
-      "liquid_light",
-      "prism_refraction",
+      "protean_clouds",
+      "nimitz_aurora",
+      "scarlet_golden_haze",
       "aurora",
-      "voronoi_flow",
-      "aurora_curtains",
-      "volumetric_clouds",
-      "spinning_spiral",
-      "oil_projector"
+      "protean_clouds"
     ],
     "palette": {
       "primary": 180,
@@ -140,14 +136,11 @@
   },
   "friendofthedevil": {
     "preferredModes": [
-      "vintage_film",
-      "lo_fi_grain",
-      "oil_projector",
-      "smoke_rings",
-      "ink_wash",
-      "coral_reef",
-      "warm_nebula",
-      "liquid_projector"
+      "morning_dew_fog",
+      "nimitz_aurora",
+      "protean_clouds",
+      "protean_clouds",
+      "deep_ocean"
     ],
     "palette": {
       "primary": 25,
@@ -174,13 +167,12 @@
   },
   "ripple": {
     "preferredModes": [
+      "morning_dew_fog",
+      "nimitz_aurora",
+      "scarlet_golden_haze",
       "aurora",
       "deep_ocean",
-      "crystal_cavern",
-      "cosmic_dust",
-      "stained_glass",
-      "volumetric_nebula",
-      "liquid_projector"
+      "campfire"
     ],
     "palette": {
       "primary": 200,
@@ -208,13 +200,13 @@
   },
   "caseyjones": {
     "preferredModes": [
-      "concert_lighting",
-      "kaleidoscope",
-      "inferno",
-      "fractal_flames",
-      "solar_flare",
-      "lava_flow",
-      "fluid_light"
+      "scarlet_golden_haze",
+      "protean_clouds",
+      "nimitz_aurora",
+      "deep_ocean",
+      "aurora",
+      "volumetric_clouds",
+      "cosmic_voyage"
     ],
     "palette": {
       "primary": 40,
@@ -243,12 +235,13 @@
   },
   "unclejohnsband": {
     "preferredModes": [
+      "nimitz_aurora",
+      "terrapin_nebula",
+      "scarlet_golden_haze",
       "aurora",
-      "oil_projector",
-      "vintage_film",
-      "stained_glass",
-      "voronoi_flow",
-      "smoke_rings"
+      "protean_clouds",
+      "deep_ocean",
+      "volumetric_clouds"
     ],
     "palette": {
       "primary": 40,
@@ -274,13 +267,13 @@
   },
   "shakedownstreet": {
     "preferredModes": [
-      "mandala_engine",
-      "inferno",
-      "lava_flow",
-      "liquid_light",
-      "fractal_flames",
-      "kaleidoscope",
-      "acid_melt"
+      "protean_clouds",
+      "scarlet_golden_haze",
+      "star_nest",
+      "deep_ocean",
+      "aurora",
+      "volumetric_clouds",
+      "cosmic_voyage"
     ],
     "palette": {
       "primary": 290,
@@ -309,13 +302,13 @@
   },
   "darkstar": {
     "preferredModes": [
+      "dark_star_void",
+      "star_nest",
+      "terrapin_nebula",
       "cosmic_voyage",
       "deep_ocean",
-      "crystal_cavern",
-      "galaxy_spiral",
-      "volumetric_nebula",
-      "blacklight_glow",
-      "liquid_light"
+      "cosmic_voyage",
+      "volumetric_nebula"
     ],
     "palette": {
       "primary": 260,
@@ -354,13 +347,13 @@
   },
   "fireonthemountain": {
     "preferredModes": [
-      "inferno",
-      "liquid_light",
-      "kaleidoscope",
-      "fractal_flames",
-      "lava_flow",
-      "reaction_diffusion",
-      "liquid_mandala"
+      "fire_mountain_smoke",
+      "protean_clouds",
+      "deep_ocean",
+      "aurora",
+      "volumetric_clouds",
+      "cosmic_voyage",
+      "protean_clouds"
     ],
     "palette": {
       "primary": 10,
@@ -393,15 +386,13 @@
   },
   "scarletbegonias": {
     "preferredModes": [
-      "reaction_diffusion",
-      "liquid_light",
-      "solar_flare",
-      "fractal_flames",
-      "plasma_field",
-      "kaleidoscope",
-      "acid_melt",
-      "oil_projector",
-      "tie_dye"
+      "scarlet_golden_haze",
+      "nimitz_aurora",
+      "protean_clouds",
+      "deep_ocean",
+      "aurora",
+      "volumetric_clouds",
+      "cosmic_voyage"
     ],
     "palette": {
       "primary": 0,
@@ -430,15 +421,12 @@
   },
   "eyesoftheworld": {
     "preferredModes": [
+      "terrapin_nebula",
+      "nimitz_aurora",
+      "star_nest",
       "aurora",
       "cosmic_voyage",
-      "liquid_light",
-      "bioluminescence",
-      "galaxy_spiral",
-      "volumetric_clouds",
-      "spinning_spiral",
-      "oil_projector",
-      "tie_dye"
+      "deep_ocean"
     ],
     "palette": {
       "primary": 170,
@@ -472,13 +460,13 @@
   },
   "morningdew": {
     "preferredModes": [
+      "morning_dew_fog",
+      "terrapin_nebula",
+      "protean_clouds",
       "deep_ocean",
-      "stark_minimal",
-      "crystal_cavern",
-      "volumetric_smoke",
-      "cosmic_dust",
-      "inferno",
-      "liquid_light"
+      "volumetric_clouds",
+      "cosmic_voyage",
+      "cosmic_dust"
     ],
     "palette": {
       "primary": 200,
@@ -517,14 +505,13 @@
   },
   "stellablue": {
     "preferredModes": [
+      "wharf_rat_storm",
+      "morning_dew_fog",
+      "terrapin_nebula",
       "deep_ocean",
-      "cosmic_voyage",
       "aurora",
-      "warm_nebula",
-      "crystal_cavern",
-      "galaxy_spiral",
-      "blacklight_glow",
-      "liquid_light"
+      "volumetric_clouds",
+      "cosmic_dust"
     ],
     "palette": {
       "primary": 220,
@@ -558,12 +545,13 @@
   },
   "notfadeaway": {
     "preferredModes": [
-      "mandala_engine",
-      "kaleidoscope",
-      "tie_dye",
-      "inferno",
-      "sacred_geometry",
-      "liquid_light"
+      "fire_mountain_smoke",
+      "protean_clouds",
+      "st_stephen_lightning",
+      "deep_ocean",
+      "aurora",
+      "volumetric_clouds",
+      "cosmic_voyage"
     ],
     "palette": {
       "primary": 40,
@@ -592,14 +580,13 @@
   },
   "estimatedprophet": {
     "preferredModes": [
+      "estimated_prophet_mist",
+      "st_stephen_lightning",
+      "seascape",
       "deep_ocean",
       "aurora",
-      "void_light",
-      "cosmic_voyage",
-      "liquid_light",
-      "oil_projector",
-      "smoke_rings",
-      "bioluminescence"
+      "protean_clouds",
+      "void_light"
     ],
     "palette": {
       "primary": 260,
@@ -631,14 +618,13 @@
   },
   "chinacatsunflower": {
     "preferredModes": [
-      "mandala_engine",
-      "solar_flare",
-      "oil_projector",
-      "fractal_flames",
-      "plasma_field",
-      "kaleidoscope",
-      "liquid_mandala",
-      "acid_melt"
+      "scarlet_golden_haze",
+      "nimitz_aurora",
+      "star_nest",
+      "protean_clouds",
+      "deep_ocean",
+      "aurora",
+      "volumetric_clouds"
     ],
     "palette": {
       "primary": 50,
@@ -664,13 +650,13 @@
   },
   "iknowyourider": {
     "preferredModes": [
-      "solar_flare",
-      "kaleidoscope",
-      "liquid_light",
-      "fractal_flames",
-      "inferno",
-      "lava_flow",
-      "oil_projector"
+      "scarlet_golden_haze",
+      "protean_clouds",
+      "nimitz_aurora",
+      "deep_ocean",
+      "aurora",
+      "volumetric_clouds",
+      "cosmic_voyage"
     ],
     "palette": {
       "primary": 30,
@@ -698,13 +684,13 @@
   },
   "truckin": {
     "preferredModes": [
-      "concert_lighting",
-      "vintage_film",
-      "plasma_field",
-      "solar_flare",
-      "particle_swarm",
-      "fractal_flames",
-      "volumetric_smoke"
+      "protean_clouds",
+      "fire_mountain_smoke",
+      "st_stephen_lightning",
+      "deep_ocean",
+      "aurora",
+      "volumetric_clouds",
+      "cosmic_voyage"
     ],
     "palette": {
       "primary": 35,
@@ -729,14 +715,13 @@
   },
   "sugarmagnolia": {
     "preferredModes": [
-      "tie_dye",
-      "kaleidoscope",
-      "liquid_mandala",
-      "concert_lighting",
-      "flower_field",
-      "prism_refraction",
-      "spinning_spiral",
-      "liquid_light"
+      "scarlet_golden_haze",
+      "nimitz_aurora",
+      "protean_clouds",
+      "deep_ocean",
+      "aurora",
+      "volumetric_clouds",
+      "cosmic_voyage"
     ],
     "palette": {
       "primary": 340,
@@ -765,13 +750,13 @@
   },
   "terrapinstation": {
     "preferredModes": [
+      "terrapin_nebula",
+      "dark_star_void",
+      "star_nest",
       "cosmic_voyage",
-      "crystal_cavern",
+      "cosmic_voyage",
       "aurora",
-      "galaxy_spiral",
-      "deep_ocean",
-      "liquid_light",
-      "oil_projector"
+      "cosmic_voyage"
     ],
     "palette": {
       "primary": 160,
@@ -802,15 +787,13 @@
   },
   "playingintheband": {
     "preferredModes": [
-      "cosmic_voyage",
-      "galaxy_spiral",
-      "void_light",
-      "kaleidoscope",
-      "volumetric_nebula",
-      "acid_melt",
-      "liquid_light",
-      "oil_projector",
-      "tie_dye"
+      "protean_clouds",
+      "star_nest",
+      "dark_star_void",
+      "terrapin_nebula",
+      "deep_ocean",
+      "aurora",
+      "volumetric_clouds"
     ],
     "palette": {
       "primary": 280,
@@ -840,13 +823,13 @@
   },
   "theotherone": {
     "preferredModes": [
-      "kaleidoscope",
-      "reaction_diffusion",
-      "mandala_engine",
-      "acid_melt",
-      "liquid_light",
-      "oil_projector",
-      "tie_dye"
+      "dark_star_void",
+      "st_stephen_lightning",
+      "star_nest",
+      "cosmic_voyage",
+      "protean_clouds",
+      "deep_ocean",
+      "aurora"
     ],
     "palette": {
       "primary": 350,
@@ -878,13 +861,13 @@
   },
   "wharfrat": {
     "preferredModes": [
+      "wharf_rat_storm",
+      "morning_dew_fog",
+      "protean_clouds",
       "rain_street",
-      "smoke_rings",
+      "protean_clouds",
       "deep_ocean",
-      "volumetric_smoke",
-      "ink_wash",
-      "vintage_film",
-      "warm_nebula"
+      "deep_ocean"
     ],
     "palette": {
       "primary": 40,
@@ -915,14 +898,12 @@
   },
   "birdsong": {
     "preferredModes": [
-      "aurora_curtains",
-      "flower_field",
+      "nimitz_aurora",
+      "terrapin_nebula",
+      "protean_clouds",
       "aurora",
-      "aurora_sky",
-      "volumetric_clouds",
-      "prism_refraction",
-      "cosmic_voyage",
-      "spinning_spiral"
+      "deep_ocean",
+      "volumetric_clouds"
     ],
     "palette": {
       "primary": 200,
@@ -953,13 +934,13 @@
   },
   "helpontheway": {
     "preferredModes": [
-      "crystal_cavern",
-      "cosmic_voyage",
-      "liquid_light",
+      "st_stephen_lightning",
+      "dark_star_void",
+      "protean_clouds",
+      "deep_ocean",
       "aurora",
-      "volumetric_nebula",
-      "oil_projector",
-      "tie_dye"
+      "volumetric_clouds",
+      "cosmic_voyage"
     ],
     "palette": {
       "primary": 240,
@@ -984,12 +965,13 @@
   },
   "slipknot": {
     "preferredModes": [
-      "inferno",
-      "spectral_analyzer",
-      "fractal_flames",
-      "lava_flow",
-      "liquid_light",
-      "oil_projector"
+      "dark_star_void",
+      "st_stephen_lightning",
+      "star_nest",
+      "cosmic_voyage",
+      "protean_clouds",
+      "deep_ocean",
+      "aurora"
     ],
     "palette": {
       "primary": 10,
@@ -1020,13 +1002,13 @@
   },
   "franklinstower": {
     "preferredModes": [
-      "spectral_analyzer",
-      "plasma_field",
-      "liquid_light",
-      "fractal_flames",
-      "inferno",
-      "lava_flow",
-      "volumetric_smoke"
+      "scarlet_golden_haze",
+      "nimitz_aurora",
+      "aurora",
+      "protean_clouds",
+      "deep_ocean",
+      "volumetric_clouds",
+      "cosmic_voyage"
     ],
     "palette": {
       "primary": 45,
@@ -1056,12 +1038,13 @@
   },
   "ststephen": {
     "preferredModes": [
-      "concert_lighting",
-      "inferno",
-      "fractal_flames",
-      "volumetric_nebula",
-      "liquid_light",
-      "oil_projector"
+      "st_stephen_lightning",
+      "star_nest",
+      "protean_clouds",
+      "deep_ocean",
+      "aurora",
+      "volumetric_clouds",
+      "cosmic_voyage"
     ],
     "palette": {
       "primary": 300,
@@ -1091,13 +1074,13 @@
   },
   "newminglewoodblues": {
     "preferredModes": [
-      "concert_lighting",
-      "inferno",
-      "kaleidoscope",
-      "liquid_light",
-      "fractal_flames",
-      "oil_projector",
-      "tie_dye"
+      "protean_clouds",
+      "st_stephen_lightning",
+      "fire_mountain_smoke",
+      "deep_ocean",
+      "aurora",
+      "volumetric_clouds",
+      "cosmic_voyage"
     ],
     "palette": {
       "primary": 15,
@@ -1127,14 +1110,13 @@
   },
   "loser": {
     "preferredModes": [
-      "vintage_film",
-      "fluid_2d",
-      "liquid_light",
-      "lo_fi_grain",
+      "wharf_rat_storm",
+      "morning_dew_fog",
+      "protean_clouds",
       "aurora",
-      "smoke_rings",
-      "coral_reef",
-      "liquid_projector"
+      "deep_ocean",
+      "volumetric_clouds",
+      "cosmic_voyage"
     ],
     "palette": {
       "primary": 30,
@@ -1168,13 +1150,11 @@
   },
   "elpaso": {
     "preferredModes": [
-      "vintage_film",
-      "lo_fi_grain",
-      "oil_projector",
-      "smoke_rings",
-      "ink_wash",
-      "coral_reef",
-      "warp_field"
+      "fire_mountain_smoke",
+      "scarlet_golden_haze",
+      "protean_clouds",
+      "desert_road",
+      "campfire"
     ],
     "palette": {
       "primary": 35,
@@ -1200,12 +1180,13 @@
   },
   "theyloveeachother": {
     "preferredModes": [
-      "liquid_light",
-      "tie_dye",
-      "fractal_flames",
-      "kaleidoscope",
-      "particle_swarm",
-      "oil_projector"
+      "protean_clouds",
+      "deep_ocean",
+      "aurora",
+      "volumetric_clouds",
+      "cosmic_voyage",
+      "protean_clouds",
+      "star_nest"
     ],
     "palette": {
       "primary": 340,
@@ -1233,12 +1214,13 @@
   },
   "jackstraw": {
     "preferredModes": [
-      "concert_lighting",
-      "inferno",
-      "fractal_flames",
-      "reaction_diffusion",
-      "liquid_light",
-      "oil_projector"
+      "protean_clouds",
+      "st_stephen_lightning",
+      "fire_mountain_smoke",
+      "deep_ocean",
+      "aurora",
+      "volumetric_clouds",
+      "cosmic_voyage"
     ],
     "palette": {
       "primary": 10,
@@ -1268,13 +1250,13 @@
   },
   "lazylightnin": {
     "preferredModes": [
-      "reaction_diffusion",
-      "concert_lighting",
-      "solar_flare",
-      "fractal_flames",
-      "kaleidoscope",
-      "volumetric_nebula",
-      "liquid_light"
+      "protean_clouds",
+      "st_stephen_lightning",
+      "star_nest",
+      "deep_ocean",
+      "aurora",
+      "volumetric_clouds",
+      "cosmic_voyage"
     ],
     "palette": {
       "primary": 55,
@@ -1304,13 +1286,13 @@
   },
   "supplication": {
     "preferredModes": [
-      "inferno",
-      "liquid_light",
-      "spectral_analyzer",
-      "fractal_flames",
-      "lava_flow",
-      "solar_flare",
-      "oil_projector"
+      "fire_mountain_smoke",
+      "st_stephen_lightning",
+      "protean_clouds",
+      "deep_ocean",
+      "aurora",
+      "volumetric_clouds",
+      "cosmic_voyage"
     ],
     "palette": {
       "primary": 5,
@@ -1344,13 +1326,11 @@
   },
   "browneyedwomen": {
     "preferredModes": [
-      "oil_projector",
-      "vintage_film",
-      "lo_fi_grain",
-      "smoke_rings",
-      "aurora",
-      "coral_reef",
-      "liquid_projector"
+      "scarlet_golden_haze",
+      "protean_clouds",
+      "nimitz_aurora",
+      "protean_clouds",
+      "aurora"
     ],
     "palette": {
       "primary": 25,
@@ -1379,13 +1359,13 @@
   },
   "mamatried": {
     "preferredModes": [
-      "vintage_film",
-      "lo_fi_grain",
-      "oil_projector",
-      "smoke_rings",
-      "ink_wash",
-      "coral_reef",
-      "warp_field"
+      "protean_clouds",
+      "deep_ocean",
+      "deep_ocean",
+      "protean_clouds",
+      "deep_ocean",
+      "aurora",
+      "volumetric_clouds"
     ],
     "palette": {
       "primary": 40,
@@ -1411,13 +1391,11 @@
   },
   "rowjimmy": {
     "preferredModes": [
+      "nimitz_aurora",
+      "terrapin_nebula",
+      "protean_clouds",
       "deep_ocean",
-      "aurora",
-      "liquid_light",
-      "bioluminescence",
-      "crystalline_growth",
-      "smoke_rings",
-      "coral_reef"
+      "aurora"
     ],
     "palette": {
       "primary": 195,
@@ -1455,12 +1433,13 @@
   },
   "dancininthestreet": {
     "preferredModes": [
-      "neon_grid",
-      "mandala_engine",
-      "inferno",
-      "fractal_flames",
-      "fluid_light",
-      "liquid_light"
+      "protean_clouds",
+      "deep_ocean",
+      "aurora",
+      "volumetric_clouds",
+      "cosmic_voyage",
+      "protean_clouds",
+      "star_nest"
     ],
     "palette": {
       "primary": 350,
@@ -1492,11 +1471,10 @@
   "drumsspace": {
     "preferredModes": [
       "cosmic_voyage",
-      "crystal_cavern",
+      "cosmic_voyage",
       "deep_ocean",
       "void_light",
-      "galaxy_spiral",
-      "liquid_light"
+      "cosmic_voyage"
     ],
     "palette": {
       "primary": 240,
@@ -1528,9 +1506,9 @@
       "peakSaturation": 0.4
     },
     "drumsSpaceShaders": {
-      "drums_tribal": "electric_arc",
-      "space_ambient": "morphogenesis",
-      "transition": "voronoi_flow"
+      "drums_tribal": "inferno",
+      "space_ambient": "deep_ocean",
+      "transition": "protean_clouds"
     },
     "narrativeArc": "meditative_journey",
     "thematicTags": [
@@ -1541,12 +1519,13 @@
   },
   "onemoresaturdaynight": {
     "preferredModes": [
-      "inferno",
-      "mandala_engine",
-      "lava_flow",
-      "liquid_light",
-      "fractal_flames",
-      "oil_projector"
+      "protean_clouds",
+      "fire_mountain_smoke",
+      "st_stephen_lightning",
+      "deep_ocean",
+      "aurora",
+      "volumetric_clouds",
+      "cosmic_voyage"
     ],
     "palette": {
       "primary": 20,
@@ -1578,13 +1557,13 @@
   },
   "touchofgrey": {
     "preferredModes": [
-      "concert_lighting",
-      "reaction_diffusion",
-      "fractal_flames",
-      "inferno",
-      "lava_flow",
-      "solar_flare",
-      "liquid_light"
+      "protean_clouds",
+      "deep_ocean",
+      "aurora",
+      "volumetric_clouds",
+      "cosmic_voyage",
+      "protean_clouds",
+      "star_nest"
     ],
     "palette": {
       "primary": 0,
@@ -1612,12 +1591,13 @@
   },
   "goingdowntheroad": {
     "preferredModes": [
-      "inferno",
-      "reaction_diffusion",
-      "liquid_light",
-      "fractal_flames",
-      "lava_flow",
-      "oil_projector"
+      "fire_mountain_smoke",
+      "protean_clouds",
+      "st_stephen_lightning",
+      "deep_ocean",
+      "aurora",
+      "volumetric_clouds",
+      "cosmic_voyage"
     ],
     "palette": {
       "primary": 25,
@@ -1647,13 +1627,13 @@
   },
   "mississippihalfstep": {
     "preferredModes": [
-      "mycelium_network",
-      "vintage_film",
-      "lo_fi_grain",
-      "smoke_rings",
-      "liquid_light",
+      "protean_clouds",
       "aurora",
-      "coral_reef"
+      "deep_ocean",
+      "protean_clouds",
+      "deep_ocean",
+      "volumetric_clouds",
+      "cosmic_voyage"
     ],
     "palette": {
       "primary": 35,
@@ -1682,11 +1662,11 @@
     "preferredModes": [
       "aurora",
       "cosmic_voyage",
-      "crystal_cavern",
+      "cosmic_voyage",
       "deep_ocean",
-      "diffraction_rings",
-      "bioluminescence",
-      "liquid_light"
+      "protean_clouds",
+      "volumetric_clouds",
+      "protean_clouds"
     ],
     "palette": {
       "primary": 200,
@@ -1717,12 +1697,13 @@
   },
   "turnonthelovelight": {
     "preferredModes": [
-      "concert_lighting",
-      "inferno",
-      "kaleidoscope",
-      "fractal_flames",
       "volumetric_nebula",
-      "liquid_light"
+      "protean_clouds",
+      "deep_ocean",
+      "aurora",
+      "volumetric_clouds",
+      "cosmic_voyage",
+      "protean_clouds"
     ],
     "palette": {
       "primary": 50,
@@ -1753,12 +1734,13 @@
   },
   "samsonanddelilah": {
     "preferredModes": [
-      "concert_lighting",
-      "fractal_flames",
-      "bioluminescence",
-      "liquid_light",
-      "oil_projector",
-      "tie_dye"
+      "fire_mountain_smoke",
+      "st_stephen_lightning",
+      "protean_clouds",
+      "deep_ocean",
+      "aurora",
+      "volumetric_clouds",
+      "cosmic_voyage"
     ],
     "palette": {
       "primary": 350,
@@ -1787,13 +1769,13 @@
   },
   "johnnybjgoode": {
     "preferredModes": [
-      "spectral_analyzer",
-      "mandala_engine",
-      "liquid_light",
-      "inferno",
-      "fractal_flames",
-      "lava_flow",
-      "oil_projector"
+      "protean_clouds",
+      "deep_ocean",
+      "aurora",
+      "volumetric_clouds",
+      "cosmic_voyage",
+      "protean_clouds",
+      "star_nest"
     ],
     "palette": {
       "primary": 45,
@@ -1822,12 +1804,13 @@
   },
   "usblues": {
     "preferredModes": [
-      "concert_lighting",
-      "vintage_film",
-      "oil_projector",
-      "particle_swarm",
-      "reaction_diffusion",
-      "volumetric_nebula"
+      "volumetric_nebula",
+      "protean_clouds",
+      "deep_ocean",
+      "aurora",
+      "volumetric_clouds",
+      "cosmic_voyage",
+      "protean_clouds"
     ],
     "palette": {
       "primary": 220,
@@ -1854,10 +1837,11 @@
     "preferredModes": [
       "aurora",
       "deep_ocean",
-      "stained_glass",
-      "crystal_cavern",
-      "diffraction_rings",
-      "crystalline_growth"
+      "cosmic_voyage",
+      "protean_clouds",
+      "volumetric_clouds",
+      "cosmic_voyage",
+      "protean_clouds"
     ],
     "palette": {
       "primary": 210,
@@ -1895,13 +1879,13 @@
   },
   "blackpeter": {
     "preferredModes": [
-      "stark_minimal",
-      "vintage_film",
       "deep_ocean",
-      "aurora_curtains",
-      "crystalline_growth",
+      "protean_clouds",
       "cosmic_dust",
-      "oil_projector"
+      "protean_clouds",
+      "aurora",
+      "volumetric_clouds",
+      "cosmic_voyage"
     ],
     "palette": {
       "primary": 200,
@@ -1932,12 +1916,13 @@
   },
   "cumberlandblues": {
     "preferredModes": [
-      "concert_lighting",
-      "lo_fi_grain",
-      "vintage_film",
-      "particle_swarm",
-      "tie_dye",
-      "smoke_rings"
+      "protean_clouds",
+      "protean_clouds",
+      "deep_ocean",
+      "aurora",
+      "volumetric_clouds",
+      "cosmic_voyage",
+      "protean_clouds"
     ],
     "palette": {
       "primary": 30,
@@ -1962,14 +1947,13 @@
   },
   "looselucy": {
     "preferredModes": [
-      "tie_dye",
-      "liquid_light",
-      "fractal_flames",
-      "solar_flare",
-      "kaleidoscope",
-      "plasma_field",
-      "liquid_mandala",
-      "acid_melt"
+      "protean_clouds",
+      "deep_ocean",
+      "aurora",
+      "volumetric_clouds",
+      "cosmic_voyage",
+      "protean_clouds",
+      "star_nest"
     ],
     "palette": {
       "primary": 300,
@@ -1998,14 +1982,13 @@
   },
   "direwolf": {
     "preferredModes": [
-      "vintage_film",
-      "oil_projector",
-      "lo_fi_grain",
-      "smoke_rings",
+      "protean_clouds",
       "aurora",
-      "ink_wash",
-      "coral_reef",
-      "liquid_projector"
+      "deep_ocean",
+      "deep_ocean",
+      "protean_clouds",
+      "deep_ocean",
+      "volumetric_clouds"
     ],
     "palette": {
       "primary": 30,
@@ -2033,11 +2016,10 @@
   "comesametime": {
     "preferredModes": [
       "aurora",
-      "crystal_cavern",
+      "cosmic_voyage",
       "deep_ocean",
       "cosmic_voyage",
-      "diffraction_rings",
-      "warm_nebula"
+      "protean_clouds"
     ],
     "palette": {
       "primary": 180,
@@ -2064,13 +2046,13 @@
   },
   "itmusthavebeen": {
     "preferredModes": [
-      "vintage_film",
-      "ink_wash",
-      "oil_projector",
-      "lo_fi_grain",
+      "deep_ocean",
       "aurora",
-      "smoke_rings",
-      "volumetric_clouds"
+      "protean_clouds",
+      "volumetric_clouds",
+      "protean_clouds",
+      "deep_ocean",
+      "cosmic_voyage"
     ],
     "palette": {
       "primary": 25,
@@ -2097,12 +2079,13 @@
   },
   "hesgone": {
     "preferredModes": [
+      "morning_dew_fog",
+      "terrapin_nebula",
+      "protean_clouds",
       "deep_ocean",
+      "volumetric_clouds",
       "aurora",
-      "smoke_rings",
-      "volumetric_nebula",
-      "aurora_curtains",
-      "warm_nebula"
+      "cosmic_voyage"
     ],
     "palette": {
       "primary": 35,
@@ -2131,13 +2114,13 @@
   },
   "letitgrow": {
     "preferredModes": [
-      "mandala_engine",
-      "liquid_mandala",
-      "flower_field",
+      "protean_clouds",
       "aurora",
-      "kaleidoscope",
-      "stained_glass",
-      "liquid_light"
+      "protean_clouds",
+      "deep_ocean",
+      "volumetric_clouds",
+      "cosmic_voyage",
+      "protean_clouds"
     ],
     "palette": {
       "primary": 120,
@@ -2168,12 +2151,12 @@
   },
   "cassidy": {
     "preferredModes": [
-      "inferno",
-      "concert_lighting",
-      "fractal_flames",
-      "tie_dye",
-      "liquid_light",
-      "oil_projector"
+      "nimitz_aurora",
+      "scarlet_golden_haze",
+      "protean_clouds",
+      "aurora",
+      "deep_ocean",
+      "volumetric_clouds"
     ],
     "palette": {
       "primary": 10,
@@ -2203,13 +2186,13 @@
   },
   "rambleonrose": {
     "preferredModes": [
-      "tie_dye",
-      "kaleidoscope",
-      "liquid_mandala",
-      "oil_projector",
-      "vintage_film",
-      "flower_field",
-      "stained_glass"
+      "protean_clouds",
+      "protean_clouds",
+      "deep_ocean",
+      "aurora",
+      "volumetric_clouds",
+      "cosmic_voyage",
+      "protean_clouds"
     ],
     "palette": {
       "primary": 340,
@@ -2239,11 +2222,11 @@
     "preferredModes": [
       "desert_road",
       "campfire",
-      "vintage_film",
-      "oil_projector",
-      "warm_nebula",
-      "smoke_rings",
-      "lo_fi_grain"
+      "protean_clouds",
+      "protean_clouds",
+      "protean_clouds",
+      "deep_ocean",
+      "aurora"
     ],
     "palette": {
       "primary": 30,
@@ -2273,11 +2256,11 @@
     "preferredModes": [
       "aurora",
       "deep_ocean",
-      "aurora_curtains",
-      "crystal_cavern",
+      "protean_clouds",
+      "cosmic_voyage",
       "volumetric_clouds",
-      "warm_nebula",
-      "ink_wash"
+      "protean_clouds",
+      "deep_ocean"
     ],
     "palette": {
       "primary": 270,
@@ -2308,13 +2291,13 @@
   },
   "shipoffools": {
     "preferredModes": [
-      "void_light",
-      "ink_wash",
+      "wharf_rat_storm",
+      "estimated_prophet_mist",
+      "seascape",
       "deep_ocean",
-      "smoke_rings",
-      "volumetric_smoke",
-      "blacklight_glow",
-      "liquid_light"
+      "rain_street",
+      "protean_clouds",
+      "aurora"
     ],
     "palette": {
       "primary": 230,
@@ -2346,12 +2329,12 @@
   "meandmyuncle": {
     "preferredModes": [
       "desert_road",
-      "vintage_film",
-      "lo_fi_grain",
-      "oil_projector",
       "campfire",
-      "warm_nebula",
-      "smoke_rings"
+      "protean_clouds",
+      "protean_clouds",
+      "protean_clouds",
+      "deep_ocean",
+      "aurora"
     ],
     "palette": {
       "primary": 30,
@@ -2382,10 +2365,11 @@
     "preferredModes": [
       "river",
       "ocean",
-      "concert_lighting",
       "deep_ocean",
-      "inferno",
-      "liquid_light"
+      "protean_clouds",
+      "aurora",
+      "volumetric_clouds",
+      "cosmic_voyage"
     ],
     "palette": {
       "primary": 220,
@@ -2416,11 +2400,11 @@
     "preferredModes": [
       "rain_street",
       "volumetric_clouds",
-      "aurora_curtains",
+      "protean_clouds",
       "deep_ocean",
       "aurora",
-      "warm_nebula",
-      "ink_wash"
+      "protean_clouds",
+      "deep_ocean"
     ],
     "palette": {
       "primary": 210,
@@ -2452,12 +2436,10 @@
   "peggyo": {
     "preferredModes": [
       "forest",
-      "flower_field",
+      "protean_clouds",
       "aurora",
-      "vintage_film",
-      "oil_projector",
-      "warm_nebula",
-      "aurora_curtains"
+      "protean_clouds",
+      "protean_clouds"
     ],
     "palette": {
       "primary": 150,
@@ -2486,12 +2468,13 @@
   },
   "thewheel": {
     "preferredModes": [
-      "mandala_engine",
-      "liquid_mandala",
-      "kaleidoscope",
       "aurora",
       "cosmic_voyage",
-      "liquid_light"
+      "protean_clouds",
+      "deep_ocean",
+      "volumetric_clouds",
+      "protean_clouds",
+      "star_nest"
     ],
     "palette": {
       "primary": 45,
@@ -2521,12 +2504,13 @@
   },
   "mightaswell": {
     "preferredModes": [
-      "tie_dye",
-      "concert_lighting",
-      "kaleidoscope",
-      "liquid_mandala",
-      "flower_field",
-      "inferno"
+      "protean_clouds",
+      "protean_clouds",
+      "deep_ocean",
+      "aurora",
+      "volumetric_clouds",
+      "cosmic_voyage",
+      "protean_clouds"
     ],
     "palette": {
       "primary": 30,
@@ -2557,12 +2541,13 @@
   },
   "greateststory": {
     "preferredModes": [
-      "concert_lighting",
-      "inferno",
-      "fractal_flames",
-      "tie_dye",
-      "liquid_light",
-      "oil_projector"
+      "protean_clouds",
+      "deep_ocean",
+      "aurora",
+      "volumetric_clouds",
+      "cosmic_voyage",
+      "protean_clouds",
+      "star_nest"
     ],
     "palette": {
       "primary": 5,
@@ -2592,12 +2577,13 @@
   },
   "promisedland": {
     "preferredModes": [
-      "desert_road",
-      "concert_lighting",
-      "inferno",
-      "fractal_flames",
-      "liquid_light",
-      "oil_projector"
+      "protean_clouds",
+      "fire_mountain_smoke",
+      "st_stephen_lightning",
+      "deep_ocean",
+      "aurora",
+      "volumetric_clouds",
+      "cosmic_voyage"
     ],
     "palette": {
       "primary": 45,
@@ -2626,13 +2612,13 @@
   },
   "goodlovin": {
     "preferredModes": [
-      "concert_lighting",
-      "tie_dye",
-      "inferno",
-      "fractal_flames",
-      "liquid_light",
-      "oil_projector",
-      "aurora"
+      "aurora",
+      "protean_clouds",
+      "deep_ocean",
+      "volumetric_clouds",
+      "cosmic_voyage",
+      "protean_clouds",
+      "star_nest"
     ],
     "palette": {
       "primary": 330,
@@ -2664,13 +2650,13 @@
   },
   "themusicneverstopped": {
     "preferredModes": [
-      "spectral_analyzer",
-      "concert_lighting",
-      "tie_dye",
-      "prism_refraction",
-      "liquid_light",
-      "kaleidoscope",
-      "oil_projector"
+      "protean_clouds",
+      "star_nest",
+      "st_stephen_lightning",
+      "deep_ocean",
+      "aurora",
+      "volumetric_clouds",
+      "cosmic_voyage"
     ],
     "palette": {
       "primary": 310,
@@ -2702,13 +2688,10 @@
   "crazyfingers": {
     "preferredModes": [
       "aurora",
-      "crystal_cavern",
-      "voronoi_flow",
-      "prism_refraction",
-      "aurora_curtains",
-      "warp_field",
+      "cosmic_voyage",
+      "protean_clouds",
       "volumetric_nebula",
-      "blacklight_glow"
+      "protean_clouds"
     ],
     "palette": {
       "primary": 180,
@@ -2745,7 +2728,7 @@
       "void_light",
       "space_travel",
       "aurora",
-      "blacklight_glow"
+      "protean_clouds"
     ],
     "palette": {
       "primary": 210,
@@ -2777,13 +2760,11 @@
   },
   "hightime": {
     "preferredModes": [
-      "vintage_film",
-      "flower_field",
+      "protean_clouds",
       "campfire",
-      "oil_projector",
-      "warm_nebula",
+      "protean_clouds",
       "aurora",
-      "smoke_rings"
+      "protean_clouds"
     ],
     "palette": {
       "primary": 350,
@@ -2816,9 +2797,8 @@
       "deep_ocean",
       "river",
       "volumetric_clouds",
-      "aurora_curtains",
-      "aurora",
-      "liquid_light"
+      "protean_clouds",
+      "aurora"
     ],
     "palette": {
       "primary": 200,
@@ -2848,12 +2828,13 @@
   },
   "feellikeastranger": {
     "preferredModes": [
-      "concert_lighting",
-      "spectral_analyzer",
-      "tie_dye",
-      "prism_refraction",
-      "liquid_light",
-      "oil_projector"
+      "protean_clouds",
+      "st_stephen_lightning",
+      "star_nest",
+      "deep_ocean",
+      "aurora",
+      "volumetric_clouds",
+      "cosmic_voyage"
     ],
     "palette": {
       "primary": 320,
@@ -2884,12 +2865,13 @@
   },
   "hellinabucket": {
     "preferredModes": [
-      "inferno",
-      "lava_flow",
-      "concert_lighting",
-      "fractal_flames",
-      "liquid_light",
-      "oil_projector"
+      "protean_clouds",
+      "deep_ocean",
+      "aurora",
+      "volumetric_clouds",
+      "cosmic_voyage",
+      "protean_clouds",
+      "star_nest"
     ],
     "palette": {
       "primary": 20,
@@ -2919,13 +2901,13 @@
   },
   "westlafadeaway": {
     "preferredModes": [
-      "oil_projector",
-      "smoke_rings",
-      "liquid_light",
-      "voronoi_flow",
-      "liquid_mandala",
-      "vintage_film",
-      "tie_dye"
+      "protean_clouds",
+      "protean_clouds",
+      "deep_ocean",
+      "aurora",
+      "volumetric_clouds",
+      "cosmic_voyage",
+      "protean_clouds"
     ],
     "palette": {
       "primary": 280,
@@ -2955,13 +2937,13 @@
   },
   "blackthroatedwind": {
     "preferredModes": [
-      "desert_road",
-      "rain_street",
-      "smoke_rings",
+      "wharf_rat_storm",
+      "protean_clouds",
+      "estimated_prophet_mist",
       "volumetric_smoke",
       "deep_ocean",
-      "ink_wash",
-      "liquid_light"
+      "rain_street",
+      "protean_clouds"
     ],
     "palette": {
       "primary": 35,
@@ -2990,13 +2972,13 @@
   },
   "herecomessunshine": {
     "preferredModes": [
-      "flower_field",
+      "protean_clouds",
       "aurora_sky",
-      "tie_dye",
       "aurora",
-      "prism_refraction",
-      "liquid_mandala",
-      "kaleidoscope"
+      "protean_clouds",
+      "deep_ocean",
+      "volumetric_clouds",
+      "cosmic_voyage"
     ],
     "palette": {
       "primary": 50,
@@ -3027,12 +3009,13 @@
   },
   "newspeedwayboogie": {
     "preferredModes": [
-      "concert_lighting",
-      "inferno",
-      "liquid_light",
-      "fractal_flames",
-      "oil_projector",
-      "tie_dye"
+      "protean_clouds",
+      "deep_ocean",
+      "aurora",
+      "volumetric_clouds",
+      "cosmic_voyage",
+      "protean_clouds",
+      "star_nest"
     ],
     "palette": {
       "primary": 0,
@@ -3064,12 +3047,12 @@
   "foolishheart": {
     "preferredModes": [
       "aurora",
-      "stained_glass",
-      "oil_projector",
-      "flower_field",
-      "warm_nebula",
-      "liquid_mandala",
-      "aurora_curtains"
+      "protean_clouds",
+      "protean_clouds",
+      "protean_clouds",
+      "protean_clouds",
+      "deep_ocean",
+      "volumetric_clouds"
     ],
     "palette": {
       "primary": 345,
@@ -3100,12 +3083,12 @@
   "mexicaliblues": {
     "preferredModes": [
       "desert_road",
-      "vintage_film",
-      "lo_fi_grain",
-      "oil_projector",
       "campfire",
-      "warm_nebula",
-      "smoke_rings"
+      "protean_clouds",
+      "protean_clouds",
+      "protean_clouds",
+      "deep_ocean",
+      "aurora"
     ],
     "palette": {
       "primary": 25,

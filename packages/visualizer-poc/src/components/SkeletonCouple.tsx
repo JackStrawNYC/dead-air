@@ -12,6 +12,8 @@ import React from "react";
 import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
 import { seeded } from "../utils/seededRandom";
+import { useAudioSnapshot } from "./parametric/audio-helpers";
+import { useTempoFactor } from "../data/TempoContext";
 
 const WALTZ_DURATION = 540; // 18 seconds at 30fps
 const WALTZ_GAP = 1410;     // 47 second gap (65s total cycle)
@@ -174,16 +176,9 @@ interface Props {
 export const SkeletonCouple: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
-
-  // Rolling energy
-  const idx = Math.min(Math.max(0, frame), frames.length - 1);
-  let eSum = 0;
-  let eCount = 0;
-  for (let i = Math.max(0, idx - 75); i <= Math.min(frames.length - 1, idx + 75); i++) {
-    eSum += frames[i].rms;
-    eCount++;
-  }
-  const energy = eCount > 0 ? eSum / eCount : 0;
+  const snap = useAudioSnapshot(frames);
+  const tempoFactor = useTempoFactor();
+  const { energy, beatDecay, musicalTime, chromaHue, onsetEnvelope } = snap;
 
   const cycleIndex = Math.floor(frame / WALTZ_CYCLE);
   const cycleFrame = frame % WALTZ_CYCLE;
@@ -213,11 +208,9 @@ export const SkeletonCouple: React.FC<Props> = ({ frames }) => {
     extrapolateRight: "clamp",
   });
 
-  // Waltz spin — energy drives rotation speed
-  // Slow waltz: ~1 full rotation over the 18 seconds when quiet
-  // Fast waltz: ~3 rotations when loud
-  const baseSpinRate = 0.4; // rotations per cycle when quiet
-  const energySpinRate = interpolate(energy, [0.03, 0.25], [baseSpinRate, 2.5], {
+  // Waltz spin — energy and tempo drive rotation speed
+  const baseSpinRate = 0.4 * tempoFactor;
+  const energySpinRate = interpolate(energy, [0.03, 0.25], [baseSpinRate, 2.5 * tempoFactor], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
@@ -227,8 +220,9 @@ export const SkeletonCouple: React.FC<Props> = ({ frames }) => {
   const centerX = width * 0.62 + Math.sin(progress * Math.PI * 2) * width * 0.04;
   const centerY = height * 0.45 + Math.cos(progress * Math.PI) * height * 0.03;
 
-  // Body sway for waltz motion (1-2-3, 1-2-3 waltz time)
-  const waltzBeat = Math.sin(frame * 0.15) * 0.6 + Math.sin(frame * 0.1) * 0.4;
+  // Body sway for waltz motion — synced to musical beat (3/4 waltz feel)
+  const beatPhase = (musicalTime % 3) / 3; // waltz is in 3
+  const waltzBeat = Math.sin(beatPhase * Math.PI * 2) * 0.6 + beatDecay * 0.4;
 
   // Scale with energy (slightly larger when loud)
   const scale = interpolate(energy, [0.03, 0.2], [0.85, 1.1], {
@@ -236,11 +230,11 @@ export const SkeletonCouple: React.FC<Props> = ({ frames }) => {
     extrapolateRight: "clamp",
   });
 
-  // Neon glow — brighter during loud passages
+  // Neon glow — brighter during loud passages, onset flashes
   const glowIntensity = interpolate(energy, [0.05, 0.2], [8, 30], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
-  });
+  }) + onsetEnvelope * 15;
   const glowColor = colorPair.lead;
   const glowColor2 = colorPair.follow;
 

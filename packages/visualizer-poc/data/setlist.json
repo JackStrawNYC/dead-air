@@ -11,21 +11,43 @@
       "title": "The Promised Land",
       "set": 1,
       "trackNumber": 1,
-      "defaultMode": "aurora_curtains",
+      "defaultMode": "highway_horizon",
       "audioFile": "veneta-72/gd72-08-27d1t02.mp3",
       "palette": {
         "primary": 200,
         "secondary": 40,
         "saturation": 0.9
       },
-      "songArt": "assets/song-art/veneta-72/d1t02.png"
+      "songArt": "assets/song-art/veneta-72/d1t02.png",
+      "sectionOverrides": [
+        {
+          "sectionIndex": 0,
+          "mode": "highway_horizon"
+        },
+        {
+          "sectionIndex": 1,
+          "mode": "highway_horizon"
+        },
+        {
+          "sectionIndex": 2,
+          "mode": "highway_horizon"
+        },
+        {
+          "sectionIndex": 3,
+          "mode": "highway_horizon"
+        },
+        {
+          "sectionIndex": 4,
+          "mode": "highway_horizon"
+        }
+      ]
     },
     {
       "trackId": "d1t03",
       "title": "Sugaree",
       "set": 1,
       "trackNumber": 2,
-      "defaultMode": "stained_glass",
+      "defaultMode": "honeycomb_cathedral",
       "audioFile": "veneta-72/gd72-08-27d1t03.mp3",
       "palette": {
         "primary": 35,
@@ -39,7 +61,7 @@
       "title": "Me And My Uncle",
       "set": 1,
       "trackNumber": 3,
-      "defaultMode": "aurora",
+      "defaultMode": "campfire_embers",
       "audioFile": "veneta-72/gd72-08-27d1t04.mp3",
       "palette": {
         "primary": 0,
@@ -53,7 +75,7 @@
       "title": "Deal",
       "set": 1,
       "trackNumber": 4,
-      "defaultMode": "smoke_rings",
+      "defaultMode": "neon_casino",
       "audioFile": "veneta-72/gd72-08-27d1t05.mp3",
       "palette": {
         "primary": 220,
@@ -67,7 +89,7 @@
       "title": "Black Throated Wind",
       "set": 1,
       "trackNumber": 5,
-      "defaultMode": "stained_glass",
+      "defaultMode": "storm_vortex",
       "audioFile": "veneta-72/gd72-08-27d1t06.mp3",
       "palette": {
         "primary": 50,
@@ -82,7 +104,7 @@
       "title": "China Cat Sunflower",
       "set": 1,
       "trackNumber": 6,
-      "defaultMode": "deep_ocean",
+      "defaultMode": "psychedelic_garden",
       "audioFile": "veneta-72/gd72-08-27d1t07.mp3",
       "palette": {
         "primary": 15,
@@ -97,7 +119,7 @@
       "title": "I Know You Rider",
       "set": 1,
       "trackNumber": 7,
-      "defaultMode": "cosmic_voyage",
+      "defaultMode": "cosmic_railroad",
       "audioFile": "veneta-72/gd72-08-27d1t08.mp3",
       "palette": {
         "primary": 25,
@@ -111,7 +133,7 @@
       "title": "Mexicali Blues",
       "set": 1,
       "trackNumber": 8,
-      "defaultMode": "aurora",
+      "defaultMode": "desert_cantina",
       "audioFile": "veneta-72/gd72-08-27d1t09.mp3",
       "palette": {
         "primary": 330,
@@ -125,7 +147,7 @@
       "title": "Bertha",
       "set": 1,
       "trackNumber": 9,
-      "defaultMode": "liquid_light",
+      "defaultMode": "earthquake_fissure",
       "audioFile": "veneta-72/gd72-08-27d1t10.mp3",
       "palette": {
         "primary": 270,
@@ -139,7 +161,7 @@
       "title": "Playing In The Band",
       "set": 2,
       "trackNumber": 1,
-      "defaultMode": "aurora",
+      "defaultMode": "mobius_amphitheater",
       "audioFile": "veneta-72/gd72-08-27d2t02.mp3",
       "palette": {
         "primary": 15,
@@ -153,7 +175,7 @@
       "title": "He's Gone",
       "set": 2,
       "trackNumber": 2,
-      "defaultMode": "oil_projector",
+      "defaultMode": "memorial_drift",
       "audioFile": "veneta-72/gd72-08-27d2t03.mp3",
       "palette": {
         "primary": 200,
@@ -167,7 +189,7 @@
       "title": "Jack Straw",
       "set": 2,
       "trackNumber": 3,
-      "defaultMode": "liquid_light",
+      "defaultMode": "boxcar_tunnel",
       "audioFile": "veneta-72/gd72-08-27d2t04.mp3",
       "palette": {
         "primary": 50,
@@ -181,7 +203,7 @@
       "title": "Bird Song",
       "set": 2,
       "trackNumber": 4,
-      "defaultMode": "aurora",
+      "defaultMode": "aviary_canopy",
       "audioFile": "veneta-72/gd72-08-27d2t05.mp3",
       "palette": {
         "primary": 240,
@@ -195,7 +217,7 @@
       "title": "Greatest Story Ever Told",
       "set": 2,
       "trackNumber": 5,
-      "defaultMode": "deep_ocean",
+      "defaultMode": "clockwork_temple",
       "audioFile": "veneta-72/gd72-08-27d2t06.mp3",
       "palette": {
         "primary": 260,
@@ -209,7 +231,7 @@
       "title": "Dark Star",
       "set": 3,
       "trackNumber": 1,
-      "defaultMode": "liquid_light",
+      "defaultMode": "event_horizon",
       "audioFile": "veneta-72/gd72-08-27d3t01.mp3",
       "palette": {
         "primary": 260,
@@ -224,7 +246,7 @@
       "title": "El Paso",
       "set": 3,
       "trackNumber": 2,
-      "defaultMode": "oil_projector",
+      "defaultMode": "canyon_chase",
       "audioFile": "veneta-72/gd72-08-27d3t02.mp3",
       "palette": {
         "primary": 25,
@@ -238,7 +260,7 @@
       "title": "Sing Me Back Home",
       "set": 3,
       "trackNumber": 3,
-      "defaultMode": "smoke_rings",
+      "defaultMode": "porch_twilight",
       "audioFile": "veneta-72/gd72-08-27d3t03.mp3",
       "palette": {
         "primary": 195,
@@ -252,7 +274,7 @@
       "title": "Sugar Magnolia",
       "set": 3,
       "trackNumber": 4,
-      "defaultMode": "cosmic_voyage",
+      "defaultMode": "bloom_explosion",
       "audioFile": "veneta-72/gd72-08-27d3t04.mp3",
       "palette": {
         "primary": 310,
@@ -266,35 +288,79 @@
       "title": "Casey Jones",
       "set": 3,
       "trackNumber": 5,
-      "defaultMode": "oil_projector",
+      "defaultMode": "locomotive_engine",
       "audioFile": "veneta-72/gd72-08-27d3t05.mp3",
       "palette": {
         "primary": 20,
         "secondary": 200,
         "saturation": 1.0
       },
-      "songArt": "assets/song-art/veneta-72/d3t05.png"
+      "songArt": "assets/song-art/veneta-72/d3t05.png",
+      "sectionOverrides": [
+        {
+          "sectionIndex": 0,
+          "mode": "locomotive_engine"
+        },
+        {
+          "sectionIndex": 1,
+          "mode": "locomotive_engine"
+        },
+        {
+          "sectionIndex": 2,
+          "mode": "locomotive_engine"
+        },
+        {
+          "sectionIndex": 3,
+          "mode": "locomotive_engine"
+        },
+        {
+          "sectionIndex": 4,
+          "mode": "locomotive_engine"
+        }
+      ]
     },
     {
       "trackId": "d3t06",
       "title": "One More Saturday Night",
       "set": 3,
       "trackNumber": 6,
-      "defaultMode": "cosmic_voyage",
+      "defaultMode": "dance_floor_prism",
       "audioFile": "veneta-72/gd72-08-27d3t06.mp3",
       "palette": {
         "primary": 50,
         "secondary": 280,
         "saturation": 1.0
       },
-      "songArt": "assets/song-art/veneta-72/d3t06.png"
+      "songArt": "assets/song-art/veneta-72/d3t06.png",
+      "sectionOverrides": [
+        {
+          "sectionIndex": 0,
+          "mode": "dance_floor_prism"
+        },
+        {
+          "sectionIndex": 1,
+          "mode": "dance_floor_prism"
+        },
+        {
+          "sectionIndex": 2,
+          "mode": "dance_floor_prism"
+        },
+        {
+          "sectionIndex": 3,
+          "mode": "dance_floor_prism"
+        },
+        {
+          "sectionIndex": 4,
+          "mode": "dance_floor_prism"
+        }
+      ]
     },
     {
       "trackId": "d3t07",
       "title": "And We Bid You Goodnight",
       "set": 3,
       "trackNumber": 7,
-      "defaultMode": "stained_glass",
+      "defaultMode": "stained_glass_dissolution",
       "audioFile": "veneta-72/gd72-08-27d3t07.mp3",
       "palette": {
         "primary": 165,

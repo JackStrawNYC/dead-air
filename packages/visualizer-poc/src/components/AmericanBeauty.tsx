@@ -11,6 +11,8 @@ import React from "react";
 import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
 import { seeded } from "../utils/seededRandom";
+import { useAudioSnapshot } from "./parametric/audio-helpers";
+import { useTempoFactor } from "../data/TempoContext";
 
 const CYCLE = 1650; // 55 seconds at 30fps
 const DURATION = 420; // 14 seconds
@@ -96,15 +98,9 @@ interface Props {
 export const AmericanBeauty: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
-
-  const idx = Math.min(Math.max(0, frame), frames.length - 1);
-  let eSum = 0;
-  let eCount = 0;
-  for (let i = Math.max(0, idx - 75); i <= Math.min(frames.length - 1, idx + 75); i++) {
-    eSum += frames[i].rms;
-    eCount++;
-  }
-  const energy = eCount > 0 ? eSum / eCount : 0;
+  const snap = useAudioSnapshot(frames);
+  const tempoFactor = useTempoFactor();
+  const { energy, slowEnergy, chromaHue, beatDecay } = snap;
 
   // Pre-generate stem data
   const stems = React.useMemo(() => {
@@ -183,8 +179,8 @@ export const AmericanBeauty: React.FC<Props> = ({ frames }) => {
           const currentHeight = stem.height * growProgress;
           const topY = bottomY - currentHeight;
 
-          // Gentle sway
-          const sway = Math.sin(frame * 0.03 + stem.swayPhase) * 8 * growProgress;
+          // Gentle sway — tempo-scaled
+          const sway = Math.sin(frame * 0.03 * tempoFactor + stem.swayPhase) * 8 * growProgress;
 
           // Rose bloom (starts after stem is 60% grown)
           const bloomProgress = interpolate(
@@ -194,9 +190,12 @@ export const AmericanBeauty: React.FC<Props> = ({ frames }) => {
             { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
           );
 
-          const roseHue = stem.roseHue % 360;
-          const roseColor = `hsl(${roseHue}, 85%, 45%)`;
-          const roseInner = `hsl(${(roseHue + 10) % 360}, 90%, 55%)`;
+          // Roses subtly tinted by chroma — stays in red/pink range but shifts warmth
+          const chromaTint = ((chromaHue / 360) - 0.5) * 10; // ±5 degree shift
+          const roseHue = (stem.roseHue + chromaTint) % 360;
+          const roseLightness = 45 + beatDecay * 8; // beat pulse brightens roses
+          const roseColor = `hsl(${roseHue}, 85%, ${roseLightness}%)`;
+          const roseInner = `hsl(${(roseHue + 10) % 360}, 90%, ${roseLightness + 10}%)`;
 
           return (
             <g key={si}>

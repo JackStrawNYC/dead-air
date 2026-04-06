@@ -231,24 +231,24 @@ export function getJamPhaseBoundaries(
 
 export const JAM_PHASE_SHADER_POOLS: Record<JamPhase, VisualMode[]> = {
   exploration: [
-    "deep_ocean", "cosmic_dust", "aurora", "morphogenesis", "void_light",
-    "cosmic_voyage", "ink_wash", "aurora_curtains", "volumetric_clouds",
-    "volumetric_nebula", "smoke_rings", "coral_reef",
+    "deep_ocean", "cosmic_dust", "aurora", "deep_ocean", "void_light",
+    "cosmic_voyage", "deep_ocean", "protean_clouds", "volumetric_clouds",
+    "volumetric_nebula", "protean_clouds", "deep_ocean",
   ],
   building: [
-    "liquid_light", "fluid_2d", "reaction_diffusion", "kaleidoscope",
-    "neural_web", "warp_field", "plasma_field", "oil_projector",
-    "fluid_light", "mycelium_network", "volumetric_smoke",
+    "protean_clouds", "fluid_2d", "deep_ocean", "cosmic_voyage",
+    "cosmic_voyage", "cosmic_voyage", "protean_clouds", "protean_clouds",
+    "fluid_light", "deep_ocean", "volumetric_smoke",
   ],
   peak_space: [
-    "feedback_recursion", "fractal_flames", "electric_arc", "inferno",
-    "fractal_zoom", "sacred_geometry", "lava_flow", "solar_flare",
-    "climax_surge", "mandala_engine", "tie_dye",
+    "cosmic_voyage", "cosmic_voyage", "inferno", "inferno",
+    "cosmic_voyage", "cosmic_voyage", "inferno", "inferno",
+    "inferno", "mandala_engine", "protean_clouds",
   ],
   resolution: [
-    "tie_dye", "stained_glass", "oil_projector", "cosmic_voyage",
-    "mycelium_network", "diffraction_rings", "aurora", "deep_ocean",
-    "ink_wash", "vintage_film", "voronoi_flow",
+    "protean_clouds", "protean_clouds", "protean_clouds", "cosmic_voyage",
+    "deep_ocean", "deep_ocean", "aurora", "deep_ocean",
+    "deep_ocean", "vintage_film", "protean_clouds",
   ],
 };
 

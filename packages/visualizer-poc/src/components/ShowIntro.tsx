@@ -132,7 +132,7 @@ export const ShowIntro: React.FC<ShowIntroProps> = ({
       <div style={{ position: "absolute", inset: 0, opacity: sceneOpacity, overflow: "hidden", background: "#0a0812" }}>
         <Img
           src={staticFile("assets/song-art/show-poster.png")}
-          style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center" }}
+          style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center 30%" }}
         />
         {/* Bottom vignette for legibility */}
         <div

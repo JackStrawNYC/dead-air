@@ -79,10 +79,12 @@ void main() {
   float melodicPitch = clamp(melInfluence, 0.0, 1.0);
   float effectiveBeat = uBeatSnap * smoothstep(0.3, 0.7, uBeatConfidence);
 
-  float slowTime = uDynamicTime * 0.03;
+  // [SLOW DOWN] Halved time multiplier (was 0.03)
+  float slowTime = uDynamicTime * 0.015;
 
   // --- Domain warping + energy-responsive detail ---
-  vec2 domainWarpOff = vec2(fbm3(vec3(p * 0.5, uDynamicTime * 0.05)), fbm3(vec3(p * 0.5 + 100.0, uDynamicTime * 0.05))) * 0.3;
+  // [SLOW DOWN] Halved warp speed (was 0.05)
+  vec2 domainWarpOff = vec2(fbm3(vec3(p * 0.5, uDynamicTime * 0.025)), fbm3(vec3(p * 0.5 + 100.0, uDynamicTime * 0.025))) * 0.3;
   float detailMod = 1.0 + energy * 0.5;
 
   // --- Uniform integrations ---
@@ -109,10 +111,12 @@ void main() {
                           : coherence < 0.3 ? mix(1.0, 2.0, (0.3 - coherence) / 0.3)
                           : 1.0;
 
-  // --- Deep purple-black background ---
-  vec3 col = vec3(0.02, 0.01, 0.04);
-  // Subtle gradient: slightly lighter at center for depth
-  col += vec3(0.01, 0.005, 0.02) * (1.0 - length(p) * 0.6);
+  // --- [DARKEN] Deep UV-black background (further darkened) ---
+  // Energy-squared gating: nearly invisible at quiet, reveals at peaks
+  float e2 = energy * energy;
+  vec3 col = vec3(0.003, 0.002, 0.006);
+  // Subtle gradient: only visible when energy is present
+  col += vec3(0.004, 0.002, 0.008) * (1.0 - length(p) * 0.6) * e2;
 
   // --- Melodic vertical drift ---
   float vertShift = (melodicPitch - 0.5) * 0.06;
@@ -120,7 +124,8 @@ void main() {
   // --- Palette neon colors ---
   float hue1 = uPalettePrimary + chromaHueMod + chordHue;
   float hue2 = uPaletteSecondary + chordHue * 0.5;
-  float sat = mix(0.7, 1.0, energy) * uPaletteSaturation;
+  // [REDUCE SATURATION AT QUIET] Saturation scales with energy (floor lowered to 0.1)
+  float sat = mix(0.1, 1.0, e2) * uPaletteSaturation;
 
   // Fixed neon accent hues (blacklight palette)
   float neonGreenHue = 0.33;   // electric green
@@ -146,7 +151,8 @@ void main() {
       // Each blob has a unique position from noise
       float seedX = fi * 1.7 + 3.14;
       float seedY = fi * 2.3 + 7.91;
-      float driftSpeed = slowTime * 0.4 * sectionDriftSpeed;
+      // [SLOW DOWN] Halved drift speed (was slowTime * 0.4)
+      float driftSpeed = slowTime * 0.2 * sectionDriftSpeed;
 
       vec2 center = vec2(
         snoise(vec3(seedX, driftSpeed, 0.0)) * 0.6,
@@ -157,12 +163,14 @@ void main() {
 
       // FBM noise field for organic shape
       float warpStr = (1.0 - stability) * 0.15 * coherenceWarpMult;
+      // [SLOW DOWN] Halved warp time (was slowTime * 0.3)
       vec2 warp = vec2(
-        snoise(vec3(dp * 2.5 + fi * 10.0, slowTime * 0.3)),
-        snoise(vec3(dp * 2.5 + fi * 10.0 + 50.0, slowTime * 0.3))
+        snoise(vec3(dp * 2.5 + fi * 10.0, slowTime * 0.15)),
+        snoise(vec3(dp * 2.5 + fi * 10.0 + 50.0, slowTime * 0.15))
       ) * warpStr;
 
-      float noiseField = fbm6(vec3((dp + warp) * 4.0 * detailMod, slowTime * 0.2 + fi * 5.0));
+      // [SLOW DOWN] Halved noise field time (was slowTime * 0.2)
+      float noiseField = fbm6(vec3((dp + warp) * 4.0 * detailMod, slowTime * 0.1 + fi * 5.0));
       noiseField = noiseField * 0.5 + 0.5; // remap to 0-1
 
       // Threshold to create shape boundaries
@@ -183,14 +191,15 @@ void main() {
       blobHue = fract(blobHue + chromaHueMod * 0.5);
       vec3 neonColor = hsv2rgb(vec3(blobHue, sat, 1.0));
 
-      // Bright core
-      float core = shape * (0.6 + energy * 0.6) * sectionGlowMult;
+      // [DARKEN] Bright core scaled by energy-squared
+      float core = shape * (0.3 + e2 * 0.9) * sectionGlowMult;
       col += neonColor * core;
 
       // Exponential falloff halo (the blacklight glow effect)
       float haloRadius = blobRadius * bassBreathe * (1.5 + tension * 0.5);
       float halo = exp(-dist * dist / (haloRadius * haloRadius * 0.15)) * shape * 0.4;
-      halo += exp(-dist / (haloRadius * 2.0)) * 0.08 * energy; // wider soft glow
+      // [DARKEN] Wider soft glow scaled by e2 (was energy)
+      halo += exp(-dist / (haloRadius * 2.0)) * 0.05 * e2;
       col += neonColor * halo * sectionGlowMult;
 
       // Vocal glow adds warmth to halos
@@ -209,7 +218,8 @@ void main() {
 
       float seedX = fi * 3.1 + 17.5;
       float seedY = fi * 2.7 + 23.8;
-      float driftSpeed = slowTime * 0.6 * sectionDriftSpeed;
+      // [SLOW DOWN] Halved drift speed (was slowTime * 0.6)
+      float driftSpeed = slowTime * 0.3 * sectionDriftSpeed;
 
       vec2 center = vec2(
         snoise(vec3(seedX, driftSpeed, 10.0)) * 0.55,
@@ -219,13 +229,15 @@ void main() {
       vec2 dp = p - center;
 
       // Slight rotation per mushroom
-      float rot = slowTime * 0.3 * (fi - 2.0) * 0.1;
+      // [SLOW DOWN] Halved rotation speed (was slowTime * 0.3)
+      float rot = slowTime * 0.15 * (fi - 2.0) * 0.1;
       float cr = cos(rot);
       float sr = sin(rot);
       dp = mat2(cr, -sr, sr, cr) * dp;
 
       // Noise-warped edge
-      float edgeNoise = snoise(vec3(dp * 8.0, slowTime * 0.4 + fi * 20.0)) * 0.02 * coherenceWarpMult;
+      // [SLOW DOWN] Halved edge noise time (was slowTime * 0.4)
+      float edgeNoise = snoise(vec3(dp * 8.0, slowTime * 0.2 + fi * 20.0)) * 0.02 * coherenceWarpMult;
       float capRadius = (0.04 + energy * 0.03) * bassPulse;
       float sdf = sdMushroomCap(dp, capRadius + edgeNoise);
 
@@ -247,14 +259,16 @@ void main() {
       // FFT modulation
       float fftSample = texture2D(uFFTTexture, vec2((fi + 3.0) / 8.0, 0.5)).r;
 
-      col += mushColor * edge * (0.5 + energy * 0.5 + fftSample * 0.3) * sectionGlowMult;
-      col += mushColor * glow * (0.3 + bass * 0.4) * sectionGlowMult;
+      // [DARKEN] Mushroom glow scaled by e2
+      col += mushColor * edge * (0.2 + e2 * 0.8 + fftSample * 0.3) * sectionGlowMult;
+      col += mushColor * glow * (0.1 + bass * 0.3 * energy) * sectionGlowMult;
     }
   }
 
   // --- LAYER 3: Tiny bright spore/particle dots ---
   {
-    float particleIntensity = (0.2 + highs * 0.8) * (0.5 + energy * 0.5);
+    // [DARKEN] Particle intensity scaled by e2
+    float particleIntensity = (0.1 + highs * 0.6) * e2;
     float sparkle = 0.0;
     vec3 particleCol = vec3(0.0);
 
@@ -262,8 +276,9 @@ void main() {
       float fi = float(i);
 
       // Pseudo-random position from noise
-      float px = snoise(vec3(fi * 5.3, 1.0, slowTime * 0.2 * sectionDriftSpeed)) * 0.7;
-      float py = snoise(vec3(fi * 7.1, 2.0, slowTime * 0.2 * sectionDriftSpeed)) * 0.5;
+      // [SLOW DOWN] Halved particle drift (was slowTime * 0.2)
+      float px = snoise(vec3(fi * 5.3, 1.0, slowTime * 0.1 * sectionDriftSpeed)) * 0.7;
+      float py = snoise(vec3(fi * 7.1, 2.0, slowTime * 0.1 * sectionDriftSpeed)) * 0.5;
       vec2 particlePos = vec2(px, py + vertShift * 0.5);
 
       float dist = length(p - particlePos);
@@ -272,7 +287,8 @@ void main() {
       float dot_glow = exp(-dist * dist * 800.0) * particleIntensity;
 
       // Flickering: each particle has its own flicker phase
-      float flicker = snoise(vec3(fi * 13.7, slowTime * 2.0, 0.0));
+      // [SLOW DOWN] Halved flicker speed (was slowTime * 2.0)
+      float flicker = snoise(vec3(fi * 13.7, slowTime * 1.0, 0.0));
       flicker = smoothstep(-0.2, 0.5, flicker);
       dot_glow *= flicker;
 
@@ -297,7 +313,8 @@ void main() {
 
     float onsetHue = fract(hue1 + uTime * 0.1);
     vec3 onsetColor = hsv2rgb(vec3(onsetHue, 0.8, 1.0));
-    col += onsetColor * onsetBloom;
+    // [DARKEN] Onset bloom scaled down at quiet
+    col += onsetColor * onsetBloom * (0.3 + energy * 0.7);
   }
 
   // --- Beat flash: intensify all glowing elements ---
@@ -306,11 +323,18 @@ void main() {
   // --- Climax boost ---
   col *= 1.0 + climaxBoost * 0.6;
 
+  // === ATMOSPHERIC DEPTH ===
+  float fogNoise_ad = fbm3(vec3(p * 0.5, uDynamicTime * 0.012));
+  float fogDensity_ad = mix(0.35, 0.02, energy);
+  vec3 fogColor_ad = vec3(0.01, 0.008, 0.015);
+  col = mix(col, fogColor_ad, fogDensity_ad * (0.5 + fogNoise_ad * 0.5));
+
   // --- Vignette (tight, to keep edges very dark) ---
   float vigScale = mix(0.35, 0.25, energy);
   float vignette = 1.0 - dot(p * vigScale, p * vigScale);
   vignette = smoothstep(0.0, 1.0, vignette);
-  col = mix(vec3(0.02, 0.01, 0.04), col, vignette);
+  // [LOWER BLACK FLOOR] Vignette fades to true UV-black (lowered further)
+  col = mix(vec3(0.003, 0.002, 0.006), col, vignette);
 
   // --- Post-processing ---
   col = applyPostProcess(col, vUv, p);

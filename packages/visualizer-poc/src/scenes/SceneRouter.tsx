@@ -321,15 +321,23 @@ export function getModeForSection(
 ): VisualMode {
   // Safe shaders whitelist — validate chosen mode at the end
   const SAFE_SHADERS: Set<VisualMode> = new Set([
-    "liquid_light", "oil_projector", "tie_dye", "aurora", "inferno",
-    "deep_ocean", "stained_glass", "plasma_field", "cosmic_voyage",
-    "lava_flow", "aurora_curtains", "sacred_geometry", "mandala_engine",
-    "fractal_flames", "kaleidoscope", "fractal_zoom", "galaxy_spiral",
-    "spinning_spiral", "smoke_rings", "coral_reef",
+    "protean_clouds", "protean_clouds", "protean_clouds", "aurora", "inferno",
+    "deep_ocean", "protean_clouds", "protean_clouds", "cosmic_voyage",
+    "inferno", "protean_clouds", "cosmic_voyage", "mandala_engine",
+    "cosmic_voyage", "cosmic_voyage", "cosmic_voyage", "cosmic_voyage",
+    "protean_clouds", "protean_clouds", "deep_ocean",
     "volumetric_clouds", "volumetric_smoke", "volumetric_nebula",
-    "river", "forest", "mountain_fire", "space_travel", "ocean",
+    "river", "forest", "mountain_fire", "cosmic_voyage", "ocean",
     "campfire", "rain_street", "aurora_sky", "storm", "canyon",
-    "flower_field", "desert_road",
+    "protean_clouds", "desert_road",
+    "fractal_temple",
+    "highway_horizon", "honeycomb_cathedral", "campfire_embers",
+    "neon_casino", "storm_vortex", "psychedelic_garden",
+    "cosmic_railroad", "desert_cantina", "earthquake_fissure",
+    "mobius_amphitheater", "memorial_drift", "boxcar_tunnel",
+    "aviary_canopy", "clockwork_temple", "event_horizon",
+    "canyon_chase", "porch_twilight", "bloom_explosion",
+    "locomotive_engine", "dance_floor_prism", "stained_glass_dissolution",
   ]);
   const validateSafe = (mode: VisualMode): VisualMode =>
     SAFE_SHADERS.has(mode) ? mode : song.defaultMode;
@@ -421,31 +429,31 @@ export function getModeForSection(
 
       // Stem section bias: route shaders by what the band is doing
       if (stemSection === "solo") {
-        const dramaticModes: VisualMode[] = ["inferno", "liquid_light", "fractal_flames", "electric_arc"];
+        const dramaticModes: VisualMode[] = ["inferno", "protean_clouds", "cosmic_voyage", "inferno"];
         const dramatic = dramaticModes.filter((m) => filteredPool.includes(m));
         if (dramatic.length > 0) {
           filteredPool = [...filteredPool, ...dramatic, ...dramatic]; // 3x weight
         }
       } else if (stemSection === "vocal") {
-        const warmModes: VisualMode[] = ["oil_projector", "stained_glass", "aurora"];
+        const warmModes: VisualMode[] = ["protean_clouds", "protean_clouds", "aurora"];
         const warm = warmModes.filter((m) => filteredPool.includes(m));
         if (warm.length > 0) {
           filteredPool = [...filteredPool, ...warm, ...warm]; // 3x weight
         }
       } else if (stemSection === "jam") {
-        const generativeModes: VisualMode[] = ["feedback_recursion", "reaction_diffusion", "fractal_zoom", "kaleidoscope", "mandala_engine", "voronoi_flow"];
+        const generativeModes: VisualMode[] = ["cosmic_voyage", "deep_ocean", "cosmic_voyage", "cosmic_voyage", "mandala_engine", "protean_clouds"];
         const generative = generativeModes.filter((m) => filteredPool.includes(m));
         if (generative.length > 0) {
           filteredPool = [...filteredPool, ...generative, ...generative]; // 3x weight
         }
       } else if (stemSection === "instrumental") {
-        const midModes: VisualMode[] = ["aurora", "voronoi_flow", "oil_projector", "tie_dye", "crystal_cavern"];
+        const midModes: VisualMode[] = ["aurora", "protean_clouds", "protean_clouds", "protean_clouds", "cosmic_voyage"];
         const mid = midModes.filter((m) => filteredPool.includes(m));
         if (mid.length > 0) {
           filteredPool = [...filteredPool, ...mid]; // 2x weight
         }
       } else if (stemSection === "quiet") {
-        const ambientModes: VisualMode[] = ["cosmic_dust", "deep_ocean", "void_light", "morphogenesis", "cosmic_voyage"];
+        const ambientModes: VisualMode[] = ["cosmic_dust", "deep_ocean", "void_light", "deep_ocean", "cosmic_voyage"];
         const ambient = ambientModes.filter((m) => filteredPool.includes(m));
         if (ambient.length > 0) {
           filteredPool = [...filteredPool, ...ambient, ...ambient]; // 3x weight
@@ -454,19 +462,19 @@ export function getModeForSection(
 
       // Stem dominant musician bias: who's driving → which shaders feel right
       if (stemDominant === "jerry") {
-        const jerryModes: VisualMode[] = ["kaleidoscope", "fractal_zoom", "sacred_geometry", "aurora"];
+        const jerryModes: VisualMode[] = ["cosmic_voyage", "cosmic_voyage", "cosmic_voyage", "aurora"];
         const matches = jerryModes.filter((m) => filteredPool.includes(m));
         if (matches.length > 0) {
           for (let i = 0; i < 2; i++) filteredPool = [...filteredPool, ...matches]; // 2.5x weight
         }
       } else if (stemDominant === "phil") {
-        const philModes: VisualMode[] = ["deep_ocean", "cosmic_voyage", "neural_web", "cosmic_dust"];
+        const philModes: VisualMode[] = ["deep_ocean", "cosmic_voyage", "cosmic_voyage", "cosmic_dust"];
         const matches = philModes.filter((m) => filteredPool.includes(m));
         if (matches.length > 0) {
           for (let i = 0; i < 2; i++) filteredPool = [...filteredPool, ...matches];
         }
       } else if (stemDominant === "drums") {
-        const drumsModes: VisualMode[] = ["mandala_engine", "reaction_diffusion", "electric_arc", "inferno"];
+        const drumsModes: VisualMode[] = ["mandala_engine", "deep_ocean", "inferno", "inferno"];
         const matches = drumsModes.filter((m) => filteredPool.includes(m));
         if (matches.length > 0) {
           for (let i = 0; i < 2; i++) filteredPool = [...filteredPool, ...matches];
@@ -486,7 +494,7 @@ export function getModeForSection(
         // Improvisation bias: high improv biases toward fluid/generative shaders
         const improvScore = estimateImprovisationScore(frames, section.frameStart);
         if (improvScore > 0.6) {
-          const improvModes: VisualMode[] = ["fluid_2d", "fractal_zoom", "reaction_diffusion", "kaleidoscope", "mandala_engine", "feedback_recursion"];
+          const improvModes: VisualMode[] = ["fluid_2d", "cosmic_voyage", "deep_ocean", "cosmic_voyage", "mandala_engine", "cosmic_voyage"];
           const improvMatches = improvModes.filter((m) => filteredPool.includes(m));
           if (improvMatches.length > 0) {
             filteredPool = [...filteredPool, ...improvMatches, ...improvMatches]; // 3x weight
@@ -498,13 +506,13 @@ export function getModeForSection(
       if (songIdentity?.narrativeArc) {
         const arc = songIdentity.narrativeArc;
         if (arc === "meditative_journey" || arc === "elegy") {
-          const ambientModes: VisualMode[] = ["aurora", "deep_ocean", "cosmic_dust", "void_light", "morphogenesis", "cosmic_voyage", "oil_projector"];
+          const ambientModes: VisualMode[] = ["aurora", "deep_ocean", "cosmic_dust", "void_light", "deep_ocean", "cosmic_voyage", "protean_clouds"];
           const ambientMatches = ambientModes.filter((m) => filteredPool.includes(m));
           if (ambientMatches.length > 0) {
             filteredPool = [...filteredPool, ...ambientMatches]; // 2x weight
           }
         } else if (arc === "jam_vehicle") {
-          const generativeModes: VisualMode[] = ["feedback_recursion", "reaction_diffusion", "fractal_zoom", "kaleidoscope", "mandala_engine", "voronoi_flow"];
+          const generativeModes: VisualMode[] = ["cosmic_voyage", "deep_ocean", "cosmic_voyage", "cosmic_voyage", "mandala_engine", "protean_clouds"];
           const generativeMatches = generativeModes.filter((m) => filteredPool.includes(m));
           if (generativeMatches.length > 0) {
             filteredPool = [...filteredPool, ...generativeMatches]; // 2x weight
@@ -516,8 +524,8 @@ export function getModeForSection(
       if (songDuration !== undefined) {
         if (songDuration < 300) {
           const structuredModes: VisualMode[] = [
-            "concert_lighting", "vintage_film", "lo_fi_grain",
-            "stark_minimal", "tie_dye", "inferno", "oil_projector",
+            "inferno", "vintage_film", "lo_fi_grain",
+            "deep_ocean", "protean_clouds", "inferno", "protean_clouds",
           ];
           const matches = structuredModes.filter((m) => filteredPool.includes(m));
           if (matches.length > 0) {
@@ -525,8 +533,8 @@ export function getModeForSection(
           }
         } else if (songDuration > 360) {
           const feedbackModes: VisualMode[] = [
-            "feedback_recursion", "reaction_diffusion", "morphogenesis",
-            "fractal_zoom", "kaleidoscope", "mandala_engine", "neural_web", "voronoi_flow",
+            "cosmic_voyage", "deep_ocean", "deep_ocean",
+            "cosmic_voyage", "cosmic_voyage", "mandala_engine", "cosmic_voyage", "protean_clouds",
           ];
           const matches = feedbackModes.filter((m) => filteredPool.includes(m));
           if (matches.length > 0) {
@@ -621,26 +629,26 @@ export function getDrumsSpaceMode(phase: string, seed?: number, songIdentity?: S
   const rng = seededRandom((seed ?? 0) + 31337);
   switch (phase) {
     case "drums_tribal": {
-      const pool: VisualMode[] = ["inferno", "concert_lighting", "electric_arc"];
+      const pool: VisualMode[] = ["inferno", "inferno", "inferno"];
       return pool[Math.floor(rng() * pool.length)];
     }
     case "transition": {
-      const pool: VisualMode[] = ["cosmic_voyage", "aurora", "voronoi_flow"];
+      const pool: VisualMode[] = ["cosmic_voyage", "aurora", "protean_clouds"];
       return pool[Math.floor(rng() * pool.length)];
     }
     case "space_ambient": {
-      const pool: VisualMode[] = ["deep_ocean", "cosmic_dust", "crystal_cavern", "void_light", "morphogenesis"];
+      const pool: VisualMode[] = ["deep_ocean", "cosmic_dust", "cosmic_voyage", "void_light", "deep_ocean"];
       return pool[Math.floor(rng() * pool.length)];
     }
     case "space_textural": {
-      const pool: VisualMode[] = ["sacred_geometry", "fractal_zoom", "mandala_engine", "morphogenesis"];
+      const pool: VisualMode[] = ["cosmic_voyage", "cosmic_voyage", "mandala_engine", "deep_ocean"];
       return pool[Math.floor(rng() * pool.length)];
     }
     case "space_melodic": {
-      const pool: VisualMode[] = ["kaleidoscope", "aurora", "sacred_geometry", "crystal_cavern"];
+      const pool: VisualMode[] = ["cosmic_voyage", "aurora", "cosmic_voyage", "cosmic_voyage"];
       return pool[Math.floor(rng() * pool.length)];
     }
-    case "reemergence": return rng() > 0.5 ? "concert_lighting" : "liquid_light";
+    case "reemergence": return rng() > 0.5 ? "inferno" : "protean_clouds";
     default: return "cosmic_voyage";
   }
 }
@@ -696,7 +704,7 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
 
   // IT transcendent shader forcing: deep coherence lock → meditative shader pool
   if (itForceTranscendentShader) {
-    const transcendentPool: VisualMode[] = ["fractal_zoom", "kaleidoscope", "mandala_engine", "cosmic_voyage", "aurora"];
+    const transcendentPool: VisualMode[] = ["cosmic_voyage", "cosmic_voyage", "mandala_engine", "cosmic_voyage", "aurora"];
     const rng = seededRandom((seed ?? 0) + frame * 7);
     const dsMode = transcendentPool[Math.floor(rng() * transcendentPool.length)];
     return <>{renderMode(dsMode, frames, sections, palette, tempo, undefined, jamDensity)}</>;
@@ -979,7 +987,7 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
     let secondaryMode: VisualMode;
     if (shouldSoloSpotlightDual) {
       // Solo spotlight: blend a focus-appropriate shader (stark, void, aurora)
-      const soloPool: VisualMode[] = ["stark_minimal", "void_light", "aurora", "deep_ocean"];
+      const soloPool: VisualMode[] = ["deep_ocean", "void_light", "aurora", "deep_ocean"];
       const soloFiltered = soloPool.filter((m) => m !== currentMode);
       secondaryMode = soloFiltered[Math.floor(rng() * soloFiltered.length)] ?? getComplement(currentMode);
     } else {

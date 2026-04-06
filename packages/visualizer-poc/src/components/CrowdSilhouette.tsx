@@ -11,6 +11,8 @@ import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
 import { useShowContext } from "../data/ShowContext";
 import { seeded } from "../utils/seededRandom";
+import { useAudioSnapshot } from "./parametric/audio-helpers";
+import { useTempoFactor } from "../data/TempoContext";
 
 interface PersonData {
   /** x position as fraction of width */
@@ -68,17 +70,9 @@ export const CrowdSilhouette: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
   const ctx = useShowContext();
-
-  const idx = Math.min(Math.max(0, frame), frames.length - 1);
-
-  // Rolling energy over +/-75 frames
-  let eSum = 0;
-  let eCount = 0;
-  for (let i = Math.max(0, idx - 75); i <= Math.min(frames.length - 1, idx + 75); i++) {
-    eSum += frames[i].rms;
-    eCount++;
-  }
-  const energy = eCount > 0 ? eSum / eCount : 0;
+  const snap = useAudioSnapshot(frames);
+  const tempoFactor = useTempoFactor();
+  const { energy, beatDecay, chromaHue, bass, musicalTime } = snap;
 
   const crowd = React.useMemo(() => generateCrowd(ctx?.showSeed ?? 19770508), [ctx?.showSeed]);
 
@@ -126,8 +120,10 @@ export const CrowdSilhouette: React.FC<Props> = ({ frames }) => {
         {crowd.map((person, i) => {
           const px = person.x * width;
 
-          // Bob motion
-          const bob = Math.sin(frame * person.bobFreq + person.bobPhase) * bobIntensity;
+          // Bob motion — beat-synced base + personal sway
+          const beatBob = beatDecay * bobIntensity * 0.6;
+          const personalSway = Math.sin(frame * person.bobFreq * tempoFactor + person.bobPhase) * bobIntensity * 0.4;
+          const bob = beatBob + personalSway;
 
           const headY = baseY - 40 * person.heightMult + bob;
           const shoulderY = headY + person.headRadius + 4;
@@ -141,7 +137,8 @@ export const CrowdSilhouette: React.FC<Props> = ({ frames }) => {
             ? Math.sin(frame * person.waveFreq + person.wavePhase) * 15
             : 0;
 
-          const glowColor = `hsla(${person.glowHue}, 100%, 70%, 0.4)`;
+          // Glow tinted by chroma — each person offsets from the dominant pitch color
+          const glowColor = `hsla(${(chromaHue + person.glowHue * 0.3) % 360}, 100%, 70%, 0.4)`;
 
           return (
             <g key={i}>

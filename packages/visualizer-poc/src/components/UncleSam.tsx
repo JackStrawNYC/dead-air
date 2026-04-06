@@ -11,6 +11,8 @@ import React from "react";
 import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
 import { seeded } from "../utils/seededRandom";
+import { useAudioSnapshot } from "./parametric/audio-helpers";
+import { useTempoFactor } from "../data/TempoContext";
 
 const APPEAR_DURATION = 180; // 6 seconds at 30fps
 const APPEAR_GAP = 2520;     // 84 second gap (90s total cycle)
@@ -163,19 +165,12 @@ interface Props {
 export const UncleSam: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
+  const snap = useAudioSnapshot(frames);
+  const tempoFactor = useTempoFactor();
+  const { energy, chromaHue, onsetEnvelope, beatDecay, peakApproaching } = snap;
 
-  // Rolling energy
-  const idx = Math.min(Math.max(0, frame), frames.length - 1);
-  let eSum = 0;
-  let eCount = 0;
-  for (let i = Math.max(0, idx - 75); i <= Math.min(frames.length - 1, idx + 75); i++) {
-    eSum += frames[i].rms;
-    eCount++;
-  }
-  const energy = eCount > 0 ? eSum / eCount : 0;
-
-  // Only appear during high energy
-  if (energy < 0.2) return null;
+  // Only appear during high energy or when peak is imminent
+  if (energy < 0.2 && (peakApproaching ?? 0) < 0.7) return null;
 
   const cycleIndex = Math.floor(frame / APPEAR_CYCLE);
   const cycleFrame = frame % APPEAR_CYCLE;
@@ -233,9 +228,9 @@ export const UncleSam: React.FC<Props> = ({ frames }) => {
     extrapolateRight: "clamp",
   });
 
-  // Color cycling on glow for psychedelic effect
-  const hueShift = (frame * 2) % 360;
-  const dynamicGlow = `hsl(${hueShift}, 100%, 60%)`;
+  // Color driven by music — chroma hue with onset flash
+  const hueShift = chromaHue + onsetEnvelope * 60;
+  const dynamicGlow = `hsl(${hueShift}, 100%, ${60 + beatDecay * 15}%)`;
 
   const charSize = 200;
 

@@ -70,7 +70,7 @@ void main() {
   float melodicPitch = clamp(melInfluence, 0.0, 1.0);
   float effectiveBeat = uBeatSnap * smoothstep(0.3, 0.7, uBeatConfidence);
 
-  float slowTime = uDynamicTime * 0.03;
+  float slowTime = uDynamicTime * 0.015;
 
   // --- Domain warping + energy detail ---
   vec2 domainWarpOff = vec2(fbm3(vec3(p * 0.5, uDynamicTime * 0.05)), fbm3(vec3(p * 0.5 + 100.0, uDynamicTime * 0.05))) * 0.3;
@@ -118,7 +118,7 @@ void main() {
 
   // --- Warp parameters ---
   // Energy drives intensity: low = gentle breathing, high = aggressive melting
-  float warpIntensity = mix(0.04, 0.28, energy) * sectionWarpMult * coherenceWarpMult;
+  float warpIntensity = mix(0.01, 0.22, energy * energy) * sectionWarpMult * coherenceWarpMult;
   warpIntensity += climaxBoost * 0.15;
   // Bass drives scale: bigger bass = bigger, slower distortions
   float warpScale = mix(1.2, 0.6, bass);
@@ -183,7 +183,7 @@ void main() {
   // Palette hues
   float hue1 = uPalettePrimary + chromaHueMod + chordHue;
   float hue2 = uPaletteSecondary + chordHue * 0.5;
-  float sat = mix(0.45, 0.95, energy) * uPaletteSaturation;
+  float sat = mix(0.1, 0.75, energy) * uPaletteSaturation;
   float satBoost = mix(1.0, 1.15, sChorus); // chorus = more vibrant
 
   // Noise-driven color sampling: the warp itself creates the color variation
@@ -203,14 +203,14 @@ void main() {
 
   // Value (brightness) modulated by warp depth
   float warpDepth = length(totalWarp);
-  float val = mix(0.5, 1.0, energy) + warpDepth * 2.0;
-  val = clamp(val, 0.3, 1.0);
+  float val = mix(0.06, 0.8, energy * energy) + warpDepth * 0.8;
+  val = clamp(val, 0.04, 0.95);
   val += vocalGlow; // vocal warmth
 
   vec3 col = hsv2rgb(vec3(fract(finalHue), sat * satBoost, val));
 
   // --- Add warm glow at center ---
-  float centerGlow = exp(-dist * dist * 3.0) * mix(0.15, 0.35, slowE);
+  float centerGlow = exp(-dist * dist * 4.0) * mix(0.03, 0.25, energy);
   vec3 warmCenter = hsv2rgb(vec3(fract(hue1 + 0.05), sat * 0.6, 1.0));
   col += warmCenter * centerGlow;
 
@@ -232,6 +232,12 @@ void main() {
 
   // --- Climax boost ---
   col *= 1.0 + climaxBoost * 0.4;
+
+  // === ATMOSPHERIC DEPTH: haze creates sense of floating IN the distortion ===
+  float fogNoise = fbm3(vec3(wp * 0.5, slowTime * 0.3));
+  float fogDensity = mix(0.5, 0.03, energy);
+  vec3 fogColor = hsv2rgb(vec3(fract(hue1 + 0.03), 0.08, 0.03));
+  col = mix(col, fogColor, fogDensity * (0.4 + fogNoise * 0.6));
 
   // --- Vignette ---
   float vigScale = mix(0.32, 0.24, energy);

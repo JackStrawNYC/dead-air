@@ -8,6 +8,7 @@
 import React from "react";
 import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
+import { useAudioSnapshot } from "./parametric/audio-helpers";
 
 const CYCLE = 1650; // 55s at 30fps
 const DURATION = 480; // 16s visible
@@ -30,15 +31,8 @@ const RAINBOW_BANDS: { color: string; field: keyof EnhancedFrameData }[] = [
 export const PrismRainbow: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
-
-  const idx = Math.min(Math.max(0, frame), frames.length - 1);
-  let eSum = 0;
-  let eCount = 0;
-  for (let i = Math.max(0, idx - 75); i <= Math.min(frames.length - 1, idx + 75); i++) {
-    eSum += frames[i].rms;
-    eCount++;
-  }
-  const energy = eCount > 0 ? eSum / eCount : 0;
+  const snap = useAudioSnapshot(frames);
+  const { energy, bass, mids, highs, onsetEnvelope } = snap;
 
   // Cycle gating
   const cycleFrame = frame % CYCLE;
@@ -95,7 +89,8 @@ export const PrismRainbow: React.FC<Props> = ({ frames }) => {
   const exitY = 0;
   const beamLength = width * 0.55;
 
-  const currentFrame = frames[idx];
+  // Map smoothed frequency bands to rainbow brightness
+  const bandBrightness = [bass, bass, bass * 0.7 + mids * 0.3, mids, mids * 0.5 + highs * 0.5, highs, highs];
 
   return (
     <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden" }}>
@@ -174,12 +169,12 @@ export const PrismRainbow: React.FC<Props> = ({ frames }) => {
             const endX = exitX + Math.cos(rad) * beamLength;
             const endY = exitY + Math.sin(rad) * beamLength;
 
-            // Get band brightness from frequency data
-            const fieldValue = currentFrame[band.field] as number;
+            // Band brightness from smoothed frequency data + onset flash
+            const fieldValue = bandBrightness[i] ?? 0;
             const bandOpacity = interpolate(fieldValue, [0, 0.5], [0.3, 1.0], {
               extrapolateLeft: "clamp",
               extrapolateRight: "clamp",
-            });
+            }) + onsetEnvelope * 0.15;
 
             return (
               <React.Fragment key={i}>

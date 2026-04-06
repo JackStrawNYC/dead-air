@@ -8,6 +8,8 @@
 import React from "react";
 import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
+import { useAudioSnapshot } from "./parametric/audio-helpers";
+import { useTempoFactor } from "../data/TempoContext";
 
 /** Map 0-1 hue to an RGB hex string */
 function hueToHex(h: number): string {
@@ -44,40 +46,11 @@ interface Props {
 export const JerryGuitar: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
-
-  const idx = Math.min(Math.max(0, frame), frames.length - 1);
-
-  // Smooth energy (151-frame window)
-  let eSum = 0;
-  let eCount = 0;
-  for (let i = Math.max(0, idx - 75); i <= Math.min(frames.length - 1, idx + 75); i++) {
-    eSum += frames[i].rms;
-    eCount++;
-  }
-  const energy = eCount > 0 ? eSum / eCount : 0;
-
-  // Mid-band energy for string vibration (narrower window — 31 frames)
-  let midSum = 0;
-  let midCount = 0;
-  for (let i = Math.max(0, idx - 15); i <= Math.min(frames.length - 1, idx + 15); i++) {
-    midSum += frames[i].mid;
-    midCount++;
-  }
-  const midEnergy = midCount > 0 ? midSum / midCount : 0;
-
-  // Smooth chroma hue (31-frame window)
-  let chromaSum = 0;
-  let chromaCount = 0;
-  for (let i = Math.max(0, idx - 15); i <= Math.min(frames.length - 1, idx + 15); i++) {
-    const ch = frames[i].chroma;
-    let maxI = 0;
-    for (let j = 1; j < 12; j++) {
-      if (ch[j] > ch[maxI]) maxI = j;
-    }
-    chromaSum += maxI / 12;
-    chromaCount++;
-  }
-  const chromaHue = chromaCount > 0 ? chromaSum / chromaCount : 0;
+  const snap = useAudioSnapshot(frames);
+  const tempoFactor = useTempoFactor();
+  const { energy, mids: midEnergy, chromaHue: chromaHueDeg, beatDecay, onsetEnvelope, otherEnergy } = snap;
+  // Convert 0-360 hue to 0-1 range for existing hueToHex
+  const chromaHue = chromaHueDeg / 360;
 
   // Cycle timing
   const cycleFrame = frame % CYCLE;
@@ -98,7 +71,9 @@ export const JerryGuitar: React.FC<Props> = ({ frames }) => {
     extrapolateRight: "clamp",
   });
 
-  const opacity = envelope * energyGate * 0.5;
+  // Boost visibility when guitar/keys stem is prominent
+  const otherBoost = interpolate(otherEnergy ?? 0, [0.05, 0.3], [0, 0.2], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const opacity = envelope * energyGate * (0.5 + otherBoost);
   if (opacity < 0.01) return null;
 
   // Scale breathing with energy
@@ -107,8 +82,8 @@ export const JerryGuitar: React.FC<Props> = ({ frames }) => {
     extrapolateRight: "clamp",
   });
 
-  // Slow rotation: ~2 deg/s
-  const rotation = (frame / 30) * 2;
+  // Slow rotation: ~2 deg/s, tempo-scaled
+  const rotation = (frame / 30) * 2 * tempoFactor;
 
   // Colors from chroma
   const bodyColor = hueToHex(chromaHue);
@@ -121,11 +96,11 @@ export const JerryGuitar: React.FC<Props> = ({ frames }) => {
     extrapolateRight: "clamp",
   });
 
-  // Glow from energy
+  // Glow from energy + onset flash
   const glowRadius = interpolate(energy, [0.05, 0.3], [4, 15], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
-  });
+  }) + onsetEnvelope * 8;
 
   // Guitar SVG size — fit within viewport
   const svgScale = Math.min(width, height) * 0.45;
@@ -142,7 +117,7 @@ export const JerryGuitar: React.FC<Props> = ({ frames }) => {
       const t = (x - 80) / 160; // 0 to 1 along string
       // Vibration envelope: zero at endpoints, max at center
       const envt = Math.sin(t * Math.PI);
-      const dy = Math.sin(frame * 0.3 * freq + x * 0.05 + si) * amp * envt;
+      const dy = Math.sin(frame * 0.3 * freq * tempoFactor + x * 0.05 + si) * amp * envt;
       points.push(`${x},${y + dy}`);
     }
     return points.join(" ");

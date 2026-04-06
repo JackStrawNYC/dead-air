@@ -149,6 +149,19 @@ export const VisualModeSchema = z.enum([
   "warm_nebula", "prism_refraction", "cellular_automata",
   "spinning_spiral", "acid_melt", "blacklight_glow", "liquid_projector",
   "smoke_and_mirrors", "molten_glass",
+  "protean_clouds", "dark_star_void", "star_nest",
+  "morning_dew_fog", "wharf_rat_storm", "fire_mountain_smoke",
+  "estimated_prophet_mist", "nimitz_aurora", "scarlet_golden_haze",
+  "terrapin_nebula", "st_stephen_lightning", "seascape",
+  "concert_beams", "particle_burst", "combustible_voronoi",
+  "fractal_temple",
+  "highway_horizon", "honeycomb_cathedral", "campfire_embers",
+  "neon_casino", "storm_vortex", "psychedelic_garden",
+  "cosmic_railroad", "desert_cantina", "earthquake_fissure",
+  "mobius_amphitheater", "memorial_drift", "boxcar_tunnel",
+  "aviary_canopy", "clockwork_temple", "event_horizon",
+  "canyon_chase", "porch_twilight", "bloom_explosion",
+  "locomotive_engine", "dance_floor_prism", "stained_glass_dissolution",
 ]);
 
 export const ColorPaletteSchema = z.object({

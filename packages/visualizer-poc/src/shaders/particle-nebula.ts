@@ -1,119 +1,45 @@
 /**
- * Particle Nebula — vertex + fragment shaders for InstancedMesh.
- * 4K icosphere particles in toroidal flow field with Phong shading.
- *
- * v7: Upgraded from Points to InstancedMesh for proper lighting.
+ * Particle Nebula — raymarched volumetric nebula cloud with embedded star
+ * clusters and particle filaments. Full emission+absorption volumetric
+ * rendering with ridged multifractal density.
  *
  * Audio reactivity:
- *   uBass       → torus expansion, particle scale
- *   uEnergy     → particle brightness, size, orbit speed
- *   uHighs      → specular intensity
- *   uOnsetSnap  → flash + orbit perturbation
- *   uMusicalTime → orbit phase-lock
+ *   uBass            → nebula density / thickness
+ *   uEnergy          → step count (32-64), overall brightness
+ *   uDrumOnset       → brightness flash (supernova pulse)
+ *   uVocalPresence   → warm emission tint shift
+ *   uHarmonicTension → color saturation (low=monochrome, high=vivid)
+ *   uMelodicPitch    → nebula scale (high=fine filaments, low=broad clouds)
+ *   uSectionType     → jam=dense swirling, space=thin/starry, chorus=bright
+ *   uClimaxPhase     → supernova burst (radial bloom + density explosion)
+ *   uSlowEnergy      → drift speed
+ *   uSpaceScore      → nebula expansion / thinning
+ *   uTimbralBrightness → emission temperature (cool→hot)
+ *   uDynamicRange    → contrast between dense/sparse regions
+ *   uBeatStability   → filament coherence (stable=sharp, unstable=diffuse)
+ *   uPalettePrimary  → nebula tint
+ *   uPaletteSecondary → star / emission color
  */
 
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
+import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
 
 export const particleNebulaVert = /* glsl */ `
-${noiseGLSL}
-
-uniform float uTime;
-uniform float uDynamicTime;
-uniform float uBass;
-uniform float uMids;
-uniform float uHighs;
-uniform float uOnset;
-uniform float uBeat;
-uniform float uRms;
-uniform float uEnergy;
-uniform float uFlatness;
-uniform float uSectionProgress;
-uniform float uSectionIndex;
-uniform float uTempo;
-uniform float uOnsetSnap;
-uniform float uBeatSnap;
-uniform float uMusicalTime;
-uniform float uFastEnergy;
-uniform float uFastBass;
-uniform float uDrumOnset;
-uniform float uDrumBeat;
-uniform float uSpectralFlux;
-uniform float uSectionType;
-uniform float uMelodicPitch;
-uniform float uHarmonicTension;
-uniform float uBeatStability;
-
-attribute float aRadius;
-attribute float aTheta;
-attribute float aPhi;
-attribute float aRandom;
-
-varying vec3 vNormal;
-varying vec3 vWorldPos;
-varying float vColorMix;
-varying float vDist;
-varying float vEnergy;
-varying float vOnsetSnap;
-
+varying vec2 vUv;
 void main() {
-  float energy = clamp(uEnergy, 0.0, 1.0);
-  float tempoScale = uTempo / 120.0;
-
-  // Section-type modulation
-  float sectionT = uSectionType;
-  float sJam = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
-  float sSpace = smoothstep(6.5, 7.5, sectionT);
-  float sChorus = smoothstep(1.5, 2.5, sectionT) * (1.0 - step(2.5, sectionT));
-  float orbitSpeedMod = mix(1.0, 1.4, sJam) * mix(1.0, 0.4, sSpace) * mix(1.0, 1.1, sChorus);
-  float particleScaleMod = mix(1.0, 1.3, sJam) * mix(1.0, 0.6, sSpace) * mix(1.0, 1.2, sChorus);
-
-  // Toroidal flow field: particles orbit a torus
-  // Bass expands the torus major radius
-  float majorR = 2.0 + uBass * 1.0 + energy * 0.5;
-  float minorR = aRadius * mix(0.3, 1.2, energy) * particleScaleMod;
-
-  // Beat pulse for orbit modulation
-  float bp = beatPulse(uMusicalTime);
-  minorR *= 1.0 + max(uBeatSnap, uDrumBeat) * 0.20;
-  minorR *= 1.0 + uOnsetSnap * 0.08 + uDrumOnset * 0.12;
-  // Melodic pitch lifts orbit radius (higher melody = wider nebula)
-  minorR *= 1.0 + clamp(uMelodicPitch, 0.0, 1.0) * 0.15;
-
-  // Tempo-aware toroidal orbit (section-modulated)
-  float orbitSpeed = (mix(0.02, 0.06, energy) + uMids * 0.04) * tempoScale * (1.0 + bp * 0.20) * orbitSpeedMod;
-  float theta = aTheta + uDynamicTime * orbitSpeed * (0.5 + aRandom * 0.5);
-  float phi = aPhi + uDynamicTime * orbitSpeed * 0.3 * (aRandom - 0.5);
-
-  // Toroidal position: (R + r*cos(phi)) * cos(theta), (R + r*cos(phi)) * sin(theta), r*sin(phi)
-  float torusX = (majorR + minorR * cos(phi)) * cos(theta);
-  float torusY = minorR * sin(phi);
-  float torusZ = (majorR + minorR * cos(phi)) * sin(theta);
-
-  vec3 pos = vec3(torusX, torusY, torusZ);
-
-  // Noise displacement for organic feel
-  float noiseDisp = snoise(vec3(pos * 0.3 + uDynamicTime * 0.08)) * 0.3;
-  pos += normalize(pos) * noiseDisp;
-
-  // Per-instance size from energy (section-modulated)
-  float baseScale = (mix(0.04, 0.12, energy) + uRms * 0.04 + aRandom * 0.03) * particleScaleMod;
-
-  // Transform through instanceMatrix (position/rotation/scale baked in scene)
-  vec4 worldPos = instanceMatrix * vec4(pos, 1.0);
-  // Apply per-particle scale to the local normal
-  vNormal = normalize(normalMatrix * normal);
-  vWorldPos = worldPos.xyz;
-
-  vec4 mvPosition = modelViewMatrix * worldPos;
-  gl_Position = projectionMatrix * mvPosition;
-
-  vColorMix = aRandom;
-  vDist = length(mvPosition.xyz);
-  vEnergy = energy;
-  vOnsetSnap = uOnsetSnap;
+  vUv = uv;
+  gl_Position = vec4(position, 1.0);
 }
 `;
+
+const postProcess = buildPostProcessGLSL({
+  bloomThresholdOffset: -0.12,
+  caEnabled: true,
+  halationEnabled: true,
+  lightLeakEnabled: true,
+  temporalBlendEnabled: false,
+});
 
 export const particleNebulaFrag = /* glsl */ `
 precision highp float;
@@ -122,127 +48,279 @@ ${sharedUniformsGLSL}
 
 ${noiseGLSL}
 
-varying vec3 vNormal;
-varying vec3 vWorldPos;
-varying float vColorMix;
-varying float vDist;
-varying float vEnergy;
-varying float vOnsetSnap;
+${postProcess}
+
+varying vec2 vUv;
+
+#define PI 3.14159265
+#define TAU 6.28318530
+
+// ─── pn-prefixed helper functions ───
+
+// Hash-based star field: point lights scattered in 3D cells
+float pnStars(vec3 pos) {
+  vec3 cell = floor(pos * 10.0);
+  vec3 f = fract(pos * 10.0) - 0.5;
+  float h = fract(sin(dot(cell, vec3(127.1, 311.7, 74.7))) * 43758.5453);
+  // ~12% of cells contain a star
+  float star = step(0.88, h);
+  float dist = length(f);
+  // Tight point-like falloff
+  float brightness = h * star * smoothstep(0.06, 0.005, dist);
+  return brightness;
+}
+
+// Background star layer (farfield, no volume interaction)
+float pnBgStars(vec3 dir) {
+  vec3 cell = floor(dir * 30.0);
+  vec3 f = fract(dir * 30.0) - 0.5;
+  float h = fract(sin(dot(cell, vec3(91.3, 157.9, 233.1))) * 43758.5453);
+  float star = step(0.92, h);
+  float dist = length(f);
+  // Twinkle: time-varying brightness
+  float twinkle = 0.7 + 0.3 * sin(h * TAU + uDynamicTime * (1.0 + h * 3.0));
+  return h * star * smoothstep(0.04, 0.002, dist) * twinkle;
+}
+
+// Nebula density field: ridged multifractal + FBM blend with curl advection
+float pnDensity(vec3 pos, float flowTime, float nebulaScale, float bassBoost, float jamMod) {
+  // Curl advection: swirl the sample position for organic motion
+  vec3 curl = curlNoise(pos * 0.3 + flowTime * 0.05) * (0.3 + jamMod * 0.4);
+  vec3 advected = pos + curl;
+
+  // Primary structure: ridged multifractal for sharp filaments
+  float ridged = ridgedMultifractal(advected * nebulaScale, 5, 2.2, 0.45);
+
+  // Broad volumetric fill: low-frequency FBM
+  float broad = fbm3(advected * nebulaScale * 0.4 + vec3(0.0, flowTime * 0.06, flowTime * 0.03));
+
+  // Fine filament detail: high-frequency noise
+  float fine = snoise(advected * nebulaScale * 3.0 + flowTime * 0.12) * 0.5 + 0.5;
+
+  // Blend layers: ridged filaments + broad clouds + fine detail
+  float density = ridged * 0.5 + broad * 0.35 + fine * 0.15;
+
+  // Bass thickens the nebula
+  density *= 0.55 + bassBoost * 0.55;
+
+  return density;
+}
+
+// Nebula emission color at a given density sample
+vec3 pnEmission(float density, float ridgeFactor, float depth01,
+                vec3 nebulaColor, vec3 starColor, float vocalWarmth,
+                float tension, float timbralHeat, float chorusBright) {
+  // Base emission from nebula tint, modulated by ridged structure
+  vec3 emission = mix(nebulaColor, starColor * 0.9, ridgeFactor * tension);
+
+  // Vocal presence warms the emission toward amber
+  vec3 warmTint = vec3(1.15, 0.92, 0.72);
+  emission = mix(emission, emission * warmTint, vocalWarmth * 0.5);
+
+  // Timbral brightness shifts emission temperature (cool blue → hot white-gold)
+  vec3 coolEmit = emission * vec3(0.7, 0.8, 1.2);
+  vec3 hotEmit = emission * vec3(1.3, 1.1, 0.85);
+  emission = mix(coolEmit, hotEmit, timbralHeat);
+
+  // Self-illumination: denser regions glow more
+  emission *= 1.0 + density * 6.0;
+
+  // Depth coloring: warm near camera, cool in the distance
+  emission = mix(emission, emission * vec3(0.55, 0.65, 1.0), depth01);
+
+  // Chorus brightness boost
+  emission *= 1.0 + chorusBright * 0.3;
+
+  return emission;
+}
+
+// Volumetric raymarch: emission + absorption model
+vec3 pnMarch(vec3 ro, vec3 rd, float energy, float bass, float drumOnset,
+             float flowTime, float nebulaScale, vec3 nebulaColor, vec3 starColor,
+             float vocalWarmth, float tension, float timbralHeat,
+             float jamMod, float spaceMod, float chorusBright,
+             float climaxBoost, float dynamicRange, float beatStab,
+             out float totalAlpha) {
+  // Energy-adaptive step count: 32 at rest, 64 at full energy
+  float stepFloat = mix(32.0, 64.0, smoothstep(0.15, 0.55, energy));
+  int steps = int(stepFloat);
+  float stepSize = mix(0.14, 0.10, energy); // tighter steps at high energy
+
+  vec3 accumColor = vec3(0.0);
+  totalAlpha = 0.0;
+
+  for (int i = 0; i < 64; i++) {
+    if (i >= steps) break;
+    if (totalAlpha > 0.96) break; // early exit at near-opaque
+
+    float fi = float(i);
+    float depth = 0.4 + fi * stepSize;
+    vec3 pos = ro + rd * depth;
+
+    // Density evaluation
+    float density = pnDensity(pos, flowTime, nebulaScale, bass, jamMod);
+
+    // Space mode thins the nebula
+    density *= 1.0 - spaceMod * 0.45;
+
+    // Dynamic range: push contrast between dense/sparse
+    density = pow(max(density, 0.0), mix(1.0, 1.4, dynamicRange));
+
+    // Beat stability: sharp filaments when stable, diffuse when unstable
+    float sharpness = mix(0.7, 1.0, beatStab);
+    density = pow(max(density, 0.0), sharpness);
+
+    // Drum onset flash: brightness surge in near-field
+    float onsetFlash = drumOnset * 0.35 * exp(-fi * 0.06);
+    density += onsetFlash;
+
+    // Climax supernova: density explosion
+    density += climaxBoost * 0.25 * exp(-fi * 0.04);
+
+    // Scale to absorption coefficient
+    density *= 0.06;
+
+    if (density > 0.001) {
+      float alpha = density * (1.0 - totalAlpha);
+      float depth01 = fi / stepFloat;
+
+      // Ridged factor for emission coloring (recalculate cheaply)
+      float ridgeFactor = ridged4(pos * nebulaScale + flowTime * 0.08);
+
+      vec3 emission = pnEmission(density, ridgeFactor, depth01,
+                                  nebulaColor, starColor, vocalWarmth,
+                                  tension, timbralHeat, chorusBright);
+
+      // Climax supernova: radial bloom intensifies emission
+      emission *= 1.0 + climaxBoost * 0.6 * (1.0 - depth01);
+
+      accumColor += emission * alpha;
+      totalAlpha += alpha;
+    }
+
+    // Embedded star clusters: visible through thin nebula
+    float star = pnStars(pos + vec3(flowTime * 0.015));
+    if (star > 0.005) {
+      float starVis = (1.0 - totalAlpha) * star;
+      vec3 sColor = mix(vec3(0.92, 0.94, 1.0), starColor, 0.25);
+      // Stars flicker with energy
+      sColor *= 0.8 + energy * 0.4;
+      accumColor += sColor * starVis * 0.6;
+    }
+  }
+
+  return accumColor;
+}
 
 void main() {
-  // Section-type modulation (fragment brightness)
+  vec2 uv = vUv;
+  vec2 aspect = vec2(uResolution.x / uResolution.y, 1.0);
+  vec2 p = (uv - 0.5) * aspect;
+
+  // === AUDIO CLAMPS ===
+  float energy = clamp(uEnergy, 0.0, 1.0);
+  float bass = clamp(uBass, 0.0, 1.0);
+  float slowE = clamp(uSlowEnergy, 0.0, 1.0);
+  float drumOnset = clamp(uDrumOnset, 0.0, 1.0);
+  float tension = clamp(uHarmonicTension, 0.0, 1.0);
+  float pitch = clamp(uMelodicPitch, 0.0, 1.0);
+  float vocalWarmth = clamp(uVocalPresence, 0.0, 1.0);
+  float timbralHeat = clamp(uTimbralBrightness, 0.0, 1.0);
+  float dynamicRange = clamp(uDynamicRange, 0.0, 1.0);
+  float beatStab = clamp(uBeatStability, 0.0, 1.0);
+  float spaceScore = clamp(uSpaceScore, 0.0, 1.0);
+
+  // === SECTION-TYPE GATES ===
   float sectionT = uSectionType;
   float sJam = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
   float sSpace = smoothstep(6.5, 7.5, sectionT);
   float sChorus = smoothstep(1.5, 2.5, sectionT) * (1.0 - step(2.5, sectionT));
-  float brightnessMod = mix(1.0, 1.3, sJam) * mix(1.0, 0.6, sSpace) * mix(1.0, 1.2, sChorus);
+  float sSolo = smoothstep(3.5, 4.5, sectionT) * (1.0 - step(4.5, sectionT));
 
-  // --- Energy-responsive detail ---
-  float detailMod = 1.0 + vEnergy * 0.5;
+  // Composite modifiers
+  float jamMod = sJam;
+  float spaceMod = max(sSpace, spaceScore * 0.6);
+  float chorusBright = sChorus;
 
-  // === PHONG SHADING with moving point light ===
-  vec3 norm = normalize(vNormal);
-
-  // Moving point light orbits the nebula
-  float lightAngle = uDynamicTime * 0.2;
-  vec3 lightPos = vec3(cos(lightAngle) * 4.0, sin(lightAngle * 0.7) * 2.0, sin(lightAngle) * 4.0);
-  vec3 lightDir = normalize(lightPos - vWorldPos);
-  vec3 viewDir = normalize(-vWorldPos);
-
-  // Diffuse
-  float ndotl = max(0.0, dot(norm, lightDir));
-  float diffuse = ndotl * 0.7;
-
-  // Specular (Blinn-Phong) — tension sharpens highlights
-  vec3 halfVec = normalize(lightDir + viewDir);
-  float tension = clamp(uHarmonicTension, 0.0, 1.0);
-  float specPow = 16.0 + uHighs * 32.0;
-  float spec = pow(max(0.0, dot(norm, halfVec)), specPow) * (0.3 + uHighs * 0.4) * mix(0.7, 1.3, tension);
-
-  // Beat stability sharpens diffuse lighting (stable=crisp, unstable=soft)
-  float beatStab = clamp(uBeatStability, 0.0, 1.0);
-  diffuse *= mix(0.7, 1.0, beatStab);
-
-  // Ambient
-  float ambient = 0.15 + vEnergy * 0.1;
-
-  // === COLOR from palette ===
-  float caAmount = uBass * 0.03 + vEnergy * 0.015 + uOnsetSnap * 0.04 + uDrumOnset * 0.05;
-  float hueCenter = hsvToCosineHue(uPalettePrimary) + uChromaHue * 0.25 + vColorMix * 0.3;
-  vec3 baseColor = 0.5 + 0.5 * cos(6.28318 * vec3(hueCenter, hueCenter + 0.33, hueCenter + 0.67));
-
-  // Secondary palette blend
-  float secHue = hsvToCosineHue(uPaletteSecondary) + vColorMix * 0.2;
-  vec3 secRgb = 0.5 + 0.5 * cos(6.28318 * vec3(secHue, secHue + 0.33, secHue + 0.67));
-  baseColor = mix(baseColor, secRgb, vColorMix * 0.3);
-
-  // Color temperature
-  vec3 warmShift = vec3(1.12, 0.95, 0.82);
-  vec3 coolShift = vec3(0.85, 0.95, 1.12);
-  baseColor *= mix(coolShift, warmShift, vEnergy);
-
-  // Palette saturation
-  float sat = mix(0.6, 1.0, vEnergy) * uPaletteSaturation;
-  vec3 gray = vec3(dot(baseColor, vec3(0.299, 0.587, 0.114)));
-  baseColor = mix(gray, baseColor, sat);
-
-  // Composite lighting (section-modulated brightness)
-  vec3 rgb = (baseColor * (ambient + diffuse) + vec3(1.0, 0.98, 0.95) * spec) * brightnessMod;
-
-  // === CLIMAX REACTIVITY ===
+  // === CLIMAX ===
   float isClimax = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5);
-  float climaxBoost = isClimax * uClimaxIntensity;
-  rgb *= 1.0 + uBeatSnap * 0.30 * (1.0 + climaxBoost * 0.5);
-  rgb *= 1.0 + vOnsetSnap * 0.12;
+  float climaxBoost = isClimax * clamp(uClimaxIntensity, 0.0, 1.0);
 
-  // Rim glow
-  float rim = 1.0 - max(0.0, dot(norm, viewDir));
-  rim = pow(rim, 3.0) * (0.2 + climaxBoost * 0.15);
-  rgb += baseColor * rim * 0.5;
+  // === FLOW TIME ===
+  float flowTime = uDynamicTime * (0.025 + slowE * 0.02)
+                   * (1.0 + sJam * 0.6 - sSpace * 0.5 + sSolo * 0.3);
 
-  rgb *= mix(0.40, 0.78, vEnergy) + uRms * 0.3 + uFastEnergy * 0.15;
+  // === PALETTE ===
+  float hue1 = hsvToCosineHue(uPalettePrimary);
+  vec3 nebulaColor = 0.5 + 0.5 * cos(TAU * vec3(hue1, hue1 + 0.33, hue1 + 0.67));
 
-  // === DISTANCE FOG ===
-  float fogDensity = mix(0.15, 0.02, vEnergy);
-  float fogAmount = 1.0 - exp(-fogDensity * vDist * vDist);
-  vec3 fogColor = vec3(0.02, 0.02, 0.04);
-  rgb = mix(rgb, fogColor, fogAmount);
+  float hue2 = hsvToCosineHue(uPaletteSecondary);
+  vec3 starColor = 0.5 + 0.5 * cos(TAU * vec3(hue2, hue2 + 0.33, hue2 + 0.67));
 
-  // === COLOR AFTERGLOW ===
-  float afterglowStr = smoothstep(0.3, 0.7, vEnergy) * 0.04;
-  float agHue = hsvToCosineHue(uAfterglowHue);
-  vec3 afterglowCol = 0.5 + 0.5 * cos(6.28318 * vec3(agHue, agHue + 0.33, agHue + 0.67));
-  rgb += afterglowCol * afterglowStr;
+  // Tension → color saturation: low=desaturated blue, high=vivid palette
+  vec3 lowTensionBase = vec3(0.12, 0.15, 0.30);
+  vec3 highTensionBase = nebulaColor * vec3(1.15, 0.65, 1.05);
+  nebulaColor = mix(lowTensionBase, highTensionBase, tension);
 
-  // === BLOOM ===
-  float lum = dot(rgb, vec3(0.299, 0.587, 0.114));
-  float bThresh = 0.4 - climaxBoost * 0.08;
-  float bloomAmount = max(0.0, lum - bThresh) * (2.0 + climaxBoost * 1.5);
-  vec3 bloomColor = mix(rgb, vec3(1.0, 0.98, 0.95), 0.3);
-  vec3 bloom = bloomColor * bloomAmount * (0.25 + climaxBoost * 0.15);
-  rgb = rgb + bloom - rgb * bloom;
+  // Saturation from harmonic tension
+  float palSat = mix(0.5, 1.0, tension) * uPaletteSaturation;
+  vec3 nebulaGray = vec3(dot(nebulaColor, vec3(0.299, 0.587, 0.114)));
+  nebulaColor = mix(nebulaGray, nebulaColor, palSat);
 
-  // ONSET SATURATION PULSE
+  // === NEBULA SCALE ===
+  // High pitch → fine filament detail; low pitch → broad sweeping clouds
+  float nebulaScale = mix(0.35, 1.1, 1.0 - pitch)
+                      * (1.0 + sJam * 0.35 - sSpace * 0.25 + sSolo * 0.15)
+                      / (1.0 + spaceScore * 0.3);
+
+  // === RAY SETUP (3D camera system) ===
+  vec3 ro, rd;
+  setupCameraRay(uv, aspect, ro, rd);
+
+  // === VOLUMETRIC RAYMARCH ===
+  float totalAlpha;
+  vec3 col = pnMarch(ro, rd, energy, bass, drumOnset, flowTime, nebulaScale,
+                     nebulaColor, starColor, vocalWarmth, tension, timbralHeat,
+                     jamMod, spaceMod, chorusBright, climaxBoost, dynamicRange,
+                     beatStab, totalAlpha);
+
+  // === BACKGROUND STARS (far-field, behind the nebula) ===
+  float bgStar = pnBgStars(rd * 15.0 + vec3(flowTime * 0.008));
+  vec3 bgColor = vec3(0.015, 0.015, 0.04)
+               + vec3(0.82, 0.88, 1.0) * bgStar * 0.35 * (1.0 - totalAlpha);
+  // Space mode: more star visibility
+  bgColor *= 1.0 + spaceMod * 0.3;
+  col = mix(bgColor, col, totalAlpha);
+
+  // === SECONDARY GLOW HAZE (palette-tinted emission fog) ===
+  float glowNoise = fbm3(vec3(p * 1.8, flowTime * 0.12));
+  vec3 glowCol = mix(nebulaColor, starColor, glowNoise * 0.5 + 0.5) * 0.04;
+  col += glowCol * (0.25 + energy * 0.25);
+
+  // === BEAT + CLIMAX RESPONSE ===
+  float bp = beatPulse(uMusicalTime);
+  col *= 1.0 + bp * 0.05 * smoothstep(0.3, 0.7, uBeatConfidence);
+  col *= 1.0 + climaxBoost * 0.25;
+  col *= 1.0 + uBeatSnap * 0.08 * (1.0 + climaxBoost * 0.4);
+
+  // === ONSET SATURATION PULSE ===
   float onsetPulse = step(0.5, uOnsetSnap) * uOnsetSnap;
-  float onsetLuma = dot(rgb, vec3(0.299, 0.587, 0.114));
-  rgb = mix(vec3(onsetLuma), rgb, 1.0 + onsetPulse * 1.0);
-  rgb *= 1.0 + onsetPulse * 0.12;
+  float onsetLuma = dot(col, vec3(0.299, 0.587, 0.114));
+  col = mix(vec3(onsetLuma), col, 1.0 + onsetPulse * 0.8);
+  col *= 1.0 + onsetPulse * 0.10;
 
-  // === CINEMATIC GRADE ===
-  rgb = cinematicGrade(rgb, vEnergy);
+  // === SEMANTIC: cosmic → nebula glow boost ===
+  col *= 1.0 + uSemanticCosmic * 0.20;
+  col *= 1.0 + uSemanticPsychedelic * 0.10;
 
-  // === FILM GRAIN ===
-  float grainTime = floor(uRms * 50.0) / 50.0;
-  float grainIntensity = mix(0.04, 0.01, vEnergy);
-  // Use world position as UV proxy for grain
-  vec2 grainUv = vWorldPos.xy * 10.0;
-  rgb += filmGrain(grainUv, grainTime) * grainIntensity;
+  // === DEAD ICONOGRAPHY ===
+  float _nf = snoise(vec3(p * 2.0, uTime * 0.1));
+  col += iconEmergence(p, uTime, energy, bass, nebulaColor, starColor, _nf, uClimaxPhase, uSectionIndex);
+  col += heroIconEmergence(p, uTime, energy, bass, nebulaColor, starColor, _nf, uSectionIndex);
 
-  // Lifted blacks (build-phase-aware: near true black during build for anticipation)
-  float isBuild = step(0.5, uClimaxPhase) * step(uClimaxPhase, 1.5);
-  float liftMult = mix(1.0, 0.15, isBuild * uClimaxIntensity);
-  rgb = max(rgb, vec3(0.06, 0.05, 0.08) * liftMult);
+  // === POST PROCESS ===
+  col = applyPostProcess(col, uv, p);
 
-  gl_FragColor = vec4(rgb, 1.0);
+  gl_FragColor = vec4(col, 1.0);
 }
 `;

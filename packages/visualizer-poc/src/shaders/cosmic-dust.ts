@@ -1,7 +1,20 @@
 /**
- * Cosmic Dust — starfield with slow cosmic drift and nebula clouds.
- * Works well for Space/quiet passages. Deep, contemplative visuals.
- * Audio-reactive: energy brightens stars, onset creates shooting stars.
+ * Cosmic Dust Field — raymarched volumetric interstellar dust cloud with
+ * embedded crystalline grain SDFs. Camera drifts through luminous dust lanes,
+ * backlit gas wisps, and glittering specular dust grains.
+ *
+ * Audio reactivity:
+ *   uBass            → dust density pulse (clouds swell on bass)
+ *   uEnergy          → grain count / brightness, step budget
+ *   uDrumOnset       → grain sparkle burst (specular flash)
+ *   uVocalPresence   → backlight intensity (voice lights the dust from behind)
+ *   uHarmonicTension → color temperature (low=cool blue, high=warm amber)
+ *   uSectionType     → jam=dense swirling, space=thin sparse, chorus=golden backlight
+ *   uClimaxPhase     → dust parts to reveal bright star behind
+ *   uMelodicPitch    → grain size (high pitch = fine crystalline, low = broad)
+ *   uSlowEnergy      → camera drift speed
+ *   uTimbralBrightness → edge glow intensity
+ *   uSpaceScore      → dust thinning / cosmic silence
  */
 
 import { noiseGLSL } from "./noise";
@@ -16,6 +29,16 @@ void main() {
 }
 `;
 
+const postProcess = buildPostProcessGLSL({
+  grainStrength: 'normal',
+  bloomEnabled: true,
+  bloomThresholdOffset: -0.08,
+  halationEnabled: true,
+  caEnabled: true,
+  dofEnabled: true,
+  lightLeakEnabled: true,
+});
+
 export const cosmicDustFrag = /* glsl */ `
 precision highp float;
 
@@ -23,175 +46,381 @@ ${sharedUniformsGLSL}
 
 ${noiseGLSL}
 
-${buildPostProcessGLSL({ grainStrength: 'normal', bloomEnabled: true, halationEnabled: true })}
+${postProcess}
 
 varying vec2 vUv;
 
 #define PI 3.14159265
+#define TAU 6.28318530
 
-// Hash for star positions
-float hash(vec2 p) {
-  return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
-}
+// ─── Hash helpers (cd2 prefixed) ───
 
-float hash3(vec3 p) {
+float cd2Hash(vec3 p) {
   return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453);
 }
 
-// Star field layer
-float starField(vec2 uv, float scale, float brightness) {
-  vec2 id = floor(uv * scale);
-  vec2 f = fract(uv * scale) - 0.5;
+float cd2Hash2(vec2 p) {
+  return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+}
 
-  float stars = 0.0;
-  for (int y = -1; y <= 1; y++) {
-    for (int x = -1; x <= 1; x++) {
-      vec2 neighbor = vec2(float(x), float(y));
-      vec2 cellId = id + neighbor;
-      float h = hash(cellId);
-      if (h > 0.92) { // ~8% of cells have stars
-        vec2 starPos = neighbor + vec2(hash(cellId + 0.1), hash(cellId + 0.2)) - 0.5 - f;
-        float d = length(starPos);
-        float twinkle = 0.7 + 0.3 * sin(uTime * (2.0 + h * 3.0) + h * 100.0);
-        float star = smoothstep(0.05 * brightness, 0.0, d) * twinkle;
-        // Color variation
-        float colorVar = hash(cellId + 0.3);
-        stars += star * (0.5 + colorVar * 0.5);
+// ─── Dust density field: layered FBM with curl advection ───
+// Returns density (0-1+) at a given 3D position in the dust cloud.
+
+float cd2Dust(vec3 pos, float flowTime, float densityMod) {
+  // Primary volume: broad structure
+  float broad = fbm3(pos * 0.7 + vec3(flowTime * 0.04, 0.0, flowTime * 0.02));
+
+  // Filament structure: ridged fractal for wispy lanes
+  float filament = ridgedMultifractal(pos * 1.2 + vec3(0.0, flowTime * 0.03, flowTime * 0.06), 4, 2.2, 0.45);
+
+  // Fine turbulence: small-scale eddies
+  float fine = snoise(pos * 3.5 + vec3(flowTime * 0.1, flowTime * 0.07, 0.0)) * 0.5 + 0.5;
+
+  // Combine: broad shapes with filament detail
+  float density = broad * 0.45 + filament * 0.4 + fine * 0.15;
+
+  // Apply density modifier (bass, section, etc.)
+  density *= densityMod;
+
+  // Soft floor: don't allow negative density
+  return max(density - 0.15, 0.0);
+}
+
+// ─── Crystalline dust grain SDF ───
+// Tiny specular point lights scattered through the volume.
+// Returns brightness (0-1) for a grain at this position.
+
+float cd2Grain(vec3 pos, float grainDensity, float sparkle) {
+  // Grid-based placement: each cell may contain a grain
+  float grainScale = 6.0 + grainDensity * 4.0;
+  vec3 cell = floor(pos * grainScale);
+  vec3 cellFrac = fract(pos * grainScale) - 0.5;
+
+  float grainBright = 0.0;
+
+  // Check surrounding cells for nearest grain
+  for (int dz = -1; dz <= 1; dz++) {
+    for (int dy = -1; dy <= 1; dy++) {
+      for (int dx = -1; dx <= 1; dx++) {
+        vec3 neighbor = vec3(float(dx), float(dy), float(dz));
+        vec3 cellId = cell + neighbor;
+        float cellHash = cd2Hash(cellId);
+
+        // Only ~18% of cells have grains (energy increases this)
+        if (cellHash > (0.82 - grainDensity * 0.15)) {
+          // Grain position within cell (jittered)
+          vec3 grainPos = neighbor + vec3(
+            cd2Hash(cellId + 0.1),
+            cd2Hash(cellId + 0.2),
+            cd2Hash(cellId + 0.3)
+          ) - 0.5 - cellFrac;
+
+          float dist = length(grainPos);
+
+          // Tiny specular point: very sharp falloff
+          float grain = smoothstep(0.12, 0.0, dist);
+
+          // Per-grain twinkle (phase varies per grain)
+          float twinklePhase = cellHash * 100.0;
+          float twinkleSpeed = 2.0 + cellHash * 4.0;
+          float twinkle = 0.4 + 0.6 * pow(max(0.0, sin(uTime * twinkleSpeed + twinklePhase)), 3.0);
+
+          // Sparkle burst on drum onset
+          float burstPhase = sin(uTime * 12.0 + twinklePhase);
+          float burst = sparkle * max(0.0, burstPhase) * 2.0;
+
+          grain *= twinkle + burst;
+
+          // Size variation: some grains are brighter/larger
+          grain *= 0.5 + cellHash * 0.8;
+
+          grainBright += grain;
+        }
       }
     }
   }
-  return stars;
+
+  return grainBright;
 }
 
-// Nebula cloud (FBM-based)
-float nebula(vec2 uv, float t) {
-  float v = 0.0;
-  float a = 0.5;
-  vec3 p = vec3(uv, t * 0.05);
-  for (int i = 0; i < 5; i++) {
-    v += a * (snoise(p) * 0.5 + 0.5);
-    p = p * 2.1 + vec3(0.0, 0.0, t * 0.02);
-    a *= 0.5;
-  }
-  return v;
+// ─── Backlight scattering: simulates light from behind dust ───
+// Brighter where dust is thin and backlight is strong.
+
+vec3 cd2Backlight(vec3 pos, vec3 lightDir, float dustDensity, float intensity, vec3 lightColor) {
+  // Forward-scattering approximation: bright when viewing toward light through thin dust
+  float scatter = exp(-dustDensity * 4.0) * intensity;
+
+  // Mie-like forward scattering lobe
+  float phase = 0.5 + 0.5 * dot(normalize(pos), lightDir);
+  phase = pow(phase, 3.0);
+
+  return lightColor * scatter * phase;
+}
+
+// ─── Central star (revealed during climax) ───
+
+vec3 cd2Star(vec2 screenPos, float reveal, float vocalLight) {
+  float dist = length(screenPos);
+
+  // Core glow
+  float core = exp(-dist * 8.0) * reveal;
+
+  // Corona rays
+  float rays = 0.0;
+  float angle = atan(screenPos.y, screenPos.x);
+  rays += exp(-dist * 3.0) * pow(max(0.0, sin(angle * 4.0 + uTime * 0.2)), 8.0) * 0.3;
+  rays += exp(-dist * 2.0) * pow(max(0.0, sin(angle * 6.0 - uTime * 0.15)), 12.0) * 0.15;
+
+  // Diffraction spikes (4-point cross)
+  float spikeH = exp(-abs(screenPos.y) * 40.0) * exp(-abs(screenPos.x) * 4.0);
+  float spikeV = exp(-abs(screenPos.x) * 40.0) * exp(-abs(screenPos.y) * 4.0);
+  float spikes = (spikeH + spikeV) * reveal * 0.4;
+
+  float totalBright = core + rays + spikes;
+
+  // Star color: warm white shifting to gold with vocal presence
+  vec3 starColor = mix(vec3(1.0, 0.95, 0.85), vec3(1.0, 0.85, 0.55), vocalLight * 0.4);
+
+  return starColor * totalBright;
 }
 
 void main() {
-  vec2 uv = (gl_FragCoord.xy - 0.5 * uResolution) / min(uResolution.x, uResolution.y);
-  float t = uDynamicTime * 0.08;
+  vec2 uvScreen = vUv;
+  vec2 aspect = vec2(uResolution.x / uResolution.y, 1.0);
+  vec2 screenPos = (uvScreen - 0.5) * aspect;
+
+  // ─── Audio clamping ───
   float energy = clamp(uEnergy, 0.0, 1.0);
+  float bass = clamp(uBass, 0.0, 1.0);
+  float slowE = clamp(uSlowEnergy, 0.0, 1.0);
+  float drumOnset = clamp(uDrumOnset, 0.0, 1.0);
+  float tension = clamp(uHarmonicTension, 0.0, 1.0);
+  float pitch = clamp(uMelodicPitch, 0.0, 1.0);
+  float vocalPres = clamp(uVocalPresence, 0.0, 1.0);
+  float timbralBright = clamp(uTimbralBrightness, 0.0, 1.0);
+  float spaceScore = clamp(uSpaceScore, 0.0, 1.0);
+  float beatStab = clamp(uBeatStability, 0.0, 1.0);
+  float dynamicRange = clamp(uDynamicRange, 0.0, 1.0);
+  float melDir = uMelodicDirection;
+  float chromaHue = uChromaHue;
 
-  // --- Domain warping + energy-responsive detail ---
-  vec2 domainWarpOff = vec2(fbm3(vec3(uv * 0.5, uDynamicTime * 0.05)), fbm3(vec3(uv * 0.5 + 100.0, uDynamicTime * 0.05))) * 0.3;
-  float detailMod = 1.0 + energy * 0.5;
-
-  // Section-type modulation
+  // ─── Section-type modulation ───
   float sectionT = uSectionType;
-  float sJam = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
-  float sSpace = smoothstep(6.5, 7.5, sectionT);
+  float sJam    = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
+  float sSpace  = smoothstep(6.5, 7.5, sectionT);
   float sChorus = smoothstep(1.5, 2.5, sectionT) * (1.0 - step(2.5, sectionT));
-  float driftSpeedMod = mix(1.0, 1.4, sJam) * mix(1.0, 0.35, sSpace) * mix(1.0, 1.1, sChorus);
-  float starBrightMod = mix(1.0, 1.3, sJam) * mix(1.0, 0.6, sSpace) * mix(1.0, 1.2, sChorus);
-  float shootFreqMod = mix(1.0, 1.5, sJam) * mix(1.0, 0.4, sSpace) * mix(1.0, 1.15, sChorus);
+  float sSolo   = smoothstep(3.5, 4.5, sectionT) * (1.0 - step(4.5, sectionT));
 
-  // Slow cosmic drift (melodic direction shifts drift)
-  float melDir = uMelodicDirection * 0.02;
-  vec2 drift = vec2(t * 0.1 * driftSpeedMod + melDir, t * 0.05 * driftSpeedMod);
-  vec2 starUv = uv + drift;
-
-  // Star layers at different depths (parallax: different speeds per layer)
-  float stars = 0.0;
-  vec2 parallax1 = starUv;
-  vec2 parallax2 = starUv * 1.1 + drift * 0.3 + 5.0;  // medium depth — slower
-  vec2 parallax3 = starUv * 0.8 + drift * 0.1 + 10.0;  // far depth — slowest
-  stars += starField(parallax1, 30.0, 1.0) * 0.6;
-  stars += starField(parallax2, 50.0, 0.7) * 0.3;
-  stars += starField(parallax3, 80.0, 0.5) * 0.15;
-
-  // Beat stability (must be before star shimmer)
-  float beatStability = clamp(uBeatStability, 0.0, 1.0);
-
-  // Energy brightens stars (section-modulated)
-  stars *= (0.7 + uEnergy * 0.6 + uFastEnergy * 0.2) * starBrightMod;
-  // Beat stability: unstable → star shimmer boost
-  stars *= 1.0 + (1.0 - beatStability) * 0.2 * sin(uTime * 8.0 + uv.x * 30.0);
-
-  // === STAR GLOW: diffraction spikes (4-point cross) on bright stars ===
-  float spikeStar = starField(parallax1, 30.0, 1.0);
-  if (spikeStar > 0.3) {
-    // Find approximate star center from grid
-    vec2 spikeCenter = (floor(parallax1 * 30.0) + 0.5) / 30.0;
-    vec2 toStar = uv - spikeCenter;
-    // 4-point cross spikes
-    float spikeH = exp(-abs(toStar.y) * 200.0) * exp(-abs(toStar.x) * 20.0);
-    float spikeV = exp(-abs(toStar.x) * 200.0) * exp(-abs(toStar.y) * 20.0);
-    float spikes = (spikeH + spikeV) * spikeStar * 0.15;
-    stars += spikes;
-  }
-
-  // === VOLUMETRIC NEBULA: raymarched dust clouds (4-step accumulation) ===
-  // --- Phase 1: New uniform integrations ---
-  float chromaHueMod = uChromaHue * 0.25;
-  float chordHue = float(int(uChordIndex)) / 24.0 * 0.15;
-  float pitchBright = uMelodicPitch * 0.15;
-  float tensionDensity = clamp(uHarmonicTension, 0.0, 1.0) * 0.15;
-  float peakGlow = clamp(uPeakApproaching, 0.0, 1.0) * 0.12;
-
-  vec3 nebColor1 = hsv2rgb(vec3(uPalettePrimary + chromaHueMod + chordHue, 0.6 * uPaletteSaturation, 0.25 + pitchBright));
-  vec3 nebColor2 = hsv2rgb(vec3(uPaletteSecondary, 0.5 * uPaletteSaturation, 0.20 + peakGlow));
-
-  vec3 nebulaMix = vec3(0.0);
-  float nebAlpha = 0.0;
-  for (int s = 0; s < 4; s++) {
-    float fs = float(s);
-    float depth = 0.8 + fs * 0.4;
-    vec2 sampleUv = uv * (0.6 + fs * 0.15) + drift * (0.5 - fs * 0.1);
-    float density = nebula(sampleUv, uDynamicTime + fs * 50.0);
-    density = smoothstep(0.25 - tensionDensity, 0.7, density);
-    float layerAlpha = density * 0.3 * (1.0 - nebAlpha);
-    vec3 layerColor = mix(nebColor1, nebColor2, fs / 3.0 + density * 0.2);
-    // Depth-dependent brightness (further = dimmer)
-    layerColor *= 1.0 / depth;
-    nebulaMix += layerColor * layerAlpha;
-    nebAlpha += layerAlpha;
-  }
-
-  // Bass makes nebula pulse
-  nebulaMix *= 0.8 + uBass * 0.5;
-
-  // Background deep space gradient
-  float bgGrad = smoothstep(1.5, 0.0, length(uv));
-  vec3 bgColor = hsv2rgb(vec3(uPalettePrimary + 0.15, 0.3, 0.03)) * bgGrad;
-
-  // Combine layers
-  vec3 color = bgColor + nebulaMix + vec3(stars);
-
-  // === CLIMAX REACTIVITY ===
+  // ─── Climax ───
   float isClimax = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5);
-  float climaxBoost = isClimax * uClimaxIntensity;
+  float climaxBoost = isClimax * clamp(uClimaxIntensity, 0.0, 1.0);
 
-  // Onset: shooting star flash (amplified, section-modulated)
-  float shootAngle = uTime * 0.5 * shootFreqMod + uSectionIndex * 2.0;
-  vec2 shootDir = vec2(cos(shootAngle), sin(shootAngle));
-  float shootTrail = smoothstep(0.02, 0.0, abs(dot(uv - shootDir * 0.3, vec2(-shootDir.y, shootDir.x))));
-  shootTrail *= smoothstep(0.8, 0.0, length(uv - shootDir * 0.3));
-  color += shootTrail * uOnsetSnap * 0.8 * (1.0 + climaxBoost * 0.5);
+  // Climax dust parting: 0 = normal, 1 = fully parted (star revealed)
+  float dustParting = smoothstep(1.5, 3.0, uClimaxPhase) * clamp(uClimaxIntensity, 0.0, 1.0);
 
-  color *= 1.0 + climaxBoost * 0.05;
-  color *= 1.0 + max(uBeatSnap, uDrumBeat) * 0.20 * (1.0 + climaxBoost * 0.4);
+  // ─── Drift speed: slow + energy-responsive + section-modulated ───
+  float driftSpeed = (0.02 + slowE * 0.015) * (1.0 + sJam * 0.6 - sSpace * 0.5);
+  float flowTime = uDynamicTime * driftSpeed;
 
-  // Vignette — subtle
-  float vig = 1.0 - smoothstep(0.8, 1.6, length(uv));
-  color *= 0.3 + vig * 0.7;
+  // ─── Palette ───
+  float hue1 = hsvToCosineHue(uPalettePrimary + chromaHue * 0.15);
+  float hue2 = hsvToCosineHue(uPaletteSecondary);
 
-  // === DEAD ICONOGRAPHY ===
-  float _nf = snoise(vec3(uv * 2.0, uTime * 0.1));
-  color += iconEmergence(uv, uTime, energy, uBass, nebColor1, nebColor2, _nf, uClimaxPhase, uSectionIndex);
-  color += heroIconEmergence(uv, uTime, energy, uBass, nebColor1, nebColor2, _nf, uSectionIndex);
+  // Color temperature from harmonic tension: cool blue → warm amber
+  vec3 coolDust = vec3(0.12, 0.15, 0.3);  // deep blue
+  vec3 warmDust = vec3(0.35, 0.18, 0.08); // warm amber
+  vec3 dustBaseColor = mix(coolDust, warmDust, tension);
 
-  // === POST-PROCESSING (shared chain) ===
-  color = applyPostProcess(color, vUv, uv);
+  // Palette tinting
+  vec3 paletteTint = 0.5 + 0.5 * cos(TAU * vec3(hue1, hue1 + 0.33, hue1 + 0.67));
+  dustBaseColor = mix(dustBaseColor, paletteTint * 0.4, 0.3 + uPaletteSaturation * 0.2);
 
-  gl_FragColor = vec4(color, 1.0);
+  // Secondary color for grain specular
+  vec3 grainColor = 0.5 + 0.5 * cos(TAU * vec3(hue2, hue2 + 0.33, hue2 + 0.67));
+  grainColor = mix(grainColor, vec3(1.0, 0.95, 0.85), 0.4); // shift toward white
+
+  // Chorus golden backlight color
+  vec3 chorusBacklightColor = mix(vec3(1.0, 0.85, 0.55), vec3(1.0, 0.92, 0.7), vocalPres);
+
+  // Backlight color: vocal presence warms it, chorus makes it golden
+  vec3 backlightColor = mix(vec3(0.8, 0.85, 1.0), chorusBacklightColor, sChorus * 0.8 + vocalPres * 0.3);
+
+  // ─── Ray setup (3D camera system) ───
+  vec3 ro, rd;
+  setupCameraRay(uvScreen, aspect, ro, rd);
+
+  // ─── Dust density modulation (audio-driven) ───
+  // Bass → density pulse, section → swirl/sparse, space → thin
+  float densityMod = 0.8 + bass * 0.5;
+  densityMod *= (1.0 + sJam * 0.4 - sSpace * 0.35 + sSolo * 0.15);
+  densityMod *= (1.0 - spaceScore * 0.25);
+  densityMod *= (1.0 - dustParting * 0.7); // climax parts the dust
+
+  // ─── Volumetric raymarch (40-72 steps) ───
+  int stepCount = int(mix(40.0, 72.0, smoothstep(0.15, 0.55, energy)));
+  float stepSize = 0.10;
+
+  vec3 dustAccum = vec3(0.0);
+  float dustAlpha = 0.0;
+  float totalGrainBright = 0.0;
+
+  // Backlight direction: from behind, slightly offset by melodic direction
+  vec3 backlightDir = normalize(vec3(melDir * 0.1, 0.1, -1.0));
+
+  // Grain density scales with energy
+  float grainDensityParam = energy * 0.8 + 0.2;
+
+  // Sparkle from drum onset
+  float sparkleParam = drumOnset * 1.5;
+
+  for (int i = 0; i < 72; i++) {
+    if (i >= stepCount) break;
+    if (dustAlpha > 0.96) break;
+
+    float fi = float(i);
+    float marchDist = 0.3 + fi * stepSize;
+    vec3 pos = ro + rd * marchDist;
+
+    // Swirling motion for jam sections: curl offset
+    vec3 swirlOffset = vec3(0.0);
+    if (sJam > 0.01) {
+      // Cheap swirl approximation without full curlNoise
+      float swirlAngle = flowTime * 3.0 + length(pos.xy) * 2.0;
+      swirlOffset = vec3(
+        sin(swirlAngle + pos.z * 1.5) * 0.15,
+        cos(swirlAngle + pos.x * 1.5) * 0.15,
+        sin(swirlAngle * 0.7 + pos.y) * 0.1
+      ) * sJam;
+    }
+
+    vec3 samplePos = pos + swirlOffset;
+
+    // Sample dust density
+    float density = cd2Dust(samplePos, flowTime, densityMod);
+
+    // Depth-dependent absorption: far dust is thinner
+    float depthFade = exp(-fi * 0.015);
+    density *= depthFade;
+
+    if (density > 0.001) {
+      float alpha = density * 0.06 * (1.0 - dustAlpha);
+
+      // ─── Dust illumination ───
+
+      // Self-emission: denser regions glow faintly
+      vec3 selfGlow = dustBaseColor * density * 2.5;
+
+      // Backlit scattering (vocal presence drives intensity)
+      float backlightIntensity = 0.3 + vocalPres * 0.7 + sChorus * 0.4;
+      vec3 backlit = cd2Backlight(rd, backlightDir, density * 8.0, backlightIntensity, backlightColor);
+
+      // Edge glow: timbral brightness drives rim lighting
+      float edgeGlow = pow(1.0 - abs(dot(rd, normalize(samplePos))), 2.5);
+      vec3 rimLight = dustBaseColor * edgeGlow * timbralBright * 0.4;
+
+      // Combine illumination
+      vec3 dustColor = selfGlow + backlit + rimLight;
+
+      // Depth coloring: near = warm, far = cool
+      float depthT = fi / float(stepCount);
+      dustColor = mix(dustColor, dustColor * vec3(0.7, 0.75, 1.1), depthT * 0.5);
+
+      // Dynamic range → contrast in dust layers
+      dustColor *= 0.8 + dynamicRange * 0.4;
+
+      dustAccum += dustColor * alpha;
+      dustAlpha += alpha;
+    }
+
+    // ─── Crystalline dust grains (embedded in the volume) ───
+    float grain = cd2Grain(samplePos, grainDensityParam, sparkleParam);
+    if (grain > 0.01) {
+      float grainVisibility = (1.0 - dustAlpha) * grain * depthFade;
+
+      // Grain color: mix of palette secondary + white specular
+      vec3 gColor = grainColor * (0.6 + grain * 0.8);
+
+      // Beat instability → extra shimmer on grains
+      gColor *= 1.0 + (1.0 - beatStab) * 0.3 * sin(uTime * 10.0 + fi * 7.0);
+
+      dustAccum += gColor * grainVisibility * 0.35;
+      totalGrainBright += grainVisibility;
+    }
+  }
+
+  vec3 col = dustAccum;
+
+  // ─── Background: deep space with distant stars ───
+  float bgStarField = 0.0;
+  {
+    // Distant static stars behind the dust
+    vec3 bgDir = rd * 15.0;
+    vec3 bgCell = floor(bgDir);
+    vec3 bgFrac = fract(bgDir) - 0.5;
+
+    for (int bz = -1; bz <= 1; bz++) {
+      for (int by = -1; by <= 1; by++) {
+        for (int bx = -1; bx <= 1; bx++) {
+          vec3 bNeighbor = vec3(float(bx), float(by), float(bz));
+          vec3 bCellId = bgCell + bNeighbor;
+          float bHash = cd2Hash(bCellId);
+          if (bHash > 0.88) {
+            vec3 starPos = bNeighbor + vec3(
+              cd2Hash(bCellId + 0.1),
+              cd2Hash(bCellId + 0.2),
+              cd2Hash(bCellId + 0.3)
+            ) - 0.5 - bgFrac;
+            float sDist = length(starPos);
+            float sBright = smoothstep(0.06, 0.0, sDist) * bHash;
+            bgStarField += sBright;
+          }
+        }
+      }
+    }
+  }
+
+  // Background color: deep indigo with faint stars
+  vec3 bgColor = vec3(0.01, 0.012, 0.03) + vec3(0.8, 0.85, 1.0) * bgStarField * 0.25 * (1.0 - dustAlpha);
+  col = mix(bgColor, col, dustAlpha * 0.85 + 0.15);
+
+  // ─── Central star (climax reveal) ───
+  // As climax intensifies, dust parts and a brilliant star emerges behind
+  if (dustParting > 0.05) {
+    vec3 starGlow = cd2Star(screenPos, dustParting, vocalPres);
+    // Star is attenuated by remaining dust
+    float starAttenuation = 1.0 - dustAlpha * (1.0 - dustParting * 0.8);
+    col += starGlow * starAttenuation;
+  }
+
+  // ─── Global modulations ───
+
+  // Beat + climax brightness
+  col *= 1.0 + climaxBoost * 0.15;
+  col *= 1.0 + uBeatSnap * 0.08 * (1.0 + climaxBoost * 0.3);
+  col *= 1.0 + max(uOnsetSnap, uDrumBeat) * 0.12;
+
+  // Energy forecast: approaching peak → slow brightening
+  col *= 1.0 + clamp(uEnergyForecast, 0.0, 1.0) * 0.06;
+  col *= 1.0 + clamp(uPeakApproaching, 0.0, 1.0) * 0.08;
+
+  // Semantic: cosmic → deepen blue + expand, ambient → soften
+  col *= 1.0 + uSemanticCosmic * 0.15;
+  col = mix(col, col * vec3(0.85, 0.9, 1.1), uSemanticAmbient * 0.2);
+
+  // Jam phase modulation: building → brighter grains, peak_space → ethereal
+  float jamBuild = smoothstep(0.5, 1.5, uJamPhase) * (1.0 - step(1.5, uJamPhase));
+  float jamPeakSpace = smoothstep(1.5, 2.5, uJamPhase) * (1.0 - step(2.5, uJamPhase));
+  col *= 1.0 + jamBuild * uJamProgress * 0.1;
+  col = mix(col, col * vec3(0.8, 0.85, 1.15), jamPeakSpace * 0.25);
+
+  // ─── Dead Iconography ───
+  float _nf = snoise(vec3(screenPos * 2.0, uTime * 0.1));
+  col += iconEmergence(screenPos, uTime, energy, bass, paletteTint, grainColor, _nf, uClimaxPhase, uSectionIndex);
+  col += heroIconEmergence(screenPos, uTime, energy, bass, paletteTint, grainColor, _nf, uSectionIndex);
+
+  // ─── Post-processing (shared chain) ───
+  col = applyPostProcess(col, uvScreen, screenPos);
+
+  gl_FragColor = vec4(col, 1.0);
 }
 `;

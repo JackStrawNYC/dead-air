@@ -42,14 +42,14 @@ export interface SemanticProfile {
 // ─── Semantic → Shader Mappings ───
 
 const SEMANTIC_SHADERS: Record<keyof SemanticScores, VisualMode[]> = {
-  psychedelic: ["fractal_zoom", "kaleidoscope", "tie_dye", "liquid_light", "reaction_diffusion"],
-  aggressive: ["inferno", "electric_arc", "plasma_field", "fractal_flames"],
-  tender: ["aurora", "oil_projector", "vintage_film", "ink_wash"],
+  psychedelic: ["cosmic_voyage", "cosmic_voyage", "protean_clouds", "protean_clouds", "deep_ocean"],
+  aggressive: ["inferno", "inferno", "protean_clouds", "cosmic_voyage"],
+  tender: ["aurora", "protean_clouds", "vintage_film", "deep_ocean"],
   cosmic: ["cosmic_voyage", "cosmic_dust", "deep_ocean", "volumetric_nebula", "void_light"],
-  rhythmic: ["mandala_engine", "concert_lighting", "truchet_tiling", "sacred_geometry"],
-  ambient: ["cosmic_dust", "morphogenesis", "void_light", "mycelium_network"],
-  chaotic: ["feedback_recursion", "reaction_diffusion", "databend", "signal_decay"],
-  triumphant: ["sacred_geometry", "stained_glass", "aurora_curtains", "solar_flare"],
+  rhythmic: ["mandala_engine", "inferno", "cosmic_voyage", "cosmic_voyage"],
+  ambient: ["cosmic_dust", "deep_ocean", "void_light", "deep_ocean"],
+  chaotic: ["cosmic_voyage", "deep_ocean", "cosmic_voyage", "deep_ocean"],
+  triumphant: ["cosmic_voyage", "protean_clouds", "protean_clouds", "inferno"],
 };
 
 // ─── Semantic → Overlay Category Biases ───

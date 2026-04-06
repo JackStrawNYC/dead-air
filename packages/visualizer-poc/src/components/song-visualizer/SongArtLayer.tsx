@@ -48,11 +48,11 @@ export const SongArtLayer: React.FC<SongArtProps> = ({ src, suppressionFactor, h
 
   // Energy-reactive wash: quiet → 0.40, peak → 0.10
   // Art is intro title card only — gone after 12s, shader owns the song body
-  const introTarget = introFactor < 1 ? 0.95 * (1 - introFactor) : 0;
+  const introTarget = introFactor < 1 ? 0.55 * (1 - introFactor) : 0;
   const baseOpacity = interpolate(
     frame,
     [0, ART_FULL_END, ART_FADE_END],
-    [0.95, 0.95, introTarget],
+    [0.35, 0.35, introTarget],
     {
       extrapolateLeft: "clamp",
       extrapolateRight: "clamp",
@@ -108,8 +108,8 @@ export const SongArtLayer: React.FC<SongArtProps> = ({ src, suppressionFactor, h
             const artBright = interpolate(energy, [0, 0.15, 0.30], [0.65, 0.75, 0.85], clampOpts);
             const artContrast = interpolate(energy, [0, 0.15, 0.30], [0.75, 0.85, 0.95], clampOpts);
             // During intro (introFactor < 0.5), use consistent values instead of harsh 0.7
-            const b = introFactor < 0.5 ? 1.0 : artBright;
-            const c = introFactor < 0.5 ? 1.0 : artContrast;
+            const b = introFactor < 0.5 ? 0.75 : artBright;
+            const c = introFactor < 0.5 ? 0.85 : artContrast;
             return `brightness(${b.toFixed(3)}) contrast(${c.toFixed(3)})`;
           })(),
           hueRotation !== 0 ? `hue-rotate(${hueRotation.toFixed(1)}deg)` : "",
@@ -122,7 +122,7 @@ export const SongArtLayer: React.FC<SongArtProps> = ({ src, suppressionFactor, h
           width: "100%",
           height: "100%",
           objectFit: "cover",
-          objectPosition: "center 55%",
+          objectPosition: "center 38%",
           transform: `scale(${scale}) translateX(${translateX}px)`,
           willChange: "transform",
         }}

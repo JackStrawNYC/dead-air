@@ -9,26 +9,28 @@
 import React from "react";
 import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
+import { useAudioSnapshot } from "./parametric/audio-helpers";
+import { useTempoFactor } from "../data/TempoContext";
 
 // ── WALL OF SOUND SILHOUETTE ────────────────────────────────────
 
-const WallSpeakers: React.FC<{ width: number; height: number; energy: number; frame: number }> = ({
-  width, height, energy, frame,
+const WallSpeakers: React.FC<{ width: number; height: number; energy: number; bass: number; chromaHue: number; beatDecay: number; frame: number }> = ({
+  width, height, energy, bass, chromaHue, beatDecay, frame,
 }) => {
   // Only visible during high energy
   if (energy < 0.15) return null;
 
   const opacity = interpolate(energy, [0.15, 0.3], [0, 0.4], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-  const hue = (frame * 0.5) % 360;
+  const hue = chromaHue;
   const color = `hsl(${hue}, 80%, 50%)`;
-  const glow = `drop-shadow(0 0 8px ${color}) drop-shadow(0 0 20px ${color})`;
+  const glow = `drop-shadow(0 0 ${8 + beatDecay * 12}px ${color}) drop-shadow(0 0 ${20 + bass * 15}px ${color})`;
 
   const stackW = 80;
   const numStacks = Math.ceil(width / stackW) + 1;
   const baseY = height - 10;
 
-  // Speaker cone pulse with energy
-  const pulse = 1 + energy * 0.15;
+  // Speaker cone pulse with bass
+  const pulse = 1 + bass * 0.25 + beatDecay * 0.1;
 
   return (
     <svg
@@ -68,10 +70,10 @@ const WallSpeakers: React.FC<{ width: number; height: number; energy: number; fr
 
 // ── SPINNING VINYL ──────────────────────────────────────────────
 
-const VinylRecord: React.FC<{ energy: number; frame: number }> = ({ energy, frame }) => {
+const VinylRecord: React.FC<{ energy: number; chromaHue: number; tempoFactor: number; frame: number }> = ({ energy, chromaHue, tempoFactor, frame }) => {
   const size = 100;
-  const rotation = frame * (2 + energy * 3); // RPM increases with energy
-  const color = `hsl(${(frame * 0.3) % 360}, 70%, 50%)`;
+  const rotation = frame * (2 + energy * 3) * tempoFactor; // RPM increases with energy and tempo
+  const color = `hsl(${chromaHue}, 70%, 50%)`;
 
   return (
     <div
@@ -109,7 +111,7 @@ const VinylRecord: React.FC<{ energy: number; frame: number }> = ({ energy, fram
 
 // ── NEON SIGN ───────────────────────────────────────────────────
 
-const NeonSign: React.FC<{ energy: number; frame: number }> = ({ energy, frame }) => {
+const NeonSign: React.FC<{ energy: number; chromaHue: number; onsetEnvelope: number; beatDecay: number; frame: number }> = ({ energy, chromaHue, onsetEnvelope, beatDecay, frame }) => {
   const NEON_CYCLE = 2100;     // 70 seconds between appearances
   const NEON_DURATION = 360;   // 12 seconds visible
 
@@ -119,15 +121,16 @@ const NeonSign: React.FC<{ energy: number; frame: number }> = ({ energy, frame }
   const progress = cycleFrame / NEON_DURATION;
   const fadeIn = interpolate(progress, [0, 0.1], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: Easing.out(Easing.cubic) });
   const fadeOut = interpolate(progress, [0.9, 1], [1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-  const opacity = Math.min(fadeIn, fadeOut) * 0.75;
+  const opacity = Math.min(fadeIn, fadeOut) * interpolate(energy, [0.05, 0.25], [0.5, 0.9], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
 
-  // Neon flicker
-  const flicker1 = Math.sin(frame * 3.7) > 0.92 ? 0.3 : 1;
+  // Neon flicker — onset-triggered buzzy flicker + subtle beat pulse
+  const onsetFlicker = onsetEnvelope > 0.3 ? 0.3 + Math.random() * 0.4 : 1;
+  const flicker1 = Math.sin(frame * 3.7) > 0.92 ? 0.3 : onsetFlicker;
   const flicker2 = Math.sin(frame * 5.1 + 2) > 0.95 ? 0.4 : 1;
 
-  const hue = (frame * 0.4) % 360;
-  const color1 = `hsl(${hue}, 100%, 65%)`;
-  const color2 = `hsl(${(hue + 60) % 360}, 100%, 65%)`;
+  const hue = chromaHue;
+  const color1 = `hsl(${hue}, 100%, ${55 + beatDecay * 15}%)`;
+  const color2 = `hsl(${(hue + 60) % 360}, 100%, ${55 + beatDecay * 15}%)`;
 
   return (
     <div
@@ -196,21 +199,15 @@ interface Props {
 export const WallOfSound: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
-
-  const idx = Math.min(Math.max(0, frame), frames.length - 1);
-  let eSum = 0;
-  let eCount = 0;
-  for (let i = Math.max(0, idx - 60); i <= Math.min(frames.length - 1, idx + 60); i++) {
-    eSum += frames[i].rms;
-    eCount++;
-  }
-  const energy = eCount > 0 ? eSum / eCount : 0;
+  const snap = useAudioSnapshot(frames);
+  const tempoFactor = useTempoFactor();
+  const { energy, bass, chromaHue, beatDecay, onsetEnvelope } = snap;
 
   return (
     <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden" }}>
-      <WallSpeakers width={width} height={height} energy={energy} frame={frame} />
-      <VinylRecord energy={energy} frame={frame} />
-      <NeonSign energy={energy} frame={frame} />
+      <WallSpeakers width={width} height={height} energy={energy} bass={bass} chromaHue={chromaHue} beatDecay={beatDecay} frame={frame} />
+      <VinylRecord energy={energy} chromaHue={chromaHue} tempoFactor={tempoFactor} frame={frame} />
+      <NeonSign energy={energy} chromaHue={chromaHue} onsetEnvelope={onsetEnvelope} beatDecay={beatDecay} frame={frame} />
     </div>
   );
 };

@@ -1,23 +1,34 @@
 /**
- * Video Feedback Recursion — infinite-regress tunnel effect via frame feedback.
- * Reads uPrevFrame, scales UV inward, rotates slightly, composites with a
- * seed pattern. Classic 1960s-70s video synthesizer aesthetic.
+ * Feedback Recursion Hall — raymarched infinite mirror corridor.
+ * Two parallel mirrors face each other creating classic infinite regression.
+ * Reflected images are slightly distorted, color-shifted, and delayed,
+ * producing a psychedelic tunnel of recursive reflections stretching to infinity.
+ * Camera stands between the mirrors looking down the infinite regression.
  *
  * Visual aesthetic:
- *   - Quiet: gentle slow tunnel, warm ambient colors
- *   - Building: tunnel deepens, rotation increases, seed pattern brightens
- *   - Peak: deep recursive zoom with saturated color injection
- *   - Release: tunnel widens, colors desaturate, gentle drift
+ *   - Quiet: still corridor, deep infinite regression, cool ambient
+ *   - Building: mirrors pulse closer, reflections intensify, hue shifts deepen
+ *   - Peak: vivid deep recursion, maximum clarity, prismatic color per bounce
+ *   - Release: mirrors drift apart, reflections fade to fog
  *
- * Audio reactivity:
- *   uEnergy          → inward scale factor (deeper tunnel at high energy)
- *   uBass            → rotation amount (bass drives twist)
- *   uOnsetSnap       → color injection burst
- *   uMelodicPitch    → twist center offset (drifting origin)
- *   uHarmonicTension → barrel distortion of recursion
- *   uBeatStability   → recursion regularity (stable = clean, unstable = chaotic)
- *   uSlowEnergy      → seed pattern brightness
- *   uChromaHue       → hue modulation
+ * Audio reactivity (14+ uniforms):
+ *   uBass              → mirror distance pulsing (corridor breathing)
+ *   uEnergy            → recursion depth/clarity, ray step count
+ *   uDrumOnset         → ripple distortion through all reflections
+ *   uVocalPresence     → warm ambient fill light between mirrors
+ *   uHarmonicTension   → distortion per reflection bounce
+ *   uSectionType       → jam=mirrors tilt creating spiral regression,
+ *                         space=still/infinite, chorus=vivid deep recursion
+ *   uClimaxPhase       → mirrors fold inward creating kaleidoscopic collapse
+ *   uSlowEnergy        → drift speed of camera and reflections
+ *   uMelodicPitch      → vertical camera drift
+ *   uBeatStability     → reflection coherence (stable=clean, unstable=warped)
+ *   uTimbralBrightness → specular intensity on mirror frames
+ *   uSpaceScore        → infinite depth multiplier (deeper regression)
+ *   uDynamicRange      → contrast between reflections and shadows
+ *   uChromaHue         → base hue shift per bounce
+ *   uStemBass          → floor vibration amplitude
+ *   uSemanticPsychedelic → color saturation boost per bounce
  */
 
 import { noiseGLSL } from "./noise";
@@ -32,197 +43,622 @@ void main() {
 }
 `;
 
+const postProcess = buildPostProcessGLSL({
+  bloomEnabled: true,
+  bloomThresholdOffset: -0.06,
+  caEnabled: true,
+  halationEnabled: true,
+  lightLeakEnabled: true,
+  beatPulseEnabled: true,
+  lensDistortionEnabled: true,
+  eraGradingEnabled: true,
+  grainStrength: "normal",
+});
+
 export const feedbackRecursionFrag = /* glsl */ `
 precision highp float;
-
 ${sharedUniformsGLSL}
-uniform sampler2D uPrevFrame;
-
-
 ${noiseGLSL}
-
-${buildPostProcessGLSL({ grainStrength: "normal", bloomEnabled: true, caEnabled: true, halationEnabled: true, dofEnabled: true, temporalBlendEnabled: true })}
-
+${postProcess}
 varying vec2 vUv;
 
 #define PI 3.14159265
 #define TAU 6.28318530
 
+// ─── Hash helpers ───
+float frHash(float n) { return fract(sin(n * 127.1) * 43758.5453); }
+float frHash2(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+
+// ─── Smooth min ───
+float frSmin(float a, float b, float k) {
+  float h = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0);
+  return mix(b, a, h) - k * h * (1.0 - h);
+}
+
+// ─── Box SDF ───
+float frBox(vec3 p, vec3 b) {
+  vec3 q = abs(p) - b;
+  return length(max(q, 0.0)) + min(max(q.x, max(q.y, q.z)), 0.0);
+}
+
+// ─── Rounded box SDF ───
+float frRoundBox(vec3 p, vec3 b, float r) {
+  vec3 q = abs(p) - b + r;
+  return length(max(q, 0.0)) + min(max(q.x, max(q.y, q.z)), 0.0) - r;
+}
+
+// ─── Mirror frame SDF: ornate rectangular frame around each mirror ───
+float frFrame(vec3 p, float mirrorHalf, float frameThick, float frameDepth) {
+  // Outer box (full frame footprint)
+  float outer = frRoundBox(p, vec3(1.4, 2.0, frameDepth), 0.04);
+  // Inner cutout (mirror opening)
+  float inner = frBox(p, vec3(1.4 - frameThick, 2.0 - frameThick, frameDepth + 0.1));
+  // Frame = outer minus inner
+  float frame = max(outer, -inner);
+
+  // Decorative molding ridges along the frame edges
+  float moldingX = sin(p.y * 12.0) * 0.008;
+  float moldingY = sin(p.x * 8.0) * 0.006;
+  frame -= (moldingX + moldingY) * smoothstep(0.0, 0.05, abs(frame - 0.02));
+
+  return frame;
+}
+
+// ─── Floor SDF: polished reflective surface between mirrors ───
+float frFloor(vec3 p, float bassVib) {
+  float floorY = -2.2;
+  float floorDist = p.y - floorY;
+  // Bass vibration ripple on floor surface
+  floorDist += sin(p.x * 3.0 + p.z * 2.0) * bassVib * 0.015;
+  // Subtle tile pattern displacement
+  float tile = smoothstep(0.48, 0.5, abs(fract(p.x * 0.5) - 0.5))
+             + smoothstep(0.48, 0.5, abs(fract(p.z * 0.5) - 0.5));
+  floorDist -= tile * 0.003;
+  return floorDist;
+}
+
+// ─── Mirror plane SDF ───
+// Returns distance to a mirror surface at given X offset, with optional tilt
+float frMirrorPlane(vec3 p, float xPos, float tiltAngle, float climaxFold) {
+  // Mirror is an XZ plane at x = xPos
+  vec3 mp = p;
+  mp.x -= xPos;
+
+  // Tilt for jam mode: rotate around Y axis
+  if (abs(tiltAngle) > 0.001) {
+    float ct = cos(tiltAngle);
+    float st = sin(tiltAngle);
+    mp.xz = mat2(ct, st, -st, ct) * mp.xz;
+  }
+
+  // Climax fold: mirrors tilt inward around horizontal axis
+  if (climaxFold > 0.01) {
+    float foldAngle = climaxFold * 0.4;
+    float cf = cos(foldAngle);
+    float sf = sin(foldAngle);
+    float signX = sign(xPos);
+    mp.xy = mat2(cf, sf * signX, -sf * signX, cf) * mp.xy;
+  }
+
+  // Thin slab for the mirror surface
+  return abs(mp.x) - 0.02;
+}
+
+// ─── Complete scene SDF ───
+// Returns distance to nearest surface. Material ID via matId (out):
+//   0 = floor, 1 = left mirror, 2 = right mirror, 3 = frame
+float frMap(vec3 p, float mirrorDist, float tiltAngle, float climaxFold,
+            float bassVib, float frameThick, out float matId) {
+  float halfDist = mirrorDist * 0.5;
+
+  // Mirror planes
+  float leftMirror = frMirrorPlane(p, -halfDist, -tiltAngle, climaxFold);
+  float rightMirror = frMirrorPlane(p, halfDist, tiltAngle, climaxFold);
+
+  // Frames around mirrors (offset from mirror surfaces)
+  vec3 leftFrameP = p - vec3(-halfDist - 0.03, 0.0, 0.0);
+  vec3 rightFrameP = p - vec3(halfDist + 0.03, 0.0, 0.0);
+  float leftFrame = frFrame(leftFrameP, halfDist, frameThick, 0.06);
+  float rightFrame = frFrame(rightFrameP, halfDist, frameThick, 0.06);
+
+  // Floor
+  float floorD = frFloor(p, bassVib);
+
+  // Find closest surface and assign material ID
+  float scene = floorD;
+  matId = 0.0;
+
+  if (leftMirror < scene) { scene = leftMirror; matId = 1.0; }
+  if (rightMirror < scene) { scene = rightMirror; matId = 2.0; }
+
+  float frames = min(leftFrame, rightFrame);
+  if (frames < scene) { scene = frames; matId = 3.0; }
+
+  return scene;
+}
+
+// Overload without matId for normals / AO
+float frMapSimple(vec3 p, float mirrorDist, float tiltAngle, float climaxFold,
+                  float bassVib, float frameThick) {
+  float dummy;
+  return frMap(p, mirrorDist, tiltAngle, climaxFold, bassVib, frameThick, dummy);
+}
+
+// ─── Normal via central differences ───
+vec3 frNormal(vec3 p, float mirrorDist, float tiltAngle, float climaxFold,
+              float bassVib, float frameThick) {
+  vec2 eps = vec2(0.002, 0.0);
+  float d0 = frMapSimple(p, mirrorDist, tiltAngle, climaxFold, bassVib, frameThick);
+  return normalize(vec3(
+    frMapSimple(p + eps.xyy, mirrorDist, tiltAngle, climaxFold, bassVib, frameThick) - d0,
+    frMapSimple(p + eps.yxy, mirrorDist, tiltAngle, climaxFold, bassVib, frameThick) - d0,
+    frMapSimple(p + eps.yyx, mirrorDist, tiltAngle, climaxFold, bassVib, frameThick) - d0
+  ));
+}
+
+// ─── Ambient occlusion (4-sample) ───
+float frAO(vec3 p, vec3 n, float mirrorDist, float tiltAngle, float climaxFold,
+           float bassVib, float frameThick) {
+  float occl = 1.0;
+  for (int j = 1; j < 5; j++) {
+    float aoDist = 0.15 * float(j);
+    float aoSample = frMapSimple(p + n * aoDist, mirrorDist, tiltAngle, climaxFold, bassVib, frameThick);
+    occl -= (aoDist - aoSample) * (0.3 / float(j));
+  }
+  return clamp(occl, 0.15, 1.0);
+}
+
+// ─── Mirror bounce: simulate recursive reflections ───
+// Traces the reflected view through the mirror corridor, accumulating
+// color shifts, distortion, and fade per bounce.
+vec3 frBounce(vec3 ro, vec3 rd, float mirrorDist, float energy, float tension,
+              float drumRipple, float hueShift, float satBoost,
+              float stability, float sSpace, float sChorus, float sJam,
+              float tiltAngle, float climaxFold, vec3 palette1, vec3 palette2,
+              float timbralSpec, float flowTime) {
+  vec3 accumCol = vec3(0.0);
+  float accumAlpha = 1.0;
+  float halfDist = mirrorDist * 0.5;
+
+  // Max bounces: driven by energy (4-12)
+  int maxBounces = int(mix(4.0, 12.0, energy));
+  // Space mode: extend to max bounces for infinite feel
+  maxBounces = int(mix(float(maxBounces), 12.0, sSpace));
+  // Chorus: push to deeper recursion
+  maxBounces = int(mix(float(maxBounces), 14.0, sChorus * 0.5));
+
+  vec3 bounceRo = ro;
+  vec3 bounceRd = rd;
+  float bounceHue = 0.0;
+
+  for (int bounce = 0; bounce < 14; bounce++) {
+    if (bounce >= maxBounces) break;
+    if (accumAlpha < 0.02) break;
+
+    float fb = float(bounce);
+
+    // Distance to next mirror surface (simplified analytic for speed)
+    float tToMirror;
+    if (bounceRd.x > 0.001) {
+      tToMirror = (halfDist - bounceRo.x) / bounceRd.x;
+    } else if (bounceRd.x < -0.001) {
+      tToMirror = (-halfDist - bounceRo.x) / bounceRd.x;
+    } else {
+      // Ray nearly parallel to mirrors — infinite corridor view
+      tToMirror = 50.0;
+    }
+
+    tToMirror = max(tToMirror, 0.1);
+
+    // Hit point on mirror
+    vec3 mirrorHitPt = bounceRo + bounceRd * tToMirror;
+
+    // ─── Drum onset ripple: sinusoidal UV distortion per bounce ───
+    float ripplePhase = fb * 0.7 + flowTime * 4.0;
+    float rippleAmt = drumRipple * 0.06 * exp(-fb * 0.3);
+    mirrorHitPt.y += sin(mirrorHitPt.x * 8.0 + ripplePhase) * rippleAmt;
+    mirrorHitPt.z += cos(mirrorHitPt.y * 6.0 + ripplePhase) * rippleAmt * 0.7;
+
+    // ─── Tension distortion: warp increases per bounce ───
+    float tensionWarp = tension * 0.03 * (fb + 1.0);
+    mirrorHitPt.y += sin(mirrorHitPt.z * 3.0 + fb * 1.5) * tensionWarp;
+    mirrorHitPt.z += cos(mirrorHitPt.y * 4.0 + fb * 2.0) * tensionWarp * 0.6;
+
+    // ─── Stability: unstable = jittery reflection positions ───
+    float jitter = (1.0 - stability) * 0.04 * sin(flowTime * 11.0 + fb * 3.7);
+    mirrorHitPt.y += jitter;
+
+    // ─── Color per bounce: progressive hue shift ───
+    bounceHue += hueShift + fb * 0.04;
+    float bounceSat = mix(0.4, 0.9, energy) * (1.0 + satBoost * 0.3);
+
+    // Mix between palette colors with per-bounce rotation
+    vec3 bounceColor = mix(palette1, palette2, 0.5 + 0.5 * sin(bounceHue * TAU));
+
+    // Apply HSV-like hue rotation to the bounce color
+    vec3 bounceHSV = rgb2hsv(bounceColor);
+    bounceHSV.x = fract(bounceHSV.x + bounceHue * 0.15);
+    bounceHSV.y = clamp(bounceHSV.y * bounceSat * 1.3, 0.0, 1.0);
+    bounceColor = hsv2rgb(bounceHSV);
+
+    // Chorus: vivid, saturated, deeper colors
+    bounceColor = mix(bounceColor, bounceColor * 1.4, sChorus * 0.3);
+
+    // ─── Reflection fade: deeper bounces progressively dimmer ───
+    float fadePower = mix(0.35, 0.15, energy); // high energy = slower fade
+    fadePower = mix(fadePower, 0.08, sSpace);  // space = very slow fade (infinite)
+    float bounceFade = exp(-fb * fadePower);
+
+    // ─── Depth fog between mirrors ───
+    float fogDist = tToMirror * 0.08;
+    vec3 fogColor = mix(vec3(0.01, 0.02, 0.04), vec3(0.03, 0.02, 0.05), fb * 0.1);
+    float fogAmount = 1.0 - exp(-fogDist * fogDist);
+
+    // ─── Pattern in each reflection: ghostly image in the mirror ───
+    // Each bounce shows a slightly different noise pattern (the "reflected room")
+    vec2 mirrorUV = mirrorHitPt.yz * 0.3;
+    float mirrorNoise = fbm3(vec3(mirrorUV * (2.0 + fb * 0.5), flowTime * 0.1 + fb * 1.3));
+    float mirrorPattern = smoothstep(-0.2, 0.6, mirrorNoise);
+
+    // Glowing frame edges visible in reflections
+    float frameGlow = smoothstep(1.3, 1.5, abs(mirrorHitPt.y))
+                    + smoothstep(1.8, 2.1, abs(mirrorHitPt.z));
+    frameGlow = clamp(frameGlow, 0.0, 1.0);
+
+    // Specular highlight on mirror surface (timbral brightness drives intensity)
+    float spec = pow(max(dot(reflect(bounceRd, vec3(sign(bounceRd.x), 0.0, 0.0)),
+                         vec3(0.0, 0.3, -0.9)), 0.0), 12.0 + energy * 24.0);
+    spec *= timbralSpec * 0.4;
+
+    // Combine this bounce's contribution
+    vec3 reflectionCol = bounceColor * mirrorPattern * 0.6;
+    reflectionCol += bounceColor * frameGlow * 0.15;
+    reflectionCol += vec3(1.0, 0.97, 0.92) * spec;
+    reflectionCol = mix(reflectionCol, fogColor, fogAmount * 0.5);
+
+    // Accumulate with progressive alpha falloff
+    accumCol += reflectionCol * bounceFade * accumAlpha;
+    accumAlpha *= (0.88 - fb * 0.03); // each bounce absorbs some light
+
+    // ─── Reflect the ray for next bounce ───
+    // Mirror normal points inward along X
+    vec3 mirrorNorm = vec3(-sign(bounceRd.x), 0.0, 0.0);
+
+    // Jam tilt: spiral the normal slightly per bounce
+    if (abs(tiltAngle) > 0.001) {
+      float tiltPer = tiltAngle * (1.0 + fb * 0.15);
+      mirrorNorm.y += sin(tiltPer) * 0.15;
+      mirrorNorm.z += cos(tiltPer * 0.7) * 0.1;
+      mirrorNorm = normalize(mirrorNorm);
+    }
+
+    // Climax fold: progressive inward fold per bounce
+    if (climaxFold > 0.01) {
+      float foldPer = climaxFold * (0.3 + fb * 0.08);
+      mirrorNorm.y += sin(foldPer * 2.0) * foldPer * 0.5;
+      mirrorNorm = normalize(mirrorNorm);
+    }
+
+    bounceRd = reflect(bounceRd, mirrorNorm);
+    bounceRo = mirrorHitPt + bounceRd * 0.05;
+  }
+
+  return accumCol;
+}
+
+// ─── Ambient volumetric glow between mirrors ───
+vec3 frAmbientGlow(vec3 ro, vec3 rd, float maxDist, float vocalWarm,
+                   float energy, float flowTime, vec3 warmColor) {
+  vec3 glow = vec3(0.0);
+  int steps = int(mix(6.0, 14.0, energy));
+
+  for (int i = 0; i < 14; i++) {
+    if (i >= steps) break;
+    float fi = float(i);
+    float t = (fi + frHash(fi * 3.7)) * maxDist / float(steps);
+    vec3 samplePos = ro + rd * t;
+
+    // Soft volumetric fog between mirrors
+    float density = fbm3(samplePos * 0.4 + vec3(flowTime * 0.02, 0.0, flowTime * 0.03));
+    density = smoothstep(-0.3, 0.5, density) * 0.02;
+
+    // Vocal warmth drives ambient intensity
+    density *= 0.3 + vocalWarm * 0.7;
+
+    // Warm color with slight spatial variation
+    vec3 fogCol = warmColor * (0.6 + 0.4 * sin(samplePos.z * 0.5 + flowTime * 0.1));
+
+    float depthFade = exp(-t * 0.15);
+    glow += fogCol * density * depthFade;
+  }
+
+  return glow;
+}
+
 void main() {
   vec2 uv = vUv;
-  vec2 aspect = vec2(uResolution.x / uResolution.y, 1.0);
-  vec2 p = (uv - 0.5) * aspect;
+  vec2 asp = vec2(uResolution.x / uResolution.y, 1.0);
+  vec2 p = (uv - 0.5) * asp;
 
+  // ─── Clamp audio uniforms ───
   float energy = clamp(uEnergy, 0.0, 1.0);
   float bass = clamp(uBass, 0.0, 1.0);
-  float onset = clamp(uOnsetSnap, 0.0, 1.0);
   float slowE = clamp(uSlowEnergy, 0.0, 1.0);
+  float drumOn = clamp(uDrumOnset, 0.0, 1.0);
+  float vocalP = clamp(uVocalPresence, 0.0, 1.0);
   float tension = clamp(uHarmonicTension, 0.0, 1.0);
-  float stability = clamp(uBeatStability, 0.0, 1.0);
-  float melodicPitch = clamp(uMelodicPitch, 0.0, 1.0);
+  float melodicP = clamp(uMelodicPitch, 0.0, 1.0);
+  float timbralB = clamp(uTimbralBrightness, 0.0, 1.0);
+  float spaceS = clamp(uSpaceScore, 0.0, 1.0);
+  float dynRange = clamp(uDynamicRange, 0.0, 1.0);
+  float beatStab = clamp(uBeatStability, 0.0, 1.0);
+  float stemBass = clamp(uStemBass, 0.0, 1.0);
+  float semPsych = clamp(uSemanticPsychedelic, 0.0, 1.0);
+  float chromaH = uChromaHue;
 
-  // 7-band spectral: sub, low, low-mid, mid, upper-mid, presence, brilliance
+  // 7-band spectral
   float fftBass = texture2D(uFFTTexture, vec2(0.07, 0.5)).r;
   float fftMid = texture2D(uFFTTexture, vec2(0.36, 0.5)).r;
   float fftHigh = texture2D(uFFTTexture, vec2(0.78, 0.5)).r;
 
-  float slowTime = uDynamicTime * 0.05;
-  float chromaHueMod = uChromaHue * 0.2;
-  float chordConf = smoothstep(0.3, 0.6, uChordConfidence);
-  float chordHue = float(int(uChordIndex)) / 24.0 * 0.15 * chordConf;
-  float vocalWarmth = uVocalEnergy * 0.1;
-  float accelBoost = 1.0 + uEnergyAccel * 0.12;
-  float energyFreq = 1.0 + energy * 0.5;
-
-  // --- Domain warping: organic distortion of feedback space ---
-  p += vec2(fbm3(vec3(p * 0.5 * energyFreq, uDynamicTime * 0.05)), fbm3(vec3(p * 0.5 * energyFreq + 100.0, uDynamicTime * 0.05))) * 0.3;
-
-  // --- Section type modulation (0=intro,1=verse,2=chorus,3=bridge,4=solo,5=jam,6=outro,7=space) ---
+  // ─── Section-type modulation ───
   float sectionT = uSectionType;
   float sJam = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
   float sSpace = smoothstep(6.5, 7.5, sectionT);
+  float sChorus = smoothstep(1.5, 2.5, sectionT) * (1.0 - step(2.5, sectionT));
   float sSolo = smoothstep(3.5, 4.5, sectionT) * (1.0 - step(4.5, sectionT));
-  // Jam: deeper recursion, more rotation. Space: shallow, slow. Solo: dramatic zoom.
-  float sectionScaleMod = mix(1.0, 1.4, sJam) * mix(1.0, 0.3, sSpace) * mix(1.0, 1.5, sSolo);
-  float sectionRotMod = mix(1.0, 1.5, sJam) * mix(1.0, 0.2, sSpace) * (1.0 + uPeakApproaching * 0.3);
 
-  // Timbral flux → feedback distortion rate
-  float feedbackFlux = 1.0 + uTimbralFlux * 0.6;
-
-  // --- Recursion parameters ---
-  // Scale: zoom inward 2-5% per frame, driven by energy (section-modulated)
-  // FFT bass → deeper tunnel zoom; FFT highs → longer trail decay
-  float scaleAmount = 1.0 - (0.02 + energy * 0.03 + fftBass * 0.015) * accelBoost * sectionScaleMod;
-
-  // Rotation: bass drives twist (section-modulated), timbral flux accelerates
-  float stemBass = clamp(uStemBass, 0.0, 1.0);
-  float rotAmount = (bass * 0.03 + stemBass * 0.015 + 0.005) * sign(sin(slowTime * 0.2)) * sectionRotMod * feedbackFlux; // Phil's bass deepens the twist
-  // Stability affects regularity: unstable = jittery rotation
-  rotAmount += (1.0 - stability) * sin(uTime * 7.0) * 0.01;
-
-  // --- Drifting center: melodic pitch shifts the recursion origin ---
-  vec2 center = vec2(0.5) + vec2(
-    sin(slowTime * 0.3) * 0.05 + (melodicPitch - 0.5) * 0.08,
-    cos(slowTime * 0.4) * 0.04
-  );
-
-  // --- Secondary drifting seed point for asymmetry ---
-  vec2 seedDrift = vec2(
-    sin(slowTime * 0.7 + 1.5) * 0.15,
-    cos(slowTime * 0.5 + 2.3) * 0.12
-  );
-
-  // --- Sample previous frame with scale + rotation ---
-  vec2 feedbackUv = uv - center;
-
-  // Apply barrel distortion (tension-driven)
-  float r2 = dot(feedbackUv, feedbackUv);
-  float barrel = 1.0 + tension * 0.3 * r2;
-  feedbackUv *= barrel;
-
-  // Scale inward
-  feedbackUv *= scaleAmount;
-
-  // Rotate
-  float ca = cos(rotAmount); float sa = sin(rotAmount);
-  feedbackUv = vec2(
-    ca * feedbackUv.x - sa * feedbackUv.y,
-    sa * feedbackUv.x + ca * feedbackUv.y
-  );
-
-  feedbackUv += center;
-
-  // Clamp to valid UV range
-  feedbackUv = clamp(feedbackUv, vec2(0.001), vec2(0.999));
-
-  // Sample previous frame with decay
-  float decayRate = mix(0.92, 0.98, slowE) + fftHigh * 0.02;
-  // Jam phase feedback: exploration=long trails, building=moderate, peak=max persistence, resolution=clearing
-  if (uJamPhase >= 0.0) {
-    float jpExplore = step(-0.5, uJamPhase) * step(uJamPhase, 0.5);
-    float jpBuild   = step(0.5, uJamPhase) * step(uJamPhase, 1.5);
-    float jpPeak    = step(1.5, uJamPhase) * step(uJamPhase, 2.5);
-    float jpResolve = step(2.5, uJamPhase);
-    decayRate += jpExplore * 0.03 + jpBuild * 0.01 + jpPeak * 0.05 - jpResolve * 0.04;
-    decayRate = clamp(decayRate, 0.80, 0.97);
-  }
-  vec3 feedback = texture2D(uPrevFrame, feedbackUv).rgb * decayRate;
-
-  // --- Current frame seed pattern ---
-  // Radial gradient: bright center fading to dark edges
-  float radialDist = length(p);
-  float radialGlow = exp(-radialDist * radialDist * 3.0);
-
-  // Concentric beat-synced rings
-  float ringFreq = 8.0 + energy * 12.0;
-  float rings = 0.5 + 0.5 * sin(radialDist * ringFreq - uMusicalTime * TAU);
-  rings *= radialGlow;
-
-  // Palette-colored seed
-  float hue1 = uPalettePrimary + chromaHueMod + chordHue;
-  float hue2 = uPaletteSecondary + chordHue * 0.5;
-  float sat = mix(0.5, 1.0, energy) * uPaletteSaturation;
-
-  vec3 seedColor1 = hsv2rgb(vec3(hue1, sat, 1.0));
-  vec3 seedColor2 = hsv2rgb(vec3(hue2, sat * 0.8, 0.8));
-
-  // Noise texture for organic variation (fbm6 for rich primary pattern)
-  float noiseVal = fbm6(vec3(p * 4.0 * energyFreq + seedDrift, slowTime * 0.8));
-  float patternMix = noiseVal * 0.5 + 0.5;
-
-  vec3 seedPattern = mix(seedColor1, seedColor2, patternMix) * radialGlow * 0.3;
-  seedPattern += seedColor1 * rings * 0.2;
-
-  // --- Secondary warmth layer: dual-palette depth underneath recursion ---
-  float warmthField = fbm6(vec3(p * 1.5 + vec2(slowTime * 0.03, -slowTime * 0.02), slowTime * 0.04 + 44.0));
-  vec3 warmthColor = hsv2rgb(vec3(hue2 + warmthField * 0.1, sat * 0.5, 0.15 + warmthField * 0.12));
-  seedPattern = mix(seedPattern, seedPattern + warmthColor, 0.3);
-
-  // Vocal warmth adds to seed
-  seedPattern += seedColor2 * vocalWarmth * radialGlow;
-
-  // --- Onset color injection ---
-  if (onset > 0.1) {
-    vec3 onsetColor = hsv2rgb(vec3(hue1 + 0.1, 1.0, 1.0));
-    float onsetRing = 0.5 + 0.5 * sin(radialDist * 20.0 - uTime * 10.0);
-    seedPattern += onsetColor * onset * onsetRing * 0.6;
-  }
-
-  // --- Composite: seed + feedback ---
-  vec3 col = max(seedPattern, feedback);
-  // Additive blend for bright areas
-  col += seedPattern * 0.1;
-
-  // --- Climax boost ---
+  // ─── Climax ───
   float isClimax = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5);
-  float climaxBoost = isClimax * uClimaxIntensity;
-  col *= 1.0 + climaxBoost * 0.5;
+  float climaxBoost = isClimax * clamp(uClimaxIntensity, 0.0, 1.0);
+  float climaxFold = climaxBoost; // mirrors fold inward
 
-  // During climax, increase seed brightness for more recursive depth
-  if (climaxBoost > 0.01) {
-    col += seedPattern * climaxBoost * 0.3;
+  // ─── Palette ───
+  float h1 = uPalettePrimary + chromaH * 0.15;
+  float h2 = uPaletteSecondary + chromaH * 0.1;
+  float sat = mix(0.5, 1.0, energy) * uPaletteSaturation;
+  vec3 palette1 = hsv2rgb(vec3(h1, sat, 0.9));
+  vec3 palette2 = hsv2rgb(vec3(h2, sat * 0.8, 0.7));
+  vec3 warmTint = hsv2rgb(vec3(h1 + 0.05, sat * 0.4, 0.5));
+  vec3 coolTint = hsv2rgb(vec3(h2 + 0.3, sat * 0.3, 0.3));
+
+  // ─── Time / motion ───
+  float flowTime = uDynamicTime * (0.05 + slowE * 0.03)
+                 * mix(1.0, 1.5, sJam) * mix(1.0, 0.3, sSpace);
+
+  // ─── Mirror distance: bass makes the corridor breathe ───
+  float baseMirrorDist = 3.0;
+  // Bass pulsing: corridor breathes with the rhythm
+  float breathe = bass * 0.4 + fftBass * 0.2;
+  float mirrorDist = baseMirrorDist + sin(flowTime * 1.5) * breathe * 0.5 - breathe * 0.15;
+  // Climax: mirrors collapse inward
+  mirrorDist *= mix(1.0, 0.4, climaxBoost);
+  // Space: mirrors drift slightly apart for infinite feel
+  mirrorDist *= mix(1.0, 1.3, sSpace);
+
+  // ─── Jam mode: mirrors tilt creating spiral regression ───
+  float tiltAngle = sJam * sin(flowTime * 0.8) * 0.15;
+  // Solo: slight tilt for dramatic angle
+  tiltAngle += sSolo * 0.06 * sin(flowTime * 0.5);
+
+  // ─── Frame geometry parameters ───
+  float frameThick = 0.12 + energy * 0.04;
+
+  // ─── Bass vibration for floor ───
+  float bassVib = stemBass * 0.5 + bass * 0.3;
+
+  // ─── Camera: standing between mirrors, looking down the regression ───
+  vec3 ro = vec3(
+    sin(flowTime * 0.2) * 0.3 * (1.0 - sSpace * 0.7),  // gentle lateral drift
+    -0.4 + melodicP * 0.6 + cos(flowTime * 0.15) * 0.1, // melodic pitch lifts view
+    sin(flowTime * 0.08) * 0.5                            // subtle fore-aft drift
+  );
+
+  // Drum onset: camera jolt
+  ro.y += drumOn * 0.12;
+  ro.x += drumOn * 0.05 * sin(flowTime * 7.0);
+
+  // Look direction: into the mirror regression
+  vec3 lookTarget = vec3(
+    mirrorDist * 0.4 * sign(sin(flowTime * 0.04)),  // alternate looking left/right
+    0.0 + melodicP * 0.2,
+    0.0
+  );
+
+  // Space: look straight down the corridor (no lateral bias)
+  lookTarget.x = mix(lookTarget.x, 0.0, sSpace * 0.8);
+
+  vec3 fw = normalize(lookTarget - ro);
+  vec3 worldUp = vec3(0.0, 1.0, 0.0);
+  // Climax: camera tilts as mirrors fold
+  float camTilt = climaxBoost * sin(flowTime * 2.0) * 0.15;
+  worldUp = normalize(vec3(sin(camTilt), cos(camTilt), 0.0));
+  vec3 ri = normalize(cross(fw, worldUp));
+  vec3 camUp = cross(ri, fw);
+  float fov = 0.8 + energy * 0.1 - sSpace * 0.15 + climaxBoost * 0.3;
+  vec3 rd = normalize(p.x * ri + p.y * camUp + fov * fw);
+
+  // ─── Raymarch the mirror corridor geometry ───
+  float totalDist = 0.0;
+  vec3 hitPos = ro;
+  float hitMatId = -1.0;
+  bool didHitGeom = false;
+  int maxSteps = int(mix(48.0, 72.0, energy));
+
+  for (int i = 0; i < 72; i++) {
+    if (i >= maxSteps) break;
+    vec3 pos = ro + rd * totalDist;
+    float matId;
+    float dist = frMap(pos, mirrorDist, tiltAngle, climaxFold, bassVib, frameThick, matId);
+
+    if (dist < 0.003) {
+      hitPos = pos;
+      hitMatId = matId;
+      didHitGeom = true;
+      break;
+    }
+    if (totalDist > 25.0) break;
+    totalDist += dist * 0.75;
   }
 
+  vec3 col = vec3(0.0);
 
-  // --- SDF icon emergence ---
+  if (didHitGeom) {
+    // ─── Surface normal ───
+    vec3 norm = frNormal(hitPos, mirrorDist, tiltAngle, climaxFold, bassVib, frameThick);
+
+    // ─── Ambient occlusion ───
+    float occl = frAO(hitPos, norm, mirrorDist, tiltAngle, climaxFold, bassVib, frameThick);
+
+    // ─── Depth fog ───
+    float depthFade = exp(-totalDist * 0.08);
+
+    // ─── Lighting: overhead ambient + point lights between mirrors ───
+    vec3 lightDir = normalize(vec3(0.3, 0.8, -0.3));
+    float diff = max(dot(norm, lightDir), 0.0);
+
+    // Vocal presence warm fill
+    vec3 ambientLight = coolTint * 0.06 + warmTint * vocalP * 0.12;
+
+    if (hitMatId < 0.5) {
+      // ─── FLOOR: polished dark surface with reflections ───
+      vec3 floorCol = vec3(0.04, 0.035, 0.03) * (1.0 + dynRange * 0.3);
+
+      // Floor reflection: sample the mirror bounce from reflected angle
+      vec3 floorReflDir = reflect(rd, vec3(0.0, 1.0, 0.0));
+      vec3 floorRefl = frBounce(hitPos, floorReflDir, mirrorDist, energy * 0.5,
+        tension, drumOn, chromaH * 0.15 + 0.02, semPsych, beatStab,
+        sSpace, sChorus, sJam, tiltAngle, climaxFold,
+        palette1 * 0.5, palette2 * 0.5, timbralB, flowTime);
+
+      // Fresnel on floor (glancing angles more reflective)
+      float floorFresnel = pow(1.0 - max(dot(norm, -rd), 0.0), 4.0);
+
+      col = floorCol * (ambientLight + diff * warmTint * 0.15) * occl;
+      col += floorRefl * floorFresnel * 0.3;
+      col *= depthFade;
+
+    } else if (hitMatId < 2.5) {
+      // ─── MIRROR SURFACES (left=1, right=2): recursive reflections ───
+
+      // The mirror reflection — the heart of the shader
+      vec3 reflDir = reflect(rd, norm);
+      vec3 mirrorRefl = frBounce(hitPos, reflDir, mirrorDist, energy,
+        tension, drumOn, chromaH * 0.15 + 0.03, semPsych, beatStab,
+        sSpace, sChorus, sJam, tiltAngle, climaxFold,
+        palette1, palette2, timbralB, flowTime);
+
+      // Mirror surface: highly reflective with slight tint
+      float mirrorFresnel = 0.85 + 0.15 * pow(1.0 - max(dot(norm, -rd), 0.0), 3.0);
+
+      // Specular highlight on mirror glass
+      vec3 specDir = reflect(-lightDir, norm);
+      float spec = pow(max(dot(specDir, -rd), 0.0), 24.0 + energy * 48.0);
+
+      col = mirrorRefl * mirrorFresnel;
+      col += vec3(1.0, 0.97, 0.93) * spec * timbralB * 0.2;
+      col += ambientLight * 0.05;
+      col *= occl * depthFade;
+
+    } else {
+      // ─── FRAME: ornate border around mirrors ───
+      vec3 frameCol = vec3(0.15, 0.1, 0.05); // dark wood/bronze
+      frameCol += vec3(0.3, 0.22, 0.08) * (0.5 + 0.5 * fbm3(hitPos * 4.0)); // wood grain
+
+      // Metallic specular on frame edges
+      vec3 specDir = reflect(-lightDir, norm);
+      float spec = pow(max(dot(specDir, -rd), 0.0), 16.0);
+      float fresnel = pow(1.0 - max(dot(norm, -rd), 0.0), 3.0);
+
+      col = frameCol * (ambientLight + diff * warmTint * 0.3) * occl;
+      col += vec3(0.8, 0.65, 0.3) * spec * 0.15 * timbralB;
+      col += warmTint * fresnel * 0.06;
+      col *= depthFade;
+    }
+
+  } else {
+    // ─── RAY MISS: deep corridor infinity ───
+    // For rays that travel between mirrors without hitting geometry,
+    // simulate the infinite regression directly
+    vec3 infiniteRefl = frBounce(ro, rd, mirrorDist, energy,
+      tension, drumOn, chromaH * 0.15 + 0.05, semPsych, beatStab,
+      sSpace, sChorus, sJam, tiltAngle, climaxFold,
+      palette1, palette2, timbralB, flowTime);
+
+    col = infiniteRefl;
+
+    // Deep space fade to dark
+    float depthFog = exp(-totalDist * 0.04);
+    col *= depthFog;
+    col += coolTint * 0.02 * (1.0 - depthFog);
+  }
+
+  // ─── Ambient volumetric glow between mirrors ───
+  float glowDist = didHitGeom ? totalDist : 12.0;
+  vec3 ambGlow = frAmbientGlow(ro, rd, glowDist, vocalP, energy, flowTime, warmTint);
+  col += ambGlow * (1.0 + climaxBoost * 0.4);
+
+  // ─── Drum onset ripple flash: brief prismatic burst ───
+  if (drumOn > 0.1) {
+    float rippleRing = 0.5 + 0.5 * sin(length(p) * 15.0 - flowTime * 8.0);
+    vec3 rippleCol = hsv2rgb(vec3(h1 + length(p) * 0.1, 0.9, 1.0));
+    col += rippleCol * drumOn * rippleRing * 0.15;
+  }
+
+  // ─── Climax: kaleidoscopic collapse — mirrors fold, colors explode ───
+  if (climaxBoost > 0.1) {
+    // Kaleidoscopic UV fold
+    vec2 kp = p;
+    float kAngle = atan(kp.y, kp.x);
+    float kRadius = length(kp);
+    float foldCount = 3.0 + climaxBoost * 5.0;
+    kAngle = abs(mod(kAngle, TAU / foldCount) - PI / foldCount);
+    vec2 kUV = vec2(cos(kAngle), sin(kAngle)) * kRadius;
+
+    float kNoise = fbm3(vec3(kUV * 4.0, flowTime * 0.3));
+    vec3 kColor = hsv2rgb(vec3(h1 + kNoise * 0.3 + flowTime * 0.05, 0.9, 1.0));
+    col = mix(col, col + kColor * 0.5, climaxBoost * 0.6);
+
+    // Brightness surge
+    col *= 1.0 + climaxBoost * 0.4;
+  }
+
+  // ─── Solo: heightened mirror contrast ───
+  if (sSolo > 0.1) {
+    float soloLuma = dot(col, vec3(0.299, 0.587, 0.114));
+    col = mix(col, col * 1.35, sSolo * 0.3);
+  }
+
+  // ─── Dynamic range: contrast between bright reflections and dark gaps ───
   {
-    float nf = fbm3(vec3(p * 2.0, slowTime));
-    vec3 c1 = hsv2rgb(vec3(hue1, sat, 1.0));
-    vec3 c2 = hsv2rgb(vec3(hue2, sat, 1.0));
-    col += iconEmergence(p, uTime, energy, bass, c1, c2, nf, uClimaxPhase, uSectionIndex) * 0.5;
+    float luma = dot(col, vec3(0.299, 0.587, 0.114));
+    float contrast = mix(1.0, 1.3, dynRange);
+    col = mix(vec3(luma), col, contrast);
   }
 
-  // --- Vignette ---
-  float vigScale = mix(0.28, 0.20, energy);
-  float vignette = 1.0 - dot(p * vigScale, p * vigScale);
-  vignette = smoothstep(0.0, 1.0, vignette);
-  col *= vignette;
+  // ─── Psychedelic semantic boost ───
+  col *= 1.0 + semPsych * 0.15;
 
-  // Semantic: chaotic → increase feedback distortion
-  col *= 1.0 + uSemanticChaotic * 0.12;
+  // ─── Vignette: mirror corridor framing ───
+  float vigStrength = mix(0.35, 0.25, energy);
+  float vig = 1.0 - dot(p * vigStrength, p * vigStrength);
+  vig = smoothstep(0.0, 1.0, vig);
+  col = mix(vec3(0.01, 0.01, 0.02), col, vig);
 
-  // --- Post-processing ---
-  col = applyPostProcess(col, vUv, p);
+  // ─── Dead iconography ───
+  {
+    float _nf = snoise(vec3(p * 2.0, uTime * 0.1));
+    col += iconEmergence(p, uTime, energy, bass, palette1, palette2, _nf, uClimaxPhase, uSectionIndex);
+    col += heroIconEmergence(p, uTime, energy, bass, palette1, palette2, _nf, uSectionIndex);
+  }
+
+  // ─── Lifted blacks: corridor has ambient even in darkness ───
+  float isBuild = step(0.5, uClimaxPhase) * step(uClimaxPhase, 1.5);
+  float liftMult = mix(1.0, 0.3, isBuild * clamp(uClimaxIntensity, 0.0, 1.0));
+  col = max(col, vec3(0.015, 0.012, 0.02) * liftMult);
+
+  // ─── Post-process chain ───
+  col = applyPostProcess(col, uv, p);
 
   gl_FragColor = vec4(col, 1.0);
 }

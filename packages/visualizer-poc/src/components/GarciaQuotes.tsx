@@ -9,6 +9,7 @@ import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
 import { seeded } from "../utils/seededRandom";
 import { BAND_CONFIG } from "../data/band-config";
+import { useAudioSnapshot } from "./parametric/audio-helpers";
 
 // Quotes from band config — portable across artists
 const QUOTES = BAND_CONFIG.quotes.map((q) => q.text);
@@ -24,19 +25,13 @@ interface Props {
 
 export const GarciaQuotes: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
+  const snap = useAudioSnapshot(frames);
+  const { energy, spaceScore, chromaHue } = snap;
 
-  // Rolling energy (75-frame window each side)
-  const idx = Math.min(Math.max(0, frame), frames.length - 1);
-  let eSum = 0;
-  let eCount = 0;
-  for (let i = Math.max(0, idx - 75); i <= Math.min(frames.length - 1, idx + 75); i++) {
-    eSum += frames[i].rms;
-    eCount++;
-  }
-  const energy = eCount > 0 ? eSum / eCount : 0;
-
-  // Energy gate: quotes only during quiet passages
-  if (energy > 0.15) return null;
+  // Energy gate: quotes only during quiet/spacey passages
+  // Use spaceScore when available for more accurate quiet detection
+  const isQuiet = (spaceScore ?? 0) > 0.4 || energy < 0.15;
+  if (!isQuiet) return null;
 
   const delayedFrame = frame - INITIAL_DELAY;
   if (delayedFrame < 0) return null;
@@ -85,7 +80,7 @@ export const GarciaQuotes: React.FC<Props> = ({ frames }) => {
             fontSize: 18,
             fontStyle: "italic",
             color: "rgba(255, 245, 225, 0.75)",
-            textShadow: "0 0 20px rgba(255, 200, 100, 0.15)",
+            textShadow: `0 0 20px hsla(${chromaHue}, 40%, 60%, 0.15)`,
             lineHeight: 1.6,
             letterSpacing: 0.3,
           }}

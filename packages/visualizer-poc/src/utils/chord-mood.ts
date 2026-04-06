@@ -82,19 +82,19 @@ export function detectChordMood(
 
   if (isMajor && isCalm) {
     mood = "luminous";
-    preferredModes = ["aurora", "crystal_cavern", "sacred_geometry", "kaleidoscope", "truchet_tiling"];
+    preferredModes = ["aurora", "cosmic_voyage", "cosmic_voyage", "cosmic_voyage", "cosmic_voyage"];
   } else if (isMinor && isCalm) {
     mood = "shadowed";
-    preferredModes = ["deep_ocean", "cosmic_voyage", "void_light", "particle_nebula", "diffraction_rings"];
+    preferredModes = ["deep_ocean", "cosmic_voyage", "void_light", "cosmic_voyage", "deep_ocean"];
   } else if (isTense) {
     mood = "turbulent";
-    preferredModes = ["fluid_2d", "reaction_diffusion", "fractal_zoom", "inferno", "fractal_flames", "feedback_recursion"];
+    preferredModes = ["fluid_2d", "deep_ocean", "cosmic_voyage", "inferno", "cosmic_voyage", "cosmic_voyage"];
   } else if (isMajor && isTense) {
     mood = "transcendent";
-    preferredModes = ["liquid_light", "mandala_engine", "tie_dye", "kaleidoscope"];
+    preferredModes = ["protean_clouds", "mandala_engine", "protean_clouds", "cosmic_voyage"];
   } else {
     mood = "grounded";
-    preferredModes = ["oil_projector", "concert_lighting", "lo_fi_grain", "vintage_film"];
+    preferredModes = ["protean_clouds", "inferno", "lo_fi_grain", "vintage_film"];
   }
 
   // Confidence is based on chord detection confidence + energy stability

@@ -69,7 +69,8 @@ void main() {
   float effectiveBeat = uBeatSnap * smoothstep(0.3, 0.7, uBeatConfidence);
 
   // Very slow base time — contemplative movement
-  float slowTime = uDynamicTime * 0.02;
+  // [SLOW DOWN] Halved time multiplier (was 0.02)
+  float slowTime = uDynamicTime * 0.01;
 
   // --- Uniform integrations ---
   float chromaHueMod = uChromaHue * 0.25;
@@ -108,7 +109,8 @@ void main() {
   // --- Palette: amber/copper/rose base mixed with song palette ---
   float hue1 = uPalettePrimary + chromaHueMod + chordHue;
   float hue2 = uPaletteSecondary + chordHue * 0.5;
-  float sat = mix(0.35, 0.75, energy) * uPaletteSaturation;
+  // [REDUCE SATURATION AT QUIET] Floor from 0.35 to 0.1
+  float sat = mix(0.1, 0.75, e2) * uPaletteSaturation;
 
   // Warm base hues: amber (~0.097), copper (~0.069), rose (~0.958)
   float amberHue = 0.097;
@@ -120,16 +122,20 @@ void main() {
   vec3 warmCopper = hsv2rgb(vec3(mix(copperHue, hue2, 0.35), sat * 0.85, 0.9));
   vec3 warmRose = hsv2rgb(vec3(mix(roseHue, hue1 + 0.15, 0.3), sat * 0.7, 0.85));
 
-  // --- Deep warm background ---
+  // --- [DARKEN] Deep warm background (was 0.015-0.03, now near-black) ---
   vec3 col = mix(
-    vec3(0.015, 0.008, 0.005),
-    vec3(0.03, 0.015, 0.01),
+    vec3(0.004, 0.002, 0.001),
+    vec3(0.01, 0.005, 0.003),
     uv.y * 0.8 + slowE * 0.2
   );
 
+  // [DARKEN] Energy-squared for dramatic dynamic range
+  float e2 = energy * energy;
+
   // === Domain warping for organic cloud morphology ===
   vec2 domainP = p;
-  domainP += vec2(fbm3(vec3(p * 0.5 * (1.0 + energy * 0.5), uDynamicTime * 0.05)), fbm3(vec3(p * 0.5 * (1.0 + energy * 0.5) + 100.0, uDynamicTime * 0.05))) * 0.3;
+  // [SLOW DOWN] Halved warp speed (was 0.05)
+  domainP += vec2(fbm3(vec3(p * 0.5 * (1.0 + energy * 0.5), uDynamicTime * 0.025)), fbm3(vec3(p * 0.5 * (1.0 + energy * 0.5) + 100.0, uDynamicTime * 0.025))) * 0.3;
 
   // === 4-LAYER FBM NEBULA CLOUDS ===
 
@@ -255,11 +261,18 @@ void main() {
     col += heroIconEmergence(p, uTime, energy, bass, c1, c2, nf, uSectionIndex);
   }
 
+  // === ATMOSPHERIC DEPTH ===
+  float fogNoise_ad = fbm3(vec3(p * 0.5, uDynamicTime * 0.012));
+  float fogDensity_ad = mix(0.35, 0.02, energy);
+  vec3 fogColor_ad = vec3(0.01, 0.008, 0.015);
+  col = mix(col, fogColor_ad, fogDensity_ad * (0.5 + fogNoise_ad * 0.5));
+
   // === VIGNETTE ===
   float vigScale = mix(0.28, 0.20, energy);
   float vignette = 1.0 - dot(p * vigScale, p * vigScale);
   vignette = smoothstep(0.0, 1.0, vignette);
-  vec3 vigTint = vec3(0.012, 0.006, 0.004);
+  // [LOWER BLACK FLOOR] Near-black vignette edge (was 0.012, 0.006, 0.004)
+  vec3 vigTint = vec3(0.003, 0.002, 0.001);
   col = mix(vigTint, col, vignette);
 
   // === POST-PROCESSING ===

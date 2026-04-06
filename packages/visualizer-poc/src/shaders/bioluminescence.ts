@@ -112,10 +112,15 @@ void main() {
   float melodicPitch = clamp(melInfluence, 0.0, 1.0);
   float effectiveBeat = uBeatSnap * smoothstep(0.3, 0.7, uBeatConfidence);
 
-  float slowTime = uDynamicTime * 0.04;
+  // [SLOW DOWN] Halved time multiplier (was 0.04)
+  float slowTime = uDynamicTime * 0.02;
+
+  // [DARKEN] Energy-squared for dramatic dynamic range
+  float e2 = energy * energy;
 
   // --- Domain warping + energy-responsive detail ---
-  vec2 domainWarpOff = vec2(fbm3(vec3(p * 0.5, uDynamicTime * 0.05)), fbm3(vec3(p * 0.5 + 100.0, uDynamicTime * 0.05))) * 0.3;
+  // [SLOW DOWN] Halved warp speed (was 0.05)
+  vec2 domainWarpOff = vec2(fbm3(vec3(p * 0.5, uDynamicTime * 0.025)), fbm3(vec3(p * 0.5 + 100.0, uDynamicTime * 0.025))) * 0.3;
   float detailMod = 1.0 + energy * 0.5;
 
   // --- Uniform integrations ---
@@ -124,10 +129,10 @@ void main() {
   float chordHue = float(int(uChordIndex)) / 24.0 * 0.12 * chordConf;
   float vocalGlow = uVocalEnergy * 0.1;
 
-  // --- Dark background (near black void) ---
+  // --- [DARKEN] Deep ocean at night background (was 0.005-0.025 range) ---
   vec3 col = mix(
-    vec3(0.005, 0.008, 0.015),
-    vec3(0.01, 0.015, 0.025),
+    vec3(0.002, 0.003, 0.006),
+    vec3(0.004, 0.006, 0.012),
     uv.y + snoise(vec3(uv * 2.0, slowTime * 0.3)) * 0.05
   );
 
@@ -159,7 +164,8 @@ void main() {
   // --- Palette colors mixed with bioluminescent palette ---
   float hue1 = uPalettePrimary + chromaHueMod + chordHue;
   float hue2 = uPaletteSecondary + chordHue * 0.5;
-  float sat = mix(0.5, 1.0, energy) * uPaletteSaturation;
+  // [REDUCE SATURATION AT QUIET] Floor from 0.5 to 0.1
+  float sat = mix(0.1, 1.0, e2) * uPaletteSaturation;
 
   // Bioluminescent base colors: cyan, green, magenta
   vec3 bioColorCyan = vec3(0.0, 1.0, 1.0);
@@ -219,8 +225,8 @@ void main() {
       orgColor = mix(mixedMagenta, mixedCyan, (colorPhase - 0.666) * 3.0);
     }
 
-    // Accumulate organism glow
-    col += orgColor * glow * visibility * (0.4 + energy * 0.6 + vocalGlow);
+    // [DARKEN] Accumulate organism glow — gated by e2
+    col += orgColor * glow * visibility * (0.05 + e2 * 0.95 + vocalGlow);
 
     // --- Tendrils: 3-5 branching per organism ---
     float tendrilCount = 3.0 + tension * 2.0;
@@ -283,11 +289,18 @@ void main() {
     col += heroIconEmergence(p, uTime, energy, bass, c1, c2, nf, uSectionIndex);
   }
 
+  // === ATMOSPHERIC DEPTH ===
+  float fogNoise_ad = fbm3(vec3(p * 0.5, uDynamicTime * 0.012));
+  float fogDensity_ad = mix(0.35, 0.02, energy);
+  vec3 fogColor_ad = vec3(0.01, 0.008, 0.015);
+  col = mix(col, fogColor_ad, fogDensity_ad * (0.5 + fogNoise_ad * 0.5));
+
   // --- Vignette ---
   float vigScale = mix(0.30, 0.22, energy);
   float vignette = 1.0 - dot(p * vigScale, p * vigScale);
   vignette = smoothstep(0.0, 1.0, vignette);
-  col = mix(vec3(0.003, 0.005, 0.01), col, vignette);
+  // [LOWER BLACK FLOOR] Near-black vignette edge (was 0.003, 0.005, 0.01)
+  col = mix(vec3(0.001, 0.002, 0.004), col, vignette);
 
   // --- Post-processing ---
   col = applyPostProcess(col, vUv, p);

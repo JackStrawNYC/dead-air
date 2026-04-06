@@ -47,11 +47,11 @@ const SCAN_FRAMES = 600;     // 20s — backward scan window for baseline
 // ─── Trigger → Visual Mappings ───
 
 const TRIGGER_SHADERS: Record<TriggerType, VisualMode[]> = {
-  spectral_eruption: ["inferno", "electric_arc", "fractal_flames"],
-  interplay_shift: ["kaleidoscope", "sacred_geometry", "voronoi_flow"],
-  groove_solidify: ["mandala_engine", "truchet_tiling", "concert_lighting"],
-  energy_eruption: ["climax_surge", "inferno", "fractal_zoom"],
-  improv_spike: ["feedback_recursion", "reaction_diffusion", "fluid_2d"],
+  spectral_eruption: ["inferno", "inferno", "cosmic_voyage"],
+  interplay_shift: ["cosmic_voyage", "cosmic_voyage", "protean_clouds"],
+  groove_solidify: ["mandala_engine", "cosmic_voyage", "inferno"],
+  energy_eruption: ["inferno", "inferno", "cosmic_voyage"],
+  improv_spike: ["cosmic_voyage", "deep_ocean", "fluid_2d"],
 };
 
 const TRIGGER_OVERLAYS: Record<TriggerType, string[]> = {

@@ -48,8 +48,8 @@ const SET_THEMES: Record<number, SetTheme> = {
     windowDurationMult: 0.95,
     abstractionOffset: 0,
     overlayBias: { character: +0.08, atmospheric: +0.05, sacred: -0.03 },
-    boostedModes: ["concert_lighting", "tie_dye", "inferno", "aurora", "electric_arc", "lava_flow"],
-    suppressedModes: ["cosmic_dust", "void_light", "morphogenesis", "reaction_diffusion"],
+    boostedModes: ["inferno", "protean_clouds", "inferno", "aurora", "inferno", "inferno"],
+    suppressedModes: ["cosmic_dust", "void_light", "deep_ocean", "deep_ocean"],
     cameraSteadinessOffset: 0.15, // steadier during set 1
   },
   // Set 2: cool, ethereal — exploratory jams, psychedelic depths
@@ -62,7 +62,7 @@ const SET_THEMES: Record<number, SetTheme> = {
     windowDurationMult: 1.15,
     abstractionOffset: 0.10,
     overlayBias: { sacred: +0.10, geometric: +0.08, nature: +0.06, character: -0.10 },
-    boostedModes: ["cosmic_voyage", "deep_ocean", "sacred_geometry", "fractal_zoom", "reaction_diffusion", "kaleidoscope", "morphogenesis", "feedback_recursion", "feedback_recursion", "mycelium_network"],
+    boostedModes: ["cosmic_voyage", "deep_ocean", "cosmic_voyage", "cosmic_voyage", "deep_ocean", "cosmic_voyage", "deep_ocean", "cosmic_voyage", "cosmic_voyage", "deep_ocean"],
     suppressedModes: [], // all modes available in set 2
     cameraSteadinessOffset: -0.15, // looser/more organic camera
   },
@@ -75,8 +75,8 @@ const SET_THEMES: Record<number, SetTheme> = {
     windowDurationMult: 0.90,
     abstractionOffset: 0,
     overlayBias: { character: +0.10, atmospheric: +0.08, sacred: +0.03, reactive: -0.05 },
-    boostedModes: ["oil_projector", "vintage_film", "aurora", "stained_glass", "smoke_rings"],
-    suppressedModes: ["stark_minimal", "digital_rain", "signal_decay", "databend"],
+    boostedModes: ["protean_clouds", "vintage_film", "aurora", "protean_clouds", "protean_clouds"],
+    suppressedModes: ["deep_ocean", "cosmic_voyage", "deep_ocean", "cosmic_voyage"],
     cameraSteadinessOffset: 0.20, // intimate, steady
   },
 };

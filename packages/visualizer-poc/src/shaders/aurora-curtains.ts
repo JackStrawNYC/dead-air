@@ -80,16 +80,21 @@ void main() {
   float sChorus = smoothstep(1.5, 2.5, sectionT) * (1.0 - step(2.5, sectionT));
   float sSolo = smoothstep(3.5, 4.5, sectionT) * (1.0 - step(4.5, sectionT));
 
-  float slowTime = uDynamicTime * 0.03 * mix(1.0, 1.5, sJam) * mix(1.0, 0.3, sSpace);
+  // [SLOW DOWN] Halved time multiplier (was 0.03)
+  float slowTime = uDynamicTime * 0.015 * mix(1.0, 1.5, sJam) * mix(1.0, 0.3, sSpace);
+
+  // [DARKEN] Energy-squared for dramatic dynamic range
+  float e2 = energy * energy;
 
   // --- Domain warping + energy detail ---
-  vec2 warpedP = p + vec2(fbm3(vec3(p * 0.5, uDynamicTime * 0.05)), fbm3(vec3(p * 0.5 + 100.0, uDynamicTime * 0.05))) * 0.3;
+  // [SLOW DOWN] Halved warp speed (was 0.05)
+  vec2 warpedP = p + vec2(fbm3(vec3(p * 0.5, uDynamicTime * 0.025)), fbm3(vec3(p * 0.5 + 100.0, uDynamicTime * 0.025))) * 0.3;
   float detailMod = 1.0 + energy * 0.5;
 
-  // --- Sky background gradient ---
+  // --- [DARKEN] Sky background gradient (darkened from 0.005-0.04 range) ---
   float skyGrad = smoothstep(-0.5, 0.3, p.y);
-  vec3 skyLow = vec3(0.005, 0.008, 0.02);
-  vec3 skyHigh = vec3(0.01, 0.015, 0.04);
+  vec3 skyLow = vec3(0.002, 0.003, 0.008);
+  vec3 skyHigh = vec3(0.004, 0.006, 0.015);
   vec3 col = mix(skyLow, skyHigh, skyGrad);
 
   // --- Multi-layer aurora curtains ---
@@ -97,23 +102,23 @@ void main() {
   float foldComplexity = 3.0 + tension * 5.0;
   float waveDir = mix(-0.5, 0.5, melodicDir);
 
-  // Layer 1: main curtain
+  // Layer 1: main curtain — [DARKEN] gated by e2, [REDUCE SATURATION] floor 0.1
   float c1 = auroraCurtain(p, slowTime, foldComplexity, curtainHeight, 0.3 + waveDir, 0.0);
   float n1 = fbm3(vec3(p * 3.0, slowTime * 0.5)) * 0.5 + 0.5;
   float hue1 = uPalettePrimary + chromaHueMod;
-  vec3 layer1 = hsv2rgb(vec3(hue1, mix(0.5, 0.9, energy) * uPaletteSaturation, c1 * n1 * slowEnergy));
+  vec3 layer1 = hsv2rgb(vec3(hue1, mix(0.1, 0.9, e2) * uPaletteSaturation, c1 * n1 * slowEnergy * e2));
 
-  // Layer 2: secondary curtain (offset)
+  // Layer 2: secondary curtain (offset) — [DARKEN] gated by e2, [REDUCE SATURATION] floor 0.08
   float c2 = auroraCurtain(p + vec2(0.1, -0.05), slowTime * 0.8, foldComplexity * 1.3, curtainHeight * 0.7, 0.2 - waveDir * 0.5, PI * 0.5);
   float n2 = fbm3(vec3(p * 4.0 + 10.0, slowTime * 0.4)) * 0.5 + 0.5;
   float hue2 = uPaletteSecondary + chromaHueMod * 0.5;
-  vec3 layer2 = hsv2rgb(vec3(hue2, mix(0.4, 0.85, energy) * uPaletteSaturation, c2 * n2 * slowEnergy * 0.8));
+  vec3 layer2 = hsv2rgb(vec3(hue2, mix(0.08, 0.85, e2) * uPaletteSaturation, c2 * n2 * slowEnergy * 0.8 * e2));
 
-  // Layer 3: subtle background shimmer
+  // Layer 3: subtle background shimmer — [DARKEN] gated by e2, [REDUCE SATURATION] floor 0.1
   float c3 = auroraCurtain(p + vec2(-0.15, 0.03), slowTime * 0.6, foldComplexity * 0.7, curtainHeight * 1.2, 0.15, PI);
   float n3 = fbm6(p * 2.0 * detailMod + slowTime * 0.2) * 0.5 + 0.5;
   float hue3 = mix(hue1, hue2, 0.5) + 0.1;
-  vec3 layer3 = hsv2rgb(vec3(hue3, 0.4 * uPaletteSaturation, c3 * n3 * slowEnergy * 0.4));
+  vec3 layer3 = hsv2rgb(vec3(hue3, mix(0.1, 0.4, e2) * uPaletteSaturation, c3 * n3 * slowEnergy * 0.4 * e2));
 
   col += layer1 + layer2 + layer3;
 
@@ -147,11 +152,18 @@ void main() {
     col += iconEmergence(p, uTime, energy, bass, ic1, ic2, nf, uClimaxPhase, uSectionIndex) * 0.5;
   }
 
+  // === ATMOSPHERIC DEPTH ===
+  float fogNoise_ad = fbm3(vec3(p * 0.5, uDynamicTime * 0.012));
+  float fogDensity_ad = mix(0.35, 0.02, energy);
+  vec3 fogColor_ad = vec3(0.01, 0.008, 0.015);
+  col = mix(col, fogColor_ad, fogDensity_ad * (0.5 + fogNoise_ad * 0.5));
+
   // --- Vignette ---
   float vigScale = mix(0.28, 0.20, energy);
   float vignette = 1.0 - dot(p * vigScale, p * vigScale);
   vignette = smoothstep(0.0, 1.0, vignette);
-  col = mix(vec3(0.003, 0.005, 0.012), col, vignette);
+  // [LOWER BLACK FLOOR] Near-black vignette edge
+  col = mix(vec3(0.002, 0.003, 0.008), col, vignette);
 
   // --- Post-processing ---
   col = applyPostProcess(col, vUv, p);

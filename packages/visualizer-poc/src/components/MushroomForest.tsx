@@ -8,6 +8,8 @@ import React from "react";
 import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
 import { seeded } from "../utils/seededRandom";
+import { useAudioSnapshot } from "./parametric/audio-helpers";
+import { useTempoFactor } from "../data/TempoContext";
 
 // ── MUSHROOM ────────────────────────────────────────────────────
 
@@ -40,11 +42,14 @@ function generateMushrooms(seed: number): MushroomData[] {
   }));
 }
 
-const MushroomForestOverlay: React.FC<{ width: number; height: number; energy: number; frame: number }> = ({
-  width, height, energy, frame,
+const MushroomForestOverlay: React.FC<{ width: number; height: number; energy: number; chromaHue: number; spaceScore: number; tempoFactor: number; frame: number }> = ({
+  width, height, energy, chromaHue, spaceScore, tempoFactor, frame,
 }) => {
-  // Mushrooms prefer quieter moments
-  const quietEnergy = 1 - interpolate(energy, [0.05, 0.25], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  // Mushrooms prefer quieter/spacey moments — use spaceScore when available
+  const quietEnergy = Math.max(
+    spaceScore,
+    1 - interpolate(energy, [0.05, 0.25], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" })
+  );
   if (quietEnergy < 0.2) return null;
 
   const cycleFrame = frame % MUSHROOM_CYCLE;
@@ -72,7 +77,7 @@ const MushroomForestOverlay: React.FC<{ width: number; height: number; energy: n
         const capH = m.capWidth * 0.6;
 
         // Gentle sway
-        const sway = Math.sin(frame * 0.03 + i * 2) * 5 * growPhase;
+        const sway = Math.sin(frame * 0.03 * tempoFactor + i * 2) * 5 * growPhase;
 
         return (
           <g key={i} transform={`translate(${x + sway}, ${baseY}) rotate(${m.lean * growPhase})`}>
@@ -157,8 +162,8 @@ function generateSkulls(seed: number): SkullData[] {
   }));
 }
 
-const SkeletonCrowd: React.FC<{ width: number; height: number; energy: number; frame: number }> = ({
-  width, height, energy, frame,
+const SkeletonCrowd: React.FC<{ width: number; height: number; energy: number; chromaHue: number; beatDecay: number; tempoFactor: number; frame: number }> = ({
+  width, height, energy, chromaHue, beatDecay, tempoFactor, frame,
 }) => {
   if (energy < 0.12) return null;
 
@@ -166,9 +171,9 @@ const SkeletonCrowd: React.FC<{ width: number; height: number; energy: number; f
   const skulls = React.useMemo(() => generateSkulls(5081977), []);
   const baseY = height - 35;
 
-  const hue = (frame * 0.6) % 360;
-  const color = `hsl(${hue}, 80%, 60%)`;
-  const glow = `drop-shadow(0 0 5px ${color})`;
+  const hue = chromaHue;
+  const color = `hsl(${hue}, 80%, ${60 + beatDecay * 12}%)`;
+  const glow = `drop-shadow(0 0 ${5 + beatDecay * 8}px ${color})`;
 
   return (
     <svg
@@ -177,7 +182,7 @@ const SkeletonCrowd: React.FC<{ width: number; height: number; energy: number; f
     >
       {skulls.map((s, i) => {
         const x = s.x * width;
-        const bob = Math.sin(frame * s.bobSpeed * 0.02 + s.bobPhase) * (4 + energy * 10);
+        const bob = (beatDecay * (4 + energy * 6)) + Math.sin(frame * s.bobSpeed * 0.02 * tempoFactor + s.bobPhase) * (4 + energy * 4);
         const y = baseY + bob;
         const tilt = Math.sin(frame * 0.05 + i) * 8;
         const skullColor = `hsl(${(hue + i * 25) % 360}, 80%, 60%)`;
@@ -213,20 +218,14 @@ interface Props {
 export const MushroomForest: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
-
-  const idx = Math.min(Math.max(0, frame), frames.length - 1);
-  let eSum = 0;
-  let eCount = 0;
-  for (let i = Math.max(0, idx - 75); i <= Math.min(frames.length - 1, idx + 75); i++) {
-    eSum += frames[i].rms;
-    eCount++;
-  }
-  const energy = eCount > 0 ? eSum / eCount : 0;
+  const snap = useAudioSnapshot(frames);
+  const tempoFactor = useTempoFactor();
+  const { energy, chromaHue, beatDecay, spaceScore } = snap;
 
   return (
     <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden" }}>
-      <MushroomForestOverlay width={width} height={height} energy={energy} frame={frame} />
-      <SkeletonCrowd width={width} height={height} energy={energy} frame={frame} />
+      <MushroomForestOverlay width={width} height={height} energy={energy} chromaHue={chromaHue} spaceScore={spaceScore ?? 0} tempoFactor={tempoFactor} frame={frame} />
+      <SkeletonCrowd width={width} height={height} energy={energy} chromaHue={chromaHue} beatDecay={beatDecay} tempoFactor={tempoFactor} frame={frame} />
     </div>
   );
 };

@@ -1,17 +1,31 @@
 /**
- * Mandala Engine — concentric petal rings in polar coords with N-fold symmetry.
+ * Mandala Engine — raymarched 3D mandala with depth.
  *
- * Symmetry order driven by chord index: C=3, D=4, ..., B=12 petals.
- * FBM domain warping creates organic, breathing mandala patterns.
+ * Concentric rings of sacred geometry SDFs at different Z-depths.
+ * Each ring contains different shapes (lotuses, dharma wheels, vajra forms).
+ * Camera faces the mandala head-on; rings rotate at different speeds,
+ * revealing depth through parallax. Light streams through the gaps.
  *
- * Audio mapping:
- *   bass           -> rotation speed (pushes mandala spin)
- *   melodicPitch   -> complexity (more rings at higher pitch)
- *   harmonicTension -> distortion amount (warps symmetry axes)
- *   beatStability   -> symmetry fidelity (tight = clean, loose = fractured)
- *   energy         -> brightness + ring count
- *   chromaHue      -> color rotation
- *   climaxPhase    -> stealie SDF emergence at center
+ * Audio mapping (14+ uniforms):
+ *   uBass              → ring breathing (radial pulse, geometry scale)
+ *   uEnergy            → ring count, detail level, overall brightness
+ *   uDrumOnset         → ring rotation snap (discrete angular jumps)
+ *   uVocalPresence     → backlight intensity through mandala gaps
+ *   uHarmonicTension   → ring alignment (low=ordered, high=chaotic offsets)
+ *   uSectionType       → jam=all rings spin independently,
+ *                         space=perfect stillness/alignment,
+ *                         chorus=full illumination,
+ *                         solo=spotlight from behind
+ *   uClimaxPhase       → mandala opens like a flower revealing inner light
+ *   uSlowEnergy        → camera drift speed
+ *   uHighs             → specular sharpness on geometry edges
+ *   uMelodicPitch      → camera Z-depth shift (closer/further)
+ *   uBeatSnap          → pulse flash on ring edges
+ *   uCoherence         → geometry crispness (high=perfect, low=organic)
+ *   uSpaceScore        → void expansion, fewer rings
+ *   uTimbralBrightness → surface shimmer / golden ratio iridescence
+ *   uSemanticCosmic    → depth fog color toward deep indigo
+ *   uSemanticPsychedelic → geometry complexity multiplication
  */
 
 import { noiseGLSL } from "./noise";
@@ -26,159 +40,541 @@ void main() {
 }
 `;
 
+const postProcess = buildPostProcessGLSL({
+  bloomEnabled: true,
+  bloomThresholdOffset: -0.08,
+  halationEnabled: true,
+  caEnabled: true,
+  lightLeakEnabled: true,
+  grainStrength: "light",
+  eraGradingEnabled: true,
+  lensDistortionEnabled: true,
+});
+
 export const mandalaEngineFrag = /* glsl */ `
 precision highp float;
-
 ${sharedUniformsGLSL}
-
 ${noiseGLSL}
-
-${buildPostProcessGLSL({ grainStrength: 'light', flareEnabled: false, paletteCycleEnabled: true })}
-
+${postProcess}
 varying vec2 vUv;
 
-#define PI 3.14159265
-#define TAU 6.28318530
+#define ME2_PI 3.14159265
+#define ME2_TAU 6.28318530
+#define ME2_PHI 1.61803398
+#define ME2_MAX_RINGS 7
+#define ME2_MAX_STEPS 80
+
+// ─── Hash ───
+float me2Hash(float n) { return fract(sin(n) * 43758.5453); }
+float me2Hash2(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+
+// ─── Smooth min for organic SDF blending ───
+float me2Smin(float a, float b, float k) {
+  float h = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0);
+  return mix(b, a, h) - k * h * (1.0 - h);
+}
+
+// ─── Rotation helpers ───
+mat2 me2Rot(float a) {
+  float ca = cos(a); float sa = sin(a);
+  return mat2(ca, -sa, sa, ca);
+}
+
+// ─── SDF: Torus (concentric ring) ───
+float me2Torus(vec3 p, float R, float r) {
+  vec2 q = vec2(length(p.xy) - R, p.z);
+  return length(q) - r;
+}
+
+// ─── SDF: Lotus petal (elongated teardrop rotated around center) ───
+// A single petal: capsule with tapered end, mirrored into N-fold symmetry
+float me2Petal(vec2 p, float petalLen, float petalWidth) {
+  // Taper: petal narrows toward tip
+  float taper = smoothstep(0.0, petalLen, p.x) * 0.6 + 0.4;
+  float yDist = abs(p.y) - petalWidth * taper;
+  float xDist = p.x - petalLen;
+  float capsule = length(max(vec2(xDist, yDist), 0.0)) + min(max(xDist, yDist), 0.0);
+  return capsule;
+}
+
+// ─── SDF: Lotus flower (N petals in a ring at given radius) ───
+float me2Lotus(vec3 p, float radius, int petals, float petalLen, float petalWidth, float curlAmount) {
+  // Work in XY plane at the ring's Z
+  vec2 q = p.xy;
+  float angle = atan(q.y, q.x);
+  float r = length(q);
+
+  // Fold into petal sectors
+  float sector = ME2_TAU / float(petals);
+  float foldedAngle = mod(angle + sector * 0.5, sector) - sector * 0.5;
+
+  // Local petal coordinate: centered at ring radius
+  vec2 localP = vec2(r - radius, 0.0);
+  localP = vec2(cos(foldedAngle) * (r - radius) - sin(foldedAngle) * abs(p.z) * curlAmount,
+                sin(foldedAngle) * (r - radius) + p.z * 0.5);
+
+  float petal = me2Petal(localP, petalLen, petalWidth);
+
+  // Also measure Z-thickness: petals are thin
+  float zThick = abs(p.z) - petalWidth * 0.3;
+  return max(petal, zThick);
+}
+
+// ─── SDF: Dharma wheel spokes (radial bars + central hub + rim) ───
+float me2DharmaWheel(vec3 p, float radius, int spokes, float thickness) {
+  vec2 q = p.xy;
+  float r = length(q);
+  float angle = atan(q.y, q.x);
+
+  // Outer rim (torus cross-section)
+  float rim = abs(r - radius) - thickness;
+  rim = max(rim, abs(p.z) - thickness * 0.8);
+
+  // Central hub
+  float hub = length(vec3(q, p.z)) - radius * 0.15;
+
+  // Spokes: fold into spoke sectors
+  float sector = ME2_TAU / float(spokes);
+  float foldedAngle = mod(angle + sector * 0.5, sector) - sector * 0.5;
+  // Spoke as thin bar from hub to rim
+  float spokeD = max(abs(foldedAngle) * r - thickness * 0.5,
+                     abs(p.z) - thickness * 0.6);
+  // Only between hub and rim
+  spokeD = max(spokeD, -(r - radius * 0.15));
+  spokeD = max(spokeD, r - radius + thickness * 0.5);
+
+  return min(rim, min(hub, spokeD));
+}
+
+// ─── SDF: Vajra shape (double-ended diamond scepter) ───
+float me2Vajra(vec3 p, float radius, float size) {
+  vec2 q = p.xy;
+  float r = length(q);
+  float angle = atan(q.y, q.x);
+
+  // Fold into 6 positions around the ring
+  float sector = ME2_TAU / 6.0;
+  float foldedAngle = mod(angle + sector * 0.5, sector) - sector * 0.5;
+
+  // Local position centered at ring radius
+  vec2 localP = vec2(r - radius, foldedAngle * radius);
+
+  // Diamond/octahedron cross-section
+  float diamond = (abs(localP.x) + abs(localP.y)) * 0.7071 - size;
+  // Z thickness
+  float zd = abs(p.z) - size * 0.5;
+  return max(diamond, zd);
+}
+
+// ─── SDF: Star pattern (concentric star shapes) ───
+float me2Star(vec3 p, float radius, int points, float innerR, float thickness) {
+  vec2 q = p.xy;
+  float r = length(q);
+  float angle = atan(q.y, q.x);
+
+  // Star shape: modulate radius by angle
+  float sector = ME2_TAU / float(points);
+  float foldedAngle = mod(angle, sector) - sector * 0.5;
+  float starR = mix(innerR, radius, 0.5 + 0.5 * cos(foldedAngle * float(points)));
+
+  float starD = r - starR;
+  float zd = abs(p.z) - thickness;
+  return max(abs(starD) - thickness * 0.5, zd);
+}
+
+// ─── Single ring SDF: choose geometry type based on ring index ───
+float me2Ring(vec3 p, int ringIdx, float ringRadius, float breathe,
+              float tension, float tm, float energy, float psyche) {
+  // Breathing: rings expand/contract with bass
+  float R = ringRadius + breathe * sin(float(ringIdx) * 1.7 + tm * 0.5) * 0.3;
+
+  // Geometry type per ring (cycling through shapes)
+  int geomType = int(mod(float(ringIdx), 4.0));
+
+  // Complexity scales with energy and psychedelic
+  float complexity = 1.0 + energy * 0.5 + psyche * 0.3;
+
+  // Thickness gets thinner for outer rings
+  float baseThick = mix(0.06, 0.03, float(ringIdx) / 7.0);
+  float thick = baseThick * (1.0 + energy * 0.3);
+
+  float d = 1e5;
+
+  if (geomType == 0) {
+    // Lotus petals
+    int petals = int(6.0 + energy * 4.0 + float(ringIdx) * 2.0);
+    float petalLen = 0.3 + energy * 0.15;
+    float petalW = 0.05 + energy * 0.02;
+    float curlAmt = 0.3 + tension * 0.5;
+    d = me2Lotus(p, R, petals, petalLen, petalW, curlAmt);
+  } else if (geomType == 1) {
+    // Dharma wheel
+    int spokes = int(8.0 + energy * 4.0);
+    d = me2DharmaWheel(p, R, spokes, thick * 2.0);
+  } else if (geomType == 2) {
+    // Vajra diamonds
+    float vSize = 0.08 + energy * 0.04;
+    d = me2Vajra(p, R, vSize);
+  } else {
+    // Star mandala
+    int pts = int(5.0 + energy * 3.0 + float(ringIdx));
+    float innerRatio = 0.85 * R;
+    d = me2Star(p, R, pts, innerRatio, thick);
+  }
+
+  // Tension warps geometry: noise displacement
+  if (tension > 0.05) {
+    d += snoise(vec3(p.xy * 3.0, tm * 0.3 + float(ringIdx) * 10.0)) * tension * 0.04;
+  }
+
+  return d;
+}
+
+// ─── Complete scene SDF ───
+float me2Map(vec3 p, float energy, float bass, float tension, float tm,
+             float sJam, float sSpace, float sChorus, float sSolo,
+             float climB, float psyche, float coherence, float drumSnap) {
+  float d = 1e5;
+
+  // Number of rings scales with energy
+  int numRings = int(3.0 + energy * 4.0 - sSpace * 3.0);
+  numRings = clamp(numRings, 2, ME2_MAX_RINGS);
+
+  // Ring spacing uses golden ratio for sacred proportions
+  float baseSpacing = 0.5 * ME2_PHI;
+
+  // Bass breathing: all rings breathe together
+  float breathe = bass * 0.25;
+
+  // Climax: mandala opens outward like a flower blooming
+  float bloomOpen = smoothstep(1.5, 3.0, climB) * 1.5;
+
+  for (int i = 0; i < ME2_MAX_RINGS; i++) {
+    if (i >= numRings) break;
+
+    float fi = float(i);
+    float ringRadius = (fi + 1.0) * baseSpacing + breathe * 0.3 + bloomOpen * fi * 0.3;
+
+    // Each ring at a different Z-depth for parallax
+    float ringZ = (fi - float(numRings) * 0.5) * 0.4;
+    // Space: all rings collapse to same Z (flat, aligned)
+    ringZ *= mix(1.0, 0.05, sSpace);
+    // Climax: rings separate more in Z (dramatic depth)
+    ringZ *= 1.0 + climB * 0.8;
+
+    // Per-ring rotation: independent in jam, aligned in space
+    float baseRot = tm * (0.1 + fi * 0.03) * mix(1.0, -1.0, step(0.5, fract(fi * 0.5)));
+    // Jam: each ring gets its own tempo multiplier
+    float jamRot = sJam * tm * 0.2 * sin(fi * ME2_PHI);
+    // Space: freeze rotation
+    float spaceFreeze = mix(1.0, 0.0, sSpace);
+    // Drum onset: snap rotation (discrete angular jumps)
+    float drumRot = drumSnap * ME2_PI / (6.0 + fi * 2.0);
+    // Tension: misalign rings
+    float tensionOffset = tension * sin(fi * 2.7 + tm * 0.5) * 0.5;
+
+    float totalRot = (baseRot + jamRot + drumRot + tensionOffset) * spaceFreeze;
+
+    // Transform point into ring-local space
+    vec3 ringP = p;
+    ringP.z -= ringZ;
+    // Rotate in XY plane (the mandala plane)
+    ringP.xy = me2Rot(totalRot) * ringP.xy;
+
+    float ringD = me2Ring(ringP, i, ringRadius, breathe, tension, tm, energy, psyche);
+    d = min(d, ringD);
+  }
+
+  // ─── Central core: glowing orb that the mandala encircles ───
+  // More visible during chorus (full illumination) and climax (revealed light)
+  float coreRadius = 0.15 + bass * 0.1 + climB * 0.4;
+  float coreSDF = length(p) - coreRadius;
+  // Core is always soft, doesn't hard-surface
+  d = me2Smin(d, coreSDF, 0.15 + climB * 0.2);
+
+  // ─── Connecting filaments between rings (coherence-gated) ───
+  if (coherence > 0.3) {
+    float filaments = 1e5;
+    float filAngle = atan(p.y, p.x);
+    float filR = length(p.xy);
+    // Radial filaments connecting rings
+    float filSector = ME2_TAU / 12.0;
+    float filFolded = mod(filAngle + filSector * 0.5, filSector) - filSector * 0.5;
+    float filD = abs(filFolded) * filR - 0.01;
+    filD = max(filD, abs(p.z) - 0.02);
+    // Only between innermost and outermost ring radii
+    float innerR = baseSpacing;
+    float outerR = float(numRings) * baseSpacing + breathe * 0.3 + bloomOpen * float(numRings) * 0.3;
+    filD = max(filD, -(filR - innerR));
+    filD = max(filD, filR - outerR);
+    d = min(d, filD / coherence);
+  }
+
+  return d;
+}
+
+// ─── Normal via central differences ───
+vec3 me2Normal(vec3 p, float energy, float bass, float tension, float tm,
+               float sJam, float sSpace, float sChorus, float sSolo,
+               float climB, float psyche, float coherence, float drumSnap) {
+  vec2 eps = vec2(0.003, 0.0);
+  float ref = me2Map(p, energy, bass, tension, tm, sJam, sSpace, sChorus, sSolo, climB, psyche, coherence, drumSnap);
+  return normalize(vec3(
+    me2Map(p + eps.xyy, energy, bass, tension, tm, sJam, sSpace, sChorus, sSolo, climB, psyche, coherence, drumSnap) - ref,
+    me2Map(p + eps.yxy, energy, bass, tension, tm, sJam, sSpace, sChorus, sSolo, climB, psyche, coherence, drumSnap) - ref,
+    me2Map(p + eps.yyx, energy, bass, tension, tm, sJam, sSpace, sChorus, sSolo, climB, psyche, coherence, drumSnap) - ref
+  ));
+}
+
+// ─── Ambient occlusion ───
+float me2Occlusion(vec3 p, vec3 n, float energy, float bass, float tension, float tm,
+                   float sJam, float sSpace, float sChorus, float sSolo,
+                   float climB, float psyche, float coherence, float drumSnap) {
+  float occ = 1.0;
+  for (int i = 1; i < 5; i++) {
+    float fi = float(i);
+    float stepD = 0.1 * fi;
+    float sampD = me2Map(p + n * stepD, energy, bass, tension, tm, sJam, sSpace, sChorus, sSolo, climB, psyche, coherence, drumSnap);
+    occ -= (stepD - sampD) * (0.3 / fi);
+  }
+  return clamp(occ, 0.1, 1.0);
+}
+
+// ─── Volumetric light through mandala gaps ───
+float me2VolumetricLight(vec3 ro, vec3 rd, float maxDist, float energy, float bass,
+                         float tension, float tm, float sJam, float sSpace,
+                         float sChorus, float sSolo, float climB, float psyche,
+                         float coherence, float drumSnap) {
+  float accumLight = 0.0;
+  float stepSize = maxDist / 16.0;
+  for (int i = 0; i < 16; i++) {
+    float marchDist = (float(i) + 0.5) * stepSize;
+    vec3 samplePos = ro + rd * marchDist;
+    float sceneDist = me2Map(samplePos, energy, bass, tension, tm, sJam, sSpace, sChorus, sSolo, climB, psyche, coherence, drumSnap);
+    // In open space (gaps between rings) = light passes through
+    float inGap = smoothstep(-0.05, 0.15, sceneDist);
+    // Fog density varies: denser near center, sparser at edges
+    float centerDist = length(samplePos.xy);
+    float fogDensity = exp(-centerDist * 0.4) * 0.06;
+    // Distance attenuation from backlight source (behind mandala)
+    float backFade = 1.0 / (1.0 + abs(samplePos.z - 3.0) * 0.2);
+    accumLight += inGap * fogDensity * backFade;
+  }
+  return accumLight;
+}
 
 void main() {
   vec2 uv = vUv;
-  float aspect = uResolution.x / uResolution.y;
-  vec2 p = (uv - 0.5) * vec2(aspect, 1.0);
+  vec2 asp = vec2(uResolution.x / uResolution.y, 1.0);
+  vec2 p = (uv - 0.5) * asp;
 
+  // ─── Audio clamping ───
   float energy = clamp(uEnergy, 0.0, 1.0);
+  float bass = clamp(uBass, 0.0, 1.0);
+  float slowE = clamp(uSlowEnergy, 0.0, 1.0);
+  float highs = clamp(uHighs, 0.0, 1.0);
+  float drumOn = clamp(uDrumOnset, 0.0, 1.0);
+  float vocalP = clamp(uVocalPresence, 0.0, 1.0);
+  float tension = clamp(uHarmonicTension, 0.0, 1.0);
+  float coherence = clamp(uCoherence, 0.0, 1.0);
+  float spaceS = clamp(uSpaceScore, 0.0, 1.0);
+  float timbralB = clamp(uTimbralBrightness, 0.0, 1.0);
+  float psyche = clamp(uSemanticPsychedelic, 0.0, 1.0);
+  float cosmic = clamp(uSemanticCosmic, 0.0, 1.0);
+  float melPitch = clamp(uMelodicPitch * uMelodicConfidence, 0.0, 1.0);
+  float beatSnp = uBeatSnap * smoothstep(0.3, 0.7, uBeatConfidence);
 
-  // --- Domain warping for organic mandala feel ---
-  p += vec2(fbm3(vec3(p * 0.5 * (1.0 + energy * 0.5), uDynamicTime * 0.05)), fbm3(vec3(p * 0.5 * (1.0 + energy * 0.5) + 100.0, uDynamicTime * 0.05))) * 0.3;
+  // ─── Section type decomposition ───
+  float sJam = smoothstep(4.5, 5.5, uSectionType) * (1.0 - step(5.5, uSectionType));
+  float sSpace = smoothstep(6.5, 7.5, uSectionType) + spaceS * 0.5;
+  sSpace = clamp(sSpace, 0.0, 1.0);
+  float sChorus = smoothstep(1.5, 2.5, uSectionType) * (1.0 - step(2.5, uSectionType));
+  float sSolo = smoothstep(3.5, 4.5, uSectionType) * (1.0 - step(4.5, uSectionType));
 
-  // 7-band spectral: sub, low, low-mid, mid, upper-mid, presence, brilliance
-  float fftBass = texture2D(uFFTTexture, vec2(0.07, 0.5)).r;
-  float fftMid = texture2D(uFFTTexture, vec2(0.36, 0.5)).r;
-  float fftHigh = texture2D(uFFTTexture, vec2(0.78, 0.5)).r;
-  float t = uDynamicTime;
+  // ─── Climax state ───
+  float climB = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5) * clamp(uClimaxIntensity, 0.0, 1.0);
 
-  // --- Section type modulation (0=intro,1=verse,2=chorus,3=bridge,4=solo,5=jam,6=outro,7=space) ---
-  float sectionT = uSectionType;
-  float sJam = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
-  float sSpace = smoothstep(6.5, 7.5, sectionT);
-  float sChorus = smoothstep(1.5, 2.5, sectionT) * (1.0 - step(2.5, sectionT));
-  // Jam: faster rotation, more rings. Space: still, minimal. Chorus: extra petals.
-  float sectionRotMod = mix(1.0, 1.4, sJam) * mix(1.0, 0.15, sSpace) * mix(1.0, 1.2, sChorus);
-  float sectionRingMod = mix(0.0, 3.0, sJam) + mix(0.0, -2.0, sSpace) + mix(0.0, 1.0, sChorus);
-  t *= sectionRotMod;
+  // ─── Time (slowed, section-modulated) ───
+  float tm = uDynamicTime * (0.06 + slowE * 0.03) * (1.0 + sJam * 0.5 - sSpace * 0.4);
+  // Drum onset snaps: accumulate discrete angular jumps
+  float drumSnap = drumOn * 0.3;
+  tm += drumSnap;
 
-  // ─── N-fold symmetry from chord index ───
-  // Map chord index (0-23) to 3-12 petals
-  float rawN = mod(uChordIndex, 12.0);
-  float N = mix(3.0, 12.0, rawN / 11.0);
-  N = floor(N + 0.5); // Snap to integer
+  // ─── Palette ───
+  float h1 = hsvToCosineHue(uPalettePrimary);
+  vec3 palPrimary = 0.5 + 0.5 * cos(ME2_TAU * vec3(h1, h1 + 0.33, h1 + 0.67));
+  float h2 = hsvToCosineHue(uPaletteSecondary);
+  vec3 palSecondary = 0.5 + 0.5 * cos(ME2_TAU * vec3(h2, h2 + 0.33, h2 + 0.67));
 
-  // Beat stability modulates symmetry precision
-  // High stability = clean N-fold, low = slightly fractured
-  float stabilityWarp = (1.0 - uBeatStability) * 0.15;
+  // Backlight color: warm golden, modulated by vocal presence
+  vec3 backlightColor = mix(vec3(1.0, 0.85, 0.55), vec3(1.0, 0.95, 0.85), vocalP);
+  backlightColor *= 0.5 + vocalP * 1.0;
+  // Chorus: full illumination — backlight strengthened
+  backlightColor *= 1.0 + sChorus * 0.6;
 
-  // ─── Polar coordinates with rotation ───
-  float angle = atan(p.y, p.x);
-  float radius = length(p);
+  // ─── Camera: head-on view of the mandala ───
+  // Camera looks straight down the Z axis at the mandala
+  float camZ = -3.5 + melPitch * 0.8 - climB * 1.0;
+  // Subtle drift for life
+  float driftX = sin(tm * 0.07) * 0.15 * mix(1.0, 0.02, sSpace);
+  float driftY = cos(tm * 0.05) * 0.1 * mix(1.0, 0.02, sSpace);
 
-  // Beat-locked radius pulse: expand on beats, confidence-gated
-  float effectiveBeat = uBeatSnap * smoothstep(0.3, 0.7, uBeatConfidence);
-  float effectiveDownbeat = uDownbeat * uBeatConfidence;
-  float downbeatPulse = effectiveDownbeat * 0.12;
-  radius -= downbeatPulse + effectiveBeat * 0.06; // expansion on downbeat + beats
+  vec3 ro = vec3(driftX, driftY, camZ);
+  vec3 lookAt = vec3(0.0, 0.0, 0.0);
+  vec3 fw = normalize(lookAt - ro);
+  vec3 ri = normalize(cross(vec3(0.0, 1.0, 0.0), fw));
+  vec3 upVec = cross(fw, ri);
+  float fov = 0.9 + energy * 0.15 + climB * 0.25;
+  vec3 rd = normalize(p.x * ri + p.y * upVec + fov * fw);
 
-  // Tempo derivative → rotation acceleration
-  float tempoAccel = 1.0 + uTempoDerivative * 0.5;
+  // ─── Raymarch ───
+  float totalDist = 0.0;
+  vec3 marchPos = ro;
+  bool marchHit = false;
 
-  // Bass-driven rotation
-  float rotation = t * 0.2 * tempoAccel + uBass * 1.5 + uStemBass * 0.8;
-  angle += rotation;
+  for (int i = 0; i < ME2_MAX_STEPS; i++) {
+    vec3 ps = ro + rd * totalDist;
+    float dist = me2Map(ps, energy, bass, tension, tm, sJam, sSpace, sChorus, sSolo, climB, psyche, coherence, drumSnap);
 
-  // Fold angle into N-fold symmetry
-  float sector = TAU / N;
-  float foldedAngle = mod(angle + sector * 0.5, sector) - sector * 0.5;
-  foldedAngle = abs(foldedAngle);
+    if (dist < 0.002) {
+      marchPos = ps;
+      marchHit = true;
+      break;
+    }
+    if (totalDist > 15.0) break;
+    totalDist += dist * 0.7;
+  }
 
-  // Harmonic tension warps the fold lines
-  foldedAngle += sin(radius * 8.0 + t * 0.5) * uHarmonicTension * 0.3;
-  // Beat stability jitter
-  foldedAngle += snoise(vec3(p * 3.0, t * 0.3)) * stabilityWarp;
+  // ─── Shading ───
+  vec3 col = vec3(0.0);
 
-  // ─── FBM domain warping for organic feel ───
-  vec2 polarP = vec2(foldedAngle * 2.0, radius);
+  if (marchHit) {
+    vec3 norm = me2Normal(marchPos, energy, bass, tension, tm, sJam, sSpace, sChorus, sSolo, climB, psyche, coherence, drumSnap);
+    float occl = me2Occlusion(marchPos, norm, energy, bass, tension, tm, sJam, sSpace, sChorus, sSolo, climB, psyche, coherence, drumSnap);
 
-  // Melodic pitch controls complexity (more FBM octaves at high pitch)
-  float melInfluence = uMelodicPitch * uMelodicConfidence;
-  float complexity = 2.0 + melInfluence * 4.0 + energy * 2.0;
-  float warpAmount = 0.3 + uHarmonicTension * 0.5;
+    // ─── Lighting: backlight through mandala + rim + fill ───
+    // Primary: backlight from behind the mandala (positive Z)
+    vec3 backLightDir = normalize(vec3(0.0, 0.0, 1.0));
+    float backDiff = max(dot(norm, backLightDir), 0.0);
 
-  vec3 warpSeed = vec3(polarP * complexity * (1.0 + energy * 0.5), t * 0.15);
-  float warp1 = fbm6(warpSeed);
-  float warp2 = fbm6(warpSeed + vec3(5.2, 1.3, 2.7));
-  vec2 warpedP = polarP + vec2(warp1, warp2) * warpAmount;
+    // Fill light from camera direction
+    vec3 fillDir = normalize(vec3(0.2, 0.3, -0.8));
+    float fillDiff = max(dot(norm, fillDir), 0.0);
 
-  // ─── Petal ring pattern ───
-  // Concentric rings modulated by angle + FFT per-band radius
-  // Outer ring responds to bass, middle to mids, inner to highs
-  float fftRadiusMod = radius > 0.5 ? fftBass * 0.15
-                     : radius > 0.25 ? fftMid * 0.12
-                     : fftHigh * 0.10;
-  float ringMod = 1.0 + uJamDensity * 0.5;
-  float ringCount = max(1.0, (3.0 + energy * 5.0 + uMelodicPitch * 3.0 + sectionRingMod + uHarmonicTension * 2.0) * ringMod);
-  float ringPattern = sin((warpedP.y + fftRadiusMod) * ringCount * PI) * 0.5 + 0.5;
+    // Specular: highs + timbral brightness control sharpness
+    float specPow = 12.0 + highs * 48.0 + timbralB * 24.0;
+    float specBack = pow(max(dot(reflect(-backLightDir, norm), -rd), 0.0), specPow);
+    float specFill = pow(max(dot(reflect(-fillDir, norm), -rd), 0.0), specPow * 0.5);
 
-  // Petal shape: angular modulation
-  float petalShape = cos(warpedP.x * N) * 0.5 + 0.5;
-  petalShape = pow(petalShape, mix(0.5, 2.0, uBeatStability));
+    // Fresnel: rim glow (light wrapping around geometry edges)
+    float fresnel = pow(1.0 - max(dot(norm, -rd), 0.0), 3.0);
 
-  // Combined pattern
-  float pattern = ringPattern * petalShape;
+    // ─── Surface color ───
+    // Distance from center determines ring → palette gradient
+    float centerR = length(marchPos.xy);
+    float ringGrad = fract(centerR * ME2_PHI * 0.5);
+    vec3 surfColor = mix(palPrimary * 0.2, palSecondary * 0.15, ringGrad);
 
-  // Radial falloff (mandala fades at edges)
-  float falloff = 1.0 - smoothstep(0.3, 0.8, radius);
-  pattern *= falloff;
+    // Timbral iridescence: golden ratio shimmer on surfaces
+    float shimmer = 0.5 + 0.5 * sin(centerR * ME2_PHI * 8.0 + tm * 0.5);
+    surfColor += palPrimary * shimmer * timbralB * 0.08;
 
-  // ─── Color from palette + chroma hue + chord hue ───
-  float chordConf = smoothstep(0.3, 0.6, uChordConfidence);
-  float chordHue = float(int(uChordIndex)) / 24.0 * 0.12 * chordConf;
-  float peakGlow = clamp(uPeakApproaching, 0.0, 1.0);
-  float hue1 = hsvToCosineHue(uPalettePrimary) + uChromaHue * 0.15 + chordHue;
-  float hue2 = hsvToCosineHue(uPaletteSecondary) + uChromaShift * 0.1 + chordHue * 0.5;
+    // ─── Compose surface ───
+    // Backlight: warm light through the mandala (the star of the show)
+    vec3 backContrib = backlightColor * backDiff * 0.4;
+    // Fill: subtle frontal illumination
+    vec3 fillContrib = mix(palPrimary, palSecondary, 0.3) * fillDiff * 0.12;
+    // Ambient
+    vec3 ambient = surfColor * 0.08 * occl;
 
-  vec3 color1 = 0.5 + 0.5 * cos(TAU * (hue1 + vec3(0.0, 0.33, 0.67)));
-  vec3 color2 = 0.5 + 0.5 * cos(TAU * (hue2 + vec3(0.0, 0.33, 0.67)));
+    col = ambient + backContrib + fillContrib;
+    col += palSecondary * specBack * 0.15 * (1.0 + timbralB * 0.5);
+    col += palPrimary * specFill * 0.05;
 
-  // Blend colors based on radius and pattern
-  vec3 col = mix(color2, color1, pattern);
+    // Rim glow: mandala edges glow with backlight color
+    col += backlightColor * fresnel * 0.12 * (1.0 + vocalP * 0.4);
 
-  // Ring edges glow brighter
-  float ringEdge = abs(sin(warpedP.y * ringCount * PI));
-  ringEdge = pow(ringEdge, 8.0);
-  col += vec3(0.3) * ringEdge * energy;
+    // Beat snap flash on geometry
+    col += vec3(1.0, 0.95, 0.9) * beatSnp * 0.1 * fresnel;
 
-  // Petal center glow
-  float petalGlow = pow(petalShape, 4.0) * ringPattern;
-  col += color1 * petalGlow * 0.4;
+    // Coherence: crisp vs diffuse
+    float crispness = mix(0.5, 1.0, coherence);
+    col *= crispness + (1.0 - crispness) * 0.6;
 
-  // --- Secondary organic overlay: flowing energy underneath geometry ---
-  float organicLayer = fbm6(vec3(p * 2.5 + vec2(t * 0.08, t * 0.06), t * 0.12));
-  vec3 organicColor = mix(color1 * 0.4, color2 * 0.5, organicLayer);
-  col += organicColor * (1.0 - pattern) * 0.3 * energy;
+    // Solo: dramatic spotlight from behind
+    if (sSolo > 0.01) {
+      float spotlight = exp(-centerR * 1.2);
+      col += backlightColor * spotlight * sSolo * 0.25;
+    }
 
-  // ─── Background: dark with subtle FBM texture ───
-  float bg = fbm3(vec3(p * 2.0, t * 0.1)) * 0.03;
-  col = mix(vec3(bg), col, smoothstep(0.0, 0.15, pattern));
+    // AO application
+    col *= occl;
 
-  // Energy brightness + peak approaching ramp
-  col *= 0.6 + energy * 0.6 + peakGlow * 0.15;
+    // Energy boost
+    col *= 1.0 + energy * 0.3;
 
-  // ─── Stealie emergence during climax ───
-  float noiseField = fbm3(vec3(p * 2.0, t * 0.15));
-  vec3 palCol1 = color1;
-  vec3 palCol2 = color2;
-  col += stealieEmergence(p, uTime, energy, uBass, palCol1, palCol2, noiseField, uClimaxPhase);
+  } else {
+    // ─── Background: deep void with subtle glow from mandala center ───
+    float bgGrad = length(p) * 0.8;
+    vec3 voidColor = mix(vec3(0.008, 0.005, 0.015), vec3(0.002, 0.001, 0.005), bgGrad);
+    // Cosmic coloring shifts void toward indigo
+    voidColor = mix(voidColor, vec3(0.005, 0.003, 0.02), cosmic * 0.5);
+    col = voidColor;
+
+    // Central glow: light that the mandala frames
+    float centralGlow = exp(-length(p) * 2.5);
+    col += backlightColor * centralGlow * 0.06 * (1.0 + climB * 0.5);
+
+    // Distant stars
+    vec3 starCell = floor(rd * 50.0);
+    float starHash = fract(sin(dot(starCell, vec3(127.1, 311.7, 74.7))) * 43758.5453);
+    float starBright = step(0.94, starHash) * smoothstep(0.04, 0.01, length(fract(rd * 50.0) - 0.5));
+    col += mix(vec3(0.7, 0.75, 1.0), palSecondary, 0.3) * starBright * 0.2;
+  }
+
+  // ─── Volumetric backlight (god rays through mandala gaps) ───
+  {
+    float maxMarchDist = marchHit ? totalDist : 12.0;
+    float volLight = me2VolumetricLight(ro, rd, maxMarchDist, energy, bass, tension, tm,
+                                         sJam, sSpace, sChorus, sSolo, climB, psyche, coherence, drumSnap);
+    col += backlightColor * volLight * (0.5 + vocalP * 0.8 + climB * 0.5);
+  }
+
+  // ─── Atmospheric haze (depth fog) ───
+  {
+    float hazeDensity = mix(0.04, 0.015, energy);
+    float hazeD = 1.0 - exp(-totalDist * hazeDensity);
+    vec3 hazeColor = mix(vec3(0.008, 0.005, 0.015), palPrimary * 0.02, 0.3 + cosmic * 0.4);
+    col = mix(col, hazeColor, hazeD);
+  }
+
+  // ─── Climax: mandala opens, inner light floods outward ───
+  if (climB > 0.2) {
+    // Golden radial burst from center
+    float burstR = length(p);
+    float burst = exp(-burstR * mix(3.0, 1.5, climB));
+    col += backlightColor * burst * climB * 0.35;
+    // Sparkle particles
+    float sparkle = snoise(vec3(p * 25.0, tm * 2.0));
+    sparkle = smoothstep(0.65, 1.0, sparkle);
+    col += backlightColor * sparkle * climB * 0.2;
+  }
+
+  // ─── Beat pulse brightness ───
+  col *= 1.0 + beatSnp * 0.06;
+
+  // ─── Minimum black floor ───
+  col = max(col, vec3(0.006, 0.004, 0.01));
+
+  // ─── Icon emergence ───
+  {
+    float nf = snoise(vec3(p * 2.0, uTime * 0.1));
+    col += iconEmergence(p, uTime, energy, uBass, palPrimary, palSecondary, nf, uClimaxPhase, uSectionIndex);
+    col += heroIconEmergence(p, uTime, energy, uBass, palPrimary, palSecondary, nf, uSectionIndex);
+  }
 
   // ─── Post-processing ───
-  col = applyPostProcess(col, vUv, p);
+  col = applyPostProcess(col, uv, p);
 
   gl_FragColor = vec4(col, 1.0);
 }

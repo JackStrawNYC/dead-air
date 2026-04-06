@@ -339,8 +339,8 @@ export const GRATEFUL_DEAD_CONFIG: BandConfig = {
 
   eraPresets: {
     primal: {
-      preferredModes: ["liquid_light", "oil_projector", "vintage_film", "feedback_recursion", "plasma_field", "stained_glass", "aurora_curtains", "smoke_rings", "ink_wash", "coral_reef"],
-      excludedModes: ["concert_lighting", "crystal_cavern", "electric_arc", "digital_rain", "neural_web", "databend", "signal_decay"],
+      preferredModes: ["protean_clouds", "protean_clouds", "vintage_film", "cosmic_voyage", "protean_clouds", "protean_clouds", "protean_clouds", "protean_clouds", "deep_ocean", "deep_ocean"],
+      excludedModes: ["inferno", "cosmic_voyage", "inferno", "cosmic_voyage", "cosmic_voyage", "cosmic_voyage", "deep_ocean"],
       excludedOverlays: ["LaserShow"],
       grainIntensity: 1.8,
       colorTempShift: 8,
@@ -351,8 +351,8 @@ export const GRATEFUL_DEAD_CONFIG: BandConfig = {
       preferredTransitions: ["dissolve", "void"],
     },
     classic: {
-      preferredModes: ["liquid_light", "tie_dye", "aurora", "oil_projector", "fluid_light", "stained_glass", "plasma_field", "voronoi_flow", "smoke_rings", "aurora_curtains", "lava_flow", "deep_ocean", "coral_reef", "galaxy_spiral", "solar_flare"],
-      excludedModes: ["stark_minimal", "concert_lighting", "vintage_film", "digital_rain", "neural_web", "databend", "signal_decay"],
+      preferredModes: ["protean_clouds", "protean_clouds", "aurora", "protean_clouds", "fluid_light", "protean_clouds", "protean_clouds", "protean_clouds", "protean_clouds", "protean_clouds", "inferno", "deep_ocean", "deep_ocean", "cosmic_voyage", "inferno"],
+      excludedModes: ["deep_ocean", "inferno", "vintage_film", "cosmic_voyage", "cosmic_voyage", "cosmic_voyage", "deep_ocean"],
       excludedOverlays: [],
       grainIntensity: 1.8,
       colorTempShift: 10,
@@ -363,8 +363,8 @@ export const GRATEFUL_DEAD_CONFIG: BandConfig = {
       preferredTransitions: ["dissolve", "morph", "kaleidoscope_dissolve", "spiral_vortex"],
     },
     brent_era: {
-      preferredModes: ["concert_lighting", "liquid_light", "tie_dye", "inferno", "electric_arc", "fractal_flames", "plasma_field", "lava_flow", "kaleidoscope", "solar_flare"],
-      excludedModes: ["stark_minimal", "void_light"],
+      preferredModes: ["inferno", "protean_clouds", "protean_clouds", "inferno", "inferno", "cosmic_voyage", "protean_clouds", "inferno", "cosmic_voyage", "inferno"],
+      excludedModes: ["deep_ocean", "void_light"],
       excludedOverlays: [],
       grainIntensity: 0.3,
       colorTempShift: -2,
@@ -375,8 +375,8 @@ export const GRATEFUL_DEAD_CONFIG: BandConfig = {
       preferredTransitions: ["flash", "distortion_morph", "chromatic_wipe"],
     },
     hiatus: {
-      preferredModes: ["concert_lighting", "cosmic_voyage", "deep_ocean", "diffraction_rings", "morphogenesis", "voronoi_flow", "digital_rain", "neural_web", "signal_decay", "databend", "warp_field"],
-      excludedModes: ["oil_projector"],
+      preferredModes: ["inferno", "cosmic_voyage", "deep_ocean", "deep_ocean", "deep_ocean", "protean_clouds", "cosmic_voyage", "cosmic_voyage", "deep_ocean", "cosmic_voyage", "cosmic_voyage"],
+      excludedModes: ["protean_clouds"],
       excludedOverlays: [],
       grainIntensity: 0.5,
       colorTempShift: 0,
@@ -387,8 +387,8 @@ export const GRATEFUL_DEAD_CONFIG: BandConfig = {
       preferredTransitions: ["dissolve", "void"],
     },
     touch_of_grey: {
-      preferredModes: ["concert_lighting", "inferno", "tie_dye", "fractal_flames", "electric_arc", "plasma_field", "neural_web", "lava_flow", "digital_rain", "databend", "signal_decay", "solar_flare"],
-      excludedModes: ["oil_projector"],
+      preferredModes: ["inferno", "inferno", "protean_clouds", "cosmic_voyage", "inferno", "protean_clouds", "cosmic_voyage", "inferno", "cosmic_voyage", "cosmic_voyage", "deep_ocean", "inferno"],
+      excludedModes: ["protean_clouds"],
       excludedOverlays: [],
       grainIntensity: 0.6,
       colorTempShift: 0,
@@ -399,7 +399,7 @@ export const GRATEFUL_DEAD_CONFIG: BandConfig = {
       preferredTransitions: ["flash", "distortion_morph", "chromatic_wipe"],
     },
     revival: {
-      preferredModes: ["vintage_film", "void_light", "deep_ocean", "aurora", "aurora_curtains", "oil_projector", "smoke_rings"],
+      preferredModes: ["vintage_film", "void_light", "deep_ocean", "aurora", "protean_clouds", "protean_clouds", "protean_clouds"],
       excludedModes: [],
       excludedOverlays: [],
       grainIntensity: 0.5,

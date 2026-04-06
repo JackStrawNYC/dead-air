@@ -11,6 +11,7 @@ import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
 import { useShowContext } from "../data/ShowContext";
 import { seeded } from "../utils/seededRandom";
+import { useAudioSnapshot } from "./parametric/audio-helpers";
 
 // -- Label text lines (fallback when no context) ---------------------------
 
@@ -58,16 +59,8 @@ export const BootlegLabel: React.FC<Props> = ({ frames }) => {
   const { durationInFrames } = useVideoConfig();
   const ctx = useShowContext();
   const labelLines = useMemo(() => buildLabelLines(ctx), [ctx]);
-
-  // Rolling energy (75-frame window each side)
-  const idx = Math.min(Math.max(0, frame), frames.length - 1);
-  let energySum = 0;
-  let energyCount = 0;
-  for (let i = Math.max(0, idx - 75); i <= Math.min(frames.length - 1, idx + 75); i++) {
-    energySum += frames[i].rms;
-    energyCount++;
-  }
-  const energy = energyCount > 0 ? energySum / energyCount : 0;
+  const snap = useAudioSnapshot(frames);
+  const { energy, bass, beatDecay } = snap;
 
   // Base opacity: 0.3 - 0.4, slightly reactive to energy
   const baseOpacity = interpolate(energy, [0.03, 0.25], [0.3, 0.42], {
@@ -103,9 +96,8 @@ export const BootlegLabel: React.FC<Props> = ({ frames }) => {
   const jitterX = (rng() - 0.5) * 1.6;
   const jitterY = (rng() - 0.5) * 1.6;
 
-  // Very subtle scale pulse tied to low-frequency energy
-  const lowEnergy = frames[idx]?.sub ?? 0;
-  const scalePulse = 1 + lowEnergy * 0.008;
+  // Subtle scale pulse tied to bass + beat
+  const scalePulse = 1 + bass * 0.015 + beatDecay * 0.008;
 
   // Tape counter (like a real deck counter)
   const counterValue = Math.floor(frame / 30);

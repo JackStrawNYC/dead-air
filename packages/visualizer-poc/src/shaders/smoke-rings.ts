@@ -77,7 +77,7 @@ void main() {
   float chordHue = float(int(uChordIndex)) / 24.0 * 0.12 * chordConf;
   float stability = clamp(uBeatStability, 0.0, 1.0);
 
-  float slowTime = uDynamicTime * 0.05;
+  float slowTime = uDynamicTime * 0.025;
 
   // --- Section-type modulation (0=intro,1=verse,2=chorus,3=bridge,4=solo,5=jam,6=outro,7=space) ---
   float sectionT = uSectionType;
@@ -93,7 +93,7 @@ void main() {
   // Vocal pitch → vertical drift modulation
   float vocalDrift = mix(-0.1, 0.15, uVocalPitch);
 
-  float riseSpeed = (0.03 + slowEnergy * 0.04) * sectionRiseSpeed;
+  float riseSpeed = (0.015 + slowEnergy * 0.02) * sectionRiseSpeed;
 
   vec3 col = vec3(0.008, 0.006, 0.012); // dark background
 
@@ -130,12 +130,13 @@ void main() {
     float d = smokeRingField(domainP, center + vec2(tensionWarp), majorR, minorR, slowTime + fi, energy);
 
     // Volumetric glow
-    float glow = exp(-max(d, 0.0) * 30.0) * 0.5;
-    float edge = smoothstep(0.01, 0.0, d) * 0.7;
+    float ringBrightness = 0.05 + energy * 0.45;
+    float glow = exp(-max(d, 0.0) * 30.0) * 0.3 * ringBrightness;
+    float edge = smoothstep(0.01, 0.0, d) * 0.4 * ringBrightness;
 
     // Color per ring
     float hue = uPalettePrimary + fi * 0.05 + chromaHueMod + vocalPresence * 0.1 + chordHue; // chord shifts ring hue
-    float sat = mix(0.3, 0.8, energy) * uPaletteSaturation;
+    float sat = mix(0.08, 0.8, energy * energy) * uPaletteSaturation;
     float val = (glow + edge) * perspective;
 
     // Fade in/out at extremes
@@ -145,7 +146,7 @@ void main() {
     vec3 ringColor = hsv2rgb(vec3(hue, sat, val));
 
     // Scattering at edges — brighter at ring boundary
-    float scatter = exp(-abs(d) * 50.0) * 0.3;
+    float scatter = exp(-abs(d) * 50.0) * 0.15 * ringBrightness;
     vec3 scatterColor = hsv2rgb(vec3(uPaletteSecondary + fi * 0.03, sat * 0.5, scatter));
 
     col += ringColor + scatterColor;
@@ -162,7 +163,7 @@ void main() {
     hsv2rgb(vec3(uPaletteSecondary + 0.05, 0.25, 0.12)),
     hazeLayer
   );
-  col += hazeColor * 0.3 * (0.4 + energy * 0.3);
+  col += hazeColor * 0.15 * energy;
 
   // --- Collision glow at ring intersections ---
   float collisionGlow = 0.0;
@@ -191,6 +192,12 @@ void main() {
     vec3 c2 = hsv2rgb(vec3(uPaletteSecondary, 0.8, 1.0));
     col += iconEmergence(p, uTime, energy, bass, c1, c2, nf, uClimaxPhase, uSectionIndex) * 0.5;
   }
+
+  // === ATMOSPHERIC FOG: smoke-filled room ===
+  float fogNoise2 = fbm3(vec3(p * 0.6, uDynamicTime * 0.015));
+  float fogDensity2 = mix(0.4, 0.03, energy);
+  vec3 fogColor2 = vec3(0.015, 0.012, 0.02);
+  col = mix(col, fogColor2, fogDensity2 * (0.5 + fogNoise2 * 0.5));
 
   // --- Vignette ---
   float vigScale = mix(0.30, 0.22, energy);

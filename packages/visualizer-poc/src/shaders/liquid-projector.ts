@@ -66,6 +66,9 @@ void main() {
   float tempoScale = uLocalTempo / 120.0;
   float sectionSeed = uSectionIndex * 5.7;
 
+  // --- Energy-squared for brightness scaling (quiet = very dark) ---
+  float energySq = energy * energy;
+
   // --- Section type modulation ---
   float sectionT = uSectionType;
   float sJam = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
@@ -82,14 +85,14 @@ void main() {
 
   // --- Coherence morphology: coherent=stable, incoherent=chaotic ---
   float coherenceMix = clamp(uCoherence, 0.0, 1.0);
-  float driftSpeed = mix(0.08, 0.03, coherenceMix); // incoherent = faster drift
+  float driftSpeed = mix(0.04, 0.015, coherenceMix); // halved: incoherent = faster drift
   float bubbleThresholdShift = mix(0.05, -0.02, coherenceMix); // incoherent = more bubbles
 
-  // Time: very slow — oils drift, they don't snap
-  float t = uDynamicTime * 0.04 * tempoScale * convectMod * peakMod;
+  // Time: very slow — oils drift, they don't snap (halved for contemplative pacing)
+  float t = uDynamicTime * 0.02 * tempoScale * convectMod * peakMod;
 
-  // --- Domain warping + energy-responsive detail ---
-  vec2 domainWarpOff = vec2(fbm3(vec3(p * 0.5, uDynamicTime * 0.05)), fbm3(vec3(p * 0.5 + 100.0, uDynamicTime * 0.05))) * 0.3;
+  // --- Domain warping + energy-responsive detail (halved time multipliers) ---
+  vec2 domainWarpOff = vec2(fbm3(vec3(p * 0.5, uDynamicTime * 0.025)), fbm3(vec3(p * 0.5 + 100.0, uDynamicTime * 0.025))) * 0.3;
   float detailMod = 1.0 + energy * 0.5;
 
   // --- Audio integration ---
@@ -101,13 +104,13 @@ void main() {
   // --- Heat convection: bass drives vertical drift (hot oil rises) ---
   float heatPulse = uBass * 0.02 + uFastBass * 0.01;
   vec2 convection = vec2(
-    snoise(vec3(p.x * 2.0, uDynamicTime * 0.05, sectionSeed)) * 0.005,
+    snoise(vec3(p.x * 2.0, uDynamicTime * 0.025, sectionSeed)) * 0.005,
     -(heatPulse + directionDrift) * convectMod
   );
 
-  // --- Heat shimmer: gentle UV displacement from projector bulb heat ---
-  float shimmerX = snoise(vec3(p * 3.0, uDynamicTime * 0.15)) * 0.008;
-  float shimmerY = snoise(vec3(p * 3.0 + 5.0, uDynamicTime * 0.12)) * 0.01;
+  // --- Heat shimmer: gentle UV displacement from projector bulb heat (halved) ---
+  float shimmerX = snoise(vec3(p * 3.0, uDynamicTime * 0.075)) * 0.008;
+  float shimmerY = snoise(vec3(p * 3.0 + 5.0, uDynamicTime * 0.06)) * 0.01;
   vec2 shimmer = vec2(shimmerX, shimmerY) * (0.5 + energy * 0.5);
   p += shimmer;
 
@@ -125,10 +128,10 @@ void main() {
   float layer1Raw = fbm6(warped1 * 0.6);
   float layer1 = bubbleShape(layer1Raw, 0.08 + bubbleThresholdShift, 0.12 / bubbleRateMod);
 
-  // Color: primary palette with warm amber bias
+  // Color: primary palette with warm amber bias (brightness scales with energy^2)
   float hue1 = hsvToCosineHue(uPalettePrimary) + uChromaHue * 0.2 + chordHue;
   vec3 col1 = 0.5 + 0.5 * cos(6.28318 * vec3(hue1, hue1 + 0.33, hue1 + 0.67));
-  col1 *= mix(0.35, 0.9, energy);
+  col1 *= mix(0.04, 0.9, energySq);
 
   // ===========================================================
   // LAYER 2: Medium bubble formations (dye drops)
@@ -142,10 +145,10 @@ void main() {
   float layer2Raw = fbm3(warped2 * 0.9);
   float layer2 = bubbleShape(layer2Raw, 0.12 + bubbleThresholdShift, 0.09 / bubbleRateMod);
 
-  // Color: secondary palette
+  // Color: secondary palette (brightness scales with energy^2)
   float hue2 = hsvToCosineHue(uPaletteSecondary) + uChromaHue * 0.15 + 0.1;
   vec3 col2 = 0.5 + 0.5 * cos(6.28318 * vec3(hue2, hue2 + 0.33, hue2 + 0.67));
-  col2 *= mix(0.3, 0.8, energy);
+  col2 *= mix(0.03, 0.8, energySq);
 
   // ===========================================================
   // LAYER 3: Fine surface tension ripples (water/oil interface)
@@ -158,17 +161,17 @@ void main() {
   float layer3Raw = fbm3(warped3 * 2.0);
   float layer3 = bubbleShape(layer3Raw, 0.15 + bubbleThresholdShift, 0.07 / bubbleRateMod);
 
-  // Color: mix of primary and secondary (tertiary dye)
+  // Color: mix of primary and secondary (tertiary dye) (brightness scales with energy^2)
   float hue3 = mix(hsvToCosineHue(uPalettePrimary), hsvToCosineHue(uPaletteSecondary), 0.5) + 0.25;
   vec3 col3 = 0.5 + 0.5 * cos(6.28318 * vec3(hue3, hue3 + 0.33, hue3 + 0.67));
-  col3 *= mix(0.25, 0.7, energy);
+  col3 *= mix(0.03, 0.7, energySq);
 
   // ===========================================================
   // COMPOSITE: warm amber projector base + additive oil layers
   // ===========================================================
 
-  // Projector bulb base: warm amber/golden tone (the glass itself glows)
-  vec3 bulbColor = vec3(0.06, 0.04, 0.02); // warm dark amber
+  // Projector bulb base: warm dark amber, nearly invisible at low energy
+  vec3 bulbColor = vec3(0.03, 0.02, 0.01) * (0.3 + energySq * 0.7);
   vec3 col = bulbColor;
 
   // Additive blending: like real projected light, colors ADD
@@ -186,20 +189,20 @@ void main() {
                     + mix(col2, col3, 0.5) * 0.12 * overlap23
                     + mix(col1, col3, 0.5) * 0.12 * overlap13
                     + vec3(1.0, 0.95, 0.85) * 0.08 * overlapAll; // white-hot triple overlap
-  col += overlapColor * (0.7 + energy * 0.3);
+  col += overlapColor * (0.5 + energySq * 0.5);
 
   // ===========================================================
   // BUBBLE FORMATION: threshold noise into circular bubble shapes
   // ===========================================================
   {
-    // Small bubbles form from heat — bass drives rate
-    float bubbleNoise = fbm3(vec3(p * 4.0 + convection * 8.0, uDynamicTime * 0.2 * bubbleRateMod));
+    // Small bubbles form from heat — bass drives rate (halved time)
+    float bubbleNoise = fbm3(vec3(p * 4.0 + convection * 8.0, uDynamicTime * 0.1 * bubbleRateMod));
     float bubbleThreshold = 0.35 - uBass * 0.08 - energy * 0.05;
     float bubbles = smoothstep(bubbleThreshold, bubbleThreshold + 0.03, bubbleNoise);
     // Bubble bright edges (light refracts through curved oil surface)
     float bubbleEdge = smoothstep(0.04, 0.01, abs(bubbleNoise - bubbleThreshold)) * 0.2;
-    col += bubbles * vec3(0.04, 0.03, 0.02) * col1; // tinted by primary
-    col += bubbleEdge * vec3(1.0, 0.95, 0.85) * (0.3 + energy * 0.4);
+    col += bubbles * vec3(0.04, 0.03, 0.02) * col1 * energySq;
+    col += bubbleEdge * vec3(1.0, 0.95, 0.85) * (0.1 + energySq * 0.5);
   }
 
   // ===========================================================
@@ -212,7 +215,7 @@ void main() {
     float tension13 = surfaceTension(layer1Raw, layer3Raw, lineWidth * 0.9);
     float tensionTotal = (tension12 + tension23 * 0.8 + tension13 * 0.7) * 0.06;
     // Surface tension lines catch the projector light — bright warm highlights
-    col += tensionTotal * vec3(1.0, 0.92, 0.78) * (0.4 + energy * 0.6) * uHighs;
+    col += tensionTotal * vec3(1.0, 0.92, 0.78) * (0.2 + energySq * 0.8) * uHighs;
   }
 
   // ===========================================================
@@ -223,7 +226,7 @@ void main() {
     float rim2 = bubbleRim(layer2, 0.07) * 0.10;
     float rim3 = bubbleRim(layer3, 0.06) * 0.08;
     vec3 rimLight = vec3(1.0, 0.95, 0.85); // projector bulb color on rims
-    col += rimLight * (rim1 + rim2 + rim3) * (0.5 + energy * 0.5);
+    col += rimLight * (rim1 + rim2 + rim3) * (0.2 + energySq * 0.8);
   }
 
   // ===========================================================
@@ -239,7 +242,7 @@ void main() {
     );
     float beatDist = length(p - beatCenter);
     float beatRing = smoothstep(0.02, 0.0, abs(beatDist - beatEvent * 0.4)) * beatEvent * 0.15;
-    col += beatRing * vec3(1.0, 0.95, 0.85);
+    col += beatRing * vec3(1.0, 0.95, 0.85) * energySq;
   }
 
   // ===========================================================
@@ -259,14 +262,14 @@ void main() {
       // Fresh dye: highly saturated primary color
       float dropHue = hsvToCosineHue(uPalettePrimary) + dropSeed * 0.1;
       vec3 dyeColor = 0.5 + 0.5 * cos(6.28318 * vec3(dropHue, dropHue + 0.33, dropHue + 0.67));
-      col += dyeColor * dropBloom * 0.4;
+      col += dyeColor * dropBloom * 0.4 * energySq;
     }
   }
 
   // ===========================================================
   // VOCAL WARMTH: vocals add golden amber tint (singer = projector operator)
   // ===========================================================
-  col += vec3(0.08, 0.05, 0.02) * vocalWarmth;
+  col += vec3(0.08, 0.05, 0.02) * vocalWarmth * energySq;
 
   // ===========================================================
   // CLIMAX REACTIVITY
@@ -282,11 +285,13 @@ void main() {
   col *= 1.0 + uBeatSnap * 0.2 * (1.0 + climaxBoost * 0.4);
 
   // ===========================================================
-  // PALETTE SATURATION (section-modulated)
+  // PALETTE SATURATION (energy-dependent: quiet = near-monochrome)
   // ===========================================================
   float lum = dot(col, vec3(0.299, 0.587, 0.114));
   vec3 gray = vec3(lum);
-  col = mix(gray, col, mix(0.75, 1.1, uPaletteSaturation) * satMod);
+  // At low energy, saturation drops to 0.35 (near-monochrome). At high energy, full vivid.
+  float energySat = mix(0.35, 1.1, energySq);
+  col = mix(gray, col, energySat * mix(0.75, 1.1, uPaletteSaturation) * satMod);
 
   // ===========================================================
   // COLOR AFTERGLOW
@@ -304,6 +309,14 @@ void main() {
   col *= warmTint;
 
   // ===========================================================
+  // ATMOSPHERIC DEPTH: fog recedes with energy
+  // ===========================================================
+  float fogNoise = fbm3(vec3(p * 0.5, uDynamicTime * 0.012));
+  float fogDensity = mix(0.35, 0.02, energy);
+  vec3 fogColor = vec3(0.02, 0.015, 0.01);
+  col = mix(col, fogColor, fogDensity * (0.4 + fogNoise * 0.6));
+
+  // ===========================================================
   // VIGNETTE: circular lens falloff (projector optics)
   // ===========================================================
   float lensDist = length(p);
@@ -312,7 +325,7 @@ void main() {
   vignette = smoothstep(0.0, 1.0, vignette);
 
   // Colored vignette: warm amber at edges (lens chromatic falloff)
-  vec3 vigTint = vec3(0.06, 0.04, 0.02);
+  vec3 vigTint = vec3(0.03, 0.02, 0.01);
   col = mix(vigTint, col, vignette);
 
   // ===========================================================
@@ -346,11 +359,11 @@ void main() {
   col = stageFloodFill(col, p, uDynamicTime, energy, uPalettePrimary, uPaletteSecondary);
 
   // ===========================================================
-  // LIFTED BLACKS (build-phase-aware)
+  // LOWERED BLACK FLOOR (build-phase-aware)
   // ===========================================================
   float isBuild = step(0.5, uClimaxPhase) * step(uClimaxPhase, 1.5);
   float liftMult = mix(1.0, 0.15, isBuild * uClimaxIntensity);
-  col = max(col, vec3(0.07, 0.05, 0.03) * liftMult); // warm lifted blacks
+  col = max(col, vec3(0.015, 0.012, 0.01) * liftMult); // dark warm black floor
 
   // ===========================================================
   // FEEDBACK TRAILS: oils don't snap, they flow slowly

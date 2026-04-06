@@ -1,15 +1,28 @@
 /**
- * Digital Rain — Matrix-style cascading glyphs.
- * Cascading glyph columns with depth parallax. Beat-synced glitch flash.
- * Chord changes swap glyph sets.
+ * Digital Rain — raymarched 3D volumetric matrix rain.
+ * Columns of glowing descending glyphs at varying Z-distances create a
+ * true volumetric forest of digital rain. Camera moves through the columns.
+ * Each column is a cylinder of descending glyph particles with emission,
+ * volumetric scatter, depth fog, and reflective floor.
  *
- * Audio reactivity:
- *   uEnergy     → fall speed + density
- *   uBeatSnap   → glitch flash
- *   uChordIndex → glyph set selection
- *   uMids       → glyph brightness
- *   uOnset      → character change rate
- *   uBass       → column width
+ * Audio reactivity (14+ uniforms):
+ *   uBass             → column sway amplitude
+ *   uEnergy           → rain density / overall brightness
+ *   uDrumOnset        → wave of brightness through columns
+ *   uVocalPresence    → ambient green glow
+ *   uHarmonicTension  → rain fall speed
+ *   uSectionType      → jam=dense rapid, space=sparse slow, chorus=full downpour
+ *   uClimaxPhase      → rain parts to reveal something behind it
+ *   uClimaxIntensity  → parting intensity
+ *   uMids             → glyph character cycling rate
+ *   uOnset            → glyph mutation flash
+ *   uBeatSnap         → horizontal glitch bands
+ *   uSlowEnergy       → camera drift speed
+ *   uChordIndex       → glyph set rotation
+ *   uPalettePrimary   → rain column tint
+ *   uPaletteSecondary → background / floor tint
+ *   uTimbralBrightness→ emission sharpness
+ *   uSpaceScore       → fog density
  */
 
 import { noiseGLSL } from "./noise";
@@ -24,6 +37,13 @@ void main() {
 }
 `;
 
+const postProcess = buildPostProcessGLSL({
+  bloomEnabled: true,
+  grainStrength: "light",
+  halationEnabled: true,
+  caEnabled: true,
+});
+
 export const digitalRainFrag = /* glsl */ `
 precision highp float;
 
@@ -31,65 +51,179 @@ ${sharedUniformsGLSL}
 
 ${noiseGLSL}
 
-${buildPostProcessGLSL({
-  bloomEnabled: true,
-  grainStrength: "light",
-})}
+${postProcess}
 
 varying vec2 vUv;
 
 #define PI 3.14159265
+#define TAU 6.28318530
+#define MAX_STEPS 80
+#define MAX_DIST 40.0
+#define SURF_DIST 0.002
 
-// Pseudo-random for column seeding
-float hash11(float p) {
+// ─── Hashing ───
+float drHash11(float p) {
   p = fract(p * 0.1031);
   p *= p + 33.33;
   p *= p + p;
   return fract(p);
 }
 
-float hash21(vec2 p) {
+float drHash21(vec2 p) {
   vec3 p3 = fract(vec3(p.xyx) * 0.1031);
   p3 += dot(p3, p3.yzx + 33.33);
   return fract((p3.x + p3.y) * p3.z);
 }
 
-// Glyph pattern — abstract geometric shapes based on grid position
-float glyphPattern(vec2 cellUV, float seed, float chordIdx) {
-  // Rotate based on chord index for visual variety
-  float angle = chordIdx * 0.26;
+vec2 drHash22(vec2 p) {
+  vec3 p3 = fract(vec3(p.xyx) * vec3(0.1031, 0.1030, 0.0973));
+  p3 += dot(p3, p3.yzx + 33.33);
+  return fract((p3.xx + p3.yz) * p3.zy);
+}
+
+// ─── Glyph SDF: abstract geometric glyph within a unit cell ───
+// Returns brightness [0,1] for a glyph at cell-local UV, seed selects shape
+float drGlyph(vec2 cellUV, float seed, float chordIdx) {
+  // Rotate glyph shape by chord index
+  float angle = chordIdx * 0.26 + seed * 1.5;
   float ca = cos(angle), sa = sin(angle);
   vec2 ruv = vec2(ca * cellUV.x - sa * cellUV.y, sa * cellUV.x + ca * cellUV.y);
 
-  // Create abstract glyph from combined shapes
+  // Multi-shape composite: select shapes by seed bands
+  float band = fract(seed * 7.31);
+
   float s1 = step(0.2, abs(ruv.x)) + step(0.2, abs(ruv.y));
-  float s2 = step(0.6, length(ruv));
-  float s3 = step(0.3, abs(ruv.x + ruv.y));
+  float s2 = step(0.55, length(ruv));
+  float s3 = step(0.25, abs(ruv.x + ruv.y));
+  float s4 = step(0.25, abs(ruv.x - ruv.y));
 
-  // Mix shapes based on seed for variety
-  float pattern = mix(s1, s2, fract(seed * 3.7));
-  pattern = mix(pattern, s3, fract(seed * 7.3) * 0.5);
+  float pattern;
+  if (band < 0.25) {
+    pattern = s1 * (1.0 - s2);
+  } else if (band < 0.5) {
+    pattern = s2 + s3 * 0.5;
+  } else if (band < 0.75) {
+    pattern = s3 * s4;
+  } else {
+    pattern = max(s1, s4) * (1.0 - s2);
+  }
 
-  // Add crosshatch lines
-  float lines = step(0.9, fract(ruv.x * 4.0 + seed * 2.0)) +
-                step(0.9, fract(ruv.y * 4.0 + seed * 5.0));
-  pattern = max(pattern, lines * 0.5);
+  // Crosshatch lines for texture
+  float lines = step(0.92, fract(ruv.x * 4.0 + seed * 2.0)) +
+                step(0.92, fract(ruv.y * 4.0 + seed * 5.0));
+  pattern = max(pattern, lines * 0.6);
 
   return clamp(1.0 - pattern, 0.0, 1.0);
+}
+
+// ─── Column: a single rain column at grid position (ix, iz) ───
+// Returns (emission brightness, column distance) for the ray point
+// columnPos: world-space position of the column center (x, z)
+// swayAmount: bass-driven sway
+// fallSpeed: how fast glyphs descend
+// density: 0=absent, 1=full
+// glyphSize: world-space size of each glyph cell
+struct DrColumnResult {
+  float emission;
+  float dist;
+  float headGlow;
+};
+
+DrColumnResult drColumn(vec3 pos, vec2 columnXZ, float columnSeed,
+                        float swayAmount, float fallSpeed, float density,
+                        float glyphSize, float flowTime, float chordIdx,
+                        float onsetMut, float drumWave) {
+  DrColumnResult res;
+  res.emission = 0.0;
+  res.dist = 100.0;
+  res.headGlow = 0.0;
+
+  if (density < 0.01) return res;
+
+  // Column sway (bass-driven sinusoidal displacement)
+  float swayPhase = columnSeed * TAU + flowTime * 0.3;
+  float sx = sin(swayPhase) * swayAmount;
+  float sz = cos(swayPhase * 0.7 + 1.3) * swayAmount * 0.6;
+  vec2 swayedXZ = columnXZ + vec2(sx, sz);
+
+  // Distance from ray point to column axis (infinite cylinder)
+  vec2 delta = pos.xz - swayedXZ;
+  float colDist = length(delta);
+  float colRadius = glyphSize * 0.55;
+
+  res.dist = colDist - colRadius;
+
+  // Only compute glyph emission if we are close to the column
+  if (colDist > colRadius * 3.0) return res;
+
+  // Vertical glyph cell
+  float fallY = pos.y + flowTime * fallSpeed + columnSeed * 50.0;
+  float cellIdx = floor(fallY / glyphSize);
+  float cellFrac = fract(fallY / glyphSize);
+
+  // Cell-local UV for glyph rendering
+  float lateralU = clamp(delta.x / colRadius, -1.0, 1.0);
+  vec2 cellUV = vec2(lateralU, cellFrac * 2.0 - 1.0);
+
+  // Glyph seed: changes with onset for mutation effect
+  float glyphSeed = drHash21(vec2(columnSeed * 127.0, cellIdx + floor(onsetMut)));
+
+  float glyph = drGlyph(cellUV, glyphSeed, chordIdx);
+
+  // Trail fade: head of column is brightest, fading tail behind
+  float trailLen = 10.0 + density * 8.0;
+  float trailHead = fract(flowTime * fallSpeed * 0.08 + columnSeed * 5.0);
+  float normalizedY = fract(fallY * 0.015);
+  float trailDist = fract(trailHead - normalizedY);
+  float trailFade = smoothstep(trailLen * 0.015, 0.0, trailDist);
+
+  // Head glow: the leading character is white-hot
+  float headBright = smoothstep(0.015, 0.0, trailDist) * 2.0;
+  res.headGlow = headBright * glyph * density;
+
+  // Drum onset wave: bright pulse travelling down the column
+  float drumPhase = fract(flowTime * 0.5 - pos.y * 0.05 + columnSeed * 0.3);
+  float drumPulse = drumWave * smoothstep(0.05, 0.0, abs(drumPhase - 0.5)) * 3.0;
+
+  // Column emission (cylindrical falloff)
+  float cylFalloff = 1.0 - smoothstep(0.0, colRadius, colDist);
+  res.emission = glyph * (trailFade + headBright + drumPulse) * density * cylFalloff;
+
+  return res;
+}
+
+// ─── Floor: reflective ground plane with rain column reflections ───
+float drFloor(vec3 pos) {
+  return pos.y + 3.0; // floor at y = -3
+}
+
+// ─── Scene distance function ───
+// We raymarch a simplified field: floor plane + volumetric column sampling
+float drMap(vec3 pos) {
+  float floorDist = drFloor(pos);
+  return floorDist;
 }
 
 void main() {
   vec2 uv = vUv;
   vec2 aspect = vec2(uResolution.x / uResolution.y, 1.0);
-  vec2 p = (uv - 0.5) * aspect;
+  vec2 screenP = (uv - 0.5) * aspect;
 
+  // === AUDIO READS (14+ uniforms) ===
   float energy = clamp(uEnergy, 0.0, 1.0);
   float bass = clamp(uBass, 0.0, 1.0);
   float mids = clamp(uMids, 0.0, 1.0);
   float onset = clamp(uOnset, 0.0, 1.0);
+  float drumOnset = clamp(uDrumOnset, 0.0, 1.0);
   float beatSnap = clamp(uBeatSnap, 0.0, 1.0);
+  float vocalPresence = clamp(uVocalPresence, 0.0, 1.0);
+  float tension = clamp(uHarmonicTension, 0.0, 1.0);
+  float slowEnergy = clamp(uSlowEnergy, 0.0, 1.0);
   float chordIndex = uChordIndex;
-  float chromaHueMod = uChromaHue * 0.15;
+  float timbralBright = clamp(uTimbralBrightness, 0.0, 1.0);
+  float spaceScore = clamp(uSpaceScore, 0.0, 1.0);
+  float climaxPhase = uClimaxPhase;
+  float climaxIntensity = clamp(uClimaxIntensity, 0.0, 1.0);
 
   // === SECTION-TYPE MODULATION ===
   float sectionT = uSectionType;
@@ -98,150 +232,256 @@ void main() {
   float sChorus = smoothstep(1.5, 2.5, sectionT) * (1.0 - step(2.5, sectionT));
   float sSolo = smoothstep(3.5, 4.5, sectionT) * (1.0 - step(4.5, sectionT));
 
-  float slowTime = uDynamicTime;
-  float energyDetail = 1.0 + energy * 0.5;
+  float flowTime = uDynamicTime;
+  float chromaHueMod = uChromaHue * 0.15;
 
-  // === DOMAIN WARPING: organic UV distortion for psychedelic feel ===
-  p += vec2(fbm3(vec3(p * 0.5 * energyDetail, uDynamicTime * 0.05)), fbm3(vec3(p * 0.5 * energyDetail + 100.0, uDynamicTime * 0.05))) * 0.3;
+  // === DERIVED PARAMETERS ===
+  // Rain fall speed: tension drives speed, section-type modulates
+  float fallSpeed = (0.6 + tension * 0.8 + energy * 0.4)
+                  * mix(1.0, 1.8, sJam)    // jam: rapid
+                  * mix(1.0, 0.25, sSpace)  // space: slow drip
+                  * mix(1.0, 1.4, sChorus); // chorus: downpour
 
-  // --- Column parameters ---
-  float columnWidth = mix(0.03, 0.02, bass) * mix(1.0, 0.8, sJam) * mix(1.0, 1.5, sSpace);
-  float fallSpeed = (0.3 + energy * 0.5) * mix(1.0, 1.5, sJam) * mix(1.0, 0.3, sSpace) * mix(1.0, 1.2, sChorus);
-  float glyphSize = columnWidth * 0.9;
+  // Column sway from bass
+  float swayAmount = bass * 0.4 + 0.05;
 
-  // Background: deep with fbm6 texture and dual palette colors
-  float bgDetail = fbm6(vec3(p * 2.0 * energyDetail, slowTime * 0.03));
-  float bgHue1 = hsvToCosineHue(uPalettePrimary);
-  float bgHue2 = hsvToCosineHue(uPaletteSecondary);
-  vec3 bgCol1 = 0.5 + 0.5 * cos(6.28318 * vec3(bgHue1, bgHue1 + 0.33, bgHue1 + 0.67));
-  vec3 bgCol2 = 0.5 + 0.5 * cos(6.28318 * vec3(bgHue2, bgHue2 + 0.33, bgHue2 + 0.67));
-  vec3 col = vec3(0.005, 0.008, 0.005) + mix(bgCol1, bgCol2, bgDetail * 0.5 + 0.5) * 0.02;
+  // Rain density: energy-driven, section-modulated
+  float rainDensity = (0.4 + energy * 0.5)
+                    * mix(1.0, 1.4, sJam)
+                    * mix(1.0, 0.3, sSpace)
+                    * mix(1.0, 1.3, sChorus)
+                    * mix(1.0, 1.1, sSolo);
 
-  // --- Cascading columns ---
-  float numColumns = 1.0 / columnWidth;
+  // Glyph size (world space)
+  float glyphSize = 0.3;
 
-  // Column index
-  float colIdx = floor((p.x + 0.5 * aspect.x) / columnWidth);
-  float colCenter = (colIdx + 0.5) * columnWidth - 0.5 * aspect.x;
+  // Onset mutation rate
+  float onsetMut = onset * 3.0 + flowTime * mids * 0.2;
 
-  // Column-specific properties
-  float colSeed = hash11(colIdx * 127.1);
-  float colSpeed = fallSpeed * (0.5 + colSeed * 1.0);
-  float colPhase = colSeed * 100.0;
+  // === CLIMAX: rain parting ===
+  float isClimax = step(1.5, climaxPhase) * step(climaxPhase, 3.5);
+  float climaxBoost = isClimax * climaxIntensity;
+  float rainPartFactor = climaxBoost * 0.6; // columns thin out at climax
 
-  // Vertical position in column
-  float colY = p.y + slowTime * colSpeed + colPhase;
+  // === PALETTE ===
+  float hue1 = hsvToCosineHue(uPalettePrimary) + chromaHueMod;
+  float hue2 = hsvToCosineHue(uPaletteSecondary) + chromaHueMod * 0.5;
+  float chordHue = float(int(chordIndex)) / 24.0 * 0.1;
+  vec3 rainColor1 = 0.5 + 0.5 * cos(TAU * vec3(hue1 + chordHue, hue1 + chordHue + 0.33, hue1 + chordHue + 0.67));
+  vec3 rainColor2 = 0.5 + 0.5 * cos(TAU * vec3(hue2, hue2 + 0.33, hue2 + 0.67));
+  float sat = uPaletteSaturation;
 
-  // Glyph cell
-  float cellIdx = floor(colY / glyphSize);
-  vec2 cellUV = vec2(
-    (p.x - colCenter) / glyphSize,
-    fract(colY / glyphSize)
-  );
-  cellUV = cellUV * 2.0 - 1.0; // -1 to 1
+  // === CAMERA SETUP ===
+  vec3 ro, rd;
+  setupCameraRay(uv, aspect, ro, rd);
 
-  // Glyph seed changes based on onset
-  float glyphSeed = hash21(vec2(colIdx, cellIdx + floor(onset * 2.0 + slowTime * 0.1)));
+  // Gentle camera drift through the rain field
+  float driftPhase = flowTime * 0.04 * (1.0 + slowEnergy * 0.3);
+  ro.x += sin(driftPhase) * 2.0;
+  ro.z += flowTime * 0.15 * (1.0 + slowEnergy * 0.2);
+  ro.y = mix(0.0, 0.5, energy); // slight vertical lift at high energy
 
-  // Character change rate from onset
-  float changeRate = onset * 0.5;
-  glyphSeed += floor(slowTime * changeRate) * 0.1;
+  // === FLOOR RAYMARCH ===
+  // March to find the floor plane for reflections
+  float floorT = -1.0;
+  if (rd.y < -0.001) {
+    floorT = -(ro.y + 3.0) / rd.y;
+  }
 
-  // Draw glyph
-  float glyph = glyphPattern(cellUV, glyphSeed, chordIndex);
+  // === VOLUMETRIC RAIN COLUMN ACCUMULATION ===
+  // Instead of marching SDF, we sample columns along the ray via grid traversal
+  vec3 col = vec3(0.0);
+  float totalEmission = 0.0;
+  float totalHeadGlow = 0.0;
 
-  // Fade trail: brighter at top of column
-  float trailLen = 8.0 + energy * 12.0;
-  float trailHead = fract(slowTime * colSpeed * 0.1 + colSeed * 10.0);
-  float normalizedY = fract(colY * 0.02);
-  float trailDist = fract(trailHead - normalizedY);
-  float trailFade = smoothstep(trailLen * 0.02, 0.0, trailDist);
+  // Grid spacing for column placement
+  float gridSpacing = 1.5;
+  int numSamples = int(mix(40.0, 70.0, energy));
 
-  // Head brightness (lead character is brightest)
-  float headGlow = smoothstep(0.02, 0.0, trailDist) * 1.5;
+  // March along the ray, sampling rain columns
+  for (int i = 0; i < 70; i++) {
+    if (i >= numSamples) break;
+    float fi = float(i);
+    float marchT = 0.3 + fi * 0.5;
 
-  // Column density varies
-  float density = step(0.3 - energy * 0.2, colSeed);
+    // Don't sample past max distance or past the floor
+    if (marchT > MAX_DIST) break;
+    if (floorT > 0.0 && marchT > floorT) break;
 
-  // Color — dual palette with smooth blending
-  float hue = uPalettePrimary + chromaHueMod;
-  float hue2 = uPaletteSecondary + chromaHueMod * 0.5;
-  float sat = mix(0.6, 1.0, mids) * uPaletteSaturation;
-  float val = glyph * (trailFade + headGlow) * density * mids;
+    vec3 samplePos = ro + rd * marchT;
 
-  // Head character is white-tinted, body uses dual palette
-  vec3 bodyColor = mix(
-    hsv2rgb(vec3(hue, sat, val)),
-    hsv2rgb(vec3(hue2, sat * 0.9, val * 0.8)),
-    trailDist * 0.6
-  );
-  vec3 glyphColor = mix(
-    bodyColor,
-    vec3(val * 1.2),
-    headGlow * 0.5
-  );
+    // Find the nearest column grid cell
+    vec2 gridCell = floor(samplePos.xz / gridSpacing);
 
-  col += glyphColor;
+    // Check 3x3 neighborhood for nearby columns
+    for (int gx = -1; gx <= 1; gx++) {
+      for (int gz = -1; gz <= 1; gz++) {
+        vec2 cell = gridCell + vec2(float(gx), float(gz));
+        float cellSeed = drHash21(cell);
 
-  // --- Depth parallax: background layer ---
-  float bgColumnWidth = columnWidth * 2.0;
-  float bgColIdx = floor((p.x + 0.5 * aspect.x) / bgColumnWidth);
-  float bgColSeed = hash11(bgColIdx * 237.5);
-  float bgY = p.y + slowTime * fallSpeed * 0.3 + bgColSeed * 50.0;
-  float bgCellIdx = floor(bgY / (bgColumnWidth * 0.9));
-  float bgGlyphSeed = hash21(vec2(bgColIdx, bgCellIdx));
-  vec2 bgCellUV = vec2(
-    (p.x - (bgColIdx + 0.5) * bgColumnWidth + 0.5 * aspect.x) / (bgColumnWidth * 0.9),
-    fract(bgY / (bgColumnWidth * 0.9))
-  ) * 2.0 - 1.0;
-  float bgGlyph = glyphPattern(bgCellUV, bgGlyphSeed, chordIndex);
-  float bgFade = fract(slowTime * 0.05 + bgColSeed * 5.0);
-  bgFade = smoothstep(0.5, 0.0, bgFade);
-  col += hsv2rgb(vec3(hue + 0.05, sat * 0.5, bgGlyph * bgFade * 0.08));
+        // Column density (some cells empty for natural look)
+        float colDensity = step(1.0 - rainDensity, cellSeed);
 
-  // === SECONDARY LAYER: flowing organic nebula behind the rain ===
-  float nebulaVal = fbm6(vec3(p * 1.5 * energyDetail + 50.0, slowTime * 0.02));
-  float nebHue1 = hsvToCosineHue(uPalettePrimary) + nebulaVal * 0.15;
-  float nebHue2 = hsvToCosineHue(uPaletteSecondary) + nebulaVal * 0.1;
-  vec3 nebCol1 = 0.5 + 0.5 * cos(6.28318 * vec3(nebHue1, nebHue1 + 0.33, nebHue1 + 0.67));
-  vec3 nebCol2 = 0.5 + 0.5 * cos(6.28318 * vec3(nebHue2, nebHue2 + 0.33, nebHue2 + 0.67));
-  vec3 nebulaLayer = mix(nebCol1, nebCol2, nebulaVal * 0.5 + 0.5) * (0.04 + energy * 0.06);
-  col = mix(col, col + nebulaLayer, 0.3);
+        // Climax parting: columns near center thin out
+        float centerDist = length(cell * gridSpacing - ro.xz);
+        colDensity *= mix(1.0, smoothstep(2.0, 6.0, centerDist), rainPartFactor);
 
-  // --- Beat-synced glitch flash ---
+        if (colDensity < 0.01) continue;
+
+        // Column world position (jittered within grid cell)
+        vec2 jitter = drHash22(cell) * 0.6 - 0.3;
+        vec2 columnXZ = (cell + 0.5 + jitter) * gridSpacing;
+
+        DrColumnResult cr = drColumn(
+          samplePos, columnXZ, cellSeed,
+          swayAmount, fallSpeed, colDensity,
+          glyphSize, flowTime, chordIndex,
+          onsetMut, drumOnset
+        );
+
+        if (cr.emission > 0.001) {
+          // Depth fog attenuation
+          float fogAtten = exp(-marchT * (0.04 + spaceScore * 0.06));
+
+          // Color: blend primary/secondary by depth, head is white-hot
+          float depthBlend = marchT / MAX_DIST;
+          vec3 glyphCol = mix(rainColor1, rainColor2, depthBlend * 0.6 + cellSeed * 0.3);
+          glyphCol = mix(glyphCol, vec3(1.0), 0.15 * sat); // saturation pushes toward white
+
+          // Timbral brightness sharpens emission
+          float sharpness = 1.0 + timbralBright * 0.5;
+
+          vec3 emitColor = glyphCol * pow(cr.emission, 1.0 / sharpness) * fogAtten;
+
+          // Head glow is near-white
+          vec3 headColor = mix(glyphCol, vec3(1.0, 0.98, 0.92), 0.7) * cr.headGlow * fogAtten;
+
+          col += emitColor * 0.06 + headColor * 0.04;
+          totalEmission += cr.emission * fogAtten;
+          totalHeadGlow += cr.headGlow * fogAtten;
+        }
+      }
+    }
+  }
+
+  // === VOLUMETRIC SCATTER (green ambient haze from vocal presence) ===
+  {
+    float scatterAccum = 0.0;
+    int scatterSteps = 16;
+    for (int i = 0; i < 16; i++) {
+      float fi = float(i);
+      float st = 0.5 + fi * 1.5;
+      if (st > MAX_DIST) break;
+      vec3 sp = ro + rd * st;
+      float noiseDensity = fbm3(sp * 0.15 + vec3(flowTime * 0.02, 0.0, flowTime * 0.01));
+      noiseDensity = max(0.0, noiseDensity);
+      float fogAtten = exp(-st * 0.06);
+      scatterAccum += noiseDensity * fogAtten * 0.04;
+    }
+    // Vocal presence makes the scatter green-tinted
+    vec3 scatterColor = mix(rainColor2 * 0.15, vec3(0.05, 0.25, 0.08), vocalPresence * 0.7);
+    col += scatterColor * scatterAccum * (0.6 + energy * 0.8);
+  }
+
+  // === FLOOR REFLECTION ===
+  if (floorT > 0.0 && floorT < MAX_DIST) {
+    vec3 floorPos = ro + rd * floorT;
+
+    // Floor base color: dark with subtle grid pattern
+    vec2 floorUV = floorPos.xz * 0.5;
+    float gridLine = smoothstep(0.02, 0.0, abs(fract(floorUV.x) - 0.5)) +
+                     smoothstep(0.02, 0.0, abs(fract(floorUV.y) - 0.5));
+    vec3 floorBase = rainColor2 * 0.02 + vec3(gridLine * 0.015);
+
+    // Fresnel-like reflection strength (steeper angle = more reflection)
+    float fresnel = pow(1.0 - abs(rd.y), 4.0);
+
+    // Reflected rain: sample a few nearby column reflections on the floor
+    vec3 reflectedRain = vec3(0.0);
+    vec2 floorGrid = floor(floorPos.xz / gridSpacing);
+    for (int gx = -2; gx <= 2; gx++) {
+      for (int gz = -2; gz <= 2; gz++) {
+        vec2 cell = floorGrid + vec2(float(gx), float(gz));
+        float cellSeed = drHash21(cell);
+        if (cellSeed < 1.0 - rainDensity) continue;
+
+        vec2 jitter = drHash22(cell) * 0.6 - 0.3;
+        vec2 columnXZ = (cell + 0.5 + jitter) * gridSpacing;
+        float colDist = length(floorPos.xz - columnXZ);
+        float reflGlow = exp(-colDist * colDist * 0.8);
+
+        // Trail phase for column brightness at this moment
+        float trailHead = fract(flowTime * fallSpeed * 0.08 + cellSeed * 5.0);
+        float brightness = 0.3 + 0.7 * trailHead;
+
+        float depthBlend = cellSeed * 0.5;
+        vec3 refCol = mix(rainColor1, rainColor2, depthBlend);
+        reflectedRain += refCol * reflGlow * brightness * 0.08;
+      }
+    }
+
+    // Floor fog attenuation
+    float floorFog = exp(-floorT * 0.05);
+    vec3 floorColor = floorBase + reflectedRain * fresnel;
+    col = mix(col, floorColor * floorFog, smoothstep(MAX_DIST, 2.0, floorT) * 0.7);
+  }
+
+  // === DEPTH FOG: far columns dissolve into background ===
+  {
+    float fogBase = fbm3(vec3(screenP * 0.8, flowTime * 0.02)) * 0.3 + 0.1;
+    vec3 fogColor = mix(vec3(0.005, 0.012, 0.005), rainColor2 * 0.04, 0.3);
+    fogColor += vec3(0.02, 0.08, 0.02) * vocalPresence; // vocal green ambient
+    float fogMask = 1.0 - exp(-totalEmission * 0.5);
+    col = mix(fogColor * fogBase, col, 0.3 + 0.7 * clamp(totalEmission * 2.0, 0.0, 1.0));
+  }
+
+  // === CLIMAX REVEAL: something behind the rain ===
+  if (climaxBoost > 0.01) {
+    // A pulsing bright core visible through the parted rain
+    float revealDist = length(screenP);
+    float revealGlow = exp(-revealDist * revealDist * 2.0) * climaxBoost;
+    // Bright mandala / sigil shape behind the rain
+    float revealAngle = atan(screenP.y, screenP.x);
+    float revealPattern = 0.5 + 0.5 * sin(revealAngle * 6.0 + flowTime * 0.5);
+    revealPattern *= 0.5 + 0.5 * sin(revealDist * 8.0 - flowTime * 2.0);
+    vec3 revealColor = mix(rainColor1 * 2.0, vec3(1.0, 0.95, 0.85), 0.5);
+    col += revealColor * revealGlow * (0.3 + revealPattern * 0.4) * (1.0 - totalEmission * 0.3);
+  }
+
+  // === DRUM ONSET WAVE: horizontal band of brightness ===
+  if (drumOnset > 0.05) {
+    float waveFront = fract(flowTime * 0.8);
+    float waveY = mix(-1.0, 1.0, waveFront);
+    float waveDist = abs(screenP.y - waveY);
+    float waveBright = drumOnset * smoothstep(0.15, 0.0, waveDist) * 0.4;
+    col += rainColor1 * waveBright;
+  }
+
+  // === BEAT GLITCH ===
   if (beatSnap > 0.5) {
     float glitchStrength = (beatSnap - 0.5) * 2.0;
-    float glitchY = hash11(floor(p.y * 20.0 + slowTime * 100.0));
-    float glitchBand = step(0.85, glitchY);
-    col += vec3(0.1, 0.3, 0.1) * glitchBand * glitchStrength;
-
-    // Horizontal shift on strong beats
-    float shift = glitchStrength * 0.02 * sin(p.y * 50.0);
-    col.r += col.g * abs(shift) * 5.0;
+    float glitchY = drHash11(floor(screenP.y * 20.0 + flowTime * 100.0));
+    float glitchBand = step(0.88, glitchY);
+    col += rainColor1 * 0.2 * glitchBand * glitchStrength;
+    // Chromatic split on strong beats
+    col.r += col.g * glitchStrength * 0.15;
+    col.b += col.g * glitchStrength * 0.08;
   }
 
-  // --- Climax boost ---
-  float isClimax = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5);
-  float climaxBoost = isClimax * uClimaxIntensity;
-  col *= 1.0 + climaxBoost * 0.5;
+  // === ENERGY BRIGHTNESS ===
+  col *= 0.7 + energy * 0.6;
 
-
-  // --- SDF icon emergence ---
+  // === DEAD ICONOGRAPHY ===
   {
-    float nf = fbm3(vec3(p * 2.0, slowTime * 0.05));
-    vec3 c1 = hsv2rgb(vec3(uPalettePrimary, 0.8, 1.0));
-    vec3 c2 = hsv2rgb(vec3(uPaletteSecondary, 0.8, 1.0));
-    col += iconEmergence(p, uTime, energy, bass, c1, c2, nf, uClimaxPhase, uSectionIndex) * 0.5;
+    float nf = fbm3(vec3(screenP * 2.0, flowTime * 0.05));
+    vec3 c1 = mix(rainColor1, vec3(0.2, 1.0, 0.3), 0.3);
+    vec3 c2 = mix(rainColor2, vec3(0.1, 0.6, 0.2), 0.3);
+    col += iconEmergence(screenP, uTime, energy, bass, c1, c2, nf, uClimaxPhase, uSectionIndex);
+    col += heroIconEmergence(screenP, uTime, energy, bass, c1, c2, nf, uSectionIndex);
   }
 
-  // --- Vignette ---
-  float vigScale = mix(0.28, 0.20, energy);
-  float vignette = 1.0 - dot(p * vigScale, p * vigScale);
-  vignette = smoothstep(0.0, 1.0, vignette);
-  col = mix(vec3(0.002, 0.005, 0.002), col, vignette);
-
-  // --- Post-processing ---
-  col = applyPostProcess(col, vUv, p);
+  // === POST-PROCESSING ===
+  col = applyPostProcess(col, uv, screenP);
 
   gl_FragColor = vec4(col, 1.0);
 }

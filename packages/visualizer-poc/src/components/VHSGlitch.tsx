@@ -10,6 +10,8 @@ import React from "react";
 import { useCurrentFrame, useVideoConfig, interpolate } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
 import { seeded } from "../utils/seededRandom";
+import { useAudioSnapshot } from "./parametric/audio-helpers";
+import { useTempoFactor } from "../data/TempoContext";
 
 // ── GLITCH EVENTS ───────────────────────────────────────────────
 
@@ -46,16 +48,9 @@ interface Props {
 export const VHSGlitch: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
-
-  // Rolling energy (151-frame window)
-  const idx = Math.min(Math.max(0, frame), frames.length - 1);
-  let eSum = 0;
-  let eCount = 0;
-  for (let i = Math.max(0, idx - 75); i <= Math.min(frames.length - 1, idx + 75); i++) {
-    eSum += frames[i].rms;
-    eCount++;
-  }
-  const energy = eCount > 0 ? eSum / eCount : 0;
+  const snap = useAudioSnapshot(frames);
+  const tempoFactor = useTempoFactor();
+  const { energy, bass, onsetEnvelope } = snap;
 
   // Pre-compute glitch events deterministically
   const glitchEvents = React.useMemo(() => {
@@ -124,8 +119,8 @@ export const VHSGlitch: React.FC<Props> = ({ frames }) => {
     opacity: 0.2 + rng() * 0.6,
   }));
 
-  // Color channel split offset
-  const channelOffset = 2 + intensity * 10;
+  // Color channel split offset — bass-driven for that woofy distortion
+  const channelOffset = 2 + intensity * 10 + bass * 6;
 
   // Rapid flicker (on/off per frame)
   const flickerOn = rng() > 0.25;
@@ -191,12 +186,12 @@ export const VHSGlitch: React.FC<Props> = ({ frames }) => {
           />
         ))}
 
-        {/* Tracking distortion line */}
+        {/* Tracking distortion line — tempo-scaled scan speed */}
         <rect
           x={0}
-          y={((frame * 3.7) % height)}
+          y={((frame * 3.7 * tempoFactor) % height)}
           width={width}
-          height={2}
+          height={2 + onsetEnvelope * 4}
           fill={`rgba(255, 255, 255, ${0.5 * intensity})`}
         />
       </svg>
