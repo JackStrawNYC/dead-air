@@ -1,29 +1,27 @@
 /**
- * Fluid 2D — Navier-Stokes-inspired 2D fluid simulation shader.
+ * Fluid Cavern — raymarched 3D underground river cavern.
  *
- * Uses ping-pong feedback buffers (MultiPassQuad) to carry fluid state
- * between frames. The previous frame's output is available as uPrevFrame.
+ * Full SDF scene: water surface with reflections, stalactites/stalagmites
+ * as SDF geometry, water erosion patterns on cave walls, volumetric mist.
+ * Camera glides through an immense subterranean space.
  *
- * Single-pass approximation of fluid dynamics:
- *   - Advection: read previous frame at velocity-offset position
- *   - Velocity field: curl noise + audio-driven forces
- *   - Diffusion: 5-tap blur of advected color
- *   - Color injection: palette-colored dye on beats/onsets
- *   - Decay: gradual fade to prevent infinite accumulation
- *
- * Audio mapping:
- *   bass     -> radial velocity burst from center (pushes color outward)
- *   vocals   -> upward laminar flow (gentle vertical push)
- *   onsets   -> inject color splashes at center
- *   energy   -> diffusion rate (higher = faster spread)
- *   drumOnset -> secondary color injection trigger
- *   chromaHue -> injection color variation
- *   beatSnap -> radial pulse ripple
- *   jamDensity -> curl noise complexity (more octaves at high density)
- *
- * Note: The fluid effect only works properly during sequential rendering
- * (video export). During Remotion preview/seeking, MultiPassQuad's gap
- * detection resets the feedback buffer, so the fluid starts fresh.
+ * Audio reactivity (14+ uniforms):
+ *   uBass            -> water surface ripple amplitude, stalactite pulse
+ *   uEnergy          -> mist density, step count, overall brightness
+ *   uOnsetSnap       -> water splash burst, stalagmite growth spike
+ *   uDrumOnset       -> cavern shake, ripple impulse
+ *   uVocalEnergy     -> bioluminescent glow on cave walls
+ *   uVocalPresence   -> warm mist tint
+ *   uHighs           -> water surface specular sharpness
+ *   uSlowEnergy      -> camera drift speed, mist drift
+ *   uBeatSnap        -> stalactite drip flash
+ *   uHarmonicTension -> cave wall erosion complexity
+ *   uMelodicPitch    -> water color depth
+ *   uChordIndex      -> palette hue shift
+ *   uStemBass        -> sub-surface water glow
+ *   uTimbralBrightness -> specular highlight intensity
+ *   uClimaxPhase     -> cavern opens up, light floods in
+ *   uPalettePrimary/Secondary -> cave/water palette
  */
 
 import { noiseGLSL } from "./noise";
@@ -42,256 +40,413 @@ export const fluid2DFrag = /* glsl */ `
 precision highp float;
 
 ${sharedUniformsGLSL}
-uniform sampler2D uPrevFrame;
 
 ${noiseGLSL}
 
-// Feedback texture from MultiPassQuad (previous frame's output)
-
-${buildPostProcessGLSL({ grainStrength: 'light', flareEnabled: false, bloomEnabled: true, halationEnabled: true, temporalBlendEnabled: true })}
+${buildPostProcessGLSL({ grainStrength: 'light', bloomEnabled: true, halationEnabled: true, caEnabled: true, dofEnabled: true })}
 
 varying vec2 vUv;
 
 #define PI 3.14159265
+#define F2_MAX_STEPS 80
+#define F2_MAX_DIST 40.0
+#define F2_SURF_DIST 0.002
+#define F2_MIST_STEPS 24
 
-// ─── Curl-noise velocity field ───
-// Simplified 2D curl from 3D noise derivatives.
-// Uses fbm3 for performance (3 octaves); full curlNoise is 12 evals per call.
-vec2 curlVelocity(vec2 p, float t) {
-  float eps = 0.01;
-  float n1 = fbm3(vec3(p.x + eps, p.y, t));
-  float n2 = fbm3(vec3(p.x - eps, p.y, t));
-  float n3 = fbm3(vec3(p.x, p.y + eps, t));
-  float n4 = fbm3(vec3(p.x, p.y - eps, t));
-  // Curl in 2D: (dN/dy, -dN/dx) for divergence-free flow
-  float dNdy = (n3 - n4) / (2.0 * eps);
-  float dNdx = (n1 - n2) / (2.0 * eps);
-  return vec2(dNdy, -dNdx);
+// ─── Prefixed SDF primitives ───
+
+float f2Sphere(vec3 pos, float radius) {
+  return length(pos) - radius;
+}
+
+float f2Box(vec3 pos, vec3 dims) {
+  vec3 q = abs(pos) - dims;
+  return length(max(q, 0.0)) + min(max(q.x, max(q.y, q.z)), 0.0);
+}
+
+float f2Cylinder(vec3 pos, float radius, float halfHeight) {
+  vec2 d = vec2(length(pos.xz) - radius, abs(pos.y) - halfHeight);
+  return min(max(d.x, d.y), 0.0) + length(max(d, 0.0));
+}
+
+float f2Capsule(vec3 pos, vec3 a, vec3 b, float radius) {
+  vec3 ab = b - a;
+  float param = clamp(dot(pos - a, ab) / dot(ab, ab), 0.0, 1.0);
+  return length(pos - a - param * ab) - radius;
+}
+
+float f2SmoothMin(float a, float b, float k) {
+  float h = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0);
+  return mix(b, a, h) - k * h * (1.0 - h);
+}
+
+float f2SmoothMax(float a, float b, float k) {
+  return -f2SmoothMin(-a, -b, k);
+}
+
+// ─── Stalactite SDF: elongated cone with noise displacement ───
+float f2Stalactite(vec3 pos, vec3 base, float length2, float radius, float seed, float timeVal) {
+  vec3 local = pos - base;
+  float param = clamp(-local.y / length2, 0.0, 1.0);
+  float coneR = radius * (1.0 - param * 0.85);
+  float dist2D = length(local.xz) - coneR;
+  float distY = max(-local.y - length2, local.y);
+  float dist = max(dist2D, distY);
+  // Noise displacement for organic feel
+  float noiseDisp = snoise(vec3(pos.xz * 2.0 + seed, timeVal * 0.02)) * 0.06 * param;
+  return dist + noiseDisp;
+}
+
+// ─── Stalagmite SDF: inverted stalactite growing up ───
+float f2Stalagmite(vec3 pos, vec3 base, float height, float radius, float seed, float timeVal) {
+  vec3 local = pos - base;
+  float param = clamp(local.y / height, 0.0, 1.0);
+  float coneR = radius * (1.0 - param * 0.9);
+  float dist2D = length(local.xz) - coneR;
+  float distY = max(local.y - height, -local.y);
+  float dist = max(dist2D, distY);
+  float noiseDisp = snoise(vec3(pos.xz * 2.5 + seed + 50.0, timeVal * 0.015)) * 0.05 * param;
+  return dist + noiseDisp;
+}
+
+// ─── Cave walls: infinite tube with FBM displacement ───
+float f2CaveWalls(vec3 pos, float timeVal, float tension) {
+  float tubeR = 4.5 + sin(pos.z * 0.15) * 1.2 + cos(pos.z * 0.08 + 1.0) * 0.8;
+  float tubeDist = tubeR - length(pos.xy);
+
+  // Erosion patterns: ridged FBM displacement
+  int erosionOctaves = 3 + int(tension * 3.0);
+  float erosion = ridgedMultifractal(vec3(pos.xz * 0.3, pos.y * 0.2 + timeVal * 0.01), erosionOctaves, 2.2, 0.5);
+  tubeDist -= erosion * 0.6;
+
+  // Large-scale warping
+  tubeDist -= fbm3(vec3(pos * 0.15 + timeVal * 0.005)) * 0.8;
+
+  return -tubeDist;
+}
+
+// ─── Water surface: infinite plane with ripples ───
+float f2WaterSurface(vec3 pos, float timeVal, float bass, float drumOnset) {
+  float waterY = -1.8;
+  // Multi-frequency ripples
+  float ripple = sin(pos.x * 3.0 + timeVal * 1.2) * 0.04
+               + sin(pos.z * 2.5 - timeVal * 0.8) * 0.03
+               + sin(pos.x * 7.0 + pos.z * 5.0 + timeVal * 2.5) * 0.015;
+  // Bass drives big waves
+  ripple += sin(pos.x * 1.2 + pos.z * 0.8 + timeVal * 0.6) * bass * 0.1;
+  // Drum impulse splash
+  float splashDist = length(pos.xz);
+  ripple += sin(splashDist * 8.0 - timeVal * 6.0) * drumOnset * 0.08 * exp(-splashDist * 0.3);
+
+  return pos.y - waterY - ripple;
+}
+
+// ─── Full scene SDF ───
+// Returns vec2(distance, materialID): 0=cave, 1=stalactite, 2=stalagmite, 3=water
+vec2 f2SceneMap(vec3 pos, float timeVal, float bass, float drumOnset, float tension, float onset) {
+  // Cave walls
+  float cave = f2CaveWalls(pos, timeVal, tension);
+  vec2 result = vec2(cave, 0.0);
+
+  // Water surface
+  float water = f2WaterSurface(pos, timeVal, bass, drumOnset);
+  if (water < result.x) result = vec2(water, 3.0);
+
+  // Stalactites (ceiling)
+  for (int idx = 0; idx < 6; idx++) {
+    float fi = float(idx);
+    float seedVal = fi * 7.31;
+    vec3 sBase = vec3(
+      sin(seedVal * 1.3 + 2.0) * 3.0,
+      2.5 + sin(seedVal * 0.7) * 0.5,
+      fi * 2.5 - 6.0 + sin(seedVal) * 1.5
+    );
+    float sLen = 1.2 + sin(seedVal * 2.1) * 0.6 + onset * 0.3;
+    float sRad = 0.15 + sin(seedVal * 3.7) * 0.05;
+    float stal = f2Stalactite(pos, sBase, sLen, sRad, seedVal, timeVal);
+    if (stal < result.x) result = vec2(stal, 1.0);
+  }
+
+  // Stalagmites (floor)
+  for (int idx = 0; idx < 5; idx++) {
+    float fi = float(idx);
+    float seedVal = fi * 11.17 + 100.0;
+    vec3 mBase = vec3(
+      sin(seedVal * 1.7) * 3.5,
+      -1.8,
+      fi * 3.0 - 5.0 + cos(seedVal * 0.5) * 2.0
+    );
+    float mH = 0.8 + sin(seedVal * 2.3) * 0.4 + onset * 0.2;
+    float mR = 0.2 + sin(seedVal * 3.1) * 0.08;
+    float mite = f2Stalagmite(pos, mBase, mH, mR, seedVal, timeVal);
+    if (mite < result.x) result = vec2(mite, 2.0);
+  }
+
+  return result;
+}
+
+// ─── Scene normal via central differences ───
+vec3 f2CalcNormal(vec3 pos, float timeVal, float bass, float drumOnset, float tension, float onset) {
+  vec2 offset = vec2(0.003, 0.0);
+  float d0 = f2SceneMap(pos, timeVal, bass, drumOnset, tension, onset).x;
+  return normalize(vec3(
+    f2SceneMap(pos + offset.xyy, timeVal, bass, drumOnset, tension, onset).x - d0,
+    f2SceneMap(pos + offset.yxy, timeVal, bass, drumOnset, tension, onset).x - d0,
+    f2SceneMap(pos + offset.yyx, timeVal, bass, drumOnset, tension, onset).x - d0
+  ));
+}
+
+// ─── Ambient occlusion (5-tap) ───
+float f2CalcAO(vec3 pos, vec3 norm, float timeVal, float bass, float drumOnset, float tension, float onset) {
+  float occlusion = 0.0;
+  float weight = 1.0;
+  for (int idx = 0; idx < 5; idx++) {
+    float dist = 0.02 + float(idx) * 0.06;
+    float sdf = f2SceneMap(pos + norm * dist, timeVal, bass, drumOnset, tension, onset).x;
+    occlusion += (dist - sdf) * weight;
+    weight *= 0.7;
+  }
+  return clamp(1.0 - occlusion * 3.0, 0.0, 1.0);
+}
+
+// ─── Soft shadow ───
+float f2SoftShadow(vec3 ro2, vec3 rd2, float minT, float maxT, float k2, float timeVal, float bass, float drumOnset, float tension, float onset) {
+  float result = 1.0;
+  float marchT = minT;
+  for (int idx = 0; idx < 32; idx++) {
+    if (marchT > maxT) break;
+    float dist = f2SceneMap(ro2 + rd2 * marchT, timeVal, bass, drumOnset, tension, onset).x;
+    if (dist < 0.001) return 0.0;
+    result = min(result, k2 * dist / marchT);
+    marchT += clamp(dist, 0.01, 0.5);
+  }
+  return clamp(result, 0.0, 1.0);
+}
+
+// ─── Volumetric mist density ───
+float f2MistDensity(vec3 pos, float timeVal, float energy) {
+  float baseD = fbm3(vec3(pos.xz * 0.2, pos.y * 0.3 + timeVal * 0.03));
+  // Mist concentrated near water level
+  float heightMask = exp(-pow(pos.y + 1.0, 2.0) * 0.8);
+  return clamp(baseD * 0.5 + 0.2, 0.0, 1.0) * heightMask * (0.3 + energy * 0.7);
 }
 
 void main() {
   vec2 uv = vUv;
-  float aspect = uResolution.x / uResolution.y;
-  vec2 p = (uv - 0.5) * vec2(aspect, 1.0);
+  vec2 aspect = vec2(uResolution.x / uResolution.y, 1.0);
+  vec2 screenP = (uv - 0.5) * aspect;
 
   float energy = clamp(uEnergy, 0.0, 1.0);
-  float t = uDynamicTime;
+  float bass = clamp(uBass, 0.0, 1.0);
+  float onset = clamp(uOnsetSnap, 0.0, 1.0);
+  float drumOnset = clamp(uDrumOnset, 0.0, 1.0);
+  float highs = clamp(uHighs, 0.0, 1.0);
+  float slowE = clamp(uSlowEnergy, 0.0, 1.0);
+  float vocalE = clamp(uVocalEnergy, 0.0, 1.0);
+  float vocalP = clamp(uVocalPresence, 0.0, 1.0);
+  float tension = clamp(uHarmonicTension, 0.0, 1.0);
+  float melodicPitch = clamp(uMelodicPitch, 0.0, 1.0);
+  float stemBass = clamp(uStemBass, 0.0, 1.0);
+  float timbralBright = clamp(uTimbralBrightness, 0.0, 1.0);
+  float beatSnap = clamp(uBeatSnap, 0.0, 1.0);
 
-  // --- Domain warping for organic turbulence ---
-  vec2 domainP = p;
-  domainP += vec2(fbm3(vec3(p * 0.5 * (1.0 + energy * 0.5), t * 0.05)), fbm3(vec3(p * 0.5 * (1.0 + energy * 0.5) + 100.0, t * 0.05))) * 0.3;
+  float timeVal = uDynamicTime;
+  float flowTime = timeVal * (0.06 + slowE * 0.04);
 
   // Section-type modulation
   float sectionT = uSectionType;
   float sJam = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
   float sSpace = smoothstep(6.5, 7.5, sectionT);
   float sChorus = smoothstep(1.5, 2.5, sectionT) * (1.0 - step(2.5, sectionT));
-  float curlComplexMod = mix(1.0, 1.4, sJam) * mix(1.0, 0.5, sSpace) * mix(1.0, 1.1, sChorus);
-  float flowSpeedMod = mix(1.0, 1.3, sJam) * mix(1.0, 0.4, sSpace) * mix(1.0, 1.15, sChorus);
-  float injectRateMod = mix(1.0, 1.5, sJam) * mix(1.0, 0.5, sSpace) * mix(1.0, 1.2, sChorus);
+  float mistMod = mix(1.0, 1.4, sJam) * mix(1.0, 0.5, sSpace) * mix(1.0, 1.1, sChorus);
+  float lightMod = mix(1.0, 1.3, sJam) * mix(1.0, 0.6, sSpace) * mix(1.0, 1.2, sChorus);
 
-  // ─── Velocity field from curl noise + audio forces ───
-  // Curl noise scale increases with jam density (more complex at high density)
-  float curlScale = mix(2.0, 4.5, uJamDensity) * curlComplexMod;
-  float curlSpeed = (0.15 + uSlowEnergy * 0.1) * flowSpeedMod;
-  vec2 vel = curlVelocity(p * curlScale, t * curlSpeed) * 0.3;
+  // Climax
+  float isClimax = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5);
+  float climaxBoost = isClimax * uClimaxIntensity;
 
-  // Harmonic tension: turbulence (cross-frequency curl perturbation)
-  float turbulence = uHarmonicTension * 0.15;
-  vel += curlVelocity(p * curlScale * 2.3 + 7.1, t * curlSpeed * 1.7) * turbulence;
+  // Palette
+  float chordHue = float(int(uChordIndex)) / 24.0 * 0.12;
+  float hue1 = hsvToCosineHue(uPalettePrimary) + chordHue;
+  float hue2 = hsvToCosineHue(uPaletteSecondary) + chordHue * 0.5;
+  vec3 caveTint = 0.5 + 0.5 * cos(6.28318 * vec3(hue1, hue1 + 0.33, hue1 + 0.67));
+  vec3 waterTint = 0.5 + 0.5 * cos(6.28318 * vec3(hue2, hue2 + 0.33, hue2 + 0.67));
 
-  // Section variation: rotate velocity field per section
-  float sectionAngle = uSectionIndex * 0.7;
-  float ca = cos(sectionAngle);
-  float sa = sin(sectionAngle);
-  vel = vec2(ca * vel.x - sa * vel.y, sa * vel.x + ca * vel.y);
+  // === RAY SETUP ===
+  vec3 ro, rd;
+  setupCameraRay(uv, aspect, ro, rd);
 
-  // Bass: radial burst from center (pushes color outward)
-  vec2 radialDir = normalize(p + vec2(0.001));
-  vel += radialDir * uBass * 0.05;
+  // Camera positioned inside cavern, drifting forward
+  ro += vec3(sin(flowTime * 0.3) * 1.5, 0.0, flowTime * 2.0);
 
-  // Stem bass: additional radial push from separated bass track
-  vel += radialDir * uStemBass * 0.03;
+  // Light source: bioluminescent glow from ahead + above
+  vec3 lightPos = ro + vec3(2.0, 3.0 + climaxBoost * 2.0, 5.0);
+  vec3 lightDir = normalize(lightPos - ro);
 
-  // Vocals: upward laminar flow (gentle vertical push when vocals present)
-  vel.y += uVocalEnergy * 0.025;
+  // === PRIMARY RAYMARCH ===
+  float marchDist = 0.0;
+  vec2 marchResult = vec2(0.0);
+  bool marchHitSurface = false;
 
-  // Vocal presence: slight lateral drift when singing detected
-  vel.x += uVocalPresence * 0.01 * sin(t * 0.5);
-
-  // Other (guitar/keys): swirling motion based on centroid brightness
-  float otherSwirl = uOtherEnergy * uOtherCentroid * 0.02;
-  vel += vec2(cos(t * 0.7), sin(t * 0.7)) * otherSwirl;
-
-  // Beat snap: radial pulse ripple
-  vel += radialDir * uBeatSnap * 0.04;
-
-  // Musical time: subtle rotational current
-  float musAngle = uMusicalTime * PI * 0.5;
-  vel += vec2(cos(musAngle), sin(musAngle)) * 0.005;
-
-  // ─── Advection: read previous frame at velocity-offset position ───
-  float dt = 1.0 / 30.0; // Fixed timestep for 30fps rendering
-
-  // MacCormack advection correction: forward + backward sampling
-  vec2 advectedUV = uv - vel * dt;
-  advectedUV = clamp(advectedUV, vec2(0.001), vec2(0.999));
-  vec3 forwardSample = texture2D(uPrevFrame, advectedUV).rgb;
-
-  // Backward correction step (improves advection accuracy)
-  vec2 backUV = advectedUV + vel * dt;
-  backUV = clamp(backUV, vec2(0.001), vec2(0.999));
-  vec3 backSample = texture2D(uPrevFrame, backUV).rgb;
-  vec3 prevColor = forwardSample + 0.5 * (texture2D(uPrevFrame, uv).rgb - backSample);
-
-  // ─── Diffusion: 5-tap blur of advected color ───
-  // Higher energy = faster diffusion (wider blur kernel)
-  float diff = 0.002 + energy * 0.003;
-  vec3 diffused = prevColor;
-  diffused += texture2D(uPrevFrame, clamp(advectedUV + vec2(diff, 0.0), 0.001, 0.999)).rgb;
-  diffused += texture2D(uPrevFrame, clamp(advectedUV - vec2(diff, 0.0), 0.001, 0.999)).rgb;
-  diffused += texture2D(uPrevFrame, clamp(advectedUV + vec2(0.0, diff), 0.001, 0.999)).rgb;
-  diffused += texture2D(uPrevFrame, clamp(advectedUV - vec2(0.0, diff), 0.001, 0.999)).rgb;
-  diffused /= 5.0;
-
-  // Diagonal taps for smoother diffusion at high energy
-  float diag = diff * 0.707;
-  vec3 diagSamples = vec3(0.0);
-  diagSamples += texture2D(uPrevFrame, clamp(advectedUV + vec2(diag, diag), 0.001, 0.999)).rgb;
-  diagSamples += texture2D(uPrevFrame, clamp(advectedUV + vec2(-diag, diag), 0.001, 0.999)).rgb;
-  diagSamples += texture2D(uPrevFrame, clamp(advectedUV + vec2(diag, -diag), 0.001, 0.999)).rgb;
-  diagSamples += texture2D(uPrevFrame, clamp(advectedUV + vec2(-diag, -diag), 0.001, 0.999)).rgb;
-  diagSamples /= 4.0;
-
-  // Blend cardinal and diagonal samples
-  diffused = mix(diffused, diagSamples, 0.3);
-
-  // ─── Vorticity confinement: amplify rotational structures ───
-  // Prevents diffusion from killing all the interesting swirls
-  float vortL = length(texture2D(uPrevFrame, clamp(advectedUV + vec2(-diff, 0.0), 0.001, 0.999)).rgb);
-  float vortR = length(texture2D(uPrevFrame, clamp(advectedUV + vec2(diff, 0.0), 0.001, 0.999)).rgb);
-  float vortD = length(texture2D(uPrevFrame, clamp(advectedUV + vec2(0.0, -diff), 0.001, 0.999)).rgb);
-  float vortU = length(texture2D(uPrevFrame, clamp(advectedUV + vec2(0.0, diff), 0.001, 0.999)).rgb);
-  vec2 vortGrad = vec2(vortR - vortL, vortU - vortD);
-  float vortLen = length(vortGrad);
-  if (vortLen > 0.001) {
-    vec2 vortDir = normalize(vortGrad);
-    // Perpendicular force amplifies rotation
-    vec2 vortForce = vec2(-vortDir.y, vortDir.x) * 0.02 * energy;
-    diffused.rg += vortForce * 0.5;
+  for (int idx = 0; idx < F2_MAX_STEPS; idx++) {
+    vec3 marchPos = ro + rd * marchDist;
+    marchResult = f2SceneMap(marchPos, flowTime, bass, drumOnset, tension, onset);
+    if (marchResult.x < F2_SURF_DIST) {
+      marchHitSurface = true;
+      break;
+    }
+    if (marchDist > F2_MAX_DIST) break;
+    marchDist += marchResult.x * 0.8;
   }
 
-  // ─── Buoyancy: bright areas rise ───
-  float brightness = dot(diffused, vec3(0.299, 0.587, 0.114));
-  float buoyancy = (brightness - 0.3) * 0.02 * energy;
-  vec2 buoyUV = advectedUV + vec2(0.0, buoyancy * dt);
-  buoyUV = clamp(buoyUV, vec2(0.001), vec2(0.999));
-  diffused = mix(diffused, texture2D(uPrevFrame, buoyUV).rgb, 0.15);
+  vec3 col = vec3(0.0);
 
-  // ─── Decay: slowly fade to prevent infinite accumulation ───
-  // Faster decay at low energy (fluid dissipates when quiet)
-  float decayRate = mix(0.988, 0.997, energy);
-  // Jam phase feedback: exploration=long trails, building=moderate, peak=max persistence, resolution=clearing
-  if (uJamPhase >= 0.0) {
-    float jpExplore = step(-0.5, uJamPhase) * step(uJamPhase, 0.5);
-    float jpBuild   = step(0.5, uJamPhase) * step(uJamPhase, 1.5);
-    float jpPeak    = step(1.5, uJamPhase) * step(uJamPhase, 2.5);
-    float jpResolve = step(2.5, uJamPhase);
-    decayRate += jpExplore * 0.03 + jpBuild * 0.01 + jpPeak * 0.05 - jpResolve * 0.04;
-    decayRate = clamp(decayRate, 0.80, 0.97);
+  if (marchHitSurface) {
+    vec3 marchPos = ro + rd * marchDist;
+    vec3 norm = f2CalcNormal(marchPos, flowTime, bass, drumOnset, tension, onset);
+    float matID = marchResult.y;
+
+    // Ambient occlusion
+    float occl = f2CalcAO(marchPos, norm, flowTime, bass, drumOnset, tension, onset);
+
+    // Lighting
+    vec3 toLightDir = normalize(lightPos - marchPos);
+    float lightDist = length(lightPos - marchPos);
+    float attenuation = 1.0 / (1.0 + lightDist * 0.05 + lightDist * lightDist * 0.01);
+
+    // Diffuse
+    float diffuse = max(dot(norm, toLightDir), 0.0);
+
+    // Specular (Blinn-Phong)
+    vec3 halfVec = normalize(toLightDir - rd);
+    float specPower = 32.0 + highs * 64.0 + timbralBright * 32.0;
+    float specular = pow(max(dot(norm, halfVec), 0.0), specPower);
+
+    // Fresnel
+    float fresnel = pow(1.0 - max(dot(norm, -rd), 0.0), 3.0);
+
+    // Soft shadow
+    float shadow = f2SoftShadow(marchPos + norm * 0.02, toLightDir, 0.05, lightDist, 16.0, flowTime, bass, drumOnset, tension, onset);
+
+    // Material coloring
+    vec3 matColor;
+    float specMult = 0.0;
+
+    if (matID < 0.5) {
+      // Cave walls
+      float erosionTex = ridged4(vec3(marchPos * 0.4 + flowTime * 0.005));
+      matColor = caveTint * 0.3 * (0.5 + erosionTex * 0.5);
+      // Bioluminescent patches driven by vocals
+      float bioGlow = smoothstep(0.4, 0.8, fbm3(vec3(marchPos * 0.8 + 20.0)));
+      matColor += waterTint * bioGlow * vocalE * 0.5;
+      specMult = 0.15;
+    } else if (matID < 1.5) {
+      // Stalactites
+      matColor = caveTint * 0.5;
+      float dripGlow = smoothstep(0.7, 1.0, fract(marchPos.y * 3.0 - flowTime * 0.5));
+      matColor += vec3(0.8, 0.9, 1.0) * dripGlow * beatSnap * 0.4;
+      specMult = 0.3;
+    } else if (matID < 2.5) {
+      // Stalagmites
+      matColor = caveTint * 0.4;
+      matColor += vec3(0.1, 0.05, 0.0) * fbm3(vec3(marchPos * 2.0));
+      specMult = 0.2;
+    } else {
+      // Water surface
+      float depth = melodicPitch * 0.3;
+      matColor = waterTint * (0.3 + depth);
+      // Sub-surface glow from stem bass
+      matColor += waterTint * 0.4 * stemBass;
+      specMult = 0.8 + timbralBright * 0.4;
+
+      // Water reflection: second march upward
+      vec3 reflDir = reflect(rd, norm);
+      float reflDist = 0.0;
+      bool reflHitSurface = false;
+      for (int ridx = 0; ridx < 40; ridx++) {
+        vec3 reflPos = marchPos + reflDir * reflDist;
+        vec2 reflResult = f2SceneMap(reflPos, flowTime, bass, drumOnset, tension, onset);
+        if (reflResult.x < F2_SURF_DIST) {
+          reflHitSurface = true;
+          break;
+        }
+        if (reflDist > 20.0) break;
+        reflDist += reflResult.x * 0.9;
+      }
+      if (reflHitSurface) {
+        vec3 reflPos = marchPos + reflDir * reflDist;
+        vec3 reflNorm = f2CalcNormal(reflPos, flowTime, bass, drumOnset, tension, onset);
+        float reflDiff = max(dot(reflNorm, toLightDir), 0.0);
+        vec3 reflCol = caveTint * 0.3 * reflDiff;
+        matColor = mix(matColor, reflCol, fresnel * 0.5);
+      }
+    }
+
+    // Compose lighting
+    vec3 lightColor = mix(vec3(0.8, 0.85, 1.0), vec3(1.0, 0.95, 0.85), climaxBoost);
+    vec3 ambient = matColor * 0.15 * occl;
+    vec3 diffuseCol = matColor * diffuse * attenuation * shadow * lightMod;
+    vec3 specCol = lightColor * specular * specMult * attenuation * shadow;
+    vec3 fresnelCol = waterTint * fresnel * 0.2;
+
+    col = ambient + diffuseCol + specCol + fresnelCol;
+
+    // Distance fog
+    float fogAmount = 1.0 - exp(-marchDist * 0.04);
+    vec3 fogColor = caveTint * 0.08;
+    col = mix(col, fogColor, fogAmount);
+
+  } else {
+    // No surface hit: deep cave darkness with subtle glow
+    col = caveTint * 0.02;
   }
-  diffused *= decayRate;
 
-  // ─── Color injection: palette-colored dye on beats/onsets ───
-  // Injection mask: radial falloff from center
-  float injectRadius = 0.12 + uBass * 0.1 + uFastBass * 0.05;
-  float injectMask = smoothstep(injectRadius, 0.0, length(p));
+  // === VOLUMETRIC MIST ===
+  {
+    vec3 mistAccum = vec3(0.0);
+    float mistAlpha = 0.0;
+    float mistMaxDist = marchHitSurface ? marchDist : F2_MAX_DIST;
+    float mistStep = mistMaxDist / float(F2_MIST_STEPS);
 
-  // Onset trigger: combine onset snap and drum onset
-  float onsetTrigger = max(uOnsetSnap, uDrumOnset);
+    for (int midx = 0; midx < F2_MIST_STEPS; midx++) {
+      float mistT = float(midx) * mistStep + mistStep * 0.5;
+      vec3 mistPos = ro + rd * mistT;
 
-  // Injection strength (section-modulated)
-  float inject = onsetTrigger * injectMask * injectRateMod;
+      float density = f2MistDensity(mistPos, flowTime, energy) * mistMod;
+      density *= 0.04;
 
-  // Injection color from palette
-  float injectHue = hsvToCosineHue(uPalettePrimary) + uChromaHue * 0.1;
-  vec3 injectColor = 0.5 + 0.5 * cos(6.28318 * (injectHue + vec3(0.0, 0.33, 0.67)));
+      if (density > 0.001) {
+        float alpha = density * (1.0 - mistAlpha);
 
-  // Secondary injection: offset position for spatial variety
-  vec2 secondaryPos = vec2(
-    sin(t * 0.3 + uSectionIndex * 2.1) * 0.3,
-    cos(t * 0.25 + uSectionIndex * 1.7) * 0.2
-  );
-  float secondaryMask = smoothstep(injectRadius * 0.8, 0.0, length(p - secondaryPos));
-  float secondaryInject = onsetTrigger * secondaryMask * 0.7;
+        // Mist lighting
+        vec3 mistToLight = normalize(lightPos - mistPos);
+        float mistScatter = pow(max(dot(rd, mistToLight), 0.0), 4.0);
 
-  float secondaryHue = hsvToCosineHue(uPaletteSecondary) + uChromaShift * 0.15;
-  vec3 secondaryColor = 0.5 + 0.5 * cos(6.28318 * (secondaryHue + vec3(0.0, 0.33, 0.67)));
+        vec3 mistColor = mix(caveTint * 0.15, waterTint * 0.2, mistScatter);
+        // Vocal warmth in mist
+        mistColor += vec3(0.08, 0.04, 0.02) * vocalP * 0.3;
+        mistColor *= (1.0 + mistScatter * energy * 0.8);
 
-  // Beat-driven tertiary injection at edge positions
-  float beatInject = uBeatSnap * 0.4;
-  vec2 edgePos = vec2(cos(uMusicalTime * PI), sin(uMusicalTime * PI * 0.7)) * 0.4;
-  float edgeMask = smoothstep(0.15, 0.0, length(p - edgePos));
-  float tertiaryHue = hsvToCosineHue(uPalettePrimary + 0.5);
-  vec3 tertiaryColor = 0.5 + 0.5 * cos(6.28318 * (tertiaryHue + vec3(0.0, 0.33, 0.67)));
+        mistAccum += mistColor * alpha;
+        mistAlpha += alpha;
+        if (mistAlpha > 0.95) break;
+      }
+    }
 
-  // Melodic pitch injection: orbiting point driven by pitch Y offset
-  float pitchY = uMelodicPitch * 0.4 - 0.2; // -0.2 to +0.2 vertical offset
-  vec2 melodyPos = vec2(
-    cos(t * 0.4 + uChordIndex * 3.0) * 0.35,
-    pitchY + sin(t * 0.35) * 0.15
-  );
-  float melodyMask = smoothstep(injectRadius * 0.6, 0.0, length(p - melodyPos));
-  float melodyInject = onsetTrigger * melodyMask * 0.5;
-  float melodyHue = uChordIndex + uChromaHue * 0.2;
-  vec3 melodyColor = 0.5 + 0.5 * cos(6.28318 * (melodyHue + vec3(0.0, 0.33, 0.67)));
+    col = mix(col, col + mistAccum, 1.0 - mistAlpha * 0.3);
+    col += mistAccum * 0.7;
+  }
 
-  // ─── Compose: blend diffused fluid with injections ───
-  vec3 col = diffused;
+  // Energy brightness
+  col *= 0.8 + energy * 0.4 + climaxBoost * 0.3;
 
-  // Primary injection (center, onset-driven)
-  col = mix(col, injectColor, inject * 0.5);
+  // === DEAD ICONOGRAPHY ===
+  float _nf = fbm3(vec3(screenP * 2.0, uTime * 0.1));
+  col += iconEmergence(screenP, uTime, energy, bass, caveTint, waterTint, _nf, uClimaxPhase, uSectionIndex);
+  col += heroIconEmergence(screenP, uTime, energy, bass, caveTint, waterTint, _nf, uSectionIndex);
 
-  // Secondary injection (offset, onset-driven)
-  col = mix(col, secondaryColor, secondaryInject * 0.4);
-
-  // Tertiary injection (edge, beat-driven)
-  col += tertiaryColor * beatInject * edgeMask * 0.3;
-
-  // Melody injection (orbiting, pitch-driven)
-  col = mix(col, melodyColor, melodyInject * 0.35);
-
-  // Vocal warmth: gentle warm tint when vocals are present
-  float vocalWarmth = uVocalEnergy * uVocalPresence * 0.05;
-  col += vec3(0.08, 0.04, 0.0) * vocalWarmth;
-
-  // Energy-driven brightness boost (prevents dead-looking fluid at peaks)
-  col *= 0.85 + energy * 0.3;
-
-  // --- Secondary visual layer: deep turbulent structure ---
-  float turbLayer = fbm6(vec3(domainP * 2.0 * (1.0 + energy * 0.5), t * 0.08));
-  float secondaryHueBlend = hsvToCosineHue(uPaletteSecondary + turbLayer * 0.15);
-  vec3 turbColor = 0.5 + 0.5 * cos(6.28318 * (secondaryHueBlend + vec3(0.0, 0.33, 0.67)));
-  col += turbColor * turbLayer * 0.3 * energy * 0.3;
-
-  // Subtle noise overlay for texture (prevents banding in smooth gradients)
-  float noiseTex = snoise(vec3(domainP * 8.0, t * 0.5)) * 0.015;
-  col += noiseTex;
-
-  // Vignette (lighter than most modes — fluid should fill the screen)
-  float vigDist = length(p * 0.29);
-  float vignette = 1.0 - vigDist * vigDist;
-  vignette = smoothstep(0.0, 1.0, vignette);
-  col *= mix(0.7, 1.0, vignette);
-
-  // ─── Stealie emergence during climax ───
-  float noiseField = fbm3(vec3(p * 2.0, t * 0.15));
-  vec3 palCol1 = 0.5 + 0.5 * cos(6.28318 * (hsvToCosineHue(uPalettePrimary) + vec3(0.0, 0.33, 0.67)));
-  vec3 palCol2 = 0.5 + 0.5 * cos(6.28318 * (hsvToCosineHue(uPaletteSecondary) + vec3(0.0, 0.33, 0.67)));
-  col += stealieEmergence(p, uTime, energy, uBass, palCol1, palCol2, noiseField, uClimaxPhase);
-
-  // ─── Post-processing (shared chain) ───
-  col = applyPostProcess(col, vUv, p);
+  // === POST-PROCESSING ===
+  col = applyPostProcess(col, uv, screenP);
 
   gl_FragColor = vec4(col, 1.0);
 }
