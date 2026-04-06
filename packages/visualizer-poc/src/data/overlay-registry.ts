@@ -63,7 +63,7 @@ export const OVERLAY_REGISTRY: OverlayEntry[] = [
   { name: "SpiralArms",        layer: 4, category: "geometric", tags: ["cosmic", "organic"],            energyBand: "mid",  weight: 2, dutyCycle: 33, energyResponse: [0.08, 0.25, 1.8], tier: "C" },
   { name: "SunMandala",        layer: 4, category: "geometric", tags: ["cosmic", "contemplative"],      energyBand: "low",  weight: 2, dutyCycle: 33, energyResponse: [0.05, 0.18, 2.2], tier: "C" },
   { name: "MoireInterference", layer: 4, category: "geometric", tags: ["psychedelic", "mechanical"],    energyBand: "high", weight: 2, dutyCycle: 33, energyResponse: [0.10, 0.30, 1.5], tier: "C" },
-  { name: "LissajousCurves",   layer: 4, category: "geometric", tags: ["cosmic", "psychedelic"],        energyBand: "mid",  weight: 2, dutyCycle: 33, energyResponse: [0.08, 0.22, 1.8], tier: "B" },
+  { name: "LissajousCurves",   layer: 4, category: "geometric", tags: ["cosmic", "psychedelic"],        energyBand: "mid",  weight: 2, dutyCycle: 33, energyResponse: [0.08, 0.22, 1.8], tier: "C" },
 
   // ═══ Layer 5: Song References + Dead Culture ═══
   { name: "SunMoonMotif",     layer: 5, category: "nature", tags: ["cosmic", "dead-culture"],           energyBand: "any",  weight: 2, dutyCycle: 100, energyResponse: [0.03, 0.15, 2.0], tier: "C" },
@@ -101,7 +101,7 @@ export const OVERLAY_REGISTRY: OverlayEntry[] = [
   // ═══ Phase 9 Wave 3: New Overlays (8) ═══
   { name: "RainDrops",       layer: 1, category: "atmospheric", tags: ["organic", "contemplative"],      energyBand: "low",  weight: 1, dutyCycle: 100, energyResponse: [0.0, 0.05, 2.5], tier: "B" },
   { name: "FogBank",         layer: 1, category: "atmospheric", tags: ["organic", "contemplative"],      energyBand: "low",  weight: 1, dutyCycle: 100, energyResponse: [0.0, 0.08, 2.5], tier: "B" },
-  { name: "TidalPool",      layer: 5, category: "nature",      tags: ["organic", "aquatic"],             energyBand: "mid",  weight: 2, dutyCycle: 50,  energyResponse: [0.05, 0.18, 2.0], tier: "B" },
+  { name: "TidalPool",      layer: 5, category: "nature",      tags: ["organic", "aquatic"],             energyBand: "mid",  weight: 2, dutyCycle: 50,  energyResponse: [0.05, 0.18, 2.0], tier: "C" },
   { name: "VineGrowth",     layer: 5, category: "nature",      tags: ["organic", "psychedelic"],         energyBand: "mid",  weight: 2, dutyCycle: 60,  energyResponse: [0.05, 0.20, 1.8], tier: "B" },
   { name: "PhilLesh",       layer: 6, category: "character",   tags: ["dead-culture", "organic"],        energyBand: "mid",  weight: 2, dutyCycle: 100, energyResponse: [0.03, 0.18, 1.5], tier: "B" },
   { name: "DrummersDuo",    layer: 6, category: "character",   tags: ["dead-culture", "intense"],        energyBand: "mid",  weight: 2, dutyCycle: 100, energyResponse: [0.03, 0.18, 1.5], tier: "B" },

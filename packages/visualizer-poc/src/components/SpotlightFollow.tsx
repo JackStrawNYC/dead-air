@@ -1,20 +1,18 @@
 /**
  * SpotlightFollow — Single followspot beam that tracks a wandering point.
- * The beam originates from upper-left or upper-right (alternates each cycle)
- * and illuminates a circular pool that drifts slowly across the stage area.
+ * The beam originates from upper-left or upper-right (alternates slowly)
+ * and illuminates a circular pool that drifts across the stage area.
  * Beam width (cone angle) varies with energy — tight during quiet, wide during
- * loud. The pool has a soft feathered edge. Color is warm white/amber.
- * Appears every 35s for 15s when energy > 0.05.
+ * loud. Pool drift speed scales with tempoFactor. The pool has a soft feathered
+ * edge. Color is warm white/amber. Renders continuously; rotation engine
+ * controls visibility. Energy gate at 0.05.
  */
 
 import React from "react";
-import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
+import { useCurrentFrame, useVideoConfig, interpolate } from "remotion";
+import { useAudioSnapshot } from "./parametric/audio-helpers";
+import { useTempoFactor } from "../data/TempoContext";
 import type { EnhancedFrameData } from "../data/types";
-
-// Timing: appears every 35s (1050 frames) for 15s (450 frames)
-const CYCLE_PERIOD = 1050;
-const SHOW_DURATION = 450;
-const FADE_FRAMES = 40;
 
 interface Props {
   frames: EnhancedFrameData[];
@@ -24,55 +22,24 @@ export const SpotlightFollow: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
 
-  const idx = Math.min(Math.max(0, frame), frames.length - 1);
+  const snap = useAudioSnapshot(frames);
+  const tempoFactor = useTempoFactor();
+  const { energy, chromaHue, beatDecay, onsetEnvelope } = snap;
 
-  // Rolling energy over +/-75 frames
-  let eSum = 0;
-  let eCount = 0;
-  for (let i = Math.max(0, idx - 75); i <= Math.min(frames.length - 1, idx + 75); i++) {
-    eSum += frames[i].rms;
-    eCount++;
-  }
-  const energy = eCount > 0 ? eSum / eCount : 0;
+  // Energy gate — below threshold, don't render
+  if (energy <= 0.05) return null;
 
-  // All useMemo calls before conditionals (none needed here, but pattern compliance)
-  const cycleIndex = React.useMemo(() => Math.floor(frame / CYCLE_PERIOD), [frame]);
-
-  // Cycle timing
-  const cyclePos = frame % CYCLE_PERIOD;
-  const inShowWindow = cyclePos < SHOW_DURATION;
-
-  // Energy gate
-  const energyGate = energy > 0.05 ? 1 : 0;
-
-  // Fade envelope
-  const showFadeIn = interpolate(cyclePos, [0, FADE_FRAMES], [0, 1], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-    easing: Easing.out(Easing.cubic),
-  });
-  const showFadeOut = interpolate(
-    cyclePos,
-    [SHOW_DURATION - FADE_FRAMES, SHOW_DURATION],
-    [1, 0],
-    { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: Easing.in(Easing.cubic) },
-  );
-  const showEnvelope = Math.min(showFadeIn, showFadeOut);
-
-  const masterOpacity = inShowWindow ? showEnvelope * energyGate : 0;
-
-  if (masterOpacity < 0.01) return null;
-
-  // Origin alternates sides each cycle
-  const fromLeft = cycleIndex % 2 === 0;
+  // Origin alternates sides based on slow oscillation
+  const fromLeft = Math.sin(frame * 0.002) > 0;
   const originX = fromLeft ? width * 0.05 : width * 0.95;
   const originY = -20;
 
-  // Target point wanders with slow sine motion in the lower 2/3 of frame
-  const targetX = width * 0.3 + Math.sin(frame * 0.008 + 1.2) * width * 0.2
-    + Math.sin(frame * 0.013 + 3.7) * width * 0.1;
-  const targetY = height * 0.4 + Math.sin(frame * 0.006 + 0.5) * height * 0.15
-    + Math.sin(frame * 0.011 + 2.1) * height * 0.08;
+  // Target point wanders with slow sine motion scaled by tempoFactor
+  const drift = tempoFactor;
+  const targetX = width * 0.3 + Math.sin(frame * 0.008 * drift + 1.2) * width * 0.2
+    + Math.sin(frame * 0.013 * drift + 3.7) * width * 0.1;
+  const targetY = height * 0.4 + Math.sin(frame * 0.006 * drift + 0.5) * height * 0.15
+    + Math.sin(frame * 0.011 * drift + 2.1) * height * 0.08;
 
   // Beam width varies with energy: tight when quiet, wide when loud
   const beamRadius = interpolate(energy, [0.05, 0.35], [40, 120], {
@@ -106,7 +73,7 @@ export const SpotlightFollow: React.FC<Props> = ({ frames }) => {
 
   return (
     <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden" }}>
-      <svg width={width} height={height} style={{ opacity: masterOpacity * flicker }}>
+      <svg width={width} height={height} style={{ opacity: flicker }}>
         <defs>
           <radialGradient id="spot-pool" cx="50%" cy="50%" r="50%">
             <stop offset="0%" stopColor={`hsla(${warmth}, 80%, 95%, 0.4)`} />

@@ -3,17 +3,16 @@
  * Organic bezier curves with small leaves branching off. Vine growth speed
  * driven by energy. Deep green stems with lighter green leaves. New vine
  * segments appear progressively. Leaves unfurl when vine reaches their position.
- * Cycle: 65s, 25s grow duration.
+ * Grows continuously over ~8s then holds fully grown.
  */
 
 import React from "react";
 import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
+import { useAudioSnapshot } from "./parametric/audio-helpers";
+import { useTempoFactor } from "../data/TempoContext";
 import type { EnhancedFrameData } from "../data/types";
 import { useShowContext } from "../data/ShowContext";
 import { seeded } from "../utils/seededRandom";
-
-const CYCLE = 1950; // 65s at 30fps
-const DURATION = 750; // 25s grow duration
 
 interface VineSegment {
   /** Control points for bezier: [startX, startY, cp1x, cp1y, cp2x, cp2y, endX, endY] */
@@ -117,35 +116,17 @@ export const VineGrowth: React.FC<Props> = ({ frames }) => {
   const { width, height } = useVideoConfig();
   const ctx = useShowContext();
 
-  const idx = Math.min(Math.max(0, frame), frames.length - 1);
-  let eSum = 0;
-  let eCount = 0;
-  for (let i = Math.max(0, idx - 75); i <= Math.min(frames.length - 1, idx + 75); i++) {
-    eSum += frames[i].rms;
-    eCount++;
-  }
-  const energy = eCount > 0 ? eSum / eCount : 0;
+  const snap = useAudioSnapshot(frames);
+  const tempoFactor = useTempoFactor();
+  const { energy, slowEnergy, chromaHue, beatDecay } = snap;
 
   const vines = React.useMemo(() => generateVines(ctx?.showSeed ?? 19770508), [ctx?.showSeed]);
 
-  const cycleFrame = frame % CYCLE;
-  if (cycleFrame >= DURATION) return null;
+  // Grow over ~8s (240 frames at 30fps), slowEnergy modulates speed
+  const growSpeed = 0.7 + slowEnergy * 1.5;
+  const growProgress = Math.min((frame / 240) * growSpeed, 1);
 
-  const progress = cycleFrame / DURATION;
-  const growSpeed = 0.7 + energy * 1.5;
-  const growProgress = Math.min(1, progress * growSpeed);
-
-  const fadeIn = interpolate(progress, [0, 0.08], [0, 1], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-    easing: Easing.out(Easing.cubic),
-  });
-  const fadeOut = interpolate(progress, [0.88, 1], [1, 0], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-    easing: Easing.in(Easing.cubic),
-  });
-  const masterOpacity = Math.min(fadeIn, fadeOut) * (0.5 + energy * 0.3);
+  const masterOpacity = 0.5 + energy * 0.3;
 
   if (masterOpacity < 0.01) return null;
 
@@ -197,10 +178,10 @@ export const VineGrowth: React.FC<Props> = ({ frames }) => {
                 const ex = seg.ex * width;
                 const ey = seg.ey * height;
 
-                // Sway with energy
-                const sway = Math.sin(frame * 0.008 + vi * 2 + si * 0.5) * (3 + energy * 8);
+                // Sway with energy, scaled by tempo
+                const sway = Math.sin(frame * 0.008 * tempoFactor + vi * 2 + si * 0.5) * (3 + energy * 8);
 
-                const strokeW = Math.max(1, (3.5 - si * 0.2) * seg.thickness);
+                const strokeW = Math.max(1, (3.5 - si * 0.2) * seg.thickness * (1 + beatDecay * 0.15));
                 const greenVal = 120 + si * 8;
                 const stemColor = `rgba(30, ${greenVal}, 40, ${0.7 + energy * 0.2})`;
 
@@ -251,10 +232,12 @@ export const VineGrowth: React.FC<Props> = ({ frames }) => {
                 const lx = (vine.startX + seg.ex * leaf.t) * width * 0.5 + width * 0.25;
                 const ly = (1.0 - (1.0 - seg.ey) * leaf.t) * height;
 
-                const sway = Math.sin(frame * 0.012 + li * 1.3) * 3;
+                const sway = Math.sin(frame * 0.012 * tempoFactor + li * 1.3) * 3;
                 const leafScale = leafUnfurl * (0.8 + energy * 0.4);
                 const rot = leaf.angle * 57.3 + leaf.side * 30 + sway;
-                const leafColor = `hsl(${leaf.hue}, 65%, ${45 + energy * 15}%)`;
+                // Subtle green hue variation from chromaHue
+                const hueShift = ((chromaHue - 120) * 0.1);
+                const leafColor = `hsl(${leaf.hue + hueShift}, 65%, ${45 + energy * 15}%)`;
 
                 return (
                   <g

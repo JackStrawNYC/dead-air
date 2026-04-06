@@ -2,17 +2,17 @@
  * FractalZoom — Infinite spiraling fractal tunnel effect.
  * Concentric hexagons that scale up from center and fade out at edges,
  * creating a zoom-through illusion. 12-15 rings at different scale phases.
- * Rotation and scale speed driven by energy. Neon color cycling.
- * Appears periodically (every 50 seconds, visible for 15 seconds).
+ * Rotation speed driven by energy + tempo. Chroma-hue-based coloring.
+ * Beat-synced brightness pulses. Renders continuously (rotation engine controls visibility).
  */
 
 import React from "react";
-import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
+import { useCurrentFrame, useVideoConfig, interpolate } from "remotion";
+import { useAudioSnapshot } from "./parametric/audio-helpers";
+import { useTempoFactor } from "../data/TempoContext";
 import type { EnhancedFrameData } from "../data/types";
 import { seeded } from "../utils/seededRandom";
 
-const CYCLE = 1500;     // 50 seconds between appearances
-const DURATION = 450;   // 15 seconds visible
 const NUM_RINGS = 14;
 const SIDES = 6;        // hexagons
 
@@ -47,9 +47,6 @@ function generateRings(seed: number): RingData[] {
   }));
 }
 
-// Stagger timing: offset from other components at frame 120 (4s)
-const STAGGER_OFFSET = 120;
-
 interface Props {
   frames: EnhancedFrameData[];
 }
@@ -58,63 +55,34 @@ export const FractalZoom: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
 
-  const idx = Math.min(Math.max(0, frame), frames.length - 1);
-
-  // Rolling energy over +/-75 frames
-  let eSum = 0;
-  let eCount = 0;
-  for (let i = Math.max(0, idx - 75); i <= Math.min(frames.length - 1, idx + 75); i++) {
-    eSum += frames[i].rms;
-    eCount++;
-  }
-  const energy = eCount > 0 ? eSum / eCount : 0;
+  const snap = useAudioSnapshot(frames);
+  const tempoFactor = useTempoFactor();
+  const { energy, chromaHue, beatDecay, onsetEnvelope } = snap;
 
   const rings = React.useMemo(() => generateRings(19650813), []);
 
-  // Periodic visibility: every CYCLE frames, visible for DURATION frames
-  const effectiveFrame = Math.max(0, frame - STAGGER_OFFSET);
-  const cycleFrame = effectiveFrame % CYCLE;
-  if (cycleFrame >= DURATION) return null;
-
-  const progress = cycleFrame / DURATION;
-
-  // Fade in/out with Easing
-  const fadeIn = interpolate(progress, [0, 0.1], [0, 1], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-    easing: Easing.out(Easing.cubic),
-  });
-  const fadeOut = interpolate(progress, [0.85, 1], [1, 0], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-    easing: Easing.in(Easing.cubic),
-  });
-  const visibility = Math.min(fadeIn, fadeOut);
-
-  // Energy-driven opacity
-  const energyOpacity = interpolate(energy, [0.04, 0.25], [0.15, 0.5], {
+  // Energy-driven opacity — the rotation engine controls visibility
+  const masterOpacity = interpolate(energy, [0.04, 0.25], [0.15, 0.5], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
-
-  const masterOpacity = visibility * energyOpacity;
   if (masterOpacity < 0.01) return null;
 
   const cx = width / 2;
   const cy = height / 2;
   const maxRadius = Math.min(width, height) * 0.55;
 
-  // Speed: rotation and scale expansion rate driven by energy
+  // Speed: rotation and scale expansion rate driven by energy and tempo
   const speedMult = interpolate(energy, [0.03, 0.3], [0.5, 2.0], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
-  });
+  }) * tempoFactor;
 
   // Global rotation
-  const globalRotation = cycleFrame * 0.4 * speedMult;
+  const globalRotation = frame * 0.4 * speedMult;
 
-  // Base cycling hue
-  const baseHue = (cycleFrame * 1.2) % 360;
+  // Base hue from chroma analysis
+  const baseHue = chromaHue;
 
   return (
     <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden" }}>
@@ -130,7 +98,7 @@ export const FractalZoom: React.FC<Props> = ({ frames }) => {
           {rings.map((ring, ri) => {
             // Each ring scales from 0 to maxRadius in a looping cycle
             // Phase offset creates the tunnel layering
-            const scaleProgress = ((cycleFrame * 0.015 * speedMult + ring.phaseOffset) % 1);
+            const scaleProgress = ((frame * 0.015 * speedMult + ring.phaseOffset) % 1);
 
             // Exponential scaling for zoom feel (closer rings move faster)
             const scale = scaleProgress * scaleProgress;
@@ -152,7 +120,7 @@ export const FractalZoom: React.FC<Props> = ({ frames }) => {
 
             const hue = (baseHue + ring.hueOffset) % 360;
             const sat = 90 + energy * 10;
-            const light = 55 + energy * 15;
+            const light = 55 + beatDecay * 20;
             const color = `hsla(${hue}, ${sat}%, ${light}%, ${ringAlpha})`;
             const glowColor = `hsla(${hue}, 100%, 70%, ${ringAlpha * 0.5})`;
 

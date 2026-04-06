@@ -1,13 +1,15 @@
 /**
  * StageLights — Par can stage lights mounted on a rig across the top of frame.
- * 6-10 par cans in a row, each casting a cone of colored light downward.
- * Colors shift with chroma data (pitch class distribution). Intensity scales
- * with energy. Beams have soft gaussian edges and overlap to create color mixing.
- * Appears every 55s for 20s when energy > 0.08.
+ * 8 par cans in a row, each casting a cone of colored light downward.
+ * Colors shift with chromaHue. Intensity scales with energy. Beat decay drives
+ * flicker. Beams have soft gaussian edges and overlap to create color mixing.
+ * Renders continuously when energy > 0.08 (rotation engine handles fades).
  */
 
 import React from "react";
-import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
+import { useCurrentFrame, useVideoConfig, interpolate } from "remotion";
+import { useAudioSnapshot } from "./parametric/audio-helpers";
+import { useTempoFactor } from "../data/TempoContext";
 import type { EnhancedFrameData } from "../data/types";
 import { useShowContext } from "../data/ShowContext";
 import { seeded } from "../utils/seededRandom";
@@ -44,11 +46,6 @@ function generatePars(seed: number): ParCanData[] {
   }));
 }
 
-// Timing: appears every 55s (1650 frames @30fps) for 20s (600 frames)
-const CYCLE_PERIOD = 1650;
-const SHOW_DURATION = 600;
-const FADE_FRAMES = 50;
-
 interface Props {
   frames: EnhancedFrameData[];
 }
@@ -58,46 +55,14 @@ export const StageLights: React.FC<Props> = ({ frames }) => {
   const { width, height } = useVideoConfig();
   const ctx = useShowContext();
 
-  const idx = Math.min(Math.max(0, frame), frames.length - 1);
-
-  // Rolling energy over +/-75 frames
-  let eSum = 0;
-  let eCount = 0;
-  for (let i = Math.max(0, idx - 75); i <= Math.min(frames.length - 1, idx + 75); i++) {
-    eSum += frames[i].rms;
-    eCount++;
-  }
-  const energy = eCount > 0 ? eSum / eCount : 0;
+  const snap = useAudioSnapshot(frames);
+  const tempoFactor = useTempoFactor();
+  const { energy, chromaHue, beatDecay, bass, highs } = snap;
 
   const pars = React.useMemo(() => generatePars(ctx?.showSeed ?? 19770508), [ctx?.showSeed]);
 
-  // Cycle timing
-  const cyclePos = frame % CYCLE_PERIOD;
-  const inShowWindow = cyclePos < SHOW_DURATION;
-
-  // Energy gate
-  const energyGate = energy > 0.08 ? 1 : 0;
-
-  // Fade envelope
-  const showFadeIn = interpolate(cyclePos, [0, FADE_FRAMES], [0, 1], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-    easing: Easing.out(Easing.cubic),
-  });
-  const showFadeOut = interpolate(
-    cyclePos,
-    [SHOW_DURATION - FADE_FRAMES, SHOW_DURATION],
-    [1, 0],
-    { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: Easing.in(Easing.cubic) },
-  );
-  const showEnvelope = Math.min(showFadeIn, showFadeOut);
-
-  const masterOpacity = inShowWindow ? showEnvelope * energyGate : 0;
-
-  if (masterOpacity < 0.01) return null;
-
-  // Current chroma data
-  const chroma = frames[idx]?.chroma ?? [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+  // Energy gate — below threshold, don't render
+  if (energy <= 0.08) return null;
 
   // Beam intensity from energy
   const beamIntensity = interpolate(energy, [0.08, 0.4], [0.25, 0.85], {
@@ -110,12 +75,11 @@ export const StageLights: React.FC<Props> = ({ frames }) => {
 
   return (
     <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden" }}>
-      <svg width={width} height={height} style={{ opacity: masterOpacity }}>
+      <svg width={width} height={height}>
         <defs>
           {pars.map((par, i) => {
-            // Hue shifts with the chroma channel this par responds to
-            const chromaInfluence = chroma[par.chromaIdx] * 60;
-            const hue = (par.baseHue + chromaInfluence + frame * 0.3) % 360;
+            // Each par can offsets from the shared chromaHue by its baseHue
+            const hue = (chromaHue + par.baseHue + frame * 0.3 * tempoFactor) % 360;
             return (
               <radialGradient
                 key={`par-grad-${i}`}
@@ -136,7 +100,8 @@ export const StageLights: React.FC<Props> = ({ frames }) => {
         <rect x={0} y={rigY - 4} width={width} height={8} fill="rgba(20, 20, 25, 0.6)" rx={2} />
         {pars.map((par, i) => {
           const px = par.x * width;
-          const flicker = 0.75 + Math.sin(frame * par.flickerFreq + par.flickerPhase) * 0.25;
+          // beatDecay drives flicker intensity — pars pulse on beats
+          const flicker = 0.65 + beatDecay * 0.35 + Math.sin(frame * par.flickerFreq * tempoFactor + par.flickerPhase) * 0.15;
           const alpha = beamIntensity * par.intensityMult * flicker;
 
           // Cone geometry
@@ -145,9 +110,8 @@ export const StageLights: React.FC<Props> = ({ frames }) => {
           const leftX = px - coneBottomWidth / 2;
           const rightX = px + coneBottomWidth / 2;
 
-          // Par can housing (small circle)
-          const chromaInfluence = chroma[par.chromaIdx] * 60;
-          const hue = (par.baseHue + chromaInfluence + frame * 0.3) % 360;
+          // Par can hue from shared chromaHue
+          const hue = (chromaHue + par.baseHue + frame * 0.3 * tempoFactor) % 360;
 
           return (
             <g key={i} opacity={alpha}>

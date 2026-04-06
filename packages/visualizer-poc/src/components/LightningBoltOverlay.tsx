@@ -28,7 +28,13 @@ export const LightningBoltOverlay: React.FC<Props> = ({ frames }) => {
 
   if (onsetOpacity < 0.02) return null;
 
-  const boltSize = Math.min(width, height) * 0.15;
+  // Size scales with onset intensity — bigger transients = bigger bolt
+  const baseSize = Math.min(width, height) * 0.15;
+  const intensityScale = interpolate(snap.onsetEnvelope, [0.3, 0.8, 1], [0.8, 1.3, 1.8], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+  });
+  const boltSize = baseSize * intensityScale;
 
   // Position varies per onset cycle — hash based on frame
   const cycleId = Math.floor(frame / 30); // approximate onset cycle
@@ -53,7 +59,7 @@ export const LightningBoltOverlay: React.FC<Props> = ({ frames }) => {
           top: `${posY}%`,
           transform: "translate(-50%, -50%)",
           opacity: onsetOpacity,
-          filter: `drop-shadow(0 0 20px ${glowColor}) drop-shadow(0 0 40px ${glowColor})`,
+          filter: `drop-shadow(0 0 ${20 + (snap.bass ?? 0) * 15}px ${glowColor}) drop-shadow(0 0 ${40 + (snap.bass ?? 0) * 20}px ${glowColor})`,
           willChange: "opacity",
         }}
       >

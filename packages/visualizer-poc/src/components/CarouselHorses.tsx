@@ -2,19 +2,18 @@
  * CarouselHorses — 6 carousel horse silhouettes arranged in a circle,
  * rotating as if viewed from above. Each horse bobs up/down with a
  * slight phase offset (carousel pole motion). Ornate silhouette shapes.
- * Golden/warm amber color with carnival glow. Rotation speed driven
- * by tempo/energy. Cycle: 60s, 18s visible.
+ * Color tinted by chromaHue. Rotation speed driven by tempo/energy.
+ * Renders continuously (rotation engine handles fades).
  */
 
 import React from "react";
-import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
+import { useCurrentFrame, useVideoConfig, interpolate } from "remotion";
+import { useAudioSnapshot } from "./parametric/audio-helpers";
+import { useTempoFactor } from "../data/TempoContext";
 import type { EnhancedFrameData } from "../data/types";
 import { seeded } from "../utils/seededRandom";
 
 const NUM_HORSES = 6;
-const CYCLE_FRAMES = 60 * 30; // 60s
-const VISIBLE_FRAMES = 18 * 30; // 18s
-const FADE_FRAMES = 60;
 
 // Carousel horse silhouette as SVG path (ornate prancing horse)
 // Normalized to roughly 0,0 to 60,70 bounding box
@@ -41,18 +40,11 @@ export const CarouselHorses: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
 
-  const idx = Math.min(Math.max(0, frame), frames.length - 1);
+  const snap = useAudioSnapshot(frames);
+  const tempoFactor = useTempoFactor();
+  const { energy, chromaHue, beatDecay } = snap;
 
-  // Rolling energy over +/-75 frames
-  let eSum = 0;
-  let eCount = 0;
-  for (let i = Math.max(0, idx - 75); i <= Math.min(frames.length - 1, idx + 75); i++) {
-    eSum += frames[i].rms;
-    eCount++;
-  }
-  const energy = eCount > 0 ? eSum / eCount : 0;
-
-  // Deterministic data (useMemo before any return null)
+  // Deterministic data
   const horsePhases = React.useMemo(() => {
     const rng = seeded(60197708);
     return Array.from({ length: NUM_HORSES }, () => ({
@@ -62,32 +54,11 @@ export const CarouselHorses: React.FC<Props> = ({ frames }) => {
     }));
   }, []);
 
-  // Cycle timing
-  const cyclePos = frame % CYCLE_FRAMES;
-  const inShowWindow = cyclePos < VISIBLE_FRAMES;
-
-  if (!inShowWindow) return null;
-
-  // Fade envelope
-  const fadeIn = interpolate(cyclePos, [0, FADE_FRAMES], [0, 1], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-    easing: Easing.out(Easing.cubic),
-  });
-  const fadeOut = interpolate(cyclePos, [VISIBLE_FRAMES - FADE_FRAMES, VISIBLE_FRAMES], [1, 0], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-    easing: Easing.in(Easing.cubic),
-  });
-  const masterOpacity = Math.min(fadeIn, fadeOut) * 0.6;
-
-  if (masterOpacity < 0.01) return null;
-
-  // Rotation speed driven by energy
+  // Rotation speed driven by energy and tempo
   const rotSpeed = interpolate(energy, [0.03, 0.3], [0.3, 1.5], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
-  });
+  }) * tempoFactor;
 
   // Current rotation angle (degrees)
   const rotAngle = frame * rotSpeed;
@@ -99,9 +70,9 @@ export const CarouselHorses: React.FC<Props> = ({ frames }) => {
   const radiusY = radiusX * 0.35; // foreshortened for top-down perspective
   const horseScale = 0.8;
 
-  // Golden/amber color
-  const baseHue = 40; // amber
-  const glowColor = `rgba(255, 200, 80, 0.4)`;
+  // Hue tinted by chromaHue (audio-derived pitch class)
+  const baseHue = chromaHue;
+  const glowColor = `hsla(${baseHue}, 80%, 60%, 0.4)`;
 
   return (
     <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden" }}>
@@ -109,8 +80,8 @@ export const CarouselHorses: React.FC<Props> = ({ frames }) => {
         width={width}
         height={height}
         style={{
-          opacity: masterOpacity,
-          filter: `drop-shadow(0 0 15px ${glowColor}) drop-shadow(0 0 30px rgba(255, 170, 40, 0.2))`,
+          opacity: 0.6,
+          filter: `drop-shadow(0 0 15px ${glowColor}) drop-shadow(0 0 30px ${glowColor})`,
         }}
       >
         {/* Center hub */}
@@ -132,9 +103,9 @@ export const CarouselHorses: React.FC<Props> = ({ frames }) => {
           const hx = centerX + Math.cos(angleRad) * radiusX;
           const hy = centerY + Math.sin(angleRad) * radiusY;
 
-          // Bobbing (carousel pole motion)
+          // Bobbing synced to beat decay (carousel pole motion)
           const hp = horsePhases[hi];
-          const bob = Math.sin(frame * hp.bobFreq + hp.bobPhase) * hp.bobAmp;
+          const bob = Math.sin(frame * hp.bobFreq + hp.bobPhase) * hp.bobAmp * (0.5 + 0.5 * beatDecay);
 
           // Depth-based scaling: horses at front (bottom) appear larger
           const depthScale = interpolate(Math.sin(angleRad), [-1, 1], [0.5, 1.0], {

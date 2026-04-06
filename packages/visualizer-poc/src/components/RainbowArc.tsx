@@ -37,21 +37,32 @@ export const RainbowArc: React.FC<Props> = ({ frames }) => {
   const { width, height } = useVideoConfig();
   const snap = useAudioSnapshot(frames);
 
-  const energy = snap.energy;
+  const { energy, bass, mids, highs, beatDecay, onsetEnvelope } = snap;
+
+  // Map frequency bands to rainbow bands (bass=warm, mids=middle, highs=cool)
+  const bandEnergies = [
+    bass,                         // Red — bass
+    bass * 0.6 + mids * 0.4,     // Orange — bass/mids blend
+    mids * 0.7 + bass * 0.3,     // Yellow — mids/bass
+    mids,                         // Green — mids
+    mids * 0.5 + highs * 0.5,    // Blue — mids/highs
+    highs * 0.7 + mids * 0.3,    // Indigo — highs/mids
+    highs,                        // Violet — highs
+  ];
 
   // Arc center and base radius
   const centerX = width * 0.5;
   const centerY = height * 0.65;
   const baseRadius = width * 0.38;
 
-  // Energy-driven pulse on arc width
-  const widthPulse = 1 + Math.sin(frame * 0.04) * 0.08 * (1 + energy * 2);
+  // Energy-driven pulse on arc width + beat pulse
+  const widthPulse = 1 + Math.sin(frame * 0.04) * 0.08 * (1 + energy * 2) + beatDecay * 0.06;
   const bandWidth = ARC_BAND_WIDTH * widthPulse;
 
   // Shimmer effect
   const shimmer = 1 + Math.sin(frame * 0.07) * 0.03 + Math.sin(frame * 0.13) * 0.02;
 
-  // Master opacity driven by energy (brighter during louder passages)
+  // Master opacity driven by energy
   const masterOpacity = interpolate(energy, [0.03, 0.25], [0.35, 0.65], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
@@ -83,20 +94,27 @@ export const RainbowArc: React.FC<Props> = ({ frames }) => {
           );
         })}
 
-        {/* Main rainbow - 7 concentric arcs (outer to inner: R-O-Y-G-B-I-V) */}
+        {/* Main rainbow - 7 concentric arcs, each driven by its frequency band */}
         {RAINBOW_COLORS.map((color, ci) => {
           const r = baseRadius + (RAINBOW_COLORS.length - 1 - ci) * (bandWidth + ARC_GAP);
+          const bandE = bandEnergies[ci] ?? energy;
+          // Per-band opacity: quiet bands dim, active bands glow
+          const bandOpacity = interpolate(bandE, [0.02, 0.3], [0.25, 0.85], {
+            extrapolateLeft: "clamp",
+            extrapolateRight: "clamp",
+          }) + onsetEnvelope * 0.1;
+          const bandGlow = 4 + bandE * 14;
 
           return (
             <path
               key={`main-${ci}`}
               d={`M ${centerX - r} ${centerY} A ${r} ${r} 0 0 1 ${centerX + r} ${centerY}`}
               stroke={color}
-              strokeWidth={bandWidth}
+              strokeWidth={bandWidth * (1 + bandE * 0.3)}
               fill="none"
-              opacity={0.5 + energy * 0.3}
+              opacity={bandOpacity}
               style={{
-                filter: `drop-shadow(0 0 ${4 + energy * 8}px ${color}88)`,
+                filter: `drop-shadow(0 0 ${bandGlow}px ${color}88)`,
               }}
             />
           );
