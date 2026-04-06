@@ -13,7 +13,6 @@
  *   ├─ PoeticLyrics (flowing text)
  *   ├─ DynamicOverlayStack (5-20 rotation overlays)
  *   ├─ CrowdOverlay (applause glow)
- *   ├─ SpecialPropsLayer (title, DNA, milestones, listen-for, fan quotes, grain)
  *   └─ AudioLayer (song audio + crowd ambience)
  */
 
@@ -43,6 +42,7 @@ import { resolveLyricTriggers, loadAlignmentWords } from "./data/lyric-trigger-r
 import { resolveMediaForSong } from "./data/media-resolver";
 import { SongPaletteProvider } from "./data/SongPaletteContext";
 import { EraGrade } from "./components/EraGrade";
+import { getFilmStock } from "./utils/film-stock";
 import { EnergyEnvelope } from "./components/EnergyEnvelope";
 import { computeClimaxState, climaxModulation } from "./utils/climax-state";
 import { computeAudioSnapshot, buildBeatArray } from "./utils/audio-reactive";
@@ -91,11 +91,6 @@ import { computeTempoLock } from "./utils/tempo-lock";
 import type { PrecomputedNarrative, PrevSongContext } from "./utils/show-narrative-precompute";
 import { computeAfterJamQuality } from "./utils/after-jam-quality";
 import { computeCrowdEnergy } from "./utils/crowd-energy";
-import { IntroQuote } from "./components/IntroQuote";
-import { LyricFragment } from "./components/LyricFragment";
-import { WaveformOverlay } from "./components/WaveformOverlay";
-import { GuitarStrings } from "./components/GuitarStrings";
-import { MeshDeformationGrid } from "./components/MeshDeformationGrid";
 import { computeStemCharacter } from "./utils/stem-character";
 import { TimeDilationProvider } from "./data/TimeDilationContext";
 import { computeReactiveTriggers } from "./utils/reactive-triggers";
@@ -105,13 +100,8 @@ import { buildIconSchedule, getIconForFrame } from "./utils/icon-overlay-manager
 // Extracted sub-components
 import { SongArtLayer } from "./components/song-visualizer/SongArtLayer";
 import { DynamicOverlayStack } from "./components/song-visualizer/DynamicOverlayStack";
-import { SpecialPropsLayer } from "./components/song-visualizer/SpecialPropsLayer";
 import { AudioLayer } from "./components/song-visualizer/AudioLayer";
 import {
-  songStatsData,
-  milestonesMap,
-  narrationData,
-  fanReviewsData,
   mediaCatalog,
 } from "./components/song-visualizer/show-data-loader";
 
@@ -403,6 +393,13 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
 
   // opacityMapBase computed after reactiveState (below) for reactive overlay injection
   let opacityMapBase: Record<string, number> | null = null;
+
+  // ─── Film stock filter for text layer (matches EraGrade treatment) ───
+  const filmStockFilter = useMemo(() => {
+    if (!props.show?.era) return undefined;
+    const stock = getFilmStock(props.show.era);
+    return stock?.cssFilter || undefined;
+  }, [props.show?.era]);
 
   // ─── Palette hue rotation ───
   const hueRotation = useMemo(() => {
@@ -703,8 +700,8 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
         : frame < 360 ? 0.50 + 0.50 * ((frame - 150) / 210)                         // 5-12s: ramp back to full
         : 1)
     : isInSuiteMiddle ? 1
-    : frame < INTRO_FULL ? 0.15                                                      // 0-4s: shader at 15% (art hero)
-      : frame < INTRO_FULL + INTRO_RAMP ? 0.15 + 0.85 * ((frame - INTRO_FULL) / INTRO_RAMP)  // 4-12s: shader ramps 15%→100%
+    : frame < INTRO_FULL ? 0.0                                                       // 0-15s: shader OFF (art hero, no flicker)
+      : frame < INTRO_FULL + INTRO_RAMP ? ((frame - INTRO_FULL) / INTRO_RAMP)                 // 15-20s: shader ramps 0%→100%
       : 1;
 
   // ─── Fade in/out ───
@@ -843,8 +840,8 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
           {/* AI image overlay REMOVED — makes viewers think "AI slop" and adds visual noise.
               Dead identity comes from song card (intro/bookend) and the shader itself. */}
 
-          {/* IT flash — chromatic burst on coherence break */}
-          {itState.flashIntensity > 0.01 && (
+          {/* IT flash — chromatic burst on coherence break (suppressed during intro) */}
+          {introFactor > 0.5 && itState.flashIntensity > 0.01 && (
             <div
               style={{
                 position: "absolute",
@@ -860,7 +857,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
 
           {/* IT strobe — beat-synced pulse during deep coherence lock.
               Uses soft-light blend (gentler than overlay) to avoid harsh white flashes. */}
-          {itState.strobeIntensity > 0.01 && (
+          {introFactor > 0.5 && itState.strobeIntensity > 0.01 && (
             <div
               style={{
                 position: "absolute",
@@ -908,54 +905,31 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
             );
           })()}
 
-          {/* Intro ambient shimmer — atmosphere colored by what just happened */}
-          {introFactor < 0.5 && !props.segueIn && (() => {
-            const sc = afterJamMods.shimmerColor ?? { r: 120, g: 80, b: 60 };
-            const speed = afterJamMods.shimmerSpeed;
-            // Blend after-jam color with upcoming song's palette for continuity bridge
-            const nextPalHue = effectivePalette?.primary ?? 30;
-            const blendProgress = Math.max(0, Math.min(1, frame / 300)); // blend over 10s
-            const nextAngle = (nextPalHue / 360) * Math.PI * 2;
-            const nr = Math.round(100 + 50 * Math.cos(nextAngle));
-            const ng = Math.round(80 + 40 * Math.cos(nextAngle - 2.1));
-            const nb = Math.round(90 + 50 * Math.sin(nextAngle));
-            const br = Math.round(sc.r * (1 - blendProgress) + nr * blendProgress);
-            const bg = Math.round(sc.g * (1 - blendProgress) + ng * blendProgress);
-            const bb = Math.round(sc.b * (1 - blendProgress) + nb * blendProgress);
-            return (
-              <div
-                style={{
-                  position: "absolute",
-                  inset: 0,
-                  pointerEvents: "none",
-                  background: `radial-gradient(ellipse at ${50 + Math.sin(frame * 0.003 * speed) * 15}% ${55 + Math.cos(frame * 0.004 * speed) * 10}%, rgba(${br}, ${bg}, ${bb}, 0.12), transparent 60%)`,
-                  mixBlendMode: "screen",
-                  opacity: (0.6 + 0.3 * Math.sin(frame * 0.015 * speed)) * (1 - introFactor * 2),
-                }}
-              />
-            );
-          })()}
-
-          {/* IntroQuote disabled — only song cards, setlist, concert info */}
-
-          {/* Lyrics disabled — pure visual experience */}
 
         </EnergyEnvelope>
         </EraGrade>
         </CameraMotion>
 
-        {/* Text elements rendered OUTSIDE CameraMotion to prevent CSS transform blur */}
-        {!isDeadAir && <ConcertInfo />}
-        {!isDeadAir && <SetlistScroll frames={f} currentSong={props.song.title} introFactor={introFactor} />}
+        {/* Text elements rendered OUTSIDE CameraMotion to prevent CSS transform blur,
+            but wrapped in film stock filter so typography lives in the same visual world */}
         {!isDeadAir && (
-          <SilentErrorBoundary name="NowPlaying">
-            <NowPlaying
-              title={props.song.title}
-              artist="Grateful Dead"
-              energy={audioSnapshot.energy}
-              isSacredSegue={isSacredSegueIn}
-            />
-          </SilentErrorBoundary>
+          <div style={{
+            position: "absolute",
+            inset: 0,
+            pointerEvents: "none",
+            filter: filmStockFilter,
+          }}>
+            <ConcertInfo />
+            <SetlistScroll frames={f} currentSong={props.song.title} introFactor={introFactor} />
+            <SilentErrorBoundary name="NowPlaying">
+              <NowPlaying
+                title={props.song.title}
+                artist="Grateful Dead"
+                energy={audioSnapshot.energy}
+                isSacredSegue={isSacredSegueIn}
+              />
+            </SilentErrorBoundary>
+          </div>
         )}
       </div>
       </VisualizerErrorBoundary>

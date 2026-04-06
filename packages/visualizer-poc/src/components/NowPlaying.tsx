@@ -1,6 +1,13 @@
 import React from "react";
 import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
+import { loadFont } from "@remotion/google-fonts/CormorantGaramond";
 import { responsiveFontSize, responsiveSize } from "../utils/responsive-text";
+import { useSongPalette } from "../data/SongPaletteContext";
+
+const { fontFamily: cormorant } = loadFont("normal", {
+  weights: ["400", "600", "700"],
+  subsets: ["latin"],
+});
 
 interface Props {
   title: string;
@@ -13,6 +20,7 @@ interface Props {
 export const NowPlaying: React.FC<Props> = ({ title, artist, energy = 0, isSacredSegue }) => {
   const frame = useCurrentFrame();
   const { height } = useVideoConfig();
+  const palette = useSongPalette();
 
   // Sacred segues: delay to frame 1200 (40s) with 120-frame fade
   // Normal: appear at frame 300 with 90-frame fade
@@ -38,6 +46,9 @@ export const NowPlaying: React.FC<Props> = ({ title, artist, energy = 0, isSacre
 
   const backdropPad = responsiveSize(12, height);
 
+  // Subtle palette accent — thin left border in palette primary color
+  const accentColor = `hsla(${palette.primary}, 60%, 55%, ${0.5 * fadeIn})`;
+
   return (
     <div
       style={{
@@ -49,19 +60,20 @@ export const NowPlaying: React.FC<Props> = ({ title, artist, energy = 0, isSacre
         display: "flex",
         flexDirection: "column",
         gap: responsiveSize(2, height),
-        background: "rgba(0, 0, 0, 0.75)",
+        background: "rgba(0, 0, 0, 0.65)",
         padding: `${backdropPad}px ${backdropPad * 1.8}px`,
-        borderRadius: responsiveSize(6, height),
+        borderLeft: `${Math.round(3 * (height / 1080))}px solid ${accentColor}`,
+        maxWidth: `${94 - padding}%`,
       }}
     >
       <div
         style={{
-          fontFamily: "'Cormorant Garamond', Georgia, serif",
+          fontFamily: `${cormorant}, 'Cormorant Garamond', Georgia, serif`,
           fontSize: titleSize,
-          fontWeight: 700,
-          color: "rgba(255, 255, 255, 1.0)",
-          textShadow: "0 2px 4px rgba(0,0,0,0.6)",
-          letterSpacing: "0.01em",
+          fontWeight: 600,
+          color: "rgba(255, 255, 255, 0.95)",
+          textShadow: "0 1px 3px rgba(0,0,0,0.5)",
+          letterSpacing: "0.02em",
         }}
       >
         {title}
@@ -69,11 +81,12 @@ export const NowPlaying: React.FC<Props> = ({ title, artist, energy = 0, isSacre
       {artist && (
         <div
           style={{
-            fontFamily: "'Cormorant Garamond', Georgia, serif",
+            fontFamily: `${cormorant}, 'Cormorant Garamond', Georgia, serif`,
             fontSize: artistSize,
             fontWeight: 400,
-            color: "rgba(255, 255, 255, 0.85)",
-            letterSpacing: "0.02em",
+            color: "rgba(255, 255, 255, 0.6)",
+            letterSpacing: "0.06em",
+            textTransform: "uppercase",
           }}
         >
           {artist}

@@ -6,8 +6,14 @@
 
 import React from "react";
 import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
+import { loadFont } from "@remotion/google-fonts/CormorantGaramond";
 import { useShowContext, formatDateCompact } from "../data/ShowContext";
 import { useSongPalette } from "../data/SongPaletteContext";
+
+const { fontFamily: cormorant } = loadFont("normal", {
+  weights: ["400", "600", "700"],
+  subsets: ["latin"],
+});
 
 const DELAY = 60;           // 2s — appears during poster art intro, alongside song title
 const SHOW_DURATION = 240;  // 8 seconds visible total (incl fades)
@@ -99,27 +105,38 @@ export const ConcertInfo: React.FC<Props> = ({
           {/* Band name */}
           <div
             style={{
-              fontSize: 52 * s,
-              fontWeight: 900,
-              fontFamily: "serif",
-              letterSpacing: 12 * s,
-              color: `hsl(${hue1}, 100%, 65%)`,
-              textShadow: `0 0 ${20 * s}px hsl(${hue1}, 100%, 50%), 0 0 ${40 * s}px hsl(${hue2}, 100%, 50%), 0 0 ${60 * s}px hsl(${hue1}, 80%, 40%)`,
+              fontSize: 48 * s,
+              fontWeight: 700,
+              fontFamily: `${cormorant}, 'Cormorant Garamond', Georgia, serif`,
+              letterSpacing: 14 * s,
+              color: `hsl(${hue1}, 40%, 85%)`,
+              textShadow: `0 0 ${30 * s}px hsl(${hue1}, 60%, 40%), 0 0 ${60 * s}px hsl(${hue2}, 50%, 30%)`,
               textTransform: "uppercase",
             }}
           >
             {bandName}
           </div>
 
+          {/* Decorative line above venue */}
+          <div
+            style={{
+              width: 180 * s,
+              height: 1 * s,
+              background: `linear-gradient(90deg, transparent, hsl(${hue1}, 30%, 60%), transparent)`,
+              marginTop: 14 * s,
+              opacity: 0.5,
+            }}
+          />
+
           {/* Venue */}
           <div
             style={{
-              fontSize: 20 * s,
-              fontWeight: 600,
-              fontFamily: "serif",
+              fontSize: 18 * s,
+              fontWeight: 400,
+              fontFamily: `${cormorant}, 'Cormorant Garamond', Georgia, serif`,
               letterSpacing: 6 * s,
-              color: `hsl(${hue2}, 90%, 70%)`,
-              textShadow: `0 0 ${12 * s}px hsl(${hue2}, 100%, 50%)`,
+              color: `hsl(${hue2}, 30%, 70%)`,
+              textShadow: `0 0 ${8 * s}px hsl(${hue2}, 40%, 35%)`,
               marginTop: 12 * s,
             }}
           >
@@ -129,12 +146,12 @@ export const ConcertInfo: React.FC<Props> = ({
           {/* Date */}
           <div
             style={{
-              fontSize: 18 * s,
+              fontSize: 16 * s,
               fontWeight: 400,
-              fontFamily: "monospace",
-              letterSpacing: 4 * s,
-              color: `hsl(${(hue1 + 180) % 360}, 80%, 70%)`,
-              textShadow: `0 0 ${10 * s}px hsl(${(hue1 + 180) % 360}, 100%, 50%)`,
+              fontFamily: `${cormorant}, 'Cormorant Garamond', Georgia, serif`,
+              letterSpacing: 5 * s,
+              color: `hsl(${hue1}, 20%, 60%)`,
+              textShadow: `0 0 ${6 * s}px hsl(${hue1}, 30%, 30%)`,
               marginTop: 6 * s,
             }}
           >
@@ -145,28 +162,28 @@ export const ConcertInfo: React.FC<Props> = ({
           {songTitle && (
             <div
               style={{
-                fontSize: 28 * s,
-                fontWeight: 700,
-                fontFamily: "serif",
+                fontSize: 24 * s,
+                fontWeight: 600,
+                fontFamily: `${cormorant}, 'Cormorant Garamond', Georgia, serif`,
                 fontStyle: "italic",
                 letterSpacing: 3 * s,
-                color: `hsl(${(hue1 + 90) % 360}, 100%, 75%)`,
-                textShadow: `0 0 ${15 * s}px hsl(${(hue1 + 90) % 360}, 100%, 55%)`,
-                marginTop: 16 * s,
+                color: `hsl(${hue1}, 25%, 75%)`,
+                textShadow: `0 0 ${10 * s}px hsl(${hue1}, 35%, 40%)`,
+                marginTop: 18 * s,
               }}
             >
               {songTitle}
             </div>
           )}
 
-          {/* Decorative line */}
+          {/* Decorative line below */}
           <div
             style={{
-              width: 200 * s,
-              height: 2 * s,
-              background: `linear-gradient(90deg, transparent, hsl(${hue1}, 100%, 65%), transparent)`,
-              marginTop: 10 * s,
-              opacity: 0.6,
+              width: 120 * s,
+              height: 1 * s,
+              background: `linear-gradient(90deg, transparent, hsl(${hue1}, 30%, 60%), transparent)`,
+              marginTop: 12 * s,
+              opacity: 0.4,
             }}
           />
         </div>
@@ -180,27 +197,27 @@ export const ConcertInfo: React.FC<Props> = ({
           left: 20 * s,
           opacity: ticketOpacity,
           transform: "rotate(-3deg)",
-          filter: `drop-shadow(0 0 ${8 * s}px rgba(255,200,100,0.3))`,
+          filter: `drop-shadow(0 0 ${8 * s}px hsla(${hue1}, 30%, 40%, 0.2))`,
         }}
       >
         <div
           style={{
-            border: `${1.5 * s}px solid rgba(255, 200, 100, 0.6)`,
+            border: `${1 * s}px solid hsla(${hue1}, 25%, 55%, 0.35)`,
             borderRadius: 4 * s,
             padding: `${8 * s}px ${14 * s}px`,
-            background: "rgba(0, 0, 0, 0.25)",
-            fontFamily: "monospace",
+            background: "rgba(0, 0, 0, 0.3)",
+            fontFamily: `${cormorant}, 'Cormorant Garamond', Georgia, serif`,
             fontSize: 10 * s,
-            color: "rgba(255, 200, 100, 0.8)",
+            color: `hsla(${hue1}, 30%, 70%, 0.7)`,
             lineHeight: 1.6,
             minWidth: 140 * s,
           }}
         >
-          <div style={{ fontSize: 7 * s, letterSpacing: 3 * s, opacity: 0.6 }}>ADMIT ONE</div>
+          <div style={{ fontSize: 7 * s, letterSpacing: 3 * s, opacity: 0.6, fontFamily: "'Courier New', monospace" }}>ADMIT ONE</div>
           <div style={{ fontWeight: 700, fontSize: 11 * s, marginTop: 2 * s }}>{bandName}</div>
           <div style={{ fontSize: 9 * s, opacity: 0.8 }}>{venue.split(",")[0]}</div>
           <div style={{ fontSize: 9 * s, opacity: 0.7 }}>{date}</div>
-          <div style={{ borderTop: `${1 * s}px dashed rgba(255,200,100,0.3)`, marginTop: 4 * s, paddingTop: 3 * s, fontSize: 8 * s, opacity: 0.5 }}>
+          <div style={{ borderTop: `${1 * s}px dashed hsla(${hue1}, 30%, 60%, 0.25)`, marginTop: 4 * s, paddingTop: 3 * s, fontSize: 8 * s, opacity: 0.5, fontFamily: "'Courier New', monospace" }}>
             NO. {ticketNumber} &nbsp; GA
           </div>
         </div>
