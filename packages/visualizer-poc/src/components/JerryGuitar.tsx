@@ -31,8 +31,7 @@ function hueToHex(h: number): string {
   return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
 }
 
-const CYCLE = 1800;    // 60 seconds at 30fps
-const DURATION = 600;  // 20 seconds at 30fps
+// No internal cycle — rotation engine controls visibility
 
 // String Y positions relative to guitar body (6 strings, high E to low E)
 const STRING_Y = [0, 1, 2, 3, 4, 5];
@@ -52,19 +51,7 @@ export const JerryGuitar: React.FC<Props> = ({ frames }) => {
   // Convert 0-360 hue to 0-1 range for existing hueToHex
   const chromaHue = chromaHueDeg / 360;
 
-  // Cycle timing
-  const cycleFrame = frame % CYCLE;
-  if (cycleFrame >= DURATION) return null;
-
-  const progress = cycleFrame / DURATION;
-
-  // Fade envelope: 10% in, hold, 10% out
-  const envelope = interpolate(progress, [0, 0.1, 0.85, 1], [0, 1, 1, 0], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-    easing: Easing.out(Easing.cubic),
-  });
-
+  // Continuous rendering — no internal cycle, rotation engine controls visibility
   // Energy gate at 0.10
   const energyGate = interpolate(energy, [0.05, 0.10], [0, 1], {
     extrapolateLeft: "clamp",
@@ -73,7 +60,7 @@ export const JerryGuitar: React.FC<Props> = ({ frames }) => {
 
   // Boost visibility when guitar/keys stem is prominent
   const otherBoost = interpolate(otherEnergy ?? 0, [0.05, 0.3], [0, 0.2], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-  const opacity = envelope * energyGate * (0.5 + otherBoost);
+  const opacity = energyGate * (0.5 + otherBoost);
   if (opacity < 0.01) return null;
 
   // Scale breathing with energy

@@ -14,9 +14,11 @@ import { seeded } from "../utils/seededRandom";
 import { useAudioSnapshot } from "./parametric/audio-helpers";
 import { useTempoFactor } from "../data/TempoContext";
 
-const APPEAR_DURATION = 180; // 6 seconds at 30fps
-const APPEAR_GAP = 2520;     // 84 second gap (90s total cycle)
-const APPEAR_CYCLE = APPEAR_DURATION + APPEAR_GAP;
+// Dramatic zoom loop — 6s zoom + 6s hold/reset = 12s cycle
+// Much shorter than old 90s cycle so it fires within rotation windows
+const APPEAR_DURATION = 180; // 6 seconds zoom
+const APPEAR_HOLD = 180;     // 6 seconds hold at full presence
+const APPEAR_CYCLE = APPEAR_DURATION + APPEAR_HOLD;
 
 const NEON_PALETTES = [
   { primary: "#FF1744", accent: "#00E5FF", hat: "#651FFF", stars: "#FFD700" },
@@ -175,39 +177,36 @@ export const UncleSam: React.FC<Props> = ({ frames }) => {
   const cycleIndex = Math.floor(frame / APPEAR_CYCLE);
   const cycleFrame = frame % APPEAR_CYCLE;
 
-  // Only render during appear portion
-  if (cycleFrame >= APPEAR_DURATION) return null;
-
-  const progress = cycleFrame / APPEAR_DURATION;
+  // During zoom phase: animate in. During hold phase: stay present
+  const inZoom = cycleFrame < APPEAR_DURATION;
+  const progress = inZoom ? cycleFrame / APPEAR_DURATION : 1;
 
   // Deterministic palette selection
   const rng = seeded(cycleIndex * 67 + 1776);
   const palette = NEON_PALETTES[Math.floor(rng() * NEON_PALETTES.length)];
 
-  // Zoom: 0.3 -> 1.2 -> 2.5 (three-phase zoom)
-  const scale = interpolate(
+  // Zoom: 0.3 -> 1.2 during zoom phase, hold at 1.2 during hold phase
+  const zoomScale = interpolate(
     progress,
-    [0, 0.4, 0.7, 1],
-    [0.3, 1.2, 1.2, 2.5],
+    [0, 0.5, 1],
+    [0.3, 1.0, 1.2],
     {
       extrapolateLeft: "clamp",
       extrapolateRight: "clamp",
       easing: Easing.bezier(0.25, 0.1, 0.25, 1),
     },
   );
+  // During hold phase, breathe slightly with energy
+  const holdBreath = inZoom ? 0 : (energy - 0.2) * 0.15;
+  const scale = zoomScale + holdBreath;
 
-  // Opacity: quick fade in, hold, then fade as it zooms past
-  const fadeIn = interpolate(progress, [0, 0.15], [0, 1], {
+  // Opacity: fade in during zoom, hold during presence
+  const fadeIn = interpolate(progress, [0, 0.2], [0, 1], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
     easing: Easing.out(Easing.cubic),
   });
-  const fadeOut = interpolate(progress, [0.7, 1], [1, 0], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-    easing: Easing.in(Easing.quad),
-  });
-  const opacity = Math.min(fadeIn, fadeOut) * interpolate(energy, [0.2, 0.35], [0.7, 1], {
+  const opacity = fadeIn * interpolate(energy, [0.2, 0.35], [0.7, 1], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });

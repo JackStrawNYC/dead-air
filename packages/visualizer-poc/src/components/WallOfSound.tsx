@@ -111,22 +111,13 @@ const VinylRecord: React.FC<{ energy: number; chromaHue: number; tempoFactor: nu
 
 // ── NEON SIGN ───────────────────────────────────────────────────
 
-const NeonSign: React.FC<{ energy: number; chromaHue: number; onsetEnvelope: number; beatDecay: number; frame: number }> = ({ energy, chromaHue, onsetEnvelope, beatDecay, frame }) => {
-  const NEON_CYCLE = 2100;     // 70 seconds between appearances
-  const NEON_DURATION = 360;   // 12 seconds visible
+const NeonSign: React.FC<{ energy: number; chromaHue: number; onsetEnvelope: number; beatDecay: number; frame: number }> = ({ energy, chromaHue, onsetEnvelope, beatDecay }) => {
+  // Always render when parent WallOfSound is active — no internal cycle
+  const opacity = interpolate(energy, [0.05, 0.25], [0.5, 0.9], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
 
-  const cycleFrame = frame % NEON_CYCLE;
-  if (cycleFrame >= NEON_DURATION) return null;
-
-  const progress = cycleFrame / NEON_DURATION;
-  const fadeIn = interpolate(progress, [0, 0.1], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: Easing.out(Easing.cubic) });
-  const fadeOut = interpolate(progress, [0.9, 1], [1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-  const opacity = Math.min(fadeIn, fadeOut) * interpolate(energy, [0.05, 0.25], [0.5, 0.9], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-
-  // Neon flicker — onset-triggered buzzy flicker + subtle beat pulse
-  const onsetFlicker = onsetEnvelope > 0.3 ? 0.3 + Math.random() * 0.4 : 1;
-  const flicker1 = Math.sin(frame * 3.7) > 0.92 ? 0.3 : onsetFlicker;
-  const flicker2 = Math.sin(frame * 5.1 + 2) > 0.95 ? 0.4 : 1;
+  // Neon flicker — onset-triggered buzzy flicker
+  const flicker1 = onsetEnvelope > 0.3 ? 0.3 + onsetEnvelope * 0.4 : 1;
+  const flicker2 = onsetEnvelope > 0.4 ? 0.4 + onsetEnvelope * 0.3 : 1;
 
   const hue = chromaHue;
   const color1 = `hsl(${hue}, 100%, ${55 + beatDecay * 15}%)`;

@@ -25,8 +25,9 @@ interface MushroomData {
   spotCount: number;
 }
 
-const MUSHROOM_CYCLE = 1050;   // 35 seconds
-const MUSHROOM_DURATION = 600; // 20 seconds
+// No internal cycle — rotation engine controls visibility
+// Mushrooms grow over ~6 seconds then hold
+const GROW_FRAMES = 180; // 6 seconds to full size
 const NUM_MUSHROOMS = 10;
 
 function generateMushrooms(seed: number): MushroomData[] {
@@ -52,20 +53,11 @@ const MushroomForestOverlay: React.FC<{ width: number; height: number; energy: n
   );
   if (quietEnergy < 0.2) return null;
 
-  const cycleFrame = frame % MUSHROOM_CYCLE;
-  const cycleIdx = Math.floor(frame / MUSHROOM_CYCLE);
-  if (cycleFrame >= MUSHROOM_DURATION) return null;
+  // Continuous rendering — grow once then hold
+  const mushrooms = React.useMemo(() => generateMushrooms(420), []);
 
-  const mushrooms = React.useMemo(() => generateMushrooms(cycleIdx * 17 + 420), [cycleIdx]);
-
-  const progress = cycleFrame / MUSHROOM_DURATION;
-  // Grow up then shrink
-  const growPhase = interpolate(progress, [0, 0.4, 0.8, 1], [0, 1, 1, 0], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-    easing: Easing.out(Easing.cubic),
-  });
-  const opacity = interpolate(progress, [0, 0.1, 0.85, 1], [0, 0.7, 0.7, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" }) * quietEnergy;
+  const growPhase = Math.min(frame / GROW_FRAMES, 1);
+  const opacity = interpolate(growPhase, [0, 0.15], [0, 0.7], { extrapolateLeft: "clamp", extrapolateRight: "clamp" }) * quietEnergy;
 
   return (
     <svg width={width} height={height} style={{ position: "absolute", inset: 0, opacity, pointerEvents: "none" }}>

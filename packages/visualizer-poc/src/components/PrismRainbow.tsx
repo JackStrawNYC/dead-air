@@ -10,8 +10,7 @@ import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
 import { useAudioSnapshot } from "./parametric/audio-helpers";
 
-const CYCLE = 1650; // 55s at 30fps
-const DURATION = 480; // 16s visible
+// No internal cycle — rotation engine controls visibility
 
 interface Props {
   frames: EnhancedFrameData[];
@@ -34,23 +33,8 @@ export const PrismRainbow: React.FC<Props> = ({ frames }) => {
   const snap = useAudioSnapshot(frames);
   const { energy, bass, mids, highs, onsetEnvelope } = snap;
 
-  // Cycle gating
-  const cycleFrame = frame % CYCLE;
-  if (cycleFrame >= DURATION) return null;
-
-  const progress = cycleFrame / DURATION;
-
-  const fadeIn = interpolate(progress, [0, 0.08], [0, 1], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-    easing: Easing.out(Easing.cubic),
-  });
-  const fadeOut = interpolate(progress, [0.88, 1], [1, 0], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-    easing: Easing.in(Easing.cubic),
-  });
-  const opacity = Math.min(fadeIn, fadeOut) * interpolate(energy, [0.02, 0.2], [0.4, 0.85], {
+  // Continuous rendering — no internal cycle, rotation engine controls visibility
+  const opacity = interpolate(energy, [0.02, 0.2], [0.4, 0.85], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });

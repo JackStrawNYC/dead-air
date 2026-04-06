@@ -1,14 +1,25 @@
 /**
- * Smoke Rings — toroidal vortex rings.
- * SDF-based torus rings rising and colliding. Volumetric scattering at edges.
+ * Smoke Rings — raymarched volumetric toroidal vortices.
+ * True 3D smoke ring structures rising through space, each ring a volumetric
+ * torus density field with turbulent FBM displacement. Multiple rings at
+ * different stages of formation and dissolution. Camera looks up through
+ * rising rings.
  *
  * Audio reactivity:
- *   uBass          → ring scale
- *   uEnergy        → ring count
- *   uVocalPresence → ring color shift
- *   uStemBass      → ring thickness
- *   uChromaHue     → hue modulation
- *   uSlowEnergy    → rise speed
+ *   uBass             → ring size / thickness
+ *   uEnergy           → ring count / density
+ *   uDrumOnset        → new ring launch
+ *   uVocalPresence    → warm backlight glow
+ *   uHarmonicTension  → turbulence / dissolution rate
+ *   uSectionType      → jam=rapid rings, space=single floating, chorus=chain
+ *   uClimaxPhase      → rings collide and merge into massive vortex
+ *   uSlowEnergy       → drift speed
+ *   uStemBass         → ring inner thickness
+ *   uChromaHue        → hue modulation
+ *   uChordIndex       → chord-shifted ring color
+ *   uMelodicPitch     → vertical camera tilt
+ *   uBeatStability    → ring coherence
+ *   uDynamicRange     → density contrast
  */
 
 import { noiseGLSL } from "./noise";
@@ -23,6 +34,16 @@ void main() {
 }
 `;
 
+const postProcess = buildPostProcessGLSL({
+  bloomEnabled: true,
+  halationEnabled: true,
+  grainStrength: "normal",
+  caEnabled: true,
+  lensDistortionEnabled: true,
+  lightLeakEnabled: false,
+  temporalBlendEnabled: false,
+});
+
 export const smokeRingsFrag = /* glsl */ `
 precision highp float;
 
@@ -30,33 +51,199 @@ ${sharedUniformsGLSL}
 
 ${noiseGLSL}
 
-${buildPostProcessGLSL({
-  bloomEnabled: true,
-  halationEnabled: true,
-  grainStrength: "normal",
-  temporalBlendEnabled: false,
-})}
+${postProcess}
 
 varying vec2 vUv;
 
-#define PI 3.14159265
-#define TAU 6.28318530
-#define MAX_RINGS 6
+#define SR_PI 3.14159265
+#define SR_TAU 6.28318530
+#define SR_MAX_STEPS 64
+#define SR_MAX_RINGS 7
+#define SR_MAX_DIST 18.0
+#define SR_DENSITY_SCALE 0.065
 
-// 2D torus ring SDF (ring in XY plane viewed from front)
-float torusSDF(vec2 p, vec2 center, float majorR, float minorR) {
-  vec2 q = p - center;
-  float d = length(q) - majorR;
-  return abs(d) - minorR;
+// ─── Torus SDF: distance from point to torus surface ───
+// majorR = ring radius, minorR = tube thickness
+float srTorusSDF(vec3 pos, float majorR, float minorR) {
+  vec2 q = vec2(length(pos.xz) - majorR, pos.y);
+  return length(q) - minorR;
 }
 
-// Smooth torus field with FBM displacement
-float smokeRingField(vec2 p, vec2 center, float majorR, float minorR, float time, float energyMod) {
-  float d = torusSDF(p, center, majorR, minorR);
-  // FBM6 displacement for rich smoke-like edges with energy-responsive detail
-  float disp = fbm6(vec3(p * 4.0 * (1.0 + energyMod * 0.5), time * 0.5)) * 0.03;
-  d += disp;
-  return d;
+// ─── Single ring density: torus with FBM turbulence ───
+// Returns volumetric density at point p for ring centered at ringCenter
+float srRingDensity(vec3 pos, vec3 ringCenter, float majorR, float minorR,
+                    float turbulence, float dissolve, float phase) {
+  // Transform to ring-local space
+  vec3 localP = pos - ringCenter;
+
+  // Tilt ring slightly based on its phase (rings wobble as they rise)
+  float tiltAngle = sin(phase * SR_TAU + uDynamicTime * 0.3) * 0.15;
+  float cs = cos(tiltAngle);
+  float sn = sin(tiltAngle);
+  localP.xy = mat2(cs, -sn, sn, cs) * localP.xy;
+
+  // Base torus distance
+  float dist = srTorusSDF(localP, majorR, minorR);
+
+  // FBM turbulence displaces the surface
+  float noiseScale = 2.5 + turbulence * 3.0;
+  float noiseTime = uDynamicTime * 0.12 * (1.0 + turbulence * 0.8);
+  vec3 noisePos = localP * noiseScale + vec3(0.0, noiseTime, phase * 10.0);
+  float displacement = fbm6(noisePos) * minorR * (0.8 + turbulence * 1.5);
+
+  dist += displacement;
+
+  // Convert SDF to density (exponential falloff from surface)
+  float density = exp(-max(dist, 0.0) * (6.0 - dissolve * 3.0));
+
+  // Interior density boost (inside the torus tube)
+  float interior = smoothstep(minorR * 0.5, -minorR * 0.2, dist);
+  density += interior * 0.4;
+
+  // Dissolve: reduce density as ring ages
+  density *= (1.0 - dissolve * 0.7);
+
+  return clamp(density, 0.0, 1.0);
+}
+
+// ─── Volumetric smoke field: sum of all ring densities ───
+// Returns total density and dominant ring index for coloring
+float srSmokeDensity(vec3 pos, float bassV, float energyV, float onsetV,
+                     float tensionV, float climaxMerge, float sJam,
+                     float sSpace, float sChorus, float stabilityV,
+                     float dynRange, out float ringAge) {
+  float totalDensity = 0.0;
+  ringAge = 0.0;
+  float maxContrib = 0.0;
+
+  // Ring count: 2 base + energy drives up to MAX_RINGS
+  // Section modulation: jam=more, space=1, chorus=3-4
+  float countF = mix(2.0, float(SR_MAX_RINGS), energyV);
+  countF = mix(countF, countF * 1.4, sJam);
+  countF = mix(countF, 1.0, sSpace);
+  countF = mix(countF, min(countF, 4.0), sChorus);
+  int ringCount = int(clamp(countF, 1.0, float(SR_MAX_RINGS)));
+
+  // Ring parameters
+  float baseMajorR = 0.6 + bassV * 0.5;       // bass → ring size
+  float baseMinorR = 0.12 + bassV * 0.08;      // bass → tube thickness
+  float riseSpeed = (0.08 + uSlowEnergy * 0.06) * mix(1.0, 1.6, sJam) * mix(1.0, 0.3, sSpace);
+
+  for (int idx = 0; idx < SR_MAX_RINGS; idx++) {
+    if (idx >= ringCount) break;
+    float fi = float(idx);
+
+    // Each ring has a staggered phase in its lifecycle
+    float basePhase = fract(uDynamicTime * riseSpeed * 0.01 + fi * 0.143);
+
+    // Drum onset launches rings faster (phase jump)
+    float onsetBoost = onsetV * 0.15 * exp(-fi * 0.5);
+    float phase = fract(basePhase + onsetBoost);
+
+    // Ring lifecycle: 0=forming at bottom, 0.5=mid-rise, 1=dissolving at top
+    float lifeProgress = phase;
+
+    // Ring center: rises vertically, slight horizontal drift
+    float yPos = mix(-3.0, 5.0, lifeProgress);  // rise from below to above
+    float xDrift = sin(fi * 2.37 + uDynamicTime * 0.08) * 0.4 * (1.0 - sSpace * 0.8);
+    float zDrift = cos(fi * 3.14 + uDynamicTime * 0.06) * 0.3;
+    vec3 ringCenter = vec3(xDrift, yPos, zDrift);
+
+    // Size evolves: starts small, expands, then disperses
+    float sizeEnvelope = smoothstep(0.0, 0.15, lifeProgress) * smoothstep(1.0, 0.7, lifeProgress);
+    float majorR = baseMajorR * sizeEnvelope * (0.8 + fi * 0.06);
+    float minorR = baseMinorR * sizeEnvelope * (1.0 + stabilityV * 0.2);
+
+    // Turbulence from harmonic tension; dissolution increases with age
+    float ringTurbulence = tensionV * (0.5 + lifeProgress * 0.5);
+    float dissolve = smoothstep(0.5, 1.0, lifeProgress) * (0.8 + tensionV * 0.4);
+
+    // Chorus: tighter spacing (chain effect)
+    if (sChorus > 0.3) {
+      ringCenter.y = mix(ringCenter.y, -2.0 + fi * 1.2, sChorus * 0.6);
+    }
+
+    // Climax: rings converge toward center and merge
+    if (climaxMerge > 0.0) {
+      ringCenter = mix(ringCenter, vec3(0.0, 1.0, 0.0), climaxMerge * 0.7);
+      majorR *= (1.0 + climaxMerge * 0.8);  // rings swell
+      minorR *= (1.0 + climaxMerge * 1.2);  // tubes thicken
+      ringTurbulence += climaxMerge * 0.6;   // more turbulent merge
+    }
+
+    float density = srRingDensity(pos, ringCenter, majorR, minorR,
+                                  ringTurbulence, dissolve, phase);
+
+    // Dynamic range controls density contrast
+    density = pow(density, mix(1.0, 0.6, dynRange));
+
+    // Track dominant ring for coloring
+    if (density > maxContrib) {
+      maxContrib = density;
+      ringAge = lifeProgress;
+    }
+
+    totalDensity += density;
+  }
+
+  // Climax massive vortex: additional swirling density at center
+  if (climaxMerge > 0.3) {
+    float vortexDist = length(pos - vec3(0.0, 1.0, 0.0));
+    float vortexAngle = atan(pos.z, pos.x) + uDynamicTime * 0.5 * climaxMerge;
+    float spiralNoise = fbm3(vec3(vortexAngle * 2.0, vortexDist * 3.0, uDynamicTime * 0.2));
+    float vortexDensity = exp(-vortexDist * 0.8) * spiralNoise * climaxMerge * 0.6;
+    totalDensity += max(0.0, vortexDensity);
+  }
+
+  // Ambient haze: subtle atmospheric density everywhere
+  float haze = fbm3(pos * 0.3 + vec3(uDynamicTime * 0.02)) * 0.03 * energyV;
+  totalDensity += haze;
+
+  return clamp(totalDensity, 0.0, 1.0);
+}
+
+// ─── Volumetric scattering color: Henyey-Greenstein phase + palette ───
+vec3 srScatterColor(vec3 rayDir, vec3 lightDir, float density, float ringAge,
+                    float energyV, float vocalV, float chromaHueMod,
+                    float chordHue, float climaxMerge) {
+  // Forward scattering (Henyey-Greenstein approximation, g=0.7)
+  float cosTheta = dot(rayDir, lightDir);
+  float gParam = 0.7;
+  float phase = (1.0 - gParam * gParam) /
+                (4.0 * SR_PI * pow(1.0 + gParam * gParam - 2.0 * gParam * cosTheta, 1.5));
+
+  // Base smoke color from palette
+  float hue1 = uPalettePrimary + chromaHueMod + chordHue;
+  float hue2 = uPaletteSecondary + chromaHueMod * 0.5;
+  vec3 warmColor = hsv2rgb(vec3(hue1, 0.35 * uPaletteSaturation, 0.7));
+  vec3 coolColor = hsv2rgb(vec3(hue2, 0.25 * uPaletteSaturation, 0.5));
+
+  // Young rings are brighter/warmer, old rings are cooler/dimmer
+  vec3 baseColor = mix(warmColor, coolColor, ringAge);
+
+  // Vocal presence → warm amber backlight
+  vec3 backlightColor = vec3(1.0, 0.85, 0.55) * vocalV * 0.4;
+
+  // Forward scatter adds bright highlight
+  vec3 scatterTint = mix(vec3(0.9, 0.85, 0.75), vec3(1.0, 0.7, 0.4), energyV);
+  vec3 scattered = scatterTint * phase * 0.3;
+
+  // Rim glow at density edges
+  float rimStrength = smoothstep(0.4, 0.1, density) * smoothstep(0.01, 0.1, density);
+  vec3 rimColor = hsv2rgb(vec3(hue1 + 0.15, 0.6, 0.8)) * rimStrength * 0.5;
+
+  // Climax: rings glow white-hot
+  vec3 climaxGlow = vec3(1.0, 0.95, 0.85) * climaxMerge * density * 0.4;
+
+  return baseColor * density + scattered + backlightColor * density + rimColor + climaxGlow;
+}
+
+// ─── Depth fog: atmospheric distance-based extinction ───
+vec3 srDepthFog(vec3 col, float dist, float energyV) {
+  float fogDensity = 0.04 + energyV * 0.02;
+  float fogAmount = 1.0 - exp(-dist * fogDensity);
+  vec3 fogColor = hsv2rgb(vec3(uPalettePrimary + 0.05, 0.15, 0.04));
+  return mix(col, fogColor, fogAmount);
 }
 
 void main() {
@@ -64,149 +251,156 @@ void main() {
   vec2 aspect = vec2(uResolution.x / uResolution.y, 1.0);
   vec2 p = (uv - 0.5) * aspect;
 
-  float energy = clamp(uEnergy, 0.0, 1.0);
-  float bass = clamp(uBass, 0.0, 1.0);
-  float stemBass = clamp(uStemBass, 0.0, 1.0);
-  float vocalPresence = clamp(uVocalPresence, 0.0, 1.0);
-  float slowEnergy = clamp(uSlowEnergy, 0.0, 1.0);
-  float otherEnergy = clamp(uOtherEnergy, 0.0, 1.0);
+  // === AUDIO INPUTS ===
+  float energyV = clamp(uEnergy, 0.0, 1.0);
+  float bassV = clamp(uBass, 0.0, 1.0);
+  float stemBassV = clamp(uStemBass, 0.0, 1.0);
+  float vocalV = clamp(uVocalPresence, 0.0, 1.0);
+  float tensionV = clamp(uHarmonicTension, 0.0, 1.0);
+  float onsetV = clamp(uDrumOnset, 0.0, 1.0);
+  float stabilityV = clamp(uBeatStability, 0.0, 1.0);
+  float dynRange = clamp(uDynamicRange, 0.0, 1.0);
   float chromaHueMod = uChromaHue * 0.2;
-
-  float tension = clamp(uHarmonicTension, 0.0, 1.0);
   float chordConf = smoothstep(0.3, 0.6, uChordConfidence);
   float chordHue = float(int(uChordIndex)) / 24.0 * 0.12 * chordConf;
-  float stability = clamp(uBeatStability, 0.0, 1.0);
+  float melodicPitch = clamp(uMelodicPitch, 0.0, 1.0);
+  float slowEnergyV = clamp(uSlowEnergy, 0.0, 1.0);
 
-  float slowTime = uDynamicTime * 0.025;
-
-  // --- Section-type modulation (0=intro,1=verse,2=chorus,3=bridge,4=solo,5=jam,6=outro,7=space) ---
+  // === SECTION-TYPE MODULATION ===
   float sectionT = uSectionType;
   float sJam = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
   float sSpace = smoothstep(6.5, 7.5, sectionT);
   float sChorus = smoothstep(1.5, 2.5, sectionT) * (1.0 - step(2.5, sectionT));
-  // Jam: faster rise, more rings, denser. Space: slow drift, sparse. Chorus: wider, brighter rings.
-  float sectionRiseSpeed = mix(1.0, 1.4, sJam) * mix(1.0, 0.35, sSpace) * mix(1.0, 1.1, sChorus);
-  float sectionRingCount = mix(1.0, 1.4, sJam) * mix(1.0, 0.6, sSpace);
-  float sectionRingScale = mix(1.0, 1.3, sJam) * mix(1.0, 0.7, sSpace) * mix(1.0, 1.2, sChorus);
-  float sectionCollision = mix(1.0, 1.5, sJam) * mix(1.0, 0.5, sSpace);
+  float sSolo = smoothstep(3.5, 4.5, sectionT) * (1.0 - step(4.5, sectionT));
 
-  // Vocal pitch → vertical drift modulation
-  float vocalDrift = mix(-0.1, 0.15, uVocalPitch);
+  // === CLIMAX ===
+  float climaxPhase = uClimaxPhase;
+  float climaxIntensity = clamp(uClimaxIntensity, 0.0, 1.0);
+  float isClimax = step(1.5, climaxPhase) * step(climaxPhase, 3.5);
+  float climaxMerge = isClimax * climaxIntensity;
 
-  float riseSpeed = (0.015 + slowEnergy * 0.02) * sectionRiseSpeed;
+  // === RAY SETUP (camera looks upward through rising rings) ===
+  vec3 ro, rd;
+  setupCameraRay(uv, aspect, ro, rd);
 
-  vec3 col = vec3(0.008, 0.006, 0.012); // dark background
+  // Nudge camera to look slightly upward; melodic pitch tilts more
+  float verticalTilt = 0.3 + melodicPitch * 0.2 + sSpace * 0.2;
+  rd = normalize(rd + vec3(0.0, verticalTilt, 0.0));
 
-  // --- Domain warping for volumetric depth ---
-  vec2 domainP = p;
-  domainP += vec2(fbm3(vec3(p * 0.5 * (1.0 + energy * 0.5), uDynamicTime * 0.05)), fbm3(vec3(p * 0.5 * (1.0 + energy * 0.5) + 100.0, uDynamicTime * 0.05))) * 0.3;
+  // === LIGHT DIRECTION (warm overhead, shifted by vocal presence) ===
+  vec3 lightDir = normalize(vec3(0.3 + vocalV * 0.3, 1.0, -0.2));
 
-  // --- Ring parameters ---
-  int ringCount = 3 + int(energy * 3.0 * sectionRingCount); // 3-6 rings, section-modulated
-  float ringScale = (0.08 + bass * 0.06) * sectionRingScale;
-  float ringThickness = 0.006 + stemBass * 0.008 + (1.0 - stability) * 0.004; // unstable beats widen rings
+  // === VOLUMETRIC RAYMARCH ===
+  // Adaptive step count: 32 quiet, 64 at peaks
+  int stepCount = int(mix(32.0, 64.0, energyV) + sJam * 8.0 - sSpace * 8.0);
+  float stepSize = SR_MAX_DIST / float(SR_MAX_STEPS);
 
-  // --- Draw rings ---
-  for (int i = 0; i < MAX_RINGS; i++) {
-    if (i >= ringCount) break;
-    float fi = float(i);
+  vec3 accumColor = vec3(0.0);
+  float accumAlpha = 0.0;
+  float accumDist = 0.0;
 
-    // Each ring rises at a different phase
-    float phase = fract(slowTime * riseSpeed + fi * 0.167);
+  for (int marchStep = 0; marchStep < SR_MAX_STEPS; marchStep++) {
+    if (marchStep >= stepCount) break;
+    if (accumAlpha > 0.95) break;  // early termination
 
-    // Ring center: rises from bottom, drifts horizontally + vocal pitch vertical offset
-    vec2 center = vec2(
-      sin(fi * 2.7 + slowTime * 0.3) * 0.15,
-      -0.4 + phase * 0.8 + vocalDrift
-    );
+    float fi = float(marchStep);
+    float marchDist = 0.5 + fi * stepSize;
+    vec3 samplePos = ro + rd * marchDist;
 
-    // Ring scales as it rises (perspective)
-    float perspective = 0.6 + phase * 0.4;
-    float majorR = ringScale * perspective * (1.0 + fi * 0.08);
-    float minorR = ringThickness * perspective;
+    // Sample density
+    float ringAge;
+    float density = srSmokeDensity(samplePos, bassV, energyV, onsetV,
+                                   tensionV, climaxMerge, sJam, sSpace,
+                                   sChorus, stabilityV, dynRange, ringAge);
 
-    // Torus field — tension warps ring shape
-    float tensionWarp = tension * sin(slowTime * 2.0 + fi * 3.14) * 0.01;
-    float d = smokeRingField(domainP, center + vec2(tensionWarp), majorR, minorR, slowTime + fi, energy);
+    if (density > 0.002) {
+      // Scale density for integration
+      float scaledDensity = density * SR_DENSITY_SCALE * stepSize;
 
-    // Volumetric glow
-    float ringBrightness = 0.05 + energy * 0.45;
-    float glow = exp(-max(d, 0.0) * 30.0) * 0.3 * ringBrightness;
-    float edge = smoothstep(0.01, 0.0, d) * 0.4 * ringBrightness;
+      // Compute color at this sample
+      vec3 sampleColor = srScatterColor(rd, lightDir, density, ringAge,
+                                        energyV, vocalV, chromaHueMod,
+                                        chordHue, climaxMerge);
 
-    // Color per ring
-    float hue = uPalettePrimary + fi * 0.05 + chromaHueMod + vocalPresence * 0.1 + chordHue; // chord shifts ring hue
-    float sat = mix(0.08, 0.8, energy * energy) * uPaletteSaturation;
-    float val = (glow + edge) * perspective;
+      // Volumetric lighting: secondary march toward light (3 steps)
+      float lightAccum = 0.0;
+      for (int ls = 0; ls < 3; ls++) {
+        float lt = float(ls + 1) * 0.3;
+        vec3 lightSample = samplePos + lightDir * lt;
+        float dummy;
+        float lightDensity = srSmokeDensity(lightSample, bassV, energyV, onsetV,
+                                            tensionV, climaxMerge, sJam, sSpace,
+                                            sChorus, stabilityV, dynRange, dummy);
+        lightAccum += lightDensity * 0.3;
+      }
+      float lightTransmit = exp(-lightAccum * 3.0);
 
-    // Fade in/out at extremes
-    float fadeMask = smoothstep(0.0, 0.15, phase) * smoothstep(1.0, 0.85, phase);
-    val *= fadeMask;
+      // Apply lighting: Beer-Lambert extinction + forward scatter
+      sampleColor *= lightTransmit;
+      sampleColor += vec3(1.0, 0.9, 0.75) * lightTransmit * density * 0.08;
 
-    vec3 ringColor = hsv2rgb(vec3(hue, sat, val));
+      // Depth-based dimming
+      float depthFade = exp(-marchDist * 0.06);
+      sampleColor *= depthFade;
 
-    // Scattering at edges — brighter at ring boundary
-    float scatter = exp(-abs(d) * 50.0) * 0.15 * ringBrightness;
-    vec3 scatterColor = hsv2rgb(vec3(uPaletteSecondary + fi * 0.03, sat * 0.5, scatter));
-
-    col += ringColor + scatterColor;
+      // Front-to-back compositing
+      float alpha = scaledDensity * (1.0 - accumAlpha);
+      accumColor += sampleColor * alpha;
+      accumAlpha += alpha;
+      accumDist += marchDist * alpha;
+    }
   }
 
-  // --- Background fog (fbm6 for volumetric depth) ---
-  float fog = fbm6(vec3(domainP * 2.0 * (1.0 + energy * 0.5) + vec2(slowTime * 0.1, 0.0), slowTime * 0.2)) * 0.08;
-  col += vec3(fog * 0.3, fog * 0.2, fog * 0.4) * (energy + otherEnergy * 0.15);
+  // === BACKGROUND: deep atmospheric gradient ===
+  float skyGrad = smoothstep(-0.3, 0.8, rd.y);
+  vec3 deepColor = hsv2rgb(vec3(uPalettePrimary + 0.55, 0.3, 0.02));
+  vec3 upperColor = hsv2rgb(vec3(uPaletteSecondary + 0.1, 0.2, 0.06));
+  vec3 skyColor = mix(deepColor, upperColor, skyGrad);
 
-  // --- Secondary volumetric layer: atmospheric depth haze ---
-  float hazeLayer = fbm6(vec3(domainP * 1.5 + 200.0, slowTime * 0.15));
-  vec3 hazeColor = mix(
-    hsv2rgb(vec3(uPalettePrimary + 0.1, 0.3, 0.15)),
-    hsv2rgb(vec3(uPaletteSecondary + 0.05, 0.25, 0.12)),
-    hazeLayer
-  );
-  col += hazeColor * 0.15 * energy;
+  // Subtle background nebula noise
+  float bgNoise = fbm3(vec3(rd.xz * 2.0, uDynamicTime * 0.02)) * 0.03;
+  skyColor += bgNoise * vec3(0.4, 0.3, 0.5) * energyV;
 
-  // --- Collision glow at ring intersections ---
-  float collisionGlow = 0.0;
-  for (int i = 0; i < 3; i++) {
-    float fi = float(i);
-    float phase1 = fract(slowTime * riseSpeed + fi * 0.167);
-    float phase2 = fract(slowTime * riseSpeed + (fi + 1.0) * 0.167);
-    vec2 c1 = vec2(sin(fi * 2.7 + slowTime * 0.3) * 0.15, -0.4 + phase1 * 0.8);
-    vec2 c2 = vec2(sin((fi + 1.0) * 2.7 + slowTime * 0.3) * 0.15, -0.4 + phase2 * 0.8);
-    float overlap = max(0.0, 0.1 - length(c1 - c2));
-    float nearBoth = exp(-length(p - mix(c1, c2, 0.5)) * 15.0);
-    collisionGlow += overlap * nearBoth * 10.0;
+  // Vocal presence → warm backlight glow behind rings
+  float backlightGlow = pow(max(0.0, dot(rd, lightDir)), 3.0) * vocalV * 0.15;
+  skyColor += vec3(1.0, 0.8, 0.5) * backlightGlow;
+
+  // Composite rings over background
+  vec3 col = mix(skyColor, accumColor, accumAlpha);
+
+  // === DEPTH FOG ===
+  float avgDist = accumAlpha > 0.01 ? accumDist / accumAlpha : SR_MAX_DIST;
+  col = srDepthFog(col, avgDist, energyV);
+
+  // === DRUM ONSET FLASH (new ring birth flash) ===
+  col += vec3(0.08, 0.06, 0.03) * onsetV * (1.0 - accumAlpha) * 0.5;
+
+  // === BEAT PULSE ===
+  col *= 1.0 + uBeatSnap * 0.1 * (1.0 + climaxMerge * 0.3);
+
+  // === SOLO: brighter center, more contrast ===
+  if (sSolo > 0.0) {
+    float centerGlow = exp(-length(p) * 2.5) * sSolo * 0.15;
+    col += vec3(centerGlow) * hsv2rgb(vec3(uPalettePrimary, 0.5, 1.0));
   }
-  col += hsv2rgb(vec3(uPaletteSecondary, 0.6, collisionGlow * energy * 0.5 * sectionCollision));
 
-  // --- Climax boost ---
-  float isClimax = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5);
-  float climaxBoost = isClimax * uClimaxIntensity;
-  col *= 1.0 + climaxBoost * 0.5;
-
-
-  // --- SDF icon emergence ---
+  // === DEAD ICONOGRAPHY ===
   {
-    float nf = fbm3(vec3(p * 2.0, slowTime));
+    float nf = fbm3(vec3(p * 2.0, uDynamicTime * 0.1));
     vec3 c1 = hsv2rgb(vec3(uPalettePrimary, 0.8, 1.0));
     vec3 c2 = hsv2rgb(vec3(uPaletteSecondary, 0.8, 1.0));
-    col += iconEmergence(p, uTime, energy, bass, c1, c2, nf, uClimaxPhase, uSectionIndex) * 0.5;
+    col += iconEmergence(p, uTime, energyV, bassV, c1, c2, nf, uClimaxPhase, uSectionIndex) * 0.5;
+    col += heroIconEmergence(p, uTime, energyV, bassV, c1, c2, nf, uSectionIndex);
   }
 
-  // === ATMOSPHERIC FOG: smoke-filled room ===
-  float fogNoise2 = fbm3(vec3(p * 0.6, uDynamicTime * 0.015));
-  float fogDensity2 = mix(0.4, 0.03, energy);
-  vec3 fogColor2 = vec3(0.015, 0.012, 0.02);
-  col = mix(col, fogColor2, fogDensity2 * (0.5 + fogNoise2 * 0.5));
-
-  // --- Vignette ---
-  float vigScale = mix(0.30, 0.22, energy);
+  // === VIGNETTE ===
+  float vigScale = mix(0.28, 0.20, energyV);
   float vignette = 1.0 - dot(p * vigScale, p * vigScale);
   vignette = smoothstep(0.0, 1.0, vignette);
-  col = mix(vec3(0.005, 0.003, 0.008), col, vignette);
+  col = mix(vec3(0.004, 0.003, 0.006), col, vignette);
 
-  // --- Post-processing ---
-  col = applyPostProcess(col, vUv, p);
+  // === POST-PROCESSING ===
+  col = applyPostProcess(col, uv, p);
 
   gl_FragColor = vec4(col, 1.0);
 }

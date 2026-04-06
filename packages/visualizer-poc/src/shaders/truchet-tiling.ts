@@ -1,23 +1,30 @@
 /**
- * Truchet Tiling — quarter-circle arc tiling with SDF rendering.
- * Grid of cells with 2 orientations per cell (hash-based), creating
- * flowing maze-like patterns at multiple scales.
+ * Truchet Labyrinth — raymarched 3D pipe maze.
+ * Each cell of a 3D grid contains quarter-torus pipe segments that connect
+ * to neighbors, forming an infinite flowing labyrinth. Luminous fluid
+ * travels through the pipes while the camera flies through the network.
  *
  * Visual aesthetic:
- *   - Quiet: slow flowing arcs, thin lines, subtle palette
- *   - Building: arcs thicken, flow accelerates, detail layers emerge
- *   - Peak: dense multi-scale maze with bright flowing highlights
- *   - Release: lines thin, speed drops, pattern simplifies
+ *   - Quiet: dim metallic pipes, faint fluid glow, slow camera drift
+ *   - Building: fluid brightens, pipes pulse wider, camera accelerates
+ *   - Peak: full flow, pipes burst open, volumetric spray fills cells
+ *   - Release: fluid drains, pipes thin, ambient reflections linger
  *
  * Audio reactivity:
- *   uBass            → line thickness
- *   uEnergy          → flow speed + grid density
- *   uOnsetSnap       → orientation flips (pattern disruption)
- *   uHarmonicTension → curl noise grid distortion
- *   uMelodicPitch    → color shift per scale layer
- *   uChordIndex      → palette selection
- *   uSlowEnergy      → macro scale visibility
- *   uBeatStability   → pattern coherence
+ *   uBass            → pipe diameter pulse (thicker on low-end hits)
+ *   uEnergy          → fluid flow speed + glow intensity
+ *   uDrumOnset       → pressure wave (expanding ring through pipe network)
+ *   uVocalPresence   → fluid warmth (amber shift)
+ *   uHarmonicTension → pipe connection randomness (maze complexity)
+ *   uSectionType     → jam=rapid flow, space=empty pipes, chorus=full flow
+ *   uClimaxPhase     → pipes burst open releasing fluid as volumetric spray
+ *   uMelodicPitch    → fluid hue cycling
+ *   uSlowEnergy      → camera orbit radius
+ *   uBeatStability   → pipe surface smoothness
+ *   uOnsetSnap       → flash at pipe junctions
+ *   uSpaceScore      → pipe network sparsity
+ *   uTimbralBrightness → specular highlight sharpness
+ *   uDynamicRange    → contrast between pipe metal and fluid glow
  */
 
 import { noiseGLSL } from "./noise";
@@ -39,185 +46,542 @@ ${sharedUniformsGLSL}
 
 ${noiseGLSL}
 
-${buildPostProcessGLSL({ grainStrength: "normal", bloomEnabled: true, halationEnabled: true })}
+${buildPostProcessGLSL({ grainStrength: "normal", bloomEnabled: true, halationEnabled: true, caEnabled: true })}
 
 varying vec2 vUv;
 
 #define PI 3.14159265
 #define TAU 6.28318530
+#define MAX_STEPS 96
+#define MAX_DIST 40.0
+#define SURF_DIST 0.002
 
-// Hash function for cell orientation
-float hash21(vec2 p) {
-  p = fract(p * vec2(123.34, 456.21));
-  p += dot(p, p + 45.32);
-  return fract(p.x * p.y);
+// ─── Hash helpers ───
+float ttHash(float n) { return fract(sin(n) * 43758.5453); }
+float ttHash3(vec3 p) {
+  p = fract(p * vec3(123.34, 456.21, 789.53));
+  p += dot(p, p.yzx + 45.32);
+  return fract(p.x * p.y * p.z);
 }
 
-// Truchet arc SDF: quarter-circle arc in a unit cell
-// Returns distance to arc, given cell-local UV (0-1)
-float truchetArc(vec2 cellUv, float orient, float thickness) {
-  // 2 orientations: connect (0,0)-(1,1) or (1,0)-(0,1)
-  vec2 center1, center2;
-  if (orient < 0.5) {
-    center1 = vec2(0.0, 0.0);
-    center2 = vec2(1.0, 1.0);
-  } else {
-    center1 = vec2(1.0, 0.0);
-    center2 = vec2(0.0, 1.0);
+// ─── SDF primitives ───
+float ttSdTorus(vec3 pos, float majorR, float minorR) {
+  vec2 q = vec2(length(pos.xz) - majorR, pos.y);
+  return length(q) - minorR;
+}
+
+float ttSdSphere(vec3 pos, float radius) {
+  return length(pos) - radius;
+}
+
+float ttSdCapsule(vec3 pos, vec3 a, vec3 b, float radius) {
+  vec3 pa = pos - a, ba = b - a;
+  float h = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0);
+  return length(pa - ba * h) - radius;
+}
+
+float ttSmoothUnion(float d1, float d2, float k) {
+  float h = clamp(0.5 + 0.5 * (d2 - d1) / k, 0.0, 1.0);
+  return mix(d2, d1, h) - k * h * (1.0 - h);
+}
+
+// ─── Quarter-torus pipe segment ───
+// A quarter-torus in the XZ plane connecting two faces of a unit cell.
+// axis: 0=XY bend, 1=YZ bend, 2=XZ bend
+// flip: mirrors the arc direction
+float ttQuarterTorus(vec3 pos, int axis, float flip, float majorR, float minorR) {
+  vec3 q = pos;
+  // Rotate to align the torus with the desired axis pair
+  if (axis == 1) { q = q.zxy; }
+  else if (axis == 2) { q = q.xzy; }
+
+  // Offset to corner and flip if needed
+  q.xz -= vec2(0.5) * flip;
+
+  // Quarter-torus: only the positive quadrant
+  vec2 xz = vec2(abs(q.x), abs(q.z));
+  if (flip < 0.0) { xz = vec2(q.x, q.z); }
+
+  vec2 ring = vec2(length(xz) - majorR, q.y);
+  return length(ring) - minorR;
+}
+
+// ─── Pipe cell: 3D Truchet connections ───
+// Each cell has 3 axes; each axis gets one of 2 orientations based on hash.
+// Returns: x=pipe distance, y=fluid distance, z=junction glow
+vec3 ttCell(vec3 cellPos, vec3 cellId, float pipeRadius, float fluidRadius,
+            float tension, float flowPhase, float burstAmount) {
+  float h1 = ttHash3(cellId);
+  float h2 = ttHash3(cellId + 71.0);
+  float h3 = ttHash3(cellId + 137.0);
+
+  // Tension increases randomness of connections
+  float threshold = 0.5 + tension * 0.3 * (ttHash3(cellId + 200.0) - 0.5);
+
+  float flip1 = step(threshold, h1) * 2.0 - 1.0;
+  float flip2 = step(threshold, h2) * 2.0 - 1.0;
+  float flip3 = step(threshold, h3) * 2.0 - 1.0;
+
+  float majorR = 0.5;
+
+  // Three quarter-torus pipes per cell (one per axis pair)
+  vec3 q1 = cellPos; q1.xz -= 0.5 * flip1; q1.xz = abs(q1.xz);
+  float d1 = length(vec2(length(q1.xz) - majorR, q1.y)) - pipeRadius;
+
+  vec3 q2 = cellPos.yzx; q2.xz -= 0.5 * flip2; q2.xz = abs(q2.xz);
+  float d2 = length(vec2(length(q2.xz) - majorR, q2.y)) - pipeRadius;
+
+  vec3 q3 = cellPos.zxy; q3.xz -= 0.5 * flip3; q3.xz = abs(q3.xz);
+  float d3 = length(vec2(length(q3.xz) - majorR, q3.y)) - pipeRadius;
+
+  // Combine pipes with smooth union
+  float pipeDist = ttSmoothUnion(d1, ttSmoothUnion(d2, d3, 0.04), 0.04);
+
+  // Fluid inside pipes (thinner radius, offset by flow phase)
+  float fluidOff = sin(flowPhase + dot(cellId, vec3(1.7, 2.3, 3.1))) * 0.1;
+  float fd1 = length(vec2(length(q1.xz) - majorR, q1.y + fluidOff)) - fluidRadius;
+  float fd2 = length(vec2(length(q2.xz) - majorR, q2.y + fluidOff)) - fluidRadius;
+  float fd3 = length(vec2(length(q3.xz) - majorR, q3.y + fluidOff)) - fluidRadius;
+  float fluidDist = min(fd1, min(fd2, fd3));
+
+  // Junction glow: where pipes from different axes meet (cell center)
+  float junctionDist = length(cellPos) - 0.15;
+
+  // Climax burst: pipes fracture open
+  if (burstAmount > 0.01) {
+    float fracture = burstAmount * 0.3;
+    pipeDist += fracture * sin(cellPos.x * 12.0 + cellPos.y * 8.0 + cellPos.z * 10.0) * 0.1;
+    fluidDist -= burstAmount * 0.2; // fluid expands outside pipes
   }
 
-  // Distance to quarter-circle arcs from corners
-  float d1 = abs(length(cellUv - center1) - 0.5) - thickness;
-  float d2 = abs(length(cellUv - center2) - 0.5) - thickness;
-
-  return min(d1, d2);
+  return vec3(pipeDist, fluidDist, junctionDist);
 }
 
-// Render one Truchet grid layer
-vec3 truchetLayer(vec2 uv, float gridScale, float flowSeed, float thickness,
-                  float hue, float sat, float brightness, float energy, float onset) {
-  vec2 gridUv = uv * gridScale;
-  vec2 cellId = floor(gridUv);
-  vec2 cellUv = fract(gridUv);
+// ─── Scene map: returns vec2(distance, materialId) ───
+// materialId: 0=pipe, 1=fluid, 2=junction, 3=burst spray
+vec2 ttMap(vec3 pos, float pipeRadius, float fluidRadius, float tension,
+           float flowPhase, float burstAmount, float pressureWave, vec3 pressureOrigin) {
+  vec3 cellId = floor(pos + 0.5);
+  vec3 cellPos = fract(pos + 0.5) - 0.5;
 
-  // Cell orientation from hash (slowly evolving with flow)
-  float orient = step(0.5, hash21(cellId + floor(flowSeed)));
+  // Check current cell + neighbors for smooth boundaries
+  float bestPipe = 1e6;
+  float bestFluid = 1e6;
+  float bestJunction = 1e6;
 
-  // Onset can flip orientation for disruption
-  if (onset > 0.5) {
-    float flipChance = hash21(cellId + 99.0);
-    if (flipChance < onset * 0.3) {
-      orient = 1.0 - orient;
+  for (int dx = -1; dx <= 1; dx++) {
+    for (int dy = -1; dy <= 1; dy++) {
+      for (int dz = -1; dz <= 1; dz++) {
+        vec3 offset = vec3(float(dx), float(dy), float(dz));
+        vec3 neighborId = cellId + offset;
+        vec3 neighborPos = pos - neighborId;
+
+        // Skip far cells for performance
+        if (dot(neighborPos, neighborPos) > 3.0) continue;
+
+        // Sparsity: some cells are empty when space score is high
+        float sparsity = ttHash3(neighborId + 500.0);
+        float sparsityThreshold = 0.0;
+        // Use burstAmount as proxy — we'll pass adjusted values
+        if (sparsity < sparsityThreshold) continue;
+
+        vec3 cellResult = ttCell(neighborPos, neighborId, pipeRadius, fluidRadius,
+                                 tension, flowPhase, burstAmount);
+
+        bestPipe = min(bestPipe, cellResult.x);
+        bestFluid = min(bestFluid, cellResult.y);
+        bestJunction = min(bestJunction, cellResult.z);
+      }
     }
   }
 
-  // SDF distance to arc
-  float d = truchetArc(cellUv, orient, thickness);
+  // Pressure wave from drum onset: expanding ring
+  if (pressureWave > 0.01) {
+    float waveDist = abs(length(pos - pressureOrigin) - pressureWave * 8.0) - 0.15;
+    bestFluid = ttSmoothUnion(bestFluid, waveDist, 0.2);
+  }
 
-  // Anti-aliased arc rendering
-  float arcMask = 1.0 - smoothstep(0.0, 0.015, d);
+  // Find closest surface and material
+  float dist = bestPipe;
+  float matId = 0.0;
 
-  // Edge glow
-  float glowMask = 1.0 - smoothstep(0.0, 0.08, d);
+  if (bestFluid < dist) {
+    dist = bestFluid;
+    matId = 1.0;
+  }
 
-  // Color with flow-based variation
-  float flowHue = hue + hash21(cellId) * 0.15;
-  vec3 arcColor = hsv2rgb(vec3(flowHue, sat, brightness));
-  vec3 glowColor = hsv2rgb(vec3(flowHue + 0.1, sat * 0.7, brightness * 0.5));
+  if (bestJunction < dist - 0.05) {
+    dist = bestJunction;
+    matId = 2.0;
+  }
 
-  return arcColor * arcMask + glowColor * glowMask * 0.3;
+  // Burst spray: volumetric blobs during climax
+  if (burstAmount > 0.1) {
+    float sprayNoise = fbm3(pos * 3.0 + flowPhase * 0.5) * burstAmount;
+    float sprayDist = length(cellPos) - 0.3 * burstAmount + sprayNoise * 0.2;
+    if (sprayDist < dist) {
+      dist = sprayDist;
+      matId = 3.0;
+    }
+  }
+
+  return vec2(dist, matId);
+}
+
+// ─── Raymarching ───
+vec2 ttMarch(vec3 rayOrigin, vec3 rayDir, float pipeRadius, float fluidRadius,
+             float tension, float flowPhase, float burstAmount,
+             float pressureWave, vec3 pressureOrigin) {
+  float traveled = 0.0;
+  float matId = -1.0;
+
+  for (int i = 0; i < MAX_STEPS; i++) {
+    vec3 pos = rayOrigin + rayDir * traveled;
+    vec2 scene = ttMap(pos, pipeRadius, fluidRadius, tension, flowPhase,
+                       burstAmount, pressureWave, pressureOrigin);
+    float dist = scene.x;
+
+    if (dist < SURF_DIST) {
+      matId = scene.y;
+      break;
+    }
+    traveled += dist * 0.7; // relaxation factor for safety
+    if (traveled > MAX_DIST) break;
+  }
+
+  return vec2(traveled, matId);
+}
+
+// ─── Normal via central differences ───
+vec3 ttNormal(vec3 pos, float pipeRadius, float fluidRadius, float tension,
+              float flowPhase, float burstAmount, float pressureWave, vec3 pressureOrigin) {
+  vec2 offset = vec2(0.003, 0.0);
+  float d = ttMap(pos, pipeRadius, fluidRadius, tension, flowPhase,
+                  burstAmount, pressureWave, pressureOrigin).x;
+  vec3 n = d - vec3(
+    ttMap(pos - offset.xyy, pipeRadius, fluidRadius, tension, flowPhase,
+          burstAmount, pressureWave, pressureOrigin).x,
+    ttMap(pos - offset.yxy, pipeRadius, fluidRadius, tension, flowPhase,
+          burstAmount, pressureWave, pressureOrigin).x,
+    ttMap(pos - offset.yyx, pipeRadius, fluidRadius, tension, flowPhase,
+          burstAmount, pressureWave, pressureOrigin).x
+  );
+  return normalize(n);
+}
+
+// ─── Ambient occlusion (5-tap) ───
+float ttOcclusion(vec3 pos, vec3 norm, float pipeRadius, float fluidRadius,
+                  float tension, float flowPhase, float burstAmount,
+                  float pressureWave, vec3 pressureOrigin) {
+  float occ = 0.0;
+  float weight = 1.0;
+  for (int i = 1; i <= 5; i++) {
+    float dist = 0.02 * float(i);
+    float d = ttMap(pos + norm * dist, pipeRadius, fluidRadius, tension,
+                    flowPhase, burstAmount, pressureWave, pressureOrigin).x;
+    occ += (dist - d) * weight;
+    weight *= 0.85;
+  }
+  return clamp(1.0 - occ * 6.0, 0.0, 1.0);
+}
+
+// ─── Fluid glow (volumetric accumulation along ray) ───
+vec3 ttFluid(vec3 rayOrigin, vec3 rayDir, float maxT, float flowPhase,
+             float fluidIntensity, vec3 fluidColor, float burstAmount) {
+  vec3 glow = vec3(0.0);
+  float stepSize = 0.15;
+  int steps = 24;
+
+  for (int i = 0; i < 24; i++) {
+    float t = float(i) * stepSize;
+    if (t > maxT) break;
+    vec3 pos = rayOrigin + rayDir * t;
+
+    vec3 cellId = floor(pos + 0.5);
+    vec3 cellPos = fract(pos + 0.5) - 0.5;
+
+    // Distance to pipe centerline in this cell
+    float h = ttHash3(cellId);
+    float flip = step(0.5, h) * 2.0 - 1.0;
+    vec3 q = cellPos; q.xz -= 0.5 * flip; q.xz = abs(q.xz);
+    float centerDist = abs(length(q.xz) - 0.5);
+
+    // Flow animation along pipe
+    float flow = sin(flowPhase + dot(cellId, vec3(2.1, 3.7, 1.3)) + t * 2.0);
+    flow = flow * 0.5 + 0.5;
+
+    // Glow intensity falls off from pipe center
+    float glowStr = exp(-centerDist * 12.0) * flow * fluidIntensity;
+
+    // Burst spray: extra volumetric glow in cells
+    if (burstAmount > 0.1) {
+      float sprayGlow = exp(-length(cellPos) * 4.0) * burstAmount * 0.5;
+      glowStr += sprayGlow;
+    }
+
+    glow += fluidColor * glowStr * stepSize;
+  }
+
+  return glow;
+}
+
+// ─── Pipe material shading ───
+vec3 ttPipe(vec3 pos, vec3 norm, vec3 rayDir, vec3 lightDir, float matId,
+            float occlusionVal, vec3 fluidColor, float energy, float vocalWarmth,
+            float timbralSpec, float dynamicContrast, float beatStab) {
+  vec3 col = vec3(0.0);
+
+  if (matId < 0.5) {
+    // ── Metallic pipe surface ──
+    vec3 baseColor = mix(vec3(0.15, 0.14, 0.18), vec3(0.25, 0.22, 0.20), vocalWarmth);
+
+    // Roughness from beat stability (stable = smoother)
+    float roughness = mix(0.4, 0.15, beatStab);
+
+    // Diffuse
+    float diff = max(dot(norm, lightDir), 0.0) * 0.6;
+
+    // Specular (Blinn-Phong with variable sharpness from timbral brightness)
+    vec3 halfVec = normalize(lightDir - rayDir);
+    float specPower = mix(16.0, 128.0, timbralSpec);
+    float spec = pow(max(dot(norm, halfVec), 0.0), specPower);
+    vec3 specColor = mix(vec3(0.8, 0.75, 0.7), vec3(1.0, 0.95, 0.9), timbralSpec);
+
+    // Fresnel reflection
+    float fresnel = pow(1.0 - abs(dot(norm, -rayDir)), 3.0);
+    vec3 reflColor = mix(baseColor * 1.5, fluidColor * 0.3, fresnel * 0.4);
+
+    // Inner glow bleeding through pipe walls
+    float innerGlow = exp(-abs(dot(norm, rayDir)) * 3.0) * energy * 0.3;
+
+    col = baseColor * (0.08 + diff) + specColor * spec * (0.5 + energy * 0.5)
+        + reflColor * fresnel * 0.3 + fluidColor * innerGlow;
+
+    // Dynamic range: contrast between dark metal and bright highlights
+    col = mix(col * 0.5, col * 1.5, dynamicContrast * 0.3 + 0.5);
+
+  } else if (matId < 1.5) {
+    // ── Luminous fluid ──
+    col = fluidColor * (1.5 + energy * 2.0);
+
+    // Subsurface scattering effect
+    float scatter = pow(max(dot(rayDir, lightDir), 0.0), 3.0);
+    col += fluidColor * scatter * 0.8;
+
+    // Pulsing core brightness
+    col *= 1.0 + sin(pos.x * 4.0 + pos.y * 3.0 + pos.z * 5.0) * 0.2;
+
+  } else if (matId < 2.5) {
+    // ── Junction node ──
+    col = fluidColor * 2.0 + vec3(0.5, 0.4, 0.3);
+    float pulse = sin(pos.x + pos.y + pos.z + energy * TAU) * 0.5 + 0.5;
+    col *= 1.0 + pulse * 0.5;
+
+  } else {
+    // ── Burst spray (climax) ──
+    col = fluidColor * 3.0;
+    col += vec3(1.0, 0.8, 0.5) * energy;
+    // Volumetric scatter
+    float scatter = pow(max(dot(rayDir, lightDir), 0.0), 2.0);
+    col += vec3(1.0, 0.9, 0.7) * scatter * 1.5;
+  }
+
+  // Apply ambient occlusion
+  col *= occlusionVal;
+
+  return col;
+}
+
+// ─── Camera path through pipe network ───
+vec3 ttCameraPath(float timeVal, float slowE, float orbitMod) {
+  float speed = 0.3 + slowE * 0.2;
+  float pathT = timeVal * speed;
+  return vec3(
+    sin(pathT * 0.7) * 2.0 + cos(pathT * 0.3) * 1.5,
+    cos(pathT * 0.5) * 1.8 + sin(pathT * 0.4) * 1.0,
+    pathT * 1.5 + sin(pathT * 0.6) * 0.8
+  ) * (1.0 + orbitMod * 0.3);
 }
 
 void main() {
   vec2 uv = vUv;
   vec2 aspect = vec2(uResolution.x / uResolution.y, 1.0);
-  vec2 p = (uv - 0.5) * aspect;
+  vec2 screenPos = (uv - 0.5) * aspect;
 
+  // ─── Audio parameter extraction ───
   float energy = clamp(uEnergy, 0.0, 1.0);
   float bass = clamp(uBass, 0.0, 1.0);
-  float onset = clamp(uOnsetSnap, 0.0, 1.0);
-  float slowE = clamp(uSlowEnergy, 0.0, 1.0);
+  float drumOnset = clamp(uDrumOnset, 0.0, 1.0);
+  float vocalPresence = clamp(uVocalPresence, 0.0, 1.0);
   float tension = clamp(uHarmonicTension, 0.0, 1.0);
   float melodicPitch = clamp(uMelodicPitch, 0.0, 1.0);
-  float stability = clamp(uBeatStability, 0.0, 1.0);
+  float slowE = clamp(uSlowEnergy, 0.0, 1.0);
+  float onsetSnap = clamp(uOnsetSnap, 0.0, 1.0);
+  float beatStab = clamp(uBeatStability, 0.0, 1.0);
+  float spaceScore = clamp(uSpaceScore, 0.0, 1.0);
+  float timbralBright = clamp(uTimbralBrightness, 0.0, 1.0);
+  float dynRange = clamp(uDynamicRange, 0.0, 1.0);
+  float accelBoost = 1.0 + uEnergyAccel * 0.1;
+  float chromaHueMod = uChromaHue * 0.15;
 
-  float slowTime = uDynamicTime * 0.04;
-
-  // --- Domain warping + energy-responsive detail ---
-  vec2 domainWarpOff = vec2(fbm3(vec3(p * 0.5, uDynamicTime * 0.05)), fbm3(vec3(p * 0.5 + 100.0, uDynamicTime * 0.05))) * 0.3;
-  float detailMod = 1.0 + energy * 0.5;
-
-  float chromaHueMod = uChromaHue * 0.2;
-  float chordHue = float(int(uChordIndex)) / 24.0 * 0.15;
-  float accelBoost = 1.0 + uEnergyAccel * 0.12;
-
-  // --- Section-type modulation (0=intro,1=verse,2=chorus,3=bridge,4=solo,5=jam,6=outro,7=space) ---
+  // ─── Section-type modulation ───
   float sectionT = uSectionType;
   float sJam = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
   float sSpace = smoothstep(6.5, 7.5, sectionT);
   float sChorus = smoothstep(1.5, 2.5, sectionT) * (1.0 - step(2.5, sectionT));
-  // Jam: faster flow, thicker arcs, denser cells. Space: slow, thin, sparse. Chorus: vibrant, moderate.
-  float sectionFlowSpeed = mix(1.0, 1.5, sJam) * mix(1.0, 0.35, sSpace) * mix(1.0, 1.15, sChorus);
-  float sectionThickness = mix(1.0, 1.3, sJam) * mix(1.0, 0.6, sSpace) * mix(1.0, 1.1, sChorus);
-  float sectionDensity = mix(1.0, 1.4, sJam) * mix(1.0, 0.6, sSpace);
+  float sSolo = smoothstep(3.5, 4.5, sectionT) * (1.0 - step(4.5, sectionT));
 
-  // --- Domain warp from harmonic tension ---
-  vec2 warped = p;
-  if (tension > 0.1) {
-    vec3 curl = curlNoise(vec3(p * 2.0, slowTime * 0.5));
-    warped += curl.xy * tension * 0.08;
-  }
+  // Flow speed: jam=rapid, space=near-still, chorus=full, solo=dramatic
+  float flowSpeed = mix(1.0, 2.5, sJam) * mix(1.0, 0.1, sSpace)
+                   * mix(1.0, 1.5, sChorus) * mix(1.0, 1.8, sSolo);
+  float flowPhase = uDynamicTime * (0.5 + energy * 2.0) * flowSpeed * accelBoost;
 
-  // --- Line thickness from bass (section-modulated) ---
-  float baseThickness = (0.02 + bass * 0.04) * sectionThickness;
+  // Pipe radius: bass-pulsed
+  float basePipeRadius = 0.06 + bass * 0.04;
+  basePipeRadius *= mix(1.0, 1.3, sJam) * mix(1.0, 0.6, sSpace);
 
-  // Tempo derivative → tile rotation rate
-  float tempoAccel = 1.0 + uTempoDerivative * 0.3;
+  // Fluid radius (inside pipes)
+  float baseFluidRadius = basePipeRadius * 0.4 * mix(1.0, 1.6, sChorus) * mix(1.0, 0.2, sSpace);
 
-  // --- Flow speed from energy (section-modulated) ---
-  float flowSpeed = (0.3 + energy * 1.5) * accelBoost * sectionFlowSpeed * tempoAccel;
-  float flowSeed = slowTime * flowSpeed;
-
-  // --- Palette ---
-  float hue1 = uPalettePrimary + chromaHueMod + chordHue;
-  float hue2 = uPaletteSecondary + chordHue * 0.5;
-  float sat = mix(0.5, 1.0, energy) * uPaletteSaturation;
-
-  // --- Background ---
-  vec3 col = mix(
-    vec3(0.01, 0.01, 0.02),
-    vec3(0.03, 0.02, 0.04),
-    uv.y
-  );
-
-  // --- Layer 1: Primary grid (section-modulated density) ---
-  float gridDensity = mix(6.0, 14.0, energy) * sectionDensity;
-  vec3 layer1 = truchetLayer(warped, gridDensity, flowSeed,
-    baseThickness, hue1, sat, 0.7 + energy * 0.3, energy, onset);
-  col += layer1;
-
-  // --- Layer 2: Detail (2x density) ---
-  float detailHue = hue2 + melodicPitch * 0.2;
-  vec3 layer2 = truchetLayer(warped, gridDensity * 2.0, flowSeed * 1.3 + 7.0,
-    baseThickness * 0.6, detailHue, sat * 0.8, 0.5 + energy * 0.3, energy, onset);
-  col += layer2 * 0.5;
-
-  // --- Layer 3: Macro (0.5x density) ---
-  if (slowE > 0.2) {
-    float macroHue = mix(hue1, hue2, 0.5) + melodicPitch * 0.15;
-    vec3 layer3 = truchetLayer(warped, gridDensity * 0.5, flowSeed * 0.7 + 15.0,
-      baseThickness * 1.5, macroHue, sat * 0.6, 0.3 + slowE * 0.3, energy, onset);
-    col += layer3 * 0.3 * smoothstep(0.2, 0.5, slowE);
-  }
-
-  // --- Onset flash at flow junctions ---
-  if (onset > 0.3) {
-    float junctionGlow = onset * 0.4;
-    col += vec3(1.0, 0.95, 0.9) * junctionGlow * (1.0 - length(p) * 0.5);
-  }
-
-  // --- Climax boost ---
+  // Climax burst
   float isClimax = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5);
-  float climaxBoost = isClimax * uClimaxIntensity;
-  col *= 1.0 + climaxBoost * 0.5;
+  float climaxIntensity = isClimax * uClimaxIntensity;
+  float burstAmount = climaxIntensity * smoothstep(0.3, 1.0, climaxIntensity);
 
+  // Pressure wave from drum onset
+  float pressureWave = drumOnset;
 
-  // --- SDF icon emergence ---
-  {
-    float nf = fbm3(vec3(p * 2.0, slowTime));
-    vec3 c1 = hsv2rgb(vec3(hue1, sat, 1.0));
-    vec3 c2 = hsv2rgb(vec3(hue2, sat, 1.0));
-    col += iconEmergence(p, uTime, energy, bass, c1, c2, nf, uClimaxPhase, uSectionIndex) * 0.5;
+  // Sparsity from space score (reduce pipe density)
+  // (handled implicitly through thinner pipes and less fluid)
+
+  // ─── Camera setup ───
+  float camTime = uDynamicTime * 0.04;
+  vec3 camOrigin = ttCameraPath(camTime, slowE, energy);
+
+  // Look-ahead along path
+  vec3 camLookAt = ttCameraPath(camTime + 0.3, slowE, energy);
+
+  // Camera offset from uniforms
+  camOrigin += vec3(uCamOffset.x, uCamOffset.y, 0.0) * 0.5;
+
+  // Build camera matrix
+  vec3 camForward = normalize(camLookAt - camOrigin);
+  vec3 worldUp = vec3(sin(camTime * 0.15) * 0.1, 1.0, cos(camTime * 0.1) * 0.05);
+  worldUp = normalize(worldUp);
+  vec3 camSide = normalize(cross(camForward, worldUp));
+  vec3 camUp = cross(camSide, camForward);
+
+  float fov = 0.8 + energy * 0.2;
+  vec3 rayDir = normalize(screenPos.x * camSide + screenPos.y * camUp + fov * camForward);
+
+  // Pressure wave origin tracks camera with slight lag
+  vec3 pressureOrigin = ttCameraPath(camTime - 0.5, slowE, energy);
+
+  // ─── Fluid color from palette + audio ───
+  float fluidHue = uPalettePrimary + melodicPitch * 0.2 + chromaHueMod;
+  float fluidSat = mix(0.6, 1.0, energy) * uPaletteSaturation;
+  float vocalWarmShift = vocalPresence * 0.08; // shift toward amber
+  vec3 fluidColor = hsv2rgb(vec3(fluidHue + vocalWarmShift, fluidSat, 0.8 + energy * 0.2));
+
+  // ─── Raymarch the scene ───
+  vec2 marchResult = ttMarch(camOrigin, rayDir, basePipeRadius, baseFluidRadius,
+                             tension, flowPhase, burstAmount, pressureWave, pressureOrigin);
+  float travelDist = marchResult.x;
+  float matId = marchResult.y;
+
+  // ─── Background: deep void with subtle gradient ───
+  vec3 col = mix(vec3(0.01, 0.008, 0.015), vec3(0.02, 0.015, 0.03),
+                 screenPos.y * 0.5 + 0.5);
+
+  // Volumetric fluid glow (always accumulated, even on miss)
+  float fluidGlowIntensity = (0.3 + energy * 0.7) * mix(1.0, 0.05, sSpace)
+                             * mix(1.0, 1.5, sChorus);
+  vec3 volGlow = ttFluid(camOrigin, rayDir, min(travelDist, MAX_DIST * 0.5),
+                         flowPhase, fluidGlowIntensity, fluidColor, burstAmount);
+  col += volGlow * 0.4;
+
+  if (matId >= 0.0 && travelDist < MAX_DIST) {
+    vec3 surfPos = camOrigin + rayDir * travelDist;
+
+    // Normal
+    vec3 surfNorm = ttNormal(surfPos, basePipeRadius, baseFluidRadius, tension,
+                             flowPhase, burstAmount, pressureWave, pressureOrigin);
+
+    // Light direction: follows camera loosely + fixed fill
+    vec3 lightDir1 = normalize(vec3(0.5, 0.8, -0.3) + camForward * 0.3);
+    vec3 lightDir2 = normalize(vec3(-0.3, -0.2, 0.8));
+
+    // Ambient occlusion
+    float occVal = ttOcclusion(surfPos, surfNorm, basePipeRadius, baseFluidRadius,
+                               tension, flowPhase, burstAmount, pressureWave, pressureOrigin);
+
+    // Main shading
+    vec3 surfCol = ttPipe(surfPos, surfNorm, rayDir, lightDir1, matId,
+                          occVal, fluidColor, energy, vocalPresence,
+                          timbralBright, dynRange, beatStab);
+
+    // Fill light (cooler)
+    float fillDiff = max(dot(surfNorm, lightDir2), 0.0) * 0.15;
+    vec3 fillColor = hsv2rgb(vec3(uPaletteSecondary, 0.3, 0.5));
+    surfCol += fillColor * fillDiff * occVal;
+
+    // Reflections: fake environment reflection using fbm
+    {
+      vec3 reflDir = reflect(rayDir, surfNorm);
+      float reflNoise = fbm3(reflDir * 2.0 + uDynamicTime * 0.02);
+      vec3 reflCol = hsv2rgb(vec3(fluidHue + 0.15, 0.4, 0.3 + reflNoise * 0.3));
+      float fresnel = pow(1.0 - abs(dot(surfNorm, -rayDir)), 4.0);
+      surfCol += reflCol * fresnel * 0.25 * (0.5 + energy * 0.5);
+    }
+
+    // Onset flash at junctions
+    if (onsetSnap > 0.3 && matId > 1.5 && matId < 2.5) {
+      surfCol += vec3(1.0, 0.95, 0.85) * onsetSnap * 0.8;
+    }
+
+    // Distance fog
+    float fogAmount = 1.0 - exp(-travelDist * 0.04);
+    vec3 fogColor = fluidColor * 0.05 + vec3(0.01);
+    surfCol = mix(surfCol, fogColor, fogAmount);
+
+    col = surfCol;
+    // Re-add volumetric glow on top (screen blend)
+    col = col + volGlow * 0.3 - col * volGlow * 0.15;
   }
 
-  // --- Vignette ---
-  float vigScale = mix(0.28, 0.20, energy);
-  float vignette = 1.0 - dot(p * vigScale, p * vigScale);
-  vignette = smoothstep(0.0, 1.0, vignette);
-  col = mix(vec3(0.01, 0.008, 0.02), col, vignette);
+  // ─── Climax burst spray bloom ───
+  if (burstAmount > 0.1) {
+    float sprayBloom = burstAmount * energy * 0.3;
+    vec3 sprayColor = fluidColor * 2.0 + vec3(0.3, 0.2, 0.1);
+    col += sprayColor * sprayBloom * (1.0 - length(screenPos) * 0.8);
+  }
 
-  // --- Post-processing ---
-  col = applyPostProcess(col, vUv, p);
+  // ─── Pressure wave flash ───
+  if (pressureWave > 0.1) {
+    float waveBright = pressureWave * 0.15;
+    col += fluidColor * waveBright;
+  }
+
+  // ─── SDF icon emergence ───
+  {
+    float nf = fbm3(vec3(screenPos * 2.0, uDynamicTime * 0.03));
+    vec3 iconCol1 = hsv2rgb(vec3(fluidHue, fluidSat, 1.0));
+    vec3 iconCol2 = hsv2rgb(vec3(uPaletteSecondary, fluidSat, 1.0));
+    col += iconEmergence(screenPos, uTime, energy, bass, iconCol1, iconCol2, nf,
+                         uClimaxPhase, uSectionIndex) * 0.5;
+  }
+
+  // ─── Hero icon emergence ───
+  if (uHeroIconTrigger > 0.5) {
+    float nf = fbm3(vec3(screenPos * 1.5, uDynamicTime * 0.02));
+    vec3 heroCol1 = fluidColor * 1.5;
+    vec3 heroCol2 = hsv2rgb(vec3(uPaletteSecondary + 0.1, 0.9, 1.0));
+    col += heroIconEmergence(screenPos, uTime, energy, bass, heroCol1, heroCol2, nf,
+                             uClimaxPhase, uHeroIconProgress) * 0.7;
+  }
+
+  // ─── Post-processing ───
+  col = applyPostProcess(col, vUv, screenPos);
 
   gl_FragColor = vec4(col, 1.0);
 }

@@ -14,8 +14,9 @@ import { seeded } from "../utils/seededRandom";
 import { useAudioSnapshot } from "./parametric/audio-helpers";
 import { useTempoFactor } from "../data/TempoContext";
 
-const CYCLE = 1650; // 55 seconds at 30fps
-const DURATION = 420; // 14 seconds
+// No internal cycle — rotation engine controls visibility
+// Bloom period: roses grow over ~8 seconds then hold
+const BLOOM_FRAMES = 240; // 8 seconds to full bloom
 const STEM_COUNT = 10;
 
 interface StemData {
@@ -122,34 +123,18 @@ export const AmericanBeauty: React.FC<Props> = ({ frames }) => {
     return result;
   }, []);
 
-  // Cycle gating
-  const cycleFrame = frame % CYCLE;
-  if (cycleFrame >= DURATION) return null;
-
-  const progress = cycleFrame / DURATION;
-
-  // Fade in/out
-  const fadeIn = interpolate(progress, [0, 0.08], [0, 1], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-    easing: Easing.out(Easing.cubic),
-  });
-  const fadeOut = interpolate(progress, [0.9, 1], [1, 0], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-    easing: Easing.in(Easing.cubic),
-  });
+  // Continuous rendering — no internal cycle, rotation engine controls visibility
+  // Bloom progress: grows over first BLOOM_FRAMES then holds fully bloomed
+  const bloomSpeed = 0.8 + energy * 2.0;
+  const progress = Math.min(frame / (BLOOM_FRAMES / bloomSpeed), 1);
 
   const baseOpacity = interpolate(energy, [0.03, 0.25], [0.3, 0.6], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
-  const masterOpacity = Math.min(fadeIn, fadeOut) * baseOpacity;
+  const masterOpacity = baseOpacity;
 
   if (masterOpacity < 0.01) return null;
-
-  // Bloom speed multiplier from energy
-  const bloomSpeed = 0.8 + energy * 2.0;
 
   const stemColor = "hsl(130, 55%, 35%)";
   const leafColor = "hsl(125, 50%, 40%)";

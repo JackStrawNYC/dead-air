@@ -15,9 +15,8 @@ import { seeded } from "../utils/seededRandom";
 import { useAudioSnapshot } from "./parametric/audio-helpers";
 import { useTempoFactor } from "../data/TempoContext";
 
-const WALTZ_DURATION = 540; // 18 seconds at 30fps
-const WALTZ_GAP = 1410;     // 47 second gap (65s total cycle)
-const WALTZ_CYCLE = WALTZ_DURATION + WALTZ_GAP;
+// Color rotation period — change colors every ~20 seconds
+const COLOR_PERIOD = 600;
 
 const COLOR_PAIRS = [
   { lead: "#FF1493", follow: "#00FFFF", rose: "#FF4500" },
@@ -180,45 +179,29 @@ export const SkeletonCouple: React.FC<Props> = ({ frames }) => {
   const tempoFactor = useTempoFactor();
   const { energy, beatDecay, musicalTime, chromaHue, onsetEnvelope } = snap;
 
-  const cycleIndex = Math.floor(frame / WALTZ_CYCLE);
-  const cycleFrame = frame % WALTZ_CYCLE;
-
-  // Only render during waltz portion
-  if (cycleFrame >= WALTZ_DURATION) return null;
-
-  const progress = cycleFrame / WALTZ_DURATION;
-
-  // Deterministic color pair selection
-  const rng = seeded(cycleIndex * 43 + 5081);
+  // Continuous rendering — rotation engine controls visibility
+  // Rotate color pairs every ~20 seconds for variety
+  const colorIndex = Math.floor(frame / COLOR_PERIOD);
+  const rng = seeded(colorIndex * 43 + 5081);
   const colorPair = COLOR_PAIRS[Math.floor(rng() * COLOR_PAIRS.length)];
 
-  // Fade in/out with staggered timing
-  const fadeIn = interpolate(progress, [0, 0.12], [0, 1], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-    easing: Easing.out(Easing.cubic),
-  });
-  const fadeOut = interpolate(progress, [0.88, 1], [1, 0], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-    easing: Easing.in(Easing.cubic),
-  });
-  const opacity = Math.min(fadeIn, fadeOut) * interpolate(energy, [0.03, 0.2], [0.5, 0.9], {
+  // Energy-driven opacity (no fade cycle — rotation engine handles fades)
+  const opacity = interpolate(energy, [0.03, 0.2], [0.5, 0.9], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
 
-  // Waltz spin — energy and tempo drive rotation speed
-  const baseSpinRate = 0.4 * tempoFactor;
-  const energySpinRate = interpolate(energy, [0.03, 0.25], [baseSpinRate, 2.5 * tempoFactor], {
+  // Waltz spin — continuous, energy and tempo drive rotation speed
+  const spinRate = interpolate(energy, [0.03, 0.25], [0.4 * tempoFactor, 2.5 * tempoFactor], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
-  const spinAngle = cycleFrame * (energySpinRate * 360 / WALTZ_DURATION);
+  const spinAngle = frame * spinRate * 0.5;
 
   // Position: center-right area of screen, with gentle drift
-  const centerX = width * 0.62 + Math.sin(progress * Math.PI * 2) * width * 0.04;
-  const centerY = height * 0.45 + Math.cos(progress * Math.PI) * height * 0.03;
+  const driftPhase = frame * 0.002 * tempoFactor;
+  const centerX = width * 0.62 + Math.sin(driftPhase) * width * 0.04;
+  const centerY = height * 0.45 + Math.cos(driftPhase * 0.7) * height * 0.03;
 
   // Body sway for waltz motion — synced to musical beat (3/4 waltz feel)
   const beatPhase = (musicalTime % 3) / 3; // waltz is in 3

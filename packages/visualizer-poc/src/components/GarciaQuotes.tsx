@@ -14,9 +14,8 @@ import { useAudioSnapshot } from "./parametric/audio-helpers";
 // Quotes from band config — portable across artists
 const QUOTES = BAND_CONFIG.quotes.map((q) => q.text);
 
-const INITIAL_DELAY = 2400; // 80s — deep enough to feel earned
-const CYCLE = 999999;       // once per song
-const DURATION = 360;       // 12 seconds — shorter is more precious
+// No internal cycle — rotation engine controls visibility
+// Typewriter reveal completes over ~12 seconds, then holds
 const CHARS_PER_FRAME = 0.5; // ~15 chars/sec
 
 interface Props {
@@ -33,34 +32,20 @@ export const GarciaQuotes: React.FC<Props> = ({ frames }) => {
   const isQuiet = (spaceScore ?? 0) > 0.4 || energy < 0.15;
   if (!isQuiet) return null;
 
-  const delayedFrame = frame - INITIAL_DELAY;
-  if (delayedFrame < 0) return null;
-
-  const cycleIndex = Math.floor(delayedFrame / CYCLE);
-  const cycleFrame = delayedFrame % CYCLE;
-
-  if (cycleFrame >= DURATION) return null;
-
-  const rng = seeded(cycleIndex * 41 + 19420801);
+  // Continuous rendering — rotation engine controls visibility
+  // Pick a quote deterministically based on song position
+  const quoteSlot = Math.floor(frame / 900); // new quote every ~30s if visible
+  const rng = seeded(quoteSlot * 41 + 19420801);
   const quoteIdx = Math.floor(rng() * QUOTES.length);
   const quote = QUOTES[quoteIdx];
 
-  const progress = cycleFrame / DURATION;
-  const fadeIn = interpolate(progress, [0, 0.08], [0, 1], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-    easing: Easing.out(Easing.cubic),
-  });
-  const fadeOut = interpolate(progress, [0.85, 1], [1, 0], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-    easing: Easing.in(Easing.cubic),
-  });
-  const fadeOpacity = Math.min(fadeIn, fadeOut);
-
-  // Typewriter: reveal characters one at a time
-  const charsRevealed = Math.floor(cycleFrame * CHARS_PER_FRAME);
+  // Typewriter: reveal characters since becoming visible
+  const charsRevealed = Math.floor(frame * CHARS_PER_FRAME);
   const visibleText = quote.slice(0, Math.min(charsRevealed, quote.length));
+  const fadeOpacity = interpolate(energy, [0.02, 0.12], [0.9, 0.5], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+  });
 
   return (
     <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden" }}>
