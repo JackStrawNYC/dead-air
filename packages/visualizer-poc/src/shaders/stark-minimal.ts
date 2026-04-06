@@ -1,11 +1,38 @@
 /**
- * Stark Minimal — clean geometric abstraction.
- * High contrast, slow-moving shapes, mostly monochrome with accent color.
- * Best for contemplative/acoustic sections and low-energy passages.
+ * Stark Minimal — raymarched 3D brutalist architecture.
+ * Massive concrete slabs, sharp geometric voids, dramatic shadows. Tadao
+ * Ando-inspired spaces with single shafts of light through narrow slots.
+ * The beauty of emptiness and weight.
+ *
+ * Visual aesthetic:
+ *   - Quiet: vast empty concrete hall, single shaft of light
+ *   - Building: additional light slots open, shadows deepen
+ *   - Peak: multiple shafts, concrete surfaces begin to glow at edges
+ *   - Release: slots close, returning to solitary light
+ *
+ * Audio reactivity (14+ uniforms):
+ *   uEnergy           -> number of light shafts + shaft brightness
+ *   uBass             -> concrete slab vibration (subtle displacement)
+ *   uMids             -> surface detail / roughness visibility
+ *   uHighs            -> specular sharpness on polished concrete
+ *   uRms              -> ambient light level
+ *   uOnsetSnap        -> light shaft flicker / new slot opening
+ *   uBeatSnap         -> architecture pulse (subtle scale throb)
+ *   uSlowEnergy       -> camera drift speed
+ *   uClimaxPhase      -> void opens in center ceiling (2+)
+ *   uClimaxIntensity  -> void aperture size
+ *   uHarmonicTension  -> shadow contrast deepening
+ *   uMelodicPitch     -> primary light angle
+ *   uBeatStability    -> architectural precision (high=perfect geometry)
+ *   uSectionType      -> jam=more complexity, space=minimal
+ *   uVocalPresence    -> warm light tint
+ *   uDynamicRange     -> contrast between light/shadow
+ *   uCoherence        -> structural symmetry
  */
 
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
+import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
 
 export const starkMinimalVert = /* glsl */ `
 varying vec2 vUv;
@@ -22,209 +49,426 @@ ${sharedUniformsGLSL}
 
 ${noiseGLSL}
 
+${buildPostProcessGLSL({
+  grainStrength: "light",
+  bloomEnabled: true,
+  bloomThresholdOffset: -0.04,
+  caEnabled: false,
+  halationEnabled: true,
+  lensDistortionEnabled: true,
+  dofEnabled: true,
+})}
+
 varying vec2 vUv;
 
 #define PI 3.14159265
+#define TAU 6.28318530
+#define SM_MAX_STEPS 100
+#define SM_MAX_DIST 40.0
+#define SM_SURF_DIST 0.001
 
-// Signed distance to a circle
-float sdCircle(vec2 p, float r) {
-  return length(p) - r;
+// ============================================================
+// Utility
+// ============================================================
+mat2 smRot2(float a) {
+  float c = cos(a), s = sin(a);
+  return mat2(c, -s, s, c);
 }
 
-// Signed distance to a line segment
-float sdLine(vec2 p, vec2 a, vec2 b) {
-  vec2 pa = p - a, ba = b - a;
-  float h = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0);
-  return length(pa - ba * h);
+float smHash(float n) {
+  return fract(sin(n) * 43758.5453123);
+}
+
+// ============================================================
+// SDF primitives
+// ============================================================
+float smBox(vec3 p, vec3 b) {
+  vec3 d = abs(p) - b;
+  return length(max(d, 0.0)) + min(max(d.x, max(d.y, d.z)), 0.0);
+}
+
+float smRoundBox(vec3 p, vec3 b, float r) {
+  vec3 d = abs(p) - b;
+  return length(max(d, 0.0)) - r + min(max(d.x, max(d.y, d.z)), 0.0);
+}
+
+float smCylinder(vec3 p, float h, float r) {
+  vec2 d = abs(vec2(length(p.xz), p.y)) - vec2(r, h);
+  return min(max(d.x, d.y), 0.0) + length(max(d, 0.0));
+}
+
+// ============================================================
+// Concrete surface roughness
+// ============================================================
+float smConcreteRoughness(vec3 p, float detail) {
+  float rough = snoise(p * 8.0) * 0.003;
+  rough += snoise(p * 20.0) * 0.001 * detail;
+  rough += snoise(p * 50.0) * 0.0004 * detail;
+  return rough;
+}
+
+// ============================================================
+// Scene: Brutalist hall with walls, columns, ceiling slits
+// ============================================================
+float smMap(vec3 p, float bassVib, float stability, float onset, float climaxAperture) {
+  float minDist = SM_MAX_DIST;
+
+  // Concrete roughness on all surfaces
+  float rough = smConcreteRoughness(p, 1.0);
+
+  // --- Main hall: large bounding box (inverted — camera inside) ---
+  float hallWidth = 12.0;
+  float hallHeight = 8.0;
+  float hallDepth = 20.0;
+  float hall = -smBox(p, vec3(hallWidth, hallHeight, hallDepth));
+  hall += rough;
+  minDist = min(minDist, hall);
+
+  // --- Floor: thick concrete slab ---
+  float floor = p.y + 3.5 + bassVib * 0.05;
+  floor += rough;
+  minDist = min(minDist, floor);
+
+  // --- Ceiling: heavy concrete roof ---
+  float ceiling = -(p.y - 7.0) + rough;
+  minDist = min(minDist, ceiling);
+
+  // --- Ceiling light slots: narrow rectangular voids ---
+  // These cut through the ceiling to let light in
+  for (int i = 0; i < 5; i++) {
+    float fi = float(i);
+    float slotX = (fi - 2.0) * 4.0;
+    // Slot width varies: thinner at edges (imperfect geometry from low stability)
+    float slotWidth = 0.08 + (1.0 - stability) * 0.04;
+    float slotDepth = mix(3.0, 8.0, fi / 4.0);
+    vec3 slotP = p - vec3(slotX, 7.0, 0.0);
+    float slot = smBox(slotP, vec3(slotWidth, 0.5, slotDepth));
+    minDist = max(minDist, -slot); // subtract from ceiling
+  }
+
+  // --- Climax: circular void opening in center ceiling ---
+  if (climaxAperture > 0.01) {
+    float apertureR = climaxAperture * 3.0;
+    float aperture = smCylinder(p - vec3(0.0, 7.0, 0.0), 1.0, apertureR);
+    minDist = max(minDist, -aperture);
+  }
+
+  // --- Massive concrete columns ---
+  for (int i = 0; i < 6; i++) {
+    float fi = float(i);
+    float colZ = (fi - 2.5) * 6.0;
+    // Left column
+    vec3 colPL = p - vec3(-6.0, 1.75, colZ);
+    colPL.y += bassVib * 0.02 * sin(fi * 2.3);
+    float colL = smRoundBox(colPL, vec3(1.2, 5.25, 1.2), 0.02);
+    colL += rough;
+    minDist = min(minDist, colL);
+    // Right column
+    vec3 colPR = p - vec3(6.0, 1.75, colZ);
+    colPR.y += bassVib * 0.02 * sin(fi * 3.1);
+    float colR = smRoundBox(colPR, vec3(1.2, 5.25, 1.2), 0.02);
+    colR += rough;
+    minDist = min(minDist, colR);
+  }
+
+  // --- Horizontal concrete beam spanning between columns ---
+  for (int i = 0; i < 3; i++) {
+    float fi = float(i);
+    float beamZ = (fi - 1.0) * 8.0;
+    vec3 beamP = p - vec3(0.0, 5.5, beamZ);
+    float beam = smRoundBox(beamP, vec3(8.0, 0.6, 0.8), 0.01);
+    beam += rough;
+    minDist = min(minDist, beam);
+  }
+
+  // --- Wall alcove: recessed niche in back wall ---
+  vec3 alcoveP = p - vec3(0.0, 1.0, -18.0);
+  float alcove = smBox(alcoveP, vec3(3.0, 4.0, 2.0));
+  float alcoveSubtract = smBox(alcoveP + vec3(0.0, 0.0, -0.5), vec3(2.5, 3.5, 1.5));
+  float alcoveResult = max(alcove, -alcoveSubtract);
+  alcoveResult += rough;
+  minDist = min(minDist, alcoveResult);
+
+  // --- Stepped platform (altar-like raised area) ---
+  for (int i = 0; i < 3; i++) {
+    float fi = float(i);
+    float stepW = 4.0 - fi * 0.8;
+    float stepH = -3.0 + fi * 0.5;
+    vec3 stepP = p - vec3(0.0, stepH, -14.0);
+    float stepSlab = smBox(stepP, vec3(stepW, 0.25, 2.0 - fi * 0.3));
+    stepSlab += rough;
+    minDist = min(minDist, stepSlab);
+  }
+
+  return minDist;
+}
+
+// ============================================================
+// Normal via central differences
+// ============================================================
+vec3 smNormal(vec3 p, float bassVib, float stability, float onset, float climaxAperture) {
+  vec2 eps = vec2(0.002, 0.0);
+  float d = smMap(p, bassVib, stability, onset, climaxAperture);
+  return normalize(vec3(
+    smMap(p + eps.xyy, bassVib, stability, onset, climaxAperture) - d,
+    smMap(p + eps.yxy, bassVib, stability, onset, climaxAperture) - d,
+    smMap(p + eps.yyx, bassVib, stability, onset, climaxAperture) - d
+  ));
+}
+
+// ============================================================
+// Ambient Occlusion (5-tap)
+// ============================================================
+float smAmbientOcclusion(vec3 p, vec3 n, float bassVib, float stability, float onset, float climaxAperture) {
+  float occ = 0.0;
+  float weight = 1.0;
+  for (int i = 1; i <= 5; i++) {
+    float fi = float(i);
+    float dist = fi * 0.12;
+    float d = smMap(p + n * dist, bassVib, stability, onset, climaxAperture);
+    occ += (dist - d) * weight;
+    weight *= 0.55;
+  }
+  return clamp(1.0 - occ * 3.0, 0.0, 1.0);
+}
+
+// ============================================================
+// Soft shadow
+// ============================================================
+float smSoftShadow(vec3 ro, vec3 rd, float mint, float maxt, float k,
+                    float bassVib, float stability, float onset, float climaxAperture) {
+  float res = 1.0;
+  float marchT = mint;
+  for (int i = 0; i < 48; i++) {
+    if (marchT > maxt) break;
+    float d = smMap(ro + rd * marchT, bassVib, stability, onset, climaxAperture);
+    if (d < 0.001) return 0.0;
+    res = min(res, k * d / marchT);
+    marchT += max(d, 0.01);
+  }
+  return clamp(res, 0.0, 1.0);
+}
+
+// ============================================================
+// Volumetric light shafts through ceiling slots
+// ============================================================
+vec3 smLightShafts(vec3 ro, vec3 rd, float maxT, float energy, float onset,
+                    vec3 shaftColor, float climaxAperture) {
+  vec3 shafts = vec3(0.0);
+  int shaftSteps = 40;
+  float stepSize = min(maxT, 25.0) / float(shaftSteps);
+
+  for (int i = 0; i < 40; i++) {
+    float fi = float(i);
+    float marchT = fi * stepSize + 0.2;
+    vec3 pos = ro + rd * marchT;
+
+    float inShaft = 0.0;
+
+    // Check each ceiling slot
+    int numSlots = 1 + int(energy * 4.0);
+    for (int s = 0; s < 5; s++) {
+      if (s >= numSlots) break;
+      float fs = float(s);
+      float slotX = (fs - 2.0) * 4.0;
+      float slotWidth = 0.12;
+
+      // Is this point below the slot and within its X/Z bounds?
+      float inSlotX = smoothstep(slotWidth, 0.0, abs(pos.x - slotX));
+      float slotDepth = mix(3.0, 8.0, fs / 4.0);
+      float inSlotZ = smoothstep(slotDepth, slotDepth * 0.8, abs(pos.z));
+      float belowCeiling = smoothstep(7.5, 6.5, pos.y);
+      float aboveFloor = smoothstep(-4.0, -3.0, pos.y);
+
+      inShaft += inSlotX * inSlotZ * belowCeiling * aboveFloor;
+    }
+
+    // Climax aperture: circular shaft from ceiling void
+    if (climaxAperture > 0.01) {
+      float apertureR = climaxAperture * 3.0;
+      float distFromCenter = length(pos.xz);
+      float inAperture = smoothstep(apertureR, apertureR * 0.5, distFromCenter);
+      float belowCeiling = smoothstep(7.5, 6.0, pos.y);
+      float aboveFloor = smoothstep(-4.0, -3.0, pos.y);
+      inShaft += inAperture * belowCeiling * aboveFloor * 2.0;
+    }
+
+    // Dust in the shafts
+    float dust = fbm3(vec3(pos * 0.8 + uDynamicTime * vec3(0.02, 0.05, 0.01)));
+    dust = dust * 0.5 + 0.5;
+
+    float depthAtten = exp(-marchT * 0.03);
+    shafts += shaftColor * inShaft * dust * depthAtten * 0.006;
+  }
+
+  return shafts;
 }
 
 void main() {
   vec2 uv = vUv;
   vec2 aspect = vec2(uResolution.x / uResolution.y, 1.0);
-  vec2 p = (uv - 0.5) * aspect;
+  vec2 screenP = (uv - 0.5) * aspect;
 
+  // === AUDIO INPUTS ===
   float energy = clamp(uEnergy, 0.0, 1.0);
-  float tempoScale = uTempo / 120.0;
-  float sectionSeed = uSectionIndex * 3.14;
-
-  // --- Section-type modulation (0=intro,1=verse,2=chorus,3=bridge,4=solo,5=jam,6=outro,7=space) ---
+  float bass = clamp(uBass, 0.0, 1.0);
+  float mids = clamp(uMids, 0.0, 1.0);
+  float highs = clamp(uHighs, 0.0, 1.0);
+  float rms = clamp(uRms, 0.0, 1.0);
+  float onset = clamp(uOnsetSnap, 0.0, 1.0);
+  float beatSnap = clamp(uBeatSnap, 0.0, 1.0);
+  float slowEnergy = clamp(uSlowEnergy, 0.0, 1.0);
+  float tension = clamp(uHarmonicTension, 0.0, 1.0);
+  float melodicPitch = clamp(uMelodicPitch, 0.0, 1.0);
+  float beatStability = clamp(uBeatStability, 0.0, 1.0);
+  float vocalPresence = clamp(uVocalPresence, 0.0, 1.0);
+  float dynamicRange = clamp(uDynamicRange, 0.0, 1.0);
+  float coherence = clamp(uCoherence, 0.0, 1.0);
   float sectionT = uSectionType;
+
+  // === SECTION-TYPE MODULATION ===
   float sJam = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
   float sSpace = smoothstep(6.5, 7.5, sectionT);
   float sChorus = smoothstep(1.5, 2.5, sectionT) * (1.0 - step(2.5, sectionT));
-  // Jam: faster motion, more complexity. Space: near-still, stark. Chorus: brighter accents.
-  float sectionSpeed = mix(1.0, 1.4, sJam) * mix(1.0, 0.3, sSpace) * mix(1.0, 1.1, sChorus);
-  float sectionAccent = mix(1.0, 1.3, sJam) * mix(1.0, 0.5, sSpace) * mix(1.0, 1.2, sChorus);
-  float sectionComplexity = mix(1.0, 1.4, sJam) * mix(1.0, 0.5, sSpace);
 
-  float t = uDynamicTime * 0.08 * tempoScale * sectionSpeed;
-  float energyDetail = 1.0 + energy * 0.5;
+  float climaxAperture = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5) * uClimaxIntensity;
 
-  // === DOMAIN WARPING: gentle organic UV distortion ===
-  p += vec2(fbm3(vec3(p * 0.5 * energyDetail, uDynamicTime * 0.05)), fbm3(vec3(p * 0.5 * energyDetail + 100.0, uDynamicTime * 0.05))) * 0.3;
+  float bassVib = bass * mix(1.0, 1.3, sJam) * mix(1.0, 0.2, sSpace);
 
-  // Deep black background with subtle warm gradient
-  float bgGrad = 1.0 - length(p) * 0.3;
-  vec3 col = vec3(0.015, 0.012, 0.018) * bgGrad;
+  // === PALETTE ===
+  float chromaHueMod = uChromaHue * 0.1;
+  float chordHue = float(int(uChordIndex)) / 24.0 * 0.08;
+  float hue1 = hsvToCosineHue(uPalettePrimary) + chromaHueMod + chordHue;
+  float hue2 = hsvToCosineHue(uPaletteSecondary) + chordHue * 0.5;
+  vec3 palColor1 = 0.5 + 0.5 * cos(TAU * vec3(hue1, hue1 + 0.33, hue1 + 0.67));
+  vec3 palColor2 = 0.5 + 0.5 * cos(TAU * vec3(hue2, hue2 + 0.33, hue2 + 0.67));
 
-  // === GEOMETRIC ELEMENTS ===
-  // Sub-pixel anti-aliasing width (resolution-aware)
-  float px = 1.5 / min(uResolution.x, uResolution.y);
+  // Concrete color: mostly gray with subtle warm/cool variation
+  vec3 concreteBase = vec3(0.25, 0.24, 0.23);
+  vec3 concreteWarm = mix(concreteBase, concreteBase * vec3(1.05, 1.0, 0.92), vocalPresence * 0.3);
 
-  // Breathing circle — radius tied to RMS (smoothstep eased)
-  float breathPhase = sin(t * 2.0);
-  float easedBreath = breathPhase * breathPhase * (3.0 - 2.0 * abs(breathPhase)) * sign(breathPhase);
-  // --- Phase 1: New uniform integrations ---
-  float chromaHueMod = uChromaHue * 0.25;
-  float chordHue = float(int(uChordIndex)) / 24.0 * 0.15;
-  float stabilityGeo = uBeatStability;  // high=geometric, low=organic
-  float pitchRadius = uMelodicPitch * 0.05;  // melodic pitch affects circle radius
+  // Light shaft color: warm white, palette-tinted
+  vec3 shaftColor = mix(vec3(1.0, 0.95, 0.85), palColor1, 0.15);
+  shaftColor = mix(shaftColor, vec3(1.0, 0.9, 0.7), vocalPresence * 0.2);
 
-  float circleR = 0.15 + (uRms + uFastEnergy * 0.5) * 0.12 + easedBreath * 0.04 + pitchRadius;
-  float circleDist = sdCircle(p, circleR);
-  float circleEdge = smoothstep(px, 0.0, abs(circleDist));
-  float circleFill = smoothstep(0.02, 0.0, circleDist) * 0.03;
+  // === RAY SETUP ===
+  vec3 ro, rd;
+  setupCameraRay(uv, aspect, ro, rd);
 
-  // Accent color from palette (used sparingly)
-  float acHue = hsvToCosineHue(uPalettePrimary) + chromaHueMod + chordHue;
-  vec3 accentCol = 0.5 + 0.5 * cos(6.28318 * vec3(acHue, acHue + 0.33, acHue + 0.67));
-  vec3 accentGray = vec3(dot(accentCol, vec3(0.299, 0.587, 0.114)));
-  accentCol = mix(accentGray, accentCol, uPaletteSaturation * 0.7); // Reduced saturation
+  // === RAYMARCH ===
+  float marchT = 0.0;
+  bool marchHit = false;
+  vec3 marchPos = ro;
 
-  col += circleEdge * vec3(0.5, 0.48, 0.45) * 0.4; // Thin white circle outline
-  col += circleFill * accentCol * energy * sectionAccent; // Subtle accent fill, section-modulated
-
-  // === CLIMAX REACTIVITY ===
-  float isClimax = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5);
-  float climaxBoost = isClimax * uClimaxIntensity;
-
-  // Concentric rings — expand on beats (amplified, sub-pixel AA)
-  float bp = beatPulse(uMusicalTime);
-  float ringExpand = uBeatSnap * 0.25 + bp * 0.15 + climaxBoost * 0.08 + uDrumOnset * 0.15;
-  // Store ring positions for connecting lines
-  vec2 ringPoints[3];
-  for (int i = 1; i <= 3; i++) {
-    float fi = float(i);
-    float ringR = circleR + fi * 0.08 + ringExpand * fi;
-    float ringDist = sdCircle(p, ringR);
-    float ringEdge = smoothstep(px, 0.0, abs(ringDist));
-    float ringAlpha = 0.15 / fi;
-    col += ringEdge * vec3(0.35, 0.33, 0.30) * ringAlpha;
-    // Point on ring for constellation lines
-    float ptAngle = t * (0.3 + fi * 0.15) + fi * 2.094;
-    ringPoints[i-1] = vec2(cos(ptAngle), sin(ptAngle)) * ringR;
+  for (int i = 0; i < SM_MAX_STEPS; i++) {
+    marchPos = ro + rd * marchT;
+    float d = smMap(marchPos, bassVib, beatStability, onset, climaxAperture);
+    if (d < SM_SURF_DIST) {
+      marchHit = true;
+      break;
+    }
+    if (marchT > SM_MAX_DIST) break;
+    marchT += d * 0.8;
   }
 
-  // === GOLDEN RATIO SPIRAL (Fibonacci) ===
-  float spiralAngle = atan(p.y, p.x);
-  float spiralR = length(p);
-  // Logarithmic spiral: r = a * e^(b*theta), b = 1/golden_ratio
-  float goldenB = 0.3063; // ln(golden_ratio) / (PI/2)
-  float spiralPhase = t * 0.5;
-  float spiralDist = abs(spiralR - 0.05 * exp(goldenB * (spiralAngle + spiralPhase + 6.28318)));
-  // Wrap for multiple arms
-  float spiralDist2 = abs(spiralR - 0.05 * exp(goldenB * (spiralAngle + spiralPhase + 6.28318 * 2.0)));
-  float spiralDist3 = abs(spiralR - 0.05 * exp(goldenB * (spiralAngle + spiralPhase)));
-  float minSpiral = min(spiralDist, min(spiralDist2, spiralDist3));
-  float spiralEdge = smoothstep(px * 1.5, 0.0, minSpiral) * smoothstep(0.5, 0.15, spiralR);
-  col += spiralEdge * accentCol * 0.12;
+  // === SHADING ===
+  vec3 col = vec3(0.0);
 
-  // === CONSTELLATION LINES: thin connecting lines between ring points ===
-  for (int i = 0; i < 2; i++) {
-    float connDist = sdLine(p, ringPoints[i], ringPoints[i+1]);
-    float connEdge = smoothstep(px, 0.0, connDist);
-    col += connEdge * vec3(0.2, 0.19, 0.18) * 0.08;
-  }
-  // Close the triangle
-  float closeDist = sdLine(p, ringPoints[2], ringPoints[0]);
-  col += smoothstep(px, 0.0, closeDist) * vec3(0.2, 0.19, 0.18) * 0.06;
+  // Background: dark gray void
+  vec3 bgCol = vec3(0.02, 0.018, 0.025);
 
-  // Rotating line — sweeps slowly with eased acceleration
-  float linePhase = t * 1.2 + sectionSeed;
-  float easedAngle = linePhase + 0.15 * sin(linePhase * 0.7); // smooth acceleration/deceleration
-  float lineLen = 0.35 + uMids * 0.15;
-  vec2 lineDir = vec2(cos(easedAngle), sin(easedAngle));
-  float lineDist = sdLine(p, -lineDir * lineLen, lineDir * lineLen);
-  float lineEdge = smoothstep(px, 0.0, abs(lineDist - 0.001));
-  col += lineEdge * vec3(0.3, 0.28, 0.25) * 0.3;
+  if (marchHit) {
+    vec3 pos = marchPos;
+    vec3 norm = smNormal(pos, bassVib, beatStability, onset, climaxAperture);
 
-  // Cross-hair at center — subtle (sub-pixel AA)
-  float crossH = smoothstep(px, 0.0, abs(p.y)) * smoothstep(0.06, 0.04, abs(p.x));
-  float crossV = smoothstep(px, 0.0, abs(p.x)) * smoothstep(0.06, 0.04, abs(p.y));
-  col += (crossH + crossV) * vec3(0.2, 0.19, 0.17) * 0.15;
+    // Primary light: from above through slots, angle from melodicPitch
+    float lightAngle = PI * 0.3 + melodicPitch * PI * 0.2;
+    vec3 lightDir = normalize(vec3(sin(lightAngle) * 0.3, 1.0, cos(lightAngle) * 0.2));
+    vec3 viewDir = normalize(ro - pos);
+    vec3 halfVec = normalize(lightDir + viewDir);
 
-  // === SLOW NOISE FIELD: rich background texture (fbm6 + dual palette + energy-responsive) ===
-  float noiseField = fbm6(vec3(p * 2.0 * energyDetail, t * 0.2 + sectionSeed));
-  col += noiseField * 0.015 * vec3(0.8, 0.75, 0.7) * sectionComplexity;
-  // Secondary palette wash in the noise field
-  float secAccentHue = hsvToCosineHue(uPaletteSecondary) + noiseField * 0.1;
-  vec3 secAccent = 0.5 + 0.5 * cos(6.28318 * vec3(secAccentHue, secAccentHue + 0.33, secAccentHue + 0.67));
-  col += secAccent * 0.008 * (0.5 + noiseField * 0.5) * sectionComplexity;
+    // === DIFFUSE ===
+    float diff = max(dot(norm, lightDir), 0.0);
 
-  // === SECONDARY LAYER: flowing organic field beneath geometry ===
-  float orgNoise = fbm6(vec3(p * 1.5 * energyDetail + 50.0, t * 0.15));
-  vec3 orgCol1 = 0.5 + 0.5 * cos(6.28318 * vec3(acHue + 0.15, acHue + 0.48, acHue + 0.82));
-  vec3 orgCol2 = secAccent;
-  vec3 orgLayer = mix(orgCol1, orgCol2, orgNoise * 0.5 + 0.5) * 0.02 * (0.5 + orgNoise * 0.5);
-  col = mix(col, col + orgLayer, 0.3);
+    // === SPECULAR (polished concrete) ===
+    float specPow = 16.0 + highs * 64.0;
+    float spec = pow(max(dot(norm, halfVec), 0.0), specPow);
 
-  // === CENTROID-DRIVEN GLOW: brighter when treble-heavy + climax ===
-  float centroidGlow = uCentroid * 0.04 + climaxBoost * 0.03;
-  float glowDist = length(p);
-  float glow = exp(-glowDist * 4.0) * centroidGlow;
-  col += glow * accentCol * sectionAccent;
+    // === FRESNEL ===
+    float fresnel = pow(1.0 - max(dot(norm, viewDir), 0.0), 4.0);
 
-  // === SECTION TRANSITION: horizontal wipe line ===
-  float edgeDist = min(uSectionProgress, 1.0 - uSectionProgress);
-  float wipeLine = smoothstep(0.04, 0.0, edgeDist);
-  float wipeY = mix(-0.5, 0.5, uSectionProgress) * aspect.y;
-  float wipeEdge = smoothstep(0.003, 0.0, abs(p.y - wipeY)) * wipeLine;
-  col += wipeEdge * vec3(0.4, 0.38, 0.35) * 0.5;
+    // === AMBIENT OCCLUSION ===
+    float occl = smAmbientOcclusion(pos, norm, bassVib, beatStability, onset, climaxAperture);
 
-  // Subtle vignette
-  float vig = 1.0 - dot(p * 0.39, p * 0.39);
-  vig = smoothstep(0.0, 1.0, vig);
-  col *= mix(0.85, 1.0, vig);
+    // === SOFT SHADOW ===
+    float shadow = smSoftShadow(pos + norm * 0.02, lightDir, 0.1, 15.0, 6.0,
+                                 bassVib, beatStability, onset, climaxAperture);
 
-  // === ANIMATED STAGE FLOOD: flowing palette noise in dark areas ===
-  col = stageFloodFill(col, p, uDynamicTime, uEnergy, uPalettePrimary, uPaletteSecondary);
+    // === MATERIAL: concrete ===
+    vec3 matCol = concreteWarm;
 
-  // === ANAMORPHIC FLARE: horizontal light streak ===
-  col = anamorphicFlare(vUv, col, uEnergy, uOnsetSnap);
+    // Surface detail: mids controls roughness visibility
+    float surfNoise = snoise(pos * 12.0) * 0.04 * mids;
+    matCol += vec3(surfNoise);
 
-  // === HALATION: warm film bloom ===
-  col = halation(vUv, col, uEnergy);
+    // Formwork lines: faint horizontal bands on walls
+    float formwork = smoothstep(0.02, 0.0, abs(fract(pos.y * 2.0) - 0.5) - 0.48);
+    matCol *= 1.0 - formwork * 0.08;
 
-  // === CINEMATIC GRADE (ACES filmic tone mapping) ===
-  col = cinematicGrade(col, uEnergy);
+    // Tie holes: small dark dots in grid
+    float tieGrid = smoothstep(0.04, 0.0, length(fract(pos.xz * 0.5) - 0.5));
+    matCol *= 1.0 - tieGrid * 0.15;
 
-  // Very light grain
-  float grainTime = floor(uTime * 15.0) / 15.0;
-  col += filmGrain(uv, grainTime) * 0.03;
+    // === COMPOSE LIGHTING ===
+    float ambientLevel = 0.03 + rms * 0.04;
+    vec3 ambient = matCol * ambientLevel;
+    vec3 diffuseLight = matCol * diff * shaftColor * 0.6;
+    vec3 specLight = shaftColor * spec * 0.2;
+    vec3 fresnelLight = palColor2 * fresnel * 0.05;
 
-  // ONSET SATURATION PULSE: push colors away from gray (psychedelic, not white)
-  float onsetPulse = step(0.5, uOnsetSnap) * uOnsetSnap;
-  float onsetLuma = dot(col, vec3(0.299, 0.587, 0.114));
-  col = mix(vec3(onsetLuma), col, 1.0 + onsetPulse * 1.0);
-  col *= 1.0 + onsetPulse * 0.12;
+    col = (ambient + diffuseLight + specLight + fresnelLight) * occl;
 
-  // ONSET CHROMATIC ABERRATION (directional fringing)
-  if (uOnsetSnap > 0.4) {
-    float caAmt = (uOnsetSnap - 0.4) * 0.15;
-    col = applyCA(col, vUv, caAmt);
+    // Shadow contrast: tension deepens shadows
+    float shadowContrast = mix(0.4, 0.2, tension * 0.5);
+    col *= shadowContrast + shadow * (1.0 - shadowContrast);
+
+    // Dynamic range: adjust contrast between lit and shadow
+    float lumaSurf = dot(col, vec3(0.299, 0.587, 0.114));
+    col = mix(col, col * (0.5 + lumaSurf * 1.5), dynamicRange * 0.3);
+
+    // Depth fog
+    float depthFade = 1.0 - exp(-marchT * 0.025);
+    col = mix(col, bgCol, depthFade);
+
+    // Beat scale pulse: subtle geometry breathing
+    col *= 1.0 + beatSnap * 0.02;
+  } else {
+    col = bgCol;
   }
 
-  // === DEAD ICONOGRAPHY ===
-  float _nf = snoise(vec3(p * 2.0, uTime * 0.1));
-  vec3 _bg = vec3(0.12, 0.10, 0.08);
-  col += iconEmergence(p, uTime, energy, uBass, accentCol, _bg, _nf, uClimaxPhase, uSectionIndex);
-  col += heroIconEmergence(p, uTime, energy, uBass, accentCol, _bg, _nf, uSectionIndex);
+  // === VOLUMETRIC LIGHT SHAFTS ===
+  col += smLightShafts(ro, rd, min(marchT, SM_MAX_DIST), energy, onset,
+                        shaftColor, climaxAperture);
 
-  // Lifted blacks (build-phase-aware: near true black during build for anticipation)
-  float isBuild = step(0.5, uClimaxPhase) * step(uClimaxPhase, 1.5);
-  float liftMult = mix(1.0, 0.15, isBuild * uClimaxIntensity);
-  col = max(col, vec3(0.06, 0.05, 0.08) * liftMult);
+  // === ACCENT COLOR (very subtle — this is brutalist) ===
+  // Only during chorus: faint palette wash on light areas
+  float accentGate = sChorus * 0.1 + climaxAperture * 0.2;
+  if (accentGate > 0.01) {
+    float luma = dot(col, vec3(0.299, 0.587, 0.114));
+    col = mix(col, col * palColor1 * 2.0, accentGate * smoothstep(0.1, 0.4, luma));
+  }
 
+  // === SDF ICON EMERGENCE ===
+  {
+    float nf = snoise(vec3(screenP * 2.0, uTime * 0.1));
+    vec3 iconCol1 = mix(concreteWarm, palColor1, 0.5) * 2.0;
+    vec3 iconCol2 = vec3(0.12, 0.10, 0.08);
+    col += iconEmergence(screenP, uTime, energy, bass, iconCol1, iconCol2, nf, uClimaxPhase, uSectionIndex);
+    col += heroIconEmergence(screenP, uTime, energy, bass, iconCol1, iconCol2, nf, uSectionIndex);
+  }
+
+  // === POST-PROCESSING ===
+  col = applyPostProcess(col, vUv, screenP);
   gl_FragColor = vec4(col, 1.0);
 }
 `;

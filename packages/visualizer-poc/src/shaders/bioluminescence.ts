@@ -1,31 +1,26 @@
 /**
- * Bioluminescence — Growing glowing organisms with branching tendrils.
- * Feedback shader (uPrevFrame) with persistence trails of phosphorescent organisms.
+ * Bioluminescence — raymarched deep sea bioluminescent scene.
+ * Jellyfish bell SDFs with trailing tentacles, dinoflagellate particle clouds,
+ * anglerfish lure light. Pure darkness except organism emission.
  *
- * Visual aesthetic:
- *   - Dark void background with 8-12 glowing organisms
- *   - Each organism: central pulsing glow + 3-5 branching FBM tendrils
- *   - Cyan (#0ff) / green (#0f8) / magenta (#f0f) phosphorescence
- *   - Organisms leave glowing persistence trails via feedback
- *   - Quiet: few dim organisms, short tendrils
- *   - Building: organisms multiply, tendrils extend
- *   - Peak: full bioluminescent field, bright cascading flashes
- *   - Release: organisms fade, trails linger
- *
- * Audio reactivity:
- *   uEnergy          -> organism count and glow intensity
- *   uBass            -> central pulse size
- *   uHighs           -> tendril tip brightness
+ * Audio reactivity (14+ uniforms):
+ *   uEnergy          -> organism glow intensity + count
+ *   uBass            -> jellyfish bell pulse
+ *   uHighs           -> dinoflagellate sparkle
+ *   uMids            -> tentacle glow intensity
  *   uOnsetSnap       -> bioluminescent flash cascade
- *   uSlowEnergy      -> background ambient level
- *   uHarmonicTension -> tendril branching complexity
- *   uBeatStability   -> organism drift stability
+ *   uSlowEnergy      -> drift speed
+ *   uBeatSnap        -> rhythmic bell contraction
  *   uMelodicPitch    -> vertical organism drift
- *   uChromaHue       -> hue shift across palette
- *   uChordIndex      -> micro-rotate hue per chord
- *   uFFTTexture      -> per-organism size modulation
- *   uClimaxPhase     -> full flash + all organisms at max
- *   uPalettePrimary/Secondary -> mixed with bioluminescent palette
+ *   uMelodicDirection -> current direction
+ *   uHarmonicTension -> tentacle complexity
+ *   uBeatStability   -> drift stability
+ *   uChromaHue       -> hue shift
+ *   uChordIndex      -> micro hue rotation
+ *   uSectionType     -> section-aware modulation
+ *   uClimaxPhase     -> full luminescence
+ *   uVocalEnergy     -> anglerfish lure brightness
+ *   uCoherence       -> organism pattern stability
  */
 
 import { noiseGLSL } from "./noise";
@@ -48,272 +43,360 @@ uniform sampler2D uPrevFrame;
 
 ${noiseGLSL}
 
-${buildPostProcessGLSL({ grainStrength: "light", bloomEnabled: true, halationEnabled: true, anaglyphEnabled: true })}
+${buildPostProcessGLSL({
+  grainStrength: "light",
+  bloomEnabled: true,
+  halationEnabled: true,
+  dofEnabled: true,
+})}
 
 varying vec2 vUv;
 
 #define PI 3.14159265
 #define TAU 6.28318530
+#define BL_MAX_STEPS 80
+#define BL_MAX_DIST 40.0
+#define BL_SURF_DIST 0.002
 
-// --- Seeded hash for organism placement ---
-float hash21(vec2 p) {
-  p = fract(p * vec2(123.34, 456.21));
-  p += dot(p, p + 45.32);
-  return fract(p.x * p.y);
+// ---- Hash ----
+float blHash(float n) { return fract(sin(n) * 43758.5453); }
+vec2 blHash2(float n) { return vec2(blHash(n), blHash(n + 7.13)); }
+
+// ---- Smooth minimum for metaball blending ----
+float blSmin(float a, float b, float k) {
+  float h = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0);
+  return mix(b, a, h) - k * h * (1.0 - h);
 }
 
-vec2 hash22(vec2 p) {
-  return vec2(hash21(p), hash21(p + 17.3));
+// ---- Jellyfish bell SDF ----
+float blJellyfishBell(vec3 pos, vec3 center, float radius, float pulsePhase) {
+  vec3 localP = pos - center;
+  // Oblate spheroid (bell shape)
+  float bellSquash = 0.6 + sin(pulsePhase) * 0.15; // breathing
+  vec3 scaled = localP / vec3(radius, radius * bellSquash, radius);
+  float sphere = length(scaled) - 1.0;
+  // Carve out bottom hemisphere to make bell shape
+  float cutPlane = -localP.y - radius * 0.1;
+  float bell = max(sphere, cutPlane);
+  // Add rippled edge
+  float edgeAngle = atan(localP.z, localP.x);
+  float edgeRipple = sin(edgeAngle * 8.0 + pulsePhase * 2.0) * 0.05 * radius;
+  bell += edgeRipple * smoothstep(-0.1, 0.1, cutPlane);
+  return bell * radius; // undo scaling
 }
 
-// --- Bioluminescent organism glow ---
-float organismGlow(vec2 p, vec2 center, float radius, float pulse) {
-  float d = length(p - center);
-  float core = exp(-d * d / (radius * radius * pulse));
-  float halo = exp(-d / (radius * 3.0)) * 0.3;
-  return core + halo;
-}
+// ---- Tentacle SDF (series of spheres along a curve) ----
+float blTentacle(vec3 pos, vec3 anchor, float seed, float len, float time, float tension) {
+  float minDist = 1e6;
+  int segments = 12;
+  float segLen = len / float(segments);
+  vec3 currPos = anchor;
+  vec3 dir = vec3(0.0, -1.0, 0.0);
 
-// --- Tendril path via FBM ---
-vec2 tendrilPath(vec2 origin, float angle, float t, float seed, float warp) {
-  float x = origin.x + cos(angle) * t + snoise(vec3(seed, t * 4.0, seed * 7.0)) * warp * t;
-  float y = origin.y + sin(angle) * t + snoise(vec3(seed + 100.0, t * 4.0, seed * 3.0)) * warp * t;
-  return vec2(x, y);
-}
+  for (int i = 0; i < 12; i++) {
+    float fi = float(i);
+    float taper = 1.0 - fi / float(segments) * 0.8;
+    float radius = (0.02 + tension * 0.01) * taper;
 
-// --- Distance to a tendril ---
-float tendrilField(vec2 p, vec2 origin, float angle, float length_, float seed, float warp, float width) {
-  float minDist = 1000.0;
-  float steps = 20.0;
-  for (int i = 0; i < 20; i++) {
-    float t = float(i) / steps * length_;
-    vec2 pt = tendrilPath(origin, angle, t, seed, warp);
-    float d = length(p - pt);
-    // Taper width along tendril
-    float taper = width * (1.0 - float(i) / steps * 0.7);
-    minDist = min(minDist, d / max(taper, 0.001));
+    // Curve the tentacle with noise
+    float sway = snoise(vec3(seed + fi * 0.5, time * 0.3, seed * 3.0));
+    float sway2 = snoise(vec3(seed * 2.0 + fi * 0.3, time * 0.25, seed));
+    currPos += dir * segLen;
+    currPos.x += sway * 0.04 * (1.0 + tension);
+    currPos.z += sway2 * 0.04 * (1.0 + tension);
+    dir = normalize(dir + vec3(sway * 0.15, -0.8, sway2 * 0.15));
+
+    float dist = length(pos - currPos) - radius;
+    minDist = min(minDist, dist);
   }
   return minDist;
+}
+
+// ---- Scene SDF with jellyfish ----
+float blSceneSDF(vec3 pos, float time, float bass, float tension, float energy,
+                  out int blClosestId, out vec3 blClosestEmission) {
+  float minDist = 1e6;
+  blClosestId = -1;
+  blClosestEmission = vec3(0.0);
+
+  // 5 jellyfish at different positions
+  for (int j = 0; j < 5; j++) {
+    float fj = float(j);
+    float seed = fj * 7.13 + 42.0;
+    vec3 jfCenter = vec3(
+      sin(time * 0.1 + seed) * 4.0 + cos(seed * 3.0) * 2.0,
+      sin(time * 0.08 + seed * 2.0) * 2.0 + fj * 1.5 - 2.0,
+      cos(time * 0.12 + seed) * 3.0 + sin(seed * 5.0) * 2.0
+    );
+    float pulsePhase = time * 1.5 + fj * 1.2 + bass * 2.0;
+    float bellRadius = 0.3 + fj * 0.08 + energy * 0.1;
+    float bellDist = blJellyfishBell(pos, jfCenter, bellRadius, pulsePhase);
+
+    // Tentacles
+    float tentDist = 1e6;
+    int tentCount = 3 + int(tension * 3.0);
+    for (int t = 0; t < 6; t++) {
+      if (t >= tentCount) break;
+      float ft = float(t);
+      float angle = ft / float(tentCount) * TAU;
+      vec3 anchor = jfCenter + vec3(cos(angle) * bellRadius * 0.6, -bellRadius * 0.3, sin(angle) * bellRadius * 0.6);
+      float td = blTentacle(pos, anchor, seed + ft * 3.0, 0.6 + energy * 0.4, time, tension);
+      tentDist = min(tentDist, td);
+    }
+
+    float jfDist = blSmin(bellDist, tentDist, 0.05);
+    if (jfDist < minDist) {
+      minDist = jfDist;
+      blClosestId = j;
+    }
+  }
+
+  // Anglerfish lure (single glowing sphere)
+  vec3 anglerPos = vec3(sin(time * 0.07) * 6.0, -2.0 + sin(time * 0.15) * 1.0, cos(time * 0.09) * 5.0);
+  float anglerDist = length(pos - anglerPos) - 0.08;
+  if (anglerDist < minDist) {
+    minDist = anglerDist;
+    blClosestId = 10; // anglerfish ID
+  }
+
+  return minDist;
+}
+
+// ---- Normal estimation ----
+vec3 blCalcNormal(vec3 pos, float time, float bass, float tension, float energy) {
+  float eps = 0.005;
+  int dummyId; vec3 dummyEmit;
+  float ref = blSceneSDF(pos, time, bass, tension, energy, dummyId, dummyEmit);
+  return normalize(vec3(
+    blSceneSDF(pos + vec3(eps, 0, 0), time, bass, tension, energy, dummyId, dummyEmit) - ref,
+    blSceneSDF(pos + vec3(0, eps, 0), time, bass, tension, energy, dummyId, dummyEmit) - ref,
+    blSceneSDF(pos + vec3(0, 0, eps), time, bass, tension, energy, dummyId, dummyEmit) - ref
+  ));
+}
+
+// ---- Occlusion ----
+float blCalcOcclusion(vec3 pos, vec3 nrm, float time, float bass, float tension, float energy) {
+  float occl = 0.0;
+  float weight = 1.0;
+  int dummyId; vec3 dummyEmit;
+  for (int i = 1; i <= 4; i++) {
+    float sampleDist = float(i) * 0.15;
+    float sdf = blSceneSDF(pos + nrm * sampleDist, time, bass, tension, energy, dummyId, dummyEmit);
+    occl += weight * (sampleDist - sdf);
+    weight *= 0.5;
+  }
+  return clamp(1.0 - occl * 2.0, 0.0, 1.0);
 }
 
 void main() {
   vec2 uv = vUv;
   vec2 aspect = vec2(uResolution.x / uResolution.y, 1.0);
-  vec2 p = (uv - 0.5) * aspect;
+  vec2 screenP = (uv - 0.5) * aspect;
 
+  // ---- Audio ----
   float energy = clamp(uEnergy, 0.0, 1.0);
   float bass = clamp(uBass, 0.0, 1.0);
   float highs = clamp(uHighs, 0.0, 1.0);
+  float mids = clamp(uMids, 0.0, 1.0);
   float onset = clamp(uOnsetSnap, 0.0, 1.0);
   float slowE = clamp(uSlowEnergy, 0.0, 1.0);
   float tension = clamp(uHarmonicTension, 0.0, 1.0);
   float stability = clamp(uBeatStability, 0.0, 1.0);
-  float melInfluence = uMelodicPitch * uMelodicConfidence;
-  float melodicPitch = clamp(melInfluence, 0.0, 1.0);
+  float melodicPitch = clamp(uMelodicPitch * uMelodicConfidence, 0.0, 1.0);
+  float melodicDir = clamp(uMelodicDirection, -1.0, 1.0);
   float effectiveBeat = uBeatSnap * smoothstep(0.3, 0.7, uBeatConfidence);
-
-  // [SLOW DOWN] Halved time multiplier (was 0.04)
-  float slowTime = uDynamicTime * 0.02;
-
-  // [DARKEN] Energy-squared for dramatic dynamic range
-  float e2 = energy * energy;
-
-  // --- Domain warping + energy-responsive detail ---
-  // [SLOW DOWN] Halved warp speed (was 0.05)
-  vec2 domainWarpOff = vec2(fbm3(vec3(p * 0.5, uDynamicTime * 0.025)), fbm3(vec3(p * 0.5 + 100.0, uDynamicTime * 0.025))) * 0.3;
-  float detailMod = 1.0 + energy * 0.5;
-
-  // --- Uniform integrations ---
+  float coherence = clamp(uCoherence, 0.0, 1.0);
   float chromaHueMod = uChromaHue * 0.3;
   float chordConf = smoothstep(0.3, 0.6, uChordConfidence);
   float chordHue = float(int(uChordIndex)) / 24.0 * 0.12 * chordConf;
-  float vocalGlow = uVocalEnergy * 0.1;
+  float vocalGlow = uVocalEnergy * 0.15;
+  float e2 = energy * energy;
+  float slowTime = uDynamicTime * 0.02;
 
-  // --- [DARKEN] Deep ocean at night background (was 0.005-0.025 range) ---
-  vec3 col = mix(
-    vec3(0.002, 0.003, 0.006),
-    vec3(0.004, 0.006, 0.012),
-    uv.y + snoise(vec3(uv * 2.0, slowTime * 0.3)) * 0.05
-  );
-
-  // --- Melodic vertical drift ---
-  float vertShift = (melodicPitch - 0.5) * 0.06;
-
-  // --- Section type modulation (0=intro,1=verse,2=chorus,3=bridge,4=solo,5=jam,6=outro,7=space) ---
+  // ---- Section ----
   float sectionT = uSectionType;
   float sJam = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
   float sSpace = smoothstep(6.5, 7.5, sectionT);
   float sChorus = smoothstep(1.5, 2.5, sectionT) * (1.0 - step(2.5, sectionT));
   float sSolo = smoothstep(3.5, 4.5, sectionT) * (1.0 - step(4.5, sectionT));
-  // Jam: more organisms, faster growth. Space: fewer, slow drift. Chorus: vibrant glow. Solo: dramatic pulses.
-  float sectionDriftSpeed = mix(1.0, 1.4, sJam) * mix(1.0, 0.3, sSpace) * mix(1.0, 1.2, sSolo);
-  float sectionGlowMult = mix(1.0, 1.3, sChorus) * mix(1.0, 0.5, sSpace) * mix(1.0, 1.5, sSolo);
+  float sectionGlow = mix(1.0, 1.3, sChorus) * mix(1.0, 0.5, sSpace) * mix(1.0, 1.5, sSolo);
+  float sectionDrift = mix(1.0, 1.4, sJam) * mix(1.0, 0.3, sSpace);
 
-  // --- Coherence morphology ---
-  float coherence = clamp(uCoherence, 0.0, 1.0);
-  // High coherence: stable organism positions, clean tendrils
-  // Low coherence: chaotic drift, branching tendrils
-  float coherenceWarp = coherence > 0.7 ? mix(1.0, 0.3, (coherence - 0.7) / 0.3)
-                       : coherence < 0.3 ? mix(1.0, 2.0, (0.3 - coherence) / 0.3)
-                       : 1.0;
-
-  // --- Climax detection ---
+  // ---- Climax ----
   float isClimax = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5);
   float climaxBoost = isClimax * uClimaxIntensity;
 
-  // --- Palette colors mixed with bioluminescent palette ---
+  // ---- Palette ----
   float hue1 = uPalettePrimary + chromaHueMod + chordHue;
   float hue2 = uPaletteSecondary + chordHue * 0.5;
-  // [REDUCE SATURATION AT QUIET] Floor from 0.5 to 0.1
   float sat = mix(0.1, 1.0, e2) * uPaletteSaturation;
 
-  // Bioluminescent base colors: cyan, green, magenta
-  vec3 bioColorCyan = vec3(0.0, 1.0, 1.0);
-  vec3 bioColorGreen = vec3(0.0, 1.0, 0.53);
-  vec3 bioColorMagenta = vec3(1.0, 0.0, 1.0);
+  // ---- Camera ----
+  float sceneTime = slowTime * sectionDrift;
+  vec3 rayOrig = vec3(
+    sin(sceneTime * 0.15) * 5.0,
+    melodicPitch * 2.0 - 1.0 + sin(sceneTime * 0.1) * 1.5,
+    cos(sceneTime * 0.12) * 5.0 - 8.0
+  );
+  vec3 camLookAt = vec3(sin(sceneTime * 0.08) * 2.0, 0.0, 0.0);
+  vec3 camFwd = normalize(camLookAt - rayOrig);
+  vec3 camSide = normalize(cross(camFwd, vec3(0.0, 1.0, 0.0)));
+  vec3 camVert = cross(camSide, camFwd);
+  float fovScale = tan(radians(55.0) * 0.5);
+  vec3 rayDir = normalize(camFwd + camSide * screenP.x * fovScale + camVert * screenP.y * fovScale);
 
-  // Blend bioluminescent palette with song palette
-  vec3 paletteColor1 = hsv2rgb(vec3(hue1, sat, 1.0));
-  vec3 paletteColor2 = hsv2rgb(vec3(hue2, sat, 1.0));
-  vec3 mixedCyan = mix(bioColorCyan, paletteColor1, 0.3);
-  vec3 mixedGreen = mix(bioColorGreen, paletteColor2, 0.25);
-  vec3 mixedMagenta = mix(bioColorMagenta, mix(paletteColor1, paletteColor2, 0.5), 0.2);
+  // ---- Deep ocean black ----
+  vec3 col = vec3(0.001, 0.002, 0.004);
 
-  // --- Organism count: 4-12 based on energy + section ---
-  float organismCount = 4.0 + energy * 8.0 + sJam * 3.0 - sSpace * 2.0;
-  organismCount = clamp(organismCount, 3.0, 12.0);
-  organismCount = mix(organismCount, 12.0, climaxBoost);
+  // ---- Raymarch scene ----
+  float marchDist = 0.0;
+  int closestId = -1;
+  vec3 closestEmit = vec3(0.0);
+  bool didCollide = false;
 
-  // --- Beat pulse ---
-  float bp = beatPulse(uMusicalTime) * smoothstep(0.3, 0.7, uBeatConfidence);
+  for (int i = 0; i < BL_MAX_STEPS; i++) {
+    vec3 marchPos = rayOrig + rayDir * marchDist;
+    float sdf = blSceneSDF(marchPos, sceneTime, bass, tension, energy, closestId, closestEmit);
+    if (sdf < BL_SURF_DIST) {
+      didCollide = true;
+      break;
+    }
+    if (marchDist > BL_MAX_DIST) break;
+    marchDist += sdf * 0.8;
+  }
 
-  // --- Draw organisms ---
-  for (int i = 0; i < 12; i++) {
-    float fi = float(i);
+  if (didCollide) {
+    vec3 collidePos = rayOrig + rayDir * marchDist;
+    vec3 nrm = blCalcNormal(collidePos, sceneTime, bass, tension, energy);
+    float occl = blCalcOcclusion(collidePos, nrm, sceneTime, bass, tension, energy);
 
-    // Visibility based on organism count
-    float visibility = smoothstep(fi - 0.3, fi + 0.5, organismCount);
-    if (visibility < 0.001) continue;
+    // Fresnel
+    float fresnelVal = pow(1.0 - max(dot(nrm, -rayDir), 0.0), 3.0);
 
-    // Seeded position for this organism
-    vec2 seed2 = vec2(fi * 7.13, fi * 3.71 + 42.0);
-    vec2 basePos = (hash22(seed2) - 0.5) * aspect * 1.4;
-
-    // Slow drift with stability influence
-    float driftSpeed = 0.15 * sectionDriftSpeed * mix(1.0, 0.4, stability);
-    basePos.x += sin(slowTime * driftSpeed + fi * 1.7) * 0.15;
-    basePos.y += cos(slowTime * driftSpeed * 0.8 + fi * 2.3) * 0.12 + vertShift;
-
-    // FFT-driven size modulation
-    float fftSample = texture2D(uFFTTexture, vec2(fi / 12.0, 0.5)).r;
-
-    // Central glow radius: bass-driven pulse
-    float baseRadius = 0.03 + energy * 0.02 + fftSample * 0.015;
-    float pulseRadius = baseRadius * (1.0 + bass * 0.4 + bp * 0.15);
-
-    // Draw central organism glow
-    float glow = organismGlow(p, basePos, pulseRadius, 1.0 + bass * 0.5) * sectionGlowMult;
-
-    // Per-organism color cycling through bioluminescent palette
-    float colorPhase = fract(fi * 0.33 + slowTime * 0.1 + chromaHueMod);
-    vec3 orgColor;
-    if (colorPhase < 0.333) {
-      orgColor = mix(mixedCyan, mixedGreen, colorPhase * 3.0);
-    } else if (colorPhase < 0.666) {
-      orgColor = mix(mixedGreen, mixedMagenta, (colorPhase - 0.333) * 3.0);
+    // Organism emission color based on ID
+    float orgHue;
+    float orgBright;
+    if (closestId == 10) {
+      // Anglerfish lure: warm golden glow
+      orgHue = fract(hue2 + 0.1);
+      orgBright = 0.8 + vocalGlow * 2.0;
     } else {
-      orgColor = mix(mixedMagenta, mixedCyan, (colorPhase - 0.666) * 3.0);
+      // Jellyfish: cycling bioluminescent palette
+      float fId = float(closestId);
+      float colorPhase = fract(fId * 0.33 + sceneTime * 0.1 + chromaHueMod);
+      orgHue = fract(mix(hue1, hue2, colorPhase));
+      orgBright = 0.5 + e2 * 0.5;
     }
 
-    // [DARKEN] Accumulate organism glow — gated by e2
-    col += orgColor * glow * visibility * (0.05 + e2 * 0.95 + vocalGlow);
+    vec3 emissionCol = hsv2rgb(vec3(orgHue, sat, orgBright));
 
-    // --- Tendrils: 3-5 branching per organism ---
-    float tendrilCount = 3.0 + tension * 2.0;
-    float tendrilLength = 0.08 + energy * 0.12 + sJam * 0.05 - sSpace * 0.04;
-    tendrilLength *= mix(1.0, 1.5, climaxBoost);
-    float tendrilWarp = 0.3 * coherenceWarp;
-    float tendrilWidth = 0.006 + bass * 0.003;
+    // Subsurface scattering approximation (jellyfish are translucent)
+    float sss = pow(max(dot(rayDir, nrm), 0.0), 2.0) * 0.4;
 
-    for (int j = 0; j < 5; j++) {
-      float fj = float(j);
-      if (fj >= tendrilCount) break;
+    // Diffuse from self-illumination (emissive organisms)
+    float selfLight = 0.3 + 0.7 * occl;
 
-      // Tendril angle: evenly spaced + slight noise wobble
-      float tendrilAngle = fj / tendrilCount * TAU + snoise(vec3(fi, fj, slowTime * 0.2)) * 0.5;
-      float tendrilSeed = fi * 13.0 + fj * 7.0;
+    col = emissionCol * (selfLight + sss) * sectionGlow;
+    col += emissionCol * fresnelVal * 0.3;
 
-      // Distance field for tendril
-      float tf = tendrilField(p, basePos, tendrilAngle, tendrilLength, tendrilSeed, tendrilWarp, tendrilWidth);
-      float tendrilGlow = exp(-tf * tf * 8.0) * 0.6;
+    // Beat pulse on jellyfish bells
+    col *= 1.0 + effectiveBeat * 0.3;
 
-      // Tip brightness from highs
-      float tipBrightness = 1.0 + highs * 0.8;
+    // Distance fog (deep ocean absorbs light)
+    float fogFactor = 1.0 - exp(-marchDist * 0.08);
+    col = mix(col, vec3(0.001, 0.002, 0.004), fogFactor);
+  }
 
-      // Tendril color: slightly shifted from organism
-      vec3 tendrilColor = orgColor * mix(0.7, tipBrightness, smoothstep(1.0, 0.0, tf));
+  // ---- Volumetric god rays from organisms ----
+  {
+    float godRayAccum = 0.0;
+    vec3 godRayColor = vec3(0.0);
+    int grSteps = int(mix(16.0, 32.0, energy));
+    float grStepSize = min(BL_MAX_DIST, 20.0) / float(grSteps);
+    for (int i = 0; i < 32; i++) {
+      if (i >= grSteps) break;
+      float fi = float(i);
+      float grT = 1.0 + fi * grStepSize;
+      vec3 grPos = rayOrig + rayDir * grT;
 
-      col += tendrilColor * tendrilGlow * visibility * sectionGlowMult;
+      // Check proximity to each jellyfish
+      for (int j = 0; j < 5; j++) {
+        float fj = float(j);
+        float seed = fj * 7.13 + 42.0;
+        vec3 jfCenter = vec3(
+          sin(sceneTime * 0.1 + seed) * 4.0 + cos(seed * 3.0) * 2.0,
+          sin(sceneTime * 0.08 + seed * 2.0) * 2.0 + fj * 1.5 - 2.0,
+          cos(sceneTime * 0.12 + seed) * 3.0 + sin(seed * 5.0) * 2.0
+        );
+        float jfDist = length(grPos - jfCenter);
+        float scatter = exp(-jfDist * jfDist * 0.5) * 0.01;
+        float jfHue = fract(hue1 + fj * 0.15 + sceneTime * 0.05);
+        godRayColor += hsv2rgb(vec3(jfHue, sat * 0.7, 1.0)) * scatter;
+      }
+
+      // Anglerfish lure scatter
+      vec3 anglerPos = vec3(sin(sceneTime * 0.07) * 6.0, -2.0 + sin(sceneTime * 0.15) * 1.0, cos(sceneTime * 0.09) * 5.0);
+      float anglerDist = length(grPos - anglerPos);
+      godRayColor += hsv2rgb(vec3(fract(hue2 + 0.1), 0.8, 1.0)) * exp(-anglerDist * anglerDist * 2.0) * 0.015 * (1.0 + vocalGlow);
     }
+    col += godRayColor * e2 * sectionGlow;
+  }
 
-    // --- Onset flash cascade ---
-    if (onset > 0.1) {
-      float flashRadius = pulseRadius * 3.0 * onset;
-      float flash = exp(-length(p - basePos) / flashRadius) * onset * 1.5;
-      // Cascade: stagger flash by organism index
-      float cascade = smoothstep(fi * 0.08, fi * 0.08 + 0.15, onset);
-      col += vec3(0.8, 0.95, 1.0) * flash * cascade * visibility;
+  // ---- Dinoflagellate particles (sparkle field) ----
+  {
+    for (int k = 0; k < 30; k++) {
+      float fk = float(k);
+      float seed = fk * 13.7 + 100.0;
+      vec3 particlePos = vec3(
+        sin(sceneTime * 0.2 + seed) * 6.0,
+        cos(sceneTime * 0.15 + seed * 2.0) * 4.0,
+        sin(sceneTime * 0.18 + seed * 0.5) * 6.0
+      );
+      // Project to screen
+      vec3 toParticle = particlePos - rayOrig;
+      float projDist = dot(toParticle, rayDir);
+      if (projDist < 0.5) continue;
+      vec3 projPoint = rayOrig + rayDir * projDist;
+      float screenDist = length(particlePos - projPoint);
+      float sparkle = exp(-screenDist * screenDist * 200.0) * (0.02 + highs * 0.06);
+      // Twinkle
+      sparkle *= 0.5 + 0.5 * sin(uDynamicTime * 5.0 + seed * TAU);
+      vec3 sparkleCol = hsv2rgb(vec3(fract(hue1 + fk * 0.05), 0.6, 1.0));
+      col += sparkleCol * sparkle * e2;
     }
   }
 
-  // --- Ambient deep-water particles (slow floating specks) ---
-  for (int k = 0; k < 20; k++) {
-    float fk = float(k);
-    vec2 particlePos = vec2(
-      sin(slowTime * 0.3 + fk * 5.1) * 0.6 * aspect.x,
-      cos(slowTime * 0.25 + fk * 3.7) * 0.5 + sin(fk * 2.0) * 0.3
-    );
-    float d = length(p - particlePos);
-    float speck = exp(-d * d * 800.0) * (0.05 + slowE * 0.1);
-    col += mixedCyan * speck * 0.4;
+  // ---- Onset flash cascade ----
+  if (onset > 0.1) {
+    col += vec3(0.05, 0.08, 0.12) * onset * exp(-length(screenP) * 2.0);
   }
 
-  // --- Climax full-field flash ---
+  // ---- Climax boost ----
   col *= 1.0 + climaxBoost * 0.6;
 
-  // --- SDF icon emergence ---
+  // ---- SDF icon emergence ----
   {
-    float nf = fbm3(vec3(p * 2.0, slowTime));
+    float nf = fbm3(vec3(screenP * 2.0, slowTime));
     vec3 c1 = hsv2rgb(vec3(hue1, sat, 1.0));
     vec3 c2 = hsv2rgb(vec3(hue2, sat, 1.0));
-    col += heroIconEmergence(p, uTime, energy, bass, c1, c2, nf, uSectionIndex);
+    col += iconEmergence(screenP, uTime, energy, bass, c1, c2, nf, uClimaxPhase, uSectionIndex) * 0.5;
+    col += heroIconEmergence(screenP, uTime, energy, bass, c1, c2, nf, uSectionIndex);
   }
 
-  // === ATMOSPHERIC DEPTH ===
-  float fogNoise_ad = fbm3(vec3(p * 0.5, uDynamicTime * 0.012));
-  float fogDensity_ad = mix(0.35, 0.02, energy);
-  vec3 fogColor_ad = vec3(0.01, 0.008, 0.015);
-  col = mix(col, fogColor_ad, fogDensity_ad * (0.5 + fogNoise_ad * 0.5));
-
-  // --- Vignette ---
+  // ---- Vignette ----
   float vigScale = mix(0.30, 0.22, energy);
-  float vignette = 1.0 - dot(p * vigScale, p * vigScale);
+  float vignette = 1.0 - dot(screenP * vigScale, screenP * vigScale);
   vignette = smoothstep(0.0, 1.0, vignette);
-  // [LOWER BLACK FLOOR] Near-black vignette edge (was 0.003, 0.005, 0.01)
-  col = mix(vec3(0.001, 0.002, 0.004), col, vignette);
+  col = mix(vec3(0.001, 0.001, 0.003), col, vignette);
 
-  // --- Post-processing ---
-  col = applyPostProcess(col, vUv, p);
+  // ---- Post-processing ----
+  col = applyPostProcess(col, vUv, screenP);
 
-  // Feedback trails: section-type-aware decay
+  // ---- Feedback trails ----
   vec3 prev = texture2D(uPrevFrame, vUv).rgb;
-  float sJam_fb = smoothstep(4.5, 5.5, uSectionType) * (1.0 - step(5.5, uSectionType));
-  float sSpace_fb = smoothstep(6.5, 7.5, uSectionType);
-  float sChorus_fb = smoothstep(1.5, 2.5, uSectionType) * (1.0 - step(2.5, uSectionType));
-  float baseDecay_fb = mix(0.93, 0.93 - 0.07, energy);
-  float feedbackDecay = baseDecay_fb + sJam_fb * 0.04 + sSpace_fb * 0.06 - sChorus_fb * 0.05;
+  float baseDecay_fb = mix(0.93, 0.86, energy);
+  float feedbackDecay = baseDecay_fb + sJam * 0.04 + sSpace * 0.06 - sChorus * 0.05;
   feedbackDecay = clamp(feedbackDecay, 0.82, 0.97);
-  // Jam phase feedback: exploration=long trails, building=moderate, peak=max persistence, resolution=clearing
   if (uJamPhase >= 0.0) {
     float jpExplore = step(-0.5, uJamPhase) * step(uJamPhase, 0.5);
     float jpBuild   = step(0.5, uJamPhase) * step(uJamPhase, 1.5);

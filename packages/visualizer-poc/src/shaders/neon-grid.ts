@@ -1,27 +1,26 @@
 /**
- * Neon Grid — Perspective laser grid with intersection node strobes on beat.
- * Synthwave-inspired vanishing-point grid with horizon gradient.
+ * Neon Grid — raymarched retro-futuristic 3D landscape.
+ * Infinite grid plane stretching to horizon with neon-lit edges, geometric mountain
+ * wireframe silhouettes, retrowave sun disc, chrome sphere reflections.
+ * 80s synthwave aesthetic rendered as a true 3D raymarched scene.
  *
- * Visual aesthetic:
- *   - Quiet: dim grid lines, slow scan line drift, soft neon glow
- *   - Building: lines thicken, scan line speeds up, intersection nodes appear
- *   - Peak: full neon bloom, dense grid, strobing intersection nodes, ripple flashes
- *   - Release: grid fades back, scan line slows, glow softens
- *
- * Audio reactivity:
- *   uBass            → line thickness (thicker on bass hits)
- *   uHighs           → horizontal scan line sweep speed + brightness
- *   uEnergy          → grid density + overall glow intensity
- *   uOnsetSnap       → grid flash ripple outward from center
- *   uBeatSnap        → intersection node strobe (gated by uBeatConfidence)
- *   uBeatStability   → low stability = FBM warp on grid for organic feel
- *   uHarmonicTension → grid color saturation + secondary line layers
- *   uMelodicPitch    → vanishing point vertical shift
- *   uChromaHue       → hue shift across palette
- *   uChordIndex      → micro-rotate hue per chord
- *   uFFTTexture      → per-column line brightness modulation
- *   uClimaxPhase     → full intensity boost, double grid density
- *   uPalettePrimary/Secondary → base and accent neon colors
+ * Audio reactivity (14+ uniforms):
+ *   uEnergy          -> grid glow intensity + scene brightness
+ *   uBass            -> grid line thickness + chrome sphere pulse
+ *   uHighs           -> scan line speed + sparkle
+ *   uMids            -> mountain wireframe brightness
+ *   uOnsetSnap       -> grid flash ripple
+ *   uSlowEnergy      -> scroll speed
+ *   uBeatSnap        -> intersection strobe
+ *   uMelodicPitch    -> sun vertical position
+ *   uMelodicDirection -> camera drift direction
+ *   uHarmonicTension -> mountain complexity
+ *   uBeatStability   -> grid regularity
+ *   uChromaHue       -> neon hue shift
+ *   uChordIndex      -> micro hue rotation
+ *   uSectionType     -> section modulation
+ *   uClimaxPhase     -> full neon intensity
+ *   uVocalEnergy     -> sun corona glow
  */
 
 import { noiseGLSL } from "./noise";
@@ -44,275 +43,350 @@ uniform sampler2D uPrevFrame;
 
 ${noiseGLSL}
 
-${buildPostProcessGLSL({ grainStrength: "light", bloomEnabled: true, flareEnabled: true, anaglyphEnabled: true })}
+${buildPostProcessGLSL({
+  grainStrength: "light",
+  bloomEnabled: true,
+  flareEnabled: true,
+  anaglyphEnabled: true,
+  dofEnabled: true,
+})}
 
 varying vec2 vUv;
 
 #define PI 3.14159265
 #define TAU 6.28318530
+#define NG_MAX_STEPS 80
+#define NG_MAX_DIST 80.0
+#define NG_SURF_DIST 0.001
+
+// ---- SDF primitives ----
+float ngSdPlane(vec3 pos) {
+  return pos.y;
+}
+
+float ngSdSphere(vec3 pos, vec3 center, float radius) {
+  return length(pos - center) - radius;
+}
+
+// ---- Wireframe mountain profile ----
+float ngMountainHeight(float xVal, float tension) {
+  float h = 0.0;
+  h += sin(xVal * 0.3) * 2.5;
+  h += sin(xVal * 0.7 + 1.5) * 1.5;
+  h += sin(xVal * 1.5 + 3.0) * 0.8 * tension;
+  h += snoise(vec3(xVal * 0.2, 0.0, 0.0)) * 1.5;
+  return max(h, 0.0);
+}
+
+// ---- Scene SDF ----
+float ngSceneSDF(vec3 pos, float time, float bass, float tension,
+                  out int ngObjId) {
+  ngObjId = 0;
+
+  // Ground plane
+  float plane = ngSdPlane(pos);
+  float minDist = plane;
+  ngObjId = 1; // ground
+
+  // Chrome spheres (3 reflective orbs)
+  for (int i = 0; i < 3; i++) {
+    float fi = float(i);
+    vec3 sphereCenter = vec3(
+      sin(fi * 2.5 + time * 0.15) * 4.0,
+      0.5 + sin(time * 0.3 + fi * 1.7) * 0.3 + bass * 0.2,
+      8.0 + fi * 5.0 + sin(fi * 3.0) * 3.0
+    );
+    float sphereR = 0.4 + fi * 0.1;
+    float sph = ngSdSphere(pos, sphereCenter, sphereR);
+    if (sph < minDist) {
+      minDist = sph;
+      ngObjId = 2 + i; // chrome spheres
+    }
+  }
+
+  return minDist;
+}
+
+// ---- Normal calculation ----
+vec3 ngCalcNormal(vec3 pos, float time, float bass, float tension) {
+  float eps = 0.005;
+  int dummyId;
+  float ref = ngSceneSDF(pos, time, bass, tension, dummyId);
+  return normalize(vec3(
+    ngSceneSDF(pos + vec3(eps, 0, 0), time, bass, tension, dummyId) - ref,
+    ngSceneSDF(pos + vec3(0, eps, 0), time, bass, tension, dummyId) - ref,
+    ngSceneSDF(pos + vec3(0, 0, eps), time, bass, tension, dummyId) - ref
+  ));
+}
+
+// ---- Occlusion ----
+float ngCalcOcclusion(vec3 pos, vec3 nrm, float time, float bass, float tension) {
+  float occl = 0.0;
+  float weight = 1.0;
+  int dummyId;
+  for (int i = 1; i <= 5; i++) {
+    float sd = float(i) * 0.2;
+    float sdf = ngSceneSDF(pos + nrm * sd, time, bass, tension, dummyId);
+    occl += weight * (sd - sdf);
+    weight *= 0.6;
+  }
+  return clamp(1.0 - occl * 0.8, 0.0, 1.0);
+}
+
+// ---- Neon grid pattern on ground plane ----
+vec3 ngGridPattern(vec3 pos, float time, float energy, float bass, float highs,
+                    float effectiveBeat, float onset, float density,
+                    vec3 neonCyan, vec3 neonMagenta) {
+  // Scrolling grid
+  float scroll = time * (1.5 + energy * 1.0);
+  vec2 gridUV = vec2(pos.x, pos.z + scroll);
+
+  float gridDensity = density;
+  float lineWidth = 0.02 + bass * 0.04;
+
+  // Grid lines
+  float gx = abs(fract(gridUV.x * gridDensity) - 0.5);
+  float gz = abs(fract(gridUV.y * gridDensity * 0.5) - 0.5);
+  float lineX = smoothstep(lineWidth, 0.0, gx);
+  float lineZ = smoothstep(lineWidth * 0.8, 0.0, gz);
+
+  // Distance fade
+  float depthFade = exp(-pos.z * 0.04);
+
+  vec3 gridCol = neonCyan * lineX * depthFade * 0.8;
+  gridCol += neonMagenta * lineZ * depthFade * 0.6;
+
+  // Intersection nodes on beat
+  float nodeX = smoothstep(lineWidth * 2.0, 0.0, gx);
+  float nodeZ = smoothstep(lineWidth * 2.0, 0.0, gz);
+  float nodeMask = nodeX * nodeZ * depthFade;
+  gridCol += mix(neonCyan, neonMagenta, 0.5) * nodeMask * effectiveBeat * 2.0;
+
+  // Glow halos
+  float glowW = lineWidth * 5.0;
+  float glowX = smoothstep(glowW, 0.0, gx) * depthFade;
+  float glowZ = smoothstep(glowW, 0.0, gz) * depthFade;
+  gridCol += neonCyan * glowX * 0.08 * energy;
+  gridCol += neonMagenta * glowZ * 0.06 * energy;
+
+  // Onset ripple
+  float rippleDist = length(vec2(pos.x, pos.z - 5.0));
+  float ripple = exp(-pow((rippleDist - onset * 10.0) * 0.5, 2.0)) * onset;
+  gridCol += vec3(1.0, 0.95, 0.9) * ripple * 0.5;
+
+  // Highs scan line
+  float scanPos = fract(time * (0.5 + highs * 1.5));
+  float scanZ = mix(0.0, 40.0, scanPos);
+  float scanDist = abs(pos.z - scanZ);
+  float scanLine = exp(-scanDist * scanDist * 0.5) * (0.3 + highs * 0.7);
+  gridCol += neonCyan * scanLine * 0.5;
+
+  return gridCol * (0.3 + energy * 0.7);
+}
 
 void main() {
   vec2 uv = vUv;
   vec2 aspect = vec2(uResolution.x / uResolution.y, 1.0);
-  vec2 p = (uv - 0.5) * aspect;
+  vec2 screenP = (uv - 0.5) * aspect;
 
-  // --- Clamp audio inputs ---
+  // ---- Audio ----
   float energy = clamp(uEnergy, 0.0, 1.0);
   float bass = clamp(uBass, 0.0, 1.0);
   float highs = clamp(uHighs, 0.0, 1.0);
   float mids = clamp(uMids, 0.0, 1.0);
   float onset = clamp(uOnsetSnap, 0.0, 1.0);
   float slowE = clamp(uSlowEnergy, 0.0, 1.0);
-  float stability = clamp(uBeatStability, 0.0, 1.0);
   float tension = clamp(uHarmonicTension, 0.0, 1.0);
-  float melInfluence = uMelodicPitch * uMelodicConfidence;
-  float melodicPitch = clamp(melInfluence, 0.0, 1.0);
+  float stability = clamp(uBeatStability, 0.0, 1.0);
+  float melodicPitch = clamp(uMelodicPitch * uMelodicConfidence, 0.0, 1.0);
+  float melodicDir = clamp(uMelodicDirection, -1.0, 1.0);
   float effectiveBeat = uBeatSnap * smoothstep(0.3, 0.7, uBeatConfidence);
-
-  // 7-band spectral
-  float fftBass = texture2D(uFFTTexture, vec2(0.07, 0.5)).r;
-  float fftMid = texture2D(uFFTTexture, vec2(0.36, 0.5)).r;
-  float fftHigh = texture2D(uFFTTexture, vec2(0.78, 0.5)).r;
-
-  float slowTime = uDynamicTime * 0.06;
-  float energyDetail = 1.0 + energy * 0.5;
-
-  // === DOMAIN WARPING: organic distortion to break the rigid grid feel ===
-  p += vec2(fbm3(vec3(p * 0.5 * energyDetail, uDynamicTime * 0.05)), fbm3(vec3(p * 0.5 * energyDetail + 100.0, uDynamicTime * 0.05))) * 0.3;
-
-  // --- Uniform integrations ---
   float chromaHueMod = uChromaHue * 0.25;
   float chordConf = smoothstep(0.3, 0.6, uChordConfidence);
   float chordHue = float(int(uChordIndex)) / 24.0 * 0.12 * chordConf;
-  float vocalGlow = uVocalEnergy * 0.08;
-  float peakApproach = clamp(uPeakApproaching, 0.0, 1.0);
+  float vocalGlow = uVocalEnergy * 0.1;
+  float e2 = energy * energy;
+  float slowTime = uDynamicTime * 0.04;
 
-  // --- Section type modulation (0=intro,1=verse,2=chorus,3=bridge,4=solo,5=jam,6=outro,7=space) ---
+  // ---- Section ----
   float sectionT = uSectionType;
   float sJam = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
   float sSpace = smoothstep(6.5, 7.5, sectionT);
   float sChorus = smoothstep(1.5, 2.5, sectionT) * (1.0 - step(2.5, sectionT));
   float sSolo = smoothstep(3.5, 4.5, sectionT) * (1.0 - step(4.5, sectionT));
-  // Jam: faster scan, denser grid. Space: near-frozen, minimal. Chorus: vivid colors. Solo: dramatic glow.
-  float sectionScanSpeed = mix(1.0, 1.6, sJam) * mix(1.0, 0.15, sSpace) * mix(1.0, 1.25, sChorus);
-  float sectionDensityMod = mix(1.0, 1.4, sJam) * mix(1.0, 0.6, sSpace) * mix(1.0, 1.2, sChorus);
+  float sectionSpeed = mix(1.0, 1.6, sJam) * mix(1.0, 0.15, sSpace) * mix(1.0, 1.25, sChorus);
+  float sectionDensity = mix(1.0, 1.4, sJam) * mix(1.0, 0.6, sSpace);
 
-  // --- Coherence morphology ---
-  float coherence = clamp(uCoherence, 0.0, 1.0);
-  // High coherence: clean straight grid lines. Low coherence: wobbly warped grid.
-  float coherenceWarpMult = coherence > 0.7 ? mix(1.0, 0.15, (coherence - 0.7) / 0.3)
-                          : coherence < 0.3 ? mix(1.0, 2.8, (0.3 - coherence) / 0.3)
-                          : 1.0;
-
-  // --- Climax state ---
+  // ---- Climax ----
   float isClimax = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5);
   float climaxBoost = isClimax * uClimaxIntensity;
 
-  // --- Background: dark with horizon gradient + fbm6 nebula texture ---
-  // Synthwave sunset: dark purple base, warm horizon glow
-  vec3 bgDark = vec3(0.01, 0.005, 0.03);
-  vec3 bgHorizon = vec3(0.06, 0.01, 0.08) + vec3(0.04, 0.01, 0.02) * energy;
-  float horizonLine = 0.5 + (melodicPitch - 0.5) * 0.06; // melody shifts vanishing point
-  float horizonGrad = exp(-pow((uv.y - horizonLine) * 3.0, 2.0));
-  vec3 col = mix(bgDark, bgHorizon, horizonGrad * 0.6);
-
-  // FBM6 sky nebula texture with dual palette
-  float skyNebula = fbm6(vec3(p * 2.0 * energyDetail, slowTime * 0.15));
-  float skyHue1 = hsvToCosineHue(uPalettePrimary);
-  float skyHue2 = hsvToCosineHue(uPaletteSecondary);
-  vec3 skyCol1 = 0.5 + 0.5 * cos(6.28318 * vec3(skyHue1, skyHue1 + 0.33, skyHue1 + 0.67));
-  vec3 skyCol2 = 0.5 + 0.5 * cos(6.28318 * vec3(skyHue2, skyHue2 + 0.33, skyHue2 + 0.67));
-  vec3 nebulaTint = mix(skyCol1, skyCol2, skyNebula * 0.5 + 0.5);
-
-  // Subtle sky gradient above horizon with nebula
-  float skyGlow = smoothstep(horizonLine, horizonLine + 0.3, uv.y);
-  col += vec3(0.015, 0.005, 0.025) * skyGlow * (0.3 + slowE * 0.4);
-  col += nebulaTint * 0.03 * skyGlow * (0.5 + skyNebula * 0.5) * energy;
-
-  // --- Palette colors ---
+  // ---- Palette ----
   float hue1 = uPalettePrimary + chromaHueMod + chordHue;
   float hue2 = uPaletteSecondary + chordHue * 0.5;
   float sat = mix(0.5, 1.0, energy) * uPaletteSaturation;
-  // Chorus: boost saturation
-  sat *= mix(1.0, 1.2, sChorus);
 
-  // Neon base colors: cyan/magenta/purple mixed with song palette
   vec3 neonCyan = hsv2rgb(vec3(fract(0.52 + hue1 * 0.3), sat, 1.0));
   vec3 neonMagenta = hsv2rgb(vec3(fract(0.83 + hue2 * 0.3), sat, 1.0));
   vec3 neonPurple = hsv2rgb(vec3(fract(0.75 + (hue1 + hue2) * 0.15), sat * 0.9, 0.9));
 
-  // --- Perspective grid projection ---
-  // Transform UV to perspective: vanishing point at center-top
-  float vpY = horizonLine; // vanishing point Y (shifted by melody)
-  float perspY = uv.y - vpY;
+  // ---- Camera ----
+  float camDrift = melodicDir * 0.3;
+  vec3 rayOrig = vec3(
+    sin(slowTime * 0.1 * sectionSpeed) * 2.0 + camDrift,
+    1.8 + sin(slowTime * 0.15) * 0.3,
+    -2.0
+  );
+  vec3 camLookAt = vec3(0.0, 1.0 + melodicPitch * 0.5, 20.0);
+  vec3 camFwd = normalize(camLookAt - rayOrig);
+  vec3 camSide = normalize(cross(camFwd, vec3(0.0, 1.0, 0.0)));
+  vec3 camVert = cross(camSide, camFwd);
+  float fovScale = tan(radians(60.0) * 0.5);
+  vec3 rayDir = normalize(camFwd + camSide * screenP.x * fovScale + camVert * screenP.y * fovScale);
 
-  // Only draw grid below the horizon (perspective floor)
-  float gridMask = smoothstep(0.0, -0.02, perspY);
+  // ---- Sky: synthwave gradient ----
+  float skyGrad = smoothstep(-0.1, 0.5, rayDir.y);
+  vec3 skyDark = vec3(0.01, 0.005, 0.03);
+  vec3 skyHorizon = vec3(0.06, 0.01, 0.08);
+  vec3 col = mix(skyHorizon, skyDark, skyGrad);
 
-  // Perspective depth: closer to horizon = further away
-  float depth = -0.15 / min(perspY, -0.001); // perspective division
-  depth = clamp(depth, 0.0, 40.0);
+  // ---- Retrowave sun disc ----
+  float sunY = 0.15 + melodicPitch * 0.1;
+  vec3 sunDir = normalize(vec3(0.0, sunY, 1.0));
+  float sunDot = max(dot(rayDir, sunDir), 0.0);
+  float sunDisc = smoothstep(0.992, 0.997, sunDot);
+  float sunGlow = pow(sunDot, 32.0) * 0.5;
+  float sunCorona = pow(sunDot, 8.0) * 0.15 * (1.0 + vocalGlow * 2.0);
 
-  // Perspective X: spread increases with distance from horizon
-  float perspX = (uv.x - 0.5) * depth * 0.5;
+  // Sun with horizontal stripes (retrowave style)
+  vec3 sunColor = vec3(1.0, 0.3, 0.5);
+  vec3 sunGlowColor = mix(neonMagenta, vec3(1.0, 0.5, 0.2), 0.5);
+  // Horizontal stripe mask on sun
+  float sunStripes = step(0.5, fract(rayDir.y * 40.0 - slowTime * 0.5));
+  float sunBody = sunDisc * mix(0.8, 1.0, sunStripes);
+  col += sunColor * sunBody * (0.5 + e2 * 0.5);
+  col += sunGlowColor * sunGlow * (0.3 + e2 * 0.7);
+  col += neonMagenta * sunCorona;
 
-  // Grid scroll: move toward viewer
-  float scrollSpeed = (0.8 + energy * 0.6) * sectionScanSpeed;
-  float gridScroll = slowTime * scrollSpeed * 3.0;
+  // ---- Raymarch scene ----
+  float marchDist = 0.0;
+  int objId = 0;
+  bool didCollide = false;
+  float sceneTime = slowTime * sectionSpeed;
 
-  // --- Grid density (energy + climax driven) ---
-  float baseDensity = (6.0 + energy * 8.0) * sectionDensityMod + climaxBoost * 6.0;
-  float gridDensityX = baseDensity * (1.0 + uJamDensity * 0.3);
-  float gridDensityY = baseDensity * 0.8;
-
-  // --- FBM warp for organic feel at low stability ---
-  float warpAmount = (1.0 - stability) * 0.04 * coherenceWarpMult;
-  vec2 gridUV = vec2(perspX, depth + gridScroll);
-  if (warpAmount > 0.001) {
-    vec2 warp = vec2(
-      snoise(vec3(gridUV * 0.5, slowTime * 0.3)),
-      snoise(vec3(gridUV * 0.5 + 100.0, slowTime * 0.3))
-    ) * warpAmount;
-    gridUV += warp;
+  for (int i = 0; i < NG_MAX_STEPS; i++) {
+    vec3 marchPos = rayOrig + rayDir * marchDist;
+    float sdf = ngSceneSDF(marchPos, sceneTime, bass, tension, objId);
+    if (sdf < NG_SURF_DIST) {
+      didCollide = true;
+      break;
+    }
+    if (marchDist > NG_MAX_DIST) break;
+    marchDist += sdf * 0.8;
   }
 
-  // --- Grid lines ---
-  // Line thickness driven by bass
-  float lineThickness = (0.03 + bass * 0.06 + fftBass * 0.03) * mix(1.0, 1.3, sJam) * mix(1.0, 0.5, sSpace);
+  if (didCollide) {
+    vec3 collidePos = rayOrig + rayDir * marchDist;
+    vec3 nrm = ngCalcNormal(collidePos, sceneTime, bass, tension);
+    float occl = ngCalcOcclusion(collidePos, nrm, sceneTime, bass, tension);
 
-  // Vertical grid lines (receding into distance)
-  float gridX = fract(gridUV.x * gridDensityX);
-  float vertLine = smoothstep(lineThickness, 0.0, abs(gridX - 0.5) - 0.5 + lineThickness);
-  // Distance fade: lines get thinner farther away
-  float depthFade = exp(-depth * 0.08);
-  vertLine *= depthFade;
+    if (objId == 1) {
+      // Ground plane: neon grid
+      float gridDensity = (0.3 + energy * 0.3) * sectionDensity;
+      vec3 gridCol = ngGridPattern(collidePos, sceneTime, energy, bass, highs,
+                                    effectiveBeat, onset, gridDensity,
+                                    neonCyan, neonMagenta);
+      // Ground base color (very dark)
+      vec3 groundBase = vec3(0.005, 0.003, 0.01);
+      col = groundBase + gridCol * occl;
 
-  // Horizontal grid lines (cross-hatching in depth)
-  float gridY = fract(gridUV.y * gridDensityY);
-  float horizLine = smoothstep(lineThickness * 0.8, 0.0, abs(gridY - 0.5) - 0.5 + lineThickness * 0.8);
-  horizLine *= depthFade;
+      // Reflect sun on ground
+      vec3 reflDir = reflect(rayDir, nrm);
+      float reflSun = pow(max(dot(reflDir, sunDir), 0.0), 16.0);
+      col += sunGlowColor * reflSun * 0.1 * e2;
 
-  // --- FFT-driven per-column brightness ---
-  float fftColumn = texture2D(uFFTTexture, vec2(fract(perspX * 0.1 + 0.5), 0.5)).r;
-  vertLine *= (0.7 + fftColumn * 0.5);
+    } else {
+      // Chrome spheres: reflective with neon environment
+      vec3 reflDir = reflect(rayDir, nrm);
+      float fresnelVal = pow(1.0 - max(dot(nrm, -rayDir), 0.0), 4.0);
 
-  // --- Combine grid lines with neon colors ---
-  float gridIntensity = 0.4 + energy * 0.8 + climaxBoost * 0.5;
-  vec3 vertColor = mix(neonCyan, neonPurple, smoothstep(0.0, 15.0, depth));
-  vec3 horizColor = mix(neonMagenta, neonCyan, smoothstep(0.0, 15.0, depth));
+      // Environment reflection (fake): sun + sky + grid glow
+      float reflSun = pow(max(dot(reflDir, sunDir), 0.0), 32.0);
+      vec3 envRefl = sunColor * reflSun * 0.5;
+      envRefl += mix(neonCyan, neonMagenta, reflDir.x * 0.5 + 0.5) * 0.1;
+      envRefl += skyDark * 0.2;
 
-  col += vertColor * vertLine * gridIntensity * gridMask;
-  col += horizColor * horizLine * gridIntensity * gridMask * 0.8;
+      // Specular highlight
+      vec3 lightDir = normalize(vec3(0.5, 1.0, -0.3));
+      vec3 halfVec = normalize(lightDir - rayDir);
+      float specular = pow(max(dot(nrm, halfVec), 0.0), 64.0);
 
-  // --- Grid line glow (wider, softer bloom around lines) ---
-  float glowWidth = lineThickness * 4.0;
-  float vertGlow = smoothstep(glowWidth, 0.0, abs(gridX - 0.5) - 0.5 + glowWidth) * depthFade;
-  float horizGlow = smoothstep(glowWidth, 0.0, abs(gridY - 0.5) - 0.5 + glowWidth) * depthFade;
-  col += vertColor * vertGlow * gridMask * 0.12 * energy;
-  col += horizColor * horizGlow * gridMask * 0.08 * energy;
+      vec3 chromeCol = mix(vec3(0.05), envRefl, 0.7 + fresnelVal * 0.3);
+      chromeCol += neonCyan * specular * 0.5;
+      chromeCol *= occl;
 
-  // --- Intersection node strobes on beat ---
-  float nodeX = smoothstep(lineThickness * 1.5, 0.0, abs(gridX - 0.5) - 0.5 + lineThickness * 1.5);
-  float nodeY = smoothstep(lineThickness * 1.5, 0.0, abs(gridY - 0.5) - 0.5 + lineThickness * 1.5);
-  float nodeMask = nodeX * nodeY * depthFade * gridMask;
+      col = chromeCol * (0.5 + e2 * 0.5);
+    }
 
-  // Beat strobe: pulse at intersections
-  float beatPulseVal = effectiveBeat;
-  float nodeStrobe = nodeMask * beatPulseVal * 2.5;
-  vec3 nodeColor = mix(neonCyan, neonMagenta, sin(depth * 0.5 + slowTime) * 0.5 + 0.5);
-  col += nodeColor * nodeStrobe * (0.6 + energy * 0.6);
-
-  // Node glow halo
-  float nodeGlowRadius = lineThickness * 6.0;
-  float nodeGlowX = smoothstep(nodeGlowRadius, 0.0, abs(gridX - 0.5) - 0.5 + nodeGlowRadius);
-  float nodeGlowY = smoothstep(nodeGlowRadius, 0.0, abs(gridY - 0.5) - 0.5 + nodeGlowRadius);
-  float nodeGlow = nodeGlowX * nodeGlowY * depthFade * gridMask * beatPulseVal;
-  col += nodeColor * nodeGlow * 0.15;
-
-  // --- Horizontal scan line (highs-driven) ---
-  float scanSpeed = (1.0 + highs * 3.0 + fftHigh * 2.0) * sectionScanSpeed;
-  float scanPos = fract(slowTime * scanSpeed * 0.4);
-  float scanY = mix(1.0, vpY, scanPos); // sweep from bottom to horizon
-  float scanDist = abs(uv.y - scanY);
-  float scanLine = exp(-scanDist * scanDist * 800.0) * (0.3 + highs * 0.9);
-  vec3 scanColor = mix(neonCyan, vec3(1.0, 1.0, 1.0), 0.3);
-  col += scanColor * scanLine * gridMask;
-
-  // Secondary scan line at different phase
-  float scanPos2 = fract(slowTime * scanSpeed * 0.25 + 0.5);
-  float scanY2 = mix(1.0, vpY, scanPos2);
-  float scanDist2 = abs(uv.y - scanY2);
-  float scanLine2 = exp(-scanDist2 * scanDist2 * 600.0) * highs * 0.4;
-  col += neonMagenta * scanLine2 * gridMask;
-
-  // --- Onset flash ripple from center ---
-  if (onset > 0.05) {
-    float rippleTime = onset;
-    float distFromCenter = length(vec2(uv.x - 0.5, (uv.y - vpY) * 2.0));
-    float rippleRadius = rippleTime * 0.8;
-    float ripple = exp(-pow((distFromCenter - rippleRadius) * 12.0, 2.0));
-    col += vec3(1.0, 0.95, 0.9) * ripple * onset * 1.5;
-    // Also brighten grid lines on onset
-    col += vertColor * vertLine * onset * 0.5 * gridMask;
-    col += horizColor * horizLine * onset * 0.4 * gridMask;
+    // Distance fog
+    float fogFactor = 1.0 - exp(-marchDist * 0.02);
+    col = mix(col, mix(skyHorizon, skyDark, 0.5) * 0.5, fogFactor);
   }
 
-  // --- Horizon glow line ---
-  float horizEdge = exp(-pow((uv.y - vpY) * 15.0, 2.0));
-  vec3 horizGlowColor = mix(neonMagenta, neonPurple, 0.5);
-  col += horizGlowColor * horizEdge * (0.15 + energy * 0.25 + vocalGlow);
+  // ---- Wireframe mountain silhouettes (ray vs height profile) ----
+  {
+    float mountainZ = 30.0;
+    float tMountain = (mountainZ - rayOrig.z) / rayDir.z;
+    if (tMountain > 0.0 && (marchDist < 0.0 || tMountain < marchDist || !didCollide)) {
+      vec3 mPos = rayOrig + rayDir * tMountain;
+      float mHeight = ngMountainHeight(mPos.x, tension);
+      float mY = mPos.y;
 
-  // --- Above-horizon subtle reflection (mirror grid, very dim) ---
-  float aboveHorizon = smoothstep(0.0, 0.02, uv.y - vpY);
-  if (aboveHorizon > 0.01) {
-    float reflDepth = 0.15 / max(uv.y - vpY, 0.001);
-    reflDepth = clamp(reflDepth, 0.0, 20.0);
-    float reflX = (uv.x - 0.5) * reflDepth * 0.5;
-    vec2 reflUV = vec2(reflX, reflDepth + gridScroll);
-    float reflGridX = fract(reflUV.x * gridDensityX);
-    float reflVert = smoothstep(lineThickness * 0.5, 0.0, abs(reflGridX - 0.5) - 0.5 + lineThickness * 0.5);
-    float reflFade = exp(-reflDepth * 0.12) * 0.08;
-    col += neonPurple * reflVert * reflFade * aboveHorizon * energy;
+      // Wireframe: draw lines at height intervals
+      if (mY > 0.0 && mY < mHeight + 0.5) {
+        float wireH = fract(mY * 2.0);
+        float wireX = fract(mPos.x * 0.5);
+        float hLine = smoothstep(0.02, 0.0, abs(wireH - 0.5) - 0.48);
+        float vLine = smoothstep(0.02, 0.0, abs(wireX - 0.5) - 0.48);
+        float wire = max(hLine, vLine) * smoothstep(mHeight + 0.5, mHeight - 0.5, mY);
+
+        float mFade = exp(-(mountainZ - rayOrig.z) * 0.03);
+        vec3 wireCol = mix(neonPurple, neonCyan, mY / max(mHeight, 1.0));
+        col += wireCol * wire * mFade * (0.15 + mids * 0.3 + e2 * 0.3);
+      }
+    }
   }
 
-  // === SECONDARY LAYER: volumetric fog between grid and horizon ===
-  float fogNoise = fbm6(vec3(p * 1.5 * energyDetail + 150.0, slowTime * 0.2));
-  vec3 fogColor = mix(neonCyan, neonPurple, fogNoise * 0.5 + 0.5);
-  float fogMask = smoothstep(horizonLine, horizonLine - 0.25, uv.y) * gridMask;
-  col = mix(col, col + fogColor * 0.06 * (0.5 + fogNoise * 0.5), 0.3 * fogMask);
+  // ---- Horizon glow line ----
+  float horizEdge = exp(-pow(rayDir.y * 15.0, 2.0));
+  col += mix(neonMagenta, neonPurple, 0.5) * horizEdge * (0.1 + energy * 0.2 + vocalGlow);
 
-  // --- Peak approaching anticipation ---
-  col *= 1.0 + peakApproach * 0.12;
-
-  // --- Climax boost ---
+  // ---- Climax boost ----
   col *= 1.0 + climaxBoost * 0.5;
 
-  // --- SDF icon emergence ---
+  // ---- SDF icon emergence ----
   {
-    float nf = fbm3(vec3(p * 2.0, slowTime));
+    float nf = fbm3(vec3(screenP * 2.0, slowTime));
     vec3 c1 = hsv2rgb(vec3(hue1, sat, 1.0));
     vec3 c2 = hsv2rgb(vec3(hue2, sat, 1.0));
-    col += heroIconEmergence(p, uTime, energy, bass, c1, c2, nf, uSectionIndex);
+    col += iconEmergence(screenP, uTime, energy, bass, c1, c2, nf, uClimaxPhase, uSectionIndex) * 0.5;
+    col += heroIconEmergence(screenP, uTime, energy, bass, c1, c2, nf, uSectionIndex);
   }
 
-  // --- Vignette ---
+  // ---- Vignette ----
   float vigScale = mix(0.28, 0.20, energy);
-  float vignette = 1.0 - dot(p * vigScale, p * vigScale);
+  float vignette = 1.0 - dot(screenP * vigScale, screenP * vigScale);
   vignette = smoothstep(0.0, 1.0, vignette);
   col = mix(vec3(0.01, 0.005, 0.02), col, vignette);
 
-  // --- Post-processing ---
-  col = applyPostProcess(col, vUv, p);
+  // ---- Post-processing ----
+  col = applyPostProcess(col, vUv, screenP);
 
-  // --- Feedback trails: section-type-aware decay ---
+  // ---- Feedback trails ----
   vec3 prev = texture2D(uPrevFrame, vUv).rgb;
-  float sJam_fb = smoothstep(4.5, 5.5, uSectionType) * (1.0 - step(5.5, uSectionType));
-  float sSpace_fb = smoothstep(6.5, 7.5, uSectionType);
-  float sChorus_fb = smoothstep(1.5, 2.5, uSectionType) * (1.0 - step(2.5, uSectionType));
-  float baseDecay = mix(0.90, 0.90 - 0.07, energy);
-  float feedbackDecay = baseDecay + sJam_fb * 0.04 + sSpace_fb * 0.06 - sChorus_fb * 0.06;
+  float baseDecay = mix(0.90, 0.83, energy);
+  float feedbackDecay = baseDecay + sJam * 0.04 + sSpace * 0.06 - sChorus * 0.06;
   feedbackDecay = clamp(feedbackDecay, 0.80, 0.97);
-  // Jam phase feedback: exploration=long trails, building=moderate, peak=max persistence, resolution=clearing
   if (uJamPhase >= 0.0) {
     float jpExplore = step(-0.5, uJamPhase) * step(uJamPhase, 0.5);
     float jpBuild   = step(0.5, uJamPhase) * step(uJamPhase, 1.5);

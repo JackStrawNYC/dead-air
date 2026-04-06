@@ -1,29 +1,28 @@
 /**
- * Acid Melt — Multi-layer FBM domain warping for classic psychedelic visuals.
- * Surfaces melting, breathing, morphing. Everything looks alive and gently warping.
- * Walls breathe, colors bleed into each other, reality distorts.
+ * Acid Melt — raymarched 3D melting geometry.
+ * Solid geometric shapes (cubes, spheres, pyramids) that melt and drip
+ * downward as if made of wax. The melting surface reveals glowing internal
+ * structure. Gravity-driven deformation. Psychedelic color mapping.
+ * Full raymarching with AO, diffuse+specular+Fresnel, emissive interior.
  *
- * Visual aesthetic:
- *   - Quiet: gentle breathing, slow undulation, warm color drift
- *   - Building: warp intensity increases, colors shift faster
- *   - Peak: aggressive melting, rapid color bleeding, strong distortion
- *   - Release: distortion softens, colors settle
- *
- * Audio reactivity:
- *   uEnergy          → warp intensity (gentle breathing → aggressive melting)
- *   uBass            → warp scale (bigger bass = bigger distortions)
- *   uBeatSnap        → pulse in warp amplitude (momentary intensification)
- *   uOnsetSnap       → ripple waves outward from center
- *   uSlowEnergy      → base undulation speed
- *   uHighs           → color sharpness, detail in warp layers
- *   uChromaHue       → hue shift across palette
- *   uChordIndex      → micro-rotate hue per chord
- *   uHarmonicTension → additional warp layer complexity
- *   uBeatStability   → smooth warping vs chaotic warping
- *   uMelodicPitch    → vertical drift in warp field
- *   uPalettePrimary/Secondary → warm color palette mixing
- *   uClimaxPhase     → full intensity boost, maximum melt
- *   uVocalEnergy     → inner glow warmth
+ * Audio reactivity (14+ uniforms):
+ *   uEnergy          -> melt intensity + glow brightness
+ *   uBass            -> melt speed + drip size
+ *   uHighs           -> surface detail sharpness
+ *   uMids            -> mid-object glow
+ *   uOnsetSnap       -> melt acceleration pulse
+ *   uSlowEnergy      -> rotation speed
+ *   uBeatSnap        -> shape morph pulse
+ *   uMelodicPitch    -> vertical emphasis
+ *   uMelodicDirection -> rotation direction
+ *   uHarmonicTension -> internal structure complexity
+ *   uBeatStability   -> melt coherence
+ *   uChromaHue       -> psychedelic hue shift
+ *   uChordIndex      -> micro hue rotation
+ *   uSectionType     -> section modulation
+ *   uClimaxPhase     -> maximum melt
+ *   uVocalEnergy     -> inner glow warmth
+ *   uCoherence       -> shape integrity
  */
 
 import { noiseGLSL } from "./noise";
@@ -46,218 +45,380 @@ uniform sampler2D uPrevFrame;
 
 ${noiseGLSL}
 
-${buildPostProcessGLSL({ grainStrength: "light", bloomEnabled: true, halationEnabled: true, temporalBlendEnabled: true })}
+${buildPostProcessGLSL({
+  grainStrength: "light",
+  bloomEnabled: true,
+  halationEnabled: true,
+  dofEnabled: true,
+})}
 
 varying vec2 vUv;
 
 #define PI 3.14159265
 #define TAU 6.28318530
+#define AM_MAX_STEPS 90
+#define AM_MAX_DIST 30.0
+#define AM_SURF_DIST 0.001
+
+// ---- Smooth minimum ----
+float amSmin(float a, float b, float k) {
+  float h = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0);
+  return mix(b, a, h) - k * h * (1.0 - h);
+}
+
+// ---- Box SDF ----
+float amSdBox(vec3 pos, vec3 halfSize) {
+  vec3 d = abs(pos) - halfSize;
+  return length(max(d, 0.0)) + min(max(d.x, max(d.y, d.z)), 0.0);
+}
+
+// ---- Octahedron SDF ----
+float amSdOctahedron(vec3 pos, float s) {
+  pos = abs(pos);
+  float m = pos.x + pos.y + pos.z - s;
+  vec3 q;
+  if (3.0 * pos.x < m) q = pos.xyz;
+  else if (3.0 * pos.y < m) q = pos.yzx;
+  else if (3.0 * pos.z < m) q = pos.zxy;
+  else return m * 0.57735027;
+  float k = clamp(0.5 * (q.z - q.y + s), 0.0, s);
+  return length(vec3(q.x, q.y - s + k, q.z - k));
+}
+
+// ---- Melt displacement: gravity-driven downward deformation ----
+vec3 amMeltDisplace(vec3 pos, float meltAmount, float time, float bass, float tension) {
+  // Gravity: upper parts drip downward more
+  float gravityFactor = smoothstep(-0.5, 1.5, pos.y) * meltAmount;
+
+  // Noise-driven melt channels
+  float channel1 = snoise(vec3(pos.xz * 2.0, time * 0.3)) * gravityFactor;
+  float channel2 = snoise(vec3(pos.xz * 4.0 + 10.0, time * 0.2)) * gravityFactor * 0.5;
+
+  // Drip: specific downward channels form
+  float dripNoise = snoise(vec3(pos.x * 3.0, time * 0.5, pos.z * 3.0));
+  float drip = max(dripNoise - 0.3, 0.0) * gravityFactor * 2.0;
+
+  // Bass pushes melt faster
+  float bMelt = bass * 0.3 * gravityFactor;
+
+  // Tension adds viscous stretching
+  float stretch = sin(pos.y * 3.0 + time * 0.4) * tension * gravityFactor * 0.2;
+
+  vec3 displacement = vec3(
+    channel1 * 0.3 + stretch,
+    -(drip + bMelt + channel2 * 0.2),
+    channel2 * 0.3
+  );
+  return displacement;
+}
+
+// ---- Scene SDF ----
+float amSceneSDF(vec3 pos, float time, float meltAmount, float bass, float tension,
+                  float energy, out int amObjId, out float amInternalGlow) {
+  amObjId = 0;
+  amInternalGlow = 0.0;
+
+  float minDist = 1e6;
+
+  // Shape 1: Melting cube
+  {
+    vec3 cubePos = pos - vec3(-2.0, 0.5, 0.0);
+    vec3 meltOff = amMeltDisplace(cubePos, meltAmount, time, bass, tension);
+    vec3 meltedPos = cubePos + meltOff;
+    float cube = amSdBox(meltedPos, vec3(0.8));
+    // Drip pools below
+    float dripPool = length(vec3(cubePos.x, cubePos.y + 1.5, cubePos.z)) - 0.4 * meltAmount;
+    cube = amSmin(cube, dripPool, 0.3);
+    if (cube < minDist) {
+      minDist = cube;
+      amObjId = 1;
+      amInternalGlow = smoothstep(0.0, -0.3, cube) * meltAmount;
+    }
+  }
+
+  // Shape 2: Melting sphere
+  {
+    vec3 sphPos = pos - vec3(0.0, 0.8, 0.0);
+    vec3 meltOff = amMeltDisplace(sphPos, meltAmount, time + 1.5, bass, tension);
+    vec3 meltedPos = sphPos + meltOff;
+    float sphere = length(meltedPos) - 1.0;
+    // Drip tendrils
+    float dripT = length(vec3(sphPos.x * 0.5, sphPos.y + 2.0, sphPos.z * 0.5)) - 0.3 * meltAmount;
+    sphere = amSmin(sphere, dripT, 0.4);
+    if (sphere < minDist) {
+      minDist = sphere;
+      amObjId = 2;
+      amInternalGlow = smoothstep(0.0, -0.3, sphere) * meltAmount;
+    }
+  }
+
+  // Shape 3: Melting octahedron (pyramid-like)
+  {
+    vec3 octPos = pos - vec3(2.0, 0.6, 0.0);
+    vec3 meltOff = amMeltDisplace(octPos, meltAmount, time + 3.0, bass, tension);
+    vec3 meltedPos = octPos + meltOff;
+    float oct = amSdOctahedron(meltedPos, 0.9);
+    float dripO = length(vec3(octPos.x, octPos.y + 1.8, octPos.z)) - 0.25 * meltAmount;
+    oct = amSmin(oct, dripO, 0.25);
+    if (oct < minDist) {
+      minDist = oct;
+      amObjId = 3;
+      amInternalGlow = smoothstep(0.0, -0.3, oct) * meltAmount;
+    }
+  }
+
+  // Ground plane (catches drips)
+  float ground = pos.y + 1.5;
+  // Melted wax pools on ground
+  float poolNoise = snoise(vec3(pos.xz * 2.0, time * 0.1)) * 0.1 * meltAmount;
+  ground -= poolNoise;
+  if (ground < minDist) {
+    minDist = ground;
+    amObjId = 4;
+    amInternalGlow = max(poolNoise, 0.0) * 2.0;
+  }
+
+  return minDist;
+}
+
+// ---- Normal ----
+vec3 amCalcNormal(vec3 pos, float time, float meltAmount, float bass, float tension, float energy) {
+  float eps = 0.003;
+  int dummyId; float dummyGlow;
+  float ref = amSceneSDF(pos, time, meltAmount, bass, tension, energy, dummyId, dummyGlow);
+  return normalize(vec3(
+    amSceneSDF(pos + vec3(eps, 0, 0), time, meltAmount, bass, tension, energy, dummyId, dummyGlow) - ref,
+    amSceneSDF(pos + vec3(0, eps, 0), time, meltAmount, bass, tension, energy, dummyId, dummyGlow) - ref,
+    amSceneSDF(pos + vec3(0, 0, eps), time, meltAmount, bass, tension, energy, dummyId, dummyGlow) - ref
+  ));
+}
+
+// ---- Occlusion ----
+float amCalcOcclusion(vec3 pos, vec3 nrm, float time, float meltAmount, float bass,
+                       float tension, float energy) {
+  float occl = 0.0;
+  float weight = 1.0;
+  int dummyId; float dummyGlow;
+  for (int i = 1; i <= 5; i++) {
+    float sd = float(i) * 0.12;
+    float sdf = amSceneSDF(pos + nrm * sd, time, meltAmount, bass, tension, energy, dummyId, dummyGlow);
+    occl += weight * max(sd - sdf, 0.0);
+    weight *= 0.55;
+  }
+  return clamp(1.0 - occl * 2.5, 0.0, 1.0);
+}
 
 void main() {
   vec2 uv = vUv;
   vec2 aspect = vec2(uResolution.x / uResolution.y, 1.0);
-  vec2 p = (uv - 0.5) * aspect;
+  vec2 screenP = (uv - 0.5) * aspect;
 
-  // --- Clamp audio uniforms ---
+  // ---- Audio ----
   float energy = clamp(uEnergy, 0.0, 1.0);
   float bass = clamp(uBass, 0.0, 1.0);
   float highs = clamp(uHighs, 0.0, 1.0);
+  float mids = clamp(uMids, 0.0, 1.0);
   float onset = clamp(uOnsetSnap, 0.0, 1.0);
   float slowE = clamp(uSlowEnergy, 0.0, 1.0);
   float tension = clamp(uHarmonicTension, 0.0, 1.0);
   float stability = clamp(uBeatStability, 0.0, 1.0);
-  float melInfluence = uMelodicPitch * uMelodicConfidence;
-  float melodicPitch = clamp(melInfluence, 0.0, 1.0);
+  float melodicPitch = clamp(uMelodicPitch * uMelodicConfidence, 0.0, 1.0);
+  float melodicDir = clamp(uMelodicDirection, -1.0, 1.0);
   float effectiveBeat = uBeatSnap * smoothstep(0.3, 0.7, uBeatConfidence);
-
-  float slowTime = uDynamicTime * 0.015;
-
-  // --- Domain warping + energy detail ---
-  vec2 domainWarpOff = vec2(fbm3(vec3(p * 0.5, uDynamicTime * 0.05)), fbm3(vec3(p * 0.5 + 100.0, uDynamicTime * 0.05))) * 0.3;
-  float detailMod = 1.0 + energy * 0.5;
-
-  // --- Uniform integrations ---
+  float coherence = clamp(uCoherence, 0.0, 1.0);
   float chromaHueMod = uChromaHue * 0.3;
   float chordConf = smoothstep(0.3, 0.6, uChordConfidence);
   float chordHue = float(int(uChordIndex)) / 24.0 * 0.12 * chordConf;
   float vocalGlow = uVocalEnergy * 0.15;
+  float e2 = energy * energy;
+  float slowTime = uDynamicTime * 0.015;
 
-  // --- Section type modulation (0=intro,1=verse,2=chorus,3=bridge,4=solo,5=jam,6=outro,7=space) ---
+  // ---- Section ----
   float sectionT = uSectionType;
   float sJam = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
   float sSpace = smoothstep(6.5, 7.5, sectionT);
   float sChorus = smoothstep(1.5, 2.5, sectionT) * (1.0 - step(2.5, sectionT));
   float sSolo = smoothstep(3.5, 4.5, sectionT) * (1.0 - step(4.5, sectionT));
-  // Jam: faster warp, denser layers. Space: barely moving, gentle breath. Chorus: vibrant colors. Solo: dramatic warp.
-  float sectionWarpMult = mix(1.0, 1.6, sJam) * mix(1.0, 0.15, sSpace) * mix(1.0, 1.4, sSolo) * mix(1.0, 1.2, sChorus);
-  float sectionSpeedMult = mix(1.0, 1.4, sJam) * mix(1.0, 0.3, sSpace) * mix(1.0, 1.3, sSolo);
+  float sectionMelt = mix(1.0, 1.6, sJam) * mix(1.0, 0.15, sSpace) * mix(1.0, 1.4, sSolo);
+  float sectionSat = mix(1.0, 1.15, sChorus) * mix(1.0, 0.6, sSpace);
 
-  // --- Coherence morphology ---
-  float coherence = clamp(uCoherence, 0.0, 1.0);
-  // High coherence: smoother, more organized warp patterns
-  // Low coherence: chaotic, unpredictable distortion
-  float coherenceWarpMult = coherence > 0.7 ? mix(1.0, 0.5, (coherence - 0.7) / 0.3)
-                          : coherence < 0.3 ? mix(1.0, 2.0, (0.3 - coherence) / 0.3)
-                          : 1.0;
-
-  // --- Slow field rotation ---
-  float rotAngle = slowTime * 0.4 * sectionSpeedMult;
-  float bp = beatPulse(uMusicalTime) * smoothstep(0.3, 0.7, uBeatConfidence);
-  rotAngle += bp * 0.03;
-  float ca = cos(rotAngle);
-  float sa = sin(rotAngle);
-  p = mat2(ca, -sa, sa, ca) * p;
-
-  // --- Melodic vertical drift ---
-  float vertDrift = (melodicPitch - 0.5) * 0.12;
-  p.y -= vertDrift;
-
-  // --- Climax state ---
+  // ---- Climax ----
   float isClimax = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5);
   float climaxBoost = isClimax * uClimaxIntensity;
 
-  // --- Warp parameters ---
-  // Energy drives intensity: low = gentle breathing, high = aggressive melting
-  float warpIntensity = mix(0.01, 0.22, energy * energy) * sectionWarpMult * coherenceWarpMult;
-  warpIntensity += climaxBoost * 0.15;
-  // Bass drives scale: bigger bass = bigger, slower distortions
-  float warpScale = mix(1.2, 0.6, bass);
-  // Beat creates momentary pulse in amplitude
-  warpIntensity *= 1.0 + effectiveBeat * 0.4;
-  // Tension adds complexity
-  warpIntensity *= 1.0 + tension * 0.2;
-  // Stability: smooth vs chaotic
-  float chaosAmount = (1.0 - stability) * 0.3;
-
-  // =========================================================
-  // DOMAIN WARPING: 3 layers at different scales warping each other
-  // This is the core visual — coordinates distort so the color field melts/breathes
-  // =========================================================
-
-  // Layer 1: Large-scale slow undulation (the "breathing")
-  vec2 warp1 = vec2(
-    fbm3(vec3(p * warpScale, slowTime * 0.7)),
-    fbm3(vec3(p * warpScale + 50.0, slowTime * 0.7 + 30.0))
-  );
-
-  // Layer 2: Medium-scale morphing (the "melting"), warped by layer 1
-  vec2 warp2Coords = p + warp1 * warpIntensity * 0.6;
-  vec2 warp2 = vec2(
-    fbm3(vec3(warp2Coords * warpScale * 2.0 + 100.0, slowTime * 1.1)),
-    fbm3(vec3(warp2Coords * warpScale * 2.0 + 200.0, slowTime * 1.1 + 70.0))
-  );
-
-  // Layer 3: Fine detail (the "texture"), warped by layers 1+2
-  vec2 warp3Coords = p + (warp1 + warp2) * warpIntensity * 0.4;
-  vec2 warp3 = vec2(
-    snoise(vec3(warp3Coords * warpScale * 4.5 + 300.0, slowTime * 1.8)),
-    snoise(vec3(warp3Coords * warpScale * 4.5 + 400.0, slowTime * 1.8 + 50.0))
-  );
-
-  // Chaos injection from instability
-  vec2 chaosWarp = vec2(
-    snoise(vec3(p * 6.0, slowTime * 3.0 + 500.0)),
-    snoise(vec3(p * 6.0 + 600.0, slowTime * 3.0))
-  ) * chaosAmount;
-
-  // Combined warp: all layers contribute
-  vec2 totalWarp = warp1 * warpIntensity
-                 + warp2 * warpIntensity * 0.7
-                 + warp3 * warpIntensity * 0.35 * (1.0 + highs * 0.5)
-                 + chaosWarp * warpIntensity;
-
-  // --- Onset ripple: radial wave outward from center ---
-  float dist = length(p);
-  float ripplePhase = dist * 12.0 - uTime * 4.0;
-  float ripple = sin(ripplePhase) * exp(-dist * 2.5) * onset * 0.08;
-  totalWarp += vec2(ripple) * normalize(p + 0.001);
-
-  // Final warped coordinates
-  vec2 wp = p + totalWarp;
-
-  // =========================================================
-  // COLOR: Sample from smooth gradient using warped coordinates
-  // Warm palette mixing with noise-driven transitions
-  // =========================================================
-
-  // Palette hues
+  // ---- Palette ----
   float hue1 = uPalettePrimary + chromaHueMod + chordHue;
   float hue2 = uPaletteSecondary + chordHue * 0.5;
-  float sat = mix(0.1, 0.75, energy) * uPaletteSaturation;
-  float satBoost = mix(1.0, 1.15, sChorus); // chorus = more vibrant
+  float sat = mix(0.3, 0.9, energy) * uPaletteSaturation * sectionSat;
 
-  // Noise-driven color sampling: the warp itself creates the color variation
-  float colorNoise = fbm3(vec3(wp * 1.8, slowTime * 0.5));
-  float colorNoise2 = snoise(vec3(wp * 2.5 + 150.0, slowTime * 0.8));
+  // ---- Melt amount: energy + time driven ----
+  float meltAmount = mix(0.05, 0.8, e2) * sectionMelt;
+  meltAmount += climaxBoost * 0.3;
+  meltAmount += onset * 0.15; // onset pulse
+  // Coherence: high = less melt, low = aggressive melt
+  meltAmount *= mix(1.3, 0.6, coherence);
+  meltAmount = clamp(meltAmount, 0.0, 1.0);
 
-  // Mix between primary and secondary hues using the warped noise field
-  float hueMix = colorNoise * 0.5 + 0.5; // 0..1 range
-  hueMix += colorNoise2 * 0.2;
-  hueMix = clamp(hueMix, 0.0, 1.0);
+  // ---- Camera ----
+  float sceneTime = slowTime * mix(1.0, 1.4, sJam) * mix(1.0, 0.3, sSpace);
+  float camAngle = sceneTime * 0.2 * sign(melodicDir + 0.001);
+  camAngle += effectiveBeat * 0.05;
+  float camAlt = 2.0 + sin(sceneTime * 0.15) * 0.5 + melodicPitch * 1.0;
+  float camDist = 5.5 + sin(sceneTime * 0.1) * 0.5;
+  vec3 rayOrig = vec3(cos(camAngle) * camDist, camAlt, sin(camAngle) * camDist);
+  vec3 camLookAt = vec3(0.0, 0.0, 0.0);
+  vec3 camFwd = normalize(camLookAt - rayOrig);
+  vec3 camSide = normalize(cross(camFwd, vec3(0.0, 1.0, 0.0)));
+  vec3 camVert = cross(camSide, camFwd);
+  float fovScale = tan(radians(55.0) * 0.5);
+  vec3 rayDir = normalize(camFwd + camSide * screenP.x * fovScale + camVert * screenP.y * fovScale);
 
-  float finalHue = mix(hue1, hue2, hueMix);
-  // Add a third interpolated hue for richness
-  float hue3 = fract((hue1 + hue2) * 0.5 + 0.1);
-  float triMix = smoothstep(0.3, 0.7, colorNoise2 * 0.5 + 0.5);
-  finalHue = mix(finalHue, hue3, triMix * 0.3);
+  // ---- Background: psychedelic gradient ----
+  float bgNoise = fbm3(vec3(rayDir * 2.0, sceneTime * 0.08));
+  vec3 bgCol1 = hsv2rgb(vec3(hue1, sat * 0.3, 0.04));
+  vec3 bgCol2 = hsv2rgb(vec3(hue2, sat * 0.25, 0.03));
+  vec3 col = mix(bgCol1, bgCol2, bgNoise * 0.5 + 0.5) + vec3(0.01, 0.005, 0.015);
 
-  // Value (brightness) modulated by warp depth
-  float warpDepth = length(totalWarp);
-  float val = mix(0.06, 0.8, energy * energy) + warpDepth * 0.8;
-  val = clamp(val, 0.04, 0.95);
-  val += vocalGlow; // vocal warmth
+  // ---- Raymarch ----
+  float marchDist = 0.0;
+  int objId = 0;
+  float internalGlow = 0.0;
+  bool didCollide = false;
 
-  vec3 col = hsv2rgb(vec3(fract(finalHue), sat * satBoost, val));
+  for (int i = 0; i < AM_MAX_STEPS; i++) {
+    vec3 marchPos = rayOrig + rayDir * marchDist;
+    float sdf = amSceneSDF(marchPos, sceneTime, meltAmount, bass, tension, energy, objId, internalGlow);
+    if (sdf < AM_SURF_DIST) {
+      didCollide = true;
+      break;
+    }
+    if (marchDist > AM_MAX_DIST) break;
+    marchDist += sdf * 0.7;
+  }
 
-  // --- Add warm glow at center ---
-  float centerGlow = exp(-dist * dist * 4.0) * mix(0.03, 0.25, energy);
-  vec3 warmCenter = hsv2rgb(vec3(fract(hue1 + 0.05), sat * 0.6, 1.0));
-  col += warmCenter * centerGlow;
+  if (didCollide) {
+    vec3 collidePos = rayOrig + rayDir * marchDist;
+    vec3 nrm = amCalcNormal(collidePos, sceneTime, meltAmount, bass, tension, energy);
+    float occl = amCalcOcclusion(collidePos, nrm, sceneTime, meltAmount, bass, tension, energy);
 
-  // --- Color bleeding: secondary layer with offset warp ---
-  vec2 bleedWarp = wp + vec2(
-    snoise(vec3(wp * 1.5 + 700.0, slowTime * 0.6)),
-    snoise(vec3(wp * 1.5 + 800.0, slowTime * 0.6))
-  ) * 0.06;
-  float bleedNoise = fbm3(vec3(bleedWarp * 2.0, slowTime * 0.9));
-  float bleedHue = mix(hue2, hue1, bleedNoise * 0.5 + 0.5);
-  vec3 bleedColor = hsv2rgb(vec3(fract(bleedHue), sat * 0.7, 0.8));
-  col = mix(col, bleedColor, 0.15 + energy * 0.1);
+    // Lighting
+    vec3 lightDir = normalize(vec3(0.4, 1.0, -0.3));
+    float diffuse = max(dot(nrm, lightDir), 0.0);
+    vec3 halfVec = normalize(lightDir - rayDir);
+    float specPow = mix(16.0, 48.0, highs);
+    float specular = pow(max(dot(nrm, halfVec), 0.0), specPow);
+    float fresnelVal = pow(1.0 - max(dot(nrm, -rayDir), 0.0), 3.0);
 
-  // --- Onset flash ---
-  col += vec3(1.0, 0.97, 0.92) * onset * 0.25 * exp(-dist * 1.5);
+    // Object color: psychedelic mapping based on position + melt
+    float warpNoise = fbm3(vec3(collidePos * 1.5 + sceneTime * 0.1));
+    float surfHue;
+    if (objId == 1) surfHue = fract(hue1 + warpNoise * 0.3);
+    else if (objId == 2) surfHue = fract(hue2 + warpNoise * 0.25);
+    else if (objId == 3) surfHue = fract((hue1 + hue2) * 0.5 + warpNoise * 0.35);
+    else surfHue = fract(hue1 + 0.1 + warpNoise * 0.2); // ground pools
 
-  // --- Beat brightness pulse ---
-  col *= 1.0 + effectiveBeat * 0.12;
+    vec3 surfaceCol = hsv2rgb(vec3(surfHue, sat, 0.6 + e2 * 0.3));
 
-  // --- Climax boost ---
+    // Surface detail from highs
+    float surfDetail = snoise(vec3(collidePos * 8.0, sceneTime * 0.5));
+    surfDetail = smoothstep(0.3, 0.8, surfDetail) * highs * 0.15;
+
+    // Apply lighting
+    vec3 litCol = surfaceCol * (0.15 + diffuse * 0.5) * occl;
+    litCol += vec3(0.9, 0.85, 0.75) * specular * 0.3 * occl;
+    litCol += surfaceCol * fresnelVal * 0.2;
+    litCol += surfaceCol * surfDetail;
+
+    // Internal glowing structure revealed by melt
+    if (internalGlow > 0.01 && objId != 4) {
+      float intNoise = ridged4(collidePos * 3.0 + vec3(sceneTime * 0.15, 0.0, 0.0));
+      float intHue = fract(surfHue + 0.33 + intNoise * 0.2);
+      vec3 intColor = hsv2rgb(vec3(intHue, 1.0, 1.0));
+      // Emissive internal structure
+      litCol += intColor * internalGlow * (0.3 + e2 * 0.7) * (1.0 + tension * 0.5);
+      litCol += intColor * intNoise * internalGlow * 0.2;
+    }
+
+    // Ground pools glow from below
+    if (objId == 4) {
+      float poolGlow = max(internalGlow, 0.0);
+      vec3 poolEmit = hsv2rgb(vec3(fract(hue1 + collidePos.x * 0.1), sat, 0.6));
+      litCol += poolEmit * poolGlow * e2 * 0.5;
+    }
+
+    // Mids glow
+    float midZone = smoothstep(-0.5, 0.5, collidePos.y) * smoothstep(1.5, 0.5, collidePos.y);
+    litCol *= 1.0 + mids * midZone * 0.2;
+
+    // Vocal warmth
+    litCol += vec3(0.06, 0.03, 0.01) * vocalGlow * e2;
+
+    // Beat morph pulse
+    litCol *= 1.0 + effectiveBeat * 0.15;
+
+    col = litCol;
+
+    // Distance fog
+    float fogFactor = 1.0 - exp(-marchDist * 0.04);
+    vec3 fogCol = hsv2rgb(vec3(fract(hue1 + 0.03), 0.08, 0.02));
+    col = mix(col, fogCol, fogFactor);
+  }
+
+  // ---- Volumetric internal glow (emissive leaking from melted shapes) ----
+  {
+    int volSteps = int(mix(12.0, 24.0, energy));
+    float maxDist = marchDist > 0.0 ? marchDist : 15.0;
+    float volStepSize = maxDist / float(volSteps);
+    vec3 volAccum = vec3(0.0);
+
+    for (int i = 0; i < 24; i++) {
+      if (i >= volSteps) break;
+      float fi = float(i);
+      float volT = 0.5 + fi * volStepSize;
+      vec3 volPos = rayOrig + rayDir * volT;
+
+      // Emissive near shapes
+      for (int s = 0; s < 3; s++) {
+        float fs = float(s);
+        vec3 shapeCenter = vec3(fs * 2.0 - 2.0, 0.5, 0.0);
+        float shapeDist = length(volPos - shapeCenter);
+        float emitGlow = exp(-shapeDist * shapeDist * 0.5) * meltAmount * 0.003;
+        float emitHue = fract(hue1 + fs * 0.15);
+        volAccum += hsv2rgb(vec3(emitHue, 0.8, 1.0)) * emitGlow * e2;
+      }
+    }
+    col += volAccum;
+  }
+
+  // ---- Onset flash ----
+  col += vec3(1.0, 0.97, 0.92) * onset * 0.2 * exp(-length(screenP) * 2.0);
+
+  // ---- Climax boost ----
   col *= 1.0 + climaxBoost * 0.4;
 
-  // === ATMOSPHERIC DEPTH: haze creates sense of floating IN the distortion ===
-  float fogNoise = fbm3(vec3(wp * 0.5, slowTime * 0.3));
-  float fogDensity = mix(0.5, 0.03, energy);
-  vec3 fogColor = hsv2rgb(vec3(fract(hue1 + 0.03), 0.08, 0.03));
-  col = mix(col, fogColor, fogDensity * (0.4 + fogNoise * 0.6));
+  // ---- SDF icon emergence ----
+  {
+    float nf = fbm3(vec3(screenP * 2.0, slowTime));
+    vec3 c1 = hsv2rgb(vec3(hue1, sat, 1.0));
+    vec3 c2 = hsv2rgb(vec3(hue2, sat, 1.0));
+    col += iconEmergence(screenP, uTime, energy, bass, c1, c2, nf, uClimaxPhase, uSectionIndex) * 0.5;
+    col += heroIconEmergence(screenP, uTime, energy, bass, c1, c2, nf, uSectionIndex);
+  }
 
-  // --- Vignette ---
+  // ---- Vignette ----
   float vigScale = mix(0.32, 0.24, energy);
-  float vignette = 1.0 - dot(p * vigScale, p * vigScale);
+  float vignette = 1.0 - dot(screenP * vigScale, screenP * vigScale);
   vignette = smoothstep(0.0, 1.0, vignette);
-  vec3 vigColor = vec3(0.01, 0.008, 0.015);
-  col = mix(vigColor, col, vignette);
+  col = mix(vec3(0.008, 0.005, 0.012), col, vignette);
 
-  // --- Post-processing ---
-  col = applyPostProcess(col, vUv, p);
+  // ---- Post-processing ----
+  col = applyPostProcess(col, vUv, screenP);
 
-  // Feedback trails: section-type-aware decay
+  // ---- Feedback trails ----
   vec3 prev = texture2D(uPrevFrame, vUv).rgb;
-  float sJam_fb = smoothstep(4.5, 5.5, uSectionType) * (1.0 - step(5.5, uSectionType));
-  float sSpace_fb = smoothstep(6.5, 7.5, uSectionType);
-  float sChorus_fb = smoothstep(1.5, 2.5, uSectionType) * (1.0 - step(2.5, uSectionType));
-  float baseDecay_fb = mix(0.92, 0.92 - 0.08, energy);
-  float feedbackDecay = baseDecay_fb + sJam_fb * 0.04 + sSpace_fb * 0.06 - sChorus_fb * 0.05;
+  float baseDecay_fb = mix(0.92, 0.84, energy);
+  float feedbackDecay = baseDecay_fb + sJam * 0.04 + sSpace * 0.06 - sChorus * 0.05;
   feedbackDecay = clamp(feedbackDecay, 0.80, 0.97);
-  // Jam phase feedback: exploration=long trails, building=moderate, peak=max persistence, resolution=clearing
   if (uJamPhase >= 0.0) {
     float jpExplore = step(-0.5, uJamPhase) * step(uJamPhase, 0.5);
     float jpBuild   = step(0.5, uJamPhase) * step(uJamPhase, 1.5);

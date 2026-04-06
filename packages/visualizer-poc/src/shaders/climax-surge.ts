@@ -1,28 +1,28 @@
 /**
- * Climax Surge — fullscreen spectacle burst for show peaks only.
- * Radial energy explosion from center with concentric shockwaves,
- * prismatic light scattering, and every visual system at maximum.
+ * Climax Surge — raymarched 3D energy vortex.
  *
- * DESIGN INTENT: This shader should only be selected during the show's
- * highest energy moments. It's the visual equivalent of the final
- * crescendo — overwhelming, euphoric, then dissolving back.
+ * A massive energy buildup that explodes outward. Concentric shockwave
+ * ring SDFs expanding from center, volumetric particle debris, energy
+ * bloom. Designed specifically for peak moments. Raymarched 3D scene
+ * with proper SDF geometry for rings, debris particles, and a
+ * central energy core.
  *
- * Visual elements:
- *   - Radial shockwave rings expanding from center
- *   - Prismatic color separation at wave edges
- *   - Particle burst / debris field
- *   - Full-screen pulsating glow
- *   - Starburst rays
- *
- * Audio reactivity:
- *   uEnergy        → overall intensity, ring count
- *   uBass          → ring thickness, central glow
- *   uOnsetSnap     → new shockwave spawn
- *   uDrumOnset     → starburst ray intensity
- *   uClimaxPhase   → gates appearance (only active during climax/sustain)
- *   uClimaxIntensity → amplifies all effects
- *   uMusicalTime   → beat-locked pulsation
- *   uFastEnergy    → responsive brightness spikes
+ * Audio reactivity (14+ uniforms):
+ *   uEnergy          -> overall intensity, ring count, step quality
+ *   uBass            -> ring thickness, central core size
+ *   uOnsetSnap       -> new shockwave ring spawn, flash
+ *   uDrumOnset       -> starburst ray intensity, debris burst
+ *   uClimaxPhase     -> gates appearance (only active during climax)
+ *   uClimaxIntensity -> amplifies all effects
+ *   uMusicalTime     -> beat-locked ring timing
+ *   uFastEnergy      -> responsive brightness spikes
+ *   uHighs           -> specular sharpness on ring surfaces
+ *   uHarmonicTension -> ring distortion, energy arc complexity
+ *   uVocalEnergy     -> warm energy bloom at core
+ *   uEnergyForecast  -> anticipatory ring pre-expansion
+ *   uStemDrums       -> starburst reinforcement
+ *   uTimbralBrightness -> emission intensity scaling
+ *   uPalettePrimary/Secondary -> ring/core palette
  */
 
 import { noiseGLSL } from "./noise";
@@ -44,161 +44,396 @@ ${sharedUniformsGLSL}
 
 ${noiseGLSL}
 
-${buildPostProcessGLSL({ grainStrength: "normal", bloomEnabled: true, bloomThresholdOffset: -0.15, halationEnabled: true, caEnabled: true, flareEnabled: true, thermalShimmerEnabled: true })}
+${buildPostProcessGLSL({ grainStrength: "normal", bloomEnabled: true, bloomThresholdOffset: -0.15, halationEnabled: true, caEnabled: true, thermalShimmerEnabled: true })}
 
 varying vec2 vUv;
 
 #define PI 3.14159265
-#define NUM_RINGS 8
+#define CS_MAX_STEPS 80
+#define CS_MAX_DIST 40.0
+#define CS_SURF_DIST 0.002
+#define CS_NUM_RINGS 8
+#define CS_NUM_DEBRIS 16
+#define CS_VOL_STEPS 24
+
+// ─── SDF: torus (shockwave ring) ───
+float csTorus(vec3 pos, float majorR, float minorR) {
+  vec2 q = vec2(length(pos.xz) - majorR, pos.y);
+  return length(q) - minorR;
+}
+
+// ─── SDF: sphere ───
+float csSphere(vec3 pos, float radius) {
+  return length(pos) - radius;
+}
+
+// ─── SDF: elongated ellipsoid (debris particle) ───
+float csEllipsoid(vec3 pos, vec3 radii) {
+  float k0 = length(pos / radii);
+  float k1 = length(pos / (radii * radii));
+  return k0 * (k0 - 1.0) / k1;
+}
+
+float csSmoothMin(float a, float b, float k) {
+  float h = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0);
+  return mix(b, a, h) - k * h * (1.0 - h);
+}
+
+// ─── Rotate 2D ───
+vec2 csRot2D(vec2 coord, float angle) {
+  float c = cos(angle);
+  float s = sin(angle);
+  return vec2(c * coord.x - s * coord.y, s * coord.x + c * coord.y);
+}
+
+// ─── Scene map: expanding rings + core + debris ───
+// Returns vec2(dist, matID): 0=core, 1=ring, 2=debris
+vec2 csSceneMap(vec3 pos, float timeVal, float musTime, float bass, float onset,
+                float tension, float forecast, float ringCountMod, float explSpeed) {
+  float result = CS_MAX_DIST;
+  float matID = -1.0;
+
+  // === CENTRAL ENERGY CORE ===
+  float coreRadius = 0.3 + bass * 0.2 + onset * 0.15;
+  // Pulsating with noise displacement
+  float coreNoise = snoise(vec3(pos * 3.0 + timeVal * 0.5)) * 0.1;
+  float coreDist = csSphere(pos, coreRadius) + coreNoise;
+  if (coreDist < result) {
+    result = coreDist;
+    matID = 0.0;
+  }
+
+  // === SHOCKWAVE RINGS ===
+  for (int idx = 0; idx < CS_NUM_RINGS; idx++) {
+    float fi = float(idx);
+
+    // Ring timing: staggered based on musical time
+    float ringPhase = fract(musTime * 0.25 * ringCountMod - fi * 0.125);
+    float ringRadius = ringPhase * 8.0 * explSpeed; // expanding outward
+
+    // Ring thickness: thinner as it expands
+    float ringThickness = (0.08 + bass * 0.04) * (1.0 - ringPhase * 0.7);
+
+    // Skip tiny or huge rings
+    if (ringRadius < 0.1 || ringRadius > 7.0) continue;
+
+    // Ring with noise distortion from tension
+    vec3 ringPos = pos;
+    if (tension > 0.3) {
+      float distort = snoise(vec3(atan(pos.z, pos.x) * 2.0, pos.y * 3.0, timeVal + fi)) * tension * 0.2;
+      ringPos.y += distort;
+    }
+
+    // Tilt rings for visual variety
+    ringPos.xz = csRot2D(ringPos.xz, fi * 0.3);
+    ringPos.xy = csRot2D(ringPos.xy, fi * 0.15 + timeVal * 0.02);
+
+    float ringDist = csTorus(ringPos, ringRadius, ringThickness);
+
+    // Anticipatory pre-expansion from forecast
+    if (forecast > 0.3) {
+      float preRingPhase = fract(musTime * 0.25 * ringCountMod - fi * 0.125 + 0.05);
+      float preRadius = preRingPhase * 8.0 * explSpeed;
+      float preDist = csTorus(ringPos, preRadius, ringThickness * 0.5);
+      ringDist = csSmoothMin(ringDist, preDist, 0.1);
+    }
+
+    if (ringDist < result) {
+      result = ringDist;
+      matID = 1.0 + fi * 0.1; // encode ring index in matID
+    }
+  }
+
+  // === DEBRIS PARTICLES ===
+  for (int didx = 0; didx < CS_NUM_DEBRIS; didx++) {
+    float dfi = float(didx);
+    float seedVal = dfi * 13.7;
+
+    // Debris trajectory: radial outward from center
+    float debrisAngle = fract(sin(seedVal) * 43758.5453) * 2.0 * PI;
+    float debrisPhi = fract(sin(seedVal + 7.0) * 23421.6) * PI - PI * 0.5;
+    float debrisSpeed = (fract(sin(seedVal + 3.0) * 12345.6) * 0.5 + 0.3) * explSpeed;
+
+    // Time-based radial expansion
+    float debrisPhase = fract(musTime * 0.5 - dfi * 0.05);
+    float debrisR = debrisPhase * debrisSpeed * 6.0;
+
+    // 3D position
+    vec3 debrisPos = vec3(
+      cos(debrisAngle) * cos(debrisPhi),
+      sin(debrisPhi),
+      sin(debrisAngle) * cos(debrisPhi)
+    ) * debrisR;
+
+    // Elongated ellipsoid along velocity direction
+    vec3 debrisLocal = pos - debrisPos;
+
+    // Align with radial direction
+    vec3 velDir = normalize(debrisPos + vec3(0.001));
+    vec3 worldUp2 = abs(velDir.y) > 0.99 ? vec3(1.0, 0.0, 0.0) : vec3(0.0, 1.0, 0.0);
+    vec3 debrisSide = normalize(cross(worldUp2, velDir));
+    vec3 debrisUp = cross(velDir, debrisSide);
+
+    vec3 aligned = vec3(
+      dot(debrisLocal, debrisSide),
+      dot(debrisLocal, velDir),
+      dot(debrisLocal, debrisUp)
+    );
+
+    float debrisFade = (1.0 - debrisPhase);
+    float debrisSize = 0.04 * debrisFade + 0.01;
+    float debrisDist = csEllipsoid(aligned, vec3(debrisSize, debrisSize * 3.0, debrisSize));
+
+    if (debrisDist < result) {
+      result = debrisDist;
+      matID = 2.0 + dfi * 0.01;
+    }
+  }
+
+  return vec2(result, matID);
+}
+
+// ─── Normal calculation ───
+vec3 csCalcNormal(vec3 pos, float timeVal, float musTime, float bass, float onset,
+                  float tension, float forecast, float ringCountMod, float explSpeed) {
+  vec2 off = vec2(0.003, 0.0);
+  float d0 = csSceneMap(pos, timeVal, musTime, bass, onset, tension, forecast, ringCountMod, explSpeed).x;
+  return normalize(vec3(
+    csSceneMap(pos + off.xyy, timeVal, musTime, bass, onset, tension, forecast, ringCountMod, explSpeed).x - d0,
+    csSceneMap(pos + off.yxy, timeVal, musTime, bass, onset, tension, forecast, ringCountMod, explSpeed).x - d0,
+    csSceneMap(pos + off.yyx, timeVal, musTime, bass, onset, tension, forecast, ringCountMod, explSpeed).x - d0
+  ));
+}
+
+// ─── Ambient occlusion ───
+float csCalcAO(vec3 pos, vec3 norm, float timeVal, float musTime, float bass, float onset,
+               float tension, float forecast, float ringCountMod, float explSpeed) {
+  float occlusion = 0.0;
+  float weight = 1.0;
+  for (int idx = 0; idx < 5; idx++) {
+    float dist = 0.02 + float(idx) * 0.06;
+    float sdf = csSceneMap(pos + norm * dist, timeVal, musTime, bass, onset, tension, forecast, ringCountMod, explSpeed).x;
+    occlusion += (dist - sdf) * weight;
+    weight *= 0.7;
+  }
+  return clamp(1.0 - occlusion * 3.0, 0.0, 1.0);
+}
+
+// ─── Volumetric energy density (for glow between rings) ───
+float csEnergyDensity(vec3 pos, float timeVal, float energy, float bass) {
+  float dist = length(pos);
+  // Radial energy falloff
+  float radialD = exp(-dist * 0.3);
+  // Swirling noise
+  float noiseD = fbm3(vec3(pos * 0.5 + timeVal * 0.1));
+  return clamp(radialD * (0.3 + noiseD * 0.5) * energy, 0.0, 1.0);
+}
 
 void main() {
   vec2 uv = vUv;
   uv = applyCameraCut(uv, uOnsetSnap, uBeatSnap, uEnergy, uCoherence, uClimaxPhase, uMusicalTime, uSectionIndex);
   vec2 aspect = vec2(uResolution.x / uResolution.y, 1.0);
-  vec2 p = (uv - 0.5) * aspect;
+  vec2 screenP = (uv - 0.5) * aspect;
 
   float energy = clamp(uEnergy, 0.0, 1.0);
   float bass = clamp(uBass, 0.0, 1.0);
   float onset = clamp(uOnsetSnap, 0.0, 1.0);
   float drumOnset = clamp(uDrumOnset, 0.0, 1.0);
   float fastE = clamp(uFastEnergy, 0.0, 1.0);
+  float highs = clamp(uHighs, 0.0, 1.0);
+  float vocalE = clamp(uVocalEnergy, 0.0, 1.0);
+  float tension = clamp(uHarmonicTension, 0.0, 1.0);
+  float forecast = clamp(uEnergyForecast, 0.0, 1.0);
+  float stemDrums = clamp(uStemDrums, 0.0, 1.0);
+  float timbralBright = clamp(uTimbralBrightness, 0.0, 1.0);
+  float musTime = uMusicalTime;
 
-  // Section-type modulation
+  float timeVal = uDynamicTime;
+
+  // Section modulation
   float sectionT = uSectionType;
   float sJam = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
   float sSpace = smoothstep(6.5, 7.5, sectionT);
   float sChorus = smoothstep(1.5, 2.5, sectionT) * (1.0 - step(2.5, sectionT));
-  float explosionSpeedMod = mix(1.0, 1.4, sJam) * mix(1.0, 0.4, sSpace) * mix(1.0, 1.15, sChorus);
+  float explSpeed = mix(1.0, 1.4, sJam) * mix(1.0, 0.5, sSpace) * mix(1.0, 1.15, sChorus);
   float ringCountMod = mix(1.0, 1.3, sJam) * mix(1.0, 0.6, sSpace) * mix(1.0, 1.1, sChorus);
-  float particleDensityMod = mix(1.0, 1.5, sJam) * mix(1.0, 0.5, sSpace) * mix(1.0, 1.2, sChorus);
+  float debrisDensityMod = mix(1.0, 1.5, sJam) * mix(1.0, 0.4, sSpace) * mix(1.0, 1.2, sChorus);
 
+  // Climax gating
   float isClimax = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5);
   float climaxI = uClimaxIntensity;
   float gate = isClimax * climaxI;
 
-  // --- Phase 1: New uniform integrations ---
-  float forecastRings = uEnergyForecast * 0.15;   // anticipatory ring expansion
-  float peakDesat = uPeakApproaching * 0.12;       // pre-burst desaturation
-  float chromaHueMod = uChromaHue * 0.25;
-  float chordHue = float(int(uChordIndex)) / 24.0 * 0.15;
-
-  // Background: hot gradient when climax, dark otherwise
-  vec3 bgColor = mix(
-    vec3(0.02, 0.01, 0.03),
-    vec3(0.08, 0.03, 0.06),
-    gate * energy
-  );
-  vec3 col = bgColor;
+  // Even without full climax, energy > 0.6 triggers partial visuals
+  float partialGate = max(gate, smoothstep(0.6, 0.9, energy) * 0.5);
 
   // Palette
-  float hue1 = uPalettePrimary + chromaHueMod + chordHue;
-  float hue2 = uPaletteSecondary + chordHue * 0.5;
+  float chordHue = float(int(uChordIndex)) / 24.0 * 0.15;
+  float hue1 = hsvToCosineHue(uPalettePrimary) + chordHue;
+  float hue2 = hsvToCosineHue(uPaletteSecondary) + chordHue * 0.5;
   float sat = mix(0.7, 1.0, energy) * uPaletteSaturation;
 
-  // Radial distance from center
-  float dist = length(p);
-  float angle = atan(p.y, p.x);
+  vec3 coreColor = 0.5 + 0.5 * cos(6.28318 * vec3(hue1, hue1 + 0.33, hue1 + 0.67));
+  vec3 ringColor = 0.5 + 0.5 * cos(6.28318 * vec3(hue2, hue2 + 0.33, hue2 + 0.67));
 
-  // ═══ SHOCKWAVE RINGS ═══
-  // Multiple expanding rings, each spawned at a different beat
-  float slowTime = uDynamicTime * 0.2 * explosionSpeedMod;
+  // === RAY SETUP ===
+  vec3 ro, rd;
+  setupCameraRay(uv, aspect, ro, rd);
 
-  // --- Domain warping + energy-responsive detail ---
-  vec2 domainWarpOff = vec2(fbm3(vec3(p * 0.5, uDynamicTime * 0.05)), fbm3(vec3(p * 0.5 + 100.0, uDynamicTime * 0.05))) * 0.3;
-  float detailMod = 1.0 + energy * 0.5;
+  // Camera pulls back as energy increases, giving scale to the explosion
+  float camDist = 6.0 + energy * 2.0 + gate * 3.0;
+  ro += vec3(sin(timeVal * 0.03) * 1.0, 0.5, camDist);
 
-  for (int i = 0; i < NUM_RINGS; i++) {
-    float fi = float(i);
-    // Ring timing: staggered based on musical time
-    float ringTime = fract(uMusicalTime * 0.25 * ringCountMod - fi * 0.125);
-    float ringRadius = ringTime * 1.2; // expands outward
-    float ringWidth = 0.02 + bass * 0.015;
+  // === PRIMARY RAYMARCH ===
+  float marchDist = 0.0;
+  vec2 marchResult = vec2(0.0);
+  bool marchHitSurface = false;
 
-    // Ring intensity: fade as it expands
-    float ringFade = (1.0 - ringTime) * (1.0 - ringTime);
-
-    // Ring shape
-    float ringDist = abs(dist - ringRadius);
-    float ring = smoothstep(ringWidth, 0.0, ringDist) * ringFade;
-
-    // Ring color: shifts hue per ring for prismatic effect
-    float ringHue = mix(hue1, hue2, fi / float(NUM_RINGS - 1));
-    vec3 ringColor = hsv2rgb(vec3(ringHue + ringTime * 0.1, sat, 1.0));
-
-    col += ringColor * ring * (0.5 + gate * 0.8);
-  }
-
-  // ═══ CENTRAL GLOW ═══
-  // Intense core that pulses with bass
-  float bp = beatPulse(uMusicalTime);
-  float coreRadius = 0.08 + bass * 0.06 + bp * 0.04;
-  float coreGlow = exp(-dist * dist / (coreRadius * coreRadius));
-  vec3 coreColor = mix(
-    hsv2rgb(vec3(hue1, sat * 0.5, 1.0)),
-    vec3(1.0, 0.95, 0.9),
-    0.3
-  );
-  col += coreColor * coreGlow * (1.0 + gate * 1.5 + fastE * 0.5);
-
-  // ═══ STARBURST RAYS ═══
-  // Radial rays from center, driven by drums
-  {
-    float rayCount = 12.0;
-    float rayAngle = mod(angle * rayCount / (2.0 * PI) + slowTime * 2.0, 1.0);
-    float ray = pow(abs(sin(rayAngle * PI)), 20.0);
-    float rayFade = exp(-dist * 2.5);
-    float stemDrums = clamp(uStemDrums, 0.0, 1.0);
-    float rayIntensity = ray * rayFade * (drumOnset * 0.8 + energy * 0.3 + stemDrums * 0.4); // drums intensify starburst
-    vec3 rayColor = hsv2rgb(vec3(hue2 + 0.1, sat * 0.7, 1.0));
-    col += rayColor * rayIntensity * (0.3 + gate * 0.5);
-  }
-
-  // ═══ PARTICLE DEBRIS ═══
-  // Small bright points scattered outward
-  {
-    float debris = 0.0;
-    for (int i = 0; i < 20; i++) {
-      float fi = float(i);
-      float seed = fi * 13.7;
-      float debrisAngle = fract(sin(seed) * 43758.5453) * 2.0 * PI;
-      float debrisSpeed = (fract(sin(seed + 7.0) * 23421.6312) * 0.5 + 0.3) * explosionSpeedMod;
-      float debrisTime = fract(uMusicalTime * 0.5 * particleDensityMod - fi * 0.05);
-      float debrisRadius = debrisTime * debrisSpeed * 1.5;
-      vec2 debrisPos = vec2(cos(debrisAngle), sin(debrisAngle)) * debrisRadius;
-      float debrisDist = length(p - debrisPos);
-      float debrisFade = (1.0 - debrisTime) * (1.0 - debrisTime);
-      debris += smoothstep(0.006, 0.0, debrisDist) * debrisFade;
+  for (int idx = 0; idx < CS_MAX_STEPS; idx++) {
+    vec3 marchPos = ro + rd * marchDist;
+    marchResult = csSceneMap(marchPos, timeVal, musTime, bass, onset, tension, forecast, ringCountMod, explSpeed);
+    if (marchResult.x < CS_SURF_DIST) {
+      marchHitSurface = true;
+      break;
     }
-    vec3 debrisColor = hsv2rgb(vec3(hue1 + 0.05, sat * 0.6, 1.0));
-    col += debrisColor * debris * (0.6 + gate * 0.6);
+    if (marchDist > CS_MAX_DIST) break;
+    marchDist += marchResult.x * 0.8;
   }
 
-  // ═══ NOISE DISTORTION ═══
-  // Warped noise field adds organic turbulence
-  float noiseVal = fbm3(vec3(p * 3.0, slowTime));
-  col += hsv2rgb(vec3(hue1 + noiseVal * 0.05, sat * 0.3, 1.0)) * max(0.0, noiseVal) * 0.08 * energy;
+  // Background: hot gradient during climax, dark otherwise
+  vec3 bgColor = mix(
+    vec3(0.01, 0.005, 0.02),
+    vec3(0.06, 0.02, 0.05),
+    partialGate * energy
+  );
+  // Radial glow in background
+  float bgRadial = exp(-dot(screenP, screenP) * 2.0) * partialGate * 0.3;
+  bgColor += coreColor * bgRadial;
 
-  // ═══ ONSET FLASH ═══
-  // White-hot flash on strong onsets
-  col += vec3(1.0, 0.98, 0.95) * onset * 0.3 * gate;
+  vec3 col = bgColor;
 
-  // ═══ SDF ICON ═══
+  if (marchHitSurface) {
+    vec3 marchPos = ro + rd * marchDist;
+    vec3 norm = csCalcNormal(marchPos, timeVal, musTime, bass, onset, tension, forecast, ringCountMod, explSpeed);
+    float matID = marchResult.y;
+
+    float occl = csCalcAO(marchPos, norm, timeVal, musTime, bass, onset, tension, forecast, ringCountMod, explSpeed);
+
+    // Lighting: point light at center + directional from above
+    vec3 toLightDir = normalize(-marchPos); // toward center
+    vec3 upLightDir = normalize(vec3(0.3, 1.0, 0.2));
+    float centerDist = length(marchPos);
+
+    float diffuse = max(dot(norm, toLightDir), 0.0) * 0.6 + max(dot(norm, upLightDir), 0.0) * 0.3;
+    vec3 halfVec = normalize(toLightDir - rd);
+    float specPower = 32.0 + highs * 64.0;
+    float specular = pow(max(dot(norm, halfVec), 0.0), specPower);
+    float fresnel = pow(1.0 - max(dot(norm, -rd), 0.0), 3.0);
+
+    if (matID < 0.5) {
+      // Central energy core
+      float coreEmission = (2.0 + fastE * 1.5 + gate * 2.0) * (0.5 + timbralBright * 0.5);
+      vec3 coreGlow = mix(coreColor, vec3(1.0, 0.95, 0.9), 0.4) * coreEmission;
+      // Vocal warmth in core
+      coreGlow += vec3(0.15, 0.08, 0.02) * vocalE;
+      col = coreGlow * occl;
+      col += vec3(1.0, 0.98, 0.95) * specular * 0.5;
+      col += coreColor * fresnel * 0.4;
+
+    } else if (matID < 2.0) {
+      // Shockwave ring
+      float ringIdx = (matID - 1.0) * 10.0;
+      float ringPhase = fract(musTime * 0.25 * ringCountMod - ringIdx * 0.125);
+
+      // Ring color: prismatic shift per ring
+      float ringHue = mix(hue1, hue2, ringIdx / float(CS_NUM_RINGS));
+      vec3 thisRingColor = 0.5 + 0.5 * cos(6.28318 * vec3(ringHue, ringHue + 0.33, ringHue + 0.67));
+
+      // Ring emission: bright, fading as it expands
+      float ringBright = (1.0 - ringPhase) * (1.5 + gate * 2.0 + timbralBright * 0.5);
+
+      // Edge glow via fresnel
+      vec3 ringLit = thisRingColor * ringBright;
+      ringLit += thisRingColor * fresnel * 0.5;
+      ringLit += vec3(1.0, 0.95, 0.9) * specular * 0.3;
+
+      col = ringLit * occl;
+
+    } else {
+      // Debris particles
+      float debrisBright = (0.8 + energy * 0.5 + gate * 1.0) * debrisDensityMod;
+      vec3 debrisCol = mix(coreColor, ringColor, 0.5);
+      col = debrisCol * debrisBright * occl;
+      col += debrisCol * fresnel * 0.3;
+      col += vec3(1.0, 0.95, 0.9) * specular * 0.2;
+    }
+
+    // Distance fog (minimal — this shader should be bright)
+    float fogAmount = 1.0 - exp(-marchDist * 0.02);
+    col = mix(col, bgColor, fogAmount * 0.5);
+  }
+
+  // === VOLUMETRIC ENERGY GLOW ===
   {
-    float nf = fbm3(vec3(p * 2.0, slowTime));
-    vec3 c1 = hsv2rgb(vec3(hue1, sat, 1.0));
-    vec3 c2 = hsv2rgb(vec3(hue2, sat, 1.0));
-    col += stealieEmergence(p, uTime, energy, bass, c1, c2, nf, uClimaxPhase);
-    col += heroIconEmergence(p, uTime, energy, bass, c1, c2, nf, uSectionIndex);
+    vec3 volAccum = vec3(0.0);
+    float volAlpha = 0.0;
+    float volMaxDist = marchHitSurface ? marchDist : 20.0;
+    float volStep = volMaxDist / float(CS_VOL_STEPS);
+
+    for (int vidx = 0; vidx < CS_VOL_STEPS; vidx++) {
+      float volT = float(vidx) * volStep;
+      vec3 volPos = ro + rd * volT;
+
+      float density = csEnergyDensity(volPos, timeVal, energy, bass) * 0.05 * partialGate;
+
+      if (density > 0.001) {
+        float alpha = density * (1.0 - volAlpha);
+
+        // Scattered light color
+        float volDist = length(volPos);
+        vec3 volColor = mix(coreColor, ringColor, smoothstep(1.0, 5.0, volDist));
+        volColor *= (1.0 + gate * 0.5);
+
+        volAccum += volColor * alpha;
+        volAlpha += alpha;
+        if (volAlpha > 0.9) break;
+      }
+    }
+
+    col += volAccum;
   }
 
-  // Vignette (subtle — this shader should be bright)
-  float vigScale = mix(0.22, 0.18, energy);
-  float vignette = 1.0 - dot(p * vigScale, p * vigScale);
-  vignette = smoothstep(0.0, 1.0, vignette);
-  col = mix(vec3(0.02, 0.01, 0.03), col, vignette);
+  // === STARBURST RAYS (raymarched through 2D angular pattern) ===
+  {
+    float angle = atan(screenP.y, screenP.x);
+    float dist = length(screenP);
+    float rayCount = 16.0;
+    float rayAngle = mod(angle * rayCount / (2.0 * PI) + timeVal * 0.5, 1.0);
+    float rayShape = pow(abs(sin(rayAngle * PI)), 24.0);
+    float rayFade = exp(-dist * 2.0);
+    float rayIntensity = rayShape * rayFade * (drumOnset * 0.8 + energy * 0.2 + stemDrums * 0.3);
+    vec3 rayCol = mix(ringColor, vec3(1.0, 0.95, 0.9), 0.3);
+    col += rayCol * rayIntensity * (0.2 + partialGate * 0.6);
+  }
+
+  // === ONSET FLASH ===
+  col += vec3(1.0, 0.98, 0.95) * onset * 0.25 * partialGate;
+
+  // Beat pulse
+  float bp = beatPulse(uMusicalTime);
+  col *= 1.0 + bp * 0.1 * (1.0 + gate * 0.3);
+
+  // === DEAD ICONOGRAPHY ===
+  {
+    float nf = fbm3(vec3(screenP * 2.0, timeVal * 0.1));
+    vec3 c1 = 0.5 + 0.5 * cos(6.28318 * vec3(hue1, hue1 + 0.33, hue1 + 0.67));
+    vec3 c2 = 0.5 + 0.5 * cos(6.28318 * vec3(hue2, hue2 + 0.33, hue2 + 0.67));
+    col += stealieEmergence(screenP, uTime, energy, bass, c1, c2, nf, uClimaxPhase);
+    col += heroIconEmergence(screenP, uTime, energy, bass, c1, c2, nf, uSectionIndex);
+  }
 
   // Post-processing
-  col = applyPostProcess(col, vUv, p);
+  col = applyPostProcess(col, uv, screenP);
 
   gl_FragColor = vec4(col, 1.0);
 }

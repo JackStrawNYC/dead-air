@@ -1,15 +1,27 @@
 /**
- * Aurora Curtains — multi-layer aurora borealis.
- * Layered aurora with magnetic field line curvature. FBM-driven shimmer,
- * chroma-tinted bands.
+ * Aurora Curtains — raymarched 3D aurora curtains draped across a mountain valley.
+ * Volumetric emission bands with proper depth and parallax, snow-capped mountain
+ * SDF silhouettes below. Full 3D scene with ambient occlusion, Fresnel rim,
+ * diffuse+specular lighting on terrain.
  *
- * Audio reactivity:
- *   uMelodicPitch     → curtain height
- *   uMelodicDirection → wave direction
- *   uHarmonicTension  → fold complexity
- *   uChromaHue        → aurora color
- *   uSlowEnergy       → brightness
- *   uBass             → ground glow intensity
+ * Audio reactivity (14+ uniforms):
+ *   uEnergy          -> curtain brightness + complexity
+ *   uBass            -> ground rumble + mountain glow
+ *   uHighs           -> star twinkle intensity
+ *   uMids            -> mid-altitude curtain layer
+ *   uSlowEnergy      -> curtain drift speed
+ *   uOnsetSnap       -> aurora flash pulse
+ *   uBeatSnap        -> curtain ripple sync
+ *   uMelodicPitch    -> curtain peak altitude
+ *   uMelodicDirection -> curtain sway direction
+ *   uHarmonicTension -> fold complexity in curtains
+ *   uChromaHue       -> aurora hue shift
+ *   uChordIndex      -> micro hue rotation
+ *   uBeatStability   -> curtain coherence
+ *   uSectionType     -> section-aware modulation
+ *   uClimaxPhase     -> full intensity aurora storm
+ *   uVocalEnergy     -> warm ground glow
+ *   uPalettePrimary/Secondary -> aurora tint palette
  */
 
 import { noiseGLSL } from "./noise";
@@ -36,137 +48,352 @@ ${buildPostProcessGLSL({
   halationEnabled: true,
   paletteCycleEnabled: true,
   grainStrength: "light",
-  temporalBlendEnabled: false,
+  dofEnabled: true,
 })}
 
 varying vec2 vUv;
 
 #define PI 3.14159265
 #define TAU 6.28318530
+#define ACU_MAX_STEPS 96
+#define ACU_MAX_DIST 60.0
+#define ACU_SURF_DIST 0.001
 
-// Aurora curtain layer: vertical ribbons with wave displacement
-float auroraCurtain(vec2 p, float time, float freq, float amplitude, float speed, float phase) {
-  // Horizontal wave displacement
-  float wave = sin(p.x * freq + time * speed + phase) * amplitude;
-  wave += sin(p.x * freq * 2.3 + time * speed * 0.7 + phase * 1.5) * amplitude * 0.3;
+// ---- Prefixed hash ----
+float acuHash21(vec2 p) {
+  p = fract(p * vec2(123.34, 456.21));
+  p += dot(p, p + 45.32);
+  return fract(p.x * p.y);
+}
 
-  // Vertical extent with soft falloff
-  float curtainY = 0.1 + wave;
-  float dist = p.y - curtainY;
+// ---- Mountain terrain SDF ----
+float acuMountainHeight(vec2 xz) {
+  float base = 0.0;
+  // Large mountain ridges
+  base += ridged4(vec3(xz * 0.08, 0.0)) * 4.5;
+  // Medium detail
+  base += fbm3(vec3(xz * 0.2, 1.0)) * 1.8;
+  // Fine rocky detail
+  base += snoise(vec3(xz * 0.6, 2.0)) * 0.4;
+  // Valley in center
+  float valleyMask = smoothstep(0.0, 8.0, abs(xz.x));
+  base *= valleyMask * 0.7 + 0.3;
+  return base - 3.0;
+}
 
-  // Soft vertical gradient (brighter at top, fades toward bottom)
-  float vGrad = smoothstep(-0.3, 0.1, dist) * smoothstep(0.5, 0.0, dist);
+float acuTerrainSDF(vec3 pos) {
+  return pos.y - acuMountainHeight(pos.xz);
+}
 
-  return vGrad;
+// ---- Snow cap mask ----
+float acuSnowMask(vec3 pos, float terrainH) {
+  float slope = length(vec2(
+    acuMountainHeight(pos.xz + vec2(0.1, 0.0)) - acuMountainHeight(pos.xz - vec2(0.1, 0.0)),
+    acuMountainHeight(pos.xz + vec2(0.0, 0.1)) - acuMountainHeight(pos.xz - vec2(0.0, 0.1))
+  ));
+  float altFactor = smoothstep(1.0, 3.5, terrainH);
+  float slopeFactor = smoothstep(2.0, 0.5, slope);
+  return altFactor * slopeFactor;
+}
+
+// ---- Terrain normal via central differences ----
+vec3 acuTerrainNormal(vec3 pos) {
+  float eps = 0.05;
+  float hC = acuMountainHeight(pos.xz);
+  float hX = acuMountainHeight(pos.xz + vec2(eps, 0.0));
+  float hZ = acuMountainHeight(pos.xz + vec2(0.0, eps));
+  return normalize(vec3(hC - hX, eps, hC - hZ));
+}
+
+// ---- Aurora curtain density at a 3D point ----
+float acuAuroraDensity(vec3 pos, float time, float foldComplexity, float curtainAlt,
+                        float swayDir, float bassVal) {
+  // Curtains live between altitude 6-18
+  float altMin = 6.0 + curtainAlt * 2.0;
+  float altMax = altMin + 12.0;
+  float altMask = smoothstep(altMin, altMin + 2.0, pos.y) * smoothstep(altMax, altMax - 3.0, pos.y);
+  if (altMask < 0.001) return 0.0;
+
+  // Curtain sheet: thin in Z, extended in X
+  float curtainZ = sin(pos.x * 0.3 * foldComplexity + time * 0.2 + swayDir) * 2.0;
+  curtainZ += sin(pos.x * 0.7 + time * 0.15) * 0.8;
+  curtainZ += snoise(vec3(pos.x * 0.15, pos.y * 0.1, time * 0.08)) * 3.0;
+
+  float sheetDist = abs(pos.z - curtainZ);
+  float sheetMask = exp(-sheetDist * sheetDist * 0.5);
+
+  // Vertical structure: brighter at top, wispy at bottom
+  float vertGrad = smoothstep(altMin, altMin + 4.0, pos.y);
+  vertGrad *= 1.0 + sin(pos.y * 1.5 + time * 0.3) * 0.2;
+
+  // FBM turbulence for organic feel
+  float turb = fbm3(vec3(pos.x * 0.2, pos.y * 0.3, time * 0.1)) * 0.5 + 0.5;
+
+  // Bass makes curtains thicker/denser
+  float density = sheetMask * altMask * vertGrad * turb * (0.6 + bassVal * 0.4);
+  return density;
+}
+
+// ---- Terrain raymarching ----
+float acuMarchTerrain(vec3 rayOrig, vec3 rayDir) {
+  float dist = 0.0;
+  for (int i = 0; i < ACU_MAX_STEPS; i++) {
+    vec3 pos = rayOrig + rayDir * dist;
+    float sdf = acuTerrainSDF(pos);
+    if (sdf < ACU_SURF_DIST) return dist;
+    if (dist > ACU_MAX_DIST) break;
+    dist += sdf * 0.7; // conservative step
+  }
+  return -1.0;
+}
+
+// ---- Ambient occlusion for terrain ----
+float acuTerrainOcclusion(vec3 pos, vec3 nrm) {
+  float occl = 0.0;
+  float weight = 1.0;
+  for (int i = 1; i <= 5; i++) {
+    float fi = float(i);
+    float sampleDist = fi * 0.3;
+    float sdf = acuTerrainSDF(pos + nrm * sampleDist);
+    occl += weight * (sampleDist - sdf);
+    weight *= 0.6;
+  }
+  return clamp(1.0 - occl * 0.6, 0.0, 1.0);
+}
+
+// ---- Star field ----
+float acuStarField(vec3 rd) {
+  vec3 cell = floor(rd * 80.0);
+  vec3 fr = fract(rd * 80.0) - 0.5;
+  float h = fract(sin(dot(cell, vec3(127.1, 311.7, 74.7))) * 43758.5453);
+  float star = step(0.92, h);
+  float dist = length(fr);
+  return star * smoothstep(0.06, 0.01, dist) * h;
 }
 
 void main() {
   vec2 uv = vUv;
   vec2 aspect = vec2(uResolution.x / uResolution.y, 1.0);
-  vec2 p = (uv - 0.5) * aspect;
+  vec2 screenP = (uv - 0.5) * aspect;
 
+  // ---- Audio clamping ----
   float energy = clamp(uEnergy, 0.0, 1.0);
   float bass = clamp(uBass, 0.0, 1.0);
-  float slowEnergy = clamp(uSlowEnergy, 0.0, 1.0);
-  float melodicPitch = clamp(uMelodicPitch, 0.0, 1.0);
-  float melodicDir = clamp(uMelodicDirection + 1.0, 0.0, 2.0) * 0.5; // remap -1..1 to 0..1
+  float highs = clamp(uHighs, 0.0, 1.0);
+  float mids = clamp(uMids, 0.0, 1.0);
+  float onset = clamp(uOnsetSnap, 0.0, 1.0);
+  float slowE = clamp(uSlowEnergy, 0.0, 1.0);
   float tension = clamp(uHarmonicTension, 0.0, 1.0);
+  float stability = clamp(uBeatStability, 0.0, 1.0);
+  float melodicPitch = clamp(uMelodicPitch * uMelodicConfidence, 0.0, 1.0);
+  float melodicDir = clamp(uMelodicDirection, -1.0, 1.0);
+  float effectiveBeat = uBeatSnap * smoothstep(0.3, 0.7, uBeatConfidence);
+  float vocalGlow = uVocalEnergy * 0.12;
   float chromaHueMod = uChromaHue * 0.25;
+  float chordConf = smoothstep(0.3, 0.6, uChordConfidence);
+  float chordHue = float(int(uChordIndex)) / 24.0 * 0.12 * chordConf;
 
-  // === SECTION-TYPE MODULATION ===
+  float e2 = energy * energy;
+  float slowTime = uDynamicTime * 0.015;
+
+  // ---- Section modulation ----
   float sectionT = uSectionType;
   float sJam = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
   float sSpace = smoothstep(6.5, 7.5, sectionT);
   float sChorus = smoothstep(1.5, 2.5, sectionT) * (1.0 - step(2.5, sectionT));
   float sSolo = smoothstep(3.5, 4.5, sectionT) * (1.0 - step(4.5, sectionT));
+  float sectionSpeed = mix(1.0, 1.5, sJam) * mix(1.0, 0.3, sSpace);
+  float sectionBright = mix(1.0, 1.3, sChorus) * mix(1.0, 0.5, sSpace) * mix(1.0, 1.4, sSolo);
 
-  // [SLOW DOWN] Halved time multiplier (was 0.03)
-  float slowTime = uDynamicTime * 0.015 * mix(1.0, 1.5, sJam) * mix(1.0, 0.3, sSpace);
-
-  // [DARKEN] Energy-squared for dramatic dynamic range
-  float e2 = energy * energy;
-
-  // --- Domain warping + energy detail ---
-  // [SLOW DOWN] Halved warp speed (was 0.05)
-  vec2 warpedP = p + vec2(fbm3(vec3(p * 0.5, uDynamicTime * 0.025)), fbm3(vec3(p * 0.5 + 100.0, uDynamicTime * 0.025))) * 0.3;
-  float detailMod = 1.0 + energy * 0.5;
-
-  // --- [DARKEN] Sky background gradient (darkened from 0.005-0.04 range) ---
-  float skyGrad = smoothstep(-0.5, 0.3, p.y);
-  vec3 skyLow = vec3(0.002, 0.003, 0.008);
-  vec3 skyHigh = vec3(0.004, 0.006, 0.015);
-  vec3 col = mix(skyLow, skyHigh, skyGrad);
-
-  // --- Multi-layer aurora curtains ---
-  float curtainHeight = mix(0.05, 0.15, melodicPitch);
-  float foldComplexity = 3.0 + tension * 5.0;
-  float waveDir = mix(-0.5, 0.5, melodicDir);
-
-  // Layer 1: main curtain — [DARKEN] gated by e2, [REDUCE SATURATION] floor 0.1
-  float c1 = auroraCurtain(p, slowTime, foldComplexity, curtainHeight, 0.3 + waveDir, 0.0);
-  float n1 = fbm3(vec3(p * 3.0, slowTime * 0.5)) * 0.5 + 0.5;
-  float hue1 = uPalettePrimary + chromaHueMod;
-  vec3 layer1 = hsv2rgb(vec3(hue1, mix(0.1, 0.9, e2) * uPaletteSaturation, c1 * n1 * slowEnergy * e2));
-
-  // Layer 2: secondary curtain (offset) — [DARKEN] gated by e2, [REDUCE SATURATION] floor 0.08
-  float c2 = auroraCurtain(p + vec2(0.1, -0.05), slowTime * 0.8, foldComplexity * 1.3, curtainHeight * 0.7, 0.2 - waveDir * 0.5, PI * 0.5);
-  float n2 = fbm3(vec3(p * 4.0 + 10.0, slowTime * 0.4)) * 0.5 + 0.5;
-  float hue2 = uPaletteSecondary + chromaHueMod * 0.5;
-  vec3 layer2 = hsv2rgb(vec3(hue2, mix(0.08, 0.85, e2) * uPaletteSaturation, c2 * n2 * slowEnergy * 0.8 * e2));
-
-  // Layer 3: subtle background shimmer — [DARKEN] gated by e2, [REDUCE SATURATION] floor 0.1
-  float c3 = auroraCurtain(p + vec2(-0.15, 0.03), slowTime * 0.6, foldComplexity * 0.7, curtainHeight * 1.2, 0.15, PI);
-  float n3 = fbm6(p * 2.0 * detailMod + slowTime * 0.2) * 0.5 + 0.5;
-  float hue3 = mix(hue1, hue2, 0.5) + 0.1;
-  vec3 layer3 = hsv2rgb(vec3(hue3, mix(0.1, 0.4, e2) * uPaletteSaturation, c3 * n3 * slowEnergy * 0.4 * e2));
-
-  col += layer1 + layer2 + layer3;
-
-  // --- Magnetic field line shimmer ---
-  float fieldLines = sin(p.x * 20.0 + p.y * 5.0 + slowTime * 2.0) * 0.5 + 0.5;
-  fieldLines *= smoothstep(-0.1, 0.2, p.y) * smoothstep(0.5, 0.1, p.y);
-  col += vec3(fieldLines * 0.03) * energy;
-
-  // --- Ground glow ---
-  float groundGlow = exp(-max(-p.y - 0.3, 0.0) * 8.0) * bass * 0.15;
-  vec3 glowColor = hsv2rgb(vec3(uPalettePrimary + 0.05, 0.6, groundGlow));
-  col += glowColor;
-
-  // --- Star field in dark sky ---
-  float starNoise = snoise(vec3(p * 100.0, 0.0));
-  float stars = smoothstep(0.97, 1.0, starNoise) * 0.5;
-  stars *= smoothstep(0.0, 0.3, p.y); // only in upper sky
-  col += vec3(stars);
-
-  // --- Climax boost ---
+  // ---- Climax ----
   float isClimax = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5);
   float climaxBoost = isClimax * uClimaxIntensity;
-  col *= 1.0 + climaxBoost * 0.5;
 
+  // ---- Palette ----
+  float hue1 = uPalettePrimary + chromaHueMod + chordHue;
+  float hue2 = uPaletteSecondary + chordHue * 0.5;
+  float sat = mix(0.1, 0.9, e2) * uPaletteSaturation;
 
-  // --- SDF icon emergence ---
-  {
-    float nf = fbm3(vec3(p * 2.0, slowTime));
-    vec3 ic1 = hsv2rgb(vec3(uPalettePrimary, 0.8, 1.0));
-    vec3 ic2 = hsv2rgb(vec3(uPaletteSecondary, 0.8, 1.0));
-    col += iconEmergence(p, uTime, energy, bass, ic1, ic2, nf, uClimaxPhase, uSectionIndex) * 0.5;
+  // ---- Camera setup via shared system ----
+  vec3 rayOrig, rayDir;
+  setupCameraRay(uv, aspect, rayOrig, rayDir);
+
+  // Override camera for this scene: positioned on hillside looking across valley
+  float camSway = sin(slowTime * 0.3 * sectionSpeed) * 0.5;
+  rayOrig = vec3(camSway, 4.0 + melodicPitch * 1.5, -12.0 + sin(slowTime * 0.1) * 2.0);
+  vec3 camFwd = normalize(vec3(sin(slowTime * 0.08) * 0.2, 0.15, 1.0));
+  vec3 camSide = normalize(cross(camFwd, vec3(0.0, 1.0, 0.0)));
+  vec3 camVert = cross(camSide, camFwd);
+  float fovScale = tan(radians(mix(50.0, 65.0, energy)) * 0.5);
+  rayDir = normalize(camFwd + camSide * screenP.x * fovScale + camVert * screenP.y * fovScale);
+
+  // ---- Sky gradient ----
+  float skyGrad = smoothstep(-0.1, 0.6, rayDir.y);
+  vec3 skyLow = vec3(0.002, 0.004, 0.012);
+  vec3 skyHigh = vec3(0.005, 0.008, 0.025);
+  vec3 col = mix(skyLow, skyHigh, skyGrad);
+
+  // ---- Stars ----
+  float stars = acuStarField(rayDir) * (0.3 + highs * 0.7);
+  stars *= smoothstep(0.05, 0.3, rayDir.y); // only above horizon
+  float starTwinkle = sin(uDynamicTime * 3.0 + acuHash21(rayDir.xz * 100.0) * TAU) * 0.3 + 0.7;
+  col += vec3(0.9, 0.93, 1.0) * stars * starTwinkle * (1.0 - e2 * 0.3);
+
+  // ---- Raymarch terrain ----
+  float terrainDist = acuMarchTerrain(rayOrig, rayDir);
+  float terrainMask = 0.0;
+
+  if (terrainDist > 0.0) {
+    terrainMask = 1.0;
+    vec3 terrainPos = rayOrig + rayDir * terrainDist;
+    vec3 terrainNrm = acuTerrainNormal(terrainPos);
+    float terrainH = acuMountainHeight(terrainPos.xz);
+
+    // Ambient occlusion
+    float occl = acuTerrainOcclusion(terrainPos, terrainNrm);
+
+    // Moonlight direction
+    vec3 moonDir = normalize(vec3(0.3, 0.8, -0.5));
+    float diffuse = max(dot(terrainNrm, moonDir), 0.0);
+
+    // Specular (Blinn-Phong)
+    vec3 halfVec = normalize(moonDir - rayDir);
+    float specular = pow(max(dot(terrainNrm, halfVec), 0.0), 32.0);
+
+    // Fresnel rim
+    float fresnelVal = pow(1.0 - max(dot(terrainNrm, -rayDir), 0.0), 3.0);
+
+    // Snow
+    float snow = acuSnowMask(terrainPos, terrainH);
+
+    // Rock color: dark with palette tint
+    vec3 rockColor = vec3(0.02, 0.025, 0.03) + hsv2rgb(vec3(hue1, 0.2, 0.03));
+    vec3 snowColor = vec3(0.12, 0.14, 0.18);
+    vec3 terrainCol = mix(rockColor, snowColor, snow);
+
+    // Apply lighting
+    vec3 moonLight = vec3(0.15, 0.18, 0.25) * (0.5 + e2 * 0.5);
+    vec3 ambient = vec3(0.008, 0.01, 0.02);
+
+    terrainCol = terrainCol * (ambient + moonLight * diffuse * occl);
+    terrainCol += moonLight * specular * snow * 0.3 * occl;
+    terrainCol += vec3(0.04, 0.06, 0.1) * fresnelVal * 0.15;
+
+    // Bass ground glow
+    float glowFromBelow = exp(-max(terrainH - 0.5, 0.0) * 0.5) * bass * 0.08;
+    vec3 groundGlowCol = hsv2rgb(vec3(hue1, 0.6, 1.0));
+    terrainCol += groundGlowCol * glowFromBelow * e2;
+
+    // Vocal warmth glow
+    terrainCol += vec3(0.04, 0.02, 0.01) * vocalGlow * e2;
+
+    // Distance fog
+    float fogFactor = 1.0 - exp(-terrainDist * 0.03);
+    terrainCol = mix(terrainCol, skyLow, fogFactor);
+
+    col = terrainCol;
   }
 
-  // === ATMOSPHERIC DEPTH ===
-  float fogNoise_ad = fbm3(vec3(p * 0.5, uDynamicTime * 0.012));
-  float fogDensity_ad = mix(0.35, 0.02, energy);
-  vec3 fogColor_ad = vec3(0.01, 0.008, 0.015);
+  // ---- Volumetric aurora curtains ----
+  float foldComplexity = 1.0 + tension * 3.0;
+  float curtainAlt = melodicPitch * 2.0;
+  float swayDir = melodicDir * 0.5;
+  float auroraTime = slowTime * sectionSpeed * (0.8 + slowE * 0.4);
+
+  // March through aurora volume
+  int auroraSteps = int(mix(32.0, 64.0, energy));
+  float auroraStepSize = 0.5;
+  vec3 auroraAccum = vec3(0.0);
+  float auroraAlpha = 0.0;
+
+  for (int i = 0; i < 64; i++) {
+    if (i >= auroraSteps) break;
+    if (auroraAlpha > 0.92) break;
+    float fi = float(i);
+    float marchT = 2.0 + fi * auroraStepSize;
+
+    // Stop if we hit terrain
+    if (terrainDist > 0.0 && marchT > terrainDist) break;
+
+    vec3 samplePos = rayOrig + rayDir * marchT;
+
+    float density = acuAuroraDensity(samplePos, auroraTime, foldComplexity,
+                                      curtainAlt, swayDir, bass);
+    if (density < 0.001) continue;
+
+    density *= 0.08 * (0.3 + e2 * 0.7) * sectionBright;
+    density += climaxBoost * density * 0.5;
+
+    float alpha = density * (1.0 - auroraAlpha);
+
+    // Aurora color: varies with altitude and horizontal position
+    float colorPhase = samplePos.y * 0.06 + samplePos.x * 0.02 + auroraTime * 0.15;
+    float auroraHue = fract(hue1 + colorPhase * 0.3);
+    vec3 auroraCol = hsv2rgb(vec3(auroraHue, mix(0.3, 0.95, e2) * uPaletteSaturation, 1.0));
+
+    // Bottom of curtains gets warmer (oxygen emission red)
+    float warmBottom = smoothstep(10.0, 6.0, samplePos.y);
+    vec3 warmCol = hsv2rgb(vec3(fract(hue2 + 0.05), 0.7, 0.9));
+    auroraCol = mix(auroraCol, warmCol, warmBottom * 0.4);
+
+    // Mids boost mid-altitude brightness
+    float midAlt = smoothstep(8.0, 12.0, samplePos.y) * smoothstep(16.0, 12.0, samplePos.y);
+    auroraCol *= 1.0 + mids * midAlt * 0.3;
+
+    // Onset flash
+    auroraCol *= 1.0 + onset * 0.8 * exp(-fi * 0.05);
+
+    // Beat ripple
+    float beatRipple = sin(samplePos.x * 2.0 + effectiveBeat * TAU) * effectiveBeat * 0.15;
+    auroraCol *= 1.0 + beatRipple;
+
+    auroraAccum += auroraCol * alpha;
+    auroraAlpha += alpha;
+  }
+
+  // Blend aurora over scene (additive emission)
+  col += auroraAccum;
+
+  // ---- Aurora reflection on snow (if terrain visible) ----
+  if (terrainDist > 0.0) {
+    vec3 terrainPos = rayOrig + rayDir * terrainDist;
+    float terrainH = acuMountainHeight(terrainPos.xz);
+    float snow = acuSnowMask(terrainPos, terrainH);
+    float reflStrength = snow * auroraAlpha * 0.08 * e2;
+    col += auroraAccum * reflStrength;
+  }
+
+  // ---- Magnetic field line shimmer ----
+  float fieldLines = sin(rayDir.x * 30.0 + rayDir.y * 10.0 + slowTime * 2.0) * 0.5 + 0.5;
+  fieldLines *= smoothstep(0.0, 0.3, rayDir.y) * smoothstep(0.7, 0.3, rayDir.y);
+  col += vec3(fieldLines * 0.015) * energy * auroraAlpha;
+
+  // ---- Climax boost ----
+  col *= 1.0 + climaxBoost * 0.5;
+
+  // ---- SDF icon emergence ----
+  {
+    float nf = fbm3(vec3(screenP * 2.0, slowTime));
+    vec3 ic1 = hsv2rgb(vec3(hue1, 0.8, 1.0));
+    vec3 ic2 = hsv2rgb(vec3(hue2, 0.8, 1.0));
+    col += iconEmergence(screenP, uTime, energy, bass, ic1, ic2, nf, uClimaxPhase, uSectionIndex) * 0.5;
+    col += heroIconEmergence(screenP, uTime, energy, bass, ic1, ic2, nf, uSectionIndex);
+  }
+
+  // ---- Atmospheric depth ----
+  float fogNoise_ad = fbm3(vec3(screenP * 0.5, uDynamicTime * 0.012));
+  float fogDensity_ad = mix(0.3, 0.02, energy);
+  vec3 fogColor_ad = vec3(0.005, 0.006, 0.015);
   col = mix(col, fogColor_ad, fogDensity_ad * (0.5 + fogNoise_ad * 0.5));
 
-  // --- Vignette ---
+  // ---- Vignette ----
   float vigScale = mix(0.28, 0.20, energy);
-  float vignette = 1.0 - dot(p * vigScale, p * vigScale);
+  float vignette = 1.0 - dot(screenP * vigScale, screenP * vigScale);
   vignette = smoothstep(0.0, 1.0, vignette);
-  // [LOWER BLACK FLOOR] Near-black vignette edge
   col = mix(vec3(0.002, 0.003, 0.008), col, vignette);
 
-  // --- Post-processing ---
-  col = applyPostProcess(col, vUv, p);
+  // ---- Post-processing ----
+  col = applyPostProcess(col, vUv, screenP);
 
   gl_FragColor = vec4(col, 1.0);
 }

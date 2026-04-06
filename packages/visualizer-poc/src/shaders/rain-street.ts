@@ -1,23 +1,26 @@
 /**
- * Rain Street — wet city street at night, noir cinematic atmosphere.
- * Rain streaks fall as animated vertical lines. Puddles reflect colored
- * neon-like light. Fog at ground level. Street lamp glow with bloom.
+ * Rain Street — raymarched rainy city street at night. Noir aesthetic.
+ * Wet pavement with puddle reflections, falling rain particles, neon sign
+ * reflections in puddles, streetlamp volumetric cones, building silhouettes.
+ * Full 3D raymarched SDF scene with proper lighting and atmospheric effects.
  *
- * Designed for melancholic, contemplative songs (Wharf Rat, Black Muddy River).
- * MASSIVE dynamic range: gentle drizzle -> driving rain.
- *
- * Audio reactivity:
- *   uEnergy     -> rain intensity, puddle activity, lamp brightness
- *   uBeat/uOnset -> puddle ripple bursts (expanding circles)
- *   uBass       -> ground-level fog pulse, deep puddle reflections
- *   uChromaHue  -> reflected neon color shifts
- *   uStemVocalRms -> fog density at ground level
- *   uFlatness   -> rain streak density (noisy=more rain)
- *   uSlowEnergy -> overall ambient light, reflection clarity
- *   uOnsetSnap  -> splash highlights, bright droplet flashes
- *   uPalettePrimary   -> dominant neon reflection color
- *   uPaletteSecondary -> secondary reflection / lamp color
- *   uSectionType -> jam=driving rain, space=just puddle reflections, solo=spotlight from lamp
+ * Audio reactivity (14+ uniforms):
+ *   uEnergy           → rain intensity, puddle activity, lamp brightness
+ *   uBass             → ground fog pulse, deep puddle reflections
+ *   uHighs            → rain streak sharpness, specular on wet surfaces
+ *   uOnsetSnap        → puddle splash burst, lightning flash
+ *   uBeatSnap         → puddle ripple sync
+ *   uSlowEnergy       → ambient light level, reflection clarity
+ *   uHarmonicTension  → fog turbulence, neon flicker
+ *   uMelodicPitch     → camera angle shift, neon sign color temp
+ *   uChromaHue        → reflected neon color shifts
+ *   uChordIndex       → neon palette micro-rotation
+ *   uVocalEnergy      → fog density at ground level
+ *   uFlatness         → rain streak density
+ *   uSpectralFlux     → rain speed variation
+ *   uSectionType      → jam=driving rain, space=just puddle reflections, solo=spotlight
+ *   uClimaxPhase      → full downpour + lightning
+ *   uPalettePrimary/Secondary → neon reflection colors
  */
 
 import { noiseGLSL } from "./noise";
@@ -39,295 +42,385 @@ ${sharedUniformsGLSL}
 
 ${noiseGLSL}
 
-${buildPostProcessGLSL({ grainStrength: 'heavy', bloomEnabled: true, halationEnabled: true, caEnabled: true })}
+${buildPostProcessGLSL({ grainStrength: "heavy", bloomEnabled: true, halationEnabled: true, caEnabled: true })}
 
 varying vec2 vUv;
 
 #define PI 3.14159265
+#define TAU 6.28318530
+#define MAX_STEPS 80
+#define MAX_DIST 30.0
+#define SURF_DIST 0.003
 
-// --- Rain streak: animated vertical falling line ---
-float rainStreak(vec2 uv, float seed, float time, float speed) {
-  float h1 = fract(sin(seed * 127.1) * 43758.5453);
-  float h2 = fract(sin(seed * 311.7) * 43758.5453);
-  float h3 = fract(sin(seed * 543.3) * 43758.5453);
+// ═══════════════════════════════════════════════════════════
+// Prefixed SDF primitives — rs namespace
+// ═══════════════════════════════════════════════════════════
 
-  float x = h1;
+float rsSdBox(vec3 pos, vec3 bounds) {
+  vec3 q = abs(pos) - bounds;
+  return length(max(q, 0.0)) + min(max(q.x, max(q.y, q.z)), 0.0);
+}
+
+float rsSdSphere(vec3 pos, float radius) {
+  return length(pos) - radius;
+}
+
+float rsSdCappedCylinder(vec3 pos, float radius, float halfH) {
+  float dR = length(pos.xz) - radius;
+  float dY = abs(pos.y) - halfH;
+  return min(max(dR, dY), 0.0) + length(max(vec2(dR, dY), 0.0));
+}
+
+float rsSdRoundBox(vec3 pos, vec3 bounds, float rad) {
+  vec3 q = abs(pos) - bounds;
+  return length(max(q, 0.0)) + min(max(q.x, max(q.y, q.z)), 0.0) - rad;
+}
+
+// ═══════════════════════════════════════════════════════════
+// Scene SDF — the rain-soaked noir street
+// ═══════════════════════════════════════════════════════════
+
+vec2 rsSceneSDF(vec3 pos, float flowTime) {
+  float matId = 0.0;
+  float minDist = 100.0;
+
+  // Street surface: flat ground with puddle depressions
+  float puddleNoise = snoise(vec3(pos.x * 2.0, pos.z * 2.0, 0.5)) * 0.03;
+  float streetY = pos.y + puddleNoise;
+  if (streetY < minDist) { minDist = streetY; matId = 0.0; }
+
+  // Sidewalk curb (left and right)
+  float curbL = rsSdBox(pos - vec3(-4.0, 0.08, 0.0), vec3(0.5, 0.08, 20.0));
+  if (curbL < minDist) { minDist = curbL; matId = 1.0; }
+  float curbR = rsSdBox(pos - vec3(4.0, 0.08, 0.0), vec3(0.5, 0.08, 20.0));
+  if (curbR < minDist) { minDist = curbR; matId = 1.0; }
+
+  // Buildings: left side
+  for (int i = 0; i < 4; i++) {
+    float fi = float(i);
+    float buildZ = fi * 5.0 - 5.0;
+    float buildH = 4.0 + 2.0 * fract(sin(fi * 127.1) * 43758.5);
+    float buildW = 2.0 + 0.5 * fract(sin(fi * 311.7) * 43758.5);
+    float building = rsSdBox(pos - vec3(-6.0 - buildW, buildH * 0.5, buildZ), vec3(buildW, buildH * 0.5, 2.0));
+    if (building < minDist) { minDist = building; matId = 2.0 + fi * 0.1; }
+  }
+
+  // Buildings: right side
+  for (int i = 0; i < 4; i++) {
+    float fi = float(i);
+    float buildZ = fi * 5.0 - 3.0;
+    float buildH = 3.5 + 2.5 * fract(sin((fi + 10.0) * 127.1) * 43758.5);
+    float buildW = 1.8 + 0.8 * fract(sin((fi + 10.0) * 311.7) * 43758.5);
+    float building = rsSdBox(pos - vec3(6.0 + buildW, buildH * 0.5, buildZ), vec3(buildW, buildH * 0.5, 2.0));
+    if (building < minDist) { minDist = building; matId = 2.0 + (fi + 4.0) * 0.1; }
+  }
+
+  // Street lamps (2 tall poles with spherical lights)
+  for (int i = 0; i < 2; i++) {
+    float fi = float(i);
+    float lampX = mix(-3.5, 3.5, fi);
+    float lampZ = mix(-2.0, 5.0, fi);
+    // Pole
+    vec3 polePos = pos - vec3(lampX, 2.0, lampZ);
+    float pole = rsSdCappedCylinder(polePos, 0.05, 2.0);
+    // Arm
+    vec3 armPos = pos - vec3(lampX + (fi < 0.5 ? 0.3 : -0.3), 3.8, lampZ);
+    float arm = rsSdBox(armPos, vec3(0.3, 0.02, 0.02));
+    // Lamp head
+    vec3 lampHeadPos = pos - vec3(lampX + (fi < 0.5 ? 0.5 : -0.5), 3.7, lampZ);
+    float lampHead = rsSdSphere(lampHeadPos, 0.12);
+    float lamp = min(pole, min(arm, lampHead));
+    if (lamp < minDist) { minDist = lamp; matId = 3.0 + fi * 0.1; }
+  }
+
+  // Neon signs on buildings
+  {
+    vec3 neonPos1 = pos - vec3(-5.0, 3.0, -2.0);
+    float neon1 = rsSdRoundBox(neonPos1, vec3(0.03, 0.3, 0.8), 0.02);
+    if (neon1 < minDist) { minDist = neon1; matId = 4.0; }
+
+    vec3 neonPos2 = pos - vec3(5.2, 2.5, 4.0);
+    float neon2 = rsSdRoundBox(neonPos2, vec3(0.03, 0.25, 0.6), 0.02);
+    if (neon2 < minDist) { minDist = neon2; matId = 4.5; }
+  }
+
+  return vec2(minDist, matId);
+}
+
+// ═══════════════════════════════════════════════════════════
+// Normal, AO
+// ═══════════════════════════════════════════════════════════
+
+vec3 rsCalcNormal(vec3 pos, float flowTime) {
+  vec2 eps = vec2(0.003, 0.0);
+  float d0 = rsSceneSDF(pos, flowTime).x;
+  return normalize(vec3(
+    rsSceneSDF(pos + eps.xyy, flowTime).x - d0,
+    rsSceneSDF(pos + eps.yxy, flowTime).x - d0,
+    rsSceneSDF(pos + eps.yyx, flowTime).x - d0
+  ));
+}
+
+float rsCalcAO(vec3 pos, vec3 norm, float flowTime) {
+  float occ = 0.0;
+  float weight = 1.0;
+  for (int i = 1; i <= 5; i++) {
+    float dist = float(i) * 0.12;
+    float sampled = rsSceneSDF(pos + norm * dist, flowTime).x;
+    occ += (dist - sampled) * weight;
+    weight *= 0.6;
+  }
+  return clamp(1.0 - occ * 2.5, 0.0, 1.0);
+}
+
+// ═══════════════════════════════════════════════════════════
+// Rain particles — screen-space for efficiency
+// ═══════════════════════════════════════════════════════════
+
+float rsRainStreak(vec2 fragUv, float seed, float rainTime, float speed) {
+  float h1 = fract(sin(seed * 127.1) * 43758.5);
+  float h2 = fract(sin(seed * 311.7) * 43758.5);
+  float h3 = fract(sin(seed * 543.3) * 43758.5);
+  float posX = h1;
   float fallSpeed = speed * (0.7 + h2 * 0.6);
-  float y = fract(h3 + time * fallSpeed);
-
-  // Streak shape: very thin vertical line
-  float dx = abs(uv.x - x);
-  float dy = uv.y - (1.0 - y);
-
-  float streakLen = 0.03 + h2 * 0.04;
+  float posY = fract(h3 + rainTime * fallSpeed);
+  float dx = abs(fragUv.x - posX);
+  float dy = fragUv.y - (1.0 - posY);
+  float streakLen = 0.025 + h2 * 0.035;
   float inStreak = step(0.0, dy) * step(dy, streakLen);
-  float thin = smoothstep(0.002, 0.0005, dx);
-
+  float thin = smoothstep(0.0015, 0.0004, dx);
   return thin * inStreak * (0.5 + h3 * 0.5);
 }
 
-// --- Puddle ripple: expanding concentric circle ---
-float puddleRipple(vec2 uv, vec2 center, float time, float birth) {
-  float age = time - birth;
-  if (age < 0.0 || age > 2.0) return 0.0;
-
-  float dist = length(uv - center);
-  float radius = age * 0.15;
-  float ring = smoothstep(0.008, 0.0, abs(dist - radius) - 0.003);
-  float fade = smoothstep(2.0, 0.0, age);
-
-  return ring * fade;
-}
-
-// --- Street lamp glow ---
-vec3 lampGlow(vec2 p, vec2 lampPos, vec3 lampColor, float intensity) {
-  float dist = length(p - lampPos);
-  // Soft circular glow with inverse-square falloff
-  float glow = intensity / (1.0 + dist * dist * 25.0);
-  // Bloom halo: wider, dimmer
-  float halo = intensity * 0.3 / (1.0 + dist * dist * 6.0);
-  return lampColor * (glow + halo);
-}
-
 void main() {
-  vec2 uv = vUv;
+  vec2 fragUv = vUv;
   vec2 aspect = vec2(uResolution.x / uResolution.y, 1.0);
-  vec2 p = (uv - 0.5) * aspect;
+  vec2 screenPos = (fragUv - 0.5) * aspect;
 
   float energy = clamp(uEnergy, 0.0, 1.0);
   float bass = clamp(uBass, 0.0, 1.0);
   float highs = clamp(uHighs, 0.0, 1.0);
   float onset = clamp(uOnsetSnap, 0.0, 1.0);
   float slowE = clamp(uSlowEnergy, 0.0, 1.0);
+  float tension = clamp(uHarmonicTension, 0.0, 1.0);
+  float melPitch = clamp(uMelodicPitch * uMelodicConfidence, 0.0, 1.0);
+  float effectiveBeat = uBeatSnap * smoothstep(0.3, 0.7, uBeatConfidence);
+  float flux = clamp(uSpectralFlux, 0.0, 1.0);
+  float vocalE = clamp(uVocalEnergy, 0.0, 1.0);
   float flatness = clamp(uFlatness, 0.0, 1.0);
-  float chromaH = clamp(uChromaHue, 0.0, 1.0);
-  float vocalRms = clamp(uVocalEnergy, 0.0, 1.0);
+  float chromaH = uChromaHue;
+  float chordHue = float(int(uChordIndex)) / 24.0 * 0.1 * smoothstep(0.3, 0.6, uChordConfidence);
 
-  // === SECTION-TYPE MODULATION ===
   float sectionT = uSectionType;
   float sJam = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
   float sSpace = smoothstep(6.5, 7.5, sectionT);
-  float sChorus = smoothstep(1.5, 2.5, sectionT) * (1.0 - step(2.5, sectionT));
   float sSolo = smoothstep(3.5, 4.5, sectionT) * (1.0 - step(4.5, sectionT));
 
-  // === Audio parameters ===
-  float tensionTurb = uHarmonicTension * 0.15;
-  float beatStab = clamp(uBeatStability, 0.0, 1.0);
-  float bp = beatPulse(uMusicalTime);
-  float bpH = beatPulseHalf(uMusicalTime);
+  float isClimax = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5);
+  float climaxBoost = isClimax * uClimaxIntensity;
 
-  // === CLIMAX ===
-  float climaxPhase = uClimaxPhase;
-  float climaxI = uClimaxIntensity;
-  float isClimax = step(1.5, climaxPhase) * step(climaxPhase, 3.5);
-  float climaxBoost = isClimax * climaxI;
-
-  float slowTime = uDynamicTime * 0.12;
-
-  // --- Domain warping + detail ---
-  vec2 warpedP = p + vec2(fbm3(vec3(p * 0.5, uDynamicTime * 0.05)), fbm3(vec3(p * 0.5 + 100.0, uDynamicTime * 0.05))) * 0.3;
-  float detailMod = 1.0 + energy * 0.5;
-
-  // === RAIN INTENSITY: massive dynamic range ===
+  float flowTime = uDynamicTime * 0.08;
   float rainIntensity = mix(0.05, 1.0, energy);
-  rainIntensity *= mix(1.0, 1.5, sJam) * mix(1.0, 0.05, sSpace) * mix(1.0, 0.7, sSolo);
-  rainIntensity += flatness * 0.2;
+  rainIntensity *= mix(1.0, 1.5, sJam) * mix(1.0, 0.1, sSpace);
   rainIntensity += climaxBoost * 0.3;
-  rainIntensity = clamp(rainIntensity, 0.0, 1.5);
 
-  // === NEON COLORS from palette + chroma shift ===
-  float hue1 = uPalettePrimary + chromaH * 0.08;
-  float hue2 = uPaletteSecondary + chromaH * 0.06;
+  // Palette: neon noir
+  float hue1 = uPalettePrimary + chromaH * 0.08 + chordHue;
+  float hue2 = uPaletteSecondary + chromaH * 0.06 + chordHue * 0.5;
   float sat = mix(0.7, 1.0, slowE) * uPaletteSaturation;
+  vec3 neonCol1 = hsv2rgb(vec3(hue1, sat, 0.9));
+  vec3 neonCol2 = hsv2rgb(vec3(hue2, sat * 0.9, 0.85));
+  neonCol1 = mix(neonCol1, vec3(0.9, 0.2, 0.5), 0.2); // magenta tint
+  neonCol2 = mix(neonCol2, vec3(0.2, 0.5, 0.9), 0.2); // cyan tint
 
-  vec3 neonColor1 = hsv2rgb(vec3(hue1, sat, 0.9));
-  vec3 neonColor2 = hsv2rgb(vec3(hue2, sat * 0.9, 0.85));
-  // Ensure cinematic neon tones
-  neonColor1 = mix(neonColor1, vec3(0.9, 0.2, 0.5), 0.2);  // magenta hint
-  neonColor2 = mix(neonColor2, vec3(0.2, 0.5, 0.9), 0.2);  // cyan hint
+  // Lamp positions
+  vec3 lampPos1 = vec3(-3.2, 3.7, -2.0);
+  vec3 lampPos2 = vec3(3.8, 3.7, 5.0);
+  vec3 neonSignPos1 = vec3(-5.0, 3.0, -2.0);
+  vec3 neonSignPos2 = vec3(5.2, 2.5, 4.0);
+  vec3 lampColor1 = vec3(1.0, 0.85, 0.5); // sodium
+  vec3 lampColor2 = mix(neonCol2, vec3(0.9, 0.9, 1.0), 0.4);
 
-  float energyFreq = 1.0 + energy * 0.5;
+  // ═══ Camera ═══
+  float slowTime = uDynamicTime * 0.03;
+  float camX = sin(slowTime * 0.3) * 1.5;
+  float camY = 1.5 + melPitch * 0.5 + cos(slowTime * 0.2) * 0.2;
+  vec3 camOrigin = vec3(camX, camY, -5.0 + sin(slowTime * 0.15) * 2.0);
+  vec3 camLookAt = vec3(0.0, 1.0, 6.0);
+  camLookAt = mix(camLookAt, vec3(lampPos1.x, 2.0, lampPos1.z), sSolo * 0.3);
 
-  // === SKY: dark overcast night — domain-warped clouds for richness ===
-  vec3 skyColor = mix(
-    vec3(0.02, 0.02, 0.035),
-    vec3(0.04, 0.035, 0.05),
-    smoothstep(0.0, 0.5, uv.y)
-  );
-  // Palette-tinted sky undertone
-  skyColor = mix(skyColor, hsv2rgb(vec3(uPaletteSecondary + chromaH * 0.05, 0.1, 0.03)), 0.15);
-  // Domain-warped cloud texture (fbm6 for rich detail)
-  vec3 cloudWarpPos = vec3(p.x * 0.5, p.y * 0.3, slowTime * 0.03);
-  float cloudWarp = fbm3(cloudWarpPos) * 0.3;
-  float clouds = fbm6(vec3(p.x * 1.5 * energyFreq + cloudWarp, p.y * 0.8 + slowTime * 0.05, slowTime * 0.1));
-  skyColor += vec3(0.015) * smoothstep(-0.1, 0.3, clouds) * smoothstep(0.2, 0.5, uv.y);
-  // Secondary cloud layer for depth (30%)
-  float cloudLayer2 = fbm3(vec3(p.x * 0.8 - slowTime * 0.02, p.y * 0.5 + 5.0, slowTime * 0.08));
-  skyColor += vec3(0.01, 0.008, 0.012) * smoothstep(0.0, 0.4, cloudLayer2) * smoothstep(0.3, 0.6, uv.y) * 0.3;
+  vec3 camFwd = normalize(camLookAt - camOrigin);
+  vec3 camRt = normalize(cross(vec3(0.0, 1.0, 0.0), camFwd));
+  vec3 camUpDir = cross(camFwd, camRt);
+  float fov = 1.2;
+  vec3 rayDir = normalize(screenPos.x * camRt + screenPos.y * camUpDir + fov * camFwd);
 
-  vec3 col = skyColor;
+  // ═══ Raymarch ═══
+  float totalDist = 0.0;
+  float matId = 0.0;
+  bool didHitSurface = false;
 
-  // === STREET HORIZON ===
-  float horizonY = -0.05;
-  float isStreet = smoothstep(horizonY + 0.03, horizonY - 0.02, p.y);
-
-  // === BUILDINGS: silhouette skyline ===
-  float buildingH = 0.15 + 0.2 * step(0.5, fract(p.x * 3.0 + 0.2))
-                   + 0.12 * step(0.6, fract(p.x * 5.0 + 0.7))
-                   + 0.08 * snoise(vec3(floor(p.x * 4.0), 0.0, 3.0));
-  float buildingMask = step(p.y, horizonY + buildingH) * step(horizonY, p.y);
-  // Windows: scattered lit rectangles
-  vec2 winGrid = fract(vec2(p.x * 20.0, (p.y - horizonY) * 30.0));
-  float hasWindow = step(0.7, fract(sin(dot(floor(vec2(p.x * 20.0, (p.y - horizonY) * 30.0)), vec2(127.1, 311.7))) * 43758.5453));
-  float winLight = step(0.3, winGrid.x) * step(winGrid.x, 0.7) * step(0.3, winGrid.y) * step(winGrid.y, 0.7) * hasWindow;
-  vec3 buildingCol = vec3(0.01, 0.01, 0.015);
-  buildingCol += mix(neonColor1, neonColor2, fract(p.x * 3.0)) * winLight * 0.15;
-  col = mix(col, buildingCol, buildingMask);
-
-  // === STREET LAMPS ===
-  vec2 lamp1Pos = vec2(-0.35, horizonY + 0.25);
-  vec2 lamp2Pos = vec2(0.45, horizonY + 0.22);
-  vec3 lampColor1 = vec3(1.0, 0.85, 0.5); // warm sodium
-  vec3 lampColor2 = mix(neonColor2, vec3(0.9, 0.9, 1.0), 0.5); // cool white-blue
-
-  float lampIntensity = mix(0.15, 0.4, slowE) + sSolo * 0.25;
-  lampIntensity += climaxBoost * 0.1;
-
-  col += lampGlow(p, lamp1Pos, lampColor1, lampIntensity);
-  col += lampGlow(p, lamp2Pos, lampColor2, lampIntensity * 0.7);
-
-  // Lamp pole silhouettes
-  float pole1 = smoothstep(0.008, 0.003, abs(p.x - lamp1Pos.x)) * step(horizonY, p.y) * step(p.y, lamp1Pos.y);
-  float pole2 = smoothstep(0.008, 0.003, abs(p.x - lamp2Pos.x)) * step(horizonY, p.y) * step(p.y, lamp2Pos.y);
-  col = mix(col, vec3(0.01), max(pole1, pole2));
-
-  // === WET STREET SURFACE ===
-  vec3 streetColor = vec3(0.015, 0.015, 0.02);
-
-  // Puddle areas: irregular shapes on the street
-  float puddleNoise = snoise(vec3(p.x * 4.0, p.y * 6.0, 2.5));
-  float puddleArea = smoothstep(0.1, 0.3, puddleNoise) * isStreet;
-
-  // Puddle reflections: mirror the scene above with domain-warped distortion
-  vec2 reflUV = vec2(p.x, -p.y + 2.0 * horizonY);
-  // Multi-frequency ripple distortion for shimmer
-  float reflDistort = snoise(vec3(reflUV * 5.0 * energyFreq, uDynamicTime * 0.5)) * 0.02;
-  float reflDistort2 = snoise(vec3(reflUV * 12.0 * energyFreq, uDynamicTime * 0.8 + 3.0)) * 0.008;
-  reflUV += reflDistort + reflDistort2;
-  // Rain impact shimmer: high-frequency ripple breakup
-  float shimmer = snoise(vec3(p * 20.0 * energyFreq, uDynamicTime * 2.0)) * 0.004 * energy;
-  reflUV += shimmer;
-
-  // Reflected lamp glow in puddles
-  vec3 puddleRefl = vec3(0.0);
-  puddleRefl += lampGlow(reflUV, lamp1Pos, lampColor1, lampIntensity * 0.5);
-  puddleRefl += lampGlow(reflUV, lamp2Pos, lampColor2, lampIntensity * 0.35);
-
-  // Neon reflections in wet surface — both palette colors
-  float neonRefl1 = smoothstep(0.5, 0.0, length(reflUV - vec2(-0.2, 0.15)));
-  float neonRefl2 = smoothstep(0.5, 0.0, length(reflUV - vec2(0.3, 0.2)));
-  puddleRefl += neonColor1 * neonRefl1 * 0.15 * slowE;
-  puddleRefl += neonColor2 * neonRefl2 * 0.12 * slowE;
-
-  // === SHIMMER HIGHLIGHT LAYER: specular rain-on-surface sparkle (30%) ===
-  float shimmerNoise = snoise(vec3(p * 30.0 * energyFreq, uDynamicTime * 1.5));
-  float shimmerSparkle = pow(max(0.0, shimmerNoise), 6.0) * energy;
-  vec3 shimmerColor = mix(neonColor1, neonColor2, snoise(vec3(p * 5.0, uDynamicTime * 0.3)) * 0.5 + 0.5);
-  puddleRefl += shimmerColor * shimmerSparkle * 0.3;
-
-  // Wet surface: mix of dark street + reflections
-  float wetness = mix(0.2, 0.6, energy) + puddleArea * 0.3;
-  vec3 wetStreet = mix(streetColor, puddleRefl, wetness);
-
-  // === PUDDLE RIPPLES from beat/onset ===
-  float rippleTotal = 0.0;
-  for (int i = 0; i < 12; i++) {
-    float seed = float(i) * 13.37;
-    float rh1 = fract(sin(seed * 127.1) * 43758.5453);
-    float rh2 = fract(sin(seed * 311.7) * 43758.5453);
-    float rh3 = fract(sin(seed * 543.3) * 43758.5453);
-
-    vec2 rippleCenter = vec2(
-      (rh1 - 0.5) * aspect.x * 0.8,
-      horizonY - 0.05 - rh2 * 0.3
-    );
-
-    // Ripples triggered periodically, more frequent with energy
-    float ripplePeriod = mix(3.0, 0.8, energy);
-    float rippleBirth = floor(uDynamicTime / ripplePeriod + rh3 * ripplePeriod) * ripplePeriod;
-    rippleTotal += puddleRipple(p, rippleCenter, uDynamicTime, rippleBirth);
+  for (int i = 0; i < MAX_STEPS; i++) {
+    vec3 marchPos = camOrigin + rayDir * totalDist;
+    vec2 sceneResult = rsSceneSDF(marchPos, flowTime);
+    float sceneDist = sceneResult.x;
+    matId = sceneResult.y;
+    if (abs(sceneDist) < SURF_DIST) { didHitSurface = true; break; }
+    if (totalDist > MAX_DIST) break;
+    totalDist += sceneDist * 0.8;
   }
 
-  // Beat-triggered splash ripples
-  float beatRipple = puddleRipple(p, vec2(0.0, horizonY - 0.15), uDynamicTime,
-    floor(uMusicalTime) / max(uTempo / 60.0, 0.5));
-  rippleTotal += beatRipple * max(bp, uBeatSnap) * 2.0;
+  vec3 col = vec3(0.015, 0.015, 0.025); // dark overcast sky
 
-  // Ripples add bright highlights to puddles
-  wetStreet += vec3(0.15, 0.12, 0.1) * rippleTotal * puddleArea;
-  // Ripples also distort reflections (already handled by noise)
+  if (didHitSurface) {
+    vec3 hitPos = camOrigin + rayDir * totalDist;
+    vec3 normal = rsCalcNormal(hitPos, flowTime);
+    float ambOcc = rsCalcAO(hitPos, normal, flowTime);
 
-  col = mix(col, wetStreet, isStreet);
+    // Multi-light shading
+    vec3 surfaceCol = vec3(0.0);
+    for (int li = 0; li < 2; li++) {
+      vec3 lightPos = li == 0 ? lampPos1 : lampPos2;
+      vec3 lightCol = li == 0 ? lampColor1 : lampColor2;
+      float intensity = mix(0.15, 0.4, slowE) + sSolo * 0.25 * float(li == 0);
+      vec3 toLight = lightPos - hitPos;
+      float lightDist = length(toLight);
+      vec3 lightDir = toLight / lightDist;
+      float atten = intensity / (1.0 + lightDist * lightDist * 0.15);
+      float diff = max(dot(normal, lightDir), 0.0);
+      vec3 halfVec = normalize(lightDir - rayDir);
+      float spec = pow(max(dot(normal, halfVec), 0.0), 16.0 + highs * 32.0);
+      float fresnel = pow(1.0 - max(dot(normal, -rayDir), 0.0), 3.0);
+      surfaceCol += lightCol * diff * atten;
+      surfaceCol += lightCol * spec * atten * 0.5;
+      surfaceCol += lightCol * fresnel * atten * 0.15;
+    }
 
-  // === RAIN STREAKS ===
-  float rainSpeed = mix(0.8, 2.5, rainIntensity);
-  float rainCount = mix(30.0, 150.0, rainIntensity);
-  float rainTotal = 0.0;
+    // Neon sign light
+    for (int ni = 0; ni < 2; ni++) {
+      vec3 neonPos = ni == 0 ? neonSignPos1 : neonSignPos2;
+      vec3 neonCol = ni == 0 ? neonCol1 : neonCol2;
+      vec3 toNeon = neonPos - hitPos;
+      float neonDist = length(toNeon);
+      float neonAtten = 0.3 / (1.0 + neonDist * neonDist * 0.2);
+      float neonDiff = max(dot(normal, normalize(toNeon)), 0.0);
+      surfaceCol += neonCol * neonDiff * neonAtten * energy;
+    }
 
-  for (int i = 0; i < 150; i++) {
-    if (float(i) >= rainCount) break;
-    rainTotal += rainStreak(uv, float(i) * 3.17 + 0.5, uDynamicTime, rainSpeed);
+    // Material coloring
+    if (matId < 0.5) {
+      // Wet street: dark, reflective
+      vec3 streetBase = vec3(0.015, 0.015, 0.02);
+      // Puddle wetness increases reflections
+      float wetness = 0.3 + energy * 0.4;
+      surfaceCol = mix(streetBase, surfaceCol, wetness);
+      // Specular wet highlights
+      surfaceCol += surfaceCol * 0.3 * highs;
+    } else if (matId < 1.5) {
+      // Curb: slightly lighter concrete
+      surfaceCol *= 0.5;
+      surfaceCol += vec3(0.03, 0.028, 0.025);
+    } else if (matId < 3.0) {
+      // Buildings: dark silhouettes with occasional lit windows
+      vec3 buildCol = vec3(0.01, 0.01, 0.015);
+      // Window grid
+      vec2 winGrid = fract(vec2(hitPos.z * 4.0, hitPos.y * 3.0));
+      float hasWindow = step(0.7, fract(sin(dot(floor(vec2(hitPos.z * 4.0, hitPos.y * 3.0)), vec2(127.1, 311.7))) * 43758.5));
+      float winLight = step(0.25, winGrid.x) * step(winGrid.x, 0.75) * step(0.2, winGrid.y) * step(winGrid.y, 0.8) * hasWindow;
+      buildCol += mix(neonCol1, neonCol2, fract(hitPos.z * 0.3)) * winLight * 0.15;
+      surfaceCol = buildCol + surfaceCol * 0.1;
+    } else if (matId < 3.5) {
+      // Lamp: warm emissive head
+      float lampIdx = fract((matId - 3.0) * 10.0);
+      vec3 lc = lampIdx < 0.5 ? lampColor1 : lampColor2;
+      surfaceCol = lc * (0.5 + energy * 0.5);
+    } else if (matId < 5.0) {
+      // Neon signs: bright emissive
+      vec3 neonColor = matId < 4.25 ? neonCol1 : neonCol2;
+      float flicker = 0.9 + 0.1 * sin(uDynamicTime * 8.0 + matId * 20.0) * (1.0 - clamp(uBeatStability, 0.0, 1.0));
+      surfaceCol = neonColor * flicker * (0.6 + energy * 0.4);
+    }
+
+    col = surfaceCol * ambOcc;
+
+    float fogDist = totalDist / MAX_DIST;
+    vec3 fogColor = vec3(0.02, 0.02, 0.03);
+    col = mix(col, fogColor, fogDist * fogDist * 0.6);
   }
 
-  // Rain color: slightly blue-white, catches lamp light
-  vec3 rainColor = vec3(0.5, 0.55, 0.65);
-  // Nearest lamp tints the rain
-  float lampDist1 = length(p - lamp1Pos);
-  float lampDist2 = length(p - lamp2Pos);
-  rainColor += lampColor1 * 0.2 / (1.0 + lampDist1 * lampDist1 * 10.0);
-  rainColor += lampColor2 * 0.15 / (1.0 + lampDist2 * lampDist2 * 10.0);
-
-  col += rainColor * rainTotal * mix(0.08, 0.25, rainIntensity);
-
-  // === GROUND FOG from vocal presence + bass ===
-  float fogAmount = vocalRms * 0.3 + bass * 0.15 + 0.05;
-  fogAmount *= mix(1.0, 0.3, sSpace);
-  float fogHeight = smoothstep(horizonY - 0.15, horizonY + 0.08, p.y) * smoothstep(horizonY + 0.15, horizonY + 0.03, p.y);
-  float fogNoise = fbm6(vec3(p.x * 2.0 * detailMod + slowTime * 0.3, p.y * 3.0, slowTime * 0.15));
-  float fog = fogHeight * (0.3 + 0.7 * smoothstep(-0.2, 0.3, fogNoise)) * fogAmount;
-
-  // Fog picks up nearby light colors
-  vec3 fogColor = mix(vec3(0.06, 0.06, 0.08), lampColor1 * 0.15 + neonColor1 * 0.05, slowE);
-  col = mix(col, fogColor, fog);
-
-  // === ONSET SPLASH: bright flash on street surface ===
-  float splash = onset * energy;
-  col += vec3(0.1, 0.08, 0.06) * splash * isStreet;
-
-  // === SDF ICON EMERGENCE ===
+  // ═══ Volumetric lamp cones ═══
   {
-    float nf = fbm6(vec3(p * 2.0, slowTime));
-    vec3 iconLight = iconEmergence(p, uTime, energy, bass, neonColor1, neonColor2, nf, uClimaxPhase, uSectionIndex);
-    col += iconLight * 0.5;
+    vec3 volAccum = vec3(0.0);
+    for (int i = 0; i < 12; i++) {
+      float marchT = float(i) * 1.5 + 0.5;
+      vec3 samplePos = camOrigin + rayDir * marchT;
+      for (int li = 0; li < 2; li++) {
+        vec3 lightPos = li == 0 ? lampPos1 : lampPos2;
+        vec3 lightCol = li == 0 ? lampColor1 : lampColor2;
+        vec3 toLamp = samplePos - lightPos;
+        float distToLamp = length(toLamp);
+        float coneAngle = dot(normalize(toLamp), vec3(0.0, -1.0, 0.0));
+        float cone = smoothstep(0.7, 0.95, coneAngle);
+        float scatter = cone * exp(-distToLamp * 0.4) * 0.015;
+        float haze = fbm3(vec3(samplePos * 0.3, flowTime * 0.1)) * 0.5 + 0.5;
+        volAccum += lightCol * scatter * haze;
+      }
+    }
+    float lampIntensity = mix(0.15, 0.5, slowE) + sSolo * 0.25;
+    col += volAccum * lampIntensity * (1.0 + climaxBoost * 0.3);
   }
 
-  // --- Secondary visual layer: wet neon reflection shimmer (30% blend) ---
-  float refShimmer = fbm3(vec3(warpedP * 5.0 * detailMod, uDynamicTime * 0.2));
-  vec3 refCol = mix(neonColor1, neonColor2, refShimmer * 0.5 + 0.5) * 0.06;
-  float refMask = isStreet * energy;
-  col += refCol * refMask * 0.3;
+  // ═══ Rain streaks (screen space) ═══
+  {
+    float rainSpeed = mix(0.8, 2.5, rainIntensity) + flux * 0.5;
+    float rainCount = mix(20.0, 120.0, rainIntensity);
+    float rainTotal = 0.0;
+    for (int i = 0; i < 120; i++) {
+      if (float(i) >= rainCount) break;
+      rainTotal += rsRainStreak(fragUv, float(i) * 3.17 + 0.5, uDynamicTime, rainSpeed);
+    }
+    vec3 rainColor = vec3(0.4, 0.45, 0.55);
+    col += rainColor * rainTotal * mix(0.06, 0.2, rainIntensity);
+  }
 
-  // === VIGNETTE: strong noir vignette ===
+  // ═══ Ground fog ═══
+  {
+    float fogAmount = vocalE * 0.3 + bass * 0.15 + 0.05;
+    fogAmount *= mix(1.0, 0.3, sSpace);
+    float fogHeight = smoothstep(0.4, 0.2, fragUv.y);
+    float fogNoise = fbm3(vec3(screenPos.x * 2.0, flowTime * 0.2, flowTime * 0.1));
+    vec3 fogColor = vec3(0.04, 0.04, 0.05) + lampColor1 * 0.03;
+    col = mix(col, fogColor, fogHeight * fogAmount * (0.5 + fogNoise * 0.5));
+  }
+
+  // Onset splash flash
+  if (onset > 0.4) {
+    col += vec3(0.1, 0.08, 0.06) * (onset - 0.4) * 2.0 * energy;
+  }
+
+  // Lightning flash on climax
+  if (climaxBoost > 0.3) {
+    float lightning = fract(sin(uTime * 50.0) * 43758.5);
+    if (lightning > 0.9) col += vec3(0.4, 0.42, 0.5) * climaxBoost;
+  }
+
+  col *= 1.0 + effectiveBeat * 0.1;
+
+  // Vignette: strong noir
   float vigScale = mix(0.40, 0.28, energy);
-  float vignette = 1.0 - dot(p * vigScale, p * vigScale);
+  float vignette = 1.0 - dot(screenPos * vigScale, screenPos * vigScale);
   vignette = smoothstep(0.0, 1.0, vignette);
-  col = mix(vec3(0.005, 0.005, 0.01), col, vignette);
+  col = mix(vec3(0.003, 0.003, 0.008), col, vignette);
 
-  // === DARKNESS TEXTURE ===
-  col += darknessTexture(uv, uTime, energy);
+  // Icon emergence
+  {
+    float nf = fbm3(vec3(screenPos * 2.0, uDynamicTime * 0.1));
+    col += iconEmergence(screenPos, uTime, energy, bass, neonCol1, neonCol2, nf, uClimaxPhase, uSectionIndex) * 0.5;
+    col += heroIconEmergence(screenPos, uTime, energy, bass, neonCol1, neonCol2, nf, uSectionIndex);
+  }
 
-  // === POST-PROCESSING ===
-  col = applyPostProcess(col, vUv, p);
+  // Post-processing
+  col = applyPostProcess(col, vUv, screenPos);
 
   gl_FragColor = vec4(col, 1.0);
 }

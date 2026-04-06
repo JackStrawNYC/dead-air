@@ -1,20 +1,31 @@
 /**
- * Smoke and Mirrors — volumetric fog with embedded reflective planes.
- * Raymarched smoke density field with mirror surfaces that emerge and dissolve.
- * Replaces lo-fi-grain.
+ * Smoke and Mirrors — raymarched 3D smoke chamber with mirror plane SDFs.
+ * Volumetric smoke density field with reflective mirror surfaces that show
+ * distorted reflections of the smoke. Light bounces between mirrors.
+ * Full 3D raymarched scene with proper AO, diffuse+specular+fresnel lighting.
  *
- * Audio reactivity:
- *   uBass       → fog density/thickness
- *   uEnergy     → mirror surface visibility, overall brightness
- *   uHighs      → mirror specular sharpness
- *   uOnsetSnap  → reveals mirror surfaces
- *   uSlowEnergy → fog drift speed
- *   uPalettePrimary   → fog tint color
- *   uPaletteSecondary → mirror highlight color
+ * Audio reactivity (14+ uniforms):
+ *   uEnergy           → smoke density, mirror visibility, overall brightness
+ *   uBass             → smoke thickness pulse, mirror vibration
+ *   uHighs            → mirror specular sharpness, smoke detail level
+ *   uOnsetSnap        → mirror surface reveals, smoke burst
+ *   uBeatSnap         → smoke pulse, mirror flash
+ *   uSlowEnergy       → smoke drift speed, ambient glow
+ *   uHarmonicTension  → smoke turbulence, mirror angle complexity
+ *   uMelodicPitch     → light direction shift, smoke color temperature
+ *   uChromaHue        → smoke + mirror tint shift
+ *   uChordIndex       → per-chord mirror hue rotation
+ *   uVocalEnergy      → center spotlight warmth through smoke
+ *   uVocalPresence    → god ray spotlight cone
+ *   uSpectralFlux     → smoke advection speed
+ *   uSectionType      → jam=dense smoke, space=still+reflective, solo=spotlight
+ *   uClimaxPhase      → maximum density + all mirrors active
+ *   uPalettePrimary/Secondary → smoke + mirror palette colors
  */
 
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
+import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
 
 export const smokeAndMirrorsVert = /* glsl */ `
 varying vec2 vUv;
@@ -28,283 +39,387 @@ export const smokeAndMirrorsFrag = /* glsl */ `
 precision highp float;
 
 ${sharedUniformsGLSL}
+uniform sampler2D uPrevFrame;
 
 ${noiseGLSL}
+
+${buildPostProcessGLSL({ grainStrength: "normal", bloomEnabled: true, halationEnabled: true, caEnabled: true })}
 
 varying vec2 vUv;
 
 #define PI 3.14159265
+#define TAU 6.28318530
+#define MAX_STEPS 80
+#define MAX_DIST 20.0
+#define SURF_DIST 0.003
 
-// Smoke density field (FBM + curl noise advection with bass modulation)
-float smokeDensity(vec3 p, float bass, float time, float energy) {
+// ═══════════════════════════════════════════════════════════
+// Prefixed SDF primitives — sam namespace
+// ═══════════════════════════════════════════════════════════
+
+float samSdBox(vec3 pos, vec3 bounds) {
+  vec3 q = abs(pos) - bounds;
+  return length(max(q, 0.0)) + min(max(q.x, max(q.y, q.z)), 0.0);
+}
+
+float samSdPlane(vec3 pos, vec3 normal, float offset) {
+  return dot(pos, normal) - offset;
+}
+
+float samSdSphere(vec3 pos, float radius) {
+  return length(pos) - radius;
+}
+
+float samSdRoundBox(vec3 pos, vec3 bounds, float rad) {
+  vec3 q = abs(pos) - bounds;
+  return length(max(q, 0.0)) + min(max(q.x, max(q.y, q.z)), 0.0) - rad;
+}
+
+// ═══════════════════════════════════════════════════════════
+// Smoke density field
+// ═══════════════════════════════════════════════════════════
+
+float samSmokeDensity(vec3 pos, float bassDensity, float flowTime, float energyVal, float turbulence) {
   // Upward drift
-  p.y -= time * 0.3;
-  p.x += sin(p.y * 0.5 + time * 0.2) * 0.3;
+  pos.y -= flowTime * 0.4;
+  pos.x += sin(pos.y * 0.5 + flowTime * 0.2) * 0.3;
+  pos.z += cos(pos.y * 0.4 + flowTime * 0.15) * 0.2;
 
-  // Curl noise advection for fluid smoke motion (gated behind energy > 0.2)
-  if (energy > 0.2) {
-    vec3 curl = curlNoise(vec3(p.xy, time * 0.1));
-    p += curl * 0.25 * smoothstep(0.2, 0.6, energy);
+  // Curl noise advection for fluid motion (energy gated)
+  if (energyVal > 0.15) {
+    vec3 curl = curlNoise(vec3(pos.xy * 0.8, flowTime * 0.08));
+    pos += curl * (0.2 + turbulence * 0.3) * smoothstep(0.15, 0.5, energyVal);
   }
 
-  float d = fbm6(p * 0.8);
-  d += fbm3(p * 1.6 + 3.0) * 0.5;
-
-  // Curl noise density contribution
-  d += curlNoise(vec3(p.xy, time * 0.1)).z * 0.3;
-
-  // Bass thickens fog
-  d *= 0.5 + bass * 0.5;
-
-  return clamp(d * 0.5 + 0.3, 0.0, 1.0);
+  float density = fbm6(pos * 0.6);
+  density += fbm3(pos * 1.2 + 3.0) * 0.4;
+  density += curlNoise(vec3(pos.xy * 0.5, flowTime * 0.06)).z * 0.2;
+  density *= 0.5 + bassDensity * 0.5;
+  return clamp(density * 0.5 + 0.3, 0.0, 1.0);
 }
 
-// Mirror plane SDF (infinite plane at given height with normal)
-float mirrorPlane(vec3 p, vec3 planeNormal, float planeD) {
-  return dot(p, planeNormal) - planeD;
+// ═══════════════════════════════════════════════════════════
+// Mirror scene SDF — physical mirror objects in the chamber
+// ═══════════════════════════════════════════════════════════
+
+struct SamMirrorInfo {
+  vec3 normal;
+  float dist;
+  int mirrorIdx;
+};
+
+vec2 samSceneSDF(vec3 pos, float flowTime, float bassVib) {
+  float matId = 0.0;
+
+  // Chamber walls (inverted box)
+  float chamber = -samSdBox(pos, vec3(5.0, 4.0, 8.0));
+  float minDist = chamber;
+
+  // Floor
+  float floorD = pos.y + 3.0;
+  if (floorD < minDist) { minDist = floorD; matId = 1.0; }
+
+  // Ceiling
+  float ceilD = -(pos.y - 3.5);
+  if (ceilD < minDist) { minDist = ceilD; matId = 2.0; }
+
+  // Mirror 1: large angled plane on left
+  {
+    float angle1 = flowTime * 0.08 + bassVib * 0.1;
+    vec3 n1 = normalize(vec3(cos(angle1) * 0.8, 0.1, sin(angle1) * 0.5));
+    vec3 mirrorCenter1 = vec3(-3.0, 0.0, 2.0 + sin(flowTime * 0.1) * 0.5);
+    float mirrorD1 = abs(samSdPlane(pos - mirrorCenter1, n1, 0.0)) - 0.02;
+    // Bound the mirror to a reasonable rectangle
+    float mirrorBound1 = samSdBox(pos - mirrorCenter1, vec3(0.03, 2.0, 1.5));
+    mirrorD1 = max(mirrorD1, mirrorBound1);
+    if (mirrorD1 < minDist) { minDist = mirrorD1; matId = 3.0; }
+  }
+
+  // Mirror 2: right side, different angle
+  {
+    float angle2 = flowTime * 0.06 + 2.1;
+    vec3 n2 = normalize(vec3(-cos(angle2) * 0.7, -0.15, sin(angle2) * 0.6));
+    vec3 mirrorCenter2 = vec3(3.0, 0.5, 1.0 + cos(flowTime * 0.08) * 0.3);
+    float mirrorD2 = abs(samSdPlane(pos - mirrorCenter2, n2, 0.0)) - 0.02;
+    float mirrorBound2 = samSdBox(pos - mirrorCenter2, vec3(0.03, 1.8, 1.8));
+    mirrorD2 = max(mirrorD2, mirrorBound2);
+    if (mirrorD2 < minDist) { minDist = mirrorD2; matId = 4.0; }
+  }
+
+  // Mirror 3: ceiling-angled, looking down
+  {
+    vec3 n3 = normalize(vec3(0.1, -0.9, 0.15 + sin(flowTime * 0.05) * 0.1));
+    vec3 mirrorCenter3 = vec3(0.0, 3.0, 3.0);
+    float mirrorD3 = abs(samSdPlane(pos - mirrorCenter3, n3, 0.0)) - 0.015;
+    float mirrorBound3 = samSdBox(pos - mirrorCenter3, vec3(2.0, 0.02, 1.5));
+    mirrorD3 = max(mirrorD3, mirrorBound3);
+    if (mirrorD3 < minDist) { minDist = mirrorD3; matId = 5.0; }
+  }
+
+  // Mirror 4: floor mirror (puddle-like)
+  {
+    vec3 n4 = vec3(0.0, 1.0, 0.0);
+    vec3 mirrorCenter4 = vec3(0.5, -2.98, 2.0);
+    float mirrorD4 = abs(samSdPlane(pos - mirrorCenter4, n4, 0.0)) - 0.01;
+    float mirrorBound4 = samSdBox(pos - mirrorCenter4, vec3(1.5, 0.02, 2.0));
+    mirrorD4 = max(mirrorD4, mirrorBound4);
+    if (mirrorD4 < minDist) { minDist = mirrorD4; matId = 6.0; }
+  }
+
+  return vec2(minDist, matId);
 }
+
+// ═══════════════════════════════════════════════════════════
+// Normal, AO
+// ═══════════════════════════════════════════════════════════
+
+vec3 samCalcNormal(vec3 pos, float flowTime, float bassVib) {
+  vec2 eps = vec2(0.003, 0.0);
+  float d0 = samSceneSDF(pos, flowTime, bassVib).x;
+  return normalize(vec3(
+    samSceneSDF(pos + eps.xyy, flowTime, bassVib).x - d0,
+    samSceneSDF(pos + eps.yxy, flowTime, bassVib).x - d0,
+    samSceneSDF(pos + eps.yyx, flowTime, bassVib).x - d0
+  ));
+}
+
+float samCalcAO(vec3 pos, vec3 norm, float flowTime, float bassVib) {
+  float occ = 0.0;
+  float weight = 1.0;
+  for (int i = 1; i <= 5; i++) {
+    float dist = float(i) * 0.12;
+    float sampled = samSceneSDF(pos + norm * dist, flowTime, bassVib).x;
+    occ += (dist - sampled) * weight;
+    weight *= 0.6;
+  }
+  return clamp(1.0 - occ * 2.5, 0.0, 1.0);
+}
+
+// ═══════════════════════════════════════════════════════════
+// Get mirror normal by material ID
+// ═══════════════════════════════════════════════════════════
+
+vec3 samGetMirrorNormal(float matId, float flowTime, float bassVib) {
+  if (matId < 3.5) {
+    float angle1 = flowTime * 0.08 + bassVib * 0.1;
+    return normalize(vec3(cos(angle1) * 0.8, 0.1, sin(angle1) * 0.5));
+  } else if (matId < 4.5) {
+    float angle2 = flowTime * 0.06 + 2.1;
+    return normalize(vec3(-cos(angle2) * 0.7, -0.15, sin(angle2) * 0.6));
+  } else if (matId < 5.5) {
+    return normalize(vec3(0.1, -0.9, 0.15 + sin(flowTime * 0.05) * 0.1));
+  } else {
+    return vec3(0.0, 1.0, 0.0);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// Main
+// ═══════════════════════════════════════════════════════════
 
 void main() {
-  vec2 uv = vUv;
+  vec2 fragUv = vUv;
   vec2 aspect = vec2(uResolution.x / uResolution.y, 1.0);
-  vec2 p = (uv - 0.5) * aspect;
+  vec2 screenPos = (fragUv - 0.5) * aspect;
 
   float energy = clamp(uEnergy, 0.0, 1.0);
   float bass = clamp(uBass, 0.0, 1.0);
   float highs = clamp(uHighs, 0.0, 1.0);
   float onset = clamp(uOnsetSnap, 0.0, 1.0);
   float slowE = clamp(uSlowEnergy, 0.0, 1.0);
+  float tension = clamp(uHarmonicTension, 0.0, 1.0);
+  float melPitch = clamp(uMelodicPitch * uMelodicConfidence, 0.0, 1.0);
+  float effectiveBeat = uBeatSnap * smoothstep(0.3, 0.7, uBeatConfidence);
+  float flux = clamp(uSpectralFlux, 0.0, 1.0);
+  float vocalE = clamp(uVocalEnergy, 0.0, 1.0);
+  float vocalPres = clamp(uVocalPresence, 0.0, 1.0);
+  float chromaH = uChromaHue;
+  float chordHue = float(int(uChordIndex)) / 24.0 * 0.12 * smoothstep(0.3, 0.6, uChordConfidence);
 
-  // === SECTION-TYPE MODULATION (must be before any usage) ===
   float sectionT = uSectionType;
   float sJam = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
   float sSpace = smoothstep(6.5, 7.5, sectionT);
-  float sChorus = smoothstep(1.5, 2.5, sectionT) * (1.0 - step(2.5, sectionT));
   float sSolo = smoothstep(3.5, 4.5, sectionT) * (1.0 - step(4.5, sectionT));
+  float sChorus = smoothstep(1.5, 2.5, sectionT) * (1.0 - step(2.5, sectionT));
 
-  // === BARREL DISTORTION ===
-  vec2 distUv = barrelDistort(uv, 0.1);
-  vec2 dp = (distUv - 0.5) * aspect;
-
-  float flowTime = uDynamicTime * 0.1 * mix(1.0, 1.3, sJam) * mix(1.0, 0.5, sSpace);
-
-  // --- Domain warping + energy-responsive detail ---
-  vec2 domainWarpOff = vec2(fbm3(vec3(dp * 0.5, uDynamicTime * 0.05)), fbm3(vec3(dp * 0.5 + 100.0, uDynamicTime * 0.05))) * 0.3;
-  float detailMod = 1.0 + energy * 0.5;
-
-  // --- Phase 1: New uniform integrations ---
-  float vocalSpot = uVocalPresence * 0.25;
-  float vocalWarmth = uVocalEnergy * 0.12;
-  float trendExpand = uEnergyTrend * 0.04;
-  float tensionTurb = uHarmonicTension * 0.35;
-  float pitchTemp = uMelodicPitch * 0.15;
-  float peakDesat = uPeakApproaching * 0.15;
-  float chromaHueMod = uChromaHue * 0.25;
-  float chordHue = float(int(uChordIndex)) / 24.0 * 0.15;
-
-  // === RAY SETUP ===
-  vec3 ro = vec3(0.0, 0.0, -2.0);
-  vec3 rd = normalize(vec3(dp, 1.5));
-
-  // === PALETTE COLORS ===
-  float hue1 = hsvToCosineHue(uPalettePrimary) + chromaHueMod + chordHue;
-  vec3 fogTint = 0.5 + 0.5 * cos(6.28318 * vec3(hue1, hue1 + 0.33, hue1 + 0.67));
-  fogTint += vec3(0.06, 0.03, 0.0) * vocalWarmth; // vocal warmth in fog
-  fogTint = mix(fogTint, vec3(0.4, 0.45, 0.5), 0.4); // push toward neutral smoke
-
-  float hue2 = hsvToCosineHue(uPaletteSecondary);
-  vec3 mirrorTint = 0.5 + 0.5 * cos(6.28318 * vec3(hue2, hue2 + 0.33, hue2 + 0.67));
-
-  // === CLIMAX REACTIVITY ===
   float isClimax = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5);
   float climaxBoost = isClimax * uClimaxIntensity;
 
-  // === VOLUMETRIC FOG RAYMARCH (24 steps for denser volumetric smoke) ===
-  vec3 fogAccum = vec3(0.0);
-  float fogAlpha = 0.0;
-  float fogSteps = 24.0;
+  float flowTime = uDynamicTime * (0.08 + flux * 0.04) * mix(1.0, 1.3, sJam) * mix(1.0, 0.4, sSpace);
+  float bassVib = bass * 0.15;
 
-  for (int i = 0; i < 24; i++) {
-    float fi = float(i);
-    float t = 0.3 + fi * 0.2;
-    vec3 pos = ro + rd * t;
+  // Palette
+  float hue1 = hsvToCosineHue(uPalettePrimary) + chromaH * 0.2 + chordHue;
+  float hue2 = hsvToCosineHue(uPaletteSecondary) + chordHue * 0.5;
+  vec3 fogTint = 0.5 + 0.5 * cos(TAU * vec3(hue1, hue1 + 0.33, hue1 + 0.67));
+  fogTint = mix(fogTint, vec3(0.4, 0.45, 0.5), 0.3); // push toward smoke neutral
+  fogTint += vec3(0.04, 0.02, 0.0) * vocalE; // vocal warmth
+  vec3 mirrorTint = 0.5 + 0.5 * cos(TAU * vec3(hue2, hue2 + 0.33, hue2 + 0.67));
 
-    float density = smokeDensity(pos, bass, flowTime, energy);
-    density *= 0.08; // thinner per-step for more steps
+  // ═══ Camera ═══
+  float slowTime = uDynamicTime * 0.04;
+  float camSwayX = sin(slowTime * 0.5) * 1.5;
+  float camBob = cos(slowTime * 0.35) * 0.3;
+  vec3 camOrigin = vec3(camSwayX, 0.0 + camBob + melPitch * 0.5, -4.0);
+  vec3 camLookAt = vec3(sin(slowTime * 0.3) * 0.8, 0.3 + melPitch * 0.3, 3.0);
+  camLookAt = mix(camLookAt, vec3(0.0, 0.0, 2.0), sSolo * 0.5);
 
-    if (density > 0.001) {
-      float alpha = density * (1.0 - fogAlpha);
+  vec3 camFwd = normalize(camLookAt - camOrigin);
+  vec3 camRt = normalize(cross(vec3(0.0, 1.0, 0.0), camFwd));
+  vec3 camUpDir = cross(camFwd, camRt);
+  float fov = 1.3 + bass * 0.1;
+  vec3 rayDir = normalize(screenPos.x * camRt + screenPos.y * camUpDir + fov * camFwd);
 
-      // Depth-varying color: warm near, cool far
-      vec3 smokeColor = mix(fogTint * 0.55, fogTint * 0.25, fi / fogSteps);
+  // ═══ Raymarch scene ═══
+  float totalDist = 0.0;
+  float matId = 0.0;
+  bool didHitSurface = false;
 
-      // Light scattering: brighter where density is lower (forward scattering)
-      float scatter = exp(-density * 3.0) * energy * 0.3;
-      smokeColor += scatter * vec3(0.8, 0.85, 0.9);
-
-      fogAccum += smokeColor * alpha;
-      fogAlpha += alpha;
-    }
+  for (int i = 0; i < MAX_STEPS; i++) {
+    vec3 marchPos = camOrigin + rayDir * totalDist;
+    vec2 sceneResult = samSceneSDF(marchPos, flowTime, bassVib);
+    float sceneDist = sceneResult.x;
+    matId = sceneResult.y;
+    if (abs(sceneDist) < SURF_DIST) { didHitSurface = true; break; }
+    if (totalDist > MAX_DIST) break;
+    totalDist += sceneDist * 0.8;
   }
 
-  vec3 col = fogAccum;
+  vec3 col = vec3(0.02, 0.018, 0.025);
 
-  // === MIRROR PLANES: 3 reflective surfaces at different angles ===
-  // Onset reveals mirrors (they fade in and out)
-  float mirrorVisibility = smoothstep(0.2, 0.6, energy) * (0.5 + onset * 0.5);
+  if (didHitSurface) {
+    vec3 hitPos = camOrigin + rayDir * totalDist;
+    vec3 normal = samCalcNormal(hitPos, flowTime, bassVib);
+    float ambOcc = samCalcAO(hitPos, normal, flowTime, bassVib);
 
-  if (mirrorVisibility > 0.01) {
-    // Mirror 1: angled plane
-    float angle1 = flowTime * 0.15;
-    vec3 n1 = normalize(vec3(sin(angle1) * 0.3, 0.1, cos(angle1)));
-    float d1 = mirrorPlane(ro + rd * 2.0, n1, sin(flowTime * 0.2) * 0.5);
-    float mirror1 = smoothstep(0.08, 0.0, abs(d1)) * mirrorVisibility;
+    vec3 lightDir = normalize(vec3(0.3 + melPitch * 0.3, 1.0, -0.3));
+    float diffuse = max(dot(normal, lightDir), 0.0);
+    vec3 halfVec = normalize(lightDir - rayDir);
+    float specular = pow(max(dot(normal, halfVec), 0.0), 16.0 + highs * 48.0);
+    float fresnel = pow(1.0 - max(dot(normal, -rayDir), 0.0), 3.0);
 
-    // Mirror 2: different angle
-    float angle2 = flowTime * 0.1 + 2.09;
-    vec3 n2 = normalize(vec3(cos(angle2) * 0.4, -0.2, sin(angle2)));
-    float d2 = mirrorPlane(ro + rd * 3.0, n2, cos(flowTime * 0.15) * 0.3);
-    float mirror2 = smoothstep(0.1, 0.0, abs(d2)) * mirrorVisibility * 0.7;
+    bool isMirror = matId >= 3.0 && matId <= 6.5;
 
-    // Mirror 3: horizontal-ish
-    vec3 n3 = normalize(vec3(0.1, 0.8 + sin(flowTime * 0.08) * 0.2, 0.1));
-    float d3 = mirrorPlane(ro + rd * 1.5, n3, 0.0);
-    float mirror3 = smoothstep(0.12, 0.0, abs(d3)) * mirrorVisibility * 0.5;
+    if (!isMirror) {
+      // Chamber walls/floor/ceiling
+      vec3 surfaceColor = vec3(0.02, 0.018, 0.025);
+      surfaceColor += fogTint * diffuse * 0.06;
+      col = surfaceColor * ambOcc;
+    } else {
+      // Mirror surface: reflective with specular
+      float mirrorVis = smoothstep(0.15, 0.5, energy) * (0.5 + onset * 0.5);
+      mirrorVis += climaxBoost * 0.3;
 
-    // Specular highlights on mirrors (metallic white)
-    vec3 lightDir = normalize(vec3(0.5, 1.0, -0.3));
-    float spec1 = pow(max(0.0, dot(reflect(rd, n1), lightDir)), 8.0 + highs * 24.0);
-    float spec2 = pow(max(0.0, dot(reflect(rd, n2), lightDir)), 8.0 + highs * 24.0);
-    float spec3 = pow(max(0.0, dot(reflect(rd, n3), lightDir)), 8.0 + highs * 24.0);
+      vec3 mirrorNorm = samGetMirrorNormal(matId, flowTime, bassVib);
+      vec3 reflDir = reflect(rayDir, mirrorNorm);
 
-    // === REFLECTED RAY MARCH: secondary 8-step march through fog along reflected direction ===
-    vec3 reflectedFog1 = vec3(0.0);
-    vec3 reflectedFog2 = vec3(0.0);
-    vec3 reflectedFog3 = vec3(0.0);
-
-    if (mirror1 > 0.02) {
-      vec3 reflDir1 = reflect(rd, n1);
-      vec3 reflOrigin1 = ro + rd * 2.0;
-      for (int j = 0; j < 8; j++) {
-        float rt = 0.2 + float(j) * 0.3;
-        vec3 rpos = reflOrigin1 + reflDir1 * rt;
-        float rd1 = smokeDensity(rpos, bass, flowTime, energy) * 0.06;
-        vec3 rc = mix(fogTint * 0.25, mirrorTint * 0.15, float(j) / 8.0);
-        reflectedFog1 += rc * rd1;
+      // March reflected smoke
+      vec3 reflectedFog = vec3(0.0);
+      float reflAlpha = 0.0;
+      for (int j = 0; j < 12; j++) {
+        float rt = 0.3 + float(j) * 0.4;
+        vec3 rpos = hitPos + reflDir * rt;
+        float rd = samSmokeDensity(rpos, bass, flowTime, energy, tension) * 0.05;
+        if (rd > 0.001) {
+          float rAlpha = rd * (1.0 - reflAlpha);
+          vec3 rc = mix(fogTint * 0.3, mirrorTint * 0.2, float(j) / 12.0);
+          reflectedFog += rc * rAlpha;
+          reflAlpha += rAlpha;
+        }
       }
-    }
-    if (mirror2 > 0.02) {
-      vec3 reflDir2 = reflect(rd, n2);
-      vec3 reflOrigin2 = ro + rd * 3.0;
-      for (int j = 0; j < 8; j++) {
-        float rt = 0.2 + float(j) * 0.3;
-        vec3 rpos = reflOrigin2 + reflDir2 * rt;
-        float rd2 = smokeDensity(rpos, bass, flowTime, energy) * 0.06;
-        vec3 rc = mix(fogTint * 0.2, mirrorTint * 0.12, float(j) / 8.0);
-        reflectedFog2 += rc * rd2;
-      }
-    }
-    if (mirror3 > 0.02) {
-      vec3 reflDir3 = reflect(rd, n3);
-      vec3 reflOrigin3 = ro + rd * 1.5;
-      for (int j = 0; j < 8; j++) {
-        float rt = 0.2 + float(j) * 0.3;
-        vec3 rpos = reflOrigin3 + reflDir3 * rt;
-        float rd3 = smokeDensity(rpos, bass, flowTime, energy) * 0.06;
-        vec3 rc = mix(fogTint * 0.2, mirrorTint * 0.1, float(j) / 8.0);
-        reflectedFog3 += rc * rd3;
-      }
+
+      // Mirror specular
+      float mirrorSpec = pow(max(dot(reflect(rayDir, mirrorNorm), lightDir), 0.0), 16.0 + highs * 32.0);
+      vec3 mirrorColor = mix(vec3(0.7, 0.75, 0.8), mirrorTint, 0.3);
+
+      col = mirrorColor * 0.1 * ambOcc;
+      col += mirrorSpec * vec3(1.0, 0.98, 0.95) * 0.6 * mirrorVis;
+      col += reflectedFog * mirrorVis;
+      col += fresnel * mirrorTint * 0.2 * mirrorVis;
     }
 
-    // Mirrors reflect a palette-tinted metallic color + reflected fog
-    vec3 mirrorColor = mix(vec3(0.7, 0.75, 0.8), mirrorTint, 0.3);
-    col += mirror1 * (mirrorColor * 0.3 + spec1 * vec3(1.0, 0.98, 0.95) * 0.6 + reflectedFog1);
-    col += mirror2 * (mirrorColor * 0.25 + spec2 * vec3(1.0, 0.98, 0.95) * 0.5 + reflectedFog2);
-    col += mirror3 * (mirrorColor * 0.2 + spec3 * vec3(1.0, 0.98, 0.95) * 0.4 + reflectedFog3);
+    float fogDist = totalDist / MAX_DIST;
+    col = mix(col, fogTint * 0.05, fogDist * fogDist);
   }
 
-  // === GOD RAYS: secondary in-scatter march from overhead light ===
+  // ═══ Volumetric fog raymarch ═══
   {
-    // Melodic pitch shifts beam angle; tension adds turbulence to god rays
-    vec3 lightPos = vec3(pitchTemp * 0.8 + vocalSpot * 0.3, 1.5, -1.0);
-    vec3 lightDir = normalize(lightPos - ro);
+    vec3 fogAccum = vec3(0.0);
+    float fogAlpha = 0.0;
+
+    for (int i = 0; i < 24; i++) {
+      float fi = float(i);
+      float marchT = 0.3 + fi * 0.3;
+      if (marchT > totalDist && didHitSurface) break;
+      vec3 samplePos = camOrigin + rayDir * marchT;
+
+      float density = samSmokeDensity(samplePos, bass, flowTime, energy, tension);
+      density *= 0.06;
+
+      if (density > 0.001) {
+        float alpha = density * (1.0 - fogAlpha);
+        vec3 smokeColor = mix(fogTint * 0.4, fogTint * 0.15, fi / 24.0);
+
+        // Forward scattering
+        float scatter = exp(-density * 3.0) * energy * 0.25;
+        smokeColor += scatter * vec3(0.8, 0.85, 0.9);
+
+        fogAccum += smokeColor * alpha;
+        fogAlpha += alpha;
+      }
+    }
+
+    col += fogAccum;
+  }
+
+  // ═══ God rays ═══
+  {
+    vec3 lightPos = vec3(melPitch * 0.5 + vocalPres * 0.2, 2.5, -1.0);
     float godRayAccum = 0.0;
     for (int g = 0; g < 12; g++) {
-      float gt = 0.4 + float(g) * 0.25;
-      vec3 gpos = ro + rd * gt;
+      float gt = 0.4 + float(g) * 0.3;
+      vec3 gpos = camOrigin + rayDir * gt;
       vec3 toLightDir = normalize(lightPos - gpos);
-      // Sample fog density along light direction (in-scatter)
-      float lightDensity = smokeDensity(gpos + toLightDir * 0.3, bass, flowTime, energy) + tensionTurb * 0.1;
-      float fogDen = smokeDensity(gpos, bass, flowTime, energy);
-      // In-scatter: light where fog is thin along light path but present at sample
+      float lightDensity = samSmokeDensity(gpos + toLightDir * 0.3, bass, flowTime, energy, tension);
+      float fogDen = samSmokeDensity(gpos, bass, flowTime, energy, tension);
       float inscatter = fogDen * exp(-lightDensity * 3.0);
-      godRayAccum += inscatter * 0.04;
+      godRayAccum += inscatter * 0.03;
     }
-    // Vocal spotlight: cone brightens toward vocal presence
-    float spotCone = smoothstep(0.4, 0.0, length(dp - vec2(0.0, 0.2))) * vocalSpot;
-    vec3 rayColor = mix(fogTint * 0.6, vec3(0.9, 0.85, 0.75), 0.3 + pitchTemp);
+    float spotCone = smoothstep(0.4, 0.0, length(screenPos - vec2(0.0, 0.2))) * vocalPres * 0.3;
+    vec3 rayColor = mix(fogTint * 0.5, vec3(0.9, 0.85, 0.75), 0.3 + melPitch * 0.2);
     col += rayColor * godRayAccum * (1.0 + spotCone * 2.0 + climaxBoost * 0.5);
   }
 
-  // === AMBIENT FOG FLOOR: never pitch black ===
-  float ambientFog = 0.12 + slowE * 0.06;
-  col += fogTint * ambientFog * (1.0 - fogAlpha);
+  // Beat + climax
+  col *= 1.0 + effectiveBeat * 0.15;
+  col *= 1.0 + climaxBoost * 0.3;
 
-  col *= 1.0 + climaxBoost * 0.05;
-  col *= 1.0 + uBeatSnap * 0.18 * (1.0 + climaxBoost * 0.4);
-  // Peak approaching: subtle desaturation toward white (pre-peak tension)
-  float colLum = dot(col, vec3(0.299, 0.587, 0.114));
-  col = mix(col, vec3(colLum), peakDesat);
+  // Onset smoke burst
+  if (onset > 0.3) {
+    col += fogTint * (onset - 0.3) * 0.4 * energy;
+  }
 
-  // === VIGNETTE ===
+  // Vignette
   float vigScale = mix(0.34, 0.26, energy);
-  float vignette = 1.0 - dot(dp * vigScale, dp * vigScale);
+  float vignette = 1.0 - dot(screenPos * vigScale, screenPos * vigScale);
   vignette = smoothstep(0.0, 1.0, vignette);
-  col = mix(vec3(0.05, 0.04, 0.06), col, vignette);
+  col = mix(vec3(0.02, 0.018, 0.025), col, vignette);
 
-  // === LIGHT LEAK ===
-  col += lightLeak(dp, uDynamicTime, energy, uOnsetSnap);
+  // Icon emergence
+  {
+    float nf = snoise(vec3(screenPos * 2.0, uTime * 0.1));
+    col += iconEmergence(screenPos, uTime, energy, bass, fogTint, mirrorTint, nf, uClimaxPhase, uSectionIndex);
+    col += heroIconEmergence(screenPos, uTime, energy, bass, fogTint, mirrorTint, nf, uSectionIndex);
+  }
 
-  // === BLOOM ===
-  float lum = dot(col, vec3(0.299, 0.587, 0.114));
-  float bloomThreshold = mix(0.40, 0.25, energy) - climaxBoost * 0.08;
-  float bloomAmount = max(0.0, lum - bloomThreshold) * (2.0 + climaxBoost * 1.5);
-  vec3 bloomColor = mix(col, vec3(0.9, 0.92, 1.0), 0.3);
-  vec3 bloom = bloomColor * bloomAmount * (0.3 + climaxBoost * 0.15);
-  col = col + bloom - col * bloom;
+  // Post-processing
+  col = applyPostProcess(col, vUv, screenPos);
 
-  // === ANIMATED STAGE FLOOD ===
-  col = stageFloodFill(col, dp, uDynamicTime, energy, uPalettePrimary, uPaletteSecondary);
-
-  // === ANAMORPHIC FLARE ===
-  col = anamorphicFlare(vUv, col, energy, uOnsetSnap);
-
-  // === HALATION ===
-  col = halation(vUv, col, energy);
-
-  // === CINEMATIC GRADE ===
-  col = cinematicGrade(col, energy);
-
-  // === FILM GRAIN ===
-  float grainTime = floor(uTime * 15.0) / 15.0;
-  float grainIntensity = mix(0.05, 0.025, energy);
-  col += filmGrainRes(uv, grainTime, uResolution.y) * grainIntensity;
-
-  // ONSET SATURATION PULSE
-  float onsetPulse = step(0.5, uOnsetSnap) * uOnsetSnap;
-  float onsetLuma = dot(col, vec3(0.299, 0.587, 0.114));
-  col = mix(vec3(onsetLuma), col, 1.0 + onsetPulse * 1.0);
-  col *= 1.0 + onsetPulse * 0.12;
-
-  // === DEAD ICONOGRAPHY ===
-  float _nf = snoise(vec3(p * 2.0, uTime * 0.1));
-  col += iconEmergence(p, uTime, energy, uBass, fogTint, mirrorTint, _nf, uClimaxPhase, uSectionIndex);
-  col += heroIconEmergence(p, uTime, energy, uBass, fogTint, mirrorTint, _nf, uSectionIndex);
-
-  // Lifted blacks
-  float isBuild = step(0.5, uClimaxPhase) * step(uClimaxPhase, 1.5);
-  float liftMult = mix(1.0, 0.15, isBuild * uClimaxIntensity);
-  col = max(col, vec3(0.06, 0.05, 0.08) * liftMult);
+  // Feedback
+  vec3 prev = texture2D(uPrevFrame, vUv).rgb;
+  float baseDecay = mix(0.93, 0.86, energy);
+  float feedbackDecay = clamp(baseDecay + sJam * 0.04 + sSpace * 0.06, 0.80, 0.97);
+  col = max(col, prev * feedbackDecay);
 
   gl_FragColor = vec4(col, 1.0);
 }

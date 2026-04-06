@@ -1,26 +1,28 @@
 /**
- * Spinning Spiral — hypnotic rotating vortex in classic 60s psychedelia.
- * The kind of spiral you see on Dead poster art, spinning wheels at the
- * Acid Tests, hypnotic concentric vortex pulling you into the center.
+ * Spinning Spiral — raymarched 3D logarithmic spiral sculpture.
+ * A massive nautilus-shell cross-section as SDF geometry, with the camera
+ * traveling along the spiral interior. Golden ratio proportions,
+ * Fibonacci sequence visible in the geometry. Full raymarching with
+ * AO, diffuse+specular+Fresnel, volumetric interior glow.
  *
- * Visual aesthetic:
- *   - Quiet: slow 3-arm spiral, muted rainbow bands, gentle noise warp
- *   - Building: arms multiply (4-5), twist tightens, color saturation climbs
- *   - Peak: 6-8 arms, tight bass-driven twist, full rainbow cycling, center blaze
- *   - Release: arms loosen, rotation decelerates, colors fade to warm tones
- *
- * Audio reactivity:
- *   uEnergy         -> arm count (3 at low, 6-8 at peak)
- *   uBass           -> twist factor (tighter spirals on bass hits)
- *   uTempo/uLocalTempo -> base rotation speed (synced to beat feel)
- *   uBeatSnap       -> momentary rotation acceleration
- *   uOnsetSnap      -> flash at spiral center radiating outward
- *   uChromaHue      -> hue modulation overlay on spiral arm colors
- *   uPalettePrimary/Secondary -> base hue for arm color bands
- *   uHarmonicTension -> noise warp intensity (more tension = more organic)
- *   uMelodicDirection -> rotation direction (ascending=CW, descending=CCW)
+ * Audio reactivity (14+ uniforms):
+ *   uEnergy          -> spiral detail + glow intensity
+ *   uBass            -> spiral pulse/breathing
+ *   uHighs           -> surface detail + edge shimmer
+ *   uMids            -> mid-spiral glow
+ *   uOnsetSnap       -> flash radiating from center
+ *   uSlowEnergy      -> drift speed
+ *   uBeatSnap        -> rotation acceleration
+ *   uMelodicPitch    -> camera altitude
+ *   uMelodicDirection -> rotation direction
+ *   uHarmonicTension -> spiral complexity
+ *   uBeatStability   -> geometry stability
+ *   uChromaHue       -> hue shift
+ *   uChordIndex      -> micro hue rotation
+ *   uSectionType     -> section modulation
+ *   uClimaxPhase     -> max spiral intensity
+ *   uVocalEnergy     -> inner chamber glow
  *   uTempoDerivative -> rotation rate modulation
- *   uSectionType     -> jam=faster, space=near-frozen, chorus=vivid
  */
 
 import { noiseGLSL } from "./noise";
@@ -41,266 +43,360 @@ precision highp float;
 ${sharedUniformsGLSL}
 uniform sampler2D uPrevFrame;
 
-
 ${noiseGLSL}
 
-${buildPostProcessGLSL({ grainStrength: "light", bloomEnabled: true, paletteCycleEnabled: true, temporalBlendEnabled: true })}
+${buildPostProcessGLSL({
+  grainStrength: "light",
+  bloomEnabled: true,
+  paletteCycleEnabled: true,
+  dofEnabled: true,
+})}
 
 varying vec2 vUv;
 
 #define PI 3.14159265
 #define TAU 6.28318530
+#define PHI 1.6180339887
+#define SS_MAX_STEPS 90
+#define SS_MAX_DIST 30.0
+#define SS_SURF_DIST 0.001
+
+// ---- Logarithmic spiral SDF ----
+// A golden spiral tube: r = a * phi^(theta/2pi)
+float ssSpiralTube(vec3 pos, float time, float bass, float tension) {
+  // Project to XZ plane for polar
+  float posR = length(pos.xz);
+  float posTheta = atan(pos.z, pos.x);
+
+  // Logarithmic spiral parameters
+  float growthRate = log(PHI) / TAU; // golden ratio growth per revolution
+  float spiralA = 0.3 + bass * 0.05;
+
+  // Find nearest spiral arm
+  float nearestDist = 1e6;
+
+  // Check multiple spiral windings
+  for (int w = -3; w < 6; w++) {
+    float fw = float(w);
+    float armTheta = posTheta + fw * TAU;
+
+    // Expected radius at this theta
+    float expectedR = spiralA * exp(growthRate * armTheta);
+
+    // Skip if too far from expected
+    if (abs(posR - expectedR) > 1.5) continue;
+
+    // Tube center follows the spiral
+    vec3 tubeCenter = vec3(cos(armTheta) * expectedR, 0.0, sin(armTheta) * expectedR);
+
+    // Tube radius grows with spiral (Fibonacci proportions)
+    float tubeRadius = expectedR * 0.18 * (1.0 + tension * 0.1);
+
+    // Add vertical extent with noise modulation
+    float verticalWave = sin(armTheta * 3.0 + time * 0.3) * 0.1 * tubeRadius;
+    tubeCenter.y += verticalWave;
+
+    // Distance to tube
+    float dist = length(pos - tubeCenter) - tubeRadius;
+
+    // Surface detail from noise
+    float surfDetail = snoise(vec3(pos * 3.0 + armTheta * 0.5, time * 0.1)) * 0.02 * tubeRadius;
+    dist += surfDetail;
+
+    nearestDist = min(nearestDist, dist);
+  }
+
+  return nearestDist;
+}
+
+// ---- Central column SDF ----
+float ssCentralPillar(vec3 pos, float bass) {
+  float cylRadius = 0.15 + bass * 0.03;
+  float cylDist = length(pos.xz) - cylRadius;
+  // Limit height
+  float capDist = abs(pos.y) - 2.0;
+  return max(cylDist, capDist);
+}
+
+// ---- Fibonacci chamber walls ----
+float ssChamberWalls(vec3 pos, float time, float tension) {
+  float posR = length(pos.xz);
+  float posTheta = atan(pos.z, pos.x);
+  float growthRate = log(PHI) / TAU;
+  float spiralA = 0.3;
+
+  // Thin radial walls at Fibonacci intervals
+  float minDist = 1e6;
+  for (int f = 0; f < 8; f++) {
+    float ff = float(f);
+    // Fibonacci numbers: 1, 1, 2, 3, 5, 8, 13, 21
+    float fibAngle = ff * TAU * PHI; // golden angle spacing
+    float wallR = spiralA * exp(growthRate * fibAngle);
+    if (abs(posR - wallR) > 0.5) continue;
+
+    // Thin wall perpendicular to spiral
+    float wallAngle = fibAngle;
+    float wallNx = cos(wallAngle);
+    float wallNz = sin(wallAngle);
+    float wallDist = abs(pos.x * wallNx + pos.z * wallNz) - 0.02;
+
+    // Only near the spiral radius
+    float radialMask = smoothstep(0.3, 0.0, abs(posR - wallR));
+    float dist = wallDist / max(radialMask, 0.01);
+    minDist = min(minDist, max(wallDist, -radialMask + 0.5));
+  }
+  return minDist;
+}
+
+// ---- Full scene SDF ----
+float ssSceneSDF(vec3 pos, float time, float bass, float tension, out int ssObjId) {
+  ssObjId = 0;
+  float spiral = ssSpiralTube(pos, time, bass, tension);
+  float pillar = ssCentralPillar(pos, bass);
+  float walls = ssChamberWalls(pos, time, tension);
+
+  float minDist = spiral;
+  ssObjId = 1; // spiral
+
+  if (pillar < minDist) { minDist = pillar; ssObjId = 2; }
+  if (walls < minDist) { minDist = walls; ssObjId = 3; }
+
+  return minDist;
+}
+
+// ---- Normal ----
+vec3 ssCalcNormal(vec3 pos, float time, float bass, float tension) {
+  float eps = 0.003;
+  int dummyId;
+  float ref = ssSceneSDF(pos, time, bass, tension, dummyId);
+  return normalize(vec3(
+    ssSceneSDF(pos + vec3(eps, 0, 0), time, bass, tension, dummyId) - ref,
+    ssSceneSDF(pos + vec3(0, eps, 0), time, bass, tension, dummyId) - ref,
+    ssSceneSDF(pos + vec3(0, 0, eps), time, bass, tension, dummyId) - ref
+  ));
+}
+
+// ---- Occlusion ----
+float ssCalcOcclusion(vec3 pos, vec3 nrm, float time, float bass, float tension) {
+  float occl = 0.0;
+  float weight = 1.0;
+  int dummyId;
+  for (int i = 1; i <= 5; i++) {
+    float sd = float(i) * 0.1;
+    float sdf = ssSceneSDF(pos + nrm * sd, time, bass, tension, dummyId);
+    occl += weight * max(sd - sdf, 0.0);
+    weight *= 0.6;
+  }
+  return clamp(1.0 - occl * 2.0, 0.0, 1.0);
+}
 
 void main() {
   vec2 uv = vUv;
   vec2 aspect = vec2(uResolution.x / uResolution.y, 1.0);
-  vec2 p = (uv - 0.5) * aspect;
+  vec2 screenP = (uv - 0.5) * aspect;
 
-  // --- Clamp audio inputs ---
+  // ---- Audio ----
   float energy = clamp(uEnergy, 0.0, 1.0);
   float bass = clamp(uBass, 0.0, 1.0);
   float highs = clamp(uHighs, 0.0, 1.0);
+  float mids = clamp(uMids, 0.0, 1.0);
   float onset = clamp(uOnsetSnap, 0.0, 1.0);
   float slowE = clamp(uSlowEnergy, 0.0, 1.0);
-  float stability = clamp(uBeatStability, 0.0, 1.0);
   float tension = clamp(uHarmonicTension, 0.0, 1.0);
-  float melInfluence = uMelodicPitch * uMelodicConfidence;
-  float melodicPitch = clamp(melInfluence, 0.0, 1.0);
+  float stability = clamp(uBeatStability, 0.0, 1.0);
+  float melodicPitch = clamp(uMelodicPitch * uMelodicConfidence, 0.0, 1.0);
   float melodicDir = clamp(uMelodicDirection, -1.0, 1.0);
-
-  // 7-band spectral: sub, low, low-mid, mid, upper-mid, presence, brilliance
-  float fftBass = texture2D(uFFTTexture, vec2(0.07, 0.5)).r;
-  float fftMid = texture2D(uFFTTexture, vec2(0.36, 0.5)).r;
-  float fftHigh = texture2D(uFFTTexture, vec2(0.78, 0.5)).r;
-
-  float slowTime = uDynamicTime * 0.1;
-  float energyDetail = 1.0 + energy * 0.5;
-
-  // === DOMAIN WARPING: organic UV distortion ===
-  p += vec2(fbm3(vec3(p * 0.5 * energyDetail, uDynamicTime * 0.05)), fbm3(vec3(p * 0.5 * energyDetail + 100.0, uDynamicTime * 0.05))) * 0.3;
-
-  // --- Phase 1 uniform integrations ---
-  float vocalWarmth = uVocalEnergy * 0.1;
-  float otherShimmer = uOtherEnergy * 0.12;
-  float accelBoost = 1.0 + uEnergyAccel * 0.12;
+  float effectiveBeat = uBeatSnap * smoothstep(0.3, 0.7, uBeatConfidence);
   float chromaHueMod = uChromaHue * 0.2;
   float chordConf = smoothstep(0.3, 0.6, uChordConfidence);
   float chordHue = float(int(uChordIndex)) / 24.0 * 0.1 * chordConf;
-  float forecastGlow = clamp(uEnergyForecast, 0.0, 1.0) * 0.08;
-  float peakApproach = clamp(uPeakApproaching, 0.0, 1.0);
+  float vocalGlow = uVocalEnergy * 0.12;
+  float e2 = energy * energy;
 
-  // --- Section type modulation ---
-  // Mapping: 0=intro, 1=verse, 2=chorus, 3=bridge, 4=solo, 5=jam, 6=outro, 7=space
+  // ---- Section ----
   float sectionT = uSectionType;
-  float jamFactor = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
-  float spaceFactor = smoothstep(6.5, 7.5, sectionT);
-  float chorusFactor = smoothstep(1.5, 2.5, sectionT) * (1.0 - step(2.5, sectionT));
-  float soloFactor = smoothstep(3.5, 4.5, sectionT) * (1.0 - step(4.5, sectionT));
+  float sJam = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
+  float sSpace = smoothstep(6.5, 7.5, sectionT);
+  float sChorus = smoothstep(1.5, 2.5, sectionT) * (1.0 - step(2.5, sectionT));
+  float sSolo = smoothstep(3.5, 4.5, sectionT) * (1.0 - step(4.5, sectionT));
+  float sectionRotSpeed = mix(1.0, 1.6, sJam) * mix(1.0, 0.15, sSpace) * mix(1.0, 1.2, sChorus) * mix(1.0, 1.3, sSolo);
 
-  // --- Coherence morphology ---
-  float coherence = clamp(uCoherence, 0.0, 1.0);
-
-  // --- Background: deep psychedelic void with dual palette nebula ---
-  float bgNebula = fbm6(vec3(p * 1.5 * energyDetail, slowTime * 0.08));
-  vec3 bgPrimary = hsv2rgb(vec3(uPalettePrimary, 0.3 * uPaletteSaturation, 0.04));
-  vec3 bgSecondary = hsv2rgb(vec3(uPaletteSecondary, 0.25 * uPaletteSaturation, 0.03));
-  vec3 col = mix(
-    vec3(0.01, 0.005, 0.02),
-    vec3(0.02, 0.01, 0.03),
-    uv.y
-  ) + mix(bgPrimary, bgSecondary, bgNebula * 0.5 + 0.5) * (0.5 + bgNebula * 0.5);
-
-  // --- Polar coordinates ---
-  float r = length(p);
-  float theta = atan(p.y, p.x);
-
-  // --- Arm count driven by energy ---
-  // Low energy: 3 arms. Peak energy: 6-8 arms.
-  float armCount = mix(3.0, 7.0, energy) + fftMid * 1.0;
-  armCount += jamFactor * 1.5;       // jam: more arms
-  armCount -= spaceFactor * 1.5;     // space: fewer arms
-  armCount += chorusFactor * 0.5;    // chorus: slight boost
-
-  // High coherence: lock to nearest integer (clean symmetry)
-  if (coherence > 0.7) {
-    armCount = floor(armCount + 0.5);
-  }
-  // Low coherence: fractional arm count wobble
-  if (coherence < 0.3) {
-    float jitterAmt = (0.3 - coherence) / 0.3;
-    armCount += sin(slowTime * 5.0) * 0.6 * jitterAmt;
-  }
-  armCount = max(armCount, 2.0);
-
-  // --- Twist factor driven by bass ---
-  // Bass hits tighten the spiral (more windings per radius)
-  float twist = 4.0 + bass * 8.0 + fftBass * 3.0;
-  twist *= mix(1.0, 1.3, jamFactor);   // jam: tighter twist
-  twist *= mix(1.0, 0.4, spaceFactor); // space: loose, open spiral
-  twist += tension * 3.0;              // harmonic tension adds complexity
-
-  // --- Rotation speed driven by tempo ---
-  float tempoFactor = clamp(uLocalTempo / 120.0, 0.5, 2.0); // normalize around 120 BPM
-  float tempoAccel = 1.0 + uTempoDerivative * 0.3;
-  float rotSpeed = 0.3 * tempoFactor * tempoAccel * accelBoost;
-
-  // Section-driven speed modulation
-  rotSpeed *= mix(1.0, 1.6, jamFactor);   // jam: much faster rotation
-  rotSpeed *= mix(1.0, 0.15, spaceFactor); // space: near-frozen
-  rotSpeed *= mix(1.0, 1.2, chorusFactor); // chorus: energetic
-  rotSpeed *= mix(1.0, 1.3, soloFactor);   // solo: dramatic spin
-
-  // Melodic direction drives rotation direction
-  float rotDir = sign(melodicDir + 0.001);
-  float rotation = uDynamicTime * rotSpeed * rotDir;
-
-  // Beat creates rotation speed bump (momentary acceleration)
-  float effectiveBeat = uBeatSnap * smoothstep(0.3, 0.7, uBeatConfidence);
-  rotation += effectiveBeat * 0.4 * rotDir;
-
-  // Downbeat emphasis: extra rotation kick
-  rotation += uDownbeat * smoothstep(0.3, 0.7, uBeatConfidence) * 0.25;
-
-  // --- FBM6 noise warps the spiral edges for organic feel (energy-responsive detail) ---
-  float warpAmp = 0.15 + tension * 0.3 + bass * 0.2;
-  vec3 warpInput = vec3(p * 2.5 * energyDetail, slowTime * 0.5);
-  float warp1 = fbm6(warpInput) * warpAmp;
-  float warp2 = fbm6(warpInput + vec3(3.7, 1.2, 0.0)) * warpAmp * 0.7;
-
-  // Warp the polar coordinates
-  float warpedTheta = theta + warp1 * 1.5;
-  float warpedR = r + warp2 * 0.3;
-
-  // --- Spiral arm pattern ---
-  // Core spiral: sin(theta * armCount + r * twist - time * rotationSpeed)
-  float spiral1 = sin(warpedTheta * armCount + warpedR * twist - rotation);
-  // Second nested spiral at different scale and speed (counter-rotating)
-  float spiral2 = sin(warpedTheta * (armCount * 0.5 + 1.0) + warpedR * twist * 0.6 + rotation * 0.7);
-  // Third fine-detail spiral
-  float spiral3 = sin(warpedTheta * (armCount * 2.0 - 1.0) + warpedR * twist * 1.4 - rotation * 1.3);
-
-  // Combine spirals: primary dominant, secondaries add texture
-  float spiralPattern = spiral1 * 0.6 + spiral2 * 0.25 + spiral3 * 0.15;
-  // Normalize to 0-1 range
-  spiralPattern = spiralPattern * 0.5 + 0.5;
-
-  // Onset noise burst: disrupt spiral edges momentarily
-  if (onset > 0.1) {
-    float onsetNoise = snoise(vec3(p * 6.0, uDynamicTime * 4.0));
-    spiralPattern += onsetNoise * onset * 0.2;
-    spiralPattern = clamp(spiralPattern, 0.0, 1.0);
-  }
-
-  // --- Color bands along spiral arms ---
-  // Each arm gets a different hue, cycling over time
-  float hueBase = uPalettePrimary + chromaHueMod + chordHue;
-  float hueSpan = mod(uPaletteSecondary - uPalettePrimary + 0.5, 1.0) - 0.5;
-
-  // Arm index from angular position gives each arm a distinct hue
-  float armPhase = fract(warpedTheta * armCount / TAU + rotation / TAU);
-  float armHue = hueBase + armPhase * hueSpan + spiralPattern * 0.15;
-
-  // Rainbow cycling over time
-  armHue += uDynamicTime * 0.02 + vocalWarmth;
-
-  // Chroma hue modulation overlay
-  armHue += uChromaHue * 0.12 * sin(spiralPattern * TAU + slowTime);
-
-  // Chorus: more vivid rainbow spread
-  armHue += chorusFactor * spiralPattern * 0.2;
-
-  float sat = mix(0.5, 1.0, energy) * uPaletteSaturation;
-  sat += chorusFactor * 0.15; // chorus: vivid colors
-  sat -= spaceFactor * 0.2;   // space: muted
-  sat = clamp(sat, 0.3, 1.0);
-
-  float brightness = mix(0.2, 0.7, spiralPattern) + energy * 0.3 + forecastGlow;
-  brightness *= accelBoost;
-
-  vec3 spiralColor = hsv2rgb(vec3(fract(armHue), sat, brightness));
-
-  // Radial falloff: bright center, darker edges
-  float radialFade = exp(-r * r * 2.0);
-  col += spiralColor * radialFade;
-
-  // --- Center glowing vortex that pulses with energy ---
-  float centerGlow = exp(-r * r * 25.0);
-  // Onset triggers flash at center radiating outward
-  float onsetWave = onset * exp(-pow(r - onset * 0.5, 2.0) * 15.0);
-  centerGlow += onsetWave * 2.0;
-
-  vec3 coreHue = hsv2rgb(vec3(
-    fract(hueBase + uDynamicTime * 0.05 + vocalWarmth),
-    mix(0.3, 0.8, energy),
-    1.0
-  ));
-  col += coreHue * centerGlow * (0.4 + bass * 0.6 + energy * 0.3);
-
-  // --- Onset radiating rings from center ---
-  if (onset > 0.2) {
-    float ringWave = sin(r * 20.0 - uDynamicTime * 8.0) * 0.5 + 0.5;
-    float ringFade = exp(-r * 3.0) * onset;
-    col += vec3(1.0, 0.95, 0.85) * ringWave * ringFade * 0.5;
-  }
-
-  // --- Spiral edge highlights from highs ---
-  float edgeBright = pow(abs(spiral1), 8.0) * highs * 0.5;
-  vec3 edgeColor = hsv2rgb(vec3(fract(hueBase + 0.33 + chromaHueMod), sat * 0.7, 1.0));
-  col += edgeColor * edgeBright * radialFade;
-
-  // --- Ridged noise detail on spiral surface ---
-  float ridged = ridged4(vec3(p * 3.0 + vec2(warp1, warp2), slowTime * 0.3));
-  col += spiralColor * ridged * 0.08 * fftHigh;
-
-  // === SECONDARY LAYER: deep cosmic flow beneath spiral ===
-  float cosmicNoise = fbm6(vec3(p * 1.8 * energyDetail + 90.0, slowTime * 0.12));
-  vec3 cosCol1 = hsv2rgb(vec3(fract(hueBase + 0.2), sat * 0.5, 0.2));
-  vec3 cosCol2 = hsv2rgb(vec3(fract(uPaletteSecondary + 0.1), sat * 0.4, 0.15));
-  vec3 cosmicLayer = mix(cosCol1, cosCol2, cosmicNoise * 0.5 + 0.5) * (0.5 + cosmicNoise * 0.5);
-  col = mix(col, col + cosmicLayer * 0.1, 0.3 * radialFade);
-
-  // --- Peak approaching: anticipatory glow ---
-  col *= 1.0 + peakApproach * 0.15;
-
-  // --- Climax boost ---
+  // ---- Climax ----
   float isClimax = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5);
   float climaxBoost = isClimax * uClimaxIntensity;
-  col *= 1.0 + climaxBoost * 0.4;
 
-  // Climax: extra spiral layers and brightness
-  if (climaxBoost > 0.01) {
-    float climaxSpiral = sin(warpedTheta * armCount * 2.0 + warpedR * twist * 1.5 - rotation * 2.0);
-    climaxSpiral = climaxSpiral * 0.5 + 0.5;
-    vec3 climaxColor = hsv2rgb(vec3(fract(hueBase + 0.5), 1.0, 1.0));
-    col += climaxColor * climaxSpiral * climaxBoost * 0.25 * radialFade;
+  // ---- Palette ----
+  float hue1 = uPalettePrimary + chromaHueMod + chordHue;
+  float hue2 = uPaletteSecondary + chordHue * 0.5;
+  float sat = mix(0.4, 1.0, energy) * uPaletteSaturation;
+
+  // ---- Rotation ----
+  float tempoAccel = 1.0 + uTempoDerivative * 0.3;
+  float rotSpeed = 0.15 * tempoAccel * sectionRotSpeed;
+  float rotDir = sign(melodicDir + 0.001);
+  float rotation = uDynamicTime * rotSpeed * rotDir + effectiveBeat * 0.3 * rotDir;
+  float slowTime = uDynamicTime * 0.08 * sectionRotSpeed;
+
+  // ---- Camera: travels along spiral interior ----
+  float camTheta = rotation;
+  float growthRate = log(PHI) / TAU;
+  float camR = 0.3 * exp(growthRate * camTheta) * 2.0;
+  camR = clamp(camR, 1.0, 6.0);
+  vec3 rayOrig = vec3(
+    cos(camTheta) * camR,
+    0.5 + melodicPitch * 1.0 + sin(slowTime * 0.5) * 0.3,
+    sin(camTheta) * camR
+  );
+  // Look toward spiral center with slight forward bias
+  float lookTheta = camTheta + 0.5;
+  float lookR = camR * 0.3;
+  vec3 camLookAt = vec3(cos(lookTheta) * lookR, 0.2, sin(lookTheta) * lookR);
+  vec3 camFwd = normalize(camLookAt - rayOrig);
+  vec3 camSide = normalize(cross(camFwd, vec3(0.0, 1.0, 0.0)));
+  vec3 camVert = cross(camSide, camFwd);
+  float fovScale = tan(radians(60.0) * 0.5);
+  vec3 rayDir = normalize(camFwd + camSide * screenP.x * fovScale + camVert * screenP.y * fovScale);
+
+  // ---- Background: deep psychedelic void ----
+  vec3 bgPrimary = hsv2rgb(vec3(hue1, 0.3 * uPaletteSaturation, 0.03));
+  vec3 bgSecondary = hsv2rgb(vec3(hue2, 0.25 * uPaletteSaturation, 0.02));
+  float bgNebula = fbm3(vec3(rayDir * 2.0, slowTime * 0.1));
+  vec3 col = vec3(0.01, 0.005, 0.02) + mix(bgPrimary, bgSecondary, bgNebula * 0.5 + 0.5) * 0.3;
+
+  // ---- Raymarch ----
+  float marchDist = 0.0;
+  int objId = 0;
+  bool didCollide = false;
+
+  for (int i = 0; i < SS_MAX_STEPS; i++) {
+    vec3 marchPos = rayOrig + rayDir * marchDist;
+    float sdf = ssSceneSDF(marchPos, slowTime, bass, tension, objId);
+    if (sdf < SS_SURF_DIST) {
+      didCollide = true;
+      break;
+    }
+    if (marchDist > SS_MAX_DIST) break;
+    marchDist += sdf * 0.7;
   }
 
-  // --- Vignette: outer edges dissolve into darkness ---
+  if (didCollide) {
+    vec3 collidePos = rayOrig + rayDir * marchDist;
+    vec3 nrm = ssCalcNormal(collidePos, slowTime, bass, tension);
+    float occl = ssCalcOcclusion(collidePos, nrm, slowTime, bass, tension);
+
+    // Lighting
+    vec3 lightDir = normalize(vec3(0.3, 1.0, -0.5));
+    float diffuse = max(dot(nrm, lightDir), 0.0);
+    vec3 halfVec = normalize(lightDir - rayDir);
+    float specular = pow(max(dot(nrm, halfVec), 0.0), 48.0);
+    float fresnelVal = pow(1.0 - max(dot(nrm, -rayDir), 0.0), 3.0);
+
+    // Material color based on object and position
+    float posR = length(collidePos.xz);
+    float posTheta = atan(collidePos.z, collidePos.x);
+    float spiralPhase = posR / max(posR, 0.01); // normalized radial position
+
+    vec3 surfaceCol;
+    if (objId == 1) {
+      // Spiral tube: golden pearlescent
+      float shellHue = fract(hue1 + posTheta / TAU * 0.2 + posR * 0.05);
+      surfaceCol = hsv2rgb(vec3(shellHue, sat * 0.7, 0.6 + e2 * 0.3));
+      // Nacre iridescence
+      float nacreDelta = 2.0 * (1.0 + snoise(vec3(collidePos * 5.0, slowTime * 0.1))) * max(dot(nrm, -rayDir), 0.0);
+      vec3 nacreCol = vec3(
+        0.5 + 0.5 * cos(TAU * nacreDelta),
+        0.5 + 0.5 * cos(TAU * (nacreDelta + 0.33)),
+        0.5 + 0.5 * cos(TAU * (nacreDelta + 0.67))
+      );
+      surfaceCol = mix(surfaceCol, nacreCol, 0.3 * fresnelVal);
+    } else if (objId == 2) {
+      // Central pillar: warm golden
+      surfaceCol = hsv2rgb(vec3(fract(hue1 + 0.1), sat * 0.8, 0.7));
+    } else {
+      // Chamber walls: subtle pattern
+      surfaceCol = hsv2rgb(vec3(fract(hue2 + posTheta * 0.1), sat * 0.5, 0.4));
+    }
+
+    // Apply lighting
+    vec3 ambient = surfaceCol * 0.15;
+    vec3 litCol = ambient + surfaceCol * diffuse * 0.6 * occl;
+    litCol += vec3(0.9, 0.85, 0.7) * specular * 0.4 * occl;
+    litCol += surfaceCol * fresnelVal * 0.25;
+
+    // Edge shimmer from highs
+    litCol += surfaceCol * highs * fresnelVal * 0.3;
+
+    // Mid-spiral glow
+    float midRadial = smoothstep(0.5, 2.0, posR) * smoothstep(5.0, 2.0, posR);
+    litCol *= 1.0 + mids * midRadial * 0.2;
+
+    // Vocal inner glow
+    litCol += hsv2rgb(vec3(fract(hue1 + 0.05), 0.6, 0.5)) * vocalGlow * occl;
+
+    col = litCol * (0.3 + e2 * 0.7);
+
+    // Distance fog
+    float fogFactor = 1.0 - exp(-marchDist * 0.05);
+    col = mix(col, vec3(0.01, 0.005, 0.02), fogFactor);
+  }
+
+  // ---- Volumetric inner glow along spiral center ----
+  {
+    int volSteps = int(mix(16.0, 32.0, energy));
+    float volStepSize = min(SS_MAX_DIST, marchDist > 0.0 ? marchDist : 15.0) / float(volSteps);
+    vec3 volAccum = vec3(0.0);
+
+    for (int i = 0; i < 32; i++) {
+      if (i >= volSteps) break;
+      float fi = float(i);
+      float volT = 0.5 + fi * volStepSize;
+      vec3 volPos = rayOrig + rayDir * volT;
+
+      // Glow near spiral center axis
+      float centerDist = length(volPos.xz);
+      float axialGlow = exp(-centerDist * centerDist * 2.0) * 0.005;
+
+      // Glow near spiral tube surfaces
+      float posR = length(volPos.xz);
+      float spiralGlow = exp(-abs(posR - 0.3 * exp(log(PHI) / TAU * atan(volPos.z, volPos.x))) * 2.0) * 0.003;
+
+      float totalGlow = (axialGlow + spiralGlow) * e2;
+      vec3 glowCol = hsv2rgb(vec3(fract(hue1 + posR * 0.1), sat * 0.6, 1.0));
+      volAccum += glowCol * totalGlow;
+    }
+    col += volAccum;
+  }
+
+  // ---- Onset flash from center ----
+  float centerGlow = exp(-length(screenP) * length(screenP) * 8.0);
+  col += vec3(1.0, 0.95, 0.85) * onset * centerGlow * 0.3;
+
+  // ---- Climax boost ----
+  col *= 1.0 + climaxBoost * 0.4;
+
+  // ---- SDF icon emergence ----
+  {
+    float nf = fbm3(vec3(screenP * 2.0, slowTime));
+    vec3 c1 = hsv2rgb(vec3(hue1, sat, 1.0));
+    vec3 c2 = hsv2rgb(vec3(hue2, sat, 1.0));
+    col += iconEmergence(screenP, uTime, energy, bass, c1, c2, nf, uClimaxPhase, uSectionIndex) * 0.5;
+    col += heroIconEmergence(screenP, uTime, energy, bass, c1, c2, nf, uSectionIndex);
+  }
+
+  // ---- Vignette ----
   float vigScale = mix(0.30, 0.22, energy);
-  float vignette = 1.0 - dot(p * vigScale, p * vigScale);
+  float vignette = 1.0 - dot(screenP * vigScale, screenP * vigScale);
   vignette = smoothstep(0.0, 1.0, vignette);
   col = mix(vec3(0.01, 0.005, 0.02), col, vignette);
 
-  // --- Semantic modulation ---
-  // Psychedelic: boost spiral saturation + chromatic shift
-  float psychBoost = uSemanticPsychedelic * 0.35;
-  col = mix(col, col * vec3(1.0 + psychBoost * 0.2, 1.0, 1.0 + psychBoost * 0.15), psychBoost);
+  // ---- Post-processing ----
+  col = applyPostProcess(col, vUv, screenP);
 
-  // Cosmic: cooler tones, deeper vortex
-  col *= 1.0 + uSemanticCosmic * 0.08;
-
-  // --- Post-processing ---
-  col = applyPostProcess(col, vUv, p);
-
-  // --- Feedback trails: motion blur on rotation ---
+  // ---- Feedback trails ----
   vec3 prev = texture2D(uPrevFrame, vUv).rgb;
-  float sJam_fb = smoothstep(4.5, 5.5, uSectionType) * (1.0 - step(5.5, uSectionType));
-  float sSpace_fb = smoothstep(6.5, 7.5, uSectionType);
-  float sChorus_fb = smoothstep(1.5, 2.5, uSectionType) * (1.0 - step(2.5, uSectionType));
-  float baseDecay = mix(0.93, 0.93 - 0.07, energy);
-  float feedbackDecay = baseDecay + sJam_fb * 0.04 + sSpace_fb * 0.06 - sChorus_fb * 0.06;
+  float baseDecay = mix(0.93, 0.86, energy);
+  float feedbackDecay = baseDecay + sJam * 0.04 + sSpace * 0.06 - sChorus * 0.06;
   feedbackDecay = clamp(feedbackDecay, 0.80, 0.97);
-  // Jam phase feedback: exploration=long trails, building=moderate, peak=max persistence, resolution=clearing
   if (uJamPhase >= 0.0) {
     float jpExplore = step(-0.5, uJamPhase) * step(uJamPhase, 0.5);
     float jpBuild   = step(0.5, uJamPhase) * step(uJamPhase, 1.5);

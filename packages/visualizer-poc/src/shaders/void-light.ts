@@ -1,21 +1,38 @@
 /**
- * Void Light — darkness-forward shader for Space passages and contemplation.
+ * Void Light — raymarched 3D void with a single impossible light source.
+ * Pure darkness except for one geometric light object (rotating icosahedron)
+ * that casts volumetric rays into the infinite void. Dust particles catch
+ * the light. The contrast between absolute darkness and pure light.
  *
- * Deep near-black background with a single drifting light point.
- * The anti-shader: when the music goes to nothing, the visuals should too.
- * Silence is visual too.
+ * Visual aesthetic:
+ *   - Quiet: near-total darkness, faint icosahedron glow, sparse dust
+ *   - Building: icosahedron brightens, light rays extend, dust density grows
+ *   - Peak: blazing light source, god rays fill the void, dust swirls
+ *   - Release: light contracts, rays shorten, dust settles
  *
- * Audio mapping:
- *   energy → light intensity
- *   chromaHue → light color
- *   bass → glow radius
- *   onsetSnap → sparkle triggers
- *   coherence → light stability (high = steadier)
- *   climax → additional lights at Fibonacci angles
+ * Audio reactivity (14+ uniforms):
+ *   uEnergy           -> light intensity + ray length + dust density
+ *   uBass             -> icosahedron scale pulse + low-frequency throb
+ *   uMids             -> dust particle mid-field density
+ *   uHighs            -> specular sharpness on icosahedron facets
+ *   uOnsetSnap        -> light burst flash + sparkle triggers
+ *   uBeatSnap         -> icosahedron rotation snap to beat
+ *   uSlowEnergy       -> base rotation speed
+ *   uClimaxPhase      -> icosahedron shatters into multiple fragments (2+)
+ *   uClimaxIntensity  -> shatter spread + additional light sources
+ *   uHarmonicTension  -> light color desaturation under tension
+ *   uMelodicPitch     -> icosahedron vertical oscillation
+ *   uSectionType      -> space=single dim point, jam=spinning fast
+ *   uBeatStability    -> rotation smoothness
+ *   uVocalPresence    -> warm halo color shift
+ *   uCoherence        -> light stability (flicker reduction)
+ *   uDynamicRange     -> contrast between lit dust and void
+ *   uChromaHue        -> primary light hue
  */
 
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
+import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
 
 export const voidLightVert = /* glsl */ `
 varying vec2 vUv;
@@ -32,143 +49,449 @@ ${sharedUniformsGLSL}
 
 ${noiseGLSL}
 
+${buildPostProcessGLSL({
+  grainStrength: "heavy",
+  bloomEnabled: true,
+  bloomThresholdOffset: -0.15,
+  caEnabled: true,
+  halationEnabled: true,
+  lensDistortionEnabled: true,
+})}
+
 varying vec2 vUv;
 
-// Palette color from hue
-vec3 paletteColor(float hue, float sat) {
-  float h = hsvToCosineHue(hue);
-  vec3 col = 0.5 + 0.5 * cos(6.28318 * (h + vec3(0.0, 0.33, 0.67)));
-  return mix(vec3(dot(col, vec3(0.299, 0.587, 0.114))), col, sat);
+#define PI 3.14159265
+#define TAU 6.28318530
+#define VL_MAX_STEPS 80
+#define VL_MAX_DIST 30.0
+#define VL_SURF_DIST 0.002
+#define VL_PHI 1.618033988749
+
+// ============================================================
+// Utility
+// ============================================================
+mat2 vlRot2(float a) {
+  float c = cos(a), s = sin(a);
+  return mat2(c, -s, s, c);
 }
 
-// Golden ratio for Fibonacci-spaced angles
-const float PHI = 1.618033988749;
+float vlHash(float n) {
+  return fract(sin(n) * 43758.5453123);
+}
+
+vec3 vlHash3(float n) {
+  return vec3(vlHash(n), vlHash(n + 17.3), vlHash(n + 31.7));
+}
+
+// ============================================================
+// SDF: icosahedron (exact — folding method)
+// ============================================================
+float vlIcosahedron(vec3 p, float radius) {
+  // Golden ratio vertices: project onto icosahedral face normals
+  float g = VL_PHI;
+
+  // 6 face normals of the icosahedron (covering all 20 faces via abs)
+  vec3 n1 = normalize(vec3(1.0, g, 0.0));
+  vec3 n2 = normalize(vec3(-1.0, g, 0.0));
+  vec3 n3 = normalize(vec3(0.0, 1.0, g));
+  vec3 n4 = normalize(vec3(0.0, 1.0, -g));
+  vec3 n5 = normalize(vec3(g, 0.0, 1.0));
+  vec3 n6 = normalize(vec3(-g, 0.0, 1.0));
+
+  vec3 ap = abs(p);
+  float d = dot(ap, n1);
+  d = max(d, dot(ap, n2));
+  d = max(d, dot(ap, n3));
+  d = max(d, dot(ap, n4));
+  d = max(d, dot(ap, n5));
+  d = max(d, dot(ap, n6));
+
+  return d - radius;
+}
+
+// ============================================================
+// SDF: icosahedron with rotation
+// ============================================================
+float vlRotatedIcosahedron(vec3 p, float radius, float time, float rotSpeed,
+                            float beatSnap, float stability) {
+  // Multi-axis rotation
+  float smoothRot = time * rotSpeed;
+  // Beat snap: quantize rotation to beat grid
+  float snapAmount = beatSnap * 0.3;
+  smoothRot += snapAmount * floor(smoothRot / (PI * 0.5)) * 0.1;
+
+  // Stability: jitter when unstable
+  float jitter = (1.0 - stability) * 0.1 * sin(time * 13.0);
+
+  p.xy *= vlRot2(smoothRot + jitter);
+  p.yz *= vlRot2(smoothRot * 0.7 + 1.0 + jitter * 0.5);
+  p.xz *= vlRot2(smoothRot * 0.3 + 2.0);
+
+  return vlIcosahedron(p, radius);
+}
+
+// ============================================================
+// Scene SDF: icosahedron (+ fragments at climax)
+// ============================================================
+float vlMap(vec3 p, float radius, float time, float rotSpeed,
+            float beatSnap, float stability, float climaxShatter) {
+  float minDist = VL_MAX_DIST;
+
+  // Vertical oscillation from melodic pitch
+  float yOff = sin(time * 0.3) * clamp(uMelodicPitch, 0.0, 1.0) * 1.5;
+
+  if (climaxShatter < 0.01) {
+    // Single icosahedron
+    vec3 icoP = p - vec3(0.0, yOff, 0.0);
+    float ico = vlRotatedIcosahedron(icoP, radius, time, rotSpeed, beatSnap, stability);
+    minDist = min(minDist, ico);
+  } else {
+    // Shattered into fragments at Fibonacci-distributed positions
+    int fragCount = 3 + int(climaxShatter * 8.0);
+    for (int i = 0; i < 12; i++) {
+      if (i >= fragCount) break;
+      float fi = float(i);
+      float seed = fi * 7.31;
+
+      // Fibonacci-distributed outward positions
+      float phi = acos(1.0 - 2.0 * (fi + 0.5) / float(fragCount));
+      float theta = PI * (1.0 + sqrt(5.0)) * fi;
+
+      vec3 fragPos = vec3(
+        sin(phi) * cos(theta),
+        sin(phi) * sin(theta),
+        cos(phi)
+      ) * climaxShatter * 3.0;
+      fragPos.y += yOff;
+
+      // Fragment size: smaller than original
+      float fragR = radius * mix(0.6, 0.2, climaxShatter) * (0.5 + vlHash(seed) * 0.5);
+
+      vec3 fragP = p - fragPos;
+      float frag = vlRotatedIcosahedron(fragP, fragR, time + fi * 0.5, rotSpeed * 1.5, 0.0, 0.5);
+      minDist = min(minDist, frag);
+    }
+  }
+
+  return minDist;
+}
+
+// ============================================================
+// Normal via central differences
+// ============================================================
+vec3 vlNormal(vec3 p, float radius, float time, float rotSpeed,
+              float beatSnap, float stability, float climaxShatter) {
+  vec2 eps = vec2(0.002, 0.0);
+  float d = vlMap(p, radius, time, rotSpeed, beatSnap, stability, climaxShatter);
+  return normalize(vec3(
+    vlMap(p + eps.xyy, radius, time, rotSpeed, beatSnap, stability, climaxShatter) - d,
+    vlMap(p + eps.yxy, radius, time, rotSpeed, beatSnap, stability, climaxShatter) - d,
+    vlMap(p + eps.yyx, radius, time, rotSpeed, beatSnap, stability, climaxShatter) - d
+  ));
+}
+
+// ============================================================
+// Ambient Occlusion (5-tap)
+// ============================================================
+float vlAmbientOcclusion(vec3 p, vec3 n, float radius, float time,
+                          float rotSpeed, float beatSnap, float stability,
+                          float climaxShatter) {
+  float occ = 0.0;
+  float weight = 1.0;
+  for (int i = 1; i <= 5; i++) {
+    float fi = float(i);
+    float dist = fi * 0.06;
+    float d = vlMap(p + n * dist, radius, time, rotSpeed, beatSnap, stability, climaxShatter);
+    occ += (dist - d) * weight;
+    weight *= 0.6;
+  }
+  return clamp(1.0 - occ * 4.0, 0.0, 1.0);
+}
+
+// ============================================================
+// Volumetric god rays from icosahedron
+// ============================================================
+vec3 vlGodRays(vec3 ro, vec3 rd, float maxT, float lightIntensity,
+               vec3 lightColor, float dustDensity, float time,
+               float climaxShatter, float dynamicRange) {
+  vec3 rays = vec3(0.0);
+  vec3 lightPos = vec3(0.0, sin(time * 0.3) * clamp(uMelodicPitch, 0.0, 1.0) * 1.5, 0.0);
+
+  int raySteps = 48;
+  float stepSize = min(maxT, 20.0) / float(raySteps);
+
+  for (int i = 0; i < 48; i++) {
+    float fi = float(i);
+    float marchT = fi * stepSize + 0.1;
+    vec3 pos = ro + rd * marchT;
+
+    // Distance from light source
+    vec3 toLight = pos - lightPos;
+    float distToLight = length(toLight);
+
+    // Radial falloff: inverse square
+    float radialFalloff = 1.0 / (1.0 + distToLight * distToLight * 0.15);
+
+    // Directional bias: rays radiate outward from light
+    vec3 rayDir = normalize(toLight);
+    float dirBias = 1.0 - abs(dot(rd, rayDir)) * 0.3; // slightly favor perpendicular viewing
+
+    // Dust density: noise-based particles in the void
+    float dust = fbm3(vec3(pos * 0.8 + time * vec3(0.02, 0.03, 0.01)));
+    dust = dust * 0.5 + 0.5;
+    dust *= dustDensity;
+
+    // Additional dust swirls at higher energy
+    float swirl = snoise(vec3(pos * 2.0 + time * 0.15));
+    dust += max(0.0, swirl) * dustDensity * 0.5;
+
+    // Dynamic range sharpens the dust visibility
+    dust = mix(dust, pow(dust, 1.5), dynamicRange * 0.5);
+
+    // Depth attenuation
+    float depthAtten = exp(-marchT * 0.04);
+
+    // Accumulate
+    rays += lightColor * radialFalloff * dust * dirBias * lightIntensity * depthAtten * 0.008;
+
+    // Climax: additional scattered light from fragments
+    if (climaxShatter > 0.01) {
+      int fragCount = 3 + int(climaxShatter * 8.0);
+      for (int f = 0; f < 4; f++) {
+        if (f >= fragCount) break;
+        float ff = float(f);
+        float phi = acos(1.0 - 2.0 * (ff + 0.5) / float(fragCount));
+        float theta = PI * (1.0 + sqrt(5.0)) * ff;
+        vec3 fragPos = vec3(sin(phi) * cos(theta), sin(phi) * sin(theta), cos(phi)) * climaxShatter * 3.0;
+        float fragDist = length(pos - fragPos);
+        float fragGlow = climaxShatter / (1.0 + fragDist * fragDist * 0.5);
+        rays += lightColor * fragGlow * dust * depthAtten * 0.003;
+      }
+    }
+  }
+
+  return rays;
+}
+
+// ============================================================
+// Dust mote particles (discrete bright points)
+// ============================================================
+vec3 vlDustMotes(vec3 ro, vec3 rd, float maxT, float energy,
+                  float time, vec3 lightPos, vec3 lightColor) {
+  vec3 dust = vec3(0.0);
+
+  for (int i = 0; i < 20; i++) {
+    float fi = float(i);
+    float seed = fi * 11.37 + 5.71;
+
+    // Mote position: slow 3D brownian drift
+    vec3 motePos = vec3(
+      sin(seed * 1.3 + time * 0.06) * 6.0,
+      cos(seed * 2.7 + time * 0.04) * 4.0,
+      sin(seed * 0.7 + time * 0.05) * 6.0
+    );
+
+    // Distance from light: motes only visible when lit
+    float distFromLight = length(motePos - lightPos);
+    float lit = 1.0 / (1.0 + distFromLight * distFromLight * 0.2);
+
+    // Distance from ray
+    vec3 toRo = motePos - ro;
+    float proj = dot(toRo, rd);
+    if (proj < 0.0 || proj > maxT) continue;
+    vec3 closest = ro + rd * proj;
+    float moteDist = length(closest - motePos);
+
+    // Point glow: very tight falloff
+    float moteGlow = lit * energy * exp(-moteDist * moteDist * 300.0);
+
+    // Twinkle: slight flicker per mote
+    float twinkle = 0.7 + 0.3 * sin(time * 5.0 + seed * 3.0);
+    moteGlow *= twinkle;
+
+    dust += lightColor * moteGlow * 0.5;
+  }
+
+  return dust;
+}
 
 void main() {
   vec2 uv = vUv;
-  float aspect = uResolution.x / uResolution.y;
-  vec2 p = (uv - 0.5) * vec2(aspect, 1.0);
+  vec2 aspect = vec2(uResolution.x / uResolution.y, 1.0);
+  vec2 screenP = (uv - 0.5) * aspect;
 
-  float t = uDynamicTime;
-  float energy_clamped = clamp(uEnergy, 0.0, 1.0);
-  float energyDetail = 1.0 + energy_clamped * 0.5;
-
-  // === DOMAIN WARPING: subtle organic UV distortion ===
-  p += vec2(fbm3(vec3(p * 0.5 * energyDetail, uDynamicTime * 0.05)), fbm3(vec3(p * 0.5 * energyDetail + 100.0, uDynamicTime * 0.05))) * 0.3;
+  // === AUDIO INPUTS ===
+  float energy = clamp(uEnergy, 0.0, 1.0);
+  float bass = clamp(uBass, 0.0, 1.0);
+  float mids = clamp(uMids, 0.0, 1.0);
+  float highs = clamp(uHighs, 0.0, 1.0);
+  float onset = clamp(uOnsetSnap, 0.0, 1.0);
+  float beatSnap = clamp(uBeatSnap, 0.0, 1.0);
+  float slowEnergy = clamp(uSlowEnergy, 0.0, 1.0);
+  float tension = clamp(uHarmonicTension, 0.0, 1.0);
+  float melodicPitch = clamp(uMelodicPitch, 0.0, 1.0);
+  float beatStability = clamp(uBeatStability, 0.0, 1.0);
+  float vocalPresence = clamp(uVocalPresence, 0.0, 1.0);
+  float coherence = clamp(uCoherence, 0.0, 1.0);
+  float dynamicRange = clamp(uDynamicRange, 0.0, 1.0);
+  float sectionT = uSectionType;
 
   // === SECTION-TYPE MODULATION ===
-  float sectionT = uSectionType;
   float sJam = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
   float sSpace = smoothstep(6.5, 7.5, sectionT);
   float sChorus = smoothstep(1.5, 2.5, sectionT) * (1.0 - step(2.5, sectionT));
-  float sSolo = smoothstep(3.5, 4.5, sectionT) * (1.0 - step(4.5, sectionT));
 
-  // ─── Deep near-black background with fbm6 texture ───
-  vec3 col = vec3(0.01, 0.008, 0.015);
+  float time = uDynamicTime * 0.2;
 
-  // Rich background texture (fbm6 for depth, energy-responsive, dual palette)
-  float bgNoise = fbm6(vec3(p * 3.0 * energyDetail, t * 0.02));
-  col += vec3(bgNoise * 0.5, bgNoise * 0.3, bgNoise) * 0.008;
-  // Dual palette nebula glow in the void
-  float voidHue1 = hsvToCosineHue(uPalettePrimary);
-  float voidHue2 = hsvToCosineHue(uPaletteSecondary);
-  vec3 voidCol1 = 0.5 + 0.5 * cos(6.28318 * vec3(voidHue1, voidHue1 + 0.33, voidHue1 + 0.67));
-  vec3 voidCol2 = 0.5 + 0.5 * cos(6.28318 * vec3(voidHue2, voidHue2 + 0.33, voidHue2 + 0.67));
-  col += mix(voidCol1, voidCol2, bgNoise * 0.5 + 0.5) * 0.008 * (0.5 + bgNoise * 0.5);
+  // Icosahedron parameters
+  float icoRadius = 0.6 + bass * 0.3 + beatPulse(uMusicalTime) * 0.1;
+  float rotSpeed = (0.3 + slowEnergy * 0.3) * mix(1.0, 2.0, sJam) * mix(1.0, 0.2, sSpace);
+  float climaxShatter = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5) * uClimaxIntensity;
 
-  // --- Phase 1: New uniform integrations ---
+  // Light intensity
+  float lightIntensity = energy * 3.0 * mix(1.0, 1.3, sChorus) * mix(1.0, 0.3, sSpace);
+  lightIntensity *= 0.5 + coherence * 0.5; // flicker when incoherent
+  lightIntensity += onset * 2.0; // burst on onset
+
+  // Dust density
+  float dustDensity = 0.3 + energy * 0.7 + mids * 0.3;
+  dustDensity *= mix(1.0, 1.5, sJam) * mix(1.0, 0.3, sSpace);
+
+  // === PALETTE ===
   float chromaHueMod = uChromaHue * 0.25;
-  float stabilityBoost = uBeatStability * 0.3;  // beat stability adds to light steadiness
+  float chordHue = float(int(uChordIndex)) / 24.0 * 0.1;
+  float hue1 = hsvToCosineHue(uPalettePrimary) + chromaHueMod + chordHue;
+  float hue2 = hsvToCosineHue(uPaletteSecondary) + chordHue * 0.5;
+  vec3 palColor1 = 0.5 + 0.5 * cos(TAU * vec3(hue1, hue1 + 0.33, hue1 + 0.67));
+  vec3 palColor2 = 0.5 + 0.5 * cos(TAU * vec3(hue2, hue2 + 0.33, hue2 + 0.67));
 
-  // ─── Primary drifting light point ───
-  // Position via slow simplex noise (coherence + beat stability = stability)
-  float stability = 0.3 + uCoherence * 0.7 + stabilityBoost; // high coherence = steadier
-  float driftSpeed = (0.08 / stability) * mix(1.0, 1.6, sJam) * mix(1.0, 0.3, sSpace);
-  vec2 lightPos = vec2(
-    snoise(vec3(t * driftSpeed, 0.0, 0.0)) * 0.4,
-    snoise(vec3(0.0, t * driftSpeed, 10.0)) * 0.3
-  );
+  // Light color: palette-driven, vocal shifts warm
+  vec3 lightColor = mix(palColor1, vec3(1.0, 0.95, 0.85), 0.3);
+  lightColor = mix(lightColor, lightColor * vec3(1.1, 0.95, 0.8), vocalPresence * 0.3);
+  // Tension desaturates
+  float lightLuma = dot(lightColor, vec3(0.299, 0.587, 0.114));
+  lightColor = mix(lightColor, vec3(lightLuma), tension * 0.3);
 
-  // Distance to light
-  float dist = length(p - lightPos);
+  // === RAY SETUP ===
+  vec3 ro, rd;
+  setupCameraRay(uv, aspect, ro, rd);
 
-  // Glow radius: bass-driven
-  float glowRadius = (0.08 + uBass * 0.15) * mix(1.0, 1.5, sJam) * mix(1.0, 0.6, sSpace) * mix(1.0, 1.3, sChorus);
+  // Light source position (tracks icosahedron)
+  float yOff = sin(time * 0.3) * melodicPitch * 1.5;
+  vec3 lightPos = vec3(0.0, yOff, 0.0);
 
-  // Intensity from energy
-  float lightIntensity = uEnergy * 3.0 * mix(1.0, 1.2, sChorus) * mix(1.0, 0.5, sSpace);
+  // === RAYMARCH ===
+  float marchT = 0.0;
+  bool marchHit = false;
+  vec3 marchPos = ro;
 
-  // Inverse-square falloff (physically motivated)
-  float glow = lightIntensity / (1.0 + dist * dist / (glowRadius * glowRadius));
+  for (int i = 0; i < VL_MAX_STEPS; i++) {
+    marchPos = ro + rd * marchT;
+    float d = vlMap(marchPos, icoRadius, time, rotSpeed, beatSnap, beatStability, climaxShatter);
+    if (d < VL_SURF_DIST) {
+      marchHit = true;
+      break;
+    }
+    if (marchT > VL_MAX_DIST) break;
+    marchT += d * 0.9;
+  }
 
-  // Light color from chromaHue + palette
-  vec3 lightColor = paletteColor(
-    mix(uPalettePrimary, uChromaHue, 0.4),
-    uPaletteSaturation * 0.8
-  );
+  // === SHADING ===
+  vec3 col = vec3(0.0);
 
-  col += lightColor * glow;
+  // Background: absolute void
+  vec3 bgCol = vec3(0.005, 0.004, 0.008);
 
-  // ─── Onset sparkles: brief secondary lights on transients ───
-  float sparkleDecay = 10.0; // fade in ~10 frames (0.33s)
-  if (uOnsetSnap > 0.2) {
-    for (int i = 0; i < 3; i++) {
+  if (marchHit) {
+    vec3 pos = marchPos;
+    vec3 norm = vlNormal(pos, icoRadius, time, rotSpeed, beatSnap, beatStability, climaxShatter);
+
+    vec3 viewDir = normalize(ro - pos);
+    vec3 lightDir = normalize(lightPos - pos);
+    vec3 halfVec = normalize(lightDir + viewDir);
+
+    // === DIFFUSE ===
+    float diff = max(dot(norm, lightDir), 0.0);
+
+    // === SPECULAR (sharp facets) ===
+    float specPow = 64.0 + highs * 256.0;
+    float spec = pow(max(dot(norm, halfVec), 0.0), specPow);
+
+    // === FRESNEL ===
+    float fresnel = pow(1.0 - max(dot(norm, viewDir), 0.0), 3.0);
+
+    // === AO ===
+    float occl = vlAmbientOcclusion(pos, norm, icoRadius, time, rotSpeed, beatSnap, beatStability, climaxShatter);
+
+    // === MATERIAL: luminous crystal ===
+    // The icosahedron IS the light source — it's emissive
+    vec3 emissive = lightColor * lightIntensity * 0.5;
+
+    // Facet-dependent color variation via normal direction
+    float facetVar = abs(dot(norm, vec3(0.577, 0.577, 0.577)));
+    emissive = mix(emissive, emissive * palColor2 * 2.0, facetVar * 0.3);
+
+    // Surface lighting (self-illuminated + external reflection)
+    vec3 diffLight = lightColor * diff * 0.3;
+    vec3 specLight = vec3(1.0) * spec * 1.5; // bright white specular
+    vec3 fresnelLight = palColor2 * fresnel * 0.4;
+
+    col = (emissive + diffLight + specLight + fresnelLight) * occl;
+
+    // Onset: bright flash
+    col += lightColor * onset * 3.0;
+  } else {
+    col = bgCol;
+  }
+
+  // === VOLUMETRIC GOD RAYS ===
+  col += vlGodRays(ro, rd, min(marchT, VL_MAX_DIST), lightIntensity,
+                    lightColor, dustDensity, time, climaxShatter, dynamicRange);
+
+  // === DUST MOTES ===
+  col += vlDustMotes(ro, rd, min(marchT, VL_MAX_DIST), energy,
+                      time, lightPos, lightColor);
+
+  // === ONSET SPARKLES: brief secondary light points ===
+  if (onset > 0.2) {
+    for (int i = 0; i < 5; i++) {
       float fi = float(i);
-      float sparkleAngle = fi * PHI * 6.28318 + uMusicalTime * 0.5;
-      float sparkleRadius = 0.15 + fi * 0.1;
-      vec2 sparklePos = lightPos + vec2(cos(sparkleAngle), sin(sparkleAngle)) * sparkleRadius;
+      float sparkleAngle = fi * VL_PHI * TAU + uMusicalTime * 0.5;
+      float sparkleR = 1.0 + fi * 0.5;
+      vec3 sparklePos = lightPos + vec3(
+        cos(sparkleAngle) * sparkleR,
+        sin(sparkleAngle * 0.7) * sparkleR * 0.5,
+        sin(sparkleAngle) * sparkleR
+      );
 
-      float sDist = length(p - sparklePos);
-      float sparkle = uOnsetSnap * 0.5 / (1.0 + sDist * sDist * 200.0);
-
-      vec3 sparkleCol = paletteColor(uPaletteSecondary + fi * 0.1, uPaletteSaturation);
-      col += sparkleCol * sparkle;
+      vec3 toSpark = sparklePos - ro;
+      float sparkProj = dot(toSpark, rd);
+      if (sparkProj < 0.0) continue;
+      vec3 sparkClosest = ro + rd * sparkProj;
+      float sparkDist = length(sparkClosest - sparklePos);
+      float sparkGlow = onset * 0.8 / (1.0 + sparkDist * sparkDist * 150.0);
+      col += palColor2 * sparkGlow;
     }
   }
 
-  // ─── Build/climax: additional lights at Fibonacci-spaced angles ───
-  float buildGate = smoothstep(0.5, 2.0, uClimaxPhase) * uClimaxIntensity;
-  if (buildGate > 0.01) {
-    int extraLights = 2 + int(buildGate * 4.0);
-    for (int i = 0; i < 6; i++) {
-      if (i >= extraLights) break;
-      float fi = float(i + 1);
-      float angle = fi * PHI * 6.28318 + t * 0.1;
-      float radius = 0.2 + fi * 0.08;
-      vec2 extraPos = vec2(cos(angle), sin(angle)) * radius;
-
-      float eDist = length(p - extraPos);
-      float eGlow = buildGate * uEnergy * 2.0 / (1.0 + eDist * eDist / (glowRadius * glowRadius * 0.5));
-
-      vec3 eColor = paletteColor(uPalettePrimary + fi * 0.06, uPaletteSaturation * 0.6);
-      col += eColor * eGlow;
-    }
+  // === CLIMAX: additional ambient glow when shattered ===
+  if (climaxShatter > 0.01) {
+    float voidGlow = climaxShatter * energy * 0.08;
+    col += lightColor * voidGlow;
   }
 
-  // === SECONDARY LAYER: deep cosmic drift beneath the light points ===
-  float cosmicNoise = fbm6(vec3(p * 1.5 * energyDetail + 80.0, t * 0.015));
-  vec3 cosmicLayer = mix(voidCol1, voidCol2, cosmicNoise * 0.5 + 0.5);
-  col = mix(col, col + cosmicLayer * 0.015 * (0.5 + cosmicNoise * 0.5), 0.3);
-
-  // ─── Heavy film grain (0.06-0.08 range — much more than other shaders) ───
-  float grainTime = floor(uTime * 15.0) / 15.0;
-  float grainIntensity = 0.06 + uEnergy * 0.02;
-  col += filmGrainRes(uv, grainTime, uResolution.y) * grainIntensity;
-
-  // ─── NO stage flood fill — void should be dark ───
-  // ─── NO bloom — darkness is the point ───
-
-  // === DEAD ICONOGRAPHY ===
-  float _nf = snoise(vec3(p * 2.0, uTime * 0.1));
-  vec3 _vc1 = hsv2rgb(vec3(uPalettePrimary, 0.6, 0.8));
-  vec3 _vc2 = hsv2rgb(vec3(uPaletteSecondary, 0.6, 0.8));
-  col += iconEmergence(p, uTime, uEnergy, uBass, _vc1, _vc2, _nf, uClimaxPhase, uSectionIndex);
-  col += heroIconEmergence(p, uTime, uEnergy, uBass, _vc1, _vc2, _nf, uSectionIndex);
-
-  // Minimal tone mapping (keep dark areas dark)
+  // === TONE MAPPING (keep void truly dark) ===
   col = max(col, vec3(0.0));
-  col = 1.0 - exp(-col * 1.5);
 
+  // === SDF ICON EMERGENCE ===
+  {
+    float nf = snoise(vec3(screenP * 2.0, uTime * 0.1));
+    col += iconEmergence(screenP, uTime, energy, bass, lightColor, palColor2, nf, uClimaxPhase, uSectionIndex);
+    col += heroIconEmergence(screenP, uTime, energy, bass, lightColor, palColor2, nf, uSectionIndex);
+  }
+
+  // === POST-PROCESSING ===
+  col = applyPostProcess(col, vUv, screenP);
   gl_FragColor = vec4(col, 1.0);
 }
 `;

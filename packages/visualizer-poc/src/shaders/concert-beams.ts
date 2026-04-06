@@ -1,8 +1,26 @@
 /**
- * Concert Lighting — volumetric cone beams + stage silhouette.
- * Fullscreen fragment shader (ANGLE-friendly, no ray marching).
+ * Concert Beams — raymarched 3D concert venue with volumetric stage lighting.
+ * Full SDF scene: stage truss structures, moving head light fixtures casting
+ * volumetric beam cones through haze, crowd silhouettes, and stage floor.
+ * A real concert lighting rig rendered in 3D with proper raymarching.
  *
- * v6 additions: beat rings, crowd silhouette, key change flash, color afterglow.
+ * Audio reactivity (14+ uniforms):
+ *   uEnergy           → beam intensity, haze density, active beam count
+ *   uBass             → truss vibration, camera shake, beam width pulse
+ *   uHighs            → specular on truss metal, beam edge sharpness
+ *   uOnsetSnap        → beam position snap, strobe flash
+ *   uBeatSnap         → beam sweep speed sync
+ *   uSlowEnergy       → haze drift speed, ambient light level
+ *   uHarmonicTension  → beam angle complexity, color cycling speed
+ *   uBeatStability    → beam sweep steadiness vs erratic
+ *   uMelodicPitch     → beam tilt vertical angle
+ *   uChromaHue        → beam color palette rotation
+ *   uChordIndex       → per-beam hue micro-offset
+ *   uVocalEnergy      → center-stage spotlight warmth
+ *   uSpectralFlux     → haze turbulence
+ *   uSectionType      → jam=rapid sweep, space=dim ambient, solo=single spot
+ *   uClimaxPhase      → all beams active, maximum intensity
+ *   uPalettePrimary/Secondary → beam color palette
  */
 
 import { noiseGLSL } from "./noise";
@@ -24,240 +42,421 @@ ${sharedUniformsGLSL}
 
 ${noiseGLSL}
 
-${buildPostProcessGLSL({ halationEnabled: true, bloomThresholdOffset: -0.08, temporalBlendEnabled: false })}
+${buildPostProcessGLSL({ halationEnabled: true, bloomEnabled: true, caEnabled: true, bloomThresholdOffset: -0.08 })}
 
 varying vec2 vUv;
 
-#define NUM_BEAMS 8
 #define PI 3.14159265
+#define TAU 6.28318530
+#define MAX_STEPS 80
+#define MAX_DIST 30.0
+#define SURF_DIST 0.003
 
-float beam(vec2 uv, float beamX, float angle, float width, float intensity) {
-  float ca = cos(angle);
-  float sa = sin(angle);
-  vec2 local = uv - vec2(beamX, 0.0);
-  float along = local.x * sa + local.y * ca;
-  float perp = abs(local.x * ca - local.y * sa);
-  float coneWidth = width * (0.02 + along * 0.6);
-  if (along < 0.0) return 0.0;
-  float edge = smoothstep(coneWidth, coneWidth * 0.3, perp);
-  float falloff = 1.0 / (1.0 + along * 2.0);
-  float scatter = snoise(vec3(uv * 5.0, uDynamicTime * 0.3)) * 0.3 + 0.7;
-  return edge * falloff * intensity * scatter;
+// ═══════════════════════════════════════════════════════════
+// Prefixed SDF primitives — cb namespace
+// ═══════════════════════════════════════════════════════════
+
+float cbSdBox(vec3 pos, vec3 bounds) {
+  vec3 q = abs(pos) - bounds;
+  return length(max(q, 0.0)) + min(max(q.x, max(q.y, q.z)), 0.0);
 }
 
-float getContrastForBeam(int i) {
-  if (i == 0) return uContrast0.x;
-  if (i == 1) return uContrast0.y;
-  if (i == 2) return uContrast0.z;
-  if (i == 3) return uContrast0.w;
-  if (i == 4) return uContrast1.x;
-  if (i == 5) return uContrast1.y;
-  if (i == 6) return uContrast1.z;
-  return uContrast1.w;
+float cbSdSphere(vec3 pos, float radius) {
+  return length(pos) - radius;
+}
+
+float cbSdCappedCylinder(vec3 pos, float radius, float halfH) {
+  float dR = length(pos.xz) - radius;
+  float dY = abs(pos.y) - halfH;
+  return min(max(dR, dY), 0.0) + length(max(vec2(dR, dY), 0.0));
+}
+
+float cbSdCapsule(vec3 pos, vec3 a, vec3 b, float radius) {
+  vec3 ab = b - a;
+  float param = clamp(dot(pos - a, ab) / dot(ab, ab), 0.0, 1.0);
+  return length(pos - a - ab * param) - radius;
+}
+
+float cbSdRoundBox(vec3 pos, vec3 bounds, float rad) {
+  vec3 q = abs(pos) - bounds;
+  return length(max(q, 0.0)) + min(max(q.x, max(q.y, q.z)), 0.0) - rad;
+}
+
+float cbSmoothUnion(float d1, float d2, float k) {
+  float h = clamp(0.5 + 0.5 * (d2 - d1) / k, 0.0, 1.0);
+  return mix(d2, d1, h) - k * h * (1.0 - h);
+}
+
+// ═══════════════════════════════════════════════════════════
+// Truss SDF — triangular box truss cross-section
+// ═══════════════════════════════════════════════════════════
+
+float cbTrussSegment(vec3 pos, float halfLen, float trussRadius, float pipeRadius) {
+  // Main horizontal pipe
+  float mainPipe = cbSdCappedCylinder(pos.xzy, pipeRadius, halfLen);
+  // Top pipe (offset up)
+  vec3 topPos = pos - vec3(0.0, trussRadius, 0.0);
+  float topPipe = cbSdCappedCylinder(topPos.xzy, pipeRadius, halfLen);
+  // Bottom-left pipe
+  vec3 blPos = pos - vec3(-trussRadius * 0.866, -trussRadius * 0.5, 0.0);
+  float blPipe = cbSdCappedCylinder(blPos.xzy, pipeRadius, halfLen);
+  // Bottom-right pipe
+  vec3 brPos = pos - vec3(trussRadius * 0.866, -trussRadius * 0.5, 0.0);
+  float brPipe = cbSdCappedCylinder(brPos.xzy, pipeRadius, halfLen);
+  // Cross braces (diagonals) — simplified as boxes
+  float crossBrace1 = cbSdCapsule(pos,
+    vec3(0.0, trussRadius, -halfLen * 0.8),
+    vec3(trussRadius * 0.866, -trussRadius * 0.5, -halfLen * 0.4),
+    pipeRadius * 0.6);
+  float crossBrace2 = cbSdCapsule(pos,
+    vec3(0.0, trussRadius, halfLen * 0.4),
+    vec3(-trussRadius * 0.866, -trussRadius * 0.5, halfLen * 0.8),
+    pipeRadius * 0.6);
+  float truss = min(mainPipe, min(topPipe, min(blPipe, brPipe)));
+  truss = min(truss, min(crossBrace1, crossBrace2));
+  return truss;
+}
+
+// ═══════════════════════════════════════════════════════════
+// Scene SDF — the concert venue
+// ═══════════════════════════════════════════════════════════
+
+vec2 cbSceneSDF(vec3 pos, float bassVib) {
+  float matId = 0.0;
+  float minDist = 100.0;
+
+  // Stage floor
+  float stageFloor = pos.y + 2.0;
+  if (stageFloor < minDist) { minDist = stageFloor; matId = 0.0; }
+
+  // Back wall
+  float backWall = -(pos.z - 8.0);
+  if (backWall < minDist) { minDist = backWall; matId = 1.0; }
+
+  // Overhead truss: two horizontal runs + cross piece
+  {
+    // Left horizontal truss
+    vec3 trussL = pos - vec3(-3.5, 5.0 + bassVib * 0.02, 3.0);
+    float tL = cbTrussSegment(trussL, 5.0, 0.15, 0.03);
+    if (tL < minDist) { minDist = tL; matId = 2.0; }
+
+    // Right horizontal truss
+    vec3 trussR = pos - vec3(3.5, 5.0 + bassVib * 0.02, 3.0);
+    float tR = cbTrussSegment(trussR, 5.0, 0.15, 0.03);
+    if (tR < minDist) { minDist = tR; matId = 2.0; }
+
+    // Cross truss (perpendicular)
+    vec3 trussX = pos - vec3(0.0, 5.0, 3.0);
+    trussX = trussX.zyx; // rotate 90 degrees
+    float tX = cbTrussSegment(trussX, 3.5, 0.15, 0.03);
+    if (tX < minDist) { minDist = tX; matId = 2.0; }
+
+    // Front cross truss
+    vec3 trussFront = pos - vec3(0.0, 4.5, -1.0);
+    trussFront = trussFront.zyx;
+    float tF = cbTrussSegment(trussFront, 4.0, 0.12, 0.025);
+    if (tF < minDist) { minDist = tF; matId = 2.0; }
+  }
+
+  // Moving head light fixtures (8 fixtures on the truss)
+  for (int i = 0; i < 8; i++) {
+    float fi = float(i);
+    float fixtureX = (fi - 3.5) * 1.2;
+    float fixtureZ = mix(-1.0, 5.0, step(4.0, fi));
+    float fixtureY = mix(4.5, 5.0, step(4.0, fi));
+    vec3 fPos = pos - vec3(fixtureX, fixtureY, fixtureZ);
+    // Fixture body: cylinder + sphere head
+    float fixtureBody = cbSdCappedCylinder(fPos, 0.08, 0.12);
+    float fixtureHead = cbSdSphere(fPos - vec3(0.0, -0.15, 0.0), 0.1);
+    float fixture = min(fixtureBody, fixtureHead);
+    if (fixture < minDist) { minDist = fixture; matId = 3.0 + fi * 0.1; }
+  }
+
+  // Crowd silhouettes (bumpy surface at floor level in front)
+  {
+    float crowdZ = pos.z + 3.0;
+    if (crowdZ > 0.0 && pos.y > -2.5 && pos.y < -0.5) {
+      float crowdNoise = snoise(vec3(pos.x * 3.0, pos.y * 2.0, 0.0)) * 0.3;
+      crowdNoise += snoise(vec3(pos.x * 8.0, 0.0, 0.0)) * 0.1;
+      float crowdHeight = -0.8 + crowdNoise;
+      float crowdDist = pos.y - crowdHeight;
+      crowdDist = max(crowdDist, crowdZ);
+      crowdDist = max(crowdDist, -(pos.z + 6.0));
+      if (crowdDist < minDist) { minDist = crowdDist; matId = 4.0; }
+    }
+  }
+
+  // Stage monitors (wedge shapes at front of stage)
+  for (int i = 0; i < 3; i++) {
+    float fi = float(i);
+    vec3 monPos = pos - vec3((fi - 1.0) * 2.5, -1.7, -1.5);
+    float monitor = cbSdRoundBox(monPos, vec3(0.3, 0.15, 0.25), 0.02);
+    if (monitor < minDist) { minDist = monitor; matId = 5.0; }
+  }
+
+  return vec2(minDist, matId);
+}
+
+// ═══════════════════════════════════════════════════════════
+// Normal, AO
+// ═══════════════════════════════════════════════════════════
+
+vec3 cbCalcNormal(vec3 pos, float bassVib) {
+  vec2 eps = vec2(0.003, 0.0);
+  float d0 = cbSceneSDF(pos, bassVib).x;
+  return normalize(vec3(
+    cbSceneSDF(pos + eps.xyy, bassVib).x - d0,
+    cbSceneSDF(pos + eps.yxy, bassVib).x - d0,
+    cbSceneSDF(pos + eps.yyx, bassVib).x - d0
+  ));
+}
+
+float cbCalcAO(vec3 pos, vec3 norm, float bassVib) {
+  float occ = 0.0;
+  float weight = 1.0;
+  for (int i = 1; i <= 5; i++) {
+    float dist = float(i) * 0.15;
+    float sampled = cbSceneSDF(pos + norm * dist, bassVib).x;
+    occ += (dist - sampled) * weight;
+    weight *= 0.6;
+  }
+  return clamp(1.0 - occ * 2.0, 0.0, 1.0);
+}
+
+// ═══════════════════════════════════════════════════════════
+// Volumetric beam cone — evaluated along ray
+// ═══════════════════════════════════════════════════════════
+
+float cbBeamCone(vec3 pos, vec3 beamOrigin, vec3 beamDir, float coneAngle, float beamLen) {
+  vec3 toPos = pos - beamOrigin;
+  float alongBeam = dot(toPos, beamDir);
+  if (alongBeam < 0.0 || alongBeam > beamLen) return 0.0;
+  vec3 perpVec = toPos - beamDir * alongBeam;
+  float perpDist = length(perpVec);
+  float coneRadius = tan(coneAngle) * alongBeam;
+  float beam = smoothstep(coneRadius, coneRadius * 0.3, perpDist);
+  float falloff = 1.0 / (1.0 + alongBeam * 0.3);
+  return beam * falloff;
 }
 
 void main() {
-  vec2 uv = vUv;
-  uv = applyCameraCut(uv, uOnsetSnap, uBeatSnap, uEnergy, uCoherence, uClimaxPhase, uMusicalTime, uSectionIndex);
+  vec2 fragUv = vUv;
   vec2 aspect = vec2(uResolution.x / uResolution.y, 1.0);
-  vec2 p = (uv - vec2(0.5, 0.0)) * aspect;
-
-  // === DOMAIN WARPING: organic UV distortion ===
-  float energyDetail = 1.0 + clamp(uEnergy, 0.0, 1.0) * 0.5;
-  p += vec2(fbm3(vec3(p * 0.5 * energyDetail, uDynamicTime * 0.05)), fbm3(vec3(p * 0.5 * energyDetail + 100.0, uDynamicTime * 0.05))) * 0.3;
+  vec2 screenPos = (fragUv - 0.5) * aspect;
 
   float energy = clamp(uEnergy, 0.0, 1.0);
-  float tempoScale = uLocalTempo / 120.0;
+  float bass = clamp(uBass, 0.0, 1.0);
+  float highs = clamp(uHighs, 0.0, 1.0);
+  float onset = clamp(uOnsetSnap, 0.0, 1.0);
+  float slowE = clamp(uSlowEnergy, 0.0, 1.0);
+  float tension = clamp(uHarmonicTension, 0.0, 1.0);
+  float stability = clamp(uBeatStability, 0.0, 1.0);
+  float melPitch = clamp(uMelodicPitch * uMelodicConfidence, 0.0, 1.0);
   float effectiveBeat = uBeatSnap * smoothstep(0.3, 0.7, uBeatConfidence);
+  float flux = clamp(uSpectralFlux, 0.0, 1.0);
+  float vocalE = clamp(uVocalEnergy, 0.0, 1.0);
+  float chromaH = uChromaHue;
+  float chordConf = smoothstep(0.3, 0.6, uChordConfidence);
+  float chordHue = float(int(uChordIndex)) / 24.0 * 0.12 * chordConf;
 
-  // === SECTION-TYPE MODULATION ===
   float sectionT = uSectionType;
   float sJam = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
   float sSpace = smoothstep(6.5, 7.5, sectionT);
-  float sChorus = smoothstep(1.5, 2.5, sectionT) * (1.0 - step(2.5, sectionT));
   float sSolo = smoothstep(3.5, 4.5, sectionT) * (1.0 - step(4.5, sectionT));
+  float sChorus = smoothstep(1.5, 2.5, sectionT) * (1.0 - step(2.5, sectionT));
 
-  // --- Phase 1: New uniform integrations ---
-  // Vocal warmth on center beams
-  float vocalWarmth = uVocalEnergy * 0.15;
-  // Guitar drives foreground beam intensity
-  float guitarIntensity = uOtherEnergy * 0.3;
-  // Guitar brightness shifts warm/cool
-  float guitarBrightness = uOtherCentroid;
-  // Energy acceleration drives sweep speed
-  float accelSweep = 1.0 + uEnergyAccel * 0.15;
-  // Melodic pitch shifts beam sweep center
-  float melInfluence = uMelodicPitch * uMelodicConfidence;
-  float pitchSweep = (melInfluence - 0.5) * 0.1;
-  // Beat stability: high=steady beams, low=erratic
-  float beamSteadiness = uBeatStability;
-  // Harmonic tension: beam angle complexity
-  float tensionAngle = uHarmonicTension * 0.2;
-  // Chord hue micro-rotation
-  float chordHue = float(int(uChordIndex)) / 24.0 * 0.15;
-  // Downbeat flash: beam intensity bump on measure start
-  float downbeatFlash = uDownbeat * 0.15;
+  float isClimax = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5);
+  float climaxBoost = isClimax * uClimaxIntensity;
 
-  // Bass camera shake
-  float shakeX = snoise(vec3(uTime * 8.0, 1.0, 0.0)) * uBass * 0.003;
-  float shakeY = snoise(vec3(1.0, uTime * 8.0, 0.0)) * uBass * 0.003;
-  p += vec2(shakeX, shakeY);
+  float slowTime = uDynamicTime * 0.05;
+  float bassVib = bass * 0.3;
+  float tempoScale = uLocalTempo / 120.0;
 
-  // === CHROMATIC ABERRATION setup ===
-  float caStrength = uBass * 0.006 + uRms * 0.003 + uOnsetSnap * 0.06;
+  // ═══ Camera ═══
+  float camSwayX = sin(slowTime * 0.4) * 0.8;
+  float camBobY = cos(slowTime * 0.3) * 0.2;
+  vec3 camOrigin = vec3(camSwayX, 0.5 + camBobY, -6.0);
+  // Bass shake
+  float shakeGate = smoothstep(0.2, 0.5, energy);
+  camOrigin.x += snoise(vec3(uTime * 6.0, 0.0, 0.0)) * bass * 0.03 * shakeGate;
+  camOrigin.y += snoise(vec3(0.0, uTime * 6.0, 0.0)) * bass * 0.02 * shakeGate;
 
-  // Background — deeper and more colorful
-  float bgHue = hsvToCosineHue(uPalettePrimary) + uDynamicTime * 0.02;
-  vec3 bgColor = 0.5 + 0.5 * cos(6.28318 * (vec3(bgHue, bgHue + 0.33, bgHue + 0.67) + vec3(0.0, 0.1, 0.2)));
-  bgColor *= 0.08 + uRms * 0.12;
-  // FBM6 noise to break flat background banding (rich detail, energy-responsive)
-  float bgNoise = fbm6(vec3(p * 3.0 * energyDetail, uDynamicTime * 0.1));
-  bgColor *= 0.85 + bgNoise * 0.3;
-  // Secondary palette wash in background
-  float secBgHue = hsvToCosineHue(uPaletteSecondary) + uDynamicTime * 0.015;
-  vec3 secBgColor = 0.5 + 0.5 * cos(6.28318 * (vec3(secBgHue, secBgHue + 0.33, secBgHue + 0.67)));
-  bgColor += secBgColor * 0.03 * (0.5 + bgNoise * 0.5);
-  vec3 col = bgColor;
+  vec3 camLookAt = vec3(0.0, 1.5 + melPitch * 1.5, 4.0);
+  camLookAt = mix(camLookAt, vec3(0.0, 2.0, 3.0), sSolo * 0.4);
 
-  float activeBeamCount = (3.0 + energy * 5.0 + uJamDensity * 2.0) * mix(1.0, 1.3, sJam) * mix(1.0, 0.5, sSpace) * mix(1.0, 1.2, sChorus);
-  float beamSpacing = aspect.x / float(NUM_BEAMS + 1);
-  float sectionHueShift = mod(uSectionIndex * 0.15, 1.0);
+  vec3 camFwd = normalize(camLookAt - camOrigin);
+  vec3 camRt = normalize(cross(vec3(0.0, 1.0, 0.0), camFwd));
+  vec3 camUpDir = cross(camFwd, camRt);
+  float fov = 1.3 + bass * 0.1;
+  vec3 rayDir = normalize(screenPos.x * camRt + screenPos.y * camUpDir + fov * camFwd);
 
-  for (int i = 0; i < NUM_BEAMS; i++) {
-    float fi = float(i);
-    float beamPhase = fi * 1.618;
+  // ═══ Raymarch scene ═══
+  float totalDist = 0.0;
+  float matId = 0.0;
+  bool didHitSurface = false;
 
-    float beamActive = smoothstep(activeBeamCount, activeBeamCount - 1.0, fi);
-    if (beamActive < 0.01) continue;
-
-    float beamX = -aspect.x * 0.5 + beamSpacing * (fi + 1.0) + sin(uDynamicTime * 0.15 + fi * 0.7) * 0.08;
-    float sweepSpeed = (mix(0.25, 0.6, energy) * tempoScale * accelSweep + uBass * 0.1) * mix(1.0, 1.3, sJam) * mix(1.0, 0.4, sSpace) * (1.0 + uPeakApproaching * 0.3);
-    float angle = PI * 0.5 + sin(uDynamicTime * sweepSpeed + beamPhase * 2.0 + pitchSweep) * mix(0.35, 0.70, energy + uFastEnergy * 0.15 + tensionAngle);
-    float width = mix(0.03, 0.11, energy) + uMids * 0.04;
-
-    float contrastBoost = getContrastForBeam(i) * 0.3;
-    // Snappy beat for intensity
-    float intensity = (0.5 + uRms * 0.5 + contrastBoost + downbeatFlash) * beamActive;
-
-    // Single beam evaluation (simplified from per-channel chromatic aberration)
-    float beamVal = beam(p, beamX, angle, width, intensity);
-
-    // Beam color
-    float hue = hsvToCosineHue(uPalettePrimary) + uChromaHue * 0.25 + chordHue + fi * 0.12 + sectionHueShift;
-    vec3 beamCol = 0.5 + 0.5 * cos(6.28318 * (vec3(hue, hue + 0.33, hue + 0.67)));
-
-    // Palette saturation
-    vec3 beamGray = vec3(dot(beamCol, vec3(0.299, 0.587, 0.114)));
-    beamCol = mix(beamGray, beamCol, uPaletteSaturation);
-
-    // Warm white alternating beams
-    if (i == 0 || i == 3) {
-      vec3 warmWhite = vec3(1.0, 0.95, 0.85);
-      float ptHue = hsvToCosineHue(uPaletteSecondary);
-      vec3 palTint = 0.5 + 0.5 * cos(6.28318 * vec3(ptHue, ptHue + 0.33, ptHue + 0.67));
-      beamCol = mix(beamCol, mix(warmWhite, palTint, 0.3), 0.5);
-    }
-
-    // Color temperature (with guitar brightness + vocal warmth)
-    vec3 warmShift = vec3(1.1, 0.95, 0.85);
-    vec3 coolShift = vec3(0.88, 0.95, 1.1);
-    beamCol *= mix(coolShift, warmShift, energy + guitarBrightness * 0.15);
-    // Vocal warmth on center beams
-    if (i == 3 || i == 4) {
-      beamCol += vec3(0.08, 0.04, 0.0) * vocalWarmth;
-    }
-
-    // Directional chromatic aberration on beam color
-    beamCol = applyCA(beamCol, vUv, caStrength);
-
-    col += beamCol * beamVal * 0.85;
+  for (int i = 0; i < MAX_STEPS; i++) {
+    vec3 marchPos = camOrigin + rayDir * totalDist;
+    vec2 sceneResult = cbSceneSDF(marchPos, bassVib);
+    float sceneDist = sceneResult.x;
+    matId = sceneResult.y;
+    if (abs(sceneDist) < SURF_DIST) { didHitSurface = true; break; }
+    if (totalDist > MAX_DIST) break;
+    totalDist += sceneDist * 0.8;
   }
 
-  // === SECONDARY LAYER: volumetric light wash (blended at 30%) ===
-  float volNoise = fbm6(vec3(p * 1.5 * energyDetail, uDynamicTime * 0.04));
-  float volHue1 = hsvToCosineHue(uPalettePrimary) + volNoise * 0.2;
-  float volHue2 = hsvToCosineHue(uPaletteSecondary) + volNoise * 0.15;
-  vec3 volColor1 = 0.5 + 0.5 * cos(6.28318 * vec3(volHue1, volHue1 + 0.33, volHue1 + 0.67));
-  vec3 volColor2 = 0.5 + 0.5 * cos(6.28318 * vec3(volHue2, volHue2 + 0.33, volHue2 + 0.67));
-  vec3 volLayer = mix(volColor1, volColor2, volNoise * 0.5 + 0.5) * (0.08 + energy * 0.12);
-  float volMask = smoothstep(0.0, 0.5, uv.y) * (1.0 - smoothstep(0.7, 1.0, uv.y));
-  col = mix(col, col + volLayer * volMask, 0.3);
+  // Palette
+  float hue1 = hsvToCosineHue(uPalettePrimary) + chromaH * 0.2 + chordHue;
+  float hue2 = hsvToCosineHue(uPaletteSecondary) + chordHue * 0.5;
+  vec3 palCol1 = 0.5 + 0.5 * cos(TAU * vec3(hue1, hue1 + 0.33, hue1 + 0.67));
+  vec3 palCol2 = 0.5 + 0.5 * cos(TAU * vec3(hue2, hue2 + 0.33, hue2 + 0.67));
 
-  // === ATMOSPHERIC HAZE: fbm-driven secondary palette color between beams ===
-  float hazeNoise = fbm6(vec3(p * 2.0 * energyDetail + 50.0, uDynamicTime * 0.08));
-  float secHue = hsvToCosineHue(uPaletteSecondary) + hazeNoise * 0.15;
-  vec3 hazeColor = 0.5 + 0.5 * cos(6.28318 * vec3(secHue, secHue + 0.33, secHue + 0.67));
-  float hazeAmount = (0.03 + energy * 0.05) * (0.5 + hazeNoise * 0.5) * mix(1.0, 1.5, sJam) * mix(1.0, 0.3, sSpace);
-  col += hazeColor * hazeAmount;
+  vec3 col = vec3(0.01, 0.008, 0.015); // dark venue background
 
-  // === CLIMAX REACTIVITY ===
-  float climaxPhase = uClimaxPhase;
-  float climaxI = uClimaxIntensity;
-  float isClimax = step(1.5, climaxPhase) * step(climaxPhase, 3.5);
-  float climaxBoost = isClimax * climaxI;
+  if (didHitSurface) {
+    vec3 hitPos = camOrigin + rayDir * totalDist;
+    vec3 normal = cbCalcNormal(hitPos, bassVib);
+    float ambOcc = cbCalcAO(hitPos, normal, bassVib);
 
-  // === BEAT SNAP: strobe-like flash on hard transients ===
-  float strobeKick = max(effectiveBeat, uDrumBeat) * 0.60 * (1.0 + climaxBoost * 0.5);
-  col += strobeKick * vec3(1.0, 0.95, 0.85);
+    // Simple overhead key light
+    vec3 keyLightDir = normalize(vec3(0.3, 1.0, -0.5));
+    float diffuse = max(dot(normal, keyLightDir), 0.0);
+    vec3 halfVec = normalize(keyLightDir - rayDir);
+    float specular = pow(max(dot(normal, halfVec), 0.0), 24.0 + highs * 32.0);
+    float fresnel = pow(1.0 - max(dot(normal, -rayDir), 0.0), 3.0);
 
-  // === COLOR AFTERGLOW ===
-  float afterglowStr = smoothstep(0.3, 0.7, energy) * 0.04;
-  float agHue = hsvToCosineHue(uAfterglowHue);
-  vec3 afterglowCol = 0.5 + 0.5 * cos(6.28318 * vec3(agHue, agHue + 0.33, agHue + 0.67));
-  col += afterglowCol * afterglowStr;
+    vec3 surfaceColor;
+    if (matId < 0.5) {
+      // Stage floor: dark reflective
+      surfaceColor = vec3(0.02, 0.02, 0.025) + diffuse * 0.06;
+      surfaceColor += specular * 0.1 * vec3(1.0, 0.95, 0.9);
+      surfaceColor += fresnel * 0.03 * palCol1;
+    } else if (matId < 1.5) {
+      // Back wall
+      surfaceColor = vec3(0.015, 0.012, 0.02);
+      surfaceColor += diffuse * 0.04;
+    } else if (matId < 2.5) {
+      // Truss: metallic silver
+      vec3 metalColor = vec3(0.5, 0.5, 0.55);
+      surfaceColor = metalColor * (0.05 + diffuse * 0.2);
+      surfaceColor += vec3(0.8, 0.8, 0.85) * specular * 0.5 * (0.3 + highs * 0.7);
+      surfaceColor += metalColor * fresnel * 0.15;
+    } else if (matId < 4.0) {
+      // Light fixtures: dark body with emissive head
+      float fixtureIdx = (matId - 3.0) * 10.0;
+      surfaceColor = vec3(0.02, 0.02, 0.03);
+      // Emissive lens glow
+      surfaceColor += palCol1 * 0.2 * energy;
+    } else if (matId < 4.5) {
+      // Crowd: dark silhouette
+      surfaceColor = vec3(0.015, 0.012, 0.02);
+    } else {
+      // Stage monitors
+      surfaceColor = vec3(0.03, 0.03, 0.035);
+      surfaceColor += diffuse * 0.05;
+    }
 
-  // Stage silhouette — softened with wider smoothstep + noise edge
-  float stageNoise = snoise(vec3(uv.x * 12.0, uDynamicTime * 0.15, 5.0)) * 0.02;
-  float stageY = smoothstep(0.38, 0.22, uv.y + stageNoise);
-  col = mix(col, vec3(0.04, 0.03, 0.05), stageY * 0.70);
+    col = surfaceColor * ambOcc;
 
-  // === CROWD SILHOUETTE: wavy heads along bottom edge ===
-  // Higher frequency + extra octave prevents visible repeating patterns at 1920px
-  float crowdY = 0.12 + snoise(vec3(uv.x * 20.0, uDynamicTime * 0.3, 0.0)) * 0.02
-               + snoise(vec3(uv.x * 50.0, 0.0, uDynamicTime * 0.1)) * 0.008
-               + snoise(vec3(uv.x * 80.0, uDynamicTime * 0.05, 3.7)) * 0.004;
-  crowdY += uDrumBeat * 0.005 * sin(uv.x * 15.0 + uDynamicTime);
-  float crowdMask = smoothstep(crowdY + 0.01, crowdY - 0.01, uv.y);
-  col = mix(col, vec3(0.035, 0.028, 0.04), crowdMask * 0.65);
+    // Distance fog
+    float fogFactor = smoothstep(0.0, 1.0, totalDist / MAX_DIST);
+    col = mix(col, vec3(0.01, 0.008, 0.015), fogFactor);
+  }
 
-  // Sparkle dust
-  float sparkle = snoise(vec3(p * 30.0, uDynamicTime * 3.0));
-  sparkle = max(0.0, sparkle - 0.85) * 6.0;
-  col += sparkle * uHighs * 0.15 * vec3(1.0, 0.95, 0.9);
-
-  // Vignette (energy-driven, no beat pulse)
-  float vigScale = mix(0.30, 0.29, energy);
-  float vig = 1.0 - dot((uv - 0.5) * vigScale, (uv - 0.5) * vigScale);
-  vig = smoothstep(0.0, 1.0, vig);
-
-  // Colored vignette
-  float vigHue = hsvToCosineHue(uPaletteSecondary);
-  vec3 vigTint = 0.5 + 0.5 * cos(6.28318 * vec3(vigHue, vigHue + 0.33, vigHue + 0.67));
-  vigTint = max(vigTint * 0.02, vec3(0.05, 0.04, 0.06));
-  col = mix(vigTint, col, vig);
-
-  // Drum onset flash (scene-specific)
-  col += uDrumOnset * 0.15 * vec3(1.0, 0.95, 0.85);
-
-  // SDF hero icon
+  // ═══ Volumetric beams — the main visual feature ═══
   {
-    float nf = fbm3(vec3(p * 2.0, uDynamicTime * 0.1));
-    float heroHue1 = uPalettePrimary;
-    float heroHue2 = uPaletteSecondary;
-    vec3 c1 = hsv2rgb(vec3(heroHue1, uPaletteSaturation, 1.0));
-    vec3 c2 = hsv2rgb(vec3(heroHue2, uPaletteSaturation, 1.0));
-    col += heroIconEmergence(p, uTime, energy, uBass, c1, c2, nf, uSectionIndex);
+    float activeBeams = 3.0 + energy * 5.0;
+    activeBeams *= mix(1.0, 1.3, sJam) * mix(1.0, 0.3, sSpace);
+    activeBeams += climaxBoost * 3.0;
+    float sweepSpeed = mix(0.2, 0.8, energy) * tempoScale * mix(1.0, 1.5, sJam) * mix(1.0, 0.3, sSpace);
+    float hazeAmount = mix(0.3, 1.0, slowE) + flux * 0.2;
+
+    vec3 beamAccum = vec3(0.0);
+
+    for (int b = 0; b < 8; b++) {
+      float fb = float(b);
+      if (fb >= activeBeams) break;
+
+      float fixtureX = (fb - 3.5) * 1.2;
+      float fixtureZ = mix(-1.0, 5.0, step(4.0, fb));
+      float fixtureY = mix(4.5, 5.0, step(4.0, fb));
+      vec3 beamOrigin = vec3(fixtureX, fixtureY, fixtureZ);
+
+      // Beam direction: sweeping with audio
+      float sweepAngle = sin(uDynamicTime * sweepSpeed + fb * 1.618 * TAU) * (0.4 + tension * 0.3);
+      sweepAngle *= mix(1.0, 0.3, stability * 0.5);
+      float tiltAngle = -PI * 0.35 - melPitch * 0.2 + cos(uDynamicTime * sweepSpeed * 0.7 + fb * 2.3) * 0.15;
+
+      // Solo: all beams converge to center stage
+      float soloConverge = sSolo * 0.7;
+      vec3 soloTarget = vec3(0.0, -1.5, 2.0);
+      vec3 defaultDir = normalize(vec3(sin(sweepAngle), sin(tiltAngle), cos(sweepAngle) * 0.5));
+      vec3 soloDir = normalize(soloTarget - beamOrigin);
+      vec3 beamDir = normalize(mix(defaultDir, soloDir, soloConverge));
+
+      float coneAngle = 0.08 + energy * 0.04 + bass * 0.02;
+      float beamIntensity = (0.3 + energy * 0.7) * mix(1.0, 0.2, sSpace);
+      beamIntensity += effectiveBeat * 0.2;
+      beamIntensity += climaxBoost * 0.3;
+
+      // Beam color
+      float beamHue = hue1 + fb * 0.08 + mod(uSectionIndex * 0.1, 1.0);
+      vec3 beamColor = 0.5 + 0.5 * cos(TAU * vec3(beamHue, beamHue + 0.33, beamHue + 0.67));
+      // Warm white alternating
+      if (b == 0 || b == 4) beamColor = mix(beamColor, vec3(1.0, 0.95, 0.85), 0.4);
+      // Vocal warmth on center beams
+      if (b == 3 || b == 4) beamColor += vec3(0.1, 0.05, 0.0) * vocalE;
+
+      // Volumetric beam march (16 samples along ray)
+      for (int s = 0; s < 16; s++) {
+        float marchT = float(s) * 1.2 + 0.5;
+        vec3 samplePos = camOrigin + rayDir * marchT;
+        float beamVal = cbBeamCone(samplePos, beamOrigin, beamDir, coneAngle, 12.0);
+        // Haze density modulation
+        float haze = fbm3(vec3(samplePos * 0.2, uDynamicTime * 0.08 * (1.0 + flux))) * 0.5 + 0.5;
+        beamVal *= haze * hazeAmount;
+        beamAccum += beamColor * beamVal * beamIntensity * 0.025;
+      }
+    }
+
+    col += beamAccum;
   }
 
-  // Timbral brightness → color temperature (bright timbre → cooler beams)
-  float timbralTemp = mix(0.0, 0.3, uTimbralBrightness);
-  col = mix(col, col * vec3(0.7, 0.85, 1.0), timbralTemp);
+  // ═══ Strobe flash on onset ═══
+  if (onset > 0.5) {
+    col += vec3(1.0, 0.95, 0.9) * (onset - 0.5) * 1.2 * energy;
+  }
 
-  // Semantic: triumphant → golden beam boost
-  col = mix(col, col * vec3(1.15, 1.08, 0.9), uSemanticTriumphant * 0.3);
+  // ═══ Beat flash ═══
+  col += vec3(1.0, 0.97, 0.92) * effectiveBeat * 0.12;
 
-  // === POST-PROCESSING (shared chain) ===
-  col = applyPostProcess(col, vUv, p);
+  // ═══ Crowd silhouette bottom edge ═══
+  {
+    float crowdY = 0.12 + snoise(vec3(fragUv.x * 20.0, uDynamicTime * 0.3, 0.0)) * 0.02
+                 + snoise(vec3(fragUv.x * 50.0, 0.0, uDynamicTime * 0.1)) * 0.008;
+    float crowdMask = smoothstep(crowdY + 0.01, crowdY - 0.01, fragUv.y);
+    col = mix(col, vec3(0.02, 0.015, 0.025), crowdMask * 0.5);
+  }
+
+  // ═══ Climax boost ═══
+  col *= 1.0 + climaxBoost * 0.4;
+
+  // ═══ Vignette ═══
+  float vigScale = mix(0.30, 0.24, energy);
+  float vignette = 1.0 - dot(screenPos * vigScale, screenPos * vigScale);
+  vignette = smoothstep(0.0, 1.0, vignette);
+  vec3 vigTint = palCol2 * 0.02;
+  col = mix(vigTint, col, vignette);
+
+  // ═══ Icon emergence ═══
+  {
+    float nf = fbm3(vec3(screenPos * 2.0, uDynamicTime * 0.1));
+    col += iconEmergence(screenPos, uTime, energy, bass, palCol1, palCol2, nf, uClimaxPhase, uSectionIndex);
+    col += heroIconEmergence(screenPos, uTime, energy, bass, palCol1, palCol2, nf, uSectionIndex);
+  }
+
+  // ═══ Post-processing ═══
+  col = applyPostProcess(col, vUv, screenPos);
 
   gl_FragColor = vec4(col, 1.0);
 }
