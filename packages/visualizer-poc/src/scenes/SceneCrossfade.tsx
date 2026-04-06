@@ -36,14 +36,56 @@ export const SceneCrossfade: React.FC<Props> = ({ progress, outgoing, incoming, 
     }
   }
 
-  // --- Dissolve/Morph style ---
-  // Clean switch at 65% progress — outgoing stays longer, no opacity dip, no flash.
-  if (style === "dissolve" || style === "morph") {
+  // --- Dissolve style ---
+  // True opacity crossfade: outgoing fades out while incoming fades in.
+  // Both scenes render simultaneously during the blend for a smooth transition.
+  if (style === "dissolve") {
+    const outOpacityD = interpolate(progress, [0, 0.4, 0.8], [1, 0.9, 0], {
+      extrapolateLeft: "clamp", extrapolateRight: "clamp",
+      easing: Easing.inOut(Easing.ease),
+    });
+    const inOpacityD = interpolate(progress, [0.15, 0.6, 1.0], [0, 0.3, 1], {
+      extrapolateLeft: "clamp", extrapolateRight: "clamp",
+      easing: Easing.inOut(Easing.ease),
+    });
     return (
       <div style={{ position: "relative", width: "100%", height: "100%" }}>
-        <div style={{ position: "absolute", inset: 0 }}>
-          {progress < 0.65 ? outgoing : incoming}
-        </div>
+        {outOpacityD > 0.01 && (
+          <div style={{ position: "absolute", inset: 0, opacity: outOpacityD }}>
+            {outgoing}
+          </div>
+        )}
+        {inOpacityD > 0.01 && (
+          <div style={{ position: "absolute", inset: 0, opacity: inOpacityD }}>
+            {incoming}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // --- Morph style ---
+  // Extended crossfade with longer overlap: both scenes visible at ~50% for the
+  // middle portion, creating an organic blend between visual worlds.
+  if (style === "morph") {
+    const outOpacityM = interpolate(progress, [0, 0.3, 0.7, 1.0], [1, 0.8, 0.3, 0], {
+      extrapolateLeft: "clamp", extrapolateRight: "clamp",
+    });
+    const inOpacityM = interpolate(progress, [0, 0.3, 0.7, 1.0], [0, 0.3, 0.8, 1], {
+      extrapolateLeft: "clamp", extrapolateRight: "clamp",
+    });
+    return (
+      <div style={{ position: "relative", width: "100%", height: "100%" }}>
+        {outOpacityM > 0.01 && (
+          <div style={{ position: "absolute", inset: 0, opacity: outOpacityM }}>
+            {outgoing}
+          </div>
+        )}
+        {inOpacityM > 0.01 && (
+          <div style={{ position: "absolute", inset: 0, opacity: inOpacityM }}>
+            {incoming}
+          </div>
+        )}
       </div>
     );
   }

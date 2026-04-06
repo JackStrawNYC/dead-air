@@ -19,6 +19,7 @@ export type SceneTransitionStyle =
  * @param sectionType Optional section type label for jam/solo bias
  * @param scenePreferredIn Optional preferred transition for incoming scene
  * @param scenePreferredOut Optional preferred transition for outgoing scene
+ * @param spectralFlux Optional spectral flux at boundary (0-1)
  */
 export function selectTransitionStyle(
   energyBefore: number,
@@ -28,11 +29,30 @@ export function selectTransitionStyle(
   scenePreferredOut?: SceneTransitionStyle,
   spectralFlux?: number,
 ): SceneTransitionStyle {
-  // Scene preferences override energy-based selection when present
+  // Scene preferences from registry override energy-based selection
   if (scenePreferredIn) return scenePreferredIn;
   if (scenePreferredOut) return scenePreferredOut;
 
-  // All within-song transitions use dissolve for clean, seamless visuals.
-  // Flash is reserved only for IT coherence breaks (handled elsewhere).
+  const delta = energyAfter - energyBefore;
+  const absDelta = Math.abs(delta);
+
+  // Large energy jump UP (quiet→loud): flash — reinforce the eruption
+  if (delta > 0.12) return "flash";
+
+  // Large energy drop (loud→quiet): void — fade through darkness
+  if (delta < -0.12) return "void";
+
+  // High spectral flux (rapid timbral change): distortion — visual disruption
+  if (spectralFlux !== undefined && spectralFlux > 0.25) return "distortion";
+
+  // Jam/solo sections with moderate energy change: morph for organic feel
+  if ((sectionType === "jam" || sectionType === "solo") && absDelta > 0.05) {
+    return "morph";
+  }
+
+  // Space sections: void for meditative transitions
+  if (sectionType === "space") return "void";
+
+  // Default: dissolve for clean, seamless crossfade
   return "dissolve";
 }

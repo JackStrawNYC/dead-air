@@ -74,33 +74,34 @@ describe("shader-strings", () => {
 // ─── Transition Selector (new shader styles) ───
 
 describe("transition-selector shader styles", () => {
-  it("shader_luminance selectable at high energy + flux", () => {
-    // Try multiple energy combos to hit the deterministic coin flip
-    let found = false;
-    for (let i = 0; i < 20; i++) {
-      const eBefore = 0.2 + i * 0.01;
-      const eAfter = 0.5 + i * 0.01;
-      const style = selectTransitionStyle(eBefore, eAfter, undefined, undefined, undefined, 0.3);
-      if (style === "shader_luminance") {
-        found = true;
-        break;
-      }
-    }
-    expect(found).toBe(true);
+  it("flash selected for large energy jump up", () => {
+    const style = selectTransitionStyle(0.05, 0.3, undefined, undefined, undefined, 0.1);
+    expect(style).toBe("flash");
   });
 
-  it("shader_dissolve selectable at moderate energy", () => {
-    let found = false;
-    for (let i = 0; i < 30; i++) {
-      const eBefore = 0.2 + i * 0.005;
-      const eAfter = 0.25 + i * 0.005;
-      const style = selectTransitionStyle(eBefore, eAfter, undefined, undefined, undefined, 0.1);
-      if (style === "shader_dissolve") {
-        found = true;
-        break;
-      }
-    }
-    expect(found).toBe(true);
+  it("void selected for large energy drop", () => {
+    const style = selectTransitionStyle(0.3, 0.05, undefined, undefined, undefined, 0.1);
+    expect(style).toBe("void");
+  });
+
+  it("distortion selected for high spectral flux", () => {
+    const style = selectTransitionStyle(0.15, 0.15, undefined, undefined, undefined, 0.35);
+    expect(style).toBe("distortion");
+  });
+
+  it("morph selected for jam sections with moderate energy change", () => {
+    const style = selectTransitionStyle(0.1, 0.2, "jam", undefined, undefined, 0.1);
+    expect(style).toBe("morph");
+  });
+
+  it("void selected for space sections", () => {
+    const style = selectTransitionStyle(0.1, 0.1, "space", undefined, undefined);
+    expect(style).toBe("void");
+  });
+
+  it("dissolve selected for neutral transitions", () => {
+    const style = selectTransitionStyle(0.15, 0.15, "verse", undefined, undefined, 0.05);
+    expect(style).toBe("dissolve");
   });
 
   it("scene preferences still override shader styles", () => {

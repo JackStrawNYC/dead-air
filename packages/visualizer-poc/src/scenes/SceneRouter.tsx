@@ -105,13 +105,24 @@ export function dynamicCrossfadeDuration(
   const avgFlux = fluxCount > 0 ? fluxSum / fluxCount : 0;
 
   // Flux typically ranges 0-0.5. Above 0.15 is a significant timbral shift.
-  // Scale factor: 1.0 (no flux) down to 0.5 (high flux)
-  const fluxCompression = Math.max(0.7, 1 - Math.min(avgFlux / 0.3, 1) * 0.5);
+  // Scale factor: 1.0 (no flux) down to 0.4 (high flux) — aggressive compression
+  // so psychedelic moments with rapid timbral change get snappy transitions.
+  const fluxCompression = Math.max(0.4, 1 - Math.min(avgFlux / 0.25, 1) * 0.6);
 
-  return Math.max(36, Math.round(baseDuration * fluxCompression));
+  return Math.max(30, Math.round(baseDuration * fluxCompression));
 }
 
-const BEAT_CROSSFADE_FRAMES = 90; // 3 seconds when beat-synced (45 before + 45 after)
+/**
+ * Tempo-scaled beat crossfade: 2 beats worth of frames instead of fixed 90.
+ * At 120 BPM → 60f (2s), at 80 BPM → 45f (1.5s), at 160 BPM → 22f (0.75s).
+ * Falls back to 60f (2s) when tempo is unknown.
+ */
+function beatCrossfadeFrames(tempo?: number): number {
+  if (!tempo || tempo <= 0) return 60;
+  // 2 beats at given tempo, at 30fps
+  const framesPerBeat = (60 / tempo) * 30;
+  return Math.max(20, Math.min(90, Math.round(framesPerBeat * 2)));
+}
 
 // Complement modes and energy pools are now in scene-registry.ts
 
@@ -723,7 +734,9 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
     const rng = seededRandom((seed ?? 0) + frame * 11 + (reactiveState.triggerType?.length ?? 0));
     const reactiveMode = reactiveState.suggestedModes[Math.floor(rng() * reactiveState.suggestedModes.length)];
     const regularMode = getModeForSection(song, currentSectionIdx, sections, seed, era, false, usedShaderModes, songIdentity, stemSection, frames, songDuration, setNumber, trackNumber, shaderModeLastUsed, stemDominant);
-    const REACTIVE_CROSSFADE = 15;
+    // Energy-scaled reactive crossfade: snappy at high energy, gentle at low
+    const reactiveEnergy = frames[Math.min(frame, frames.length - 1)]?.rms ?? 0.15;
+    const REACTIVE_CROSSFADE = reactiveEnergy > 0.2 ? 12 : reactiveEnergy > 0.1 ? 22 : 40;
     const age = reactiveState.triggerAge;
 
     if (age < REACTIVE_CROSSFADE) {
@@ -855,8 +868,11 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
     if (prevMode !== currentMode) {
       const boundary = currentSection.frameStart;
       const beatFrame = findNearestBeat(frames, boundary - 30, boundary + 30);
-      const crossfadeLen = beatFrame !== null ? BEAT_CROSSFADE_FRAMES : dynamicCrossfadeDuration(frames, boundary);
-      const crossfadeStart = beatFrame !== null ? beatFrame - 30 : boundary;
+      const dynamicLen = dynamicCrossfadeDuration(frames, boundary);
+      const beatLen = beatCrossfadeFrames(tempo);
+      // Use the shorter of beat-synced and dynamic — fast spectral changes win
+      const crossfadeLen = beatFrame !== null ? Math.min(beatLen, dynamicLen) : dynamicLen;
+      const crossfadeStart = beatFrame !== null ? beatFrame - Math.floor(beatLen / 2) : boundary;
       const distFromStart = frame - crossfadeStart;
 
       if (distFromStart >= 0 && distFromStart < crossfadeLen) {
@@ -883,7 +899,24 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
         const sectionLabel = currentSection ? (frames[boundary]?.sectionType ?? undefined) : undefined;
         const scenePreferredOut = SCENE_REGISTRY[prevMode]?.preferredTransitionOut;
         const scenePreferredIn = SCENE_REGISTRY[currentMode]?.preferredTransitionIn;
-        const transitionStyle = selectTransitionStyle(energyBefore, energyAfter, sectionLabel, scenePreferredIn, scenePreferredOut);
+        // Compute spectral flux at boundary for style selection
+        const fluxWindow = 8;
+        const fluxLo = Math.max(1, boundary - fluxWindow);
+        const fluxHi = Math.min(frames.length - 1, boundary + fluxWindow);
+        let fluxSum = 0, fluxCount = 0;
+        for (let i = fluxLo; i <= fluxHi; i++) {
+          const curr = frames[i].contrast;
+          const prev = frames[i - 1].contrast;
+          let l2 = 0;
+          for (let b = 0; b < 7; b++) {
+            const diff = curr[b] - prev[b];
+            l2 += diff * diff;
+          }
+          fluxSum += Math.sqrt(l2);
+          fluxCount++;
+        }
+        const boundaryFlux = fluxCount > 0 ? fluxSum / fluxCount : 0;
+        const transitionStyle = selectTransitionStyle(energyBefore, energyAfter, sectionLabel, scenePreferredIn, scenePreferredOut, boundaryFlux);
         return (
           <SceneCrossfade
             progress={progress}
@@ -904,8 +937,10 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
     if (nextMode !== currentMode) {
       const boundary = currentSection.frameEnd;
       const beatFrame = findNearestBeat(frames, boundary - 30, boundary + 30);
-      const crossfadeLen = beatFrame !== null ? BEAT_CROSSFADE_FRAMES : dynamicCrossfadeDuration(frames, boundary);
-      const crossfadeEnd = beatFrame !== null ? beatFrame + 30 : boundary;
+      const dynamicLenOut = dynamicCrossfadeDuration(frames, boundary);
+      const beatLenOut = beatCrossfadeFrames(tempo);
+      const crossfadeLen = beatFrame !== null ? Math.min(beatLenOut, dynamicLenOut) : dynamicLenOut;
+      const crossfadeEnd = beatFrame !== null ? beatFrame + Math.floor(beatLenOut / 2) : boundary;
       const distToEnd = crossfadeEnd - frame;
 
       if (distToEnd >= 0 && distToEnd < crossfadeLen) {
@@ -932,7 +967,24 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
         const sectionLabel = nextSection ? (frames[boundary]?.sectionType ?? undefined) : undefined;
         const scenePreferredOutB = SCENE_REGISTRY[currentMode]?.preferredTransitionOut;
         const scenePreferredInB = SCENE_REGISTRY[nextMode]?.preferredTransitionIn;
-        const transitionStyle = selectTransitionStyle(energyBefore, energyAfter, sectionLabel, scenePreferredInB, scenePreferredOutB);
+        // Compute spectral flux at boundary for style selection
+        const fluxWindowOut = 8;
+        const fluxLoOut = Math.max(1, boundary - fluxWindowOut);
+        const fluxHiOut = Math.min(frames.length - 1, boundary + fluxWindowOut);
+        let fluxSumOut = 0, fluxCountOut = 0;
+        for (let i = fluxLoOut; i <= fluxHiOut; i++) {
+          const curr = frames[i].contrast;
+          const prev = frames[i - 1].contrast;
+          let l2 = 0;
+          for (let b = 0; b < 7; b++) {
+            const diff = curr[b] - prev[b];
+            l2 += diff * diff;
+          }
+          fluxSumOut += Math.sqrt(l2);
+          fluxCountOut++;
+        }
+        const boundaryFluxOut = fluxCountOut > 0 ? fluxSumOut / fluxCountOut : 0;
+        const transitionStyle = selectTransitionStyle(energyBefore, energyAfter, sectionLabel, scenePreferredInB, scenePreferredOutB, boundaryFluxOut);
         return (
           <SceneCrossfade
             progress={progress}
