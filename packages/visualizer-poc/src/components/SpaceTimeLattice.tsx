@@ -1,9 +1,22 @@
 /**
- * SpaceTimeLattice — perspective grid that warps with bass.
+ * SpaceTimeLattice — A+++ perspective grid that warps with bass.
  * Layer 4, tier B, tags: cosmic, psychedelic.
- * 8x6 grid of dots/intersections that distort toward center on bass hits.
- * Bass makes grid warp inward (perspective distortion).
- * Energy drives dot brightness. Position: full screen.
+ *
+ * 10x8 grid of dots connected by lines forming a warping lattice.
+ * Each dot: bright core + soft glow halo. Warp toward center on bass hits
+ * (gravitational lensing effect). Concentric ripple rings emanating from
+ * warp center. Grid lines have gradient opacity (brighter near center).
+ * Perspective depth (dots farther from center are smaller/dimmer).
+ * Subtle secondary grid offset behind main grid for depth.
+ *
+ * Audio mapping:
+ *   bass        → warp intensity (gravitational pull)
+ *   energy      → dot brightness + overall opacity
+ *   chromaHue   → palette hue
+ *   beatDecay   → ripple ring timing + dot pulse
+ *   slowEnergy  → ambient drift speed
+ *   mids        → secondary grid visibility
+ *   centroid    → glow halo size
  */
 
 import React from "react";
@@ -12,25 +25,36 @@ import type { EnhancedFrameData } from "../data/types";
 import { useAudioSnapshot } from "./parametric/audio-helpers";
 import { useTempoFactor } from "../data/TempoContext";
 
-/** Map 0-1 hue to an RGB hex string */
-function hueToHex(h: number): string {
-  const s = 0.85;
-  const l = 0.6;
-  const hue = ((h % 1) + 1) % 1;
-  const c = (1 - Math.abs(2 * l - 1)) * s;
-  const x = c * (1 - Math.abs(((hue * 6) % 2) - 1));
-  const m = l - c / 2;
-  let r = 0, g = 0, b = 0;
-  const sector = Math.floor(hue * 6);
-  if (sector === 0) { r = c; g = x; }
-  else if (sector === 1) { r = x; g = c; }
-  else if (sector === 2) { g = c; b = x; }
-  else if (sector === 3) { g = x; b = c; }
-  else if (sector === 4) { r = x; b = c; }
-  else { r = c; b = x; }
-  const toHex = (v: number) => Math.round((v + m) * 255).toString(16).padStart(2, "0");
-  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+/* ------------------------------------------------------------------ */
+/*  Color helpers                                                      */
+/* ------------------------------------------------------------------ */
+
+/** Map 0-1 hue to an HSL string with configurable saturation/lightness/alpha */
+function hsl(h: number, s: number, l: number, a = 1): string {
+  const hue = (((h % 1) + 1) % 1) * 360;
+  return `hsla(${hue}, ${Math.round(s)}%, ${Math.round(l)}%, ${a.toFixed(3)})`;
 }
+
+/* ------------------------------------------------------------------ */
+/*  Constants                                                          */
+/* ------------------------------------------------------------------ */
+
+const COLS = 10;
+const ROWS = 8;
+const VIEW_W = 400;
+const VIEW_H = 320;
+const CENTER_X = VIEW_W / 2;
+const CENTER_Y = VIEW_H / 2;
+const MAX_DIST = Math.sqrt(CENTER_X * CENTER_X + CENTER_Y * CENTER_Y);
+const MARGIN_X = 25;
+const MARGIN_Y = 20;
+
+/** Number of concentric ripple rings */
+const NUM_RIPPLES = 5;
+
+/* ------------------------------------------------------------------ */
+/*  Component                                                          */
+/* ------------------------------------------------------------------ */
 
 interface Props {
   frames: EnhancedFrameData[];
@@ -43,149 +67,238 @@ export const SpaceTimeLattice: React.FC<Props> = ({ frames }) => {
   const snap = useAudioSnapshot(frames);
   const energy = snap.energy;
   const slowEnergy = snap.slowEnergy;
-  const chromaHue = snap.chromaHue / 360;
+  const bass = snap.bass;
+  const mids = snap.mids;
+  const beatDecay = snap.beatDecay;
+  const centroid = snap.centroid;
+  const chromaHue = snap.chromaHue / 360; // normalize to 0-1
   const tempoFactor = useTempoFactor();
 
-  // Opacity: subtle 0.1-0.3
-  const opacity = interpolate(energy, [0.02, 0.4], [0.1, 0.3], {
+  /* --- master opacity --- */
+  const opacity = interpolate(energy, [0.02, 0.4], [0.1, 0.35], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
 
-  // Colors
-  const dotColor = hueToHex(chromaHue);
-  const lineColor = hueToHex(chromaHue + 0.15);
-
-  // Grid params
-  const cols = 8;
-  const rows = 6;
-  const viewW = 320;
-  const viewH = 240;
-  const centerX = viewW / 2;
-  const centerY = viewH / 2;
-
-  // Bass warp strength
-  const warpStrength = interpolate(snap.bass, [0.05, 0.5], [0, 0.35], {
+  /* --- warp (gravitational lensing) --- */
+  const warpStrength = interpolate(bass, [0.04, 0.55], [0, 0.42], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
 
-  // Slow drift
+  /* --- animation clock --- */
   const drift = frame * 0.005 * tempoFactor;
 
-  // Compute warped grid positions
+  /* --- warped position calculator --- */
   const getWarpedPos = (col: number, row: number): [number, number] => {
-    // Base grid position with margins
-    const marginX = 30;
-    const marginY = 25;
-    const baseX = marginX + (col / (cols - 1)) * (viewW - marginX * 2);
-    const baseY = marginY + (row / (rows - 1)) * (viewH - marginY * 2);
+    const baseX = MARGIN_X + (col / (COLS - 1)) * (VIEW_W - MARGIN_X * 2);
+    const baseY = MARGIN_Y + (row / (ROWS - 1)) * (VIEW_H - MARGIN_Y * 2);
 
-    // Vector from center
-    const dx = baseX - centerX;
-    const dy = baseY - centerY;
+    const dx = baseX - CENTER_X;
+    const dy = baseY - CENTER_Y;
     const dist = Math.sqrt(dx * dx + dy * dy);
-    const maxDist = Math.sqrt(centerX * centerX + centerY * centerY);
-    const normDist = dist / maxDist;
+    const normDist = dist / MAX_DIST;
 
-    // Warp: pull toward center proportional to bass, stronger at edges
-    const pullFactor = warpStrength * normDist;
-    const warpedX = baseX - dx * pullFactor;
-    const warpedY = baseY - dy * pullFactor;
+    // Gravitational pull toward center — stronger at edges
+    const pullFactor = warpStrength * normDist * normDist;
+    let wx = baseX - dx * pullFactor;
+    let wy = baseY - dy * pullFactor;
 
-    // Subtle wave ripple
-    const ripple = Math.sin(dist * 0.05 + drift * 3) * slowEnergy * 3;
-    const rippleAngle = Math.atan2(dy, dx);
+    // Radial ripple wave
+    const ripple = Math.sin(dist * 0.06 - drift * 4) * slowEnergy * 3.5;
+    const angle = Math.atan2(dy, dx);
+    wx += Math.cos(angle) * ripple;
+    wy += Math.sin(angle) * ripple;
 
-    return [
-      warpedX + Math.cos(rippleAngle) * ripple,
-      warpedY + Math.sin(rippleAngle) * ripple,
-    ];
+    // Subtle tangential twist on bass
+    const twist = warpStrength * 0.03 * dist;
+    wx += -Math.sin(angle) * twist;
+    wy += Math.cos(angle) * twist;
+
+    return [wx, wy];
   };
 
-  // Build grid dots and lines
-  const dots: React.ReactNode[] = [];
-  const hLines: React.ReactNode[] = [];
-  const vLines: React.ReactNode[] = [];
-
-  // Pre-compute all positions
+  /* --- pre-compute all grid positions --- */
   const positions: [number, number][][] = [];
-  for (let r = 0; r < rows; r++) {
+  for (let r = 0; r < ROWS; r++) {
     positions[r] = [];
-    for (let c = 0; c < cols; c++) {
+    for (let c = 0; c < COLS; c++) {
       positions[r][c] = getWarpedPos(c, r);
     }
   }
 
-  // Horizontal grid lines
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols - 1; c++) {
+  /* --- secondary (shadow) grid — offset behind main for depth --- */
+  const secondaryOpacity = interpolate(mids, [0.05, 0.35], [0.04, 0.12], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+  });
+  const secOffset = 3 + slowEnergy * 2; // pixels offset
+
+  const secondaryPositions: [number, number][][] = [];
+  for (let r = 0; r < ROWS; r++) {
+    secondaryPositions[r] = [];
+    for (let c = 0; c < COLS; c++) {
+      const [px, py] = positions[r][c];
+      secondaryPositions[r][c] = [px + secOffset, py + secOffset];
+    }
+  }
+
+  /* ---------------------------------------------------------------- */
+  /*  Build SVG elements                                               */
+  /* ---------------------------------------------------------------- */
+
+  const elements: React.ReactNode[] = [];
+
+  /* --- Secondary grid lines (behind main) --- */
+  const secLineColor = hsl(chromaHue + 0.08, 50, 40, secondaryOpacity);
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS - 1; c++) {
+      const [x1, y1] = secondaryPositions[r][c];
+      const [x2, y2] = secondaryPositions[r][c + 1];
+      elements.push(
+        <line key={`sh-${r}-${c}`} x1={x1} y1={y1} x2={x2} y2={y2}
+          stroke={secLineColor} strokeWidth="0.4" />,
+      );
+    }
+  }
+  for (let c = 0; c < COLS; c++) {
+    for (let r = 0; r < ROWS - 1; r++) {
+      const [x1, y1] = secondaryPositions[r][c];
+      const [x2, y2] = secondaryPositions[r + 1][c];
+      elements.push(
+        <line key={`sv-${r}-${c}`} x1={x1} y1={y1} x2={x2} y2={y2}
+          stroke={secLineColor} strokeWidth="0.4" />,
+      );
+    }
+  }
+
+  /* --- Main grid lines — gradient opacity (brighter near center) --- */
+  const buildLineOpacity = (x1: number, y1: number, x2: number, y2: number): number => {
+    const mx = (x1 + x2) / 2;
+    const my = (y1 + y2) / 2;
+    const dist = Math.sqrt((mx - CENTER_X) ** 2 + (my - CENTER_Y) ** 2);
+    const normDist = dist / MAX_DIST;
+    // Near center = brighter, edges = dimmer
+    const proximityBoost = 1 - normDist * 0.7;
+    return (0.15 + slowEnergy * 0.15 + energy * 0.1) * proximityBoost;
+  };
+
+  const mainLineColor = chromaHue + 0.15;
+
+  // Horizontal lines
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS - 1; c++) {
       const [x1, y1] = positions[r][c];
       const [x2, y2] = positions[r][c + 1];
-      hLines.push(
-        <line
-          key={`h-${r}-${c}`}
-          x1={x1} y1={y1}
-          x2={x2} y2={y2}
-          stroke={lineColor}
-          strokeWidth="0.6"
-          opacity={0.2 + slowEnergy * 0.15}
-        />,
+      const lineOp = buildLineOpacity(x1, y1, x2, y2);
+      elements.push(
+        <line key={`h-${r}-${c}`} x1={x1} y1={y1} x2={x2} y2={y2}
+          stroke={hsl(mainLineColor, 75, 55, lineOp)}
+          strokeWidth={0.5 + energy * 0.4} />,
       );
     }
   }
 
-  // Vertical grid lines
-  for (let c = 0; c < cols; c++) {
-    for (let r = 0; r < rows - 1; r++) {
+  // Vertical lines
+  for (let c = 0; c < COLS; c++) {
+    for (let r = 0; r < ROWS - 1; r++) {
       const [x1, y1] = positions[r][c];
       const [x2, y2] = positions[r + 1][c];
-      vLines.push(
-        <line
-          key={`v-${r}-${c}`}
-          x1={x1} y1={y1}
-          x2={x2} y2={y2}
-          stroke={lineColor}
-          strokeWidth="0.6"
-          opacity={0.2 + slowEnergy * 0.15}
+      const lineOp = buildLineOpacity(x1, y1, x2, y2);
+      elements.push(
+        <line key={`v-${r}-${c}`} x1={x1} y1={y1} x2={x2} y2={y2}
+          stroke={hsl(mainLineColor, 75, 55, lineOp)}
+          strokeWidth={0.5 + energy * 0.4} />,
+      );
+    }
+  }
+
+  /* --- Concentric ripple rings emanating from warp center --- */
+  for (let i = 0; i < NUM_RIPPLES; i++) {
+    // Each ring expands outward, staggered in time
+    const ripplePhase = ((drift * 2.5 + i / NUM_RIPPLES) % 1);
+    const rippleRadius = ripplePhase * MAX_DIST * 0.9;
+    // Fade in then out: peak at 30-50% expansion
+    const rippleAlpha = interpolate(ripplePhase, [0, 0.15, 0.4, 0.85, 1], [0, 0.35, 0.25, 0.08, 0], {
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+    }) * beatDecay * 1.8;
+
+    if (rippleAlpha > 0.01 && rippleRadius > 2) {
+      elements.push(
+        <circle key={`ripple-${i}`}
+          cx={CENTER_X} cy={CENTER_Y} r={rippleRadius}
+          fill="none"
+          stroke={hsl(chromaHue + 0.05, 80, 65, rippleAlpha)}
+          strokeWidth={1 + beatDecay * 1.5}
         />,
       );
     }
   }
 
-  // Intersection dots
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
+  /* --- Intersection dots: bright core + soft glow halo --- */
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
       const [px, py] = positions[r][c];
-      // Distance from center affects brightness
-      const dx = px - centerX;
-      const dy = py - centerY;
+      const dx = px - CENTER_X;
+      const dy = py - CENTER_Y;
       const dist = Math.sqrt(dx * dx + dy * dy);
-      const maxDist = Math.sqrt(centerX * centerX + centerY * centerY);
-      const normDist = dist / maxDist;
+      const normDist = dist / MAX_DIST;
 
-      const dotBrightness = interpolate(energy, [0.05, 0.5], [0.3, 0.9], {
+      /* Perspective depth: farther from center = smaller & dimmer */
+      const depthScale = 1 - normDist * 0.55;
+      const depthDim = 0.4 + (1 - normDist) * 0.6;
+
+      const baseBrightness = interpolate(energy, [0.05, 0.5], [0.3, 0.95], {
         extrapolateLeft: "clamp",
         extrapolateRight: "clamp",
-      }) * (0.5 + (1 - normDist) * 0.5);
+      });
+      const dotBrightness = baseBrightness * depthDim;
 
-      const dotRadius = 1.5 + snap.beatDecay * 1.5 * (1 - normDist * 0.5);
+      /* Core radius pulses on beat */
+      const coreRadius = (1.2 + beatDecay * 1.8) * depthScale;
+      /* Halo radius responds to centroid (brightness) */
+      const haloRadius = (3 + centroid * 4 + beatDecay * 2.5) * depthScale;
+      const haloAlpha = dotBrightness * 0.25;
 
-      dots.push(
-        <circle
-          key={`d-${r}-${c}`}
-          cx={px}
-          cy={py}
-          r={dotRadius}
-          fill={dotColor}
-          opacity={dotBrightness}
+      /* Per-dot hue micro-variation based on grid position */
+      const dotHue = chromaHue + (c * 0.008) + (r * 0.005);
+      const dotLightness = 60 + beatDecay * 20;
+
+      // Soft glow halo (rendered first, behind core)
+      if (haloAlpha > 0.01) {
+        elements.push(
+          <circle key={`halo-${r}-${c}`}
+            cx={px} cy={py} r={haloRadius}
+            fill={hsl(dotHue, 70, dotLightness + 10, haloAlpha)}
+            style={{ filter: "blur(2px)" }}
+          />,
+        );
+      }
+
+      // Bright core
+      elements.push(
+        <circle key={`core-${r}-${c}`}
+          cx={px} cy={py} r={coreRadius}
+          fill={hsl(dotHue, 85, dotLightness, dotBrightness)}
         />,
       );
     }
   }
 
-  // Gentle overall rotation
-  const rotation = drift * 2;
+  /* --- Center glow — gravitational singularity point --- */
+  const centerGlowR = 8 + bass * 18 + beatDecay * 6;
+  const centerGlowAlpha = 0.15 + bass * 0.3 + beatDecay * 0.15;
+  elements.push(
+    <circle key="center-glow"
+      cx={CENTER_X} cy={CENTER_Y} r={centerGlowR}
+      fill={hsl(chromaHue, 90, 75, centerGlowAlpha)}
+      style={{ filter: `blur(${6 + bass * 10}px)` }}
+    />,
+  );
+
+  /* --- Gentle overall rotation --- */
+  const rotation = drift * 1.8;
 
   return (
     <div
@@ -206,14 +319,13 @@ export const SpaceTimeLattice: React.FC<Props> = ({ frames }) => {
         }}
       >
         <svg
-          width={width * 0.9}
-          height={height * 0.9}
-          viewBox={`0 0 ${viewW} ${viewH}`}
+          width={width * 0.92}
+          height={height * 0.92}
+          viewBox={`0 0 ${VIEW_W} ${VIEW_H}`}
           fill="none"
+          style={{ mixBlendMode: "screen" }}
         >
-          {hLines}
-          {vLines}
-          {dots}
+          {elements}
         </svg>
       </div>
     </div>
