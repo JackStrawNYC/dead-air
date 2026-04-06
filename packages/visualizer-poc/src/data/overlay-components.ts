@@ -69,6 +69,11 @@ import { MeteorShower } from "../components/MeteorShower";
 import { LiquidLightBorder } from "../components/LiquidLightBorder";
 import { SpiralHypnoDisc } from "../components/SpiralHypnoDisc";
 import { OwsleyBear } from "../components/OwsleyBear";
+import { MicStandSilhouette } from "../components/MicStandSilhouette";
+import { SpinningYinYang } from "../components/SpinningYinYang";
+import { SugareeRose } from "../components/SugareeRose";
+import { GratefulDeadLogo } from "../components/GratefulDeadLogo";
+import { BobCowboyHat } from "../components/BobCowboyHat";
 
 // ─── Layer 5: Song References (3) + Dead Culture ───
 import { SunMoonMotif } from "../components/SunMoonMotif";
@@ -467,6 +472,11 @@ export const OVERLAY_COMPONENTS: Record<string, OverlayComponentEntry> = {
   LiquidLightBorder: { Component: LiquidLightBorder, layer: 1 },
   SpiralHypnoDisc:   { Component: SpiralHypnoDisc, layer: 2 },
   OwsleyBear:        { Component: OwsleyBear, layer: 6 },
+  MicStandSilhouette:{ Component: MicStandSilhouette, layer: 6 },
+  SpinningYinYang:   { Component: SpinningYinYang, layer: 2 },
+  SugareeRose:       { Component: SugareeRose, layer: 5 },
+  GratefulDeadLogo:  { Component: GratefulDeadLogo, layer: 7 },
+  BobCowboyHat:      { Component: BobCowboyHat, layer: 6 },
 
   // Layer 3: Reactive
   LightningBoltOverlay: { Component: LightningBoltOverlay, layer: 3 },

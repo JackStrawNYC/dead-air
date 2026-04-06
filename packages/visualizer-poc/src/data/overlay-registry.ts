@@ -425,6 +425,11 @@ export const OVERLAY_REGISTRY: OverlayEntry[] = [
   { name: "LiquidLightBorder",      layer: 1, category: "atmospheric", tags: ["psychedelic", "dead-culture"],      energyBand: "any",  weight: 2, dutyCycle: 100, energyResponse: [0.03, 0.18, 1.5], tier: "A" },
   { name: "SpiralHypnoDisc",        layer: 2, category: "sacred",      tags: ["psychedelic", "cosmic"],            energyBand: "any",  weight: 2, dutyCycle: 100, energyResponse: [0.03, 0.20, 1.5], tier: "A" },
   { name: "OwsleyBear",             layer: 6, category: "character",   tags: ["dead-culture", "festival"],         energyBand: "any",  weight: 3, dutyCycle: 100, energyResponse: [0.03, 0.18, 1.5], tier: "A" },
+  { name: "MicStandSilhouette",     layer: 6, category: "character",   tags: ["dead-culture", "organic"],          energyBand: "mid",  weight: 3, dutyCycle: 100, energyResponse: [0.05, 0.20, 1.5], tier: "A" },
+  { name: "SpinningYinYang",        layer: 2, category: "sacred",      tags: ["cosmic", "contemplative"],          energyBand: "any",  weight: 2, dutyCycle: 100, energyResponse: [0.03, 0.18, 1.5], tier: "A" },
+  { name: "SugareeRose",            layer: 5, category: "nature",      tags: ["dead-culture", "organic"],          energyBand: "low",  weight: 2, dutyCycle: 100, energyResponse: [0.0, 0.12, 2.0], tier: "A" },
+  { name: "GratefulDeadLogo",       layer: 7, category: "artifact",    tags: ["dead-culture", "retro"],            energyBand: "any",  weight: 3, dutyCycle: 50,  energyResponse: [0.05, 0.20, 1.5], tier: "A" },
+  { name: "BobCowboyHat",           layer: 6, category: "character",   tags: ["dead-culture", "organic"],          energyBand: "mid",  weight: 3, dutyCycle: 100, energyResponse: [0.05, 0.20, 1.5], tier: "A" },
 ];
 
 /**
