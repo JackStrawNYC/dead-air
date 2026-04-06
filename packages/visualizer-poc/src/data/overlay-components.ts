@@ -75,6 +75,29 @@ import { SugareeRose } from "../components/SugareeRose";
 import { GratefulDeadLogo } from "../components/GratefulDeadLogo";
 import { BobCowboyHat } from "../components/BobCowboyHat";
 
+// ─── Veneta 8/27/72 Show-Specific Overlays ───
+import { OregonSunBlaze } from "../components/OregonSunBlaze";
+import { KeseyFurthur } from "../components/KeseyFurthur";
+import { SunshineDaydreamCamera } from "../components/SunshineDaydreamCamera";
+import { VenetaSwimmers } from "../components/VenetaSwimmers";
+import { RenaissanceFaireBanner } from "../components/RenaissanceFaireBanner";
+import { OregonMeadow } from "../components/OregonMeadow";
+import { HeatShimmer } from "../components/HeatShimmer";
+import { GreyhoundBus } from "../components/GreyhoundBus";
+import { CowboySaloon } from "../components/CowboySaloon";
+import { HeadlightTrain } from "../components/HeadlightTrain";
+import { BirdInFlight } from "../components/BirdInFlight";
+import { SteamLocomotive } from "../components/SteamLocomotive";
+import { GospelChurch } from "../components/GospelChurch";
+import { PlayingCards } from "../components/PlayingCards";
+import { EmptyChair } from "../components/EmptyChair";
+import { PrisonBars } from "../components/PrisonBars";
+import { WindWalker } from "../components/WindWalker";
+import { MexicaliDesert } from "../components/MexicaliDesert";
+import { MosesStaff } from "../components/MosesStaff";
+import { MusicalNotation } from "../components/MusicalNotation";
+import { WichitaTulsa } from "../components/WichitaTulsa";
+
 // ─── Layer 5: Song References (3) + Dead Culture ───
 import { SunMoonMotif } from "../components/SunMoonMotif";
 import { ChinaCatSunflower } from "../components/ChinaCatSunflower";
@@ -477,6 +500,29 @@ export const OVERLAY_COMPONENTS: Record<string, OverlayComponentEntry> = {
   SugareeRose:       { Component: SugareeRose, layer: 5 },
   GratefulDeadLogo:  { Component: GratefulDeadLogo, layer: 7 },
   BobCowboyHat:      { Component: BobCowboyHat, layer: 6 },
+
+  // ─── Veneta 8/27/72 Show-Specific Overlays ───
+  OregonSunBlaze:        { Component: OregonSunBlaze, layer: 1 },
+  KeseyFurthur:          { Component: KeseyFurthur, layer: 6 },
+  SunshineDaydreamCamera:{ Component: SunshineDaydreamCamera, layer: 7 },
+  VenetaSwimmers:        { Component: VenetaSwimmers, layer: 5 },
+  RenaissanceFaireBanner:{ Component: RenaissanceFaireBanner, layer: 1 },
+  OregonMeadow:          { Component: OregonMeadow, layer: 5 },
+  HeatShimmer:           { Component: HeatShimmer, layer: 1 },
+  GreyhoundBus:          { Component: GreyhoundBus, layer: 6 },
+  CowboySaloon:          { Component: CowboySaloon, layer: 6 },
+  HeadlightTrain:        { Component: HeadlightTrain, layer: 3 },
+  BirdInFlight:          { Component: BirdInFlight, layer: 5 },
+  SteamLocomotive:       { Component: SteamLocomotive, layer: 6 },
+  GospelChurch:          { Component: GospelChurch, layer: 5 },
+  PlayingCards:          { Component: PlayingCards, layer: 7 },
+  EmptyChair:            { Component: EmptyChair, layer: 6 },
+  PrisonBars:            { Component: PrisonBars, layer: 6 },
+  WindWalker:            { Component: WindWalker, layer: 6 },
+  MexicaliDesert:        { Component: MexicaliDesert, layer: 5 },
+  MosesStaff:            { Component: MosesStaff, layer: 2 },
+  MusicalNotation:       { Component: MusicalNotation, layer: 7 },
+  WichitaTulsa:          { Component: WichitaTulsa, layer: 6 },
 
   // Layer 3: Reactive
   LightningBoltOverlay: { Component: LightningBoltOverlay, layer: 3 },

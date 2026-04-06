@@ -226,7 +226,7 @@ export const OVERLAY_REGISTRY: OverlayEntry[] = [
   { name: "GraffitiTag",             layer: 10, category: "distortion", tags: ["psychedelic","retro"], energyBand: "mid", weight: 2, dutyCycle: 33, energyResponse: [0,0.08,2.5], tier: "C" },
   { name: "Gyroscope",               layer: 4, category: "geometric", tags: ["mechanical","psychedelic"], energyBand: "mid", weight: 2, dutyCycle: 33, energyResponse: [0.08,0.25,2], tier: "C" },
   { name: "HeartbeatEKG",            layer: 9, category: "hud", tags: ["retro","mechanical"], energyBand: "any", weight: 1, dutyCycle: 100, energyResponse: [0,0.12,2], tier: "C" },
-  { name: "HeatShimmer",             layer: 10, category: "distortion", tags: ["psychedelic","retro"], energyBand: "mid", weight: 2, dutyCycle: 33, energyResponse: [0,0.08,2.5], tier: "C" },
+  { name: "HeatShimmer",             layer: 1, category: "atmospheric", tags: ["organic","contemplative"], energyBand: "any", weight: 2, dutyCycle: 100, energyResponse: [0.03,0.18,1.8], tier: "A" },
   { name: "Hieroglyphs",             layer: 2, category: "sacred", tags: ["cosmic","contemplative"], energyBand: "mid", weight: 2, dutyCycle: 100, energyResponse: [0.04,0.18,2], tier: "C" },
   { name: "HighwaySign",             layer: 7, category: "artifact", tags: ["retro","dead-culture"], energyBand: "any", weight: 1, dutyCycle: 20, energyResponse: [0,0.05,3], tier: "C" },
   { name: "HilbertCurve",            layer: 4, category: "geometric", tags: ["mechanical","psychedelic"], energyBand: "mid", weight: 2, dutyCycle: 33, energyResponse: [0.08,0.25,2], tier: "C" },
@@ -430,6 +430,28 @@ export const OVERLAY_REGISTRY: OverlayEntry[] = [
   { name: "SugareeRose",            layer: 5, category: "nature",      tags: ["dead-culture", "organic"],          energyBand: "low",  weight: 2, dutyCycle: 100, energyResponse: [0.0, 0.12, 2.0], tier: "A" },
   { name: "GratefulDeadLogo",       layer: 7, category: "artifact",    tags: ["dead-culture", "retro"],            energyBand: "any",  weight: 3, dutyCycle: 50,  energyResponse: [0.05, 0.20, 1.5], tier: "A" },
   { name: "BobCowboyHat",           layer: 6, category: "character",   tags: ["dead-culture", "organic"],          energyBand: "mid",  weight: 3, dutyCycle: 100, energyResponse: [0.05, 0.20, 1.5], tier: "A" },
+
+  // ═══ Veneta 8/27/72 Show-Specific Overlays (20 new) ═══
+  { name: "OregonSunBlaze",         layer: 1, category: "atmospheric", tags: ["organic", "intense"],               energyBand: "any",  weight: 3, dutyCycle: 100, energyResponse: [0.05, 0.25, 1.8], tier: "A" },
+  { name: "KeseyFurthur",           layer: 6, category: "character",   tags: ["dead-culture", "psychedelic"],      energyBand: "any",  weight: 3, dutyCycle: 100, energyResponse: [0.03, 0.18, 1.5], tier: "A" },
+  { name: "SunshineDaydreamCamera", layer: 7, category: "artifact",    tags: ["dead-culture", "retro"],            energyBand: "any",  weight: 2, dutyCycle: 100, energyResponse: [0.03, 0.15, 1.8], tier: "A" },
+  { name: "VenetaSwimmers",         layer: 5, category: "nature",      tags: ["dead-culture", "festival"],         energyBand: "low",  weight: 2, dutyCycle: 100, energyResponse: [0.0, 0.12, 2.0], tier: "A" },
+  { name: "RenaissanceFaireBanner", layer: 1, category: "atmospheric", tags: ["dead-culture", "festival"],         energyBand: "any",  weight: 2, dutyCycle: 100, energyResponse: [0.03, 0.18, 1.5], tier: "A" },
+  { name: "OregonMeadow",           layer: 5, category: "nature",      tags: ["organic", "contemplative"],         energyBand: "low",  weight: 2, dutyCycle: 100, energyResponse: [0.0, 0.10, 2.5], tier: "B" },
+  { name: "GreyhoundBus",           layer: 6, category: "character",   tags: ["dead-culture", "retro"],            energyBand: "mid",  weight: 2, dutyCycle: 100, energyResponse: [0.05, 0.20, 1.5], tier: "A" },
+  { name: "CowboySaloon",           layer: 6, category: "character",   tags: ["dead-culture", "retro"],            energyBand: "mid",  weight: 2, dutyCycle: 100, energyResponse: [0.05, 0.20, 1.8], tier: "A" },
+  { name: "HeadlightTrain",         layer: 3, category: "reactive",    tags: ["dead-culture", "intense"],          energyBand: "mid",  weight: 2, dutyCycle: 100, energyResponse: [0.08, 0.25, 1.5], tier: "A" },
+  { name: "BirdInFlight",           layer: 5, category: "nature",      tags: ["organic", "contemplative"],         energyBand: "any",  weight: 2, dutyCycle: 100, energyResponse: [0.03, 0.15, 1.8], tier: "A" },
+  { name: "SteamLocomotive",        layer: 6, category: "character",   tags: ["dead-culture", "intense"],          energyBand: "mid",  weight: 2, dutyCycle: 100, energyResponse: [0.05, 0.22, 1.8], tier: "A" },
+  { name: "GospelChurch",           layer: 5, category: "nature",      tags: ["dead-culture", "contemplative"],    energyBand: "low",  weight: 2, dutyCycle: 100, energyResponse: [0.0, 0.12, 2.0], tier: "A" },
+  { name: "PlayingCards",           layer: 7, category: "artifact",    tags: ["dead-culture", "retro"],            energyBand: "any",  weight: 2, dutyCycle: 100, energyResponse: [0.03, 0.18, 1.5], tier: "A" },
+  { name: "EmptyChair",             layer: 6, category: "character",   tags: ["dead-culture", "contemplative"],    energyBand: "low",  weight: 2, dutyCycle: 100, energyResponse: [0.0, 0.12, 2.0], tier: "A" },
+  { name: "PrisonBars",             layer: 6, category: "character",   tags: ["dead-culture", "contemplative"],    energyBand: "low",  weight: 2, dutyCycle: 100, energyResponse: [0.0, 0.12, 2.0], tier: "A" },
+  { name: "WindWalker",             layer: 6, category: "character",   tags: ["dead-culture", "intense"],          energyBand: "mid",  weight: 2, dutyCycle: 100, energyResponse: [0.05, 0.20, 1.8], tier: "A" },
+  { name: "MexicaliDesert",         layer: 5, category: "nature",      tags: ["dead-culture", "retro"],            energyBand: "mid",  weight: 2, dutyCycle: 100, energyResponse: [0.03, 0.18, 1.8], tier: "A" },
+  { name: "MosesStaff",             layer: 2, category: "sacred",      tags: ["dead-culture", "intense"],          energyBand: "mid",  weight: 2, dutyCycle: 100, energyResponse: [0.05, 0.22, 1.5], tier: "A" },
+  { name: "MusicalNotation",        layer: 7, category: "artifact",    tags: ["dead-culture", "psychedelic"],      energyBand: "any",  weight: 2, dutyCycle: 100, energyResponse: [0.03, 0.18, 1.5], tier: "A" },
+  { name: "WichitaTulsa",           layer: 6, category: "character",   tags: ["dead-culture", "retro"],            energyBand: "mid",  weight: 2, dutyCycle: 100, energyResponse: [0.05, 0.22, 1.8], tier: "A" },
 ];
 
 /**
