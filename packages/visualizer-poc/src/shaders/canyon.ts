@@ -1,16 +1,27 @@
 /**
- * Canyon — slot canyon walls with sky strip above and volumetric god rays.
- * Narrow passage looking up at a sliver of sky. Sandstone striations on walls.
- * Light beams cutting through the gap. Ancient, timeless, sacred.
+ * Canyon — raymarched slot canyon.
+ * Narrow canyon with layered sandstone walls (horizontal sediment color bands),
+ * light shaft from above hitting canyon floor, water puddle with sky reflection,
+ * tumbleweeds. Ancient, timeless, sacred.
  *
  * Audio reactivity:
- *   uEnergy       -> beam intensity, gap width (narrow at rest, wide at peaks)
- *   uHighs        -> dust motes floating in beams
- *   uBass         -> wall vibration, deep resonance glow
- *   uOnsetSnap    -> beam flicker
- *   uSlowEnergy   -> ambient wall warmth
- *   uSpectralFlux -> wall texture complexity
- *   uSectionType  -> jam=walls pulse with rhythm, space=narrow dark, solo=spotlight beam
+ *   uBass             → wall vibration, deep resonance glow
+ *   uEnergy           → beam intensity, gap width (narrow→wide)
+ *   uDrumOnset        → beam flicker, tumbleweed launch
+ *   uVocalPresence    → warmth in beam color
+ *   uHarmonicTension  → wall crack intensity
+ *   uBeatSnap         → dust mote pulse
+ *   uSectionType      → jam=walls pulse with rhythm, space=narrow dark, solo=spotlight beam
+ *   uClimaxPhase      → canyon opens wide, full illumination
+ *   uSlowEnergy       → ambient wall warmth
+ *   uHighs            → dust mote density
+ *   uOnsetSnap        → secondary beam flicker
+ *   uMelodicPitch     → beam angle shift
+ *   uChromaHue        → sandstone hue cycling
+ *   uPalettePrimary   → wall base color
+ *   uPaletteSecondary → beam accent color
+ *   uSpectralFlux     → wall texture complexity
+ *   uDynamicRange     → shadow depth contrast
  */
 
 import { noiseGLSL } from "./noise";
@@ -32,258 +43,460 @@ ${sharedUniformsGLSL}
 
 ${noiseGLSL}
 
-${buildPostProcessGLSL({ grainStrength: 'light', dofEnabled: true, bloomEnabled: true })}
+${buildPostProcessGLSL({
+  grainStrength: "light",
+  bloomEnabled: true,
+  bloomThresholdOffset: -0.06,
+  dofEnabled: true,
+  halationEnabled: true,
+  lensDistortionEnabled: true,
+})}
 
 varying vec2 vUv;
 
 #define PI 3.14159265
+#define TAU 6.28318530
+#define MAX_STEPS 80
+#define MAX_DIST 25.0
+#define SURF_DIST 0.002
 
-// --- Sandstone wall texture: layered horizontal striations ---
-float sandstoneTexture(vec2 p, float detail) {
-  // Horizontal stratification layers
+// ============================================================
+// Prefixed utilities (can = canyon)
+// ============================================================
+mat2 canRot2(float a) {
+  float c = cos(a), s = sin(a);
+  return mat2(c, -s, s, c);
+}
+
+float canHash(float n) { return fract(sin(n) * 43758.5453123); }
+float canHash2(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+
+// ============================================================
+// SDF primitives
+// ============================================================
+float canSDSphere(vec3 pos, float radius) {
+  return length(pos) - radius;
+}
+
+float canSDBox(vec3 pos, vec3 size) {
+  vec3 q = abs(pos) - size;
+  return length(max(q, 0.0)) + min(max(q.x, max(q.y, q.z)), 0.0);
+}
+
+float canSDCapsule(vec3 pos, vec3 a, vec3 b, float radius) {
+  vec3 pa = pos - a, ba = b - a;
+  float h = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0);
+  return length(pa - ba * h) - radius;
+}
+
+float canSmin(float a, float b, float k) {
+  float h = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0);
+  return mix(b, a, h) - k * h * (1.0 - h);
+}
+
+// ============================================================
+// Canyon wall profile: sinuous narrow passage
+// ============================================================
+float canWallProfile(vec3 pos, float gapWidth, float timeVal) {
+  // Canyon runs along Z-axis
+  // Wall surfaces with noise-modulated curves
+  float wallNoise1 = snoise(vec3(0.0, pos.y * 0.5, pos.z * 0.3 + 1.0)) * 0.3;
+  float wallNoise2 = snoise(vec3(5.0, pos.y * 0.7, pos.z * 0.4)) * 0.2;
+  float wallNoise3 = snoise(vec3(10.0, pos.y * 1.5, pos.z * 0.8)) * 0.08;
+
+  // Left wall distance
+  float leftWall = pos.x + gapWidth + wallNoise1 + wallNoise3;
+  // Right wall distance
+  float rightWall = -pos.x + gapWidth + wallNoise2 + wallNoise3;
+
+  // Canyon narrows higher up (slot canyon shape)
+  float narrowFactor = smoothstep(0.0, 8.0, pos.y) * 0.4;
+  leftWall -= narrowFactor;
+  rightWall -= narrowFactor;
+
+  // Combined: negative inside walls
+  float walls = min(leftWall, rightWall);
+  return -walls; // flip: positive outside canyon air
+}
+
+// ============================================================
+// Sandstone texture layers
+// ============================================================
+float canSandstoneLayer(vec3 pos, float detail) {
   float strata = 0.0;
-  strata += snoise(vec3(p.x * 0.5, p.y * 8.0, 0.0)) * 0.4;
-  strata += snoise(vec3(p.x * 1.0, p.y * 16.0, 5.0)) * 0.25;
-  strata += snoise(vec3(p.x * 2.0, p.y * 32.0, 10.0)) * 0.15 * detail;
+  strata += snoise(vec3(pos.x * 0.3, pos.y * 6.0, pos.z * 0.2)) * 0.35;
+  strata += snoise(vec3(pos.x * 0.8, pos.y * 14.0, pos.z * 0.5 + 5.0)) * 0.2;
+  strata += snoise(vec3(pos.x * 1.5, pos.y * 28.0, pos.z * 1.0 + 10.0)) * 0.1 * detail;
   // Erosion pockets
-  float erosion = snoise(vec3(p.x * 3.0, p.y * 4.0, 15.0));
-  erosion = smoothstep(0.3, 0.6, erosion) * 0.2;
-  // Vertical cracks
-  float cracks = snoise(vec3(p.x * 12.0, p.y * 2.0, 20.0));
-  cracks = smoothstep(0.7, 0.75, abs(cracks)) * 0.15 * detail;
-  return strata + erosion + cracks;
+  float erosion = snoise(vec3(pos.x * 2.0, pos.y * 3.0, pos.z * 2.0 + 15.0));
+  erosion = smoothstep(0.35, 0.6, erosion) * 0.15;
+  return strata + erosion;
 }
 
-// --- God ray: volumetric light beam through gap with atmospheric density ---
-float godRay(vec2 p, float beamX, float beamWidth, float time, float energy) {
-  float energyFreq = 1.0 + energy * 0.5;
-  // Beam from sky strip down through canyon
-  float beamDist = abs(p.x - beamX);
-  float beam = smoothstep(beamWidth, beamWidth * 0.1, beamDist);
-  // Beam narrows toward bottom (perspective)
-  float perspective = smoothstep(-0.5, 0.5, p.y);
-  beam *= mix(0.3, 1.0, perspective);
-  // Multi-layer atmospheric scattering (domain-warped for richness)
-  float scatterWarp = snoise(vec3(p * 1.5, time * 0.02)) * 0.15;
-  float scatter = snoise(vec3(p.x * 3.0 * energyFreq + scatterWarp, p.y * 2.0 - time * 0.05, time * 0.03));
-  float scatter2 = snoise(vec3(p.x * 7.0 * energyFreq, p.y * 4.0 - time * 0.03 + 5.0, time * 0.05));
-  scatter = 0.5 + 0.3 * scatter + 0.2 * scatter2;
-  beam *= scatter;
-  // Volumetric density variation: thicker pockets of air
-  float density = snoise(vec3(p.x * 2.0, p.y * 1.5 + time * 0.02, time * 0.04 + 10.0));
-  beam *= 0.85 + 0.15 * density;
-  // Vertical falloff: stronger at top
-  beam *= smoothstep(-0.5, 0.4, p.y);
-  return beam;
+// ============================================================
+// Tumbleweed SDF
+// ============================================================
+float canTumbleweed(vec3 pos, float radius) {
+  float sphere = canSDSphere(pos, radius);
+  // Spiky noise displacement for twig texture
+  float spikes = snoise(pos * 12.0) * 0.02 + snoise(pos * 24.0) * 0.01;
+  return sphere + spikes;
 }
 
-// --- Dust motes: tiny bright particles in light beams ---
-float dustMotes(vec2 uv, float time, float density) {
-  float acc = 0.0;
-  for (int i = 0; i < 3; i++) {
-    float seed = float(i) * 23.7;
-    float speed = 0.03 + float(i) * 0.01;
-    vec2 dUv = uv;
-    dUv.y -= time * speed;
-    dUv.x += sin(time * 0.2 + float(i)) * 0.02;
-    vec2 cell = floor(dUv * density);
-    vec2 f = fract(dUv * density);
-    float h = fract(sin(dot(cell + seed, vec2(127.1, 311.7))) * 43758.5453);
-    float h2 = fract(sin(dot(cell + seed, vec2(269.5, 183.3))) * 43758.5453);
-    vec2 motePos = vec2(h, h2);
-    float dist = length(f - motePos);
-    float hasMote = step(0.85, h);
-    float twinkle = 0.6 + 0.4 * sin(time * 3.0 + h * 20.0);
-    acc += hasMote * twinkle * smoothstep(0.02, 0.005, dist);
+// ============================================================
+// Full scene: floor + walls + tumbleweeds + puddle
+// matID: 0=floor, 1=wall, 2=tumbleweed, 3=puddle
+// ============================================================
+vec2 canMap(vec3 pos, float gapWidth, float timeVal) {
+  // Floor
+  float floor = pos.y;
+  vec2 result = vec2(floor, 0.0);
+
+  // Puddle on floor
+  float puddleCenter = 5.0;
+  float puddleDist = length(pos.xz - vec2(0.0, puddleCenter));
+  float puddleRadius = 0.8;
+  if (puddleDist < puddleRadius && pos.y < 0.01) {
+    result = vec2(pos.y - 0.005, 3.0);
   }
-  return acc;
+
+  // Canyon walls
+  float walls = canWallProfile(pos, gapWidth, timeVal);
+  if (walls < result.x) {
+    result = vec2(walls, 1.0);
+  }
+
+  // Ceiling: cap the canyon
+  float ceiling = -(pos.y - 10.0);
+  float ceilNoise = snoise(vec3(pos.xz * 0.5, 20.0)) * 0.5;
+  ceiling += ceilNoise;
+  if (ceiling < result.x) {
+    result = vec2(ceiling, 1.0);
+  }
+
+  // Tumbleweeds
+  for (int i = 0; i < 3; i++) {
+    float fi = float(i);
+    float twSeed = canHash(fi * 7.3 + 1.0);
+    float twZ = 2.0 + fi * 3.0 + sin(timeVal * 0.3 + fi * 2.0) * 0.5;
+    float twX = (twSeed - 0.5) * gapWidth * 0.8;
+    float twRadius = 0.08 + twSeed * 0.06;
+    vec3 twPos = vec3(twX, twRadius, twZ);
+    float tw = canTumbleweed(pos - twPos, twRadius);
+    if (tw < result.x) {
+      result = vec2(tw, 2.0);
+    }
+  }
+
+  return result;
+}
+
+// ============================================================
+// Normal
+// ============================================================
+vec3 canNormal(vec3 pos, float gapWidth, float timeVal) {
+  float eps = 0.002;
+  float d = canMap(pos, gapWidth, timeVal).x;
+  return normalize(vec3(
+    canMap(pos + vec3(eps, 0.0, 0.0), gapWidth, timeVal).x - d,
+    canMap(pos + vec3(0.0, eps, 0.0), gapWidth, timeVal).x - d,
+    canMap(pos + vec3(0.0, 0.0, eps), gapWidth, timeVal).x - d
+  ));
+}
+
+// ============================================================
+// Ambient occlusion
+// ============================================================
+float canAO(vec3 pos, vec3 norm, float gapWidth, float timeVal) {
+  float occ = 0.0;
+  float weight = 1.0;
+  for (int i = 1; i <= 5; i++) {
+    float dist = 0.01 + 0.05 * float(i);
+    float sampleD = canMap(pos + norm * dist, gapWidth, timeVal).x;
+    occ += (dist - sampleD) * weight;
+    weight *= 0.65;
+  }
+  return clamp(1.0 - occ * 3.0, 0.0, 1.0);
+}
+
+// ============================================================
+// God ray: volumetric light shaft through the slot
+// ============================================================
+vec3 canGodRay(vec3 ro, vec3 rd, float marchDist, float gapWidth,
+               float timeVal, float energy, float beamIntensity,
+               vec3 beamColor, float melPitch) {
+  vec3 light = vec3(0.0);
+  float stepSize = 0.3;
+  vec3 lightDir = normalize(vec3(sin(melPitch * 0.5 - 0.25) * 0.3, 1.0, 0.1));
+
+  for (int i = 0; i < 32; i++) {
+    float tRay = float(i) * stepSize + 0.5;
+    if (tRay > marchDist) break;
+    vec3 pos = ro + rd * tRay;
+
+    // Ray is lit if there's a clear path straight up to the sky
+    float gapDist = abs(pos.x);
+    float inBeam = smoothstep(gapWidth * 0.8, gapWidth * 0.2, gapDist);
+
+    // Height attenuation: beam stronger at top
+    float heightFade = smoothstep(0.0, 6.0, pos.y);
+
+    // Volumetric scattering noise
+    float scatterNoise = fbm3(vec3(pos * 0.5 + vec3(0.0, -timeVal * 0.05, 0.0)));
+    float scatter = 0.3 + 0.7 * (scatterNoise * 0.5 + 0.5);
+
+    // Dust density variation
+    float dustDensity = fbm3(vec3(pos * 1.5 + vec3(timeVal * 0.02, -timeVal * 0.03, 0.0)));
+    dustDensity = 0.5 + 0.5 * dustDensity;
+
+    float density = inBeam * heightFade * scatter * dustDensity * beamIntensity * 0.05;
+    light += beamColor * density * stepSize;
+  }
+  return light;
+}
+
+// ============================================================
+// Dust motes in beams
+// ============================================================
+vec3 canDustMotes(vec3 ro, vec3 rd, float marchDist, float timeVal,
+                  float density, float gapWidth) {
+  vec3 motes = vec3(0.0);
+  int moteCount = int(mix(8.0, 24.0, density));
+  for (int i = 0; i < 24; i++) {
+    if (i >= moteCount) break;
+    float fi = float(i);
+    vec3 seed = vec3(canHash(fi * 3.1), canHash(fi * 7.7), canHash(fi * 13.3));
+
+    vec3 motePos = vec3(
+      (seed.x - 0.5) * gapWidth * 1.5,
+      seed.y * 8.0 + sin(timeVal * 0.3 + fi) * 0.5,
+      seed.z * 10.0 + 1.0
+    );
+
+    // Slow drift
+    motePos.x += sin(timeVal * 0.15 + fi * 2.0) * 0.1;
+    motePos.y += cos(timeVal * 0.1 + fi * 1.5) * 0.2;
+
+    vec3 toMote = motePos - ro;
+    float proj = dot(toMote, rd);
+    if (proj < 0.0 || proj > marchDist) continue;
+    vec3 closest = ro + rd * proj;
+    float dist = length(closest - motePos);
+
+    float moteSize = 0.008 + seed.x * 0.005;
+    float glow = smoothstep(moteSize * 5.0, 0.0, dist);
+    float twinkle = 0.5 + 0.5 * sin(timeVal * 3.0 + fi * 5.0);
+
+    motes += vec3(0.95, 0.85, 0.6) * glow * twinkle * 0.15;
+  }
+  return motes;
 }
 
 void main() {
   vec2 uv = vUv;
   vec2 aspect = vec2(uResolution.x / uResolution.y, 1.0);
-  vec2 p = (uv - 0.5) * aspect;
+  vec2 screenPos = (uv - 0.5) * aspect;
 
   float energy = clamp(uEnergy, 0.0, 1.0);
   float bass = clamp(uBass, 0.0, 1.0);
   float highs = clamp(uHighs, 0.0, 1.0);
   float onset = clamp(uOnsetSnap, 0.0, 1.0);
+  float drumOnset = clamp(uDrumOnset, 0.0, 1.0);
   float slowE = clamp(uSlowEnergy, 0.0, 1.0);
+  float chromaH = clamp(uChromaHue, 0.0, 1.0);
   float flux = clamp(uSpectralFlux, 0.0, 1.0);
-  float melodicP = clamp(uMelodicPitch, 0.0, 1.0);
+  float vocalP = clamp(uVocalPresence, 0.0, 1.0);
+  float melPitch = clamp(uMelodicPitch, 0.0, 1.0);
+  float tension = clamp(uHarmonicTension, 0.0, 1.0);
+  float dynRange = clamp(uDynamicRange, 0.0, 1.0);
+  float beatSnap = clamp(uBeatSnap, 0.0, 1.0);
 
-  // === SECTION-TYPE MODULATION ===
   float sectionT = uSectionType;
   float sJam = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
   float sSpace = smoothstep(6.5, 7.5, sectionT);
   float sSolo = smoothstep(3.5, 4.5, sectionT) * (1.0 - step(4.5, sectionT));
   float sChorus = smoothstep(1.5, 2.5, sectionT) * (1.0 - step(2.5, sectionT));
 
-  float slowTime = uDynamicTime * 0.08;
-
-  // --- Domain warping + palette ---
-  vec2 warpedP = p + vec2(fbm3(vec3(p * 0.5, uDynamicTime * 0.05)), fbm3(vec3(p * 0.5 + 100.0, uDynamicTime * 0.05))) * 0.3;
-  float detailMod = 1.0 + energy * 0.5;
-  vec3 palCol1 = hsv2rgb(vec3(uPalettePrimary, 0.7 * uPaletteSaturation, 0.9));
-  vec3 palCol2 = hsv2rgb(vec3(uPaletteSecondary, 0.6 * uPaletteSaturation, 0.85));
-
-  // === CLIMAX ===
   float isClimax = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5);
   float climaxBoost = isClimax * uClimaxIntensity;
 
-  // === GAP WIDTH: energy controls how narrow/wide the canyon is ===
-  // MASSIVE dynamic range: claustrophobic at rest, cathedral at peaks
-  float baseGap = mix(0.06, 0.28, energy);
-  baseGap *= mix(1.0, 0.5, sSpace); // narrow in space
-  baseGap *= mix(1.0, 1.4, sChorus); // wider in chorus
-  baseGap += climaxBoost * 0.1; // climax opens wide
+  float timeVal = uDynamicTime * 0.1;
 
-  // Wall edges: noise-modulated for organic canyon shape
-  float wallNoise = snoise(vec3(0.0, p.y * 3.0, slowTime * 0.1)) * 0.04;
-  float wallNoiseR = snoise(vec3(5.0, p.y * 3.5, slowTime * 0.12)) * 0.04;
+  // Gap width: energy-driven
+  float gapWidth = mix(0.3, 1.2, energy);
+  gapWidth *= mix(1.0, 0.5, sSpace);
+  gapWidth *= mix(1.0, 1.4, sChorus);
+  gapWidth += climaxBoost * 0.3;
+  // Jam: walls pulse with beat
+  gapWidth += sJam * beatPulse(uMusicalTime) * 0.1;
 
-  float leftWallEdge = -baseGap + wallNoise;
-  float rightWallEdge = baseGap + wallNoiseR;
+  // Palette
+  float hue1 = uPalettePrimary + chromaH * 0.06;
+  float hue2 = uPaletteSecondary + chromaH * 0.04;
+  float palSat = mix(0.4, 0.7, energy) * uPaletteSaturation;
+  vec3 palCol1 = hsv2rgb(vec3(hue1, palSat, mix(0.7, 0.9, energy)));
+  vec3 palCol2 = hsv2rgb(vec3(hue2, palSat * 0.8, mix(0.6, 0.85, energy)));
 
-  // Jam: walls pulse with rhythm
-  float jamPulse = sJam * beatPulse(uMusicalTime) * 0.03;
-  leftWallEdge -= jamPulse;
-  rightWallEdge += jamPulse;
+  // Camera: walking through canyon
+  float camSpeed = 0.15 + energy * 0.05;
+  float camZ = uTime * camSpeed;
+  vec3 camOrigin = vec3(sin(uTime * 0.04) * gapWidth * 0.2, 1.5, camZ);
+  vec3 camTarget = camOrigin + vec3(0.0, 0.3 + sin(uTime * 0.03) * 0.5, 3.0);
+  vec3 camForward = normalize(camTarget - camOrigin);
+  vec3 camWorldUp = vec3(0.0, 1.0, 0.0);
+  vec3 camRt = normalize(cross(camForward, camWorldUp));
+  vec3 camUpV = cross(camRt, camForward);
 
-  // === DETERMINE ZONES ===
-  float inLeftWall = smoothstep(leftWallEdge + 0.005, leftWallEdge - 0.005, p.x);
-  float inRightWall = smoothstep(rightWallEdge - 0.005, rightWallEdge + 0.005, p.x);
-  float inGap = 1.0 - inLeftWall - inRightWall;
-  inGap = clamp(inGap, 0.0, 1.0);
+  vec3 rd = normalize(screenPos.x * camRt + screenPos.y * camUpV + 1.2 * camForward);
 
-  // === SKY STRIP: visible through gap at top ===
-  vec3 skyColor = mix(
-    vec3(0.15, 0.25, 0.45), // deep blue
-    vec3(0.40, 0.55, 0.80), // lighter blue
-    smoothstep(0.2, 0.5, p.y)
-  );
-  // Warm sky near horizon (bottom of sky strip)
-  skyColor = mix(skyColor, vec3(0.5, 0.35, 0.2), smoothstep(0.4, 0.1, p.y) * 0.3);
-  // Sky only visible in gap and upper portion
-  float skyVis = inGap * smoothstep(0.1, 0.35, p.y);
+  // ─── Raymarching ───
+  float marchDist = 0.0;
+  vec2 marchResult = vec2(MAX_DIST, -1.0);
 
-  vec3 col = vec3(0.0);
-
-  // === WALL RENDERING ===
-  float energyFreq = 1.0 + energy * 0.5;
-  // Sandstone base colors: warm reds and oranges with palette influence
-  vec3 sandstoneBase = mix(vec3(0.35, 0.18, 0.08), palCol1 * 0.3, 0.1);
-  vec3 sandstoneLight = mix(vec3(0.55, 0.30, 0.15), palCol2 * 0.4, 0.08);
-  vec3 sandstoneDark = vec3(0.15, 0.07, 0.03);
-
-  float wallDetail = 0.5 + flux * 0.5;
-
-  // Left wall — rich textured with secondary mineral layer
-  if (inLeftWall > 0.01) {
-    float wallDepth = smoothstep(leftWallEdge, leftWallEdge - 0.4, p.x);
-    float tex = sandstoneTexture(vec2(-p.x * 2.0 * energyFreq, p.y), wallDetail);
-    vec3 wallColor = mix(sandstoneLight, sandstoneBase, 0.5 + tex * 0.5);
-    wallColor = mix(wallColor, sandstoneDark, wallDepth * 0.7);
-    // Secondary mineral vein layer (30% blend)
-    float mineralNoise = snoise(vec3(-p.x * 6.0, p.y * 12.0, 25.0));
-    vec3 mineralColor = mix(vec3(0.5, 0.25, 0.12), palCol1 * 0.5, 0.2);
-    float mineralMask = smoothstep(0.6, 0.75, mineralNoise) * wallDetail;
-    wallColor = mix(wallColor, mineralColor, mineralMask * 0.3);
-    // Warm ambient from slow energy
-    wallColor += vec3(0.04, 0.02, 0.01) * slowE;
-    // Bass resonance glow: deep warm pulse
-    wallColor += vec3(0.06, 0.02, 0.01) * bass * 0.3 * (1.0 - wallDepth);
-    col += wallColor * inLeftWall;
+  for (int i = 0; i < MAX_STEPS; i++) {
+    vec3 pos = camOrigin + rd * marchDist;
+    vec2 dist = canMap(pos, gapWidth, timeVal);
+    if (dist.x < SURF_DIST) {
+      marchResult = vec2(marchDist, dist.y);
+      break;
+    }
+    marchDist += dist.x * 0.6;
+    if (marchDist > MAX_DIST) break;
   }
 
-  // Right wall — asymmetric detail for natural feel
-  if (inRightWall > 0.01) {
-    float wallDepth = smoothstep(rightWallEdge, rightWallEdge + 0.4, p.x);
-    float tex = sandstoneTexture(vec2(p.x * 2.0 * energyFreq + 3.0, p.y + 1.0), wallDetail);
-    vec3 wallColor = mix(sandstoneLight, sandstoneBase, 0.5 + tex * 0.5);
-    wallColor = mix(wallColor, sandstoneDark, wallDepth * 0.7);
-    // Secondary mineral vein layer (30% blend)
-    float mineralNoise = snoise(vec3(p.x * 5.0 + 10.0, p.y * 14.0, 30.0));
-    vec3 mineralColor = mix(vec3(0.45, 0.22, 0.10), palCol2 * 0.4, 0.15);
-    float mineralMask = smoothstep(0.6, 0.75, mineralNoise) * wallDetail;
-    wallColor = mix(wallColor, mineralColor, mineralMask * 0.3);
-    wallColor += vec3(0.04, 0.02, 0.01) * slowE;
-    wallColor += vec3(0.06, 0.02, 0.01) * bass * 0.3 * (1.0 - wallDepth);
-    col += wallColor * inRightWall;
+  vec3 col;
+
+  if (marchResult.y < 0.0) {
+    // Sky through slot
+    float skyGrad = rd.y * 0.5 + 0.5;
+    col = mix(vec3(0.4, 0.35, 0.25), vec3(0.3, 0.5, 0.8), skyGrad);
+    col = mix(col, vec3(0.5, 0.35, 0.2), smoothstep(0.5, 0.1, rd.y) * 0.3);
+  } else {
+    vec3 hitPos = camOrigin + rd * marchResult.x;
+    vec3 norm = canNormal(hitPos, gapWidth, timeVal);
+    float matID = marchResult.y;
+    float ambOcc = canAO(hitPos, norm, gapWidth, timeVal);
+
+    // Light direction: from above through slot
+    vec3 lightDir = normalize(vec3(0.0, 1.0, 0.2));
+    float diffuse = max(dot(norm, lightDir), 0.0);
+
+    // Specular
+    vec3 viewDir = normalize(camOrigin - hitPos);
+    vec3 halfDir = normalize(lightDir + viewDir);
+    float specPow = matID > 2.5 ? 64.0 : 16.0;
+    float specular = pow(max(dot(norm, halfDir), 0.0), specPow);
+
+    // Fresnel
+    float fresnelVal = pow(1.0 - max(dot(viewDir, norm), 0.0), 3.0);
+
+    vec3 matColor;
+    vec3 specCol;
+
+    if (matID < 0.5) {
+      // Floor: dark sandy ground
+      float floorNoise = fbm3(vec3(hitPos.xz * 3.0, 0.0));
+      matColor = mix(vec3(0.12, 0.08, 0.05), vec3(0.18, 0.12, 0.07), floorNoise);
+      specCol = vec3(0.05);
+    } else if (matID < 1.5) {
+      // Canyon walls: layered sandstone
+      float wallDetail = 0.5 + flux * 0.5;
+      float tex = canSandstoneLayer(hitPos, wallDetail);
+
+      // Sediment color bands
+      vec3 darkStone = mix(vec3(0.35, 0.18, 0.08), palCol1 * 0.3, 0.1);
+      vec3 brightStone = mix(vec3(0.6, 0.32, 0.15), palCol2 * 0.35, 0.08);
+      vec3 redBand = vec3(0.55, 0.2, 0.1);
+
+      float bandSelect = sin(hitPos.y * 4.0 + snoise(vec3(hitPos.y * 2.0, hitPos.x * 0.3, 0.0)) * 0.5);
+      matColor = mix(darkStone, brightStone, smoothstep(-0.3, 0.3, bandSelect));
+      matColor = mix(matColor, redBand, smoothstep(0.5, 0.8, bandSelect) * 0.5);
+      matColor += tex * 0.1;
+
+      // Crack lines from tension
+      float cracks = snoise(vec3(hitPos.x * 8.0, hitPos.y * 2.0, hitPos.z * 1.5));
+      float crackMask = smoothstep(0.7, 0.75, abs(cracks)) * tension * 0.3;
+      matColor = mix(matColor, darkStone * 0.5, crackMask);
+
+      // Warm ambient from slow energy
+      matColor += vec3(0.03, 0.015, 0.005) * slowE;
+      // Bass resonance glow
+      matColor += vec3(0.04, 0.015, 0.005) * bass * 0.2;
+
+      specCol = matColor * 0.2;
+    } else if (matID < 2.5) {
+      // Tumbleweed
+      matColor = vec3(0.35, 0.28, 0.15);
+      specCol = vec3(0.1, 0.08, 0.04);
+    } else {
+      // Puddle: dark reflective water
+      matColor = vec3(0.02, 0.03, 0.05);
+      // Sky reflection in puddle
+      vec3 reflDir = reflect(rd, norm);
+      float skyRefl = smoothstep(0.0, 0.5, reflDir.y);
+      matColor += mix(vec3(0.1, 0.15, 0.25), vec3(0.3, 0.4, 0.6), skyRefl) * 0.3;
+      specCol = vec3(0.3, 0.3, 0.35);
+    }
+
+    // Compose lighting
+    vec3 ambientLight = vec3(0.06, 0.04, 0.03);
+    col = matColor * ambientLight * ambOcc;
+    col += matColor * vec3(0.9, 0.8, 0.6) * diffuse * 0.5;
+    col += specCol * specular * 0.3;
+    col += matColor * fresnelVal * 0.08;
+
+    // Dynamic range contrast
+    col *= mix(0.85, 1.15, dynRange * diffuse);
+
+    // Distance fog inside canyon: dark atmospheric
+    float fogAmount = 1.0 - exp(-marchResult.x * 0.06);
+    vec3 fogColor = vec3(0.04, 0.03, 0.02);
+    col = mix(col, fogColor, fogAmount * 0.5);
   }
 
-  // === GOD RAYS: light beams through the gap ===
-  float beamIntensity = mix(0.1, 0.8, energy);
-  beamIntensity += onset * 0.3;
+  // ─── Volumetric god rays ───
+  float beamIntensity = mix(0.15, 0.9, energy);
+  beamIntensity += onset * 0.3 + drumOnset * 0.2;
   beamIntensity += climaxBoost * 0.4;
-  beamIntensity *= mix(1.0, 0.2, sSpace); // faint in space
-  beamIntensity *= mix(1.0, 2.0, sSolo); // intense in solo
+  beamIntensity *= mix(1.0, 0.15, sSpace);
+  beamIntensity *= mix(1.0, 2.0, sSolo);
 
-  // Multiple beams at different angles
-  float beam1 = godRay(p, 0.0, baseGap * 0.6, slowTime, energy);
-  float beam2 = godRay(p, sin(slowTime * 0.3) * baseGap * 0.3, baseGap * 0.35, slowTime + 5.0, energy);
-  // Solo: single concentrated beam
-  float beam3 = godRay(p, 0.0, baseGap * 0.25, slowTime, energy) * sSolo * 1.5;
-
-  float totalBeam = (beam1 * 0.6 + beam2 * 0.3 + beam3) * beamIntensity;
-  totalBeam *= inGap; // beams only in gap
-
-  // Beam color: warm golden light
   vec3 beamColor = vec3(0.9, 0.75, 0.5);
-  // Palette influence
-  beamColor = mix(beamColor, hsv2rgb(vec3(uPalettePrimary, 0.4, 1.0)), 0.15);
+  beamColor = mix(beamColor, palCol1 * 1.2, 0.15);
+  beamColor = mix(beamColor, beamColor * vec3(1.1, 1.0, 0.9), vocalP * 0.3);
 
-  col += beamColor * totalBeam;
+  float maxMarchDist = marchResult.y < 0.0 ? MAX_DIST : marchResult.x;
+  col += canGodRay(camOrigin, rd, maxMarchDist, gapWidth, timeVal, energy, beamIntensity, beamColor, melPitch);
 
-  // === BEAM ILLUMINATION ON WALLS ===
-  // Light from beams bounces onto nearby wall surfaces
-  float wallIllum = totalBeam * 0.4;
-  float leftIllum = wallIllum * smoothstep(leftWallEdge - 0.15, leftWallEdge, p.x);
-  float rightIllum = wallIllum * smoothstep(rightWallEdge + 0.15, rightWallEdge, p.x);
-  col += beamColor * 0.3 * (leftIllum * inLeftWall + rightIllum * inRightWall);
+  // ─── Dust motes ───
+  float dustDensity = highs * 0.5 + energy * 0.3 + beatSnap * 0.2;
+  col += canDustMotes(camOrigin, rd, maxMarchDist, timeVal, dustDensity, gapWidth);
 
-  // === DUST MOTES in beams ===
-  float dustIntensity = highs * 0.4 + energy * 0.2;
-  float motes = dustMotes(uv, uTime, 60.0);
-  // Dust only visible in lit areas (beams)
-  float dustMask = totalBeam * inGap;
-  col += vec3(0.9, 0.8, 0.6) * motes * dustMask * dustIntensity;
-
-  // === SKY through gap ===
-  col += skyColor * skyVis * 0.8;
-
-  // === FLOOR: dark sandy ground ===
-  float floorMask = smoothstep(-0.35, -0.45, p.y);
-  vec3 floorColor = vec3(0.08, 0.05, 0.03);
-  // Beam light on floor
-  floorColor += beamColor * totalBeam * 0.15;
-  col = mix(col, floorColor, floorMask);
-
-  // --- Secondary visual layer: warm sandstone glow (30% blend) ---
-  float stoneGlow = fbm3(vec3(warpedP * 3.0 * detailMod, slowTime * 0.2));
-  vec3 glowCol = mix(palCol1, palCol2, stoneGlow * 0.5 + 0.5) * 0.1;
-  float glowMask = (inLeftWall + inRightWall) * (1.0 - smoothstep(0.0, 0.15, abs(p.x) - baseGap * 0.5));
-  col += glowCol * glowMask * 0.3 * energy;
-
-  // === ICON EMERGENCE ===
+  // ─── Icon emergence ───
   {
-    float nf = fbm6(vec3(p * 2.0, slowTime));
-    vec3 iconLight = iconEmergence(p, uTime, energy, bass,
+    float nf = fbm3(vec3(screenPos * 2.0, timeVal));
+    vec3 iconLight = iconEmergence(screenPos, uTime, energy, bass,
       vec3(0.55, 0.30, 0.15), beamColor, nf, uClimaxPhase, uSectionIndex);
     col += iconLight;
   }
+  {
+    float nf = fbm3(vec3(screenPos * 1.5, timeVal + 5.0));
+    vec3 heroLight = heroIconEmergence(screenPos, uTime, energy, bass,
+      palCol1, palCol2, nf, uSectionIndex);
+    col += heroLight;
+  }
 
-  // === VIGNETTE: heavy, focusing attention on the gap ===
+  // ─── Vignette ───
   float vigScale = mix(0.35, 0.25, energy);
-  float vignette = 1.0 - dot(p * vigScale, p * vigScale);
+  float vignette = 1.0 - dot(screenPos * vigScale, screenPos * vigScale);
   vignette = smoothstep(0.0, 1.0, vignette);
   col = mix(vec3(0.02, 0.01, 0.005), col, vignette);
 
-  // === DARKNESS TEXTURE ===
+  // ─── Darkness texture ───
   col += darknessTexture(uv, uTime, energy);
 
-  // === POST-PROCESSING ===
-  col = applyPostProcess(col, vUv, p);
+  // ─── Post-processing ───
+  col = applyPostProcess(col, vUv, screenPos);
 
   gl_FragColor = vec4(col, 1.0);
 }

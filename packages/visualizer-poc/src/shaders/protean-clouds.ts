@@ -102,11 +102,11 @@ vec4 _pc_render(vec3 ro, vec3 rd, float time) {
   float t = 1.5;
   float fogT = 0.0;
 
-  // Energy-responsive step count: 80 at quiet, 130 at peak
+  // Step count: 40 base, up to 60 at peak
   float energy = clamp(uEnergy, 0.0, 1.0);
-  int maxSteps = 80 + int(energy * 50.0);
+  int maxSteps = 40 + int(energy * 20.0);
 
-  for (int i = 0; i < 130; i++) {
+  for (int i = 0; i < 60; i++) {
     if (i >= maxSteps) break;
     if (rez.a > 0.99) break;
 

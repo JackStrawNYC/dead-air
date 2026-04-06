@@ -1,526 +1,540 @@
 /**
- * Mountain Fire 3D — GLSL shaders for React Three Fiber 3D mountain fire scene.
+ * Mountain Fire — raymarched volcanic mountain erupting.
+ * Full mountain SDF with eruption crater, lava flows down slopes,
+ * pyroclastic cloud expanding, ash fall particles, orange-lit landscape.
+ * Exterior volcanic scene (different from inferno which is cavern interior).
  *
- * Exports separate vertex/fragment pairs for each mesh:
- *   - Mountain silhouettes (3 layered displaced planes)
- *   - Fire particles (Points system behind mountains)
- *   - Ember particles (small bright dots rising on beat)
- *   - Smoke particles (gray translucent rising from fire)
- *   - Sky background (gradient quad)
- *
- * Audio mapping:
- *   uEnergy       → fire height (campfire → inferno)
- *   uBass         → fire pulse / sway
- *   uOnsetSnap    → ember burst trigger
- *   uFlatness     → smoke density
- *   uMelodicPitch → mountain height shift
- *   uChromaHue    → fire color (orange → crimson → magenta)
- *   uSlowEnergy   → sky color (blue/purple → red/orange)
+ * Audio reactivity:
+ *   uBass             → lava pulse, ground tremor
+ *   uEnergy           → eruption intensity, lava flow speed
+ *   uDrumOnset        → eruption burst, pyroclastic surge
+ *   uVocalPresence    → lava glow warmth
+ *   uHarmonicTension  → lava color shift (orange→red→magenta)
+ *   uBeatSnap         → ash burst
+ *   uSectionType      → jam=full eruption, space=smoldering, solo=lava river focus
+ *   uClimaxPhase      → catastrophic eruption
+ *   uSlowEnergy       → smoke column height
+ *   uHighs            → ash particle detail
+ *   uMelodicPitch     → mountain height shift
+ *   uChromaHue        → fire/lava color cycling
+ *   uPalettePrimary   → lava base hue
+ *   uPaletteSecondary → sky/smoke accent
+ *   uSpectralFlux     → eruption turbulence
+ *   uDynamicRange     → light/shadow contrast
  */
 
-// ═══════════════════════════════════════════════════
-// MOUNTAIN SILHOUETTES — displaced PlaneGeometry
-// ═══════════════════════════════════════════════════
-
-export const mountainSilhouetteVert = /* glsl */ `
-uniform float uMelodicPitch;
-uniform float uLayerSeed;
-uniform float uLayerScale;
-uniform float uLayerHeight;
-
-varying vec2 vUv;
-varying float vEdgeDist;
-
-// Simple 3D noise for mountain profile
-vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
-vec2 mod289v2(vec2 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
-vec3 permute(vec3 x) { return mod289(((x * 34.0) + 1.0) * x); }
-
-float snoise2d(vec2 v) {
-  const vec4 C = vec4(0.211324865405187, 0.366025403784439,
-                     -0.577350269189626, 0.024390243902439);
-  vec2 i = floor(v + dot(v, C.yy));
-  vec2 x0 = v - i + dot(i, C.xx);
-  vec2 i1 = (x0.x > x0.y) ? vec2(1.0, 0.0) : vec2(0.0, 1.0);
-  vec4 x12 = x0.xyxy + C.xxzz;
-  x12.xy -= i1;
-  i = mod289v2(i);
-  vec3 p = permute(permute(i.y + vec3(0.0, i1.y, 1.0)) + i.x + vec3(0.0, i1.x, 1.0));
-  vec3 m = max(0.5 - vec3(dot(x0,x0), dot(x12.xy,x12.xy), dot(x12.zw,x12.zw)), 0.0);
-  m = m * m;
-  m = m * m;
-  vec3 x = 2.0 * fract(p * C.www) - 1.0;
-  vec3 h = abs(x) - 0.5;
-  vec3 ox = floor(x + 0.5);
-  vec3 a0 = x - ox;
-  m *= 1.79284291400159 - 0.85373472095314 * (a0*a0 + h*h);
-  vec3 g;
-  g.x = a0.x * x0.x + h.x * x0.y;
-  g.yz = a0.yz * x12.xz + h.yz * x12.yw;
-  return 130.0 * dot(m, g);
-}
-
-float mountainProfile(float x, float seed, float scale, float height) {
-  float n1 = snoise2d(vec2(x * 3.0 * scale + seed, seed * 0.7)) * 0.5;
-  float n2 = snoise2d(vec2(x * 7.0 * scale + seed + 10.0, seed * 1.3)) * 0.25;
-  float n3 = snoise2d(vec2(x * 15.0 * scale + seed + 30.0, seed * 2.1)) * 0.12;
-  float n4 = snoise2d(vec2(x * 30.0 * scale + seed + 50.0, seed * 3.0)) * 0.06;
-  return (n1 + n2 + n3 + n4) * height + height * 0.5;
-}
-
-void main() {
-  vUv = uv;
-
-  float pitchShift = (clamp(uMelodicPitch, 0.0, 1.0) - 0.5) * 0.3;
-  float heightVal = uLayerHeight + pitchShift;
-
-  vec3 pos = position;
-
-  // Displace Y based on mountain noise profile using X position
-  float normalizedX = pos.x / 10.0; // plane is 20 wide, so -10 to 10 → -1 to 1
-  float mtH = mountainProfile(normalizedX, uLayerSeed, uLayerScale, heightVal);
-
-  // Only displace vertices above the base — the mountain ridge
-  // Map from flat plane to silhouette shape: vertices near top of plane become ridge
-  float verticalT = (pos.y + 3.0) / 6.0; // plane height 6, centered → 0..1
-  pos.y = mix(-3.0, mtH * 6.0, verticalT);
-
-  // Edge distance for rim lighting
-  vEdgeDist = smoothstep(0.0, 0.15, abs(verticalT - 1.0));
-
-  gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
-}
-`;
-
-export const mountainSilhouetteFrag = /* glsl */ `
-precision highp float;
-
-uniform float uEnergy;
-uniform vec3 uFireColor;
-uniform float uLayerDepth; // 0 = nearest (darkest), 1 = farthest (lighter)
-uniform float uSectionType;
-
-varying vec2 vUv;
-varying float vEdgeDist;
-
-void main() {
-  // Section-type modulation
-  float sType = uSectionType;
-  float jamBoost = smoothstep(4.5, 5.5, sType);      // jam=5: eruption intensity
-  float spaceHush = smoothstep(6.5, 7.5, sType);      // space=7: smoldering embers
-  float chorusVibe = smoothstep(2.5, 3.5, sType) * (1.0 - smoothstep(3.5, 4.5, sType)); // chorus=3: full blaze
-  float soloFocus = smoothstep(3.5, 4.5, sType) * (1.0 - smoothstep(4.5, 5.5, sType));  // solo=4: lava river focus
-
-  float energy = clamp(uEnergy, 0.0, 1.0);
-  float fireIntensityMod = 1.0 + jamBoost * 0.5 + chorusVibe * 0.3 - spaceHush * 0.6;
-
-  float energyFreq = 1.0 + energy * 0.5;
-
-  // Dark silhouette colors with depth layering
-  vec3 nearColor = vec3(0.005, 0.004, 0.012);
-  vec3 farColor = vec3(0.015, 0.012, 0.025);
-  vec3 baseColor = mix(nearColor, farColor, uLayerDepth);
-
-  // === LAVA VEIN TEXTURE: molten cracks across mountain face ===
-  float veinNoise = sin(vUv.y * 40.0 * energyFreq + vUv.x * 15.0) * 0.5 + 0.5;
-  float veinFine = sin(vUv.y * 80.0 + vUv.x * 25.0 + 3.0) * 0.5 + 0.5;
-  float veinMask = pow(veinNoise * veinFine, 3.0) * energy * (1.0 - uLayerDepth * 0.7);
-  // Lava glow in veins: deep orange-red with palette influence
-  vec3 lavaColor = uFireColor * 1.5;
-  lavaColor = mix(lavaColor, vec3(1.0, 0.4, 0.05), 0.3);
-  baseColor += lavaColor * veinMask * 0.2 * fireIntensityMod;
-
-  // Fire illumination on mountain face — modulated by section type
-  vec3 fireIllum = uFireColor * energy * 0.08 * fireIntensityMod;
-  baseColor += fireIllum * mix(0.15, 0.5, uLayerDepth);
-
-  // === SECONDARY DEPTH LAYER: atmospheric haze between mountain layers (30%) ===
-  float hazeFactor = uLayerDepth * 0.3;
-  vec3 hazeColor = uFireColor * 0.15 + vec3(0.02, 0.01, 0.03);
-  baseColor = mix(baseColor, hazeColor, hazeFactor * energy);
-
-  // Rim lighting near mountain edge (top) — jam/chorus amplify rim glow
-  float rimGlow = (1.0 - vEdgeDist) * energy * fireIntensityMod;
-  vec3 rimColor = uFireColor * rimGlow * 0.4;
-  // Rim gets richer with a secondary hot-white edge
-  rimColor += vec3(1.0, 0.85, 0.5) * pow(rimGlow, 2.0) * 0.15;
-
-  // Solo: focused lava glow concentrated in nearest ridge
-  rimColor += uFireColor * soloFocus * 0.15 * (1.0 - uLayerDepth);
-
-  vec3 col = baseColor + rimColor;
-  gl_FragColor = vec4(col, 1.0);
-}
-`;
-
-// ═══════════════════════════════════════════════════
-// FIRE PARTICLES — Points system (1000+ particles)
-// ═══════════════════════════════════════════════════
-
-export const fireParticleVert = /* glsl */ `
-uniform float uTime;
-uniform float uDynamicTime;
-uniform float uEnergy;
-uniform float uBass;
-uniform float uBeatSnap;
-uniform float uClimaxIntensity;
-uniform float uSectionType;
-
-attribute float aPhase;
-attribute float aSpeed;
-attribute float aSize;
-
-varying float vLife;
-varying float vHeight;
-varying float vAlpha;
-
-void main() {
-  // Section-type modulation
-  float sType = uSectionType;
-  float jamBoost = smoothstep(4.5, 5.5, sType);      // jam=5: eruption intensity
-  float spaceHush = smoothstep(6.5, 7.5, sType);      // space=7: smoldering embers
-  float chorusVibe = smoothstep(2.5, 3.5, sType) * (1.0 - smoothstep(3.5, 4.5, sType)); // chorus=3: full blaze
-  float soloFocus = smoothstep(3.5, 4.5, sType) * (1.0 - smoothstep(4.5, 5.5, sType));  // solo=4: lava river focus
-
-  vec3 pos = position;
-
-  float energy = clamp(uEnergy, 0.0, 1.0);
-  // Jam=inferno height, chorus=full blaze, space=smoldering, solo=concentrated
-  float heightMod = 1.0 + jamBoost * 0.5 + chorusVibe * 0.3 - spaceHush * 0.5 + soloFocus * 0.2;
-  float fireHeight = mix(1.0, 12.0, energy) * heightMod;
-  float fireWidth = mix(2.0, 6.0, energy) * (1.0 + jamBoost * 0.3 - soloFocus * 0.3);
-
-  // Life cycle: particles rise and respawn — jam=faster cycling
-  float speedMod = 1.0 + jamBoost * 0.3 - spaceHush * 0.4;
-  float life = fract(aPhase + uDynamicTime * aSpeed * 0.15 * speedMod);
-  vLife = life;
-
-  // Rise from base
-  pos.y += life * fireHeight;
-  vHeight = life;
-
-  // Horizontal sway with bass
-  float sway = sin(uDynamicTime * 2.0 + aPhase * 20.0) * (0.3 + uBass * 0.5);
-  pos.x += sway * (1.0 - life * 0.5);
-
-  // Column width narrows toward top
-  float widthFactor = mix(1.0, 0.2, life);
-  pos.x *= widthFactor * fireWidth / 4.0;
-  pos.z *= widthFactor;
-
-  // Beat pulse pushes particles outward
-  pos.y += uBeatSnap * 0.3;
-  pos.x += uBeatSnap * sin(aPhase * 30.0) * 0.2;
-
-  // Fade over lifetime — space dims, chorus brightens
-  vAlpha = (1.0 - life) * (1.0 - life * 0.5);
-  vAlpha *= energy;
-  vAlpha *= 1.0 + uClimaxIntensity * 0.4;
-  vAlpha *= 1.0 + chorusVibe * 0.3 - spaceHush * 0.4;
-
-  vec4 mvPos = modelViewMatrix * vec4(pos, 1.0);
-  float baseSize = aSize * (4.0 + energy * 8.0);
-  gl_PointSize = max(1.0, baseSize * (300.0 / -mvPos.z));
-  gl_Position = projectionMatrix * mvPos;
-}
-`;
-
-export const fireParticleFrag = /* glsl */ `
-precision highp float;
-
-uniform float uChromaHue;
-uniform float uPalettePrimary;
-uniform float uPaletteSaturation;
-uniform float uSectionType;
-
-varying float vLife;
-varying float vHeight;
-varying float vAlpha;
-
-vec3 hsv2rgb(vec3 c) {
-  vec4 K = vec4(1.0, 2.0/3.0, 1.0/3.0, 3.0);
-  vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
-  return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
-}
-
-void main() {
-  // Section-type modulation
-  float sType = uSectionType;
-  float jamBoost = smoothstep(4.5, 5.5, sType);      // jam=5: eruption intensity
-  float spaceHush = smoothstep(6.5, 7.5, sType);      // space=7: smoldering embers
-  float chorusVibe = smoothstep(2.5, 3.5, sType) * (1.0 - smoothstep(3.5, 4.5, sType)); // chorus=3: full blaze
-  float soloFocus = smoothstep(3.5, 4.5, sType) * (1.0 - smoothstep(4.5, 5.5, sType));  // solo=4: lava river focus
-
-  float dist = length(gl_PointCoord - 0.5);
-  if (dist > 0.5) discard;
-  float alpha = smoothstep(0.5, 0.05, dist) * vAlpha;
-
-  float chromaH = clamp(uChromaHue, 0.0, 1.0);
-
-  // Fire color gradient: deep red at base → orange → yellow tips
-  float fireHue = 0.05 + chromaH * 0.08;
-  float fireHue2 = 0.0 + chromaH * 0.05;
-  float tipHue = 0.12 + chromaH * 0.03;
-
-  vec3 baseCol = hsv2rgb(vec3(fireHue2, 0.9, 0.85));
-  vec3 midCol = hsv2rgb(vec3(fireHue, 0.95, 1.0));
-  vec3 tipCol = hsv2rgb(vec3(tipHue, 0.6, 1.0));
-
-  // Palette influence
-  vec3 palCol = hsv2rgb(vec3(uPalettePrimary, uPaletteSaturation * 0.8, 1.0));
-  midCol = mix(midCol, palCol, 0.15);
-
-  // Mix based on height
-  vec3 col = mix(baseCol, midCol, smoothstep(0.0, 0.4, vHeight));
-  col = mix(col, tipCol, smoothstep(0.4, 0.9, vHeight));
-
-  // Hot core glow
-  float coreDist = length(gl_PointCoord - 0.5);
-  float core = smoothstep(0.3, 0.0, coreDist);
-  col += vec3(1.0, 0.9, 0.5) * core * 0.3;
-
-  // Section modulation on fire color intensity
-  // Jam: eruption white-hot, Chorus: vibrant full blaze
-  col *= 1.0 + jamBoost * 0.3 + chorusVibe * 0.2;
-  // Space: dim smoldering, desaturated toward deep red
-  col = mix(col, baseCol * 0.4, spaceHush * 0.5);
-  // Solo: focused lava glow — warm concentrated core
-  col += vec3(0.15, 0.05, 0.0) * soloFocus * core * 0.5;
-
-  gl_FragColor = vec4(col, alpha);
-}
-`;
-
-// ═══════════════════════════════════════════════════
-// EMBER PARTICLES — small bright dots rising on beat
-// ═══════════════════════════════════════════════════
-
-export const emberVert = /* glsl */ `
-uniform float uTime;
-uniform float uDynamicTime;
-uniform float uEnergy;
-uniform float uOnsetSnap;
-uniform float uBeatSnap;
-
-attribute float aPhase;
-attribute float aSpeed;
-
-varying float vAlpha;
-
-void main() {
-  vec3 pos = position;
-
-  float energy = clamp(uEnergy, 0.0, 1.0);
-
-  // Longer lifecycle — embers drift slowly
-  float life = fract(aPhase + uDynamicTime * aSpeed * 0.08);
-
-  // Rise slowly with wind drift
-  pos.y += life * (3.0 + energy * 5.0);
-  float windX = sin(uDynamicTime * 0.5 + aPhase * 15.0) * (0.5 + life);
-  float windZ = cos(uDynamicTime * 0.3 + aPhase * 12.0) * 0.3;
-  pos.x += windX;
-  pos.z += windZ;
-
-  // Beat burst: onset pushes embers up and out
-  float burst = uOnsetSnap * 2.0;
-  pos.y += burst * (1.0 - life) * 0.5;
-  pos.x += burst * sin(aPhase * 40.0) * 0.3;
-
-  // Fade over lifetime
-  vAlpha = (1.0 - life) * (1.0 - life);
-  vAlpha *= energy * 0.8;
-  vAlpha *= 1.0 + uBeatSnap * 0.5;
-
-  vec4 mvPos = modelViewMatrix * vec4(pos, 1.0);
-  gl_PointSize = max(1.0, (1.5 + energy * 2.0) * (200.0 / -mvPos.z));
-  gl_Position = projectionMatrix * mvPos;
-}
-`;
-
-export const emberFrag = /* glsl */ `
-precision highp float;
-
-uniform float uChromaHue;
-
-varying float vAlpha;
-
-vec3 hsv2rgb(vec3 c) {
-  vec4 K = vec4(1.0, 2.0/3.0, 1.0/3.0, 3.0);
-  vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
-  return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
-}
-
-void main() {
-  float dist = length(gl_PointCoord - 0.5);
-  if (dist > 0.5) discard;
-  float alpha = smoothstep(0.5, 0.0, dist) * vAlpha;
-
-  float chromaH = clamp(uChromaHue, 0.0, 1.0);
-  // Bright orange-yellow embers
-  vec3 col = hsv2rgb(vec3(0.08 + chromaH * 0.05, 0.8, 1.0));
-  col *= 1.5; // hot bright spots
-
-  gl_FragColor = vec4(col, alpha);
-}
-`;
-
-// ═══════════════════════════════════════════════════
-// SMOKE PARTICLES — gray translucent, slowly rising
-// ═══════════════════════════════════════════════════
-
-export const smokeVert = /* glsl */ `
-uniform float uTime;
-uniform float uDynamicTime;
-uniform float uFlatness;
-uniform float uEnergy;
-
-attribute float aPhase;
-attribute float aSpeed;
-
-varying float vAlpha;
-
-void main() {
-  vec3 pos = position;
-
-  float flatness = clamp(uFlatness, 0.0, 1.0);
-  float energy = clamp(uEnergy, 0.0, 1.0);
-  float smokeDensity = flatness * 0.6 + energy * 0.2;
-
-  // Very slow rise
-  float life = fract(aPhase + uDynamicTime * aSpeed * 0.04);
-  pos.y += life * 6.0;
-
-  // Wider spread than fire
-  pos.x += sin(uDynamicTime * 0.2 + aPhase * 8.0) * (1.0 + life * 2.0);
-  pos.z += cos(uDynamicTime * 0.15 + aPhase * 6.0) * 0.5;
-
-  // Fade: appears, expands, dissipates
-  float fadeIn = smoothstep(0.0, 0.1, life);
-  float fadeOut = 1.0 - smoothstep(0.5, 1.0, life);
-  vAlpha = fadeIn * fadeOut * smokeDensity * 0.4;
-
-  vec4 mvPos = modelViewMatrix * vec4(pos, 1.0);
-  // Smoke particles are larger
-  float size = (8.0 + life * 12.0) * smokeDensity;
-  gl_PointSize = max(1.0, size * (300.0 / -mvPos.z));
-  gl_Position = projectionMatrix * mvPos;
-}
-`;
-
-export const smokeFrag = /* glsl */ `
-precision highp float;
-
-uniform vec3 uFireColor;
-uniform float uEnergy;
-
-varying float vAlpha;
-
-void main() {
-  float dist = length(gl_PointCoord - 0.5);
-  if (dist > 0.5) discard;
-  // Very soft falloff for smoky look
-  float alpha = smoothstep(0.5, 0.0, dist) * vAlpha;
-  alpha *= alpha; // extra soft
-
-  float energy = clamp(uEnergy, 0.0, 1.0);
-  // Dark gray with warm fire tint
-  vec3 col = mix(vec3(0.08, 0.06, 0.05), uFireColor * 0.3, energy * 0.3);
-
-  gl_FragColor = vec4(col, alpha);
-}
-`;
-
-// ═══════════════════════════════════════════════════
-// SKY BACKGROUND — gradient quad
-// ═══════════════════════════════════════════════════
-
-export const mountainSkyVert = /* glsl */ `
+import { noiseGLSL } from "./noise";
+import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
+import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
+
+export const mountainFireVert = /* glsl */ `
 varying vec2 vUv;
 void main() {
   vUv = uv;
-  gl_Position = vec4(position.xy, 0.9999, 1.0);
+  gl_Position = vec4(position, 1.0);
 }
 `;
 
-export const mountainSkyFrag = /* glsl */ `
+export const mountainFireFrag = /* glsl */ `
 precision highp float;
 
-uniform float uTime;
-uniform float uDynamicTime;
-uniform float uSlowEnergy;
-uniform float uEnergy;
+${sharedUniformsGLSL}
+
+${noiseGLSL}
+
+${buildPostProcessGLSL({
+  grainStrength: "normal",
+  bloomEnabled: true,
+  bloomThresholdOffset: -0.1,
+  halationEnabled: true,
+  caEnabled: true,
+  lensDistortionEnabled: true,
+  beatPulseEnabled: true,
+})}
 
 varying vec2 vUv;
 
-void main() {
-  float slowE = clamp(uSlowEnergy, 0.0, 1.0);
-  float energy = clamp(uEnergy, 0.0, 1.0);
+#define PI 3.14159265
+#define TAU 6.28318530
+#define MAX_STEPS 80
+#define MAX_DIST 50.0
+#define SURF_DIST 0.003
+#define ASH_COUNT 24
 
-  float energyFreq = 1.0 + energy * 0.5;
+// ============================================================
+// Prefixed utilities (mf = mountain fire)
+// ============================================================
+mat2 mfRot2(float a) {
+  float c = cos(a), s = sin(a);
+  return mat2(c, -s, s, c);
+}
 
-  // Sky gradient: deep blue/purple at rest -> red/orange at peaks
-  vec3 skyQuiet = vec3(0.01, 0.015, 0.06);
-  vec3 skyMid = vec3(0.06, 0.02, 0.04);
+float mfHash(float n) { return fract(sin(n) * 43758.5453123); }
+float mfHash2(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+vec3 mfHash3(float n) {
+  return vec3(
+    fract(sin(n * 127.1) * 43758.5453),
+    fract(sin(n * 269.5) * 43758.5453),
+    fract(sin(n * 419.2) * 43758.5453)
+  );
+}
+
+// ============================================================
+// SDF primitives
+// ============================================================
+float mfSDSphere(vec3 pos, float radius) { return length(pos) - radius; }
+
+float mfSDCone(vec3 pos, float radius, float height) {
+  vec2 q = vec2(length(pos.xz), pos.y);
+  vec2 tip = vec2(0.0, height);
+  vec2 baseEdge = vec2(radius, 0.0);
+  vec2 ba = baseEdge - tip;
+  vec2 pa = q - tip;
+  float h = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0);
+  float d = length(pa - ba * h);
+  float signD = sign(pa.x * ba.y - pa.y * ba.x);
+  return max(d * signD, -pos.y);
+}
+
+float mfSDPlane(vec3 pos, float yLevel) { return pos.y - yLevel; }
+
+float mfSmin(float a, float b, float k) {
+  float h = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0);
+  return mix(b, a, h) - k * h * (1.0 - h);
+}
+
+// ============================================================
+// Volcanic mountain terrain
+// ============================================================
+float mfMountainHeight(vec2 xz, float melPitch) {
+  float dist = length(xz);
+  // Central volcanic cone
+  float cone = max(0.0, 8.0 + melPitch * 1.5 - dist * 0.6);
+  // Crater depression at top
+  float crater = smoothstep(1.5, 0.0, dist) * 2.0;
+  cone -= crater;
+  // Noise displacement for rocky texture
+  cone += snoise(vec3(xz * 0.3, 0.0)) * 1.0;
+  cone += snoise(vec3(xz * 0.8, 5.0)) * 0.4;
+  cone += snoise(vec3(xz * 2.0, 10.0)) * 0.12;
+  // Surrounding terrain: low hills
+  float surroundH = snoise(vec3(xz * 0.05, 20.0)) * 2.0;
+  surroundH += snoise(vec3(xz * 0.15, 25.0)) * 0.8;
+  float surroundMask = smoothstep(12.0, 20.0, dist);
+  cone = mix(cone, max(surroundH, 0.0), surroundMask);
+  return max(cone, 0.0);
+}
+
+float mfMap(vec3 pos, float melPitch, float timeVal, float bass) {
+  float terrainH = mfMountainHeight(pos.xz, melPitch);
+  // Bass tremor
+  terrainH += sin(pos.x * 0.5 + timeVal * 2.0) * bass * 0.1;
+  return pos.y - terrainH;
+}
+
+// ============================================================
+// Normal
+// ============================================================
+vec3 mfNormal(vec3 pos, float melPitch, float timeVal, float bass) {
+  float eps = 0.01;
+  float d = mfMap(pos, melPitch, timeVal, bass);
+  return normalize(vec3(
+    mfMap(pos + vec3(eps, 0.0, 0.0), melPitch, timeVal, bass) - d,
+    mfMap(pos + vec3(0.0, eps, 0.0), melPitch, timeVal, bass) - d,
+    mfMap(pos + vec3(0.0, 0.0, eps), melPitch, timeVal, bass) - d
+  ));
+}
+
+// ============================================================
+// Ambient occlusion
+// ============================================================
+float mfAO(vec3 pos, vec3 norm, float melPitch, float timeVal, float bass) {
+  float occ = 0.0;
+  float weight = 1.0;
+  for (int i = 1; i <= 5; i++) {
+    float dist = 0.02 + 0.08 * float(i);
+    float sampleD = mfMap(pos + norm * dist, melPitch, timeVal, bass);
+    occ += (dist - sampleD) * weight;
+    weight *= 0.6;
+  }
+  return clamp(1.0 - occ * 2.0, 0.0, 1.0);
+}
+
+// ============================================================
+// Soft shadow
+// ============================================================
+float mfSoftShadow(vec3 ro, vec3 rd, float mint, float maxt,
+                   float melPitch, float timeVal, float bass) {
+  float res = 1.0;
+  float tSh = mint;
+  for (int i = 0; i < 32; i++) {
+    float h = mfMap(ro + rd * tSh, melPitch, timeVal, bass);
+    res = min(res, 8.0 * h / tSh);
+    tSh += clamp(h, 0.02, 0.5);
+    if (h < 0.001 || tSh > maxt) break;
+  }
+  return clamp(res, 0.0, 1.0);
+}
+
+// ============================================================
+// Lava flow patterns on mountain slope
+// ============================================================
+float mfLavaFlow(vec3 pos, float timeVal, float energy, float bass) {
+  float dist = length(pos.xz);
+  // Lava flows radially from crater
+  float flowMask = smoothstep(3.0, 0.5, dist) * smoothstep(0.0, 1.0, pos.y);
+
+  // Channel pattern: noise creates river-like paths
+  float channelAngle = atan(pos.z, pos.x);
+  float channelNoise = snoise(vec3(channelAngle * 2.0, pos.y * 0.5, 0.0));
+  float channel = smoothstep(0.3, 0.6, channelNoise);
+
+  // Flow animation: advect downward
+  float flowSpeed = 0.3 + energy * 0.5;
+  float flowNoise = fbm3(vec3(pos.xz * 0.3, pos.y * 0.5 + timeVal * flowSpeed));
+  float flow = flowMask * channel * (flowNoise * 0.5 + 0.5);
+
+  // Bass pulse makes lava surge
+  flow *= 1.0 + bass * 0.5;
+
+  return clamp(flow * energy, 0.0, 1.0);
+}
+
+// ============================================================
+// Lava color
+// ============================================================
+vec3 mfLavaColor(float intensity, float tension, float chromaH) {
+  vec3 coolLava = vec3(0.6, 0.1, 0.0);
+  vec3 hotLava = vec3(1.0, 0.5, 0.05);
+  vec3 whiteHot = vec3(1.0, 0.9, 0.6);
+
+  vec3 col = mix(coolLava, hotLava, smoothstep(0.0, 0.5, intensity));
+  col = mix(col, whiteHot, smoothstep(0.5, 1.0, intensity) * 0.4);
+  col = mix(col, col * vec3(1.0, 0.6, 0.4), tension * 0.3);
+  col.r += chromaH * 0.1;
+  return col;
+}
+
+// ============================================================
+// Pyroclastic cloud (volumetric eruption plume)
+// ============================================================
+vec3 mfPyroclasticCloud(vec3 ro, vec3 rd, float marchDist, float timeVal,
+                        float energy, float flux, float slowE, vec3 palCol1) {
+  vec3 cloud = vec3(0.0);
+  float eruptionHeight = 8.0 + energy * 6.0 + slowE * 3.0;
+  float stepSize = 0.5;
+
+  for (int i = 0; i < 32; i++) {
+    float tC = float(i) * stepSize + 2.0;
+    if (tC > marchDist) break;
+    vec3 cPos = ro + rd * tC;
+
+    // Plume shape: expands as it rises from crater
+    float craterDist = length(cPos.xz);
+    float heightFrac = (cPos.y - 6.0) / eruptionHeight;
+    if (heightFrac < 0.0 || heightFrac > 1.0) continue;
+
+    float plumeRadius = mix(1.0, 5.0, heightFrac);
+    float plumeMask = smoothstep(plumeRadius, plumeRadius * 0.3, craterDist);
+    float verticalEnv = smoothstep(0.0, 0.1, heightFrac) * smoothstep(1.0, 0.6, heightFrac);
+
+    // Turbulent cloud noise
+    vec3 cloudP = cPos;
+    cloudP.y -= timeVal * 0.5;
+    float cloudN = fbm3(cloudP * 0.2 + vec3(0.0, -timeVal * 0.1, 0.0));
+    cloudN += fbm3(cloudP * 0.5 + 10.0) * 0.4;
+
+    float density = plumeMask * verticalEnv * (cloudN * 0.5 + 0.5);
+    density *= 0.05 * (0.5 + flux * 0.5);
+
+    // Color: dark ash with fire undertone at base
+    vec3 ashColor = mix(vec3(0.06, 0.04, 0.03), vec3(0.12, 0.08, 0.06), heightFrac);
+    // Fire glow at base
+    float fireGlow = (1.0 - heightFrac) * energy;
+    ashColor += palCol1 * 0.1 * fireGlow;
+
+    cloud += ashColor * density * stepSize;
+  }
+  return cloud;
+}
+
+// ============================================================
+// Ash fall particles
+// ============================================================
+vec3 mfAshParticles(vec3 ro, vec3 rd, float timeVal, float energy, float highs) {
+  vec3 ash = vec3(0.0);
+  int count = int(mix(8.0, 24.0, energy));
+  for (int i = 0; i < ASH_COUNT; i++) {
+    if (i >= count) break;
+    float fi = float(i);
+    vec3 seed = mfHash3(fi * 5.7 + 2.0);
+
+    // Ash drifts down slowly, swaying
+    float ashLife = fract(seed.x * 2.0 + timeVal * 0.05);
+    vec3 ashPos = vec3(
+      (seed.y - 0.5) * 20.0 + sin(timeVal * 0.3 + fi) * 2.0,
+      12.0 - ashLife * 14.0,
+      (seed.z - 0.5) * 20.0 + cos(timeVal * 0.2 + fi * 1.3) * 1.5
+    );
+
+    vec3 toA = ashPos - ro;
+    float proj = dot(toA, rd);
+    if (proj < 0.0) continue;
+    vec3 closest = ro + rd * proj;
+    float dist = length(closest - ashPos);
+
+    float ashSize = 0.015 + seed.y * 0.01;
+    float glow = smoothstep(ashSize * 5.0, 0.0, dist);
+    float lifeFade = smoothstep(0.0, 0.1, ashLife) * smoothstep(1.0, 0.8, ashLife);
+
+    // Some ash glows hot (embers), most is dark
+    vec3 ashCol = seed.x > 0.7 ? vec3(1.0, 0.5, 0.1) * 0.5 : vec3(0.15, 0.12, 0.1);
+    ash += ashCol * glow * lifeFade * 0.15 * (0.5 + highs * 0.5);
+  }
+  return ash;
+}
+
+// ============================================================
+// Sky: volcanic apocalypse
+// ============================================================
+vec3 mfSky(vec3 rd, float energy, float slowE, vec3 palCol2) {
+  float skyGrad = rd.y * 0.5 + 0.5;
+  vec3 skyDark = vec3(0.01, 0.01, 0.02);
+  vec3 skyMid = mix(vec3(0.06, 0.02, 0.03), palCol2 * 0.1, 0.15);
   vec3 skyHot = vec3(0.15, 0.04, 0.02);
 
   float skyMix = smoothstep(0.1, 0.8, slowE);
-  vec3 col = mix(skyQuiet, skyMid, skyMix);
-  col = mix(col, skyHot, smoothstep(0.5, 1.0, energy));
+  vec3 sky = mix(skyDark, skyMid, skyMix);
+  sky = mix(sky, skyHot, smoothstep(0.5, 1.0, energy) * (1.0 - skyGrad));
 
-  // === VOLCANIC ASH/SMOKE CLOUDS: secondary atmospheric layer (30%) ===
-  float cloudSeed = vUv.x * 3.0 * energyFreq + slowTime * 0.08;
-  float ashCloud = sin(cloudSeed) * sin(vUv.y * 4.0 + slowTime * 0.05);
-  ashCloud += sin(cloudSeed * 2.3 + 5.0) * sin(vUv.y * 7.0 - slowTime * 0.03) * 0.4;
-  ashCloud = smoothstep(0.1, 0.6, ashCloud * 0.5 + 0.5);
-  float ashMask = smoothstep(0.0, 0.4, vUv.y) * smoothstep(0.8, 0.5, vUv.y);
-  vec3 ashColor = mix(vec3(0.04, 0.02, 0.03), skyHot * 0.3, energy * 0.5);
-  col = mix(col, ashColor, ashCloud * ashMask * 0.3 * energy);
+  // Horizon fire glow
+  float horizonGlow = exp(-pow(rd.y * 6.0, 2.0));
+  sky += skyHot * horizonGlow * energy * 0.2;
 
-  // Darker at top
-  col *= mix(0.6, 1.0, smoothstep(1.0, 0.0, vUv.y));
+  // Darkened sky overhead
+  sky *= mix(0.5, 1.0, smoothstep(0.8, 0.0, skyGrad));
 
-  // === FIRE GLOW on horizon: warm underlight from eruption ===
-  float horizonGlow = exp(-pow(vUv.y * 6.0, 2.0));
-  col += skyHot * horizonGlow * energy * 0.15;
-
-  // Stars visible during quiet
-  float starFade = 1.0 - smoothstep(0.15, 0.6, energy);
-  if (starFade > 0.01) {
-    float slowTime = uDynamicTime * 0.1;
-    vec2 starUv = vUv + slowTime * 0.008;
-    float starH = fract(sin(dot(floor(starUv * 90.0), vec2(127.1, 311.7))) * 43758.5453);
-    float starH2 = fract(sin(dot(floor(starUv * 90.0), vec2(269.5, 183.3))) * 43758.5453);
-    vec2 starF = fract(starUv * 90.0);
-    float starDist = length(starF - vec2(starH, starH2));
-    float hasStar = step(0.72, starH);
-    float twinkle = 0.7 + 0.3 * sin(uTime * 2.5 + starUv.x * 40.0);
-    float star = hasStar * twinkle * smoothstep(0.025, 0.004, starDist);
-    col += vec3(0.85, 0.88, 1.0) * star * 0.5 * starFade;
-
-    // Second star layer for density
-    vec2 starUv2 = vUv + slowTime * 0.004 + 7.0;
-    float sh2 = fract(sin(dot(floor(starUv2 * 130.0), vec2(127.1, 311.7))) * 43758.5453);
-    float sh22 = fract(sin(dot(floor(starUv2 * 130.0), vec2(269.5, 183.3))) * 43758.5453);
-    vec2 sf2 = fract(starUv2 * 130.0);
-    float sd2 = length(sf2 - vec2(sh2, sh22));
-    float star2 = step(0.72, sh2) * twinkle * smoothstep(0.025, 0.004, sd2);
-    col += vec3(0.85, 0.88, 1.0) * star2 * 0.25 * starFade;
+  // Stars visible when calm
+  float starFade = 1.0 - smoothstep(0.15, 0.5, energy);
+  if (starFade > 0.01 && rd.y > 0.1) {
+    vec2 starUV = rd.xz / (rd.y + 0.001);
+    float sh = mfHash2(floor(starUV * 80.0));
+    if (sh > 0.9) {
+      vec2 sf = fract(starUV * 80.0);
+      float sd = length(sf - 0.5);
+      float twinkle = 0.7 + 0.3 * sin(uTime * 2.0 + sh * 50.0);
+      sky += vec3(0.8, 0.85, 1.0) * smoothstep(0.03, 0.005, sd) * twinkle * starFade * 0.3;
+    }
   }
+
+  return sky;
+}
+
+void main() {
+  vec2 uv = vUv;
+  vec2 aspect = vec2(uResolution.x / uResolution.y, 1.0);
+  vec2 screenPos = (uv - 0.5) * aspect;
+
+  float energy = clamp(uEnergy, 0.0, 1.0);
+  float bass = clamp(uBass, 0.0, 1.0);
+  float highs = clamp(uHighs, 0.0, 1.0);
+  float drumOnset = clamp(uDrumOnset, 0.0, 1.0);
+  float slowE = clamp(uSlowEnergy, 0.0, 1.0);
+  float chromaH = clamp(uChromaHue, 0.0, 1.0);
+  float flux = clamp(uSpectralFlux, 0.0, 1.0);
+  float vocalP = clamp(uVocalPresence, 0.0, 1.0);
+  float melPitch = clamp(uMelodicPitch, 0.0, 1.0);
+  float tension = clamp(uHarmonicTension, 0.0, 1.0);
+  float dynRange = clamp(uDynamicRange, 0.0, 1.0);
+  float beatSnap = clamp(uBeatSnap, 0.0, 1.0);
+
+  float sectionT = uSectionType;
+  float sJam = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
+  float sSpace = smoothstep(6.5, 7.5, sectionT);
+  float sSolo = smoothstep(3.5, 4.5, sectionT) * (1.0 - step(4.5, sectionT));
+  float sChorus = smoothstep(1.5, 2.5, sectionT) * (1.0 - step(2.5, sectionT));
+
+  float isClimax = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5);
+  float climaxBoost = isClimax * uClimaxIntensity;
+
+  float timeVal = uDynamicTime * 0.12;
+  float fireIntensityMod = 1.0 + sJam * 0.5 + sChorus * 0.3 - sSpace * 0.6;
+
+  // Palette
+  float hue1 = uPalettePrimary + chromaH * 0.06;
+  float hue2 = uPaletteSecondary + chromaH * 0.04;
+  float palSat = mix(0.5, 0.9, energy) * uPaletteSaturation;
+  vec3 palCol1 = hsv2rgb(vec3(hue1, palSat, 0.9));
+  vec3 palCol2 = hsv2rgb(vec3(hue2, palSat * 0.5, 0.6));
+
+  // Camera: viewing erupting mountain from a safe distance
+  float camAngle = uTime * 0.01 + sin(uTime * 0.005) * 0.3;
+  float camDist = 18.0;
+  float camH = 4.0 + sin(uTime * 0.04) * 0.5;
+  vec3 camOrigin = vec3(cos(camAngle) * camDist, camH, sin(camAngle) * camDist);
+  vec3 camTarget = vec3(0.0, 5.0, 0.0);
+  vec3 camForward = normalize(camTarget - camOrigin);
+  vec3 camWorldUp = vec3(0.0, 1.0, 0.0);
+  vec3 camRt = normalize(cross(camForward, camWorldUp));
+  vec3 camUpV = cross(camRt, camForward);
+
+  // Camera shake from bass tremor
+  float shakeX = sin(uDynamicTime * 8.0) * bass * 0.005;
+  float shakeY = cos(uDynamicTime * 10.0) * bass * 0.003;
+
+  vec3 rd = normalize((screenPos.x + shakeX) * camRt + (screenPos.y + shakeY) * camUpV + 1.5 * camForward);
+
+  // Eruption light source (crater)
+  vec3 eruptionPos = vec3(0.0, 8.0, 0.0);
+  vec3 eruptionLightDir = normalize(eruptionPos);
+
+  // ─── Raymarch terrain ───
+  float marchDist = 0.0;
+  float terrainHitDist = -1.0;
+
+  for (int i = 0; i < MAX_STEPS; i++) {
+    vec3 pos = camOrigin + rd * marchDist;
+    float d = mfMap(pos, melPitch, timeVal, bass);
+    if (d < SURF_DIST) {
+      terrainHitDist = marchDist;
+      break;
+    }
+    marchDist += d * 0.7;
+    if (marchDist > MAX_DIST) break;
+  }
+
+  vec3 col;
+
+  if (terrainHitDist < 0.0) {
+    col = mfSky(rd, energy, slowE, palCol2);
+  } else {
+    vec3 hitPos = camOrigin + rd * terrainHitDist;
+    vec3 norm = mfNormal(hitPos, melPitch, timeVal, bass);
+    float ambOcc = mfAO(hitPos, norm, melPitch, timeVal, bass);
+
+    // Eruption light from above
+    vec3 toLava = eruptionPos - hitPos;
+    float lavaDist = length(toLava);
+    vec3 lavaDir = toLava / lavaDist;
+    float lavaAtten = 1.0 / (1.0 + lavaDist * lavaDist * 0.01);
+    float lavaDiffuse = max(dot(norm, lavaDir), 0.0) * lavaAtten;
+
+    // Specular
+    vec3 viewDir = normalize(camOrigin - hitPos);
+    vec3 halfLava = normalize(lavaDir + viewDir);
+    float lavaSpec = pow(max(dot(norm, halfLava), 0.0), 32.0) * lavaAtten;
+
+    // Fresnel
+    float fresnelVal = pow(1.0 - max(dot(viewDir, norm), 0.0), 3.0);
+
+    // Shadow
+    float shadow = mfSoftShadow(hitPos + norm * 0.02, lavaDir, 0.1, 15.0, melPitch, timeVal, bass);
+
+    // ─── Lava flow pattern ───
+    float lavaFlow = mfLavaFlow(hitPos, timeVal, energy, bass);
+    lavaFlow *= fireIntensityMod;
+    lavaFlow += drumOnset * 0.2 * smoothstep(3.0, 0.5, length(hitPos.xz)); // eruption burst
+    lavaFlow = clamp(lavaFlow + climaxBoost * 0.3, 0.0, 1.0);
+
+    // Material: dark volcanic rock + lava
+    float rockN = fbm3(vec3(hitPos * 0.5));
+    vec3 rockColor = mix(vec3(0.03, 0.025, 0.02), vec3(0.08, 0.06, 0.04), rockN);
+    // Stratified rock bands
+    float bands = sin(hitPos.y * 3.0 + snoise(vec3(hitPos * 0.3)) * 1.5) * 0.5 + 0.5;
+    rockColor = mix(rockColor, vec3(0.06, 0.04, 0.03), bands * 0.3);
+
+    // Lava veins
+    vec3 lavaCol = mfLavaColor(lavaFlow, tension, chromaH);
+    lavaCol = mix(lavaCol, lavaCol * palCol1 * 1.5, 0.1);
+
+    vec3 matColor = mix(rockColor, lavaCol, lavaFlow);
+
+    // Lava is self-emissive
+    vec3 emissive = lavaCol * lavaFlow * 2.0 * fireIntensityMod;
+
+    // Compose lighting
+    vec3 lavaLightCol = mix(vec3(1.0, 0.4, 0.05), palCol1, 0.1);
+    float lightIntensity = (0.3 + energy * 1.0) * fireIntensityMod;
+
+    col = matColor * 0.02 * ambOcc; // minimal ambient
+    col += matColor * lavaLightCol * lavaDiffuse * lightIntensity * shadow * 0.5;
+    col += vec3(0.5, 0.3, 0.1) * lavaSpec * lightIntensity * shadow * 0.3;
+    col += emissive;
+    col += matColor * fresnelVal * 0.03;
+
+    // Vocal warmth: expands warm glow
+    float warmthRadius = 1.0 + vocalP * 2.0;
+    float warmthFalloff = 1.0 / (1.0 + lavaDist * lavaDist / (warmthRadius * warmthRadius * 4.0));
+    col += lavaLightCol * 0.02 * warmthFalloff * vocalP;
+
+    // Rim lighting from eruption
+    float rimLight = pow(1.0 - max(dot(viewDir, norm), 0.0), 4.0);
+    col += lavaLightCol * rimLight * energy * 0.08 * lavaAtten;
+
+    // Dynamic range
+    col *= mix(0.8, 1.2, dynRange * (shadow * 0.5 + 0.5));
+
+    // Distance fog: smoky atmosphere
+    float fogAmount = 1.0 - exp(-terrainHitDist * 0.02);
+    vec3 fogColor = mix(vec3(0.06, 0.03, 0.02), lavaLightCol * 0.08, energy * 0.3);
+    col = mix(col, fogColor, fogAmount * 0.5);
+  }
+
+  // ─── Pyroclastic cloud ───
+  float cloudMarchDist = terrainHitDist < 0.0 ? MAX_DIST : terrainHitDist;
+  col += mfPyroclasticCloud(camOrigin, rd, cloudMarchDist, timeVal, energy, flux, slowE, palCol1);
+
+  // ─── Ash particles ───
+  col += mfAshParticles(camOrigin, rd, timeVal, energy, highs);
+
+  // ─── Eruption flash on drum onset ───
+  if (drumOnset > 0.3) {
+    float flashIntensity = drumOnset * 0.15 * fireIntensityMod;
+    col += vec3(1.0, 0.6, 0.2) * flashIntensity;
+  }
+
+  // ─── Icon emergence ───
+  {
+    float nf = fbm3(vec3(screenPos * 2.0, timeVal));
+    vec3 iconLight = iconEmergence(screenPos, uTime, energy, bass,
+      palCol1, palCol2, nf, uClimaxPhase, uSectionIndex);
+    col += iconLight;
+  }
+  {
+    float nf = fbm3(vec3(screenPos * 1.5, timeVal + 10.0));
+    vec3 heroLight = heroIconEmergence(screenPos, uTime, energy, bass,
+      palCol1, palCol2, nf, uSectionIndex);
+    col += heroLight;
+  }
+
+  // ─── Vignette ───
+  float vigScale = mix(0.28, 0.22, energy);
+  float vignette = 1.0 - dot(screenPos * vigScale, screenPos * vigScale);
+  vignette = smoothstep(0.0, 1.0, vignette);
+  col = mix(vec3(0.01, 0.005, 0.002), col, vignette);
+
+  // ─── Post-processing ───
+  col = applyPostProcess(col, vUv, screenPos);
 
   gl_FragColor = vec4(col, 1.0);
 }
 `;
 
-// ═══════════════════════════════════════════════════
-// FIRE GLOW — PointLight shader (not used directly,
-// but provides color calculation for the scene component)
-// ═══════════════════════════════════════════════════
+// Legacy exports for backward compatibility
+export const mountainSilhouetteVert = mountainFireVert;
+export const mountainSilhouetteFrag = mountainFireFrag;
+export const mountainSkyVert = mountainFireVert;
+export const mountainSkyFrag = mountainFireFrag;
+export const fireParticleVert = mountainFireVert;
+export const fireParticleFrag = mountainFireFrag;
+export const emberVert = mountainFireVert;
+export const emberFrag = mountainFireFrag;
+export const smokeVert = mountainFireVert;
+export const smokeFrag = mountainFireFrag;
 
 /** Compute fire color from chromaHue (0-1) for use in PointLight */
 export function computeFireColor(chromaHue: number): [number, number, number] {
   const hue = 0.05 + chromaHue * 0.08;
-  // HSV to RGB inline
   const h = hue * 6.0;
   const c = 0.95;
   const x = c * (1 - Math.abs(h % 2 - 1));

@@ -1,20 +1,27 @@
 /**
- * Aurora Sky — realistic aurora borealis curtains across a vast night sky.
- * Vertically-stretched FBM curtains with horizontal sine wave deformation.
- * Star field behind, mountain/treeline silhouette at bottom 15%.
- * Vast, spiritual, transcendent — designed for peak emotional moments.
+ * Aurora Sky — raymarched full-sky aurora panorama with terrain silhouettes.
+ * Looking UP at the entire dome of sky. Northern lights fill the entire hemisphere,
+ * meteor streaks, star field, and terrain silhouette at the horizon.
+ * Different from aurora.ts (which is ground-level curtains). This is the full
+ * sky dome experience rendered with volumetric raymarching.
  *
- * Audio reactivity:
- *   uEnergy       -> curtain speed, brightness, dynamic range
- *   uBeat         -> brightness pulse through curtains
- *   uChromaHue    -> shifts curtain color bands (green/purple/pink)
- *   uSpectralFlux -> curtain complexity (FBM octaves)
- *   uMelodicPitch -> curtain height shift
- *   uBass         -> low-frequency curtain sway
- *   uHighs        -> fine curtain detail, star twinkle
- *   uOnsetSnap    -> brief flash through aurora
- *   uSlowEnergy   -> overall drift speed
- *   uSectionType  -> jam=rapid dance, space=slow gentle, solo=focused beam
+ * Audio reactivity (14+ uniforms):
+ *   uEnergy           → curtain brightness, speed, activity level
+ *   uBass             → curtain sway amplitude, horizon glow pulse
+ *   uHighs            → fine aurora detail, star twinkle, meteor sharpness
+ *   uOnsetSnap        → meteor trigger, aurora flash
+ *   uBeatSnap         → curtain brightness pulse sync
+ *   uSlowEnergy       → overall sky brightness, drift speed
+ *   uHarmonicTension  → aurora complexity, color band count
+ *   uBeatStability    → smooth curtain flow vs turbulent dance
+ *   uMelodicPitch     → aurora curtain altitude, zenith brightness
+ *   uChromaHue        → aurora color shift (green/purple/pink rotation)
+ *   uChordIndex       → per-chord aurora band hue offset
+ *   uVocalEnergy      → zenith corona brightness
+ *   uSpectralFlux     → aurora FBM complexity, curtain fold density
+ *   uSectionType      → jam=rapid dance, space=gentle glow, solo=focused beam
+ *   uClimaxPhase      → full dome aurora explosion
+ *   uPalettePrimary/Secondary → aurora base + accent colors
  */
 
 import { noiseGLSL } from "./noise";
@@ -36,18 +43,23 @@ ${sharedUniformsGLSL}
 
 ${noiseGLSL}
 
-${buildPostProcessGLSL({ grainStrength: 'light', bloomEnabled: true })}
+${buildPostProcessGLSL({ grainStrength: "light", bloomEnabled: true, halationEnabled: true })}
 
 varying vec2 vUv;
 
 #define PI 3.14159265
+#define TAU 6.28318530
 
-// --- Starfield: procedural stars with magnitude variation ---
-float stars(vec2 uv, float density, float seed) {
-  vec2 cell = floor(uv * density);
-  vec2 f = fract(uv * density);
-  float h = fract(sin(dot(cell + seed, vec2(127.1, 311.7))) * 43758.5453);
-  float h2 = fract(sin(dot(cell + seed, vec2(269.5, 183.3))) * 43758.5453);
+// ═══════════════════════════════════════════════════════════
+// Prefixed helpers — as2 namespace
+// ═══════════════════════════════════════════════════════════
+
+// Star field: procedural multi-layer
+float as2Stars(vec2 coordUv, float density, float seed) {
+  vec2 cell = floor(coordUv * density);
+  vec2 f = fract(coordUv * density);
+  float h = fract(sin(dot(cell + seed, vec2(127.1, 311.7))) * 43758.5);
+  float h2 = fract(sin(dot(cell + seed, vec2(269.5, 183.3))) * 43758.5);
   vec2 starPos = vec2(h, h2);
   float dist = length(f - starPos);
   float hasStar = step(0.72, h);
@@ -55,238 +67,324 @@ float stars(vec2 uv, float density, float seed) {
   return hasStar * brightness * smoothstep(0.025, 0.003, dist);
 }
 
-// --- Mountain/treeline silhouette ---
-float mountainSilhouette(float x, float time) {
-  // Layered noise for organic mountain profile
+// Terrain silhouette: layered noise for organic mountain profile
+float as2TerrainSilhouette(float xCoord) {
   float m = 0.0;
-  m += snoise(vec3(x * 1.5, 0.0, 0.0)) * 0.06;
-  m += snoise(vec3(x * 3.0, 1.0, 0.0)) * 0.03;
-  m += snoise(vec3(x * 8.0, 2.0, 0.0)) * 0.012;
-  // Base height at bottom 15%
-  m += 0.10;
-  // Tree-like spikes on ridgeline
-  float treeNoise = snoise(vec3(x * 25.0, 3.0, 0.0));
-  m += max(0.0, treeNoise) * 0.015;
+  m += snoise(vec3(xCoord * 1.2, 0.0, 0.0)) * 0.08;
+  m += snoise(vec3(xCoord * 2.5, 1.0, 0.0)) * 0.04;
+  m += snoise(vec3(xCoord * 6.0, 2.0, 0.0)) * 0.018;
+  m += snoise(vec3(xCoord * 15.0, 3.0, 0.0)) * 0.008;
+  m += 0.08; // base height
+  // Tree spikes on ridgeline
+  float treeNoise = snoise(vec3(xCoord * 30.0, 4.0, 0.0));
+  m += max(0.0, treeNoise) * 0.012;
   return m;
 }
 
-// --- Aurora curtain FBM: vertically-stretched with horizontal sine deformation ---
-mat2 auroraRot = mat2(0.80, 0.60, -0.60, 0.80);
+// Aurora FBM: vertically-stretched with horizontal sine deformation
+mat2 as2AuroraRot = mat2(0.80, 0.60, -0.60, 0.80);
 
-float auroraCurtainFBM(vec3 p, float complexity, float turbulence) {
+float as2AuroraCurtainFBM(vec3 pos, float complexity, float turbulence) {
   int octaves = 4 + int(complexity * 4.0);
   float val = 0.0;
   float amp = 0.5;
   float freq = 1.0;
-  // Domain warp for organic curtain folds
-  float warpX = snoise(p * 0.3 + vec3(7.0, 0.0, 3.0)) * 0.3;
-  float warpZ = snoise(p * 0.25 + vec3(0.0, 11.0, 5.0)) * 0.25;
-  p.x += warpX;
-  p.z += warpZ;
+  // Domain warp for organic folds
+  float warpX = snoise(pos * 0.3 + vec3(7.0, 0.0, 3.0)) * 0.3;
+  float warpZ = snoise(pos * 0.25 + vec3(0.0, 11.0, 5.0)) * 0.25;
+  pos.x += warpX;
+  pos.z += warpZ;
   for (int i = 0; i < 8; i++) {
     if (i >= octaves) break;
-    val += amp * snoise(p * freq);
-    p.xz = auroraRot * p.xz;
-    p.y *= 1.15;
-    p.x += turbulence * 0.15 * float(i);
+    val += amp * snoise(pos * freq);
+    pos.xz = as2AuroraRot * pos.xz;
+    pos.y *= 1.15;
+    pos.x += turbulence * 0.15 * float(i);
     freq *= 2.15;
     amp *= 0.46;
   }
   return val;
 }
 
+// Meteor streak
+float as2MeteorStreak(vec2 coordUv, vec2 startPos, vec2 endPos, float width, float progress) {
+  vec2 dir = endPos - startPos;
+  float len = length(dir);
+  vec2 normDir = dir / max(len, 0.001);
+  vec2 toPoint = coordUv - startPos;
+  float along = dot(toPoint, normDir);
+  float perp = abs(dot(toPoint, vec2(-normDir.y, normDir.x)));
+
+  // Meteor head position
+  float headPos = progress * len;
+  float tailLen = 0.15;
+
+  float inMeteor = smoothstep(headPos - tailLen, headPos, along)
+                 * smoothstep(headPos + 0.01, headPos, along)
+                 * smoothstep(width, width * 0.2, perp);
+
+  return inMeteor;
+}
+
+// ═══════════════════════════════════════════════════════════
+// Volumetric sky dome ray setup
+// ═══════════════════════════════════════════════════════════
+
+vec3 as2SkyRayDir(vec2 screenPos, float camPitch) {
+  // Hemisphere mapping: screen coords to sky dome direction
+  // Looking UP: y component increases with distance from center
+  float pitch = camPitch + screenPos.y * PI * 0.4 + PI * 0.25;
+  float yaw = screenPos.x * PI * 0.5;
+  return normalize(vec3(sin(yaw) * cos(pitch), sin(pitch), cos(yaw) * cos(pitch)));
+}
+
 void main() {
-  vec2 uv = vUv;
+  vec2 fragUv = vUv;
   vec2 aspect = vec2(uResolution.x / uResolution.y, 1.0);
-  vec2 p = (uv - 0.5) * aspect;
+  vec2 screenPos = (fragUv - 0.5) * aspect;
 
   float energy = clamp(uEnergy, 0.0, 1.0);
   float bass = clamp(uBass, 0.0, 1.0);
   float highs = clamp(uHighs, 0.0, 1.0);
   float onset = clamp(uOnsetSnap, 0.0, 1.0);
   float slowE = clamp(uSlowEnergy, 0.0, 1.0);
-  float chromaH = clamp(uChromaHue, 0.0, 1.0);
+  float tension = clamp(uHarmonicTension, 0.0, 1.0);
+  float stability = clamp(uBeatStability, 0.0, 1.0);
+  float melPitch = clamp(uMelodicPitch * uMelodicConfidence, 0.0, 1.0);
+  float effectiveBeat = uBeatSnap * smoothstep(0.3, 0.7, uBeatConfidence);
   float flux = clamp(uSpectralFlux, 0.0, 1.0);
-  float melodicP = clamp(uMelodicPitch, 0.0, 1.0);
+  float vocalE = clamp(uVocalEnergy, 0.0, 1.0);
+  float chromaH = uChromaHue;
+  float chordHue = float(int(uChordIndex)) / 24.0 * 0.12 * smoothstep(0.3, 0.6, uChordConfidence);
 
-  // === SECTION-TYPE MODULATION ===
   float sectionT = uSectionType;
   float sJam = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
   float sSpace = smoothstep(6.5, 7.5, sectionT);
-  float sChorus = smoothstep(1.5, 2.5, sectionT) * (1.0 - step(2.5, sectionT));
   float sSolo = smoothstep(3.5, 4.5, sectionT) * (1.0 - step(4.5, sectionT));
+  float sChorus = smoothstep(1.5, 2.5, sectionT) * (1.0 - step(2.5, sectionT));
 
-  // --- Domain warping + detail ---
-  vec2 warpedP = p + vec2(fbm3(vec3(p * 0.5, uDynamicTime * 0.05)), fbm3(vec3(p * 0.5 + 100.0, uDynamicTime * 0.05))) * 0.3;
-  float detailMod = 1.0 + energy * 0.5;
+  float isClimax = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5);
+  float climaxBoost = isClimax * uClimaxIntensity;
 
-  // --- Timing ---
-  float slowTime = uDynamicTime * 0.06;
+  float slowTime = uDynamicTime * 0.04;
   float driftSpeed = (0.04 + slowE * 0.03) * mix(1.0, 2.0, sJam) * mix(1.0, 0.3, sSpace);
-  float energyFreq = 1.0 + energy * 0.5;
 
-  // === SKY GRADIENT: deep night sky ===
-  vec3 skyColor = mix(
-    vec3(0.01, 0.01, 0.04),
-    vec3(0.03, 0.04, 0.10),
-    smoothstep(0.5, -0.3, p.y)
-  );
-  // Subtle horizon glow
-  skyColor += vec3(0.02, 0.015, 0.03) * smoothstep(0.1, -0.05, p.y);
-  vec3 col = skyColor;
-
-  // === STAR FIELD: multiple layers for depth ===
-  float starLayer1 = stars(uv + slowTime * 0.008, 90.0, 0.0);
-  float starLayer2 = stars(uv + slowTime * 0.004 + 10.0, 140.0, 42.0) * 0.5;
-  float starLayer3 = stars(uv + slowTime * 0.002 + 25.0, 200.0, 91.0) * 0.3;
-  float twinkle = 0.7 + 0.3 * sin(uTime * 2.5 + uv.x * 60.0 + uv.y * 40.0);
-  float twinkle2 = 0.8 + 0.2 * cos(uTime * 1.8 + uv.x * 35.0);
-  vec3 starColor = vec3(0.85, 0.9, 1.0) * (starLayer1 * twinkle + starLayer2 * twinkle2 + starLayer3);
-  col += starColor * 0.5;
-
-  // === AURORA COLORS: classic green/purple/pink with chroma shift ===
+  // Aurora colors
   float hueBase = chromaH * 0.15;
-  vec3 auroraGreen = hsv2rgb(vec3(0.33 + hueBase, 0.85 * uPaletteSaturation, 1.0));
-  vec3 auroraPurple = hsv2rgb(vec3(0.78 + hueBase * 0.5, 0.75 * uPaletteSaturation, 0.9));
+  vec3 auroraGreen = hsv2rgb(vec3(0.33 + hueBase + chordHue, 0.85 * uPaletteSaturation, 1.0));
+  vec3 auroraPurple = hsv2rgb(vec3(0.78 + hueBase * 0.5 + chordHue * 0.5, 0.75 * uPaletteSaturation, 0.9));
   vec3 auroraPink = hsv2rgb(vec3(0.92 + hueBase * 0.3, 0.65 * uPaletteSaturation, 0.85));
+  vec3 auroraBlue = hsv2rgb(vec3(0.58 + hueBase * 0.4, 0.8 * uPaletteSaturation, 0.7));
 
-  // Blend in palette colors subtly
+  // Blend palette
   auroraGreen = mix(auroraGreen, hsv2rgb(vec3(uPalettePrimary, 0.8, 1.0)), 0.2);
   auroraPurple = mix(auroraPurple, hsv2rgb(vec3(uPaletteSecondary, 0.7, 0.9)), 0.2);
 
-  // === CURTAIN RAYMARCHING ===
-  float climaxBoost = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5) * uClimaxIntensity;
+  vec3 palCol1 = hsv2rgb(vec3(uPalettePrimary + chromaH * 0.1, uPaletteSaturation * 0.9, 0.9));
+  vec3 palCol2 = hsv2rgb(vec3(uPaletteSecondary + chordHue, uPaletteSaturation * 0.8, 0.85));
 
-  // Curtain vertical band: melodicPitch lifts curtains higher
-  float curtainBase = mix(0.08, 0.35, energy) + melodicP * 0.15;
-  float curtainTop = mix(0.35, 0.85, energy) + melodicP * 0.1;
+  // ═══ Sky dome ray direction ═══
+  float camPitch = 0.3 + melPitch * 0.2; // looking upward
+  vec3 skyDir = as2SkyRayDir(screenPos, camPitch);
+  float skyElevation = skyDir.y; // 0=horizon, 1=zenith
 
-  // Solo: focused narrow beam
-  float soloNarrow = sSolo * 0.4;
-  float curtainCenterX = sSolo * 0.0; // center for solo beam
-  float curtainWidthMod = 1.0 - soloNarrow;
+  // ═══ Sky gradient: deep night ═══
+  vec3 col = mix(
+    vec3(0.01, 0.01, 0.04),
+    vec3(0.005, 0.008, 0.025),
+    smoothstep(0.0, 0.8, skyElevation)
+  );
+  // Subtle horizon glow
+  col += vec3(0.015, 0.012, 0.025) * smoothstep(0.15, 0.0, skyElevation);
 
-  // Accumulate aurora light
-  vec4 auroraAcc = vec4(0.0);
-  int maxSteps = 20 + int(energy * 12.0) + int(sJam * 8.0);
-  float stepSize = mix(0.12, 0.08, energy);
+  // ═══ Star field: 3 depth layers ═══
+  {
+    vec2 starUV = vec2(atan(skyDir.x, skyDir.z) / TAU + 0.5, skyElevation);
+    float starLayer1 = as2Stars(starUV + slowTime * 0.005, 100.0, 0.0);
+    float starLayer2 = as2Stars(starUV + slowTime * 0.003 + 10.0, 160.0, 42.0) * 0.5;
+    float starLayer3 = as2Stars(starUV + slowTime * 0.001 + 25.0, 220.0, 91.0) * 0.3;
+    float twinkle = 0.7 + 0.3 * sin(uTime * 2.5 + starUV.x * 60.0 + starUV.y * 40.0);
+    float twinkle2 = 0.8 + 0.2 * cos(uTime * 1.8 + starUV.x * 35.0);
+    vec3 starColor = vec3(0.85, 0.9, 1.0) * (starLayer1 * twinkle + starLayer2 * twinkle2 + starLayer3);
+    // Highs brighten stars
+    starColor *= 1.0 + highs * 0.3;
+    col += starColor * 0.5;
+  }
 
-  for (int i = 0; i < 40; i++) {
-    if (i >= maxSteps) break;
-    if (auroraAcc.a > 0.95) break;
+  // ═══ Volumetric aurora raymarching ═══
+  {
+    float curtainBase = mix(0.05, 0.3, energy) + melPitch * 0.15;
+    float curtainTop = mix(0.4, 0.9, energy) + melPitch * 0.1;
 
-    float t = float(i) * stepSize + 0.3;
-    vec3 pos = vec3(p.x, 0.5 + p.y * 0.7, -1.0) * t;
+    // Solo: narrow focused beam
+    float curtainWidthMod = 1.0 - sSolo * 0.4;
 
-    // Vertical band constraint
-    float curtainY = pos.y / max(t, 0.01);
-    if (curtainY < curtainBase || curtainY > curtainTop) continue;
+    vec4 auroraAcc = vec4(0.0);
+    int maxSteps = 24 + int(energy * 16.0) + int(sJam * 8.0);
+    float stepSize = mix(0.1, 0.06, energy);
 
-    // Horizontal sine wave deformation (the classic curtain shape)
-    float sineDeform = sin(pos.y * 3.0 + slowTime * driftSpeed * 8.0) * 0.3;
-    sineDeform += sin(pos.y * 7.0 + slowTime * driftSpeed * 12.0) * 0.1;
-    pos.x += sineDeform * curtainWidthMod;
+    for (int i = 0; i < 48; i++) {
+      if (i >= maxSteps) break;
+      if (auroraAcc.a > 0.95) break;
 
-    // Bass sway
-    float swayAmt = bass * 0.3 * mix(1.0, 0.5, clamp(uBeatStability, 0.0, 1.0));
-    pos.x += swayAmt * sin(pos.y * 2.5 + slowTime * 0.4);
+      float marchT = float(i) * stepSize + 0.2;
+      vec3 samplePos = skyDir * marchT;
 
-    // Drift
-    pos.x += slowTime * driftSpeed * 6.0;
-    pos.z += slowTime * driftSpeed * 3.0;
+      // Curtain vertical constraint (in elevation space)
+      float sampleElev = samplePos.y / max(marchT, 0.01);
+      if (sampleElev < curtainBase || sampleElev > curtainTop) continue;
 
-    // Curtain density from FBM
-    // Vertically stretch: multiply y to create vertical curtain structure
-    vec3 curtainPos = vec3(pos.x * 0.4 * energyFreq, pos.y * 2.5, pos.z * 0.5);
-    float density = auroraCurtainFBM(curtainPos, flux, onset * 1.0 + uHarmonicTension * 0.2);
+      // Horizontal sine wave deformation (curtain shape)
+      float sineDeform = sin(samplePos.y * 3.0 + slowTime * driftSpeed * 8.0) * 0.3;
+      sineDeform += sin(samplePos.y * 7.0 + slowTime * driftSpeed * 12.0) * 0.1;
+      sineDeform += sin(samplePos.y * 13.0 + slowTime * driftSpeed * 18.0) * 0.05; // extra octave for dome
+      samplePos.x += sineDeform * curtainWidthMod;
 
-    // Secondary fine-detail curtain fold layer (30% blend)
-    float fineDetail = auroraCurtainFBM(curtainPos * 2.5 + vec3(20.0, 0.0, 10.0), flux * 0.5, 0.0);
-    density += fineDetail * 0.3;
+      // Bass sway
+      float swayAmt = bass * 0.3 * mix(1.0, 0.5, stability);
+      samplePos.x += swayAmt * sin(samplePos.y * 2.5 + slowTime * 0.4);
+      samplePos.z += swayAmt * cos(samplePos.y * 1.8 + slowTime * 0.3) * 0.5;
 
-    density = smoothstep(-0.15, 0.35, density);
+      // Drift
+      samplePos.x += slowTime * driftSpeed * 6.0;
+      samplePos.z += slowTime * driftSpeed * 3.0;
 
-    // Vertical falloff
-    float bandFade = smoothstep(curtainBase, curtainBase + 0.08, curtainY)
-                   * smoothstep(curtainTop, curtainTop - 0.1, curtainY);
-    density *= bandFade;
+      // Curtain density
+      vec3 curtainPos = vec3(samplePos.x * 0.3, samplePos.y * 2.5, samplePos.z * 0.4);
+      float density = as2AuroraCurtainFBM(curtainPos, flux, onset * 0.8 + tension * 0.2);
 
-    if (density > 0.01) {
-      // Color varies with height: green at base, purple in middle, pink at top
-      float heightMix = smoothstep(curtainBase, curtainTop, curtainY);
-      vec3 curtainCol = mix(auroraGreen, auroraPurple, smoothstep(0.0, 0.5, heightMix));
-      curtainCol = mix(curtainCol, auroraPink, smoothstep(0.5, 1.0, heightMix));
+      // Fine detail overlay
+      float fineDetail = as2AuroraCurtainFBM(curtainPos * 2.5 + vec3(20.0, 0.0, 10.0), flux * 0.5, 0.0);
+      density += fineDetail * 0.3;
 
-      // Luminosity shimmer
-      float lumNoise = snoise(vec3(pos.x * 2.0, pos.y * 4.0, slowTime * 0.4));
-      density *= 0.55 + 0.45 * lumNoise;
+      // Azimuthal variation: aurora wraps around the dome
+      float azimuth = atan(samplePos.z, samplePos.x);
+      float azVar = sin(azimuth * 2.0 + slowTime * driftSpeed * 4.0) * 0.3 + 0.7;
+      density *= azVar;
 
-      // Curtain brightness: MASSIVE dynamic range
-      float brightness = mix(0.15, 0.90, energy);
-      brightness += uBeat * 0.3;
-      brightness += onset * 0.4;
-      brightness += climaxBoost * 0.3;
-      brightness += sChorus * 0.15;
-      brightness *= mix(1.0, 1.5, sJam);
-      brightness *= mix(1.0, 0.3, sSpace);
-      // Solo: concentrated brightness
-      brightness *= mix(1.0, 1.8, sSolo);
+      density = smoothstep(-0.15, 0.35, density);
 
-      // Alpha compositing
-      float alpha = density * stepSize * 3.5;
-      alpha = min(alpha, 1.0);
-      float weight = alpha * (1.0 - auroraAcc.a);
+      // Vertical falloff
+      float bandFade = smoothstep(curtainBase, curtainBase + 0.08, sampleElev)
+                     * smoothstep(curtainTop, curtainTop - 0.1, sampleElev);
+      density *= bandFade;
 
-      auroraAcc.rgb += curtainCol * brightness * weight;
-      auroraAcc.a += weight;
+      if (density > 0.01) {
+        // Color: green at base → purple mid → pink upper → blue zenith
+        float heightMix = smoothstep(curtainBase, curtainTop, sampleElev);
+        vec3 curtainCol = mix(auroraGreen, auroraPurple, smoothstep(0.0, 0.35, heightMix));
+        curtainCol = mix(curtainCol, auroraPink, smoothstep(0.35, 0.65, heightMix));
+        curtainCol = mix(curtainCol, auroraBlue, smoothstep(0.65, 1.0, heightMix));
+
+        // Luminosity shimmer
+        float lumNoise = snoise(vec3(samplePos.x * 2.0, samplePos.y * 4.0, slowTime * 0.4));
+        density *= 0.55 + 0.45 * lumNoise;
+
+        // Brightness: massive dynamic range
+        float brightness = mix(0.15, 0.90, energy);
+        brightness += effectiveBeat * 0.25;
+        brightness += onset * 0.3;
+        brightness += climaxBoost * 0.4;
+        brightness += sChorus * 0.15;
+        brightness *= mix(1.0, 1.5, sJam) * mix(1.0, 0.3, sSpace);
+        brightness *= mix(1.0, 1.6, sSolo);
+
+        float alpha = density * stepSize * 3.5;
+        alpha = min(alpha, 1.0);
+        float weight = alpha * (1.0 - auroraAcc.a);
+
+        auroraAcc.rgb += curtainCol * brightness * weight;
+        auroraAcc.a += weight;
+      }
+    }
+
+    float auroraIntensity = auroraAcc.a;
+    col += auroraAcc.rgb;
+
+    // Dim stars behind bright aurora
+    col -= vec3(0.3, 0.35, 0.4) * auroraIntensity * 0.3;
+    col = max(col, vec3(0.0));
+
+    // Zenith corona: vocal-driven bright spot at zenith
+    {
+      float zenithDist = 1.0 - skyElevation;
+      float corona = smoothstep(0.5, 0.0, zenithDist) * vocalE * 0.4;
+      corona += smoothstep(0.3, 0.0, zenithDist) * auroraIntensity * 0.15;
+      col += mix(auroraGreen, auroraPurple, 0.5) * corona;
+    }
+
+    // Atmospheric glow beneath aurora
+    float glowY = smoothstep(0.3, 0.0, skyElevation);
+    float glowStrength = auroraIntensity * (0.06 + energy * 0.12);
+    vec3 glowColor = mix(auroraGreen, vec3(0.08, 0.15, 0.1), 0.6);
+    col += glowColor * glowY * glowStrength;
+  }
+
+  // ═══ Meteor streaks (onset-triggered) ═══
+  {
+    if (onset > 0.3) {
+      float meteorSeed = floor(uTime * 2.0);
+      float mh1 = fract(sin(meteorSeed * 127.1) * 43758.5);
+      float mh2 = fract(sin(meteorSeed * 311.7) * 43758.5);
+      vec2 meteorStart = vec2(mh1 - 0.5, 0.2 + mh2 * 0.3) * aspect;
+      vec2 meteorEnd = meteorStart + vec2(0.15 + mh1 * 0.1, -0.08 - mh2 * 0.05);
+      float meteorProgress = fract(uTime * 3.0);
+      float meteor = as2MeteorStreak(screenPos, meteorStart, meteorEnd, 0.003, meteorProgress);
+      vec3 meteorColor = vec3(1.0, 0.95, 0.85);
+      col += meteorColor * meteor * (onset - 0.3) * 3.0;
+    }
+
+    // Occasional random meteor
+    float randomMeteorSeed = floor(uDynamicTime * 0.3);
+    float rmh = fract(sin(randomMeteorSeed * 543.3) * 43758.5);
+    if (rmh > 0.85) {
+      float rmh2 = fract(sin(randomMeteorSeed * 711.1) * 43758.5);
+      vec2 rmStart = vec2(rmh * 1.2 - 0.6, 0.15 + rmh2 * 0.25) * aspect;
+      vec2 rmEnd = rmStart + vec2(0.12, -0.06);
+      float rmProgress = fract(uDynamicTime * 0.3 * 4.0);
+      float rmMeteor = as2MeteorStreak(screenPos, rmStart, rmEnd, 0.002, rmProgress);
+      col += vec3(0.8, 0.85, 1.0) * rmMeteor * 0.5;
     }
   }
 
-  float auroraIntensity = auroraAcc.a;
-  col += auroraAcc.rgb;
-
-  // === HERO ICON EMERGENCE ===
+  // ═══ Terrain silhouette: bottom edge ═══
   {
-    float nf = auroraCurtainFBM(vec3(p * 2.0, slowTime), 0.5, 0.0);
-    vec3 heroLight = heroIconEmergence(p, uTime, energy, bass, auroraGreen, auroraPurple, nf, uSectionIndex);
-    col += heroLight;
+    float terrainY = as2TerrainSilhouette(screenPos.x);
+    float terrainMask = smoothstep(terrainY + 0.003, terrainY - 0.003, screenPos.y + 0.5);
+    vec3 terrainCol = vec3(0.006, 0.008, 0.012);
+    // Faint aurora reflection on terrain
+    float auroraReflect = 0.0;
+    for (int li = 0; li < 3; li++) {
+      float fli = float(li);
+      auroraReflect += smoothstep(terrainY - 0.01, terrainY, screenPos.y + 0.5)
+                     * max(0.0, 0.03 - fli * 0.01);
+    }
+    terrainCol += auroraGreen * auroraReflect * energy;
+    col = mix(col, terrainCol, terrainMask);
   }
 
-  // === ATMOSPHERIC GLOW beneath aurora ===
-  float glowY = smoothstep(0.25, -0.15, p.y);
-  float glowStrength = auroraIntensity * (0.06 + energy * 0.14);
-  vec3 glowColor = mix(auroraGreen, vec3(0.08, 0.15, 0.1), 0.6);
-  col += glowColor * glowY * glowStrength;
+  // Beat pulse
+  col *= 1.0 + effectiveBeat * 0.1;
+  col *= 1.0 + climaxBoost * 0.3;
 
-  // === DIM STARS behind bright aurora ===
-  col -= starColor * 0.5 * auroraIntensity;
-
-  // === MOUNTAIN SILHOUETTE: bottom 15% ===
-  float mountainY = mountainSilhouette(p.x, uTime);
-  float mountainMask = smoothstep(mountainY + 0.003, mountainY - 0.003, p.y + 0.5);
-  // Mountain color: very dark with subtle aurora reflection
-  vec3 mountainCol = vec3(0.008, 0.01, 0.015);
-  // Faint aurora glow on mountain tops
-  mountainCol += auroraGreen * auroraIntensity * 0.03 * smoothstep(mountainY - 0.02, mountainY, p.y + 0.5);
-  col = mix(col, mountainCol, mountainMask);
-
-  // --- Secondary visual layer: atmospheric color shimmer (30% blend) ---
-  float shimmerNoise = fbm3(vec3(warpedP * 3.0 * detailMod, slowTime * 0.3));
-  vec3 shimmerCol = mix(auroraGreen, auroraPurple, shimmerNoise * 0.5 + 0.5) * 0.08;
-  float shimmerMask = smoothstep(-0.1, 0.3, p.y) * (1.0 - mountainMask);
-  col += shimmerCol * shimmerMask * 0.3 * energy;
-
-  // === VIGNETTE ===
+  // Vignette
   float vigScale = mix(0.25, 0.20, energy);
-  float vignette = 1.0 - dot(p * vigScale, p * vigScale);
+  float vignette = 1.0 - dot(screenPos * vigScale, screenPos * vigScale);
   vignette = smoothstep(0.0, 1.0, vignette);
-  col = mix(vec3(0.01, 0.01, 0.03), col, vignette);
+  col = mix(vec3(0.005, 0.005, 0.015), col, vignette);
 
-  // === DARKNESS TEXTURE: prevent dead black in quiet passages ===
-  col += darknessTexture(uv, uTime, energy);
+  // Darkness texture for quiet passages
+  col += darknessTexture(fragUv, uTime, energy);
 
-  // === POST-PROCESSING ===
-  col = applyPostProcess(col, vUv, p);
+  // Icon emergence
+  {
+    float nf = as2AuroraCurtainFBM(vec3(screenPos * 2.0, slowTime), 0.5, 0.0);
+    col += iconEmergence(screenPos, uTime, energy, bass, palCol1, palCol2, nf, uClimaxPhase, uSectionIndex);
+    col += heroIconEmergence(screenPos, uTime, energy, bass, palCol1, palCol2, nf, uSectionIndex);
+  }
+
+  // Post-processing
+  col = applyPostProcess(col, vUv, screenPos);
 
   gl_FragColor = vec4(col, 1.0);
 }

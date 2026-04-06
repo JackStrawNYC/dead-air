@@ -1,271 +1,525 @@
 /**
- * River — 3D water surface shaders for React Three Fiber geometry scene.
+ * River — raymarched mountain river scene.
+ * Rushing water surface SDF with white rapids/foam, river rocks as sphere SDFs,
+ * pine tree silhouettes on banks, mist rising from rapids, golden hour light.
  *
- * Vertex shader: sine wave layers + FBM noise displacement for rolling water.
- * Fragment shader: reflective blue-green with Fresnel effect, foam at crests,
- * palette-driven tint, and post-processing.
- *
- * Audio reactivity (via uniforms):
- *   uEnergy     -> wave height, flow speed, foam density
- *   uBass       -> low-frequency swell amplitude
- *   uOnsetSnap  -> splash ripple rings
- *   uHighs      -> surface sparkle intensity
- *   uVocalEnergy -> mist factor fed to fragment
- *   uChromaHue  -> water color temperature shift
- *   uHarmonicTension -> choppiness / cross-wave turbulence
- *   uBeatStability -> tightens wave patterns
- *   uSlowEnergy -> ambient drift
- *   uPalettePrimary   -> deep water hue
- *   uPaletteSecondary -> sky/reflection hue
- *   uSectionType -> jam=faster, space=still, solo=focused rapids
- *   uMelodicPitch -> reflection brightness
+ * Audio reactivity:
+ *   uBass             → low-frequency swell amplitude, rock vibration
+ *   uEnergy           → flow speed, rapids intensity, foam density
+ *   uDrumOnset        → splash burst
+ *   uVocalPresence    → mist density
+ *   uHarmonicTension  → choppiness / cross-wave turbulence
+ *   uBeatSnap         → ripple pulse
+ *   uSectionType      → jam=rapids, space=still pool, solo=focused current
+ *   uClimaxPhase      → white water eruption
+ *   uSlowEnergy       → ambient drift, golden hour warmth
+ *   uHighs            → surface sparkle
+ *   uMelodicPitch     → reflection brightness
+ *   uChromaHue        → water color temperature shift
+ *   uPalettePrimary   → deep water hue
+ *   uPaletteSecondary → sky/reflection hue
+ *   uSpectralFlux     → current turbulence
+ *   uDynamicRange     → depth contrast
+ *   uBeatStability    → wave pattern regularity
  */
 
 import { noiseGLSL } from "./noise";
+import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
+import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
 
-export const riverWaterVert = /* glsl */ `
-uniform float uTime;
-uniform float uDynamicTime;
-uniform float uEnergy;
-uniform float uBass;
-uniform float uOnsetSnap;
-uniform float uSlowEnergy;
-uniform float uHarmonicTension;
-uniform float uBeatStability;
-uniform float uSectionType;
-uniform float uMelodicDirection;
-
+export const riverVert = /* glsl */ `
 varying vec2 vUv;
-varying vec3 vWorldPos;
-varying vec3 vNormal;
-varying float vDisplacement;
-varying float vFoamFactor;
+void main() {
+  vUv = uv;
+  gl_Position = vec4(position, 1.0);
+}
+`;
+
+export const riverFrag = /* glsl */ `
+precision highp float;
+
+${sharedUniformsGLSL}
 
 ${noiseGLSL}
 
-void main() {
-  vUv = uv;
+${buildPostProcessGLSL({
+  grainStrength: "light",
+  bloomEnabled: true,
+  bloomThresholdOffset: -0.06,
+  halationEnabled: true,
+  dofEnabled: true,
+  lensDistortionEnabled: true,
+})}
 
-  vec3 pos = position;
+varying vec2 vUv;
+
+#define PI 3.14159265
+#define TAU 6.28318530
+#define MAX_STEPS 80
+#define MAX_DIST 35.0
+#define SURF_DIST 0.003
+
+// ============================================================
+// Prefixed utilities (riv = river)
+// ============================================================
+mat2 rivRot2(float a) {
+  float c = cos(a), s = sin(a);
+  return mat2(c, -s, s, c);
+}
+
+float rivHash(float n) { return fract(sin(n) * 43758.5453123); }
+float rivHash2(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+vec3 rivHash3(float n) {
+  return vec3(
+    fract(sin(n * 127.1) * 43758.5453),
+    fract(sin(n * 269.5) * 43758.5453),
+    fract(sin(n * 419.2) * 43758.5453)
+  );
+}
+
+// ============================================================
+// SDF primitives
+// ============================================================
+float rivSDSphere(vec3 pos, float radius) {
+  return length(pos) - radius;
+}
+
+float rivSDEllipsoid(vec3 pos, vec3 radii) {
+  float k0 = length(pos / radii);
+  float k1 = length(pos / (radii * radii));
+  return k0 * (k0 - 1.0) / k1;
+}
+
+float rivSDCapsule(vec3 pos, vec3 a, vec3 b, float radius) {
+  vec3 pa = pos - a, ba = b - a;
+  float h = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0);
+  return length(pa - ba * h) - radius;
+}
+
+float rivSmin(float a, float b, float k) {
+  float h = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0);
+  return mix(b, a, h) - k * h * (1.0 - h);
+}
+
+// ============================================================
+// Terrain: river banks with slope
+// ============================================================
+float rivBankHeight(vec2 xz) {
+  // River channel runs along Z. Banks rise on either side.
+  float riverWidth = 3.0 + snoise(vec3(0.0, 0.0, xz.y * 0.1)) * 0.8;
+  float distFromCenter = abs(xz.x);
+  float bank = smoothstep(riverWidth * 0.5, riverWidth * 0.5 + 2.0, distFromCenter);
+  float h = bank * 1.5;
+  // Rolling bank terrain
+  h += snoise(vec3(xz * 0.15, 0.0)) * 0.5 * bank;
+  h += snoise(vec3(xz * 0.4, 5.0)) * 0.2 * bank;
+  return h;
+}
+
+// ============================================================
+// Water surface: animated wave SDF
+// ============================================================
+float rivWaterHeight(vec2 xz, float timeVal, float energy, float bass, float tension,
+                     float sJam, float sSpace) {
+  float flowSpeed = mix(0.5, 2.5, energy) * mix(1.0, 1.6, sJam) * mix(1.0, 0.15, sSpace);
+  float flowZ = xz.y - timeVal * flowSpeed;
+
+  float h = 0.0;
+  // Broad swells
+  h += sin(flowZ * 0.3 + xz.x * 0.1) * 0.08 * (1.0 + bass * 0.5);
+  // Mid waves
+  h += sin(flowZ * 1.2 + xz.x * 0.5 + 2.0) * 0.04 * energy;
+  h += sin(flowZ * 2.5 - xz.x * 0.8) * 0.02 * energy;
+  // FBM texture
+  h += snoise(vec3(xz.x * 0.3, flowZ * 0.5, timeVal * 0.1)) * 0.06 * energy;
+  // Cross-chop from tension
+  h += sin(xz.x * 2.0 + flowZ * 2.0 + timeVal) * tension * 0.03;
+  return h - 0.2;
+}
+
+// ============================================================
+// River rocks
+// ============================================================
+float rivRocks(vec3 pos, float timeVal) {
+  float rocks = 1e5;
+  for (int i = 0; i < 12; i++) {
+    float fi = float(i);
+    vec3 seed = rivHash3(fi * 7.1 + 3.0);
+    float rockX = (seed.x - 0.5) * 5.0;
+    float rockZ = seed.y * 20.0 + 2.0;
+    float rockSize = 0.15 + seed.z * 0.25;
+
+    vec3 rockPos = vec3(rockX, -0.2 + rockSize * 0.4, rockZ);
+    // Slightly flattened ellipsoid for natural look
+    vec3 rockRadii = vec3(rockSize, rockSize * 0.6, rockSize * 0.9);
+    float rock = rivSDEllipsoid(pos - rockPos, rockRadii);
+    rocks = min(rocks, rock);
+  }
+  return rocks;
+}
+
+// ============================================================
+// Pine tree silhouette SDF (simplified cone + trunk)
+// ============================================================
+float rivPineTree(vec3 pos, float seed) {
+  float treeH = 2.0 + seed * 1.5;
+  // Trunk
+  float trunk = rivSDCapsule(pos, vec3(0.0), vec3(0.0, treeH * 0.4, 0.0), 0.05);
+  // Cone canopy: stacked cones
+  float canopy = 1e5;
+  for (int i = 0; i < 3; i++) {
+    float fi = float(i);
+    float coneY = treeH * (0.3 + fi * 0.2);
+    float coneRadius = (0.5 - fi * 0.1) * (1.0 + seed * 0.3);
+    float coneH = 0.6;
+    vec3 conePos = pos - vec3(0.0, coneY, 0.0);
+    // Cone approximation: inverted sphere at base, clipped
+    float cone = length(conePos.xz) - coneRadius * (1.0 - conePos.y / coneH);
+    cone = max(cone, -conePos.y);
+    cone = max(cone, conePos.y - coneH);
+    canopy = min(canopy, cone);
+  }
+  return min(trunk, canopy);
+}
+
+// ============================================================
+// Scene map: terrain + water + rocks + trees
+// matID: 0=bank ground, 1=water, 2=rock, 3=tree
+// ============================================================
+vec2 rivMap(vec3 pos, float timeVal, float energy, float bass, float tension,
+            float sJam, float sSpace) {
+  // Bank terrain
+  float bankH = rivBankHeight(pos.xz);
+  float bank = pos.y - bankH;
+  vec2 result = vec2(bank, 0.0);
+
+  // Water surface
+  float riverWidth = 3.0 + snoise(vec3(0.0, 0.0, pos.z * 0.1)) * 0.8;
+  float inRiver = 1.0 - smoothstep(riverWidth * 0.5 - 0.5, riverWidth * 0.5, abs(pos.x));
+  if (inRiver > 0.1) {
+    float waterH = rivWaterHeight(pos.xz, timeVal, energy, bass, tension, sJam, sSpace);
+    float water = pos.y - waterH;
+    if (water < result.x) {
+      result = vec2(water, 1.0);
+    }
+  }
+
+  // Rocks
+  float rocks = rivRocks(pos, timeVal);
+  if (rocks < result.x) {
+    result = vec2(rocks, 2.0);
+  }
+
+  // Pine trees on banks
+  for (int i = 0; i < 8; i++) {
+    float fi = float(i);
+    float treeSeed = rivHash(fi * 11.3);
+    float treeX = (fi < 4.0 ? -1.0 : 1.0) * (riverWidth * 0.5 + 1.5 + treeSeed * 3.0);
+    float treeZ = treeSeed * 25.0 + 1.0;
+    vec3 treeBase = vec3(treeX, rivBankHeight(vec2(treeX, treeZ)), treeZ);
+    float tree = rivPineTree(pos - treeBase, treeSeed);
+    if (tree < result.x) {
+      result = vec2(tree, 3.0);
+    }
+  }
+
+  return result;
+}
+
+// ============================================================
+// Normal
+// ============================================================
+vec3 rivNormal(vec3 pos, float timeVal, float energy, float bass, float tension,
+               float sJam, float sSpace) {
+  float eps = 0.002;
+  float d = rivMap(pos, timeVal, energy, bass, tension, sJam, sSpace).x;
+  return normalize(vec3(
+    rivMap(pos + vec3(eps, 0.0, 0.0), timeVal, energy, bass, tension, sJam, sSpace).x - d,
+    rivMap(pos + vec3(0.0, eps, 0.0), timeVal, energy, bass, tension, sJam, sSpace).x - d,
+    rivMap(pos + vec3(0.0, 0.0, eps), timeVal, energy, bass, tension, sJam, sSpace).x - d
+  ));
+}
+
+// ============================================================
+// Ambient occlusion
+// ============================================================
+float rivAO(vec3 pos, vec3 norm, float timeVal, float energy, float bass,
+            float tension, float sJam, float sSpace) {
+  float occ = 0.0;
+  float weight = 1.0;
+  for (int i = 1; i <= 5; i++) {
+    float dist = 0.01 + 0.05 * float(i);
+    float sampleD = rivMap(pos + norm * dist, timeVal, energy, bass, tension, sJam, sSpace).x;
+    occ += (dist - sampleD) * weight;
+    weight *= 0.65;
+  }
+  return clamp(1.0 - occ * 3.0, 0.0, 1.0);
+}
+
+// ============================================================
+// Soft shadow
+// ============================================================
+float rivSoftShadow(vec3 ro, vec3 rd, float mint, float maxt,
+                    float timeVal, float energy, float bass, float tension,
+                    float sJam, float sSpace) {
+  float res = 1.0;
+  float tSh = mint;
+  for (int i = 0; i < 32; i++) {
+    float h = rivMap(ro + rd * tSh, timeVal, energy, bass, tension, sJam, sSpace).x;
+    res = min(res, 8.0 * h / tSh);
+    tSh += clamp(h, 0.02, 0.3);
+    if (h < 0.001 || tSh > maxt) break;
+  }
+  return clamp(res, 0.0, 1.0);
+}
+
+// ============================================================
+// Sky
+// ============================================================
+vec3 rivSky(vec3 rd, float slowE, vec3 sunDir, vec3 palCol1, vec3 palCol2) {
+  float skyGrad = rd.y * 0.5 + 0.5;
+  vec3 skyBottom = mix(vec3(0.9, 0.65, 0.35), vec3(1.0, 0.7, 0.4), slowE);
+  vec3 skyTop = mix(vec3(0.4, 0.55, 0.85), palCol2 * 0.7, 0.15);
+  vec3 sky = mix(skyBottom, skyTop, skyGrad);
+
+  float sunDot = max(dot(rd, sunDir), 0.0);
+  sky += vec3(1.0, 0.85, 0.55) * pow(sunDot, 96.0) * 2.5;
+  sky += vec3(1.0, 0.75, 0.4) * pow(sunDot, 12.0) * 0.3;
+
+  // Clouds
+  float cloudN = fbm3(vec3(rd.xz * 3.0 / max(rd.y, 0.05), uDynamicTime * 0.015));
+  float cloudMask = smoothstep(0.1, 0.6, rd.y) * smoothstep(0.9, 0.5, rd.y);
+  sky += vec3(1.0, 0.95, 0.85) * smoothstep(0.35, 0.65, cloudN) * cloudMask * 0.2;
+
+  return sky;
+}
+
+// ============================================================
+// Volumetric mist from rapids
+// ============================================================
+vec3 rivMist(vec3 ro, vec3 rd, float marchDist, float timeVal, float energy,
+             float vocalP) {
+  vec3 mist = vec3(0.0);
+  float mistIntensity = vocalP * 0.4 + energy * 0.15;
+  if (mistIntensity < 0.02) return mist;
+
+  float stepSize = 0.5;
+  for (int i = 0; i < 20; i++) {
+    float tM = float(i) * stepSize + 0.5;
+    if (tM > marchDist) break;
+    vec3 mPos = ro + rd * tM;
+
+    // Mist near water surface
+    float heightMask = smoothstep(-0.5, 0.2, mPos.y) * smoothstep(1.5, 0.3, mPos.y);
+    // Only near river channel
+    float riverWidth = 3.0 + snoise(vec3(0.0, 0.0, mPos.z * 0.1)) * 0.8;
+    float channelMask = smoothstep(riverWidth, riverWidth * 0.3, abs(mPos.x));
+
+    float noiseDensity = fbm3(vec3(mPos.x * 0.3, mPos.z * 0.3 - timeVal * 0.1, timeVal * 0.05));
+    noiseDensity = smoothstep(0.3, 0.7, noiseDensity);
+
+    float density = heightMask * channelMask * noiseDensity * mistIntensity * 0.04;
+    vec3 mistColor = vec3(0.85, 0.88, 0.92);
+    mist += mistColor * density * stepSize;
+  }
+  return mist;
+}
+
+void main() {
+  vec2 uv = vUv;
+  vec2 aspect = vec2(uResolution.x / uResolution.y, 1.0);
+  vec2 screenPos = (uv - 0.5) * aspect;
 
   float energy = clamp(uEnergy, 0.0, 1.0);
   float bass = clamp(uBass, 0.0, 1.0);
-  float onset = clamp(uOnsetSnap, 0.0, 1.0);
-  float tension = clamp(uHarmonicTension, 0.0, 1.0);
-  float beatStab = clamp(uBeatStability, 0.0, 1.0);
+  float highs = clamp(uHighs, 0.0, 1.0);
+  float onset = clamp(uDrumOnset, 0.0, 1.0);
   float slowE = clamp(uSlowEnergy, 0.0, 1.0);
+  float chromaH = clamp(uChromaHue, 0.0, 1.0);
+  float flux = clamp(uSpectralFlux, 0.0, 1.0);
+  float vocalP = clamp(uVocalPresence, 0.0, 1.0);
+  float melPitch = clamp(uMelodicPitch, 0.0, 1.0);
+  float tension = clamp(uHarmonicTension, 0.0, 1.0);
+  float dynRange = clamp(uDynamicRange, 0.0, 1.0);
+  float beatSnap = clamp(uBeatSnap, 0.0, 1.0);
+  float beatStab = clamp(uBeatStability, 0.0, 1.0);
 
-  // Section type modulation
   float sectionT = uSectionType;
   float sJam = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
   float sSpace = smoothstep(6.5, 7.5, sectionT);
   float sSolo = smoothstep(3.5, 4.5, sectionT) * (1.0 - step(4.5, sectionT));
+  float sChorus = smoothstep(1.5, 2.5, sectionT) * (1.0 - step(2.5, sectionT));
 
-  float flowSpeed = mix(0.3, 1.5, energy * energy);
-  flowSpeed *= mix(1.0, 1.6, sJam);
-  flowSpeed *= mix(1.0, 0.15, sSpace);
-  flowSpeed *= mix(1.0, 1.3, sSolo);
+  float isClimax = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5);
+  float climaxBoost = isClimax * uClimaxIntensity;
 
-  float t = uDynamicTime * flowSpeed;
+  float timeVal = uDynamicTime * 0.15;
 
-  // === Layer 1: Large rolling swells (bass-driven) ===
-  float swellAmp = mix(0.15, 0.8, bass) * mix(0.5, 1.0, energy);
-  swellAmp *= mix(1.0, 0.1, sSpace); // calm in space
-  float swell = sin(pos.x * 0.3 + t * 0.4) * sin(pos.z * 0.2 - t * 0.6) * swellAmp;
-  swell += sin(pos.x * 0.15 - t * 0.25 + 1.7) * cos(pos.z * 0.1 - t * 0.35) * swellAmp * 0.6;
+  // Palette
+  float hue1 = uPalettePrimary + chromaH * 0.06;
+  float hue2 = uPaletteSecondary + chromaH * 0.04;
+  float palSat = mix(0.5, 0.85, slowE) * uPaletteSaturation;
+  vec3 palCol1 = hsv2rgb(vec3(hue1, palSat, mix(0.5, 0.8, energy)));
+  vec3 palCol2 = hsv2rgb(vec3(hue2, palSat * 0.8, mix(0.6, 0.85, energy)));
 
-  // === Layer 2: Mid-frequency waves (energy-driven) ===
-  float midWaveAmp = mix(0.05, 0.35, energy);
-  float midWave = sin(pos.x * 1.2 + t * 1.5 + 3.1) * sin(pos.z * 0.8 - t * 2.0) * midWaveAmp;
-  midWave += sin(pos.x * 0.7 - pos.z * 1.5 + t * 1.8) * midWaveAmp * 0.4;
+  // Camera: alongside the river
+  float camZ = uTime * 0.15 + 2.0;
+  float camX = -2.0 + sin(uTime * 0.03) * 0.5;
+  float camY = 1.2 + sin(uTime * 0.05) * 0.1;
+  vec3 camOrigin = vec3(camX, camY + rivBankHeight(vec2(camX, camZ)) * 0.3, camZ);
+  vec3 camTarget = camOrigin + vec3(1.5, -0.3, 3.0);
+  vec3 camForward = normalize(camTarget - camOrigin);
+  vec3 camWorldUp = vec3(0.0, 1.0, 0.0);
+  vec3 camRt = normalize(cross(camForward, camWorldUp));
+  vec3 camUpV = cross(camRt, camForward);
 
-  // === Layer 3: FBM noise displacement for natural texture ===
-  vec3 noisePos = vec3(pos.x * 0.08, pos.z * 0.08 - t * 0.15, uTime * 0.1);
-  float fbmDisp = fbm(noisePos) * mix(0.1, 0.5, energy);
-  // Finer detail layer
-  float fbmFine = fbm(noisePos * 3.0 + vec3(17.0, 0.0, 5.0)) * mix(0.02, 0.15, energy);
+  vec3 rd = normalize(screenPos.x * camRt + screenPos.y * camUpV + 1.5 * camForward);
 
-  // === Layer 4: Onset splash ripples ===
-  float onsetRipple = 0.0;
-  if (onset > 0.1) {
-    float dist = length(pos.xz);
-    onsetRipple = sin(dist * 2.0 - uTime * 8.0) * onset * 0.3 * smoothstep(20.0, 0.0, dist);
+  // Sun: golden hour low angle
+  vec3 sunDir = normalize(vec3(0.6, 0.25, 0.3));
+
+  // ─── Raymarching ───
+  float marchDist = 0.0;
+  vec2 marchResult = vec2(MAX_DIST, -1.0);
+
+  for (int i = 0; i < MAX_STEPS; i++) {
+    vec3 pos = camOrigin + rd * marchDist;
+    vec2 dist = rivMap(pos, timeVal, energy, bass, tension, sJam, sSpace);
+    if (dist.x < SURF_DIST) {
+      marchResult = vec2(marchDist, dist.y);
+      break;
+    }
+    marchDist += dist.x * 0.7;
+    if (marchDist > MAX_DIST) break;
   }
 
-  // === Layer 5: Harmonic tension cross-chop ===
-  float chop = sin(pos.x * 2.5 + pos.z * 2.5 + t * 3.0) * tension * mix(0.05, 0.25, energy);
+  vec3 col;
 
-  // === Layer 6: Beat-locked pulse ===
-  float beatPulse = sin(pos.z * 0.5 - uTime * 4.0) * beatStab * 0.08;
+  if (marchResult.y < 0.0) {
+    col = rivSky(rd, slowE, sunDir, palCol1, palCol2);
+  } else {
+    vec3 hitPos = camOrigin + rd * marchResult.x;
+    vec3 norm = rivNormal(hitPos, timeVal, energy, bass, tension, sJam, sSpace);
+    float matID = marchResult.y;
+    float ambOcc = rivAO(hitPos, norm, timeVal, energy, bass, tension, sJam, sSpace);
 
-  float totalDisp = swell + midWave + fbmDisp + fbmFine + onsetRipple + chop + beatPulse;
-  pos.y += totalDisp;
+    float diffuse = max(dot(norm, sunDir), 0.0);
+    float shadow = rivSoftShadow(hitPos + norm * 0.01, sunDir, 0.05, 10.0,
+                                  timeVal, energy, bass, tension, sJam, sSpace);
+    diffuse *= shadow;
 
-  vDisplacement = totalDisp;
+    vec3 viewDir = normalize(camOrigin - hitPos);
+    vec3 halfDir = normalize(sunDir + viewDir);
+    float fresnelVal = pow(1.0 - max(dot(viewDir, norm), 0.0), 3.0);
 
-  // Foam factor: high displacement + high energy = foam
-  float dispMag = abs(totalDisp);
-  float foamThreshold = mix(0.5, 0.15, energy);
-  vFoamFactor = smoothstep(foamThreshold, foamThreshold + 0.2, dispMag) * energy;
-  vFoamFactor += onset * 0.3; // onset adds foam
+    vec3 matColor;
+    vec3 specCol;
+    float specPow;
 
-  // Compute approximate normal from displacement gradient
-  float eps = 0.5;
-  vec3 posR = vec3(pos.x + eps, position.y, pos.z);
-  vec3 posF = vec3(pos.x, position.y, pos.z + eps);
-  float dispR = sin(posR.x * 0.3 + t * 0.4) * sin(posR.z * 0.2 - t * 0.6) * swellAmp
-              + sin(posR.x * 1.2 + t * 1.5 + 3.1) * sin(posR.z * 0.8 - t * 2.0) * midWaveAmp
-              + fbm(vec3(posR.x * 0.08, posR.z * 0.08 - t * 0.15, uTime * 0.1)) * mix(0.1, 0.5, energy);
-  float dispF = sin(posF.x * 0.3 + t * 0.4) * sin(posF.z * 0.2 - t * 0.6) * swellAmp
-              + sin(posF.x * 1.2 + t * 1.5 + 3.1) * sin(posF.z * 0.8 - t * 2.0) * midWaveAmp
-              + fbm(vec3(posF.x * 0.08, posF.z * 0.08 - t * 0.15, uTime * 0.1)) * mix(0.1, 0.5, energy);
-  vec3 tangent = normalize(vec3(eps, dispR - totalDisp, 0.0));
-  vec3 bitangent = normalize(vec3(0.0, dispF - totalDisp, eps));
-  vNormal = normalize(cross(bitangent, tangent));
+    if (matID < 0.5) {
+      // Bank: grass/earth
+      float grassN = fbm3(vec3(hitPos.xz * 2.0, 0.0));
+      matColor = mix(vec3(0.15, 0.35, 0.08), vec3(0.25, 0.45, 0.12), grassN);
+      matColor = mix(matColor, vec3(0.3, 0.22, 0.1), smoothstep(0.5, 0.0, hitPos.y) * 0.5);
+      specCol = vec3(0.08, 0.1, 0.04);
+      specPow = 8.0;
+    } else if (matID < 1.5) {
+      // Water surface
+      float waterDepth = 0.5 + energy * 0.3;
+      vec3 deepColor = mix(vec3(0.05, 0.15, 0.2), palCol1 * 0.4, 0.2);
+      vec3 shallowColor = mix(vec3(0.1, 0.25, 0.3), palCol2 * 0.5, 0.15);
+      matColor = mix(deepColor, shallowColor, 0.5);
 
-  vWorldPos = (modelMatrix * vec4(pos, 1.0)).xyz;
+      // Sky reflection via fresnel
+      vec3 reflDir = reflect(rd, norm);
+      vec3 skyRefl = rivSky(reflDir, slowE, sunDir, palCol1, palCol2);
+      matColor = mix(matColor, skyRefl, fresnelVal * 0.7);
 
-  gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+      // Foam at rapids: high displacement = foam
+      float flowSpeed = mix(0.5, 2.5, energy) * mix(1.0, 1.6, sJam) * mix(1.0, 0.15, sSpace);
+      float foamNoise = fbm3(vec3(hitPos.xz * 1.5 + vec2(0.0, -timeVal * flowSpeed * 0.3), timeVal * 0.2));
+      float foamMask = smoothstep(0.4, 0.7, foamNoise) * energy;
+      foamMask += onset * 0.3;
+      foamMask += climaxBoost * 0.2;
+      matColor = mix(matColor, vec3(0.9, 0.92, 0.95), clamp(foamMask, 0.0, 0.7) * 0.6);
+
+      // Sparkle from highs
+      float sparkle = smoothstep(0.9, 0.95, snoise(vec3(hitPos.xz * 10.0, uDynamicTime * 0.5)));
+      matColor += vec3(1.0, 0.95, 0.85) * sparkle * highs * 0.5;
+
+      // Subsurface caustics
+      float causticN = fbm3(vec3(hitPos.xz * 0.8 + vec2(0.0, -timeVal * flowSpeed * 0.1), timeVal * 0.08));
+      causticN = pow(max(causticN * 0.5 + 0.5, 0.0), 2.5);
+      matColor += shallowColor * causticN * 0.15 * (1.0 - fresnelVal);
+
+      specCol = vec3(0.5, 0.5, 0.6);
+      specPow = 64.0;
+    } else if (matID < 2.5) {
+      // Rocks: wet stone
+      float rockN = fbm3(vec3(hitPos * 3.0));
+      matColor = mix(vec3(0.2, 0.18, 0.15), vec3(0.35, 0.3, 0.25), rockN);
+      // Wet sheen
+      matColor *= 0.7 + 0.3 * smoothstep(-0.3, 0.1, hitPos.y);
+      specCol = vec3(0.2, 0.18, 0.15);
+      specPow = 32.0;
+    } else {
+      // Pine trees: dark green silhouette
+      matColor = vec3(0.05, 0.12, 0.04);
+      specCol = vec3(0.02, 0.04, 0.01);
+      specPow = 4.0;
+    }
+
+    float specular = pow(max(dot(norm, halfDir), 0.0), specPow) * shadow;
+
+    // Compose lighting
+    vec3 sunColor = vec3(1.0, 0.85, 0.6); // golden hour
+    vec3 ambientLight = vec3(0.1, 0.12, 0.15);
+
+    col = matColor * ambientLight * ambOcc;
+    col += matColor * sunColor * diffuse * 0.65;
+    col += specCol * sunColor * specular * 0.4;
+    if (matID > 0.5 && matID < 1.5) {
+      col += matColor * fresnelVal * 0.15; // extra fresnel on water
+    }
+
+    // Distance fog
+    float fogDist = marchResult.x;
+    float fogAmount = 1.0 - exp(-fogDist * 0.03);
+    vec3 fogColor = mix(vec3(0.7, 0.6, 0.45), palCol2 * 0.5, 0.2);
+    col = mix(col, fogColor, fogAmount);
+  }
+
+  // ─── Volumetric mist ───
+  float mistMarchDist = marchResult.y < 0.0 ? MAX_DIST : marchResult.x;
+  col += rivMist(camOrigin, rd, mistMarchDist, timeVal, energy, vocalP);
+
+  // ─── Icon emergence ───
+  {
+    float nf = fbm3(vec3(screenPos * 2.0, timeVal));
+    vec3 iconLight = iconEmergence(screenPos, uTime, energy, bass,
+      palCol1, palCol2, nf, uClimaxPhase, uSectionIndex);
+    col += iconLight;
+  }
+  {
+    float nf = fbm3(vec3(screenPos * 1.5, timeVal + 8.0));
+    vec3 heroLight = heroIconEmergence(screenPos, uTime, energy, bass,
+      palCol1, palCol2, nf, uSectionIndex);
+    col += heroLight;
+  }
+
+  // ─── Vignette ───
+  float vigScale = mix(0.28, 0.22, energy);
+  float vignette = 1.0 - dot(screenPos * vigScale, screenPos * vigScale);
+  vignette = smoothstep(0.0, 1.0, vignette);
+  col = mix(vec3(0.05, 0.04, 0.02), col, vignette);
+
+  // ─── Post-processing ───
+  col = applyPostProcess(col, vUv, screenPos);
+
+  gl_FragColor = vec4(col, 1.0);
 }
 `;
 
-export const riverWaterFrag = /* glsl */ `
-precision highp float;
-
-uniform float uTime;
-uniform float uDynamicTime;
-uniform float uEnergy;
-uniform float uBass;
-uniform float uHighs;
-uniform float uOnsetSnap;
-uniform float uSlowEnergy;
-uniform float uChromaHue;
-uniform float uVocalEnergy;
-uniform float uVocalPresence;
-uniform float uPalettePrimary;
-uniform float uPaletteSecondary;
-uniform float uPaletteSaturation;
-uniform float uMelodicPitch;
-uniform float uClimaxPhase;
-uniform float uClimaxIntensity;
-uniform float uBeatStability;
-uniform float uSectionType;
-uniform float uHarmonicTension;
-uniform vec3 uCameraPosition;
-
-varying vec2 vUv;
-varying vec3 vWorldPos;
-varying vec3 vNormal;
-varying float vDisplacement;
-varying float vFoamFactor;
-
-${noiseGLSL}
-
-void main() {
-  float energy = clamp(uEnergy, 0.0, 1.0);
-  float bass = clamp(uBass, 0.0, 1.0);
-  float highs = clamp(uHighs, 0.0, 1.0);
-  float onset = clamp(uOnsetSnap, 0.0, 1.0);
-  float slowE = clamp(uSlowEnergy, 0.0, 1.0);
-  float chromaH = clamp(uChromaHue, 0.0, 1.0);
-  float melPitch = clamp(uMelodicPitch, 0.0, 1.0);
-  float tension = clamp(uHarmonicTension, 0.0, 1.0);
-
-  // === WATER COLOR: palette-driven with chroma hue shift ===
-  float hue1 = uPalettePrimary + chromaH * 0.08;
-  float hue2 = uPaletteSecondary + chromaH * 0.06;
-  float sat = mix(0.5, 0.8, slowE) * uPaletteSaturation;
-
-  vec3 deepColor = hsv2rgb(vec3(hue1, sat, 0.2 + energy * 0.15));
-  vec3 midColor = hsv2rgb(vec3(mix(hue1, hue2, 0.5), sat * 0.9, 0.3 + energy * 0.2));
-  vec3 shallowColor = hsv2rgb(vec3(hue2, sat * 0.7, 0.45 + energy * 0.25));
-
-  // Depth-based: use world Z to pick color (far = deep, near = shallow)
-  float depthFactor = smoothstep(-50.0, 10.0, vWorldPos.z);
-  vec3 waterColor = mix(deepColor, shallowColor, depthFactor * 0.7);
-  waterColor = mix(waterColor, midColor, clamp(vDisplacement * 0.3 + 0.35, 0.0, 1.0));
-
-  // === DOMAIN-WARPED SUBSURFACE CAUSTICS (secondary layer at 30%) ===
-  float energyFreq = 1.0 + energy * 0.5;
-  vec3 warpPos = vec3(vWorldPos.xz * 0.15 * energyFreq, uDynamicTime * 0.08);
-  float warpOffset = fbm3(warpPos) * 0.4;
-  vec3 causticPos = vec3(vWorldPos.x * 0.2 + warpOffset, vWorldPos.z * 0.2 - warpOffset, uDynamicTime * 0.12);
-  float caustics = fbm6(causticPos * energyFreq);
-  caustics = pow(max(0.0, caustics * 0.5 + 0.5), 2.0);
-  vec3 causticColor = mix(shallowColor, vec3(0.4, 0.6, 0.8), 0.5) * caustics;
-  waterColor += causticColor * 0.3 * (1.0 - depthFactor);
-
-  // === FRESNEL REFLECTION ===
-  vec3 viewDir = normalize(uCameraPosition - vWorldPos);
-  vec3 N = normalize(vNormal);
-  float fresnel = pow(1.0 - max(dot(viewDir, N), 0.0), 3.0);
-  fresnel = mix(0.1, 0.8, fresnel);
-
-  // Sky reflection color — domain-warped for rippled reflection
-  vec3 reflWarpPos = vec3(vWorldPos.xz * 0.03, uDynamicTime * 0.05);
-  float reflWarp = fbm3(reflWarpPos) * 0.15;
-  vec3 skyColor = mix(
-    vec3(0.02, 0.04, 0.1),
-    vec3(0.08, 0.12, 0.25),
-    0.5 + 0.5 * N.y + reflWarp
-  );
-  // Secondary palette sky tint
-  skyColor = mix(skyColor, hsv2rgb(vec3(hue2, sat * 0.3, 0.2)), 0.15);
-  // Moon/melodic glow in reflection
-  skyColor += vec3(0.3, 0.35, 0.5) * melPitch * 0.3;
-
-  waterColor = mix(waterColor, skyColor, fresnel);
-
-  // === SURFACE SPARKLE: energy + highs driven ===
-  vec3 sparklePos = vec3(vWorldPos.xz * 0.5, uDynamicTime * 0.3);
-  float sparkleNoise = snoise(sparklePos);
-  float sparkleThreshold = mix(0.88, 0.55, energy + highs * 0.3);
-  float sparkle = smoothstep(sparkleThreshold, sparkleThreshold + 0.04, sparkleNoise);
-  sparkle *= mix(0.3, 1.0, energy) * (0.4 + highs * 0.6);
-  // Sparkle picks up both palette colors
-  vec3 sparkleColor = mix(vec3(0.9, 0.92, 1.0), hsv2rgb(vec3(hue1, sat * 0.3, 1.0)), 0.2);
-  waterColor += sparkleColor * sparkle * 0.4;
-
-  // === FOAM at wave crests — richer with fbm6 ===
-  vec3 foamColor = vec3(0.85, 0.9, 0.95);
-  float foam = vFoamFactor;
-  // High-detail foam noise
-  float foamNoise = fbm6(vec3(vWorldPos.xz * 0.3 * energyFreq, uDynamicTime * 0.2));
-  foam *= smoothstep(0.2, 0.6, foamNoise);
-  // Secondary foam detail layer for lace-like texture
-  float foamDetail = fbm3(vec3(vWorldPos.xz * 1.2 * energyFreq, uDynamicTime * 0.15 + 5.0));
-  foam += smoothstep(0.55, 0.75, foamDetail) * energy * 0.25;
-  foam = clamp(foam, 0.0, 1.0);
-  waterColor = mix(waterColor, foamColor, foam * 0.7);
-
-  // === BASS RIPPLE HIGHLIGHT ===
-  float bassHighlight = sin(length(vWorldPos.xz) * 0.5 - uDynamicTime * 2.0 * bass) * bass * 0.08;
-  waterColor += vec3(0.5, 0.6, 0.8) * max(0.0, bassHighlight);
-
-  // === ONSET SPLASH BRIGHTNESS ===
-  waterColor += vec3(0.3, 0.35, 0.4) * onset * 0.2;
-
-  // === CLIMAX BOOST ===
-  float climaxPhase = uClimaxPhase;
-  float climaxI = uClimaxIntensity;
-  float isClimax = step(1.5, climaxPhase) * step(climaxPhase, 3.5);
-  float climaxBoost = isClimax * climaxI;
-  waterColor *= 1.0 + climaxBoost * 0.35;
-
-  // === DEPTH FOG at distance (layered for richness) ===
-  float fogDist = length(uCameraPosition - vWorldPos);
-  float fogAmount = 1.0 - exp(-fogDist * 0.015 * mix(1.5, 0.5, energy));
-  vec3 fogColor = mix(
-    hsv2rgb(vec3(hue1, sat * 0.2, 0.06)),
-    hsv2rgb(vec3(hue2, sat * 0.15, 0.12)),
-    0.5 + 0.3 * sin(vWorldPos.x * 0.01)
-  );
-  waterColor = mix(waterColor, fogColor, clamp(fogAmount, 0.0, 0.7));
-
-  gl_FragColor = vec4(waterColor, 1.0);
-}
-`;
-
-// Keep legacy exports for backwards compatibility (unused but prevents import errors)
-export const riverVert = riverWaterVert;
-export const riverFrag = riverWaterFrag;
+// Legacy exports for backward compatibility
+export const riverWaterVert = riverVert;
+export const riverWaterFrag = riverFrag;

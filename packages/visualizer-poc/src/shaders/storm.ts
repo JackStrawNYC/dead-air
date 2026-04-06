@@ -1,17 +1,26 @@
 /**
- * Storm — thunderstorm clouds viewed from below with lightning, rain, and wind.
- * Dramatic, ominous, powerful. Near-black between flashes, full electrical storm at peaks.
+ * Storm — raymarched supercell thunderstorm.
+ * Massive volumetric cumulonimbus cloud, rotating mesocyclone, rain curtains,
+ * ground-to-cloud lightning bolts on drum onset, green-tinted sky.
  *
  * Audio reactivity:
- *   uEnergy       -> cloud roil speed, overall storm intensity
- *   uOnset        -> lightning flash trigger
- *   uBass         -> wind particle intensity, thunder rumble glow
- *   uHighs        -> rain intensity, detail in cloud edges
- *   uOnsetSnap    -> secondary flash trigger
- *   uSlowEnergy   -> ambient purple cloud glow
- *   uStemDrumOnset -> biggest lightning bolts
- *   uSpectralFlux -> cloud turbulence
- *   uSectionType  -> jam=constant rumble/frequent lightning, space=distant/dark, solo=massive bolt
+ *   uBass             → wind intensity, thunder rumble glow
+ *   uEnergy           → cloud roil speed, overall storm intensity
+ *   uDrumOnset        → biggest lightning bolts
+ *   uVocalPresence    → eerie green tint intensity
+ *   uHarmonicTension  → cloud darkness/menace
+ *   uBeatSnap         → rain intensity pulse
+ *   uSectionType      → jam=constant rumble/frequent lightning, space=distant/dark, solo=massive bolt
+ *   uClimaxPhase      → full electrical storm eruption
+ *   uSlowEnergy       → ambient purple cloud glow
+ *   uHighs            → rain detail, hail sparkle
+ *   uOnsetSnap        → secondary flash trigger
+ *   uMelodicPitch     → mesocyclone rotation speed
+ *   uChromaHue        → lightning color shift
+ *   uPalettePrimary   → cloud glow color
+ *   uPaletteSecondary → lightning accent
+ *   uSpectralFlux     → cloud turbulence
+ *   uDynamicRange     → contrast between lit/unlit
  */
 
 import { noiseGLSL } from "./noise";
@@ -33,293 +42,453 @@ ${sharedUniformsGLSL}
 
 ${noiseGLSL}
 
-${buildPostProcessGLSL({ grainStrength: 'heavy', bloomEnabled: true, caEnabled: true })}
+${buildPostProcessGLSL({
+  grainStrength: "heavy",
+  bloomEnabled: true,
+  bloomThresholdOffset: -0.1,
+  caEnabled: true,
+  halationEnabled: true,
+  lensDistortionEnabled: true,
+  beatPulseEnabled: true,
+})}
 
 varying vec2 vUv;
 
 #define PI 3.14159265
+#define TAU 6.28318530
+#define MAX_STEPS 60
+#define MAX_DIST 50.0
+#define SURF_DIST 0.005
 
-// --- Storm cloud FBM: layered, turbulent ---
-mat2 stormRot = mat2(0.82, 0.57, -0.57, 0.82);
-
-float stormCloudFBM(vec3 p, int octaves) {
-  float val = 0.0;
-  float amp = 0.5;
-  float freq = 1.0;
-  // Domain warp for turbulent cloud structure
-  float wx = snoise(p * 0.25 + vec3(5.0, 0.0, 3.0)) * 0.35;
-  float wz = snoise(p * 0.2 + vec3(0.0, 7.0, 11.0)) * 0.3;
-  p.x += wx;
-  p.z += wz;
-  for (int i = 0; i < 8; i++) {
-    if (i >= octaves) break;
-    val += amp * snoise(p * freq);
-    p.xz = stormRot * p.xz;
-    p.y *= 1.05;
-    freq *= 2.15;
-    amp *= 0.50;
-  }
-  return val;
+// ============================================================
+// Prefixed utilities (stm = storm)
+// ============================================================
+mat2 stmRot2(float a) {
+  float c = cos(a), s = sin(a);
+  return mat2(c, -s, s, c);
 }
 
-// --- Lightning bolt SDF: branching fork pattern ---
-float lightningBolt(vec2 p, float seed, float time) {
-  // Main bolt: segmented zigzag line
-  float d = 1e10;
-  vec2 pos = vec2(0.0, 0.5); // start from top
-  float segLen = 0.08;
-  float angle = -PI * 0.5; // pointing down
+float stmHash(float n) { return fract(sin(n) * 43758.5453123); }
+float stmHash2(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+vec3 stmHash3(float n) {
+  return vec3(
+    fract(sin(n * 127.1) * 43758.5453),
+    fract(sin(n * 269.5) * 43758.5453),
+    fract(sin(n * 419.2) * 43758.5453)
+  );
+}
 
-  for (int i = 0; i < 12; i++) {
-    // Random zigzag angle per segment
-    float h = fract(sin(float(i) * 73.156 + seed * 31.72) * 43758.5453);
-    float zigzag = (h - 0.5) * 1.2;
-    angle += zigzag;
+// ============================================================
+// SDF primitives
+// ============================================================
+float stmSDSphere(vec3 pos, float radius) {
+  return length(pos) - radius;
+}
 
-    vec2 nextPos = pos + vec2(cos(angle), sin(angle)) * segLen;
+float stmSDPlane(vec3 pos, float yLevel) {
+  return pos.y - yLevel;
+}
 
-    // Line segment SDF
-    vec2 pa = p - pos;
-    vec2 ba = nextPos - pos;
-    float t = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0);
-    float segDist = length(pa - ba * t);
+float stmSmin(float a, float b, float k) {
+  float h = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0);
+  return mix(b, a, h) - k * h * (1.0 - h);
+}
 
-    // Thicker at top, thinner at bottom
-    float thickness = 0.006 * (1.0 - float(i) * 0.06);
-    d = min(d, segDist - thickness);
+// ============================================================
+// Ground terrain (flat plains with puddles)
+// ============================================================
+float stmGroundHeight(vec2 xz) {
+  float h = 0.0;
+  h += snoise(vec3(xz * 0.05, 0.0)) * 0.5;
+  h += snoise(vec3(xz * 0.15, 5.0)) * 0.15;
+  return h;
+}
 
-    // Branch at some segments
-    if (i == 3 || i == 6 || i == 9) {
-      float branchAngle = angle + (h > 0.5 ? 0.8 : -0.8);
-      vec2 branchEnd = pos + vec2(cos(branchAngle), sin(branchAngle)) * segLen * 0.6;
-      vec2 bp = p - pos;
-      vec2 bb = branchEnd - pos;
-      float bt = clamp(dot(bp, bb) / dot(bb, bb), 0.0, 1.0);
-      float branchDist = length(bp - bb * bt) - 0.003;
-      d = min(d, branchDist);
+float stmMap(vec3 pos) {
+  float ground = pos.y - stmGroundHeight(pos.xz);
+  return ground;
+}
+
+vec3 stmNormal(vec3 pos) {
+  float eps = 0.01;
+  float d = stmMap(pos);
+  return normalize(vec3(
+    stmMap(pos + vec3(eps, 0.0, 0.0)) - d,
+    stmMap(pos + vec3(0.0, eps, 0.0)) - d,
+    stmMap(pos + vec3(0.0, 0.0, eps)) - d
+  ));
+}
+
+float stmAO(vec3 pos, vec3 norm) {
+  float occ = 0.0;
+  float weight = 1.0;
+  for (int i = 1; i <= 5; i++) {
+    float dist = 0.02 + 0.08 * float(i);
+    float sampleD = stmMap(pos + norm * dist);
+    occ += (dist - sampleD) * weight;
+    weight *= 0.65;
+  }
+  return clamp(1.0 - occ * 2.0, 0.0, 1.0);
+}
+
+// ============================================================
+// Volumetric cloud density — supercell structure
+// ============================================================
+float stmCloudDensity(vec3 pos, float timeVal, float energy, float flux,
+                      float melPitch, float sJam, float sSpace) {
+  // Cloud base and top
+  float cloudBase = 6.0;
+  float cloudTop = 20.0;
+  float heightFrac = (pos.y - cloudBase) / (cloudTop - cloudBase);
+  if (heightFrac < 0.0 || heightFrac > 1.0) return 0.0;
+
+  // Vertical density envelope: anvil shape
+  float verticalEnvelope = smoothstep(0.0, 0.15, heightFrac) * smoothstep(1.0, 0.7, heightFrac);
+  // Extra density bulge in middle for supercell updraft
+  verticalEnvelope += smoothstep(0.3, 0.5, heightFrac) * smoothstep(0.7, 0.5, heightFrac) * 0.5;
+
+  // Mesocyclone rotation
+  float rotSpeed = (0.1 + melPitch * 0.15 + energy * 0.1) * mix(1.0, 1.5, sJam) * mix(1.0, 0.3, sSpace);
+  vec2 rotatedXZ = stmRot2(timeVal * rotSpeed) * (pos.xz - vec2(0.0, 10.0));
+  vec3 cloudP = vec3(rotatedXZ.x, pos.y, rotatedXZ.y);
+
+  // Domain warp for turbulence
+  float warpX = snoise(cloudP * 0.08 + vec3(5.0, 0.0, 3.0)) * 2.0;
+  float warpZ = snoise(cloudP * 0.06 + vec3(0.0, 7.0, 11.0)) * 1.8;
+  cloudP.x += warpX;
+  cloudP.z += warpZ;
+
+  // Multi-octave cloud noise
+  float cloudNoise = 0.0;
+  float amp = 0.5;
+  float freq = 0.15;
+  int octaves = 4 + int(energy * 2.0) + int(sJam);
+  for (int i = 0; i < 7; i++) {
+    if (i >= octaves) break;
+    cloudNoise += amp * snoise(cloudP * freq + vec3(0.0, -timeVal * 0.05 * float(i + 1), 0.0));
+    cloudP.xz = stmRot2(0.57) * cloudP.xz;
+    freq *= 2.1;
+    amp *= 0.48;
+  }
+
+  // Combine
+  float density = verticalEnvelope * (cloudNoise * 0.5 + 0.5);
+  density = smoothstep(0.2, 0.6, density);
+
+  // Flux adds more turbulent detail
+  density *= 1.0 + flux * 0.3;
+
+  return clamp(density, 0.0, 1.0);
+}
+
+// ============================================================
+// Lightning bolt (procedural branching zigzag)
+// ============================================================
+float stmLightningBolt(vec3 ro, vec3 rd, float boltSeed, vec2 boltXZ, float timeVal) {
+  float intensity = 0.0;
+
+  // Main bolt path: from cloud base to ground
+  vec3 boltStart = vec3(boltXZ.x, 15.0, boltXZ.y);
+  vec3 boltEnd = vec3(boltXZ.x + (stmHash(boltSeed) - 0.5) * 4.0, 0.0, boltXZ.y + (stmHash(boltSeed + 1.0) - 0.5) * 3.0);
+
+  int segments = 16;
+  vec3 prevSeg = boltStart;
+
+  for (int i = 1; i <= 16; i++) {
+    float fi = float(i) / float(segments);
+    vec3 nextSeg = mix(boltStart, boltEnd, fi);
+    // Zigzag offset
+    float jitterX = (stmHash(boltSeed + fi * 73.1) - 0.5) * 3.0 * (1.0 - fi);
+    float jitterZ = (stmHash(boltSeed + fi * 91.7) - 0.5) * 2.0 * (1.0 - fi);
+    nextSeg.x += jitterX;
+    nextSeg.z += jitterZ;
+
+    // Closest approach of ray to line segment
+    vec3 pa = ro - prevSeg;
+    vec3 ba = nextSeg - prevSeg;
+    vec3 baNorm = normalize(ba);
+    float baLen = length(ba);
+
+    float tLine = clamp(dot(pa, baNorm), 0.0, baLen);
+    vec3 closestOnLine = prevSeg + baNorm * tLine;
+    float tRay = dot(closestOnLine - ro, rd);
+    if (tRay < 0.0) { prevSeg = nextSeg; continue; }
+    vec3 closestOnRay = ro + rd * tRay;
+    float dist = length(closestOnRay - closestOnLine);
+
+    // Thickness: thicker at top, thinner at bottom
+    float thickness = 0.03 * (1.0 - fi * 0.7);
+    float glow = exp(-dist * dist / (thickness * thickness * 8.0));
+    float core = exp(-dist * dist / (thickness * thickness));
+    intensity += glow * 0.3 + core * 0.7;
+
+    // Branch at specific segments
+    if (i == 4 || i == 8 || i == 12) {
+      float branchAngle = stmHash(boltSeed + fi * 33.0) * TAU;
+      vec3 branchEnd = closestOnLine + vec3(cos(branchAngle), -1.5, sin(branchAngle)) * 2.0;
+      vec3 pb = ro - closestOnLine;
+      vec3 bb = branchEnd - closestOnLine;
+      vec3 bbN = normalize(bb);
+      float bbLen = length(bb);
+      float tB = clamp(dot(pb, bbN), 0.0, bbLen);
+      vec3 closestB = closestOnLine + bbN * tB;
+      float tRB = dot(closestB - ro, rd);
+      if (tRB > 0.0) {
+        vec3 closestRB = ro + rd * tRB;
+        float distB = length(closestRB - closestB);
+        float branchThickness = thickness * 0.4;
+        intensity += exp(-distB * distB / (branchThickness * branchThickness * 6.0)) * 0.15;
+      }
     }
 
-    pos = nextPos;
+    prevSeg = nextSeg;
   }
-  return d;
+
+  return clamp(intensity, 0.0, 1.0);
 }
 
-// --- Rain: diagonal streaks ---
-float rain(vec2 uv, float time, float intensity, float windAngle) {
-  float acc = 0.0;
+// ============================================================
+// Rain curtain (ray-volumetric streaks)
+// ============================================================
+float stmRain(vec2 uv, float timeVal, float intensity, float wind) {
+  float accum = 0.0;
   for (int layer = 0; layer < 3; layer++) {
-    float speed = 2.0 + float(layer) * 0.8;
-    float density = 40.0 + float(layer) * 20.0;
+    float speed = 3.0 + float(layer) * 1.2;
+    float density = 50.0 + float(layer) * 25.0;
     float seed = float(layer) * 17.3;
 
-    // Rotate UV for wind angle
-    vec2 ruv = uv;
-    ruv.x += ruv.y * windAngle * 0.3;
-    ruv.y -= time * speed;
+    vec2 rUV = uv;
+    rUV.x += rUV.y * wind * 0.3;
+    rUV.y -= timeVal * speed;
 
-    vec2 cell = floor(ruv * density);
-    vec2 f = fract(ruv * density);
+    vec2 cell = floor(rUV * density);
+    vec2 f = fract(rUV * density);
 
     float h = fract(sin(dot(cell + seed, vec2(127.1, 311.7))) * 43758.5453);
-
-    // Vertical streak
     float streakX = abs(f.x - h) * density;
     float streakY = f.y;
-    float streak = smoothstep(1.5, 0.0, streakX) * smoothstep(0.0, 0.15, streakY) * smoothstep(0.7, 0.3, streakY);
-    streak *= step(0.6, h); // only some cells have rain
+    float streak = smoothstep(1.8, 0.0, streakX) * smoothstep(0.0, 0.1, streakY) * smoothstep(0.6, 0.3, streakY);
+    streak *= step(0.55, h);
 
-    acc += streak * (0.5 + float(layer) * 0.15);
+    accum += streak * (0.4 + float(layer) * 0.15);
   }
-  return acc * intensity;
+  return accum * intensity;
 }
 
 void main() {
   vec2 uv = vUv;
   vec2 aspect = vec2(uResolution.x / uResolution.y, 1.0);
-  vec2 p = (uv - 0.5) * aspect;
+  vec2 screenPos = (uv - 0.5) * aspect;
 
   float energy = clamp(uEnergy, 0.0, 1.0);
   float bass = clamp(uBass, 0.0, 1.0);
   float highs = clamp(uHighs, 0.0, 1.0);
   float onset = clamp(uOnsetSnap, 0.0, 1.0);
-  float slowE = clamp(uSlowEnergy, 0.0, 1.0);
-  float flux = clamp(uSpectralFlux, 0.0, 1.0);
   float drumOnset = clamp(uDrumOnset, 0.0, 1.0);
+  float slowE = clamp(uSlowEnergy, 0.0, 1.0);
+  float chromaH = clamp(uChromaHue, 0.0, 1.0);
+  float flux = clamp(uSpectralFlux, 0.0, 1.0);
+  float vocalP = clamp(uVocalPresence, 0.0, 1.0);
+  float melPitch = clamp(uMelodicPitch, 0.0, 1.0);
+  float tension = clamp(uHarmonicTension, 0.0, 1.0);
+  float dynRange = clamp(uDynamicRange, 0.0, 1.0);
+  float beatSnap = clamp(uBeatSnap, 0.0, 1.0);
 
-  // === SECTION-TYPE MODULATION ===
   float sectionT = uSectionType;
   float sJam = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
   float sSpace = smoothstep(6.5, 7.5, sectionT);
   float sSolo = smoothstep(3.5, 4.5, sectionT) * (1.0 - step(4.5, sectionT));
   float sChorus = smoothstep(1.5, 2.5, sectionT) * (1.0 - step(2.5, sectionT));
 
-  float slowTime = uDynamicTime * 0.1;
-  float cloudSpeed = (0.05 + energy * 0.08 + flux * 0.04) * mix(1.0, 1.6, sJam) * mix(1.0, 0.3, sSpace);
-
-  // --- Domain warping + palette ---
-  vec2 warpedP = p + vec2(fbm3(vec3(p * 0.5, uDynamicTime * 0.05)), fbm3(vec3(p * 0.5 + 100.0, uDynamicTime * 0.05))) * 0.3;
-  float detailMod = 1.0 + energy * 0.5;
-  vec3 palCol1 = hsv2rgb(vec3(uPalettePrimary, 0.7 * uPaletteSaturation, 0.8));
-  vec3 palCol2 = hsv2rgb(vec3(uPaletteSecondary, 0.6 * uPaletteSaturation, 0.75));
-
-  // === CLIMAX ===
   float isClimax = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5);
   float climaxBoost = isClimax * uClimaxIntensity;
 
-  // === SKY: near-black base ===
-  vec3 col = vec3(0.01, 0.01, 0.02);
+  float timeVal = uDynamicTime * 0.15;
 
-  // === CLOUD LAYER: top 60% ===
-  float cloudY = smoothstep(-0.1, 0.15, p.y); // clouds exist above this line
+  // Palette
+  float hue1 = uPalettePrimary + chromaH * 0.06;
+  float hue2 = uPaletteSecondary + chromaH * 0.04;
+  float palSat = mix(0.5, 0.8, energy) * uPaletteSaturation;
+  vec3 palCol1 = hsv2rgb(vec3(hue1, palSat * 0.6, 0.7));
+  vec3 palCol2 = hsv2rgb(vec3(hue2, palSat * 0.5, 0.8));
 
-  float energyFreq = 1.0 + energy * 0.5;
+  // Camera: looking up at supercell
+  vec3 camOrigin = vec3(0.0, 1.5, 0.0);
+  vec3 camTarget = vec3(sin(uTime * 0.02) * 2.0, 8.0, 10.0 + cos(uTime * 0.015) * 3.0);
+  vec3 camForward = normalize(camTarget - camOrigin);
+  vec3 camWorldUp = vec3(0.0, 1.0, 0.0);
+  vec3 camRt = normalize(cross(camForward, camWorldUp));
+  vec3 camUpV = cross(camRt, camForward);
 
-  if (cloudY > 0.01) {
-    // Cloud density from layered FBM — energy-responsive frequency
-    int cloudOctaves = 4 + int(energy * 2.0) + int(sJam * 2.0);
-    vec3 cloudPos = vec3(p.x * 1.5 * energyFreq, p.y * 0.8 + slowTime * cloudSpeed, slowTime * cloudSpeed * 0.3);
-    float cloudDensity = stormCloudFBM(cloudPos, cloudOctaves);
+  vec3 rd = normalize(screenPos.x * camRt + screenPos.y * camUpV + 1.5 * camForward);
 
-    // Second layer: slower, larger scale for massive cloud structure
-    float cloudDensity2 = stormCloudFBM(cloudPos * 0.4 + vec3(10.0, slowTime * cloudSpeed * 0.2, 5.0), cloudOctaves - 1);
+  // ─── Raymarch ground ───
+  float marchDist = 0.0;
+  float groundDist = -1.0;
 
-    // Third layer: fine detail wisps at cloud edges (30% secondary layer)
-    float cloudWisps = stormCloudFBM(cloudPos * 3.0 + vec3(30.0, 0.0, 15.0), min(cloudOctaves, 5));
-    float wispMask = smoothstep(0.2, 0.5, cloudDensity) * (1.0 - smoothstep(0.5, 0.8, cloudDensity));
-
-    float cloud = smoothstep(-0.1, 0.4, cloudDensity) * 0.6
-                + smoothstep(-0.05, 0.3, cloudDensity2) * 0.25
-                + smoothstep(0.1, 0.5, cloudWisps) * wispMask * 0.3;
-    cloud *= cloudY;
-
-    // Cloud color: palette-tinted with subtle purple/blue glow
-    vec3 cloudColor = mix(vec3(0.03, 0.025, 0.04), palCol1 * 0.05, 0.2);
-    // Purple underglow from ambient electrical charge
-    float purpleGlow = slowE * 0.08 + energy * 0.04;
-    cloudColor += mix(vec3(0.04, 0.01, 0.06), palCol2 * 0.08, 0.15) * purpleGlow;
-    // Jam: more purple rumble
-    cloudColor += vec3(0.03, 0.01, 0.05) * sJam * 0.3;
-
-    col = mix(col, cloudColor, cloud);
-
-    // Cloud edge highlights — rich multi-tone
-    float edgeLight = smoothstep(0.3, 0.5, cloudDensity) * (1.0 - smoothstep(0.5, 0.7, cloudDensity));
-    vec3 edgeColor = mix(vec3(0.06, 0.04, 0.08), palCol2 * 0.1, 0.2);
-    col += edgeColor * edgeLight * cloud * (0.3 + energy * 0.4);
-
-    // Cloud depth: darker cores, lighter edges for volumetric feel
-    float coreDepth = smoothstep(0.5, 0.8, cloudDensity);
-    col -= vec3(0.01, 0.008, 0.015) * coreDepth * cloud;
+  for (int i = 0; i < MAX_STEPS; i++) {
+    vec3 pos = camOrigin + rd * marchDist;
+    float d = stmMap(pos);
+    if (d < SURF_DIST) {
+      groundDist = marchDist;
+      break;
+    }
+    marchDist += d * 0.7;
+    if (marchDist > MAX_DIST) break;
   }
 
-  // === LIGHTNING ===
-  // Flash probability: onset-driven with section modulation
-  float flashChance = max(onset, drumOnset * 1.5);
-  flashChance = max(flashChance, uBeatSnap * 0.5);
-  // Jam: more frequent flashes
-  flashChance *= mix(1.0, 2.0, sJam);
-  // Space: rare distant flashes
-  flashChance *= mix(1.0, 0.15, sSpace);
-  // Solo: single massive bolt
-  float soloFlash = sSolo * step(0.8, onset);
+  // Base color: dark ominous sky
+  vec3 col = vec3(0.0);
 
-  // Flash timing: seed from musical time for beat-locked flashes
+  // ─── Sky gradient: green-tinted storm sky ───
+  float skyGrad = rd.y * 0.5 + 0.5;
+  vec3 skyDark = mix(vec3(0.01, 0.02, 0.01), vec3(0.02, 0.03, 0.02), skyGrad);
+  vec3 skyGreen = vec3(0.03, 0.06, 0.02) * vocalP; // Eerie green
+  col = skyDark + skyGreen;
+
+  // ─── Volumetric cloud marching ───
+  float cloudStepSize = 0.4;
+  float cloudAccum = 0.0;
+  vec3 cloudColor = vec3(0.0);
+  float maxCloudDist = groundDist > 0.0 ? groundDist : 40.0;
+
+  for (int i = 0; i < 48; i++) {
+    float tCloud = 3.0 + float(i) * cloudStepSize;
+    if (tCloud > maxCloudDist) break;
+    vec3 cloudPos = camOrigin + rd * tCloud;
+
+    float density = stmCloudDensity(cloudPos, timeVal, energy, flux, melPitch, sJam, sSpace);
+    if (density < 0.01) continue;
+
+    // Cloud shading: lighter top, darker bottom
+    float cloudHeight = (cloudPos.y - 6.0) / 14.0;
+    vec3 baseCloud = mix(vec3(0.02, 0.02, 0.03), vec3(0.06, 0.05, 0.08), cloudHeight);
+    baseCloud = mix(baseCloud, palCol1 * 0.04, 0.15);
+
+    // Purple underglow from electrical charge
+    baseCloud += vec3(0.02, 0.005, 0.04) * slowE * (1.0 - cloudHeight);
+
+    // Tension makes clouds darker/more menacing
+    baseCloud *= 1.0 - tension * 0.3;
+
+    // Edge lighting
+    float edgeLight = smoothstep(0.3, 0.5, density) * (1.0 - smoothstep(0.5, 0.7, density));
+    baseCloud += palCol2 * 0.06 * edgeLight;
+
+    cloudColor = mix(cloudColor, baseCloud, density * cloudStepSize * 0.5);
+    cloudAccum += density * cloudStepSize * 0.3;
+    if (cloudAccum > 0.95) break;
+  }
+
+  col = mix(col, cloudColor / max(cloudAccum, 0.01), clamp(cloudAccum, 0.0, 1.0));
+
+  // ─── Lightning ───
+  float flashChance = max(onset, drumOnset * 1.5);
+  flashChance = max(flashChance, beatSnap * 0.3);
+  flashChance *= mix(1.0, 2.5, sJam) * mix(1.0, 0.1, sSpace);
+  float soloFlash = sSolo * step(0.7, onset);
+
   float flashSeed = floor(uMusicalTime * 4.0);
   float flashHash = fract(sin(flashSeed * 91.237) * 43758.5453);
   float flashActive = step(1.0 - flashChance * 0.5, flashHash);
   flashActive = max(flashActive, soloFlash);
 
-  // Flash decay: quick bright then fast fade
   float flashTime = fract(uMusicalTime * 4.0);
-  float flashBrightness = flashActive * smoothstep(0.0, 0.02, flashTime) * smoothstep(0.3, 0.05, flashTime);
-  // Drum onset: biggest bolts
-  float drumBoltScale = mix(1.0, 2.0, drumOnset);
-  flashBrightness *= drumBoltScale;
-  flashBrightness += climaxBoost * 0.3 * flashActive;
+  float flashBrightness = flashActive * smoothstep(0.0, 0.02, flashTime) * smoothstep(0.25, 0.04, flashTime);
+  flashBrightness *= mix(1.0, 2.0, drumOnset) + climaxBoost * 0.5;
 
   if (flashBrightness > 0.01) {
-    // Lightning bolt position: random horizontal offset
-    float boltX = (flashHash - 0.5) * 1.2;
-    // Solo: center the bolt
+    float boltX = (flashHash - 0.5) * 8.0;
+    float boltZ = 8.0 + stmHash(flashSeed + 5.0) * 10.0;
     boltX = mix(boltX, 0.0, sSolo);
 
-    vec2 boltUV = p - vec2(boltX, 0.1);
-    float boltDist = lightningBolt(boltUV, flashSeed, uTime);
+    float boltIntensity = stmLightningBolt(camOrigin, rd, flashSeed, vec2(boltX, boltZ), timeVal);
 
-    // Bolt glow: bright core with wide falloff
-    float boltGlow = smoothstep(0.15, 0.0, boltDist) * flashBrightness;
-    float boltCore = smoothstep(0.008, 0.0, boltDist) * flashBrightness;
+    // Lightning color
+    vec3 boltColor = mix(vec3(0.7, 0.7, 1.0), palCol2, 0.2);
+    col += boltColor * boltIntensity * flashBrightness * 3.0;
+    col += vec3(1.0, 0.95, 1.0) * boltIntensity * flashBrightness * 1.5;
 
-    // Lightning color: blue-white core, purple-white glow
-    vec3 boltColor = vec3(0.7, 0.7, 1.0) * boltGlow * 1.5;
-    boltColor += vec3(1.0, 0.95, 1.0) * boltCore * 3.0;
-    col += boltColor;
+    // Cloud illumination from flash
+    col += vec3(0.08, 0.06, 0.12) * flashBrightness * clamp(cloudAccum, 0.0, 1.0) * 0.6;
 
-    // Cloud illumination from flash: wide area bloom
-    float cloudIllum = flashBrightness * 0.4;
-    float illumDist = length(p - vec2(boltX, 0.15));
-    float illumFalloff = smoothstep(0.8, 0.0, illumDist);
-    col += vec3(0.15, 0.12, 0.20) * cloudIllum * illumFalloff * cloudY;
-
-    // Full-sky flash at peak moments
-    float skyFlash = flashBrightness * 0.08 * (1.0 + climaxBoost);
-    col += vec3(0.1, 0.08, 0.15) * skyFlash;
+    // Sky flash
+    col += vec3(0.05, 0.04, 0.08) * flashBrightness * 0.3;
   }
 
-  // === RAIN: diagonal sheets below clouds ===
-  float rainIntensity = mix(0.0, 0.3, energy) + highs * 0.15;
-  rainIntensity *= mix(1.0, 1.5, sJam);
-  rainIntensity *= mix(1.0, 0.2, sSpace);
-  float windAngle = 0.3 + bass * 0.4; // wind from bass
-  float rainVal = rain(uv, uTime, rainIntensity, windAngle);
-  // Rain only below cloud base
-  float rainMask = smoothstep(0.2, -0.1, p.y);
-  col += vec3(0.12, 0.12, 0.15) * rainVal * rainMask;
+  // ─── Ground rendering ───
+  if (groundDist > 0.0) {
+    vec3 hitPos = camOrigin + rd * groundDist;
+    vec3 norm = stmNormal(hitPos);
+    float ambOcc = stmAO(hitPos, norm);
 
-  // === WIND PARTICLES: bass-driven streaks ===
-  float windStrength = bass * 0.15 + uFastBass * 0.1;
-  if (windStrength > 0.01) {
-    vec2 windUV = uv;
-    windUV.x += uTime * 0.8;
-    windUV.y += sin(windUV.x * 5.0) * 0.02;
-    float windNoise = snoise(vec3(windUV * vec2(8.0, 2.0), uTime * 0.5));
-    float windParticle = smoothstep(0.6, 0.8, windNoise) * windStrength;
-    // Mostly in lower half
-    windParticle *= smoothstep(0.3, -0.2, p.y);
-    col += vec3(0.08, 0.08, 0.1) * windParticle;
+    // Wet ground: dark with puddle reflections
+    float puddleNoise = snoise(vec3(hitPos.xz * 0.5, 0.0));
+    float isPuddle = smoothstep(0.3, 0.5, puddleNoise);
+
+    vec3 groundCol = vec3(0.03, 0.025, 0.02); // wet dark earth
+    groundCol *= ambOcc;
+
+    // Specular from lightning on wet ground
+    if (flashBrightness > 0.01) {
+      vec3 viewDir = normalize(camOrigin - hitPos);
+      vec3 reflDir = reflect(-rd, norm);
+      float specWet = pow(max(dot(reflDir, normalize(vec3(0.0, 1.0, 0.0))), 0.0), 16.0);
+      groundCol += vec3(0.15, 0.12, 0.2) * specWet * flashBrightness * (0.3 + isPuddle * 0.7);
+    }
+
+    // Fresnel on puddles
+    float fresnelVal = pow(1.0 - max(dot(normalize(camOrigin - hitPos), norm), 0.0), 4.0);
+    groundCol += vec3(0.02, 0.02, 0.03) * fresnelVal * isPuddle;
+
+    // Distance fog
+    float fogAmount = 1.0 - exp(-groundDist * 0.03);
+    col = mix(groundCol, col, fogAmount);
   }
 
-  // === DISTANT THUNDER GLOW (space sections) ===
-  float distantGlow = sSpace * 0.06 * (0.5 + 0.5 * sin(uTime * 0.3));
-  float distantPos = sin(uTime * 0.1) * 0.5;
-  float distantDist = length(p - vec2(distantPos, 0.3));
-  col += vec3(0.04, 0.02, 0.06) * distantGlow * smoothstep(0.6, 0.0, distantDist);
+  // ─── Rain ───
+  float rainIntensity = mix(0.05, 0.4, energy) + highs * 0.15 + beatSnap * 0.1;
+  rainIntensity *= mix(1.0, 1.5, sJam) * mix(1.0, 0.2, sSpace);
+  float windAngle = 0.3 + bass * 0.5;
+  float rainVal = stmRain(uv, timeVal * 3.0, rainIntensity, windAngle);
+  float rainMask = smoothstep(0.5, -0.2, screenPos.y);
+  col += vec3(0.08, 0.08, 0.12) * rainVal * rainMask;
 
-  // === HERO ICON EMERGENCE ===
+  // ─── Wind particles ───
+  float windStr = bass * 0.12 + uFastBass * 0.08;
+  if (windStr > 0.01) {
+    vec2 windUV = uv + vec2(uTime * 0.8, sin(uv.x * 5.0) * 0.02);
+    float windN = snoise(vec3(windUV * vec2(8.0, 2.0), uTime * 0.5));
+    float windP = smoothstep(0.65, 0.85, windN) * windStr;
+    windP *= smoothstep(0.4, -0.2, screenPos.y);
+    col += vec3(0.06, 0.06, 0.08) * windP;
+  }
+
+  // ─── Hero icon emergence ───
   {
-    float nf = stormCloudFBM(vec3(p * 2.0, slowTime), 4);
-    vec3 heroLight = heroIconEmergence(p, uTime, energy, bass,
+    float nf = fbm3(vec3(screenPos * 2.0, timeVal));
+    vec3 heroLight = heroIconEmergence(screenPos, uTime, energy, bass,
       vec3(0.5, 0.4, 1.0), vec3(1.0, 0.95, 1.0), nf, uSectionIndex);
     col += heroLight;
   }
+  {
+    float nf = fbm3(vec3(screenPos * 1.5, timeVal + 7.0));
+    vec3 iconLight = iconEmergence(screenPos, uTime, energy, bass,
+      palCol1, palCol2, nf, uClimaxPhase, uSectionIndex);
+    col += iconLight;
+  }
 
-  // === VIGNETTE: heavy darkness at edges ===
+  // ─── Vignette ───
   float vigScale = mix(0.30, 0.24, energy);
-  float vignette = 1.0 - dot(p * vigScale, p * vigScale);
+  float vignette = 1.0 - dot(screenPos * vigScale, screenPos * vigScale);
   vignette = smoothstep(0.0, 1.0, vignette);
   col = mix(vec3(0.005, 0.005, 0.01), col, vignette);
 
-  // --- Secondary visual layer: atmospheric electrical field (30% blend) ---
-  float elecNoise = fbm3(vec3(warpedP * 3.0 * detailMod, uDynamicTime * 0.15));
-  vec3 elecCol = mix(palCol1, palCol2, elecNoise * 0.5 + 0.5) * 0.08;
-  float elecMask = smoothstep(-0.1, 0.2, p.y) * energy;
-  col += elecCol * elecMask * 0.3;
-
-  // === DARKNESS TEXTURE ===
+  // ─── Darkness texture ───
   col += darknessTexture(uv, uTime, energy);
 
-  // === POST-PROCESSING ===
-  col = applyPostProcess(col, vUv, p);
+  // ─── Post-processing ───
+  col = applyPostProcess(col, vUv, screenPos);
 
   gl_FragColor = vec4(col, 1.0);
 }

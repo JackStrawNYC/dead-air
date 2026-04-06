@@ -1,525 +1,443 @@
 /**
- * Ocean 3D — GLSL shaders for React Three Fiber 3D ocean scene.
+ * Ocean — raymarched ocean surface from above.
+ * Volumetric water with subsurface scattering, rolling wave geometry,
+ * foam patterns on crests, deep water color gradients, seabird silhouettes,
+ * horizon with sky gradient.
  *
- * Exports separate vertex/fragment pairs for each mesh:
- *   - Water surface (PlaneGeometry with vertex displacement)
- *   - Sky background (fullscreen quad behind everything)
- *   - Celestial body (SphereGeometry with emissive material)
- *   - Foam/spray particles (Points)
- *   - Bioluminescence particles (Points)
- *
- * Audio mapping:
- *   uBass + uEnergy → swell height (calm → massive waves)
- *   uOnsetSnap      → foam/spray burst
- *   uSlowEnergy     → celestial body pulse, atmosphere
- *   uVocalPresence  → bioluminescence intensity
- *   uMelodicPitch   → wave frequency modulation
- *   uChromaHue      → water/sky tint
- *   uFlatness       → wave chop detail
+ * Audio reactivity:
+ *   uBass             → swell height (calm → massive waves)
+ *   uEnergy           → wave intensity, foam density, storm factor
+ *   uDrumOnset        → foam/spray burst
+ *   uVocalPresence    → bioluminescence intensity
+ *   uHarmonicTension  → choppiness
+ *   uBeatSnap         → wave pulse
+ *   uSectionType      → jam=choppy whitecaps, space=glass-calm, solo=deep current
+ *   uClimaxPhase      → massive wave eruption
+ *   uSlowEnergy       → atmosphere, celestial pulse
+ *   uHighs            → surface sparkle
+ *   uMelodicPitch     → wave frequency modulation
+ *   uChromaHue        → water/sky tint
+ *   uPalettePrimary   → deep water hue
+ *   uPaletteSecondary → sky/reflection hue
+ *   uSpectralFlux     → wave turbulence
+ *   uDynamicRange     → depth contrast
+ *   uFlatness         → chop detail
  */
 
-// ═══════════════════════════════════════════════════
-// WATER SURFACE — vertex-displaced PlaneGeometry
-// ═══════════════════════════════════════════════════
+import { noiseGLSL } from "./noise";
+import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
+import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
 
-export const oceanWaterVert = /* glsl */ `
-uniform float uTime;
-uniform float uDynamicTime;
-uniform float uBass;
-uniform float uEnergy;
-uniform float uMelodicPitch;
-uniform float uFlatness;
-uniform float uSlowEnergy;
-uniform float uBeatSnap;
-uniform float uSectionType;
+export const oceanVert = /* glsl */ `
+varying vec2 vUv;
+void main() {
+  vUv = uv;
+  gl_Position = vec4(position, 1.0);
+}
+`;
+
+export const oceanFrag = /* glsl */ `
+precision highp float;
+
+${sharedUniformsGLSL}
+
+${noiseGLSL}
+
+${buildPostProcessGLSL({
+  grainStrength: "normal",
+  bloomEnabled: true,
+  bloomThresholdOffset: -0.06,
+  halationEnabled: true,
+  caEnabled: true,
+  lensDistortionEnabled: true,
+  dofEnabled: true,
+})}
 
 varying vec2 vUv;
-varying float vWaveHeight;
-varying vec3 vWorldPos;
-varying vec3 vNormal;
 
-// Simplex-style hash for wave noise
-vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
-vec2 mod289v2(vec2 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
-vec3 permute(vec3 x) { return mod289(((x * 34.0) + 1.0) * x); }
+#define PI 3.14159265
+#define TAU 6.28318530
+#define MAX_STEPS 70
+#define MAX_DIST 80.0
+#define SURF_DIST 0.005
 
-float snoise2d(vec2 v) {
-  const vec4 C = vec4(0.211324865405187, 0.366025403784439,
-                     -0.577350269189626, 0.024390243902439);
-  vec2 i = floor(v + dot(v, C.yy));
-  vec2 x0 = v - i + dot(i, C.xx);
-  vec2 i1 = (x0.x > x0.y) ? vec2(1.0, 0.0) : vec2(0.0, 1.0);
-  vec4 x12 = x0.xyxy + C.xxzz;
-  x12.xy -= i1;
-  i = mod289v2(i);
-  vec3 p = permute(permute(i.y + vec3(0.0, i1.y, 1.0)) + i.x + vec3(0.0, i1.x, 1.0));
-  vec3 m = max(0.5 - vec3(dot(x0,x0), dot(x12.xy,x12.xy), dot(x12.zw,x12.zw)), 0.0);
-  m = m * m;
-  m = m * m;
-  vec3 x = 2.0 * fract(p * C.www) - 1.0;
-  vec3 h = abs(x) - 0.5;
-  vec3 ox = floor(x + 0.5);
-  vec3 a0 = x - ox;
-  m *= 1.79284291400159 - 0.85373472095314 * (a0*a0 + h*h);
-  vec3 g;
-  g.x = a0.x * x0.x + h.x * x0.y;
-  g.yz = a0.yz * x12.xz + h.yz * x12.yw;
-  return 130.0 * dot(m, g);
+// ============================================================
+// Prefixed utilities (oc2 = ocean)
+// ============================================================
+mat2 oc2Rot2(float a) {
+  float c = cos(a), s = sin(a);
+  return mat2(c, -s, s, c);
 }
 
-float oceanWave(vec2 pos, float time, float waveFreq, float waveAmp, float storminess) {
+float oc2Hash(float n) { return fract(sin(n) * 43758.5453123); }
+float oc2Hash2(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+vec3 oc2Hash3(float n) {
+  return vec3(
+    fract(sin(n * 127.1) * 43758.5453),
+    fract(sin(n * 269.5) * 43758.5453),
+    fract(sin(n * 419.2) * 43758.5453)
+  );
+}
+
+// ============================================================
+// Ocean wave height field
+// ============================================================
+float oc2WaveHeight(vec2 xz, float timeVal, float energy, float bass,
+                    float melPitch, float tension, float sJam, float sSpace) {
+  float storminess = clamp(energy + bass * 0.3, 0.0, 1.5);
+  float waveSpeed = (0.3 + energy * 0.5) * (1.0 + sJam * 0.4 - sSpace * 0.6);
+  float waveTime = timeVal * waveSpeed;
+  float waveFreq = mix(0.08, 0.2, energy) + melPitch * 0.05 + sJam * 0.04;
+  float waveAmp = mix(0.3, 4.0, storminess) * (1.0 + sJam * 0.3 - sSpace * 0.7);
+
   float h = 0.0;
   float freq = waveFreq;
   float amp = waveAmp;
   mat2 rot = mat2(0.8, 0.6, -0.6, 0.8);
-  for (int i = 0; i < 5; i++) {
-    float wave = sin(pos.x * freq + time * (0.8 + float(i) * 0.15))
-               + sin(pos.y * freq * 0.7 + time * (0.6 + float(i) * 0.1));
+
+  for (int i = 0; i < 6; i++) {
+    float wave = sin(xz.x * freq + waveTime * (0.8 + float(i) * 0.15))
+               + sin(xz.y * freq * 0.7 + waveTime * (0.6 + float(i) * 0.1));
     h += wave * amp;
-    float nDisp = snoise2d(pos * freq * 0.3 + time * 0.1) * amp * 0.4 * storminess;
-    h += nDisp;
-    pos = rot * pos;
+    // Noise displacement for natural feel
+    float nDisp = snoise(vec3(xz * freq * 0.3, waveTime * 0.1 + float(i) * 3.0));
+    h += nDisp * amp * 0.3 * storminess;
+    xz = rot * xz;
     freq *= 1.8;
     amp *= 0.5;
   }
+
+  // Cross-chop from tension
+  h += sin(xz.x * 0.5 + xz.y * 0.5 + waveTime * 2.0) * tension * 0.3;
+
   return h;
 }
 
-void main() {
-  vUv = uv;
-
-  // Section-type modulation
-  float sType = uSectionType;
-  float jamBoost = smoothstep(4.5, 5.5, sType);      // jam=5: choppy waves/whitecaps
-  float spaceHush = smoothstep(6.5, 7.5, sType);      // space=7: glass-calm
-  float chorusVibe = smoothstep(2.5, 3.5, sType) * (1.0 - smoothstep(3.5, 4.5, sType)); // chorus=3: rolling swells
-  float soloFocus = smoothstep(3.5, 4.5, sType) * (1.0 - smoothstep(4.5, 5.5, sType));  // solo=4: deep current focus
-
-  float energy = clamp(uEnergy, 0.0, 1.0);
-  float bass = clamp(uBass, 0.0, 1.0);
-  float storminess = clamp(energy + bass * 0.3, 0.0, 1.5);
-  float melodicP = clamp(uMelodicPitch, 0.0, 1.0);
-
-  // Jam: choppier/faster, Space: glassy still, Chorus: rolling swells
-  float waveSpeedMod = 1.0 + jamBoost * 0.4 - spaceHush * 0.6 + chorusVibe * 0.15;
-  float waveTime = uDynamicTime * (0.3 + energy * 0.4) * waveSpeedMod;
-  float waveFreq = mix(1.5, 4.0, energy) + melodicP * 2.0 + jamBoost * 1.5 - spaceHush * 1.0;
-  float waveAmpMod = 1.0 + jamBoost * 0.4 + chorusVibe * 0.2 - spaceHush * 0.7;
-  float waveAmp = mix(0.1, 2.5, storminess) * waveAmpMod;
-
-  vec3 pos = position;
-  float h = oceanWave(pos.xz * 0.01, waveTime, waveFreq, waveAmp, storminess);
-
-  // Add chop detail from flatness — jam increases chop
-  float chopMod = 1.0 + jamBoost * 0.5 - spaceHush * 0.5;
-  float chop = snoise2d(pos.xz * 0.05 + uDynamicTime * 0.2) * uFlatness * 0.3 * chopMod;
-  h += chop;
-
-  // Beat snap adds a quick vertical pulse
-  h += uBeatSnap * 0.15;
-
-  // Solo: deep current — long-period undulation
-  h += sin(pos.x * 0.5 + uDynamicTime * 0.15) * soloFocus * bass * 0.8;
-
-  pos.y += h;
-  vWaveHeight = h;
-
-  // Compute normal via finite differences
-  float dx = 0.5;
-  float hx = oceanWave((pos.xz + vec2(dx, 0.0)) * 0.01, waveTime, waveFreq, waveAmp, storminess);
-  float hz = oceanWave((pos.xz + vec2(0.0, dx)) * 0.01, waveTime, waveFreq, waveAmp, storminess);
-  vNormal = normalize(vec3(h - hx, dx * 2.0, h - hz));
-
-  vWorldPos = (modelMatrix * vec4(pos, 1.0)).xyz;
-  gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
-}
-`;
-
-export const oceanWaterFrag = /* glsl */ `
-precision highp float;
-
-uniform float uTime;
-uniform float uEnergy;
-uniform float uBass;
-uniform float uSlowEnergy;
-uniform float uOnsetSnap;
-uniform float uVocalPresence;
-uniform float uChromaHue;
-uniform float uPalettePrimary;
-uniform float uPaletteSecondary;
-uniform float uPaletteSaturation;
-uniform float uDynamicTime;
-uniform vec3 uCelestialPos;
-uniform float uSectionType;
-
-varying vec2 vUv;
-varying float vWaveHeight;
-varying vec3 vWorldPos;
-varying vec3 vNormal;
-
-vec3 hsv2rgb(vec3 c) {
-  vec4 K = vec4(1.0, 2.0/3.0, 1.0/3.0, 3.0);
-  vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
-  return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
+// ============================================================
+// Ocean SDF map
+// ============================================================
+float oc2Map(vec3 pos, float timeVal, float energy, float bass,
+             float melPitch, float tension, float sJam, float sSpace) {
+  float waterH = oc2WaveHeight(pos.xz, timeVal, energy, bass, melPitch, tension, sJam, sSpace);
+  return pos.y - waterH;
 }
 
-void main() {
-  // Section-type modulation
-  float sType = uSectionType;
-  float jamBoost = smoothstep(4.5, 5.5, sType);      // jam=5: choppy waves/whitecaps
-  float spaceHush = smoothstep(6.5, 7.5, sType);      // space=7: glass-calm
-  float chorusVibe = smoothstep(2.5, 3.5, sType) * (1.0 - smoothstep(3.5, 4.5, sType)); // chorus=3: rolling swells
-  float soloFocus = smoothstep(3.5, 4.5, sType) * (1.0 - smoothstep(4.5, 5.5, sType));  // solo=4: deep current focus
+// ============================================================
+// Normal via central differences
+// ============================================================
+vec3 oc2Normal(vec3 pos, float timeVal, float energy, float bass,
+               float melPitch, float tension, float sJam, float sSpace) {
+  float eps = 0.05;
+  float d = oc2Map(pos, timeVal, energy, bass, melPitch, tension, sJam, sSpace);
+  return normalize(vec3(
+    oc2Map(pos + vec3(eps, 0.0, 0.0), timeVal, energy, bass, melPitch, tension, sJam, sSpace) - d,
+    oc2Map(pos + vec3(0.0, eps, 0.0), timeVal, energy, bass, melPitch, tension, sJam, sSpace) - d,
+    oc2Map(pos + vec3(0.0, 0.0, eps), timeVal, energy, bass, melPitch, tension, sJam, sSpace) - d
+  ));
+}
 
-  float energy = clamp(uEnergy, 0.0, 1.0);
-  float storminess = clamp(energy + uBass * 0.3, 0.0, 1.5);
-  float chromaH = clamp(uChromaHue, 0.0, 1.0);
-  float onset = clamp(uOnsetSnap, 0.0, 1.0);
+// ============================================================
+// Ambient occlusion (simplified for ocean)
+// ============================================================
+float oc2AO(vec3 pos, vec3 norm, float timeVal, float energy, float bass,
+            float melPitch, float tension, float sJam, float sSpace) {
+  float occ = 0.0;
+  float weight = 1.0;
+  for (int i = 1; i <= 4; i++) {
+    float dist = 0.1 + 0.2 * float(i);
+    float sampleD = oc2Map(pos + norm * dist, timeVal, energy, bass, melPitch, tension, sJam, sSpace);
+    occ += (dist - sampleD) * weight;
+    weight *= 0.6;
+  }
+  return clamp(1.0 - occ * 1.5, 0.0, 1.0);
+}
 
-  float energyFreq = 1.0 + energy * 0.5;
+// ============================================================
+// Sky with horizon
+// ============================================================
+vec3 oc2Sky(vec3 rd, float energy, float slowE, vec3 sunDir, vec3 palCol1, vec3 palCol2) {
+  float skyGrad = rd.y * 0.5 + 0.5;
+  float storminess = clamp(energy + 0.2, 0.0, 1.5);
 
-  // Deep water color — space=darker/calmer, jam=greener storm tones
-  float hue = uPalettePrimary + chromaH * 0.05;
-  float hue2 = uPaletteSecondary + chromaH * 0.04;
-  float sat = mix(0.5, 0.9, uSlowEnergy) * uPaletteSaturation;
-  vec3 calmDeep = hsv2rgb(vec3(hue, sat, mix(0.06, 0.18, uSlowEnergy)));
-  vec3 stormDeep = vec3(0.08, 0.12, 0.10);
-  float stormMix = storminess * 0.7 + jamBoost * 0.2 - spaceHush * 0.3;
-  vec3 waterColor = mix(calmDeep, stormDeep, clamp(stormMix, 0.0, 1.0));
+  vec3 horizonColor = mix(vec3(0.5, 0.4, 0.3), palCol2 * 0.6, 0.2);
+  horizonColor = mix(horizonColor, vec3(0.15, 0.12, 0.1), storminess * 0.4);
+  vec3 deepSkyColor = mix(vec3(0.02, 0.04, 0.12), vec3(0.05, 0.06, 0.15), slowE);
 
-  // Space: deeper, darker, more mysterious blue
-  waterColor = mix(waterColor, vec3(0.02, 0.04, 0.10), spaceHush * 0.4);
+  vec3 sky = mix(horizonColor, deepSkyColor, skyGrad);
 
-  // Surface shading: lighter crests, darker troughs
-  float maxWaveH = mix(0.5, 2.5, storminess);
-  float surfaceShade = smoothstep(-maxWaveH, maxWaveH, vWaveHeight);
-  vec3 crestColor = mix(waterColor * 1.6, vec3(0.25, 0.35, 0.30), storminess * 0.3);
-  vec3 troughColor = waterColor * 0.5;
-  vec3 col = mix(troughColor, crestColor, surfaceShade);
+  // Sun/moon
+  float sunDot = max(dot(rd, sunDir), 0.0);
+  float celestialBright = mix(0.9, 0.15, storminess);
+  sky += vec3(1.0, 0.92, 0.7) * pow(sunDot, 128.0) * celestialBright * 2.0;
+  sky += vec3(1.0, 0.85, 0.6) * pow(sunDot, 16.0) * celestialBright * 0.3;
 
-  // === SUBSURFACE SCATTERING LAYER (secondary at 30%) ===
-  // Domain-warped caustic pattern beneath surface
-  vec2 causticBase = vWorldPos.xz * 0.04 * energyFreq;
-  float causticWarp = snoise2d(causticBase * 0.5 + uDynamicTime * 0.03) * 0.3;
-  float causticPattern = snoise2d((causticBase + causticWarp) * 2.0 + uDynamicTime * 0.05);
-  causticPattern = pow(max(0.0, causticPattern * 0.5 + 0.5), 3.0);
-  vec3 subsurfaceColor = hsv2rgb(vec3(hue2, sat * 0.6, 0.3)) * causticPattern;
-  col += subsurfaceColor * 0.3 * (1.0 - surfaceShade);
+  // Clouds
+  float cloudN = fbm3(vec3(rd.xz * 2.5 / max(rd.y, 0.03), uDynamicTime * 0.01));
+  float cloudMask = smoothstep(0.05, 0.4, rd.y) * smoothstep(0.8, 0.4, rd.y);
+  vec3 cloudColor = mix(horizonColor * 0.5, vec3(0.08, 0.07, 0.1), 0.5);
+  sky = mix(sky, cloudColor, smoothstep(0.3, 0.6, cloudN) * cloudMask * storminess * 0.4);
 
-  // Fresnel reflection
-  vec3 viewDir = normalize(cameraPosition - vWorldPos);
-  float fresnel = pow(1.0 - max(dot(viewDir, vNormal), 0.0), 3.0);
-  // Reflection uses both palette colors
-  vec3 reflectColor = mix(
-    hsv2rgb(vec3(hue, sat * 0.3, 0.12)),
-    hsv2rgb(vec3(hue2, sat * 0.25, 0.25)),
-    uSlowEnergy
-  );
-  col = mix(col, reflectColor, fresnel * 0.6);
-
-  // === FOAM: rich multi-layer detail ===
-  float foamMask = smoothstep(maxWaveH * 0.5, maxWaveH, vWaveHeight);
-  float foamBoost = 1.0 + jamBoost * 0.5 - spaceHush * 0.8;
-  float foamAmount = foamMask * (onset * 0.8 + storminess * 0.5 + energy * 0.3) * clamp(foamBoost, 0.0, 2.0);
-
-  // Primary foam noise — high detail FBM pattern
-  float foamNoise1 = snoise2d(vWorldPos.xz * 0.08 * energyFreq + uDynamicTime * 0.1);
-  float foamNoise2 = snoise2d(vWorldPos.xz * 0.25 * energyFreq + uDynamicTime * 0.15 + 10.0);
-  float foamTexture = foamNoise1 * 0.5 + foamNoise2 * 0.3;
-  foamAmount *= smoothstep(-0.1, 0.3, foamTexture);
-
-  // Secondary foam: trailing wisps and lace patterns
-  float foamWisp = snoise2d(vWorldPos.xz * 0.5 * energyFreq - uDynamicTime * 0.08);
-  float foamLace = pow(max(0.0, foamWisp), 4.0) * energy * 0.3;
-  foamAmount += foamLace * foamMask;
-  foamAmount = clamp(foamAmount, 0.0, 1.0);
-
-  // Foam edges are translucent, cores are bright
-  vec3 foamCol = mix(vec3(0.7, 0.75, 0.8), vec3(0.92, 0.95, 1.0), smoothstep(0.3, 0.8, foamAmount));
-  col = mix(col, foamCol, foamAmount * 0.7);
-
-  // Bioluminescence during vocal presence
-  if (uVocalPresence > 0.1) {
-    float bioGate = smoothstep(0.1, 0.5, uVocalPresence) * (1.0 - storminess * 0.7);
-    // Domain-warped bio pattern for organic shapes
-    float bioWarp = snoise2d(vWorldPos.xz * 0.1 + uDynamicTime * 0.04) * 0.5;
-    float bioPattern = sin(vWorldPos.x * 0.5 + bioWarp + uDynamicTime * 0.3) *
-                       cos(vWorldPos.z * 0.7 - bioWarp + uDynamicTime * 0.2);
-    bioPattern = smoothstep(0.3, 0.8, bioPattern * 0.5 + 0.5);
-    vec3 bioColor = mix(
-      hsv2rgb(vec3(hue, 0.8, 0.9)),
-      hsv2rgb(vec3(hue2, 0.7, 0.8)),
-      bioPattern
-    );
-    col += bioColor * bioPattern * bioGate * 0.25;
+  // Stars (calm only)
+  float starVis = smoothstep(0.4, 0.0, storminess);
+  if (starVis > 0.01 && rd.y > 0.1) {
+    vec2 starUV = rd.xz / (rd.y + 0.001);
+    float starH = oc2Hash2(floor(starUV * 80.0));
+    if (starH > 0.9) {
+      vec2 starF = fract(starUV * 80.0);
+      float starDist = length(starF - 0.5);
+      float twinkle = 0.6 + 0.4 * sin(uTime * 2.0 + starH * 50.0);
+      sky += vec3(0.8, 0.85, 1.0) * smoothstep(0.03, 0.005, starDist) * twinkle * starVis * 0.4;
+    }
   }
 
-  // Celestial reflection in water (stretched vertical highlight)
-  float reflectX = vWorldPos.x - uCelestialPos.x * 20.0;
-  float reflectStretch = 8.0 + storminess * 12.0;
-  float reflectDist = sqrt(reflectX * reflectX * 0.01 + pow(vWorldPos.z * 0.02, 2.0));
-  float celestialReflect = exp(-reflectDist * reflectDist * reflectStretch * 0.01);
-  // Rippled reflection breakup
-  float reflRipple = snoise2d(vWorldPos.xz * 0.06 + uDynamicTime * 0.15) * 0.15;
-  celestialReflect *= (0.5 + 0.5 * sin(vWorldPos.z * 0.3 + uDynamicTime * 0.5 + reflRipple * 5.0));
-  float celestialBrightness = mix(0.9, 0.15, storminess);
-  col += vec3(1.0, 0.92, 0.7) * celestialReflect * celestialBrightness * 0.3;
+  // Horizon glow band
+  float horizonGlow = exp(-pow(rd.y * 8.0, 2.0));
+  sky += horizonColor * horizonGlow * 0.3;
 
-  // Chorus: sparkling highlight on surface
-  col += vec3(0.06, 0.08, 0.12) * chorusVibe * surfaceShade * 0.5;
-
-  // Solo: deep current focus — darker troughs, subtle deep blue undertone
-  col += vec3(0.0, 0.02, 0.06) * soloFocus * (1.0 - surfaceShade) * 0.5;
-
-  // Distance fog toward horizon — palette-tinted
-  float dist = length(vWorldPos.xz) * 0.005;
-  float fog = 1.0 - exp(-dist * dist);
-  vec3 fogColor = mix(
-    hsv2rgb(vec3(hue, sat * 0.15, 0.06)),
-    hsv2rgb(vec3(hue2, sat * 0.1, 0.08)),
-    0.5
-  );
-  col = mix(col, fogColor, clamp(fog, 0.0, 0.7));
-
-  gl_FragColor = vec4(col, 1.0);
+  return sky;
 }
-`;
 
-// ═══════════════════════════════════════════════════
-// SKY BACKGROUND — fullscreen quad behind scene
-// ═══════════════════════════════════════════════════
+// ============================================================
+// Seabird silhouettes
+// ============================================================
+vec3 oc2Seabirds(vec3 ro, vec3 rd, float timeVal) {
+  vec3 birds = vec3(0.0);
+  for (int i = 0; i < 5; i++) {
+    float fi = float(i);
+    vec3 seed = oc2Hash3(fi * 5.7 + 2.0);
+    float bTime = timeVal * 0.3 + seed.x * TAU;
+    vec3 birdPos = vec3(
+      sin(bTime) * 15.0 + seed.y * 10.0 - 5.0,
+      12.0 + seed.z * 4.0 + sin(bTime * 2.0) * 0.5,
+      10.0 + seed.x * 20.0
+    );
 
-export const oceanSkyVert = /* glsl */ `
-varying vec2 vUv;
-void main() {
-  vUv = uv;
-  gl_Position = vec4(position.xy, 0.9999, 1.0);
+    vec3 toB = birdPos - ro;
+    float proj = dot(toB, rd);
+    if (proj < 0.0) continue;
+    vec3 closest = ro + rd * proj;
+    float dist = length(closest - birdPos);
+
+    // Wing flap
+    float wingPhase = sin(timeVal * 3.0 + fi * 2.0);
+    float wingSpan = 0.3;
+    // Simplified: check as small sphere
+    float birdSize = 0.15 + abs(wingPhase) * 0.1;
+    float silhouette = smoothstep(birdSize * 2.0, birdSize * 0.5, dist);
+
+    // Dark against sky
+    birds += vec3(-0.2) * silhouette * 0.3;
+  }
+  return birds;
 }
-`;
 
-export const oceanSkyFrag = /* glsl */ `
-precision highp float;
-
-uniform float uTime;
-uniform float uDynamicTime;
-uniform float uEnergy;
-uniform float uSlowEnergy;
-uniform float uChromaHue;
-uniform float uPalettePrimary;
-uniform float uPaletteSecondary;
-uniform float uPaletteSaturation;
-uniform vec2 uResolution;
-
-varying vec2 vUv;
-
-vec3 hsv2rgb(vec3 c) {
-  vec4 K = vec4(1.0, 2.0/3.0, 1.0/3.0, 3.0);
-  vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
-  return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
+// ============================================================
+// Volumetric subsurface scattering (in-water light)
+// ============================================================
+vec3 oc2Subsurface(vec3 hitPos, vec3 norm, vec3 sunDir, float energy,
+                   vec3 palCol1, float timeVal) {
+  float sss = max(dot(-norm, sunDir), 0.0);
+  sss = pow(sss, 2.0) * 0.3;
+  float causticN = fbm3(vec3(hitPos.xz * 0.1 + vec2(0.0, -timeVal * 0.05), timeVal * 0.05));
+  causticN = pow(max(causticN * 0.5 + 0.5, 0.0), 3.0);
+  vec3 sssColor = mix(vec3(0.0, 0.3, 0.2), palCol1 * 0.8, 0.3);
+  return sssColor * (sss + causticN * 0.15) * (0.3 + energy * 0.7);
 }
 
 void main() {
   vec2 uv = vUv;
+  vec2 aspect = vec2(uResolution.x / uResolution.y, 1.0);
+  vec2 screenPos = (uv - 0.5) * aspect;
+
   float energy = clamp(uEnergy, 0.0, 1.0);
+  float bass = clamp(uBass, 0.0, 1.0);
+  float highs = clamp(uHighs, 0.0, 1.0);
+  float onset = clamp(uDrumOnset, 0.0, 1.0);
   float slowE = clamp(uSlowEnergy, 0.0, 1.0);
-  float storminess = clamp(energy + 0.3, 0.0, 1.5);
   float chromaH = clamp(uChromaHue, 0.0, 1.0);
-  float energyFreq = 1.0 + energy * 0.5;
+  float flux = clamp(uSpectralFlux, 0.0, 1.0);
+  float vocalP = clamp(uVocalPresence, 0.0, 1.0);
+  float melPitch = clamp(uMelodicPitch, 0.0, 1.0);
+  float tension = clamp(uHarmonicTension, 0.0, 1.0);
+  float dynRange = clamp(uDynamicRange, 0.0, 1.0);
+  float beatSnap = clamp(uBeatSnap, 0.0, 1.0);
+  float flatness = clamp(uFlatness, 0.0, 1.0);
 
-  float hue1 = uPaletteSecondary + chromaH * 0.08;
-  float hue2 = uPalettePrimary + chromaH * 0.05;
-  float sat = mix(0.5, 0.9, slowE) * uPaletteSaturation;
+  float sectionT = uSectionType;
+  float sJam = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
+  float sSpace = smoothstep(6.5, 7.5, sectionT);
+  float sSolo = smoothstep(3.5, 4.5, sectionT) * (1.0 - step(4.5, sectionT));
+  float sChorus = smoothstep(1.5, 2.5, sectionT) * (1.0 - step(2.5, sectionT));
 
-  vec3 horizonColor = hsv2rgb(vec3(hue1, sat * 0.6, mix(0.15, 0.35, slowE)));
-  vec3 deepSkyColor = mix(vec3(0.01, 0.01, 0.04), hsv2rgb(vec3(hue2, sat * 0.2, 0.03)), 0.2);
-  horizonColor = mix(horizonColor, vec3(0.08, 0.06, 0.12), storminess * 0.5);
+  float isClimax = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5);
+  float climaxBoost = isClimax * uClimaxIntensity;
 
-  // Gradient: horizon at bottom of sky quad, deep space at top
-  float skyGradient = uv.y;
-  vec3 col = mix(horizonColor, deepSkyColor, skyGradient);
+  float timeVal = uDynamicTime * 0.1;
+  float storminess = clamp(energy + bass * 0.3, 0.0, 1.5);
 
-  // === CLOUD LAYER: secondary layer for atmospheric depth (30%) ===
-  float slowTime = uDynamicTime * 0.15;
-  vec2 cloudUV = uv * vec2(2.0, 1.0) * energyFreq;
-  float cloudWarp = sin(cloudUV.x * 1.5 + slowTime * 0.02) * 0.08;
-  float cloudDensity = sin(cloudUV.x * 3.0 + cloudWarp + slowTime * 0.03)
-                     * sin(cloudUV.y * 5.0 + slowTime * 0.02);
-  cloudDensity = smoothstep(0.2, 0.6, cloudDensity * 0.5 + 0.5);
-  float cloudMask = smoothstep(0.0, 0.3, uv.y) * smoothstep(0.7, 0.4, uv.y);
-  vec3 cloudColor = mix(horizonColor * 0.4, vec3(0.06, 0.05, 0.08), 0.5);
-  col = mix(col, cloudColor, cloudDensity * cloudMask * 0.3 * storminess);
+  // Palette
+  float hue1 = uPalettePrimary + chromaH * 0.05;
+  float hue2 = uPaletteSecondary + chromaH * 0.04;
+  float palSat = mix(0.5, 0.9, slowE) * uPaletteSaturation;
+  vec3 palCol1 = hsv2rgb(vec3(hue1, palSat, mix(0.3, 0.6, energy)));
+  vec3 palCol2 = hsv2rgb(vec3(hue2, palSat * 0.7, mix(0.4, 0.7, energy)));
 
-  // Stars: visible during calm — two layers for depth
-  float starVisibility = smoothstep(0.4, 0.0, storminess);
-  if (starVisibility > 0.01) {
-    vec2 starUv = uv + slowTime * 0.005;
-    float starH = fract(sin(dot(floor(starUv * 100.0), vec2(127.1, 311.7))) * 43758.5453);
-    float starH2 = fract(sin(dot(floor(starUv * 100.0), vec2(269.5, 183.3))) * 43758.5453);
-    vec2 starF = fract(starUv * 100.0);
-    float starDist = length(starF - vec2(starH, starH2));
-    float hasStar = step(0.75, starH);
-    float twinkle = 0.6 + 0.4 * sin(uTime * 1.5 + starH * 50.0);
-    float star = hasStar * twinkle * smoothstep(0.03, 0.005, starDist);
-    col += vec3(0.8, 0.85, 1.0) * star * 0.5 * starVisibility;
+  // Camera: hovering above ocean
+  float camH = 6.0 + sin(uTime * 0.04) * 1.5;
+  vec3 camOrigin = vec3(sin(uTime * 0.02) * 5.0, camH, uTime * 0.3);
+  vec3 camTarget = camOrigin + vec3(0.0, -3.0, 10.0);
+  vec3 camForward = normalize(camTarget - camOrigin);
+  vec3 camWorldUp = vec3(0.0, 1.0, 0.0);
+  vec3 camRt = normalize(cross(camForward, camWorldUp));
+  vec3 camUpV = cross(camRt, camForward);
 
-    // Second deeper star layer
-    vec2 starUv2 = uv + slowTime * 0.003 + 7.0;
-    float sh2 = fract(sin(dot(floor(starUv2 * 150.0), vec2(127.1, 311.7))) * 43758.5453);
-    float sh22 = fract(sin(dot(floor(starUv2 * 150.0), vec2(269.5, 183.3))) * 43758.5453);
-    vec2 sf2 = fract(starUv2 * 150.0);
-    float sd2 = length(sf2 - vec2(sh2, sh22));
-    float star2 = step(0.78, sh2) * twinkle * smoothstep(0.02, 0.003, sd2);
-    col += vec3(0.7, 0.75, 0.9) * star2 * 0.25 * starVisibility;
+  vec3 rd = normalize(screenPos.x * camRt + screenPos.y * camUpV + 1.5 * camForward);
+
+  // Sun position
+  vec3 sunDir = normalize(vec3(0.4, 0.3, 0.5));
+
+  // ─── Raymarching ───
+  float marchDist = 0.0;
+  float waterHitDist = -1.0;
+
+  for (int i = 0; i < MAX_STEPS; i++) {
+    vec3 pos = camOrigin + rd * marchDist;
+    float d = oc2Map(pos, timeVal, energy, bass, melPitch, tension, sJam, sSpace);
+    if (d < SURF_DIST) {
+      waterHitDist = marchDist;
+      break;
+    }
+    marchDist += d * 0.6;
+    if (marchDist > MAX_DIST) break;
   }
 
-  // Horizon glow band at bottom — richer with palette bleed
-  float horizonGlow = exp(-pow((uv.y) * 8.0, 2.0));
-  vec3 glowColor = mix(horizonColor, hsv2rgb(vec3(hue2, sat * 0.4, 0.3)), 0.3);
-  col += glowColor * horizonGlow * 0.3;
+  vec3 col;
+
+  if (waterHitDist < 0.0) {
+    // Sky
+    col = oc2Sky(rd, energy, slowE, sunDir, palCol1, palCol2);
+    // Seabird silhouettes
+    col += oc2Seabirds(camOrigin, rd, timeVal);
+  } else {
+    vec3 hitPos = camOrigin + rd * waterHitDist;
+    vec3 norm = oc2Normal(hitPos, timeVal, energy, bass, melPitch, tension, sJam, sSpace);
+    float ambOcc = oc2AO(hitPos, norm, timeVal, energy, bass, melPitch, tension, sJam, sSpace);
+
+    // Diffuse
+    float diffuse = max(dot(norm, sunDir), 0.0) * 0.5 + 0.5;
+
+    // Specular
+    vec3 viewDir = normalize(camOrigin - hitPos);
+    vec3 halfDir = normalize(sunDir + viewDir);
+    float specular = pow(max(dot(norm, halfDir), 0.0), 64.0);
+
+    // Fresnel
+    float fresnelVal = pow(1.0 - max(dot(viewDir, norm), 0.0), 3.5);
+
+    // Water base color
+    vec3 deepWater = mix(vec3(0.02, 0.06, 0.12), palCol1 * 0.3, 0.15);
+    vec3 shallowWater = mix(vec3(0.05, 0.15, 0.2), palCol2 * 0.4, 0.1);
+    deepWater = mix(deepWater, vec3(0.02, 0.04, 0.10), sSpace * 0.4);
+
+    float waveH = oc2WaveHeight(hitPos.xz, timeVal, energy, bass, melPitch, tension, sJam, sSpace);
+    float maxWaveH = mix(0.5, 4.0, storminess);
+    float surfaceShade = smoothstep(-maxWaveH, maxWaveH, waveH);
+    vec3 waterColor = mix(deepWater, shallowWater, surfaceShade * 0.6);
+
+    // Subsurface scattering
+    vec3 sss = oc2Subsurface(hitPos, norm, sunDir, energy, palCol1, timeVal);
+    waterColor += sss;
+
+    // Sky reflection
+    vec3 reflDir = reflect(rd, norm);
+    vec3 skyRefl = oc2Sky(reflDir, energy, slowE, sunDir, palCol1, palCol2);
+    waterColor = mix(waterColor, skyRefl, fresnelVal * 0.65);
+
+    // Foam on crests
+    float foamMask = smoothstep(maxWaveH * 0.4, maxWaveH * 0.85, waveH);
+    float foamBoost = 1.0 + sJam * 0.5 - sSpace * 0.7;
+    float foamAmount = foamMask * (onset * 0.6 + storminess * 0.4 + energy * 0.3) * clamp(foamBoost, 0.0, 2.0);
+    float foamN1 = snoise(vec3(hitPos.xz * 0.1, timeVal * 0.15));
+    float foamN2 = snoise(vec3(hitPos.xz * 0.3, timeVal * 0.2 + 10.0));
+    foamAmount *= smoothstep(-0.1, 0.4, foamN1 * 0.6 + foamN2 * 0.4);
+    foamAmount += pow(max(foamN2, 0.0), 4.0) * energy * 0.2 * foamMask;
+    foamAmount = clamp(foamAmount, 0.0, 1.0);
+    vec3 foamColor = mix(vec3(0.7, 0.75, 0.8), vec3(0.92, 0.95, 1.0), smoothstep(0.3, 0.8, foamAmount));
+    waterColor = mix(waterColor, foamColor, foamAmount * 0.65);
+
+    // Surface sparkle
+    float sparkle = smoothstep(0.9, 0.95, snoise(vec3(hitPos.xz * 8.0, uDynamicTime * 0.4)));
+    waterColor += vec3(1.0, 0.95, 0.85) * sparkle * highs * 0.4 * (1.0 - storminess * 0.5);
+
+    // Bioluminescence on vocal presence
+    if (vocalP > 0.1) {
+      float bioGate = smoothstep(0.1, 0.5, vocalP) * (1.0 - storminess * 0.6);
+      float bioN = sin(hitPos.x * 0.3 + snoise(vec3(hitPos.xz * 0.1, timeVal * 0.04)) * 3.0 + timeVal * 0.3)
+                 * cos(hitPos.z * 0.4 + timeVal * 0.2);
+      bioN = smoothstep(0.3, 0.8, bioN * 0.5 + 0.5);
+      vec3 bioColor = mix(hsv2rgb(vec3(hue1, 0.8, 0.9)), hsv2rgb(vec3(hue2, 0.7, 0.8)), bioN);
+      waterColor += bioColor * bioN * bioGate * 0.2;
+    }
+
+    // Compose
+    vec3 sunColor = vec3(1.0, 0.92, 0.75);
+    float celestialBright = mix(0.8, 0.2, storminess);
+
+    col = waterColor * ambOcc;
+    col += waterColor * sunColor * diffuse * celestialBright * 0.3;
+    col += vec3(0.8, 0.85, 1.0) * specular * celestialBright * 0.4;
+
+    // Chorus: sparkling highlight
+    col += vec3(0.04, 0.06, 0.1) * sChorus * surfaceShade * 0.4;
+    // Solo: deep undertone
+    col += vec3(0.0, 0.02, 0.05) * sSolo * (1.0 - surfaceShade) * 0.4;
+
+    // Distance fog toward horizon
+    float fogDist = waterHitDist * 0.005;
+    float fogAmount = 1.0 - exp(-fogDist * fogDist);
+    vec3 fogColor = mix(
+      hsv2rgb(vec3(hue1, palSat * 0.15, 0.06)),
+      hsv2rgb(vec3(hue2, palSat * 0.1, 0.08)),
+      0.5
+    );
+    col = mix(col, fogColor, clamp(fogAmount, 0.0, 0.7));
+  }
+
+  // ─── Icon emergence ───
+  {
+    float nf = fbm3(vec3(screenPos * 2.0, timeVal));
+    vec3 iconLight = iconEmergence(screenPos, uTime, energy, bass,
+      palCol1, palCol2, nf, uClimaxPhase, uSectionIndex);
+    col += iconLight;
+  }
+  {
+    float nf = fbm3(vec3(screenPos * 1.5, timeVal + 10.0));
+    vec3 heroLight = heroIconEmergence(screenPos, uTime, energy, bass,
+      palCol1, palCol2, nf, uSectionIndex);
+    col += heroLight;
+  }
+
+  // ─── Vignette ───
+  float vigScale = mix(0.28, 0.22, energy);
+  float vignette = 1.0 - dot(screenPos * vigScale, screenPos * vigScale);
+  vignette = smoothstep(0.0, 1.0, vignette);
+  col = mix(vec3(0.01, 0.02, 0.04), col, vignette);
+
+  // ─── Post-processing ───
+  col = applyPostProcess(col, vUv, screenPos);
 
   gl_FragColor = vec4(col, 1.0);
 }
 `;
 
-// ═══════════════════════════════════════════════════
-// CELESTIAL BODY — emissive sphere on horizon
-// ═══════════════════════════════════════════════════
-
-export const oceanCelestialVert = /* glsl */ `
-varying vec3 vNormal;
-varying vec3 vWorldPos;
-void main() {
-  vNormal = normalize(normalMatrix * normal);
-  vWorldPos = (modelMatrix * vec4(position, 1.0)).xyz;
-  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-}
-`;
-
-export const oceanCelestialFrag = /* glsl */ `
-precision highp float;
-
-uniform float uSlowEnergy;
-uniform float uEnergy;
-
-varying vec3 vNormal;
-varying vec3 vWorldPos;
-
-void main() {
-  float storminess = clamp(uEnergy + 0.3, 0.0, 1.5);
-  float brightness = mix(0.9, 0.15, storminess);
-
-  // Warm amber body color
-  vec3 bodyColor = mix(vec3(1.0, 0.92, 0.7), vec3(0.6, 0.6, 0.7), storminess);
-
-  // Limb darkening for realistic celestial body
-  vec3 viewDir = normalize(cameraPosition - vWorldPos);
-  float rim = pow(1.0 - max(dot(viewDir, vNormal), 0.0), 2.0);
-  float limbDarkening = 1.0 - rim * 0.4;
-
-  vec3 col = bodyColor * brightness * limbDarkening;
-
-  // Emissive glow falloff at edges
-  float glow = pow(max(dot(viewDir, vNormal), 0.0), 0.5);
-  col *= glow;
-
-  gl_FragColor = vec4(col, glow * brightness);
-}
-`;
-
-// ═══════════════════════════════════════════════════
-// FOAM/SPRAY PARTICLES — Points on wave crests
-// ═══════════════════════════════════════════════════
-
-export const oceanFoamVert = /* glsl */ `
-uniform float uTime;
-uniform float uEnergy;
-uniform float uOnsetSnap;
-
-attribute float aPhase;
-attribute float aSpeed;
-
-varying float vAlpha;
-
-void main() {
-  vec3 pos = position;
-
-  // Particles drift upward and outward from crests
-  float life = fract(aPhase + uTime * aSpeed * 0.3);
-  pos.y += life * (0.5 + uEnergy * 1.5);
-  pos.x += sin(life * 6.28 + aPhase * 20.0) * 0.3;
-  pos.z += cos(life * 4.0 + aPhase * 15.0) * 0.2;
-
-  // Fade out over lifetime
-  vAlpha = (1.0 - life) * (1.0 - life);
-  vAlpha *= clamp(uOnsetSnap + uEnergy * 0.5, 0.0, 1.0);
-
-  vec4 mvPos = modelViewMatrix * vec4(pos, 1.0);
-  gl_PointSize = max(1.0, (3.0 + uEnergy * 4.0) * (300.0 / -mvPos.z));
-  gl_Position = projectionMatrix * mvPos;
-}
-`;
-
-export const oceanFoamFrag = /* glsl */ `
-precision highp float;
-varying float vAlpha;
-
-void main() {
-  // Soft circular particle
-  float dist = length(gl_PointCoord - 0.5);
-  if (dist > 0.5) discard;
-  float alpha = smoothstep(0.5, 0.1, dist) * vAlpha;
-  gl_FragColor = vec4(0.85, 0.9, 0.95, alpha);
-}
-`;
-
-// ═══════════════════════════════════════════════════
-// BIOLUMINESCENCE PARTICLES — Points in water
-// ═══════════════════════════════════════════════════
-
-export const oceanBioVert = /* glsl */ `
-uniform float uTime;
-uniform float uVocalPresence;
-uniform float uDynamicTime;
-
-attribute float aPhase;
-
-varying float vAlpha;
-varying float vHue;
-
-void main() {
-  vec3 pos = position;
-
-  // Gentle drift
-  float t = uDynamicTime * 0.1 + aPhase * 6.28;
-  pos.x += sin(t * 0.7 + aPhase * 10.0) * 0.5;
-  pos.z += cos(t * 0.5 + aPhase * 8.0) * 0.5;
-  pos.y += sin(t * 0.3 + aPhase * 12.0) * 0.1;
-
-  // Vocal presence triggers visibility
-  float gate = smoothstep(0.1, 0.5, uVocalPresence);
-  // Individual pulse
-  float pulse = sin(uTime * 2.0 + aPhase * 30.0) * 0.5 + 0.5;
-  vAlpha = gate * pulse * 0.8;
-  vHue = aPhase;
-
-  vec4 mvPos = modelViewMatrix * vec4(pos, 1.0);
-  gl_PointSize = max(1.0, (2.0 + pulse * 3.0) * gate * (200.0 / -mvPos.z));
-  gl_Position = projectionMatrix * mvPos;
-}
-`;
-
-export const oceanBioFrag = /* glsl */ `
-precision highp float;
-varying float vAlpha;
-varying float vHue;
-
-void main() {
-  float dist = length(gl_PointCoord - 0.5);
-  if (dist > 0.5) discard;
-  float alpha = smoothstep(0.5, 0.0, dist) * vAlpha;
-
-  // Blue-green bioluminescence with variation
-  vec3 col = mix(vec3(0.1, 0.5, 0.9), vec3(0.0, 0.8, 0.6), vHue);
-  gl_FragColor = vec4(col, alpha);
-}
-`;
+// Legacy exports for backward compatibility
+export const oceanWaterVert = oceanVert;
+export const oceanWaterFrag = oceanFrag;
+export const oceanSkyVert = oceanVert;
+export const oceanSkyFrag = oceanFrag;
+export const oceanCelestialVert = oceanVert;
+export const oceanCelestialFrag = oceanFrag;
+export const oceanFoamVert = oceanVert;
+export const oceanFoamFrag = oceanFrag;
+export const oceanBioVert = oceanVert;
+export const oceanBioFrag = oceanFrag;
