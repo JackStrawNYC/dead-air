@@ -23,6 +23,23 @@ import { seeded, seededShuffle } from "../utils/seededRandom";
 import { hashString } from "../utils/hash";
 import { deriveChromaPalette } from "../utils/chroma-palette";
 import songIdentitiesJson from "./song-identities.json";
+import { isVenetaShow, getVenetaSongIdentity } from "./veneta-routing";
+
+// ─── Show context for show-specific routing ───
+// Set this when the active show is known (e.g. by Root.tsx based on show metadata).
+// When set, lookupSongIdentity will check show-specific routing first.
+
+let activeShowDate: string | undefined;
+
+/** Set the active show date to enable show-specific routing (e.g. Veneta). */
+export function setActiveShowDate(date: string | undefined): void {
+  activeShowDate = date;
+}
+
+/** Get the currently active show date (or undefined). */
+export function getActiveShowDate(): string | undefined {
+  return activeShowDate;
+}
 
 // ─── JSON Override Layer ───
 // Dashboard edits write to data/song-identities.json; lookupSongIdentity checks it first.
@@ -327,7 +344,13 @@ const SONG_ALIASES: Record<string, string> = {
 export function lookupSongIdentity(title: string): SongIdentity | undefined {
   const normalized = normalizeTitle(title);
 
-  // 1. Check JSON overrides first (dashboard-edited)
+  // 0. Show-specific routing (e.g. Veneta) — checked first when active show is set
+  if (isVenetaShow(activeShowDate)) {
+    const venetaIdentity = getVenetaSongIdentity(title);
+    if (venetaIdentity) return venetaIdentity;
+  }
+
+  // 1. Check JSON overrides next (dashboard-edited)
   const overrides = loadJsonOverrides();
   if (overrides) {
     if (overrides[normalized]) return overrides[normalized];

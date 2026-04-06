@@ -10,7 +10,7 @@ import { parseSetlist, safeParse, FlexibleTrackAnalysisSchema, OverlayScheduleSc
 import { SELECTABLE_REGISTRY } from "./data/overlay-registry";
 import { formatDateLong, getShowSeed } from "./data/ShowContext";
 import { validateSectionOverrides } from "./scenes/SceneRouter";
-import { resolveSongMode, lookupSongIdentity } from "./data/song-identities";
+import { resolveSongMode, lookupSongIdentity, setActiveShowDate } from "./data/song-identities";
 import { precomputeNarrativeStates } from "./utils/show-narrative-precompute";
 import type { PrecomputedNarrative } from "./utils/show-narrative-precompute";
 import { isJamSegmentTitle } from "./data/band-config";
@@ -78,6 +78,10 @@ try {
 
 const setlist = parseSetlist(setlistData);
 const showSeed = getShowSeed(setlist);
+
+// Activate show-specific routing (e.g. Veneta 8/27/72) based on setlist date.
+// This must be set before any lookupSongIdentity calls so show overrides apply.
+setActiveShowDate(setlist.date);
 const resolveMode = (song: SetlistEntry) =>
   resolveSongMode(song.title, song.defaultMode, showSeed);
 
