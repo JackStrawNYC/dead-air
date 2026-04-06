@@ -65,6 +65,10 @@ import { WolfGuitar } from "../components/WolfGuitar";
 import { TieDyeBorder } from "../components/TieDyeBorder";
 import { RedwoodSilhouettes } from "../components/RedwoodSilhouettes";
 import { MountainPanorama } from "../components/MountainPanorama";
+import { MeteorShower } from "../components/MeteorShower";
+import { LiquidLightBorder } from "../components/LiquidLightBorder";
+import { SpiralHypnoDisc } from "../components/SpiralHypnoDisc";
+import { OwsleyBear } from "../components/OwsleyBear";
 
 // ─── Layer 5: Song References (3) + Dead Culture ───
 import { SunMoonMotif } from "../components/SunMoonMotif";
@@ -459,6 +463,10 @@ export const OVERLAY_COMPONENTS: Record<string, OverlayComponentEntry> = {
   TieDyeBorder:      { Component: TieDyeBorder, layer: 1 },
   RedwoodSilhouettes:{ Component: RedwoodSilhouettes, layer: 5 },
   MountainPanorama:  { Component: MountainPanorama, layer: 5 },
+  MeteorShower:      { Component: MeteorShower, layer: 1 },
+  LiquidLightBorder: { Component: LiquidLightBorder, layer: 1 },
+  SpiralHypnoDisc:   { Component: SpiralHypnoDisc, layer: 2 },
+  OwsleyBear:        { Component: OwsleyBear, layer: 6 },
 
   // Layer 3: Reactive
   LightningBoltOverlay: { Component: LightningBoltOverlay, layer: 3 },

@@ -261,10 +261,9 @@ export const OVERLAY_REGISTRY: OverlayEntry[] = [
   { name: "MatrixRain",              layer: 1, category: "atmospheric", tags: ["organic","contemplative"], energyBand: "low", weight: 1, dutyCycle: 100, energyResponse: [0,0.08,2.5], tier: "C" },
   { name: "MemphisDesign",           layer: 4, category: "geometric", tags: ["mechanical","psychedelic"], energyBand: "mid", weight: 2, dutyCycle: 33, energyResponse: [0.08,0.25,2], tier: "C" },
   { name: "MengerSponge",            layer: 4, category: "geometric", tags: ["mechanical","psychedelic"], energyBand: "mid", weight: 2, dutyCycle: 33, energyResponse: [0.08,0.25,2], tier: "C" },
-  { name: "MeteorShower",            layer: 1, category: "atmospheric", tags: ["organic","contemplative"], energyBand: "low", weight: 1, dutyCycle: 100, energyResponse: [0,0.08,2.5], tier: "C" },
   { name: "Metronome",               layer: 9, category: "hud", tags: ["retro","mechanical"], energyBand: "any", weight: 1, dutyCycle: 100, energyResponse: [0,0.12,2], tier: "C" },
   { name: "MolecularBonds",          layer: 4, category: "geometric", tags: ["mechanical","psychedelic"], energyBand: "mid", weight: 2, dutyCycle: 33, energyResponse: [0.08,0.25,2], tier: "C" },
-  { name: "MoonPhases",              layer: 1, category: "atmospheric", tags: ["organic","contemplative"], energyBand: "low", weight: 1, dutyCycle: 100, energyResponse: [0,0.08,2.5], tier: "C" },
+  { name: "MoonPhases",              layer: 1, category: "atmospheric", tags: ["cosmic","dead-culture","contemplative"], energyBand: "low", weight: 2, dutyCycle: 100, energyResponse: [0.0,0.10,2.5], tier: "A" },
   { name: "MoshPit",                 layer: 6, category: "character", tags: ["dead-culture","festival"], energyBand: "mid", weight: 2, dutyCycle: 100, energyResponse: [0.05,0.2,1.5], tier: "C" },
   { name: "MotelSign",               layer: 7, category: "artifact", tags: ["retro","dead-culture"], energyBand: "any", weight: 1, dutyCycle: 20, energyResponse: [0,0.05,3], tier: "C" },
   { name: "Moth",                    layer: 5, category: "nature", tags: ["organic","contemplative"], energyBand: "mid", weight: 2, dutyCycle: 100, energyResponse: [0.03,0.15,2], tier: "C" },
@@ -422,6 +421,10 @@ export const OVERLAY_REGISTRY: OverlayEntry[] = [
   { name: "TieDyeBorder",           layer: 1, category: "atmospheric", tags: ["psychedelic", "dead-culture"],      energyBand: "any",  weight: 2, dutyCycle: 100, energyResponse: [0.03, 0.18, 1.5], tier: "A" },
   { name: "RedwoodSilhouettes",     layer: 5, category: "nature",      tags: ["organic", "contemplative"],         energyBand: "low",  weight: 2, dutyCycle: 100, energyResponse: [0.0, 0.10, 2.5], tier: "B" },
   { name: "MountainPanorama",       layer: 5, category: "nature",      tags: ["organic", "contemplative"],         energyBand: "low",  weight: 2, dutyCycle: 100, energyResponse: [0.0, 0.10, 2.5], tier: "B" },
+  { name: "MeteorShower",           layer: 1, category: "atmospheric", tags: ["cosmic", "intense"],                energyBand: "any",  weight: 2, dutyCycle: 100, energyResponse: [0.05, 0.25, 1.8], tier: "A" },
+  { name: "LiquidLightBorder",      layer: 1, category: "atmospheric", tags: ["psychedelic", "dead-culture"],      energyBand: "any",  weight: 2, dutyCycle: 100, energyResponse: [0.03, 0.18, 1.5], tier: "A" },
+  { name: "SpiralHypnoDisc",        layer: 2, category: "sacred",      tags: ["psychedelic", "cosmic"],            energyBand: "any",  weight: 2, dutyCycle: 100, energyResponse: [0.03, 0.20, 1.5], tier: "A" },
+  { name: "OwsleyBear",             layer: 6, category: "character",   tags: ["dead-culture", "festival"],         energyBand: "any",  weight: 3, dutyCycle: 100, energyResponse: [0.03, 0.18, 1.5], tier: "A" },
 ];
 
 /**
