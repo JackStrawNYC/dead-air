@@ -59,6 +59,13 @@ import { LissajousCurves } from "../components/LissajousCurves";
 import { RoseGarden } from "../components/RoseGarden";
 import { StealYourFaceKaleidoscope } from "../components/StealYourFaceKaleidoscope";
 
+// ─── New Overlays (April 2026 expansion) ───
+import { Europe72Jester } from "../components/Europe72Jester";
+import { WolfGuitar } from "../components/WolfGuitar";
+import { TieDyeBorder } from "../components/TieDyeBorder";
+import { RedwoodSilhouettes } from "../components/RedwoodSilhouettes";
+import { MountainPanorama } from "../components/MountainPanorama";
+
 // ─── Layer 5: Song References (3) + Dead Culture ───
 import { SunMoonMotif } from "../components/SunMoonMotif";
 import { ChinaCatSunflower } from "../components/ChinaCatSunflower";
@@ -445,6 +452,13 @@ export const OVERLAY_COMPONENTS: Record<string, OverlayComponentEntry> = {
   StealieFade:       { Component: StealieFade, layer: 2 },
   RoseGarden:        { Component: RoseGarden, layer: 2 },
   StealYourFaceKaleidoscope: { Component: StealYourFaceKaleidoscope, layer: 2 },
+
+  // ─── New Overlays (April 2026 expansion) ───
+  Europe72Jester:    { Component: Europe72Jester, layer: 6 },
+  WolfGuitar:        { Component: WolfGuitar, layer: 6 },
+  TieDyeBorder:      { Component: TieDyeBorder, layer: 1 },
+  RedwoodSilhouettes:{ Component: RedwoodSilhouettes, layer: 5 },
+  MountainPanorama:  { Component: MountainPanorama, layer: 5 },
 
   // Layer 3: Reactive
   LightningBoltOverlay: { Component: LightningBoltOverlay, layer: 3 },

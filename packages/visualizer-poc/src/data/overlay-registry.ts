@@ -415,6 +415,13 @@ export const OVERLAY_REGISTRY: OverlayEntry[] = [
   { name: "GoldenRoad",             layer: 5, category: "nature",      tags: ["dead-culture", "organic"],          energyBand: "low",  weight: 1, dutyCycle: 60,  energyResponse: [0.02, 0.12, 2.0], tier: "B" },
   { name: "NeonDeadSign",           layer: 7, category: "artifact",    tags: ["dead-culture", "retro"],            energyBand: "mid",  weight: 1, dutyCycle: 40,  energyResponse: [0.05, 0.15, 2.0], tier: "B" },
   { name: "SetlistPaper",           layer: 7, category: "artifact",    tags: ["dead-culture", "retro"],            energyBand: "low",  weight: 1, dutyCycle: 30,  energyResponse: [0.0, 0.08, 2.5], tier: "B" },
+
+  // ═══ April 2026 Expansion (15 new overlays) ═══
+  { name: "Europe72Jester",         layer: 6, category: "character",   tags: ["dead-culture", "festival"],         energyBand: "any",  weight: 3, dutyCycle: 100, energyResponse: [0.03, 0.18, 1.5], tier: "A" },
+  { name: "WolfGuitar",             layer: 6, category: "character",   tags: ["dead-culture", "organic"],          energyBand: "mid",  weight: 3, dutyCycle: 100, energyResponse: [0.05, 0.20, 1.5], tier: "A" },
+  { name: "TieDyeBorder",           layer: 1, category: "atmospheric", tags: ["psychedelic", "dead-culture"],      energyBand: "any",  weight: 2, dutyCycle: 100, energyResponse: [0.03, 0.18, 1.5], tier: "A" },
+  { name: "RedwoodSilhouettes",     layer: 5, category: "nature",      tags: ["organic", "contemplative"],         energyBand: "low",  weight: 2, dutyCycle: 100, energyResponse: [0.0, 0.10, 2.5], tier: "B" },
+  { name: "MountainPanorama",       layer: 5, category: "nature",      tags: ["organic", "contemplative"],         energyBand: "low",  weight: 2, dutyCycle: 100, energyResponse: [0.0, 0.10, 2.5], tier: "B" },
 ];
 
 /**
