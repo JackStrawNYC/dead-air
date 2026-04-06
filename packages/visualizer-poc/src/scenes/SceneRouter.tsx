@@ -826,7 +826,7 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
 
       // Standard jam phase render (with dual-shader composition if energy warrants)
       const frameEnergy = frames[Math.min(frame, frames.length - 1)]?.rms ?? 0;
-      const jamShouldDual = false; // DISABLED: complement shaders have sJam GLSL bugs
+      const jamShouldDual = frameEnergy > 0.05;
       if (jamShouldDual) {
         const affinityPool = TRANSITION_AFFINITY[jpMode];
         const rng = seededRandom((seed ?? 0) + JAM_PHASE_INDEX[jamEvolution.phase] * 31);
@@ -1022,14 +1022,13 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
   const interplayForceDual = stemInterplayMode === "tight-lock";
   const isSoloSpotlight = stemInterplayMode === "solo-spotlight";
 
-  // Dual-shader DISABLED: complement shaders have sJam GLSL compilation bugs
-  const shouldDual = false && !dualCooldown && !isSoloSpotlight && (climaxForceDual || interplayForceDual || (sectionLen >= 600 && (
+  const shouldDual = !dualCooldown && !isSoloSpotlight && (climaxForceDual || interplayForceDual || (sectionLen >= 600 && (
     frameEnergy > dualEnergyThreshold ||
     stemSection === "jam" || stemSection === "solo"
   )));
 
   // Solo-spotlight dual: subtle focus blend instead of full suppression
-  const shouldSoloSpotlightDual = false; // DISABLED: complement shaders have sJam bugs
+  const shouldSoloSpotlightDual = isSoloSpotlight && sectionLen >= 600 && frameEnergy > 0.06;
 
   if (shouldDual || shouldSoloSpotlightDual) {
     // Prefer transition affinity pool for secondary shader selection
