@@ -263,7 +263,12 @@ export type VisualMode =
   | "bloom_explosion"
   | "locomotive_engine"
   | "dance_floor_prism"
-  | "stained_glass_dissolution";
+  | "stained_glass_dissolution"
+  | "crystalline_void"
+  | "amber_drift"
+  | "obsidian_mirror"
+  | "spectral_bridge"
+  | "ember_meadow";
 
 /** Per-section mode override in setlist */
 export interface SectionOverride {

@@ -177,6 +177,12 @@ import { BloomExplosionScene } from "./BloomExplosionScene";
 import { LocomotiveEngineScene } from "./LocomotiveEngineScene";
 import { DanceFloorPrismScene } from "./DanceFloorPrismScene";
 import { StainedGlassDissolutionScene } from "./StainedGlassDissolutionScene";
+// New shader wrappers
+import { CrystallineVoidScene } from "./CrystallineVoidScene";
+import { AmberDriftScene } from "./AmberDriftScene";
+import { ObsidianMirrorScene } from "./ObsidianMirrorScene";
+import { SpectralBridgeScene } from "./SpectralBridgeScene";
+import { EmberMeadowScene } from "./EmberMeadowScene";
 
 // ─── Scene Registry ───
 
@@ -910,6 +916,36 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     complement: "honeycomb_cathedral",
     preferredTransitionIn: "dissolve",
     spectralFamily: "tonal",
+  },
+  crystalline_void: {
+    Component: CrystallineVoidScene,
+    energyAffinity: "high",
+    complement: "neon_grid",
+    spectralFamily: "tonal",
+  },
+  amber_drift: {
+    Component: AmberDriftScene,
+    energyAffinity: "low",
+    complement: "warm_nebula",
+    spectralFamily: "warm",
+  },
+  obsidian_mirror: {
+    Component: ObsidianMirrorScene,
+    energyAffinity: "low",
+    complement: "stark_minimal",
+    spectralFamily: "tonal",
+  },
+  spectral_bridge: {
+    Component: SpectralBridgeScene,
+    energyAffinity: "any",
+    complement: "creation",
+    spectralFamily: "tonal",
+  },
+  ember_meadow: {
+    Component: EmberMeadowScene,
+    energyAffinity: "mid",
+    complement: "warm_nebula",
+    spectralFamily: "warm",
   },
 };
 
