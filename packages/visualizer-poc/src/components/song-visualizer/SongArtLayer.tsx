@@ -5,7 +5,14 @@
  */
 
 import React from "react";
-import { Img, useCurrentFrame, interpolate, Easing } from "remotion";
+import { useCurrentFrame, interpolate, Easing } from "remotion";
+
+// PERF: We use a native <img> here instead of Remotion's <Img> on purpose.
+// Remotion's <Img> wraps the load in delayRender(), and when 4 chrome workers
+// race to load the same PNG at once, one of them deadlocks during the intro
+// period. Native <img> loads asynchronously without blocking the frame, and
+// for static PNGs cached in the bundle the load is essentially instant — no
+// visible difference, but it unblocks multi-worker concurrency.
 
 const clampOpts = { extrapolateLeft: "clamp" as const, extrapolateRight: "clamp" as const };
 
@@ -76,8 +83,10 @@ export const SongArtLayer: React.FC<SongArtProps> = ({
           border: "1px solid rgba(255,255,255,0.15)",
         }}
       >
-        <Img
+        <img
           src={src}
+          alt=""
+          loading="eager"
           style={{
             width: "100%",
             height: "100%",

@@ -10,8 +10,7 @@
 
 import React from "react";
 import { useCurrentFrame, useVideoConfig, interpolate, spring } from "remotion";
-import { loadFont } from "@remotion/google-fonts/CormorantGaramond";
-import { loadFont as loadMono } from "@remotion/google-fonts/JetBrainsMono";
+import { loadFont, loadMonoFont as loadMono } from "../utils/font-shim";
 import { useSongPalette } from "../data/SongPaletteContext";
 
 const { fontFamily: cormorant } = loadFont("normal", {

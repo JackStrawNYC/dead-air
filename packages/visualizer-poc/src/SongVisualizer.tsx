@@ -445,6 +445,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
     );
   }
 
+
   // ─── Audio-reactive state (per-frame) ───
   const sections = getSections(analysis);
   const tempo = analysis?.meta?.tempo ?? 120;
@@ -770,7 +771,9 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
     opacity: currentIconTexture ? iconState.opacity * (1 - deadAirFactor) : 0,
   };
 
-  // ─── Render ───
+
+  // ─── Render (full) ───
+  // eslint-disable-next-line no-unreachable
   return (
     <div style={{ width, height, position: "relative", overflow: "hidden", background: "#000" }}>
       <ShowNarrativeProvider totalSongs={props.show?.songs.length ?? 1} initialState={props.narrativeState ? { ...props.narrativeState, usedOverlayIds: new Set(props.narrativeState.predictedOverlayIds ?? []) } : undefined}>

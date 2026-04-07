@@ -1,6 +1,6 @@
 import React from "react";
 import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
-import { loadFont } from "@remotion/google-fonts/CormorantGaramond";
+import { loadFont } from "../utils/font-shim";
 import { responsiveFontSize, responsiveSize } from "../utils/responsive-text";
 import { useSongPalette } from "../data/SongPaletteContext";
 

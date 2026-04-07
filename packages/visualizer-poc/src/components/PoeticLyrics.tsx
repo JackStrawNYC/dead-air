@@ -13,7 +13,7 @@
 
 import React, { useMemo } from "react";
 import { useCurrentFrame, interpolate } from "remotion";
-import { loadFont } from "@remotion/google-fonts/CormorantGaramond";
+import { loadFont } from "../utils/font-shim";
 import { useSongPalette } from "../data/SongPaletteContext";
 import type { EnhancedFrameData, SectionBoundary } from "../data/types";
 

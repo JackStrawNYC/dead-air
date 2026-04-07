@@ -16,7 +16,7 @@ import { detectSuite } from "./suite-detector";
 import type { SuiteInfo } from "./suite-detector";
 import { SELECTABLE_REGISTRY } from "../data/overlay-registry";
 import { lookupSongIdentity, getOrGenerateSongIdentity } from "../data/song-identities";
-import { TRANSITION_AFFINITY } from "../scenes/scene-registry";
+import { TRANSITION_AFFINITY } from "../scenes/transition-affinity";
 import { seededLCG as seededRandom } from "./seededRandom";
 import { hashString } from "./hash";
 

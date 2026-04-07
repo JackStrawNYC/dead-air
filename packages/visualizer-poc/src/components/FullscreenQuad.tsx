@@ -208,7 +208,22 @@ export const FullscreenQuad: React.FC<Props> = ({
     fftTextureRef.current.needsUpdate = true;
   }
 
-  // Render targets for FXAA post-pass + icon overlay
+  // Render targets for FXAA post-pass + icon overlay.
+  //
+  // PERF: Render the heavy fragment shader at a lower internal resolution and
+  // upscale via linear-sampled output mesh. The shader cost scales with pixel
+  // count, so a 0.5x downscale = 4x speedup of the shader pass. Output is still
+  // emitted at full (width × height) so overlays/text/song art stay sharp at
+  // full 1080p — only the shader interior is softened.
+  //
+  // SHADER_DOWNSCALE: 1 = full output res, 2 = half (4x faster), 3 = third (9x faster).
+  // Hardcoded to 2 — gives us a reliable 4x shader speedup without per-bundle env-var
+  // fragility. Bump to 3 if you need an even faster render at the cost of more
+  // shader softness.
+  const SHADER_DOWNSCALE = 2;
+  const shaderWidth = Math.max(1, Math.round(width / SHADER_DOWNSCALE));
+  const shaderHeight = Math.max(1, Math.round(height / SHADER_DOWNSCALE));
+
   const targetsRef = useRef<{
     main: THREE.WebGLRenderTarget;
     iconOverlay: THREE.WebGLRenderTarget;
@@ -228,9 +243,9 @@ export const FullscreenQuad: React.FC<Props> = ({
       format: THREE.RGBAFormat,
     };
     targetsRef.current = {
-      main: new THREE.WebGLRenderTarget(width, height, opts),
-      iconOverlay: new THREE.WebGLRenderTarget(width, height, opts),
-      fxaa: new THREE.WebGLRenderTarget(width, height, opts),
+      main: new THREE.WebGLRenderTarget(shaderWidth, shaderHeight, opts),
+      iconOverlay: new THREE.WebGLRenderTarget(shaderWidth, shaderHeight, opts),
+      fxaa: new THREE.WebGLRenderTarget(shaderWidth, shaderHeight, opts),
     };
     return () => {
       targetsRef.current?.main.dispose();
@@ -238,7 +253,8 @@ export const FullscreenQuad: React.FC<Props> = ({
       targetsRef.current?.fxaa.dispose();
       targetsRef.current = null;
     };
-  }, [width, height]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shaderWidth, shaderHeight]);
 
   // Camera for offscreen rendering
   const camera = useMemo(
@@ -445,7 +461,8 @@ export const FullscreenQuad: React.FC<Props> = ({
   uniforms.uOnset.value = smooth.onset;
   uniforms.uBeat.value = beatDecay;
   uniforms.uMids.value = smooth.mids;
-  uniforms.uResolution.value.set(width, height);
+  // Shader sees the downscaled internal resolution, not the output resolution
+  uniforms.uResolution.value.set(shaderWidth, shaderHeight);
   uniforms.uEnergy.value = smooth.energy;
   uniforms.uSectionProgress.value = smooth.sectionProgress;
   uniforms.uSectionIndex.value = smooth.sectionIndex;
@@ -611,9 +628,9 @@ export const FullscreenQuad: React.FC<Props> = ({
       postShaderTexture = targets.iconOverlay.texture;
     }
 
-    // Pass 2: FXAA anti-aliasing
+    // Pass 2: FXAA anti-aliasing — runs at the downscaled shader resolution
     fxaaPass.uniforms.uInputTexture.value = postShaderTexture;
-    fxaaPass.uniforms.uResolution.value.set(width, height);
+    fxaaPass.uniforms.uResolution.value.set(shaderWidth, shaderHeight);
     gl.setRenderTarget(targets.fxaa);
     gl.clear();
     gl.render(fxaaPass.scene, camera);

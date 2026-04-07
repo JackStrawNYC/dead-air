@@ -6,7 +6,7 @@
 
 import React from "react";
 import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
-import { loadFont } from "@remotion/google-fonts/CormorantGaramond";
+import { loadFont } from "../utils/font-shim";
 import { useShowContext, formatDateCompact } from "../data/ShowContext";
 import { useSongPalette } from "../data/SongPaletteContext";
 

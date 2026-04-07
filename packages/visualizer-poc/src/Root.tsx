@@ -11,9 +11,9 @@ import { SELECTABLE_REGISTRY } from "./data/overlay-registry";
 import { formatDateLong, getShowSeed } from "./data/ShowContext";
 import { validateSectionOverrides } from "./scenes/SceneRouter";
 import { resolveSongMode, lookupSongIdentity, setActiveShowDate } from "./data/song-identities";
-import { precomputeNarrativeStates } from "./utils/show-narrative-precompute";
 import type { PrecomputedNarrative } from "./utils/show-narrative-precompute";
-import { isJamSegmentTitle } from "./data/band-config";
+import type { ShowPhase } from "./data/ShowNarrativeContext";
+import type { VisualMode } from "./data/types";
 
 // ─── Dynamic show loading ───
 // Supports multi-show via --props='{"showId":"1972-08-27"}' or SHOW_ID env var.
@@ -44,23 +44,22 @@ try {
   // show-context.json is optional
 }
 
-// Import all track analysis files
-// Uses static require path prefix for default show so Webpack can resolve via require.context.
-const analysisCache: Record<string, unknown> = {};
-function loadTrackAnalysis(trackId: string) {
-  if (analysisCache[trackId]) return analysisCache[trackId];
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const data = (!showId || showId === "cornell-77")
-      ? require(`../data/tracks/${trackId}-analysis.json`)
-      : require(`../data/shows/${showId}/tracks/${trackId}-analysis.json`);
-    const validated = safeParse(FlexibleTrackAnalysisSchema, data);
-    analysisCache[trackId] = validated;
-    return validated;
-  } catch (e) {
-    console.error(`[loadTrackAnalysis] FAILED for ${trackId}:`, e);
-    return null;
-  }
+// Per-track analysis is NOT bundled — it's loaded by the Remotion CLI via
+// `--props=path/to/analysis.json` and arrives as inputProps. This keeps the JS
+// bundle small (under 10 MB instead of ~250 MB) which is critical for render
+// worker memory pressure. See scripts/render-show.ts for the props plumbing.
+
+// Pre-computed track-level metadata: total frame counts per track. This tiny
+// JSON replaces the need to read each full analysis just to know its length.
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const showTimeline = (!showId || showId === "cornell-77")
+  ? require("../data/show-timeline.json")
+  : require(`../data/shows/${showId}/show-timeline.json`);
+
+interface TimelineTrack { trackId: string; totalFrames: number }
+const timelineByTrackId: Record<string, number> = {};
+for (const t of (showTimeline.tracks as TimelineTrack[] | undefined) ?? []) {
+  timelineByTrackId[t.trackId] = t.totalFrames;
 }
 
 // Try to load overlay schedule (may not exist yet — that's OK)
@@ -85,19 +84,56 @@ setActiveShowDate(setlist.date);
 const resolveMode = (song: SetlistEntry) =>
   resolveSongMode(song.title, song.defaultMode, showSeed);
 
-// ─── Pre-compute cross-song narrative state ───
+// ─── Pre-computed cross-song narrative state ───
 // Each song gets the accumulated state from all songs rendered before it.
-// This enables show-arc awareness, fatigue tracking, and shader variety
-// enforcement even though each Composition renders in a separate process.
-const narrativeStates: PrecomputedNarrative[] = precomputeNarrativeStates(
-  setlist.songs,
-  (trackId: string) => {
-    const analysis = loadTrackAnalysis(trackId) as { frames?: Array<{ rms: number; flatness?: number }> } | null;
-    return analysis?.frames ?? null;
-  },
-  (song) => resolveSongMode(song.title, song.defaultMode as import("./data/types").VisualMode, showSeed),
-  isJamSegmentTitle,
-);
+// Enables show-arc awareness, fatigue tracking, and shader variety enforcement
+// across compositions that render in separate Remotion worker processes.
+//
+// Computed by `scripts/precompute-narrative.ts` (runs before bundling) and
+// loaded here as a small (~40 KB) JSON. This used to call precomputeNarrativeStates()
+// at module init, which forced Webpack to inline ALL analysis JSONs (~250 MB)
+// into the bundle and tanked render performance.
+//
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const narrativeStatesRaw = (!showId || showId === "cornell-77")
+  ? require("../data/narrative-states.json")
+  : require(`../data/shows/${showId}/narrative-states.json`);
+
+interface SerializedNarrative {
+  songsCompleted: number;
+  songPeakEnergies: number[];
+  showEnergyBaseline: number;
+  showPhase: ShowPhase;
+  hasDrumsSpace: boolean;
+  postDrumsSpaceCount: number;
+  hasHadCoherenceLock: boolean;
+  itLockCount: number;
+  usedShaderModes: [VisualMode, number][];
+  shaderModeLastUsed: [VisualMode, number][];
+  songPeakScores: number[];
+  peakOfShowFired: boolean;
+  suiteInfo: PrecomputedNarrative["suiteInfo"];
+  prevSongContext: PrecomputedNarrative["prevSongContext"];
+  predictedOverlayIds: string[];
+}
+
+const narrativeStates: PrecomputedNarrative[] = (narrativeStatesRaw as SerializedNarrative[]).map((s) => ({
+  songsCompleted: s.songsCompleted,
+  songPeakEnergies: s.songPeakEnergies,
+  showEnergyBaseline: s.showEnergyBaseline,
+  showPhase: s.showPhase,
+  hasDrumsSpace: s.hasDrumsSpace,
+  postDrumsSpaceCount: s.postDrumsSpaceCount,
+  hasHadCoherenceLock: s.hasHadCoherenceLock,
+  itLockCount: s.itLockCount,
+  usedShaderModes: new Map(s.usedShaderModes),
+  shaderModeLastUsed: new Map(s.shaderModeLastUsed),
+  songPeakScores: s.songPeakScores,
+  peakOfShowFired: s.peakOfShowFired,
+  suiteInfo: s.suiteInfo,
+  prevSongContext: s.prevSongContext,
+  predictedOverlayIds: s.predictedOverlayIds,
+}));
 
 const FPS_SCALE = RENDER_FPS / 30; // 1.0 at 30fps, 2.0 at 60fps
 const DEFAULT_FRAMES = Math.round(31417 * FPS_SCALE); // Morning Dew fallback
@@ -226,21 +262,29 @@ export const Root: React.FC = () => {
               narrativeState: narrativeStates[i],
             } satisfies SongVisualizerProps as Record<string, unknown>}
             calculateMetadata={async ({ props }) => {
-              // Try bundle require first (dev/studio), then fall back to --props (CLI render)
-              let analysis = loadTrackAnalysis(song.trackId) as { meta?: { totalFrames?: number; sections?: unknown[] }; frames?: unknown[] } | null;
-              if (!analysis && (props as Record<string, unknown>).meta && (props as Record<string, unknown>).frames) {
-                analysis = safeParse(FlexibleTrackAnalysisSchema, { meta: (props as Record<string, unknown>).meta, frames: (props as Record<string, unknown>).frames });
-              }
-              if (analysis?.meta) {
-                if (analysis.meta.sections) {
-                  validateSectionOverrides(song, analysis.meta.sections.length);
+              // Analysis arrives via --props (CLI render) as top-level meta+frames.
+              // Wrap as { analysis: { meta, frames } } so SongVisualizer can read it.
+              const p = props as Record<string, unknown>;
+              if (p.meta && p.frames) {
+                const analysis = safeParse(FlexibleTrackAnalysisSchema, { meta: p.meta, frames: p.frames });
+                if (analysis?.meta) {
+                  if (analysis.meta.sections) {
+                    validateSectionOverrides(song, analysis.meta.sections.length);
+                  }
+                  return {
+                    durationInFrames: Math.round((analysis.meta.totalFrames ?? DEFAULT_FRAMES) * FPS_SCALE),
+                    props: { ...props, analysis },
+                  };
                 }
-                return {
-                  durationInFrames: Math.round((analysis.meta.totalFrames ?? DEFAULT_FRAMES) * FPS_SCALE),
-                  props: { ...props, analysis },
-                };
               }
-              return { durationInFrames: DEFAULT_FRAMES };
+              // Fallback for studio / preview without --props: use the precomputed
+              // show-timeline.json totalFrames so the composition has the right length
+              // even though the inner SongVisualizer will render its empty fallback.
+              const tf = timelineByTrackId[song.trackId];
+              const durationInFrames = tf
+                ? Math.round(tf * FPS_SCALE)
+                : DEFAULT_FRAMES;
+              return { durationInFrames };
             }}
           />
         );
@@ -296,14 +340,18 @@ export const Root: React.FC = () => {
             show: setlist,
           } satisfies SongVisualizerProps as Record<string, unknown>}
           calculateMetadata={async ({ props }) => {
-            const analysis = loadTrackAnalysis("s2t08") as { meta?: { totalFrames?: number } } | null;
-            if (analysis?.meta) {
-              return {
-                durationInFrames: Math.round((analysis.meta.totalFrames ?? DEFAULT_FRAMES) * FPS_SCALE),
-                props: { ...props, analysis },
-              };
+            const p = props as Record<string, unknown>;
+            if (p.meta && p.frames) {
+              const analysis = safeParse(FlexibleTrackAnalysisSchema, { meta: p.meta, frames: p.frames });
+              if (analysis?.meta) {
+                return {
+                  durationInFrames: Math.round((analysis.meta.totalFrames ?? DEFAULT_FRAMES) * FPS_SCALE),
+                  props: { ...props, analysis },
+                };
+              }
             }
-            return { durationInFrames: DEFAULT_FRAMES };
+            const tf = timelineByTrackId["s2t08"];
+            return { durationInFrames: tf ? Math.round(tf * FPS_SCALE) : DEFAULT_FRAMES };
           }}
         />
       )}

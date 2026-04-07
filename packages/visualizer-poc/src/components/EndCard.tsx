@@ -11,7 +11,7 @@
 
 import React from "react";
 import { Img, staticFile, useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
-import { loadFont } from "@remotion/google-fonts/CormorantGaramond";
+import { loadFont } from "../utils/font-shim";
 import { useShowContext } from "../data/ShowContext";
 
 const { fontFamily: cormorant } = loadFont("normal", {

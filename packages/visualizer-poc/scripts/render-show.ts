@@ -153,6 +153,8 @@ function computeSourceHash(): string {
     join(ROOT, "src", "data", "overlay-windows.ts"),
     join(ROOT, "src", "data", "schemas.ts"),
     join(DATA_DIR, "setlist.json"),
+    join(DATA_DIR, "show-timeline.json"),
+    join(DATA_DIR, "narrative-states.json"),
   ];
   const optionalFiles = [
     join(DATA_DIR, "overlay-schedule.json"),
@@ -189,8 +191,32 @@ function computeSourceHash(): string {
   return hash.digest("hex").slice(0, 16);
 }
 
+/** Run the cross-song narrative precompute step.
+ *  Writes data/narrative-states.json (~40 KB) which Root.tsx imports.
+ *  Replaces the old in-bundle precompute that forced Webpack to inline ~250 MB
+ *  of analysis JSONs into bundle.js. */
+function ensureNarrativePrecompute(): void {
+  const out = join(DATA_DIR, "narrative-states.json");
+  const setlistPath = join(DATA_DIR, "setlist.json");
+  // Stale if missing or older than setlist.json
+  if (existsSync(out)) {
+    const outMtime = statSync(out).mtimeMs;
+    const setlistMtime = statSync(setlistPath).mtimeMs;
+    if (outMtime >= setlistMtime) {
+      console.log("Narrative precompute up-to-date.");
+      return;
+    }
+  }
+  console.log("Precomputing narrative states ...");
+  execSync(`npx tsx ${join(ROOT, "scripts", "precompute-narrative.ts")}`, {
+    cwd: ROOT,
+    stdio: "inherit",
+  });
+}
+
 /** Bundle the project, rebuilding if source files changed */
 function ensureBundle(): string {
+  ensureNarrativePrecompute();
   const currentHash = computeSourceHash();
 
   if (existsSync(join(BUNDLE_DIR, "index.html")) && existsSync(BUNDLE_HASH_FILE)) {

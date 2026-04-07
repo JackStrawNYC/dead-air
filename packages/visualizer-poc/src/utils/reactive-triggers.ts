@@ -78,14 +78,14 @@ function sectionBaseline(
   frames: EnhancedFrameData[],
   frameIdx: number,
   sectionFrameStart: number,
-  accessor: (f: EnhancedFrameData) => number,
+  accessor: (frames: EnhancedFrameData[], idx: number) => number,
 ): number {
   const scanStart = Math.max(sectionFrameStart, frameIdx - SCAN_FRAMES);
   if (frameIdx <= scanStart) return 0;
   let sum = 0;
   let count = 0;
   for (let i = scanStart; i < frameIdx; i++) {
-    sum += accessor(frames[i]);
+    sum += accessor(frames, i);
     count++;
   }
   return count > 0 ? sum / count : 0;
@@ -121,10 +121,12 @@ function detectSpectralEruption(
     fluxSum += frameSpectralFlux(frames, i);
   }
   const currentFlux = fluxSum / Math.min(window, frameIdx);
-  const baseline = sectionBaseline(frames, frameIdx, sectionFrameStart, (f) => {
-    const idx = frames.indexOf(f);
-    return idx > 0 ? frameSpectralFlux(frames, idx) : 0;
-  });
+  // Was O(N²) per call: the inner accessor used `frames.indexOf(f)` which scanned the
+  // entire frames array (~6300 entries) for each of the up-to-600 baseline frames.
+  // Pass the index directly so this is O(SCAN_FRAMES) per call.
+  const baseline = sectionBaseline(frames, frameIdx, sectionFrameStart, (fr, idx) =>
+    idx > 0 ? frameSpectralFlux(fr, idx) : 0,
+  );
   // Use timbralFlux if available (more stable), else fall back to computed
   const tFlux = frames[frameIdx].timbralFlux ?? currentFlux;
   const effectiveFlux = Math.max(tFlux, currentFlux);
