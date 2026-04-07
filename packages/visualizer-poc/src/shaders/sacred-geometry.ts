@@ -462,10 +462,10 @@ void main() {
   tm += drumOn * 0.15;
 
   // ─── Palette ───
-  float h1 = hsvToCosineHue(uPalettePrimary);
-  vec3 palPrimary = 0.5 + 0.5 * cos(SG2_TAU * vec3(h1, h1 + 0.33, h1 + 0.67));
-  float h2 = hsvToCosineHue(uPaletteSecondary);
-  vec3 palSecondary = 0.5 + 0.5 * cos(SG2_TAU * vec3(h2, h2 + 0.33, h2 + 0.67));
+  float h1 = uPalettePrimary;
+  vec3 palPrimary = paletteHueColor(h1, 0.85, 0.95);
+  float h2 = uPaletteSecondary;
+  vec3 palSecondary = paletteHueColor(h2, 0.85, 0.95);
 
   // Golden light color modulated by vocal presence
   vec3 goldenLight = mix(vec3(1.0, 0.85, 0.55), vec3(1.0, 0.95, 0.8), vocalP);

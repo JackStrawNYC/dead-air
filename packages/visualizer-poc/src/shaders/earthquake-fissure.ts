@@ -348,11 +348,11 @@ void main() {
   float flowTime = uDynamicTime * (0.15 + slowEnergy * 0.1);
 
   // === PALETTE ===
-  float hue1 = hsvToCosineHue(uPalettePrimary) + chordHue + chromaHueMod;
-  float hue2 = hsvToCosineHue(uPaletteSecondary) + chordHue * 0.5;
-  vec3 rockTint = 0.5 + 0.5 * cos(TAU * vec3(hue1, hue1 + 0.33, hue1 + 0.67));
+  float hue1 = uPalettePrimary + chordHue + chromaHueMod;
+  float hue2 = uPaletteSecondary + chordHue * 0.5;
+  vec3 rockTint = paletteHueColor(hue1, 0.55, 0.85);
   rockTint = mix(rockTint, vec3(0.35, 0.28, 0.22), 0.6); // push toward stone
-  vec3 magmaTint = 0.5 + 0.5 * cos(TAU * vec3(hue2, hue2 + 0.33, hue2 + 0.67));
+  vec3 magmaTint = paletteHueColor(hue2, 0.85, 0.95);
 
   // === CAMERA (uses 3D camera system) ===
   vec3 ro, rd;

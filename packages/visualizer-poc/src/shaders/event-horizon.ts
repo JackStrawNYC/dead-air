@@ -561,10 +561,8 @@ void main() {
 
   // ─── Palette tinting (subtle, respects the black hole's colors) ───
   {
-    float hue1 = hsvToCosineHue(uPalettePrimary);
-    vec3 pal1 = 0.5 + 0.5 * cos(EH_TAU * vec3(hue1, hue1 + 0.33, hue1 + 0.67));
-    float hue2 = hsvToCosineHue(uPaletteSecondary);
-    vec3 pal2 = 0.5 + 0.5 * cos(EH_TAU * vec3(hue2, hue2 + 0.33, hue2 + 0.67));
+    vec3 pal1 = paletteHueColor(uPalettePrimary, 0.8, 0.95);
+    vec3 pal2 = paletteHueColor(uPaletteSecondary, 0.8, 0.95);
     vec3 palTint = mix(pal1, pal2, sin(uTime * 0.05) * 0.5 + 0.5);
     col = mix(col, col * palTint, 0.1 + energy * 0.05);
   }
@@ -572,10 +570,8 @@ void main() {
   // ─── DEAD ICONOGRAPHY ───
   {
     float _nf = snoise(vec3(p * 2.0, uTime * 0.1));
-    float iconHue1 = hsvToCosineHue(uPalettePrimary);
-    vec3 palCol1 = 0.5 + 0.5 * cos(EH_TAU * vec3(iconHue1, iconHue1 + 0.33, iconHue1 + 0.67));
-    float iconHue2 = hsvToCosineHue(uPaletteSecondary);
-    vec3 palCol2 = 0.5 + 0.5 * cos(EH_TAU * vec3(iconHue2, iconHue2 + 0.33, iconHue2 + 0.67));
+    vec3 palCol1 = paletteHueColor(uPalettePrimary, 0.85, 1.0);
+    vec3 palCol2 = paletteHueColor(uPaletteSecondary, 0.85, 1.0);
     col += iconEmergence(p, uTime, energy, bass, palCol1, palCol2, _nf, uClimaxPhase, uSectionIndex);
     col += heroIconEmergence(p, uTime, energy, bass, palCol1, palCol2, _nf, uSectionIndex);
   }

@@ -1,333 +1,159 @@
 /**
- * CrowdSilhouette — A+++ concert crowd silhouette along bottom of frame.
- *
- * 28 people with realistic SVG body shapes across 3 depth layers:
- *   - Front row (8): large, dark, detailed, lower on screen
- *   - Mid row (10): medium, semi-transparent, slightly higher
- *   - Back row (10): small, hazy, highest, overlapping
- *
- * Body variety: 4 templates (tall-thin, medium, stocky, small) with
- * accessories (hats, hair, raised fists, peace signs, open palms, lighters).
+ * CrowdSilhouette — A+++ overlay: POV from the back of the crowd looking
+ * toward a stage. Heads/shoulders fill the bottom third in 3 depth bands;
+ * a stage truss with band silhouettes glows at the back; phones and lighters
+ * sparkle above the heads; haze fog drifts; bass thumps the row, beat pulses
+ * the stage lights. Like being in the audience at a Dead show.
  *
  * Audio reactivity:
- *   - Beat-synced collective bob (bass drives amplitude)
- *   - Energy drives number of raised hands + bob intensity
- *   - ChromaHue tints neon glow outlines
- *   - BeatDecay pulses glow brightness
- *   - Individual sway layered over collective motion
+ *   slowEnergy   → stage atmospheric glow & smoke density
+ *   energy       → arm/phone raise + halo brightness
+ *   bass         → row sway and ground rumble
+ *   beatDecay    → stage spotlight pulse
+ *   onsetEnvelope→ flash flares from the stage
+ *   chromaHue    → stage light tint
+ *   tempoFactor  → light sweep speed
  */
 
 import React from "react";
-import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
+import { useCurrentFrame, useVideoConfig, interpolate } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
-import { useShowContext } from "../data/ShowContext";
 import { seeded } from "../utils/seededRandom";
 import { useAudioSnapshot } from "./parametric/audio-helpers";
 import { useTempoFactor } from "../data/TempoContext";
 
-/* ------------------------------------------------------------------ */
-/*  Types                                                              */
-/* ------------------------------------------------------------------ */
+const CYCLE_TOTAL = 2400;
+const VISIBLE_DURATION = 800;
+const FRONT_HEAD_COUNT = 16;
+const MID_HEAD_COUNT = 22;
+const BACK_HEAD_COUNT = 26;
+const PHONE_COUNT = 22;
+const LIGHTER_COUNT = 14;
+const STAGE_LIGHT_COUNT = 9;
+const STAR_COUNT = 50;
+const SMOKE_COUNT = 12;
 
-type BodyType = "tall" | "medium" | "stocky" | "small";
-type HandGesture = "fist" | "peace" | "open" | "lighter" | "sway" | "none";
-type Accessory = "hat" | "beanie" | "hair_long" | "hair_afro" | "none";
-type DepthLayer = "front" | "mid" | "back";
-
-interface PersonData {
-  x: number; // 0-1 fraction of width
-  bodyType: BodyType;
-  handGesture: HandGesture;
-  handThreshold: number; // energy threshold to raise hand
-  accessory: Accessory;
-  layer: DepthLayer;
-  heightOffset: number; // random vertical jitter within layer
-  waveFreq: number;
-  wavePhase: number;
+interface Head {
+  x: number;
+  size: number;
+  hairStyle: 0 | 1 | 2 | 3;
+  hatType: 0 | 1 | 2;
+  shoulderW: number;
   bobPhase: number;
   swayPhase: number;
-  swayAmp: number;
-  handSide: -1 | 1;
-  glowHueOffset: number;
-  shoulderTilt: number; // slight lean
-  headTilt: number;
+  shade: number;
 }
 
-/* ------------------------------------------------------------------ */
-/*  Constants                                                          */
-/* ------------------------------------------------------------------ */
-
-const NUM_FRONT = 8;
-const NUM_MID = 10;
-const NUM_BACK = 10;
-const FADE_IN_FRAMES = 90;
-
-const BODY_TYPES: BodyType[] = ["tall", "medium", "stocky", "small"];
-const GESTURES: HandGesture[] = ["fist", "peace", "open", "lighter", "sway", "none"];
-const ACCESSORIES: Accessory[] = ["hat", "beanie", "hair_long", "hair_afro", "none", "none", "none"];
-
-/* ------------------------------------------------------------------ */
-/*  Body dimensions per type                                           */
-/* ------------------------------------------------------------------ */
-
-interface BodyDims {
-  headR: number;
-  neckH: number;
-  shoulderW: number;
-  torsoH: number;
-  torsoNarrow: number; // waist as fraction of shoulder
-  armLen: number;
-  scale: number;
+interface Phone {
+  x: number;
+  y: number;
+  raise: number;
+  tilt: number;
+  brightness: number;
+  phase: number;
 }
 
-const BODY_DIMS: Record<BodyType, BodyDims> = {
-  tall:    { headR: 9,  neckH: 6,  shoulderW: 30, torsoH: 50, torsoNarrow: 0.65, armLen: 42, scale: 1.15 },
-  medium:  { headR: 10, neckH: 5,  shoulderW: 34, torsoH: 44, torsoNarrow: 0.70, armLen: 38, scale: 1.0 },
-  stocky:  { headR: 11, neckH: 4,  shoulderW: 40, torsoH: 40, torsoNarrow: 0.80, armLen: 34, scale: 0.95 },
-  small:   { headR: 8,  neckH: 4,  shoulderW: 26, torsoH: 36, torsoNarrow: 0.68, armLen: 30, scale: 0.85 },
-};
-
-/* ------------------------------------------------------------------ */
-/*  Layer configs                                                      */
-/* ------------------------------------------------------------------ */
-
-interface LayerConfig {
-  baseY: number;      // fraction from bottom (0 = very bottom)
-  opacity: number;    // fill darkness
-  glowMult: number;   // glow strength multiplier
-  scaleMult: number;  // size multiplier
-  strokeW: number;
+interface Lighter {
+  x: number;
+  y: number;
+  raise: number;
+  flickerSpeed: number;
+  phase: number;
 }
 
-const LAYER_CFG: Record<DepthLayer, LayerConfig> = {
-  front: { baseY: 0.02, opacity: 0.92, glowMult: 1.0,  scaleMult: 1.0,  strokeW: 0.7 },
-  mid:   { baseY: 0.06, opacity: 0.80, glowMult: 0.7,  scaleMult: 0.82, strokeW: 0.5 },
-  back:  { baseY: 0.10, opacity: 0.60, glowMult: 0.45, scaleMult: 0.65, strokeW: 0.3 },
-};
+interface StageLight {
+  x: number;
+  hueOffset: number;
+  speed: number;
+  phase: number;
+  baseAngle: number;
+}
 
-/* ------------------------------------------------------------------ */
-/*  Crowd Generation (deterministic)                                   */
-/* ------------------------------------------------------------------ */
+interface Star {
+  x: number;
+  y: number;
+  size: number;
+  phase: number;
+}
 
-function generateCrowd(seed: number): PersonData[] {
+interface SmokeBlob {
+  x: number;
+  y: number;
+  rx: number;
+  ry: number;
+  drift: number;
+  phase: number;
+}
+
+function buildHeads(seed: number, count: number): Head[] {
   const rng = seeded(seed);
-  const people: PersonData[] = [];
-
-  const pick = <T,>(arr: T[]): T => arr[Math.floor(rng() * arr.length)];
-
-  const makePerson = (layer: DepthLayer, xMin: number, xMax: number): PersonData => ({
-    x: xMin + rng() * (xMax - xMin),
-    bodyType: pick(BODY_TYPES),
-    handGesture: pick(GESTURES),
-    handThreshold: 0.15 + rng() * 0.75, // staggered thresholds
-    accessory: pick(ACCESSORIES),
-    layer,
-    heightOffset: (rng() - 0.5) * 12,
-    waveFreq: 0.02 + rng() * 0.05,
-    wavePhase: rng() * Math.PI * 2,
+  return Array.from({ length: count }, (_, i) => ({
+    x: (i + 0.4 + rng() * 0.2) / count,
+    size: 0.85 + rng() * 0.4,
+    hairStyle: Math.floor(rng() * 4) as 0 | 1 | 2 | 3,
+    hatType: rng() < 0.35 ? (Math.floor(rng() * 3) as 0 | 1 | 2) : 0,
+    shoulderW: 1.4 + rng() * 0.8,
     bobPhase: rng() * Math.PI * 2,
     swayPhase: rng() * Math.PI * 2,
-    swayAmp: 1.5 + rng() * 3,
-    handSide: rng() > 0.5 ? 1 : -1,
-    glowHueOffset: rng() * 60 - 30,
-    shoulderTilt: (rng() - 0.5) * 6,
-    headTilt: (rng() - 0.5) * 8,
-  });
-
-  // Back row: spread across full width
-  for (let i = 0; i < NUM_BACK; i++) {
-    people.push(makePerson("back", 0.02 + (i / NUM_BACK) * 0.88, 0.02 + ((i + 1) / NUM_BACK) * 0.88));
-  }
-  // Mid row: spread across full width
-  for (let i = 0; i < NUM_MID; i++) {
-    people.push(makePerson("mid", 0.01 + (i / NUM_MID) * 0.90, 0.01 + ((i + 1) / NUM_MID) * 0.90));
-  }
-  // Front row: spread across full width
-  for (let i = 0; i < NUM_FRONT; i++) {
-    people.push(makePerson("front", 0.01 + (i / NUM_FRONT) * 0.92, 0.01 + ((i + 1) / NUM_FRONT) * 0.92));
-  }
-
-  return people;
+    shade: 0.05 + rng() * 0.15,
+  }));
 }
 
-/* ------------------------------------------------------------------ */
-/*  SVG Path builders                                                  */
-/* ------------------------------------------------------------------ */
-
-/** Head + neck + shoulders + torso as a single smooth SVG path */
-function buildBodyPath(dims: BodyDims, tilt: number): string {
-  const { headR, neckH, shoulderW, torsoH, torsoNarrow } = dims;
-  const sw2 = shoulderW / 2;
-  const waistW = sw2 * torsoNarrow;
-  const headCY = -(neckH + headR);
-  const neckW = headR * 0.45;
-
-  // Build path: start at left waist, go up left torso, left shoulder,
-  // up neck, around head, down neck, right shoulder, down right torso, close
-  return [
-    `M ${-waistW},${torsoH}`,
-    // left torso up to shoulder (gentle curve)
-    `C ${-waistW - 2},${torsoH * 0.5} ${-sw2 - 3},${8} ${-sw2},${0}`,
-    // left shoulder to neck base (shoulder curve)
-    `Q ${-sw2 + 4},${-3} ${-neckW},${-2}`,
-    // left neck up
-    `L ${-neckW},${-(neckH * 0.6)}`,
-    // around the head (elliptical arc for realism)
-    `Q ${-neckW - 1},${headCY + headR * 0.3} ${-headR * 0.9},${headCY + headR * 0.15}`,
-    `A ${headR},${headR * 1.05} 0 1 1 ${headR * 0.9},${headCY + headR * 0.15}`,
-    // right neck down
-    `Q ${neckW + 1},${headCY + headR * 0.3} ${neckW},${-(neckH * 0.6)}`,
-    `L ${neckW},${-2}`,
-    // right shoulder
-    `Q ${sw2 - 4},${-3} ${sw2},${0}`,
-    // right torso down
-    `C ${sw2 + 3},${8} ${waistW + 2},${torsoH * 0.5} ${waistW},${torsoH}`,
-    "Z",
-  ].join(" ");
+function buildPhones(): Phone[] {
+  const rng = seeded(58_223_481);
+  return Array.from({ length: PHONE_COUNT }, () => ({
+    x: rng(),
+    y: 0.45 + rng() * 0.20,
+    raise: 0.5 + rng() * 0.5,
+    tilt: (rng() - 0.5) * 0.5,
+    brightness: 0.6 + rng() * 0.4,
+    phase: rng() * Math.PI * 2,
+  }));
 }
 
-/** Hat silhouette (wide brim) */
-function hatPath(headR: number): string {
-  const brim = headR * 1.6;
-  const crownH = headR * 0.7;
-  const crownW = headR * 0.85;
-  return [
-    `M ${-brim},0`,
-    `L ${-brim},${-2}`,
-    `Q ${-brim},${-4} ${-crownW},${-4}`,
-    `L ${-crownW},${-crownH}`,
-    `Q ${-crownW * 0.3},${-crownH - 4} ${0},${-crownH - 4}`,
-    `Q ${crownW * 0.3},${-crownH - 4} ${crownW},${-crownH}`,
-    `L ${crownW},${-4}`,
-    `Q ${brim},${-4} ${brim},${-2}`,
-    `L ${brim},0`,
-    "Z",
-  ].join(" ");
+function buildLighters(): Lighter[] {
+  const rng = seeded(73_119_226);
+  return Array.from({ length: LIGHTER_COUNT }, () => ({
+    x: rng(),
+    y: 0.50 + rng() * 0.18,
+    raise: 0.6 + rng() * 0.4,
+    flickerSpeed: 0.10 + rng() * 0.30,
+    phase: rng() * Math.PI * 2,
+  }));
 }
 
-/** Beanie/knit cap */
-function beaniePath(headR: number): string {
-  const w = headR * 0.95;
-  const h = headR * 0.55;
-  return [
-    `M ${-w},0`,
-    `Q ${-w},${-h * 0.8} ${-w * 0.6},${-h}`,
-    `Q ${0},${-h - 5} ${w * 0.6},${-h}`,
-    `Q ${w},${-h * 0.8} ${w},0`,
-    "Z",
-  ].join(" ");
+function buildStageLights(): StageLight[] {
+  const rng = seeded(46_018_752);
+  return Array.from({ length: STAGE_LIGHT_COUNT }, (_, i) => ({
+    x: 0.18 + (i / (STAGE_LIGHT_COUNT - 1)) * 0.64,
+    hueOffset: -50 + rng() * 100,
+    speed: 0.005 + rng() * 0.012,
+    phase: rng() * Math.PI * 2,
+    baseAngle: -Math.PI / 2 + (rng() - 0.5) * 0.5,
+  }));
 }
 
-/** Long flowing hair outline */
-function longHairPath(headR: number): string {
-  const w = headR * 1.2;
-  const drop = headR * 1.8;
-  return [
-    `M ${-w},${-headR * 0.2}`,
-    `Q ${-w - 3},${drop * 0.4} ${-w + 2},${drop}`,
-    `L ${-w + 6},${drop}`,
-    `Q ${-headR * 0.5},${drop * 0.6} ${-headR * 0.5},${0}`,
-    `M ${w},${-headR * 0.2}`,
-    `Q ${w + 3},${drop * 0.4} ${w - 2},${drop}`,
-    `L ${w - 6},${drop}`,
-    `Q ${headR * 0.5},${drop * 0.6} ${headR * 0.5},${0}`,
-  ].join(" ");
+function buildStars(): Star[] {
+  const rng = seeded(97_550_113);
+  return Array.from({ length: STAR_COUNT }, () => ({
+    x: rng(),
+    y: rng() * 0.36,
+    size: 0.4 + rng() * 1.5,
+    phase: rng() * Math.PI * 2,
+  }));
 }
 
-/** Afro silhouette (larger head halo) */
-function afroPath(headR: number): string {
-  const r = headR * 1.45;
-  return `M 0,${-headR * 0.1} m ${-r},0 a ${r},${r * 1.1} 0 1,0 ${r * 2},0 a ${r},${r * 1.1} 0 1,0 ${-r * 2},0`;
+function buildSmoke(): SmokeBlob[] {
+  const rng = seeded(28_440_905);
+  return Array.from({ length: SMOKE_COUNT }, () => ({
+    x: rng(),
+    y: 0.36 + rng() * 0.14,
+    rx: 0.10 + rng() * 0.16,
+    ry: 0.04 + rng() * 0.05,
+    drift: 0.0001 + rng() * 0.00035,
+    phase: rng() * Math.PI * 2,
+  }));
 }
-
-/* ------------------------------------------------------------------ */
-/*  Hand/arm gesture paths                                             */
-/* ------------------------------------------------------------------ */
-
-function fistPath(): string {
-  // Closed fist at top of arm
-  return [
-    // arm
-    `M -3,0 L -3,-30 Q -3,-32 -1,-33`,
-    `L 5,-33 Q 7,-32 7,-30 L 7,0`,
-    // fist knuckles
-    `M -4,-33 Q -5,-38 -2,-40 L 6,-40 Q 9,-38 8,-33`,
-  ].join(" ");
-}
-
-function peacePath(): string {
-  // Peace sign: two fingers up
-  return [
-    // arm
-    `M -3,0 L -3,-28 L 7,-28 L 7,0`,
-    // index finger
-    `M -1,-28 L -2,-44 L 1,-44 L 2,-28`,
-    // middle finger
-    `M 3,-28 L 4,-44 L 7,-44 L 6,-28`,
-    // folded ring/pinky bump
-    `M -3,-28 Q -5,-31 -3,-28`,
-  ].join(" ");
-}
-
-function openPalmPath(): string {
-  // Open hand with spread fingers
-  return [
-    // arm
-    `M -3,0 L -3,-26 L 7,-26 L 7,0`,
-    // palm
-    `M -4,-26 L -5,-32 L 9,-32 L 8,-26`,
-    // thumb
-    `M -5,-28 L -9,-34 L -7,-35 L -4,-30`,
-    // index
-    `M -3,-32 L -4,-42 L -1,-42 L 0,-32`,
-    // middle
-    `M 0,-32 L 0,-44 L 3,-44 L 3,-32`,
-    // ring
-    `M 3,-32 L 4,-41 L 7,-41 L 6,-32`,
-    // pinky
-    `M 6,-32 L 8,-38 L 10,-37 L 8,-32`,
-  ].join(" ");
-}
-
-function lighterPath(): string {
-  // Hand holding up a lighter with flame
-  return [
-    // arm
-    `M -3,0 L -3,-28 L 7,-28 L 7,0`,
-    // hand grip
-    `M -2,-28 L -2,-34 L 6,-34 L 6,-28`,
-    // lighter body
-    `M 0,-34 L 0,-42 L 4,-42 L 4,-34`,
-    // flame (teardrop)
-    `M 2,-42 Q -1,-48 2,-52 Q 5,-48 2,-42`,
-  ].join(" ");
-}
-
-function swayArmPath(): string {
-  // Arm raised overhead, waving side to side
-  return [
-    // arm (slightly curved)
-    `M -2,0 Q -4,-15 -2,-30`,
-    `L 4,-30 Q 6,-15 4,0`,
-    // open hand
-    `M -2,-30 L -3,-36 L 5,-36 L 4,-30`,
-    // fingers
-    `M -1,-36 L -1,-40 L 1,-40 L 1,-36`,
-    `M 1,-36 L 2,-41 L 4,-41 L 3,-36`,
-  ].join(" ");
-}
-
-const GESTURE_PATHS: Record<Exclude<HandGesture, "none">, string> = {
-  fist: fistPath(),
-  peace: peacePath(),
-  open: openPalmPath(),
-  lighter: lighterPath(),
-  sway: swayArmPath(),
-};
-
-/* ------------------------------------------------------------------ */
-/*  Component                                                          */
-/* ------------------------------------------------------------------ */
 
 interface Props {
   frames: EnhancedFrameData[];
@@ -336,204 +162,322 @@ interface Props {
 export const CrowdSilhouette: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
-  const ctx = useShowContext();
-  const snap = useAudioSnapshot(frames);
   const tempoFactor = useTempoFactor();
-  const { energy, beatDecay, chromaHue, bass } = snap;
+  const snap = useAudioSnapshot(frames);
 
-  const crowd = React.useMemo(() => generateCrowd(ctx?.showSeed ?? 19770508), [ctx?.showSeed]);
+  const frontHeads = React.useMemo(() => buildHeads(11_009_211, FRONT_HEAD_COUNT), []);
+  const midHeads = React.useMemo(() => buildHeads(22_018_322, MID_HEAD_COUNT), []);
+  const backHeads = React.useMemo(() => buildHeads(33_027_433, BACK_HEAD_COUNT), []);
+  const phones = React.useMemo(buildPhones, []);
+  const lighters = React.useMemo(buildLighters, []);
+  const stageLights = React.useMemo(buildStageLights, []);
+  const stars = React.useMemo(buildStars, []);
+  const smoke = React.useMemo(buildSmoke, []);
 
-  // Master fade-in over first 3 seconds
-  const masterFade = interpolate(frame, [0, FADE_IN_FRAMES], [0, 1], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-    easing: Easing.out(Easing.cubic),
-  });
-
-  // Base opacity: always visible 10-22%, energy pushes slightly higher
-  const baseOpacity = interpolate(energy, [0.03, 0.35], [0.10, 0.22], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
-  const masterOpacity = baseOpacity * masterFade;
+  const cycleFrame = frame % CYCLE_TOTAL;
+  if (cycleFrame >= VISIBLE_DURATION) return null;
+  const progress = cycleFrame / VISIBLE_DURATION;
+  const fadeIn = interpolate(progress, [0, 0.08], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const fadeOut = interpolate(progress, [0.92, 1], [1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const masterOpacity = Math.min(fadeIn, fadeOut) * 0.95;
   if (masterOpacity < 0.01) return null;
 
-  // Energy-driven hand raise threshold (high energy = lower threshold = more hands)
-  const handRaiseThreshold = interpolate(energy, [0.05, 0.40], [0.85, 0.15], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
+  const stageGlow = interpolate(snap.slowEnergy, [0.02, 0.32], [0.55, 1.15], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const energy = snap.energy;
+  const bass = snap.bass;
+  const beatPulse = 1 + snap.beatDecay * 0.4;
+  const onsetFlash = snap.onsetEnvelope > 0.55 ? Math.min(1, (snap.onsetEnvelope - 0.4) * 1.7) : 0;
+
+  const baseHue = 32;
+  const tintHue = ((baseHue + (snap.chromaHue - 180) * 0.5) % 360 + 360) % 360;
+  const lightCore = `hsl(${tintHue}, 95%, 80%)`;
+  const lightWarm = `hsl(${(tintHue + 14) % 360}, 90%, 65%)`;
+
+  const skyTop = `hsl(${(tintHue + 220) % 360}, 32%, 6%)`;
+  const skyMid = `hsl(${(tintHue + 240) % 360}, 26%, 11%)`;
+  const skyHorizon = `hsl(${(tintHue + 16) % 360}, 38%, 18%)`;
+
+  const stageY = height * 0.46;
+  const stageH = height * 0.16;
+  const crowdBaseY = height * 0.99;
+
+  // ===== Render head silhouette =====
+  function renderHead(h: Head, rowIndex: 0 | 1 | 2, key: string) {
+    const baseScale = rowIndex === 0 ? 1.0 : rowIndex === 1 ? 0.78 : 0.58;
+    const baseY =
+      rowIndex === 0
+        ? crowdBaseY - height * 0.04
+        : rowIndex === 1
+        ? crowdBaseY - height * 0.10
+        : crowdBaseY - height * 0.16;
+    const headR = 28 * baseScale * h.size;
+    const px = h.x * width;
+    const sway = Math.sin(frame * 0.012 * tempoFactor + h.swayPhase) * (3 + bass * 8) * baseScale;
+    const bob = Math.abs(Math.sin(frame * 0.035 * tempoFactor + h.bobPhase)) * (2 + energy * 6) * baseScale;
+    const cy = baseY - headR * 1.05 - bob;
+    const cx = px + sway;
+    const fillIntensity = Math.round(7 - rowIndex * 1.8);
+    const headFill = `rgba(${fillIntensity},${fillIntensity},${fillIntensity + 6},${0.96 - rowIndex * 0.12})`;
+    const rimColor = `hsla(${tintHue}, 85%, 65%, ${(0.16 - rowIndex * 0.04) * beatPulse})`;
+    return (
+      <g key={key}>
+        {/* Shoulders */}
+        <path
+          d={`M ${cx - headR * h.shoulderW * 1.4} ${baseY}
+              Q ${cx - headR * h.shoulderW} ${cy + headR * 0.6} ${cx - headR * 0.7} ${cy + headR * 0.4}
+              L ${cx + headR * 0.7} ${cy + headR * 0.4}
+              Q ${cx + headR * h.shoulderW} ${cy + headR * 0.6} ${cx + headR * h.shoulderW * 1.4} ${baseY} Z`}
+          fill={headFill}
+        />
+        {/* Neck */}
+        <rect x={cx - headR * 0.30} y={cy + headR * 0.7} width={headR * 0.6} height={headR * 0.5} fill={headFill} />
+        {/* Head circle */}
+        <circle cx={cx} cy={cy} r={headR} fill={headFill} />
+        {/* Hair styles */}
+        {h.hairStyle === 0 && (
+          <path
+            d={`M ${cx - headR} ${cy - headR * 0.2}
+                Q ${cx} ${cy - headR * 1.2} ${cx + headR} ${cy - headR * 0.2} L ${cx + headR * 0.9} ${cy - headR * 0.4}
+                Q ${cx} ${cy - headR * 1.0} ${cx - headR * 0.9} ${cy - headR * 0.4} Z`}
+            fill={headFill}
+          />
+        )}
+        {h.hairStyle === 1 && (
+          <path
+            d={`M ${cx - headR * 1.05} ${cy - headR * 0.25}
+                Q ${cx} ${cy - headR * 1.4} ${cx + headR * 1.05} ${cy - headR * 0.25}
+                L ${cx + headR * 1.2} ${cy + headR * 1.6}
+                Q ${cx} ${cy + headR * 1.2} ${cx - headR * 1.2} ${cy + headR * 1.6} Z`}
+            fill={headFill}
+          />
+        )}
+        {h.hairStyle === 2 && (
+          <circle cx={cx} cy={cy - headR * 0.2} r={headR * 1.35} fill={headFill} />
+        )}
+        {h.hairStyle === 3 && (
+          <path
+            d={`M ${cx - headR * 1.1} ${cy - headR * 0.2}
+                Q ${cx - headR * 0.8} ${cy - headR * 1.5} ${cx - headR * 0.2} ${cy - headR * 1.0}
+                Q ${cx + headR * 0.2} ${cy - headR * 1.6} ${cx + headR * 0.8} ${cy - headR * 1.0}
+                Q ${cx + headR * 1.2} ${cy - headR * 0.8} ${cx + headR * 1.1} ${cy - headR * 0.2}
+                L ${cx + headR * 0.9} ${cy - headR * 0.4}
+                Q ${cx} ${cy - headR * 1.0} ${cx - headR * 0.9} ${cy - headR * 0.4} Z`}
+            fill={headFill}
+          />
+        )}
+        {/* Hat */}
+        {h.hatType === 1 && (
+          <ellipse cx={cx} cy={cy - headR * 0.85} rx={headR * 1.5} ry={headR * 0.35} fill={headFill} />
+        )}
+        {h.hatType === 2 && (
+          <rect x={cx - headR * 0.95} y={cy - headR * 0.4} width={headR * 1.9} height={headR * 0.30} fill={headFill} />
+        )}
+        {/* Rim halo */}
+        <circle cx={cx} cy={cy - headR * 0.4} r={headR * 0.7} fill={rimColor} />
+      </g>
+    );
+  }
+
+  // ===== stage lights with cones =====
+  const stageBeams = stageLights.map((s, i) => {
+    const angle = s.baseAngle + Math.sin(frame * s.speed + s.phase) * 0.35;
+    const sx = s.x * width;
+    const sy = stageY + 6;
+    const len = height * 0.22;
+    const ex = sx + Math.cos(angle + Math.PI / 2) * len;
+    const ey = sy - Math.abs(Math.sin(angle + Math.PI / 2)) * len;
+    const w = 50 + beatPulse * 12;
+    const beamHue = (tintHue + s.hueOffset + 360) % 360;
+    const beamColor = `hsl(${beamHue}, 92%, 70%)`;
+    return (
+      <g key={`sb-${i}`} style={{ mixBlendMode: "screen" }}>
+        <path
+          d={`M ${sx - 4} ${sy}
+              L ${ex - w * 0.5} ${ey}
+              L ${ex + w * 0.5} ${ey}
+              L ${sx + 4} ${sy} Z`}
+          fill={beamColor}
+          opacity={0.10 * stageGlow}
+        />
+        <path
+          d={`M ${sx - 2} ${sy}
+              L ${ex - w * 0.22} ${ey}
+              L ${ex + w * 0.22} ${ey}
+              L ${sx + 2} ${sy} Z`}
+          fill={beamColor}
+          opacity={0.22 * stageGlow}
+        />
+        <circle cx={sx} cy={sy} r={4 + beatPulse * 2} fill={beamColor} opacity={0.8} />
+      </g>
+    );
   });
 
-  // Bob intensity: bass drives amplitude
-  const bobAmp = interpolate(bass, [0.02, 0.25], [1.5, 10], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
+  // ===== smoke =====
+  const smokeNodes = smoke.map((c, i) => {
+    const drift = (c.x + frame * c.drift) % 1.2 - 0.1;
+    const breath = 1 + Math.sin(frame * 0.012 + c.phase) * 0.06;
+    return (
+      <ellipse
+        key={`sm-${i}`}
+        cx={drift * width}
+        cy={c.y * height}
+        rx={c.rx * width * breath}
+        ry={c.ry * height * breath}
+        fill={`rgba(40, 30, 50, ${0.45 + stageGlow * 0.20})`}
+      />
+    );
   });
 
-  // Glow intensity pulsing with beat
-  const glowBase = interpolate(energy, [0.05, 0.35], [2, 8], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
+  // ===== stars =====
+  const starNodes = stars.map((s, i) => {
+    const tw = 0.5 + Math.sin(frame * 0.05 + s.phase) * 0.45;
+    return <circle key={`star-${i}`} cx={s.x * width} cy={s.y * height} r={s.size * tw} fill="rgba(240, 232, 220, 0.85)" />;
   });
-  const glowPulse = glowBase * (1 + beatDecay * 0.6);
 
-  // Collective beat bob: everyone moves together on beat hits
-  const collectiveBob = beatDecay * bobAmp * 0.7;
+  // ===== phones =====
+  const phoneNodes = phones.map((p, i) => {
+    const t = frame * 0.018 + p.phase;
+    const raiseAmt = (0.6 + energy * 0.4) * p.raise;
+    const px = p.x * width;
+    const py = p.y * height - raiseAmt * 30 + Math.sin(t) * 4;
+    const glow = 0.6 + Math.sin(t * 1.4) * 0.3 * p.brightness;
+    return (
+      <g key={`ph-${i}`}>
+        <circle cx={px} cy={py} r={18 + beatPulse * 6} fill="rgba(180, 220, 255, 0.10)" />
+        <circle cx={px} cy={py} r={9} fill="rgba(180, 220, 255, 0.30)" />
+        <rect
+          x={px - 4}
+          y={py - 6}
+          width={8}
+          height={12}
+          rx={1.2}
+          fill="rgba(220, 240, 255, 0.95)"
+          opacity={glow}
+          transform={`rotate(${p.tilt * 30}, ${px}, ${py})`}
+        />
+      </g>
+    );
+  });
+
+  // ===== lighters =====
+  const lighterNodes = lighters.map((l, i) => {
+    const t = frame * l.flickerSpeed + l.phase;
+    const flicker = 0.7 + Math.sin(t * 3.2) * 0.3;
+    const lx = l.x * width;
+    const ly = l.y * height - l.raise * 40 + Math.sin(t) * 3;
+    return (
+      <g key={`lt-${i}`} style={{ mixBlendMode: "screen" }}>
+        <circle cx={lx} cy={ly} r={26 + beatPulse * 6} fill="rgba(255, 200, 80, 0.10)" />
+        <circle cx={lx} cy={ly} r={12} fill="rgba(255, 220, 120, 0.30)" />
+        <ellipse cx={lx} cy={ly - 2} rx={3.4} ry={6 * flicker} fill="rgba(255, 200, 80, 0.90)" />
+        <ellipse cx={lx} cy={ly - 3} rx={1.6} ry={4 * flicker} fill="rgba(255, 250, 220, 0.95)" />
+      </g>
+    );
+  });
 
   return (
     <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden" }}>
-      <svg width={width} height={height} style={{ opacity: masterOpacity }}>
+      <svg width={width} height={height} style={{ opacity: masterOpacity, willChange: "opacity" }}>
         <defs>
-          {/* Atmospheric haze gradient between depth layers */}
-          <linearGradient id="crowd-haze" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="rgba(10,8,20,0)" />
-            <stop offset="40%" stopColor={`hsla(${chromaHue}, 30%, 15%, 0.08)`} />
-            <stop offset="100%" stopColor="rgba(5,5,10,0)" />
+          <linearGradient id="cs-sky" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={skyTop} />
+            <stop offset="55%" stopColor={skyMid} />
+            <stop offset="100%" stopColor={skyHorizon} />
           </linearGradient>
-          {/* Bottom fade-out so silhouettes blend into frame edge */}
-          <linearGradient id="crowd-bottom-fade" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="rgba(0,0,0,0)" />
-            <stop offset="100%" stopColor="rgba(5,5,10,1)" />
-          </linearGradient>
+          <radialGradient id="cs-stagewash" cx="0.5" cy="1" r="0.6">
+            <stop offset="0%" stopColor={lightCore} stopOpacity="0.55" />
+            <stop offset="100%" stopColor={lightWarm} stopOpacity="0" />
+          </radialGradient>
+          <filter id="cs-blur" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="6" />
+          </filter>
         </defs>
 
-        {/* Haze layer between back and front rows */}
+        {/* Sky */}
+        <rect width={width} height={height} fill="url(#cs-sky)" />
+
+        {/* Stars */}
+        <g>{starNodes}</g>
+
+        {/* Stage backwash glow */}
+        <ellipse cx={width * 0.5} cy={stageY + 30} rx={width * 0.6} ry={height * 0.18} fill="url(#cs-stagewash)" />
+
+        {/* Stage truss */}
+        <g opacity={0.85}>
+          <rect x={width * 0.14} y={stageY - 6} width={width * 0.72} height={4} fill="rgba(20, 16, 26, 0.95)" />
+          <rect x={width * 0.14} y={stageY - 6} width={6} height={stageH + 6} fill="rgba(20, 16, 26, 0.95)" />
+          <rect x={width * 0.86 - 6} y={stageY - 6} width={6} height={stageH + 6} fill="rgba(20, 16, 26, 0.95)" />
+          {Array.from({ length: 16 }).map((_, i) => (
+            <line
+              key={`td-${i}`}
+              x1={width * 0.14 + i * (width * 0.72 / 16)}
+              y1={stageY - 2}
+              x2={width * 0.14 + (i + 1) * (width * 0.72 / 16)}
+              y2={stageY + 6}
+              stroke="rgba(30, 24, 38, 0.7)"
+              strokeWidth={1}
+            />
+          ))}
+          <rect x={width * 0.18} y={stageY - 2} width={26} height={48} rx={3} fill="rgba(15, 10, 20, 0.95)" />
+          <rect x={width * 0.78} y={stageY - 2} width={26} height={48} rx={3} fill="rgba(15, 10, 20, 0.95)" />
+          <rect x={width * 0.10} y={stageY + stageH} width={width * 0.80} height={6} fill="rgba(8, 4, 14, 0.95)" />
+        </g>
+
+        {/* Stage band silhouettes */}
+        <g>
+          {[0.35, 0.50, 0.65].map((px, i) => {
+            const x = px * width;
+            const y = stageY + stageH - 4;
+            const figH = stageH * 0.78;
+            return (
+              <g key={`band-${i}`}>
+                <path
+                  d={`M ${x - figH * 0.18} ${y}
+                      Q ${x - figH * 0.20} ${y - figH * 0.55} ${x - figH * 0.10} ${y - figH * 0.78}
+                      L ${x + figH * 0.10} ${y - figH * 0.78}
+                      Q ${x + figH * 0.20} ${y - figH * 0.55} ${x + figH * 0.18} ${y} Z`}
+                  fill="rgba(6, 3, 10, 0.95)"
+                />
+                <circle cx={x} cy={y - figH * 0.86} r={figH * 0.10} fill="rgba(6, 3, 10, 0.95)" />
+              </g>
+            );
+          })}
+          <ellipse cx={width * 0.50} cy={stageY + stageH - 8} rx={28} ry={10} fill="rgba(6, 3, 10, 0.95)" />
+          <rect x={width * 0.50 - 18} y={stageY + stageH - 22} width={36} height={14} rx={4} fill="rgba(8, 4, 14, 0.95)" />
+        </g>
+
+        {/* Smoke */}
+        <g filter="url(#cs-blur)">{smokeNodes}</g>
+
+        {/* Stage spotlight beams */}
+        <g>{stageBeams}</g>
+
+        {/* Onset flash */}
+        {onsetFlash > 0 && (
+          <rect width={width} height={height} fill={`hsla(${tintHue}, 90%, 80%, ${onsetFlash * 0.10})`} />
+        )}
+
+        {/* Back row of crowd */}
+        <g>{backHeads.map((h, i) => renderHead(h, 2, `back-${i}`))}</g>
+
+        {/* Lighters layer */}
+        <g>{lighterNodes}</g>
+
+        {/* Phones layer */}
+        <g>{phoneNodes}</g>
+
+        {/* Mid row */}
+        <g>{midHeads.map((h, i) => renderHead(h, 1, `mid-${i}`))}</g>
+
+        {/* Front row (foreground) */}
+        <g>{frontHeads.map((h, i) => renderHead(h, 0, `front-${i}`))}</g>
+
+        {/* Final atmospheric wash */}
         <rect
-          x={0}
-          y={height * 0.78}
           width={width}
-          height={height * 0.22}
-          fill="url(#crowd-haze)"
-          opacity={0.5 + energy * 0.3}
-        />
-
-        {/* Render back-to-front for correct depth ordering */}
-        {crowd.map((person, i) => {
-          const lcfg = LAYER_CFG[person.layer];
-          const dims = BODY_DIMS[person.bodyType];
-          const s = dims.scale * lcfg.scaleMult;
-
-          // Position
-          const px = person.x * width;
-          const baseYPos = height - height * lcfg.baseY + person.heightOffset;
-
-          // Beat-synced bob (collective + personal)
-          const personalBob =
-            Math.sin(frame * 0.03 * tempoFactor + person.bobPhase) * bobAmp * 0.3;
-          const totalBob = (collectiveBob + personalBob) * s;
-
-          // Lateral sway
-          const sway =
-            Math.sin(frame * 0.015 * tempoFactor + person.swayPhase) * person.swayAmp * s;
-
-          const cy = baseYPos + totalBob;
-          const cx = px + sway;
-
-          // Glow color: chromaHue + personal offset, pulsing brightness
-          const hue = (chromaHue + person.glowHueOffset + 360) % 360;
-          const glowAlpha = (0.3 + beatDecay * 0.4) * lcfg.glowMult;
-          const glowColor = `hsla(${hue}, 90%, 65%, ${glowAlpha.toFixed(3)})`;
-          const fillColor = `rgba(5, 5, 10, ${lcfg.opacity.toFixed(2)})`;
-          const effectiveGlow = glowPulse * lcfg.glowMult;
-
-          // Should this person's hand be raised?
-          const handUp = person.handGesture !== "none" && person.handThreshold > handRaiseThreshold;
-
-          // Hand wave/sway animation
-          const waveAngle = handUp
-            ? Math.sin(frame * person.waveFreq * tempoFactor + person.wavePhase) * 18
-            : 0;
-
-          // Accessory positioning: top of head
-          const headCY = -(dims.neckH + dims.headR);
-          const headTopY = headCY - dims.headR;
-
-          return (
-            <g
-              key={i}
-              transform={`translate(${cx.toFixed(1)},${cy.toFixed(1)}) scale(${s.toFixed(3)})`}
-              style={{ filter: `drop-shadow(0 0 ${effectiveGlow.toFixed(1)}px ${glowColor})` }}
-            >
-              {/* Body silhouette */}
-              <path
-                d={buildBodyPath(dims, person.shoulderTilt)}
-                fill={fillColor}
-                stroke={glowColor}
-                strokeWidth={lcfg.strokeW}
-                strokeLinejoin="round"
-              />
-
-              {/* Accessory */}
-              {person.accessory === "hat" && (
-                <g transform={`translate(0,${headTopY + dims.headR * 0.35}) rotate(${person.headTilt * 0.5})`}>
-                  <path d={hatPath(dims.headR)} fill={fillColor} stroke={glowColor} strokeWidth={lcfg.strokeW * 0.8} />
-                </g>
-              )}
-              {person.accessory === "beanie" && (
-                <g transform={`translate(0,${headTopY + dims.headR * 0.5})`}>
-                  <path d={beaniePath(dims.headR)} fill={fillColor} stroke={glowColor} strokeWidth={lcfg.strokeW * 0.8} />
-                </g>
-              )}
-              {person.accessory === "hair_long" && (
-                <g transform={`translate(0,${headCY})`}>
-                  <path d={longHairPath(dims.headR)} fill="none" stroke={glowColor} strokeWidth={lcfg.strokeW * 1.2} opacity={0.6} />
-                </g>
-              )}
-              {person.accessory === "hair_afro" && (
-                <g transform={`translate(0,${headCY})`}>
-                  <path d={afroPath(dims.headR)} fill={fillColor} stroke={glowColor} strokeWidth={lcfg.strokeW * 0.7} />
-                </g>
-              )}
-
-              {/* Raised arm + gesture */}
-              {handUp && person.handGesture !== "none" && (
-                <g
-                  transform={[
-                    `translate(${person.handSide * dims.shoulderW * 0.4},${-2})`,
-                    `rotate(${-25 * person.handSide + waveAngle})`,
-                    `scale(${person.handSide === -1 ? -1 : 1},1)`,
-                  ].join(" ")}
-                >
-                  <path
-                    d={GESTURE_PATHS[person.handGesture]}
-                    fill={fillColor}
-                    stroke={glowColor}
-                    strokeWidth={lcfg.strokeW * 0.7}
-                    strokeLinejoin="round"
-                    strokeLinecap="round"
-                  />
-                  {/* Lighter flame glow */}
-                  {person.handGesture === "lighter" && (
-                    <circle
-                      cx={2}
-                      cy={-48}
-                      r={4 + beatDecay * 3}
-                      fill={`hsla(${(hue + 30) % 360}, 100%, 80%, ${(0.3 + beatDecay * 0.4).toFixed(2)})`}
-                      style={{ filter: `blur(${2 + beatDecay * 2}px)` }}
-                    />
-                  )}
-                </g>
-              )}
-
-              {/* Lower body extension (below torso, fades into bottom) */}
-              <rect
-                x={-dims.shoulderW * dims.torsoNarrow * 0.5}
-                y={dims.torsoH}
-                width={dims.shoulderW * dims.torsoNarrow}
-                height={40}
-                fill={fillColor}
-                opacity={0.9}
-              />
-            </g>
-          );
-        })}
-
-        <rect
-          x={0}
-          y={height - 25}
-          width={width}
-          height={25}
-          fill="url(#crowd-bottom-fade)"
+          height={height}
+          fill={`hsla(${tintHue}, 60%, 50%, ${0.04 + stageGlow * 0.04})`}
+          style={{ mixBlendMode: "screen" }}
         />
       </svg>
     </div>

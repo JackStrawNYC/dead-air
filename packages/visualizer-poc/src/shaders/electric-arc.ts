@@ -740,29 +740,7 @@ void main() {
     col += flashCol * flashPow * 0.35;
   }
 
-  // ═══════════════════════════════════════════════════
-  // Feedback trail (arc persistence)
-  // ═══════════════════════════════════════════════════
-  {
-    vec3 prevColor = texture2D(uPrevFrame, uv).rgb;
-    float decayRate = 0.90 + bass * 0.04;
-
-    // Jam phase feedback modulation
-    if (uJamPhase >= 0.0) {
-      float jpExplore = step(-0.5, uJamPhase) * step(uJamPhase, 0.5);
-      float jpBuild   = step(0.5, uJamPhase) * step(uJamPhase, 1.5);
-      float jpPeak    = step(1.5, uJamPhase) * step(uJamPhase, 2.5);
-      float jpResolve = step(2.5, uJamPhase);
-      decayRate += jpExplore * 0.03 + jpBuild * 0.01 + jpPeak * 0.04 - jpResolve * 0.05;
-      decayRate = clamp(decayRate, 0.78, 0.96);
-    }
-
-    // Dynamic range modulates feedback: high range = sharper decay (more contrast)
-    decayRate -= dynRange * 0.04;
-    decayRate = clamp(decayRate, 0.75, 0.96);
-
-    col = max(col, prevColor * decayRate);
-  }
+  // Feedback trail handled by shared temporalBlendEnabled in postprocess.
 
   // ═══════════════════════════════════════════════════
   // SDF icon emergence

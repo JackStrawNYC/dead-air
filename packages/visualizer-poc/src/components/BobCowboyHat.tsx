@@ -1,771 +1,661 @@
 /**
- * BobCowboyHat — Bob Weir iconic cowboy-hat portrait silhouette, A+++ quality.
+ * BobCowboyHat — A+++ giant cowboy-hat hero scene.
  *
- * The 80s/90s era Bobby: head-and-shoulders silhouette dominated by his signature
- * wide-brim Stetson — front/back curl, tall pinched crown, hat band with concho.
- * Profile turned slightly forward-right: hair cascading from under the brim,
- * beard suggestion, neck and upper shoulders. A vintage SM58 microphone on a
- * stand stands in front, and a warm amber follow-spot pours down from above.
- *
- * Distinct from BobWeir.tsx (which is a full-body guitarist with ES-335) — this
- * one is a portrait piece, the kind of silhouette frame from a 1989 Long Beach
- * or 1990 Cap Center bootleg.
+ * Bob Weir's signature wide-brim Stetson dominates the frame at ~50% width:
+ * tall pinched crown, dramatic brim curl, woven hatband with concho buckle,
+ * decorative stitching, eagle feather, weathered leather creases, and a
+ * faint band of rainbow stitching. The hat sits over a dusty western horizon
+ * with a setting sun, distant mesas, sagebrush silhouettes, and lazy
+ * tumbleweeds blown across the foreground.
  *
  * Audio reactivity:
- *   vocalPresence — drives overall opacity (Bobby appears when he's at the mic)
- *   vocalEnergy — pulses spotlight intensity and rim glow
- *   energy      — gentle scale + brim halo
- *   beatDecay   — pulses spotlight core, mic glow ring
- *   chromaHue   — tints warm amber spotlight wash (+/- 18deg)
- *   tempoFactor — sways head tilt subtly to the meter
- *
- * Continuous rendering — rotation engine controls visibility externally.
+ *   slowEnergy   → sun warmth + rim light
+ *   energy       → dust density + concho shine
+ *   bass         → tumbleweed roll speed
+ *   beatDecay    → hat rim glow pulse
+ *   onsetEnvelope→ gold concho flash
+ *   chromaHue    → western palette shift
+ *   tempoFactor  → wind/tumbleweed rate
  */
 
 import React from "react";
 import { useCurrentFrame, useVideoConfig, interpolate } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
+import { seeded } from "../utils/seededRandom";
 import { useAudioSnapshot } from "./parametric/audio-helpers";
 import { useTempoFactor } from "../data/TempoContext";
 
-/* ------------------------------------------------------------------ */
-/*  Color utility — HSL to rgba                                        */
-/* ------------------------------------------------------------------ */
+const CYCLE_TOTAL = 2400;
+const VISIBLE_DURATION = 780;
 
-function hslToRgba(h: number, s: number, l: number, a: number): string {
-  const hh = ((h % 360) + 360) % 360;
-  const c = (1 - Math.abs(2 * l - 1)) * s;
-  const x = c * (1 - Math.abs(((hh / 60) % 2) - 1));
-  const m = l - c / 2;
-  let r = 0,
-    g = 0,
-    b = 0;
-  if (hh < 60) {
-    r = c;
-    g = x;
-  } else if (hh < 120) {
-    r = x;
-    g = c;
-  } else if (hh < 180) {
-    g = c;
-    b = x;
-  } else if (hh < 240) {
-    g = x;
-    b = c;
-  } else if (hh < 300) {
-    r = x;
-    b = c;
-  } else {
-    r = c;
-    b = x;
-  }
-  return `rgba(${Math.round((r + m) * 255)},${Math.round((g + m) * 255)},${Math.round((b + m) * 255)},${a})`;
+interface DustMote {
+  bx: number;
+  by: number;
+  r: number;
+  speed: number;
+  phase: number;
 }
 
-/* ------------------------------------------------------------------ */
-/*  Props                                                              */
-/* ------------------------------------------------------------------ */
+interface Tumbleweed {
+  bx: number;
+  by: number;
+  r: number;
+  speed: number;
+  phase: number;
+}
+
+interface Sage {
+  x: number;
+  scale: number;
+  branchCount: number;
+}
 
 interface Props {
   frames: EnhancedFrameData[];
 }
 
-/* ------------------------------------------------------------------ */
-/*  Component                                                          */
-/* ------------------------------------------------------------------ */
-
 export const BobCowboyHat: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
-  const snap = useAudioSnapshot(frames);
   const tempoFactor = useTempoFactor();
+  const snap = useAudioSnapshot(frames);
 
-  const {
-    energy,
-    vocalEnergy,
-    vocalPresence,
-    beatDecay,
-    chromaHue: chromaHueDeg,
-    musicalTime,
-  } = snap;
+  const dust = React.useMemo<DustMote[]>(() => {
+    const rng = seeded(67_223_005);
+    return Array.from({ length: 70 }, () => ({
+      bx: rng(),
+      by: 0.3 + rng() * 0.65,
+      r: 0.4 + rng() * 1.6,
+      speed: 0.001 + rng() * 0.005,
+      phase: rng() * Math.PI * 2,
+    }));
+  }, []);
 
-  /* ---- Visibility gating: vocalPresence is the master gate ---- */
-  const presenceGate = interpolate(vocalPresence, [0.04, 0.18], [0, 1], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
-  const energyAssist = interpolate(energy, [0.05, 0.22], [0, 0.25], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
-  const opacity = presenceGate * (0.62 + energyAssist);
-  if (opacity < 0.01) return null;
+  const tumbles = React.useMemo<Tumbleweed[]>(() => {
+    const rng = seeded(33_115_009);
+    return Array.from({ length: 4 }, (_, i) => ({
+      bx: -0.1 + (i * 0.34) + rng() * 0.04,
+      by: 0.78 + rng() * 0.10,
+      r: 14 + rng() * 18,
+      speed: 0.0015 + rng() * 0.0025,
+      phase: rng() * Math.PI * 2,
+    }));
+  }, []);
 
-  /* ---- Warm amber base hue, chroma-shifted ---- */
-  const baseHue = 32; // warm amber / Stetson tan
-  const hueShift = (chromaHueDeg / 360) * 36 - 18;
-  const hue = baseHue + hueShift;
+  const sages = React.useMemo<Sage[]>(() => {
+    const rng = seeded(82_447_103);
+    return Array.from({ length: 12 }, (_, i) => ({
+      x: i / 11 + (rng() - 0.5) * 0.05,
+      scale: 0.6 + rng() * 0.7,
+      branchCount: 5 + Math.floor(rng() * 4),
+    }));
+  }, []);
 
-  /* ---- Portrait position: right-of-center, upper third ---- */
-  const figureX = width * 0.62;
-  const figureBaseY = height * 0.46;
-  const scale = Math.min(width, height) / 1080;
+  const cycleFrame = frame % CYCLE_TOTAL;
+  if (cycleFrame >= VISIBLE_DURATION) return null;
+  const progress = cycleFrame / VISIBLE_DURATION;
+  const fadeIn = interpolate(progress, [0, 0.09], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const fadeOut = interpolate(progress, [0.91, 1], [1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const masterOpacity = Math.min(fadeIn, fadeOut) * 0.95;
+  if (masterOpacity < 0.01) return null;
 
-  /* ---- Subtle head sway on tempo ---- */
-  const swayPhase = musicalTime * Math.PI * 2 * 0.5 * tempoFactor;
-  const headTilt =
-    Math.sin(swayPhase) * 1.6 +
-    Math.sin(swayPhase * 0.5 + 1.2) * 0.8 +
-    Math.sin(frame * 0.018) * 0.6;
+  const energy = snap.energy;
+  const bass = snap.bass;
+  const slowEnergy = snap.slowEnergy;
+  const beatDecay = snap.beatDecay;
+  const onsetEnv = snap.onsetEnvelope;
+  const chromaHue = snap.chromaHue;
 
-  /* ---- Portrait sway (very gentle horizontal drift) ---- */
-  const portraitSway =
-    Math.sin(swayPhase * 0.5) * 1.4 + Math.sin(frame * 0.012) * 0.6;
+  const sunBright = 0.6 + slowEnergy * 0.4;
+  const conchoShine = 0.5 + energy * 0.4 + onsetEnv * 0.5 + beatDecay * 0.2;
+  const rimGlow = 0.5 + slowEnergy * 0.3 + beatDecay * 0.3;
+  const tumbleSpeed = 0.5 + bass * 2.0;
 
-  /* ---- Spotlight pulse: vocal-energy driven, beat-decay accent ---- */
-  const spotlightBase = interpolate(vocalEnergy, [0.04, 0.35], [0.32, 0.62], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
-  const spotlightPulse = spotlightBase + beatDecay * 0.18;
-  const spotlightRadius = interpolate(vocalEnergy, [0.05, 0.4], [110, 175], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
+  const baseHue = 28;
+  const tintHue = ((baseHue + (chromaHue - 180) * 0.30) % 360 + 360) % 360;
+  const skyTop = `hsl(${(tintHue + 230) % 360}, 45%, 24%)`;
+  const skyMid = `hsl(${(tintHue + 12) % 360}, 75%, 48%)`;
+  const skyHorizon = `hsl(${(tintHue - 6 + 360) % 360}, 92%, 70%)`;
+  const skyBottom = `hsl(${(tintHue - 14 + 360) % 360}, 78%, 60%)`;
+  const sandColor = `hsl(${(tintHue + 8) % 360}, 55%, 55%)`;
+  const sandShade = `hsl(${(tintHue + 14) % 360}, 50%, 38%)`;
 
-  /* ---- Rim light intensity ---- */
-  const rimIntensity =
-    interpolate(vocalPresence, [0.1, 0.4], [0.2, 0.45], {
-      extrapolateLeft: "clamp",
-      extrapolateRight: "clamp",
-    }) +
-    beatDecay * 0.18;
+  const cx = width * 0.5;
+  const horizonY = height * 0.62;
 
-  /* ---- Flicker (warm tungsten follow spot) ---- */
-  const flicker =
-    0.93 +
-    Math.sin(frame * 0.13 + 1.1) * 0.035 +
-    Math.sin(frame * 0.31 + 2.7) * 0.022;
+  /* HAT geometry — ~50% of frame width */
+  const hatW = width * 0.50;
+  const hatCx = cx;
+  const hatCy = height * 0.50;
+  const brimW = hatW;
+  const brimH = hatW * 0.16;
+  const crownW = hatW * 0.46;
+  const crownH = hatW * 0.34;
 
-  /* ---- Breathing pulse (very subtle) ---- */
-  const breathe =
-    1.0 + Math.sin(frame * 0.05) * 0.006 + beatDecay * 0.012;
-
-  /* ---- Mic glow on vocal energy ---- */
-  const micGlow = interpolate(vocalEnergy, [0.04, 0.35], [0.18, 0.55], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
-
-  /* ---- Color palette ---- */
-  const silhouetteColor = hslToRgba(hue, 0.32, 0.06, 0.93);
-  const silhouetteDark = hslToRgba(hue, 0.28, 0.04, 0.96);
-  const silhouetteFace = hslToRgba(hue, 0.34, 0.07, 0.95);
-  const hatColor = hslToRgba(hue, 0.22, 0.05, 0.97);
-  const hatHighlight = hslToRgba(hue, 0.45, 0.18, 0.7);
-  const hatBandColor = hslToRgba(hue + 6, 0.55, 0.22, 0.85);
-  const hatConchoColor = hslToRgba(hue + 8, 0.7, 0.55, 0.75);
-  const hairColor = hslToRgba(hue - 4, 0.3, 0.06, 0.92);
-  const beardColor = hslToRgba(hue - 4, 0.28, 0.05, 0.85);
-
-  const rimColor = hslToRgba(hue, 0.78, 0.66, rimIntensity);
-  const rimColorSoft = hslToRgba(hue, 0.7, 0.6, rimIntensity * 0.55);
-  const rimColorWarm = hslToRgba(hue + 6, 0.85, 0.7, rimIntensity * 0.85);
-
-  const spotCoreColor = hslToRgba(hue, 0.52, 0.86, spotlightPulse * 0.5);
-  const spotMidColor = hslToRgba(hue, 0.55, 0.65, spotlightPulse * 0.22);
-  const spotEdgeColor = hslToRgba(hue, 0.5, 0.5, 0);
-
-  const glowColor = hslToRgba(hue, 0.6, 0.55, spotlightPulse * 0.18);
-  const dustColor = hslToRgba(hue, 0.45, 0.78, 0.16 + beatDecay * 0.1);
-
-  const micBodyColor = hslToRgba(hue, 0.18, 0.08, 0.92);
-  const micGrilleColor = hslToRgba(hue, 0.22, 0.14, 0.88);
-  const micGrilleRim = hslToRgba(hue, 0.55, 0.55, micGlow);
-  const micStandColor = hslToRgba(hue, 0.18, 0.05, 0.9);
-
-  /* ---- Dust motes drifting through spotlight beam ---- */
-  const dustMotes: Array<{ x: number; y: number; r: number; opacity: number }> = [];
-  for (let i = 0; i < 22; i++) {
-    const seed = i * 137.508; // golden angle
-    const phase = seed + frame * (0.009 + i * 0.0018);
-    const driftX = Math.sin(phase) * (28 + i * 2.5);
-    const driftY = ((Math.cos(phase * 0.7 + i) * 130) - 60 + i * 11) % 240 - 100;
-    const moteR = 0.55 + Math.sin(seed * 3.7) * 0.45;
-    const distFalloff = interpolate(
-      Math.abs(driftX),
-      [0, spotlightRadius * 0.45],
-      [1, 0],
-      { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
+  /* Dust nodes */
+  const dustNodes = dust.map((d, i) => {
+    const t = frame * d.speed * tempoFactor + d.phase;
+    const px = ((d.bx + Math.sin(t) * 0.02 + t * 0.04) % 1.2) * width;
+    const py = (d.by * height) + Math.cos(t * 1.3) * 4;
+    const op = (0.18 + Math.sin(t * 2 + i) * 0.10) * (0.5 + energy * 0.5);
+    return (
+      <circle
+        key={`dust-${i}`}
+        cx={px}
+        cy={py}
+        r={d.r}
+        fill={`hsla(${tintHue + 10}, 60%, 70%, ${op})`}
+      />
     );
-    const moteOpacity = (0.13 + Math.sin(phase * 1.3) * 0.08) * distFalloff;
-    dustMotes.push({ x: driftX, y: driftY, r: moteR, opacity: moteOpacity });
-  }
+  });
 
-  /* ---- Unique gradient IDs to avoid Remotion frame collisions ---- */
-  const idTag = `bch-${frame % 1000}`;
-  const spotGradId = `${idTag}-spot`;
-  const coneGradId = `${idTag}-cone`;
-  const hatGradId = `${idTag}-hat`;
-  const glowGradId = `${idTag}-glow`;
-  const micGradId = `${idTag}-mic`;
+  /* Tumbleweed nodes */
+  const tumbleNodes = tumbles.map((tw, i) => {
+    const t = frame * tw.speed * tempoFactor * tumbleSpeed + tw.phase;
+    const px = ((tw.bx + t * 0.4) % 1.4) * width - tw.r;
+    const py = tw.by * height + Math.sin(t * 4) * 6;
+    const rot = (frame * tumbleSpeed * 8 + i * 90) % 360;
+    return (
+      <g key={`tw-${i}`} transform={`translate(${px}, ${py}) rotate(${rot})`}>
+        <circle cx={0} cy={0} r={tw.r} fill="rgba(110, 76, 30, 0.32)" />
+        {Array.from({ length: 18 }, (_, k) => {
+          const a = (k / 18) * Math.PI * 2 + (k % 2) * 0.3;
+          const r0 = tw.r * 0.4;
+          const r1 = tw.r * (0.85 + (k % 3) * 0.05);
+          return (
+            <line
+              key={k}
+              x1={Math.cos(a) * r0}
+              y1={Math.sin(a) * r0}
+              x2={Math.cos(a) * r1}
+              y2={Math.sin(a) * r1}
+              stroke="rgba(140, 92, 36, 0.85)"
+              strokeWidth={0.8}
+            />
+          );
+        })}
+        {Array.from({ length: 12 }, (_, k) => {
+          const a = (k / 12) * Math.PI * 2 + 0.4;
+          return (
+            <line
+              key={`b-${k}`}
+              x1={Math.cos(a) * tw.r * 0.3}
+              y1={Math.sin(a) * tw.r * 0.3}
+              x2={Math.cos(a + 0.7) * tw.r * 0.95}
+              y2={Math.sin(a + 0.7) * tw.r * 0.95}
+              stroke="rgba(80, 50, 20, 0.7)"
+              strokeWidth={0.6}
+            />
+          );
+        })}
+      </g>
+    );
+  });
 
-  /* ================================================================ */
-  /*  SVG layout — viewBox local coords (origin at chest)             */
-  /*  Head sits ~ y = -90, hat brim ~ y = -120                         */
-  /* ================================================================ */
-  const headR = 24;
-  const headCy = -82;
-  const brimY = headCy - headR * 0.45;
-  const brimWidth = 78;
-  const brimHeight = 11;
-  const crownH = 38;
+  /* Sage silhouettes */
+  const sageNodes = sages.map((s, i) => {
+    const sx = s.x * width;
+    const sy = horizonY + 6 + (i % 2) * 4;
+    const w = 18 * s.scale;
+    const h = 12 * s.scale;
+    const branches = Array.from({ length: s.branchCount }, (_, k) => {
+      const dx = (k - s.branchCount / 2) * (w / s.branchCount);
+      const ty = sy - h - Math.sin(k * 0.7) * 3;
+      return (
+        <line
+          key={k}
+          x1={sx + dx * 0.2}
+          y1={sy}
+          x2={sx + dx}
+          y2={ty}
+          stroke="rgba(20, 14, 8, 0.85)"
+          strokeWidth={1.2}
+        />
+      );
+    });
+    return (
+      <g key={`sage-${i}`} opacity={0.85}>
+        <ellipse cx={sx} cy={sy} rx={w * 0.4} ry={1.2} fill="rgba(20, 14, 8, 0.85)" />
+        {branches}
+        {Array.from({ length: s.branchCount * 2 }, (_, k) => (
+          <circle
+            key={`leaf-${k}`}
+            cx={sx + (k - s.branchCount) * (w / (s.branchCount * 2))}
+            cy={sy - h - Math.sin(k * 0.4) * 2}
+            r={1.6}
+            fill="rgba(80, 90, 50, 0.85)"
+          />
+        ))}
+      </g>
+    );
+  });
 
   return (
-    <div
-      style={{
-        position: "absolute",
-        inset: 0,
-        pointerEvents: "none",
-        overflow: "hidden",
-      }}
-    >
-      <svg
-        width={width}
-        height={height}
-        style={{
-          opacity: opacity * flicker,
-          mixBlendMode: "screen",
-        }}
-      >
+    <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden" }}>
+      <svg width={width} height={height} style={{ opacity: masterOpacity, willChange: "opacity" }}>
         <defs>
-          {/* Spotlight radial gradient */}
-          <radialGradient id={spotGradId} cx="50%" cy="28%" r="55%">
-            <stop offset="0%" stopColor={spotCoreColor} />
-            <stop offset="42%" stopColor={spotMidColor} />
-            <stop offset="100%" stopColor={spotEdgeColor} />
-          </radialGradient>
-
-          {/* Volumetric cone */}
-          <linearGradient id={coneGradId} x1="50%" y1="0%" x2="50%" y2="100%">
-            <stop
-              offset="0%"
-              stopColor={hslToRgba(hue, 0.55, 0.85, spotlightPulse * 0.42)}
-            />
-            <stop
-              offset="35%"
-              stopColor={hslToRgba(hue, 0.55, 0.7, spotlightPulse * 0.18)}
-            />
-            <stop
-              offset="100%"
-              stopColor={hslToRgba(hue, 0.5, 0.5, 0)}
-            />
+          <linearGradient id="bch-sky" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={skyTop} />
+            <stop offset="40%" stopColor={skyMid} />
+            <stop offset="75%" stopColor={skyHorizon} />
+            <stop offset="100%" stopColor={skyBottom} />
           </linearGradient>
-
-          {/* Hat 3D shading — top to bottom darken */}
-          <linearGradient id={hatGradId} x1="50%" y1="0%" x2="50%" y2="100%">
-            <stop offset="0%" stopColor={hslToRgba(hue, 0.32, 0.11, 0.96)} />
-            <stop offset="55%" stopColor={hslToRgba(hue, 0.25, 0.06, 0.97)} />
-            <stop offset="100%" stopColor={hslToRgba(hue, 0.2, 0.03, 0.98)} />
+          <radialGradient id="bch-sun" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor="#FFFAE0" stopOpacity={0.95 * sunBright} />
+            <stop offset="40%" stopColor={`hsl(${(tintHue + 14) % 360}, 95%, 70%)`} stopOpacity={0.7 * sunBright} />
+            <stop offset="100%" stopColor={`hsl(${tintHue}, 90%, 60%)`} stopOpacity={0} />
+          </radialGradient>
+          <linearGradient id="bch-felt" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#3a2615" />
+            <stop offset="40%" stopColor="#5b3a1d" />
+            <stop offset="80%" stopColor="#3a230f" />
+            <stop offset="100%" stopColor="#1c1108" />
           </linearGradient>
-
-          {/* Soft warm glow behind portrait */}
-          <radialGradient id={glowGradId} cx="50%" cy="50%" r="55%">
-            <stop offset="0%" stopColor={glowColor} />
-            <stop offset="60%" stopColor={hslToRgba(hue, 0.6, 0.4, spotlightPulse * 0.07)} />
-            <stop offset="100%" stopColor={hslToRgba(hue, 0.5, 0.3, 0)} />
+          <linearGradient id="bch-band" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#1d1108" />
+            <stop offset="50%" stopColor="#2d1c10" />
+            <stop offset="100%" stopColor="#0f0804" />
+          </linearGradient>
+          <radialGradient id="bch-concho" cx="40%" cy="35%" r="60%">
+            <stop offset="0%" stopColor="#FFF8C0" />
+            <stop offset="30%" stopColor="#F4D060" />
+            <stop offset="65%" stopColor="#B07020" />
+            <stop offset="100%" stopColor="#5a380c" />
           </radialGradient>
-
-          {/* Mic grille glow */}
-          <radialGradient id={micGradId} cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor={hslToRgba(hue + 4, 0.6, 0.4, micGlow * 0.6)} />
-            <stop offset="100%" stopColor={hslToRgba(hue + 4, 0.5, 0.2, 0)} />
-          </radialGradient>
+          <linearGradient id="bch-ground" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={sandColor} />
+            <stop offset="100%" stopColor={sandShade} />
+          </linearGradient>
+          <filter id="bch-blur" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="4" />
+          </filter>
         </defs>
 
-        {/* ============================================================ */}
-        {/*  VOLUMETRIC SPOTLIGHT CONE from above                          */}
-        {/* ============================================================ */}
-        <g transform={`translate(${figureX + portraitSway}, ${figureBaseY})`}>
-          <polygon
-            points={`${-14 * scale},${-280 * scale} ${14 * scale},${-280 * scale} ${spotlightRadius * scale * 0.95},${100 * scale * breathe} ${-spotlightRadius * scale * 0.95},${100 * scale * breathe}`}
-            fill={`url(#${coneGradId})`}
-            style={{ filter: `blur(${14 * scale}px)` }}
-          />
-          {/* Inner brighter shaft */}
-          <polygon
-            points={`${-7 * scale},${-280 * scale} ${7 * scale},${-280 * scale} ${spotlightRadius * 0.4 * scale},${70 * scale * breathe} ${-spotlightRadius * 0.4 * scale},${70 * scale * breathe}`}
-            fill={hslToRgba(hue, 0.5, 0.82, spotlightPulse * 0.14)}
-            style={{ filter: `blur(${9 * scale}px)` }}
-          />
-        </g>
+        {/* SKY */}
+        <rect width={width} height={height} fill="url(#bch-sky)" />
 
-        {/* ============================================================ */}
-        {/*  AMBIENT GLOW WASH behind portrait                             */}
-        {/* ============================================================ */}
-        <ellipse
-          cx={figureX + portraitSway}
-          cy={figureBaseY - 30 * scale}
-          rx={spotlightRadius * 1.35 * scale}
-          ry={spotlightRadius * 1.55 * scale}
-          fill={`url(#${glowGradId})`}
-          style={{ filter: `blur(${24 * scale}px)` }}
+        {/* SUN — behind/lower right */}
+        <circle cx={width * 0.74} cy={horizonY - 8} r={Math.min(width, height) * 0.10 * 4} fill="url(#bch-sun)" />
+        <circle cx={width * 0.74} cy={horizonY - 8} r={Math.min(width, height) * 0.07} fill="rgba(255, 240, 200, 0.85)" opacity={sunBright} />
+        <circle cx={width * 0.74} cy={horizonY - 8} r={Math.min(width, height) * 0.04} fill="#FFFFFF" opacity={0.92 * sunBright} />
+
+        {/* BACKGROUND CLOUDS */}
+        {Array.from({ length: 7 }, (_, i) => {
+          const cxC = (i / 6) * width + Math.sin(frame * 0.0005 + i) * 12;
+          const cyC = height * (0.18 + (i % 3) * 0.06);
+          return (
+            <ellipse
+              key={`cloud-${i}`}
+              cx={cxC}
+              cy={cyC}
+              rx={60 + i * 8}
+              ry={14 + (i % 3) * 4}
+              fill={`rgba(255, 230, 190, ${0.4 + (i % 2) * 0.12})`}
+              filter="url(#bch-blur)"
+            />
+          );
+        })}
+
+        {/* MESAS in distance */}
+        <path
+          d={`M 0 ${horizonY}
+              L ${width * 0.10} ${horizonY - 26}
+              L ${width * 0.16} ${horizonY - 26}
+              L ${width * 0.20} ${horizonY - 14}
+              L ${width * 0.30} ${horizonY - 38}
+              L ${width * 0.40} ${horizonY - 38}
+              L ${width * 0.44} ${horizonY - 18}
+              L ${width * 0.58} ${horizonY - 22}
+              L ${width * 0.66} ${horizonY - 22}
+              L ${width * 0.70} ${horizonY - 8}
+              L ${width * 0.84} ${horizonY - 30}
+              L ${width * 0.92} ${horizonY - 30}
+              L ${width * 0.96} ${horizonY - 14}
+              L ${width} ${horizonY}
+              L ${width} ${horizonY + 6}
+              L 0 ${horizonY + 6} Z`}
+          fill={`hsl(${(tintHue + 240) % 360}, 35%, 25%)`}
+          opacity={0.9}
+        />
+        {/* Mesas mid-layer */}
+        <path
+          d={`M 0 ${horizonY + 4}
+              L ${width * 0.16} ${horizonY - 12}
+              L ${width * 0.28} ${horizonY - 12}
+              L ${width * 0.36} ${horizonY + 4}
+              L ${width * 0.52} ${horizonY - 6}
+              L ${width * 0.62} ${horizonY - 6}
+              L ${width * 0.66} ${horizonY + 4}
+              L ${width * 0.80} ${horizonY - 14}
+              L ${width * 0.92} ${horizonY - 14}
+              L ${width} ${horizonY + 4}
+              L ${width} ${horizonY + 8}
+              L 0 ${horizonY + 8} Z`}
+          fill={`hsl(${(tintHue + 220) % 360}, 30%, 18%)`}
+          opacity={0.95}
         />
 
-        {/* ============================================================ */}
-        {/*  SPOTLIGHT FOCAL OVAL                                          */}
-        {/* ============================================================ */}
+        {/* GROUND */}
+        <rect x={0} y={horizonY + 6} width={width} height={height - horizonY - 6} fill="url(#bch-ground)" />
+
+        {/* SAND TEXTURE LINES */}
+        {Array.from({ length: 12 }, (_, i) => (
+          <line
+            key={`sandline-${i}`}
+            x1={0}
+            y1={horizonY + 12 + i * (height - horizonY - 12) / 12}
+            x2={width}
+            y2={horizonY + 16 + i * (height - horizonY - 12) / 12}
+            stroke={`rgba(60, 36, 16, ${0.18 - i * 0.01})`}
+            strokeWidth={0.6}
+          />
+        ))}
+
+        {/* SAGE silhouettes */}
+        {sageNodes}
+
+        {/* TUMBLEWEEDS */}
+        {tumbleNodes}
+
+        {/* DUST BACK LAYER */}
+        <g opacity={0.6}>{dustNodes.slice(0, 35)}</g>
+
+        {/* === HAT === */}
+        {/* Hat ground shadow */}
         <ellipse
-          cx={figureX + portraitSway}
-          cy={figureBaseY - 60 * scale}
-          rx={spotlightRadius * 1.0 * scale}
-          ry={spotlightRadius * 1.15 * scale}
-          fill={`url(#${spotGradId})`}
-          style={{ filter: `blur(${18 * scale}px)` }}
+          cx={hatCx}
+          cy={hatCy + brimH * 0.7}
+          rx={brimW * 0.55}
+          ry={brimH * 0.24}
+          fill="rgba(0, 0, 0, 0.35)"
+          filter="url(#bch-blur)"
         />
 
-        {/* ============================================================ */}
-        {/*  DUST MOTES                                                    */}
-        {/* ============================================================ */}
-        <g transform={`translate(${figureX + portraitSway}, ${figureBaseY - 40 * scale})`}>
-          {dustMotes.map((m, i) => (
+        {/* Outer brim glow rim (3-layer) */}
+        <ellipse
+          cx={hatCx}
+          cy={hatCy}
+          rx={brimW * 0.56}
+          ry={brimH * 0.66}
+          fill="none"
+          stroke={`hsla(${(tintHue + 14) % 360}, 90%, 70%, ${0.30 * rimGlow})`}
+          strokeWidth={6}
+          filter="url(#bch-blur)"
+        />
+        <ellipse
+          cx={hatCx}
+          cy={hatCy}
+          rx={brimW * 0.55}
+          ry={brimH * 0.62}
+          fill="none"
+          stroke={`hsla(${(tintHue + 18) % 360}, 95%, 78%, ${0.55 * rimGlow})`}
+          strokeWidth={3}
+        />
+
+        {/* HAT BRIM (curved upward at edges) */}
+        <path
+          d={`M ${hatCx - brimW * 0.50} ${hatCy + brimH * 0.10}
+              Q ${hatCx - brimW * 0.55} ${hatCy - brimH * 0.20} ${hatCx - brimW * 0.42} ${hatCy - brimH * 0.20}
+              Q ${hatCx - brimW * 0.20} ${hatCy + brimH * 0.20} ${hatCx} ${hatCy + brimH * 0.20}
+              Q ${hatCx + brimW * 0.20} ${hatCy + brimH * 0.20} ${hatCx + brimW * 0.42} ${hatCy - brimH * 0.20}
+              Q ${hatCx + brimW * 0.55} ${hatCy - brimH * 0.20} ${hatCx + brimW * 0.50} ${hatCy + brimH * 0.10}
+              Q ${hatCx + brimW * 0.40} ${hatCy + brimH * 0.50} ${hatCx} ${hatCy + brimH * 0.55}
+              Q ${hatCx - brimW * 0.40} ${hatCy + brimH * 0.50} ${hatCx - brimW * 0.50} ${hatCy + brimH * 0.10}
+              Z`}
+          fill="url(#bch-felt)"
+          stroke="rgba(0, 0, 0, 0.95)"
+          strokeWidth={3}
+        />
+
+        {/* Brim underside shadow */}
+        <path
+          d={`M ${hatCx - brimW * 0.46} ${hatCy + brimH * 0.18}
+              Q ${hatCx} ${hatCy + brimH * 0.35} ${hatCx + brimW * 0.46} ${hatCy + brimH * 0.18}
+              L ${hatCx + brimW * 0.40} ${hatCy + brimH * 0.50}
+              Q ${hatCx} ${hatCy + brimH * 0.55} ${hatCx - brimW * 0.40} ${hatCy + brimH * 0.50} Z`}
+          fill="rgba(0, 0, 0, 0.55)"
+        />
+
+        {/* Brim edge stitching */}
+        {Array.from({ length: 38 }, (_, i) => {
+          const t = i / 37;
+          const a = -Math.PI + t * Math.PI;
+          const ex = hatCx + Math.cos(a) * brimW * 0.49;
+          const ey = hatCy + Math.sin(a) * brimH * 0.55 + brimH * 0.10;
+          return (
             <circle
-              key={`bch-dust-${i}`}
-              cx={m.x * scale}
-              cy={m.y * scale}
-              r={m.r * scale}
-              fill={dustColor}
-              opacity={m.opacity}
+              key={`bs-${i}`}
+              cx={ex}
+              cy={ey}
+              r={0.7}
+              fill="rgba(220, 180, 90, 0.85)"
             />
-          ))}
+          );
+        })}
+
+        {/* Brim curl creases */}
+        <path
+          d={`M ${hatCx - brimW * 0.42} ${hatCy - brimH * 0.18}
+              Q ${hatCx - brimW * 0.30} ${hatCy + brimH * 0.05} ${hatCx - brimW * 0.18} ${hatCy + brimH * 0.05}`}
+          stroke="rgba(20, 12, 4, 0.6)"
+          strokeWidth={1.2}
+          fill="none"
+        />
+        <path
+          d={`M ${hatCx + brimW * 0.42} ${hatCy - brimH * 0.18}
+              Q ${hatCx + brimW * 0.30} ${hatCy + brimH * 0.05} ${hatCx + brimW * 0.18} ${hatCy + brimH * 0.05}`}
+          stroke="rgba(20, 12, 4, 0.6)"
+          strokeWidth={1.2}
+          fill="none"
+        />
+
+        {/* CROWN — tall pinched top */}
+        <path
+          d={`M ${hatCx - crownW * 0.5} ${hatCy + brimH * 0.10}
+              Q ${hatCx - crownW * 0.48} ${hatCy - crownH * 0.85} ${hatCx - crownW * 0.20} ${hatCy - crownH * 0.95}
+              Q ${hatCx - crownW * 0.10} ${hatCy - crownH * 1.05} ${hatCx} ${hatCy - crownH * 0.85}
+              Q ${hatCx + crownW * 0.10} ${hatCy - crownH * 1.05} ${hatCx + crownW * 0.20} ${hatCy - crownH * 0.95}
+              Q ${hatCx + crownW * 0.48} ${hatCy - crownH * 0.85} ${hatCx + crownW * 0.5} ${hatCy + brimH * 0.10}
+              Q ${hatCx} ${hatCy + brimH * 0.05} ${hatCx - crownW * 0.5} ${hatCy + brimH * 0.10} Z`}
+          fill="url(#bch-felt)"
+          stroke="rgba(0, 0, 0, 0.95)"
+          strokeWidth={3}
+        />
+
+        {/* CROWN PINCH (center crease) */}
+        <path
+          d={`M ${hatCx} ${hatCy - crownH * 0.85}
+              Q ${hatCx - 4} ${hatCy - crownH * 0.40} ${hatCx} ${hatCy + brimH * 0.05}`}
+          stroke="rgba(0, 0, 0, 0.85)"
+          strokeWidth={2.5}
+          fill="none"
+        />
+        <path
+          d={`M ${hatCx} ${hatCy - crownH * 0.85}
+              Q ${hatCx + 4} ${hatCy - crownH * 0.40} ${hatCx} ${hatCy + brimH * 0.05}`}
+          stroke="rgba(120, 80, 30, 0.55)"
+          strokeWidth={1.2}
+          fill="none"
+        />
+
+        {/* Crown side dents */}
+        <path
+          d={`M ${hatCx - crownW * 0.35} ${hatCy - crownH * 0.55}
+              Q ${hatCx - crownW * 0.20} ${hatCy - crownH * 0.45} ${hatCx - crownW * 0.10} ${hatCy - crownH * 0.55}`}
+          stroke="rgba(0, 0, 0, 0.55)"
+          strokeWidth={1.6}
+          fill="none"
+        />
+        <path
+          d={`M ${hatCx + crownW * 0.35} ${hatCy - crownH * 0.55}
+              Q ${hatCx + crownW * 0.20} ${hatCy - crownH * 0.45} ${hatCx + crownW * 0.10} ${hatCy - crownH * 0.55}`}
+          stroke="rgba(0, 0, 0, 0.55)"
+          strokeWidth={1.6}
+          fill="none"
+        />
+
+        {/* HATBAND */}
+        <path
+          d={`M ${hatCx - crownW * 0.50} ${hatCy + brimH * 0.05}
+              Q ${hatCx} ${hatCy + brimH * 0.00} ${hatCx + crownW * 0.50} ${hatCy + brimH * 0.05}
+              L ${hatCx + crownW * 0.50} ${hatCy + brimH * 0.16}
+              Q ${hatCx} ${hatCy + brimH * 0.10} ${hatCx - crownW * 0.50} ${hatCy + brimH * 0.16} Z`}
+          fill="url(#bch-band)"
+          stroke="rgba(0, 0, 0, 0.95)"
+          strokeWidth={1.4}
+        />
+        {/* Hatband decorative stitching */}
+        {Array.from({ length: 22 }, (_, i) => {
+          const t = i / 21;
+          const sx = hatCx - crownW * 0.50 + t * crownW * 1.0;
+          const sy = hatCy + brimH * 0.10 - Math.sin(t * Math.PI) * 1;
+          return (
+            <line
+              key={`hbst-${i}`}
+              x1={sx}
+              y1={sy - 1.5}
+              x2={sx}
+              y2={sy + 1.5}
+              stroke={`hsl(${(i * 24) % 360}, 80%, 65%)`}
+              strokeWidth={0.7}
+              opacity={0.85}
+            />
+          );
+        })}
+
+        {/* Concho buckle (left of band) */}
+        <circle
+          cx={hatCx - crownW * 0.30}
+          cy={hatCy + brimH * 0.08}
+          r={brimH * 0.15 * (1 + onsetEnv * 0.15)}
+          fill="url(#bch-concho)"
+          stroke="rgba(40, 20, 4, 0.95)"
+          strokeWidth={0.8}
+        />
+        {/* Concho center stamp */}
+        <circle
+          cx={hatCx - crownW * 0.30}
+          cy={hatCy + brimH * 0.08}
+          r={brimH * 0.06}
+          fill="rgba(220, 160, 40, 0.85)"
+          stroke="rgba(40, 20, 4, 0.95)"
+          strokeWidth={0.5}
+        />
+        {/* Concho rays (sun pattern) */}
+        {Array.from({ length: 8 }, (_, i) => {
+          const a = (i / 8) * Math.PI * 2;
+          return (
+            <line
+              key={`cr-${i}`}
+              x1={hatCx - crownW * 0.30 + Math.cos(a) * brimH * 0.07}
+              y1={hatCy + brimH * 0.08 + Math.sin(a) * brimH * 0.07}
+              x2={hatCx - crownW * 0.30 + Math.cos(a) * brimH * 0.13}
+              y2={hatCy + brimH * 0.08 + Math.sin(a) * brimH * 0.13}
+              stroke="rgba(60, 30, 8, 0.85)"
+              strokeWidth={0.7}
+            />
+          );
+        })}
+        {/* Concho shine */}
+        <circle
+          cx={hatCx - crownW * 0.30 - 2}
+          cy={hatCy + brimH * 0.06}
+          r={1.8}
+          fill="#FFF8D8"
+          opacity={conchoShine}
+        />
+
+        {/* Eagle feather tucked into hatband */}
+        <g transform={`translate(${hatCx + crownW * 0.30}, ${hatCy + brimH * 0.06}) rotate(-20)`}>
+          <path
+            d={`M 0 0
+                Q -2 -8 -1 -22
+                Q 0 -34 2 -42
+                Q 4 -34 5 -22
+                Q 5 -8 3 0 Z`}
+            fill="rgba(245, 240, 220, 0.92)"
+            stroke="rgba(40, 24, 8, 0.9)"
+            strokeWidth={0.7}
+          />
+          <line x1="2" y1="-2" x2="2.5" y2="-40" stroke="rgba(40, 24, 8, 0.85)" strokeWidth={0.5} />
+          {/* Feather barbs */}
+          {Array.from({ length: 8 }, (_, i) => {
+            const fy = -6 - i * 4;
+            return (
+              <g key={`barb-${i}`}>
+                <line x1="2" y1={fy} x2={-2} y2={fy + 1} stroke="rgba(120, 80, 30, 0.75)" strokeWidth={0.4} />
+                <line x1="2" y1={fy} x2={6} y2={fy + 1} stroke="rgba(120, 80, 30, 0.75)" strokeWidth={0.4} />
+              </g>
+            );
+          })}
+          {/* Black tip */}
+          <ellipse cx="2" cy="-40" rx="2.5" ry="3" fill="rgba(20, 12, 4, 0.95)" />
+          {/* Red string tying it on */}
+          <line x1="0" y1="0" x2="-2" y2="2" stroke="rgba(180, 40, 30, 0.9)" strokeWidth={0.8} />
         </g>
 
-        {/* ============================================================ */}
-        {/*  PORTRAIT GROUP                                                */}
-        {/* ============================================================ */}
-        <g
-          transform={`translate(${figureX + portraitSway}, ${figureBaseY}) scale(${breathe * scale})`}
-        >
-          {/* -------------------------------------------------------- */}
-          {/*  UPPER SHOULDERS (head and shoulders only)                */}
-          {/* -------------------------------------------------------- */}
-          {/* Shoulder line + neck base */}
-          <path
-            d={`M -82,40
-                C -78,12 -52,-8 -34,-22
-                L -10,-32
-                L 10,-32
-                L 34,-22
-                C 52,-8 78,12 82,40
-                L 82,80
-                L -82,80 Z`}
-            fill={silhouetteColor}
-          />
-          {/* Subtle vest collar V-neck hint */}
-          <path
-            d={`M -10,-30
-                L -2,12
-                L 0,12
-                L 2,12
-                L 10,-30 Z`}
-            fill={silhouetteDark}
-          />
-          {/* Shoulder rim light — left edge */}
-          <path
-            d={`M -82,40
-                C -78,12 -52,-8 -34,-22`}
-            fill="none"
-            stroke={rimColor}
-            strokeWidth={1.4}
-          />
-          {/* Shoulder rim light — right edge */}
-          <path
-            d={`M 82,40
-                C 78,12 52,-8 34,-22`}
-            fill="none"
-            stroke={rimColor}
-            strokeWidth={1.4}
-          />
-          {/* Lower shoulder soft rim (warm) */}
-          <line
-            x1={-78}
-            y1={56}
-            x2={-44}
-            y2={36}
-            stroke={rimColorSoft}
-            strokeWidth={0.8}
-          />
-          <line
-            x1={78}
-            y1={56}
-            x2={44}
-            y2={36}
-            stroke={rimColorSoft}
-            strokeWidth={0.8}
-          />
+        {/* Crown felt creases (weathered) */}
+        {Array.from({ length: 14 }, (_, i) => {
+          const t = i / 13;
+          const yC = hatCy - crownH * 0.70 + t * crownH * 0.55;
+          const xLen = crownW * (0.30 + Math.sin(t * 5) * 0.08);
+          return (
+            <line
+              key={`crease-${i}`}
+              x1={hatCx - xLen}
+              y1={yC + Math.sin(i * 0.7) * 1.2}
+              x2={hatCx + xLen}
+              y2={yC + Math.cos(i * 0.5) * 1.2}
+              stroke="rgba(20, 12, 4, 0.30)"
+              strokeWidth={0.6}
+            />
+          );
+        })}
 
-          {/* -------------------------------------------------------- */}
-          {/*  NECK                                                     */}
-          {/* -------------------------------------------------------- */}
-          <path
-            d={`M -11,-32
-                Q -10,-46 -9,-58
-                L 9,-58
-                Q 10,-46 11,-32 Z`}
-            fill={silhouetteColor}
-          />
-          {/* Neck rim light (right side, catches spotlight) */}
-          <line
-            x1={11}
-            y1={-32}
-            x2={9}
-            y2={-58}
-            stroke={rimColorWarm}
-            strokeWidth={1.0}
-          />
+        {/* Top crown highlight */}
+        <ellipse
+          cx={hatCx}
+          cy={hatCy - crownH * 0.80}
+          rx={crownW * 0.18}
+          ry={crownH * 0.06}
+          fill="rgba(180, 130, 70, 0.45)"
+        />
 
-          {/* -------------------------------------------------------- */}
-          {/*  HEAD + HAT GROUP — rotates on subtle head tilt           */}
-          {/* -------------------------------------------------------- */}
-          <g transform={`rotate(${headTilt}, 0, ${headCy + 4})`}>
-            {/* ---- HAIR — flowing from under brim, sides + back ---- */}
-            <path
-              d={`M -22,${headCy + 6}
-                  C -28,${headCy + 14} -28,${headCy + 26} -22,${headCy + 34}
-                  L -16,${headCy + 36}
-                  C -20,${headCy + 26} -20,${headCy + 14} -18,${headCy + 6} Z`}
-              fill={hairColor}
-            />
-            <path
-              d={`M 22,${headCy + 6}
-                  C 28,${headCy + 14} 28,${headCy + 26} 22,${headCy + 34}
-                  L 16,${headCy + 36}
-                  C 20,${headCy + 26} 20,${headCy + 14} 18,${headCy + 6} Z`}
-              fill={hairColor}
-            />
-            {/* Back hair tuft visible behind shoulder */}
-            <ellipse
-              cx={-2}
-              cy={headCy + 28}
-              rx={20}
-              ry={9}
-              fill={hairColor}
-            />
+        {/* Hatband bottom shadow */}
+        <line
+          x1={hatCx - crownW * 0.50}
+          y1={hatCy + brimH * 0.18}
+          x2={hatCx + crownW * 0.50}
+          y2={hatCy + brimH * 0.18}
+          stroke="rgba(0, 0, 0, 0.65)"
+          strokeWidth={1.2}
+        />
 
-            {/* ---- HEAD/FACE PROFILE (slightly forward-right) ---- */}
-            <path
-              d={`M -16,${headCy + 6}
-                  C -19,${headCy - 2} -18,${headCy - 12} -10,${headCy - 16}
-                  C -2,${headCy - 19} 8,${headCy - 18} 14,${headCy - 12}
-                  C 18,${headCy - 6} 19,${headCy + 2} 18,${headCy + 8}
-                  C 17,${headCy + 14} 14,${headCy + 18} 10,${headCy + 20}
-                  L 6,${headCy + 22}
-                  C 2,${headCy + 24} -2,${headCy + 24} -6,${headCy + 22}
-                  C -12,${headCy + 18} -16,${headCy + 14} -16,${headCy + 6} Z`}
-              fill={silhouetteFace}
-            />
+        {/* === END HAT === */}
 
-            {/* Subtle nose bridge hint (right profile) */}
-            <path
-              d={`M 17,${headCy + 2}
-                  Q 20,${headCy + 4} 19,${headCy + 7}
-                  Q 17,${headCy + 9} 16,${headCy + 8} Z`}
-              fill={silhouetteDark}
-            />
+        {/* DUST FRONT LAYER */}
+        <g opacity={0.85}>{dustNodes.slice(35)}</g>
 
-            {/* Beard suggestion — soft jawline darkening */}
-            <path
-              d={`M -12,${headCy + 16}
-                  C -8,${headCy + 22} 8,${headCy + 23} 12,${headCy + 18}
-                  L 10,${headCy + 24}
-                  C 4,${headCy + 27} -4,${headCy + 27} -10,${headCy + 24} Z`}
-              fill={beardColor}
-            />
+        {/* Sun glint above hat */}
+        <ellipse
+          cx={hatCx + crownW * 0.20}
+          cy={hatCy - crownH * 0.85}
+          rx={2}
+          ry={5}
+          fill="rgba(255, 240, 200, 0.7)"
+          opacity={beatDecay * 0.7 + 0.2}
+        />
 
-            {/* Face rim light — front edge catches spotlight */}
-            <path
-              d={`M 14,${headCy - 12}
-                  C 18,${headCy - 6} 19,${headCy + 2} 18,${headCy + 8}
-                  C 17,${headCy + 14} 14,${headCy + 18} 10,${headCy + 20}`}
-              fill="none"
-              stroke={rimColorWarm}
-              strokeWidth={1.2}
-            />
-            {/* Cheek highlight glint */}
-            <ellipse
-              cx={13}
-              cy={headCy + 8}
-              rx={1.6}
-              ry={2.4}
-              fill={hslToRgba(hue + 8, 0.6, 0.55, rimIntensity * 0.5)}
-            />
+        {/* WARM ATMOSPHERIC TINT WASH */}
+        <rect width={width} height={height} fill={`hsla(${tintHue + 10}, 80%, 55%, ${0.05 + slowEnergy * 0.06})`} />
 
-            {/* ============================================== */}
-            {/*  THE ICONIC COWBOY HAT                          */}
-            {/* ============================================== */}
-
-            {/* ---- BRIM (back layer) — wide ellipse ---- */}
-            <ellipse
-              cx={-1}
-              cy={brimY}
-              rx={brimWidth / 2}
-              ry={brimHeight}
-              fill={`url(#${hatGradId})`}
-            />
-
-            {/* ---- BRIM curl — front edge sweeps up ---- */}
-            <path
-              d={`M ${-brimWidth / 2 + 4},${brimY + 1}
-                  Q ${-brimWidth / 2 + 12},${brimY + brimHeight + 4} ${-brimWidth / 2 + 22},${brimY + brimHeight + 5}
-                  L ${brimWidth / 2 - 22},${brimY + brimHeight + 5}
-                  Q ${brimWidth / 2 - 12},${brimY + brimHeight + 4} ${brimWidth / 2 - 4},${brimY + 1}
-                  Q ${brimWidth / 2 - 14},${brimY - 2} 0,${brimY - 1}
-                  Q ${-brimWidth / 2 + 14},${brimY - 2} ${-brimWidth / 2 + 4},${brimY + 1} Z`}
-              fill={hatColor}
-            />
-
-            {/* ---- BRIM curl — left side sweeps up (Stetson curl) ---- */}
-            <path
-              d={`M ${-brimWidth / 2},${brimY}
-                  Q ${-brimWidth / 2 - 4},${brimY - 6} ${-brimWidth / 2 + 6},${brimY - 4}
-                  L ${-brimWidth / 2 + 10},${brimY + 1}
-                  L ${-brimWidth / 2 + 2},${brimY + 3} Z`}
-              fill={hatColor}
-            />
-
-            {/* ---- BRIM curl — right side sweeps up ---- */}
-            <path
-              d={`M ${brimWidth / 2},${brimY}
-                  Q ${brimWidth / 2 + 4},${brimY - 6} ${brimWidth / 2 - 6},${brimY - 4}
-                  L ${brimWidth / 2 - 10},${brimY + 1}
-                  L ${brimWidth / 2 - 2},${brimY + 3} Z`}
-              fill={hatColor}
-            />
-
-            {/* ---- CROWN — tall, with classic pinched top crease ---- */}
-            <path
-              d={`M ${-22},${brimY - 1}
-                  C ${-26},${brimY - crownH * 0.4} ${-22},${brimY - crownH * 0.85} ${-16},${brimY - crownH}
-                  Q ${-10},${brimY - crownH - 3} ${-6},${brimY - crownH + 1}
-                  Q ${-2},${brimY - crownH + 4} 0,${brimY - crownH + 1}
-                  Q ${2},${brimY - crownH + 4} ${6},${brimY - crownH + 1}
-                  Q ${10},${brimY - crownH - 3} ${16},${brimY - crownH}
-                  C ${22},${brimY - crownH * 0.85} ${26},${brimY - crownH * 0.4} ${22},${brimY - 1}
-                  Z`}
-              fill={`url(#${hatGradId})`}
-            />
-
-            {/* ---- Crown center crease — vertical pinch line ---- */}
-            <path
-              d={`M -1,${brimY - crownH + 2}
-                  Q 0,${brimY - crownH * 0.55} -1,${brimY - 4}`}
-              fill="none"
-              stroke={hslToRgba(hue, 0.18, 0.02, 0.65)}
-              strokeWidth={1}
-            />
-            {/* Side pinch creases */}
-            <path
-              d={`M -8,${brimY - crownH + 2}
-                  Q -10,${brimY - crownH * 0.6} -9,${brimY - 4}`}
-              fill="none"
-              stroke={hslToRgba(hue, 0.18, 0.02, 0.45)}
-              strokeWidth={0.7}
-            />
-            <path
-              d={`M 8,${brimY - crownH + 2}
-                  Q 10,${brimY - crownH * 0.6} 9,${brimY - 4}`}
-              fill="none"
-              stroke={hslToRgba(hue, 0.18, 0.02, 0.45)}
-              strokeWidth={0.7}
-            />
-
-            {/* ---- HAT BAND ---- */}
-            <path
-              d={`M -22,${brimY - 4}
-                  C -16,${brimY - 6} 16,${brimY - 6} 22,${brimY - 4}
-                  L 22,${brimY - 1}
-                  C 16,${brimY - 3} -16,${brimY - 3} -22,${brimY - 1} Z`}
-              fill={hatBandColor}
-            />
-
-            {/* Hat band concho (decorative) */}
-            <circle
-              cx={-12}
-              cy={brimY - 3}
-              r={1.6}
-              fill={hatConchoColor}
-            />
-            <circle
-              cx={-12}
-              cy={brimY - 3}
-              r={0.6}
-              fill={hslToRgba(hue + 12, 0.85, 0.75, rimIntensity)}
-            />
-
-            {/* Crown rim light — top catches spotlight */}
-            <path
-              d={`M -16,${brimY - crownH + 1}
-                  Q -10,${brimY - crownH - 3} -6,${brimY - crownH + 1}
-                  Q -2,${brimY - crownH + 4} 0,${brimY - crownH + 1}
-                  Q 2,${brimY - crownH + 4} 6,${brimY - crownH + 1}
-                  Q 10,${brimY - crownH - 3} 16,${brimY - crownH}`}
-              fill="none"
-              stroke={rimColorWarm}
-              strokeWidth={1.4}
-            />
-
-            {/* Crown side rim — left edge */}
-            <path
-              d={`M -22,${brimY - 1}
-                  C -26,${brimY - crownH * 0.4} -22,${brimY - crownH * 0.85} -16,${brimY - crownH + 1}`}
-              fill="none"
-              stroke={rimColorSoft}
-              strokeWidth={0.9}
-            />
-            {/* Crown side rim — right edge */}
-            <path
-              d={`M 22,${brimY - 1}
-                  C 26,${brimY - crownH * 0.4} 22,${brimY - crownH * 0.85} 16,${brimY - crownH}`}
-              fill="none"
-              stroke={rimColor}
-              strokeWidth={1.1}
-            />
-
-            {/* Brim front edge highlight */}
-            <path
-              d={`M ${-brimWidth / 2 + 16},${brimY + brimHeight + 4}
-                  Q 0,${brimY + brimHeight + 6} ${brimWidth / 2 - 16},${brimY + brimHeight + 4}`}
-              fill="none"
-              stroke={hatHighlight}
-              strokeWidth={1.2}
-            />
-            {/* Brim front rim (warm spotlight catch) */}
-            <path
-              d={`M ${-brimWidth / 2 + 14},${brimY + brimHeight + 5}
-                  Q 0,${brimY + brimHeight + 7} ${brimWidth / 2 - 14},${brimY + brimHeight + 5}`}
-              fill="none"
-              stroke={rimColorWarm}
-              strokeWidth={0.9}
-              strokeDasharray="6,9"
-            />
-
-            {/* Hat brim halo — extra glow on energy */}
-            <ellipse
-              cx={0}
-              cy={brimY - 2}
-              rx={brimWidth / 2 + 4}
-              ry={brimHeight + 4}
-              fill="none"
-              stroke={hslToRgba(hue + 4, 0.7, 0.6, rimIntensity * 0.35 + energy * 0.15)}
-              strokeWidth={0.7}
-              strokeDasharray="3,8"
-            />
-          </g>
-
-          {/* -------------------------------------------------------- */}
-          {/*  MICROPHONE in front of Bobby                             */}
-          {/* -------------------------------------------------------- */}
-          {/* Stand pole (vertical) */}
-          <line
-            x1={-30}
-            y1={20}
-            x2={-30}
-            y2={88}
-            stroke={micStandColor}
-            strokeWidth={1.4}
-          />
-          {/* Stand boom angled up to mic */}
-          <line
-            x1={-30}
-            y1={20}
-            x2={-12}
-            y2={-2}
-            stroke={micStandColor}
-            strokeWidth={1.4}
-          />
-          {/* Boom clutch */}
-          <circle cx={-30} cy={20} r={1.4} fill={micStandColor} />
-
-          {/* Mic body (cylinder) */}
-          <rect
-            x={-13}
-            y={-4}
-            width={5}
-            height={11}
-            rx={1.2}
-            fill={micBodyColor}
-          />
-          {/* Mic body rim line */}
-          <line
-            x1={-13}
-            y1={6}
-            x2={-8}
-            y2={6}
-            stroke={hslToRgba(hue, 0.4, 0.18, 0.7)}
-            strokeWidth={0.5}
-          />
-
-          {/* Mic grille (ball) */}
-          <ellipse
-            cx={-10.5}
-            cy={-9}
-            rx={4.2}
-            ry={4.6}
-            fill={micGrilleColor}
-          />
-          {/* Grille mesh hint — concentric arcs */}
-          <path
-            d={`M -14,-9 Q -10.5,-13 -7,-9`}
-            fill="none"
-            stroke={hslToRgba(hue, 0.4, 0.25, 0.55)}
-            strokeWidth={0.4}
-          />
-          <path
-            d={`M -14,-9 Q -10.5,-5 -7,-9`}
-            fill="none"
-            stroke={hslToRgba(hue, 0.4, 0.25, 0.55)}
-            strokeWidth={0.4}
-          />
-          <line
-            x1={-10.5}
-            y1={-13.6}
-            x2={-10.5}
-            y2={-4.4}
-            stroke={hslToRgba(hue, 0.4, 0.25, 0.45)}
-            strokeWidth={0.35}
-          />
-
-          {/* Mic grille rim glow — pulses with vocal energy */}
-          <ellipse
-            cx={-10.5}
-            cy={-9}
-            rx={5.4}
-            ry={5.8}
-            fill={`url(#${micGradId})`}
-          />
-          <ellipse
-            cx={-10.5}
-            cy={-9}
-            rx={4.6}
-            ry={5.0}
-            fill="none"
-            stroke={micGrilleRim}
-            strokeWidth={0.9}
-          />
-
-          {/* Mic stand rim light */}
-          <line
-            x1={-29}
-            y1={28}
-            x2={-29}
-            y2={84}
-            stroke={rimColorSoft}
-            strokeWidth={0.5}
-          />
-        </g>
+        {/* VIGNETTE */}
+        <radialGradient id="bch-vign" cx="50%" cy="50%" r="70%">
+          <stop offset="50%" stopColor="rgba(0,0,0,0)" />
+          <stop offset="100%" stopColor="rgba(0,0,0,0.55)" />
+        </radialGradient>
+        <rect width={width} height={height} fill="url(#bch-vign)" />
       </svg>
     </div>
   );
 };
-
-export default BobCowboyHat;

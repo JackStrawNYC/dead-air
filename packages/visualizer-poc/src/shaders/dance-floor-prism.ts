@@ -410,10 +410,10 @@ void main() {
 
   // ─── Palette (chord-shifted) ───
   float chordHue = float(int(uChordIndex)) / 24.0 * 0.12;
-  float hue1 = hsvToCosineHue(uPalettePrimary) + chordHue;
-  float hue2 = hsvToCosineHue(uPaletteSecondary) + chordHue;
-  vec3 palCol1 = 0.5 + 0.5 * cos(DF_TAU * vec3(hue1, hue1 + 0.33, hue1 + 0.67));
-  vec3 palCol2 = 0.5 + 0.5 * cos(DF_TAU * vec3(hue2, hue2 + 0.33, hue2 + 0.67));
+  float hue1 = uPalettePrimary + chordHue;
+  float hue2 = uPaletteSecondary + chordHue;
+  vec3 palCol1 = paletteHueColor(hue1, 0.85, 0.95);
+  vec3 palCol2 = paletteHueColor(hue2, 0.85, 0.95);
 
   // ─── Derived quantities ───
   float prismAngle = uDynamicTime * (0.3 + energy * 0.7) * mix(1.0, 1.5, sJam) * mix(1.0, 0.2, sSpace);

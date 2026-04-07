@@ -297,10 +297,10 @@ void main() {
   burstAmt *= 1.0 + aggression * 0.4;
 
   // Palette
-  float hue1 = hsvToCosineHue(uPalettePrimary);
-  float hue2 = hsvToCosineHue(uPaletteSecondary);
-  vec3 palCol1 = 0.5 + 0.5 * cos(6.28318 * vec3(hue1, hue1 + 0.33, hue1 + 0.67));
-  vec3 palCol2 = 0.5 + 0.5 * cos(6.28318 * vec3(hue2, hue2 + 0.33, hue2 + 0.67));
+  float hue1 = uPalettePrimary;
+  float hue2 = uPaletteSecondary;
+  vec3 palCol1 = paletteHueColor(hue1, 0.75, 0.9);
+  vec3 palCol2 = paletteHueColor(hue2, 0.8, 0.95);
 
   // Camera: looking upward through smoke column
   vec3 ro = vec3(0.0, -1.5, time);

@@ -571,12 +571,12 @@ void main() {
   float chromaHueMod = uChromaHue * 0.2;
   float chordHue = float(int(uChordIndex)) / 24.0 * 0.12;
 
-  float hue1 = hsvToCosineHue(uPalettePrimary) + chromaHueMod + chordHue;
-  vec3 waterColor = 0.5 + 0.5 * cos(TAU * vec3(hue1, hue1 + 0.33, hue1 + 0.67));
+  float hue1 = uPalettePrimary + chromaHueMod + chordHue;
+  vec3 waterColor = paletteHueColor(hue1, 0.7, 0.85);
   waterColor = mix(waterColor, vec3(0.02, 0.08, 0.18), 0.6 + spaceScore * 0.2);
 
-  float hue2 = hsvToCosineHue(uPaletteSecondary);
-  vec3 accentColor = 0.5 + 0.5 * cos(TAU * vec3(hue2, hue2 + 0.33, hue2 + 0.67));
+  float hue2 = uPaletteSecondary;
+  vec3 accentColor = paletteHueColor(hue2, 0.85, 0.95);
   accentColor = mix(accentColor, vec3(0.3, 0.7, 0.9), 0.3);
 
   // === FLOW TIME (section-modulated) ===

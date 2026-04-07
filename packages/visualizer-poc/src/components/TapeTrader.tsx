@@ -31,7 +31,10 @@ interface Props {
 export const TapeTrader: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
-  const ctx = useShowContext();
+  const showCtx = useShowContext();
+  const ctx = showCtx;
+  const showVenueShort = (showCtx?.venueShort ?? "Concert").toUpperCase();
+  const showDateShort = showCtx?.dateShort ?? "";
 
   const idx = Math.min(Math.max(0, frame), frames.length - 1);
 
@@ -237,7 +240,7 @@ export const TapeTrader: React.FC<Props> = ({ frames }) => {
             letterSpacing={0.5}
             fill={`hsla(25, 40%, 45%, 0.6)`}
           >
-            {ctx?.dateShort ?? "5/8/77"} {ctx?.venueShort ?? "BARTON HALL"}
+            {showDateShort} {showVenueShort}
           </text>
 
           {/* Wear marks — subtle horizontal lines across label */}

@@ -1,1043 +1,448 @@
 /**
- * BobWeir — Bobby Weir rhythm guitarist silhouette, A+++ quality.
+ * BobWeir — A+++ overlay: Bob Weir on stage with his ES-335.
+ * Full concert scene rendered in SVG: stage floor with reflection, audience
+ * silhouettes, spotlight cone with dust motes, monitor wedges, mic stand,
+ * amp stack, cable, and Bob himself in his cowboy hat and vest holding the
+ * ES-335 (with f-holes, headstock, neck, tailpiece, vibrating strings).
  *
- * Detailed figure: cowboy hat silhouette, shoulders/torso with vest suggestion,
- * arms in strumming pose (right hand near soundhole, left on fretboard),
- * iconic wide-legged stance. ES-335 semi-hollow guitar with f-holes, neck,
- * headstock, fret suggestions, and 6 vibrating strings.
- *
- * Volumetric spotlight cone from above with dust motes, pool of light at feet,
- * warm amber color palette, rim lighting on figure edges, stage floor reflection.
- *
- * Audio: energy drives strumming intensity, beatDecay for spotlight pulse,
- * chromaHue for glow tint, musicalTime for strum timing, bass for body sway.
- * Continuous rendering — rotation engine controls visibility externally.
+ * Audio reactivity:
+ *   slowEnergy → spotlight warmth + dust mote density
+ *   energy → audience hands raised, glow brightness
+ *   bass → amp stack rumble (subtle vertical jitter)
+ *   beatDecay → strum amplitude pulse
+ *   onsetEnvelope → flash highlights on guitar body
+ *   chromaHue → amber/warm palette tint
+ *   tempoFactor → strum oscillation speed
  */
 
 import React from "react";
 import { useCurrentFrame, useVideoConfig, interpolate } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
+import { seeded } from "../utils/seededRandom";
 import { useAudioSnapshot } from "./parametric/audio-helpers";
 import { useTempoFactor } from "../data/TempoContext";
 
-/* ------------------------------------------------------------------ */
-/*  Color utility                                                      */
-/* ------------------------------------------------------------------ */
+const CYCLE_TOTAL = 2400;
+const VISIBLE_DURATION = 780;
+const DUST_COUNT = 70;
+const AUDIENCE_COUNT = 32;
+const HAND_COUNT = 14;
 
-function hslToRgba(h: number, s: number, l: number, a: number): string {
-  const c = (1 - Math.abs(2 * l - 1)) * s;
-  const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
-  const m = l - c / 2;
-  let r = 0,
-    g = 0,
-    b = 0;
-  if (h < 60) {
-    r = c;
-    g = x;
-  } else if (h < 120) {
-    r = x;
-    g = c;
-  } else if (h < 180) {
-    g = c;
-    b = x;
-  } else if (h < 240) {
-    g = x;
-    b = c;
-  } else if (h < 300) {
-    r = x;
-    b = c;
-  } else {
-    r = c;
-    b = x;
-  }
-  return `rgba(${Math.round((r + m) * 255)},${Math.round((g + m) * 255)},${Math.round((b + m) * 255)},${a})`;
+interface DustMote { x: number; y: number; r: number; speed: number; phase: number; drift: number; }
+interface AudienceHead { x: number; w: number; h: number; tilt: number; }
+interface RaisedHand { x: number; baseY: number; sway: number; phase: number; }
+
+function buildDust(): DustMote[] {
+  const rng = seeded(48_223_911);
+  return Array.from({ length: DUST_COUNT }, () => ({
+    x: rng(),
+    y: rng(),
+    r: 0.6 + rng() * 1.6,
+    speed: 0.0006 + rng() * 0.0018,
+    phase: rng() * Math.PI * 2,
+    drift: 4 + rng() * 14,
+  }));
 }
 
-/* ------------------------------------------------------------------ */
-/*  Constants                                                          */
-/* ------------------------------------------------------------------ */
-
-const STRING_COUNT = 6;
-const STRING_SPACING = 3.8;
-
-interface Props {
-  frames: EnhancedFrameData[];
+function buildAudience(): AudienceHead[] {
+  const rng = seeded(33_881_207);
+  return Array.from({ length: AUDIENCE_COUNT }, () => ({
+    x: rng(),
+    w: 14 + rng() * 22,
+    h: 18 + rng() * 26,
+    tilt: (rng() - 0.5) * 0.18,
+  }));
 }
 
-/* ------------------------------------------------------------------ */
-/*  Component                                                          */
-/* ------------------------------------------------------------------ */
+function buildHands(): RaisedHand[] {
+  const rng = seeded(71_902_443);
+  return Array.from({ length: HAND_COUNT }, () => ({
+    x: 0.05 + rng() * 0.9,
+    baseY: 0.86 + rng() * 0.06,
+    sway: 0.005 + rng() * 0.012,
+    phase: rng() * Math.PI * 2,
+  }));
+}
+
+interface Props { frames: EnhancedFrameData[]; }
 
 export const BobWeir: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
-  const snap = useAudioSnapshot(frames);
   const tempoFactor = useTempoFactor();
+  const snap = useAudioSnapshot(frames);
 
-  const {
-    energy,
-    mids,
-    bass,
-    highs,
-    beatDecay,
-    chromaHue: chromaHueDeg,
-    onsetEnvelope,
-    musicalTime,
-    otherEnergy,
-    slowEnergy,
-    drumBeat,
-    fastEnergy,
-  } = snap;
+  const dustMotes = React.useMemo(buildDust, []);
+  const audience = React.useMemo(buildAudience, []);
+  const hands = React.useMemo(buildHands, []);
 
-  /* -- Energy gating: Bobby appears at moderate energy -- */
-  const energyGate = interpolate(energy, [0.06, 0.14], [0, 1], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
-  const otherBoost = interpolate(otherEnergy ?? 0, [0.05, 0.3], [0, 0.2], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
-  const opacity = energyGate * (0.55 + otherBoost);
-  if (opacity < 0.01) return null;
+  const cycleFrame = frame % CYCLE_TOTAL;
+  if (cycleFrame >= VISIBLE_DURATION) return null;
+  const progress = cycleFrame / VISIBLE_DURATION;
+  const fadeIn = interpolate(progress, [0, 0.09], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const fadeOut = interpolate(progress, [0.91, 1], [1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const masterOpacity = Math.min(fadeIn, fadeOut) * 0.95;
+  if (masterOpacity < 0.01) return null;
 
-  /* -- Warm amber base hue shifted by chromaHue -- */
-  const baseHue = 35; // warm amber
-  const hueShift = (chromaHueDeg / 360) * 30 - 15; // +/-15 degree shift from chroma
-  const hue = baseHue + hueShift;
+  // Audio drives
+  const spotWarmth = interpolate(snap.slowEnergy, [0.02, 0.32], [0.55, 1.05], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const crowdEnergy = interpolate(snap.energy, [0.02, 0.30], [0.4, 1.0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const ampRumble = interpolate(snap.bass, [0.0, 0.7], [0.0, 1.0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const strumPulse = 1 + snap.beatDecay * 0.42;
+  const flashHit = snap.onsetEnvelope > 0.55 ? Math.min(1, (snap.onsetEnvelope - 0.4) * 1.6) : 0;
 
-  /* -- Figure position: right-center stage -- */
-  const figureX = width * 0.64;
-  const figureBaseY = height * 0.48;
-  const scale = Math.min(width, height) / 1080; // normalize to 1080 baseline
+  // Amber base hue, modulated by chromaHue
+  const baseHue = 38;
+  const tintHue = ((baseHue + (snap.chromaHue - 180) * 0.30) % 360 + 360) % 360;
+  const tintLight = 64 + spotWarmth * 16;
+  const tintColor = `hsl(${tintHue}, 78%, ${tintLight}%)`;
+  const tintCore = `hsl(${tintHue}, 92%, ${Math.min(96, tintLight + 20)}%)`;
+  const tintDeep = `hsl(${(tintHue + 14) % 360}, 60%, 28%)`;
 
-  /* -- Sway: Bobby's rhythmic body movement, bass-driven -- */
-  const swayAmount = interpolate(bass, [0.05, 0.35], [2, 10], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
-  const sway =
-    Math.sin(musicalTime * Math.PI * 2 * 0.5) * swayAmount +
-    Math.sin(musicalTime * Math.PI * 2 * 0.25) * swayAmount * 0.4;
+  // Geometry
+  const cx = width * 0.5;
+  const stageY = height * 0.74;
+  const horizonY = height * 0.50;
+  const bobX = cx;
+  const bobBaseY = stageY - 12;
+  const ampX = width * 0.78;
 
-  /* -- Breathing / pulse -- */
-  const breathe =
-    1.0 +
-    Math.sin(frame * 0.04) * 0.008 +
-    beatDecay * 0.015;
+  const skyTop = `hsl(${(tintHue + 200) % 360}, 36%, 4%)`;
+  const skyMid = `hsl(${(tintHue + 220) % 360}, 28%, 7%)`;
+  const stageColor = `hsl(${(tintHue + 30) % 360}, 18%, 11%)`;
 
-  /* -- Strumming: energy-driven right arm motion, synced to musicalTime -- */
-  const strumIntensity = interpolate(energy, [0.05, 0.4], [3, 18], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
-  const strumAngle =
-    Math.sin(musicalTime * Math.PI * 2) * strumIntensity +
-    Math.sin(musicalTime * Math.PI * 4) * strumIntensity * 0.35 +
-    onsetEnvelope * 8;
-
-  /* -- Spotlight parameters -- */
-  const spotlightIntensity = interpolate(energy, [0.05, 0.35], [0.25, 0.55], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
-  const spotlightPulse = spotlightIntensity + beatDecay * 0.12;
-  const spotlightRadius = interpolate(energy, [0.05, 0.4], [80, 160], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
+  // Dust mote nodes
+  const dustNodes = dustMotes.map((d, i) => {
+    const t = frame * d.speed * tempoFactor + d.phase;
+    const px = (d.x + Math.sin(t * 1.3) * 0.04) * width;
+    const py = (d.y * 0.55 + Math.sin(t * 0.7) * 0.02) * height;
+    const flicker = 0.5 + Math.sin(t * 2.4) * 0.4;
+    return (
+      <circle key={`dust-${i}`} cx={px} cy={py} r={d.r * (0.7 + spotWarmth * 0.5)}
+        fill={tintCore} opacity={0.35 * flicker * spotWarmth} />
+    );
   });
 
-  /* -- Flicker -- */
-  const flicker =
-    0.92 +
-    Math.sin(frame * 0.11 + 1.7) * 0.04 +
-    Math.sin(frame * 0.29 + 3.1) * 0.025;
-
-  /* -- Rim light intensity -- */
-  const rimIntensity = interpolate(energy, [0.1, 0.35], [0.12, 0.35], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  }) + beatDecay * 0.15;
-
-  /* -- Figure dimensions (in local SVG coords, viewBox 0 0 300 500) -- */
-  const headR = 16;
-  const hatBrimW = 38;
-  const hatCrownH = 22;
-  const shoulderW = 56;
-  const torsoH = 70;
-  const hipW = 44;
-  const legH = 80;
-  const stanceW = 50; // Bobby's iconic wide stance
-
-  // Guitar body (ES-335 semi-hollow)
-  const guitarBodyW = 48;
-  const guitarBodyH = 34;
-  const guitarBodyCx = 10;
-  const guitarBodyCy = 15;
-
-  /* -- Colors -- */
-  const ambientColor = hslToRgba(hue, 0.7, 0.6, spotlightPulse * flicker);
-  const ambientColorDim = hslToRgba(hue, 0.6, 0.45, spotlightPulse * flicker * 0.5);
-  const silhouetteColor = hslToRgba(hue, 0.3, 0.06, 0.92);
-  const silhouetteDark = hslToRgba(hue, 0.25, 0.04, 0.95);
-  const rimColor = hslToRgba(hue, 0.75, 0.65, rimIntensity);
-  const rimColorSoft = hslToRgba(hue, 0.7, 0.6, rimIntensity * 0.6);
-  const guitarColor = hslToRgba(hue + 5, 0.35, 0.08, 0.93);
-  const guitarRim = hslToRgba(hue, 0.7, 0.6, rimIntensity * 0.7);
-  const stringColor = hslToRgba(hue + 10, 0.5, 0.7, 0.5 + energy * 0.3);
-  const fholeColor = hslToRgba(hue, 0.4, 0.03, 0.9);
-  const spotCoreColor = hslToRgba(hue, 0.5, 0.85, spotlightPulse * 0.45);
-  const spotMidColor = hslToRgba(hue, 0.55, 0.65, spotlightPulse * 0.2);
-  const spotEdgeColor = hslToRgba(hue, 0.5, 0.5, 0);
-  const dustColor = hslToRgba(hue, 0.4, 0.75, 0.15 + beatDecay * 0.1);
-  const groundColor = hslToRgba(hue, 0.5, 0.55, spotlightPulse * 0.15);
-  const reflectionColor = hslToRgba(hue, 0.3, 0.08, spotlightPulse * 0.12);
-  const vestEdge = hslToRgba(hue - 10, 0.4, 0.12, 0.3);
-
-  /* -- Dust mote positions (deterministic from frame) -- */
-  const dustMotes: Array<{ x: number; y: number; r: number; opacity: number }> = [];
-  for (let i = 0; i < 18; i++) {
-    const seed = i * 137.508; // golden angle
-    const phase = seed + frame * (0.008 + i * 0.002);
-    const driftX = Math.sin(phase) * (25 + i * 3);
-    const driftY = Math.cos(phase * 0.7 + i) * 120 - 60 + i * 12;
-    const moteR = 0.6 + Math.sin(seed * 3.7) * 0.4;
-    const moteOpacity =
-      (0.12 + Math.sin(phase * 1.3) * 0.08) *
-      interpolate(
-        Math.abs(driftX),
-        [0, spotlightRadius * 0.4],
-        [1, 0],
-        { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
-      );
-    dustMotes.push({ x: driftX, y: driftY, r: moteR, opacity: moteOpacity });
-  }
-
-  /* -- String vibration paths -- */
-  const vibAmp = interpolate(energy, [0.03, 0.4], [0.2, 2.8], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
+  // Audience heads (foreground silhouette row)
+  const audienceNodes = audience.map((a, i) => {
+    const ax = a.x * width;
+    const ay = height * 0.92;
+    return (
+      <g key={`aud-${i}`} transform={`rotate(${a.tilt * 12}, ${ax}, ${ay})`}>
+        <path d={`M ${ax - a.w * 0.9} ${ay + a.h * 0.6} Q ${ax} ${ay + a.h * 0.2} ${ax + a.w * 0.9} ${ay + a.h * 0.6} L ${ax + a.w * 1.1} ${height} L ${ax - a.w * 1.1} ${height} Z`}
+          fill="rgba(2, 2, 6, 0.92)" />
+        <ellipse cx={ax} cy={ay} rx={a.w * 0.55} ry={a.h * 0.55} fill="rgba(4, 4, 10, 0.96)" />
+        <path d={`M ${ax - a.w * 0.5} ${ay - a.h * 0.2} Q ${ax} ${ay - a.h * 0.6} ${ax + a.w * 0.5} ${ay - a.h * 0.2}`}
+          fill="none" stroke="rgba(0, 0, 0, 1)" strokeWidth={1.4} />
+      </g>
+    );
   });
 
-  const stringPaths: string[] = [];
-  // Strings run across the guitar body, roughly from bridge to where neck meets body
-  const stringStartX = guitarBodyCx - guitarBodyW * 0.35;
-  const stringEndX = guitarBodyCx + guitarBodyW * 0.5;
-  const stringCenterY = guitarBodyCy;
-  for (let si = 0; si < STRING_COUNT; si++) {
-    const y = stringCenterY - (STRING_COUNT / 2 - si) * STRING_SPACING + STRING_SPACING * 0.5;
-    const freq = 3.0 + si * 0.8;
-    const amp = vibAmp * (0.5 + si * 0.15);
-    const pts: string[] = [];
-    for (let x = stringStartX; x <= stringEndX; x += 1.5) {
-      const t = (x - stringStartX) / (stringEndX - stringStartX);
-      const env = Math.sin(t * Math.PI);
-      const dy =
-        Math.sin(musicalTime * Math.PI * 2 * freq * tempoFactor + x * 0.12 + si * 1.5) *
-        amp *
-        env;
-      pts.push(`${x.toFixed(1)},${(y + dy).toFixed(2)}`);
-    }
-    stringPaths.push(pts.join(" "));
-  }
+  // Raised hands (energy-gated)
+  const handNodes = hands.map((h, i) => {
+    const handHeight = crowdEnergy * (0.04 + (i % 3) * 0.012);
+    const sway = Math.sin(frame * h.sway + h.phase) * 4;
+    const hx = h.x * width + sway;
+    const hy = (h.baseY - handHeight) * height;
+    const armBaseY = h.baseY * height + 14;
+    return (
+      <g key={`hand-${i}`} opacity={crowdEnergy * 0.85}>
+        <line x1={hx} y1={armBaseY} x2={hx} y2={hy + 8} stroke="rgba(2, 2, 6, 0.95)" strokeWidth={3} strokeLinecap="round" />
+        <ellipse cx={hx} cy={hy + 4} rx={3.4} ry={5} fill="rgba(2, 2, 6, 0.95)" />
+        <line x1={hx - 2} y1={hy + 4} x2={hx - 3} y2={hy - 2} stroke="rgba(2, 2, 6, 0.95)" strokeWidth={1.4} strokeLinecap="round" />
+        <line x1={hx} y1={hy + 2} x2={hx} y2={hy - 4} stroke="rgba(2, 2, 6, 0.95)" strokeWidth={1.4} strokeLinecap="round" />
+        <line x1={hx + 2} y1={hy + 4} x2={hx + 3} y2={hy - 2} stroke="rgba(2, 2, 6, 0.95)" strokeWidth={1.4} strokeLinecap="round" />
+      </g>
+    );
+  });
 
-  /* -- Head tilt driven by slow energy -- */
-  const headTilt = interpolate(slowEnergy, [0.08, 0.3], [-2, 3], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  }) + Math.sin(frame * 0.025) * 1.5;
+  // Spotlight cone
+  const spotTopX = cx;
+  const spotTopY = 0;
+  const spotBaseY = stageY - 8;
+  const spotHalfW = width * 0.22;
+  const spotPath = `M ${spotTopX - 28} ${spotTopY} L ${spotTopX + 28} ${spotTopY} L ${spotTopX + spotHalfW} ${spotBaseY} L ${spotTopX - spotHalfW} ${spotBaseY} Z`;
 
-  /* -- Unique SVG gradient IDs -- */
-  const spotGradId = `bob-spot-${frame % 1000}`;
-  const coneGradId = `bob-cone-${frame % 1000}`;
-  const reflGradId = `bob-refl-${frame % 1000}`;
-  const bodyGradId = `bob-body-${frame % 1000}`;
+  // Bob silhouette geometry
+  const bobBodyH = 130;
+  const torsoTopY = bobBaseY - bobBodyH;
+  const headR = 18;
+  const headCY = torsoTopY - headR + 4;
+  const strumOffset = Math.sin(frame * 0.18 * tempoFactor) * 4 * strumPulse;
 
-  /* ================================================================ */
-  /*  SVG figure center: 150, 250 in a 300x500 viewBox                */
-  /* ================================================================ */
-  const cx = 150;
-  const neckY = -torsoH / 2 - headR - 6; // base of head/top of neck
-  const headCy = neckY - headR + 2;
-  const hipY = torsoH / 2;
-  const feetY = hipY + legH;
+  // ES-335 guitar (held diagonally)
+  const guitarBodyCX = bobX + 22;
+  const guitarBodyCY = bobBaseY - 60;
+  const guitarRotate = -22;
+
+  // String vibration
+  const stringVib = (s: number) => Math.sin(frame * 0.7 * tempoFactor + s * 1.2) * (1.5 + snap.beatDecay * 2.5);
 
   return (
-    <div
-      style={{
-        position: "absolute",
-        inset: 0,
-        pointerEvents: "none",
-        overflow: "hidden",
-      }}
-    >
-      <svg
-        width={width}
-        height={height}
-        style={{
-          opacity: opacity * flicker,
-          mixBlendMode: "screen",
-        }}
-      >
+    <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden" }}>
+      <svg width={width} height={height} style={{ opacity: masterOpacity, willChange: "opacity" }}>
         <defs>
-          {/* Spotlight radial gradient */}
-          <radialGradient id={spotGradId} cx="50%" cy="30%" r="50%">
-            <stop offset="0%" stopColor={spotCoreColor} />
-            <stop offset="40%" stopColor={spotMidColor} />
-            <stop offset="100%" stopColor={spotEdgeColor} />
-          </radialGradient>
-
-          {/* Volumetric cone gradient (top-down) */}
-          <linearGradient id={coneGradId} x1="50%" y1="0%" x2="50%" y2="100%">
-            <stop
-              offset="0%"
-              stopColor={hslToRgba(hue, 0.5, 0.85, spotlightPulse * 0.35)}
-            />
-            <stop
-              offset="30%"
-              stopColor={hslToRgba(hue, 0.5, 0.7, spotlightPulse * 0.15)}
-            />
-            <stop
-              offset="100%"
-              stopColor={hslToRgba(hue, 0.5, 0.5, 0)}
-            />
+          <linearGradient id="bw-sky" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={skyTop} />
+            <stop offset="55%" stopColor={skyMid} />
+            <stop offset="100%" stopColor={tintDeep} />
           </linearGradient>
-
-          {/* Stage reflection gradient */}
-          <linearGradient id={reflGradId} x1="50%" y1="0%" x2="50%" y2="100%">
-            <stop offset="0%" stopColor={reflectionColor} />
-            <stop
-              offset="100%"
-              stopColor={hslToRgba(hue, 0.2, 0.05, 0)}
-            />
+          <linearGradient id="bw-stage" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={stageColor} />
+            <stop offset="100%" stopColor="rgba(2, 2, 6, 0.98)" />
           </linearGradient>
-
-          {/* Guitar body gradient */}
-          <radialGradient id={bodyGradId} cx="45%" cy="40%" r="55%">
-            <stop
-              offset="0%"
-              stopColor={hslToRgba(hue + 5, 0.35, 0.1, 0.95)}
-            />
-            <stop
-              offset="100%"
-              stopColor={hslToRgba(hue + 5, 0.3, 0.04, 0.95)}
-            />
+          <linearGradient id="bw-spot" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={tintCore} stopOpacity={0.55} />
+            <stop offset="55%" stopColor={tintColor} stopOpacity={0.18} />
+            <stop offset="100%" stopColor={tintColor} stopOpacity={0} />
+          </linearGradient>
+          <radialGradient id="bw-halo">
+            <stop offset="0%" stopColor={tintCore} stopOpacity={0.85} />
+            <stop offset="60%" stopColor={tintColor} stopOpacity={0.18} />
+            <stop offset="100%" stopColor={tintColor} stopOpacity={0} />
           </radialGradient>
+          <radialGradient id="bw-vig">
+            <stop offset="55%" stopColor="rgba(0,0,0,0)" />
+            <stop offset="100%" stopColor="rgba(0,0,0,0.55)" />
+          </radialGradient>
+          <linearGradient id="bw-hatBrim" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#1a0f06" />
+            <stop offset="100%" stopColor="#0a0502" />
+          </linearGradient>
+          <linearGradient id="bw-vest" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#1c1208" />
+            <stop offset="100%" stopColor="#0a0602" />
+          </linearGradient>
+          <linearGradient id="bw-jeans" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#0f1320" />
+            <stop offset="100%" stopColor="#040610" />
+          </linearGradient>
+          <linearGradient id="bw-guitarBody" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor="#3c1808" />
+            <stop offset="50%" stopColor="#7a3a0e" />
+            <stop offset="100%" stopColor="#2a0f04" />
+          </linearGradient>
+          <linearGradient id="bw-amp" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#0f0b06" />
+            <stop offset="100%" stopColor="#040201" />
+          </linearGradient>
+          <filter id="bw-blur" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="4" />
+          </filter>
         </defs>
 
-        {/* ============================================================ */}
-        {/*  VOLUMETRIC SPOTLIGHT CONE from above                         */}
-        {/* ============================================================ */}
-        <g transform={`translate(${figureX + sway}, ${figureBaseY})`}>
-          {/* Wide cone trapezoid */}
-          <polygon
-            points={`${-12 * scale},${-240 * scale} ${12 * scale},${-240 * scale} ${spotlightRadius * scale * 0.9},${(feetY + 30) * scale * breathe} ${-spotlightRadius * scale * 0.9},${(feetY + 30) * scale * breathe}`}
-            fill={`url(#${coneGradId})`}
-            style={{ filter: `blur(${12 * scale}px)` }}
-          />
+        {/* Sky / arena background */}
+        <rect width={width} height={height} fill="url(#bw-sky)" />
 
-          {/* Cone core — brighter narrow beam */}
-          <polygon
-            points={`${-6 * scale},${-240 * scale} ${6 * scale},${-240 * scale} ${spotlightRadius * 0.35 * scale},${(feetY + 10) * scale * breathe} ${-spotlightRadius * 0.35 * scale},${(feetY + 10) * scale * breathe}`}
-            fill={hslToRgba(hue, 0.45, 0.8, spotlightPulse * 0.12)}
-            style={{ filter: `blur(${8 * scale}px)` }}
-          />
+        {/* Distant stage trusses (silhouette) */}
+        <rect x={width * 0.05} y={height * 0.08} width={width * 0.9} height={6} fill="rgba(0, 0, 0, 0.85)" />
+        <rect x={width * 0.05} y={height * 0.08} width={6} height={height * 0.42} fill="rgba(0, 0, 0, 0.85)" />
+        <rect x={width * 0.95 - 6} y={height * 0.08} width={6} height={height * 0.42} fill="rgba(0, 0, 0, 0.85)" />
+        {[0.18, 0.30, 0.42, 0.58, 0.70, 0.82].map((px, i) => (
+          <g key={`fix-${i}`}>
+            <line x1={width * px} y1={height * 0.085} x2={width * px} y2={height * 0.13} stroke="rgba(0, 0, 0, 0.9)" strokeWidth={2} />
+            <rect x={width * px - 6} y={height * 0.13} width={12} height={8} fill="rgba(0, 0, 0, 0.95)" />
+            <circle cx={width * px} cy={height * 0.14} r={3} fill={tintCore} opacity={0.6 * spotWarmth} />
+          </g>
+        ))}
+
+        {/* Stage backdrop / curtain */}
+        <rect x={0} y={horizonY} width={width} height={stageY - horizonY} fill="rgba(8, 6, 12, 0.85)" />
+        {Array.from({ length: 18 }).map((_, i) => (
+          <line key={`fold-${i}`} x1={(i / 18) * width} y1={horizonY} x2={(i / 18) * width + 8} y2={stageY}
+            stroke="rgba(0, 0, 0, 0.55)" strokeWidth={1.2} />
+        ))}
+
+        {/* Spotlight cone (volumetric) */}
+        <path d={spotPath} fill="url(#bw-spot)" style={{ mixBlendMode: "screen" }} />
+        <path d={`M ${spotTopX - 14} ${spotTopY} L ${spotTopX + 14} ${spotTopY} L ${spotTopX + spotHalfW * 0.55} ${spotBaseY} L ${spotTopX - spotHalfW * 0.55} ${spotBaseY} Z`}
+          fill={tintCore} opacity={0.18 * spotWarmth} style={{ mixBlendMode: "screen" }} />
+
+        {/* Stage floor */}
+        <rect x={0} y={stageY} width={width} height={height - stageY} fill="url(#bw-stage)" />
+        <rect x={0} y={stageY - 1} width={width} height={2} fill={tintColor} opacity={0.32 * spotWarmth} />
+        {Array.from({ length: 14 }).map((_, i) => (
+          <line key={`plank-${i}`} x1={0} y1={stageY + 8 + i * 12} x2={width} y2={stageY + 8 + i * 12}
+            stroke="rgba(0, 0, 0, 0.45)" strokeWidth={0.6} />
+        ))}
+
+        {/* Stage reflection of Bob (subtle blur) */}
+        <g opacity={0.18 * spotWarmth}>
+          <ellipse cx={bobX} cy={stageY + 40} rx={42} ry={20} fill="rgba(2, 2, 6, 0.6)" filter="url(#bw-blur)" />
         </g>
 
-        {/* ============================================================ */}
-        {/*  SPOTLIGHT GLOW — ambient wash behind figure                   */}
-        {/* ============================================================ */}
-        <ellipse
-          cx={figureX + sway}
-          cy={figureBaseY - 20 * scale}
-          rx={spotlightRadius * 1.2 * scale}
-          ry={spotlightRadius * 1.8 * scale}
-          fill={`url(#${spotGradId})`}
-          style={{ filter: `blur(${20 * scale}px)` }}
-        />
+        {/* Amp stack stage right */}
+        <g transform={`translate(${ampX} ${stageY - 220}) translate(0 ${ampRumble * 1.2 * Math.sin(frame * 0.5)})`}>
+          <rect x={-58} y={0} width={116} height={90} fill="url(#bw-amp)" stroke="rgba(0, 0, 0, 1)" strokeWidth={1.5} />
+          <rect x={-50} y={8} width={100} height={74} fill="none" stroke="rgba(60, 50, 40, 0.45)" strokeWidth={0.8} />
+          {Array.from({ length: 6 }).map((_, r) =>
+            Array.from({ length: 7 }).map((_, c) => (
+              <circle key={`g-${r}-${c}`} cx={-44 + c * 14} cy={14 + r * 12} r={1.4} fill="rgba(40, 32, 22, 0.55)" />
+            )),
+          )}
+          <rect x={-12} y={64} width={24} height={6} fill="rgba(20, 14, 8, 0.85)" />
+          <line x1={-10} y1={67} x2={10} y2={67} stroke={tintCore} strokeWidth={0.6} opacity={0.55} />
 
-        {/* ============================================================ */}
-        {/*  GROUND POOL OF LIGHT                                          */}
-        {/* ============================================================ */}
-        <ellipse
-          cx={figureX + sway}
-          cy={figureBaseY + (feetY + 15) * scale * breathe}
-          rx={spotlightRadius * 0.9 * scale}
-          ry={spotlightRadius * 0.18 * scale}
-          fill={groundColor}
-          style={{ filter: `blur(${10 * scale}px)` }}
-        />
-
-        {/* Secondary ground warmth */}
-        <ellipse
-          cx={figureX + sway}
-          cy={figureBaseY + (feetY + 10) * scale * breathe}
-          rx={spotlightRadius * 0.5 * scale}
-          ry={spotlightRadius * 0.08 * scale}
-          fill={hslToRgba(hue, 0.6, 0.65, spotlightPulse * 0.1)}
-          style={{ filter: `blur(${6 * scale}px)` }}
-        />
-
-        {/* ============================================================ */}
-        {/*  DUST MOTES in spotlight beam                                   */}
-        {/* ============================================================ */}
-        <g transform={`translate(${figureX + sway}, ${figureBaseY})`}>
-          {dustMotes.map((m, i) => (
-            <circle
-              key={`dust-${i}`}
-              cx={m.x * scale}
-              cy={m.y * scale}
-              r={m.r * scale}
-              fill={dustColor}
-              opacity={m.opacity}
-            />
+          <rect x={-62} y={94} width={124} height={120} fill="url(#bw-amp)" stroke="rgba(0, 0, 0, 1)" strokeWidth={1.5} />
+          <rect x={-54} y={102} width={108} height={104} fill="none" stroke="rgba(60, 50, 40, 0.45)" strokeWidth={0.8} />
+          {[-30, 30].map((dx) => (
+            <g key={`spk-${dx}`}>
+              <circle cx={dx} cy={130} r={20} fill="rgba(0, 0, 0, 0.95)" stroke="rgba(60, 50, 40, 0.55)" strokeWidth={0.8} />
+              <circle cx={dx} cy={130} r={16} fill="none" stroke="rgba(40, 32, 22, 0.55)" strokeWidth={0.6} />
+              <circle cx={dx} cy={130} r={5 + ampRumble * 0.8} fill="rgba(20, 14, 8, 0.95)" />
+              <circle cx={dx} cy={130} r={2} fill={tintCore} opacity={0.5 * ampRumble} />
+              <circle cx={dx} cy={180} r={20} fill="rgba(0, 0, 0, 0.95)" stroke="rgba(60, 50, 40, 0.55)" strokeWidth={0.8} />
+              <circle cx={dx} cy={180} r={16} fill="none" stroke="rgba(40, 32, 22, 0.55)" strokeWidth={0.6} />
+              <circle cx={dx} cy={180} r={5 + ampRumble * 0.8} fill="rgba(20, 14, 8, 0.95)" />
+              <circle cx={dx} cy={180} r={2} fill={tintCore} opacity={0.5 * ampRumble} />
+            </g>
           ))}
+          <ellipse cx={0} cy={156} rx={70} ry={18} fill={tintCore} opacity={0.10 + ampRumble * 0.10} filter="url(#bw-blur)" />
         </g>
 
-        {/* ============================================================ */}
-        {/*  STAGE FLOOR REFLECTION (inverted, faded)                      */}
-        {/* ============================================================ */}
-        <g
-          transform={`translate(${figureX + sway}, ${figureBaseY + (feetY + 20) * scale * breathe}) scale(${breathe * scale}, ${-0.25 * scale})`}
-          opacity={spotlightPulse * 0.15}
-          style={{ filter: `blur(${3 * scale}px)` }}
-        >
-          {/* Simplified reflection silhouette */}
-          <path
-            d={`M 0,${headCy} L ${-shoulderW / 2},${-torsoH / 2 + 5} L ${-shoulderW / 2},${torsoH * 0.3} L ${-stanceW / 2},${feetY} L ${stanceW / 2},${feetY} L ${shoulderW / 2},${torsoH * 0.3} L ${shoulderW / 2},${-torsoH / 2 + 5} Z`}
-            fill={reflectionColor}
-          />
+        {/* Cable from Bob to amp */}
+        <path d={`M ${bobX + 18} ${bobBaseY - 50} Q ${(bobX + ampX) / 2} ${stageY + 18} ${ampX - 40} ${stageY - 110}`}
+          stroke="rgba(0, 0, 0, 0.95)" strokeWidth={2.2} fill="none" />
+        <path d={`M ${bobX + 18} ${bobBaseY - 50} Q ${(bobX + ampX) / 2} ${stageY + 18} ${ampX - 40} ${stageY - 110}`}
+          stroke="rgba(50, 40, 30, 0.55)" strokeWidth={0.7} fill="none" />
+
+        {/* Monitor wedge in front of Bob */}
+        <g transform={`translate(${bobX} ${stageY + 22})`}>
+          <path d="M -42 0 L 42 0 L 32 24 L -32 24 Z" fill="rgba(6, 4, 10, 0.95)" stroke="rgba(40, 30, 20, 0.7)" strokeWidth={1.2} />
+          <ellipse cx={-14} cy={12} rx={9} ry={6} fill="rgba(0, 0, 0, 0.95)" stroke="rgba(60, 50, 40, 0.55)" strokeWidth={0.5} />
+          <ellipse cx={14} cy={12} rx={9} ry={6} fill="rgba(0, 0, 0, 0.95)" stroke="rgba(60, 50, 40, 0.55)" strokeWidth={0.5} />
+          <circle cx={-14} cy={12} r={2} fill={tintCore} opacity={0.4} />
+          <circle cx={14} cy={12} r={2} fill={tintCore} opacity={0.4} />
         </g>
 
-        {/* ============================================================ */}
-        {/*  FIGURE SILHOUETTE GROUP                                       */}
-        {/* ============================================================ */}
-        <g
-          transform={`translate(${figureX + sway}, ${figureBaseY}) scale(${breathe * scale})`}
-        >
-          {/* ---------------------------------------------------------- */}
-          {/*  LEGS — Bobby's iconic wide stance                          */}
-          {/* ---------------------------------------------------------- */}
-
-          {/* Left leg */}
-          <path
-            d={`M ${-hipW * 0.22},${hipY}
-                C ${-hipW * 0.25},${hipY + legH * 0.3} ${-stanceW * 0.85},${hipY + legH * 0.5} ${-stanceW * 0.9},${feetY}
-                L ${-stanceW * 0.9 + 12},${feetY}
-                L ${-stanceW * 0.75},${feetY - 3}
-                C ${-stanceW * 0.55},${hipY + legH * 0.45} ${-hipW * 0.1},${hipY + legH * 0.2} ${-2},${hipY}`}
-            fill={silhouetteColor}
-          />
-          {/* Left boot */}
-          <path
-            d={`M ${-stanceW * 0.9},${feetY}
-                L ${-stanceW * 0.9 - 6},${feetY + 4}
-                L ${-stanceW * 0.9 + 14},${feetY + 4}
-                L ${-stanceW * 0.9 + 12},${feetY} Z`}
-            fill={silhouetteDark}
-          />
-
-          {/* Right leg */}
-          <path
-            d={`M ${2},${hipY}
-                C ${hipW * 0.1},${hipY + legH * 0.2} ${stanceW * 0.55},${hipY + legH * 0.45} ${stanceW * 0.75},${feetY - 3}
-                L ${stanceW * 0.9 - 12},${feetY}
-                L ${stanceW * 0.9},${feetY}
-                C ${stanceW * 0.85},${hipY + legH * 0.5} ${hipW * 0.25},${hipY + legH * 0.3} ${hipW * 0.22},${hipY}`}
-            fill={silhouetteColor}
-          />
-          {/* Right boot */}
-          <path
-            d={`M ${stanceW * 0.9 - 12},${feetY}
-                L ${stanceW * 0.9 - 14},${feetY + 4}
-                L ${stanceW * 0.9 + 6},${feetY + 4}
-                L ${stanceW * 0.9},${feetY} Z`}
-            fill={silhouetteDark}
-          />
-
-          {/* Leg rim light — left inner edge */}
-          <path
-            d={`M ${-hipW * 0.1},${hipY + legH * 0.15}
-                C ${-stanceW * 0.4},${hipY + legH * 0.45} ${-stanceW * 0.7},${feetY - 15} ${-stanceW * 0.78},${feetY - 3}`}
-            fill="none"
-            stroke={rimColorSoft}
-            strokeWidth={1}
-          />
-          {/* Leg rim light — right inner edge */}
-          <path
-            d={`M ${hipW * 0.1},${hipY + legH * 0.15}
-                C ${stanceW * 0.4},${hipY + legH * 0.45} ${stanceW * 0.7},${feetY - 15} ${stanceW * 0.78},${feetY - 3}`}
-            fill="none"
-            stroke={rimColorSoft}
-            strokeWidth={1}
-          />
-
-          {/* ---------------------------------------------------------- */}
-          {/*  TORSO with vest suggestion                                  */}
-          {/* ---------------------------------------------------------- */}
-          <path
-            d={`M ${-shoulderW / 2},${-torsoH / 2 + 8}
-                Q ${-shoulderW / 2 - 4},${-torsoH / 2 + 2} ${-shoulderW / 2 + 6},${-torsoH / 2}
-                L ${shoulderW / 2 - 6},${-torsoH / 2}
-                Q ${shoulderW / 2 + 4},${-torsoH / 2 + 2} ${shoulderW / 2},${-torsoH / 2 + 8}
-                L ${hipW / 2},${hipY}
-                L ${-hipW / 2},${hipY} Z`}
-            fill={silhouetteColor}
-          />
-
-          {/* Vest suggestion — open front V, slightly lighter edges */}
-          <path
-            d={`M ${-6},${-torsoH / 2 + 2}
-                L ${-shoulderW * 0.12},${hipY - 5}
-                L ${-shoulderW * 0.08},${hipY - 5}
-                L ${-2},${-torsoH / 2 + 4} Z`}
-            fill={vestEdge}
-          />
-          <path
-            d={`M ${6},${-torsoH / 2 + 2}
-                L ${shoulderW * 0.12},${hipY - 5}
-                L ${shoulderW * 0.08},${hipY - 5}
-                L ${2},${-torsoH / 2 + 4} Z`}
-            fill={vestEdge}
-          />
-
-          {/* Vest side seam hints */}
-          <line
-            x1={-shoulderW * 0.35}
-            y1={-torsoH / 2 + 12}
-            x2={-hipW * 0.4}
-            y2={hipY - 2}
-            stroke={vestEdge}
-            strokeWidth={0.6}
-          />
-          <line
-            x1={shoulderW * 0.35}
-            y1={-torsoH / 2 + 12}
-            x2={hipW * 0.4}
-            y2={hipY - 2}
-            stroke={vestEdge}
-            strokeWidth={0.6}
-          />
-
-          {/* Torso rim light — left edge (spotlight backlight) */}
-          <path
-            d={`M ${-shoulderW / 2},${-torsoH / 2 + 8}
-                L ${-hipW / 2},${hipY}`}
-            fill="none"
-            stroke={rimColor}
-            strokeWidth={1.2}
-          />
-          {/* Torso rim light — right edge */}
-          <path
-            d={`M ${shoulderW / 2},${-torsoH / 2 + 8}
-                L ${hipW / 2},${hipY}`}
-            fill="none"
-            stroke={rimColor}
-            strokeWidth={1.2}
-          />
-
-          {/* ---------------------------------------------------------- */}
-          {/*  NECK (body part)                                            */}
-          {/* ---------------------------------------------------------- */}
-          <rect
-            x={-5}
-            y={-torsoH / 2 - 8}
-            width={10}
-            height={12}
-            rx={3}
-            fill={silhouetteColor}
-          />
-
-          {/* ---------------------------------------------------------- */}
-          {/*  HEAD with cowboy hat                                         */}
-          {/* ---------------------------------------------------------- */}
-          <g transform={`rotate(${headTilt}, 0, ${headCy})`}>
-            {/* Head */}
-            <ellipse
-              cx={0}
-              cy={headCy}
-              rx={headR}
-              ry={headR * 1.05}
-              fill={silhouetteColor}
-            />
-
-            {/* Hair suggestion — slightly wider around sides/back */}
-            <ellipse
-              cx={0}
-              cy={headCy + 2}
-              rx={headR * 1.08}
-              ry={headR * 0.9}
-              fill={silhouetteDark}
-            />
-
-            {/* Cowboy hat — brim */}
-            <ellipse
-              cx={0}
-              cy={headCy - headR * 0.7}
-              rx={hatBrimW}
-              ry={7}
-              fill={silhouetteDark}
-            />
-
-            {/* Cowboy hat — crown */}
-            <path
-              d={`M ${-headR * 0.85},${headCy - headR * 0.7}
-                  Q ${-headR * 0.9},${headCy - headR * 0.7 - hatCrownH * 0.8} ${-headR * 0.3},${headCy - headR * 0.7 - hatCrownH}
-                  Q ${0},${headCy - headR * 0.7 - hatCrownH - 3} ${headR * 0.3},${headCy - headR * 0.7 - hatCrownH}
-                  Q ${headR * 0.9},${headCy - headR * 0.7 - hatCrownH * 0.8} ${headR * 0.85},${headCy - headR * 0.7}
-                  Z`}
-              fill={silhouetteDark}
-            />
-
-            {/* Hat band */}
-            <line
-              x1={-headR * 0.82}
-              y1={headCy - headR * 0.7 - 2}
-              x2={headR * 0.82}
-              y2={headCy - headR * 0.7 - 2}
-              stroke={hslToRgba(hue, 0.5, 0.2, 0.4)}
-              strokeWidth={1.5}
-            />
-
-            {/* Hat rim light — top edge of crown catches spotlight */}
-            <path
-              d={`M ${-headR * 0.25},${headCy - headR * 0.7 - hatCrownH}
-                  Q ${0},${headCy - headR * 0.7 - hatCrownH - 2.5} ${headR * 0.25},${headCy - headR * 0.7 - hatCrownH}`}
-              fill="none"
-              stroke={rimColor}
-              strokeWidth={1.3}
-            />
-
-            {/* Hat brim rim light — front edge */}
-            <ellipse
-              cx={0}
-              cy={headCy - headR * 0.7}
-              rx={hatBrimW + 1}
-              ry={8}
-              fill="none"
-              stroke={rimColorSoft}
-              strokeWidth={0.8}
-              strokeDasharray="4,6"
-            />
-
-            {/* Head rim light — catches edge of spotlight */}
-            <ellipse
-              cx={0}
-              cy={headCy}
-              rx={headR + 1.5}
-              ry={headR * 1.05 + 1.5}
-              fill="none"
-              stroke={rimColor}
-              strokeWidth={1}
-              strokeDasharray="8,12"
-            />
-          </g>
-
-          {/* ---------------------------------------------------------- */}
-          {/*  LEFT ARM — on fretboard (extended outward and up)           */}
-          {/* ---------------------------------------------------------- */}
-          {/* Upper arm */}
-          <path
-            d={`M ${-shoulderW / 2},${-torsoH / 2 + 8}
-                C ${-shoulderW / 2 - 8},${-torsoH / 2 + 15} ${-shoulderW / 2 - 18},${-10} ${-shoulderW / 2 - 22},${-5}
-                L ${-shoulderW / 2 - 18},${-3}
-                C ${-shoulderW / 2 - 12},${-8} ${-shoulderW / 2 - 4},${-torsoH / 2 + 18} ${-shoulderW / 2 + 5},${-torsoH / 2 + 10}`}
-            fill={silhouetteColor}
-          />
-          {/* Forearm reaching to fretboard */}
-          <path
-            d={`M ${-shoulderW / 2 - 22},${-5}
-                C ${-shoulderW / 2 - 30},${0} ${-shoulderW / 2 - 38},${-8} ${-shoulderW / 2 - 40},${-12}
-                L ${-shoulderW / 2 - 37},${-14}
-                C ${-shoulderW / 2 - 34},${-10} ${-shoulderW / 2 - 26},${-3} ${-shoulderW / 2 - 18},${-3}`}
-            fill={silhouetteColor}
-          />
-          {/* Hand on fretboard */}
-          <ellipse
-            cx={-shoulderW / 2 - 39}
-            cy={-13}
-            rx={5}
-            ry={4}
-            fill={silhouetteColor}
-          />
-          {/* Left arm rim light */}
-          <path
-            d={`M ${-shoulderW / 2 - 2},${-torsoH / 2 + 12}
-                C ${-shoulderW / 2 - 10},${-torsoH / 2 + 18} ${-shoulderW / 2 - 20},${-8} ${-shoulderW / 2 - 22},${-4}`}
-            fill="none"
-            stroke={rimColorSoft}
-            strokeWidth={0.8}
-          />
-
-          {/* ---------------------------------------------------------- */}
-          {/*  RIGHT ARM — strumming (animated angle)                      */}
-          {/* ---------------------------------------------------------- */}
-          <g
-            transform={`rotate(${strumAngle * 0.3}, ${shoulderW / 2}, ${-torsoH / 2 + 8})`}
-          >
-            {/* Upper arm */}
-            <path
-              d={`M ${shoulderW / 2},${-torsoH / 2 + 8}
-                  C ${shoulderW / 2 + 6},${-torsoH / 2 + 15} ${shoulderW / 2 + 10},${0} ${shoulderW / 2 + 8},${8}
-                  L ${shoulderW / 2 + 4},${10}
-                  C ${shoulderW / 2 + 2},${2} ${shoulderW / 2},${-torsoH / 2 + 18} ${shoulderW / 2 - 4},${-torsoH / 2 + 10}`}
-              fill={silhouetteColor}
-            />
-            {/* Forearm — strumming motion */}
-            <g transform={`rotate(${strumAngle * 0.7}, ${shoulderW / 2 + 8}, ${8})`}>
-              <path
-                d={`M ${shoulderW / 2 + 8},${8}
-                    C ${shoulderW / 2 + 12},${14} ${shoulderW / 2 + 8},${22} ${shoulderW / 2 + 4},${26}
-                    L ${shoulderW / 2},${24}
-                    C ${shoulderW / 2 + 4},${20} ${shoulderW / 2 + 8},${12} ${shoulderW / 2 + 4},${10}`}
-                fill={silhouetteColor}
-              />
-              {/* Strumming hand near soundhole */}
-              <ellipse
-                cx={shoulderW / 2 + 3}
-                cy={26}
-                rx={4.5}
-                ry={3.5}
-                fill={silhouetteColor}
-              />
-            </g>
-            {/* Right arm rim light */}
-            <path
-              d={`M ${shoulderW / 2 + 2},${-torsoH / 2 + 12}
-                  C ${shoulderW / 2 + 8},${-torsoH / 2 + 18} ${shoulderW / 2 + 12},${2} ${shoulderW / 2 + 10},${8}`}
-              fill="none"
-              stroke={rimColorSoft}
-              strokeWidth={0.8}
-            />
-          </g>
-
-          {/* ---------------------------------------------------------- */}
-          {/*  ES-335 GUITAR — semi-hollow body                            */}
-          {/* ---------------------------------------------------------- */}
-          <g>
-            {/* Guitar body — double-cutaway semi-hollow shape */}
-            <path
-              d={`M ${guitarBodyCx - guitarBodyW * 0.15},${guitarBodyCy - guitarBodyH * 0.5}
-                  C ${guitarBodyCx - guitarBodyW * 0.4},${guitarBodyCy - guitarBodyH * 0.55} ${guitarBodyCx - guitarBodyW * 0.5},${guitarBodyCy - guitarBodyH * 0.3} ${guitarBodyCx - guitarBodyW * 0.48},${guitarBodyCy}
-                  C ${guitarBodyCx - guitarBodyW * 0.5},${guitarBodyCy + guitarBodyH * 0.3} ${guitarBodyCx - guitarBodyW * 0.4},${guitarBodyCy + guitarBodyH * 0.55} ${guitarBodyCx - guitarBodyW * 0.15},${guitarBodyCy + guitarBodyH * 0.5}
-                  C ${guitarBodyCx + guitarBodyW * 0.05},${guitarBodyCy + guitarBodyH * 0.6} ${guitarBodyCx + guitarBodyW * 0.25},${guitarBodyCy + guitarBodyH * 0.55} ${guitarBodyCx + guitarBodyW * 0.35},${guitarBodyCy + guitarBodyH * 0.4}
-                  C ${guitarBodyCx + guitarBodyW * 0.42},${guitarBodyCy + guitarBodyH * 0.25} ${guitarBodyCx + guitarBodyW * 0.42},${guitarBodyCy + guitarBodyH * 0.1} ${guitarBodyCx + guitarBodyW * 0.38},${guitarBodyCy}
-                  C ${guitarBodyCx + guitarBodyW * 0.42},${guitarBodyCy - guitarBodyH * 0.1} ${guitarBodyCx + guitarBodyW * 0.42},${guitarBodyCy - guitarBodyH * 0.25} ${guitarBodyCx + guitarBodyW * 0.35},${guitarBodyCy - guitarBodyH * 0.4}
-                  C ${guitarBodyCx + guitarBodyW * 0.25},${guitarBodyCy - guitarBodyH * 0.55} ${guitarBodyCx + guitarBodyW * 0.05},${guitarBodyCy - guitarBodyH * 0.6} ${guitarBodyCx - guitarBodyW * 0.15},${guitarBodyCy - guitarBodyH * 0.5}
-                  Z`}
-              fill={`url(#${bodyGradId})`}
-              stroke={guitarRim}
-              strokeWidth={0.6}
-            />
-
-            {/* F-hole left */}
-            <path
-              d={`M ${guitarBodyCx - 10},${guitarBodyCy - 8}
-                  C ${guitarBodyCx - 12},${guitarBodyCy - 5} ${guitarBodyCx - 12},${guitarBodyCy + 5} ${guitarBodyCx - 10},${guitarBodyCy + 8}
-                  C ${guitarBodyCx - 9},${guitarBodyCy + 5} ${guitarBodyCx - 9},${guitarBodyCy - 5} ${guitarBodyCx - 10},${guitarBodyCy - 8} Z`}
-              fill={fholeColor}
-              stroke={guitarRim}
-              strokeWidth={0.3}
-            />
-
-            {/* F-hole right */}
-            <path
-              d={`M ${guitarBodyCx + 10},${guitarBodyCy - 8}
-                  C ${guitarBodyCx + 12},${guitarBodyCy - 5} ${guitarBodyCx + 12},${guitarBodyCy + 5} ${guitarBodyCx + 10},${guitarBodyCy + 8}
-                  C ${guitarBodyCx + 9},${guitarBodyCy + 5} ${guitarBodyCx + 9},${guitarBodyCy - 5} ${guitarBodyCx + 10},${guitarBodyCy - 8} Z`}
-              fill={fholeColor}
-              stroke={guitarRim}
-              strokeWidth={0.3}
-            />
-
-            {/* Bridge */}
-            <rect
-              x={guitarBodyCx - 8}
-              y={guitarBodyCy + 6}
-              width={16}
-              height={2.5}
-              rx={0.5}
-              fill={hslToRgba(hue, 0.3, 0.15, 0.7)}
-            />
-
-            {/* Tailpiece */}
-            <rect
-              x={guitarBodyCx - 5}
-              y={guitarBodyCy + 11}
-              width={10}
-              height={3}
-              rx={1}
-              fill={hslToRgba(hue, 0.3, 0.12, 0.6)}
-            />
-
-            {/* Pickguard suggestion */}
-            <path
-              d={`M ${guitarBodyCx - 2},${guitarBodyCy - guitarBodyH * 0.35}
-                  C ${guitarBodyCx - 12},${guitarBodyCy - guitarBodyH * 0.25} ${guitarBodyCx - 14},${guitarBodyCy + guitarBodyH * 0.15} ${guitarBodyCx - 6},${guitarBodyCy + guitarBodyH * 0.3}
-                  L ${guitarBodyCx + 2},${guitarBodyCy + guitarBodyH * 0.25}
-                  C ${guitarBodyCx + 4},${guitarBodyCy} ${guitarBodyCx + 2},${guitarBodyCy - guitarBodyH * 0.2} ${guitarBodyCx - 2},${guitarBodyCy - guitarBodyH * 0.35} Z`}
-              fill={hslToRgba(hue, 0.2, 0.06, 0.3)}
-            />
-
-            {/* Neck pickup */}
-            <rect
-              x={guitarBodyCx - 7}
-              y={guitarBodyCy - 5}
-              width={14}
-              height={3.5}
-              rx={1}
-              fill={hslToRgba(hue, 0.3, 0.1, 0.6)}
-              stroke={guitarRim}
-              strokeWidth={0.3}
-            />
-
-            {/* Bridge pickup */}
-            <rect
-              x={guitarBodyCx - 7}
-              y={guitarBodyCy + 2}
-              width={14}
-              height={3.5}
-              rx={1}
-              fill={hslToRgba(hue, 0.3, 0.1, 0.6)}
-              stroke={guitarRim}
-              strokeWidth={0.3}
-            />
-
-            {/* Knobs */}
-            <circle cx={guitarBodyCx - 14} cy={guitarBodyCy + 10} r={1.8} fill={hslToRgba(hue, 0.3, 0.12, 0.5)} />
-            <circle cx={guitarBodyCx - 14} cy={guitarBodyCy + 15} r={1.8} fill={hslToRgba(hue, 0.3, 0.12, 0.5)} />
-            <circle cx={guitarBodyCx + 14} cy={guitarBodyCy + 10} r={1.8} fill={hslToRgba(hue, 0.3, 0.12, 0.5)} />
-            <circle cx={guitarBodyCx + 14} cy={guitarBodyCy + 15} r={1.8} fill={hslToRgba(hue, 0.3, 0.12, 0.5)} />
-
-            {/* Toggle switch */}
-            <line
-              x1={guitarBodyCx + guitarBodyW * 0.3}
-              y1={guitarBodyCy - guitarBodyH * 0.25}
-              x2={guitarBodyCx + guitarBodyW * 0.3}
-              y2={guitarBodyCy - guitarBodyH * 0.15}
-              stroke={hslToRgba(hue, 0.4, 0.2, 0.5)}
-              strokeWidth={0.8}
-            />
-            <circle
-              cx={guitarBodyCx + guitarBodyW * 0.3}
-              cy={guitarBodyCy - guitarBodyH * 0.28}
-              r={1}
-              fill={hslToRgba(hue, 0.4, 0.25, 0.5)}
-            />
-
-            {/* Guitar body rim light — catches spotlight edge */}
-            <path
-              d={`M ${guitarBodyCx - guitarBodyW * 0.15},${guitarBodyCy - guitarBodyH * 0.5}
-                  C ${guitarBodyCx - guitarBodyW * 0.4},${guitarBodyCy - guitarBodyH * 0.55} ${guitarBodyCx - guitarBodyW * 0.5},${guitarBodyCy - guitarBodyH * 0.3} ${guitarBodyCx - guitarBodyW * 0.48},${guitarBodyCy}`}
-              fill="none"
-              stroke={rimColor}
-              strokeWidth={0.8}
-            />
-
-            {/* ---------------------------------------------------------- */}
-            {/*  GUITAR NECK — angled up-left toward fret hand              */}
-            {/* ---------------------------------------------------------- */}
-            <g transform={`rotate(-28, ${guitarBodyCx + guitarBodyW * 0.38}, ${guitarBodyCy})`}>
-              {/* Neck body */}
-              <rect
-                x={guitarBodyCx + guitarBodyW * 0.38}
-                y={guitarBodyCy - 5}
-                width={52}
-                height={10}
-                rx={1.5}
-                fill={guitarColor}
-                stroke={guitarRim}
-                strokeWidth={0.4}
-              />
-
-              {/* Fretboard */}
-              <rect
-                x={guitarBodyCx + guitarBodyW * 0.4}
-                y={guitarBodyCy - 3.5}
-                width={48}
-                height={7}
-                rx={1}
-                fill={hslToRgba(hue, 0.25, 0.05, 0.7)}
-              />
-
-              {/* Fret markers */}
-              {[8, 16, 24, 32].map((fx, i) => (
-                <line
-                  key={`fret-${i}`}
-                  x1={guitarBodyCx + guitarBodyW * 0.4 + fx}
-                  y1={guitarBodyCy - 3}
-                  x2={guitarBodyCx + guitarBodyW * 0.4 + fx}
-                  y2={guitarBodyCy + 3}
-                  stroke={hslToRgba(hue, 0.3, 0.3, 0.25)}
-                  strokeWidth={0.5}
-                />
-              ))}
-
-              {/* Dot markers */}
-              {[12, 20, 28].map((fx, i) => (
-                <circle
-                  key={`dot-${i}`}
-                  cx={guitarBodyCx + guitarBodyW * 0.4 + fx}
-                  cy={guitarBodyCy}
-                  r={0.8}
-                  fill={hslToRgba(hue, 0.4, 0.4, 0.3)}
-                />
-              ))}
-
-              {/* 12th fret double dot */}
-              <circle cx={guitarBodyCx + guitarBodyW * 0.4 + 36} cy={guitarBodyCy - 1.5} r={0.7} fill={hslToRgba(hue, 0.4, 0.4, 0.3)} />
-              <circle cx={guitarBodyCx + guitarBodyW * 0.4 + 36} cy={guitarBodyCy + 1.5} r={0.7} fill={hslToRgba(hue, 0.4, 0.4, 0.3)} />
-
-              {/* Headstock */}
-              <path
-                d={`M ${guitarBodyCx + guitarBodyW * 0.4 + 48},${guitarBodyCy - 5}
-                    L ${guitarBodyCx + guitarBodyW * 0.4 + 58},${guitarBodyCy - 7}
-                    C ${guitarBodyCx + guitarBodyW * 0.4 + 62},${guitarBodyCy - 7} ${guitarBodyCx + guitarBodyW * 0.4 + 62},${guitarBodyCy + 7} ${guitarBodyCx + guitarBodyW * 0.4 + 58},${guitarBodyCy + 7}
-                    L ${guitarBodyCx + guitarBodyW * 0.4 + 48},${guitarBodyCy + 5} Z`}
-                fill={guitarColor}
-                stroke={guitarRim}
-                strokeWidth={0.4}
-              />
-
-              {/* Tuning pegs — 3 per side */}
-              {[0, 1, 2].map((i) => (
-                <React.Fragment key={`tpeg-t-${i}`}>
-                  <rect
-                    x={guitarBodyCx + guitarBodyW * 0.4 + 50 + i * 3}
-                    y={guitarBodyCy - 8 - 2}
-                    width={2}
-                    height={2.5}
-                    rx={0.5}
-                    fill={hslToRgba(hue, 0.3, 0.2, 0.4)}
-                  />
-                </React.Fragment>
-              ))}
-              {[0, 1, 2].map((i) => (
-                <React.Fragment key={`tpeg-b-${i}`}>
-                  <rect
-                    x={guitarBodyCx + guitarBodyW * 0.4 + 50 + i * 3}
-                    y={guitarBodyCy + 7.5}
-                    width={2}
-                    height={2.5}
-                    rx={0.5}
-                    fill={hslToRgba(hue, 0.3, 0.2, 0.4)}
-                  />
-                </React.Fragment>
-              ))}
-            </g>
-
-            {/* ---------------------------------------------------------- */}
-            {/*  VIBRATING STRINGS across guitar body                       */}
-            {/* ---------------------------------------------------------- */}
-            {stringPaths.map((path, si) => {
-              const thickness = 0.4 + si * 0.1;
-              const stringGlow = 1 + energy * 3;
-              const stringOp = 0.35 + energy * 0.35;
-              return (
-                <polyline
-                  key={`str-${si}`}
-                  points={path}
-                  stroke={stringColor}
-                  strokeWidth={thickness}
-                  fill="none"
-                  opacity={stringOp}
-                  style={{
-                    filter: `drop-shadow(0 0 ${stringGlow}px ${stringColor})`,
-                  }}
-                />
-              );
-            })}
-          </g>
-
-          {/* ---------------------------------------------------------- */}
-          {/*  SHOULDER RIM LIGHT — top-down spotlight edge                 */}
-          {/* ---------------------------------------------------------- */}
-          <path
-            d={`M ${-shoulderW / 2 + 6},${-torsoH / 2}
-                Q ${-shoulderW / 2 - 2},${-torsoH / 2 + 2} ${-shoulderW / 2},${-torsoH / 2 + 8}`}
-            fill="none"
-            stroke={rimColor}
-            strokeWidth={1.4}
-            style={{ filter: `blur(1px)` }}
-          />
-          <line
-            x1={-shoulderW / 2 + 6}
-            y1={-torsoH / 2}
-            x2={shoulderW / 2 - 6}
-            y2={-torsoH / 2}
-            stroke={rimColor}
-            strokeWidth={1.2}
-            style={{ filter: `blur(1px)` }}
-          />
-          <path
-            d={`M ${shoulderW / 2 - 6},${-torsoH / 2}
-                Q ${shoulderW / 2 + 2},${-torsoH / 2 + 2} ${shoulderW / 2},${-torsoH / 2 + 8}`}
-            fill="none"
-            stroke={rimColor}
-            strokeWidth={1.4}
-            style={{ filter: `blur(1px)` }}
-          />
-
-          {/* ---------------------------------------------------------- */}
-          {/*  AMBIENT GLOW on figure — warm spotlight wash                 */}
-          {/* ---------------------------------------------------------- */}
-          <ellipse
-            cx={0}
-            cy={-10}
-            rx={shoulderW * 0.8}
-            ry={torsoH * 0.6}
-            fill={ambientColorDim}
-            style={{ filter: `blur(${25}px)`, mixBlendMode: "screen" }}
-          />
-
-          {/* Beat-reactive highlight burst */}
-          {beatDecay > 0.3 && (
-            <ellipse
-              cx={0}
-              cy={-torsoH * 0.2}
-              rx={shoulderW * 0.5 * beatDecay}
-              ry={torsoH * 0.3 * beatDecay}
-              fill={hslToRgba(hue, 0.6, 0.75, beatDecay * 0.1)}
-              style={{ filter: `blur(${15}px)`, mixBlendMode: "screen" }}
-            />
-          )}
-
-          {/* Drum hit flash on figure */}
-          {drumBeat > 0.5 && (
-            <ellipse
-              cx={0}
-              cy={0}
-              rx={shoulderW * 0.3}
-              ry={torsoH * 0.2}
-              fill={hslToRgba(hue + 15, 0.7, 0.8, drumBeat * 0.08)}
-              style={{ filter: `blur(${12}px)`, mixBlendMode: "screen" }}
-            />
-          )}
+        {/* Mic stand to Bob's left */}
+        <g transform={`translate(${bobX - 60} ${bobBaseY - 100})`}>
+          <ellipse cx={0} cy={108} rx={18} ry={3} fill="rgba(2, 2, 6, 0.95)" />
+          <line x1={0} y1={106} x2={0} y2={4} stroke="rgba(20, 18, 14, 0.95)" strokeWidth={2.2} />
+          <line x1={0} y1={4} x2={20} y2={-4} stroke="rgba(20, 18, 14, 0.95)" strokeWidth={2.2} />
+          <ellipse cx={24} cy={-6} rx={5} ry={9} fill="rgba(8, 6, 12, 0.98)" stroke="rgba(40, 32, 22, 0.7)" strokeWidth={0.8} />
+          <ellipse cx={24} cy={-10} rx={5} ry={4} fill="rgba(60, 50, 40, 0.55)" />
+          <path d="M 0 108 Q -10 116 -22 120" stroke="rgba(0, 0, 0, 0.95)" strokeWidth={1.6} fill="none" />
         </g>
 
-        {/* ============================================================ */}
-        {/*  SECONDARY ATMOSPHERIC EFFECTS                                 */}
-        {/* ============================================================ */}
+        {/* Bob's silhouette */}
+        <g>
+          {/* Legs */}
+          <path d={`M ${bobX - 14} ${bobBaseY - 60} L ${bobX - 18} ${bobBaseY} L ${bobX - 8} ${bobBaseY} L ${bobX - 4} ${bobBaseY - 60} Z`}
+            fill="url(#bw-jeans)" />
+          <path d={`M ${bobX + 4} ${bobBaseY - 60} L ${bobX + 8} ${bobBaseY} L ${bobX + 18} ${bobBaseY} L ${bobX + 14} ${bobBaseY - 60} Z`}
+            fill="url(#bw-jeans)" />
+          <rect x={bobX - 22} y={bobBaseY - 64} width={44} height={5} fill="rgba(40, 26, 12, 0.95)" />
+          <rect x={bobX - 3} y={bobBaseY - 64} width={6} height={5} fill={tintCore} opacity={0.6} />
 
-        {/* Haze at feet level */}
-        <ellipse
-          cx={figureX + sway}
-          cy={figureBaseY + (feetY + 5) * scale * breathe}
-          rx={stanceW * 1.5 * scale}
-          ry={8 * scale}
-          fill={hslToRgba(hue, 0.3, 0.5, 0.06 + energy * 0.04)}
-          style={{ filter: `blur(${8 * scale}px)` }}
-        />
+          {/* Torso (vest) */}
+          <path d={`M ${bobX - 28} ${torsoTopY + 12} Q ${bobX - 32} ${bobBaseY - 80} ${bobX - 22} ${bobBaseY - 60} L ${bobX + 22} ${bobBaseY - 60} Q ${bobX + 32} ${bobBaseY - 80} ${bobX + 28} ${torsoTopY + 12} Q ${bobX} ${torsoTopY + 4} ${bobX - 28} ${torsoTopY + 12} Z`}
+            fill="url(#bw-vest)" stroke="rgba(0, 0, 0, 1)" strokeWidth={1} />
+          <line x1={bobX} y1={torsoTopY + 8} x2={bobX} y2={bobBaseY - 64} stroke="rgba(0, 0, 0, 1)" strokeWidth={1.2} />
+          <path d={`M ${bobX - 14} ${torsoTopY + 14} Q ${bobX} ${torsoTopY + 8} ${bobX + 14} ${torsoTopY + 14} L ${bobX + 12} ${bobBaseY - 64} L ${bobX - 12} ${bobBaseY - 64} Z`}
+            fill="rgba(80, 60, 30, 0.55)" />
 
-        {/* Warm ambient bloom behind upper body (highs-reactive) */}
-        <ellipse
-          cx={figureX + sway}
-          cy={figureBaseY + headCy * scale * breathe}
-          rx={40 * scale}
-          ry={30 * scale}
-          fill={hslToRgba(hue + 10, 0.5, 0.7, highs * 0.08)}
-          style={{ filter: `blur(${15 * scale}px)`, mixBlendMode: "screen" }}
-        />
+          {/* Arms */}
+          <path d={`M ${bobX - 26} ${torsoTopY + 18} Q ${bobX - 50} ${bobBaseY - 80} ${bobX - 38} ${bobBaseY - 50}`}
+            stroke="rgba(80, 60, 30, 0.65)" strokeWidth={9} fill="none" strokeLinecap="round" />
+          <path d={`M ${bobX + 26} ${torsoTopY + 18} Q ${bobX + 36 + strumOffset} ${bobBaseY - 80} ${bobX + 28 + strumOffset} ${bobBaseY - 56}`}
+            stroke="rgba(80, 60, 30, 0.65)" strokeWidth={9} fill="none" strokeLinecap="round" />
+
+          {/* Head */}
+          <ellipse cx={bobX} cy={headCY} rx={headR * 0.85} ry={headR} fill="rgba(60, 38, 18, 0.92)" />
+          <path d={`M ${bobX - headR + 2} ${headCY} Q ${bobX - headR - 4} ${headCY + 14} ${bobX - headR - 2} ${headCY + 22} Q ${bobX} ${headCY + 18} ${bobX + headR + 2} ${headCY + 22} Q ${bobX + headR + 4} ${headCY + 14} ${bobX + headR - 2} ${headCY}`}
+            fill="rgba(20, 12, 4, 0.95)" />
+          <path d={`M ${bobX - 10} ${headCY + 6} Q ${bobX} ${headCY + 16} ${bobX + 10} ${headCY + 6}`}
+            fill="rgba(20, 12, 4, 0.85)" />
+
+          {/* Cowboy hat */}
+          <ellipse cx={bobX} cy={headCY - headR + 4} rx={headR + 14} ry={5} fill="url(#bw-hatBrim)" />
+          <path d={`M ${bobX - headR - 2} ${headCY - headR + 2} Q ${bobX - headR - 4} ${headCY - headR - 12} ${bobX} ${headCY - headR - 14} Q ${bobX + headR + 4} ${headCY - headR - 12} ${bobX + headR + 2} ${headCY - headR + 2} Z`}
+            fill="rgba(18, 10, 4, 0.98)" />
+          <ellipse cx={bobX} cy={headCY - headR - 4} rx={headR - 2} ry={3} fill="rgba(40, 26, 12, 0.7)" />
+          <rect x={bobX - headR - 1} y={headCY - headR + 1} width={(headR + 1) * 2} height={2.5} fill="rgba(80, 60, 30, 0.85)" />
+        </g>
+
+        {/* ES-335 guitar */}
+        <g transform={`rotate(${guitarRotate}, ${guitarBodyCX}, ${guitarBodyCY})`}>
+          <ellipse cx={guitarBodyCX} cy={guitarBodyCY} rx={48} ry={36} fill="url(#bw-guitarBody)" stroke="rgba(0, 0, 0, 1)" strokeWidth={1.4} />
+          <ellipse cx={guitarBodyCX} cy={guitarBodyCY} rx={45} ry={33} fill="none" stroke="rgba(220, 180, 100, 0.45)" strokeWidth={0.8} />
+          {/* F-holes */}
+          <path d={`M ${guitarBodyCX - 22} ${guitarBodyCY - 14} Q ${guitarBodyCX - 26} ${guitarBodyCY - 6} ${guitarBodyCX - 22} ${guitarBodyCY + 4} Q ${guitarBodyCX - 18} ${guitarBodyCY + 12} ${guitarBodyCX - 22} ${guitarBodyCY + 18}`}
+            stroke="rgba(0, 0, 0, 1)" strokeWidth={2.5} fill="none" strokeLinecap="round" />
+          <path d={`M ${guitarBodyCX + 22} ${guitarBodyCY - 14} Q ${guitarBodyCX + 26} ${guitarBodyCY - 6} ${guitarBodyCX + 22} ${guitarBodyCY + 4} Q ${guitarBodyCX + 18} ${guitarBodyCY + 12} ${guitarBodyCX + 22} ${guitarBodyCY + 18}`}
+            stroke="rgba(0, 0, 0, 1)" strokeWidth={2.5} fill="none" strokeLinecap="round" />
+          {/* Pickguard */}
+          <path d={`M ${guitarBodyCX - 4} ${guitarBodyCY - 8} L ${guitarBodyCX + 14} ${guitarBodyCY - 4} L ${guitarBodyCX + 16} ${guitarBodyCY + 14} L ${guitarBodyCX - 6} ${guitarBodyCY + 12} Z`}
+            fill="rgba(0, 0, 0, 0.85)" stroke="rgba(180, 140, 60, 0.45)" strokeWidth={0.5} />
+          {/* Pickups (2 humbuckers) */}
+          <rect x={guitarBodyCX - 4} y={guitarBodyCY - 6} width={18} height={6} rx={1} fill="rgba(60, 50, 40, 0.95)" />
+          <rect x={guitarBodyCX - 4} y={guitarBodyCY + 4} width={18} height={6} rx={1} fill="rgba(60, 50, 40, 0.95)" />
+          {Array.from({ length: 6 }).map((_, i) => (
+            <circle key={`pole-n-${i}`} cx={guitarBodyCX - 2 + i * 3} cy={guitarBodyCY - 3} r={0.7} fill="rgba(180, 160, 120, 0.8)" />
+          ))}
+          {Array.from({ length: 6 }).map((_, i) => (
+            <circle key={`pole-b-${i}`} cx={guitarBodyCX - 2 + i * 3} cy={guitarBodyCY + 7} r={0.7} fill="rgba(180, 160, 120, 0.8)" />
+          ))}
+          {/* Tailpiece */}
+          <rect x={guitarBodyCX + 18} y={guitarBodyCY - 6} width={4} height={20} fill="rgba(180, 160, 120, 0.85)" />
+          <rect x={guitarBodyCX + 14} y={guitarBodyCY - 7} width={3} height={22} fill="rgba(140, 120, 80, 0.85)" />
+          {/* Knobs */}
+          <circle cx={guitarBodyCX + 8} cy={guitarBodyCY + 22} r={2.2} fill="rgba(200, 170, 100, 0.85)" />
+          <circle cx={guitarBodyCX + 16} cy={guitarBodyCY + 22} r={2.2} fill="rgba(200, 170, 100, 0.85)" />
+          <circle cx={guitarBodyCX + 8} cy={guitarBodyCY + 28} r={2.2} fill="rgba(200, 170, 100, 0.85)" />
+          <circle cx={guitarBodyCX + 16} cy={guitarBodyCY + 28} r={2.2} fill="rgba(200, 170, 100, 0.85)" />
+          <circle cx={guitarBodyCX - 2} cy={guitarBodyCY - 18} r={1.5} fill="rgba(220, 200, 140, 0.85)" />
+
+          {/* Neck */}
+          <rect x={guitarBodyCX - 110} y={guitarBodyCY - 4} width={68} height={8} fill="rgba(60, 36, 14, 0.98)" stroke="rgba(0, 0, 0, 1)" strokeWidth={0.8} />
+          {Array.from({ length: 14 }).map((_, i) => (
+            <line key={`fret-${i}`} x1={guitarBodyCX - 108 + i * 5} y1={guitarBodyCY - 4} x2={guitarBodyCX - 108 + i * 5} y2={guitarBodyCY + 4}
+              stroke="rgba(220, 200, 140, 0.65)" strokeWidth={0.5} />
+          ))}
+          <circle cx={guitarBodyCX - 86} cy={guitarBodyCY} r={0.9} fill="rgba(220, 200, 140, 0.85)" />
+          <circle cx={guitarBodyCX - 76} cy={guitarBodyCY} r={0.9} fill="rgba(220, 200, 140, 0.85)" />
+          <circle cx={guitarBodyCX - 66} cy={guitarBodyCY} r={0.9} fill="rgba(220, 200, 140, 0.85)" />
+          <circle cx={guitarBodyCX - 56} cy={guitarBodyCY} r={0.9} fill="rgba(220, 200, 140, 0.85)" />
+
+          {/* Strings (vibrating) */}
+          {Array.from({ length: 6 }).map((_, i) => {
+            const y = guitarBodyCY - 3 + i * 1.2;
+            return (
+              <line key={`s-${i}`} x1={guitarBodyCX - 110} y1={y + stringVib(i)} x2={guitarBodyCX + 18} y2={y}
+                stroke="rgba(220, 200, 140, 0.7)" strokeWidth={0.4 + i * 0.05} />
+            );
+          })}
+
+          {/* Headstock */}
+          <path d={`M ${guitarBodyCX - 116} ${guitarBodyCY - 8} L ${guitarBodyCX - 138} ${guitarBodyCY - 14} L ${guitarBodyCX - 142} ${guitarBodyCY + 6} L ${guitarBodyCX - 116} ${guitarBodyCY + 8} Z`}
+            fill="rgba(40, 24, 8, 0.98)" stroke="rgba(0, 0, 0, 1)" strokeWidth={0.8} />
+          {Array.from({ length: 6 }).map((_, i) => {
+            const tx = guitarBodyCX - 120 - (i % 3) * 6;
+            const ty = guitarBodyCY - 12 + Math.floor(i / 3) * 16;
+            return <circle key={`tuner-${i}`} cx={tx} cy={ty} r={1.6} fill="rgba(180, 160, 120, 0.85)" />;
+          })}
+        </g>
+
+        {/* Spotlight halo on Bob */}
+        <circle cx={bobX} cy={bobBaseY - 80} r={150 * (0.85 + spotWarmth * 0.3) * strumPulse}
+          fill="url(#bw-halo)" style={{ mixBlendMode: "screen" }} />
+
+        {/* Onset flash on guitar body */}
+        {flashHit > 0 && (
+          <ellipse cx={guitarBodyCX} cy={guitarBodyCY} rx={60} ry={42}
+            fill={tintCore} opacity={flashHit * 0.45} style={{ mixBlendMode: "screen" }} />
+        )}
+
+        {/* Audience silhouettes */}
+        <g>{audienceNodes}</g>
+        <g>{handNodes}</g>
+
+        {/* Dust motes */}
+        <g style={{ mixBlendMode: "screen" }}>{dustNodes}</g>
+
+        {/* Vignette */}
+        <rect width={width} height={height} fill="url(#bw-vig)" />
       </svg>
     </div>
   );

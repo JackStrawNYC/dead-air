@@ -252,8 +252,8 @@ void main() {
   float time = uDynamicTime * timeScale;
 
   // Palette
-  float hue1 = hsvToCosineHue(uPalettePrimary);
-  float hue2 = hsvToCosineHue(uPaletteSecondary);
+  float hue1 = uPalettePrimary;
+  float hue2 = uPaletteSecondary;
 
   // Fog color: cold blue-gray at rest -> warm amber at energy
   vec3 coldFog = vec3(0.35, 0.40, 0.55);
@@ -262,8 +262,8 @@ void main() {
   // Tension desaturates
   fogColor = mix(fogColor, vec3(dot(fogColor, vec3(0.299, 0.587, 0.114))), tension * 0.4);
   // Blend with palette
-  vec3 palCol1 = 0.5 + 0.5 * cos(6.28318 * vec3(hue1, hue1 + 0.33, hue1 + 0.67));
-  vec3 palCol2 = 0.5 + 0.5 * cos(6.28318 * vec3(hue2, hue2 + 0.33, hue2 + 0.67));
+  vec3 palCol1 = paletteHueColor(hue1, 0.7, 0.85);
+  vec3 palCol2 = paletteHueColor(hue2, 0.7, 0.85);
   fogColor = mix(fogColor, fogColor * palCol1, 0.2);
 
   // Sky behind the fog: dark blue at rest, golden at climax

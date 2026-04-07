@@ -576,10 +576,8 @@ void main() {
 
   // ─── SDF hero icon ───
   {
-    float hue1 = hsvToCosineHue(uPalettePrimary) + chromaHueMod + chordHue;
-    float hue2 = hsvToCosineHue(uPaletteSecondary);
-    vec3 iconC1 = hsv2rgb(vec3(hue1, uPaletteSaturation, 1.0));
-    vec3 iconC2 = hsv2rgb(vec3(hue2, uPaletteSaturation, 1.0));
+    vec3 iconC1 = paletteHueColor(uPalettePrimary + chromaHueMod + chordHue, uPaletteSaturation, 1.0);
+    vec3 iconC2 = paletteHueColor(uPaletteSecondary, uPaletteSaturation, 1.0);
     float noiseField = fbm3(vec3(centeredP * 2.0, timeVal * 0.1));
     col += heroIconEmergence(centeredP, uTime, energy, bass, iconC1, iconC2, noiseField, uSectionIndex);
   }

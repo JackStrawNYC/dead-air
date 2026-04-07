@@ -213,15 +213,15 @@ void main() {
   float effectiveBeat = beat * smoothstep(0.3, 0.7, uBeatConfidence);
 
   // ─── Palette ───
-  float hue1 = hsvToCosineHue(uPalettePrimary);
-  float hue2 = hsvToCosineHue(uPaletteSecondary);
+  float hue1 = uPalettePrimary;
+  float hue2 = uPaletteSecondary;
   float chromaHueMod = uChromaHue * 0.15;
   float chordHue = float(int(uChordIndex)) / 24.0 * 0.1;
   hue1 += chromaHueMod + chordHue;
   hue2 += chromaHueMod * 0.5;
 
-  vec3 palCol1 = 0.5 + 0.5 * cos(TAU * vec3(hue1, hue1 + 0.33, hue1 + 0.67));
-  vec3 palCol2 = 0.5 + 0.5 * cos(TAU * vec3(hue2, hue2 + 0.33, hue2 + 0.67));
+  vec3 palCol1 = paletteHueColor(hue1, 0.85, 0.95);
+  vec3 palCol2 = paletteHueColor(hue2, 0.85, 0.95);
 
   // ─── Section-type modulation ───
   float sectionT = uSectionType;

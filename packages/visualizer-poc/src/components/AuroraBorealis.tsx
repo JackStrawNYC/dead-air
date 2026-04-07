@@ -1,58 +1,68 @@
 /**
- * AuroraBorealis — Shimmering northern lights across the top third of the screen.
- * Multiple overlapping SVG paths with wavy tops, filled with gradient colors
- * (green, purple, pink). The wave undulates via sine functions at different
- * frequencies. Opacity breathes with energy. Color shifts with chroma hue data
- * (smoothed over 20 frames).
+ * AuroraBorealis — A+++ overlay.
+ * Northern lights — flowing curtains of green/purple/cyan across the upper
+ * 60% of the frame. Multiple wave layers with different speeds. Mountain
+ * silhouette + foreground tree silhouettes at the bottom. Stars peeking
+ * through aurora. Snowy ground hint.
+ *
+ * Audio reactivity:
+ *   slowEnergy → aurora bloom
+ *   energy     → curtain brightness
+ *   bass       → ripple amplitude
+ *   beatDecay  → flow speed
+ *   onsetEnvelope → flare
+ *   chromaHue  → color shift across spectrum
+ *   tempoFactor → curtain animation rate
  */
 
 import React from "react";
-import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
+import { useCurrentFrame, useVideoConfig, interpolate } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
 import { seeded } from "../utils/seededRandom";
 import { useAudioSnapshot } from "./parametric/audio-helpers";
+import { useTempoFactor } from "../data/TempoContext";
 
-interface AuroraBand {
-  /** Y offset from top as fraction (0 = very top) */
-  yOffset: number;
-  /** Wave frequency multiplier */
-  waveFreq: number;
-  /** Wave amplitude (px) */
-  waveAmp: number;
-  /** Secondary wave frequency (for complex waveform) */
-  waveFreq2: number;
-  /** Secondary wave amplitude */
-  waveAmp2: number;
-  /** Phase offset */
+const CYCLE_TOTAL = 2400;
+const VISIBLE_DURATION = 780;
+const STAR_COUNT = 110;
+const TREE_COUNT = 20;
+const CURTAIN_COUNT = 6;
+const CURTAIN_SEGMENTS = 36;
+
+interface BgStar {
+  x: number;
+  y: number;
+  r: number;
+  twinkleSpeed: number;
   phase: number;
-  /** Band height (px) */
-  bandHeight: number;
-  /** Base hue offset from chroma-derived hue */
-  hueOffset: number;
-  /** Opacity multiplier */
-  alphaScale: number;
+}
+interface Tree {
+  x: number;
+  height: number;
+  width: number;
+  type: number;
 }
 
-const NUM_BANDS = 5;
-const WAVE_SEGMENTS = 40; // number of line segments per band
-
-function generateBands(seed: number): AuroraBand[] {
-  const rng = seeded(seed);
-  return Array.from({ length: NUM_BANDS }, (_, i) => ({
-    yOffset: 0.02 + (i / NUM_BANDS) * 0.22 + rng() * 0.04,
-    waveFreq: 0.008 + rng() * 0.012,
-    waveAmp: 15 + rng() * 35,
-    waveFreq2: 0.015 + rng() * 0.025,
-    waveAmp2: 8 + rng() * 18,
+function buildStars(): BgStar[] {
+  const rng = seeded(64_887_119);
+  return Array.from({ length: STAR_COUNT }, () => ({
+    x: rng(),
+    y: rng() * 0.55,
+    r: 0.5 + rng() * 1.4,
+    twinkleSpeed: 0.02 + rng() * 0.05,
     phase: rng() * Math.PI * 2,
-    bandHeight: 60 + rng() * 80,
-    hueOffset: i * 55, // spread bands across hue range
-    alphaScale: 0.5 + rng() * 0.5,
   }));
 }
 
-// Stagger: appears at frame 300 (10s in)
-const STAGGER_START = 300;
+function buildTrees(): Tree[] {
+  const rng = seeded(11_553_217);
+  return Array.from({ length: TREE_COUNT }, () => ({
+    x: rng(),
+    height: 60 + rng() * 90,
+    width: 18 + rng() * 16,
+    type: Math.floor(rng() * 2),
+  }));
+}
 
 interface Props {
   frames: EnhancedFrameData[];
@@ -61,115 +71,208 @@ interface Props {
 export const AuroraBorealis: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
-
+  const tempoFactor = useTempoFactor();
   const snap = useAudioSnapshot(frames);
-  const energy = snap.energy;
-  const chromaHue = snap.chromaHue; // already 0-360
 
-  const bands = React.useMemo(() => generateBands(19720401), []);
+  const bgStars = React.useMemo(buildStars, []);
+  const trees = React.useMemo(buildTrees, []);
 
-  // Master fade in
-  const masterFade = interpolate(frame, [STAGGER_START, STAGGER_START + 150], [0, 1], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-    easing: Easing.out(Easing.cubic),
-  });
-
-  // Breathing opacity driven by energy
-  const breathe = interpolate(energy, [0.03, 0.25], [0.12, 0.4], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
-
-  const masterOpacity = breathe * masterFade;
+  const cycleFrame = frame % CYCLE_TOTAL;
+  if (cycleFrame >= VISIBLE_DURATION) return null;
+  const progress = cycleFrame / VISIBLE_DURATION;
+  const fadeIn = interpolate(progress, [0, 0.09], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const fadeOut = interpolate(progress, [0.91, 1], [1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const masterOpacity = Math.min(fadeIn, fadeOut) * 0.95;
   if (masterOpacity < 0.01) return null;
 
-  // Shimmer: subtle rapid oscillation on top of energy
-  const shimmer = 1 + Math.sin(frame * 0.3) * 0.05 + Math.sin(frame * 0.17) * 0.03;
+  // Audio
+  const auroraBloom = interpolate(snap.slowEnergy, [0.02, 0.32], [0.55, 1.15], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const curtainBright = interpolate(snap.energy, [0.02, 0.32], [0.45, 1.0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const rippleAmp = 1 + snap.bass * 0.6;
+  const flowMul = 1 + snap.beatDecay * 0.4;
+  const flareBurst = snap.onsetEnvelope > 0.5 ? Math.min(1, (snap.onsetEnvelope - 0.4) * 1.6) : 0;
+
+  // Palette
+  const baseHue = 140; // green
+  const tintHue = ((baseHue + (snap.chromaHue - 180) * 0.35) % 360 + 360) % 360;
+  const skyTop = `hsl(${(tintHue + 200) % 360}, 50%, 5%)`;
+  const skyMid = `hsl(${(tintHue + 220) % 360}, 50%, 10%)`;
+  const skyBot = `hsl(${(tintHue + 200) % 360}, 40%, 14%)`;
+
+  // Stars
+  const starNodes = bgStars.map((s, i) => {
+    const t = frame * s.twinkleSpeed + s.phase;
+    const tw = 0.55 + Math.sin(t) * 0.4;
+    return (
+      <circle key={`bs-${i}`} cx={s.x * width} cy={s.y * height}
+        r={s.r * (0.85 + tw * 0.3)}
+        fill={`hsl(${tintHue}, 30%, 92%)`} opacity={0.85 * tw} />
+    );
+  });
+
+  // Aurora curtains
+  function buildCurtain(idx: number): React.ReactNode {
+    const baseY = height * (0.10 + idx * 0.10);
+    const ampBase = 60 + idx * 20;
+    const speedMul = 0.020 + idx * 0.006;
+    const phaseOffset = idx * 1.7;
+    const cHue = (tintHue + idx * 35) % 360;
+    const sat = 80;
+
+    // Build top edge wave
+    const topPoints: string[] = [];
+    const botPoints: string[] = [];
+    for (let s = 0; s <= CURTAIN_SEGMENTS; s++) {
+      const x = (s / CURTAIN_SEGMENTS) * width;
+      const phase = frame * speedMul * tempoFactor * flowMul + s * 0.4 + phaseOffset;
+      const wave = Math.sin(phase) * ampBase * rippleAmp + Math.sin(phase * 2.3) * ampBase * 0.4;
+      const ty = baseY + wave;
+      const by = ty + (140 + idx * 40) + Math.sin(phase * 1.5) * 30;
+      topPoints.push(`${s === 0 ? "M" : "L"} ${x} ${ty}`);
+      botPoints.push(`L ${x} ${by}`);
+    }
+    // Reverse the bottom for the closing path
+    const botReversed: string[] = [];
+    for (let s = CURTAIN_SEGMENTS; s >= 0; s--) {
+      const x = (s / CURTAIN_SEGMENTS) * width;
+      const phase = frame * speedMul * tempoFactor * flowMul + s * 0.4 + phaseOffset;
+      const wave = Math.sin(phase) * ampBase * rippleAmp + Math.sin(phase * 2.3) * ampBase * 0.4;
+      const ty = baseY + wave;
+      const by = ty + (140 + idx * 40) + Math.sin(phase * 1.5) * 30;
+      botReversed.push(`L ${x} ${by}`);
+    }
+    const curtainPath = topPoints.join(" ") + " " + botReversed.join(" ") + " Z";
+    const gradId = `aurora-curtain-${idx}`;
+
+    return (
+      <g key={`curtain-${idx}`}>
+        <defs>
+          <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={`hsl(${cHue}, ${sat}%, 70%)`} stopOpacity={0.0} />
+            <stop offset="20%" stopColor={`hsl(${cHue}, ${sat}%, 65%)`} stopOpacity={0.55 * curtainBright} />
+            <stop offset="60%" stopColor={`hsl(${cHue}, ${sat}%, 55%)`} stopOpacity={0.35 * curtainBright} />
+            <stop offset="100%" stopColor={`hsl(${cHue}, ${sat}%, 45%)`} stopOpacity={0.0} />
+          </linearGradient>
+        </defs>
+        <path d={curtainPath} fill={`url(#${gradId})`} style={{ mixBlendMode: "screen" }} />
+      </g>
+    );
+  }
+
+  const curtains: React.ReactNode[] = [];
+  for (let i = 0; i < CURTAIN_COUNT; i++) curtains.push(buildCurtain(i));
+
+  // Mountain silhouette
+  const mountainPath = `M 0 ${height}
+    L 0 ${height * 0.78}
+    L ${width * 0.10} ${height * 0.74}
+    L ${width * 0.18} ${height * 0.78}
+    L ${width * 0.27} ${height * 0.68}
+    L ${width * 0.36} ${height * 0.74}
+    L ${width * 0.46} ${height * 0.62}
+    L ${width * 0.55} ${height * 0.70}
+    L ${width * 0.62} ${height * 0.66}
+    L ${width * 0.72} ${height * 0.74}
+    L ${width * 0.82} ${height * 0.70}
+    L ${width * 0.92} ${height * 0.78}
+    L ${width} ${height * 0.74}
+    L ${width} ${height} Z`;
+
+  // Trees
+  const treeNodes = trees.map((t, i) => {
+    const tx = t.x * width;
+    const tBaseY = height * 0.92;
+    const tH = t.height;
+    const tW = t.width;
+    if (t.type === 0) {
+      // Pine tree (triangular)
+      return (
+        <g key={`tree-${i}`}>
+          <path d={`M ${tx} ${tBaseY - tH}
+            L ${tx - tW * 0.5} ${tBaseY - tH * 0.4}
+            L ${tx - tW * 0.3} ${tBaseY - tH * 0.4}
+            L ${tx - tW * 0.6} ${tBaseY}
+            L ${tx + tW * 0.6} ${tBaseY}
+            L ${tx + tW * 0.3} ${tBaseY - tH * 0.4}
+            L ${tx + tW * 0.5} ${tBaseY - tH * 0.4} Z`}
+            fill="rgba(4, 4, 10, 1)" />
+          <line x1={tx} y1={tBaseY - tH} x2={tx} y2={tBaseY}
+            stroke="rgba(8, 8, 16, 1)" strokeWidth={1.5} />
+        </g>
+      );
+    }
+    // Triangular fir
+    return (
+      <path key={`tree-${i}`}
+        d={`M ${tx} ${tBaseY - tH} L ${tx - tW * 0.55} ${tBaseY} L ${tx + tW * 0.55} ${tBaseY} Z`}
+        fill="rgba(4, 4, 10, 1)" />
+    );
+  });
 
   return (
     <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden" }}>
-      <svg
-        width={width}
-        height={height}
-        style={{
-          opacity: masterOpacity * shimmer,
-          filter: `blur(${4 + snap.flatness * 4}px) drop-shadow(0 0 20px hsla(${chromaHue}, 80%, 60%, 0.3))`,
-          mixBlendMode: "screen",
-        }}
-      >
+      <svg width={width} height={height} style={{ opacity: masterOpacity, willChange: "opacity" }}>
         <defs>
-          {bands.map((band, bi) => {
-            const hue1 = (chromaHue + band.hueOffset) % 360;
-            const hue2 = (chromaHue + band.hueOffset + 40) % 360;
-            return (
-              <linearGradient key={`ag-${bi}`} id={`aurora-grad-${bi}`} x1="0%" y1="0%" x2="0%" y2="100%">
-                <stop offset="0%" stopColor={`hsla(${hue1}, 80%, 65%, 0.8)`} />
-                <stop offset="40%" stopColor={`hsla(${hue2}, 70%, 55%, 0.5)`} />
-                <stop offset="100%" stopColor={`hsla(${hue1}, 60%, 40%, 0)`} />
-              </linearGradient>
-            );
-          })}
+          <linearGradient id="ab-sky" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={skyTop} />
+            <stop offset="55%" stopColor={skyMid} />
+            <stop offset="100%" stopColor={skyBot} />
+          </linearGradient>
+          <linearGradient id="ab-mountain" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="rgba(20, 18, 30, 0.96)" />
+            <stop offset="100%" stopColor="rgba(6, 6, 12, 1)" />
+          </linearGradient>
+          <radialGradient id="ab-haze">
+            <stop offset="0%" stopColor={`hsl(${tintHue}, 70%, 60%)`} stopOpacity={0.18 * auroraBloom} />
+            <stop offset="100%" stopColor={`hsl(${tintHue}, 70%, 60%)`} stopOpacity={0} />
+          </radialGradient>
+          <linearGradient id="ab-snow" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="rgba(160, 180, 220, 0.6)" />
+            <stop offset="100%" stopColor="rgba(40, 50, 80, 0.95)" />
+          </linearGradient>
         </defs>
 
-        {bands.map((band, bi) => {
-          // Stagger each band
-          const bandFade = interpolate(
-            frame,
-            [STAGGER_START + bi * 25, STAGGER_START + bi * 25 + 90],
-            [0, 1],
-            { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: Easing.out(Easing.cubic) },
-          );
-          if (bandFade < 0.01) return null;
+        <rect width={width} height={height} fill="url(#ab-sky)" />
 
-          // Build the wavy top path + flat bottom to create a filled band
-          const topY = band.yOffset * height;
-          const segW = width / WAVE_SEGMENTS;
+        {/* Stars */}
+        {starNodes}
 
-          // Speed of wave animation scales with energy
-          const waveSpeed = interpolate(energy, [0.03, 0.3], [0.6, 1.5], {
-            extrapolateLeft: "clamp",
-            extrapolateRight: "clamp",
-          });
-          const t = frame * waveSpeed;
+        {/* Atmospheric haze */}
+        <ellipse cx={width * 0.5} cy={height * 0.35} rx={width * 0.7} ry={height * 0.4}
+          fill="url(#ab-haze)" />
 
-          // Build top edge points
-          const topPoints: Array<{ x: number; y: number }> = [];
-          for (let s = 0; s <= WAVE_SEGMENTS; s++) {
-            const x = s * segW;
-            const xNorm = s / WAVE_SEGMENTS;
-            const wave1 = Math.sin(x * band.waveFreq + t * 0.05 + band.phase) * band.waveAmp;
-            const wave2 = Math.sin(x * band.waveFreq2 + t * 0.03 + band.phase * 1.7) * band.waveAmp2;
-            // Energy-driven amplitude boost, bass scales wave amplitude (0.8-1.4x)
-            const bassAmpMult = 0.8 + snap.bass * 1.2;
-            const energyWave = Math.sin(x * 0.003 + t * 0.02) * energy * 25 * bassAmpMult;
-            // Taper at edges for natural look
-            const edgeTaper = Math.sin(xNorm * Math.PI);
-            const y = topY + (wave1 + wave2 + energyWave) * edgeTaper;
-            topPoints.push({ x, y });
-          }
+        {/* Aurora curtains (back to front) */}
+        {curtains}
 
-          // Build SVG path: top wave, then down right side, across bottom, up left side
-          const bottomY = topY + band.bandHeight;
-          let d = `M ${topPoints[0].x} ${topPoints[0].y}`;
-          for (let s = 1; s < topPoints.length; s++) {
-            // Smooth curve between points
-            const prev = topPoints[s - 1];
-            const curr = topPoints[s];
-            const cpx = (prev.x + curr.x) / 2;
-            d += ` Q ${prev.x + segW * 0.5} ${prev.y}, ${curr.x} ${curr.y}`;
-          }
-          // Close: straight down right side, across bottom, up left
-          d += ` L ${width} ${bottomY} L 0 ${bottomY} Z`;
+        {/* Optional flare burst across whole upper area */}
+        {flareBurst > 0.1 && (
+          <rect x={0} y={0} width={width} height={height * 0.6}
+            fill={`hsl(${tintHue}, 80%, 70%)`} opacity={flareBurst * 0.18} style={{ mixBlendMode: "screen" }} />
+        )}
 
-          return (
-            <path
-              key={bi}
-              d={d}
-              fill={`url(#aurora-grad-${bi})`}
-              opacity={bandFade * band.alphaScale}
-            />
-          );
+        {/* Mountain ridge */}
+        <path d={mountainPath} fill="url(#ab-mountain)" stroke="rgba(40, 30, 60, 0.4)" strokeWidth={1} />
+        {/* Snow caps */}
+        {[
+          [0.10, 0.74], [0.27, 0.68], [0.46, 0.62], [0.62, 0.66], [0.82, 0.70],
+        ].map(([x, y], i) => (
+          <path key={`snow-${i}`}
+            d={`M ${x * width - 8} ${y * height + 4}
+                L ${x * width} ${y * height}
+                L ${x * width + 8} ${y * height + 4}`}
+            stroke="rgba(220, 230, 250, 0.55)" strokeWidth={2} fill="none" />
+        ))}
+
+        {/* Trees */}
+        {treeNodes}
+
+        {/* Snowy ground */}
+        <rect x={0} y={height * 0.92} width={width} height={height * 0.08} fill="url(#ab-snow)" />
+        {/* Snow texture dots */}
+        {Array.from({ length: 60 }).map((_, i) => {
+          const sx = ((i * 37) % 100) / 100 * width;
+          const sy = height * (0.93 + ((i * 13) % 8) / 100);
+          return <circle key={`snow-d-${i}`} cx={sx} cy={sy} r={1} fill="rgba(220, 230, 250, 0.75)" />;
         })}
       </svg>
     </div>

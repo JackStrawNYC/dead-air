@@ -48,6 +48,7 @@ ${buildPostProcessGLSL({
   bloomEnabled: true,
   halationEnabled: true,
   dofEnabled: true,
+  temporalBlendEnabled: true,
 })}
 
 varying vec2 vUv;
@@ -281,10 +282,11 @@ void main() {
       orgHue = fract(hue2 + 0.1);
       orgBright = 0.8 + vocalGlow * 2.0;
     } else {
-      // Jellyfish: cycling bioluminescent palette
+      // Jellyfish: cycling bioluminescent palette (shortest-arc blend)
       float fId = float(closestId);
       float colorPhase = fract(fId * 0.33 + sceneTime * 0.1 + chromaHueMod);
-      orgHue = fract(mix(hue1, hue2, colorPhase));
+      float bioHueDiff = fract(hue2 - hue1 + 0.5) - 0.5;
+      orgHue = fract(hue1 + bioHueDiff * colorPhase);
       orgBright = 0.5 + e2 * 0.5;
     }
 
@@ -391,21 +393,6 @@ void main() {
 
   // ---- Post-processing ----
   col = applyPostProcess(col, vUv, screenP);
-
-  // ---- Feedback trails ----
-  vec3 prev = texture2D(uPrevFrame, vUv).rgb;
-  float baseDecay_fb = mix(0.93, 0.86, energy);
-  float feedbackDecay = baseDecay_fb + sJam * 0.04 + sSpace * 0.06 - sChorus * 0.05;
-  feedbackDecay = clamp(feedbackDecay, 0.82, 0.97);
-  if (uJamPhase >= 0.0) {
-    float jpExplore = step(-0.5, uJamPhase) * step(uJamPhase, 0.5);
-    float jpBuild   = step(0.5, uJamPhase) * step(uJamPhase, 1.5);
-    float jpPeak    = step(1.5, uJamPhase) * step(uJamPhase, 2.5);
-    float jpResolve = step(2.5, uJamPhase);
-    feedbackDecay += jpExplore * 0.03 + jpBuild * 0.01 + jpPeak * 0.05 - jpResolve * 0.04;
-    feedbackDecay = clamp(feedbackDecay, 0.82, 0.97);
-  }
-  col = max(col, prev * feedbackDecay);
 
   gl_FragColor = vec4(col, 1.0);
 }

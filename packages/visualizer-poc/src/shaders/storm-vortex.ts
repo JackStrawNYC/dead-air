@@ -290,8 +290,8 @@ void main() {
               * (1.0 + climB * 0.3);
 
   // ─── Palette: ominous storm colors ───
-  float h1 = hsvToCosineHue(uPalettePrimary);
-  vec3 stormCol = 0.5 + 0.5 * cos(TAU * vec3(h1, h1 + 0.33, h1 + 0.67));
+  float h1 = uPalettePrimary;
+  vec3 stormCol = paletteHueColor(h1, 0.6, 0.85);
   // Desaturate toward dark grey-blue
   float stormLum = dot(stormCol, vec3(0.299, 0.587, 0.114));
   stormCol = mix(vec3(stormLum), stormCol, 0.35 + tension * 0.3);
@@ -301,8 +301,8 @@ void main() {
   vec3 warningCol = mix(warningGreen, warningPurple, sin(flowT * 0.2) * 0.5 + 0.5);
   stormCol = mix(stormCol, warningCol, tension * 0.5);
 
-  float h2 = hsvToCosineHue(uPaletteSecondary);
-  vec3 lightCol = 0.5 + 0.5 * cos(TAU * vec3(h2, h2 + 0.33, h2 + 0.67));
+  float h2 = uPaletteSecondary;
+  vec3 lightCol = paletteHueColor(h2, 0.85, 0.95);
   lightCol = mix(lightCol, vec3(0.9, 0.92, 1.0), 0.5); // push lightning toward blue-white
 
   // ─── Camera: inside the storm, looking up at the vortex ───

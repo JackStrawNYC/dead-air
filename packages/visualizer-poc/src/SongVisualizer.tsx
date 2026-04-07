@@ -37,7 +37,6 @@ import { ShowContextProvider, getShowSeed } from "./data/ShowContext";
 import { VisualizerErrorBoundary } from "./components/VisualizerErrorBoundary";
 import { SilentErrorBoundary } from "./components/SilentErrorBoundary";
 import { LyricTriggerLayer } from "./components/LyricTriggerLayer";
-import { PoeticLyrics } from "./components/PoeticLyrics";
 import { resolveLyricTriggers, loadAlignmentWords } from "./data/lyric-trigger-resolver";
 import { resolveMediaForSong } from "./data/media-resolver";
 import { SongPaletteProvider } from "./data/SongPaletteContext";
@@ -690,6 +689,21 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
     : 0;
   const isDeadAir = deadAirFactor > 0.99;
 
+  // DEAD AIR climax dampening: applause has impulsive transients that the climax
+  // detector reads as "high energy", which fires bloom/saturation/density boosts.
+  // Without this dampening, the visual pulses with the applause as if the band were
+  // still playing. We zero out climax modulation as deadAirFactor ramps up.
+  if (deadAirFactor > 0.01) {
+    const liveFactor = 1 - deadAirFactor;
+    climaxMod.saturationOffset *= liveFactor;
+    climaxMod.brightnessOffset *= liveFactor;
+    climaxMod.bloomOffset *= liveFactor;
+    climaxMod.contrastOffset *= liveFactor;
+    climaxMod.overlayDensityMult = 1 + (climaxMod.overlayDensityMult - 1) * liveFactor;
+    climaxMod.shaderSpeedMult = 1 + (climaxMod.shaderSpeedMult - 1) * liveFactor;
+    climaxMod.cameraDrama *= liveFactor;
+  }
+
   // ─── Intro factor: song card visible ~15s, then shader takes over ───
   // 0 = art dominates (shader suppressed), 1 = shader + icons fully open.
   const INTRO_FULL = 450;  // 15s at 30fps — song card is hero
@@ -769,7 +783,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
       <TimeDilationProvider value={spaceTimeDilation}>
       <VisualizerErrorBoundary>
       <div style={{ position: "absolute", inset: 0, opacity }}>
-        <CameraMotion frames={f} jamEvolution={jamEvolution} bass={audioSnapshot.bass} cameraFreeze={counterpoint.cameraFreeze || itState.cameraLock || introFactor < 0.5} drumsSpacePhase={drumsSpaceState?.subPhase} fastEnergy={audioSnapshot.fastEnergy} vocalPresence={audioSnapshot.vocalPresence} isSolo={soloState.isSolo} soloIntensity={soloState.intensity} grooveMotionMult={grooveMods.motionMult * fatigue.motionMult * stemInterplay.motionMult * peakOfShow.motionMult * crowdEnergy.motionMult * narrativeDirective.motionMult * stemCharacter.motionMult} groovePulseMult={grooveMods.pulseMult * phraseState.zoomBreathing * tempoLock.zoomPulse * regularityStabilityMod} sectionDriftMult={sectionVocab.driftSpeedMult} cameraSteadiness={Math.max(0, Math.min(1, sectionVocab.cameraSteadiness + setTheme.cameraSteadinessOffset))} cameraDrama={climaxMod.cameraDrama} itSnapZoom={itState.snapZoom}>
+        <CameraMotion frames={f} jamEvolution={jamEvolution} bass={audioSnapshot.bass} cameraFreeze={counterpoint.cameraFreeze || itState.cameraLock || introFactor < 0.5} drumsSpacePhase={drumsSpaceState?.subPhase} fastEnergy={audioSnapshot.fastEnergy} vocalPresence={audioSnapshot.vocalPresence} isSolo={soloState.isSolo} soloIntensity={soloState.intensity} grooveMotionMult={grooveMods.motionMult * fatigue.motionMult * stemInterplay.motionMult * peakOfShow.motionMult * crowdEnergy.motionMult * narrativeDirective.motionMult * stemCharacter.motionMult} groovePulseMult={grooveMods.pulseMult * phraseState.zoomBreathing * tempoLock.zoomPulse * regularityStabilityMod} sectionDriftMult={sectionVocab.driftSpeedMult} cameraSteadiness={Math.max(0, Math.min(1, sectionVocab.cameraSteadiness + setTheme.cameraSteadinessOffset))} cameraDrama={climaxMod.cameraDrama} itSnapZoom={itState.snapZoom} deadAirFactor={deadAirFactor}>
         <EraGrade>
         <EnergyEnvelope snapshot={audioSnapshot} climaxMod={climaxMod} calibration={energyCalibration} drumsSpacePhase={drumsSpaceState?.subPhase} itLuminanceLift={itState.luminanceLift} itSaturationSurge={itState.saturationSurge} itVignettePull={itState.vignettePull} deadAirFactor={deadAirFactor} introFactor={introFactor}>
           <div style={{ position: "absolute", inset: 0, opacity: introFactor }}>
@@ -840,34 +854,29 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
           {/* AI image overlay REMOVED — makes viewers think "AI slop" and adds visual noise.
               Dead identity comes from song card (intro/bookend) and the shader itself. */}
 
-          {/* IT flash — chromatic burst on coherence break (suppressed during intro) */}
-          {introFactor > 0.5 && itState.flashIntensity > 0.01 && (
+          {/* IT flash — chromatic burst on coherence break (suppressed during intro).
+              CHILL CALIBRATION: capped at 0.3 max opacity (was 1.0) and threshold raised
+              to 0.15 (was 0.01) so only the strongest coherence-break events fire it.
+              Strict requirement: flash never strobes consecutively, must be rare. */}
+          {introFactor > 0.5 && itState.flashIntensity > 0.15 && (
             <div
               style={{
                 position: "absolute",
                 inset: 0,
                 backgroundColor: itState.flashHue > 0
-                  ? `hsla(${itState.flashHue}, 80%, 85%, ${itState.flashIntensity})`
-                  : `rgba(255, 255, 255, ${itState.flashIntensity})`,
+                  ? `hsla(${itState.flashHue}, 60%, 85%, ${Math.min(0.3, itState.flashIntensity * 0.4)})`
+                  : `rgba(255, 255, 255, ${Math.min(0.3, itState.flashIntensity * 0.4)})`,
                 pointerEvents: "none",
                 mixBlendMode: "screen",
               }}
             />
           )}
 
-          {/* IT strobe — beat-synced pulse during deep coherence lock.
-              Uses soft-light blend (gentler than overlay) to avoid harsh white flashes. */}
-          {introFactor > 0.5 && itState.strobeIntensity > 0.01 && (
-            <div
-              style={{
-                position: "absolute",
-                inset: 0,
-                backgroundColor: `rgba(255, 255, 255, ${itState.strobeIntensity.toFixed(3)})`,
-                pointerEvents: "none",
-                mixBlendMode: "soft-light",
-              }}
-            />
-          )}
+          {/* IT strobe — DISABLED in chill mode. Was beat-synced pulse during deep
+              coherence lock; even at soft-light blend it causes "what just flashed?"
+              reactions during 3-hour viewing. Replaced by the gentler beat pulse in
+              postprocess.glsl.ts which is already capped at 2.5%. */}
+          {/* Strobe block disabled — see chill calibration */}
 
           {/* Dead air ambient shimmer — audio-reactive glow when music ends */}
           {deadAirFactor > 0.01 && (() => {

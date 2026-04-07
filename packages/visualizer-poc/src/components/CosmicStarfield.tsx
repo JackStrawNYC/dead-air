@@ -1,114 +1,147 @@
 /**
- * CosmicStarfield — A+++ deep space starfield with parallax layers,
- * nebula wisps, twinkling diamonds, and hyperspace warp streaks.
+ * CosmicStarfield — A+++ overlay.
+ * Rich star field with multiple star types (giants, dwarfs, distant), nebulae
+ * in 3-4 colors, glowing constellations connecting stars with thin lines,
+ * occasional shooting stars. Each star has size variation, color temperature,
+ * glow halo. NOT just dots.
  *
- * Three parallax layers:
- *   - Background (80): tiny, slow, dim — the infinite deep
- *   - Mid (40): medium brightness, moderate speed
- *   - Foreground (20): large, fast, blazing past the camera
- *
- * Each star is a cross/diamond shape with glow halo and motion streaks.
- * Twinkling at per-star frequencies. Mostly blue-white, 1-in-10 warm.
- * Nebula wisps: 2-3 large faint radial-gradient clouds, chromaHue-tinted.
- * Warp from center outward, energy-driven speed (gentle drift to hyperspace).
+ * Audio reactivity:
+ *   slowEnergy → nebula bloom + ambient warmth
+ *   energy     → star halo brightness
+ *   bass       → giant star pulse
+ *   beatDecay  → twinkle amplitude
+ *   onsetEnvelope → shooting star triggers
+ *   chromaHue  → nebula color tint
+ *   tempoFactor → twinkle/drift speed
  */
 
 import React from "react";
 import { useCurrentFrame, useVideoConfig, interpolate } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
-import { useShowContext } from "../data/ShowContext";
 import { seeded } from "../utils/seededRandom";
 import { useAudioSnapshot } from "./parametric/audio-helpers";
 import { useTempoFactor } from "../data/TempoContext";
 
-/* ------------------------------------------------------------------ */
-/*  Types                                                              */
-/* ------------------------------------------------------------------ */
+const CYCLE_TOTAL = 2400;
+const VISIBLE_DURATION = 780;
+const STAR_COUNT = 240;
+const NEBULA_COUNT = 8;
+const CONSTELLATION_COUNT = 4;
 
 interface Star {
-  angle: number; // radians from center
-  speed: number; // 0-1 base speed factor
-  baseRadius: number; // starting distance from center (0-1 normalized)
-  size: number; // base pixel radius
-  twinkleFreq: number; // oscillation frequency (radians per frame)
-  twinklePhase: number; // phase offset for unique timing
-  brightness: number; // base alpha 0-1
-  isWarm: boolean; // ~10% warm (amber/gold), rest blue-white
-  warmHue: number; // hue for warm stars (20-50 gold/amber range)
-  layer: "bg" | "mid" | "fg";
+  x: number;
+  y: number;
+  baseR: number;
+  twinkleSpeed: number;
+  phase: number;
+  hueOffset: number;
+  type: "dwarf" | "giant" | "blue" | "red";
+  hasFlare: boolean;
 }
-
 interface Nebula {
-  cx: number; // center x (0-1 normalized)
-  cy: number; // center y (0-1 normalized)
-  rx: number; // radius x (0-1 normalized)
-  ry: number; // radius y (0-1 normalized)
-  baseHue: number; // starting hue offset
-  rotationSpeed: number; // radians per frame
-  driftAngle: number; // drift direction
-  driftSpeed: number; // drift magnitude per frame (normalized)
-  opacity: number; // base opacity (very faint)
+  x: number;
+  y: number;
+  rx: number;
+  ry: number;
+  rotation: number;
+  hueOffset: number;
+  drift: number;
+  layers: number;
+}
+interface ConstellationStar {
+  x: number;
+  y: number;
+  size: number;
+}
+interface ConstellationDef {
+  stars: ConstellationStar[];
+  edges: [number, number][];
+  baseHueOffset: number;
+}
+interface ShootingStar {
+  startFrame: number;
+  startX: number;
+  startY: number;
+  angle: number;
+  length: number;
 }
 
-/* ------------------------------------------------------------------ */
-/*  Layer Configs                                                      */
-/* ------------------------------------------------------------------ */
-
-const LAYER_CONFIG = {
-  bg: { count: 80, sizeMin: 0.5, sizeMax: 1.5, speedMin: 0.1, speedMax: 0.3, brightMin: 0.15, brightMax: 0.4 },
-  mid: { count: 40, sizeMin: 1.2, sizeMax: 2.8, speedMin: 0.3, speedMax: 0.6, brightMin: 0.35, brightMax: 0.7 },
-  fg: { count: 20, sizeMin: 2.5, sizeMax: 5.0, speedMin: 0.6, speedMax: 1.0, brightMin: 0.6, brightMax: 1.0 },
-} as const;
-
-const NUM_NEBULAE = 3;
-const STAR_CYCLE = 360; // frames per full warp cycle
-
-/* ------------------------------------------------------------------ */
-/*  Generation (deterministic)                                         */
-/* ------------------------------------------------------------------ */
-
-function generateStars(seed: number): Star[] {
-  const rng = seeded(seed);
-  const stars: Star[] = [];
-
-  for (const [layer, cfg] of Object.entries(LAYER_CONFIG) as [Star["layer"], (typeof LAYER_CONFIG)[keyof typeof LAYER_CONFIG]][]) {
-    for (let i = 0; i < cfg.count; i++) {
-      const isWarm = rng() < 0.1;
-      stars.push({
-        angle: rng() * Math.PI * 2,
-        speed: cfg.speedMin + rng() * (cfg.speedMax - cfg.speedMin),
-        baseRadius: 0.02 + rng() * 0.25,
-        size: cfg.sizeMin + rng() * (cfg.sizeMax - cfg.sizeMin),
-        twinkleFreq: 0.03 + rng() * 0.12, // ~1-4 second cycles at 30fps
-        twinklePhase: rng() * Math.PI * 2,
-        brightness: cfg.brightMin + rng() * (cfg.brightMax - cfg.brightMin),
-        isWarm,
-        warmHue: 20 + rng() * 30, // gold-amber range
-        layer,
-      });
-    }
-  }
-  return stars;
+function buildStars(): Star[] {
+  const rng = seeded(91_553_271);
+  return Array.from({ length: STAR_COUNT }, () => {
+    const t = rng();
+    let type: Star["type"] = "dwarf";
+    if (t > 0.94) type = "giant";
+    else if (t > 0.78) type = "blue";
+    else if (t > 0.66) type = "red";
+    const baseR =
+      type === "giant" ? 2.4 + rng() * 2.0
+        : type === "blue" ? 1.4 + rng() * 1.0
+        : type === "red" ? 1.2 + rng() * 0.8
+        : 0.4 + rng() * 0.9;
+    return {
+      x: rng(),
+      y: rng(),
+      baseR,
+      twinkleSpeed: 0.018 + rng() * 0.05,
+      phase: rng() * Math.PI * 2,
+      hueOffset:
+        type === "giant" ? -10 + rng() * 20
+          : type === "blue" ? -50 - rng() * 30
+          : type === "red" ? 60 + rng() * 30
+          : rng() * 20,
+      type,
+      hasFlare: type === "giant" || type === "blue",
+    };
+  });
 }
 
-function generateNebulae(seed: number): Nebula[] {
-  const rng = seeded(seed + 7777);
-  return Array.from({ length: NUM_NEBULAE }, () => ({
-    cx: 0.2 + rng() * 0.6,
-    cy: 0.2 + rng() * 0.6,
-    rx: 0.15 + rng() * 0.25,
-    ry: 0.12 + rng() * 0.2,
-    baseHue: rng() * 360,
-    rotationSpeed: (rng() - 0.5) * 0.002,
-    driftAngle: rng() * Math.PI * 2,
-    driftSpeed: 0.00003 + rng() * 0.00006,
-    opacity: 0.04 + rng() * 0.06, // very faint: 4-10%
+function buildNebulae(): Nebula[] {
+  const rng = seeded(33_882_104);
+  return Array.from({ length: NEBULA_COUNT }, () => ({
+    x: rng(),
+    y: rng(),
+    rx: 0.16 + rng() * 0.22,
+    ry: 0.10 + rng() * 0.18,
+    rotation: rng() * 360,
+    hueOffset: -120 + rng() * 240,
+    drift: 0.00006 + rng() * 0.00014,
+    layers: 4,
   }));
 }
 
-/* ------------------------------------------------------------------ */
-/*  Component                                                          */
-/* ------------------------------------------------------------------ */
+function buildConstellations(): ConstellationDef[] {
+  const rng = seeded(72_119_044);
+  return Array.from({ length: CONSTELLATION_COUNT }, (_, ci) => {
+    const cx = 0.15 + rng() * 0.7;
+    const cy = 0.15 + rng() * 0.7;
+    const numStars = 5 + Math.floor(rng() * 4);
+    const stars: ConstellationStar[] = Array.from({ length: numStars }, () => ({
+      x: cx + (rng() - 0.5) * 0.18,
+      y: cy + (rng() - 0.5) * 0.18,
+      size: 1.6 + rng() * 1.6,
+    }));
+    const edges: [number, number][] = [];
+    for (let i = 0; i < numStars - 1; i++) {
+      edges.push([i, i + 1]);
+    }
+    if (numStars > 4 && rng() > 0.4) {
+      edges.push([0, Math.floor(numStars / 2)]);
+    }
+    return { stars, edges, baseHueOffset: -90 + (ci / CONSTELLATION_COUNT) * 240 };
+  });
+}
+
+function buildShootingStars(): ShootingStar[] {
+  const rng = seeded(55_661_209);
+  return Array.from({ length: 8 }, (_, i) => ({
+    startFrame: 60 + i * 90 + Math.floor(rng() * 30),
+    startX: rng(),
+    startY: rng() * 0.5,
+    angle: Math.PI * 0.15 + rng() * Math.PI * 0.2,
+    length: 80 + rng() * 120,
+  }));
+}
 
 interface Props {
   frames: EnhancedFrameData[];
@@ -117,247 +150,165 @@ interface Props {
 export const CosmicStarfield: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
-  const ctx = useShowContext();
-
-  const snap = useAudioSnapshot(frames);
   const tempoFactor = useTempoFactor();
+  const snap = useAudioSnapshot(frames);
 
-  const showSeed = ctx?.showSeed ?? 19770508;
-  const stars = React.useMemo(() => generateStars(showSeed), [showSeed]);
-  const nebulae = React.useMemo(() => generateNebulae(showSeed), [showSeed]);
+  const stars = React.useMemo(buildStars, []);
+  const nebulae = React.useMemo(buildNebulae, []);
+  const constellations = React.useMemo(buildConstellations, []);
+  const shootingStars = React.useMemo(buildShootingStars, []);
 
-  const cx = width / 2;
-  const cy = height / 2;
-  const maxR = Math.sqrt(cx * cx + cy * cy);
+  const cycleFrame = frame % CYCLE_TOTAL;
+  if (cycleFrame >= VISIBLE_DURATION) return null;
+  const progress = cycleFrame / VISIBLE_DURATION;
+  const fadeIn = interpolate(progress, [0, 0.09], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const fadeOut = interpolate(progress, [0.91, 1], [1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const masterOpacity = Math.min(fadeIn, fadeOut) * 0.95;
+  if (masterOpacity < 0.01) return null;
 
-  /* ---- Audio-derived parameters ---- */
+  // Audio drives
+  const cosmicGlow = interpolate(snap.slowEnergy, [0.02, 0.32], [0.55, 1.15], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const haloBright = interpolate(snap.energy, [0.02, 0.32], [0.45, 1.0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const giantPulse = 1 + snap.bass * 0.35;
+  const twinkleAmp = 0.4 + snap.beatDecay * 0.4;
+  const flareBurst = snap.onsetEnvelope > 0.5 ? Math.min(1, (snap.onsetEnvelope - 0.4) * 1.6) : 0;
 
-  const energy = snap.energy;
-  const beatDecay = snap.beatDecay;
-  const chromaHue = snap.chromaHue;
-  const bass = snap.bass;
-  const highs = snap.highs;
+  // Palette
+  const baseHue = 220;
+  const tintHue = ((baseHue + (snap.chromaHue - 180) * 0.55) % 360 + 360) % 360;
+  const skyTop = `hsl(${(tintHue + 200) % 360}, 50%, 4%)`;
+  const skyMid = `hsl(${(tintHue + 220) % 360}, 50%, 7%)`;
+  const skyBot = `hsl(${(tintHue + 200) % 360}, 45%, 10%)`;
 
-  // Warp speed: gentle drift at low energy, hyperspace at high
-  const baseSpeed = interpolate(energy, [0.02, 0.15, 0.4, 0.7], [0.3, 0.8, 2.0, 4.0], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
-  const beatPulse = 1 + beatDecay * 0.6;
-  const speedMult = baseSpeed * beatPulse * tempoFactor;
-
-  // Streak elongation: energy + highs boost
-  const streakBase = interpolate(energy, [0.03, 0.2, 0.5, 0.8], [1, 6, 18, 40], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
-  const highsStreakBoost = 1 + highs * 1.2;
-
-  // Overall opacity: always present but scales with energy
-  const opacity = interpolate(energy, [0.01, 0.1, 0.4], [0.2, 0.5, 0.75], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
-
-  // Beat brightness pulse: stars flash brighter on beats
-  const beatBright = 1 + beatDecay * 0.4;
-
-  // Bass throb: subtle size increase on bass hits
-  const bassThrob = 1 + bass * 0.3;
-
-  /* ---- Nebula rendering ---- */
-
-  const nebulaElements = nebulae.map((neb, i) => {
-    // Slow drift over time
-    const drift = frame * neb.driftSpeed;
-    const nebCx = (neb.cx + Math.cos(neb.driftAngle) * drift) * width;
-    const nebCy = (neb.cy + Math.sin(neb.driftAngle) * drift) * height;
-    const nebRx = neb.rx * width;
-    const nebRy = neb.ry * height;
-
-    // Rotation
-    const rotation = frame * neb.rotationSpeed * (180 / Math.PI);
-
-    // Hue: blend nebula base hue with chromaHue
-    const hue = (neb.baseHue * 0.4 + chromaHue * 0.6) % 360;
-
-    // Opacity: very faint, breathe slightly with slow energy
-    const nebOpacity = neb.opacity * (0.7 + snap.slowEnergy * 0.6) * (0.8 + beatDecay * 0.15);
-
-    const gradId = `nebula-grad-${i}`;
-
+  // Stars
+  const starNodes = stars.map((s, i) => {
+    const t = frame * s.twinkleSpeed * tempoFactor + s.phase;
+    const twinkle = 0.55 + Math.sin(t) * twinkleAmp;
+    const sx = s.x * width;
+    const sy = s.y * height;
+    const r = s.baseR * (s.type === "giant" ? giantPulse : 1) * (0.85 + twinkle * 0.3);
+    const sHue = (tintHue + s.hueOffset + 360) % 360;
+    const sat = s.type === "blue" ? 80 : s.type === "red" ? 70 : 60;
+    const lite = s.type === "giant" ? 90 : 80;
+    const flare = s.hasFlare ? flareBurst * 0.6 : 0;
     return (
-      <g key={`nebula-${i}`} transform={`rotate(${rotation} ${nebCx} ${nebCy})`}>
-        <defs>
-          <radialGradient id={gradId} cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor={`hsla(${hue}, 70%, 60%, ${nebOpacity})`} />
-            <stop offset="35%" stopColor={`hsla(${hue}, 60%, 45%, ${nebOpacity * 0.5})`} />
-            <stop offset="70%" stopColor={`hsla(${(hue + 30) % 360}, 50%, 35%, ${nebOpacity * 0.15})`} />
-            <stop offset="100%" stopColor={`hsla(${hue}, 40%, 20%, 0)`} />
-          </radialGradient>
-        </defs>
-        <ellipse
-          cx={nebCx}
-          cy={nebCy}
-          rx={nebRx}
-          ry={nebRy}
-          fill={`url(#${gradId})`}
-        />
-      </g>
-    );
-  });
-
-  /* ---- Star rendering ---- */
-
-  const starElements = stars.map((star, i) => {
-    // Twinkle: per-star sinusoidal brightness oscillation
-    const twinkle = 0.6 + 0.4 * Math.sin(frame * star.twinkleFreq + star.twinklePhase);
-
-    // Layer-specific speed multiplier (bg slowest, fg fastest)
-    const layerSpeedScale = star.layer === "bg" ? 0.4 : star.layer === "mid" ? 0.7 : 1.0;
-
-    // Warp position: fly from center outward, loop
-    const period = STAR_CYCLE / (star.speed * layerSpeedScale);
-    const t = ((frame * speedMult * layerSpeedScale) % period) / period;
-    const r = (star.baseRadius + t * (1 - star.baseRadius)) * maxR;
-
-    const x = cx + Math.cos(star.angle) * r;
-    const y = cy + Math.sin(star.angle) * r;
-
-    // Distance-based fade: dim near center, bright at edges
-    const distFade = Math.pow(r / maxR, 0.7);
-
-    // Combined alpha
-    const alpha = Math.min(1, star.brightness * twinkle * distFade * beatBright);
-    if (alpha < 0.03) return null;
-
-    // Star color
-    let hue: number;
-    let sat: number;
-    let lum: number;
-    if (star.isWarm) {
-      hue = star.warmHue;
-      sat = 50 + energy * 20;
-      lum = 75 + energy * 15;
-    } else {
-      // Blue-white: hue 210-240 range, low saturation for white look
-      hue = 215 + Math.sin(star.twinklePhase) * 15;
-      sat = 15 + energy * 25;
-      lum = 80 + energy * 15;
-    }
-
-    const color = `hsla(${hue}, ${sat}%, ${Math.min(95, lum)}%, ${alpha})`;
-    const glowColor = `hsla(${hue}, ${Math.min(100, sat + 20)}%, 85%, ${alpha * 0.35})`;
-    const coreColor = `hsla(${hue}, ${Math.min(100, sat - 5)}%, 95%, ${Math.min(1, alpha * 1.3)})`;
-
-    // Size with bass throb and distance scaling
-    const sz = star.size * bassThrob * (0.6 + distFade * 0.4);
-
-    // Streak length: longer at high energy, longer for faster/nearer stars
-    const streakLen = streakBase * star.speed * highsStreakBoost * layerSpeedScale;
-
-    // Streak endpoint (toward center)
-    const sx = cx + Math.cos(star.angle) * Math.max(0, r - streakLen);
-    const sy = cy + Math.sin(star.angle) * Math.max(0, r - streakLen);
-
-    // Cross/diamond arm length
-    const arm = sz * 0.6;
-    // Perpendicular angle for cross arms
-    const perpAngle = star.angle + Math.PI / 2;
-    const armDx = Math.cos(perpAngle) * arm;
-    const armDy = Math.sin(perpAngle) * arm;
-    // Radial arms (along motion direction)
-    const radDx = Math.cos(star.angle) * arm * 0.8;
-    const radDy = Math.sin(star.angle) * arm * 0.8;
-
-    // Glow radius scales with size
-    const glowR = sz * (1.8 + energy * 2.0);
-
-    // Whether to show prominent streak (only when moving fast enough)
-    const showStreak = streakLen > 2;
-
-    // Streak width: thinner for bg, thicker for fg
-    const streakWidth = star.layer === "bg" ? sz * 0.5 : star.layer === "mid" ? sz * 0.7 : sz * 0.9;
-
-    return (
-      <g key={i}>
-        {/* Outer glow halo */}
-        <circle
-          cx={x}
-          cy={y}
-          r={glowR}
-          fill={glowColor}
-          style={{ mixBlendMode: "screen" }}
-        />
-
-        {/* Motion streak — elongated toward center when warping */}
-        {showStreak && (
-          <line
-            x1={x}
-            y1={y}
-            x2={sx}
-            y2={sy}
-            stroke={color}
-            strokeWidth={streakWidth}
-            strokeLinecap="round"
-            style={{ mixBlendMode: "screen" }}
-          />
+      <g key={`star-${i}`}>
+        {(s.type === "giant" || s.type === "blue") && (
+          <circle cx={sx} cy={sy} r={r * 6} fill={`hsl(${sHue}, ${sat}%, ${lite}%)`} opacity={0.06 * twinkle * haloBright} />
         )}
-
-        {/* Diamond/cross shape: 4 arms */}
-        {/* Perpendicular arms */}
-        <line
-          x1={x - armDx}
-          y1={y - armDy}
-          x2={x + armDx}
-          y2={y + armDy}
-          stroke={coreColor}
-          strokeWidth={sz * 0.25}
-          strokeLinecap="round"
-        />
-        {/* Radial arms */}
-        <line
-          x1={x - radDx}
-          y1={y - radDy}
-          x2={x + radDx}
-          y2={y + radDy}
-          stroke={coreColor}
-          strokeWidth={sz * 0.25}
-          strokeLinecap="round"
-        />
-
-        {/* Bright core dot */}
-        <circle
-          cx={x}
-          cy={y}
-          r={sz * 0.35}
-          fill={coreColor}
-        />
+        <circle cx={sx} cy={sy} r={r * 3} fill={`hsl(${sHue}, ${sat}%, ${lite}%)`} opacity={0.18 * twinkle * haloBright} />
+        <circle cx={sx} cy={sy} r={r * 1.6} fill={`hsl(${sHue}, ${sat}%, ${lite + 5}%)`} opacity={0.40 * twinkle} />
+        <circle cx={sx} cy={sy} r={r} fill={`hsl(${sHue}, ${sat - 10}%, ${lite + 10}%)`} opacity={0.95 * twinkle + flare} />
+        {s.hasFlare && flareBurst > 0.2 && (
+          <>
+            <line x1={sx - r * 8} y1={sy} x2={sx + r * 8} y2={sy}
+              stroke={`hsl(${sHue}, ${sat}%, 92%)`} strokeWidth={0.6} opacity={flare} />
+            <line x1={sx} y1={sy - r * 8} x2={sx} y2={sy + r * 8}
+              stroke={`hsl(${sHue}, ${sat}%, 92%)`} strokeWidth={0.6} opacity={flare} />
+          </>
+        )}
       </g>
     );
   });
 
-  /* ---- Compose ---- */
+  // Nebulae
+  const nebulaNodes = nebulae.map((n, i) => {
+    const drift = ((n.x + frame * n.drift) + 1) % 1;
+    const nx = drift * width;
+    const ny = n.y * height;
+    const nHue = (tintHue + n.hueOffset + 360) % 360;
+    return (
+      <g key={`neb-${i}`} transform={`translate(${nx}, ${ny}) rotate(${n.rotation + frame * 0.008})`}>
+        <ellipse rx={n.rx * width * 1.55} ry={n.ry * height * 1.55} fill={`hsl(${nHue}, 60%, 45%)`} opacity={0.04 * cosmicGlow} />
+        <ellipse rx={n.rx * width * 1.15} ry={n.ry * height * 1.15} fill={`hsl(${nHue}, 70%, 55%)`} opacity={0.07 * cosmicGlow} />
+        <ellipse rx={n.rx * width * 0.75} ry={n.ry * height * 0.75} fill={`hsl(${nHue}, 80%, 65%)`} opacity={0.10 * cosmicGlow} />
+        <ellipse rx={n.rx * width * 0.40} ry={n.ry * height * 0.40} fill={`hsl(${nHue}, 90%, 78%)`} opacity={0.13 * cosmicGlow} />
+        <ellipse rx={n.rx * width * 0.18} ry={n.ry * height * 0.18} fill={`hsl(${nHue}, 100%, 88%)`} opacity={0.16 * cosmicGlow} />
+      </g>
+    );
+  });
+
+  // Constellation lines + bright stars
+  const constellationNodes = constellations.map((c, ci) => {
+    const cHue = (tintHue + c.baseHueOffset + 360) % 360;
+    const lineColor = `hsl(${cHue}, 75%, 75%)`;
+    const lineOpacity = 0.32 + Math.sin(frame * 0.012 + ci) * 0.12;
+    const lines = c.edges.map(([a, b], ei) => {
+      const sa = c.stars[a];
+      const sb = c.stars[b];
+      return (
+        <line key={`cl-${ci}-${ei}`}
+          x1={sa.x * width} y1={sa.y * height}
+          x2={sb.x * width} y2={sb.y * height}
+          stroke={lineColor} strokeWidth={1.0} opacity={lineOpacity * cosmicGlow} />
+      );
+    });
+    const cstars = c.stars.map((s, si) => {
+      const t = frame * 0.04 + ci + si;
+      const tw = 0.7 + Math.sin(t) * 0.25;
+      const r = s.size * (0.9 + tw * 0.3);
+      return (
+        <g key={`cs-${ci}-${si}`}>
+          <circle cx={s.x * width} cy={s.y * height} r={r * 4} fill={lineColor} opacity={0.10 * tw * haloBright} />
+          <circle cx={s.x * width} cy={s.y * height} r={r * 2} fill={lineColor} opacity={0.30 * tw * haloBright} />
+          <circle cx={s.x * width} cy={s.y * height} r={r} fill={`hsl(${cHue}, 90%, 92%)`} opacity={0.95 * tw} />
+        </g>
+      );
+    });
+    return <g key={`con-${ci}`}>{lines}{cstars}</g>;
+  });
+
+  // Shooting stars
+  const shootingNodes = shootingStars.map((s, i) => {
+    const phase = frame - s.startFrame;
+    if (phase < 0) return null;
+    const period = 60;
+    const cyclePhase = phase % period;
+    if (cyclePhase > 25) return null;
+    const t = cyclePhase / 25;
+    const fade = Math.sin(t * Math.PI);
+    const sx0 = s.startX * width;
+    const sy0 = s.startY * height;
+    const dx = Math.cos(s.angle) * s.length * (1 + t);
+    const dy = Math.sin(s.angle) * s.length * (1 + t);
+    return (
+      <g key={`ss-${i}`}>
+        <line x1={sx0} y1={sy0} x2={sx0 + dx} y2={sy0 + dy}
+          stroke="rgba(220, 240, 255, 0.95)" strokeWidth={2.4} opacity={fade} strokeLinecap="round" />
+        <line x1={sx0} y1={sy0} x2={sx0 + dx * 0.7} y2={sy0 + dy * 0.7}
+          stroke="rgba(255, 255, 255, 1)" strokeWidth={1.0} opacity={fade} strokeLinecap="round" />
+        <circle cx={sx0 + dx} cy={sy0 + dy} r={3.6 * fade} fill="#fff" opacity={fade} />
+      </g>
+    );
+  });
 
   return (
-    <div
-      style={{
-        position: "absolute",
-        inset: 0,
-        pointerEvents: "none",
-        overflow: "hidden",
-      }}
-    >
-      <svg
-        width={width}
-        height={height}
-        style={{ opacity }}
-        viewBox={`0 0 ${width} ${height}`}
-      >
-        {/* Nebula wisps render behind stars */}
-        {nebulaElements}
-        {/* Stars: bg first, then mid, then fg (painter's order — fg on top) */}
-        {starElements}
+    <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden" }}>
+      <svg width={width} height={height} style={{ opacity: masterOpacity, willChange: "opacity" }}>
+        <defs>
+          <linearGradient id="cs-sky" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={skyTop} />
+            <stop offset="55%" stopColor={skyMid} />
+            <stop offset="100%" stopColor={skyBot} />
+          </linearGradient>
+          <radialGradient id="cs-deep">
+            <stop offset="0%" stopColor={`hsl(${tintHue}, 50%, 16%)`} stopOpacity={0.5} />
+            <stop offset="100%" stopColor="rgba(0,0,0,0)" />
+          </radialGradient>
+          <filter id="cs-blur" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="6" />
+          </filter>
+        </defs>
+
+        <rect width={width} height={height} fill="url(#cs-sky)" />
+        <ellipse cx={width * 0.5} cy={height * 0.5} rx={width * 0.55} ry={height * 0.55}
+          fill="url(#cs-deep)" />
+
+        {/* Distant background scatter (already inside stars) */}
+        <g filter="url(#cs-blur)">{nebulaNodes}</g>
+        {starNodes}
+        {constellationNodes}
+        <g style={{ mixBlendMode: "screen" }}>{shootingNodes}</g>
       </svg>
     </div>
   );

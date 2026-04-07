@@ -47,13 +47,19 @@ interface Props {
   cameraDrama?: number;
   /** IT snap zoom intensity (0-1): transient zoom punch during coherence lock */
   itSnapZoom?: number;
+  /** Dead air factor (0 = music playing, 1 = fully in dead air/applause).
+   *  Camera goes near-still during dead air so applause transients don't shake the frame. */
+  deadAirFactor?: number;
 }
 
 const QUIET_SCALE = 1.06;
 const PEAK_SCALE = 1.01;
-const SHAKE_PX = 2;            // Barely perceptible — felt not seen
+// Chill calibration: shake/tilt halved from previous values for 3-hour viewability.
+// The motion is now "slow drift" rather than "felt impact". Climax moments still
+// punch through via cameraDrama amplification.
+const SHAKE_PX = 1;            // Was 2 — barely visible by design
 const SHAKE_DECAY_FRAMES = 30;
-const TILT_DEG = 0.4;         // Gentle tilt, not seasickness
+const TILT_DEG = 0.2;         // Was 0.4 — almost imperceptible
 const TILT_DECAY_FRAMES = 20;
 
 /** Phase-driven camera parameters for long jams */
@@ -76,7 +82,7 @@ function shakeHash(frame: number): { x: number; y: number } {
   return { x, y };
 }
 
-export const CameraMotion: React.FC<Props> = ({ frames, children, jamEvolution, bass, cameraFreeze, drumsSpacePhase, fastEnergy, vocalPresence, isSolo, soloIntensity, grooveMotionMult = 1, groovePulseMult = 1, sectionDriftMult = 1, cameraSteadiness = 0.5, cameraDrama = 0, itSnapZoom = 0 }) => {
+export const CameraMotion: React.FC<Props> = ({ frames, children, jamEvolution, bass, cameraFreeze, drumsSpacePhase, fastEnergy, vocalPresence, isSolo, soloIntensity, grooveMotionMult = 1, groovePulseMult = 1, sectionDriftMult = 1, cameraSteadiness = 0.5, cameraDrama = 0, itSnapZoom = 0, deadAirFactor = 0 }) => {
   const frozenTransform = React.useRef({ scale: 1.04, totalX: 0, totalY: 0, tilt: 0 });
   const frame = useCurrentFrame();
   const idx = Math.min(Math.max(0, frame), frames.length - 1);
@@ -197,8 +203,9 @@ export const CameraMotion: React.FC<Props> = ({ frames, children, jamEvolution, 
   }
 
   // Bass-driven continuous micro-sway (energy-gated: true stillness in silence)
+  // Chill calibration: amplitude halved (3.0 → 1.5) for slower, more meditative drift.
   const bassGate = egate;
-  const bassAmp = (bass ?? 0) * 3.0 * bassGate;
+  const bassAmp = (bass ?? 0) * 1.5 * bassGate;
   const bassT = frame / 30;
   shakeX += Math.sin(bassT * 3.7) * bassAmp * 0.5;
   shakeY += Math.cos(bassT * 2.3) * bassAmp * 0.3;
@@ -238,6 +245,21 @@ export const CameraMotion: React.FC<Props> = ({ frames, children, jamEvolution, 
 
   let totalX = shakeX + driftX;
   let totalY = shakeY + driftY;
+
+  // DEAD AIR: dampen camera reactivity to near-zero during applause/silence between songs.
+  // Crowd applause has impulsive transients that the audio analyzer interprets as drum
+  // hits — without this dampening, the camera would shake for the full minute or two of
+  // applause, making it feel like the song is still playing. We dampen exponentially:
+  // at deadAirFactor=1 the camera is essentially still (1% of normal motion).
+  if (deadAirFactor > 0.01) {
+    const liveFactor = 1 - deadAirFactor; // 1 = music playing, 0 = full dead air
+    const motionMult = liveFactor * liveFactor; // quadratic for stronger dampening
+    totalX *= motionMult;
+    totalY *= motionMult;
+    tiltDeg *= motionMult;
+    // Settle scale toward neutral 1.04 during dead air
+    scale = scale * liveFactor + 1.04 * deadAirFactor;
+  }
 
   // Camera freeze: hold previous frame's transform during counterpoint freeze
   if (cameraFreeze) {

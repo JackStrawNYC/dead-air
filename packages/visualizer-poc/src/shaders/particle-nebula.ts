@@ -251,11 +251,11 @@ void main() {
                    * (1.0 + sJam * 0.6 - sSpace * 0.5 + sSolo * 0.3);
 
   // === PALETTE ===
-  float hue1 = hsvToCosineHue(uPalettePrimary);
-  vec3 nebulaColor = 0.5 + 0.5 * cos(TAU * vec3(hue1, hue1 + 0.33, hue1 + 0.67));
+  float hue1 = uPalettePrimary;
+  vec3 nebulaColor = paletteHueColor(hue1, 0.78, 0.92);
 
-  float hue2 = hsvToCosineHue(uPaletteSecondary);
-  vec3 starColor = 0.5 + 0.5 * cos(TAU * vec3(hue2, hue2 + 0.33, hue2 + 0.67));
+  float hue2 = uPaletteSecondary;
+  vec3 starColor = paletteHueColor(hue2, 0.85, 0.98);
 
   // Tension → color saturation: low=desaturated blue, high=vivid palette
   vec3 lowTensionBase = vec3(0.12, 0.15, 0.30);

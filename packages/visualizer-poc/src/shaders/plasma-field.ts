@@ -474,8 +474,8 @@ void main() {
   float flowTime = uDynamicTime * (0.2 + slowEnergy * 0.15);
 
   // === PALETTE ===
-  float hue1 = hsvToCosineHue(uPalettePrimary) + chordHue + chromaHueMod;
-  float hue2 = hsvToCosineHue(uPaletteSecondary) + chordHue * 0.5;
+  float hue1 = uPalettePrimary + chordHue + chromaHueMod;
+  float hue2 = uPaletteSecondary + chordHue * 0.5;
   float hueShift = uPalettePrimary + chromaHueMod;
 
   // === CAMERA ===
@@ -545,7 +545,7 @@ void main() {
 
       // Base metal color: cool steel gray with palette tint
       vec3 metalBase = mix(vec3(0.25, 0.27, 0.30), vec3(0.35, 0.33, 0.30), brushNoise * 0.3);
-      vec3 paletteTint = 0.5 + 0.5 * cos(TAU * vec3(hue1, hue1 + 0.33, hue1 + 0.67));
+      vec3 paletteTint = paletteHueColor(hue1, 0.7, 0.85);
       metalBase = mix(metalBase, paletteTint * 0.2, 0.08);
 
       // Diffuse lighting
@@ -597,7 +597,7 @@ void main() {
 
       // Field line color: cyan-blue glow modulated by palette
       vec3 fieldBaseColor = pf2PlasmaColor(0.4 + vocalGlow * 0.2, hueShift);
-      vec3 palColor = 0.5 + 0.5 * cos(TAU * vec3(hue2, hue2 + 0.33, hue2 + 0.67));
+      vec3 palColor = paletteHueColor(hue2, 0.85, 0.95);
       vec3 fieldColor = mix(fieldBaseColor, palColor, 0.2);
 
       // Emission intensity: vocal presence drives glow
@@ -675,7 +675,7 @@ void main() {
 
     // Distant lab walls: very dark with subtle palette-tinted ambient
     vec3 labWall = vec3(0.01, 0.012, 0.018);
-    vec3 labTint = 0.5 + 0.5 * cos(TAU * vec3(hue1, hue1 + 0.33, hue1 + 0.67));
+    vec3 labTint = paletteHueColor(hue1, 0.7, 0.85);
     labWall += labTint * 0.005;
     col += labWall;
   }

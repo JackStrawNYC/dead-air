@@ -380,23 +380,6 @@ void main() {
   vec2 postP = (postUv - 0.5) * aspect;
   col = applyPostProcess(col, postUv, postP);
 
-  // ─── Feedback trails ───
-  vec3 prev = texture2D(uPrevFrame, screenUv).rgb;
-  float baseDecay = mix(0.92, 0.88, energy);
-  // Section-type feedback: jam=long trails, space=long ethereal, chorus=fast refresh
-  float feedbackDecay = baseDecay + sJam * 0.04 + sSpace * 0.05 - sChorus * 0.06;
-  feedbackDecay = clamp(feedbackDecay, 0.80, 0.96);
-  // Jam phase modulation
-  if (uJamPhase >= 0.0) {
-    float jpExplore = step(-0.5, uJamPhase) * step(uJamPhase, 0.5);
-    float jpBuild   = step(0.5, uJamPhase) * step(uJamPhase, 1.5);
-    float jpPeak    = step(1.5, uJamPhase) * step(uJamPhase, 2.5);
-    float jpResolve = step(2.5, uJamPhase);
-    feedbackDecay += jpExplore * 0.03 + jpBuild * 0.01 + jpPeak * 0.04 - jpResolve * 0.05;
-    feedbackDecay = clamp(feedbackDecay, 0.80, 0.96);
-  }
-  col = max(col, prev * feedbackDecay);
-
   gl_FragColor = vec4(col, 1.0);
 }
 `;

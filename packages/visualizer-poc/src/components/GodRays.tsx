@@ -1,157 +1,114 @@
 /**
- * GodRays — A+++ volumetric light beams radiating from the upper frame.
+ * GodRays — A+++ overlay: divine sun/spotlight rays beaming down from above
+ * a cathedral or forest backdrop, with visible dust motes drifting through
+ * the rays. 14 large diagonal beams (3 layers each), distant gothic arches
+ * silhouetted in the background, atmospheric mist on the floor, ground
+ * pool where rays land. Energy drives ray brightness; bass thickens the
+ * mist; chromaHue shifts the divine tint warm↔cool.
  *
- * 9 rays originating from different points across the top edge. Each ray is a
- * 3-layer trapezoid: outer atmospheric glow (gaussian blur), main gradient body,
- * and inner bright core stripe. Rays drift slowly with independent angular sweep.
- * Varying widths (2 wide, 4 medium, 3 narrow). Dust motes float within wider
- * rays (5 small dots per wide ray). Floor illumination pools where rays hit bottom.
- * Atmospheric haze where rays overlap (additive screen blend).
- *
- * Audio mapping:
- *   energy      -> ray brightness + visible ray count (6-9)
- *   slowEnergy  -> atmospheric haze density
- *   beatDecay   -> individual ray pulse (phase-offset per ray)
- *   chromaHue   -> golden <-> cool blue color shift
- *   bass        -> floor pool glow intensity
- *
- * Cycle: 60s (1800 frames), 20s (600 frames) visible window.
+ * Audio reactivity:
+ *   slowEnergy   → ray brightness and atmospheric warmth
+ *   energy       → cone width
+ *   bass         → mist density
+ *   beatDecay    → simultaneous pulse
+ *   onsetEnvelope→ flash
+ *   chromaHue    → divine tint
+ *   tempoFactor  → drift speed
  */
 
 import React from "react";
-import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
+import { useCurrentFrame, useVideoConfig, interpolate } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
+import { seeded } from "../utils/seededRandom";
 import { useAudioSnapshot } from "./parametric/audio-helpers";
 import { useTempoFactor } from "../data/TempoContext";
-import { seeded } from "../utils/seededRandom";
 
-/* ------------------------------------------------------------------ */
-/*  Types                                                              */
-/* ------------------------------------------------------------------ */
+const CYCLE_TOTAL = 2400;
+const VISIBLE_DURATION = 800;
+const RAY_COUNT = 14;
+const DUST_COUNT = 90;
+const ARCH_COUNT = 6;
+const TREE_COUNT = 10;
+const STAR_COUNT = 30;
+const MIST_COUNT = 12;
 
-type RayWidth = "wide" | "medium" | "narrow";
-
-interface RayData {
-  originX: number;       // 0-1 across top of screen
-  sweepFreq: number;     // radians per frame
-  sweepAmp: number;      // fraction of width
-  sweepPhase: number;    // phase offset
-  coneAngle: number;     // half-spread of beam (radians)
-  length: number;        // beam length as fraction of height
-  opacityMult: number;   // base opacity 0-1
-  widthCategory: RayWidth;
-  beatPhase: number;     // per-ray pulse phase offset
+interface Ray {
+  x: number;
+  width: number;
+  angle: number;
+  hueOffset: number;
+  phase: number;
+  reach: number;
 }
 
-interface DustMote {
-  xOff: number;          // offset from ray center (-0.5..0.5)
-  yPos: number;          // position along ray (0=top, 1=bottom)
-  driftSpd: number;      // drift speed multiplier
-  driftPh: number;       // drift phase
-  radius: number;        // px
-  opacity: number;       // 0-1
+interface Dust {
+  x: number;
+  y: number;
+  size: number;
+  speed: number;
+  phase: number;
 }
 
-/* ------------------------------------------------------------------ */
-/*  Constants                                                          */
-/* ------------------------------------------------------------------ */
-
-const NUM_RAYS = 9;
-const CYCLE = 1800;   // 60s at 30fps
-const DURATION = 600; // 20s visible
-const MOTES_PER_WIDE = 5;
-
-/** 2 wide, 4 medium, 3 narrow */
-const WIDTH_SEQ: RayWidth[] = [
-  "wide", "narrow", "medium", "wide", "medium", "narrow", "medium", "medium", "narrow",
-];
-
-/** Cone angle range per width category */
-const CONE: Record<RayWidth, [number, number]> = {
-  wide: [0.07, 0.10],
-  medium: [0.04, 0.065],
-  narrow: [0.02, 0.035],
-};
-
-/** Shared extrapolation config */
-const CL = { extrapolateLeft: "clamp" as const, extrapolateRight: "clamp" as const };
-
-/* ------------------------------------------------------------------ */
-/*  Seeded generation                                                  */
-/* ------------------------------------------------------------------ */
-
-function generateRays(seed: number): RayData[] {
-  const rng = seeded(seed);
-  return Array.from({ length: NUM_RAYS }, (_, i) => {
-    // Distribute origins evenly across top edge with controlled jitter
-    const slot = (i + 0.5) / NUM_RAYS;
-    const jitter = (rng() - 0.5) * (0.9 / NUM_RAYS) * 0.6;
-    const ox = Math.max(0.03, Math.min(0.97, 0.05 + slot * 0.9 + jitter));
-    const cat = WIDTH_SEQ[i];
-    const [cMin, cMax] = CONE[cat];
-    return {
-      originX: ox,
-      sweepFreq: 0.0015 + rng() * 0.004,
-      sweepAmp: 0.02 + rng() * 0.05,
-      sweepPhase: rng() * Math.PI * 2,
-      coneAngle: cMin + rng() * (cMax - cMin),
-      length: 0.7 + rng() * 0.3,
-      opacityMult: 0.55 + rng() * 0.45,
-      widthCategory: cat,
-      beatPhase: rng() * Math.PI * 2,
-    };
-  });
+interface MistBlob {
+  x: number;
+  y: number;
+  rx: number;
+  ry: number;
+  drift: number;
+  phase: number;
 }
 
-function generateMotes(seed: number, n: number): DustMote[] {
-  const rng = seeded(seed);
-  return Array.from({ length: n }, () => ({
-    xOff: (rng() - 0.5) * 0.7,
-    yPos: 0.15 + rng() * 0.7,
-    driftSpd: 0.3 + rng() * 0.7,
-    driftPh: rng() * Math.PI * 2,
-    radius: 1.5 + rng() * 2.5,
-    opacity: 0.3 + rng() * 0.5,
+interface Star {
+  x: number;
+  y: number;
+  size: number;
+  phase: number;
+}
+
+function buildRays(): Ray[] {
+  const rng = seeded(50_881_337);
+  return Array.from({ length: RAY_COUNT }, (_, i) => ({
+    x: 0.06 + (i / (RAY_COUNT - 1)) * 0.88 + (rng() - 0.5) * 0.04,
+    width: 80 + rng() * 70,
+    angle: -0.18 + (i / (RAY_COUNT - 1)) * 0.36 + (rng() - 0.5) * 0.06,
+    hueOffset: -8 + rng() * 16,
+    phase: rng() * Math.PI * 2,
+    reach: 0.92 + rng() * 0.18,
   }));
 }
 
-/* ------------------------------------------------------------------ */
-/*  Color + geometry helpers                                           */
-/* ------------------------------------------------------------------ */
-
-/**
- * Map chromaHue (0-360) to ray color.
- * Default warm golden (hue ~42). Shifts toward cool blue (~220) as
- * chromaHue enters the 60-300 range.
- */
-function rayColor(chromaHue: number, energy: number) {
-  const nh = ((chromaHue % 360) + 360) % 360;
-  let h: number;
-  if (nh < 60) h = 38 + nh * 0.1;
-  else if (nh < 180) h = interpolate(nh, [60, 180], [42, 220], CL);
-  else if (nh < 300) h = interpolate(nh, [180, 300], [220, 260], CL);
-  else h = interpolate(nh, [300, 360], [260, 42], CL);
-
-  // Energy washes out: lower sat, higher lightness at peaks
-  const s = interpolate(energy, [0.05, 0.4], [75, 30], CL);
-  const l = interpolate(energy, [0.05, 0.4], [68, 92], CL);
-  return { h, s, l };
+function buildDust(): Dust[] {
+  const rng = seeded(64_002_881);
+  return Array.from({ length: DUST_COUNT }, () => ({
+    x: rng(),
+    y: rng() * 0.95,
+    size: 0.7 + rng() * 1.6,
+    speed: 0.0006 + rng() * 0.0030,
+    phase: rng() * Math.PI * 2,
+  }));
 }
 
-const hs = (h: number, s: number, l: number) =>
-  `hsl(${h.toFixed(1)}, ${s.toFixed(1)}%, ${l.toFixed(1)}%)`;
-
-/** Build a trapezoid path (narrow at top, wide at bottom). */
-function trapPath(
-  cx: number, y0: number, htTop: number, htBot: number, len: number,
-): string {
-  const by = y0 + len;
-  return `M ${cx - htTop} ${y0} L ${cx + htTop} ${y0} L ${cx + htBot} ${by} L ${cx - htBot} ${by} Z`;
+function buildMist(): MistBlob[] {
+  const rng = seeded(81_117_220);
+  return Array.from({ length: MIST_COUNT }, () => ({
+    x: rng(),
+    y: 0.62 + rng() * 0.22,
+    rx: 0.14 + rng() * 0.20,
+    ry: 0.05 + rng() * 0.07,
+    drift: 0.0001 + rng() * 0.00040,
+    phase: rng() * Math.PI * 2,
+  }));
 }
 
-/* ------------------------------------------------------------------ */
-/*  Component                                                          */
-/* ------------------------------------------------------------------ */
+function buildStars(): Star[] {
+  const rng = seeded(38_881_445);
+  return Array.from({ length: STAR_COUNT }, () => ({
+    x: rng(),
+    y: rng() * 0.30,
+    size: 0.4 + rng() * 1.4,
+    phase: rng() * Math.PI * 2,
+  }));
+}
 
 interface Props {
   frames: EnhancedFrameData[];
@@ -160,186 +117,245 @@ interface Props {
 export const GodRays: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
-  const snap = useAudioSnapshot(frames);
   const tempoFactor = useTempoFactor();
+  const snap = useAudioSnapshot(frames);
 
-  const rays = React.useMemo(() => generateRays(19775508), []);
-  const dustMotes = React.useMemo(
-    () => rays.map((r, i) =>
-      r.widthCategory === "wide" ? generateMotes(19775508 + 1000 + i * 137, MOTES_PER_WIDE) : [],
-    ),
-    [rays],
-  );
+  const rays = React.useMemo(buildRays, []);
+  const dust = React.useMemo(buildDust, []);
+  const mist = React.useMemo(buildMist, []);
+  const stars = React.useMemo(buildStars, []);
 
-  /* ---- Timing gate ---- */
-  const cycleFrame = frame % CYCLE;
-  if (cycleFrame >= DURATION) return null;
+  const cycleFrame = frame % CYCLE_TOTAL;
+  if (cycleFrame >= VISIBLE_DURATION) return null;
+  const progress = cycleFrame / VISIBLE_DURATION;
+  const fadeIn = interpolate(progress, [0, 0.10], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const fadeOut = interpolate(progress, [0.90, 1], [1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const masterOpacity = Math.min(fadeIn, fadeOut) * 0.92;
+  if (masterOpacity < 0.01) return null;
 
-  const progress = cycleFrame / DURATION;
-  const fadeIn = interpolate(progress, [0, 0.08], [0, 1], {
-    ...CL, easing: Easing.out(Easing.cubic),
+  const rayBright = interpolate(snap.slowEnergy, [0.02, 0.32], [0.55, 1.20], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const energy = snap.energy;
+  const bass = snap.bass;
+  const beatPulse = 1 + snap.beatDecay * 0.32;
+  const onsetFlare = snap.onsetEnvelope > 0.55 ? Math.min(1, (snap.onsetEnvelope - 0.4) * 1.6) : 0;
+
+  const baseHue = 44;
+  const tintHue = ((baseHue + (snap.chromaHue - 180) * 0.4) % 360 + 360) % 360;
+  const rayCore = `hsl(${tintHue + 18}, 95%, 88%)`;
+  const rayMid = `hsl(${tintHue + 6}, 90%, 70%)`;
+  const rayDeep = `hsl(${tintHue - 8}, 85%, 50%)`;
+
+  const skyTop = `hsl(${(tintHue + 220) % 360}, 22%, 8%)`;
+  const skyMid = `hsl(${(tintHue + 240) % 360}, 18%, 14%)`;
+  const skyHorizon = `hsl(${tintHue}, 36%, 28%)`;
+
+  const horizonY = height * 0.78;
+
+  // Ray cone renderer
+  const rayNodes = rays.map((r, i) => {
+    const sx = r.x * width;
+    const sy = -10;
+    const angle = r.angle + Math.sin(frame * 0.005 * tempoFactor + r.phase) * 0.04;
+    const len = height * r.reach;
+    const ex = sx + Math.tan(angle) * len;
+    const ey = len;
+    const w = r.width * (1 + energy * 0.30) * beatPulse;
+    const hue = (tintHue + r.hueOffset + 360) % 360;
+    const cCore = `hsl(${hue + 18}, 95%, 88%)`;
+    const cMid = `hsl(${hue + 6}, 92%, 72%)`;
+    const cDeep = `hsl(${hue - 6}, 88%, 52%)`;
+    return (
+      <g key={`ray-${i}`} style={{ mixBlendMode: "screen" }}>
+        {/* Outermost atmospheric wash */}
+        <path
+          d={`M ${sx - w * 0.12} ${sy}
+              L ${ex - w * 0.62} ${ey}
+              L ${ex + w * 0.62} ${ey}
+              L ${sx + w * 0.12} ${sy} Z`}
+          fill={cDeep}
+          opacity={0.10 * rayBright}
+        />
+        {/* Mid */}
+        <path
+          d={`M ${sx - w * 0.06} ${sy}
+              L ${ex - w * 0.32} ${ey}
+              L ${ex + w * 0.32} ${ey}
+              L ${sx + w * 0.06} ${sy} Z`}
+          fill={cMid}
+          opacity={0.22 * rayBright}
+        />
+        {/* Core */}
+        <path
+          d={`M ${sx - w * 0.022} ${sy}
+              L ${ex - w * 0.12} ${ey}
+              L ${ex + w * 0.12} ${ey}
+              L ${sx + w * 0.022} ${sy} Z`}
+          fill={cCore}
+          opacity={0.40 * rayBright * beatPulse}
+        />
+        {/* Floor pool where ray lands */}
+        <ellipse
+          cx={ex}
+          cy={ey - 4}
+          rx={w * 0.55}
+          ry={w * 0.10}
+          fill={cMid}
+          opacity={0.30 * rayBright}
+        />
+        <ellipse
+          cx={ex}
+          cy={ey - 4}
+          rx={w * 0.20}
+          ry={w * 0.04}
+          fill={cCore}
+          opacity={0.55 * rayBright}
+        />
+      </g>
+    );
   });
-  const fadeOut = interpolate(progress, [0.88, 1], [1, 0], {
-    ...CL, easing: Easing.in(Easing.quad),
+
+  // Dust motes drifting in the rays
+  const dustNodes = dust.map((d, i) => {
+    const t = frame * d.speed + d.phase;
+    const px = ((d.x + t * 0.5) % 1.1 - 0.05) * width;
+    const py = (d.y + Math.sin(t * 1.4) * 0.02) * height;
+    const flicker = 0.4 + Math.sin(t * 2.3) * 0.45;
+    return (
+      <circle
+        key={`dust-${i}`}
+        cx={px}
+        cy={py}
+        r={d.size * (0.7 + rayBright * 0.5)}
+        fill={rayCore}
+        opacity={0.40 * flicker * rayBright}
+      />
+    );
   });
-  const masterOp = Math.min(fadeIn, fadeOut) * 0.55;
-  if (masterOp < 0.01) return null;
 
-  /* ---- Audio-reactive values ---- */
-  const { energy, slowEnergy, beatDecay, chromaHue, bass } = snap;
+  // Mist on the floor
+  const mistNodes = mist.map((m, i) => {
+    const drift = (m.x + frame * m.drift * (1 + bass * 0.5)) % 1.2 - 0.1;
+    const breath = 1 + Math.sin(frame * 0.012 + m.phase) * 0.08;
+    return (
+      <ellipse
+        key={`mist-${i}`}
+        cx={drift * width}
+        cy={m.y * height}
+        rx={m.rx * width * breath}
+        ry={m.ry * height * breath}
+        fill={`hsla(${tintHue + 14}, 50%, 70%, ${0.20 + bass * 0.18 + rayBright * 0.10})`}
+      />
+    );
+  });
 
-  const bright = interpolate(energy, [0.04, 0.35], [0.45, 1.3], CL);
-  const visCount = Math.round(interpolate(energy, [0.03, 0.3], [6, NUM_RAYS], CL));
-  const haze = interpolate(slowEnergy, [0.03, 0.25], [0.08, 0.35], CL);
-  const floorGlow = interpolate(bass, [0.02, 0.3], [0.1, 0.6], CL);
+  // Stars
+  const starNodes = stars.map((s, i) => {
+    const tw = 0.5 + Math.sin(frame * 0.05 + s.phase) * 0.45;
+    return <circle key={`star-${i}`} cx={s.x * width} cy={s.y * height} r={s.size * tw} fill="rgba(240, 232, 220, 0.65)" />;
+  });
 
-  const { h: rH, s: rS, l: rL } = rayColor(chromaHue, energy);
-  const originY = -12;
-  const t = frame * tempoFactor;
+  // Gothic arches in the back
+  const archNodes = Array.from({ length: ARCH_COUNT }).map((_, i) => {
+    const arx = (i + 0.5) / ARCH_COUNT * width;
+    const ary = horizonY - height * 0.30;
+    const archW = width * 0.10;
+    const archH = height * 0.30;
+    return (
+      <g key={`arch-${i}`} opacity={0.85}>
+        <path
+          d={`M ${arx - archW / 2} ${horizonY}
+              L ${arx - archW / 2} ${ary + archH * 0.4}
+              Q ${arx - archW / 2} ${ary} ${arx} ${ary - 4}
+              Q ${arx + archW / 2} ${ary} ${arx + archW / 2} ${ary + archH * 0.4}
+              L ${arx + archW / 2} ${horizonY} Z`}
+          fill="rgba(20, 16, 26, 0.96)"
+        />
+        <path
+          d={`M ${arx - archW / 2 + 3} ${horizonY}
+              L ${arx - archW / 2 + 3} ${ary + archH * 0.42}
+              Q ${arx - archW / 2 + 3} ${ary + 3} ${arx} ${ary + 1}
+              Q ${arx + archW / 2 - 3} ${ary + 3} ${arx + archW / 2 - 3} ${ary + archH * 0.42}
+              L ${arx + archW / 2 - 3} ${horizonY} Z`}
+          fill="rgba(40, 32, 50, 0.65)"
+        />
+      </g>
+    );
+  });
+
+  // Distant trees flanking
+  const treeNodes = Array.from({ length: TREE_COUNT }).map((_, i) => {
+    const t = i / TREE_COUNT;
+    const tx = (t < 0.5 ? t * 0.4 : 0.6 + (t - 0.5) * 0.4) * width;
+    const ty = horizonY - 6;
+    const ts = 0.85 + ((i * 1.31) % 1) * 0.5;
+    return (
+      <g key={`tree-${i}`}>
+        <rect x={tx - 4 * ts} y={ty} width={8 * ts} height={20 * ts} fill="rgba(18, 14, 8, 0.95)" />
+        <path d={`M ${tx - 30 * ts} ${ty + 6} L ${tx} ${ty - 80 * ts} L ${tx + 30 * ts} ${ty + 6} Z`} fill="rgba(14, 22, 14, 0.95)" />
+        <path d={`M ${tx - 26 * ts} ${ty - 14 * ts} L ${tx} ${ty - 70 * ts} L ${tx + 26 * ts} ${ty - 14 * ts} Z`} fill="rgba(20, 30, 18, 0.95)" />
+      </g>
+    );
+  });
 
   return (
     <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden" }}>
-      <svg
-        width={width}
-        height={height}
-        style={{ position: "absolute", inset: 0, opacity: masterOp, pointerEvents: "none", mixBlendMode: "screen" }}
-      >
+      <svg width={width} height={height} style={{ opacity: masterOpacity, willChange: "opacity" }}>
         <defs>
-          {/* Per-ray gradients: outer glow, main body, inner core, floor pool */}
-          {rays.map((ray, ri) => {
-            if (ri >= visCount) return null;
-
-            // Per-ray beat pulse — phase offset so they don't all pulse together
-            const pulse = 1 + beatDecay * 0.25 * Math.sin(ray.beatPhase + frame * 0.1);
-            const eb = bright * ray.opacityMult * pulse; // effective brightness
-
-            return (
-              <React.Fragment key={`d-${ri}`}>
-                {/* Outer atmospheric glow gradient */}
-                <linearGradient id={`go-${ri}`} x1="0.5" y1="0" x2="0.5" y2="1">
-                  <stop offset="0%" stopColor={hs(rH, rS * 0.6, rL + 8)} stopOpacity={0.18 * eb} />
-                  <stop offset="35%" stopColor={hs(rH, rS * 0.5, rL + 5)} stopOpacity={0.10 * eb} />
-                  <stop offset="75%" stopColor={hs(rH, rS * 0.4, rL)} stopOpacity={0.04 * eb} />
-                  <stop offset="100%" stopColor={hs(rH, rS * 0.3, rL)} stopOpacity={0} />
-                </linearGradient>
-
-                {/* Main body gradient */}
-                <linearGradient id={`gm-${ri}`} x1="0.5" y1="0" x2="0.5" y2="1">
-                  <stop offset="0%" stopColor={hs(rH, rS, rL)} stopOpacity={0.35 * eb} />
-                  <stop offset="20%" stopColor={hs(rH, rS * 0.9, rL + 3)} stopOpacity={0.28 * eb} />
-                  <stop offset="55%" stopColor={hs(rH, rS * 0.7, rL + 2)} stopOpacity={0.14 * eb} />
-                  <stop offset="85%" stopColor={hs(rH, rS * 0.5, rL)} stopOpacity={0.05 * eb} />
-                  <stop offset="100%" stopColor={hs(rH, rS * 0.3, rL)} stopOpacity={0} />
-                </linearGradient>
-
-                {/* Inner bright core gradient */}
-                <linearGradient id={`gc-${ri}`} x1="0.5" y1="0" x2="0.5" y2="1">
-                  <stop offset="0%" stopColor={hs(rH, rS * 0.3, Math.min(rL + 20, 98))} stopOpacity={0.55 * eb} />
-                  <stop offset="15%" stopColor={hs(rH, rS * 0.4, Math.min(rL + 15, 96))} stopOpacity={0.40 * eb} />
-                  <stop offset="50%" stopColor={hs(rH, rS * 0.5, rL + 8)} stopOpacity={0.18 * eb} />
-                  <stop offset="80%" stopColor={hs(rH, rS * 0.4, rL)} stopOpacity={0.06 * eb} />
-                  <stop offset="100%" stopColor={hs(rH, rS * 0.3, rL)} stopOpacity={0} />
-                </linearGradient>
-
-                {/* Floor illumination pool radial gradient */}
-                <radialGradient id={`gp-${ri}`} cx="0.5" cy="0" r="0.7">
-                  <stop offset="0%" stopColor={hs(rH, rS * 0.6, rL + 5)} stopOpacity={floorGlow * eb * 0.5} />
-                  <stop offset="50%" stopColor={hs(rH, rS * 0.4, rL)} stopOpacity={floorGlow * eb * 0.2} />
-                  <stop offset="100%" stopColor={hs(rH, rS * 0.3, rL)} stopOpacity={0} />
-                </radialGradient>
-              </React.Fragment>
-            );
-          })}
-
-          {/* Blur filters — different stdDeviation per layer */}
-          <filter id="gbo"><feGaussianBlur stdDeviation="18" /></filter>
-          <filter id="gbm"><feGaussianBlur stdDeviation="6" /></filter>
-          <filter id="gbc"><feGaussianBlur stdDeviation="2" /></filter>
-          <filter id="gbp"><feGaussianBlur stdDeviation="30" /></filter>
-          <filter id="gbmo"><feGaussianBlur stdDeviation="1.5" /></filter>
-          <filter id="gbh"><feGaussianBlur stdDeviation="40" /></filter>
+          <linearGradient id="gr-sky" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={skyTop} />
+            <stop offset="55%" stopColor={skyMid} />
+            <stop offset="100%" stopColor={skyHorizon} />
+          </linearGradient>
+          <linearGradient id="gr-floor" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={`hsl(${tintHue}, 25%, 18%)`} />
+            <stop offset="100%" stopColor="rgba(8, 6, 12, 0.98)" />
+          </linearGradient>
+          <radialGradient id="gr-source" cx="0.5" cy="0" r="0.6">
+            <stop offset="0%" stopColor={rayCore} stopOpacity="0.7" />
+            <stop offset="100%" stopColor={rayDeep} stopOpacity="0" />
+          </radialGradient>
+          <filter id="gr-blur" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="6" />
+          </filter>
         </defs>
 
-        {/* Atmospheric haze layer — diffuse glow where rays overlap */}
+        {/* Sky */}
+        <rect width={width} height={height} fill="url(#gr-sky)" />
+
+        {/* Stars */}
+        <g>{starNodes}</g>
+
+        {/* Source glow at the top */}
+        <ellipse cx={width * 0.5} cy={0} rx={width * 0.6} ry={height * 0.18} fill="url(#gr-source)" />
+
+        {/* Distant trees & arches at horizon */}
+        <g>{treeNodes}</g>
+        <g>{archNodes}</g>
+
+        {/* Floor */}
+        <rect x={0} y={horizonY} width={width} height={height - horizonY} fill="url(#gr-floor)" />
+
+        {/* Mist on floor (behind rays) */}
+        <g filter="url(#gr-blur)">{mistNodes}</g>
+
+        {/* Onset flash */}
+        {onsetFlare > 0 && (
+          <rect width={width} height={height} fill={`hsla(${tintHue}, 80%, 88%, ${onsetFlare * 0.12})`} />
+        )}
+
+        {/* God rays (the focus) */}
+        <g>{rayNodes}</g>
+
+        {/* Dust motes (top layer) */}
+        <g style={{ mixBlendMode: "screen" }}>{dustNodes}</g>
+
+        {/* Final atmospheric wash */}
         <rect
-          x={0} y={0} width={width} height={height}
-          fill={hs(rH, rS * 0.3, rL + 5)}
-          opacity={haze * masterOp * 0.4}
-          filter="url(#gbh)"
+          width={width}
+          height={height}
+          fill={`hsla(${tintHue}, 70%, 60%, ${0.05 + rayBright * 0.05})`}
+          style={{ mixBlendMode: "screen" }}
         />
-
-        {/* Render each visible ray */}
-        {rays.map((ray, ri) => {
-          if (ri >= visCount) return null;
-
-          // Dual-frequency angular drift (slow primary + subtle secondary)
-          const sweep =
-            Math.sin(t * ray.sweepFreq + ray.sweepPhase) * ray.sweepAmp +
-            Math.sin(t * ray.sweepFreq * 0.37 + ray.sweepPhase * 1.7) * ray.sweepAmp * 0.3;
-
-          const bLen = height * ray.length;
-          const cx = (ray.originX + sweep) * width;
-
-          // Trapezoid half-spreads: narrow at top, wide at bottom
-          const htTop = ray.coneAngle * bLen * 0.05;
-          const htBot = ray.coneAngle * bLen;
-
-          const motes = dustMotes[ri];
-
-          return (
-            <g key={`r-${ri}`}>
-              {/* Layer 1: Outer atmospheric glow (widest, most blurred) */}
-              <path
-                d={trapPath(cx, originY, htTop * 2.24, htBot * 1.6, bLen * 1.05)}
-                fill={`url(#go-${ri})`}
-                filter="url(#gbo)"
-              />
-
-              {/* Layer 2: Main gradient body */}
-              <path
-                d={trapPath(cx, originY, htTop * 0.8, htBot, bLen)}
-                fill={`url(#gm-${ri})`}
-                filter="url(#gbm)"
-              />
-
-              {/* Layer 3: Inner bright core stripe (narrowest, sharpest) */}
-              <path
-                d={trapPath(cx, originY, htTop * 0.15, htBot * 0.3, bLen * 0.92)}
-                fill={`url(#gc-${ri})`}
-                filter="url(#gbc)"
-              />
-
-              {/* Floor illumination pool */}
-              <ellipse
-                cx={cx} cy={originY + bLen}
-                rx={htBot * 1.8} ry={height * 0.08}
-                fill={`url(#gp-${ri})`}
-                filter="url(#gbp)"
-              />
-
-              {/* Dust motes floating within wide rays */}
-              {motes.map((m, mi) => {
-                const mt = t * m.driftSpd * 0.008;
-                const dx = Math.sin(mt + m.driftPh) * htBot * 0.15;
-                const dy = Math.cos(mt * 0.7 + m.driftPh * 1.3) * bLen * 0.03;
-                const mx = cx + m.xOff * htBot * 2 * m.yPos + dx;
-                const my = originY + m.yPos * bLen + dy;
-                const mp = 1 + beatDecay * 0.3 * Math.sin(m.driftPh + frame * 0.15);
-                const mo = m.opacity * bright * ray.opacityMult * mp * 0.6;
-
-                return (
-                  <circle
-                    key={`m-${ri}-${mi}`}
-                    cx={mx} cy={my} r={m.radius}
-                    fill={hs(rH, rS * 0.5, Math.min(rL + 15, 96))}
-                    opacity={Math.min(mo, 0.7)}
-                    filter="url(#gbmo)"
-                  />
-                );
-              })}
-            </g>
-          );
-        })}
       </svg>
     </div>
   );

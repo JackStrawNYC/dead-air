@@ -242,9 +242,11 @@ vec3 ksGemColor(float matID, float hue1, float hue2, float chromaShift, float sa
     return hsv2rgb(vec3(fract(hue1 + chromaShift), sat, 0.95));
   }
   if (matID < 7.0) {
-    // Ring gems — spread across hue range
+    // Ring gems — spread across hue range (shortest-arc blend between palette hues)
     float spread = (matID - 3.0) / 4.0;
-    return hsv2rgb(vec3(fract(mix(hue1, hue2, spread) + hueOff), sat, val));
+    float ksHueDiff = fract(hue2 - hue1 + 0.5) - 0.5;
+    float ringHue = fract(hue1 + ksHueDiff * spread + hueOff);
+    return hsv2rgb(vec3(ringHue, sat, val));
   }
   if (matID < 10.0) {
     // Beads — secondary palette variants
@@ -512,25 +514,6 @@ void main() {
 
   // ─── Post-Processing ───
   col = applyPostProcess(col, uv, screenPos);
-
-  // ─── Feedback Trails ───
-  vec3 prev = texture2D(uPrevFrame, vUv).rgb;
-  float sJam_fb = smoothstep(4.5, 5.5, uSectionType) * (1.0 - step(5.5, uSectionType));
-  float sSpace_fb = smoothstep(6.5, 7.5, uSectionType);
-  float sChorus_fb = smoothstep(1.5, 2.5, uSectionType) * (1.0 - step(2.5, uSectionType));
-  float baseDecay = mix(0.92, 0.85, energy);
-  float feedbackDecay = baseDecay + sJam_fb * 0.04 + sSpace_fb * 0.06 - sChorus_fb * 0.06;
-  feedbackDecay = clamp(feedbackDecay, 0.80, 0.97);
-  // Jam phase feedback
-  if (uJamPhase >= 0.0) {
-    float jpExplore = step(-0.5, uJamPhase) * step(uJamPhase, 0.5);
-    float jpBuild   = step(0.5, uJamPhase) * step(uJamPhase, 1.5);
-    float jpPeak    = step(1.5, uJamPhase) * step(uJamPhase, 2.5);
-    float jpResolve = step(2.5, uJamPhase);
-    feedbackDecay += jpExplore * 0.03 + jpBuild * 0.01 + jpPeak * 0.05 - jpResolve * 0.04;
-    feedbackDecay = clamp(feedbackDecay, 0.80, 0.97);
-  }
-  col = max(col, prev * feedbackDecay);
 
   gl_FragColor = vec4(col, 1.0);
 }

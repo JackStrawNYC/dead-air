@@ -9,15 +9,18 @@ import type { RotationWindow } from "./overlay-rotation";
 
 /**
  * Window duration in frames by energy.
- * Quiet passages rotate every 60s to prevent visual stagnation.
- * Peaks rotate faster for visual energy.
+ *
+ * CHILL CALIBRATION (3-hour party background):
+ * Doubled all windows. Overlays now hold for 60-120s instead of 30-60s.
+ * Slower rotation = each overlay has time to be appreciated, no visual churn,
+ * less "what was that?" reactions when viewers glance up.
  */
 const WINDOW_FRAMES_BY_ENERGY: Record<string, number> = {
-  low:  1800,  // 1 minute
-  mid:  1200,  // 40 seconds
-  high: 900,   // 30 seconds
+  low:  3600,  // 2 minutes — ambient sections hold for a long time
+  mid:  2400,  // 80 seconds — verses/bridges
+  high: 1800,  // 60 seconds — even peaks get more time
 };
-const WINDOW_FRAMES_DEFAULT = 900;
+const WINDOW_FRAMES_DEFAULT = 1800;
 
 /**
  * Subdivide sections into energy-aware rotation windows, aligned to section boundaries.

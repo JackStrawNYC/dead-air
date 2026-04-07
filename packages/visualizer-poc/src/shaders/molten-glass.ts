@@ -429,12 +429,6 @@ void main() {
   // Post-processing
   col = applyPostProcess(col, vUv, screenPos);
 
-  // Feedback
-  vec3 prev = texture2D(uPrevFrame, vUv).rgb;
-  float baseDecay = mix(0.92, 0.85, energy);
-  float feedbackDecay = clamp(baseDecay + sJam * 0.04 + sSpace * 0.06, 0.80, 0.97);
-  col = max(col, prev * feedbackDecay);
-
   gl_FragColor = vec4(col, 1.0);
 }
 `;

@@ -1,101 +1,139 @@
 /**
- * EmberRise — A+++ cinematic ember field: 60+ particles across 3 depth layers.
+ * EmberRise — A+++ overlay: a fire at the bottom of the frame with 100+
+ * embers and sparks rising and fading. Multi-layered flames at the base,
+ * smoke trailing up, ember particles in 3 depth layers, distant trees in
+ * the night, starry sky. Bass intensifies the fire pulse; energy raises
+ * the ember spawn rate; chromaHue tints flame color.
  *
- * Each ember has a white-hot core, warm orange mid-glow, soft red outer halo,
- * and a faint smoke wisp trail. Embers tumble and rotate individually as they
- * rise at depth-dependent speeds. Sinusoidal wind drift driven by melodicDirection.
- * A glowing coal bed at the bottom with feTurbulence texture. 1-in-8 "spark"
- * embers are brighter with longer trails.
- *
- * Audio mapping:
- *   energy     → ember count + brightness
- *   bass       → coal bed glow intensity
- *   beatDecay  → burst of extra embers
- *   chromaHue  → warm palette tint
- *   tempoFactor→ rise speed multiplier
+ * Audio reactivity:
+ *   slowEnergy   → fire warmth and atmospheric glow
+ *   energy       → ember spawn rate
+ *   bass         → flame size pulse
+ *   beatDecay    → fire flare
+ *   onsetEnvelope→ ember burst
+ *   chromaHue    → flame tint
+ *   tempoFactor  → ember speed
  */
 
 import React from "react";
-import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
+import { useCurrentFrame, useVideoConfig, interpolate } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
-import { useShowContext } from "../data/ShowContext";
 import { seeded } from "../utils/seededRandom";
 import { useAudioSnapshot } from "./parametric/audio-helpers";
 import { useTempoFactor } from "../data/TempoContext";
 
-/* ─── Types ─── */
+const CYCLE_TOTAL = 2400;
+const VISIBLE_DURATION = 800;
+const FRONT_EMBERS = 36;
+const MID_EMBERS = 40;
+const BACK_EMBERS = 40;
+const SMOKE_PUFFS = 16;
+const FLAME_BLOBS = 12;
+const TREE_COUNT = 10;
+const STAR_COUNT = 80;
 
-interface EmberData {
-  x: number;
+interface Ember {
+  baseX: number;
   riseSpeed: number;
   driftFreq: number;
   driftAmp: number;
   driftPhase: number;
-  baseSize: number;
-  hue: number;
-  lightness: number;
-  cycleOffset: number;
-  flickerFreq: number;
-  flickerPhase: number;
-  /** 0 = near (large/slow), 1 = mid, 2 = far (small/fast) */
-  depthLayer: 0 | 1 | 2;
-  /** Per-ember rotation speed (rad/frame) */
-  rotSpeed: number;
-  /** Per-ember rotation phase offset */
-  rotPhase: number;
-  /** True for 1-in-8 "spark" embers: brighter, longer trail */
-  isSpark: boolean;
-  /** Tumble wobble frequency */
-  tumbleFreq: number;
-  /** Tumble wobble amplitude (px) */
-  tumbleAmp: number;
+  size: number;
+  flickerSpeed: number;
+  hueOffset: number;
+  spawnOffset: number;
+  lifeSpan: number;
 }
 
-/* ─── Constants ─── */
+interface SmokePuff {
+  x: number;
+  rise: number;
+  rx: number;
+  ry: number;
+  drift: number;
+  phase: number;
+  spawnOffset: number;
+}
 
-const NUM_EMBERS = 72;
-const RISE_CYCLE = 270; // ~9s full rise at 30fps
-const STAGGER_FRAMES = 120; // 4s fade-in
-const COAL_BED_HEIGHT = 0.08; // bottom 8% of screen
+interface FlameBlob {
+  x: number;
+  height: number;
+  width: number;
+  flickerSpeed: number;
+  phase: number;
+  hueOffset: number;
+}
 
-/** Depth layer config: [sizeMult, speedMult, opacityMult] */
-const DEPTH_CONFIG: Record<0 | 1 | 2, [number, number, number]> = {
-  0: [1.6, 0.7, 1.0],   // near: large, slow, full opacity
-  1: [1.0, 1.0, 0.75],  // mid: normal
-  2: [0.55, 1.4, 0.5],  // far: small, fast, dimmer
-};
+interface Tree {
+  x: number;
+  size: number;
+}
 
-/* ─── Ember Generator ─── */
+interface Star {
+  x: number;
+  y: number;
+  size: number;
+  phase: number;
+}
 
-function generateEmbers(seed: number): EmberData[] {
+function buildEmbers(seed: number, count: number): Ember[] {
   const rng = seeded(seed);
-  return Array.from({ length: NUM_EMBERS }, (_, i) => {
-    const depthRoll = rng();
-    const depthLayer: 0 | 1 | 2 = depthRoll < 0.25 ? 0 : depthRoll < 0.65 ? 1 : 2;
-    const isSpark = i % 8 === 0; // every 8th ember is a spark
-    return {
-      x: rng(),
-      riseSpeed: 1.2 + rng() * 3.0,
-      driftFreq: 0.008 + rng() * 0.025,
-      driftAmp: 12 + rng() * 45,
-      driftPhase: rng() * Math.PI * 2,
-      baseSize: isSpark ? 2.5 + rng() * 2.0 : 1.0 + rng() * 2.2,
-      hue: rng() * 50, // 0-50: deep red through warm orange
-      lightness: 55 + rng() * 35,
-      cycleOffset: Math.floor(rng() * RISE_CYCLE),
-      flickerFreq: 0.06 + rng() * 0.22,
-      flickerPhase: rng() * Math.PI * 2,
-      depthLayer,
-      rotSpeed: (rng() - 0.5) * 0.12, // -0.06 to +0.06 rad/frame
-      rotPhase: rng() * Math.PI * 2,
-      isSpark,
-      tumbleFreq: 0.02 + rng() * 0.04,
-      tumbleAmp: 3 + rng() * 8,
-    };
-  });
+  return Array.from({ length: count }, () => ({
+    baseX: 0.20 + rng() * 0.60,
+    riseSpeed: 0.0030 + rng() * 0.0080,
+    driftFreq: 0.018 + rng() * 0.030,
+    driftAmp: 12 + rng() * 30,
+    driftPhase: rng() * Math.PI * 2,
+    size: 0.7 + rng() * 1.6,
+    flickerSpeed: 0.10 + rng() * 0.30,
+    hueOffset: -10 + rng() * 30,
+    spawnOffset: rng() * 180,
+    lifeSpan: 220 + rng() * 220,
+  }));
 }
 
-/* ─── Component ─── */
+function buildSmoke(): SmokePuff[] {
+  const rng = seeded(60_338_002);
+  return Array.from({ length: SMOKE_PUFFS }, () => ({
+    x: 0.30 + rng() * 0.40,
+    rise: 0.0010 + rng() * 0.0030,
+    rx: 30 + rng() * 40,
+    ry: 18 + rng() * 22,
+    drift: 0.005 + rng() * 0.010,
+    phase: rng() * Math.PI * 2,
+    spawnOffset: rng() * 280,
+  }));
+}
+
+function buildFlames(): FlameBlob[] {
+  const rng = seeded(81_447_226);
+  return Array.from({ length: FLAME_BLOBS }, (_, i) => ({
+    x: 0.32 + (i / (FLAME_BLOBS - 1)) * 0.36 + (rng() - 0.5) * 0.04,
+    height: 60 + rng() * 50,
+    width: 22 + rng() * 18,
+    flickerSpeed: 0.15 + rng() * 0.30,
+    phase: rng() * Math.PI * 2,
+    hueOffset: -10 + rng() * 20,
+  }));
+}
+
+function buildTrees(): Tree[] {
+  const rng = seeded(72_117_226);
+  return Array.from({ length: TREE_COUNT }, (_, i) => ({
+    x: (i + 0.3 + rng() * 0.4) / TREE_COUNT,
+    size: 0.85 + rng() * 0.5,
+  }));
+}
+
+function buildStars(): Star[] {
+  const rng = seeded(93_002_115);
+  return Array.from({ length: STAR_COUNT }, () => ({
+    x: rng(),
+    y: rng() * 0.55,
+    size: 0.4 + rng() * 1.4,
+    phase: rng() * Math.PI * 2,
+  }));
+}
 
 interface Props {
   frames: EnhancedFrameData[];
@@ -104,276 +142,219 @@ interface Props {
 export const EmberRise: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
-  const ctx = useShowContext();
   const tempoFactor = useTempoFactor();
-  const audio = useAudioSnapshot(frames);
+  const snap = useAudioSnapshot(frames);
 
-  const embers = React.useMemo(
-    () => generateEmbers(ctx?.showSeed ?? 19770508),
-    [ctx?.showSeed],
-  );
+  const frontEmbers = React.useMemo(() => buildEmbers(11_009_443, FRONT_EMBERS), []);
+  const midEmbers = React.useMemo(() => buildEmbers(22_018_554, MID_EMBERS), []);
+  const backEmbers = React.useMemo(() => buildEmbers(33_027_665, BACK_EMBERS), []);
+  const smoke = React.useMemo(buildSmoke, []);
+  const flames = React.useMemo(buildFlames, []);
+  const trees = React.useMemo(buildTrees, []);
+  const stars = React.useMemo(buildStars, []);
 
-  /* ── Master fade-in ── */
-  const masterFade = interpolate(frame, [STAGGER_FRAMES, STAGGER_FRAMES + 90], [0, 1], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-    easing: Easing.out(Easing.cubic),
-  });
-
-  /* ── Audio-driven parameters ── */
-  const { energy, bass, beatDecay, chromaHue, melodicDirection: melodicDir } = audio;
-
-  // Overall opacity: 10-35% based on energy
-  const baseOpacity = interpolate(energy, [0.02, 0.35], [0.10, 0.35], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
-  const masterOpacity = baseOpacity * masterFade;
+  const cycleFrame = frame % CYCLE_TOTAL;
+  if (cycleFrame >= VISIBLE_DURATION) return null;
+  const progress = cycleFrame / VISIBLE_DURATION;
+  const fadeIn = interpolate(progress, [0, 0.10], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const fadeOut = interpolate(progress, [0.90, 1], [1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const masterOpacity = Math.min(fadeIn, fadeOut) * 0.95;
   if (masterOpacity < 0.01) return null;
 
-  // Brightness multiplier from energy
-  const brightnessMult = interpolate(energy, [0.02, 0.35], [0.5, 1.3], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
+  const fireGlow = interpolate(snap.slowEnergy, [0.02, 0.32], [0.6, 1.20], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const energy = snap.energy;
+  const bass = snap.bass;
+  const beatPulse = 1 + snap.beatDecay * 0.40;
+  const onsetFlare = snap.onsetEnvelope > 0.55 ? Math.min(1, (snap.onsetEnvelope - 0.4) * 1.6) : 0;
+
+  const baseHue = 22;
+  const tintHue = ((baseHue + (snap.chromaHue - 180) * 0.30) % 360 + 360) % 360;
+
+  const skyTop = `hsl(${(tintHue + 220) % 360}, 36%, 5%)`;
+  const skyMid = `hsl(${(tintHue + 240) % 360}, 30%, 8%)`;
+  const skyHorizon = `hsl(${(tintHue + 6) % 360}, 36%, 14%)`;
+
+  const horizonY = height * 0.78;
+  const fireBaseY = height * 0.96;
+
+  // Ember renderer
+  function renderEmber(e: Ember, depth: 0 | 1 | 2, key: string) {
+    const t = ((frame * tempoFactor + e.spawnOffset) % e.lifeSpan) / e.lifeSpan;
+    const rise = t * e.lifeSpan * e.riseSpeed * height;
+    const px = e.baseX * width + Math.sin((frame + e.spawnOffset) * e.driftFreq + e.driftPhase) * e.driftAmp;
+    const py = fireBaseY - rise;
+    if (py < height * 0.02) return null;
+    const lifeFade = 1 - t;
+    const flicker = 0.5 + Math.sin((frame + e.spawnOffset) * e.flickerSpeed) * 0.4;
+    const depthScale = depth === 0 ? 1.0 : depth === 1 ? 0.78 : 0.55;
+    const sz = e.size * depthScale * beatPulse;
+    const hue = (tintHue + e.hueOffset + 360) % 360;
+    const cCore = `hsl(${hue + 22}, 100%, 90%)`;
+    const cMid = `hsl(${hue + 6}, 95%, 65%)`;
+    const cOuter = `hsl(${hue - 8}, 90%, 45%)`;
+    return (
+      <g key={key} style={{ mixBlendMode: "screen" }}>
+        <circle cx={px} cy={py} r={sz * 10} fill={cOuter} opacity={0.10 * lifeFade * flicker * fireGlow} />
+        <circle cx={px} cy={py} r={sz * 5} fill={cMid} opacity={0.22 * lifeFade * flicker * fireGlow} />
+        <circle cx={px} cy={py} r={sz * 2.2} fill={cMid} opacity={0.55 * lifeFade * flicker} />
+        <circle cx={px} cy={py} r={sz * 1.0} fill={cCore} opacity={0.95 * lifeFade * flicker} />
+      </g>
+    );
+  }
+
+  // Smoke puffs rising
+  const smokeNodes = smoke.map((s, i) => {
+    const t = ((frame + s.spawnOffset) * s.rise) % 1;
+    const rise = t * (height * 0.7);
+    const px = s.x * width + Math.sin((frame + s.spawnOffset) * s.drift + s.phase) * 18;
+    const py = fireBaseY - rise;
+    const fade = 1 - t;
+    return (
+      <ellipse
+        key={`sm-${i}`}
+        cx={px}
+        cy={py}
+        rx={s.rx * (1 + (1 - fade) * 0.6)}
+        ry={s.ry * (1 + (1 - fade) * 0.4)}
+        fill={`rgba(50, 40, 50, ${fade * 0.40})`}
+      />
+    );
   });
 
-  // Speed multiplier: energy + tempo
-  const speedMult = interpolate(energy, [0.02, 0.35], [0.6, 1.4], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  }) * Math.max(0.5, tempoFactor);
-
-  // Visible count: energy + beatDecay burst
-  const baseVisible = interpolate(energy, [0.02, 0.35], [30, NUM_EMBERS], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
-  const beatBurst = Math.round(beatDecay * 12); // up to 12 extra on beat
-  const visibleCount = Math.min(NUM_EMBERS, Math.round(baseVisible) + beatBurst);
-
-  // Wind drift offset driven by melodicDirection
-  const windOffset = melodicDir * 40; // px shift from melodic direction
-
-  // Coal bed glow from bass
-  const coalGlow = interpolate(bass, [0.05, 0.4], [0.3, 1.0], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
+  // Flames
+  const flameNodes = flames.map((fl, i) => {
+    const px = fl.x * width;
+    const py = fireBaseY;
+    const t = frame * fl.flickerSpeed + fl.phase;
+    const flicker = 0.85 + Math.sin(t) * 0.15 + Math.sin(t * 2.7) * 0.08;
+    const fH = fl.height * flicker * (1 + bass * 0.30) * beatPulse;
+    const fW = fl.width * (1 + Math.sin(t * 1.3) * 0.10);
+    const hue = (tintHue + fl.hueOffset + 360) % 360;
+    const cCore = `hsl(${hue + 22}, 100%, 90%)`;
+    const cMid = `hsl(${hue + 6}, 95%, 65%)`;
+    const cDeep = `hsl(${hue - 14}, 85%, 40%)`;
+    return (
+      <g key={`fl-${i}`} style={{ mixBlendMode: "screen" }}>
+        <ellipse cx={px} cy={py - fH * 0.4} rx={fW} ry={fH * 0.55} fill={cDeep} opacity={0.85} />
+        <ellipse cx={px} cy={py - fH * 0.5} rx={fW * 0.7} ry={fH * 0.45} fill={cMid} opacity={0.85} />
+        <ellipse cx={px} cy={py - fH * 0.6} rx={fW * 0.4} ry={fH * 0.32} fill={cCore} opacity={0.92} />
+      </g>
+    );
   });
 
-  // ChromaHue tinting: warm offset (-15..+15 degrees)
-  const hueTint = ((chromaHue % 360) / 360) * 30 - 15;
-  const coalPulse = 1.0 + beatDecay * 0.4;
-  const sid = ctx?.showSeed ?? 0;
-  const filterId = `ember-glow-${sid}`;
-  const coalFilterId = `coal-glow-${sid}`;
-  const smokeFilterId = `smoke-blur-${sid}`;
+  // Trees
+  const treeNodes = trees.map((t, i) => {
+    const tx = t.x * width;
+    const ty = horizonY;
+    const ts = t.size;
+    return (
+      <g key={`tr-${i}`}>
+        <rect x={tx - 4 * ts} y={ty - 4} width={8 * ts} height={20 * ts} fill="rgba(8, 6, 12, 0.96)" />
+        <path d={`M ${tx - 32 * ts} ${ty - 4} L ${tx} ${ty - 86 * ts} L ${tx + 32 * ts} ${ty - 4} Z`} fill="rgba(10, 16, 12, 0.96)" />
+        <path d={`M ${tx - 26 * ts} ${ty - 22 * ts} L ${tx} ${ty - 76 * ts} L ${tx + 26 * ts} ${ty - 22 * ts} Z`} fill="rgba(14, 22, 16, 0.96)" />
+      </g>
+    );
+  });
+
+  // Stars
+  const starNodes = stars.map((s, i) => {
+    const tw = 0.5 + Math.sin(frame * 0.05 + s.phase) * 0.45;
+    return <circle key={`star-${i}`} cx={s.x * width} cy={s.y * height} r={s.size * tw} fill="rgba(240, 232, 220, 0.85)" />;
+  });
+
+  // Glow pool around the fire
+  const fireWashR = 200 + bass * 60 + beatPulse * 18;
 
   return (
     <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden" }}>
-      <svg width={width} height={height} style={{ opacity: masterOpacity }}>
+      <svg width={width} height={height} style={{ opacity: masterOpacity, willChange: "opacity" }}>
         <defs>
-          {/* Glow blur for embers */}
-          <filter id={filterId} x="-100%" y="-100%" width="300%" height="300%">
-            <feGaussianBlur in="SourceGraphic" stdDeviation="2.5" />
-          </filter>
-          {/* Smoke trail blur */}
-          <filter id={smokeFilterId} x="-100%" y="-100%" width="300%" height="300%">
-            <feGaussianBlur in="SourceGraphic" stdDeviation="4" />
-          </filter>
-          {/* Coal bed turbulence texture */}
-          <filter id={coalFilterId} x="0" y="0" width="100%" height="100%">
-            <feTurbulence
-              id={`coal-turb-${sid}`}
-              type="fractalNoise"
-              baseFrequency="0.04 0.02"
-              numOctaves={4}
-              seed={ctx?.showSeed ?? 42}
-              result="noise"
-            />
-            <feColorMatrix
-              in="noise"
-              type="saturate"
-              values="0"
-              result="gray"
-            />
-            <feComponentTransfer in="gray" result="shaped">
-              <feFuncA type="table" tableValues="0 0.3 0.6 0.4 0.1" />
-            </feComponentTransfer>
-            <feComposite in="SourceGraphic" in2="shaped" operator="in" />
+          <linearGradient id="er-sky" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={skyTop} />
+            <stop offset="55%" stopColor={skyMid} />
+            <stop offset="100%" stopColor={skyHorizon} />
+          </linearGradient>
+          <linearGradient id="er-ground" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={`hsl(${tintHue}, 35%, 14%)`} />
+            <stop offset="100%" stopColor="rgba(4, 2, 4, 0.98)" />
+          </linearGradient>
+          <radialGradient id="er-firewash" cx="0.5" cy="0.5" r="0.5">
+            <stop offset="0%" stopColor={`hsl(${tintHue + 24}, 95%, 80%)`} stopOpacity="0.9" />
+            <stop offset="50%" stopColor={`hsl(${tintHue}, 90%, 55%)`} stopOpacity="0.40" />
+            <stop offset="100%" stopColor={`hsl(${tintHue - 14}, 80%, 35%)`} stopOpacity="0" />
+          </radialGradient>
+          <filter id="er-blur" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="6" />
           </filter>
         </defs>
 
-        {/* ── Coal Bed: glowing gradient at bottom ── */}
-        <g opacity={coalGlow * coalPulse}>
-          {/* Base radial glow */}
+        {/* Sky */}
+        <rect width={width} height={height} fill="url(#er-sky)" />
+
+        {/* Stars */}
+        <g>{starNodes}</g>
+
+        {/* Trees */}
+        <g>{treeNodes}</g>
+
+        {/* Ground */}
+        <rect x={0} y={horizonY} width={width} height={height - horizonY} fill="url(#er-ground)" />
+
+        {/* Firewash glow */}
+        <ellipse
+          cx={width * 0.5}
+          cy={fireBaseY}
+          rx={fireWashR * 1.4}
+          ry={fireWashR * 0.8}
+          fill="url(#er-firewash)"
+          opacity={fireGlow}
+          style={{ mixBlendMode: "screen" }}
+        />
+
+        {/* Smoke (back) */}
+        <g filter="url(#er-blur)">{smokeNodes}</g>
+
+        {/* Back embers (smallest) */}
+        <g>{backEmbers.map((e, i) => renderEmber(e, 2, `bk-${i}`))}</g>
+
+        {/* Mid embers */}
+        <g>{midEmbers.map((e, i) => renderEmber(e, 1, `md-${i}`))}</g>
+
+        {/* Onset flare */}
+        {onsetFlare > 0 && (
           <ellipse
-            cx={width / 2}
-            cy={height + 10}
-            rx={width * 0.6}
-            ry={height * COAL_BED_HEIGHT * 2.5}
-            fill={`hsla(${15 + hueTint}, 100%, 25%, 0.6)`}
-            filter={`url(#${filterId})`}
+            cx={width * 0.5}
+            cy={fireBaseY}
+            rx={fireWashR * 2.2}
+            ry={fireWashR * 1.4}
+            fill={`hsl(${tintHue + 24}, 95%, 80%)`}
+            opacity={onsetFlare * 0.20}
+            style={{ mixBlendMode: "screen" }}
           />
-          {/* Hot center core */}
-          <ellipse
-            cx={width / 2}
-            cy={height + 5}
-            rx={width * 0.35}
-            ry={height * COAL_BED_HEIGHT * 1.5}
-            fill={`hsla(${25 + hueTint}, 100%, 45%, 0.5)`}
-            filter={`url(#${filterId})`}
-          />
-          {/* Textured coal surface */}
-          <rect
-            x={0}
-            y={height * (1 - COAL_BED_HEIGHT)}
-            width={width}
-            height={height * COAL_BED_HEIGHT}
-            fill={`hsla(${10 + hueTint}, 90%, 18%, 0.7)`}
-            filter={`url(#${coalFilterId})`}
-          />
-          {/* Bright ember-line along the top edge of the coal bed */}
-          <line
-            x1={width * 0.1}
-            y1={height * (1 - COAL_BED_HEIGHT)}
-            x2={width * 0.9}
-            y2={height * (1 - COAL_BED_HEIGHT)}
-            stroke={`hsla(${30 + hueTint}, 100%, 55%, ${0.3 * coalGlow})`}
-            strokeWidth={2}
-            filter={`url(#${filterId})`}
-          />
+        )}
+
+        {/* Flames (foreground) */}
+        <g>{flameNodes}</g>
+
+        {/* Front embers (largest, most prominent) */}
+        <g>{frontEmbers.map((e, i) => renderEmber(e, 0, `fn-${i}`))}</g>
+
+        {/* Logs at the base */}
+        <g>
+          <ellipse cx={width * 0.50} cy={fireBaseY + 4} rx={120} ry={10} fill="rgba(20, 12, 6, 0.98)" />
+          <rect x={width * 0.42} y={fireBaseY - 6} width={80} height={14} rx={6} fill="rgba(28, 16, 6, 0.98)" />
+          <rect x={width * 0.50} y={fireBaseY - 10} width={70} height={12} rx={5} fill="rgba(24, 14, 6, 0.98)" />
+          {/* Glow on logs */}
+          <ellipse cx={width * 0.50} cy={fireBaseY - 2} rx={80} ry={8} fill={`hsl(${tintHue + 14}, 95%, 60%)`} opacity={0.55 * fireGlow} />
         </g>
 
-        {/* ── Ember Particles ── */}
-        {embers.slice(0, visibleCount).map((ember, i) => {
-          const [sizeMult, layerSpeedMult, opacityMult] = DEPTH_CONFIG[ember.depthLayer];
-
-          // Cycle position: each ember loops independently
-          const effectiveSpeed = speedMult * layerSpeedMult;
-          const cycleFrame = (frame * effectiveSpeed + ember.cycleOffset) % RISE_CYCLE;
-          const riseProgress = cycleFrame / RISE_CYCLE; // 0 = bottom, 1 = top
-
-          // Y position: bottom to top
-          const py = height * (1.02 - riseProgress * 1.12);
-
-          // X position: base + sine drift + wind + tumble
-          const baseDrift = Math.sin(frame * ember.driftFreq + ember.driftPhase) * ember.driftAmp;
-          const tumble = Math.sin(frame * ember.tumbleFreq + ember.flickerPhase) * ember.tumbleAmp;
-          const px = ember.x * width + baseDrift + windOffset * (0.5 + riseProgress * 0.5) + tumble;
-
-          // Wrap X
-          const wx = ((px % width) + width) % width;
-
-          // Vertical fade: bright at bottom, fade near top
-          const verticalFade = interpolate(
-            riseProgress,
-            [0, 0.08, 0.15, 0.65, 0.85, 1],
-            [0.1, 0.6, 1, 0.7, 0.25, 0],
-            { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
-          );
-
-          // Multi-frequency flicker for organic feel
-          const f1 = Math.sin(frame * ember.flickerFreq + ember.flickerPhase) * 0.25;
-          const f2 = Math.sin(frame * ember.flickerFreq * 2.3 + ember.flickerPhase * 0.7) * 0.1;
-          const f3 = Math.sin(frame * ember.flickerFreq * 0.4 + ember.flickerPhase * 1.3) * 0.08;
-          const flicker = 0.57 + f1 + f2 + f3;
-
-          const alpha = verticalFade * flicker * brightnessMult * opacityMult;
-          if (alpha < 0.02) return null;
-
-          // Size: shrinks as ember rises (cooling), depth-scaled
-          const r = ember.baseSize * sizeMult * (1 - riseProgress * 0.35);
-
-          // Per-ember rotation angle
-          const rotation = (frame * ember.rotSpeed + ember.rotPhase) * (180 / Math.PI);
-
-          // Color: base hue + chroma tint, spark embers are hotter
-          const h = ember.hue + hueTint;
-          const sparkBoost = ember.isSpark ? 1.4 : 1.0;
-          const lit = Math.min(97, ember.lightness * brightnessMult * sparkBoost);
-
-          // 4-layer glow: core (white-hot), inner (warm orange), outer (red halo), smoke wisp
-          const coreAlpha = alpha * 1.0;
-          const midAlpha = alpha * 0.55;
-          const haloAlpha = alpha * 0.22;
-          const smokeAlpha = alpha * 0.08;
-
-          const coreColor = `hsla(${h + 10}, 100%, ${Math.min(98, lit + 20)}%, ${coreAlpha})`;
-          const midColor = `hsla(${h}, 100%, ${lit}%, ${midAlpha})`;
-          const haloColor = `hsla(${Math.max(0, h - 8)}, 85%, ${Math.max(20, lit - 20)}%, ${haloAlpha})`;
-          const smokeColor = `hsla(0, 0%, 40%, ${smokeAlpha})`;
-
-          // Trail length: sparks get longer trails
-          const trailLen = ember.isSpark ? r * 8 : r * 4;
-          const trailAlpha = ember.isSpark ? alpha * 0.18 : alpha * 0.09;
-          const trailColor = `hsla(${h - 5}, 70%, ${Math.max(15, lit - 30)}%, ${trailAlpha})`;
-
-          // Smoke wisp: offset slightly behind (above, since rising)
-          const smokeOffsetY = r * 3;
-
-          return (
-            <g
-              key={i}
-              transform={`rotate(${rotation}, ${wx}, ${py})`}
-            >
-              {/* Smoke wisp trail behind ember */}
-              <ellipse
-                cx={wx}
-                cy={py + smokeOffsetY}
-                rx={r * 1.8}
-                ry={r * 3}
-                fill={smokeColor}
-                filter={`url(#${smokeFilterId})`}
-              />
-
-              {/* Ember trail (stretched ellipse below) */}
-              <ellipse
-                cx={wx}
-                cy={py + trailLen * 0.4}
-                rx={r * 0.7}
-                ry={trailLen * 0.5}
-                fill={trailColor}
-                filter={`url(#${filterId})`}
-              />
-
-              {/* Outer red halo */}
-              <circle
-                cx={wx}
-                cy={py}
-                r={r * 4.5}
-                fill={haloColor}
-                filter={`url(#${filterId})`}
-              />
-
-              {/* Mid warm orange glow */}
-              <circle
-                cx={wx}
-                cy={py}
-                r={r * 2.2}
-                fill={midColor}
-                filter={`url(#${filterId})`}
-              />
-
-              {/* Bright white-hot core */}
-              <circle
-                cx={wx}
-                cy={py}
-                r={r}
-                fill={coreColor}
-              />
-
-              {/* Tiny specular highlight on spark embers */}
-              {ember.isSpark && (
-                <circle
-                  cx={wx - r * 0.25}
-                  cy={py - r * 0.25}
-                  r={r * 0.35}
-                  fill={`hsla(60, 100%, 98%, ${coreAlpha * 0.7})`}
-                />
-              )}
-            </g>
-          );
-        })}
+        {/* Final atmospheric warmth wash */}
+        <rect
+          width={width}
+          height={height}
+          fill={`hsla(${tintHue}, 80%, 50%, ${0.05 + fireGlow * 0.04})`}
+          style={{ mixBlendMode: "screen" }}
+        />
       </svg>
     </div>
   );

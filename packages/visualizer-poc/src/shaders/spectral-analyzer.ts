@@ -221,9 +221,11 @@ void main() {
 
   // Palette
   float chordHue = float(int(uChordIndex)) / 24.0 * 0.12;
-  float hue1 = hsvToCosineHue(uPalettePrimary) + chordHue;
-  float hue2 = hsvToCosineHue(uPaletteSecondary) + chordHue * 0.5;
+  float hue1 = uPalettePrimary + chordHue;
+  float hue2 = uPaletteSecondary + chordHue * 0.5;
   float sat = mix(0.7, 1.0, energy) * uPaletteSaturation;
+  // Shortest-arc hue distance for band-tinted multi-band coloring
+  float saHueDiff = fract(hue2 - hue1 + 0.5) - 0.5;
 
   // === RAY SETUP ===
   vec3 ro, rd;
@@ -298,8 +300,8 @@ void main() {
         // Reflected tower: tint by band
         int bandIdx = int(reflResult.y - 1.0);
         float bandE = saGetBand(bandIdx);
-        float bandHue = mix(hue1, hue2, float(bandIdx) / 6.0);
-        vec3 towerCol = 0.5 + 0.5 * cos(6.28318 * vec3(bandHue, bandHue + 0.33, bandHue + 0.67));
+        float bandHue = fract(hue1 + saHueDiff * (float(bandIdx) / 6.0));
+        vec3 towerCol = paletteHueColor(bandHue, sat, 0.95);
         float reflFade = exp(-reflDist * 0.08) * bass * 0.6;
         floorCol += towerCol * bandE * reflFade;
       }
@@ -315,8 +317,8 @@ void main() {
       // Tower surface
       int bandIdx = int(matID - 1.0);
       float bandE = saGetBand(bandIdx);
-      float bandHue = mix(hue1, hue2, float(bandIdx) / 6.0);
-      vec3 towerCol = 0.5 + 0.5 * cos(6.28318 * vec3(bandHue, bandHue + 0.33, bandHue + 0.67));
+      float bandHue = fract(hue1 + saHueDiff * (float(bandIdx) / 6.0));
+      vec3 towerCol = paletteHueColor(bandHue, sat, 0.95);
 
       // Self-emission: towers glow based on their band energy
       float emission = bandE * (0.4 + timbralBright * 0.4 + climaxBoost * 0.5) * glowMod;
@@ -369,8 +371,8 @@ void main() {
       if (glowScene.y > 0.5) {
         int bandIdx = int(glowScene.y - 1.0);
         float bandE = saGetBand(bandIdx);
-        float bandHue = mix(hue1, hue2, float(bandIdx) / 6.0);
-        vec3 gCol = 0.5 + 0.5 * cos(6.28318 * vec3(bandHue, bandHue + 0.33, bandHue + 0.67));
+        float bandHue = fract(hue1 + saHueDiff * (float(bandIdx) / 6.0));
+        vec3 gCol = paletteHueColor(bandHue, sat, 0.95);
         glowColorAccum += gCol * proximity * bandE * 0.015 * glowMod;
       }
       glowAccum += proximity * 0.01;
@@ -387,8 +389,8 @@ void main() {
 
   // === DEAD ICONOGRAPHY ===
   float _nf = snoise(vec3(screenP * 2.0, uTime * 0.1));
-  vec3 _ic1 = 0.5 + 0.5 * cos(6.28318 * vec3(hue1, hue1 + 0.33, hue1 + 0.67));
-  vec3 _ic2 = 0.5 + 0.5 * cos(6.28318 * vec3(hue2, hue2 + 0.33, hue2 + 0.67));
+  vec3 _ic1 = paletteHueColor(hue1, sat, 0.95);
+  vec3 _ic2 = paletteHueColor(hue2, sat, 0.95);
   col += iconEmergence(screenP, uTime, energy, bass, _ic1, _ic2, _nf, uClimaxPhase, uSectionIndex);
   col += heroIconEmergence(screenP, uTime, energy, bass, _ic1, _ic2, _nf, uSectionIndex);
 

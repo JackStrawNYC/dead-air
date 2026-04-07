@@ -1,698 +1,691 @@
 /**
- * HeadlightTrain — "I wish I was a headlight on a northbound train."
+ * HeadlightTrain — A+++ scene for "I Know You Rider".
+ * "I wish I was a headlight on a northbound train."
  *
- * THE iconic Grateful Dead lyric from "I Know You Rider." A single piercing
- * headlight beam barreling toward the viewer down a pair of converging rails,
- * dragging a steam locomotive silhouette out of the fog. Built for hero use:
- *
- *  - Two parallel rails in extreme one-point perspective, converging at the
- *    vanishing point in the upper-center of the frame.
- *  - 24 wooden ties/sleepers crossing the rails. Tie spacing is computed in
- *    perspective space (closer ties further apart, distant ties compressed).
- *  - A gravel/ballast bed feathered around and between the rails.
- *  - A single bright headlight at the vanishing point, rendered in three
- *    layers: an enormous gaussian-blurred atmospheric halo, a mid-body cone,
- *    and a bright white-hot inner core. Color biased toward warm sodium
- *    yellow-white, slightly tinted by chromaHue.
- *  - A volumetric beam: a wide cone of light extending from the headlight
- *    forward, with two soft gradient layers approximating volumetric scatter,
- *    plus 14 dust motes floating inside the beam.
- *  - The light spills onto the rails near the vanishing point (illuminated
- *    rail strokes that fade with distance), and onto the ground around the
- *    tracks (a warm radial pool).
- *  - A dark steam locomotive silhouette emerges from the glow: smokestack,
- *    boiler, cab outline, cowcatcher hint — mostly hidden, just a shape.
- *  - A drifting dark plume of smoke rising from the smokestack, plus 4 small
- *    steam puffs along the sides of the boiler. Plume sways with bass.
- *  - A dark night sky with 28 procedurally-placed stars and a faint moon glow.
- *  - Foggy/dusty air around the entire scene to make the beam read volumetric.
- *  - The headlight slowly grows larger over a ~30s approach cycle, then
- *    resets — the train is approaching, never quite arriving.
+ * A massive locomotive thunders out of the darkness, its single piercing
+ * headlight burning toward the camera like a sun. The train silhouette fills
+ * the lower half of the frame, steam billowing skyward, twin rails converging
+ * to a point on a moonlit horizon. Atmospheric haze, sparks from the wheels,
+ * the warm ember-glow of the firebox. Telephone poles whip past on either side.
  *
  * Audio reactivity:
- *  - energy → headlight brightness, beam intensity, halo size
- *  - beatDecay → beam pulses (subtle width + brightness throbbing)
- *  - bass → smoke/steam intensity and plume sway
- *  - onsetEnvelope → flashes the headlight white-hot
- *  - chromaHue → tints the beam color slightly toward the dominant pitch
- *  - tempoFactor → speeds/slows the approach cycle
+ *   slowEnergy   → headlight master glow + sky warmth
+ *   energy       → steam volume + spark count + wheel speed
+ *   bass         → ground rumble + smoke churn
+ *   beatDecay    → headlight pulse
+ *   onsetEnvelope→ whistle steam burst + headlight flash
+ *   chromaHue    → headlight color tint shift
+ *   tempoFactor  → wheel rotation + smoke drift speed
  */
 
 import React from "react";
 import { useCurrentFrame, useVideoConfig, interpolate } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
+import { seeded } from "../utils/seededRandom";
 import { useAudioSnapshot } from "./parametric/audio-helpers";
 import { useTempoFactor } from "../data/TempoContext";
+
+const CYCLE_TOTAL = 2400;
+const VISIBLE_DURATION = 780;
+
+interface SteamPuff {
+  baseX: number;
+  baseY: number;
+  radius: number;
+  drift: number;
+  rise: number;
+  phase: number;
+  shade: number;
+}
+
+interface Spark {
+  side: -1 | 1;
+  baseY: number;
+  speed: number;
+  size: number;
+  phase: number;
+  drift: number;
+}
+
+interface Pole {
+  side: -1 | 1;
+  baseT: number;
+  height: number;
+  phase: number;
+}
+
+interface DustMote {
+  bx: number;
+  by: number;
+  r: number;
+  speed: number;
+  phase: number;
+}
 
 interface Props {
   frames: EnhancedFrameData[];
 }
 
-/* ------------------------------------------------------------------ */
-/*  Constants                                                          */
-/* ------------------------------------------------------------------ */
-
-const SKY_COLOR = "#06080F";
-const GROUND_COLOR = "#0E0B08";
-const RAIL_COLOR = "#5C5852";
-const RAIL_LIT_COLOR = "#FFE9B0";
-const TIE_COLOR = "#3A2A1C";
-const TIE_DARK_COLOR = "#1F1610";
-const BALLAST_COLOR = "#1B1714";
-const HEADLIGHT_CORE = "#FFFCEC";
-const HEADLIGHT_WARM = "#FFE89E";
-const HEADLIGHT_HALO = "#FFD978";
-const TRAIN_SILHOUETTE = "#0A0806";
-const SMOKE_COLOR = "#1A1612";
-const STAR_COLOR = "#E6E2D6";
-
-const TIE_COUNT = 24;
-const STAR_COUNT = 28;
-const DUST_MOTE_COUNT = 14;
-const STEAM_PUFF_COUNT = 4;
-
-/* ------------------------------------------------------------------ */
-/*  Deterministic pseudo-random                                        */
-/* ------------------------------------------------------------------ */
-
-function rand(seed: number): number {
-  const x = Math.sin(seed * 12.9898 + 78.233) * 43758.5453;
-  return x - Math.floor(x);
-}
-
-/* ------------------------------------------------------------------ */
-/*  Perspective math                                                   */
-/* ------------------------------------------------------------------ */
-
-/**
- * Map a "depth" parameter t in [0, 1] to a perspective-correct y position
- * between the vanishing point (t=0) and the foreground (t=1). Uses a
- * hyperbolic mapping so closer ties spread out and distant ties compress.
- */
-function depthToY(t: number, vy: number, fy: number): number {
-  // Hyperbolic perspective: small t stays near vy, large t accelerates to fy.
-  // y = vy + (fy - vy) * (t^2.4) gives that nice perspective compression.
-  return vy + (fy - vy) * Math.pow(t, 2.4);
-}
-
-/* ------------------------------------------------------------------ */
-/*  Main component                                                     */
-/* ------------------------------------------------------------------ */
-
 export const HeadlightTrain: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
-  const snap = useAudioSnapshot(frames);
   const tempoFactor = useTempoFactor();
+  const snap = useAudioSnapshot(frames);
 
-  /* ---- Audio reactive values ---- */
+  const steamPuffs = React.useMemo<SteamPuff[]>(() => {
+    const rng = seeded(82_113_557);
+    return Array.from({ length: 38 }, () => ({
+      baseX: -0.18 + rng() * 0.36,
+      baseY: 0.38 + rng() * 0.18,
+      radius: 18 + rng() * 42,
+      drift: 0.0006 + rng() * 0.0015,
+      rise: 0.0008 + rng() * 0.0018,
+      phase: rng() * Math.PI * 2,
+      shade: 0.25 + rng() * 0.55,
+    }));
+  }, []);
+
+  const sparks = React.useMemo<Spark[]>(() => {
+    const rng = seeded(44_811_237);
+    return Array.from({ length: 26 }, () => ({
+      side: rng() < 0.5 ? -1 : 1,
+      baseY: 0.78 + rng() * 0.14,
+      speed: 0.4 + rng() * 1.4,
+      size: 0.8 + rng() * 2.6,
+      phase: rng() * Math.PI * 2,
+      drift: rng() * 8 - 4,
+    }));
+  }, []);
+
+  const poles = React.useMemo<Pole[]>(() => {
+    const rng = seeded(31_775_011);
+    return Array.from({ length: 14 }, (_, i) => ({
+      side: i % 2 === 0 ? -1 : 1,
+      baseT: (i / 14) + rng() * 0.04,
+      height: 0.18 + rng() * 0.09,
+      phase: rng() * Math.PI * 2,
+    }));
+  }, []);
+
+  const dust = React.useMemo<DustMote[]>(() => {
+    const rng = seeded(99_133_447);
+    return Array.from({ length: 50 }, () => ({
+      bx: rng(),
+      by: 0.4 + rng() * 0.55,
+      r: 0.4 + rng() * 1.4,
+      speed: 0.001 + rng() * 0.004,
+      phase: rng() * Math.PI * 2,
+    }));
+  }, []);
+
+  const cycleFrame = frame % CYCLE_TOTAL;
+  if (cycleFrame >= VISIBLE_DURATION) return null;
+  const progress = cycleFrame / VISIBLE_DURATION;
+  const fadeIn = interpolate(progress, [0, 0.09], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const fadeOut = interpolate(progress, [0.91, 1], [1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const masterOpacity = Math.min(fadeIn, fadeOut) * 0.95;
+  if (masterOpacity < 0.01) return null;
+
   const energy = snap.energy;
-  const beatDecay = snap.beatDecay;
   const bass = snap.bass;
-  const chromaHue = snap.chromaHue;
+  const slowEnergy = snap.slowEnergy;
+  const beatDecay = snap.beatDecay;
   const onsetEnv = snap.onsetEnvelope;
+  const chromaHue = snap.chromaHue;
 
-  /* ---- Approach cycle ---- */
-  // ~30s approach cycle scaled by tempo. Faster songs = faster approach.
-  const approachPeriod = 900 / Math.max(0.65, tempoFactor);
-  const tApproach = (frame % approachPeriod) / approachPeriod;
-  // Approach grows slowly then accelerates near the end (ease-in cubic).
-  const approach = Math.pow(tApproach, 1.6);
+  const headlightGlow = 0.55 + slowEnergy * 0.6 + beatDecay * 0.18 + onsetEnv * 0.22;
+  const steamVolume = 0.4 + energy * 0.7 + onsetEnv * 0.4;
+  const groundRumble = bass * 5;
+  const wheelSpeed = (3 + bass * 14) * tempoFactor;
 
-  /* ---- Geometry: vanishing point + foreground ---- */
-  const vpX = width * 0.5;
-  // Vanishing point sits in the upper-middle area.
-  const vpY = height * 0.48;
-  const fgY = height * 1.02;
-  const horizonY = height * 0.5;
+  const baseHue = 42;
+  const tintHue = ((baseHue + (chromaHue - 180) * 0.32) % 360 + 360) % 360;
+  const tintCore = `hsl(${tintHue}, 96%, 92%)`;
+  const tintMid = `hsl(${tintHue}, 82%, 72%)`;
+  const tintEdge = `hsl(${tintHue}, 65%, 50%)`;
+  const skyTop = `hsl(${(tintHue + 200) % 360}, 38%, 4%)`;
+  const skyMid = `hsl(${(tintHue + 215) % 360}, 30%, 9%)`;
+  const skyHorizon = `hsl(${(tintHue + 18) % 360}, 36%, 17%)`;
 
-  // Rail spread at the foreground (closer = wider apart).
-  const railSpreadFg = width * 0.62;
-  // Rail spread at the vanishing point (just barely separated).
-  const railSpreadVp = width * 0.012;
+  const cx = width * 0.5;
+  const horizonY = height * 0.58;
+  const trainBaseY = height * 0.96;
+  const trainTopY = height * 0.40;
 
-  // X coordinate of each rail at depth t in [0,1].
-  const railX = (t: number, side: -1 | 1): number => {
-    const spread = railSpreadVp + (railSpreadFg - railSpreadVp) * Math.pow(t, 1.6);
-    return vpX + side * spread * 0.5;
-  };
+  const trainW = width * 0.58;
+  const trainLeft = cx - trainW * 0.5;
+  const trainRight = cx + trainW * 0.5;
 
-  // Tie half-width at depth t.
-  const tieHalf = (t: number): number => {
-    const spread = railSpreadVp + (railSpreadFg - railSpreadVp) * Math.pow(t, 1.6);
-    return spread * 0.78;
-  };
+  const hlX = cx;
+  const hlY = height * 0.50;
+  const hlBaseR = Math.min(width, height) * 0.085;
+  const hlR = hlBaseR * (1 + beatDecay * 0.18 + onsetEnv * 0.12);
 
-  // Tie thickness in pixels at depth t.
-  const tieThick = (t: number): number => Math.max(1.2, 2 + Math.pow(t, 1.8) * 18);
+  const shakeY = Math.sin(frame * 0.42) * groundRumble * 0.4;
+  const shakeX = Math.sin(frame * 0.31) * groundRumble * 0.25;
 
-  /* ---- Headlight scaling ---- */
-  // Base size grows with the approach cycle. Train never fully arrives.
-  const headlightBaseR = interpolate(
-    approach,
-    [0, 1],
-    [width * 0.012, width * 0.052],
-  );
-  // Energy adds extra scale.
-  const headlightR = headlightBaseR * (0.85 + energy * 0.6);
-  // Onset envelope flashes a brief white-hot bloom.
-  const onsetFlash = interpolate(onsetEnv, [0, 1], [0, 1.15], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
+  const railVanishX = cx;
+  const railVanishY = horizonY + 6;
+  const railNearLeftX = cx - width * 0.16;
+  const railNearRightX = cx + width * 0.16;
+  const railNearY = trainBaseY;
+
+  const ties: React.ReactNode[] = [];
+  for (let i = 0; i < 16; i++) {
+    const t = Math.pow(i / 15, 1.6);
+    const ty = railVanishY + (railNearY - railVanishY) * t;
+    const halfW = (railNearLeftX - cx) * t * 1.08;
+    const tieAlpha = 0.25 + t * 0.55;
+    const tieH = 2 + t * 8;
+    ties.push(
+      <rect
+        key={`tie-${i}`}
+        x={cx + halfW * 1.05}
+        y={ty}
+        width={-halfW * 2.1}
+        height={tieH}
+        fill={`rgba(28, 18, 10, ${tieAlpha})`}
+      />,
+    );
+  }
+
+  const railLeftPath = `M ${railVanishX - 1} ${railVanishY} L ${railNearLeftX} ${railNearY}`;
+  const railRightPath = `M ${railVanishX + 1} ${railVanishY} L ${railNearRightX} ${railNearY}`;
+
+  const steamNodes = steamPuffs.map((p, i) => {
+    const t = frame * (1 + tempoFactor * 0.5);
+    const px = (cx + p.baseX * width) + Math.sin(t * p.drift + p.phase) * 22 + shakeX;
+    const py = (height * p.baseY) - (t * p.rise * 60) % (height * 0.6);
+    const r = p.radius * (0.7 + steamVolume * 0.5 + Math.sin(t * 0.02 + i) * 0.08);
+    const op = (0.18 + p.shade * 0.32) * masterOpacity;
+    return (
+      <ellipse
+        key={`steam-${i}`}
+        cx={px}
+        cy={py}
+        rx={r}
+        ry={r * 0.78}
+        fill={`rgba(${190 + p.shade * 50}, ${188 + p.shade * 45}, ${184 + p.shade * 40}, ${op})`}
+      />
+    );
   });
 
-  // Headlight position — anchored at the vanishing point but lifts up slightly
-  // as the train approaches (perspective rise).
-  const hlX = vpX;
-  const hlY = vpY - 6 - approach * 14;
-
-  /* ---- Beam cone ---- */
-  // Beam extends from the headlight forward to the foreground.
-  // Beam half-width at the foreground. Bigger as the train gets closer.
-  const beamFgHalfWidth = interpolate(approach, [0, 1], [width * 0.18, width * 0.34]);
-  const beamFgHalfWidthEnergized =
-    beamFgHalfWidth * (0.9 + energy * 0.35) * (1 + beatDecay * 0.06);
-
-  const beamLeftX = vpX - beamFgHalfWidthEnergized;
-  const beamRightX = vpX + beamFgHalfWidthEnergized;
-  const beamBottomY = height * 1.05;
-
-  /* ---- Beam color (slightly chroma-tinted) ---- */
-  // Map chromaHue (0..360) to a soft tint added on top of warm yellow-white.
-  const tintHue = chromaHue;
-  const tintSat = 22;
-  const tintL = 86;
-  const beamTint = `hsl(${tintHue.toFixed(0)}, ${tintSat}%, ${tintL}%)`;
-
-  /* ---- Brightness intensities ---- */
-  const haloOpacity = interpolate(energy, [0.02, 0.4], [0.45, 0.95], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
+  const sparkNodes = sparks.map((s, i) => {
+    const t = frame * s.speed + s.phase;
+    const lifeFrac = (t * 0.06) % 1;
+    const sx = cx + s.side * (width * 0.10 + s.drift) + Math.sin(t * 0.3) * 6;
+    const sy = (height * s.baseY) - lifeFrac * 60;
+    const op = (1 - lifeFrac) * 0.85 * energy;
+    if (op < 0.02) return null;
+    return (
+      <circle
+        key={`spark-${i}`}
+        cx={sx}
+        cy={sy}
+        r={s.size * (1.2 - lifeFrac)}
+        fill={`hsl(${28 + i * 4}, 95%, 70%)`}
+        opacity={op}
+      />
+    );
   });
-  const beamOpacity =
-    interpolate(energy, [0.02, 0.4], [0.18, 0.45], {
-      extrapolateLeft: "clamp",
-      extrapolateRight: "clamp",
-    }) *
-    (0.92 + beatDecay * 0.18) *
-    (1 + onsetFlash * 0.55);
-  const coreOpacity = Math.min(1, 0.85 + energy * 0.15 + onsetFlash * 0.4);
 
-  /* ---- Smoke / steam intensity ---- */
-  const smokeIntensity = interpolate(bass, [0.02, 0.4], [0.4, 0.95], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
+  const poleNodes = poles.map((p, i) => {
+    const tBase = (p.baseT + (frame * 0.0035 * tempoFactor)) % 1;
+    const t = Math.pow(tBase, 1.5);
+    const px = cx + p.side * (width * 0.12 + t * width * 0.42);
+    const topY = horizonY - (height * p.height) * (0.4 + t * 0.6);
+    const botY = horizonY + (trainBaseY - horizonY) * t * 0.95;
+    const op = (0.25 + t * 0.55) * masterOpacity;
+    const sw = 0.6 + t * 2.2;
+    return (
+      <g key={`pole-${i}`} opacity={op}>
+        <line x1={px} y1={topY} x2={px} y2={botY} stroke="rgba(20, 14, 8, 0.9)" strokeWidth={sw} />
+        <line
+          x1={px - 8 - t * 14}
+          y1={topY + 4 + t * 6}
+          x2={px + 8 + t * 14}
+          y2={topY + 4 + t * 6}
+          stroke="rgba(20, 14, 8, 0.9)"
+          strokeWidth={sw * 0.7}
+        />
+        <path
+          d={`M ${px - 6 - t * 12} ${topY + 6 + t * 6} Q ${px} ${topY + 14 + t * 8} ${px + 6 + t * 12} ${topY + 6 + t * 6}`}
+          stroke="rgba(10, 8, 4, 0.6)"
+          strokeWidth={sw * 0.4}
+          fill="none"
+        />
+      </g>
+    );
   });
-  const plumeSway = Math.sin(frame * 0.025 + bass * 6) * (8 + bass * 22);
 
-  /* ---- Master opacity (always on — this is a hero overlay) ---- */
-  const masterOpacity = 0.96;
+  const dustNodes = dust.map((d, i) => {
+    const t = frame * d.speed + d.phase;
+    const px = ((d.bx + Math.sin(t) * 0.02) * width) % width;
+    const py = (d.by * height) + Math.cos(t * 1.3) * 4;
+    const op = 0.18 + Math.sin(t * 2 + i) * 0.08;
+    return (
+      <circle
+        key={`dust-${i}`}
+        cx={px}
+        cy={py}
+        r={d.r}
+        fill={`hsla(${tintHue}, 30%, 75%, ${op})`}
+      />
+    );
+  });
 
-  /* ---- Compute ties ---- */
-  const ties: { y: number; halfW: number; thick: number; t: number }[] = [];
-  for (let i = 0; i < TIE_COUNT; i++) {
-    // Distribute t with bias toward foreground (more visible ties up close).
-    const u = i / (TIE_COUNT - 1);
-    const t = Math.pow(u, 0.85);
-    const y = depthToY(t, vpY, fgY);
-    ties.push({ y, halfW: tieHalf(t), thick: tieThick(t), t });
-  }
-
-  /* ---- Compute stars ---- */
-  const stars: { x: number; y: number; r: number; flicker: number }[] = [];
-  for (let i = 0; i < STAR_COUNT; i++) {
-    const sx = rand(i * 1.7) * width;
-    const sy = rand(i * 2.3 + 11) * horizonY * 0.92;
-    const sr = 0.6 + rand(i * 3.1 + 5) * 1.8;
-    // Twinkle phase.
-    const flicker = 0.55 + 0.45 * Math.sin(frame * 0.04 + i * 1.7);
-    stars.push({ x: sx, y: sy, r: sr, flicker });
-  }
-
-  /* ---- Compute dust motes inside the beam ---- */
-  const dustMotes: { x: number; y: number; r: number; o: number }[] = [];
-  for (let i = 0; i < DUST_MOTE_COUNT; i++) {
-    // depth t along the beam
-    const dT = ((i / DUST_MOTE_COUNT) + (frame * 0.0015) + rand(i * 5.1) * 0.3) % 1;
-    const dY = depthToY(dT, hlY, beamBottomY);
-    // beam half-width at this depth (linear from headlight to foreground)
-    const dHalf =
-      interpolate(dT, [0, 1], [headlightR * 1.1, beamFgHalfWidthEnergized]) *
-      0.92;
-    const dxOff = (rand(i * 7.7 + 3) - 0.5) * dHalf * 1.4;
-    const dr = 1 + rand(i * 11.3) * 2.4 + dT * 2.2;
-    const dOpac = interpolate(dT, [0, 0.15, 0.85, 1], [0, 0.85, 0.7, 0]) *
-      (0.5 + energy * 0.6);
-    dustMotes.push({ x: hlX + dxOff, y: dY, r: dr, o: dOpac });
-  }
-
-  /* ---- Train silhouette geometry ---- */
-  // The train sits behind the headlight at the vanishing point. As approach
-  // grows the silhouette enlarges with the headlight.
-  const trainScale = 0.6 + approach * 1.4;
-  const trainCx = hlX;
-  const trainBaseY = hlY + headlightR * 0.8;
-  const boilerW = headlightR * 4.6 * trainScale;
-  const boilerH = headlightR * 2.2 * trainScale;
-  const cabW = headlightR * 2.0 * trainScale;
-  const cabH = headlightR * 2.4 * trainScale;
-  const stackW = headlightR * 0.7 * trainScale;
-  const stackH = headlightR * 1.6 * trainScale;
-
-  /* ---- Smoke plume polyline ---- */
-  // Plume drifts up from smokestack with bass-driven sway.
-  const plumePts: { x: number; y: number; r: number; o: number }[] = [];
-  const plumeBaseX = trainCx - boilerW * 0.18;
-  const plumeBaseY = trainBaseY - boilerH * 0.5 - stackH;
-  for (let i = 0; i < 9; i++) {
-    const pT = i / 8;
-    const px = plumeBaseX + Math.sin(pT * 3.1 + frame * 0.02) * (4 + pT * plumeSway * 0.5);
-    const py = plumeBaseY - pT * (60 + smokeIntensity * 70) * trainScale;
-    const pr = (4 + pT * 14) * trainScale * (0.7 + smokeIntensity * 0.55);
-    const po = (1 - pT) * 0.7 * smokeIntensity;
-    plumePts.push({ x: px, y: py, r: pr, o: po });
-  }
-
-  /* ---- Steam side puffs ---- */
-  const steamPuffs: { x: number; y: number; r: number; o: number }[] = [];
-  for (let i = 0; i < STEAM_PUFF_COUNT; i++) {
-    const side = i < 2 ? -1 : 1;
-    const driftPhase = (frame * 0.018 + i * 1.3) % 1;
-    const sx =
-      trainCx + side * (boilerW * 0.42 + driftPhase * 30 * trainScale);
-    const sy =
-      trainBaseY - boilerH * 0.1 - driftPhase * 36 * trainScale;
-    const sr = (3 + driftPhase * 10) * trainScale * (0.6 + smokeIntensity * 0.6);
-    const so = (1 - driftPhase) * 0.55 * smokeIntensity;
-    steamPuffs.push({ x: sx, y: sy, r: sr, o: so });
-  }
+  const wheelRot = (frame * wheelSpeed) % 360;
 
   return (
-    <div
-      style={{
-        position: "absolute",
-        inset: 0,
-        pointerEvents: "none",
-        overflow: "hidden",
-      }}
-    >
-      <svg
-        width={width}
-        height={height}
-        viewBox={`0 0 ${width} ${height}`}
-        style={{ opacity: masterOpacity, willChange: "opacity" }}
-      >
+    <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden" }}>
+      <svg width={width} height={height} style={{ opacity: masterOpacity, willChange: "opacity" }}>
         <defs>
-          {/* Sky / horizon gradient */}
-          <linearGradient id="ht-sky" x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" stopColor="#03050B" />
-            <stop offset="55%" stopColor="#0A0D17" />
-            <stop offset="100%" stopColor="#181410" />
+          <linearGradient id="ht-sky" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={skyTop} />
+            <stop offset="55%" stopColor={skyMid} />
+            <stop offset="100%" stopColor={skyHorizon} />
           </linearGradient>
-          {/* Ground gradient — darker far, slightly warmer near */}
-          <linearGradient id="ht-ground" x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" stopColor="#0A0805" />
-            <stop offset="100%" stopColor="#1A130A" />
-          </linearGradient>
-          {/* Ballast pool — radial warm glow on the gravel under the headlight */}
-          <radialGradient id="ht-ground-pool" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor={HEADLIGHT_WARM} stopOpacity={0.32} />
-            <stop offset="40%" stopColor={HEADLIGHT_HALO} stopOpacity={0.14} />
-            <stop offset="100%" stopColor={HEADLIGHT_HALO} stopOpacity={0} />
+          <radialGradient id="ht-headlight" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor={tintCore} stopOpacity={0.98 * headlightGlow} />
+            <stop offset="14%" stopColor={tintCore} stopOpacity={0.85 * headlightGlow} />
+            <stop offset="42%" stopColor={tintMid} stopOpacity={0.42 * headlightGlow} />
+            <stop offset="78%" stopColor={tintEdge} stopOpacity={0.10 * headlightGlow} />
+            <stop offset="100%" stopColor={tintEdge} stopOpacity={0} />
           </radialGradient>
-          {/* Volumetric beam outer (atmospheric) */}
-          <linearGradient id="ht-beam-outer" x1="50%" y1="0%" x2="50%" y2="100%">
-            <stop offset="0%" stopColor={HEADLIGHT_HALO} stopOpacity={0.0} />
-            <stop offset="20%" stopColor={HEADLIGHT_HALO} stopOpacity={0.18} />
-            <stop offset="100%" stopColor={HEADLIGHT_HALO} stopOpacity={0.0} />
-          </linearGradient>
-          {/* Volumetric beam mid */}
-          <linearGradient id="ht-beam-mid" x1="50%" y1="0%" x2="50%" y2="100%">
-            <stop offset="0%" stopColor={HEADLIGHT_WARM} stopOpacity={0.0} />
-            <stop offset="15%" stopColor={HEADLIGHT_WARM} stopOpacity={0.42} />
-            <stop offset="80%" stopColor={HEADLIGHT_WARM} stopOpacity={0.06} />
-            <stop offset="100%" stopColor={HEADLIGHT_WARM} stopOpacity={0.0} />
-          </linearGradient>
-          {/* Volumetric beam inner core */}
-          <linearGradient id="ht-beam-inner" x1="50%" y1="0%" x2="50%" y2="100%">
-            <stop offset="0%" stopColor={HEADLIGHT_CORE} stopOpacity={0.0} />
-            <stop offset="10%" stopColor={HEADLIGHT_CORE} stopOpacity={0.7} />
-            <stop offset="55%" stopColor={HEADLIGHT_CORE} stopOpacity={0.18} />
-            <stop offset="100%" stopColor={HEADLIGHT_CORE} stopOpacity={0.0} />
-          </linearGradient>
-          {/* Headlight halo radial */}
-          <radialGradient id="ht-halo">
-            <stop offset="0%" stopColor={HEADLIGHT_CORE} stopOpacity={1} />
-            <stop offset="18%" stopColor={HEADLIGHT_WARM} stopOpacity={0.85} />
-            <stop offset="45%" stopColor={HEADLIGHT_HALO} stopOpacity={0.35} />
-            <stop offset="100%" stopColor={HEADLIGHT_HALO} stopOpacity={0} />
-          </radialGradient>
-          {/* Headlight inner core */}
-          <radialGradient id="ht-core">
+          <radialGradient id="ht-headcore" cx="50%" cy="50%" r="50%">
             <stop offset="0%" stopColor="#FFFFFF" stopOpacity={1} />
-            <stop offset="55%" stopColor={HEADLIGHT_CORE} stopOpacity={0.95} />
-            <stop offset="100%" stopColor={HEADLIGHT_WARM} stopOpacity={0} />
+            <stop offset="60%" stopColor={tintCore} stopOpacity={0.7} />
+            <stop offset="100%" stopColor={tintCore} stopOpacity={0} />
           </radialGradient>
-          {/* Moon glow */}
-          <radialGradient id="ht-moon">
-            <stop offset="0%" stopColor="#E8E4D0" stopOpacity={0.3} />
-            <stop offset="100%" stopColor="#E8E4D0" stopOpacity={0} />
+          <linearGradient id="ht-train" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#0a0608" />
+            <stop offset="60%" stopColor="#1a1216" />
+            <stop offset="100%" stopColor="#06030a" />
+          </linearGradient>
+          <linearGradient id="ht-firebox" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#FFB860" />
+            <stop offset="50%" stopColor="#E04A14" />
+            <stop offset="100%" stopColor="#7A1E04" />
+          </linearGradient>
+          <linearGradient id="ht-rail" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#5a5046" />
+            <stop offset="100%" stopColor="#2a221c" />
+          </linearGradient>
+          <radialGradient id="ht-moon" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor="#F4E8C0" stopOpacity={0.92} />
+            <stop offset="60%" stopColor="#C8B488" stopOpacity={0.55} />
+            <stop offset="100%" stopColor="#88765a" stopOpacity={0} />
           </radialGradient>
-          {/* Fog overlay near vanishing point */}
-          <radialGradient id="ht-fog">
-            <stop offset="0%" stopColor="#1A1A22" stopOpacity={0.5} />
-            <stop offset="100%" stopColor="#1A1A22" stopOpacity={0} />
+          <radialGradient id="ht-vignette" cx="50%" cy="55%" r="70%">
+            <stop offset="40%" stopColor="rgba(0,0,0,0)" />
+            <stop offset="100%" stopColor="rgba(0,0,0,0.65)" />
           </radialGradient>
-          {/* Filter for blurring the outer beam (volumetric softness) */}
-          <filter id="ht-blur-outer" x="-30%" y="-30%" width="160%" height="160%">
-            <feGaussianBlur stdDeviation="14" />
-          </filter>
-          <filter id="ht-blur-mid" x="-20%" y="-20%" width="140%" height="140%">
+          <filter id="ht-blur" x="-20%" y="-20%" width="140%" height="140%">
             <feGaussianBlur stdDeviation="6" />
           </filter>
-          <filter id="ht-blur-soft" x="-20%" y="-20%" width="140%" height="140%">
-            <feGaussianBlur stdDeviation="2.4" />
+          <filter id="ht-soft" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="2" />
           </filter>
         </defs>
 
-        {/* Sky */}
-        <rect x={0} y={0} width={width} height={horizonY + 4} fill="url(#ht-sky)" />
-        {/* Ground */}
-        <rect x={0} y={horizonY} width={width} height={height - horizonY} fill="url(#ht-ground)" />
+        {/* SKY */}
+        <rect width={width} height={height} fill="url(#ht-sky)" />
 
-        {/* Stars */}
-        {stars.map((s, i) => (
-          <circle
-            key={`st-${i}`}
-            cx={s.x}
-            cy={s.y}
-            r={s.r}
-            fill={STAR_COLOR}
-            opacity={0.55 * s.flicker}
+        {/* MOON */}
+        <circle cx={width * 0.18} cy={height * 0.22} r={hlBaseR * 0.7} fill="url(#ht-moon)" filter="url(#ht-soft)" />
+        <circle cx={width * 0.18} cy={height * 0.22} r={hlBaseR * 0.32} fill="rgba(244, 232, 192, 0.55)" />
+        <circle cx={width * 0.18 - 4} cy={height * 0.215} r={2} fill="rgba(120, 100, 70, 0.4)" />
+        <circle cx={width * 0.18 + 6} cy={height * 0.225} r={1.5} fill="rgba(120, 100, 70, 0.35)" />
+
+        {/* MOUNTAINS */}
+        <path
+          d={`M 0 ${horizonY + 4}
+              L ${width * 0.10} ${horizonY - 22}
+              L ${width * 0.18} ${horizonY - 8}
+              L ${width * 0.26} ${horizonY - 30}
+              L ${width * 0.34} ${horizonY - 14}
+              L ${width * 0.44} ${horizonY - 26}
+              L ${width * 0.55} ${horizonY - 12}
+              L ${width * 0.66} ${horizonY - 22}
+              L ${width * 0.76} ${horizonY - 8}
+              L ${width * 0.86} ${horizonY - 18}
+              L ${width} ${horizonY + 4}
+              L ${width} ${horizonY + 8}
+              L 0 ${horizonY + 8} Z`}
+          fill="rgba(14, 10, 16, 0.95)"
+        />
+
+        {/* GROUND */}
+        <rect x={0} y={horizonY + 6} width={width} height={height - horizonY - 6} fill="rgba(10, 6, 8, 0.92)" />
+
+        {/* TIES */}
+        <g>{ties}</g>
+
+        {/* RAILS */}
+        <path d={railLeftPath} stroke="url(#ht-rail)" strokeWidth={3.5} fill="none" />
+        <path d={railRightPath} stroke="url(#ht-rail)" strokeWidth={3.5} fill="none" />
+        <path d={railLeftPath} stroke={tintMid} strokeWidth={1.2} fill="none" opacity={0.55 * headlightGlow} />
+        <path d={railRightPath} stroke={tintMid} strokeWidth={1.2} fill="none" opacity={0.55 * headlightGlow} />
+
+        {/* POLES */}
+        {poleNodes}
+
+        {/* DUST BACK */}
+        <g opacity={0.4}>{dustNodes.slice(0, 25)}</g>
+
+        {/* HEADLIGHT BEAM CONE */}
+        <g opacity={0.42 * headlightGlow} style={{ mixBlendMode: "screen" }}>
+          <path
+            d={`M ${hlX} ${hlY + 6}
+                L ${railNearLeftX - 90} ${trainBaseY}
+                L ${railNearRightX + 90} ${trainBaseY} Z`}
+            fill={`hsla(${tintHue}, 95%, 78%, 0.18)`}
           />
-        ))}
+          <path
+            d={`M ${hlX} ${hlY + 6}
+                L ${railNearLeftX - 30} ${trainBaseY}
+                L ${railNearRightX + 30} ${trainBaseY} Z`}
+            fill={`hsla(${tintHue}, 98%, 86%, 0.30)`}
+          />
+          <path
+            d={`M ${hlX} ${hlY + 6}
+                L ${cx - 60} ${trainBaseY}
+                L ${cx + 60} ${trainBaseY} Z`}
+            fill={`hsla(${tintHue}, 100%, 94%, 0.42)`}
+          />
+        </g>
 
-        {/* Faint moon */}
-        <circle
-          cx={width * 0.82}
-          cy={height * 0.16}
-          r={Math.min(width, height) * 0.045}
-          fill="url(#ht-moon)"
-        />
-        <circle
-          cx={width * 0.82}
-          cy={height * 0.16}
-          r={Math.min(width, height) * 0.012}
-          fill="#D8D2BC"
-          opacity={0.42}
-        />
+        {/* STEAM BACK */}
+        <g filter="url(#ht-blur)">{steamNodes.slice(0, 22)}</g>
 
-        {/* Ballast bed (gravel) — wide trapezoid in perspective */}
-        <polygon
-          points={`${vpX - railSpreadVp * 0.7},${vpY} ${vpX + railSpreadVp * 0.7},${vpY} ${vpX + railSpreadFg * 0.95},${fgY} ${vpX - railSpreadFg * 0.95},${fgY}`}
-          fill={BALLAST_COLOR}
-          opacity={0.75}
-        />
-        {/* Ballast texture — scattered grit dots */}
-        {Array.from({ length: 90 }).map((_, i) => {
-          const r1 = rand(i * 13.7 + 0.1);
-          const r2 = rand(i * 5.3 + 7.1);
-          const t = 0.05 + r1 * 0.95;
-          const gy = depthToY(t, vpY, fgY);
-          const halfW = tieHalf(t) * 1.25;
-          const gx = vpX + (r2 - 0.5) * halfW * 2;
-          const gr = 0.6 + rand(i * 9.9) * (0.6 + t * 1.6);
-          return (
-            <circle
-              key={`grit-${i}`}
-              cx={gx}
-              cy={gy}
-              r={gr}
-              fill="#2C241B"
-              opacity={0.55}
-            />
-          );
-        })}
-
-        {/* Warm ground pool around headlight base */}
-        <ellipse
-          cx={vpX}
-          cy={vpY + 18 + approach * 24}
-          rx={width * (0.18 + approach * 0.14)}
-          ry={height * (0.06 + approach * 0.05)}
-          fill="url(#ht-ground-pool)"
-          opacity={0.85 * (0.6 + energy * 0.6)}
-        />
-
-        {/* Wooden ties (rendered back-to-front so foreground covers distant) */}
-        {ties.map((tie, i) => {
-          const lit = interpolate(tie.t, [0, 0.45], [1, 0], {
-            extrapolateLeft: "clamp",
-            extrapolateRight: "clamp",
-          });
-          // Lit color blends warm light into the wood near the vanishing point.
-          const r = Math.round(58 + (255 - 58) * lit * 0.8);
-          const g = Math.round(42 + (220 - 42) * lit * 0.8);
-          const b = Math.round(28 + (140 - 28) * lit * 0.5);
-          const tieColor = lit > 0.05 ? `rgb(${r},${g},${b})` : TIE_COLOR;
-          return (
-            <g key={`tie-${i}`}>
-              {/* Tie shadow under */}
-              <rect
-                x={vpX - tie.halfW}
-                y={tie.y + tie.thick * 0.45}
-                width={tie.halfW * 2}
-                height={Math.max(0.8, tie.thick * 0.35)}
-                fill={TIE_DARK_COLOR}
-                opacity={0.65}
-              />
-              {/* Tie body */}
-              <rect
-                x={vpX - tie.halfW}
-                y={tie.y - tie.thick * 0.5}
-                width={tie.halfW * 2}
-                height={tie.thick}
-                fill={tieColor}
-                opacity={0.92}
-              />
-            </g>
-          );
-        })}
-
-        {/* Rails — drawn as polylines along depth so we can color-fade them
-            from lit-near-VP to dark-near-foreground. We split each rail into
-            10 segments for the gradient illusion. */}
-        {([-1, 1] as const).map((side) => {
-          const segs = 12;
-          return Array.from({ length: segs }).map((_, i) => {
-            const t1 = i / segs;
-            const t2 = (i + 1) / segs;
-            const y1 = depthToY(t1, vpY, fgY);
-            const y2 = depthToY(t2, vpY, fgY);
-            const x1 = railX(t1, side);
-            const x2 = railX(t2, side);
-            // Lit factor: high near vanishing point, fades with distance from VP.
-            const litFactor = Math.pow(1 - (t1 + t2) * 0.5, 2.2);
-            const litMix = litFactor * (0.6 + energy * 0.6);
-            // Blend rail base color toward warm lit color.
-            const r = Math.round(92 + (255 - 92) * litMix);
-            const g = Math.round(88 + (233 - 88) * litMix);
-            const b = Math.round(82 + (176 - 82) * litMix);
-            const sw = Math.max(1.6, 2 + Math.pow((t1 + t2) * 0.5, 1.6) * 6);
+        {/* LOCOMOTIVE */}
+        <g transform={`translate(${shakeX}, ${shakeY})`}>
+          {/* Cowcatcher */}
+          <path
+            d={`M ${trainLeft + 60} ${trainBaseY}
+                L ${cx - 130} ${trainBaseY - 70}
+                L ${cx + 130} ${trainBaseY - 70}
+                L ${trainRight - 60} ${trainBaseY}
+                Z`}
+            fill="url(#ht-train)"
+            stroke="rgba(0,0,0,0.95)"
+            strokeWidth={2}
+          />
+          {Array.from({ length: 9 }, (_, i) => {
+            const t = i / 8;
+            const sx = trainLeft + 60 + t * (trainW - 120);
             return (
               <line
-                key={`rail-${side}-${i}`}
-                x1={x1}
-                y1={y1}
-                x2={x2}
-                y2={y2}
-                stroke={`rgb(${r},${g},${b})`}
-                strokeWidth={sw}
-                strokeLinecap="round"
-                opacity={0.94}
+                key={`slat-${i}`}
+                x1={sx}
+                y1={trainBaseY}
+                x2={cx - 130 + t * 260}
+                y2={trainBaseY - 70}
+                stroke="rgba(40, 28, 18, 0.85)"
+                strokeWidth={1.8}
               />
             );
-          });
-        })}
+          })}
 
-        {/* ============== VOLUMETRIC BEAM CONE ============== */}
-        {/* Outer atmospheric beam — heavily blurred wide cone */}
-        <polygon
-          points={`${hlX - headlightR * 0.9},${hlY} ${hlX + headlightR * 0.9},${hlY} ${beamRightX + 60},${beamBottomY} ${beamLeftX - 60},${beamBottomY}`}
-          fill="url(#ht-beam-outer)"
-          opacity={beamOpacity * 1.0}
-          filter="url(#ht-blur-outer)"
-        />
-        {/* Mid beam body */}
-        <polygon
-          points={`${hlX - headlightR * 0.55},${hlY} ${hlX + headlightR * 0.55},${hlY} ${beamRightX * 0.78 + vpX * 0.22},${beamBottomY} ${beamLeftX * 0.78 + vpX * 0.22},${beamBottomY}`}
-          fill="url(#ht-beam-mid)"
-          opacity={beamOpacity * 1.25}
-          filter="url(#ht-blur-mid)"
-        />
-        {/* Inner bright core beam */}
-        <polygon
-          points={`${hlX - headlightR * 0.28},${hlY} ${hlX + headlightR * 0.28},${hlY} ${beamRightX * 0.45 + vpX * 0.55},${beamBottomY} ${beamLeftX * 0.45 + vpX * 0.55},${beamBottomY}`}
-          fill="url(#ht-beam-inner)"
-          opacity={beamOpacity * 1.4}
-          filter="url(#ht-blur-soft)"
-        />
-        {/* Chroma-tinted thin streak — pure tint hint */}
-        <polygon
-          points={`${hlX - headlightR * 0.18},${hlY} ${hlX + headlightR * 0.18},${hlY} ${vpX + (beamRightX - vpX) * 0.32},${beamBottomY} ${vpX - (vpX - beamLeftX) * 0.32},${beamBottomY}`}
-          fill={beamTint}
-          opacity={beamOpacity * 0.32}
-          filter="url(#ht-blur-soft)"
-        />
-
-        {/* ============== TRAIN SILHOUETTE ============== */}
-        {/* Cab (rear, bigger box) */}
-        <rect
-          x={trainCx - cabW * 0.5}
-          y={trainBaseY - boilerH - cabH * 0.4}
-          width={cabW}
-          height={cabH}
-          fill={TRAIN_SILHOUETTE}
-          opacity={0.92}
-          rx={cabW * 0.05}
-        />
-        {/* Boiler (cylindrical, in front of cab) */}
-        <rect
-          x={trainCx - boilerW * 0.5}
-          y={trainBaseY - boilerH}
-          width={boilerW}
-          height={boilerH}
-          fill={TRAIN_SILHOUETTE}
-          opacity={0.95}
-          rx={boilerH * 0.42}
-        />
-        {/* Smokebox (front of boiler) — slightly larger circle */}
-        <ellipse
-          cx={trainCx}
-          cy={trainBaseY - boilerH * 0.5}
-          rx={boilerW * 0.34}
-          ry={boilerH * 0.62}
-          fill={TRAIN_SILHOUETTE}
-          opacity={0.95}
-        />
-        {/* Smokestack */}
-        <rect
-          x={trainCx - boilerW * 0.18 - stackW * 0.5}
-          y={trainBaseY - boilerH * 0.5 - stackH}
-          width={stackW}
-          height={stackH}
-          fill={TRAIN_SILHOUETTE}
-          opacity={0.96}
-        />
-        {/* Smokestack flare top */}
-        <rect
-          x={trainCx - boilerW * 0.18 - stackW * 0.85}
-          y={trainBaseY - boilerH * 0.5 - stackH - stackH * 0.12}
-          width={stackW * 1.7}
-          height={stackH * 0.16}
-          fill={TRAIN_SILHOUETTE}
-          opacity={0.96}
-        />
-        {/* Steam dome (small bump on boiler) */}
-        <ellipse
-          cx={trainCx + boilerW * 0.05}
-          cy={trainBaseY - boilerH - 1}
-          rx={boilerW * 0.08}
-          ry={boilerH * 0.18}
-          fill={TRAIN_SILHOUETTE}
-          opacity={0.95}
-        />
-        {/* Cowcatcher hint (angled wedge in front) */}
-        <polygon
-          points={`${trainCx - boilerW * 0.42},${trainBaseY - boilerH * 0.05} ${trainCx + boilerW * 0.42},${trainBaseY - boilerH * 0.05} ${trainCx + boilerW * 0.18},${trainBaseY + boilerH * 0.18} ${trainCx - boilerW * 0.18},${trainBaseY + boilerH * 0.18}`}
-          fill={TRAIN_SILHOUETTE}
-          opacity={0.92}
-        />
-
-        {/* ============== HEADLIGHT (3-layer) ============== */}
-        {/* Outer halo (largest) */}
-        <circle
-          cx={hlX}
-          cy={hlY}
-          r={headlightR * (4.2 + onsetFlash * 1.4)}
-          fill="url(#ht-halo)"
-          opacity={haloOpacity * 0.55}
-          filter="url(#ht-blur-mid)"
-        />
-        {/* Mid headlight body */}
-        <circle
-          cx={hlX}
-          cy={hlY}
-          r={headlightR * (1.9 + onsetFlash * 0.6)}
-          fill="url(#ht-halo)"
-          opacity={haloOpacity}
-          filter="url(#ht-blur-soft)"
-        />
-        {/* Bright inner core (white-hot) */}
-        <circle
-          cx={hlX}
-          cy={hlY}
-          r={headlightR * (0.85 + onsetFlash * 0.35)}
-          fill="url(#ht-core)"
-          opacity={coreOpacity}
-        />
-        {/* Solid white pinpoint */}
-        <circle
-          cx={hlX}
-          cy={hlY}
-          r={headlightR * (0.32 + onsetFlash * 0.18)}
-          fill="#FFFFFF"
-          opacity={Math.min(1, 0.95 + onsetFlash * 0.05)}
-        />
-
-        {/* ============== STEAM / SMOKE ============== */}
-        {/* Side steam puffs */}
-        {steamPuffs.map((p, i) => (
-          <circle
-            key={`steam-${i}`}
-            cx={p.x}
-            cy={p.y}
-            r={p.r}
-            fill="#3A332C"
-            opacity={p.o}
-            filter="url(#ht-blur-soft)"
+          {/* Boiler front */}
+          <ellipse
+            cx={cx}
+            cy={hlY + 60}
+            rx={trainW * 0.42}
+            ry={hlR * 1.95}
+            fill="url(#ht-train)"
+            stroke="rgba(0,0,0,0.9)"
+            strokeWidth={2.5}
           />
-        ))}
-        {/* Smoke plume from smokestack */}
-        {plumePts.map((p, i) => (
-          <circle
-            key={`plume-${i}`}
-            cx={p.x}
-            cy={p.y}
-            r={p.r}
-            fill={SMOKE_COLOR}
-            opacity={p.o}
-            filter="url(#ht-blur-soft)"
-          />
-        ))}
+          {[-1, 0, 1].map((k) => (
+            <ellipse
+              key={`band-${k}`}
+              cx={cx}
+              cy={hlY + 60 + k * hlR * 0.8}
+              rx={trainW * 0.42 + k * 1.2}
+              ry={hlR * 1.95 + k * 0.4}
+              fill="none"
+              stroke="rgba(60, 44, 30, 0.45)"
+              strokeWidth={1.2}
+            />
+          ))}
+          {Array.from({ length: 14 }, (_, i) => {
+            const a = (i / 14) * Math.PI * 2;
+            return (
+              <circle
+                key={`rivet-${i}`}
+                cx={cx + Math.cos(a) * trainW * 0.42}
+                cy={hlY + 60 + Math.sin(a) * hlR * 1.95}
+                r={1.4}
+                fill="rgba(80, 60, 40, 0.7)"
+              />
+            );
+          })}
 
-        {/* ============== DUST MOTES IN BEAM ============== */}
-        {dustMotes.map((d, i) => (
-          <circle
-            key={`dust-${i}`}
-            cx={d.x}
-            cy={d.y}
-            r={d.r}
-            fill={HEADLIGHT_CORE}
-            opacity={d.o * (0.6 + beatDecay * 0.4)}
-            filter="url(#ht-blur-soft)"
+          {/* Smokestack */}
+          <rect
+            x={cx - 22}
+            y={trainTopY - 30}
+            width={44}
+            height={70}
+            fill="url(#ht-train)"
+            stroke="rgba(0,0,0,0.9)"
+            strokeWidth={2}
           />
-        ))}
+          <path
+            d={`M ${cx - 28} ${trainTopY - 30}
+                L ${cx - 36} ${trainTopY - 44}
+                L ${cx + 36} ${trainTopY - 44}
+                L ${cx + 28} ${trainTopY - 30} Z`}
+            fill="rgba(8, 4, 6, 0.95)"
+            stroke="rgba(0,0,0,1)"
+            strokeWidth={1.6}
+          />
 
-        {/* ============== FOG NEAR VANISHING POINT ============== */}
-        <ellipse
-          cx={vpX}
-          cy={vpY + 20}
-          rx={width * 0.42}
-          ry={height * 0.18}
-          fill="url(#ht-fog)"
-          opacity={0.6}
+          {/* Steam dome */}
+          <ellipse cx={cx + 70} cy={trainTopY + 24} rx={22} ry={14} fill="url(#ht-train)" stroke="rgba(0,0,0,0.9)" strokeWidth={1.6} />
+          <ellipse cx={cx + 70} cy={trainTopY + 22} rx={18} ry={3} fill="rgba(60, 42, 28, 0.5)" />
+
+          {/* Bell */}
+          <path
+            d={`M ${cx - 60} ${trainTopY + 18}
+                Q ${cx - 60} ${trainTopY + 6} ${cx - 50} ${trainTopY + 6}
+                L ${cx - 70} ${trainTopY + 6}
+                Q ${cx - 80} ${trainTopY + 6} ${cx - 80} ${trainTopY + 18}
+                Z`}
+            fill="rgba(120, 92, 40, 0.85)"
+            stroke="rgba(20, 12, 4, 0.9)"
+            strokeWidth={1}
+          />
+          <line x1={cx - 70} y1={trainTopY + 18} x2={cx - 70} y2={trainTopY + 24} stroke="rgba(20, 12, 4, 0.9)" strokeWidth={0.8} />
+
+          {/* Headlight housing */}
+          <circle cx={hlX} cy={hlY} r={hlR * 1.55} fill="rgba(8, 4, 6, 0.95)" stroke="rgba(0, 0, 0, 1)" strokeWidth={2.2} />
+          <circle cx={hlX} cy={hlY} r={hlR * 1.4} fill="rgba(18, 12, 10, 0.92)" />
+          <circle
+            cx={hlX}
+            cy={hlY}
+            r={hlR * 1.4}
+            fill="none"
+            stroke="rgba(180, 160, 130, 0.7)"
+            strokeWidth={1.4}
+          />
+
+          {/* HEADLIGHT 3-LAYER GLOW */}
+          <circle cx={hlX} cy={hlY} r={hlR * 4.0} fill="url(#ht-headlight)" style={{ mixBlendMode: "screen" }} opacity={0.55 * headlightGlow} />
+          <circle cx={hlX} cy={hlY} r={hlR * 2.2} fill="url(#ht-headlight)" style={{ mixBlendMode: "screen" }} opacity={0.78 * headlightGlow} />
+          <circle cx={hlX} cy={hlY} r={hlR * 1.0} fill="url(#ht-headcore)" style={{ mixBlendMode: "screen" }} />
+          <circle cx={hlX} cy={hlY} r={hlR * 0.45} fill="#FFFFFF" opacity={0.95 * headlightGlow} />
+
+          {/* Number plate */}
+          <rect
+            x={cx - 30}
+            y={trainTopY + 50}
+            width={60}
+            height={18}
+            rx={2}
+            fill="rgba(40, 28, 18, 0.9)"
+            stroke="rgba(120, 90, 50, 0.7)"
+            strokeWidth={0.8}
+          />
+          <text
+            x={cx}
+            y={trainTopY + 64}
+            fontSize="12"
+            fontFamily="Georgia, serif"
+            fontWeight="900"
+            textAnchor="middle"
+            fill="rgba(220, 180, 110, 0.85)"
+            letterSpacing="1.5"
+          >
+            1972
+          </text>
+
+          {/* Firebox glow */}
+          <ellipse
+            cx={cx}
+            cy={trainBaseY - 40}
+            rx={36}
+            ry={14}
+            fill="url(#ht-firebox)"
+            opacity={0.65 + bass * 0.25}
+            style={{ mixBlendMode: "screen" }}
+          />
+          <ellipse
+            cx={cx}
+            cy={trainBaseY - 40}
+            rx={20}
+            ry={6}
+            fill="#FFE0A0"
+            opacity={0.5 + bass * 0.3}
+          />
+
+          {/* Driving wheels */}
+          {[-1, 1].map((side) => (
+            <g key={`wheelgrp-${side}`}>
+              <circle
+                cx={cx + side * 90}
+                cy={trainBaseY - 28}
+                r={28}
+                fill="rgba(8, 4, 6, 0.98)"
+                stroke="rgba(40, 28, 18, 0.9)"
+                strokeWidth={2}
+              />
+              <circle
+                cx={cx + side * 90}
+                cy={trainBaseY - 28}
+                r={22}
+                fill="rgba(14, 10, 8, 0.95)"
+              />
+              <g transform={`rotate(${wheelRot * side}, ${cx + side * 90}, ${trainBaseY - 28})`}>
+                {[0, 60, 120].map((a) => {
+                  const rad = (a * Math.PI) / 180;
+                  return (
+                    <line
+                      key={`spoke-${side}-${a}`}
+                      x1={cx + side * 90 - Math.cos(rad) * 22}
+                      y1={trainBaseY - 28 - Math.sin(rad) * 22}
+                      x2={cx + side * 90 + Math.cos(rad) * 22}
+                      y2={trainBaseY - 28 + Math.sin(rad) * 22}
+                      stroke="rgba(60, 44, 30, 0.85)"
+                      strokeWidth={2.5}
+                    />
+                  );
+                })}
+                <circle cx={cx + side * 90} cy={trainBaseY - 28} r={5} fill="rgba(120, 92, 50, 0.85)" />
+              </g>
+            </g>
+          ))}
+          {/* Pony wheels */}
+          {[-1, 1].map((side) => (
+            <g key={`pwheel-${side}`}>
+              <circle
+                cx={cx + side * 160}
+                cy={trainBaseY - 18}
+                r={16}
+                fill="rgba(8, 4, 6, 0.98)"
+                stroke="rgba(40, 28, 18, 0.9)"
+                strokeWidth={1.5}
+              />
+              <g transform={`rotate(${wheelRot * 1.4 * side}, ${cx + side * 160}, ${trainBaseY - 18})`}>
+                <line
+                  x1={cx + side * 160 - 12}
+                  y1={trainBaseY - 18}
+                  x2={cx + side * 160 + 12}
+                  y2={trainBaseY - 18}
+                  stroke="rgba(60, 44, 30, 0.85)"
+                  strokeWidth={1.8}
+                />
+                <line
+                  x1={cx + side * 160}
+                  y1={trainBaseY - 30}
+                  x2={cx + side * 160}
+                  y2={trainBaseY - 6}
+                  stroke="rgba(60, 44, 30, 0.85)"
+                  strokeWidth={1.8}
+                />
+              </g>
+            </g>
+          ))}
+
+          {/* Connecting rod */}
+          <line
+            x1={cx - 90}
+            y1={trainBaseY - 28}
+            x2={cx + 90}
+            y2={trainBaseY - 28}
+            stroke="rgba(140, 110, 70, 0.75)"
+            strokeWidth={3}
+          />
+          <circle cx={cx - 90} cy={trainBaseY - 28} r={3} fill="rgba(180, 140, 80, 0.9)" />
+          <circle cx={cx + 90} cy={trainBaseY - 28} r={3} fill="rgba(180, 140, 80, 0.9)" />
+
+          {/* Cab */}
+          <rect
+            x={cx - 90}
+            y={trainTopY - 4}
+            width={180}
+            height={50}
+            fill="rgba(8, 4, 6, 0.85)"
+            stroke="rgba(40, 28, 18, 0.7)"
+            strokeWidth={1.4}
+          />
+          <rect x={cx - 70} y={trainTopY + 6} width={26} height={20} fill="rgba(220, 150, 60, 0.4)" stroke="rgba(0,0,0,0.8)" strokeWidth={1} />
+          <rect x={cx + 44} y={trainTopY + 6} width={26} height={20} fill="rgba(220, 150, 60, 0.4)" stroke="rgba(0,0,0,0.8)" strokeWidth={1} />
+        </g>
+
+        {/* SPARKS */}
+        <g style={{ mixBlendMode: "screen" }}>{sparkNodes}</g>
+
+        {/* STEAM FRONT */}
+        <g filter="url(#ht-blur)">{steamNodes.slice(22)}</g>
+
+        {/* DUST FRONT */}
+        <g opacity={0.7}>{dustNodes.slice(25)}</g>
+
+        {/* OUTER BLOOM */}
+        <circle
+          cx={hlX}
+          cy={hlY}
+          r={Math.max(width, height) * 0.55}
+          fill="url(#ht-headlight)"
+          opacity={0.18 * headlightGlow}
+          style={{ mixBlendMode: "screen" }}
         />
+
+        {/* WHISTLE BURST */}
+        {onsetEnv > 0.5 && (
+          <g opacity={onsetEnv * 0.7} style={{ mixBlendMode: "screen" }}>
+            <ellipse cx={cx + 70} cy={trainTopY - 8} rx={28} ry={14} fill="rgba(240, 235, 220, 0.85)" filter="url(#ht-blur)" />
+            <ellipse cx={cx + 90} cy={trainTopY - 24} rx={22} ry={10} fill="rgba(240, 235, 220, 0.7)" filter="url(#ht-blur)" />
+          </g>
+        )}
+
+        {/* VIGNETTE */}
+        <rect width={width} height={height} fill="url(#ht-vignette)" />
+
+        {/* WARM TINT WASH */}
+        <rect width={width} height={height} fill={`hsla(${tintHue}, 60%, 55%, ${0.04 + slowEnergy * 0.04})`} />
       </svg>
     </div>
   );

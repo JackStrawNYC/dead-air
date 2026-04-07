@@ -793,13 +793,13 @@ void main() {
   float chromaHueMod = uChromaHue * 0.2;
   float chordHue = float(int(uChordIndex)) / 24.0 * 0.12;
 
-  float hue1 = hsvToCosineHue(uPalettePrimary) + chromaHueMod + chordHue;
+  float hue1 = uPalettePrimary + chromaHueMod + chordHue;
   // Reef water: warm tropical blue-green (shifts toward cooler blue in space)
-  vec3 waterColor = 0.5 + 0.5 * cos(TAU * vec3(hue1 + 0.05, hue1 + 0.38, hue1 + 0.72));
+  vec3 waterColor = paletteHueColor(hue1, 0.65, 0.85);
   waterColor = mix(waterColor, vec3(0.03, 0.12, 0.22), 0.5 + spaceScore * 0.3);
 
-  float hue2 = hsvToCosineHue(uPaletteSecondary);
-  vec3 accentColor = 0.5 + 0.5 * cos(TAU * vec3(hue2, hue2 + 0.33, hue2 + 0.67));
+  float hue2 = uPaletteSecondary;
+  vec3 accentColor = paletteHueColor(hue2, 0.8, 0.95);
   accentColor = mix(accentColor, vec3(0.4, 0.8, 0.6), 0.2); // tropical green accent
 
   // === FLOW TIME (section-modulated) ===

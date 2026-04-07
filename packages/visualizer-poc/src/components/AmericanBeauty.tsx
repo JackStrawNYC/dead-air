@@ -1,9 +1,20 @@
 /**
- * AmericanBeauty -- Rose field growing across bottom third.
- * 10 stems (cubic bezier S-curve), 3-4 tangent-aligned thorns, 2 veined leaves,
- * rose bloom (7 outer + 5 middle + 3 inner petals + sepals + bud spiral),
- * per-petal radial gradient, dewdrop with beat-sparkle, ground grass.
- * Bloom sequence L→R, energy-driven speed. Appears every 55s for 14s.
+ * AmericanBeauty — A+++ tribute to the Grateful Dead's American Beauty album cover.
+ *
+ * Single oversized hero rose centered in the frame, occupying ~50% of the width,
+ * against a vintage cream parchment background with a subtle floral pattern,
+ * gold leaf borders, and warm sepia vignette. The rose has 5 concentric rings of
+ * crimson velvet petals with per-petal radial gradients, dark thorns and
+ * leaves, dewdrops, and a subtle pulse on the beat.
+ *
+ * Audio reactivity:
+ *   slowEnergy → bloom warmth + sepia richness
+ *   energy     → petal saturation + glow
+ *   bass       → rose subtle expansion
+ *   beatDecay  → dewdrop sparkle + gentle pulse
+ *   onsetEnvelope → background vignette flash
+ *   chromaHue  → palette shift between crimson / burgundy / coral
+ *   tempoFactor → rose drift sway
  */
 
 import React from "react";
@@ -13,431 +24,333 @@ import { seeded } from "../utils/seededRandom";
 import { useAudioSnapshot } from "./parametric/audio-helpers";
 import { useTempoFactor } from "../data/TempoContext";
 
-const BLOOM_FRAMES = 240;
-const STEM_COUNT = 10;
+const CYCLE_TOTAL = 2400;
+const VISIBLE_DURATION = 780;
 
-interface StemData {
-  x: number;
-  height: number;
-  swayPhase: number;
-  bloomDelay: number;
-  roseHue: number;
-  roseSize: number;
-  thornCount: number;
-  stemCurve1: number;
-  stemCurve2: number;
-  leafPositions: number[];
-  leafAngles: number[];
-  leafSides: number[];
-  dewdropPetal: number;
+interface FloralStamp { x: number; y: number; size: number; rot: number; }
+
+function buildFloralStamps(): FloralStamp[] {
+  const rng = seeded(19_701_101);
+  return Array.from({ length: 38 }, () => ({
+    x: rng(),
+    y: rng(),
+    size: 18 + rng() * 22,
+    rot: rng() * 360,
+  }));
 }
 
-/* Point on cubic bezier — stem/thorn/leaf placement */
-function cubicBez(
-  t: number,
-  x0: number, y0: number, x1: number, y1: number,
-  x2: number, y2: number, x3: number, y3: number,
-): [number, number] {
-  const u = 1 - t, uu = u * u, uuu = uu * u, tt = t * t, ttt = tt * t;
-  return [
-    uuu * x0 + 3 * uu * t * x1 + 3 * u * tt * x2 + ttt * x3,
-    uuu * y0 + 3 * uu * t * y1 + 3 * u * tt * y2 + ttt * y3,
-  ];
-}
-
-/* Normalized tangent on cubic bezier — thorn alignment */
-function cubicTan(
-  t: number,
-  x0: number, y0: number, x1: number, y1: number,
-  x2: number, y2: number, x3: number, y3: number,
-): [number, number] {
-  const u = 1 - t;
-  const dx = 3 * u * u * (x1 - x0) + 6 * u * t * (x2 - x1) + 3 * t * t * (x3 - x2);
-  const dy = 3 * u * u * (y1 - y0) + 6 * u * t * (y2 - y1) + 3 * t * t * (y3 - y2);
-  const len = Math.sqrt(dx * dx + dy * dy) || 1;
-  return [dx / len, dy / len];
-}
-
-/* ------------------------------------------------------------------ */
-/*  SVG gradient definitions — per-stem petal + leaf gradients        */
-/* ------------------------------------------------------------------ */
-const GradientDefs: React.FC<{
-  stems: StemData[];
-  chromaTint: number;
-  beatDecay: number;
-}> = ({ stems, chromaTint, beatDecay }) => (
-  <defs>
-    <filter id="dew-blur">
-      <feGaussianBlur in="SourceGraphic" stdDeviation="1.2" />
-    </filter>
-    {stems.map((stem, si) => {
-      const h = (stem.roseHue + chromaTint) % 360;
-      const lb = 32 + beatDecay * 5, le = 52 + beatDecay * 8;
-      return (
-        <React.Fragment key={si}>
-          <radialGradient id={`pg-${si}`} cx="30%" cy="70%" r="80%">
-            <stop offset="0%" stopColor={`hsl(${h},88%,${lb}%)`} />
-            <stop offset="100%" stopColor={`hsl(${h},82%,${le}%)`} />
-          </radialGradient>
-          <radialGradient id={`pm-${si}`} cx="35%" cy="65%" r="75%">
-            <stop offset="0%" stopColor={`hsl(${(h + 5) % 360},90%,${lb + 3}%)`} />
-            <stop offset="100%" stopColor={`hsl(${(h + 5) % 360},85%,${le + 4}%)`} />
-          </radialGradient>
-          <radialGradient id={`pi-${si}`} cx="40%" cy="60%" r="65%">
-            <stop offset="0%" stopColor={`hsl(${(h + 10) % 360},92%,${lb + 5}%)`} />
-            <stop offset="100%" stopColor={`hsl(${(h + 10) % 360},88%,${le + 6}%)`} />
-          </radialGradient>
-          <linearGradient id={`lg-${si}`} x1="0%" y1="0%" x2="100%" y2="50%">
-            <stop offset="0%" stopColor="hsl(130,55%,30%)" />
-            <stop offset="100%" stopColor="hsl(125,50%,42%)" />
-          </linearGradient>
-        </React.Fragment>
-      );
-    })}
-  </defs>
-);
-
-/* ------------------------------------------------------------------ */
-/*  Rose Bloom — sepals + 3 petal rings (7/5/3) + central bud spiral  */
-/* ------------------------------------------------------------------ */
-const RoseBloom: React.FC<{
-  cx: number; cy: number; size: number;
-  bloom: number; si: number; breathe: number;
-}> = ({ cx, cy, size, bloom, si, breathe }) => {
-  const es = size * bloom * (0.95 + breathe * 0.05);
-  if (es < 1) return null;
-  const el: React.ReactNode[] = [];
-
-  // Sepals — 3-4 green pointed leaves behind bloom
-  const sepalCount = 3 + (si % 2);
-  for (let s = 0; s < sepalCount; s++) {
-    const a = (s / sepalCount) * Math.PI * 2 + 0.3;
-    const sx = Math.cos(a) * es * 0.5, sy = Math.sin(a) * es * 0.5;
-    const tx = Math.cos(a) * es * 0.85, ty = Math.sin(a) * es * 0.85;
-    const px = -Math.sin(a) * es * 0.12, py = Math.cos(a) * es * 0.12;
-    el.push(
-      <path key={`sp-${s}`}
-        d={`M${cx},${cy} Q${cx + sx + px},${cy + sy + py} ${cx + tx},${cy + ty} Q${cx + sx - px},${cy + sy - py} ${cx},${cy}`}
-        fill="hsl(130,55%,32%)" opacity={0.6 * bloom} />,
-    );
-  }
-
-  // Outer ring: 7 curved petals with slight tip curl
-  for (let p = 0; p < 7; p++) {
-    const a = (p / 7) * Math.PI * 2;
-    const px = Math.cos(a) * es * 0.42, py = Math.sin(a) * es * 0.42;
-    const tx = Math.cos(a) * es * 0.65, ty = Math.sin(a) * es * 0.65;
-    const curlX = -Math.sin(a) * es * 0.08, curlY = Math.cos(a) * es * 0.08;
-    const w = es * 0.22, wx = -Math.sin(a) * w, wy = Math.cos(a) * w;
-    el.push(
-      <path key={`o-${p}`}
-        d={`M${cx + wx * 0.3},${cy + wy * 0.3} Q${cx + px + wx},${cy + py + wy} ${cx + tx + curlX},${cy + ty + curlY} Q${cx + px - wx},${cy + py - wy} ${cx - wx * 0.3},${cy - wy * 0.3}`}
-        fill={`url(#pg-${si})`} opacity={0.72 * bloom} />,
-    );
-  }
-
-  // Middle ring: 5 petals, slightly more closed
-  for (let p = 0; p < 5; p++) {
-    const a = ((p + 0.35) / 5) * Math.PI * 2;
-    const px = Math.cos(a) * es * 0.28, py = Math.sin(a) * es * 0.28;
-    const tx = Math.cos(a) * es * 0.42, ty = Math.sin(a) * es * 0.42;
-    const w = es * 0.16, wx = -Math.sin(a) * w, wy = Math.cos(a) * w;
-    el.push(
-      <path key={`m-${p}`}
-        d={`M${cx + wx * 0.2},${cy + wy * 0.2} Q${cx + px + wx * 0.8},${cy + py + wy * 0.8} ${cx + tx},${cy + ty} Q${cx + px - wx * 0.8},${cy + py - wy * 0.8} ${cx - wx * 0.2},${cy - wy * 0.2}`}
-        fill={`url(#pm-${si})`} opacity={0.82 * bloom} />,
-    );
-  }
-
-  // Inner ring: 3 tight petals
-  for (let p = 0; p < 3; p++) {
-    const a = ((p + 0.2) / 3) * Math.PI * 2;
-    const px = Math.cos(a) * es * 0.14, py = Math.sin(a) * es * 0.14;
-    const tx = Math.cos(a) * es * 0.24, ty = Math.sin(a) * es * 0.24;
-    const w = es * 0.1, wx = -Math.sin(a) * w, wy = Math.cos(a) * w;
-    el.push(
-      <path key={`i-${p}`}
-        d={`M${cx},${cy} Q${cx + px + wx},${cy + py + wy} ${cx + tx},${cy + ty} Q${cx + px - wx},${cy + py - wy} ${cx},${cy}`}
-        fill={`url(#pi-${si})`} opacity={0.9 * bloom} />,
-    );
-  }
-
-  // Central bud spiral
-  const budR = es * 0.07;
-  el.push(
-    <circle key="bo" cx={cx} cy={cy} r={budR} fill={`url(#pi-${si})`} opacity={0.95 * bloom} />,
-    <circle key="bi" cx={cx + budR * 0.2} cy={cy - budR * 0.15} r={budR * 0.5}
-      fill={`url(#pm-${si})`} opacity={0.9 * bloom} />,
-  );
-
-  return <>{el}</>;
-};
-
-/* ------------------------------------------------------------------ */
-/*  Leaf — pointed bezier blade + midrib + 3 lateral vein pairs       */
-/* ------------------------------------------------------------------ */
-const Leaf: React.FC<{
-  cx: number; cy: number; side: number;
-  angle: number; scale: number; si: number; opacity: number;
-}> = ({ cx, cy, side, angle, scale, si, opacity }) => {
-  const len = 22 * scale, w = 8 * scale;
-  const rot = side * (35 + angle * 10);
-  const rad = (rot * Math.PI) / 180;
-  const tipX = cx + Math.cos(rad) * len;
-  const tipY = cy + Math.sin(rad) * len;
-  const perpX = -Math.sin(rad) * w;
-  const perpY = Math.cos(rad) * w;
-  const mf = 0.45;
-  const mx = cx + Math.cos(rad) * len * mf;
-  const my = cy + Math.sin(rad) * len * mf;
-
-  return (
-    <g opacity={opacity}>
-      {/* Leaf blade — pointed bezier */}
-      <path
-        d={`M${cx},${cy} Q${mx + perpX * 1.3},${my + perpY * 1.3} ${tipX},${tipY} Q${mx - perpX * 1.3},${my - perpY * 1.3} ${cx},${cy}`}
-        fill={`url(#lg-${si})`}
-      />
-      {/* Midrib vein */}
-      <line x1={cx} y1={cy} x2={tipX} y2={tipY}
-        stroke="hsl(130,40%,28%)" strokeWidth={0.8 * scale} opacity={0.5} />
-      {/* Lateral veins — 3 pairs angled off midrib */}
-      {[0.3, 0.5, 0.7].map((f, vi) => {
-        const vx = cx + Math.cos(rad) * len * f;
-        const vy = cy + Math.sin(rad) * len * f;
-        const vl = w * (1 - Math.abs(f - 0.5)) * 0.1;
-        return (
-          <React.Fragment key={vi}>
-            <line x1={vx} y1={vy} x2={vx + perpX * vl} y2={vy + perpY * vl}
-              stroke="hsl(130,40%,28%)" strokeWidth={0.5 * scale} opacity={0.35} />
-            <line x1={vx} y1={vy} x2={vx - perpX * vl} y2={vy - perpY * vl}
-              stroke="hsl(130,40%,28%)" strokeWidth={0.5 * scale} opacity={0.35} />
-          </React.Fragment>
-        );
-      })}
-    </g>
-  );
-};
-
-/* ------------------------------------------------------------------ */
-/*  Dewdrop — white ellipse with gaussian blur + beat sparkle          */
-/* ------------------------------------------------------------------ */
-const Dewdrop: React.FC<{
-  cx: number; cy: number; size: number; sparkle: number;
-}> = ({ cx, cy, size, sparkle }) => {
-  const r = size * (0.8 + sparkle * 0.4);
-  const op = 0.5 + sparkle * 0.5;
-  return (
-    <g filter="url(#dew-blur)">
-      <ellipse cx={cx} cy={cy} rx={r * 1.2} ry={r * 0.8} fill="white" opacity={op * 0.6} />
-      <ellipse cx={cx - r * 0.15} cy={cy - r * 0.2} rx={r * 0.5} ry={r * 0.35}
-        fill="white" opacity={op * 0.9} />
-    </g>
-  );
-};
-
-/* ------------------------------------------------------------------ */
-/*  Main Component                                                     */
-/* ------------------------------------------------------------------ */
-interface Props {
-  frames: EnhancedFrameData[];
-}
+interface Props { frames: EnhancedFrameData[]; }
 
 export const AmericanBeauty: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
-  const snap = useAudioSnapshot(frames);
   const tempoFactor = useTempoFactor();
-  const { energy, slowEnergy, chromaHue, beatDecay, bass } = snap;
+  const snap = useAudioSnapshot(frames);
 
-  /* Pre-generate stem data deterministically */
-  const stems = React.useMemo(() => {
-    const rng = seeded(19_700_101);
-    const result: StemData[] = [];
-    for (let s = 0; s < STEM_COUNT; s++) {
-      result.push({
-        x: 0.07 + (s / (STEM_COUNT - 1)) * 0.86,
-        height: 160 + rng() * 110,
-        roseSize: 22 + rng() * 12,
-        swayPhase: rng() * Math.PI * 2,
-        bloomDelay: s * 0.055,
-        thornCount: 3 + Math.floor(rng() * 2),
-        roseHue: 340 + rng() * 30,
-        stemCurve1: (rng() - 0.5) * 30,
-        stemCurve2: (rng() - 0.5) * 25,
-        leafPositions: [0.3 + rng() * 0.1, 0.55 + rng() * 0.1],
-        leafAngles: [rng(), rng()],
-        leafSides: [rng() > 0.5 ? 1 : -1, rng() > 0.5 ? -1 : 1],
-        dewdropPetal: Math.floor(rng() * 7),
-      });
+  const stamps = React.useMemo(buildFloralStamps, []);
+
+  const cycleFrame = frame % CYCLE_TOTAL;
+  if (cycleFrame >= VISIBLE_DURATION) return null;
+  const progress = cycleFrame / VISIBLE_DURATION;
+  const fadeIn = interpolate(progress, [0, 0.10], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const fadeOut = interpolate(progress, [0.90, 1], [1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const masterOpacity = Math.min(fadeIn, fadeOut) * 0.95;
+  if (masterOpacity < 0.01) return null;
+
+  const warmth = interpolate(snap.slowEnergy, [0.0, 0.32], [0.55, 1.10], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const glow = interpolate(snap.energy, [0.0, 0.30], [0.55, 1.0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const pulse = 1 + snap.beatDecay * 0.04 + snap.bass * 0.02;
+  const sway = Math.sin(frame * 0.012 * tempoFactor) * 4;
+  const sparkle = snap.onsetEnvelope > 0.4 ? Math.min(1, (snap.onsetEnvelope - 0.3) * 1.6) : 0;
+
+  // Hue rotation: crimson -> burgundy -> coral
+  const baseHue = 350;
+  const hueShift = ((snap.chromaHue - 180) * 0.18);
+  const roseHue = ((baseHue + hueShift) % 360 + 360) % 360;
+
+  // Rose dimensions
+  const cx = width * 0.5 + sway;
+  const cy = height * 0.50;
+  const roseSize = Math.min(width * 0.45, height * 0.62) * 0.5 * pulse;
+
+  // ─── PETAL BUILDER ──
+  // 5 rings of petals: outer huge, middle medium, inner tight, plus bud spiral
+  function petalRing(count: number, radius: number, petalLen: number, petalWid: number,
+    rot: number, ringHue: number, lightness: number): React.ReactNode[] {
+    const out: React.ReactNode[] = [];
+    for (let i = 0; i < count; i++) {
+      const a = (i / count) * Math.PI * 2 + rot;
+      const px = cx + Math.cos(a) * radius;
+      const py = cy + Math.sin(a) * radius;
+      const tipX = cx + Math.cos(a) * (radius + petalLen);
+      const tipY = cy + Math.sin(a) * (radius + petalLen);
+      const wxN = -Math.sin(a) * petalWid;
+      const wyN = Math.cos(a) * petalWid;
+      // Curl
+      const curlX = -Math.sin(a) * petalLen * 0.20;
+      const curlY = Math.cos(a) * petalLen * 0.20;
+
+      // Gradient unique per petal
+      const gid = `petal-${ringHue.toFixed(0)}-${count}-${i}-${lightness.toFixed(0)}`;
+      out.push(
+        <g key={gid}>
+          <defs>
+            <radialGradient id={gid} cx="35%" cy="65%" r="80%">
+              <stop offset="0%" stopColor={`hsl(${ringHue}, 75%, ${lightness - 12}%)`} />
+              <stop offset="55%" stopColor={`hsl(${ringHue}, 92%, ${lightness}%)`} />
+              <stop offset="100%" stopColor={`hsl(${ringHue}, 88%, ${Math.min(85, lightness + 14)}%)`} />
+            </radialGradient>
+          </defs>
+          {/* Petal body */}
+          <path d={`M ${px + wxN * 0.4} ${py + wyN * 0.4}
+            Q ${px + wxN * 1.2 + curlX * 0.5} ${py + wyN * 1.2 + curlY * 0.5}
+              ${tipX + curlX} ${tipY + curlY}
+            Q ${px - wxN * 1.2 + curlX * 0.5} ${py - wyN * 1.2 + curlY * 0.5}
+              ${px - wxN * 0.4} ${py - wyN * 0.4} Z`}
+            fill={`url(#${gid})`}
+            stroke={`hsl(${ringHue}, 85%, ${lightness - 22}%)`}
+            strokeWidth={1.2}
+            opacity={0.92} />
+          {/* Vein highlight */}
+          <line x1={px} y1={py} x2={tipX + curlX * 0.7} y2={tipY + curlY * 0.7}
+            stroke={`hsl(${ringHue}, 60%, ${lightness + 18}%)`}
+            strokeWidth={0.8} opacity={0.45} />
+        </g>,
+      );
     }
-    return result;
-  }, []);
+    return out;
+  }
 
-  /* Pre-generate grass blades */
-  const grass = React.useMemo(() => {
-    const rng = seeded(19_700_102);
-    return Array.from({ length: 60 }, () => ({
-      x: rng() * 1.1 - 0.05,
-      height: 8 + rng() * 18,
-      lean: (rng() - 0.5) * 20,
-      hue: 115 + rng() * 30,
-    }));
-  }, []);
+  // Sepals (green, behind petals)
+  const sepals: React.ReactNode[] = [];
+  for (let s = 0; s < 5; s++) {
+    const a = (s / 5) * Math.PI * 2 + 0.4;
+    const sx = cx + Math.cos(a) * roseSize * 0.55;
+    const sy = cy + Math.sin(a) * roseSize * 0.55;
+    const tx = cx + Math.cos(a) * roseSize * 1.20;
+    const ty = cy + Math.sin(a) * roseSize * 1.20;
+    const px = -Math.sin(a) * roseSize * 0.18;
+    const py = Math.cos(a) * roseSize * 0.18;
+    sepals.push(
+      <path key={`sep-${s}`}
+        d={`M ${cx} ${cy} Q ${sx + px} ${sy + py} ${tx} ${ty} Q ${sx - px} ${sy - py} ${cx} ${cy} Z`}
+        fill="hsl(125, 45%, 28%)" stroke="hsl(125, 45%, 18%)" strokeWidth={1.4} opacity={0.85} />,
+    );
+  }
 
-  /* Bloom timing — energy drives speed */
-  const bloomSpeed = 0.8 + energy * 2.0;
-  const progress = Math.min(frame / (BLOOM_FRAMES / bloomSpeed), 1);
+  // Stem & leaves (extending below the rose)
+  const stemPath = `M ${cx - 4} ${cy + roseSize * 0.7}
+    Q ${cx - 8} ${cy + roseSize * 1.4} ${cx} ${cy + roseSize * 2.0}
+    Q ${cx + 8} ${cy + roseSize * 2.6} ${cx - 4} ${cy + roseSize * 3.4}`;
 
-  /* Master opacity */
-  const baseOpacity = interpolate(energy, [0.03, 0.25], [0.3, 0.65], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
+  // ─── FLORAL BACKGROUND STAMPS ──
+  const stampNodes = stamps.map((s, i) => {
+    const sx = s.x * width;
+    const sy = s.y * height;
+    return (
+      <g key={`stamp-${i}`} transform={`translate(${sx} ${sy}) rotate(${s.rot})`} opacity={0.18 * warmth}>
+        {/* Stamp: simple 5-petal rosette outline */}
+        {[0, 1, 2, 3, 4].map((p) => {
+          const pa = (p / 5) * Math.PI * 2;
+          const ex = Math.cos(pa) * s.size;
+          const ey = Math.sin(pa) * s.size;
+          return (
+            <ellipse key={p} cx={ex * 0.5} cy={ey * 0.5}
+              rx={s.size * 0.32} ry={s.size * 0.18}
+              fill="none" stroke="hsl(28, 45%, 38%)" strokeWidth={0.8}
+              transform={`rotate(${(pa * 180) / Math.PI} ${ex * 0.5} ${ey * 0.5})`} />
+          );
+        })}
+        <circle cx={0} cy={0} r={s.size * 0.18} fill="none" stroke="hsl(28, 45%, 38%)" strokeWidth={0.7} />
+      </g>
+    );
   });
-  if (baseOpacity < 0.01) return null;
-
-  /* Audio-derived modulations */
-  const chromaTint = ((chromaHue / 360) - 0.5) * 12;
-  const breathe = slowEnergy;
 
   return (
     <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden" }}>
-      <svg
-        width={width}
-        height={height}
-        style={{
-          opacity: baseOpacity,
-          filter: "drop-shadow(0 0 6px rgba(220,20,60,0.35)) drop-shadow(0 0 16px rgba(220,20,60,0.18))",
-        }}
-      >
-        <GradientDefs stems={stems} chromaTint={chromaTint} beatDecay={beatDecay} />
+      <svg width={width} height={height} style={{ opacity: masterOpacity, willChange: "opacity" }}>
+        <defs>
+          <radialGradient id="ab-bg" cx="50%" cy="50%" r="75%">
+            <stop offset="0%" stopColor="hsl(40, 55%, 92%)" />
+            <stop offset="50%" stopColor="hsl(36, 45%, 84%)" />
+            <stop offset="100%" stopColor="hsl(28, 35%, 56%)" />
+          </radialGradient>
+          <radialGradient id="ab-vig">
+            <stop offset="55%" stopColor="rgba(0,0,0,0)" />
+            <stop offset="100%" stopColor="rgba(40, 18, 6, 0.85)" />
+          </radialGradient>
+          <filter id="ab-blur" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="3" />
+          </filter>
+          <filter id="ab-soft" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="14" />
+          </filter>
+          <linearGradient id="ab-stem" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="hsl(125, 50%, 32%)" />
+            <stop offset="100%" stopColor="hsl(125, 45%, 18%)" />
+          </linearGradient>
+          <radialGradient id="ab-glow">
+            <stop offset="0%" stopColor={`hsla(${roseHue}, 90%, 70%, ${0.4 * glow})`} />
+            <stop offset="100%" stopColor={`hsla(${roseHue}, 90%, 50%, 0)`} />
+          </radialGradient>
+        </defs>
 
-        {/* Ground grass — small green strokes swaying at base */}
-        {grass.map((blade, gi) => {
-          const bx = blade.x * width;
-          const by = height;
-          const sway = Math.sin(frame * 0.02 * tempoFactor + gi * 0.7) * 3;
-          const lean = blade.lean + sway + bass * 4;
+        {/* Cream parchment background */}
+        <rect width={width} height={height} fill="url(#ab-bg)" />
+
+        {/* Floral stamps in the background */}
+        {stampNodes}
+
+        {/* Vintage gold leaf border */}
+        <rect x={width * 0.02} y={height * 0.02}
+          width={width * 0.96} height={height * 0.96}
+          fill="none" stroke="hsl(38, 65%, 48%)" strokeWidth={4} opacity={0.7} />
+        <rect x={width * 0.025} y={height * 0.025}
+          width={width * 0.95} height={height * 0.95}
+          fill="none" stroke="hsl(38, 75%, 56%)" strokeWidth={1.4} opacity={0.85} />
+        <rect x={width * 0.035} y={height * 0.035}
+          width={width * 0.93} height={height * 0.93}
+          fill="none" stroke="hsl(38, 65%, 38%)" strokeWidth={0.8} opacity={0.55} />
+
+        {/* Gold corner flourishes */}
+        {[
+          [width * 0.04, height * 0.04, 1, 1],
+          [width * 0.96, height * 0.04, -1, 1],
+          [width * 0.04, height * 0.96, 1, -1],
+          [width * 0.96, height * 0.96, -1, -1],
+        ].map(([x, y, fx, fy], i) => (
+          <g key={`fl-${i}`} transform={`translate(${x} ${y}) scale(${fx} ${fy})`}>
+            <path d="M 0 0 L 60 0 Q 36 6 24 24 Q 12 12 0 60 Z"
+              fill="hsl(38, 75%, 50%)" opacity={0.6} />
+            <circle cx={32} cy={32} r={8} fill="none" stroke="hsl(38, 75%, 60%)" strokeWidth={1.4} />
+            <circle cx={32} cy={32} r={4} fill="hsl(38, 75%, 60%)" />
+          </g>
+        ))}
+
+        {/* "AMERICAN BEAUTY" banner along the top */}
+        <text x={width / 2} y={height * 0.10}
+          textAnchor="middle"
+          fontFamily="Georgia, serif"
+          fontSize={Math.min(width * 0.04, 56)}
+          fontWeight="bold"
+          letterSpacing="6"
+          fill="hsl(28, 65%, 32%)"
+          opacity={0.85}>
+          AMERICAN BEAUTY
+        </text>
+        <line x1={width * 0.30} y1={height * 0.115} x2={width * 0.70} y2={height * 0.115}
+          stroke="hsl(38, 65%, 42%)" strokeWidth={2} opacity={0.7} />
+
+        {/* Soft glow halo behind the rose */}
+        <ellipse cx={cx} cy={cy} rx={roseSize * 1.8} ry={roseSize * 1.8}
+          fill="url(#ab-glow)" filter="url(#ab-soft)" />
+
+        {/* Stem (behind rose) */}
+        <path d={stemPath} stroke="url(#ab-stem)" strokeWidth={10} fill="none" strokeLinecap="round" />
+        {/* Stem highlight */}
+        <path d={stemPath} stroke="hsl(125, 60%, 50%)" strokeWidth={2} fill="none" strokeLinecap="round" opacity={0.6} />
+
+        {/* Stem leaves (2 large veined leaves) */}
+        {[
+          { side: -1, t: 0.30 },
+          { side: 1, t: 0.55 },
+        ].map((leaf, li) => {
+          const lt = leaf.t;
+          const ly = cy + roseSize * 0.7 + lt * roseSize * 2.7;
+          const lx = cx + (lt < 0.5 ? -8 : 8);
+          const lw = roseSize * 0.55;
+          const lh = roseSize * 0.22;
+          const tipX = lx + leaf.side * lw;
+          const tipY = ly - lh * 0.6;
           return (
-            <path
-              key={`g-${gi}`}
-              d={`M${bx},${by} L${bx + lean * 0.4},${by - blade.height * 0.6} L${bx + lean},${by - blade.height}`}
-              stroke={`hsl(${blade.hue},50%,${32 + slowEnergy * 8}%)`}
-              strokeWidth={1.5}
-              fill="none"
-              strokeLinecap="round"
-              opacity={0.45}
-            />
-          );
-        })}
-
-        {/* Rose stems — each with S-curve, thorns, leaves, bloom, dewdrop */}
-        {stems.map((stem, si) => {
-          const bx = stem.x * width;
-          const by = height;
-
-          /* Growth progress per stem — staggered left to right */
-          const growProgress = interpolate(
-            progress,
-            [stem.bloomDelay, Math.min(stem.bloomDelay + 0.25 / bloomSpeed, 0.85)],
-            [0, 1],
-            { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
-          );
-          const currentHeight = stem.height * growProgress;
-          if (currentHeight < 2) return null;
-
-          const topY = by - currentHeight;
-          const sway = Math.sin(frame * 0.025 * tempoFactor + stem.swayPhase) * 9 * growProgress;
-
-          /* Cubic bezier S-curve control points */
-          const c1x = bx + stem.stemCurve1 + sway * 0.25;
-          const c1y = by - currentHeight * 0.33;
-          const c2x = bx + stem.stemCurve2 + sway * 0.6;
-          const c2y = by - currentHeight * 0.66;
-          const ex = bx + sway;
-          const ey = topY;
-
-          /* Bloom starts after stem is 60% grown */
-          const bloomProgress = interpolate(
-            growProgress, [0.6, 1], [0, 1],
-            { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
-          );
-
-          /* Dewdrop position — on one outer petal */
-          const dewAngle = (stem.dewdropPetal / 7) * Math.PI * 2;
-          const dewR = stem.roseSize * bloomProgress * 0.55;
-
-          return (
-            <g key={si}>
-              {/* Stem path — cubic bezier S-curve */}
-              <path
-                d={`M${bx},${by} C${c1x},${c1y} ${c2x},${c2y} ${ex},${ey}`}
-                stroke="hsl(130,55%,33%)"
-                strokeWidth={3.2}
-                fill="none"
-                strokeLinecap="round"
-              />
-
-              {/* Thorns — tangent-aligned sharp triangular projections */}
-              {Array.from({ length: stem.thornCount }).map((_, ti) => {
-                const t = (ti + 1) / (stem.thornCount + 1);
-                if (t * currentHeight < 15) return null;
-                const [tx, ty] = cubicBez(t, bx, by, c1x, c1y, c2x, c2y, ex, ey);
-                const [dx, dy] = cubicTan(t, bx, by, c1x, c1y, c2x, c2y, ex, ey);
-                const side = ti % 2 === 0 ? 1 : -1;
-                const perpX = -dy * side, perpY = dx * side;
+            <g key={`leaf-${li}`}>
+              <path d={`M ${lx} ${ly}
+                Q ${lx + leaf.side * lw * 0.5} ${ly - lh * 1.2} ${tipX} ${tipY}
+                Q ${lx + leaf.side * lw * 0.5} ${ly + lh * 0.4} ${lx} ${ly} Z`}
+                fill="hsl(125, 50%, 32%)" stroke="hsl(125, 50%, 18%)" strokeWidth={1.4} />
+              <line x1={lx} y1={ly} x2={tipX} y2={tipY}
+                stroke="hsl(125, 60%, 22%)" strokeWidth={1.2} opacity={0.6} />
+              {[0.3, 0.5, 0.7].map((vt, vi) => {
+                const vx = lx + (tipX - lx) * vt;
+                const vy = ly + (tipY - ly) * vt;
                 return (
-                  <polygon
-                    key={`th-${ti}`}
-                    points={`${tx},${ty} ${tx + perpX * 5.5 + dx * 3},${ty + perpY * 5.5 + dy * 3} ${tx - dx * 1.5},${ty - dy * 1.5}`}
-                    fill="hsl(130,50%,28%)"
-                    opacity={0.65}
-                  />
+                  <line key={`v-${li}-${vi}`} x1={vx} y1={vy}
+                    x2={vx - leaf.side * lw * 0.10} y2={vy + lh * 0.18}
+                    stroke="hsl(125, 50%, 22%)" strokeWidth={0.8} opacity={0.5} />
                 );
               })}
-
-              {/* Leaves — 2 per stem with pointed bezier + veins */}
-              {stem.leafPositions.map((leafT, li) => {
-                if (leafT * currentHeight < 40) return null;
-                const [lx, ly] = cubicBez(leafT, bx, by, c1x, c1y, c2x, c2y, ex, ey);
-                return (
-                  <Leaf
-                    key={`lf-${li}`}
-                    cx={lx}
-                    cy={ly}
-                    side={stem.leafSides[li]}
-                    angle={stem.leafAngles[li]}
-                    scale={0.85 + slowEnergy * 0.15}
-                    si={si}
-                    opacity={0.7}
-                  />
-                );
-              })}
-
-              {/* Rose bloom — sepals + 3 petal rings + bud spiral */}
-              {bloomProgress > 0 && (
-                <RoseBloom
-                  cx={ex}
-                  cy={ey}
-                  size={stem.roseSize}
-                  bloom={bloomProgress}
-                  si={si}
-                  breathe={breathe}
-                />
-              )}
-
-              {/* Dewdrop — one per rose, beat-sparkle */}
-              {bloomProgress > 0.5 && (
-                <Dewdrop
-                  cx={ex + Math.cos(dewAngle) * dewR}
-                  cy={ey + Math.sin(dewAngle) * dewR}
-                  size={2.2}
-                  sparkle={beatDecay}
-                />
-              )}
             </g>
           );
         })}
+
+        {/* Sepals (green pointed leaves behind the rose) */}
+        {sepals}
+
+        {/* Outer petal ring (12 large petals) */}
+        {petalRing(12, roseSize * 0.55, roseSize * 0.65, roseSize * 0.32, 0.0, roseHue, 38)}
+
+        {/* Mid-outer petal ring (10) */}
+        {petalRing(10, roseSize * 0.42, roseSize * 0.55, roseSize * 0.28, Math.PI / 12, roseHue, 42)}
+
+        {/* Mid petal ring (8) */}
+        {petalRing(8, roseSize * 0.32, roseSize * 0.45, roseSize * 0.24, Math.PI / 8, roseHue, 46)}
+
+        {/* Inner ring (6) */}
+        {petalRing(6, roseSize * 0.20, roseSize * 0.35, roseSize * 0.18, Math.PI / 6, roseHue, 50)}
+
+        {/* Innermost tight ring (5) */}
+        {petalRing(5, roseSize * 0.10, roseSize * 0.25, roseSize * 0.14, Math.PI / 5, roseHue, 54)}
+
+        {/* Bud spiral (concentric circles for the heart) */}
+        <circle cx={cx} cy={cy} r={roseSize * 0.10}
+          fill={`hsl(${roseHue}, 92%, 32%)`} stroke={`hsl(${roseHue}, 95%, 22%)`} strokeWidth={1.6} />
+        <circle cx={cx + roseSize * 0.02} cy={cy - roseSize * 0.018} r={roseSize * 0.06}
+          fill={`hsl(${roseHue}, 88%, 42%)`} />
+        <circle cx={cx + roseSize * 0.012} cy={cy - roseSize * 0.012} r={roseSize * 0.025}
+          fill={`hsl(${roseHue}, 80%, 56%)`} />
+
+        {/* Dewdrops on petals */}
+        {[
+          { ax: -0.30, ay: -0.20, sz: 0.020 },
+          { ax: 0.18, ay: -0.32, sz: 0.016 },
+          { ax: 0.34, ay: 0.10, sz: 0.018 },
+          { ax: -0.10, ay: 0.30, sz: 0.014 },
+        ].map((d, di) => {
+          const dx = cx + d.ax * roseSize * 1.6;
+          const dy = cy + d.ay * roseSize * 1.6;
+          const dr = roseSize * d.sz * (1 + snap.beatDecay * 0.4);
+          return (
+            <g key={`dew-${di}`}>
+              <ellipse cx={dx} cy={dy} rx={dr * 1.2} ry={dr * 0.85}
+                fill="rgba(255, 255, 255, 0.65)" filter="url(#ab-blur)" />
+              <ellipse cx={dx - dr * 0.3} cy={dy - dr * 0.4} rx={dr * 0.4} ry={dr * 0.25}
+                fill="rgba(255, 255, 255, 0.95)" />
+            </g>
+          );
+        })}
+
+        {/* "GRATEFUL DEAD" footer */}
+        <line x1={width * 0.30} y1={height * 0.93} x2={width * 0.70} y2={height * 0.93}
+          stroke="hsl(38, 65%, 42%)" strokeWidth={1.5} opacity={0.7} />
+        <text x={width / 2} y={height * 0.96}
+          textAnchor="middle"
+          fontFamily="Georgia, serif"
+          fontSize={Math.min(width * 0.022, 32)}
+          fontStyle="italic"
+          letterSpacing="4"
+          fill="hsl(28, 55%, 30%)"
+          opacity={0.8}>
+          THE GRATEFUL DEAD
+        </text>
+
+        {/* Sparkle on onset */}
+        {sparkle > 0.05 && (
+          <ellipse cx={cx} cy={cy} rx={roseSize * 1.4} ry={roseSize * 1.4}
+            fill={`hsla(${roseHue}, 90%, 80%, ${sparkle * 0.18})`} filter="url(#ab-soft)" />
+        )}
+
+        {/* Sepia vignette */}
+        <rect width={width} height={height} fill="url(#ab-vig)" />
       </svg>
     </div>
   );

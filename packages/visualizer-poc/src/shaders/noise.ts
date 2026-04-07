@@ -189,6 +189,35 @@ vec3 hsv2rgb(vec3 c) {
 // so we invert the hue to get correct colors.
 float hsvToCosineHue(float h) { return 1.0 - h; }
 
+// --- Safe palette color blender ---
+// Replaces the broken pattern: hsv2rgb(vec3(mix(baseHue, paletteHue, t), s, v))
+//
+// The broken pattern fails for cool palettes because linear hue mixing can
+// overshoot into wrong hue zones (e.g. mix(amber=0.097, purple=0.722, 0.4)
+// = 0.347 = green — completely unintended).
+//
+// safeBlendHue uses SHORTEST-ARC blending (always picks the closer direction
+// around the hue circle) AND CAPS the blend strength at 0.5 so the palette
+// can tint the base but never replace it. The result is always a smooth
+// blend between the base hue and the palette hue, and never overshoots.
+//
+// Use this anywhere a shader wants to "warm-bias" or "tint with palette".
+vec3 safeBlendHue(float baseHue, float palHue, float blendStrength, float sat, float val) {
+  // Shortest-arc hue distance: result in [-0.5, 0.5]
+  float diff = fract(palHue - baseHue + 0.5) - 0.5;
+  // Cap blend strength so palette tints but never replaces base
+  float t = clamp(blendStrength, 0.0, 0.5);
+  float blendedHue = fract(baseHue + diff * t);
+  return hsv2rgb(vec3(blendedHue, clamp(sat, 0.0, 1.0), clamp(val, 0.0, 1.0)));
+}
+
+// --- Direct palette color (no base hue) ---
+// When a shader wants the song palette color directly, no warm-base needed.
+// Just clamps and returns the palette hue with given sat/val.
+vec3 paletteHueColor(float palHue, float sat, float val) {
+  return hsv2rgb(vec3(fract(palHue), clamp(sat, 0.0, 1.0), clamp(val, 0.0, 1.0)));
+}
+
 // --- Animated stage flood: flowing palette-colored noise in dark areas ---
 // Call BEFORE cinematicGrade (in HDR space) — tone curve will compress the result.
 // Additive blend gated by darkness: lifts dark pixels, transparent on bright ones.
@@ -355,12 +384,16 @@ vec3 cinematicGrade(vec3 col, float energy) {
 
   // Gentle contrast + era saturation: GLSL owns all color grading.
   // uEraSaturation plumbed from era data (default 1.0 for no era).
+  // Saturation factor is CAPPED at 1.5 — values >1 still extrapolate (boost saturation),
+  // but bounded so bright shaders don't push channels into negative or over-bright territory.
   float luma = dot(col, vec3(0.2126, 0.7152, 0.0722));
   float contrast = mix(1.05, 1.35, energy);
   contrast *= 1.0 + uHarmonicTension * 0.08;
   float isClimaxGrade = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5);
   float climaxSat = isClimaxGrade * uClimaxIntensity * 0.70;
-  col = mix(vec3(luma), col, contrast * uEraSaturation * 1.15 + uShowSaturation + climaxSat);
+  float satFactor = contrast * uEraSaturation * 1.15 + uShowSaturation + climaxSat;
+  satFactor = clamp(satFactor, 0.0, 1.5);
+  col = mix(vec3(luma), col, satFactor);
 
   // === PEAK-OF-SHOW TRANSCENDENCE ===
   // One-time, per-show moment: golden glow + saturation surge + luminance bloom.

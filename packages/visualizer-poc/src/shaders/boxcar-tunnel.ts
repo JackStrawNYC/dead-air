@@ -369,10 +369,10 @@ void main() {
   float climaxOpen = climaxBoost * 0.8; // walls blow open
 
   // ─── Palette ───
-  float h1 = hsvToCosineHue(uPalettePrimary);
-  vec3 warmTint = 0.5 + 0.5 * cos(TAU * vec3(h1, h1 + 0.33, h1 + 0.67));
-  float h2 = hsvToCosineHue(uPaletteSecondary);
-  vec3 coolTint = 0.5 + 0.5 * cos(TAU * vec3(h2, h2 + 0.33, h2 + 0.67));
+  float h1 = uPalettePrimary;
+  vec3 warmTint = paletteHueColor(h1, 0.8, 0.9);
+  float h2 = uPaletteSecondary;
+  vec3 coolTint = paletteHueColor(h2, 0.8, 0.9);
 
   // Push warm tint toward amber for boxcar feel
   warmTint = mix(warmTint, vec3(1.0, 0.75, 0.35), 0.3);

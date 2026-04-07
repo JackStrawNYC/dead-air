@@ -401,10 +401,10 @@ void main() {
   tm += drumSnap;
 
   // ─── Palette ───
-  float h1 = hsvToCosineHue(uPalettePrimary);
-  vec3 palPrimary = 0.5 + 0.5 * cos(ME2_TAU * vec3(h1, h1 + 0.33, h1 + 0.67));
-  float h2 = hsvToCosineHue(uPaletteSecondary);
-  vec3 palSecondary = 0.5 + 0.5 * cos(ME2_TAU * vec3(h2, h2 + 0.33, h2 + 0.67));
+  float h1 = uPalettePrimary;
+  vec3 palPrimary = paletteHueColor(h1, 0.85, 0.95);
+  float h2 = uPaletteSecondary;
+  vec3 palSecondary = paletteHueColor(h2, 0.85, 0.95);
 
   // Backlight color: warm golden, modulated by vocal presence
   vec3 backlightColor = mix(vec3(1.0, 0.85, 0.55), vec3(1.0, 0.95, 0.85), vocalP);

@@ -264,12 +264,12 @@ void main() {
   float rainPartFactor = climaxBoost * 0.6; // columns thin out at climax
 
   // === PALETTE ===
-  float hue1 = hsvToCosineHue(uPalettePrimary) + chromaHueMod;
-  float hue2 = hsvToCosineHue(uPaletteSecondary) + chromaHueMod * 0.5;
+  float hue1 = uPalettePrimary + chromaHueMod;
+  float hue2 = uPaletteSecondary + chromaHueMod * 0.5;
   float chordHue = float(int(chordIndex)) / 24.0 * 0.1;
-  vec3 rainColor1 = 0.5 + 0.5 * cos(TAU * vec3(hue1 + chordHue, hue1 + chordHue + 0.33, hue1 + chordHue + 0.67));
-  vec3 rainColor2 = 0.5 + 0.5 * cos(TAU * vec3(hue2, hue2 + 0.33, hue2 + 0.67));
   float sat = uPaletteSaturation;
+  vec3 rainColor1 = paletteHueColor(hue1 + chordHue, sat * 0.85, 0.95);
+  vec3 rainColor2 = paletteHueColor(hue2, sat * 0.85, 0.95);
 
   // === CAMERA SETUP ===
   vec3 ro, rd;

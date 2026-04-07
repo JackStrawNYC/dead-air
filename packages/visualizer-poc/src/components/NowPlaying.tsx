@@ -22,10 +22,16 @@ export const NowPlaying: React.FC<Props> = ({ title, artist, energy = 0, isSacre
   const { height } = useVideoConfig();
   const palette = useSongPalette();
 
-  // Sacred segues: delay to frame 1200 (40s) with 120-frame fade
-  // Normal: appear at frame 300 with 90-frame fade
-  const fadeStart = isSacredSegue ? 1200 : 300;
-  const fadeDuration = isSacredSegue ? 120 : 90;
+  // CHILL CALIBRATION: NowPlaying is now a brief title flash, NOT persistent text.
+  // Appears at 10s, fades in over 3s, holds for 8s, then fades out over 4s.
+  // After ~25s the title is gone — viewers see just shaders + overlays for the
+  // rest of the song. The album art card in the bottom-left is the persistent ID.
+  //
+  // Sacred segues: delay to 40s with gentler timing.
+  const fadeStart = isSacredSegue ? 1200 : 300;     // 10s normal, 40s sacred
+  const fadeDuration = isSacredSegue ? 120 : 90;    // 3s fade in
+  const holdDuration = isSacredSegue ? 360 : 240;   // 12s sacred / 8s normal hold
+  const fadeOutDuration = isSacredSegue ? 180 : 120; // 6s sacred / 4s normal fade out
 
   const fadeIn = interpolate(frame, [fadeStart, fadeStart + fadeDuration], [0, 1], {
     extrapolateLeft: "clamp",
@@ -33,12 +39,21 @@ export const NowPlaying: React.FC<Props> = ({ title, artist, energy = 0, isSacre
     easing: Easing.out(Easing.cubic),
   });
 
-  if (fadeIn < 0.01) return null;
+  // Fade out after the hold window
+  const fadeOutStart = fadeStart + fadeDuration + holdDuration;
+  const fadeOut = interpolate(frame, [fadeOutStart, fadeOutStart + fadeOutDuration], [1, 0], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+    easing: Easing.in(Easing.cubic),
+  });
+
+  const visibility = Math.min(fadeIn, fadeOut);
+  if (visibility < 0.01) return null;
 
   // Base opacity — clearly readable against any shader
   const baseOpacity = 0.85;
   const energyPulse = energy * 0.05;
-  const opacity = Math.min(0.95, (baseOpacity + energyPulse) * fadeIn);
+  const opacity = Math.min(0.95, (baseOpacity + energyPulse) * visibility);
 
   const titleSize = responsiveFontSize(38, height);
   const artistSize = responsiveFontSize(22, height);

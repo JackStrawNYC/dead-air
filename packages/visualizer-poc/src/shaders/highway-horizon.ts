@@ -355,10 +355,10 @@ void main() {
   float roadW = 2.5 + bass * 0.3 + sin(ft * 0.2) * 0.1;
 
   // ─── Palette ───
-  float h1 = hsvToCosineHue(uPalettePrimary);
-  vec3 palCol1 = 0.5 + 0.5 * cos(HH_TAU * vec3(h1, h1 + 0.33, h1 + 0.67));
-  float h2 = hsvToCosineHue(uPaletteSecondary);
-  vec3 palCol2 = 0.5 + 0.5 * cos(HH_TAU * vec3(h2, h2 + 0.33, h2 + 0.67));
+  float h1 = uPalettePrimary;
+  vec3 palCol1 = paletteHueColor(h1, 0.8, 0.9);
+  float h2 = uPaletteSecondary;
+  vec3 palCol2 = paletteHueColor(h2, 0.8, 0.9);
 
   // Desert-warm palette blend
   vec3 desertWarm = mix(vec3(0.7, 0.4, 0.2), vec3(0.9, 0.6, 0.3), tension);

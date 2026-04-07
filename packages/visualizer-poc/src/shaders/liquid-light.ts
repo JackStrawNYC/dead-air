@@ -343,10 +343,12 @@ void main() {
   float llTime = uDynamicTime * (0.06 + slowE * 0.04) * (1.0 + sJam * 0.6 - sSpace * 0.4);
 
   // ─── Palette ───
+  // h1/h2 use cosine-hue for the multi-blob procedural color generator (llOilColor)
   float h1 = hsvToCosineHue(uPalettePrimary);
   float h2 = hsvToCosineHue(uPaletteSecondary);
-  vec3 palPrimary = 0.5 + 0.5 * cos(LL_TAU * vec3(h1, h1 + 0.33, h1 + 0.67));
-  vec3 palSecondary = 0.5 + 0.5 * cos(LL_TAU * vec3(h2, h2 + 0.33, h2 + 0.67));
+  // palPrimary/palSecondary are direct palette colors used for cathedral glow / icons
+  vec3 palPrimary = paletteHueColor(uPalettePrimary, 0.85, 0.95);
+  vec3 palSecondary = paletteHueColor(uPaletteSecondary, 0.85, 0.95);
 
   // Cathedral material colors
   vec3 stoneWarm = vec3(0.18, 0.14, 0.10);

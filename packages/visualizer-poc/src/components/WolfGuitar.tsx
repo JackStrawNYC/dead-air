@@ -1,967 +1,694 @@
 /**
- * WolfGuitar — Jerry Garcia's "Wolf" guitar (Doug Irwin, 1973-1979).
+ * WolfGuitar — A+++ overlay: Bob Weir's "Wolf" Doug Irwin guitar
+ * (originally Jerry's, then Bob's). Hero centerpiece with the iconic
+ * inlaid wolf head on the body, lightning bolt inlay, single-cutaway
+ * silhouette, three pickups, brass binding, ornate Doug Irwin headstock.
  *
- * The guitar before Tiger. Distinctive features:
- *  - Single-cutaway solid body (vs Tiger's double cutaway)
- *  - Wolf head inlay on the upper bout (the namesake)
- *  - Peace symbol inlay near the bridge pickup
- *  - 2 humbuckers with 12 pole pieces each
- *  - Floating bridge with individual saddles and a separate tailpiece
- *  - Doug Irwin custom headstock with truss rod cover
- *  - Subtle horizontal wood grain across the body
- *  - 6 strings vibrating with mid-band amplitude modulation
+ * The Wolf fills ~50%+ of the frame width and height, vertical orientation.
+ * Cool silver/blue palette to differentiate from Tiger's amber warmth.
+ * Moonlight cone from above, misty atmosphere swirling, stage floor
+ * reflection, subtle silver glow halo. NOT a starfield — this is a SCENE.
  *
  * Audio reactivity:
- *  - mids → string vibration amplitude
- *  - otherEnergy → overall visibility boost
- *  - chromaHue → rim glow + wolf inlay glow color
- *  - beatDecay → pickup glow pulse
- *  - bass → knob shimmer
- *  - onsetEnvelope → outer glow flash
- *  - tempoFactor → vibration frequency scaling
- *
- * Continuous rendering — visibility controlled by overlay rotation engine.
+ *   slowEnergy → moonlight intensity
+ *   energy → wolf eyes glow + silver shimmer
+ *   bass → low-end string sustain
+ *   beatDecay → string vibration amplitude
+ *   onsetEnvelope → wolf eye flash burst
+ *   chromaHue → cool moonlight tint
+ *   tempoFactor → string oscillation rate
  */
 
 import React from "react";
 import { useCurrentFrame, useVideoConfig, interpolate } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
+import { seeded } from "../utils/seededRandom";
 import { useAudioSnapshot } from "./parametric/audio-helpers";
 import { useTempoFactor } from "../data/TempoContext";
 
-/* ------------------------------------------------------------------ */
-/*  Color utilities                                                    */
-/* ------------------------------------------------------------------ */
+const CYCLE_TOTAL = 2400;
+const VISIBLE_DURATION = 780;
+const MIST_COUNT = 80;
+const MOON_RAY_COUNT = 14;
+const CLOUD_COUNT = 8;
 
-function hueToHex(h: number, s = 0.85, l = 0.6): string {
-  const hue = ((h % 1) + 1) % 1;
-  const c = (1 - Math.abs(2 * l - 1)) * s;
-  const x = c * (1 - Math.abs(((hue * 6) % 2) - 1));
-  const m = l - c / 2;
-  let r = 0,
-    g = 0,
-    b = 0;
-  const sector = Math.floor(hue * 6);
-  if (sector === 0) {
-    r = c;
-    g = x;
-  } else if (sector === 1) {
-    r = x;
-    g = c;
-  } else if (sector === 2) {
-    g = c;
-    b = x;
-  } else if (sector === 3) {
-    g = x;
-    b = c;
-  } else if (sector === 4) {
-    r = x;
-    b = c;
-  } else {
-    r = c;
-    b = x;
-  }
-  const toHex = (v: number) =>
-    Math.round((v + m) * 255)
-      .toString(16)
-      .padStart(2, "0");
-  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+interface MistMote { x: number; y: number; r: number; speed: number; phase: number; }
+interface MistCloud { x: number; y: number; rx: number; ry: number; drift: number; alpha: number; }
+
+function buildMist(): MistMote[] {
+  const rng = seeded(85_443_902);
+  return Array.from({ length: MIST_COUNT }, () => ({
+    x: rng(),
+    y: rng() * 0.92,
+    r: 0.7 + rng() * 2.0,
+    speed: 0.0006 + rng() * 0.0020,
+    phase: rng() * Math.PI * 2,
+  }));
 }
 
-function hueToRgba(h: number, a: number, s = 0.85, l = 0.6): string {
-  const hue = ((h % 1) + 1) % 1;
-  const c = (1 - Math.abs(2 * l - 1)) * s;
-  const x = c * (1 - Math.abs(((hue * 6) % 2) - 1));
-  const m = l - c / 2;
-  let r = 0,
-    g = 0,
-    b = 0;
-  const sector = Math.floor(hue * 6);
-  if (sector === 0) {
-    r = c;
-    g = x;
-  } else if (sector === 1) {
-    r = x;
-    g = c;
-  } else if (sector === 2) {
-    g = c;
-    b = x;
-  } else if (sector === 3) {
-    g = x;
-    b = c;
-  } else if (sector === 4) {
-    r = x;
-    b = c;
-  } else {
-    r = c;
-    b = x;
-  }
-  return `rgba(${Math.round((r + m) * 255)},${Math.round((g + m) * 255)},${Math.round((b + m) * 255)},${a})`;
+function buildClouds(): MistCloud[] {
+  const rng = seeded(67_441_223);
+  return Array.from({ length: CLOUD_COUNT }, () => ({
+    x: rng(),
+    y: 0.05 + rng() * 0.85,
+    rx: 0.16 + rng() * 0.20,
+    ry: 0.04 + rng() * 0.05,
+    drift: 0.00008 + rng() * 0.00025,
+    alpha: 0.10 + rng() * 0.18,
+  }));
 }
 
-/* ------------------------------------------------------------------ */
-/*  Geometry constants                                                 */
-/* ------------------------------------------------------------------ */
-
-const STRING_COUNT = 6;
-const STRING_SPACING = 5.6;
-const STRING_BASE_Y = 138;
-
-// Wolf had a different fret marker layout — single dots at 3,5,7,9 and double at 12,
-// matching standard, but the inlays were mother-of-pearl diamond/oval shapes.
-const SINGLE_FRET_X = [186, 204, 220, 234];
-const DOUBLE_FRET_X = 248;
-
-// Pole pieces — 6 per row, 2 rows per humbucker (12 total dots per pickup)
-const POLE_PIECE_SPACING = 4.8;
-
-interface Props {
-  frames: EnhancedFrameData[];
-}
-
-/* ------------------------------------------------------------------ */
-/*  Component                                                          */
-/* ------------------------------------------------------------------ */
+interface Props { frames: EnhancedFrameData[]; }
 
 export const WolfGuitar: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
-  const snap = useAudioSnapshot(frames);
   const tempoFactor = useTempoFactor();
-  const {
-    energy,
-    mids: midEnergy,
-    chromaHue: chromaHueDeg,
-    beatDecay,
-    onsetEnvelope,
-    otherEnergy,
-    bass,
-    highs,
-  } = snap;
+  const snap = useAudioSnapshot(frames);
 
-  // Convert 0-360 hue to 0-1
-  const chromaHue = chromaHueDeg / 360;
+  const mist = React.useMemo(buildMist, []);
+  const clouds = React.useMemo(buildClouds, []);
 
-  /* -- Energy gating -- */
-  const energyGate = interpolate(energy, [0.05, 0.1], [0, 1], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
-  const otherBoost = interpolate(otherEnergy ?? 0, [0.05, 0.32], [0, 0.32], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
-  const opacity = energyGate * (0.48 + otherBoost);
-  if (opacity < 0.01) return null;
+  const cycleFrame = frame % CYCLE_TOTAL;
+  if (cycleFrame >= VISIBLE_DURATION) return null;
+  const progress = cycleFrame / VISIBLE_DURATION;
+  const fadeIn = interpolate(progress, [0, 0.09], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const fadeOut = interpolate(progress, [0.91, 1], [1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const masterOpacity = Math.min(fadeIn, fadeOut) * 0.95;
+  if (masterOpacity < 0.01) return null;
 
-  /* -- Animation parameters -- */
-  const breathe = interpolate(energy, [0.05, 0.3], [0.95, 1.07], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
-  // Wolf rotates slightly slower than Tiger — lower-key vibe
-  const rotation = (frame / 30) * 1.4 * tempoFactor;
+  // Audio drives
+  const moonlight = interpolate(snap.slowEnergy, [0.02, 0.32], [0.55, 1.10], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const eyeGlow = interpolate(snap.energy, [0.02, 0.30], [0.45, 1.0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const sustain = interpolate(snap.bass, [0.0, 0.7], [0.30, 1.0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const stringPulse = 1 + snap.beatDecay * 0.5;
+  const flash = snap.onsetEnvelope > 0.5 ? Math.min(1, (snap.onsetEnvelope - 0.4) * 1.6) : 0;
 
-  /* -- Color palette derived from chroma hue -- */
-  // Wolf had a darker maple body — base it on a slightly cooler hue offset
-  const bodyColor = hueToHex(chromaHue + 0.02, 0.62, 0.5);
-  const bodyDark = hueToHex(chromaHue, 0.55, 0.3);
-  const woodGrainColor = hueToRgba(chromaHue + 0.04, 0.18, 0.55, 0.35);
-  const glowColor = hueToHex(chromaHue + 0.08, 0.92, 0.66);
-  const stringColor = hueToHex(chromaHue + 0.18, 0.45, 0.78);
-  const accentColor = hueToHex(chromaHue + 0.32, 0.6, 0.55);
-  const wolfInlayColor = hueToHex(chromaHue + 0.12, 0.85, 0.7);
-  const pearlColor = hueToRgba(chromaHue + 0.55, 0.55, 0.2, 0.85);
-  const rimColor = hueToRgba(chromaHue + 0.1, 0.4 + beatDecay * 0.32);
-  const fretColor = hueToRgba(chromaHue + 0.2, 0.28, 0.4, 0.65);
+  // Cool moonlight palette modulated by chromaHue
+  const baseHue = 210;
+  const tintHue = ((baseHue + (snap.chromaHue - 180) * 0.30) % 360 + 360) % 360;
+  const tintLight = 60 + moonlight * 16;
+  const tintColor = `hsl(${tintHue}, 60%, ${tintLight}%)`;
+  const tintCore = `hsl(${(tintHue + 8) % 360}, 78%, ${Math.min(96, tintLight + 24)}%)`;
+  const silverColor = `hsl(${(tintHue + 4) % 360}, 30%, ${72 + eyeGlow * 12}%)`;
+  const silverDeep = `hsl(${(tintHue + 6) % 360}, 24%, 38%)`;
+  const silverBright = `hsl(${(tintHue + 8) % 360}, 38%, ${85 + eyeGlow * 10}%)`;
 
-  /* -- String vibration amplitude from mids -- */
-  const vibAmp = interpolate(midEnergy, [0.02, 0.4], [0.3, 3.5], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
+  // ─── HERO GEOMETRY ─────────────────────────────────────────────────
+  // Wolf is the centerpiece. Vertical orientation. Slightly smaller body
+  // than Tiger (single-cutaway = narrower upper bout).
+  const cx = width * 0.5;
+  const cy = height * 0.50;
 
-  /* -- Outer glow from energy + onset flash + beat pulse -- */
-  const baseGlow = interpolate(energy, [0.05, 0.3], [3, 12], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
-  const glowRadius = baseGlow + onsetEnvelope * 8 + beatDecay * 6;
+  const bodyW = width * 0.40;
+  const bodyH = height * 0.46;
+  const bodyCX = cx;
+  const bodyCY = cy + height * 0.10;
 
-  /* -- SVG sizing -- */
-  const svgScale = Math.min(width, height) * 0.48;
+  const neckW = bodyW * 0.13;
+  const neckLen = height * 0.34;
+  const neckTopY = bodyCY - bodyH * 0.50 - neckLen;
+  const headstockH = height * 0.12;
+  const headstockTopY = neckTopY - headstockH;
 
-  /* ================================================================ */
-  /*  Build vibrating string paths                                     */
-  /* ================================================================ */
-  const stringPaths: string[] = [];
-  for (let si = 0; si < STRING_COUNT; si++) {
-    const y = STRING_BASE_Y + si * STRING_SPACING;
-    const freq = 3.5 + si * 0.9;
-    const amp = vibAmp * (0.7 + si * 0.18);
-    const points: string[] = [];
-    // String runs from tailpiece anchor (x=70) through bridge (x=86) to nut (x=262)
-    for (let x = 86; x <= 262; x += 2) {
-      const t = (x - 86) / 176;
-      const env = Math.sin(t * Math.PI);
-      const dy =
-        Math.sin(frame * 0.28 * freq * tempoFactor + x * 0.06 + si * 1.3) *
-        amp *
-        env;
-      points.push(`${x},${(y + dy).toFixed(2)}`);
-    }
-    stringPaths.push(points.join(" "));
-  }
+  // String vibration
+  const stringVib = (s: number) => Math.sin(frame * 0.55 * tempoFactor + s * 1.1) * (1.5 + snap.beatDecay * 3 + sustain * 1);
 
-  /* ================================================================ */
-  /*  Wood grain — subtle horizontal lines across the body             */
-  /* ================================================================ */
-  const woodGrainLines: React.ReactNode[] = [];
-  for (let i = 0; i < 9; i++) {
-    const gy = 102 + i * 11.5;
-    // Slight curvature so grains follow the body contour
-    const curve = Math.sin(i * 0.7) * 1.8;
-    woodGrainLines.push(
-      <path
-        key={`grain-${i}`}
-        d={`M 50,${gy.toFixed(1)} Q 90,${(gy + curve).toFixed(1)} 130,${(gy - curve * 0.6).toFixed(1)}`}
-        stroke={woodGrainColor}
-        strokeWidth={0.55 + (i % 3) * 0.2}
-        fill="none"
-        strokeLinecap="round"
-      />,
-    );
-  }
-
-  /* ================================================================ */
-  /*  Pickup pole pieces — 6 per row, 2 rows per humbucker            */
-  /* ================================================================ */
-  const renderPolePieces = (cx: number, cy: number) => {
-    const pieces: React.ReactNode[] = [];
-    for (let row = 0; row < 2; row++) {
-      for (let col = 0; col < 6; col++) {
-        pieces.push(
-          <circle
-            key={`pp-${cx}-${row}-${col}`}
-            cx={cx - 12 + col * POLE_PIECE_SPACING}
-            cy={cy - 2 + row * 4.5}
-            r="1.2"
-            fill={accentColor}
-            opacity={0.6 + midEnergy * 0.3}
-          />,
-        );
-      }
-    }
-    return pieces;
-  };
-
-  /* ================================================================ */
-  /*  Bridge saddles — 6 individual                                    */
-  /* ================================================================ */
-  const bridgeSaddles: React.ReactNode[] = [];
-  for (let i = 0; i < 6; i++) {
-    const sy = STRING_BASE_Y + i * STRING_SPACING;
-    bridgeSaddles.push(
-      <rect
-        key={`saddle-${i}`}
-        x={82}
-        y={sy - 1.5}
-        width={5}
-        height={3}
-        rx={0.5}
-        fill={accentColor}
-        opacity={0.55}
-      />,
-    );
-  }
-
-  /* ================================================================ */
-  /*  Tuning pegs — 3 per side of headstock                           */
-  /* ================================================================ */
-  const tuningPegs: React.ReactNode[] = [];
-  for (let i = 0; i < 6; i++) {
-    const pegX = i < 3 ? 282 : 286;
-    const pegY = i < 3 ? 132 + i * 8 : 132 + (i - 3) * 8;
-    tuningPegs.push(
-      <g key={`peg-${i}`}>
-        {/* Peg shaft */}
-        <rect
-          x={pegX - 1}
-          y={pegY - 1.5}
-          width={8}
-          height={3}
-          rx={1}
-          fill={bodyDark}
-          opacity={0.6}
-        />
-        {/* Peg button (pearloid) */}
-        <circle
-          cx={pegX + 8}
-          cy={pegY}
-          r="2.6"
-          fill={accentColor}
-          opacity={0.55}
-          stroke={bodyDark}
-          strokeWidth={0.5}
-        />
-        <circle
-          cx={pegX + 8}
-          cy={pegY}
-          r="1.4"
-          fill={pearlColor}
-          opacity={0.5}
-        />
+  // Moonlight cone rays from above
+  const rays: React.ReactNode[] = [];
+  for (let r = 0; r < MOON_RAY_COUNT; r++) {
+    const a = -Math.PI / 2 + ((r / MOON_RAY_COUNT) - 0.5) * 0.8;
+    const len = height * 1.2;
+    const x2 = Math.cos(a) * len;
+    const y2 = Math.sin(a) * len;
+    const w0 = 26 + eyeGlow * 18;
+    rays.push(
+      <g key={`ray-${r}`}>
+        <path d={`M 0 0 L ${x2 - w0 * 0.6} ${y2} L ${x2 + w0 * 0.6} ${y2} Z`}
+          fill={tintColor} opacity={0.10 * eyeGlow * moonlight} />
+        <path d={`M 0 0 L ${x2 - w0 * 0.30} ${y2} L ${x2 + w0 * 0.30} ${y2} Z`}
+          fill={tintColor} opacity={0.20 * eyeGlow * moonlight} />
+        <path d={`M 0 0 L ${x2 - w0 * 0.10} ${y2} L ${x2 + w0 * 0.10} ${y2} Z`}
+          fill={tintCore} opacity={0.36 * eyeGlow * moonlight} />
       </g>,
     );
   }
 
-  /* ================================================================ */
-  /*  Fret lines along the neck                                        */
-  /* ================================================================ */
-  const fretLines: React.ReactNode[] = [];
-  const fretPositions = [170, 178, 186, 194, 204, 212, 220, 228, 234, 240, 248, 254, 260];
-  for (let i = 0; i < fretPositions.length; i++) {
-    const fx = fretPositions[i];
-    fretLines.push(
-      <line
-        key={`fret-${i}`}
-        x1={fx}
-        y1={STRING_BASE_Y - 3}
-        x2={fx}
-        y2={STRING_BASE_Y + 5 * STRING_SPACING + 3}
-        stroke={fretColor}
-        strokeWidth={0.8}
-      />,
+  // Mist clouds drifting through the scene
+  const cloudNodes = clouds.map((c, i) => {
+    const cxN = ((c.x + frame * c.drift) % 1.2) - 0.1;
+    return (
+      <ellipse key={`cloud-${i}`} cx={cxN * width} cy={c.y * height}
+        rx={c.rx * width} ry={c.ry * height}
+        fill={`rgba(120, 140, 180, ${c.alpha * moonlight})`} />
     );
-  }
-
-  /* ================================================================ */
-  /*  Knobs — Wolf had 4 (2 vol + 2 tone)                             */
-  /* ================================================================ */
-  const knobRadius = 3.4;
-  const knobPositions = [
-    { cx: 60, cy: 178, label: "vol1" },
-    { cx: 72, cy: 188, label: "vol2" },
-    { cx: 86, cy: 195, label: "tone1" },
-    { cx: 100, cy: 196, label: "tone2" },
-  ];
-
-  const knobShimmer = interpolate(bass, [0.05, 0.3], [0.3, 0.72], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
   });
 
-  // Highs-driven pickup glow (Wolf's clean treble bite)
-  const pickupGlow = interpolate(highs, [0.05, 0.25], [0, 3.2], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
+  // Stage floor (suggesting performance space at the bottom)
+  const stagePlanks = Array.from({ length: 7 }, (_, i) => {
+    const py = height * 0.93 + i * 4;
+    return (
+      <line key={`plank-${i}`} x1={0} y1={py} x2={width} y2={py}
+        stroke={`rgba(8, 12, 22, ${0.6 - i * 0.06})`} strokeWidth={0.8} />
+    );
   });
-
-  // Beat-decay-driven pickup edge pulse
-  const pickupBeatPulse = 0.4 + beatDecay * 0.5;
-
-  // Wolf inlay glow modulation — chromaHue tinted, energy + beat pulsed
-  const wolfGlowRadius = 2 + beatDecay * 4 + onsetEnvelope * 3;
 
   return (
-    <div
-      style={{
-        position: "absolute",
-        inset: 0,
-        pointerEvents: "none",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-      }}
-    >
-      <div
-        style={{
-          transform: `rotate(${rotation}deg) scale(${breathe})`,
-          opacity,
-          filter: [
-            `drop-shadow(0 0 ${glowRadius}px ${bodyColor})`,
-            `drop-shadow(0 0 ${glowRadius * 1.8}px ${glowColor})`,
-            `drop-shadow(0 0 ${glowRadius * 0.5}px ${rimColor})`,
-          ].join(" "),
-          willChange: "transform, opacity, filter",
-        }}
-      >
-        <svg
-          width={svgScale}
-          height={svgScale * 0.6}
-          viewBox="0 0 320 200"
-          fill="none"
-        >
-          {/* ======================================================= */}
-          {/*  GUITAR BODY — single-cutaway Wolf shape                 */}
-          {/* ======================================================= */}
-          {/*
-              Wolf has a single cutaway on the upper-treble side
-              (toward the neck) and a more rounded, asymmetric lower
-              bout. We outline a teardrop-with-horn silhouette.
-          */}
-          <path
-            d={[
-              // Upper bout, rounded shoulder (bass side)
-              "M 100,94",
-              "C 84,90 66,96 54,108",
-              // Bass side curve down to lower bout
-              "C 42,122 38,142 42,160",
-              // Bottom of body (rounded)
-              "C 46,178 60,194 80,200",
-              "C 100,206 122,202 134,192",
-              // Lower-treble bout
-              "C 144,182 148,168 146,154",
-              // Single cutaway entry (treble horn neck-ward)
-              "C 144,142 142,130 144,120",
-              // Cutaway notch — tapers in toward neck
-              "C 146,112 144,104 138,100",
-              // Upper bout right closing
-              "C 132,96 120,93 113,93",
-              "Z",
-            ].join(" ")}
-            fill={bodyColor}
-            opacity={0.32}
-            stroke={bodyColor}
-            strokeWidth={2}
-          />
+    <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden" }}>
+      <svg width={width} height={height} style={{ opacity: masterOpacity, willChange: "opacity" }}>
+        <defs>
+          <linearGradient id="wg-bg" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#020610" />
+            <stop offset="50%" stopColor="#040818" />
+            <stop offset="100%" stopColor="#01030a" />
+          </linearGradient>
+          <linearGradient id="wg-stage" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#040816" />
+            <stop offset="100%" stopColor="#01020a" />
+          </linearGradient>
+          <radialGradient id="wg-halo">
+            <stop offset="0%" stopColor={tintCore} stopOpacity={0.85} />
+            <stop offset="50%" stopColor={tintColor} stopOpacity={0.20} />
+            <stop offset="100%" stopColor={tintColor} stopOpacity={0} />
+          </radialGradient>
+          <linearGradient id="wg-wood" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor="#0a0c18" />
+            <stop offset="35%" stopColor="#1c2236" />
+            <stop offset="55%" stopColor="#2a3046" />
+            <stop offset="75%" stopColor="#1a1e30" />
+            <stop offset="100%" stopColor="#06080e" />
+          </linearGradient>
+          <radialGradient id="wg-bodyGloss" cx="50%" cy="35%" r="60%">
+            <stop offset="0%" stopColor="rgba(180, 210, 250, 0.40)" />
+            <stop offset="40%" stopColor="rgba(140, 170, 210, 0.18)" />
+            <stop offset="100%" stopColor="rgba(0, 0, 0, 0)" />
+          </radialGradient>
+          <linearGradient id="wg-silver" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={silverBright} />
+            <stop offset="50%" stopColor={silverColor} />
+            <stop offset="100%" stopColor={silverDeep} />
+          </linearGradient>
+          <linearGradient id="wg-fretboard" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#0a0a14" />
+            <stop offset="50%" stopColor="#050510" />
+            <stop offset="100%" stopColor="#020208" />
+          </linearGradient>
+          <linearGradient id="wg-neck" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stopColor="#1c1c28" />
+            <stop offset="50%" stopColor="#3a3a4c" />
+            <stop offset="100%" stopColor="#0e0e16" />
+          </linearGradient>
+          <radialGradient id="wg-vig">
+            <stop offset="55%" stopColor="rgba(0,0,0,0)" />
+            <stop offset="100%" stopColor="rgba(0,0,0,0.65)" />
+          </radialGradient>
+          <radialGradient id="wg-eyeGlow">
+            <stop offset="0%" stopColor={tintCore} stopOpacity={0.95} />
+            <stop offset="100%" stopColor={tintCore} stopOpacity={0} />
+          </radialGradient>
+          <filter id="wg-blur" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="3" />
+          </filter>
+          <filter id="wg-softBlur" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="8" />
+          </filter>
+        </defs>
 
-          {/* Rim lighting — beat-reactive */}
-          <path
-            d={[
-              "M 100,94",
-              "C 84,90 66,96 54,108",
-              "C 42,122 38,142 42,160",
-              "C 46,178 60,194 80,200",
-              "C 100,206 122,202 134,192",
-              "C 144,182 148,168 146,154",
-              "C 144,142 142,130 144,120",
-              "C 146,112 144,104 138,100",
-              "C 132,96 120,93 113,93",
-              "Z",
-            ].join(" ")}
-            fill="none"
-            stroke={rimColor}
-            strokeWidth={1.5 + beatDecay * 1.6}
-          />
+        {/* ── BACKDROP LAYER ── */}
+        <rect width={width} height={height} fill="url(#wg-bg)" />
+        <rect width={width} height={height} fill="url(#wg-stage)" />
 
-          {/* ======================================================= */}
-          {/*  WOOD GRAIN — subtle horizontal flow                     */}
-          {/* ======================================================= */}
-          {woodGrainLines}
+        {/* ── MIST CLOUDS DRIFTING ── */}
+        <g filter="url(#wg-softBlur)">{cloudNodes}</g>
 
-          {/* Body inner shadow / depth */}
-          <path
-            d={[
-              "M 60,118",
-              "C 50,140 50,168 64,184",
-              "C 84,196 110,196 124,182",
-              "C 134,168 138,148 134,128",
-              "C 122,116 100,112 84,114",
-              "C 72,116 64,118 60,118",
-              "Z",
-            ].join(" ")}
-            fill={bodyDark}
-            opacity={0.12}
-          />
+        {/* ── MOONLIGHT CONE FROM ABOVE ── */}
+        <g transform={`translate(${cx} ${-30})`} style={{ mixBlendMode: "screen" }}>
+          {rays}
+        </g>
+        {/* Moon at top */}
+        <circle cx={cx} cy={-10} r={50}
+          fill={tintCore} opacity={0.65 * moonlight} filter="url(#wg-softBlur)" />
+        <circle cx={cx} cy={0} r={26}
+          fill={tintCore} opacity={0.80 * moonlight} />
+        <circle cx={cx - 6} cy={-2} r={3} fill="rgba(80, 100, 140, 0.55)" />
+        <circle cx={cx + 8} cy={4} r={2.2} fill="rgba(80, 100, 140, 0.55)" />
 
-          {/* ======================================================= */}
-          {/*  WOLF HEAD INLAY — upper bout                            */}
-          {/* ======================================================= */}
-          {/*
-              Small stylized wolf head silhouette. Composed of:
-              - rounded skull
-              - two pointed triangular ears
-              - snout extending forward
-              - two eye dots
-              Positioned on the upper bass bout above the pickups.
-          */}
-          <g
-            style={{
-              filter: `drop-shadow(0 0 ${wolfGlowRadius}px ${wolfInlayColor})`,
-            }}
-          >
-            {/* Skull / head outline */}
-            <path
-              d={[
-                "M 70,108",
-                "L 68,103",  // left ear base
-                "L 71,99",   // left ear tip
-                "L 74,103",  // left ear inner
-                "L 78,101",  // top of head between ears
-                "L 81,99",   // right ear inner
-                "L 84,98",   // right ear tip
-                "L 86,103",  // right ear base
-                "C 88,107 89,112 87,116",  // right side of head
-                "L 91,118",  // snout top
-                "L 92,121",  // snout tip
-                "L 88,121",  // snout bottom
-                "L 86,119",  // jaw notch
-                "C 80,121 73,120 70,116",  // left side of jaw
-                "C 67,113 67,110 70,108",  // close to start
-                "Z",
-              ].join(" ")}
-              fill={wolfInlayColor}
-              opacity={0.78}
-              stroke={pearlColor}
-              strokeWidth={0.45}
-            />
-            {/* Inner ear shading */}
-            <path
-              d="M 70,103 L 71,100 L 73,103 Z"
-              fill={bodyDark}
-              opacity={0.5}
-            />
-            <path
-              d="M 82,103 L 84,99 L 85,103 Z"
-              fill={bodyDark}
-              opacity={0.5}
-            />
-            {/* Eye */}
-            <circle cx={78} cy={110} r={0.9} fill={bodyDark} opacity={0.85} />
-            {/* Nose */}
-            <circle cx={91} cy={119.5} r={0.7} fill={bodyDark} opacity={0.85} />
-          </g>
+        {/* ── HALO BEHIND GUITAR ── */}
+        <ellipse cx={bodyCX} cy={bodyCY - height * 0.06}
+          rx={width * 0.40 * (0.9 + moonlight * 0.20) * stringPulse}
+          ry={height * 0.50 * (0.9 + moonlight * 0.18) * stringPulse}
+          fill="url(#wg-halo)" style={{ mixBlendMode: "screen" }} />
 
-          {/* ======================================================= */}
-          {/*  PEACE SYMBOL INLAY — between pickups                    */}
-          {/* ======================================================= */}
-          <g opacity={0.7}>
-            <circle
-              cx={111}
-              cy={144}
-              r={4.2}
-              fill="none"
-              stroke={pearlColor}
-              strokeWidth={0.7}
-            />
-            {/* Vertical stem */}
-            <line
-              x1={111}
-              y1={140}
-              x2={111}
-              y2={148}
-              stroke={pearlColor}
-              strokeWidth={0.7}
-            />
-            {/* Two diagonal arms */}
-            <line
-              x1={111}
-              y1={144}
-              x2={108}
-              y2={147}
-              stroke={pearlColor}
-              strokeWidth={0.7}
-            />
-            <line
-              x1={111}
-              y1={144}
-              x2={114}
-              y2={147}
-              stroke={pearlColor}
-              strokeWidth={0.7}
-            />
-          </g>
+        {/* ── STAGE FLOOR / REFLECTION ── */}
+        <rect x={0} y={height * 0.94} width={width} height={height * 0.06} fill="rgba(0, 1, 6, 0.92)" />
+        {stagePlanks}
+        {/* Audience silhouette suggestion */}
+        {Array.from({ length: 16 }).map((_, i) => {
+          const ax = (i + 0.5) * (width / 16);
+          const ay = height * 0.97 + Math.sin(i * 1.7) * 2;
+          return (
+            <ellipse key={`aud-${i}`} cx={ax} cy={ay} rx={14 + (i % 3) * 4} ry={6 + (i % 2) * 2}
+              fill="rgba(0, 1, 6, 0.95)" />
+          );
+        })}
+        {/* Stage floor reflection of guitar */}
+        <ellipse cx={cx} cy={height * 0.94} rx={bodyW * 0.45} ry={6}
+          fill={tintColor} opacity={0.18 * moonlight} filter="url(#wg-blur)" style={{ mixBlendMode: "screen" }} />
 
-          {/* ======================================================= */}
-          {/*  PICKUPS — 2 humbuckers with pole pieces                 */}
-          {/* ======================================================= */}
-          {/* Neck pickup */}
-          <rect
-            x={96}
-            y={128}
-            width={30}
-            height={10}
-            rx={2}
-            fill={bodyDark}
-            opacity={0.5}
-            style={{
-              filter:
-                pickupGlow > 0.5
-                  ? `drop-shadow(0 0 ${pickupGlow}px ${glowColor})`
-                  : undefined,
-            }}
-          />
-          <rect
-            x={97}
-            y={129}
-            width={28}
-            height={8}
-            rx={1.5}
-            fill="none"
-            stroke={accentColor}
-            strokeWidth={0.4}
-            opacity={pickupBeatPulse}
-          />
-          {renderPolePieces(111, 133)}
+        {/* ── SILVER PLAQUE BELOW THE GUITAR ── */}
+        <g transform={`translate(${cx} ${height * 0.91})`}>
+          <rect x={-130} y={-10} width={260} height={26} rx={3} fill="url(#wg-silver)"
+            stroke="rgba(20, 30, 50, 0.85)" strokeWidth={1.4} />
+          <rect x={-126} y={-7} width={252} height={20} rx={2} fill="none"
+            stroke={silverDeep} strokeWidth={0.7} opacity={0.65} />
+          <line x1={-110} y1={3} x2={110} y2={3} stroke="rgba(20, 30, 50, 0.65)" strokeWidth={0.6} />
+          <path d="M -100 3 Q -94 -3 -88 3 Q -82 9 -76 3" stroke={silverDeep} strokeWidth={0.8} fill="none" />
+          <path d="M 100 3 Q 94 -3 88 3 Q 82 9 76 3" stroke={silverDeep} strokeWidth={0.8} fill="none" />
+          <text x={0} y={8} textAnchor="middle" fontSize={11} fontFamily="Georgia, serif"
+            fontWeight={900} fill="rgba(20, 30, 50, 0.92)" letterSpacing={4}>WOLF</text>
+          <circle cx={-122} cy={3} r={1.8} fill="rgba(20, 30, 50, 0.95)" />
+          <circle cx={122} cy={3} r={1.8} fill="rgba(20, 30, 50, 0.95)" />
+          <circle cx={-122} cy={3} r={0.6} fill={silverBright} />
+          <circle cx={122} cy={3} r={0.6} fill={silverBright} />
+        </g>
 
-          {/* Bridge pickup */}
-          <rect
-            x={96}
-            y={150}
-            width={30}
-            height={10}
-            rx={2}
-            fill={bodyDark}
-            opacity={0.5}
-            style={{
-              filter:
-                pickupGlow > 0.5
-                  ? `drop-shadow(0 0 ${pickupGlow}px ${glowColor})`
-                  : undefined,
-            }}
-          />
-          <rect
-            x={97}
-            y={151}
-            width={28}
-            height={8}
-            rx={1.5}
-            fill="none"
-            stroke={accentColor}
-            strokeWidth={0.4}
-            opacity={pickupBeatPulse}
-          />
-          {renderPolePieces(111, 155)}
+        {/* ─────────────────────────────────────────────────────────── */}
+        {/* ── THE WOLF GUITAR — HERO CENTERPIECE ── */}
+        {/* ─────────────────────────────────────────────────────────── */}
+        <g transform={`translate(${bodyCX} ${bodyCY})`}>
 
-          {/* Pickup toggle switch */}
-          <line
-            x1={132}
-            y1={128}
-            x2={132}
-            y2={140}
-            stroke={accentColor}
-            strokeWidth={1.2}
-            opacity={0.55}
-          />
-          <circle cx={132} cy={129} r={1.9} fill={accentColor} opacity={0.65} />
-          <circle cx={132} cy={129} r={0.8} fill={pearlColor} opacity={0.6} />
+          {/* Body cast shadow */}
+          <ellipse cx={8} cy={12} rx={bodyW * 0.50 + 8} ry={bodyH * 0.48 + 8}
+            fill="rgba(0, 0, 0, 0.62)" filter="url(#wg-blur)" />
 
-          {/* ======================================================= */}
-          {/*  BRIDGE + TAILPIECE                                      */}
-          {/* ======================================================= */}
-          {/* Wolf had a separate bridge/tailpiece system: floating
-              bridge with individual saddles forward of a stoptail-style
-              tailpiece. Render the bridge plate, saddles, then a
-              distinct rectangular tailpiece with an angled escape
-              for the strings. */}
+          {/* ── BODY: single-cutaway shape (cutaway on UPPER-RIGHT only) ── */}
+          {/* Asymmetric Doug Irwin Wolf silhouette */}
+          <path d={`
+            M ${-bodyW * 0.18} ${-bodyH * 0.46}
+            C ${-bodyW * 0.34} ${-bodyH * 0.50}, ${-bodyW * 0.46} ${-bodyH * 0.42}, ${-bodyW * 0.50} ${-bodyH * 0.30}
+            C ${-bodyW * 0.56} ${-bodyH * 0.14}, ${-bodyW * 0.58} ${ bodyH * 0.04}, ${-bodyW * 0.54} ${ bodyH * 0.18}
+            C ${-bodyW * 0.50} ${ bodyH * 0.32}, ${-bodyW * 0.40} ${ bodyH * 0.44}, ${-bodyW * 0.26} ${ bodyH * 0.50}
+            C ${-bodyW * 0.12} ${ bodyH * 0.54}, ${ bodyW * 0.12} ${ bodyH * 0.54}, ${ bodyW * 0.26} ${ bodyH * 0.50}
+            C ${ bodyW * 0.40} ${ bodyH * 0.44}, ${ bodyW * 0.50} ${ bodyH * 0.32}, ${ bodyW * 0.54} ${ bodyH * 0.18}
+            C ${ bodyW * 0.58} ${ bodyH * 0.04}, ${ bodyW * 0.56} ${-bodyH * 0.14}, ${ bodyW * 0.50} ${-bodyH * 0.30}
+            C ${ bodyW * 0.46} ${-bodyH * 0.40}, ${ bodyW * 0.36} ${-bodyH * 0.44}, ${ bodyW * 0.24} ${-bodyH * 0.36}
+            C ${ bodyW * 0.16} ${-bodyH * 0.30}, ${ bodyW * 0.10} ${-bodyH * 0.36}, 0 ${-bodyH * 0.34}
+            C ${-bodyW * 0.10} ${-bodyH * 0.32}, ${-bodyW * 0.14} ${-bodyH * 0.42}, ${-bodyW * 0.18} ${-bodyH * 0.46}
+            Z
+          `} fill="url(#wg-wood)" stroke="rgba(0, 0, 0, 0.95)" strokeWidth={3} />
 
-          {/* Bridge plate */}
-          <rect
-            x={80}
-            y={STRING_BASE_Y - 5}
-            width={8}
-            height={STRING_SPACING * 5 + 10}
-            rx={1}
-            fill={bodyDark}
-            opacity={0.4}
-          />
-          {bridgeSaddles}
+          {/* Body gloss highlight */}
+          <ellipse cx={-bodyW * 0.06} cy={-bodyH * 0.10} rx={bodyW * 0.42} ry={bodyH * 0.36}
+            fill="url(#wg-bodyGloss)" />
 
-          {/* Tailpiece — Wolf style: blocky stoptail with through-holes */}
-          <rect
-            x={66}
-            y={STRING_BASE_Y - 4}
-            width={8}
-            height={STRING_SPACING * 5 + 8}
-            rx={1.5}
-            fill={bodyDark}
-            opacity={0.42}
-            stroke={accentColor}
-            strokeWidth={0.4}
-          />
-          {/* Tailpiece string-through holes */}
-          {Array.from({ length: 6 }).map((_, i) => (
-            <circle
-              key={`tail-hole-${i}`}
-              cx={70}
-              cy={STRING_BASE_Y + i * STRING_SPACING}
-              r={0.9}
-              fill={accentColor}
-              opacity={0.7}
-            />
-          ))}
+          {/* ── BRASS BINDING (outer + inner) ── */}
+          <path d={`
+            M ${-bodyW * 0.18} ${-bodyH * 0.46}
+            C ${-bodyW * 0.34} ${-bodyH * 0.50}, ${-bodyW * 0.46} ${-bodyH * 0.42}, ${-bodyW * 0.50} ${-bodyH * 0.30}
+            C ${-bodyW * 0.56} ${-bodyH * 0.14}, ${-bodyW * 0.58} ${ bodyH * 0.04}, ${-bodyW * 0.54} ${ bodyH * 0.18}
+            C ${-bodyW * 0.50} ${ bodyH * 0.32}, ${-bodyW * 0.40} ${ bodyH * 0.44}, ${-bodyW * 0.26} ${ bodyH * 0.50}
+            C ${-bodyW * 0.12} ${ bodyH * 0.54}, ${ bodyW * 0.12} ${ bodyH * 0.54}, ${ bodyW * 0.26} ${ bodyH * 0.50}
+            C ${ bodyW * 0.40} ${ bodyH * 0.44}, ${ bodyW * 0.50} ${ bodyH * 0.32}, ${ bodyW * 0.54} ${ bodyH * 0.18}
+            C ${ bodyW * 0.58} ${ bodyH * 0.04}, ${ bodyW * 0.56} ${-bodyH * 0.14}, ${ bodyW * 0.50} ${-bodyH * 0.30}
+            C ${ bodyW * 0.46} ${-bodyH * 0.40}, ${ bodyW * 0.36} ${-bodyH * 0.44}, ${ bodyW * 0.24} ${-bodyH * 0.36}
+            C ${ bodyW * 0.16} ${-bodyH * 0.30}, ${ bodyW * 0.10} ${-bodyH * 0.36}, 0 ${-bodyH * 0.34}
+            C ${-bodyW * 0.10} ${-bodyH * 0.32}, ${-bodyW * 0.14} ${-bodyH * 0.42}, ${-bodyW * 0.18} ${-bodyH * 0.46}
+            Z
+          `} fill="none" stroke={silverColor} strokeWidth={4} opacity={0.92} />
+          <path d={`
+            M ${-bodyW * 0.18} ${-bodyH * 0.46}
+            C ${-bodyW * 0.34} ${-bodyH * 0.50}, ${-bodyW * 0.46} ${-bodyH * 0.42}, ${-bodyW * 0.50} ${-bodyH * 0.30}
+            C ${-bodyW * 0.56} ${-bodyH * 0.14}, ${-bodyW * 0.58} ${ bodyH * 0.04}, ${-bodyW * 0.54} ${ bodyH * 0.18}
+            C ${-bodyW * 0.50} ${ bodyH * 0.32}, ${-bodyW * 0.40} ${ bodyH * 0.44}, ${-bodyW * 0.26} ${ bodyH * 0.50}
+            C ${-bodyW * 0.12} ${ bodyH * 0.54}, ${ bodyW * 0.12} ${ bodyH * 0.54}, ${ bodyW * 0.26} ${ bodyH * 0.50}
+            C ${ bodyW * 0.40} ${ bodyH * 0.44}, ${ bodyW * 0.50} ${ bodyH * 0.32}, ${ bodyW * 0.54} ${ bodyH * 0.18}
+            C ${ bodyW * 0.58} ${ bodyH * 0.04}, ${ bodyW * 0.56} ${-bodyH * 0.14}, ${ bodyW * 0.50} ${-bodyH * 0.30}
+            C ${ bodyW * 0.46} ${-bodyH * 0.40}, ${ bodyW * 0.36} ${-bodyH * 0.44}, ${ bodyW * 0.24} ${-bodyH * 0.36}
+            C ${ bodyW * 0.16} ${-bodyH * 0.30}, ${ bodyW * 0.10} ${-bodyH * 0.36}, 0 ${-bodyH * 0.34}
+            C ${-bodyW * 0.10} ${-bodyH * 0.32}, ${-bodyW * 0.14} ${-bodyH * 0.42}, ${-bodyW * 0.18} ${-bodyH * 0.46}
+            Z
+          `} fill="none" stroke={silverBright} strokeWidth={1.4} opacity={0.85} />
 
-          {/* ======================================================= */}
-          {/*  KNOBS (2 Volume + 2 Tone)                               */}
-          {/* ======================================================= */}
-          {knobPositions.map((knob) => (
-            <g key={knob.label}>
-              {/* Knob body */}
-              <circle
-                cx={knob.cx}
-                cy={knob.cy}
-                r={knobRadius}
-                fill={bodyDark}
-                opacity={0.42 + knobShimmer * 0.22}
-                stroke={accentColor}
-                strokeWidth={0.6}
-              />
-              {/* Knob indicator line */}
-              <line
-                x1={knob.cx}
-                y1={knob.cy}
-                x2={knob.cx}
-                y2={knob.cy - knobRadius + 0.8}
-                stroke={accentColor}
-                strokeWidth={0.6}
-                opacity={0.55}
-              />
-              {/* Knob ring detail */}
-              <circle
-                cx={knob.cx}
-                cy={knob.cy}
-                r={knobRadius - 1}
-                fill="none"
-                stroke={accentColor}
-                strokeWidth={0.3}
-                opacity={0.35}
-              />
-              {/* Pearloid cap center */}
-              <circle
-                cx={knob.cx}
-                cy={knob.cy}
-                r={knobRadius - 2}
-                fill={pearlColor}
-                opacity={0.4}
-              />
-            </g>
-          ))}
-
-          {/* Output jack */}
-          <circle cx={52} cy={170} r={2.6} fill={bodyDark} opacity={0.45} />
-          <circle
-            cx={52}
-            cy={170}
-            r={1.5}
-            fill="none"
-            stroke={accentColor}
-            strokeWidth={0.5}
-            opacity={0.5}
-          />
-          <circle cx={52} cy={170} r={0.6} fill={accentColor} opacity={0.55} />
-
-          {/* ======================================================= */}
-          {/*  NECK + FRETBOARD                                        */}
-          {/* ======================================================= */}
-          {/* Neck back (lighter wood) */}
-          <rect
-            x={148}
-            y={STRING_BASE_Y - 7}
-            width={120}
-            height={STRING_SPACING * 5 + 14}
-            rx={2}
-            fill={bodyColor}
-            opacity={0.22}
-            stroke={bodyColor}
-            strokeWidth={0.8}
-          />
-
-          {/* Fretboard — darker rosewood */}
-          <rect
-            x={155}
-            y={STRING_BASE_Y - 4}
-            width={108}
-            height={STRING_SPACING * 5 + 8}
-            rx={1.5}
-            fill={bodyDark}
-            opacity={0.22}
-          />
-
-          {/* Fret wire lines */}
-          {fretLines}
-
-          {/* ----- Mother-of-pearl fret markers ----- */}
-          {/* Wolf used distinctive ovular pearl inlays. Render them
-              as small ellipses with subtle chromatic glow. */}
-          {SINGLE_FRET_X.map((fx) => (
-            <g key={`fmark-${fx}`}>
-              <ellipse
-                cx={fx}
-                cy={STRING_BASE_Y + 2.5 * STRING_SPACING}
-                rx={2.0}
-                ry={1.4}
-                fill={pearlColor}
-                opacity={0.6}
-              />
-              <ellipse
-                cx={fx}
-                cy={STRING_BASE_Y + 2.5 * STRING_SPACING}
-                rx={1.0}
-                ry={0.6}
-                fill={wolfInlayColor}
-                opacity={0.55}
-              />
-            </g>
-          ))}
-
-          {/* Double-dot 12th fret (oval pearls) */}
-          <ellipse
-            cx={DOUBLE_FRET_X}
-            cy={STRING_BASE_Y + 1.2 * STRING_SPACING}
-            rx={2.0}
-            ry={1.4}
-            fill={pearlColor}
-            opacity={0.65}
-          />
-          <ellipse
-            cx={DOUBLE_FRET_X}
-            cy={STRING_BASE_Y + 3.8 * STRING_SPACING}
-            rx={2.0}
-            ry={1.4}
-            fill={pearlColor}
-            opacity={0.65}
-          />
-
-          {/* Nut */}
-          <rect
-            x={262}
-            y={STRING_BASE_Y - 4}
-            width={2.5}
-            height={STRING_SPACING * 5 + 8}
-            rx={0.5}
-            fill={accentColor}
-            opacity={0.5}
-          />
-
-          {/* ======================================================= */}
-          {/*  HEADSTOCK — Doug Irwin custom shape                     */}
-          {/* ======================================================= */}
-          {/*
-              Doug Irwin's custom headstock for Wolf was an asymmetric
-              "open book" silhouette — narrower at the nut, flaring
-              outward toward the tip with a slight dropoff on the
-              treble side. Render with two paths for face + edge.
-          */}
-          <path
-            d={[
-              "M 265,130",
-              "L 273,124",
-              "C 280,118 290,116 297,121",
-              "L 301,127",
-              "C 304,132 304,138 302,144",
-              "L 302,150",
-              "C 304,156 304,162 301,167",
-              "L 297,172",
-              "C 290,177 280,175 273,170",
-              "L 265,164",
-              "Z",
-            ].join(" ")}
-            fill={bodyColor}
-            opacity={0.3}
-            stroke={bodyColor}
-            strokeWidth={1.2}
-          />
-
-          {/* Headstock face (lighter inner panel) */}
-          <path
-            d={[
-              "M 268,133",
-              "L 275,128",
-              "C 282,123 290,123 295,127",
-              "L 298,131",
-              "C 300,136 300,140 299,144",
-              "L 299,150",
-              "C 300,154 300,158 298,162",
-              "L 295,165",
-              "C 290,168 282,168 275,164",
-              "L 268,159",
-              "Z",
-            ].join(" ")}
-            fill={bodyColor}
-            opacity={0.12}
-          />
-
-          {/* Truss rod cover — small bell-shaped plate near nut */}
-          <path
-            d={[
-              "M 267,142",
-              "L 271,140",
-              "C 273,140 273,144 273,146",
-              "L 273,150",
-              "C 273,152 273,154 271,154",
-              "L 267,152",
-              "Z",
-            ].join(" ")}
-            fill={bodyDark}
-            opacity={0.55}
-            stroke={accentColor}
-            strokeWidth={0.4}
-          />
-          {/* Truss rod cover screws */}
-          <circle cx={269} cy={143} r={0.5} fill={accentColor} opacity={0.7} />
-          <circle cx={269} cy={151} r={0.5} fill={accentColor} opacity={0.7} />
-
-          {/* Tuning pegs — 3 per side */}
-          {tuningPegs}
-
-          {/* String trees (2 small guides on headstock) */}
-          <rect
-            x={272}
-            y={137}
-            width={3}
-            height={1.5}
-            rx={0.5}
-            fill={accentColor}
-            opacity={0.5}
-          />
-          <rect
-            x={272}
-            y={153}
-            width={3}
-            height={1.5}
-            rx={0.5}
-            fill={accentColor}
-            opacity={0.5}
-          />
-
-          {/* ======================================================= */}
-          {/*  VIBRATING STRINGS                                       */}
-          {/* ======================================================= */}
-          {stringPaths.map((path, si) => {
-            const thickness = 0.6 + si * 0.18;
-            const stringGlow = 1.5 + midEnergy * 4;
-            const stringOpacity = 0.5 + midEnergy * 0.4;
+          {/* ── WOOD GRAIN HORIZONTAL (subtle maple striations) ── */}
+          {Array.from({ length: 16 }).map((_, i) => {
+            const y = -bodyH * 0.40 + i * (bodyH * 0.054);
             return (
-              <polyline
-                key={`str-${si}`}
-                points={path}
-                stroke={stringColor}
-                strokeWidth={thickness}
-                fill="none"
-                opacity={stringOpacity}
-                style={{
-                  filter: `drop-shadow(0 0 ${stringGlow}px ${stringColor})`,
-                }}
-              />
+              <line key={`grain-${i}`} x1={-bodyW * 0.46} y1={y} x2={bodyW * 0.46}
+                y2={y + (i % 2 === 0 ? 1.5 : -1.5)}
+                stroke={`rgba(120, 150, 200, ${0.10 + (i % 3) * 0.05})`} strokeWidth={0.5} />
             );
           })}
 
-          {/* String anchor points at the bridge */}
-          {Array.from({ length: 6 }).map((_, i) => (
-            <circle
-              key={`anchor-b-${i}`}
-              cx={86}
-              cy={STRING_BASE_Y + i * STRING_SPACING}
-              r={0.85}
-              fill={stringColor}
-              opacity={0.55}
-            />
+          {/* ── WOLF HEAD INLAY — large, center of upper bout ── */}
+          <g transform={`translate(${bodyW * 0.04} ${-bodyH * 0.16}) scale(2.2)`}>
+            {/* Inlay backing plate (mother of pearl base) */}
+            <ellipse cx={0} cy={0} rx={26} ry={28}
+              fill="rgba(220, 230, 250, 0.20)" stroke={silverColor} strokeWidth={0.8} />
+            {/* Wolf head outline — squared muzzle, pointed ears */}
+            <path d="M 0 -22 Q -16 -22 -20 -10 Q -24 4 -18 18 Q -10 26 0 26 Q 10 26 18 18 Q 24 4 20 -10 Q 16 -22 0 -22 Z"
+              fill="rgba(220, 230, 250, 0.75)" stroke={silverDeep} strokeWidth={1.0} />
+            {/* Inner head shading */}
+            <path d="M 0 -18 Q -12 -18 -16 -8 Q -18 4 -14 14 Q -8 22 0 22"
+              fill="none" stroke={silverDeep} strokeWidth={0.6} opacity={0.7} />
+            {/* Ear left (pricked, triangular) */}
+            <path d="M -14 -16 L -22 -28 L -10 -18 Z"
+              fill={silverBright} stroke={silverDeep} strokeWidth={0.6} />
+            <path d="M -14 -18 L -18 -24 L -12 -20 Z" fill={silverDeep} opacity={0.6} />
+            {/* Ear right */}
+            <path d="M 14 -16 L 22 -28 L 10 -18 Z"
+              fill={silverBright} stroke={silverDeep} strokeWidth={0.6} />
+            <path d="M 14 -18 L 18 -24 L 12 -20 Z" fill={silverDeep} opacity={0.6} />
+            {/* Forehead highlight */}
+            <path d="M -6 -14 Q 0 -18 6 -14" stroke={silverBright} strokeWidth={0.8} fill="none" opacity={0.85} />
+            {/* Snout — protruding muzzle */}
+            <path d="M -7 8 Q -8 14 -5 18 L 5 18 Q 8 14 7 8 L 4 6 L -4 6 Z"
+              fill="rgba(200, 215, 240, 0.92)" stroke={silverDeep} strokeWidth={0.6} />
+            {/* Nose */}
+            <ellipse cx={0} cy={10} rx={2.0} ry={1.4} fill="rgba(20, 30, 50, 0.95)" />
+            <circle cx={-0.5} cy={9.5} r={0.5} fill="rgba(200, 220, 250, 0.85)" />
+            {/* Mouth line */}
+            <line x1={0} y1={12} x2={0} y2={17} stroke="rgba(20, 30, 50, 0.85)" strokeWidth={0.5} />
+            <path d="M 0 17 Q -3 18 -5 17" stroke="rgba(20, 30, 50, 0.85)" strokeWidth={0.5} fill="none" />
+            <path d="M 0 17 Q 3 18 5 17" stroke="rgba(20, 30, 50, 0.85)" strokeWidth={0.5} fill="none" />
+            {/* Fang hints */}
+            <path d="M -2 18 L -1.6 20 L -1.2 18 Z" fill="rgba(220, 230, 250, 0.95)" />
+            <path d="M 2 18 L 1.6 20 L 1.2 18 Z" fill="rgba(220, 230, 250, 0.95)" />
+            {/* Eyes — almond-shaped, glowing */}
+            <ellipse cx={-7} cy={-2} rx={3.4} ry={2.0} fill="rgba(20, 30, 50, 0.95)"
+              transform="rotate(-15 -7 -2)" />
+            <ellipse cx={7} cy={-2} rx={3.4} ry={2.0} fill="rgba(20, 30, 50, 0.95)"
+              transform="rotate(15 7 -2)" />
+            {/* Eye glow — energy-driven */}
+            <circle cx={-7} cy={-2} r={1.6} fill={tintCore} opacity={0.8 + eyeGlow * 0.2} />
+            <circle cx={7} cy={-2} r={1.6} fill={tintCore} opacity={0.8 + eyeGlow * 0.2} />
+            <circle cx={-6.5} cy={-2.5} r={0.5} fill="rgba(255, 255, 255, 0.95)" />
+            <circle cx={7.5} cy={-2.5} r={0.5} fill="rgba(255, 255, 255, 0.95)" />
+            {/* Onset eye flash */}
+            {flash > 0 && (
+              <>
+                <circle cx={-7} cy={-2} r={5 + flash * 5} fill={tintCore} opacity={flash * 0.65} />
+                <circle cx={7} cy={-2} r={5 + flash * 5} fill={tintCore} opacity={flash * 0.65} />
+              </>
+            )}
+            {/* Whiskers */}
+            <line x1={-5} y1={11} x2={-14} y2={12} stroke={silverColor} strokeWidth={0.4} />
+            <line x1={-5} y1={13} x2={-14} y2={15} stroke={silverColor} strokeWidth={0.4} />
+            <line x1={-5} y1={15} x2={-13} y2={17} stroke={silverColor} strokeWidth={0.4} />
+            <line x1={5} y1={11} x2={14} y2={12} stroke={silverColor} strokeWidth={0.4} />
+            <line x1={5} y1={13} x2={14} y2={15} stroke={silverColor} strokeWidth={0.4} />
+            <line x1={5} y1={15} x2={13} y2={17} stroke={silverColor} strokeWidth={0.4} />
+            {/* Fur tufts on the sides */}
+            <path d="M -18 -2 Q -22 0 -20 4" stroke={silverColor} strokeWidth={0.5} fill="none" />
+            <path d="M -18 4 Q -22 6 -20 10" stroke={silverColor} strokeWidth={0.5} fill="none" />
+            <path d="M 18 -2 Q 22 0 20 4" stroke={silverColor} strokeWidth={0.5} fill="none" />
+            <path d="M 18 4 Q 22 6 20 10" stroke={silverColor} strokeWidth={0.5} fill="none" />
+          </g>
+
+          {/* ── LIGHTNING BOLT INLAY — lower bout, diagonal ── */}
+          <g transform={`translate(${-bodyW * 0.22} ${bodyH * 0.16})`}>
+            {/* Lightning bolt path */}
+            <path d="M 0 -18 L 8 -4 L 2 -4 L 10 14 L 0 2 L 6 2 Z"
+              fill={silverBright} stroke={silverDeep} strokeWidth={0.8} />
+            <path d="M 0 -18 L 8 -4 L 2 -4 L 10 14 L 0 2 L 6 2 Z"
+              fill="none" stroke={tintCore} strokeWidth={0.4} opacity={0.8} />
+            {/* Glow around bolt */}
+            <path d="M 0 -18 L 8 -4 L 2 -4 L 10 14 L 0 2 L 6 2 Z"
+              fill="none" stroke={tintCore} strokeWidth={2} opacity={0.25 * eyeGlow} />
+          </g>
+
+          {/* ── PICKUPS (3 humbuckers) ── */}
+          {[bodyH * 0.10, bodyH * 0.22, bodyH * 0.34].map((py, i) => (
+            <g key={`pu-${i}`}>
+              {/* Pickup ring */}
+              <rect x={-bodyW * 0.22} y={py - 8} width={bodyW * 0.44} height={18} rx={2}
+                fill="rgba(15, 18, 28, 0.95)" stroke={silverColor} strokeWidth={1.2} />
+              {/* Pickup body */}
+              <rect x={-bodyW * 0.20} y={py - 6} width={bodyW * 0.40} height={14} rx={1}
+                fill="rgba(25, 30, 44, 0.92)" />
+              {/* Silver cover plate */}
+              <rect x={-bodyW * 0.19} y={py - 5} width={bodyW * 0.38} height={12} rx={0.5}
+                fill="url(#wg-silver)" opacity={0.55} />
+              {/* Pole pieces (6 pairs for humbucker) */}
+              {Array.from({ length: 6 }).map((_, j) => (
+                <g key={`pole-${i}-${j}`}>
+                  <circle cx={-bodyW * 0.16 + j * (bodyW * 0.064)} cy={py - 1.5} r={1.6}
+                    fill="rgba(15, 18, 28, 0.95)" />
+                  <circle cx={-bodyW * 0.16 + j * (bodyW * 0.064)} cy={py - 1.5} r={1.1}
+                    fill={silverBright} opacity={0.92} />
+                  <circle cx={-bodyW * 0.16 + j * (bodyW * 0.064)} cy={py + 2.5} r={1.6}
+                    fill="rgba(15, 18, 28, 0.95)" />
+                  <circle cx={-bodyW * 0.16 + j * (bodyW * 0.064)} cy={py + 2.5} r={1.1}
+                    fill={silverBright} opacity={0.92} />
+                </g>
+              ))}
+              {/* Mounting screws */}
+              <circle cx={-bodyW * 0.21} cy={py + 1} r={1.2} fill={silverColor} />
+              <circle cx={bodyW * 0.21} cy={py + 1} r={1.2} fill={silverColor} />
+            </g>
           ))}
 
-          {/* String anchor points at the nut */}
+          {/* ── BRIDGE + TAILPIECE ── */}
+          <rect x={-bodyW * 0.16} y={bodyH * 0.42} width={bodyW * 0.32} height={10} rx={1.5}
+            fill="rgba(15, 18, 28, 0.95)" stroke={silverColor} strokeWidth={0.8} />
+          <rect x={-bodyW * 0.15} y={bodyH * 0.422} width={bodyW * 0.30} height={8} rx={1}
+            fill="url(#wg-silver)" opacity={0.85} />
+          {/* Saddles */}
           {Array.from({ length: 6 }).map((_, i) => (
-            <circle
-              key={`anchor-n-${i}`}
-              cx={262}
-              cy={STRING_BASE_Y + i * STRING_SPACING}
-              r={0.7}
-              fill={stringColor}
-              opacity={0.45}
-            />
+            <g key={`saddle-${i}`}>
+              <rect x={-bodyW * 0.13 + i * (bodyW * 0.052)} y={bodyH * 0.43} width={4.5} height={6}
+                fill={silverBright} stroke="rgba(20, 30, 50, 0.85)" strokeWidth={0.4} />
+              <line x1={-bodyW * 0.128 + i * (bodyW * 0.052) + 2.25} y1={bodyH * 0.432}
+                x2={-bodyW * 0.128 + i * (bodyW * 0.052) + 2.25} y2={bodyH * 0.448}
+                stroke="rgba(20, 30, 50, 0.65)" strokeWidth={0.4} />
+            </g>
           ))}
-        </svg>
-      </div>
+          {/* Tailpiece */}
+          <rect x={-bodyW * 0.18} y={bodyH * 0.455} width={bodyW * 0.36} height={7} rx={1}
+            fill="url(#wg-silver)" stroke="rgba(20, 30, 50, 0.85)" strokeWidth={0.6} />
+          {Array.from({ length: 6 }).map((_, i) => (
+            <circle key={`anchor-${i}`} cx={-bodyW * 0.12 + i * (bodyW * 0.048)} cy={bodyH * 0.4585}
+              r={1} fill="rgba(20, 30, 50, 0.95)" />
+          ))}
+
+          {/* ── KNOBS (5: master + tone + mid + 2 aux) ── */}
+          {[
+            [bodyW * 0.26, bodyH * 0.18],
+            [bodyW * 0.32, bodyH * 0.28],
+            [bodyW * 0.30, bodyH * 0.38],
+            [-bodyW * 0.30, bodyH * 0.30],
+            [-bodyW * 0.32, bodyH * 0.40],
+          ].map((pos, i) => {
+            const px = pos[0];
+            const py = pos[1];
+            return (
+              <g key={`knob-${i}`}>
+                <circle cx={px} cy={py} r={9} fill="rgba(15, 18, 28, 0.95)"
+                  stroke={silverColor} strokeWidth={1.3} />
+                <circle cx={px} cy={py} r={7} fill="url(#wg-silver)" opacity={0.95} />
+                <circle cx={px} cy={py} r={7} fill="none" stroke={silverDeep} strokeWidth={0.5} />
+                <circle cx={px} cy={py} r={2.5} fill="rgba(20, 30, 50, 0.85)" />
+                <line x1={px} y1={py - 1} x2={px} y2={py - 6} stroke="rgba(20, 30, 50, 0.95)" strokeWidth={1.3} />
+                {Array.from({ length: 11 }).map((_, k) => {
+                  const a = -Math.PI * 0.75 + (k / 10) * Math.PI * 1.5;
+                  const x1 = px + Math.cos(a) * 9;
+                  const y1 = py + Math.sin(a) * 9;
+                  const x2 = px + Math.cos(a) * 11;
+                  const y2 = py + Math.sin(a) * 11;
+                  return <line key={`tick-${i}-${k}`} x1={x1} y1={y1} x2={x2} y2={y2}
+                    stroke={silverColor} strokeWidth={0.5} />;
+                })}
+              </g>
+            );
+          })}
+
+          {/* ── PICKUP SELECTOR TOGGLE ── */}
+          <g transform={`translate(${bodyW * 0.18} ${-bodyH * 0.06})`}>
+            <circle cx={0} cy={0} r={5} fill="rgba(15, 18, 28, 0.95)" stroke={silverColor} strokeWidth={0.9} />
+            <circle cx={0} cy={0} r={3.5} fill="url(#wg-silver)" />
+            <line x1={0} y1={0} x2={2.4} y2={-2.4} stroke="rgba(20, 30, 50, 0.95)" strokeWidth={1.6}
+              strokeLinecap="round" />
+            <circle cx={2.4} cy={-2.4} r={1.2} fill={silverBright} />
+          </g>
+
+          {/* ── INPUT JACK ── */}
+          <g transform={`translate(${bodyW * 0.42} ${bodyH * 0.20})`}>
+            <rect x={-4} y={-4} width={8} height={8} rx={1} fill="url(#wg-silver)" stroke={silverDeep} strokeWidth={0.6} />
+            <circle cx={0} cy={0} r={2} fill="rgba(15, 18, 28, 0.95)" />
+            <circle cx={0} cy={0} r={1} fill="rgba(40, 50, 70, 0.95)" />
+          </g>
+
+          {/* ── NECK JOINT (heel) ── */}
+          <rect x={-neckW * 0.7} y={-bodyH * 0.46} width={neckW * 1.4} height={14}
+            fill="url(#wg-neck)" stroke="rgba(0, 0, 0, 0.95)" strokeWidth={1.4} />
+          <line x1={-neckW * 0.7} y1={-bodyH * 0.46 + 4} x2={neckW * 0.7} y2={-bodyH * 0.46 + 4}
+            stroke={silverColor} strokeWidth={0.6} opacity={0.65} />
+
+        </g>
+
+        {/* ─── NECK + FRETBOARD + HEADSTOCK (absolute frame coords) ─── */}
+        <g>
+          {/* Neck back */}
+          <rect x={cx - neckW / 2 - 1} y={neckTopY} width={neckW + 2} height={neckLen + 14}
+            fill="url(#wg-neck)" stroke="rgba(0, 0, 0, 0.98)" strokeWidth={1.6} />
+          {/* Subtle highlight stripe on neck */}
+          <rect x={cx - neckW / 2 + 2} y={neckTopY + 2} width={2} height={neckLen + 10}
+            fill={`rgba(180, 200, 240, ${0.25 + moonlight * 0.15})`} />
+
+          {/* Fretboard */}
+          <rect x={cx - neckW * 0.42} y={neckTopY + 4} width={neckW * 0.84} height={neckLen + 6}
+            fill="url(#wg-fretboard)" stroke="rgba(0, 0, 0, 0.85)" strokeWidth={0.8} />
+
+          {/* Frets (22) */}
+          {Array.from({ length: 22 }).map((_, i) => {
+            const fy = neckTopY + 4 + (i + 1) * (neckLen / 22);
+            return (
+              <g key={`fret-${i}`}>
+                <line x1={cx - neckW * 0.42} y1={fy} x2={cx + neckW * 0.42} y2={fy}
+                  stroke={silverBright} strokeWidth={1.4} />
+                <line x1={cx - neckW * 0.42} y1={fy + 0.6} x2={cx + neckW * 0.42} y2={fy + 0.6}
+                  stroke={silverDeep} strokeWidth={0.4} />
+              </g>
+            );
+          })}
+
+          {/* Inlays — pearl dots at frets 3, 5, 7, 9, 12 (double), 15, 17, 19 */}
+          {[3, 5, 7, 9, 12, 12, 15, 17, 19].map((fretNum, i) => {
+            const fretSpacing = neckLen / 22;
+            const fy = neckTopY + 4 + (fretNum - 0.5) * fretSpacing;
+            const isDouble12First = fretNum === 12 && i === 4;
+            const isDouble12Second = fretNum === 12 && i === 5;
+            const offset = isDouble12First ? -neckW * 0.18 : isDouble12Second ? neckW * 0.18 : 0;
+            return (
+              <g key={`inlay-${i}`}>
+                <circle cx={cx + offset} cy={fy - 1} r={3.2}
+                  fill="rgba(240, 245, 255, 0.92)"
+                  stroke="rgba(80, 100, 140, 0.6)" strokeWidth={0.4} />
+                <circle cx={cx + offset - 0.6} cy={fy - 1.6} r={1.0}
+                  fill="rgba(255, 255, 255, 0.95)" />
+              </g>
+            );
+          })}
+
+          {/* ── STRINGS (6) — vibrating ── */}
+          {Array.from({ length: 6 }).map((_, i) => {
+            const xBase = cx - neckW * 0.30 + i * (neckW * 0.12);
+            const vib = stringVib(i);
+            return (
+              <g key={`str-${i}`}>
+                <line x1={xBase + 0.6} y1={neckTopY + 4} x2={xBase + 0.6}
+                  y2={bodyCY + bodyH * 0.46} stroke="rgba(0, 0, 0, 0.7)" strokeWidth={0.8 + i * 0.15} />
+                <line x1={xBase + vib * 0.4} y1={neckTopY + 4} x2={xBase}
+                  y2={bodyCY + bodyH * 0.46}
+                  stroke="rgba(220, 230, 250, 0.92)" strokeWidth={0.7 + i * 0.18} />
+                <line x1={xBase + vib * 0.4} y1={neckTopY + 4} x2={xBase}
+                  y2={bodyCY + bodyH * 0.46}
+                  stroke={tintCore} strokeWidth={0.3} opacity={0.5 + 0.4 * snap.beatDecay} />
+              </g>
+            );
+          })}
+
+          {/* ── HEADSTOCK — Doug Irwin shape ── */}
+          {/* Headstock shadow */}
+          <path d={`
+            M ${cx - neckW * 0.50} ${neckTopY + 6}
+            Q ${cx - neckW * 1.10} ${neckTopY - headstockH * 0.35} ${cx - neckW * 0.85} ${headstockTopY + headstockH * 0.30}
+            Q ${cx - neckW * 0.40} ${headstockTopY - 4} 0 ${headstockTopY + 8}
+            L ${cx} ${headstockTopY + 8}
+            Q ${cx + neckW * 0.40} ${headstockTopY - 4} ${cx + neckW * 0.85} ${headstockTopY + headstockH * 0.30}
+            Q ${cx + neckW * 1.10} ${neckTopY - headstockH * 0.35} ${cx + neckW * 0.50} ${neckTopY + 6}
+            Z
+          `} fill="rgba(0, 0, 0, 0.55)" transform={`translate(4 4)`} />
+
+          {/* Headstock body */}
+          <path d={`
+            M ${cx - neckW * 0.50} ${neckTopY + 6}
+            Q ${cx - neckW * 1.10} ${neckTopY - headstockH * 0.35} ${cx - neckW * 0.85} ${headstockTopY + headstockH * 0.30}
+            Q ${cx - neckW * 0.40} ${headstockTopY - 4} ${cx} ${headstockTopY + 8}
+            Q ${cx + neckW * 0.40} ${headstockTopY - 4} ${cx + neckW * 0.85} ${headstockTopY + headstockH * 0.30}
+            Q ${cx + neckW * 1.10} ${neckTopY - headstockH * 0.35} ${cx + neckW * 0.50} ${neckTopY + 6}
+            Z
+          `} fill="url(#wg-neck)" stroke="rgba(0, 0, 0, 0.98)" strokeWidth={2} />
+
+          {/* Headstock face highlight */}
+          <path d={`
+            M ${cx - neckW * 0.40} ${neckTopY + 4}
+            Q ${cx - neckW * 0.95} ${neckTopY - headstockH * 0.30} ${cx - neckW * 0.75} ${headstockTopY + headstockH * 0.32}
+            Q ${cx - neckW * 0.36} ${headstockTopY} ${cx} ${headstockTopY + 12}
+          `} fill="none" stroke={`rgba(180, 210, 250, ${0.40 + moonlight * 0.20})`} strokeWidth={1.2} />
+
+          {/* Silver logo plate "WOLF / DOUG IRWIN" */}
+          <rect x={cx - neckW * 0.55} y={headstockTopY + headstockH * 0.45}
+            width={neckW * 1.10} height={14} rx={1.5}
+            fill="url(#wg-silver)" stroke="rgba(20, 30, 50, 0.85)" strokeWidth={0.8} />
+          <text x={cx} y={headstockTopY + headstockH * 0.45 + 10}
+            textAnchor="middle" fontSize={9} fontFamily="Georgia, serif" fontWeight={900}
+            fill="rgba(20, 30, 50, 0.95)" letterSpacing={1.4}>D.IRWIN</text>
+
+          {/* Truss rod cover */}
+          <rect x={cx - neckW * 0.20} y={neckTopY - 4} width={neckW * 0.40} height={10} rx={1}
+            fill="url(#wg-silver)" stroke="rgba(20, 30, 50, 0.85)" strokeWidth={0.5} />
+          <circle cx={cx - neckW * 0.14} cy={neckTopY + 1} r={0.8} fill="rgba(20, 30, 50, 0.95)" />
+          <circle cx={cx + neckW * 0.14} cy={neckTopY + 1} r={0.8} fill="rgba(20, 30, 50, 0.95)" />
+
+          {/* Tuning pegs (3 per side) */}
+          {Array.from({ length: 6 }).map((_, i) => {
+            const side = i < 3 ? -1 : 1;
+            const idx = i % 3;
+            const px = cx + side * neckW * 0.95;
+            const py = headstockTopY + headstockH * 0.18 + idx * (headstockH * 0.18);
+            return (
+              <g key={`tuner-${i}`}>
+                {/* Post on the headstock face */}
+                <circle cx={cx + side * neckW * 0.40} cy={py} r={3.5}
+                  fill="rgba(10, 14, 22, 0.98)" stroke={silverColor} strokeWidth={0.8} />
+                <circle cx={cx + side * neckW * 0.40} cy={py} r={1.8}
+                  fill={silverBright} />
+                <circle cx={cx + side * neckW * 0.40} cy={py} r={1.0}
+                  fill="rgba(220, 230, 250, 0.85)" />
+                {/* Tuner button */}
+                <ellipse cx={px} cy={py} rx={6} ry={3.5}
+                  fill="url(#wg-silver)" stroke="rgba(20, 30, 50, 0.85)" strokeWidth={0.6} />
+                <ellipse cx={px} cy={py} rx={3} ry={1.6}
+                  fill={silverDeep} opacity={0.7} />
+                <line x1={cx + side * neckW * 0.45} y1={py} x2={px - side * 5} y2={py}
+                  stroke={silverDeep} strokeWidth={1} />
+              </g>
+            );
+          })}
+
+          {/* Decorative scroll at the top */}
+          <path d={`M ${cx - neckW * 0.20} ${headstockTopY + 6}
+            Q ${cx} ${headstockTopY - 2} ${cx + neckW * 0.20} ${headstockTopY + 6}`}
+            stroke={silverColor} strokeWidth={1.4} fill="none" />
+          <circle cx={cx} cy={headstockTopY + 4} r={1.8} fill={silverBright} />
+        </g>
+
+        {/* ── ONSET FLASH ON WOLF EYES (silhouette) ── */}
+        {flash > 0 && (
+          <ellipse cx={cx + bodyW * 0.04} cy={bodyCY - bodyH * 0.16}
+            rx={48 + flash * 26} ry={48 + flash * 26}
+            fill={tintCore} opacity={flash * 0.50} style={{ mixBlendMode: "screen" }} />
+        )}
+
+        {/* ── MIST MOTES IN MOONLIGHT ── */}
+        <g style={{ mixBlendMode: "screen" }}>
+          {mist.map((d, i) => {
+            const t = frame * d.speed * tempoFactor + d.phase;
+            const px = (d.x + Math.sin(t * 1.2) * 0.04) * width;
+            const py = (d.y + Math.sin(t * 0.6) * 0.02) * height;
+            const flicker = 0.5 + Math.sin(t * 2.4) * 0.4;
+            const distFromCenter = Math.abs(px - cx) / (width * 0.5);
+            const moonlightBoost = Math.max(0, 1 - distFromCenter * 1.4);
+            return (
+              <circle key={`mist-${i}`} cx={px} cy={py} r={d.r * (0.8 + moonlight * 0.5)}
+                fill={tintCore} opacity={(0.30 + moonlightBoost * 0.45) * flicker * moonlight} />
+            );
+          })}
+        </g>
+
+        {/* ── VIGNETTE ── */}
+        <rect width={width} height={height} fill="url(#wg-vig)" />
+      </svg>
     </div>
   );
 };

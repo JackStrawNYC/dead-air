@@ -175,11 +175,11 @@ void main() {
   vec3 rd = normalize(p.x * rolledRight + p.y * rolledUp + fov * camForward);
 
   // === PALETTE COLORS ===
-  float hue1 = hsvToCosineHue(uPalettePrimary) + pitch * 0.15 + flux * uDynamicTime * 0.002;
-  vec3 palCol1 = 0.5 + 0.5 * cos(_SN_TAU * vec3(hue1, hue1 + 0.33, hue1 + 0.67));
+  float hue1 = uPalettePrimary + pitch * 0.15 + flux * uDynamicTime * 0.002;
+  vec3 palCol1 = paletteHueColor(hue1, 0.78, 0.92);
 
-  float hue2 = hsvToCosineHue(uPaletteSecondary) + pitch * 0.1;
-  vec3 palCol2 = 0.5 + 0.5 * cos(_SN_TAU * vec3(hue2, hue2 + 0.33, hue2 + 0.67));
+  float hue2 = uPaletteSecondary + pitch * 0.1;
+  vec3 palCol2 = paletteHueColor(hue2, 0.85, 0.98);
 
   // === TRAVEL ORIGIN ===
   float travelSpeed = 0.03 + energy * 0.07 + climaxBoost * 0.1;
@@ -237,7 +237,7 @@ void main() {
       float depthHue = float(r) * 0.006 + passHueShift;
 
       // Band 1: cool outer wisps
-      vec3 coolHue = 0.5 + 0.5 * cos(_SN_TAU * vec3(hue1 + depthHue, hue1 + 0.33 + depthHue, hue1 + 0.67 + depthHue));
+      vec3 coolHue = paletteHueColor(hue1 + depthHue, 0.78, 0.92);
       vec3 bandCool = coolHue * vec3(0.7, 0.85, 1.0);
 
       // Band 2: warm body (palette blend)

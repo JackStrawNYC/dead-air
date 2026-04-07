@@ -162,6 +162,8 @@ export const VisualModeSchema = z.enum([
   "aviary_canopy", "clockwork_temple", "event_horizon",
   "canyon_chase", "porch_twilight", "bloom_explosion",
   "locomotive_engine", "dance_floor_prism", "stained_glass_dissolution",
+  // Curated chill-mode shaders added during Phase B
+  "ember_meadow",
 ]);
 
 export const ColorPaletteSchema = z.object({

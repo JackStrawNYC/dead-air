@@ -95,17 +95,19 @@ float acBranchSeg(vec3 p, float baseRadius, float tipRadius, float segLen) {
 }
 
 // ─── Bark texture: noise-based displacement for rough surface ───
+// Kept very small to preserve SDF Lipschitz (normal estimation safety)
 float acBark(vec3 p) {
-  return (snoise(p * 8.0) * 0.3 + snoise(p * 16.0) * 0.15 + snoise(p * 32.0) * 0.05) * 0.012;
+  return (snoise(p * 4.0) * 0.3 + snoise(p * 8.0) * 0.1) * 0.005;
 }
 
 // ─── Leaf cluster: noisy soft sphere at branch tip ───
+// All displacement frequencies kept low and amplitudes small
 float acLeafCluster(vec3 p, float radius, float leafTime) {
-  float n = snoise(p * 3.0 + leafTime * 0.3) * 0.3;
-  float d = length(p) - radius * (1.0 + n * 0.4);
-  // Flutter from beats
-  d += sin(p.x * 12.0 + leafTime * 2.0) * 0.015;
-  d += sin(p.z * 10.0 + leafTime * 1.7) * 0.01;
+  float n = snoise(p * 2.0 + leafTime * 0.3) * 0.15;
+  float d = length(p) - radius * (1.0 + n * 0.2);
+  // Gentle flutter — low frequency so normals stay smooth
+  d += sin(p.x * 3.0 + leafTime * 1.5) * 0.005;
+  d += sin(p.z * 2.5 + leafTime * 1.3) * 0.004;
   return d;
 }
 
@@ -268,13 +270,15 @@ vec2 acMap(vec3 p, float sway, float flowTime, float energy, float drumOnset, fl
 
 // ─── Normal estimation (central differences) ───
 vec3 acNormal(vec3 p, float sway, float flowTime, float energy, float drumOnset, float density) {
-  float eps = 0.003;
+  float eps = 0.008;
   float ref = acMap(p, sway, flowTime, energy, drumOnset, density).x;
-  return normalize(vec3(
+  vec3 nrm = vec3(
     acMap(p + vec3(eps, 0.0, 0.0), sway, flowTime, energy, drumOnset, density).x - ref,
     acMap(p + vec3(0.0, eps, 0.0), sway, flowTime, energy, drumOnset, density).x - ref,
     acMap(p + vec3(0.0, 0.0, eps), sway, flowTime, energy, drumOnset, density).x - ref
-  ));
+  );
+  float len = length(nrm);
+  return len > 0.0001 ? nrm / len : vec3(0.0, 1.0, 0.0);
 }
 
 // ─── God rays: dappled light through canopy gaps ───
@@ -428,36 +432,35 @@ void main() {
 
     // === MATERIAL COLORS ===
     if (matId < 0.5) {
-      // Branch / leaf material
-      // Determine if we're on bark or leaf by checking proximity to leaf clusters
-      float leafTest = length(fract(marchPos / 3.5) - 0.5);
-      float isLeaf = smoothstep(0.35, 0.25, leafTest) * step(marchPos.y, 4.0);
+      // Unified canopy material — use Y height to softly transition from
+      // brown bark below to green/gold leaves above. Smooth, no discontinuities.
+      float heightT = smoothstep(-1.0, 1.5, marchPos.y);
 
-      // Bark: rich brown with noise variation
-      vec3 barkCol = vec3(0.25, 0.15, 0.08);
-      barkCol += vec3(0.05) * snoise(marchPos * 6.0);
-      // Add warm golden tones from vocal presence
-      barkCol = mix(barkCol, vec3(0.35, 0.25, 0.12), vocalWarmth * 0.3);
+      vec3 barkCol = vec3(0.22, 0.14, 0.08);
+      barkCol = mix(barkCol, vec3(0.32, 0.22, 0.10), vocalWarmth * 0.3);
 
-      // Leaf color: green/gold gradient
-      vec3 leafGreen = vec3(0.15, 0.4, 0.1);
-      vec3 leafGold = vec3(0.5, 0.45, 0.15);
-      vec3 leafAmber = vec3(0.6, 0.35, 0.1);
-      float leafVariation = snoise(marchPos * 4.0 + flowTime * 0.1);
+      vec3 leafGreen = vec3(0.18, 0.42, 0.12);
+      vec3 leafGold = vec3(0.45, 0.42, 0.15);
+      vec3 leafAmber = vec3(0.55, 0.32, 0.12);
+      float leafVariation = snoise(marchPos * 0.8 + flowTime * 0.1);
       vec3 leafCol = mix(leafGreen, leafGold, leafVariation * 0.5 + 0.5);
-      leafCol = mix(leafCol, leafAmber, tension * 0.3); // tension shifts to warmer amber
+      leafCol = mix(leafCol, leafAmber, tension * 0.3);
 
-      // Highs drive leaf shimmer
-      leafCol *= 1.0 + highs * 0.3 * sin(marchPos.x * 20.0 + flowTime * 3.0);
+      // Soft height-based blend instead of hard fract() boundary
+      vec3 surfaceColUnused = mix(barkCol, leafCol, heightT);
 
-      // Beat-synced flutter brightness
-      leafCol *= 1.0 + beatVal * 0.15;
+      // Beat-synced flutter brightness (no high-frequency sin)
+      leafCol *= 1.0 + beatVal * 0.12 + highs * 0.06;
+      barkCol *= 1.0 + beatVal * 0.05;
+      // overwrite isLeaf for downstream code
+      float isLeaf = heightT;
 
       vec3 surfaceCol = mix(barkCol, leafCol, isLeaf);
 
-      // Dappled light: noise-modulated sun patches
-      float dapple = snoise(marchPos * 2.0 + vec3(flowTime * 0.05, 0.0, flowTime * 0.03));
-      dapple = smoothstep(-0.2, 0.5, dapple);
+      // Dappled light: gentle low-frequency modulation, NO smoothstep
+      // (smoothstep creates sharp edges that chromatic aberration turns into rainbow noise)
+      float dapple = snoise(marchPos * 0.6 + vec3(flowTime * 0.05, 0.0, flowTime * 0.03));
+      dapple = 0.7 + 0.3 * dapple; // soft 0.4-1.0 range, no hard edges
       float dappleLight = dapple * diffuse;
 
       // Vocal warmth adds golden sunlight color
@@ -553,11 +556,11 @@ void main() {
   col *= 1.0 + uBeatSnap * 0.08;
 
   // === CANOPY DAPPLE OVERLAY ===
-  // Additional screenspace dappled light pattern
+  // Gentle low-freq additive light, no smoothstep
   {
-    float dapplePattern = fbm3(vec3(p * 4.0 + flowTime * 0.1, flowTime * 0.05));
-    dapplePattern = smoothstep(0.0, 0.5, dapplePattern);
-    float dappleStr = 0.08 * (1.0 + energy * 0.3) * (1.0 - climaxBreak * 0.5);
+    float dapplePattern = fbm3(vec3(p * 1.5 + flowTime * 0.1, flowTime * 0.05));
+    dapplePattern = 0.5 + 0.5 * dapplePattern;
+    float dappleStr = 0.05 * (1.0 + energy * 0.3) * (1.0 - climaxBreak * 0.5);
     vec3 dappleCol = vec3(1.0, 0.95, 0.7) * dapplePattern * dappleStr;
     col += dappleCol;
   }

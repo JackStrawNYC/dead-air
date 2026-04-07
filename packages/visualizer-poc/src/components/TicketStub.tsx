@@ -120,10 +120,11 @@ export const TicketStub: React.FC<Props> = ({ frames }) => {
   if (masterOpacity < 0.005) return null;
 
   // ── Show context ──
-  const venue = ctx?.venueShort ?? "BARTON HALL";
-  const venueLoc = ctx?.venueLocation ?? "ITHACA, NY";
-  const date = ctx?.dateShort ?? "5/8/77";
-  const dateLong = ctx?.date ?? "May 8, 1977";
+  const venue = (ctx?.venueShort ?? "Concert").toUpperCase();
+  const venueLoc = ctx?.venueLocation ?? "";
+  const date = ctx?.dateShort ?? "";
+  const dateLong = ctx?.date ?? "";
+  const showBand = ctx?.bandName ?? "Grateful Dead";
   const showSeed = ctx?.showSeed ?? 19770508;
   const era = ctx?.era ?? "70s";
 
@@ -244,7 +245,7 @@ export const TicketStub: React.FC<Props> = ({ frames }) => {
               <div style={{ fontFamily: serif, fontSize: 16, fontWeight: "bold", letterSpacing: 4,
                 color: ink, textAlign: "center", lineHeight: 1.1, textTransform: "uppercase",
                 textShadow: `0 0 1px ${inkFaded}` }}>
-                GRATEFUL DEAD
+                {showBand.toUpperCase()}
               </div>
               <div style={{ margin: "3px auto", width: "80%", height: 1,
                 background: `linear-gradient(90deg,transparent,${inkLight},transparent)` }}/>

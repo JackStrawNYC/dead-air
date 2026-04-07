@@ -1,21 +1,21 @@
 /**
- * VenetaSwimmers — A+++ river-swimming scene for Veneta 8/27/72.
+ * VenetaSwimmers — A+++ "Sunshine Daydream" river-swimming scene.
  *
- * Veneta was 100°F. The river ran behind the stage. The crowd stripped
- * naked and swam to escape the heat. This overlay paints that joyful,
- * sun-baked freedom along the bottom of the frame: a curved riverbank,
- * rippling water, golden sun reflection, splash bursts, and 8-12 swimmer
- * silhouettes — wading, floating, swimming, diving, sunbathing.
- *
- * All silhouettes are tasteful figure shapes — no anatomical detail,
- * just dark joyful bodies cooling off in the river.
+ * Veneta '72 was 100°F. Behind the stage at the Springfield Creamery benefit,
+ * a river ran past the Old Renaissance Faire grounds. The crowd stripped and
+ * swam to escape the heat. This is a pastoral hippie utopia: a sunlit river
+ * with 7 swimmers (some floating, some splashing), grassy banks lined with
+ * willows and reeds, sun dapples on water, lily pads, distant rolling hills,
+ * dragonflies, sun rays through the trees.
  *
  * Audio reactivity:
- *   - slowEnergy → water rippling intensity (calm vs rolling)
- *   - energy     → splash intensity + droplet count
- *   - bass       → wave amplitude
- *   - chromaHue  → tints sun reflection (warm gold ↔ cooler amber)
- *   - beatDecay  → pulses sun glints
+ *   slowEnergy   → sun warmth
+ *   energy       → splash intensity
+ *   bass         → ripple amplitude
+ *   beatDecay    → sun ray pulse
+ *   onsetEnvelope→ splash flash
+ *   chromaHue    → palette tint
+ *   tempoFactor  → swimmer drift speed
  */
 
 import React from "react";
@@ -25,96 +25,51 @@ import { seeded } from "../utils/seededRandom";
 import { useAudioSnapshot } from "./parametric/audio-helpers";
 import { useTempoFactor } from "../data/TempoContext";
 
-/* ------------------------------------------------------------------ */
-/*  Types                                                              */
-/* ------------------------------------------------------------------ */
+const CYCLE_TOTAL = 2400;
+const VISIBLE_DURATION = 780;
 
-type SwimmerPose = "wading" | "swimming" | "floating" | "diving" | "sitting";
-
-interface SwimmerData {
-  pose: SwimmerPose;
-  x: number; y: number; scale: number; phase: number; drift: number;
-  facing: -1 | 1; armsUp: boolean;
+interface SwimmerSpec {
+  bx: number;
+  by: number;
+  size: number;
+  pose: "float" | "splash" | "swim" | "wave";
+  hairHue: number;
+  phase: number;
 }
 
-interface SplashData {
-  x: number; y: number; period: number; phase: number; maxR: number;
+interface RippleSpec {
+  bx: number;
+  by: number;
+  size: number;
+  speed: number;
+  phase: number;
 }
 
-interface BankElement {
-  type: "tree" | "clothes" | "sunbather";
-  x: number; scale: number; variant: number;
+interface LilyPad {
+  bx: number;
+  by: number;
+  size: number;
+  hasFlower: boolean;
 }
 
-interface SunGlint {
-  t: number; jitter: number; phase: number; freq: number; r: number;
+interface Dragonfly {
+  cx: number;
+  cy: number;
+  r: number;
+  speed: number;
+  phase: number;
 }
 
-/* ------------------------------------------------------------------ */
-/*  Deterministic data generators                                      */
-/* ------------------------------------------------------------------ */
-
-const SWIMMER_COUNT = 11;
-const SPLASH_COUNT = 4;
-const GLINT_COUNT = 22;
-
-function generateSwimmers(seed: number): SwimmerData[] {
-  const rng = seeded(seed);
-  const poses: SwimmerPose[] = [
-    "wading", "swimming", "floating", "diving", "wading",
-    "swimming", "floating", "sitting", "wading", "swimming", "floating",
-  ];
-  return poses.slice(0, SWIMMER_COUNT).map((pose, i) => ({
-    pose,
-    x: 0.06 + (i / SWIMMER_COUNT) * 0.88 + (rng() - 0.5) * 0.05,
-    y: 0.25 + rng() * 0.6,
-    scale: 0.85 + rng() * 0.45,
-    phase: rng() * Math.PI * 2,
-    drift: 0.0008 + rng() * 0.0014,
-    facing: rng() > 0.5 ? 1 : -1,
-    armsUp: rng() > 0.55,
-  }));
+interface Reed {
+  x: number;
+  height: number;
+  sway: number;
+  phase: number;
 }
 
-function generateSplashes(seed: number): SplashData[] {
-  const rng = seeded(seed * 7 + 11);
-  return Array.from({ length: SPLASH_COUNT }, (_, i) => ({
-    x: 0.18 + (i / SPLASH_COUNT) * 0.7 + rng() * 0.05,
-    y: 0.35 + rng() * 0.4,
-    period: 90 + Math.floor(rng() * 110),
-    phase: rng() * 200,
-    maxR: 18 + rng() * 22,
-  }));
+interface Props {
+  frames: EnhancedFrameData[];
 }
-
-function generateBank(seed: number): BankElement[] {
-  const rng = seeded(seed * 13 + 5);
-  return ([
-    { type: "tree", x: 0.05, scale: 1.15, variant: 0 },
-    { type: "tree", x: 0.92, scale: 0.95, variant: 1 },
-    { type: "clothes", x: 0.22, scale: 1.0, variant: 0 },
-    { type: "clothes", x: 0.78, scale: 0.9, variant: 1 },
-    { type: "sunbather", x: 0.48, scale: 1.05, variant: 0 },
-    { type: "tree", x: 0.65, scale: 0.85, variant: 2 },
-  ] as BankElement[]).map((e) => ({ ...e, x: e.x + (rng() - 0.5) * 0.02 }));
-}
-
-function generateGlints(seed: number): SunGlint[] {
-  const rng = seeded(seed * 23 + 19);
-  return Array.from({ length: GLINT_COUNT }, () => ({
-    t: rng(),
-    jitter: (rng() - 0.5) * 24,
-    phase: rng() * Math.PI * 2,
-    freq: 0.06 + rng() * 0.12,
-    r: 1.4 + rng() * 2.6,
-  }));
-}
-
-/* ------------------------------------------------------------------ */
-/*  Component                                                          */
-/* ------------------------------------------------------------------ */
-
-interface Props { frames: EnhancedFrameData[]; }
 
 export const VenetaSwimmers: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
@@ -122,317 +77,469 @@ export const VenetaSwimmers: React.FC<Props> = ({ frames }) => {
   const tempoFactor = useTempoFactor();
   const snap = useAudioSnapshot(frames);
 
-  const swimmers = React.useMemo(() => generateSwimmers(8271972), []);
-  const splashes = React.useMemo(() => generateSplashes(8271972), []);
-  const bank = React.useMemo(() => generateBank(8271972), []);
-  const glints = React.useMemo(() => generateGlints(8271972), []);
+  const swimmers = React.useMemo<SwimmerSpec[]>(() => {
+    const rng = seeded(82_447_113);
+    const poses: ("float" | "splash" | "swim" | "wave")[] = ["float", "splash", "swim", "wave"];
+    return [
+      { bx: 0.18, by: 0.74, size: 18, pose: "float",  hairHue: 28,  phase: rng() * 6 },
+      { bx: 0.30, by: 0.78, size: 16, pose: "swim",   hairHue: 14,  phase: rng() * 6 },
+      { bx: 0.44, by: 0.72, size: 18, pose: "splash", hairHue: 38,  phase: rng() * 6 },
+      { bx: 0.56, by: 0.78, size: 18, pose: "wave",   hairHue: 22,  phase: rng() * 6 },
+      { bx: 0.66, by: 0.74, size: 16, pose: "float",  hairHue: 12,  phase: rng() * 6 },
+      { bx: 0.78, by: 0.78, size: 18, pose: "swim",   hairHue: 30,  phase: rng() * 6 },
+      { bx: 0.88, by: 0.72, size: 14, pose: "wave",   hairHue: 18,  phase: rng() * 6 },
+    ];
+  }, []);
 
-  /* River band geometry — bottom 38% of frame */
-  const bandTop = height * 0.62;
-  const bandHeight = height * 0.38;
-  const waterTop = bandTop + bandHeight * 0.18;
-  const waterHeight = bandHeight - (waterTop - bandTop);
+  const ripples = React.useMemo<RippleSpec[]>(() => {
+    const rng = seeded(11_447_223);
+    return Array.from({ length: 22 }, () => ({
+      bx: rng(),
+      by: 0.65 + rng() * 0.30,
+      size: 10 + rng() * 22,
+      speed: 0.012 + rng() * 0.018,
+      phase: rng() * Math.PI * 2,
+    }));
+  }, []);
 
-  /* Audio drives */
-  const rippleIntensity = interpolate(snap.slowEnergy, [0.02, 0.25], [0.45, 1.25],
-    { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-  const splashIntensity = interpolate(snap.energy, [0.03, 0.32], [0.5, 1.4],
-    { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-  const waveAmp = interpolate(snap.bass, [0.0, 0.6], [2.2, 7.5],
-    { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-  const sunHueShift = interpolate(snap.chromaHue, [0, 1], [-18, 22]);
-  const sunPulse = 0.78 + snap.beatDecay * 0.32;
+  const lilyPads = React.useMemo<LilyPad[]>(() => {
+    const rng = seeded(33_887_443);
+    return Array.from({ length: 14 }, () => ({
+      bx: rng(),
+      by: 0.66 + rng() * 0.28,
+      size: 12 + rng() * 14,
+      hasFlower: rng() > 0.55,
+    }));
+  }, []);
 
-  /* Sun reflection vertical streak */
-  const sunPathX = width * 0.58;
-  const sunPathTop = waterTop + 4;
-  const sunPathBot = bandTop + bandHeight - 8;
-  const sunPathLen = sunPathBot - sunPathTop;
+  const dragons = React.useMemo<Dragonfly[]>(() => {
+    const rng = seeded(67_887_001);
+    return Array.from({ length: 5 }, () => ({
+      cx: rng(),
+      cy: 0.40 + rng() * 0.30,
+      r: 0.04 + rng() * 0.04,
+      speed: 0.0015 + rng() * 0.003,
+      phase: rng() * Math.PI * 2,
+    }));
+  }, []);
 
-  /* Curved riverbank polyline (gently waving) */
-  const bankPoints: string[] = [];
-  for (let i = 0; i <= 60; i++) {
-    const px = (i / 60) * width;
-    const py = waterTop + Math.sin(i * 0.35 + frame * 0.01) * 3
-      + Math.sin(i * 0.12 - frame * 0.005) * 5;
-    bankPoints.push(`${px},${py}`);
+  const reeds = React.useMemo<Reed[]>(() => {
+    const rng = seeded(99_447_223);
+    return Array.from({ length: 32 }, () => ({
+      x: rng(),
+      height: 28 + rng() * 60,
+      sway: 0.003 + rng() * 0.012,
+      phase: rng() * Math.PI * 2,
+    }));
+  }, []);
+
+  const cycleFrame = frame % CYCLE_TOTAL;
+  if (cycleFrame >= VISIBLE_DURATION) return null;
+  const progress = cycleFrame / VISIBLE_DURATION;
+  const fadeIn = interpolate(progress, [0, 0.09], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const fadeOut = interpolate(progress, [0.91, 1], [1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const masterOpacity = Math.min(fadeIn, fadeOut) * 0.95;
+  if (masterOpacity < 0.01) return null;
+
+  const energy = snap.energy;
+  const bass = snap.bass;
+  const slowEnergy = snap.slowEnergy;
+  const beatDecay = snap.beatDecay;
+  const onsetEnv = snap.onsetEnvelope;
+  const chromaHue = snap.chromaHue;
+
+  const sunBright = 0.6 + slowEnergy * 0.4;
+  const splashIntensity = 0.5 + energy * 0.4 + onsetEnv * 0.5;
+  const rippleAmp = 1 + bass * 1.5;
+  const rayPulse = 1 + beatDecay * 0.3;
+
+  const baseHue = 90;
+  const tintHue = ((baseHue + (chromaHue - 180) * 0.30) % 360 + 360) % 360;
+  const skyTop = `hsl(${(tintHue + 130) % 360}, 65%, 60%)`;
+  const skyMid = `hsl(${(tintHue + 130) % 360}, 75%, 78%)`;
+  const skyHorizon = `hsl(${(tintHue + 60) % 360}, 80%, 88%)`;
+  const waterTop = `hsl(${(tintHue + 110) % 360}, 65%, 50%)`;
+  const waterBot = `hsl(${(tintHue + 130) % 360}, 70%, 28%)`;
+
+  const horizonY = height * 0.50;
+  const sunX = width * 0.72;
+  const sunY = horizonY - 20;
+
+  /* === Swimmer renderer === */
+  function renderSwimmer(s: SwimmerSpec, idx: number): React.ReactNode {
+    const sx = s.bx * width;
+    const sy = s.by * height + Math.sin(frame * 0.04 + s.phase) * 2;
+
+    const skinHue = 28;
+    const skinColor = `hsl(${skinHue}, 60%, 70%)`;
+    const hairColor = `hsl(${s.hairHue}, 70%, 30%)`;
+
+    if (s.pose === "float") {
+      // Floating on back, arms out
+      return (
+        <g key={`sw-${idx}`}>
+          {/* Body shadow on water */}
+          <ellipse cx={sx} cy={sy + 4} rx={s.size * 1.2} ry={3} fill="rgba(0, 0, 0, 0.3)" />
+          {/* Body (visible in water) */}
+          <ellipse cx={sx} cy={sy} rx={s.size * 0.8} ry={s.size * 0.3} fill={skinColor} stroke="rgba(40, 20, 8, 0.85)" strokeWidth={0.8} />
+          {/* Head */}
+          <circle cx={sx + s.size * 0.6} cy={sy} r={s.size * 0.32} fill={skinColor} stroke="rgba(40, 20, 8, 0.85)" strokeWidth={0.8} />
+          {/* Hair on top */}
+          <path d={`M ${sx + s.size * 0.6 - s.size * 0.32} ${sy} Q ${sx + s.size * 0.6 - s.size * 0.32} ${sy - s.size * 0.4} ${sx + s.size * 0.6 + s.size * 0.32} ${sy - s.size * 0.32}`} fill={hairColor} />
+          {/* Arms out */}
+          <line x1={sx} y1={sy} x2={sx - s.size * 0.7} y2={sy + s.size * 0.3} stroke={skinColor} strokeWidth={3} strokeLinecap="round" />
+          <line x1={sx} y1={sy} x2={sx + s.size * 0.2} y2={sy - s.size * 0.5} stroke={skinColor} strokeWidth={3} strokeLinecap="round" />
+          {/* Smile */}
+          <path d={`M ${sx + s.size * 0.55} ${sy + 1} Q ${sx + s.size * 0.6} ${sy + 3} ${sx + s.size * 0.65} ${sy + 1}`} stroke="rgba(40, 20, 8, 0.85)" strokeWidth={0.6} fill="none" />
+          {/* Closed eye */}
+          <circle cx={sx + s.size * 0.66} cy={sy - 1} r={0.6} fill="rgba(40, 20, 8, 0.85)" />
+        </g>
+      );
+    } else if (s.pose === "splash") {
+      const splashR = s.size * 1.2 * splashIntensity;
+      return (
+        <g key={`sw-${idx}`}>
+          {/* Splash droplets */}
+          {Array.from({ length: 14 }, (_, k) => {
+            const a = (k / 14) * Math.PI * 2;
+            const r = splashR;
+            return (
+              <circle
+                key={k}
+                cx={sx + Math.cos(a) * r}
+                cy={sy + Math.sin(a) * r * 0.6 - 8}
+                r={1.4 + (k % 3)}
+                fill="rgba(255, 255, 250, 0.85)"
+              />
+            );
+          })}
+          {/* Splash spray base */}
+          <ellipse cx={sx} cy={sy - 4} rx={s.size * 0.9} ry={4} fill="rgba(255, 255, 250, 0.6)" />
+          {/* Head */}
+          <circle cx={sx} cy={sy} r={s.size * 0.32} fill={skinColor} stroke="rgba(40, 20, 8, 0.85)" strokeWidth={0.8} />
+          <path d={`M ${sx - s.size * 0.32} ${sy} Q ${sx} ${sy - s.size * 0.4} ${sx + s.size * 0.32} ${sy}`} fill={hairColor} />
+          {/* Arms up */}
+          <line x1={sx} y1={sy + 4} x2={sx - s.size * 0.6} y2={sy - s.size * 0.7} stroke={skinColor} strokeWidth={3} strokeLinecap="round" />
+          <line x1={sx} y1={sy + 4} x2={sx + s.size * 0.6} y2={sy - s.size * 0.7} stroke={skinColor} strokeWidth={3} strokeLinecap="round" />
+          {/* Joyous smile */}
+          <path d={`M ${sx - 3} ${sy + 2} Q ${sx} ${sy + 4} ${sx + 3} ${sy + 2}`} stroke="rgba(40, 20, 8, 0.85)" strokeWidth={0.6} fill="none" />
+        </g>
+      );
+    } else if (s.pose === "swim") {
+      // Front crawl
+      return (
+        <g key={`sw-${idx}`}>
+          <ellipse cx={sx} cy={sy + 4} rx={s.size * 1.5} ry={3} fill="rgba(0, 0, 0, 0.3)" />
+          <ellipse cx={sx} cy={sy} rx={s.size * 1.0} ry={s.size * 0.30} fill={skinColor} stroke="rgba(40, 20, 8, 0.85)" strokeWidth={0.8} />
+          <circle cx={sx + s.size * 0.85} cy={sy - 2} r={s.size * 0.30} fill={skinColor} stroke="rgba(40, 20, 8, 0.85)" strokeWidth={0.8} />
+          <path d={`M ${sx + s.size * 0.55} ${sy - 2} Q ${sx + s.size * 0.75} ${sy - s.size * 0.5} ${sx + s.size * 1.15} ${sy - s.size * 0.32}`} fill={hairColor} />
+          {/* Arm reaching forward */}
+          <path d={`M ${sx} ${sy} Q ${sx + s.size * 0.5} ${sy - s.size * 0.6} ${sx + s.size * 1.2} ${sy - s.size * 0.5}`} stroke={skinColor} strokeWidth={3} fill="none" strokeLinecap="round" />
+          {/* Arm in water */}
+          <line x1={sx} y1={sy + 2} x2={sx - s.size * 0.6} y2={sy + 4} stroke={skinColor} strokeWidth={3} strokeLinecap="round" />
+          {/* Splash from kicking */}
+          {Array.from({ length: 6 }, (_, k) => (
+            <circle
+              key={k}
+              cx={sx - s.size * 0.7 + k * 2}
+              cy={sy - 4 - Math.sin(frame * 0.3 + k) * 2}
+              r={0.8}
+              fill="rgba(255, 255, 250, 0.85)"
+            />
+          ))}
+        </g>
+      );
+    } else {
+      // wave
+      return (
+        <g key={`sw-${idx}`}>
+          <ellipse cx={sx} cy={sy + 3} rx={s.size * 0.8} ry={3} fill="rgba(0, 0, 0, 0.3)" />
+          <ellipse cx={sx} cy={sy} rx={s.size * 0.6} ry={s.size * 0.3} fill={skinColor} stroke="rgba(40, 20, 8, 0.85)" strokeWidth={0.8} />
+          <circle cx={sx} cy={sy - s.size * 0.2} r={s.size * 0.32} fill={skinColor} stroke="rgba(40, 20, 8, 0.85)" strokeWidth={0.8} />
+          <path d={`M ${sx - s.size * 0.32} ${sy - s.size * 0.2} Q ${sx} ${sy - s.size * 0.6} ${sx + s.size * 0.32} ${sy - s.size * 0.2}`} fill={hairColor} />
+          {/* Waving arm */}
+          <line x1={sx} y1={sy} x2={sx + s.size * 0.5 + Math.sin(frame * 0.15) * 4} y2={sy - s.size * 0.8} stroke={skinColor} strokeWidth={3} strokeLinecap="round" />
+          {/* Other arm */}
+          <line x1={sx} y1={sy} x2={sx - s.size * 0.4} y2={sy} stroke={skinColor} strokeWidth={3} strokeLinecap="round" />
+          {/* Smile */}
+          <path d={`M ${sx - 2} ${sy - s.size * 0.18} Q ${sx} ${sy - s.size * 0.14} ${sx + 2} ${sy - s.size * 0.18}`} stroke="rgba(40, 20, 8, 0.85)" strokeWidth={0.6} fill="none" />
+        </g>
+      );
+    }
   }
-  const bankPath = `M 0,${bandTop} L ${bankPoints.join(" L ")} L ${width},${bandTop} Z`;
-  const bankEdge = `M ${bankPoints.join(" L ")}`;
 
-  /* Multi-layer ripple builder */
-  const ripple = (yFrac: number, freq: number, ph: number, amp: number): string => {
-    const baseY = waterTop + waterHeight * yFrac;
-    const pts: string[] = [];
-    for (let i = 0; i <= 50; i++) {
-      const px = (i / 50) * width;
-      const wy = baseY + Math.sin(i * freq + frame * 0.04 + ph) * amp * rippleIntensity
-        + Math.sin(i * freq * 2.3 + frame * 0.025 + ph * 0.7) * amp * 0.4 * rippleIntensity;
-      pts.push(`${px},${wy}`);
-    }
-    return `M ${pts.join(" L ")}`;
-  };
-
-  /* Hue-shifted sun gold */
-  const goldG = Math.max(120, Math.min(240, Math.round(195 + sunHueShift * 0.8)));
-  const goldB = Math.max(20, Math.min(140, Math.round(70 + sunHueShift * -1.5)));
-  const sunColor = `rgb(255, ${goldG}, ${goldB})`;
-
-  /* ----------------------------------------------------------------- */
-  /*  Swimmer renderer                                                  */
-  /* ----------------------------------------------------------------- */
-  const renderSwimmer = (s: SwimmerData, idx: number) => {
-    const cx = s.x * width;
-    const baseY = waterTop + s.y * waterHeight;
-    const sc = s.scale;
-    const flip = s.facing;
-    const bob = Math.sin(frame * 0.04 + s.phase) * 1.6 * rippleIntensity;
-    const drift = Math.sin(frame * s.drift + s.phase) * 6;
-    const fill = "rgba(18,14,10,0.85)";
-    const stroke = (x1: number, y1: number, x2: number, y2: number, w = 3 * sc) =>
-      <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={fill} strokeWidth={w} strokeLinecap="round" />;
-
-    if (s.pose === "wading") {
-      const headR = 7 * sc, torsoH = 28 * sc;
-      const handY = s.armsUp ? -torsoH - 22 : -torsoH * 0.4;
-      const handX = s.armsUp ? 13 * sc * flip : 11 * sc;
-      return (
-        <g key={idx} transform={`translate(${cx + drift}, ${baseY + bob})`}>
-          <ellipse cx={0} cy={2} rx={14 * sc} ry={2.5} fill="rgba(0,0,0,0.35)" />
-          <circle cx={0} cy={-torsoH - headR} r={headR} fill={fill} />
-          <path d={`M ${-7 * sc} ${-torsoH} Q 0 ${-torsoH - 4} ${7 * sc} ${-torsoH} L ${5 * sc} 0 Q 0 2 ${-5 * sc} 0 Z`} fill={fill} />
-          {stroke(-6 * sc, -torsoH + 4, -handX, handY, 3.2 * sc)}
-          {stroke(6 * sc, -torsoH + 4, handX, s.armsUp ? -torsoH - 24 : handY, 3.2 * sc)}
-        </g>
-      );
-    }
-    if (s.pose === "swimming") {
-      const armSweep = Math.sin(frame * 0.18 + s.phase) * 0.9;
-      return (
-        <g key={idx} transform={`translate(${cx + drift}, ${baseY + bob}) scale(${flip}, 1)`}>
-          <ellipse cx={0} cy={3} rx={20 * sc} ry={2.8} fill="rgba(0,0,0,0.3)" />
-          <circle cx={4 * sc} cy={-3 * sc} r={5.5 * sc} fill={fill} />
-          <path d={`M ${-14 * sc} 0 Q ${-2 * sc} ${-6 * sc} ${10 * sc} ${-2 * sc} Q ${-2 * sc} ${4 * sc} ${-14 * sc} 2 Z`} fill={fill} />
-          {stroke(6 * sc, -2 * sc, (18 + armSweep * 4) * sc, (-10 - armSweep * 5) * sc, 3.4 * sc)}
-        </g>
-      );
-    }
-    if (s.pose === "floating") {
-      const armSpread = 14 * sc;
-      return (
-        <g key={idx} transform={`translate(${cx + drift}, ${baseY + bob})`}>
-          <ellipse cx={0} cy={3} rx={20 * sc} ry={3} fill="rgba(0,0,0,0.3)" />
-          <ellipse cx={0} cy={0} rx={16 * sc} ry={5 * sc} fill={fill} />
-          <circle cx={-14 * sc} cy={-1} r={5 * sc} fill={fill} />
-          {stroke(-2 * sc, -2 * sc, -2 * sc, -armSpread)}
-          {stroke(2 * sc, -2 * sc, 2 * sc, armSpread)}
-        </g>
-      );
-    }
-    if (s.pose === "diving") {
-      const arc = Math.sin(((frame + s.phase * 30) * 0.04) % Math.PI);
-      const dy = -28 * sc - arc * 18 * sc;
-      return (
-        <g key={idx}>
-          <g transform={`translate(${cx}, ${baseY + dy}) rotate(${20 * flip})`}>
-            <circle cx={0} cy={-12 * sc} r={5 * sc} fill={fill} />
-            <ellipse cx={0} cy={2} rx={4 * sc} ry={14 * sc} fill={fill} />
-            {stroke(-3 * sc, -8 * sc, -9 * sc, -2 * sc)}
-            {stroke(3 * sc, -8 * sc, 9 * sc, -2 * sc)}
-          </g>
-          <ellipse cx={cx} cy={baseY + 4} rx={9 * sc * (0.6 + arc * 0.7)} ry={2.4} fill="rgba(255,255,255,0.55)" />
-        </g>
-      );
-    }
-    // sitting on rock at edge
+  const dragonNodes = dragons.map((d, i) => {
+    const t = frame * d.speed * tempoFactor + d.phase;
+    const dx = d.cx * width + Math.cos(t) * d.r * width;
+    const dy = d.cy * height + Math.sin(t * 1.5) * d.r * height * 0.5;
+    const wing = Math.sin(frame * 0.4 + i) * 4;
     return (
-      <g key={idx} transform={`translate(${cx + drift}, ${waterTop - 2})`}>
-        <ellipse cx={0} cy={6} rx={18 * sc} ry={5 * sc} fill="rgba(40,30,20,0.7)" />
-        <circle cx={0} cy={-22 * sc} r={6 * sc} fill={fill} />
-        <path d={`M ${-7 * sc} ${-16 * sc} Q 0 ${-22 * sc} ${7 * sc} ${-16 * sc} L ${10 * sc} ${-2 * sc} Q 0 ${2 * sc} ${-10 * sc} ${-2 * sc} Z`} fill={fill} />
-        {stroke(-6 * sc, -12 * sc, -13 * sc, -4 * sc)}
-        {stroke(6 * sc, -12 * sc, 12 * sc, -2 * sc)}
-        {stroke(-4 * sc, -2 * sc, -10 * sc, 6 * sc, 3.2 * sc)}
+      <g key={`dr-${i}`} opacity={0.85}>
+        <ellipse cx={dx - 3} cy={dy} rx={3 + wing} ry={1.5} fill={`hsla(${(tintHue + 200) % 360}, 80%, 70%, 0.55)`} />
+        <ellipse cx={dx + 3} cy={dy} rx={3 + wing} ry={1.5} fill={`hsla(${(tintHue + 200) % 360}, 80%, 70%, 0.55)`} />
+        <line x1={dx - 4} y1={dy} x2={dx + 4} y2={dy} stroke="rgba(80, 30, 100, 0.95)" strokeWidth={1.4} />
+        <circle cx={dx + 4} cy={dy} r={1} fill="rgba(20, 20, 20, 0.95)" />
       </g>
     );
-  };
+  });
 
-  /* ----------------------------------------------------------------- */
-  /*  Splash renderer                                                   */
-  /* ----------------------------------------------------------------- */
-  const renderSplash = (sp: SplashData, idx: number) => {
-    const cycleT = ((frame + sp.phase) % sp.period) / sp.period;
-    if (cycleT > 0.55) return null;
-    const t = cycleT / 0.55;
-    const r = sp.maxR * t * splashIntensity;
-    const cx = sp.x * width;
-    const cy = waterTop + sp.y * waterHeight;
-    const op = (1 - t) * 0.85;
-    const dropletCount = Math.floor(6 + splashIntensity * 4);
-    return (
-      <g key={idx}>
-        <ellipse cx={cx} cy={cy} rx={r} ry={r * 0.45} fill="none" stroke="rgba(255,255,255,0.85)" strokeWidth={2} opacity={op} />
-        <ellipse cx={cx} cy={cy} rx={r * 0.7} ry={r * 0.32} fill="none" stroke="rgba(220,240,255,0.7)" strokeWidth={1.4} opacity={op} />
-        <ellipse cx={cx} cy={cy} rx={r * 1.6} ry={r * 0.7} fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth={1} opacity={op * 0.6} />
-        {Array.from({ length: dropletCount }, (_, i) => {
-          const ang = (i / dropletCount) * Math.PI * 2;
-          const dr = r + 6 + t * 12;
-          const dx = Math.cos(ang) * dr;
-          const dy = Math.sin(ang) * dr * 0.6 - t * 14;
-          return <circle key={i} cx={cx + dx} cy={cy + dy} r={1.8 + (1 - t) * 1.6} fill="rgba(255,255,255,0.85)" opacity={op} />;
-        })}
-      </g>
-    );
-  };
-
-  /* ----------------------------------------------------------------- */
-  /*  Bank element renderer                                             */
-  /* ----------------------------------------------------------------- */
-  const renderBank = (el: BankElement, idx: number) => {
-    const cx = el.x * width;
-    const baseY = waterTop - 2;
-    if (el.type === "tree") {
-      const h = 95 * el.scale;
-      const trunkW = 6 * el.scale;
-      return (
-        <g key={`b${idx}`}>
-          <rect x={cx - trunkW / 2} y={baseY - h * 0.4} width={trunkW} height={h * 0.4} fill="rgba(18,12,8,0.85)" />
-          <ellipse cx={cx + (el.variant - 1) * 4} cy={baseY - h * 0.55} rx={26 * el.scale} ry={28 * el.scale} fill="rgba(14,18,10,0.9)" />
-          <ellipse cx={cx - 8 * el.scale} cy={baseY - h * 0.7} rx={18 * el.scale} ry={20 * el.scale} fill="rgba(14,18,10,0.85)" />
-          <ellipse cx={cx + 10 * el.scale} cy={baseY - h * 0.75} rx={16 * el.scale} ry={18 * el.scale} fill="rgba(14,18,10,0.85)" />
-        </g>
-      );
-    }
-    if (el.type === "clothes") {
-      return (
-        <g key={`b${idx}`}>
-          <ellipse cx={cx} cy={baseY - 4 * el.scale} rx={14 * el.scale} ry={5 * el.scale} fill="rgba(180,140,90,0.75)" />
-          <ellipse cx={cx - 4 * el.scale} cy={baseY - 6 * el.scale} rx={9 * el.scale} ry={3.5 * el.scale} fill="rgba(220,80,60,0.65)" />
-          <ellipse cx={cx + 5 * el.scale} cy={baseY - 7 * el.scale} rx={7 * el.scale} ry={3 * el.scale} fill="rgba(80,140,180,0.6)" />
-        </g>
-      );
-    }
-    // sunbather reclining on bank
-    return (
-      <g key={`b${idx}`}>
-        <ellipse cx={cx} cy={baseY - 2} rx={28 * el.scale} ry={4 * el.scale} fill="rgba(0,0,0,0.3)" />
-        <ellipse cx={cx} cy={baseY - 5 * el.scale} rx={22 * el.scale} ry={4 * el.scale} fill="rgba(20,14,10,0.85)" />
-        <circle cx={cx + 18 * el.scale} cy={baseY - 6 * el.scale} r={4 * el.scale} fill="rgba(20,14,10,0.85)" />
-      </g>
-    );
-  };
-
-  /* ----------------------------------------------------------------- */
-  /*  Render                                                            */
-  /* ----------------------------------------------------------------- */
   return (
     <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden" }}>
-      <svg width={width} height={height}>
+      <svg width={width} height={height} style={{ opacity: masterOpacity, willChange: "opacity" }}>
         <defs>
+          <linearGradient id="vs-sky" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={skyTop} />
+            <stop offset="55%" stopColor={skyMid} />
+            <stop offset="100%" stopColor={skyHorizon} />
+          </linearGradient>
           <linearGradient id="vs-water" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stopColor="rgba(40,75,110,0.55)" />
-            <stop offset="0.5" stopColor="rgba(28,55,85,0.7)" />
-            <stop offset="1" stopColor="rgba(14,30,52,0.85)" />
+            <stop offset="0%" stopColor={waterTop} />
+            <stop offset="100%" stopColor={waterBot} />
           </linearGradient>
-          <linearGradient id="vs-haze" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stopColor="rgba(255,220,170,0)" />
-            <stop offset="0.5" stopColor="rgba(255,210,150,0.18)" />
-            <stop offset="1" stopColor="rgba(255,200,140,0)" />
-          </linearGradient>
-          <radialGradient id="vs-sunglow" cx="0.5" cy="0.5" r="0.5">
-            <stop offset="0" stopColor={sunColor} stopOpacity="0.85" />
-            <stop offset="1" stopColor={sunColor} stopOpacity="0" />
+          <radialGradient id="vs-sun" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor="#FFFAE0" stopOpacity={0.95 * sunBright} />
+            <stop offset="40%" stopColor={`hsl(${(tintHue + 60) % 360}, 95%, 80%)`} stopOpacity={0.7 * sunBright} />
+            <stop offset="100%" stopColor={`hsl(${tintHue}, 80%, 60%)`} stopOpacity={0} />
           </radialGradient>
-          <filter id="vs-blur"><feGaussianBlur stdDeviation="1.2" /></filter>
+          <filter id="vs-blur" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="3" />
+          </filter>
         </defs>
 
-        {/* Hot summer haze band above water */}
-        <rect x={0} y={bandTop - 60} width={width} height={120} fill="url(#vs-haze)"
-          opacity={0.7 + Math.sin(frame * 0.012) * 0.1} />
+        {/* SKY */}
+        <rect width={width} height={height} fill="url(#vs-sky)" />
 
-        {/* Water body */}
-        <path d={bankPath} fill="url(#vs-water)" />
+        {/* SUN */}
+        <circle cx={sunX} cy={sunY} r={Math.min(width, height) * 0.10 * 4} fill="url(#vs-sun)" />
+        <circle cx={sunX} cy={sunY} r={Math.min(width, height) * 0.06} fill="rgba(255, 240, 200, 0.85)" opacity={sunBright} />
+        <circle cx={sunX} cy={sunY} r={Math.min(width, height) * 0.03} fill="#FFFFFF" opacity={0.92 * sunBright} />
 
-        {/* Reflection depth lines */}
-        {Array.from({ length: 8 }).map((_, i) => {
-          const yFrac = 0.15 + (i / 8) * 0.85;
-          const y = waterTop + waterHeight * yFrac;
-          return <line key={`refl${i}`} x1={0} y1={y} x2={width} y2={y + Math.sin(frame * 0.02 + i) * 2}
-            stroke="rgba(180,210,235,1)" strokeWidth={0.6} opacity={0.06 + (1 - yFrac) * 0.08} />;
-        })}
+        {/* SUN RAYS through trees */}
+        <g opacity={0.4 * rayPulse} style={{ mixBlendMode: "screen" }}>
+          {Array.from({ length: 10 }, (_, i) => {
+            const a = -Math.PI / 2 + (i - 5) * 0.12;
+            const len = height * 0.95;
+            return (
+              <path
+                key={`sr-${i}`}
+                d={`M ${sunX} ${sunY}
+                    L ${sunX + Math.cos(a) * len - 12} ${sunY + Math.sin(a) * len}
+                    L ${sunX + Math.cos(a) * len + 12} ${sunY + Math.sin(a) * len} Z`}
+                fill={`hsla(${(tintHue + 60) % 360}, 95%, 85%, 0.20)`}
+              />
+            );
+          })}
+        </g>
 
-        {/* Multi-layer ripple paths */}
-        <path d={ripple(0.22, 0.28, 0, waveAmp * 0.8)} fill="none" stroke="rgba(200,220,240,0.4)" strokeWidth={1.1} />
-        <path d={ripple(0.4, 0.34, 1.2, waveAmp * 0.95)} fill="none" stroke="rgba(180,210,235,0.35)" strokeWidth={1} />
-        <path d={ripple(0.55, 0.22, 2.4, waveAmp)} fill="none" stroke="rgba(160,195,225,0.32)" strokeWidth={1.2} />
-        <path d={ripple(0.72, 0.4, 0.6, waveAmp * 0.75)} fill="none" stroke="rgba(150,185,215,0.28)" strokeWidth={0.9} />
-        <path d={ripple(0.88, 0.18, 3.1, waveAmp * 0.6)} fill="none" stroke="rgba(140,175,205,0.22)" strokeWidth={0.8} />
+        {/* DISTANT HILLS */}
+        <path
+          d={`M 0 ${horizonY + 4}
+              L ${width * 0.10} ${horizonY - 18}
+              L ${width * 0.22} ${horizonY - 8}
+              L ${width * 0.36} ${horizonY - 22}
+              L ${width * 0.50} ${horizonY - 12}
+              L ${width * 0.64} ${horizonY - 24}
+              L ${width * 0.78} ${horizonY - 8}
+              L ${width * 0.90} ${horizonY - 18}
+              L ${width} ${horizonY + 4}
+              L ${width} ${horizonY + 8}
+              L 0 ${horizonY + 8} Z`}
+          fill={`hsl(${(tintHue + 30) % 360}, 50%, 38%)`}
+          opacity={0.85}
+        />
+        {/* Mid hills */}
+        <path
+          d={`M 0 ${horizonY + 8}
+              L ${width * 0.20} ${horizonY - 4}
+              L ${width * 0.40} ${horizonY - 10}
+              L ${width * 0.60} ${horizonY - 6}
+              L ${width * 0.80} ${horizonY - 12}
+              L ${width} ${horizonY + 4}
+              L ${width} ${horizonY + 14}
+              L 0 ${horizonY + 14} Z`}
+          fill={`hsl(${(tintHue + 30) % 360}, 55%, 30%)`}
+          opacity={0.95}
+        />
 
-        {/* Subtle current flow lines */}
-        {Array.from({ length: 6 }).map((_, i) => {
-          const yFrac = 0.3 + (i / 6) * 0.6;
-          const y = waterTop + waterHeight * yFrac;
-          const flowPhase = frame * 0.015 * tempoFactor + i * 0.6;
-          const xs = Array.from({ length: 12 }, (_, k) => {
-            const px = (k / 11) * width;
-            return `${px},${y + Math.sin(px * 0.005 + flowPhase) * 4}`;
-          });
-          return <path key={`flow${i}`} d={`M ${xs.join(" L ")}`} fill="none"
-            stroke="rgba(220,235,250,0.18)" strokeWidth={0.7} strokeDasharray="14 22" />;
-        })}
-
-        {/* Sun reflection glow column */}
-        <ellipse cx={sunPathX} cy={(sunPathTop + sunPathBot) / 2} rx={42} ry={sunPathLen * 0.55}
-          fill="url(#vs-sunglow)" opacity={0.65 * sunPulse} />
-
-        {/* Twinkling sun glints along the path */}
-        {glints.map((g, i) => {
-          const py = sunPathTop + g.t * sunPathLen;
-          const px = sunPathX + g.jitter + Math.sin(frame * g.freq + g.phase) * 6;
-          const twinkle = 0.4 + (Math.sin(frame * g.freq * 2.4 + g.phase) * 0.5 + 0.5) * 0.6;
-          const r = g.r * (0.7 + twinkle * 0.6) * sunPulse;
+        {/* WILLOW TREES on far bank */}
+        {Array.from({ length: 8 }, (_, i) => {
+          const tx = (i / 7) * width + Math.sin(i) * 12;
+          const ty = horizonY + 8;
           return (
-            <g key={`glint${i}`}>
-              <circle cx={px} cy={py} r={r * 2.4} fill={sunColor} opacity={twinkle * 0.18} filter="url(#vs-blur)" />
-              <circle cx={px} cy={py} r={r} fill="rgba(255,250,220,1)" opacity={twinkle * 0.95} />
-              {twinkle > 0.7 && (
-                <>
-                  <line x1={px - r * 4} y1={py} x2={px + r * 4} y2={py}
-                    stroke="rgba(255,250,220,1)" strokeWidth={0.6} opacity={twinkle * 0.6} />
-                  <line x1={px} y1={py - r * 3} x2={px} y2={py + r * 3}
-                    stroke="rgba(255,250,220,1)" strokeWidth={0.6} opacity={twinkle * 0.6} />
-                </>
+            <g key={`wt-${i}`}>
+              <line x1={tx} y1={ty} x2={tx + 2} y2={ty + 32} stroke="rgba(60, 36, 14, 0.95)" strokeWidth={2} />
+              {/* Drooping willow branches */}
+              {Array.from({ length: 8 }, (_, k) => {
+                const a = -Math.PI + (k / 7) * Math.PI;
+                const r = 22;
+                return (
+                  <path
+                    key={k}
+                    d={`M ${tx + 2} ${ty} Q ${tx + Math.cos(a) * r} ${ty + 8} ${tx + Math.cos(a) * r * 1.2} ${ty + 18 + Math.sin(frame * 0.02 + k) * 2}`}
+                    stroke="rgba(40, 80, 30, 0.85)"
+                    strokeWidth={1.4}
+                    fill="none"
+                  />
+                );
+              })}
+              {/* Foliage clumps */}
+              {Array.from({ length: 6 }, (_, k) => {
+                const a = (k / 6) * Math.PI * 2;
+                return (
+                  <ellipse
+                    key={k}
+                    cx={tx + Math.cos(a) * 14}
+                    cy={ty + 4 + Math.sin(a) * 6}
+                    rx={6}
+                    ry={5}
+                    fill={`hsla(${(tintHue + 30) % 360}, 60%, ${35 + (k % 2) * 8}%, 0.85)`}
+                  />
+                );
+              })}
+            </g>
+          );
+        })}
+
+        {/* FAR BANK GRASS */}
+        <rect x={0} y={horizonY + 14} width={width} height={6} fill={`hsl(${(tintHue + 30) % 360}, 65%, 35%)`} />
+
+        {/* WATER */}
+        <rect x={0} y={horizonY + 20} width={width} height={height - horizonY - 20} fill="url(#vs-water)" />
+
+        {/* SUN GLINT on water */}
+        <ellipse
+          cx={sunX}
+          cy={horizonY + 26}
+          rx={width * 0.08}
+          ry={3}
+          fill="rgba(255, 250, 200, 0.85)"
+        />
+        {Array.from({ length: 14 }, (_, i) => {
+          const t = i / 13;
+          const sy = horizonY + 30 + t * (height - horizonY - 40);
+          const swidth = width * 0.04 * (1 - t);
+          return (
+            <ellipse
+              key={`gli-${i}`}
+              cx={sunX + Math.sin(t * 6 + frame * 0.04) * 6}
+              cy={sy}
+              rx={swidth}
+              ry={1.5}
+              fill="rgba(255, 250, 200, 0.55)"
+            />
+          );
+        })}
+
+        {/* WATER RIPPLES (concentric) */}
+        {ripples.map((r, i) => {
+          const t = frame * r.speed + r.phase;
+          const phase = (t % 1);
+          const size = r.size * (0.6 + phase * 1.4) * rippleAmp;
+          const op = (1 - phase) * 0.5;
+          return (
+            <ellipse
+              key={`rp-${i}`}
+              cx={r.bx * width}
+              cy={r.by * height}
+              rx={size}
+              ry={size * 0.32}
+              fill="none"
+              stroke={`rgba(255, 255, 250, ${op})`}
+              strokeWidth={1.2}
+            />
+          );
+        })}
+
+        {/* LILY PADS */}
+        {lilyPads.map((lp, i) => {
+          const lx = lp.bx * width;
+          const ly = lp.by * height + Math.sin(frame * 0.02 + i) * 1.5;
+          return (
+            <g key={`lp-${i}`}>
+              <ellipse cx={lx + 2} cy={ly + 1} rx={lp.size} ry={lp.size * 0.4} fill="rgba(0, 0, 0, 0.25)" />
+              <ellipse cx={lx} cy={ly} rx={lp.size} ry={lp.size * 0.4} fill={`hsl(${(tintHue + 30) % 360}, 65%, 38%)`} stroke={`hsl(${(tintHue + 30) % 360}, 60%, 25%)`} strokeWidth={0.8} />
+              {/* Slit cut */}
+              <line x1={lx} y1={ly} x2={lx + lp.size} y2={ly} stroke={`hsl(${(tintHue + 30) % 360}, 60%, 25%)`} strokeWidth={0.8} />
+              {/* Flower */}
+              {lp.hasFlower && (
+                <g>
+                  {Array.from({ length: 6 }, (_, k) => {
+                    const a = (k / 6) * Math.PI * 2;
+                    return (
+                      <ellipse
+                        key={k}
+                        cx={lx + Math.cos(a) * 2}
+                        cy={ly - 2 + Math.sin(a) * 1}
+                        rx={2.5}
+                        ry={4}
+                        fill="rgba(255, 240, 245, 0.95)"
+                        stroke="rgba(180, 60, 80, 0.85)"
+                        strokeWidth={0.5}
+                      />
+                    );
+                  })}
+                  <circle cx={lx} cy={ly - 2} r={1.5} fill={`hsl(50, 95%, 60%)`} />
+                </g>
               )}
             </g>
           );
         })}
 
-        {/* Riverbank edge highlight */}
-        <path d={bankEdge} fill="none" stroke="rgba(220,200,160,0.55)" strokeWidth={1.5} />
+        {/* === SWIMMERS === */}
+        {swimmers.map((s, i) => renderSwimmer(s, i))}
 
-        {/* Riverbank elements (trees, clothes piles, sunbather) */}
-        {bank.map(renderBank)}
+        {/* DRAGONFLIES */}
+        {dragonNodes}
 
-        {/* Wisps of steam rising from water */}
-        {Array.from({ length: 7 }).map((_, i) => {
-          const sx = (i / 7) * width + Math.sin(frame * 0.008 + i) * 18;
-          const sy0 = waterTop + 6 + Math.sin(i * 1.4) * 4;
-          const drift = Math.sin(frame * 0.02 + i * 1.3) * 12;
-          const len = 32 + Math.sin(i * 2.1) * 10;
+        {/* FOREGROUND BANK (left + right) with reeds */}
+        <path
+          d={`M 0 ${height * 0.78}
+              Q ${width * 0.04} ${height * 0.74} ${width * 0.06} ${height * 0.78}
+              Q ${width * 0.04} ${height * 0.85} 0 ${height * 0.88} Z`}
+          fill={`hsl(${(tintHue + 30) % 360}, 60%, 28%)`}
+        />
+        <path
+          d={`M ${width} ${height * 0.78}
+              Q ${width * 0.96} ${height * 0.74} ${width * 0.94} ${height * 0.78}
+              Q ${width * 0.96} ${height * 0.85} ${width} ${height * 0.88} Z`}
+          fill={`hsl(${(tintHue + 30) % 360}, 60%, 28%)`}
+        />
+
+        {/* REEDS along banks */}
+        {reeds.map((r, i) => {
+          const x = r.x < 0.5 ? r.x * width * 0.16 : width - (1 - r.x) * width * 0.16;
+          const baseY = height * 0.86;
+          const sway = Math.sin(frame * r.sway + r.phase) * 4;
           return (
-            <path key={`steam${i}`}
-              d={`M ${sx} ${sy0} Q ${sx + drift} ${sy0 - len * 0.5} ${sx + drift * 1.4} ${sy0 - len}`}
-              fill="none" stroke="rgba(255,250,235,0.18)" strokeWidth={3.5}
-              strokeLinecap="round" filter="url(#vs-blur)"
-              opacity={0.55 + Math.sin(frame * 0.03 + i) * 0.2} />
+            <path
+              key={`reed-${i}`}
+              d={`M ${x} ${baseY} Q ${x + sway} ${baseY - r.height * 0.6} ${x + sway * 1.6} ${baseY - r.height}`}
+              stroke={`hsl(${(tintHue + 35) % 360}, 70%, 35%)`}
+              strokeWidth={1.4}
+              fill="none"
+            />
           );
         })}
 
-        {/* Swimmers — y-sorted so back swimmers draw first */}
-        {[...swimmers].sort((a, b) => a.y - b.y).map((s, i) => renderSwimmer(s, i))}
+        {/* SUN DAPPLES on water (front layer) */}
+        {Array.from({ length: 38 }, (_, i) => {
+          const dx = (i * 73) % width;
+          const dy = horizonY + 30 + ((i * 47) % (height * 0.30));
+          const r = 1 + Math.sin(frame * 0.05 + i) * 0.6;
+          return (
+            <circle
+              key={`dap-${i}`}
+              cx={dx}
+              cy={dy}
+              r={r}
+              fill="rgba(255, 250, 200, 0.55)"
+              opacity={0.5 + Math.sin(frame * 0.1 + i) * 0.3}
+            />
+          );
+        })}
 
-        {/* Splash bursts on top */}
-        {splashes.map(renderSplash)}
+        {/* WARM TINT WASH */}
+        <rect width={width} height={height} fill={`hsla(${tintHue + 60}, 80%, 60%, ${0.04 + slowEnergy * 0.05})`} />
       </svg>
     </div>
   );

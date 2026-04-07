@@ -1,336 +1,101 @@
 /**
- * LighterWave — Sea of lighters held aloft during ballads.
+ * LighterWave — A+++ overlay: a sea of hundreds of lighters held aloft
+ * across the lower 60% of the frame during a ballad. Distant stage at the
+ * back, dark venue, atmospheric haze, drifting smoke, hundreds of small
+ * flickering flames each with a 3-layer glow halo. Each lighter has a
+ * unique flicker phase and slight sway. Rear stage spotlight cuts through
+ * the smoke from above. The image of a Dead show in 1977.
  *
- * 50-60 lighter flames across the bottom 30% of the frame, distributed in
- * 3 depth layers for crowd density. Each lighter has a small rectangular
- * metallic body, a detailed multi-zone flame (white-hot core, bright yellow
- * middle, orange outer, blue base), and a silhouette arm/wrist extending
- * from below. Every flame flickers independently via multi-sine oscillation.
- * The entire crowd sways gently side-to-side (collective sway, as at a real
- * show). Some lighters ride higher (raised arms) while others stay low.
- *
- * INVERSELY gated on energy — MORE visible during quiet/ballad passages,
- * fading out as the band gets loud. Perfect for Morning Dew quiet section,
- * Row Jimmy, Stella Blue, Black Peter.
- *
- * Audio mapping:
- *   energy        → inverse gate (visible when quiet)
- *   slowEnergy    → collective sway amplitude
- *   beatDecay     → sway synchronization pulse
- *   chromaHue     → ambient glow tint
- *   tempoFactor   → sway speed
- *   dynamicRange  → flame height variation
- *   vocalPresence → flame brightness boost (vocal ballad = brighter)
- *
- * Layer 1, low energy, 10-25% base opacity.
+ * Audio reactivity:
+ *   slowEnergy   → overall flame brightness and atmospheric warmth
+ *   energy       → flame size and sway amplitude
+ *   bass         → ground rumble and crowd sway
+ *   beatDecay    → simultaneous flicker pulse
+ *   onsetEnvelope→ stage flare
+ *   chromaHue    → background tint
+ *   tempoFactor  → sway speed
  */
 
 import React from "react";
-import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
+import { useCurrentFrame, useVideoConfig, interpolate } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
+import { seeded } from "../utils/seededRandom";
 import { useAudioSnapshot } from "./parametric/audio-helpers";
 import { useTempoFactor } from "../data/TempoContext";
-import { seeded } from "../utils/seededRandom";
 
-/* ------------------------------------------------------------------ */
-/*  Types                                                              */
-/* ------------------------------------------------------------------ */
+const CYCLE_TOTAL = 2400;
+const VISIBLE_DURATION = 820;
+const FRONT_FLAMES = 80;
+const MID_FLAMES = 90;
+const BACK_FLAMES = 110;
+const SMOKE_PUFFS = 16;
+const STAR_COUNT = 50;
+const STAGE_LIGHT_COUNT = 5;
 
-interface LighterData {
-  /** X position as fraction of width (0-1) */
+interface Flame {
   x: number;
-  /** Y position as fraction of height — within bottom 30% */
   y: number;
-  /** Depth layer: 0 = back (smallest, dimmest), 1 = mid, 2 = front */
-  layer: number;
-  /** Scale factor driven by layer (back smaller, front bigger) */
-  scale: number;
-  /** Brightness modifier driven by layer */
-  layerBrightness: number;
-  /** Arm raise height (how far the lighter is above the arm base) */
-  armRaise: number;
-  /** Flicker: primary sine frequency */
-  flickerFreq1: number;
-  /** Flicker: secondary (harmonic) sine frequency */
-  flickerFreq2: number;
-  /** Flicker: tertiary (subharmonic) sine frequency */
-  flickerFreq3: number;
-  /** Flicker: phase offset */
-  flickerPhase: number;
-  /** Sway: individual offset from collective sway */
-  swayPhaseOffset: number;
-  /** Sway: amplitude modifier (how loosely this person sways) */
-  swayAmpMod: number;
-  /** Vertical bob frequency (gentle arm fatigue movement) */
-  bobFreq: number;
-  /** Vertical bob amplitude (px) */
-  bobAmp: number;
-  /** Bob phase offset */
-  bobPhase: number;
-  /** Lighter body hue shift (metallic variation) */
-  bodyHueShift: number;
-  /** Flame hue (28-55, yellow to deep orange) */
-  flameHue: number;
-  /** Whether this lighter tilts slightly left or right */
-  tiltDir: number;
-  /** Tilt amount (radians, small) */
-  tiltAmount: number;
+  size: number;
+  flickerSpeed: number;
+  flickerAmp: number;
+  swayPhase: number;
+  hueOffset: number;
+  phase: number;
 }
 
-/* ------------------------------------------------------------------ */
-/*  Constants                                                          */
-/* ------------------------------------------------------------------ */
+interface SmokePuff {
+  x: number;
+  y: number;
+  rx: number;
+  ry: number;
+  drift: number;
+  shade: number;
+  phase: number;
+}
 
-const NUM_LIGHTERS = 55;
-const STAGGER_START = 60; // 2 seconds before fade-in begins
-const FADE_IN_DURATION = 120; // 4 seconds to fully appear (lighters raise slowly)
+interface Star {
+  x: number;
+  y: number;
+  size: number;
+  phase: number;
+}
 
-/* Layer config: [yMin, yMax, scaleMin, scaleMax, brightnessMin, brightnessMax, count] */
-const LAYER_CONFIG: [number, number, number, number, number, number, number][] = [
-  [0.70, 0.78, 0.50, 0.70, 0.45, 0.60, 15], // back: small, dim, higher on screen
-  [0.76, 0.86, 0.70, 0.95, 0.60, 0.80, 22], // mid: medium
-  [0.84, 0.96, 0.90, 1.20, 0.75, 1.00, 18], // front: large, bright, lower on screen
-];
-
-/* ------------------------------------------------------------------ */
-/*  Seeded lighter generation                                          */
-/* ------------------------------------------------------------------ */
-
-function generateLighters(seed: number): LighterData[] {
+function buildFlames(seed: number, count: number, yMin: number, yMax: number): Flame[] {
   const rng = seeded(seed);
-  const lighters: LighterData[] = [];
-
-  for (let layerIdx = 0; layerIdx < LAYER_CONFIG.length; layerIdx++) {
-    const [yMin, yMax, scaleMin, scaleMax, brightMin, brightMax, count] = LAYER_CONFIG[layerIdx];
-    for (let i = 0; i < count; i++) {
-      lighters.push({
-        x: 0.02 + rng() * 0.96,
-        y: yMin + rng() * (yMax - yMin),
-        layer: layerIdx,
-        scale: scaleMin + rng() * (scaleMax - scaleMin),
-        layerBrightness: brightMin + rng() * (brightMax - brightMin),
-        armRaise: 20 + rng() * 45, // how high the lighter is above the arm base
-        flickerFreq1: 0.08 + rng() * 0.14,
-        flickerFreq2: 0.18 + rng() * 0.30,
-        flickerFreq3: 0.03 + rng() * 0.06,
-        flickerPhase: rng() * Math.PI * 2,
-        swayPhaseOffset: (rng() - 0.5) * 0.6, // slight desync from collective sway
-        swayAmpMod: 0.6 + rng() * 0.8,
-        bobFreq: 0.008 + rng() * 0.018,
-        bobAmp: 1.5 + rng() * 5,
-        bobPhase: rng() * Math.PI * 2,
-        bodyHueShift: rng() * 30 - 15, // metallic color variation
-        flameHue: 28 + rng() * 27,
-        tiltDir: rng() > 0.5 ? 1 : -1,
-        tiltAmount: 0.02 + rng() * 0.12,
-      });
-    }
-  }
-
-  // Sort by y so back layer renders first (painter's algorithm)
-  lighters.sort((a, b) => a.y - b.y);
-  return lighters;
+  return Array.from({ length: count }, () => ({
+    x: rng(),
+    y: yMin + rng() * (yMax - yMin),
+    size: 0.7 + rng() * 0.6,
+    flickerSpeed: 0.15 + rng() * 0.30,
+    flickerAmp: 0.2 + rng() * 0.4,
+    swayPhase: rng() * Math.PI * 2,
+    hueOffset: -8 + rng() * 16,
+    phase: rng() * Math.PI * 2,
+  }));
 }
 
-/* ------------------------------------------------------------------ */
-/*  Single flame renderer                                              */
-/* ------------------------------------------------------------------ */
-
-interface FlameProps {
-  /** Base size unit (px) */
-  s: number;
-  /** Flicker intensity 0-1 */
-  flicker: number;
-  /** Flame hue (28-55) */
-  hue: number;
-  /** Ambient hue tint from chroma (0-360) */
-  ambientHue: number;
-  /** Ambient tint strength (0-1) */
-  ambientStrength: number;
-  /** Overall alpha */
-  alpha: number;
+function buildSmoke(): SmokePuff[] {
+  const rng = seeded(80_115_236);
+  return Array.from({ length: SMOKE_PUFFS }, () => ({
+    x: rng(),
+    y: 0.18 + rng() * 0.30,
+    rx: 0.10 + rng() * 0.20,
+    ry: 0.04 + rng() * 0.06,
+    drift: 0.0001 + rng() * 0.00040,
+    shade: 0.18 + rng() * 0.22,
+    phase: rng() * Math.PI * 2,
+  }));
 }
 
-function renderFlame({ s, flicker, hue, ambientHue, ambientStrength, alpha }: FlameProps): React.ReactNode {
-  // Mix in ambient hue from chromaHue — gentle tint on the glow
-  const glowHue = hue + (ambientHue - hue) * ambientStrength * 0.15;
-  const flickAlpha = alpha * (0.6 + flicker * 0.4);
-
-  // Height varies with flicker
-  const h = s * (1.8 + flicker * 0.5);
-  const w = s * 0.55;
-
-  return (
-    <>
-      {/* Ambient glow — large, soft */}
-      <ellipse
-        cx={0}
-        cy={-h * 0.4}
-        rx={s * 3.0}
-        ry={s * 3.5}
-        fill={`hsla(${glowHue}, 80%, 55%, ${flickAlpha * 0.12})`}
-        style={{ filter: "blur(6px)" }}
-      />
-      {/* Outer flame — orange with slight blue base */}
-      <path
-        d={`M 0 ${-h}
-            C ${w * 1.1} ${-h * 0.55}, ${w * 0.95} ${h * 0.15}, ${w * 0.3} ${h * 0.35}
-            Q ${w * 0.15} ${h * 0.45}, 0 ${h * 0.4}
-            Q ${-w * 0.15} ${h * 0.45}, ${-w * 0.3} ${h * 0.35}
-            C ${-w * 0.95} ${h * 0.15}, ${-w * 1.1} ${-h * 0.55}, 0 ${-h}
-            Z`}
-        fill={`hsla(${hue + 8}, 100%, 55%, ${flickAlpha * 0.7})`}
-      />
-      {/* Blue base zone — real lighter flames have blue at ignition point */}
-      <ellipse
-        cx={0}
-        cy={h * 0.3}
-        rx={w * 0.55}
-        ry={s * 0.35}
-        fill={`hsla(220, 80%, 55%, ${flickAlpha * 0.5})`}
-        style={{ filter: "blur(1px)" }}
-      />
-      {/* Middle flame — bright yellow */}
-      <path
-        d={`M 0 ${-h * 0.85}
-            C ${w * 0.7} ${-h * 0.4}, ${w * 0.55} ${h * 0.05}, ${w * 0.15} ${h * 0.2}
-            Q 0 ${h * 0.28}, ${-w * 0.15} ${h * 0.2}
-            C ${-w * 0.55} ${h * 0.05}, ${-w * 0.7} ${-h * 0.4}, 0 ${-h * 0.85}
-            Z`}
-        fill={`hsla(${hue - 5}, 100%, 70%, ${flickAlpha * 0.85})`}
-      />
-      {/* White-hot core — intense bright center at base */}
-      <path
-        d={`M 0 ${-h * 0.55}
-            C ${w * 0.35} ${-h * 0.2}, ${w * 0.25} ${h * 0.05}, 0 ${h * 0.12}
-            C ${-w * 0.25} ${h * 0.05}, ${-w * 0.35} ${-h * 0.2}, 0 ${-h * 0.55}
-            Z`}
-        fill={`hsla(48, 100%, 95%, ${flickAlpha * 0.95})`}
-        style={{ filter: "blur(0.5px)" }}
-      />
-      {/* Tip highlight — tiny bright point at apex */}
-      <circle
-        cx={0}
-        cy={-h * 0.92}
-        r={w * 0.2}
-        fill={`hsla(40, 100%, 88%, ${flickAlpha * 0.6})`}
-        style={{ filter: "blur(1px)" }}
-      />
-    </>
-  );
+function buildStars(): Star[] {
+  const rng = seeded(63_022_704);
+  return Array.from({ length: STAR_COUNT }, () => ({
+    x: rng(),
+    y: rng() * 0.30,
+    size: 0.4 + rng() * 1.4,
+    phase: rng() * Math.PI * 2,
+  }));
 }
-
-/* ------------------------------------------------------------------ */
-/*  Single lighter renderer (body + arm silhouette + flame)            */
-/* ------------------------------------------------------------------ */
-
-interface LighterRenderProps {
-  lighter: LighterData;
-  px: number;
-  py: number;
-  tilt: number;
-  flicker: number;
-  ambientHue: number;
-  ambientStrength: number;
-  masterAlpha: number;
-  height: number;
-}
-
-function renderLighter({
-  lighter,
-  px,
-  py,
-  tilt,
-  flicker,
-  ambientHue,
-  ambientStrength,
-  masterAlpha,
-  height,
-}: LighterRenderProps): React.ReactNode {
-  const s = lighter.scale * 7; // base size unit
-  const alpha = masterAlpha * lighter.layerBrightness;
-
-  // Lighter body dimensions
-  const bodyW = s * 0.5;
-  const bodyH = s * 1.6;
-
-  // Metal body gradient lightness based on layer hue shift
-  const metalBase = 45 + lighter.bodyHueShift * 0.3;
-
-  // Arm extends from body bottom down to bottom of frame
-  const armLength = (1.0 - lighter.y) * height + 20;
-  const wristWidth = s * 0.65;
-  const forearmWidth = s * 0.85;
-
-  return (
-    <g transform={`translate(${px}, ${py}) rotate(${tilt})`}>
-      {/* Arm/hand silhouette — dark shape extending downward */}
-      <path
-        d={`M ${-wristWidth * 0.5} ${bodyH * 0.3}
-            L ${-forearmWidth * 0.5} ${armLength}
-            L ${forearmWidth * 0.5} ${armLength}
-            L ${wristWidth * 0.5} ${bodyH * 0.3}
-            Z`}
-        fill={`rgba(15, 12, 10, ${alpha * 0.85})`}
-      />
-      {/* Hand/fist gripping the lighter — rounded rectangle */}
-      <rect
-        x={-wristWidth * 0.65}
-        y={bodyH * 0.1}
-        width={wristWidth * 1.3}
-        height={s * 1.0}
-        rx={s * 0.2}
-        ry={s * 0.2}
-        fill={`rgba(20, 16, 14, ${alpha * 0.8})`}
-      />
-      {/* Lighter body — small metallic rectangle */}
-      <rect
-        x={-bodyW * 0.5}
-        y={-bodyH * 0.5}
-        width={bodyW}
-        height={bodyH}
-        rx={s * 0.06}
-        ry={s * 0.06}
-        fill={`hsla(${210 + lighter.bodyHueShift}, 8%, ${metalBase}%, ${alpha * 0.9})`}
-        stroke={`hsla(${210 + lighter.bodyHueShift}, 5%, ${metalBase + 15}%, ${alpha * 0.4})`}
-        strokeWidth={0.5}
-      />
-      {/* Metallic highlight strip on lighter body */}
-      <rect
-        x={-bodyW * 0.15}
-        y={-bodyH * 0.45}
-        width={bodyW * 0.2}
-        height={bodyH * 0.85}
-        rx={s * 0.03}
-        fill={`hsla(${210 + lighter.bodyHueShift}, 6%, ${metalBase + 20}%, ${alpha * 0.35})`}
-      />
-      {/* Lighter top (metal windguard) */}
-      <rect
-        x={-bodyW * 0.35}
-        y={-bodyH * 0.55}
-        width={bodyW * 0.7}
-        height={s * 0.2}
-        rx={s * 0.03}
-        fill={`hsla(${210 + lighter.bodyHueShift}, 5%, ${metalBase + 10}%, ${alpha * 0.7})`}
-      />
-      {/* Flame — positioned above the lighter body */}
-      <g transform={`translate(0, ${-bodyH * 0.55 - s * 0.3})`}>
-        {renderFlame({
-          s,
-          flicker,
-          hue: lighter.flameHue,
-          ambientHue,
-          ambientStrength,
-          alpha,
-        })}
-      </g>
-    </g>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/*  Main component                                                     */
-/* ------------------------------------------------------------------ */
 
 interface Props {
   frames: EnhancedFrameData[];
@@ -339,139 +104,223 @@ interface Props {
 export const LighterWave: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
-  const audio = useAudioSnapshot(frames);
   const tempoFactor = useTempoFactor();
+  const snap = useAudioSnapshot(frames);
 
-  const lighters = React.useMemo(() => generateLighters(19770508), []);
+  const frontFlames = React.useMemo(() => buildFlames(11_667_223, FRONT_FLAMES, 0.78, 0.97), []);
+  const midFlames = React.useMemo(() => buildFlames(22_778_334, MID_FLAMES, 0.62, 0.82), []);
+  const backFlames = React.useMemo(() => buildFlames(33_889_445, BACK_FLAMES, 0.50, 0.68), []);
+  const smoke = React.useMemo(buildSmoke, []);
+  const stars = React.useMemo(buildStars, []);
 
-  /* ---- Master fade-in (lighters raise slowly into frame) ---- */
-  const masterFade = interpolate(
-    frame,
-    [STAGGER_START, STAGGER_START + FADE_IN_DURATION],
-    [0, 1],
-    { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: Easing.out(Easing.cubic) },
-  );
-
-  /* ---- INVERSE energy gating: MORE visible when quiet ---- */
-  const energyGate = interpolate(audio.energy, [0.07, 0.22], [1, 0], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
-
-  /* ---- Base opacity: higher when quieter ---- */
-  const baseOpacity = interpolate(audio.energy, [0.0, 0.15], [0.25, 0.10], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
-
-  /* ---- Vocal presence boost: brighter during vocal ballads ---- */
-  const vocalBoost = 1.0 + audio.vocalPresence * 0.25;
-
-  /* ---- Dynamic range drives flame height variation ---- */
-  const flameHeightMod = 0.85 + audio.dynamicRange * 0.3;
-
-  const masterOpacity = Math.min(1, baseOpacity * masterFade * energyGate * vocalBoost);
-
+  const cycleFrame = frame % CYCLE_TOTAL;
+  if (cycleFrame >= VISIBLE_DURATION) return null;
+  const progress = cycleFrame / VISIBLE_DURATION;
+  const fadeIn = interpolate(progress, [0, 0.10], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const fadeOut = interpolate(progress, [0.90, 1], [1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const masterOpacity = Math.min(fadeIn, fadeOut) * 0.95;
   if (masterOpacity < 0.01) return null;
 
-  /* ---- How many lighters visible (more during quiet passages) ---- */
-  const visibleCount = Math.round(
-    interpolate(audio.energy, [0.0, 0.18], [NUM_LIGHTERS, 30], {
-      extrapolateLeft: "clamp",
-      extrapolateRight: "clamp",
-    }),
-  );
+  const flameGlow = interpolate(snap.slowEnergy, [0.02, 0.32], [0.6, 1.15], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const energy = snap.energy;
+  const bass = snap.bass;
+  const beatPulse = 1 + snap.beatDecay * 0.40;
+  const onsetFlare = snap.onsetEnvelope > 0.55 ? Math.min(1, (snap.onsetEnvelope - 0.4) * 1.6) : 0;
 
-  /* ---- Collective sway: everyone sways together at shows ---- */
-  const swaySpeed = 0.012 * tempoFactor;
-  const swayBase = Math.sin(frame * swaySpeed) * (8 + audio.slowEnergy * 18);
-  // beatDecay creates a sync pulse — on beat, everyone snaps together slightly
-  const beatSync = audio.beatDecay * 3;
+  const baseHue = 28;
+  const tintHue = ((baseHue + (snap.chromaHue - 180) * 0.4) % 360 + 360) % 360;
+  const flameHueBase = 30;
+  const flameCore = `hsl(${flameHueBase + 18}, 100%, 88%)`;
+  const flameMid = `hsl(${flameHueBase + 6}, 95%, 65%)`;
+  const flameDeep = `hsl(${flameHueBase - 14}, 90%, 45%)`;
 
-  /* ---- Ambient glow from chromaHue ---- */
-  const ambientHue = audio.chromaHue;
-  // Strength: stronger in quieter passages
-  const ambientStrength = interpolate(audio.energy, [0.0, 0.2], [0.6, 0.1], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
+  const skyTop = `hsl(${(tintHue + 220) % 360}, 30%, 4%)`;
+  const skyMid = `hsl(${(tintHue + 240) % 360}, 24%, 8%)`;
+  const skyHorizon = `hsl(${(tintHue + 18) % 360}, 36%, 14%)`;
+
+  const horizonY = height * 0.46;
+  const stageY = height * 0.42;
+  const stageH = height * 0.10;
+
+  // Flame renderer with 3-layer halo
+  function renderFlame(f: Flame, rowIndex: 0 | 1 | 2, key: string) {
+    const baseSize = rowIndex === 0 ? 1.0 : rowIndex === 1 ? 0.78 : 0.55;
+    const t = frame * f.flickerSpeed + f.phase;
+    const flicker = 0.7 + Math.sin(t) * f.flickerAmp + Math.sin(t * 2.7) * 0.15;
+    const sway = Math.sin(frame * 0.012 * tempoFactor + f.swayPhase) * (1.5 + bass * 4) * baseSize;
+    const px = f.x * width + sway;
+    const py = f.y * height;
+    const sz = f.size * baseSize * (1 + energy * 0.30) * beatPulse;
+    const glowR = sz * 18;
+    const halo2R = sz * 10;
+    const flameW = sz * 1.8;
+    const flameH = sz * 5.5 * flicker;
+    const flameHue = (flameHueBase + f.hueOffset) % 360;
+    const fCore = `hsl(${flameHue + 22}, 100%, 92%)`;
+    const fMid = `hsl(${flameHue + 6}, 95%, 65%)`;
+    const fDeep = `hsl(${flameHue - 12}, 90%, 45%)`;
+    return (
+      <g key={key}>
+        {/* outer glow halo */}
+        <circle cx={px} cy={py} r={glowR} fill={fDeep} opacity={0.10 * flameGlow * flicker} />
+        {/* mid halo */}
+        <circle cx={px} cy={py} r={halo2R} fill={fMid} opacity={0.22 * flameGlow * flicker} />
+        {/* inner halo */}
+        <circle cx={px} cy={py} r={sz * 5} fill={fCore} opacity={0.36 * flameGlow * flicker} />
+        {/* lighter body silhouette below the flame */}
+        <rect x={px - sz * 1.4} y={py + sz * 0.5} width={sz * 2.8} height={sz * 4} rx={sz * 0.4} fill="rgba(8, 6, 12, 0.85)" />
+        {/* flame body teardrop */}
+        <ellipse cx={px} cy={py - flameH * 0.3} rx={flameW} ry={flameH * 0.5} fill={fDeep} />
+        <ellipse cx={px} cy={py - flameH * 0.45} rx={flameW * 0.65} ry={flameH * 0.4} fill={fMid} />
+        <ellipse cx={px} cy={py - flameH * 0.55} rx={flameW * 0.32} ry={flameH * 0.28} fill={fCore} />
+      </g>
+    );
+  }
+
+  // Smoke clouds
+  const smokeNodes = smoke.map((s, i) => {
+    const drift = (s.x + frame * s.drift) % 1.2 - 0.1;
+    const breath = 1 + Math.sin(frame * 0.012 + s.phase) * 0.06;
+    return (
+      <ellipse
+        key={`sm-${i}`}
+        cx={drift * width}
+        cy={s.y * height}
+        rx={s.rx * width * breath}
+        ry={s.ry * height * breath}
+        fill={`rgba(${28 + s.shade * 14},${24 + s.shade * 12},${36 + s.shade * 16},${0.40 + flameGlow * 0.22})`}
+      />
+    );
   });
 
-  /* ---- Per-lighter stagger (they don't all appear at once) ---- */
-  const staggerWindow = FADE_IN_DURATION * 0.7;
+  // Stars
+  const starNodes = stars.map((s, i) => {
+    const tw = 0.5 + Math.sin(frame * 0.05 + s.phase) * 0.45;
+    return <circle key={`star-${i}`} cx={s.x * width} cy={s.y * height} r={s.size * tw} fill="rgba(240, 232, 220, 0.85)" />;
+  });
+
+  // Stage spotlights (diagonal cones from above, hitting smoke)
+  const stageBeams = Array.from({ length: STAGE_LIGHT_COUNT }).map((_, i) => {
+    const sx = width * (0.20 + (i / (STAGE_LIGHT_COUNT - 1)) * 0.60);
+    const sy = stageY - 8;
+    const angle = -Math.PI / 2 + (i - (STAGE_LIGHT_COUNT - 1) / 2) * 0.18 + Math.sin(frame * 0.005 + i) * 0.15;
+    const len = height * 0.8;
+    const ex = sx + Math.cos(angle + Math.PI / 2) * len;
+    const ey = sy - Math.abs(Math.sin(angle + Math.PI / 2)) * len;
+    const w = 50 + beatPulse * 14;
+    return (
+      <g key={`sb-${i}`} style={{ mixBlendMode: "screen" }}>
+        <path
+          d={`M ${sx - 4} ${sy} L ${ex - w * 0.5} ${ey} L ${ex + w * 0.5} ${ey} L ${sx + 4} ${sy} Z`}
+          fill={flameMid}
+          opacity={0.10 * flameGlow}
+        />
+        <path
+          d={`M ${sx - 2} ${sy} L ${ex - w * 0.22} ${ey} L ${ex + w * 0.22} ${ey} L ${sx + 2} ${sy} Z`}
+          fill={flameCore}
+          opacity={0.18 * flameGlow}
+        />
+      </g>
+    );
+  });
 
   return (
     <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden" }}>
-      <svg
-        width={width}
-        height={height}
-        style={{ opacity: masterOpacity, mixBlendMode: "screen" }}
-        viewBox={`0 0 ${width} ${height}`}
-      >
+      <svg width={width} height={height} style={{ opacity: masterOpacity, willChange: "opacity" }}>
         <defs>
-          {/* Subtle top-down gradient mask so upper lighters fade into darkness */}
-          <linearGradient id="lighter-depth-fade" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0.55" stopColor="white" stopOpacity={0.3} />
-            <stop offset="0.75" stopColor="white" stopOpacity={0.7} />
-            <stop offset="1.0" stopColor="white" stopOpacity={1.0} />
+          <linearGradient id="lw-sky" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={skyTop} />
+            <stop offset="55%" stopColor={skyMid} />
+            <stop offset="100%" stopColor={skyHorizon} />
           </linearGradient>
-          <mask id="lighter-depth-mask">
-            <rect width={width} height={height} fill="url(#lighter-depth-fade)" />
-          </mask>
+          <linearGradient id="lw-floor" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="rgba(8, 4, 14, 0.4)" />
+            <stop offset="100%" stopColor="rgba(2, 1, 4, 0.95)" />
+          </linearGradient>
+          <radialGradient id="lw-stagewash" cx="0.5" cy="1" r="0.7">
+            <stop offset="0%" stopColor={flameCore} stopOpacity="0.42" />
+            <stop offset="50%" stopColor={flameDeep} stopOpacity="0.18" />
+            <stop offset="100%" stopColor="rgba(0,0,0,0)" />
+          </radialGradient>
+          <filter id="lw-blur" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="6" />
+          </filter>
         </defs>
 
-        <g mask="url(#lighter-depth-mask)">
-          {lighters.slice(0, visibleCount).map((lighter, i) => {
-            /* ---- Per-lighter stagger fade ---- */
-            const lighterDelay = (i / NUM_LIGHTERS) * staggerWindow;
-            const lighterFade = interpolate(
-              frame,
-              [STAGGER_START + lighterDelay, STAGGER_START + lighterDelay + 60],
-              [0, 1],
-              { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: Easing.out(Easing.quad) },
-            );
-            if (lighterFade < 0.02) return null;
+        {/* Sky */}
+        <rect width={width} height={height} fill="url(#lw-sky)" />
 
-            /* ---- Multi-sine flicker (3 harmonics) ---- */
-            const f1 = Math.sin(frame * lighter.flickerFreq1 + lighter.flickerPhase);
-            const f2 = Math.sin(frame * lighter.flickerFreq2 + lighter.flickerPhase * 1.7);
-            const f3 = Math.sin(frame * lighter.flickerFreq3 + lighter.flickerPhase * 0.5);
-            const flicker = 0.5 + f1 * 0.28 + f2 * 0.15 + f3 * 0.07;
-            const flickerClamped = Math.max(0.15, Math.min(1, flicker));
+        {/* Stars */}
+        <g>{starNodes}</g>
 
-            /* ---- Collective sway + individual variation ---- */
-            const individualSway =
-              Math.sin(frame * swaySpeed + lighter.swayPhaseOffset) * lighter.swayAmpMod * 5;
-            const totalSway = (swayBase + individualSway + beatSync) * lighter.swayAmpMod;
+        {/* Distant stage glow */}
+        <ellipse cx={width * 0.5} cy={stageY + stageH} rx={width * 0.55} ry={height * 0.16} fill="url(#lw-stagewash)" />
 
-            /* ---- Vertical bob (arm fatigue) ---- */
-            const bob = Math.sin(frame * lighter.bobFreq + lighter.bobPhase) * lighter.bobAmp;
+        {/* Stage truss */}
+        <g opacity={0.85}>
+          <rect x={width * 0.16} y={stageY - 4} width={width * 0.68} height={4} fill="rgba(18, 14, 22, 0.95)" />
+          <rect x={width * 0.16} y={stageY - 4} width={5} height={stageH + 4} fill="rgba(18, 14, 22, 0.95)" />
+          <rect x={width * 0.84 - 5} y={stageY - 4} width={5} height={stageH + 4} fill="rgba(18, 14, 22, 0.95)" />
+          {Array.from({ length: 18 }).map((_, i) => (
+            <line
+              key={`tr-${i}`}
+              x1={width * 0.16 + i * (width * 0.68 / 18)}
+              y1={stageY}
+              x2={width * 0.16 + (i + 1) * (width * 0.68 / 18)}
+              y2={stageY + 4}
+              stroke="rgba(28, 22, 32, 0.7)"
+              strokeWidth={1}
+            />
+          ))}
+          <rect x={width * 0.20} y={stageY} width={20} height={42} rx={3} fill="rgba(12, 8, 18, 0.95)" />
+          <rect x={width * 0.80 - 20} y={stageY} width={20} height={42} rx={3} fill="rgba(12, 8, 18, 0.95)" />
+        </g>
 
-            /* ---- Position ---- */
-            const px = lighter.x * width + totalSway;
-            const py = lighter.y * height + bob;
-
-            /* ---- Tilt (slight lean) ---- */
-            const tiltBase = lighter.tiltDir * lighter.tiltAmount * (180 / Math.PI);
-            const tiltSway = (totalSway / width) * 8; // lean into sway direction
-            const tilt = tiltBase + tiltSway;
-
+        {/* Distant band silhouettes */}
+        <g>
+          {[0.38, 0.50, 0.62].map((px, i) => {
+            const x = px * width;
+            const y = stageY + stageH;
+            const figH = stageH * 0.85;
             return (
-              <g key={i} style={{ opacity: lighterFade }}>
-                {renderLighter({
-                  lighter,
-                  px,
-                  py,
-                  tilt,
-                  flicker: flickerClamped * flameHeightMod,
-                  ambientHue,
-                  ambientStrength,
-                  masterAlpha: lighterFade,
-                  height,
-                })}
+              <g key={`bd-${i}`}>
+                <ellipse cx={x} cy={y - figH * 0.4} rx={figH * 0.18} ry={figH * 0.45} fill="rgba(4, 2, 8, 0.98)" />
+                <circle cx={x} cy={y - figH * 0.85} r={figH * 0.10} fill="rgba(4, 2, 8, 0.98)" />
               </g>
             );
           })}
         </g>
+
+        {/* Smoke layer */}
+        <g filter="url(#lw-blur)">{smokeNodes}</g>
+
+        {/* Stage beams */}
+        <g>{stageBeams}</g>
+
+        {/* Onset flare */}
+        {onsetFlare > 0 && (
+          <rect width={width} height={height} fill={`hsla(${tintHue}, 90%, 80%, ${onsetFlare * 0.10})`} />
+        )}
+
+        {/* Floor wash */}
+        <rect x={0} y={horizonY} width={width} height={height - horizonY} fill="url(#lw-floor)" />
+
+        {/* Back row flames (smallest) */}
+        <g>{backFlames.map((f, i) => renderFlame(f, 2, `back-${i}`))}</g>
+
+        {/* Mid row flames */}
+        <g>{midFlames.map((f, i) => renderFlame(f, 1, `mid-${i}`))}</g>
+
+        {/* Front row flames (largest) */}
+        <g>{frontFlames.map((f, i) => renderFlame(f, 0, `front-${i}`))}</g>
+
+        {/* Final atmospheric warmth wash */}
+        <rect
+          width={width}
+          height={height}
+          fill={`hsla(${tintHue}, 80%, 50%, ${0.05 + flameGlow * 0.04})`}
+          style={{ mixBlendMode: "screen" }}
+        />
       </svg>
     </div>
   );

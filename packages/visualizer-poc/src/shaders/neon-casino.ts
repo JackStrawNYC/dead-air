@@ -332,8 +332,7 @@ vec3 ncNeonColor(float cellZ, float ncTime, float tension, float bass,
   }
 
   // Blend with palette colors
-  float h1 = hsvToCosineHue(palH1);
-  vec3 palCol = 0.5 + 0.5 * cos(NC_TAU * vec3(h1, h1 + 0.33, h1 + 0.67));
+  vec3 palCol = paletteHueColor(palH1, 0.85, 0.95);
   neonCol = mix(neonCol, palCol, 0.25);
 
   // Pulse with bass
@@ -372,10 +371,10 @@ void main() {
   float ncTime = uDynamicTime * (0.08 + slowE * 0.06) * (1.0 + sJam * 0.5 - sSpace * 0.4);
 
   // Palette
-  float h1 = hsvToCosineHue(uPalettePrimary);
-  float h2 = hsvToCosineHue(uPaletteSecondary);
-  vec3 palCol1 = 0.5 + 0.5 * cos(NC_TAU * vec3(h1, h1 + 0.33, h1 + 0.67));
-  vec3 palCol2 = 0.5 + 0.5 * cos(NC_TAU * vec3(h2, h2 + 0.33, h2 + 0.67));
+  float h1 = uPalettePrimary;
+  float h2 = uPaletteSecondary;
+  vec3 palCol1 = paletteHueColor(h1, 0.85, 0.95);
+  vec3 palCol2 = paletteHueColor(h2, 0.85, 0.95);
 
   // ─── Camera ───
   float fwd = ncTime * 4.5;

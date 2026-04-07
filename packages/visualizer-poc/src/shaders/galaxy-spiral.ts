@@ -340,11 +340,11 @@ void main() {
   // ═══════════════════════════════════════════════════
   // Palette
   // ═══════════════════════════════════════════════════
-  float hue1 = hsvToCosineHue(uPalettePrimary + chromaHueMod + chordHueShift);
-  vec3 primaryTint = 0.5 + 0.5 * cos(TAU * vec3(hue1, hue1 + 0.33, hue1 + 0.67));
+  float hue1 = uPalettePrimary + chromaHueMod + chordHueShift;
+  vec3 primaryTint = paletteHueColor(hue1, 0.85, 0.95);
 
-  float hue2 = hsvToCosineHue(uPaletteSecondary + chordHueShift * 0.5);
-  vec3 secondaryTint = 0.5 + 0.5 * cos(TAU * vec3(hue2, hue2 + 0.33, hue2 + 0.67));
+  float hue2 = uPaletteSecondary + chordHueShift * 0.5;
+  vec3 secondaryTint = paletteHueColor(hue2, 0.85, 0.95);
 
   // ═══════════════════════════════════════════════════
   // Camera setup — custom orbit, not using setupCameraRay

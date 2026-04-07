@@ -1,441 +1,533 @@
 /**
- * MarchingTerrapins — A+++ parade of 5 richly-detailed terrapins.
+ * MarchingTerrapins — A+++ parade of 6 terrapins marching across a stage with
+ * instruments. Heroes are 30-40% of frame height. Cycle-based visibility (no
+ * dependence on march-window detection that may fail with low-energy data).
  *
- * Each terrapin features:
- *   - Domed shell with radial gradient fill:
- *       - 7 central hexagonal scutes with inner detail hexes + cross-hatch growth lines
- *       - 14 marginal scutes along the rim with individual inner arcs
- *       - Shell highlight sheen overlay + rim stroke
- *   - Angular head with:
- *       - Beak mouth, nostril, jaw line
- *       - Brow ridge, cheek scale marks
- *       - Full eye (socket, iris, pupil, catchlight)
- *       - Scaled neck bridge (3 arc segments + wrinkle lines)
- *   - 4 independently-animated legs:
- *       - Each with joint detail ellipse, wrinkle texture arcs
- *       - 3 claw/toe bumps per foot
- *       - Alternating left-right gait locked to musicalTime
- *   - Segmented tail (4 segments + tip)
- *   - Plastron (belly) visible between legs
- *   - Ground shadow ellipse
- *   - Neon glow colored by chromaHue, energy-modulated
+ * Each terrapin has:
+ *   - Domed shell with 7 hex scutes + 14 marginal scutes + radial gradient
+ *   - Angular head with eye, beak, neck scales
+ *   - 4 walk-cycle legs alternating in stride
+ *   - Tail
+ *   - Instrument (banjo, fiddle, drum, tambourine, horn, mandolin)
+ *   - Ground shadow
  *
- * March choreography: each terrapin at a different gait phase so they don't
- * step in unison. musicalTime drives gait, beatDecay drives bounce,
- * energy drives glow intensity, chromaHue drives palette, tempoFactor drives speed.
+ * Audio reactivity:
+ *   slowEnergy → spotlight warmth + sky tint
+ *   energy     → bounce + glow intensity
+ *   bass       → leg stomp depth
+ *   beatDecay  → shell pulse + bob
+ *   onsetEnvelope → rim flash
+ *   chromaHue  → palette shift
+ *   tempoFactor → walk cycle rate
  */
 
 import React from "react";
-import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
+import { useCurrentFrame, useVideoConfig, interpolate } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
-import {
-  useAudioSnapshot,
-  precomputeMarchWindows,
-  findActiveMarch,
-  type MarchConfig,
-} from "./parametric/audio-helpers";
+import { useAudioSnapshot } from "./parametric/audio-helpers";
 import { useTempoFactor } from "../data/TempoContext";
 import { seeded } from "../utils/seededRandom";
 
-/* ── constants ── */
-const NUM_TURTLES = 5;
-const TURTLE_SPACING = 280;
-const TURTLE_SIZE = 200;
+const CYCLE_TOTAL = 2400;
+const VISIBLE_DURATION = 780;
+const NUM_TURTLES = 6;
+const STAR_COUNT = 70;
+const SPARK_COUNT = 50;
 
-const MARCH_CONFIG: MarchConfig = {
-  enterThreshold: 0.05,
-  exitThreshold: 0.03,
-  sustainFrames: 60,
-  cooldownFrames: 250,
-  marchDuration: 600,
-};
+type Instrument = "banjo" | "tambourine" | "fiddle" | "drum" | "horn" | "mandolin";
 
-/** Flat-top hex points centered at (cx, cy) with radius r */
-const hexPts = (cx: number, cy: number, r: number): string => {
-  let s = "";
-  for (let k = 0; k < 6; k++) {
-    const a = (Math.PI / 3) * k - Math.PI / 2;
-    s += `${cx + r * Math.cos(a)},${cy + r * Math.sin(a)} `;
-  }
-  return s.trim();
-};
-
-const hsl = (h: number, s = 100, l = 60) => `hsl(${h % 360},${s}%,${l}%)`;
-
-/* Leg layout: [cx, cy, rx, ry, baseRotation, clawDir] for FL / FR / BL / BR */
-const LEG_DEFS: [number, number, number, number, number, number][] = [
-  [36, 75, 11, 6.5, -8, -1],   // front-left
-  [87, 75, 11, 6.5, 8, 1],     // front-right
-  [28, 78, 12, 7, -12, -1],    // back-left
-  [95, 78, 12, 7, 12, 1],      // back-right
-];
-
-/* 7 central scute positions: [cx, cy, outerR, innerR] */
-const SCUTES: [number, number, number, number][] = [
-  [62, 42, 9, 5],      // center (largest)
-  [62, 28, 7.5, 4],    // top
-  [49, 34, 7, 3.5],    // top-left
-  [75, 34, 7, 3.5],    // top-right
-  [62, 54, 7, 3.5],    // bottom
-  [50, 49, 6.5, 3.2],  // bottom-left
-  [74, 49, 6.5, 3.2],  // bottom-right
-];
-
-/* ── Single Terrapin SVG ── */
-const Terrapin: React.FC<{
-  size: number;
+interface TurtleSpec {
+  idx: number;
+  xFrac: number;
+  depth: number;
   hue: number;
-  legPhases: [number, number, number, number];
-  beatDecay: number;
-  energy: number;
-  index: number;
-}> = ({ size, hue, legPhases, beatDecay, energy, index }) => {
-  const rng = seeded(index * 7919 + 31);
-
-  // Color palette derived from hue
-  const primary = hsl(hue);
-  const accent = hsl(hue + 30, 100, 70);
-  const dark = hsl(hue, 80, 30);
-  const mid = hsl(hue, 90, 45);
-  const highlight = hsl(hue + 15, 100, 80);
-  const belly = hsl(hue + 10, 60, 55);
-
-  // Gradient IDs (unique per turtle to avoid SVG id collision)
-  const gId = `shell-grad-${index}`;
-  const sId = `shell-sheen-${index}`;
-
-  // Beat bounce scales the shell dome slightly
-  const shellScale = 1 + beatDecay * 0.03;
-
-  return (
-    <svg width={size} height={size * 0.78} viewBox="0 0 140 109" fill="none">
-      <defs>
-        {/* Shell radial gradient: highlight center -> primary -> dark rim */}
-        <radialGradient id={gId} cx="50%" cy="40%" r="55%">
-          <stop offset="0%" stopColor={highlight} stopOpacity="0.9" />
-          <stop offset="45%" stopColor={primary} stopOpacity="0.85" />
-          <stop offset="100%" stopColor={dark} stopOpacity="0.7" />
-        </radialGradient>
-        {/* Shell highlight sheen */}
-        <radialGradient id={sId} cx="42%" cy="30%" r="30%">
-          <stop offset="0%" stopColor="white" stopOpacity="0.35" />
-          <stop offset="100%" stopColor="white" stopOpacity="0" />
-        </radialGradient>
-      </defs>
-
-      {/* ── Ground shadow ellipse ── */}
-      <ellipse
-        cx="65"
-        cy="104"
-        rx={52 + energy * 4}
-        ry="5"
-        fill="black"
-        opacity={0.25 + energy * 0.15}
-      />
-
-      {/* ── Segmented tail (4 segments + rounded tip) ── */}
-      <g opacity="0.7">
-        <path
-          d="M14 55 Q10 57 7 56 Q4 54.5 3 52 Q1.5 50 2.5 48"
-          stroke={primary}
-          strokeWidth="3.5"
-          strokeLinecap="round"
-          fill="none"
-        />
-        {/* Segment marks */}
-        <line x1="11" y1="55.5" x2="9.5" y2="53.5" stroke={mid} strokeWidth="0.8" opacity="0.5" />
-        <line x1="8" y1="55" x2="6.5" y2="53" stroke={mid} strokeWidth="0.8" opacity="0.45" />
-        <line x1="5.5" y1="53.5" x2="4.2" y2="51.8" stroke={mid} strokeWidth="0.7" opacity="0.4" />
-        <line x1="3.5" y1="51.5" x2="2.8" y2="49.5" stroke={mid} strokeWidth="0.6" opacity="0.35" />
-        {/* Tail tip */}
-        <circle cx="2.5" cy="48" r="1.3" fill={primary} opacity="0.6" />
-      </g>
-
-      {/* ── Plastron (belly) visible between legs ── */}
-      <ellipse cx="62" cy="78" rx="28" ry="6" fill={belly} opacity="0.3" />
-      <ellipse cx="62" cy="78" rx="20" ry="4" fill={belly} opacity="0.15" />
-
-      {/* ── 4 legs with joint detail, wrinkle arcs, and 3 claws each ── */}
-      {LEG_DEFS.map(([cx, cy, rx, ry, baseRot, dir], li) => {
-        const ph = legPhases[li];
-        const lift = Math.sin(ph) * 5;
-        const rot = Math.sin(ph) * 8;
-        const stride = Math.cos(ph) * 3;
-
-        return (
-          <g key={li} transform={`translate(${stride} ${lift})`}>
-            <g transform={`rotate(${baseRot + rot * (dir < 0 ? 1 : -1)} ${cx} ${cy})`}>
-              {/* Main leg shape */}
-              <ellipse cx={cx} cy={cy} rx={rx} ry={ry} fill={mid} opacity="0.8" />
-
-              {/* Joint detail (lighter band at top of leg) */}
-              <ellipse
-                cx={cx}
-                cy={cy - 4}
-                rx={rx * 0.5}
-                ry={ry * 0.43}
-                fill={primary}
-                opacity="0.4"
-              />
-
-              {/* Wrinkle/skin texture arcs on leg */}
-              <path
-                d={`M${cx - rx * 0.4} ${cy - 1} Q${cx} ${cy - 3} ${cx + rx * 0.4} ${cy - 1}`}
-                stroke={dark}
-                strokeWidth="0.5"
-                fill="none"
-                opacity="0.25"
-              />
-              <path
-                d={`M${cx - rx * 0.3} ${cy + 1} Q${cx} ${cy - 0.5} ${cx + rx * 0.3} ${cy + 1}`}
-                stroke={dark}
-                strokeWidth="0.4"
-                fill="none"
-                opacity="0.2"
-              />
-
-              {/* 3 claw/toe bumps */}
-              {[0, 1, 2].map((c) => (
-                <circle
-                  key={c}
-                  cx={cx + dir * (rx - c * 4)}
-                  cy={cy + ry - 2 + c * 1.5}
-                  r={2 - c * 0.2}
-                  fill={dark}
-                  opacity={0.6 - c * 0.025}
-                />
-              ))}
-            </g>
-          </g>
-        );
-      })}
-
-      {/* ── Shell (beat-scaled dome) ── */}
-      <g transform={`translate(62 48) scale(${shellScale}) translate(-62 -48)`}>
-        {/* Shell dome base with gradient fill */}
-        <ellipse cx="62" cy="52" rx="40" ry="28" fill={`url(#${gId})`} />
-
-        {/* ── 14 marginal scutes along the rim ── */}
-        {Array.from({ length: 14 }, (_, k) => {
-          const a = (Math.PI / 13) * k + Math.PI * 0.08;
-          const mx = 62 + 37 * Math.cos(a - Math.PI);
-          const my = 53 + 10 * Math.sin(a - Math.PI);
-          const sw = 6 + rng() * 1.5;
-          const sh = 4 + rng();
-          const op = 0.35 + rng() * 0.15;
-          return (
-            <g key={k}>
-              {/* Marginal scute body */}
-              <ellipse
-                cx={mx}
-                cy={my}
-                rx={sw}
-                ry={sh}
-                stroke={accent}
-                strokeWidth="0.7"
-                fill={mid}
-                opacity={op}
-              />
-              {/* Inner detail arc on each marginal scute */}
-              <path
-                d={`M${mx - sw * 0.5} ${my} Q${mx} ${my - sh * 0.6} ${mx + sw * 0.5} ${my}`}
-                stroke={accent}
-                strokeWidth="0.4"
-                fill="none"
-                opacity={op * 0.5}
-              />
-            </g>
-          );
-        })}
-
-        {/* Shell rim */}
-        <ellipse
-          cx="62"
-          cy="58"
-          rx="38"
-          ry="11"
-          stroke={accent}
-          strokeWidth="1.2"
-          fill="none"
-          opacity="0.5"
-        />
-
-        {/* ── 7 central hexagonal scutes ── */}
-        {SCUTES.map(([cx, cy, outerR, innerR], si) => {
-          const isCenter = si === 0;
-          return (
-            <g key={si}>
-              {/* Outer hex */}
-              <polygon
-                points={hexPts(cx, cy, outerR)}
-                stroke={accent}
-                strokeWidth={isCenter ? 1.4 : 1.1}
-                fill={mid}
-                opacity={0.45 - si * 0.015}
-              />
-              {/* Inner hex (growth ring) */}
-              <polygon
-                points={hexPts(cx, cy, innerR)}
-                stroke={accent}
-                strokeWidth={isCenter ? 0.6 : 0.5}
-                fill="none"
-                opacity={0.3 - si * 0.012}
-              />
-              {/* Tiny innermost hex (second growth ring) */}
-              <polygon
-                points={hexPts(cx, cy, innerR * 0.5)}
-                stroke={accent}
-                strokeWidth="0.3"
-                fill="none"
-                opacity={0.15}
-              />
-            </g>
-          );
-        })}
-
-        {/* Center scute cross-hatch growth lines (3 radial lines) */}
-        <line x1="62" y1="33" x2="62" y2="51" stroke={accent} strokeWidth="0.4" opacity="0.2" />
-        <line x1="54" y1="37.5" x2="70" y2="46.5" stroke={accent} strokeWidth="0.4" opacity="0.2" />
-        <line x1="70" y1="37.5" x2="54" y2="46.5" stroke={accent} strokeWidth="0.4" opacity="0.2" />
-
-        {/* Shell dome highlight sheen overlay */}
-        <ellipse cx="55" cy="36" rx="22" ry="14" fill={`url(#${sId})`} />
-
-        {/* Specular crescent on dome top */}
-        <path d="M42 34Q55 24 72 34" stroke="white" strokeWidth="1.2" fill="none" opacity="0.12" />
-      </g>
-
-      {/* ── Neck bridge: 3 scale arcs + wrinkle lines ── */}
-      <rect x="98" y="44" width="16" height="12" rx="6" fill={mid} opacity="0.75" />
-      {[0, 1, 2].map((n) => (
-        <path key={`arc-${n}`} d={`M${100 + n} ${47 + n * 3}Q${103 + n} ${45 + n * 3} ${106 + n} ${47 + n * 3}`}
-          stroke={accent} strokeWidth="0.6" fill="none" opacity={0.35 - n * 0.05} />
-      ))}
-      <line x1="99" y1="49" x2="113" y2="49" stroke={dark} strokeWidth="0.35" opacity="0.15" />
-      <line x1="100" y1="52" x2="112" y2="52" stroke={dark} strokeWidth="0.3" opacity="0.12" />
-
-      {/* ── Angular head with full anatomy ── */}
-      <g>
-        <path d="M112 42L126 44L128 48L124 53L114 54L110 50Z" fill={primary} opacity="0.85" />
-        {/* Jaw line */}
-        <path d="M114 54Q120 56 124 53" stroke={dark} strokeWidth="0.8" fill="none" opacity="0.3" />
-        {/* Brow ridges (primary + secondary) */}
-        <path d="M113 43Q119 40 125 43" stroke={accent} strokeWidth="1.2" fill="none" opacity="0.5" />
-        <path d="M114 44Q119 41.5 124 44" stroke={dark} strokeWidth="0.5" fill="none" opacity="0.2" />
-        {/* Cheek scales */}
-        <path d="M115 50Q117 49 116 51" stroke={dark} strokeWidth="0.4" fill="none" opacity="0.2" />
-        <path d="M117 51Q119 50 118 52" stroke={dark} strokeWidth="0.4" fill="none" opacity="0.18" />
-        {/* Eye: socket, iris, pupil, catchlight */}
-        <ellipse cx="120" cy="46" rx="4" ry="3.5" fill={dark} opacity="0.3" />
-        <circle cx="120" cy="46" r="2.8" fill={hsl(hue + 60, 70, 40)} opacity="0.9" />
-        <circle cx="120.5" cy="45.8" r="1.4" fill="black" opacity="0.85" />
-        <circle cx="121.3" cy="44.8" r="0.7" fill="white" opacity="0.9" />
-        {/* Beak / mouth + nostril */}
-        <path d="M126 48L131 49L127 51" stroke={dark} strokeWidth="1.3" fill={hsl(hue, 60, 50)} opacity="0.7" />
-        <circle cx="127" cy="47.5" r="0.6" fill="black" opacity="0.4" />
-      </g>
-    </svg>
-  );
-};
-
-/* ── Main component ── */
-interface Props {
-  frames: EnhancedFrameData[];
+  instrument: Instrument;
+  phase: number;
 }
+
+interface Star { x: number; y: number; r: number; speed: number; phase: number; }
+
+function buildTurtles(): TurtleSpec[] {
+  return [
+    { idx: 0, xFrac: 0.08, depth: 0.78, hue: 110, instrument: "banjo", phase: 0.0 },
+    { idx: 1, xFrac: 0.23, depth: 0.92, hue: 150, instrument: "tambourine", phase: 1.2 },
+    { idx: 2, xFrac: 0.38, depth: 1.05, hue: 88, instrument: "fiddle", phase: 2.4 },
+    { idx: 3, xFrac: 0.55, depth: 1.00, hue: 28, instrument: "drum", phase: 0.7 },
+    { idx: 4, xFrac: 0.72, depth: 0.92, hue: 200, instrument: "mandolin", phase: 1.9 },
+    { idx: 5, xFrac: 0.88, depth: 0.78, hue: 320, instrument: "horn", phase: 0.4 },
+  ];
+}
+
+function buildStars(): Star[] {
+  const rng = seeded(82_447_991);
+  return Array.from({ length: STAR_COUNT }, () => ({
+    x: rng(),
+    y: rng() * 0.55,
+    r: 0.5 + rng() * 1.6,
+    speed: 0.005 + rng() * 0.025,
+    phase: rng() * Math.PI * 2,
+  }));
+}
+
+function buildSparks(): Star[] {
+  const rng = seeded(35_991_447);
+  return Array.from({ length: SPARK_COUNT }, () => ({
+    x: rng(),
+    y: rng() * 0.85,
+    r: 0.6 + rng() * 1.8,
+    speed: 0.012 + rng() * 0.04,
+    phase: rng() * Math.PI * 2,
+  }));
+}
+
+const hsl = (h: number, s = 80, l = 55) => `hsl(${((h % 360) + 360) % 360}, ${s}%, ${l}%)`;
+
+interface Props { frames: EnhancedFrameData[]; }
 
 export const MarchingTerrapins: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
-  const snap = useAudioSnapshot(frames);
   const tempoFactor = useTempoFactor();
+  const snap = useAudioSnapshot(frames);
 
-  const { energy, beatDecay: bd, chromaHue, musicalTime } = snap;
+  const turtles = React.useMemo(buildTurtles, []);
+  const stars = React.useMemo(buildStars, []);
+  const sparks = React.useMemo(buildSparks, []);
 
-  const marchWindows = React.useMemo(
-    () => precomputeMarchWindows(frames, MARCH_CONFIG),
-    [frames],
-  );
+  const cycleFrame = frame % CYCLE_TOTAL;
+  if (cycleFrame >= VISIBLE_DURATION) return null;
+  const progress = cycleFrame / VISIBLE_DURATION;
+  const fadeIn = interpolate(progress, [0, 0.10], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const fadeOut = interpolate(progress, [0.90, 1], [1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const masterOpacity = Math.min(fadeIn, fadeOut) * 0.95;
+  if (masterOpacity < 0.01) return null;
 
-  const activeMarch = findActiveMarch(marchWindows, frame);
-  if (!activeMarch) return null;
+  const warmth = interpolate(snap.slowEnergy, [0.0, 0.32], [0.55, 1.10], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const bounce = interpolate(snap.energy, [0.0, 0.30], [0.45, 1.0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const flash = snap.onsetEnvelope > 0.5 ? Math.min(1, (snap.onsetEnvelope - 0.4) * 1.6) : 0;
 
-  const marchFrame = frame - activeMarch.startFrame;
-  const marchDuration = activeMarch.endFrame - activeMarch.startFrame;
-  const progress = marchFrame / marchDuration;
-  const goingRight = activeMarch.direction === 1;
+  const tintShift = snap.chromaHue - 180;
+  const baseHue = 130;
+  const tintHue = ((baseHue + tintShift * 0.30) % 360 + 360) % 360;
+  const skyTop = `hsl(${(tintHue + 200) % 360}, 50%, 8%)`;
+  const skyMid = `hsl(${(tintHue + 220) % 360}, 38%, 14%)`;
+  const skyHorizon = `hsl(${(tintHue + 18) % 360}, 45%, 24%)`;
 
-  const clamp = { extrapolateLeft: "clamp" as const, extrapolateRight: "clamp" as const };
-  const fadeIn = interpolate(progress, [0, 0.1], [0, 1], { ...clamp, easing: Easing.out(Easing.cubic) });
-  const fadeOut = interpolate(progress, [0.9, 1], [1, 0], { ...clamp, easing: Easing.in(Easing.cubic) });
-  const baseOpacity = Math.min(fadeIn, fadeOut) * interpolate(energy, [0, 0.15], [0.5, 0.85], clamp);
+  const groundY = height * 0.78;
+  const baseTurtleH = height * 0.40;
 
-  const totalWidth = NUM_TURTLES * TURTLE_SPACING;
-  const yBase = height - TURTLE_SIZE * 0.78 - 18;
+  // ─── TURTLE BUILDER ──
+  function buildTurtle(spec: TurtleSpec): React.ReactNode {
+    const scale = spec.depth;
+    const tH = baseTurtleH * scale;
+    const tW = tH * 1.20;
+    const slowDrift = (frame * 0.0001 * tempoFactor);
+    const xPos = (spec.xFrac + slowDrift) % 1.10 - 0.05;
+    const cxT = xPos * width;
+    const bobPhase = frame * 0.10 * tempoFactor + spec.phase;
+    const bob = Math.sin(bobPhase) * (4 + bounce * 6 + snap.beatDecay * 8) * scale;
+    const cyT = groundY - tH * 0.45 + bob;
 
-  // Gait base speed driven by tempoFactor
-  const gaitSpeed = 0.06 * tempoFactor;
+    const shellHue = (spec.hue + tintShift * 0.5) % 360;
+    const shellMain = hsl(shellHue, 75, 48);
+    const shellLight = hsl(shellHue, 90, 70);
+    const shellDeep = hsl(shellHue, 80, 28);
+    const skinCol = hsl(shellHue + 30, 60, 55);
+    const skinDeep = hsl(shellHue + 30, 65, 35);
+    const accent = hsl(shellHue, 100, 75);
+    const stroke = "rgba(20, 8, 2, 0.85)";
+
+    const tx = cxT;
+    const ty = cyT;
+    const legA = Math.sin(bobPhase) * 6 * scale;
+    const legB = Math.sin(bobPhase + Math.PI) * 6 * scale;
+    const legC = Math.sin(bobPhase + Math.PI / 2) * 6 * scale;
+    const legD = Math.sin(bobPhase + Math.PI * 1.5) * 6 * scale;
+
+    // Hex points helper
+    const hexPts = (cx: number, cy: number, r: number) => {
+      let s = "";
+      for (let k = 0; k < 6; k++) {
+        const a = (Math.PI / 3) * k - Math.PI / 2;
+        s += `${cx + r * Math.cos(a)},${cy + r * Math.sin(a)} `;
+      }
+      return s.trim();
+    };
+
+    // Central scute positions (relative to turtle center, scaled by tW/tH)
+    const scutes: [number, number, number][] = [
+      [0, -0.05, 0.13],
+      [0, -0.18, 0.10],
+      [-0.13, -0.10, 0.10],
+      [0.13, -0.10, 0.10],
+      [0, 0.06, 0.10],
+      [-0.12, 0.04, 0.09],
+      [0.12, 0.04, 0.09],
+    ];
+
+    return (
+      <g key={`t-${spec.idx}`}>
+        {/* Shadow */}
+        <ellipse cx={tx} cy={groundY + 4} rx={tW * 0.55} ry={6 * scale}
+          fill="rgba(0,0,0,0.55)" />
+
+        {/* ── Hind legs ── */}
+        <g transform={`translate(0 ${legB})`}>
+          <ellipse cx={tx + tW * 0.32} cy={ty + tH * 0.28} rx={tW * 0.08} ry={tH * 0.11}
+            fill={skinDeep} stroke={stroke} strokeWidth={1.6} />
+          <ellipse cx={tx + tW * 0.32} cy={ty + tH * 0.36} rx={tW * 0.06} ry={tH * 0.04}
+            fill={skinCol} opacity={0.7} />
+          {[0, 1, 2].map((c) => (
+            <circle key={`c1-${c}`} cx={tx + tW * 0.36 - c * tW * 0.018} cy={ty + tH * 0.40} r={1.6}
+              fill="rgba(20, 8, 2, 0.85)" />
+          ))}
+        </g>
+        <g transform={`translate(0 ${legD})`}>
+          <ellipse cx={tx - tW * 0.32} cy={ty + tH * 0.28} rx={tW * 0.08} ry={tH * 0.11}
+            fill={skinDeep} stroke={stroke} strokeWidth={1.6} />
+          <ellipse cx={tx - tW * 0.32} cy={ty + tH * 0.36} rx={tW * 0.06} ry={tH * 0.04}
+            fill={skinCol} opacity={0.7} />
+          {[0, 1, 2].map((c) => (
+            <circle key={`c2-${c}`} cx={tx - tW * 0.36 + c * tW * 0.018} cy={ty + tH * 0.40} r={1.6}
+              fill="rgba(20, 8, 2, 0.85)" />
+          ))}
+        </g>
+
+        {/* ── Tail ── */}
+        <path d={`M ${tx + tW * 0.42} ${ty + tH * 0.05}
+          Q ${tx + tW * 0.52} ${ty + tH * 0.10}
+            ${tx + tW * 0.55} ${ty + tH * 0.18}`}
+          stroke={skinCol} strokeWidth={6 * scale} fill="none" strokeLinecap="round" />
+        <path d={`M ${tx + tW * 0.46} ${ty + tH * 0.10}
+          Q ${tx + tW * 0.50} ${ty + tH * 0.13}
+            ${tx + tW * 0.52} ${ty + tH * 0.16}`}
+          stroke={skinDeep} strokeWidth={3 * scale} fill="none" strokeLinecap="round" />
+
+        {/* ── Plastron (belly) shadow ── */}
+        <ellipse cx={tx} cy={ty + tH * 0.18} rx={tW * 0.34} ry={tH * 0.06}
+          fill={skinCol} opacity={0.30} />
+
+        {/* ── Shell dome with radial gradient ── */}
+        <defs>
+          <radialGradient id={`shell-${spec.idx}`} cx="40%" cy="32%" r="65%">
+            <stop offset="0%" stopColor={shellLight} />
+            <stop offset="50%" stopColor={shellMain} />
+            <stop offset="100%" stopColor={shellDeep} />
+          </radialGradient>
+        </defs>
+        <ellipse cx={tx} cy={ty} rx={tW * 0.45} ry={tH * 0.34}
+          fill={`url(#shell-${spec.idx})`} stroke={stroke} strokeWidth={2.5} />
+
+        {/* ── 14 marginal scutes around the rim ── */}
+        {Array.from({ length: 14 }).map((_, k) => {
+          const a = (k / 14) * Math.PI - Math.PI;
+          const mx = tx + Math.cos(a) * tW * 0.42;
+          const my = ty + Math.sin(a) * tH * 0.28 + tH * 0.05;
+          return (
+            <ellipse key={`mg-${k}`} cx={mx} cy={my} rx={tW * 0.05} ry={tH * 0.04}
+              fill={shellMain} stroke={accent} strokeWidth={0.8} opacity={0.55} />
+          );
+        })}
+
+        {/* ── 7 central hexagonal scutes ── */}
+        {scutes.map(([sx, sy, sr], si) => (
+          <g key={`sc-${si}`}>
+            <polygon points={hexPts(tx + sx * tW, ty + sy * tH, sr * tH)}
+              fill={shellMain} stroke={accent} strokeWidth={1.2} opacity={0.8} />
+            <polygon points={hexPts(tx + sx * tW, ty + sy * tH, sr * tH * 0.55)}
+              fill="none" stroke={accent} strokeWidth={0.6} opacity={0.6} />
+          </g>
+        ))}
+
+        {/* Shell sheen */}
+        <ellipse cx={tx - tW * 0.10} cy={ty - tH * 0.18} rx={tW * 0.18} ry={tH * 0.10}
+          fill="rgba(255, 255, 255, 0.30)" />
+
+        {/* ── Front legs ── */}
+        <g transform={`translate(0 ${legA})`}>
+          <ellipse cx={tx - tW * 0.20} cy={ty + tH * 0.22} rx={tW * 0.10} ry={tH * 0.06}
+            fill={skinDeep} stroke={stroke} strokeWidth={1.4}
+            transform={`rotate(${-15} ${tx - tW * 0.20} ${ty + tH * 0.22})`} />
+          {[0, 1, 2].map((c) => (
+            <circle key={`f1-${c}`} cx={tx - tW * 0.30 - c * tW * 0.02} cy={ty + tH * 0.26} r={1.6}
+              fill="rgba(20, 8, 2, 0.85)" />
+          ))}
+        </g>
+        <g transform={`translate(0 ${legC})`}>
+          <ellipse cx={tx + tW * 0.20} cy={ty + tH * 0.22} rx={tW * 0.10} ry={tH * 0.06}
+            fill={skinDeep} stroke={stroke} strokeWidth={1.4}
+            transform={`rotate(${15} ${tx + tW * 0.20} ${ty + tH * 0.22})`} />
+          {[0, 1, 2].map((c) => (
+            <circle key={`f2-${c}`} cx={tx + tW * 0.30 + c * tW * 0.02} cy={ty + tH * 0.26} r={1.6}
+              fill="rgba(20, 8, 2, 0.85)" />
+          ))}
+        </g>
+
+        {/* ── Neck bridge with scales ── */}
+        <rect x={tx - tW * 0.52} y={ty - tH * 0.08} width={tW * 0.18} height={tH * 0.10}
+          rx={tH * 0.05} fill={skinCol} stroke={stroke} strokeWidth={1.4} />
+        {[0, 1, 2].map((n) => (
+          <path key={`nk-${n}`}
+            d={`M ${tx - tW * 0.50 + n * tW * 0.05} ${ty - tH * 0.05}
+                Q ${tx - tW * 0.475 + n * tW * 0.05} ${ty - tH * 0.07}
+                  ${tx - tW * 0.45 + n * tW * 0.05} ${ty - tH * 0.05}`}
+            stroke={skinDeep} strokeWidth={0.8} fill="none" opacity={0.7} />
+        ))}
+
+        {/* ── Head: angular polygon ── */}
+        <path d={`M ${tx - tW * 0.52} ${ty - tH * 0.08}
+          L ${tx - tW * 0.62} ${ty - tH * 0.06}
+          L ${tx - tW * 0.66} ${ty - tH * 0.02}
+          L ${tx - tW * 0.62} ${ty + tH * 0.02}
+          L ${tx - tW * 0.55} ${ty + tH * 0.04}
+          L ${tx - tW * 0.52} ${ty + tH * 0.0} Z`}
+          fill={skinCol} stroke={stroke} strokeWidth={1.6} />
+        {/* Brow ridge */}
+        <path d={`M ${tx - tW * 0.62} ${ty - tH * 0.05}
+          Q ${tx - tW * 0.59} ${ty - tH * 0.07}
+            ${tx - tW * 0.55} ${ty - tH * 0.06}`}
+          stroke={skinDeep} strokeWidth={1.2} fill="none" opacity={0.85} />
+        {/* Eye */}
+        <circle cx={tx - tW * 0.58} cy={ty - tH * 0.04} r={tH * 0.022}
+          fill="white" />
+        <circle cx={tx - tW * 0.58} cy={ty - tH * 0.04} r={tH * 0.014}
+          fill={hsl(shellHue + 60, 70, 40)} />
+        <circle cx={tx - tW * 0.58} cy={ty - tH * 0.04} r={tH * 0.008}
+          fill="black" />
+        <circle cx={tx - tW * 0.583} cy={ty - tH * 0.043} r={tH * 0.003}
+          fill="white" />
+        {/* Beak */}
+        <path d={`M ${tx - tW * 0.66} ${ty - tH * 0.01}
+          L ${tx - tW * 0.69} ${ty + tH * 0.01}
+          L ${tx - tW * 0.66} ${ty + tH * 0.02}`}
+          stroke={stroke} strokeWidth={1.2} fill={skinDeep} />
+        {/* Nostril */}
+        <circle cx={tx - tW * 0.66} cy={ty - tH * 0.01} r={0.6}
+          fill="black" opacity={0.6} />
+
+        {/* ── Instrument ── */}
+        {(() => {
+          const ix = tx + tW * 0.05;
+          const iy = ty - tH * 0.30;
+          const is = tH * 0.18;
+          switch (spec.instrument) {
+            case "banjo":
+              return (
+                <g key={`ins-${spec.idx}`}>
+                  <circle cx={ix} cy={iy} r={is * 0.55} fill="#d4a060" stroke={stroke} strokeWidth={2} />
+                  <circle cx={ix} cy={iy} r={is * 0.42} fill="#e8c080" stroke={stroke} strokeWidth={1.0} />
+                  <rect x={ix - is * 0.04} y={iy + is * 0.30} width={is * 0.08} height={is * 1.10}
+                    fill="#5a3812" stroke={stroke} strokeWidth={1.4} />
+                  {[0, 1, 2, 3].map((sn) => (
+                    <line key={`bs-${sn}`} x1={ix - is * 0.025 + sn * is * 0.018} y1={iy + is * 0.40}
+                      x2={ix - is * 0.025 + sn * is * 0.018} y2={iy + is * 1.30}
+                      stroke="rgba(255,255,255,0.85)" strokeWidth={0.6} />
+                  ))}
+                  <circle cx={ix - is * 0.04} cy={iy + is * 0.34} r={is * 0.04} fill="#3a1808" />
+                </g>
+              );
+            case "tambourine":
+              return (
+                <g key={`ins-${spec.idx}`}>
+                  <circle cx={ix} cy={iy} r={is * 0.55} fill="#c4a060" stroke={stroke} strokeWidth={2.4} />
+                  <circle cx={ix} cy={iy} r={is * 0.42} fill="rgba(40, 24, 8, 0.5)" stroke={stroke} strokeWidth={0.8} />
+                  {[0, 1, 2, 3, 4, 5, 6, 7].map((k) => {
+                    const a = (k / 8) * Math.PI * 2;
+                    return (
+                      <circle key={`tj-${k}`} cx={ix + Math.cos(a) * is * 0.55}
+                        cy={iy + Math.sin(a) * is * 0.55} r={is * 0.08}
+                        fill="#e8c080" stroke={stroke} strokeWidth={0.8} />
+                    );
+                  })}
+                </g>
+              );
+            case "fiddle":
+              return (
+                <g key={`ins-${spec.idx}`} transform={`rotate(-25 ${ix} ${iy})`}>
+                  <ellipse cx={ix} cy={iy} rx={is * 0.30} ry={is * 0.55}
+                    fill="#a04818" stroke={stroke} strokeWidth={2} />
+                  <ellipse cx={ix} cy={iy + is * 0.10} rx={is * 0.18} ry={is * 0.25}
+                    fill="#7a3008" opacity={0.6} />
+                  <rect x={ix - is * 0.04} y={iy - is * 1.0} width={is * 0.08} height={is * 0.45}
+                    fill="#3a1808" stroke={stroke} strokeWidth={1} />
+                  {[0, 1, 2, 3].map((sn) => (
+                    <line key={`fs-${sn}`} x1={ix - is * 0.025 + sn * is * 0.018} y1={iy - is * 0.55}
+                      x2={ix - is * 0.025 + sn * is * 0.018} y2={iy + is * 0.45}
+                      stroke="rgba(255,255,255,0.7)" strokeWidth={0.5} />
+                  ))}
+                  {/* Bow */}
+                  <line x1={ix - is * 0.10} y1={iy + is * 0.10} x2={ix + is * 0.85} y2={iy - is * 0.40}
+                    stroke="rgba(40, 20, 6, 0.95)" strokeWidth={2.2} />
+                </g>
+              );
+            case "drum":
+              return (
+                <g key={`ins-${spec.idx}`}>
+                  <ellipse cx={ix} cy={iy - is * 0.30} rx={is * 0.65} ry={is * 0.18}
+                    fill="#a06030" stroke={stroke} strokeWidth={2} />
+                  <rect x={ix - is * 0.65} y={iy - is * 0.30} width={is * 1.30} height={is * 0.65}
+                    fill="#7a4018" stroke={stroke} strokeWidth={2} />
+                  <ellipse cx={ix} cy={iy + is * 0.35} rx={is * 0.65} ry={is * 0.18}
+                    fill="#5a2810" stroke={stroke} strokeWidth={1.4} />
+                  {/* Drum strap zigzag */}
+                  <path d={`M ${ix - is * 0.65} ${iy - is * 0.10}
+                    L ${ix - is * 0.50} ${iy + is * 0.20}
+                    L ${ix - is * 0.30} ${iy - is * 0.10}
+                    L ${ix - is * 0.10} ${iy + is * 0.20}
+                    L ${ix + is * 0.10} ${iy - is * 0.10}
+                    L ${ix + is * 0.30} ${iy + is * 0.20}
+                    L ${ix + is * 0.50} ${iy - is * 0.10}
+                    L ${ix + is * 0.65} ${iy + is * 0.20}`}
+                    stroke="#e8c080" strokeWidth={1.4} fill="none" />
+                </g>
+              );
+            case "mandolin":
+              return (
+                <g key={`ins-${spec.idx}`} transform={`rotate(-15 ${ix} ${iy})`}>
+                  <ellipse cx={ix} cy={iy} rx={is * 0.40} ry={is * 0.55}
+                    fill="#c08040" stroke={stroke} strokeWidth={2} />
+                  <circle cx={ix} cy={iy + is * 0.05} r={is * 0.10} fill="#3a1808" stroke={stroke} strokeWidth={1} />
+                  <rect x={ix - is * 0.05} y={iy - is * 1.0} width={is * 0.10} height={is * 0.50}
+                    fill="#5a3812" stroke={stroke} strokeWidth={1.2} />
+                </g>
+              );
+            case "horn":
+              return (
+                <g key={`ins-${spec.idx}`} transform={`rotate(-25 ${ix} ${iy})`}>
+                  <path d={`M ${ix - is * 0.4} ${iy}
+                    L ${ix + is * 0.5} ${iy}
+                    L ${ix + is * 0.7} ${iy - is * 0.30}
+                    L ${ix + is * 0.7} ${iy + is * 0.30}
+                    L ${ix + is * 0.5} ${iy} Z`}
+                    fill="#e0c060" stroke={stroke} strokeWidth={2} />
+                  <ellipse cx={ix + is * 0.7} cy={iy} rx={is * 0.16} ry={is * 0.30}
+                    fill="#f8e090" stroke={stroke} strokeWidth={1.4} />
+                  <circle cx={ix - is * 0.4} cy={iy} r={is * 0.10} fill="#a08040" stroke={stroke} strokeWidth={1.4} />
+                </g>
+              );
+          }
+        })()}
+
+        {/* ── Glow halo ── */}
+        <ellipse cx={tx} cy={ty} rx={tW * 0.65} ry={tH * 0.5}
+          fill={hsl(shellHue, 100, 60)} opacity={0.25 * bounce}
+          filter="url(#mt-blur)" />
+      </g>
+    );
+  }
+
+  // Star nodes
+  const starNodes = stars.map((s, i) => {
+    const flick = 0.5 + Math.sin(frame * s.speed + s.phase) * 0.5;
+    return (
+      <circle key={`st-${i}`} cx={s.x * width} cy={s.y * height}
+        r={s.r * (0.7 + flick * 0.6)}
+        fill="#fff5d0" opacity={0.40 + flick * 0.45} />
+    );
+  });
+
+  // Spark nodes
+  const sparkNodes = sparks.map((s, i) => {
+    const flick = 0.5 + Math.sin(frame * s.speed + s.phase) * 0.5;
+    return (
+      <circle key={`spk-${i}`} cx={s.x * width} cy={s.y * height}
+        r={s.r * (0.7 + bounce * 0.6)}
+        fill={hsl(tintHue, 90, 75)} opacity={0.40 * flick * bounce} />
+    );
+  });
+
+  // Stage lights overhead
+  const stageLights = Array.from({ length: 5 }).map((_, i) => {
+    const lx = (0.10 + i * 0.20) * width;
+    const ly = height * 0.04;
+    return (
+      <g key={`sl-${i}`}>
+        <rect x={lx - 18} y={ly - 8} width={36} height={16} rx={4}
+          fill="rgba(40, 40, 50, 0.85)" stroke="rgba(60, 60, 70, 0.9)" strokeWidth={1} />
+        <ellipse cx={lx} cy={ly + 8} rx={14} ry={6}
+          fill="rgba(255, 240, 180, 0.85)" />
+        <path d={`M ${lx - 80} ${ly + 8} L ${lx + 80} ${ly + 8}
+          L ${lx + 200} ${groundY} L ${lx - 200} ${groundY} Z`}
+          fill="rgba(255, 240, 180, 0.07)" />
+      </g>
+    );
+  });
+
+  // Sort turtles by depth so back ones render first
+  const sorted = [...turtles].sort((a, b) => a.depth - b.depth);
 
   return (
     <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden" }}>
-      {Array.from({ length: NUM_TURTLES }, (_, i) => {
-        const tp = progress - i * 0.02; // stagger march progress
+      <svg width={width} height={height} style={{ opacity: masterOpacity, willChange: "opacity" }}>
+        <defs>
+          <linearGradient id="mt-sky" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={skyTop} />
+            <stop offset="55%" stopColor={skyMid} />
+            <stop offset="100%" stopColor={skyHorizon} />
+          </linearGradient>
+          <linearGradient id="mt-floor" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="rgba(60, 36, 14, 0.95)" />
+            <stop offset="100%" stopColor="rgba(15, 8, 2, 1)" />
+          </linearGradient>
+          <radialGradient id="mt-spot">
+            <stop offset="0%" stopColor={hsl(tintHue, 90, 80)} stopOpacity={0.40} />
+            <stop offset="100%" stopColor={hsl(tintHue, 90, 80)} stopOpacity={0} />
+          </radialGradient>
+          <radialGradient id="mt-vig">
+            <stop offset="55%" stopColor="rgba(0,0,0,0)" />
+            <stop offset="100%" stopColor="rgba(0,0,0,0.65)" />
+          </radialGradient>
+          <filter id="mt-blur" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="8" />
+          </filter>
+        </defs>
 
-        // Position across screen
-        const xRange: [number, number] = goingRight
-          ? [-totalWidth, width + TURTLE_SPACING]
-          : [width + TURTLE_SPACING, -totalWidth];
-        const xBase = interpolate(tp, [0, 1], xRange, clamp);
-        const x = goingRight
-          ? xBase + i * TURTLE_SPACING
-          : xBase - i * TURTLE_SPACING + totalWidth;
+        {/* Sky */}
+        <rect width={width} height={height} fill="url(#mt-sky)" />
 
-        // Beat-driven bob + gentle sine sway
-        const bobBase = Math.sin(frame * (2 + energy * 1.5) * tempoFactor * 0.01 + i * 1.8);
-        const bob = bobBase * (3 + energy * 4 + bd * 6);
-        const tilt = Math.sin(frame * 0.02 * tempoFactor + i * 1.1) * 3;
+        {/* Stars */}
+        <g style={{ mixBlendMode: "screen" }}>{starNodes}</g>
 
-        // 4 independent leg phases: alternating left-right gait locked to musicalTime
-        const gaitBase = musicalTime > 0 ? musicalTime * Math.PI * 2 : frame * gaitSpeed;
-        const po = i * 0.9;
-        const legPhases: [number, number, number, number] = [
-          gaitBase + po,                    // FL
-          gaitBase + po + Math.PI,            // FR (opposite)
-          gaitBase + po + Math.PI * 0.5,      // BL (quarter offset)
-          gaitBase + po + Math.PI * 1.5,      // BR (opposite of BL)
-        ];
+        {/* Stage truss + lights */}
+        <line x1={0} y1={height * 0.06} x2={width} y2={height * 0.06}
+          stroke="rgba(60, 60, 70, 0.85)" strokeWidth={3} />
+        {stageLights}
 
-        // Per-turtle staggered fade
-        const fo = i * 0.03;
-        const individualFade = interpolate(
-          progress, [fo, fo + 0.08, 0.88 - fo, 0.96 - fo], [0, 1, 1, 0], clamp,
-        );
+        {/* Spotlight */}
+        <ellipse cx={width / 2} cy={groundY - baseTurtleH * 0.4} rx={width * 0.65} ry={baseTurtleH * 0.7}
+          fill="url(#mt-spot)" style={{ mixBlendMode: "screen" }} opacity={warmth} />
 
-        // Neon glow: chromaHue-colored, energy + beatDecay modulated
-        const turtleHue = (chromaHue + i * 55) % 360;
-        const gc = hsl(turtleHue, 100, 55);
-        const gs = 8 + energy * 18 + bd * 10;
-        const glow = `drop-shadow(0 0 ${gs * 0.5}px ${gc}) drop-shadow(0 0 ${gs}px ${gc}) drop-shadow(0 0 ${gs * 1.8}px ${gc})`;
+        {/* Distant horizon */}
+        <path d={`M 0 ${height * 0.72} L ${width * 0.18} ${height * 0.64} L ${width * 0.32} ${height * 0.68} L ${width * 0.5} ${height * 0.60} L ${width * 0.68} ${height * 0.66} L ${width * 0.85} ${height * 0.62} L ${width} ${height * 0.68} L ${width} ${height * 0.78} L 0 ${height * 0.78} Z`}
+          fill="rgba(20, 12, 30, 0.85)" />
 
-        return (
-          <div
-            key={i}
-            style={{
-              position: "absolute",
-              left: x,
-              top: yBase + bob,
-              transform: `rotate(${tilt}deg) scaleX(${goingRight ? 1 : -1})`,
-              opacity: baseOpacity * individualFade,
-              filter: glow,
-              willChange: "transform, opacity",
-            }}
-          >
-            <Terrapin
-              size={TURTLE_SIZE} hue={turtleHue} legPhases={legPhases}
-              beatDecay={bd} energy={energy} index={i}
-            />
-          </div>
-        );
-      })}
+        {/* Stage floor */}
+        <rect x={0} y={groundY} width={width} height={height - groundY} fill="url(#mt-floor)" />
+        {Array.from({ length: 8 }, (_, i) => (
+          <line key={`plank-${i}`} x1={0} y1={groundY + i * 14} x2={width} y2={groundY + i * 14}
+            stroke="rgba(70, 40, 14, 0.45)" strokeWidth={0.8} />
+        ))}
+        {Array.from({ length: 12 }, (_, i) => (
+          <line key={`pv-${i}`} x1={(i / 11) * width} y1={groundY} x2={(i / 11) * width} y2={height}
+            stroke="rgba(70, 40, 14, 0.30)" strokeWidth={0.6} />
+        ))}
+
+        {/* Turtles */}
+        {sorted.map(buildTurtle)}
+
+        {/* Sparks */}
+        <g style={{ mixBlendMode: "screen" }}>{sparkNodes}</g>
+
+        {/* Onset flash */}
+        {flash > 0.05 && (
+          <rect width={width} height={height}
+            fill={`rgba(255, 245, 220, ${flash * 0.10})`}
+            style={{ mixBlendMode: "screen" }} />
+        )}
+
+        {/* Vignette */}
+        <rect width={width} height={height} fill="url(#mt-vig)" />
+      </svg>
     </div>
   );
 };

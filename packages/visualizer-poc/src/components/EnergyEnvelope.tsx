@@ -67,8 +67,9 @@ export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod,
     : baseBrightness;
 
   // Palette sovereignty: only drums/space hue + dead air warmth
-  // Chroma hue breathing: dominant pitch class modulates hue ±15 degrees
-  const chromaHueShift = (snapshot.chromaHue ?? 0) * (15 / 360) * Math.min(1, energy * 4);
+  // Chroma hue breathing: dominant pitch class modulates hue ±5 degrees (chill calibration).
+  // Was ±15° — too noticeable on long renders. Now subtle enough to be felt-not-seen.
+  const chromaHueShift = (snapshot.chromaHue ?? 0) * (5 / 360) * Math.min(1, energy * 4);
   const totalHueShift = (dsHueOffset + chromaHueShift + deadAirFactor * 20) * (1 - deadAirFactor * 0.5);
 
   // Saturation: only IT surge (coherence lock is worth honoring)

@@ -1,401 +1,171 @@
 /**
- * SpiralHypnoDisc -- Rotating optical-illusion hypnotic spiral disc.
+ * SpiralHypnoDisc — A+++ overlay.
+ * A large hypnotic spinning spiral disc (~60% of frame), black/white spiral
+ * that rotates with optical illusion zoom. Subtle color shifts. Background
+ * goes dark. The spiral is THE focus.
  *
- * Classic 60s psychedelic projection straight out of Bill Graham's Fillmore.
- * Three stacked Archimedean spiral discs at different scales rotate at
- * independent speeds, producing the illusion of an infinite tunnel zoom.
- *
- * A+++ structure: 3 layered discs (large slow / mid / small fast) each with
- * 3-4 intertwining Archimedean spiral arms (B&W high contrast fading to
- * chromaHue color at high energy). Concentric color ring bands behind the
- * arms, outer boundary rings, bright center vortex with radial glow + inner
- * converging spiral, soft chroma-tinted outer aura halo. Continuous rotation
- * creates depth-zoom illusion. Subtle scale breathing from slowEnergy.
- *
- * Audio mapping:
- *   energy        -> rotation speed multiplier (faster when louder)
- *   slowEnergy    -> scale breathing (disc inhales/exhales)
- *   beatDecay     -> center vortex brightness pulse
- *   chromaHue     -> spiral color tint (B&W -> hue at high energy)
- *   onsetEnvelope -> white flash at center vortex
- *   tempoFactor   -> overall rotation tempo lock
+ * Audio reactivity:
+ *   slowEnergy → vignette warmth
+ *   energy     → rim glow
+ *   bass       → zoom pulse
+ *   beatDecay  → rotation acceleration
+ *   onsetEnvelope → flash burst
+ *   chromaHue  → subtle color shift in spiral
+ *   tempoFactor → spin rate
  */
 
-import React, { useMemo } from "react";
+import React from "react";
 import { useCurrentFrame, useVideoConfig, interpolate } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
 import { useAudioSnapshot } from "./parametric/audio-helpers";
 import { useTempoFactor } from "../data/TempoContext";
 
-/* ---------- Types & constants ---------- */
+const CYCLE_TOTAL = 2400;
+const VISIBLE_DURATION = 780;
+const SPIRAL_ARMS = 8;
+const ARM_SEGMENTS = 60;
+const RIM_DOTS = 36;
 
 interface Props {
   frames: EnhancedFrameData[];
 }
 
-interface DiscDef {
-  /** Relative scale (1.0 = base radius) */
-  scale: number;
-  /** Rotation speed multiplier (signed: + clockwise, - counter) */
-  speed: number;
-  /** Number of intertwining spiral arms */
-  arms: number;
-  /** Spiral tightness (radians per unit) — controls density */
-  tightness: number;
-  /** Base opacity */
-  opacity: number;
-  /** Stroke thickness multiplier */
-  thickness: number;
-}
-
-/** Three nested discs: outermost slow, innermost fast — creates tunnel zoom. */
-const DISCS: DiscDef[] = [
-  { scale: 1.00, speed: -0.0090, arms: 4, tightness: 6.5, opacity: 0.85, thickness: 1.0 },
-  { scale: 0.66, speed:  0.0165, arms: 3, tightness: 5.2, opacity: 0.78, thickness: 0.85 },
-  { scale: 0.36, speed: -0.0290, arms: 4, tightness: 4.0, opacity: 0.70, thickness: 0.7 },
-];
-
-const RING_BANDS = 6;
-const ARM_STEPS = 110;
-const VORTEX_STEPS = 70;
-
-/* ---------- Spiral arm path builder (Archimedean wedge) ---------- */
-
-/**
- * Build an Archimedean spiral arm as a thick filled wedge. The wedge tapers
- * from thin near the center to thicker at the outer edge for organic depth.
- */
-function buildSpiralArmPath(
-  cx: number,
-  cy: number,
-  startAngle: number,
-  armOffset: number,
-  tightness: number,
-  maxRadius: number,
-  armWidth: number,
-  steps: number,
-): string {
-  const inner: string[] = [];
-  const outer: string[] = [];
-  for (let s = 0; s <= steps; s++) {
-    const t = s / steps;
-    // Archimedean: r grows linearly with theta
-    const theta = startAngle + armOffset + t * tightness;
-    const r = t * maxRadius;
-    // Arm tapers from center (thin) to outer edge (thicker)
-    const w = armWidth * (0.25 + t * 0.85);
-    // Tangent angle for perpendicular offset (arm width direction)
-    const tangentAngle = theta + Math.atan2(r, tightness);
-    const perpX = Math.cos(tangentAngle + Math.PI / 2);
-    const perpY = Math.sin(tangentAngle + Math.PI / 2);
-    const baseX = cx + Math.cos(theta) * r;
-    const baseY = cy + Math.sin(theta) * r;
-    inner.push(`${baseX - perpX * w},${baseY - perpY * w}`);
-    outer.push(`${baseX + perpX * w},${baseY + perpY * w}`);
-  }
-  let d = `M ${inner[0]}`;
-  for (let i = 1; i < inner.length; i++) d += ` L ${inner[i]}`;
-  for (let i = outer.length - 1; i >= 0; i--) d += ` L ${outer[i]}`;
-  d += " Z";
-  return d;
-}
-
-/* ---------- Inner converging vortex spiral ---------- */
-
-function buildVortexSpiralPath(
-  cx: number,
-  cy: number,
-  startAngle: number,
-  maxRadius: number,
-  turns: number,
-): string {
-  const points: string[] = [];
-  for (let s = 0; s <= VORTEX_STEPS; s++) {
-    const t = s / VORTEX_STEPS;
-    const r = (1 - t) * maxRadius;
-    const theta = startAngle + t * turns * Math.PI * 2;
-    const x = cx + Math.cos(theta) * r;
-    const y = cy + Math.sin(theta) * r;
-    points.push(s === 0 ? `M ${x} ${y}` : `L ${x} ${y}`);
-  }
-  return points.join(" ");
-}
-
-/* ---------- Color helper ---------- */
-
-/** Mix between black/white alternation and a chroma-hue color. */
-function spiralStrokeColor(
-  isAlt: boolean,
-  hueDeg: number,
-  colorMix: number,
-  bright: number,
-): string {
-  const monoLight = isAlt ? 96 : 6;
-  const colorLight = isAlt ? 70 : 22;
-  const sat = colorMix * 88;
-  const light = monoLight * (1 - colorMix) + colorLight * colorMix + bright * 6;
-  return `hsl(${hueDeg}, ${sat}%, ${Math.max(0, Math.min(100, light))}%)`;
-}
-
-/* ---------- Main component ---------- */
-
 export const SpiralHypnoDisc: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
-  const snap = useAudioSnapshot(frames);
   const tempoFactor = useTempoFactor();
+  const snap = useAudioSnapshot(frames);
 
-  const energy = snap.energy;
-  const slowEnergy = snap.slowEnergy;
-  const beatDecay = snap.beatDecay;
-  const chromaHue = snap.chromaHue;
-  const onsetEnvelope = snap.onsetEnvelope;
+  const cycleFrame = frame % CYCLE_TOTAL;
+  if (cycleFrame >= VISIBLE_DURATION) return null;
+  const progress = cycleFrame / VISIBLE_DURATION;
+  const fadeIn = interpolate(progress, [0, 0.09], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const fadeOut = interpolate(progress, [0.91, 1], [1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const masterOpacity = Math.min(fadeIn, fadeOut) * 0.95;
+  if (masterOpacity < 0.01) return null;
 
-  // Layout
+  // Audio
+  const vignetteWarmth = interpolate(snap.slowEnergy, [0.02, 0.32], [0.55, 1.15], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const rimBright = interpolate(snap.energy, [0.02, 0.32], [0.45, 1.0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const zoomPulse = 1 + snap.bass * 0.15;
+  const spinAccel = 1 + snap.beatDecay * 0.45;
+  const flashBurst = snap.onsetEnvelope > 0.5 ? Math.min(1, (snap.onsetEnvelope - 0.4) * 1.6) : 0;
+
+  // Subtle color modulation
+  const tintHue = ((snap.chromaHue + frame * 0.5) % 360 + 360) % 360;
+  const tintColor = `hsl(${tintHue}, 70%, 65%)`;
+  const tintBright = `hsl(${tintHue}, 90%, 80%)`;
+
+  // Hero geometry — large
   const cx = width / 2;
   const cy = height / 2;
-  const baseRadius = Math.min(width, height) * 0.34;
+  const discR = Math.min(width, height) * 0.34 * zoomPulse;
+  const spinAngle = (frame * 0.6 * tempoFactor * spinAccel) % 360;
 
-  // Audio modulators
-  const speedMul = (0.6 + energy * 1.6) * tempoFactor;
-  const breathePhase = Math.sin(frame * 0.018) * 0.5 + 0.5;
-  const breatheAmp = 0.04 + slowEnergy * 0.07;
-  const scaleBreath = 1 + (breathePhase - 0.5) * 2 * breatheAmp;
-  const colorMix = interpolate(energy, [0.15, 0.55], [0, 0.85], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
-  const baseHue = chromaHue;
-  const centerBright = 0.55 + beatDecay * 0.4 + onsetEnvelope * 0.35;
-  const centerFlash = onsetEnvelope * 0.85;
-  const overallOpacity = 0.18 + energy * 0.40 + slowEnergy * 0.08;
+  // Spiral arms — Archimedean
+  const armNodes: React.ReactNode[] = [];
+  for (let arm = 0; arm < SPIRAL_ARMS; arm++) {
+    const armOffset = (arm / SPIRAL_ARMS) * Math.PI * 2;
+    const points: string[] = [];
+    for (let s = 0; s < ARM_SEGMENTS; s++) {
+      const t = s / (ARM_SEGMENTS - 1);
+      const r = t * discR;
+      const a = armOffset + t * Math.PI * 4;
+      const x = Math.cos(a) * r;
+      const y = Math.sin(a) * r;
+      points.push(`${s === 0 ? "M" : "L"} ${x} ${y}`);
+    }
+    const armPath = points.join(" ");
+    armNodes.push(
+      <g key={`arm-${arm}`}>
+        <path d={armPath} stroke="rgba(0, 0, 0, 0.95)" strokeWidth={discR * 0.10} fill="none" strokeLinecap="round" />
+        <path d={armPath} stroke="rgba(255, 255, 255, 0.96)" strokeWidth={discR * 0.06} fill="none" strokeLinecap="round" />
+        <path d={armPath} stroke={tintColor} strokeWidth={discR * 0.015} fill="none" strokeLinecap="round" opacity={0.55} />
+      </g>
+    );
+  }
 
-  // Per-disc rotation angles (each spins at independent speed)
-  const discRotations = DISCS.map((d) => frame * d.speed * speedMul);
+  // Counter-rotating rings
+  const counterRings: React.ReactNode[] = [];
+  for (let r = 0; r < 8; r++) {
+    const t = r / 8;
+    const ringR = discR * (0.15 + t * 0.85);
+    counterRings.push(
+      <circle key={`cr-${r}`} cx={0} cy={0} r={ringR}
+        fill="none" stroke="rgba(255, 255, 255, 0.4)" strokeWidth={1.0}
+        strokeDasharray={`${ringR * 0.04} ${ringR * 0.10}`}
+        opacity={0.55} />
+    );
+  }
 
-  // Pre-computed deterministic ring band hue offsets
-  const ringHueOffsets = useMemo(
-    () => Array.from({ length: RING_BANDS }, (_, i) => (i * 53) % 360),
-    [],
-  );
+  // Rim ornament dots
+  const rimNodes: React.ReactNode[] = [];
+  for (let r = 0; r < RIM_DOTS; r++) {
+    const a = (r / RIM_DOTS) * Math.PI * 2;
+    const ringR = discR * 1.05;
+    const dx = Math.cos(a) * ringR;
+    const dy = Math.sin(a) * ringR;
+    rimNodes.push(
+      <circle key={`rim-${r}`} cx={dx} cy={dy} r={r % 4 === 0 ? 4 : 2}
+        fill={tintBright} opacity={0.85 * rimBright} />
+    );
+  }
 
   return (
-    <div
-      style={{
-        position: "absolute",
-        inset: 0,
-        pointerEvents: "none",
-        overflow: "hidden",
-      }}
-    >
-      <svg
-        width={width}
-        height={height}
-        viewBox={`0 0 ${width} ${height}`}
-        style={{ position: "absolute", inset: 0, opacity: overallOpacity }}
-      >
+    <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden" }}>
+      <svg width={width} height={height} style={{ opacity: masterOpacity, willChange: "opacity" }}>
         <defs>
-          {/* Outer aura halo, tinted by chromaHue */}
-          <radialGradient id="shd-aura" cx="50%" cy="50%" r="55%">
-            <stop offset="0%" stopColor={`hsl(${baseHue}, ${20 + colorMix * 60}%, ${28 + slowEnergy * 18}%)`} stopOpacity={0} />
-            <stop offset="55%" stopColor={`hsl(${baseHue}, ${30 + colorMix * 60}%, ${42 + slowEnergy * 18}%)`} stopOpacity={0.18 + energy * 0.18} />
-            <stop offset="100%" stopColor={`hsl(${baseHue}, ${20 + colorMix * 50}%, 6%)`} stopOpacity={0} />
+          <radialGradient id="shd-vignette">
+            <stop offset="0%" stopColor="rgba(0,0,0,0)" />
+            <stop offset="60%" stopColor="rgba(0,0,0,0.55)" />
+            <stop offset="100%" stopColor="rgba(0,0,0,0.95)" />
           </radialGradient>
-
-          {/* Center vortex glow */}
-          <radialGradient id="shd-center" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor="white" stopOpacity={centerBright} />
-            <stop offset="25%" stopColor={`hsl(${baseHue}, 90%, ${75 + colorMix * 10}%)`} stopOpacity={0.85 * centerBright} />
-            <stop offset="60%" stopColor={`hsl(${baseHue}, 80%, 45%)`} stopOpacity={0.45 * centerBright} />
-            <stop offset="100%" stopColor="black" stopOpacity={0} />
+          <radialGradient id="shd-warm">
+            <stop offset="0%" stopColor={tintColor} stopOpacity={0.35 * vignetteWarmth} />
+            <stop offset="40%" stopColor={tintColor} stopOpacity={0.10 * vignetteWarmth} />
+            <stop offset="100%" stopColor={tintColor} stopOpacity={0} />
           </radialGradient>
-
-          {/* Ring band gradients (one per concentric color band) */}
-          {ringHueOffsets.map((hueOff, i) => {
-            const h = (baseHue + hueOff) % 360;
-            return (
-              <radialGradient key={`shd-band-${i}`} id={`shd-band-${i}`} cx="50%" cy="50%" r="50%">
-                <stop offset="0%" stopColor={`hsl(${h}, ${50 + colorMix * 35}%, 55%)`} stopOpacity={0} />
-                <stop offset="50%" stopColor={`hsl(${h}, ${55 + colorMix * 35}%, 50%)`} stopOpacity={0.22} />
-                <stop offset="100%" stopColor={`hsl(${h}, ${50 + colorMix * 35}%, 45%)`} stopOpacity={0} />
-              </radialGradient>
-            );
-          })}
-
-          <filter id="shd-glow" x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur stdDeviation={4 + beatDecay * 6} result="blur" />
-            <feMerge>
-              <feMergeNode in="blur" />
-              <feMergeNode in="SourceGraphic" />
-            </feMerge>
-          </filter>
-          <filter id="shd-soft">
-            <feGaussianBlur in="SourceGraphic" stdDeviation="2.4" />
-          </filter>
-
-          {/* Per-disc circular clip paths */}
-          <clipPath id="shd-clip-large"><circle cx={cx} cy={cy} r={baseRadius * DISCS[0].scale * scaleBreath} /></clipPath>
-          <clipPath id="shd-clip-mid"><circle cx={cx} cy={cy} r={baseRadius * DISCS[1].scale * scaleBreath} /></clipPath>
-          <clipPath id="shd-clip-small"><circle cx={cx} cy={cy} r={baseRadius * DISCS[2].scale * scaleBreath} /></clipPath>
+          <radialGradient id="shd-rim-glow">
+            <stop offset="80%" stopColor="rgba(0,0,0,0)" />
+            <stop offset="92%" stopColor={tintColor} stopOpacity={0.6 * rimBright} />
+            <stop offset="100%" stopColor={tintBright} stopOpacity={0.95 * rimBright} />
+          </radialGradient>
         </defs>
 
-        {/* Outer aura halo (drawn first, behind everything) */}
-        <circle
-          cx={cx}
-          cy={cy}
-          r={baseRadius * 1.55 * scaleBreath}
-          fill="url(#shd-aura)"
-        />
+        <rect width={width} height={height} fill="#000" />
+        <circle cx={cx} cy={cy} r={discR * 1.6} fill="url(#shd-warm)" />
 
-        {/* Concentric color ring bands behind disc structure */}
-        {Array.from({ length: RING_BANDS }, (_, i) => {
-          const t = (i + 0.5) / RING_BANDS;
-          const ringR = baseRadius * scaleBreath * (0.18 + t * 0.92);
-          const ringW = baseRadius * scaleBreath * (0.04 + slowEnergy * 0.018);
-          return (
-            <circle
-              key={`band-${i}`}
-              cx={cx}
-              cy={cy}
-              r={ringR}
-              fill="none"
-              stroke={`url(#shd-band-${i})`}
-              strokeWidth={ringW}
-              opacity={0.55 + colorMix * 0.25}
-              filter="url(#shd-soft)"
-            />
-          );
-        })}
-
-        {/* Three layered spiral discs */}
-        {DISCS.map((disc, di) => {
-          const discR = baseRadius * disc.scale * scaleBreath;
-          const rotation = discRotations[di];
-          const clipId =
-            di === 0 ? "shd-clip-large" : di === 1 ? "shd-clip-mid" : "shd-clip-small";
-          const armBaseWidth = discR * 0.085 * disc.thickness;
-          // Smaller discs spin faster + read brighter for tunnel illusion
-          const discBright = 0.4 + (1 - disc.scale) * 0.4 + beatDecay * 0.25;
-
-          return (
-            <g key={`disc-${di}`} clipPath={`url(#${clipId})`}>
-              {/* Disc dark backing so spiral arms read as silhouettes */}
-              <circle
-                cx={cx}
-                cy={cy}
-                r={discR}
-                fill={`hsl(${baseHue}, ${10 + colorMix * 30}%, ${4 + slowEnergy * 5}%)`}
-                opacity={disc.opacity * 0.75}
-              />
-
-              {/* Spiral arms — alternating B&W (or color at high energy) */}
-              {Array.from({ length: disc.arms }, (_, a) => {
-                const armOffset = (a / disc.arms) * Math.PI * 2;
-                const isAlt = a % 2 === 0;
-                const armPath = buildSpiralArmPath(
-                  cx, cy, rotation, armOffset, disc.tightness,
-                  discR, armBaseWidth, ARM_STEPS,
-                );
-                const fill = spiralStrokeColor(isAlt, baseHue, colorMix, discBright);
-                return (
-                  <path key={`arm-${di}-${a}`} d={armPath} fill={fill} opacity={disc.opacity} />
-                );
-              })}
-
-              {/* Disc outer boundary ring */}
-              <circle
-                cx={cx}
-                cy={cy}
-                r={discR * 0.985}
-                fill="none"
-                stroke={`hsl(${baseHue}, ${30 + colorMix * 50}%, ${75 + beatDecay * 15}%)`}
-                strokeWidth={discR * 0.012}
-                opacity={0.7}
-              />
-              {/* Inset secondary ring */}
-              <circle
-                cx={cx}
-                cy={cy}
-                r={discR * 0.92}
-                fill="none"
-                stroke={`hsl(${baseHue}, ${20 + colorMix * 40}%, 20%)`}
-                strokeWidth={discR * 0.006}
-                opacity={0.55}
-              />
-            </g>
-          );
-        })}
-
-        {/* Inner converging vortex spiral at the very center */}
-        <g opacity={0.75 + colorMix * 0.2}>
-          {Array.from({ length: 3 }, (_, v) => {
-            const vortexAngle = -frame * 0.045 * speedMul + (v / 3) * Math.PI * 2;
-            const vortexR = baseRadius * 0.18 * scaleBreath;
-            const vortexPath = buildVortexSpiralPath(cx, cy, vortexAngle, vortexR, 3);
-            return (
-              <path
-                key={`vortex-${v}`}
-                d={vortexPath}
-                fill="none"
-                stroke={`hsl(${baseHue}, ${60 + colorMix * 30}%, ${78 + beatDecay * 12}%)`}
-                strokeWidth={1.6 + beatDecay * 1.4}
-                strokeLinecap="round"
-                opacity={0.65}
-              />
-            );
-          })}
+        <g transform={`translate(${cx}, ${cy}) rotate(${spinAngle})`}>
+          <circle r={discR} fill="rgba(245, 245, 250, 0.96)" stroke="#000" strokeWidth={3} />
+          {armNodes}
+          <g transform={`rotate(${-spinAngle * 1.6})`}>
+            {counterRings}
+          </g>
+          <circle r={discR * 0.06} fill="#000" />
+          <circle r={discR * 0.04} fill={tintBright} opacity={0.85} />
         </g>
 
-        {/* Center vortex glow disc */}
-        <circle
-          cx={cx}
-          cy={cy}
-          r={baseRadius * 0.14 * (1 + beatDecay * 0.3)}
-          fill="url(#shd-center)"
-          filter="url(#shd-glow)"
-        />
+        <circle cx={cx} cy={cy} r={discR + 4} fill="url(#shd-rim-glow)" />
 
-        {/* Bright center point */}
-        <circle
-          cx={cx}
-          cy={cy}
-          r={baseRadius * 0.022 * (1 + beatDecay * 0.5)}
-          fill="white"
-          opacity={0.85 * centerBright}
-        />
+        <g transform={`translate(${cx}, ${cy})`}>
+          {rimNodes}
+        </g>
 
-        {/* Onset white flash overlay at center */}
-        {centerFlash > 0.02 && (
-          <circle
-            cx={cx}
-            cy={cy}
-            r={baseRadius * 0.08 * (1 + onsetEnvelope * 1.4)}
-            fill="white"
-            opacity={centerFlash * 0.7}
-            filter="url(#shd-glow)"
-          />
+        <circle cx={cx} cy={cy} r={discR + 22} fill="none"
+          stroke={tintColor} strokeWidth={1.6} opacity={0.55} strokeDasharray="2 8" />
+        <circle cx={cx} cy={cy} r={discR + 36} fill="none"
+          stroke={tintColor} strokeWidth={1.0} opacity={0.30} strokeDasharray="1 12" />
+
+        <rect width={width} height={height} fill="url(#shd-vignette)" />
+
+        {flashBurst > 0.1 && (
+          <>
+            <circle cx={cx} cy={cy} r={discR * (1.4 + flashBurst * 0.6)}
+              fill="none" stroke={tintBright} strokeWidth={3} opacity={flashBurst * 0.9} />
+            <circle cx={cx} cy={cy} r={discR * (1.7 + flashBurst * 0.8)}
+              fill="none" stroke={tintColor} strokeWidth={1.6} opacity={flashBurst * 0.6} />
+          </>
         )}
-
-        {/* Outer rim highlight */}
-        <circle
-          cx={cx}
-          cy={cy}
-          r={baseRadius * scaleBreath * 1.005}
-          fill="none"
-          stroke={`hsl(${baseHue}, ${40 + colorMix * 40}%, ${82 + beatDecay * 10}%)`}
-          strokeWidth={1.4}
-          opacity={0.35 + energy * 0.25}
-        />
-        {/* Wider soft outer rim */}
-        <circle
-          cx={cx}
-          cy={cy}
-          r={baseRadius * scaleBreath * 1.06}
-          fill="none"
-          stroke={`hsl(${baseHue}, ${30 + colorMix * 30}%, 60%)`}
-          strokeWidth={0.8}
-          opacity={0.18 + slowEnergy * 0.15}
-        />
       </svg>
     </div>
   );

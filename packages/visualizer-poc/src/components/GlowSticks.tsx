@@ -1,329 +1,384 @@
 /**
- * GlowSticks — A+++ neon glow sticks launched from the crowd into the air.
+ * GlowSticks — A+++ overlay: a sea of glow sticks waved by the crowd, with
+ * vibrant colored streaks arcing across the frame. 60+ sticks held by
+ * silhouetted hands at the bottom, each leaving a fading neon trail. Stage
+ * truss in the back. Smoke and atmospheric haze. Pink, cyan, green, yellow,
+ * red, blue. Each stick rotates and the trail tracks its swing path.
  *
- * 10-12 sticks in flight simultaneously, launched from the bottom crowd area.
- * Each stick is a rounded-rect tube with 3-layer glow: bright white-hot core,
- * saturated mid glow, and soft outer halo. Realistic parabolic arc physics
- * with per-stick tumble/spin. Trail of 4 fading ghost positions behind each
- * stick. 6 neon colors (green, pink, blue, yellow, orange, purple).
- *
- * Peak hang: sticks near apex glow brighter. Landing: brief flash on impact.
- * Audio: energy drives launch frequency, beatDecay triggers launches,
- * onsetEnvelope bursts 2-3 simultaneous sticks, chromaHue shifts palette,
- * tempoFactor scales physics speed.
+ * Audio reactivity:
+ *   slowEnergy   → trail length and saturation
+ *   energy       → swing amplitude
+ *   bass         → wave amplitude across the crowd
+ *   beatDecay    → simultaneous brightness pulse
+ *   onsetEnvelope→ flash/burst
+ *   chromaHue    → color rotation
+ *   tempoFactor  → swing speed
  */
 
 import React from "react";
 import { useCurrentFrame, useVideoConfig, interpolate } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
-import { useShowContext } from "../data/ShowContext";
 import { seeded } from "../utils/seededRandom";
 import { useAudioSnapshot } from "./parametric/audio-helpers";
 import { useTempoFactor } from "../data/TempoContext";
 
-/* ---- Color palette — 6 neon colors, hue-shiftable via chromaHue ---- */
+const CYCLE_TOTAL = 2400;
+const VISIBLE_DURATION = 800;
+const STICK_COUNT = 64;
+const TRAIL_SAMPLES = 14;
+const HAND_COUNT = 18;
+const SMOKE_COUNT = 12;
+const STAR_COUNT = 50;
 
-const BASE_COLORS = [
-  { h: 120, s: 100, l: 58 }, // neon green
-  { h: 320, s: 100, l: 62 }, // hot pink
-  { h: 200, s: 100, l: 58 }, // electric blue
-  { h: 55, s: 100, l: 55 },  // yellow
-  { h: 25, s: 100, l: 55 },  // orange
-  { h: 280, s: 100, l: 62 }, // purple
-];
-
-function shiftedColor(idx: number, hueShift: number) {
-  const base = BASE_COLORS[idx % BASE_COLORS.length];
-  return { h: (base.h + hueShift) % 360, s: base.s, l: base.l };
+interface Stick {
+  baseX: number;
+  baseY: number;
+  swingFreq: number;
+  swingAmp: number;
+  swingPhase: number;
+  hueOffset: number;
+  length: number;
+  spinSpeed: number;
+  spinPhase: number;
+  thickness: number;
 }
 
-function hsl(h: number, s: number, l: number, a: number): string {
-  return `hsla(${h}, ${s}%, ${l}%, ${a})`;
+interface Hand {
+  x: number;
+  y: number;
+  size: number;
+  bobPhase: number;
 }
 
-/* ---- Types ---- */
-
-interface StickData {
-  startX: number; vx: number; vy: number; colorIdx: number;
-  stickLen: number; stickWidth: number; spinSpeed: number;
-  spinPhase: number; tumbleAxis: number; lifetime: number;
+interface SmokeBlob {
+  x: number;
+  y: number;
+  rx: number;
+  ry: number;
+  drift: number;
+  phase: number;
 }
 
-interface StickEvent { frame: number; stick: StickData; }
-
-/* ---- Physics constants ---- */
-
-const GRAVITY = 0.12;
-const MAX_CONCURRENT = 12;
-const BASE_LIFETIME = 90;
-const GHOST_COUNT = 4;
-const LAUNCH_Y_FRAC = 0.88;
-const MIN_LAUNCH_GAP = 6;
-const IMPACT_FLASH_FRAMES = 5;
-
-/* ---- Precompute — deterministic stick launch schedule ---- */
-
-function precomputeSticks(frames: EnhancedFrameData[], masterSeed: number): StickEvent[] {
-  const rng = seeded(masterSeed);
-  const events: StickEvent[] = [];
-
-  for (let f = 0; f < frames.length; f++) {
-    const fd = frames[f];
-    const energy = fd.rms ?? 0;
-    const isBeat = fd.beat;
-    const isOnset = (fd.onset ?? 0) > 0.3;
-
-    const activeCount = events.filter(
-      (e) => f >= e.frame && f < e.frame + e.stick.lifetime,
-    ).length;
-
-    const lastEvent = events[events.length - 1];
-    if (lastEvent && f - lastEvent.frame < MIN_LAUNCH_GAP) continue;
-
-    // Determine how many sticks to launch this frame
-    let launchCount = 0;
-    if (isOnset && energy > 0.2 && activeCount + 3 <= MAX_CONCURRENT) {
-      launchCount = 2 + (rng() > 0.5 ? 1 : 0); // onset burst: 2-3
-    } else if (isBeat && energy > 0.12 && activeCount < MAX_CONCURRENT) {
-      launchCount = 1;
-      if (energy > 0.35 && rng() > 0.4 && activeCount + 2 <= MAX_CONCURRENT) launchCount = 2;
-    } else if (energy > 0.4 && rng() > 0.85 && activeCount < MAX_CONCURRENT - 2) {
-      launchCount = 1; // high energy fill
-    }
-
-    if (launchCount === 0) continue;
-
-    for (let b = 0; b < launchCount; b++) {
-      const startX = 0.08 + rng() * 0.84;
-      const energyBoost = 1 + energy * 0.8;
-      const baseVy = -(6 + rng() * 5) * energyBoost;
-      const centerBias = (startX - 0.5) * -1.5;
-      const vx = (rng() - 0.5) * 3.5 + centerBias * 0.5;
-      const lifetime = BASE_LIFETIME + Math.floor(rng() * 30) + Math.floor(Math.abs(baseVy) * 2);
-
-      events.push({
-        frame: f,
-        stick: {
-          startX, vx, vy: baseVy,
-          colorIdx: Math.floor(rng() * BASE_COLORS.length),
-          stickLen: 38 + rng() * 28,
-          stickWidth: 4 + rng() * 3,
-          spinSpeed: 0.08 + rng() * 0.25,
-          spinPhase: rng() * Math.PI * 2,
-          tumbleAxis: 0.02 + rng() * 0.04,
-          lifetime,
-        },
-      });
-    }
-  }
-  return events;
+interface Star {
+  x: number;
+  y: number;
+  size: number;
+  phase: number;
 }
 
-/* ---- Physics helpers ---- */
-
-function getPosition(
-  s: StickData, age: number, launchY: number, w: number, ts: number,
-): { x: number; y: number } {
-  const t = age * ts;
-  return { x: s.startX * w + s.vx * t, y: launchY + s.vy * t + 0.5 * GRAVITY * t * t };
+function buildSticks(): Stick[] {
+  const rng = seeded(50_998_217);
+  return Array.from({ length: STICK_COUNT }, () => ({
+    baseX: rng(),
+    baseY: 0.50 + rng() * 0.42,
+    swingFreq: 0.025 + rng() * 0.040,
+    swingAmp: 0.6 + rng() * 0.7,
+    swingPhase: rng() * Math.PI * 2,
+    hueOffset: rng() * 360,
+    length: 22 + rng() * 24,
+    spinSpeed: 0.04 + rng() * 0.10,
+    spinPhase: rng() * Math.PI * 2,
+    thickness: 2.4 + rng() * 1.6,
+  }));
 }
 
-function getRotation(s: StickData, age: number, ts: number): number {
-  const t = age * ts;
-  return s.spinPhase + t * s.spinSpeed + Math.sin(t * s.tumbleAxis * 7) * 0.3;
+function buildHands(): Hand[] {
+  const rng = seeded(72_117_002);
+  return Array.from({ length: HAND_COUNT }, (_, i) => ({
+    x: (i + 0.5 + rng() * 0.2) / HAND_COUNT,
+    y: 0.92 + rng() * 0.06,
+    size: 0.85 + rng() * 0.30,
+    bobPhase: rng() * Math.PI * 2,
+  }));
 }
 
-/** 0-1: how close to apex (1 = at peak) */
-function apexProximity(s: StickData, age: number, ts: number): number {
-  const t = age * ts;
-  const tApex = -s.vy / GRAVITY;
-  return Math.max(0, 1 - Math.abs(t - tApex) / 18);
+function buildSmoke(): SmokeBlob[] {
+  const rng = seeded(38_779_115);
+  return Array.from({ length: SMOKE_COUNT }, () => ({
+    x: rng(),
+    y: 0.30 + rng() * 0.30,
+    rx: 0.10 + rng() * 0.18,
+    ry: 0.04 + rng() * 0.05,
+    drift: 0.0001 + rng() * 0.00040,
+    phase: rng() * Math.PI * 2,
+  }));
 }
 
-/** Has the stick fallen back below launch height? */
-function hasLanded(s: StickData, age: number, launchY: number, w: number, ts: number): boolean {
-  const { y } = getPosition(s, age, launchY, w, ts);
-  return age > 10 && y >= launchY + 10;
+function buildStars(): Star[] {
+  const rng = seeded(94_002_337);
+  return Array.from({ length: STAR_COUNT }, () => ({
+    x: rng(),
+    y: rng() * 0.30,
+    size: 0.4 + rng() * 1.5,
+    phase: rng() * Math.PI * 2,
+  }));
 }
 
-/* ---- Component ---- */
-
-interface Props { frames: EnhancedFrameData[]; }
+interface Props {
+  frames: EnhancedFrameData[];
+}
 
 export const GlowSticks: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
-  const ctx = useShowContext();
-  const snap = useAudioSnapshot(frames);
   const tempoFactor = useTempoFactor();
+  const snap = useAudioSnapshot(frames);
 
-  const stickEvents = React.useMemo(
-    () => precomputeSticks(frames, ctx?.showSeed ?? 19770508),
-    [frames, ctx?.showSeed],
-  );
+  const sticks = React.useMemo(buildSticks, []);
+  const hands = React.useMemo(buildHands, []);
+  const smoke = React.useMemo(buildSmoke, []);
+  const stars = React.useMemo(buildStars, []);
 
-  const tempoScale = 0.85 + tempoFactor * 0.15;
-  const hueShift = (snap.chromaHue ?? 0) * 0.15;
-  const launchY = height * LAUNCH_Y_FRAC;
+  const cycleFrame = frame % CYCLE_TOTAL;
+  if (cycleFrame >= VISIBLE_DURATION) return null;
+  const progress = cycleFrame / VISIBLE_DURATION;
+  const fadeIn = interpolate(progress, [0, 0.08], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const fadeOut = interpolate(progress, [0.92, 1], [1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const masterOpacity = Math.min(fadeIn, fadeOut) * 0.95;
+  if (masterOpacity < 0.01) return null;
 
-  const activeSticks = stickEvents.filter(
-    (e) => frame >= e.frame && frame < e.frame + e.stick.lifetime,
-  );
+  const trailGlow = interpolate(snap.slowEnergy, [0.02, 0.32], [0.55, 1.15], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const energy = snap.energy;
+  const bass = snap.bass;
+  const beatPulse = 1 + snap.beatDecay * 0.35;
+  const onsetFlare = snap.onsetEnvelope > 0.55 ? Math.min(1, (snap.onsetEnvelope - 0.4) * 1.6) : 0;
 
-  if (activeSticks.length === 0) return null;
+  const baseHueShift = (snap.chromaHue - 180) * 0.6;
+  const skyTop = `hsl(${(260 + baseHueShift) % 360}, 30%, 5%)`;
+  const skyMid = `hsl(${(280 + baseHueShift) % 360}, 28%, 9%)`;
+  const skyHorizon = `hsl(${(310 + baseHueShift) % 360}, 38%, 15%)`;
 
-  const midFilter = "glowstick-mid";
-  const outerFilter = "glowstick-outer";
+  const horizonY = height * 0.42;
+  const stageY = height * 0.40;
+  const stageH = height * 0.10;
+
+  // Stick + trail renderer
+  const stickNodes = sticks.map((s, i) => {
+    const baseX = s.baseX * width;
+    const baseY = s.baseY * height;
+    const swingT = frame * s.swingFreq * tempoFactor + s.swingPhase;
+    const stickAngle = Math.sin(swingT) * s.swingAmp + Math.sin(frame * s.spinSpeed + s.spinPhase) * 0.3;
+    const swingTilt = stickAngle - Math.PI / 2;
+    const len = s.length * (1 + energy * 0.20) * beatPulse;
+    const hue = (s.hueOffset + baseHueShift + frame * 0.2) % 360;
+    const stickColor = `hsl(${hue}, 100%, 65%)`;
+    const stickCore = `hsl(${hue}, 100%, 88%)`;
+    const stickGlow = `hsl(${hue}, 95%, 55%)`;
+
+    // Trail of past positions (interpolated swing samples)
+    const trailPaths: React.ReactNode[] = [];
+    let prevX: number | null = null;
+    let prevY: number | null = null;
+    for (let t = 0; t < TRAIL_SAMPLES; t++) {
+      const past = -t * 1.8;
+      const ang = Math.sin(swingT + past * s.swingFreq * 0.5) * s.swingAmp + Math.sin((frame + past) * s.spinSpeed + s.spinPhase) * 0.3;
+      const tilt = ang - Math.PI / 2;
+      const tipX = baseX + Math.cos(tilt) * len;
+      const tipY = baseY + Math.sin(tilt) * len;
+      if (prevX !== null && prevY !== null) {
+        const opacity = (1 - t / TRAIL_SAMPLES) * 0.55 * trailGlow;
+        trailPaths.push(
+          <line
+            key={`tr-${i}-${t}`}
+            x1={prevX}
+            y1={prevY}
+            x2={tipX}
+            y2={tipY}
+            stroke={stickColor}
+            strokeWidth={s.thickness * 1.2 * (1 - t / TRAIL_SAMPLES)}
+            strokeLinecap="round"
+            opacity={opacity}
+          />,
+        );
+      }
+      prevX = tipX;
+      prevY = tipY;
+    }
+
+    const tipX = baseX + Math.cos(swingTilt) * len;
+    const tipY = baseY + Math.sin(swingTilt) * len;
+    const midX = baseX + Math.cos(swingTilt) * len * 0.5;
+    const midY = baseY + Math.sin(swingTilt) * len * 0.5;
+
+    return (
+      <g key={`stick-${i}`}>
+        {/* Trail (fading) */}
+        <g style={{ mixBlendMode: "screen" }}>{trailPaths}</g>
+
+        {/* Outer stick glow */}
+        <line
+          x1={baseX}
+          y1={baseY}
+          x2={tipX}
+          y2={tipY}
+          stroke={stickGlow}
+          strokeWidth={s.thickness * 4 * beatPulse}
+          strokeLinecap="round"
+          opacity={0.18 * trailGlow}
+          style={{ mixBlendMode: "screen" }}
+        />
+        {/* Mid stick */}
+        <line
+          x1={baseX}
+          y1={baseY}
+          x2={tipX}
+          y2={tipY}
+          stroke={stickColor}
+          strokeWidth={s.thickness * 1.8}
+          strokeLinecap="round"
+          opacity={0.55 * trailGlow}
+          style={{ mixBlendMode: "screen" }}
+        />
+        {/* Bright core */}
+        <line
+          x1={baseX}
+          y1={baseY}
+          x2={tipX}
+          y2={tipY}
+          stroke={stickCore}
+          strokeWidth={s.thickness * 0.7}
+          strokeLinecap="round"
+          opacity={0.95}
+          style={{ mixBlendMode: "screen" }}
+        />
+        {/* Tip dot */}
+        <circle cx={tipX} cy={tipY} r={s.thickness * 1.6 * beatPulse} fill={stickCore} opacity={0.9} style={{ mixBlendMode: "screen" }} />
+        <circle cx={tipX} cy={tipY} r={s.thickness * 4} fill={stickColor} opacity={0.32 * trailGlow} style={{ mixBlendMode: "screen" }} />
+        {/* Mid sparkle */}
+        <circle cx={midX} cy={midY} r={s.thickness * 0.8} fill={stickCore} opacity={0.7} style={{ mixBlendMode: "screen" }} />
+      </g>
+    );
+  });
+
+  // Hand silhouettes at the bottom
+  const handNodes = hands.map((h, i) => {
+    const px = h.x * width;
+    const py = h.y * height;
+    const bob = Math.sin(frame * 0.025 + h.bobPhase) * (2 + bass * 4);
+    const figH = 100 * h.size;
+    const fill = "rgba(6, 4, 12, 0.95)";
+    return (
+      <g key={`hand-${i}`}>
+        {/* shoulders */}
+        <ellipse cx={px} cy={py + bob + figH * 0.05} rx={figH * 0.30} ry={figH * 0.10} fill={fill} />
+        {/* head */}
+        <circle cx={px} cy={py - figH * 0.18 + bob} r={figH * 0.12} fill={fill} />
+        {/* raised arm */}
+        <path
+          d={`M ${px - figH * 0.10} ${py + bob}
+              Q ${px - figH * 0.05} ${py - figH * 0.45 + bob} ${px - figH * 0.02} ${py - figH * 0.55 + bob}`}
+          stroke={fill}
+          strokeWidth={figH * 0.10}
+          strokeLinecap="round"
+          fill="none"
+        />
+      </g>
+    );
+  });
+
+  // Smoke
+  const smokeNodes = smoke.map((c, i) => {
+    const drift = (c.x + frame * c.drift) % 1.2 - 0.1;
+    const breath = 1 + Math.sin(frame * 0.012 + c.phase) * 0.06;
+    return (
+      <ellipse
+        key={`sm-${i}`}
+        cx={drift * width}
+        cy={c.y * height}
+        rx={c.rx * width * breath}
+        ry={c.ry * height * breath}
+        fill={`rgba(40, 30, 60, ${0.40 + trailGlow * 0.20})`}
+      />
+    );
+  });
+
+  // Stars
+  const starNodes = stars.map((s, i) => {
+    const tw = 0.5 + Math.sin(frame * 0.05 + s.phase) * 0.45;
+    return <circle key={`star-${i}`} cx={s.x * width} cy={s.y * height} r={s.size * tw} fill="rgba(240, 232, 220, 0.85)" />;
+  });
 
   return (
     <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden" }}>
-      <svg width={width} height={height}>
+      <svg width={width} height={height} style={{ opacity: masterOpacity, willChange: "opacity" }}>
         <defs>
-          <filter id={midFilter} x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur stdDeviation="4" />
-          </filter>
-          <filter id={outerFilter} x="-80%" y="-80%" width="260%" height="260%">
-            <feGaussianBlur stdDeviation="10" />
+          <linearGradient id="gs-sky" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={skyTop} />
+            <stop offset="55%" stopColor={skyMid} />
+            <stop offset="100%" stopColor={skyHorizon} />
+          </linearGradient>
+          <linearGradient id="gs-floor" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="rgba(8, 4, 16, 0.4)" />
+            <stop offset="100%" stopColor="rgba(2, 1, 6, 0.95)" />
+          </linearGradient>
+          <filter id="gs-blur" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="6" />
           </filter>
         </defs>
 
-        {activeSticks.map((event, si) => {
-          const age = frame - event.frame;
-          const stick = event.stick;
-          const lifeProgress = age / stick.lifetime;
+        {/* Sky */}
+        <rect width={width} height={height} fill="url(#gs-sky)" />
 
-          const pos = getPosition(stick, age, launchY, width, tempoScale);
-          if (pos.x < -100 || pos.x > width + 100 || pos.y < -200 || pos.y > height + 100) {
-            return null;
-          }
+        {/* Stars */}
+        <g>{starNodes}</g>
 
-          const radians = getRotation(stick, age, tempoScale);
-          const halfLen = stick.stickLen / 2;
-          const dx = Math.cos(radians) * halfLen;
-          const dy = Math.sin(radians) * halfLen;
+        {/* Distant stage truss */}
+        <g opacity={0.72}>
+          <rect x={width * 0.18} y={stageY - 4} width={width * 0.64} height={4} fill="rgba(18, 14, 22, 0.95)" />
+          <rect x={width * 0.18} y={stageY - 4} width={5} height={stageH + 4} fill="rgba(18, 14, 22, 0.95)" />
+          <rect x={width * 0.82 - 5} y={stageY - 4} width={5} height={stageH + 4} fill="rgba(18, 14, 22, 0.95)" />
+          {Array.from({ length: 14 }).map((_, i) => (
+            <line
+              key={`tr-${i}`}
+              x1={width * 0.18 + i * (width * 0.64 / 14)}
+              y1={stageY}
+              x2={width * 0.18 + (i + 1) * (width * 0.64 / 14)}
+              y2={stageY + 4}
+              stroke="rgba(28, 22, 32, 0.7)"
+              strokeWidth={1}
+            />
+          ))}
+        </g>
 
-          // Alpha envelope: quick fade in, long sustain, fade out
-          const alpha = interpolate(lifeProgress, [0, 0.06, 0.75, 1], [0.2, 1, 0.85, 0], {
-            extrapolateLeft: "clamp", extrapolateRight: "clamp",
-          });
-          if (alpha < 0.02) return null;
+        {/* Distant band */}
+        <g>
+          {[0.40, 0.50, 0.60].map((px, i) => {
+            const x = px * width;
+            const y = stageY + stageH;
+            const figH = stageH * 0.85;
+            return (
+              <g key={`bd-${i}`}>
+                <ellipse cx={x} cy={y - figH * 0.4} rx={figH * 0.18} ry={figH * 0.45} fill="rgba(6, 3, 12, 0.98)" />
+                <circle cx={x} cy={y - figH * 0.85} r={figH * 0.10} fill="rgba(6, 3, 12, 0.98)" />
+              </g>
+            );
+          })}
+        </g>
 
-          // Apex: brighter glow when stick hangs at peak
-          const apex = apexProximity(stick, age, tempoScale);
-          const apexBoost = apex * 12;
+        {/* Smoke layer */}
+        <g filter="url(#gs-blur)">{smokeNodes}</g>
 
-          // Landing flash: brief bright burst on impact
-          const landed = hasLanded(stick, age, launchY, width, tempoScale);
-          const landAge = landed ? Math.max(0, age - (stick.lifetime - IMPACT_FLASH_FRAMES)) : -1;
-          const flash = landed && landAge >= 0 && landAge < IMPACT_FLASH_FRAMES
-            ? interpolate(landAge, [0, IMPACT_FLASH_FRAMES], [1, 0], {
-                extrapolateLeft: "clamp", extrapolateRight: "clamp",
-              })
-            : 0;
+        {/* Onset flash */}
+        {onsetFlare > 0 && (
+          <rect width={width} height={height} fill={`hsla(${(280 + baseHueShift) % 360}, 80%, 80%, ${onsetFlare * 0.10})`} />
+        )}
 
-          const color = shiftedColor(stick.colorIdx, hueShift);
+        {/* Floor wash */}
+        <rect x={0} y={horizonY} width={width} height={height - horizonY} fill="url(#gs-floor)" />
 
-          // 3-layer glow: outer halo, mid bloom, bright core
-          const outerHsl = hsl(color.h, color.s, color.l - 5, alpha * 0.25);
-          const midHsl = hsl(color.h, color.s, color.l + 5 + apexBoost * 0.5, alpha * 0.6);
-          const coreHsl = hsl(color.h, color.s - 15, Math.min(95, color.l + 25 + apexBoost), alpha);
+        {/* Hand silhouettes (bottom layer) */}
+        <g>{handNodes}</g>
 
-          // Ghost trail: 4 fading echo positions
-          const ghosts: Array<{ x: number; y: number; a: number; rad: number }> = [];
-          for (let g = 1; g <= GHOST_COUNT; g++) {
-            const ghostAge = age - g * 3;
-            if (ghostAge < 0) continue;
-            const gPos = getPosition(stick, ghostAge, launchY, width, tempoScale);
-            const gRad = getRotation(stick, ghostAge, tempoScale);
-            ghosts.push({ x: gPos.x, y: gPos.y, a: alpha * (1 - g / (GHOST_COUNT + 1)) * 0.35, rad: gRad });
-          }
+        {/* Glow stick streaks (top layer, dominant) */}
+        <g>{stickNodes}</g>
 
-          return (
-            <g key={`stick-${event.frame}-${si}`}>
-              {/* Ghost trail — fading echoes behind the stick */}
-              {ghosts.map((ghost, gi) => {
-                const gDx = Math.cos(ghost.rad) * halfLen * 0.9;
-                const gDy = Math.sin(ghost.rad) * halfLen * 0.9;
-                return (
-                  <line
-                    key={`g${gi}`}
-                    x1={ghost.x - gDx} y1={ghost.y - gDy}
-                    x2={ghost.x + gDx} y2={ghost.y + gDy}
-                    stroke={hsl(color.h, color.s, color.l + 10, ghost.a)}
-                    strokeWidth={stick.stickWidth + 6}
-                    strokeLinecap="round"
-                    filter={`url(#${midFilter})`}
-                  />
-                );
-              })}
-
-              {/* Layer 1: Outer halo — wide, soft, atmospheric */}
-              <line
-                x1={pos.x - dx} y1={pos.y - dy} x2={pos.x + dx} y2={pos.y + dy}
-                stroke={outerHsl}
-                strokeWidth={stick.stickWidth + 22}
-                strokeLinecap="round"
-                filter={`url(#${outerFilter})`}
-              />
-
-              {/* Layer 2: Mid glow — saturated color bloom */}
-              <line
-                x1={pos.x - dx} y1={pos.y - dy} x2={pos.x + dx} y2={pos.y + dy}
-                stroke={midHsl}
-                strokeWidth={stick.stickWidth + 10}
-                strokeLinecap="round"
-                filter={`url(#${midFilter})`}
-              />
-
-              {/* Layer 3: Bright core — white-hot center tube */}
-              <line
-                x1={pos.x - dx} y1={pos.y - dy} x2={pos.x + dx} y2={pos.y + dy}
-                stroke={coreHsl}
-                strokeWidth={stick.stickWidth}
-                strokeLinecap="round"
-              />
-
-              {/* End cap glow — bright points at stick tips */}
-              <circle
-                cx={pos.x - dx} cy={pos.y - dy}
-                r={stick.stickWidth * 0.8 + apex * 3}
-                fill={coreHsl} filter={`url(#${midFilter})`}
-              />
-              <circle
-                cx={pos.x + dx} cy={pos.y + dy}
-                r={stick.stickWidth * 0.8 + apex * 3}
-                fill={coreHsl} filter={`url(#${midFilter})`}
-              />
-
-              {/* Apex glow pulse — extra bloom when stick hangs at peak */}
-              {apex > 0.3 && (
-                <circle
-                  cx={pos.x} cy={pos.y}
-                  r={stick.stickLen * 0.4 * apex}
-                  fill={hsl(color.h, color.s, color.l + 20, apex * alpha * 0.15)}
-                  filter={`url(#${outerFilter})`}
-                />
-              )}
-
-              {/* Landing impact flash — brief bright circle on ground hit */}
-              {flash > 0.05 && (
-                <>
-                  <circle
-                    cx={pos.x} cy={launchY}
-                    r={30 + flash * 40}
-                    fill={hsl(color.h, 40, 95, flash * 0.8)}
-                    filter={`url(#${outerFilter})`}
-                  />
-                  <circle
-                    cx={pos.x} cy={launchY}
-                    r={8 + flash * 15}
-                    fill={hsl(color.h, 60, 95, flash * 0.9)}
-                  />
-                </>
-              )}
-            </g>
-          );
-        })}
+        {/* Final neon wash */}
+        <rect
+          width={width}
+          height={height}
+          fill={`hsla(${(290 + baseHueShift) % 360}, 80%, 60%, ${0.04 + trailGlow * 0.04})`}
+          style={{ mixBlendMode: "screen" }}
+        />
       </svg>
     </div>
   );

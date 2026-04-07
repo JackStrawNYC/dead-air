@@ -432,8 +432,8 @@ void main() {
   float geyserTime = uDynamicTime * (0.8 + energy * 0.5);
 
   // === PALETTE ===
-  float hue1 = hsvToCosineHue(uPalettePrimary) + chordHue + chromaHueMod;
-  float hue2 = hsvToCosineHue(uPaletteSecondary) + chordHue * 0.5;
+  float hue1 = uPalettePrimary + chordHue + chromaHueMod;
+  float hue2 = uPaletteSecondary + chordHue * 0.5;
   float hueShift = uPalettePrimary + chromaHueMod;
 
   // === HEAT DISTORTION on screen UVs ===
@@ -502,7 +502,7 @@ void main() {
       vec3 rockColor = mix(vec3(0.06, 0.04, 0.03), vec3(0.18, 0.12, 0.08), rockNoise);
 
       // Palette tint
-      vec3 rockTint = 0.5 + 0.5 * cos(TAU * vec3(hue1, hue1 + 0.33, hue1 + 0.67));
+      vec3 rockTint = paletteHueColor(hue1, 0.7, 0.85);
       rockColor = mix(rockColor, rockTint * 0.15, 0.15);
 
       // Diffuse lighting: magma from below + dim ambient
@@ -540,7 +540,7 @@ void main() {
       float surfNoise = fbm3(marchPos * 3.0) * 0.5 + 0.5;
 
       // Subtle deep color from palette
-      vec3 deepTint = 0.5 + 0.5 * cos(TAU * vec3(hue2, hue2 + 0.33, hue2 + 0.67));
+      vec3 deepTint = paletteHueColor(hue2, 0.85, 0.8);
       obsidianBase = mix(obsidianBase, deepTint * 0.05, 0.3);
 
       // Diffuse: minimal (obsidian is mostly specular)

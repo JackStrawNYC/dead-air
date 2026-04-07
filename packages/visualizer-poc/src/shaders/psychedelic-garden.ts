@@ -680,12 +680,12 @@ void main() {
   vec3 rd = normalize(forward + rgt * marchP.x * fovScale + upd * marchP.y * fovScale);
 
   // ─── Palette ───
-  float hue1 = hsvToCosineHue(uPalettePrimary) + chromaH * 0.08;
-  float hue2 = hsvToCosineHue(uPaletteSecondary) + chromaH * 0.06;
+  float hue1 = uPalettePrimary + chromaH * 0.08;
+  float hue2 = uPaletteSecondary + chromaH * 0.06;
   float sat = mix(0.5, 1.0, energy) * uPaletteSaturation;
 
-  vec3 petalCol1 = 0.5 + 0.5 * cos(TAU * vec3(hue1, hue1 + 0.33, hue1 + 0.67));
-  vec3 petalCol2 = 0.5 + 0.5 * cos(TAU * vec3(hue2, hue2 + 0.33, hue2 + 0.67));
+  vec3 petalCol1 = paletteHueColor(hue1, sat, 0.95);
+  vec3 petalCol2 = paletteHueColor(hue2, sat, 0.95);
   // Warm sunflower bias
   petalCol1 = mix(petalCol1, vec3(1.0, 0.85, 0.15), 0.2);
   petalCol2 = mix(petalCol2, vec3(0.95, 0.55, 0.10), 0.15);

@@ -77,11 +77,11 @@ void main() {
   float flowTime = uDynamicTime * (0.03 + slowE * 0.02) * (1.0 + sJam * 0.5 - sSpace * 0.4);
 
   // === PALETTE ===
-  float hue1 = hsvToCosineHue(uPalettePrimary);
-  vec3 nebulaTint = 0.5 + 0.5 * cos(6.28318 * vec3(hue1, hue1 + 0.33, hue1 + 0.67));
+  float hue1 = uPalettePrimary;
+  vec3 nebulaTint = paletteHueColor(hue1, 0.78, 0.92);
 
-  float hue2 = hsvToCosineHue(uPaletteSecondary);
-  vec3 emissionTint = 0.5 + 0.5 * cos(6.28318 * vec3(hue2, hue2 + 0.33, hue2 + 0.67));
+  float hue2 = uPaletteSecondary;
+  vec3 emissionTint = paletteHueColor(hue2, 0.85, 0.98);
 
   // Tension → color saturation
   // Low tension: monochrome blue; High tension: saturated reds/purples

@@ -54,6 +54,7 @@ ${buildPostProcessGLSL({
   halationEnabled: true,
   lensDistortionEnabled: true,
   eraGradingEnabled: true,
+  temporalBlendEnabled: true,
 })}
 
 varying vec2 vUv;
@@ -328,14 +329,6 @@ void main() {
 
   // ---- Post-processing ----
   col = applyPostProcess(col, vUv, screenP);
-
-  // ---- Feedback trails (slow decay — enhances contemplative mood) ----
-  vec3 prev = texture2D(uPrevFrame, vUv).rgb;
-  float baseDecay = mix(0.90, 0.84, energy);
-  // Space = longer trails, jam = shorter
-  float feedbackDecay = baseDecay + sSpace * 0.04 - sJam * 0.02;
-  feedbackDecay = clamp(feedbackDecay, 0.80, 0.95);
-  col = max(col, prev * feedbackDecay);
 
   gl_FragColor = vec4(col, 1.0);
 }

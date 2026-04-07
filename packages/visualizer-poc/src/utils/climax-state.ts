@@ -278,15 +278,20 @@ export function detectTexture(snapshot: AudioSnapshot, energy: number): MusicalT
  *  Push saturation hard, keep brightness restrained.
  *  Brightness values halved (0.20→0.10, 0.15→0.08) to prevent strobe pulsation
  *  when combined with other brightness drivers (fastEnergy, IT lift, counterpoint). */
+// CHILL CALIBRATION (3-hour party background):
+// All climax/sustain offsets approximately HALVED. Climax moments should be felt
+// as a gentle swell rather than a system-wide spectacle. Camera drama, density,
+// shader speed all toned down. The music carries the energy; the visuals don't
+// need to scream.
 const PHASE_TARGETS: Record<
   ClimaxPhase,
   { sat: number; bright: number; vig: number; bloom: number; contrast: number; density: number; speed: number; drama: number; forceDual: boolean }
 > = {
-  idle:    { sat: -0.10, bright: -0.04, vig: -0.04, bloom: -0.05, contrast: -0.03, density: 0.70, speed: 1.0, drama: 0.0, forceDual: false },
-  build:   { sat: -0.15, bright: +0.02, vig: -0.02, bloom: 0.10, contrast: +0.10, density: 1.10, speed: 1.05, drama: 0.2, forceDual: false },
-  climax:  { sat: +0.80, bright: +0.18, vig: -0.08, bloom: 0.15, contrast: +0.15, density: 1.60, speed: 1.15, drama: 0.4, forceDual: false },
-  sustain: { sat: +0.50, bright: +0.14, vig: -0.06, bloom: 0.10, contrast: +0.10, density: 1.40, speed: 1.10, drama: 0.3, forceDual: false },
-  release: { sat: +0.15, bright: -0.02, vig: -0.01, bloom: 0.03, contrast: +0.02, density: 0.60, speed: 0.95, drama: 0.1, forceDual: false },
+  idle:    { sat: -0.10, bright: -0.04, vig: -0.04, bloom: -0.05, contrast: -0.03, density: 0.70, speed: 1.0,  drama: 0.0, forceDual: false },
+  build:   { sat: -0.10, bright: +0.01, vig: -0.01, bloom: 0.05,  contrast: +0.05, density: 1.05, speed: 1.02, drama: 0.1, forceDual: false },
+  climax:  { sat: +0.40, bright: +0.10, vig: -0.04, bloom: 0.08,  contrast: +0.08, density: 1.30, speed: 1.07, drama: 0.2, forceDual: false },
+  sustain: { sat: +0.25, bright: +0.07, vig: -0.03, bloom: 0.05,  contrast: +0.05, density: 1.20, speed: 1.05, drama: 0.15, forceDual: false },
+  release: { sat: +0.08, bright: -0.01, vig: -0.01, bloom: 0.02,  contrast: +0.01, density: 0.80, speed: 0.97, drama: 0.05, forceDual: false },
 };
 
 /** Anticipation sub-state overrides — dramatic darkness before the drop.

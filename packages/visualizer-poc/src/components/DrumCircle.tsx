@@ -1,167 +1,41 @@
 /**
- * DrumCircle — Community drum circle with seated figures around a central energy mandala.
- * Layer 6, reacts to stemDrumOnset/drumBeat. 7 seated silhouettes in a circle,
- * each with distinct hand drum types (djembe, conga, bongos). Hands alternate on beat.
- * Central mandala pulses with drumBeat, radiating energy rings on hits.
- * Ripple waves from each drummer on hits. Connection arcs show rhythmic interplay.
+ * DrumCircle — A+++ overlay: Mickey + Bill's drum kit + percussion in a circular formation.
+ * Multiple drums (kick, snare, toms, cymbals, congas, tambourines, gongs) arranged
+ * in a circle. Drumsticks crossed. Stage lights overhead. Subtle drumstick motion
+ * sync'd to beats. Percussionist silhouette suggested between two kits.
  *
- * NOT DrummersDuo (Bill & Mickey). This is the community — people sitting
- * cross-legged around a circle playing hand drums together.
+ * Audio reactivity:
+ *   slowEnergy → ambient stage glow
+ *   energy → cymbal shimmer
+ *   bass → kick drum head pulse
+ *   beatDecay → drumstick motion + tom flash
+ *   onsetEnvelope → snare/cymbal flash
+ *   chromaHue → palette tint
+ *   tempoFactor → stick rhythm speed
  */
 
 import React from "react";
-import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
+import { useCurrentFrame, useVideoConfig, interpolate } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
+import { seeded } from "../utils/seededRandom";
 import { useAudioSnapshot } from "./parametric/audio-helpers";
 import { useTempoFactor } from "../data/TempoContext";
-import { seeded } from "../utils/seededRandom";
 
-/* ------------------------------------------------------------------ */
-/*  Constants                                                          */
-/* ------------------------------------------------------------------ */
+const CYCLE_TOTAL = 2400;
+const VISIBLE_DURATION = 780;
+const PARTICLE_COUNT = 50;
 
-const FADE_IN = 60;
-const NUM_DRUMMERS = 7;
-const MAX_RIPPLES = 12;
-const RIPPLE_LIFE = 55;
-const MANDALA_PETALS = 12;
-const MAX_ENERGY_RINGS = 5;
-const ENERGY_RING_LIFE = 40;
+interface Particle { x: number; y: number; r: number; speed: number; phase: number; }
 
-type DrumType = "djembe" | "conga" | "bongos";
-
-interface Drummer {
-  angle: number; radiusJitter: number; scale: number;
-  handPhase: number; drumType: DrumType; bobPhase: number; seatStyle: 0 | 1;
-}
-
-interface Ripple { birthFrame: number; drummerIdx: number; intensity: number; }
-interface Ring { birthFrame: number; intensity: number; }
-
-const hsl = (h: number, s: number, l: number, a = 1) =>
-  `hsla(${h}, ${s}%, ${l}%, ${a})`;
-
-const CLAMP = { extrapolateLeft: "clamp" as const, extrapolateRight: "clamp" as const };
-
-function genDrummers(seed: number): Drummer[] {
-  const rng = seeded(seed);
-  const types: DrumType[] = [
-    "djembe", "conga", "bongos", "djembe", "conga", "djembe", "bongos",
-  ];
-  return Array.from({ length: NUM_DRUMMERS }, (_, i) => ({
-    angle: (i / NUM_DRUMMERS) * Math.PI * 2 - Math.PI / 2 + (rng() - 0.5) * 0.15,
-    radiusJitter: (rng() - 0.5) * 8,
-    scale: 0.88 + rng() * 0.24,
-    handPhase: rng() * Math.PI * 2,
-    drumType: types[i],
-    bobPhase: rng() * Math.PI * 2,
-    seatStyle: rng() > 0.55 ? 1 : 0,
+function buildParticles(): Particle[] {
+  const rng = seeded(57_812_220);
+  return Array.from({ length: PARTICLE_COUNT }, () => ({
+    x: rng(),
+    y: rng() * 0.85,
+    r: 0.6 + rng() * 1.6,
+    speed: 0.0006 + rng() * 0.0018,
+    phase: rng() * Math.PI * 2,
   }));
-}
-
-function drawDrum(
-  type: DrumType, s: number,
-  h: number, sat: number, lit: number, bp: number,
-): React.ReactNode {
-  const glow = 0.15 + bp * 0.15;
-
-  if (type === "djembe") {
-    // Tall goblet-shaped hand drum
-    const w = 14 * s, ht = 22 * s;
-    return (
-      <g>
-        <path
-          d={`M ${-w / 2},0 Q ${-w / 2 - 2 * s},${ht * 0.4} ${-w * 0.3},${ht}
-              L ${w * 0.3},${ht} Q ${w / 2 + 2 * s},${ht * 0.4} ${w / 2},0 Z`}
-          fill={hsl(h - 5, sat - 20, 18, 0.85)}
-          stroke={hsl(h, sat, lit, glow)}
-          strokeWidth={0.6}
-        />
-        <ellipse cx={0} cy={0} rx={w / 2} ry={3.5 * s}
-          fill={hsl(h + 10, sat - 30, 28, 0.7 + bp * 0.2)}
-          stroke={hsl(h, sat, lit + 10, glow + 0.1)} strokeWidth={0.5} />
-      </g>
-    );
-  }
-
-  if (type === "conga") {
-    // Barrel-shaped drum with tuning rings
-    const w = 12 * s, ht = 20 * s;
-    return (
-      <g>
-        <path
-          d={`M ${-w / 2},0 Q ${-w / 2 - 1.5 * s},${ht * 0.5} ${-w / 2},${ht}
-              L ${w / 2},${ht} Q ${w / 2 + 1.5 * s},${ht * 0.5} ${w / 2},0 Z`}
-          fill={hsl(h + 5, sat - 25, 15, 0.85)}
-          stroke={hsl(h, sat, lit, glow)}
-          strokeWidth={0.5}
-        />
-        <ellipse cx={0} cy={0} rx={w / 2} ry={3 * s}
-          fill={hsl(h + 15, sat - 35, 30, 0.65 + bp * 0.2)}
-          stroke={hsl(h, sat, lit + 10, glow + 0.1)} strokeWidth={0.4} />
-        {/* Tuning rings */}
-        <ellipse cx={0} cy={ht * 0.3} rx={w / 2 + 0.5 * s} ry={2 * s}
-          fill="none" stroke={hsl(h, sat - 10, lit - 10, 0.12)} strokeWidth={0.4} />
-        <ellipse cx={0} cy={ht * 0.65} rx={w / 2 + 0.3 * s} ry={2 * s}
-          fill="none" stroke={hsl(h, sat - 10, lit - 10, 0.1)} strokeWidth={0.4} />
-      </g>
-    );
-  }
-
-  // Bongos — double small drums side by side
-  const w = 7 * s, ht = 12 * s;
-  return (
-    <g>
-      <rect x={-w - s} y={0} width={w} height={ht} rx={2 * s}
-        fill={hsl(h - 8, sat - 18, 16, 0.85)}
-        stroke={hsl(h, sat, lit, glow)} strokeWidth={0.4} />
-      <ellipse cx={-w / 2 - s} cy={0} rx={w / 2} ry={2.5 * s}
-        fill={hsl(h + 8, sat - 30, 26, 0.65 + bp * 0.2)}
-        stroke={hsl(h, sat, lit + 10, glow + 0.1)} strokeWidth={0.4} />
-      <rect x={s} y={s} width={w * 0.85} height={ht * 0.9} rx={2 * s}
-        fill={hsl(h - 3, sat - 22, 14, 0.85)}
-        stroke={hsl(h, sat, lit, glow)} strokeWidth={0.4} />
-      <ellipse cx={s + w * 0.425} cy={s} rx={w * 0.425} ry={2 * s}
-        fill={hsl(h + 12, sat - 28, 28, 0.6 + bp * 0.2)}
-        stroke={hsl(h, sat, lit + 10, glow + 0.1)} strokeWidth={0.4} />
-    </g>
-  );
-}
-
-/** Render shoulder -> elbow -> hand reaching to drum */
-function drawArm(
-  side: -1 | 1,
-  handUp: number,
-  hitPunch: number,
-  torsoW: number,
-  shoulderY: number,
-  torsoH: number,
-  drumOX: number,
-  drumOY: number,
-  s: number,
-  h: number,
-): React.ReactNode {
-  const shoulderX = side * (torsoW / 2 - 2 * s);
-  const elbowX = shoulderX + side * 5 * s;
-  const lift = handUp > 0
-    ? -8 * s * handUp - hitPunch * 6 * s * (handUp > 0.5 ? 0 : 1)
-    : 0;
-  const handY = drumOY - 2 * s + lift;
-  const elbowY = shoulderY + torsoH * 0.2 + lift * 0.3;
-  const handX = drumOX + side * 3 * s;
-
-  return (
-    <g>
-      {/* Upper arm */}
-      <line x1={shoulderX} y1={shoulderY + 5 * s} x2={elbowX} y2={elbowY}
-        stroke={hsl(h, 42, 10, 0.85)} strokeWidth={4.5 * s} strokeLinecap="round" />
-      {/* Forearm */}
-      <line x1={elbowX} y1={elbowY} x2={handX} y2={handY}
-        stroke={hsl(h, 42, 10, 0.85)} strokeWidth={3.5 * s} strokeLinecap="round" />
-      {/* Hand */}
-      <circle cx={handX} cy={handY} r={2.5 * s} fill={hsl(h, 35, 14, 0.85)} />
-    </g>
-  );
 }
 
 interface Props { frames: EnhancedFrameData[]; }
@@ -169,380 +43,316 @@ interface Props { frames: EnhancedFrameData[]; }
 export const DrumCircle: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
+  const tempoFactor = useTempoFactor();
   const snap = useAudioSnapshot(frames);
-  const tf = useTempoFactor();
 
-  const { energy, drumOnset, drumBeat, beatDecay, chromaHue, bass, slowEnergy } = snap;
+  const particles = React.useMemo(buildParticles, []);
 
-  const drummers = React.useMemo(() => genDrummers(42), []);
-  const idx = Math.min(Math.max(0, frame), frames.length - 1);
-
-  /* ---- Collect ripple events from recent frames ---- */
-  const ripples = React.useMemo(() => {
-    const out: Ripple[] = [];
-    const rng = seeded(7721 + Math.floor(idx / RIPPLE_LIFE));
-    for (let f = Math.max(0, idx - RIPPLE_LIFE); f <= idx; f++) {
-      const fd = frames[f];
-      const onset = fd.stemDrumOnset ?? fd.onset;
-      const beat = fd.stemDrumBeat ?? fd.beat;
-      if (beat && onset > 0.12) {
-        out.push({
-          birthFrame: f,
-          drummerIdx: Math.floor(rng() * NUM_DRUMMERS),
-          intensity: onset,
-        });
-      }
-    }
-    return out.slice(-MAX_RIPPLES);
-  }, [idx, frames]);
-
-  /* ---- Collect energy ring events (central mandala bursts) ---- */
-  const rings = React.useMemo(() => {
-    const out: Ring[] = [];
-    for (let f = Math.max(0, idx - ENERGY_RING_LIFE); f <= idx; f++) {
-      const fd = frames[f];
-      const onset = fd.stemDrumOnset ?? fd.onset;
-      const beat = fd.stemDrumBeat ?? fd.beat;
-      if (beat && onset > 0.2) {
-        out.push({ birthFrame: f, intensity: onset });
-      }
-    }
-    return out.slice(-MAX_ENERGY_RINGS);
-  }, [idx, frames]);
-
-  /* ---- Gate & opacity ---- */
-  const gate = interpolate(energy, [0.03, 0.1], [0, 1], CLAMP);
-  if (gate < 0.01) return null;
-
-  const fade = interpolate(frame, [0, FADE_IN], [0, 1], {
-    ...CLAMP, easing: Easing.out(Easing.cubic),
-  });
-
-  const baseOpacity = interpolate(energy, [0.04, 0.35], [0.18, 0.6], CLAMP);
-  const masterOpacity = baseOpacity * gate * fade;
+  const cycleFrame = frame % CYCLE_TOTAL;
+  if (cycleFrame >= VISIBLE_DURATION) return null;
+  const progress = cycleFrame / VISIBLE_DURATION;
+  const fadeIn = interpolate(progress, [0, 0.09], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const fadeOut = interpolate(progress, [0.91, 1], [1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const masterOpacity = Math.min(fadeIn, fadeOut) * 0.95;
   if (masterOpacity < 0.01) return null;
 
-  /* ---- Colors: warm amber/earth, chromaHue tinted ---- */
-  const h = 30 + chromaHue * 0.08;
-  const s = 72;
-  const l = interpolate(energy, [0.05, 0.4], [38, 58], CLAMP);
+  // Audio
+  const ambientGlow = interpolate(snap.slowEnergy, [0.02, 0.32], [0.5, 1.0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const cymbalShimmer = interpolate(snap.energy, [0.02, 0.30], [0.4, 1.0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const kickPulse = interpolate(snap.bass, [0.0, 0.7], [1.0, 1.18], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const stickMotion = snap.beatDecay;
+  const flash = snap.onsetEnvelope > 0.55 ? Math.min(1, (snap.onsetEnvelope - 0.4) * 1.6) : 0;
 
-  /* ---- Subtle flicker ---- */
-  const flicker =
-    0.9 + Math.sin(frame * 0.09 * tf + 1.7) * 0.05
-        + Math.sin(frame * 0.23 * tf + 3.1) * 0.03;
+  // Palette — warm brass/wood
+  const baseHue = 28;
+  const tintHue = ((baseHue + (snap.chromaHue - 180) * 0.30) % 360 + 360) % 360;
+  const tintLight = 60 + ambientGlow * 16;
+  const tintColor = `hsl(${tintHue}, 76%, ${tintLight}%)`;
+  const tintCore = `hsl(${tintHue}, 92%, ${Math.min(96, tintLight + 22)}%)`;
+  const brassColor = `hsl(${(tintHue + 8) % 360}, 80%, ${66 + cymbalShimmer * 14}%)`;
+  const tintDeep = `hsl(${(tintHue + 8) % 360}, 60%, 22%)`;
 
-  /* ---- Layout ---- */
   const cx = width * 0.5;
-  const cy = height * 0.52;
-  const R = Math.min(width, height) * 0.18;
+  const cy = height * 0.58;
+  const stageY = height * 0.82;
+  const horizonY = height * 0.50;
+  const radius = Math.min(width, height) * 0.27;
 
-  /* ---- Breathe with slow energy ---- */
-  const breathe = interpolate(slowEnergy, [0.02, 0.25], [0.97, 1.03], CLAMP);
+  // Drum positions on circle (12 drums total)
+  const drumLayout = [
+    { angle: -Math.PI / 2, type: "kick", size: 1.3 },           // top - kick
+    { angle: -Math.PI / 2 + 0.5, type: "tom", size: 0.85 },     // upper right
+    { angle: -Math.PI / 2 + 0.95, type: "tom", size: 0.85 },
+    { angle: 0, type: "floortom", size: 1.0 },                  // right - floor tom
+    { angle: 0.6, type: "conga", size: 1.05 },                  // lower right
+    { angle: 1.3, type: "tambourine", size: 0.7 },
+    { angle: Math.PI / 2, type: "snare", size: 0.95 },          // bottom - snare
+    { angle: Math.PI - 0.6, type: "conga", size: 1.05 },        // lower left
+    { angle: Math.PI - 1.3, type: "gong", size: 1.2 },
+    { angle: Math.PI, type: "floortom", size: 1.0 },            // left
+    { angle: -Math.PI / 2 - 0.95, type: "tom", size: 0.85 },    // upper left
+    { angle: -Math.PI / 2 - 0.5, type: "tom", size: 0.85 },
+  ];
 
-  /* ================================================================ */
-  /*  RENDER                                                           */
-  /* ================================================================ */
+  // Cymbal positions (above the ring)
+  const cymbalLayout = [
+    { angle: -Math.PI / 2 - 1.3, dist: 1.15 },
+    { angle: -Math.PI / 2 + 1.3, dist: 1.15 },
+    { angle: -Math.PI / 2 - 0.4, dist: 1.25 },
+    { angle: -Math.PI / 2 + 0.4, dist: 1.25 },
+  ];
+
+  // Render single drum
+  const renderDrum = (a: number, type: string, size: number, idx: number) => {
+    const dx = cx + Math.cos(a) * radius;
+    const dy = cy + Math.sin(a) * radius * 0.75;
+
+    if (type === "kick") {
+      const r = 38 * size;
+      return (
+        <g key={`drum-${idx}`}>
+          <ellipse cx={dx} cy={dy} rx={r} ry={r * 0.95} fill="rgba(20, 14, 8, 0.95)" stroke="rgba(0, 0, 0, 1)" strokeWidth={1.4} />
+          <ellipse cx={dx} cy={dy} rx={r * 0.88} ry={r * 0.85 * kickPulse} fill="rgba(220, 200, 160, 0.9)" stroke={brassColor} strokeWidth={1.2} />
+          <ellipse cx={dx} cy={dy} rx={r * 0.6} ry={r * 0.55 * kickPulse} fill="none" stroke="rgba(80, 60, 40, 0.55)" strokeWidth={0.8} />
+          <circle cx={dx} cy={dy} r={r * 0.10} fill={brassColor} opacity={0.85} />
+          {/* Lugs */}
+          {Array.from({ length: 10 }).map((_, i) => {
+            const la = (i / 10) * Math.PI * 2;
+            return <rect key={`lug-${i}`} x={dx + Math.cos(la) * r - 1} y={dy + Math.sin(la) * r * 0.95 - 3} width={2} height={6} fill={brassColor} />;
+          })}
+        </g>
+      );
+    }
+
+    if (type === "snare" || type === "tom" || type === "floortom") {
+      const r = (type === "floortom" ? 26 : type === "snare" ? 22 : 18) * size;
+      const headFlash = flash > 0 && idx % 2 === 0 ? flash : 0;
+      return (
+        <g key={`drum-${idx}`}>
+          <ellipse cx={dx} cy={dy} rx={r} ry={r * 0.92} fill="rgba(20, 14, 8, 0.95)" stroke="rgba(0, 0, 0, 1)" strokeWidth={1.2} />
+          <ellipse cx={dx} cy={dy} rx={r * 0.88} ry={r * 0.80} fill="rgba(220, 200, 160, 0.9)" stroke={brassColor} strokeWidth={1} />
+          <ellipse cx={dx} cy={dy} rx={r * 0.55} ry={r * 0.50} fill="none" stroke="rgba(80, 60, 40, 0.45)" strokeWidth={0.6} />
+          {headFlash > 0 && (
+            <ellipse cx={dx} cy={dy} rx={r * 0.88} ry={r * 0.80} fill={tintCore} opacity={headFlash * 0.55} style={{ mixBlendMode: "screen" }} />
+          )}
+          {/* Lugs */}
+          {Array.from({ length: 8 }).map((_, i) => {
+            const la = (i / 8) * Math.PI * 2;
+            return <rect key={`lug-${i}`} x={dx + Math.cos(la) * r - 1} y={dy + Math.sin(la) * r * 0.92 - 2.5} width={2} height={5} fill={brassColor} />;
+          })}
+          {/* Snares wires (only for snare) */}
+          {type === "snare" && (
+            <line x1={dx - r} y1={dy + r * 0.85} x2={dx + r} y2={dy + r * 0.85} stroke={brassColor} strokeWidth={0.6} />
+          )}
+        </g>
+      );
+    }
+
+    if (type === "conga") {
+      const r = 16 * size;
+      return (
+        <g key={`drum-${idx}`}>
+          {/* Conga body — tall barrel */}
+          <path d={`M ${dx - r} ${dy - 4} L ${dx - r * 0.85} ${dy + 36} L ${dx + r * 0.85} ${dy + 36} L ${dx + r} ${dy - 4} Q ${dx} ${dy - 8} ${dx - r} ${dy - 4} Z`}
+            fill="rgba(80, 40, 20, 0.95)" stroke="rgba(0, 0, 0, 1)" strokeWidth={1} />
+          {/* Head */}
+          <ellipse cx={dx} cy={dy - 4} rx={r} ry={r * 0.32} fill="rgba(220, 200, 160, 0.92)" stroke={brassColor} strokeWidth={1} />
+          {/* Tension hardware */}
+          {Array.from({ length: 5 }).map((_, i) => (
+            <line key={`tens-${i}`} x1={dx - r + i * (r * 0.4)} y1={dy - 2} x2={dx - r + 2 + i * (r * 0.4)} y2={dy + 16} stroke={brassColor} strokeWidth={0.6} />
+          ))}
+          {/* Hoop */}
+          <ellipse cx={dx} cy={dy - 4} rx={r} ry={r * 0.32} fill="none" stroke={brassColor} strokeWidth={1.2} />
+        </g>
+      );
+    }
+
+    if (type === "tambourine") {
+      const r = 14 * size;
+      return (
+        <g key={`drum-${idx}`}>
+          <circle cx={dx} cy={dy} r={r} fill="rgba(120, 80, 30, 0.9)" stroke="rgba(0, 0, 0, 0.85)" strokeWidth={1} />
+          <circle cx={dx} cy={dy} r={r * 0.85} fill="rgba(220, 200, 160, 0.85)" />
+          {/* Jingles */}
+          {Array.from({ length: 8 }).map((_, i) => {
+            const la = (i / 8) * Math.PI * 2;
+            return <circle key={`jin-${i}`} cx={dx + Math.cos(la) * r * 0.92} cy={dy + Math.sin(la) * r * 0.92} r={1.6} fill={brassColor} opacity={0.85 + cymbalShimmer * 0.15} />;
+          })}
+        </g>
+      );
+    }
+
+    if (type === "gong") {
+      const r = 28 * size;
+      return (
+        <g key={`drum-${idx}`}>
+          {/* Frame */}
+          <rect x={dx - r - 4} y={dy - r - 4} width={2} height={r * 2 + 8} fill="rgba(40, 24, 12, 0.95)" />
+          <rect x={dx + r + 2} y={dy - r - 4} width={2} height={r * 2 + 8} fill="rgba(40, 24, 12, 0.95)" />
+          <rect x={dx - r - 4} y={dy - r - 6} width={r * 2 + 10} height={2} fill="rgba(40, 24, 12, 0.95)" />
+          {/* Ropes */}
+          <line x1={dx - r - 3} y1={dy - r - 4} x2={dx - r * 0.7} y2={dy - r * 0.7} stroke="rgba(40, 24, 12, 0.85)" strokeWidth={0.8} />
+          <line x1={dx + r + 3} y1={dy - r - 4} x2={dx + r * 0.7} y2={dy - r * 0.7} stroke="rgba(40, 24, 12, 0.85)" strokeWidth={0.8} />
+          {/* Gong disc */}
+          <circle cx={dx} cy={dy} r={r} fill="rgba(160, 120, 40, 0.92)" stroke="rgba(60, 40, 10, 0.9)" strokeWidth={1.4} />
+          <circle cx={dx} cy={dy} r={r * 0.85} fill="none" stroke="rgba(220, 180, 60, 0.55)" strokeWidth={0.8} />
+          <circle cx={dx} cy={dy} r={r * 0.65} fill="none" stroke="rgba(220, 180, 60, 0.45)" strokeWidth={0.6} />
+          <circle cx={dx} cy={dy} r={r * 0.40} fill="none" stroke="rgba(220, 180, 60, 0.40)" strokeWidth={0.5} />
+          {/* Center dome */}
+          <circle cx={dx} cy={dy} r={r * 0.18} fill="rgba(220, 180, 60, 0.85)" stroke="rgba(60, 40, 10, 0.9)" strokeWidth={0.8} />
+          <circle cx={dx - 2} cy={dy - 2} r={r * 0.08} fill="rgba(255, 230, 140, 0.9)" />
+        </g>
+      );
+    }
+
+    return null;
+  };
+
+  // Render cymbal
+  const renderCymbal = (a: number, dist: number, idx: number) => {
+    const cymX = cx + Math.cos(a) * radius * dist;
+    const cymY = cy + Math.sin(a) * radius * 0.75 * dist - 30;
+    const cymR = 22;
+    const flashOnsetIdx = flash > 0 && idx % 2 === 0 ? flash : 0;
+    return (
+      <g key={`cym-${idx}`}>
+        {/* Stand */}
+        <line x1={cymX} y1={cymY + 4} x2={cymX} y2={stageY - 12} stroke="rgba(20, 20, 20, 0.95)" strokeWidth={1.4} />
+        {/* Cymbal disc */}
+        <ellipse cx={cymX} cy={cymY} rx={cymR} ry={cymR * 0.18} fill="rgba(220, 180, 60, 0.95)" stroke="rgba(60, 40, 10, 0.85)" strokeWidth={0.8} />
+        {/* Concentric grooves */}
+        {[0.85, 0.7, 0.55, 0.4].map((f) => (
+          <ellipse key={`cgroove-${f}`} cx={cymX} cy={cymY} rx={cymR * f} ry={cymR * 0.18 * f} fill="none" stroke="rgba(60, 40, 10, 0.4)" strokeWidth={0.4} />
+        ))}
+        {/* Bell */}
+        <ellipse cx={cymX} cy={cymY - 1.5} rx={cymR * 0.18} ry={2} fill="rgba(255, 220, 100, 0.95)" />
+        {/* Shimmer */}
+        <ellipse cx={cymX} cy={cymY} rx={cymR} ry={cymR * 0.18} fill={tintCore} opacity={0.18 * cymbalShimmer} style={{ mixBlendMode: "screen" }} />
+        {/* Flash */}
+        {flashOnsetIdx > 0 && (
+          <ellipse cx={cymX} cy={cymY} rx={cymR * 1.5} ry={cymR * 0.5} fill={tintCore} opacity={flashOnsetIdx * 0.55} style={{ mixBlendMode: "screen" }} />
+        )}
+      </g>
+    );
+  };
+
+  // Drumstick pair (crossed in foreground)
+  const stickAngle = stickMotion * 0.18 * Math.sin(frame * 0.5 * tempoFactor);
 
   return (
     <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden" }}>
-      <svg
-        width={width}
-        height={height}
-        style={{
-          opacity: masterOpacity * flicker,
-          mixBlendMode: "screen",
-          transform: `scale(${breathe})`,
-          transformOrigin: `${cx}px ${cy}px`,
-          willChange: "transform, opacity",
-        }}
-      >
+      <svg width={width} height={height} style={{ opacity: masterOpacity, willChange: "opacity" }}>
         <defs>
-          <radialGradient id="dc-mandala-glow">
-            <stop offset="0%" stopColor={hsl(h, s, l + 20, 0.35 + beatDecay * 0.25)} />
-            <stop offset="40%" stopColor={hsl(h, s, l + 10, 0.15 + beatDecay * 0.1)} />
-            <stop offset="100%" stopColor={hsl(h, s, l, 0)} />
+          <linearGradient id="dc-bg" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#0a0604" />
+            <stop offset="50%" stopColor="#140a06" />
+            <stop offset="100%" stopColor={tintDeep} />
+          </linearGradient>
+          <linearGradient id="dc-stage" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="rgba(14, 10, 6, 0.95)" />
+            <stop offset="100%" stopColor="rgba(2, 1, 0, 0.99)" />
+          </linearGradient>
+          <radialGradient id="dc-halo">
+            <stop offset="0%" stopColor={tintCore} stopOpacity={0.35} />
+            <stop offset="60%" stopColor={tintColor} stopOpacity={0.10} />
+            <stop offset="100%" stopColor={tintColor} stopOpacity={0} />
           </radialGradient>
+          <radialGradient id="dc-vig">
+            <stop offset="55%" stopColor="rgba(0,0,0,0)" />
+            <stop offset="100%" stopColor="rgba(0,0,0,0.55)" />
+          </radialGradient>
+          <linearGradient id="dc-stick" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stopColor="#3a2010" />
+            <stop offset="50%" stopColor="#7a4818" />
+            <stop offset="100%" stopColor="#2a1808" />
+          </linearGradient>
+          <filter id="dc-blur" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="4" />
+          </filter>
         </defs>
 
-        {/* ========================================================== */}
-        {/*  Connection arcs between drummers (rhythmic interplay)      */}
-        {/* ========================================================== */}
-        {drummers.map((d1, i) =>
-          [(i + 1) % NUM_DRUMMERS, (i + 3) % NUM_DRUMMERS].map((j) => {
-            const d2 = drummers[j];
-            const x1 = cx + Math.cos(d1.angle) * (R + d1.radiusJitter);
-            const y1 = cy + Math.sin(d1.angle) * (R + d1.radiusJitter) * 0.55;
-            const x2 = cx + Math.cos(d2.angle) * (R + d2.radiusJitter);
-            const y2 = cy + Math.sin(d2.angle) * (R + d2.radiusJitter) * 0.55;
+        {/* Background */}
+        <rect width={width} height={height} fill="url(#dc-bg)" />
 
-            const phase = Math.sin(frame * 0.04 * tf + i * 1.1 + j * 0.7);
-            const arcAlpha = (0.04 + drumBeat * 0.12 + energy * 0.06) * (0.5 + phase * 0.5);
-            if (arcAlpha < 0.01) return null;
+        {/* Truss + lights */}
+        <rect x={width * 0.04} y={height * 0.06} width={width * 0.92} height={5} fill="rgba(0, 0, 0, 0.85)" />
+        {[0.18, 0.32, 0.46, 0.54, 0.68, 0.82].map((px, i) => (
+          <g key={`fix-${i}`}>
+            <line x1={width * px} y1={height * 0.065} x2={width * px} y2={height * 0.11} stroke="rgba(0, 0, 0, 0.9)" strokeWidth={2} />
+            <rect x={width * px - 5} y={height * 0.11} width={10} height={6} fill="rgba(0, 0, 0, 0.95)" />
+            <circle cx={width * px} cy={height * 0.12} r={2.5 + cymbalShimmer * 1.5} fill={tintCore} opacity={0.55 + cymbalShimmer * 0.35} />
+            <path d={`M ${width * px - 4} ${height * 0.13} L ${width * px - 22} ${height * 0.36} L ${width * px + 22} ${height * 0.36} L ${width * px + 4} ${height * 0.13} Z`}
+              fill={tintColor} opacity={0.10 * cymbalShimmer} style={{ mixBlendMode: "screen" }} />
+          </g>
+        ))}
 
-            // Arc bows inward toward circle center
-            const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
-            const toCenter = Math.atan2(cy - my, cx - mx);
-            const bow = 20 + drumBeat * 15;
-            const cpx = mx + Math.cos(toCenter) * bow;
-            const cpy = my + Math.sin(toCenter) * bow;
+        {/* Backdrop */}
+        <rect x={0} y={horizonY} width={width} height={stageY - horizonY} fill="rgba(8, 4, 2, 0.85)" />
 
-            return (
-              <path
-                key={`arc-${i}-${j}`}
-                d={`M ${x1} ${y1} Q ${cpx} ${cpy} ${x2} ${y2}`}
-                fill="none"
-                stroke={hsl(h + 15, s - 10, l + 20, arcAlpha)}
-                strokeWidth={0.8 + drumBeat * 0.6}
-                style={{ filter: `blur(${1.5 + drumBeat}px)` }}
-              />
-            );
-          }),
-        )}
+        {/* Stage floor */}
+        <rect x={0} y={stageY} width={width} height={height - stageY} fill="url(#dc-stage)" />
+        <rect x={0} y={stageY - 1} width={width} height={2} fill={tintColor} opacity={0.30 * ambientGlow} />
+        {Array.from({ length: 10 }).map((_, i) => (
+          <line key={`plank-${i}`} x1={0} y1={stageY + 6 + i * 12} x2={width} y2={stageY + 6 + i * 12}
+            stroke="rgba(0, 0, 0, 0.45)" strokeWidth={0.6} />
+        ))}
 
-        {/* ========================================================== */}
-        {/*  Central energy mandala                                     */}
-        {/* ========================================================== */}
-        <g>
-          {/* Ambient radial glow */}
-          <circle cx={cx} cy={cy} r={R * 0.45 + energy * 20} fill="url(#dc-mandala-glow)" />
+        {/* Halo behind drum kit */}
+        <ellipse cx={cx} cy={cy + 20} rx={radius * 1.6 * (0.85 + ambientGlow * 0.3)} ry={radius * 1.0}
+          fill="url(#dc-halo)" style={{ mixBlendMode: "screen" }} />
 
-          {/* Rotating mandala petals */}
-          {Array.from({ length: MANDALA_PETALS }, (_, i) => {
-            const angle = (i / MANDALA_PETALS) * Math.PI * 2 + frame * 0.008 * tf;
-            const petalR = 18 + beatDecay * 25 + energy * 15;
-            const petalW = 6 + beatDecay * 4;
-            const px = cx + Math.cos(angle) * petalR;
-            const py = cy + Math.sin(angle) * petalR * 0.55;
-            const alpha = 0.08 + beatDecay * 0.2 + drumOnset * 0.15;
+        {/* Cymbals (back layer) */}
+        {cymbalLayout.map((c, i) => renderCymbal(c.angle, c.dist, i))}
 
-            return (
-              <ellipse
-                key={`petal-${i}`}
-                cx={px} cy={py}
-                rx={petalW} ry={petalW * 0.4}
-                transform={`rotate(${(angle * 180) / Math.PI}, ${px}, ${py})`}
-                fill={hsl(h + (i % 3) * 12, s, l + 15, alpha)}
-                style={{ filter: `blur(${2 + beatDecay * 2}px)` }}
-              />
-            );
-          })}
-
-          {/* Inner core — bright flash on beat */}
-          <circle cx={cx} cy={cy} r={8 + beatDecay * 12}
-            fill={hsl(h + 5, s + 10, l + 25, 0.1 + beatDecay * 0.35)}
-            style={{ filter: `blur(${4 + beatDecay * 4}px)` }} />
-
-          {/* Dashed sacred-geometry rings */}
-          <circle cx={cx} cy={cy} r={22 + energy * 10} fill="none"
-            stroke={hsl(h, s, l + 10, 0.08 + beatDecay * 0.12)} strokeWidth={0.8}
-            strokeDasharray={`${3 + beatDecay * 4} 5`} style={{ filter: "blur(1px)" }} />
-          <circle cx={cx} cy={cy} r={35 + energy * 15} fill="none"
-            stroke={hsl(h + 20, s - 15, l + 5, 0.05 + beatDecay * 0.08)} strokeWidth={0.5}
-            strokeDasharray={`${2 + beatDecay * 3} 7`} style={{ filter: "blur(1.5px)" }} />
+        {/* Percussionist silhouette suggestion (between two kits) */}
+        <g transform={`translate(${cx} ${cy + 30})`}>
+          <ellipse cx={0} cy={-30} rx={12} ry={14} fill="rgba(0, 0, 0, 0.95)" />
+          <path d="M -22 -10 Q -28 12 -22 32 L 22 32 Q 28 12 22 -10 Q 0 -22 -22 -10 Z" fill="rgba(0, 0, 0, 0.95)" />
+          {/* Hair / hat */}
+          <path d="M -12 -42 Q 0 -48 12 -42 Q 14 -36 12 -30 L -12 -30 Q -14 -36 -12 -42 Z" fill="rgba(0, 0, 0, 0.95)" />
         </g>
 
-        {/* ========================================================== */}
-        {/*  Energy rings expanding from center on hits                 */}
-        {/* ========================================================== */}
-        {rings.map((ring, ri) => {
-          const age = idx - ring.birthFrame;
-          if (age < 0 || age > ENERGY_RING_LIFE) return null;
-          const p = age / ENERGY_RING_LIFE;
-          const radius = p * (R * 1.2 + ring.intensity * 40);
-          const alpha = interpolate(p, [0, 0.08, 0.5, 1], [0, 0.35, 0.12, 0], CLAMP) * ring.intensity;
-          if (alpha < 0.01) return null;
+        {/* Drums (foreground ring) */}
+        {drumLayout.map((d, i) => renderDrum(d.angle, d.type, d.size, i))}
 
-          return (
-            <circle
-              key={`ering-${ri}-${ring.birthFrame}`}
-              cx={cx} cy={cy} r={radius}
-              fill="none"
-              stroke={hsl(h + 10, s, l + 15, alpha)}
-              strokeWidth={2.5 * (1 - p * 0.7)}
-              style={{ filter: `blur(${1 + p * 4}px)` }}
-            />
-          );
-        })}
+        {/* Crossed drumsticks center foreground */}
+        <g transform={`translate(${cx} ${cy + 14}) rotate(${stickAngle * 60})`}>
+          <line x1={-50} y1={0} x2={50} y2={0} stroke="url(#dc-stick)" strokeWidth={3} strokeLinecap="round" />
+          <ellipse cx={50} cy={0} rx={3.5} ry={2.5} fill="rgba(220, 200, 160, 0.95)" />
+          <ellipse cx={-50} cy={0} rx={2} ry={1.5} fill="rgba(80, 50, 18, 0.95)" />
+        </g>
+        <g transform={`translate(${cx} ${cy + 14}) rotate(${-30 - stickAngle * 60})`}>
+          <line x1={-50} y1={0} x2={50} y2={0} stroke="url(#dc-stick)" strokeWidth={3} strokeLinecap="round" />
+          <ellipse cx={50} cy={0} rx={3.5} ry={2.5} fill="rgba(220, 200, 160, 0.95)" />
+          <ellipse cx={-50} cy={0} rx={2} ry={1.5} fill="rgba(80, 50, 18, 0.95)" />
+        </g>
 
-        {/* ========================================================== */}
-        {/*  Ripple waves from individual drummers                      */}
-        {/* ========================================================== */}
-        {ripples.map((rp, ri) => {
-          const age = idx - rp.birthFrame;
-          if (age < 0 || age > RIPPLE_LIFE) return null;
-          const p = age / RIPPLE_LIFE;
+        {/* Onset flash burst from kit center */}
+        {flash > 0 && (
+          <>
+            <circle cx={cx} cy={cy + 14} r={radius * 1.4 + flash * 60}
+              fill="none" stroke={tintCore} strokeWidth={2 + flash * 2} opacity={flash * 0.5} style={{ mixBlendMode: "screen" }} />
+            <circle cx={cx} cy={cy + 14} r={radius * 0.9 + flash * 40}
+              fill="none" stroke={tintColor} strokeWidth={1.5} opacity={flash * 0.4} style={{ mixBlendMode: "screen" }} />
+          </>
+        )}
 
-          const d = drummers[rp.drummerIdx];
-          const dx = cx + Math.cos(d.angle) * (R + d.radiusJitter);
-          const dy = cy + Math.sin(d.angle) * (R + d.radiusJitter) * 0.55;
-          const rippleR = p * (35 + rp.intensity * 60);
-          const alpha = interpolate(p, [0, 0.1, 0.6, 1], [0, 0.4, 0.15, 0], CLAMP) * rp.intensity;
-          if (alpha < 0.01) return null;
+        {/* Particles */}
+        <g style={{ mixBlendMode: "screen" }}>
+          {particles.map((p, i) => {
+            const t = frame * p.speed * tempoFactor + p.phase;
+            const px = (p.x + Math.sin(t * 1.2) * 0.04) * width;
+            const py = (p.y + Math.sin(t * 0.6) * 0.02) * height;
+            const flicker = 0.5 + Math.sin(t * 2.4) * 0.4;
+            return (
+              <circle key={`p-${i}`} cx={px} cy={py} r={p.r * (0.8 + ambientGlow * 0.4)}
+                fill={tintCore} opacity={0.30 * flicker * ambientGlow} />
+            );
+          })}
+        </g>
 
-          return (
-            <g key={`rp-${ri}-${rp.birthFrame}`}>
-              <circle cx={dx} cy={dy} r={rippleR} fill="none"
-                stroke={hsl(h + 5, s, l + 12, alpha)} strokeWidth={2 * (1 - p * 0.5)}
-                style={{ filter: `blur(${0.5 + p * 2.5}px)` }} />
-              <circle cx={dx} cy={dy} r={rippleR * 0.55} fill="none"
-                stroke={hsl(h + 15, s - 10, l + 20, alpha * 0.45)} strokeWidth={1.2 * (1 - p * 0.4)}
-                style={{ filter: `blur(${0.3 + p * 1.5}px)` }} />
-            </g>
-          );
-        })}
-
-        {/* ========================================================== */}
-        {/*  Seated drummer figures                                      */}
-        {/* ========================================================== */}
-        {drummers.map((d, di) => {
-          const r = R + d.radiusJitter;
-          const dx = cx + Math.cos(d.angle) * r;
-          const dy = cy + Math.sin(d.angle) * r * 0.55; // perspective compression
-          const sc = d.scale;
-
-          // Facing direction: toward center of circle
-          const facingDir = Math.cos(Math.atan2(cy - dy, cx - dx)) > 0 ? 1 : -1;
-
-          // Head bob driven by beat
-          const bob = Math.sin(frame * 0.12 * tf + d.bobPhase)
-            * (2.5 + drumBeat * 4) * energy;
-
-          // Hand alternation: each drummer has unique phase
-          const handCycle = frame * 0.1 * tf + d.handPhase;
-          const leftUp = Math.sin(handCycle);
-          const rightUp = Math.sin(handCycle + Math.PI);
-          const punch = drumOnset * 0.8;
-
-          // Figure dimensions
-          const headR = 9 * sc;
-          const tH = 28 * sc;  // torso height
-          const tW = 24 * sc;  // torso width
-          const shY = -tH * 0.45; // shoulder Y
-          const hipY = tH * 0.15;
-
-          // Drum position: between crossed legs
-          const drumX = (facingDir as number) * 2 * sc;
-          const drumY = hipY - 2 * sc;
-
-          // Per-figure warm glow
-          const figGlow = 0.04 + drumBeat * 0.06 + energy * 0.03;
-
-          return (
-            <g key={`d-${di}`} transform={`translate(${dx}, ${dy})`}>
-              {/* Background warmth glow */}
-              <circle cx={0} cy={shY} r={35 * sc + energy * 15}
-                fill={hsl(h, s - 20, l - 5, figGlow)}
-                style={{ filter: `blur(${10 + energy * 5}px)` }} />
-
-              {/* Seated legs */}
-              {d.seatStyle === 0 ? (
-                <g>
-                  {/* Cross-legged: left folded under, right folded over */}
-                  <path
-                    d={`M ${-tW * 0.3} ${hipY}
-                        Q ${-tW * 0.55} ${hipY + 8 * sc} ${-tW * 0.35} ${hipY + 14 * sc}
-                        Q ${-tW * 0.1} ${hipY + 18 * sc} ${tW * 0.05} ${hipY + 10 * sc}
-                        L ${-tW * 0.05} ${hipY}`}
-                    fill={hsl(h, 40, 9, 0.88)} />
-                  <path
-                    d={`M ${tW * 0.3} ${hipY}
-                        Q ${tW * 0.55} ${hipY + 6 * sc} ${tW * 0.4} ${hipY + 13 * sc}
-                        Q ${tW * 0.15} ${hipY + 17 * sc} ${-tW * 0.05} ${hipY + 10 * sc}
-                        L ${tW * 0.05} ${hipY}`}
-                    fill={hsl(h, 40, 7, 0.88)} />
-                </g>
-              ) : (
-                <g>
-                  {/* Knees-up cushion: knees visible, feet tucked */}
-                  <path
-                    d={`M ${-tW * 0.25} ${hipY}
-                        L ${-tW * 0.4} ${hipY + 4 * sc}
-                        Q ${-tW * 0.45} ${hipY - 6 * sc} ${-tW * 0.25} ${hipY - 8 * sc}
-                        Q ${-tW * 0.1} ${hipY - 2 * sc} ${-tW * 0.1} ${hipY}`}
-                    fill={hsl(h, 40, 9, 0.88)} />
-                  <path
-                    d={`M ${tW * 0.25} ${hipY}
-                        L ${tW * 0.4} ${hipY + 4 * sc}
-                        Q ${tW * 0.45} ${hipY - 5 * sc} ${tW * 0.25} ${hipY - 7 * sc}
-                        Q ${tW * 0.1} ${hipY - sc} ${tW * 0.1} ${hipY}`}
-                    fill={hsl(h, 40, 7, 0.88)} />
-                </g>
-              )}
-
-              {/* Drum (between legs) */}
-              <g transform={`translate(${drumX}, ${drumY})`}>
-                {drawDrum(d.drumType, sc, h, s, l, beatDecay)}
-              </g>
-
-              {/* Torso — slightly leaning forward */}
-              <path
-                d={`M ${-tW / 2} ${shY + 3 * sc}
-                    Q ${-tW / 2 - sc} ${shY} ${-tW * 0.35} ${shY}
-                    L ${tW * 0.35} ${shY}
-                    Q ${tW / 2 + sc} ${shY} ${tW / 2} ${shY + 3 * sc}
-                    L ${tW * 0.28} ${hipY}
-                    L ${-tW * 0.28} ${hipY} Z`}
-                fill={hsl(h, 42, 9, 0.9)}
-                stroke={hsl(h, s, l, 0.08)}
-                strokeWidth={0.4} />
-
-              {/* Neck */}
-              <rect x={-3 * sc} y={shY - 5 * sc} width={6 * sc} height={6 * sc}
-                fill={hsl(h, 42, 10, 0.9)} />
-
-              {/* Head with rhythmic bob */}
-              <circle cx={0} cy={shY - headR - 5 * sc + bob} r={headR}
-                fill={hsl(h, 42, 10, 0.9)}
-                stroke={hsl(h, s, l, 0.12)} strokeWidth={0.5} />
-
-              {/* Rim light on head */}
-              <circle cx={0} cy={shY - headR - 5 * sc + bob} r={headR + 1.2}
-                fill="none"
-                stroke={hsl(h, s, l + 10, 0.1 + drumBeat * 0.08)}
-                strokeWidth={1}
-                style={{ filter: "blur(1.5px)" }} />
-
-              {/* Arms: left hand and right hand alternate on/off drum */}
-              {drawArm(-1, leftUp, punch, tW, shY, tH, drumX, drumY, sc, h)}
-              {drawArm(1, rightUp, punch, tW, shY, tH, drumX, drumY, sc, h)}
-            </g>
-          );
-        })}
-
-        {/* ========================================================== */}
-        {/*  Ambient ground glow under the circle                       */}
-        {/* ========================================================== */}
-        <ellipse
-          cx={cx} cy={cy + R * 0.35}
-          rx={R * 1.1} ry={R * 0.2}
-          fill={hsl(h, s - 25, l - 15, 0.06 + energy * 0.04)}
-          style={{ filter: `blur(${12 + energy * 6}px)` }}
-        />
-
-        {/* ========================================================== */}
-        {/*  Floating energy motes orbiting between players             */}
-        {/* ========================================================== */}
-        {Array.from({ length: 10 }, (_, i) => {
-          const moteAngle = (i / 10) * Math.PI * 2 + frame * 0.006 * tf;
-          const moteR = R * (0.35 + 0.25 * Math.sin(frame * 0.015 * tf + i * 1.4));
-          const mx = cx + Math.cos(moteAngle) * moteR;
-          const my = cy + Math.sin(moteAngle) * moteR * 0.5;
-          const alpha =
-            (0.03 + energy * 0.08 + drumBeat * 0.06)
-            * (0.5 + 0.5 * Math.sin(frame * 0.05 + i * 2.1));
-          if (alpha < 0.01) return null;
-
-          return (
-            <circle
-              key={`mote-${i}`}
-              cx={mx} cy={my}
-              r={1.5 + bass * 2}
-              fill={hsl(h + i * 8, s, l + 20, alpha)}
-              style={{ filter: `blur(${2 + energy * 2}px)` }}
-            />
-          );
-        })}
+        {/* Vignette */}
+        <rect width={width} height={height} fill="url(#dc-vig)" />
       </svg>
     </div>
   );

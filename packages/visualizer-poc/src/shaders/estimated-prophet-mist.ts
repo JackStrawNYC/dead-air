@@ -334,10 +334,10 @@ void main() {
   );
 
   // Palette integration
-  float hue1 = hsvToCosineHue(uPalettePrimary);
-  float hue2 = hsvToCosineHue(uPaletteSecondary);
-  vec3 palCol1 = 0.5 + 0.5 * cos(6.28318 * vec3(hue1, hue1 + 0.33, hue1 + 0.67));
-  vec3 palCol2 = 0.5 + 0.5 * cos(6.28318 * vec3(hue2, hue2 + 0.33, hue2 + 0.67));
+  float hue1 = uPalettePrimary;
+  float hue2 = uPaletteSecondary;
+  vec3 palCol1 = paletteHueColor(hue1, 0.7, 0.85);
+  vec3 palCol2 = paletteHueColor(hue2, 0.7, 0.85);
 
   // Camera: sea level, looking across the ocean surface
   vec3 ro = vec3(0.0, 0.3, time);

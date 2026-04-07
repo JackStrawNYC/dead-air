@@ -335,21 +335,21 @@ void main() {
   vec3 col = vec3(0.0);
 
   // ─── Palette ───
-  float h1 = hsvToCosineHue(uPalettePrimary);
-  float h2 = hsvToCosineHue(uPaletteSecondary);
-  vec3 palPrimary = 0.5 + 0.5 * cos(TAU * vec3(h1, h1 + 0.33, h1 + 0.67));
-  vec3 palSecondary = 0.5 + 0.5 * cos(TAU * vec3(h2, h2 + 0.33, h2 + 0.67));
+  float h1 = uPalettePrimary;
+  float h2 = uPaletteSecondary;
+  vec3 palPrimary = paletteHueColor(h1, 0.85, 0.95);
+  vec3 palSecondary = paletteHueColor(h2, 0.85, 0.95);
 
   // Per-projector colors: cycle through palette + complements
   vec3 projColors[5];
   projColors[0] = palPrimary;
   projColors[1] = palSecondary;
   float h3 = h1 + 0.5; // complement
-  projColors[2] = 0.5 + 0.5 * cos(TAU * vec3(h3, h3 + 0.33, h3 + 0.67));
+  projColors[2] = paletteHueColor(h3, 0.85, 0.95);
   float h4 = h2 + 0.33;
-  projColors[3] = 0.5 + 0.5 * cos(TAU * vec3(h4, h4 + 0.33, h4 + 0.67));
+  projColors[3] = paletteHueColor(h4, 0.85, 0.95);
   float h5 = h1 + 0.17 + uChromaHue * 0.2;
-  projColors[4] = 0.5 + 0.5 * cos(TAU * vec3(h5, h5 + 0.33, h5 + 0.67));
+  projColors[4] = paletteHueColor(h5, 0.85, 0.95);
 
   // Chord-driven hue shift on all projector colors
   float chordShift = float(int(uChordIndex)) / 24.0 * 0.1;
@@ -407,11 +407,7 @@ void main() {
         // Color with chord shift + improv variation
         vec3 oilColor = projColors[i];
         float hueShift = chordShift + improvScore * 0.05 * sin(flowTime + projIdx * 2.0);
-        oilColor = 0.5 + 0.5 * cos(TAU * vec3(
-          hsvToCosineHue(uPalettePrimary) + float(i) * 0.2 + hueShift,
-          hsvToCosineHue(uPalettePrimary) + float(i) * 0.2 + hueShift + 0.33,
-          hsvToCosineHue(uPalettePrimary) + float(i) * 0.2 + hueShift + 0.67
-        ));
+        oilColor = paletteHueColor(uPalettePrimary + float(i) * 0.2 + hueShift, 0.85, 0.95);
 
         // Chorus: push toward full vivid saturation
         float chorSat = mix(1.0, 1.3, sChorus);

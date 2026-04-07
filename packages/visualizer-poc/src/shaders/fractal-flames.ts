@@ -251,8 +251,9 @@ vec3 ffFlame(float density, float colorIdx, float hue1, float hue2, float sat,
   // Apply dynamic range as contrast on the density
   logD = pow(logD, 0.8 + dynamicContrast * 0.4);
 
-  // Multi-hue: blend primary/secondary based on which transforms contributed
-  float hue = mix(hue1, hue2, colorIdx);
+  // Multi-hue: blend primary/secondary using shortest-arc (no overshoot into wrong hues)
+  float diffHues = fract(hue2 - hue1 + 0.5) - 0.5;
+  float hue = fract(hue1 + diffHues * clamp(colorIdx, 0.0, 1.0));
 
   // Timbral brightness shifts the hue toward hot (orange/white) or cool (blue/violet)
   hue += (timbralTemp - 0.5) * 0.08;
@@ -261,7 +262,7 @@ vec3 ffFlame(float density, float colorIdx, float hue1, float hue2, float sat,
   float warmBias = vocalWarmth * 0.12;
   hue -= warmBias; // shift toward red/orange in HSV
 
-  vec3 col = hsv2rgb(vec3(hue, sat, logD));
+  vec3 col = hsv2rgb(vec3(fract(hue), sat, logD));
 
   // Vocal warmth: additive amber glow
   col += vec3(0.15, 0.08, 0.02) * vocalWarmth * logD * 0.5;
@@ -481,7 +482,9 @@ void main() {
   // Soft palette-tinted haze around dense regions
   {
     float glowField = fbm3(vec3(p * 1.5, flowTime * 0.1));
-    vec3 glowTint = hsv2rgb(vec3(mix(hue1, hue2, glowField * 0.5 + 0.5), sat * 0.5, 0.06));
+    float glowDiff = fract(hue2 - hue1 + 0.5) - 0.5;
+    float glowHue = fract(hue1 + glowDiff * clamp(glowField * 0.5 + 0.5, 0.0, 1.0));
+    vec3 glowTint = hsv2rgb(vec3(glowHue, sat * 0.5, 0.06));
     col += glowTint * totalDensity * 0.15 * (0.4 + energy * 0.4);
   }
 

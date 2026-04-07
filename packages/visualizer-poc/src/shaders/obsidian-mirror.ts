@@ -58,6 +58,7 @@ ${buildPostProcessGLSL({
   lensDistortionEnabled: true,
   beatPulseEnabled: false,
   eraGradingEnabled: true,
+  temporalBlendEnabled: true,
 })}
 
 varying vec2 vUv;
@@ -425,15 +426,6 @@ void main() {
 
   // ─── Post-processing (bloom off, halation off, CA off) ───
   col = applyPostProcess(col, vUv, screenP);
-
-  // ─── Ultra-slow feedback trail — temporal smoothing for stillness ───
-  // High decay means new frames dominate slightly; the previous frame keeps
-  // a long ghost that reinforces stillness and hides frame-to-frame jitter.
-  vec3 prev = texture2D(uPrevFrame, vUv).rgb;
-  float feedbackDecay = 0.90 - energy * 0.03 + sSpace * 0.04 + spaceScore * 0.03;
-  feedbackDecay = clamp(feedbackDecay, 0.82, 0.94);
-  // max() preserves bright points (stars, moon) while keeping the darks dark.
-  col = max(col, prev * feedbackDecay);
 
   gl_FragColor = vec4(col, 1.0);
 }

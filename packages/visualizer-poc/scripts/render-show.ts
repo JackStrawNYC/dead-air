@@ -29,7 +29,7 @@
 
 import { execSync } from "child_process";
 import { createHash } from "crypto";
-import { existsSync, mkdirSync, readFileSync, writeFileSync, rmSync } from "fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync, rmSync, readdirSync, statSync } from "fs";
 import { join, resolve } from "path";
 import { cpus } from "os";
 
@@ -117,37 +117,71 @@ interface ChapterEntry {
 
 // ─── Bundle invalidation via source hash ───
 
-/** Hash key source files to detect changes that require rebundling */
+/** Hash key source files to detect changes that require rebundling.
+ *  As of the chill-mode + A+++ overlay rebuild, this hashes:
+ *  - Critical core files (Root, SongVisualizer, FullscreenQuad, etc.)
+ *  - SceneRouter + scene-registry (routing + safe shaders)
+ *  - All shader shared files (postprocess, noise, fxaa, uniforms)
+ *  - All overlay components in src/components/ (recursively)
+ *  - All scene component files in src/scenes/
+ *  - data: setlist.json, schemas, types
+ *  This is intentionally aggressive — the cost of a stale bundle is much higher
+ *  than the cost of a redundant rebuild. */
 function computeSourceHash(): string {
   const filesToHash = [
     join(ROOT, "src", "entry.ts"),
     join(ROOT, "src", "Root.tsx"),
     join(ROOT, "src", "SongVisualizer.tsx"),
-    join(ROOT, "src", "components", "EnergyEnvelope.tsx"),
-    join(ROOT, "src", "components", "EraGrade.tsx"),
-    join(ROOT, "src", "components", "FilmGrain.tsx"),
-    join(ROOT, "src", "components", "FullscreenQuad.tsx"),
-    join(ROOT, "src", "components", "AudioReactiveCanvas.tsx"),
-
-    join(ROOT, "src", "shaders", "liquid-light.ts"),
-    join(ROOT, "src", "shaders", "concert-beams.ts"),
+    // Components — full directory walk
+    join(ROOT, "src", "components"),
+    // Scene routing + registry
+    join(ROOT, "src", "scenes", "SceneRouter.tsx"),
+    join(ROOT, "src", "scenes", "scene-registry.ts"),
+    // Shared shader infrastructure
+    join(ROOT, "src", "shaders", "shared", "postprocess.glsl.ts"),
+    join(ROOT, "src", "shaders", "shared", "uniforms.glsl.ts"),
+    join(ROOT, "src", "shaders", "shared", "fxaa.glsl.ts"),
     join(ROOT, "src", "shaders", "noise.ts"),
+    // Utils that affect render output
     join(ROOT, "src", "utils", "audio-reactive.ts"),
     join(ROOT, "src", "utils", "energy.ts"),
     join(ROOT, "src", "utils", "climax-state.ts"),
+    join(ROOT, "src", "utils", "reactive-triggers.ts"),
+    // Data
     join(ROOT, "src", "data", "overlay-selector.ts"),
     join(ROOT, "src", "data", "overlay-rotation.ts"),
+    join(ROOT, "src", "data", "overlay-windows.ts"),
+    join(ROOT, "src", "data", "schemas.ts"),
     join(DATA_DIR, "setlist.json"),
   ];
-  // Optional files (may not exist)
   const optionalFiles = [
     join(DATA_DIR, "overlay-schedule.json"),
     join(DATA_DIR, "show-context.json"),
   ];
 
   const hash = createHash("sha256");
+  // Recursively hash a directory's tsx/ts files (sorted for determinism)
+  function hashDir(dir: string): void {
+    if (!existsSync(dir)) return;
+    const entries = readdirSync(dir, { withFileTypes: true });
+    const sorted = entries.sort((a, b) => a.name.localeCompare(b.name));
+    for (const entry of sorted) {
+      const full = join(dir, entry.name);
+      if (entry.isDirectory()) {
+        hashDir(full);
+      } else if (entry.name.endsWith(".tsx") || entry.name.endsWith(".ts")) {
+        hash.update(readFileSync(full));
+      }
+    }
+  }
   for (const f of filesToHash) {
-    hash.update(readFileSync(f));
+    if (!existsSync(f)) continue;
+    const stat = statSync(f);
+    if (stat.isDirectory()) {
+      hashDir(f);
+    } else {
+      hash.update(readFileSync(f));
+    }
   }
   for (const f of optionalFiles) {
     if (existsSync(f)) hash.update(readFileSync(f));
@@ -301,7 +335,8 @@ function renderSong(
         `--props=${analysisPath}`,
         `--gl=${glArg}`,
         `--concurrency=${adaptiveConcurrency}`,
-        `--timeout=600000`,
+        `--timeout=900000`,
+        `--delay-render-timeout-in-milliseconds=180000`,
         `--frames=0-${totalFrames - 1}`,
         "--muted",
       ].join(" ");
@@ -330,7 +365,8 @@ function renderSong(
           `--props=${analysisPath}`,
           `--gl=${glArg}`,
           `--concurrency=${adaptiveConcurrency}`,
-          `--timeout=600000`,
+          `--timeout=900000`,
+          `--delay-render-timeout-in-milliseconds=180000`,
           `--frames=${start}-${end}`,
           "--muted",
         ].join(" ");
@@ -380,13 +416,20 @@ function renderShowIntro(bundlePath: string): string | null {
   }
 
   console.log("\nRendering show intro (15.5s) ...");
+  // CHILL CALIBRATION + 4K FIX:
+  // ShowIntro at 4K previously hit Remotion's delayRender 28s timeout because the
+  // OffthreadVideo + Img + 4K decode pipeline takes >28s for the first frame.
+  // Fix: --delay-render-timeout-in-milliseconds=300000 (5 min) gives the pipeline
+  // ample time to load assets + warm shader cache, while keeping --concurrency=2
+  // (to avoid memory pressure on 4K decode).
   const cmd = [
     "npx remotion render",
     bundlePath,
     "ShowIntro",
     outputPath,
     `--gl=${glArg}`,
-    `--timeout=600000`,
+    `--timeout=900000`,
+    `--delay-render-timeout-in-milliseconds=300000`,
     `--concurrency=2`,
   ].join(" ");
 

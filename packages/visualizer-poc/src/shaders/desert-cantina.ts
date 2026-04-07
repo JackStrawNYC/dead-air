@@ -368,10 +368,10 @@ void main() {
   float dcTime = uDynamicTime * (0.06 + slowE * 0.05) * (1.0 + sJam * 0.5 - sSpace * 0.4);
 
   // ─── Palette ───
-  float palH1 = hsvToCosineHue(uPalettePrimary);
-  float palH2 = hsvToCosineHue(uPaletteSecondary);
-  vec3 palCol1 = 0.5 + 0.5 * cos(DC_TAU * vec3(palH1, palH1 + 0.33, palH1 + 0.67));
-  vec3 palCol2 = 0.5 + 0.5 * cos(DC_TAU * vec3(palH2, palH2 + 0.33, palH2 + 0.67));
+  float palH1 = uPalettePrimary;
+  float palH2 = uPaletteSecondary;
+  vec3 palCol1 = paletteHueColor(palH1, 0.8, 0.9);
+  vec3 palCol2 = paletteHueColor(palH2, 0.8, 0.9);
 
   // Terracotta / warm colors
   vec3 terracotta = vec3(0.65, 0.30, 0.15);

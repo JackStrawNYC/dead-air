@@ -466,10 +466,10 @@ void main() {
   float shakeAmp = (bass * 0.4 + drumOnset * 0.3 + beatSnap * 0.2) * shakeMod * (1.0 + climaxBoost * 0.4);
 
   // === PALETTE ===
-  float hue1 = hsvToCosineHue(uPalettePrimary) + chordHue + chromaHueMod;
-  float hue2 = hsvToCosineHue(uPaletteSecondary) + chordHue * 0.5;
+  float hue1 = uPalettePrimary + chordHue + chromaHueMod;
+  float hue2 = uPaletteSecondary + chordHue * 0.5;
   float hueShift = uPalettePrimary + chromaHueMod;
-  vec3 basaltTint = 0.5 + 0.5 * cos(TAU * vec3(hue1, hue1 + 0.33, hue1 + 0.67));
+  vec3 basaltTint = paletteHueColor(hue1, 0.6, 0.85);
   basaltTint = mix(basaltTint, vec3(0.2, 0.15, 0.12), 0.7); // push toward dark rock
 
   // === HEAT DISTORTION on screen UVs ===
@@ -611,7 +611,7 @@ void main() {
       float surfNoise = fbm3(marchPos * 4.0) * 0.5 + 0.5;
 
       // Subtle deep color from palette
-      vec3 deepTint = 0.5 + 0.5 * cos(TAU * vec3(hue2, hue2 + 0.33, hue2 + 0.67));
+      vec3 deepTint = paletteHueColor(hue2, 0.85, 0.8);
       obsidianBase = mix(obsidianBase, deepTint * 0.04, 0.25);
 
       // Diffuse: minimal (obsidian is mostly specular/reflective)

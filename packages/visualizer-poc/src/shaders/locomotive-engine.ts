@@ -701,10 +701,8 @@ void main() {
   // ─── SDF Iconography ───
   {
     float nf = snoise(vec3(screenP * 2.0, uDynamicTime * 0.1));
-    float hue1 = hsvToCosineHue(uPalettePrimary);
-    float hue2 = hsvToCosineHue(uPaletteSecondary);
-    vec3 c1 = hsv2rgb(vec3(hue1, uPaletteSaturation, 1.0));
-    vec3 c2 = hsv2rgb(vec3(hue2, uPaletteSaturation, 1.0));
+    vec3 c1 = paletteHueColor(uPalettePrimary, uPaletteSaturation, 1.0);
+    vec3 c2 = paletteHueColor(uPaletteSecondary, uPaletteSaturation, 1.0);
     col += iconEmergence(screenP, uTime, energyV, bassV, c1, c2, nf, uClimaxPhase, uSectionIndex);
     col += heroIconEmergence(screenP, uTime, energyV, bassV, c1, c2, nf, uSectionIndex);
   }

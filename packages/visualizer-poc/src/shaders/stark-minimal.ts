@@ -338,10 +338,10 @@ void main() {
   // === PALETTE ===
   float chromaHueMod = uChromaHue * 0.1;
   float chordHue = float(int(uChordIndex)) / 24.0 * 0.08;
-  float hue1 = hsvToCosineHue(uPalettePrimary) + chromaHueMod + chordHue;
-  float hue2 = hsvToCosineHue(uPaletteSecondary) + chordHue * 0.5;
-  vec3 palColor1 = 0.5 + 0.5 * cos(TAU * vec3(hue1, hue1 + 0.33, hue1 + 0.67));
-  vec3 palColor2 = 0.5 + 0.5 * cos(TAU * vec3(hue2, hue2 + 0.33, hue2 + 0.67));
+  float hue1 = uPalettePrimary + chromaHueMod + chordHue;
+  float hue2 = uPaletteSecondary + chordHue * 0.5;
+  vec3 palColor1 = paletteHueColor(hue1, 0.7, 0.92);
+  vec3 palColor2 = paletteHueColor(hue2, 0.7, 0.92);
 
   // Concrete color: mostly gray with subtle warm/cool variation
   vec3 concreteBase = vec3(0.25, 0.24, 0.23);

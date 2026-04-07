@@ -267,10 +267,10 @@ void main() {
 
   // Palette
   float chordHue = float(int(uChordIndex)) / 24.0 * 0.12;
-  float hue1 = hsvToCosineHue(uPalettePrimary) + chordHue;
-  float hue2 = hsvToCosineHue(uPaletteSecondary) + chordHue * 0.5;
-  vec3 caveTint = 0.5 + 0.5 * cos(6.28318 * vec3(hue1, hue1 + 0.33, hue1 + 0.67));
-  vec3 waterTint = 0.5 + 0.5 * cos(6.28318 * vec3(hue2, hue2 + 0.33, hue2 + 0.67));
+  float hue1 = uPalettePrimary + chordHue;
+  float hue2 = uPaletteSecondary + chordHue * 0.5;
+  vec3 caveTint = paletteHueColor(hue1, 0.65, 0.85);
+  vec3 waterTint = paletteHueColor(hue2, 0.7, 0.9);
 
   // === RAY SETUP ===
   vec3 ro, rd;

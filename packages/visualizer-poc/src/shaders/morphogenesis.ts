@@ -344,10 +344,10 @@ void main() {
   float generations = energy * (1.0 + sJam * 0.4 + climaxBranching * 0.6);
 
   // === Palette ===
-  float hue1 = hsvToCosineHue(uPalettePrimary);
-  vec3 baseTint = 0.5 + 0.5 * cos(TAU * vec3(hue1, hue1 + 0.33, hue1 + 0.67));
-  float hue2 = hsvToCosineHue(uPaletteSecondary);
-  vec3 accentTint = 0.5 + 0.5 * cos(TAU * vec3(hue2, hue2 + 0.33, hue2 + 0.67));
+  float hue1 = uPalettePrimary;
+  vec3 baseTint = paletteHueColor(hue1, 0.7, 0.9);
+  float hue2 = uPaletteSecondary;
+  vec3 accentTint = paletteHueColor(hue2, 0.85, 0.95);
 
   // Bioluminescent glow color: warm when vocals present
   vec3 bioGlow = mix(

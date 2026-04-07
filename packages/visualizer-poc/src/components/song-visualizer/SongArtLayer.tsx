@@ -1,12 +1,7 @@
 /**
- * SongArtLayer — per-song poster art with Ken Burns zoom.
- *
- * Visual foundation: intro full-opacity title card (4s), then settles
- * to energy-reactive background wash. Quiet passages: art rises.
- * Peak energy: art fades, shader visuals dominate.
- *
- * Dead air bookend: poster reappears gently after the music ends,
- * serving as a "that was [song]" title card during applause/tuning.
+ * SongArtLayer — Option E: Tiny + Faded
+ * Just shrink it. Small bottom-left corner card, low opacity, 12 seconds.
+ * Stop trying so hard. The art is there if you look but never demands attention.
  */
 
 import React from "react";
@@ -14,84 +9,49 @@ import { Img, useCurrentFrame, interpolate, Easing } from "remotion";
 
 const clampOpts = { extrapolateLeft: "clamp" as const, extrapolateRight: "clamp" as const };
 
-const ART_FULL_END = 450;      // 15s at 30fps — song card fills screen
-const ART_FADE_END = 600;      // 20s — crossfade to shader complete
+// Aligned with SongVisualizer intro: shader is fully off until frame 450 (15s),
+// then ramps in over 150 frames (5s). Card holds until 15s, then crossfades out
+// over the same 5s window so the visualizer emerges as the card dissolves.
+const ART_FADE_IN_END = 60;     // 2s fade in
+const ART_HOLD_END = 450;       // 15s — full hold
+const ART_FADE_END = 600;       // 20s — fully gone, shader at 100%
 
 interface SongArtProps {
   src: string;
-  /** Smooth 0-1 suppression factor: 1 = full art, 0.45 = dimmed for curated media */
   suppressionFactor: number;
-  /** Hue rotation in degrees (palette consistency with overlays/scene) */
   hueRotation?: number;
-  /** Rolling energy (0-1) for breath modulation */
   energy?: number;
-  /** Climax intensity (0-1) — art suppresses further during climax/sustain */
   climaxIntensity?: number;
-  /** Focus system opacity multiplier (0-1) — controls art visibility by climax phase */
   focusOpacity?: number;
-  /** Whether this song is a segue-in — suppress art during first 10s */
   segueIn?: boolean;
-  /** CSS mix-blend-mode override (default "screen") */
   artBlendMode?: string;
-  /** Intro factor 0-1: 0 = intro period (art-forward), 1 = engine fully open */
   introFactor?: number;
-  /** Dead air factor 0-1: 0 = music playing, 1 = fully in dead air (post-music) */
   deadAirFactor?: number;
 }
 
-export const SongArtLayer: React.FC<SongArtProps> = ({ src, suppressionFactor, hueRotation = 0, energy = 0, climaxIntensity = 0, focusOpacity = 1, segueIn = false, artBlendMode, introFactor = 1, deadAirFactor = 0 }) => {
+export const SongArtLayer: React.FC<SongArtProps> = ({
+  src,
+  hueRotation = 0,
+  energy = 0,
+  segueIn = false,
+  deadAirFactor = 0,
+}) => {
   const frame = useCurrentFrame();
 
-  // Suppress art briefly during segue-in crossfade (3s), then fade in over 2s
   if (segueIn && frame < 90) return null;
   const segueFade = segueIn && frame < 150 ? (frame - 90) / 60 : 1;
 
-  // Energy-reactive wash: quiet → 0.40, peak → 0.10
-  // Art is intro title card only — gone after 12s, shader owns the song body
-  const introTarget = introFactor < 1 ? 0.55 * (1 - introFactor) : 0;
-  const baseOpacity = interpolate(
-    frame,
-    [0, ART_FULL_END, ART_FADE_END],
-    [0.35, 0.35, introTarget],
-    {
-      extrapolateLeft: "clamp",
-      extrapolateRight: "clamp",
-      easing: Easing.out(Easing.cubic),
-    },
+  const cardOpacity = interpolate(
+    frame, [0, ART_FADE_IN_END, ART_HOLD_END, ART_FADE_END], [0, 0.7, 0.7, 0],
+    { ...clampOpts, easing: Easing.inOut(Easing.cubic) },
   );
-
-  // Climax suppression: during climax/sustain, further suppress art
-  const climaxSuppression = 1 - climaxIntensity * 0.7;
-  // Intro override: during intro period (introFactor < 1), keep art prominent
-  // by lerping focusOpacity toward 1.0. First 4s always full override.
-  const introBoost = frame < ART_FULL_END ? 1.0
-    : introFactor < 1 ? focusOpacity + (1.0 - focusOpacity) * (1 - introFactor)
-    : focusOpacity;
-  // During intro (first 15s), art is the hero — no suppression
-  const artOpacity = introFactor < 0.5
-    ? baseOpacity  // Full brightness during song card
-    : baseOpacity * suppressionFactor * climaxSuppression * introBoost;
-
-  // Dead air reappearance: poster returns prominently as bookend
-  const deadAirOpacity = deadAirFactor * 0.85;
-  const finalOpacity = Math.max(artOpacity, deadAirOpacity) * segueFade;
-
+  // DEAD AIR: bring the card back at higher opacity (0.85 instead of 0.5) to clearly
+  // signal "song over, between tracks". Viewers should immediately recognize the song
+  // ended without needing to look at audio waveforms.
+  const finalOpacity = Math.max(cardOpacity, deadAirFactor * 0.85) * segueFade;
   if (finalOpacity < 0.01) return null;
 
-  // Slow Ken Burns zoom + drift throughout
-  const scale = interpolate(
-    frame,
-    [0, ART_FADE_END, ART_FADE_END + 9000],
-    [1.0, 1.04, 1.10],
-    { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
-  );
-
-  const translateX = interpolate(
-    frame,
-    [0, ART_FADE_END + 9000],
-    [0, -10],
-    { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
-  );
+  const breath = 1.0 + energy * 0.05;
 
   return (
     <div
@@ -99,48 +59,54 @@ export const SongArtLayer: React.FC<SongArtProps> = ({ src, suppressionFactor, h
         position: "absolute",
         inset: 0,
         opacity: finalOpacity,
-        mixBlendMode: (introFactor < 0.5 || deadAirFactor > 0.5 ? "normal" : (artBlendMode ?? "screen")) as React.CSSProperties["mixBlendMode"],
-        overflow: "hidden",
-        filter: [
-          // Energy-adaptive color correction: brighter art at peaks, darker at quiet
-          // Previously hardcoded brightness(0.7) contrast(0.8) — made intros muddy
-          (() => {
-            const artBright = interpolate(energy, [0, 0.15, 0.30], [0.65, 0.75, 0.85], clampOpts);
-            const artContrast = interpolate(energy, [0, 0.15, 0.30], [0.75, 0.85, 0.95], clampOpts);
-            // During intro (introFactor < 0.5), use consistent values instead of harsh 0.7
-            const b = introFactor < 0.5 ? 0.75 : artBright;
-            const c = introFactor < 0.5 ? 0.85 : artContrast;
-            return `brightness(${b.toFixed(3)}) contrast(${c.toFixed(3)})`;
-          })(),
-          hueRotation !== 0 ? `hue-rotate(${hueRotation.toFixed(1)}deg)` : "",
-        ].filter(Boolean).join(" ") || undefined,
+        pointerEvents: "none",
       }}
     >
-      <Img
-        src={src}
+      {/* Small card bottom-left, 22% width */}
+      <div
         style={{
-          width: "100%",
-          height: "100%",
-          objectFit: "cover",
-          objectPosition: "center 38%",
-          transform: `scale(${scale}) translateX(${translateX}px)`,
-          willChange: "transform",
+          position: "absolute",
+          left: "5%",
+          bottom: "12%",
+          width: "22%",
+          aspectRatio: "1.3 / 1",
+          borderRadius: "3px",
+          overflow: "hidden",
+          boxShadow: "0 8px 24px rgba(0,0,0,0.6), 0 2px 6px rgba(0,0,0,0.4)",
+          border: "1px solid rgba(255,255,255,0.15)",
         }}
-      />
-      {/* Bottom vignette for text legibility during intro */}
-      {frame < ART_FADE_END && (
+      >
+        <Img
+          src={src}
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            objectPosition: "center 38%",
+            filter: `brightness(${(0.7 * breath).toFixed(3)}) contrast(0.95) saturate(0.85) ${hueRotation !== 0 ? `hue-rotate(${hueRotation.toFixed(1)}deg)` : ""}`,
+          }}
+        />
+        {/* Inner darken vignette */}
         <div
           style={{
             position: "absolute",
-            bottom: 0,
-            left: 0,
-            right: 0,
-            height: "40%",
-            background: "linear-gradient(transparent, rgba(0,0,0,0.6))",
+            inset: 0,
+            background: "radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.35) 100%)",
             pointerEvents: "none",
           }}
         />
-      )}
+        {/* Subtle film grain */}
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            backgroundImage: 'url("data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22200%22 height=%22200%22><filter id=%22n%22><feTurbulence type=%22fractalNoise%22 baseFrequency=%221.3%22 numOctaves=%222%22 seed=%229%22/><feColorMatrix values=%220 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.4 0%22/></filter><rect width=%22200%22 height=%22200%22 filter=%22url(%23n)%22/></svg>")',
+            backgroundSize: "200px 200px",
+            mixBlendMode: "overlay",
+            opacity: 0.5,
+          }}
+        />
+      </div>
     </div>
   );
 };

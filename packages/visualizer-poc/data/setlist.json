@@ -2,7 +2,7 @@
   "date": "1972-08-27",
   "venue": "Old Renaissance Faire Grounds, Veneta, OR",
   "bandName": "Grateful Dead",
-  "taperInfo": "SBD > Pacific High Studios Master > CD \u2014 Sunshine Daydream",
+  "taperInfo": "SBD > Pacific High Studios Master > CD — Sunshine Daydream",
   "era": "primal",
   "venueType": "festival",
   "songs": [
@@ -11,7 +11,7 @@
       "title": "The Promised Land",
       "set": 1,
       "trackNumber": 1,
-      "defaultMode": "highway_horizon",
+      "defaultMode": "fractal_temple",
       "audioFile": "veneta-72/gd72-08-27d1t02.mp3",
       "palette": {
         "primary": 200,
@@ -38,200 +38,1052 @@
         },
         {
           "sectionIndex": 4,
+          "mode": "desert_road"
+        },
+        {
+          "sectionIndex": 5,
+          "mode": "desert_road"
+        },
+        {
+          "sectionIndex": 6,
+          "mode": "desert_road"
+        },
+        {
+          "sectionIndex": 7,
+          "mode": "highway_horizon"
+        },
+        {
+          "sectionIndex": 8,
+          "mode": "highway_horizon"
+        },
+        {
+          "sectionIndex": 9,
           "mode": "highway_horizon"
         }
-      ]
+      ],
+      "overlayOverrides": {
+        "include": [
+          "GreyhoundBus",
+          "BobWeir",
+          "HeadlightTrain",
+          "WichitaTulsa",
+          "SunshineDaydreamCamera",
+          "OregonSunBlaze",
+          "GoldenRoad",
+          "BreathingStealie",
+          "StageLights",
+          "VWBusParade"
+        ]
+      }
     },
     {
       "trackId": "d1t03",
       "title": "Sugaree",
       "set": 1,
       "trackNumber": 2,
-      "defaultMode": "honeycomb_cathedral",
+      "defaultMode": "fractal_temple",
       "audioFile": "veneta-72/gd72-08-27d1t03.mp3",
       "palette": {
         "primary": 35,
         "secondary": 190,
         "saturation": 0.85
       },
-      "songArt": "assets/song-art/veneta-72/d1t03.png"
+      "songArt": "assets/song-art/veneta-72/d1t03.png",
+      "sectionOverrides": [
+        {
+          "sectionIndex": 0,
+          "mode": "scarlet_golden_haze"
+        },
+        {
+          "sectionIndex": 1,
+          "mode": "scarlet_golden_haze"
+        },
+        {
+          "sectionIndex": 2,
+          "mode": "scarlet_golden_haze"
+        },
+        {
+          "sectionIndex": 3,
+          "mode": "ember_meadow"
+        },
+        {
+          "sectionIndex": 4,
+          "mode": "ember_meadow"
+        },
+        {
+          "sectionIndex": 5,
+          "mode": "ember_meadow"
+        },
+        {
+          "sectionIndex": 6,
+          "mode": "fluid_light"
+        },
+        {
+          "sectionIndex": 7,
+          "mode": "fluid_light"
+        },
+        {
+          "sectionIndex": 8,
+          "mode": "scarlet_golden_haze"
+        },
+        {
+          "sectionIndex": 9,
+          "mode": "scarlet_golden_haze"
+        },
+        {
+          "sectionIndex": 10,
+          "mode": "scarlet_golden_haze"
+        },
+        {
+          "sectionIndex": 11,
+          "mode": "scarlet_golden_haze"
+        }
+      ],
+      "overlayOverrides": {
+        "include": [
+          "SugareeRose",
+          "JerryGuitar",
+          "RoseGarden",
+          "AmericanBeauty",
+          "GoldenRoad",
+          "Fireflies",
+          "GodRays",
+          "TouchOfGrey",
+          "StealieFade",
+          "BreathingStealie",
+          "PrismRainbow"
+        ]
+      }
     },
     {
       "trackId": "d1t04",
       "title": "Me And My Uncle",
       "set": 1,
       "trackNumber": 3,
-      "defaultMode": "campfire_embers",
+      "defaultMode": "fractal_temple",
       "audioFile": "veneta-72/gd72-08-27d1t04.mp3",
       "palette": {
         "primary": 0,
         "secondary": 220,
-        "saturation": 1.0
+        "saturation": 1
       },
-      "songArt": "assets/song-art/veneta-72/d1t04.png"
+      "songArt": "assets/song-art/veneta-72/d1t04.png",
+      "sectionOverrides": [
+        {
+          "sectionIndex": 0,
+          "mode": "desert_cantina"
+        },
+        {
+          "sectionIndex": 1,
+          "mode": "desert_cantina"
+        },
+        {
+          "sectionIndex": 2,
+          "mode": "desert_cantina"
+        },
+        {
+          "sectionIndex": 3,
+          "mode": "canyon_chase"
+        },
+        {
+          "sectionIndex": 4,
+          "mode": "canyon_chase"
+        },
+        {
+          "sectionIndex": 5,
+          "mode": "canyon_chase"
+        },
+        {
+          "sectionIndex": 6,
+          "mode": "desert_cantina"
+        },
+        {
+          "sectionIndex": 7,
+          "mode": "desert_cantina"
+        },
+        {
+          "sectionIndex": 8,
+          "mode": "desert_cantina"
+        },
+        {
+          "sectionIndex": 9,
+          "mode": "desert_cantina"
+        }
+      ],
+      "overlayOverrides": {
+        "include": [
+          "BobCowboyHat",
+          "MexicaliDesert",
+          "CowboySaloon",
+          "HeatShimmer",
+          "BobWeir",
+          "WolfGuitar",
+          "CampfireSparks",
+          "CarouselHorses",
+          "SkeletonBand"
+        ]
+      }
     },
     {
       "trackId": "d1t05",
       "title": "Deal",
       "set": 1,
       "trackNumber": 4,
-      "defaultMode": "neon_casino",
+      "defaultMode": "fractal_temple",
       "audioFile": "veneta-72/gd72-08-27d1t05.mp3",
       "palette": {
         "primary": 220,
         "secondary": 340,
         "saturation": 0.85
       },
-      "songArt": "assets/song-art/veneta-72/d1t05.png"
+      "songArt": "assets/song-art/veneta-72/d1t05.png",
+      "sectionOverrides": [
+        {
+          "sectionIndex": 0,
+          "mode": "neon_casino"
+        },
+        {
+          "sectionIndex": 1,
+          "mode": "neon_casino"
+        },
+        {
+          "sectionIndex": 2,
+          "mode": "neon_casino"
+        },
+        {
+          "sectionIndex": 3,
+          "mode": "bloom_explosion"
+        },
+        {
+          "sectionIndex": 4,
+          "mode": "bloom_explosion"
+        },
+        {
+          "sectionIndex": 5,
+          "mode": "neon_casino"
+        },
+        {
+          "sectionIndex": 6,
+          "mode": "neon_casino"
+        },
+        {
+          "sectionIndex": 7,
+          "mode": "neon_casino"
+        },
+        {
+          "sectionIndex": 8,
+          "mode": "neon_casino"
+        },
+        {
+          "sectionIndex": 9,
+          "mode": "neon_casino"
+        },
+        {
+          "sectionIndex": 10,
+          "mode": "neon_casino"
+        },
+        {
+          "sectionIndex": 11,
+          "mode": "neon_casino"
+        }
+      ],
+      "overlayOverrides": {
+        "include": [
+          "UncleSam",
+          "JerryGuitar",
+          "NeonDeadSign",
+          "PlayingCards",
+          "LighterWave",
+          "CrowdDance",
+          "PrismRainbow",
+          "StealYourFaceKaleidoscope",
+          "GratefulDeadLogo",
+          "StageLights",
+          "BreathingStealie",
+          "LotScene"
+        ]
+      }
     },
     {
       "trackId": "d1t06",
       "title": "Black Throated Wind",
       "set": 1,
       "trackNumber": 5,
-      "defaultMode": "storm_vortex",
+      "defaultMode": "fractal_temple",
       "audioFile": "veneta-72/gd72-08-27d1t06.mp3",
       "palette": {
         "primary": 50,
         "secondary": 280,
-        "saturation": 1.0
+        "saturation": 1
       },
       "segueInto": true,
-      "songArt": "assets/song-art/veneta-72/d1t06.png"
+      "songArt": "assets/song-art/veneta-72/d1t06.png",
+      "sectionOverrides": [
+        {
+          "sectionIndex": 0,
+          "mode": "porch_twilight"
+        },
+        {
+          "sectionIndex": 1,
+          "mode": "porch_twilight"
+        },
+        {
+          "sectionIndex": 2,
+          "mode": "desert_road"
+        },
+        {
+          "sectionIndex": 3,
+          "mode": "desert_road"
+        },
+        {
+          "sectionIndex": 4,
+          "mode": "desert_road"
+        },
+        {
+          "sectionIndex": 5,
+          "mode": "desert_road"
+        },
+        {
+          "sectionIndex": 6,
+          "mode": "storm_vortex"
+        },
+        {
+          "sectionIndex": 7,
+          "mode": "storm_vortex"
+        },
+        {
+          "sectionIndex": 8,
+          "mode": "porch_twilight"
+        },
+        {
+          "sectionIndex": 9,
+          "mode": "porch_twilight"
+        },
+        {
+          "sectionIndex": 10,
+          "mode": "porch_twilight"
+        },
+        {
+          "sectionIndex": 11,
+          "mode": "porch_twilight"
+        }
+      ],
+      "overlayOverrides": {
+        "include": [
+          "WindWalker",
+          "MountainPanorama",
+          "CampfireCircle",
+          "EmptyChair",
+          "FogBank",
+          "MoonPhases",
+          "RainDrops",
+          "SkeletonCouple",
+          "RedwoodSilhouettes"
+        ]
+      }
     },
     {
       "trackId": "d1t07",
       "title": "China Cat Sunflower",
       "set": 1,
       "trackNumber": 6,
-      "defaultMode": "psychedelic_garden",
+      "defaultMode": "fractal_temple",
       "audioFile": "veneta-72/gd72-08-27d1t07.mp3",
       "palette": {
         "primary": 15,
         "secondary": 270,
-        "saturation": 1.0
+        "saturation": 1
       },
       "songArt": "assets/song-art/veneta-72/d1t07.png",
-      "segueInto": true
+      "segueInto": true,
+      "sectionOverrides": [
+        {
+          "sectionIndex": 0,
+          "mode": "psychedelic_garden"
+        },
+        {
+          "sectionIndex": 1,
+          "mode": "psychedelic_garden"
+        },
+        {
+          "sectionIndex": 2,
+          "mode": "psychedelic_garden"
+        },
+        {
+          "sectionIndex": 3,
+          "mode": "kaleidoscope"
+        },
+        {
+          "sectionIndex": 4,
+          "mode": "kaleidoscope"
+        },
+        {
+          "sectionIndex": 5,
+          "mode": "kaleidoscope"
+        },
+        {
+          "sectionIndex": 6,
+          "mode": "mandala_engine"
+        },
+        {
+          "sectionIndex": 7,
+          "mode": "mandala_engine"
+        },
+        {
+          "sectionIndex": 8,
+          "mode": "psychedelic_garden"
+        },
+        {
+          "sectionIndex": 9,
+          "mode": "psychedelic_garden"
+        },
+        {
+          "sectionIndex": 10,
+          "mode": "psychedelic_garden"
+        },
+        {
+          "sectionIndex": 11,
+          "mode": "psychedelic_garden"
+        }
+      ],
+      "overlayOverrides": {
+        "include": [
+          "SunflowerStealie",
+          "PsychedelicEye",
+          "GratefulMandala",
+          "RoseGarden",
+          "Fireflies",
+          "JerryGuitar",
+          "SpinningYinYang",
+          "MeteorShower",
+          "BreathingStealie"
+        ]
+      }
     },
     {
       "trackId": "d1t08",
       "title": "I Know You Rider",
       "set": 1,
       "trackNumber": 7,
-      "defaultMode": "cosmic_railroad",
+      "defaultMode": "fractal_temple",
       "audioFile": "veneta-72/gd72-08-27d1t08.mp3",
       "palette": {
         "primary": 25,
         "secondary": 180,
         "saturation": 0.9
       },
-      "songArt": "assets/song-art/veneta-72/d1t08.png"
+      "songArt": "assets/song-art/veneta-72/d1t08.png",
+      "sectionOverrides": [
+        {
+          "sectionIndex": 0,
+          "mode": "cosmic_railroad"
+        },
+        {
+          "sectionIndex": 1,
+          "mode": "cosmic_railroad"
+        },
+        {
+          "sectionIndex": 2,
+          "mode": "cosmic_railroad"
+        },
+        {
+          "sectionIndex": 3,
+          "mode": "cosmic_railroad"
+        },
+        {
+          "sectionIndex": 4,
+          "mode": "aurora"
+        },
+        {
+          "sectionIndex": 5,
+          "mode": "aurora"
+        },
+        {
+          "sectionIndex": 6,
+          "mode": "aurora"
+        },
+        {
+          "sectionIndex": 7,
+          "mode": "cosmic_railroad"
+        },
+        {
+          "sectionIndex": 8,
+          "mode": "cosmic_railroad"
+        },
+        {
+          "sectionIndex": 9,
+          "mode": "cosmic_railroad"
+        },
+        {
+          "sectionIndex": 10,
+          "mode": "cosmic_railroad"
+        },
+        {
+          "sectionIndex": 11,
+          "mode": "cosmic_railroad"
+        }
+      ],
+      "overlayOverrides": {
+        "include": [
+          "HeadlightTrain",
+          "MountainPanorama",
+          "AuroraBorealis",
+          "Constellation",
+          "CrowdSilhouette",
+          "CassetteReels",
+          "TapingSection",
+          "DancingTerrapinOverlay",
+          "BreathingStealie"
+        ]
+      }
     },
     {
       "trackId": "d1t09",
       "title": "Mexicali Blues",
       "set": 1,
       "trackNumber": 8,
-      "defaultMode": "desert_cantina",
+      "defaultMode": "fractal_temple",
       "audioFile": "veneta-72/gd72-08-27d1t09.mp3",
       "palette": {
         "primary": 330,
         "secondary": 120,
-        "saturation": 1.0
+        "saturation": 1
       },
-      "songArt": "assets/song-art/veneta-72/d1t09.png"
+      "songArt": "assets/song-art/veneta-72/d1t09.png",
+      "sectionOverrides": [
+        {
+          "sectionIndex": 0,
+          "mode": "desert_cantina"
+        },
+        {
+          "sectionIndex": 1,
+          "mode": "desert_cantina"
+        },
+        {
+          "sectionIndex": 2,
+          "mode": "desert_cantina"
+        },
+        {
+          "sectionIndex": 3,
+          "mode": "canyon"
+        },
+        {
+          "sectionIndex": 4,
+          "mode": "canyon"
+        },
+        {
+          "sectionIndex": 5,
+          "mode": "canyon"
+        },
+        {
+          "sectionIndex": 6,
+          "mode": "canyon"
+        },
+        {
+          "sectionIndex": 7,
+          "mode": "desert_cantina"
+        },
+        {
+          "sectionIndex": 8,
+          "mode": "desert_cantina"
+        },
+        {
+          "sectionIndex": 9,
+          "mode": "desert_cantina"
+        },
+        {
+          "sectionIndex": 10,
+          "mode": "desert_cantina"
+        }
+      ],
+      "overlayOverrides": {
+        "include": [
+          "MexicaliDesert",
+          "BobCowboyHat",
+          "HotAirBalloons",
+          "HeatShimmer",
+          "CarouselHorses",
+          "SkeletonBand",
+          "RedwoodSilhouettes",
+          "MushroomForest"
+        ]
+      }
     },
     {
       "trackId": "d1t10",
       "title": "Bertha",
       "set": 1,
       "trackNumber": 9,
-      "defaultMode": "earthquake_fissure",
+      "defaultMode": "fractal_temple",
       "audioFile": "veneta-72/gd72-08-27d1t10.mp3",
       "palette": {
         "primary": 270,
         "secondary": 60,
-        "saturation": 1.0
+        "saturation": 1
       },
-      "songArt": "assets/song-art/veneta-72/d1t10.png"
+      "songArt": "assets/song-art/veneta-72/d1t10.png",
+      "sectionOverrides": [
+        {
+          "sectionIndex": 0,
+          "mode": "fractal_temple"
+        },
+        {
+          "sectionIndex": 1,
+          "mode": "fractal_temple"
+        },
+        {
+          "sectionIndex": 2,
+          "mode": "fractal_temple"
+        },
+        {
+          "sectionIndex": 3,
+          "mode": "liquid_light"
+        },
+        {
+          "sectionIndex": 4,
+          "mode": "liquid_light"
+        },
+        {
+          "sectionIndex": 5,
+          "mode": "mobius_amphitheater"
+        },
+        {
+          "sectionIndex": 6,
+          "mode": "liquid_light"
+        },
+        {
+          "sectionIndex": 7,
+          "mode": "liquid_light"
+        },
+        {
+          "sectionIndex": 8,
+          "mode": "mobius_amphitheater"
+        },
+        {
+          "sectionIndex": 9,
+          "mode": "fractal_temple"
+        },
+        {
+          "sectionIndex": 10,
+          "mode": "fractal_temple"
+        },
+        {
+          "sectionIndex": 11,
+          "mode": "fractal_temple"
+        }
+      ],
+      "overlayOverrides": {
+        "include": [
+          "OwsleyBear",
+          "JerryGuitar",
+          "BearParade",
+          "Roses",
+          "LiquidLightBorder",
+          "Europe72Jester",
+          "SkullKaleidoscope",
+          "SpiralHypnoDisc",
+          "PsychedelicEye",
+          "CrowdDance",
+          "StageLights",
+          "BreathingStealie"
+        ]
+      }
     },
     {
       "trackId": "d2t02",
       "title": "Playing In The Band",
       "set": 2,
       "trackNumber": 1,
-      "defaultMode": "mobius_amphitheater",
+      "defaultMode": "fractal_temple",
       "audioFile": "veneta-72/gd72-08-27d2t02.mp3",
       "palette": {
         "primary": 15,
         "secondary": 240,
-        "saturation": 1.0
+        "saturation": 1
       },
-      "songArt": "assets/song-art/veneta-72/d2t02.png"
+      "songArt": "assets/song-art/veneta-72/d2t02.png",
+      "sectionOverrides": [
+        {
+          "sectionIndex": 0,
+          "mode": "protean_clouds"
+        },
+        {
+          "sectionIndex": 1,
+          "mode": "protean_clouds"
+        },
+        {
+          "sectionIndex": 2,
+          "mode": "volumetric_nebula"
+        },
+        {
+          "sectionIndex": 3,
+          "mode": "volumetric_nebula"
+        },
+        {
+          "sectionIndex": 4,
+          "mode": "cosmic_voyage"
+        },
+        {
+          "sectionIndex": 5,
+          "mode": "cosmic_voyage"
+        },
+        {
+          "sectionIndex": 6,
+          "mode": "event_horizon"
+        },
+        {
+          "sectionIndex": 7,
+          "mode": "event_horizon"
+        },
+        {
+          "sectionIndex": 8,
+          "mode": "terrapin_nebula"
+        },
+        {
+          "sectionIndex": 9,
+          "mode": "terrapin_nebula"
+        },
+        {
+          "sectionIndex": 10,
+          "mode": "protean_clouds"
+        },
+        {
+          "sectionIndex": 11,
+          "mode": "protean_clouds"
+        }
+      ],
+      "overlayOverrides": {
+        "include": [
+          "SpaceTimeLattice",
+          "BobWeir",
+          "PhilLesh",
+          "CosmicStarfield",
+          "Constellation",
+          "MeteorShower",
+          "EgyptianEye",
+          "GratefulMandala",
+          "Fireflies",
+          "CrowdDance",
+          "KeseyFurthur",
+          "BreathingStealie"
+        ]
+      }
     },
     {
       "trackId": "d2t03",
       "title": "He's Gone",
       "set": 2,
       "trackNumber": 2,
-      "defaultMode": "memorial_drift",
+      "defaultMode": "fractal_temple",
       "audioFile": "veneta-72/gd72-08-27d2t03.mp3",
       "palette": {
         "primary": 200,
         "secondary": 30,
         "saturation": 0.9
       },
-      "songArt": "assets/song-art/veneta-72/d2t03.png"
+      "songArt": "assets/song-art/veneta-72/d2t03.png",
+      "sectionOverrides": [
+        {
+          "sectionIndex": 0,
+          "mode": "memorial_drift"
+        },
+        {
+          "sectionIndex": 1,
+          "mode": "memorial_drift"
+        },
+        {
+          "sectionIndex": 2,
+          "mode": "memorial_drift"
+        },
+        {
+          "sectionIndex": 3,
+          "mode": "morning_dew_fog"
+        },
+        {
+          "sectionIndex": 4,
+          "mode": "morning_dew_fog"
+        },
+        {
+          "sectionIndex": 5,
+          "mode": "morning_dew_fog"
+        },
+        {
+          "sectionIndex": 6,
+          "mode": "aurora_curtains"
+        },
+        {
+          "sectionIndex": 7,
+          "mode": "memorial_drift"
+        },
+        {
+          "sectionIndex": 8,
+          "mode": "memorial_drift"
+        },
+        {
+          "sectionIndex": 9,
+          "mode": "memorial_drift"
+        },
+        {
+          "sectionIndex": 10,
+          "mode": "memorial_drift"
+        },
+        {
+          "sectionIndex": 11,
+          "mode": "memorial_drift"
+        }
+      ],
+      "overlayOverrides": {
+        "include": [
+          "EmptyChair",
+          "MicStandSilhouette",
+          "GodRays",
+          "MoonPhases",
+          "LighterWave",
+          "FogBank",
+          "SkeletonCouple",
+          "TouchOfGrey",
+          "SpotlightFollow"
+        ]
+      }
     },
     {
       "trackId": "d2t04",
       "title": "Jack Straw",
       "set": 2,
       "trackNumber": 3,
-      "defaultMode": "boxcar_tunnel",
+      "defaultMode": "fractal_temple",
       "audioFile": "veneta-72/gd72-08-27d2t04.mp3",
       "palette": {
         "primary": 50,
         "secondary": 300,
-        "saturation": 1.0
+        "saturation": 1
       },
-      "songArt": "assets/song-art/veneta-72/d2t04.png"
+      "songArt": "assets/song-art/veneta-72/d2t04.png",
+      "sectionOverrides": [
+        {
+          "sectionIndex": 0,
+          "mode": "boxcar_tunnel"
+        },
+        {
+          "sectionIndex": 1,
+          "mode": "boxcar_tunnel"
+        },
+        {
+          "sectionIndex": 2,
+          "mode": "boxcar_tunnel"
+        },
+        {
+          "sectionIndex": 3,
+          "mode": "canyon_chase"
+        },
+        {
+          "sectionIndex": 4,
+          "mode": "canyon_chase"
+        },
+        {
+          "sectionIndex": 5,
+          "mode": "canyon_chase"
+        },
+        {
+          "sectionIndex": 6,
+          "mode": "bloom_explosion"
+        },
+        {
+          "sectionIndex": 7,
+          "mode": "boxcar_tunnel"
+        },
+        {
+          "sectionIndex": 8,
+          "mode": "boxcar_tunnel"
+        },
+        {
+          "sectionIndex": 9,
+          "mode": "boxcar_tunnel"
+        },
+        {
+          "sectionIndex": 10,
+          "mode": "boxcar_tunnel"
+        },
+        {
+          "sectionIndex": 11,
+          "mode": "boxcar_tunnel"
+        }
+      ],
+      "overlayOverrides": {
+        "include": [
+          "BobCowboyHat",
+          "SteamLocomotive",
+          "GreyhoundBus",
+          "PrisonBars",
+          "BobWeir",
+          "WolfGuitar",
+          "HeatShimmer",
+          "BreathingStealie",
+          "CrowdSilhouette"
+        ]
+      }
     },
     {
       "trackId": "d2t05",
       "title": "Bird Song",
       "set": 2,
       "trackNumber": 4,
-      "defaultMode": "aviary_canopy",
+      "defaultMode": "fractal_temple",
       "audioFile": "veneta-72/gd72-08-27d2t05.mp3",
       "palette": {
         "primary": 240,
         "secondary": 60,
         "saturation": 0.8
       },
-      "songArt": "assets/song-art/veneta-72/d2t05.png"
+      "songArt": "assets/song-art/veneta-72/d2t05.png",
+      "sectionOverrides": [
+        {
+          "sectionIndex": 0,
+          "mode": "aviary_canopy"
+        },
+        {
+          "sectionIndex": 1,
+          "mode": "aviary_canopy"
+        },
+        {
+          "sectionIndex": 2,
+          "mode": "aviary_canopy"
+        },
+        {
+          "sectionIndex": 3,
+          "mode": "flower_field"
+        },
+        {
+          "sectionIndex": 4,
+          "mode": "flower_field"
+        },
+        {
+          "sectionIndex": 5,
+          "mode": "aurora_sky"
+        },
+        {
+          "sectionIndex": 6,
+          "mode": "aurora_sky"
+        },
+        {
+          "sectionIndex": 7,
+          "mode": "aurora_sky"
+        },
+        {
+          "sectionIndex": 8,
+          "mode": "cosmic_dust"
+        },
+        {
+          "sectionIndex": 9,
+          "mode": "aviary_canopy"
+        },
+        {
+          "sectionIndex": 10,
+          "mode": "aviary_canopy"
+        },
+        {
+          "sectionIndex": 11,
+          "mode": "aviary_canopy"
+        }
+      ],
+      "overlayOverrides": {
+        "include": [
+          "BirdInFlight",
+          "OregonMeadow",
+          "Roses",
+          "Fireflies",
+          "GoldenRoad",
+          "Constellation",
+          "VineGrowth",
+          "BoxOfRain",
+          "TerrapinStation"
+        ]
+      }
     },
     {
       "trackId": "d2t06",
       "title": "Greatest Story Ever Told",
       "set": 2,
       "trackNumber": 5,
-      "defaultMode": "clockwork_temple",
+      "defaultMode": "aviary_canopy",
       "audioFile": "veneta-72/gd72-08-27d2t06.mp3",
       "palette": {
         "primary": 260,
         "secondary": 120,
         "saturation": 0.85
       },
-      "songArt": "assets/song-art/veneta-72/d2t06.png"
+      "songArt": "assets/song-art/veneta-72/d2t06.png",
+      "sectionOverrides": [
+        {
+          "sectionIndex": 0,
+          "mode": "aviary_canopy"
+        },
+        {
+          "sectionIndex": 1,
+          "mode": "aviary_canopy"
+        },
+        {
+          "sectionIndex": 2,
+          "mode": "aviary_canopy"
+        },
+        {
+          "sectionIndex": 3,
+          "mode": "aviary_canopy"
+        },
+        {
+          "sectionIndex": 4,
+          "mode": "aviary_canopy"
+        },
+        {
+          "sectionIndex": 5,
+          "mode": "warm_nebula"
+        },
+        {
+          "sectionIndex": 6,
+          "mode": "climax_surge"
+        },
+        {
+          "sectionIndex": 7,
+          "mode": "aviary_canopy"
+        },
+        {
+          "sectionIndex": 8,
+          "mode": "fractal_temple"
+        },
+        {
+          "sectionIndex": 9,
+          "mode": "fractal_temple"
+        },
+        {
+          "sectionIndex": 10,
+          "mode": "fractal_temple"
+        },
+        {
+          "sectionIndex": 11,
+          "mode": "fractal_temple"
+        }
+      ],
+      "overlayOverrides": {
+        "include": [
+          "MosesStaff",
+          "GospelChurch",
+          "GodRays",
+          "BirdInFlight",
+          "OregonMeadow",
+          "CommunityCircle",
+          "BearParade",
+          "GratefulDeadLogo",
+          "PrismRainbow",
+          "BreathingStealie"
+        ]
+      }
     },
     {
       "trackId": "d3t01",
       "title": "Dark Star",
       "set": 3,
       "trackNumber": 1,
-      "defaultMode": "event_horizon",
+      "defaultMode": "fractal_temple",
       "audioFile": "veneta-72/gd72-08-27d3t01.mp3",
       "palette": {
         "primary": 260,
@@ -239,61 +1091,319 @@
         "saturation": 0.85
       },
       "segueInto": true,
-      "songArt": "assets/song-art/veneta-72/d3t01.png"
+      "songArt": "assets/song-art/veneta-72/d3t01.png",
+      "sectionOverrides": [
+        {
+          "sectionIndex": 0,
+          "mode": "dark_star_void"
+        },
+        {
+          "sectionIndex": 1,
+          "mode": "dark_star_void"
+        },
+        {
+          "sectionIndex": 2,
+          "mode": "star_nest"
+        },
+        {
+          "sectionIndex": 3,
+          "mode": "star_nest"
+        },
+        {
+          "sectionIndex": 4,
+          "mode": "cosmic_voyage"
+        },
+        {
+          "sectionIndex": 5,
+          "mode": "cosmic_voyage"
+        },
+        {
+          "sectionIndex": 6,
+          "mode": "event_horizon"
+        },
+        {
+          "sectionIndex": 7,
+          "mode": "event_horizon"
+        },
+        {
+          "sectionIndex": 8,
+          "mode": "volumetric_nebula"
+        },
+        {
+          "sectionIndex": 9,
+          "mode": "volumetric_nebula"
+        },
+        {
+          "sectionIndex": 10,
+          "mode": "dark_star_void"
+        },
+        {
+          "sectionIndex": 11,
+          "mode": "dark_star_void"
+        }
+      ],
+      "overlayOverrides": {
+        "include": [
+          "DarkStarPortal",
+          "DarkStarAscent",
+          "PhilLesh",
+          "CosmicEagle",
+          "CosmicStarfield",
+          "SpaceTimeLattice",
+          "Constellation",
+          "MeteorShower",
+          "EgyptianEye",
+          "FogBank",
+          "BreathingStealie"
+        ]
+      }
     },
     {
       "trackId": "d3t02",
       "title": "El Paso",
       "set": 3,
       "trackNumber": 2,
-      "defaultMode": "canyon_chase",
+      "defaultMode": "fractal_temple",
       "audioFile": "veneta-72/gd72-08-27d3t02.mp3",
       "palette": {
         "primary": 25,
         "secondary": 180,
         "saturation": 0.9
       },
-      "songArt": "assets/song-art/veneta-72/d3t02.png"
+      "songArt": "assets/song-art/veneta-72/d3t02.png",
+      "sectionOverrides": [
+        {
+          "sectionIndex": 0,
+          "mode": "desert_cantina"
+        },
+        {
+          "sectionIndex": 1,
+          "mode": "desert_cantina"
+        },
+        {
+          "sectionIndex": 2,
+          "mode": "desert_cantina"
+        },
+        {
+          "sectionIndex": 3,
+          "mode": "canyon_chase"
+        },
+        {
+          "sectionIndex": 4,
+          "mode": "canyon_chase"
+        },
+        {
+          "sectionIndex": 5,
+          "mode": "canyon_chase"
+        },
+        {
+          "sectionIndex": 6,
+          "mode": "canyon"
+        },
+        {
+          "sectionIndex": 7,
+          "mode": "canyon"
+        },
+        {
+          "sectionIndex": 8,
+          "mode": "desert_cantina"
+        },
+        {
+          "sectionIndex": 9,
+          "mode": "desert_cantina"
+        },
+        {
+          "sectionIndex": 10,
+          "mode": "desert_cantina"
+        },
+        {
+          "sectionIndex": 11,
+          "mode": "desert_cantina"
+        }
+      ],
+      "overlayOverrides": {
+        "include": [
+          "BobCowboyHat",
+          "CowboySaloon",
+          "HeatShimmer",
+          "PlayingCards",
+          "BobWeir",
+          "PrisonBars",
+          "RoseOverlay",
+          "MexicaliDesert"
+        ]
+      }
     },
     {
       "trackId": "d3t03",
       "title": "Sing Me Back Home",
       "set": 3,
       "trackNumber": 3,
-      "defaultMode": "porch_twilight",
+      "defaultMode": "fractal_temple",
       "audioFile": "veneta-72/gd72-08-27d3t03.mp3",
       "palette": {
         "primary": 195,
         "secondary": 330,
         "saturation": 0.8
       },
-      "songArt": "assets/song-art/veneta-72/d3t03.png"
+      "songArt": "assets/song-art/veneta-72/d3t03.png",
+      "sectionOverrides": [
+        {
+          "sectionIndex": 0,
+          "mode": "porch_twilight"
+        },
+        {
+          "sectionIndex": 1,
+          "mode": "porch_twilight"
+        },
+        {
+          "sectionIndex": 2,
+          "mode": "porch_twilight"
+        },
+        {
+          "sectionIndex": 3,
+          "mode": "campfire_embers"
+        },
+        {
+          "sectionIndex": 4,
+          "mode": "campfire_embers"
+        },
+        {
+          "sectionIndex": 5,
+          "mode": "memorial_drift"
+        },
+        {
+          "sectionIndex": 6,
+          "mode": "memorial_drift"
+        },
+        {
+          "sectionIndex": 7,
+          "mode": "porch_twilight"
+        },
+        {
+          "sectionIndex": 8,
+          "mode": "porch_twilight"
+        },
+        {
+          "sectionIndex": 9,
+          "mode": "porch_twilight"
+        },
+        {
+          "sectionIndex": 10,
+          "mode": "porch_twilight"
+        },
+        {
+          "sectionIndex": 11,
+          "mode": "porch_twilight"
+        }
+      ],
+      "overlayOverrides": {
+        "include": [
+          "GospelChurch",
+          "EmptyChair",
+          "CampfireCircle",
+          "EmberRise",
+          "MicStandSilhouette",
+          "MoonPhases",
+          "LighterWave",
+          "FogBank",
+          "GodRays",
+          "MusicalNotation",
+          "RoseOverlay"
+        ]
+      }
     },
     {
       "trackId": "d3t04",
       "title": "Sugar Magnolia",
       "set": 3,
       "trackNumber": 4,
-      "defaultMode": "bloom_explosion",
+      "defaultMode": "fractal_temple",
       "audioFile": "veneta-72/gd72-08-27d3t04.mp3",
       "palette": {
         "primary": 310,
         "secondary": 60,
-        "saturation": 1.0
+        "saturation": 1
       },
-      "songArt": "assets/song-art/veneta-72/d3t04.png"
+      "songArt": "assets/song-art/veneta-72/d3t04.png",
+      "sectionOverrides": [
+        {
+          "sectionIndex": 0,
+          "mode": "flower_field"
+        },
+        {
+          "sectionIndex": 1,
+          "mode": "flower_field"
+        },
+        {
+          "sectionIndex": 2,
+          "mode": "flower_field"
+        },
+        {
+          "sectionIndex": 3,
+          "mode": "scarlet_golden_haze"
+        },
+        {
+          "sectionIndex": 4,
+          "mode": "scarlet_golden_haze"
+        },
+        {
+          "sectionIndex": 5,
+          "mode": "scarlet_golden_haze"
+        },
+        {
+          "sectionIndex": 6,
+          "mode": "psychedelic_garden"
+        },
+        {
+          "sectionIndex": 7,
+          "mode": "psychedelic_garden"
+        },
+        {
+          "sectionIndex": 8,
+          "mode": "flower_field"
+        },
+        {
+          "sectionIndex": 9,
+          "mode": "flower_field"
+        },
+        {
+          "sectionIndex": 10,
+          "mode": "flower_field"
+        },
+        {
+          "sectionIndex": 11,
+          "mode": "flower_field"
+        }
+      ],
+      "overlayOverrides": {
+        "include": [
+          "SunflowerStealie",
+          "RoseGarden",
+          "BobWeir",
+          "OregonMeadow",
+          "AmericanBeauty",
+          "GoldenRoad",
+          "Fireflies",
+          "RainbowArc",
+          "PeaceSignShower",
+          "VenetaSwimmers",
+          "StageLights",
+          "BreathingStealie"
+        ]
+      }
     },
     {
       "trackId": "d3t05",
       "title": "Casey Jones",
       "set": 3,
       "trackNumber": 5,
-      "defaultMode": "locomotive_engine",
+      "defaultMode": "fractal_temple",
       "audioFile": "veneta-72/gd72-08-27d3t05.mp3",
       "palette": {
         "primary": 20,
         "secondary": 200,
-        "saturation": 1.0
+        "saturation": 1
       },
       "songArt": "assets/song-art/veneta-72/d3t05.png",
       "sectionOverrides": [
@@ -311,25 +1421,67 @@
         },
         {
           "sectionIndex": 3,
-          "mode": "locomotive_engine"
+          "mode": "cosmic_railroad"
         },
         {
           "sectionIndex": 4,
+          "mode": "cosmic_railroad"
+        },
+        {
+          "sectionIndex": 5,
+          "mode": "cosmic_railroad"
+        },
+        {
+          "sectionIndex": 6,
+          "mode": "boxcar_tunnel"
+        },
+        {
+          "sectionIndex": 7,
+          "mode": "boxcar_tunnel"
+        },
+        {
+          "sectionIndex": 8,
+          "mode": "locomotive_engine"
+        },
+        {
+          "sectionIndex": 9,
+          "mode": "locomotive_engine"
+        },
+        {
+          "sectionIndex": 10,
+          "mode": "locomotive_engine"
+        },
+        {
+          "sectionIndex": 11,
           "mode": "locomotive_engine"
         }
-      ]
+      ],
+      "overlayOverrides": {
+        "include": [
+          "SteamLocomotive",
+          "JerryGuitar",
+          "HeadlightTrain",
+          "GoldenRoad",
+          "MountainPanorama",
+          "MarchingTerrapins",
+          "SkullRoses",
+          "ThirteenPointBolt",
+          "CrowdDance",
+          "BreathingStealie"
+        ]
+      }
     },
     {
       "trackId": "d3t06",
       "title": "One More Saturday Night",
       "set": 3,
       "trackNumber": 6,
-      "defaultMode": "dance_floor_prism",
+      "defaultMode": "fractal_temple",
       "audioFile": "veneta-72/gd72-08-27d3t06.mp3",
       "palette": {
         "primary": 50,
         "secondary": 280,
-        "saturation": 1.0
+        "saturation": 1
       },
       "songArt": "assets/song-art/veneta-72/d3t06.png",
       "sectionOverrides": [
@@ -351,23 +1503,121 @@
         },
         {
           "sectionIndex": 4,
+          "mode": "neon_casino"
+        },
+        {
+          "sectionIndex": 5,
+          "mode": "neon_casino"
+        },
+        {
+          "sectionIndex": 6,
+          "mode": "neon_casino"
+        },
+        {
+          "sectionIndex": 7,
+          "mode": "neon_casino"
+        },
+        {
+          "sectionIndex": 8,
+          "mode": "bloom_explosion"
+        },
+        {
+          "sectionIndex": 9,
+          "mode": "bloom_explosion"
+        },
+        {
+          "sectionIndex": 10,
+          "mode": "bloom_explosion"
+        },
+        {
+          "sectionIndex": 11,
           "mode": "dance_floor_prism"
         }
-      ]
+      ],
+      "overlayOverrides": {
+        "include": [
+          "NeonDeadSign",
+          "BobWeir",
+          "GlowSticks",
+          "LaserShow",
+          "SpeakerStack",
+          "CrowdDance",
+          "LighterWave",
+          "StageLights",
+          "LightningBolt",
+          "PrismRainbow",
+          "GratefulDeadLogo",
+          "BreathingStealie"
+        ]
+      }
     },
     {
       "trackId": "d3t07",
       "title": "And We Bid You Goodnight",
       "set": 3,
       "trackNumber": 7,
-      "defaultMode": "stained_glass_dissolution",
+      "defaultMode": "fractal_temple",
       "audioFile": "veneta-72/gd72-08-27d3t07.mp3",
       "palette": {
         "primary": 165,
         "secondary": 340,
         "saturation": 0.75
       },
-      "songArt": "assets/song-art/veneta-72/d3t07.png"
+      "songArt": "assets/song-art/veneta-72/d3t07.png",
+      "sectionOverrides": [
+        {
+          "sectionIndex": 0,
+          "mode": "morning_dew_fog"
+        },
+        {
+          "sectionIndex": 1,
+          "mode": "morning_dew_fog"
+        },
+        {
+          "sectionIndex": 2,
+          "mode": "morning_dew_fog"
+        },
+        {
+          "sectionIndex": 3,
+          "mode": "honeycomb_cathedral"
+        },
+        {
+          "sectionIndex": 4,
+          "mode": "honeycomb_cathedral"
+        },
+        {
+          "sectionIndex": 5,
+          "mode": "honeycomb_cathedral"
+        },
+        {
+          "sectionIndex": 6,
+          "mode": "morning_dew_fog"
+        },
+        {
+          "sectionIndex": 7,
+          "mode": "morning_dew_fog"
+        },
+        {
+          "sectionIndex": 8,
+          "mode": "morning_dew_fog"
+        }
+      ],
+      "overlayOverrides": {
+        "include": [
+          "GospelChurch",
+          "GodRays",
+          "MoonPhases",
+          "CampfireCircle",
+          "LighterWave",
+          "FogBank",
+          "Constellation",
+          "CommunityCircle",
+          "WaveOfLight",
+          "SunMoonMotif",
+          "UnitySpiral",
+          "CampfireSparks"
+        ]
+      }
     }
   ],
   "showPoster": "assets/song-art/veneta-72/show-poster.png"

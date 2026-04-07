@@ -1,266 +1,393 @@
 /**
- * FogBank -- Layer 1 (Atmospheric)
- * A+++ volumetric fog: parallax depth layers, wispy tendrils,
- * chromaHue-tinted light shafts, and churning ground fog.
+ * FogBank — A+++ overlay: dense fog filling the frame in 5 depth layers,
+ * with faint silhouettes barely visible (trees, distant figures, distant
+ * stage). Light rays cut through the fog from above. Wispy tendrils drift
+ * laterally. The whole feels dreamy and uncertain. Bass slowly rocks the
+ * fog laterally; energy thickens the wisps; chromaHue tints the moonlight.
  *
- * Audio: slowEnergy -> fog density, bass -> ground fog churn,
- *        chromaHue -> light shaft tint, energy -> visibility
- *
- * Tier A+++ | Tags: organic, contemplative, atmospheric | dutyCycle: 100 | energyBand: low
+ * Audio reactivity:
+ *   slowEnergy   → fog density and ray brightness
+ *   energy       → tendril speed and amplitude
+ *   bass         → lateral drift
+ *   beatDecay    → ray pulse
+ *   onsetEnvelope→ flash flare
+ *   chromaHue    → moonlight tint
+ *   tempoFactor  → drift rate
  */
 
 import React from "react";
-import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
+import { useCurrentFrame, useVideoConfig, interpolate } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
-import { useShowContext } from "../data/ShowContext";
 import { seeded } from "../utils/seededRandom";
 import { useAudioSnapshot } from "./parametric/audio-helpers";
 import { useTempoFactor } from "../data/TempoContext";
 
-interface FogLayer {
-  y: number; rx: number; ry: number; driftSpeed: number;
-  undulateFreq: number; undulateAmp: number; phase: number;
-  opacity: number; depth: number; blur: number;
-}
-interface WispyTendril {
-  startY: number; cp1x: number; cp1y: number; cp2x: number; cp2y: number;
-  endY: number; driftSpeed: number; morphFreq: number; morphAmp: number;
-  phase: number; opacity: number; strokeWidth: number; blur: number;
-}
-interface LightShaft {
-  x: number; angle: number; shaftWidth: number; rotSpeed: number;
-  phase: number; opacity: number; blur: number; warmCoolBias: number;
+const CYCLE_TOTAL = 2400;
+const VISIBLE_DURATION = 800;
+const BACK_FOG = 8;
+const MID_FOG = 10;
+const FRONT_FOG = 12;
+const TENDRIL_COUNT = 22;
+const RAY_COUNT = 9;
+const FIGURE_COUNT = 7;
+const TREE_COUNT = 9;
+const STAR_COUNT = 30;
+
+interface FogBlob {
+  x: number;
+  y: number;
+  rx: number;
+  ry: number;
+  drift: number;
+  shade: number;
+  phase: number;
 }
 
-const CLAMP = { extrapolateLeft: "clamp" as const, extrapolateRight: "clamp" as const };
-const CLAMP_EASE = { ...CLAMP, easing: Easing.out(Easing.cubic) };
-const STAGGER = 90;
+interface Tendril {
+  x: number;
+  y: number;
+  length: number;
+  thickness: number;
+  drift: number;
+  phase: number;
+}
 
-/* -- Generators ---------------------------------------------------- */
+interface Ray {
+  x: number;
+  width: number;
+  angle: number;
+  phase: number;
+}
 
-function genFogLayers(seed: number): FogLayer[] {
+interface Figure {
+  x: number;
+  y: number;
+  size: number;
+  bobPhase: number;
+  shade: number;
+  isFigure: boolean;
+}
+
+interface Tree {
+  x: number;
+  y: number;
+  size: number;
+  treeType: 0 | 1;
+}
+
+interface Star {
+  x: number;
+  y: number;
+  size: number;
+  phase: number;
+}
+
+function buildFog(seed: number, count: number, yMin: number, yMax: number): FogBlob[] {
   const rng = seeded(seed);
-  return Array.from({ length: 7 }, (_, i) => {
-    const d = i / 6; // depth 0=far, 1=near
-    return {
-      y: 0.2 + rng() * 0.6, rx: 0.6 + (1 - d) * 0.8 + rng() * 0.3,
-      ry: 0.06 + (1 - d) * 0.1 + rng() * 0.06, driftSpeed: 0.08 + d * 0.4 + rng() * 0.15,
-      undulateFreq: 0.003 + rng() * 0.004, undulateAmp: 0.01 + rng() * 0.02,
-      phase: rng() * Math.PI * 2, opacity: 0.04 + d * 0.08 + rng() * 0.04,
-      depth: i, blur: 30 + (1 - d) * 40 + rng() * 15,
-    };
-  });
-}
-
-function genTendrils(seed: number): WispyTendril[] {
-  const rng = seeded(seed);
-  return Array.from({ length: 6 }, () => ({
-    startY: 0.2 + rng() * 0.6, cp1x: 0.15 + rng() * 0.25, cp1y: -0.05 + rng() * 0.1,
-    cp2x: 0.55 + rng() * 0.25, cp2y: -0.05 + rng() * 0.1, endY: 0.2 + rng() * 0.6,
-    driftSpeed: 0.1 + rng() * 0.2, morphFreq: 0.006 + rng() * 0.008,
-    morphAmp: 15 + rng() * 30, phase: rng() * Math.PI * 2,
-    opacity: 0.05 + rng() * 0.05, strokeWidth: 2 + rng() * 5, blur: 8 + rng() * 12,
+  return Array.from({ length: count }, () => ({
+    x: rng(),
+    y: yMin + rng() * (yMax - yMin),
+    rx: 0.18 + rng() * 0.30,
+    ry: 0.06 + rng() * 0.10,
+    drift: 0.00008 + rng() * 0.00040,
+    shade: 0.38 + rng() * 0.30,
+    phase: rng() * Math.PI * 2,
   }));
 }
 
-function genShafts(seed: number): LightShaft[] {
-  const rng = seeded(seed);
-  return Array.from({ length: 3 }, (_, i) => ({
-    x: 0.15 + (i / 2) * 0.7 + (rng() - 0.5) * 0.15, angle: -25 + rng() * 50,
-    shaftWidth: 60 + rng() * 100, rotSpeed: 0.003 + rng() * 0.005,
-    phase: rng() * Math.PI * 2, opacity: 0.06 + rng() * 0.06,
-    blur: 25 + rng() * 20, warmCoolBias: rng(),
+function buildTendrils(): Tendril[] {
+  const rng = seeded(45_882_607);
+  return Array.from({ length: TENDRIL_COUNT }, () => ({
+    x: rng(),
+    y: 0.20 + rng() * 0.70,
+    length: 0.18 + rng() * 0.30,
+    thickness: 12 + rng() * 22,
+    drift: 0.0001 + rng() * 0.00038,
+    phase: rng() * Math.PI * 2,
   }));
 }
 
-/** ChromaHue-derived shaft tint (returns partial hsla string, caller appends alpha + ')') */
-function shaftColor(hue: number, warmCool: number, e: number): string {
-  const h = (40 + hue % 30) * (1 - warmCool) + (200 + hue % 40) * warmCool;
-  return `hsla(${h}, ${30 + e * 30}%, ${70 + e * 15}%,`;
+function buildRays(): Ray[] {
+  const rng = seeded(73_117_945);
+  return Array.from({ length: RAY_COUNT }, (_, i) => ({
+    x: 0.10 + (i / (RAY_COUNT - 1)) * 0.80 + (rng() - 0.5) * 0.06,
+    width: 70 + rng() * 60,
+    angle: -0.10 + rng() * 0.20,
+    phase: rng() * Math.PI * 2,
+  }));
 }
 
-/* -- Component ----------------------------------------------------- */
+function buildFigures(): Figure[] {
+  const rng = seeded(89_004_338);
+  return Array.from({ length: FIGURE_COUNT }, (_, i) => ({
+    x: 0.10 + (i / (FIGURE_COUNT - 1)) * 0.80 + (rng() - 0.5) * 0.05,
+    y: 0.62 + rng() * 0.18,
+    size: 0.65 + rng() * 0.45,
+    bobPhase: rng() * Math.PI * 2,
+    shade: 0.05 + rng() * 0.10,
+    isFigure: rng() > 0.4,
+  }));
+}
 
-interface Props { frames: EnhancedFrameData[] }
+function buildTrees(): Tree[] {
+  const rng = seeded(38_006_751);
+  return Array.from({ length: TREE_COUNT }, (_, i) => ({
+    x: (i / TREE_COUNT) + (rng() - 0.5) * 0.05,
+    y: 0.55 + rng() * 0.20,
+    size: 0.85 + rng() * 0.5,
+    treeType: Math.floor(rng() * 2) as 0 | 1,
+  }));
+}
+
+function buildStars(): Star[] {
+  const rng = seeded(67_881_002);
+  return Array.from({ length: STAR_COUNT }, () => ({
+    x: rng(),
+    y: rng() * 0.30,
+    size: 0.4 + rng() * 1.4,
+    phase: rng() * Math.PI * 2,
+  }));
+}
+
+interface Props {
+  frames: EnhancedFrameData[];
+}
 
 export const FogBank: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
-  const ctx = useShowContext();
-  const snap = useAudioSnapshot(frames);
   const tempoFactor = useTempoFactor();
-  const seed = ctx?.showSeed ?? 19770508;
+  const snap = useAudioSnapshot(frames);
 
-  const fogLayers = React.useMemo(() => genFogLayers(seed + 400), [seed]);
-  const tendrils = React.useMemo(() => genTendrils(seed + 401), [seed]);
-  const shafts = React.useMemo(() => genShafts(seed + 402), [seed]);
+  const backFog = React.useMemo(() => buildFog(11_991_337, BACK_FOG, 0.30, 0.65), []);
+  const midFog = React.useMemo(() => buildFog(22_882_446, MID_FOG, 0.40, 0.85), []);
+  const frontFog = React.useMemo(() => buildFog(33_773_555, FRONT_FOG, 0.55, 1.05), []);
+  const tendrils = React.useMemo(buildTendrils, []);
+  const rays = React.useMemo(buildRays, []);
+  const figures = React.useMemo(buildFigures, []);
+  const trees = React.useMemo(buildTrees, []);
+  const stars = React.useMemo(buildStars, []);
 
-  const { slowEnergy, energy, bass, chromaHue } = snap;
-  const t = frame * tempoFactor;
+  const cycleFrame = frame % CYCLE_TOTAL;
+  if (cycleFrame >= VISIBLE_DURATION) return null;
+  const progress = cycleFrame / VISIBLE_DURATION;
+  const fadeIn = interpolate(progress, [0, 0.10], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const fadeOut = interpolate(progress, [0.90, 1], [1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const masterOpacity = Math.min(fadeIn, fadeOut) * 0.85;
+  if (masterOpacity < 0.01) return null;
 
-  const quietness = 1 - interpolate(energy, [0.03, 0.25], [0, 1], CLAMP);
-  const fogDensity = interpolate(slowEnergy, [0.03, 0.20], [0.7, 0.25], CLAMP);
-  const masterFade = interpolate(frame, [STAGGER, STAGGER + 150], [0, 1], CLAMP_EASE);
-  const masterOp = fogDensity * masterFade;
-  if (masterOp < 0.01) return null;
+  const fogDensity = interpolate(snap.slowEnergy, [0.02, 0.32], [0.55, 1.15], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const energy = snap.energy;
+  const bass = snap.bass;
+  const beatPulse = 1 + snap.beatDecay * 0.30;
+  const onsetFlare = snap.onsetEnvelope > 0.55 ? Math.min(1, (snap.onsetEnvelope - 0.4) * 1.5) : 0;
 
-  /* -- 1. Fog Layers (7 parallax ellipses) ------------------------- */
+  const baseHue = 210;
+  const tintHue = ((baseHue + (snap.chromaHue - 180) * 0.4) % 360 + 360) % 360;
+  const moonCore = `hsl(${tintHue}, 60%, 90%)`;
+  const moonRay = `hsl(${tintHue}, 50%, 78%)`;
+  const moonFog = `hsl(${tintHue}, 30%, 65%)`;
 
-  const fogEls = fogLayers.map((L, i) => {
-    const delay = STAGGER + i * 18;
-    const fade = interpolate(frame, [delay, delay + 100], [0, 1], CLAMP_EASE);
-    if (fade < 0.01) return null;
+  const skyTop = `hsl(${(tintHue + 220) % 360}, 25%, 7%)`;
+  const skyMid = `hsl(${(tintHue + 235) % 360}, 22%, 12%)`;
+  const skyHorizon = `hsl(${(tintHue + 10) % 360}, 25%, 22%)`;
 
-    const driftX =
-      Math.sin((t + L.phase) * 0.002 * L.driftSpeed) * width * 0.12 +
-      Math.sin((t + L.phase * 1.3) * 0.0008 * L.driftSpeed) * width * 0.06;
-    const undY =
-      Math.sin(t * L.undulateFreq + L.phase) * height * L.undulateAmp +
-      Math.sin(t * L.undulateFreq * 0.6 + L.phase * 2.1) * height * L.undulateAmp * 0.5;
+  const lateralDrift = Math.sin(frame * 0.005 * tempoFactor) * (8 + bass * 24);
 
-    const cx = width * 0.5 + driftX;
-    const cy = L.y * height + undY;
-    const rx = L.rx * width * 0.5 * (1 + quietness * 0.15);
-    const ry = L.ry * height * (1 + quietness * 0.3);
-    const op = L.opacity * (0.6 + quietness * 0.4) * masterOp * fade;
-    const gid = `fg-${i}`;
-
+  // ===== fog blob renderer =====
+  function renderFog(blob: FogBlob, key: string, depth: 0 | 1 | 2) {
+    const drift = (blob.x + frame * blob.drift * (1 + bass * 0.4)) % 1.2 - 0.1;
+    const breath = 1 + Math.sin(frame * 0.012 + blob.phase) * 0.08;
+    const opacity = (depth === 0 ? 0.50 : depth === 1 ? 0.42 : 0.34) * fogDensity * (0.75 + blob.shade * 0.5);
+    const px = drift * width + lateralDrift * (depth === 0 ? 0.4 : depth === 1 ? 0.6 : 1.0);
     return (
-      <g key={gid} style={{ filter: `blur(${L.blur}px)` }}>
-        <defs>
-          <radialGradient id={gid} cx="50%" cy="50%" rx="50%" ry="50%">
-            <stop offset="0%" stopColor={`hsla(210,15%,85%,${op})`} />
-            <stop offset="35%" stopColor={`hsla(215,12%,82%,${op * 0.7})`} />
-            <stop offset="65%" stopColor={`hsla(220,10%,78%,${op * 0.3})`} />
-            <stop offset="100%" stopColor="hsla(220,10%,78%,0)" />
-          </radialGradient>
-        </defs>
-        <ellipse cx={cx} cy={cy} rx={rx} ry={ry} fill={`url(#${gid})`} />
-      </g>
+      <ellipse
+        key={key}
+        cx={px}
+        cy={blob.y * height}
+        rx={blob.rx * width * breath}
+        ry={blob.ry * height * breath}
+        fill={`hsla(${tintHue}, 25%, ${50 + blob.shade * 20}%, ${opacity})`}
+      />
     );
-  });
+  }
 
-  /* -- 2. Wispy Tendrils (6 blurred bezier wisps) ------------------ */
-
-  const tendrilEls = tendrils.map((T, i) => {
-    const delay = STAGGER + 7 * 18 + i * 25;
-    const fade = interpolate(frame, [delay, delay + 120], [0, 1], CLAMP_EASE);
-    if (fade < 0.01) return null;
-
-    const driftX = Math.sin((t + T.phase) * 0.0015 * T.driftSpeed) * width * 0.08;
-    const mt = t * T.morphFreq;
-    const m1y = Math.sin(mt + T.phase) * T.morphAmp;
-    const m2y = Math.sin(mt * 0.7 + T.phase * 1.6) * T.morphAmp;
-    const m1x = Math.cos(mt * 0.5 + T.phase * 0.8) * T.morphAmp * 0.6;
-    const m2x = Math.cos(mt * 0.4 + T.phase * 1.2) * T.morphAmp * 0.6;
-
-    const sx = driftX - width * 0.1, sy = T.startY * height;
-    const c1x = T.cp1x * width + driftX + m1x, c1y = sy + T.cp1y * height + m1y;
-    const c2x = T.cp2x * width + driftX + m2x, c2y = T.endY * height + T.cp2y * height + m2y;
-    const ex = width * 1.1 + driftX, ey = T.endY * height;
-
-    const op = T.opacity * masterOp * fade * (0.5 + quietness * 0.5);
-
+  // ===== tendrils =====
+  const tendrilNodes = tendrils.map((t, i) => {
+    const drift = (t.x + frame * t.drift * (1 + energy * 0.4)) % 1.2 - 0.1;
+    const px = drift * width + lateralDrift * 0.7;
+    const py = t.y * height;
+    const sweep = Math.sin(frame * 0.018 + t.phase) * 30;
+    const len = t.length * width;
     return (
       <path
-        key={`t-${i}`}
-        d={`M ${sx} ${sy} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${ex} ${ey}`}
-        fill="none" stroke={`hsla(215,15%,85%,${op})`}
-        strokeWidth={T.strokeWidth * (1 + quietness * 0.5)} strokeLinecap="round"
-        style={{ filter: `blur(${T.blur}px)` }}
+        key={`td-${i}`}
+        d={`M ${px} ${py}
+            Q ${px + len * 0.3} ${py + sweep * 0.5} ${px + len * 0.6} ${py + sweep * 0.8}
+            T ${px + len} ${py + sweep * 1.2}`}
+        stroke={moonFog}
+        strokeWidth={t.thickness * (0.85 + fogDensity * 0.40)}
+        strokeLinecap="round"
+        fill="none"
+        opacity={0.16 * fogDensity}
       />
     );
   });
 
-  /* -- 3. Light Shafts (3 rotating beams, chromaHue-tinted) -------- */
-
-  const shaftEls = shafts.map((S, i) => {
-    const delay = STAGGER + 200 + i * 40;
-    const fade = interpolate(frame, [delay, delay + 180], [0, 1], CLAMP_EASE);
-    if (fade < 0.01) return null;
-
-    const ang = S.angle + Math.sin(t * S.rotSpeed + S.phase) * 8;
-    const shiftX = Math.sin(t * 0.001 + S.phase * 2.3) * width * 0.03;
-    const cx = S.x * width + shiftX;
-    const hw = S.shaftWidth * 0.5 * (0.8 + energy * 0.4);
-    const sLen = height * 1.6;
-    const col = shaftColor(chromaHue, S.warmCoolBias, energy);
-    const op = S.opacity * masterOp * fade * (0.4 + energy * 0.6);
-    const gid = `sh-${i}`;
-
+  // ===== light rays from above =====
+  const rayNodes = rays.map((r, i) => {
+    const sx = r.x * width;
+    const sy = -10;
+    const angle = r.angle + Math.sin(frame * 0.008 + r.phase) * 0.04;
+    const len = height * 1.05;
+    const ex = sx + Math.tan(angle) * len;
+    const ey = len;
+    const w = r.width * (1 + energy * 0.3) * beatPulse;
     return (
-      <g key={gid} style={{
-        transform: `rotate(${ang}deg)`, transformOrigin: `${cx}px ${height * 0.5}px`,
-        filter: `blur(${S.blur}px)`,
-      }}>
-        <defs>
-          <linearGradient id={gid} x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%" stopColor={`${col} 0)`} />
-            <stop offset="30%" stopColor={`${col} ${op * 0.6})`} />
-            <stop offset="50%" stopColor={`${col} ${op})`} />
-            <stop offset="70%" stopColor={`${col} ${op * 0.6})`} />
-            <stop offset="100%" stopColor={`${col} 0)`} />
-          </linearGradient>
-        </defs>
-        <rect x={cx - hw} y={-sLen * 0.3} width={hw * 2} height={sLen} fill={`url(#${gid})`} />
+      <g key={`ray-${i}`} style={{ mixBlendMode: "screen" }}>
+        <path
+          d={`M ${sx - w * 0.10} ${sy}
+              L ${ex - w * 0.55} ${ey}
+              L ${ex + w * 0.55} ${ey}
+              L ${sx + w * 0.10} ${sy} Z`}
+          fill={moonRay}
+          opacity={0.08 * fogDensity}
+        />
+        <path
+          d={`M ${sx - w * 0.05} ${sy}
+              L ${ex - w * 0.28} ${ey}
+              L ${ex + w * 0.28} ${ey}
+              L ${sx + w * 0.05} ${sy} Z`}
+          fill={moonRay}
+          opacity={0.16 * fogDensity}
+        />
+        <path
+          d={`M ${sx - w * 0.018} ${sy}
+              L ${ex - w * 0.10} ${ey}
+              L ${ex + w * 0.10} ${ey}
+              L ${sx + w * 0.018} ${sy} Z`}
+          fill={moonCore}
+          opacity={0.28 * fogDensity * beatPulse}
+        />
       </g>
     );
   });
 
-  /* -- 4. Ground Fog (bottom 20%, bass-driven churn) --------------- */
-
-  const bassChurn = interpolate(bass, [0.02, 0.3], [0.3, 1.5], CLAMP);
-  const gfDelay = STAGGER + 60;
-  const gfFade = interpolate(frame, [gfDelay, gfDelay + 120], [0, 1], CLAMP_EASE);
-  const gH = height * (0.18 + quietness * 0.08);
-  const gTop = height - gH;
-  const gOp = masterOp * gfFade * (0.5 + quietness * 0.4);
-
-  const groundSubs = Array.from({ length: 4 }, (_, gi) => {
-    const ph = gi * 1.7;
-    const dx = Math.sin(t * 0.002 * bassChurn + ph) * width * 0.06 +
-      Math.cos(t * 0.001 * bassChurn + ph * 2.3) * width * 0.03;
-    const uy = Math.sin(t * 0.003 * bassChurn + ph * 0.8) * gH * 0.08;
-    const op = gOp * (0.6 + (gi / 4) * 0.4);
-    const cy = gTop + gi * (gH / 4) * 0.3 + uy;
-    const rx = width * (0.7 + gi * 0.08);
-    const ry = gH * (0.5 + gi * 0.15);
-    const bl = 25 + gi * 10;
-    const gid = `gf-${gi}`;
+  // ===== faint figures (people in the fog) =====
+  const figureNodes = figures.map((f, i) => {
+    const fx = f.x * width;
+    const fy = f.y * height;
+    const bob = Math.sin(frame * 0.018 + f.bobPhase) * 2;
+    const figH = 100 * f.size;
+    const shade = `rgba(${10 + f.shade * 20},${10 + f.shade * 20},${20 + f.shade * 20}, ${0.40 + f.shade * 0.20})`;
+    if (f.isFigure) {
+      return (
+        <g key={`fig-${i}`}>
+          <ellipse cx={fx} cy={fy + bob} rx={figH * 0.18} ry={figH * 0.45} fill={shade} />
+          <circle cx={fx} cy={fy - figH * 0.36 + bob} r={figH * 0.12} fill={shade} />
+        </g>
+      );
+    }
+    // distant stage box (alternative)
     return (
-      <g key={gid} style={{ filter: `blur(${bl}px)` }}>
-        <defs>
-          <radialGradient id={gid} cx="50%" cy="30%" rx="50%" ry="50%">
-            <stop offset="0%" stopColor={`hsla(210,10%,88%,${op * 0.9})`} />
-            <stop offset="50%" stopColor={`hsla(215,8%,82%,${op * 0.5})`} />
-            <stop offset="100%" stopColor="hsla(220,8%,80%,0)" />
-          </radialGradient>
-        </defs>
-        <ellipse cx={width * 0.5 + dx} cy={cy} rx={rx} ry={ry} fill={`url(#${gid})`} />
+      <g key={`fig-${i}`}>
+        <rect x={fx - figH * 0.4} y={fy - figH * 0.4} width={figH * 0.8} height={figH * 0.4} fill={shade} />
       </g>
     );
   });
 
-  /* -- Render ------------------------------------------------------ */
+  // ===== trees in the fog =====
+  const treeNodes = trees.map((t, i) => {
+    const tx = t.x * width;
+    const ty = t.y * height;
+    const ts = t.size;
+    const fade = `rgba(20, 18, 26, ${0.35 + (1 - t.y) * 0.20})`;
+    if (t.treeType === 0) {
+      return (
+        <g key={`tr-${i}`}>
+          <rect x={tx - 5 * ts} y={ty} width={10 * ts} height={20 * ts} fill={fade} />
+          <path d={`M ${tx - 32 * ts} ${ty + 8} L ${tx} ${ty - 80 * ts} L ${tx + 32 * ts} ${ty + 8} Z`} fill={fade} />
+        </g>
+      );
+    }
+    return (
+      <g key={`tr-${i}`}>
+        <rect x={tx - 4 * ts} y={ty} width={8 * ts} height={22 * ts} fill={fade} />
+        <circle cx={tx} cy={ty - 30 * ts} r={36 * ts} fill={fade} />
+      </g>
+    );
+  });
+
+  // ===== stars =====
+  const starNodes = stars.map((s, i) => {
+    const tw = 0.5 + Math.sin(frame * 0.05 + s.phase) * 0.45;
+    return <circle key={`star-${i}`} cx={s.x * width} cy={s.y * height} r={s.size * tw} fill="rgba(220, 220, 230, 0.55)" />;
+  });
 
   return (
     <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden" }}>
-      <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`}
-        style={{ mixBlendMode: "screen" }}>
-        {fogEls}
-        {tendrilEls}
-        {shaftEls}
+      <svg width={width} height={height} style={{ opacity: masterOpacity, willChange: "opacity" }}>
         <defs>
-          <linearGradient id="gf-base" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="hsla(215,10%,85%,0)" />
-            <stop offset="30%" stopColor={`hsla(215,10%,85%,${gOp * 0.2})`} />
-            <stop offset="70%" stopColor={`hsla(210,12%,88%,${gOp * 0.5})`} />
-            <stop offset="100%" stopColor={`hsla(210,12%,90%,${gOp * 0.7})`} />
+          <linearGradient id="fb-sky" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={skyTop} />
+            <stop offset="55%" stopColor={skyMid} />
+            <stop offset="100%" stopColor={skyHorizon} />
           </linearGradient>
+          <radialGradient id="fb-moon" cx="0.5" cy="0.5" r="0.5">
+            <stop offset="0%" stopColor={moonCore} stopOpacity="0.5" />
+            <stop offset="100%" stopColor={moonRay} stopOpacity="0" />
+          </radialGradient>
+          <filter id="fb-blur" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="14" />
+          </filter>
+          <filter id="fb-blur-soft" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="6" />
+          </filter>
         </defs>
-        <rect x={0} y={gTop} width={width} height={gH}
-          fill="url(#gf-base)" style={{ filter: "blur(15px)" }} />
-        {groundSubs}
+
+        {/* Sky */}
+        <rect width={width} height={height} fill="url(#fb-sky)" />
+
+        {/* Stars */}
+        <g>{starNodes}</g>
+
+        {/* Moon glow */}
+        <circle cx={width * 0.78} cy={height * 0.18} r={height * 0.24} fill="url(#fb-moon)" />
+        <circle cx={width * 0.78} cy={height * 0.18} r={28} fill={moonCore} opacity={0.85} />
+
+        {/* Trees in the back (faint) */}
+        <g filter="url(#fb-blur-soft)">{treeNodes}</g>
+
+        {/* Distant figures */}
+        <g filter="url(#fb-blur-soft)">{figureNodes}</g>
+
+        {/* Back fog */}
+        <g filter="url(#fb-blur)">{backFog.map((b, i) => renderFog(b, `bk-${i}`, 0))}</g>
+
+        {/* Light rays cutting through */}
+        <g>{rayNodes}</g>
+
+        {/* Mid fog */}
+        <g filter="url(#fb-blur)">{midFog.map((b, i) => renderFog(b, `md-${i}`, 1))}</g>
+
+        {/* Tendrils */}
+        <g filter="url(#fb-blur-soft)">{tendrilNodes}</g>
+
+        {/* Front fog */}
+        <g filter="url(#fb-blur)">{frontFog.map((b, i) => renderFog(b, `fn-${i}`, 2))}</g>
+
+        {/* Onset flash */}
+        {onsetFlare > 0 && (
+          <rect width={width} height={height} fill={`hsla(${tintHue}, 60%, 80%, ${onsetFlare * 0.10})`} />
+        )}
+
+        {/* Final atmospheric wash */}
+        <rect
+          width={width}
+          height={height}
+          fill={`hsla(${tintHue}, 30%, 50%, ${0.06 + fogDensity * 0.05})`}
+          style={{ mixBlendMode: "screen" }}
+        />
       </svg>
     </div>
   );

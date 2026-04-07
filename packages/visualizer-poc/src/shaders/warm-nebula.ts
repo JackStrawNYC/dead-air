@@ -50,6 +50,7 @@ ${buildPostProcessGLSL({
   halationEnabled: true,
   lightLeakEnabled: true,
   dofEnabled: true,
+  temporalBlendEnabled: true,
 })}
 
 varying vec2 vUv;
@@ -154,9 +155,9 @@ void main() {
   float copperHue = 0.069;
   float roseHue = 0.958;
 
-  vec3 warmAmber = hsv2rgb(vec3(mix(amberHue, hue1, 0.4), sat * 0.9, 1.0));
-  vec3 warmCopper = hsv2rgb(vec3(mix(copperHue, hue2, 0.35), sat * 0.85, 0.9));
-  vec3 warmRose = hsv2rgb(vec3(mix(roseHue, hue1 + 0.15, 0.3), sat * 0.7, 0.85));
+  vec3 warmAmber = safeBlendHue(amberHue, hue1, 0.4, sat * 0.9, 1.0);
+  vec3 warmCopper = safeBlendHue(copperHue, hue2, 0.35, sat * 0.85, 0.9);
+  vec3 warmRose = safeBlendHue(roseHue, hue1 + 0.15, 0.3, sat * 0.7, 0.85);
 
   // ---- Coherence warp factor ----
   float coherenceWarp = coherence > 0.7 ? mix(1.0, 0.3, (coherence - 0.7) / 0.3)
@@ -306,23 +307,8 @@ void main() {
   vignette = smoothstep(0.0, 1.0, vignette);
   col = mix(vec3(0.003, 0.002, 0.001), col, vignette);
 
-  // ---- Post-processing ----
+  // ---- Post-processing (includes temporal blend) ----
   col = applyPostProcess(col, vUv, screenP);
-
-  // ---- Feedback trails ----
-  vec3 prev = texture2D(uPrevFrame, vUv).rgb;
-  float baseDecay_fb = mix(0.93, 0.87, energy);
-  float feedbackDecay = baseDecay_fb + sJam * 0.03 + sSpace * 0.05 - sChorus * 0.05;
-  feedbackDecay = clamp(feedbackDecay, 0.82, 0.97);
-  if (uJamPhase >= 0.0) {
-    float jpExplore = step(-0.5, uJamPhase) * step(uJamPhase, 0.5);
-    float jpBuild   = step(0.5, uJamPhase) * step(uJamPhase, 1.5);
-    float jpPeak    = step(1.5, uJamPhase) * step(uJamPhase, 2.5);
-    float jpResolve = step(2.5, uJamPhase);
-    feedbackDecay += jpExplore * 0.02 + jpBuild * 0.01 + jpPeak * 0.04 - jpResolve * 0.03;
-    feedbackDecay = clamp(feedbackDecay, 0.82, 0.97);
-  }
-  col = max(col, prev * feedbackDecay);
 
   gl_FragColor = vec4(col, 1.0);
 }

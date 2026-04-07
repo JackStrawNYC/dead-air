@@ -151,10 +151,10 @@ void main() {
   vec3 rayDir = normalize(screenPos.x * rolledRight + screenPos.y * rolledUp + fov * camFwd);
 
   // ═══ Palette ═══
-  float hue1 = hsvToCosineHue(uPalettePrimary) + chromaH * 0.15 + chordHue;
-  vec3 cloudColor = 0.5 + 0.5 * cos(TAU * vec3(hue1, hue1 + 0.33, hue1 + 0.67));
-  float hue2 = hsvToCosineHue(uPaletteSecondary) + chordHue * 0.5;
-  vec3 emissionColor = 0.5 + 0.5 * cos(TAU * vec3(hue2, hue2 + 0.33, hue2 + 0.67));
+  float hue1 = uPalettePrimary + chromaH * 0.15 + chordHue;
+  vec3 cloudColor = paletteHueColor(hue1, 0.78, 0.92);
+  float hue2 = uPaletteSecondary + chordHue * 0.5;
+  vec3 emissionColor = paletteHueColor(hue2, 0.85, 0.98);
 
   // ═══ Kaliset volumetric fractal ═══
   float formuparam = 0.53 + onset * 0.15 + effectiveBeat * 0.12 + uDrumOnset * 0.15;
@@ -211,7 +211,7 @@ void main() {
     // Multi-scale color mapping
     float density = clamp(acc * 0.001, 0.0, 1.0);
     float depthHue = float(r) * 0.008;
-    vec3 shiftedCloud = 0.5 + 0.5 * cos(TAU * vec3(hue1 + depthHue, hue1 + 0.33 + depthHue, hue1 + 0.67 + depthHue));
+    vec3 shiftedCloud = paletteHueColor(hue1 + depthHue, 0.78, 0.92);
 
     vec3 bandCool = shiftedCloud * vec3(0.7, 0.85, 1.0);
     vec3 bandWarm = mix(shiftedCloud, emissionColor, 0.35) * vec3(1.0, 0.95, 0.85);
@@ -305,14 +305,8 @@ void main() {
     col += heroIconEmergence(screenPos, uTime, energy, bass, cloudColor, emissionColor, nf, uSectionIndex);
   }
 
-  // Post-processing
+  // Post-processing (temporal blend handled inside via temporalBlendEnabled)
   col = applyPostProcess(col, vUv, screenPos);
-
-  // Feedback
-  vec3 prev = texture2D(uPrevFrame, vUv).rgb;
-  float baseDecay = mix(0.95, 0.88, energy);
-  float feedbackDecay = clamp(baseDecay + sJam * 0.04 + sSpace * 0.06, 0.80, 0.97);
-  col = max(col, prev * feedbackDecay);
 
   gl_FragColor = vec4(col, 1.0);
 }

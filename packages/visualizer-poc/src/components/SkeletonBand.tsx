@@ -1,321 +1,342 @@
 /**
- * SkeletonBand -- parade of 4 skeleton musicians crossing the screen.
- * Each skeleton is tied to a stem: bass, drums, guitar (other), vocals.
- * Silhouette style with backlit glow from chromaHue palette.
- * No energy gating -- renders whenever active (rotation engine controls timing).
- * Each musician plays their instrument when their stem is active.
+ * SkeletonBand — A+++ overlay: Stealie iconography come to life.
+ * Five skeleton musicians on stage in iconic Dead poses: lead guitarist,
+ * bassist, drummer, keyboardist, and rhythm guitarist. Stage with lights,
+ * roses + bones decorations, tie-dye color palette.
+ *
+ * Audio reactivity:
+ *   slowEnergy → ambient stage glow
+ *   energy → skeleton motion intensity
+ *   bass → bassist sway
+ *   beatDecay → drummer arm beat + glow
+ *   onsetEnvelope → cymbal flash
+ *   chromaHue → tie-dye palette tint shift
+ *   tempoFactor → motion speed
  */
 
 import React from "react";
 import { useCurrentFrame, useVideoConfig, interpolate } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
+import { seeded } from "../utils/seededRandom";
 import { useAudioSnapshot } from "./parametric/audio-helpers";
 import { useTempoFactor } from "../data/TempoContext";
 
-type IconFC = React.FC<{
-  size: number;
-  color: string;
-  glowColor: string;
-  activity: number; // 0-1 how active this stem is right now
-  frame: number;
-  tempoFactor: number;
-}>;
+const CYCLE_TOTAL = 2400;
+const VISIBLE_DURATION = 780;
+const ROSE_COUNT = 14;
+const PARTICLE_COUNT = 50;
 
-/* ------------------------------------------------------------------ */
-/*  Skeleton SVGs — silhouette style with instrument-playing poses     */
-/* ------------------------------------------------------------------ */
+interface Rose { x: number; y: number; r: number; angle: number; }
+interface Particle { x: number; y: number; r: number; speed: number; phase: number; }
 
-/** Bass skeleton (Phil) — body bobs with bass, plucking hand moves */
-const SkeletonBass: IconFC = ({ size, color, glowColor, activity, frame, tempoFactor }) => {
-  const pluck = Math.sin(frame * 0.25 * tempoFactor) * activity * 8;
-  const bodyBob = activity * 6;
-  const headTilt = Math.sin(frame * 0.08 * tempoFactor) * activity * 4;
-  return (
-    <svg width={size} height={size * 1.2} viewBox="0 0 100 130" fill="none">
-      {/* Backlit glow */}
-      <ellipse cx="50" cy="65" rx="35" ry="55" fill={glowColor} opacity={0.08 + activity * 0.12} />
-      {/* Head */}
-      <circle cx="50" cy={16 - bodyBob * 0.3} r="13" fill={color} opacity="0.9"
-        transform={`rotate(${headTilt}, 50, 16)`} />
-      <circle cx="45" cy="13" r="2" fill="black" opacity="0.6" />
-      <circle cx="55" cy="13" r="2" fill="black" opacity="0.6" />
-      {/* Jaw — opens slightly with bass hits */}
-      <rect x="44" y={21 + activity * 2} width="12" height={3 + activity * 3} rx="1" fill={color} opacity="0.5" />
-      {/* Spine */}
-      <line x1="50" y1={29 - bodyBob * 0.2} x2="50" y2={68 + bodyBob * 0.5} stroke={color} strokeWidth="3" />
-      {/* Ribs */}
-      <path d={`M 38 ${38 + bodyBob * 0.2} Q 44 ${42 + bodyBob * 0.3} 50 ${38 + bodyBob * 0.2} Q 56 ${42 + bodyBob * 0.3} 62 ${38 + bodyBob * 0.2}`} stroke={color} strokeWidth="1.5" opacity="0.4" />
-      <path d={`M 40 ${45 + bodyBob * 0.3} Q 45 ${48 + bodyBob * 0.3} 50 ${45 + bodyBob * 0.3} Q 55 ${48 + bodyBob * 0.3} 60 ${45 + bodyBob * 0.3}`} stroke={color} strokeWidth="1.5" opacity="0.4" />
-      {/* Left arm — neck hand (steady) */}
-      <line x1="42" y1="40" x2="25" y2="30" stroke={color} strokeWidth="2.5" strokeLinecap="round" />
-      {/* Right arm — plucking hand (moves with bass) */}
-      <line x1="58" y1="42" x2={70 + pluck * 0.3} y2={58 + pluck} stroke={color} strokeWidth="2.5" strokeLinecap="round" />
-      {/* Bass guitar body */}
-      <ellipse cx="22" cy="78" rx="13" ry="17" fill={color} opacity={0.3 + activity * 0.2} />
-      <circle cx="22" cy="76" r="3.5" fill="black" opacity="0.25" />
-      {/* Bass neck */}
-      <line x1="22" y1="61" x2="22" y2="8" stroke={color} strokeWidth="2.5" opacity="0.45" />
-      <rect x="18" y="4" width="8" height="7" rx="2" fill={color} opacity="0.4" />
-      {/* Strings vibrate with activity */}
-      {activity > 0.15 && (
-        <path d={`M 22 61 Q ${22 + Math.sin(frame * 0.6) * activity * 3} 40 22 18`}
-          stroke={color} strokeWidth="0.8" opacity={activity * 0.6} />
-      )}
-      {/* Legs — slight bounce */}
-      <line x1="45" y1={68 + bodyBob * 0.5} x2="38" y2={105 + bodyBob} stroke={color} strokeWidth="2.5" strokeLinecap="round" />
-      <line x1="55" y1={68 + bodyBob * 0.5} x2="62" y2={105 + bodyBob} stroke={color} strokeWidth="2.5" strokeLinecap="round" />
-      <ellipse cx="36" cy={108 + bodyBob} rx="7" ry="3" fill={color} opacity="0.4" />
-      <ellipse cx="64" cy={108 + bodyBob} rx="7" ry="3" fill={color} opacity="0.4" />
-    </svg>
-  );
-};
-
-/** Drum skeleton (Bill/Mickey) — sticks strike on drum onset */
-const SkeletonDrums: IconFC = ({ size, color, glowColor, activity, frame, tempoFactor }) => {
-  // Sticks slam down on hits, rest position up
-  const stickStrike = activity > 0.3 ? activity * 25 : 0;
-  const leftStickPhase = Math.sin(frame * 0.3 * tempoFactor) > 0 ? stickStrike : 0;
-  const rightStickPhase = Math.sin(frame * 0.3 * tempoFactor + Math.PI) > 0 ? stickStrike : 0;
-  const headBang = activity * 5;
-  return (
-    <svg width={size * 1.2} height={size * 1.2} viewBox="0 0 130 130" fill="none">
-      <ellipse cx="65" cy="65" rx="40" ry="55" fill={glowColor} opacity={0.08 + activity * 0.12} />
-      {/* Head — bangs forward on hits */}
-      <circle cx="65" cy={16 + headBang * 0.4} r="13" fill={color} opacity="0.9" />
-      <circle cx="60" cy="13" r="2" fill="black" opacity="0.6" />
-      <circle cx="70" cy="13" r="2" fill="black" opacity="0.6" />
-      <rect x="59" y="21" width="12" height="3" rx="1" fill={color} opacity="0.5" />
-      {/* Spine */}
-      <line x1="65" y1="29" x2="65" y2="62" stroke={color} strokeWidth="3" />
-      <path d="M 53 38 Q 59 42 65 38 Q 71 42 77 38" stroke={color} strokeWidth="1.5" opacity="0.4" />
-      {/* Left arm + stick — strikes down */}
-      <line x1="55" y1="38" x2="30" y2={30 + leftStickPhase * 0.6} stroke={color} strokeWidth="2.5" strokeLinecap="round" />
-      <line x1="30" y1={30 + leftStickPhase * 0.6} x2={22 + leftStickPhase * 0.3} y2={20 + leftStickPhase} stroke={color} strokeWidth="2" strokeLinecap="round" />
-      {/* Right arm + stick — strikes down (alternating) */}
-      <line x1="75" y1="38" x2="100" y2={30 + rightStickPhase * 0.6} stroke={color} strokeWidth="2.5" strokeLinecap="round" />
-      <line x1="100" y1={30 + rightStickPhase * 0.6} x2={108 - rightStickPhase * 0.3} y2={20 + rightStickPhase} stroke={color} strokeWidth="2" strokeLinecap="round" />
-      {/* Drum kit — glows on hit */}
-      <ellipse cx="42" cy="77" rx="18" ry="12" stroke={color} strokeWidth="2"
-        opacity={0.4 + (leftStickPhase > 5 ? 0.4 : 0)} />
-      <ellipse cx="88" cy="77" rx="18" ry="12" stroke={color} strokeWidth="2"
-        opacity={0.4 + (rightStickPhase > 5 ? 0.4 : 0)} />
-      <ellipse cx="65" cy="87" rx="22" ry="14" stroke={color} strokeWidth="2.5"
-        opacity={0.5 + activity * 0.3} />
-      {/* Hit flash on drums */}
-      {activity > 0.5 && (
-        <>
-          <ellipse cx="65" cy="87" rx="18" ry="10" fill={glowColor} opacity={activity * 0.25} />
-        </>
-      )}
-      {/* Cymbal */}
-      <ellipse cx="108" cy="58" rx="12" ry="3" stroke={color} strokeWidth="1.5" opacity={0.4 + activity * 0.3} />
-      <line x1="108" y1="58" x2="108" y2="88" stroke={color} strokeWidth="1.5" opacity="0.3" />
-      {/* Legs behind kit */}
-      <line x1="59" y1="62" x2="50" y2="102" stroke={color} strokeWidth="2.5" strokeLinecap="round" opacity="0.5" />
-      <line x1="71" y1="62" x2="80" y2="102" stroke={color} strokeWidth="2.5" strokeLinecap="round" opacity="0.5" />
-    </svg>
-  );
-};
-
-/** Guitar skeleton (Jerry) — strumming hand moves with stemOtherRms */
-const SkeletonGuitar: IconFC = ({ size, color, glowColor, activity, frame, tempoFactor }) => {
-  const strum = Math.sin(frame * 0.2 * tempoFactor) * activity * 10;
-  const sway = Math.sin(frame * 0.05 * tempoFactor) * activity * 6;
-  const neckBend = Math.sin(frame * 0.04 * tempoFactor) * activity * 3;
-  return (
-    <svg width={size} height={size * 1.2} viewBox="0 0 100 130" fill="none">
-      <ellipse cx="50" cy="65" rx="35" ry="55" fill={glowColor} opacity={0.08 + activity * 0.12} />
-      {/* Head — sways with playing */}
-      <g transform={`translate(${sway * 0.3}, 0)`}>
-        <circle cx="50" cy="16" r="13" fill={color} opacity="0.9" />
-        <circle cx="45" cy="13" r="2" fill="black" opacity="0.6" />
-        <circle cx="55" cy="13" r="2" fill="black" opacity="0.6" />
-        <rect x="44" y="21" width="12" height="3" rx="1" fill={color} opacity="0.5" />
-      </g>
-      {/* Spine — slight sway */}
-      <line x1={50 + sway * 0.2} y1="29" x2={50 + sway * 0.1} y2="68" stroke={color} strokeWidth="3" />
-      <path d={`M ${38 + sway * 0.15} 38 Q ${44 + sway * 0.15} 42 ${50 + sway * 0.15} 38 Q ${56 + sway * 0.15} 42 ${62 + sway * 0.15} 38`} stroke={color} strokeWidth="1.5" opacity="0.4" />
-      {/* Left arm — fretting hand (subtle neck movement) */}
-      <line x1="42" y1="40" x2={20 + neckBend} y2="52" stroke={color} strokeWidth="2.5" strokeLinecap="round" />
-      {/* Right arm — strumming hand */}
-      <line x1="58" y1="40" x2={73 + strum * 0.5} y2={55 + strum} stroke={color} strokeWidth="2.5" strokeLinecap="round" />
-      {/* Guitar body */}
-      <ellipse cx="70" cy="60" rx="15" ry="11" fill={color} opacity={0.35 + activity * 0.15} />
-      <ellipse cx="70" cy="70" rx="13" ry="10" fill={color} opacity={0.3 + activity * 0.15} />
-      <circle cx="70" cy="63" r="3" fill="black" opacity="0.25" />
-      {/* Guitar neck */}
-      <line x1="57" y1="56" x2="20" y2="48" stroke={color} strokeWidth="2.5" opacity="0.5" />
-      {/* Strings vibration */}
-      {activity > 0.15 && (
-        <path d={`M 57 56 Q ${40 + Math.sin(frame * 0.5) * activity * 4} ${52 + Math.cos(frame * 0.7) * activity * 2} 20 48`}
-          stroke={color} strokeWidth="0.7" opacity={activity * 0.5} />
-      )}
-      {/* Legs */}
-      <line x1="46" y1="68" x2="36" y2="105" stroke={color} strokeWidth="2.5" strokeLinecap="round" />
-      <line x1="54" y1="68" x2="64" y2="105" stroke={color} strokeWidth="2.5" strokeLinecap="round" />
-      <ellipse cx="34" cy="108" rx="7" ry="3" fill={color} opacity="0.4" />
-      <ellipse cx="66" cy="108" rx="7" ry="3" fill={color} opacity="0.4" />
-    </svg>
-  );
-};
-
-/** Vocal skeleton (Bobby/Jerry vocal) — jaw moves with stemVocalRms */
-const SkeletonVocal: IconFC = ({ size, color, glowColor, activity, frame, tempoFactor }) => {
-  const jawOpen = activity * 8;
-  const armGesture = Math.sin(frame * 0.07 * tempoFactor) * activity * 12;
-  const bodyRock = Math.sin(frame * 0.06 * tempoFactor) * activity * 4;
-  return (
-    <svg width={size} height={size * 1.2} viewBox="0 0 100 130" fill="none">
-      <ellipse cx="50" cy="65" rx="35" ry="55" fill={glowColor} opacity={0.08 + activity * 0.12} />
-      {/* Head */}
-      <circle cx="50" cy="16" r="13" fill={color} opacity="0.9" />
-      <circle cx="45" cy="13" r="2" fill="black" opacity="0.6" />
-      <circle cx="55" cy="13" r="2" fill="black" opacity="0.6" />
-      {/* Jaw — wide open when singing */}
-      <ellipse cx="50" cy={22 + jawOpen * 0.5} rx="6" ry={2 + jawOpen * 0.6} fill={color} opacity="0.5" />
-      {/* Visible mouth cavity when singing */}
-      {activity > 0.2 && (
-        <ellipse cx="50" cy={23 + jawOpen * 0.4} rx={3 + activity * 2} ry={activity * 3} fill="black" opacity={0.3 + activity * 0.2} />
-      )}
-      {/* Spine */}
-      <line x1={50 + bodyRock} y1="29" x2={50 + bodyRock * 0.5} y2="68" stroke={color} strokeWidth="3" />
-      <path d={`M ${38 + bodyRock * 0.3} 38 Q ${44 + bodyRock * 0.3} 42 ${50 + bodyRock * 0.3} 38 Q ${56 + bodyRock * 0.3} 42 ${62 + bodyRock * 0.3} 38`} stroke={color} strokeWidth="1.5" opacity="0.4" />
-      <path d={`M ${40 + bodyRock * 0.2} 45 Q ${45 + bodyRock * 0.2} 48 ${50 + bodyRock * 0.2} 45 Q ${55 + bodyRock * 0.2} 48 ${60 + bodyRock * 0.2} 45`} stroke={color} strokeWidth="1.5" opacity="0.4" />
-      {/* Left arm — mic hand (holding steady) */}
-      <line x1="42" y1="40" x2="35" y2="28" stroke={color} strokeWidth="2.5" strokeLinecap="round" />
-      {/* Microphone */}
-      <rect x="32" y="18" width="6" height="12" rx="3" fill={color} opacity={0.5 + activity * 0.3} />
-      <line x1="35" y1="30" x2="35" y2="28" stroke={color} strokeWidth="1.5" opacity="0.4" />
-      {/* Right arm — gesturing */}
-      <line x1="58" y1="40" x2={72 + armGesture} y2={48 - Math.abs(armGesture) * 0.5} stroke={color} strokeWidth="2.5" strokeLinecap="round" />
-      {/* Sound waves from mouth when singing */}
-      {activity > 0.25 && (
-        <>
-          <path d={`M 40 ${20 + jawOpen * 0.3} Q 32 ${16 + jawOpen * 0.3} 28 ${18 + jawOpen * 0.3}`}
-            stroke={color} strokeWidth="1" opacity={activity * 0.4} fill="none" />
-          <path d={`M 60 ${20 + jawOpen * 0.3} Q 68 ${16 + jawOpen * 0.3} 72 ${18 + jawOpen * 0.3}`}
-            stroke={color} strokeWidth="1" opacity={activity * 0.4} fill="none" />
-        </>
-      )}
-      {/* Legs */}
-      <line x1="45" y1="68" x2="38" y2="105" stroke={color} strokeWidth="2.5" strokeLinecap="round" />
-      <line x1="55" y1="68" x2="62" y2="105" stroke={color} strokeWidth="2.5" strokeLinecap="round" />
-      <ellipse cx="36" cy="108" rx="7" ry="3" fill={color} opacity="0.4" />
-      <ellipse cx="64" cy="108" rx="7" ry="3" fill={color} opacity="0.4" />
-    </svg>
-  );
-};
-
-/* ------------------------------------------------------------------ */
-/*  Band layout: Bass, Drums, Guitar, Vocals                          */
-/* ------------------------------------------------------------------ */
-
-const SKELETONS: IconFC[] = [SkeletonBass, SkeletonDrums, SkeletonGuitar, SkeletonVocal];
-const SKELETON_SPACING = 300;
-const MARCH_DURATION = 450; // 15 seconds to cross at 30fps
-
-interface Props {
-  frames: EnhancedFrameData[];
+function buildRoses(): Rose[] {
+  const rng = seeded(20_771_339);
+  return Array.from({ length: ROSE_COUNT }, () => ({
+    x: 0.05 + rng() * 0.9,
+    y: 0.85 + rng() * 0.1,
+    r: 6 + rng() * 8,
+    angle: rng() * Math.PI,
+  }));
 }
+
+function buildParticles(): Particle[] {
+  const rng = seeded(38_990_445);
+  return Array.from({ length: PARTICLE_COUNT }, () => ({
+    x: rng(),
+    y: rng() * 0.85,
+    r: 0.6 + rng() * 1.6,
+    speed: 0.0007 + rng() * 0.0018,
+    phase: rng() * Math.PI * 2,
+  }));
+}
+
+interface Props { frames: EnhancedFrameData[]; }
 
 export const SkeletonBand: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
-  const snap = useAudioSnapshot(frames);
   const tempoFactor = useTempoFactor();
+  const snap = useAudioSnapshot(frames);
 
-  const idx = Math.min(Math.max(0, frame), frames.length - 1);
-  const fd = frames[idx];
+  const roses = React.useMemo(buildRoses, []);
+  const particles = React.useMemo(buildParticles, []);
 
-  // Per-stem activity levels (0-1) with fallbacks
-  const stemActivity = [
-    fd.stemBassRms ?? fd.sub,                        // bass skeleton
-    fd.stemDrumOnset ?? fd.onset,                     // drum skeleton
-    fd.stemOtherRms ?? fd.mid,                        // guitar skeleton
-    fd.stemVocalRms ?? snap.energy,                   // vocal skeleton
+  const cycleFrame = frame % CYCLE_TOTAL;
+  if (cycleFrame >= VISIBLE_DURATION) return null;
+  const progress = cycleFrame / VISIBLE_DURATION;
+  const fadeIn = interpolate(progress, [0, 0.09], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const fadeOut = interpolate(progress, [0.91, 1], [1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const masterOpacity = Math.min(fadeIn, fadeOut) * 0.95;
+  if (masterOpacity < 0.01) return null;
+
+  // Audio
+  const stageBright = interpolate(snap.slowEnergy, [0.02, 0.32], [0.5, 1.0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const motion = interpolate(snap.energy, [0.02, 0.30], [0.4, 1.0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const bassRock = interpolate(snap.bass, [0.0, 0.7], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const drumPulse = 1 + snap.beatDecay * 0.5;
+  const cymbalFlash = snap.onsetEnvelope > 0.55 ? Math.min(1, (snap.onsetEnvelope - 0.4) * 1.6) : 0;
+
+  // Tie-dye palette — base hue cycles with chromaHue
+  const baseHue = 280;
+  const tintHue = ((baseHue + (snap.chromaHue - 180) * 0.50) % 360 + 360) % 360;
+  const tintLight = 60 + stageBright * 16;
+  const tintColor = `hsl(${tintHue}, 78%, ${tintLight}%)`;
+  const tintCore = `hsl(${tintHue}, 92%, ${Math.min(96, tintLight + 22)}%)`;
+  const tintAlt = `hsl(${(tintHue + 60) % 360}, 78%, ${tintLight}%)`;
+  const tintAlt2 = `hsl(${(tintHue + 120) % 360}, 78%, ${tintLight}%)`;
+  const boneColor = "rgba(240, 230, 200, 0.95)";
+  const boneShadow = "rgba(140, 130, 100, 0.65)";
+
+  // Stage layout
+  const stageY = height * 0.78;
+  const horizonY = height * 0.50;
+
+  // Skeleton band positions (5 figures)
+  const positions = [
+    { x: width * 0.50, type: "lead", scale: 1.0 },
+    { x: width * 0.30, type: "rhythm", scale: 1.0 },
+    { x: width * 0.70, type: "bass", scale: 1.0 },
+    { x: width * 0.85, type: "drums", scale: 0.95 },
+    { x: width * 0.15, type: "keys", scale: 0.95 },
   ];
 
-  // March progress: simple linear crossing, no energy gating
-  const progress = (frame % MARCH_DURATION) / MARCH_DURATION;
-  const marchIndex = Math.floor(frame / MARCH_DURATION);
-  const goingRight = marchIndex % 2 === 0;
+  // Skeleton renderer
+  const renderSkeleton = (sx: number, baseY: number, type: string, scale: number, idx: number) => {
+    const sway = Math.sin(frame * 0.05 * tempoFactor + idx * 1.3) * 3 * motion;
+    const headR = 14 * scale;
+    const headCY = baseY - 110 * scale;
+    const ribTopY = headCY + headR + 4;
+    const ribBotY = ribTopY + 36 * scale;
+    const pelvisY = ribBotY + 12 * scale;
+    const legBotY = baseY;
 
-  // Palette-driven colors from chromaHue
-  const hue = snap.chromaHue;
-  const skeletonColors = [
-    `hsl(${hue}, 70%, 65%)`,
-    `hsl(${(hue + 90) % 360}, 75%, 60%)`,
-    `hsl(${(hue + 180) % 360}, 70%, 65%)`,
-    `hsl(${(hue + 270) % 360}, 75%, 60%)`,
-  ];
-  const glowColors = [
-    `hsla(${hue}, 80%, 70%, 0.5)`,
-    `hsla(${(hue + 90) % 360}, 85%, 65%, 0.5)`,
-    `hsla(${(hue + 180) % 360}, 80%, 70%, 0.5)`,
-    `hsla(${(hue + 270) % 360}, 85%, 65%, 0.5)`,
-  ];
+    return (
+      <g key={`skel-${idx}`} transform={`translate(${sway} 0)`}>
+        {/* Skull */}
+        <ellipse cx={sx} cy={headCY} rx={headR} ry={headR * 1.05} fill={boneColor} stroke={boneShadow} strokeWidth={0.8} />
+        <path d={`M ${sx - headR + 2} ${headCY + headR * 0.4} Q ${sx} ${headCY + headR + 4} ${sx + headR - 2} ${headCY + headR * 0.4}`}
+          fill="none" stroke={boneShadow} strokeWidth={1} />
+        {/* Eye sockets */}
+        <ellipse cx={sx - headR * 0.35} cy={headCY - 1} rx={headR * 0.25} ry={headR * 0.30} fill="rgba(20, 8, 30, 0.95)" />
+        <ellipse cx={sx + headR * 0.35} cy={headCY - 1} rx={headR * 0.25} ry={headR * 0.30} fill="rgba(20, 8, 30, 0.95)" />
+        <circle cx={sx - headR * 0.35} cy={headCY - 1} r={1.2} fill={tintCore} opacity={0.7 + motion * 0.3} />
+        <circle cx={sx + headR * 0.35} cy={headCY - 1} r={1.2} fill={tintCore} opacity={0.7 + motion * 0.3} />
+        {/* Nose */}
+        <path d={`M ${sx} ${headCY + 2} L ${sx - 1.5} ${headCY + 5} L ${sx + 1.5} ${headCY + 5} Z`} fill="rgba(20, 8, 30, 0.85)" />
+        {/* Teeth */}
+        <line x1={sx - 6} y1={headCY + 8} x2={sx + 6} y2={headCY + 8} stroke={boneShadow} strokeWidth={0.6} />
+        {Array.from({ length: 5 }).map((_, i) => (
+          <line key={`tooth-${i}`} x1={sx - 5 + i * 2.5} y1={headCY + 8} x2={sx - 5 + i * 2.5} y2={headCY + 11} stroke={boneShadow} strokeWidth={0.4} />
+        ))}
 
-  // Fade in/out at march edges
-  const fadeIn = interpolate(progress, [0, 0.06], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-  const fadeOut = interpolate(progress, [0.94, 1], [1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-  // Lower opacity when quiet, but never fully invisible
-  const energyOpacity = interpolate(snap.energy, [0.02, 0.15], [0.3, 0.75], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-  const masterOpacity = Math.min(fadeIn, fadeOut) * energyOpacity;
+        {/* Spine */}
+        <line x1={sx} y1={ribTopY} x2={sx} y2={pelvisY} stroke={boneColor} strokeWidth={2} strokeLinecap="round" />
+        {Array.from({ length: 6 }).map((_, i) => (
+          <circle key={`vert-${i}`} cx={sx} cy={ribTopY + 4 + i * 6} r={1.2} fill={boneShadow} />
+        ))}
 
-  const totalWidth = SKELETONS.length * SKELETON_SPACING;
-  const yBase = height * 0.35;
+        {/* Ribcage */}
+        {Array.from({ length: 5 }).map((_, i) => {
+          const ry = ribTopY + 4 + i * 6;
+          const widthAtY = (16 - Math.abs(i - 2) * 2) * scale;
+          return (
+            <path key={`rib-${i}`}
+              d={`M ${sx} ${ry} Q ${sx - widthAtY} ${ry + 1} ${sx - widthAtY} ${ry + 4} M ${sx} ${ry} Q ${sx + widthAtY} ${ry + 1} ${sx + widthAtY} ${ry + 4}`}
+              stroke={boneColor} strokeWidth={1.3} fill="none" strokeLinecap="round" />
+          );
+        })}
+
+        {/* Pelvis */}
+        <path d={`M ${sx - 14 * scale} ${pelvisY} Q ${sx} ${pelvisY + 6 * scale} ${sx + 14 * scale} ${pelvisY} L ${sx + 10 * scale} ${pelvisY + 12 * scale} L ${sx - 10 * scale} ${pelvisY + 12 * scale} Z`}
+          fill="rgba(220, 210, 180, 0.85)" stroke={boneShadow} strokeWidth={0.8} />
+
+        {/* Legs */}
+        <line x1={sx - 7 * scale} y1={pelvisY + 12 * scale} x2={sx - 9 * scale} y2={legBotY - 6} stroke={boneColor} strokeWidth={2.4} strokeLinecap="round" />
+        <line x1={sx + 7 * scale} y1={pelvisY + 12 * scale} x2={sx + 9 * scale} y2={legBotY - 6} stroke={boneColor} strokeWidth={2.4} strokeLinecap="round" />
+        <ellipse cx={sx - 9 * scale} cy={legBotY - 2} rx={5 * scale} ry={2.4} fill={boneColor} stroke={boneShadow} strokeWidth={0.6} />
+        <ellipse cx={sx + 9 * scale} cy={legBotY - 2} rx={5 * scale} ry={2.4} fill={boneColor} stroke={boneShadow} strokeWidth={0.6} />
+        <circle cx={sx - 8 * scale} cy={pelvisY + 30 * scale} r={2} fill={boneColor} stroke={boneShadow} strokeWidth={0.5} />
+        <circle cx={sx + 8 * scale} cy={pelvisY + 30 * scale} r={2} fill={boneColor} stroke={boneShadow} strokeWidth={0.5} />
+
+        {/* Type-specific arms + instruments */}
+        {type === "lead" && (
+          <g>
+            <line x1={sx + 14 * scale} y1={ribTopY + 4} x2={sx + 28 * scale + Math.sin(frame * 0.4) * 3} y2={ribBotY + 4} stroke={boneColor} strokeWidth={2.4} strokeLinecap="round" />
+            <line x1={sx + 28 * scale + Math.sin(frame * 0.4) * 3} y1={ribBotY + 4} x2={sx + 22 * scale + Math.sin(frame * 0.4) * 3} y2={ribBotY + 22} stroke={boneColor} strokeWidth={2} strokeLinecap="round" />
+            <line x1={sx - 14 * scale} y1={ribTopY + 4} x2={sx - 26 * scale} y2={ribBotY + 2} stroke={boneColor} strokeWidth={2.4} strokeLinecap="round" />
+            <line x1={sx - 26 * scale} y1={ribBotY + 2} x2={sx - 36 * scale} y2={ribBotY - 6} stroke={boneColor} strokeWidth={2} strokeLinecap="round" />
+            <ellipse cx={sx + 6 * scale} cy={ribBotY + 8} rx={20 * scale} ry={14 * scale} fill={tintAlt} stroke="rgba(0, 0, 0, 0.85)" strokeWidth={1} opacity={0.8} />
+            <ellipse cx={sx + 6 * scale} cy={ribBotY + 8} rx={4} ry={3} fill="rgba(0, 0, 0, 0.85)" />
+            <rect x={sx - 36 * scale} y={ribBotY + 5} width={36 * scale} height={4} fill={tintColor} opacity={0.85} />
+          </g>
+        )}
+
+        {type === "rhythm" && (
+          <g>
+            <line x1={sx + 14 * scale} y1={ribTopY + 4} x2={sx + 26 * scale + Math.sin(frame * 0.3) * 2} y2={ribBotY + 4} stroke={boneColor} strokeWidth={2.4} strokeLinecap="round" />
+            <line x1={sx + 26 * scale + Math.sin(frame * 0.3) * 2} y1={ribBotY + 4} x2={sx + 22 * scale} y2={ribBotY + 22} stroke={boneColor} strokeWidth={2} strokeLinecap="round" />
+            <line x1={sx - 14 * scale} y1={ribTopY + 4} x2={sx - 26 * scale} y2={ribBotY + 2} stroke={boneColor} strokeWidth={2.4} strokeLinecap="round" />
+            <line x1={sx - 26 * scale} y1={ribBotY + 2} x2={sx - 36 * scale} y2={ribBotY - 4} stroke={boneColor} strokeWidth={2} strokeLinecap="round" />
+            <ellipse cx={sx + 6 * scale} cy={ribBotY + 8} rx={18 * scale} ry={12 * scale} fill={tintAlt2} stroke="rgba(0, 0, 0, 0.85)" strokeWidth={1} opacity={0.8} />
+            <rect x={sx - 36 * scale} y={ribBotY + 5} width={36 * scale} height={3.5} fill={tintColor} opacity={0.85} />
+          </g>
+        )}
+
+        {type === "bass" && (
+          <g transform={`translate(0 ${bassRock * 2 * Math.sin(frame * 0.3)})`}>
+            <line x1={sx + 14 * scale} y1={ribTopY + 4} x2={sx + 24 * scale} y2={ribBotY + 6} stroke={boneColor} strokeWidth={2.4} strokeLinecap="round" />
+            <line x1={sx + 24 * scale} y1={ribBotY + 6} x2={sx + 18 * scale} y2={ribBotY + 24} stroke={boneColor} strokeWidth={2} strokeLinecap="round" />
+            <line x1={sx - 14 * scale} y1={ribTopY + 4} x2={sx - 28 * scale} y2={ribBotY} stroke={boneColor} strokeWidth={2.4} strokeLinecap="round" />
+            <line x1={sx - 28 * scale} y1={ribBotY} x2={sx - 42 * scale} y2={ribBotY - 10} stroke={boneColor} strokeWidth={2} strokeLinecap="round" />
+            <ellipse cx={sx + 4 * scale} cy={ribBotY + 12} rx={22 * scale} ry={14 * scale} fill={tintColor} stroke="rgba(0, 0, 0, 0.85)" strokeWidth={1} opacity={0.8} />
+            <rect x={sx - 42 * scale} y={ribBotY + 5} width={46 * scale} height={4} fill={tintAlt} opacity={0.85} />
+          </g>
+        )}
+
+        {type === "drums" && (
+          <g>
+            <line x1={sx - 10 * scale} y1={ribTopY + 6} x2={sx - 24 * scale + Math.sin(frame * 0.7) * 4} y2={ribBotY + 14} stroke={boneColor} strokeWidth={2} strokeLinecap="round" />
+            <line x1={sx + 10 * scale} y1={ribTopY + 6} x2={sx + 24 * scale + Math.cos(frame * 0.7) * 4} y2={ribBotY + 14} stroke={boneColor} strokeWidth={2} strokeLinecap="round" />
+            <ellipse cx={sx} cy={ribBotY + 30} rx={20 * scale} ry={6} fill="rgba(220, 200, 160, 0.85)" stroke="rgba(80, 60, 30, 0.85)" strokeWidth={1} />
+            <ellipse cx={sx} cy={ribBotY + 30} rx={20 * scale} ry={6} fill={tintAlt} opacity={0.4 * drumPulse} />
+            <rect x={sx - 20 * scale} y={ribBotY + 30} width={40 * scale} height={14} fill="rgba(80, 60, 30, 0.85)" />
+            <ellipse cx={sx + 22 * scale} cy={ribBotY - 6} rx={14 * scale} ry={2} fill="rgba(220, 180, 80, 0.95)" stroke="rgba(120, 90, 20, 0.85)" strokeWidth={0.6} />
+            {cymbalFlash > 0 && (
+              <ellipse cx={sx + 22 * scale} cy={ribBotY - 6} rx={20 * scale} ry={4} fill={tintCore} opacity={cymbalFlash * 0.6} style={{ mixBlendMode: "screen" }} />
+            )}
+          </g>
+        )}
+
+        {type === "keys" && (
+          <g>
+            <line x1={sx - 14 * scale} y1={ribTopY + 4} x2={sx - 22 * scale + Math.sin(frame * 0.5) * 2} y2={ribBotY + 14} stroke={boneColor} strokeWidth={2.4} strokeLinecap="round" />
+            <line x1={sx + 14 * scale} y1={ribTopY + 4} x2={sx + 22 * scale + Math.cos(frame * 0.5) * 2} y2={ribBotY + 14} stroke={boneColor} strokeWidth={2.4} strokeLinecap="round" />
+            <rect x={sx - 32 * scale} y={ribBotY + 14} width={64 * scale} height={10} fill="rgba(20, 14, 8, 0.95)" stroke="rgba(0, 0, 0, 1)" strokeWidth={0.8} />
+            {Array.from({ length: 14 }).map((_, i) => (
+              <rect key={`wk-${i}`} x={sx - 32 * scale + i * (64 * scale / 14)} y={ribBotY + 16} width={64 * scale / 14 - 0.5} height={8} fill="rgba(240, 230, 200, 0.95)" stroke="rgba(20, 14, 8, 0.7)" strokeWidth={0.3} />
+            ))}
+            {[1, 2, 4, 5, 6, 8, 9, 11, 12, 13].map((i) => (
+              <rect key={`bk-${i}`} x={sx - 32 * scale + i * (64 * scale / 14) - 1} y={ribBotY + 16} width={1.6} height={5} fill="rgba(20, 14, 8, 0.95)" />
+            ))}
+          </g>
+        )}
+      </g>
+    );
+  };
 
   return (
     <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden" }}>
-      {SKELETONS.map((Skeleton, i) => {
-        const skelProgress = progress - i * 0.025;
-        const color = skeletonColors[i];
-        const glowColor = glowColors[i];
-        const activity = stemActivity[i];
+      <svg width={width} height={height} style={{ opacity: masterOpacity, willChange: "opacity" }}>
+        <defs>
+          <linearGradient id="sb-bg" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#08020e" />
+            <stop offset="50%" stopColor="#100a1c" />
+            <stop offset="100%" stopColor="#020108" />
+          </linearGradient>
+          <linearGradient id="sb-stage" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="rgba(14, 10, 22, 0.95)" />
+            <stop offset="100%" stopColor="rgba(2, 1, 6, 0.99)" />
+          </linearGradient>
+          <linearGradient id="sb-tiedye" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor={tintColor} stopOpacity={0.18} />
+            <stop offset="50%" stopColor={tintAlt} stopOpacity={0.18} />
+            <stop offset="100%" stopColor={tintAlt2} stopOpacity={0.18} />
+          </linearGradient>
+          <radialGradient id="sb-vig">
+            <stop offset="55%" stopColor="rgba(0,0,0,0)" />
+            <stop offset="100%" stopColor="rgba(0,0,0,0.55)" />
+          </radialGradient>
+          <radialGradient id="sb-halo">
+            <stop offset="0%" stopColor={tintCore} stopOpacity={0.6} />
+            <stop offset="100%" stopColor={tintColor} stopOpacity={0} />
+          </radialGradient>
+          <filter id="sb-blur" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="4" />
+          </filter>
+        </defs>
 
-        let x: number;
-        if (goingRight) {
-          x = interpolate(skelProgress, [0, 1], [-totalWidth, width + SKELETON_SPACING], {
-            extrapolateLeft: "clamp", extrapolateRight: "clamp",
-          }) + i * SKELETON_SPACING;
-        } else {
-          x = interpolate(skelProgress, [0, 1], [width + SKELETON_SPACING, -totalWidth], {
-            extrapolateLeft: "clamp", extrapolateRight: "clamp",
-          }) - i * SKELETON_SPACING + totalWidth;
-        }
+        {/* Background */}
+        <rect width={width} height={height} fill="url(#sb-bg)" />
+        {/* Tie-dye wash */}
+        <rect width={width} height={height} fill="url(#sb-tiedye)" />
 
-        // Stem-reactive bob: each skeleton bobs to their own stem
-        const bob = Math.sin((frame * 0.1 * tempoFactor) + i * 1.5) * (4 + activity * 14 + snap.beatDecay * 6);
-        const tilt = Math.sin((frame * 0.06 * tempoFactor) + i * 0.8) * (3 + activity * 4);
+        {/* Truss + lights */}
+        <rect x={width * 0.04} y={height * 0.06} width={width * 0.92} height={5} fill="rgba(0, 0, 0, 0.85)" />
+        {[0.15, 0.30, 0.42, 0.50, 0.58, 0.70, 0.85].map((px, i) => {
+          const lightHue = (tintHue + i * 50) % 360;
+          return (
+            <g key={`fix-${i}`}>
+              <line x1={width * px} y1={height * 0.065} x2={width * px} y2={height * 0.11} stroke="rgba(0, 0, 0, 0.9)" strokeWidth={2} />
+              <rect x={width * px - 6} y={height * 0.11} width={12} height={7} fill="rgba(0, 0, 0, 0.95)" />
+              <circle cx={width * px} cy={height * 0.12} r={3 + motion * 1.5} fill={`hsl(${lightHue}, 85%, 70%)`} opacity={0.6 + motion * 0.35} />
+              <path d={`M ${width * px - 4} ${height * 0.13} L ${width * px - 30} ${height * 0.42} L ${width * px + 30} ${height * 0.42} L ${width * px + 4} ${height * 0.13} Z`}
+                fill={`hsl(${lightHue}, 85%, 70%)`} opacity={0.10 * motion} style={{ mixBlendMode: "screen" }} />
+            </g>
+          );
+        })}
 
-        // Backlit silhouette glow — brighter when stem is active
-        const glowIntensity = 8 + activity * 20;
-        const glow = `drop-shadow(0 0 ${glowIntensity}px ${glowColor}) drop-shadow(0 0 ${glowIntensity * 2}px ${glowColor})`;
+        {/* Backdrop */}
+        <rect x={0} y={horizonY} width={width} height={stageY - horizonY} fill="rgba(8, 4, 14, 0.8)" />
 
-        return (
-          <div
-            key={i}
-            style={{
-              position: "absolute",
-              left: x,
-              top: yBase + bob,
-              transform: `rotate(${tilt}deg) scaleX(${goingRight ? 1 : -1})`,
-              opacity: masterOpacity,
-              filter: glow,
-              willChange: "transform, opacity",
-            }}
-          >
-            <Skeleton
-              size={120}
-              color={color}
-              glowColor={glowColor}
-              activity={activity}
-              frame={frame}
-              tempoFactor={tempoFactor}
-            />
-          </div>
-        );
-      })}
+        {/* Stage floor */}
+        <rect x={0} y={stageY} width={width} height={height - stageY} fill="url(#sb-stage)" />
+        <rect x={0} y={stageY - 1} width={width} height={2} fill={tintColor} opacity={0.35 * stageBright} />
+
+        {/* Roses on stage edge */}
+        {roses.map((r, i) => (
+          <g key={`rose-${i}`} transform={`translate(${r.x * width} ${r.y * height}) rotate(${(r.angle * 180) / Math.PI})`}>
+            <circle cx={0} cy={0} r={r.r} fill={tintAlt} stroke="rgba(80, 20, 30, 0.85)" strokeWidth={0.8} />
+            <circle cx={0} cy={0} r={r.r * 0.7} fill={tintColor} opacity={0.85} />
+            <circle cx={0} cy={0} r={r.r * 0.4} fill="rgba(80, 20, 30, 0.85)" />
+            <circle cx={-r.r * 0.5} cy={-r.r * 0.3} r={r.r * 0.4} fill={tintAlt} opacity={0.7} />
+            <circle cx={r.r * 0.5} cy={-r.r * 0.3} r={r.r * 0.4} fill={tintAlt} opacity={0.7} />
+            <line x1={0} y1={r.r} x2={r.r * 0.3} y2={r.r * 3} stroke="rgba(20, 50, 20, 0.85)" strokeWidth={1.2} />
+            <ellipse cx={r.r * 0.15} cy={r.r * 2} rx={r.r * 0.3} ry={r.r * 0.7} fill="rgba(20, 50, 20, 0.85)" />
+          </g>
+        ))}
+
+        {/* Bones strewn between roses */}
+        {Array.from({ length: 8 }).map((_, i) => {
+          const bx = width * (0.10 + (i * 0.12));
+          const by = height * 0.94;
+          return (
+            <g key={`bone-${i}`} transform={`translate(${bx} ${by}) rotate(${i * 23})`}>
+              <line x1={-12} y1={0} x2={12} y2={0} stroke={boneColor} strokeWidth={3} strokeLinecap="round" />
+              <circle cx={-12} cy={-2} r={3} fill={boneColor} stroke={boneShadow} strokeWidth={0.5} />
+              <circle cx={-12} cy={2} r={3} fill={boneColor} stroke={boneShadow} strokeWidth={0.5} />
+              <circle cx={12} cy={-2} r={3} fill={boneColor} stroke={boneShadow} strokeWidth={0.5} />
+              <circle cx={12} cy={2} r={3} fill={boneColor} stroke={boneShadow} strokeWidth={0.5} />
+            </g>
+          );
+        })}
+
+        {/* Skeletons */}
+        {positions.map((p, i) => renderSkeleton(p.x, stageY - 12, p.type, p.scale, i))}
+
+        {/* Glow halos behind skeletons */}
+        {positions.map((p, i) => (
+          <circle key={`halo-${i}`} cx={p.x} cy={stageY - 70} r={80 * (0.85 + stageBright * 0.3) * drumPulse}
+            fill="url(#sb-halo)" style={{ mixBlendMode: "screen" }} />
+        ))}
+
+        {/* Particles */}
+        <g style={{ mixBlendMode: "screen" }}>
+          {particles.map((p, i) => {
+            const t = frame * p.speed * tempoFactor + p.phase;
+            const px = (p.x + Math.sin(t * 1.2) * 0.04) * width;
+            const py = (p.y + Math.sin(t * 0.6) * 0.02) * height;
+            const flicker = 0.5 + Math.sin(t * 2.4) * 0.4;
+            const hueOffset = (i * 60) % 360;
+            return (
+              <circle key={`p-${i}`} cx={px} cy={py} r={p.r * (0.8 + stageBright * 0.4)}
+                fill={`hsl(${(tintHue + hueOffset) % 360}, 90%, 80%)`} opacity={0.4 * flicker * stageBright} />
+            );
+          })}
+        </g>
+
+        {/* Vignette */}
+        <rect width={width} height={height} fill="url(#sb-vig)" />
+      </svg>
     </div>
   );
 };

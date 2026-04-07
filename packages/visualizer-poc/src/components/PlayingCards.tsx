@@ -1,24 +1,28 @@
 /**
- * PlayingCards — Casino tableau for "Deal" / gambling-themed Dead songs.
+ * PlayingCards — A+++ classic Bicycle-style poker hand spread on green felt.
  *
- * "Don't you let that deal go down" — the Dead loved gambling imagery (Loser,
- * Stagger Lee, Jack Straw, Deal, Candyman). This overlay arranges 6 Dead-themed
- * playing cards across a green-felt casino table with poker chips, a tumbling
- * die, cigar smoke wisps, and a warm overhead spotlight.
+ * 5 cards arranged as a fanned hand in the lower-center of the frame, against
+ * a dark green felt poker table with subtle ambient overhead light. Each card
+ * has:
+ *   - Proper traditional Bicycle styling: white face, ornate corner indices
+ *     (rank + suit pip), gold border, subtle texture
+ *   - For face cards (J/Q/K): silhouetted illustration of the royal figure
+ *     (NO smiley emoji faces) — vintage line-art-style portrait silhouettes
+ *   - Center pip patterns for number cards
+ *   - Realistic cast shadows
+ *   - Slight perspective tilt
  *
- * Cards: Ace of Spades (death card), King of Hearts (suicide king),
- * Jack of Diamonds (Jack Straw!), Queen of Hearts, Stealie Joker, and a face-down
- * card with a stealie/rose back pattern.
+ * The hand is: Ace of Spades, King of Hearts, Queen of Diamonds, Jack of Clubs,
+ * 10 of Diamonds — a classic poker straight flush feel.
  *
- * Audio Reactivity:
- *   - energy        → card glow intensity, spotlight brightness, master opacity
- *   - beatDecay     → poker chip stack pulse
- *   - onsetEnvelope → triggers card flip animations
- *   - chromaHue     → tints the felt background
- *   - bass          → drives tumbling die rotation + bounce height
- *   - tempoFactor   → master rotation/drift speed
- *
- * Cycle: 50s, 14s visible.
+ * Audio reactivity:
+ *   slowEnergy → spotlight warmth + glow
+ *   energy     → card glow / saturation
+ *   beatDecay  → subtle pulse
+ *   bass       → dust/smoke drift
+ *   onsetEnvelope → spark sparkle
+ *   chromaHue  → felt tint
+ *   tempoFactor → drift speed
  */
 
 import React from "react";
@@ -28,47 +32,363 @@ import { seeded } from "../utils/seededRandom";
 import { useAudioSnapshot } from "./parametric/audio-helpers";
 import { useTempoFactor } from "../data/TempoContext";
 
-const CYCLE = 1500;
-const DURATION = 420;
-const FADE = 36;
-const NUM_CARDS = 6;
-const CARD_W = 150;
-const CARD_H = 210;
+const CYCLE_TOTAL = 2400;
+const VISIBLE_DURATION = 780;
 
-type Suit = "spade" | "heart" | "diamond";
-type Rank = "A" | "K" | "Q" | "J" | "JOKER" | "BACK";
-interface CardSpec { rank: Rank; suit: Suit; face: "up" | "down" }
+type Suit = "spade" | "heart" | "diamond" | "club";
+type Rank = "A" | "K" | "Q" | "J" | "10";
 
-const CARDS: CardSpec[] = [
-  { rank: "A", suit: "spade", face: "up" },
-  { rank: "K", suit: "heart", face: "up" },
-  { rank: "J", suit: "diamond", face: "up" },
-  { rank: "Q", suit: "heart", face: "up" },
-  { rank: "JOKER", suit: "spade", face: "up" },
-  { rank: "BACK", suit: "spade", face: "down" },
+interface CardSpec {
+  rank: Rank;
+  suit: Suit;
+  rotation: number;
+  xOffset: number;
+  yOffset: number;
+}
+
+const HAND: CardSpec[] = [
+  { rank: "A", suit: "spade",   rotation: -22, xOffset: -0.21, yOffset: 0.05 },
+  { rank: "K", suit: "heart",   rotation: -11, xOffset: -0.10, yOffset: 0.01 },
+  { rank: "Q", suit: "diamond", rotation:   0, xOffset:  0.00, yOffset: -0.01 },
+  { rank: "J", suit: "club",    rotation:  11, xOffset:  0.10, yOffset: 0.01 },
+  { rank: "10",suit: "diamond", rotation:  22, xOffset:  0.21, yOffset: 0.05 },
 ];
 
-const SUIT_COLOR: Record<Suit, string> = { spade: "#0a0a0a", heart: "#c01a1a", diamond: "#c01a1a" };
-const SUIT_GLYPH: Record<Suit, string> = { spade: "♠", heart: "♥", diamond: "♦" };
-
-const CHIP_COLORS: [string, string, string][] = [
-  ["#c01a1a", "#7a0c0c", "#ffffff"],
-  ["#1a3fc0", "#0c1a7a", "#ffffff"],
-  ["#1a8a2a", "#0c5018", "#ffffff"],
-  ["#0a0a0a", "#222222", "#dddddd"],
-  ["#d4a017", "#8a6a0c", "#ffffff"],
-];
-
-const PIPS: Record<number, [number, number][]> = {
-  1: [[0, 0]],
-  2: [[-0.5, -0.5], [0.5, 0.5]],
-  3: [[-0.5, -0.5], [0, 0], [0.5, 0.5]],
-  4: [[-0.5, -0.5], [0.5, -0.5], [-0.5, 0.5], [0.5, 0.5]],
-  5: [[-0.5, -0.5], [0.5, -0.5], [0, 0], [-0.5, 0.5], [0.5, 0.5]],
-  6: [[-0.5, -0.5], [0.5, -0.5], [-0.5, 0], [0.5, 0], [-0.5, 0.5], [0.5, 0.5]],
+const SUIT_COLOR: Record<Suit, string> = {
+  spade: "#0a0a0a",
+  club: "#0a0a0a",
+  heart: "#b8141a",
+  diamond: "#b8141a",
 };
 
-interface Props { frames: EnhancedFrameData[] }
+interface SmokeWisp { x: number; speed: number; phase: number; size: number; lifeOff: number; }
+interface DustMote { x: number; y: number; r: number; speed: number; phase: number; }
+
+function buildSmokeWisps(): SmokeWisp[] {
+  const rng = seeded(771_133);
+  return Array.from({ length: 6 }, () => ({
+    x: 0.10 + rng() * 0.80,
+    speed: 0.15 + rng() * 0.20,
+    phase: rng() * Math.PI * 2,
+    size: 26 + rng() * 22,
+    lifeOff: rng() * 220,
+  }));
+}
+
+function buildDust(): DustMote[] {
+  const rng = seeded(884_002);
+  return Array.from({ length: 28 }, () => ({
+    x: rng(),
+    y: 0.20 + rng() * 0.60,
+    r: 1.0 + rng() * 1.8,
+    speed: 0.005 + rng() * 0.018,
+    phase: rng() * Math.PI * 2,
+  }));
+}
+
+interface Props { frames: EnhancedFrameData[]; }
+
+/* ─── Suit pip drawing helpers ─── */
+const Pip: React.FC<{ suit: Suit; cx: number; cy: number; size: number; color: string }> = ({
+  suit, cx, cy, size, color,
+}) => {
+  if (suit === "spade") {
+    return (
+      <path d={`M ${cx} ${cy - size}
+        Q ${cx - size * 0.9} ${cy - size * 0.10} ${cx - size * 0.50} ${cy + size * 0.30}
+        Q ${cx - size * 0.20} ${cy + size * 0.55} ${cx} ${cy + size * 0.20}
+        Q ${cx + size * 0.20} ${cy + size * 0.55} ${cx + size * 0.50} ${cy + size * 0.30}
+        Q ${cx + size * 0.9} ${cy - size * 0.10} ${cx} ${cy - size} Z
+        M ${cx - size * 0.20} ${cy + size * 0.45}
+        L ${cx + size * 0.20} ${cy + size * 0.45}
+        L ${cx + size * 0.30} ${cy + size * 0.85}
+        L ${cx - size * 0.30} ${cy + size * 0.85} Z`}
+        fill={color} />
+    );
+  }
+  if (suit === "club") {
+    return (
+      <g fill={color}>
+        <circle cx={cx} cy={cy - size * 0.45} r={size * 0.40} />
+        <circle cx={cx - size * 0.45} cy={cy + size * 0.10} r={size * 0.40} />
+        <circle cx={cx + size * 0.45} cy={cy + size * 0.10} r={size * 0.40} />
+        <path d={`M ${cx - size * 0.20} ${cy + size * 0.30}
+          L ${cx + size * 0.20} ${cy + size * 0.30}
+          L ${cx + size * 0.34} ${cy + size * 0.85}
+          L ${cx - size * 0.34} ${cy + size * 0.85} Z`} />
+      </g>
+    );
+  }
+  if (suit === "heart") {
+    return (
+      <path d={`M ${cx} ${cy + size * 0.85}
+        Q ${cx - size * 0.95} ${cy + size * 0.10}
+          ${cx - size * 0.80} ${cy - size * 0.40}
+        Q ${cx - size * 0.55} ${cy - size * 0.85}
+          ${cx} ${cy - size * 0.30}
+        Q ${cx + size * 0.55} ${cy - size * 0.85}
+          ${cx + size * 0.80} ${cy - size * 0.40}
+        Q ${cx + size * 0.95} ${cy + size * 0.10}
+          ${cx} ${cy + size * 0.85} Z`}
+        fill={color} />
+    );
+  }
+  // diamond
+  return (
+    <path d={`M ${cx} ${cy - size}
+      L ${cx + size * 0.65} ${cy}
+      L ${cx} ${cy + size}
+      L ${cx - size * 0.65} ${cy} Z`}
+      fill={color} />
+  );
+};
+
+/** Center pip pattern for number cards */
+const CardPips: React.FC<{ rank: Rank; suit: Suit; cardW: number; cardH: number; color: string }> = ({
+  rank, suit, cardW, cardH, color,
+}) => {
+  if (rank === "10") {
+    // 10 pips: 4 in left column, 4 in right column, 2 in center top/bottom
+    const ps = cardW * 0.10;
+    const positions: [number, number, boolean][] = [
+      [-0.25, -0.32, false], [0.25, -0.32, false],
+      [-0.25, -0.10, false], [0.25, -0.10, false],
+      [0, -0.21, false],
+      [-0.25, 0.10, true], [0.25, 0.10, true],
+      [-0.25, 0.32, true], [0.25, 0.32, true],
+      [0, 0.21, true],
+    ];
+    return (
+      <g>
+        {positions.map(([px, py, flip], i) => (
+          <g key={i} transform={flip ? `translate(${px * cardW} ${py * cardH}) rotate(180)` : `translate(${px * cardW} ${py * cardH})`}>
+            <Pip suit={suit} cx={0} cy={0} size={ps} color={color} />
+          </g>
+        ))}
+      </g>
+    );
+  }
+  if (rank === "A") {
+    // Big single center pip
+    return <Pip suit={suit} cx={0} cy={0} size={cardW * 0.34} color={color} />;
+  }
+  return null;
+};
+
+/** Royal figure silhouette for face cards — NOT a smiley face */
+const RoyalFigure: React.FC<{
+  rank: "K" | "Q" | "J";
+  suit: Suit;
+  cardW: number;
+  cardH: number;
+  color: string;
+}> = ({ rank, cardW, cardH, color }) => {
+  // Half-portrait silhouette (head + torso) repeated mirrored top/bottom
+  // Drawn as vintage line art with NO eyes/smile — all details are abstract
+  // shapes. Half-circle medallion in center.
+  const fillDk = "#1a1a1a";
+  const fillGold = "#c8a04a";
+  const fillRed = "#9a1620";
+  const fillBlue = "#1a3a8a";
+
+  function HalfPortrait({ flip }: { flip: boolean }) {
+    return (
+      <g transform={flip ? `scale(1 -1)` : ""}>
+        {/* Crown / hat */}
+        {rank === "K" && (
+          <g>
+            <path d={`M -${cardW * 0.20} -${cardH * 0.18}
+              L -${cardW * 0.20} -${cardH * 0.10}
+              L -${cardW * 0.14} -${cardH * 0.18}
+              L -${cardW * 0.08} -${cardH * 0.08}
+              L  ${cardW * 0.00} -${cardH * 0.20}
+              L  ${cardW * 0.08} -${cardH * 0.08}
+              L  ${cardW * 0.14} -${cardH * 0.18}
+              L  ${cardW * 0.20} -${cardH * 0.10}
+              L  ${cardW * 0.20} -${cardH * 0.18}
+              L  ${cardW * 0.16} -${cardH * 0.05}
+              L -${cardW * 0.16} -${cardH * 0.05} Z`}
+              fill={fillGold} stroke={fillDk} strokeWidth={0.9} />
+            <circle cx={-cardW * 0.14} cy={-cardH * 0.10} r={cardW * 0.012} fill={fillRed} />
+            <circle cx={0} cy={-cardH * 0.13} r={cardW * 0.014} fill={fillBlue} />
+            <circle cx={cardW * 0.14} cy={-cardH * 0.10} r={cardW * 0.012} fill={fillRed} />
+          </g>
+        )}
+        {rank === "Q" && (
+          <g>
+            <path d={`M -${cardW * 0.18} -${cardH * 0.14}
+              Q 0 -${cardH * 0.22} ${cardW * 0.18} -${cardH * 0.14}
+              L ${cardW * 0.16} -${cardH * 0.05}
+              L -${cardW * 0.16} -${cardH * 0.05} Z`}
+              fill={fillGold} stroke={fillDk} strokeWidth={0.9} />
+            <circle cx={0} cy={-cardH * 0.14} r={cardW * 0.018} fill={fillRed} />
+            <circle cx={-cardW * 0.10} cy={-cardH * 0.10} r={cardW * 0.012} fill={fillBlue} />
+            <circle cx={cardW * 0.10} cy={-cardH * 0.10} r={cardW * 0.012} fill={fillBlue} />
+          </g>
+        )}
+        {rank === "J" && (
+          <g>
+            <path d={`M -${cardW * 0.18} -${cardH * 0.10}
+              Q 0 -${cardH * 0.20} ${cardW * 0.18} -${cardH * 0.10}
+              L ${cardW * 0.16} -${cardH * 0.04}
+              L -${cardW * 0.16} -${cardH * 0.04} Z`}
+              fill={fillRed} stroke={fillDk} strokeWidth={0.9} />
+            <line x1={cardW * 0.18} y1={-cardH * 0.10} x2={cardW * 0.26} y2={-cardH * 0.18}
+              stroke={fillGold} strokeWidth={1.6} />
+            <circle cx={cardW * 0.26} cy={-cardH * 0.18} r={cardW * 0.012} fill={fillGold} />
+          </g>
+        )}
+        {/* Head silhouette — solid oval (no eyes/smile) */}
+        <ellipse cx={0} cy={-cardH * 0.02} rx={cardW * 0.12} ry={cardH * 0.05}
+          fill="#e8d8a0" stroke={fillDk} strokeWidth={1.4} />
+        {/* Hair / wig outline */}
+        <path d={`M -${cardW * 0.14} -${cardH * 0.04}
+          Q -${cardW * 0.10} ${cardH * 0.04} -${cardW * 0.04} ${cardH * 0.02}
+          L ${cardW * 0.04} ${cardH * 0.02}
+          Q ${cardW * 0.10} ${cardH * 0.04} ${cardW * 0.14} -${cardH * 0.04}`}
+          stroke={fillDk} strokeWidth={1.6} fill="none" />
+        {/* Beard / collar (K only) */}
+        {rank === "K" && (
+          <path d={`M -${cardW * 0.10} ${cardH * 0.01}
+            Q 0 ${cardH * 0.06} ${cardW * 0.10} ${cardH * 0.01}
+            L ${cardW * 0.08} ${cardH * 0.05}
+            L -${cardW * 0.08} ${cardH * 0.05} Z`}
+            fill="#e8e0c0" stroke={fillDk} strokeWidth={1.0} />
+        )}
+        {/* Robe / collar */}
+        <path d={`M -${cardW * 0.20} ${cardH * 0.06}
+          Q -${cardW * 0.10} ${cardH * 0.04} 0 ${cardH * 0.05}
+          Q ${cardW * 0.10} ${cardH * 0.04} ${cardW * 0.20} ${cardH * 0.06}
+          L ${cardW * 0.24} ${cardH * 0.18}
+          L -${cardW * 0.24} ${cardH * 0.18} Z`}
+          fill={color === "#b8141a" ? fillRed : fillBlue}
+          stroke={fillDk} strokeWidth={1.2} />
+        {/* Robe gold trim */}
+        <path d={`M -${cardW * 0.20} ${cardH * 0.06}
+          Q 0 ${cardH * 0.07} ${cardW * 0.20} ${cardH * 0.06}`}
+          stroke={fillGold} strokeWidth={1.6} fill="none" />
+        {/* Sword / scepter / flower (rank-specific) */}
+        {rank === "K" && (
+          <g>
+            <line x1={-cardW * 0.22} y1={cardH * 0.18}
+              x2={-cardW * 0.30} y2={-cardH * 0.04}
+              stroke={fillGold} strokeWidth={1.8} />
+            <circle cx={-cardW * 0.30} cy={-cardH * 0.04} r={cardW * 0.014} fill={fillGold} />
+            <line x1={cardW * 0.22} y1={cardH * 0.18}
+              x2={cardW * 0.32} y2={-cardH * 0.04}
+              stroke="#a8a8a8" strokeWidth={2.4} />
+            <line x1={cardW * 0.32} y1={-cardH * 0.04}
+              x2={cardW * 0.34} y2={-cardH * 0.06}
+              stroke={fillGold} strokeWidth={2.4} />
+          </g>
+        )}
+        {rank === "Q" && (
+          <g>
+            <line x1={-cardW * 0.22} y1={cardH * 0.18}
+              x2={-cardW * 0.30} y2={-cardH * 0.04}
+              stroke={fillGold} strokeWidth={1.4} />
+            <ellipse cx={-cardW * 0.30} cy={-cardH * 0.06} rx={cardW * 0.025} ry={cardW * 0.022}
+              fill={fillRed} />
+            <ellipse cx={-cardW * 0.27} cy={-cardH * 0.08} rx={cardW * 0.014} ry={cardW * 0.012}
+              fill="#e8d8a0" />
+          </g>
+        )}
+        {rank === "J" && (
+          <g>
+            <line x1={cardW * 0.20} y1={cardH * 0.16}
+              x2={cardW * 0.32} y2={-cardH * 0.06}
+              stroke={fillGold} strokeWidth={1.6} />
+            <circle cx={cardW * 0.32} cy={-cardH * 0.06} r={cardW * 0.018} fill={fillBlue} />
+          </g>
+        )}
+      </g>
+    );
+  }
+
+  return (
+    <g>
+      {/* Diagonal divider line (classic face card has mirrored top/bottom) */}
+      <line x1={-cardW * 0.36} y1={-cardH * 0.36}
+        x2={cardW * 0.36} y2={cardH * 0.36}
+        stroke={fillDk} strokeWidth={0.5} opacity={0.35} />
+      {/* Top half */}
+      <g transform={`translate(0 -${cardH * 0.18})`}>
+        <HalfPortrait flip={false} />
+      </g>
+      {/* Bottom half (mirrored) */}
+      <g transform={`translate(0 ${cardH * 0.18})`}>
+        <HalfPortrait flip />
+      </g>
+    </g>
+  );
+};
+
+const PlayingCard: React.FC<{
+  card: CardSpec;
+  cardW: number;
+  cardH: number;
+}> = ({ card, cardW, cardH }) => {
+  const halfW = cardW / 2;
+  const halfH = cardH / 2;
+  const color = SUIT_COLOR[card.suit];
+  const cornerRank = card.rank === "10" ? "10" : card.rank;
+  const cornerFs = cardW * 0.18;
+  const cornerSs = cardW * 0.13;
+
+  return (
+    <g>
+      {/* White card background */}
+      <rect x={-halfW} y={-halfH} width={cardW} height={cardH}
+        rx={cardW * 0.07} ry={cardW * 0.07}
+        fill="#fdfaf2" stroke="#1a1208" strokeWidth={2} />
+      {/* Inner gold border */}
+      <rect x={-halfW + cardW * 0.05} y={-halfH + cardW * 0.05}
+        width={cardW - cardW * 0.10} height={cardH - cardW * 0.10}
+        rx={cardW * 0.04} ry={cardW * 0.04}
+        fill="none" stroke="#b8941a" strokeWidth={0.9} opacity={0.55} />
+      {/* Subtle paper texture (cross-hatch lines) */}
+      {[0.10, 0.30, 0.50, 0.70, 0.90].map((y, i) => (
+        <line key={`tex-${i}`}
+          x1={-halfW + cardW * 0.07} y1={-halfH + cardH * y}
+          x2={halfW - cardW * 0.07} y2={-halfH + cardH * y}
+          stroke="#d8c8a0" strokeWidth={0.3} opacity={0.25} />
+      ))}
+
+      {/* Top-left corner: rank + suit */}
+      <text x={-halfW + cardW * 0.13} y={-halfH + cardW * 0.22}
+        fontSize={cornerFs} fontFamily="Georgia, serif" fontWeight="bold"
+        fill={color} textAnchor="middle">{cornerRank}</text>
+      <g transform={`translate(${-halfW + cardW * 0.13} ${-halfH + cardW * 0.36})`}>
+        <Pip suit={card.suit} cx={0} cy={0} size={cornerSs} color={color} />
+      </g>
+
+      {/* Bottom-right corner: rotated rank + suit */}
+      <g transform={`rotate(180 ${halfW - cardW * 0.13} ${halfH - cardW * 0.22})`}>
+        <text x={halfW - cardW * 0.13} y={halfH - cardW * 0.22}
+          fontSize={cornerFs} fontFamily="Georgia, serif" fontWeight="bold"
+          fill={color} textAnchor="middle">{cornerRank}</text>
+        <g transform={`translate(${halfW - cardW * 0.13} ${halfH - cardW * 0.08})`}>
+          <Pip suit={card.suit} cx={0} cy={0} size={cornerSs} color={color} />
+        </g>
+      </g>
+
+      {/* Center: pips for A/10, royal figure for J/Q/K */}
+      {(card.rank === "A" || card.rank === "10") && (
+        <CardPips rank={card.rank} suit={card.suit} cardW={cardW} cardH={cardH} color={color} />
+      )}
+      {(card.rank === "J" || card.rank === "Q" || card.rank === "K") && (
+        <g>
+          {/* Frame around royal figure */}
+          <rect x={-cardW * 0.34} y={-cardH * 0.40}
+            width={cardW * 0.68} height={cardH * 0.80}
+            rx={cardW * 0.03}
+            fill="none" stroke={color} strokeWidth={1.2} opacity={0.45} />
+          <RoyalFigure rank={card.rank} suit={card.suit} cardW={cardW} cardH={cardH} color={color} />
+        </g>
+      )}
+    </g>
+  );
+};
 
 export const PlayingCards: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
@@ -76,326 +396,138 @@ export const PlayingCards: React.FC<Props> = ({ frames }) => {
   const tempoFactor = useTempoFactor();
   const snap = useAudioSnapshot(frames);
 
-  const layout = React.useMemo(() => {
-    const r = seeded(7842);
-    const cards = CARDS.map((card, i) => {
-      const t = (i + 0.5) / NUM_CARDS;
-      return {
-        card,
-        cx: 0.18 + t * 0.66 + (r() - 0.5) * 0.04,
-        cy: 0.46 + (r() - 0.5) * 0.16 + Math.sin(t * Math.PI) * -0.06,
-        baseRot: (t - 0.5) * 35 + (r() - 0.5) * 14,
-        bobFreq: 0.6 + r() * 0.7,
-        bobPhase: r() * Math.PI * 2,
-        bobAmp: 6 + r() * 8,
-        rotFreq: 0.25 + r() * 0.4,
-        rotPhase: r() * Math.PI * 2,
-        rotAmp: 2 + r() * 3,
-        flipPhase: r() * Math.PI * 2,
-        flipFreq: 0.7 + r() * 0.6,
-        sparklePhase: r() * Math.PI * 2,
-        scale: 0.92 + r() * 0.18,
-      };
-    });
-    const chipStacks = Array.from({ length: 4 }).map(() => ({
-      cx: 0.08 + r() * 0.84,
-      cy: 0.78 + (r() - 0.5) * 0.1,
-      height: 3 + Math.floor(r() * 5),
-      radius: 28 + r() * 6,
-      color: CHIP_COLORS[Math.floor(r() * CHIP_COLORS.length)],
-      wobblePhase: r() * Math.PI * 2,
-    }));
-    const smokeWisps = Array.from({ length: 5 }).map(() => ({
-      cx: 0.12 + r() * 0.76,
-      driftFreq: 0.15 + r() * 0.2,
-      driftPhase: r() * Math.PI * 2,
-      driftAmp: 18 + r() * 22,
-      lifeOffset: r() * 200,
-      lifeDuration: 220 + r() * 140,
-      width: 28 + r() * 18,
-    }));
-    const die = {
-      startX: 0.72 + r() * 0.1,
-      bouncePhase: r() * Math.PI * 2,
-      driftAmp: 14 + r() * 10,
-    };
-    return { cards, chipStacks, smokeWisps, die };
-  }, []);
+  const wisps = React.useMemo(buildSmokeWisps, []);
+  const dust = React.useMemo(buildDust, []);
 
-  const cycleFrame = frame % CYCLE;
-  if (cycleFrame >= DURATION) return null;
+  const cycleFrame = frame % CYCLE_TOTAL;
+  if (cycleFrame >= VISIBLE_DURATION) return null;
+  const progress = cycleFrame / VISIBLE_DURATION;
+  const fadeIn = interpolate(progress, [0, 0.10], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const fadeOut = interpolate(progress, [0.90, 1], [1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const masterOpacity = Math.min(fadeIn, fadeOut) * 0.95;
+  if (masterOpacity < 0.01) return null;
 
-  const fadeIn = interpolate(cycleFrame, [0, FADE], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-  const fadeOut = interpolate(cycleFrame, [DURATION - FADE, DURATION], [1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-  const baseOpacity = Math.min(fadeIn, fadeOut);
-  if (baseOpacity < 0.01) return null;
+  const warmth = interpolate(snap.slowEnergy, [0.0, 0.32], [0.55, 1.10], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const cardGlow = interpolate(snap.energy, [0.0, 0.30], [0.55, 1.0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const pulse = 1 + snap.beatDecay * 0.04;
+  const sparkle = snap.onsetEnvelope > 0.4 ? Math.min(1, (snap.onsetEnvelope - 0.3) * 1.6) : 0;
 
-  const t = cycleFrame / 30;
-  const energyGlow = 4 + snap.energy * 22;
-  const chipPulse = 1 + snap.beatDecay * 0.18;
-  const onset = snap.onsetEnvelope;
-  const bass = snap.bass;
-  const hueShift = (snap.chromaHue / 360) * 36 - 18;
-  const opacity = baseOpacity * (0.78 + Math.min(0.22, snap.energy * 0.6));
-  const spotlightStrength = 0.55 + snap.energy * 0.25;
+  const tintShift = snap.chromaHue - 180;
+  const feltHueA = `hsl(${(140 + tintShift * 0.10) % 360}, 60%, 18%)`;
+  const feltHueB = `hsl(${(150 + tintShift * 0.10) % 360}, 50%, 8%)`;
+
+  const cardW = Math.min(width * 0.13, 220) * pulse;
+  const cardH = cardW * 1.45;
+  const handCx = width * 0.5;
+  const handCy = height * 0.62;
+
+  // Smoke wisps (cigar smoke)
+  const wispNodes = wisps.map((w, i) => {
+    const t = ((cycleFrame + w.lifeOff) % 320) / 320;
+    const sx = w.x * width + Math.sin(frame * 0.012 + w.phase) * 18;
+    const sy = (1 - t) * height * 0.85;
+    const wr = w.size * (1 + t * 1.2);
+    return (
+      <ellipse key={`wisp-${i}`} cx={sx} cy={sy} rx={wr} ry={wr * 0.7}
+        fill="#e8e3d8" opacity={Math.sin(t * Math.PI) * 0.16}
+        filter="url(#pc-blur-lg)" />
+    );
+  });
+
+  // Dust motes
+  const dustNodes = dust.map((d, i) => {
+    const flick = 0.5 + Math.sin(frame * d.speed + d.phase) * 0.5;
+    return (
+      <circle key={`dm-${i}`} cx={d.x * width} cy={d.y * height}
+        r={d.r * (0.7 + flick * 0.6)}
+        fill="rgba(255, 240, 200, 0.65)" opacity={0.30 * flick * warmth} />
+    );
+  });
 
   return (
-    <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden", opacity, willChange: "opacity" }}>
-      <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} style={{ filter: `hue-rotate(${hueShift}deg)` }}>
+    <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden" }}>
+      <svg width={width} height={height} style={{ opacity: masterOpacity, willChange: "opacity" }}>
         <defs>
-          <radialGradient id="pc-felt" cx="50%" cy="55%" r="75%">
-            <stop offset="0%" stopColor="#0e5b2e" stopOpacity={0.55} />
-            <stop offset="55%" stopColor="#0a3e1f" stopOpacity={0.42} />
-            <stop offset="100%" stopColor="#03150a" stopOpacity={0.6} />
+          <radialGradient id="pc-felt" cx="50%" cy="55%" r="80%">
+            <stop offset="0%" stopColor={feltHueA} />
+            <stop offset="55%" stopColor={feltHueB} />
+            <stop offset="100%" stopColor="#03100a" />
           </radialGradient>
-          <radialGradient id="pc-spot" cx="50%" cy="20%" r="65%" fx="50%" fy="18%">
-            <stop offset="0%" stopColor="#fff5d6" stopOpacity={spotlightStrength} />
+          <radialGradient id="pc-spot" cx="50%" cy="20%" r="65%">
+            <stop offset="0%" stopColor="#fff5d6" stopOpacity={0.55 * warmth} />
             <stop offset="40%" stopColor="#e8c98a" stopOpacity={0.18} />
             <stop offset="100%" stopColor="#000000" stopOpacity={0} />
           </radialGradient>
-          <radialGradient id="pc-back" cx="50%" cy="50%" r="55%">
-            <stop offset="0%" stopColor="#c41e3a" stopOpacity={1} />
-            <stop offset="65%" stopColor="#7a0c1c" stopOpacity={1} />
-            <stop offset="100%" stopColor="#3a040c" stopOpacity={1} />
+          <radialGradient id="pc-vig">
+            <stop offset="55%" stopColor="rgba(0,0,0,0)" />
+            <stop offset="100%" stopColor="rgba(0,0,0,0.70)" />
           </radialGradient>
+          <filter id="pc-blur-lg" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="10" />
+          </filter>
+          <filter id="pc-shadow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="4" />
+          </filter>
         </defs>
 
-        <rect x={0} y={0} width={width} height={height} fill="url(#pc-felt)" />
-        <ellipse cx={width * 0.5} cy={height * 0.55} rx={width * 0.55} ry={height * 0.45} fill="none" stroke="#03100a" strokeWidth={3} opacity={0.25} />
-        <rect x={0} y={0} width={width} height={height} fill="url(#pc-spot)" />
+        {/* Felt background */}
+        <rect width={width} height={height} fill="url(#pc-felt)" />
+
+        {/* Inner felt boundary oval */}
+        <ellipse cx={width / 2} cy={height * 0.55}
+          rx={width * 0.55} ry={height * 0.48}
+          fill="none" stroke="#03100a" strokeWidth={3} opacity={0.35} />
+        <ellipse cx={width / 2} cy={height * 0.55}
+          rx={width * 0.52} ry={height * 0.46}
+          fill="none" stroke="rgba(255, 220, 140, 0.10)" strokeWidth={1} />
+
+        {/* Overhead spotlight */}
+        <rect width={width} height={height} fill="url(#pc-spot)" />
 
         {/* Cigar smoke */}
-        {layout.smokeWisps.map((w, i) => {
-          const localT = (cycleFrame + w.lifeOffset) % w.lifeDuration;
-          const lifeP = localT / w.lifeDuration;
-          const sx = w.cx * width + Math.sin(t * w.driftFreq + w.driftPhase) * w.driftAmp;
-          const sy = 0.85 * height - lifeP * height * 0.7;
-          const wispR = w.width * (1 + lifeP * 1.6);
-          return (
-            <ellipse key={`smoke-${i}`} cx={sx} cy={sy} rx={wispR} ry={wispR * 0.7}
-              fill="#e8e3d8" opacity={Math.sin(lifeP * Math.PI) * 0.18} style={{ filter: "blur(8px)" }} />
-          );
-        })}
+        {wispNodes}
 
-        {/* Poker chip stacks */}
-        {layout.chipStacks.map((stack, si) => {
-          const sx = stack.cx * width + Math.sin(t * 0.7 + stack.wobblePhase) * 1.2;
-          const sy = stack.cy * height;
-          const sp = chipPulse + Math.sin(t * 2 + stack.wobblePhase) * 0.03;
-          const [face, edge, stripe] = stack.color;
+        {/* Card shadows */}
+        {HAND.map((card, i) => {
+          const cx = handCx + card.xOffset * width;
+          const cy = handCy + card.yOffset * height;
           return (
-            <g key={`chips-${si}`} transform={`translate(${sx}, ${sy})`}>
-              <ellipse cx={0} cy={6} rx={stack.radius * 1.1 * sp} ry={stack.radius * 0.32 * sp} fill="#000000" opacity={0.4} style={{ filter: "blur(2.5px)" }} />
-              {Array.from({ length: stack.height }).map((_, ci) => {
-                const cy = -ci * 6;
-                const r = stack.radius * sp;
-                return (
-                  <g key={`chip-${si}-${ci}`}>
-                    <ellipse cx={0} cy={cy + 3} rx={r} ry={r * 0.3} fill={edge} opacity={0.92} />
-                    <ellipse cx={0} cy={cy} rx={r} ry={r * 0.3} fill={face} stroke={edge} strokeWidth={1.2} opacity={0.96} />
-                    {[-1, -0.5, 0, 0.5, 1].map((p, pi) => (
-                      <rect key={`s-${si}-${ci}-${pi}`} x={p * r * 0.85 - 1.5} y={cy - r * 0.32} width={3} height={r * 0.2} fill={stripe} opacity={0.85} />
-                    ))}
-                  </g>
-                );
-              })}
+            <g key={`shadow-${i}`} transform={`translate(${cx + 8} ${cy + 14}) rotate(${card.rotation})`}>
+              <rect x={-cardW / 2} y={-cardH / 2} width={cardW} height={cardH}
+                rx={cardW * 0.07}
+                fill="rgba(0, 0, 0, 0.55)" filter="url(#pc-shadow)" />
             </g>
           );
         })}
 
-        {/* Tumbling die — bass-driven */}
-        {(() => {
-          const dieSize = 38;
-          const dieX = layout.die.startX * width + Math.sin(t * 0.96 + layout.die.bouncePhase) * layout.die.driftAmp;
-          const dieBounce = Math.abs(Math.sin(t * (1.6 + bass * 4) + layout.die.bouncePhase));
-          const dieY = height * 0.74 - dieBounce * (28 + bass * 70);
-          const dieRot = t * (60 + bass * 240) * (tempoFactor || 1);
-          const faceVal = (Math.floor(t * (4 + bass * 12)) % 6) + 1;
-          const halfD = dieSize / 2;
+        {/* Cards (back to front so they overlap nicely) */}
+        {HAND.map((card, i) => {
+          const cx = handCx + card.xOffset * width;
+          const cy = handCy + card.yOffset * height;
+          const cardSway = Math.sin(frame * 0.012 * tempoFactor + i * 0.7) * 1.5;
           return (
-            <g transform={`translate(${dieX}, ${dieY}) rotate(${dieRot})`} style={{ filter: "drop-shadow(0 4px 6px rgba(0,0,0,0.55))" }}>
-              <rect x={-halfD} y={-halfD} width={dieSize} height={dieSize} rx={6} ry={6} fill="#fdfaf2" stroke="#1a1208" strokeWidth={1.4} />
-              {PIPS[faceVal].map((p, pi) => (
-                <circle key={`dp-${pi}`} cx={p[0] * halfD * 0.62} cy={p[1] * halfD * 0.62} r={dieSize * 0.09} fill="#1a1208" />
-              ))}
+            <g key={`card-${i}`}
+              transform={`translate(${cx} ${cy + cardSway}) rotate(${card.rotation})`}
+              style={{ filter: `drop-shadow(0 0 ${4 + cardGlow * 14}px hsla(45, 90%, 70%, ${0.30 + cardGlow * 0.25}))` }}>
+              <PlayingCard card={card} cardW={cardW} cardH={cardH} />
             </g>
           );
-        })()}
+        })}
 
-        {/* Playing cards */}
-        {layout.cards
-          .map((c, i) => ({ ...c, originalIndex: i }))
-          .sort((a, b) => Math.abs(b.cx - 0.5) - Math.abs(a.cx - 0.5))
-          .map((cardObj) => {
-            const i = cardObj.originalIndex;
-            const cx = cardObj.cx * width;
-            const bob = Math.sin(t * cardObj.bobFreq * (tempoFactor || 1) + cardObj.bobPhase) * cardObj.bobAmp;
-            const cy = cardObj.cy * height + bob;
-            const rot = cardObj.baseRot + Math.sin(t * cardObj.rotFreq + cardObj.rotPhase) * cardObj.rotAmp;
-            const flipsThisCard = i === 0 || i === 4 || i === 5;
-            const flipPhase = t * cardObj.flipFreq * 0.5 + cardObj.flipPhase + onset * 4;
-            const flipAmount = flipsThisCard ? Math.sin(flipPhase) * (0.3 + onset * 0.7) : 0;
-            const scaleX = Math.cos(flipAmount * Math.PI);
-            const showingFront = cardObj.card.face === "up" ? scaleX >= 0 : scaleX < 0;
-            const absScaleX = Math.max(0.04, Math.abs(scaleX));
-            const sparklePhase = t * 0.8 + cardObj.sparklePhase;
-            const sparkleX = Math.cos(sparklePhase) * (CARD_W * 0.3) * cardObj.scale;
-            const sparkleY = Math.sin(sparklePhase * 1.3) * (CARD_H * 0.3) * cardObj.scale;
-            const sparkleOp = 0.35 + snap.energy * 0.45;
-            const cardW = CARD_W * cardObj.scale;
-            const cardH = CARD_H * cardObj.scale;
-            return (
-              <g key={`card-${i}`}
-                transform={`translate(${cx}, ${cy}) rotate(${rot}) scale(${absScaleX}, 1)`}
-                style={{ filter: `drop-shadow(0 0 ${energyGlow}px rgba(255,230,150,${0.35 + snap.energy * 0.4})) drop-shadow(0 6px 8px rgba(0,0,0,0.6))` }}>
-                {showingFront
-                  ? <CardFront card={cardObj.card} cardW={cardW} cardH={cardH} />
-                  : <CardBack cardW={cardW} cardH={cardH} />}
-                <circle cx={sparkleX} cy={sparkleY} r={2 + snap.energy * 3} fill="#fffbe5" opacity={sparkleOp} />
-                <circle cx={sparkleX} cy={sparkleY} r={6 + snap.energy * 6} fill="#fffbe5" opacity={sparkleOp * 0.35} style={{ filter: "blur(3px)" }} />
-              </g>
-            );
-          })}
+        {/* Sparkle on onset */}
+        {sparkle > 0.05 && (
+          <ellipse cx={handCx} cy={handCy}
+            rx={cardW * 4} ry={cardH * 1.5}
+            fill={`hsla(45, 90%, 80%, ${sparkle * 0.18})`}
+            filter="url(#pc-blur-lg)" />
+        )}
+
+        {/* Dust motes */}
+        <g style={{ mixBlendMode: "screen" }}>{dustNodes}</g>
+
+        {/* Vignette */}
+        <rect width={width} height={height} fill="url(#pc-vig)" />
       </svg>
     </div>
-  );
-};
-
-/* ---------- CardFront: rank+suit corners + center figure ---------- */
-const CardFront: React.FC<{ card: CardSpec; cardW: number; cardH: number }> = ({ card, cardW, cardH }) => {
-  const halfW = cardW / 2, halfH = cardH / 2;
-  const isJoker = card.rank === "JOKER";
-  const color = isJoker ? "#1a1a1a" : SUIT_COLOR[card.suit];
-  const glyph = isJoker ? "★" : SUIT_GLYPH[card.suit];
-  const rankLabel = isJoker ? "JKR" : card.rank;
-  const fS = cardW * 0.13, sS = cardW * 0.11;
-
-  return (
-    <g>
-      <rect x={-halfW} y={-halfH} width={cardW} height={cardH} rx={cardW * 0.07} ry={cardW * 0.07} fill="#fdfaf2" stroke="#1a1208" strokeWidth={1.6} />
-      <rect x={-halfW + cardW * 0.05} y={-halfH + cardW * 0.05} width={cardW - cardW * 0.1} height={cardH - cardW * 0.1} rx={cardW * 0.04} ry={cardW * 0.04} fill="none" stroke={color} strokeWidth={0.9} opacity={0.4} />
-
-      {/* Top-left corner */}
-      <text x={-halfW + cardW * 0.1} y={-halfH + cardW * 0.18} fontSize={fS} fontFamily="Georgia, serif" fontWeight="bold" fill={color} textAnchor="middle">{rankLabel}</text>
-      <text x={-halfW + cardW * 0.1} y={-halfH + cardW * 0.32} fontSize={sS} fill={color} textAnchor="middle">{glyph}</text>
-
-      {/* Bottom-right corner (rotated 180°) */}
-      <g transform={`rotate(180, ${halfW - cardW * 0.1}, ${halfH - cardW * 0.18})`}>
-        <text x={halfW - cardW * 0.1} y={halfH - cardW * 0.18} fontSize={fS} fontFamily="Georgia, serif" fontWeight="bold" fill={color} textAnchor="middle">{rankLabel}</text>
-        <text x={halfW - cardW * 0.1} y={halfH - cardW * 0.04} fontSize={sS} fill={color} textAnchor="middle">{glyph}</text>
-      </g>
-
-      {/* Center decoration */}
-      {card.rank === "A" && (
-        <text x={0} y={cardW * 0.18} fontSize={cardW * 0.7} fill={color} textAnchor="middle">{glyph}</text>
-      )}
-      {(card.rank === "K" || card.rank === "Q" || card.rank === "J") && (
-        <FigureFace rank={card.rank} color={color} glyph={glyph} cardW={cardW} cardH={cardH} />
-      )}
-      {card.rank === "JOKER" && <StealieJoker cardW={cardW} cardH={cardH} />}
-    </g>
-  );
-};
-
-/* ---------- FigureFace: King / Queen / Jack ---------- */
-const FigureFace: React.FC<{ rank: "K" | "Q" | "J"; color: string; glyph: string; cardW: number; cardH: number }> = ({ rank, color, glyph, cardW, cardH }) => {
-  const cy = -cardH * 0.02;
-  const hr = cardW * 0.18;
-  return (
-    <g>
-      <rect x={-cardW * 0.32} y={-cardH * 0.32} width={cardW * 0.64} height={cardH * 0.64} rx={cardW * 0.04} ry={cardW * 0.04} fill="none" stroke={color} strokeWidth={0.7} opacity={0.35} />
-      <circle cx={0} cy={cy} r={hr} fill="#f5e6c8" stroke={color} strokeWidth={1.2} />
-
-      {rank === "K" && (
-        <>
-          <path d={`M ${-hr * 1.05} ${cy - hr * 0.85} L ${-hr * 0.6} ${cy - hr * 1.6} L ${-hr * 0.25} ${cy - hr * 0.95} L 0 ${cy - hr * 1.7} L ${hr * 0.25} ${cy - hr * 0.95} L ${hr * 0.6} ${cy - hr * 1.6} L ${hr * 1.05} ${cy - hr * 0.85} Z`} fill="#d4a017" stroke={color} strokeWidth={1.1} />
-          <circle cx={-hr * 0.6} cy={cy - hr * 1.45} r={2.2} fill="#c01a1a" />
-          <circle cx={0} cy={cy - hr * 1.55} r={2.6} fill="#1a3fc0" />
-          <circle cx={hr * 0.6} cy={cy - hr * 1.45} r={2.2} fill="#1a8a2a" />
-          <path d={`M ${-hr * 0.7} ${cy + hr * 0.4} Q 0 ${cy + hr * 1.4} ${hr * 0.7} ${cy + hr * 0.4} Z`} fill="#d8d2c4" stroke={color} strokeWidth={0.8} />
-        </>
-      )}
-      {rank === "Q" && (
-        <>
-          <path d={`M ${-hr * 0.95} ${cy - hr * 0.95} Q 0 ${cy - hr * 1.55} ${hr * 0.95} ${cy - hr * 0.95}`} fill="none" stroke="#d4a017" strokeWidth={2.2} />
-          <circle cx={0} cy={cy - hr * 1.35} r={2.4} fill="#c01a1a" />
-          <circle cx={-hr * 0.55} cy={cy - hr * 1.18} r={1.8} fill="#1a3fc0" />
-          <circle cx={hr * 0.55} cy={cy - hr * 1.18} r={1.8} fill="#1a3fc0" />
-          <path d={`M ${-hr * 1.1} ${cy} Q ${-hr * 1.4} ${cy + hr * 0.9} ${-hr * 0.6} ${cy + hr * 1.05}`} fill="#6b3812" stroke={color} strokeWidth={0.8} />
-          <path d={`M ${hr * 1.1} ${cy} Q ${hr * 1.4} ${cy + hr * 0.9} ${hr * 0.6} ${cy + hr * 1.05}`} fill="#6b3812" stroke={color} strokeWidth={0.8} />
-        </>
-      )}
-      {rank === "J" && (
-        <>
-          <path d={`M ${-hr * 1.05} ${cy - hr * 0.5} Q ${-hr * 0.9} ${cy - hr * 1.4} ${hr * 0.6} ${cy - hr * 1.3} L ${hr * 1.0} ${cy - hr * 0.6} Z`} fill="#1a8a2a" stroke={color} strokeWidth={1.1} />
-          <line x1={hr * 0.6} y1={cy - hr * 1.3} x2={hr * 1.2} y2={cy - hr * 1.85} stroke="#fdfaf2" strokeWidth={1.5} />
-          <path d={`M ${-hr * 1.05} ${cy} Q ${-hr * 1.2} ${cy + hr * 0.8} ${-hr * 0.5} ${cy + hr * 0.9}`} fill="#a06a2a" stroke={color} strokeWidth={0.7} />
-        </>
-      )}
-
-      {/* Eyes / nose / mouth */}
-      <circle cx={-hr * 0.32} cy={cy - hr * 0.05} r={1.6} fill={color} />
-      <circle cx={hr * 0.32} cy={cy - hr * 0.05} r={1.6} fill={color} />
-      <line x1={0} y1={cy + hr * 0.05} x2={0} y2={cy + hr * 0.22} stroke={color} strokeWidth={0.9} />
-      <path d={`M ${-hr * 0.22} ${cy + hr * 0.4} Q 0 ${cy + hr * 0.5} ${hr * 0.22} ${cy + hr * 0.4}`} fill="none" stroke={color} strokeWidth={1.0} />
-
-      {/* Collar */}
-      <path d={`M ${-hr * 1.4} ${cy + hr * 1.6} Q ${-hr * 0.5} ${cy + hr * 1.0} 0 ${cy + hr * 1.05} Q ${hr * 0.5} ${cy + hr * 1.0} ${hr * 1.4} ${cy + hr * 1.6} L ${hr * 1.4} ${cy + hr * 2.0} L ${-hr * 1.4} ${cy + hr * 2.0} Z`} fill={color === "#c01a1a" ? "#c01a1a" : "#1a1a1a"} opacity={0.85} stroke={color} strokeWidth={1.0} />
-
-      {/* Suit accents */}
-      <text x={-cardW * 0.28} y={cardH * 0.34} fontSize={cardW * 0.13} fill={color} textAnchor="middle">{glyph}</text>
-      <text x={cardW * 0.28} y={-cardH * 0.24} fontSize={cardW * 0.13} fill={color} textAnchor="middle">{glyph}</text>
-    </g>
-  );
-};
-
-/* ---------- StealieJoker: Joker with Steal-Your-Face center ---------- */
-const StealieJoker: React.FC<{ cardW: number; cardH: number }> = ({ cardW, cardH }) => {
-  const r = cardW * 0.27;
-  return (
-    <g>
-      <circle cx={0} cy={0} r={r} fill="#c01a1a" stroke="#1a1208" strokeWidth={1.2} />
-      <path d={`M 0 ${-r} A ${r} ${r} 0 0 0 0 ${r} Z`} fill="#1a3fc0" />
-      <path d={`M ${-r * 0.4} ${-r * 0.7} L ${r * 0.15} ${-r * 0.05} L ${-r * 0.1} ${r * 0.05} L ${r * 0.4} ${r * 0.75} L ${-r * 0.05} ${r * 0.15} L ${r * 0.15} ${-r * 0.05} Z`} fill="#fdfaf2" stroke="#1a1208" strokeWidth={0.9} />
-      <text x={0} y={cardH * 0.36} fontSize={cardW * 0.09} fontFamily="Georgia, serif" fontStyle="italic" fill="#1a1208" textAnchor="middle">JOKER</text>
-      <text x={0} y={-cardH * 0.32} fontSize={cardW * 0.09} fontFamily="Georgia, serif" fontStyle="italic" fill="#1a1208" textAnchor="middle">WILD</text>
-    </g>
-  );
-};
-
-/* ---------- CardBack: stealie/rose decorative pattern ---------- */
-const CardBack: React.FC<{ cardW: number; cardH: number }> = ({ cardW, cardH }) => {
-  const halfW = cardW / 2, halfH = cardH / 2;
-  return (
-    <g>
-      <rect x={-halfW} y={-halfH} width={cardW} height={cardH} rx={cardW * 0.07} ry={cardW * 0.07} fill="url(#pc-back)" stroke="#1a1208" strokeWidth={1.6} />
-      <rect x={-halfW + cardW * 0.06} y={-halfH + cardW * 0.06} width={cardW - cardW * 0.12} height={cardH - cardW * 0.12} rx={cardW * 0.04} ry={cardW * 0.04} fill="none" stroke="#d4a017" strokeWidth={1.5} opacity={0.9} />
-      <rect x={-halfW + cardW * 0.085} y={-halfH + cardW * 0.085} width={cardW - cardW * 0.17} height={cardH - cardW * 0.17} rx={cardW * 0.03} ry={cardW * 0.03} fill="none" stroke="#d4a017" strokeWidth={0.6} opacity={0.55} />
-
-      {/* Center stealie medallion */}
-      <circle cx={0} cy={0} r={cardW * 0.22} fill="#fdfaf2" stroke="#d4a017" strokeWidth={1.4} />
-      <circle cx={0} cy={0} r={cardW * 0.2} fill="#c01a1a" />
-      <path d={`M 0 ${-cardW * 0.2} A ${cardW * 0.2} ${cardW * 0.2} 0 0 0 0 ${cardW * 0.2} Z`} fill="#1a3fc0" />
-      <path d={`M ${-cardW * 0.08} ${-cardW * 0.13} L ${cardW * 0.03} ${-cardW * 0.01} L ${-cardW * 0.02} ${cardW * 0.01} L ${cardW * 0.08} ${cardW * 0.14} L ${-cardW * 0.01} ${cardW * 0.03} L ${cardW * 0.03} ${-cardW * 0.01} Z`} fill="#fdfaf2" stroke="#1a1208" strokeWidth={0.6} />
-
-      {/* Corner roses */}
-      {[
-        [-halfW + cardW * 0.18, -halfH + cardW * 0.18],
-        [halfW - cardW * 0.18, -halfH + cardW * 0.18],
-        [-halfW + cardW * 0.18, halfH - cardW * 0.18],
-        [halfW - cardW * 0.18, halfH - cardW * 0.18],
-      ].map((pt, i) => (
-        <g key={`rose-${i}`} transform={`translate(${pt[0]}, ${pt[1]})`}>
-          <circle r={cardW * 0.05} fill="#d4a017" opacity={0.9} />
-          <circle r={cardW * 0.035} fill="#c01a1a" />
-          <circle r={cardW * 0.018} fill="#fdfaf2" opacity={0.85} />
-        </g>
-      ))}
-
-      {/* Diagonal pattern lines */}
-      {[-0.6, -0.3, 0, 0.3, 0.6].map((s, i) => (
-        <line key={`d-${i}`} x1={-halfW + cardW * 0.1} y1={s * cardH * 0.4} x2={halfW - cardW * 0.1} y2={s * cardH * 0.4 + cardH * 0.05} stroke="#d4a017" strokeWidth={0.4} opacity={0.25} />
-      ))}
-    </g>
   );
 };

@@ -360,10 +360,10 @@ void main() {
   // === PALETTE ===
   float chromaHueMod = uChromaHue * 0.25;
   float chordHue = float(int(uChordIndex)) / 24.0 * 0.1;
-  float hue1 = hsvToCosineHue(uPalettePrimary) + chromaHueMod + chordHue;
-  float hue2 = hsvToCosineHue(uPaletteSecondary) + chordHue * 0.5;
-  vec3 palColor1 = 0.5 + 0.5 * cos(TAU * vec3(hue1, hue1 + 0.33, hue1 + 0.67));
-  vec3 palColor2 = 0.5 + 0.5 * cos(TAU * vec3(hue2, hue2 + 0.33, hue2 + 0.67));
+  float hue1 = uPalettePrimary + chromaHueMod + chordHue;
+  float hue2 = uPaletteSecondary + chordHue * 0.5;
+  vec3 palColor1 = paletteHueColor(hue1, 0.85, 0.95);
+  vec3 palColor2 = paletteHueColor(hue2, 0.85, 0.95);
 
   // Light color: palette-driven, vocal shifts warm
   vec3 lightColor = mix(palColor1, vec3(1.0, 0.95, 0.85), 0.3);

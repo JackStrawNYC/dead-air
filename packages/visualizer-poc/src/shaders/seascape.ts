@@ -255,10 +255,10 @@ void main() {
   float sunSize = mix(128.0, 48.0, climaxBoost); // larger during storm
 
   // === PALETTE COLORS ===
-  float hue1 = hsvToCosineHue(uPalettePrimary);
-  vec3 palCol1 = 0.5 + 0.5 * cos(_SS_TAU * vec3(hue1, hue1 + 0.33, hue1 + 0.67));
-  float hue2 = hsvToCosineHue(uPaletteSecondary);
-  vec3 palCol2 = 0.5 + 0.5 * cos(_SS_TAU * vec3(hue2, hue2 + 0.33, hue2 + 0.67));
+  float hue1 = uPalettePrimary;
+  vec3 palCol1 = paletteHueColor(hue1, 0.7, 0.9);
+  float hue2 = uPaletteSecondary;
+  vec3 palCol2 = paletteHueColor(hue2, 0.7, 0.9);
 
   // Water body color: palette-tinted deep ocean
   vec3 waterBase = vec3(0.02, 0.12, 0.22);

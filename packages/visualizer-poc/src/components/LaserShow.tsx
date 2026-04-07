@@ -1,234 +1,133 @@
 /**
- * LaserShow — Concert laser beams from the top of the frame.
+ * LaserShow — A+++ overlay: a concert laser show with multiple beams crossing
+ * the frame from various angles, rendered as proper light cones with falloff
+ * and atmospheric scatter from heavy stage smoke. 14 lasers in a fan from
+ * truss-mounted heads at the top, hitting the smoke layer and the ground.
+ * Geometric scanning patterns. Stage at the bottom, crowd silhouette
+ * foreground, smoke fills mid-air. NOT lines — actual cones.
  *
- * 10-12 laser beams originating from the top (rigging position), each rendered
- * with a 3-layer approach: thin bright core + medium glow + wide soft bloom.
- * Beams scan sinusoidally at different frequencies/phases. 5 laser colors
- * (green, red, blue, amber, white) matching real laser rigs. Beam endpoints
- * hit the "floor" with bright impact dots. Beams crossing create bright
- * intersection flares. Fan patterns (3-4 beams from same origin) and parallel
- * sweeps (2-3 beams together). 2-3 horizontal atmospheric haze bands. Beams
- * widen slightly in the middle section (smoke visibility). At high energy:
- * faster sweeps, more beams. At peaks: brief strobe flash.
- *
- * Appears every 40s for 12s when energy > 0.10.
+ * Audio reactivity:
+ *   slowEnergy   → smoke density and base brightness
+ *   energy       → cone width
+ *   bass         → laser sweep amplitude
+ *   beatDecay    → simultaneous strobe pulse
+ *   onsetEnvelope→ flash burst
+ *   chromaHue    → primary laser color
+ *   tempoFactor  → sweep speed
  */
 
 import React from "react";
-import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
+import { useCurrentFrame, useVideoConfig, interpolate } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
+import { seeded } from "../utils/seededRandom";
 import { useAudioSnapshot } from "./parametric/audio-helpers";
 import { useTempoFactor } from "../data/TempoContext";
-import { seeded } from "../utils/seededRandom";
 
-/* ------------------------------------------------------------------ */
-/*  Types                                                              */
-/* ------------------------------------------------------------------ */
+const CYCLE_TOTAL = 2400;
+const VISIBLE_DURATION = 800;
+const BEAM_COUNT = 14;
+const SCAN_BEAM_COUNT = 8;
+const SMOKE_COUNT = 22;
+const DUST_COUNT = 60;
+const STAR_COUNT = 40;
 
-interface BeamDef {
-  /** Origin X as fraction of width (0-1) */
-  originFrac: number;
-  /** Base angle offset from vertical (radians, 0 = straight down) */
+interface Beam {
+  x: number;
   baseAngle: number;
-  /** Sweep frequency (radians per frame) */
   sweepFreq: number;
-  /** Sweep amplitude (radians) */
   sweepAmp: number;
-  /** Phase offset */
   sweepPhase: number;
-  /** Index into LASER_COLORS */
-  colorIdx: number;
-  /** Base core stroke width */
-  coreWidth: number;
-  /** Base brightness 0-1 */
-  brightness: number;
-  /** Group: "fan-L" | "fan-R" | "parallel" | "solo" — determines sweep coupling */
-  group: string;
+  hueOffset: number;
+  width: number;
+  reach: number;
 }
 
-interface LaserColor {
-  core: string;
-  glow: string;
-  bloom: string;
-  /** Color for impact dots and intersection flares */
-  flare: string;
+interface SmokeBlob {
+  x: number;
+  y: number;
+  rx: number;
+  ry: number;
+  drift: number;
+  shade: number;
+  phase: number;
 }
 
-/* ------------------------------------------------------------------ */
-/*  Laser color palette — 5 colors like real laser rigs               */
-/* ------------------------------------------------------------------ */
-
-const LASER_COLORS: LaserColor[] = [
-  {
-    core: "rgba(0,255,60,1)",
-    glow: "rgba(0,255,60,0.45)",
-    bloom: "rgba(0,255,60,0.12)",
-    flare: "rgba(180,255,200,0.9)",
-  },
-  {
-    core: "rgba(255,25,25,1)",
-    glow: "rgba(255,25,25,0.4)",
-    bloom: "rgba(255,25,25,0.1)",
-    flare: "rgba(255,180,160,0.9)",
-  },
-  {
-    core: "rgba(50,140,255,1)",
-    glow: "rgba(50,140,255,0.4)",
-    bloom: "rgba(50,140,255,0.1)",
-    flare: "rgba(180,210,255,0.9)",
-  },
-  {
-    core: "rgba(255,180,30,1)",
-    glow: "rgba(255,180,30,0.35)",
-    bloom: "rgba(255,180,30,0.09)",
-    flare: "rgba(255,230,160,0.9)",
-  },
-  {
-    core: "rgba(255,255,255,1)",
-    glow: "rgba(255,255,255,0.35)",
-    bloom: "rgba(255,255,255,0.08)",
-    flare: "rgba(255,255,255,0.95)",
-  },
-];
-
-const NUM_BEAMS = 12;
-
-/* ------------------------------------------------------------------ */
-/*  Beam generation — deterministic from seed                          */
-/* ------------------------------------------------------------------ */
-
-function generateBeams(seed: number): BeamDef[] {
-  const rng = seeded(seed + 7777);
-  const beams: BeamDef[] = [];
-
-  // Fan-Left group: 3 beams from ~25% x, spreading outward
-  const fanLOrigin = 0.22 + rng() * 0.06;
-  for (let i = 0; i < 3; i++) {
-    beams.push({
-      originFrac: fanLOrigin + (rng() - 0.5) * 0.02,
-      baseAngle: -0.3 + i * 0.25,
-      sweepFreq: 0.018 + rng() * 0.012,
-      sweepAmp: 0.08 + rng() * 0.12,
-      sweepPhase: rng() * Math.PI * 2,
-      colorIdx: i % 3, // green, red, blue
-      coreWidth: 1.0 + rng() * 0.5,
-      brightness: 0.75 + rng() * 0.25,
-      group: "fan-L",
-    });
-  }
-
-  // Fan-Right group: 3 beams from ~75% x, spreading outward
-  const fanROrigin = 0.72 + rng() * 0.06;
-  for (let i = 0; i < 3; i++) {
-    beams.push({
-      originFrac: fanROrigin + (rng() - 0.5) * 0.02,
-      baseAngle: -0.3 + i * 0.25,
-      sweepFreq: 0.02 + rng() * 0.015,
-      sweepAmp: 0.1 + rng() * 0.15,
-      sweepPhase: rng() * Math.PI * 2,
-      colorIdx: (i + 2) % 5, // blue, amber, white
-      coreWidth: 1.0 + rng() * 0.5,
-      brightness: 0.7 + rng() * 0.3,
-      group: "fan-R",
-    });
-  }
-
-  // Parallel sweep group: 3 beams from center, sweeping together
-  for (let i = 0; i < 3; i++) {
-    const sharedFreq = 0.025 + rng() * 0.01;
-    const sharedPhase = rng() * Math.PI * 2;
-    beams.push({
-      originFrac: 0.42 + i * 0.08,
-      baseAngle: -0.05 + i * 0.05,
-      sweepFreq: sharedFreq,
-      sweepAmp: 0.35 + rng() * 0.15,
-      sweepPhase: sharedPhase + i * 0.15,
-      colorIdx: [0, 3, 4][i], // green, amber, white
-      coreWidth: 0.8 + rng() * 0.6,
-      brightness: 0.65 + rng() * 0.35,
-      group: "parallel",
-    });
-  }
-
-  // Solo beams: 3 independent beams placed across the top
-  for (let i = 0; i < 3; i++) {
-    beams.push({
-      originFrac: 0.15 + rng() * 0.7,
-      baseAngle: (rng() - 0.5) * 0.6,
-      sweepFreq: 0.015 + rng() * 0.03,
-      sweepAmp: 0.2 + rng() * 0.4,
-      sweepPhase: rng() * Math.PI * 2,
-      colorIdx: Math.floor(rng() * 5),
-      coreWidth: 0.9 + rng() * 0.7,
-      brightness: 0.6 + rng() * 0.4,
-      group: "solo",
-    });
-  }
-
-  return beams;
+interface Dust {
+  x: number;
+  y: number;
+  size: number;
+  speed: number;
+  phase: number;
 }
 
-/* ------------------------------------------------------------------ */
-/*  Haze band definitions                                              */
-/* ------------------------------------------------------------------ */
-
-interface HazeBand {
-  yFrac: number; // vertical position as fraction of height
-  widthFrac: number; // thickness as fraction of height
-  drift: number; // horizontal drift speed
-  opacity: number;
+interface Star {
+  x: number;
+  y: number;
+  size: number;
+  phase: number;
 }
 
-function generateHaze(seed: number): HazeBand[] {
-  const rng = seeded(seed + 3333);
-  return [
-    { yFrac: 0.3 + rng() * 0.1, widthFrac: 0.08 + rng() * 0.04, drift: 0.3 + rng() * 0.2, opacity: 0.12 },
-    { yFrac: 0.5 + rng() * 0.1, widthFrac: 0.06 + rng() * 0.04, drift: -(0.2 + rng() * 0.3), opacity: 0.09 },
-    { yFrac: 0.7 + rng() * 0.08, widthFrac: 0.05 + rng() * 0.03, drift: 0.15 + rng() * 0.15, opacity: 0.07 },
-  ];
+function buildBeams(): Beam[] {
+  const rng = seeded(34_557_886);
+  return Array.from({ length: BEAM_COUNT }, (_, i) => ({
+    x: 0.10 + (i / (BEAM_COUNT - 1)) * 0.80,
+    baseAngle: -Math.PI / 2 + (rng() - 0.5) * 0.30,
+    sweepFreq: 0.008 + rng() * 0.020,
+    sweepAmp: 0.50 + rng() * 0.45,
+    sweepPhase: rng() * Math.PI * 2,
+    hueOffset: -60 + rng() * 120,
+    width: 50 + rng() * 30,
+    reach: 0.85 + rng() * 0.20,
+  }));
 }
 
-/* ------------------------------------------------------------------ */
-/*  Geometry helpers                                                    */
-/* ------------------------------------------------------------------ */
-
-/** Compute beam endpoint — beam goes from origin (top) downward. */
-function beamEndpoint(
-  originX: number,
-  originY: number,
-  angle: number,
-  length: number,
-): { x: number; y: number } {
-  return {
-    x: originX + Math.sin(angle) * length,
-    y: originY + Math.cos(angle) * length,
-  };
+function buildScanBeams(): Beam[] {
+  const rng = seeded(80_113_004);
+  return Array.from({ length: SCAN_BEAM_COUNT }, (_, i) => ({
+    x: 0.20 + (i / (SCAN_BEAM_COUNT - 1)) * 0.60,
+    baseAngle: -Math.PI / 2,
+    sweepFreq: 0.006 + rng() * 0.014,
+    sweepAmp: 0.7 + rng() * 0.4,
+    sweepPhase: i * 0.6,
+    hueOffset: -30 + rng() * 60,
+    width: 22,
+    reach: 1.0,
+  }));
 }
 
-/** Line-line intersection (returns null if parallel or out of segment). */
-function lineIntersect(
-  x1: number, y1: number, x2: number, y2: number,
-  x3: number, y3: number, x4: number, y4: number,
-): { x: number; y: number } | null {
-  const denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
-  if (Math.abs(denom) < 0.001) return null;
-  const t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / denom;
-  const u = -((x1 - x2) * (y1 - y3) - (y1 - y2) * (x1 - x3)) / denom;
-  if (t < 0.05 || t > 0.95 || u < 0.05 || u > 0.95) return null;
-  return { x: x1 + t * (x2 - x1), y: y1 + t * (y2 - y1) };
+function buildSmoke(): SmokeBlob[] {
+  const rng = seeded(91_447_022);
+  return Array.from({ length: SMOKE_COUNT }, () => ({
+    x: rng(),
+    y: 0.20 + rng() * 0.60,
+    rx: 0.10 + rng() * 0.20,
+    ry: 0.04 + rng() * 0.06,
+    drift: 0.0001 + rng() * 0.00038,
+    shade: 0.20 + rng() * 0.30,
+    phase: rng() * Math.PI * 2,
+  }));
 }
 
-/* ------------------------------------------------------------------ */
-/*  Timing constants                                                    */
-/* ------------------------------------------------------------------ */
+function buildDust(): Dust[] {
+  const rng = seeded(57_201_338);
+  return Array.from({ length: DUST_COUNT }, () => ({
+    x: rng(),
+    y: 0.10 + rng() * 0.80,
+    size: 0.6 + rng() * 1.4,
+    speed: 0.0005 + rng() * 0.0028,
+    phase: rng() * Math.PI * 2,
+  }));
+}
 
-const CYCLE_PERIOD = 1200; // every 40s at 30fps
-const SHOW_DURATION = 360; // 12s
-const FADE_FRAMES = 45;
-
-/* ------------------------------------------------------------------ */
-/*  Component                                                           */
-/* ------------------------------------------------------------------ */
+function buildStars(): Star[] {
+  const rng = seeded(63_004_891);
+  return Array.from({ length: STAR_COUNT }, () => ({
+    x: rng(),
+    y: rng() * 0.30,
+    size: 0.4 + rng() * 1.4,
+    phase: rng() * Math.PI * 2,
+  }));
+}
 
 interface Props {
   frames: EnhancedFrameData[];
@@ -237,440 +136,226 @@ interface Props {
 export const LaserShow: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
-  const audio = useAudioSnapshot(frames);
   const tempoFactor = useTempoFactor();
+  const snap = useAudioSnapshot(frames);
 
-  const {
-    energy,
-    beatDecay,
-    onsetEnvelope,
-    chromaHue,
-    bass,
-    highs,
-    fastEnergy,
-  } = audio;
+  const beams = React.useMemo(buildBeams, []);
+  const scanBeams = React.useMemo(buildScanBeams, []);
+  const smoke = React.useMemo(buildSmoke, []);
+  const dust = React.useMemo(buildDust, []);
+  const stars = React.useMemo(buildStars, []);
 
-  // Seed from show context or fallback
-  const beams = React.useMemo(() => generateBeams(19770508), []);
-  const hazeBands = React.useMemo(() => generateHaze(19770508), []);
-
-  /* ---- Cycle timing ---- */
-  const cyclePos = frame % CYCLE_PERIOD;
-  const inShowWindow = cyclePos < SHOW_DURATION;
-  const energyGate = energy > 0.10 ? 1 : 0;
-
-  const showFadeIn = interpolate(cyclePos, [0, FADE_FRAMES], [0, 1], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-    easing: Easing.out(Easing.cubic),
-  });
-  const showFadeOut = interpolate(
-    cyclePos,
-    [SHOW_DURATION - FADE_FRAMES, SHOW_DURATION],
-    [1, 0],
-    { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: Easing.in(Easing.cubic) },
-  );
-  const showEnvelope = Math.min(showFadeIn, showFadeOut);
-  const masterOpacity = inShowWindow ? showEnvelope * energyGate : 0;
-
+  const cycleFrame = frame % CYCLE_TOTAL;
+  if (cycleFrame >= VISIBLE_DURATION) return null;
+  const progress = cycleFrame / VISIBLE_DURATION;
+  const fadeIn = interpolate(progress, [0, 0.08], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const fadeOut = interpolate(progress, [0.92, 1], [1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const masterOpacity = Math.min(fadeIn, fadeOut) * 0.95;
   if (masterOpacity < 0.01) return null;
 
-  /* ---- Audio-derived parameters ---- */
+  const beamGlow = interpolate(snap.slowEnergy, [0.02, 0.32], [0.55, 1.20], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const energy = snap.energy;
+  const bass = snap.bass;
+  const beatPulse = 1 + snap.beatDecay * 0.45;
+  const onsetFlare = snap.onsetEnvelope > 0.55 ? Math.min(1, (snap.onsetEnvelope - 0.4) * 1.7) : 0;
 
-  // Sweep speed: energy + tempo drive scanning speed
-  const sweepSpeed = interpolate(energy, [0.1, 0.5], [0.5, 2.8], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  }) * tempoFactor;
+  const baseHue = 320;
+  const tintHue = ((baseHue + (snap.chromaHue - 180) * 0.6) % 360 + 360) % 360;
 
-  // Visible beam count: more beams at higher energy
-  const visibleCount = Math.max(
-    4,
-    Math.round(interpolate(energy, [0.1, 0.4], [4, NUM_BEAMS], {
-      extrapolateLeft: "clamp",
-      extrapolateRight: "clamp",
-    })),
-  );
+  const skyTop = `hsl(${(tintHue + 220) % 360}, 30%, 4%)`;
+  const skyMid = `hsl(${(tintHue + 240) % 360}, 26%, 8%)`;
+  const skyHorizon = `hsl(${(tintHue + 16) % 360}, 36%, 14%)`;
 
-  // Strobe flash: triggered by beatDecay peaks at high energy
-  const strobeActive = energy > 0.35 && beatDecay > 0.7;
-  const strobeFlash = strobeActive
-    ? 0.3 + beatDecay * 0.7
-    : 0;
+  const stageY = height * 0.78;
+  const stageH = height * 0.22;
+  const trussY = height * 0.04;
 
-  // Onset brightness boost
-  const onsetBoost = 1 + onsetEnvelope * 0.6;
-
-  // Color palette hue shift from chromaHue (0-360)
-  const hueShift = chromaHue / 360;
-
-  // Beam length: from top origin to past bottom
-  const beamLength = height * 1.25;
-  const originY = -10; // just above frame
-
-  /* ---- Compute beam positions this frame ---- */
-
-  interface ComputedBeam {
-    ox: number;
-    oy: number;
-    ex: number;
-    ey: number;
-    color: LaserColor;
-    coreWidth: number;
-    alpha: number;
-    /** Beam widens in the middle (haze effect) */
-    midWidenFactor: number;
+  // Build a beam cone (3 layered paths)
+  function renderBeamCone(b: Beam, key: string, isScan: boolean) {
+    const sx = b.x * width;
+    const sy = trussY + 18;
+    const angle = b.baseAngle + Math.sin(frame * b.sweepFreq * tempoFactor + b.sweepPhase) * b.sweepAmp * (1 + bass * 0.6);
+    const len = height * b.reach;
+    const ex = sx + Math.cos(angle + Math.PI / 2) * len;
+    const ey = sy + Math.abs(Math.sin(angle + Math.PI / 2)) * len;
+    const w = b.width * (1 + energy * 0.45) * (isScan ? 0.6 : 1.0);
+    const beamHue = (tintHue + b.hueOffset + 360) % 360;
+    const beamColor = `hsl(${beamHue}, 95%, 60%)`;
+    const beamCore = `hsl(${beamHue}, 100%, 88%)`;
+    const beamOuter = `hsl(${beamHue}, 90%, 50%)`;
+    const dx = -Math.sin(angle + Math.PI / 2);
+    const dy = Math.cos(angle + Math.PI / 2);
+    return (
+      <g key={key} style={{ mixBlendMode: "screen" }}>
+        {/* outer atmospheric cone */}
+        <path
+          d={`M ${sx - dx * w * 0.10} ${sy - dy * w * 0.10}
+              L ${ex - dx * w * 0.55} ${ey - dy * w * 0.55}
+              L ${ex + dx * w * 0.55} ${ey + dy * w * 0.55}
+              L ${sx + dx * w * 0.10} ${sy + dy * w * 0.10} Z`}
+          fill={beamOuter}
+          opacity={0.10 * beamGlow}
+        />
+        {/* mid cone */}
+        <path
+          d={`M ${sx - dx * w * 0.05} ${sy - dy * w * 0.05}
+              L ${ex - dx * w * 0.28} ${ey - dy * w * 0.28}
+              L ${ex + dx * w * 0.28} ${ey + dy * w * 0.28}
+              L ${sx + dx * w * 0.05} ${sy + dy * w * 0.05} Z`}
+          fill={beamColor}
+          opacity={0.22 * beamGlow}
+        />
+        {/* core cone */}
+        <path
+          d={`M ${sx - dx * w * 0.018} ${sy - dy * w * 0.018}
+              L ${ex - dx * w * 0.10} ${ey - dy * w * 0.10}
+              L ${ex + dx * w * 0.10} ${ey + dy * w * 0.10}
+              L ${sx + dx * w * 0.018} ${sy + dy * w * 0.018} Z`}
+          fill={beamCore}
+          opacity={0.42 * beamGlow * beatPulse}
+        />
+        {/* origin glow at the truss */}
+        <circle cx={sx} cy={sy} r={10 + beatPulse * 5} fill={beamCore} opacity={0.85} />
+        <circle cx={sx} cy={sy} r={20 + beatPulse * 8} fill={beamColor} opacity={0.40 * beamGlow} />
+        {/* hit-point glow on the floor */}
+        <circle cx={ex} cy={ey} r={8 + beatPulse * 6} fill={beamCore} opacity={0.7} />
+        <circle cx={ex} cy={ey} r={20 + beatPulse * 10} fill={beamColor} opacity={0.30 * beamGlow} />
+      </g>
+    );
   }
 
-  const computed: ComputedBeam[] = [];
+  const beamNodes = beams.map((b, i) => renderBeamCone(b, `beam-${i}`, false));
+  const scanNodes = scanBeams.map((b, i) => renderBeamCone(b, `scan-${i}`, true));
 
-  for (let i = 0; i < visibleCount && i < beams.length; i++) {
-    const b = beams[i];
+  // Smoke
+  const smokeNodes = smoke.map((s, i) => {
+    const drift = (s.x + frame * s.drift) % 1.2 - 0.1;
+    const breath = 1 + Math.sin(frame * 0.012 + s.phase) * 0.06;
+    return (
+      <ellipse
+        key={`sm-${i}`}
+        cx={drift * width}
+        cy={s.y * height}
+        rx={s.rx * width * breath}
+        ry={s.ry * height * breath}
+        fill={`rgba(${30 + s.shade * 14},${24 + s.shade * 12},${44 + s.shade * 18},${0.42 + beamGlow * 0.25})`}
+      />
+    );
+  });
 
-    // Sweep angle
-    const sweepT = frame * b.sweepFreq * sweepSpeed;
-    const angle =
-      b.baseAngle +
-      Math.sin(sweepT + b.sweepPhase) * b.sweepAmp +
-      Math.sin(sweepT * 0.37 + b.sweepPhase * 1.7) * b.sweepAmp * 0.3; // secondary harmonic
+  // Dust motes
+  const dustNodes = dust.map((d, i) => {
+    const t = frame * d.speed + d.phase;
+    const px = ((d.x + t * 0.4) % 1.1 - 0.05) * width;
+    const py = (d.y + Math.sin(t * 1.4) * 0.02) * height;
+    const flicker = 0.4 + Math.sin(t * 2.3) * 0.4;
+    return <circle key={`dust-${i}`} cx={px} cy={py} r={d.size * (0.7 + beamGlow * 0.5)} fill={`hsl(${tintHue}, 90%, 80%)`} opacity={0.32 * flicker} />;
+  });
 
-    const ox = b.originFrac * width;
-    const oy = originY;
-    const end = beamEndpoint(ox, oy, angle, beamLength);
-
-    // Flicker: subtle per-beam variation
-    const flicker = 0.85 + Math.sin(frame * 0.18 + i * 3.1) * 0.15;
-
-    // Hue-shifted color index
-    const shiftedIdx = (b.colorIdx + Math.floor(hueShift * 5)) % 5;
-    const color = LASER_COLORS[shiftedIdx];
-
-    // Brightness: base * flicker * onset boost
-    const alpha = Math.min(1, b.brightness * flicker * onsetBoost);
-
-    // Beam widens in the middle third (visible in haze)
-    const midWidenFactor = 1 + energy * 0.8;
-
-    computed.push({
-      ox,
-      oy,
-      ex: end.x,
-      ey: end.y,
-      color,
-      coreWidth: b.coreWidth,
-      alpha,
-      midWidenFactor,
-    });
-  }
-
-  /* ---- Find beam intersections ---- */
-  interface Intersection {
-    x: number;
-    y: number;
-    color1: LaserColor;
-    color2: LaserColor;
-  }
-
-  const intersections: Intersection[] = [];
-  for (let i = 0; i < computed.length; i++) {
-    for (let j = i + 1; j < computed.length; j++) {
-      const a = computed[i];
-      const b = computed[j];
-      const pt = lineIntersect(a.ox, a.oy, a.ex, a.ey, b.ox, b.oy, b.ex, b.ey);
-      if (pt && pt.x > -50 && pt.x < width + 50 && pt.y > -50 && pt.y < height + 50) {
-        intersections.push({ x: pt.x, y: pt.y, color1: a.color, color2: b.color });
-      }
-    }
-  }
-  // Limit to 8 most visible intersections (avoid clutter)
-  const visibleIntersections = intersections.slice(0, 8);
-
-  /* ---- Impact dots where beams hit the floor ---- */
-  interface ImpactDot {
-    x: number;
-    y: number;
-    color: LaserColor;
-    intensity: number;
-  }
-
-  const impacts: ImpactDot[] = [];
-  for (const beam of computed) {
-    // Clip beam to bottom of frame
-    if (beam.ey >= height * 0.85) {
-      // Interpolate to find floor hit point
-      const t = (height - beam.oy) / (beam.ey - beam.oy);
-      const hitX = beam.ox + t * (beam.ex - beam.ox);
-      if (hitX > -20 && hitX < width + 20) {
-        impacts.push({
-          x: hitX,
-          y: height,
-          color: beam.color,
-          intensity: beam.alpha * 0.8,
-        });
-      }
-    }
-  }
-
-  /* ---- SVG filter IDs ---- */
-  const filterId = `laser-glow-${frame % 100}`;
-  const hazeFilterId = `haze-blur-${frame % 100}`;
+  // Stars
+  const starNodes = stars.map((s, i) => {
+    const tw = 0.5 + Math.sin(frame * 0.05 + s.phase) * 0.45;
+    return <circle key={`star-${i}`} cx={s.x * width} cy={s.y * height} r={s.size * tw} fill="rgba(240, 232, 220, 0.85)" />;
+  });
 
   return (
-    <div
-      style={{
-        position: "absolute",
-        inset: 0,
-        pointerEvents: "none",
-        overflow: "hidden",
-      }}
-    >
-      <svg width={width} height={height} style={{ opacity: masterOpacity }}>
+    <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden" }}>
+      <svg width={width} height={height} style={{ opacity: masterOpacity, willChange: "opacity" }}>
         <defs>
-          {/* Glow filter for beam bloom layer */}
-          <filter id={filterId} x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur stdDeviation="8" />
+          <linearGradient id="ls-sky" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={skyTop} />
+            <stop offset="55%" stopColor={skyMid} />
+            <stop offset="100%" stopColor={skyHorizon} />
+          </linearGradient>
+          <linearGradient id="ls-stage" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="rgba(14, 8, 22, 0.95)" />
+            <stop offset="100%" stopColor="rgba(2, 1, 6, 0.98)" />
+          </linearGradient>
+          <filter id="ls-blur" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="5" />
           </filter>
-          <filter id={hazeFilterId} x="-10%" y="-10%" width="120%" height="120%">
-            <feGaussianBlur stdDeviation="20" />
-          </filter>
-
-          {/* Radial gradient for impact dots */}
-          {computed.map((beam, i) => (
-            <radialGradient key={`impact-grad-${i}`} id={`impact-${i}`}>
-              <stop offset="0%" stopColor={beam.color.flare} stopOpacity={0.9} />
-              <stop offset="40%" stopColor={beam.color.glow} stopOpacity={0.4} />
-              <stop offset="100%" stopColor={beam.color.bloom} stopOpacity={0} />
-            </radialGradient>
-          ))}
-
-          {/* Radial gradient for intersection flares */}
-          {visibleIntersections.map((ix, i) => (
-            <radialGradient key={`ix-grad-${i}`} id={`ix-${i}`}>
-              <stop offset="0%" stopColor="rgba(255,255,255,0.95)" stopOpacity={1} />
-              <stop offset="30%" stopColor={ix.color1.flare} stopOpacity={0.6} />
-              <stop offset="100%" stopColor={ix.color2.bloom} stopOpacity={0} />
-            </radialGradient>
-          ))}
         </defs>
 
-        {/* ---- Strobe flash overlay ---- */}
-        {strobeFlash > 0.05 && (
-          <rect
-            x={0}
-            y={0}
-            width={width}
-            height={height}
-            fill="white"
-            opacity={strobeFlash * 0.15}
-          />
+        {/* Sky */}
+        <rect width={width} height={height} fill="url(#ls-sky)" />
+
+        {/* Stars */}
+        <g>{starNodes}</g>
+
+        {/* Top truss */}
+        <g opacity={0.92}>
+          <rect x={width * 0.06} y={trussY} width={width * 0.88} height={6} fill="rgba(20, 16, 26, 0.98)" />
+          <rect x={width * 0.06} y={trussY} width={6} height={26} fill="rgba(20, 16, 26, 0.98)" />
+          <rect x={width * 0.94 - 6} y={trussY} width={6} height={26} fill="rgba(20, 16, 26, 0.98)" />
+          {Array.from({ length: 30 }).map((_, i) => (
+            <line
+              key={`tr-${i}`}
+              x1={width * 0.06 + i * (width * 0.88 / 30)}
+              y1={trussY + 4}
+              x2={width * 0.06 + (i + 1) * (width * 0.88 / 30)}
+              y2={trussY + 22}
+              stroke="rgba(28, 22, 32, 0.7)"
+              strokeWidth={1}
+            />
+          ))}
+          {/* Laser fixtures */}
+          {beams.map((b, i) => (
+            <rect
+              key={`fx-${i}`}
+              x={b.x * width - 8}
+              y={trussY + 8}
+              width={16}
+              height={14}
+              rx={2}
+              fill="rgba(8, 6, 14, 0.98)"
+            />
+          ))}
+        </g>
+
+        {/* Smoke layer (must be behind beams to scatter) */}
+        <g filter="url(#ls-blur)">{smokeNodes}</g>
+
+        {/* Onset flash */}
+        {onsetFlare > 0 && (
+          <rect width={width} height={height} fill={`hsla(${tintHue}, 90%, 80%, ${onsetFlare * 0.15})`} />
         )}
 
-        {/* ---- Atmospheric haze bands ---- */}
-        {hazeBands.map((band, i) => {
-          const bandY = band.yFrac * height;
-          const bandH = band.widthFrac * height;
-          const driftX = Math.sin(frame * 0.005 * band.drift + i * 2) * width * 0.08;
-          const hazeOpacity = band.opacity * (0.7 + energy * 0.6);
+        {/* Main fan beams */}
+        <g>{beamNodes}</g>
 
-          return (
-            <rect
-              key={`haze-${i}`}
-              x={-width * 0.1 + driftX}
-              y={bandY - bandH / 2}
-              width={width * 1.2}
-              height={bandH}
-              rx={bandH / 2}
-              fill="rgba(200,210,230,0.3)"
-              opacity={hazeOpacity}
-              filter={`url(#${hazeFilterId})`}
-            />
-          );
-        })}
+        {/* Scanning narrow beams */}
+        <g>{scanNodes}</g>
 
-        {/* ---- Beam layers: bloom (widest, softest) ---- */}
-        {computed.map((beam, i) => {
-          // Beam widens in the middle: interpolate stroke width
-          // We draw the bloom as a thick blurred line
-          const bloomWidth = (beam.coreWidth * 12 + bass * 8) * beam.midWidenFactor;
+        {/* Dust motes through the beams */}
+        <g style={{ mixBlendMode: "screen" }}>{dustNodes}</g>
 
-          return (
-            <line
-              key={`bloom-${i}`}
-              x1={beam.ox}
-              y1={beam.oy}
-              x2={beam.ex}
-              y2={beam.ey}
-              stroke={beam.color.bloom}
-              strokeWidth={bloomWidth}
-              strokeLinecap="round"
-              opacity={beam.alpha * 0.3}
-              filter={`url(#${filterId})`}
-            />
-          );
-        })}
+        {/* Stage at bottom */}
+        <rect x={0} y={stageY} width={width} height={stageH} fill="url(#ls-stage)" />
+        <rect x={width * 0.10} y={stageY - 4} width={width * 0.80} height={6} fill="rgba(18, 14, 22, 0.95)" />
 
-        {/* ---- Beam layers: glow (medium width) ---- */}
-        {computed.map((beam, i) => {
-          const glowWidth = beam.coreWidth * 4 + highs * 3;
+        {/* Crowd silhouette foreground (heads bobbing) */}
+        <g>
+          {Array.from({ length: 22 }).map((_, i) => {
+            const px = (i + 0.5) / 22 * width;
+            const py = height * 0.97;
+            const bob = Math.sin(frame * 0.025 + i * 0.7) * (2 + bass * 4);
+            const r = 14 + (i % 3) * 3;
+            return (
+              <g key={`crowd-${i}`}>
+                <circle cx={px} cy={py - 18 + bob} r={r} fill="rgba(4, 2, 8, 0.98)" />
+                <ellipse cx={px} cy={py} rx={r * 1.6} ry={r * 0.8} fill="rgba(4, 2, 8, 0.98)" />
+              </g>
+            );
+          })}
+        </g>
 
-          return (
-            <line
-              key={`glow-${i}`}
-              x1={beam.ox}
-              y1={beam.oy}
-              x2={beam.ex}
-              y2={beam.ey}
-              stroke={beam.color.glow}
-              strokeWidth={glowWidth}
-              strokeLinecap="round"
-              opacity={beam.alpha * 0.55}
-            />
-          );
-        })}
-
-        {/* ---- Beam layers: core (thin, bright) ---- */}
-        {computed.map((beam, i) => (
-          <line
-            key={`core-${i}`}
-            x1={beam.ox}
-            y1={beam.oy}
-            x2={beam.ex}
-            y2={beam.ey}
-            stroke={beam.color.core}
-            strokeWidth={beam.coreWidth}
-            strokeLinecap="round"
-            opacity={beam.alpha * 0.95}
-          />
-        ))}
-
-        {/* ---- Beam haze widening in middle section ---- */}
-        {computed.map((beam, i) => {
-          // A shorter, wider segment in the middle third of the beam
-          const t1 = 0.3;
-          const t2 = 0.7;
-          const mx1 = beam.ox + t1 * (beam.ex - beam.ox);
-          const my1 = beam.oy + t1 * (beam.ey - beam.oy);
-          const mx2 = beam.ox + t2 * (beam.ex - beam.ox);
-          const my2 = beam.oy + t2 * (beam.ey - beam.oy);
-          const hazeWidth = beam.coreWidth * 6 * beam.midWidenFactor;
-
-          return (
-            <line
-              key={`haze-beam-${i}`}
-              x1={mx1}
-              y1={my1}
-              x2={mx2}
-              y2={my2}
-              stroke={beam.color.glow}
-              strokeWidth={hazeWidth}
-              strokeLinecap="round"
-              opacity={beam.alpha * 0.15}
-              filter={`url(#${filterId})`}
-            />
-          );
-        })}
-
-        {/* ---- Impact dots on the floor ---- */}
-        {impacts.map((dot, i) => {
-          const pulseR = 10 + fastEnergy * 15 + Math.sin(frame * 0.12 + i * 1.5) * 3;
-
-          return (
-            <g key={`impact-${i}`}>
-              {/* Outer bloom */}
-              <ellipse
-                cx={dot.x}
-                cy={dot.y}
-                rx={pulseR * 2.5}
-                ry={pulseR * 0.6}
-                fill={dot.color.bloom}
-                opacity={dot.intensity * 0.3}
-                filter={`url(#${filterId})`}
-              />
-              {/* Mid glow */}
-              <ellipse
-                cx={dot.x}
-                cy={dot.y}
-                rx={pulseR * 1.2}
-                ry={pulseR * 0.35}
-                fill={dot.color.glow}
-                opacity={dot.intensity * 0.5}
-              />
-              {/* Bright core */}
-              <ellipse
-                cx={dot.x}
-                cy={dot.y}
-                rx={pulseR * 0.4}
-                ry={pulseR * 0.15}
-                fill={dot.color.flare}
-                opacity={dot.intensity * 0.8}
-              />
-            </g>
-          );
-        })}
-
-        {/* ---- Intersection flares ---- */}
-        {visibleIntersections.map((ix, i) => {
-          const flareR = 6 + beatDecay * 12;
-          const flareAlpha = 0.4 + beatDecay * 0.4;
-
-          return (
-            <g key={`ix-${i}`}>
-              {/* Outer bloom */}
-              <circle
-                cx={ix.x}
-                cy={ix.y}
-                r={flareR * 2.5}
-                fill={`url(#ix-${i})`}
-                opacity={flareAlpha * 0.25}
-                filter={`url(#${filterId})`}
-              />
-              {/* Bright center */}
-              <circle
-                cx={ix.x}
-                cy={ix.y}
-                r={flareR * 0.5}
-                fill="white"
-                opacity={flareAlpha * 0.7}
-              />
-              {/* Cross-hair lines (small starburst) */}
-              <line
-                x1={ix.x - flareR}
-                y1={ix.y}
-                x2={ix.x + flareR}
-                y2={ix.y}
-                stroke="rgba(255,255,255,0.6)"
-                strokeWidth={0.8}
-                opacity={flareAlpha * 0.5}
-              />
-              <line
-                x1={ix.x}
-                y1={ix.y - flareR}
-                x2={ix.x}
-                y2={ix.y + flareR}
-                stroke="rgba(255,255,255,0.6)"
-                strokeWidth={0.8}
-                opacity={flareAlpha * 0.5}
-              />
-            </g>
-          );
-        })}
-
-        {/* ---- Origin glow points (laser emitter housings) ---- */}
-        {computed.map((beam, i) => {
-          const emitterR = 3 + onsetEnvelope * 4;
-
-          return (
-            <circle
-              key={`emitter-${i}`}
-              cx={beam.ox}
-              cy={Math.max(0, beam.oy)}
-              r={emitterR}
-              fill={beam.color.flare}
-              opacity={beam.alpha * 0.6}
-              filter={`url(#${filterId})`}
-            />
-          );
-        })}
+        {/* Final atmospheric tint */}
+        <rect
+          width={width}
+          height={height}
+          fill={`hsla(${tintHue}, 70%, 50%, ${0.04 + beamGlow * 0.04})`}
+          style={{ mixBlendMode: "screen" }}
+        />
       </svg>
     </div>
   );

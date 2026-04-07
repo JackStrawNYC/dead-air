@@ -316,10 +316,10 @@ void main() {
   float climaxIntensity = isClimax * clamp(uClimaxIntensity, 0.0, 1.0);
 
   // === PALETTE ===
-  float hue1 = hsvToCosineHue(uPalettePrimary);
-  vec3 palPrimary = 0.5 + 0.5 * cos(NW_TAU * vec3(hue1, hue1 + 0.33, hue1 + 0.67));
-  float hue2 = hsvToCosineHue(uPaletteSecondary);
-  vec3 palSecondary = 0.5 + 0.5 * cos(NW_TAU * vec3(hue2, hue2 + 0.33, hue2 + 0.67));
+  float hue1 = uPalettePrimary;
+  vec3 palPrimary = paletteHueColor(hue1, 0.85, 0.95);
+  float hue2 = uPaletteSecondary;
+  vec3 palSecondary = paletteHueColor(hue2, 0.85, 0.95);
 
   // === CAMERA RAY ===
   vec3 rayOrigin, rayDir;
@@ -460,20 +460,7 @@ void main() {
     col += palSecondary * wavePhase * sChorus * 0.06 * energy;
   }
 
-  // === JAM PHASE FEEDBACK ===
-  {
-    vec4 prevFrame = texture2D(uPrevFrame, vUv);
-    float feedbackDecay = 0.92;
-    if (uJamPhase >= 0.0) {
-      float jpExplore = step(-0.5, uJamPhase) * step(uJamPhase, 0.5);
-      float jpBuild   = step(0.5, uJamPhase) * step(uJamPhase, 1.5);
-      float jpPeak    = step(1.5, uJamPhase) * step(uJamPhase, 2.5);
-      float jpResolve = step(2.5, uJamPhase);
-      feedbackDecay += jpExplore * 0.03 + jpBuild * 0.02 + jpPeak * 0.04 - jpResolve * 0.06;
-      feedbackDecay = clamp(feedbackDecay, 0.80, 0.96);
-    }
-    col = mix(col, max(col, prevFrame.rgb * 0.9), feedbackDecay * 0.3);
-  }
+  // Feedback handled by shared temporalBlendEnabled in postprocess.
 
   // === CLIMAX: cascade activation ===
   if (climaxIntensity > 0.01) {

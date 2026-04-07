@@ -43,7 +43,7 @@ uniform sampler2D uPrevFrame;
 
 ${noiseGLSL}
 
-${buildPostProcessGLSL({ grainStrength: "normal", bloomEnabled: true, halationEnabled: true, caEnabled: true })}
+${buildPostProcessGLSL({ grainStrength: "normal", bloomEnabled: true, halationEnabled: true, caEnabled: true, temporalBlendEnabled: true })}
 
 varying vec2 vUv;
 
@@ -249,12 +249,12 @@ void main() {
   float bassVib = bass * 0.15;
 
   // Palette
-  float hue1 = hsvToCosineHue(uPalettePrimary) + chromaH * 0.2 + chordHue;
-  float hue2 = hsvToCosineHue(uPaletteSecondary) + chordHue * 0.5;
-  vec3 fogTint = 0.5 + 0.5 * cos(TAU * vec3(hue1, hue1 + 0.33, hue1 + 0.67));
+  float hue1 = uPalettePrimary + chromaH * 0.2 + chordHue;
+  float hue2 = uPaletteSecondary + chordHue * 0.5;
+  vec3 fogTint = paletteHueColor(hue1, 0.6, 0.85);
   fogTint = mix(fogTint, vec3(0.4, 0.45, 0.5), 0.3); // push toward smoke neutral
   fogTint += vec3(0.04, 0.02, 0.0) * vocalE; // vocal warmth
-  vec3 mirrorTint = 0.5 + 0.5 * cos(TAU * vec3(hue2, hue2 + 0.33, hue2 + 0.67));
+  vec3 mirrorTint = paletteHueColor(hue2, 0.85, 0.95);
 
   // ═══ Camera ═══
   float slowTime = uDynamicTime * 0.04;
@@ -414,12 +414,6 @@ void main() {
 
   // Post-processing
   col = applyPostProcess(col, vUv, screenPos);
-
-  // Feedback
-  vec3 prev = texture2D(uPrevFrame, vUv).rgb;
-  float baseDecay = mix(0.93, 0.86, energy);
-  float feedbackDecay = clamp(baseDecay + sJam * 0.04 + sSpace * 0.06, 0.80, 0.97);
-  col = max(col, prev * feedbackDecay);
 
   gl_FragColor = vec4(col, 1.0);
 }

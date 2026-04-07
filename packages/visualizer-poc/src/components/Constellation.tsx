@@ -1,133 +1,107 @@
 /**
- * Constellation — Connect-the-dots star patterns forming Dead icons.
- * 5 constellation patterns: Bear, Stealie, Lightning Bolt, Rose, Terrapin.
- * Each is 8-15 star points connected by thin lines. One constellation appears
- * every 50s for 12s. Stars twinkle (opacity sine). Lines draw in sequentially
- * (1 line per 10 frames). Faint background star field. White/ice-blue stars.
+ * Constellation — A+++ overlay.
+ * A large recognizable constellation pattern (Big Dipper, Orion, Scorpio)
+ * connected with luminous lines, stars varying in brightness, surrounding
+ * star field, mythological figure outline traced very faintly behind the
+ * constellation. Center of frame, ~70% of dimensions.
+ *
+ * Audio reactivity:
+ *   slowEnergy → cosmic warmth + figure trace
+ *   energy     → star halo brightness
+ *   bass       → main star pulse
+ *   beatDecay  → line shimmer
+ *   onsetEnvelope → flash bursts
+ *   chromaHue  → palette tint
+ *   tempoFactor → twinkle rate
  */
 
 import React from "react";
-import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
+import { useCurrentFrame, useVideoConfig, interpolate } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
 import { seeded } from "../utils/seededRandom";
 import { useAudioSnapshot } from "./parametric/audio-helpers";
+import { useTempoFactor } from "../data/TempoContext";
 
-// Constellation point data: normalized 0-1 coordinates
-// Each constellation has points and edges (index pairs)
-interface ConstellationDef {
-  name: string;
-  points: [number, number][];
-  edges: [number, number][];
-}
-
-const CONSTELLATIONS: ConstellationDef[] = [
-  {
-    // Bear (dancing bear silhouette)
-    name: "Bear",
-    points: [
-      [0.5, 0.15], [0.42, 0.22], [0.58, 0.22], // head, ears
-      [0.5, 0.35], // neck
-      [0.4, 0.45], [0.6, 0.45], // shoulders
-      [0.35, 0.6], [0.65, 0.6], // elbows
-      [0.3, 0.75], [0.7, 0.75], // hands
-      [0.45, 0.65], [0.55, 0.65], // hips
-      [0.4, 0.85], [0.6, 0.85], // feet
-    ],
-    edges: [
-      [0, 1], [0, 2], [0, 3], [3, 4], [3, 5],
-      [4, 6], [5, 7], [6, 8], [7, 9],
-      [4, 10], [5, 11], [10, 12], [11, 13],
-    ],
-  },
-  {
-    // Stealie (skull circle)
-    name: "Stealie",
-    points: [
-      [0.5, 0.12], [0.7, 0.2], [0.82, 0.38], [0.82, 0.58],
-      [0.7, 0.76], [0.5, 0.84], [0.3, 0.76], [0.18, 0.58],
-      [0.18, 0.38], [0.3, 0.2],
-      [0.4, 0.45], [0.6, 0.45], // eyes
-      [0.5, 0.6], // nose
-    ],
-    edges: [
-      [0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 6],
-      [6, 7], [7, 8], [8, 9], [9, 0],
-      [10, 11], [10, 12], [11, 12],
-    ],
-  },
-  {
-    // Lightning Bolt
-    name: "Lightning Bolt",
-    points: [
-      [0.45, 0.1], [0.6, 0.1], [0.48, 0.35], [0.62, 0.35],
-      [0.42, 0.65], [0.58, 0.65], [0.35, 0.9], [0.5, 0.9],
-      [0.55, 0.5], // center flash point
-    ],
-    edges: [
-      [0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 6], [6, 7],
-      [0, 2], [3, 8], [8, 5],
-    ],
-  },
-  {
-    // Rose
-    name: "Rose",
-    points: [
-      [0.5, 0.15], [0.62, 0.22], [0.68, 0.36], [0.6, 0.48],
-      [0.5, 0.42], [0.4, 0.48], [0.32, 0.36], [0.38, 0.22],
-      [0.5, 0.55], // center
-      [0.5, 0.7], [0.5, 0.88], // stem
-      [0.38, 0.75], [0.62, 0.75], // leaves
-    ],
-    edges: [
-      [0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 6], [6, 7], [7, 0],
-      [4, 8], [8, 9], [9, 10], [9, 11], [9, 12],
-    ],
-  },
-  {
-    // Terrapin (turtle top-down)
-    name: "Terrapin",
-    points: [
-      [0.5, 0.12], // head
-      [0.4, 0.25], [0.6, 0.25], // front flippers
-      [0.35, 0.35], [0.65, 0.35], // shell top
-      [0.3, 0.5], [0.7, 0.5], // shell mid
-      [0.35, 0.65], [0.65, 0.65], // shell bottom
-      [0.5, 0.5], // shell center
-      [0.4, 0.75], [0.6, 0.75], // rear flippers
-      [0.5, 0.85], // tail
-    ],
-    edges: [
-      [0, 1], [0, 2], [1, 3], [2, 4], [3, 5], [4, 6],
-      [5, 7], [6, 8], [7, 10], [8, 11], [10, 12], [11, 12],
-      [3, 9], [4, 9], [7, 9], [8, 9],
-    ],
-  },
-];
+const CYCLE_TOTAL = 2400;
+const VISIBLE_DURATION = 780;
+const BG_STAR_COUNT = 180;
+const NEBULA_COUNT = 5;
 
 interface BgStar {
   x: number;
   y: number;
-  size: number;
-  twinkleFreq: number;
-  twinklePhase: number;
-  brightness: number;
+  r: number;
+  twinkleSpeed: number;
+  phase: number;
+  hueOffset: number;
+}
+interface Nebula {
+  x: number;
+  y: number;
+  rx: number;
+  ry: number;
+  rotation: number;
+  hueOffset: number;
 }
 
-function generateBgStars(seed: number, count: number): BgStar[] {
-  const rng = seeded(seed);
-  return Array.from({ length: count }, () => ({
+// Orion constellation (normalized 0-1, centered)
+// 8 main stars + figure trace
+interface ConStar { x: number; y: number; size: number; name?: string; }
+interface ConFigure { points: [number, number][]; }
+
+const ORION_STARS: ConStar[] = [
+  { x: 0.32, y: 0.18, size: 4.0, name: "Betelgeuse" },
+  { x: 0.68, y: 0.20, size: 3.6, name: "Bellatrix" },
+  { x: 0.45, y: 0.42, size: 2.6, name: "Mintaka" },
+  { x: 0.50, y: 0.45, size: 2.8, name: "Alnilam" },
+  { x: 0.55, y: 0.48, size: 2.6, name: "Alnitak" },
+  { x: 0.30, y: 0.78, size: 4.4, name: "Saiph" },
+  { x: 0.72, y: 0.80, size: 4.6, name: "Rigel" },
+  { x: 0.50, y: 0.30, size: 2.0 },
+  { x: 0.40, y: 0.55, size: 1.8 },
+  { x: 0.60, y: 0.55, size: 1.8 },
+  { x: 0.25, y: 0.05, size: 2.4 },
+  { x: 0.75, y: 0.07, size: 2.2 },
+];
+const ORION_LINES: [number, number][] = [
+  [0, 7], [7, 1],   // shoulders + head
+  [0, 2], [2, 3], [3, 4], [4, 1],   // belt
+  [2, 5], [4, 6],   // legs
+  [0, 10], [1, 11], // arms
+  [8, 5], [9, 6],   // knees
+];
+// Faint figure trace — hunter outline
+const ORION_FIGURE: ConFigure = {
+  points: [
+    [0.32, 0.05], [0.30, 0.18], [0.20, 0.30], [0.30, 0.42], [0.30, 0.78], [0.25, 0.95],
+    [0.50, 0.85], [0.75, 0.95], [0.70, 0.78], [0.70, 0.42], [0.80, 0.30], [0.70, 0.18],
+    [0.68, 0.05], [0.50, 0.10], [0.32, 0.05],
+  ],
+};
+
+function buildBgStars(): BgStar[] {
+  const rng = seeded(83_881_117);
+  return Array.from({ length: BG_STAR_COUNT }, () => ({
     x: rng(),
     y: rng(),
-    size: 0.5 + rng() * 1.5,
-    twinkleFreq: 0.02 + rng() * 0.06,
-    twinklePhase: rng() * Math.PI * 2,
-    brightness: 0.3 + rng() * 0.7,
+    r: 0.4 + rng() * 1.6,
+    twinkleSpeed: 0.02 + rng() * 0.05,
+    phase: rng() * Math.PI * 2,
+    hueOffset: -30 + rng() * 60,
   }));
 }
 
-const CYCLE = 1500; // 50s at 30fps
-const DURATION = 360; // 12s
-const LINE_DRAW_FRAMES = 10; // frames per line segment
+function buildNebulae(): Nebula[] {
+  const rng = seeded(12_557_991);
+  return Array.from({ length: NEBULA_COUNT }, () => ({
+    x: rng(),
+    y: rng(),
+    rx: 0.18 + rng() * 0.22,
+    ry: 0.10 + rng() * 0.16,
+    rotation: rng() * 360,
+    hueOffset: -90 + rng() * 180,
+  }));
+}
 
 interface Props {
   frames: EnhancedFrameData[];
@@ -136,146 +110,168 @@ interface Props {
 export const Constellation: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
-
+  const tempoFactor = useTempoFactor();
   const snap = useAudioSnapshot(frames);
-  const energy = snap.energy;
 
-  const bgStars = React.useMemo(() => generateBgStars(3141592, 80), []);
+  const bgStars = React.useMemo(buildBgStars, []);
+  const nebulae = React.useMemo(buildNebulae, []);
 
-  // Determine which constellation is active
-  const cycleFrame = frame % CYCLE;
-  const constellationIndex = Math.floor(frame / CYCLE) % CONSTELLATIONS.length;
-  const constellation = CONSTELLATIONS[constellationIndex];
-  const isActive = cycleFrame < DURATION;
+  const cycleFrame = frame % CYCLE_TOTAL;
+  if (cycleFrame >= VISIBLE_DURATION) return null;
+  const progress = cycleFrame / VISIBLE_DURATION;
+  const fadeIn = interpolate(progress, [0, 0.09], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const fadeOut = interpolate(progress, [0.91, 1], [1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const masterOpacity = Math.min(fadeIn, fadeOut) * 0.95;
+  if (masterOpacity < 0.01) return null;
 
-  // Constellation position offset (centered, scaled)
-  const scale = Math.min(width, height) * 0.3;
-  const offsetX = width * 0.5 - scale * 0.5;
-  const offsetY = height * 0.5 - scale * 0.5;
+  // Audio
+  const cosmicGlow = interpolate(snap.slowEnergy, [0.02, 0.32], [0.55, 1.15], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const haloBright = interpolate(snap.energy, [0.02, 0.32], [0.45, 1.0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const starPulse = 1 + snap.bass * 0.40;
+  const lineShimmer = 0.7 + snap.beatDecay * 0.30;
+  const flashBurst = snap.onsetEnvelope > 0.5 ? Math.min(1, (snap.onsetEnvelope - 0.4) * 1.6) : 0;
 
-  // Fade for constellation
-  const constFadeIn = isActive
-    ? interpolate(cycleFrame, [0, 45], [0, 1], {
-        extrapolateLeft: "clamp",
-        extrapolateRight: "clamp",
-        easing: Easing.out(Easing.cubic),
-      })
-    : 0;
-  const constFadeOut = isActive
-    ? interpolate(cycleFrame, [DURATION - 60, DURATION], [1, 0], {
-        extrapolateLeft: "clamp",
-        extrapolateRight: "clamp",
-      })
-    : 0;
-  const constOpacity = Math.min(constFadeIn, constFadeOut) * (0.6 + energy * 0.3);
+  // Palette
+  const baseHue = 210;
+  const tintHue = ((baseHue + (snap.chromaHue - 180) * 0.30) % 360 + 360) % 360;
+  const tintColor = `hsl(${tintHue}, 70%, 65%)`;
+  const tintCore = `hsl(${tintHue}, 90%, 85%)`;
+  const skyTop = `hsl(${(tintHue + 220) % 360}, 50%, 4%)`;
+  const skyMid = `hsl(${(tintHue + 230) % 360}, 50%, 8%)`;
+  const skyBot = `hsl(${(tintHue + 200) % 360}, 50%, 12%)`;
+
+  // Constellation centered at frame center, fills 70%
+  const conCx = width / 2;
+  const conCy = height / 2;
+  const conW = width * 0.55;
+  const conH = height * 0.65;
+  const cLeft = conCx - conW / 2;
+  const cTop = conCy - conH / 2;
+
+  function px(x: number): number { return cLeft + x * conW; }
+  function py(y: number): number { return cTop + y * conH; }
+
+  // Background stars
+  const bgStarNodes = bgStars.map((s, i) => {
+    const t = frame * s.twinkleSpeed * tempoFactor + s.phase;
+    const tw = 0.55 + Math.sin(t) * 0.4;
+    const sx = s.x * width;
+    const sy = s.y * height;
+    const r = s.r * (0.85 + tw * 0.3);
+    const sHue = (tintHue + s.hueOffset + 360) % 360;
+    return (
+      <g key={`bs-${i}`}>
+        <circle cx={sx} cy={sy} r={r * 3} fill={`hsl(${sHue}, 70%, 75%)`} opacity={0.15 * tw * haloBright} />
+        <circle cx={sx} cy={sy} r={r} fill={`hsl(${sHue}, 80%, 88%)`} opacity={0.85 * tw} />
+      </g>
+    );
+  });
+
+  // Nebula clouds in background
+  const nebulaNodes = nebulae.map((n, i) => {
+    const nx = n.x * width;
+    const ny = n.y * height;
+    const nHue = (tintHue + n.hueOffset + 360) % 360;
+    return (
+      <g key={`neb-${i}`} transform={`translate(${nx}, ${ny}) rotate(${n.rotation + frame * 0.01})`}>
+        <ellipse rx={n.rx * width * 1.2} ry={n.ry * height * 1.2} fill={`hsl(${nHue}, 60%, 50%)`} opacity={0.05 * cosmicGlow} />
+        <ellipse rx={n.rx * width * 0.7} ry={n.ry * height * 0.7} fill={`hsl(${nHue}, 75%, 60%)`} opacity={0.10 * cosmicGlow} />
+        <ellipse rx={n.rx * width * 0.30} ry={n.ry * height * 0.30} fill={`hsl(${nHue}, 90%, 75%)`} opacity={0.14 * cosmicGlow} />
+      </g>
+    );
+  });
+
+  // Constellation lines
+  const lineNodes = ORION_LINES.map(([a, b], i) => {
+    const sa = ORION_STARS[a];
+    const sb = ORION_STARS[b];
+    const t = frame * 0.04 + i;
+    const shim = lineShimmer + Math.sin(t) * 0.10;
+    return (
+      <g key={`ln-${i}`}>
+        <line x1={px(sa.x)} y1={py(sa.y)} x2={px(sb.x)} y2={py(sb.y)}
+          stroke={tintColor} strokeWidth={2.2} opacity={0.20 * shim * cosmicGlow} />
+        <line x1={px(sa.x)} y1={py(sa.y)} x2={px(sb.x)} y2={py(sb.y)}
+          stroke={tintCore} strokeWidth={1} opacity={0.55 * shim * cosmicGlow} />
+      </g>
+    );
+  });
+
+  // Constellation main stars
+  const starNodes = ORION_STARS.map((s, i) => {
+    const t = frame * 0.04 + i;
+    const tw = 0.7 + Math.sin(t) * 0.25;
+    const r = s.size * starPulse * (0.9 + tw * 0.3);
+    const flare = i < 7 ? flareStrength(s, flashBurst) : 0;
+    return (
+      <g key={`cs-${i}`}>
+        <circle cx={px(s.x)} cy={py(s.y)} r={r * 8} fill={tintColor} opacity={0.05 * tw * haloBright} />
+        <circle cx={px(s.x)} cy={py(s.y)} r={r * 4} fill={tintColor} opacity={0.15 * tw * haloBright} />
+        <circle cx={px(s.x)} cy={py(s.y)} r={r * 2} fill={tintCore} opacity={0.35 * tw * haloBright} />
+        <circle cx={px(s.x)} cy={py(s.y)} r={r} fill="rgba(255, 255, 255, 0.95)" opacity={0.95 * tw + flare} />
+        {i < 7 && flashBurst > 0.2 && (
+          <>
+            <line x1={px(s.x) - r * 7} y1={py(s.y)} x2={px(s.x) + r * 7} y2={py(s.y)}
+              stroke="rgba(255, 255, 255, 0.95)" strokeWidth={0.6} opacity={flare} />
+            <line x1={px(s.x)} y1={py(s.y) - r * 7} x2={px(s.x)} y2={py(s.y) + r * 7}
+              stroke="rgba(255, 255, 255, 0.95)" strokeWidth={0.6} opacity={flare} />
+          </>
+        )}
+        {s.name && (
+          <text x={px(s.x) + r * 2 + 4} y={py(s.y) + 3}
+            fontSize={9} fill={tintCore} opacity={0.5 * cosmicGlow}
+            fontFamily="Georgia, serif">
+            {s.name}
+          </text>
+        )}
+      </g>
+    );
+  });
+
+  // Faint hunter figure trace
+  const figurePath = ORION_FIGURE.points.map((p, i) =>
+    `${i === 0 ? "M" : "L"} ${px(p[0])} ${py(p[1])}`).join(" ") + " Z";
 
   return (
     <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden" }}>
-      <svg width={width} height={height}>
+      <svg width={width} height={height} style={{ opacity: masterOpacity, willChange: "opacity" }}>
         <defs>
-          <filter id="star-glow-const">
-            <feGaussianBlur stdDeviation="2" result="blur" />
-            <feMerge>
-              <feMergeNode in="blur" />
-              <feMergeNode in="SourceGraphic" />
-            </feMerge>
+          <linearGradient id="con-sky" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={skyTop} />
+            <stop offset="55%" stopColor={skyMid} />
+            <stop offset="100%" stopColor={skyBot} />
+          </linearGradient>
+          <radialGradient id="con-deep">
+            <stop offset="0%" stopColor={`hsl(${tintHue}, 60%, 18%)`} stopOpacity={0.5} />
+            <stop offset="100%" stopColor="rgba(0,0,0,0)" />
+          </radialGradient>
+          <filter id="con-blur" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="6" />
           </filter>
         </defs>
 
-        {/* Background star field — always visible */}
-        {bgStars.map((star, i) => {
-          const twinkle =
-            (Math.sin(frame * star.twinkleFreq + star.twinklePhase) + 1) * 0.5;
-          const alpha = star.brightness * (0.3 + twinkle * 0.7) * 0.25;
-          return (
-            <circle
-              key={`bg${i}`}
-              cx={star.x * width}
-              cy={star.y * height}
-              r={star.size}
-              fill={`rgba(200, 220, 255, ${alpha})`}
-            />
-          );
-        })}
+        <rect width={width} height={height} fill="url(#con-sky)" />
+        <ellipse cx={width * 0.5} cy={height * 0.5} rx={width * 0.55} ry={height * 0.55}
+          fill="url(#con-deep)" />
 
-        {/* Active constellation */}
-        {isActive && constOpacity > 0.01 && (
-          <g opacity={constOpacity}>
-            {/* Draw lines sequentially — beat doubles draw speed */}
-            {constellation.edges.map(([a, b], lineIdx) => {
-              const beatDrawSpeed = 1 + snap.beatDecay; // 1x normal, 2x on beat
-              const effectiveLineFrames = LINE_DRAW_FRAMES / beatDrawSpeed;
-              const lineStart = lineIdx * effectiveLineFrames;
-              const lineProgress = interpolate(
-                cycleFrame,
-                [lineStart, lineStart + effectiveLineFrames],
-                [0, 1],
-                { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
-              );
-              if (lineProgress <= 0) return null;
+        <g filter="url(#con-blur)">{nebulaNodes}</g>
+        {bgStarNodes}
 
-              const pA = constellation.points[a];
-              const pB = constellation.points[b];
-              const x1 = offsetX + pA[0] * scale;
-              const y1 = offsetY + pA[1] * scale;
-              const x2Full = offsetX + pB[0] * scale;
-              const y2Full = offsetY + pB[1] * scale;
+        {/* Faint figure trace */}
+        <path d={figurePath} fill="none" stroke={tintColor} strokeWidth={2}
+          strokeDasharray="6 8" opacity={0.18 * cosmicGlow} />
+        <path d={figurePath} fill={tintColor} opacity={0.04 * cosmicGlow} />
 
-              // Partially drawn line
-              const x2 = x1 + (x2Full - x1) * lineProgress;
-              const y2 = y1 + (y2Full - y1) * lineProgress;
+        {/* Lines */}
+        {lineNodes}
 
-              return (
-                <line
-                  key={`line${lineIdx}`}
-                  x1={x1}
-                  y1={y1}
-                  x2={x2}
-                  y2={y2}
-                  stroke="rgba(180, 210, 255, 0.5)"
-                  strokeWidth={1}
-                  strokeLinecap="round"
-                />
-              );
-            })}
-
-            {/* Star points — chroma tint 15% blend, centroid glow radius */}
-            {constellation.points.map(([px, py], pi) => {
-              const twinkle =
-                (Math.sin(frame * 0.08 + pi * 1.7) + 1) * 0.5;
-              const sx = offsetX + px * scale;
-              const sy = offsetY + py * scale;
-              // Centroid → glow radius (bigger when brighter/treble)
-              const centroidGlow = 0.8 + snap.centroid * 0.4;
-              const r = (2 + twinkle * 1.5 + energy * 1) * centroidGlow;
-
-              // Chroma → star tint (15% blend toward chroma hue)
-              const chromaR = Math.round(180 + (Math.cos(snap.chromaHue * Math.PI / 180) * 40) * 0.15);
-              const chromaG = Math.round(210 + (Math.cos((snap.chromaHue - 120) * Math.PI / 180) * 40) * 0.15);
-              const chromaB = Math.round(255 + (Math.cos((snap.chromaHue - 240) * Math.PI / 180) * 40) * 0.15);
-
-              return (
-                <g key={`star${pi}`}>
-                  <circle
-                    cx={sx}
-                    cy={sy}
-                    r={r * 2.5}
-                    fill={`rgba(${chromaR}, ${chromaG}, ${chromaB}, ${0.15 * twinkle})`}
-                    style={{ filter: "blur(3px)" }}
-                  />
-                  <circle
-                    cx={sx}
-                    cy={sy}
-                    r={r}
-                    fill={`rgba(${Math.min(255, chromaR + 40)}, ${Math.min(255, chromaG + 25)}, 255, ${0.7 + twinkle * 0.3})`}
-                    filter="url(#star-glow-const)"
-                  />
-                </g>
-              );
-            })}
-          </g>
-        )}
+        {/* Stars (front) */}
+        {starNodes}
       </svg>
     </div>
   );
 };
+
+function flareStrength(_s: ConStar, flash: number): number {
+  return flash * 0.6;
+}

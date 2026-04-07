@@ -126,8 +126,10 @@ float ps2SwarmDensity(vec3 pos, float timeVal, float energy, float bass, float o
 
 // ─── Swarm color: varies by position and velocity-analog ───
 vec3 ps2SwarmColor(vec3 pos, float density, float timeVal, float hue1, float hue2, float sat, float energy, float highs) {
-  // Position-based hue variation
-  float posHue = mix(hue1, hue2, fract(pos.x * 0.2 + pos.z * 0.15 + timeVal * 0.02));
+  // Position-based hue variation (shortest-arc blend between palette hues)
+  float hueDiff = fract(hue2 - hue1 + 0.5) - 0.5;
+  float t = fract(pos.x * 0.2 + pos.z * 0.15 + timeVal * 0.02);
+  float posHue = fract(hue1 + hueDiff * t);
 
   // Density-based brightness
   float bright = 0.5 + density * 0.8 + energy * 0.3;
@@ -194,8 +196,8 @@ void main() {
 
   // Palette
   float chordHue = float(int(uChordIndex)) / 24.0 * 0.15;
-  float hue1 = hsvToCosineHue(uPalettePrimary) + chordHue;
-  float hue2 = hsvToCosineHue(uPaletteSecondary) + chordHue * 0.5;
+  float hue1 = uPalettePrimary + chordHue;
+  float hue2 = uPaletteSecondary + chordHue * 0.5;
   float sat = mix(0.6, 1.0, energy) * uPaletteSaturation;
 
   // === RAY SETUP ===
@@ -273,8 +275,8 @@ void main() {
   // Ambient nebula field behind swarm
   float nebulaVal = fbm3(vec3(rd * 3.0 + timeVal * 0.01));
   vec3 nebulaCol = mix(
-    0.5 + 0.5 * cos(6.28318 * vec3(hue1, hue1 + 0.33, hue1 + 0.67)),
-    0.5 + 0.5 * cos(6.28318 * vec3(hue2, hue2 + 0.33, hue2 + 0.67)),
+    paletteHueColor(hue1, sat, 0.92),
+    paletteHueColor(hue2, sat, 0.92),
     nebulaVal * 0.5 + 0.5
   );
   bgColor += nebulaCol * max(0.0, nebulaVal) * 0.03 * energy;
@@ -357,7 +359,7 @@ void main() {
       if (bgDensity > 0.001) {
         float bgAlpha = bgDensity * (1.0 - bgSwarmAlpha);
         vec3 bgSwarmCol = mix(
-          0.5 + 0.5 * cos(6.28318 * vec3(hue2, hue2 + 0.33, hue2 + 0.67)),
+          paletteHueColor(hue2, sat, 0.9),
           vec3(0.6, 0.65, 0.8),
           0.4
         ) * 0.3;
@@ -387,7 +389,7 @@ void main() {
     }
 
     vec3 trailCol = mix(
-      0.5 + 0.5 * cos(6.28318 * vec3(hue1, hue1 + 0.33, hue1 + 0.67)),
+      paletteHueColor(hue1, sat, 0.95),
       vec3(1.0, 0.95, 0.9),
       0.3
     );
@@ -419,9 +421,10 @@ void main() {
       float particleBright = smoothstep(particleRadius, particleRadius * 0.1, particleDist2D);
       particleBright *= exp(-particleDot * 0.1); // distance fade
 
-      // Particle color with shimmer
-      float pHue = mix(hue1, hue2, fract(pSeed * 0.37));
-      vec3 pCol = 0.5 + 0.5 * cos(6.28318 * vec3(pHue, pHue + 0.33, pHue + 0.67));
+      // Particle color with shimmer (shortest-arc blend between palette hues)
+      float psHueDiff = fract(hue2 - hue1 + 0.5) - 0.5;
+      float pHue = fract(hue1 + psHueDiff * fract(pSeed * 0.37));
+      vec3 pCol = paletteHueColor(pHue, sat, 0.95);
       float pShimmer = 0.8 + 0.2 * sin(timeVal * 8.0 + pfi * 5.0);
 
       col += pCol * particleBright * pShimmer * (0.3 + energy * 0.5) * brightMod;
@@ -432,7 +435,7 @@ void main() {
   if (tension > 0.3) {
     float vortexGlow = exp(-dot(screenP, screenP) * 3.0) * (tension - 0.3) * 2.0;
     vec3 vortexCol = mix(
-      0.5 + 0.5 * cos(6.28318 * vec3(hue1, hue1 + 0.33, hue1 + 0.67)),
+      paletteHueColor(hue1, sat, 0.95),
       vec3(1.0, 0.95, 0.9),
       0.3
     );
@@ -454,8 +457,8 @@ void main() {
   // === DEAD ICONOGRAPHY ===
   {
     float nf = fbm3(vec3(screenP * 2.0, slowTime));
-    vec3 col1 = 0.5 + 0.5 * cos(6.28318 * vec3(hue1, hue1 + 0.33, hue1 + 0.67));
-    vec3 col2 = 0.5 + 0.5 * cos(6.28318 * vec3(hue2, hue2 + 0.33, hue2 + 0.67));
+    vec3 col1 = paletteHueColor(hue1, sat, 0.95);
+    vec3 col2 = paletteHueColor(hue2, sat, 0.95);
     col += iconEmergence(screenP, uTime, energy, bass, col1, col2, nf, uClimaxPhase, uSectionIndex) * 0.6;
     col += heroIconEmergence(screenP, uTime, energy, bass, col1, col2, nf, uSectionIndex);
   }

@@ -1,231 +1,152 @@
 /**
- * CrowdDance — A+++ dancing crowd silhouettes along the bottom of the screen.
+ * CrowdDance — A+++ overlay: a sea of dancing figures silhouetted against
+ * a stage-lit horizon. 40+ articulated dancers across 3 depth rows, with
+ * mountains, sky gradient, stage spotlight cones, drifting smoke, lasers,
+ * star sparkle, and dust motes. The bottom 50% of the frame is the dance
+ * pit; the top is the venue/sky. Bass drives stomp; energy drives arms;
+ * beatDecay locks heads to the pulse. chromaHue tints the stage light.
  *
- * 14 fully-articulated dancing figures in 2 depth rows (front + back).
- * 4 body types (tall dancer, medium groover, compact bopper, lanky swayer).
- * 4 dance styles (swaying, bouncing, spinning, arm-waving) with per-figure
- * choreography driven by musicalTime, beatDecay, bass, and energy.
- *
- * Neon glow outlines colored by chromaHue. Beat-locked vertical bounce.
- * Bass drives stomp amplitude. Energy scales all movement intensity.
- * Energy gate: visible only when energy > 0.20.
- * Layer 1, high energy overlay.
+ * Audio reactivity:
+ *   slowEnergy   → sky warmth and atmospheric mist density
+ *   energy       → arm raise amplitude + figure sway intensity
+ *   bass         → vertical stomp / ground rumble
+ *   beatDecay    → head bob pulse, light cone strobe
+ *   onsetEnvelope→ stage flash flares
+ *   chromaHue    → stage light hue (gold↔magenta↔cyan)
+ *   tempoFactor  → choreography tempo
  */
 
 import React from "react";
-import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
+import { useCurrentFrame, useVideoConfig, interpolate } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
-import { useShowContext } from "../data/ShowContext";
 import { seeded } from "../utils/seededRandom";
 import { useAudioSnapshot } from "./parametric/audio-helpers";
 import { useTempoFactor } from "../data/TempoContext";
 
-/* ---- Body type definitions ---- */
+const CYCLE_TOTAL = 2400;
+const VISIBLE_DURATION = 820;
+const FRONT_ROW = 14;
+const MID_ROW = 16;
+const BACK_ROW = 18;
+const SPOT_BEAMS = 7;
+const SMOKE_PUFFS = 14;
+const STAR_COUNT = 60;
+const DUST_COUNT = 48;
 
-type BodyType = "tall" | "medium" | "compact" | "lanky";
-type DanceStyle = "sway" | "bounce" | "spin" | "armWave";
-
-interface BodyProfile {
-  heightScale: number; widthScale: number; headRatio: number;
-  torsoRatio: number; legRatio: number; armLength: number;
-  shoulderWidth: number; hipWidth: number;
+interface Dancer {
+  x: number;
+  baseHeight: number;
+  swayFreq: number;
+  swayPhase: number;
+  bouncePhase: number;
+  armPhase: number;
+  armStyle: 0 | 1 | 2;
+  hipPhase: number;
+  legPhase: number;
+  bodyShade: number;
+  hatType: 0 | 1 | 2;
 }
 
-const BODY_PROFILES: Record<BodyType, BodyProfile> = {
-  tall:    { heightScale: 1.25, widthScale: 0.85, headRatio: 0.30, torsoRatio: 0.38, legRatio: 0.38, armLength: 0.34, shoulderWidth: 0.50, hipWidth: 0.32 },
-  medium:  { heightScale: 1.00, widthScale: 1.00, headRatio: 0.34, torsoRatio: 0.35, legRatio: 0.36, armLength: 0.30, shoulderWidth: 0.55, hipWidth: 0.36 },
-  compact: { heightScale: 0.82, widthScale: 1.12, headRatio: 0.38, torsoRatio: 0.33, legRatio: 0.34, armLength: 0.28, shoulderWidth: 0.58, hipWidth: 0.40 },
-  lanky:   { heightScale: 1.15, widthScale: 0.78, headRatio: 0.28, torsoRatio: 0.40, legRatio: 0.36, armLength: 0.36, shoulderWidth: 0.46, hipWidth: 0.28 },
-};
-
-const BODY_TYPES: BodyType[] = ["tall", "medium", "compact", "lanky"];
-const DANCE_STYLES: DanceStyle[] = ["sway", "bounce", "spin", "armWave"];
-
-/* ---- Figure data ---- */
-
-interface FigureData {
-  x: number; bodyType: BodyType; danceStyle: DanceStyle; row: "front" | "back";
-  swayFreq: number; swayPhase: number; swayAmp: number; bouncePhase: number;
-  armExcitability: number; armPhaseOffset: number; legPhaseOffset: number;
-  spinSpeed: number; darkness: number;
+interface SpotBeam {
+  x: number;
+  angleBase: number;
+  angleAmp: number;
+  speed: number;
+  hueOffset: number;
+  width: number;
+  phase: number;
 }
 
-const NUM_FIGURES = 14;
-const STAGGER_START = 45;
-const clampOpts = { extrapolateLeft: "clamp" as const, extrapolateRight: "clamp" as const };
-
-function generateFigures(seed: number): FigureData[] {
-  const rng = seeded(seed + 777);
-  const figures: FigureData[] = [];
-  for (let i = 0; i < NUM_FIGURES; i++) {
-    const row: "front" | "back" = i < 8 ? "front" : "back";
-    const baseX = row === "front" ? 0.06 + (i / 8) * 0.88 : 0.10 + ((i - 8) / 6) * 0.80;
-    const jitter = (rng() - 0.5) * 0.06;
-    figures.push({
-      x: Math.max(0.03, Math.min(0.97, baseX + jitter)),
-      bodyType: BODY_TYPES[Math.floor(rng() * BODY_TYPES.length)],
-      danceStyle: DANCE_STYLES[Math.floor(rng() * DANCE_STYLES.length)],
-      row, swayFreq: 0.012 + rng() * 0.02, swayPhase: rng() * Math.PI * 2,
-      swayAmp: 3 + rng() * 6, bouncePhase: rng() * Math.PI * 2,
-      armExcitability: 0.35 + rng() * 0.65, armPhaseOffset: rng() * Math.PI * 2,
-      legPhaseOffset: rng() * Math.PI * 2, spinSpeed: 0.6 + rng() * 0.8,
-      darkness: 0.03 + rng() * 0.08,
-    });
-  }
-  return figures;
+interface SmokePuff {
+  x: number;
+  y: number;
+  rx: number;
+  ry: number;
+  drift: number;
+  shade: number;
+  phase: number;
 }
 
-/* ---- Articulated silhouette path builder ---- */
-
-function buildSilhouette(
-  baseW: number, baseH: number, profile: BodyProfile,
-  armRaise: number, armSwing: number, legBend: number, leanAngle: number,
-): string {
-  const w = baseW * profile.widthScale, h = baseH * profile.heightScale;
-  const headR = w * profile.headRatio, neckH = h * 0.04;
-  const shoulderW = w * profile.shoulderWidth, torsoH = h * profile.torsoRatio;
-  const legH = h * profile.legRatio, hipW = w * profile.hipWidth;
-  const armLen = h * profile.armLength;
-
-  // Key Y positions
-  const headCY = headR, neckY = headCY + headR + neckH * 0.5;
-  const shoulderY = neckY + neckH, hipY = shoulderY + torsoH;
-  const kneeY = hipY + legH * 0.48, footY = hipY + legH;
-  const lx = leanAngle * w * 0.15; // lean offset
-
-  // Arm angles: left/right differ via armSwing (-1..+1)
-  const angL = interpolate(armRaise + armSwing * 0.3, [0, 1], [-25, -155], clampOpts);
-  const angR = interpolate(armRaise - armSwing * 0.3, [0, 1], [-25, -155], clampOpts);
-  const radL = (angL * Math.PI) / 180, radR = (angR * Math.PI) / 180;
-
-  // Arm endpoints with elbow midpoint for natural curve
-  const ef = 0.45; // elbow fraction
-  const alEX = -shoulderW + Math.cos(radL) * armLen * ef;
-  const alEY = shoulderY + Math.sin(radL) * armLen * ef;
-  const alX = -shoulderW + Math.cos(radL * 0.85) * armLen;
-  const alY = shoulderY + Math.sin(radL * 0.85) * armLen;
-  const arEX = shoulderW + Math.cos(radR) * armLen * ef;
-  const arEY = shoulderY + Math.sin(radR) * armLen * ef;
-  const arX = shoulderW + Math.cos(radR * 0.85) * armLen;
-  const arY = shoulderY + Math.sin(radR * 0.85) * armLen;
-  const hr = w * 0.06; // hand radius
-
-  // Leg positions with knee bend
-  const ls = hipW * 0.6, kbx = legBend * w * 0.18, kby = legBend * legH * 0.06;
-  const lKX = -ls * 0.5 - kbx + lx * 0.5, lKY = kneeY + kby;
-  const lFX = -ls * 0.7 - kbx * 0.5 + lx * 0.3;
-  const rKX = ls * 0.5 + kbx * 0.7 + lx * 0.5, rKY = kneeY - kby * 0.3;
-  const rFX = ls * 0.7 + kbx * 0.3 + lx * 0.3;
-  const fw = w * 0.12; // foot width
-  const nw = w * 0.10; // neck width
-
-  // Head (smooth ellipse)
-  const p = [
-    `M ${-headR + lx * 0.8} ${headCY}`,
-    `A ${headR} ${headR * 1.05} 0 1 1 ${headR + lx * 0.8} ${headCY}`,
-    `A ${headR} ${headR * 1.05} 0 1 1 ${-headR + lx * 0.8} ${headCY} Z`,
-    // Body: neck -> left shoulder
-    `M ${-nw + lx * 0.7} ${neckY}`,
-    `Q ${-nw * 1.5 + lx * 0.6} ${shoulderY - neckH} ${-shoulderW + lx * 0.5} ${shoulderY}`,
-    // Left arm out (elbow -> hand -> hand blob -> return)
-    `L ${alEX + lx * 0.3} ${alEY}`,
-    `Q ${(alEX + alX) * 0.5 + lx * 0.2} ${(alEY + alY) * 0.5 - 2} ${alX + lx * 0.2} ${alY}`,
-    `A ${hr} ${hr} 0 1 1 ${alX + hr * 1.5 + lx * 0.2} ${alY + hr * 0.5}`,
-    `A ${hr} ${hr} 0 1 1 ${alX + lx * 0.2} ${alY}`,
-    `Q ${(alEX + alX) * 0.5 + lx * 0.2} ${(alEY + alY) * 0.5 + 2} ${alEX + lx * 0.3} ${alEY}`,
-    `L ${-shoulderW + lx * 0.5} ${shoulderY}`,
-    // Left torso (ribcage curve) -> hip
-    `Q ${-shoulderW * 0.95 + lx * 0.3} ${(shoulderY + hipY) * 0.45} ${-hipW + lx * 0.2} ${hipY}`,
-    // Left leg: hip -> knee -> foot (flat) -> back up
-    `L ${lKX} ${lKY} L ${lFX - fw} ${footY} L ${lFX + fw} ${footY}`,
-    `L ${-hipW * 0.3 + lx * 0.2} ${hipY + legH * 0.02}`,
-    // Crotch crossover
-    `L ${hipW * 0.3 + lx * 0.2} ${hipY + legH * 0.02}`,
-    // Right leg
-    `L ${rKX} ${rKY} L ${rFX - fw} ${footY} L ${rFX + fw} ${footY}`,
-    `L ${hipW + lx * 0.2} ${hipY}`,
-    // Right torso
-    `Q ${shoulderW * 0.95 + lx * 0.3} ${(shoulderY + hipY) * 0.45} ${shoulderW + lx * 0.5} ${shoulderY}`,
-    // Right arm
-    `L ${arEX + lx * 0.3} ${arEY}`,
-    `Q ${(arEX + arX) * 0.5 + lx * 0.2} ${(arEY + arY) * 0.5 - 2} ${arX + lx * 0.2} ${arY}`,
-    `A ${hr} ${hr} 0 1 1 ${arX - hr * 1.5 + lx * 0.2} ${arY + hr * 0.5}`,
-    `A ${hr} ${hr} 0 1 1 ${arX + lx * 0.2} ${arY}`,
-    `Q ${(arEX + arX) * 0.5 + lx * 0.2} ${(arEY + arY) * 0.5 + 2} ${arEX + lx * 0.3} ${arEY}`,
-    `L ${shoulderW + lx * 0.5} ${shoulderY}`,
-    // Right neck close
-    `Q ${nw * 1.5 + lx * 0.6} ${shoulderY - neckH} ${nw + lx * 0.7} ${neckY} Z`,
-  ];
-  return p.join(" ");
+interface Star {
+  x: number;
+  y: number;
+  size: number;
+  twinkle: number;
+  phase: number;
 }
 
-/* ---- Dance choreography per style ---- */
-
-interface DanceState {
-  armRaise: number; armSwing: number; legBend: number;
-  leanAngle: number; extraBounce: number;
+interface Mote {
+  x: number;
+  y: number;
+  size: number;
+  speed: number;
+  phase: number;
 }
 
-function computeDance(
-  style: DanceStyle, musicalTime: number, energy: number,
-  bass: number, beatDecay: number, tempoFactor: number, fig: FigureData,
-): DanceState {
-  const t = musicalTime * tempoFactor;
-  const ph = fig.armPhaseOffset, lph = fig.legPhaseOffset;
-  const int = Math.max(0, Math.min(1, (energy - 0.15) / 0.45)); // intensity 0-1
-
-  switch (style) {
-    case "sway": {
-      const s = Math.sin(t * Math.PI * 0.5 + ph);
-      return {
-        armRaise: 0.15 + int * 0.45 + beatDecay * 0.15,
-        armSwing: s * (0.3 + int * 0.5),
-        legBend: Math.abs(s) * int * 0.25,
-        leanAngle: s * (0.2 + int * 0.4),
-        extraBounce: bass * 2,
-      };
-    }
-    case "bounce": {
-      const b = Math.sin(t * Math.PI + lph);
-      return {
-        armRaise: 0.2 + int * 0.6 + beatDecay * 0.25,
-        armSwing: Math.sin(t * Math.PI * 0.25 + ph) * int * 0.3,
-        legBend: Math.abs(b) * (0.2 + int * 0.5),
-        leanAngle: Math.sin(t * Math.PI * 0.33 + ph) * int * 0.15,
-        extraBounce: bass * 5 + beatDecay * 4,
-      };
-    }
-    case "spin": {
-      const sp = t * fig.spinSpeed + ph;
-      const c = Math.sin(sp * Math.PI * 0.5);
-      return {
-        armRaise: 0.3 + int * 0.5 + Math.abs(c) * 0.2,
-        armSwing: c * (0.5 + int * 0.4),
-        legBend: (0.15 + int * 0.3) * Math.abs(Math.sin(sp * Math.PI * 0.25 + lph)),
-        leanAngle: c * (0.3 + int * 0.5),
-        extraBounce: bass * 3 + beatDecay * 2,
-      };
-    }
-    case "armWave": {
-      const wt = t * 0.8 + ph;
-      return {
-        armRaise: 0.45 + int * 0.5 + beatDecay * 0.1,
-        armSwing: Math.sin(wt * Math.PI) * (0.4 + int * 0.5),
-        legBend: Math.abs(Math.sin(wt * Math.PI * 0.5 + lph)) * int * 0.2,
-        leanAngle: Math.sin(wt * Math.PI * 0.33) * int * 0.2,
-        extraBounce: bass * 2.5 + beatDecay * 1.5,
-      };
-    }
-  }
+function buildRow(seed: number, count: number): Dancer[] {
+  const rng = seeded(seed);
+  return Array.from({ length: count }, (_, i) => ({
+    x: (i + 0.4 + rng() * 0.2) / count,
+    baseHeight: 0.78 + rng() * 0.34,
+    swayFreq: 0.018 + rng() * 0.018,
+    swayPhase: rng() * Math.PI * 2,
+    bouncePhase: rng() * Math.PI * 2,
+    armPhase: rng() * Math.PI * 2,
+    armStyle: Math.floor(rng() * 3) as 0 | 1 | 2,
+    hipPhase: rng() * Math.PI * 2,
+    legPhase: rng() * Math.PI * 2,
+    bodyShade: 0.04 + rng() * 0.10,
+    hatType: Math.floor(rng() * 3) as 0 | 1 | 2,
+  }));
 }
 
-/* ---- HSL helper ---- */
-
-function hsl(h: number, s: number, l: number, a: number): string {
-  return `hsla(${h % 360}, ${Math.round(s)}%, ${Math.round(l)}%, ${a.toFixed(3)})`;
+function buildSpots(): SpotBeam[] {
+  const rng = seeded(48_771_209);
+  return Array.from({ length: SPOT_BEAMS }, (_, i) => ({
+    x: 0.10 + (i / (SPOT_BEAMS - 1)) * 0.80,
+    angleBase: -Math.PI / 2 + (rng() - 0.5) * 0.4,
+    angleAmp: 0.18 + rng() * 0.22,
+    speed: 0.005 + rng() * 0.012,
+    hueOffset: -40 + rng() * 80,
+    width: 70 + rng() * 50,
+    phase: rng() * Math.PI * 2,
+  }));
 }
 
-/* ---- Component ---- */
+function buildSmoke(): SmokePuff[] {
+  const rng = seeded(31_488_502);
+  return Array.from({ length: SMOKE_PUFFS }, () => ({
+    x: rng(),
+    y: 0.32 + rng() * 0.26,
+    rx: 0.12 + rng() * 0.18,
+    ry: 0.04 + rng() * 0.05,
+    drift: 0.00012 + rng() * 0.00038,
+    shade: 0.20 + rng() * 0.30,
+    phase: rng() * Math.PI * 2,
+  }));
+}
+
+function buildStars(): Star[] {
+  const rng = seeded(99_117_604);
+  return Array.from({ length: STAR_COUNT }, () => ({
+    x: rng(),
+    y: rng() * 0.30,
+    size: 0.4 + rng() * 1.6,
+    twinkle: 0.02 + rng() * 0.05,
+    phase: rng() * Math.PI * 2,
+  }));
+}
+
+function buildMotes(): Mote[] {
+  const rng = seeded(74_226_180);
+  return Array.from({ length: DUST_COUNT }, () => ({
+    x: rng(),
+    y: 0.20 + rng() * 0.50,
+    size: 0.6 + rng() * 1.6,
+    speed: 0.0008 + rng() * 0.0028,
+    phase: rng() * Math.PI * 2,
+  }));
+}
 
 interface Props {
   frames: EnhancedFrameData[];
@@ -234,134 +155,360 @@ interface Props {
 export const CrowdDance: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
-  const ctx = useShowContext();
-  const snap = useAudioSnapshot(frames);
   const tempoFactor = useTempoFactor();
+  const snap = useAudioSnapshot(frames);
 
-  const { energy, beatDecay, musicalTime, chromaHue, bass, drumBeat, fastEnergy } = snap;
+  const frontRow = React.useMemo(() => buildRow(11_223_344, FRONT_ROW), []);
+  const midRow = React.useMemo(() => buildRow(22_334_455, MID_ROW), []);
+  const backRow = React.useMemo(() => buildRow(33_445_566, BACK_ROW), []);
+  const spots = React.useMemo(buildSpots, []);
+  const smoke = React.useMemo(buildSmoke, []);
+  const stars = React.useMemo(buildStars, []);
+  const motes = React.useMemo(buildMotes, []);
 
-  const figures = React.useMemo(
-    () => generateFigures(ctx?.showSeed ?? 19770508),
-    [ctx?.showSeed],
-  );
-
-  // Master fade in
-  const masterFade = interpolate(frame, [STAGGER_START, STAGGER_START + 75], [0, 1], {
-    ...clampOpts, easing: Easing.out(Easing.cubic),
-  });
-
-  // Energy gate: visible when energy > 0.20, full at 0.32
-  const energyGate = interpolate(energy, [0.20, 0.32], [0, 1], clampOpts);
-  const masterOpacity = energyGate * masterFade;
+  const cycleFrame = frame % CYCLE_TOTAL;
+  if (cycleFrame >= VISIBLE_DURATION) return null;
+  const progress = cycleFrame / VISIBLE_DURATION;
+  const fadeIn = interpolate(progress, [0, 0.08], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const fadeOut = interpolate(progress, [0.92, 1], [1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const masterOpacity = Math.min(fadeIn, fadeOut) * 0.95;
   if (masterOpacity < 0.01) return null;
 
-  // Global beat bounce (sharp up, exponential settle via beatDecay)
-  const bounceBase = interpolate(energy, [0.20, 0.50], [3, 14], clampOpts);
-  const globalBounce = bounceBase * beatDecay;
+  const energy = snap.energy;
+  const bass = snap.bass;
+  const beatPulse = 1 + snap.beatDecay * 0.32;
+  const slowGlow = interpolate(snap.slowEnergy, [0.02, 0.32], [0.55, 1.1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const onsetFlash = snap.onsetEnvelope > 0.55 ? Math.min(1, (snap.onsetEnvelope - 0.4) * 1.6) : 0;
+  const tempoBeat = frame * 0.085 * tempoFactor;
 
-  // Bass stomp amplifier
-  const bassAmp = interpolate(bass, [0.1, 0.6], [0, 6], clampOpts);
+  const baseHue = 290;
+  const tintHue = ((baseHue + (snap.chromaHue - 180) * 0.45) % 360 + 360) % 360;
+  const lightHue = tintHue;
+  const lightCore = `hsl(${lightHue}, 92%, 78%)`;
+  const lightWarm = `hsl(${(lightHue + 30) % 360}, 80%, 62%)`;
+  const lightCool = `hsl(${(lightHue + 200) % 360}, 75%, 58%)`;
 
-  // Figure dimensions
-  const baseW = 24, baseH = height * 0.13;
+  const horizonY = height * 0.50;
+  const groundY = height * 0.62;
+  const skyTop = `hsl(${(tintHue + 220) % 360}, 35%, 7%)`;
+  const skyMid = `hsl(${(tintHue + 240) % 360}, 28%, 12%)`;
+  const skyHorizon = `hsl(${(tintHue + 16) % 360}, 45%, 22%)`;
 
-  // Neon glow intensity scales with energy
-  const glowIntensity = interpolate(energy, [0.20, 0.55], [0.15, 0.8], clampOpts);
-  const drumFlash = drumBeat * 0.3;
+  // ===== build silhouettes for one row =====
+  function renderRow(row: Dancer[], rowIndex: 0 | 1 | 2) {
+    const baselineY = rowIndex === 0 ? height * 0.99 : rowIndex === 1 ? height * 0.92 : height * 0.84;
+    const rowScale = rowIndex === 0 ? 1.0 : rowIndex === 1 ? 0.78 : 0.58;
+    const rowDarkness = rowIndex === 0 ? 0.95 : rowIndex === 1 ? 0.78 : 0.58;
+    const figureHeightBase = height * 0.42 * rowScale;
+
+    return row.map((d, i) => {
+      const px = d.x * width;
+      const t = frame * d.swayFreq * tempoFactor + d.swayPhase;
+      const sway = Math.sin(t) * (4 + energy * 12) * rowScale;
+      const stomp = Math.abs(Math.sin(tempoBeat + d.bouncePhase)) * (3 + bass * 14) * rowScale;
+      const figureH = figureHeightBase * d.baseHeight * (1 - stomp / 600);
+      const baseY = baselineY - stomp;
+      const headR = figureH * 0.075;
+      const headY = baseY - figureH;
+      const torsoTop = headY + headR * 1.6;
+      const torsoBot = baseY - figureH * 0.42;
+      const hipY = torsoBot + figureH * 0.02;
+
+      // Arm choreography
+      const armBaseAngle =
+        d.armStyle === 0
+          ? -Math.PI / 2 + Math.sin(tempoBeat * 1.2 + d.armPhase) * 0.5  // sway
+          : d.armStyle === 1
+          ? -Math.PI / 2 - 0.3 + Math.sin(tempoBeat + d.armPhase) * 0.3  // raised swaying
+          : -Math.PI / 2 - 0.6 - energy * 0.5;                            // arms up
+      const armRaise = energy * 0.6 + (d.armStyle === 2 ? 0.4 : 0);
+      const armLen = figureH * 0.36;
+      const shoulderY = torsoTop + figureH * 0.04;
+      const lShoulderX = px - figureH * 0.10 + sway * 0.4;
+      const rShoulderX = px + figureH * 0.10 + sway * 0.4;
+      const lElbowAngle = armBaseAngle - 0.3 - armRaise * 0.5;
+      const rElbowAngle = armBaseAngle + 0.3 + armRaise * 0.5;
+      const lElbowX = lShoulderX + Math.cos(lElbowAngle) * armLen * 0.5;
+      const lElbowY = shoulderY + Math.sin(lElbowAngle) * armLen * 0.5;
+      const rElbowX = rShoulderX + Math.cos(rElbowAngle) * armLen * 0.5;
+      const rElbowY = shoulderY + Math.sin(rElbowAngle) * armLen * 0.5;
+      const lHandAngle = lElbowAngle - 0.1 - Math.sin(tempoBeat * 1.3 + d.armPhase) * 0.4;
+      const rHandAngle = rElbowAngle + 0.1 + Math.sin(tempoBeat * 1.3 + d.armPhase + 1) * 0.4;
+      const lHandX = lElbowX + Math.cos(lHandAngle) * armLen * 0.55;
+      const lHandY = lElbowY + Math.sin(lHandAngle) * armLen * 0.55;
+      const rHandX = rElbowX + Math.cos(rHandAngle) * armLen * 0.55;
+      const rHandY = rElbowY + Math.sin(rHandAngle) * armLen * 0.55;
+
+      // Legs
+      const legSpread = figureH * 0.07;
+      const legPhase = tempoBeat * 0.7 + d.legPhase;
+      const lLegX = px - legSpread + Math.sin(legPhase) * 4;
+      const rLegX = px + legSpread + Math.sin(legPhase + Math.PI) * 4;
+      const lKneeY = hipY + figureH * 0.20 + Math.abs(Math.sin(legPhase)) * 4;
+      const rKneeY = hipY + figureH * 0.20 + Math.abs(Math.sin(legPhase + Math.PI)) * 4;
+      const lFootY = baseY;
+      const rFootY = baseY;
+      const lFootX = lLegX + Math.sin(legPhase) * 6;
+      const rFootX = rLegX + Math.sin(legPhase + Math.PI) * 6;
+
+      const fillR = Math.round(8 * rowDarkness);
+      const fillG = Math.round(6 * rowDarkness);
+      const fillB = Math.round(14 * rowDarkness);
+      const figureFill = `rgba(${fillR},${fillG},${fillB},${0.92 * rowDarkness})`;
+      const rimFill = `hsla(${lightHue}, 90%, 70%, ${0.18 * rowDarkness * beatPulse})`;
+
+      return (
+        <g key={`r${rowIndex}-d${i}`}>
+          {/* Torso (tapered) */}
+          <path
+            d={`M ${px - figureH * 0.085} ${torsoTop}
+                Q ${px - figureH * 0.10 + sway} ${(torsoTop + torsoBot) / 2} ${px - figureH * 0.075} ${torsoBot}
+                L ${px + figureH * 0.075} ${torsoBot}
+                Q ${px + figureH * 0.10 + sway} ${(torsoTop + torsoBot) / 2} ${px + figureH * 0.085} ${torsoTop}
+                Z`}
+            fill={figureFill}
+          />
+          {/* Hips/lower torso */}
+          <path
+            d={`M ${px - figureH * 0.075} ${torsoBot}
+                Q ${px} ${hipY + figureH * 0.04} ${px + figureH * 0.075} ${torsoBot}
+                L ${px + figureH * 0.06} ${hipY}
+                L ${px - figureH * 0.06} ${hipY}
+                Z`}
+            fill={figureFill}
+          />
+          {/* Head */}
+          <circle cx={px + sway * 0.5} cy={headY} r={headR} fill={figureFill} />
+          {/* Hat overlay */}
+          {d.hatType === 1 && (
+            <ellipse cx={px + sway * 0.5} cy={headY - headR * 0.6} rx={headR * 1.4} ry={headR * 0.4} fill={figureFill} />
+          )}
+          {d.hatType === 2 && (
+            <path
+              d={`M ${px + sway * 0.5 - headR * 1.6} ${headY - headR * 0.2}
+                  Q ${px + sway * 0.5} ${headY - headR * 1.8} ${px + sway * 0.5 + headR * 1.6} ${headY - headR * 0.2}
+                  L ${px + sway * 0.5 + headR * 0.9} ${headY - headR * 0.4}
+                  L ${px + sway * 0.5 - headR * 0.9} ${headY - headR * 0.4} Z`}
+              fill={figureFill}
+            />
+          )}
+          {/* Arms (shoulder→elbow→hand) */}
+          <line x1={lShoulderX} y1={shoulderY} x2={lElbowX} y2={lElbowY} stroke={figureFill} strokeWidth={figureH * 0.04} strokeLinecap="round" />
+          <line x1={lElbowX} y1={lElbowY} x2={lHandX} y2={lHandY} stroke={figureFill} strokeWidth={figureH * 0.035} strokeLinecap="round" />
+          <line x1={rShoulderX} y1={shoulderY} x2={rElbowX} y2={rElbowY} stroke={figureFill} strokeWidth={figureH * 0.04} strokeLinecap="round" />
+          <line x1={rElbowX} y1={rElbowY} x2={rHandX} y2={rHandY} stroke={figureFill} strokeWidth={figureH * 0.035} strokeLinecap="round" />
+          {/* Legs */}
+          <line x1={px - legSpread * 0.5} y1={hipY} x2={lLegX} y2={lKneeY} stroke={figureFill} strokeWidth={figureH * 0.045} strokeLinecap="round" />
+          <line x1={lLegX} y1={lKneeY} x2={lFootX} y2={lFootY} stroke={figureFill} strokeWidth={figureH * 0.045} strokeLinecap="round" />
+          <line x1={px + legSpread * 0.5} y1={hipY} x2={rLegX} y2={rKneeY} stroke={figureFill} strokeWidth={figureH * 0.045} strokeLinecap="round" />
+          <line x1={rLegX} y1={rKneeY} x2={rFootX} y2={rFootY} stroke={figureFill} strokeWidth={figureH * 0.045} strokeLinecap="round" />
+          {/* Rim light from above */}
+          <circle cx={px + sway * 0.5} cy={headY - headR * 0.5} r={headR * 0.8} fill={rimFill} />
+          <ellipse cx={px} cy={shoulderY - 2} rx={figureH * 0.10} ry={2.5} fill={rimFill} />
+        </g>
+      );
+    });
+  }
+
+  // ===== distant mountains =====
+  const mountainPath =
+    `M 0 ${horizonY + 6} ` +
+    `L ${width * 0.08} ${horizonY - height * 0.04} ` +
+    `L ${width * 0.18} ${horizonY - height * 0.10} ` +
+    `L ${width * 0.27} ${horizonY - height * 0.05} ` +
+    `L ${width * 0.36} ${horizonY - height * 0.13} ` +
+    `L ${width * 0.46} ${horizonY - height * 0.07} ` +
+    `L ${width * 0.55} ${horizonY - height * 0.16} ` +
+    `L ${width * 0.65} ${horizonY - height * 0.09} ` +
+    `L ${width * 0.74} ${horizonY - height * 0.12} ` +
+    `L ${width * 0.84} ${horizonY - height * 0.04} ` +
+    `L ${width * 0.93} ${horizonY - height * 0.08} ` +
+    `L ${width} ${horizonY + 6} Z`;
+
+  // ===== spotlight beams =====
+  const beams = spots.map((s, i) => {
+    const angle = s.angleBase + Math.sin(frame * s.speed + s.phase) * s.angleAmp;
+    const sx = s.x * width;
+    const sy = horizonY * 0.10;
+    const len = height * 0.95;
+    const ex = sx + Math.cos(angle) * len;
+    const ey = sy + Math.sin(angle) * len;
+    const w = s.width * (1 + beatPulse * 0.18);
+    const dx = -Math.sin(angle);
+    const dy = Math.cos(angle);
+    const beamHue = (lightHue + s.hueOffset + 360) % 360;
+    const beamColor = `hsl(${beamHue}, 92%, 70%)`;
+    const beamCore = `hsl(${beamHue}, 100%, 88%)`;
+    return (
+      <g key={`beam-${i}`} style={{ mixBlendMode: "screen" }}>
+        <path
+          d={`M ${sx - dx * w * 0.10} ${sy - dy * w * 0.10}
+              L ${ex - dx * w * 0.6} ${ey - dy * w * 0.6}
+              L ${ex + dx * w * 0.6} ${ey + dy * w * 0.6}
+              L ${sx + dx * w * 0.10} ${sy + dy * w * 0.10} Z`}
+          fill={beamColor}
+          opacity={0.10 * slowGlow}
+        />
+        <path
+          d={`M ${sx - dx * w * 0.05} ${sy - dy * w * 0.05}
+              L ${ex - dx * w * 0.32} ${ey - dy * w * 0.32}
+              L ${ex + dx * w * 0.32} ${ey + dy * w * 0.32}
+              L ${sx + dx * w * 0.05} ${sy + dy * w * 0.05} Z`}
+          fill={beamColor}
+          opacity={0.22 * slowGlow}
+        />
+        <path
+          d={`M ${sx - dx * w * 0.018} ${sy - dy * w * 0.018}
+              L ${ex - dx * w * 0.10} ${ey - dy * w * 0.10}
+              L ${ex + dx * w * 0.10} ${ey + dy * w * 0.10}
+              L ${sx + dx * w * 0.018} ${sy + dy * w * 0.018} Z`}
+          fill={beamCore}
+          opacity={0.40 * slowGlow * beatPulse}
+        />
+        <circle cx={sx} cy={sy} r={10 + beatPulse * 6} fill={beamCore} opacity={0.7} />
+      </g>
+    );
+  });
+
+  // ===== smoke clouds =====
+  const smokeNodes = smoke.map((c, i) => {
+    const drift = (c.x + frame * c.drift) % 1.2 - 0.1;
+    const breath = 1 + Math.sin(frame * 0.01 + c.phase) * 0.06;
+    return (
+      <ellipse
+        key={`smoke-${i}`}
+        cx={drift * width}
+        cy={c.y * height}
+        rx={c.rx * width * breath}
+        ry={c.ry * height * breath}
+        fill={`rgba(${30 + c.shade * 14},${24 + c.shade * 12},${42 + c.shade * 18},${0.45 + slowGlow * 0.18})`}
+      />
+    );
+  });
+
+  // ===== stars =====
+  const starNodes = stars.map((s, i) => {
+    const tw = 0.5 + Math.sin(frame * s.twinkle + s.phase) * 0.45;
+    return (
+      <circle
+        key={`star-${i}`}
+        cx={s.x * width}
+        cy={s.y * height}
+        r={s.size * tw}
+        fill="rgba(240, 232, 220, 0.85)"
+      />
+    );
+  });
+
+  // ===== dust motes =====
+  const moteNodes = motes.map((m, i) => {
+    const t = frame * m.speed + m.phase;
+    const px = ((m.x + t * 0.4) % 1.1 - 0.05) * width;
+    const py = (m.y + Math.sin(t * 1.4) * 0.02) * height;
+    const flicker = 0.4 + Math.sin(t * 2.3) * 0.4;
+    return (
+      <circle
+        key={`mote-${i}`}
+        cx={px}
+        cy={py}
+        r={m.size * (0.7 + slowGlow * 0.5)}
+        fill={lightCore}
+        opacity={0.32 * flicker}
+      />
+    );
+  });
 
   return (
     <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden" }}>
-      <svg width={width} height={height}
-        style={{ opacity: masterOpacity, mixBlendMode: "screen" }}>
+      <svg width={width} height={height} style={{ opacity: masterOpacity, willChange: "opacity" }}>
         <defs>
-          <filter id="crowd-glow" x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur in="SourceGraphic" stdDeviation={2 + glowIntensity * 3} result="blur1" />
-            <feGaussianBlur in="SourceGraphic" stdDeviation={0.8} result="sharp" />
-            <feMerge>
-              <feMergeNode in="blur1" />
-              <feMergeNode in="sharp" />
-            </feMerge>
+          <linearGradient id="cd-sky" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={skyTop} />
+            <stop offset="55%" stopColor={skyMid} />
+            <stop offset="100%" stopColor={skyHorizon} />
+          </linearGradient>
+          <linearGradient id="cd-mountains" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="rgba(28, 22, 38, 0.95)" />
+            <stop offset="100%" stopColor="rgba(12, 8, 22, 0.98)" />
+          </linearGradient>
+          <radialGradient id="cd-stagelight" cx="0.5" cy="1" r="0.7">
+            <stop offset="0%" stopColor={lightCore} stopOpacity="0.5" />
+            <stop offset="40%" stopColor={lightWarm} stopOpacity="0.18" />
+            <stop offset="100%" stopColor={lightCool} stopOpacity="0" />
+          </radialGradient>
+          <linearGradient id="cd-ground" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="rgba(8, 4, 12, 0.85)" />
+            <stop offset="100%" stopColor="rgba(2, 1, 4, 0.98)" />
+          </linearGradient>
+          <filter id="cd-blur" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="6" />
           </filter>
         </defs>
 
-        {/* Back row renders first (behind), then front row on top */}
-        {figures
-          .slice()
-          .sort((a, b) => (a.row === b.row ? 0 : a.row === "back" ? -1 : 1))
-          .map((fig, i) => {
-            const profile = BODY_PROFILES[fig.bodyType];
-            const isBack = fig.row === "back";
+        {/* Sky */}
+        <rect width={width} height={height} fill="url(#cd-sky)" />
 
-            // Depth: back row is smaller, fainter, slightly higher
-            const depthScale = isBack ? 0.65 : 1.0;
-            const depthOpacity = isBack ? 0.45 : 0.75;
+        {/* Stars */}
+        <g>{starNodes}</g>
 
-            const px = fig.x * width;
-            const baseY = isBack ? height * 0.87 : height * 0.90;
-            const figH = baseH * profile.heightScale * depthScale;
-            const figW = baseW * depthScale;
+        {/* Stage haze backwash */}
+        <ellipse cx={width * 0.5} cy={horizonY + 8} rx={width * 0.7} ry={height * 0.12} fill="url(#cd-stagelight)" />
 
-            // Per-figure dance choreography
-            const dance = computeDance(
-              fig.danceStyle, musicalTime, energy, bass, beatDecay, tempoFactor, fig,
-            );
+        {/* Distant mountains */}
+        <path d={mountainPath} fill="url(#cd-mountains)" />
 
-            // Horizontal sway (tempo-scaled, energy-amplified)
-            const swayX = Math.sin(
-              frame * fig.swayFreq * tempoFactor + fig.swayPhase,
-            ) * fig.swayAmp * (0.5 + energy);
+        {/* Distant stage rig (truss + scaffold) */}
+        <g opacity={0.7}>
+          <rect x={width * 0.12} y={horizonY - height * 0.04} width={width * 0.76} height={4} fill="rgba(20, 18, 28, 0.92)" />
+          <rect x={width * 0.12} y={horizonY - height * 0.20} width={6} height={height * 0.20} fill="rgba(20, 18, 28, 0.92)" />
+          <rect x={width * 0.88} y={horizonY - height * 0.20} width={6} height={height * 0.20} fill="rgba(20, 18, 28, 0.92)" />
+          <rect x={width * 0.12} y={horizonY - height * 0.20} width={width * 0.76} height={4} fill="rgba(20, 18, 28, 0.92)" />
+          {Array.from({ length: 14 }).map((_, i) => (
+            <line
+              key={`truss-${i}`}
+              x1={width * 0.12 + i * (width * 0.76 / 14)}
+              y1={horizonY - height * 0.20}
+              x2={width * 0.12 + (i + 1) * (width * 0.76 / 14)}
+              y2={horizonY - height * 0.04}
+              stroke="rgba(30, 26, 40, 0.7)"
+              strokeWidth={1.2}
+            />
+          ))}
+        </g>
 
-            // Vertical bounce: global beat + dance-specific + bass stomp
-            const phasedBounce =
-              globalBounce * (0.5 + 0.5 * Math.sin(fig.bouncePhase)) +
-              dance.extraBounce * (0.4 + 0.6 * fig.armExcitability) +
-              bassAmp * (0.3 + 0.7 * Math.sin(fig.bouncePhase + 1.0));
+        {/* Smoke layer */}
+        <g filter="url(#cd-blur)">{smokeNodes}</g>
 
-            // Per-figure stagger entrance
-            const delay = isBack ? 20 : 0;
-            const staggerFade = interpolate(
-              frame, [STAGGER_START + delay + i * 4, STAGGER_START + delay + i * 4 + 40],
-              [0, 1], { ...clampOpts, easing: Easing.out(Easing.cubic) },
-            );
+        {/* Spotlight beams */}
+        <g>{beams}</g>
 
-            const path = buildSilhouette(
-              figW, figH, profile,
-              dance.armRaise, dance.armSwing, dance.legBend, dance.leanAngle,
-            );
+        {/* Onset flash */}
+        {onsetFlash > 0 && (
+          <rect width={width} height={height} fill={`hsla(${lightHue}, 90%, 80%, ${onsetFlash * 0.10})`} />
+        )}
 
-            // Dark body fill with subtle chromaHue tint
-            const bodyAlpha = (0.55 + energy * 0.15 + drumFlash) * depthOpacity * staggerFade;
-            const bodyLight = 4 + fig.darkness * 80 + (isBack ? 1.5 : 0);
-            const bodyColor = hsl(chromaHue + 180, 15, bodyLight, bodyAlpha);
+        {/* Ground plane */}
+        <rect x={0} y={groundY} width={width} height={height - groundY} fill="url(#cd-ground)" />
 
-            // Neon glow outline in chromaHue (back row offset +30deg)
-            const glowHue = chromaHue + (isBack ? 30 : 0);
-            const glowAlpha = (glowIntensity + drumFlash) * depthOpacity * staggerFade;
-            const glowColor = hsl(glowHue, 80 + energy * 15, 55 + fastEnergy * 20, glowAlpha * 0.7);
+        {/* Back row dancers */}
+        <g>{renderRow(backRow, 2)}</g>
 
-            // Warm stage rim light
-            const rimAlpha = (0.06 + energy * 0.12 + beatDecay * 0.08) * depthOpacity * staggerFade;
-            const rimColor = hsl(chromaHue + 40, 60, 70, rimAlpha);
+        {/* Mid row dancers */}
+        <g>{renderRow(midRow, 1)}</g>
 
-            return (
-              <g key={i}
-                transform={`translate(${px + swayX}, ${baseY - phasedBounce - figH})`}
-                opacity={staggerFade}>
-                {/* Blurred neon glow */}
-                <path d={path} fill="none" stroke={glowColor}
-                  strokeWidth={1.5 + glowIntensity * 2} strokeLinejoin="round"
-                  filter="url(#crowd-glow)" />
-                {/* Solid body */}
-                <path d={path} fill={bodyColor} />
-                {/* Sharp neon edge */}
-                <path d={path} fill="none" stroke={glowColor}
-                  strokeWidth={0.6 + glowIntensity * 0.8} strokeLinejoin="round" />
-                {/* Warm rim light */}
-                <path d={path} fill="none" stroke={rimColor}
-                  strokeWidth={0.4} strokeLinejoin="round" />
-              </g>
-            );
-          })}
+        {/* Front row dancers */}
+        <g>{renderRow(frontRow, 0)}</g>
+
+        {/* Dust motes (top layer) */}
+        <g style={{ mixBlendMode: "screen" }}>{moteNodes}</g>
+
+        {/* Final atmospheric warmth wash */}
+        <rect
+          width={width}
+          height={height}
+          fill={`hsla(${lightHue}, 80%, 60%, ${0.05 + slowGlow * 0.04})`}
+          style={{ mixBlendMode: "screen" }}
+        />
       </svg>
     </div>
   );

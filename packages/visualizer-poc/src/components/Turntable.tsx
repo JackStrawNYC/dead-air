@@ -186,7 +186,7 @@ export const Turntable: React.FC<Props> = ({ frames }) => {
               fontFamily="Georgia, serif"
               opacity={0.6}
             >
-              {ctx ? `${ctx.venueShort} ${ctx.dateShort}` : "CORNELL 5/8/77"}
+              {ctx ? `${ctx.venueShort.toUpperCase()} ${ctx.dateShort}` : "CONCERT"}
             </text>
           </g>
         </g>

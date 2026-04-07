@@ -371,8 +371,8 @@ void main() {
   }
 
   // Palette tinting — subtle, respect the void
-  vec3 palCol1 = 0.5 + 0.5 * cos(6.28318 * vec3(hsvToCosineHue(uPalettePrimary), hsvToCosineHue(uPalettePrimary) + 0.33, hsvToCosineHue(uPalettePrimary) + 0.67));
-  vec3 palCol2 = 0.5 + 0.5 * cos(6.28318 * vec3(hsvToCosineHue(uPaletteSecondary), hsvToCosineHue(uPaletteSecondary) + 0.33, hsvToCosineHue(uPaletteSecondary) + 0.67));
+  vec3 palCol1 = paletteHueColor(uPalettePrimary, 0.85, 0.85);
+  vec3 palCol2 = paletteHueColor(uPaletteSecondary, 0.85, 0.85);
   float palMix = 0.08 + energy * 0.06;
   col = mix(col, col * mix(palCol1, palCol2, sin(uTime * 0.06) * 0.5 + 0.5), palMix);
 

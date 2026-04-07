@@ -269,12 +269,12 @@ void main() {
 
   // Palette
   float chordHue = float(int(uChordIndex)) / 24.0 * 0.15;
-  float hue1 = hsvToCosineHue(uPalettePrimary) + chordHue;
-  float hue2 = hsvToCosineHue(uPaletteSecondary) + chordHue * 0.5;
+  float hue1 = uPalettePrimary + chordHue;
+  float hue2 = uPaletteSecondary + chordHue * 0.5;
   float sat = mix(0.7, 1.0, energy) * uPaletteSaturation;
 
-  vec3 coreColor = 0.5 + 0.5 * cos(6.28318 * vec3(hue1, hue1 + 0.33, hue1 + 0.67));
-  vec3 ringColor = 0.5 + 0.5 * cos(6.28318 * vec3(hue2, hue2 + 0.33, hue2 + 0.67));
+  vec3 coreColor = paletteHueColor(hue1, sat, 0.95);
+  vec3 ringColor = paletteHueColor(hue2, sat, 0.95);
 
   // === RAY SETUP ===
   vec3 ro, rd;
@@ -345,9 +345,10 @@ void main() {
       float ringIdx = (matID - 1.0) * 10.0;
       float ringPhase = fract(musTime * 0.25 * ringCountMod - ringIdx * 0.125);
 
-      // Ring color: prismatic shift per ring
-      float ringHue = mix(hue1, hue2, ringIdx / float(CS_NUM_RINGS));
-      vec3 thisRingColor = 0.5 + 0.5 * cos(6.28318 * vec3(ringHue, ringHue + 0.33, ringHue + 0.67));
+      // Ring color: prismatic shift per ring (shortest-arc palette blend)
+      float csRingHueDiff = fract(hue2 - hue1 + 0.5) - 0.5;
+      float ringHue = fract(hue1 + csRingHueDiff * (ringIdx / float(CS_NUM_RINGS)));
+      vec3 thisRingColor = paletteHueColor(ringHue, sat, 0.95);
 
       // Ring emission: bright, fading as it expands
       float ringBright = (1.0 - ringPhase) * (1.5 + gate * 2.0 + timbralBright * 0.5);
@@ -426,8 +427,8 @@ void main() {
   // === DEAD ICONOGRAPHY ===
   {
     float nf = fbm3(vec3(screenP * 2.0, timeVal * 0.1));
-    vec3 c1 = 0.5 + 0.5 * cos(6.28318 * vec3(hue1, hue1 + 0.33, hue1 + 0.67));
-    vec3 c2 = 0.5 + 0.5 * cos(6.28318 * vec3(hue2, hue2 + 0.33, hue2 + 0.67));
+    vec3 c1 = paletteHueColor(hue1, sat, 0.95);
+    vec3 c2 = paletteHueColor(hue2, sat, 0.95);
     col += stealieEmergence(screenP, uTime, energy, bass, c1, c2, nf, uClimaxPhase);
     col += heroIconEmergence(screenP, uTime, energy, bass, c1, c2, nf, uSectionIndex);
   }

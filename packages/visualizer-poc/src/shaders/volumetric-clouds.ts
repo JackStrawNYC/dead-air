@@ -88,12 +88,12 @@ void main() {
   float flowTime = uDynamicTime * (0.08 + slowE * 0.04) * mix(1.0, 1.4, sJam) * mix(1.0, 0.4, sSpace);
 
   // === PALETTE (chord-shifted) ===
-  float hue1 = hsvToCosineHue(uPalettePrimary) + chordHue;
-  vec3 cloudTint = 0.5 + 0.5 * cos(6.28318 * vec3(hue1, hue1 + 0.33, hue1 + 0.67));
+  float hue1 = uPalettePrimary + chordHue;
+  vec3 cloudTint = paletteHueColor(hue1, 0.55, 0.92);
   cloudTint = mix(cloudTint, vec3(0.85, 0.88, 0.92), 0.5 - tension * 0.15); // tension adds color saturation
 
-  float hue2 = hsvToCosineHue(uPaletteSecondary);
-  vec3 skyTint = 0.5 + 0.5 * cos(6.28318 * vec3(hue2, hue2 + 0.33, hue2 + 0.67));
+  float hue2 = uPaletteSecondary;
+  vec3 skyTint = paletteHueColor(hue2, 0.6, 0.92);
 
   // === CLIMAX: parting clouds ===
   float isClimax = step(1.5, climaxPhase) * step(climaxPhase, 3.5);

@@ -334,10 +334,10 @@ void main() {
   float flowTime = uDynamicTime * (0.06 + slowE * 0.03);
 
   // ─── Palette ───
-  float hue1 = hsvToCosineHue(uPalettePrimary) + chordHue * 0.15;
-  float hue2 = hsvToCosineHue(uPaletteSecondary) + chordHue * 0.08;
-  vec3 signalTint = 0.5 + 0.5 * cos(TAU * vec3(hue1, hue1 + 0.33, hue1 + 0.67));
-  vec3 secondaryTint = 0.5 + 0.5 * cos(TAU * vec3(hue2, hue2 + 0.33, hue2 + 0.67));
+  float hue1 = uPalettePrimary + chordHue * 0.15;
+  float hue2 = uPaletteSecondary + chordHue * 0.08;
+  vec3 signalTint = paletteHueColor(hue1, 0.7, 0.9);
+  vec3 secondaryTint = paletteHueColor(hue2, 0.7, 0.9);
 
   // ─── Dish count: energy + section-driven ───
   int dishCount = 2 + int(energy * 3.0); // 2-5 dishes

@@ -88,12 +88,12 @@ void main() {
   float flowTime = uDynamicTime * (0.06 + slowE * 0.04) * mix(1.0, 1.3, sJam) * mix(1.0, 0.5, sSpace);
 
   // === PALETTE (chord-shifted) ===
-  float hue1 = hsvToCosineHue(uPalettePrimary) + chordHue;
-  vec3 smokeTint = 0.5 + 0.5 * cos(6.28318 * vec3(hue1, hue1 + 0.33, hue1 + 0.67));
+  float hue1 = uPalettePrimary + chordHue;
+  vec3 smokeTint = paletteHueColor(hue1, 0.55, 0.85);
   smokeTint = mix(smokeTint, vec3(0.4, 0.42, 0.45), 0.5 - tension * 0.12); // tension adds color to smoke
 
-  float hue2 = hsvToCosineHue(uPaletteSecondary);
-  vec3 spotlightTint = 0.5 + 0.5 * cos(6.28318 * vec3(hue2, hue2 + 0.33, hue2 + 0.67));
+  float hue2 = uPaletteSecondary;
+  vec3 spotlightTint = paletteHueColor(hue2, 0.85, 0.95);
 
   // === 3 SPOTLIGHT POSITIONS (seeded from sectionIndex) ===
   vec3 spotPos[3];

@@ -229,10 +229,10 @@ void main() {
     mix(1.0, 1.6, sJam) * mix(1.0, 0.2, sSpace) * mix(1.0, 1.2, sChorus);
 
   // ─── Palette ───
-  float h1 = hsvToCosineHue(uPalettePrimary);
-  float h2 = hsvToCosineHue(uPaletteSecondary);
-  vec3 palWarm = 0.5 + 0.5 * cos(TAU * vec3(h1, h1 + 0.33, h1 + 0.67));
-  vec3 palCool = 0.5 + 0.5 * cos(TAU * vec3(h2, h2 + 0.33, h2 + 0.67));
+  float h1 = uPalettePrimary;
+  float h2 = uPaletteSecondary;
+  vec3 palWarm = paletteHueColor(h1, 0.85, 0.95);
+  vec3 palCool = paletteHueColor(h2, 0.85, 0.95);
   // Haze color: blend palette with warm bias
   vec3 hazeCol = mix(palWarm, palCool, 0.3) * vec3(0.8, 0.7, 1.0);
 

@@ -1,426 +1,54 @@
 /**
- * UncleSam — Uncle Sam skeleton pointing at camera ("I WANT YOU… to follow the Dead").
+ * UncleSam — A+++ Uncle Sam recruiting-poster scene for "U.S. Blues".
  *
- * A+++ richly detailed SVG skeleton figure in full Uncle Sam regalia:
- *   - Skull with cranium sutures, deep eye sockets with inner glow, cheekbones,
- *     nasal cavity, defined jaw, 10 individual teeth
- *   - Tall top hat with brim, hat band, 3 SVG polygon stars, red/white stripes
- *   - Vertebral spine (7 segments), 4-pair rib cage with sternum, pelvis
- *   - Arms with humerus, radius/ulna, wrist bones — right arm POINTING with
- *     prominent extended index finger (3 bone segments), other fingers curled
- *   - Legs with femur, knee joint, tibia/fibula, foot bones, boot detail
- *   - Ghostly dashed coat tails suggesting the Uncle Sam suit
- *   - Triple-layer neon glow with chromaHue-driven dynamic color
+ * Iconic top-hatted Uncle Sam silhouette dominates ~50% of the frame, finger
+ * pointing toward camera "I want YOU". White beard, red-and-white striped hat
+ * with starred band, blue tailcoat, red bow tie. Behind him: psychedelic
+ * stars-and-stripes flag rippling, fireworks bursts, recruiting-poster
+ * yellow border vignette. Tie-dye sky behind. The Dead's "U.S. Blues" patriotic
+ * irreverence — psychedelic palette, not literal red/white/blue.
  *
- * Dramatic entrance: zoom from 0.3x → 1.2x, hold, breathe with energy.
- * Audio: energy gates (>0.2), chromaHue drives glow, onsetEnvelope adds flash,
- *        beatDecay pulses eye glow, peakApproaching for early activation.
+ * Audio reactivity:
+ *   slowEnergy   → flag wave amplitude
+ *   energy       → fireworks intensity
+ *   bass         → finger-point throb
+ *   beatDecay    → star pulse
+ *   onsetEnvelope→ firework burst trigger
+ *   chromaHue    → palette shift (psychedelic patriotic)
+ *   tempoFactor  → flag/firework rate
  */
 
 import React from "react";
-import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
+import { useCurrentFrame, useVideoConfig, interpolate } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
 import { seeded } from "../utils/seededRandom";
 import { useAudioSnapshot } from "./parametric/audio-helpers";
 import { useTempoFactor } from "../data/TempoContext";
 
-// ── Timing ──────────────────────────────────────────────────────────
-const APPEAR_DURATION = 180; // 6s zoom-in
-const APPEAR_HOLD = 180; // 6s hold at full presence
-const APPEAR_CYCLE = APPEAR_DURATION + APPEAR_HOLD;
+const CYCLE_TOTAL = 2400;
+const VISIBLE_DURATION = 780;
 
-// ── Palettes ────────────────────────────────────────────────────────
-const NEON_PALETTES = [
-  { primary: "#FF1744", accent: "#00E5FF", hat: "#651FFF", stars: "#FFD700", stripe: "#FF8A80" },
-  { primary: "#FF00FF", accent: "#76FF03", hat: "#FF1493", stars: "#00FFFF", stripe: "#FF80AB" },
-  { primary: "#FF4500", accent: "#ADFF2F", hat: "#DA70D6", stars: "#FFD700", stripe: "#FFAB91" },
-  { primary: "#00FF7F", accent: "#FF69B4", hat: "#00CED1", stars: "#FFEA00", stripe: "#B9F6CA" },
-];
-
-// ── SVG Helper: 5-pointed star polygon ──────────────────────────────
-function starPoints(cx: number, cy: number, outerR: number, innerR: number): string {
-  const pts: string[] = [];
-  for (let i = 0; i < 10; i++) {
-    const angle = (Math.PI / 2) * -1 + (Math.PI / 5) * i;
-    const r = i % 2 === 0 ? outerR : innerR;
-    pts.push(`${cx + r * Math.cos(angle)},${cy + r * Math.sin(angle)}`);
-  }
-  return pts.join(" ");
+interface Star {
+  x: number;
+  y: number;
+  size: number;
+  phase: number;
+  speed: number;
 }
 
-// ═══════════════════════════════════════════════════════════════════
-//  UncleSamSkeleton — richly detailed SVG
-// ═══════════════════════════════════════════════════════════════════
+interface Firework {
+  cx: number;
+  cy: number;
+  rays: number;
+  hue: number;
+  phase: number;
+  cycle: number;
+}
 
-const UncleSamSkeleton: React.FC<{
-  size: number;
-  primary: string;
-  accent: string;
-  hatColor: string;
-  starColor: string;
-  stripeColor: string;
-  eyeGlow: number; // 0–1, driven by beatDecay
-  onsetFlash: number; // 0–1, driven by onsetEnvelope
-}> = ({ size, primary, accent, hatColor, starColor, stripeColor, eyeGlow, onsetFlash }) => {
-  const eyeBright = 0.5 + eyeGlow * 0.5;
-  const flashBoost = 1 + onsetFlash * 0.4;
-
-  return (
-    <svg
-      width={size}
-      height={size * 1.6}
-      viewBox="0 0 160 256"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      {/* ═══ TOP HAT ═══ */}
-      {/* Hat body — tall cylinder */}
-      <rect x="48" y="2" width="54" height="48" rx="4" fill={hatColor} opacity="0.85" />
-      {/* Hat top highlight */}
-      <rect x="52" y="4" width="46" height="4" rx="2" fill="white" opacity="0.08" />
-      {/* Hat brim — wide ellipse */}
-      <ellipse cx="75" cy="50" rx="42" ry="9" fill={hatColor} opacity="0.9" />
-      {/* Brim underside shadow */}
-      <ellipse cx="75" cy="52" rx="40" ry="7" fill="black" opacity="0.15" />
-      {/* Hat band */}
-      <rect x="48" y="36" width="54" height="10" fill={accent} opacity="0.7" />
-      {/* Band highlight line */}
-      <line x1="50" y1="41" x2="100" y2="41" stroke="white" strokeWidth="0.5" opacity="0.2" />
-      {/* 3 stars on hat band */}
-      {[60, 75, 90].map((sx, i) => (
-        <polygon
-          key={i}
-          points={starPoints(sx, 41, 4.5, 2)}
-          fill={starColor}
-          opacity={0.85 + onsetFlash * 0.15}
-        />
-      ))}
-      {/* Red/white stripe details on hat body */}
-      {[6, 12, 18, 24, 30].map((sy, i) => (
-        <line
-          key={sy}
-          x1="50"
-          y1={sy}
-          x2="100"
-          y2={sy}
-          stroke={i % 2 === 0 ? stripeColor : "white"}
-          strokeWidth="1.8"
-          opacity={i % 2 === 0 ? 0.3 : 0.1}
-        />
-      ))}
-
-      {/* ═══ SKULL ═══ */}
-      {/* Cranium dome */}
-      <ellipse cx="75" cy="70" rx="20" ry="22" fill={primary} opacity="0.85" />
-      {/* Cranium suture lines — coronal & sagittal */}
-      <path d="M 58 64 Q 67 58 75 56 Q 83 58 92 64" stroke={primary} strokeWidth="0.8" opacity="0.3" fill="none" />
-      <line x1="75" y1="50" x2="75" y2="68" stroke={primary} strokeWidth="0.6" opacity="0.2" />
-      {/* Temporal suture (left) */}
-      <path d="M 57 68 Q 60 75 58 80" stroke={primary} strokeWidth="0.6" opacity="0.2" fill="none" />
-      {/* Temporal suture (right) */}
-      <path d="M 93 68 Q 90 75 92 80" stroke={primary} strokeWidth="0.6" opacity="0.2" fill="none" />
-
-      {/* Deep eye sockets */}
-      <ellipse cx="65" cy="68" rx="7" ry="7.5" fill="black" opacity="0.65" />
-      <ellipse cx="85" cy="68" rx="7" ry="7.5" fill="black" opacity="0.65" />
-      {/* Socket rim highlights */}
-      <ellipse cx="65" cy="66" rx="7.5" ry="6" fill="none" stroke={primary} strokeWidth="0.8" opacity="0.3" />
-      <ellipse cx="85" cy="66" rx="7.5" ry="6" fill="none" stroke={primary} strokeWidth="0.8" opacity="0.3" />
-      {/* Inner eye glow — pulses with beatDecay */}
-      <circle cx="65" cy="69" r="2.8" fill={accent} opacity={eyeBright * 0.8} />
-      <circle cx="85" cy="69" r="2.8" fill={accent} opacity={eyeBright * 0.8} />
-      {/* Tiny pupil bright spot */}
-      <circle cx="65" cy="68" r="1" fill="white" opacity={eyeBright * 0.5} />
-      <circle cx="85" cy="68" r="1" fill="white" opacity={eyeBright * 0.5} />
-
-      {/* Cheekbones — pronounced angular lines */}
-      <line x1="56" y1="72" x2="50" y2="65" stroke={primary} strokeWidth="2.2" opacity="0.45" strokeLinecap="round" />
-      <line x1="94" y1="72" x2="100" y2="65" stroke={primary} strokeWidth="2.2" opacity="0.45" strokeLinecap="round" />
-      {/* Zygomatic arch (below cheekbone) */}
-      <path d="M 56 73 Q 52 76 54 80" stroke={primary} strokeWidth="1.2" opacity="0.25" fill="none" />
-      <path d="M 94 73 Q 98 76 96 80" stroke={primary} strokeWidth="1.2" opacity="0.25" fill="none" />
-
-      {/* Nasal cavity — inverted heart shape */}
-      <path
-        d="M 75 74 L 72 80 Q 73 82 75 82 Q 77 82 78 80 Z"
-        fill="black"
-        opacity="0.55"
-      />
-      {/* Nasal bone ridge */}
-      <line x1="75" y1="62" x2="75" y2="74" stroke={primary} strokeWidth="1" opacity="0.3" />
-
-      {/* Jaw / mandible */}
-      <path
-        d="M 58 78 Q 58 92 66 94 L 84 94 Q 92 92 92 78"
-        stroke={primary}
-        strokeWidth="2.5"
-        opacity="0.7"
-        fill="none"
-      />
-      {/* Chin */}
-      <ellipse cx="75" cy="95" rx="5" ry="3" fill={primary} opacity="0.4" />
-
-      {/* ── Teeth: 10 individual teeth ── */}
-      {/* Upper teeth row (background) */}
-      <rect x="61" y="83" width="28" height="5" rx="1" fill={primary} opacity="0.6" />
-      {/* Individual upper teeth */}
-      {[62, 65, 68, 71, 74, 77, 80, 83, 86].map((tx, i) => (
-        <React.Fragment key={`ut${i}`}>
-          <rect x={tx} y="83" width="2.4" height="5" rx="0.5" fill={primary} opacity="0.75" />
-          <line x1={tx + 1.2} y1="83" x2={tx + 1.2} y2="88" stroke="black" strokeWidth="0.4" opacity="0.3" />
-        </React.Fragment>
-      ))}
-      {/* Lower teeth row */}
-      <rect x="63" y="88.5" width="24" height="4" rx="1" fill={primary} opacity="0.5" />
-      {/* Individual lower teeth */}
-      {[64, 67, 70, 73, 76, 79, 82, 85].map((tx, i) => (
-        <React.Fragment key={`lt${i}`}>
-          <rect x={tx} y="88.5" width="2.2" height="4" rx="0.5" fill={primary} opacity="0.6" />
-          <line x1={tx + 1.1} y1="88.5" x2={tx + 1.1} y2="92.5" stroke="black" strokeWidth="0.3" opacity="0.25" />
-        </React.Fragment>
-      ))}
-
-      {/* ═══ SPINE — 7 vertebrae ═══ */}
-      {[99, 106, 113, 120, 127, 134, 141].map((vy, i) => (
-        <React.Fragment key={`v${i}`}>
-          {/* Vertebral body */}
-          <ellipse cx="75" cy={vy} rx="4.5" ry="3" fill={primary} opacity="0.55" />
-          {/* Spinous process (rear bump) */}
-          <circle cx="75" cy={vy - 2} r="1.5" fill={primary} opacity="0.35" />
-          {/* Disc space between vertebrae */}
-          {i < 6 && (
-            <line x1="71" y1={vy + 3} x2="79" y2={vy + 3} stroke={primary} strokeWidth="0.5" opacity="0.2" />
-          )}
-        </React.Fragment>
-      ))}
-
-      {/* ═══ RIB CAGE — 4 pairs with sternum ═══ */}
-      {/* Sternum — central bone */}
-      <line x1="75" y1="98" x2="75" y2="132" stroke={primary} strokeWidth="2" opacity="0.4" />
-      {/* Manubrium (top of sternum) */}
-      <ellipse cx="75" cy="98" rx="5" ry="2" fill={primary} opacity="0.35" />
-      {/* Rib pairs — left and right curves from sternum to spine */}
-      {[102, 110, 118, 126].map((ry, i) => {
-        const spread = 22 + i * 1.5;
-        const droop = 3 + i * 1.5;
-        return (
-          <React.Fragment key={`rib${i}`}>
-            {/* Left rib */}
-            <path
-              d={`M 75 ${ry} Q ${75 - spread * 0.6} ${ry - 2} ${75 - spread} ${ry + droop}`}
-              stroke={primary}
-              strokeWidth="2.2"
-              opacity={0.5 - i * 0.03}
-              fill="none"
-              strokeLinecap="round"
-            />
-            {/* Right rib */}
-            <path
-              d={`M 75 ${ry} Q ${75 + spread * 0.6} ${ry - 2} ${75 + spread} ${ry + droop}`}
-              stroke={primary}
-              strokeWidth="2.2"
-              opacity={0.5 - i * 0.03}
-              fill="none"
-              strokeLinecap="round"
-            />
-            {/* Rib cartilage tip (slightly brighter) */}
-            <circle cx={75 - spread} cy={ry + droop} r="1.2" fill={primary} opacity="0.3" />
-            <circle cx={75 + spread} cy={ry + droop} r="1.2" fill={primary} opacity="0.3" />
-          </React.Fragment>
-        );
-      })}
-
-      {/* ═══ PELVIS — hip bone shape ═══ */}
-      <path
-        d="M 55 148 Q 60 140 75 144 Q 90 140 95 148 Q 92 156 75 158 Q 58 156 55 148 Z"
-        fill={primary}
-        opacity="0.45"
-      />
-      {/* Iliac crest detail */}
-      <path
-        d="M 57 148 Q 66 143 75 145 Q 84 143 93 148"
-        stroke={primary}
-        strokeWidth="1.2"
-        opacity="0.3"
-        fill="none"
-      />
-      {/* Sacrum */}
-      <ellipse cx="75" cy="150" rx="4" ry="6" fill={primary} opacity="0.3" />
-
-      {/* ═══ LEFT ARM (at side, relaxed) ═══ */}
-      {/* Humerus */}
-      <line x1="55" y1="102" x2="38" y2="126" stroke={primary} strokeWidth="4" strokeLinecap="round" />
-      {/* Elbow joint */}
-      <circle cx="38" cy="126" r="3" fill={primary} opacity="0.5" />
-      {/* Radius */}
-      <line x1="38" y1="126" x2="30" y2="152" stroke={primary} strokeWidth="3.5" strokeLinecap="round" />
-      {/* Ulna (slightly offset) */}
-      <line x1="38" y1="126" x2="33" y2="153" stroke={primary} strokeWidth="2.5" opacity="0.4" strokeLinecap="round" />
-      {/* Wrist bones — carpal cluster */}
-      <circle cx="30" cy="153" r="2" fill={primary} opacity="0.5" />
-      <circle cx="33" cy="154" r="1.5" fill={primary} opacity="0.4" />
-      <circle cx="28" cy="155" r="1.5" fill={primary} opacity="0.35" />
-      {/* Left hand — relaxed with finger hints */}
-      <line x1="30" y1="155" x2="27" y2="162" stroke={primary} strokeWidth="2" strokeLinecap="round" opacity="0.6" />
-      <line x1="30" y1="155" x2="30" y2="163" stroke={primary} strokeWidth="2" strokeLinecap="round" opacity="0.55" />
-      <line x1="31" y1="155" x2="33" y2="162" stroke={primary} strokeWidth="1.8" strokeLinecap="round" opacity="0.5" />
-      <line x1="28" y1="155" x2="24" y2="160" stroke={primary} strokeWidth="1.5" strokeLinecap="round" opacity="0.4" />
-
-      {/* ═══ RIGHT ARM — POINTING AT VIEWER ═══ */}
-      {/* Humerus — extends outward */}
-      <line x1="95" y1="102" x2="118" y2="90" stroke={primary} strokeWidth="4.5" strokeLinecap="round" />
-      {/* Elbow joint */}
-      <circle cx="118" cy="90" r="3.5" fill={primary} opacity="0.55" />
-      {/* Radius — forearm reaching toward camera */}
-      <line x1="118" y1="90" x2="140" y2="76" stroke={primary} strokeWidth="4" strokeLinecap="round" />
-      {/* Ulna (parallel offset) */}
-      <line x1="118" y1="90" x2="138" y2="79" stroke={primary} strokeWidth="2.5" opacity="0.4" strokeLinecap="round" />
-      {/* Wrist bones */}
-      <circle cx="140" cy="76" r="2.5" fill={primary} opacity="0.55" />
-      <circle cx="138" cy="78" r="1.8" fill={primary} opacity="0.4" />
-      <circle cx="141" cy="78" r="1.5" fill={primary} opacity="0.35" />
-
-      {/* ── POINTING INDEX FINGER — 3 bone segments, prominent ── */}
-      {/* Metacarpal (palm to knuckle) */}
-      <line x1="141" y1="74" x2="146" y2="62" stroke={accent} strokeWidth="4.5" strokeLinecap="round" opacity={flashBoost * 0.9} />
-      {/* Proximal phalanx */}
-      <line x1="146" y1="62" x2="150" y2="50" stroke={accent} strokeWidth="4" strokeLinecap="round" opacity={flashBoost * 0.85} />
-      {/* Knuckle joint */}
-      <circle cx="146" cy="62" r="2" fill={accent} opacity="0.5" />
-      {/* Distal phalanx — fingertip */}
-      <line x1="150" y1="50" x2="152" y2="40" stroke={accent} strokeWidth="3.5" strokeLinecap="round" opacity={flashBoost} />
-      {/* Joint between proximal and distal */}
-      <circle cx="150" cy="50" r="1.8" fill={accent} opacity="0.45" />
-      {/* Fingertip glow */}
-      <circle cx="152" cy="39" r="2.5" fill={accent} opacity={0.4 + onsetFlash * 0.5} />
-
-      {/* Other fingers — curled toward palm */}
-      {/* Middle finger curled */}
-      <path d="M 139 74 Q 137 68 134 66 Q 131 68 132 72" stroke={primary} strokeWidth="2.5" strokeLinecap="round" opacity="0.55" fill="none" />
-      {/* Ring finger curled */}
-      <path d="M 138 76 Q 134 72 131 71 Q 128 73 130 77" stroke={primary} strokeWidth="2.2" strokeLinecap="round" opacity="0.5" fill="none" />
-      {/* Pinky curled */}
-      <path d="M 137 78 Q 133 76 130 76 Q 128 78 129 81" stroke={primary} strokeWidth="2" strokeLinecap="round" opacity="0.45" fill="none" />
-      {/* Thumb tucked */}
-      <path d="M 142 77 Q 144 80 142 83 Q 140 82 139 79" stroke={primary} strokeWidth="2.2" strokeLinecap="round" opacity="0.5" fill="none" />
-
-      {/* ═══ LEGS ═══ */}
-      {/* Left leg */}
-      {/* Femur */}
-      <line x1="66" y1="156" x2="56" y2="190" stroke={primary} strokeWidth="4" strokeLinecap="round" />
-      {/* Knee joint */}
-      <circle cx="56" cy="190" r="3.5" fill={primary} opacity="0.5" />
-      {/* Tibia */}
-      <line x1="56" y1="190" x2="50" y2="224" stroke={primary} strokeWidth="3.5" strokeLinecap="round" />
-      {/* Fibula (thinner, parallel) */}
-      <line x1="56" y1="190" x2="53" y2="223" stroke={primary} strokeWidth="2" opacity="0.35" strokeLinecap="round" />
-      {/* Ankle */}
-      <circle cx="50" cy="225" r="2.5" fill={primary} opacity="0.45" />
-
-      {/* Right leg */}
-      {/* Femur */}
-      <line x1="84" y1="156" x2="94" y2="190" stroke={primary} strokeWidth="4" strokeLinecap="round" />
-      {/* Knee joint */}
-      <circle cx="94" cy="190" r="3.5" fill={primary} opacity="0.5" />
-      {/* Tibia */}
-      <line x1="94" y1="190" x2="100" y2="224" stroke={primary} strokeWidth="3.5" strokeLinecap="round" />
-      {/* Fibula */}
-      <line x1="94" y1="190" x2="97" y2="223" stroke={primary} strokeWidth="2" opacity="0.35" strokeLinecap="round" />
-      {/* Ankle */}
-      <circle cx="100" cy="225" r="2.5" fill={primary} opacity="0.45" />
-
-      {/* ═══ BOOTS with stripe accents ═══ */}
-      {/* Left boot */}
-      <path
-        d="M 42 228 Q 38 226 36 230 Q 34 236 38 240 L 58 240 Q 60 236 56 228 Z"
-        fill={primary}
-        opacity="0.7"
-      />
-      {/* Boot heel */}
-      <rect x="38" y="238" width="6" height="4" rx="1" fill={primary} opacity="0.5" />
-      {/* Boot stripes */}
-      <line x1="40" y1="233" x2="56" y2="233" stroke={accent} strokeWidth="1.5" opacity="0.45" />
-      <line x1="39" y1="236" x2="57" y2="236" stroke={stripeColor} strokeWidth="1" opacity="0.3" />
-      {/* Boot toe detail */}
-      <ellipse cx="42" cy="237" rx="5" ry="3" fill={primary} opacity="0.35" />
-
-      {/* Right boot */}
-      <path
-        d="M 92 228 Q 90 226 88 230 Q 86 236 90 240 L 110 240 Q 112 236 108 228 Z"
-        fill={primary}
-        opacity="0.7"
-      />
-      {/* Boot heel */}
-      <rect x="106" y="238" width="6" height="4" rx="1" fill={primary} opacity="0.5" />
-      {/* Boot stripes */}
-      <line x1="92" y1="233" x2="108" y2="233" stroke={accent} strokeWidth="1.5" opacity="0.45" />
-      <line x1="91" y1="236" x2="109" y2="236" stroke={stripeColor} strokeWidth="1" opacity="0.3" />
-      {/* Boot toe detail */}
-      <ellipse cx="108" cy="237" rx="5" ry="3" fill={primary} opacity="0.35" />
-
-      {/* Foot bones visible through boot (ghostly) */}
-      {[42, 46, 50].map((fx) => (
-        <line key={`lf${fx}`} x1={fx} y1="230" x2={fx + 1} y2="238" stroke={primary} strokeWidth="0.8" opacity="0.15" />
-      ))}
-      {[96, 100, 104].map((fx) => (
-        <line key={`rf${fx}`} x1={fx} y1="230" x2={fx + 1} y2="238" stroke={primary} strokeWidth="0.8" opacity="0.15" />
-      ))}
-
-      {/* ═══ COAT TAILS — ghostly dashed outline ═══ */}
-      {/* Left coat tail */}
-      <path
-        d="M 55 130 Q 46 150 40 175 Q 36 192 34 210"
-        stroke={primary}
-        strokeWidth="2"
-        opacity="0.2"
-        fill="none"
-        strokeDasharray="5 4"
-      />
-      {/* Left lapel edge */}
-      <path
-        d="M 60 100 Q 50 110 48 125"
-        stroke={primary}
-        strokeWidth="1.5"
-        opacity="0.18"
-        fill="none"
-        strokeDasharray="3 3"
-      />
-      {/* Right coat tail */}
-      <path
-        d="M 95 130 Q 104 150 110 175 Q 114 192 116 210"
-        stroke={primary}
-        strokeWidth="2"
-        opacity="0.2"
-        fill="none"
-        strokeDasharray="5 4"
-      />
-      {/* Right lapel edge */}
-      <path
-        d="M 90 100 Q 100 110 102 125"
-        stroke={primary}
-        strokeWidth="1.5"
-        opacity="0.18"
-        fill="none"
-        strokeDasharray="3 3"
-      />
-      {/* Waist button suggestion */}
-      <circle cx="75" cy="140" r="2" fill={accent} opacity="0.15" />
-
-      {/* Coat collar / bow tie hint */}
-      <path
-        d="M 65 96 Q 70 93 75 96 Q 80 93 85 96"
-        stroke={accent}
-        strokeWidth="1.5"
-        opacity="0.25"
-        fill="none"
-      />
-    </svg>
-  );
-};
-
-// ═══════════════════════════════════════════════════════════════════
-//  UncleSam — orchestrator component
-// ═══════════════════════════════════════════════════════════════════
+interface FlagPoint {
+  baseY: number;
+  amp: number;
+}
 
 interface Props {
   frames: EnhancedFrameData[];
@@ -429,105 +57,573 @@ interface Props {
 export const UncleSam: React.FC<Props> = ({ frames }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
-  const snap = useAudioSnapshot(frames);
   const tempoFactor = useTempoFactor();
-  const { energy, chromaHue, onsetEnvelope, beatDecay, peakApproaching } = snap;
+  const snap = useAudioSnapshot(frames);
 
-  // ── Gate: only appear during high energy or imminent peak ──
-  if (energy < 0.2 && (peakApproaching ?? 0) < 0.7) return null;
+  const stars = React.useMemo<Star[]>(() => {
+    const rng = seeded(98_113_447);
+    return Array.from({ length: 38 }, () => ({
+      x: rng(),
+      y: rng() * 0.5,
+      size: 2 + rng() * 4,
+      phase: rng() * Math.PI * 2,
+      speed: 0.005 + rng() * 0.012,
+    }));
+  }, []);
 
-  // ── Cycle timing ──
-  const cycleIndex = Math.floor(frame / APPEAR_CYCLE);
-  const cycleFrame = frame % APPEAR_CYCLE;
-  const inZoom = cycleFrame < APPEAR_DURATION;
-  const progress = inZoom ? cycleFrame / APPEAR_DURATION : 1;
+  const fireworks = React.useMemo<Firework[]>(() => {
+    const rng = seeded(45_667_889);
+    return Array.from({ length: 6 }, () => ({
+      cx: 0.1 + rng() * 0.8,
+      cy: 0.10 + rng() * 0.30,
+      rays: 16 + Math.floor(rng() * 8),
+      hue: rng() * 360,
+      phase: rng() * Math.PI * 2,
+      cycle: 60 + rng() * 80,
+    }));
+  }, []);
 
-  // ── Deterministic palette ──
-  const rng = seeded(cycleIndex * 67 + 1776);
-  const palette = NEON_PALETTES[Math.floor(rng() * NEON_PALETTES.length)];
+  const flagPts = React.useMemo<FlagPoint[]>(() => {
+    const rng = seeded(33_887_447);
+    return Array.from({ length: 18 }, (_, i) => ({
+      baseY: 0.5 + (i % 6) * 0.05,
+      amp: 8 + rng() * 14,
+    }));
+  }, []);
 
-  // ── Zoom: 0.3 → 1.2 with cubic bezier, then hold + energy breathing ──
-  const zoomScale = interpolate(
-    progress,
-    [0, 0.4, 0.75, 1],
-    [0.3, 0.85, 1.1, 1.2],
-    {
-      extrapolateLeft: "clamp",
-      extrapolateRight: "clamp",
-      easing: Easing.bezier(0.25, 0.1, 0.25, 1),
-    },
-  );
-  // Subtle energy-driven breathing during hold phase
-  const holdBreath = inZoom ? 0 : Math.sin(cycleFrame * 0.04 * tempoFactor) * 0.03 + (energy - 0.2) * 0.12;
-  const scale = zoomScale + holdBreath;
+  const cycleFrame = frame % CYCLE_TOTAL;
+  if (cycleFrame >= VISIBLE_DURATION) return null;
+  const progress = cycleFrame / VISIBLE_DURATION;
+  const fadeIn = interpolate(progress, [0, 0.09], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const fadeOut = interpolate(progress, [0.91, 1], [1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const masterOpacity = Math.min(fadeIn, fadeOut) * 0.95;
+  if (masterOpacity < 0.01) return null;
 
-  // ── Opacity: fade in, then energy-modulated presence ──
-  const fadeIn = interpolate(progress, [0, 0.15, 0.3], [0, 0.5, 1], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-    easing: Easing.out(Easing.cubic),
+  const energy = snap.energy;
+  const bass = snap.bass;
+  const slowEnergy = snap.slowEnergy;
+  const beatDecay = snap.beatDecay;
+  const onsetEnv = snap.onsetEnvelope;
+  const chromaHue = snap.chromaHue;
+
+  const flagWave = 0.5 + slowEnergy * 0.5 + bass * 0.2;
+  const fireworkIntensity = 0.5 + energy * 0.4 + onsetEnv * 0.5;
+  const fingerPulse = 1 + bass * 0.08 + beatDecay * 0.04;
+  const starPulse = 1 + beatDecay * 0.4;
+
+  /* Psychedelic patriotic palette */
+  const baseHue = 350;
+  const tintHue = ((baseHue + (chromaHue - 180) * 0.40) % 360 + 360) % 360;
+  const redHue = (tintHue) % 360;
+  const blueHue = (tintHue + 200) % 360;
+  const goldHue = (tintHue + 60) % 360;
+
+  const cx = width * 0.5;
+  const samCx = cx;
+  const samBaseY = height * 0.96;
+  const samH = height * 0.92;
+  const samW = width * 0.52;
+
+  /* Star pattern (American flag-style 5-point) */
+  function drawStar(cxS: number, cyS: number, r: number, fill: string, opacity = 1): React.ReactNode {
+    const pts: string[] = [];
+    for (let i = 0; i < 10; i++) {
+      const a = (i / 10) * Math.PI * 2 - Math.PI / 2;
+      const rr = i % 2 === 0 ? r : r * 0.4;
+      pts.push(`${cxS + Math.cos(a) * rr},${cyS + Math.sin(a) * rr}`);
+    }
+    return <polygon points={pts.join(" ")} fill={fill} opacity={opacity} />;
+  }
+
+  /* Background star nodes */
+  const starNodes = stars.map((s, i) => {
+    const t = frame * s.speed + s.phase;
+    const flicker = 0.6 + Math.sin(t) * 0.4;
+    return (
+      <g key={`star-${i}`} opacity={flicker * starPulse * 0.85}>
+        {drawStar(s.x * width, s.y * height, s.size * starPulse, `hsl(${goldHue}, 90%, 80%)`, 1)}
+      </g>
+    );
   });
-  const energyOpacity = interpolate(energy, [0.2, 0.35, 0.7], [0.65, 0.85, 1], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
+
+  /* Firework nodes */
+  const fireworkNodes = fireworks.map((fw, i) => {
+    const cycleT = ((frame + i * 30) % fw.cycle) / fw.cycle;
+    const op = (1 - cycleT) * 0.85 * fireworkIntensity;
+    if (op < 0.02) return null;
+    const radius = cycleT * 60;
+    const rays: React.ReactNode[] = [];
+    for (let r = 0; r < fw.rays; r++) {
+      const a = (r / fw.rays) * Math.PI * 2;
+      const x1 = fw.cx * width + Math.cos(a) * radius * 0.3;
+      const y1 = fw.cy * height + Math.sin(a) * radius * 0.3;
+      const x2 = fw.cx * width + Math.cos(a) * radius;
+      const y2 = fw.cy * height + Math.sin(a) * radius;
+      rays.push(
+        <line
+          key={`fwr-${i}-${r}`}
+          x1={x1}
+          y1={y1}
+          x2={x2}
+          y2={y2}
+          stroke={`hsl(${(fw.hue + tintHue) % 360}, 90%, 70%)`}
+          strokeWidth={1.5}
+          strokeLinecap="round"
+        />,
+      );
+    }
+    return (
+      <g key={`fw-${i}`} opacity={op} style={{ mixBlendMode: "screen" }}>
+        <circle cx={fw.cx * width} cy={fw.cy * height} r={radius * 0.3} fill={`hsla(${(fw.hue + tintHue) % 360}, 95%, 85%, 0.6)`} />
+        {rays}
+      </g>
+    );
   });
-  const opacity = fadeIn * energyOpacity;
 
-  // ── Position: center with slow menacing drift ──
-  const driftX = Math.sin(progress * Math.PI * 0.5) * width * 0.02;
-  const driftY = Math.cos(progress * Math.PI * 0.3) * height * 0.01;
-  const centerX = width * 0.5 + driftX;
-  const centerY = height * 0.44 + driftY;
-
-  // ── Menacing tilt — initial lean, then settle with slight sway ──
-  const entryTilt = interpolate(progress, [0, 0.2, 0.5, 0.8, 1], [8, 3, 0, -1, -2], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
-  const holdSway = inZoom ? 0 : Math.sin(cycleFrame * 0.025 * tempoFactor) * 1.5;
-  const tilt = entryTilt + holdSway;
-
-  // ── Triple-layer neon glow ──
-  const baseGlow = interpolate(progress, [0, 0.4, 1], [8, 25, 45], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
-  const glowIntensity = baseGlow + onsetEnvelope * 20;
-
-  // Color driven by music — chromaHue + onset flash
-  const hueShift = chromaHue + onsetEnvelope * 60;
-  const dynamicGlow = `hsl(${hueShift}, 100%, ${55 + beatDecay * 20}%)`;
-
-  const charSize = 220;
+  /* Flag stripe path generator (rippling waves) */
+  const stripeHeight = height * 0.06;
+  function buildFlagPath(yBase: number, ampMul: number): string {
+    const segs = 30;
+    let p = `M 0 ${yBase}`;
+    for (let i = 0; i <= segs; i++) {
+      const xn = i / segs;
+      const x = xn * width;
+      const y = yBase + Math.sin(xn * 6 + frame * 0.04 * tempoFactor) * (stripeHeight * 0.4 * ampMul * flagWave)
+                    + Math.sin(xn * 12 + frame * 0.03) * (stripeHeight * 0.18 * ampMul);
+      p += ` L ${x} ${y}`;
+    }
+    p += ` L ${width} ${yBase + stripeHeight} L 0 ${yBase + stripeHeight} Z`;
+    return p;
+  }
 
   return (
     <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden" }}>
-      <div
-        style={{
-          position: "absolute",
-          left: centerX,
-          top: centerY,
-          transform: `translate(-50%, -50%) scale(${scale}) rotate(${tilt}deg)`,
-          opacity,
-          filter: [
-            `drop-shadow(0 0 ${glowIntensity * 0.6}px ${palette.primary})`,
-            `drop-shadow(0 0 ${glowIntensity}px ${dynamicGlow})`,
-            `drop-shadow(0 0 ${glowIntensity * 1.8}px ${palette.accent})`,
-          ].join(" "),
-          willChange: "transform, opacity, filter",
-        }}
-      >
-        <UncleSamSkeleton
-          size={charSize}
-          primary={palette.primary}
-          accent={palette.accent}
-          hatColor={palette.hat}
-          starColor={palette.stars}
-          stripeColor={palette.stripe}
-          eyeGlow={beatDecay}
-          onsetFlash={onsetEnvelope}
+      <svg width={width} height={height} style={{ opacity: masterOpacity, willChange: "opacity" }}>
+        <defs>
+          <linearGradient id="us-sky" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={`hsl(${blueHue}, 65%, 12%)`} />
+            <stop offset="50%" stopColor={`hsl(${(blueHue + 20) % 360}, 65%, 32%)`} />
+            <stop offset="100%" stopColor={`hsl(${redHue}, 70%, 38%)`} />
+          </linearGradient>
+          <linearGradient id="us-coat" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={`hsl(${blueHue}, 70%, 30%)`} />
+            <stop offset="50%" stopColor={`hsl(${blueHue}, 65%, 22%)`} />
+            <stop offset="100%" stopColor={`hsl(${blueHue}, 70%, 12%)`} />
+          </linearGradient>
+          <linearGradient id="us-hat-stripe" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={`hsl(${redHue}, 90%, 50%)`} />
+            <stop offset="100%" stopColor={`hsl(${redHue}, 95%, 30%)`} />
+          </linearGradient>
+          <radialGradient id="us-glow" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor={`hsl(${goldHue}, 95%, 80%)`} stopOpacity={0.85} />
+            <stop offset="100%" stopColor={`hsl(${goldHue}, 90%, 60%)`} stopOpacity={0} />
+          </radialGradient>
+          <linearGradient id="us-skin" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#F0CFA8" />
+            <stop offset="100%" stopColor="#B88858" />
+          </linearGradient>
+          <linearGradient id="us-beard" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#F8F5EE" />
+            <stop offset="100%" stopColor="#C8C0B0" />
+          </linearGradient>
+          <filter id="us-blur" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="3" />
+          </filter>
+        </defs>
+
+        {/* SKY (psychedelic patriotic) */}
+        <rect width={width} height={height} fill="url(#us-sky)" />
+
+        {/* BACKGROUND STARS */}
+        {starNodes}
+
+        {/* === RIPPLING FLAG BEHIND SAM === */}
+        <g opacity={0.65}>
+          {/* 7 red stripes + 6 white stripes */}
+          {Array.from({ length: 7 }, (_, i) => {
+            const yBase = height * 0.20 + i * stripeHeight * 1.3;
+            return (
+              <path
+                key={`stripe-r-${i}`}
+                d={buildFlagPath(yBase, 1 - i * 0.05)}
+                fill={`hsla(${(redHue + i * 8) % 360}, 85%, ${55 - i * 2}%, 0.85)`}
+              />
+            );
+          })}
+          {Array.from({ length: 6 }, (_, i) => {
+            const yBase = height * 0.20 + stripeHeight * 0.8 + i * stripeHeight * 1.3;
+            return (
+              <path
+                key={`stripe-w-${i}`}
+                d={buildFlagPath(yBase, 1 - i * 0.05)}
+                fill={`hsla(${(goldHue + i * 6) % 360}, 80%, ${78 - i * 3}%, 0.7)`}
+              />
+            );
+          })}
+        </g>
+
+        {/* CANTON (blue field with stars) — upper left */}
+        <rect
+          x={width * 0.06}
+          y={height * 0.18}
+          width={width * 0.32}
+          height={height * 0.22}
+          fill={`hsla(${blueHue}, 70%, 28%, 0.78)`}
         />
-      </div>
+        {Array.from({ length: 50 }, (_, i) => {
+          const row = Math.floor(i / 10);
+          const col = i % 10;
+          return (
+            <g key={`cs-${i}`}>
+              {drawStar(
+                width * 0.06 + col * (width * 0.032) + width * 0.016,
+                height * 0.18 + row * (height * 0.044) + height * 0.022,
+                3 * starPulse,
+                `hsl(${goldHue}, 95%, 88%)`,
+                0.85,
+              )}
+            </g>
+          );
+        })}
+
+        {/* FIREWORKS */}
+        {fireworkNodes}
+
+        {/* === UNCLE SAM SILHOUETTE === */}
+
+        {/* Body shadow */}
+        <ellipse
+          cx={samCx + 6}
+          cy={samBaseY - 4}
+          rx={samW * 0.4}
+          ry={20}
+          fill="rgba(0, 0, 0, 0.45)"
+          filter="url(#us-blur)"
+        />
+
+        {/* TAILCOAT body (pentagon-ish silhouette) */}
+        <path
+          d={`M ${samCx - samW * 0.30} ${samBaseY}
+              Q ${samCx - samW * 0.32} ${samBaseY - samH * 0.30} ${samCx - samW * 0.22} ${samBaseY - samH * 0.45}
+              L ${samCx - samW * 0.18} ${samBaseY - samH * 0.55}
+              L ${samCx - samW * 0.22} ${samBaseY - samH * 0.62}
+              L ${samCx + samW * 0.22} ${samBaseY - samH * 0.62}
+              L ${samCx + samW * 0.18} ${samBaseY - samH * 0.55}
+              L ${samCx + samW * 0.22} ${samBaseY - samH * 0.45}
+              Q ${samCx + samW * 0.32} ${samBaseY - samH * 0.30} ${samCx + samW * 0.30} ${samBaseY}
+              Z`}
+          fill="url(#us-coat)"
+          stroke="rgba(0, 0, 0, 0.95)"
+          strokeWidth={2.5}
+        />
+        {/* Coat lapels */}
+        <path
+          d={`M ${samCx - samW * 0.18} ${samBaseY - samH * 0.55}
+              L ${samCx - samW * 0.04} ${samBaseY - samH * 0.42}
+              L ${samCx - samW * 0.08} ${samBaseY - samH * 0.32}
+              L ${samCx - samW * 0.20} ${samBaseY - samH * 0.45} Z`}
+          fill={`hsl(${blueHue}, 75%, 18%)`}
+          stroke="rgba(0, 0, 0, 0.95)"
+          strokeWidth={1.6}
+        />
+        <path
+          d={`M ${samCx + samW * 0.18} ${samBaseY - samH * 0.55}
+              L ${samCx + samW * 0.04} ${samBaseY - samH * 0.42}
+              L ${samCx + samW * 0.08} ${samBaseY - samH * 0.32}
+              L ${samCx + samW * 0.20} ${samBaseY - samH * 0.45} Z`}
+          fill={`hsl(${blueHue}, 75%, 18%)`}
+          stroke="rgba(0, 0, 0, 0.95)"
+          strokeWidth={1.6}
+        />
+        {/* Coat brass buttons */}
+        {Array.from({ length: 5 }, (_, i) => (
+          <circle
+            key={`btn-${i}`}
+            cx={samCx}
+            cy={samBaseY - samH * 0.42 + i * (samH * 0.06)}
+            r={3.5}
+            fill={`hsl(${goldHue}, 90%, 65%)`}
+            stroke="rgba(40, 28, 8, 0.95)"
+            strokeWidth={0.6}
+          />
+        ))}
+
+        {/* WHITE SHIRT/COLLAR */}
+        <path
+          d={`M ${samCx - samW * 0.06} ${samBaseY - samH * 0.55}
+              L ${samCx - samW * 0.04} ${samBaseY - samH * 0.62}
+              L ${samCx + samW * 0.04} ${samBaseY - samH * 0.62}
+              L ${samCx + samW * 0.06} ${samBaseY - samH * 0.55}
+              L ${samCx + samW * 0.04} ${samBaseY - samH * 0.50}
+              L ${samCx - samW * 0.04} ${samBaseY - samH * 0.50} Z`}
+          fill="rgba(245, 240, 228, 0.95)"
+          stroke="rgba(40, 28, 8, 0.85)"
+          strokeWidth={1.2}
+        />
+        {/* RED BOW TIE */}
+        <path
+          d={`M ${samCx - 14} ${samBaseY - samH * 0.555}
+              L ${samCx - 6} ${samBaseY - samH * 0.555}
+              L ${samCx - 6} ${samBaseY - samH * 0.535}
+              L ${samCx - 14} ${samBaseY - samH * 0.535} Z`}
+          fill={`hsl(${redHue}, 95%, 50%)`}
+          stroke="rgba(40, 8, 8, 0.95)"
+          strokeWidth={1}
+        />
+        <path
+          d={`M ${samCx + 6} ${samBaseY - samH * 0.555}
+              L ${samCx + 14} ${samBaseY - samH * 0.555}
+              L ${samCx + 14} ${samBaseY - samH * 0.535}
+              L ${samCx + 6} ${samBaseY - samH * 0.535} Z`}
+          fill={`hsl(${redHue}, 95%, 50%)`}
+          stroke="rgba(40, 8, 8, 0.95)"
+          strokeWidth={1}
+        />
+        <rect
+          x={samCx - 6}
+          y={samBaseY - samH * 0.555}
+          width={12}
+          height={20}
+          fill={`hsl(${redHue}, 95%, 35%)`}
+          stroke="rgba(40, 8, 8, 0.95)"
+          strokeWidth={0.8}
+        />
+
+        {/* HEAD */}
+        <ellipse
+          cx={samCx}
+          cy={samBaseY - samH * 0.66}
+          rx={samW * 0.10}
+          ry={samW * 0.13}
+          fill="url(#us-skin)"
+          stroke="rgba(80, 40, 12, 0.95)"
+          strokeWidth={1.8}
+        />
+        {/* Eyes (glaring forward) */}
+        <ellipse cx={samCx - 9} cy={samBaseY - samH * 0.69} rx={3} ry={2} fill="rgba(245, 245, 240, 0.95)" />
+        <ellipse cx={samCx + 9} cy={samBaseY - samH * 0.69} rx={3} ry={2} fill="rgba(245, 245, 240, 0.95)" />
+        <circle cx={samCx - 9} cy={samBaseY - samH * 0.69} r={1.4} fill={`hsl(${blueHue}, 70%, 30%)`} />
+        <circle cx={samCx + 9} cy={samBaseY - samH * 0.69} r={1.4} fill={`hsl(${blueHue}, 70%, 30%)`} />
+        {/* Bushy white eyebrows */}
+        <path
+          d={`M ${samCx - 14} ${samBaseY - samH * 0.71} Q ${samCx - 9} ${samBaseY - samH * 0.72} ${samCx - 4} ${samBaseY - samH * 0.71}`}
+          stroke="rgba(245, 240, 228, 0.95)"
+          strokeWidth={3}
+          strokeLinecap="round"
+          fill="none"
+        />
+        <path
+          d={`M ${samCx + 4} ${samBaseY - samH * 0.71} Q ${samCx + 9} ${samBaseY - samH * 0.72} ${samCx + 14} ${samBaseY - samH * 0.71}`}
+          stroke="rgba(245, 240, 228, 0.95)"
+          strokeWidth={3}
+          strokeLinecap="round"
+          fill="none"
+        />
+        {/* Nose */}
+        <path
+          d={`M ${samCx - 2} ${samBaseY - samH * 0.69} L ${samCx - 4} ${samBaseY - samH * 0.65} L ${samCx + 2} ${samBaseY - samH * 0.65} L ${samCx + 1} ${samBaseY - samH * 0.69}`}
+          fill="rgba(180, 110, 60, 0.85)"
+          stroke="rgba(80, 40, 12, 0.95)"
+          strokeWidth={0.8}
+        />
+        {/* WHITE BEARD (long, full) */}
+        <path
+          d={`M ${samCx - samW * 0.10} ${samBaseY - samH * 0.62}
+              Q ${samCx - samW * 0.12} ${samBaseY - samH * 0.55} ${samCx - samW * 0.06} ${samBaseY - samH * 0.51}
+              L ${samCx - samW * 0.04} ${samBaseY - samH * 0.55}
+              L ${samCx + samW * 0.04} ${samBaseY - samH * 0.55}
+              L ${samCx + samW * 0.06} ${samBaseY - samH * 0.51}
+              Q ${samCx + samW * 0.12} ${samBaseY - samH * 0.55} ${samCx + samW * 0.10} ${samBaseY - samH * 0.62}
+              Q ${samCx + samW * 0.04} ${samBaseY - samH * 0.65} ${samCx} ${samBaseY - samH * 0.65}
+              Q ${samCx - samW * 0.04} ${samBaseY - samH * 0.65} ${samCx - samW * 0.10} ${samBaseY - samH * 0.62} Z`}
+          fill="url(#us-beard)"
+          stroke="rgba(120, 100, 70, 0.85)"
+          strokeWidth={1.4}
+        />
+        {/* Mustache */}
+        <path
+          d={`M ${samCx - 10} ${samBaseY - samH * 0.658}
+              Q ${samCx - 4} ${samBaseY - samH * 0.652} ${samCx} ${samBaseY - samH * 0.658}
+              Q ${samCx + 4} ${samBaseY - samH * 0.652} ${samCx + 10} ${samBaseY - samH * 0.658}`}
+          stroke="rgba(245, 240, 228, 0.95)"
+          strokeWidth={2.5}
+          fill="none"
+        />
+        {/* Beard wisps */}
+        {Array.from({ length: 18 }, (_, i) => {
+          const a = -Math.PI * 0.5 - 0.3 + (i / 17) * 0.6;
+          const r1 = samW * 0.08;
+          const r2 = samW * 0.12;
+          return (
+            <line
+              key={`bw-${i}`}
+              x1={samCx + Math.cos(a) * r1}
+              y1={samBaseY - samH * 0.62 + 4 + Math.abs(Math.sin(a)) * 6}
+              x2={samCx + Math.cos(a) * r2}
+              y2={samBaseY - samH * 0.55 + i * 0.5}
+              stroke="rgba(245, 240, 228, 0.85)"
+              strokeWidth={1}
+            />
+          );
+        })}
+
+        {/* === TOP HAT === */}
+        {/* Hat shadow */}
+        <ellipse
+          cx={samCx + 4}
+          cy={samBaseY - samH * 0.78}
+          rx={samW * 0.18}
+          ry={6}
+          fill="rgba(0, 0, 0, 0.4)"
+          filter="url(#us-blur)"
+        />
+        {/* Hat brim */}
+        <ellipse
+          cx={samCx}
+          cy={samBaseY - samH * 0.78}
+          rx={samW * 0.15}
+          ry={6}
+          fill={`hsl(${blueHue}, 75%, 18%)`}
+          stroke="rgba(0, 0, 0, 0.95)"
+          strokeWidth={2}
+        />
+        {/* Hat crown — tall stovepipe with red/white stripes */}
+        {Array.from({ length: 8 }, (_, i) => {
+          const sty = samBaseY - samH * 0.78 - i * (samH * 0.024);
+          const isRed = i % 2 === 0;
+          return (
+            <rect
+              key={`hsr-${i}`}
+              x={samCx - samW * 0.10}
+              y={sty - samH * 0.024}
+              width={samW * 0.20}
+              height={samH * 0.024}
+              fill={isRed ? `hsl(${redHue}, 90%, 50%)` : "rgba(245, 240, 228, 0.95)"}
+              stroke="rgba(0, 0, 0, 0.95)"
+              strokeWidth={1.4}
+            />
+          );
+        })}
+        {/* Star band on hat (between brim and stripes) */}
+        <rect
+          x={samCx - samW * 0.10}
+          y={samBaseY - samH * 0.78 - samH * 0.024}
+          width={samW * 0.20}
+          height={samH * 0.024}
+          fill={`hsl(${blueHue}, 80%, 22%)`}
+          stroke="rgba(0, 0, 0, 0.95)"
+          strokeWidth={1.4}
+        />
+        {Array.from({ length: 5 }, (_, i) => {
+          const sx = samCx - samW * 0.10 + 8 + i * (samW * 0.043);
+          return drawStar(sx, samBaseY - samH * 0.78 - samH * 0.012, 3, `hsl(${goldHue}, 95%, 88%)`, 0.95);
+        })}
+        {/* Hat top highlight */}
+        <ellipse
+          cx={samCx - samW * 0.05}
+          cy={samBaseY - samH * 0.78 - samH * 0.18}
+          rx={samW * 0.04}
+          ry={2}
+          fill="rgba(255, 255, 255, 0.30)"
+        />
+
+        {/* === POINTING ARM === */}
+        {/* Right arm reaches forward toward viewer */}
+        <g transform={`scale(${fingerPulse}, 1) translate(${samCx * (1 - fingerPulse) / fingerPulse}, 0)`}>
+          {/* Sleeve */}
+          <path
+            d={`M ${samCx + samW * 0.10} ${samBaseY - samH * 0.50}
+                L ${samCx + samW * 0.30} ${samBaseY - samH * 0.42}
+                L ${samCx + samW * 0.30} ${samBaseY - samH * 0.32}
+                L ${samCx + samW * 0.10} ${samBaseY - samH * 0.40} Z`}
+            fill="url(#us-coat)"
+            stroke="rgba(0, 0, 0, 0.95)"
+            strokeWidth={2}
+          />
+          {/* Cuff */}
+          <rect
+            x={samCx + samW * 0.28}
+            y={samBaseY - samH * 0.42}
+            width={samW * 0.04}
+            height={samH * 0.10}
+            fill="rgba(245, 240, 228, 0.95)"
+            stroke="rgba(0, 0, 0, 0.85)"
+            strokeWidth={1.4}
+          />
+          {/* Hand + finger */}
+          <ellipse
+            cx={samCx + samW * 0.34}
+            cy={samBaseY - samH * 0.36}
+            rx={10}
+            ry={6}
+            fill="url(#us-skin)"
+            stroke="rgba(80, 40, 12, 0.95)"
+            strokeWidth={1.2}
+          />
+          {/* Index finger pointing */}
+          <path
+            d={`M ${samCx + samW * 0.34} ${samBaseY - samH * 0.36}
+                Q ${samCx + samW * 0.40} ${samBaseY - samH * 0.36} ${samCx + samW * 0.42} ${samBaseY - samH * 0.34}
+                L ${samCx + samW * 0.42} ${samBaseY - samH * 0.32}
+                Q ${samCx + samW * 0.40} ${samBaseY - samH * 0.32} ${samCx + samW * 0.34} ${samBaseY - samH * 0.34} Z`}
+            fill="url(#us-skin)"
+            stroke="rgba(80, 40, 12, 0.95)"
+            strokeWidth={1}
+          />
+          {/* Fingernail */}
+          <ellipse
+            cx={samCx + samW * 0.41}
+            cy={samBaseY - samH * 0.33}
+            rx={1.4}
+            ry={0.8}
+            fill="rgba(255, 240, 220, 0.85)"
+          />
+        </g>
+
+        {/* === GLOW HALO around Sam === */}
+        <g style={{ mixBlendMode: "screen" }}>
+          <ellipse
+            cx={samCx}
+            cy={samBaseY - samH * 0.55}
+            rx={samW * 0.5}
+            ry={samH * 0.5}
+            fill="url(#us-glow)"
+            opacity={0.35 + slowEnergy * 0.25}
+          />
+        </g>
+
+        {/* === RECRUITING POSTER YELLOW BORDER === */}
+        <rect
+          x={20}
+          y={20}
+          width={width - 40}
+          height={height - 40}
+          fill="none"
+          stroke={`hsl(${goldHue}, 90%, 60%)`}
+          strokeWidth={6}
+          opacity={0.85}
+        />
+        <rect
+          x={32}
+          y={32}
+          width={width - 64}
+          height={height - 64}
+          fill="none"
+          stroke={`hsl(${redHue}, 85%, 55%)`}
+          strokeWidth={2}
+          opacity={0.7}
+        />
+
+        {/* TINT WASH */}
+        <rect width={width} height={height} fill={`hsla(${tintHue}, 60%, 50%, ${0.04 + slowEnergy * 0.04})`} />
+
+        {/* VIGNETTE */}
+        <radialGradient id="us-vign" cx="50%" cy="50%" r="70%">
+          <stop offset="55%" stopColor="rgba(0,0,0,0)" />
+          <stop offset="100%" stopColor="rgba(0,0,0,0.55)" />
+        </radialGradient>
+        <rect width={width} height={height} fill="url(#us-vign)" />
+      </svg>
     </div>
   );
 };

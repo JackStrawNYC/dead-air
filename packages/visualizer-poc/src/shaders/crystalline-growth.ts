@@ -341,8 +341,9 @@ void main() {
       // Crystal material
       float crystalIdx = matID;
 
-      // Crystal body color from palette with per-crystal variation
-      float crystalHue = mix(hue1, hue2, fract(crystalIdx * 0.13 + 0.3));
+      // Crystal body color from palette with per-crystal variation (shortest-arc)
+      float cgHueDiff = fract(hue2 - hue1 + 0.5) - 0.5;
+      float crystalHue = fract(hue1 + cgHueDiff * fract(crystalIdx * 0.13 + 0.3));
       vec3 crystalColor = hsv2rgb(vec3(crystalHue, sat, 1.0));
 
       // Prismatic edge dispersion: rainbow refraction at facet edges

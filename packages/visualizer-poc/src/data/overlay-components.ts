@@ -266,7 +266,6 @@ import { GothicArch } from "../components/GothicArch";
 import { GraffitiTag } from "../components/GraffitiTag";
 import { Gyroscope } from "../components/Gyroscope";
 import { HeartbeatEKG } from "../components/HeartbeatEKG";
-import { HeatShimmer } from "../components/HeatShimmer";
 import { Hieroglyphs } from "../components/Hieroglyphs";
 import { HighwaySign } from "../components/HighwaySign";
 import { HilbertCurve } from "../components/HilbertCurve";

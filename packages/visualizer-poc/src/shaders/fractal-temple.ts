@@ -75,12 +75,10 @@ void main() {
   float ft = uDynamicTime*(0.06+slowE*0.04)*(1.0+sJam*0.4-sSpace*0.3);
 
   // Palette
-  float h1 = hsvToCosineHue(uPalettePrimary);
-  vec3 wt = 0.5+0.5*cos(TAU*vec3(h1,h1+0.33,h1+0.67));
+  vec3 wt = paletteHueColor(uPalettePrimary, 0.55, 0.85);
   float wl = dot(wt,vec3(0.299,0.587,0.114));
   wt = mix(vec3(wl),wt,0.4);
-  float h2 = hsvToCosineHue(uPaletteSecondary);
-  vec3 lt = 0.5+0.5*cos(TAU*vec3(h2,h2+0.33,h2+0.67));
+  vec3 lt = paletteHueColor(uPaletteSecondary, 0.85, 1.0);
   vec3 grCol = mix(lt, vec3(1.0,0.85,0.6), clamp(uVocalPitch,0.0,1.0)*0.4);
 
   // Camera: forward travel
@@ -156,9 +154,7 @@ void main() {
   col *= 1.0+uBeatSnap*0.1;
   float vg = 1.0-dot(p*0.28,p*0.28);
   col = mix(vec3(0.02,0.015,0.03), col, smoothstep(0.0,1.0,vg));
-  float _nf = snoise(vec3(p*2.0,uTime*0.1));
-  col += iconEmergence(p,uTime,energy,uBass,wt,lt,_nf,uClimaxPhase,uSectionIndex);
-  col += heroIconEmergence(p,uTime,energy,uBass,wt,lt,_nf,uSectionIndex);
+  // Icons removed — clean shader output
   col = max(col, vec3(0.03,0.02,0.04));
   col = applyPostProcess(col, uv, p);
   gl_FragColor = vec4(col, 1.0);

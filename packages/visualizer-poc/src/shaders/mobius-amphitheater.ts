@@ -449,10 +449,10 @@ void main() {
   float maTime = uDynamicTime * (0.05 + slowE * 0.04) * (1.0 + sJam * 0.4 - sSpace * 0.3);
 
   // ─── Palette ───
-  float h1 = hsvToCosineHue(uPalettePrimary);
-  vec3 palPrimary = 0.5 + 0.5 * cos(MA_TAU * vec3(h1, h1 + 0.33, h1 + 0.67));
-  float h2 = hsvToCosineHue(uPaletteSecondary);
-  vec3 palSecondary = 0.5 + 0.5 * cos(MA_TAU * vec3(h2, h2 + 0.33, h2 + 0.67));
+  float h1 = uPalettePrimary;
+  vec3 palPrimary = paletteHueColor(h1, 0.85, 0.95);
+  float h2 = uPaletteSecondary;
+  vec3 palSecondary = paletteHueColor(h2, 0.85, 0.95);
 
   // Concert venue colors: deep purples, amber lights, cool blues
   vec3 venueAmber = vec3(1.0, 0.75, 0.3);

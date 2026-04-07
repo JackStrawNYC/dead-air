@@ -369,10 +369,10 @@ void main() {
   float forwardSpeed = ft * 6.0 + sChorus * ft * 3.0;
 
   // ─── Palette ───
-  float h1 = hsvToCosineHue(uPalettePrimary);
-  vec3 palCol1 = 0.5 + 0.5 * cos(CR_TAU * vec3(h1, h1 + 0.33, h1 + 0.67));
-  float h2 = hsvToCosineHue(uPaletteSecondary);
-  vec3 palCol2 = 0.5 + 0.5 * cos(CR_TAU * vec3(h2, h2 + 0.33, h2 + 0.67));
+  float h1 = uPalettePrimary;
+  vec3 palCol1 = paletteHueColor(h1, 0.85, 0.95);
+  float h2 = uPaletteSecondary;
+  vec3 palCol2 = paletteHueColor(h2, 0.85, 0.95);
 
   // Track center at camera Z
   float camZ = forwardSpeed;

@@ -97,10 +97,12 @@ vec3 applyPostProcess(vec3 col, vec2 uv, vec2 p) {
 
 ${
   beatPulseEnabled
-    ? `  // Beat pulse: brightness swell on confident beats
+    ? `  // Beat pulse: brightness swell on confident beats — chill calibration
+  // Reduced from 0.06 to 0.025 (~60% less aggressive) for 3-hour viewability.
+  // Beat presence stays felt but never seizure-inducing.
   float bp = beatPulse(uMusicalTime);
-  float bpGated = bp * smoothstep(0.3, 0.7, uBeatConfidence);
-  col *= 1.0 + bpGated * 0.06;
+  float bpGated = bp * smoothstep(0.4, 0.8, uBeatConfidence);
+  col *= 1.0 + bpGated * 0.025;
 `
     : ""
 }
@@ -173,12 +175,12 @@ ${
     col = mix(vec3(envLuma), col, uEnvelopeSaturation);
   }
 
-  // Envelope hue rotation
+  // Envelope hue rotation (proper HSV rotation, not 2D R-G matrix)
+  // uEnvelopeHue is in radians; convert to [0,1] hue offset.
   if (abs(uEnvelopeHue) > 0.001) {
-    float ehCos = cos(uEnvelopeHue);
-    float ehSin = sin(uEnvelopeHue);
-    mat3 ehRot = mat3(ehCos, -ehSin, 0.0, ehSin, ehCos, 0.0, 0.0, 0.0, 1.0);
-    col = max(vec3(0.0), ehRot * col);
+    vec3 ehHsv = rgb2hsv(col);
+    ehHsv.x = fract(ehHsv.x + uEnvelopeHue / 6.28318530718);
+    col = hsv2rgb(ehHsv);
   }
 
 ${
@@ -239,6 +241,11 @@ ${
     : ""
 }
   }
+
+  // Final HDR safety clamp: prevent runaway accumulation from cascading into broken
+  // patterns. [0, 2] preserves headroom for bloom/specular while bounding the worst
+  // case so feedback loops + bright shaders can't produce stuck channel artifacts.
+  col = clamp(col, vec3(0.0), vec3(2.0));
 
   return col;
 }

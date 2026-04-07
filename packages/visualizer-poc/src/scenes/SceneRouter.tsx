@@ -76,22 +76,25 @@ export function dynamicCrossfadeDuration(
   const afterQuiet = afterEnergy < QUIET;
   const afterLoud = afterEnergy > LOUD;
 
+  // CHILL CALIBRATION (3-hour party background):
+  // Minimum crossfade is now 90 frames (3s) — no snap cuts. Defaults raised so
+  // section transitions are felt as gentle dissolves rather than sudden swaps.
+  // Flux compression cap raised from 0.4 → 0.7 so even high-flux moments still
+  // give the crossfade enough time to be smooth.
   let baseDuration: number;
-  if (beforeQuiet && afterQuiet) baseDuration = 720;   // gentle dissolve
-  else if (beforeLoud && afterLoud) baseDuration = 72;  // hard cut
-  else if (beforeQuiet && afterLoud) baseDuration = 108; // fast snap
-  else if (beforeLoud && afterQuiet) baseDuration = 180; // moderate fade
-  else baseDuration = 135;                               // default
+  if (beforeQuiet && afterQuiet) baseDuration = 720;   // 24s ultra-gentle dissolve
+  else if (beforeLoud && afterLoud) baseDuration = 150; // 5s — was 2.4s
+  else if (beforeQuiet && afterLoud) baseDuration = 180; // 6s — was 3.6s
+  else if (beforeLoud && afterQuiet) baseDuration = 240; // 8s — was 6s
+  else baseDuration = 180;                               // 6s default — was 4.5s
 
-  // Spectral flux compression: measure timbral change rate at the boundary.
-  // High flux = rapid spectral change = faster visual crossfade.
-  // Compute average spectral flux in a narrow window around the boundary.
+  // Spectral flux compression — capped at 0.7 (was 0.4) so even rapid timbral
+  // changes get a smooth 4s+ crossfade instead of a 2s snap.
   const fluxWindow = 8;
   const fluxLo = Math.max(1, boundary - fluxWindow);
   const fluxHi = Math.min(frames.length - 1, boundary + fluxWindow);
   let fluxSum = 0, fluxCount = 0;
   for (let i = fluxLo; i <= fluxHi; i++) {
-    // Compute per-frame spectral flux from contrast vectors
     const curr = frames[i].contrast;
     const prev = frames[i - 1].contrast;
     let l2 = 0;
@@ -104,24 +107,25 @@ export function dynamicCrossfadeDuration(
   }
   const avgFlux = fluxCount > 0 ? fluxSum / fluxCount : 0;
 
-  // Flux typically ranges 0-0.5. Above 0.15 is a significant timbral shift.
-  // Scale factor: 1.0 (no flux) down to 0.4 (high flux) — aggressive compression
-  // so psychedelic moments with rapid timbral change get snappy transitions.
-  const fluxCompression = Math.max(0.4, 1 - Math.min(avgFlux / 0.25, 1) * 0.6);
+  // Chill cap: floor at 0.7 (was 0.4) so high-flux moments still get smooth fades
+  const fluxCompression = Math.max(0.7, 1 - Math.min(avgFlux / 0.25, 1) * 0.3);
 
-  return Math.max(30, Math.round(baseDuration * fluxCompression));
+  // Hard floor: never less than 90 frames (3 seconds) — no snap cuts in chill mode
+  return Math.max(90, Math.round(baseDuration * fluxCompression));
 }
 
 /**
- * Tempo-scaled beat crossfade: 2 beats worth of frames instead of fixed 90.
- * At 120 BPM → 60f (2s), at 80 BPM → 45f (1.5s), at 160 BPM → 22f (0.75s).
- * Falls back to 60f (2s) when tempo is unknown.
+ * Tempo-scaled beat crossfade.
+ *
+ * CHILL CALIBRATION (3-hour party background):
+ * Now 4 beats worth of frames with floor of 90 (3s). Crossfades land on
+ * phrase-friendly boundaries instead of feeling rushed. Ceiling 180 (6s).
  */
 function beatCrossfadeFrames(tempo?: number): number {
-  if (!tempo || tempo <= 0) return 60;
-  // 2 beats at given tempo, at 30fps
+  if (!tempo || tempo <= 0) return 120; // 4s default
+  // 4 beats at given tempo, at 30fps
   const framesPerBeat = (60 / tempo) * 30;
-  return Math.max(20, Math.min(90, Math.round(framesPerBeat * 2)));
+  return Math.max(90, Math.min(180, Math.round(framesPerBeat * 4)));
 }
 
 // Complement modes and energy pools are now in scene-registry.ts
@@ -330,25 +334,38 @@ export function getModeForSection(
   shaderModeLastUsed?: Map<VisualMode, number>,
   stemDominant?: string,
 ): VisualMode {
-  // Safe shaders whitelist — validate chosen mode at the end
+  // Safe shaders whitelist — validate chosen mode at the end.
+  // Includes all curated chill-mode shaders that are confirmed palette-safe
+  // (using paletteHueColor / safeBlendHue helpers post-audit) and have proper
+  // temporalBlendEnabled feedback (no broken max() pattern).
   const SAFE_SHADERS: Set<VisualMode> = new Set([
-    "protean_clouds", "protean_clouds", "protean_clouds", "aurora", "inferno",
-    "deep_ocean", "protean_clouds", "protean_clouds", "cosmic_voyage",
-    "inferno", "protean_clouds", "cosmic_voyage", "mandala_engine",
-    "cosmic_voyage", "cosmic_voyage", "cosmic_voyage", "cosmic_voyage",
-    "protean_clouds", "protean_clouds", "deep_ocean",
-    "volumetric_clouds", "volumetric_smoke", "volumetric_nebula",
-    "river", "forest", "mountain_fire", "cosmic_voyage", "ocean",
-    "campfire", "rain_street", "aurora_sky", "storm", "canyon",
-    "protean_clouds", "desert_road",
-    "fractal_temple",
-    "highway_horizon", "honeycomb_cathedral", "campfire_embers",
-    "neon_casino", "storm_vortex", "psychedelic_garden",
-    "cosmic_railroad", "desert_cantina", "earthquake_fissure",
-    "mobius_amphitheater", "memorial_drift", "boxcar_tunnel",
-    "aviary_canopy", "clockwork_temple", "event_horizon",
-    "canyon_chase", "porch_twilight", "bloom_explosion",
-    "locomotive_engine", "dance_floor_prism", "stained_glass_dissolution",
+    // Atmospheric / cosmic
+    "protean_clouds", "cosmic_voyage", "cosmic_dust", "volumetric_clouds",
+    "volumetric_smoke", "volumetric_nebula", "warm_nebula", "dark_star_void",
+    "terrapin_nebula", "creation", "void_light", "star_nest", "morning_dew_fog",
+    "scarlet_golden_haze", "estimated_prophet_mist",
+    // Aurora / sky
+    "aurora", "aurora_sky", "aurora_curtains", "nimitz_aurora",
+    // Nature
+    "river", "forest", "ocean", "seascape", "mountain_fire", "campfire",
+    "rain_street", "storm", "canyon", "ember_meadow", "flower_field",
+    "coral_reef", "aviary_canopy",
+    // Geometric / sacred
+    "fractal_temple", "honeycomb_cathedral", "sacred_geometry", "mandala_engine",
+    "kaleidoscope",
+    // Road / cowboy / journey
+    "desert_road", "desert_cantina", "highway_horizon", "cosmic_railroad",
+    "canyon_chase", "boxcar_tunnel", "locomotive_engine",
+    // Memorial / contemplative
+    "porch_twilight", "memorial_drift", "campfire_embers", "fluid_light",
+    // Peaks / climax
+    "inferno", "deep_ocean", "climax_surge", "bloom_explosion",
+    "mobius_amphitheater", "event_horizon", "psychedelic_garden",
+    // Veneta-specific
+    "neon_casino", "storm_vortex", "earthquake_fissure", "clockwork_temple",
+    "stained_glass_dissolution", "dance_floor_prism",
+    // Liquid / oil-projector aesthetic
+    "liquid_light", "oil_projector", "tie_dye", "liquid_projector",
   ]);
   const validateSafe = (mode: VisualMode): VisualMode =>
     SAFE_SHADERS.has(mode) ? mode : song.defaultMode;
@@ -713,15 +730,35 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
   // Find current section
   const { sectionIndex: currentSectionIdx } = findCurrentSection(sections, frame);
 
-  // IT transcendent shader forcing: deep coherence lock → meditative shader pool
-  if (itForceTranscendentShader) {
-    const transcendentPool: VisualMode[] = ["cosmic_voyage", "cosmic_voyage", "mandala_engine", "cosmic_voyage", "aurora"];
-    const rng = seededRandom((seed ?? 0) + frame * 7);
-    const dsMode = transcendentPool[Math.floor(rng() * transcendentPool.length)];
-    return <>{renderMode(dsMode, frames, sections, palette, tempo, undefined, jamDensity)}</>;
+  // EXPLICIT SECTION OVERRIDE: highest authority — represents user-curated choice.
+  // Honored BEFORE reactive triggers, IT lock, drums/space, semantic router, etc.
+  // If a song explicitly sets sectionOverrides for a section, that mode is used,
+  // and no other routing path can override it. This is the safety net that ensures
+  // a song's curated visual identity can't be silently replaced by a reactive
+  // shader pool that doesn't fit the song's palette or character.
+  const explicitOverride = song.sectionOverrides?.find((o) => o.sectionIndex === currentSectionIdx);
+  if (explicitOverride) {
+    return <>{renderMode(explicitOverride.mode, frames, sections, palette, tempo, undefined, jamDensity)}</>;
   }
 
-  // Drums/Space phase override: force specific shaders per sub-phase
+  // IT transcendent shader forcing: deep coherence lock → meditative shader pool.
+  // Intersect with preferredModes so we don't pick a palette-incompatible shader.
+  if (itForceTranscendentShader) {
+    const transcendentPool: VisualMode[] = ["cosmic_voyage", "cosmic_voyage", "mandala_engine", "cosmic_voyage", "aurora"];
+    const allowedTrans = songIdentity?.preferredModes && songIdentity.preferredModes.length > 0
+      ? transcendentPool.filter((m) => songIdentity.preferredModes.includes(m))
+      : transcendentPool;
+    if (allowedTrans.length > 0) {
+      const rng = seededRandom((seed ?? 0) + frame * 7);
+      const dsMode = allowedTrans[Math.floor(rng() * allowedTrans.length)];
+      return <>{renderMode(dsMode, frames, sections, palette, tempo, undefined, jamDensity)}</>;
+    }
+    // Fall through if no preferred mode matches the transcendent pool
+  }
+
+  // Drums/Space phase override: force specific shaders per sub-phase.
+  // getDrumsSpaceMode already consults songIdentity for drumsSpaceShaders mappings,
+  // so this path is already song-aware. Leave as-is.
   if (drumsSpacePhase) {
     const dsMode = getDrumsSpaceMode(drumsSpacePhase, seed, songIdentity);
     return <>{renderMode(dsMode, frames, sections, palette, tempo, undefined, jamDensity)}</>;
@@ -730,9 +767,29 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
   // ─── REACTIVE TRIGGER: mid-section shader swap on audio events ───
   // Fast 15-frame crossfade into reactive shader, then hold, then crossfade back.
   // Coherence lock always wins (suppressed upstream). Dual shader disabled during hold.
-  if (reactiveState?.isTriggered && !coherenceIsLocked && reactiveState.suggestedModes.length > 0) {
+  //
+  // Reactive triggers must respect the song's curated preferredModes — otherwise
+  // they can pick shaders with hardcoded color schemes that clash with the song's
+  // palette (e.g. cosmic_voyage's heavy nebula colors firing on a cool psychedelic
+  // song produces stuck-color clumps). We INTERSECT the trigger's suggested pool
+  // with preferredModes; if the intersection is empty, suppress the trigger.
+  //
+  // DEAD AIR: triggers are suppressed entirely. Crowd applause has impulsive
+  // transients that fire reactive triggers as if the band were still playing.
+  const isInDeadAir = (deadAirFactor ?? 0) > 0.1;
+  if (reactiveState?.isTriggered && !coherenceIsLocked && !isInDeadAir && reactiveState.suggestedModes.length > 0) {
+    // Filter reactive pool to only modes the song explicitly allows
+    const allowedModes = songIdentity?.preferredModes && songIdentity.preferredModes.length > 0
+      ? reactiveState.suggestedModes.filter((m) => songIdentity.preferredModes.includes(m))
+      : reactiveState.suggestedModes;
+
+    // If the trigger's pool has no intersection with preferred modes, suppress
+    // the trigger entirely and fall through to normal section selection.
+    if (allowedModes.length === 0) {
+      // fall through — no early return
+    } else {
     const rng = seededRandom((seed ?? 0) + frame * 11 + (reactiveState.triggerType?.length ?? 0));
-    const reactiveMode = reactiveState.suggestedModes[Math.floor(rng() * reactiveState.suggestedModes.length)];
+    const reactiveMode = allowedModes[Math.floor(rng() * allowedModes.length)];
     const regularMode = getModeForSection(song, currentSectionIdx, sections, seed, era, false, usedShaderModes, songIdentity, stemSection, frames, songDuration, setNumber, trackNumber, shaderModeLastUsed, stemDominant);
     // Energy-scaled reactive crossfade: snappy at high energy, gentle at low
     const reactiveEnergy = frames[Math.min(frame, frames.length - 1)]?.rms ?? 0.15;
@@ -752,6 +809,7 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
     }
     // During hold — render reactive shader
     return <>{renderMode(reactiveMode, frames, sections, palette, tempo, undefined, jamDensity)}</>;
+    } // close: else (allowedModes.length > 0)
   }
 
   const currentMode = getModeForSection(song, currentSectionIdx, sections, seed, era, coherenceIsLocked, usedShaderModes, songIdentity, stemSection, frames, songDuration, setNumber, trackNumber, shaderModeLastUsed, stemDominant);
@@ -887,7 +945,7 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
           const stringsA = getShaderStrings(prevMode);
           const stringsB = getShaderStrings(currentMode);
           if (stringsA && stringsB) {
-            const GPU_CROSSFADE_LEN = 60;
+            const GPU_CROSSFADE_LEN = 120; // chill: 4s GPU crossfade (was 2s)
             const gpuDistFromStart = frame - crossfadeStart;
             if (gpuDistFromStart >= 0 && gpuDistFromStart < GPU_CROSSFADE_LEN) {
               const gpuProgress = gpuDistFromStart / GPU_CROSSFADE_LEN;
@@ -955,7 +1013,7 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
           const stringsA = getShaderStrings(currentMode);
           const stringsB = getShaderStrings(nextMode);
           if (stringsA && stringsB) {
-            const GPU_CROSSFADE_LEN = 60;
+            const GPU_CROSSFADE_LEN = 120; // chill: 4s GPU crossfade (was 2s)
             const gpuDistToEnd = crossfadeEnd - frame;
             if (gpuDistToEnd >= 0 && gpuDistToEnd < GPU_CROSSFADE_LEN) {
               const gpuProgress = 1 - gpuDistToEnd / GPU_CROSSFADE_LEN;

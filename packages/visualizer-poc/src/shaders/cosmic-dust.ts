@@ -223,8 +223,8 @@ void main() {
   float flowTime = uDynamicTime * driftSpeed;
 
   // ─── Palette ───
-  float hue1 = hsvToCosineHue(uPalettePrimary + chromaHue * 0.15);
-  float hue2 = hsvToCosineHue(uPaletteSecondary);
+  float hue1 = uPalettePrimary + chromaHue * 0.15;
+  float hue2 = uPaletteSecondary;
 
   // Color temperature from harmonic tension: cool blue → warm amber
   vec3 coolDust = vec3(0.12, 0.15, 0.3);  // deep blue
@@ -232,11 +232,11 @@ void main() {
   vec3 dustBaseColor = mix(coolDust, warmDust, tension);
 
   // Palette tinting
-  vec3 paletteTint = 0.5 + 0.5 * cos(TAU * vec3(hue1, hue1 + 0.33, hue1 + 0.67));
+  vec3 paletteTint = paletteHueColor(hue1, 0.78, 0.9);
   dustBaseColor = mix(dustBaseColor, paletteTint * 0.4, 0.3 + uPaletteSaturation * 0.2);
 
   // Secondary color for grain specular
-  vec3 grainColor = 0.5 + 0.5 * cos(TAU * vec3(hue2, hue2 + 0.33, hue2 + 0.67));
+  vec3 grainColor = paletteHueColor(hue2, 0.85, 0.95);
   grainColor = mix(grainColor, vec3(1.0, 0.95, 0.85), 0.4); // shift toward white
 
   // Chorus golden backlight color

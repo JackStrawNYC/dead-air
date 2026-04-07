@@ -96,8 +96,8 @@ export const VenueMarquee: React.FC<Props> = ({ frames }) => {
     (dropoutVal < 0.02 ? -0.15 : 0); // rare micro-dropout
 
   // Venue text from context
-  const venueName = ctx?.venueShort ?? "BARTON HALL";
-  const subtitle = ctx?.venueLocation ?? "Cornell University";
+  const venueName = (ctx?.venueShort ?? "Concert").toUpperCase();
+  const subtitle = ctx?.venueLocation ?? "";
 
   // Neon colors: warm amber/red
   const neonColor = `hsla(15, 90%, 55%, 1)`;

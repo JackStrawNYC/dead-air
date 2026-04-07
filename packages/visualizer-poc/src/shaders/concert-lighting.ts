@@ -231,10 +231,10 @@ void main() {
   float tempoScale = uLocalTempo / 120.0;
 
   // Palette
-  float hue1 = hsvToCosineHue(uPalettePrimary) + chromaH * 0.2 + chordHue;
-  float hue2 = hsvToCosineHue(uPaletteSecondary) + chordHue * 0.5;
-  vec3 palCol1 = 0.5 + 0.5 * cos(TAU * vec3(hue1, hue1 + 0.33, hue1 + 0.67));
-  vec3 palCol2 = 0.5 + 0.5 * cos(TAU * vec3(hue2, hue2 + 0.33, hue2 + 0.67));
+  float hue1 = uPalettePrimary + chromaH * 0.2 + chordHue;
+  float hue2 = uPaletteSecondary + chordHue * 0.5;
+  vec3 palCol1 = paletteHueColor(hue1, 0.85, 0.95);
+  vec3 palCol2 = paletteHueColor(hue2, 0.85, 0.95);
 
   // ═══ Camera ═══
   float slowTime = uDynamicTime * 0.04;

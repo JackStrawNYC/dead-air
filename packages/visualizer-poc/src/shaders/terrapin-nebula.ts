@@ -364,10 +364,10 @@ void main() {
   col = _tn_iLerp(col.bgr, col.rgb, clamp(1.0 - prm, 0.05, 1.0));
 
   // === PALETTE TINTING: mythological emerald/gold/purple ===
-  float hue1 = hsvToCosineHue(uPalettePrimary);
-  float hue2 = hsvToCosineHue(uPaletteSecondary);
-  vec3 palCol1 = 0.5 + 0.5 * cos(6.28318 * vec3(hue1, hue1 + 0.33, hue1 + 0.67));
-  vec3 palCol2 = 0.5 + 0.5 * cos(6.28318 * vec3(hue2, hue2 + 0.33, hue2 + 0.67));
+  float hue1 = uPalettePrimary;
+  float hue2 = uPaletteSecondary;
+  vec3 palCol1 = paletteHueColor(hue1, 0.8, 0.9);
+  vec3 palCol2 = paletteHueColor(hue2, 0.8, 0.9);
   float palMix = 0.15 + energy * 0.1;
   col = mix(col, col * mix(palCol1, palCol2, sin(uTime * 0.04) * 0.5 + 0.5), palMix);
 

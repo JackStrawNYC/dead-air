@@ -280,10 +280,10 @@ void main() {
   float bassPulse = bass;
 
   // Palette
-  float hue1 = hsvToCosineHue(uPalettePrimary) + chromaH * 0.15 + chordHue;
-  float hue2 = hsvToCosineHue(uPaletteSecondary) + chordHue * 0.5;
-  vec3 plasmaColor = 0.5 + 0.5 * cos(TAU * vec3(hue1, hue1 + 0.33, hue1 + 0.67));
-  vec3 starColor = 0.5 + 0.5 * cos(TAU * vec3(hue2, hue2 + 0.33, hue2 + 0.67));
+  float hue1 = uPalettePrimary + chromaH * 0.15 + chordHue;
+  float hue2 = uPaletteSecondary + chordHue * 0.5;
+  vec3 plasmaColor = paletteHueColor(hue1, 0.85, 0.95);
+  vec3 starColor = paletteHueColor(hue2, 0.85, 0.98);
   vec3 palCol1 = hsv2rgb(vec3(uPalettePrimary + chromaH * 0.1, uPaletteSaturation * 0.9, 0.9));
   vec3 palCol2 = hsv2rgb(vec3(uPaletteSecondary + chordHue, uPaletteSaturation * 0.8, 0.85));
 

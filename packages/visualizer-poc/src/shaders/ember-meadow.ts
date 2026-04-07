@@ -54,6 +54,7 @@ ${buildPostProcessGLSL({
   caEnabled: false,
   lightLeakEnabled: true,
   dofEnabled: false,
+  temporalBlendEnabled: true,
 })}
 
 varying vec2 vUv;
@@ -465,23 +466,8 @@ void main() {
   vignette = smoothstep(0.0, 1.0, vignette);
   col = mix(vec3(0.04, 0.02, 0.03), col, vignette);
 
-  // ---- Post-processing ----
+  // ---- Post-processing (includes temporal blend) ----
   col = applyPostProcess(col, vUv, screenP);
-
-  // ---- Feedback trails (gentle for dreamy quality) ----
-  vec3 prev = texture2D(uPrevFrame, vUv).rgb;
-  float baseDecay_fb = mix(0.90, 0.84, energy);
-  float feedbackDecay = baseDecay_fb + sJam * 0.03 + sSpace * 0.06 - sChorus * 0.04;
-  feedbackDecay = clamp(feedbackDecay, 0.80, 0.95);
-  if (uJamPhase >= 0.0) {
-    float jpExplore = step(-0.5, uJamPhase) * step(uJamPhase, 0.5);
-    float jpBuild   = step(0.5, uJamPhase) * step(uJamPhase, 1.5);
-    float jpPeak    = step(1.5, uJamPhase) * step(uJamPhase, 2.5);
-    float jpResolve = step(2.5, uJamPhase);
-    feedbackDecay += jpExplore * 0.02 + jpBuild * 0.01 + jpPeak * 0.03 - jpResolve * 0.02;
-    feedbackDecay = clamp(feedbackDecay, 0.80, 0.95);
-  }
-  col = max(col, prev * feedbackDecay);
 
   gl_FragColor = vec4(col, 1.0);
 }

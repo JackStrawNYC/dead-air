@@ -39,9 +39,15 @@ export interface ReactiveState {
 }
 
 // ─── Constants ───
+//
+// CHILL CALIBRATION (3-hour party background):
+// Reactive triggers are now RARE moments, not frequent surprises. Held longer
+// for the "oh shit" memorable feel, with much wider cooldown so consecutive
+// triggers can't pile on. Combined with the wider preferredModes intersection
+// in SceneRouter, triggers are now true highlights rather than constant churn.
 
-const HOLD_FRAMES = 120;     // 4s — how long a trigger stays active
-const COOLDOWN_FRAMES = 180; // 6s — tighter gap between triggers for more "oh shit" moments
+const HOLD_FRAMES = 240;     // 8s — held longer so each trigger has impact
+const COOLDOWN_FRAMES = 900; // 30s — wide cooldown, max 2 triggers per minute
 const SCAN_FRAMES = 600;     // 20s — backward scan window for baseline
 
 // ─── Trigger → Visual Mappings ───

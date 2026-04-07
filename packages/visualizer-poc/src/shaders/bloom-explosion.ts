@@ -455,15 +455,15 @@ void main() {
 
   // === PALETTE ===
   float chordHue = float(int(uChordIndex)) / 24.0 * 0.12;
-  float h1 = hsvToCosineHue(uPalettePrimary) + chordHue;
-  vec3 petalColor1 = 0.5 + 0.5 * cos(TAU * vec3(h1, h1 + 0.15, h1 + 0.4));
+  float h1 = uPalettePrimary + chordHue;
+  vec3 petalColor1 = paletteHueColor(h1, 0.7, 0.95);
   // Magnolia: warm pink-white-cream tones
   petalColor1 = mix(petalColor1, vec3(1.0, 0.88, 0.85), 0.3);
   // Joy boost: warmer, more saturated
   petalColor1 = mix(petalColor1, vec3(1.0, 0.7, 0.5), joyMult * 0.2);
 
-  float h2 = hsvToCosineHue(uPaletteSecondary);
-  vec3 petalColor2 = 0.5 + 0.5 * cos(TAU * vec3(h2, h2 + 0.2, h2 + 0.5));
+  float h2 = uPaletteSecondary;
+  vec3 petalColor2 = paletteHueColor(h2, 0.7, 0.95);
   petalColor2 = mix(petalColor2, vec3(1.0, 0.95, 0.8), 0.2);
 
   vec3 stamenColor = vec3(1.0, 0.85, 0.2); // golden yellow
