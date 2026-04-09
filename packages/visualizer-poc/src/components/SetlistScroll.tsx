@@ -12,11 +12,12 @@ import { useShowContext } from "../data/ShowContext";
 import { seeded } from "../utils/seededRandom";
 
 // -- Timing -----------------------------------------------------------------
-
-const DELAY = 900;            // 30s — appears well after intro clears, its own moment
-const SHOW_DURATION = 240;    // 8 seconds visible total (incl fades)
-const FADE_IN_FRAMES = 60;
-const FADE_OUT_FRAMES = 60;
+// USER SPEC: setlist flashes in halfway through every song, stays ~10s, then gone.
+// (Previously appeared at 10s intro and stayed 25s — too early, too long.)
+// DELAY is computed dynamically as durationInFrames / 2 inside the component.
+const SHOW_DURATION = 300;    // 10 seconds visible total (incl fades)
+const FADE_IN_FRAMES = 45;    // 1.5s fade in
+const FADE_OUT_FRAMES = 60;   // 2s fade out
 
 // -- Torn edge clip path ----------------------------------------------------
 
@@ -40,31 +41,18 @@ interface Props {
 
 export const SetlistScroll: React.FC<Props> = ({ frames, currentSong, introFactor = 1 }) => {
   const frame = useCurrentFrame();
-  const { width, height } = useVideoConfig();
+  const { width, height, durationInFrames } = useVideoConfig();
   const ctx = useShowContext();
 
-  // Intro mode: show setlist early (13-21s) on the right side, no energy gate
-  // Normal mode: show at 30s on the left side with energy gate
-  const isIntroSong = introFactor < 1;
-  const INTRO_DELAY = 390;  // 13s — after SongTitle + ConcertInfo clear
-  const effectiveDelay = isIntroSong ? INTRO_DELAY : DELAY;
-
-  // Energy gate: only apply for normal (non-intro) appearances
-  if (!isIntroSong) {
-    const triggerIdx = Math.min(Math.max(0, effectiveDelay), frames.length - 1);
-    let triggerEnergySum = 0;
-    let triggerCount = 0;
-    for (let i = Math.max(0, triggerIdx - 75); i <= Math.min(frames.length - 1, triggerIdx + 75); i++) {
-      triggerEnergySum += frames[i].rms;
-      triggerCount++;
-    }
-    const triggerEnergy = triggerCount > 0 ? triggerEnergySum / triggerCount : 0;
-    if (triggerEnergy > 0.28) return null;
-  }
-
+  // Setlist flashes in halfway through the song, holds ~10s, then fades out.
+  // For very short tracks (< 30s), skip entirely so it doesn't dominate.
+  if (durationInFrames < 900) return null;
+  const effectiveDelay = Math.floor(durationInFrames / 2);
   const localFrame = frame - effectiveDelay;
   const inWindow = localFrame >= 0 && localFrame < SHOW_DURATION;
   if (!inWindow) return null;
+  // intentionally unused — kept in interface for backwards compat
+  void introFactor;
 
   // Fade in/out
   const fadeIn = interpolate(localFrame, [0, FADE_IN_FRAMES], [0, 1], {
@@ -86,8 +74,8 @@ export const SetlistScroll: React.FC<Props> = ({ frames, currentSong, introFacto
 
   if (opacity < 0.01) return null;
 
-  // Slide in: from right during intro, from left normally
-  const slideX = interpolate(localFrame, [0, FADE_IN_FRAMES], [isIntroSong ? 40 : -40, 0], {
+  // Slide in from right (moved from left to avoid clashing with title art / song art card)
+  const slideX = interpolate(localFrame, [0, FADE_IN_FRAMES], [40, 0], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
     easing: Easing.out(Easing.cubic),
@@ -158,9 +146,10 @@ export const SetlistScroll: React.FC<Props> = ({ frames, currentSong, introFacto
         style={{
           position: "absolute",
           top: 40 * s,
-          ...(isIntroSong ? { right: 24 * s } : { left: 24 * s }),
+          right: 24 * s,
           opacity,
           transform: `translate(${slideX + jitterX}px, ${jitterY}px) rotate(${tiltAngle}deg)`,
+          transformOrigin: "top right",
           willChange: "transform, opacity",
         }}
       >

@@ -16,12 +16,14 @@ import { useCurrentFrame, interpolate, Easing } from "remotion";
 
 const clampOpts = { extrapolateLeft: "clamp" as const, extrapolateRight: "clamp" as const };
 
-// Aligned with SongVisualizer intro: shader is fully off until frame 450 (15s),
-// then ramps in over 150 frames (5s). Card holds until 15s, then crossfades out
-// over the same 5s window so the visualizer emerges as the card dissolves.
+// USER SPEC (revised): the song art card should stay visible for ~12 seconds.
+// Previous version had it visibly gone by ~4s in renders even though the
+// timeline said 13s — the cause was the dim 0.7 opacity getting drowned out
+// once the bright shader kicked in. Bumped opacity to 0.95 and extended hold.
 const ART_FADE_IN_END = 60;     // 2s fade in
-const ART_HOLD_END = 450;       // 15s — full hold
-const ART_FADE_END = 600;       // 20s — fully gone, shader at 100%
+const ART_HOLD_END = 360;       // 12s — full hold (10s after fade-in)
+const ART_FADE_END = 420;       // 14s — fully gone (2s fade-out)
+const ART_PEAK_OPACITY = 0.95;  // was 0.7 — too dim against bright shaders
 
 interface SongArtProps {
   src: string;
@@ -49,7 +51,9 @@ export const SongArtLayer: React.FC<SongArtProps> = ({
   const segueFade = segueIn && frame < 150 ? (frame - 90) / 60 : 1;
 
   const cardOpacity = interpolate(
-    frame, [0, ART_FADE_IN_END, ART_HOLD_END, ART_FADE_END], [0, 0.7, 0.7, 0],
+    frame,
+    [0, ART_FADE_IN_END, ART_HOLD_END, ART_FADE_END],
+    [0, ART_PEAK_OPACITY, ART_PEAK_OPACITY, 0],
     { ...clampOpts, easing: Easing.inOut(Easing.cubic) },
   );
   // DEAD AIR: bring the card back at higher opacity (0.85 instead of 0.5) to clearly
@@ -67,6 +71,10 @@ export const SongArtLayer: React.FC<SongArtProps> = ({
         inset: 0,
         opacity: finalOpacity,
         pointerEvents: "none",
+        // Force this above any overlays/shader siblings in the stacking order.
+        // Without this, DynamicOverlayStack and other later siblings cover the
+        // card once their bokeh/starfield overlays kick in (~3-4s into a song).
+        zIndex: 50,
       }}
     >
       {/* Small card bottom-left, 22% width */}

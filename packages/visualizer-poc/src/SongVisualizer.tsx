@@ -78,7 +78,6 @@ import { computeNarrativeDirective } from "./utils/visual-narrator";
 import { endScreenOverlayMult } from "./utils/end-screen-zones";
 import { getVenueProfile } from "./utils/venue-profiles";
 import { deriveChromaPalette } from "./utils/chroma-palette";
-import { NowPlaying } from "./components/NowPlaying";
 import { SongPositionIndicator } from "./components/SongPositionIndicator";
 import { JamTimer } from "./components/JamTimer";
 import { UpNextTeaser } from "./components/UpNextTeaser";
@@ -833,7 +832,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
           </div>
 
           {/* Song art: visible during intro only, then gone. GLSL icons own the visual after. */}
-          {effectiveSongArt && (introFactor < 1.0 || deadAirFactor > 0.01) && (
+          {effectiveSongArt && (frame < 450 || deadAirFactor > 0.01) && (
             <SilentErrorBoundary name="SongArt">
               <SongArtLayer src={staticFile(effectiveSongArt)} suppressionFactor={artSuppressionFactor} hueRotation={hueRotation} energy={audioSnapshot.energy} climaxIntensity={climaxState.intensity} focusOpacity={focusState.artOpacity} segueIn={props.segueIn} artBlendMode={props.song.artBlendMode} introFactor={Math.min(1, introFactor * 1.5)} deadAirFactor={deadAirFactor} />
             </SilentErrorBoundary>
@@ -852,6 +851,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
             itOverlayOverride={1}
             counterpointOverlayInversion={0}
             climaxDesaturation={0}
+            deadAirFactor={deadAirFactor}
           />
 
           {/* AI image overlay REMOVED — makes viewers think "AI slop" and adds visual noise.
@@ -931,16 +931,9 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
             pointerEvents: "none",
             filter: filmStockFilter,
           }}>
-            <ConcertInfo />
+            <ConcertInfo songTitle={props.song.title} />
             <SetlistScroll frames={f} currentSong={props.song.title} introFactor={introFactor} />
-            <SilentErrorBoundary name="NowPlaying">
-              <NowPlaying
-                title={props.song.title}
-                artist="Grateful Dead"
-                energy={audioSnapshot.energy}
-                isSacredSegue={isSacredSegueIn}
-              />
-            </SilentErrorBoundary>
+            {/* NowPlaying removed — was overlapping the setlist on the left side. */}
           </div>
         )}
       </div>
