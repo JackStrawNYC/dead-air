@@ -62,6 +62,76 @@ const JITTER_EPOCH_FRAMES = 15;
  *  changes land on musical phrases instead of an arbitrary clock. 4 beats ≈ one
  *  bar in 4/4 time → overlays settle for the duration of a phrase. */
 const JITTER_EPOCH_BEATS = 4;
+
+/** Onset strength above which a frame is a "snap" event (forces rotation) */
+const SNAP_ONSET_THRESHOLD = 0.60;
+/** Drum onset strength above which a frame is a snap event */
+const SNAP_DRUM_THRESHOLD = 0.55;
+/** Minimum frames between consecutive snaps — prevents per-beat thrash */
+const SNAP_MIN_GAP = 60; // 2 seconds at 30fps
+/** Energy floor — no snaps fire below this RMS (silence/intro) */
+const SNAP_ENERGY_FLOOR = 0.06;
+/** Vocal-presence lookback for "vocal entry" detection */
+const VOCAL_ENTRY_LOOKBACK = 30;
+/** Max recent vocal frames in the lookback for it to count as a fresh entry */
+const VOCAL_ENTRY_MAX_RECENT = 5;
+
+/**
+ * Build a list of frame indices where a "snap" event occurred. A snap is a
+ * strong musical moment that should trigger immediate overlay re-selection
+ * instead of waiting for the next 4-beat phrase epoch:
+ *
+ *   - Strong transient (frame.onset > 0.60)
+ *   - Strong drum hit (frame.stemDrumOnset > 0.55, when stem data available)
+ *   - Vocal entry (vocalPresence transitions from absent to present)
+ *
+ * Snaps are deduped by SNAP_MIN_GAP (2s) so consecutive drum hits don't
+ * fire repeatedly — overlays still get to "land" between snaps. The first
+ * snap in a long quiet passage will fire; subsequent ones inside the gap
+ * window are ignored until 2s passes.
+ *
+ * Forward-pass O(n × VOCAL_ENTRY_LOOKBACK), called once per render frame.
+ */
+function buildSnapFrameArray(frames: EnhancedFrameData[]): number[] {
+  const snaps: number[] = [];
+  let lastSnap = -SNAP_MIN_GAP;
+  for (let i = 0; i < frames.length; i++) {
+    const f = frames[i];
+    if ((f.rms ?? 0) < SNAP_ENERGY_FLOOR) continue;
+    if (i - lastSnap < SNAP_MIN_GAP) continue;
+
+    const onsetSnap = (f.onset ?? 0) > SNAP_ONSET_THRESHOLD;
+    const drumSnap = (f.stemDrumOnset ?? 0) > SNAP_DRUM_THRESHOLD;
+
+    // Vocal entry: this frame has vocal presence and the recent lookback has
+    // very few. Catches the "voice enters after instrumental passage" moment.
+    let vocalEntry = false;
+    if (f.stemVocalPresence && i > VOCAL_ENTRY_LOOKBACK) {
+      let recentVocals = 0;
+      for (let j = i - VOCAL_ENTRY_LOOKBACK; j < i; j++) {
+        if (frames[j].stemVocalPresence) recentVocals++;
+      }
+      if (recentVocals < VOCAL_ENTRY_MAX_RECENT) vocalEntry = true;
+    }
+
+    if (onsetSnap || drumSnap || vocalEntry) {
+      snaps.push(i);
+      lastSnap = i;
+    }
+  }
+  return snaps;
+}
+
+/** Binary-search count of snap frames with index <= idx. */
+function snapCountUpTo(snapArray: number[], idx: number): number {
+  let lo = 0, hi = snapArray.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >>> 1;
+    if (snapArray[mid] <= idx) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo;
+}
 /** Quiet threshold for silence breathing */
 const QUIET_THRESHOLD = 0.03;
 /** Quiet window for silence breathing (frames) */
@@ -519,7 +589,15 @@ export function computeContinuousOverlays(
     }
     return Math.floor(lo / JITTER_EPOCH_BEATS);
   }
-  const jitterEpoch = beatEpoch(frameIdx);
+
+  // Onset-snap rotation: strong transients/drum hits/vocal entries push the
+  // jitter epoch forward IMMEDIATELY instead of waiting for the next 4-beat
+  // phrase. The snap count is monotonic and only advances on snap frames, so
+  // it's deterministic and stable. Combined with the existing inertia bonus,
+  // this gives "settles on phrases, snaps on big musical events" behavior.
+  const snapArray = buildSnapFrameArray(frames);
+  const fullEpoch = (idx: number) => beatEpoch(idx) + snapCountUpTo(snapArray, idx);
+  const jitterEpoch = fullEpoch(frameIdx);
   const rng = seededRandom(trackHash + jitterEpoch * 7);
 
   // ─── Pass 1: Score all pool overlays against current AudioSnapshot ───
@@ -532,9 +610,11 @@ export function computeContinuousOverlays(
   // ─── Pass 2: Score against reference snapshot (lookback frames ago) ───
   // Reference profile/stem are computed from the lookback snapshot so the
   // "previous selection" reference reflects what was musically true then.
+  // Same fullEpoch (beat + snap count) so inertia compares against what was
+  // selected just before any intervening snap.
   const refIdx = Math.max(0, frameIdx - lookback);
   const refSnapshot = computeAudioSnapshot(frames, refIdx, beatArray, 30, tempo);
-  const refRng = seededRandom(trackHash + beatEpoch(refIdx) * 7);
+  const refRng = seededRandom(trackHash + fullEpoch(refIdx) * 7);
   const refStemSection = classifyStemSection(refSnapshot);
   const refSemanticScores = extractSemanticScores(refSnapshot);
   const refSemanticProfile = refSemanticScores
