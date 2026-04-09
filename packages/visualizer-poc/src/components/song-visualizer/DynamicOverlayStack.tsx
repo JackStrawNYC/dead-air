@@ -55,6 +55,8 @@ interface Props {
   counterpointOverlayInversion?: number;
   /** Climax desaturation (0-1): 1.0 = full monochrome overlays during climax so shader owns color */
   climaxDesaturation?: number;
+  /** Dead air factor (0 = music playing, 1 = fully in dead air/applause). Suppresses overlays. */
+  deadAirFactor?: number;
 }
 
 export const DynamicOverlayStack: React.FC<Props> = ({
@@ -71,6 +73,7 @@ export const DynamicOverlayStack: React.FC<Props> = ({
   itOverlayOverride = 1,
   counterpointOverlayInversion = 0,
   climaxDesaturation = 0,
+  deadAirFactor = 0,
 }) => {
   const frame = useCurrentFrame();
 
@@ -79,25 +82,34 @@ export const DynamicOverlayStack: React.FC<Props> = ({
   const currentFrameData = frames[frameIdx];
   const sectionType = currentFrameData?.sectionType ?? "verse";
   // Section-aware pulse intensity: jams get bigger pulses, space gets minimal
-  const pulseScale = sectionType === "jam" || sectionType === "solo" ? 1.5
-    : sectionType === "space" ? 1.3
-    : sectionType === "chorus" ? 1.2
+  // CALM MODE: pulse intensities reduced ~70% to eliminate "weird pulsing light".
+  // Overlays should breathe gently with the music, not strobe.
+  const pulseScale = sectionType === "jam" || sectionType === "solo" ? 1.1
+    : sectionType === "space" ? 1.0
+    : sectionType === "chorus" ? 1.05
     : 1.0;
-  const beatPulse = currentFrameData?.beat ? 0.08 * pulseScale : 0;
-  // Drum-stem pulse: gentle response to drum hits
+  const beatPulse = currentFrameData?.beat ? 0.025 * pulseScale : 0;
   const drumPulse = (currentFrameData?.stemDrumOnset ?? 0) > 0.3
-    ? (currentFrameData.stemDrumOnset ?? 0) * 0.05 * pulseScale : 0;
+    ? (currentFrameData.stemDrumOnset ?? 0) * 0.015 * pulseScale : 0;
   const onsetPulse = (currentFrameData?.onset ?? 0) > 0.5
-    ? (currentFrameData.onset ?? 0) * 0.04 * pulseScale : 0;
+    ? (currentFrameData.onset ?? 0) * 0.012 * pulseScale : 0;
   const overlayPulse = 1.0 + beatPulse + Math.max(drumPulse, onsetPulse);
 
   // Compute opacities and apply hard cap on concurrent overlays
-  const maxConcurrent = MAX_CONCURRENT[energyLevel] ?? 4;
+  // DEAD AIR: drop the overlay cap aggressively as music ends. Crowd noise should
+  // be visually QUIET — no fireflies-and-neural-web swarms during applause.
+  const baseMaxConcurrent = MAX_CONCURRENT[energyLevel] ?? 4;
+  const maxConcurrent = deadAirFactor > 0.5 ? 1
+    : deadAirFactor > 0.1 ? Math.max(1, Math.floor(baseMaxConcurrent * (1 - deadAirFactor)))
+    : baseMaxConcurrent;
   const inversionMult = 1 - counterpointOverlayInversion;
-  // Overlay visibility: allow overlays to go subtle when suppressed
-  // Floor at 0.12 so compound multiplication can reduce but never fully kills overlays
-  const rawMult = mediaSuppression * focusSuppression * itOverlayOverride * inversionMult * overlayPulse;
-  const baseMult = Math.min(1.0, Math.max(0.12, rawMult));
+  // Overlay visibility: allow overlays to go subtle when suppressed.
+  // DEAD AIR: bypass the 0.12 floor — when applause is detected, overlays
+  // should be allowed to fully fade out, not stick at 12%.
+  const deadAirSuppress = 1 - deadAirFactor * 0.92; // 100% live → 8% during full dead air
+  const rawMult = mediaSuppression * focusSuppression * itOverlayOverride * inversionMult * overlayPulse * deadAirSuppress;
+  const minFloor = deadAirFactor > 0.5 ? 0 : 0.12; // remove floor during heavy dead air
+  const baseMult = Math.min(1.0, Math.max(minFloor, rawMult));
 
   // Single-pass: compute opacity, filter, sort, split DOM/GLSL in one loop
   const scored: { name: string; entry: OverlayComponentEntry; opacity: number }[] = [];

@@ -60,10 +60,14 @@ export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod,
     dsHueOffset = 12;       // warmth shift
   }
 
-  // Simple: brightness is brightness. Dead air dims slightly.
-  const baseBrightness = Math.max(0.75, brightness);
+  // CALM MODE FIX: dead air now dims SHADER aggressively (was 15%, now 85%).
+  // When music ends and crowd is talking/tuning, shaders should go nearly DARK.
+  // Floor lowered from 0.75 to 0.05 to allow real darkness during dead air.
+  const baseBrightness = deadAirFactor > 0.5
+    ? brightness  // no minimum floor during heavy dead air
+    : Math.max(0.75, brightness);
   const finalBrightness = deadAirFactor > 0
-    ? baseBrightness * (1 - deadAirFactor * 0.15)
+    ? Math.max(0.05, baseBrightness * (1 - deadAirFactor * 0.85))
     : baseBrightness;
 
   // Palette sovereignty: only drums/space hue + dead air warmth

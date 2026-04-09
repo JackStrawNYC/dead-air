@@ -12,9 +12,12 @@
 
 import type { EnhancedFrameData } from "../data/types";
 
-const MUSIC_THRESHOLD = 0.10; // Smoothed RMS above this = actual music
+// CALM MODE: Bumped threshold from 0.10 to 0.18 — crowd applause and band tuning
+// produce RMS ~0.10-0.15, which previously read as "still music". Now we treat
+// anything below 0.18 sustained for 3s as dead air, so shaders dim properly.
+const MUSIC_THRESHOLD = 0.18; // Smoothed RMS above this = actual music
 const SMOOTH_WINDOW = 90;     // 3 seconds at 30fps
-const MIN_TAIL_GAP = 300;     // 10 seconds to confirm song is over
+const MIN_TAIL_GAP = 180;     // 6 seconds to confirm song is over (was 10s)
 
 /**
  * Detect where the music actually ends.
