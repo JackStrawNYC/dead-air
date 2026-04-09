@@ -8,6 +8,12 @@ export const sharedUniformsGLSL = /* glsl */ `
 // ─── Time ───
 uniform float uTime;
 uniform float uDynamicTime;
+// Beat-locked time: uTime scaled by (uTempo/120), so motion runs faster on
+// faster songs and slower on slower songs. Use this in animation oscillators
+// (sin/cos loops) when you want visual rhythm to track musical rhythm without
+// caring about the beat phase. Halfway between uTime (wall-clock) and
+// uMusicalTime (beat-phase-locked). 60bpm song → 0.5x; 140bpm song → 1.17x.
+uniform float uBeatTime;
 
 // ─── Core Audio Features ───
 uniform float uBass;

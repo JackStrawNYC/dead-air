@@ -482,7 +482,8 @@ export function computeAudioSnapshot(
 
   return {
     energy,
-    slowEnergy: gaussianSmooth(frames, idx, (f) => f.rms, 180),
+    // 90-frame Gaussian (~3s) — was 180 (~6s) which lagged dynamic shifts too far.
+    slowEnergy: gaussianSmooth(frames, idx, (f) => f.rms, 90),
     bass: gaussianSmooth(frames, idx, (f) => (f.sub + f.low) * 0.5, 10),
     mids: gaussianSmooth(frames, idx, (f) => f.mid, 8),
     highs: gaussianSmooth(frames, idx, (f) => f.high, 5),

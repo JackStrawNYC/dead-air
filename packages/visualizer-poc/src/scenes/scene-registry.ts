@@ -1018,6 +1018,105 @@ export function getModesForEnergy(energy: "low" | "mid" | "high", era?: string, 
   return modes;
 }
 
+/**
+ * Continuous energy-affinity centers/widths for each discrete affinity bucket.
+ * The discrete enum survives in the registry for back-compat, but we project
+ * it onto a continuous space so shader selection responds to actual RMS rather
+ * than collapsing every "low" song into one pool.
+ *
+ * Wharf Rat (~0.10), Dark Star station (~0.18), and a slow Eyes (~0.25) all
+ * formerly bucketed to "low" — they now sit at distinct positions in this
+ * space and pull from genuinely different weighted distributions.
+ *
+ * Centers were chosen to span the typical RMS range for each affinity:
+ * - low:  songs with avgEnergy 0.00–0.25 (ballads, dirges, drones)
+ * - mid:  songs with avgEnergy 0.20–0.55 (mid-tempo grooves, jams)
+ * - high: songs with avgEnergy 0.45–0.95 (rockers, climaxes)
+ * - any:  versatile shaders that fit anywhere (wide gaussian)
+ *
+ * Sigma controls how aggressively a shader is excluded as RMS moves away
+ * from its center. Tight sigma = strong differentiation; wide sigma =
+ * "this shader works everywhere".
+ */
+const ENERGY_AFFINITY_CENTER: Record<"low" | "mid" | "high" | "any", number> = {
+  low: 0.13,
+  mid: 0.40,
+  high: 0.72,
+  any: 0.45,
+};
+const ENERGY_AFFINITY_SIGMA: Record<"low" | "mid" | "high" | "any", number> = {
+  low: 0.16,
+  mid: 0.18,
+  high: 0.20,
+  any: 0.55, // very wide — "any" shaders fit anywhere
+};
+
+/**
+ * Continuous-energy shader pool with gaussian weighting.
+ *
+ * For a given continuous RMS value (typically `section.avgEnergy`), each
+ * eligible shader is scored by `gaussian(rms, center, sigma)` where center
+ * and sigma come from its discrete `energyAffinity`. The shader is added
+ * to the pool with a copy count proportional to its score, so high-affinity
+ * shaders dominate selection while low-affinity shaders still appear
+ * occasionally for variety.
+ *
+ * This replaces the old hard 3-bucket pool, which made every "low" song
+ * (RMS 0.0–0.25) draw from an identical pool — the #1 reason ballads,
+ * dirges, and slow stations all looked the same.
+ *
+ * Era preferences and the auto-select blocklist still apply; song-specific
+ * shaders still come through `songIdentity.preferredModes` upstream.
+ */
+export function getModesForContinuousEnergy(
+  rms: number,
+  era?: string,
+  defaultMode?: VisualMode,
+): VisualMode[] {
+  // Clamp to plausible range
+  const energy = Math.max(0, Math.min(1, rms));
+
+  const eraPreset = era ? getEraPreset(era) : null;
+  const eraExcluded = new Set(eraPreset?.excludedModes ?? []);
+  const eraPreferred = new Set(eraPreset?.preferredModes ?? []);
+
+  // Build weighted pool: each shader's copy count is proportional to its
+  // gaussian score. Max 12 copies for the best fit, min 0 for very poor fits.
+  const MAX_COPIES = 12;
+  const MIN_SCORE = 0.05; // Below this, shader is excluded entirely
+
+  const weighted: VisualMode[] = [];
+  for (const [mode, entry] of Object.entries(SCENE_REGISTRY) as [VisualMode, SceneRegistryEntry][]) {
+    if (AUTO_SELECT_BLOCKLIST.has(mode)) continue;
+    if (eraExcluded.has(mode)) continue;
+
+    const aff = entry.energyAffinity;
+    const center = ENERGY_AFFINITY_CENTER[aff];
+    const sigma = ENERGY_AFFINITY_SIGMA[aff];
+
+    // Gaussian: exp(-(d^2) / (2 * sigma^2))
+    const d = energy - center;
+    const score = Math.exp(-(d * d) / (2 * sigma * sigma));
+
+    if (score < MIN_SCORE) continue;
+
+    // Era preferred shaders get 1.5x boost on top of their gaussian fit
+    const boost = eraPreferred.has(mode) ? 1.5 : 1.0;
+    const copies = Math.max(1, Math.round(score * boost * MAX_COPIES));
+    for (let i = 0; i < copies; i++) weighted.push(mode);
+  }
+
+  // Guarantee defaultMode is always in the pool
+  if (weighted.length === 0 && defaultMode) {
+    return [defaultMode];
+  }
+  if (defaultMode && !weighted.includes(defaultMode)) {
+    weighted.push(defaultMode);
+  }
+
+  return weighted;
+}
+
 /** Get modes appropriate for a given energy level AND spectral family.
  *  Soft filter: if spectral filtering leaves < 2 candidates, falls back to energy-only pool. */
 export function getModesForEnergyAndSpectral(

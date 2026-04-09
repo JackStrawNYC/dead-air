@@ -28,6 +28,7 @@ import type { StemSectionType } from "./stem-features";
 import type { ReactiveState } from "./reactive-triggers";
 import type { AudioSnapshot } from "./audio-reactive";
 import type { SemanticProfile } from "./semantic-router";
+import { computeSemanticProfile, extractSemanticScores } from "./semantic-router";
 import { computeAudioSnapshot, buildBeatArray } from "./audio-reactive";
 import { computeSmoothedEnergy } from "./energy";
 import { detectTexture } from "./climax-state";
@@ -54,8 +55,13 @@ const LOCKED_LOOKBACK = 120;
 const OPACITY_EDGE_LOW = 0.35;
 /** Smoothstep upper edge for score→opacity */
 const OPACITY_EDGE_HIGH = 0.55;
-/** Jitter epoch: frames between jitter seed changes (stabilizes scoring) */
+/** Jitter epoch: frames between jitter seed changes (stabilizes scoring).
+ *  Used as a fallback when beat data is sparse — the primary epoch is BEAT-aligned. */
 const JITTER_EPOCH_FRAMES = 15;
+/** Beats per jitter epoch — score re-randomizes once every N beats so selection
+ *  changes land on musical phrases instead of an arbitrary clock. 4 beats ≈ one
+ *  bar in 4/4 time → overlays settle for the duration of a phrase. */
+const JITTER_EPOCH_BEATS = 4;
 /** Quiet threshold for silence breathing */
 const QUIET_THRESHOLD = 0.03;
 /** Quiet window for silence breathing (frames) */
@@ -127,12 +133,22 @@ function energyBucket(energy: number): "low" | "mid" | "high" {
  * Score an overlay against live AudioSnapshot.
  * Adapted from scoreOverlayForWindow but uses AudioSnapshot directly
  * for energy level and texture detection.
+ *
+ * Optional `liveSemanticProfile` overrides the static `config.semanticProfile`
+ * — when provided, scoring uses per-frame CLAP scores instead of the
+ * song-averaged profile, so mood signals flow with the music inside a song.
+ *
+ * Optional `liveStemSection` similarly overrides `config.dominantStemSection`
+ * to enable per-frame stem-driven routing (vocal verse vs guitar solo vs drums
+ * picking different overlay categories even within the same song).
  */
 export function scoreOverlayLive(
   entry: OverlayEntry,
   snapshot: AudioSnapshot,
   config: ContinuousOverlayConfig,
   rng: () => number,
+  liveSemanticProfile?: SemanticProfile,
+  liveStemSection?: import("./stem-features").StemSectionType,
 ): number {
   const energy = snapshot.energy;
   const smoothedEnergy = energy;
@@ -150,12 +166,17 @@ export function scoreOverlayLive(
     previousWindowEnergy: null,
     setNumber: config.setNumber,
     isDrumsSpace: config.isDrumsSpace,
-    stemSectionType: config.dominantStemSection,
+    // Per-frame stem section if provided, else fall back to song-level dominant
+    stemSectionType: liveStemSection ?? config.dominantStemSection,
     mode: config.mode,
     songIdentity: config.songIdentity,
     showArcModifiers: config.showArcModifiers,
     energyHints: config.energyHints,
-    semanticProfile: config.semanticProfile,
+    // Per-frame semantic profile if provided (live CLAP), else song-averaged fallback
+    semanticProfile: liveSemanticProfile ?? config.semanticProfile,
+    // Continuous RMS — replaces the discrete windowEnergy bucket comparison
+    // with gaussian-distance scoring against each overlay's energy band.
+    continuousEnergy: snapshot.energy,
   };
 
   let score = scoreOverlayForWindow(entry, ctx, rng);
@@ -174,13 +195,8 @@ export function scoreOverlayLive(
     score += Math.max(-0.3, Math.min(0.3, affinityScore));
   }
 
-  // Live stem section from current snapshot (not dominant)
-  const liveStemSection = classifyStemSection(snapshot);
-  if (liveStemSection === "vocal" && entry.category === "character") {
-    score -= 0.10;
-  } else if (liveStemSection === "solo" && entry.category === "reactive") {
-    score -= 0.05;
-  }
+  // (Old weak ±0.05-0.10 stem-section adjustments removed — stem-section
+  // routing is now a primary signal in scoreOverlayForWindow with ±0.40+ swings.)
 
   return score;
 }
@@ -450,26 +466,84 @@ export function computeContinuousOverlays(
     inertiaBonus *= 0.7; // faster overlay turnover
   }
 
-  // Jitter seed quantized to 15-frame epochs for stability
-  const jitterEpoch = Math.floor(frameIdx / JITTER_EPOCH_FRAMES);
+  // Tempo-aware inertia: slow songs deserve longer-held overlays, fast songs
+  // need faster turnover to feel music-driven. 60bpm → 1.41x inertia (sticky),
+  // 120bpm → 1.0x (neutral), 180bpm → 0.82x (quick turnover). Sub-square-root
+  // curve so the swing feels natural across the typical 60-180bpm range.
+  const tempoForInertia = audioSnapshot.localTempo || 120;
+  const tempoInertiaMult = Math.max(0.65, Math.min(1.55, Math.sqrt(120 / Math.max(40, tempoForInertia))));
+  inertiaBonus *= tempoInertiaMult;
+
+  // ─── Per-frame live profiles (Fix A & B) ───
+  // Compute the live semantic profile and live stem section ONCE per frame
+  // (not per overlay) so all scoring passes share consistent signals.
+  //
+  // semanticProfile flows from the audioSnapshot's smoothed CLAP fields, so
+  // mood drifts as the song's character changes (e.g. He's Gone tender verse
+  // → triumphant outro). Falls back to the song-averaged config profile when
+  // per-frame CLAP data isn't available.
+  //
+  // liveStemSection comes from per-frame stem-feature classification — vocal
+  // verse vs guitar solo vs drum break get different overlay categories even
+  // when the energy is the same.
+  const liveStemSection = classifyStemSection(audioSnapshot);
+  const liveSemanticScores = extractSemanticScores(audioSnapshot);
+  const liveSemanticProfile = liveSemanticScores
+    ? computeSemanticProfile(liveSemanticScores)
+    : config.semanticProfile;
+
+  // Beat-aligned jitter epoch: count how many beats have happened up to frameIdx,
+  // group every JITTER_EPOCH_BEATS into one epoch. Selection re-randomizes on
+  // phrase boundaries instead of an arbitrary 0.5s clock — overlays settle for
+  // the duration of a musical phrase rather than ticking on wall-clock.
+  // Falls back to frame-based epochs when beat data is sparse (silence, drones).
+  const beatArray = buildBeatArray(frames);
+  const tempo = audioSnapshot.localTempo || 120;
+  function beatEpoch(idx: number): number {
+    // Binary search: count beats with index <= idx
+    if (beatArray.length === 0) return Math.floor(idx / JITTER_EPOCH_FRAMES);
+    let lo = 0, hi = beatArray.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >>> 1;
+      if (beatArray[mid] <= idx) lo = mid + 1;
+      else hi = mid;
+    }
+    // lo = number of beats <= idx. Group into JITTER_EPOCH_BEATS-sized buckets.
+    // If we ran out of beats (silent passage), interpolate via tempo so the
+    // epoch keeps advancing rather than freezing.
+    if (lo >= beatArray.length && beatArray.length > 0) {
+      const lastBeat = beatArray[beatArray.length - 1];
+      const framesPerBeat = (60 / tempo) * 30;
+      const projectedBeats = lo + Math.floor((idx - lastBeat) / framesPerBeat);
+      return Math.floor(projectedBeats / JITTER_EPOCH_BEATS);
+    }
+    return Math.floor(lo / JITTER_EPOCH_BEATS);
+  }
+  const jitterEpoch = beatEpoch(frameIdx);
   const rng = seededRandom(trackHash + jitterEpoch * 7);
 
   // ─── Pass 1: Score all pool overlays against current AudioSnapshot ───
+  // Live semantic profile + live stem section flow into every scoring call.
   const currentScores = config.pool.map((entry) => ({
     entry,
-    score: scoreOverlayLive(entry, audioSnapshot, config, rng),
+    score: scoreOverlayLive(entry, audioSnapshot, config, rng, liveSemanticProfile, liveStemSection),
   }));
 
   // ─── Pass 2: Score against reference snapshot (lookback frames ago) ───
+  // Reference profile/stem are computed from the lookback snapshot so the
+  // "previous selection" reference reflects what was musically true then.
   const refIdx = Math.max(0, frameIdx - lookback);
-  const beatArray = buildBeatArray(frames);
-  const tempo = audioSnapshot.localTempo || 120;
   const refSnapshot = computeAudioSnapshot(frames, refIdx, beatArray, 30, tempo);
-  const refRng = seededRandom(trackHash + Math.floor(refIdx / JITTER_EPOCH_FRAMES) * 7);
+  const refRng = seededRandom(trackHash + beatEpoch(refIdx) * 7);
+  const refStemSection = classifyStemSection(refSnapshot);
+  const refSemanticScores = extractSemanticScores(refSnapshot);
+  const refSemanticProfile = refSemanticScores
+    ? computeSemanticProfile(refSemanticScores)
+    : config.semanticProfile;
 
   const refScores = config.pool.map((entry) => ({
     entry,
-    score: scoreOverlayLive(entry, refSnapshot, config, refRng),
+    score: scoreOverlayLive(entry, refSnapshot, config, refRng, refSemanticProfile, refStemSection),
   }));
 
   // ─── Determine reference selection (what was showing) ───

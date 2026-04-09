@@ -26,6 +26,7 @@ import { renderScene } from "./scenes/scene-registry";
 import { OVERLAY_COMPONENTS } from "./data/overlay-components";
 import { buildRotationSchedule } from "./data/overlay-rotation";
 import { computeContinuousOverlays, type ContinuousOverlayConfig } from "./utils/continuous-overlay";
+import { computeSemanticProfile, extractSemanticScores } from "./utils/semantic-router";
 import { SELECTABLE_REGISTRY, ALWAYS_ACTIVE } from "./data/overlay-registry";
 import { getEraPreset } from "./data/era-presets";
 import { ConcertInfo } from "./components/ConcertInfo";
@@ -355,8 +356,45 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
     const sects = getSections(analysis);
     // Song hero: first overlay from overlayOverrides.include gets absolute priority
     const songHero = props.song.overlayOverrides?.include?.[0];
-    return buildRotationSchedule(props.activeOverlays, sects, props.song.trackId, showSeed, analysis?.frames, isDrumsSpace, props.energyHints, props.show?.era, props.song.defaultMode, songIdentity, showArcModifiers, undefined, dominantStemSection, narrative?.state.songsCompleted, songHero);
+    return buildRotationSchedule(props.activeOverlays, sects, props.song.trackId, showSeed, analysis?.frames, isDrumsSpace, props.energyHints, props.show?.era, props.song.defaultMode, songIdentity, showArcModifiers, undefined, dominantStemSection, narrative?.state.songsCompleted, songHero, analysis?.meta?.tempo);
   }, [props.activeOverlays, analysis, props.song.trackId, showSeed, isDrumsSpace, props.energyHints, props.show?.era, props.song.defaultMode, songIdentity, showArcModifiers, dominantStemSection, narrative?.state.songsCompleted, props.song.overlayOverrides]);
+
+  // Song-level semantic profile from CLAP scores. We average semantic fields
+  // across the whole song (not just the middle frame) so the profile reflects
+  // the song's character, not a momentary state. The shader pipeline does this
+  // per-section in SceneRouter; for overlay POOL selection a song-wide read
+  // is the right granularity — overlays are picked from a pool, not switched
+  // mid-section. Receiving end is at overlay-scoring.ts:272-278.
+  const songSemanticProfile = useMemo(() => {
+    if (!analysis?.frames?.length) return undefined;
+    const f = analysis.frames;
+    // Sample every 30 frames (1/sec) for cheap aggregation
+    let n = 0;
+    let psy = 0, agg = 0, ten = 0, cos = 0, rhy = 0, amb = 0, cha = 0, tri = 0;
+    for (let i = 0; i < f.length; i += 30) {
+      psy += f[i].semantic_psychedelic ?? 0;
+      agg += f[i].semantic_aggressive ?? 0;
+      ten += f[i].semantic_tender ?? 0;
+      cos += f[i].semantic_cosmic ?? 0;
+      rhy += f[i].semantic_rhythmic ?? 0;
+      amb += f[i].semantic_ambient ?? 0;
+      cha += f[i].semantic_chaotic ?? 0;
+      tri += f[i].semantic_triumphant ?? 0;
+      n++;
+    }
+    if (n === 0) return undefined;
+    const scores = extractSemanticScores({
+      semanticPsychedelic: psy / n,
+      semanticAggressive: agg / n,
+      semanticTender: ten / n,
+      semanticCosmic: cos / n,
+      semanticRhythmic: rhy / n,
+      semanticAmbient: amb / n,
+      semanticChaotic: cha / n,
+      semanticTriumphant: tri / n,
+    });
+    return scores ? computeSemanticProfile(scores) : undefined;
+  }, [analysis]);
 
   // ─── Continuous overlay config (replaces window scheduling) ───
   const overlayConfig = useMemo((): ContinuousOverlayConfig | null => {
@@ -386,8 +424,13 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
       songsCompleted: narrative?.state.songsCompleted,
       setNumber: props.song.set,
       era: props.show?.era,
+      // CLAP-derived overlay category bias. Receiving end at overlay-scoring.ts
+      // applies +catBias when dominantConfidence > 0.3, biasing e.g. "tender"
+      // songs toward atmospheric/nature/sacred categories and "aggressive" songs
+      // toward reactive/distortion/geometric.
+      semanticProfile: songSemanticProfile,
     };
-  }, [props.activeOverlays, analysis, props.song.trackId, showSeed, isDrumsSpace, props.energyHints, props.show?.era, props.song.defaultMode, songIdentity, showArcModifiers, dominantStemSection, narrative?.state.songsCompleted, props.song.overlayOverrides, props.song.set]);
+  }, [props.activeOverlays, analysis, props.song.trackId, showSeed, isDrumsSpace, props.energyHints, props.show?.era, props.song.defaultMode, songIdentity, showArcModifiers, dominantStemSection, narrative?.state.songsCompleted, props.song.overlayOverrides, props.song.set, songSemanticProfile]);
 
   // opacityMapBase computed after reactiveState (below) for reactive overlay injection
   let opacityMapBase: Record<string, number> | null = null;

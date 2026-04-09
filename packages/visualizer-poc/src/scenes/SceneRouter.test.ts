@@ -348,12 +348,14 @@ describe('getModeForSection', () => {
 
   it('short song (180s) biases toward structured modes', () => {
     const song = makeSong();
+    // avgEnergy 0.65 matches the 'high' enum (continuous selection now reads
+    // the number, not the string — 0.35 was incoherent with 'high').
     const sections: SectionBoundary[] = Array.from({ length: 5 }, (_, i) => ({
       frameStart: i * 900,
       frameEnd: (i + 1) * 900,
       label: `section_${i}`,
       energy: 'high' as const,
-      avgEnergy: 0.35,
+      avgEnergy: 0.65,
     }));
 
     const structuredModes = new Set([
@@ -383,12 +385,14 @@ describe('getModeForSection', () => {
 
   it('extended jam (900s) biases toward feedback/generative modes', () => {
     const song = makeSong();
+    // avgEnergy 0.65 matches the 'high' enum (continuous selection now reads
+    // the number, not the string — 0.35 was incoherent with 'high').
     const sections: SectionBoundary[] = Array.from({ length: 5 }, (_, i) => ({
       frameStart: i * 900,
       frameEnd: (i + 1) * 900,
       label: `section_${i}`,
       energy: 'high' as const,
-      avgEnergy: 0.35,
+      avgEnergy: 0.65,
     }));
 
     const feedbackModes = new Set([

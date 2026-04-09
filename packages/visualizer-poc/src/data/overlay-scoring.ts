@@ -84,6 +84,28 @@ const CARRYOVER_BONUS = 0.2;
 /** Windows shorter than this get carryover instead of repeat-penalty */
 const MIN_WINDOW_FOR_ROTATION = 900;
 
+/**
+ * Continuous-energy gaussian centers/widths for each discrete energyBand.
+ * Mirrors the shader continuous-energy fix: instead of bucketing avgEnergy
+ * into 3 string enums and comparing as strings, we project each overlay's
+ * energyBand onto a continuous space and score it by gaussian distance from
+ * the section's actual avgEnergy. Wharf Rat (rms 0.10), Dark Star station
+ * (rms 0.18), and Sugar Magnolia chorus (rms 0.65) now draw from genuinely
+ * different overlay distributions rather than collapsing into one of three buckets.
+ */
+const ENERGY_BAND_CENTER: Record<"low" | "mid" | "high", number> = {
+  low: 0.13,
+  mid: 0.40,
+  high: 0.72,
+};
+/** Tighter sigma for tier B/C — they're energy-specific and should drop out
+ *  hard when the section doesn't match. Tier A uses wider sigma below. */
+const ENERGY_BAND_SIGMA: Record<"low" | "mid" | "high", number> = {
+  low: 0.16,
+  mid: 0.18,
+  high: 0.20,
+};
+
 /** Resolve an overlay's category to a texture group */
 function resolveTextureGroup(category: string): TextureGroup | null {
   if (AMBIENT_WASH.has(category)) return "wash";
@@ -111,6 +133,10 @@ export interface ScoringContext {
   energyHints?: Record<string, OverlayPhaseHint>;
   /** Semantic profile from CLAP analysis for category bias */
   semanticProfile?: SemanticProfile;
+  /** Continuous RMS (0..1). When provided, replaces the discrete windowEnergy
+   *  string match with gaussian-distance scoring. Without it, the legacy
+   *  ±0.30 string-bucket comparison is used. */
+  continuousEnergy?: number;
 }
 
 /**
@@ -132,14 +158,33 @@ export function scoreOverlayForWindow(
     score += 0.10;
   }
 
-  // Energy band match
+  // Energy band match — continuous gaussian when avgEnergy is provided,
+  // legacy discrete string-bucket otherwise.
   if (entry.energyBand !== "any") {
-    if (entry.energyBand === ctx.windowEnergy) {
-      score += 0.3;
+    if (ctx.continuousEnergy !== undefined) {
+      const band = entry.energyBand as "low" | "mid" | "high";
+      const center = ENERGY_BAND_CENTER[band];
+      // Tier A overlays get a wider sigma (universal-ish) so iconic Dead
+      // imagery stays present across the energy spectrum. Tier B/C get
+      // narrow sigma so they actually disappear when the energy is wrong.
+      const tightSigma = ENERGY_BAND_SIGMA[band];
+      const sigma = entry.tier === "A" ? tightSigma * 1.6 : tightSigma;
+      const d = ctx.continuousEnergy - center;
+      const gauss = Math.exp(-(d * d) / (2 * sigma * sigma));
+      // Tier A: +0.05 floor (always selectable), up to +0.30 on match.
+      // Tier B/C: -0.20 floor (strong cull on mismatch), up to +0.35 on match.
+      score += entry.tier === "A"
+        ? 0.05 + gauss * 0.25
+        : -0.20 + gauss * 0.55;
     } else {
-      const rank: Record<string, number> = { low: 0, mid: 1, high: 2 };
-      const dist = Math.abs(rank[entry.energyBand] - rank[ctx.windowEnergy]);
-      score -= dist * 0.15;
+      // Legacy discrete fallback
+      if (entry.energyBand === ctx.windowEnergy) {
+        score += 0.3;
+      } else {
+        const rank: Record<string, number> = { low: 0, mid: 1, high: 2 };
+        const dist = Math.abs(rank[entry.energyBand] - rank[ctx.windowEnergy]);
+        score -= dist * 0.15;
+      }
     }
   }
 
@@ -189,30 +234,55 @@ export function scoreOverlayForWindow(
         score += DRUMS_SPACE_ADJUSTMENTS[group];
       }
 
-      // Stem-section scoring
+      // Stem-section routing (PRIMARY signal — was ±0.05-0.20, now ±0.40-0.60).
+      // Promoted from a soft modifier to a real routing axis: vocal vs solo vs
+      // drums vs jam sections now route to genuinely different overlay categories
+      // even when energy and texture are otherwise identical. The bonuses are
+      // tuned to match songIdentity.overlayBoost (+0.50) so a strong stem signal
+      // can outweigh tier and energy preferences.
+      //
+      // Routing rules:
+      //   vocal:        contemplative wash + sacred — let the voice lead, no busy character
+      //   solo:         character (Jerry/Bob/Phil) + reactive — the player IS the visual
+      //   jam:          reactive + geometric + wash — collective improvisation
+      //   quiet:        sacred + wash, hard cull on busy categories
+      //   instrumental: reactive + wash, lighter than jam
+      //   drums:        reactive + geometric + family (drummers), no atmospheric
       if (ctx.stemSectionType) {
         const stemGroup = resolveTextureGroup(entry.category);
         if (stemGroup) {
           if (ctx.stemSectionType === "vocal") {
-            if (stemGroup === "wash") score += 0.10;
-            if (stemGroup === "sacred") score += 0.15;
-            if (stemGroup === "family") score -= 0.15;
-            if (stemGroup === "reactive") score -= 0.10;
+            // Voice leads — atmospheric/sacred wash, suppress busy character/reactive
+            if (stemGroup === "wash") score += 0.40;
+            if (stemGroup === "sacred") score += 0.50;
+            if (stemGroup === "family") score -= 0.40;
+            if (stemGroup === "reactive") score -= 0.45;
+            if (stemGroup === "narrative") score -= 0.20;
           } else if (ctx.stemSectionType === "solo") {
-            if (stemGroup === "family") score += 0.20;
-            if (stemGroup === "wash") score -= 0.10;
+            // The soloist IS the visual — character overlays (Jerry, Bob, Phil) shine
+            if (stemGroup === "family") score += 0.60;
+            if (stemGroup === "reactive") score += 0.30;
+            if (stemGroup === "wash") score -= 0.30;
+            if (stemGroup === "sacred") score -= 0.20;
           } else if (ctx.stemSectionType === "jam") {
-            if (stemGroup === "reactive") score += 0.15;
-            if (stemGroup === "wash") score += 0.10;
-            if (stemGroup === "sacred") score -= 0.10;
+            // Collective improvisation — reactive/geometric for energy, wash for breath
+            if (stemGroup === "reactive") score += 0.55;
+            if (stemGroup === "wash") score += 0.30;
+            if (stemGroup === "sacred") score -= 0.30;
+            if (stemGroup === "family") score -= 0.20;
           } else if (ctx.stemSectionType === "quiet") {
-            if (stemGroup === "sacred") score += 0.20;
-            if (stemGroup === "wash") score += 0.15;
-            if (stemGroup === "reactive") score -= 0.20;
-            if (stemGroup === "family") score -= 0.15;
+            // Stillness — only sacred/wash, hard cull on anything busy
+            if (stemGroup === "sacred") score += 0.55;
+            if (stemGroup === "wash") score += 0.45;
+            if (stemGroup === "reactive") score -= 0.55;
+            if (stemGroup === "family") score -= 0.45;
+            if (stemGroup === "narrative") score -= 0.30;
           } else if (ctx.stemSectionType === "instrumental") {
-            if (stemGroup === "reactive") score += 0.08;
-            if (stemGroup === "wash") score += 0.05;
+            // Light groove without vocals — moderate reactive + wash
+            if (stemGroup === "reactive") score += 0.35;
+            if (stemGroup === "wash") score += 0.25;
+            if (stemGroup === "family") score += 0.10;
+            if (stemGroup === "sacred") score -= 0.10;
           }
         }
       }

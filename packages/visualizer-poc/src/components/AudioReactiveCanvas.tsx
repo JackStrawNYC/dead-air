@@ -351,9 +351,14 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
   const beatArray = useMemo(() => buildBeatArrayUtil(frames), [frames]);
 
   // Dynamic time accumulator: advances proportionally to energy AND tempo.
-  // Auto-calibrated to song's own percentiles so the quietest 20% of the song
-  // runs at near-zero speed and only the loudest passages reach full speed.
-  // Tempo-scaled: 90 BPM blues runs ~75% speed of 120 BPM rock.
+  // Auto-calibrated to song's own percentiles. The previous version clamped
+  // tempo scaling to 0.6–1.2x and energy speed to 0.65–1.40x — combined max
+  // contrast of ~2.8x between a 60bpm ballad section and a 140bpm peak. Real
+  // viewer perception needs more swing than that to feel like "the visuals
+  // are moving with the music". New ranges:
+  //   tempo: 0.50–1.65x (~3.3x swing across BPM range)
+  //   energy: 0.50–1.55x (~3.1x swing across loud/quiet)
+  //   combined max contrast: ~5.2x (slow ballad ≈ 0.25x natural, fast peak ≈ 2.6x)
   const dynamicTimeLookup = useMemo(() => {
     // Auto-calibrate: P15 = quiet threshold, P85 = loud threshold
     const samples = frames.filter((_, i) => i % 5 === 0).map(f => f.rms).sort((a, b) => a - b);
@@ -361,9 +366,10 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
     const loudThresh = samples[Math.floor(samples.length * 0.85)] ?? 0.35;
     const range = Math.max(0.05, loudThresh - quietThresh);
 
-    // Tempo scaling: normalize to 120 BPM baseline, clamp 0.6-1.2x
+    // Tempo scaling: normalize to 120 BPM baseline, wider clamp so 60bpm and
+    // 140bpm visuals actually feel different (was clamped 0.6-1.2x = ±20%).
     const bpm = tempo ?? 120;
-    const tempoScale = Math.max(0.6, Math.min(1.2, bpm / 120));
+    const tempoScale = Math.max(0.50, Math.min(1.65, bpm / 120));
 
     const dt = 1 / fps;
     const lookup = new Float64Array(frames.length);
@@ -376,7 +382,9 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
       const localEnergy = eCount > 0 ? eSum / eCount : 0;
       const t = Math.max(0, Math.min(1, (localEnergy - quietThresh) / range));
       const factor = t * t * (3 - 2 * t); // smoothstep
-      const speed = (0.12 + factor * 0.88) * tempoScale; // 12% at quiet → 100% at peak, scaled by tempo
+      // 50% at quiet → 155% at peak (was 65% → 140%). Wider swing means quiet
+      // sections actually breathe slowly and loud sections actually drive fast.
+      const speed = (0.50 + factor * 1.05) * tempoScale;
       accum += dt * speed;
       lookup[i] = accum;
     }
@@ -406,9 +414,11 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
   const chromaShift = chromaShiftMagnitude(frames, idx);
   const afterglowHue = colorAfterglowHue(frames, idx);
 
-  // Fast-responding signals for transient punch
-  const fastEnergy = smoothValue(frames, idx, (f) => f.rms, 15);
-  const fastBass = smoothValue(frames, idx, (f) => f.sub + f.low, 10) * 0.5;
+  // Fast-responding signals for transient punch. Was 15-frame window which is
+  // identical to `energy` above (line 391) — fastEnergy provided no actual
+  // distinction. New window is 6 frames (~0.2s) for genuine snap-attack.
+  const fastEnergy = smoothValue(frames, idx, (f) => f.rms, 6);
+  const fastBass = smoothValue(frames, idx, (f) => f.sub + f.low, 5) * 0.5;
   const drumOnset = transientEnvelope(frames, idx, (f) => f.stemDrumOnset ?? 0, 8) * Math.max(0.45, egate);
   const drumBeat = transientEnvelope(frames, idx, (f) => (f.stemDrumBeat ? 1 : 0), 18) * Math.max(0.45, egate);
   const spectralFlux = computeSpectralFlux(frames, idx, 8);
@@ -499,7 +509,9 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
       beatSnap,
       chromaShift,
       afterglowHue,
-      slowEnergy: smoothValue(frames, idx, (f) => f.rms, 180),
+      // 90-frame Gaussian (~3s) instead of 180 (~6s) — still smooth enough for
+      // ambient drift signals but no longer lags major dynamic shifts by 6 seconds
+      slowEnergy: smoothValue(frames, idx, (f) => f.rms, 90),
       stemBass,
       chroma: Array.from(fd.chroma),
       fastEnergy,
@@ -561,8 +573,10 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
         ? computeMusicalTimeUtil(beatArray, idx, fps, tempo ?? 120) / (tempo ?? 120) * 60
         : (dynamicTimeLookup[idx] ?? (idx / fps));
       const fluxMult = 1.0 + Math.min(0.04, spectralFlux * 0.1);
-      // Global 60% slowdown — lava lamp, not seizure
-      return baseDT * 0.4 * climaxSpeedMult * fluxMult * spaceTimeDilation;
+      // Removed the old `* 0.4` global slowdown. dynamicTimeLookup now returns
+      // 65%-140% of natural rate which gives the chill-but-moving feel without
+      // freezing into slow-motion. Climax/space modulators still scale on top.
+      return baseDT * climaxSpeedMult * fluxMult * spaceTimeDilation;
     })(),
     jamPhase: jamPhaseCtx.phase,
     jamProgress: jamPhaseCtx.progress,

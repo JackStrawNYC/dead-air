@@ -63,8 +63,12 @@ export interface RotationWindow {
   frameEnd: number;
   /** Overlay names active during this window */
   overlays: string[];
-  /** Energy level for this window (inherited from section) */
+  /** Energy level for this window (inherited from section) — discrete enum,
+   *  preserved for backward compat with texture-routing code that compares strings */
   energy: "low" | "mid" | "high";
+  /** Continuous avgEnergy (0..1) inherited from the source section. Used for
+   *  gaussian-distance overlay scoring and continuous crossfade/window timing. */
+  avgEnergy: number;
   /** Whether this window is a pre-peak dropout (visual silence before climax) */
   isDropout?: boolean;
 }
@@ -185,6 +189,9 @@ export function buildRotationSchedule(
   songsCompleted?: number,
   /** Song's designated hero overlay — first overlay from overlayOverrides.include */
   songHero?: string,
+  /** Track tempo in BPM. Used for tempo-aware window length and crossfade timing.
+   *  Defaults to 120 if not provided. */
+  tempo?: number,
 ): RotationSchedule {
   const trackHash = hashString(trackId) + (showSeed ?? 0);
 
@@ -225,8 +232,11 @@ export function buildRotationSchedule(
     ? allPoolEntries.filter((e) => !eraExcluded.has(e.name))
     : allPoolEntries;
 
-  // 3. Build windows from sections + mark dropout windows
-  const windows = buildWindowsFromSections(sections, windowDurationScale);
+  // 3. Build windows from sections + mark dropout windows.
+  // Tempo flows in here so window length adapts to song speed: a 60bpm ballad
+  // gets ~1.6x longer windows than a 140bpm rocker at the same energy level.
+  const songTempo = tempo ?? 120;
+  const windows = buildWindowsFromSections(sections, windowDurationScale, songTempo);
   markDropoutWindows(windows);
 
   // 4. Select overlays per window
@@ -323,6 +333,11 @@ export function buildRotationSchedule(
       songIdentity,
       showArcModifiers,
       energyHints,
+      // Continuous gaussian energy match — overlays whose energy band's center
+      // is far from this window's actual avgEnergy get strongly culled (tier B/C)
+      // or lightly de-weighted (tier A keeps wider sigma so iconic Dead imagery
+      // stays present across the full energy spectrum).
+      continuousEnergy: window.avgEnergy,
     };
     const scored = effectivePool
       .map((entry) => ({ entry, score: scoreOverlayForWindow(entry, scoringCtx, rng) }))
@@ -426,14 +441,53 @@ function findWindow(windows: RotationWindow[], frame: number): number {
 }
 
 /**
- * Get the crossfade duration for a window boundary, based on the
- * energy of both adjacent windows. Uses the slower (longer) of the two
- * to ensure transitions feel organic.
+ * Continuous, tempo-aware crossfade duration.
+ *
+ * Replaces the old 3-bucket CROSSFADE_FRAMES_BY_ENERGY lookup with a smooth
+ * function of avgEnergy and tempo. The crossfade time picks the slower side
+ * of the boundary so transitions never feel rushed:
+ *   - Quiet→quiet ballad: ~7s organic dissolve
+ *   - Mid→mid groove:     ~3s steady fade
+ *   - Peak→peak rocker:   ~1.5s snappy swap
+ *   - Slow tempo: lengthens by up to 30%
+ *   - Fast tempo: shortens by up to 25%
+ *
+ * Output is in frames at 30fps. Hard floor of 30 frames (1s) so even peak
+ * transitions are perceptible — never an instant pop.
  */
-function getCrossfadeFrames(energyA: string, energyB: string): number {
-  const framesA = CROSSFADE_FRAMES_BY_ENERGY[energyA] ?? CROSSFADE_FRAMES_DEFAULT;
-  const framesB = CROSSFADE_FRAMES_BY_ENERGY[energyB] ?? CROSSFADE_FRAMES_DEFAULT;
-  // Use the average — biased toward the slower side for organic feel
+function continuousCrossfadeFrames(
+  avgEnergyA: number,
+  avgEnergyB: number,
+  tempo: number,
+): number {
+  // Take the slower side: use the lower energy of the two for the base.
+  // This biases toward organic transitions (quiet→loud uses the quiet curve).
+  const e = Math.min(avgEnergyA, avgEnergyB);
+  // Smooth ramp: silence → 240 frames (8s), peak → 30 frames (1s)
+  const eClamp = Math.max(0, Math.min(1, e));
+  const eNorm = eClamp * eClamp * (3 - 2 * eClamp); // smoothstep
+  const baseFrames = 240 - 210 * eNorm; // 240 → 30
+  // Tempo multiplier: slow songs lengthen crossfade, fast songs shorten
+  const tempoMult = Math.max(0.75, Math.min(1.30, 120 / Math.max(40, tempo)));
+  return Math.max(30, Math.round(baseFrames * tempoMult));
+}
+
+/**
+ * Get the crossfade duration for a window boundary.
+ * Uses continuous (avgEnergy, tempo) when both windows have an avgEnergy field
+ * and a tempo is provided. Falls back to the legacy 3-bucket lookup otherwise.
+ */
+function getCrossfadeFrames(
+  windowA: RotationWindow,
+  windowB: RotationWindow,
+  tempo?: number,
+): number {
+  if (windowA.avgEnergy !== undefined && windowB.avgEnergy !== undefined && tempo !== undefined) {
+    return continuousCrossfadeFrames(windowA.avgEnergy, windowB.avgEnergy, tempo);
+  }
+  // Legacy fallback
+  const framesA = CROSSFADE_FRAMES_BY_ENERGY[windowA.energy] ?? CROSSFADE_FRAMES_DEFAULT;
+  const framesB = CROSSFADE_FRAMES_BY_ENERGY[windowB.energy] ?? CROSSFADE_FRAMES_DEFAULT;
   return Math.round((framesA + framesB) / 2);
 }
 
@@ -453,6 +507,9 @@ export function getOverlayOpacities(
   frames?: EnhancedFrameData[],
   calibration?: EnergyCalibration,
   reactiveState?: ReactiveState,
+  /** Track tempo in BPM. When provided alongside windows that carry avgEnergy,
+   *  enables continuous tempo-aware crossfade timing. */
+  tempo?: number,
 ): Record<string, number> {
   const result: Record<string, number> = {};
 
@@ -475,10 +532,10 @@ export function getOverlayOpacities(
   const nextWindow = wi < windows.length - 1 ? windows[wi + 1] : null;
 
   const fadeInFrames = prevWindow
-    ? getCrossfadeFrames(prevWindow.energy, currentWindow.energy)
+    ? getCrossfadeFrames(prevWindow, currentWindow, tempo)
     : CROSSFADE_FRAMES_DEFAULT;
   const fadeOutFrames = nextWindow
-    ? getCrossfadeFrames(currentWindow.energy, nextWindow.energy)
+    ? getCrossfadeFrames(currentWindow, nextWindow, tempo)
     : CROSSFADE_FRAMES_DEFAULT;
 
   // Check if we're in a crossfade zone

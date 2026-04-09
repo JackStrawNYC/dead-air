@@ -8,33 +8,50 @@ import type { SectionBoundary } from "./types";
 import type { RotationWindow } from "./overlay-rotation";
 
 /**
- * Window duration in frames by energy.
+ * Continuous, tempo-aware window duration.
  *
- * CHILL CALIBRATION (3-hour party background):
- * Doubled all windows. Overlays now hold for 60-120s instead of 30-60s.
- * Slower rotation = each overlay has time to be appreciated, no visual churn,
- * less "what was that?" reactions when viewers glance up.
+ * Replaces the old 3-bucket WINDOW_FRAMES_BY_ENERGY lookup with a smooth
+ * function of avgEnergy and tempo. Slow + quiet → long windows (ambient
+ * sections hold for ~3 minutes). Fast + loud → short windows (peaks
+ * rotate every ~30s). Both axes matter:
+ *   - avgEnergy: maps 0.0 → 1.05, 0.5 → 0.50, 1.0 → 0.30 (energy multiplier)
+ *   - tempo:    maps 60bpm → 1.30, 120bpm → 1.0, 180bpm → 0.78 (tempo multiplier)
+ *
+ * Base duration is ~110 seconds (3300 frames at 30fps); the multipliers
+ * push the actual range from ~30 sec (fast peak) to ~210 sec (slow ballad).
+ *
+ * CHILL CALIBRATION preserved: even fast peaks never go below 30 sec — no
+ * "what just happened" rotation churn during 3-hour viewing.
  */
-const WINDOW_FRAMES_BY_ENERGY: Record<string, number> = {
-  low:  3600,  // 2 minutes — ambient sections hold for a long time
-  mid:  2400,  // 80 seconds — verses/bridges
-  high: 1800,  // 60 seconds — even peaks get more time
-};
-const WINDOW_FRAMES_DEFAULT = 1800;
+const BASE_WINDOW_FRAMES = 3300; // ~110 seconds at 30fps
+const MIN_WINDOW_FRAMES = 900;   // 30 seconds — never faster than this
+const MAX_WINDOW_FRAMES = 6300;  // 210 seconds — never slower than this
+
+export function continuousWindowFrames(avgEnergy: number, tempo: number): number {
+  const e = Math.max(0, Math.min(1, avgEnergy));
+  // Energy multiplier: smooth ramp from 1.05 (silence) to 0.30 (peak)
+  const energyMult = 1.05 - 0.75 * e * e * (3 - 2 * e); // smoothstep curve
+  // Tempo multiplier: faster songs rotate faster. Clamp 0.65–1.40 (~2.15x range)
+  const tempoMult = Math.max(0.65, Math.min(1.40, 120 / Math.max(40, tempo)));
+  const raw = BASE_WINDOW_FRAMES * energyMult * tempoMult;
+  return Math.max(MIN_WINDOW_FRAMES, Math.min(MAX_WINDOW_FRAMES, Math.round(raw)));
+}
 
 /**
  * Subdivide sections into energy-aware rotation windows, aligned to section boundaries.
- * Each section is split into 1+ windows of roughly equal length based on energy-scaled duration.
+ * Each section is split into 1+ windows of roughly equal length, sized by the
+ * continuous (avgEnergy, tempo) function above.
  */
 export function buildWindowsFromSections(
   sections: SectionBoundary[],
   windowDurationScale: number,
+  tempo = 120,
 ): RotationWindow[] {
   const windows: RotationWindow[] = [];
   for (const section of sections) {
     const sectionLen = section.frameEnd - section.frameStart;
     const targetWindowFrames = Math.round(
-      (WINDOW_FRAMES_BY_ENERGY[section.energy] ?? WINDOW_FRAMES_DEFAULT) * windowDurationScale,
+      continuousWindowFrames(section.avgEnergy, tempo) * windowDurationScale,
     );
     const windowCount = Math.max(1, Math.round(sectionLen / targetWindowFrames));
     const windowLen = Math.floor(sectionLen / windowCount);
@@ -49,6 +66,7 @@ export function buildWindowsFromSections(
         frameEnd,
         overlays: [],
         energy: section.energy,
+        avgEnergy: section.avgEnergy,
       });
     }
   }

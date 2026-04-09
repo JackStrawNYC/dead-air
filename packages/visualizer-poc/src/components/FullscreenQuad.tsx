@@ -220,7 +220,7 @@ export const FullscreenQuad: React.FC<Props> = ({
   // Hardcoded to 2 — gives us a reliable 4x shader speedup without per-bundle env-var
   // fragility. Bump to 3 if you need an even faster render at the cost of more
   // shader softness.
-  const SHADER_DOWNSCALE = 2;
+  const SHADER_DOWNSCALE = 1;
   const shaderWidth = Math.max(1, Math.round(width / SHADER_DOWNSCALE));
   const shaderHeight = Math.max(1, Math.round(height / SHADER_DOWNSCALE));
 
@@ -266,6 +266,7 @@ export const FullscreenQuad: React.FC<Props> = ({
     return {
       uTime: { value: 0 },
       uDynamicTime: { value: 0 },
+      uBeatTime: { value: 0 },
       uBass: { value: 0 },
       uRms: { value: 0 },
       uCentroid: { value: 0 },
@@ -454,6 +455,9 @@ export const FullscreenQuad: React.FC<Props> = ({
 
   uniforms.uTime.value = time;
   uniforms.uDynamicTime.value = dynamicTime;
+  // Beat-locked time: scales wall-clock time by tempo/120 so animation
+  // oscillators run faster on faster songs without needing to track beat phase.
+  uniforms.uBeatTime.value = time * ((tempo ?? 120) / 120);
   uniforms.uBass.value = smooth.bass;
   uniforms.uRms.value = smooth.rms;
   uniforms.uCentroid.value = smooth.centroid;

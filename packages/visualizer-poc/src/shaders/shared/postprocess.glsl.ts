@@ -70,20 +70,21 @@ export function buildPostProcessGLSL(config: PostProcessConfig = {}): string {
     lightLeakEnabled = true,
   } = config;
 
-  // Grain intensity expression
+  // Grain intensity expression. Wide energy swing — quiet ballads should look
+  // visibly cleaner than rockers. Old "normal" was 0.03→0.04 (imperceptible).
   let grainExpr: string;
   switch (grainStrength) {
     case "none":
       grainExpr = "0.0";
       break;
     case "light":
-      grainExpr = "mix(0.02, 0.03, energy)";
+      grainExpr = "mix(0.015, 0.045, energy)";
       break;
     case "heavy":
-      grainExpr = "mix(0.08, 0.14, energy)";
+      grainExpr = "mix(0.05, 0.18, energy)";
       break;
-    default: // normal
-      grainExpr = "mix(0.03, 0.04, energy)";
+    default: // normal — 4x wider than the old 0.01 swing
+      grainExpr = "mix(0.02, 0.07, energy)";
   }
 
   const bloomThresholdStr =
@@ -97,12 +98,12 @@ vec3 applyPostProcess(vec3 col, vec2 uv, vec2 p) {
 
 ${
   beatPulseEnabled
-    ? `  // Beat pulse: brightness swell on confident beats — chill calibration
-  // Reduced from 0.06 to 0.025 (~60% less aggressive) for 3-hour viewability.
-  // Beat presence stays felt but never seizure-inducing.
+    ? `  // Beat pulse: brightness swell on confident beats — CALM MODE
+  // Reduced to 0.012 (~50% of previous) — eliminates "weird pulsing light"
+  // viewer complaint. Subtle enough to barely notice consciously.
   float bp = beatPulse(uMusicalTime);
   float bpGated = bp * smoothstep(0.4, 0.8, uBeatConfidence);
-  col *= 1.0 + bpGated * 0.025;
+  col *= 1.0 + bpGated * 0.012;
 `
     : ""
 }
@@ -116,14 +117,16 @@ ${
 }
 ${
   bloomEnabled
-    ? `  // Bloom: vivid self-illumination
+    ? `  // Bloom: vivid self-illumination — WIDE energy swing so a ballad reads as
+  // genuinely darker/cleaner than a rocker. Old swings were 0.18→0.30 (40% diff)
+  // which was visually flat. New swings are 2-3x wider.
   {
     float lum = dot(col, vec3(0.299, 0.587, 0.114));
-    float bloomThreshold = mix(0.45, 0.30, energy) + uBloomThreshold${bloomThresholdStr};
+    float bloomThreshold = mix(0.58, 0.18, energy) + uBloomThreshold${bloomThresholdStr};
     float bloomAmount = max(0.0, lum - bloomThreshold);
     vec3 bloomColor = mix(col, vec3(1.0, 0.95, 0.90), 0.4);
-    float bloomCap = 0.40 + energy * 0.20;
-    vec3 bloom = bloomColor * min(bloomAmount, bloomCap) * (0.18 + energy * 0.12) * uShowBloom;
+    float bloomCap = 0.20 + energy * 0.55;
+    vec3 bloom = bloomColor * min(bloomAmount, bloomCap) * (0.08 + energy * 0.32) * uShowBloom;
     col = col + bloom - col * bloom;
   }
 `
@@ -169,10 +172,14 @@ ${
   // Envelope brightness (the ONE knob)
   col *= uEnvelopeBrightness;
 
-  // Envelope saturation
+  // Envelope saturation, with an energy knee so quiet sections read as muted
+  // and loud sections read as vivid. Ballad RMS ~0.10 → ~0.78x saturation;
+  // rocker RMS ~0.65 → ~1.18x saturation. This is the visual signal that
+  // viewers actually feel as "this song looks slow/fast".
   {
     float envLuma = dot(col, vec3(0.299, 0.587, 0.114));
-    col = mix(vec3(envLuma), col, uEnvelopeSaturation);
+    float satKnee = mix(0.72, 1.22, energy);
+    col = mix(vec3(envLuma), col, uEnvelopeSaturation * satKnee);
   }
 
   // Envelope hue rotation (proper HSV rotation, not 2D R-G matrix)

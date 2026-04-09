@@ -7,7 +7,7 @@
 import React from "react";
 import { useCurrentFrame } from "remotion";
 import { SceneCrossfade } from "./SceneCrossfade";
-import { renderScene, getComplement, getModesForEnergy, TRANSITION_AFFINITY, SCENE_REGISTRY } from "./scene-registry";
+import { renderScene, getComplement, getModesForEnergy, getModesForContinuousEnergy, TRANSITION_AFFINITY, SCENE_REGISTRY } from "./scene-registry";
 import type {
   EnhancedFrameData,
   SectionBoundary,
@@ -398,10 +398,23 @@ export function getModeForSection(
       if (energyChanged) {
         const affinityPool = TRANSITION_AFFINITY[prevMode];
         if (affinityPool && affinityPool.length > 0) {
-          // Filter by energy affinity and era
-          const energyPool = getModesForEnergy(section.energy, era, song.defaultMode);
+          // Filter by continuous-energy affinity and era. avgEnergy is the
+          // actual section RMS (0..1) — replaces the old 3-bucket discretization
+          // that made every "low" song share one shader pool.
+          const energyPool = getModesForContinuousEnergy(section.avgEnergy, era, song.defaultMode);
           const energySet = new Set(energyPool);
           let candidates = affinityPool.filter((m) => energySet.has(m));
+
+          // VARIETY FALLBACK: many TRANSITION_AFFINITY entries reference modes
+          // that are now in AUTO_SELECT_BLOCKLIST, leaving only 0-2 survivors.
+          // When that happens, every song with the same defaultMode collapses
+          // to the same shader on its first energy change (e.g. fractal_temple
+          // → only volumetric_nebula). Fall through to the full continuous-energy
+          // pool when the intersection is starved, so different songs actually
+          // get different shaders even when they share a defaultMode.
+          if (candidates.length < 3) {
+            candidates = energyPool;
+          }
           if (candidates.length === 0) candidates = affinityPool;
 
           // Preferred mode awareness: intersect with preferred modes first
@@ -433,8 +446,12 @@ export function getModeForSection(
         }
       }
 
-      // No energy change: use energy-appropriate mode pool with seeded selection
-      const pool = getModesForEnergy(section.energy, era, song.defaultMode);
+      // No energy change: use continuous-energy weighted pool. Each shader's
+      // copies are gaussian-proportional to distance between its affinity
+      // center and the section's actual avgEnergy, so a quiet ballad section
+      // (avgEnergy 0.10) and a quiet station section (avgEnergy 0.20) draw
+      // from genuinely different distributions instead of identical "low" pools.
+      const pool = getModesForContinuousEnergy(section.avgEnergy, era, song.defaultMode);
 
       // Recency-weighted variety: penalize recently/frequently used modes
       let filteredPool = pool;
@@ -736,8 +753,55 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
   // and no other routing path can override it. This is the safety net that ensures
   // a song's curated visual identity can't be silently replaced by a reactive
   // shader pool that doesn't fit the song's palette or character.
+  //
+  // CROSSFADE: when adjacent sections have DIFFERENT overrides, smoothly blend
+  // between them across a 90-frame (3s) window centered on the boundary instead
+  // of doing a 1-frame snap cut. Without this, sectionOverride boundaries look
+  // like jarring jump cuts.
   const explicitOverride = song.sectionOverrides?.find((o) => o.sectionIndex === currentSectionIdx);
   if (explicitOverride) {
+    const SECTION_OVERRIDE_CROSSFADE = 180; // 6 seconds at 30fps — CALM MODE: doubled from 3s
+    const halfCF = Math.floor(SECTION_OVERRIDE_CROSSFADE / 2);
+    const currentSection = sections[currentSectionIdx];
+
+    // Look back: are we early in the current section, with a previous section
+    // that had a different override? If so, crossfade IN.
+    if (currentSection && currentSectionIdx > 0 && frame - currentSection.frameStart < halfCF) {
+      const prevOverride = song.sectionOverrides?.find((o) => o.sectionIndex === currentSectionIdx - 1);
+      if (prevOverride && prevOverride.mode !== explicitOverride.mode) {
+        const cfStart = currentSection.frameStart - halfCF;
+        const progress = Math.max(0, Math.min(1, (frame - cfStart) / SECTION_OVERRIDE_CROSSFADE));
+        return (
+          <SceneCrossfade
+            progress={progress}
+            outgoing={renderMode(prevOverride.mode, frames, sections, palette, tempo, undefined, jamDensity)}
+            incoming={renderMode(explicitOverride.mode, frames, sections, palette, tempo, undefined, jamDensity)}
+            style="morph"
+          />
+        );
+      }
+    }
+
+    // Look forward: are we late in the current section, with a NEXT section
+    // that has a different override? If so, crossfade OUT (start the blend
+    // before the boundary so the visual is already morphing into the new shader
+    // when the section actually starts).
+    if (currentSection && currentSectionIdx < sections.length - 1 && currentSection.frameEnd - frame < halfCF) {
+      const nextOverride = song.sectionOverrides?.find((o) => o.sectionIndex === currentSectionIdx + 1);
+      if (nextOverride && nextOverride.mode !== explicitOverride.mode) {
+        const cfStart = currentSection.frameEnd - halfCF;
+        const progress = Math.max(0, Math.min(1, (frame - cfStart) / SECTION_OVERRIDE_CROSSFADE));
+        return (
+          <SceneCrossfade
+            progress={progress}
+            outgoing={renderMode(explicitOverride.mode, frames, sections, palette, tempo, undefined, jamDensity)}
+            incoming={renderMode(nextOverride.mode, frames, sections, palette, tempo, undefined, jamDensity)}
+            style="morph"
+          />
+        );
+      }
+    }
+
     return <>{renderMode(explicitOverride.mode, frames, sections, palette, tempo, undefined, jamDensity)}</>;
   }
 
@@ -776,8 +840,14 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
   //
   // DEAD AIR: triggers are suppressed entirely. Crowd applause has impulsive
   // transients that fire reactive triggers as if the band were still playing.
+  //
+  // CALM MODE: also suppress reactive triggers if the song has explicit
+  // sectionOverrides — the user curated those for a reason and reactive triggers
+  // shouldn't override them. (Note: explicit override path returns early above,
+  // but this is defensive in case override returns null/undefined for some sections.)
   const isInDeadAir = (deadAirFactor ?? 0) > 0.1;
-  if (reactiveState?.isTriggered && !coherenceIsLocked && !isInDeadAir && reactiveState.suggestedModes.length > 0) {
+  const hasOverrides = (song.sectionOverrides?.length ?? 0) > 0;
+  if (reactiveState?.isTriggered && !coherenceIsLocked && !isInDeadAir && !hasOverrides && reactiveState.suggestedModes.length > 0) {
     // Filter reactive pool to only modes the song explicitly allows
     const allowedModes = songIdentity?.preferredModes && songIdentity.preferredModes.length > 0
       ? reactiveState.suggestedModes.filter((m) => songIdentity.preferredModes.includes(m))
