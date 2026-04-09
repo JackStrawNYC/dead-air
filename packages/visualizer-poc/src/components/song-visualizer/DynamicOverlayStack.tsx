@@ -141,6 +141,31 @@ export const DynamicOverlayStack: React.FC<Props> = ({
     ? `saturate(${(1 - climaxDesaturation * 0.40).toFixed(3)})`
     : undefined;
 
+  // ─── Slow audio-reactive breathing filter ───
+  // Engine-level CSS modulation that makes ALL overlays gently breathe with
+  // the music's slow envelope WITHOUT touching any individual overlay
+  // component. Driven by a 90-frame (3-second) backward-window average of
+  // RMS so changes happen over seconds — guaranteed smooth, no jitter, no
+  // flash, no flicker. CSS filter is GPU-accelerated and frame-perfect.
+  //
+  // Bounded ranges:
+  //   brightness: 0.90-1.10 (±10%) — quiet feels dimmer, loud feels brighter
+  //   saturate:   0.85-1.10 (±12.5%) — quiet feels muted, loud feels vivid
+  //
+  // The change rate is dominated by the 90-frame window so even a sudden
+  // dynamic shift (e.g. a chorus drop) takes ~3 seconds to reach the new
+  // steady state — well below any flash/flicker perception threshold.
+  let slowEnergySum = 0;
+  let slowCount = 0;
+  for (let i = Math.max(0, frameIdx - 90); i <= frameIdx; i++) {
+    slowEnergySum += frames[i]?.rms ?? 0;
+    slowCount++;
+  }
+  const slowEnergy = slowCount > 0 ? slowEnergySum / slowCount : 0.2;
+  const breathBrightness = 0.90 + Math.min(1, slowEnergy) * 0.20;
+  const breathSaturate = 0.85 + Math.min(1, slowEnergy) * 0.25;
+  const breathFilter = `brightness(${breathBrightness.toFixed(3)}) saturate(${breathSaturate.toFixed(3)})`;
+
   return (
     <TempoProvider tempo={tempo}>
     <SongPaletteProvider palette={palette}>
@@ -153,7 +178,7 @@ export const DynamicOverlayStack: React.FC<Props> = ({
             opacity: gateOpacity,
             pointerEvents: "none",
             mixBlendMode: "screen",
-            filter: desatFilter,
+            filter: [breathFilter, desatFilter ?? ""].filter(Boolean).join(" "),
             contain: "layout style paint",
           }}
         >
@@ -186,6 +211,7 @@ export const DynamicOverlayStack: React.FC<Props> = ({
           inset: 0,
           opacity: gateOpacity,
           filter: [
+            breathFilter,
             hueRotation !== 0 ? `hue-rotate(${hueRotation.toFixed(1)}deg)` : "",
             desatFilter ?? "",
           ].filter(Boolean).join(" ") || undefined,
