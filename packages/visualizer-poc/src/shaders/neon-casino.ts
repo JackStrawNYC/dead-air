@@ -206,10 +206,14 @@ vec2 ncMap(vec3 p, float ncTime, float energy, float bass, float drumOn,
   float ceilD = -(p.y - 3.0);
   if (ceilD < res.x) res = vec2(ceilD, 6.0);
 
-  // Walls — left and right
+  // Walls — left and right.
+  // SDF convention: positive in corridor air, negative in surrounding rock.
+  // Previously these were sign-inverted (leftWall negated, rightWall reversed)
+  // which made every camera ray instantly "hit" at distance ~0 and produced
+  // a flat-color frame with no actual corridor visible.
   float corridorW = 3.0 + sin(p.z * 0.3 + ncTime * 0.1) * 0.15;
-  float wallL = -(p.x + corridorW);
-  float wallR = p.x - corridorW;
+  float wallL = p.x + corridorW;       // positive when right of left wall
+  float wallR = corridorW - p.x;       // positive when left of right wall
   float wallD = min(wallL, wallR);
   if (wallD < res.x) res = vec2(wallD, 1.0);
 

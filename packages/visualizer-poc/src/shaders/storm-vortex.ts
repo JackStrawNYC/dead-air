@@ -373,14 +373,17 @@ void main() {
     float eyeThin = smoothstep(1.5, 0.3, radial) * climB * 0.5;
     density *= (1.0 + climB * 0.3 - eyeThin);
 
-    density *= 0.055;
+    // STORM BRIGHTNESS REWRITE: previous values (density *= 0.055,
+    // cloudColor 0.35→0.08) rendered the storm essentially black. Lifted by
+    // ~3x so the volumetric clouds are actually visible against the dark sky.
+    density *= 0.18;
 
     if (density > 0.001) {
       float alpha = density * (1.0 - cloudAlpha);
 
       // Depth color: near is lighter, far is darker
       float depthFade = fi / float(maxSteps);
-      vec3 cloudColor = mix(stormCol * 0.35, stormCol * 0.08, depthFade);
+      vec3 cloudColor = mix(stormCol * 1.1, stormCol * 0.35, depthFade);
 
       // Lightning illumination: flash lights up cloud interiors
       if (lightningFlash > 0.05) {
@@ -446,9 +449,11 @@ void main() {
     float spec = pow(max(dot(reflect(-lightDir, wallNorm), -rd), 0.0), 16.0);
     float fresnel = pow(1.0 - max(dot(wallNorm, -rd), 0.0), 3.0);
 
-    vec3 wallColor = stormCol * 0.08 * (0.05 + diff * 0.3);
-    wallColor += lightCol * spec * 0.05;
-    wallColor += stormCol * 0.3 * fresnel * 0.08;
+    // Brightened wall lighting (was 0.08 * (0.05 + diff*0.3) which crushed
+    // the vortex walls to black even when they were directly hit by rays).
+    vec3 wallColor = stormCol * 0.45 * (0.18 + diff * 0.7);
+    wallColor += lightCol * spec * 0.18;
+    wallColor += stormCol * 0.6 * fresnel * 0.25;
 
     // Lightning illuminates walls
     if (lightningFlash > 0.05) {
@@ -469,13 +474,16 @@ void main() {
   // EYE OF THE STORM (clear sky / stars through top)
   // ═══════════════════════════════════════════
   if (cloudAlpha < 0.9 && rd.y > 0.0) {
-    // Sky gradient: dark storm to clearer sky at vortex eye
+    // Sky gradient: dark storm to clearer sky at vortex eye.
+    // Brightened from previous near-black so the storm has a visible backdrop.
     float skyGrad = smoothstep(-0.1, 0.8, rd.y);
-    vec3 skyColor = mix(vec3(0.02, 0.02, 0.04), vec3(0.05, 0.06, 0.12), skyGrad);
+    vec3 skyHigh = mix(vec3(0.18, 0.22, 0.34), stormCol * 0.5, 0.4);
+    vec3 skyLow  = mix(vec3(0.10, 0.12, 0.18), stormCol * 0.35, 0.4);
+    vec3 skyColor = mix(skyLow, skyHigh, skyGrad);
 
     // Vocal presence reveals the calm eye
     float eyeReveal = vocalP * 0.6 + sSpace * 0.4;
-    skyColor = mix(skyColor, vec3(0.08, 0.1, 0.18), eyeReveal * skyGrad);
+    skyColor = mix(skyColor, vec3(0.30, 0.35, 0.55), eyeReveal * skyGrad);
 
     // Stars visible through the eye at high vocal presence
     if (eyeReveal > 0.15) {

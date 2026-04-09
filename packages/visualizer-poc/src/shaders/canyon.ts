@@ -104,19 +104,19 @@ float canWallProfile(vec3 pos, float gapWidth, float timeVal) {
   float wallNoise2 = snoise(vec3(5.0, pos.y * 0.7, pos.z * 0.4)) * 0.2;
   float wallNoise3 = snoise(vec3(10.0, pos.y * 1.5, pos.z * 0.8)) * 0.08;
 
-  // Left wall distance
-  float leftWall = pos.x + gapWidth + wallNoise1 + wallNoise3;
-  // Right wall distance
-  float rightWall = -pos.x + gapWidth + wallNoise2 + wallNoise3;
+  // Distance from each wall plane (positive = inside canyon air)
+  float leftDist  = pos.x + gapWidth + wallNoise1 + wallNoise3; // distance from x=-gap
+  float rightDist = -pos.x + gapWidth + wallNoise2 + wallNoise3; // distance from x=+gap
 
-  // Canyon narrows higher up (slot canyon shape)
+  // Slot canyon: narrows higher up
   float narrowFactor = smoothstep(0.0, 8.0, pos.y) * 0.4;
-  leftWall -= narrowFactor;
-  rightWall -= narrowFactor;
+  leftDist  -= narrowFactor;
+  rightDist -= narrowFactor;
 
-  // Combined: negative inside walls
-  float walls = min(leftWall, rightWall);
-  return -walls; // flip: positive outside canyon air
+  // Standard SDF convention: positive in free space (canyon air), negative in
+  // rock. Previously this returned -min(...) which flipped the sign and made
+  // every ray instantly "hit" at the camera origin, producing a flat frame.
+  return min(leftDist, rightDist);
 }
 
 // ============================================================
@@ -367,10 +367,16 @@ void main() {
   vec3 col;
 
   if (marchResult.y < 0.0) {
-    // Sky through slot
+    // Sky through canyon slot — brightened from prior dim values so the slot
+    // actually pops against the dark walls. Palette-tinted + warm horizon glow.
     float skyGrad = rd.y * 0.5 + 0.5;
-    col = mix(vec3(0.4, 0.35, 0.25), vec3(0.3, 0.5, 0.8), skyGrad);
-    col = mix(col, vec3(0.5, 0.35, 0.2), smoothstep(0.5, 0.1, rd.y) * 0.3);
+    vec3 skyHigh = mix(vec3(0.45, 0.65, 0.95), palCol2 * 1.4, 0.25);
+    vec3 skyLow = mix(vec3(0.95, 0.7, 0.4), palCol1 * 1.3, 0.25);
+    col = mix(skyLow, skyHigh, smoothstep(0.0, 0.7, skyGrad));
+    // Sun glow toward horizon
+    col += vec3(1.0, 0.85, 0.55) * smoothstep(0.4, 0.0, abs(rd.y - 0.05)) * 0.35;
+    // Energy boost on the slot
+    col *= 1.0 + energy * 0.3 + climaxBoost * 0.4;
   } else {
     vec3 hitPos = camOrigin + rd * marchResult.x;
     vec3 norm = canNormal(hitPos, gapWidth, timeVal);
@@ -438,20 +444,36 @@ void main() {
       specCol = vec3(0.3, 0.3, 0.35);
     }
 
-    // Compose lighting
-    vec3 ambientLight = vec3(0.06, 0.04, 0.03);
+    // ─── Compose lighting ───
+    // CANYON LIGHTING REWRITE: prior values were so dim the canyon walls
+    // rendered near-black against a near-black sky, producing an unviewable
+    // image. Brightened ambient + added warm bounced fill from the canyon
+    // floor + cool sky fill from above, and tinted ambient with the palette.
+    vec3 ambientLight = mix(vec3(0.18, 0.13, 0.08), palCol1 * 0.35, 0.3);
     col = matColor * ambientLight * ambOcc;
-    col += matColor * vec3(0.9, 0.8, 0.6) * diffuse * 0.5;
-    col += specCol * specular * 0.3;
-    col += matColor * fresnelVal * 0.08;
+    col += matColor * vec3(1.05, 0.9, 0.65) * diffuse * 0.85;
+    col += specCol * specular * 0.45;
+    col += matColor * fresnelVal * 0.18;
+
+    // ─── Sky fill light from above (cool) ───
+    float skyFill = max(0.0, dot(norm, vec3(0.0, 1.0, 0.0))) * 0.35;
+    col += matColor * vec3(0.45, 0.55, 0.75) * skyFill * ambOcc;
+
+    // ─── Warm bounced light from canyon floor (warmer for chorus/peak) ───
+    float floorBounce = max(0.0, dot(norm, vec3(0.0, -1.0, 0.0))) * 0.25;
+    vec3 bounceCol = mix(vec3(0.55, 0.32, 0.15), palCol2, 0.2);
+    col += matColor * bounceCol * floorBounce * (0.6 + sChorus * 0.4 + climaxBoost * 0.5);
+
+    // ─── Energy-driven warmth and brightness lift ───
+    col *= 1.0 + energy * 0.35 + climaxBoost * 0.25;
 
     // Dynamic range contrast
-    col *= mix(0.85, 1.15, dynRange * diffuse);
+    col *= mix(0.9, 1.25, dynRange * diffuse);
 
-    // Distance fog inside canyon: dark atmospheric
+    // Distance fog inside canyon: warm atmospheric haze (was nearly-black)
     float fogAmount = 1.0 - exp(-marchResult.x * 0.06);
-    vec3 fogColor = vec3(0.04, 0.03, 0.02);
-    col = mix(col, fogColor, fogAmount * 0.5);
+    vec3 fogColor = mix(vec3(0.18, 0.10, 0.05), palCol1 * 0.5, 0.4);
+    col = mix(col, fogColor, fogAmount * 0.55);
   }
 
   // ─── Volumetric god rays ───
@@ -487,10 +509,13 @@ void main() {
   }
 
   // ─── Vignette ───
-  float vigScale = mix(0.35, 0.25, energy);
+  // Was mixing toward near-black edges which crushed the entire frame; now
+  // mixes toward a warm canyon-shadow color so edges stay readable.
+  float vigScale = mix(0.30, 0.22, energy);
   float vignette = 1.0 - dot(screenPos * vigScale, screenPos * vigScale);
   vignette = smoothstep(0.0, 1.0, vignette);
-  col = mix(vec3(0.02, 0.01, 0.005), col, vignette);
+  vec3 vignetteCol = mix(vec3(0.10, 0.06, 0.04), palCol1 * 0.18, 0.4);
+  col = mix(vignetteCol, col, vignette);
 
   // ─── Darkness texture ───
   col += darknessTexture(uv, uTime, energy);

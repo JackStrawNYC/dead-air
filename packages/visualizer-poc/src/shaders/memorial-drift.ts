@@ -557,7 +557,7 @@ void main() {
       float aoVal = mdAO(hitPos, n);
 
       // Ground texture
-      float groundNoise = fbm3(hitPos.xz * 1.5 + 3.0) * 0.5 + 0.5;
+      float groundNoise = fbm3(vec3(hitPos.xz * 1.5 + 3.0, 0.0)) * 0.5 + 0.5;
       vec3 groundCol = mix(vec3(0.06, 0.06, 0.07), vec3(0.12, 0.11, 0.10), groundNoise);
 
       // Candlelight on ground
@@ -644,18 +644,28 @@ void main() {
     col = mix(col, fogCol, fogAmount);
 
   } else {
-    // ─── Background: deep sky + stars ───
-    float skyGrad = smoothstep(-0.3, 0.4, rd.y);
-    vec3 skyColor = mix(vec3(0.05, 0.04, 0.06), vec3(0.02, 0.03, 0.05), skyGrad);
+    // ─── Background: deep memorial twilight + stars ───
+    // Was vec3(0.05) → vec3(0.02) which rendered as essentially pure black on
+    // most displays. Lifted to a visible deep blue twilight tone with a real
+    // warm horizon glow so the scene reads as a memorial at dusk.
+    float skyGrad = smoothstep(-0.3, 0.6, rd.y);
+    vec3 skyHigh = vec3(0.04, 0.05, 0.10);
+    vec3 skyLow  = mix(vec3(0.18, 0.12, 0.08), vec3(0.32, 0.18, 0.10), vocalPres);
+    vec3 skyColor = mix(skyLow, skyHigh, skyGrad);
 
     // Stars
     float stars = mdStars(rd);
-    skyColor += vec3(0.8, 0.85, 1.0) * stars;
+    skyColor += vec3(0.85, 0.88, 1.0) * stars * 1.2;
 
-    // Horizon glow (vocal presence warms it)
-    float horizonGlow = exp(-abs(rd.y) * 5.0);
-    vec3 horizonCol = mix(vec3(0.08, 0.06, 0.10), vec3(0.15, 0.10, 0.06), vocalPres);
-    skyColor += horizonCol * horizonGlow * 0.3;
+    // Wide horizon glow that warms the lower half of the frame
+    float horizonGlow = exp(-max(0.0, rd.y) * 3.0);
+    vec3 horizonCol = mix(vec3(0.20, 0.13, 0.08), vec3(0.42, 0.22, 0.10), vocalPres + tender * 0.3);
+    skyColor += horizonCol * horizonGlow * 0.55;
+
+    // Faint distant moon-glow to anchor the night sky
+    vec3 moonDir = normalize(vec3(0.3, 0.45, 0.85));
+    float moon = pow(max(dot(rd, moonDir), 0.0), 32.0);
+    skyColor += vec3(0.55, 0.55, 0.65) * moon * 0.7;
 
     col = skyColor;
     hitDist = MD_MAX_DIST;
@@ -748,10 +758,12 @@ void main() {
 
   col = applyPostProcess(col, uv, p);
 
-  // Lifted blacks: memorial scenes should never go pure black
+  // Lifted blacks: memorial scenes should never go pure black. Previously
+  // floor was 0.025 which was barely above true black. Lifted to ~0.10 so
+  // even the dimmest pixels show as deep visible twilight rather than void.
   float isBuild = step(0.5, uClimaxPhase) * step(uClimaxPhase, 1.5);
-  float liftMult = mix(1.0, 0.3, isBuild * clamp(uClimaxIntensity, 0.0, 1.0));
-  col = max(col, vec3(0.025, 0.022, 0.03) * liftMult);
+  float liftMult = mix(1.0, 0.5, isBuild * clamp(uClimaxIntensity, 0.0, 1.0));
+  col = max(col, vec3(0.09, 0.07, 0.10) * liftMult);
 
   gl_FragColor = vec4(col, 1.0);
 }

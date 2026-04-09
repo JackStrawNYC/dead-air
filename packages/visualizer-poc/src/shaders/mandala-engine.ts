@@ -480,19 +480,18 @@ void main() {
     surfColor += palPrimary * shimmer * timbralB * 0.08;
 
     // ─── Compose surface ───
-    // Backlight: warm light through the mandala (the star of the show)
-    vec3 backContrib = backlightColor * backDiff * 0.4;
-    // Fill: subtle frontal illumination
-    vec3 fillContrib = mix(palPrimary, palSecondary, 0.3) * fillDiff * 0.12;
-    // Ambient
-    vec3 ambient = surfColor * 0.08 * occl;
+    // Backlight + fill + ambient — boosted from dim originals so the
+    // mandala geometry actually reads as illuminated rather than flat 2D.
+    vec3 backContrib = backlightColor * backDiff * 1.1;
+    vec3 fillContrib = mix(palPrimary, palSecondary, 0.3) * fillDiff * 0.45;
+    vec3 ambient = surfColor * 0.35 * occl;
 
     col = ambient + backContrib + fillContrib;
-    col += palSecondary * specBack * 0.15 * (1.0 + timbralB * 0.5);
-    col += palPrimary * specFill * 0.05;
+    col += palSecondary * specBack * 0.55 * (1.0 + timbralB * 0.5);
+    col += palPrimary * specFill * 0.25;
 
     // Rim glow: mandala edges glow with backlight color
-    col += backlightColor * fresnel * 0.12 * (1.0 + vocalP * 0.4);
+    col += backlightColor * fresnel * 0.45 * (1.0 + vocalP * 0.4);
 
     // Beat snap flash on geometry
     col += vec3(1.0, 0.95, 0.9) * beatSnp * 0.1 * fresnel;

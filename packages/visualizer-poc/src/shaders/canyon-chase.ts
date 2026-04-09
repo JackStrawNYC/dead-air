@@ -154,9 +154,13 @@ float ccCanyonWalls(vec3 rp, float tension, float climaxOpen, float sJam,
   wallNoiseL += bassShake * sin(rp.y * 3.0 + uTime * 6.0) * 0.06;
   wallNoiseR += bassShake * cos(rp.y * 3.0 + uTime * 6.0) * 0.06;
 
-  // Two wall planes with noise displacement
-  float leftWall = -(rp.x + halfW + wallNoiseL);
-  float rightWall = rp.x - halfW - wallNoiseR;
+  // Two wall planes with noise displacement.
+  // SDF convention: positive in canyon air, negative in surrounding rock.
+  // Previously these were sign-inverted (leftWall negated, rightWall =
+  // rp.x - halfW), which made every ray miss the walls and produced a flat
+  // background frame across the whole shader.
+  float leftWall  = rp.x + halfW + wallNoiseL;        // positive when right of left wall
+  float rightWall = halfW + wallNoiseR - rp.x;        // positive when left of right wall
 
   return min(leftWall, rightWall);
 }

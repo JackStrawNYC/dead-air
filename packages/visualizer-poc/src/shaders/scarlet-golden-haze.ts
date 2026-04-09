@@ -139,11 +139,13 @@ vec4 _sg_render(vec3 ro, vec3 rd, float time, float prm, float energy, float hig
 
     vec3 pos = ro + t * rd;
     vec2 mpv = _sg_map(pos, prm);
-    float den = clamp(mpv.x - 0.3, 0.0, 1.0) * 0.8; // reduced density multiplier
+    // den lifted: was clamp(mpv.x - 0.3, 0, 1) which was 0 for almost all
+    // pixels. Bias up so the haze actually accumulates visible content.
+    float den = clamp(mpv.x + 0.4, 0.0, 1.0) * 1.0;
     float dn = clamp((mpv.x + 2.0), 0.0, 3.0);
 
     vec4 col = vec4(0);
-    if (mpv.x > 0.6) {
+    if (mpv.x > -0.5) {
       // === GOLDEN HAZE COLORS ===
       // Warm gold base with soft rose undertones
       vec3 goldBase = vec3(0.95, 0.82, 0.45);
@@ -166,10 +168,13 @@ vec4 _sg_render(vec3 ro, vec3 rd, float time, float prm, float energy, float hig
       float dif = clamp((den - _sg_map(pos + 0.8, prm).x) / 9.0, 0.001, 1.0);
       dif += clamp((den - _sg_map(pos + 0.35, prm).x) / 2.5, 0.001, 1.0);
 
-      // Warm ambient + strong forward scatter
-      vec3 ambient = vec3(0.06, 0.05, 0.02);
-      vec3 diffLight = vec3(0.08, 0.065, 0.03) * dif;
-      col.xyz *= (ambient + diffLight * 2.0);
+      // Warm ambient + strong forward scatter.
+      // Bug fix: previously col.xyz *= (ambient + diffLight*2) which crushed
+      // every pixel by ~95% since ambient was vec3(0.06,0.05,0.02). Lighting
+      // should be additive, not multiplicative. Boosted intensities too.
+      vec3 ambient = vec3(0.18, 0.15, 0.06);
+      vec3 diffLight = vec3(0.45, 0.35, 0.15) * dif;
+      col.xyz += den * (ambient + diffLight);
 
       // === DOMINANT FORWARD SCATTERING ===
       // This is the key visual: looking toward the sun through golden dust

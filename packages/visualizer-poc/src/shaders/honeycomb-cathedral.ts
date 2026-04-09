@@ -339,22 +339,24 @@ void main() {
     // Jam: walls shift to molten honey orange
     wallColor = mix(wallColor, honeyGold * 0.4, sJam * 0.4);
 
-    // Assemble lighting
-    col = wallColor * (0.04 + diffuse * 0.35 + fillDiff) * hcAO;
-    col += colLight * spec * 0.25 * (1.0 + energy * 0.4);
-    col += colGlow * fresnel * 0.12 * (1.0 + vocalP * 0.5);
-    col += sss * 0.35 * (1.0 + energy * 0.3);
-    col *= 1.0 + energy * 0.25;
+    // Assemble lighting — was 0.04 base ambient which made walls render
+    // near-black. Lifted ambient and diffuse multipliers significantly so
+    // the cathedral interior actually reads as illuminated honey-gold.
+    col = wallColor * (0.25 + diffuse * 0.85 + fillDiff * 1.5) * hcAO;
+    col += colLight * spec * 0.55 * (1.0 + energy * 0.4);
+    col += colGlow * fresnel * 0.35 * (1.0 + vocalP * 0.5);
+    col += sss * 0.65 * (1.0 + energy * 0.3);
+    col *= 1.0 + energy * 0.30;
 
     // Space sections: add ethereal ambient to vast empty areas
     col += mix(vec3(0.0), warmWhite * 0.02, sSpace);
 
   } else {
     // ─── Background: deep amber void with distant honey glow ───
-    col = darkBrown * 0.03;
+    col = mix(darkBrown * 0.15, deepAmber * 0.4, smoothstep(-0.3, 0.6, rd.y));
     // Distant glow in the tunnel direction
-    float tunnelGlow = exp(-length(p) * 2.0) * 0.04;
-    col += honeyGold * tunnelGlow * (0.5 + energy * 0.5);
+    float tunnelGlow = exp(-length(p) * 1.4) * 0.45;
+    col += honeyGold * tunnelGlow * (0.7 + energy * 0.5);
 
     // Climax: golden sparks in the void
     if (climB > 0.1) {

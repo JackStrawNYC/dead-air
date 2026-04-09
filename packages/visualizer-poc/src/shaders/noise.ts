@@ -867,51 +867,12 @@ float _ns_sdTerrapin(vec2 p) {
 //   sectionIndex — uSectionIndex for icon variety
 vec3 iconEmergence(vec2 uv, float time, float energy, float bass,
                     vec3 col1, vec3 col2, float noiseField, float climaxPhase, float sectionIndex) {
-  // Icons emerge during build and peak moments — lower gate so they're the STAR
-  float climaxGate = smoothstep(0.5, 1.5, climaxPhase);
-  float energyGate = smoothstep(0.15, 0.35, energy);
-  float gate = energyGate * climaxGate;
-  if (gate < 0.01) return vec3(0.0);
-
-  // Slow rotation
-  float angle = time * 0.06;
-  float ca = cos(angle); float sa = sin(angle);
-  vec2 rotUv = vec2(ca * uv.x - sa * uv.y, sa * uv.x + ca * uv.y);
-
-  // Bass pulse
-  float pulse = 1.0 + bass * 0.6;
-  vec2 scaledUv = rotUv / (1.0 * pulse);
-
-  // Select icon based on section index (6 icon types)
-  float iconType = mod(sectionIndex, 6.0);
-  float d;
-  if (iconType < 1.0) {
-    d = sdStealie(scaledUv, 1.0);
-  } else if (iconType < 2.0) {
-    d = _ns_sdDancingBear(scaledUv, time * 0.5);
-  } else if (iconType < 3.0) {
-    d = _ns_sdRose(scaledUv);
-  } else if (iconType < 4.0) {
-    d = _ns_sdSkull(scaledUv, 0.3 + bass * 0.4);
-  } else if (iconType < 5.0) {
-    d = _ns_sdBolt(scaledUv);
-  } else {
-    d = _ns_sdTerrapin(scaledUv);
-  }
-
-  // Noise dissolution
-  d += noiseField * 0.08 * (1.0 - gate * 0.5);
-
-  // Glow
-  float glow = 1.0 / (1.0 + d * d * 800.0);
-  glow *= gate;
-
-  // Edge
-  float edge = smoothstep(0.008, 0.0, abs(d)) * gate;
-
-  // Color
-  vec3 iconColor = mix(col1, col2, 0.5 + 0.5 * sin(time * 0.3));
-  return iconColor * (glow * 0.5 + edge * 1.2);
+  // SHADER AUDIT FIX: previously these icons were drawn with glow*0.5 + edge*1.2
+  // and dominated weaker shaders, producing the "neon outline on flat color"
+  // brokenness across ~17 shaders. Disabled at the source — shaders look much
+  // better without an SDF icon stamped on top of them. Kept as a callable no-op
+  // so we don't have to edit every shader's call site.
+  return vec3(0.0);
 }
 
 // --- Hero Icon Emergence: fullscreen SDF icon at climax peaks ---
@@ -920,55 +881,9 @@ vec3 iconEmergence(vec2 uv, float time, float energy, float bass,
 // Includes chromatic fringe for prismatic edge effect.
 vec3 heroIconEmergence(vec2 uv, float time, float energy, float bass,
                        vec3 col1, vec3 col2, float noiseField, float sectionIndex) {
-  float gate = uHeroIconTrigger * uHeroIconProgress;
-  if (gate < 0.01) return vec3(0.0);
-
-  // Slow rotation
-  float angle = time * 0.04;
-  float ca = cos(angle); float sa = sin(angle);
-  vec2 rotUv = vec2(ca * uv.x - sa * uv.y, sa * uv.x + ca * uv.y);
-
-  // Full-screen scale: 2.0x viewport radius — truly fullscreen iconic moment
-  float pulse = 1.0 + bass * 0.3;
-  vec2 scaledUv = rotUv / (2.0 * pulse);
-
-  // Select icon based on section index (6 icon types)
-  float iconType = mod(sectionIndex, 6.0);
-  float d;
-  if (iconType < 1.0) {
-    d = sdStealie(scaledUv, 1.0);
-  } else if (iconType < 2.0) {
-    d = _ns_sdDancingBear(scaledUv, time * 0.5);
-  } else if (iconType < 3.0) {
-    d = _ns_sdRose(scaledUv);
-  } else if (iconType < 4.0) {
-    d = _ns_sdSkull(scaledUv, 0.3 + bass * 0.4);
-  } else if (iconType < 5.0) {
-    d = _ns_sdBolt(scaledUv);
-  } else {
-    d = _ns_sdTerrapin(scaledUv);
-  }
-
-  // Noise dissolution: stronger at lifecycle edges
-  float dissolveMask = 1.0 - smoothstep(0.3, 0.7, gate);
-  d += noiseField * 0.12 * (0.3 + 0.7 * dissolveMask);
-
-  // Wide glow (softer falloff than regular icon)
-  float glow = 1.0 / (1.0 + d * d * 60.0) * gate;
-
-  // Edge line
-  float edge = smoothstep(0.015, 0.0, abs(d)) * gate;
-
-  // Chromatic fringe: RGB separation along SDF boundary
-  vec3 fringe;
-  fringe.r = smoothstep(0.025, 0.0, abs(d + 0.008));
-  fringe.g = smoothstep(0.025, 0.0, abs(d));
-  fringe.b = smoothstep(0.025, 0.0, abs(d - 0.008));
-  fringe *= gate * 0.75;
-
-  // Color: blend palette with slow oscillation
-  vec3 iconColor = mix(col1, col2, 0.5 + 0.5 * sin(time * 0.2));
-  return iconColor * (glow * 0.8 + edge * 1.8) + fringe * iconColor;
+  // SHADER AUDIT FIX: same as iconEmergence above — the fullscreen 2x-viewport
+  // icon with chromatic fringe was washing out shaders during climaxes. Disabled.
+  return vec3(0.0);
 }
 
 // --- Palette Cycling: rotates all hues via RGB→HSV→rotate→HSV→RGB ---

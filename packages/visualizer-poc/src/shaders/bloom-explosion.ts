@@ -648,9 +648,10 @@ void main() {
     col += mix(petalColor1, petalColor2, sin(stormAngle * 3.0) * 0.5 + 0.5)
            * petalStorm * stormFade * climaxBoost * 0.3;
 
-    // Total white-gold flood at peak climax
-    float floodGate = smoothstep(0.7, 1.0, climaxBoost);
-    col = mix(col, vec3(1.0, 0.98, 0.9), floodGate * 0.35);
+    // Total white-gold flood at peak climax — toned WAY down (was 0.35)
+    // because it was washing the entire frame to flat warm cream during peaks.
+    float floodGate = smoothstep(0.85, 1.0, climaxBoost);
+    col = mix(col, vec3(1.0, 0.98, 0.9), floodGate * 0.08);
   }
 
   // === BASS BREATHING ===

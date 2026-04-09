@@ -143,7 +143,7 @@ float pgGardenTime;     // slow dynamic time
 float pgSwayAmp;        // bass-driven sway
 float pgMoonlight;      // 0 = day, 1 = night (space sections)
 float pgPetalStorm;     // 0 = calm, 1 = full storm (climax)
-float pgKaleidoFold;    // psychedelic geometry folding
+float pgKaleidoFoldCount; // psychedelic geometry fold count (renamed: collided with pgKaleidoFold function)
 float pgSubsurface;     // petal translucency
 
 // ─── Sunflower Head SDF ───
@@ -655,14 +655,14 @@ void main() {
   pgPetalStorm = climaxBoost * 0.6 + step(2.5, climaxPhase) * climaxI * 0.4;
   pgPetalStorm = clamp(pgPetalStorm, 0.0, 1.0);
 
-  pgKaleidoFold = semPsy * 4.0 + 2.0; // 2-6 fold segments
+  pgKaleidoFoldCount = semPsy * 4.0 + 2.0; // 2-6 fold segments
   pgSubsurface = 0.3 + vocalPres * 0.4 + tBright * 0.3;
 
   // ─── Kaleidoscopic UV folding (psychedelic semantic) ───
   vec2 marchP = p;
   if (semPsy > 0.15) {
     float foldStrength = smoothstep(0.15, 0.5, semPsy);
-    vec2 folded = pgKaleidoFold(p, pgKaleidoFold);
+    vec2 folded = pgKaleidoFold(p, pgKaleidoFoldCount);
     marchP = mix(p, folded, foldStrength * 0.3);
   }
 
