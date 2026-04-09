@@ -166,6 +166,20 @@ export const DynamicOverlayStack: React.FC<Props> = ({
   const breathSaturate = 0.85 + Math.min(1, slowEnergy) * 0.25;
   const breathFilter = `brightness(${breathBrightness.toFixed(3)}) saturate(${breathSaturate.toFixed(3)})`;
 
+  // ─── Slow audio-reactive hue drift (warm-on-loud, cool-on-quiet) ───
+  // A tiny ±4° shift on top of the per-song palette hueRotation. Driven by
+  // slowEnergy with the same 3-second smoothing as the breathing filter, so
+  // changes happen over seconds — well below any "color shifted" perception
+  // threshold. Composed into the same CSS filter chain alongside the existing
+  // segue-blend hueRotation, so per-song palette identity stays intact and
+  // this just adds a gentle dynamic warm/cool drift on top.
+  //
+  // 0.5 of slowEnergy maps to neutral, lower → cool shift, higher → warm.
+  // Bounded to ±4° so even at extreme energies it's a subtle tint, not a
+  // color shift.
+  const energyHueDrift = (Math.min(1, slowEnergy) - 0.30) * 8; // -2.4 to +5.6
+  const energyHueClamp = Math.max(-4, Math.min(4, energyHueDrift));
+
   return (
     <TempoProvider tempo={tempo}>
     <SongPaletteProvider palette={palette}>
@@ -178,7 +192,11 @@ export const DynamicOverlayStack: React.FC<Props> = ({
             opacity: gateOpacity,
             pointerEvents: "none",
             mixBlendMode: "screen",
-            filter: [breathFilter, desatFilter ?? ""].filter(Boolean).join(" "),
+            filter: [
+              breathFilter,
+              energyHueClamp !== 0 ? `hue-rotate(${energyHueClamp.toFixed(1)}deg)` : "",
+              desatFilter ?? "",
+            ].filter(Boolean).join(" "),
             contain: "layout style paint",
           }}
         >
@@ -212,7 +230,11 @@ export const DynamicOverlayStack: React.FC<Props> = ({
           opacity: gateOpacity,
           filter: [
             breathFilter,
-            hueRotation !== 0 ? `hue-rotate(${hueRotation.toFixed(1)}deg)` : "",
+            // Combine palette-driven segue rotation with slow audio drift.
+            // Both are degrees and additive, applied as a single hue-rotate.
+            (hueRotation + energyHueClamp) !== 0
+              ? `hue-rotate(${(hueRotation + energyHueClamp).toFixed(1)}deg)`
+              : "",
             desatFilter ?? "",
           ].filter(Boolean).join(" ") || undefined,
           contain: "layout style paint",
