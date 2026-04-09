@@ -120,7 +120,35 @@ export const DynamicOverlayStack: React.FC<Props> = ({
     if (op > 0.01) scored.push({ name, entry, opacity: op });
   }
   scored.sort((a, b) => b.opacity - a.opacity);
-  const withOpacity = scored.length > maxConcurrent ? scored.slice(0, maxConcurrent) : scored;
+
+  // ─── Anti-clutter layer distribution ───
+  // Pure top-N-by-opacity selection lets 5-7 overlays at peaks all stack on
+  // the same layer (e.g. 5 atmospheric layer-1 overlays piling up). Instead,
+  // walk the sorted list and prefer items on FRESH layers when their score
+  // is within 10% of the top — clearly-winning overlays still win, but ties
+  // are broken by spreading across layers for visually balanced composition.
+  //
+  // Falls back to pure score order if no fresh-layer candidate exists within
+  // the gap threshold or if the layer set is exhausted.
+  const SCORE_GAP_THRESHOLD = 0.10;
+  const pickedLayers = new Set<number>();
+  const withOpacity: typeof scored = [];
+  const queue = [...scored];
+  while (withOpacity.length < maxConcurrent && queue.length > 0) {
+    const topScore = queue[0].opacity;
+    // Find the first item within the score gap that's on a fresh layer
+    let chosenIdx = 0;
+    for (let i = 0; i < queue.length; i++) {
+      if ((topScore - queue[i].opacity) > SCORE_GAP_THRESHOLD) break;
+      if (!pickedLayers.has(queue[i].entry.layer)) {
+        chosenIdx = i;
+        break;
+      }
+    }
+    const item = queue.splice(chosenIdx, 1)[0];
+    withOpacity.push(item);
+    pickedLayers.add(item.entry.layer);
+  }
 
   // Single-pass DOM/GLSL split (avoids two .filter() calls)
   const domOverlays: typeof withOpacity = [];
