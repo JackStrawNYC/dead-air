@@ -43,7 +43,12 @@ uniform sampler2D uPrevFrame;
 
 ${noiseGLSL}
 
-${buildPostProcessGLSL({ halationEnabled: true, caEnabled: true, anaglyphEnabled: true, dofEnabled: true, temporalBlendEnabled: true })}
+// COSMIC VOYAGE FIX: previously had temporalBlend + anaglyph + caEnabled
+// all on. The volumetric fractal accumulation produces high-contrast pixels;
+// chromatic aberration + anaglyph fringe-shifted those into rainbow noise,
+// and temporalBlend fed the broken frames back in, accumulating into the
+// neon green/blue/pink "rocky" pattern. Disabled the noisy ones.
+${buildPostProcessGLSL({ halationEnabled: true, caEnabled: false, anaglyphEnabled: false, dofEnabled: true, temporalBlendEnabled: false })}
 
 varying vec2 vUv;
 
@@ -156,104 +161,85 @@ void main() {
   float hue2 = uPaletteSecondary + chordHue * 0.5;
   vec3 emissionColor = paletteHueColor(hue2, 0.85, 0.98);
 
-  // ═══ Kaliset volumetric fractal ═══
-  float formuparam = 0.53 + onset * 0.15 + effectiveBeat * 0.12 + uDrumOnset * 0.15;
-  float tile = 0.92;
-  float stemOther = clamp(uOtherEnergy, 0.0, 1.0);
-  float darkmatter = mix(0.15, 0.05, bass) * mix(1.3, 0.7, uJamDensity) * (1.0 - stemOther * 0.2);
-  float distfading = 0.78;
-  float saturation = 0.92 + tension * 0.08;
-
-  int maxIters = 18 + int(highs * 6.0);
-  float travelSpeed = energy * 0.08 + 0.02;
-  vec3 from = camPos + rayDir * 0.1;
-  from += vec3(1.0, 1.0, 1.0) * uDynamicTime * travelSpeed;
-
-  int volSteps = int(mix(20.0, 40.0, uJamDensity));
-  float marchS = 0.1;
-  float fade = 1.0;
-  vec3 accColor = vec3(0.0);
-  float accGlow = 0.0;
+  // ═════════════════════════════════════════════════════════════════
+  // COSMIC VOYAGE — REWRITE
+  // The original kaliset volumetric fractal converged to degenerate
+  // (uniform pink/magenta) output at most frames in PITB section 3 etc.
+  // Replaced with a layered FBM-based volumetric nebula in screen+ray
+  // space, which always produces per-pixel variation regardless of audio
+  // state. The camera/raydir feed back into the noise so the result still
+  // feels like flying THROUGH a nebula, just without the crash modes.
+  // ═════════════════════════════════════════════════════════════════
+  vec3 col;
   float accDensity = 0.0;
+  float accGlow = 0.0;
+  {
+    float t = uDynamicTime * 0.06 + uMusicalTime * 0.03;
 
-  for (int r = 0; r < VOLSTEPS_LIMIT; r++) {
-    if (r >= volSteps) break;
-    float stepsize = 0.08 + float(r) * 0.006;
-    vec3 samplePos = from + marchS * rayDir * 0.5;
+    // Noise input combines screen position, ray direction (for parallax)
+    // and time. The 3D point we sample drifts through noise space.
+    vec3 noiseP = vec3(screenPos * 1.6, t * 0.8) + rayDir * 0.4;
 
-    // Domain warp near camera
-    float warpFade = smoothstep(3.0, 0.5, float(r) / float(volSteps) * 5.0);
-    if (warpFade > 0.01) {
-      samplePos = mix(samplePos, cvyDomainWarp(samplePos, onset, uDynamicTime, flux), warpFade);
+    // Three layers of FBM at different scales for cloud/dust depth
+    float n1 = fbm3(noiseP * 0.9);
+    float n2 = fbm3(noiseP * 1.9 + 7.3);
+    float n3 = fbm3(noiseP * 4.0 + 19.1);
+    float density = pow(n1 * 0.55 + n2 * 0.30 + n3 * 0.15 + 0.5, 1.4);
+    density = clamp(density * (0.55 + energy * 0.45 + bass * 0.25), 0.0, 1.2);
+    accDensity = density;
+
+    // Per-pixel hue offset based on ray direction so adjacent pixels
+    // always have slightly different colors (no flat-frame failure mode).
+    // Reduced from 0.25 to 0.12 to avoid neon-rainbow saturation.
+    float pixelHue = atan(rayDir.z, rayDir.x) / TAU * 0.12
+                     + rayDir.y * 0.07
+                     + n2 * 0.10;
+    float depthDriftHue = sin(t * 0.4 + density * 3.0) * 0.06;
+
+    // Cosmic palette — VERY DIM source values. The post-process pipeline
+    // applies cinematicGrade ACES tone mapping which brightens dim values
+    // significantly, so the source needs to be dark enough that the
+    // brightened result still looks restrained instead of neon.
+    float satCap = 0.30 + energy * 0.15;
+    vec3 deepSpace = paletteHueColor(hue1 + pixelHue + depthDriftHue, satCap, 0.18);
+    vec3 nebulaWarm = paletteHueColor(hue2 + pixelHue * 0.6 - depthDriftHue * 0.5, satCap + 0.08, 0.26);
+    vec3 emissionCore = mix(emissionColor * 0.4, vec3(0.55, 0.50, 0.42), 0.6);
+
+    // Layer the colors by density
+    vec3 nebulaCol = mix(deepSpace, nebulaWarm, smoothstep(0.20, 0.65, density));
+    nebulaCol = mix(nebulaCol, emissionCore, smoothstep(0.70, 1.05, density) * 0.50);
+
+    // Vocal pulse on bright cores
+    nebulaCol += emissionCore * vocalE * smoothstep(0.55, 0.95, density) * 0.12;
+
+    // Climax: pull toward dim cream (post-process will brighten)
+    if (climaxBoost > 0.05) {
+      nebulaCol = mix(nebulaCol, vec3(0.55, 0.50, 0.42), climaxBoost * smoothstep(0.4, 0.8, density) * 0.25);
     }
 
-    // Tiling fold
-    samplePos = abs(vec3(tile) - mod(samplePos, vec3(tile * 2.0)));
+    col = nebulaCol * (0.20 + density * 0.30);
 
-    float pa = 0.0;
-    float acc = 0.0;
-    float minOrbit = 1e10;
+    // Bright stars in dark regions
+    float starN = fract(sin(dot(floor(screenPos * 110.0), vec2(127.1, 311.7))) * 43758.5);
+    float starMask = step(0.988, starN) * smoothstep(0.4, 0.0, density);
+    col += vec3(0.95, 0.92, 0.82) * starMask * 28.0 * (starN - 0.988);
 
-    for (int i = 0; i < FRACTAL_ITERS; i++) {
-      if (i >= maxIters) break;
-      samplePos = abs(samplePos) / dot(samplePos, samplePos) - formuparam;
-      float orbitLen = length(samplePos);
-      acc += abs(orbitLen - pa);
-      pa = orbitLen;
-      minOrbit = min(minOrbit, orbitLen);
-    }
+    // Streak: subtle camera-motion light streaks
+    float streak = pow(max(0.0, dot(rayDir, normalize(camFwd))), 32.0) * 0.15;
+    col += vec3(0.7, 0.65, 0.55) * streak * (0.5 + energy * 0.5);
 
-    float dm = max(0.0, darkmatter - acc * acc * 0.001);
-    acc *= acc * acc;
-
-    if (r > 6) fade *= 1.0 - dm;
-
-    // Multi-scale color mapping
-    float density = clamp(acc * 0.001, 0.0, 1.0);
-    float depthHue = float(r) * 0.008;
-    vec3 shiftedCloud = paletteHueColor(hue1 + depthHue, 0.78, 0.92);
-
-    vec3 bandCool = shiftedCloud * vec3(0.7, 0.85, 1.0);
-    vec3 bandWarm = mix(shiftedCloud, emissionColor, 0.35) * vec3(1.0, 0.95, 0.85);
-    vec3 bandHot = mix(emissionColor, vec3(1.0, 0.98, 0.95), 0.5);
-
-    vec3 localColor = mix(bandCool, bandWarm, smoothstep(0.1, 0.5, density));
-    localColor = mix(localColor, bandHot, smoothstep(0.5, 0.9, density));
-
-    // Vocal brightness on emission cores
-    localColor += emissionColor * vocalE * smoothstep(0.5, 0.9, density) * 0.3;
-
-    float s1 = marchS;
-    vec3 v = vec3(s1, s1 * s1, s1 * s1 * s1 * s1);
-    accColor += fade * localColor * acc * 0.00018;
-    accColor += fade * v * acc * 0.00006;
-
-    // Emission cores
-    float coreGlow = smoothstep(0.5, 0.05, minOrbit) * acc * 0.0002;
-    accColor += fade * emissionColor * coreGlow * (1.0 + vocalE * 0.5);
-    accDensity += density * fade * 0.01;
-
-    // God rays from emission cores
-    if (coreGlow > 0.001) {
-      vec3 toSample = normalize(samplePos);
-      float rayAlign = abs(dot(rayDir, toSample));
-      float godRay = pow(rayAlign, 8.0) * coreGlow * 3.0;
-      accColor += fade * emissionColor * godRay * (0.5 + climaxBoost * 0.5);
-    }
-
-    accGlow += fade * acc * 0.00008;
-    fade *= distfading;
-    marchS += stepsize;
+    // Per-step glow accumulator (kept for downstream compatibility)
+    accGlow = density * 0.6;
   }
 
-  // Volume AO approximation: darker in dense regions
-  float volAO = clamp(1.0 - accDensity * 3.0, 0.3, 1.0);
+  // Volume AO approximation kept for downstream code that references it
+  float volAO = clamp(1.0 - accDensity * 0.6, 0.5, 1.0);
+  col *= volAO;
+  col *= 1.0 + climaxBoost * 0.15;
 
-  // Saturation + grading
-  float lumAcc = dot(accColor, vec3(0.299, 0.587, 0.114));
-  float boostedSat = saturation + climaxBoost * 0.15;
-  vec3 col = mix(vec3(lumAcc), accColor, boostedSat);
-  col *= (1.15 + climaxBoost * 0.20) * volAO;
+  // Kept for downstream compat: lumAcc + accColor references below.
+  vec3 accColor = col;
+  float lumAcc = dot(col, vec3(0.299, 0.587, 0.114));
 
   // Melodic color temperature
   col *= mix(vec3(1.05, 0.98, 0.9), vec3(0.9, 0.98, 1.05), melPitch);
@@ -305,7 +291,7 @@ void main() {
     col += heroIconEmergence(screenPos, uTime, energy, bass, cloudColor, emissionColor, nf, uSectionIndex);
   }
 
-  // Post-processing (temporal blend handled inside via temporalBlendEnabled)
+  // Post-processing
   col = applyPostProcess(col, vUv, screenPos);
 
   gl_FragColor = vec4(col, 1.0);
