@@ -262,24 +262,42 @@ export const Root: React.FC = () => {
               narrativeState: narrativeStates[i],
             } satisfies SongVisualizerProps as Record<string, unknown>}
             calculateMetadata={async ({ props }) => {
-              // Analysis arrives via --props (CLI render) as top-level meta+frames.
-              // Wrap as { analysis: { meta, frames } } so SongVisualizer can read it.
+              // Three load paths in priority order:
+              //   1. inputProps (CLI --props=path/to/json or Lambda inputProps)
+              //   2. fetch from staticFile (Lambda render — JSONs live in public/tracks/)
+              //   3. fall through to show-timeline.json for duration only
               const p = props as Record<string, unknown>;
+              let analysis: { meta?: { totalFrames?: number; sections?: unknown[] }; frames?: unknown[] } | null = null;
+
               if (p.meta && p.frames) {
-                const analysis = safeParse(FlexibleTrackAnalysisSchema, { meta: p.meta, frames: p.frames });
-                if (analysis?.meta) {
-                  if (analysis.meta.sections) {
-                    validateSectionOverrides(song, analysis.meta.sections.length);
+                analysis = safeParse(FlexibleTrackAnalysisSchema, { meta: p.meta, frames: p.frames });
+              } else {
+                // Lambda path: fetch from public/tracks/<trackId>-analysis.json
+                try {
+                  // eslint-disable-next-line @typescript-eslint/no-require-imports
+                  const { staticFile } = require("remotion") as { staticFile: (p: string) => string };
+                  const url = staticFile(`tracks/${song.trackId}-analysis.json`);
+                  const res = await fetch(url);
+                  if (res.ok) {
+                    const json = await res.json();
+                    analysis = safeParse(FlexibleTrackAnalysisSchema, json);
                   }
-                  return {
-                    durationInFrames: Math.round((analysis.meta.totalFrames ?? DEFAULT_FRAMES) * FPS_SCALE),
-                    props: { ...props, analysis },
-                  };
+                } catch {
+                  // staticFile fetch failed — fall through to timeline lookup
                 }
               }
-              // Fallback for studio / preview without --props: use the precomputed
-              // show-timeline.json totalFrames so the composition has the right length
-              // even though the inner SongVisualizer will render its empty fallback.
+
+              if (analysis?.meta) {
+                if (analysis.meta.sections) {
+                  validateSectionOverrides(song, analysis.meta.sections.length);
+                }
+                return {
+                  durationInFrames: Math.round((analysis.meta.totalFrames ?? DEFAULT_FRAMES) * FPS_SCALE),
+                  props: { ...props, analysis },
+                };
+              }
+              // Fallback: use show-timeline.json totalFrames so the composition has
+              // the right length even though SongVisualizer will render its empty fallback.
               const tf = timelineByTrackId[song.trackId];
               const durationInFrames = tf
                 ? Math.round(tf * FPS_SCALE)

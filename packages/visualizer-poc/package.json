@@ -41,6 +41,7 @@
     "@react-three/fiber": "^8.18.0",
     "@remotion/cli": "4.0.242",
     "@remotion/google-fonts": "4.0.242",
+    "@remotion/lambda": "4.0.242",
     "@remotion/media-utils": "4.0.242",
     "@remotion/three": "4.0.242",
     "dotenv": "^16.4.0",
