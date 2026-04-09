@@ -132,6 +132,108 @@ function snapCountUpTo(snapArray: number[], idx: number): number {
   }
   return lo;
 }
+
+// ─── Auto-derived audio affinity ───
+//
+// 0 of 122 overlays declare an explicit audioAffinity field but the scoring
+// at scoreOverlayLive consumes it as a per-overlay weighted dictionary
+// mapping AudioSnapshot fields to score boosts. Auto-deriving sensible
+// affinities from each overlay's existing metadata (category + tags +
+// energyBand) gives all 122 overlays a per-frame audio fingerprint with
+// zero per-overlay manual curation.
+//
+// The total contribution is clamped to ±0.3 in the scorer, so individual
+// weights here can be slightly aggressive — the clamp protects against
+// runaway scoring.
+
+/** Per-category base audio affinity. */
+const CATEGORY_AFFINITY: Record<string, Record<string, number>> = {
+  atmospheric: { slowEnergy: 0.50, semanticAmbient: 0.40, semanticCosmic: 0.20 },
+  nature:      { slowEnergy: 0.45, semanticTender: 0.30, semanticAmbient: 0.25 },
+  sacred:      { slowEnergy: 0.40, semanticPsychedelic: 0.35, semanticCosmic: 0.30 },
+  reactive:    { onsetEnvelope: 0.50, drumOnset: 0.45, fastEnergy: 0.40, energy: 0.20 },
+  geometric:   { beatStability: 0.40, harmonicTension: 0.30, semanticRhythmic: 0.30 },
+  distortion:  { spectralFlux: 0.50, semanticChaotic: 0.45, onsetEnvelope: 0.35 },
+  character:   { vocalPresence: 0.40, otherEnergy: 0.35, energy: 0.20 },
+  artifact:    { energy: 0.25, semanticTriumphant: 0.20 },
+  hud:         {}, // text/HUD overlays — no audio coupling
+  info:        {},
+};
+
+/** Per-tag audio affinity contributions (additive on top of category). */
+const TAG_AFFINITY: Record<string, Record<string, number>> = {
+  cosmic:        { semanticCosmic: 0.40, slowEnergy: 0.20 },
+  psychedelic:   { semanticPsychedelic: 0.40, harmonicTension: 0.25 },
+  intense:       { energy: 0.45, fastEnergy: 0.30, drumOnset: 0.25 },
+  contemplative: { slowEnergy: 0.40, semanticTender: 0.30, vocalPresence: -0.20 },
+  festival:      { semanticTriumphant: 0.40, semanticRhythmic: 0.30, energy: 0.25 },
+  organic:       { slowEnergy: 0.30, semanticAmbient: 0.25 },
+  mechanical:    { semanticRhythmic: 0.35, beatStability: 0.30 },
+  aquatic:       { slowEnergy: 0.30, semanticAmbient: 0.25 },
+  // Visual-style only — no audio coupling:
+  retro:         {},
+  "dead-culture":{},
+};
+
+/** Energy-band audio affinity contribution. */
+const ENERGY_BAND_AFFINITY: Record<string, Record<string, number>> = {
+  low:  { slowEnergy: 0.20 },
+  mid:  {},
+  high: { fastEnergy: 0.20, drumOnset: 0.15 },
+  any:  {},
+};
+
+/** Cache: overlay name → derived affinity. Filled lazily on first lookup. */
+const DERIVED_AFFINITY_CACHE = new Map<string, Record<string, number>>();
+
+/**
+ * Compute the audio affinity dictionary for an overlay from its metadata.
+ * Sums category base + half-weight tag contributions + energy band.
+ * Tags contribute at 0.5x the table value because most overlays have 2-3
+ * tags and we want the total to land in a sensible range, not dominate.
+ */
+function deriveAudioAffinity(entry: OverlayEntry): Record<string, number> {
+  const result: Record<string, number> = {};
+
+  // Category base
+  const cat = CATEGORY_AFFINITY[entry.category] ?? {};
+  for (const [k, v] of Object.entries(cat)) {
+    result[k] = (result[k] ?? 0) + v;
+  }
+
+  // Per-tag contributions (half weight to avoid double-counting with category)
+  for (const tag of entry.tags ?? []) {
+    const tagWeights = TAG_AFFINITY[tag] ?? {};
+    for (const [k, v] of Object.entries(tagWeights)) {
+      result[k] = (result[k] ?? 0) + v * 0.5;
+    }
+  }
+
+  // Energy band
+  const band = ENERGY_BAND_AFFINITY[entry.energyBand] ?? {};
+  for (const [k, v] of Object.entries(band)) {
+    result[k] = (result[k] ?? 0) + v;
+  }
+
+  return result;
+}
+
+/**
+ * Get the effective audio affinity for an overlay: explicit declaration if
+ * present (overlays can opt-out of auto-derivation by declaring their own),
+ * else the auto-derived one from category/tags/energyBand. Cached per name.
+ */
+function getEffectiveAudioAffinity(entry: OverlayEntry): Record<string, number> {
+  if (entry.audioAffinity) {
+    return entry.audioAffinity as Record<string, number>;
+  }
+  let cached = DERIVED_AFFINITY_CACHE.get(entry.name);
+  if (cached === undefined) {
+    cached = deriveAudioAffinity(entry);
+    DERIVED_AFFINITY_CACHE.set(entry.name, cached);
+  }
+  return cached;
+}
 /** Quiet threshold for silence breathing */
 const QUIET_THRESHOLD = 0.03;
 /** Quiet window for silence breathing (frames) */
@@ -251,10 +353,16 @@ export function scoreOverlayLive(
 
   let score = scoreOverlayForWindow(entry, ctx, rng);
 
-  // Audio affinity: weighted sum of snapshot features × affinity weights
-  if (entry.audioAffinity) {
+  // Audio affinity: weighted sum of snapshot features × affinity weights.
+  // Uses explicit entry.audioAffinity if declared, else falls back to the
+  // auto-derived fingerprint from category/tags/energyBand. Every overlay
+  // now has an audio fingerprint — drum-affined overlays surface on drum
+  // hits, atmospheric overlays sustain on slowEnergy, vocal-affined ones
+  // appear during vocal sections, etc. — without per-overlay manual curation.
+  const affinity = getEffectiveAudioAffinity(entry);
+  if (Object.keys(affinity).length > 0) {
     let affinityScore = 0;
-    for (const [field, weight] of Object.entries(entry.audioAffinity)) {
+    for (const [field, weight] of Object.entries(affinity)) {
       if (weight === undefined) continue;
       const val = (snapshot as unknown as Record<string, number>)[field];
       if (typeof val === "number") {
