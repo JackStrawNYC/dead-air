@@ -1,0 +1,3573 @@
+{
+  "version": 1,
+  "assets": [
+    {
+      "id": "7673da6e4efaedd5",
+      "path": "assets/library/barton-hall-cornell-university-ithaca-ny-19770508-7673da6e4efaedd5.png",
+      "originalFile": "show-poster.png",
+      "type": "image",
+      "song": "Barton Hall, Cornell University, Ithaca, NY — 1977-05-08",
+      "songKey": "barton-hall-cornell-university-ithaca-ny-19770508",
+      "sourceShow": "gd1977-05-08",
+      "tags": [
+        "show-poster",
+        "venue"
+      ],
+      "sizeBytes": 7631264,
+      "addedAt": "2026-02-26T03:50:25.584Z"
+    },
+    {
+      "id": "1999bb47a41ce43d",
+      "path": "assets/library/new-minglewood-blues-1999bb47a41ce43d.png",
+      "originalFile": "s1t02.png",
+      "type": "image",
+      "song": "New Minglewood Blues",
+      "songKey": "new-minglewood-blues",
+      "sourceShow": "gd1977-05-08",
+      "tags": [
+        "song-art",
+        "poster"
+      ],
+      "sizeBytes": 8222698,
+      "addedAt": "2026-02-26T03:50:25.593Z"
+    },
+    {
+      "id": "d2e4d21240632876",
+      "path": "assets/library/loser-d2e4d21240632876.png",
+      "originalFile": "s1t03.png",
+      "type": "image",
+      "song": "Loser",
+      "songKey": "loser",
+      "sourceShow": "gd1977-05-08",
+      "tags": [
+        "song-art",
+        "poster"
+      ],
+      "sizeBytes": 6521498,
+      "addedAt": "2026-02-26T03:50:25.600Z"
+    },
+    {
+      "id": "7fa311cdffadf11a",
+      "path": "assets/library/el-paso-7fa311cdffadf11a.png",
+      "originalFile": "s1t04.png",
+      "type": "image",
+      "song": "El Paso",
+      "songKey": "el-paso",
+      "sourceShow": "gd1977-05-08",
+      "tags": [
+        "song-art",
+        "poster"
+      ],
+      "sizeBytes": 8114168,
+      "addedAt": "2026-02-26T03:50:25.609Z"
+    },
+    {
+      "id": "8407adedef2b026a",
+      "path": "assets/library/they-love-each-other-8407adedef2b026a.png",
+      "originalFile": "s1t05.png",
+      "type": "image",
+      "song": "They Love Each Other",
+      "songKey": "they-love-each-other",
+      "sourceShow": "gd1977-05-08",
+      "tags": [
+        "song-art",
+        "poster"
+      ],
+      "sizeBytes": 8752114,
+      "addedAt": "2026-02-26T03:50:25.617Z"
+    },
+    {
+      "id": "c66416680baf964a",
+      "path": "assets/library/jack-straw-c66416680baf964a.png",
+      "originalFile": "s1t06.png",
+      "type": "image",
+      "song": "Jack Straw",
+      "songKey": "jack-straw",
+      "sourceShow": "gd1977-05-08",
+      "tags": [
+        "song-art",
+        "poster"
+      ],
+      "sizeBytes": 7312396,
+      "addedAt": "2026-02-26T03:50:25.625Z"
+    },
+    {
+      "id": "ea53823a683c3872",
+      "path": "assets/library/deal-ea53823a683c3872.png",
+      "originalFile": "s1t07.png",
+      "type": "image",
+      "song": "Deal",
+      "songKey": "deal",
+      "sourceShow": "gd1977-05-08",
+      "tags": [
+        "song-art",
+        "poster"
+      ],
+      "sizeBytes": 6857806,
+      "addedAt": "2026-02-26T03:50:25.632Z"
+    },
+    {
+      "id": "bea1a8a3197f443e",
+      "path": "assets/library/lazy-lightnin-bea1a8a3197f443e.png",
+      "originalFile": "s1t08.png",
+      "type": "image",
+      "song": "Lazy Lightnin'",
+      "songKey": "lazy-lightnin",
+      "sourceShow": "gd1977-05-08",
+      "tags": [
+        "song-art",
+        "poster"
+      ],
+      "sizeBytes": 7592260,
+      "addedAt": "2026-02-26T03:50:25.639Z"
+    },
+    {
+      "id": "34f5d05b947aa411",
+      "path": "assets/library/supplication-34f5d05b947aa411.png",
+      "originalFile": "s1t09.png",
+      "type": "image",
+      "song": "Supplication",
+      "songKey": "supplication",
+      "sourceShow": "gd1977-05-08",
+      "tags": [
+        "song-art",
+        "poster"
+      ],
+      "sizeBytes": 8895816,
+      "addedAt": "2026-02-26T03:50:25.649Z"
+    },
+    {
+      "id": "774f2f1a1f958346",
+      "path": "assets/library/brown-eyed-women-774f2f1a1f958346.png",
+      "originalFile": "s1t10.png",
+      "type": "image",
+      "song": "Brown Eyed Women",
+      "songKey": "brown-eyed-women",
+      "sourceShow": "gd1977-05-08",
+      "tags": [
+        "song-art",
+        "poster"
+      ],
+      "sizeBytes": 4921990,
+      "addedAt": "2026-02-26T03:50:25.654Z"
+    },
+    {
+      "id": "07e6b44f500d5548",
+      "path": "assets/library/mama-tried-07e6b44f500d5548.png",
+      "originalFile": "s1t11.png",
+      "type": "image",
+      "song": "Mama Tried",
+      "songKey": "mama-tried",
+      "sourceShow": "gd1977-05-08",
+      "tags": [
+        "song-art",
+        "poster"
+      ],
+      "sizeBytes": 7073590,
+      "addedAt": "2026-02-26T03:50:25.661Z"
+    },
+    {
+      "id": "737696a445e69e34",
+      "path": "assets/library/row-jimmy-737696a445e69e34.png",
+      "originalFile": "s1t12.png",
+      "type": "image",
+      "song": "Row Jimmy",
+      "songKey": "row-jimmy",
+      "sourceShow": "gd1977-05-08",
+      "tags": [
+        "song-art",
+        "poster"
+      ],
+      "sizeBytes": 8460870,
+      "addedAt": "2026-02-26T03:50:25.669Z"
+    },
+    {
+      "id": "ade206558540ae5b",
+      "path": "assets/library/dancin-in-the-street-ade206558540ae5b.png",
+      "originalFile": "s1t13.png",
+      "type": "image",
+      "song": "Dancin' in the Street",
+      "songKey": "dancin-in-the-street",
+      "sourceShow": "gd1977-05-08",
+      "tags": [
+        "song-art",
+        "poster"
+      ],
+      "sizeBytes": 7806146,
+      "addedAt": "2026-02-26T03:50:25.677Z"
+    },
+    {
+      "id": "ca78b42cda8b0072",
+      "path": "assets/library/scarlet-begonias-ca78b42cda8b0072.png",
+      "originalFile": "s2t02.png",
+      "type": "image",
+      "song": "Scarlet Begonias",
+      "songKey": "scarlet-begonias",
+      "sourceShow": "gd1977-05-08",
+      "tags": [
+        "song-art",
+        "poster"
+      ],
+      "sizeBytes": 9377396,
+      "addedAt": "2026-02-26T03:50:25.686Z"
+    },
+    {
+      "id": "b3931679356092c6",
+      "path": "assets/library/fire-on-the-mountain-b3931679356092c6.png",
+      "originalFile": "s2t03.png",
+      "type": "image",
+      "song": "Fire on the Mountain",
+      "songKey": "fire-on-the-mountain",
+      "sourceShow": "gd1977-05-08",
+      "tags": [
+        "song-art",
+        "poster"
+      ],
+      "sizeBytes": 7936694,
+      "addedAt": "2026-02-26T03:50:25.695Z"
+    },
+    {
+      "id": "4983a0a0ef69ff0f",
+      "path": "assets/library/estimated-prophet-4983a0a0ef69ff0f.png",
+      "originalFile": "s2t04.png",
+      "type": "image",
+      "song": "Estimated Prophet",
+      "songKey": "estimated-prophet",
+      "sourceShow": "gd1977-05-08",
+      "tags": [
+        "song-art",
+        "poster"
+      ],
+      "sizeBytes": 7682462,
+      "addedAt": "2026-02-26T03:50:25.711Z"
+    },
+    {
+      "id": "3e8b197b8fcc8e6e",
+      "path": "assets/library/st-stephen-3e8b197b8fcc8e6e.png",
+      "originalFile": "s2t05.png",
+      "type": "image",
+      "song": "St. Stephen",
+      "songKey": "st-stephen",
+      "sourceShow": "gd1977-05-08",
+      "tags": [
+        "song-art",
+        "poster"
+      ],
+      "sizeBytes": 8492562,
+      "addedAt": "2026-02-26T03:50:25.726Z"
+    },
+    {
+      "id": "dd90d8d94215d793",
+      "path": "assets/library/not-fade-away-dd90d8d94215d793.png",
+      "originalFile": "s2t06.png",
+      "type": "image",
+      "song": "Not Fade Away",
+      "songKey": "not-fade-away",
+      "sourceShow": "gd1977-05-08",
+      "tags": [
+        "song-art",
+        "poster"
+      ],
+      "sizeBytes": 9160162,
+      "addedAt": "2026-02-26T03:50:25.737Z"
+    },
+    {
+      "id": "5a119b3e15b98425",
+      "path": "assets/library/drums-space-5a119b3e15b98425.png",
+      "originalFile": "s2t07.png",
+      "type": "image",
+      "song": "Drums / Space",
+      "songKey": "drums-space",
+      "sourceShow": "gd1977-05-08",
+      "tags": [
+        "song-art",
+        "poster"
+      ],
+      "sizeBytes": 9000358,
+      "addedAt": "2026-02-26T03:50:25.750Z"
+    },
+    {
+      "id": "7ec855562347758c",
+      "path": "assets/library/morning-dew-7ec855562347758c.png",
+      "originalFile": "s2t08.png",
+      "type": "image",
+      "song": "Morning Dew",
+      "songKey": "morning-dew",
+      "sourceShow": "gd1977-05-08",
+      "tags": [
+        "song-art",
+        "poster"
+      ],
+      "sizeBytes": 8060354,
+      "addedAt": "2026-02-26T03:50:25.760Z"
+    },
+    {
+      "id": "6a0bc845801ccda6",
+      "path": "assets/library/one-more-saturday-night-6a0bc845801ccda6.png",
+      "originalFile": "s2t09.png",
+      "type": "image",
+      "song": "One More Saturday Night",
+      "songKey": "one-more-saturday-night",
+      "sourceShow": "gd1977-05-08",
+      "tags": [
+        "song-art",
+        "poster"
+      ],
+      "sizeBytes": 6176530,
+      "addedAt": "2026-02-26T03:50:25.769Z"
+    },
+    {
+      "id": "d1fe5e1eefab3e6d",
+      "path": "assets/library/images/althea.jpg",
+      "originalFile": "althea.jpg",
+      "type": "image",
+      "song": "Althea",
+      "songKey": "althea",
+      "category": "song",
+      "tags": [
+        "curated-image"
+      ],
+      "sizeBytes": 487542,
+      "addedAt": "2026-02-28T14:08:39.908Z"
+    },
+    {
+      "id": "2f04cf6ef4570688",
+      "path": "assets/library/images/birdsong.jpg",
+      "originalFile": "birdsong.jpg",
+      "type": "image",
+      "song": "Bird Song",
+      "songKey": "bird-song",
+      "category": "song",
+      "tags": [
+        "curated-image"
+      ],
+      "sizeBytes": 452285,
+      "addedAt": "2026-02-28T14:08:39.910Z"
+    },
+    {
+      "id": "5233a794195fe3f6",
+      "path": "assets/library/images/dancingbears.jpg",
+      "originalFile": "dancingbears.jpg",
+      "type": "image",
+      "song": "Dancing Bears",
+      "songKey": "dancing-bears",
+      "category": "general",
+      "tags": [
+        "curated-image",
+        "atmospheric"
+      ],
+      "sizeBytes": 623804,
+      "addedAt": "2026-02-28T14:08:39.911Z"
+    },
+    {
+      "id": "db063ce4d9b59616",
+      "path": "assets/library/images/darkstar.jpg",
+      "originalFile": "darkstar.jpg",
+      "type": "image",
+      "song": "Dark Star",
+      "songKey": "dark-star",
+      "category": "song",
+      "tags": [
+        "curated-image"
+      ],
+      "sizeBytes": 388668,
+      "addedAt": "2026-02-28T14:08:39.911Z"
+    },
+    {
+      "id": "9cc45c2941cab83c",
+      "path": "assets/library/images/eyesoftheworld2.jpg",
+      "originalFile": "eyesoftheworld2.jpg",
+      "type": "image",
+      "song": "Eyes of the World",
+      "songKey": "eyes-of-the-world",
+      "category": "song",
+      "tags": [
+        "curated-image",
+        "variant-2"
+      ],
+      "sizeBytes": 423096,
+      "addedAt": "2026-02-28T14:08:39.912Z"
+    },
+    {
+      "id": "ffaf5712ca0a4237",
+      "path": "assets/library/images/fireonthemountain.jpg",
+      "originalFile": "fireonthemountain.jpg",
+      "type": "image",
+      "song": "Fire on the Mountain",
+      "songKey": "fire-on-the-mountain",
+      "category": "song",
+      "tags": [
+        "curated-image"
+      ],
+      "sizeBytes": 677512,
+      "addedAt": "2026-02-28T14:08:39.913Z"
+    },
+    {
+      "id": "1cd2d126cf5f893d",
+      "path": "assets/library/images/franklinstower.jpg",
+      "originalFile": "franklinstower.jpg",
+      "type": "image",
+      "song": "Franklin's Tower",
+      "songKey": "franklins-tower",
+      "category": "song",
+      "tags": [
+        "curated-image"
+      ],
+      "sizeBytes": 519442,
+      "addedAt": "2026-02-28T14:08:39.914Z"
+    },
+    {
+      "id": "ca0a35054fb8ad34",
+      "path": "assets/library/images/jerrygarcia.webp",
+      "originalFile": "jerrygarcia.webp",
+      "type": "image",
+      "song": "Jerry Garcia",
+      "songKey": "jerry-garcia",
+      "category": "general",
+      "tags": [
+        "curated-image",
+        "atmospheric"
+      ],
+      "sizeBytes": 217522,
+      "addedAt": "2026-02-28T14:08:39.915Z"
+    },
+    {
+      "id": "6fe11a5847ea8675",
+      "path": "assets/library/images/morningdew.jpg",
+      "originalFile": "morningdew.jpg",
+      "type": "image",
+      "song": "Morning Dew",
+      "songKey": "morning-dew",
+      "category": "song",
+      "tags": [
+        "curated-image"
+      ],
+      "sizeBytes": 399858,
+      "addedAt": "2026-02-28T14:08:39.919Z"
+    },
+    {
+      "id": "3e4ae164928c97a2",
+      "path": "assets/library/images/psychedeliclightningstorm.jpg",
+      "originalFile": "psychedeliclightningstorm.jpg",
+      "type": "image",
+      "song": "Psychedelic Lightning Storm",
+      "songKey": "psychedelic-lightning-storm",
+      "category": "general",
+      "tags": [
+        "curated-image",
+        "atmospheric"
+      ],
+      "sizeBytes": 462525,
+      "addedAt": "2026-02-28T14:08:39.920Z"
+    },
+    {
+      "id": "f7fa4d46a87bc009",
+      "path": "assets/library/images/scarletbegonias.jpg",
+      "originalFile": "scarletbegonias.jpg",
+      "type": "image",
+      "song": "Scarlet Begonias",
+      "songKey": "scarlet-begonias",
+      "category": "song",
+      "tags": [
+        "curated-image"
+      ],
+      "sizeBytes": 526137,
+      "addedAt": "2026-02-28T14:08:39.921Z"
+    },
+    {
+      "id": "ed58a8d6f3e8aba2",
+      "path": "assets/library/images/shakedownstreet.jpg",
+      "originalFile": "shakedownstreet.jpg",
+      "type": "image",
+      "song": "Shakedown Street",
+      "songKey": "shakedown-street",
+      "category": "song",
+      "tags": [
+        "curated-image"
+      ],
+      "sizeBytes": 640420,
+      "addedAt": "2026-02-28T14:08:39.922Z"
+    },
+    {
+      "id": "fd5566d0103a24db",
+      "path": "assets/library/images/spinningdisco.jpg",
+      "originalFile": "spinningdiscoball.jpg",
+      "type": "image",
+      "song": "Spinning Disco",
+      "songKey": "spinning-disco",
+      "category": "general",
+      "tags": [
+        "curated-image",
+        "atmospheric"
+      ],
+      "sizeBytes": 366379,
+      "addedAt": "2026-02-28T14:08:39.923Z"
+    },
+    {
+      "id": "03ce8682468c25df",
+      "path": "assets/library/images/ststephen.jpg",
+      "originalFile": "ststephen.jpg",
+      "type": "image",
+      "song": "St. Stephen",
+      "songKey": "st-stephen",
+      "category": "song",
+      "tags": [
+        "curated-image"
+      ],
+      "sizeBytes": 551198,
+      "addedAt": "2026-02-28T14:08:39.924Z"
+    },
+    {
+      "id": "8583458f29164f0c",
+      "path": "assets/library/images/sugarmagnolia.jpg",
+      "originalFile": "sugarmagnolia.jpg",
+      "type": "image",
+      "song": "Sugar Magnolia",
+      "songKey": "sugar-magnolia",
+      "category": "song",
+      "tags": [
+        "curated-image"
+      ],
+      "sizeBytes": 519404,
+      "addedAt": "2026-02-28T14:08:39.925Z"
+    },
+    {
+      "id": "e7065ce0f9c1aec4",
+      "path": "assets/library/images/theotherone.jpg",
+      "originalFile": "theotherone.jpg",
+      "type": "image",
+      "song": "The Other One",
+      "songKey": "the-other-one",
+      "category": "song",
+      "tags": [
+        "curated-image"
+      ],
+      "sizeBytes": 765718,
+      "addedAt": "2026-02-28T14:08:39.926Z"
+    },
+    {
+      "id": "e2147070fd94e4ed",
+      "path": "assets/library/images/trippy.jpg",
+      "originalFile": "trippy.jpg",
+      "type": "image",
+      "song": "Trippy",
+      "songKey": "trippy",
+      "category": "general",
+      "tags": [
+        "curated-image",
+        "atmospheric"
+      ],
+      "sizeBytes": 331411,
+      "addedAt": "2026-02-28T14:08:39.927Z"
+    },
+    {
+      "id": "2515d1507a8709c7",
+      "path": "assets/library/images/trippyfractal.jpg",
+      "originalFile": "trippyfractal.jpg",
+      "type": "image",
+      "song": "Trippy Fractal",
+      "songKey": "trippy-fractal",
+      "category": "general",
+      "tags": [
+        "curated-image",
+        "atmospheric"
+      ],
+      "sizeBytes": 526817,
+      "addedAt": "2026-02-28T14:08:39.928Z"
+    },
+    {
+      "id": "f74e6256e7512208",
+      "path": "assets/library/images/unclejohnsband.jpg",
+      "originalFile": "unclejohnsband.jpg",
+      "type": "image",
+      "song": "Uncle John's Band",
+      "songKey": "uncle-johns-band",
+      "category": "song",
+      "tags": [
+        "curated-image"
+      ],
+      "sizeBytes": 477986,
+      "addedAt": "2026-02-28T14:08:39.929Z"
+    },
+    {
+      "id": "aaaeaca3cd5f8185",
+      "path": "assets/library/images/waves.jpg",
+      "originalFile": "wavescrashing.jpg",
+      "type": "image",
+      "song": "Waves",
+      "songKey": "waves",
+      "category": "general",
+      "tags": [
+        "curated-image",
+        "atmospheric"
+      ],
+      "sizeBytes": 439644,
+      "addedAt": "2026-02-28T14:08:39.930Z"
+    },
+    {
+      "id": "43188863b51ecf10",
+      "path": "assets/library/images/weatherreportsuite.jpg",
+      "originalFile": "weatherreportsuite.jpg",
+      "type": "image",
+      "song": "Weather Report Suite",
+      "songKey": "weather-report-suite",
+      "category": "song",
+      "tags": [
+        "curated-image"
+      ],
+      "sizeBytes": 520196,
+      "addedAt": "2026-02-28T14:08:39.931Z"
+    },
+    {
+      "id": "a504351a1d76eef4",
+      "path": "assets/library/images/whirpoolpsychedelic.jpg",
+      "originalFile": "whirpoolpsychedelic.jpg",
+      "type": "image",
+      "song": "Whirlpool Psychedelic",
+      "songKey": "whirlpool-psychedelic",
+      "category": "general",
+      "tags": [
+        "curated-image",
+        "atmospheric"
+      ],
+      "sizeBytes": 362297,
+      "addedAt": "2026-02-28T14:08:39.931Z"
+    },
+    {
+      "id": "65dce0517a714213",
+      "path": "assets/library/videos/althea.mp4",
+      "originalFile": "althea.mp4",
+      "type": "video",
+      "song": "Althea",
+      "songKey": "althea",
+      "category": "song",
+      "tags": [
+        "curated-video"
+      ],
+      "sizeBytes": 20732888,
+      "addedAt": "2026-02-28T14:08:39.951Z"
+    },
+    {
+      "id": "aeb9b4f8da3f41ea",
+      "path": "assets/library/videos/birdsong.mp4",
+      "originalFile": "birdsong.mp4",
+      "type": "video",
+      "song": "Bird Song",
+      "songKey": "bird-song",
+      "category": "song",
+      "tags": [
+        "curated-video"
+      ],
+      "sizeBytes": 20093444,
+      "addedAt": "2026-02-28T14:08:39.971Z"
+    },
+    {
+      "id": "0831099cde476fd2",
+      "path": "assets/library/videos/dancingbears.mp4",
+      "originalFile": "dancingbears.mp4",
+      "type": "video",
+      "song": "Dancing Bears",
+      "songKey": "dancing-bears",
+      "category": "general",
+      "tags": [
+        "curated-video",
+        "atmospheric"
+      ],
+      "sizeBytes": 8812900,
+      "addedAt": "2026-02-28T14:08:39.980Z"
+    },
+    {
+      "id": "7b23c394b5c7a3c3",
+      "path": "assets/library/videos/dancinginthestreet.mp4",
+      "originalFile": "dancinginthestreet.mp4",
+      "type": "video",
+      "song": "Dancin' in the Street",
+      "songKey": "dancin-in-the-street",
+      "category": "song",
+      "tags": [
+        "curated-video"
+      ],
+      "sizeBytes": 30692885,
+      "addedAt": "2026-02-28T14:08:40.015Z"
+    },
+    {
+      "id": "eabdf93a6d884649",
+      "path": "assets/library/videos/eyesoftheworld.mp4",
+      "originalFile": "eyesoftheworld.mp4",
+      "type": "video",
+      "song": "Eyes of the World",
+      "songKey": "eyes-of-the-world",
+      "category": "song",
+      "tags": [
+        "curated-video"
+      ],
+      "sizeBytes": 22535800,
+      "addedAt": "2026-02-28T14:08:40.039Z"
+    },
+    {
+      "id": "036851e002c6d159",
+      "path": "assets/library/videos/eyesoftheworld2.mp4",
+      "originalFile": "eyesoftheworld2.mp4",
+      "type": "video",
+      "song": "Eyes of the World",
+      "songKey": "eyes-of-the-world",
+      "category": "song",
+      "tags": [
+        "curated-video",
+        "variant-2"
+      ],
+      "sizeBytes": 16163114,
+      "addedAt": "2026-02-28T14:08:40.054Z"
+    },
+    {
+      "id": "4b4bbcaa5ca8b2ed",
+      "path": "assets/library/videos/fireonthemountain.mp4",
+      "originalFile": "fireonthemountain.mp4",
+      "type": "video",
+      "song": "Fire on the Mountain",
+      "songKey": "fire-on-the-mountain",
+      "category": "song",
+      "tags": [
+        "curated-video"
+      ],
+      "sizeBytes": 40111562,
+      "addedAt": "2026-02-28T14:08:40.093Z"
+    },
+    {
+      "id": "52f4830764d8742b",
+      "path": "assets/library/videos/franklinstower.mp4",
+      "originalFile": "franklinstower.mp4",
+      "type": "video",
+      "song": "Franklin's Tower",
+      "songKey": "franklins-tower",
+      "category": "song",
+      "tags": [
+        "curated-video"
+      ],
+      "sizeBytes": 25470992,
+      "addedAt": "2026-02-28T14:08:40.117Z"
+    },
+    {
+      "id": "4c2c871e98c668bb",
+      "path": "assets/library/videos/general.mp4",
+      "originalFile": "general.mp4",
+      "type": "video",
+      "song": "General",
+      "songKey": "general",
+      "category": "general",
+      "tags": [
+        "curated-video",
+        "atmospheric"
+      ],
+      "sizeBytes": 4280722,
+      "addedAt": "2026-02-28T14:08:40.122Z"
+    },
+    {
+      "id": "4c74f3591f45b33e",
+      "path": "assets/library/videos/gratefuldeadband.mp4",
+      "originalFile": "gratefuldeadband.mp4",
+      "type": "video",
+      "song": "Grateful Dead Band",
+      "songKey": "grateful-dead-band",
+      "category": "general",
+      "tags": [
+        "curated-video",
+        "atmospheric"
+      ],
+      "sizeBytes": 6291056,
+      "addedAt": "2026-02-28T14:08:40.129Z"
+    },
+    {
+      "id": "5cd1dd545c09730b",
+      "path": "assets/library/videos/jerrygarcia.mp4",
+      "originalFile": "jerrygarcia.mp4",
+      "type": "video",
+      "song": "Jerry Garcia",
+      "songKey": "jerry-garcia",
+      "category": "general",
+      "tags": [
+        "curated-video",
+        "atmospheric"
+      ],
+      "sizeBytes": 18845430,
+      "addedAt": "2026-02-28T14:08:40.147Z"
+    },
+    {
+      "id": "79d59b5c9c373f55",
+      "path": "assets/library/videos/morningdew.mp4",
+      "originalFile": "morningdew.mp4",
+      "type": "video",
+      "song": "Morning Dew",
+      "songKey": "morning-dew",
+      "category": "song",
+      "tags": [
+        "curated-video"
+      ],
+      "sizeBytes": 15880105,
+      "addedAt": "2026-02-28T14:08:40.162Z"
+    },
+    {
+      "id": "e9a76dbe03e6d84a",
+      "path": "assets/library/videos/psychedeliclightningstorm.mp4",
+      "originalFile": "psychedeliclightningstorm.mp4",
+      "type": "video",
+      "song": "Psychedelic Lightning Storm",
+      "songKey": "psychedelic-lightning-storm",
+      "category": "general",
+      "tags": [
+        "curated-video",
+        "atmospheric"
+      ],
+      "sizeBytes": 30724922,
+      "addedAt": "2026-02-28T14:08:40.190Z"
+    },
+    {
+      "id": "f7639f83972dadc7",
+      "path": "assets/library/videos/scarletbegonias.mp4",
+      "originalFile": "scarletbegonias.mp4",
+      "type": "video",
+      "song": "Scarlet Begonias",
+      "songKey": "scarlet-begonias",
+      "category": "song",
+      "tags": [
+        "curated-video"
+      ],
+      "sizeBytes": 18981717,
+      "addedAt": "2026-02-28T14:08:40.209Z"
+    },
+    {
+      "id": "e05996f7e7b8389b",
+      "path": "assets/library/videos/shakedownstreet.mp4",
+      "originalFile": "shakedownstreet.mp4",
+      "type": "video",
+      "song": "Shakedown Street",
+      "songKey": "shakedown-street",
+      "category": "song",
+      "tags": [
+        "curated-video"
+      ],
+      "sizeBytes": 39110301,
+      "addedAt": "2026-02-28T14:08:40.245Z"
+    },
+    {
+      "id": "f7e03974701bbda4",
+      "path": "assets/library/videos/spinningdisco.mp4",
+      "originalFile": "spinningdisco.mp4",
+      "type": "video",
+      "song": "Spinning Disco",
+      "songKey": "spinning-disco",
+      "category": "general",
+      "tags": [
+        "curated-video",
+        "atmospheric"
+      ],
+      "sizeBytes": 20247526,
+      "addedAt": "2026-02-28T14:08:40.265Z"
+    },
+    {
+      "id": "1f71c0a20ff4ef6e",
+      "path": "assets/library/videos/stealyourface.mp4",
+      "originalFile": "stealyourface.mp4",
+      "type": "video",
+      "song": "Steal Your Face",
+      "songKey": "steal-your-face",
+      "category": "general",
+      "tags": [
+        "curated-video",
+        "atmospheric"
+      ],
+      "sizeBytes": 31360986,
+      "addedAt": "2026-02-28T14:08:40.295Z"
+    },
+    {
+      "id": "ff3f2d3da2f1e9a3",
+      "path": "assets/library/videos/ststephen.mp4",
+      "originalFile": "ststephen.mp4",
+      "type": "video",
+      "song": "St. Stephen",
+      "songKey": "st-stephen",
+      "category": "song",
+      "tags": [
+        "curated-video"
+      ],
+      "sizeBytes": 14561508,
+      "addedAt": "2026-02-28T14:08:40.310Z"
+    },
+    {
+      "id": "a5f8d8bcc7875493",
+      "path": "assets/library/videos/sugarmagnolia.mp4",
+      "originalFile": "sugarmagnolia.mp4",
+      "type": "video",
+      "song": "Sugar Magnolia",
+      "songKey": "sugar-magnolia",
+      "category": "song",
+      "tags": [
+        "curated-video"
+      ],
+      "sizeBytes": 21718797,
+      "addedAt": "2026-02-28T14:08:40.330Z"
+    },
+    {
+      "id": "f0fb9d5ecb936fc1",
+      "path": "assets/library/videos/theotherone.mp4",
+      "originalFile": "theotherone.mp4",
+      "type": "video",
+      "song": "The Other One",
+      "songKey": "the-other-one",
+      "category": "song",
+      "tags": [
+        "curated-video"
+      ],
+      "sizeBytes": 56569698,
+      "addedAt": "2026-02-28T14:08:40.380Z"
+    },
+    {
+      "id": "1c433b001af699d4",
+      "path": "assets/library/videos/unclejohnsband.mp4",
+      "originalFile": "unclejohnsband.mp4",
+      "type": "video",
+      "song": "Uncle John's Band",
+      "songKey": "uncle-johns-band",
+      "category": "song",
+      "tags": [
+        "curated-video"
+      ],
+      "sizeBytes": 21990885,
+      "addedAt": "2026-02-28T14:08:40.402Z"
+    },
+    {
+      "id": "10002119ddc617c1",
+      "path": "assets/library/videos/waves.mp4",
+      "originalFile": "waves.mp4",
+      "type": "video",
+      "song": "Waves",
+      "songKey": "waves",
+      "category": "general",
+      "tags": [
+        "curated-video",
+        "atmospheric"
+      ],
+      "sizeBytes": 29685939,
+      "addedAt": "2026-02-28T14:08:40.431Z"
+    },
+    {
+      "id": "70b2cece904fe6ac",
+      "path": "assets/library/videos/weatherreportsuite.mp4",
+      "originalFile": "weatherreportsuite.mp4",
+      "type": "video",
+      "song": "Weather Report Suite",
+      "songKey": "weather-report-suite",
+      "category": "song",
+      "tags": [
+        "curated-video"
+      ],
+      "sizeBytes": 26430033,
+      "addedAt": "2026-02-28T14:08:40.455Z"
+    },
+    {
+      "id": "0ce3c1c68f0e8da8",
+      "path": "assets/library/videos/general-liquid-light-indigo-0ce3c1c68f0e8da8.mp4",
+      "originalFile": "general-liquid-light-indigo-0ce3c1c68f0e8da8.mp4",
+      "type": "video",
+      "song": "General",
+      "songKey": "general",
+      "category": "general",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-low",
+        "duration-300",
+        "name-liquid-light-indigo"
+      ],
+      "sizeBytes": 1212072,
+      "addedAt": "2026-03-03T17:32:49.138Z",
+      "model": "minimax-hailuo-02",
+      "prompt": "Slow swirling liquid light projection, hot oil and dye on glass plate, deep indigo and electric magenta bleeding into molten gold, organic amoeba shapes slowly splitting and merging, blacklight glow, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "243c979cf0a226f4",
+      "path": "assets/library/videos/general-stealie-cosmic-roses-243c979cf0a226f4.mp4",
+      "originalFile": "general-stealie-cosmic-roses-243c979cf0a226f4.mp4",
+      "type": "video",
+      "song": "General",
+      "songKey": "general",
+      "category": "general",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-mid",
+        "duration-300",
+        "name-stealie-cosmic-roses"
+      ],
+      "sizeBytes": 2621322,
+      "addedAt": "2026-03-03T17:35:07.190Z",
+      "model": "minimax-hailuo-02",
+      "prompt": "Steal Your Face skull emerging from swirling tie-dye cosmos, thirteen-point lightning bolt crackling with electric purple energy, roses growing from eye sockets in time-lapse, art nouveau border of thorned vines, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "6472ac7e197cee10",
+      "path": "assets/library/videos/general-vortex-bears-eruption-6472ac7e197cee10.mp4",
+      "originalFile": "general-vortex-bears-eruption-6472ac7e197cee10.mp4",
+      "type": "video",
+      "song": "General",
+      "songKey": "general",
+      "category": "general",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-high",
+        "duration-300",
+        "name-vortex-bears-eruption"
+      ],
+      "sizeBytes": 4397273,
+      "addedAt": "2026-03-03T17:37:31.424Z",
+      "model": "minimax-hailuo-02",
+      "prompt": "Explosive eruption of molten gold and acid green from a central vortex, dancing bear silhouettes tumbling through the maelstrom, hot pink lightning arcs, oil-on-water color interference patterns radiating outward, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "66b0a681abcef150",
+      "path": "assets/library/videos/general-oil-lamp-amber-purple-66b0a681abcef150.mp4",
+      "originalFile": "general-oil-lamp-amber-purple-66b0a681abcef150.mp4",
+      "type": "video",
+      "song": "General",
+      "songKey": "general",
+      "category": "general",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-low",
+        "duration-300",
+        "name-oil-lamp-amber-purple"
+      ],
+      "sizeBytes": 950672,
+      "addedAt": "2026-03-03T17:39:54.163Z",
+      "model": "minimax-hailuo-02",
+      "prompt": "Overhead projector oil lamp effect, warm amber and deep purple dye pools slowly merging on hot glass, organic cellular shapes dividing and recombining, subtle breathing pulsation, velvet painting depth and glow, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "98f385c4f5255067",
+      "path": "assets/library/videos/general-skeleton-roses-bloom-98f385c4f5255067.mp4",
+      "originalFile": "general-skeleton-roses-bloom-98f385c4f5255067.mp4",
+      "type": "video",
+      "song": "General",
+      "songKey": "general",
+      "category": "general",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-low",
+        "duration-300",
+        "name-skeleton-roses-bloom"
+      ],
+      "sizeBytes": 1734275,
+      "addedAt": "2026-03-03T17:42:09.706Z",
+      "model": "minimax-hailuo-02",
+      "prompt": "Skeleton roses blooming in reverse and forward simultaneously, petals made of marbled ink in electric blue and crimson, thorned stems weaving into Grateful Dead lightning bolt patterns, blacklight ultraviolet glow, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "132344c516c0400f",
+      "path": "assets/library/videos/general-dead-icon-morph-storm-132344c516c0400f.mp4",
+      "originalFile": "general-dead-icon-morph-storm-132344c516c0400f.mp4",
+      "type": "video",
+      "song": "General",
+      "songKey": "general",
+      "category": "general",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-high",
+        "duration-300",
+        "name-dead-icon-morph-storm"
+      ],
+      "sizeBytes": 4721990,
+      "addedAt": "2026-03-03T17:44:54.515Z",
+      "model": "minimax-hailuo-02",
+      "prompt": "Rapid morphing kaleidoscope of Dead iconography — bears dissolving into skulls dissolving into terrapins dissolving into roses, electric oversaturated colors strobing between hot pink and cosmic blue, Rick Griffin poster energy, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "7c73ce86085ae623",
+      "path": "assets/library/videos/general-marbled-ink-mandala-7c73ce86085ae623.mp4",
+      "originalFile": "general-marbled-ink-mandala-7c73ce86085ae623.mp4",
+      "type": "video",
+      "song": "General",
+      "songKey": "general",
+      "category": "general",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-mid",
+        "duration-300",
+        "name-marbled-ink-mandala"
+      ],
+      "sizeBytes": 1968837,
+      "addedAt": "2026-03-03T17:47:26.181Z",
+      "model": "minimax-hailuo-02",
+      "prompt": "Marbled ink bleeding through water, tendrils of electric purple and acid green spiraling into sacred geometry mandalas, organic forms breathing and pulsing with inner light, tie-dye interference patterns, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "15889fd1adfac9a6",
+      "path": "assets/library/videos/general-terrapin-fractal-jewel-15889fd1adfac9a6.mp4",
+      "originalFile": "general-terrapin-fractal-jewel-15889fd1adfac9a6.mp4",
+      "type": "video",
+      "song": "General",
+      "songKey": "general",
+      "category": "general",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-low",
+        "duration-300",
+        "name-terrapin-fractal-jewel"
+      ],
+      "sizeBytes": 1720775,
+      "addedAt": "2026-03-03T17:50:28.482Z",
+      "model": "minimax-hailuo-02",
+      "prompt": "Terrapin shell spiraling into infinite fractal depth, each chamber glowing with different jewel-tone color — emerald, ruby, sapphire, amber — organic curves and art nouveau linework, warm velvet blacklight glow, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "6d3c7256d00d66a5",
+      "path": "assets/library/videos/general-stealie-supernova-6d3c7256d00d66a5.mp4",
+      "originalFile": "general-stealie-supernova-6d3c7256d00d66a5.mp4",
+      "type": "video",
+      "song": "General",
+      "songKey": "general",
+      "category": "general",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-high",
+        "duration-300",
+        "name-stealie-supernova"
+      ],
+      "sizeBytes": 2690687,
+      "addedAt": "2026-03-03T17:52:59.237Z",
+      "model": "minimax-hailuo-02",
+      "prompt": "Supernova of tie-dye color exploding from a central Steal Your Face emblem, concentric rings of molten gold and electric magenta radiating outward, dancing skeleton silhouettes in the shockwave, maximum saturation and energy, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "2998cd7efe0deabb",
+      "path": "assets/library/videos/general-liquid-helix-merge-2998cd7efe0deabb.mp4",
+      "originalFile": "general-liquid-helix-merge-2998cd7efe0deabb.mp4",
+      "type": "video",
+      "song": "General",
+      "songKey": "general",
+      "category": "general",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-mid",
+        "duration-300",
+        "name-liquid-helix-merge"
+      ],
+      "sizeBytes": 2866243,
+      "addedAt": "2026-03-03T17:55:33.102Z",
+      "model": "grok-imagine",
+      "prompt": "Two liquid light streams — warm amber and cool electric blue — slowly spiraling around each other like a DNA helix, organic tendrils reaching between them, oil-on-glass texture with subtle rainbow interference at contact edges, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "90ad50d8fd2ec110",
+      "path": "assets/library/videos/general-liquid-light-indigo-90ad50d8fd2ec110.mp4",
+      "originalFile": "general-liquid-light-indigo-90ad50d8fd2ec110.mp4",
+      "type": "video",
+      "song": "General",
+      "songKey": "general",
+      "category": "general",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-low",
+        "duration-300",
+        "name-liquid-light-indigo"
+      ],
+      "sizeBytes": 8437036,
+      "addedAt": "2026-03-03T18:35:30.200Z",
+      "model": "grok-imagine",
+      "prompt": "Slow swirling liquid light projection, hot oil and dye on glass plate, deep indigo and electric magenta bleeding into molten gold, organic amoeba shapes slowly splitting and merging, blacklight glow, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "52f6f35650e64d37",
+      "path": "assets/library/videos/general-stealie-cosmic-roses-52f6f35650e64d37.mp4",
+      "originalFile": "general-stealie-cosmic-roses-52f6f35650e64d37.mp4",
+      "type": "video",
+      "song": "General",
+      "songKey": "general",
+      "category": "general",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-mid",
+        "duration-300",
+        "name-stealie-cosmic-roses"
+      ],
+      "sizeBytes": 17702611,
+      "addedAt": "2026-03-03T18:36:28.689Z",
+      "model": "grok-imagine",
+      "prompt": "Steal Your Face skull emerging from swirling tie-dye cosmos, thirteen-point lightning bolt crackling with electric purple energy, roses growing from eye sockets in time-lapse, art nouveau border of thorned vines, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "1353ce75f7e1f98d",
+      "path": "assets/library/videos/general-vortex-bears-eruption-1353ce75f7e1f98d.mp4",
+      "originalFile": "general-vortex-bears-eruption-1353ce75f7e1f98d.mp4",
+      "type": "video",
+      "song": "General",
+      "songKey": "general",
+      "category": "general",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-high",
+        "duration-300",
+        "name-vortex-bears-eruption"
+      ],
+      "sizeBytes": 33566369,
+      "addedAt": "2026-03-03T18:37:33.335Z",
+      "model": "grok-imagine",
+      "prompt": "Explosive eruption of molten gold and acid green from a central vortex, dancing bear silhouettes tumbling through the maelstrom, hot pink lightning arcs, oil-on-water color interference patterns radiating outward, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "52ed6b8cfe362e7f",
+      "path": "assets/library/videos/general-oil-lamp-amber-purple-52ed6b8cfe362e7f.mp4",
+      "originalFile": "general-oil-lamp-amber-purple-52ed6b8cfe362e7f.mp4",
+      "type": "video",
+      "song": "General",
+      "songKey": "general",
+      "category": "general",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-low",
+        "duration-300",
+        "name-oil-lamp-amber-purple"
+      ],
+      "sizeBytes": 4791108,
+      "addedAt": "2026-03-03T18:38:25.644Z",
+      "model": "grok-imagine",
+      "prompt": "Overhead projector oil lamp effect, warm amber and deep purple dye pools slowly merging on hot glass, organic cellular shapes dividing and recombining, subtle breathing pulsation, velvet painting depth and glow, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "6e1c17b9b74de38a",
+      "path": "assets/library/videos/general-skeleton-roses-bloom-6e1c17b9b74de38a.mp4",
+      "originalFile": "general-skeleton-roses-bloom-6e1c17b9b74de38a.mp4",
+      "type": "video",
+      "song": "General",
+      "songKey": "general",
+      "category": "general",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-low",
+        "duration-300",
+        "name-skeleton-roses-bloom"
+      ],
+      "sizeBytes": 14497913,
+      "addedAt": "2026-03-03T18:39:20.281Z",
+      "model": "grok-imagine",
+      "prompt": "Skeleton roses blooming in reverse and forward simultaneously, petals made of marbled ink in electric blue and crimson, thorned stems weaving into Grateful Dead lightning bolt patterns, blacklight ultraviolet glow, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "bce47401583d06e2",
+      "path": "assets/library/videos/general-dead-icon-morph-storm-bce47401583d06e2.mp4",
+      "originalFile": "general-dead-icon-morph-storm-bce47401583d06e2.mp4",
+      "type": "video",
+      "song": "General",
+      "songKey": "general",
+      "category": "general",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-high",
+        "duration-300",
+        "name-dead-icon-morph-storm"
+      ],
+      "sizeBytes": 34266899,
+      "addedAt": "2026-03-03T18:40:21.024Z",
+      "model": "grok-imagine",
+      "prompt": "Rapid morphing kaleidoscope of Dead iconography — bears dissolving into skulls dissolving into terrapins dissolving into roses, electric oversaturated colors strobing between hot pink and cosmic blue, Rick Griffin poster energy, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "dd17e4c10bd3e8c1",
+      "path": "assets/library/videos/general-marbled-ink-mandala-dd17e4c10bd3e8c1.mp4",
+      "originalFile": "general-marbled-ink-mandala-dd17e4c10bd3e8c1.mp4",
+      "type": "video",
+      "song": "General",
+      "songKey": "general",
+      "category": "general",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-mid",
+        "duration-300",
+        "name-marbled-ink-mandala"
+      ],
+      "sizeBytes": 17929586,
+      "addedAt": "2026-03-03T18:41:19.609Z",
+      "model": "grok-imagine",
+      "prompt": "Marbled ink bleeding through water, tendrils of electric purple and acid green spiraling into sacred geometry mandalas, organic forms breathing and pulsing with inner light, tie-dye interference patterns, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "4b0ab664d6d36260",
+      "path": "assets/library/images/new-minglewood-blues-generated.png",
+      "originalFile": "new-minglewood-blues-generated.png",
+      "type": "image",
+      "song": "New Minglewood Blues",
+      "songKey": "new-minglewood-blues",
+      "sourceShow": "gd1977-05-08",
+      "category": "song",
+      "tags": [
+        "generated",
+        "song-video-still"
+      ],
+      "sizeBytes": 556107,
+      "addedAt": "2026-03-03T18:55:30.007Z"
+    },
+    {
+      "id": "507b85a2af12b47b",
+      "path": "assets/library/videos/new-minglewood-blues-generated.mp4",
+      "originalFile": "new-minglewood-blues-generated.mp4",
+      "type": "video",
+      "song": "New Minglewood Blues",
+      "songKey": "new-minglewood-blues",
+      "sourceShow": "gd1977-05-08",
+      "category": "song",
+      "tags": [
+        "generated",
+        "song-video"
+      ],
+      "sizeBytes": 26750104,
+      "addedAt": "2026-03-03T18:55:30.007Z"
+    },
+    {
+      "id": "7f0b2baaf86a45a8",
+      "path": "assets/library/images/loser-generated.png",
+      "originalFile": "loser-generated.png",
+      "type": "image",
+      "song": "Loser",
+      "songKey": "loser",
+      "sourceShow": "gd1977-05-08",
+      "category": "song",
+      "tags": [
+        "generated",
+        "song-video-still"
+      ],
+      "sizeBytes": 567762,
+      "addedAt": "2026-03-03T18:57:16.602Z"
+    },
+    {
+      "id": "b3a205d4dc32ddc9",
+      "path": "assets/library/videos/loser-generated.mp4",
+      "originalFile": "loser-generated.mp4",
+      "type": "video",
+      "song": "Loser",
+      "songKey": "loser",
+      "sourceShow": "gd1977-05-08",
+      "category": "song",
+      "tags": [
+        "generated",
+        "song-video"
+      ],
+      "sizeBytes": 24403209,
+      "addedAt": "2026-03-03T18:57:16.602Z"
+    },
+    {
+      "id": "001880230fa1a3d4",
+      "path": "assets/library/images/el-paso-generated.png",
+      "originalFile": "el-paso-generated.png",
+      "type": "image",
+      "song": "El Paso",
+      "songKey": "el-paso",
+      "sourceShow": "gd1977-05-08",
+      "category": "song",
+      "tags": [
+        "generated",
+        "song-video-still"
+      ],
+      "sizeBytes": 559972,
+      "addedAt": "2026-03-03T18:59:12.669Z"
+    },
+    {
+      "id": "09289c313edadb3d",
+      "path": "assets/library/videos/el-paso-generated.mp4",
+      "originalFile": "el-paso-generated.mp4",
+      "type": "video",
+      "song": "El Paso",
+      "songKey": "el-paso",
+      "sourceShow": "gd1977-05-08",
+      "category": "song",
+      "tags": [
+        "generated",
+        "song-video"
+      ],
+      "sizeBytes": 23375144,
+      "addedAt": "2026-03-03T18:59:12.669Z"
+    },
+    {
+      "id": "cacfced228f961ed",
+      "path": "assets/library/images/they-love-each-other-generated.png",
+      "originalFile": "they-love-each-other-generated.png",
+      "type": "image",
+      "song": "They Love Each Other",
+      "songKey": "they-love-each-other",
+      "sourceShow": "gd1977-05-08",
+      "category": "song",
+      "tags": [
+        "generated",
+        "song-video-still"
+      ],
+      "sizeBytes": 542050,
+      "addedAt": "2026-03-03T19:00:56.480Z"
+    },
+    {
+      "id": "08eb1a8b3f4de775",
+      "path": "assets/library/videos/they-love-each-other-generated.mp4",
+      "originalFile": "they-love-each-other-generated.mp4",
+      "type": "video",
+      "song": "They Love Each Other",
+      "songKey": "they-love-each-other",
+      "sourceShow": "gd1977-05-08",
+      "category": "song",
+      "tags": [
+        "generated",
+        "song-video"
+      ],
+      "sizeBytes": 21249947,
+      "addedAt": "2026-03-03T19:00:56.480Z"
+    },
+    {
+      "id": "c41e970f5371c42a",
+      "path": "assets/library/images/jack-straw-generated.png",
+      "originalFile": "jack-straw-generated.png",
+      "type": "image",
+      "song": "Jack Straw",
+      "songKey": "jack-straw",
+      "sourceShow": "gd1977-05-08",
+      "category": "song",
+      "tags": [
+        "generated",
+        "song-video-still"
+      ],
+      "sizeBytes": 687233,
+      "addedAt": "2026-03-03T19:02:44.339Z"
+    },
+    {
+      "id": "13ea78d466349eb7",
+      "path": "assets/library/videos/jack-straw-generated.mp4",
+      "originalFile": "jack-straw-generated.mp4",
+      "type": "video",
+      "song": "Jack Straw",
+      "songKey": "jack-straw",
+      "sourceShow": "gd1977-05-08",
+      "category": "song",
+      "tags": [
+        "generated",
+        "song-video"
+      ],
+      "sizeBytes": 29415241,
+      "addedAt": "2026-03-03T19:02:44.339Z"
+    },
+    {
+      "id": "b3706a3bef63fb5e",
+      "path": "assets/library/images/deal-generated.png",
+      "originalFile": "deal-generated.png",
+      "type": "image",
+      "song": "Deal",
+      "songKey": "deal",
+      "sourceShow": "gd1977-05-08",
+      "category": "song",
+      "tags": [
+        "generated",
+        "song-video-still"
+      ],
+      "sizeBytes": 684108,
+      "addedAt": "2026-03-03T19:04:35.442Z"
+    },
+    {
+      "id": "33f64639b8dce459",
+      "path": "assets/library/videos/deal-generated.mp4",
+      "originalFile": "deal-generated.mp4",
+      "type": "video",
+      "song": "Deal",
+      "songKey": "deal",
+      "sourceShow": "gd1977-05-08",
+      "category": "song",
+      "tags": [
+        "generated",
+        "song-video"
+      ],
+      "sizeBytes": 40379379,
+      "addedAt": "2026-03-03T19:04:35.442Z"
+    },
+    {
+      "id": "b21f624e37338fba",
+      "path": "assets/library/images/lazy-lightnin-generated.png",
+      "originalFile": "lazy-lightnin-generated.png",
+      "type": "image",
+      "song": "Lazy Lightnin'",
+      "songKey": "lazy-lightnin",
+      "sourceShow": "gd1977-05-08",
+      "category": "song",
+      "tags": [
+        "generated",
+        "song-video-still"
+      ],
+      "sizeBytes": 488306,
+      "addedAt": "2026-03-03T19:06:16.626Z"
+    },
+    {
+      "id": "b023504321ce1638",
+      "path": "assets/library/videos/lazy-lightnin-generated.mp4",
+      "originalFile": "lazy-lightnin-generated.mp4",
+      "type": "video",
+      "song": "Lazy Lightnin'",
+      "songKey": "lazy-lightnin",
+      "sourceShow": "gd1977-05-08",
+      "category": "song",
+      "tags": [
+        "generated",
+        "song-video"
+      ],
+      "sizeBytes": 20172601,
+      "addedAt": "2026-03-03T19:06:16.626Z"
+    },
+    {
+      "id": "93ba22f932daefdc",
+      "path": "assets/library/images/supplication-generated.png",
+      "originalFile": "supplication-generated.png",
+      "type": "image",
+      "song": "Supplication",
+      "songKey": "supplication",
+      "sourceShow": "gd1977-05-08",
+      "category": "song",
+      "tags": [
+        "generated",
+        "song-video-still"
+      ],
+      "sizeBytes": 587127,
+      "addedAt": "2026-03-03T19:08:11.182Z"
+    },
+    {
+      "id": "5ebcba293f6dbf90",
+      "path": "assets/library/videos/supplication-generated.mp4",
+      "originalFile": "supplication-generated.mp4",
+      "type": "video",
+      "song": "Supplication",
+      "songKey": "supplication",
+      "sourceShow": "gd1977-05-08",
+      "category": "song",
+      "tags": [
+        "generated",
+        "song-video"
+      ],
+      "sizeBytes": 24933896,
+      "addedAt": "2026-03-03T19:08:11.182Z"
+    },
+    {
+      "id": "709debd37d0b2325",
+      "path": "assets/library/images/brown-eyed-women-generated.png",
+      "originalFile": "brown-eyed-women-generated.png",
+      "type": "image",
+      "song": "Brown Eyed Women",
+      "songKey": "brown-eyed-women",
+      "sourceShow": "gd1977-05-08",
+      "category": "song",
+      "tags": [
+        "generated",
+        "song-video-still"
+      ],
+      "sizeBytes": 635411,
+      "addedAt": "2026-03-03T19:10:03.198Z"
+    },
+    {
+      "id": "1124d6065be597e7",
+      "path": "assets/library/videos/brown-eyed-women-generated.mp4",
+      "originalFile": "brown-eyed-women-generated.mp4",
+      "type": "video",
+      "song": "Brown Eyed Women",
+      "songKey": "brown-eyed-women",
+      "sourceShow": "gd1977-05-08",
+      "category": "song",
+      "tags": [
+        "generated",
+        "song-video"
+      ],
+      "sizeBytes": 36461429,
+      "addedAt": "2026-03-03T19:10:03.198Z"
+    },
+    {
+      "id": "09b4c5c83bbe400b",
+      "path": "assets/library/images/mama-tried-generated.png",
+      "originalFile": "mama-tried-generated.png",
+      "type": "image",
+      "song": "Mama Tried",
+      "songKey": "mama-tried",
+      "sourceShow": "gd1977-05-08",
+      "category": "song",
+      "tags": [
+        "generated",
+        "song-video-still"
+      ],
+      "sizeBytes": 606980,
+      "addedAt": "2026-03-03T19:11:51.957Z"
+    },
+    {
+      "id": "115f4496a98b94cc",
+      "path": "assets/library/videos/mama-tried-generated.mp4",
+      "originalFile": "mama-tried-generated.mp4",
+      "type": "video",
+      "song": "Mama Tried",
+      "songKey": "mama-tried",
+      "sourceShow": "gd1977-05-08",
+      "category": "song",
+      "tags": [
+        "generated",
+        "song-video"
+      ],
+      "sizeBytes": 26757099,
+      "addedAt": "2026-03-03T19:11:51.957Z"
+    },
+    {
+      "id": "d879f7c4a7fe6768",
+      "path": "assets/library/images/row-jimmy-generated.png",
+      "originalFile": "row-jimmy-generated.png",
+      "type": "image",
+      "song": "Row Jimmy",
+      "songKey": "row-jimmy",
+      "sourceShow": "gd1977-05-08",
+      "category": "song",
+      "tags": [
+        "generated",
+        "song-video-still"
+      ],
+      "sizeBytes": 547693,
+      "addedAt": "2026-03-03T19:13:40.187Z"
+    },
+    {
+      "id": "53bb708b2ada6ee8",
+      "path": "assets/library/videos/row-jimmy-generated.mp4",
+      "originalFile": "row-jimmy-generated.mp4",
+      "type": "video",
+      "song": "Row Jimmy",
+      "songKey": "row-jimmy",
+      "sourceShow": "gd1977-05-08",
+      "category": "song",
+      "tags": [
+        "generated",
+        "song-video"
+      ],
+      "sizeBytes": 21618307,
+      "addedAt": "2026-03-03T19:13:40.187Z"
+    },
+    {
+      "id": "17f0449b1ffccb44",
+      "path": "assets/library/images/dancin-in-the-street-generated.png",
+      "originalFile": "dancin-in-the-street-generated.png",
+      "type": "image",
+      "song": "Dancin' in the Street",
+      "songKey": "dancin-in-the-street",
+      "sourceShow": "gd1977-05-08",
+      "category": "song",
+      "tags": [
+        "generated",
+        "song-video-still"
+      ],
+      "sizeBytes": 751919,
+      "addedAt": "2026-03-03T19:15:41.717Z"
+    },
+    {
+      "id": "e78818a48563ea95",
+      "path": "assets/library/videos/dancin-in-the-street-generated.mp4",
+      "originalFile": "dancin-in-the-street-generated.mp4",
+      "type": "video",
+      "song": "Dancin' in the Street",
+      "songKey": "dancin-in-the-street",
+      "sourceShow": "gd1977-05-08",
+      "category": "song",
+      "tags": [
+        "generated",
+        "song-video"
+      ],
+      "sizeBytes": 49477204,
+      "addedAt": "2026-03-03T19:15:41.717Z"
+    },
+    {
+      "id": "0921a8fb90936172",
+      "path": "assets/library/images/scarlet-begonias-generated.png",
+      "originalFile": "scarlet-begonias-generated.png",
+      "type": "image",
+      "song": "Scarlet Begonias",
+      "songKey": "scarlet-begonias",
+      "sourceShow": "gd1977-05-08",
+      "category": "song",
+      "tags": [
+        "generated",
+        "song-video-still"
+      ],
+      "sizeBytes": 613891,
+      "addedAt": "2026-03-03T19:17:28.051Z"
+    },
+    {
+      "id": "ebf159b000611a1d",
+      "path": "assets/library/videos/scarlet-begonias-generated.mp4",
+      "originalFile": "scarlet-begonias-generated.mp4",
+      "type": "video",
+      "song": "Scarlet Begonias",
+      "songKey": "scarlet-begonias",
+      "sourceShow": "gd1977-05-08",
+      "category": "song",
+      "tags": [
+        "generated",
+        "song-video"
+      ],
+      "sizeBytes": 29132692,
+      "addedAt": "2026-03-03T19:17:28.052Z"
+    },
+    {
+      "id": "9705ed683fea4c15",
+      "path": "assets/library/images/fire-on-the-mountain-generated.png",
+      "originalFile": "fire-on-the-mountain-generated.png",
+      "type": "image",
+      "song": "Fire on the Mountain",
+      "songKey": "fire-on-the-mountain",
+      "sourceShow": "gd1977-05-08",
+      "category": "song",
+      "tags": [
+        "generated",
+        "song-video-still"
+      ],
+      "sizeBytes": 603629,
+      "addedAt": "2026-03-03T19:19:17.859Z"
+    },
+    {
+      "id": "df95a1e08afe665b",
+      "path": "assets/library/videos/fire-on-the-mountain-generated.mp4",
+      "originalFile": "fire-on-the-mountain-generated.mp4",
+      "type": "video",
+      "song": "Fire on the Mountain",
+      "songKey": "fire-on-the-mountain",
+      "sourceShow": "gd1977-05-08",
+      "category": "song",
+      "tags": [
+        "generated",
+        "song-video"
+      ],
+      "sizeBytes": 37526404,
+      "addedAt": "2026-03-03T19:19:17.859Z"
+    },
+    {
+      "id": "b39ddc49296acee4",
+      "path": "assets/library/images/estimated-prophet-generated.png",
+      "originalFile": "estimated-prophet-generated.png",
+      "type": "image",
+      "song": "Estimated Prophet",
+      "songKey": "estimated-prophet",
+      "sourceShow": "gd1977-05-08",
+      "category": "song",
+      "tags": [
+        "generated",
+        "song-video-still"
+      ],
+      "sizeBytes": 643881,
+      "addedAt": "2026-03-03T19:21:07.442Z"
+    },
+    {
+      "id": "927de715e9d45ca7",
+      "path": "assets/library/videos/estimated-prophet-generated.mp4",
+      "originalFile": "estimated-prophet-generated.mp4",
+      "type": "video",
+      "song": "Estimated Prophet",
+      "songKey": "estimated-prophet",
+      "sourceShow": "gd1977-05-08",
+      "category": "song",
+      "tags": [
+        "generated",
+        "song-video"
+      ],
+      "sizeBytes": 37297278,
+      "addedAt": "2026-03-03T19:21:07.442Z"
+    },
+    {
+      "id": "993d86a0c38cef46",
+      "path": "assets/library/images/st-stephen-generated.png",
+      "originalFile": "st-stephen-generated.png",
+      "type": "image",
+      "song": "St. Stephen",
+      "songKey": "st-stephen",
+      "sourceShow": "gd1977-05-08",
+      "category": "song",
+      "tags": [
+        "generated",
+        "song-video-still"
+      ],
+      "sizeBytes": 720217,
+      "addedAt": "2026-03-03T19:23:04.814Z"
+    },
+    {
+      "id": "4ef1429109387277",
+      "path": "assets/library/videos/st-stephen-generated.mp4",
+      "originalFile": "st-stephen-generated.mp4",
+      "type": "video",
+      "song": "St. Stephen",
+      "songKey": "st-stephen",
+      "sourceShow": "gd1977-05-08",
+      "category": "song",
+      "tags": [
+        "generated",
+        "song-video"
+      ],
+      "sizeBytes": 41606827,
+      "addedAt": "2026-03-03T19:23:04.814Z"
+    },
+    {
+      "id": "8581c281439f2d4a",
+      "path": "assets/library/images/not-fade-away-generated.png",
+      "originalFile": "not-fade-away-generated.png",
+      "type": "image",
+      "song": "Not Fade Away",
+      "songKey": "not-fade-away",
+      "sourceShow": "gd1977-05-08",
+      "category": "song",
+      "tags": [
+        "generated",
+        "song-video-still"
+      ],
+      "sizeBytes": 661582,
+      "addedAt": "2026-03-03T19:24:50.655Z"
+    },
+    {
+      "id": "89fc889a63f70621",
+      "path": "assets/library/videos/not-fade-away-generated.mp4",
+      "originalFile": "not-fade-away-generated.mp4",
+      "type": "video",
+      "song": "Not Fade Away",
+      "songKey": "not-fade-away",
+      "sourceShow": "gd1977-05-08",
+      "category": "song",
+      "tags": [
+        "generated",
+        "song-video"
+      ],
+      "sizeBytes": 36096611,
+      "addedAt": "2026-03-03T19:24:50.655Z"
+    },
+    {
+      "id": "f5134e2285c8f156",
+      "path": "assets/library/images/drums-space-generated.png",
+      "originalFile": "drums-space-generated.png",
+      "type": "image",
+      "song": "Drums / Space",
+      "songKey": "drums-space",
+      "sourceShow": "gd1977-05-08",
+      "category": "song",
+      "tags": [
+        "generated",
+        "song-video-still"
+      ],
+      "sizeBytes": 670207,
+      "addedAt": "2026-03-03T19:26:48.955Z"
+    },
+    {
+      "id": "d5d6a7ee5f24e7f7",
+      "path": "assets/library/videos/drums-space-generated.mp4",
+      "originalFile": "drums-space-generated.mp4",
+      "type": "video",
+      "song": "Drums / Space",
+      "songKey": "drums-space",
+      "sourceShow": "gd1977-05-08",
+      "category": "song",
+      "tags": [
+        "generated",
+        "song-video"
+      ],
+      "sizeBytes": 39787621,
+      "addedAt": "2026-03-03T19:26:48.955Z"
+    },
+    {
+      "id": "de5500a7386ac765",
+      "path": "assets/library/images/morning-dew-generated.png",
+      "originalFile": "morning-dew-generated.png",
+      "type": "image",
+      "song": "Morning Dew",
+      "songKey": "morning-dew",
+      "sourceShow": "gd1977-05-08",
+      "category": "song",
+      "tags": [
+        "generated",
+        "song-video-still"
+      ],
+      "sizeBytes": 440339,
+      "addedAt": "2026-03-03T19:28:35.362Z"
+    },
+    {
+      "id": "a900e5b3e5fe5046",
+      "path": "assets/library/videos/morning-dew-generated.mp4",
+      "originalFile": "morning-dew-generated.mp4",
+      "type": "video",
+      "song": "Morning Dew",
+      "songKey": "morning-dew",
+      "sourceShow": "gd1977-05-08",
+      "category": "song",
+      "tags": [
+        "generated",
+        "song-video"
+      ],
+      "sizeBytes": 19666220,
+      "addedAt": "2026-03-03T19:28:35.362Z"
+    },
+    {
+      "id": "8b9d900d592cd838",
+      "path": "assets/library/images/one-more-saturday-night-generated.png",
+      "originalFile": "one-more-saturday-night-generated.png",
+      "type": "image",
+      "song": "One More Saturday Night",
+      "songKey": "one-more-saturday-night",
+      "sourceShow": "gd1977-05-08",
+      "category": "song",
+      "tags": [
+        "generated",
+        "song-video-still"
+      ],
+      "sizeBytes": 601130,
+      "addedAt": "2026-03-03T19:30:31.355Z"
+    },
+    {
+      "id": "0820ef6d6ebd26c1",
+      "path": "assets/library/videos/one-more-saturday-night-generated.mp4",
+      "originalFile": "one-more-saturday-night-generated.mp4",
+      "type": "video",
+      "song": "One More Saturday Night",
+      "songKey": "one-more-saturday-night",
+      "sourceShow": "gd1977-05-08",
+      "category": "song",
+      "tags": [
+        "generated",
+        "song-video"
+      ],
+      "sizeBytes": 39021223,
+      "addedAt": "2026-03-03T19:30:31.355Z"
+    },
+    {
+      "id": "121e9f0c8771acce",
+      "path": "assets/library/videos/fire-on-the-mountain-scene-mid-121e9f0c8771acce.mp4",
+      "originalFile": "fire-on-the-mountain-scene-mid-121e9f0c8771acce.mp4",
+      "type": "video",
+      "song": "Fire on the Mountain",
+      "songKey": "fire-on-the-mountain",
+      "category": "song",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-mid",
+        "duration-450"
+      ],
+      "sizeBytes": 32860777,
+      "addedAt": "2026-03-03T19:52:59.344Z",
+      "model": "grok-imagine",
+      "prompt": "Molten liquid skeleton roses breathing and melting, their petals dripping into pools of electric magenta and volcanic orange, stems morphing into thirteen-point lightning bolts that pulse and dissolve back into flower forms, all swimming in thick swirling oil-lamp patterns of deep crimson and gold, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "ac64e3c0dcb86848",
+      "path": "assets/library/videos/fire-on-the-mountain-scene-mid-ac64e3c0dcb86848.mp4",
+      "originalFile": "fire-on-the-mountain-scene-mid-ac64e3c0dcb86848.mp4",
+      "type": "video",
+      "song": "Fire on the Mountain",
+      "songKey": "fire-on-the-mountain",
+      "category": "song",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-mid",
+        "duration-450"
+      ],
+      "sizeBytes": 26611081,
+      "addedAt": "2026-03-03T19:54:36.340Z",
+      "model": "grok-imagine",
+      "prompt": "Tie-dye marbled ink patterns erupting upward like geysers, hot pink and acid green spirals bleeding into electric purple flames, the colors breathing and pulsing in thick syrupy waves that fold over themselves, expanding and contracting with hypnotic rhythm, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "66e30d9619c78649",
+      "path": "assets/library/videos/fire-on-the-mountain-scene-high-66e30d9619c78649.mp4",
+      "originalFile": "fire-on-the-mountain-scene-high-66e30d9619c78649.mp4",
+      "type": "video",
+      "song": "Fire on the Mountain",
+      "songKey": "fire-on-the-mountain",
+      "category": "song",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-high",
+        "duration-450"
+      ],
+      "sizeBytes": 36076900,
+      "addedAt": "2026-03-03T19:56:20.405Z",
+      "model": "grok-imagine",
+      "prompt": "Cosmic nebula clouds of neon orange and electric blue exploding outward in violent bursts, stellar matter morphing into dancing bear silhouettes that dissolve into supernovas of hot pink and molten gold, swirling vortexes of astral fire spinning faster and faster, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "b78f2608142cf00c",
+      "path": "assets/library/videos/fire-on-the-mountain-scene-low-b78f2608142cf00c.mp4",
+      "originalFile": "fire-on-the-mountain-scene-low-b78f2608142cf00c.mp4",
+      "type": "video",
+      "song": "Fire on the Mountain",
+      "songKey": "fire-on-the-mountain",
+      "category": "song",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-low",
+        "duration-450"
+      ],
+      "sizeBytes": 9844571,
+      "addedAt": "2026-03-03T19:57:47.193Z",
+      "model": "grok-imagine",
+      "prompt": "Blacklight poster art of Steal Your Face skulls slowly melting into pools of deep violet and midnight blue, the bone forms dripping and reforming like candle wax, breathing gently as they bleed into soft swirls of indigo and dim orange embers fading to darkness, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "81e5471c67a289e9",
+      "path": "assets/library/videos/general-liquid-light-indigo-81e5471c67a289e9.mp4",
+      "originalFile": "general-liquid-light-indigo-81e5471c67a289e9.mp4",
+      "type": "video",
+      "song": "General",
+      "songKey": "general",
+      "category": "general",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-low",
+        "duration-300",
+        "name-liquid-light-indigo"
+      ],
+      "sizeBytes": 7422361,
+      "addedAt": "2026-03-03T19:58:41.373Z",
+      "model": "grok-imagine",
+      "prompt": "Slow swirling liquid light projection, hot oil and dye on glass plate, deep indigo and electric magenta bleeding into molten gold, organic amoeba shapes slowly splitting and merging, blacklight glow, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "5376c3d824d0964e",
+      "path": "assets/library/videos/general-stealie-cosmic-roses-5376c3d824d0964e.mp4",
+      "originalFile": "general-stealie-cosmic-roses-5376c3d824d0964e.mp4",
+      "type": "video",
+      "song": "General",
+      "songKey": "general",
+      "category": "general",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-mid",
+        "duration-300",
+        "name-stealie-cosmic-roses"
+      ],
+      "sizeBytes": 20443614,
+      "addedAt": "2026-03-03T19:59:45.397Z",
+      "model": "grok-imagine",
+      "prompt": "Steal Your Face skull emerging from swirling tie-dye cosmos, thirteen-point lightning bolt crackling with electric purple energy, roses growing from eye sockets in time-lapse, art nouveau border of thorned vines, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "a76cfe0ccd489fbf",
+      "path": "assets/library/videos/general-vortex-bears-eruption-a76cfe0ccd489fbf.mp4",
+      "originalFile": "general-vortex-bears-eruption-a76cfe0ccd489fbf.mp4",
+      "type": "video",
+      "song": "General",
+      "songKey": "general",
+      "category": "general",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-high",
+        "duration-300",
+        "name-vortex-bears-eruption"
+      ],
+      "sizeBytes": 42961279,
+      "addedAt": "2026-03-03T20:01:01.798Z",
+      "model": "grok-imagine",
+      "prompt": "Explosive eruption of molten gold and acid green from a central vortex, dancing bear silhouettes tumbling through the maelstrom, hot pink lightning arcs, oil-on-water color interference patterns radiating outward, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "ebf16288cfba6e73",
+      "path": "assets/library/videos/general-oil-lamp-amber-purple-ebf16288cfba6e73.mp4",
+      "originalFile": "general-oil-lamp-amber-purple-ebf16288cfba6e73.mp4",
+      "type": "video",
+      "song": "General",
+      "songKey": "general",
+      "category": "general",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-low",
+        "duration-300",
+        "name-oil-lamp-amber-purple"
+      ],
+      "sizeBytes": 4731915,
+      "addedAt": "2026-03-03T20:01:55.701Z",
+      "model": "grok-imagine",
+      "prompt": "Overhead projector oil lamp effect, warm amber and deep purple dye pools slowly merging on hot glass, organic cellular shapes dividing and recombining, subtle breathing pulsation, velvet painting depth and glow, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "2595ebcf25cc174c",
+      "path": "assets/library/videos/general-skeleton-roses-bloom-2595ebcf25cc174c.mp4",
+      "originalFile": "general-skeleton-roses-bloom-2595ebcf25cc174c.mp4",
+      "type": "video",
+      "song": "General",
+      "songKey": "general",
+      "category": "general",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-low",
+        "duration-300",
+        "name-skeleton-roses-bloom"
+      ],
+      "sizeBytes": 14365807,
+      "addedAt": "2026-03-03T20:02:57.333Z",
+      "model": "grok-imagine",
+      "prompt": "Skeleton roses blooming in reverse and forward simultaneously, petals made of marbled ink in electric blue and crimson, thorned stems weaving into Grateful Dead lightning bolt patterns, blacklight ultraviolet glow, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "f90d07ab4320e2ef",
+      "path": "assets/library/videos/general-dead-icon-morph-storm-f90d07ab4320e2ef.mp4",
+      "originalFile": "general-dead-icon-morph-storm-f90d07ab4320e2ef.mp4",
+      "type": "video",
+      "song": "General",
+      "songKey": "general",
+      "category": "general",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-high",
+        "duration-300",
+        "name-dead-icon-morph-storm"
+      ],
+      "sizeBytes": 35082519,
+      "addedAt": "2026-03-03T20:04:10.563Z",
+      "model": "grok-imagine",
+      "prompt": "Rapid morphing kaleidoscope of Dead iconography — bears dissolving into skulls dissolving into terrapins dissolving into roses, electric oversaturated colors strobing between hot pink and cosmic blue, Rick Griffin poster energy, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "61fb5a962b784a3c",
+      "path": "assets/library/videos/general-marbled-ink-mandala-61fb5a962b784a3c.mp4",
+      "originalFile": "general-marbled-ink-mandala-61fb5a962b784a3c.mp4",
+      "type": "video",
+      "song": "General",
+      "songKey": "general",
+      "category": "general",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-mid",
+        "duration-300",
+        "name-marbled-ink-mandala"
+      ],
+      "sizeBytes": 17839425,
+      "addedAt": "2026-03-03T20:05:14.100Z",
+      "model": "grok-imagine",
+      "prompt": "Marbled ink bleeding through water, tendrils of electric purple and acid green spiraling into sacred geometry mandalas, organic forms breathing and pulsing with inner light, tie-dye interference patterns, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "1997f850592225db",
+      "path": "assets/library/videos/general-terrapin-fractal-jewel-1997f850592225db.mp4",
+      "originalFile": "general-terrapin-fractal-jewel-1997f850592225db.mp4",
+      "type": "video",
+      "song": "General",
+      "songKey": "general",
+      "category": "general",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-low",
+        "duration-300",
+        "name-terrapin-fractal-jewel"
+      ],
+      "sizeBytes": 17617323,
+      "addedAt": "2026-03-03T20:06:19.043Z",
+      "model": "grok-imagine",
+      "prompt": "Terrapin shell spiraling into infinite fractal depth, each chamber glowing with different jewel-tone color — emerald, ruby, sapphire, amber — organic curves and art nouveau linework, warm velvet blacklight glow, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "92d14941bf1a42ea",
+      "path": "assets/library/videos/general-stealie-supernova-92d14941bf1a42ea.mp4",
+      "originalFile": "general-stealie-supernova-92d14941bf1a42ea.mp4",
+      "type": "video",
+      "song": "General",
+      "songKey": "general",
+      "category": "general",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-high",
+        "duration-300",
+        "name-stealie-supernova"
+      ],
+      "sizeBytes": 26197874,
+      "addedAt": "2026-03-03T20:07:24.527Z",
+      "model": "grok-imagine",
+      "prompt": "Supernova of tie-dye color exploding from a central Steal Your Face emblem, concentric rings of molten gold and electric magenta radiating outward, dancing skeleton silhouettes in the shockwave, maximum saturation and energy, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "061afd65fc7fabfc",
+      "path": "assets/library/videos/general-liquid-helix-merge-061afd65fc7fabfc.mp4",
+      "originalFile": "general-liquid-helix-merge-061afd65fc7fabfc.mp4",
+      "type": "video",
+      "song": "General",
+      "songKey": "general",
+      "category": "general",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-mid",
+        "duration-300",
+        "name-liquid-helix-merge"
+      ],
+      "sizeBytes": 9061256,
+      "addedAt": "2026-03-03T20:08:23.448Z",
+      "model": "grok-imagine",
+      "prompt": "Two liquid light streams — warm amber and cool electric blue — slowly spiraling around each other like a DNA helix, organic tendrils reaching between them, oil-on-glass texture with subtle rainbow interference at contact edges, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "349fa893fb4c1088",
+      "path": "assets/library/videos/new-minglewood-blues-scene-mid-349fa893fb4c1088.mp4",
+      "originalFile": "new-minglewood-blues-scene-mid-349fa893fb4c1088.mp4",
+      "type": "video",
+      "song": "New Minglewood Blues",
+      "songKey": "new-minglewood-blues",
+      "category": "song",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-mid",
+        "duration-450"
+      ],
+      "sizeBytes": 18228440,
+      "addedAt": "2026-03-03T21:58:27.085Z",
+      "model": "grok-imagine",
+      "prompt": "Oversaturated electric blue and hot pink Steal Your Face skull melting like wax under heat, eye sockets bleeding rainbow oil into a tie-dye pool below, lightning bolt forming and dissolving in the empty cranium space, thick dripping motion like a lava lamp, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "5b1d72560e5cfa63",
+      "path": "assets/library/videos/new-minglewood-blues-scene-mid-5b1d72560e5cfa63.mp4",
+      "originalFile": "new-minglewood-blues-scene-mid-5b1d72560e5cfa63.mp4",
+      "type": "video",
+      "song": "New Minglewood Blues",
+      "songKey": "new-minglewood-blues",
+      "category": "song",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-mid",
+        "duration-450"
+      ],
+      "sizeBytes": 39451247,
+      "addedAt": "2026-03-03T22:00:02.371Z",
+      "model": "grok-imagine",
+      "prompt": "Wall of Marshall stacks constructed from pulsing neon tubes in acid green and molten gold, each speaker cone breathing outward in waves, geometric Op Art chevron patterns radiating from the amplifiers like sound made visible, VHS tracking errors glitching through the image in magenta streaks, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "e8c19181c8c5ca9d",
+      "path": "assets/library/videos/new-minglewood-blues-scene-mid-e8c19181c8c5ca9d.mp4",
+      "originalFile": "new-minglewood-blues-scene-mid-e8c19181c8c5ca9d.mp4",
+      "type": "video",
+      "song": "New Minglewood Blues",
+      "songKey": "new-minglewood-blues",
+      "category": "song",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-mid",
+        "duration-450"
+      ],
+      "sizeBytes": 42419494,
+      "addedAt": "2026-03-03T22:01:41.444Z",
+      "model": "grok-imagine",
+      "prompt": "Dancing bears dissolving into marbled ink swirls of electric purple and orange, their silhouettes morphing into guitar string vibrations that ripple across the frame, each string a different oversaturated color bleeding into vortex spiral patterns, bodies reforming and melting in rhythm, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "3b540c0c365485e3",
+      "path": "assets/library/videos/new-minglewood-blues-scene-low-3b540c0c365485e3.mp4",
+      "originalFile": "new-minglewood-blues-scene-low-3b540c0c365485e3.mp4",
+      "type": "video",
+      "song": "New Minglewood Blues",
+      "songKey": "new-minglewood-blues",
+      "category": "song",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-low",
+        "duration-450"
+      ],
+      "sizeBytes": 12319612,
+      "addedAt": "2026-03-03T22:03:13.646Z",
+      "model": "grok-imagine",
+      "prompt": "Thirteen-point lightning bolt slowly breathing in cosmic deep blue and rose pink, surrounded by concentric circles of oil-projection fog expanding outward like ripples on water, vintage VW bus headlights appearing as twin suns in the distance that pulse gently with the fading rhythm, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "4f94e9b6692028ad",
+      "path": "assets/library/videos/loser-scene-mid-4f94e9b6692028ad.mp4",
+      "originalFile": "loser-scene-mid-4f94e9b6692028ad.mp4",
+      "type": "video",
+      "song": "Loser",
+      "songKey": "loser",
+      "category": "song",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-mid",
+        "duration-450"
+      ],
+      "sizeBytes": 28402724,
+      "addedAt": "2026-03-03T22:05:08.558Z",
+      "model": "grok-imagine",
+      "prompt": "Analog tape reels spinning hypnotically as magnetic ribbon unspools into rivers of molten copper and burnt sienna, the tape itself morphing into skeletal rose vines that coil and breathe while VHS tracking errors bleed electric purple across the frame, everything pulsing to a slow meditative rhythm, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "3a56007cce3b1d03",
+      "path": "assets/library/videos/loser-scene-mid-3a56007cce3b1d03.mp4",
+      "originalFile": "loser-scene-mid-3a56007cce3b1d03.mp4",
+      "type": "video",
+      "song": "Loser",
+      "songKey": "loser",
+      "category": "song",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-mid",
+        "duration-450"
+      ],
+      "sizeBytes": 29722052,
+      "addedAt": "2026-03-03T22:06:44.384Z",
+      "model": "grok-imagine",
+      "prompt": "Double pendulum trails painting impossible geometric mandalas in hot magenta and acid lime, each swing leaving comet-tails of color that crystallize into spinning vinyl grooves, the whole composition breathing and warping like a funhouse mirror reflecting fate's chaotic mathematics, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "cb010ed491d04ef0",
+      "path": "assets/library/videos/loser-scene-low-cb010ed491d04ef0.mp4",
+      "originalFile": "loser-scene-low-cb010ed491d04ef0.mp4",
+      "type": "video",
+      "song": "Loser",
+      "songKey": "loser",
+      "category": "song",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-low",
+        "duration-450"
+      ],
+      "sizeBytes": 22612139,
+      "addedAt": "2026-03-03T22:08:19.931Z",
+      "model": "grok-imagine",
+      "prompt": "Ghostly smoke wisps rising through a field of dying roses whose petals slowly melt into pools of deep indigo and blood orange, skeleton stems glowing phosphorescent green as they dissolve and reform in an endless cycle of loss and regeneration, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "d0b51a3f43ea8114",
+      "path": "assets/library/videos/loser-scene-low-d0b51a3f43ea8114.mp4",
+      "originalFile": "loser-scene-low-d0b51a3f43ea8114.mp4",
+      "type": "video",
+      "song": "Loser",
+      "songKey": "loser",
+      "category": "song",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-low",
+        "duration-450"
+      ],
+      "sizeBytes": 16286332,
+      "addedAt": "2026-03-03T22:09:50.919Z",
+      "model": "grok-imagine",
+      "prompt": "Oscilloscope waves transforming into a Lorenz attractor butterfly pattern that bleeds neon cyan and molten gold, the chaos mathematics spiraling into a cosmic pocket watch face where melting clock hands drip like Salvador Dali's timepieces against a swirling tie-dye void, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "e44fa1ad8ef77a51",
+      "path": "assets/library/videos/el-paso-scene-low-e44fa1ad8ef77a51.mp4",
+      "originalFile": "el-paso-scene-low-e44fa1ad8ef77a51.mp4",
+      "type": "video",
+      "song": "El Paso",
+      "songKey": "el-paso",
+      "category": "song",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-low",
+        "duration-450"
+      ],
+      "sizeBytes": 19202946,
+      "addedAt": "2026-03-03T22:11:38.522Z",
+      "model": "grok-imagine",
+      "prompt": "Vast desert mesa melting into waves of liquid terracotta and burnt sienna, heat ripples transforming sand dunes into breathing organic shapes, golden sun bleeding into violet shadows that pulse and swirl across an impossible horizon, cactus silhouettes morph into dancing skeletal forms then dissolve back into molten landscape, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "ad3205c1f97529d8",
+      "path": "assets/library/videos/el-paso-scene-mid-ad3205c1f97529d8.mp4",
+      "originalFile": "el-paso-scene-mid-ad3205c1f97529d8.mp4",
+      "type": "video",
+      "song": "El Paso",
+      "songKey": "el-paso",
+      "category": "song",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-mid",
+        "duration-450"
+      ],
+      "sizeBytes": 30013271,
+      "addedAt": "2026-03-03T22:13:14.696Z",
+      "model": "grok-imagine",
+      "prompt": "Swirling oil-projection roses in electric crimson and hot magenta spinning outward from center, each petal bleeding into neighboring petals creating hypnotic spiral patterns, golden stamens pulse and radiate like miniature suns, thorny vines morph into abstract lightning bolts that crackle across the composition in acid green, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "c2426f753267b5c4",
+      "path": "assets/library/videos/el-paso-scene-mid-c2426f753267b5c4.mp4",
+      "originalFile": "el-paso-scene-mid-c2426f753267b5c4.mp4",
+      "type": "video",
+      "song": "El Paso",
+      "songKey": "el-paso",
+      "category": "song",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-mid",
+        "duration-450"
+      ],
+      "sizeBytes": 46224215,
+      "addedAt": "2026-03-03T22:14:57.171Z",
+      "model": "grok-imagine",
+      "prompt": "Exploding chromatic split of a Steal Your Face skull fragmenting into prismatic shards of neon pink, electric blue, and radioactive yellow, each fragment spinning and morphing into new skull forms that layer and overlap, lightning bolt eyes shooting beams of molten gold that scatter into cascading particles, entire composition breathing and pulsating with violent energy, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "5d042f89a2aef938",
+      "path": "assets/library/videos/el-paso-scene-low-5d042f89a2aef938.mp4",
+      "originalFile": "el-paso-scene-low-5d042f89a2aef938.mp4",
+      "type": "video",
+      "song": "El Paso",
+      "songKey": "el-paso",
+      "category": "song",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-low",
+        "duration-450"
+      ],
+      "sizeBytes": 6237661,
+      "addedAt": "2026-03-03T22:16:23.135Z",
+      "model": "grok-imagine",
+      "prompt": "Slow-motion ink drops in deep indigo and bruised purple bleeding into amber and rust-orange pools, forming abstract mesa shapes that slowly dissolve and reform, gentle marbled patterns suggest distant mountains melting into sunset, soft pulsing glow behind translucent layers creates depth, colors separate and recombine like oil on water cooling down, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "f47564ef9a83ec6e",
+      "path": "assets/library/videos/they-love-each-other-scene-low-f47564ef9a83ec6e.mp4",
+      "originalFile": "they-love-each-other-scene-low-f47564ef9a83ec6e.mp4",
+      "type": "video",
+      "song": "They Love Each Other",
+      "songKey": "they-love-each-other",
+      "category": "song",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-low",
+        "duration-450"
+      ],
+      "sizeBytes": 18033485,
+      "addedAt": "2026-03-03T22:18:03.855Z",
+      "model": "grok-imagine",
+      "prompt": "Translucent dancing bear silhouettes made of liquid mercury slowly spiral around each other, their bodies bleeding rainbow trails that form infinite möbius loops, melting and reforming in gentle waves against deep indigo void, bodies composed of flowing oil-lamp patterns that pulse and breathe with tender rhythm, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "b486acf490f81584",
+      "path": "assets/library/videos/they-love-each-other-scene-mid-b486acf490f81584.mp4",
+      "originalFile": "they-love-each-other-scene-mid-b486acf490f81584.mp4",
+      "type": "video",
+      "song": "They Love Each Other",
+      "songKey": "they-love-each-other",
+      "category": "song",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-mid",
+        "duration-450"
+      ],
+      "sizeBytes": 26778225,
+      "addedAt": "2026-03-03T22:19:40.345Z",
+      "model": "grok-imagine",
+      "prompt": "Cascading thirteen-point lightning bolts drip like molten gold honey down the frame, each bolt fragmenting into smaller electric veins that interweave and dance, creating an organic neural network of glowing connections that pulse brighter and faster, hot pink and electric blue charges arcing between nodes in accelerating rhythm, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "219276a94c8f9129",
+      "path": "assets/library/videos/they-love-each-other-scene-high-219276a94c8f9129.mp4",
+      "originalFile": "they-love-each-other-scene-high-219276a94c8f9129.mp4",
+      "type": "video",
+      "song": "They Love Each Other",
+      "songKey": "they-love-each-other",
+      "category": "song",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-high",
+        "duration-450"
+      ],
+      "sizeBytes": 54490101,
+      "addedAt": "2026-03-03T22:21:22.500Z",
+      "model": "grok-imagine",
+      "prompt": "Massive blooming skeleton roses erupt from the center, petals made of swirling marbled ink in acid green and magenta, each petal morphing into fractured mirror shards that spin and kaleidoscope outward, revealing infinite layers of roses-within-roses, thorny vines whipping in explosive spirals as color saturation intensifies to blinding luminescence, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "6ddaa800fa6b9da6",
+      "path": "assets/library/videos/they-love-each-other-scene-low-6ddaa800fa6b9da6.mp4",
+      "originalFile": "they-love-each-other-scene-low-6ddaa800fa6b9da6.mp4",
+      "type": "video",
+      "song": "They Love Each Other",
+      "songKey": "they-love-each-other",
+      "category": "song",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-low",
+        "duration-450"
+      ],
+      "sizeBytes": 8117850,
+      "addedAt": "2026-03-03T22:22:49.468Z",
+      "model": "grok-imagine",
+      "prompt": "Concentric ripples of tie-dye color slowly expand from center like raindrops on cosmic water, each ring a different electric hue that bleeds into its neighbors, creating gentle interference patterns, Steal Your Face skull outlines faintly emerge and dissolve in the color waves like breathing ghosts, entire composition softly rotating and settling into dreamlike stillness, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "6efe3c50e1db8aa0",
+      "path": "assets/library/videos/jack-straw-scene-mid-6efe3c50e1db8aa0.mp4",
+      "originalFile": "jack-straw-scene-mid-6efe3c50e1db8aa0.mp4",
+      "type": "video",
+      "song": "Jack Straw",
+      "songKey": "jack-straw",
+      "category": "song",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-mid",
+        "duration-450"
+      ],
+      "sizeBytes": 20942899,
+      "addedAt": "2026-03-03T22:24:35.335Z",
+      "model": "grok-imagine",
+      "prompt": "Molten skeleton hand holding a dripping playing card (jack of clubs) that melts into a stream of liquid mercury, mercury pools and reforms into a second skeletal hand reaching back, hands endlessly passing the dissolving card back and forth as colors shift from deep crimson to electric violet to hot pink, skeletal fingers stretch and contract like rubber, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "1396f90f052fcb37",
+      "path": "assets/library/videos/jack-straw-scene-mid-1396f90f052fcb37.mp4",
+      "originalFile": "jack-straw-scene-mid-1396f90f052fcb37.mp4",
+      "type": "video",
+      "song": "Jack Straw",
+      "songKey": "jack-straw",
+      "category": "song",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-mid",
+        "duration-450"
+      ],
+      "sizeBytes": 30195770,
+      "addedAt": "2026-03-03T22:26:14.834Z",
+      "model": "grok-imagine",
+      "prompt": "Pulsing tie-dye highway lane stripes that breathe and undulate like living snakes, asphalt melts into pools of swirling oil paint (oranges bleeding into electric blues into acid greens), dotted center line morphs into a chain of dancing bear silhouettes holding hands, entire road surface ripples like water disturbed by wind, colors intensify and speed increases, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "7424c00baae076f1",
+      "path": "assets/library/videos/jack-straw-scene-high-7424c00baae076f1.mp4",
+      "originalFile": "jack-straw-scene-high-7424c00baae076f1.mp4",
+      "type": "video",
+      "song": "Jack Straw",
+      "songKey": "jack-straw",
+      "category": "song",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-high",
+        "duration-450"
+      ],
+      "sizeBytes": 37046731,
+      "addedAt": "2026-03-03T22:27:52.902Z",
+      "model": "grok-imagine",
+      "prompt": "Lightning bolt explodes from center screen into fractal branches of pure neon gold and electric white, each branch splits and splits again creating infinite thirteen-point bolts that pulse and retract, background cycles through deep cosmic purple to hot magenta to blazing turquoise, bolts morph into flowing ribbons of light that twist and braid together before shattering outward again, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "508e6cd985dcee21",
+      "path": "assets/library/videos/jack-straw-scene-low-508e6cd985dcee21.mp4",
+      "originalFile": "jack-straw-scene-low-508e6cd985dcee21.mp4",
+      "type": "video",
+      "song": "Jack Straw",
+      "songKey": "jack-straw",
+      "category": "song",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-low",
+        "duration-450"
+      ],
+      "sizeBytes": 7062005,
+      "addedAt": "2026-03-03T22:29:17.692Z",
+      "model": "grok-imagine",
+      "prompt": "Single red rose blooming in extreme slow motion from skeletal stem, petals unfurl and immediately begin dripping like hot wax, wax streams collect and swirl into a pool of marbled ink (crimson, gold, deep indigo), pool gently breathes and pulses, occasional rose petal surfaces and dissolves back into the liquid, colors softly bleed and separate, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "ce69816684f33f97",
+      "path": "assets/library/videos/deal-scene-mid-ce69816684f33f97.mp4",
+      "originalFile": "deal-scene-mid-ce69816684f33f97.mp4",
+      "type": "video",
+      "song": "Deal",
+      "songKey": "deal",
+      "category": "song",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-mid",
+        "duration-450"
+      ],
+      "sizeBytes": 30099577,
+      "addedAt": "2026-03-03T22:31:06.311Z",
+      "model": "grok-imagine",
+      "prompt": "Molten rivers of electric purple and hot pink ink bleeding through translucent cosmic membranes, swirling into organic spiral galaxies that pulse and breathe with the rhythm, stellar clouds morphing into abstract rose petals that dissolve back into liquid light, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "fa300782101b5cb1",
+      "path": "assets/library/videos/deal-scene-mid-fa300782101b5cb1.mp4",
+      "originalFile": "deal-scene-mid-fa300782101b5cb1.mp4",
+      "type": "video",
+      "song": "Deal",
+      "songKey": "deal",
+      "category": "song",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-mid",
+        "duration-450"
+      ],
+      "sizeBytes": 24772718,
+      "addedAt": "2026-03-03T22:43:18.838Z",
+      "model": "grok-imagine",
+      "prompt": "Translucent Steal Your Face skulls layered in infinite regress, each one filled with swirling tie-dye colors that bleed between layers, skulls slowly rotating and morphing into dancing skeletons that melt back into liquid skull forms, all rendered in hot orange, acid green, and electric blue, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "1a92bf48081c5fc1",
+      "path": "assets/library/videos/deal-scene-low-1a92bf48081c5fc1.mp4",
+      "originalFile": "deal-scene-low-1a92bf48081c5fc1.mp4",
+      "type": "video",
+      "song": "Deal",
+      "songKey": "deal",
+      "category": "song",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-low",
+        "duration-450"
+      ],
+      "sizeBytes": 14746298,
+      "addedAt": "2026-03-03T22:44:45.647Z",
+      "model": "grok-imagine",
+      "prompt": "Slow-motion oil droplets in luminous violet and turquoise floating through honey-thick space, each droplet containing a miniature universe of marbled color that gently expands and contracts, droplets occasionally merging into larger forms before peacefully drifting apart, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "93c5c500c1a949b7",
+      "path": "assets/library/videos/lazy-lightnin-scene-low-93c5c500c1a949b7.mp4",
+      "originalFile": "lazy-lightnin-scene-low-93c5c500c1a949b7.mp4",
+      "type": "video",
+      "song": "Lazy Lightnin'",
+      "songKey": "lazy-lightnin",
+      "category": "song",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-low",
+        "duration-450"
+      ],
+      "sizeBytes": 5731297,
+      "addedAt": "2026-03-03T22:46:19.347Z",
+      "model": "grok-imagine",
+      "prompt": "Molten neon oil pools breathing and expanding across a black surface, hot pink and electric lime tendrils slowly bleeding into each other like lava lamps melting in slow motion, viscous liquid shapes forming and dissolving with hypnotic rhythm, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "5c52b936221a2555",
+      "path": "assets/library/videos/lazy-lightnin-scene-mid-5c52b936221a2555.mp4",
+      "originalFile": "lazy-lightnin-scene-mid-5c52b936221a2555.mp4",
+      "type": "video",
+      "song": "Lazy Lightnin'",
+      "songKey": "lazy-lightnin",
+      "category": "song",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-mid",
+        "duration-450"
+      ],
+      "sizeBytes": 33161772,
+      "addedAt": "2026-03-03T22:47:55.126Z",
+      "model": "grok-imagine",
+      "prompt": "A Steal Your Face skull constructed entirely from swirling marbled ink, electric purple and acid orange spiraling through the bone structure as it morphs and breathes, the skull's outline pulsing wider and tighter while chromatic trails bleed from the eye sockets and dissolve into spinning galaxies, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "927631acd98e1ae3",
+      "path": "assets/library/videos/lazy-lightnin-scene-mid-927631acd98e1ae3.mp4",
+      "originalFile": "lazy-lightnin-scene-mid-927631acd98e1ae3.mp4",
+      "type": "video",
+      "song": "Lazy Lightnin'",
+      "songKey": "lazy-lightnin",
+      "category": "song",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-mid",
+        "duration-450"
+      ],
+      "sizeBytes": 39380825,
+      "addedAt": "2026-03-03T22:49:35.966Z",
+      "model": "grok-imagine",
+      "prompt": "Explosive cosmic nebula erupting in concentric rings of hot magenta, electric yellow, and plasma blue, massive shockwaves of color radiating outward and colliding back into the center in accelerating waves, entire field pulsing and flashing like a supernova breathing in double-time, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "16fe877b457acf77",
+      "path": "assets/library/videos/supplication-scene-mid-16fe877b457acf77.mp4",
+      "originalFile": "supplication-scene-mid-16fe877b457acf77.mp4",
+      "type": "video",
+      "song": "Supplication",
+      "songKey": "supplication",
+      "category": "song",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-mid",
+        "duration-450"
+      ],
+      "sizeBytes": 18464526,
+      "addedAt": "2026-03-03T22:51:20.199Z",
+      "model": "grok-imagine",
+      "prompt": "Molten golden sacred geometry breathing outward from center, flower of life patterns morphing into vesica piscis shapes that pulse and expand in concentric rings of electric violet and deep cobalt blue, liquid mandala forms bleeding into each other like hot wax under glass, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "5eb23ae401d9d3a2",
+      "path": "assets/library/videos/supplication-scene-mid-5eb23ae401d9d3a2.mp4",
+      "originalFile": "supplication-scene-mid-5eb23ae401d9d3a2.mp4",
+      "type": "video",
+      "song": "Supplication",
+      "songKey": "supplication",
+      "category": "song",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-mid",
+        "duration-450"
+      ],
+      "sizeBytes": 35053124,
+      "addedAt": "2026-03-03T22:52:57.715Z",
+      "model": "grok-imagine",
+      "prompt": "Skeletal roses with indigo petals melting into rippling water rings, each petal dissolving into caustic light reflections that shimmer across the surface in hot pink and acid green waves, stems transforming into flowing liquid streams of molten amber, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "0b98036b77de731e",
+      "path": "assets/library/videos/supplication-scene-mid-0b98036b77de731e.mp4",
+      "originalFile": "supplication-scene-mid-0b98036b77de731e.mp4",
+      "type": "video",
+      "song": "Supplication",
+      "songKey": "supplication",
+      "category": "song",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-mid",
+        "duration-450"
+      ],
+      "sizeBytes": 31992829,
+      "addedAt": "2026-03-03T22:54:34.476Z",
+      "model": "grok-imagine",
+      "prompt": "Dancing bears constructed from swirling tie-dye ink clouds underwater, their forms constantly morphing and bleeding electric orange and cosmic purple into surrounding currents, bodies fragmenting into clockwork gears made of liquid mercury that spin and recombine, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "a1bb65809e6e7246",
+      "path": "assets/library/videos/supplication-scene-low-a1bb65809e6e7246.mp4",
+      "originalFile": "supplication-scene-low-a1bb65809e6e7246.mp4",
+      "type": "video",
+      "song": "Supplication",
+      "songKey": "supplication",
+      "category": "song",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-low",
+        "duration-450"
+      ],
+      "sizeBytes": 7310884,
+      "addedAt": "2026-03-03T22:56:00.335Z",
+      "model": "grok-imagine",
+      "prompt": "Thirteen-point lightning bolts dissolving into slow oil-lamp swirls of deep turquoise and burgundy, each bolt softening into gentle ripple patterns that expand outward like prayers on still water, colors bleeding into gradient halos of soft magenta and midnight blue, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "16784d2ef7a497ce",
+      "path": "assets/library/videos/brown-eyed-women-scene-mid-16784d2ef7a497ce.mp4",
+      "originalFile": "brown-eyed-women-scene-mid-16784d2ef7a497ce.mp4",
+      "type": "video",
+      "song": "Brown Eyed Women",
+      "songKey": "brown-eyed-women",
+      "category": "song",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-mid",
+        "duration-450"
+      ],
+      "sizeBytes": 31084833,
+      "addedAt": "2026-03-03T22:57:48.008Z",
+      "model": "grok-imagine",
+      "prompt": "Glowing skeleton hands dealing oversized playing cards that morph into dancing thirteen-point lightning bolts, cards melting into pools of electric violet and hot magenta ink that swirl and reform into new suits, all against a pulsing field of acid yellow starbursts, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "51ba5a73f6565a6a",
+      "path": "assets/library/videos/brown-eyed-women-scene-mid-51ba5a73f6565a6a.mp4",
+      "originalFile": "brown-eyed-women-scene-mid-51ba5a73f6565a6a.mp4",
+      "type": "video",
+      "song": "Brown Eyed Women",
+      "songKey": "brown-eyed-women",
+      "category": "song",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-mid",
+        "duration-450"
+      ],
+      "sizeBytes": 21788035,
+      "addedAt": "2026-03-03T22:59:17.376Z",
+      "model": "grok-imagine",
+      "prompt": "Massive Steal Your Face skull breathing and expanding in molten copper and neon orange, eye sockets filled with swirling oil-on-water patterns in electric blue and lime green that pulse outward in rippling waves, roses blooming and wilting in fast-motion around the skull's perimeter dissolving into tie-dye tendrils, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "23d703362d81f4f3",
+      "path": "assets/library/videos/brown-eyed-women-scene-low-23d703362d81f4f3.mp4",
+      "originalFile": "brown-eyed-women-scene-low-23d703362d81f4f3.mp4",
+      "type": "video",
+      "song": "Brown Eyed Women",
+      "songKey": "brown-eyed-women",
+      "category": "song",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-low",
+        "duration-450"
+      ],
+      "sizeBytes": 25307492,
+      "addedAt": "2026-03-03T23:00:54.959Z",
+      "model": "grok-imagine",
+      "prompt": "Abstract dancing bears made of flowing liquid mercury and hot pink light trails morphing through geometric mandala patterns, bears dissolving into cascading ribbons of emerald green and cosmic purple that weave and braid into infinity symbols, all slowly breathing and undulating like a lava lamp, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "dd0bfcd30f8c943b",
+      "path": "assets/library/videos/brown-eyed-women-scene-low-dd0bfcd30f8c943b.mp4",
+      "originalFile": "brown-eyed-women-scene-low-dd0bfcd30f8c943b.mp4",
+      "type": "video",
+      "song": "Brown Eyed Women",
+      "songKey": "brown-eyed-women",
+      "category": "song",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-low",
+        "duration-450"
+      ],
+      "sizeBytes": 43904935,
+      "addedAt": "2026-03-03T23:02:38.907Z",
+      "model": "grok-imagine",
+      "prompt": "Blacklight poster-style roses with petals made of dripping marbled ink in electric fuchsia, poison green, and gold, each petal peeling away to reveal nested layers of spinning fractal vortexes, thorny vines morphing into skeleton bones that twist into Celtic knots before exploding into clouds of glowing tangerine particles, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "50d47f8df96d6fdd",
+      "path": "assets/library/videos/mama-tried-scene-mid-50d47f8df96d6fdd.mp4",
+      "originalFile": "mama-tried-scene-mid-50d47f8df96d6fdd.mp4",
+      "type": "video",
+      "song": "Mama Tried",
+      "songKey": "mama-tried",
+      "category": "song",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-mid",
+        "duration-450"
+      ],
+      "sizeBytes": 33714519,
+      "addedAt": "2026-03-03T23:04:23.553Z",
+      "model": "grok-imagine",
+      "prompt": "A rusty iron prison cell dissolving into streams of molten gold and electric orange light, bars melting like candle wax and reforming into a winding highway that stretches into a purple-pink sunset horizon, the road surface rippling and breathing like liquid mercury, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "52934f83c7bc19ea",
+      "path": "assets/library/videos/mama-tried-scene-mid-52934f83c7bc19ea.mp4",
+      "originalFile": "mama-tried-scene-mid-52934f83c7bc19ea.mp4",
+      "type": "video",
+      "song": "Mama Tried",
+      "songKey": "mama-tried",
+      "category": "song",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-mid",
+        "duration-450"
+      ],
+      "sizeBytes": 33126404,
+      "addedAt": "2026-03-03T23:06:02.245Z",
+      "model": "grok-imagine",
+      "prompt": "Abstract dancing bears in cowboy hats morphing into tumbleweeds that roll and multiply across a swirling desert landscape of hot pink sand dunes and acid green cacti, each tumbleweed leaving trails of electric blue light that spiral into Steal Your Face skull patterns, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "1bb41bc33537a37c",
+      "path": "assets/library/videos/mama-tried-scene-low-1bb41bc33537a37c.mp4",
+      "originalFile": "mama-tried-scene-low-1bb41bc33537a37c.mp4",
+      "type": "video",
+      "song": "Mama Tried",
+      "songKey": "mama-tried",
+      "category": "song",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-low",
+        "duration-450"
+      ],
+      "sizeBytes": 9985733,
+      "addedAt": "2026-03-03T23:07:29.040Z",
+      "model": "grok-imagine",
+      "prompt": "Slow-motion oil projection of a single red rose bleeding into deep purple ink, petals dissolving into chain-link fence patterns that gently pulse and breathe, surrounded by soft amber and faded turquoise halos that expand and contract like heartbeats, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "f80b8868f30b2cf3",
+      "path": "assets/library/videos/row-jimmy-scene-low-f80b8868f30b2cf3.mp4",
+      "originalFile": "row-jimmy-scene-low-f80b8868f30b2cf3.mp4",
+      "type": "video",
+      "song": "Row Jimmy",
+      "songKey": "row-jimmy",
+      "category": "song",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-low",
+        "duration-450"
+      ],
+      "sizeBytes": 15409332,
+      "addedAt": "2026-03-03T23:09:12.097Z",
+      "model": "grok-imagine",
+      "prompt": "Translucent jellyfish-like forms drift upward through deep indigo space, their bell-shaped bodies pulsing with bioluminescent rings of electric turquoise and lavender that breathe in slow rhythm, trailing tentacles that dissolve into spiraling ribbons of golden ink bleeding through midnight blue liquid, each pulse sending gentle ripples expanding outward in concentric circles, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "996a522e680c5367",
+      "path": "assets/library/videos/row-jimmy-scene-mid-996a522e680c5367.mp4",
+      "originalFile": "row-jimmy-scene-mid-996a522e680c5367.mp4",
+      "type": "video",
+      "song": "Row Jimmy",
+      "songKey": "row-jimmy",
+      "category": "song",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-mid",
+        "duration-450"
+      ],
+      "sizeBytes": 18405849,
+      "addedAt": "2026-03-03T23:10:42.384Z",
+      "model": "grok-imagine",
+      "prompt": "A thirteen-point lightning bolt melts into a blooming skeleton rose, its petals unfurling in time-lapse as hot pink and acid lime veins pump through translucent membranes, the entire flower slowly rotating and morphing into a Steal Your Face skull whose eye sockets become whirlpools of swirling magenta and electric orange paint, dripping upward against gravity into cosmic darkness, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "e41351032dcf4387",
+      "path": "assets/library/videos/row-jimmy-scene-mid-e41351032dcf4387.mp4",
+      "originalFile": "row-jimmy-scene-mid-e41351032dcf4387.mp4",
+      "type": "video",
+      "song": "Row Jimmy",
+      "songKey": "row-jimmy",
+      "category": "song",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-mid",
+        "duration-450"
+      ],
+      "sizeBytes": 30061438,
+      "addedAt": "2026-03-03T23:12:21.314Z",
+      "model": "grok-imagine",
+      "prompt": "Concentric ripples of molten copper and electric violet expand from an infinite center point, each wave transforming into a Fibonacci spiral of dancing bears holding roses, their forms blurring and bleeding into one another as they spin faster, the entire composition breathing outward then contracting like a living mandala built from liquid mercury and neon watercolor washes that never settle, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "50e6433832918e6d",
+      "path": "assets/library/videos/row-jimmy-scene-low-50e6433832918e6d.mp4",
+      "originalFile": "row-jimmy-scene-low-50e6433832918e6d.mp4",
+      "type": "video",
+      "song": "Row Jimmy",
+      "songKey": "row-jimmy",
+      "category": "song",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-low",
+        "duration-450"
+      ],
+      "sizeBytes": 14410564,
+      "addedAt": "2026-03-03T23:13:48.681Z",
+      "model": "grok-imagine",
+      "prompt": "Layers of translucent silk veils in deep sapphire, jade, and amethyst drift across the frame in opposite directions, each veil marbled with swirling oil-slick patterns that catch phantom light, tearing apart into floating fragments that reform as slowly rotating lotus mandalas whose petals dissolve into drifting smoke tendrils of coral pink and seafoam green, all movement glacially slow and hypnotically meditative, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "2fcb4092ad185cdf",
+      "path": "assets/library/videos/dancin-in-the-street-scene-mid-2fcb4092ad185cdf.mp4",
+      "originalFile": "dancin-in-the-street-scene-mid-2fcb4092ad185cdf.mp4",
+      "type": "video",
+      "song": "Dancin' in the Street",
+      "songKey": "dancin-in-the-street",
+      "category": "song",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-mid",
+        "duration-450"
+      ],
+      "sizeBytes": 28164317,
+      "addedAt": "2026-03-03T23:15:36.744Z",
+      "model": "grok-imagine",
+      "prompt": "Melting neon city grid where street signs liquify into flowing rivers of electric pink and acid green light, traffic signals pulse and breathe like jellyfish, asphalt transforms into rippling tie-dye pavement that undulates in waves, building facades drip downward in hot orange and purple streaks, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "040b5231e1e7440f",
+      "path": "assets/library/videos/dancin-in-the-street-scene-high-040b5231e1e7440f.mp4",
+      "originalFile": "dancin-in-the-street-scene-high-040b5231e1e7440f.mp4",
+      "type": "video",
+      "song": "Dancin' in the Street",
+      "songKey": "dancin-in-the-street",
+      "category": "song",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-high",
+        "duration-450"
+      ],
+      "sizeBytes": 39875619,
+      "addedAt": "2026-03-03T23:17:19.334Z",
+      "model": "grok-imagine",
+      "prompt": "Thirteen-point lightning bolts erupt from manhole covers in explosive bursts of cobalt blue and molten gold, each bolt morphs into dancing skeleton figures made of pure electricity that twist and dissolve into spiral galaxies of magenta and chartreuse particles, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "789a10aeb91b581e",
+      "path": "assets/library/videos/dancin-in-the-street-scene-mid-789a10aeb91b581e.mp4",
+      "originalFile": "dancin-in-the-street-scene-mid-789a10aeb91b581e.mp4",
+      "type": "video",
+      "song": "Dancin' in the Street",
+      "songKey": "dancin-in-the-street",
+      "category": "song",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-mid",
+        "duration-450"
+      ],
+      "sizeBytes": 19890176,
+      "addedAt": "2026-03-03T23:18:55.074Z",
+      "model": "grok-imagine",
+      "prompt": "Organic roses bloom from graffiti walls in time-lapse acceleration, petals made of bleeding watercolor inks in hot pink and violet that melt into swirling oil slicks, thorny vines pulse and breathe as they spell out dancing skeletons in kaleidoscopic orange and turquoise, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "599b558a0ee6f4f5",
+      "path": "assets/library/videos/dancin-in-the-street-scene-low-599b558a0ee6f4f5.mp4",
+      "originalFile": "dancin-in-the-street-scene-low-599b558a0ee6f4f5.mp4",
+      "type": "video",
+      "song": "Dancin' in the Street",
+      "songKey": "dancin-in-the-street",
+      "category": "song",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-low",
+        "duration-450"
+      ],
+      "sizeBytes": 13182692,
+      "addedAt": "2026-03-03T23:20:23.170Z",
+      "model": "grok-imagine",
+      "prompt": "Slow-motion oil lamp projection of marbled inks in deep purple and amber gold gently bleeding together, Steal Your Face skull outline emerges and dissolves into concentric circles of iridescent color, cosmic nebula clouds drift lazily through the composition in electric blue and rose, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "4a4ec3f99a709c36",
+      "path": "assets/library/videos/scarlet-begonias-scene-mid-4a4ec3f99a709c36.mp4",
+      "originalFile": "scarlet-begonias-scene-mid-4a4ec3f99a709c36.mp4",
+      "type": "video",
+      "song": "Scarlet Begonias",
+      "songKey": "scarlet-begonias",
+      "category": "song",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-mid",
+        "duration-450"
+      ],
+      "sizeBytes": 16057169,
+      "addedAt": "2026-03-03T23:22:14.010Z",
+      "model": "grok-imagine",
+      "prompt": "Molten wax flowers blooming in reverse-time, scarlet begonia petals melting into streams of hot pink and tangerine that pool and reform into dancing skeleton roses, all backlit through rippling violet glass like a liquid light projector, petals breathing and pulsing with slow organic rhythm, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "d6493e62bd7a69d6",
+      "path": "assets/library/videos/scarlet-begonias-scene-mid-d6493e62bd7a69d6.mp4",
+      "originalFile": "scarlet-begonias-scene-mid-d6493e62bd7a69d6.mp4",
+      "type": "video",
+      "song": "Scarlet Begonias",
+      "songKey": "scarlet-begonias",
+      "category": "song",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-mid",
+        "duration-450"
+      ],
+      "sizeBytes": 33477359,
+      "addedAt": "2026-03-03T23:23:50.850Z",
+      "model": "grok-imagine",
+      "prompt": "Electric blue Steal Your Face skull dissolving into a cascading waterfall of tie-dye ink ribbons, thirteen-point lightning bolts bleeding from the eyes transforming into spiraling cosmic vortexes of neon orange and acid green, skull reforming and melting in hypnotic cycles, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "67534d53b44f0b9a",
+      "path": "assets/library/videos/scarlet-begonias-scene-low-67534d53b44f0b9a.mp4",
+      "originalFile": "scarlet-begonias-scene-low-67534d53b44f0b9a.mp4",
+      "type": "video",
+      "song": "Scarlet Begonias",
+      "songKey": "scarlet-begonias",
+      "category": "song",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-low",
+        "duration-450"
+      ],
+      "sizeBytes": 10349125,
+      "addedAt": "2026-03-03T23:25:18.054Z",
+      "model": "grok-imagine",
+      "prompt": "Slow-motion oil droplets floating through magenta nebula clouds, each sphere containing a miniature dancing bear silhouette that morphs into a terrapin then dissolves into golden honey trails, droplets merging and splitting in weightless cosmic drift, colors shifting from deep purple to soft amber glow, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "c3308d654d05a92e",
+      "path": "assets/library/videos/scarlet-begonias-scene-mid-c3308d654d05a92e.mp4",
+      "originalFile": "scarlet-begonias-scene-mid-c3308d654d05a92e.mp4",
+      "type": "video",
+      "song": "Scarlet Begonias",
+      "songKey": "scarlet-begonias",
+      "category": "song",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-mid",
+        "duration-450"
+      ],
+      "sizeBytes": 37613357,
+      "addedAt": "2026-03-03T23:26:57.147Z",
+      "model": "grok-imagine",
+      "prompt": "Explosive sunburst mandala constructed from rotating guitar necks and drumsticks radiating outward, each spoke erupting into firework tendrils of chrome yellow and hot magenta that whip and coil back toward center, entire composition spinning faster and fragmenting into kaleidoscopic shards before reassembling, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "5dead9ec6b76fe69",
+      "path": "assets/library/videos/estimated-prophet-scene-mid-5dead9ec6b76fe69.mp4",
+      "originalFile": "estimated-prophet-scene-mid-5dead9ec6b76fe69.mp4",
+      "type": "video",
+      "song": "Estimated Prophet",
+      "songKey": "estimated-prophet",
+      "category": "song",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-mid",
+        "duration-450"
+      ],
+      "sizeBytes": 26465303,
+      "addedAt": "2026-03-03T23:28:43.741Z",
+      "model": "grok-imagine",
+      "prompt": "Molten golden pyramids breathing and expanding across an infinite desert of swirling purple sand, lightning bolts made of liquid mercury crackling between dissolving geometric temples, all structures melting and reforming in prophetic rhythm, electric orange heat shimmer waves pulsing outward, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "886e872e21595212",
+      "path": "assets/library/videos/estimated-prophet-scene-mid-886e872e21595212.mp4",
+      "originalFile": "estimated-prophet-scene-mid-886e872e21595212.mp4",
+      "type": "video",
+      "song": "Estimated Prophet",
+      "songKey": "estimated-prophet",
+      "category": "song",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-mid",
+        "duration-450"
+      ],
+      "sizeBytes": 20833391,
+      "addedAt": "2026-03-03T23:30:19.489Z",
+      "model": "grok-imagine",
+      "prompt": "Cascading Sri Yantra mandala constructed from bleeding neon pink and acid green ink, each triangle breathing and multiplying into fractal sacred geometry, cosmic indigo background swirling like oil on water, golden light bleeding through intersecting lines creating aurora waves, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "83b349296d7a2404",
+      "path": "assets/library/videos/estimated-prophet-scene-mid-83b349296d7a2404.mp4",
+      "originalFile": "estimated-prophet-scene-mid-83b349296d7a2404.mp4",
+      "type": "video",
+      "song": "Estimated Prophet",
+      "songKey": "estimated-prophet",
+      "category": "song",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-mid",
+        "duration-450"
+      ],
+      "sizeBytes": 43262267,
+      "addedAt": "2026-03-03T23:31:58.625Z",
+      "model": "grok-imagine",
+      "prompt": "Giant Steal Your Face skull exploding into a supernova of chromatic prismatic shards, each fragment refracting into hot magenta and electric cyan streaks, skull pieces morphing into phoenix feather patterns that swirl and combust in endless regeneration cycles, molten gold dripping upward against gravity, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "4faabd26772ad5dc",
+      "path": "assets/library/videos/estimated-prophet-scene-low-4faabd26772ad5dc.mp4",
+      "originalFile": "estimated-prophet-scene-low-4faabd26772ad5dc.mp4",
+      "type": "video",
+      "song": "Estimated Prophet",
+      "songKey": "estimated-prophet",
+      "category": "song",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-low",
+        "duration-450"
+      ],
+      "sizeBytes": 21079306,
+      "addedAt": "2026-03-03T23:33:34.352Z",
+      "model": "grok-imagine",
+      "prompt": "Infinite dark star portal slowly rotating in deep space violet, edges rimmed with pulsing electric blue and soft amber halos, portal surface rippling like disturbed mercury reflecting distant galaxy spirals, gentle tendrils of rose gold mist bleeding inward and dissolving into the void, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "11320c18050ac30e",
+      "path": "assets/library/videos/st-stephen-scene-low-11320c18050ac30e.mp4",
+      "originalFile": "st-stephen-scene-low-11320c18050ac30e.mp4",
+      "type": "video",
+      "song": "St. Stephen",
+      "songKey": "st-stephen",
+      "category": "song",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-low",
+        "duration-450"
+      ],
+      "sizeBytes": 32603748,
+      "addedAt": "2026-03-03T23:35:21.262Z",
+      "model": "grok-imagine",
+      "prompt": "Molten stained glass cathedral windows melting and reforming into impossible geometry, electric violet and hot magenta panes breathing outward as golden god rays pierce through dissolving sacred patterns, fragmenting into floating crystalline shards that swirl in slow orbital spirals, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "f9c13cea03148bb9",
+      "path": "assets/library/videos/st-stephen-scene-mid-f9c13cea03148bb9.mp4",
+      "originalFile": "st-stephen-scene-mid-f9c13cea03148bb9.mp4",
+      "type": "video",
+      "song": "St. Stephen",
+      "songKey": "st-stephen",
+      "category": "song",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-mid",
+        "duration-450"
+      ],
+      "sizeBytes": 29422775,
+      "addedAt": "2026-03-03T23:36:57.302Z",
+      "model": "grok-imagine",
+      "prompt": "Thirteen-point lightning bolts erupting from a pulsing Steal Your Face skull center, each bolt splitting into branching electric tributaries of acid green and blazing orange that morph into dancing skeleton saints with rose halos, their forms continuously dissolving back into crackling energy streams against deep cosmic purple, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "4365ac67c5ca0fce",
+      "path": "assets/library/videos/st-stephen-scene-mid-4365ac67c5ca0fce.mp4",
+      "originalFile": "st-stephen-scene-mid-4365ac67c5ca0fce.mp4",
+      "type": "video",
+      "song": "St. Stephen",
+      "songKey": "st-stephen",
+      "category": "song",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-mid",
+        "duration-450"
+      ],
+      "sizeBytes": 26778606,
+      "addedAt": "2026-03-03T23:38:35.249Z",
+      "model": "grok-imagine",
+      "prompt": "Swirling tie-dye ink spirals collapsing inward toward a glowing mandala core, then exploding outward in rapid pulsing waves of hot pink and electric blue that breed new organic forms — morphing phoenix wings and blooming geometric roses that melt back into the center vortex in hypnotic循环, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "119d8c7dfba42aec",
+      "path": "assets/library/videos/not-fade-away-scene-low-119d8c7dfba42aec.mp4",
+      "originalFile": "not-fade-away-scene-low-119d8c7dfba42aec.mp4",
+      "type": "video",
+      "song": "Not Fade Away",
+      "songKey": "not-fade-away",
+      "category": "song",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-low",
+        "duration-450"
+      ],
+      "sizeBytes": 21799524,
+      "addedAt": "2026-03-03T23:40:14.366Z",
+      "model": "grok-imagine",
+      "prompt": "Concentric tie-dye rings pulsing outward from a central Steal Your Face skull, each wave rippling in hot pink, electric purple, and acid green, the skull slowly breathing and melting into the spiraling fabric texture, colors bleeding into each other like wet ink on silk, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "22128ccdb62de748",
+      "path": "assets/library/videos/not-fade-away-scene-mid-22128ccdb62de748.mp4",
+      "originalFile": "not-fade-away-scene-mid-22128ccdb62de748.mp4",
+      "type": "video",
+      "song": "Not Fade Away",
+      "songKey": "not-fade-away",
+      "category": "song",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-mid",
+        "duration-450"
+      ],
+      "sizeBytes": 47605617,
+      "addedAt": "2026-03-03T23:41:56.818Z",
+      "model": "grok-imagine",
+      "prompt": "Molten liquid gold pouring upward in impossible rivers, splitting into mercury streams that form dancing skeleton bears, their forms constantly dissolving and reforming in swirling oil-lamp patterns, electric blue and magenta waves crashing through the composition, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "f60de9c54dc6e7f1",
+      "path": "assets/library/videos/not-fade-away-scene-mid-f60de9c54dc6e7f1.mp4",
+      "originalFile": "not-fade-away-scene-mid-f60de9c54dc6e7f1.mp4",
+      "type": "video",
+      "song": "Not Fade Away",
+      "songKey": "not-fade-away",
+      "category": "song",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-mid",
+        "duration-450"
+      ],
+      "sizeBytes": 47027679,
+      "addedAt": "2026-03-03T23:43:43.280Z",
+      "model": "grok-imagine",
+      "prompt": "Explosive cosmic nebula erupting in neon orange and electric violet, lightning bolts of pure white energy shooting through spiraling star clusters, the entire universe breathing and pulsing in 150 BPM rhythm, kaleidoscopic patterns multiplying and fragmenting into infinite geometric shards, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "e22c15722423c8b6",
+      "path": "assets/library/videos/not-fade-away-scene-low-e22c15722423c8b6.mp4",
+      "originalFile": "not-fade-away-scene-low-e22c15722423c8b6.mp4",
+      "type": "video",
+      "song": "Not Fade Away",
+      "songKey": "not-fade-away",
+      "category": "song",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-low",
+        "duration-450"
+      ],
+      "sizeBytes": 30745587,
+      "addedAt": "2026-03-03T23:45:20.593Z",
+      "model": "grok-imagine",
+      "prompt": "Undulating roses made of liquid mercury morphing into thirteen-point lightning bolts, each petal bleeding iridescent pink and turquoise oils that drip upward into infinity, the entire composition rotating slowly like a cosmic mandala dissolving into stardust particles, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "94c5798a29dbbc7c",
+      "path": "assets/library/videos/drums-space-scene-mid-94c5798a29dbbc7c.mp4",
+      "originalFile": "drums-space-scene-mid-94c5798a29dbbc7c.mp4",
+      "type": "video",
+      "song": "Drums / Space",
+      "songKey": "drums-space",
+      "category": "song",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-mid",
+        "duration-450"
+      ],
+      "sizeBytes": 12636372,
+      "addedAt": "2026-03-03T23:46:57.156Z",
+      "model": "grok-imagine",
+      "prompt": "Luminous spirit wisps and aurora ribbons spiral through deep indigo void, breathing and pulsing in slow waves as electric violet and acid green tendrils drift and merge like cosmic smoke under a blacklight, particles of stardust trailing behind each wisp in lazy arcs, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "ffda142265c5c618",
+      "path": "assets/library/videos/drums-space-scene-mid-ffda142265c5c618.mp4",
+      "originalFile": "drums-space-scene-mid-ffda142265c5c618.mp4",
+      "type": "video",
+      "song": "Drums / Space",
+      "songKey": "drums-space",
+      "category": "song",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-mid",
+        "duration-450"
+      ],
+      "sizeBytes": 32977801,
+      "addedAt": "2026-03-03T23:48:34.834Z",
+      "model": "grok-imagine",
+      "prompt": "Swirling black hole vortex rendered as concentric rings of molten gold and hot magenta bleeding into midnight purple, the spiral breathing inward and outward in hypnotic rhythm as wormhole ribbons twist through the center like living tie-dye silk screaming through space, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "b35e4cdeecf5919d",
+      "path": "assets/library/videos/drums-space-scene-mid-b35e4cdeecf5919d.mp4",
+      "originalFile": "drums-space-scene-mid-b35e4cdeecf5919d.mp4",
+      "type": "video",
+      "song": "Drums / Space",
+      "songKey": "drums-space",
+      "category": "song",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-mid",
+        "duration-450"
+      ],
+      "sizeBytes": 37489831,
+      "addedAt": "2026-03-03T23:50:12.596Z",
+      "model": "grok-imagine",
+      "prompt": "Thirteen-point lightning bolt dissolves into expanding ripples of electric blue and neon orange spreading across obsidian water like zen garden waves, each ripple morphing into dancing skeleton roses that bloom and melt back into concentric circles of pulsing color, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "b88eb05897fc52d6",
+      "path": "assets/library/videos/morning-dew-scene-low-b88eb05897fc52d6.mp4",
+      "originalFile": "morning-dew-scene-low-b88eb05897fc52d6.mp4",
+      "type": "video",
+      "song": "Morning Dew",
+      "songKey": "morning-dew",
+      "category": "song",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-low",
+        "duration-450"
+      ],
+      "sizeBytes": 7967003,
+      "addedAt": "2026-03-03T23:51:51.255Z",
+      "model": "grok-imagine",
+      "prompt": "Translucent drops of molten mercury slowly bleeding into pools of electric violet and seafoam green, each droplet creating concentric rings of pulsing neon orange that gently breathe outward and dissolve into soft cobalt mist, the entire surface undulating like a living membrane, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "ae386e426cd09661",
+      "path": "assets/library/videos/morning-dew-scene-mid-ae386e426cd09661.mp4",
+      "originalFile": "morning-dew-scene-mid-ae386e426cd09661.mp4",
+      "type": "video",
+      "song": "Morning Dew",
+      "songKey": "morning-dew",
+      "category": "song",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-mid",
+        "duration-450"
+      ],
+      "sizeBytes": 28981750,
+      "addedAt": "2026-03-03T23:53:27.527Z",
+      "model": "grok-imagine",
+      "prompt": "A Steal Your Face skull constructed entirely of swirling tie-dye patterns melts and reforms continuously, its eye sockets bleeding rivers of hot pink and acid yellow that crystallize into geometric dancing bear shapes before dissolving back into liquid color, the entire composition rotating and morphing against a field of pulsing magenta fractals, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "20348e385fa7f864",
+      "path": "assets/library/videos/morning-dew-scene-high-20348e385fa7f864.mp4",
+      "originalFile": "morning-dew-scene-high-20348e385fa7f864.mp4",
+      "type": "video",
+      "song": "Morning Dew",
+      "songKey": "morning-dew",
+      "category": "song",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-high",
+        "duration-450"
+      ],
+      "sizeBytes": 42005776,
+      "addedAt": "2026-03-03T23:55:10.371Z",
+      "model": "grok-imagine",
+      "prompt": "Explosive bursts of molten gold and electric crimson erupt from the center outward like solar plasma, each wave morphing into thirteen-point lightning bolts that shatter into cascading rose petals made of pure neon color, the entire field pulsing and breathing with intense saturation as forms continuously birth and consume each other in rapid succession, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "2beabab161207ea7",
+      "path": "assets/library/videos/morning-dew-scene-low-2beabab161207ea7.mp4",
+      "originalFile": "morning-dew-scene-low-2beabab161207ea7.mp4",
+      "type": "video",
+      "song": "Morning Dew",
+      "songKey": "morning-dew",
+      "category": "song",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-low",
+        "duration-450"
+      ],
+      "sizeBytes": 11950661,
+      "addedAt": "2026-03-03T23:56:37.636Z",
+      "model": "grok-imagine",
+      "prompt": "Slow-motion swirls of opalescent cream and deep indigo oil create organic patterns like cosmic nebulae viewed through a kaleidoscope, gentle tendrils of pale lavender and mint green drift and interweave, occasionally forming abstract skeleton shapes that dissolve back into the flowing color field, the entire composition gently spiraling inward in hypnotic slow motion, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "685033d7650d3d22",
+      "path": "assets/library/videos/one-more-saturday-night-scene-mid-685033d7650d3d22.mp4",
+      "originalFile": "one-more-saturday-night-scene-mid-685033d7650d3d22.mp4",
+      "type": "video",
+      "song": "One More Saturday Night",
+      "songKey": "one-more-saturday-night",
+      "category": "song",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-mid",
+        "duration-450"
+      ],
+      "sizeBytes": 5352846,
+      "addedAt": "2026-03-03T23:58:13.679Z",
+      "model": "grok-imagine",
+      "prompt": "Molten tie-dye rivers of hot pink, electric lime, and blazing orange flowing like liquid wax across black void, forming and reforming into dancing bear silhouettes that melt back into swirling color streams, slow hypnotic breathing motion with gentle prismatic bleeding at edges, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "c87a123fed39846b",
+      "path": "assets/library/videos/one-more-saturday-night-scene-mid-c87a123fed39846b.mp4",
+      "originalFile": "one-more-saturday-night-scene-mid-c87a123fed39846b.mp4",
+      "type": "video",
+      "song": "One More Saturday Night",
+      "songKey": "one-more-saturday-night",
+      "category": "song",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-mid",
+        "duration-450"
+      ],
+      "sizeBytes": 35076506,
+      "addedAt": "2026-03-03T23:59:51.619Z",
+      "model": "grok-imagine",
+      "prompt": "Thirteen-point lightning bolts made of crackling neon purple electricity morphing into blooming skeleton roses that explode outward in concentric waves of acid green and magenta petals, each petal disintegrating into smaller dancing Steal Your Face skulls that pulse and multiply across the frame, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "79d36c4980836383",
+      "path": "assets/library/videos/one-more-saturday-night-scene-high-79d36c4980836383.mp4",
+      "originalFile": "one-more-saturday-night-scene-high-79d36c4980836383.mp4",
+      "type": "video",
+      "song": "One More Saturday Night",
+      "songKey": "one-more-saturday-night",
+      "category": "song",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-high",
+        "duration-450"
+      ],
+      "sizeBytes": 63106425,
+      "addedAt": "2026-03-04T00:01:40.503Z",
+      "model": "grok-imagine",
+      "prompt": "Exploding supernova of iridescent oil-slick colors erupting from center in violent spiraling tendrils, each arm fragmenting into thousands of geometric terrapin shell patterns that rotate and kaleidoscope into impossible crystalline structures, everything pulsing and shattering in rapid succession with strobing electric blue and molten gold flashes, psychedelic art, liquid light show style"
+    },
+    {
+      "id": "9ef17ddffbd3481e",
+      "path": "assets/library/videos/one-more-saturday-night-scene-low-9ef17ddffbd3481e.mp4",
+      "originalFile": "one-more-saturday-night-scene-low-9ef17ddffbd3481e.mp4",
+      "type": "video",
+      "song": "One More Saturday Night",
+      "songKey": "one-more-saturday-night",
+      "category": "song",
+      "tags": [
+        "scene-video",
+        "generated",
+        "energy-low",
+        "duration-450"
+      ],
+      "sizeBytes": 8182702,
+      "addedAt": "2026-03-04T00:03:05.362Z",
+      "model": "grok-imagine",
+      "prompt": "Gentle ink drops of deep cosmic purple and midnight blue bleeding through translucent amber, forming soft undulating waves that slowly drift and merge like oil on water, faint skeleton key outlines dissolving into the flowing liquid with dreamy slow-motion grace, psychedelic art, liquid light show style"
+    }
+  ]
+}

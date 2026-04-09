@@ -1,0 +1,87 @@
+{
+  "showId": "1977-05-08",
+  "defaults": {
+    "transition_in": "crossfade",
+    "transition_out": "crossfade",
+    "pre_roll_seconds": 4,
+    "hold_seconds": 15,
+    "min_gap_seconds": 15,
+    "blend_mode": "normal",
+    "opacity": 0.85
+  },
+  "triggers": [
+    {
+      "id": "scarlet-wind",
+      "phrase": "shown the light",
+      "song": "Scarlet Begonias",
+      "visual": "assets/library/images/scarletbegonias.jpg",
+      "mediaType": "image",
+      "hold_seconds": 12,
+      "image_prompt": "Weeping willows swaying in a cosmic breeze, branches flowing like liquid light show projections, oil-on-water color swirls of emerald green deep purple and warm amber rippling through the canopy, scarlet begonia flowers scattered across the ground glowing with inner light, a golden sun melting into a blue sky, 1970s psychedelic concert poster art, no text no words no letters, 16:9",
+      "video_prompt": "Willow branches sway gently in the breeze, colors ripple and shift like oil on water, scarlet petals drift slowly through the air, dreamy atmospheric motion"
+    },
+    {
+      "id": "fotm-chorus-1",
+      "phrase": "fire on the mountain",
+      "song": "Fire on the Mountain",
+      "visual": "assets/library/videos/fireonthemountain.mp4",
+      "mediaType": "video",
+      "hold_seconds": 20,
+      "image_prompt": "A massive mountain range engulfed in psychedelic flames, fire rises from the peaks in swirling patterns of electric orange red magenta and gold, the flames morph into tie-dye spirals, Steal Your Face skull formed in the flames, rivers of glowing lava, embers spiral upward, 1970s psychedelic concert poster art style, no text no words no letters, 16:9",
+      "video_prompt": "Flames surge and dance upward from mountain peaks, lava rivers flow, embers rise into the sky, psychedelic colors pulse and shift, dramatic cinematic energy"
+    },
+    {
+      "id": "morning-dew-walk",
+      "phrase": "walk me out in the morning dew",
+      "song": "Morning Dew",
+      "visual": "assets/library/videos/morningdew.mp4",
+      "mediaType": "video",
+      "pre_roll_seconds": 5,
+      "hold_seconds": 25,
+      "image_prompt": "Ethereal morning landscape, dew drops on grass catching golden light, mist rising from valleys, silhouettes walking into dawn light, psychedelic aurora in the sky, warm amber and cool blue tones, dreamlike atmosphere, no text no words no letters, 16:9",
+      "video_prompt": "Mist rises slowly from dewy meadow at dawn, golden light filters through, ethereal atmosphere, peaceful cinematic motion"
+    },
+    {
+      "id": "estimated-prophet",
+      "phrase": "prophet on the burning shore",
+      "song": "Estimated Prophet",
+      "visual": "assets/library/videos/theotherone.mp4",
+      "mediaType": "video",
+      "hold_seconds": 20,
+      "pre_roll_seconds": 5,
+      "image_prompt": "A lone figure silhouetted on a burning shoreline, waves of fire meet psychedelic ocean, cosmic sky fractures with shafts of divine light, deep purple and burning orange tones, Steal Your Face reflected in the water, 1970s psychedelic concert poster art, no text no words no letters, 16:9",
+      "video_prompt": "Burning shore glows and pulses, waves of fire crash in slow motion, shafts of light pierce the cosmic sky, prophetic dramatic energy"
+    },
+    {
+      "id": "ststephen-remain",
+      "phrase": "saint stephen",
+      "song": "St. Stephen",
+      "visual": "assets/library/videos/ststephen.mp4",
+      "mediaType": "video",
+      "hold_seconds": 20,
+      "image_prompt": "A cosmic saint rising from swirling nebula clouds, stained glass window patterns dissolving into liquid light show projections, deep royal purple and gold tones, thunderbolts and roses intertwined, 1970s psychedelic concert poster art, no text no words no letters, 16:9",
+      "video_prompt": "Nebula clouds swirl and part to reveal cosmic figure, stained glass colors fracture and flow, majestic dramatic energy"
+    },
+    {
+      "id": "lazy-lightning",
+      "phrase": "lazy lightning",
+      "song": "Lazy Lightnin'",
+      "visual": "assets/library/videos/psychedeliclightningstorm.mp4",
+      "mediaType": "video",
+      "hold_seconds": 18,
+      "image_prompt": "Massive bolts of psychedelic lightning forking across a tie-dye sky, each bolt a different color — electric blue magenta gold emerald, lightning reflects off liquid clouds that swirl like oil on water, 1970s liquid light show, no text no words no letters, 16:9",
+      "video_prompt": "Lightning bolts fork and dance across the sky in slow motion, psychedelic colors pulse with each strike, electric atmospheric energy"
+    },
+    {
+      "id": "rowjimmy-row",
+      "phrase": "row jimmy row",
+      "song": "Row Jimmy",
+      "visual": "assets/library/videos/waves.mp4",
+      "mediaType": "video",
+      "hold_seconds": 18,
+      "pre_roll_seconds": 5,
+      "image_prompt": "A small wooden rowboat drifting on an endless psychedelic ocean, waves of liquid color — deep blue emerald purple — rolling gently, sky reflected in the water as a mirror of swirling light, peaceful dreamlike atmosphere, 1970s liquid light show, no text no words no letters, 16:9",
+      "video_prompt": "Waves of psychedelic color roll gently, boat drifts on liquid ocean, sky colors reflect and shimmer, peaceful meditative motion"
+    }
+  ]
+}

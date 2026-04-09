@@ -1,0 +1,244 @@
+{
+  "modes": [
+    {
+      "id": "liquid_light",
+      "energyAffinity": "high",
+      "complement": "oil_projector"
+    },
+    {
+      "id": "oil_projector",
+      "energyAffinity": "mid",
+      "complement": "liquid_light"
+    },
+    {
+      "id": "concert_lighting",
+      "energyAffinity": "high",
+      "complement": "lo_fi_grain"
+    },
+    {
+      "id": "lo_fi_grain",
+      "energyAffinity": "mid",
+      "complement": "concert_lighting"
+    },
+    {
+      "id": "particle_nebula",
+      "energyAffinity": "low",
+      "complement": "cosmic_dust"
+    },
+    {
+      "id": "stark_minimal",
+      "energyAffinity": "low",
+      "complement": "liquid_light"
+    },
+    {
+      "id": "tie_dye",
+      "energyAffinity": "high",
+      "complement": "vintage_film"
+    },
+    {
+      "id": "cosmic_dust",
+      "energyAffinity": "low",
+      "complement": "particle_nebula"
+    },
+    {
+      "id": "vintage_film",
+      "energyAffinity": "mid",
+      "complement": "tie_dye"
+    },
+    {
+      "id": "cosmic_voyage",
+      "energyAffinity": "low",
+      "complement": "concert_lighting"
+    },
+    {
+      "id": "inferno",
+      "energyAffinity": "high",
+      "complement": "cosmic_voyage"
+    },
+    {
+      "id": "deep_ocean",
+      "energyAffinity": "low",
+      "complement": "inferno"
+    },
+    {
+      "id": "aurora",
+      "energyAffinity": "low",
+      "complement": "tie_dye"
+    },
+    {
+      "id": "crystal_cavern",
+      "energyAffinity": "low",
+      "complement": "inferno"
+    },
+    {
+      "id": "fluid_light",
+      "energyAffinity": "high",
+      "complement": "oil_projector"
+    },
+    {
+      "id": "void_light",
+      "energyAffinity": "low",
+      "complement": "concert_lighting"
+    },
+    {
+      "id": "fluid_2d",
+      "energyAffinity": "any",
+      "complement": "liquid_light"
+    },
+    {
+      "id": "spectral_analyzer",
+      "energyAffinity": "high",
+      "complement": "particle_swarm"
+    },
+    {
+      "id": "particle_swarm",
+      "energyAffinity": "mid",
+      "complement": "spectral_analyzer"
+    },
+    {
+      "id": "crystalline_growth",
+      "energyAffinity": "low",
+      "complement": "climax_surge"
+    },
+    {
+      "id": "climax_surge",
+      "energyAffinity": "high",
+      "complement": "inferno"
+    },
+    {
+      "id": "kaleidoscope",
+      "energyAffinity": "mid",
+      "complement": "sacred_geometry"
+    },
+    {
+      "id": "fractal_zoom",
+      "energyAffinity": "any",
+      "complement": "kaleidoscope"
+    },
+    {
+      "id": "sacred_geometry",
+      "energyAffinity": "low",
+      "complement": "kaleidoscope"
+    },
+    {
+      "id": "reaction_diffusion",
+      "energyAffinity": "mid",
+      "complement": "fluid_2d"
+    },
+    {
+      "id": "mandala_engine",
+      "energyAffinity": "mid",
+      "complement": "sacred_geometry"
+    },
+    {
+      "id": "fractal_flames",
+      "energyAffinity": "high",
+      "complement": "deep_ocean"
+    },
+    {
+      "id": "feedback_recursion",
+      "energyAffinity": "any",
+      "complement": "fractal_flames"
+    },
+    {
+      "id": "truchet_tiling",
+      "energyAffinity": "mid",
+      "complement": "mandala_engine"
+    },
+    {
+      "id": "diffraction_rings",
+      "energyAffinity": "low",
+      "complement": "aurora"
+    },
+    {
+      "id": "plasma_field",
+      "energyAffinity": "any",
+      "complement": "diffraction_rings"
+    },
+    {
+      "id": "voronoi_flow",
+      "energyAffinity": "mid",
+      "complement": "truchet_tiling"
+    },
+    {
+      "id": "electric_arc",
+      "energyAffinity": "high",
+      "complement": "aurora"
+    },
+    {
+      "id": "morphogenesis",
+      "energyAffinity": "mid",
+      "complement": "reaction_diffusion"
+    },
+    {
+      "id": "stained_glass",
+      "energyAffinity": "any",
+      "complement": "sacred_geometry"
+    },
+    {
+      "id": "neural_web",
+      "energyAffinity": "high",
+      "complement": "fractal_flames"
+    },
+    {
+      "id": "smoke_rings",
+      "energyAffinity": "mid",
+      "complement": "deep_ocean"
+    },
+    {
+      "id": "aurora_curtains",
+      "energyAffinity": "low",
+      "complement": "concert_lighting"
+    },
+    {
+      "id": "digital_rain",
+      "energyAffinity": "any",
+      "complement": "stark_minimal"
+    },
+    {
+      "id": "lava_flow",
+      "energyAffinity": "high",
+      "complement": "crystal_cavern"
+    },
+    {
+      "id": "mycelium_network",
+      "energyAffinity": "mid",
+      "complement": "neural_web"
+    },
+    {
+      "id": "ink_wash",
+      "energyAffinity": "low",
+      "complement": "stark_minimal"
+    },
+    {
+      "id": "coral_reef",
+      "energyAffinity": "low",
+      "complement": "deep_ocean"
+    },
+    {
+      "id": "solar_flare",
+      "energyAffinity": "high",
+      "complement": "inferno"
+    },
+    {
+      "id": "galaxy_spiral",
+      "energyAffinity": "any",
+      "complement": "cosmic_voyage"
+    },
+    {
+      "id": "warp_field",
+      "energyAffinity": "mid",
+      "complement": "diffraction_rings"
+    },
+    {
+      "id": "signal_decay",
+      "energyAffinity": "any",
+      "complement": "digital_rain"
+    },
+    {
+      "id": "databend",
+      "energyAffinity": "high",
+      "complement": "lo_fi_grain"
+    }
+  ]
+}

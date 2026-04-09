@@ -1,0 +1,312 @@
+{
+  "date": "1972-08-27",
+  "venue": "Old Renaissance Faire Grounds, Veneta, OR",
+  "bandName": "Grateful Dead",
+  "taperInfo": "SBD > Pacific High Studios Master > CD \u2014 Sunshine Daydream",
+  "era": "primal",
+  "venueType": "outdoor",
+  "showPoster": "assets/song-art/veneta-72/show-poster.png",
+  "songs": [
+    {
+      "trackId": "d1t01",
+      "title": "Stage Announcements",
+      "set": 1,
+      "trackNumber": 1,
+      "defaultMode": "inferno",
+      "audioFile": "veneta-72/gd72-08-27d1t01.mp3",
+      "palette": {
+        "primary": 30,
+        "secondary": 210,
+        "saturation": 0.85
+      }
+    },
+    {
+      "trackId": "d1t02",
+      "title": "The Promised Land",
+      "set": 1,
+      "trackNumber": 2,
+      "defaultMode": "protean_clouds",
+      "audioFile": "veneta-72/gd72-08-27d1t02.mp3",
+      "palette": {
+        "primary": 200,
+        "secondary": 40,
+        "saturation": 0.75
+      }
+    },
+    {
+      "trackId": "d1t03",
+      "title": "Sugaree",
+      "set": 1,
+      "trackNumber": 3,
+      "defaultMode": "inferno",
+      "audioFile": "veneta-72/gd72-08-27d1t03.mp3",
+      "palette": {
+        "primary": 35,
+        "secondary": 190,
+        "saturation": 0.75
+      }
+    },
+    {
+      "trackId": "d1t04",
+      "title": "Me and My Uncle",
+      "set": 1,
+      "trackNumber": 4,
+      "defaultMode": "protean_clouds",
+      "audioFile": "veneta-72/gd72-08-27d1t04.mp3",
+      "palette": {
+        "primary": 0,
+        "secondary": 220,
+        "saturation": 0.8
+      }
+    },
+    {
+      "trackId": "d1t05",
+      "title": "Deal",
+      "set": 1,
+      "trackNumber": 5,
+      "defaultMode": "protean_clouds",
+      "audioFile": "veneta-72/gd72-08-27d1t05.mp3",
+      "palette": {
+        "primary": 220,
+        "secondary": 340,
+        "saturation": 0.7
+      }
+    },
+    {
+      "trackId": "d1t06",
+      "title": "Black Throated Wind",
+      "set": 1,
+      "trackNumber": 6,
+      "defaultMode": "cosmic_voyage",
+      "audioFile": "veneta-72/gd72-08-27d1t06.mp3",
+      "palette": {
+        "primary": 50,
+        "secondary": 280,
+        "saturation": 0.85
+      },
+      "segueInto": true
+    },
+    {
+      "trackId": "d1t07",
+      "title": "China Cat Sunflower",
+      "set": 1,
+      "trackNumber": 7,
+      "defaultMode": "protean_clouds",
+      "audioFile": "veneta-72/gd72-08-27d1t07.mp3",
+      "palette": {
+        "primary": 15,
+        "secondary": 270,
+        "saturation": 0.8
+      }
+    },
+    {
+      "trackId": "d1t08",
+      "title": "I Know You Rider",
+      "set": 1,
+      "trackNumber": 8,
+      "defaultMode": "inferno",
+      "audioFile": "veneta-72/gd72-08-27d1t08.mp3",
+      "palette": {
+        "primary": 25,
+        "secondary": 180,
+        "saturation": 0.75
+      }
+    },
+    {
+      "trackId": "d1t09",
+      "title": "Mexicali Blues",
+      "set": 1,
+      "trackNumber": 9,
+      "defaultMode": "protean_clouds",
+      "audioFile": "veneta-72/gd72-08-27d1t09.mp3",
+      "palette": {
+        "primary": 330,
+        "secondary": 120,
+        "saturation": 0.8
+      }
+    },
+    {
+      "trackId": "d1t10",
+      "title": "Bertha",
+      "set": 2,
+      "trackNumber": 1,
+      "defaultMode": "cosmic_voyage",
+      "audioFile": "veneta-72/gd72-08-27d1t10.mp3",
+      "palette": {
+        "primary": 270,
+        "secondary": 60,
+        "saturation": 0.85
+      }
+    },
+    {
+      "trackId": "d2t01",
+      "title": "Stage Announcements",
+      "set": 2,
+      "trackNumber": 2,
+      "defaultMode": "protean_clouds",
+      "audioFile": "veneta-72/gd72-08-27d2t01.mp3",
+      "palette": {
+        "primary": 180,
+        "secondary": 310,
+        "saturation": 0.7
+      }
+    },
+    {
+      "trackId": "d2t02",
+      "title": "Playing In The Band",
+      "set": 2,
+      "trackNumber": 3,
+      "defaultMode": "inferno",
+      "audioFile": "veneta-72/gd72-08-27d2t02.mp3",
+      "palette": {
+        "primary": 15,
+        "secondary": 240,
+        "saturation": 0.85
+      }
+    },
+    {
+      "trackId": "d2t03",
+      "title": "He's Gone",
+      "set": 2,
+      "trackNumber": 4,
+      "defaultMode": "deep_ocean",
+      "audioFile": "veneta-72/gd72-08-27d2t03.mp3",
+      "palette": {
+        "primary": 200,
+        "secondary": 30,
+        "saturation": 0.75
+      }
+    },
+    {
+      "trackId": "d2t04",
+      "title": "Jack Straw",
+      "set": 2,
+      "trackNumber": 5,
+      "defaultMode": "protean_clouds",
+      "audioFile": "veneta-72/gd72-08-27d2t04.mp3",
+      "palette": {
+        "primary": 50,
+        "secondary": 300,
+        "saturation": 0.8
+      }
+    },
+    {
+      "trackId": "d2t05",
+      "title": "Bird Song",
+      "set": 2,
+      "trackNumber": 6,
+      "defaultMode": "cosmic_voyage",
+      "audioFile": "veneta-72/gd72-08-27d2t05.mp3",
+      "palette": {
+        "primary": 240,
+        "secondary": 60,
+        "saturation": 0.7
+      }
+    },
+    {
+      "trackId": "d2t06",
+      "title": "Greatest Story Ever Told",
+      "set": 3,
+      "trackNumber": 1,
+      "defaultMode": "cosmic_voyage",
+      "audioFile": "veneta-72/gd72-08-27d2t06.mp3",
+      "palette": {
+        "primary": 260,
+        "secondary": 120,
+        "saturation": 0.75
+      }
+    },
+    {
+      "trackId": "d3t01",
+      "title": "Dark Star",
+      "set": 3,
+      "trackNumber": 2,
+      "defaultMode": "volumetric_nebula",
+      "audioFile": "veneta-72/gd72-08-27d3t01.mp3",
+      "palette": {
+        "primary": 260,
+        "secondary": 120,
+        "saturation": 0.75
+      },
+      "segueInto": true
+    },
+    {
+      "trackId": "d3t02",
+      "title": "El Paso",
+      "set": 3,
+      "trackNumber": 3,
+      "defaultMode": "inferno",
+      "audioFile": "veneta-72/gd72-08-27d3t02.mp3",
+      "palette": {
+        "primary": 25,
+        "secondary": 180,
+        "saturation": 0.75
+      }
+    },
+    {
+      "trackId": "d3t03",
+      "title": "Sing Me Back Home",
+      "set": 3,
+      "trackNumber": 4,
+      "defaultMode": "protean_clouds",
+      "audioFile": "veneta-72/gd72-08-27d3t03.mp3",
+      "palette": {
+        "primary": 195,
+        "secondary": 330,
+        "saturation": 0.65
+      }
+    },
+    {
+      "trackId": "d3t04",
+      "title": "Sugar Magnolia",
+      "set": 3,
+      "trackNumber": 5,
+      "defaultMode": "protean_clouds",
+      "audioFile": "veneta-72/gd72-08-27d3t04.mp3",
+      "palette": {
+        "primary": 310,
+        "secondary": 60,
+        "saturation": 0.85
+      }
+    },
+    {
+      "trackId": "d3t05",
+      "title": "Casey Jones",
+      "set": 3,
+      "trackNumber": 6,
+      "defaultMode": "inferno",
+      "audioFile": "veneta-72/gd72-08-27d3t05.mp3",
+      "palette": {
+        "primary": 20,
+        "secondary": 200,
+        "saturation": 0.8
+      }
+    },
+    {
+      "trackId": "d3t06",
+      "title": "One More Saturday Night",
+      "set": 3,
+      "trackNumber": 7,
+      "defaultMode": "protean_clouds",
+      "audioFile": "veneta-72/gd72-08-27d3t06.mp3",
+      "palette": {
+        "primary": 50,
+        "secondary": 280,
+        "saturation": 0.8
+      }
+    },
+    {
+      "trackId": "d3t07",
+      "title": "Stage Announcements",
+      "set": 3,
+      "trackNumber": 8,
+      "defaultMode": "deep_ocean",
+      "audioFile": "veneta-72/gd72-08-27d3t07.mp3",
+      "palette": {
+        "primary": 165,
+        "secondary": 340,
+        "saturation": 0.65
+      }
+    }
+  ]
+}

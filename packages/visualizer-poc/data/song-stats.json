@@ -1,0 +1,184 @@
+{
+  "showDate": "1977-05-08",
+  "source": "deadbase + setlist.fm (through May 8 1977)",
+  "songs": {
+    "s1t02": {
+      "title": "New Minglewood Blues",
+      "timesPlayed": 318,
+      "firstPlayed": "1966",
+      "lastPlayed": "1995",
+      "notable": "Standard Weir opener throughout '77",
+      "gapShows": 2,
+      "lastPlayedDate": "1977-05-05"
+    },
+    "s1t03": {
+      "title": "Loser",
+      "timesPlayed": 427,
+      "firstPlayed": "1971",
+      "lastPlayed": "1995",
+      "notable": "Garcia's gambler's lament",
+      "gapShows": 5,
+      "lastPlayedDate": "1977-04-29"
+    },
+    "s1t04": {
+      "title": "El Paso",
+      "timesPlayed": 233,
+      "firstPlayed": "1969",
+      "lastPlayed": "1995",
+      "notable": "Marty Robbins cover",
+      "gapShows": 8,
+      "lastPlayedDate": "1977-04-23"
+    },
+    "s1t05": {
+      "title": "They Love Each Other",
+      "timesPlayed": 332,
+      "firstPlayed": "1973",
+      "lastPlayed": "1995",
+      "notable": "Reworked from country to rock arrangement in '76",
+      "gapShows": 3,
+      "lastPlayedDate": "1977-05-03"
+    },
+    "s1t06": {
+      "title": "Jack Straw",
+      "timesPlayed": 473,
+      "firstPlayed": "1971",
+      "lastPlayed": "1995",
+      "notable": "Weir/Garcia vocal duel — Europe '72 staple",
+      "gapShows": 1,
+      "lastPlayedDate": "1977-05-07"
+    },
+    "s1t07": {
+      "title": "Deal",
+      "timesPlayed": 388,
+      "firstPlayed": "1971",
+      "lastPlayed": "1995",
+      "notable": "Garcia Band crossover",
+      "gapShows": 4,
+      "lastPlayedDate": "1977-05-01"
+    },
+    "s1t08": {
+      "title": "Lazy Lightnin'",
+      "timesPlayed": 36,
+      "firstPlayed": "1976",
+      "lastPlayed": "1977",
+      "notable": "Rare pairing — only 36 performances total",
+      "gapShows": 12,
+      "lastPlayedDate": "1977-04-22"
+    },
+    "s1t09": {
+      "title": "Supplication",
+      "timesPlayed": 36,
+      "firstPlayed": "1976",
+      "lastPlayed": "1977",
+      "notable": "Always paired with Lazy Lightnin' — inseparable",
+      "gapShows": 12,
+      "lastPlayedDate": "1977-04-22"
+    },
+    "s1t10": {
+      "title": "Brown Eyed Women",
+      "timesPlayed": 347,
+      "firstPlayed": "1971",
+      "lastPlayed": "1995",
+      "notable": "One of Garcia's finest story-songs",
+      "gapShows": 6,
+      "lastPlayedDate": "1977-04-27"
+    },
+    "s1t11": {
+      "title": "Mama Tried",
+      "timesPlayed": 80,
+      "firstPlayed": "1969",
+      "lastPlayed": "1981",
+      "notable": "Merle Haggard cover — played dead straight",
+      "gapShows": 15,
+      "lastPlayedDate": "1977-04-07"
+    },
+    "s1t12": {
+      "title": "Row Jimmy",
+      "timesPlayed": 218,
+      "firstPlayed": "1973",
+      "lastPlayed": "1995",
+      "notable": "Wake of the Flood deep cut",
+      "gapShows": 9,
+      "lastPlayedDate": "1977-04-22"
+    },
+    "s1t13": {
+      "title": "Dancin' in the Street",
+      "timesPlayed": 220,
+      "firstPlayed": "1976",
+      "lastPlayed": "1989",
+      "notable": "Martha and the Vandellas via Dead psychedelia",
+      "gapShows": 7,
+      "lastPlayedDate": "1977-04-25"
+    },
+    "s2t02": {
+      "title": "Scarlet Begonias",
+      "timesPlayed": 316,
+      "firstPlayed": "1974",
+      "lastPlayed": "1995",
+      "notable": "Sacred segue — the gateway to Fire on the Mountain",
+      "gapShows": 3,
+      "lastPlayedDate": "1977-05-03"
+    },
+    "s2t03": {
+      "title": "Fire on the Mountain",
+      "timesPlayed": 246,
+      "firstPlayed": "1977",
+      "lastPlayed": "1995",
+      "notable": "Debut year — this pairing will define an era",
+      "gapShows": 3,
+      "lastPlayedDate": "1977-05-03"
+    },
+    "s2t04": {
+      "title": "Estimated Prophet",
+      "timesPlayed": 283,
+      "firstPlayed": "1977",
+      "lastPlayed": "1995",
+      "notable": "Debut year — Weir's apocalyptic vision",
+      "gapShows": 1,
+      "lastPlayedDate": "1977-05-07"
+    },
+    "s2t05": {
+      "title": "St. Stephen",
+      "timesPlayed": 133,
+      "firstPlayed": "1968",
+      "lastPlayed": "1983",
+      "notable": "Revived tonight after a 6-year hiatus",
+      "gapShows": 232,
+      "lastPlayedDate": "1971-10-31"
+    },
+    "s2t06": {
+      "title": "Not Fade Away",
+      "timesPlayed": 531,
+      "firstPlayed": "1966",
+      "lastPlayed": "1995",
+      "notable": "Buddy Holly cover — most-played cover in the catalog",
+      "gapShows": 2,
+      "lastPlayedDate": "1977-05-05"
+    },
+    "s2t07": {
+      "title": "Drums / Space",
+      "timesPlayed": null,
+      "firstPlayed": "1974",
+      "lastPlayed": "1995",
+      "notable": "The unknown — every night a different journey"
+    },
+    "s2t08": {
+      "title": "Morning Dew",
+      "timesPlayed": 244,
+      "firstPlayed": "1966",
+      "lastPlayed": "1995",
+      "notable": "Bonnie Dobson cover — the emotional peak of any show",
+      "gapShows": 22,
+      "lastPlayedDate": "1977-03-18"
+    },
+    "s2t09": {
+      "title": "One More Saturday Night",
+      "timesPlayed": 327,
+      "firstPlayed": "1971",
+      "lastPlayed": "1995",
+      "notable": "Weir's Saturday night closer — mandatory encore energy",
+      "gapShows": 4,
+      "lastPlayedDate": "1977-04-30"
+    }
+  }
+}

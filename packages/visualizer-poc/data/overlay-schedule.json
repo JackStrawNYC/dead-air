@@ -1,0 +1,231 @@
+{
+  "generatedAt": "2026-03-18T18:02:01.352Z",
+  "songs": {
+    "s1t02": {
+      "title": "New Minglewood Blues",
+      "activeOverlays": [
+        "SongTitle",
+        "FilmGrain",
+        "LavaLamp",
+        "RoseGarden",
+        "PhilZone",
+        "OpArtPatterns"
+      ],
+      "totalCount": 6
+    },
+    "s1t03": {
+      "title": "Loser",
+      "activeOverlays": [
+        "SongTitle",
+        "FilmGrain",
+        "LighterWave",
+        "DarkStarPortal",
+        "BassWaveform"
+      ],
+      "totalCount": 5
+    },
+    "s1t04": {
+      "title": "El Paso",
+      "activeOverlays": [
+        "SongTitle",
+        "FilmGrain",
+        "CosmicStarfield",
+        "StealYourFaceKaleidoscope",
+        "EmberRise"
+      ],
+      "totalCount": 5
+    },
+    "s1t05": {
+      "title": "They Love Each Other",
+      "activeOverlays": [
+        "SongTitle",
+        "FilmGrain",
+        "LavaLamp",
+        "RoseGarden",
+        "PhilZone",
+        "MoireInterference"
+      ],
+      "totalCount": 6
+    },
+    "s1t06": {
+      "title": "Jack Straw",
+      "activeOverlays": [
+        "SongTitle",
+        "FilmGrain",
+        "CrowdDance",
+        "StainedGlass",
+        "BassWaveform",
+        "MoirePattern"
+      ],
+      "totalCount": 6
+    },
+    "s1t07": {
+      "title": "Deal",
+      "activeOverlays": [
+        "SongTitle",
+        "FilmGrain",
+        "GlowSticks",
+        "DarkStarPortal",
+        "EmberRise"
+      ],
+      "totalCount": 5
+    },
+    "s1t08": {
+      "title": "Lazy Lightnin'",
+      "activeOverlays": [
+        "SongTitle",
+        "FilmGrain",
+        "LighterWave",
+        "RoseOverlay",
+        "PhilZone",
+        "VortexSpiral"
+      ],
+      "totalCount": 6
+    },
+    "s1t09": {
+      "title": "Supplication",
+      "activeOverlays": [
+        "SongTitle",
+        "FilmGrain",
+        "LavaLamp",
+        "RoseGarden",
+        "BassWaveform",
+        "BatikPattern"
+      ],
+      "totalCount": 6
+    },
+    "s1t10": {
+      "title": "Brown Eyed Women",
+      "activeOverlays": [
+        "SongTitle",
+        "FilmGrain",
+        "CosmicStarfield",
+        "StealYourFaceKaleidoscope",
+        "EmberRise"
+      ],
+      "totalCount": 5
+    },
+    "s1t11": {
+      "title": "Mama Tried",
+      "activeOverlays": [
+        "SongTitle",
+        "FilmGrain",
+        "TieDyeWash",
+        "MandalaGenerator",
+        "PhilZone",
+        "MoireInterference"
+      ],
+      "totalCount": 6
+    },
+    "s1t12": {
+      "title": "Row Jimmy",
+      "activeOverlays": [
+        "SongTitle",
+        "FilmGrain",
+        "LighterWave",
+        "DarkStarPortal",
+        "BassWaveform"
+      ],
+      "totalCount": 5
+    },
+    "s1t13": {
+      "title": "Dancin' in the Street",
+      "activeOverlays": [
+        "SongTitle",
+        "FilmGrain",
+        "BearParade",
+        "LaserShow",
+        "LavaLamp"
+      ],
+      "totalCount": 5
+    },
+    "s2t02": {
+      "title": "Scarlet Begonias",
+      "activeOverlays": [
+        "SongTitle",
+        "FilmGrain",
+        "EmberRise",
+        "ThirteenPointBolt",
+        "RainDrops"
+      ],
+      "totalCount": 5
+    },
+    "s2t03": {
+      "title": "Fire on the Mountain",
+      "activeOverlays": [
+        "SongTitle",
+        "FilmGrain",
+        "EmberRise",
+        "ThirteenPointBolt",
+        "GlowSticks"
+      ],
+      "totalCount": 5
+    },
+    "s2t04": {
+      "title": "Estimated Prophet",
+      "activeOverlays": [
+        "SongTitle",
+        "FilmGrain",
+        "SacredGeometry",
+        "CosmicStarfield",
+        "DarkStarPortal"
+      ],
+      "totalCount": 5
+    },
+    "s2t05": {
+      "title": "St. Stephen",
+      "activeOverlays": [
+        "SongTitle",
+        "FilmGrain",
+        "StealYourFaceOff",
+        "LightningBoltOverlay",
+        "ThirteenPointBolt"
+      ],
+      "totalCount": 5
+    },
+    "s2t06": {
+      "title": "Not Fade Away",
+      "activeOverlays": [
+        "SongTitle",
+        "FilmGrain",
+        "WallOfSound",
+        "BearParade",
+        "LighterWave"
+      ],
+      "totalCount": 5
+    },
+    "s2t07": {
+      "title": "Drums / Space",
+      "activeOverlays": [
+        "SongTitle",
+        "FilmGrain",
+        "DarkStarPortal",
+        "SacredGeometry",
+        "CosmicStarfield"
+      ],
+      "totalCount": 5
+    },
+    "s2t08": {
+      "title": "Morning Dew",
+      "activeOverlays": [
+        "SongTitle",
+        "FilmGrain",
+        "DarkStarPortal",
+        "BreathingStealie",
+        "SacredGeometry"
+      ],
+      "totalCount": 5
+    },
+    "s2t09": {
+      "title": "One More Saturday Night",
+      "activeOverlays": [
+        "SongTitle",
+        "FilmGrain",
+        "BearParade",
+        "ParticleExplosion",
+        "LaserShow"
+      ],
+      "totalCount": 5
+    }
+  }
+}

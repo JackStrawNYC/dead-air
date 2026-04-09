@@ -1,0 +1,194 @@
+{
+  "showDate": "1977-05-08",
+  "tourContext": "The final night of a legendary spring tour that cemented 1977 as the Dead's peak year. The band arrived at Cornell riding a wave of inspired performances across the Northeast.",
+  "setNarration": {
+    "set1Intro": "Set I opens with Bobby Weir commanding the stage — a tight, driving first set that builds toward the explosive Dancin' in the Street closer.",
+    "set2Intro": "Set II is the masterpiece. Scarlet > Fire, Estimated Prophet, St. Stephen > Not Fade Away > Drums/Space > Morning Dew — a journey from celebration into the cosmos and back.",
+    "encoreIntro": "One More Saturday Night sends them home with a roar."
+  },
+  "songs": {
+    "s1t02": {
+      "listenFor": [
+        "Weir's growling vocal confidence — he owns this stage",
+        "Billy's snare hits pushing the tempo forward"
+      ],
+      "context": "Standard Weir opener for '77, but listen to the energy — they know tonight is special.",
+      "songHistory": "Played 318 times between 1966-1995"
+    },
+    "s1t03": {
+      "listenFor": [
+        "Garcia's voice straining on 'I just can't stand to lose' — pure conviction",
+        "The way the final solo builds from whisper to cry"
+      ],
+      "context": "Garcia's gambler's lament, often a second-set vehicle — placed early here, setting a contemplative tone.",
+      "songHistory": "Played 427 times between 1971-1995"
+    },
+    "s1t04": {
+      "listenFor": [
+        "Garcia's grin is audible in the phrasing",
+        "Donna's harmonies lock in perfectly"
+      ],
+      "context": "Marty Robbins' border ballad, a Dead staple since 1969. Compact and punchy — a palate cleanser.",
+      "songHistory": "Played 233 times between 1969-1995"
+    },
+    "s1t05": {
+      "listenFor": [
+        "Phil's bass weaving underneath — he's leading the dance",
+        "The instrumental break where all five find a groove pocket"
+      ],
+      "context": "A love song from the Garcia/Hunter canon, usually bright and bouncy. Tonight it shimmers.",
+      "songHistory": "Played 332 times between 1973-1995"
+    },
+    "s1t06": {
+      "listenFor": [
+        "The Weir/Garcia vocal tradeoff — razor-sharp tonight",
+        "Keith Godchaux's piano fills during the bridge"
+      ],
+      "context": "The great outlaw duet. Weir and Garcia trading verses about running from the law.",
+      "songHistory": "Played 477 times between 1971-1995"
+    },
+    "s1t07": {
+      "listenFor": [
+        "Garcia's soaring final solo — pure energy release",
+        "The way the band locks into the 'round and round' vamp"
+      ],
+      "context": "A crowd-pleasing Garcia vehicle. 'Don't you let that deal go down.'",
+      "songHistory": "Played 423 times between 1972-1995"
+    },
+    "s1t08": {
+      "listenFor": [
+        "The Weir/Garcia interplay tightening before the segue",
+        "Kreutzmann's ride cymbal work — precision at speed"
+      ],
+      "context": "Always paired with Supplication. The electric buildup before the release.",
+      "songHistory": "Played 90 times between 1976-1983"
+    },
+    "s1t10": {
+      "listenFor": [
+        "Garcia's vocal catch on 'gone are the days' — autobiography in real time",
+        "The warmth of Keith's piano in the chorus"
+      ],
+      "context": "One of Garcia's greatest narrative songs — Appalachian storytelling meets cosmic guitar.",
+      "songHistory": "Played 347 times between 1972-1995"
+    },
+    "s1t11": {
+      "listenFor": [
+        "Weir's dead-simple country vocal — no tricks, just feel",
+        "The tempo discipline — not a note wasted"
+      ],
+      "context": "Merle Haggard's country classic. The Dead play it straight — a rare breath of simplicity.",
+      "songHistory": "Played 266 times between 1969-1995"
+    },
+    "s1t12": {
+      "listenFor": [
+        "Garcia's guitar tone — liquid honey, the classic '77 sound",
+        "How the jam section builds patiently, never forcing the peak"
+      ],
+      "context": "A meditation on loss and memory. One of the most beautiful Garcia/Hunter compositions.",
+      "songHistory": "Played 336 times between 1973-1995"
+    },
+    "s1t13": {
+      "listenFor": [
+        "The explosive jam at the 5-minute mark",
+        "Phil's bass driving the energy higher and higher",
+        "The crowd energy feeding back into the band"
+      ],
+      "context": "Martha and the Vandellas' hit becomes a 15-minute psychedelic workout. A classic set-closer.",
+      "songHistory": "Played 235 times between 1965-1995"
+    },
+    "s2t02": {
+      "listenFor": [
+        "Garcia's opening riff — iconic, recognized within three notes",
+        "The jam building toward the Fire on the Mountain transition",
+        "Phil's thundering bass during the peak"
+      ],
+      "context": "The opening move of the greatest Scarlet > Fire ever played. The energy is immediately transcendent.",
+      "songHistory": "Played 316 times between 1974-1995"
+    },
+    "s2t03": {
+      "listenFor": [
+        "The rhythmic foundation — Billy and Mickey locked in a groove that could last forever",
+        "Garcia's sustained notes during the climax — screaming with joy",
+        "The segue texture dissolving into Estimated Prophet"
+      ],
+      "context": "Born from the Scarlet jam, this Fire burns hotter than any other. The definitive version.",
+      "songHistory": "Played 274 times between 1977-1995"
+    },
+    "s2t04": {
+      "listenFor": [
+        "Weir's apocalyptic vocal intensity",
+        "The 7/4 time signature groove — hypnotic and relentless",
+        "The jam section where reality starts to bend"
+      ],
+      "context": "Weir's prophet channeling divine madness. New in '77, already fully formed and terrifying.",
+      "songHistory": "Played 389 times between 1977-1995"
+    },
+    "s2t05": {
+      "listenFor": [
+        "The driving riff — one of rock's most urgent compositions",
+        "Garcia and Weir's intertwined guitars during the 'answer me' section",
+        "The crowd's visceral reaction to the opening notes"
+      ],
+      "context": "A rare 1977 St. Stephen — revived after years of absence. The crowd goes electric.",
+      "songHistory": "Played 248 times between 1968-1983"
+    },
+    "s2t06": {
+      "listenFor": [
+        "The Buddy Holly groove reimagined as cosmic pulse",
+        "The jam building and dissolving into Drums",
+        "Phil's bass bombs during the transition"
+      ],
+      "context": "Buddy Holly meets the Dead's psychedelic engine. The launch pad into Drums/Space.",
+      "songHistory": "Played 593 times between 1969-1995"
+    },
+    "s2t08": {
+      "listenFor": [
+        "Garcia's voice breaking on 'walk me out in the morning dew'",
+        "The devastating final guitar solo — possibly Garcia's greatest moment",
+        "The silence before the last verse — the crowd holding its breath"
+      ],
+      "context": "The emotional peak of the entire show. This Morning Dew is often cited as the greatest single Dead performance ever recorded.",
+      "songHistory": "Played 244 times between 1966-1995"
+    },
+    "s2t09": {
+      "listenFor": [
+        "Weir's party energy — pure celebration",
+        "The crowd singing along"
+      ],
+      "context": "The joyful encore. After the emotional devastation of Morning Dew, Bobby brings everyone back to earth.",
+      "songHistory": "Played 530 times between 1971-1995"
+    }
+  },
+  "fanReviews": [
+    {
+      "text": "This is the greatest Grateful Dead show ever recorded. The Scarlet > Fire alone is worth the price of admission, but the Morning Dew... there are no words.",
+      "reviewer": "deadhead77",
+      "stars": 5
+    },
+    {
+      "text": "I was there. Barton Hall was shaking. When Garcia hit that final note in Morning Dew, I thought the roof would come off.",
+      "reviewer": "cornellkid",
+      "stars": 5
+    },
+    {
+      "text": "The sound quality is pristine — Betty Cantor's board tape captures every nuance. You can hear Keith's piano perfectly in the mix.",
+      "reviewer": "tapehead_mike",
+      "stars": 5
+    },
+    {
+      "text": "St. Stephen into Not Fade Away is absolute fire. The band is operating on another level entirely. Every musician locked in.",
+      "reviewer": "psychedelicpete",
+      "stars": 5
+    },
+    {
+      "text": "I've listened to over 500 Dead shows. This one stands alone. The setlist, the energy, the playing — it's the total package.",
+      "reviewer": "archivejunkie",
+      "stars": 5
+    },
+    {
+      "text": "The transition from Space into Morning Dew is the most beautiful moment in the Dead's catalog. Garcia reaches somewhere beyond technique into pure emotion.",
+      "reviewer": "jerry_lives",
+      "stars": 5
+    }
+  ]
+}
