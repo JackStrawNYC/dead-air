@@ -2,7 +2,7 @@
   "date": "1972-08-27",
   "venue": "Old Renaissance Faire Grounds, Veneta, OR",
   "bandName": "Grateful Dead",
-  "taperInfo": "SBD > Pacific High Studios Master > CD — Sunshine Daydream",
+  "taperInfo": "SBD > Pacific High Studios Master > CD \u2014 Sunshine Daydream",
   "era": "primal",
   "venueType": "festival",
   "songs": [
@@ -713,19 +713,19 @@
         },
         {
           "sectionIndex": 2,
-          "mode": "volumetric_nebula"
+          "mode": "protean_clouds"
         },
         {
           "sectionIndex": 3,
-          "mode": "volumetric_nebula"
+          "mode": "protean_clouds"
         },
         {
           "sectionIndex": 4,
-          "mode": "cosmic_voyage"
+          "mode": "protean_clouds"
         },
         {
           "sectionIndex": 5,
-          "mode": "cosmic_voyage"
+          "mode": "protean_clouds"
         },
         {
           "sectionIndex": 6,
@@ -1111,11 +1111,11 @@
         },
         {
           "sectionIndex": 4,
-          "mode": "cosmic_voyage"
+          "mode": "protean_clouds"
         },
         {
           "sectionIndex": 5,
-          "mode": "cosmic_voyage"
+          "mode": "protean_clouds"
         },
         {
           "sectionIndex": 6,
@@ -1127,11 +1127,11 @@
         },
         {
           "sectionIndex": 8,
-          "mode": "volumetric_nebula"
+          "mode": "protean_clouds"
         },
         {
           "sectionIndex": 9,
-          "mode": "volumetric_nebula"
+          "mode": "protean_clouds"
         },
         {
           "sectionIndex": 10,

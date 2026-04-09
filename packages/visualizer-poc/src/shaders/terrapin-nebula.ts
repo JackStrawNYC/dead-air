@@ -468,11 +468,11 @@ void main() {
   }
 
   // ─────────────────────────────────────────────────────────────────
-  // TERRAPIN NEBULA REWRITE (procedural)
-  // The original volumetric raymarcher was producing near-zero col values
-  // for almost every pixel, so the entire frame collapsed to a uniform
-  // cream color after post-process. Replaced with a layered FBM nebula in
-  // screen space — visibly bright, palette-tinted, and audio-reactive.
+  // TERRAPIN NEBULA REWRITE v2 (procedural — toned down)
+  // v1 used 0.85-saturation HSV pure colors which produced an oversaturated
+  // magenta/green mess at low/mid energy. v2 uses muted desaturated cosmic
+  // tones (deep blue, soft purple, warm gold) and lets the audio energy
+  // gradually pull the saturation up — never fully neon.
   // ─────────────────────────────────────────────────────────────────
   {
     float t = uTime * 0.04 + uMusicalTime * 0.02;
@@ -482,44 +482,44 @@ void main() {
     float n1 = fbm3(vec3(q * 0.9, t)) * 0.55 + 0.5;
     float n2 = fbm3(vec3(q * 1.8 + 5.0, t * 0.6)) * 0.5 + 0.5;
     float n3 = fbm3(vec3(q * 3.4 + 17.0, t * 0.4)) * 0.45 + 0.5;
-    float density = pow(n1 * 0.6 + n2 * 0.3 + n3 * 0.15, 1.35);
-    density = clamp(density * (0.85 + energy * 0.5 + bass * 0.3), 0.0, 1.4);
+    float density = pow(n1 * 0.6 + n2 * 0.3 + n3 * 0.15, 1.4);
+    density = clamp(density * (0.65 + energy * 0.35), 0.0, 1.0);
 
-    // Pitch + tension drive a slow color wander between palette poles
-    vec3 emerald = hsv2rgb(vec3(0.32 + uChromaHue * 0.1, 0.85, 0.95));
-    vec3 violet  = hsv2rgb(vec3(0.78 + uChromaHue * 0.05, 0.85, 0.95));
-    vec3 gold    = hsv2rgb(vec3(0.12, 0.75, 1.0));
+    // Cosmic palette — deep, desaturated tones that survive post-process
+    // without going neon. Saturation lifts with energy.
+    float satE = 0.30 + energy * 0.25;
+    vec3 deepBlue   = vec3(0.10, 0.16, 0.32) + vec3(0.05, 0.10, 0.20) * satE;
+    vec3 softPurple = vec3(0.22, 0.14, 0.30) + vec3(0.12, 0.05, 0.15) * satE;
+    vec3 warmGold   = vec3(0.32, 0.22, 0.10) + vec3(0.20, 0.12, 0.05) * satE;
 
-    float colorMix = sin(t * 2.0 + n2 * 6.28) * 0.5 + 0.5;
-    vec3 nebulaCol = mix(emerald, violet, colorMix);
-    nebulaCol = mix(nebulaCol, gold, smoothstep(0.7, 1.1, density) * 0.6);
+    float colorMix = sin(t * 1.5 + n2 * 4.0) * 0.5 + 0.5;
+    vec3 nebulaCol = mix(deepBlue, softPurple, colorMix);
+    nebulaCol = mix(nebulaCol, warmGold, smoothstep(0.55, 0.95, density) * 0.4);
 
-    // Bright cores where density peaks
-    float cores = smoothstep(0.65, 1.05, density);
-    nebulaCol += vec3(1.1, 0.95, 0.7) * cores * 0.55;
+    // Bright cores where density peaks — cream-white, never neon
+    float cores = smoothstep(0.70, 0.95, density);
+    nebulaCol += vec3(0.45, 0.40, 0.30) * cores * 0.6;
 
-    // Palette tint from song palette (warm bias for d2t02 = orange/blue)
-    vec3 palCol1 = paletteHueColor(uPalettePrimary, 0.85, 1.0);
-    vec3 palCol2 = paletteHueColor(uPaletteSecondary, 0.85, 1.0);
-    nebulaCol = mix(nebulaCol, palCol1, 0.18);
-    nebulaCol = mix(nebulaCol, nebulaCol * palCol2 * 1.3, 0.22);
+    // Subtle palette tint from the song palette (lower than v1)
+    vec3 palCol1 = paletteHueColor(uPalettePrimary, 0.55, 0.7);
+    nebulaCol = mix(nebulaCol, nebulaCol * palCol1 * 1.4, 0.18);
 
-    col = nebulaCol * (0.55 + density * 0.55);
+    col = nebulaCol * (0.50 + density * 0.45);
 
     // Stars sprinkled on top
     float starN = fract(sin(dot(floor(p * 80.0), vec2(127.1, 311.7))) * 43758.5453);
     if (starN > 0.985) {
-      col += vec3(1.0, 0.95, 0.85) * (starN - 0.985) * 60.0;
+      col += vec3(0.85, 0.82, 0.75) * (starN - 0.985) * 35.0;
     }
 
     // Climax burst from center
     if (climaxBoost > 0.05) {
       float burst = exp(-length(p) * 1.6) * climaxBoost;
-      col += vec3(1.0, 0.92, 0.7) * burst * 0.7;
+      col += vec3(0.7, 0.6, 0.45) * burst * 0.6;
     }
 
     // Vocal warmth lift
-    col *= 1.0 + vocalEn * 0.18;
+    col *= 1.0 + vocalEn * 0.12;
   }
 
   // === POST PROCESS ===
