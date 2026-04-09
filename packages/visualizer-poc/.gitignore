@@ -1,3 +1,6 @@
+# Ignore generated/large data files but track checked-in config + show metadata.
+# The root .gitignore has `data/` which blocks the whole directory; the unignore
+# rules below explicitly allow the small/curated files we actually edit.
 data/*.json
 out/
 build/
@@ -9,3 +12,38 @@ public/audio/
 
 # Override root-level data/ ignore for source TypeScript files
 !src/data/
+
+# Curated config files we DO want tracked (small, hand-edited):
+!data/
+!data/setlist.json
+!data/setlist-cornell.json
+!data/milestones.json
+!data/song-identities.json
+!data/song-stats.json
+!data/scene-registry.json
+!data/overlay-names.json
+!data/overlay-schedule.json
+!data/lyric-triggers.json
+!data/image-library.json
+!data/narration.json
+
+# Show-specific config files. We unignore specific files rather than the
+# whole tree because per-track analysis JSONs inside data/shows/<id>/tracks/
+# are 9MB+ each and must stay ignored.
+!data/shows/
+!data/shows/*/
+!data/shows/*/setlist.json
+!data/shows/*/show-context.json
+!data/shows/*/show-timeline.json
+
+# Still ignore the bulky generated stuff inside data/.
+# Use /** suffixes so the rules recurse into the unignored data/ tree
+# (without /** the directory pattern alone doesn't propagate to files
+# once `!data/` has re-included the parent).
+data/morning-dew-analysis.json
+data/narrative-states.json
+data/setlist.json.backup-*
+data/lyrics/**
+data/tracks/**
+data/tracks-cornell/**
+data/shows/*/tracks/**
