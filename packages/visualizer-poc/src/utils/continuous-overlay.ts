@@ -186,6 +186,13 @@ const ENERGY_BAND_AFFINITY: Record<string, Record<string, number>> = {
 /** Cache: overlay name → derived affinity. Filled lazily on first lookup. */
 const DERIVED_AFFINITY_CACHE = new Map<string, Record<string, number>>();
 
+/** Cache: frames array → snap frame array. Avoids recomputing the O(n × lookback)
+ *  scan on every frame — the snap array is immutable for a given frames array. */
+const SNAP_ARRAY_CACHE = new WeakMap<EnhancedFrameData[], number[]>();
+
+/** Cache: frames array → beat array. Same rationale as snap cache. */
+const BEAT_ARRAY_CACHE = new WeakMap<EnhancedFrameData[], number[]>();
+
 /**
  * Compute the audio affinity dictionary for an overlay from its metadata.
  * Sums category base + half-weight tag contributions + energy band.
@@ -675,7 +682,11 @@ export function computeContinuousOverlays(
   // phrase boundaries instead of an arbitrary 0.5s clock — overlays settle for
   // the duration of a musical phrase rather than ticking on wall-clock.
   // Falls back to frame-based epochs when beat data is sparse (silence, drones).
-  const beatArray = buildBeatArray(frames);
+  const beatArray = BEAT_ARRAY_CACHE.get(frames) ?? (() => {
+    const arr = buildBeatArray(frames);
+    BEAT_ARRAY_CACHE.set(frames, arr);
+    return arr;
+  })();
   const tempo = audioSnapshot.localTempo || 120;
   function beatEpoch(idx: number): number {
     // Binary search: count beats with index <= idx
@@ -703,7 +714,12 @@ export function computeContinuousOverlays(
   // phrase. The snap count is monotonic and only advances on snap frames, so
   // it's deterministic and stable. Combined with the existing inertia bonus,
   // this gives "settles on phrases, snaps on big musical events" behavior.
-  const snapArray = buildSnapFrameArray(frames);
+  // Cache per frames array — avoids O(n × lookback) recomputation every frame
+  let snapArray = SNAP_ARRAY_CACHE.get(frames);
+  if (!snapArray) {
+    snapArray = buildSnapFrameArray(frames);
+    SNAP_ARRAY_CACHE.set(frames, snapArray);
+  }
   const fullEpoch = (idx: number) => beatEpoch(idx) + snapCountUpTo(snapArray, idx);
   const jitterEpoch = fullEpoch(frameIdx);
   const rng = seededRandom(trackHash + jitterEpoch * 7);

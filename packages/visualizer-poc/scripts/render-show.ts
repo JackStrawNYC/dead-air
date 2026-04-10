@@ -65,8 +65,14 @@ const PRESETS: Record<string, RenderPreset> = {
 const args = process.argv.slice(2);
 const resume = args.includes("--resume");
 const draftMode = args.includes("--draft");
-const glArg = args.find((a) => a.startsWith("--gl="))?.split("=")[1] ?? "angle";
-const chunkSize = parseInt(args.find((a) => a.startsWith("--chunk="))?.split("=")[1] ?? "3000", 10);
+// Auto-detect GL backend: EGL is the native Linux GPU path (more stable in Docker
+// than ANGLE which is a translation layer). ANGLE remains the default on macOS.
+const glArg = args.find((a) => a.startsWith("--gl="))?.split("=")[1]
+  ?? (process.platform === "linux" ? "egl" : "angle");
+// Default chunk size 1200 (was 3000). Smaller chunks reduce GPU memory accumulation
+// between Chrome process restarts. Each chunk gets a fresh Chrome instance; GPU driver
+// leaks from ANGLE/EGL contexts accumulate linearly, so smaller chunks = less pressure.
+const chunkSize = parseInt(args.find((a) => a.startsWith("--chunk="))?.split("=")[1] ?? "1200", 10);
 const trackFilter = args.find((a) => a.startsWith("--track="))?.split("=")[1];
 const previewMode = args.includes("--preview");
 const showDateArg = args.find((a) => a.startsWith("--show-date="))?.split("=")[1];
@@ -312,10 +318,27 @@ function execWithRetry(cmd: string, opts: { cwd: string; stdio: "inherit" | "pip
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
       execSync(cmd, opts);
+
+      // ─── GPU cleanup between chunks ───
+      // Chrome's GPU process doesn't fully release ANGLE/EGL WebGL contexts
+      // on exit. On Vast.ai Docker instances, this causes chunk 2+ to crash
+      // with "Target closed" because GPU memory accumulates linearly across
+      // chunk invocations. Explicitly kill stray Chrome procs, wait for file
+      // descriptors to close, and drop kernel caches.
+      if (process.platform === "linux") {
+        try { execSync("pkill -9 -f 'chrome-headless' 2>/dev/null || true", { stdio: "ignore" }); } catch {}
+        try { execSync("sleep 3", { stdio: "ignore" }); } catch {}
+        try { execSync("sync && echo 3 > /proc/sys/vm/drop_caches 2>/dev/null || true", { stdio: "ignore" }); } catch {}
+      }
+
       return; // success
     } catch (err: any) {
       const errorMsg = err.stderr?.toString().slice(-500) || err.message || "Unknown error";
       console.error(`  RENDER FAILED (attempt ${attempt}/${MAX_RETRIES}) [${label}]: ${errorMsg}`);
+
+      // Kill stray Chrome processes before retry
+      try { execSync("pkill -9 -f 'chrome-headless' 2>/dev/null || true", { stdio: "ignore" }); } catch {}
+      try { execSync("sleep 3", { stdio: "ignore" }); } catch {}
 
       if (attempt < MAX_RETRIES) {
         const waitMs = RETRY_BACKOFF_MS[attempt - 1];
