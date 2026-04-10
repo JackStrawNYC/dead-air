@@ -220,7 +220,7 @@ export const FullscreenQuad: React.FC<Props> = ({
   // Hardcoded to 2 — gives us a reliable 4x shader speedup without per-bundle env-var
   // fragility. Bump to 3 if you need an even faster render at the cost of more
   // shader softness.
-  const SHADER_DOWNSCALE = 1;
+  const SHADER_DOWNSCALE = 2;
   const shaderWidth = Math.max(1, Math.round(width / SHADER_DOWNSCALE));
   const shaderHeight = Math.max(1, Math.round(height / SHADER_DOWNSCALE));
 
