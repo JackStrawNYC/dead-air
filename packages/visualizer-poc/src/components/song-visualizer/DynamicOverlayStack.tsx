@@ -222,11 +222,7 @@ export const DynamicOverlayStack: React.FC<Props> = ({
             opacity: gateOpacity,
             pointerEvents: "none",
             mixBlendMode: "screen",
-            filter: [
-              breathFilter,
-              energyHueClamp !== 0 ? `hue-rotate(${energyHueClamp.toFixed(1)}deg)` : "",
-              desatFilter ?? "",
-            ].filter(Boolean).join(" "),
+            filter: desatFilter,
             contain: "layout style paint",
           }}
         >
@@ -259,12 +255,7 @@ export const DynamicOverlayStack: React.FC<Props> = ({
           inset: 0,
           opacity: gateOpacity,
           filter: [
-            breathFilter,
-            // Combine palette-driven segue rotation with slow audio drift.
-            // Both are degrees and additive, applied as a single hue-rotate.
-            (hueRotation + energyHueClamp) !== 0
-              ? `hue-rotate(${(hueRotation + energyHueClamp).toFixed(1)}deg)`
-              : "",
+            hueRotation !== 0 ? `hue-rotate(${hueRotation.toFixed(1)}deg)` : "",
             desatFilter ?? "",
           ].filter(Boolean).join(" ") || undefined,
           contain: "layout style paint",
