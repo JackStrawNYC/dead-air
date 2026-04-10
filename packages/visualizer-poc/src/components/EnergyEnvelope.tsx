@@ -60,14 +60,16 @@ export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod,
     dsHueOffset = 12;       // warmth shift
   }
 
-  // CALM MODE FIX: dead air now dims SHADER aggressively (was 15%, now 85%).
-  // When music ends and crowd is talking/tuning, shaders should go nearly DARK.
-  // Floor lowered from 0.75 to 0.05 to allow real darkness during dead air.
+  // Dead air dims the shader so applause/tuning is visually quiet. 60% dimming
+  // keeps the shader perceptibly alive during quiet songs like Goodnight (which
+  // reads as dead air regardless of threshold because RMS is genuinely ~0.05).
+  // 85% was tested and found too aggressive — Goodnight went to 5% brightness
+  // which is effectively invisible. 60% → floor of ~30% brightness.
   const baseBrightness = deadAirFactor > 0.5
     ? brightness  // no minimum floor during heavy dead air
     : Math.max(0.75, brightness);
   const finalBrightness = deadAirFactor > 0
-    ? Math.max(0.05, baseBrightness * (1 - deadAirFactor * 0.85))
+    ? Math.max(0.15, baseBrightness * (1 - deadAirFactor * 0.60))
     : baseBrightness;
 
   // Palette sovereignty: only drums/space hue + dead air warmth

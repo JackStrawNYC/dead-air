@@ -12,12 +12,14 @@
 
 import type { EnhancedFrameData } from "../data/types";
 
-// CALM MODE: Bumped threshold from 0.10 to 0.18 — crowd applause and band tuning
-// produce RMS ~0.10-0.15, which previously read as "still music". Now we treat
-// anything below 0.18 sustained for 3s as dead air, so shaders dim properly.
-const MUSIC_THRESHOLD = 0.18; // Smoothed RMS above this = actual music
+// CALM MODE: Threshold raised from 0.10 to 0.12 so pure crowd applause
+// (~0.10-0.11 RMS) is treated as dead air, but quiet musical playing
+// (~0.14+ RMS for vocals, ~0.12+ for quiet guitar) isn't. 0.18 was tested
+// and found too aggressive — Bird Song went dark at 3 seconds, Dark Star
+// lost its last 11 minutes.
+const MUSIC_THRESHOLD = 0.12; // Smoothed RMS above this = actual music
 const SMOOTH_WINDOW = 90;     // 3 seconds at 30fps
-const MIN_TAIL_GAP = 180;     // 6 seconds to confirm song is over (was 10s)
+const MIN_TAIL_GAP = 240;     // 8 seconds to confirm song is over
 
 /**
  * Detect where the music actually ends.
