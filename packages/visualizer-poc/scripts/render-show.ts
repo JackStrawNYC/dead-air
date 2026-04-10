@@ -58,7 +58,7 @@ const PRESETS: Record<string, RenderPreset> = {
   draft:   { width: 1280, height: 720,  concurrency: 6, skipGrain: true,  skipBloom: true,  label: "Draft (720p, no grain/bloom)" },
   preview: { width: 1920, height: 1080, concurrency: 4, skipGrain: false, skipBloom: false, label: "Preview (1080p, full quality)" },
   final:   { width: 1920, height: 1080, concurrency: 3, skipGrain: false, skipBloom: false, label: "Final (1080p, full quality, max fidelity)" },
-  "4k":    { width: 3840, height: 2160, concurrency: 4, skipGrain: false, skipBloom: false, label: "4K (2160p, full quality)" },
+  "4k":    { width: 3840, height: 2160, concurrency: 6, skipGrain: false, skipBloom: false, label: "4K (2160p, full quality)" },
 };
 
 // Parse args
