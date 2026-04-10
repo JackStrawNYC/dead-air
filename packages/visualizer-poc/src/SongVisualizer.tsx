@@ -92,6 +92,7 @@ import { computeAfterJamQuality } from "./utils/after-jam-quality";
 import { computeCrowdEnergy } from "./utils/crowd-energy";
 import { computeStemCharacter } from "./utils/stem-character";
 import { TimeDilationProvider } from "./data/TimeDilationContext";
+import { DeadAirProvider } from "./data/DeadAirContext";
 import { computeReactiveTriggers } from "./utils/reactive-triggers";
 import { IconOverlayProvider } from "./data/IconOverlayContext";
 import { buildIconSchedule, getIconForFrame } from "./utils/icon-overlay-manager";
@@ -825,6 +826,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
       <HeroPermittedProvider permitted={narrativeDirective.heroPermitted}>
       <JamPhaseProvider value={{ phase: jamEvolution.isLongJam ? JAM_PHASE_INDEX[jamEvolution.phase] : -1, progress: jamEvolution.phaseProgress }}>
       <PeakOfShowProvider value={peakOfShow.intensity}>
+      <DeadAirProvider value={deadAirFactor}>
       <TimeDilationProvider value={spaceTimeDilation}>
       <VisualizerErrorBoundary>
       <div style={{ position: "absolute", inset: 0, opacity }}>
@@ -982,6 +984,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
       </div>
       </VisualizerErrorBoundary>
       </TimeDilationProvider>
+      </DeadAirProvider>
       </PeakOfShowProvider>
       </JamPhaseProvider>
       </HeroPermittedProvider>

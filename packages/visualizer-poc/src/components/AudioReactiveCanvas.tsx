@@ -18,6 +18,7 @@ import { useHeroPermitted } from "../data/HeroPermittedContext";
 import { useJamPhase } from "../data/JamPhaseContext";
 import { usePeakOfShow } from "../data/PeakOfShowContext";
 import { useTimeDilation } from "../data/TimeDilationContext";
+import { useDeadAirFactor } from "../data/DeadAirContext";
 
 /** Audio data context passed to all Three.js children */
 export interface AudioDataContext {
@@ -445,6 +446,7 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
   const jamPhaseCtx = useJamPhase();
   const peakOfShowIntensity = usePeakOfShow();
   const spaceTimeDilation = useTimeDilation();
+  const deadAirFactorCtx = useDeadAirFactor();
   const heroIcon = heroPermitted !== false
     ? computeHeroIconState(climaxPhaseNum, climaxState.intensity)
     : { trigger: 0, progress: 0 };
@@ -573,10 +575,12 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
         ? computeMusicalTimeUtil(beatArray, idx, fps, tempo ?? 120) / (tempo ?? 120) * 60
         : (dynamicTimeLookup[idx] ?? (idx / fps));
       const fluxMult = 1.0 + Math.min(0.04, spectralFlux * 0.1);
-      // Removed the old `* 0.4` global slowdown. dynamicTimeLookup now returns
-      // 65%-140% of natural rate which gives the chill-but-moving feel without
-      // freezing into slow-motion. Climax/space modulators still scale on top.
-      return baseDT * climaxSpeedMult * fluxMult * spaceTimeDilation;
+      // Dead air slowdown: when music ends and crowd noise is playing, slow the
+      // shader clock to 5% of normal so cosmic_dust (the dead-air shader) barely
+      // drifts — reads as "between songs" screensaver, not "music is playing."
+      // The 5% floor keeps a gentle drift so the visual doesn't fully freeze.
+      const deadAirMult = 1 - deadAirFactorCtx * 0.95;
+      return baseDT * climaxSpeedMult * fluxMult * spaceTimeDilation * deadAirMult;
     })(),
     jamPhase: jamPhaseCtx.phase,
     jamProgress: jamPhaseCtx.progress,

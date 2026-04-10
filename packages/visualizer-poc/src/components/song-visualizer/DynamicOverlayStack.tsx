@@ -98,9 +98,11 @@ export const DynamicOverlayStack: React.FC<Props> = ({
   // Compute opacities and apply hard cap on concurrent overlays
   // DEAD AIR: drop the overlay cap aggressively as music ends. Crowd noise should
   // be visually QUIET — no fireflies-and-neural-web swarms during applause.
+  // At full dead air (>0.8): 0 rotation overlays, only always-active (SongTitle,
+  // FilmGrain) remain. Ramps from full count → 0 as deadAirFactor rises.
   const baseMaxConcurrent = MAX_CONCURRENT[energyLevel] ?? 4;
-  const maxConcurrent = deadAirFactor > 0.5 ? 1
-    : deadAirFactor > 0.1 ? Math.max(1, Math.floor(baseMaxConcurrent * (1 - deadAirFactor)))
+  const maxConcurrent = deadAirFactor > 0.8 ? 0
+    : deadAirFactor > 0.3 ? Math.max(0, Math.floor(baseMaxConcurrent * (1 - deadAirFactor * 1.2)))
     : baseMaxConcurrent;
   const inversionMult = 1 - counterpointOverlayInversion;
   // Overlay visibility: allow overlays to go subtle when suppressed.
