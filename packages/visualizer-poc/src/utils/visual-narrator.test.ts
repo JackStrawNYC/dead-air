@@ -112,6 +112,155 @@ describe("computeNarrativeDirective", () => {
     expect(result.saturationOffset).toBeGreaterThan(0);
   });
 
+  // ── Camera path recommendation tests ──
+
+  it("space section → crane camera path", () => {
+    const ctx: NarrativeContext = {
+      setNumber: 2,
+      setProgress: 0.5,
+      energy: 0.1,
+      sectionType: "space",
+      songProgress: 0.5,
+    };
+    const result = computeNarrativeDirective(ctx);
+    expect(result.cameraPath).toBe("crane");
+  });
+
+  it("chorus → orbital camera path", () => {
+    const ctx: NarrativeContext = {
+      setNumber: 2,
+      setProgress: 0.5,
+      energy: 0.4,
+      sectionType: "chorus",
+      songProgress: 0.5,
+    };
+    const result = computeNarrativeDirective(ctx);
+    expect(result.cameraPath).toBe("orbital");
+  });
+
+  it("jam with rising energy → spiral_in camera path", () => {
+    const ctx: NarrativeContext = {
+      setNumber: 2,
+      setProgress: 0.5,
+      energy: 0.5,
+      sectionType: "jam",
+      songProgress: 0.5,
+    };
+    const result = computeNarrativeDirective(ctx);
+    expect(result.cameraPath).toBe("spiral_in");
+  });
+
+  it("climax (climaxPhase >= 2) → dolly camera path overrides section", () => {
+    const ctx: NarrativeContext = {
+      setNumber: 2,
+      setProgress: 0.5,
+      energy: 0.8,
+      sectionType: "verse",
+      climaxPhase: 2,
+      songProgress: 0.5,
+    };
+    const result = computeNarrativeDirective(ctx);
+    expect(result.cameraPath).toBe("dolly");
+  });
+
+  it("verse with pocket groove → handheld camera path", () => {
+    const ctx: NarrativeContext = {
+      setNumber: 1,
+      setProgress: 0.3,
+      energy: 0.3,
+      sectionType: "verse",
+      grooveType: "pocket",
+      songProgress: 0.5,
+    };
+    const result = computeNarrativeDirective(ctx);
+    expect(result.cameraPath).toBe("handheld");
+  });
+
+  it("verse with floating groove → static_drift camera path", () => {
+    const ctx: NarrativeContext = {
+      setNumber: 1,
+      setProgress: 0.3,
+      energy: 0.1,
+      sectionType: "verse",
+      grooveType: "floating",
+      songProgress: 0.5,
+    };
+    const result = computeNarrativeDirective(ctx);
+    expect(result.cameraPath).toBe("static_drift");
+  });
+
+  it("intro (first 10% of song) → pull_back regardless of section", () => {
+    const ctx: NarrativeContext = {
+      setNumber: 1,
+      setProgress: 0.1,
+      energy: 0.3,
+      sectionType: "chorus",
+      songProgress: 0.05,
+    };
+    const result = computeNarrativeDirective(ctx);
+    expect(result.cameraPath).toBe("pull_back");
+  });
+
+  it("outro (last 10% of song) → crane regardless of section", () => {
+    const ctx: NarrativeContext = {
+      setNumber: 1,
+      setProgress: 0.9,
+      energy: 0.3,
+      sectionType: "verse",
+      songProgress: 0.95,
+    };
+    const result = computeNarrativeDirective(ctx);
+    expect(result.cameraPath).toBe("crane");
+  });
+
+  it("drums/space override includes crane camera path", () => {
+    const ctx: NarrativeContext = {
+      isDrumsSpace: true,
+      setNumber: 2,
+      setProgress: 0.5,
+      energy: 0.1,
+    };
+    const result = computeNarrativeDirective(ctx);
+    expect(result.cameraPath).toBe("crane");
+  });
+
+  it("jam with freeform groove → handheld camera path", () => {
+    const ctx: NarrativeContext = {
+      setNumber: 2,
+      setProgress: 0.5,
+      energy: 0.3,
+      sectionType: "jam",
+      grooveType: "freeform",
+      songProgress: 0.5,
+    };
+    const result = computeNarrativeDirective(ctx);
+    expect(result.cameraPath).toBe("handheld");
+  });
+
+  it("jam with peak energy → dolly camera path", () => {
+    const ctx: NarrativeContext = {
+      setNumber: 2,
+      setProgress: 0.5,
+      energy: 0.8,
+      sectionType: "jam",
+      songProgress: 0.5,
+    };
+    const result = computeNarrativeDirective(ctx);
+    expect(result.cameraPath).toBe("dolly");
+  });
+
+  it("solo section → pull_back camera path", () => {
+    const ctx: NarrativeContext = {
+      setNumber: 2,
+      setProgress: 0.5,
+      energy: 0.5,
+      sectionType: "solo",
+      songProgress: 0.5,
+    };
+    const result = computeNarrativeDirective(ctx);
+    expect(result.cameraPath).toBe("pull_back");
+  });
+
   it("all outputs are clamped to valid ranges", () => {
     // Test with extreme combinations that push values past bounds
     const extremeContexts: NarrativeContext[] = [

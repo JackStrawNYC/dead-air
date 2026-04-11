@@ -589,6 +589,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
   const trackNumber = props.song.trackNumber ?? 1;
   const setProgress = Math.min(1, (trackNumber - 1 + frame / durationInFrames) / totalSongsInSet);
 
+  const climaxPhaseForNarrative = { idle: 0, build: 1, climax: 2, sustain: 3, release: 4 }[climaxState.phase] ?? 0;
   const narrativeDirective = computeNarrativeDirective({
     setNumber: props.song.set,
     setProgress,
@@ -598,6 +599,8 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
     jamDeepening: jamCycle?.isDeepening,
     energy: audioSnapshot.energy,
     isDrumsSpace,
+    climaxPhase: climaxPhaseForNarrative,
+    songProgress: frame / durationInFrames,
   });
 
   // harmonicResponse and modalColor removed — were only feeding EnergyEnvelope hue modifiers (now stripped)

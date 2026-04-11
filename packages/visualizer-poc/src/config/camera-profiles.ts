@@ -6,6 +6,16 @@
  * a different camera feel (contemplative ballad vs driving rocker).
  */
 
+/** Camera path behavior — determines the fundamental motion pattern. */
+export type CameraPathType =
+  | "orbital"       // circle around origin (default / current behavior)
+  | "dolly"         // linear forward motion through the scene
+  | "crane"         // vertical arc from low angle to bird's eye
+  | "handheld"      // noise-based organic wandering (documentary feel)
+  | "static_drift"  // nearly still with micro-drift (contemplative)
+  | "pull_back"     // slow zoom out revealing the full scene
+  | "spiral_in";    // decreasing radius spiral toward center
+
 export interface CameraProfile {
   /** Base orbit radius (world units). Default: 3.5 */
   orbitRadius: number;
@@ -52,6 +62,9 @@ export interface CameraProfile {
   energyFocusShrink: number;
   /** Focus distance clamp range. Default: [2, 5] */
   focusRange: [number, number];
+
+  /** Camera path behavior. Default: "orbital" */
+  pathType?: CameraPathType;
 }
 
 /** Default camera profile — matches current hardcoded values exactly */
@@ -81,6 +94,8 @@ export const DEFAULT_CAMERA_PROFILE: CameraProfile = {
   baseFocusDistance: 3.0,
   energyFocusShrink: 1.0,
   focusRange: [2, 5],
+
+  pathType: "orbital",
 };
 
 /** Contemplative — slow orbit, minimal shake, narrow FOV (ballads, space) */
@@ -96,6 +111,7 @@ export const CONTEMPLATIVE_CAMERA: CameraProfile = {
   baseFov: 45,
   energyFovBoost: 5,
   fovRange: [40, 55],
+  pathType: "static_drift",
 };
 
 /** Driving — tighter orbit, stronger shake, wider FOV (rockers, jams) */
@@ -110,6 +126,7 @@ export const DRIVING_CAMERA: CameraProfile = {
   baseFov: 55,
   energyFovBoost: 15,
   fovRange: [45, 70],
+  pathType: "orbital",
 };
 
 /** Intimate — very close, almost no shake, narrow FOV (tender vocals) */
@@ -128,6 +145,7 @@ export const INTIMATE_CAMERA: CameraProfile = {
   fovRange: [38, 50],
   dofEnergyFactor: 0.6,
   dofClimaxFactor: 0.4,
+  pathType: "static_drift",
 };
 
 /** Expansive — wide orbit, gentle movement, maximum FOV (cosmic, peaks) */
@@ -143,6 +161,7 @@ export const EXPANSIVE_CAMERA: CameraProfile = {
   fovRange: [45, 75],
   baseFocusDistance: 4.0,
   focusRange: [2, 7],
+  pathType: "orbital",
 };
 
 /** Named profile lookup */

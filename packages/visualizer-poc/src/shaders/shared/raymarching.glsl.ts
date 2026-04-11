@@ -150,3 +150,28 @@ float ${name}(vec3 _rmro, vec3 _rmrd, float _rmmint, float _rmmaxt) {
 }
 `;
 }
+
+/**
+ * Generate a GLSL line that encodes raymarching distance into the alpha
+ * channel. Call this right before the gl_FragColor assignment in raymarched
+ * shaders so the DOF post-pass can read per-pixel depth.
+ *
+ * The depth is normalised to [0, 1] by dividing by the maximum ray distance.
+ *
+ * Usage in a shader template literal:
+ *
+ *   ${buildDepthAlphaOutput("totalDist", "12.0")}
+ *
+ * Generates:
+ *
+ *   gl_FragColor.a = clamp(totalDist / 12.0, 0.0, 1.0);
+ *
+ * @param distVar  — the GLSL variable holding the ray's total travel distance
+ * @param maxDist  — the GLSL expression for the maximum ray distance (e.g. "12.0" or "MAX_DIST")
+ */
+export function buildDepthAlphaOutput(
+  distVar: string,
+  maxDist: string,
+): string {
+  return `gl_FragColor.a = clamp(${distVar} / ${maxDist}, 0.0, 1.0);`;
+}

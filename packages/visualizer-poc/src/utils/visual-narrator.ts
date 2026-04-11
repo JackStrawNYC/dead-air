@@ -15,6 +15,7 @@
 
 import type { GrooveType } from "./groove-detector";
 import type { JamCyclePhase } from "./jam-cycles";
+import type { CameraPathType } from "../config/camera-profiles";
 
 export interface NarrativeDirective {
   /** Overlay density multiplier (0-2) */
@@ -31,6 +32,8 @@ export interface NarrativeDirective {
   heroPermitted: boolean;
   /** Motion multiplier for drift/camera speed */
   motionMult: number;
+  /** Recommended camera path type for this moment */
+  cameraPath?: CameraPathType;
 }
 
 export interface NarrativeContext {
@@ -50,6 +53,10 @@ export interface NarrativeContext {
   energy: number;
   /** Whether this is a Drums/Space section */
   isDrumsSpace?: boolean;
+  /** Climax phase number: 0=idle, 1=build, 2=climax, 3=sustain, 4=release */
+  climaxPhase?: number;
+  /** Position within the song (0-1) */
+  songProgress?: number;
 }
 
 /** Base narrative from show-level pacing */
@@ -95,6 +102,7 @@ function drumsSpaceDirective(): NarrativeDirective {
     abstractionLevel: 0.9,
     heroPermitted: false,
     motionMult: 0.3,
+    cameraPath: "crane",
   };
 }
 
@@ -107,6 +115,48 @@ const DEFAULT: NarrativeDirective = {
   heroPermitted: true,
   motionMult: 1.0,
 };
+
+/**
+ * Recommend a camera path type based on section context, groove, energy, and climax.
+ * Priority: climax > song position (intro/outro) > section type + groove.
+ */
+function recommendCameraPath(ctx: NarrativeContext): CameraPathType {
+  // Highest priority: climax (phase >= 2 means climax/sustain/release)
+  if ((ctx.climaxPhase ?? 0) >= 2) return "dolly";
+
+  // Song position: intro (first 10%) → opening reveal
+  if ((ctx.songProgress ?? 0.5) < 0.1) return "pull_back";
+  // Song position: outro (last 10%) → ascending farewell
+  if ((ctx.songProgress ?? 0.5) > 0.9) return "crane";
+
+  // Section type + groove combinations (most specific first)
+  const section = ctx.sectionType;
+  const groove = ctx.grooveType;
+
+  if (section === "space") return "crane";
+  if (section === "solo") return "pull_back";
+  if (section === "drums") return "orbital";
+  if (section === "bridge") return "static_drift";
+
+  if (section === "chorus") return "orbital";
+
+  if (section === "jam") {
+    if (groove === "freeform") return "handheld";
+    // Building energy: spiral_in; peak energy: dolly
+    if (ctx.energy > 0.7) return "dolly";
+    if (ctx.energy > 0.4) return "spiral_in";
+    return "spiral_in";
+  }
+
+  if (section === "verse") {
+    if (groove === "floating") return "static_drift";
+    if (groove === "pocket") return "handheld";
+    return "handheld";
+  }
+
+  // Default fallback
+  return "orbital";
+}
 
 /**
  * Compute the narrative directive for the current moment.
@@ -162,6 +212,9 @@ export function computeNarrativeDirective(ctx: NarrativeContext): NarrativeDirec
     result.saturationOffset += 0.12;
     result.motionMult *= 1.2;
   }
+
+  // Camera path recommendation
+  result.cameraPath = recommendCameraPath(ctx);
 
   // Clamp values
   result.overlayDensityMult = Math.max(0, Math.min(2, result.overlayDensityMult));
