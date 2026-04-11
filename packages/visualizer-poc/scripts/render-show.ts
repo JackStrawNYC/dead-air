@@ -72,7 +72,7 @@ const glArg = args.find((a) => a.startsWith("--gl="))?.split("=")[1] ?? "angle";
 // Default chunk size 600 (was 3000 → 1200). Each chunk gets a fresh Chrome
 // process; GPU driver leaks accumulate between chunks. 600 frames = 20 seconds
 // of video, enough to render cleanly before GPU memory pressure builds.
-const chunkSize = parseInt(args.find((a) => a.startsWith("--chunk="))?.split("=")[1] ?? "600", 10);
+const chunkSize = parseInt(args.find((a) => a.startsWith("--chunk="))?.split("=")[1] ?? "2400", 10);
 const trackFilter = args.find((a) => a.startsWith("--track="))?.split("=")[1];
 const previewMode = args.includes("--preview");
 const showDateArg = args.find((a) => a.startsWith("--show-date="))?.split("=")[1];
