@@ -23,7 +23,6 @@ import { selectTransitionStyle } from "../utils/transition-selector";
 import { getShaderStrings } from "../shaders/shader-strings";
 import { GPUTransition, transitionStyleToBlendMode } from "./GPUTransition";
 import type { JamEvolution, JamPhaseBoundaries } from "../utils/jam-evolution";
-import { JAM_PHASE_INDEX } from "../utils/jam-evolution";
 import type { JamCycleState } from "../utils/jam-cycles";
 import type { InterplayMode } from "../utils/stem-interplay";
 import type { ReactiveState } from "../utils/reactive-triggers";
@@ -34,6 +33,9 @@ import { findNearestBeat } from "./routing/beat-sync";
 import { getModeForSection } from "./routing/shader-variety";
 import { getDrumsSpaceMode } from "./routing/drums-space-router";
 import { averageEnergy, selectDualBlendMode, renderMode } from "./routing/scene-utils";
+import { renderSectionOverride } from "./routing/SectionOverrideRouter";
+import { renderReactiveTrigger, renderReactiveExitCrossfade } from "./routing/ReactiveShaderRouter";
+import { renderJamPhase } from "./routing/JamPhaseRouter";
 
 // Re-export extracted functions so existing imports from SceneRouter continue to work
 export { dynamicCrossfadeDuration } from "./routing/crossfade-timing";
@@ -118,63 +120,9 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
   // Find current section
   const { sectionIndex: currentSectionIdx } = findCurrentSection(sections, frame);
 
-  // EXPLICIT SECTION OVERRIDE: highest authority — represents user-curated choice.
-  // Honored BEFORE reactive triggers, IT lock, drums/space, semantic router, etc.
-  // If a song explicitly sets sectionOverrides for a section, that mode is used,
-  // and no other routing path can override it. This is the safety net that ensures
-  // a song's curated visual identity can't be silently replaced by a reactive
-  // shader pool that doesn't fit the song's palette or character.
-  //
-  // CROSSFADE: when adjacent sections have DIFFERENT overrides, smoothly blend
-  // between them across a 90-frame (3s) window centered on the boundary instead
-  // of doing a 1-frame snap cut. Without this, sectionOverride boundaries look
-  // like jarring jump cuts.
-  const explicitOverride = song.sectionOverrides?.find((o) => o.sectionIndex === currentSectionIdx);
-  if (explicitOverride) {
-    const SECTION_OVERRIDE_CROSSFADE = 180; // 6 seconds at 30fps — CALM MODE: doubled from 3s
-    const halfCF = Math.floor(SECTION_OVERRIDE_CROSSFADE / 2);
-    const currentSection = sections[currentSectionIdx];
-
-    // Look back: are we early in the current section, with a previous section
-    // that had a different override? If so, crossfade IN.
-    if (currentSection && currentSectionIdx > 0 && frame - currentSection.frameStart < halfCF) {
-      const prevOverride = song.sectionOverrides?.find((o) => o.sectionIndex === currentSectionIdx - 1);
-      if (prevOverride && prevOverride.mode !== explicitOverride.mode) {
-        const cfStart = currentSection.frameStart - halfCF;
-        const progress = Math.max(0, Math.min(1, (frame - cfStart) / SECTION_OVERRIDE_CROSSFADE));
-        return (
-          <SceneCrossfade
-            progress={progress}
-            outgoing={renderMode(prevOverride.mode, frames, sections, palette, tempo, undefined, jamDensity)}
-            incoming={renderMode(explicitOverride.mode, frames, sections, palette, tempo, undefined, jamDensity)}
-            style="morph"
-          />
-        );
-      }
-    }
-
-    // Look forward: are we late in the current section, with a NEXT section
-    // that has a different override? If so, crossfade OUT (start the blend
-    // before the boundary so the visual is already morphing into the new shader
-    // when the section actually starts).
-    if (currentSection && currentSectionIdx < sections.length - 1 && currentSection.frameEnd - frame < halfCF) {
-      const nextOverride = song.sectionOverrides?.find((o) => o.sectionIndex === currentSectionIdx + 1);
-      if (nextOverride && nextOverride.mode !== explicitOverride.mode) {
-        const cfStart = currentSection.frameEnd - halfCF;
-        const progress = Math.max(0, Math.min(1, (frame - cfStart) / SECTION_OVERRIDE_CROSSFADE));
-        return (
-          <SceneCrossfade
-            progress={progress}
-            outgoing={renderMode(explicitOverride.mode, frames, sections, palette, tempo, undefined, jamDensity)}
-            incoming={renderMode(nextOverride.mode, frames, sections, palette, tempo, undefined, jamDensity)}
-            style="morph"
-          />
-        );
-      }
-    }
-
-    return <>{renderMode(explicitOverride.mode, frames, sections, palette, tempo, undefined, jamDensity)}</>;
-  }
+  // EXPLICIT SECTION OVERRIDE — delegated to SectionOverrideRouter
+  const overrideResult = renderSectionOverride(song, sections, currentSectionIdx, frame, frames, palette, tempo, jamDensity, renderMode);
+  if (overrideResult) return overrideResult;
 
   // IT transcendent shader forcing: deep coherence lock → meditative shader pool.
   // Intersect with preferredModes so we don't pick a palette-incompatible shader.
@@ -199,185 +147,20 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
     return <>{renderMode(dsMode, frames, sections, palette, tempo, undefined, jamDensity)}</>;
   }
 
-  // ─── REACTIVE TRIGGER: mid-section shader swap on audio events ───
-  // Fast 15-frame crossfade into reactive shader, then hold, then crossfade back.
-  // Coherence lock always wins (suppressed upstream). Dual shader disabled during hold.
-  //
-  // Reactive triggers must respect the song's curated preferredModes — otherwise
-  // they can pick shaders with hardcoded color schemes that clash with the song's
-  // palette (e.g. cosmic_voyage's heavy nebula colors firing on a cool psychedelic
-  // song produces stuck-color clumps). We INTERSECT the trigger's suggested pool
-  // with preferredModes; if the intersection is empty, suppress the trigger.
-  //
-  // DEAD AIR: triggers are suppressed entirely. Crowd applause has impulsive
-  // transients that fire reactive triggers as if the band were still playing.
-  //
-  // CALM MODE: also suppress reactive triggers if the song has explicit
-  // sectionOverrides — the user curated those for a reason and reactive triggers
-  // shouldn't override them. (Note: explicit override path returns early above,
-  // but this is defensive in case override returns null/undefined for some sections.)
-  const isInDeadAir = (deadAirFactor ?? 0) > 0.1;
-  const hasOverrides = (song.sectionOverrides?.length ?? 0) > 0;
-  if (reactiveState?.isTriggered && !coherenceIsLocked && !isInDeadAir && !hasOverrides && reactiveState.suggestedModes.length > 0) {
-    // Filter reactive pool to only modes the song explicitly allows
-    const allowedModes = songIdentity?.preferredModes && songIdentity.preferredModes.length > 0
-      ? reactiveState.suggestedModes.filter((m) => songIdentity.preferredModes.includes(m))
-      : reactiveState.suggestedModes;
-
-    // If the trigger's pool has no intersection with preferred modes, suppress
-    // the trigger entirely and fall through to normal section selection.
-    if (allowedModes.length === 0) {
-      // fall through — no early return
-    } else {
-    const rng = seededRandom((seed ?? 0) + frame * 11 + (reactiveState.triggerType?.length ?? 0));
-    const reactiveMode = allowedModes[Math.floor(rng() * allowedModes.length)];
-    const regularMode = getModeForSection(song, currentSectionIdx, sections, seed, era, false, usedShaderModes, songIdentity, stemSection, frames, songDuration, setNumber, trackNumber, shaderModeLastUsed, stemDominant);
-    // Energy-scaled reactive crossfade: snappy at high energy, gentle at low
-    const reactiveEnergy = frames[Math.min(frame, frames.length - 1)]?.rms ?? 0.15;
-    const REACTIVE_CROSSFADE = reactiveEnergy > 0.2 ? 12 : reactiveEnergy > 0.1 ? 22 : 40;
-    const age = reactiveState.triggerAge;
-
-    if (age < REACTIVE_CROSSFADE) {
-      // Crossfade in
-      const progress = age / REACTIVE_CROSSFADE;
-      return (
-        <SceneCrossfade
-          progress={progress}
-          outgoing={renderMode(regularMode, frames, sections, palette, tempo, undefined, jamDensity)}
-          incoming={renderMode(reactiveMode, frames, sections, palette, tempo, undefined, jamDensity)}
-        />
-      );
-    }
-    // During hold — render reactive shader
-    lastReactiveModeRef.current = reactiveMode;
-    return <>{renderMode(reactiveMode, frames, sections, palette, tempo, undefined, jamDensity)}</>;
-    } // close: else (allowedModes.length > 0)
-  }
-
-  // ─── Reactive trigger crossfade-OUT ───
-  // When trigger just ended, record exit and blend back to regular shader.
-  if (!reactiveState?.isTriggered && lastReactiveModeRef.current) {
-    const exitMode = lastReactiveModeRef.current;
-    lastReactiveModeRef.current = null;
-    const exitEnergy = frames[Math.min(frame, frames.length - 1)]?.rms ?? 0.15;
-    reactiveExitRef.current = {
-      mode: exitMode,
-      exitFrame: frame,
-      crossfadeFrames: exitEnergy > 0.2 ? 15 : exitEnergy > 0.1 ? 25 : 40,
-    };
-  }
+  // ─── REACTIVE TRIGGER — delegated to ReactiveShaderRouter
+  const reactiveResult = renderReactiveTrigger(reactiveState, coherenceIsLocked, deadAirFactor, song, songIdentity, seed, currentSectionIdx, sections, era, usedShaderModes, stemSection, frames, songDuration, setNumber, trackNumber, shaderModeLastUsed, stemDominant, palette, tempo, jamDensity, frame, renderMode, getModeForSection, lastReactiveModeRef, reactiveExitRef);
+  if (reactiveResult) return reactiveResult;
 
   const currentMode = getModeForSection(song, currentSectionIdx, sections, seed, era, coherenceIsLocked, usedShaderModes, songIdentity, stemSection, frames, songDuration, setNumber, trackNumber, shaderModeLastUsed, stemDominant);
 
-  // Render reactive exit crossfade if active
-  if (reactiveExitRef.current && frame < reactiveExitRef.current.exitFrame + reactiveExitRef.current.crossfadeFrames) {
-    const { mode: exitMode, exitFrame, crossfadeFrames } = reactiveExitRef.current;
-    const progress = (frame - exitFrame) / crossfadeFrames;
-    return (
-      <SceneCrossfade
-        progress={progress}
-        outgoing={renderMode(exitMode, frames, sections, palette, tempo, undefined, jamDensity)}
-        incoming={renderMode(currentMode, frames, sections, palette, tempo, undefined, jamDensity)}
-      />
-    );
-  }
+  // ─── Reactive exit crossfade — delegated to ReactiveShaderRouter
+  const reactiveExitResult = renderReactiveExitCrossfade(reactiveExitRef, frame, currentMode, frames, sections, palette, tempo, jamDensity, renderMode);
+  if (reactiveExitResult) return reactiveExitResult;
   const currentSection = sections[currentSectionIdx];
 
-  // ─── JAM PHASE SHADER TRANSITIONS ───
-  // For long jams (10+ min), override the section shader with phase-specific shaders.
-  // Each phase (exploration/building/peak_space/resolution) gets its own shader,
-  // with crossfades at phase boundaries. This makes a 20-minute Dark Star
-  // visually evolve as the music evolves.
-  if (jamEvolution?.isLongJam && jamPhaseBoundaries && jamPhaseShaders) {
-    const jpMode = jamPhaseShaders[jamEvolution.phase];
-    if (jpMode) {
-      // Detect if we're near a phase boundary and need to crossfade
-      const JAM_CROSSFADE_FRAMES = 120; // 4 seconds — slow organic transition
-      const boundaries = [
-        { frame: jamPhaseBoundaries.explorationEnd, from: "exploration", to: "building" },
-        { frame: jamPhaseBoundaries.buildingEnd, from: "building", to: "peak_space" },
-        { frame: jamPhaseBoundaries.peakSpaceEnd, from: "peak_space", to: "resolution" },
-      ] as const;
-
-      for (const b of boundaries) {
-        const fromMode = jamPhaseShaders[b.from];
-        const toMode = jamPhaseShaders[b.to];
-        if (!fromMode || !toMode || fromMode === toMode) continue;
-
-        const halfCF = Math.floor(JAM_CROSSFADE_FRAMES / 2);
-        const cfStart = b.frame - halfCF;
-        const cfEnd = b.frame + halfCF;
-
-        if (frame >= cfStart && frame < cfEnd) {
-          const progress = (frame - cfStart) / JAM_CROSSFADE_FRAMES;
-          return (
-            <SceneCrossfade
-              progress={progress}
-              outgoing={renderMode(fromMode, frames, sections, palette, tempo, undefined, jamDensity)}
-              incoming={renderMode(toMode, frames, sections, palette, tempo, undefined, jamDensity)}
-              style="morph"
-            />
-          );
-        }
-      }
-
-      // Not at a phase boundary — render the phase shader.
-      // During jam cycle peaks, use DualShaderQuad to blend current phase shader
-      // with the NEXT phase's shader for sub-cycle visual climaxes.
-      if (jamCycle && (jamCycle.phase === "peak" || (jamCycle.phase === "build" && jamCycle.progress > 0.6)) && jamCycle.progress > 0.2) {
-        // Find the next phase's shader for the sub-cycle peak blend
-        const phaseOrder: string[] = ["exploration", "building", "peak_space", "resolution"];
-        const currentPhaseIdx = phaseOrder.indexOf(jamEvolution.phase);
-        const nextPhaseKey = currentPhaseIdx < phaseOrder.length - 1
-          ? phaseOrder[currentPhaseIdx + 1]
-          : phaseOrder[currentPhaseIdx]; // resolution stays on resolution
-        const peakBlendMode = jamPhaseShaders[nextPhaseKey] ?? jpMode;
-
-        if (peakBlendMode !== jpMode) {
-          const stringsA = getShaderStrings(jpMode);
-          const stringsB = getShaderStrings(peakBlendMode);
-          if (stringsA && stringsB) {
-            // Blend toward next phase shader proportional to cycle peak intensity
-            const peakBlend = 0.15 + jamCycle.progress * 0.25;
-            const blendMode = selectDualBlendMode(
-              frames[Math.min(frame, frames.length - 1)]?.rms ?? 0,
-              currentSection?.energy,
-              undefined,
-              "jam",
-            );
-            return <>{renderMode(jpMode, frames, sections, palette, tempo, undefined, jamDensity)}</>;
-          }
-        }
-      }
-
-      // Standard jam phase render (with dual-shader composition if energy warrants)
-      const frameEnergy = frames[Math.min(frame, frames.length - 1)]?.rms ?? 0;
-      const jamShouldDual = frameEnergy > 0.05;
-      if (jamShouldDual) {
-        const affinityPool = TRANSITION_AFFINITY[jpMode];
-        const rng = seededRandom((seed ?? 0) + JAM_PHASE_INDEX[jamEvolution.phase] * 31);
-        const secondaryMode = affinityPool && affinityPool.length > 0
-          ? affinityPool[Math.floor(rng() * affinityPool.length)]
-          : getComplement(jpMode);
-        const stringsA = getShaderStrings(jpMode);
-        const stringsB = getShaderStrings(secondaryMode);
-        if (stringsA && stringsB) {
-          const blendMode = selectDualBlendMode(frameEnergy, currentSection?.energy, undefined, "jam");
-          // Phase ramp: blend builds over first 15% of phase (not instant)
-          const phaseRamp = Math.min(1, jamEvolution.phaseProgress / 0.15);
-          const baseJamBlend = 0.10 + frameEnergy * 0.20;
-          const arcJamBlend = Math.sin(jamEvolution.phaseProgress * Math.PI) * 0.12;
-          const jamFrameData = frames[Math.min(frame, frames.length - 1)];
-          const jamBeatPulse = (jamFrameData?.beat ? 0.12 : 0) * Math.max(0.3, frameEnergy);
-          const blendProgress = (baseJamBlend + arcJamBlend + jamBeatPulse) * phaseRamp;
-          return <>{renderMode(jpMode, frames, sections, palette, tempo, undefined, jamDensity)}</>;
-        }
-      }
-
-      // Fallback: simple single-shader render for this jam phase
-      return <>{renderMode(jpMode, frames, sections, palette, tempo, undefined, jamDensity)}</>;
-    }
-  }
+  // ─── JAM PHASE SHADER TRANSITIONS — delegated to JamPhaseRouter
+  const jamResult = renderJamPhase(jamEvolution, jamPhaseBoundaries, jamPhaseShaders, jamCycle, frame, frames, sections, palette, tempo, jamDensity, seed, currentSection, renderMode);
+  if (jamResult) return jamResult;
 
   const nextSectionIdx = currentSectionIdx + 1;
   const prevSectionIdx = currentSectionIdx - 1;

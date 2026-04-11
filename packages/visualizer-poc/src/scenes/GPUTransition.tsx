@@ -7,12 +7,17 @@
  *
  * Used for high-energy-delta transitions where organic GPU blending
  * produces richer results than CSS opacity stacking.
+ *
+ * NOTE: This component renders DualShaderQuad directly — it does NOT
+ * wrap in AudioReactiveCanvas because it's already rendered inside
+ * a scene tree that provides audio context. DualShaderQuad reads
+ * audio data from the existing AudioDataContext via useAudioData().
  */
 
 import React from "react";
-import { AudioReactiveCanvas } from "../components/AudioReactiveCanvas";
 import { DualShaderQuad, type DualBlendMode } from "../components/DualShaderQuad";
 import { getShaderStrings } from "../shaders/shader-strings";
+import { renderScene } from "./scene-registry";
 import type { EnhancedFrameData, SectionBoundary, ColorPalette, VisualMode } from "../data/types";
 
 interface Props {
@@ -80,26 +85,24 @@ export const GPUTransition: React.FC<Props> = ({
   const stringsA = getShaderStrings(outMode);
   const stringsB = getShaderStrings(inMode);
 
-  // Fallback: if shader strings not available, can't do GPU transition
+  // If either shader isn't available as raw GLSL strings (e.g. Three.js scenes),
+  // fall back to CSS-based SceneCrossfade by rendering both scenes as React nodes.
+  // The caller (SceneRouter) handles this fallback when GPUTransition returns null.
   if (!stringsA || !stringsB) {
     return null;
   }
 
+  // DualShaderQuad renders both shaders to separate GPU targets and composites
+  // them with the blend shader. It reads audio data from AudioDataContext
+  // (provided by the AudioReactiveCanvas that wraps the entire scene tree).
   return (
-    <AudioReactiveCanvas
-      frames={frames}
-      sections={sections}
-      palette={palette}
-      tempo={tempo}
-    >
-      <DualShaderQuad
-        vertexShaderA={stringsA.vert}
-        fragmentShaderA={stringsA.frag}
-        vertexShaderB={stringsB.vert}
-        fragmentShaderB={stringsB.frag}
-        blendMode={blendMode}
-        blendProgress={progress}
-      />
-    </AudioReactiveCanvas>
+    <DualShaderQuad
+      vertexShaderA={stringsA.vert}
+      fragmentShaderA={stringsA.frag}
+      vertexShaderB={stringsB.vert}
+      fragmentShaderB={stringsB.frag}
+      blendMode={blendMode}
+      blendProgress={progress}
+    />
   );
 };

@@ -8,3 +8,6 @@ export { validateSectionOverrides } from "./section-validation";
 export { applyRecencyWeighting, getModeForSection } from "./shader-variety";
 export { getDrumsSpaceMode } from "./drums-space-router";
 export { averageEnergy, selectDualBlendMode, renderMode } from "./scene-utils";
+export { renderSectionOverride } from "./SectionOverrideRouter";
+export { renderReactiveTrigger, renderReactiveExitCrossfade } from "./ReactiveShaderRouter";
+export { renderJamPhase } from "./JamPhaseRouter";

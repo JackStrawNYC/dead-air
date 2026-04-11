@@ -19,22 +19,17 @@
 import React, { useMemo, useRef, useEffect } from "react";
 import * as THREE from "three";
 import { staticFile, useCurrentFrame, useVideoConfig, interpolate, delayRender, continueRender, Img } from "remotion";
-import { SceneRouter } from "./scenes/SceneRouter";
 import { SceneCrossfade } from "./scenes/SceneCrossfade";
-import { SegueCrossfade } from "./scenes/SegueCrossfade";
-import { renderScene } from "./scenes/scene-registry";
 import { OVERLAY_COMPONENTS } from "./data/overlay-components";
 import { buildRotationSchedule } from "./data/overlay-rotation";
 import { computeContinuousOverlays, type ContinuousOverlayConfig } from "./utils/continuous-overlay";
 import { computeSemanticProfile, extractSemanticScores } from "./utils/semantic-router";
 import { SELECTABLE_REGISTRY, ALWAYS_ACTIVE } from "./data/overlay-registry";
 import { getEraPreset } from "./data/era-presets";
-import { ConcertInfo } from "./components/ConcertInfo";
-import { SetlistScroll } from "./components/SetlistScroll";
 import { loadAnalysis, getSections } from "./data/analysis-loader";
 import type { SetlistEntry, ShowSetlist, TrackAnalysis, ColorPalette, VisualMode } from "./data/types";
 import type { OverlayPhaseHint } from "./data/types";
-import { ShowContextProvider, getShowSeed } from "./data/ShowContext";
+import { getShowSeed } from "./data/ShowContext";
 import { VisualizerErrorBoundary } from "./components/VisualizerErrorBoundary";
 import { SilentErrorBoundary } from "./components/SilentErrorBoundary";
 import { LyricTriggerLayer } from "./components/LyricTriggerLayer";
@@ -48,13 +43,9 @@ import { computeClimaxState, climaxModulation } from "./utils/climax-state";
 import { computeAudioSnapshot, buildBeatArray } from "./utils/audio-reactive";
 import { computeCoherence } from "./utils/coherence";
 import { computeDrumsSpacePhase } from "./utils/drums-space-phase";
-import { useShowNarrative, ShowNarrativeProvider } from "./data/ShowNarrativeContext";
+import { useShowNarrative } from "./data/ShowNarrativeContext";
 import { calibrateEnergy } from "./utils/energy";
-import { AudioSnapshotProvider } from "./data/AudioSnapshotContext";
-import { HeroPermittedProvider } from "./data/HeroPermittedContext";
 import { JAM_PHASE_INDEX } from "./utils/jam-evolution";
-import { JamPhaseProvider } from "./data/JamPhaseContext";
-import { PeakOfShowProvider } from "./data/PeakOfShowContext";
 import { computeMediaSuppression, computeArtSuppressionFactor } from "./utils/media-suppression";
 import { detectCrowdMoments } from "./data/crowd-detector";
 import { CrowdOverlay } from "./components/CrowdOverlay";
@@ -85,19 +76,18 @@ import { detectPeakOfShow } from "./utils/peak-of-show";
 import { computeTempoLock } from "./utils/tempo-lock";
 import type { PrecomputedNarrative } from "./utils/show-narrative-precompute";
 import { computeStemCharacter } from "./utils/stem-character";
-import { TimeDilationProvider } from "./data/TimeDilationContext";
-import { DeadAirProvider } from "./data/DeadAirContext";
 import { computeReactiveTriggers } from "./utils/reactive-triggers";
-import { IconOverlayProvider } from "./data/IconOverlayContext";
 import { buildIconSchedule, getIconForFrame } from "./utils/icon-overlay-manager";
 
 // Extracted sub-components
-import { SongArtLayer } from "./components/song-visualizer/SongArtLayer";
-import { DynamicOverlayStack } from "./components/song-visualizer/DynamicOverlayStack";
 import { AudioLayer } from "./components/song-visualizer/AudioLayer";
 import {
   mediaCatalog,
 } from "./components/song-visualizer/show-data-loader";
+import { VisualizerProviderStack } from "./components/song-visualizer/VisualizerProviderStack";
+import { SceneRouterWithSegues } from "./components/song-visualizer/SceneRouterWithSegues";
+import { OverlayAndEffectsLayer } from "./components/song-visualizer/OverlayAndEffectsLayer";
+import { TextLayer } from "./components/song-visualizer/TextLayer";
 
 // Extracted hooks
 import { useJamEvolution } from "./hooks/useJamEvolution";
@@ -741,17 +731,22 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
 
   // ─── Render (full) ───
   // eslint-disable-next-line no-unreachable
+  const climaxPhaseMap: Record<string, number> = { idle: 0, build: 1, climax: 2, sustain: 3, release: 4 };
+
   return (
     <div style={{ width, height, position: "relative", overflow: "hidden", background: "#000" }}>
-      <ShowNarrativeProvider totalSongs={props.show?.songs.length ?? 1} initialState={props.narrativeState ? { ...props.narrativeState, usedOverlayIds: new Set(props.narrativeState.predictedOverlayIds ?? []) } : undefined}>
-      <ShowContextProvider show={props.show}>
-      <AudioSnapshotProvider snapshot={audioSnapshot}>
-      <IconOverlayProvider value={iconOverlayValue}>
-      <HeroPermittedProvider permitted={narrativeDirective.heroPermitted}>
-      <JamPhaseProvider value={{ phase: jamEvolution.isLongJam ? JAM_PHASE_INDEX[jamEvolution.phase] : -1, progress: jamEvolution.phaseProgress }}>
-      <PeakOfShowProvider value={peakOfShow.intensity}>
-      <DeadAirProvider value={deadAirFactor}>
-      <TimeDilationProvider value={spaceTimeDilation}>
+      <VisualizerProviderStack
+        show={props.show}
+        totalSongs={props.show?.songs.length ?? 1}
+        narrativeInitialState={props.narrativeState ? { ...props.narrativeState, usedOverlayIds: new Set(props.narrativeState.predictedOverlayIds ?? []) } : undefined}
+        audioSnapshot={audioSnapshot}
+        iconOverlayValue={iconOverlayValue}
+        heroPermitted={narrativeDirective.heroPermitted}
+        jamPhaseValue={{ phase: jamEvolution.isLongJam ? JAM_PHASE_INDEX[jamEvolution.phase] : -1, progress: jamEvolution.phaseProgress }}
+        peakOfShowIntensity={peakOfShow.intensity}
+        deadAirFactor={deadAirFactor}
+        spaceTimeDilation={spaceTimeDilation}
+      >
       <VisualizerErrorBoundary>
       <div style={{ position: "absolute", inset: 0, opacity }}>
         <CameraMotion frames={f} jamEvolution={jamEvolution} bass={audioSnapshot.bass} cameraFreeze={counterpoint.cameraFreeze || itState.cameraLock || introFactor < 0.5} drumsSpacePhase={drumsSpaceState?.subPhase} fastEnergy={audioSnapshot.fastEnergy} vocalPresence={audioSnapshot.vocalPresence} isSolo={soloState.isSolo} soloIntensity={soloState.intensity} grooveMotionMult={grooveMods.motionMult * fatigue.motionMult * stemInterplay.motionMult * peakOfShow.motionMult * crowdEnergy.motionMult * narrativeDirective.motionMult * stemCharacter.motionMult} groovePulseMult={grooveMods.pulseMult * phraseState.zoomBreathing * tempoLock.zoomPulse * regularityStabilityMod} sectionDriftMult={sectionVocab.driftSpeedMult} cameraSteadiness={Math.max(0, Math.min(1, sectionVocab.cameraSteadiness + setTheme.cameraSteadinessOffset))} cameraDrama={climaxMod.cameraDrama} itSnapZoom={itState.snapZoom} deadAirFactor={deadAirFactor}>
@@ -759,170 +754,97 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
         <EnergyEnvelope snapshot={audioSnapshot} climaxMod={climaxMod} calibration={energyCalibration} drumsSpacePhase={drumsSpaceState?.subPhase} itLuminanceLift={itState.luminanceLift} itSaturationSurge={itState.saturationSurge} itVignettePull={itState.vignettePull} deadAirFactor={deadAirFactor} introFactor={introFactor}>
           <div style={{ position: "absolute", inset: 0, opacity: introFactor }}>
           <SilentErrorBoundary name="SceneRouter" resetKey={frame}>
-            {(() => {
-              const climaxPhaseMap: Record<string, number> = { idle: 0, build: 1, climax: 2, sustain: 3, release: 4 };
-              const sceneRouter = <SceneRouter frames={f} sections={sections} song={props.song} tempo={tempo} seed={showSeed} jamDensity={jamDensity} deadAirMode={deadAirFactor > 0 ? "cosmic_dust" : undefined} deadAirFactor={deadAirFactor > 0 ? deadAirFactor : undefined} era={props.show?.era} coherenceIsLocked={coherenceState.isLocked} drumsSpacePhase={drumsSpaceState?.subPhase} usedShaderModes={narrative?.state.usedShaderModes} shaderModeLastUsed={narrative?.state.shaderModeLastUsed} songIdentity={songIdentity} stemSection={stemSection} songDuration={analysis?.meta?.duration} palette={effectivePalette} segueIn={props.segueIn} isSacredSegueIn={isSacredSegueIn} isInSuiteMiddle={!!isInSuiteMiddle} setNumber={props.song.set} jamEvolution={jamEvolution} jamPhaseBoundaries={jamPhaseBoundaries} jamCycle={jamCycle} jamPhaseShaders={jamPhaseShaders} climaxPhase={climaxPhaseMap[climaxState.phase] ?? 0} trackNumber={props.song.trackNumber ?? 1} stemInterplayMode={stemInterplay.mode} stemDominant={stemCharacter.dominant} itForceTranscendentShader={itState.forceTranscendentShader} reactiveState={reactiveState} />;
-              const palette = effectivePalette;
-
-              // Segue IN crossfade: smooth dual-render dissolve from previous song's shader
-              // Sacred segues get 50% longer crossfade for organic palette transition
-              const segueInFrames = isSacredSegueIn ? Math.round(FADE_FRAMES * 1.5) : props.segueIn ? 900 : FADE_FRAMES;
-              if (props.segueIn && props.segueFromMode && props.segueFromMode !== props.song.defaultMode && frame < segueInFrames) {
-                const progress = frame / segueInFrames;
-                const segueStyle = songIdentity?.transitionIn ?? sacredSegueInTransition ?? (isSacredSegueIn ? "morph" : props.segueIn ? "distortion_morph" : "dissolve");
-                return (
-                  <SegueCrossfade
-                    progress={progress}
-                    outgoing={renderScene(props.segueFromMode, { frames: f, sections, palette: props.segueFromPalette ?? palette, tempo, jamDensity })}
-                    incoming={sceneRouter}
-                    style={segueStyle}
-                  />
-                );
-              }
-
-              // Segue OUT crossfade: smooth dual-render dissolve into next song's shader
-              const segueOutFrames = isSacredSegueOut ? Math.round(FADE_FRAMES * 1.5) : props.segueOut ? 900 : FADE_FRAMES;
-              if (props.segueOut && props.segueToMode && props.segueToMode !== props.song.defaultMode && frame > durationInFrames - segueOutFrames) {
-                const progress = (frame - (durationInFrames - segueOutFrames)) / segueOutFrames;
-                const segueStyle = songIdentity?.transitionOut ?? sacredSegueOutTransition ?? (isSacredSegueOut ? "morph" : props.segueOut ? "distortion_morph" : "dissolve");
-                return (
-                  <SegueCrossfade
-                    progress={progress}
-                    outgoing={sceneRouter}
-                    incoming={renderScene(props.segueToMode, { frames: f, sections, palette: props.segueToPalette ?? palette, tempo, jamDensity })}
-                    style={segueStyle}
-                  />
-                );
-              }
-
-              return sceneRouter;
-            })()}
+            <SceneRouterWithSegues
+              frames={f}
+              sections={sections}
+              song={props.song}
+              tempo={tempo}
+              showSeed={showSeed}
+              jamDensity={jamDensity}
+              deadAirFactor={deadAirFactor}
+              era={props.show?.era}
+              coherenceIsLocked={coherenceState.isLocked}
+              drumsSpacePhase={drumsSpaceState?.subPhase}
+              usedShaderModes={narrative?.state.usedShaderModes}
+              shaderModeLastUsed={narrative?.state.shaderModeLastUsed}
+              songIdentity={songIdentity}
+              stemSection={stemSection}
+              songDuration={analysis?.meta?.duration}
+              palette={effectivePalette}
+              segueIn={props.segueIn}
+              isSacredSegueIn={isSacredSegueIn}
+              isInSuiteMiddle={!!isInSuiteMiddle}
+              setNumber={props.song.set}
+              jamEvolution={jamEvolution}
+              jamPhaseBoundaries={jamPhaseBoundaries}
+              jamCycle={jamCycle}
+              jamPhaseShaders={jamPhaseShaders}
+              climaxPhase={climaxPhaseMap[climaxState.phase] ?? 0}
+              trackNumber={props.song.trackNumber ?? 1}
+              stemInterplayMode={stemInterplay.mode}
+              stemDominant={stemCharacter.dominant}
+              itForceTranscendentShader={itState.forceTranscendentShader}
+              reactiveState={reactiveState}
+              segueOut={props.segueOut}
+              segueFromMode={props.segueFromMode}
+              segueToMode={props.segueToMode}
+              segueFromPalette={props.segueFromPalette}
+              segueToPalette={props.segueToPalette}
+              sacredSegueInTransition={sacredSegueInTransition}
+              sacredSegueOutTransition={sacredSegueOutTransition}
+              isSacredSegueOut={isSacredSegueOut}
+              frame={frame}
+              durationInFrames={durationInFrames}
+              fadeFrames={FADE_FRAMES}
+            />
           </SilentErrorBoundary>
           </div>
 
-          {/* Song art: SongArtLayer handles its own fade-in/out + dead-air reappearance internally.
-              Keep it always mounted (when art exists) to avoid WebGL context crashes from unmount. */}
-          {effectiveSongArt && (
-            <SilentErrorBoundary name="SongArt" resetKey={frame}>
-              <SongArtLayer src={staticFile(effectiveSongArt)} suppressionFactor={artSuppressionFactor} hueRotation={hueRotation} energy={audioSnapshot.energy} climaxIntensity={climaxState.intensity} focusOpacity={focusState.artOpacity} segueIn={props.segueIn} artBlendMode={props.song.artBlendMode} introFactor={Math.min(1, introFactor * 1.5)} deadAirFactor={deadAirFactor} />
-            </SilentErrorBoundary>
-          )}
-
-          <DynamicOverlayStack
+          <OverlayAndEffectsLayer
+            effectiveSongArt={effectiveSongArt}
+            artSuppressionFactor={artSuppressionFactor}
+            hueRotation={hueRotation}
+            audioSnapshot={audioSnapshot}
+            climaxIntensity={climaxState.intensity}
+            focusArtOpacity={focusState.artOpacity}
+            segueIn={props.segueIn}
+            artBlendMode={props.song.artBlendMode}
+            introFactor={introFactor}
+            deadAirFactor={deadAirFactor}
+            frame={frame}
             activeEntries={activeEntries}
             opacityMap={opacityMap}
             mediaSuppression={mediaSuppression}
-            hueRotation={hueRotation}
             tempo={tempo}
             palette={effectivePalette}
             frames={f}
-            focusSuppression={1}
             energyLevel={energyLevel}
-            itOverlayOverride={1}
-            counterpointOverlayInversion={0}
-            climaxDesaturation={0}
-            deadAirFactor={deadAirFactor}
+            itFlashIntensity={itState.flashIntensity}
+            itFlashHue={itState.flashHue}
+            effectivePalette={effectivePalette}
           />
-
-          {/* AI image overlay REMOVED — makes viewers think "AI slop" and adds visual noise.
-              Dead identity comes from song card (intro/bookend) and the shader itself. */}
-
-          {/* IT flash — chromatic burst on coherence break (suppressed during intro).
-              CHILL CALIBRATION: capped at 0.3 max opacity (was 1.0) and threshold raised
-              to 0.15 (was 0.01) so only the strongest coherence-break events fire it.
-              Strict requirement: flash never strobes consecutively, must be rare. */}
-          {introFactor > 0.5 && itState.flashIntensity > 0.15 && (
-            <div
-              style={{
-                position: "absolute",
-                inset: 0,
-                backgroundColor: itState.flashHue > 0
-                  ? `hsla(${itState.flashHue}, 60%, 85%, ${Math.min(0.3, itState.flashIntensity * 0.4)})`
-                  : `rgba(255, 255, 255, ${Math.min(0.3, itState.flashIntensity * 0.4)})`,
-                pointerEvents: "none",
-                mixBlendMode: "screen",
-              }}
-            />
-          )}
-
-          {/* IT strobe — DISABLED in chill mode. Was beat-synced pulse during deep
-              coherence lock; even at soft-light blend it causes "what just flashed?"
-              reactions during 3-hour viewing. Replaced by the gentler beat pulse in
-              postprocess.glsl.ts which is already capped at 2.5%. */}
-          {/* Strobe block disabled — see chill calibration */}
-
-          {/* Dead air ambient shimmer — audio-reactive glow when music ends */}
-          {deadAirFactor > 0.01 && (() => {
-            const deadRms = audioSnapshot.energy;
-            const deadOnset = audioSnapshot.onsetEnvelope;
-            const deadBass = audioSnapshot.bass;
-
-            // Crowd roar → brighter shimmer
-            const shimmerAlpha = (0.10 + deadRms * 0.25) * deadAirFactor;
-            // Applause onset → warm color flash
-            const warmShift = deadOnset > 0.3 ? deadOnset * 40 : 0;
-            // Palette-tinted dead air: use song's primary hue for continuity
-            const palHue = effectivePalette?.primary ?? 30;
-            const palAngle = (palHue / 360) * Math.PI * 2;
-            // Warm amber/orange base — crowd energy warmth
-            const baseR = Math.round(180 + 50 * Math.cos(palAngle));
-            const baseG = Math.round(110 + 40 * Math.cos(palAngle - 2.1));
-            const baseB = Math.round(60 + 30 * Math.sin(palAngle));
-            const r = Math.min(255, baseR + Math.round(warmShift * 2.0));
-            const g = Math.min(255, baseG + Math.round(warmShift * 0.8));
-            const b = Math.max(40, baseB - Math.round(warmShift * 1.0));
-            // Bass content → wider glow
-            const spread = 55 + deadBass * 25;
-            // Time-based drift (keep organic feel)
-            const cx = 50 + Math.sin(frame * 0.007) * (10 + deadRms * 8);
-            const cy = 50 + Math.cos(frame * 0.005) * (8 + deadBass * 5);
-
-            return (
-              <div style={{
-                position: "absolute", inset: 0, pointerEvents: "none",
-                background: `radial-gradient(ellipse at ${cx}% ${cy}%, rgba(${r}, ${g}, ${b}, ${shimmerAlpha.toFixed(3)}), transparent ${spread.toFixed(0)}%)`,
-                mixBlendMode: "screen",
-                opacity: 0.6 + 0.4 * Math.sin(frame * 0.02) + deadRms * 0.35,
-              }} />
-            );
-          })()}
-
 
         </EnergyEnvelope>
         </EraGrade>
         </CameraMotion>
 
-        {/* Text elements rendered OUTSIDE CameraMotion to prevent CSS transform blur,
-            but wrapped in film stock filter so typography lives in the same visual world */}
-        {!isDeadAir && (
-          <div style={{
-            position: "absolute",
-            inset: 0,
-            pointerEvents: "none",
-            filter: filmStockFilter,
-          }}>
-            <ConcertInfo songTitle={props.song.title} />
-            <SetlistScroll frames={f} currentSong={props.song.title} introFactor={introFactor} />
-            {/* NowPlaying removed — was overlapping the setlist on the left side. */}
-          </div>
-        )}
+        <TextLayer
+          isDeadAir={isDeadAir}
+          filmStockFilter={filmStockFilter}
+          songTitle={props.song.title}
+          frames={f}
+          currentSong={props.song.title}
+          introFactor={introFactor}
+        />
       </div>
       </VisualizerErrorBoundary>
-      </TimeDilationProvider>
-      </DeadAirProvider>
-      </PeakOfShowProvider>
-      </JamPhaseProvider>
-      </HeroPermittedProvider>
-      </IconOverlayProvider>
 
       <AudioLayer
         audioFile={props.song.audioFile}
         snapshot={audioSnapshot}
         isDrumsSpace={isDrumsSpace}
       />
-      </AudioSnapshotProvider>
-      </ShowContextProvider>
-      </ShowNarrativeProvider>
+      </VisualizerProviderStack>
     </div>
   );
 };
