@@ -18,6 +18,7 @@ import { estimateImprovisationScore } from "../../utils/improv-detector";
 import { getSectionSpectralFamily } from "../../utils/spectral-section";
 import { computeSemanticProfile, extractSemanticScores } from "../../utils/semantic-router";
 import { AUTO_VARIETY_MIN_SECTION } from "./crossfade-timing";
+import { scoreDiversityBonus, type VisualMemoryState } from "../../utils/visual-memory";
 
 /**
  * Safe shaders whitelist — validate chosen mode at the end.
@@ -137,6 +138,7 @@ export function getModeForSection(
   trackNumber?: number,
   shaderModeLastUsed?: Map<VisualMode, number>,
   stemDominant?: string,
+  visualMemory?: VisualMemoryState,
 ): VisualMode {
   // Explicit override always wins
   const override = song.sectionOverrides?.find((o) => o.sectionIndex === sectionIndex);
@@ -207,6 +209,20 @@ export function getModeForSection(
               });
               if (spectralFiltered.length >= 2) candidates = spectralFiltered; // soft filter
             }
+          }
+
+          // Visual memory diversity: boost candidates that are visually novel
+          if (visualMemory && visualMemory.totalWeight > 0) {
+            const DIVERSITY_WEIGHT = 0.5;
+            const diversityCandidates: VisualMode[] = [];
+            for (const mode of candidates) {
+              const bonus = scoreDiversityBonus(visualMemory, mode);
+              const extraCopies = Math.round(bonus * DIVERSITY_WEIGHT * 4);
+              for (let i = 0; i < 1 + extraCopies; i++) {
+                diversityCandidates.push(mode);
+              }
+            }
+            if (diversityCandidates.length > 0) candidates = diversityCandidates;
           }
 
           const rng = seededRandom(seed + (trackNumber ?? 0) * 31337 + sectionIndex * 7919);
@@ -400,6 +416,20 @@ export function getModeForSection(
             }
           }
         }
+      }
+
+      // Visual memory diversity: boost candidates that are visually novel
+      if (visualMemory && visualMemory.totalWeight > 0) {
+        const DIVERSITY_WEIGHT = 0.5;
+        const diversityPool: VisualMode[] = [];
+        for (const mode of filteredPool) {
+          const bonus = scoreDiversityBonus(visualMemory, mode);
+          const extraCopies = Math.round(bonus * DIVERSITY_WEIGHT * 4);
+          for (let i = 0; i < 1 + extraCopies; i++) {
+            diversityPool.push(mode);
+          }
+        }
+        if (diversityPool.length > 0) filteredPool = diversityPool;
       }
 
       const rng = seededRandom(seed + (trackNumber ?? 0) * 31337 + sectionIndex * 7919);

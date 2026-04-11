@@ -26,6 +26,8 @@ import type { JamEvolution, JamPhaseBoundaries } from "../utils/jam-evolution";
 import type { JamCycleState } from "../utils/jam-cycles";
 import type { InterplayMode } from "../utils/stem-interplay";
 import type { ReactiveState } from "../utils/reactive-triggers";
+import type { VisualMemoryState } from "../utils/visual-memory";
+import type { CameraProfile } from "../config/camera-profiles";
 
 // ─── Extracted routing modules ───
 import { dynamicCrossfadeDuration, beatCrossfadeFrames } from "./routing/crossfade-timing";
@@ -103,18 +105,25 @@ interface Props {
   itForceTranscendentShader?: boolean;
   /** Reactive trigger state from mid-section audio analysis */
   reactiveState?: ReactiveState;
+  /** Accumulated visual memory for show-level diversity scoring */
+  visualMemory?: VisualMemoryState;
+  /** Camera behavior profile resolved from narrative directive */
+  cameraProfile?: CameraProfile;
 }
 
-export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, seed, jamDensity, deadAirMode, deadAirFactor, era, coherenceIsLocked, usedShaderModes, shaderModeLastUsed, drumsSpacePhase, songIdentity, stemSection, songDuration, palette: paletteProp, segueIn, isSacredSegueIn, isInSuiteMiddle, setNumber, jamEvolution, jamPhaseBoundaries, jamCycle, jamPhaseShaders, climaxPhase: climaxPhaseProp, trackNumber, stemInterplayMode, stemDominant, itForceTranscendentShader, reactiveState }) => {
+export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, seed, jamDensity, deadAirMode, deadAirFactor, era, coherenceIsLocked, usedShaderModes, shaderModeLastUsed, drumsSpacePhase, songIdentity, stemSection, songDuration, palette: paletteProp, segueIn, isSacredSegueIn, isInSuiteMiddle, setNumber, jamEvolution, jamPhaseBoundaries, jamCycle, jamPhaseShaders, climaxPhase: climaxPhaseProp, trackNumber, stemInterplayMode, stemDominant, itForceTranscendentShader, reactiveState, visualMemory, cameraProfile }) => {
   const frame = useCurrentFrame();
   const palette = paletteProp ?? song.palette;
+
+  // Build scene config from camera profile (threaded through all renderMode calls)
+  const sceneConfig = cameraProfile ? { cameraProfile } : undefined;
 
   // Track reactive trigger for crossfade-out when trigger ends
   const reactiveExitRef = React.useRef<{ mode: VisualMode; exitFrame: number; crossfadeFrames: number } | null>(null);
   const lastReactiveModeRef = React.useRef<VisualMode | null>(null);
 
   if (sections.length === 0) {
-    return <>{renderMode(song.defaultMode, frames, sections, palette, tempo, undefined, jamDensity)}</>;
+    return <>{renderMode(song.defaultMode, frames, sections, palette, tempo, undefined, jamDensity, sceneConfig)}</>;
   }
 
   // Find current section
@@ -134,7 +143,7 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
     if (allowedTrans.length > 0) {
       const rng = seededRandom((seed ?? 0) + frame * 7);
       const dsMode = allowedTrans[Math.floor(rng() * allowedTrans.length)];
-      return <>{renderMode(dsMode, frames, sections, palette, tempo, undefined, jamDensity)}</>;
+      return <>{renderMode(dsMode, frames, sections, palette, tempo, undefined, jamDensity, sceneConfig)}</>;
     }
     // Fall through if no preferred mode matches the transcendent pool
   }
@@ -144,14 +153,14 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
   // so this path is already song-aware. Leave as-is.
   if (drumsSpacePhase) {
     const dsMode = getDrumsSpaceMode(drumsSpacePhase, seed, songIdentity);
-    return <>{renderMode(dsMode, frames, sections, palette, tempo, undefined, jamDensity)}</>;
+    return <>{renderMode(dsMode, frames, sections, palette, tempo, undefined, jamDensity, sceneConfig)}</>;
   }
 
   // ─── REACTIVE TRIGGER — delegated to ReactiveShaderRouter
   const reactiveResult = renderReactiveTrigger(reactiveState, coherenceIsLocked, deadAirFactor, song, songIdentity, seed, currentSectionIdx, sections, era, usedShaderModes, stemSection, frames, songDuration, setNumber, trackNumber, shaderModeLastUsed, stemDominant, palette, tempo, jamDensity, frame, renderMode, getModeForSection, lastReactiveModeRef, reactiveExitRef);
   if (reactiveResult) return reactiveResult;
 
-  const currentMode = getModeForSection(song, currentSectionIdx, sections, seed, era, coherenceIsLocked, usedShaderModes, songIdentity, stemSection, frames, songDuration, setNumber, trackNumber, shaderModeLastUsed, stemDominant);
+  const currentMode = getModeForSection(song, currentSectionIdx, sections, seed, era, coherenceIsLocked, usedShaderModes, songIdentity, stemSection, frames, songDuration, setNumber, trackNumber, shaderModeLastUsed, stemDominant, visualMemory);
 
   // ─── Reactive exit crossfade — delegated to ReactiveShaderRouter
   const reactiveExitResult = renderReactiveExitCrossfade(reactiveExitRef, frame, currentMode, frames, sections, palette, tempo, jamDensity, renderMode);
@@ -173,7 +182,7 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
   // Crossfade INTO this section (from previous) — beat-synced when possible
   // High energy delta transitions (>0.15) use DualShaderQuad for organic GPU blending
   if (prevSectionIdx >= 0 && !suppressCrossfade) {
-    const prevMode = getModeForSection(song, prevSectionIdx, sections, seed, era, false, usedShaderModes, songIdentity, stemSection, frames, songDuration, setNumber, trackNumber, shaderModeLastUsed);
+    const prevMode = getModeForSection(song, prevSectionIdx, sections, seed, era, false, usedShaderModes, songIdentity, stemSection, frames, songDuration, setNumber, trackNumber, shaderModeLastUsed, stemDominant, visualMemory);
     if (prevMode !== currentMode) {
       const boundary = currentSection.frameStart;
       const beatFrame = findNearestBeat(frames, boundary - 30, boundary + 30);
@@ -238,8 +247,8 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
         return (
           <SceneCrossfade
             progress={progress}
-            outgoing={renderMode(prevMode, frames, sections, palette, tempo, undefined, jamDensity)}
-            incoming={renderMode(currentMode, frames, sections, palette, tempo, undefined, jamDensity)}
+            outgoing={renderMode(prevMode, frames, sections, palette, tempo, undefined, jamDensity, sceneConfig)}
+            incoming={renderMode(currentMode, frames, sections, palette, tempo, undefined, jamDensity, sceneConfig)}
             flashFrame={beatFrame !== null ? beatFrame : undefined}
             style={transitionStyle}
           />
@@ -251,7 +260,7 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
   // Crossfade OUT of this section (to next) — beat-synced when possible
   // High energy delta transitions use DualShaderQuad for organic GPU blending
   if (nextSectionIdx < sections.length) {
-    const nextMode = getModeForSection(song, nextSectionIdx, sections, seed, era, false, usedShaderModes, songIdentity, stemSection, frames, songDuration, setNumber, trackNumber, shaderModeLastUsed);
+    const nextMode = getModeForSection(song, nextSectionIdx, sections, seed, era, false, usedShaderModes, songIdentity, stemSection, frames, songDuration, setNumber, trackNumber, shaderModeLastUsed, stemDominant, visualMemory);
     if (nextMode !== currentMode) {
       const boundary = currentSection.frameEnd;
       const beatFrame = findNearestBeat(frames, boundary - 30, boundary + 30);
@@ -315,8 +324,8 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
         return (
           <SceneCrossfade
             progress={progress}
-            outgoing={renderMode(currentMode, frames, sections, palette, tempo, undefined, jamDensity)}
-            incoming={renderMode(nextMode, frames, sections, palette, tempo, undefined, jamDensity)}
+            outgoing={renderMode(currentMode, frames, sections, palette, tempo, undefined, jamDensity, sceneConfig)}
+            incoming={renderMode(nextMode, frames, sections, palette, tempo, undefined, jamDensity, sceneConfig)}
             flashFrame={beatFrame !== null ? beatFrame : undefined}
             style={transitionStyle}
           />
@@ -406,12 +415,12 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
         blendProgress = Math.min(dualBlendCap, blendProgress);
       }
 
-      mainScene = renderMode(currentMode, frames, sections, palette, tempo, undefined, jamDensity);
+      mainScene = renderMode(currentMode, frames, sections, palette, tempo, undefined, jamDensity, sceneConfig);
     } else {
-      mainScene = renderMode(currentMode, frames, sections, palette, tempo, undefined, jamDensity);
+      mainScene = renderMode(currentMode, frames, sections, palette, tempo, undefined, jamDensity, sceneConfig);
     }
   } else {
-    mainScene = renderMode(currentMode, frames, sections, palette, tempo, undefined, jamDensity);
+    mainScene = renderMode(currentMode, frames, sections, palette, tempo, undefined, jamDensity, sceneConfig);
   }
 
   // Dead air crossfade: transition to ambient shader after music ends

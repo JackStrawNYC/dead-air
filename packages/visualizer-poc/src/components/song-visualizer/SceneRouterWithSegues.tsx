@@ -16,6 +16,8 @@ import type { JamEvolution, JamPhaseBoundaries, JamPhase } from "../../utils/jam
 import type { JamCycleState } from "../../utils/jam-cycles";
 import type { ReactiveState } from "../../utils/reactive-triggers";
 import type { InterplayMode } from "../../utils/stem-interplay";
+import type { VisualMemoryState } from "../../utils/visual-memory";
+import type { CameraProfile } from "../../config/camera-profiles";
 
 export interface SceneRouterWithSeguesProps {
   frames: EnhancedFrameData[];
@@ -48,6 +50,10 @@ export interface SceneRouterWithSeguesProps {
   stemDominant: string;
   itForceTranscendentShader: boolean;
   reactiveState: ReactiveState;
+  /** Accumulated visual memory for show-level diversity scoring */
+  visualMemory?: VisualMemoryState;
+  /** Camera behavior profile resolved from narrative directive */
+  cameraProfile?: CameraProfile;
   // Segue IN/OUT props
   segueOut?: boolean;
   segueFromMode?: VisualMode;
@@ -69,14 +75,14 @@ export const SceneRouterWithSegues: React.FC<SceneRouterWithSeguesProps> = (prop
     songIdentity, stemSection, songDuration, palette, segueIn, isSacredSegueIn,
     isInSuiteMiddle, setNumber, jamEvolution, jamPhaseBoundaries, jamCycle,
     jamPhaseShaders, climaxPhase, trackNumber, stemInterplayMode, stemDominant,
-    itForceTranscendentShader, reactiveState,
+    itForceTranscendentShader, reactiveState, visualMemory, cameraProfile,
     segueOut, segueFromMode, segueToMode, segueFromPalette, segueToPalette,
     sacredSegueInTransition, sacredSegueOutTransition, isSacredSegueOut,
     frame, durationInFrames, fadeFrames,
   } = props;
 
   const climaxPhaseMap: Record<string, number> = { idle: 0, build: 1, climax: 2, sustain: 3, release: 4 };
-  const sceneRouter = <SceneRouter frames={f} sections={sections} song={song} tempo={tempo} seed={showSeed} jamDensity={jamDensity} deadAirMode={deadAirFactor > 0 ? "cosmic_dust" : undefined} deadAirFactor={deadAirFactor > 0 ? deadAirFactor : undefined} era={era} coherenceIsLocked={coherenceIsLocked} drumsSpacePhase={drumsSpacePhase} usedShaderModes={usedShaderModes} shaderModeLastUsed={shaderModeLastUsed} songIdentity={songIdentity} stemSection={stemSection} songDuration={songDuration} palette={palette} segueIn={segueIn} isSacredSegueIn={isSacredSegueIn} isInSuiteMiddle={isInSuiteMiddle} setNumber={setNumber} jamEvolution={jamEvolution} jamPhaseBoundaries={jamPhaseBoundaries} jamCycle={jamCycle} jamPhaseShaders={jamPhaseShaders} climaxPhase={climaxPhase} trackNumber={trackNumber} stemInterplayMode={stemInterplayMode} stemDominant={stemDominant} itForceTranscendentShader={itForceTranscendentShader} reactiveState={reactiveState} />;
+  const sceneRouter = <SceneRouter frames={f} sections={sections} song={song} tempo={tempo} seed={showSeed} jamDensity={jamDensity} deadAirMode={deadAirFactor > 0 ? "cosmic_dust" : undefined} deadAirFactor={deadAirFactor > 0 ? deadAirFactor : undefined} era={era} coherenceIsLocked={coherenceIsLocked} drumsSpacePhase={drumsSpacePhase} usedShaderModes={usedShaderModes} shaderModeLastUsed={shaderModeLastUsed} songIdentity={songIdentity} stemSection={stemSection} songDuration={songDuration} palette={palette} segueIn={segueIn} isSacredSegueIn={isSacredSegueIn} isInSuiteMiddle={isInSuiteMiddle} setNumber={setNumber} jamEvolution={jamEvolution} jamPhaseBoundaries={jamPhaseBoundaries} jamCycle={jamCycle} jamPhaseShaders={jamPhaseShaders} climaxPhase={climaxPhase} trackNumber={trackNumber} stemInterplayMode={stemInterplayMode} stemDominant={stemDominant} itForceTranscendentShader={itForceTranscendentShader} reactiveState={reactiveState} visualMemory={visualMemory} cameraProfile={cameraProfile} />;
 
   const effectivePalette = palette;
 

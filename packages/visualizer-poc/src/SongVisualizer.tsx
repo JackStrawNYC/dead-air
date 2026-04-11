@@ -62,6 +62,7 @@ import { getSectionVocabulary, composeSectionWithJamCycle } from "./utils/sectio
 import { detectGroove, grooveModifiers } from "./utils/groove-detector";
 import { detectJamCycle } from "./utils/jam-cycles";
 import { computeNarrativeDirective } from "./utils/visual-narrator";
+import { CAMERA_PROFILES, DEFAULT_CAMERA_PROFILE } from "./config/camera-profiles";
 import { endScreenOverlayMult } from "./utils/end-screen-zones";
 import { getVenueProfile } from "./utils/venue-profiles";
 import { deriveChromaPalette } from "./utils/chroma-palette";
@@ -78,6 +79,7 @@ import type { PrecomputedNarrative } from "./utils/show-narrative-precompute";
 import { computeStemCharacter } from "./utils/stem-character";
 import { computeReactiveTriggers } from "./utils/reactive-triggers";
 import { buildIconSchedule, getIconForFrame } from "./utils/icon-overlay-manager";
+import { createInitialMemory, updateVisualMemory, type VisualMemoryState } from "./utils/visual-memory";
 
 // Extracted sub-components
 import { AudioLayer } from "./components/song-visualizer/AudioLayer";
@@ -155,6 +157,20 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
     }
     return liveNarrative;
   }, [props.narrativeState, liveNarrative]);
+
+  // ─── Visual memory (show-level diversity scoring) ───
+  // Build from previously used shader modes so the routing system can steer
+  // toward underrepresented visual regions across a multi-hour show.
+  const visualMemory = useMemo((): VisualMemoryState | undefined => {
+    const usedModes = narrative?.state.usedShaderModes;
+    if (!usedModes || usedModes.size === 0) return undefined;
+    let memory = createInitialMemory();
+    for (const [mode, count] of usedModes.entries()) {
+      // Approximate duration: count * average section length (900 frames = 30s at 30fps)
+      memory = updateVisualMemory(memory, mode as VisualMode, count * 900);
+    }
+    return memory;
+  }, [narrative?.state.usedShaderModes]);
 
   // ─── Data loading & analysis ───
   const analysis = loadAnalysis(props as unknown as Record<string, unknown>);
@@ -595,6 +611,15 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
 
   // harmonicResponse and modalColor removed — were only feeding EnergyEnvelope hue modifiers (now stripped)
 
+  // Resolve camera path from narrative directive to a CameraProfile
+  const activeCameraProfile = useMemo(() => {
+    if (!narrativeDirective.cameraPath) return undefined;
+    // Look up named profile or create one with just the pathType override
+    const named = CAMERA_PROFILES[narrativeDirective.cameraPath];
+    if (named) return named;
+    return { ...DEFAULT_CAMERA_PROFILE, pathType: narrativeDirective.cameraPath };
+  }, [narrativeDirective.cameraPath]);
+
   // End screen overlay dimming (last 20s)
   const endScreenMult = endScreenOverlayMult(frame, durationInFrames);
 
@@ -785,6 +810,8 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
               stemDominant={stemCharacter.dominant}
               itForceTranscendentShader={itState.forceTranscendentShader}
               reactiveState={reactiveState}
+              visualMemory={visualMemory}
+              cameraProfile={activeCameraProfile}
               segueOut={props.segueOut}
               segueFromMode={props.segueFromMode}
               segueToMode={props.segueToMode}

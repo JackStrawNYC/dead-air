@@ -11,6 +11,8 @@ import type {
 } from "../../data/types";
 import type { DualBlendMode } from "../../components/DualShaderQuad";
 import { renderScene } from "../scene-registry";
+import type { CameraProfile } from "../../config/camera-profiles";
+import type { ShaderParameterProfile } from "../../config/shader-parameters";
 
 /** Average energy (rms) over a frame range */
 export function averageEnergy(frames: EnhancedFrameData[], start: number, end: number): number {
@@ -46,6 +48,7 @@ export function renderMode(
   tempo?: number,
   style?: React.CSSProperties,
   jamDensity?: number,
+  config?: { cameraProfile?: CameraProfile; shaderParams?: ShaderParameterProfile },
 ): React.ReactNode {
-  return renderScene(mode, { frames, sections, palette, tempo, style, jamDensity });
+  return renderScene(mode, { frames, sections, palette, tempo, style, jamDensity }, config);
 }

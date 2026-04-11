@@ -196,7 +196,16 @@
     ],
     "overlayDensity": 0.5,
     "hueShift": -8,
-    "saturationOffset": -0.08
+    "saturationOffset": -0.08,
+    "cameraProfile": "intimate",
+    "shaderParams": {
+      "bassScale": 0.5,
+      "energyScale": 0.6,
+      "motionSpeed": 0.5,
+      "colorSaturationBias": 0.03,
+      "drumReactivity": 0.4,
+      "vocalWeight": 1.5
+    }
   },
   "caseyjones": {
     "preferredModes": [
@@ -298,7 +307,14 @@
       "funk",
       "groove",
       "psychedelic"
-    ]
+    ],
+    "cameraProfile": "driving",
+    "shaderParams": {
+      "bassScale": 1.5,
+      "energyScale": 1.2,
+      "motionSpeed": 1.2,
+      "drumReactivity": 1.5
+    }
   },
   "darkstar": {
     "preferredModes": [
@@ -343,7 +359,17 @@
       "cosmic",
       "void",
       "transcendent"
-    ]
+    ],
+    "cameraProfile": "contemplative",
+    "shaderParams": {
+      "bassScale": 0.6,
+      "energyScale": 0.7,
+      "motionSpeed": 0.5,
+      "colorSaturationBias": -0.05,
+      "complexityBias": 0.2,
+      "drumReactivity": 0.5,
+      "vocalWeight": 0.6
+    }
   },
   "fireonthemountain": {
     "preferredModes": [
@@ -382,7 +408,15 @@
       "fire",
       "building",
       "psychedelic"
-    ]
+    ],
+    "cameraProfile": "driving",
+    "shaderParams": {
+      "bassScale": 1.3,
+      "energyScale": 1.3,
+      "motionSpeed": 1.2,
+      "colorSaturationBias": 0.10,
+      "drumReactivity": 1.4
+    }
   },
   "scarletbegonias": {
     "preferredModes": [
@@ -417,7 +451,15 @@
       "psychedelic",
       "joyous",
       "colorful"
-    ]
+    ],
+    "cameraProfile": "driving",
+    "shaderParams": {
+      "bassScale": 1.2,
+      "energyScale": 1.2,
+      "motionSpeed": 1.1,
+      "colorSaturationBias": 0.08,
+      "drumReactivity": 1.3
+    }
   },
   "eyesoftheworld": {
     "preferredModes": [
@@ -456,7 +498,15 @@
       "cosmic",
       "soaring",
       "jam"
-    ]
+    ],
+    "cameraProfile": "default",
+    "shaderParams": {
+      "bassScale": 0.8,
+      "energyScale": 0.9,
+      "motionSpeed": 0.8,
+      "colorSaturationBias": 0.05,
+      "vocalWeight": 1.0
+    }
   },
   "morningdew": {
     "preferredModes": [
@@ -501,7 +551,15 @@
       "apocalyptic",
       "tender",
       "devastating"
-    ]
+    ],
+    "cameraProfile": "contemplative",
+    "shaderParams": {
+      "bassScale": 0.7,
+      "energyScale": 0.8,
+      "motionSpeed": 0.6,
+      "drumReactivity": 0.6,
+      "vocalWeight": 1.6
+    }
   },
   "stellablue": {
     "preferredModes": [
@@ -541,7 +599,16 @@
       "cosmic",
       "lonesome",
       "tender"
-    ]
+    ],
+    "cameraProfile": "contemplative",
+    "shaderParams": {
+      "bassScale": 0.5,
+      "energyScale": 0.6,
+      "motionSpeed": 0.4,
+      "colorSaturationBias": -0.08,
+      "drumReactivity": 0.4,
+      "vocalWeight": 1.4
+    }
   },
   "notfadeaway": {
     "preferredModes": [
@@ -576,7 +643,14 @@
       "anthem",
       "hypnotic",
       "building"
-    ]
+    ],
+    "cameraProfile": "driving",
+    "shaderParams": {
+      "bassScale": 1.4,
+      "energyScale": 1.3,
+      "motionSpeed": 1.3,
+      "drumReactivity": 1.6
+    }
   },
   "estimatedprophet": {
     "preferredModes": [
@@ -614,7 +688,15 @@
       "prophetic",
       "spacey",
       "mystical"
-    ]
+    ],
+    "cameraProfile": "default",
+    "shaderParams": {
+      "bassScale": 1.0,
+      "energyScale": 1.0,
+      "motionSpeed": 0.9,
+      "drumReactivity": 1.1,
+      "vocalWeight": 1.2
+    }
   },
   "chinacatsunflower": {
     "preferredModes": [
@@ -646,7 +728,15 @@
       "psychedelic",
       "colorful",
       "playful"
-    ]
+    ],
+    "cameraProfile": "driving",
+    "shaderParams": {
+      "bassScale": 1.1,
+      "energyScale": 1.1,
+      "motionSpeed": 1.1,
+      "colorSaturationBias": 0.06,
+      "drumReactivity": 1.2
+    }
   },
   "iknowyourider": {
     "preferredModes": [
@@ -746,7 +836,16 @@
       "joyous",
       "psychedelic",
       "celebratory"
-    ]
+    ],
+    "cameraProfile": "driving",
+    "shaderParams": {
+      "bassScale": 1.2,
+      "energyScale": 1.2,
+      "motionSpeed": 1.2,
+      "colorSaturationBias": 0.10,
+      "drumReactivity": 1.3,
+      "vocalWeight": 1.1
+    }
   },
   "terrapinstation": {
     "preferredModes": [
@@ -783,7 +882,15 @@
       "epic",
       "cosmic",
       "narrative"
-    ]
+    ],
+    "cameraProfile": "default",
+    "shaderParams": {
+      "bassScale": 0.8,
+      "energyScale": 0.9,
+      "motionSpeed": 0.7,
+      "colorSaturationBias": 0.05,
+      "complexityBias": 0.15
+    }
   },
   "playingintheband": {
     "preferredModes": [
@@ -819,7 +926,15 @@
       "expansive",
       "spacey",
       "jam"
-    ]
+    ],
+    "cameraProfile": "default",
+    "shaderParams": {
+      "bassScale": 1.0,
+      "energyScale": 1.0,
+      "motionSpeed": 0.9,
+      "complexityBias": 0.15,
+      "drumReactivity": 1.0
+    }
   },
   "theotherone": {
     "preferredModes": [
@@ -857,7 +972,15 @@
       "chaotic",
       "psychedelic",
       "intense"
-    ]
+    ],
+    "cameraProfile": "default",
+    "shaderParams": {
+      "bassScale": 1.2,
+      "energyScale": 1.1,
+      "motionSpeed": 1.1,
+      "complexityBias": 0.2,
+      "drumReactivity": 1.3
+    }
   },
   "wharfrat": {
     "preferredModes": [
@@ -894,7 +1017,16 @@
       "redemption",
       "dark-to-light",
       "storytelling"
-    ]
+    ],
+    "cameraProfile": "intimate",
+    "shaderParams": {
+      "bassScale": 0.6,
+      "energyScale": 0.7,
+      "motionSpeed": 0.5,
+      "colorSaturationBias": -0.05,
+      "drumReactivity": 0.5,
+      "vocalWeight": 1.5
+    }
   },
   "birdsong": {
     "preferredModes": [
@@ -930,7 +1062,16 @@
       "soaring",
       "spacey",
       "joyous"
-    ]
+    ],
+    "cameraProfile": "contemplative",
+    "shaderParams": {
+      "bassScale": 0.6,
+      "energyScale": 0.7,
+      "motionSpeed": 0.5,
+      "complexityBias": 0.1,
+      "drumReactivity": 0.5,
+      "vocalWeight": 0.8
+    }
   },
   "helpontheway": {
     "preferredModes": [
@@ -1070,7 +1211,15 @@
       "intense",
       "triumphant",
       "driving"
-    ]
+    ],
+    "cameraProfile": "driving",
+    "shaderParams": {
+      "bassScale": 1.3,
+      "energyScale": 1.2,
+      "motionSpeed": 1.1,
+      "colorSaturationBias": 0.05,
+      "drumReactivity": 1.4
+    }
   },
   "newminglewoodblues": {
     "preferredModes": [
@@ -1875,7 +2024,16 @@
       "tender",
       "farewell",
       "nostalgic"
-    ]
+    ],
+    "cameraProfile": "intimate",
+    "shaderParams": {
+      "bassScale": 0.4,
+      "energyScale": 0.5,
+      "motionSpeed": 0.4,
+      "colorSaturationBias": -0.06,
+      "drumReactivity": 0.3,
+      "vocalWeight": 1.6
+    }
   },
   "blackpeter": {
     "preferredModes": [
@@ -3114,5 +3272,50 @@
       "western",
       "fun"
     ]
+  },
+  "boxofrain": {
+    "preferredModes": [
+      "morning_dew_fog",
+      "aurora",
+      "protean_clouds",
+      "deep_ocean",
+      "volumetric_clouds",
+      "cosmic_voyage"
+    ],
+    "palette": {
+      "primary": 210,
+      "secondary": 150,
+      "saturation": 0.7,
+      "brightness": 0.92
+    },
+    "overlayBoost": [
+      "BoxOfRain",
+      "Fireflies",
+      "RoseOverlay"
+    ],
+    "overlaySuppress": [
+      "LaserShow",
+      "ParticleExplosion"
+    ],
+    "moodKeywords": [
+      "contemplative",
+      "organic"
+    ],
+    "overlayDensity": 0.5,
+    "hueShift": -5,
+    "narrativeArc": "build_to_climax",
+    "thematicTags": [
+      "tender",
+      "gentle",
+      "farewell"
+    ],
+    "cameraProfile": "intimate",
+    "shaderParams": {
+      "bassScale": 0.6,
+      "energyScale": 0.7,
+      "motionSpeed": 0.6,
+      "drumReactivity": 0.5,
+      "vocalWeight": 1.4
+    }
   }
 }

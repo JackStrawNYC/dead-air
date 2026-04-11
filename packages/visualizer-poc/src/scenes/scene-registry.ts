@@ -22,6 +22,8 @@ import type { EnhancedFrameData, SectionBoundary, ColorPalette, VisualMode } fro
 import { getEraPreset } from "../data/era-presets";
 import type { SceneTransitionStyle } from "../utils/transition-selector";
 import { SceneConfigProvider } from "./SceneConfigContext";
+import type { CameraProfile } from "../config/camera-profiles";
+import type { ShaderParameterProfile } from "../config/shader-parameters";
 
 // ─── Scene Component Interface ───
 
@@ -1130,6 +1132,7 @@ export function getModesForEnergyAndSpectral(
 export function renderScene(
   mode: VisualMode,
   props: SceneProps,
+  config?: { cameraProfile?: CameraProfile; shaderParams?: ShaderParameterProfile },
 ): React.ReactNode {
   const entry = SCENE_REGISTRY[mode];
   if (!entry) {
@@ -1137,10 +1140,11 @@ export function renderScene(
     return React.createElement(fallback.Component, props);
   }
   const gi = entry.gradingIntensity;
-  if (gi !== undefined && gi < 1.0) {
+  // Wrap in SceneConfigProvider when we have non-default grading or caller-supplied config
+  if ((gi !== undefined && gi < 1.0) || config?.cameraProfile || config?.shaderParams) {
     return React.createElement(
       SceneConfigProvider,
-      { value: { gradingIntensity: gi } },
+      { value: { gradingIntensity: gi ?? 1.0, ...config } },
       React.createElement(entry.Component, props),
     );
   }
