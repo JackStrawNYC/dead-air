@@ -893,8 +893,9 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
           </SilentErrorBoundary>
           </div>
 
-          {/* Song art: visible during intro only, then gone. GLSL icons own the visual after. */}
-          {effectiveSongArt && (frame < 450 || deadAirFactor > 0.01) && (
+          {/* Song art: SongArtLayer handles its own fade-in/out + dead-air reappearance internally.
+              Keep it always mounted (when art exists) to avoid WebGL context crashes from unmount. */}
+          {effectiveSongArt && (
             <SilentErrorBoundary name="SongArt">
               <SongArtLayer src={staticFile(effectiveSongArt)} suppressionFactor={artSuppressionFactor} hueRotation={hueRotation} energy={audioSnapshot.energy} climaxIntensity={climaxState.intensity} focusOpacity={focusState.artOpacity} segueIn={props.segueIn} artBlendMode={props.song.artBlendMode} introFactor={Math.min(1, introFactor * 1.5)} deadAirFactor={deadAirFactor} />
             </SilentErrorBoundary>
