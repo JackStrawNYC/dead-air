@@ -34,6 +34,7 @@ import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
 import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
+import { lightingGLSL } from "./shared/lighting.glsl";
 
 export const databendVert = /* glsl */ `
 varying vec2 vUv;
@@ -58,6 +59,7 @@ precision highp float;
 ${sharedUniformsGLSL}
 
 ${noiseGLSL}
+${lightingGLSL}
 
 ${buildPostProcessGLSL({
   grainStrength: "normal",
@@ -486,6 +488,7 @@ void main() {
   }
 
   // === POST-PROCESSING ===
+  col = applyTemperature(col);
   col = applyPostProcess(col, vUv, screenP);
   gl_FragColor = vec4(col, 1.0);
 }

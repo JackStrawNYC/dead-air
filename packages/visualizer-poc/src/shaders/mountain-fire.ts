@@ -26,7 +26,7 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
-import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
+import { buildRaymarchNormal, buildRaymarchAO, buildDepthAlphaOutput } from "./shared/raymarching.glsl";
 import { lightingGLSL } from "./shared/lighting.glsl";
 
 export const mountainFireVert = /* glsl */ `
@@ -39,6 +39,7 @@ void main() {
 
 const mfNormalGLSL = buildRaymarchNormal("mfMap($P, melPitch, timeVal, bass)", { eps: 0.01, name: "mfNormal" });
 const mfAOGLSL = buildRaymarchAO("mfMap($P, melPitch, timeVal, bass)", { steps: 5, stepBase: 0.02, stepScale: 0.08, weightDecay: 0.6, finalMult: 2.0, name: "mfAO" });
+const mfDepthAlpha = buildDepthAlphaOutput("marchDist", "MAX_DIST");
 
 export const mountainFireFrag = /* glsl */ `
 precision highp float;
@@ -503,6 +504,7 @@ void main() {
   col = applyPostProcess(col, vUv, screenPos);
 
   gl_FragColor = vec4(col, 1.0);
+  ${mfDepthAlpha}
 }
 `;
 

@@ -26,6 +26,7 @@ import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
 import { buildRaymarchNormal } from "./shared/raymarching.glsl";
+import { lightingGLSL } from "./shared/lighting.glsl";
 
 export const campfireEmbersVert = /* glsl */ `
 varying vec2 vUv;
@@ -56,6 +57,7 @@ precision highp float;
 ${sharedUniformsGLSL}
 
 ${noiseGLSL}
+${lightingGLSL}
 
 ${postProcess}
 
@@ -596,6 +598,7 @@ void main() {
   }
 
   // ─── Post-processing (shared chain) ───
+  col = applyTemperature(col);
   col = applyPostProcess(col, vUv, centeredP);
 
   gl_FragColor = vec4(col, 1.0);

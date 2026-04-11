@@ -28,6 +28,7 @@ import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
 import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
+import { lightingGLSL } from "./shared/lighting.glsl";
 
 export const electricArcVert = /* glsl */ `
 varying vec2 vUv;
@@ -59,6 +60,7 @@ ${sharedUniformsGLSL}
 uniform sampler2D uPrevFrame;
 
 ${noiseGLSL}
+${lightingGLSL}
 
 ${postProcess}
 
@@ -751,6 +753,7 @@ void main() {
   // ═══════════════════════════════════════════════════
   // Post-processing
   // ═══════════════════════════════════════════════════
+  col = applyTemperature(col);
   col = applyPostProcess(col, vUv, (vUv - 0.5) * aspect);
 
   gl_FragColor = vec4(col, 1.0);

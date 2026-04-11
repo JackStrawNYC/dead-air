@@ -27,7 +27,8 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
-import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
+import { buildRaymarchNormal, buildRaymarchAO, buildDepthAlphaOutput } from "./shared/raymarching.glsl";
+import { lightingGLSL } from "./shared/lighting.glsl";
 
 export const mobiusAmphitheaterVert = /* glsl */ `
 varying vec2 vUv;
@@ -47,11 +48,13 @@ const postProcess = buildPostProcessGLSL({
 
 const maNormalGLSL = buildRaymarchNormal("maMap($P, energy, bass, maTime, tension, twistMult, morphAmt, sJam, sSpace, climB, halfW, halfH, majorR)", { eps: 0.003, name: "maNormal" });
 const maAOGLSL = buildRaymarchAO("maMap($P, energy, bass, maTime, tension, twistMult, morphAmt, sJam, sSpace, climB, halfW, halfH, majorR)", { steps: 3, stepBase: 0.0, stepScale: 0.12, weightDecay: 0.7, finalMult: 3.0, name: "maAO" });
+const maDepthAlpha = buildDepthAlphaOutput("totalDist", "12.0");
 
 export const mobiusAmphitheaterFrag = /* glsl */ `
 precision highp float;
 ${sharedUniformsGLSL}
 ${noiseGLSL}
+${lightingGLSL}
 ${postProcess}
 varying vec2 vUv;
 
@@ -695,7 +698,9 @@ void main() {
   col = max(col, vec3(0.02, 0.015, 0.03));
 
   // ─── Post-process ───
+  col = applyTemperature(col);
   col = applyPostProcess(col, uv, p);
   gl_FragColor = vec4(col, 1.0);
+  ${maDepthAlpha}
 }
 `;

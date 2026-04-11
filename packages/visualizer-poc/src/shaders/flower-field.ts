@@ -25,7 +25,7 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
-import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
+import { buildRaymarchNormal, buildRaymarchAO, buildDepthAlphaOutput } from "./shared/raymarching.glsl";
 import { lightingGLSL } from "./shared/lighting.glsl";
 
 export const flowerFieldVert = /* glsl */ `
@@ -38,6 +38,7 @@ void main() {
 
 const fflNormalGLSL = buildRaymarchNormal("fflMap($P, timeVal, bass, energy, bloomState, sJam, sSpace).x", { eps: 0.002, name: "fflNormal" });
 const fflAOGLSL = buildRaymarchAO("fflMap($P, timeVal, bass, energy, bloomState, sJam, sSpace).x", { steps: 5, stepBase: 0.01, stepScale: 0.04, weightDecay: 0.7, finalMult: 3.0, name: "fflAO" });
+const fflDepthAlpha = buildDepthAlphaOutput("marchDist", "MAX_DIST");
 
 export const flowerFieldFrag = /* glsl */ `
 precision highp float;
@@ -569,5 +570,6 @@ void main() {
   col = applyPostProcess(col, vUv, screenPos);
 
   gl_FragColor = vec4(col, 1.0);
+  ${fflDepthAlpha}
 }
 `;

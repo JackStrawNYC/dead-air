@@ -33,6 +33,7 @@ import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
 import { buildRaymarchNormal } from "./shared/raymarching.glsl";
+import { lightingGLSL } from "./shared/lighting.glsl";
 
 export const aviaryCanopyVert = /* glsl */ `
 varying vec2 vUv;
@@ -61,6 +62,7 @@ precision highp float;
 ${sharedUniformsGLSL}
 
 ${noiseGLSL}
+${lightingGLSL}
 
 ${postProcess}
 
@@ -566,6 +568,7 @@ void main() {
   col += heroIconEmergence(p, uTime, energy, bass, iconCol1, iconCol2, iconNoise, uSectionIndex);
 
   // === POST PROCESS ===
+  col = applyTemperature(col);
   col = applyPostProcess(col, uvCoord, p);
 
   gl_FragColor = vec4(col, 1.0);

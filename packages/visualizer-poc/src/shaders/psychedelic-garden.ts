@@ -33,7 +33,8 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
-import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
+import { buildRaymarchNormal, buildRaymarchAO, buildDepthAlphaOutput } from "./shared/raymarching.glsl";
+import { lightingGLSL } from "./shared/lighting.glsl";
 
 export const psychedelicGardenVert = /* glsl */ `
 varying vec2 vUv;
@@ -57,6 +58,7 @@ const postProcess = buildPostProcessGLSL({
 
 const pgNormalGLSL = buildRaymarchNormal("pgMap($P).dist", { eps: 0.001, name: "pgNormal" });
 const pgAOGLSL = buildRaymarchAO("pgMap($P).dist", { steps: 5, stepBase: 0.0, stepScale: 0.02, weightDecay: 0.6, finalMult: 3.0, name: "pgAO" });
+const pgDepthAlpha = buildDepthAlphaOutput("htInfo.dist", "MAX_DIST");
 
 export const psychedelicGardenFrag = /* glsl */ `
 precision highp float;
@@ -64,6 +66,7 @@ precision highp float;
 ${sharedUniformsGLSL}
 
 ${noiseGLSL}
+${lightingGLSL}
 
 ${postProcess}
 
@@ -844,8 +847,10 @@ void main() {
   }
 
   // ─── Post-processing ───
+  col = applyTemperature(col);
   col = applyPostProcess(col, uv, p);
 
   gl_FragColor = vec4(col, 1.0);
+  ${pgDepthAlpha}
 }
 `;

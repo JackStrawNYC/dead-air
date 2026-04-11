@@ -29,7 +29,8 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
-import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
+import { buildRaymarchNormal, buildRaymarchAO, buildDepthAlphaOutput } from "./shared/raymarching.glsl";
+import { lightingGLSL } from "./shared/lighting.glsl";
 
 export const clockworkTempleVert = /* glsl */ `
 varying vec2 vUv;
@@ -47,11 +48,13 @@ const postProcess = buildPostProcessGLSL({
 
 const ctNormalGLSL = buildRaymarchNormal("ctMap($P, ft, energy, bass, drumSnap, tension, pitch, sJam, sSpace, sChorus, climax, stability, beatSnap)", { eps: 0.002, name: "ctNormal" });
 const ctAOGLSL = buildRaymarchAO("ctMap($P, ft, energy, bass, drumSnap, tension, pitch, sJam, sSpace, sChorus, climax, stability, beatSnap)", { steps: 5, stepBase: 0.0, stepScale: 0.05, weightDecay: 0.6, finalMult: 3.0, name: "ctAmbientOcc" });
+const ctDepthAlpha = buildDepthAlphaOutput("totalDist", "CT_MAX_DIST");
 
 export const clockworkTempleFrag = /* glsl */ `
 precision highp float;
 ${sharedUniformsGLSL}
 ${noiseGLSL}
+${lightingGLSL}
 ${postProcess}
 varying vec2 vUv;
 
@@ -557,8 +560,10 @@ void main() {
   col += heroIconEmergence(p, uTime, energy, bass, palPrimary, palSecondary, noiseField, uSectionIndex);
 
   // ─── Post-process ───
+  col = applyTemperature(col);
   col = applyPostProcess(col, uv, p);
 
   gl_FragColor = vec4(col, 1.0);
+  ${ctDepthAlpha}
 }
 `;

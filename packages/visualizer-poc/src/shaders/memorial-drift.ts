@@ -28,7 +28,8 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
-import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
+import { buildRaymarchNormal, buildRaymarchAO, buildDepthAlphaOutput } from "./shared/raymarching.glsl";
+import { lightingGLSL } from "./shared/lighting.glsl";
 
 export const memorialDriftVert = /* glsl */ `
 varying vec2 vUv;
@@ -52,6 +53,7 @@ const postProcess = buildPostProcessGLSL({
 
 const mdNormalGLSL = buildRaymarchNormal("mdMap($P).x", { eps: 0.003, name: "mdNormal" });
 const mdAOGLSL = buildRaymarchAO("mdMap($P).x", { steps: 5, stepBase: 0.0, stepScale: 0.05, weightDecay: 0.65, finalMult: 3.0, name: "mdAO" });
+const mdDepthAlpha = buildDepthAlphaOutput("totalDist", "MD_MAX_DIST");
 
 export const memorialDriftFrag = /* glsl */ `
 precision highp float;
@@ -59,6 +61,7 @@ precision highp float;
 ${sharedUniformsGLSL}
 
 ${noiseGLSL}
+${lightingGLSL}
 
 ${postProcess}
 
@@ -740,6 +743,7 @@ void main() {
   // POST PROCESS
   // ═══════════════════════════════════════════════
 
+  col = applyTemperature(col);
   col = applyPostProcess(col, uv, p);
 
   // Lifted blacks: memorial scenes should never go pure black. Previously
@@ -750,5 +754,6 @@ void main() {
   col = max(col, vec3(0.09, 0.07, 0.10) * liftMult);
 
   gl_FragColor = vec4(col, 1.0);
+  ${mdDepthAlpha}
 }
 `;

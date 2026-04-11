@@ -26,7 +26,7 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
-import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
+import { buildRaymarchNormal, buildRaymarchAO, buildDepthAlphaOutput } from "./shared/raymarching.glsl";
 import { lightingGLSL } from "./shared/lighting.glsl";
 
 export const desertRoadVert = /* glsl */ `
@@ -39,6 +39,7 @@ void main() {
 
 const drdNormalGLSL = buildRaymarchNormal("drdMap($P, timeVal, bass).x", { eps: 0.002, name: "drdNormal" });
 const drdAOGLSL = buildRaymarchAO("drdMap($P, timeVal, bass).x", { steps: 5, stepBase: 0.02, stepScale: 0.06, weightDecay: 0.65, finalMult: 2.5, name: "drdAO" });
+const drdDepthAlpha = buildDepthAlphaOutput("marchDist", "MAX_DIST");
 
 export const desertRoadFrag = /* glsl */ `
 precision highp float;
@@ -502,6 +503,7 @@ void main() {
   col = applyPostProcess(col, vUv, screenPos);
 
   gl_FragColor = vec4(col, 1.0);
+  ${drdDepthAlpha}
 }
 `;
 

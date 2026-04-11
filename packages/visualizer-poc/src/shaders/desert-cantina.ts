@@ -31,7 +31,8 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
-import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
+import { buildRaymarchNormal, buildRaymarchAO, buildDepthAlphaOutput } from "./shared/raymarching.glsl";
+import { lightingGLSL } from "./shared/lighting.glsl";
 
 export const desertCantinaVert = /* glsl */ `
 varying vec2 vUv;
@@ -50,11 +51,13 @@ const postProcess = buildPostProcessGLSL({
 
 const dcNormalGLSL = buildRaymarchNormal("dcMap($P, dcTime, energy, bass, drumOn, melodicP, sJam, sSpace, climB).x", { eps: 0.002, name: "dcNormal" });
 const dcAOGLSL = buildRaymarchAO("dcMap($P, dcTime, energy, bass, drumOn, melodicP, sJam, sSpace, climB).x", { steps: 3, stepBase: 0.0, stepScale: 0.15, weightDecay: 0.65, finalMult: 3.0, name: "dcAO" });
+const dcDepthAlpha = buildDepthAlphaOutput("totalDist", "DC_MAX_DIST");
 
 export const desertCantinaFrag = /* glsl */ `
 precision highp float;
 ${sharedUniformsGLSL}
 ${noiseGLSL}
+${lightingGLSL}
 ${postProcess}
 varying vec2 vUv;
 
@@ -675,8 +678,10 @@ void main() {
   col = max(col, vec3(0.025, 0.018, 0.012));
 
   // ─── Post-processing ───
+  col = applyTemperature(col);
   col = applyPostProcess(col, uvCoord, screenP);
 
   gl_FragColor = vec4(col, 1.0);
+  ${dcDepthAlpha}
 }
 `;

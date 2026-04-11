@@ -28,7 +28,8 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
-import { buildRaymarchNormal } from "./shared/raymarching.glsl";
+import { buildRaymarchNormal, buildDepthAlphaOutput } from "./shared/raymarching.glsl";
+import { lightingGLSL } from "./shared/lighting.glsl";
 
 export const earthquakeFissureVert = /* glsl */ `
 varying vec2 vUv;
@@ -49,6 +50,7 @@ const postProcess = buildPostProcessGLSL({
 });
 
 const efNormalGLSL = buildRaymarchNormal("efMap($P, bass, energy, drumOnset, tension, destructionLevel, shakeAmp, seismicPhase, melodicPitch, slowEnergy, rotSpeed).x", { eps: 0.003, name: "efNormal" });
+const efDepthAlpha = buildDepthAlphaOutput("totalDist", "MAX_DIST");
 
 export const earthquakeFissureFrag = /* glsl */ `
 precision highp float;
@@ -56,6 +58,7 @@ precision highp float;
 ${sharedUniformsGLSL}
 
 ${noiseGLSL}
+${lightingGLSL}
 
 ${postProcess}
 
@@ -579,8 +582,10 @@ void main() {
   }
 
   // === POST-PROCESSING (shared chain) ===
+  col = applyTemperature(col);
   col = applyPostProcess(col, uv, screenP);
 
   gl_FragColor = vec4(col, 1.0);
+  ${efDepthAlpha}
 }
 `;

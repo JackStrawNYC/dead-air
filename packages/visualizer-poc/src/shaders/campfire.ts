@@ -26,7 +26,7 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
-import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
+import { buildRaymarchNormal, buildRaymarchAO, buildDepthAlphaOutput } from "./shared/raymarching.glsl";
 import { lightingGLSL } from "./shared/lighting.glsl";
 
 export const campfireVert = /* glsl */ `
@@ -39,6 +39,7 @@ void main() {
 
 const cf2NormalGLSL = buildRaymarchNormal("cf2Map($P).x", { eps: 0.002, name: "cf2Normal" });
 const cf2AOGLSL = buildRaymarchAO("cf2Map($P).x", { steps: 5, stepBase: 0.01, stepScale: 0.04, weightDecay: 0.65, finalMult: 3.0, name: "cf2AO" });
+const cf2DepthAlpha = buildDepthAlphaOutput("marchDist", "MAX_DIST");
 
 export const campfireFrag = /* glsl */ `
 precision highp float;
@@ -576,5 +577,6 @@ void main() {
   col = applyPostProcess(col, vUv, screenPos);
 
   gl_FragColor = vec4(col, 1.0);
+  ${cf2DepthAlpha}
 }
 `;

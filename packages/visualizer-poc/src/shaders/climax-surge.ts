@@ -29,6 +29,7 @@ import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
 import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
+import { lightingGLSL } from "./shared/lighting.glsl";
 
 export const climaxSurgeVert = /* glsl */ `
 varying vec2 vUv;
@@ -53,6 +54,7 @@ precision highp float;
 ${sharedUniformsGLSL}
 
 ${noiseGLSL}
+${lightingGLSL}
 
 ${buildPostProcessGLSL({ grainStrength: "normal", bloomEnabled: true, bloomThresholdOffset: -0.15, halationEnabled: true, caEnabled: true, thermalShimmerEnabled: true })}
 
@@ -421,6 +423,7 @@ void main() {
   }
 
   // Post-processing
+  col = applyTemperature(col);
   col = applyPostProcess(col, uv, screenP);
 
   gl_FragColor = vec4(col, 1.0);

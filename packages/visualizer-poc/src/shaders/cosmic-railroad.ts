@@ -23,7 +23,8 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
-import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
+import { buildRaymarchNormal, buildRaymarchAO, buildDepthAlphaOutput } from "./shared/raymarching.glsl";
+import { lightingGLSL } from "./shared/lighting.glsl";
 
 export const cosmicRailroadVert = /* glsl */ `
 varying vec2 vUv;
@@ -41,11 +42,13 @@ const postProcess = buildPostProcessGLSL({
 
 const crNormalGLSL = buildRaymarchNormal("crMap($P, bassV, tension, climaxLift, jamDissolve)", { eps: 0.003, name: "crNormal" });
 const crAOGLSL = buildRaymarchAO("crMap($P, bassV, tension, climaxLift, jamDissolve)", { steps: 4, stepBase: 0.0, stepScale: 0.12, weightDecay: 0.7, finalMult: 3.0, name: "crAO" });
+const crDepthAlpha = buildDepthAlphaOutput("totalDist", "CR_MAX_DIST");
 
 export const cosmicRailroadFrag = /* glsl */ `
 precision highp float;
 ${sharedUniformsGLSL}
 ${noiseGLSL}
+${lightingGLSL}
 ${postProcess}
 varying vec2 vUv;
 
@@ -590,8 +593,10 @@ void main() {
   col = max(col, vec3(0.012, 0.008, 0.02));
 
   // ─── Post-processing ───
+  col = applyTemperature(col);
   col = applyPostProcess(col, uv, pCoord);
 
   gl_FragColor = vec4(col, 1.0);
+  ${crDepthAlpha}
 }
 `;

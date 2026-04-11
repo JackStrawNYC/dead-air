@@ -26,7 +26,7 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
-import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
+import { buildRaymarchNormal, buildRaymarchAO, buildDepthAlphaOutput } from "./shared/raymarching.glsl";
 import { lightingGLSL } from "./shared/lighting.glsl";
 
 export const riverVert = /* glsl */ `
@@ -39,6 +39,7 @@ void main() {
 
 const rivNormalGLSL = buildRaymarchNormal("rivMap($P, timeVal, energy, bass, tension, sJam, sSpace).x", { eps: 0.002, name: "rivNormal" });
 const rivAOGLSL = buildRaymarchAO("rivMap($P, timeVal, energy, bass, tension, sJam, sSpace).x", { steps: 5, stepBase: 0.01, stepScale: 0.05, weightDecay: 0.65, finalMult: 3.0, name: "rivAO" });
+const rivDepthAlpha = buildDepthAlphaOutput("marchDist", "MAX_DIST");
 
 export const riverFrag = /* glsl */ `
 precision highp float;
@@ -501,6 +502,7 @@ void main() {
   col = applyPostProcess(col, vUv, screenPos);
 
   gl_FragColor = vec4(col, 1.0);
+  ${rivDepthAlpha}
 }
 `;
 

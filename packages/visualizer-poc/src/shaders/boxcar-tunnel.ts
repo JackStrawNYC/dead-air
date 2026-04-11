@@ -29,6 +29,7 @@ import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
 import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
+import { lightingGLSL } from "./shared/lighting.glsl";
 
 export const boxcarTunnelVert = /* glsl */ `
 varying vec2 vUv;
@@ -54,6 +55,7 @@ export const boxcarTunnelFrag = /* glsl */ `
 precision highp float;
 ${sharedUniformsGLSL}
 ${noiseGLSL}
+${lightingGLSL}
 ${postProcess}
 varying vec2 vUv;
 
@@ -574,6 +576,7 @@ void main() {
   col = max(col, vec3(0.025, 0.02, 0.015) * liftMult);
 
   // ─── Post-process chain ───
+  col = applyTemperature(col);
   col = applyPostProcess(col, uv, p);
 
   gl_FragColor = vec4(col, 1.0);

@@ -20,7 +20,8 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
-import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
+import { buildRaymarchNormal, buildRaymarchAO, buildDepthAlphaOutput } from "./shared/raymarching.glsl";
+import { lightingGLSL } from "./shared/lighting.glsl";
 
 export const highwayHorizonVert = /* glsl */ `
 varying vec2 vUv;
@@ -39,11 +40,13 @@ const postProcess = buildPostProcessGLSL({
 
 const hhNormalGLSL = buildRaymarchNormal("hhMap($P, bassV, drumV, roadW, climaxV)", { eps: 0.005, name: "hhNormal" });
 const hhAOGLSL = buildRaymarchAO("hhMap($P, bassV, drumV, roadW, climaxV)", { steps: 4, stepBase: 0.0, stepScale: 0.12, weightDecay: 0.7, finalMult: 3.0, name: "hhAO" });
+const hhDepthAlpha = buildDepthAlphaOutput("totalDist", "HH_MAX_DIST");
 
 export const highwayHorizonFrag = /* glsl */ `
 precision highp float;
 ${sharedUniformsGLSL}
 ${noiseGLSL}
+${lightingGLSL}
 ${postProcess}
 varying vec2 vUv;
 
@@ -575,8 +578,10 @@ void main() {
   col = max(col, vec3(0.015, 0.01, 0.008));
 
   // ─── Post-processing ───
+  col = applyTemperature(col);
   col = applyPostProcess(col, uv, pCoord);
 
   gl_FragColor = vec4(col, 1.0);
+  ${hhDepthAlpha}
 }
 `;

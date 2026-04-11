@@ -19,7 +19,8 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
-import { buildRaymarchNormal } from "./shared/raymarching.glsl";
+import { buildRaymarchNormal, buildDepthAlphaOutput } from "./shared/raymarching.glsl";
+import { lightingGLSL } from "./shared/lighting.glsl";
 
 export const neonCasinoVert = /* glsl */ `
 varying vec2 vUv;
@@ -36,11 +37,13 @@ const postProcess = buildPostProcessGLSL({
 });
 
 const ncNormalGLSL = buildRaymarchNormal("ncMap($P, ncTime, energy, bass, drumOn, tension, sJam, sSpace, climB).x", { eps: 0.002, name: "ncNormal" });
+const ncDepthAlpha = buildDepthAlphaOutput("totalDist", "NC_MAX_DIST");
 
 export const neonCasinoFrag = /* glsl */ `
 precision highp float;
 ${sharedUniformsGLSL}
 ${noiseGLSL}
+${lightingGLSL}
 ${postProcess}
 varying vec2 vUv;
 
@@ -673,8 +676,10 @@ void main() {
   }
 
   // ─── Post-processing ───
+  col = applyTemperature(col);
   col = applyPostProcess(col, uvCoord, p);
 
   gl_FragColor = vec4(col, 1.0);
+  ${ncDepthAlpha}
 }
 `;

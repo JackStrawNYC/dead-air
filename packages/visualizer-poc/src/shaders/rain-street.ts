@@ -26,7 +26,7 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
-import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
+import { buildRaymarchNormal, buildRaymarchAO, buildDepthAlphaOutput } from "./shared/raymarching.glsl";
 import { lightingGLSL } from "./shared/lighting.glsl";
 
 export const rainStreetVert = /* glsl */ `
@@ -39,6 +39,7 @@ void main() {
 
 const rsNormalGLSL = buildRaymarchNormal("rsSceneSDF($P, flowTime).x", { eps: 0.003, name: "rsCalcNormal" });
 const rsAOGLSL = buildRaymarchAO("rsSceneSDF($P, flowTime).x", { steps: 5, stepBase: 0.0, stepScale: 0.12, weightDecay: 0.6, finalMult: 2.5, name: "rsCalcAO" });
+const rsDepthAlpha = buildDepthAlphaOutput("totalDist", "MAX_DIST");
 
 export const rainStreetFrag = /* glsl */ `
 precision highp float;
@@ -411,5 +412,6 @@ void main() {
   col = applyPostProcess(col, vUv, screenPos);
 
   gl_FragColor = vec4(col, 1.0);
+  ${rsDepthAlpha}
 }
 `;

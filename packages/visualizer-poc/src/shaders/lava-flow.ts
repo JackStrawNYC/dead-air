@@ -33,7 +33,7 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
-import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
+import { buildRaymarchNormal, buildRaymarchAO, buildDepthAlphaOutput } from "./shared/raymarching.glsl";
 import { lightingGLSL } from "./shared/lighting.glsl";
 
 export const lavaFlowVert = /* glsl */ `
@@ -46,6 +46,7 @@ void main() {
 
 const lvNormalGLSL = buildRaymarchNormal("lvMap($P, bass, energy, drumOnset, tension, flowTime, flowSpeedMod, melodicPitch, eruptionScale, ventTime).x", { eps: 0.003, name: "lvNormal" });
 const lvAOGLSL = buildRaymarchAO("lvMap($P, bass, energy, drumOnset, tension, flowTime, flowSpeedMod, melodicPitch, eruptionScale, ventTime).x", { steps: 5, stepBase: -0.06, stepScale: 0.08, weightDecay: 0.7, finalMult: 3.5, name: "lvOcclusion" });
+const lvDepthAlpha = buildDepthAlphaOutput("totalDist", "MAX_DIST");
 
 const postProcess = buildPostProcessGLSL({
   bloomThresholdOffset: -0.1,
@@ -777,5 +778,6 @@ void main() {
   col = applyPostProcess(col, uv, screenP);
 
   gl_FragColor = vec4(col, 1.0);
+  ${lvDepthAlpha}
 }
 `;

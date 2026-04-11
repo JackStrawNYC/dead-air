@@ -27,6 +27,7 @@ import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
 import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
+import { lightingGLSL } from "./shared/lighting.glsl";
 
 export const blacklightGlowVert = /* glsl */ `
 varying vec2 vUv;
@@ -52,6 +53,7 @@ ${sharedUniformsGLSL}
 uniform sampler2D uPrevFrame;
 
 ${noiseGLSL}
+${lightingGLSL}
 
 ${buildPostProcessGLSL({ grainStrength: "light", bloomEnabled: true, halationEnabled: true, caEnabled: true, temporalBlendEnabled: true })}
 
@@ -478,6 +480,7 @@ void main() {
   }
 
   // ═══ Post-processing ═══
+  col = applyTemperature(col);
   col = applyPostProcess(col, vUv, screenPos);
 
   gl_FragColor = vec4(col, 1.0);

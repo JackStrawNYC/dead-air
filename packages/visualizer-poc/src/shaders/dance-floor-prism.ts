@@ -32,7 +32,8 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
-import { buildRaymarchNormal } from "./shared/raymarching.glsl";
+import { buildRaymarchNormal, buildDepthAlphaOutput } from "./shared/raymarching.glsl";
+import { lightingGLSL } from "./shared/lighting.glsl";
 
 export const danceFloorPrismVert = /* glsl */ `
 varying vec2 vUv;
@@ -52,11 +53,13 @@ const postProcess = buildPostProcessGLSL({
 });
 
 const dfNormalGLSL = buildRaymarchNormal("dfMap($P, energy, bass, tension, climaxPhase, climaxIntensity, prismAngle, sJam, sSpace, sChorus, crowdCount).x", { eps: 0.002, name: "dfNormal" });
+const dfDepthAlpha = buildDepthAlphaOutput("marchT", "DF_MAX_DIST");
 
 export const danceFloorPrismFrag = /* glsl */ `
 precision highp float;
 ${sharedUniformsGLSL}
 ${noiseGLSL}
+${lightingGLSL}
 ${postProcess}
 varying vec2 vUv;
 
@@ -610,8 +613,10 @@ void main() {
   }
 
   // ─── Post-processing (shared chain) ───
+  col = applyTemperature(col);
   col = applyPostProcess(col, uvCoord, p);
 
   gl_FragColor = vec4(col, 1.0);
+  ${dfDepthAlpha}
 }
 `;

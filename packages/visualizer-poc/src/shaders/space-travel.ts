@@ -26,7 +26,7 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
-import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
+import { buildRaymarchNormal, buildRaymarchAO, buildDepthAlphaOutput } from "./shared/raymarching.glsl";
 import { lightingGLSL } from "./shared/lighting.glsl";
 
 export const spaceTravelVert = /* glsl */ `
@@ -39,6 +39,7 @@ void main() {
 
 const st2NormalGLSL = buildRaymarchNormal("st2SceneSDF($P, tunnelRadius, twist, flowTime, bassBreath).x", { eps: 0.003, name: "st2CalcNormal" });
 const st2AOGLSL = buildRaymarchAO("st2SceneSDF($P, tunnelRadius, twist, flowTime, bassBreath).x", { steps: 5, stepBase: 0.0, stepScale: 0.1, weightDecay: 0.6, finalMult: 2.5, name: "st2CalcAO" });
+const st2DepthAlpha = buildDepthAlphaOutput("totalDist", "MAX_DIST");
 
 export const spaceTravelFrag = /* glsl */ `
 precision highp float;
@@ -360,5 +361,6 @@ void main() {
   col = applyPostProcess(col, vUv, screenPos);
 
   gl_FragColor = vec4(col, 1.0);
+  ${st2DepthAlpha}
 }
 `;

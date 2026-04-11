@@ -273,7 +273,14 @@
       "rocker",
       "party",
       "driving"
-    ]
+    ],
+    "cameraProfile": "driving",
+    "shaderParams": {
+      "bassScale": 1.2,
+      "energyScale": 1.2,
+      "motionSpeed": 1.1,
+      "drumReactivity": 1.3
+    }
   },
   "unclejohnsband": {
     "preferredModes": [
@@ -810,7 +817,15 @@
       "rocker",
       "country",
       "warm"
-    ]
+    ],
+    "cameraProfile": "driving",
+    "shaderParams": {
+      "bassScale": 1.1,
+      "energyScale": 1.1,
+      "motionSpeed": 1,
+      "drumReactivity": 1.2,
+      "vocalWeight": 1.1
+    }
   },
   "truckin": {
     "preferredModes": [
@@ -1149,7 +1164,15 @@
       "epic",
       "intense",
       "building"
-    ]
+    ],
+    "cameraProfile": "default",
+    "shaderParams": {
+      "bassScale": 1,
+      "energyScale": 1.1,
+      "motionSpeed": 1,
+      "complexityBias": 0.15,
+      "drumReactivity": 1.2
+    }
   },
   "slipknot": {
     "preferredModes": [
@@ -1186,7 +1209,15 @@
       "intense",
       "driving",
       "psychedelic"
-    ]
+    ],
+    "cameraProfile": "driving",
+    "shaderParams": {
+      "bassScale": 1.2,
+      "energyScale": 1.2,
+      "motionSpeed": 1.1,
+      "complexityBias": 0.15,
+      "drumReactivity": 1.4
+    }
   },
   "franklinstower": {
     "preferredModes": [
@@ -1311,7 +1342,14 @@
       "rocker",
       "party",
       "hot"
-    ]
+    ],
+    "cameraProfile": "driving",
+    "shaderParams": {
+      "bassScale": 1.3,
+      "energyScale": 1.2,
+      "motionSpeed": 1.2,
+      "drumReactivity": 1.4
+    }
   },
   "loser": {
     "preferredModes": [
@@ -1351,7 +1389,15 @@
       "tender",
       "storytelling",
       "contemplative"
-    ]
+    ],
+    "cameraProfile": "contemplative",
+    "shaderParams": {
+      "bassScale": 0.6,
+      "energyScale": 0.7,
+      "motionSpeed": 0.5,
+      "vocalWeight": 1.4,
+      "colorSaturationBias": -0.04
+    }
   },
   "elpaso": {
     "preferredModes": [
@@ -1381,7 +1427,14 @@
       "country",
       "western",
       "storytelling"
-    ]
+    ],
+    "cameraProfile": "intimate",
+    "shaderParams": {
+      "bassScale": 0.9,
+      "motionSpeed": 0.8,
+      "vocalWeight": 1.3,
+      "colorSaturationBias": 0.03
+    }
   },
   "theyloveeachother": {
     "preferredModes": [
@@ -1415,7 +1468,15 @@
       "joyous",
       "psychedelic",
       "groovy"
-    ]
+    ],
+    "cameraProfile": "driving",
+    "shaderParams": {
+      "bassScale": 1.1,
+      "energyScale": 1.1,
+      "motionSpeed": 1,
+      "colorSaturationBias": 0.06,
+      "drumReactivity": 1.2
+    }
   },
   "jackstraw": {
     "preferredModes": [
@@ -1495,7 +1556,15 @@
       "psychedelic",
       "electric",
       "driving"
-    ]
+    ],
+    "cameraProfile": "driving",
+    "shaderParams": {
+      "bassScale": 1.2,
+      "energyScale": 1.2,
+      "motionSpeed": 1.1,
+      "complexityBias": 0.1,
+      "drumReactivity": 1.3
+    }
   },
   "supplication": {
     "preferredModes": [
@@ -1535,7 +1604,15 @@
       "intense",
       "building",
       "explosive"
-    ]
+    ],
+    "cameraProfile": "default",
+    "shaderParams": {
+      "bassScale": 1.1,
+      "energyScale": 1.2,
+      "motionSpeed": 1.1,
+      "drumReactivity": 1.3,
+      "complexityBias": 0.1
+    }
   },
   "browneyedwomen": {
     "preferredModes": [
@@ -1608,7 +1685,14 @@
       "country",
       "retro",
       "fun"
-    ]
+    ],
+    "cameraProfile": "intimate",
+    "shaderParams": {
+      "bassScale": 0.9,
+      "motionSpeed": 0.8,
+      "vocalWeight": 1.2,
+      "drumReactivity": 1
+    }
   },
   "rowjimmy": {
     "preferredModes": [
@@ -1650,7 +1734,15 @@
       "contemplative",
       "gentle",
       "organic"
-    ]
+    ],
+    "cameraProfile": "contemplative",
+    "shaderParams": {
+      "bassScale": 0.5,
+      "energyScale": 0.6,
+      "motionSpeed": 0.4,
+      "vocalWeight": 1.4,
+      "colorSaturationBias": -0.06
+    }
   },
   "dancininthestreet": {
     "preferredModes": [
@@ -1687,7 +1779,14 @@
       "party",
       "intense",
       "dance"
-    ]
+    ],
+    "cameraProfile": "driving",
+    "shaderParams": {
+      "bassScale": 1.3,
+      "energyScale": 1.3,
+      "motionSpeed": 1.2,
+      "drumReactivity": 1.4
+    }
   },
   "drumsspace": {
     "preferredModes": [
@@ -1825,7 +1924,15 @@
       "anthem",
       "resilient",
       "catchy"
-    ]
+    ],
+    "cameraProfile": "default",
+    "shaderParams": {
+      "bassScale": 1.1,
+      "energyScale": 1.1,
+      "motionSpeed": 1,
+      "colorSaturationBias": 0.05,
+      "drumReactivity": 1.1
+    }
   },
   "goingdowntheroad": {
     "preferredModes": [
@@ -1861,7 +1968,14 @@
       "driving",
       "festival",
       "anthem"
-    ]
+    ],
+    "cameraProfile": "driving",
+    "shaderParams": {
+      "bassScale": 1.2,
+      "energyScale": 1.2,
+      "motionSpeed": 1.1,
+      "drumReactivity": 1.3
+    }
   },
   "mississippihalfstep": {
     "preferredModes": [
@@ -1894,7 +2008,15 @@
       "organic",
       "storytelling",
       "warm"
-    ]
+    ],
+    "cameraProfile": "default",
+    "shaderParams": {
+      "bassScale": 0.8,
+      "energyScale": 0.9,
+      "motionSpeed": 0.8,
+      "vocalWeight": 1.2,
+      "colorSaturationBias": 0.03
+    }
   },
   "weatherreportsuite": {
     "preferredModes": [
@@ -1976,7 +2098,14 @@
       "party",
       "intense",
       "dance"
-    ]
+    ],
+    "cameraProfile": "driving",
+    "shaderParams": {
+      "bassScale": 1.3,
+      "energyScale": 1.3,
+      "motionSpeed": 1.2,
+      "drumReactivity": 1.4
+    }
   },
   "samsonanddelilah": {
     "preferredModes": [
@@ -2053,7 +2182,14 @@
       "rocker",
       "party",
       "retro"
-    ]
+    ],
+    "cameraProfile": "driving",
+    "shaderParams": {
+      "bassScale": 1.3,
+      "energyScale": 1.2,
+      "motionSpeed": 1.2,
+      "drumReactivity": 1.3
+    }
   },
   "usblues": {
     "preferredModes": [
@@ -2221,7 +2357,15 @@
       "country",
       "driving",
       "fun"
-    ]
+    ],
+    "cameraProfile": "driving",
+    "shaderParams": {
+      "bassScale": 1.1,
+      "energyScale": 1.1,
+      "motionSpeed": 1,
+      "drumReactivity": 1.2,
+      "vocalWeight": 1.1
+    }
   },
   "looselucy": {
     "preferredModes": [
@@ -2256,7 +2400,15 @@
       "psychedelic",
       "funky",
       "colorful"
-    ]
+    ],
+    "cameraProfile": "driving",
+    "shaderParams": {
+      "bassScale": 1.2,
+      "energyScale": 1.1,
+      "motionSpeed": 1,
+      "colorSaturationBias": 0.06,
+      "drumReactivity": 1.3
+    }
   },
   "direwolf": {
     "preferredModes": [
@@ -2289,7 +2441,14 @@
       "folk",
       "dark",
       "storytelling"
-    ]
+    ],
+    "cameraProfile": "intimate",
+    "shaderParams": {
+      "bassScale": 0.8,
+      "motionSpeed": 0.7,
+      "vocalWeight": 1.3,
+      "colorSaturationBias": -0.03
+    }
   },
   "comesametime": {
     "preferredModes": [
@@ -2320,7 +2479,15 @@
       "cosmic",
       "contemplative",
       "gentle"
-    ]
+    ],
+    "cameraProfile": "contemplative",
+    "shaderParams": {
+      "bassScale": 0.5,
+      "energyScale": 0.6,
+      "motionSpeed": 0.5,
+      "vocalWeight": 1.3,
+      "complexityBias": 0.15
+    }
   },
   "itmusthavebeen": {
     "preferredModes": [
@@ -2353,7 +2520,15 @@
       "tender",
       "nostalgic",
       "organic"
-    ]
+    ],
+    "cameraProfile": "contemplative",
+    "shaderParams": {
+      "bassScale": 0.6,
+      "energyScale": 0.7,
+      "motionSpeed": 0.5,
+      "vocalWeight": 1.4,
+      "colorSaturationBias": -0.04
+    }
   },
   "hesgone": {
     "preferredModes": [
@@ -2432,7 +2607,15 @@
       "anthem",
       "building",
       "organic"
-    ]
+    ],
+    "cameraProfile": "default",
+    "shaderParams": {
+      "bassScale": 0.9,
+      "energyScale": 1,
+      "motionSpeed": 0.9,
+      "drumReactivity": 1.1,
+      "vocalWeight": 1.1
+    }
   },
   "cassidy": {
     "preferredModes": [
@@ -2509,7 +2692,15 @@
       "playful",
       "storytelling",
       "colorful"
-    ]
+    ],
+    "cameraProfile": "default",
+    "shaderParams": {
+      "bassScale": 1,
+      "energyScale": 1,
+      "motionSpeed": 0.9,
+      "vocalWeight": 1.1,
+      "colorSaturationBias": 0.04
+    }
   },
   "tennesseejed": {
     "preferredModes": [
@@ -2587,7 +2778,15 @@
       "tender",
       "ballad",
       "fragile"
-    ]
+    ],
+    "cameraProfile": "contemplative",
+    "shaderParams": {
+      "bassScale": 0.5,
+      "energyScale": 0.6,
+      "motionSpeed": 0.4,
+      "vocalWeight": 1.5,
+      "colorSaturationBias": -0.06
+    }
   },
   "shipoffools": {
     "preferredModes": [
@@ -2624,7 +2823,15 @@
       "introspective",
       "brooding"
     ],
-    "saturationOffset": -0.08
+    "saturationOffset": -0.08,
+    "cameraProfile": "contemplative",
+    "shaderParams": {
+      "bassScale": 0.6,
+      "energyScale": 0.6,
+      "motionSpeed": 0.5,
+      "vocalWeight": 1.3,
+      "colorSaturationBias": -0.05
+    }
   },
   "meandmyuncle": {
     "preferredModes": [
@@ -2659,7 +2866,14 @@
       "country",
       "shuffle",
       "fun"
-    ]
+    ],
+    "cameraProfile": "intimate",
+    "shaderParams": {
+      "bassScale": 0.9,
+      "motionSpeed": 0.8,
+      "drumReactivity": 1.1,
+      "vocalWeight": 1.2
+    }
   },
   "bigriver": {
     "preferredModes": [
@@ -2694,7 +2908,14 @@
       "driving",
       "rocker",
       "powerful"
-    ]
+    ],
+    "cameraProfile": "driving",
+    "shaderParams": {
+      "bassScale": 1.2,
+      "energyScale": 1.1,
+      "motionSpeed": 1.1,
+      "drumReactivity": 1.3
+    }
   },
   "lookslikerain": {
     "preferredModes": [
@@ -2771,7 +2992,15 @@
       "folk",
       "ballad",
       "tender"
-    ]
+    ],
+    "cameraProfile": "intimate",
+    "shaderParams": {
+      "bassScale": 0.8,
+      "energyScale": 0.9,
+      "motionSpeed": 0.7,
+      "vocalWeight": 1.4,
+      "colorSaturationBias": 0.03
+    }
   },
   "thewheel": {
     "preferredModes": [
@@ -2807,7 +3036,15 @@
       "meditative",
       "spacey",
       "philosophical"
-    ]
+    ],
+    "cameraProfile": "contemplative",
+    "shaderParams": {
+      "bassScale": 0.6,
+      "energyScale": 0.7,
+      "motionSpeed": 0.5,
+      "complexityBias": 0.15,
+      "vocalWeight": 1.2
+    }
   },
   "mightaswell": {
     "preferredModes": [
@@ -2844,7 +3081,15 @@
       "celebratory",
       "fun",
       "party"
-    ]
+    ],
+    "cameraProfile": "driving",
+    "shaderParams": {
+      "bassScale": 1.2,
+      "energyScale": 1.2,
+      "motionSpeed": 1.1,
+      "colorSaturationBias": 0.08,
+      "drumReactivity": 1.3
+    }
   },
   "greateststory": {
     "preferredModes": [
@@ -2880,7 +3125,15 @@
       "driving",
       "rocker",
       "anthemic"
-    ]
+    ],
+    "cameraProfile": "driving",
+    "shaderParams": {
+      "bassScale": 1.1,
+      "energyScale": 1.1,
+      "motionSpeed": 1,
+      "drumReactivity": 1.3,
+      "colorSaturationBias": 0.05
+    }
   },
   "promisedland": {
     "preferredModes": [
@@ -2915,7 +3168,14 @@
       "fast",
       "rocker",
       "driving"
-    ]
+    ],
+    "cameraProfile": "driving",
+    "shaderParams": {
+      "bassScale": 1.3,
+      "energyScale": 1.2,
+      "motionSpeed": 1.2,
+      "drumReactivity": 1.4
+    }
   },
   "goodlovin": {
     "preferredModes": [
@@ -2953,7 +3213,15 @@
       "party",
       "high-energy",
       "fun"
-    ]
+    ],
+    "cameraProfile": "driving",
+    "shaderParams": {
+      "bassScale": 1.3,
+      "energyScale": 1.3,
+      "motionSpeed": 1.2,
+      "colorSaturationBias": 0.08,
+      "drumReactivity": 1.4
+    }
   },
   "themusicneverstopped": {
     "preferredModes": [
@@ -2990,7 +3258,15 @@
       "dance",
       "funk",
       "groove"
-    ]
+    ],
+    "cameraProfile": "driving",
+    "shaderParams": {
+      "bassScale": 1.3,
+      "energyScale": 1.2,
+      "motionSpeed": 1.1,
+      "drumReactivity": 1.4,
+      "colorSaturationBias": 0.06
+    }
   },
   "crazyfingers": {
     "preferredModes": [
@@ -3024,7 +3300,15 @@
       "dreamy",
       "psychedelic",
       "ethereal"
-    ]
+    ],
+    "cameraProfile": "contemplative",
+    "shaderParams": {
+      "bassScale": 0.6,
+      "energyScale": 0.7,
+      "motionSpeed": 0.5,
+      "complexityBias": 0.15,
+      "vocalWeight": 1.2
+    }
   },
   "standingonthemoon": {
     "preferredModes": [
@@ -3063,7 +3347,15 @@
       "lonesome",
       "contemplative"
     ],
-    "saturationOffset": -0.05
+    "saturationOffset": -0.05,
+    "cameraProfile": "contemplative",
+    "shaderParams": {
+      "bassScale": 0.5,
+      "energyScale": 0.6,
+      "motionSpeed": 0.4,
+      "vocalWeight": 1.4,
+      "colorSaturationBias": -0.06
+    }
   },
   "hightime": {
     "preferredModes": [
@@ -3096,7 +3388,15 @@
       "tender",
       "waltz",
       "nostalgic"
-    ]
+    ],
+    "cameraProfile": "contemplative",
+    "shaderParams": {
+      "bassScale": 0.6,
+      "energyScale": 0.7,
+      "motionSpeed": 0.5,
+      "vocalWeight": 1.4,
+      "colorSaturationBias": -0.04
+    }
   },
   "lostsailor": {
     "preferredModes": [
@@ -3131,7 +3431,15 @@
       "oceanic",
       "building",
       "searching"
-    ]
+    ],
+    "cameraProfile": "default",
+    "shaderParams": {
+      "bassScale": 0.9,
+      "energyScale": 1,
+      "motionSpeed": 0.8,
+      "complexityBias": 0.1,
+      "vocalWeight": 1.1
+    }
   },
   "feellikeastranger": {
     "preferredModes": [
@@ -3168,7 +3476,15 @@
       "disco",
       "funk",
       "groove"
-    ]
+    ],
+    "cameraProfile": "driving",
+    "shaderParams": {
+      "bassScale": 1.2,
+      "energyScale": 1.2,
+      "motionSpeed": 1.1,
+      "drumReactivity": 1.3,
+      "colorSaturationBias": 0.06
+    }
   },
   "hellinabucket": {
     "preferredModes": [
@@ -3204,7 +3520,14 @@
       "raucous",
       "aggressive",
       "hot"
-    ]
+    ],
+    "cameraProfile": "driving",
+    "shaderParams": {
+      "bassScale": 1.3,
+      "energyScale": 1.2,
+      "motionSpeed": 1.2,
+      "drumReactivity": 1.4
+    }
   },
   "westlafadeaway": {
     "preferredModes": [
@@ -3240,7 +3563,15 @@
       "slinky",
       "groove",
       "funky"
-    ]
+    ],
+    "cameraProfile": "default",
+    "shaderParams": {
+      "bassScale": 1.1,
+      "energyScale": 1,
+      "motionSpeed": 0.9,
+      "drumReactivity": 1.2,
+      "colorSaturationBias": 0.04
+    }
   },
   "blackthroatedwind": {
     "preferredModes": [
@@ -3275,7 +3606,15 @@
       "driving",
       "folk",
       "stormy"
-    ]
+    ],
+    "cameraProfile": "default",
+    "shaderParams": {
+      "bassScale": 0.9,
+      "energyScale": 1,
+      "motionSpeed": 0.9,
+      "drumReactivity": 1.1,
+      "vocalWeight": 1.2
+    }
   },
   "herecomessunshine": {
     "preferredModes": [
@@ -3312,7 +3651,15 @@
       "joyous",
       "bright",
       "uplifting"
-    ]
+    ],
+    "cameraProfile": "default",
+    "shaderParams": {
+      "bassScale": 0.9,
+      "energyScale": 1,
+      "motionSpeed": 0.9,
+      "colorSaturationBias": 0.06,
+      "vocalWeight": 1.2
+    }
   },
   "newspeedwayboogie": {
     "preferredModes": [
@@ -3349,7 +3696,14 @@
       "rocker",
       "aggressive"
     ],
-    "saturationOffset": -0.1
+    "saturationOffset": -0.1,
+    "cameraProfile": "driving",
+    "shaderParams": {
+      "bassScale": 1.2,
+      "energyScale": 1.1,
+      "motionSpeed": 1.1,
+      "drumReactivity": 1.3
+    }
   },
   "foolishheart": {
     "preferredModes": [
@@ -3385,7 +3739,15 @@
       "tender",
       "rocker",
       "romantic"
-    ]
+    ],
+    "cameraProfile": "default",
+    "shaderParams": {
+      "bassScale": 0.9,
+      "energyScale": 1,
+      "motionSpeed": 0.9,
+      "vocalWeight": 1.3,
+      "drumReactivity": 1
+    }
   },
   "mexicaliblues": {
     "preferredModes": [
@@ -3420,7 +3782,15 @@
       "country",
       "western",
       "fun"
-    ]
+    ],
+    "cameraProfile": "intimate",
+    "shaderParams": {
+      "bassScale": 0.9,
+      "motionSpeed": 0.8,
+      "vocalWeight": 1.2,
+      "drumReactivity": 1,
+      "colorSaturationBias": 0.03
+    }
   },
   "boxofrain": {
     "preferredModes": [

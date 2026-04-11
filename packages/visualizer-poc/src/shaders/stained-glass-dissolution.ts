@@ -36,6 +36,7 @@ import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
 import { buildRaymarchNormal } from "./shared/raymarching.glsl";
+import { lightingGLSL } from "./shared/lighting.glsl";
 
 export const stainedGlassDissolutionVert = /* glsl */ `
 varying vec2 vUv;
@@ -65,6 +66,7 @@ precision highp float;
 ${sharedUniformsGLSL}
 
 ${noiseGLSL}
+${lightingGLSL}
 
 ${postProcess}
 
@@ -665,6 +667,7 @@ void main() {
   col = mix(vec3(0.003, 0.002, 0.005), col, vig);
 
   // ─── Post-processing ───
+  col = applyTemperature(col);
   col = applyPostProcess(col, uv, p);
 
   gl_FragColor = vec4(col, 1.0);

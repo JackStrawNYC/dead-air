@@ -29,7 +29,7 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
-import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
+import { buildRaymarchNormal, buildRaymarchAO, buildDepthAlphaOutput } from "./shared/raymarching.glsl";
 import { lightingGLSL } from "./shared/lighting.glsl";
 
 export const coralReefVert = /* glsl */ `
@@ -42,6 +42,7 @@ void main() {
 
 const cr2NormalGLSL = buildRaymarchNormal("cr2Map($P, flowTime, bassVal, midsVal).x", { eps: 0.002, name: "cr2Normal" });
 const cr2AOGLSL = buildRaymarchAO("cr2Map($P, flowTime, bassVal, midsVal).x", { steps: 5, stepBase: -0.04, stepScale: 0.06, weightDecay: 0.7, finalMult: 3.0, name: "cr2Occlusion" });
+const cr2DepthAlpha = buildDepthAlphaOutput("totalDist", "MAX_DIST");
 
 const postProcess = buildPostProcessGLSL({
   grainStrength: "light",
@@ -1070,5 +1071,6 @@ void main() {
   col = applyPostProcess(col, vUv, screenP);
 
   gl_FragColor = vec4(col, 1.0);
+  ${cr2DepthAlpha}
 }
 `;
