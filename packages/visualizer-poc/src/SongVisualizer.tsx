@@ -79,6 +79,7 @@ import type { PrecomputedNarrative } from "./utils/show-narrative-precompute";
 import { computeStemCharacter } from "./utils/stem-character";
 import { computeReactiveTriggers } from "./utils/reactive-triggers";
 import { buildIconSchedule, getIconForFrame } from "./utils/icon-overlay-manager";
+import { getPeakMoments, type PeakMoment } from "./data/dead-knowledge-graph";
 import { createInitialMemory, updateVisualMemory, type VisualMemoryState } from "./utils/visual-memory";
 
 // Extracted sub-components
@@ -203,6 +204,27 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
     if (idx <= 0) return false;
     return isJamSegmentTitle(songs[idx - 1].title);
   }, [props.show, props.segueIn, props.song.trackId]);
+
+  // ─── Segue titles for knowledge graph lookup ───
+  const segueFromTitle = useMemo(() => {
+    if (!props.segueIn || !props.show) return undefined;
+    const songs = props.show.songs;
+    const idx = songs.findIndex((s) => s.trackId === props.song.trackId);
+    return idx > 0 ? songs[idx - 1].title : undefined;
+  }, [props.segueIn, props.show, props.song.trackId]);
+
+  const segueToTitle = useMemo(() => {
+    if (!props.segueOut || !props.show) return undefined;
+    const songs = props.show.songs;
+    const idx = songs.findIndex((s) => s.trackId === props.song.trackId);
+    return idx >= 0 && idx < songs.length - 1 ? songs[idx + 1].title : undefined;
+  }, [props.segueOut, props.show, props.song.trackId]);
+
+  // ─── Peak moments from knowledge graph (cultural intelligence) ───
+  const peakMoments = useMemo(
+    () => getPeakMoments(props.song.title),
+    [props.song.title],
+  );
 
   const energyCalibration = useMemo(
     () => analysis ? calibrateEnergy(analysis.frames) : undefined,
@@ -611,6 +633,40 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
 
   // harmonicResponse and modalColor removed — were only feeding EnergyEnvelope hue modifiers (now stripped)
 
+  // ─── Knowledge graph peak moments: subtle multipliers on narrative directive ───
+  // When we're approaching a culturally significant peak moment (within 5% of
+  // typical progress), apply gentle modulation that enhances the existing audio-
+  // reactive systems rather than overriding them.
+  const songProgress = frame / durationInFrames;
+  const nearestPeak = peakMoments.find(
+    (p: PeakMoment) => Math.abs(songProgress - p.typicalProgress) < 0.05,
+  );
+  if (nearestPeak) {
+    // Proximity factor: strongest at exact progress, fades toward edges of window
+    const proximity = 1 - Math.abs(songProgress - nearestPeak.typicalProgress) / 0.05;
+    const strength = proximity * nearestPeak.significance;
+
+    if (nearestPeak.type === "jam_peak" || nearestPeak.type === "band_eruption") {
+      // Boost energy scale: slightly hotter saturation + motion
+      narrativeDirective.saturationOffset += 0.08 * strength;
+      narrativeDirective.motionMult *= 1 + 0.15 * strength;
+    } else if (nearestPeak.type === "vocal_climax") {
+      // Increase vocal weight: warmer temperature, less overlay clutter
+      narrativeDirective.temperature += 0.2 * strength;
+      narrativeDirective.overlayDensityMult *= 1 - 0.2 * strength;
+    } else if (nearestPeak.type === "crowd_eruption") {
+      // Activate dolly camera path for forward momentum
+      narrativeDirective.cameraPath = "dolly";
+      narrativeDirective.motionMult *= 1 + 0.2 * strength;
+      narrativeDirective.saturationOffset += 0.1 * strength;
+    } else if (nearestPeak.type === "quiet_beauty") {
+      // Switch to static_drift for contemplative stillness
+      narrativeDirective.cameraPath = "static_drift";
+      narrativeDirective.motionMult *= 1 - 0.3 * strength;
+      narrativeDirective.temperature -= 0.15 * strength;
+    }
+  }
+
   // Resolve camera path from narrative directive to a CameraProfile
   const activeCameraProfile = useMemo(() => {
     if (!narrativeDirective.cameraPath) return undefined;
@@ -820,6 +876,8 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
               sacredSegueInTransition={sacredSegueInTransition}
               sacredSegueOutTransition={sacredSegueOutTransition}
               isSacredSegueOut={isSacredSegueOut}
+              segueFromTitle={segueFromTitle}
+              segueToTitle={segueToTitle}
               frame={frame}
               durationInFrames={durationInFrames}
               fadeFrames={FADE_FRAMES}

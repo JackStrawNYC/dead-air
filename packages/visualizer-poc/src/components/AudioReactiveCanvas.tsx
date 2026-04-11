@@ -20,6 +20,10 @@ import { usePeakOfShow } from "../data/PeakOfShowContext";
 import { useTimeDilation } from "../data/TimeDilationContext";
 import { useDeadAirFactor } from "../data/DeadAirContext";
 import { GaussianSmoother } from "../utils/gaussian-smoother";
+import { classifyAllFrames } from "../utils/section-classifier";
+
+/** When true, use TS-side section classifier (with Python fallback below 0.5 confidence) */
+const USE_TS_SECTION_CLASSIFIER = true;
 
 /** Audio data context passed to all Three.js children */
 export interface AudioDataContext {
@@ -495,6 +499,19 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
   // Pre-compute cumulative beat array (once per song, avoids O(n) per frame)
   const beatArray = useMemo(() => buildBeatArrayUtil(frames), [frames]);
 
+  // Precompute TS-side section classifications for the entire song.
+  // This runs once at mount (or when frames change), not per-frame.
+  // Remotion renders frames non-sequentially, so batch precompute is required.
+  const tsClassifications = useMemo(() => {
+    if (!USE_TS_SECTION_CLASSIFIER || !frames || frames.length === 0) return null;
+    return classifyAllFrames(frames.map(f => ({
+      energy: f.rms,
+      flatness: f.flatness,
+      beatConfidence: f.beatConfidence ?? 0,
+      vocalPresence: f.stemVocalPresence ? 1 : 0,
+    })));
+  }, [frames]);
+
   // Dynamic time accumulator: advances proportionally to energy AND tempo.
   // Auto-calibrated to song's own percentiles. The previous version clamped
   // tempo scaling to 0.6–1.2x and energy speed to 0.65–1.40x — combined max
@@ -630,7 +647,12 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
   const chordIndex = frames[idx].chordIndex ?? 0; // discrete, no smoothing
   const harmonicTension = useSmoother(S.harmonicTension, frames, idx, (f) => f.harmonicTension ?? 0, isSeek);
   const chordConfidence = useSmoother(S.chordConfidence, frames, idx, (f) => f.chordConfidence ?? 0.5, isSeek);
-  const sectionTypeFloat = encodeSectionType(frames[idx].sectionType ?? "jam");
+  // Use TS classifier when available and confident, fall back to Python-derived
+  const pythonSectionType = frames[idx].sectionType ?? "jam";
+  const tsSectionType = tsClassifications?.[idx]?.sectionType;
+  const tsConfidence = tsClassifications?.[idx]?.confidence ?? 0;
+  const effectiveSectionType = (tsSectionType && tsConfidence > 0.5) ? tsSectionType : pythonSectionType;
+  const sectionTypeFloat = encodeSectionType(effectiveSectionType);
   const energyForecast = computeEnergyForecast(frames, idx);
   const peakApproaching = computePeakApproaching(frames, idx);
   const beatStabilityVal = computeBeatStability(frames, idx);

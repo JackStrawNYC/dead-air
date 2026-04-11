@@ -20,6 +20,8 @@ export type SceneTransitionStyle =
  * @param scenePreferredIn Optional preferred transition for incoming scene
  * @param scenePreferredOut Optional preferred transition for outgoing scene
  * @param spectralFlux Optional spectral flux at boundary (0-1)
+ * @param segueSignificance Optional cultural significance from knowledge graph (0-1)
+ * @param segueTreatment Optional visual treatment hint from knowledge graph
  */
 export function selectTransitionStyle(
   energyBefore: number,
@@ -28,7 +30,22 @@ export function selectTransitionStyle(
   scenePreferredIn?: SceneTransitionStyle,
   scenePreferredOut?: SceneTransitionStyle,
   spectralFlux?: number,
+  segueSignificance?: number,
+  segueTreatment?: string,
 ): SceneTransitionStyle {
+  // Knowledge graph override for famous segues — culturally significant
+  // transitions get a treatment that matches their historical character
+  if (segueSignificance !== undefined && segueSignificance > 0.7) {
+    switch (segueTreatment) {
+      case "explosive": return "flash";
+      case "ethereal": return "morph";
+      case "building": return "dissolve";
+      case "seamless": return "dissolve";
+      case "dramatic": return "void";
+      default: return "morph";
+    }
+  }
+
   // Scene preferences from registry override energy-based selection
   if (scenePreferredIn) return scenePreferredIn;
   if (scenePreferredOut) return scenePreferredOut;
