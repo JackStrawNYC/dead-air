@@ -231,6 +231,12 @@ let cachedCurrentScores: { entry: OverlayEntry; score: number }[] = [];
 let cachedRefSelectedNames: Set<string> = new Set();
 let cachedRefTargetCount = 0;
 
+// ─── Temporal opacity smoothing state ───
+// Track previous frame's opacities to blend toward, preventing single-frame jumps.
+let prevOverlayOpacities: Record<string, number> | null = null;
+let prevOverlayFrameIdx = -1;
+let prevOverlayFramesRef: WeakRef<EnhancedFrameData[]> | null = null;
+
 /**
  * Compute the audio affinity dictionary for an overlay from its metadata.
  * Sums category base + half-weight tag contributions + energy band.
@@ -773,6 +779,9 @@ export function computeContinuousOverlays(
     cachedEpoch = -1;
     cachedEpochTrackHash = trackHash;
     cachedEpochFrameIdx = -1;
+    prevOverlayOpacities = null;
+    prevOverlayFrameIdx = -1;
+    prevOverlayFramesRef = null;
   }
   putSnapshotInRing(frameIdx, audioSnapshot);
 
@@ -897,6 +906,32 @@ export function computeContinuousOverlays(
 
   // Peak anticipation: pre-boost overlays when peakApproaching is significant
   applyPeakAnticipation(result, audioSnapshot);
+
+  // ─── Temporal opacity smoothing ───
+  // Prevent single-frame opacity jumps at epoch boundaries. Blend current
+  // opacities toward the previous frame's values with a 4-frame time constant.
+  // Fade-in is slightly faster than fade-out so new overlays appear promptly
+  // but departing overlays dissolve gracefully.
+  if (prevOverlayOpacities && prevOverlayFrameIdx === frameIdx - 1 && prevOverlayFramesRef?.deref() === frames) {
+    const FADE_IN_RATE = 0.35;  // 0→1 in ~3 frames
+    const FADE_OUT_RATE = 0.25; // 1→0 in ~4 frames
+    const allKeys = new Set([...Object.keys(result), ...Object.keys(prevOverlayOpacities)]);
+    for (const name of allKeys) {
+      const target = result[name] ?? 0;
+      const prev = prevOverlayOpacities[name] ?? 0;
+      const rate = target > prev ? FADE_IN_RATE : FADE_OUT_RATE;
+      const smoothed = prev + (target - prev) * rate;
+      if (smoothed < 0.005) {
+        delete result[name]; // fully faded out — remove
+      } else {
+        result[name] = smoothed;
+      }
+    }
+  }
+  // Store for next frame's smoothing
+  prevOverlayOpacities = { ...result };
+  prevOverlayFrameIdx = frameIdx;
+  prevOverlayFramesRef = new WeakRef(frames);
 
   return { opacities: result, alwaysActive: config.alwaysActive };
 }

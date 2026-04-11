@@ -110,6 +110,7 @@ function createBaseUniforms(
   return {
     uTime: { value: 0 },
     uDynamicTime: { value: 0 },
+    uBeatTime: { value: 0 },
     uBass: { value: 0 },
     uRms: { value: 0 },
     uCentroid: { value: 0 },
@@ -136,6 +137,9 @@ function createBaseUniforms(
     uClimaxIntensity: { value: 0 },
     uSlowEnergy: { value: 0 },
     uStemBass: { value: 0 },
+    uStemDrums: { value: 0 },
+    uStemDrumOnset: { value: 0 },
+    uStemVocalRms: { value: 0 },
     uContrast0: { value: new THREE.Vector4(0, 0, 0, 0) },
     uContrast1: { value: new THREE.Vector4(0, 0, 0, 0) },
     uChroma0: { value: new THREE.Vector4(0, 0, 0, 0) },
@@ -193,6 +197,20 @@ function createBaseUniforms(
     uCamFov: { value: 50 },
     uCamDof: { value: 0 },
     uCamFocusDist: { value: 3 },
+    uTempoDerivative: { value: 0 },
+    uDynamicRange: { value: 0.5 },
+    uSpaceScore: { value: 0 },
+    uTimbralBrightness: { value: 0.5 },
+    uTimbralFlux: { value: 0 },
+    uVocalPitch: { value: 0 },
+    uSemanticPsychedelic: { value: 0 },
+    uSemanticCosmic: { value: 0 },
+    uSemanticChaotic: { value: 0 },
+    uSemanticAggressive: { value: 0 },
+    uSemanticTender: { value: 0 },
+    uSemanticAmbient: { value: 0 },
+    uSemanticRhythmic: { value: 0 },
+    uSemanticTriumphant: { value: 0 },
     uEnvelopeBrightness: { value: 1 },
     uEnvelopeSaturation: { value: 1 },
     uEnvelopeHue: { value: 0 },
@@ -436,6 +454,9 @@ export const MultiPassQuad: React.FC<Props> = ({
   u.uCoherence.value = coherence;
   u.uSlowEnergy.value = smooth.slowEnergy;
   u.uStemBass.value = smooth.stemBass;
+  u.uStemDrums.value = smooth.drumOnset;
+  u.uStemDrumOnset.value = smooth.drumOnset;
+  u.uStemVocalRms.value = smooth.vocalEnergy;
   u.uFastEnergy.value = smooth.fastEnergy;
   u.uFastBass.value = smooth.fastBass;
   u.uDrumOnset.value = smooth.drumOnset;
@@ -477,6 +498,21 @@ export const MultiPassQuad: React.FC<Props> = ({
   u.uShowGrain.value = filmStock.grain * venueProfile.grainMult;
   u.uShowBloom.value = filmStock.bloom * venueProfile.bloomMult;
   u.uVenueVignette.value = venueProfile.vignette;
+  u.uBeatTime.value = time * ((tempo ?? 120) / 120);
+  u.uTempoDerivative.value = smooth.tempoDerivative ?? 0;
+  u.uDynamicRange.value = smooth.dynamicRange ?? 0.5;
+  u.uSpaceScore.value = smooth.spaceScore ?? 0;
+  u.uTimbralBrightness.value = smooth.timbralBrightness ?? 0.5;
+  u.uTimbralFlux.value = smooth.timbralFlux ?? 0;
+  u.uVocalPitch.value = smooth.vocalPitch ?? 0;
+  u.uSemanticPsychedelic.value = smooth.semanticPsychedelic ?? 0;
+  u.uSemanticCosmic.value = smooth.semanticCosmic ?? 0;
+  u.uSemanticChaotic.value = smooth.semanticChaotic ?? 0;
+  u.uSemanticAggressive.value = smooth.semanticAggressive ?? 0;
+  u.uSemanticTender.value = smooth.semanticTender ?? 0;
+  u.uSemanticAmbient.value = smooth.semanticAmbient ?? 0;
+  u.uSemanticRhythmic.value = smooth.semanticRhythmic ?? 0;
+  u.uSemanticTriumphant.value = smooth.semanticTriumphant ?? 0;
   u.uEnvelopeBrightness.value = envelope.brightness;
   u.uEnvelopeSaturation.value = envelope.saturation;
   u.uEnvelopeHue.value = envelope.hue;

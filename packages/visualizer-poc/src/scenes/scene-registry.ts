@@ -967,22 +967,13 @@ export function getComplement(mode: VisualMode): VisualMode {
  *  Era preferred modes get 3x weight, excluded modes are removed.
  *  Song's defaultMode is always included as fallback. */
 // ─── Flat 2D noise / pattern shaders — blocked from auto-select ───
-// Only atmospheric/volumetric shaders with real depth should auto-select.
-// Rule: depth, restrained palette, atmosphere, flow not noise, feels like a place.
+// Shaders that should NOT be picked by auto-selection (getModesForContinuousEnergy).
+// Core workhorse shaders (protean_clouds, cosmic_voyage, deep_ocean, inferno) are
+// intentionally ALLOWED — the stem/duration/narrative bias layers reference them,
+// and blocking them here made those biases dead code.
 const AUTO_SELECT_BLOCKLIST: Set<VisualMode> = new Set([
-  // Flat 2D patterns — no depth, garish colors, look like microscope slides
-  "protean_clouds", "deep_ocean", "deep_ocean", "inferno",
-  "combustible_voronoi", "inferno", "creation", "cosmic_voyage",
-  "cosmic_voyage", "deep_ocean", "cosmic_voyage", "inferno",
-  "cosmic_voyage", "fluid_2d", "fluid_light", "cosmic_voyage",
-  "cosmic_voyage", "inferno", "cosmic_voyage", "inferno",
-  "protean_clouds", "liquid_mandala", "protean_clouds", "lo_fi_grain",
-  "mandala_engine", "deep_ocean", "deep_ocean", "inferno",
-  "cosmic_voyage", "protean_clouds", "cosmic_voyage", "protean_clouds",
-  "deep_ocean", "deep_ocean", "cosmic_voyage", "deep_ocean",
-  "inferno", "deep_ocean", "protean_clouds", "protean_clouds",
-  "deep_ocean", "protean_clouds", "cosmic_voyage", "vintage_film",
-  "protean_clouds", "cosmic_voyage",
+  // Genuinely low-quality or overly specific shaders
+  "combustible_voronoi", "creation", "fluid_2d",
   // Song-specific variations — designed for specific songs, not general auto-select
   "morning_dew_fog", "dark_star_void", "fire_mountain_smoke",
   "estimated_prophet_mist", "wharf_rat_storm", "scarlet_golden_haze",

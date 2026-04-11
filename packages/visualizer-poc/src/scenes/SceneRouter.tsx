@@ -740,6 +740,10 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
   const frame = useCurrentFrame();
   const palette = paletteProp ?? song.palette;
 
+  // Track reactive trigger for crossfade-out when trigger ends
+  const reactiveExitRef = React.useRef<{ mode: string; exitFrame: number; crossfadeFrames: number } | null>(null);
+  const lastReactiveModeRef = React.useRef<string | null>(null);
+
   if (sections.length === 0) {
     return <>{renderMode(song.defaultMode, frames, sections, palette, tempo, undefined, jamDensity)}</>;
   }
@@ -878,11 +882,38 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
       );
     }
     // During hold — render reactive shader
+    lastReactiveModeRef.current = reactiveMode;
     return <>{renderMode(reactiveMode, frames, sections, palette, tempo, undefined, jamDensity)}</>;
     } // close: else (allowedModes.length > 0)
   }
 
+  // ─── Reactive trigger crossfade-OUT ───
+  // When trigger just ended, record exit and blend back to regular shader.
+  if (!reactiveState?.isTriggered && lastReactiveModeRef.current) {
+    const exitMode = lastReactiveModeRef.current;
+    lastReactiveModeRef.current = null;
+    const exitEnergy = frames[Math.min(frame, frames.length - 1)]?.rms ?? 0.15;
+    reactiveExitRef.current = {
+      mode: exitMode,
+      exitFrame: frame,
+      crossfadeFrames: exitEnergy > 0.2 ? 15 : exitEnergy > 0.1 ? 25 : 40,
+    };
+  }
+
   const currentMode = getModeForSection(song, currentSectionIdx, sections, seed, era, coherenceIsLocked, usedShaderModes, songIdentity, stemSection, frames, songDuration, setNumber, trackNumber, shaderModeLastUsed, stemDominant);
+
+  // Render reactive exit crossfade if active
+  if (reactiveExitRef.current && frame < reactiveExitRef.current.exitFrame + reactiveExitRef.current.crossfadeFrames) {
+    const { mode: exitMode, exitFrame, crossfadeFrames } = reactiveExitRef.current;
+    const progress = (frame - exitFrame) / crossfadeFrames;
+    return (
+      <SceneCrossfade
+        progress={progress}
+        outgoing={renderMode(exitMode, frames, sections, palette, tempo, undefined, jamDensity)}
+        incoming={renderMode(currentMode, frames, sections, palette, tempo, undefined, jamDensity)}
+      />
+    );
+  }
   const currentSection = sections[currentSectionIdx];
 
   // ─── JAM PHASE SHADER TRANSITIONS ───
