@@ -375,6 +375,24 @@ export const MultiPassQuad: React.FC<Props> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Dispose GPU resources on unmount to prevent shader program leaks
+  useEffect(() => {
+    return () => {
+      mainPass.mesh.geometry.dispose();
+      mainPass.material.dispose();
+      for (const pp of postPassObjects) {
+        pp.mesh.geometry.dispose();
+        pp.material.dispose();
+      }
+      copyPass.scene.children.forEach((c) => {
+        if (c instanceof THREE.Mesh) { c.geometry.dispose(); (c.material as THREE.ShaderMaterial).dispose(); }
+      });
+      fxaaPass.scene.children.forEach((c) => {
+        if (c instanceof THREE.Mesh) { c.geometry.dispose(); (c.material as THREE.ShaderMaterial).dispose(); }
+      });
+    };
+  }, [mainPass, postPassObjects, copyPass, fxaaPass]);
+
   // Output material ref (for the visible mesh)
   const outputMaterialRef = useRef<THREE.ShaderMaterial>(null);
   // Initialize with a 1x1 dark texture to prevent black frame on mount

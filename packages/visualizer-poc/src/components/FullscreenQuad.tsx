@@ -308,7 +308,21 @@ export const FullscreenQuad: React.FC<Props> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Icon overlay composite pass (between main shader and FXAA)
+  // Dispose GPU resources (compiled shader programs, geometry buffers) on unmount
+  // to prevent GPU memory leaks across scene transitions.
+  useEffect(() => {
+    return () => {
+      mainPass.mesh.geometry.dispose();
+      mainPass.material.dispose();
+      fxaaPass.scene.children.forEach((c) => {
+        if (c instanceof THREE.Mesh) {
+          c.geometry.dispose();
+          (c.material as THREE.ShaderMaterial).dispose();
+        }
+      });
+    };
+  }, [mainPass, fxaaPass]);
+
   // Initialize with a 1x1 dark texture to prevent black frame on mount
   const outputUniforms = useMemo(() => {
     const initTex = new THREE.DataTexture(new Uint8Array([5, 3, 8, 255]), 1, 1);

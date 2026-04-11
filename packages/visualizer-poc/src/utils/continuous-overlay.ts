@@ -193,6 +193,44 @@ const SNAP_ARRAY_CACHE = new WeakMap<EnhancedFrameData[], number[]>();
 /** Cache: frames array → beat array. Same rationale as snap cache. */
 const BEAT_ARRAY_CACHE = new WeakMap<EnhancedFrameData[], number[]>();
 
+// ─── AudioSnapshot ring buffer ───
+// Caches recent AudioSnapshots so the reference-frame lookup (30-120 frames back)
+// hits the cache instead of recomputing 30+ gaussianSmooth passes with Math.exp().
+// Ring buffer holds the last SNAPSHOT_RING_SIZE snapshots keyed by frameIdx.
+const SNAPSHOT_RING_SIZE = 150; // covers the max LOCKED_LOOKBACK of 120 frames
+const snapshotRingBuffer: { frameIdx: number; snapshot: AudioSnapshot }[] = [];
+let snapshotRingHead = 0;
+let snapshotRingFramesRef: WeakRef<EnhancedFrameData[]> | null = null; // reset ring when frames array changes
+
+function getCachedSnapshot(frameIdx: number): AudioSnapshot | undefined {
+  for (let i = 0; i < Math.min(snapshotRingBuffer.length, SNAPSHOT_RING_SIZE); i++) {
+    const entry = snapshotRingBuffer[i];
+    if (entry && entry.frameIdx === frameIdx) return entry.snapshot;
+  }
+  return undefined;
+}
+
+function putSnapshotInRing(frameIdx: number, snapshot: AudioSnapshot): void {
+  if (snapshotRingBuffer.length < SNAPSHOT_RING_SIZE) {
+    snapshotRingBuffer.push({ frameIdx, snapshot });
+  } else {
+    snapshotRingBuffer[snapshotRingHead] = { frameIdx, snapshot };
+    snapshotRingHead = (snapshotRingHead + 1) % SNAPSHOT_RING_SIZE;
+  }
+}
+
+// ─── Epoch-level score cache ───
+// When the jitter epoch AND frameIdx haven't changed, overlay scores are identical
+// (deterministic RNG seeded on epoch, same audioSnapshot). Cache both scoring
+// passes and the reference selection to skip ~174 scoreOverlayLive calls on
+// consecutive identical-epoch frames (e.g., re-renders, tests).
+let cachedEpoch = -1;
+let cachedEpochTrackHash = 0;
+let cachedEpochFrameIdx = -1;
+let cachedCurrentScores: { entry: OverlayEntry; score: number }[] = [];
+let cachedRefSelectedNames: Set<string> = new Set();
+let cachedRefTargetCount = 0;
+
 /**
  * Compute the audio affinity dictionary for an overlay from its metadata.
  * Sums category base + half-weight tag contributions + energy band.
@@ -722,47 +760,87 @@ export function computeContinuousOverlays(
   }
   const fullEpoch = (idx: number) => beatEpoch(idx) + snapCountUpTo(snapArray, idx);
   const jitterEpoch = fullEpoch(frameIdx);
-  const rng = seededRandom(trackHash + jitterEpoch * 7);
 
-  // ─── Pass 1: Score all pool overlays against current AudioSnapshot ───
-  // Live semantic profile + live stem section flow into every scoring call.
-  const currentScores = config.pool.map((entry) => ({
-    entry,
-    score: scoreOverlayLive(entry, audioSnapshot, config, rng, liveSemanticProfile, liveStemSection),
-  }));
+  // ─── Cache current snapshot in ring buffer ───
+  // So future frames' reference lookback can hit the cache instead of
+  // recomputing 30+ gaussianSmooth passes with Math.exp().
+  // Reset when called with a different frames array (new song or test).
+  const currentFramesRef = snapshotRingFramesRef?.deref();
+  if (currentFramesRef !== frames) {
+    snapshotRingBuffer.length = 0;
+    snapshotRingHead = 0;
+    snapshotRingFramesRef = new WeakRef(frames);
+    cachedEpoch = -1;
+    cachedEpochTrackHash = trackHash;
+    cachedEpochFrameIdx = -1;
+  }
+  putSnapshotInRing(frameIdx, audioSnapshot);
 
-  // ─── Pass 2: Score against reference snapshot (lookback frames ago) ───
-  // Reference profile/stem are computed from the lookback snapshot so the
-  // "previous selection" reference reflects what was musically true then.
-  // Same fullEpoch (beat + snap count) so inertia compares against what was
-  // selected just before any intervening snap.
-  const refIdx = Math.max(0, frameIdx - lookback);
-  const refSnapshot = computeAudioSnapshot(frames, refIdx, beatArray, 30, tempo);
-  const refRng = seededRandom(trackHash + fullEpoch(refIdx) * 7);
-  const refStemSection = classifyStemSection(refSnapshot);
-  const refSemanticScores = extractSemanticScores(refSnapshot);
-  const refSemanticProfile = refSemanticScores
-    ? computeSemanticProfile(refSemanticScores)
-    : config.semanticProfile;
+  // ─── Epoch-cached scoring ───
+  // When the jitter epoch hasn't changed, overlay scores are deterministic
+  // (RNG seeded on epoch). Skip both scoring passes and reuse the cached result.
+  const epochChanged = jitterEpoch !== cachedEpoch || trackHash !== cachedEpochTrackHash || frameIdx !== cachedEpochFrameIdx;
 
-  const refScores = config.pool.map((entry) => ({
-    entry,
-    score: scoreOverlayLive(entry, refSnapshot, config, refRng, refSemanticProfile, refStemSection),
-  }));
+  let currentScores: { entry: OverlayEntry; score: number }[];
+  let refSelectedNames: Set<string>;
+  let refTargetCount: number;
 
-  // ─── Determine reference selection (what was showing) ───
-  const refTargetCount = computeTargetCount(refSnapshot, config);
-  const refSorted = [...refScores].sort((a, b) => b.score - a.score);
-  const refSelected = selectOverlaysForWindow(
-    refSorted,
-    refTargetCount,
-    config.isDrumsSpace,
-    false,
-    config.pool,
-    config.songHero,
-    energyBucket(refSnapshot.energy),
-  );
-  const refSelectedNames = new Set(refSelected.map((e) => e.name));
+  if (epochChanged) {
+    const rng = seededRandom(trackHash + jitterEpoch * 7);
+
+    // ─── Pass 1: Score all pool overlays against current AudioSnapshot ───
+    currentScores = config.pool.map((entry) => ({
+      entry,
+      score: scoreOverlayLive(entry, audioSnapshot, config, rng, liveSemanticProfile, liveStemSection),
+    }));
+
+    // ─── Pass 2: Score against reference snapshot (lookback frames ago) ───
+    // Try ring buffer first — avoids recomputing 30+ gaussianSmooth passes.
+    const refIdx = Math.max(0, frameIdx - lookback);
+    let refSnapshot = getCachedSnapshot(refIdx);
+    if (!refSnapshot) {
+      refSnapshot = computeAudioSnapshot(frames, refIdx, beatArray, 30, tempo);
+    }
+    const refRng = seededRandom(trackHash + fullEpoch(refIdx) * 7);
+    const refStemSection = classifyStemSection(refSnapshot);
+    const refSemanticScores = extractSemanticScores(refSnapshot);
+    const refSemanticProfile = refSemanticScores
+      ? computeSemanticProfile(refSemanticScores)
+      : config.semanticProfile;
+
+    const refScores = config.pool.map((entry) => ({
+      entry,
+      score: scoreOverlayLive(entry, refSnapshot!, config, refRng, refSemanticProfile, refStemSection),
+    }));
+
+    // ─── Determine reference selection (what was showing) ───
+    refTargetCount = computeTargetCount(refSnapshot, config);
+    const refSorted = [...refScores].sort((a, b) => b.score - a.score);
+    const refSelected = selectOverlaysForWindow(
+      refSorted,
+      refTargetCount,
+      config.isDrumsSpace,
+      false,
+      config.pool,
+      config.songHero,
+      energyBucket(refSnapshot.energy),
+    );
+    refSelectedNames = new Set(refSelected.map((e) => e.name));
+
+    // Update epoch cache — store scores BEFORE inertia is applied
+    // so repeated calls don't double-apply the inertia bonus.
+    cachedEpoch = jitterEpoch;
+    cachedEpochTrackHash = trackHash;
+    cachedEpochFrameIdx = frameIdx;
+    cachedCurrentScores = currentScores.map((cs) => ({ ...cs }));
+    cachedRefSelectedNames = refSelectedNames;
+    cachedRefTargetCount = refTargetCount;
+  } else {
+    // Epoch+frame unchanged — reuse cached scores (clone to avoid mutation)
+    currentScores = cachedCurrentScores.map((cs) => ({ ...cs }));
+    refSelectedNames = cachedRefSelectedNames;
+    refTargetCount = cachedRefTargetCount;
+  }
 
   // ─── Apply inertia bonus to current scores ───
   const currentTargetCount = computeTargetCount(audioSnapshot, config);
