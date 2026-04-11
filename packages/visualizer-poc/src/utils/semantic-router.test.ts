@@ -25,23 +25,23 @@ describe("computeSemanticProfile", () => {
     expect(result.dominantConfidence).toBe(0.8);
   });
 
-  it("routes psychedelic to fractal/kaleidoscope shaders", () => {
+  it("routes psychedelic to cosmic/protean shaders", () => {
     const result = computeSemanticProfile({ psychedelic: 0.9 });
-    expect(result.preferredShaders).toContain("fractal_zoom");
-    expect(result.preferredShaders).toContain("kaleidoscope");
-    expect(result.preferredShaders).toContain("tie_dye");
+    expect(result.preferredShaders).toContain("cosmic_voyage");
+    expect(result.preferredShaders).toContain("protean_clouds");
+    expect(result.preferredShaders).toContain("deep_ocean");
   });
 
   it("routes aggressive to high-energy shaders", () => {
     const result = computeSemanticProfile({ aggressive: 0.85 });
     expect(result.preferredShaders).toContain("inferno");
-    expect(result.preferredShaders).toContain("electric_arc");
+    expect(result.preferredShaders).toContain("protean_clouds");
   });
 
   it("routes tender to warm/organic shaders", () => {
     const result = computeSemanticProfile({ tender: 0.9 });
     expect(result.preferredShaders).toContain("aurora");
-    expect(result.preferredShaders).toContain("oil_projector");
+    expect(result.preferredShaders).toContain("protean_clouds");
     expect(result.motionIntensity).toBeLessThan(1);
   });
 
@@ -58,8 +58,8 @@ describe("computeSemanticProfile", () => {
       cosmic: 0.5, // secondary, above 0.3 threshold
     });
     // Should have both psychedelic AND cosmic shaders
-    expect(result.preferredShaders).toContain("fractal_zoom"); // psychedelic
-    expect(result.preferredShaders).toContain("cosmic_voyage"); // cosmic
+    expect(result.preferredShaders).toContain("protean_clouds"); // psychedelic
+    expect(result.preferredShaders).toContain("cosmic_voyage"); // cosmic (also in psychedelic)
   });
 
   it("computes overlay biases weighted by score", () => {

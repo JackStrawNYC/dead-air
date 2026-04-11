@@ -70,21 +70,24 @@ describe("getSetTheme", () => {
 
   it("set 1 has boosted structured modes and positive camera steadiness", () => {
     const theme = getSetTheme(1);
-    expect(theme.boostedModes).toContain("concert_lighting");
+    expect(theme.boostedModes).toContain("inferno");
+    expect(theme.boostedModes).toContain("protean_clouds");
     expect(theme.suppressedModes.length).toBeGreaterThan(0);
     expect(theme.cameraSteadinessOffset).toBeGreaterThan(0);
   });
 
   it("set 2 has boosted psychedelic modes and negative camera steadiness", () => {
     const theme = getSetTheme(2);
-    expect(theme.boostedModes).toContain("sacred_geometry");
+    expect(theme.boostedModes).toContain("cosmic_voyage");
+    expect(theme.boostedModes).toContain("deep_ocean");
     expect(theme.suppressedModes.length).toBe(0); // all modes available
     expect(theme.cameraSteadinessOffset).toBeLessThan(0);
   });
 
   it("encore has golden warmth and high camera steadiness", () => {
     const theme = getSetTheme(3);
-    expect(theme.boostedModes).toContain("oil_projector");
+    expect(theme.boostedModes).toContain("protean_clouds");
+    expect(theme.boostedModes).toContain("vintage_film");
     expect(theme.cameraSteadinessOffset).toBeGreaterThan(0);
   });
 });
@@ -138,31 +141,36 @@ describe("applySetModifiers", () => {
 
 describe("applySetShaderFilter", () => {
   it("boosts set 1 modes and suppresses abstract modes", () => {
-    const pool: VisualMode[] = ["concert_lighting", "cosmic_dust", "tie_dye", "aurora"];
+    const pool: VisualMode[] = ["inferno", "cosmic_dust", "protean_clouds", "aurora"];
     const filtered = applySetShaderFilter(pool, 1);
-    // concert_lighting, tie_dye, aurora are boosted (appear 2x each)
-    expect(filtered.filter((m) => m === "concert_lighting").length).toBe(2);
-    expect(filtered.filter((m) => m === "tie_dye").length).toBe(2);
+    // inferno is boosted 4x in set 1 boostedModes, so 1 original + 4 boosts = 5
+    expect(filtered.filter((m) => m === "inferno").length).toBe(5);
+    // aurora is boosted 1x in set 1 boostedModes, so 1 original + 1 boost = 2
+    expect(filtered.filter((m) => m === "aurora").length).toBe(2);
     // cosmic_dust is suppressed (set 1 suppressedModes)
     expect(filtered).not.toContain("cosmic_dust");
   });
 
   it("set 2 boosts psychedelic modes without suppressing any", () => {
-    const pool: VisualMode[] = ["cosmic_voyage", "concert_lighting", "sacred_geometry"];
+    const pool: VisualMode[] = ["cosmic_voyage", "concert_lighting", "deep_ocean"];
     const filtered = applySetShaderFilter(pool, 2);
-    expect(filtered.filter((m) => m === "cosmic_voyage").length).toBe(2);
-    expect(filtered.filter((m) => m === "sacred_geometry").length).toBe(2);
+    // cosmic_voyage appears 6x in boostedModes → 1 original + 6 boosts = 7
+    expect(filtered.filter((m) => m === "cosmic_voyage").length).toBe(7);
+    // deep_ocean appears 4x in boostedModes → 1 original + 4 boosts = 5
+    expect(filtered.filter((m) => m === "deep_ocean").length).toBe(5);
     expect(filtered).toContain("concert_lighting");
   });
 
-  it("encore suppresses harsh modes", () => {
-    const pool: VisualMode[] = ["oil_projector", "databend", "vintage_film"];
+  it("encore suppresses deep exploration modes", () => {
+    const pool: VisualMode[] = ["protean_clouds", "deep_ocean", "vintage_film"];
     const filtered = applySetShaderFilter(pool, 3);
-    expect(filtered).not.toContain("databend");
-    expect(filtered).toContain("oil_projector");
+    // deep_ocean is suppressed in set 3
+    expect(filtered).not.toContain("deep_ocean");
+    expect(filtered).toContain("protean_clouds");
   });
 
   it("does not empty pool when all modes suppressed", () => {
+    // Both cosmic_dust and void_light are in set 1 suppressedModes
     const pool: VisualMode[] = ["cosmic_dust", "void_light"];
     const filtered = applySetShaderFilter(pool, 1);
     expect(filtered.length).toBeGreaterThan(0);

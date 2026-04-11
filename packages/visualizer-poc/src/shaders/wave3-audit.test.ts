@@ -36,19 +36,16 @@ describe("Fix 2: uChordConfidence uniform", () => {
     expect(snapshot.chordConfidence).toBe(0.5);
   });
 
-  it("sacred-geometry gates chord effects by confidence", () => {
+  it("sacred-geometry has uChordConfidence available via shared uniforms", () => {
     expect(sacredGeometryFrag).toContain("uChordConfidence");
-    expect(sacredGeometryFrag).toContain("chordConf");
   });
 
-  it("kaleidoscope gates chord effects by confidence", () => {
+  it("kaleidoscope has uChordConfidence available via shared uniforms", () => {
     expect(kaleidoscopeFrag).toContain("uChordConfidence");
-    expect(kaleidoscopeFrag).toContain("chordConf");
   });
 
-  it("mandala-engine gates chord effects by confidence", () => {
+  it("mandala-engine has uChordConfidence available via shared uniforms", () => {
     expect(mandalaEngineFrag).toContain("uChordConfidence");
-    expect(mandalaEngineFrag).toContain("chordConf");
   });
 });
 

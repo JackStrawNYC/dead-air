@@ -177,8 +177,8 @@ describe("volumetric-nebula shader", () => {
 // ─── Registry Integration ───
 
 describe("volumetric shader registry", () => {
-  it("registry has 87 total entries", () => {
-    expect(Object.keys(SCENE_REGISTRY).length).toBe(87);
+  it("registry has 114 total entries", () => {
+    expect(Object.keys(SCENE_REGISTRY).length).toBe(114);
   });
 
   it("volumetric_clouds is registered with correct affinity", () => {
@@ -193,7 +193,7 @@ describe("volumetric shader registry", () => {
     const entry = SCENE_REGISTRY.volumetric_smoke;
     expect(entry).toBeDefined();
     expect(entry.energyAffinity).toBe("mid");
-    expect(entry.complement).toBe("concert_lighting");
+    expect(entry.complement).toBe("inferno");
     expect(entry.preferredTransitionIn).toBe("void");
   });
 

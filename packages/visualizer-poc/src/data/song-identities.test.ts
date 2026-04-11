@@ -21,13 +21,14 @@ describe('song-identities validation', () => {
     }
   });
 
-  it('no duplicates in any preferredModes array', () => {
+  it('preferredModes arrays contain valid modes (duplicates allowed for weighting)', () => {
     for (const [name, identity] of entries) {
-      const unique = new Set(identity.preferredModes);
-      expect(
-        unique.size,
-        `${name} has duplicate preferred modes: ${identity.preferredModes}`,
-      ).toBe(identity.preferredModes.length);
+      for (const mode of identity.preferredModes) {
+        expect(
+          registeredModes.has(mode),
+          `${name} has unregistered mode "${mode}" in preferredModes`,
+        ).toBe(true);
+      }
     }
   });
 

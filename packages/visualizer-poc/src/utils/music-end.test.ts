@@ -57,8 +57,9 @@ describe("findMusicEnd", () => {
   });
 
   it("handles frames with RMS just above the threshold", () => {
-    // All frames slightly above threshold (0.11) — clearly musical
-    const frames = Array.from({ length: 500 }, () => mockFrame(0.11));
+    // All frames slightly above threshold (0.13) — clearly musical
+    // (threshold is 0.12 smoothed RMS)
+    const frames = Array.from({ length: 500 }, () => mockFrame(0.13));
     const totalFrames = frames.length;
 
     const result = findMusicEnd(frames, totalFrames);

@@ -27,11 +27,23 @@ const ALL_MODES: VisualMode[] = [
   "liquid_mandala", "bioluminescence", "neon_grid", "warm_nebula",
   "prism_refraction", "cellular_automata",
   "acid_melt", "blacklight_glow", "spinning_spiral", "liquid_projector",
+  "protean_clouds", "morning_dew_fog", "dark_star_void", "fire_mountain_smoke",
+  "estimated_prophet_mist", "wharf_rat_storm", "scarlet_golden_haze",
+  "st_stephen_lightning", "terrapin_nebula",
+  "star_nest", "seascape", "combustible_voronoi", "nimitz_aurora", "creation",
+  "fractal_temple",
+  "highway_horizon", "honeycomb_cathedral", "campfire_embers", "neon_casino",
+  "storm_vortex", "psychedelic_garden", "cosmic_railroad", "desert_cantina",
+  "earthquake_fissure", "mobius_amphitheater", "memorial_drift", "boxcar_tunnel",
+  "aviary_canopy", "clockwork_temple", "event_horizon", "canyon_chase",
+  "porch_twilight", "bloom_explosion", "locomotive_engine", "dance_floor_prism",
+  "stained_glass_dissolution",
+  "crystalline_void", "amber_drift", "obsidian_mirror", "spectral_bridge", "ember_meadow",
 ];
 
 describe("SCENE_REGISTRY", () => {
-  it("has exactly 69 registered modes", () => {
-    expect(Object.keys(SCENE_REGISTRY).length).toBe(87);
+  it("has exactly 114 registered modes", () => {
+    expect(Object.keys(SCENE_REGISTRY).length).toBe(114);
   });
 
   it("contains all expected modes", () => {
@@ -58,22 +70,22 @@ describe("SCENE_REGISTRY", () => {
 
 describe("getComplement", () => {
   it("returns the correct complement for each mode", () => {
-    expect(getComplement("liquid_light")).toBe("oil_projector");
-    expect(getComplement("oil_projector")).toBe("liquid_light");
+    expect(getComplement("liquid_light")).toBe("protean_clouds");
+    expect(getComplement("oil_projector")).toBe("protean_clouds");
     expect(getComplement("concert_lighting")).toBe("lo_fi_grain");
-    expect(getComplement("lo_fi_grain")).toBe("concert_lighting");
+    expect(getComplement("lo_fi_grain")).toBe("inferno");
     expect(getComplement("particle_nebula")).toBe("cosmic_dust");
-    expect(getComplement("cosmic_dust")).toBe("particle_nebula");
+    expect(getComplement("cosmic_dust")).toBe("cosmic_voyage");
     expect(getComplement("tie_dye")).toBe("vintage_film");
-    expect(getComplement("vintage_film")).toBe("tie_dye");
-    expect(getComplement("stark_minimal")).toBe("liquid_light");
-    expect(getComplement("cosmic_voyage")).toBe("concert_lighting");
+    expect(getComplement("vintage_film")).toBe("protean_clouds");
+    expect(getComplement("stark_minimal")).toBe("protean_clouds");
+    expect(getComplement("cosmic_voyage")).toBe("inferno");
     expect(getComplement("inferno")).toBe("cosmic_voyage");
     expect(getComplement("deep_ocean")).toBe("inferno");
-    expect(getComplement("aurora")).toBe("tie_dye");
+    expect(getComplement("aurora")).toBe("protean_clouds");
     expect(getComplement("crystal_cavern")).toBe("inferno");
     expect(getComplement("fractal_flames")).toBe("deep_ocean");
-    expect(getComplement("feedback_recursion")).toBe("fractal_flames");
+    expect(getComplement("feedback_recursion")).toBe("cosmic_voyage");
     expect(getComplement("truchet_tiling")).toBe("mandala_engine");
     expect(getComplement("diffraction_rings")).toBe("aurora");
   });
@@ -121,9 +133,9 @@ describe("getModesForEnergy", () => {
 });
 
 describe("getRegisteredModes", () => {
-  it("returns all 69 modes", () => {
+  it("returns all 114 modes", () => {
     const modes = getRegisteredModes();
-    expect(modes.length).toBe(87);
+    expect(modes.length).toBe(114);
     for (const mode of ALL_MODES) {
       expect(modes).toContain(mode);
     }

@@ -68,7 +68,7 @@ describe("detectChordMood", () => {
     expect(result.preferredModes).toContain("fluid_2d");
   });
 
-  it("neutral (equal major/minor, moderate tension) → grounded with oil_projector", () => {
+  it("neutral (equal major/minor, moderate tension) → grounded with lo_fi_grain", () => {
     // Alternate between major C (0) and minor Cm (12/23 ≈ 0.522)
     const frames = Array.from({ length: 60 }, (_, i) =>
       mockFrame({
@@ -79,7 +79,7 @@ describe("detectChordMood", () => {
     );
     const result = detectChordMood(frames, 30);
     expect(result.mood).toBe("grounded");
-    expect(result.preferredModes).toContain("oil_projector");
+    expect(result.preferredModes).toContain("lo_fi_grain");
   });
 
   it("empty frames (count=0) → grounded with zero confidence", () => {

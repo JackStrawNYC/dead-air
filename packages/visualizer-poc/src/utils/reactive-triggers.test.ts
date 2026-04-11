@@ -106,8 +106,8 @@ describe("computeReactiveTriggers", () => {
     ];
     const result = computeReactiveTriggers(frames, 250, 0, 300, 120);
     if (result.isTriggered && result.triggerType === "energy_eruption") {
-      expect(result.suggestedModes).toContain("climax_surge");
       expect(result.suggestedModes).toContain("inferno");
+      expect(result.suggestedModes).toContain("cosmic_voyage");
     }
   });
 
