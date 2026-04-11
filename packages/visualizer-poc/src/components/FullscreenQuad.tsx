@@ -207,6 +207,10 @@ export const FullscreenQuad: React.FC<Props> = ({
     fftTextureRef.current = new THREE.DataTexture(data, 64, 1, THREE.RedFormat);
     fftTextureRef.current.needsUpdate = true;
   }
+  // Dispose FFT texture on unmount (prevents GPU memory leak across chunks)
+  useEffect(() => {
+    return () => { fftTextureRef.current?.dispose(); };
+  }, []);
 
   // Render targets for FXAA post-pass + icon overlay.
   //

@@ -244,31 +244,47 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
 
     const handle = delayRender("Loading icon overlay textures");
     let loaded = 0;
+    let resolved = false;
 
-    const checkDone = () => {
-      if (loaded >= uniquePaths.length) {
-        setIconTexturesReady(true);
-        continueRender(handle);
-      }
+    const resolve = () => {
+      if (resolved) return;
+      resolved = true;
+      setIconTexturesReady(true);
+      continueRender(handle);
     };
 
+    const checkDone = () => {
+      if (loaded >= uniquePaths.length) resolve();
+    };
+
+    // Safety timeout: if textures haven't loaded in 10 seconds, continue
+    // without them. In headless Chrome on cloud GPUs, Image.onload can
+    // hang indefinitely if the GPU is under memory pressure — this prevents
+    // the delayRender timeout from killing the entire render.
+    const safetyTimeout = setTimeout(() => {
+      if (!resolved) {
+        console.warn(`Icon texture timeout: only ${loaded}/${uniquePaths.length} loaded after 10s, continuing`);
+        resolve();
+      }
+    }, 10_000);
+
     for (const iconPath of uniquePaths) {
-      // Use HTML Image element first (works in Remotion's headless Chrome),
-      // then create THREE.Texture from the loaded image. This avoids
-      // THREE.TextureLoader's internal loader which fails silently in headless.
       const img = new Image();
       img.crossOrigin = "anonymous";
       img.onload = () => {
-        const tex = new THREE.Texture(img);
-        tex.needsUpdate = true;
-        tex.minFilter = THREE.LinearFilter;
-        tex.magFilter = THREE.LinearFilter;
-        iconTextureMap.current.set(iconPath, tex);
+        try {
+          const tex = new THREE.Texture(img);
+          tex.needsUpdate = true;
+          tex.minFilter = THREE.LinearFilter;
+          tex.magFilter = THREE.LinearFilter;
+          iconTextureMap.current.set(iconPath, tex);
+        } catch {
+          // Texture creation failed — continue without it
+        }
         loaded++;
         checkDone();
       };
       img.onerror = () => {
-        // Texture failed to load — continue without it
         loaded++;
         checkDone();
       };
@@ -276,6 +292,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
     }
 
     return () => {
+      clearTimeout(safetyTimeout);
       iconTextureMap.current.forEach((tex) => tex.dispose());
       iconTextureMap.current.clear();
     };

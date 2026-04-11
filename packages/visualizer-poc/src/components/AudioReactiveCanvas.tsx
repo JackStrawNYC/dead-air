@@ -375,16 +375,32 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
     const dt = 1 / fps;
     const lookup = new Float64Array(frames.length);
     let accum = 0;
+    // O(n) rolling window instead of O(n²) nested loop. Each frame adds one
+    // RMS value to the window and removes one, maintaining a running sum.
+    const HALF_WIN = 90;
+    let windowSum = 0;
+    let windowCount = 0;
+    // Seed the window with frames [0..HALF_WIN]
+    for (let j = 0; j <= Math.min(HALF_WIN, frames.length - 1); j++) {
+      windowSum += frames[j].rms;
+      windowCount++;
+    }
     for (let i = 0; i < frames.length; i++) {
-      const lo = Math.max(0, i - 90);
-      const hi = Math.min(frames.length - 1, i + 90);
-      let eSum = 0, eCount = 0;
-      for (let j = lo; j <= hi; j++) { eSum += frames[j].rms; eCount++; }
-      const localEnergy = eCount > 0 ? eSum / eCount : 0;
+      // Expand window right edge
+      const addIdx = i + HALF_WIN;
+      if (addIdx < frames.length && addIdx > HALF_WIN) {
+        windowSum += frames[addIdx].rms;
+        windowCount++;
+      }
+      // Shrink window left edge
+      const removeIdx = i - HALF_WIN - 1;
+      if (removeIdx >= 0) {
+        windowSum -= frames[removeIdx].rms;
+        windowCount--;
+      }
+      const localEnergy = windowCount > 0 ? windowSum / windowCount : 0;
       const t = Math.max(0, Math.min(1, (localEnergy - quietThresh) / range));
       const factor = t * t * (3 - 2 * t); // smoothstep
-      // 50% at quiet → 155% at peak (was 65% → 140%). Wider swing means quiet
-      // sections actually breathe slowly and loud sections actually drive fast.
       const speed = (0.50 + factor * 1.05) * tempoScale;
       accum += dt * speed;
       lookup[i] = accum;

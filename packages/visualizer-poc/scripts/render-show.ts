@@ -65,14 +65,14 @@ const PRESETS: Record<string, RenderPreset> = {
 const args = process.argv.slice(2);
 const resume = args.includes("--resume");
 const draftMode = args.includes("--draft");
-// Auto-detect GL backend: EGL is the native Linux GPU path (more stable in Docker
-// than ANGLE which is a translation layer). ANGLE remains the default on macOS.
-const glArg = args.find((a) => a.startsWith("--gl="))?.split("=")[1]
-  ?? (process.platform === "linux" ? "egl" : "angle");
-// Default chunk size 1200 (was 3000). Smaller chunks reduce GPU memory accumulation
-// between Chrome process restarts. Each chunk gets a fresh Chrome instance; GPU driver
-// leaks from ANGLE/EGL contexts accumulate linearly, so smaller chunks = less pressure.
-const chunkSize = parseInt(args.find((a) => a.startsWith("--chunk="))?.split("=")[1] ?? "1200", 10);
+// GL backend: ANGLE on all platforms. EGL was tested on Linux/Docker and caused
+// immediate crashes on some Vast.ai instances. ANGLE is proven stable (Bertha
+// preview, chunk tests all succeeded with ANGLE).
+const glArg = args.find((a) => a.startsWith("--gl="))?.split("=")[1] ?? "angle";
+// Default chunk size 600 (was 3000 → 1200). Each chunk gets a fresh Chrome
+// process; GPU driver leaks accumulate between chunks. 600 frames = 20 seconds
+// of video, enough to render cleanly before GPU memory pressure builds.
+const chunkSize = parseInt(args.find((a) => a.startsWith("--chunk="))?.split("=")[1] ?? "600", 10);
 const trackFilter = args.find((a) => a.startsWith("--track="))?.split("=")[1];
 const previewMode = args.includes("--preview");
 const showDateArg = args.find((a) => a.startsWith("--show-date="))?.split("=")[1];
@@ -385,7 +385,7 @@ function renderSong(
         `--gl=${glArg}`,
         `--concurrency=${adaptiveConcurrency}`,
         `--timeout=900000`,
-        `--delay-render-timeout-in-milliseconds=180000`,
+        `--delay-render-timeout-in-milliseconds=300000`,
         `--frames=0-${totalFrames - 1}`,
         "--muted",
       ].join(" ");
@@ -415,7 +415,7 @@ function renderSong(
           `--gl=${glArg}`,
           `--concurrency=${adaptiveConcurrency}`,
           `--timeout=900000`,
-          `--delay-render-timeout-in-milliseconds=180000`,
+          `--delay-render-timeout-in-milliseconds=300000`,
           `--frames=${start}-${end}`,
           "--muted",
         ].join(" ");
