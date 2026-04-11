@@ -31,6 +31,16 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
+import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
+
+const pf2NormalGLSL = buildRaymarchNormal(
+  "pf2Map($P, majorR, minorR, bass, energy, drumOnset, tension, stability, vocalGlow, melodicFreq, flowTime, turbulence, breachAmount).x",
+  { eps: 0.003, name: "pf2Normal" },
+);
+const pf2OccGLSL = buildRaymarchAO(
+  "pf2Map($P, majorR, minorR, bass, energy, drumOnset, tension, stability, vocalGlow, melodicFreq, flowTime, turbulence, breachAmount).x",
+  { steps: 5, stepBase: 0.02, stepScale: 0.08, weightDecay: 0.65, finalMult: 3.5, name: "pf2Occlusion" },
+);
 
 export const plasmaFieldVert = /* glsl */ `
 varying vec2 vUv;
@@ -317,47 +327,8 @@ vec2 pf2Map(vec3 pos, float majorR, float minorR, float bass, float energy,
   return result;
 }
 
-// ═══════════════════════════════════════════════════════════
-// Normal estimation via central differences
-// ═══════════════════════════════════════════════════════════
-
-vec3 pf2Normal(vec3 pos, float majorR, float minorR, float bass, float energy,
-               float drumOnset, float tension, float stability, float vocalGlow,
-               float melodicFreq, float flowTime, float turbulence, float breachAmount) {
-  vec2 off = vec2(0.003, 0.0);
-  float base = pf2Map(pos, majorR, minorR, bass, energy, drumOnset, tension,
-                       stability, vocalGlow, melodicFreq, flowTime, turbulence, breachAmount).x;
-  vec3 norm = vec3(
-    pf2Map(pos + off.xyy, majorR, minorR, bass, energy, drumOnset, tension,
-           stability, vocalGlow, melodicFreq, flowTime, turbulence, breachAmount).x - base,
-    pf2Map(pos + off.yxy, majorR, minorR, bass, energy, drumOnset, tension,
-           stability, vocalGlow, melodicFreq, flowTime, turbulence, breachAmount).x - base,
-    pf2Map(pos + off.yyx, majorR, minorR, bass, energy, drumOnset, tension,
-           stability, vocalGlow, melodicFreq, flowTime, turbulence, breachAmount).x - base
-  );
-  return normalize(norm);
-}
-
-// ═══════════════════════════════════════════════════════════
-// Ambient occlusion — 5-sample hemisphere
-// ═══════════════════════════════════════════════════════════
-
-float pf2Occlusion(vec3 pos, vec3 norm, float majorR, float minorR, float bass,
-                   float energy, float drumOnset, float tension, float stability,
-                   float vocalGlow, float melodicFreq, float flowTime,
-                   float turbulence, float breachAmount) {
-  float occ = 0.0;
-  float weight = 1.0;
-  for (int i = 0; i < 5; i++) {
-    float dist = 0.02 + 0.08 * float(i);
-    float sampled = pf2Map(pos + norm * dist, majorR, minorR, bass, energy, drumOnset,
-                           tension, stability, vocalGlow, melodicFreq, flowTime,
-                           turbulence, breachAmount).x;
-    occ += (dist - sampled) * weight;
-    weight *= 0.65;
-  }
-  return clamp(1.0 - occ * 3.5, 0.0, 1.0);
-}
+${pf2NormalGLSL}
+${pf2OccGLSL}
 
 // ═══════════════════════════════════════════════════════════
 // Fresnel approximation (Schlick)
@@ -522,13 +493,9 @@ void main() {
   vec3 col = vec3(0.0);
 
   if (marchFound) {
-    vec3 norm = pf2Normal(marchPos, majorR, minorR, bass, energy, drumOnset,
-                          tension, stability, vocalGlow, melodicFreq, flowTime,
-                          turbulence, breachAmount);
+    vec3 norm = pf2Normal(marchPos);
 
-    float occVal = pf2Occlusion(marchPos, norm, majorR, minorR, bass, energy,
-                                drumOnset, tension, stability, vocalGlow, melodicFreq,
-                                flowTime, turbulence, breachAmount);
+    float occVal = pf2Occlusion(marchPos, norm);
 
     // Distance from ray origin to surface for volumetric plasma pass
     float surfaceDist = totalDist;

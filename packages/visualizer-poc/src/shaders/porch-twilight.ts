@@ -24,6 +24,7 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
+import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
 
 export const porchTwilightVert = /* glsl */ `
 varying vec2 vUv;
@@ -42,6 +43,9 @@ const postProcess = buildPostProcessGLSL({
   lensDistortionEnabled: true,
   eraGradingEnabled: true,
 });
+
+const ptNormalGLSL = buildRaymarchNormal("ptMap($P, rockAngle)", { eps: 0.001, name: "ptNormal" });
+const ptOccGLSL = buildRaymarchAO("ptMap($P, rockAngle)", { steps: 5, stepBase: 0.02, stepScale: 0.06, weightDecay: 0.65, finalMult: 3.0, name: "ptOcclusion" });
 
 export const porchTwilightFrag = /* glsl */ `
 precision highp float;
@@ -210,30 +214,9 @@ float ptMap(vec3 pos, float rockAngle) {
   return d;
 }
 
-// Normal via central differences (avoids 'e' as variable name)
-vec3 ptNormal(vec3 pos, float rockAngle) {
-  float eps = 0.001;
-  float dCenter = ptMap(pos, rockAngle);
-  return normalize(vec3(
-    ptMap(pos + vec3(eps, 0.0, 0.0), rockAngle) - dCenter,
-    ptMap(pos + vec3(0.0, eps, 0.0), rockAngle) - dCenter,
-    ptMap(pos + vec3(0.0, 0.0, eps), rockAngle) - dCenter
-  ));
-}
-
-// Ambient occlusion (variable named 'occ' to avoid 'ao')
-float ptOcclusion(vec3 pos, vec3 norm, float rockAngle) {
-  float occ = 0.0;
-  float scale = 1.0;
-  for (int i = 1; i <= 5; i++) {
-    float fi = float(i);
-    float dist = 0.02 + 0.06 * fi;
-    float sampled = ptMap(pos + norm * dist, rockAngle);
-    occ += (dist - sampled) * scale;
-    scale *= 0.65;
-  }
-  return clamp(1.0 - occ * 3.0, 0.0, 1.0);
-}
+// ─── Normal + AO (shared raymarching utilities) ───
+${ptNormalGLSL}
+${ptOccGLSL}
 
 // ═══════════════════════════════════════════════════════
 // Firefly system: sine-path spheres with warm glow
@@ -474,8 +457,8 @@ void main() {
 
   // === SURFACE SHADING ===
   if (didHitSurface) {
-    vec3 norm = ptNormal(marchPos, rockAngle);
-    float occ = ptOcclusion(marchPos, norm, rockAngle);
+    vec3 norm = ptNormal(marchPos);
+    float occ = ptOcclusion(marchPos, norm);
 
     // Sun direction (matching sky sun)
     vec3 sunDir = normalize(vec3(0.3, 0.08, 1.0));

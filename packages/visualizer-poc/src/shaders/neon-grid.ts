@@ -26,6 +26,16 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
+import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
+
+const ngNormalGLSL = buildRaymarchNormal(
+  "ngSceneSDFScalar($P, sceneTime, bass, tension)",
+  { eps: 0.005, name: "ngCalcNormal" },
+);
+const ngAOGLSL = buildRaymarchAO(
+  "ngSceneSDFScalar($P, sceneTime, bass, tension)",
+  { steps: 5, stepBase: 0.0, stepScale: 0.2, weightDecay: 0.6, finalMult: 0.8, name: "ngCalcOcclusion" },
+);
 
 export const neonGridVert = /* glsl */ `
 varying vec2 vUv;
@@ -108,31 +118,14 @@ float ngSceneSDF(vec3 pos, float time, float bass, float tension,
   return minDist;
 }
 
-// ---- Normal calculation ----
-vec3 ngCalcNormal(vec3 pos, float time, float bass, float tension) {
-  float eps = 0.005;
+// ---- Scalar wrapper for shared raymarching utilities ----
+float ngSceneSDFScalar(vec3 pos, float time, float bass, float tension) {
   int dummyId;
-  float ref = ngSceneSDF(pos, time, bass, tension, dummyId);
-  return normalize(vec3(
-    ngSceneSDF(pos + vec3(eps, 0, 0), time, bass, tension, dummyId) - ref,
-    ngSceneSDF(pos + vec3(0, eps, 0), time, bass, tension, dummyId) - ref,
-    ngSceneSDF(pos + vec3(0, 0, eps), time, bass, tension, dummyId) - ref
-  ));
+  return ngSceneSDF(pos, time, bass, tension, dummyId);
 }
 
-// ---- Occlusion ----
-float ngCalcOcclusion(vec3 pos, vec3 nrm, float time, float bass, float tension) {
-  float occl = 0.0;
-  float weight = 1.0;
-  int dummyId;
-  for (int i = 1; i <= 5; i++) {
-    float sd = float(i) * 0.2;
-    float sdf = ngSceneSDF(pos + nrm * sd, time, bass, tension, dummyId);
-    occl += weight * (sd - sdf);
-    weight *= 0.6;
-  }
-  return clamp(1.0 - occl * 0.8, 0.0, 1.0);
-}
+${ngNormalGLSL}
+${ngAOGLSL}
 
 // ---- Neon grid pattern on ground plane ----
 vec3 ngGridPattern(vec3 pos, float time, float energy, float bass, float highs,
@@ -288,8 +281,8 @@ void main() {
 
   if (didCollide) {
     vec3 collidePos = rayOrig + rayDir * marchDist;
-    vec3 nrm = ngCalcNormal(collidePos, sceneTime, bass, tension);
-    float occl = ngCalcOcclusion(collidePos, nrm, sceneTime, bass, tension);
+    vec3 nrm = ngCalcNormal(collidePos);
+    float occl = ngCalcOcclusion(collidePos, nrm);
 
     if (objId == 1) {
       // Ground plane: neon grid

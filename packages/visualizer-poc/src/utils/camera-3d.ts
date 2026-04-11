@@ -6,22 +6,25 @@
  * these uniforms are consumed by GLSL shaders via setupCameraRay().
  */
 
+import { type CameraProfile, DEFAULT_CAMERA_PROFILE } from "../config/camera-profiles";
+
 export interface Camera3DState {
   /** Camera position in world space */
   position: [number, number, number];
   /** Camera look-at target */
   target: [number, number, number];
-  /** Field of view in degrees (45-65) */
+  /** Field of view in degrees */
   fov: number;
   /** Depth of field blur strength (0-1) */
   dofStrength: number;
-  /** Focus distance in world units (2-5) */
+  /** Focus distance in world units */
   focusDistance: number;
 }
 
 /**
  * Compute 3D camera state from audio parameters.
  * All inputs should be 0-1 normalized (except time/dynamicTime/sectionIndex).
+ * Optional profile parameter overrides default orbital/shake/FOV behavior.
  */
 export function compute3DCamera(
   time: number,
@@ -37,6 +40,7 @@ export function compute3DCamera(
   climaxIntensity: number,
   cameraSteadiness: number,
   beatSnap: number,
+  profile: CameraProfile = DEFAULT_CAMERA_PROFILE,
 ): Camera3DState {
   // Clamp inputs
   energy = Math.max(0, Math.min(1, energy));
@@ -48,37 +52,34 @@ export function compute3DCamera(
   cameraSteadiness = Math.max(0, Math.min(1, cameraSteadiness));
   beatSnap = Math.max(0, Math.min(1, beatSnap));
 
-  // === Orbital motion ===
-  // Radius decreases with energy (closer at peaks)
-  const orbitRadius = 3.5 - energy * 0.5;
+  const p = profile;
 
-  // Vocal intimacy: reduce orbit radius 10% when vocals present
+  // === Orbital motion ===
+  const orbitRadius = p.orbitRadius - energy * p.energyRadiusShrink;
   const vocalRadiusMod = vocalPresence > 0.3 ? 0.9 : 1.0;
   const radius = orbitRadius * vocalRadiusMod;
 
-  const orbitAngle = dynamicTime * 0.02;
-  const orbitHeight = Math.sin(dynamicTime * 0.015) * 0.3;
+  const orbitAngle = dynamicTime * p.orbitSpeed;
+  const orbitHeight = Math.sin(dynamicTime * p.orbitBobSpeed) * p.orbitBobAmplitude;
 
   const orbX = Math.sin(orbitAngle) * radius;
   const orbZ = Math.cos(orbitAngle) * radius;
   const orbY = orbitHeight;
 
-  // === Bass shake ===
-  // Dampened by steadiness
+  // === Bass shake (dampened by steadiness + vocals) ===
   const shakeDampen = 1.0 - cameraSteadiness * 0.8;
-
-  // Vocal presence also dampens shake
   const vocalShakeDampen = vocalPresence > 0.3 ? 0.8 : 1.0;
+  const sd = shakeDampen * vocalShakeDampen;
 
-  const shakeX = Math.sin(time * 3.7) * bass * 0.06 * shakeDampen * vocalShakeDampen;
-  const shakeY = Math.cos(time * 2.3) * bass * 0.04 * shakeDampen * vocalShakeDampen;
-  const shakeZ = Math.sin(time * 4.1) * bass * 0.03 * shakeDampen * vocalShakeDampen;
+  const shakeX = Math.sin(time * p.shakeFrequency[0]) * bass * p.shakeAmplitude[0] * sd;
+  const shakeY = Math.cos(time * p.shakeFrequency[1]) * bass * p.shakeAmplitude[1] * sd;
+  const shakeZ = Math.sin(time * p.shakeFrequency[2]) * bass * p.shakeAmplitude[2] * sd;
 
-  // === Drum jolt ===
-  // Subtle impulse — felt not seen
-  const joltX = drumOnset > 0.5 ? (drumOnset - 0.5) * 0.08 * Math.sin(time * 7.3) : 0;
-  const joltY = drumOnset > 0.5 ? (drumOnset - 0.5) * 0.06 * Math.cos(time * 5.1) : 0;
-  const joltZ = drumOnset > 0.5 ? (drumOnset - 0.5) * 0.04 * Math.sin(time * 6.7) : 0;
+  // === Drum jolt (subtle impulse — felt not seen) ===
+  const jt = p.joltThreshold;
+  const joltX = drumOnset > jt ? (drumOnset - jt) * p.joltAmplitude[0] * Math.sin(time * p.joltFrequency[0]) : 0;
+  const joltY = drumOnset > jt ? (drumOnset - jt) * p.joltAmplitude[1] * Math.cos(time * p.joltFrequency[1]) : 0;
+  const joltZ = drumOnset > jt ? (drumOnset - jt) * p.joltAmplitude[2] * Math.sin(time * p.joltFrequency[2]) : 0;
 
   // === Final position ===
   const position: [number, number, number] = [
@@ -89,23 +90,23 @@ export function compute3DCamera(
 
   // === Target: always look at origin with slight sway ===
   const target: [number, number, number] = [
-    Math.sin(dynamicTime * 0.01) * 0.1,
-    Math.cos(dynamicTime * 0.008) * 0.05,
+    Math.sin(dynamicTime * p.targetSwaySpeed[0]) * p.targetSway[0],
+    Math.cos(dynamicTime * p.targetSwaySpeed[1]) * p.targetSway[1],
     0,
   ];
 
   // === FOV: wider at peaks for immersion ===
-  const fov = 50 + energy * 10;
+  const fov = p.baseFov + energy * p.energyFovBoost;
 
   // === DOF ===
-  const dofStrength = energy * 0.4 + climaxIntensity * 0.3;
-  const focusDistance = 3.0 - energy * 1.0;
+  const dofStrength = energy * p.dofEnergyFactor + climaxIntensity * p.dofClimaxFactor;
+  const focusDistance = p.baseFocusDistance - energy * p.energyFocusShrink;
 
   return {
     position,
     target,
-    fov: Math.max(45, Math.min(65, fov)),
+    fov: Math.max(p.fovRange[0], Math.min(p.fovRange[1], fov)),
     dofStrength: Math.max(0, Math.min(1, dofStrength)),
-    focusDistance: Math.max(2, Math.min(5, focusDistance)),
+    focusDistance: Math.max(p.focusRange[0], Math.min(p.focusRange[1], focusDistance)),
   };
 }

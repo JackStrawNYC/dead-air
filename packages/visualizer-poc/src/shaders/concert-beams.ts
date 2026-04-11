@@ -26,6 +26,7 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
+import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
 
 export const concertBeamsVert = /* glsl */ `
 varying vec2 vUv;
@@ -34,6 +35,15 @@ void main() {
   gl_Position = vec4(position, 1.0);
 }
 `;
+
+const cbNormalGLSL = buildRaymarchNormal(
+  "cbSceneSDF($P, bassVib).x",
+  { eps: 0.003, name: "cbCalcNormal" },
+);
+const cbAOGLSL = buildRaymarchAO(
+  "cbSceneSDF($P, bassVib).x",
+  { steps: 5, stepBase: 0.0, stepScale: 0.15, weightDecay: 0.6, finalMult: 2.0, name: "cbCalcAO" },
+);
 
 export const concertBeamsFrag = /* glsl */ `
 precision highp float;
@@ -197,31 +207,8 @@ vec2 cbSceneSDF(vec3 pos, float bassVib) {
   return vec2(minDist, matId);
 }
 
-// ═══════════════════════════════════════════════════════════
-// Normal, AO
-// ═══════════════════════════════════════════════════════════
-
-vec3 cbCalcNormal(vec3 pos, float bassVib) {
-  vec2 eps = vec2(0.003, 0.0);
-  float d0 = cbSceneSDF(pos, bassVib).x;
-  return normalize(vec3(
-    cbSceneSDF(pos + eps.xyy, bassVib).x - d0,
-    cbSceneSDF(pos + eps.yxy, bassVib).x - d0,
-    cbSceneSDF(pos + eps.yyx, bassVib).x - d0
-  ));
-}
-
-float cbCalcAO(vec3 pos, vec3 norm, float bassVib) {
-  float occ = 0.0;
-  float weight = 1.0;
-  for (int i = 1; i <= 5; i++) {
-    float dist = float(i) * 0.15;
-    float sampled = cbSceneSDF(pos + norm * dist, bassVib).x;
-    occ += (dist - sampled) * weight;
-    weight *= 0.6;
-  }
-  return clamp(1.0 - occ * 2.0, 0.0, 1.0);
-}
+${cbNormalGLSL}
+${cbAOGLSL}
 
 // ═══════════════════════════════════════════════════════════
 // Volumetric beam cone — evaluated along ray
@@ -315,8 +302,8 @@ void main() {
 
   if (didHitSurface) {
     vec3 hitPos = camOrigin + rayDir * totalDist;
-    vec3 normal = cbCalcNormal(hitPos, bassVib);
-    float ambOcc = cbCalcAO(hitPos, normal, bassVib);
+    vec3 normal = cbCalcNormal(hitPos);
+    float ambOcc = cbCalcAO(hitPos, normal);
 
     // Simple overhead key light
     vec3 keyLightDir = normalize(vec3(0.3, 1.0, -0.5));

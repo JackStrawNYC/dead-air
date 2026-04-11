@@ -6,6 +6,7 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
+import { buildRaymarchNormal } from "./shared/raymarching.glsl";
 
 export const fractalTempleVert = /* glsl */ `
 varying vec2 vUv;
@@ -13,6 +14,7 @@ void main() { vUv = uv; gl_Position = vec4(position, 1.0); }
 `;
 
 const postProcess = buildPostProcessGLSL({ bloomThresholdOffset: 0.05, caEnabled: true, dofEnabled: true, eraGradingEnabled: true });
+const ftNormal = buildRaymarchNormal("ftMap($P, energy, bass, ft, psyche)", { eps: 0.002, name: "ftCalcNormal" });
 
 export const fractalTempleFrag = /* glsl */ `
 precision highp float;
@@ -58,6 +60,8 @@ float ftMap(vec3 p, float energy, float bass, float ft, float psyche) {
   }
   return d;
 }
+
+${ftNormal}
 
 void main() {
   vec2 uv = vUv;
@@ -106,12 +110,7 @@ void main() {
 
   vec3 col = vec3(0.0);
   if (ht) {
-    vec2 e2 = vec2(0.002,0.0);
-    float b0 = ftMap(hp,energy,bass,ft,psyche);
-    vec3 n = normalize(vec3(
-      ftMap(hp+e2.xyy,energy,bass,ft,psyche)-b0,
-      ftMap(hp+e2.yxy,energy,bass,ft,psyche)-b0,
-      ftMap(hp+e2.yyx,energy,bass,ft,psyche)-b0));
+    vec3 n = ftCalcNormal(hp);
     vec3 L = normalize(vec3(0.3,0.8,0.5));
     float df = max(dot(n,L),0.0);
     float sp = pow(max(dot(reflect(-L,n),-rd),0.0), 24.0+energy*40.0);

@@ -19,6 +19,7 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
+import { buildRaymarchNormal } from "./shared/raymarching.glsl";
 
 export const neonCasinoVert = /* glsl */ `
 varying vec2 vUv;
@@ -33,6 +34,8 @@ const postProcess = buildPostProcessGLSL({
   halationEnabled: true,
   lightLeakEnabled: true,
 });
+
+const ncNormalGLSL = buildRaymarchNormal("ncMap($P, ncTime, energy, bass, drumOn, tension, sJam, sSpace, climB).x", { eps: 0.002, name: "ncNormal" });
 
 export const neonCasinoFrag = /* glsl */ `
 precision highp float;
@@ -314,6 +317,9 @@ vec2 ncMap(vec3 p, float ncTime, float energy, float bass, float drumOn,
   return res;
 }
 
+// ─── Normal (shared raymarching utility) ───
+${ncNormalGLSL}
+
 // ─── Neon color palette: hot pink, electric blue, acid green ───
 vec3 ncNeonColor(float cellZ, float ncTime, float tension, float bass,
                  float palH1, float palH2, float sJam) {
@@ -414,16 +420,10 @@ void main() {
     totalDist += sceneD.x * 0.65; // conservative step for complex SDF
   }
 
-  // ─── Normal calculation ───
+  // ─── Normal (shared raymarching utility) ───
   vec3 ncNorm = vec3(0.0, 1.0, 0.0);
   if (didHit) {
-    vec2 eps = vec2(0.002, 0.0);
-    float d0 = ncMap(hitPos, ncTime, energy, bass, drumOn, tension, sJam, sSpace, climB).x;
-    ncNorm = normalize(vec3(
-      ncMap(hitPos + eps.xyy, ncTime, energy, bass, drumOn, tension, sJam, sSpace, climB).x - d0,
-      ncMap(hitPos + eps.yxy, ncTime, energy, bass, drumOn, tension, sJam, sSpace, climB).x - d0,
-      ncMap(hitPos + eps.yyx, ncTime, energy, bass, drumOn, tension, sJam, sSpace, climB).x - d0
-    ));
+    ncNorm = ncNormal(hitPos);
   }
 
   // Cell identification for per-cell neon color

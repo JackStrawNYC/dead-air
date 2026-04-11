@@ -28,6 +28,7 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
+import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
 
 export const memorialDriftVert = /* glsl */ `
 varying vec2 vUv;
@@ -48,6 +49,9 @@ const postProcess = buildPostProcessGLSL({
   eraGradingEnabled: true,
   dofEnabled: true,
 });
+
+const mdNormalGLSL = buildRaymarchNormal("mdMap($P).x", { eps: 0.003, name: "mdNormal" });
+const mdAOGLSL = buildRaymarchAO("mdMap($P).x", { steps: 5, stepBase: 0.0, stepScale: 0.05, weightDecay: 0.65, finalMult: 3.0, name: "mdAO" });
 
 export const memorialDriftFrag = /* glsl */ `
 precision highp float;
@@ -214,29 +218,9 @@ vec2 mdMapWithFlames(vec3 p, float time, float drumFlicker) {
   return scene;
 }
 
-// ─── Normal via central differences ───
-vec3 mdNormal(vec3 p) {
-  vec2 eps = vec2(0.003, 0.0);
-  float d = mdMap(p).x;
-  return normalize(vec3(
-    mdMap(p + eps.xyy).x - mdMap(p - eps.xyy).x,
-    mdMap(p + eps.yxy).x - mdMap(p - eps.yxy).x,
-    mdMap(p + eps.yyx).x - mdMap(p - eps.yyx).x
-  ));
-}
-
-// ─── Ambient occlusion ───
-float mdAO(vec3 p, vec3 n) {
-  float aoVal = 0.0;
-  float scale = 1.0;
-  for (int i = 1; i <= 5; i++) {
-    float dist = 0.05 * float(i);
-    float d = mdMap(p + n * dist).x;
-    aoVal += (dist - d) * scale;
-    scale *= 0.65;
-  }
-  return clamp(1.0 - aoVal * 3.0, 0.0, 1.0);
-}
+// ─── Normal + AO (shared raymarching utilities) ───
+${mdNormalGLSL}
+${mdAOGLSL}
 
 // ─── Soft shadow (toward candlelight) ───
 float mdSoftShadow(vec3 ro, vec3 rd, float mint, float maxt) {

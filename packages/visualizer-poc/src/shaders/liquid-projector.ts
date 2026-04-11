@@ -28,6 +28,16 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
+import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
+
+const lp2NormalGLSL = buildRaymarchNormal(
+  "lp2SceneSDFScalar($P, sceneTime, bass, energy, tension, coherence)",
+  { eps: 0.005, name: "lp2CalcNormal" },
+);
+const lp2AOGLSL = buildRaymarchAO(
+  "lp2SceneSDFScalar($P, sceneTime, bass, energy, tension, coherence)",
+  { steps: 4, stepBase: 0.0, stepScale: 0.15, weightDecay: 0.5, finalMult: 2.0, name: "lp2CalcOcclusion" },
+);
 
 export const liquidProjectorVert = /* glsl */ `
 varying vec2 vUv;
@@ -157,32 +167,14 @@ float lp2SceneSDF(vec3 pos, float time, float bass, float energy, float tension,
   return minDist;
 }
 
-// ---- Normal ----
-vec3 lp2CalcNormal(vec3 pos, float time, float bass, float energy, float tension, float coherence) {
-  float eps = 0.005;
+// ---- Scalar wrapper for shared raymarching utilities ----
+float lp2SceneSDFScalar(vec3 pos, float time, float bass, float energy, float tension, float coherence) {
   int dummyId;
-  float ref = lp2SceneSDF(pos, time, bass, energy, tension, coherence, dummyId);
-  return normalize(vec3(
-    lp2SceneSDF(pos + vec3(eps, 0, 0), time, bass, energy, tension, coherence, dummyId) - ref,
-    lp2SceneSDF(pos + vec3(0, eps, 0), time, bass, energy, tension, coherence, dummyId) - ref,
-    lp2SceneSDF(pos + vec3(0, 0, eps), time, bass, energy, tension, coherence, dummyId) - ref
-  ));
+  return lp2SceneSDF(pos, time, bass, energy, tension, coherence, dummyId);
 }
 
-// ---- Occlusion ----
-float lp2CalcOcclusion(vec3 pos, vec3 nrm, float time, float bass, float energy,
-                        float tension, float coherence) {
-  float occl = 0.0;
-  float weight = 1.0;
-  int dummyId;
-  for (int i = 1; i <= 4; i++) {
-    float sd = float(i) * 0.15;
-    float sdf = lp2SceneSDF(pos + nrm * sd, time, bass, energy, tension, coherence, dummyId);
-    occl += weight * max(sd - sdf, 0.0);
-    weight *= 0.5;
-  }
-  return clamp(1.0 - occl * 2.0, 0.0, 1.0);
-}
+${lp2NormalGLSL}
+${lp2AOGLSL}
 
 void main() {
   vec2 uv = vUv;
@@ -261,8 +253,8 @@ void main() {
 
   if (didCollide) {
     vec3 collidePos = rayOrig + rayDir * marchDist;
-    vec3 nrm = lp2CalcNormal(collidePos, sceneTime, bass, energy, tension, coherence);
-    float occl = lp2CalcOcclusion(collidePos, nrm, sceneTime, bass, energy, tension, coherence);
+    vec3 nrm = lp2CalcNormal(collidePos);
+    float occl = lp2CalcOcclusion(collidePos, nrm);
 
     // Light from below (heat source)
     vec3 heatLightDir = normalize(vec3(0.0, 1.0, 0.0));

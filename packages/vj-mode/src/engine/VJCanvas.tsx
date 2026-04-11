@@ -28,7 +28,10 @@ function defaultState(): SmoothedAudioState {
     climaxPhase: 0, climaxIntensity: 0,
     time: 0, dynamicTime: 0,
     palettePrimary: 210 / 360, paletteSecondary: 270 / 360, paletteSaturation: 1,
-    jamDensity: 0.5, coherence: 0, isLocked: false,
+    chordIndex: 0, chordConfidence: 0, harmonicTension: 0,
+    beatStability: 0, beatConfidence: 0,
+    sectionType: "verse",
+    jamDensity: 0, isLongJam: false, coherence: 0, isLocked: false,
   };
 }
 

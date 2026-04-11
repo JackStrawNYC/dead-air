@@ -24,6 +24,16 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
+import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
+
+const fzNormalGLSL = buildRaymarchNormal(
+  "fzMap($P, fzScale, fzFoldLimit, fzIterations, fzFoldDistort).x",
+  { eps: 0.001, name: "fzNormal" },
+);
+const fzAOGLSL = buildRaymarchAO(
+  "fzMap($P, fzScale, fzFoldLimit, fzIterations, fzFoldDistort).x",
+  { steps: 5, stepBase: 0.01, stepScale: 0.06, weightDecay: 0.7, finalMult: 2.5, name: "fzAmbientOcclusion" },
+);
 
 export const fractalZoomVert = /* glsl */ `
 varying vec2 vUv;
@@ -129,16 +139,7 @@ vec3 fzOrbitTrap(float trap, float hueBase, float hueSecondary, float satMult) {
   return mix(mix(col1, col2, smoothstep(0.0, 0.5, trap)), col3, t2 * 0.3);
 }
 
-// ─── Normal estimation via central differences ───
-vec3 fzNormal(vec3 pos, float scale, float foldLimit, int iterations, float foldDistort) {
-  vec2 offset = vec2(0.001, 0.0);
-  float d0 = fzMap(pos, scale, foldLimit, iterations, foldDistort).x;
-  return normalize(vec3(
-    fzMap(pos + offset.xyy, scale, foldLimit, iterations, foldDistort).x - d0,
-    fzMap(pos + offset.yxy, scale, foldLimit, iterations, foldDistort).x - d0,
-    fzMap(pos + offset.yyx, scale, foldLimit, iterations, foldDistort).x - d0
-  ));
-}
+${fzNormalGLSL}
 
 // ─── Soft shadow via short-range marching ───
 float fzSoftShadow(vec3 ro, vec3 rd, float mint, float maxt, float sharpness,
@@ -155,18 +156,7 @@ float fzSoftShadow(vec3 ro, vec3 rd, float mint, float maxt, float sharpness,
   return clamp(shade, 0.0, 1.0);
 }
 
-// ─── Ambient occlusion via distance-field sampling ───
-float fzAmbientOcclusion(vec3 pos, vec3 norm, float scale, float foldLimit, int iterations, float foldDistort) {
-  float occ = 0.0;
-  float sca = 1.0;
-  for (int i = 0; i < 5; i++) {
-    float hr = 0.01 + 0.06 * float(i);
-    float dd = fzMap(pos + norm * hr, scale, foldLimit, iterations, foldDistort).x;
-    occ += (hr - dd) * sca;
-    sca *= 0.7;
-  }
-  return clamp(1.0 - 2.5 * occ, 0.0, 1.0);
-}
+${fzAOGLSL}
 
 void main() {
   vec2 screenUv = vUv;
@@ -287,7 +277,7 @@ void main() {
     vec3 surfPos = camPos + rayDir * totalDist;
 
     // ─── Surface normal ───
-    vec3 norm = fzNormal(surfPos, fzScale, fzFoldLimit, fzIterations, fzFoldDistort);
+    vec3 norm = fzNormal(surfPos);
 
     // ─── Lighting ───
     // Two-point lighting: key + fill
@@ -313,7 +303,7 @@ void main() {
                                 fzScale, fzFoldLimit, fzIterations, fzFoldDistort);
 
     // Ambient occlusion
-    float occl = fzAmbientOcclusion(surfPos, norm, fzScale, fzFoldLimit, fzIterations, fzFoldDistort);
+    float occl = fzAmbientOcclusion(surfPos, norm);
 
     // ─── Orbit trap coloring ───
     float hueBase = uPalettePrimary + uChromaHue / 360.0;

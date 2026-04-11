@@ -25,6 +25,16 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
+import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
+
+const llNormalGLSL = buildRaymarchNormal(
+  "llMap($P, bass, energy, llTime, viscosity, splashWave, beatStab, sJam, sSpace, sChorus, climB)",
+  { eps: 0.003, name: "llNormal" },
+);
+const llAOGLSL = buildRaymarchAO(
+  "llMap($P, bass, energy, llTime, viscosity, splashWave, beatStab, sJam, sSpace, sChorus, climB)",
+  { steps: 4, stepBase: 0.0, stepScale: 0.12, weightDecay: 0.5, finalMult: 0.35, name: "llCalcAO" },
+);
 
 export const liquidLightVert = /* glsl */ `
 varying vec2 vUv;
@@ -309,6 +319,9 @@ vec3 llTransmission(vec3 surfPos, float bass, float energy, float llTime,
   return oilCol * transmission;
 }
 
+${llNormalGLSL}
+${llAOGLSL}
+
 void main() {
   vec2 uv = vUv;
   vec2 asp = vec2(uResolution.x / uResolution.y, 1.0);
@@ -406,29 +419,8 @@ void main() {
   vec3 col = vec3(0.0);
 
   if (wasHit) {
-    // ─── Normal via central differences ───
-    vec2 eps = vec2(0.003, 0.0);
-    float d0 = llMap(hitPos, bass, energy, llTime, viscosity, splashWave, beatStab,
-                     sJam, sSpace, sChorus, climB);
-    vec3 norm = normalize(vec3(
-      llMap(hitPos + eps.xyy, bass, energy, llTime, viscosity, splashWave, beatStab,
-            sJam, sSpace, sChorus, climB) - d0,
-      llMap(hitPos + eps.yxy, bass, energy, llTime, viscosity, splashWave, beatStab,
-            sJam, sSpace, sChorus, climB) - d0,
-      llMap(hitPos + eps.yyx, bass, energy, llTime, viscosity, splashWave, beatStab,
-            sJam, sSpace, sChorus, climB) - d0
-    ));
-
-    // ─── Ambient occlusion ───
-    float llAO = 1.0;
-    for (int j = 1; j < 5; j++) {
-      float aoDist = 0.12 * float(j);
-      float aoSample = llMap(hitPos + norm * aoDist, bass, energy, llTime,
-                             viscosity, splashWave, beatStab,
-                             sJam, sSpace, sChorus, climB);
-      llAO -= (aoDist - aoSample) * (0.3 / float(j));
-    }
-    llAO = clamp(llAO, 0.12, 1.0);
+    vec3 norm = llNormal(hitPos);
+    float llAO = llCalcAO(hitPos, norm);
 
     // ─── Basic directional light (from above, through glass) ───
     vec3 lightDir = normalize(vec3(sin(llTime * 0.08) * 0.3, 0.9, cos(llTime * 0.06) * 0.3));

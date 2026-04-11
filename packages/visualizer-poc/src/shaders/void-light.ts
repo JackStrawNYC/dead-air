@@ -33,6 +33,7 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
+import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
 
 export const voidLightVert = /* glsl */ `
 varying vec2 vUv;
@@ -41,6 +42,9 @@ void main() {
   gl_Position = vec4(position, 1.0);
 }
 `;
+
+const vlNormalGLSL = buildRaymarchNormal("vlMap($P, icoRadius, time, rotSpeed, beatSnap, beatStability, climaxShatter)", { eps: 0.002, name: "vlNormal" });
+const vlAOGLSL = buildRaymarchAO("vlMap($P, icoRadius, time, rotSpeed, beatSnap, beatStability, climaxShatter)", { steps: 5, stepBase: 0.0, stepScale: 0.06, weightDecay: 0.6, finalMult: 4.0, name: "vlAmbientOcclusion" });
 
 export const voidLightFrag = /* glsl */ `
 precision highp float;
@@ -176,37 +180,8 @@ float vlMap(vec3 p, float radius, float time, float rotSpeed,
   return minDist;
 }
 
-// ============================================================
-// Normal via central differences
-// ============================================================
-vec3 vlNormal(vec3 p, float radius, float time, float rotSpeed,
-              float beatSnap, float stability, float climaxShatter) {
-  vec2 eps = vec2(0.002, 0.0);
-  float d = vlMap(p, radius, time, rotSpeed, beatSnap, stability, climaxShatter);
-  return normalize(vec3(
-    vlMap(p + eps.xyy, radius, time, rotSpeed, beatSnap, stability, climaxShatter) - d,
-    vlMap(p + eps.yxy, radius, time, rotSpeed, beatSnap, stability, climaxShatter) - d,
-    vlMap(p + eps.yyx, radius, time, rotSpeed, beatSnap, stability, climaxShatter) - d
-  ));
-}
-
-// ============================================================
-// Ambient Occlusion (5-tap)
-// ============================================================
-float vlAmbientOcclusion(vec3 p, vec3 n, float radius, float time,
-                          float rotSpeed, float beatSnap, float stability,
-                          float climaxShatter) {
-  float occ = 0.0;
-  float weight = 1.0;
-  for (int i = 1; i <= 5; i++) {
-    float fi = float(i);
-    float dist = fi * 0.06;
-    float d = vlMap(p + n * dist, radius, time, rotSpeed, beatSnap, stability, climaxShatter);
-    occ += (dist - d) * weight;
-    weight *= 0.6;
-  }
-  return clamp(1.0 - occ * 4.0, 0.0, 1.0);
-}
+${vlNormalGLSL}
+${vlAOGLSL}
 
 // ============================================================
 // Volumetric god rays from icosahedron
@@ -404,7 +379,7 @@ void main() {
 
   if (marchHit) {
     vec3 pos = marchPos;
-    vec3 norm = vlNormal(pos, icoRadius, time, rotSpeed, beatSnap, beatStability, climaxShatter);
+    vec3 norm = vlNormal(pos);
 
     vec3 viewDir = normalize(ro - pos);
     vec3 lightDir = normalize(lightPos - pos);
@@ -421,7 +396,7 @@ void main() {
     float fresnel = pow(1.0 - max(dot(norm, viewDir), 0.0), 3.0);
 
     // === AO ===
-    float occl = vlAmbientOcclusion(pos, norm, icoRadius, time, rotSpeed, beatSnap, beatStability, climaxShatter);
+    float occl = vlAmbientOcclusion(pos, norm);
 
     // === MATERIAL: luminous crystal ===
     // The icosahedron IS the light source — it's emissive

@@ -33,6 +33,16 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
+import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
+
+const fl2NormalGLSL = buildRaymarchNormal(
+  "fl2Map($P, time, fl2BeatPulse, churn, blobCount, climaxErupt)",
+  { eps: 0.004, name: "fl2Normal" },
+);
+const fl2AOGLSL = buildRaymarchAO(
+  "fl2Map($P, time, fl2BeatPulse, churn, blobCount, climaxErupt)",
+  { steps: 5, stepBase: 0.0, stepScale: 0.1, weightDecay: 0.6, finalMult: 2.0, name: "fl2AmbientOcclusion" },
+);
 
 export const fluidLightVert = /* glsl */ `
 varying vec2 vUv;
@@ -215,36 +225,8 @@ float fl2MaterialID(vec3 p, float time, float beatPulse, float churn,
   return (meniscus < blobs) ? 1.0 : 0.0;
 }
 
-// ============================================================
-// Normal via central differences
-// ============================================================
-vec3 fl2Normal(vec3 p, float time, float beatPulse, float churn,
-               int blobCount, float climaxErupt) {
-  vec2 eps = vec2(0.004, 0.0);
-  float d = fl2Map(p, time, beatPulse, churn, blobCount, climaxErupt);
-  return normalize(vec3(
-    fl2Map(p + eps.xyy, time, beatPulse, churn, blobCount, climaxErupt) - d,
-    fl2Map(p + eps.yxy, time, beatPulse, churn, blobCount, climaxErupt) - d,
-    fl2Map(p + eps.yyx, time, beatPulse, churn, blobCount, climaxErupt) - d
-  ));
-}
-
-// ============================================================
-// Ambient Occlusion (5-tap)
-// ============================================================
-float fl2AmbientOcclusion(vec3 p, vec3 n, float time, float beatPulse,
-                           float churn, int blobCount, float climaxErupt) {
-  float occ = 0.0;
-  float weight = 1.0;
-  for (int i = 1; i <= 5; i++) {
-    float fi = float(i);
-    float dist = fi * 0.1;
-    float d = fl2Map(p + n * dist, time, beatPulse, churn, blobCount, climaxErupt);
-    occ += (dist - d) * weight;
-    weight *= 0.6;
-  }
-  return clamp(1.0 - occ * 2.0, 0.0, 1.0);
-}
+${fl2NormalGLSL}
+${fl2AOGLSL}
 
 // ============================================================
 // Volumetric bioluminescent fluid
@@ -380,7 +362,7 @@ void main() {
 
   if (marchHit) {
     vec3 pos = marchPos;
-    vec3 norm = fl2Normal(pos, time, fl2BeatPulse, churn, blobCount, climaxErupt);
+    vec3 norm = fl2Normal(pos);
     float matID = fl2MaterialID(pos, time, fl2BeatPulse, churn, blobCount, climaxErupt);
 
     // Light: from above (melodicPitch controls depth)
@@ -401,7 +383,7 @@ void main() {
     float fresnel = pow(1.0 - max(dot(norm, viewDir), 0.0), 3.0);
 
     // === AO ===
-    float occl = fl2AmbientOcclusion(pos, norm, time, fl2BeatPulse, churn, blobCount, climaxErupt);
+    float occl = fl2AmbientOcclusion(pos, norm);
 
     if (matID > 0.5) {
       // Meniscus surface: refractive, caustic patterns

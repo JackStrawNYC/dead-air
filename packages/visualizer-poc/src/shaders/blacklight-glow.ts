@@ -26,6 +26,7 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
+import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
 
 export const blacklightGlowVert = /* glsl */ `
 varying vec2 vUv;
@@ -34,6 +35,15 @@ void main() {
   gl_Position = vec4(position, 1.0);
 }
 `;
+
+const bg2NormalGLSL = buildRaymarchNormal(
+  "bg2SceneSDF($P, bassBreath, flowTime).x",
+  { eps: 0.003, name: "bg2CalcNormal" },
+);
+const bg2AOGLSL = buildRaymarchAO(
+  "bg2SceneSDF($P, bassBreath, flowTime).x",
+  { steps: 5, stepBase: 0.0, stepScale: 0.12, weightDecay: 0.6, finalMult: 2.5, name: "bg2CalcAO" },
+);
 
 export const blacklightGlowFrag = /* glsl */ `
 precision highp float;
@@ -178,35 +188,8 @@ vec2 bg2SceneSDF(vec3 pos, float bassBreath, float flowTime) {
   return vec2(minDist, matId);
 }
 
-// ═══════════════════════════════════════════════════════════
-// Normal estimation via central differences
-// ═══════════════════════════════════════════════════════════
-
-vec3 bg2CalcNormal(vec3 pos, float bassBreath, float flowTime) {
-  vec2 eps = vec2(0.003, 0.0);
-  float d0 = bg2SceneSDF(pos, bassBreath, flowTime).x;
-  return normalize(vec3(
-    bg2SceneSDF(pos + eps.xyy, bassBreath, flowTime).x - d0,
-    bg2SceneSDF(pos + eps.yxy, bassBreath, flowTime).x - d0,
-    bg2SceneSDF(pos + eps.yyx, bassBreath, flowTime).x - d0
-  ));
-}
-
-// ═══════════════════════════════════════════════════════════
-// Ambient occlusion — 5-step
-// ═══════════════════════════════════════════════════════════
-
-float bg2CalcAO(vec3 pos, vec3 norm, float bassBreath, float flowTime) {
-  float occ = 0.0;
-  float weight = 1.0;
-  for (int i = 1; i <= 5; i++) {
-    float dist = float(i) * 0.12;
-    float sampled = bg2SceneSDF(pos + norm * dist, bassBreath, flowTime).x;
-    occ += (dist - sampled) * weight;
-    weight *= 0.6;
-  }
-  return clamp(1.0 - occ * 2.5, 0.0, 1.0);
-}
+${bg2NormalGLSL}
+${bg2AOGLSL}
 
 // ═══════════════════════════════════════════════════════════
 // Soft shadows
@@ -315,8 +298,8 @@ void main() {
 
   if (didHitSurface) {
     vec3 hitPos = camOrigin + rayDir * totalDist;
-    vec3 normal = bg2CalcNormal(hitPos, bassBreath, flowTime);
-    float ambOcc = bg2CalcAO(hitPos, normal, bassBreath, flowTime);
+    vec3 normal = bg2CalcNormal(hitPos);
+    float ambOcc = bg2CalcAO(hitPos, normal);
 
     // UV light positions (matching tube positions on ceiling)
     vec3 uvLight1 = vec3(-2.2, 2.5, 0.0);

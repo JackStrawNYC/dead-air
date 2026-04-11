@@ -8,6 +8,11 @@
 
 import type { RawAudioFeatures, SmoothedAudioState } from "./types";
 import type { BeatState } from "./BeatDetector";
+import { ChordDetector } from "./ChordDetector";
+import { BeatStabilityEstimator } from "./BeatStabilityEstimator";
+import { SectionEstimator } from "./SectionEstimator";
+import { VocalEstimator } from "./VocalEstimator";
+import { JamDensityEstimator } from "./JamDensityEstimator";
 
 /** EMA alpha for a given original 30fps window, adapted to 60fps */
 function emaAlpha(window30fps: number): number {
@@ -98,6 +103,13 @@ export class RollingAudioState {
   // Contrast placeholder (7 bands)
   private contrastArray: number[] = new Array(7).fill(0);
 
+  // New detectors (Item 9: real-time audio feature detectors)
+  private chordDetector = new ChordDetector();
+  private beatStabilityEstimator = new BeatStabilityEstimator();
+  private sectionEstimator = new SectionEstimator();
+  private vocalEstimator = new VocalEstimator();
+  private jamDensityEstimator = new JamDensityEstimator();
+
   update(
     raw: RawAudioFeatures,
     beat: BeatState,
@@ -181,8 +193,6 @@ export class RollingAudioState {
       this.sectionStartTime = elapsedTime;
     }
 
-    const sectionProgress = Math.min(1, timeSinceSection / SECTION_DURATION_S);
-
     // === Rolling percentiles (dynamic range calibration) ===
     this.percentileSampleCounter++;
     if (this.percentileSampleCounter >= 1) { // sample every frame
@@ -220,6 +230,31 @@ export class RollingAudioState {
     // Energy gate for transients
     const egate = this.energyGate(this.emaEnergy);
 
+    // === New detectors (Item 9) ===
+    const timeMs = elapsedTime * 1000;
+    const chord = this.chordDetector.detect(raw.chromaBins);
+    const stability = this.beatStabilityEstimator.update(beat.isBeat, timeMs);
+    const section = this.sectionEstimator.update(
+      this.emaEnergy,
+      stability.beatStability,
+      stability.beatConfidence,
+      this.emaFlatness,
+      elapsedTime,
+    );
+    const vocal = this.vocalEstimator.update(
+      raw.mids,
+      raw.highs,
+      raw.centroid,
+      raw.flatness,
+      raw.rms,
+    );
+    const jam = this.jamDensityEstimator.update(
+      raw.onset,
+      beat.isBeat,
+      timeMs,
+      section.sectionType,
+    );
+
     return {
       rms: this.emaEnergy,
       bass: this.emaBass * (0.3 + 0.7 * egate),
@@ -243,16 +278,12 @@ export class RollingAudioState {
       flatness: this.emaFlatness,
       chroma: this.chromaArray,
       contrast: this.contrastArray,
-      sectionProgress,
+      sectionProgress: section.sectionProgress,
       sectionIndex: this.sectionIndex,
       stemBass: this.emaBass,
-      // Approximate stem features from frequency bands:
-      // Vocals: tonal content in mid range (low flatness = tonal, mids = vocal range)
-      vocalEnergy: this.emaMids * Math.max(0, 1 - this.emaFlatness * 2) * 0.8,
-      // Vocal presence: sustained tonal mids with centroid in vocal range (0.2-0.5)
-      vocalPresence: this.emaMids > 0.1 && this.emaFlatness < 0.4 && this.emaCentroid > 0.15 && this.emaCentroid < 0.55
-        ? Math.min(1, this.emaMids * 1.5 * (1 - this.emaFlatness))
-        : 0,
+      // Vocal estimation from VocalEstimator (replaces old inline heuristic)
+      vocalEnergy: vocal.vocalEnergy,
+      vocalPresence: vocal.vocalPresence,
       // Other (guitar/keys): mid-high frequencies
       otherEnergy: (this.emaMids * 0.4 + this.emaHighs * 0.6) * 0.7,
       // Other centroid: normalized spectral centroid in non-bass range
@@ -264,10 +295,23 @@ export class RollingAudioState {
       climaxIntensity: this.climaxIntensity,
       time: elapsedTime,
       dynamicTime: this.dynamicTimeAccum,
+      // Chord detection from ChordDetector
+      chordIndex: chord.chordIndex,
+      chordConfidence: chord.confidence,
+      harmonicTension: chord.harmonicTension,
+
+      // Beat stability from BeatStabilityEstimator
+      beatStability: stability.beatStability,
+      beatConfidence: stability.beatConfidence,
+
+      // Section estimation from SectionEstimator
+      sectionType: section.sectionType,
+
       palettePrimary: 0, // set by VJStore
       paletteSecondary: 0,
       paletteSaturation: 1,
-      jamDensity: 0.5,
+      jamDensity: jam.jamDensity,
+      isLongJam: jam.isLongJam,
       coherence: 0,
       isLocked: false,
     };
@@ -367,5 +411,12 @@ export class RollingAudioState {
     this.quietThreshold = 0.05;
     this.loudThreshold = 0.35;
     this.musicalTimeAccum = 0;
+
+    // Reset new detectors
+    this.chordDetector.reset();
+    this.beatStabilityEstimator.reset();
+    this.sectionEstimator.reset();
+    this.vocalEstimator.reset();
+    this.jamDensityEstimator.reset();
   }
 }

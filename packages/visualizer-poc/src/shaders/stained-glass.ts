@@ -26,6 +26,7 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
+import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
 
 export const stainedGlassVert = /* glsl */ `
 varying vec2 vUv;
@@ -45,6 +46,9 @@ const postProcess = buildPostProcessGLSL({
   lightLeakEnabled: true,
   dofEnabled: true,
 });
+
+const sglNormalGLSL = buildRaymarchNormal("sglMap($P)", { eps: 0.005, name: "sglNormal" });
+const sglAOGLSL = buildRaymarchAO("sglMap($P)", { steps: 5, stepBase: 0.0, stepScale: 0.1, weightDecay: 0.6, finalMult: 2.5, name: "sglAO" });
 
 export const stainedGlassFrag = /* glsl */ `
 precision highp float;
@@ -284,30 +288,9 @@ float sglMaterialID(vec3 p) {
   return 0.0; // generic stone
 }
 
-// ─── Normal via central differences ───
-vec3 sglNormal(vec3 p) {
-  vec2 offset = vec2(0.005, 0.0);
-  float d = sglMap(p);
-  return normalize(vec3(
-    sglMap(p + offset.xyy) - d,
-    sglMap(p + offset.yxy) - d,
-    sglMap(p + offset.yyx) - d
-  ));
-}
-
-// ─── Ambient occlusion ───
-float sglAO(vec3 p, vec3 n) {
-  float occ = 0.0;
-  float scale = 1.0;
-  for (int i = 1; i <= 5; i++) {
-    float fi = float(i);
-    float dist = 0.1 * fi;
-    float d = sglMap(p + n * dist);
-    occ += (dist - d) * scale;
-    scale *= 0.6;
-  }
-  return clamp(1.0 - occ * 2.5, 0.0, 1.0);
-}
+// ─── Normal + AO (shared raymarching utilities) ───
+${sglNormalGLSL}
+${sglAOGLSL}
 
 // ─── Soft shadow (toward light) ───
 float sglSoftShadow(vec3 ro, vec3 rd, float maxDist) {

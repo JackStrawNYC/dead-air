@@ -52,11 +52,10 @@ import { useShowNarrative, ShowNarrativeProvider } from "./data/ShowNarrativeCon
 import { calibrateEnergy } from "./utils/energy";
 import { AudioSnapshotProvider } from "./data/AudioSnapshotContext";
 import { HeroPermittedProvider } from "./data/HeroPermittedContext";
-import { computeJamEvolution, getJamPhaseBoundaries, getJamPhaseSequence, JAM_PHASE_INDEX } from "./utils/jam-evolution";
+import { JAM_PHASE_INDEX } from "./utils/jam-evolution";
 import { JamPhaseProvider } from "./data/JamPhaseContext";
 import { PeakOfShowProvider } from "./data/PeakOfShowContext";
 import { computeMediaSuppression, computeArtSuppressionFactor } from "./utils/media-suppression";
-import { computeSegueHueRotation } from "./utils/segue-blend";
 import { detectCrowdMoments } from "./data/crowd-detector";
 import { CrowdOverlay } from "./components/CrowdOverlay";
 import { CameraMotion } from "./components/CameraMotion";
@@ -64,12 +63,8 @@ import { computeVisualFocus } from "./utils/visual-focus";
 import { findMusicEnd } from "./utils/music-end";
 import { computeCounterpoint } from "./utils/visual-counterpoint";
 import { lookupSongIdentity, getOrGenerateSongIdentity } from "./data/song-identities";
-import { computeShowArcPhase, getShowArcModifiers } from "./data/show-arc";
-import type { ShowArcPhase } from "./data/show-arc";
-import { computeTourModifiers, applyTourModifiers } from "./utils/tour-position";
-import { getSetTheme, applySetModifiers } from "./utils/set-theme";
 import { computeITResponse } from "./utils/it-response";
-import { isSacredSegue, isJamSegmentTitle, getSacredSegueTransition } from "./data/band-config";
+import { isJamSegmentTitle } from "./data/band-config";
 import { classifyStemSection, detectSolo } from "./utils/stem-features";
 import type { StemSectionType } from "./utils/stem-features";
 import { getSectionVocabulary, composeSectionWithJamCycle } from "./utils/section-vocabulary";
@@ -82,14 +77,13 @@ import { deriveChromaPalette } from "./utils/chroma-palette";
 import { SongPositionIndicator } from "./components/SongPositionIndicator";
 import { JamTimer } from "./components/JamTimer";
 import { UpNextTeaser } from "./components/UpNextTeaser";
-import { computeFatigueDampening } from "./utils/visual-fatigue";
+// Visual fatigue, crowd energy, after-jam, tour position, set-theme, show-arc
+// computations moved to useVisualModifiers hook
 import { detectStemInterplay } from "./utils/stem-interplay";
 import { detectPhrase } from "./utils/phrase-detector";
 import { detectPeakOfShow } from "./utils/peak-of-show";
 import { computeTempoLock } from "./utils/tempo-lock";
-import type { PrecomputedNarrative, PrevSongContext } from "./utils/show-narrative-precompute";
-import { computeAfterJamQuality } from "./utils/after-jam-quality";
-import { computeCrowdEnergy } from "./utils/crowd-energy";
+import type { PrecomputedNarrative } from "./utils/show-narrative-precompute";
 import { computeStemCharacter } from "./utils/stem-character";
 import { TimeDilationProvider } from "./data/TimeDilationContext";
 import { DeadAirProvider } from "./data/DeadAirContext";
@@ -104,6 +98,11 @@ import { AudioLayer } from "./components/song-visualizer/AudioLayer";
 import {
   mediaCatalog,
 } from "./components/song-visualizer/show-data-loader";
+
+// Extracted hooks
+import { useJamEvolution } from "./hooks/useJamEvolution";
+import { useSacredSegueState } from "./hooks/useSacredSegueState";
+import { useVisualModifiers } from "./hooks/useVisualModifiers";
 
 const FADE_FRAMES = 90; // 3 seconds at 30fps
 
@@ -304,61 +303,39 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
     };
   }, [iconSchedule]);
 
-  // ─── Show arc phase ───
-  const showArcPhase = useMemo((): ShowArcPhase | undefined => {
-    if (!props.show) return undefined;
-    const songsInSet = props.show.songs.filter((s) => s.set === props.song.set).length;
-    const trackNumber = props.song.trackNumber ?? 1;
-    return computeShowArcPhase({
-      setNumber: props.song.set,
-      trackNumber,
-      songsInSet,
-      totalSongs: props.show.songs.length,
-      songsCompleted: narrative?.state.songsCompleted ?? 0,
-      isJamSegment: isDrumsSpace,
-      postJamSegmentCount: narrative?.state.postDrumsSpaceCount ?? 0,
-    });
-  }, [props.show, props.song.set, props.song.trackNumber, isDrumsSpace, narrative?.state?.songsCompleted, narrative?.state?.postDrumsSpaceCount]);
+  // ─── Show arc + tour + set + fatigue + crowd + after-jam modifiers (hook) ───
+  const {
+    showArcModifiers, setTheme,
+    fatigue, crowdEnergy, afterJamMods,
+  } = useVisualModifiers({
+    show: props.show,
+    songSet: props.song.set,
+    songTrackNumber: props.song.trackNumber,
+    isDrumsSpace,
+    songsCompleted: narrative?.state.songsCompleted ?? 0,
+    postDrumsSpaceCount: narrative?.state.postDrumsSpaceCount ?? 0,
+    songPeakEnergies: narrative?.state.songPeakEnergies ?? [],
+    prevSongContext: props.narrativeState?.prevSongContext ?? null,
+    frames: analysis?.frames ?? [],
+  });
 
-  const tourModifiers = useMemo(
-    () => computeTourModifiers({
-      nightInRun: props.show?.nightInRun,
-      totalNights: props.show?.totalNights,
-      daysOff: props.show?.daysOff,
-    }),
-    [props.show?.nightInRun, props.show?.totalNights, props.show?.daysOff],
-  );
-
-  const setTheme = useMemo(
-    () => getSetTheme(props.song.set),
-    [props.song.set],
-  );
-
-  const showArcModifiers = useMemo(
-    () => showArcPhase ? applyTourModifiers(applySetModifiers(getShowArcModifiers(showArcPhase), setTheme), tourModifiers) : undefined,
-    [showArcPhase, setTheme, tourModifiers],
-  );
-
-  // ─── Suite continuity (multi-song suites like Help>Slip>Frank) ───
-  const suiteInfo = props.narrativeState?.suiteInfo ?? null;
-  const isInSuiteMiddle = suiteInfo?.inSuite && !suiteInfo.isSuiteStart;
-
-  // ─── Sacred segue detection ───
-  const isSacredSegueIn = useMemo(() => {
-    if (!props.segueIn || !props.show) return false;
-    const songs = props.show.songs;
-    const idx = songs.findIndex((s) => s.trackId === props.song.trackId);
-    if (idx <= 0) return false;
-    return isSacredSegue(songs[idx - 1].title, props.song.title);
-  }, [props.segueIn, props.show, props.song.trackId, props.song.title]);
-
-  const isSacredSegueOut = useMemo(() => {
-    if (!props.segueOut || !props.show) return false;
-    const songs = props.show.songs;
-    const idx = songs.findIndex((s) => s.trackId === props.song.trackId);
-    if (idx < 0 || idx >= songs.length - 1) return false;
-    return isSacredSegue(props.song.title, songs[idx + 1].title);
-  }, [props.segueOut, props.show, props.song.trackId, props.song.title]);
+  // ─── Sacred segue + suite continuity + hue rotation (hook) ───
+  const {
+    isSacredSegueIn, isSacredSegueOut, suiteInfo, isInSuiteMiddle,
+    sacredSegueInTransition, sacredSegueOutTransition, hueRotation,
+  } = useSacredSegueState({
+    show: props.show,
+    songTrackId: props.song.trackId,
+    songTitle: props.song.title,
+    segueIn: props.segueIn,
+    segueOut: props.segueOut,
+    segueFromPalette: props.segueFromPalette,
+    segueToPalette: props.segueToPalette,
+    effectivePalette,
+    frame,
+    durationInFrames,
+    narrativeState: props.narrativeState,
+  });
 
   // ─── Dominant stem section (sampled every 30th frame for perf) ───
   const dominantStemSection = useMemo((): StemSectionType | undefined => {
@@ -466,16 +443,6 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
     return stock?.cssFilter || undefined;
   }, [props.show?.era]);
 
-  // ─── Palette hue rotation ───
-  const hueRotation = useMemo(() => {
-    return computeSegueHueRotation(
-      effectivePalette,
-      !!props.segueIn, !!props.segueOut,
-      props.segueFromPalette, props.segueToPalette,
-      frame, durationInFrames, FADE_FRAMES,
-    );
-  }, [effectivePalette, props.segueIn, props.segueOut, props.segueFromPalette, props.segueToPalette, frame, durationInFrames]);
-
   // ─── Media resolution ───
   const resolvedMedia = useMemo(() => {
     if (!mediaCatalog) return null;
@@ -578,29 +545,15 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
     : null;
   opacityMapBase = continuousResult?.opacities ?? null;
 
-  const jamEvolution = useMemo(
-    () => computeJamEvolution(f, frameIdx, isDrumsSpace),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [f, Math.floor(frameIdx / 30), isDrumsSpace],
-  );
-
-  // Normalize densityMult (0.75-1.25) to shader-friendly 0-1 range (0.5 = neutral)
-  const jamDensity = jamEvolution.isLongJam
-    ? Math.max(0, Math.min(1, (jamEvolution.densityMult - 0.75) / 0.5))
-    : 0.5;
-
-  // Precompute jam phase boundaries + shader sequence (once per song, not per frame)
-  const jamPhaseBoundaries = useMemo(
-    () => getJamPhaseBoundaries(f, isDrumsSpace),
-    [f, isDrumsSpace],
-  );
-  const jamPhaseShaders = useMemo(
-    () => jamEvolution.isLongJam
-      ? getJamPhaseSequence(showSeed ?? 0, songIdentity, props.song.defaultMode)
-      : undefined,
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [jamEvolution.isLongJam, showSeed, songIdentity, props.song.defaultMode],
-  );
+  // ─── Jam evolution state (hook) ───
+  const { jamEvolution, jamDensity, jamPhaseBoundaries, jamPhaseShaders } = useJamEvolution({
+    frames: f,
+    frameIdx,
+    isDrumsSpace,
+    showSeed,
+    songIdentity,
+    defaultMode: props.song.defaultMode,
+  });
 
   // ─── Section vocabulary + groove + jam cycles + narrative directive ───
   const currentSection = sections.find((s) => frameIdx >= s.frameStart && frameIdx < s.frameEnd);
@@ -661,44 +614,6 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
       crowdDensityMult = Math.max(crowdDensityMult, 1 + cm.avgIntensity * 0.5);
     }
   }
-
-  // ─── Visual fatigue governor (cumulative show intensity tracking) ───
-  const currentSongAvgEnergy = useMemo(() => {
-    if (!f.length) return 0;
-    let sum = 0;
-    let count = 0;
-    for (let i = 0; i < f.length; i += 30) {
-      sum += f[i].rms;
-      count++;
-    }
-    return count > 0 ? sum / count : 0;
-  }, [f]);
-
-  const showMinutesElapsed = (narrative?.state.songsCompleted ?? 0) * 7;
-  const isEncore = props.song.set >= 3;
-  const fatigue = computeFatigueDampening({
-    songPeakEnergies: narrative?.state.songPeakEnergies ?? [],
-    currentSongAvgEnergy,
-    showMinutesElapsed,
-    songsCompleted: narrative?.state.songsCompleted ?? 0,
-  }, isEncore);
-
-  // ─── Crowd Energy Simulation (audience momentum across the show) ───
-  const crowdEnergy = useMemo(
-    () => computeCrowdEnergy(
-      narrative?.state.songPeakEnergies ?? [],
-      props.song.set,
-      narrative?.state.songsCompleted ?? 0,
-      currentSongAvgEnergy,
-    ),
-    [narrative?.state.songPeakEnergies, props.song.set, narrative?.state.songsCompleted, currentSongAvgEnergy],
-  );
-
-  // ─── After-Jam Silence Quality (intro atmosphere from previous song) ───
-  const afterJamMods = useMemo(
-    () => computeAfterJamQuality(props.narrativeState?.prevSongContext ?? null),
-    [props.narrativeState?.prevSongContext],
-  );
 
   // ─── Peak-of-Show Recognition (THE moment) ───
   const peakOfShow = detectPeakOfShow(
@@ -803,23 +718,6 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
     : drumsSpaceState?.subPhase === "space_textural" ? 0.4
     : drumsSpaceState?.subPhase === "space_melodic" ? 0.5
     : 1.0;
-
-  // ─── Sacred segue curated transition style lookup ───
-  const sacredSegueInTransition = useMemo(() => {
-    if (!isSacredSegueIn || !props.show) return undefined;
-    const songs = props.show.songs;
-    const idx = songs.findIndex((s) => s.trackId === props.song.trackId);
-    if (idx <= 0) return undefined;
-    return getSacredSegueTransition(songs[idx - 1].title, props.song.title);
-  }, [isSacredSegueIn, props.show, props.song.trackId, props.song.title]);
-
-  const sacredSegueOutTransition = useMemo(() => {
-    if (!isSacredSegueOut || !props.show) return undefined;
-    const songs = props.show.songs;
-    const idx = songs.findIndex((s) => s.trackId === props.song.trackId);
-    if (idx < 0 || idx >= songs.length - 1) return undefined;
-    return getSacredSegueTransition(props.song.title, songs[idx + 1].title);
-  }, [isSacredSegueOut, props.show, props.song.trackId, props.song.title]);
 
   // ─── Icon overlay state (per-frame, section-aware) ───
   const sectionTypeMap: Record<string, number> = { intro: 0, verse: 1, chorus: 2, bridge: 3, solo: 4, jam: 5, outro: 6, space: 7 };

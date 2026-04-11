@@ -28,6 +28,7 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
+import { buildRaymarchNormal } from "./shared/raymarching.glsl";
 
 export const earthquakeFissureVert = /* glsl */ `
 varying vec2 vUv;
@@ -46,6 +47,8 @@ const postProcess = buildPostProcessGLSL({
   grainStrength: "normal",
   thermalShimmerEnabled: true,
 });
+
+const efNormalGLSL = buildRaymarchNormal("efMap($P, bass, energy, drumOnset, tension, destructionLevel, shakeAmp, seismicPhase, melodicPitch, slowEnergy, rotSpeed).x", { eps: 0.003, name: "efNormal" });
 
 export const earthquakeFissureFrag = /* glsl */ `
 precision highp float;
@@ -262,21 +265,9 @@ vec2 efMap(vec3 pos, float bass, float energy, float drumOnset, float tension,
 }
 
 // ═══════════════════════════════════════════════════════════
-// Normal estimation via central differences
+// Normal (shared raymarching utility)
 // ═══════════════════════════════════════════════════════════
-
-vec3 efNormal(vec3 pos, float bass, float energy, float drumOnset, float tension,
-              float destructionLevel, float shakeAmp, float seismicPhase,
-              float melodicPitch, float slowEnergy, float rotSpeed) {
-  vec2 offset = vec2(0.003, 0.0);
-  float dist = efMap(pos, bass, energy, drumOnset, tension, destructionLevel, shakeAmp, seismicPhase, melodicPitch, slowEnergy, rotSpeed).x;
-  vec3 norm = vec3(
-    efMap(pos + offset.xyy, bass, energy, drumOnset, tension, destructionLevel, shakeAmp, seismicPhase, melodicPitch, slowEnergy, rotSpeed).x - dist,
-    efMap(pos + offset.yxy, bass, energy, drumOnset, tension, destructionLevel, shakeAmp, seismicPhase, melodicPitch, slowEnergy, rotSpeed).x - dist,
-    efMap(pos + offset.yyx, bass, energy, drumOnset, tension, destructionLevel, shakeAmp, seismicPhase, melodicPitch, slowEnergy, rotSpeed).x - dist
-  );
-  return normalize(norm);
-}
+${efNormalGLSL}
 
 // ═══════════════════════════════════════════════════════════
 // Dust/ember particles — procedural from noise
@@ -392,9 +383,7 @@ void main() {
   vec3 col = vec3(0.0);
 
   if (marchFound) {
-    vec3 norm = efNormal(marchPos, bass, energy, drumOnset, tension,
-                         destructionLevel, shakeAmp, seismicPhase,
-                         melodicPitch, slowEnergy, rotSpeed);
+    vec3 norm = efNormal(marchPos);
 
     // === VORONOI DATA at surface point ===
     vec3 vor = efVoronoi(marchPos.xz * 2.5, 0.8 + tension * 0.2);

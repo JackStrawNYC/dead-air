@@ -26,6 +26,7 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
+import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
 
 export const crystallineGrowthVert = /* glsl */ `
 varying vec2 vUv;
@@ -34,6 +35,15 @@ void main() {
   gl_Position = vec4(position, 1.0);
 }
 `;
+
+const cgNormalGLSL = buildRaymarchNormal(
+  "cgSceneMap($P, timeVal, growthRate, onset, tension, bass, beatSnap2, melodicPitch, beatStab).x",
+  { eps: 0.002, name: "cgCalcNormal" },
+);
+const cgAOGLSL = buildRaymarchAO(
+  "cgSceneMap($P, timeVal, growthRate, onset, tension, bass, beatSnap2, melodicPitch, beatStab).x",
+  { steps: 5, stepBase: -0.03, stepScale: 0.04, weightDecay: 0.7, finalMult: 5.0, name: "cgCalcAO" },
+);
 
 export const crystallineGrowthFrag = /* glsl */ `
 precision highp float;
@@ -198,29 +208,8 @@ vec2 cgSceneMap(vec3 pos, float timeVal, float growthRate, float onset, float te
   return cluster;
 }
 
-// ─── Normal calculation ───
-vec3 cgCalcNormal(vec3 pos, float timeVal, float growthRate, float onset, float tension, float bass, float beatSnap2, float melodicPitch, float beatStab) {
-  vec2 off = vec2(0.002, 0.0);
-  float d0 = cgSceneMap(pos, timeVal, growthRate, onset, tension, bass, beatSnap2, melodicPitch, beatStab).x;
-  return normalize(vec3(
-    cgSceneMap(pos + off.xyy, timeVal, growthRate, onset, tension, bass, beatSnap2, melodicPitch, beatStab).x - d0,
-    cgSceneMap(pos + off.yxy, timeVal, growthRate, onset, tension, bass, beatSnap2, melodicPitch, beatStab).x - d0,
-    cgSceneMap(pos + off.yyx, timeVal, growthRate, onset, tension, bass, beatSnap2, melodicPitch, beatStab).x - d0
-  ));
-}
-
-// ─── Ambient occlusion ───
-float cgCalcAO(vec3 pos, vec3 norm, float timeVal, float growthRate, float onset, float tension, float bass, float beatSnap2, float melodicPitch, float beatStab) {
-  float occlusion = 0.0;
-  float weight = 1.0;
-  for (int idx = 0; idx < 5; idx++) {
-    float dist = 0.01 + float(idx) * 0.04;
-    float sdf = cgSceneMap(pos + norm * dist, timeVal, growthRate, onset, tension, bass, beatSnap2, melodicPitch, beatStab).x;
-    occlusion += (dist - sdf) * weight;
-    weight *= 0.7;
-  }
-  return clamp(1.0 - occlusion * 5.0, 0.0, 1.0);
-}
+${cgNormalGLSL}
+${cgAOGLSL}
 
 // ─── Soft shadow ───
 float cgSoftShadow(vec3 shadowRo, vec3 shadowRd, float minT, float maxT, float kShadow, float timeVal, float growthRate, float onset, float tension, float bass, float beatSnap2, float melodicPitch, float beatStab) {
@@ -313,10 +302,10 @@ void main() {
 
   if (marchHitSurface) {
     vec3 marchPos = ro + rd * marchDist;
-    vec3 norm = cgCalcNormal(marchPos, timeVal, growthRate, onset, tension, bass, beatSnap2, melodicPitch, beatStab);
+    vec3 norm = cgCalcNormal(marchPos);
     float matID = marchResult.y;
 
-    float occl = cgCalcAO(marchPos, norm, timeVal, growthRate, onset, tension, bass, beatSnap2, melodicPitch, beatStab);
+    float occl = cgCalcAO(marchPos, norm);
 
     // Two-light illumination for dramatic facets
     float keyDiff = max(dot(norm, keyLight), 0.0);

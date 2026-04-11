@@ -26,6 +26,7 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
+import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
 
 export const voronoiFlowVert = /* glsl */ `
 varying vec2 vUv;
@@ -34,6 +35,9 @@ void main() {
   gl_Position = vec4(position, 1.0);
 }
 `;
+
+const vf2NormalGLSL = buildRaymarchNormal("vf2Map($P, cellScale, wallThickness, irregularity, cellTime, drumOnset, shatterAmount).x", { eps: 0.003, name: "vf2Normal" });
+const vf2AOGLSL = buildRaymarchAO("vf2Map($P, cellScale, wallThickness, irregularity, cellTime, drumOnset, shatterAmount).x", { steps: 5, stepBase: -0.02, stepScale: 0.03, weightDecay: 0.7, finalMult: 1.5, name: "vf2AO" });
 
 const postProcess = buildPostProcessGLSL({
   bloomEnabled: true,
@@ -190,22 +194,7 @@ vec2 vf2Map(vec3 pos, float cellScale, float wallThickness, float irregularity,
   return vec2(wallDist, 1.0);
 }
 
-// ---------------------------------------------------------------
-// Ambient occlusion (5-tap)
-// ---------------------------------------------------------------
-float vf2AO(vec3 pos, vec3 norm, float cellScale, float wallThickness,
-            float irregularity, float timeShift, float splitEvent, float shatterAmt) {
-  float occ = 0.0;
-  float sca = 1.0;
-  for (int i = 0; i < 5; i++) {
-    float h = 0.01 + 0.12 * float(i) / 4.0;
-    vec2 d = vf2Map(pos + norm * h, cellScale, wallThickness, irregularity,
-                    timeShift, splitEvent, shatterAmt);
-    occ += (h - d.x) * sca;
-    sca *= 0.7;
-  }
-  return clamp(1.0 - 1.5 * occ, 0.0, 1.0);
-}
+${vf2AOGLSL}
 
 // ---------------------------------------------------------------
 // Fresnel: view-dependent transparency
@@ -229,19 +218,7 @@ float vf2Caustics(vec3 pos, float causticsTime, float intensity) {
   return pattern * intensity;
 }
 
-// ---------------------------------------------------------------
-// Normal estimation via central differences
-// ---------------------------------------------------------------
-vec3 vf2Normal(vec3 pos, float cellScale, float wallThickness, float irregularity,
-               float timeShift, float splitEvent, float shatterAmt) {
-  vec2 off = vec2(0.003, 0.0);
-  float d = vf2Map(pos, cellScale, wallThickness, irregularity, timeShift, splitEvent, shatterAmt).x;
-  return normalize(vec3(
-    vf2Map(pos + off.xyy, cellScale, wallThickness, irregularity, timeShift, splitEvent, shatterAmt).x - d,
-    vf2Map(pos + off.yxy, cellScale, wallThickness, irregularity, timeShift, splitEvent, shatterAmt).x - d,
-    vf2Map(pos + off.yyx, cellScale, wallThickness, irregularity, timeShift, splitEvent, shatterAmt).x - d
-  ));
-}
+${vf2NormalGLSL}
 
 void main() {
   vec2 uv = vUv;
@@ -369,16 +346,14 @@ void main() {
     // Near-surface: we found a cell wall
     if (dist < SURF_DIST) {
       didIntersect = true;
-      vec3 norm = vf2Normal(marchPos, cellScale, wallThickness, irregularity,
-                            cellTime, drumOnset, shatterAmount);
+      vec3 norm = vf2Normal(marchPos);
       lastNorm = norm;
 
       // Fresnel: glancing angles = more reflective
       float fresnel = vf2Fresnel(rd, norm, 1.45);
 
       // Ambient occlusion
-      float occl = vf2AO(marchPos, norm, cellScale, wallThickness,
-                         irregularity, cellTime, drumOnset, shatterAmount);
+      float occl = vf2AO(marchPos, norm);
 
       // Lighting: directional light from above-right
       vec3 lightDir = normalize(vec3(0.5, 1.0, 0.3));

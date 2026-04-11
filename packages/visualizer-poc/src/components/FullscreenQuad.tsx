@@ -19,6 +19,7 @@ import { compute3DCamera } from "../utils/camera-3d";
 import { useSceneConfig } from "../scenes/SceneConfigContext";
 import { useEnvelopeValues } from "../data/EnvelopeContext";
 import { fxaaVert, fxaaFrag } from "../shaders/shared/fxaa.glsl";
+import { gpuMonitor } from "../utils/gpu-monitor";
 
 /** Era saturation values — previously in EraGrade CSS, now owned by GLSL */
 const ERA_SATURATION: Record<string, number> = {
@@ -129,6 +130,8 @@ export const FullscreenQuad: React.FC<Props> = ({
 
   useEffect(() => {
     if (targetsRef.current) {
+      gpuMonitor.untrackRenderTarget(targetsRef.current.main);
+      gpuMonitor.untrackRenderTarget(targetsRef.current.fxaa);
       targetsRef.current.main.dispose();
       targetsRef.current.fxaa.dispose();
     }
@@ -142,9 +145,15 @@ export const FullscreenQuad: React.FC<Props> = ({
       main: new THREE.WebGLRenderTarget(shaderWidth, shaderHeight, opts),
       fxaa: new THREE.WebGLRenderTarget(shaderWidth, shaderHeight, opts),
     };
+    gpuMonitor.trackRenderTarget(targetsRef.current.main, "FullscreenQuad:main");
+    gpuMonitor.trackRenderTarget(targetsRef.current.fxaa, "FullscreenQuad:fxaa");
     return () => {
-      targetsRef.current?.main.dispose();
-      targetsRef.current?.fxaa.dispose();
+      if (targetsRef.current) {
+        gpuMonitor.untrackRenderTarget(targetsRef.current.main);
+        gpuMonitor.untrackRenderTarget(targetsRef.current.fxaa);
+        targetsRef.current.main.dispose();
+        targetsRef.current.fxaa.dispose();
+      }
       targetsRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -429,13 +438,14 @@ export const FullscreenQuad: React.FC<Props> = ({
   uniforms.uSemanticTriumphant.value = smooth.semanticTriumphant ?? 0;
   uniforms.uPhilBombWave.value = smooth.philBombWave ?? 0;
 
-  // 3D Camera
+  // 3D Camera (uses profile from SceneConfig context)
   const cam3d = compute3DCamera(
     time, dynamicTime, smooth.energy, smooth.bass,
     smooth.fastEnergy, smooth.vocalPresence, smooth.drumOnset,
     smooth.sectionProgress, smooth.sectionIndex,
     climaxPhase, climaxIntensity,
     smooth.beatStability, smooth.beatSnap,
+    sceneConfig.cameraProfile ?? undefined,
   );
   uniforms.uCamPos.value.set(cam3d.position[0], cam3d.position[1], cam3d.position[2]);
   uniforms.uCamTarget.value.set(cam3d.target[0], cam3d.target[1], cam3d.target[2]);

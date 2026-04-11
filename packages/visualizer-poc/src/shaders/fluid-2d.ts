@@ -27,6 +27,16 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
+import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
+
+const f2NormalGLSL = buildRaymarchNormal(
+  "f2SceneMap($P, flowTime, bass, drumOnset, tension, onset).x",
+  { eps: 0.003, name: "f2CalcNormal" },
+);
+const f2AOGLSL = buildRaymarchAO(
+  "f2SceneMap($P, flowTime, bass, drumOnset, tension, onset).x",
+  { steps: 5, stepBase: 0.02, stepScale: 0.06, weightDecay: 0.7, finalMult: 3.0, name: "f2CalcAO" },
+);
 
 export const fluid2DVert = /* glsl */ `
 varying vec2 vUv;
@@ -185,29 +195,8 @@ vec2 f2SceneMap(vec3 pos, float timeVal, float bass, float drumOnset, float tens
   return result;
 }
 
-// ─── Scene normal via central differences ───
-vec3 f2CalcNormal(vec3 pos, float timeVal, float bass, float drumOnset, float tension, float onset) {
-  vec2 offset = vec2(0.003, 0.0);
-  float d0 = f2SceneMap(pos, timeVal, bass, drumOnset, tension, onset).x;
-  return normalize(vec3(
-    f2SceneMap(pos + offset.xyy, timeVal, bass, drumOnset, tension, onset).x - d0,
-    f2SceneMap(pos + offset.yxy, timeVal, bass, drumOnset, tension, onset).x - d0,
-    f2SceneMap(pos + offset.yyx, timeVal, bass, drumOnset, tension, onset).x - d0
-  ));
-}
-
-// ─── Ambient occlusion (5-tap) ───
-float f2CalcAO(vec3 pos, vec3 norm, float timeVal, float bass, float drumOnset, float tension, float onset) {
-  float occlusion = 0.0;
-  float weight = 1.0;
-  for (int idx = 0; idx < 5; idx++) {
-    float dist = 0.02 + float(idx) * 0.06;
-    float sdf = f2SceneMap(pos + norm * dist, timeVal, bass, drumOnset, tension, onset).x;
-    occlusion += (dist - sdf) * weight;
-    weight *= 0.7;
-  }
-  return clamp(1.0 - occlusion * 3.0, 0.0, 1.0);
-}
+${f2NormalGLSL}
+${f2AOGLSL}
 
 // ─── Soft shadow ───
 float f2SoftShadow(vec3 ro2, vec3 rd2, float minT, float maxT, float k2, float timeVal, float bass, float drumOnset, float tension, float onset) {
@@ -303,11 +292,11 @@ void main() {
 
   if (marchHitSurface) {
     vec3 marchPos = ro + rd * marchDist;
-    vec3 norm = f2CalcNormal(marchPos, flowTime, bass, drumOnset, tension, onset);
+    vec3 norm = f2CalcNormal(marchPos);
     float matID = marchResult.y;
 
     // Ambient occlusion
-    float occl = f2CalcAO(marchPos, norm, flowTime, bass, drumOnset, tension, onset);
+    float occl = f2CalcAO(marchPos, norm);
 
     // Lighting
     vec3 toLightDir = normalize(lightPos - marchPos);
@@ -375,7 +364,7 @@ void main() {
       }
       if (reflHitSurface) {
         vec3 reflPos = marchPos + reflDir * reflDist;
-        vec3 reflNorm = f2CalcNormal(reflPos, flowTime, bass, drumOnset, tension, onset);
+        vec3 reflNorm = f2CalcNormal(reflPos);
         float reflDiff = max(dot(reflNorm, toLightDir), 0.0);
         vec3 reflCol = caveTint * 0.3 * reflDiff;
         matColor = mix(matColor, reflCol, fresnel * 0.5);

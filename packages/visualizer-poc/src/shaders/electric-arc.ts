@@ -27,6 +27,7 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
+import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
 
 export const electricArcVert = /* glsl */ `
 varying vec2 vUv;
@@ -47,6 +48,9 @@ const postProcess = buildPostProcessGLSL({
   lightLeakEnabled: false,
   dofEnabled: true,
 });
+
+const eaNormalGLSL = buildRaymarchNormal("eaMap($P)", { eps: 0.004, name: "eaNormal" });
+const eaAOGLSL = buildRaymarchAO("eaMap($P)", { steps: 5, stepBase: 0.0, stepScale: 0.12, weightDecay: 0.6, finalMult: 2.0, name: "eaAmbientOcc" });
 
 export const electricArcFrag = /* glsl */ `
 precision highp float;
@@ -260,34 +264,8 @@ float eaMap(vec3 p) {
   return scene;
 }
 
-// ═══════════════════════════════════════════════════
-// Normal estimation via central differences
-// ═══════════════════════════════════════════════════
-vec3 eaNormal(vec3 p) {
-  vec2 off = vec2(0.004, 0.0);
-  float d = eaMap(p);
-  return normalize(vec3(
-    eaMap(p + off.xyy) - d,
-    eaMap(p + off.yxy) - d,
-    eaMap(p + off.yyx) - d
-  ));
-}
-
-// ═══════════════════════════════════════════════════
-// Ambient occlusion
-// ═══════════════════════════════════════════════════
-float eaAmbientOcc(vec3 p, vec3 n) {
-  float occ = 0.0;
-  float weight = 1.0;
-  for (int i = 1; i <= 5; i++) {
-    float fi = float(i);
-    float dist = 0.12 * fi;
-    float d = eaMap(p + n * dist);
-    occ += (dist - d) * weight;
-    weight *= 0.6;
-  }
-  return clamp(1.0 - occ * 2.0, 0.0, 1.0);
-}
+${eaNormalGLSL}
+${eaAOGLSL}
 
 // ═══════════════════════════════════════════════════
 // Electric arc between two 3D points — noise-displaced

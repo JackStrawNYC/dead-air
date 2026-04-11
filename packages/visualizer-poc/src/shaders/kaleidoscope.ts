@@ -28,6 +28,7 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
+import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
 
 export const kaleidoscopeVert = /* glsl */ `
 varying vec2 vUv;
@@ -36,6 +37,9 @@ void main() {
   gl_Position = vec4(position, 1.0);
 }
 `;
+
+const ksNormalGLSL = buildRaymarchNormal("ksMap($P, bassSize, gemCount, shatterAmt, flowTime).x", { eps: 0.001, name: "ksNormal" });
+const ksOccGLSL = buildRaymarchAO("ksMap($P, bassSize, gemCount, shatterAmt, flowTime).x", { steps: 5, stepBase: 0.01, stepScale: 0.12, weightDecay: 0.7, finalMult: 3.0, name: "ksOcclusion" });
 
 export const kaleidoscopeFrag = /* glsl */ `
 precision highp float;
@@ -188,16 +192,9 @@ vec2 ksMap(vec3 pos, float bassSize, float gemCount, float shatterAmt, float flo
   return vec2(dist, matID);
 }
 
-// ─── Normal Calculation ───
-vec3 ksNormal(vec3 pos, float bassSize, float gemCount, float shatterAmt, float flowTime) {
-  vec2 offset = vec2(0.001, 0.0);
-  float d = ksMap(pos, bassSize, gemCount, shatterAmt, flowTime).x;
-  return normalize(vec3(
-    ksMap(pos + offset.xyy, bassSize, gemCount, shatterAmt, flowTime).x - d,
-    ksMap(pos + offset.yxy, bassSize, gemCount, shatterAmt, flowTime).x - d,
-    ksMap(pos + offset.yyx, bassSize, gemCount, shatterAmt, flowTime).x - d
-  ));
-}
+// ─── Normal + AO (shared raymarching utilities) ───
+${ksNormalGLSL}
+${ksOccGLSL}
 
 // ─── Soft Shadow (4-step) ───
 float ksSoftShadow(vec3 orig, vec3 lightDir, float bassSize, float gemCount, float shatterAmt, float flowTime) {
@@ -211,19 +208,6 @@ float ksSoftShadow(vec3 orig, vec3 lightDir, float bassSize, float gemCount, flo
     if (shade < 0.01) break;
   }
   return clamp(shade, 0.0, 1.0);
-}
-
-// ─── Ambient Occlusion (5-step) ───
-float ksOcclusion(vec3 pos, vec3 nor, float bassSize, float gemCount, float shatterAmt, float flowTime) {
-  float occ = 0.0;
-  float sca = 1.0;
-  for (int idx = 0; idx < 5; idx++) {
-    float h = 0.01 + 0.12 * float(idx);
-    float d = ksMap(pos + nor * h, bassSize, gemCount, shatterAmt, flowTime).x;
-    occ += (h - d) * sca;
-    sca *= 0.7;
-  }
-  return clamp(1.0 - 3.0 * occ, 0.0, 1.0);
 }
 
 // ─── Gem Color from Material ID ───
@@ -392,7 +376,7 @@ void main() {
 
   if (didMarch) {
     vec3 marchPos = ro + rd * totalDist;
-    vec3 nor = ksNormal(marchPos, gemSize, gemCount, shatterAmt, flowTime);
+    vec3 nor = ksNormal(marchPos);
 
     // ─── Material Color ───
     vec3 matColor = ksGemColor(matID, hue1, hue2, uChromaHue * 0.2, saturation);
@@ -425,7 +409,7 @@ void main() {
     vec3 refractionColor = hsv2rgb(vec3(fract(hue1 + dot(nor, vec3(0.3, 0.7, 0.1)) * 0.3), 0.9, 1.0));
 
     // Ambient occlusion
-    float occVal = ksOcclusion(marchPos, nor, gemSize, gemCount, shatterAmt, flowTime);
+    float occVal = ksOcclusion(marchPos, nor);
 
     // Soft shadow from key light
     float shadowVal = ksSoftShadow(marchPos + nor * 0.01, keyLightDir, gemSize, gemCount, shatterAmt, flowTime);

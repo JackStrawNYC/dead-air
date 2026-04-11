@@ -28,6 +28,7 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
+import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
 
 export const climaxSurgeVert = /* glsl */ `
 varying vec2 vUv;
@@ -36,6 +37,15 @@ void main() {
   gl_Position = vec4(position, 1.0);
 }
 `;
+
+const csNormalGLSL = buildRaymarchNormal(
+  "csSceneMap($P, timeVal, musTime, bass, onset, tension, forecast, ringCountMod, explSpeed).x",
+  { eps: 0.003, name: "csCalcNormal" },
+);
+const csAOGLSL = buildRaymarchAO(
+  "csSceneMap($P, timeVal, musTime, bass, onset, tension, forecast, ringCountMod, explSpeed).x",
+  { steps: 5, stepBase: -0.04, stepScale: 0.06, weightDecay: 0.7, finalMult: 3.0, name: "csCalcAO" },
+);
 
 export const climaxSurgeFrag = /* glsl */ `
 precision highp float;
@@ -193,31 +203,8 @@ vec2 csSceneMap(vec3 pos, float timeVal, float musTime, float bass, float onset,
   return vec2(result, matID);
 }
 
-// ─── Normal calculation ───
-vec3 csCalcNormal(vec3 pos, float timeVal, float musTime, float bass, float onset,
-                  float tension, float forecast, float ringCountMod, float explSpeed) {
-  vec2 off = vec2(0.003, 0.0);
-  float d0 = csSceneMap(pos, timeVal, musTime, bass, onset, tension, forecast, ringCountMod, explSpeed).x;
-  return normalize(vec3(
-    csSceneMap(pos + off.xyy, timeVal, musTime, bass, onset, tension, forecast, ringCountMod, explSpeed).x - d0,
-    csSceneMap(pos + off.yxy, timeVal, musTime, bass, onset, tension, forecast, ringCountMod, explSpeed).x - d0,
-    csSceneMap(pos + off.yyx, timeVal, musTime, bass, onset, tension, forecast, ringCountMod, explSpeed).x - d0
-  ));
-}
-
-// ─── Ambient occlusion ───
-float csCalcAO(vec3 pos, vec3 norm, float timeVal, float musTime, float bass, float onset,
-               float tension, float forecast, float ringCountMod, float explSpeed) {
-  float occlusion = 0.0;
-  float weight = 1.0;
-  for (int idx = 0; idx < 5; idx++) {
-    float dist = 0.02 + float(idx) * 0.06;
-    float sdf = csSceneMap(pos + norm * dist, timeVal, musTime, bass, onset, tension, forecast, ringCountMod, explSpeed).x;
-    occlusion += (dist - sdf) * weight;
-    weight *= 0.7;
-  }
-  return clamp(1.0 - occlusion * 3.0, 0.0, 1.0);
-}
+${csNormalGLSL}
+${csAOGLSL}
 
 // ─── Volumetric energy density (for glow between rings) ───
 float csEnergyDensity(vec3 pos, float timeVal, float energy, float bass) {
@@ -314,10 +301,10 @@ void main() {
 
   if (marchHitSurface) {
     vec3 marchPos = ro + rd * marchDist;
-    vec3 norm = csCalcNormal(marchPos, timeVal, musTime, bass, onset, tension, forecast, ringCountMod, explSpeed);
+    vec3 norm = csCalcNormal(marchPos);
     float matID = marchResult.y;
 
-    float occl = csCalcAO(marchPos, norm, timeVal, musTime, bass, onset, tension, forecast, ringCountMod, explSpeed);
+    float occl = csCalcAO(marchPos, norm);
 
     // Lighting: point light at center + directional from above
     vec3 toLightDir = normalize(-marchPos); // toward center

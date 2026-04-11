@@ -36,6 +36,7 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
+import { buildRaymarchNormal } from "./shared/raymarching.glsl";
 
 export const solarFlareVert = /* glsl */ `
 varying vec2 vUv;
@@ -44,6 +45,8 @@ void main() {
   gl_Position = vec4(position, 1.0);
 }
 `;
+
+const sfNormalGLSL = buildRaymarchNormal("sfMap($P, granDisp, tension)", { eps: 0.005, name: "sfNormal" });
 
 export const solarFlareFrag = /* glsl */ `
 precision highp float;
@@ -263,15 +266,7 @@ float sfMap(vec3 pos, float granDisplace, float tension) {
   return d;
 }
 
-// SDF normal via central differences
-vec3 sfNormal(vec3 pos, float granDisplace, float tension) {
-  vec2 eps = vec2(0.005, 0.0);
-  return normalize(vec3(
-    sfMap(pos + eps.xyy, granDisplace, tension) - sfMap(pos - eps.xyy, granDisplace, tension),
-    sfMap(pos + eps.yxy, granDisplace, tension) - sfMap(pos - eps.yxy, granDisplace, tension),
-    sfMap(pos + eps.yyx, granDisplace, tension) - sfMap(pos - eps.yyx, granDisplace, tension)
-  ));
-}
+${sfNormalGLSL}
 
 // ================================================================
 // BLACKBODY COLOR RAMP
@@ -432,7 +427,7 @@ void main() {
     if (d < 0.002) {
       surfaceFound = true;
       surfacePos = pos;
-      surfaceNorm = sfNormal(pos, granDisp, tension);
+      surfaceNorm = sfNormal(pos);
       granValue = gran.x;
       edgeValue = gran.y;
 

@@ -28,6 +28,16 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
+import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
+
+const pr2NormalGLSL = buildRaymarchNormal(
+  "pr2SceneSDFScalar($P, sceneTime, bass, tiltDir)",
+  { eps: 0.005, name: "pr2CalcNormal" },
+);
+const pr2AOGLSL = buildRaymarchAO(
+  "pr2SceneSDFScalar($P, sceneTime, bass, tiltDir)",
+  { steps: 5, stepBase: 0.0, stepScale: 0.15, weightDecay: 0.6, finalMult: 0.8, name: "pr2CalcOcclusion" },
+);
 
 export const prismRefractionVert = /* glsl */ `
 varying vec2 vUv;
@@ -124,31 +134,14 @@ float pr2SceneSDF(vec3 pos, float time, float bass, float tiltDir, out int pr2Ob
   return minDist;
 }
 
-// ---- Normal ----
-vec3 pr2CalcNormal(vec3 pos, float time, float bass, float tiltDir) {
-  float eps = 0.005;
+// ---- Scalar wrapper for shared raymarching utilities ----
+float pr2SceneSDFScalar(vec3 pos, float time, float bass, float tiltDir) {
   int dummyId;
-  float ref = pr2SceneSDF(pos, time, bass, tiltDir, dummyId);
-  return normalize(vec3(
-    pr2SceneSDF(pos + vec3(eps, 0, 0), time, bass, tiltDir, dummyId) - ref,
-    pr2SceneSDF(pos + vec3(0, eps, 0), time, bass, tiltDir, dummyId) - ref,
-    pr2SceneSDF(pos + vec3(0, 0, eps), time, bass, tiltDir, dummyId) - ref
-  ));
+  return pr2SceneSDF(pos, time, bass, tiltDir, dummyId);
 }
 
-// ---- Occlusion ----
-float pr2CalcOcclusion(vec3 pos, vec3 nrm, float time, float bass, float tiltDir) {
-  float occl = 0.0;
-  float weight = 1.0;
-  int dummyId;
-  for (int i = 1; i <= 5; i++) {
-    float sd = float(i) * 0.15;
-    float sdf = pr2SceneSDF(pos + nrm * sd, time, bass, tiltDir, dummyId);
-    occl += weight * (sd - sdf);
-    weight *= 0.6;
-  }
-  return clamp(1.0 - occl * 0.8, 0.0, 1.0);
-}
+${pr2NormalGLSL}
+${pr2AOGLSL}
 
 // ---- Volumetric light shaft sampling ----
 vec3 pr2VolumetricBeams(vec3 samplePos, float time, float energy, float dispAngle,
@@ -292,8 +285,8 @@ void main() {
 
   if (didCollide) {
     vec3 collidePos = rayOrig + rayDir * marchDist;
-    vec3 nrm = pr2CalcNormal(collidePos, sceneTime, bass, tiltDir);
-    float occl = pr2CalcOcclusion(collidePos, nrm, sceneTime, bass, tiltDir);
+    vec3 nrm = pr2CalcNormal(collidePos);
+    float occl = pr2CalcOcclusion(collidePos, nrm);
 
     // Light direction
     vec3 lightDir = normalize(vec3(0.5, 0.8, -0.3));

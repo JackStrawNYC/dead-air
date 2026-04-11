@@ -35,6 +35,7 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
+import { buildRaymarchNormal } from "./shared/raymarching.glsl";
 
 export const stainedGlassDissolutionVert = /* glsl */ `
 varying vec2 vUv;
@@ -55,6 +56,8 @@ const postProcess = buildPostProcessGLSL({
   eraGradingEnabled: true,
   beatPulseEnabled: false,
 });
+
+const sgNormalGLSL = buildRaymarchNormal("sgMap($P, dissolveProgress, tension, climaxBurst, bassVib, beatSteady).x", { eps: 0.003, name: "sgNormal" });
 
 export const stainedGlassDissolutionFrag = /* glsl */ `
 precision highp float;
@@ -320,18 +323,8 @@ vec2 sgMap(vec3 pos, float dissolveProgress, float tension, float climaxBurst,
   return vec2(closest, materialId);
 }
 
-// ─── Normal estimation via central differences ───
-vec3 sgNormal(vec3 pos, float dissolveProgress, float tension, float climaxBurst,
-              float bassVib, float beatSteady) {
-  vec2 offset = vec2(0.003, 0.0);
-  float d0 = sgMap(pos, dissolveProgress, tension, climaxBurst, bassVib, beatSteady).x;
-  vec3 norm = vec3(
-    sgMap(pos + offset.xyy, dissolveProgress, tension, climaxBurst, bassVib, beatSteady).x - d0,
-    sgMap(pos + offset.yxy, dissolveProgress, tension, climaxBurst, bassVib, beatSteady).x - d0,
-    sgMap(pos + offset.yyx, dissolveProgress, tension, climaxBurst, bassVib, beatSteady).x - d0
-  );
-  return normalize(norm);
-}
+// ─── Normal (shared raymarching utility) ───
+${sgNormalGLSL}
 
 // ─── Starfield: hash-based, dissolving fragments become new stars ───
 vec3 sgStarfield(vec2 coord, float dissolveProgress) {
@@ -535,7 +528,7 @@ void main() {
   if (marchSuccess) {
     vec3 surfPos = ro + rd * marchResult.x;
     float matId = marchResult.y;
-    vec3 normal = sgNormal(surfPos, dissolveProgress, tension, climaxBurst, bass, beatSteady);
+    vec3 normal = sgNormal(surfPos);
 
     // Polar coords for pane identification
     float paneR = length(surfPos.xy);

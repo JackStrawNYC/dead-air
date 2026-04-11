@@ -26,6 +26,7 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
+import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
 
 export const concertLightingVert = /* glsl */ `
 varying vec2 vUv;
@@ -34,6 +35,15 @@ void main() {
   gl_Position = vec4(position, 1.0);
 }
 `;
+
+const cl2NormalGLSL = buildRaymarchNormal(
+  "cl2SceneSDF($P, bassVib).x",
+  { eps: 0.003, name: "cl2CalcNormal" },
+);
+const cl2AOGLSL = buildRaymarchAO(
+  "cl2SceneSDF($P, bassVib).x",
+  { steps: 5, stepBase: 0.0, stepScale: 0.15, weightDecay: 0.6, finalMult: 2.0, name: "cl2CalcAO" },
+);
 
 export const concertLightingFrag = /* glsl */ `
 precision highp float;
@@ -158,31 +168,8 @@ vec2 cl2SceneSDF(vec3 pos, float bassVib) {
   return vec2(minDist, matId);
 }
 
-// ═══════════════════════════════════════════════════════════
-// Normal, AO
-// ═══════════════════════════════════════════════════════════
-
-vec3 cl2CalcNormal(vec3 pos, float bassVib) {
-  vec2 eps = vec2(0.003, 0.0);
-  float d0 = cl2SceneSDF(pos, bassVib).x;
-  return normalize(vec3(
-    cl2SceneSDF(pos + eps.xyy, bassVib).x - d0,
-    cl2SceneSDF(pos + eps.yxy, bassVib).x - d0,
-    cl2SceneSDF(pos + eps.yyx, bassVib).x - d0
-  ));
-}
-
-float cl2CalcAO(vec3 pos, vec3 norm, float bassVib) {
-  float occ = 0.0;
-  float weight = 1.0;
-  for (int i = 1; i <= 5; i++) {
-    float dist = float(i) * 0.15;
-    float sampled = cl2SceneSDF(pos + norm * dist, bassVib).x;
-    occ += (dist - sampled) * weight;
-    weight *= 0.6;
-  }
-  return clamp(1.0 - occ * 2.0, 0.0, 1.0);
-}
+${cl2NormalGLSL}
+${cl2AOGLSL}
 
 // ═══════════════════════════════════════════════════════════
 // PAR can cone evaluation
@@ -267,8 +254,8 @@ void main() {
 
   if (didHitSurface) {
     vec3 hitPos = camOrigin + rayDir * totalDist;
-    vec3 normal = cl2CalcNormal(hitPos, bassVib);
-    float ambOcc = cl2CalcAO(hitPos, normal, bassVib);
+    vec3 normal = cl2CalcNormal(hitPos);
+    float ambOcc = cl2CalcAO(hitPos, normal);
 
     vec3 lightDir = normalize(vec3(0.3, 1.0, -0.4));
     float diff = max(dot(normal, lightDir), 0.0);

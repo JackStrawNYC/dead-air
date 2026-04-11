@@ -27,6 +27,16 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
+import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
+
+const mglNormalGLSL = buildRaymarchNormal(
+  "mglSceneSDF($P, bassPulse, rotAngle, stability, flowTime).x",
+  { eps: 0.002, name: "mglCalcNormal" },
+);
+const mglAOGLSL = buildRaymarchAO(
+  "mglSceneSDF($P, bassPulse, rotAngle, stability, flowTime).x",
+  { steps: 5, stepBase: 0.0, stepScale: 0.08, weightDecay: 0.6, finalMult: 3.0, name: "mglCalcAO" },
+);
 
 export const moltenGlassVert = /* glsl */ `
 varying vec2 vUv;
@@ -177,31 +187,8 @@ vec2 mglSceneSDF(vec3 pos, float bassPulse, float rotAngle, float stability, flo
   return vec2(minDist, matId);
 }
 
-// ═══════════════════════════════════════════════════════════
-// Normal, AO
-// ═══════════════════════════════════════════════════════════
-
-vec3 mglCalcNormal(vec3 pos, float bassPulse, float rotAngle, float stability, float flowTime) {
-  vec2 eps = vec2(0.002, 0.0);
-  float d0 = mglSceneSDF(pos, bassPulse, rotAngle, stability, flowTime).x;
-  return normalize(vec3(
-    mglSceneSDF(pos + eps.xyy, bassPulse, rotAngle, stability, flowTime).x - d0,
-    mglSceneSDF(pos + eps.yxy, bassPulse, rotAngle, stability, flowTime).x - d0,
-    mglSceneSDF(pos + eps.yyx, bassPulse, rotAngle, stability, flowTime).x - d0
-  ));
-}
-
-float mglCalcAO(vec3 pos, vec3 norm, float bassPulse, float rotAngle, float stability, float flowTime) {
-  float occ = 0.0;
-  float weight = 1.0;
-  for (int i = 1; i <= 5; i++) {
-    float dist = float(i) * 0.08;
-    float sampled = mglSceneSDF(pos + norm * dist, bassPulse, rotAngle, stability, flowTime).x;
-    occ += (dist - sampled) * weight;
-    weight *= 0.6;
-  }
-  return clamp(1.0 - occ * 3.0, 0.0, 1.0);
-}
+${mglNormalGLSL}
+${mglAOGLSL}
 
 // ═══════════════════════════════════════════════════════════
 // Internal color swirl — subsurface scattering approximation
@@ -316,8 +303,8 @@ void main() {
 
   if (didHitSurface) {
     vec3 hitPos = camOrigin + rayDir * totalDist;
-    vec3 normal = mglCalcNormal(hitPos, bassPulse, rotAngle, stability, flowTime);
-    float ambOcc = mglCalcAO(hitPos, normal, bassPulse, rotAngle, stability, flowTime);
+    vec3 normal = mglCalcNormal(hitPos);
+    float ambOcc = mglCalcAO(hitPos, normal);
 
     // Kiln light (warm, from behind)
     vec3 kilnLightDir = normalize(vec3(0.0, 0.2, 1.0));

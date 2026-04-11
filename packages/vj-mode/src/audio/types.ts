@@ -77,8 +77,23 @@ export interface SmoothedAudioState {
   paletteSecondary: number;
   paletteSaturation: number;
 
-  // Extras
+  // Chord detection (from ChordDetector)
+  chordIndex: number;
+  chordConfidence: number;
+  harmonicTension: number;
+
+  // Beat stability (from BeatStabilityEstimator)
+  beatStability: number;
+  beatConfidence: number;
+
+  // Section estimation (from SectionEstimator)
+  sectionType: string;
+
+  // Jam density (from JamDensityEstimator)
   jamDensity: number;
+  isLongJam: boolean;
+
+  // Extras
   coherence: number;
   isLocked: boolean;
 }

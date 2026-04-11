@@ -28,6 +28,7 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
+import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
 
 export const spinningSpiralVert = /* glsl */ `
 varying vec2 vUv;
@@ -36,6 +37,9 @@ void main() {
   gl_Position = vec4(position, 1.0);
 }
 `;
+
+const ssNormalGLSL = buildRaymarchNormal("ssMapScalar($P, slowTime, bass, tension)", { eps: 0.003, name: "ssCalcNormal" });
+const ssAOGLSL = buildRaymarchAO("ssMapScalar($P, slowTime, bass, tension)", { steps: 5, stepBase: 0.0, stepScale: 0.1, weightDecay: 0.6, finalMult: 2.0, name: "ssCalcOcclusion" });
 
 export const spinningSpiralFrag = /* glsl */ `
 precision highp float;
@@ -165,31 +169,14 @@ float ssSceneSDF(vec3 pos, float time, float bass, float tension, out int ssObjI
   return minDist;
 }
 
-// ---- Normal ----
-vec3 ssCalcNormal(vec3 pos, float time, float bass, float tension) {
-  float eps = 0.003;
-  int dummyId;
-  float ref = ssSceneSDF(pos, time, bass, tension, dummyId);
-  return normalize(vec3(
-    ssSceneSDF(pos + vec3(eps, 0, 0), time, bass, tension, dummyId) - ref,
-    ssSceneSDF(pos + vec3(0, eps, 0), time, bass, tension, dummyId) - ref,
-    ssSceneSDF(pos + vec3(0, 0, eps), time, bass, tension, dummyId) - ref
-  ));
+// ---- Scalar map wrapper (hides out int for shared raymarching utilities) ----
+float ssMapScalar(vec3 p, float time, float bass, float tension) {
+  int _ssDummy;
+  return ssSceneSDF(p, time, bass, tension, _ssDummy);
 }
 
-// ---- Occlusion ----
-float ssCalcOcclusion(vec3 pos, vec3 nrm, float time, float bass, float tension) {
-  float occl = 0.0;
-  float weight = 1.0;
-  int dummyId;
-  for (int i = 1; i <= 5; i++) {
-    float sd = float(i) * 0.1;
-    float sdf = ssSceneSDF(pos + nrm * sd, time, bass, tension, dummyId);
-    occl += weight * max(sd - sdf, 0.0);
-    weight *= 0.6;
-  }
-  return clamp(1.0 - occl * 2.0, 0.0, 1.0);
-}
+${ssNormalGLSL}
+${ssAOGLSL}
 
 void main() {
   vec2 uv = vUv;
@@ -282,8 +269,8 @@ void main() {
 
   if (didCollide) {
     vec3 collidePos = rayOrig + rayDir * marchDist;
-    vec3 nrm = ssCalcNormal(collidePos, slowTime, bass, tension);
-    float occl = ssCalcOcclusion(collidePos, nrm, slowTime, bass, tension);
+    vec3 nrm = ssCalcNormal(collidePos);
+    float occl = ssCalcOcclusion(collidePos, nrm);
 
     // Lighting
     vec3 lightDir = normalize(vec3(0.3, 1.0, -0.5));

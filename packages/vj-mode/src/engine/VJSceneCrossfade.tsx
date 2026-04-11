@@ -135,7 +135,7 @@ export const VJSceneCrossfade: React.FC<Props> = ({ analyzer, onAudioState, onTr
         bass: audioState.bass,
         onset: audioState.onset,
         tempo: audioState.tempo,
-        harmonicTension: 0, // not available in SmoothedAudioState
+        harmonicTension: audioState.harmonicTension,
         climaxPhase: audioState.climaxPhase,
         beatSnap: audioState.beatSnap,
       }, now);

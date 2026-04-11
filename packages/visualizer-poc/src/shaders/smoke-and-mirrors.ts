@@ -26,6 +26,7 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
+import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
 
 export const smokeAndMirrorsVert = /* glsl */ `
 varying vec2 vUv;
@@ -34,6 +35,9 @@ void main() {
   gl_Position = vec4(position, 1.0);
 }
 `;
+
+const samNormalGLSL = buildRaymarchNormal("samSceneSDF($P, flowTime, bassVib).x", { eps: 0.003, name: "samCalcNormal" });
+const samAOGLSL = buildRaymarchAO("samSceneSDF($P, flowTime, bassVib).x", { steps: 5, stepBase: 0.0, stepScale: 0.12, weightDecay: 0.6, finalMult: 2.5, name: "samCalcAO" });
 
 export const smokeAndMirrorsFrag = /* glsl */ `
 precision highp float;
@@ -169,31 +173,8 @@ vec2 samSceneSDF(vec3 pos, float flowTime, float bassVib) {
   return vec2(minDist, matId);
 }
 
-// ═══════════════════════════════════════════════════════════
-// Normal, AO
-// ═══════════════════════════════════════════════════════════
-
-vec3 samCalcNormal(vec3 pos, float flowTime, float bassVib) {
-  vec2 eps = vec2(0.003, 0.0);
-  float d0 = samSceneSDF(pos, flowTime, bassVib).x;
-  return normalize(vec3(
-    samSceneSDF(pos + eps.xyy, flowTime, bassVib).x - d0,
-    samSceneSDF(pos + eps.yxy, flowTime, bassVib).x - d0,
-    samSceneSDF(pos + eps.yyx, flowTime, bassVib).x - d0
-  ));
-}
-
-float samCalcAO(vec3 pos, vec3 norm, float flowTime, float bassVib) {
-  float occ = 0.0;
-  float weight = 1.0;
-  for (int i = 1; i <= 5; i++) {
-    float dist = float(i) * 0.12;
-    float sampled = samSceneSDF(pos + norm * dist, flowTime, bassVib).x;
-    occ += (dist - sampled) * weight;
-    weight *= 0.6;
-  }
-  return clamp(1.0 - occ * 2.5, 0.0, 1.0);
-}
+${samNormalGLSL}
+${samAOGLSL}
 
 // ═══════════════════════════════════════════════════════════
 // Get mirror normal by material ID
@@ -289,8 +270,8 @@ void main() {
 
   if (didHitSurface) {
     vec3 hitPos = camOrigin + rayDir * totalDist;
-    vec3 normal = samCalcNormal(hitPos, flowTime, bassVib);
-    float ambOcc = samCalcAO(hitPos, normal, flowTime, bassVib);
+    vec3 normal = samCalcNormal(hitPos);
+    float ambOcc = samCalcAO(hitPos, normal);
 
     vec3 lightDir = normalize(vec3(0.3 + melPitch * 0.3, 1.0, -0.3));
     float diffuse = max(dot(normal, lightDir), 0.0);

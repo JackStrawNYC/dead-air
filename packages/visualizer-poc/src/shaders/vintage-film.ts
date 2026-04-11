@@ -32,6 +32,7 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
+import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
 
 export const vintageFilmVert = /* glsl */ `
 varying vec2 vUv;
@@ -40,6 +41,9 @@ void main() {
   gl_Position = vec4(position, 1.0);
 }
 `;
+
+const vf3NormalGLSL = buildRaymarchNormal("vf3Map($P, reelAngle, filmAdvance, weave, tension)", { eps: 0.003, name: "vf3Normal" });
+const vf3AOGLSL = buildRaymarchAO("vf3Map($P, reelAngle, filmAdvance, weave, tension)", { steps: 5, stepBase: 0.0, stepScale: 0.1, weightDecay: 0.6, finalMult: 2.5, name: "vf3AmbientOcclusion" });
 
 export const vintageFilmFrag = /* glsl */ `
 precision highp float;
@@ -268,34 +272,8 @@ float vf3MaterialID(vec3 p, float reelAngle, float filmAdvance, float weave) {
   return 0.0;
 }
 
-// ============================================================
-// Normal via central differences
-// ============================================================
-vec3 vf3Normal(vec3 p, float reelAngle, float filmAdvance, float weave, float tension) {
-  vec2 eps = vec2(0.003, 0.0);
-  float d = vf3Map(p, reelAngle, filmAdvance, weave, tension);
-  return normalize(vec3(
-    vf3Map(p + eps.xyy, reelAngle, filmAdvance, weave, tension) - d,
-    vf3Map(p + eps.yxy, reelAngle, filmAdvance, weave, tension) - d,
-    vf3Map(p + eps.yyx, reelAngle, filmAdvance, weave, tension) - d
-  ));
-}
-
-// ============================================================
-// Ambient Occlusion (5-tap)
-// ============================================================
-float vf3AmbientOcclusion(vec3 p, vec3 n, float reelAngle, float filmAdvance, float weave, float tension) {
-  float occ = 0.0;
-  float weight = 1.0;
-  for (int i = 1; i <= 5; i++) {
-    float fi = float(i);
-    float dist = fi * 0.1;
-    float d = vf3Map(p + n * dist, reelAngle, filmAdvance, weave, tension);
-    occ += (dist - d) * weight;
-    weight *= 0.6;
-  }
-  return clamp(1.0 - occ * 2.5, 0.0, 1.0);
-}
+${vf3NormalGLSL}
+${vf3AOGLSL}
 
 // ============================================================
 // Volumetric light cone from projector lamp
@@ -467,7 +445,7 @@ void main() {
 
   if (marchHit) {
     vec3 pos = marchPos;
-    vec3 norm = vf3Normal(pos, reelAngle, filmAdvance, weave, tension);
+    vec3 norm = vf3Normal(pos);
     float matID = vf3MaterialID(pos, reelAngle, filmAdvance, weave);
 
     // Two lights: projector lamp + ambient room
@@ -491,7 +469,7 @@ void main() {
     float fresnel = pow(1.0 - max(dot(norm, viewDir), 0.0), 3.0);
 
     // === AO ===
-    float occl = vf3AmbientOcclusion(pos, norm, reelAngle, filmAdvance, weave, tension);
+    float occl = vf3AmbientOcclusion(pos, norm);
 
     // === MATERIAL ===
     vec3 matCol;

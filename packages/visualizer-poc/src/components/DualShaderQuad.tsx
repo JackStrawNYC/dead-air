@@ -19,6 +19,7 @@ import { useSceneConfig } from "../scenes/SceneConfigContext";
 import { dualBlendVert, dualBlendFrag } from "../shaders/dual-blend";
 import { useEnvelopeValues } from "../data/EnvelopeContext";
 import { fxaaVert, fxaaFrag } from "../shaders/shared/fxaa.glsl";
+import { gpuMonitor } from "../utils/gpu-monitor";
 
 /** Era values — same as FullscreenQuad */
 const ERA_SATURATION: Record<string, number> = { primal: 0.70, classic: 0.90, hiatus: 0.75, touch_of_grey: 1.15, revival: 0.95 };
@@ -125,6 +126,7 @@ function syncUniforms(
   gradingIntensity = 1.0,
   peakOfShow = 0,
   envelope: { brightness: number; saturation: number; hue: number } = { brightness: 1, saturation: 1, hue: 0 },
+  cameraProfile?: import("../config/camera-profiles").CameraProfile,
 ) {
   u.uTime.value = time;
   u.uDynamicTime.value = dynamicTime;
@@ -203,13 +205,14 @@ function syncUniforms(
   u.uEnvelopeSaturation.value = envelope.saturation;
   u.uEnvelopeHue.value = envelope.hue;
 
-  // 3D Camera
+  // 3D Camera (uses profile if provided)
   const cam3d = compute3DCamera(
     time, dynamicTime, smooth.energy as number, smooth.bass as number,
     smooth.fastEnergy as number, smooth.vocalPresence as number, smooth.drumOnset as number,
     smooth.sectionProgress as number, smooth.sectionIndex as number,
     climaxPhase, climaxIntensity,
     smooth.beatStability as number, smooth.beatSnap as number,
+    cameraProfile,
   );
   (u.uCamPos.value as THREE.Vector3).set(cam3d.position[0], cam3d.position[1], cam3d.position[2]);
   (u.uCamTarget.value as THREE.Vector3).set(cam3d.target[0], cam3d.target[1], cam3d.target[2]);
@@ -261,15 +264,26 @@ export const DualShaderQuad: React.FC<Props> = ({
       magFilter: THREE.LinearFilter,
       format: THREE.RGBAFormat,
     };
-    return {
+    const t = {
       a: new THREE.WebGLRenderTarget(width, height, opts),
       b: new THREE.WebGLRenderTarget(width, height, opts),
       fxaa: new THREE.WebGLRenderTarget(width, height, opts),
     };
+    gpuMonitor.trackRenderTarget(t.a, "DualShaderQuad:a");
+    gpuMonitor.trackRenderTarget(t.b, "DualShaderQuad:b");
+    gpuMonitor.trackRenderTarget(t.fxaa, "DualShaderQuad:fxaa");
+    return t;
   }, [width, height]);
 
   useEffect(() => {
-    return () => { targets.a.dispose(); targets.b.dispose(); targets.fxaa.dispose(); };
+    return () => {
+      gpuMonitor.untrackRenderTarget(targets.a);
+      gpuMonitor.untrackRenderTarget(targets.b);
+      gpuMonitor.untrackRenderTarget(targets.fxaa);
+      targets.a.dispose();
+      targets.b.dispose();
+      targets.fxaa.dispose();
+    };
   }, [targets]);
 
   const camera = useMemo(() => new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1), []);
@@ -356,6 +370,7 @@ export const DualShaderQuad: React.FC<Props> = ({
     heroTrigger, heroProgress, jamDensity, jamPhase, jamProgress, coherence, isLocked,
     eraSaturation, eraBrightness, eraSepia,
     filmStock, venueProfile, width, height, sceneConfig.gradingIntensity, peakOfShow, envelope,
+    sceneConfig.cameraProfile,
   ] as const;
 
   // Update uniforms for both scenes

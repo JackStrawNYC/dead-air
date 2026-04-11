@@ -132,6 +132,8 @@ export interface SongIdentity {
   thematicTags?: string[];
   /** Visual pacing overrides */
   visualPacing?: VisualPacing;
+  /** Camera behavior profile name (default, contemplative, driving, intimate, expansive) */
+  cameraProfile?: string;
 }
 
 // ─── Song Identity Registry (loaded from JSON) ───

@@ -29,6 +29,7 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
+import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
 
 export const clockworkTempleVert = /* glsl */ `
 varying vec2 vUv;
@@ -43,6 +44,9 @@ const postProcess = buildPostProcessGLSL({
   lightLeakEnabled: true,
   eraGradingEnabled: true,
 });
+
+const ctNormalGLSL = buildRaymarchNormal("ctMap($P, ft, energy, bass, drumSnap, tension, pitch, sJam, sSpace, sChorus, climax, stability, beatSnap)", { eps: 0.002, name: "ctNormal" });
+const ctAOGLSL = buildRaymarchAO("ctMap($P, ft, energy, bass, drumSnap, tension, pitch, sJam, sSpace, sChorus, climax, stability, beatSnap)", { steps: 5, stepBase: 0.0, stepScale: 0.05, weightDecay: 0.6, finalMult: 3.0, name: "ctAmbientOcc" });
 
 export const clockworkTempleFrag = /* glsl */ `
 precision highp float;
@@ -334,33 +338,9 @@ float ctMap(vec3 p, float ft, float energy, float bass, float drumSnap,
   return d;
 }
 
-// ─── Normal estimation ───
-vec3 ctNormal(vec3 p, float ft, float energy, float bass, float drumSnap,
-              float tension, float pitch, float sJam, float sSpace, float sChorus,
-              float climax, float stability, float beatSnap) {
-  vec2 eps = vec2(0.002, 0.0);
-  float ref = ctMap(p, ft, energy, bass, drumSnap, tension, pitch, sJam, sSpace, sChorus, climax, stability, beatSnap);
-  return normalize(vec3(
-    ctMap(p + eps.xyy, ft, energy, bass, drumSnap, tension, pitch, sJam, sSpace, sChorus, climax, stability, beatSnap) - ref,
-    ctMap(p + eps.yxy, ft, energy, bass, drumSnap, tension, pitch, sJam, sSpace, sChorus, climax, stability, beatSnap) - ref,
-    ctMap(p + eps.yyx, ft, energy, bass, drumSnap, tension, pitch, sJam, sSpace, sChorus, climax, stability, beatSnap) - ref
-  ));
-}
-
-// ─── Ambient occlusion ───
-float ctAmbientOcc(vec3 p, vec3 n, float ft, float energy, float bass, float drumSnap,
-                   float tension, float pitch, float sJam, float sSpace, float sChorus,
-                   float climax, float stability, float beatSnap) {
-  float occ = 0.0;
-  float weight = 1.0;
-  for (int i = 1; i <= 5; i++) {
-    float dist = 0.05 * float(i);
-    float sampled = ctMap(p + n * dist, ft, energy, bass, drumSnap, tension, pitch, sJam, sSpace, sChorus, climax, stability, beatSnap);
-    occ += (dist - sampled) * weight;
-    weight *= 0.6;
-  }
-  return clamp(1.0 - occ * 3.0, 0.1, 1.0);
-}
+// ─── Normal + AO (shared raymarching utilities) ───
+${ctNormalGLSL}
+${ctAOGLSL}
 
 void main() {
   vec2 uv = vUv;
@@ -447,7 +427,7 @@ void main() {
 
   if (marchHit) {
     // ─── Surface shading ───
-    vec3 n = ctNormal(marchPos, ft, energy, bass, drumSnap, tension, pitch, sJam, sSpace, sChorus, climax, stability, beatSnap);
+    vec3 n = ctNormal(marchPos);
 
     // Two-light rig: warm key + cool fill
     vec3 keyLightDir = normalize(vec3(0.6, 0.8, -0.3));
@@ -469,7 +449,7 @@ void main() {
     fresnel = mix(0.04, 1.0, fresnel); // Schlick approximation for metal
 
     // Ambient occlusion
-    float occVal = ctAmbientOcc(marchPos, n, ft, energy, bass, drumSnap, tension, pitch, sJam, sSpace, sChorus, climax, stability, beatSnap);
+    float occVal = ctAmbientOcc(marchPos, n);
 
     // Material color: vary between brass/copper/gold based on position
     float matHash = fract(sin(dot(floor(marchPos * 2.0), vec3(127.1, 311.7, 74.7))) * 43758.5453);

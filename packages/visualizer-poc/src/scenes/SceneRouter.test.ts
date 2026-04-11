@@ -359,8 +359,8 @@ describe('getModeForSection', () => {
     }));
 
     const structuredModes = new Set([
-      'concert_lighting', 'vintage_film', 'lo_fi_grain',
-      'stark_minimal', 'tie_dye', 'inferno', 'oil_projector',
+      'inferno', 'vintage_film', 'lo_fi_grain',
+      'deep_ocean', 'protean_clouds',
     ]);
 
     let structuredCount = 0;
@@ -532,12 +532,12 @@ describe('getDrumsSpaceMode', () => {
     expect([...results].every((m) => pool.includes(m))).toBe(true);
   });
 
-  it('reemergence returns concert_lighting or liquid_light', () => {
+  it('reemergence returns inferno or protean_clouds', () => {
     const results = new Set<VisualMode>();
     for (let seed = 0; seed < 50; seed++) {
       results.add(getDrumsSpaceMode('reemergence', seed));
     }
-    expect([...results].every((m) => m === 'concert_lighting' || m === 'liquid_light')).toBe(true);
+    expect([...results].every((m) => m === 'inferno' || m === 'protean_clouds')).toBe(true);
   });
 
   it('unknown phase defaults to cosmic_voyage', () => {
@@ -557,45 +557,49 @@ describe('getDrumsSpaceMode', () => {
 // --- dynamicCrossfadeDuration ---
 
 describe('dynamicCrossfadeDuration', () => {
-  it('quiet→quiet returns ~240 (gentle dissolve)', () => {
+  it('quiet→quiet returns ~720 (ultra-gentle dissolve)', () => {
     // Both sides quiet (rms < 0.08)
     const frames = Array.from({ length: 200 }, () => mockFrame({ rms: 0.03 }));
     const duration = dynamicCrossfadeDuration(frames, 100);
-    // Without flux, should be close to 240
-    expect(duration).toBeGreaterThanOrEqual(120); // at least half of 240 with flux
-    expect(duration).toBeLessThanOrEqual(240);
+    // CHILL CALIBRATION: 720 frames (24s) with flux compression floor at 0.7
+    expect(duration).toBeGreaterThanOrEqual(500);
+    expect(duration).toBeLessThanOrEqual(720);
   });
 
-  it('loud→loud returns ~24 (hard cut)', () => {
+  it('loud→loud returns ~150 (smooth crossfade)', () => {
     const frames = Array.from({ length: 200 }, () => mockFrame({ rms: 0.35 }));
     const duration = dynamicCrossfadeDuration(frames, 100);
-    expect(duration).toBeGreaterThanOrEqual(12); // minimum is 12
-    expect(duration).toBeLessThanOrEqual(24);
+    // CHILL CALIBRATION: 150 frames (5s), floor at 90 (3s)
+    expect(duration).toBeGreaterThanOrEqual(90);
+    expect(duration).toBeLessThanOrEqual(150);
   });
 
-  it('quiet→loud returns ~36 (fast snap)', () => {
+  it('quiet→loud returns ~180 (moderate snap)', () => {
     const frames = Array.from({ length: 200 }, (_, i) =>
       mockFrame({ rms: i < 100 ? 0.03 : 0.35 }),
     );
     const duration = dynamicCrossfadeDuration(frames, 100);
-    expect(duration).toBeGreaterThanOrEqual(12);
-    expect(duration).toBeLessThanOrEqual(36);
+    // CHILL CALIBRATION: 180 frames (6s), floor at 90 (3s)
+    expect(duration).toBeGreaterThanOrEqual(90);
+    expect(duration).toBeLessThanOrEqual(180);
   });
 
-  it('loud→quiet returns ~60 (moderate fade)', () => {
+  it('loud→quiet returns ~240 (gentle fade)', () => {
     const frames = Array.from({ length: 200 }, (_, i) =>
       mockFrame({ rms: i < 100 ? 0.35 : 0.03 }),
     );
     const duration = dynamicCrossfadeDuration(frames, 100);
-    expect(duration).toBeGreaterThanOrEqual(30);
-    expect(duration).toBeLessThanOrEqual(60);
+    // CHILL CALIBRATION: 240 frames (8s), floor at 90 (3s)
+    expect(duration).toBeGreaterThanOrEqual(90);
+    expect(duration).toBeLessThanOrEqual(240);
   });
 
-  it('mid energy returns ~45 (default)', () => {
+  it('mid energy returns ~180 (default)', () => {
     const frames = Array.from({ length: 200 }, () => mockFrame({ rms: 0.12 }));
     const duration = dynamicCrossfadeDuration(frames, 100);
-    expect(duration).toBeGreaterThanOrEqual(20);
-    expect(duration).toBeLessThanOrEqual(45);
+    // CHILL CALIBRATION: 180 frames (6s) default, floor at 90 (3s)
+    expect(duration).toBeGreaterThanOrEqual(90);
+    expect(duration).toBeLessThanOrEqual(180);
   });
 
   it('high spectral flux compresses duration', () => {
@@ -619,7 +623,7 @@ describe('dynamicCrossfadeDuration', () => {
     expect(highFluxDuration).toBeLessThan(lowFluxDuration);
   });
 
-  it('never returns less than 12', () => {
+  it('never returns less than 90 (3s floor)', () => {
     const frames = Array.from({ length: 200 }, (_, i) =>
       mockFrame({
         rms: 0.35,
@@ -629,7 +633,8 @@ describe('dynamicCrossfadeDuration', () => {
       }),
     );
     const duration = dynamicCrossfadeDuration(frames, 100);
-    expect(duration).toBeGreaterThanOrEqual(12);
+    // CHILL CALIBRATION: hard floor at 90 frames (3s) — no snap cuts
+    expect(duration).toBeGreaterThanOrEqual(90);
   });
 });
 

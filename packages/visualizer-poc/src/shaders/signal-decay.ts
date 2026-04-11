@@ -26,6 +26,7 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
+import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
 
 export const signalDecayVert = /* glsl */ `
 varying vec2 vUv;
@@ -34,6 +35,9 @@ void main() {
   gl_Position = vec4(position, 1.0);
 }
 `;
+
+const sd2NormalGLSL = buildRaymarchNormal("sd2Map($P, energy, bass, trackStability, flowTime, dishCount).x", { eps: 0.002, name: "sd2CalcNormal" });
+const sd2AOGLSL = buildRaymarchAO("sd2Map($P, energy, bass, trackStability, flowTime, dishCount).x", { steps: 4, stepBase: -0.10, stepScale: 0.12, weightDecay: 0.7, finalMult: 3.0, name: "sd2CalcOcclusion" });
 
 const postProcess = buildPostProcessGLSL({
   grainStrength: "light",
@@ -262,33 +266,8 @@ vec3 sd2Starfield(vec3 rd, float spaceScore) {
   return stars;
 }
 
-// ─── Ambient Occlusion ───
-float sd2CalcOcclusion(vec3 pos, vec3 nor, float energy, float bass,
-                        float trackStability, float flowTime, int dishCount) {
-  float occ = 0.0;
-  float sca = 1.0;
-  for (int i = 0; i < 4; i++) {
-    float h = 0.02 + 0.12 * float(i);
-    float d = sd2Map(pos + nor * h, energy, bass, trackStability, flowTime, dishCount).x;
-    occ += (h - d) * sca;
-    sca *= 0.7;
-  }
-  return clamp(1.0 - 3.0 * occ, 0.0, 1.0);
-}
-
-// ─── Normal calculation ───
-vec3 sd2CalcNormal(vec3 p, float energy, float bass, float trackStability,
-                    float flowTime, int dishCount) {
-  vec2 eps = vec2(0.002, 0.0);
-  return normalize(vec3(
-    sd2Map(p + eps.xyy, energy, bass, trackStability, flowTime, dishCount).x -
-    sd2Map(p - eps.xyy, energy, bass, trackStability, flowTime, dishCount).x,
-    sd2Map(p + eps.yxy, energy, bass, trackStability, flowTime, dishCount).x -
-    sd2Map(p - eps.yxy, energy, bass, trackStability, flowTime, dishCount).x,
-    sd2Map(p + eps.yyx, energy, bass, trackStability, flowTime, dishCount).x -
-    sd2Map(p - eps.yyx, energy, bass, trackStability, flowTime, dishCount).x
-  ));
-}
+${sd2NormalGLSL}
+${sd2AOGLSL}
 
 // ─── Signal wave color ───
 vec3 sd2SignalColor(float density, float warmth, vec3 tint, float burst) {
@@ -384,8 +363,8 @@ void main() {
 
   // ─── Surface shading ───
   if (marchHasHit) {
-    vec3 nor = sd2CalcNormal(marchPos, energy, bass, trackStability, flowTime, dishCount);
-    float occVal = sd2CalcOcclusion(marchPos, nor, energy, bass, trackStability, flowTime, dishCount);
+    vec3 nor = sd2CalcNormal(marchPos);
+    float occVal = sd2CalcOcclusion(marchPos, nor);
 
     // Key light: from above-right (moonlight / distant star)
     vec3 lightDir = normalize(vec3(0.5, 0.8, -0.3));

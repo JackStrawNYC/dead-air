@@ -24,6 +24,16 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
+import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
+
+const nwNormalGLSL = buildRaymarchNormal(
+  "nwMap($P, flowTime, bass, energy, chaos, firingRate, branchDensity, drumSync).dist",
+  { eps: 0.001, name: "nwNormal" },
+);
+const nwOccGLSL = buildRaymarchAO(
+  "nwMap($P, flowTime, bass, energy, chaos, firingRate, branchDensity, drumSync).dist",
+  { steps: 5, stepBase: 0.02, stepScale: 0.06, weightDecay: 0.6, finalMult: 3.0, name: "nwOcclusion" },
+);
 
 export const neuralWebVert = /* glsl */ `
 varying vec2 vUv;
@@ -243,34 +253,8 @@ NwResult nwMap(vec3 pos, float flowTime, float bass, float energy, float chaos,
   return result;
 }
 
-// ─── Normal estimation (central differences) ───
-
-vec3 nwNormal(vec3 pos, float flowTime, float bass, float energy, float chaos,
-              float firingRate, float branchDensity, float drumSync) {
-  vec2 offset = vec2(NW_EPS, 0.0);
-  float distCenter = nwMap(pos, flowTime, bass, energy, chaos, firingRate, branchDensity, drumSync).dist;
-  return normalize(vec3(
-    nwMap(pos + offset.xyy, flowTime, bass, energy, chaos, firingRate, branchDensity, drumSync).dist - distCenter,
-    nwMap(pos + offset.yxy, flowTime, bass, energy, chaos, firingRate, branchDensity, drumSync).dist - distCenter,
-    nwMap(pos + offset.yyx, flowTime, bass, energy, chaos, firingRate, branchDensity, drumSync).dist - distCenter
-  ));
-}
-
-// ─── Soft AO (ambient occlusion) ───
-
-float nwOcclusion(vec3 pos, vec3 norm, float flowTime, float bass, float energy,
-                  float chaos, float firingRate, float branchDensity, float drumSync) {
-  float occl = 0.0;
-  float weight = 1.0;
-  for (int step = 0; step < 5; step++) {
-    float sampleDist = 0.02 + float(step) * 0.06;
-    float sampledScene = nwMap(pos + norm * sampleDist, flowTime, bass, energy, chaos,
-                               firingRate, branchDensity, drumSync).dist;
-    occl += weight * (sampleDist - sampledScene);
-    weight *= 0.6;
-  }
-  return clamp(1.0 - occl * 3.0, 0.0, 1.0);
-}
+${nwNormalGLSL}
+${nwOccGLSL}
 
 // ─── Main ───
 
@@ -364,8 +348,8 @@ void main() {
 
   if (surfaceFound) {
     vec3 surfPos = rayOrigin + rayDir * totalDist;
-    vec3 normal = nwNormal(surfPos, flowTime, bass, energy, chaos, firingRate, branchDensity, drumSync);
-    float occl = nwOcclusion(surfPos, normal, flowTime, bass, energy, chaos, firingRate, branchDensity, drumSync);
+    vec3 normal = nwNormal(surfPos);
+    float occl = nwOcclusion(surfPos, normal);
 
     // Light directions
     vec3 lightDir1 = normalize(vec3(0.5, 1.0, 0.3));

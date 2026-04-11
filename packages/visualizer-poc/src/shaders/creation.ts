@@ -26,6 +26,7 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
+import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
 
 export const creationVert = /* glsl */ `
 varying vec2 vUv;
@@ -34,6 +35,15 @@ void main() {
   gl_Position = vec4(position, 1.0);
 }
 `;
+
+const cr3NormalGLSL = buildRaymarchNormal(
+  "cr3SceneSDF($P, expansionPhase, bassPulse, stability, flowTime).x",
+  { eps: 0.003, name: "cr3CalcNormal" },
+);
+const cr3AOGLSL = buildRaymarchAO(
+  "cr3SceneSDF($P, expansionPhase, bassPulse, stability, flowTime).x",
+  { steps: 5, stepBase: 0.0, stepScale: 0.15, weightDecay: 0.6, finalMult: 2.0, name: "cr3CalcAO" },
+);
 
 export const creationFrag = /* glsl */ `
 precision highp float;
@@ -211,31 +221,8 @@ vec2 cr3SceneSDF(vec3 pos, float expansionPhase, float bassPulse, float stabilit
   return vec2(minDist, matId);
 }
 
-// ═══════════════════════════════════════════════════════════
-// Normal, AO
-// ═══════════════════════════════════════════════════════════
-
-vec3 cr3CalcNormal(vec3 pos, float expansion, float bassPulse, float stability, float flowTime) {
-  vec2 eps = vec2(0.003, 0.0);
-  float d0 = cr3SceneSDF(pos, expansion, bassPulse, stability, flowTime).x;
-  return normalize(vec3(
-    cr3SceneSDF(pos + eps.xyy, expansion, bassPulse, stability, flowTime).x - d0,
-    cr3SceneSDF(pos + eps.yxy, expansion, bassPulse, stability, flowTime).x - d0,
-    cr3SceneSDF(pos + eps.yyx, expansion, bassPulse, stability, flowTime).x - d0
-  ));
-}
-
-float cr3CalcAO(vec3 pos, vec3 norm, float expansion, float bassPulse, float stability, float flowTime) {
-  float occ = 0.0;
-  float weight = 1.0;
-  for (int i = 1; i <= 5; i++) {
-    float dist = float(i) * 0.15;
-    float sampled = cr3SceneSDF(pos + norm * dist, expansion, bassPulse, stability, flowTime).x;
-    occ += (dist - sampled) * weight;
-    weight *= 0.6;
-  }
-  return clamp(1.0 - occ * 2.0, 0.0, 1.0);
-}
+${cr3NormalGLSL}
+${cr3AOGLSL}
 
 // ═══════════════════════════════════════════════════════════
 // Main
@@ -326,8 +313,8 @@ void main() {
 
   if (didHitSurface) {
     vec3 hitPos = camOrigin + rayDir * totalDist;
-    vec3 normal = cr3CalcNormal(hitPos, expansionPhase, bassPulse, stability, flowTime);
-    float ambOcc = cr3CalcAO(hitPos, normal, expansionPhase, bassPulse, stability, flowTime);
+    vec3 normal = cr3CalcNormal(hitPos);
+    float ambOcc = cr3CalcAO(hitPos, normal);
 
     vec3 lightDir = normalize(vec3(0.3, 0.8, -0.5));
     float diffuse = max(dot(normal, lightDir), 0.0);

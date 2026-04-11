@@ -33,6 +33,7 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
+import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
 
 export const starkMinimalVert = /* glsl */ `
 varying vec2 vUv;
@@ -41,6 +42,9 @@ void main() {
   gl_Position = vec4(position, 1.0);
 }
 `;
+
+const smNormalGLSL = buildRaymarchNormal("smMap($P, bassVib, beatStability, onset, climaxAperture)", { eps: 0.002, name: "smNormal" });
+const smAOGLSL = buildRaymarchAO("smMap($P, bassVib, beatStability, onset, climaxAperture)", { steps: 5, stepBase: 0.0, stepScale: 0.12, weightDecay: 0.55, finalMult: 3.0, name: "smAmbientOcclusion" });
 
 export const starkMinimalFrag = /* glsl */ `
 precision highp float;
@@ -203,34 +207,8 @@ float smMap(vec3 p, float bassVib, float stability, float onset, float climaxApe
   return minDist;
 }
 
-// ============================================================
-// Normal via central differences
-// ============================================================
-vec3 smNormal(vec3 p, float bassVib, float stability, float onset, float climaxAperture) {
-  vec2 eps = vec2(0.002, 0.0);
-  float d = smMap(p, bassVib, stability, onset, climaxAperture);
-  return normalize(vec3(
-    smMap(p + eps.xyy, bassVib, stability, onset, climaxAperture) - d,
-    smMap(p + eps.yxy, bassVib, stability, onset, climaxAperture) - d,
-    smMap(p + eps.yyx, bassVib, stability, onset, climaxAperture) - d
-  ));
-}
-
-// ============================================================
-// Ambient Occlusion (5-tap)
-// ============================================================
-float smAmbientOcclusion(vec3 p, vec3 n, float bassVib, float stability, float onset, float climaxAperture) {
-  float occ = 0.0;
-  float weight = 1.0;
-  for (int i = 1; i <= 5; i++) {
-    float fi = float(i);
-    float dist = fi * 0.12;
-    float d = smMap(p + n * dist, bassVib, stability, onset, climaxAperture);
-    occ += (dist - d) * weight;
-    weight *= 0.55;
-  }
-  return clamp(1.0 - occ * 3.0, 0.0, 1.0);
-}
+${smNormalGLSL}
+${smAOGLSL}
 
 // ============================================================
 // Soft shadow
@@ -379,7 +357,7 @@ void main() {
 
   if (marchHit) {
     vec3 pos = marchPos;
-    vec3 norm = smNormal(pos, bassVib, beatStability, onset, climaxAperture);
+    vec3 norm = smNormal(pos);
 
     // Primary light: from above through slots, angle from melodicPitch
     float lightAngle = PI * 0.3 + melodicPitch * PI * 0.2;
@@ -398,7 +376,7 @@ void main() {
     float fresnel = pow(1.0 - max(dot(norm, viewDir), 0.0), 4.0);
 
     // === AMBIENT OCCLUSION ===
-    float occl = smAmbientOcclusion(pos, norm, bassVib, beatStability, onset, climaxAperture);
+    float occl = smAmbientOcclusion(pos, norm);
 
     // === SOFT SHADOW ===
     float shadow = smSoftShadow(pos + norm * 0.02, lightDir, 0.1, 15.0, 6.0,

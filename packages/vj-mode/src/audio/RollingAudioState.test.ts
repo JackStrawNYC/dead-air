@@ -49,6 +49,16 @@ describe("RollingAudioState", () => {
     expect(result).toHaveProperty("contrast");
     expect(result.chroma).toHaveLength(12);
     expect(result.contrast).toHaveLength(7);
+
+    // New detector fields (Item 9)
+    expect(result).toHaveProperty("chordIndex");
+    expect(result).toHaveProperty("chordConfidence");
+    expect(result).toHaveProperty("harmonicTension");
+    expect(result).toHaveProperty("beatStability");
+    expect(result).toHaveProperty("beatConfidence");
+    expect(result).toHaveProperty("sectionType");
+    expect(result).toHaveProperty("jamDensity");
+    expect(result).toHaveProperty("isLongJam");
   });
 
   it("smoothly tracks energy increases (EMA)", () => {

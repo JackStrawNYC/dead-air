@@ -27,6 +27,16 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
+import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
+
+const lfNormalGLSL = buildRaymarchNormal(
+  "lfMap($P, bass, drumOnset, beatSnap, emergence, tension, melPitch, timeVal)",
+  { eps: 0.001, name: "lfNormal" },
+);
+const lfAOGLSL = buildRaymarchAO(
+  "lfMap($P, bass, drumOnset, beatSnap, emergence, tension, melPitch, timeVal)",
+  { steps: 5, stepBase: 0.0, stepScale: 0.06, weightDecay: 0.6, finalMult: 3.0, name: "lfAmbientOcclusion" },
+);
 
 export const loFiGrainVert = /* glsl */ `
 varying vec2 vUv;
@@ -256,38 +266,8 @@ float lfMap(vec3 pos, float bass, float drumOnset, float beatSnap, float emergen
   return scene;
 }
 
-// ═══════════════════════════════════════════════════════
-// Scene Normal
-// ═══════════════════════════════════════════════════════
-
-vec3 lfNormal(vec3 pos, float bass, float drumOnset, float beatSnap, float emergence,
-              float tension, float melPitch, float timeVal) {
-  float eps = 0.001;
-  float d = lfMap(pos, bass, drumOnset, beatSnap, emergence, tension, melPitch, timeVal);
-  return normalize(vec3(
-    lfMap(pos + vec3(eps, 0.0, 0.0), bass, drumOnset, beatSnap, emergence, tension, melPitch, timeVal) - d,
-    lfMap(pos + vec3(0.0, eps, 0.0), bass, drumOnset, beatSnap, emergence, tension, melPitch, timeVal) - d,
-    lfMap(pos + vec3(0.0, 0.0, eps), bass, drumOnset, beatSnap, emergence, tension, melPitch, timeVal) - d
-  ));
-}
-
-// ═══════════════════════════════════════════════════════
-// Ambient Occlusion
-// ═══════════════════════════════════════════════════════
-
-float lfAmbientOcclusion(vec3 pos, vec3 nrm, float bass, float drumOnset, float beatSnap,
-                         float emergence, float tension, float melPitch, float timeVal) {
-  float occl = 0.0;
-  float weight = 1.0;
-  for (int i = 1; i <= 5; i++) {
-    float fi = float(i);
-    float stepDist = fi * 0.06;
-    float d = lfMap(pos + nrm * stepDist, bass, drumOnset, beatSnap, emergence, tension, melPitch, timeVal);
-    occl += weight * (stepDist - d);
-    weight *= 0.6;
-  }
-  return clamp(1.0 - occl * 3.0, 0.0, 1.0);
-}
+${lfNormalGLSL}
+${lfAOGLSL}
 
 // ═══════════════════════════════════════════════════════
 // Chemical Swirl Pattern (visible in fluid surface)
@@ -532,9 +512,9 @@ void main() {
 
   // ─── Shade hit surface ───
   if (sceneHitFlag) {
-    vec3 nrm = lfNormal(sceneHitPos, bass, drumOnset, effectiveBeat, emergence, tension, melPitch, timeVal);
+    vec3 nrm = lfNormal(sceneHitPos);
     int matId = lfMaterialId(sceneHitPos, bass, drumOnset, effectiveBeat, emergence, tension, melPitch, timeVal);
-    float occl = lfAmbientOcclusion(sceneHitPos, nrm, bass, drumOnset, effectiveBeat, emergence, tension, melPitch, timeVal);
+    float occl = lfAmbientOcclusion(sceneHitPos, nrm);
 
     // Safelight illumination (primary)
     vec3 safeLight = lfSafelight(sceneHitPos, nrm, vocalPresence, tender);

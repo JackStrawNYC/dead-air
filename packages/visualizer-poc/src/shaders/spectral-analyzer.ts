@@ -27,6 +27,7 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
+import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
 
 export const spectralAnalyzerVert = /* glsl */ `
 varying vec2 vUv;
@@ -35,6 +36,9 @@ void main() {
   gl_Position = vec4(position, 1.0);
 }
 `;
+
+const saNormalGLSL = buildRaymarchNormal("saSceneMap($P, timeVal, onset, beatSnap2, drumOnset, beatStab).x", { eps: 0.003, name: "saCalcNormal" });
+const saAOGLSL = buildRaymarchAO("saSceneMap($P, timeVal, onset, beatSnap2, drumOnset, beatStab).x", { steps: 5, stepBase: -0.05, stepScale: 0.08, weightDecay: 0.65, finalMult: 3.0, name: "saCalcAO" });
 
 export const spectralAnalyzerFrag = /* glsl */ `
 precision highp float;
@@ -148,29 +152,8 @@ vec2 saSceneMap(vec3 pos, float timeVal, float onset, float beatSnap2, float dru
   return result;
 }
 
-// ─── Normal calculation ───
-vec3 saCalcNormal(vec3 pos, float timeVal, float onset, float beatSnap2, float drumOnset, float beatStab) {
-  vec2 off = vec2(0.003, 0.0);
-  float d0 = saSceneMap(pos, timeVal, onset, beatSnap2, drumOnset, beatStab).x;
-  return normalize(vec3(
-    saSceneMap(pos + off.xyy, timeVal, onset, beatSnap2, drumOnset, beatStab).x - d0,
-    saSceneMap(pos + off.yxy, timeVal, onset, beatSnap2, drumOnset, beatStab).x - d0,
-    saSceneMap(pos + off.yyx, timeVal, onset, beatSnap2, drumOnset, beatStab).x - d0
-  ));
-}
-
-// ─── Ambient occlusion ───
-float saCalcAO(vec3 pos, vec3 norm, float timeVal, float onset, float beatSnap2, float drumOnset, float beatStab) {
-  float occlusion = 0.0;
-  float weight = 1.0;
-  for (int idx = 0; idx < 5; idx++) {
-    float dist = 0.03 + float(idx) * 0.08;
-    float sdf = saSceneMap(pos + norm * dist, timeVal, onset, beatSnap2, drumOnset, beatStab).x;
-    occlusion += (dist - sdf) * weight;
-    weight *= 0.65;
-  }
-  return clamp(1.0 - occlusion * 3.0, 0.0, 1.0);
-}
+${saNormalGLSL}
+${saAOGLSL}
 
 // ─── Soft shadow ───
 float saSoftShadow(vec3 shadowRo, vec3 shadowRd, float minT, float maxT, float kShadow, float timeVal, float onset, float beatSnap2, float drumOnset, float beatStab) {
@@ -260,10 +243,10 @@ void main() {
 
   if (marchHitSurface) {
     vec3 marchPos = ro + rd * marchDist;
-    vec3 norm = saCalcNormal(marchPos, timeVal, onset, beatSnap2, drumOnset, beatStab);
+    vec3 norm = saCalcNormal(marchPos);
     float matID = marchResult.y;
 
-    float occl = saCalcAO(marchPos, norm, timeVal, onset, beatSnap2, drumOnset, beatStab);
+    float occl = saCalcAO(marchPos, norm);
 
     vec3 toLightDir = normalize(lightPos - marchPos);
     float lightDist = length(lightPos - marchPos);

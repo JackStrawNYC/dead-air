@@ -29,6 +29,7 @@ import { compute3DCamera } from "../utils/camera-3d";
 import { useSceneConfig } from "../scenes/SceneConfigContext";
 import { useEnvelopeValues } from "../data/EnvelopeContext";
 import { fxaaVert, fxaaFrag } from "../shaders/shared/fxaa.glsl";
+import { gpuMonitor } from "../utils/gpu-monitor";
 
 /** Reusable Color for save/restore clear color */
 const _clearColor = new THREE.Color();
@@ -272,6 +273,10 @@ export const MultiPassQuad: React.FC<Props> = ({
   useEffect(() => {
     // Dispose old targets first (before allocating new ones)
     if (targetsRef.current) {
+      gpuMonitor.untrackRenderTarget(targetsRef.current.a);
+      gpuMonitor.untrackRenderTarget(targetsRef.current.b);
+      if (targetsRef.current.feedback) gpuMonitor.untrackRenderTarget(targetsRef.current.feedback);
+      gpuMonitor.untrackRenderTarget(targetsRef.current.fxaa);
       targetsRef.current.a.dispose();
       targetsRef.current.b.dispose();
       targetsRef.current.feedback?.dispose();
@@ -283,19 +288,30 @@ export const MultiPassQuad: React.FC<Props> = ({
       magFilter: THREE.LinearFilter,
       format: THREE.RGBAFormat,
     };
+    const fb = feedback
+      ? new THREE.WebGLRenderTarget(width, height, opts)
+      : null;
     targetsRef.current = {
       a: new THREE.WebGLRenderTarget(width, height, opts),
       b: new THREE.WebGLRenderTarget(width, height, opts),
-      feedback: feedback
-        ? new THREE.WebGLRenderTarget(width, height, opts)
-        : null,
+      feedback: fb,
       fxaa: new THREE.WebGLRenderTarget(width, height, opts),
     };
+    gpuMonitor.trackRenderTarget(targetsRef.current.a, "MultiPassQuad:a");
+    gpuMonitor.trackRenderTarget(targetsRef.current.b, "MultiPassQuad:b");
+    if (fb) gpuMonitor.trackRenderTarget(fb, "MultiPassQuad:feedback");
+    gpuMonitor.trackRenderTarget(targetsRef.current.fxaa, "MultiPassQuad:fxaa");
     return () => {
-      targetsRef.current?.a.dispose();
-      targetsRef.current?.b.dispose();
-      targetsRef.current?.feedback?.dispose();
-      targetsRef.current?.fxaa.dispose();
+      if (targetsRef.current) {
+        gpuMonitor.untrackRenderTarget(targetsRef.current.a);
+        gpuMonitor.untrackRenderTarget(targetsRef.current.b);
+        if (targetsRef.current.feedback) gpuMonitor.untrackRenderTarget(targetsRef.current.feedback);
+        gpuMonitor.untrackRenderTarget(targetsRef.current.fxaa);
+        targetsRef.current.a.dispose();
+        targetsRef.current.b.dispose();
+        targetsRef.current.feedback?.dispose();
+        targetsRef.current.fxaa.dispose();
+      }
       targetsRef.current = null;
     };
   }, [width, height, feedback]);
@@ -517,13 +533,14 @@ export const MultiPassQuad: React.FC<Props> = ({
   u.uEnvelopeSaturation.value = envelope.saturation;
   u.uEnvelopeHue.value = envelope.hue;
 
-  // 3D Camera
+  // 3D Camera (uses profile from SceneConfig context)
   const cam3d = compute3DCamera(
     time, dynamicTime, smooth.energy, smooth.bass,
     smooth.fastEnergy, smooth.vocalPresence, smooth.drumOnset,
     smooth.sectionProgress, smooth.sectionIndex,
     climaxPhase, climaxIntensity,
     smooth.beatStability, smooth.beatSnap,
+    sceneConfig.cameraProfile,
   );
   u.uCamPos.value.set(cam3d.position[0], cam3d.position[1], cam3d.position[2]);
   u.uCamTarget.value.set(cam3d.target[0], cam3d.target[1], cam3d.target[2]);

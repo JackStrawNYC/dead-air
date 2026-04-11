@@ -33,6 +33,7 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
+import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
 
 export const databendVert = /* glsl */ `
 varying vec2 vUv;
@@ -41,6 +42,15 @@ void main() {
   gl_Position = vec4(position, 1.0);
 }
 `;
+
+const dbNormalGLSL = buildRaymarchNormal(
+  "dbMap($P, corruption, randomness, drumShift, onsetCascade, bassScale, beatStability, time, climaxShatter)",
+  { eps: 0.003, name: "dbNormal" },
+);
+const dbAOGLSL = buildRaymarchAO(
+  "dbMap($P, corruption, randomness, drumShift, onsetCascade, bassScale, beatStability, time, climaxShatter)",
+  { steps: 5, stepBase: 0.0, stepScale: 0.1, weightDecay: 0.6, finalMult: 2.5, name: "dbAmbientOcclusion" },
+);
 
 export const databendFrag = /* glsl */ `
 precision highp float;
@@ -254,38 +264,8 @@ float dbMaterialID(vec3 p, float corruption, float randomness, float drumShift,
   return 0.0;
 }
 
-// ============================================================
-// Normal via central differences
-// ============================================================
-vec3 dbNormal(vec3 p, float corruption, float randomness, float drumShift,
-              float onsetCascade, float bassScale, float beatStability,
-              float time, float climaxShatter) {
-  vec2 eps = vec2(0.003, 0.0);
-  float d = dbMap(p, corruption, randomness, drumShift, onsetCascade, bassScale, beatStability, time, climaxShatter);
-  return normalize(vec3(
-    dbMap(p + eps.xyy, corruption, randomness, drumShift, onsetCascade, bassScale, beatStability, time, climaxShatter) - d,
-    dbMap(p + eps.yxy, corruption, randomness, drumShift, onsetCascade, bassScale, beatStability, time, climaxShatter) - d,
-    dbMap(p + eps.yyx, corruption, randomness, drumShift, onsetCascade, bassScale, beatStability, time, climaxShatter) - d
-  ));
-}
-
-// ============================================================
-// Ambient Occlusion (5-tap)
-// ============================================================
-float dbAmbientOcclusion(vec3 p, vec3 n, float corruption, float randomness,
-                          float drumShift, float onsetCascade, float bassScale,
-                          float beatStability, float time, float climaxShatter) {
-  float occ = 0.0;
-  float weight = 1.0;
-  for (int i = 1; i <= 5; i++) {
-    float fi = float(i);
-    float dist = fi * 0.1;
-    float d = dbMap(p + n * dist, corruption, randomness, drumShift, onsetCascade, bassScale, beatStability, time, climaxShatter);
-    occ += (dist - d) * weight;
-    weight *= 0.6;
-  }
-  return clamp(1.0 - occ * 2.5, 0.0, 1.0);
-}
+${dbNormalGLSL}
+${dbAOGLSL}
 
 // ============================================================
 // Soft shadow
@@ -406,8 +386,7 @@ void main() {
 
   if (marchHit) {
     vec3 pos = marchPos;
-    vec3 norm = dbNormal(pos, corruption, improv, drumShift, onsetCascade, bass,
-                          beatStability, time, climaxShatter);
+    vec3 norm = dbNormal(pos);
     float matID = dbMaterialID(pos, corruption, improv, drumShift, onsetCascade, bass,
                                 beatStability, time, climaxShatter);
 
@@ -428,8 +407,7 @@ void main() {
     float fresnel = pow(1.0 - max(dot(norm, viewDir), 0.0), 3.0);
 
     // === AMBIENT OCCLUSION ===
-    float occl = dbAmbientOcclusion(pos, norm, corruption, improv, drumShift,
-                                     onsetCascade, bass, beatStability, time, climaxShatter);
+    float occl = dbAmbientOcclusion(pos, norm);
 
     // === SOFT SHADOW ===
     float shadow = dbSoftShadow(pos + norm * 0.01, lightDir, 0.05, 10.0, 8.0,

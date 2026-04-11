@@ -32,6 +32,7 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
+import { buildRaymarchNormal } from "./shared/raymarching.glsl";
 
 export const danceFloorPrismVert = /* glsl */ `
 varying vec2 vUv;
@@ -49,6 +50,8 @@ const postProcess = buildPostProcessGLSL({
   eraGradingEnabled: true,
   grainStrength: "light",
 });
+
+const dfNormalGLSL = buildRaymarchNormal("dfMap($P, energy, bass, tension, climaxPhase, climaxIntensity, prismAngle, sJam, sSpace, sChorus, crowdCount).x", { eps: 0.002, name: "dfNormal" });
 
 export const danceFloorPrismFrag = /* glsl */ `
 precision highp float;
@@ -242,18 +245,8 @@ vec2 dfMap(vec3 p, float energy, float bass, float tension, float climaxPhase,
   return vec2(nearest, matId);
 }
 
-// ─── Normal estimation (tetrahedron technique) ───
-vec3 dfNormal(vec3 p, float energy, float bass, float tension, float climaxPhase,
-              float climaxIntensity, float prismAngle, float sJam, float sSpace,
-              float sChorus, float crowdCount) {
-  vec2 offset = vec2(0.002, 0.0);
-  float d = dfMap(p, energy, bass, tension, climaxPhase, climaxIntensity, prismAngle, sJam, sSpace, sChorus, crowdCount).x;
-  return normalize(vec3(
-    dfMap(p + offset.xyy, energy, bass, tension, climaxPhase, climaxIntensity, prismAngle, sJam, sSpace, sChorus, crowdCount).x - d,
-    dfMap(p + offset.yxy, energy, bass, tension, climaxPhase, climaxIntensity, prismAngle, sJam, sSpace, sChorus, crowdCount).x - d,
-    dfMap(p + offset.yyx, energy, bass, tension, climaxPhase, climaxIntensity, prismAngle, sJam, sSpace, sChorus, crowdCount).x - d
-  ));
-}
+// ─── Normal (shared raymarching utility) ───
+${dfNormalGLSL}
 
 // ─── Volumetric light beam accumulator ───
 vec3 dfBeamVolume(vec3 ro, vec3 rd, float energy, float bass, float beamCount,
@@ -459,8 +452,7 @@ void main() {
   // ─── Shading ───
   if (marchHit) {
     vec3 marchPos = ro + rd * marchT;
-    vec3 norm = dfNormal(marchPos, energy, bass, tension, climaxPhase, climaxIntensity,
-                         prismAngle, sJam, sSpace, sChorus, crowdCount);
+    vec3 norm = dfNormal(marchPos);
     vec3 lightDir = normalize(vec3(0.3, 1.0, -0.5));
 
     // Basic diffuse + specular

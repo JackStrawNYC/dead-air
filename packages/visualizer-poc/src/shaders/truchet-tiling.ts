@@ -30,6 +30,7 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
+import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
 
 export const truchetTilingVert = /* glsl */ `
 varying vec2 vUv;
@@ -38,6 +39,9 @@ void main() {
   gl_Position = vec4(position, 1.0);
 }
 `;
+
+const ttNormalGLSL = buildRaymarchNormal("ttMap($P, basePipeRadius, baseFluidRadius, tension, flowPhase, burstAmount, pressureWave, pressureOrigin).x", { eps: 0.003, name: "ttNormal" });
+const ttAOGLSL = buildRaymarchAO("ttMap($P, basePipeRadius, baseFluidRadius, tension, flowPhase, burstAmount, pressureWave, pressureOrigin).x", { steps: 5, stepBase: 0.0, stepScale: 0.02, weightDecay: 0.85, finalMult: 6.0, name: "ttOcclusion" });
 
 export const truchetTilingFrag = /* glsl */ `
 precision highp float;
@@ -252,38 +256,8 @@ vec2 ttMarch(vec3 rayOrigin, vec3 rayDir, float pipeRadius, float fluidRadius,
   return vec2(traveled, matId);
 }
 
-// ─── Normal via central differences ───
-vec3 ttNormal(vec3 pos, float pipeRadius, float fluidRadius, float tension,
-              float flowPhase, float burstAmount, float pressureWave, vec3 pressureOrigin) {
-  vec2 offset = vec2(0.003, 0.0);
-  float d = ttMap(pos, pipeRadius, fluidRadius, tension, flowPhase,
-                  burstAmount, pressureWave, pressureOrigin).x;
-  vec3 n = d - vec3(
-    ttMap(pos - offset.xyy, pipeRadius, fluidRadius, tension, flowPhase,
-          burstAmount, pressureWave, pressureOrigin).x,
-    ttMap(pos - offset.yxy, pipeRadius, fluidRadius, tension, flowPhase,
-          burstAmount, pressureWave, pressureOrigin).x,
-    ttMap(pos - offset.yyx, pipeRadius, fluidRadius, tension, flowPhase,
-          burstAmount, pressureWave, pressureOrigin).x
-  );
-  return normalize(n);
-}
-
-// ─── Ambient occlusion (5-tap) ───
-float ttOcclusion(vec3 pos, vec3 norm, float pipeRadius, float fluidRadius,
-                  float tension, float flowPhase, float burstAmount,
-                  float pressureWave, vec3 pressureOrigin) {
-  float occ = 0.0;
-  float weight = 1.0;
-  for (int i = 1; i <= 5; i++) {
-    float dist = 0.02 * float(i);
-    float d = ttMap(pos + norm * dist, pipeRadius, fluidRadius, tension,
-                    flowPhase, burstAmount, pressureWave, pressureOrigin).x;
-    occ += (dist - d) * weight;
-    weight *= 0.85;
-  }
-  return clamp(1.0 - occ * 6.0, 0.0, 1.0);
-}
+${ttNormalGLSL}
+${ttAOGLSL}
 
 // ─── Fluid glow (volumetric accumulation along ray) ───
 vec3 ttFluid(vec3 rayOrigin, vec3 rayDir, float maxT, float flowPhase,
@@ -504,16 +478,14 @@ void main() {
     vec3 surfPos = camOrigin + rayDir * travelDist;
 
     // Normal
-    vec3 surfNorm = ttNormal(surfPos, basePipeRadius, baseFluidRadius, tension,
-                             flowPhase, burstAmount, pressureWave, pressureOrigin);
+    vec3 surfNorm = ttNormal(surfPos);
 
     // Light direction: follows camera loosely + fixed fill
     vec3 lightDir1 = normalize(vec3(0.5, 0.8, -0.3) + camForward * 0.3);
     vec3 lightDir2 = normalize(vec3(-0.3, -0.2, 0.8));
 
     // Ambient occlusion
-    float occVal = ttOcclusion(surfPos, surfNorm, basePipeRadius, baseFluidRadius,
-                               tension, flowPhase, burstAmount, pressureWave, pressureOrigin);
+    float occVal = ttOcclusion(surfPos, surfNorm);
 
     // Main shading
     vec3 surfCol = ttPipe(surfPos, surfNorm, rayDir, lightDir1, matId,

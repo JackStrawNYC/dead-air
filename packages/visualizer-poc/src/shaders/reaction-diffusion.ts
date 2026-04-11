@@ -35,6 +35,7 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
+import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
 
 export const reactionDiffusionVert = /* glsl */ `
 varying vec2 vUv;
@@ -43,6 +44,9 @@ void main() {
   gl_Position = vec4(position, 1.0);
 }
 `;
+
+const rd2NormalGLSL = buildRaymarchNormal("rd2Map($P, bass, energy, tension, stability, flowTime)", { eps: 0.005, name: "rd2Normal" });
+const rd2AOGLSL = buildRaymarchAO("rd2Map($P, bass, energy, tension, stability, flowTime)", { steps: 5, stepBase: -0.10, stepScale: 0.12, weightDecay: 0.65, finalMult: 2.5, name: "rd2AmbientOcclusion" });
 
 const postProcess = buildPostProcessGLSL({
   grainStrength: "normal",
@@ -208,30 +212,8 @@ float rd2Map(vec3 pos, float bass, float energy, float tension, float stability,
   return rd2Cave(pos, bass, energy, tension, stability, time);
 }
 
-// ─── Normal Estimation via Central Differences ───
-vec3 rd2Normal(vec3 pos, float bass, float energy, float tension, float stability, float time) {
-  float eps = 0.005;
-  float d = rd2Map(pos, bass, energy, tension, stability, time);
-  return normalize(vec3(
-    rd2Map(pos + vec3(eps, 0.0, 0.0), bass, energy, tension, stability, time) - d,
-    rd2Map(pos + vec3(0.0, eps, 0.0), bass, energy, tension, stability, time) - d,
-    rd2Map(pos + vec3(0.0, 0.0, eps), bass, energy, tension, stability, time) - d
-  ));
-}
-
-// ─── Ambient Occlusion (5-sample) ───
-float rd2AmbientOcclusion(vec3 pos, vec3 norm, float bass, float energy, float tension,
-                          float stability, float time) {
-  float occ = 0.0;
-  float sca = 1.0;
-  for (int i = 0; i < 5; i++) {
-    float h = 0.02 + 0.12 * float(i);
-    float d = rd2Map(pos + norm * h, bass, energy, tension, stability, time);
-    occ += (h - d) * sca;
-    sca *= 0.65;
-  }
-  return clamp(1.0 - 2.5 * occ, 0.0, 1.0);
-}
+${rd2NormalGLSL}
+${rd2AOGLSL}
 
 void main() {
   vec2 uv = vUv;
@@ -333,10 +315,10 @@ void main() {
 
   if (marchResult > 0.0) {
     vec3 surfPos = ro + rd * marchResult;
-    vec3 surfNorm = rd2Normal(surfPos, bass, energy, tension, stability, flowTime);
+    vec3 surfNorm = rd2Normal(surfPos);
 
     // --- Ambient occlusion ---
-    float occl = rd2AmbientOcclusion(surfPos, surfNorm, bass, energy, tension, stability, flowTime);
+    float occl = rd2AmbientOcclusion(surfPos, surfNorm);
 
     // --- Bioluminescent emission ---
     float glowAmount = rd2Glow(surfPos, energy, tension, stability, flowTime, sChorus, sSpace, drumOnset);

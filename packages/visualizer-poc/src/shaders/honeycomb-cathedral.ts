@@ -19,6 +19,7 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
+import { buildRaymarchNormal } from "./shared/raymarching.glsl";
 
 export const honeycombCathedralVert = /* glsl */ `
 varying vec2 vUv;
@@ -35,6 +36,8 @@ const postProcess = buildPostProcessGLSL({
   eraGradingEnabled: true,
   lensDistortionEnabled: true,
 });
+
+const hcNormalGLSL = buildRaymarchNormal("hcMap($P, energy, bass, hcTime, tension, melPitch, sJam, sSpace, climB, drumOn)", { eps: 0.002, name: "hcNormal" });
 
 export const honeycombCathedralFrag = /* glsl */ `
 precision highp float;
@@ -182,6 +185,9 @@ float hcMap(vec3 pos, float energy, float bass, float hcTime, float tension,
   return scene;
 }
 
+// ─── Normal (shared raymarching utility) ───
+${hcNormalGLSL}
+
 // ─── Subsurface scattering approximation for amber/honey ───
 vec3 hcSubsurface(vec3 pos, vec3 norm, vec3 lightDir, vec3 viewDir,
                   float thick, vec3 sssColor, float vocalWarm) {
@@ -286,14 +292,8 @@ void main() {
   vec3 col = vec3(0.0);
 
   if (wasHit) {
-    // ─── Normal via central differences ───
-    vec2 eps = vec2(0.002, 0.0);
-    float d0 = hcMap(hitPos, energy, bass, hcTime, tension, melPitch, sJam, sSpace, climB, drumOn);
-    vec3 norm = normalize(vec3(
-      hcMap(hitPos + eps.xyy, energy, bass, hcTime, tension, melPitch, sJam, sSpace, climB, drumOn) - d0,
-      hcMap(hitPos + eps.yxy, energy, bass, hcTime, tension, melPitch, sJam, sSpace, climB, drumOn) - d0,
-      hcMap(hitPos + eps.yyx, energy, bass, hcTime, tension, melPitch, sJam, sSpace, climB, drumOn) - d0
-    ));
+    // ─── Normal (shared raymarching utility) ───
+    vec3 norm = hcNormal(hitPos);
 
     // ─── Lighting ───
     // Primary light: golden light source ahead in tunnel
