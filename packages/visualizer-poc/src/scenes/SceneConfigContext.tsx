@@ -5,12 +5,15 @@
 
 import { createContext, useContext } from "react";
 import { type CameraProfile, DEFAULT_CAMERA_PROFILE } from "../config/camera-profiles";
+import type { ShaderParameterProfile } from "../config/shader-parameters";
 
 export interface SceneConfig {
   /** Post-process grading intensity (0-1, default 1.0). Lower = more raw color. */
   gradingIntensity: number;
   /** Camera behavior profile. Default: DEFAULT_CAMERA_PROFILE */
   cameraProfile?: CameraProfile;
+  /** Per-song shader parameter modulation. Defaults to identity (1.0 scales, 0.0 biases). */
+  shaderParams?: ShaderParameterProfile;
 }
 
 const DEFAULT_CONFIG: SceneConfig = {

@@ -4,7 +4,7 @@
  * Provides audio data context for child Three.js components.
  */
 
-import React, { createContext, useContext, useMemo } from "react";
+import React, { createContext, useContext, useMemo, useRef } from "react";
 import { ThreeCanvas } from "@remotion/three";
 import { useCurrentFrame, useVideoConfig } from "remotion";
 import type { EnhancedFrameData, SectionBoundary, ColorPalette } from "../data/types";
@@ -19,6 +19,7 @@ import { useJamPhase } from "../data/JamPhaseContext";
 import { usePeakOfShow } from "../data/PeakOfShowContext";
 import { useTimeDilation } from "../data/TimeDilationContext";
 import { useDeadAirFactor } from "../data/DeadAirContext";
+import { GaussianSmoother } from "../utils/gaussian-smoother";
 
 /** Audio data context passed to all Three.js children */
 export interface AudioDataContext {
@@ -341,12 +342,155 @@ interface Props {
 
 const DEFAULT_PALETTE: ColorPalette = { primary: 210, secondary: 270 };
 
+/**
+ * Named smoother bank: one GaussianSmoother per smoothed audio feature.
+ * Created once per component mount via useRef. On seek (non-sequential frame),
+ * each smoother falls back to brute-force recompute so the ring buffer is
+ * re-seeded and subsequent sequential frames are O(window) again.
+ */
+interface SmootherBank {
+  energy: GaussianSmoother;          // 15
+  chromaHue: GaussianSmoother;       // 15
+  flatness: GaussianSmoother;        // 15
+  stemBassA: GaussianSmoother;       // 10 (stemBassRms path)
+  stemBassB: GaussianSmoother;       // 10 (sub+low fallback path)
+  fastEnergy: GaussianSmoother;      // 6
+  fastBass: GaussianSmoother;        // 5
+  vocalEnergy: GaussianSmoother;     // 12
+  vocalPresence: GaussianSmoother;   // 20
+  otherEnergyA: GaussianSmoother;    // 10 (stemOtherRms path)
+  otherEnergyB: GaussianSmoother;    // 10 (mid+high fallback)
+  otherCentroidA: GaussianSmoother;  // 15 (stemOtherCentroid path)
+  otherCentroidB: GaussianSmoother;  // 15 (centroid fallback)
+  climaxEnergy: GaussianSmoother;    // 25
+  rms: GaussianSmoother;             // 12
+  centroid: GaussianSmoother;        // 18
+  bass: GaussianSmoother;            // 12
+  mids: GaussianSmoother;            // 12
+  highs: GaussianSmoother;           // 10
+  onset: GaussianSmoother;           // 12
+  slowEnergy: GaussianSmoother;      // 90
+  localTempo: GaussianSmoother;      // 30
+  melodicPitch: GaussianSmoother;    // 8
+  melodicDirection: GaussianSmoother; // 12
+  harmonicTension: GaussianSmoother; // 15
+  chordConfidence: GaussianSmoother; // 10
+  improvScore: GaussianSmoother;     // 30
+  beatConfidence: GaussianSmoother;  // 20
+  melodicConfidence: GaussianSmoother; // 20
+  tempoDerivative: GaussianSmoother; // 10
+  dynamicRange: GaussianSmoother;    // 15
+  spaceScore: GaussianSmoother;      // 20
+  timbralBrightness: GaussianSmoother; // 12
+  timbralFlux: GaussianSmoother;     // 8
+  vocalPitch: GaussianSmoother;      // 8
+  vocalPitchConfidence: GaussianSmoother; // 10
+  semanticPsychedelic: GaussianSmoother;  // 15
+  semanticAggressive: GaussianSmoother;   // 15
+  semanticTender: GaussianSmoother;       // 15
+  semanticCosmic: GaussianSmoother;       // 15
+  semanticRhythmic: GaussianSmoother;     // 15
+  semanticAmbient: GaussianSmoother;      // 15
+  semanticChaotic: GaussianSmoother;      // 15
+  semanticTriumphant: GaussianSmoother;   // 15
+  contrast0: GaussianSmoother;       // 12
+  contrast1: GaussianSmoother;       // 12
+  contrast2: GaussianSmoother;       // 12
+  contrast3: GaussianSmoother;       // 12
+  contrast4: GaussianSmoother;       // 12
+  contrast5: GaussianSmoother;       // 12
+  contrast6: GaussianSmoother;       // 12
+}
+
+function createSmootherBank(): SmootherBank {
+  return {
+    energy: new GaussianSmoother(15),
+    chromaHue: new GaussianSmoother(15),
+    flatness: new GaussianSmoother(15),
+    stemBassA: new GaussianSmoother(10),
+    stemBassB: new GaussianSmoother(10),
+    fastEnergy: new GaussianSmoother(6),
+    fastBass: new GaussianSmoother(5),
+    vocalEnergy: new GaussianSmoother(12),
+    vocalPresence: new GaussianSmoother(20),
+    otherEnergyA: new GaussianSmoother(10),
+    otherEnergyB: new GaussianSmoother(10),
+    otherCentroidA: new GaussianSmoother(15),
+    otherCentroidB: new GaussianSmoother(15),
+    climaxEnergy: new GaussianSmoother(25),
+    rms: new GaussianSmoother(12),
+    centroid: new GaussianSmoother(18),
+    bass: new GaussianSmoother(12),
+    mids: new GaussianSmoother(12),
+    highs: new GaussianSmoother(10),
+    onset: new GaussianSmoother(12),
+    slowEnergy: new GaussianSmoother(90),
+    localTempo: new GaussianSmoother(30),
+    melodicPitch: new GaussianSmoother(8),
+    melodicDirection: new GaussianSmoother(12),
+    harmonicTension: new GaussianSmoother(15),
+    chordConfidence: new GaussianSmoother(10),
+    improvScore: new GaussianSmoother(30),
+    beatConfidence: new GaussianSmoother(20),
+    melodicConfidence: new GaussianSmoother(20),
+    tempoDerivative: new GaussianSmoother(10),
+    dynamicRange: new GaussianSmoother(15),
+    spaceScore: new GaussianSmoother(20),
+    timbralBrightness: new GaussianSmoother(12),
+    timbralFlux: new GaussianSmoother(8),
+    vocalPitch: new GaussianSmoother(8),
+    vocalPitchConfidence: new GaussianSmoother(10),
+    semanticPsychedelic: new GaussianSmoother(15),
+    semanticAggressive: new GaussianSmoother(15),
+    semanticTender: new GaussianSmoother(15),
+    semanticCosmic: new GaussianSmoother(15),
+    semanticRhythmic: new GaussianSmoother(15),
+    semanticAmbient: new GaussianSmoother(15),
+    semanticChaotic: new GaussianSmoother(15),
+    semanticTriumphant: new GaussianSmoother(15),
+    contrast0: new GaussianSmoother(12),
+    contrast1: new GaussianSmoother(12),
+    contrast2: new GaussianSmoother(12),
+    contrast3: new GaussianSmoother(12),
+    contrast4: new GaussianSmoother(12),
+    contrast5: new GaussianSmoother(12),
+    contrast6: new GaussianSmoother(12),
+  };
+}
+
+/**
+ * Use a smoother: on sequential frames, update incrementally (O(window));
+ * on seek, brute-force recompute from full frame array (O(window) scan).
+ */
+function useSmoother(
+  smoother: GaussianSmoother,
+  frames: EnhancedFrameData[],
+  idx: number,
+  accessor: (f: EnhancedFrameData) => number,
+  isSeek: boolean,
+): number {
+  if (isSeek) {
+    return smoother.recompute(frames, idx, accessor);
+  }
+  return smoother.update(idx, accessor(frames[idx]));
+}
+
 export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, sections, palette, tempo, jamDensity, coherence: coherenceProp, isLocked: isLockedProp, snapToMusicalTime: snapToMusicalTimeProp }) => {
   const frameIdx = useCurrentFrame();
   const { fps, width, height } = useVideoConfig();
 
   const idx = Math.min(Math.max(0, frameIdx), frames.length - 1);
   const fd = frames[idx];
+
+  // Smoother bank: created once, persists across renders
+  const smoothersRef = useRef<SmootherBank>(createSmootherBank());
+  const lastFrameRef = useRef<number>(-1);
+
+  // Detect non-sequential frame access (Remotion can render any frame in any order)
+  const isSeek = lastFrameRef.current !== -1 && idx !== lastFrameRef.current + 1 && idx !== lastFrameRef.current;
+  lastFrameRef.current = idx;
+
+  const S = smoothersRef.current;
 
   // Pre-compute cumulative beat array (once per song, avoids O(n) per frame)
   const beatArray = useMemo(() => buildBeatArrayUtil(frames), [frames]);
@@ -411,11 +555,15 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
   const sectionList = sections ?? [];
   const { sectionIndex, sectionProgress } = findCurrentSection(sectionList, idx);
 
-  const energy = smoothValue(frames, idx, (f) => f.rms, 15);
+  const energy = useSmoother(S.energy, frames, idx, (f) => f.rms, isSeek);
   const egate = energyGate(energy);
-  const chromaHue = smoothValue(frames, idx, (f) => dominantChromaHue(f.chroma), 15);
-  const contrast = smoothContrast(frames, idx, 12);
-  const flatness = smoothValue(frames, idx, (f) => f.flatness, 15);
+  const chromaHue = useSmoother(S.chromaHue, frames, idx, (f) => dominantChromaHue(f.chroma), isSeek);
+  const contrast: number[] = [];
+  const contrastSmoothers = [S.contrast0, S.contrast1, S.contrast2, S.contrast3, S.contrast4, S.contrast5, S.contrast6];
+  for (let band = 0; band < 7; band++) {
+    contrast.push(useSmoother(contrastSmoothers[band], frames, idx, (f) => f.contrast[band], isSeek));
+  }
+  const flatness = useSmoother(S.flatness, frames, idx, (f) => f.flatness, isSeek);
 
   // Snappy transient envelopes: fast attack, slow exponential release, energy-gated
   const onsetSnap = transientEnvelope(frames, idx, (f) => f.onset, 18) * Math.max(0.35, egate);
@@ -424,8 +572,8 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
   // Stem-separated bass: use stemBassRms if available, else fallback to (sub+low)/2
   const hasStemBass = frames[idx].stemBassRms != null;
   const stemBass = hasStemBass
-    ? smoothValue(frames, idx, (f) => f.stemBassRms ?? 0, 10)
-    : smoothValue(frames, idx, (f) => f.sub + f.low, 10) * 0.5;
+    ? useSmoother(S.stemBassA, frames, idx, (f) => f.stemBassRms ?? 0, isSeek)
+    : useSmoother(S.stemBassB, frames, idx, (f) => f.sub + f.low, isSeek) * 0.5;
 
   // Key change detection + color afterglow
   const chromaShift = chromaShiftMagnitude(frames, idx);
@@ -434,26 +582,26 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
   // Fast-responding signals for transient punch. Was 15-frame window which is
   // identical to `energy` above (line 391) — fastEnergy provided no actual
   // distinction. New window is 6 frames (~0.2s) for genuine snap-attack.
-  const fastEnergy = smoothValue(frames, idx, (f) => f.rms, 6);
-  const fastBass = smoothValue(frames, idx, (f) => f.sub + f.low, 5) * 0.5;
+  const fastEnergy = useSmoother(S.fastEnergy, frames, idx, (f) => f.rms, isSeek);
+  const fastBass = useSmoother(S.fastBass, frames, idx, (f) => f.sub + f.low, isSeek) * 0.5;
   const drumOnset = transientEnvelope(frames, idx, (f) => f.stemDrumOnset ?? 0, 8) * Math.max(0.45, egate);
   const drumBeat = transientEnvelope(frames, idx, (f) => (f.stemDrumBeat ? 1 : 0), 18) * Math.max(0.45, egate);
   const spectralFlux = computeSpectralFlux(frames, idx, 8);
 
   // Stem-separated vocal + other features
-  const vocalEnergy = smoothValue(frames, idx, (f) => f.stemVocalRms ?? 0, 12);
-  const vocalPresence = smoothValue(frames, idx, (f) => f.stemVocalPresence ? 1 : 0, 20);
+  const vocalEnergy = useSmoother(S.vocalEnergy, frames, idx, (f) => f.stemVocalRms ?? 0, isSeek);
+  const vocalPresence = useSmoother(S.vocalPresence, frames, idx, (f) => f.stemVocalPresence ? 1 : 0, isSeek);
   const hasOtherStem = frames[idx].stemOtherRms != null;
   const otherEnergy = hasOtherStem
-    ? smoothValue(frames, idx, (f) => f.stemOtherRms ?? 0, 10)
-    : smoothValue(frames, idx, (f) => (f.mid + f.high) * 0.5, 10);
+    ? useSmoother(S.otherEnergyA, frames, idx, (f) => f.stemOtherRms ?? 0, isSeek)
+    : useSmoother(S.otherEnergyB, frames, idx, (f) => (f.mid + f.high) * 0.5, isSeek);
   const otherCentroid = hasOtherStem
-    ? smoothValue(frames, idx, (f) => f.stemOtherCentroid ?? 0, 15)
-    : smoothValue(frames, idx, (f) => f.centroid, 15);
+    ? useSmoother(S.otherCentroidA, frames, idx, (f) => f.stemOtherCentroid ?? 0, isSeek)
+    : useSmoother(S.otherCentroidB, frames, idx, (f) => f.centroid, isSeek);
 
   // Climax state for shader uniforms
   const phaseMap: Record<ClimaxPhase, number> = { idle: 0, build: 1, climax: 2, sustain: 3, release: 4 };
-  const climaxEnergy = smoothValue(frames, idx, (f) => f.rms, 25);
+  const climaxEnergy = useSmoother(S.climaxEnergy, frames, idx, (f) => f.rms, isSeek);
   const climaxState = computeClimaxState(frames, idx, sectionList, climaxEnergy);
   const climaxPhaseNum = phaseMap[climaxState.phase];
   const climaxMod = climaxModulation(climaxState);
@@ -477,33 +625,46 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
   const paletteSaturation = pal.saturation ?? 1;
 
   // New audio snapshot fields — smoothed for shader consumption
-  const melodicPitch = smoothValue(frames, idx, (f) => f.melodicPitch ?? 0, 8);
-  const melodicDirection = smoothValue(frames, idx, (f) => f.melodicDirection ?? 0, 12);
+  const melodicPitch = useSmoother(S.melodicPitch, frames, idx, (f) => f.melodicPitch ?? 0, isSeek);
+  const melodicDirection = useSmoother(S.melodicDirection, frames, idx, (f) => f.melodicDirection ?? 0, isSeek);
   const chordIndex = frames[idx].chordIndex ?? 0; // discrete, no smoothing
-  const harmonicTension = smoothValue(frames, idx, (f) => f.harmonicTension ?? 0, 15);
-  const chordConfidence = smoothValue(frames, idx, (f) => f.chordConfidence ?? 0.5, 10);
+  const harmonicTension = useSmoother(S.harmonicTension, frames, idx, (f) => f.harmonicTension ?? 0, isSeek);
+  const chordConfidence = useSmoother(S.chordConfidence, frames, idx, (f) => f.chordConfidence ?? 0.5, isSeek);
   const sectionTypeFloat = encodeSectionType(frames[idx].sectionType ?? "jam");
   const energyForecast = computeEnergyForecast(frames, idx);
   const peakApproaching = computePeakApproaching(frames, idx);
   const beatStabilityVal = computeBeatStability(frames, idx);
   const downbeatPulse = transientEnvelope(frames, idx, (f) => (f.downbeat ? 1 : 0), 12) * Math.max(0.4, egate);
-  const beatConfidenceSmooth = smoothValue(frames, idx, (f) => f.beatConfidence ?? 0.5, 20);
-  const melodicConfidenceSmooth = smoothValue(frames, idx, (f) => f.melodicConfidence ?? 0.5, 20);
-  const tempoDerivativeSmooth = smoothValue(frames, idx, (f) => f.tempoDerivative ?? 0, 10);
-  const dynamicRangeSmooth = smoothValue(frames, idx, (f) => f.dynamicRange ?? 0.5, 15);
-  const spaceScoreSmooth = smoothValue(frames, idx, (f) => f.spaceScore ?? 0, 20);
-  const timbralBrightnessSmooth = smoothValue(frames, idx, (f) => f.timbralBrightness ?? 0.5, 12);
-  const timbralFluxSmooth = smoothValue(frames, idx, (f) => f.timbralFlux ?? 0, 8);
-  const vocalPitchSmooth = smoothValue(frames, idx, (f) => f.vocalPitch ?? 0, 8);
-  const vocalPitchConfidenceSmooth = smoothValue(frames, idx, (f) => f.vocalPitchConfidence ?? 0, 10);
-  const semanticPsychedelicSmooth = smoothValue(frames, idx, (f) => f.semantic_psychedelic ?? 0, 15);
-  const semanticAggressiveSmooth = smoothValue(frames, idx, (f) => f.semantic_aggressive ?? 0, 15);
-  const semanticTenderSmooth = smoothValue(frames, idx, (f) => f.semantic_tender ?? 0, 15);
-  const semanticCosmicSmooth = smoothValue(frames, idx, (f) => f.semantic_cosmic ?? 0, 15);
-  const semanticRhythmicSmooth = smoothValue(frames, idx, (f) => f.semantic_rhythmic ?? 0, 15);
-  const semanticAmbientSmooth = smoothValue(frames, idx, (f) => f.semantic_ambient ?? 0, 15);
-  const semanticChaoticSmooth = smoothValue(frames, idx, (f) => f.semantic_chaotic ?? 0, 15);
-  const semanticTriumphantSmooth = smoothValue(frames, idx, (f) => f.semantic_triumphant ?? 0, 15);
+  const beatConfidenceSmooth = useSmoother(S.beatConfidence, frames, idx, (f) => f.beatConfidence ?? 0.5, isSeek);
+  const melodicConfidenceSmooth = useSmoother(S.melodicConfidence, frames, idx, (f) => f.melodicConfidence ?? 0.5, isSeek);
+  const tempoDerivativeSmooth = useSmoother(S.tempoDerivative, frames, idx, (f) => f.tempoDerivative ?? 0, isSeek);
+  const dynamicRangeSmooth = useSmoother(S.dynamicRange, frames, idx, (f) => f.dynamicRange ?? 0.5, isSeek);
+  const spaceScoreSmooth = useSmoother(S.spaceScore, frames, idx, (f) => f.spaceScore ?? 0, isSeek);
+  const timbralBrightnessSmooth = useSmoother(S.timbralBrightness, frames, idx, (f) => f.timbralBrightness ?? 0.5, isSeek);
+  const timbralFluxSmooth = useSmoother(S.timbralFlux, frames, idx, (f) => f.timbralFlux ?? 0, isSeek);
+  const vocalPitchSmooth = useSmoother(S.vocalPitch, frames, idx, (f) => f.vocalPitch ?? 0, isSeek);
+  const vocalPitchConfidenceSmooth = useSmoother(S.vocalPitchConfidence, frames, idx, (f) => f.vocalPitchConfidence ?? 0, isSeek);
+  const semanticPsychedelicSmooth = useSmoother(S.semanticPsychedelic, frames, idx, (f) => f.semantic_psychedelic ?? 0, isSeek);
+  const semanticAggressiveSmooth = useSmoother(S.semanticAggressive, frames, idx, (f) => f.semantic_aggressive ?? 0, isSeek);
+  const semanticTenderSmooth = useSmoother(S.semanticTender, frames, idx, (f) => f.semantic_tender ?? 0, isSeek);
+  const semanticCosmicSmooth = useSmoother(S.semanticCosmic, frames, idx, (f) => f.semantic_cosmic ?? 0, isSeek);
+  const semanticRhythmicSmooth = useSmoother(S.semanticRhythmic, frames, idx, (f) => f.semantic_rhythmic ?? 0, isSeek);
+  const semanticAmbientSmooth = useSmoother(S.semanticAmbient, frames, idx, (f) => f.semantic_ambient ?? 0, isSeek);
+  const semanticChaoticSmooth = useSmoother(S.semanticChaotic, frames, idx, (f) => f.semantic_chaotic ?? 0, isSeek);
+  const semanticTriumphantSmooth = useSmoother(S.semanticTriumphant, frames, idx, (f) => f.semantic_triumphant ?? 0, isSeek);
+
+  // Pre-compute remaining smoothed values that were previously inline in the audioData literal
+  const smoothRms = useSmoother(S.rms, frames, idx, (f) => f.rms, isSeek);
+  const smoothCentroid = useSmoother(S.centroid, frames, idx, (f) => f.centroid, isSeek);
+  const smoothBass = useSmoother(S.bass, frames, idx, (f) => f.sub + f.low, isSeek) * 0.5 * (0.6 + 0.4 * egate);
+  const smoothMids = useSmoother(S.mids, frames, idx, (f) => f.mid, isSeek);
+  const smoothHighs = useSmoother(S.highs, frames, idx, (f) => f.high, isSeek);
+  const smoothOnset = useSmoother(S.onset, frames, idx, (f) => f.onset, isSeek);
+  // 90-frame Gaussian (~3s) instead of 180 (~6s) — still smooth enough for
+  // ambient drift signals but no longer lags major dynamic shifts by 6 seconds
+  const slowEnergy = useSmoother(S.slowEnergy, frames, idx, (f) => f.rms, isSeek);
+  const localTempoSmooth = useSmoother(S.localTempo, frames, idx, (f) => f.localTempo ?? (tempo ?? 120), isSeek);
+  const improvScoreSmooth = useSmoother(S.improvScore, frames, idx, (f) => f.improvisationScore ?? 0, isSeek);
 
   const audioData: AudioDataContext = {
     frame: fd,
@@ -511,12 +672,12 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
     time: frameIdx / fps,
     beatDecay: beatDecay(frames, idx) * Math.max(0.4, egate),
     smooth: {
-      rms: smoothValue(frames, idx, (f) => f.rms, 12),
-      centroid: smoothValue(frames, idx, (f) => f.centroid, 18),
-      bass: smoothValue(frames, idx, (f) => f.sub + f.low, 12) * 0.5 * (0.6 + 0.4 * egate),
-      mids: smoothValue(frames, idx, (f) => f.mid, 12),
-      highs: smoothValue(frames, idx, (f) => f.high, 10),
-      onset: smoothValue(frames, idx, (f) => f.onset, 12),
+      rms: smoothRms,
+      centroid: smoothCentroid,
+      bass: smoothBass,
+      mids: smoothMids,
+      highs: smoothHighs,
+      onset: smoothOnset,
       energy,
       sectionProgress,
       sectionIndex,
@@ -527,9 +688,7 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
       beatSnap,
       chromaShift,
       afterglowHue,
-      // 90-frame Gaussian (~3s) instead of 180 (~6s) — still smooth enough for
-      // ambient drift signals but no longer lags major dynamic shifts by 6 seconds
-      slowEnergy: smoothValue(frames, idx, (f) => f.rms, 90),
+      slowEnergy,
       stemBass,
       chroma: Array.from(fd.chroma),
       fastEnergy,
@@ -543,7 +702,7 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
       otherCentroid,
       energyAcceleration: computeEnergyAcceleration(frames, idx),
       energyTrend: computeEnergyTrend(frames, idx),
-      localTempo: smoothValue(frames, idx, (f) => f.localTempo ?? (tempo ?? 120), 30),
+      localTempo: localTempoSmooth,
       melodicPitch,
       melodicDirection,
       chordIndex,
@@ -553,7 +712,7 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
       energyForecast,
       peakApproaching,
       beatStability: beatStabilityVal,
-      improvisationScore: smoothValue(frames, idx, (f) => f.improvisationScore ?? 0, 30),
+      improvisationScore: improvScoreSmooth,
       downbeat: downbeatPulse,
       beatConfidence: beatConfidenceSmooth,
       melodicConfidence: melodicConfidenceSmooth,

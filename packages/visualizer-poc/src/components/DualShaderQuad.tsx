@@ -12,19 +12,15 @@ import { useFrame, useThree } from "@react-three/fiber";
 import { useVideoConfig } from "remotion";
 import { useAudioData } from "./AudioReactiveCanvas";
 import { useShowContext } from "../data/ShowContext";
-import { deriveFilmStock, type FilmStockParams } from "../utils/show-film-stock";
-import { getVenueProfile, type VenueProfile } from "../utils/venue-profiles";
-import { compute3DCamera } from "../utils/camera-3d";
+import { deriveFilmStock } from "../utils/show-film-stock";
+import { getVenueProfile } from "../utils/venue-profiles";
 import { useSceneConfig } from "../scenes/SceneConfigContext";
 import { dualBlendVert, dualBlendFrag } from "../shaders/dual-blend";
 import { useEnvelopeValues } from "../data/EnvelopeContext";
-import { fxaaVert, fxaaFrag } from "../shaders/shared/fxaa.glsl";
+import { fxaaFrag } from "../shaders/shared/fxaa.glsl";
 import { gpuMonitor } from "../utils/gpu-monitor";
-
-/** Era values — same as FullscreenQuad */
-const ERA_SATURATION: Record<string, number> = { primal: 0.70, classic: 0.90, hiatus: 0.75, touch_of_grey: 1.15, revival: 0.95 };
-const ERA_BRIGHTNESS: Record<string, number> = { primal: 0.97, classic: 1.0, hiatus: 0.95, touch_of_grey: 1.01, revival: 1.0 };
-const ERA_SEPIA: Record<string, number> = { primal: 0.15, classic: 0.0, hiatus: 0.0, touch_of_grey: 0.0, revival: 0.0 };
+import { DEFAULT_LIGHTING, type LightingState } from "../utils/lighting-context";
+import { createBaseUniforms, syncBaseUniforms, ERA_SATURATION, ERA_BRIGHTNESS, ERA_SEPIA } from "../utils/shader-uniforms";
 
 export type DualBlendMode =
   | "luminance_key"
@@ -60,178 +56,9 @@ void main() {
 }
 `;
 
-/** Create audio uniforms matching FullscreenQuad (without FFT texture for simplicity) */
-function createSceneUniforms(width: number, height: number): Record<string, THREE.IUniform> {
-  return {
-    uTime: { value: 0 }, uDynamicTime: { value: 0 },
-    uBass: { value: 0 }, uRms: { value: 0 }, uCentroid: { value: 0 },
-    uHighs: { value: 0 }, uOnset: { value: 0 }, uBeat: { value: 0 },
-    uMids: { value: 0 }, uResolution: { value: new THREE.Vector2(width, height) },
-    uEnergy: { value: 0 }, uSectionProgress: { value: 0 }, uSectionIndex: { value: 0 },
-    uChromaHue: { value: 0 }, uFlatness: { value: 0 },
-    uPalettePrimary: { value: 0 }, uPaletteSecondary: { value: 0 }, uPaletteSaturation: { value: 1 },
-    uTempo: { value: 120 }, uOnsetSnap: { value: 0 }, uBeatSnap: { value: 0 },
-    uChromaShift: { value: 0 }, uAfterglowHue: { value: 0 },
-    uMusicalTime: { value: 0 }, uClimaxPhase: { value: 0 }, uClimaxIntensity: { value: 0 },
-    uSlowEnergy: { value: 0 }, uStemBass: { value: 0 },
-    uContrast0: { value: new THREE.Vector4(0, 0, 0, 0) },
-    uContrast1: { value: new THREE.Vector4(0, 0, 0, 0) },
-    uChroma0: { value: new THREE.Vector4(0, 0, 0, 0) },
-    uChroma1: { value: new THREE.Vector4(0, 0, 0, 0) },
-    uChroma2: { value: new THREE.Vector4(0, 0, 0, 0) },
-    uCamOffset: { value: new THREE.Vector2(0, 0) },
-    uJamDensity: { value: 0.5 }, uJamPhase: { value: -1 }, uJamProgress: { value: 0 },
-    uCoherence: { value: 0 },
-    uFastEnergy: { value: 0 }, uFastBass: { value: 0 },
-    uDrumOnset: { value: 0 }, uDrumBeat: { value: 0 },
-    uSpectralFlux: { value: 0 },
-    uVocalEnergy: { value: 0 }, uVocalPresence: { value: 0 },
-    uOtherEnergy: { value: 0 }, uOtherCentroid: { value: 0 },
-    uSnapToMusicalTime: { value: 0 },
-    uEraSaturation: { value: 1.0 }, uEraBrightness: { value: 1.0 }, uEraSepia: { value: 0.0 },
-    uBloomThreshold: { value: 0.0 }, uLensDistortion: { value: 0.0 }, uGradingIntensity: { value: 1.0 },
-    uEnergyAccel: { value: 0 }, uEnergyTrend: { value: 0 }, uLocalTempo: { value: 120 },
-    uFFTTexture: { value: new THREE.DataTexture(new Uint8Array(64), 64, 1, THREE.RedFormat) },
-    uMelodicPitch: { value: 0 }, uMelodicDirection: { value: 0 },
-    uChordIndex: { value: 0 }, uHarmonicTension: { value: 0 }, uChordConfidence: { value: 0.5 },
-    uSectionType: { value: 5 }, uEnergyForecast: { value: 0 },
-    uPeakApproaching: { value: 0 }, uBeatStability: { value: 0.5 },
-    uImprovisationScore: { value: 0 },
-    uDownbeat: { value: 0 }, uBeatConfidence: { value: 0.5 }, uMelodicConfidence: { value: 0.5 },
-    uPeakOfShow: { value: 0 },
-    uHeroIconTrigger: { value: 0 }, uHeroIconProgress: { value: 0 },
-    uShowWarmth: { value: 0 }, uShowContrast: { value: 1 },
-    uShowSaturation: { value: 0 }, uShowGrain: { value: 1 }, uShowBloom: { value: 1 },
-    uVenueVignette: { value: 0.5 },
-    uCamPos: { value: new THREE.Vector3(0, 0, -3.5) },
-    uCamTarget: { value: new THREE.Vector3(0, 0, 0) },
-    uCamFov: { value: 50 }, uCamDof: { value: 0 }, uCamFocusDist: { value: 3 },
-    uEnvelopeBrightness: { value: 1 }, uEnvelopeSaturation: { value: 1 }, uEnvelopeHue: { value: 0 },
-  };
-}
-
-/** Sync uniform values from audio data (mirrors FullscreenQuad per-frame updates) */
-function syncUniforms(
-  u: Record<string, THREE.IUniform>,
-  time: number, dynamicTime: number, beatDecay: number,
-  smooth: Record<string, number | number[]>,
-  palettePrimary: number, paletteSecondary: number, paletteSaturation: number,
-  tempo: number, musicalTime: number,
-  climaxPhase: number, climaxIntensity: number,
-  heroTrigger: number, heroProgress: number,
-  jamDensity: number, jamPhase: number, jamProgress: number, coherence: number, isLocked: boolean,
-  eraSaturation: number, eraBrightness: number, eraSepia: number,
-  filmStock: FilmStockParams, venueProfile: VenueProfile,
-  width: number, height: number,
-  gradingIntensity = 1.0,
-  peakOfShow = 0,
-  envelope: { brightness: number; saturation: number; hue: number } = { brightness: 1, saturation: 1, hue: 0 },
-  cameraProfile?: import("../config/camera-profiles").CameraProfile,
-) {
-  u.uTime.value = time;
-  u.uDynamicTime.value = dynamicTime;
-  u.uBass.value = smooth.bass;
-  u.uRms.value = smooth.rms;
-  u.uCentroid.value = smooth.centroid;
-  u.uHighs.value = smooth.highs;
-  u.uOnset.value = smooth.onset;
-  u.uBeat.value = beatDecay;
-  u.uMids.value = smooth.mids;
-  (u.uResolution.value as THREE.Vector2).set(width, height);
-  u.uEnergy.value = smooth.energy;
-  u.uSectionProgress.value = smooth.sectionProgress;
-  u.uSectionIndex.value = smooth.sectionIndex;
-  u.uChromaHue.value = smooth.chromaHue;
-  u.uFlatness.value = smooth.flatness;
-  u.uPalettePrimary.value = palettePrimary;
-  u.uPaletteSecondary.value = paletteSecondary;
-  u.uPaletteSaturation.value = paletteSaturation;
-  u.uTempo.value = tempo;
-  u.uOnsetSnap.value = smooth.onsetSnap;
-  u.uBeatSnap.value = smooth.beatSnap;
-  u.uChromaShift.value = smooth.chromaShift;
-  u.uAfterglowHue.value = smooth.afterglowHue;
-  u.uMusicalTime.value = musicalTime;
-  u.uClimaxPhase.value = climaxPhase;
-  u.uClimaxIntensity.value = climaxIntensity;
-  u.uJamDensity.value = jamDensity;
-  u.uJamPhase.value = jamPhase;
-  u.uJamProgress.value = jamProgress;
-  u.uCoherence.value = coherence;
-  u.uSlowEnergy.value = smooth.slowEnergy;
-  u.uStemBass.value = smooth.stemBass;
-  u.uFastEnergy.value = smooth.fastEnergy;
-  u.uFastBass.value = smooth.fastBass;
-  u.uDrumOnset.value = smooth.drumOnset;
-  u.uDrumBeat.value = smooth.drumBeat;
-  u.uSpectralFlux.value = smooth.spectralFlux;
-  u.uVocalEnergy.value = smooth.vocalEnergy;
-  u.uVocalPresence.value = smooth.vocalPresence;
-  u.uOtherEnergy.value = smooth.otherEnergy;
-  u.uOtherCentroid.value = smooth.otherCentroid;
-  u.uSnapToMusicalTime.value = isLocked ? 1.0 : 0.0;
-  u.uEraSaturation.value = eraSaturation;
-  u.uEraBrightness.value = eraBrightness;
-  u.uEraSepia.value = eraSepia;
-  u.uBloomThreshold.value = -0.08 - (smooth.energy as number) * 0.18;
-  u.uLensDistortion.value = 0.02 + (smooth.energy as number) * 0.06;
-  u.uGradingIntensity.value = gradingIntensity;
-  u.uEnergyAccel.value = smooth.energyAcceleration;
-  u.uEnergyTrend.value = smooth.energyTrend;
-  u.uLocalTempo.value = smooth.localTempo;
-  u.uMelodicPitch.value = smooth.melodicPitch;
-  u.uMelodicDirection.value = smooth.melodicDirection;
-  u.uChordIndex.value = smooth.chordIndex;
-  u.uHarmonicTension.value = smooth.harmonicTension;
-  u.uChordConfidence.value = smooth.chordConfidence;
-  u.uSectionType.value = smooth.sectionTypeFloat;
-  u.uEnergyForecast.value = smooth.energyForecast;
-  u.uPeakApproaching.value = smooth.peakApproaching;
-  u.uBeatStability.value = smooth.beatStability;
-  u.uImprovisationScore.value = smooth.improvisationScore ?? 0;
-  u.uDownbeat.value = smooth.downbeat;
-  u.uBeatConfidence.value = smooth.beatConfidence;
-  u.uMelodicConfidence.value = smooth.melodicConfidence ?? 0.5;
-  u.uPeakOfShow.value = peakOfShow;
-  u.uHeroIconTrigger.value = heroTrigger;
-  u.uHeroIconProgress.value = heroProgress;
-  u.uShowWarmth.value = filmStock.warmth + venueProfile.warmth;
-  u.uShowContrast.value = filmStock.contrast;
-  u.uShowSaturation.value = filmStock.saturation;
-  u.uShowGrain.value = filmStock.grain * venueProfile.grainMult;
-  u.uShowBloom.value = filmStock.bloom * venueProfile.bloomMult;
-  u.uVenueVignette.value = venueProfile.vignette;
-  u.uEnvelopeBrightness.value = envelope.brightness;
-  u.uEnvelopeSaturation.value = envelope.saturation;
-  u.uEnvelopeHue.value = envelope.hue;
-
-  // 3D Camera (uses profile if provided)
-  const cam3d = compute3DCamera(
-    time, dynamicTime, smooth.energy as number, smooth.bass as number,
-    smooth.fastEnergy as number, smooth.vocalPresence as number, smooth.drumOnset as number,
-    smooth.sectionProgress as number, smooth.sectionIndex as number,
-    climaxPhase, climaxIntensity,
-    smooth.beatStability as number, smooth.beatSnap as number,
-    cameraProfile,
-  );
-  (u.uCamPos.value as THREE.Vector3).set(cam3d.position[0], cam3d.position[1], cam3d.position[2]);
-  (u.uCamTarget.value as THREE.Vector3).set(cam3d.target[0], cam3d.target[1], cam3d.target[2]);
-  u.uCamFov.value = cam3d.fov;
-  u.uCamDof.value = cam3d.dofStrength;
-  u.uCamFocusDist.value = cam3d.focusDistance;
-
-  // Chroma / contrast
-  const ch = smooth.chroma as number[];
-  if (ch) {
-    (u.uChroma0.value as THREE.Vector4).set(ch[0] ?? 0, ch[1] ?? 0, ch[2] ?? 0, ch[3] ?? 0);
-    (u.uChroma1.value as THREE.Vector4).set(ch[4] ?? 0, ch[5] ?? 0, ch[6] ?? 0, ch[7] ?? 0);
-    (u.uChroma2.value as THREE.Vector4).set(ch[8] ?? 0, ch[9] ?? 0, ch[10] ?? 0, ch[11] ?? 0);
-  }
-  const cst = smooth.contrast as number[];
-  if (cst) {
-    (u.uContrast0.value as THREE.Vector4).set(cst[0] ?? 0, cst[1] ?? 0, cst[2] ?? 0, cst[3] ?? 0);
-    (u.uContrast1.value as THREE.Vector4).set(cst[4] ?? 0, cst[5] ?? 0, cst[6] ?? 0, 0);
-  }
+/** Create scene uniforms using shared module */
+function createSceneUniforms(): Record<string, THREE.IUniform> {
+  return createBaseUniforms();
 }
 
 export const DualShaderQuad: React.FC<Props> = ({
@@ -255,6 +82,9 @@ export const DualShaderQuad: React.FC<Props> = ({
   const filmStock = deriveFilmStock(showCtx?.showSeed ?? 0);
   const venueProfile = getVenueProfile(showCtx?.venueType ?? "");
   const gl = useThree((state) => state.gl);
+
+  // Shared lighting state (EMA-smoothed across frames)
+  const lightingRef = useRef<LightingState>({ ...DEFAULT_LIGHTING });
 
   // Render targets (HalfFloat for HDR)
   const targets = useMemo(() => {
@@ -292,7 +122,7 @@ export const DualShaderQuad: React.FC<Props> = ({
   const sceneA = useMemo(() => {
     const scene = new THREE.Scene();
     const geo = new THREE.PlaneGeometry(2, 2);
-    const uniforms = createSceneUniforms(width, height);
+    const uniforms = createSceneUniforms();
     const mat = new THREE.ShaderMaterial({
       vertexShader: vertexShaderA, fragmentShader: fragmentShaderA,
       uniforms, depthWrite: false, depthTest: false,
@@ -306,7 +136,7 @@ export const DualShaderQuad: React.FC<Props> = ({
   const sceneB = useMemo(() => {
     const scene = new THREE.Scene();
     const geo = new THREE.PlaneGeometry(2, 2);
-    const uniforms = createSceneUniforms(width, height);
+    const uniforms = createSceneUniforms();
     const mat = new THREE.ShaderMaterial({
       vertexShader: vertexShaderB, fragmentShader: fragmentShaderB,
       uniforms, depthWrite: false, depthTest: false,
@@ -327,7 +157,7 @@ export const DualShaderQuad: React.FC<Props> = ({
     const scene = new THREE.Scene();
     const geo = new THREE.PlaneGeometry(2, 2);
     const uniforms: Record<string, THREE.IUniform> = {
-      ...createSceneUniforms(width, height),
+      ...createSceneUniforms(),
       uSceneA: { value: null as THREE.Texture | null },
       uSceneB: { value: null as THREE.Texture | null },
       uBlendMode: { value: 0 },
@@ -362,21 +192,21 @@ export const DualShaderQuad: React.FC<Props> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Per-frame render pipeline
-  const syncArgs = [
+  // ── Sync all shared uniforms for both scenes + composite ──
+  const syncData = {
     time, dynamicTime, beatDecay, smooth,
     palettePrimary, paletteSecondary, paletteSaturation,
     tempo, musicalTime, climaxPhase, climaxIntensity,
-    heroTrigger, heroProgress, jamDensity, jamPhase, jamProgress, coherence, isLocked,
+    heroTrigger, heroProgress, jamDensity, jamPhase, jamProgress,
+    coherence, isLocked, peakOfShow,
     eraSaturation, eraBrightness, eraSepia,
-    filmStock, venueProfile, width, height, sceneConfig.gradingIntensity, peakOfShow, envelope,
-    sceneConfig.cameraProfile,
-  ] as const;
-
-  // Update uniforms for both scenes
-  syncUniforms(sceneA.uniforms, ...syncArgs);
-  syncUniforms(sceneB.uniforms, ...syncArgs);
-  syncUniforms(compositePass.uniforms, ...syncArgs);
+    filmStock, venueProfile,
+    shaderWidth: width, shaderHeight: height,
+    sceneConfig, envelope, lightingRef,
+  };
+  syncBaseUniforms(sceneA.uniforms, syncData);
+  syncBaseUniforms(sceneB.uniforms, syncData);
+  syncBaseUniforms(compositePass.uniforms, syncData);
 
   compositePass.uniforms.uBlendMode.value = BLEND_MODE_INT[blendMode];
   compositePass.uniforms.uBlendProgress.value = blendProgress;

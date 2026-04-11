@@ -157,6 +157,22 @@ uniform float uSemanticAmbient;
 uniform float uSemanticRhythmic;
 uniform float uSemanticTriumphant;
 
+// ─── Per-Song Shader Parameter Modulation ───
+uniform float uParamBassScale;
+uniform float uParamEnergyScale;
+uniform float uParamMotionSpeed;
+uniform float uParamColorSatBias;
+uniform float uParamComplexity;
+uniform float uParamDrumReactivity;
+uniform float uParamVocalWeight;
+
+// ─── Shared Lighting Context ───
+uniform vec3 uKeyLightDir;
+uniform vec3 uKeyLightColor;
+uniform float uKeyLightIntensity;
+uniform vec3 uAmbientColor;
+uniform float uColorTemperature;
+
 // ─── Spatial ───
 uniform vec2 uResolution;
 uniform vec2 uCamOffset;

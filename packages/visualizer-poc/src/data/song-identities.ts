@@ -19,6 +19,7 @@
 
 import type { VisualMode, ColorPalette, OverlayTag, TrackMeta, EnhancedFrameData } from "./types";
 import type { DrumsSpaceSubPhase } from "../utils/drums-space-phase";
+import type { ShaderParameterProfile } from "../config/shader-parameters";
 import { seeded, seededShuffle } from "../utils/seededRandom";
 import { hashString } from "../utils/hash";
 import { deriveChromaPalette } from "../utils/chroma-palette";
@@ -134,6 +135,8 @@ export interface SongIdentity {
   visualPacing?: VisualPacing;
   /** Camera behavior profile name (default, contemplative, driving, intimate, expansive) */
   cameraProfile?: string;
+  /** Per-song shader parameter modulation — scales/biases that tune shader reactivity */
+  shaderParams?: ShaderParameterProfile;
 }
 
 // ─── Song Identity Registry (loaded from JSON) ───
