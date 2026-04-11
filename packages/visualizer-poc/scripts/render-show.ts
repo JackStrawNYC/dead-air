@@ -19,8 +19,10 @@
  *   --resume      Skip tracks with existing output
  *   --track=ID    Render only one track
  *   --gl=angle    GPU backend (default: angle)
- *   --chunk=N     Frames per chunk for long songs (default: 3000)
+ *   --chunk=N     Frames per chunk for long songs (default: 1200)
  *   --preview     Render only first 300 frames (10s) to a separate preview file
+ *   --frame-start=N  Only render chunks starting at frame N+ (for splitting across machines)
+ *   --frame-end=N    Only render chunks starting before frame N (for splitting across machines)
  *   --show-date   Show date for output naming (default: from setlist.json)
  *   --data-dir    Data directory override (default: ROOT/data)
  *   --seed        PRNG seed for generative variation (default: timestamp)
@@ -86,6 +88,13 @@ const concurrencyArg = args.find((a) => a.startsWith("--concurrency="))?.split("
 const noIntro = args.includes("--no-intro");
 const noEndCard = args.includes("--no-end-card");
 const noChapters = args.includes("--no-chapters");
+// Frame range filter for splitting a single song across multiple machines.
+// Each machine renders only chunks whose start frame falls within [frameStart, frameEnd).
+// After all machines finish, collect chunks and concat on one machine.
+const frameStartArg = args.find((a) => a.startsWith("--frame-start="))?.split("=")[1];
+const frameEndArg = args.find((a) => a.startsWith("--frame-end="))?.split("=")[1];
+const splitFrameStart = frameStartArg ? parseInt(frameStartArg, 10) : 0;
+const splitFrameEnd = frameEndArg ? parseInt(frameEndArg, 10) : Infinity;
 const noSetBreaks = args.includes("--no-set-breaks");
 const setBreakSecArg = args.find((a) => a.startsWith("--set-break-sec="))?.split("=")[1];
 const fpsArg = args.find((a) => a.startsWith("--fps="))?.split("=")[1];
@@ -423,6 +432,16 @@ function renderSong(
       const end = Math.min(start + chunkSize - 1, totalFrames - 1);
       const chunkPath = join(chunksDir, `chunk-${String(start).padStart(8, "0")}.mp4`);
 
+      // --frame-start / --frame-end: skip chunks outside the requested range.
+      // This allows splitting a long song across multiple machines — each
+      // renders its assigned chunk range, then chunks are collected and concat'd.
+      if (start < splitFrameStart || start >= splitFrameEnd) {
+        // Outside our assigned range — skip but still track the path for concat
+        chunks.push(chunkPath);
+        start += chunkSize;
+        continue;
+      }
+
       if (resume && isValidOutput(chunkPath)) {
         console.log(`  RESUME: chunk ${start}-${end}`);
       } else {
@@ -445,6 +464,13 @@ function renderSong(
 
       chunks.push(chunkPath);
       start += chunkSize;
+    }
+
+    // Skip concat + mux when using --frame-start/--frame-end (partial render).
+    // The machine that has all chunks will handle concat.
+    if (splitFrameEnd < Infinity || splitFrameStart > 0) {
+      console.log(`  SPLIT MODE: rendered chunks ${splitFrameStart}-${splitFrameEnd}. Skipping concat/mux.`);
+      return;
     }
 
     // Concat video chunks (video stream copy — lossless, instant)
