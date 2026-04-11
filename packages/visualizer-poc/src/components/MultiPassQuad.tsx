@@ -236,6 +236,11 @@ export const MultiPassQuad: React.FC<Props> = ({
     fftTextureRef.current.needsUpdate = true;
   }
 
+  // Dispose FFT texture on unmount to prevent GPU memory leak across scene transitions
+  useEffect(() => {
+    return () => { fftTextureRef.current?.dispose(); };
+  }, []);
+
   // Render targets: A + B for ping-pong, optional feedback buffer.
   // Uses useRef + useEffect so old targets dispose BEFORE new ones allocate,
   // preventing ~235MB GPU VRAM spike on resolution changes (e.g. 1080p→4K).

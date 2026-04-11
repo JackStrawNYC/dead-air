@@ -293,6 +293,12 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
 
     return () => {
       clearTimeout(safetyTimeout);
+      // Always resolve the delayRender handle on unmount — if we don't,
+      // Remotion waits up to 5 minutes then kills the worker.
+      if (!resolved) {
+        resolved = true;
+        continueRender(handle);
+      }
       iconTextureMap.current.forEach((tex) => tex.dispose());
       iconTextureMap.current.clear();
     };
@@ -851,7 +857,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
         <EraGrade>
         <EnergyEnvelope snapshot={audioSnapshot} climaxMod={climaxMod} calibration={energyCalibration} drumsSpacePhase={drumsSpaceState?.subPhase} itLuminanceLift={itState.luminanceLift} itSaturationSurge={itState.saturationSurge} itVignettePull={itState.vignettePull} deadAirFactor={deadAirFactor} introFactor={introFactor}>
           <div style={{ position: "absolute", inset: 0, opacity: introFactor }}>
-          <SilentErrorBoundary name="SceneRouter">
+          <SilentErrorBoundary name="SceneRouter" resetKey={frame}>
             {(() => {
               const climaxPhaseMap: Record<string, number> = { idle: 0, build: 1, climax: 2, sustain: 3, release: 4 };
               const sceneRouter = <SceneRouter frames={f} sections={sections} song={props.song} tempo={tempo} seed={showSeed} jamDensity={jamDensity} deadAirMode={deadAirFactor > 0 ? "cosmic_dust" : undefined} deadAirFactor={deadAirFactor > 0 ? deadAirFactor : undefined} era={props.show?.era} coherenceIsLocked={coherenceState.isLocked} drumsSpacePhase={drumsSpaceState?.subPhase} usedShaderModes={narrative?.state.usedShaderModes} shaderModeLastUsed={narrative?.state.shaderModeLastUsed} songIdentity={songIdentity} stemSection={stemSection} songDuration={analysis?.meta?.duration} palette={effectivePalette} segueIn={props.segueIn} isSacredSegueIn={isSacredSegueIn} isInSuiteMiddle={!!isInSuiteMiddle} setNumber={props.song.set} jamEvolution={jamEvolution} jamPhaseBoundaries={jamPhaseBoundaries} jamCycle={jamCycle} jamPhaseShaders={jamPhaseShaders} climaxPhase={climaxPhaseMap[climaxState.phase] ?? 0} trackNumber={props.song.trackNumber ?? 1} stemInterplayMode={stemInterplay.mode} stemDominant={stemCharacter.dominant} itForceTranscendentShader={itState.forceTranscendentShader} reactiveState={reactiveState} />;
@@ -896,7 +902,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
           {/* Song art: SongArtLayer handles its own fade-in/out + dead-air reappearance internally.
               Keep it always mounted (when art exists) to avoid WebGL context crashes from unmount. */}
           {effectiveSongArt && (
-            <SilentErrorBoundary name="SongArt">
+            <SilentErrorBoundary name="SongArt" resetKey={frame}>
               <SongArtLayer src={staticFile(effectiveSongArt)} suppressionFactor={artSuppressionFactor} hueRotation={hueRotation} energy={audioSnapshot.energy} climaxIntensity={climaxState.intensity} focusOpacity={focusState.artOpacity} segueIn={props.segueIn} artBlendMode={props.song.artBlendMode} introFactor={Math.min(1, introFactor * 1.5)} deadAirFactor={deadAirFactor} />
             </SilentErrorBoundary>
           )}

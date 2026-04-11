@@ -69,10 +69,13 @@ const draftMode = args.includes("--draft");
 // immediate crashes on some Vast.ai instances. ANGLE is proven stable (Bertha
 // preview, chunk tests all succeeded with ANGLE).
 const glArg = args.find((a) => a.startsWith("--gl="))?.split("=")[1] ?? "angle";
-// Default chunk size 600 (was 3000 → 1200). Each chunk gets a fresh Chrome
-// process; GPU driver leaks accumulate between chunks. 600 frames = 20 seconds
-// of video, enough to render cleanly before GPU memory pressure builds.
-const chunkSize = parseInt(args.find((a) => a.startsWith("--chunk="))?.split("=")[1] ?? "2400", 10);
+// Default chunk size 1200 (40s of video). Each chunk gets a fresh Chrome
+// process; GPU driver leaks accumulate between chunks. 2400 was too large —
+// GPU memory pressure caused stalls on Vast.ai. 600 was safe but per-chunk
+// overhead (Chrome startup + shader compilation) dominated render time.
+// 1200 is the sweet spot: enough frames to amortize startup, short enough
+// to avoid GPU memory exhaustion before the between-chunk cleanup runs.
+const chunkSize = parseInt(args.find((a) => a.startsWith("--chunk="))?.split("=")[1] ?? "1200", 10);
 const trackFilter = args.find((a) => a.startsWith("--track="))?.split("=")[1];
 const previewMode = args.includes("--preview");
 const showDateArg = args.find((a) => a.startsWith("--show-date="))?.split("=")[1];
@@ -100,6 +103,19 @@ const PREVIEW_FRAMES = parseInt(
   args.find((a) => a.startsWith("--preview-seconds="))?.split("=")[1] ?? "15",
   10,
 ) * previewFps;
+
+/**
+ * Check if a file exists AND has non-zero size. A crash mid-write leaves a
+ * 0-byte or truncated MP4 that existsSync alone would treat as complete.
+ */
+function isValidOutput(path: string): boolean {
+  if (!existsSync(path)) return false;
+  try {
+    return statSync(path).size > 1024; // >1KB — any real video is larger
+  } catch {
+    return false;
+  }
+}
 
 interface SetlistEntry {
   trackId: string;
@@ -315,9 +331,14 @@ const RETRY_BACKOFF_MS = [10_000, 20_000, 40_000]; // exponential backoff: 10s, 
  * Logs attempt number and error details on failure.
  */
 function execWithRetry(cmd: string, opts: { cwd: string; stdio: "inherit" | "pipe" }, label: string): void {
+  // 10-minute process-level timeout — if Chrome's GPU process deadlocks at the
+  // OS level, Remotion's internal --timeout can't enforce it. This is the last
+  // line of defense against hangs that would block the entire pipeline forever.
+  const PROCESS_TIMEOUT_MS = 600_000;
+
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
-      execSync(cmd, opts);
+      execSync(cmd, { ...opts, timeout: PROCESS_TIMEOUT_MS });
 
       // ─── GPU cleanup between chunks ───
       // Chrome's GPU process doesn't fully release ANGLE/EGL WebGL contexts
@@ -374,7 +395,7 @@ function renderSong(
   // Step 1: Render video-only (muted) — chunked for speed
   if (totalFrames <= chunkSize) {
     // Small enough for single pass
-    if (!(resume && existsSync(videoOnlyPath))) {
+    if (!(resume && isValidOutput(videoOnlyPath))) {
       console.log(`  Rendering video (${totalFrames} frames, single pass) ...`);
       const cmd = [
         "npx remotion render",
@@ -402,7 +423,7 @@ function renderSong(
       const end = Math.min(start + chunkSize - 1, totalFrames - 1);
       const chunkPath = join(chunksDir, `chunk-${String(start).padStart(8, "0")}.mp4`);
 
-      if (resume && existsSync(chunkPath)) {
+      if (resume && isValidOutput(chunkPath)) {
         console.log(`  RESUME: chunk ${start}-${end}`);
       } else {
         console.log(`  Chunk ${start}-${end} (${end - start + 1} frames) ...`);
@@ -427,7 +448,7 @@ function renderSong(
     }
 
     // Concat video chunks (video stream copy — lossless, instant)
-    if (!(resume && existsSync(videoOnlyPath))) {
+    if (!(resume && isValidOutput(videoOnlyPath))) {
       const listPath = join(chunksDir, "concat.txt");
       writeFileSync(listPath, chunks.map((c) => `file '${c}'`).join("\n"));
       console.log(`  Concatenating ${chunks.length} video chunks ...`);
@@ -459,7 +480,7 @@ function renderShowIntro(bundlePath: string): string | null {
   }
 
   const outputPath = join(SONGS_DIR, "show-intro.mp4");
-  if (resume && existsSync(outputPath)) {
+  if (resume && isValidOutput(outputPath)) {
     console.log("RESUME: show-intro already rendered");
     return outputPath;
   }
@@ -488,7 +509,7 @@ function renderShowIntro(bundlePath: string): string | null {
 
 function renderEndCard(bundlePath: string): string {
   const outputPath = join(SONGS_DIR, "end-card.mp4");
-  if (resume && existsSync(outputPath)) {
+  if (resume && isValidOutput(outputPath)) {
     console.log("RESUME: end-card already rendered");
     return outputPath;
   }
@@ -509,7 +530,7 @@ function renderEndCard(bundlePath: string): string {
 
 function renderSetBreak(bundlePath: string): string {
   const outputPath = join(SONGS_DIR, "set-break.mp4");
-  if (resume && existsSync(outputPath)) {
+  if (resume && isValidOutput(outputPath)) {
     console.log("RESUME: set-break already rendered");
     return outputPath;
   }
@@ -532,7 +553,7 @@ function renderSetBreak(bundlePath: string): string {
 /** Render a chapter card composition */
 function renderChapterCard(index: number, bundlePath: string): string {
   const outputPath = join(SONGS_DIR, `chapter-${index}.mp4`);
-  if (resume && existsSync(outputPath)) {
+  if (resume && isValidOutput(outputPath)) {
     console.log(`  RESUME: chapter-${index} already rendered`);
     return outputPath;
   }
@@ -642,7 +663,7 @@ function concatShow(
 
   console.log(`\nConcatenating ${entries.length} segments (${chaptersInserted} chapter cards) into full show ...`);
   execSync(
-    `ffmpeg -y -f concat -safe 0 -i "${listPath}" -c:v copy -c:a aac -ar 48000 -b:a 320k "${showOutput}"`,
+    `ffmpeg -y -f concat -safe 0 -i "${listPath}" -c:v copy -c:a copy "${showOutput}"`,
     { cwd: ROOT, stdio: "inherit" },
   );
   console.log(`Full show: ${showOutput}`);
@@ -754,7 +775,7 @@ function main() {
       : join(SONGS_DIR, `${song.trackId}.mp4`);
     const renderFrames = previewMode ? Math.min(PREVIEW_FRAMES, track.totalFrames) : track.totalFrames;
 
-    if (resume && existsSync(outputPath)) {
+    if (resume && isValidOutput(outputPath)) {
       console.log(`RESUME: ${song.trackId} already rendered`);
       rendered.push({ path: outputPath, set: song.set, trackId: song.trackId });
       framesRendered += renderFrames;

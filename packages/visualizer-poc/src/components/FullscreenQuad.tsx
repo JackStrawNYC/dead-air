@@ -19,7 +19,6 @@ import { compute3DCamera } from "../utils/camera-3d";
 import { useSceneConfig } from "../scenes/SceneConfigContext";
 import { useEnvelopeValues } from "../data/EnvelopeContext";
 import { fxaaVert, fxaaFrag } from "../shaders/shared/fxaa.glsl";
-import { useIconOverlay } from "../data/IconOverlayContext";
 
 /** Era saturation values — previously in EraGrade CSS, now owned by GLSL */
 const ERA_SATURATION: Record<string, number> = {
@@ -71,110 +70,6 @@ void main() {
  *  Self-contained GLSL: only snoise, beatPulse, hsv2rgb inlined.
  *  Does NOT use noiseGLSL (which pulls in cinematicGrade/harmonicPaletteCycle
  *  that reference sharedUniformsGLSL uniforms not present in this pass). */
-const ICON_OVERLAY_FRAG = /* glsl */ `
-precision highp float;
-
-uniform sampler2D uIconTexture;
-uniform sampler2D uBackgroundTexture;
-uniform vec2 uResolution;
-uniform float uTime;
-uniform float uDynamicTime;
-uniform float uEnergy;
-uniform float uBass;
-uniform float uOnsetSnap;
-uniform float uSlowEnergy;
-uniform float uFastEnergy;
-uniform float uMusicalTime;
-uniform float uBeatConfidence;
-uniform float uOpacity;
-uniform float uPalettePrimary;
-
-varying vec2 vUv;
-
-// ── Inlined simplex noise (3D) ──
-vec4 _ico_permute(vec4 x){return mod(((x*34.0)+1.0)*x,289.0);}
-vec4 _ico_taylorInvSqrt(vec4 r){return 1.79284291400159-0.85373472095314*r;}
-float snoise(vec3 v){
-  const vec2 C=vec2(1.0/6.0,1.0/3.0);
-  const vec4 D=vec4(0.0,0.5,1.0,2.0);
-  vec3 i=floor(v+dot(v,C.yyy));
-  vec3 x0=v-i+dot(i,C.xxx);
-  vec3 g=step(x0.yzx,x0.xyz);
-  vec3 l=1.0-g;
-  vec3 i1=min(g.xyz,l.zxy);
-  vec3 i2=max(g.xyz,l.zxy);
-  vec3 x1=x0-i1+C.xxx;
-  vec3 x2=x0-i2+C.yyy;
-  vec3 x3=x0-D.yyy;
-  i=mod(i,289.0);
-  vec4 p=_ico_permute(_ico_permute(_ico_permute(
-    i.z+vec4(0.0,i1.z,i2.z,1.0))
-    +i.y+vec4(0.0,i1.y,i2.y,1.0))
-    +i.x+vec4(0.0,i1.x,i2.x,1.0));
-  float n_=1.0/7.0;
-  vec3 ns=n_*D.wyz-D.xzx;
-  vec4 j=p-49.0*floor(p*ns.z*ns.z);
-  vec4 x_=floor(j*ns.z);
-  vec4 y_=floor(j-7.0*x_);
-  vec4 x=x_*ns.x+ns.yyyy;
-  vec4 y=y_*ns.x+ns.yyyy;
-  vec4 h=1.0-abs(x)-abs(y);
-  vec4 b0=vec4(x.xy,y.xy);
-  vec4 b1=vec4(x.zw,y.zw);
-  vec4 s0=floor(b0)*2.0+1.0;
-  vec4 s1=floor(b1)*2.0+1.0;
-  vec4 sh=-step(h,vec4(0.0));
-  vec4 a0=b0.xzyw+s0.xzyw*sh.xxyy;
-  vec4 a1=b1.xzyw+s1.xzyw*sh.zzww;
-  vec3 p0=vec3(a0.xy,h.x);
-  vec3 p1=vec3(a0.zw,h.y);
-  vec3 p2=vec3(a1.xy,h.z);
-  vec3 p3=vec3(a1.zw,h.w);
-  vec4 norm=_ico_taylorInvSqrt(vec4(dot(p0,p0),dot(p1,p1),dot(p2,p2),dot(p3,p3)));
-  p0*=norm.x;p1*=norm.y;p2*=norm.z;p3*=norm.w;
-  vec4 m=max(0.6-vec4(dot(x0,x0),dot(x1,x1),dot(x2,x2),dot(x3,x3)),0.0);
-  m=m*m;
-  return 42.0*dot(m*m,vec4(dot(p0,x0),dot(p1,x1),dot(p2,x2),dot(p3,x3)));
-}
-
-// ── Inlined beat pulse ──
-float beatPulse(float mt){
-  float f=fract(mt);
-  return exp(-f*8.0)*step(f,0.5);
-}
-
-// ── Inlined hsv2rgb ──
-vec3 hsv2rgb(vec3 c){
-  vec4 K=vec4(1.0,2.0/3.0,1.0/3.0,3.0);
-  vec3 p=abs(fract(c.xxx+K.xyz)*6.0-K.www);
-  return c.z*mix(K.xxx,clamp(p-K.xxx,0.0,1.0),c.y);
-}
-
-void main() {
-  vec2 uv = vUv;
-
-  // Sample the shader (the actual visual)
-  vec3 bg = texture2D(uBackgroundTexture, uv).rgb;
-
-  // Sample the icon image — zoom out so icons have breathing room
-  vec2 iconUV = (uv - 0.5) * 1.4 + 0.5; // 1.4x = zoomed out, more space around edges
-  iconUV += vec2(sin(uDynamicTime * 0.03) * 0.01, cos(uDynamicTime * 0.025) * 0.008);
-  vec4 imgColor = texture2D(uIconTexture, clamp(iconUV, 0.0, 1.0));
-
-  // Overlay blend: icons visible on both bright and dark shader backgrounds
-  // Dark shader areas: icon adds light (like screen)
-  // Bright shader areas: icon darkens/tints (like multiply)
-  vec3 overlayBlend = vec3(
-    bg.r < 0.5 ? 2.0 * bg.r * imgColor.r : 1.0 - 2.0 * (1.0 - bg.r) * (1.0 - imgColor.r),
-    bg.g < 0.5 ? 2.0 * bg.g * imgColor.g : 1.0 - 2.0 * (1.0 - bg.g) * (1.0 - imgColor.g),
-    bg.b < 0.5 ? 2.0 * bg.b * imgColor.b : 1.0 - 2.0 * (1.0 - bg.b) * (1.0 - imgColor.b)
-  );
-  vec3 finalColor = mix(bg, overlayBlend, uOpacity * 0.7);
-
-  gl_FragColor = vec4(finalColor, 1.0);
-}
-`;
-
 interface Props {
   vertexShader: string;
   fragmentShader: string;
@@ -191,7 +86,6 @@ export const FullscreenQuad: React.FC<Props> = ({
   const sceneConfig = useSceneConfig();
   const envelope = useEnvelopeValues();
   const showCtx = useShowContext();
-  const iconOverlay = useIconOverlay();
   const eraKey = showCtx?.era ?? "";
   const eraSaturation = ERA_SATURATION[eraKey] ?? 1.0;
   const eraBrightness = ERA_BRIGHTNESS[eraKey] ?? 1.0;
@@ -230,14 +124,12 @@ export const FullscreenQuad: React.FC<Props> = ({
 
   const targetsRef = useRef<{
     main: THREE.WebGLRenderTarget;
-    iconOverlay: THREE.WebGLRenderTarget;
     fxaa: THREE.WebGLRenderTarget;
   } | null>(null);
 
   useEffect(() => {
     if (targetsRef.current) {
       targetsRef.current.main.dispose();
-      targetsRef.current.iconOverlay.dispose();
       targetsRef.current.fxaa.dispose();
     }
     const opts: THREE.RenderTargetOptions = {
@@ -248,12 +140,10 @@ export const FullscreenQuad: React.FC<Props> = ({
     };
     targetsRef.current = {
       main: new THREE.WebGLRenderTarget(shaderWidth, shaderHeight, opts),
-      iconOverlay: new THREE.WebGLRenderTarget(shaderWidth, shaderHeight, opts),
       fxaa: new THREE.WebGLRenderTarget(shaderWidth, shaderHeight, opts),
     };
     return () => {
       targetsRef.current?.main.dispose();
-      targetsRef.current?.iconOverlay.dispose();
       targetsRef.current?.fxaa.dispose();
       targetsRef.current = null;
     };
@@ -419,37 +309,6 @@ export const FullscreenQuad: React.FC<Props> = ({
   }, []);
 
   // Icon overlay composite pass (between main shader and FXAA)
-  const iconPass = useMemo(() => {
-    const scene = new THREE.Scene();
-    const geo = new THREE.PlaneGeometry(2, 2);
-    const iconUniforms = {
-      uIconTexture: { value: null as THREE.Texture | null },
-      uBackgroundTexture: { value: null as THREE.Texture | null },
-      uResolution: { value: new THREE.Vector2(width, height) },
-      uTime: { value: 0 },
-      uDynamicTime: { value: 0 },
-      uEnergy: { value: 0 },
-      uBass: { value: 0 },
-      uOnsetSnap: { value: 0 },
-      uSlowEnergy: { value: 0 },
-      uFastEnergy: { value: 0 },
-      uMusicalTime: { value: 0 },
-      uBeatConfidence: { value: 0.5 },
-      uOpacity: { value: 0 },
-      uPalettePrimary: { value: 0 },
-    };
-    const mat = new THREE.ShaderMaterial({
-      vertexShader: PASSTHROUGH_VERT,
-      fragmentShader: ICON_OVERLAY_FRAG,
-      uniforms: iconUniforms,
-      depthWrite: false,
-      depthTest: false,
-    });
-    scene.add(new THREE.Mesh(geo, mat));
-    return { scene, uniforms: iconUniforms };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   // Initialize with a 1x1 dark texture to prevent black frame on mount
   const outputUniforms = useMemo(() => {
     const initTex = new THREE.DataTexture(new Uint8Array([5, 3, 8, 255]), 1, 1);
@@ -611,33 +470,8 @@ export const FullscreenQuad: React.FC<Props> = ({
     gl.clear();
     gl.render(mainPass.scene, camera);
 
-    // Pass 1: Icon overlay composite (if active)
-    // Composites the image icon into the shader output via screen blend + noise dissolve.
-    // Skipped when no icon texture or zero opacity — zero GPU cost when inactive.
-    let postShaderTexture = targets.main.texture;
-    if (false && iconOverlay.texture && iconOverlay.opacity > 0.01) { // DISABLED — AI art looks bad
-      iconPass.uniforms.uIconTexture.value = iconOverlay.texture;
-      iconPass.uniforms.uBackgroundTexture.value = targets.main.texture;
-      iconPass.uniforms.uResolution.value.set(width, height);
-      iconPass.uniforms.uTime.value = time;
-      iconPass.uniforms.uDynamicTime.value = dynamicTime;
-      iconPass.uniforms.uEnergy.value = smooth.energy;
-      iconPass.uniforms.uBass.value = smooth.bass;
-      iconPass.uniforms.uOnsetSnap.value = smooth.onsetSnap;
-      iconPass.uniforms.uSlowEnergy.value = smooth.slowEnergy;
-      iconPass.uniforms.uFastEnergy.value = smooth.fastEnergy;
-      iconPass.uniforms.uMusicalTime.value = musicalTime;
-      iconPass.uniforms.uBeatConfidence.value = smooth.beatConfidence;
-      iconPass.uniforms.uOpacity.value = iconOverlay.opacity;
-      iconPass.uniforms.uPalettePrimary.value = palettePrimary;
-      gl.setRenderTarget(targets.iconOverlay);
-      gl.clear();
-      gl.render(iconPass.scene, camera);
-      postShaderTexture = targets.iconOverlay.texture;
-    }
-
-    // Pass 2: FXAA anti-aliasing — runs at the downscaled shader resolution
-    fxaaPass.uniforms.uInputTexture.value = postShaderTexture;
+    // FXAA anti-aliasing — runs at the downscaled shader resolution
+    fxaaPass.uniforms.uInputTexture.value = targets.main.texture;
     fxaaPass.uniforms.uResolution.value.set(shaderWidth, shaderHeight);
     gl.setRenderTarget(targets.fxaa);
     gl.clear();
