@@ -86,7 +86,7 @@ const LOCK_CONVERGENCE_FRAMES = 15;
 const BREAK_FLASH_FRAMES = 2;
 const BREAK_RECOVERY_FRAMES = 10;
 const LOCKED_OVERLAY_OPACITY = 0.05;
-const LOCKED_LUMINANCE_LIFT = 0.28;
+const LOCKED_LUMINANCE_LIFT = 0.18;
 
 // Lock depth tier thresholds (frames since lock start)
 const SHALLOW_END = 90;     // 3 seconds
@@ -95,9 +95,10 @@ const DEEP_END = 300;       // 10 seconds
 // Beyond DEEP_END = transcendent
 
 /** Max strobe intensity during deep lock.
- *  0.25 gives visible beat-synced pulse without harsh white flashes.
- *  Gated to onset>0.15 so only real hits trigger. */
-const STROBE_MAX = 0.25;
+ *  Reduced from 0.25 to 0.12 for photosensitive safety. Original could
+ *  produce beat-locked pulsing at 2-3 Hz during fast drums. At 0.12
+ *  it's a subtle luminance swell, not a perceptible strobe. */
+const STROBE_MAX = 0.12;
 /** Time dilation factor during deep lock (slow-motion shader drift) */
 const LOCKED_TIME_DILATION = 0.3;
 /** Transcendent time dilation (maximum slow-motion) */
@@ -220,9 +221,13 @@ export function computeITResponse(
     if (isSuddenBreak) {
       // Breaking: sudden drop -- flash + reset
       if (framesSinceUnlock < BREAK_FLASH_FRAMES + BREAK_RECOVERY_FRAMES) {
-        let flashIntensity = 0;
-        if (framesSinceUnlock === 0) flashIntensity = 0.85;
-        else if (framesSinceUnlock === 1) flashIntensity = 0.50;
+        // Softened from 0.85/0.50 for photosensitive safety. Original
+      // was a 2-frame 85% white burst. Now 0.35 peak with 4-frame decay.
+      let flashIntensity = 0;
+        if (framesSinceUnlock === 0) flashIntensity = 0.35;
+        else if (framesSinceUnlock === 1) flashIntensity = 0.25;
+        else if (framesSinceUnlock === 2) flashIntensity = 0.15;
+        else if (framesSinceUnlock === 3) flashIntensity = 0.08;
 
         const recoveryProgress = Math.max(0, framesSinceUnlock - BREAK_FLASH_FRAMES) / BREAK_RECOVERY_FRAMES;
         // Flash hue: use dominant chroma at the break point for chromatic burst

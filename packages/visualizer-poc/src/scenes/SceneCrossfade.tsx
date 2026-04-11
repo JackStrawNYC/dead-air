@@ -27,12 +27,14 @@ interface Props {
 export const SceneCrossfade: React.FC<Props> = ({ progress, outgoing, incoming, flashFrame, style = "dissolve" }) => {
   const frame = useCurrentFrame();
 
-  // Beat flash (additional, on top of transition flash)
+  // Beat flash (subtle glow, NOT a strobe). Original was 80% white over 2 frames
+  // which violates photosensitive guidelines (>3Hz). Now 25% over 8 frames (267ms)
+  // — perceptible as a warm pulse, not a seizure-inducing strobe.
   let beatFlash = 0;
   if (flashFrame !== undefined) {
     const framesSinceFlash = frame - flashFrame;
-    if (framesSinceFlash >= 0 && framesSinceFlash < 3) {
-      beatFlash = 0.8 * Math.exp(-framesSinceFlash * 1.5);
+    if (framesSinceFlash >= 0 && framesSinceFlash < 8) {
+      beatFlash = 0.25 * Math.exp(-framesSinceFlash * 0.5);
     }
   }
 
@@ -125,16 +127,16 @@ export const SceneCrossfade: React.FC<Props> = ({ progress, outgoing, incoming, 
     );
   }
 
-  // --- Flash style (default) ---
-  // 30-frame transition broken into 3 phases:
-  // Flash (0-0.067): white blast, screen blend, rapid decay
-  // Blackout (0.067-0.333): near-black overlay
-  // Eruption (0.333-1.0): incoming scene smoothstep in, darkness fades
-  const flashIntensity = interpolate(progress, [0, 0.033, 0.067], [0, 0.8, 0], {
+  // --- Flash style ---
+  // Softened for photosensitive safety. Original was 80% white over 2 frames
+  // (violates ITC guidelines: >3Hz). Now 30% white over 6+ frames (~200ms),
+  // a warm bloom rather than a strobe.
+  const flashIntensity = interpolate(progress, [0, 0.067, 0.20], [0, 0.30, 0], {
     extrapolateLeft: "clamp", extrapolateRight: "clamp",
+    easing: Easing.out(Easing.ease),
   });
 
-  const blackoutOpacity = interpolate(progress, [0.033, 0.067, 0.333, 1.0], [0, 0.8, 0.56, 0], {
+  const blackoutOpacity = interpolate(progress, [0.067, 0.20, 0.40, 1.0], [0, 0.50, 0.35, 0], {
     extrapolateLeft: "clamp", extrapolateRight: "clamp",
     easing: Easing.out(Easing.ease),
   });

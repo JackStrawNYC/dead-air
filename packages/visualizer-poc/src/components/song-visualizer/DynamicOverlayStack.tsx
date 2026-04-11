@@ -28,11 +28,13 @@ interface OverlayComponentEntry {
 }
 
 /** Max concurrent overlays by energy level.
- *  Dead iconography should be PROMINENT — bears, stealies, bolts visible always. */
+ *  Reduced from 3/5/7 to 2/4/5 for cleaner visuals. At 7 overlays with accent
+ *  flashes, peaks felt cluttered. 5 max with layer spreading keeps vivid energy
+ *  without overwhelming the shader underneath. */
 const MAX_CONCURRENT: Record<string, number> = {
-  quiet: 3,
-  mid: 5,
-  peak: 7,
+  quiet: 2,
+  mid: 4,
+  peak: 5,
 };
 
 interface Props {
