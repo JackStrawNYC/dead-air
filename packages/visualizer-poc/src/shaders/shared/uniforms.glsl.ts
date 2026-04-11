@@ -173,6 +173,9 @@ uniform float uKeyLightIntensity;
 uniform vec3 uAmbientColor;
 uniform float uColorTemperature;
 
+// ─── Temporal Coherence ───
+uniform float uTemporalBlendStrength;
+
 // ─── Spatial ───
 uniform vec2 uResolution;
 uniform vec2 uCamOffset;

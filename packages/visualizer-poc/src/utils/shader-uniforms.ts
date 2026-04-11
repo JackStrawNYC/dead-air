@@ -288,6 +288,7 @@ export function createBaseUniforms(
     uKeyLightIntensity: { value: 0.7 },
     uAmbientColor: { value: new THREE.Vector3(0.08, 0.07, 0.09) },
     uColorTemperature: { value: 0.0 },
+    uTemporalBlendStrength: { value: 0.0 },
   };
 }
 
@@ -436,6 +437,9 @@ export function syncBaseUniforms(
     (u.uAmbientColor.value as THREE.Vector3).set(lighting.ambientColor[0], lighting.ambientColor[1], lighting.ambientColor[2]);
     u.uColorTemperature.value = lighting.colorTemperature;
   }
+
+  // Temporal blend — disabled by default (0.0), set by render pipeline when active
+  u.uTemporalBlendStrength.value = 0.0;
 
   // 3D Camera (uses profile from SceneConfig context)
   const cam3d = compute3DCamera(
