@@ -12,6 +12,7 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
+import { lightingGLSL } from "./shared/lighting.glsl";
 
 export const proteanCloudsVert = /* glsl */ `
 varying vec2 vUv;
@@ -38,6 +39,8 @@ precision highp float;
 ${sharedUniformsGLSL}
 
 ${noiseGLSL}
+
+${lightingGLSL}
 
 ${postProcess}
 
@@ -208,12 +211,24 @@ void main() {
   // Original nimitz color processing — no palette override, no icons
   col = _pc_iLerp(col.bgr, col.rgb, clamp(1.0 - _pc_prm1, 0.05, 1.0));
 
+  // Blend shared lighting with per-shader lighting for smooth crossfade continuity
+  // Protean clouds uses a synthetic view-aligned normal for shared diffuse
+  {
+    vec3 synthNormal = normalize(vec3(p.x * 0.3, p.y * 0.3, 1.0));
+    vec3 sharedLight = sharedDiffuse(synthNormal);
+    vec3 localLight = col;
+    col = mix(localLight, localLight * sharedLight, 0.3);
+  }
+
   // Original nimitz gamma/tone
   col = pow(col, vec3(0.55, 0.65, 0.6)) * vec3(1.0, 0.97, 0.9);
 
   // Original nimitz vignette
   vec2 q = vUv;
   col *= pow(16.0 * q.x * q.y * (1.0 - q.x) * (1.0 - q.y), 0.12) * 0.7 + 0.3;
+
+  // Shared color temperature for crossfade continuity
+  col = applyTemperature(col);
 
   // Grain only — no other post-processing
   col = applyPostProcess(col, uv, p);

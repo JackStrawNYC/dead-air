@@ -34,6 +34,7 @@ import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
 import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
+import { lightingGLSL } from "./shared/lighting.glsl";
 
 export const voidLightVert = /* glsl */ `
 varying vec2 vUv;
@@ -52,6 +53,8 @@ precision highp float;
 ${sharedUniformsGLSL}
 
 ${noiseGLSL}
+
+${lightingGLSL}
 
 ${buildPostProcessGLSL({
   grainStrength: "heavy",
@@ -385,12 +388,16 @@ void main() {
     vec3 lightDir = normalize(lightPos - pos);
     vec3 halfVec = normalize(lightDir + viewDir);
 
-    // === DIFFUSE ===
-    float diff = max(dot(norm, lightDir), 0.0);
+    // === DIFFUSE — blend shared lighting for crossfade continuity ===
+    float localDiff = max(dot(norm, lightDir), 0.0);
+    vec3 sharedLight = sharedDiffuse(norm);
+    float diff = mix(localDiff, dot(sharedLight, vec3(0.333)), 0.3);
 
-    // === SPECULAR (sharp facets) ===
+    // === SPECULAR (sharp facets) — blend shared specular ===
     float specPow = 64.0 + highs * 256.0;
-    float spec = pow(max(dot(norm, halfVec), 0.0), specPow);
+    float localSpec = pow(max(dot(norm, halfVec), 0.0), specPow);
+    vec3 sharedSpec = sharedSpecular(norm, viewDir, specPow);
+    float spec = mix(localSpec, dot(sharedSpec, vec3(0.333)), 0.3);
 
     // === FRESNEL ===
     float fresnel = pow(1.0 - max(dot(norm, viewDir), 0.0), 3.0);
@@ -464,6 +471,9 @@ void main() {
     col += iconEmergence(screenP, uTime, energy, bass, lightColor, palColor2, nf, uClimaxPhase, uSectionIndex);
     col += heroIconEmergence(screenP, uTime, energy, bass, lightColor, palColor2, nf, uSectionIndex);
   }
+
+  // Shared color temperature for crossfade continuity
+  col = applyTemperature(col);
 
   // === POST-PROCESSING ===
   col = applyPostProcess(col, vUv, screenP);

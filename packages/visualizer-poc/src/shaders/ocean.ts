@@ -28,6 +28,7 @@ import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
 import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
+import { lightingGLSL } from "./shared/lighting.glsl";
 
 export const oceanVert = /* glsl */ `
 varying vec2 vUv;
@@ -46,6 +47,8 @@ precision highp float;
 ${sharedUniformsGLSL}
 
 ${noiseGLSL}
+
+${lightingGLSL}
 
 ${buildPostProcessGLSL({
   grainStrength: "normal",
@@ -301,13 +304,17 @@ void main() {
     vec3 norm = oc2Normal(hitPos);
     float ambOcc = oc2AO(hitPos, norm);
 
-    // Diffuse
-    float diffuse = max(dot(norm, sunDir), 0.0) * 0.5 + 0.5;
+    // Diffuse — blend shared lighting for crossfade continuity
+    float localDiffuse = max(dot(norm, sunDir), 0.0) * 0.5 + 0.5;
+    vec3 sharedLight = sharedDiffuse(norm);
+    float diffuse = mix(localDiffuse, dot(sharedLight, vec3(0.333)) * 0.5 + 0.5, 0.3);
 
-    // Specular
+    // Specular — blend shared specular
     vec3 viewDir = normalize(camOrigin - hitPos);
     vec3 halfDir = normalize(sunDir + viewDir);
-    float specular = pow(max(dot(norm, halfDir), 0.0), 64.0);
+    float localSpecular = pow(max(dot(norm, halfDir), 0.0), 64.0);
+    vec3 sharedSpec = sharedSpecular(norm, viewDir, 64.0);
+    float specular = mix(localSpecular, dot(sharedSpec, vec3(0.333)), 0.3);
 
     // Fresnel
     float fresnelVal = pow(1.0 - max(dot(viewDir, norm), 0.0), 3.5);
@@ -400,6 +407,9 @@ void main() {
   float vignette = 1.0 - dot(screenPos * vigScale, screenPos * vigScale);
   vignette = smoothstep(0.0, 1.0, vignette);
   col = mix(vec3(0.01, 0.02, 0.04), col, vignette);
+
+  // Shared color temperature for crossfade continuity
+  col = applyTemperature(col);
 
   // ─── Post-processing ───
   col = applyPostProcess(col, vUv, screenPos);

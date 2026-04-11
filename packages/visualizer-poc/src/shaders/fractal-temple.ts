@@ -7,6 +7,7 @@ import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
 import { buildRaymarchNormal } from "./shared/raymarching.glsl";
+import { lightingGLSL } from "./shared/lighting.glsl";
 
 export const fractalTempleVert = /* glsl */ `
 varying vec2 vUv;
@@ -20,6 +21,7 @@ export const fractalTempleFrag = /* glsl */ `
 precision highp float;
 ${sharedUniformsGLSL}
 ${noiseGLSL}
+${lightingGLSL}
 ${postProcess}
 varying vec2 vUv;
 #define TAU 6.28318530
@@ -112,8 +114,13 @@ void main() {
   if (ht) {
     vec3 n = ftCalcNormal(hp);
     vec3 L = normalize(vec3(0.3,0.8,0.5));
-    float df = max(dot(n,L),0.0);
-    float sp = pow(max(dot(reflect(-L,n),-rd),0.0), 24.0+energy*40.0);
+    // Blend shared lighting with per-shader lighting for smooth crossfade continuity
+    float localDf = max(dot(n,L),0.0);
+    vec3 sharedLight = sharedDiffuse(n);
+    float df = mix(localDf, dot(sharedLight, vec3(0.333)), 0.3);
+    float localSp = pow(max(dot(reflect(-L,n),-rd),0.0), 24.0+energy*40.0);
+    vec3 sharedSpec = sharedSpecular(n, -rd, 24.0+energy*40.0);
+    float sp = mix(localSp, dot(sharedSpec, vec3(0.333)), 0.3);
     float fr = pow(1.0-max(dot(n,-rd),0.0), 4.0);
     // AO
     float ao2 = 1.0;
@@ -155,6 +162,8 @@ void main() {
   col = mix(vec3(0.02,0.015,0.03), col, smoothstep(0.0,1.0,vg));
   // Icons removed — clean shader output
   col = max(col, vec3(0.03,0.02,0.04));
+  // Shared color temperature for crossfade continuity
+  col = applyTemperature(col);
   col = applyPostProcess(col, uv, p);
   gl_FragColor = vec4(col, 1.0);
 }

@@ -27,6 +27,7 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
+import { lightingGLSL } from "./shared/lighting.glsl";
 
 export const auroraVert = /* glsl */ `
 varying vec2 vUv;
@@ -53,6 +54,8 @@ precision highp float;
 ${sharedUniformsGLSL}
 
 ${noiseGLSL}
+
+${lightingGLSL}
 
 ${postProcess}
 
@@ -482,8 +485,11 @@ void main() {
       snowBase += vec3(0.05, 0.07, 0.1) * timbralBr * 0.3;
 
       // Diffuse from moon (dim directional light from upper right)
+      // Blend shared lighting for crossfade continuity
       vec3 moonDir = normalize(vec3(0.5, 0.8, 0.3));
-      float moonDiff = max(dot(hitNor, moonDir), 0.0) * 0.15;
+      float localMoonDiff = max(dot(hitNor, moonDir), 0.0) * 0.15;
+      vec3 sharedLight = sharedDiffuse(hitNor);
+      float moonDiff = mix(localMoonDiff, dot(sharedLight, vec3(0.333)) * 0.15, 0.3);
       vec3 moonLight = vec3(0.15, 0.18, 0.25) * moonDiff;
 
       // Combine lighting
@@ -616,6 +622,9 @@ void main() {
   float vig = 1.0 - dot(screenP * vigScale, screenP * vigScale);
   vig = smoothstep(0.0, 1.0, vig);
   col = mix(vec3(0.01, 0.015, 0.03), col, vig);
+
+  // Shared color temperature for crossfade continuity
+  col = applyTemperature(col);
 
   // ═══════════════════════════════════════════════════
   // POST-PROCESSING

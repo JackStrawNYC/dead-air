@@ -31,6 +31,7 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
+import { lightingGLSL } from "./shared/lighting.glsl";
 
 export const mandalaEngineVert = /* glsl */ `
 varying vec2 vUv;
@@ -55,6 +56,7 @@ export const mandalaEngineFrag = /* glsl */ `
 precision highp float;
 ${sharedUniformsGLSL}
 ${noiseGLSL}
+${lightingGLSL}
 ${postProcess}
 varying vec2 vUv;
 
@@ -454,12 +456,17 @@ void main() {
 
     // ─── Lighting: backlight through mandala + rim + fill ───
     // Primary: backlight from behind the mandala (positive Z)
+    // Blend shared lighting for crossfade continuity
     vec3 backLightDir = normalize(vec3(0.0, 0.0, 1.0));
-    float backDiff = max(dot(norm, backLightDir), 0.0);
+    float localBackDiff = max(dot(norm, backLightDir), 0.0);
+    vec3 sharedLight = sharedDiffuse(norm);
+    float sharedLightMono = dot(sharedLight, vec3(0.333));
+    float backDiff = mix(localBackDiff, sharedLightMono, 0.3);
 
     // Fill light from camera direction
     vec3 fillDir = normalize(vec3(0.2, 0.3, -0.8));
-    float fillDiff = max(dot(norm, fillDir), 0.0);
+    float localFillDiff = max(dot(norm, fillDir), 0.0);
+    float fillDiff = mix(localFillDiff, sharedLightMono, 0.3);
 
     // Specular: highs + timbral brightness control sharpness
     float specPow = 12.0 + highs * 48.0 + timbralB * 24.0;
@@ -571,6 +578,9 @@ void main() {
     col += iconEmergence(p, uTime, energy, uBass, palPrimary, palSecondary, nf, uClimaxPhase, uSectionIndex);
     col += heroIconEmergence(p, uTime, energy, uBass, palPrimary, palSecondary, nf, uSectionIndex);
   }
+
+  // Shared color temperature for crossfade continuity
+  col = applyTemperature(col);
 
   // ─── Post-processing ───
   col = applyPostProcess(col, uv, p);

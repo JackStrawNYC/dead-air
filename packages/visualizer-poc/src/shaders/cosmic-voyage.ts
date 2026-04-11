@@ -26,6 +26,7 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
+import { lightingGLSL } from "./shared/lighting.glsl";
 
 export const cosmicVoyageVert = /* glsl */ `
 varying vec2 vUv;
@@ -42,6 +43,8 @@ ${sharedUniformsGLSL}
 uniform sampler2D uPrevFrame;
 
 ${noiseGLSL}
+
+${lightingGLSL}
 
 // COSMIC VOYAGE FIX: previously had temporalBlend + anaglyph + caEnabled
 // all on. The volumetric fractal accumulation produces high-contrast pixels;
@@ -241,6 +244,15 @@ void main() {
   vec3 accColor = col;
   float lumAcc = dot(col, vec3(0.299, 0.587, 0.114));
 
+  // Blend shared lighting with per-shader lighting for smooth crossfade continuity
+  // Cosmic voyage uses a synthetic view-aligned normal for shared diffuse
+  {
+    vec3 synthNormal = normalize(vec3(screenPos.x * 0.3, screenPos.y * 0.3, 1.0));
+    vec3 sharedLight = sharedDiffuse(synthNormal);
+    vec3 localLight = col;
+    col = mix(localLight, localLight * sharedLight, 0.3);
+  }
+
   // Melodic color temperature
   col *= mix(vec3(1.05, 0.98, 0.9), vec3(0.9, 0.98, 1.05), melPitch);
 
@@ -290,6 +302,9 @@ void main() {
     col += iconEmergence(screenPos, uTime, energy, bass, cloudColor, emissionColor, nf, uClimaxPhase, uSectionIndex);
     col += heroIconEmergence(screenPos, uTime, energy, bass, cloudColor, emissionColor, nf, uSectionIndex);
   }
+
+  // Shared color temperature for crossfade continuity
+  col = applyTemperature(col);
 
   // Post-processing
   col = applyPostProcess(col, vUv, screenPos);

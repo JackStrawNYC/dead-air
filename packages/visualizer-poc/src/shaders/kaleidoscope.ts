@@ -29,6 +29,7 @@ import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
 import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
+import { lightingGLSL } from "./shared/lighting.glsl";
 
 export const kaleidoscopeVert = /* glsl */ `
 varying vec2 vUv;
@@ -48,6 +49,8 @@ ${sharedUniformsGLSL}
 uniform sampler2D uPrevFrame;
 
 ${noiseGLSL}
+
+${lightingGLSL}
 
 ${buildPostProcessGLSL({ grainStrength: "normal", bloomEnabled: true, halationEnabled: true, paletteCycleEnabled: true, temporalBlendEnabled: true })}
 
@@ -381,10 +384,12 @@ void main() {
     // ─── Material Color ───
     vec3 matColor = ksGemColor(matID, hue1, hue2, uChromaHue * 0.2, saturation);
 
-    // ─── Lighting ───
+    // ─── Lighting — blend shared lighting for crossfade continuity ───
     // Key light: from behind camera, warm
     vec3 keyLightDir = normalize(vec3(0.3, 0.5, -0.8));
-    float keyDiff = max(dot(nor, keyLightDir), 0.0);
+    float localKeyDiff = max(dot(nor, keyLightDir), 0.0);
+    vec3 sharedLight = sharedDiffuse(nor);
+    float keyDiff = mix(localKeyDiff, dot(sharedLight, vec3(0.333)), 0.3);
     vec3 keyColor = vec3(1.0, 0.95, 0.9) * 0.7;
 
     // Backlight through gems (vocal presence driven)
@@ -398,10 +403,12 @@ void main() {
     float rimIntensity = 0.15 + timbralBright * 0.4;
     vec3 rimColor = hsv2rgb(vec3(fract(hue1 + 0.3), 0.5, 1.0)) * rimIntensity;
 
-    // Specular: highs control sharpness
+    // Specular: highs control sharpness — blend shared specular
     float specPow = mix(16.0, 128.0, highs);
     vec3 halfVec = normalize(keyLightDir - rd);
-    float spec = pow(max(dot(nor, halfVec), 0.0), specPow);
+    float localSpec = pow(max(dot(nor, halfVec), 0.0), specPow);
+    vec3 sharedSpec = sharedSpecular(nor, -rd, specPow);
+    float spec = mix(localSpec, dot(sharedSpec, vec3(0.333)), 0.3);
 
     // Gem refraction highlight: iridescent internal reflection
     vec3 refractDir = refract(rd, nor, 0.67); // glass-like IOR
@@ -495,6 +502,9 @@ void main() {
   float vignette = 1.0 - dot(screenPos * vigScale, screenPos * vigScale);
   vignette = smoothstep(-0.05, 0.8, vignette);
   col = mix(vec3(0.01, 0.008, 0.02), col, vignette);
+
+  // Shared color temperature for crossfade continuity
+  col = applyTemperature(col);
 
   // ─── Post-Processing ───
   col = applyPostProcess(col, uv, screenPos);

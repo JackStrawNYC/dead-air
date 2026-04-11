@@ -27,6 +27,7 @@ import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
 import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
+import { lightingGLSL } from "./shared/lighting.glsl";
 
 export const deepOceanVert = /* glsl */ `
 varying vec2 vUv;
@@ -54,6 +55,8 @@ precision highp float;
 ${sharedUniformsGLSL}
 
 ${noiseGLSL}
+
+${lightingGLSL}
 
 ${postProcess}
 
@@ -627,8 +630,10 @@ void main() {
     // Light direction: from above, slightly offset
     vec3 lightDir = normalize(vec3(0.3, 1.0, -0.2));
 
-    // Diffuse lighting
-    float diff = max(dot(norm, lightDir), 0.0);
+    // Diffuse lighting — blend shared lighting for crossfade continuity
+    float localDiff = max(dot(norm, lightDir), 0.0);
+    vec3 sharedLight = sharedDiffuse(norm);
+    float diff = mix(localDiff, dot(sharedLight, vec3(0.333)), 0.3);
 
     // Subsurface scattering approximation
     float scatter = max(0.0, dot(-norm, lightDir)) * 0.3;
@@ -785,6 +790,9 @@ void main() {
   float noiseField = snoise(vec3(screenP * 2.0, uTime * 0.1));
   col += iconEmergence(screenP, uTime, energy, bassVal, waterColor, accentColor, noiseField, uClimaxPhase, uSectionIndex);
   col += heroIconEmergence(screenP, uTime, energy, bassVal, waterColor, accentColor, noiseField, uSectionIndex);
+
+  // Shared color temperature for crossfade continuity
+  col = applyTemperature(col);
 
   // === POST-PROCESSING (shared chain) ===
   col = applyPostProcess(col, vUv, screenP);

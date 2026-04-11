@@ -33,6 +33,7 @@ import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
 import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
+import { lightingGLSL } from "./shared/lighting.glsl";
 
 export const infernoVert = /* glsl */ `
 varying vec2 vUv;
@@ -62,6 +63,8 @@ precision highp float;
 ${sharedUniformsGLSL}
 
 ${noiseGLSL}
+
+${lightingGLSL}
 
 ${postProcess}
 
@@ -471,9 +474,12 @@ void main() {
       vec3 rockTint = paletteHueColor(hue1, 0.7, 0.85);
       rockColor = mix(rockColor, rockTint * 0.15, 0.15);
 
-      // Diffuse lighting: magma from below + dim ambient
-      float diffMagma = max(0.0, dot(norm, -magmaLightDir)) * 0.4;
-      float diffAmbient = max(0.0, dot(norm, ambientDir)) * 0.08;
+      // Diffuse lighting: magma from below + dim ambient — blend shared for crossfade continuity
+      float localDiffMagma = max(0.0, dot(norm, -magmaLightDir)) * 0.4;
+      float localDiffAmbient = max(0.0, dot(norm, ambientDir)) * 0.08;
+      vec3 sharedLight = sharedDiffuse(norm);
+      float diffMagma = mix(localDiffMagma, dot(sharedLight, vec3(0.333)) * 0.4, 0.3);
+      float diffAmbient = mix(localDiffAmbient, dot(sharedLight, vec3(0.333)) * 0.08, 0.3);
 
       // Geyser point lights contribution
       float geyserDiff1 = max(0.0, dot(norm, normalize(geyserLight1 - marchPos)))
@@ -736,6 +742,9 @@ void main() {
     vec3 vigColor = mix(vec3(0.015, 0.005, 0.0), vec3(0.0), 1.0 - magmaPressure * 0.2);
     col = mix(vigColor, col, vignette);
   }
+
+  // Shared color temperature for crossfade continuity
+  col = applyTemperature(col);
 
   // === POST-PROCESSING (shared chain) ===
   col = applyPostProcess(col, uv, screenP);
