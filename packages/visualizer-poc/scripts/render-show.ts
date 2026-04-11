@@ -677,7 +677,7 @@ function main() {
   const numCores = cpus().length;
   const renderWidth = parseInt(process.env.RENDER_WIDTH ?? "1920", 10);
   const pixelScale = (renderWidth * parseInt(process.env.RENDER_HEIGHT ?? "1080", 10)) / (1920 * 1080);
-  const adaptiveConcurrency = activePreset?.concurrency ?? Math.min(24, Math.max(4, Math.floor(numCores / pixelScale)));
+  const adaptiveConcurrency = activePreset?.concurrency ?? Math.min(8, Math.max(4, Math.floor(numCores / pixelScale)));
   console.log(`Resolution: ${process.env.RENDER_WIDTH}x${process.env.RENDER_HEIGHT} | Concurrency: ${adaptiveConcurrency} (${numCores} cores)`);
 
   const setlist = JSON.parse(readFileSync(join(DATA_DIR, "setlist.json"), "utf-8"));
