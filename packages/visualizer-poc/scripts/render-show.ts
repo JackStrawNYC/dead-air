@@ -667,14 +667,17 @@ function main() {
     if (activePreset.skipBloom) process.env.SKIP_BLOOM = "1";
     console.log(`Preset: ${activePreset.label}`);
   } else {
-    process.env.RENDER_WIDTH = previewMode ? "1920" : "3840";
-    process.env.RENDER_HEIGHT = previewMode ? "1080" : "2160";
+    // Default to 1080p (was 4K). Use --preset=4k for 4K renders.
+    process.env.RENDER_WIDTH = process.env.RENDER_WIDTH ?? "1920";
+    process.env.RENDER_HEIGHT = process.env.RENDER_HEIGHT ?? "1080";
   }
-  // Adaptive concurrency: scale based on resolution and available CPU cores
+  // Adaptive concurrency: scale based on resolution and available CPU cores.
+  // Without a preset, auto-detect from CPU count with a cap of 24.
+  // This matches the configuration that successfully rendered Veneta in ~3h.
   const numCores = cpus().length;
   const renderWidth = parseInt(process.env.RENDER_WIDTH ?? "1920", 10);
   const pixelScale = (renderWidth * parseInt(process.env.RENDER_HEIGHT ?? "1080", 10)) / (1920 * 1080);
-  const adaptiveConcurrency = activePreset?.concurrency ?? Math.max(4, Math.floor(numCores / pixelScale));
+  const adaptiveConcurrency = activePreset?.concurrency ?? Math.min(24, Math.max(4, Math.floor(numCores / pixelScale)));
   console.log(`Resolution: ${process.env.RENDER_WIDTH}x${process.env.RENDER_HEIGHT} | Concurrency: ${adaptiveConcurrency} (${numCores} cores)`);
 
   const setlist = JSON.parse(readFileSync(join(DATA_DIR, "setlist.json"), "utf-8"));
