@@ -26,7 +26,8 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
-import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
+import { buildRaymarchNormal, buildRaymarchAO, buildDepthAlphaOutput } from "./shared/raymarching.glsl";
+import { lightingGLSL } from "./shared/lighting.glsl";
 
 export const stormVert = /* glsl */ `
 varying vec2 vUv;
@@ -38,6 +39,7 @@ void main() {
 
 const stmNormalGLSL = buildRaymarchNormal("stmMap($P)", { eps: 0.01, name: "stmNormal" });
 const stmAOGLSL = buildRaymarchAO("stmMap($P)", { steps: 5, stepBase: 0.02, stepScale: 0.08, weightDecay: 0.65, finalMult: 2.0, name: "stmAO" });
+const stmDepthAlpha = buildDepthAlphaOutput("marchDist", "MAX_DIST");
 
 export const stormFrag = /* glsl */ `
 precision highp float;
@@ -45,6 +47,8 @@ precision highp float;
 ${sharedUniformsGLSL}
 
 ${noiseGLSL}
+
+${lightingGLSL}
 
 ${buildPostProcessGLSL({
   grainStrength: "heavy",
@@ -473,9 +477,13 @@ void main() {
   // ─── Darkness texture ───
   col += darknessTexture(uv, uTime, energy);
 
+  // Shared color temperature for crossfade continuity
+  col = applyTemperature(col);
+
   // ─── Post-processing ───
   col = applyPostProcess(col, vUv, screenPos);
 
   gl_FragColor = vec4(col, 1.0);
+  ${stmDepthAlpha}
 }
 `;

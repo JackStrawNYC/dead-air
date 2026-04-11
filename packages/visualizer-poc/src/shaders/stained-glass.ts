@@ -26,7 +26,8 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
-import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
+import { buildRaymarchNormal, buildRaymarchAO, buildDepthAlphaOutput } from "./shared/raymarching.glsl";
+import { lightingGLSL } from "./shared/lighting.glsl";
 
 export const stainedGlassVert = /* glsl */ `
 varying vec2 vUv;
@@ -49,6 +50,7 @@ const postProcess = buildPostProcessGLSL({
 
 const sglNormalGLSL = buildRaymarchNormal("sglMap($P)", { eps: 0.005, name: "sglNormal" });
 const sglAOGLSL = buildRaymarchAO("sglMap($P)", { steps: 5, stepBase: 0.0, stepScale: 0.1, weightDecay: 0.6, finalMult: 2.5, name: "sglAO" });
+const sglDepthAlpha = buildDepthAlphaOutput("totalDist", "MAX_DIST");
 
 export const stainedGlassFrag = /* glsl */ `
 precision highp float;
@@ -56,6 +58,8 @@ precision highp float;
 ${sharedUniformsGLSL}
 
 ${noiseGLSL}
+
+${lightingGLSL}
 
 ${postProcess}
 
@@ -685,9 +689,13 @@ void main() {
     col = mix(vec3(0.002, 0.001, 0.004), col, vignette);
   }
 
+  // Shared color temperature for crossfade continuity
+  col = applyTemperature(col);
+
   // ─── Post-processing ───
   col = applyPostProcess(col, uv, screenP);
 
   gl_FragColor = vec4(col, 1.0);
+  ${sglDepthAlpha}
 }
 `;

@@ -26,7 +26,7 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
-import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
+import { buildRaymarchNormal, buildRaymarchAO, buildDepthAlphaOutput } from "./shared/raymarching.glsl";
 import { lightingGLSL } from "./shared/lighting.glsl";
 
 export const deepOceanVert = /* glsl */ `
@@ -48,6 +48,7 @@ const postProcess = buildPostProcessGLSL({
 
 const do2NormalGLSL = buildRaymarchNormal("do2Map($P, flowTime, bassVal, midsVal, drumOnset, melodicPitch, climaxAmount).x", { eps: 0.002, name: "do2Normal" });
 const do2OcclusionGLSL = buildRaymarchAO("do2Map($P, flowTime, bassVal, midsVal, drumOnset, melodicPitch, climaxAmount).x", { steps: 5, stepBase: 0.02, stepScale: 0.06, weightDecay: 0.7, finalMult: 3.0, name: "do2Occlusion" });
+const do2DepthAlpha = buildDepthAlphaOutput("totalDist", "MAX_DIST");
 
 export const deepOceanFrag = /* glsl */ `
 precision highp float;
@@ -798,5 +799,6 @@ void main() {
   col = applyPostProcess(col, vUv, screenP);
 
   gl_FragColor = vec4(col, 1.0);
+  ${do2DepthAlpha}
 }
 `;

@@ -34,6 +34,7 @@ import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
 import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
+import { lightingGLSL } from "./shared/lighting.glsl";
 
 export const lavaFlowVert = /* glsl */ `
 varying vec2 vUv;
@@ -63,6 +64,8 @@ precision highp float;
 ${sharedUniformsGLSL}
 
 ${noiseGLSL}
+
+${lightingGLSL}
 
 ${postProcess}
 
@@ -766,6 +769,9 @@ void main() {
     vec3 vigColor = mix(vec3(0.012, 0.004, 0.0), vec3(0.0), 1.0 - magmaPressure * 0.15);
     col = mix(vigColor, col, vignette);
   }
+
+  // Shared color temperature for crossfade continuity
+  col = applyTemperature(col);
 
   // === POST-PROCESSING (shared chain) ===
   col = applyPostProcess(col, uv, screenP);

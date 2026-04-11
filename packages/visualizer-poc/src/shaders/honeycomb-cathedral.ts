@@ -19,7 +19,8 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
-import { buildRaymarchNormal } from "./shared/raymarching.glsl";
+import { buildRaymarchNormal, buildDepthAlphaOutput } from "./shared/raymarching.glsl";
+import { lightingGLSL } from "./shared/lighting.glsl";
 
 export const honeycombCathedralVert = /* glsl */ `
 varying vec2 vUv;
@@ -38,11 +39,13 @@ const postProcess = buildPostProcessGLSL({
 });
 
 const hcNormalGLSL = buildRaymarchNormal("hcMap($P, energy, bass, hcTime, tension, melPitch, sJam, sSpace, climB, drumOn)", { eps: 0.002, name: "hcNormal" });
+const hcDepthAlpha = buildDepthAlphaOutput("totalDist", "15.0");
 
 export const honeycombCathedralFrag = /* glsl */ `
 precision highp float;
 ${sharedUniformsGLSL}
 ${noiseGLSL}
+${lightingGLSL}
 ${postProcess}
 varying vec2 vUv;
 
@@ -417,8 +420,12 @@ void main() {
   // ─── Floor: never fully black ───
   col = max(col, vec3(0.02, 0.015, 0.005));
 
+  // Shared color temperature for crossfade continuity
+  col = applyTemperature(col);
+
   // ─── Post-process ───
   col = applyPostProcess(col, uv, p);
   gl_FragColor = vec4(col, 1.0);
+  ${hcDepthAlpha}
 }
 `;

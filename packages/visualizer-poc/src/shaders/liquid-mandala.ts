@@ -28,7 +28,8 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
-import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
+import { buildRaymarchNormal, buildRaymarchAO, buildDepthAlphaOutput } from "./shared/raymarching.glsl";
+import { lightingGLSL } from "./shared/lighting.glsl";
 
 export const liquidMandalaVert = /* glsl */ `
 varying vec2 vUv;
@@ -40,6 +41,7 @@ void main() {
 
 const lmNormalGLSL = buildRaymarchNormal("lmSceneSDFScalar($P, sceneTime, energy, tension, bass, stability, rotation, coherence)", { eps: 0.003, name: "lmCalcNormal" });
 const lmAOGLSL = buildRaymarchAO("lmSceneSDFScalar($P, sceneTime, energy, tension, bass, stability, rotation, coherence)", { steps: 4, stepBase: 0.0, stepScale: 0.1, weightDecay: 0.5, finalMult: 4.0, name: "lmCalcOcclusion" });
+const lmDepthAlpha = buildDepthAlphaOutput("marchDist", "LM_MAX_DIST");
 
 export const liquidMandalaFrag = /* glsl */ `
 precision highp float;
@@ -48,6 +50,8 @@ ${sharedUniformsGLSL}
 uniform sampler2D uPrevFrame;
 
 ${noiseGLSL}
+
+${lightingGLSL}
 
 ${buildPostProcessGLSL({
   grainStrength: "light",
@@ -329,9 +333,13 @@ void main() {
   vignette = smoothstep(0.0, 1.0, vignette);
   col = mix(vec3(0.005, 0.004, 0.01), col, vignette);
 
+  // Shared color temperature for crossfade continuity
+  col = applyTemperature(col);
+
   // ---- Post-processing ----
   col = applyPostProcess(col, vUv, screenP);
 
   gl_FragColor = vec4(col, 1.0);
+  ${lmDepthAlpha}
 }
 `;

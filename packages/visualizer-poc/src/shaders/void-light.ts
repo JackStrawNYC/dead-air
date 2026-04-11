@@ -33,7 +33,7 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
-import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
+import { buildRaymarchNormal, buildRaymarchAO, buildDepthAlphaOutput } from "./shared/raymarching.glsl";
 import { lightingGLSL } from "./shared/lighting.glsl";
 
 export const voidLightVert = /* glsl */ `
@@ -46,6 +46,7 @@ void main() {
 
 const vlNormalGLSL = buildRaymarchNormal("vlMap($P, icoRadius, time, rotSpeed, beatSnap, beatStability, climaxShatter)", { eps: 0.002, name: "vlNormal" });
 const vlAOGLSL = buildRaymarchAO("vlMap($P, icoRadius, time, rotSpeed, beatSnap, beatStability, climaxShatter)", { steps: 5, stepBase: 0.0, stepScale: 0.06, weightDecay: 0.6, finalMult: 4.0, name: "vlAmbientOcclusion" });
+const vlDepthAlpha = buildDepthAlphaOutput("marchT", "VL_MAX_DIST");
 
 export const voidLightFrag = /* glsl */ `
 precision highp float;
@@ -478,5 +479,6 @@ void main() {
   // === POST-PROCESSING ===
   col = applyPostProcess(col, vUv, screenP);
   gl_FragColor = vec4(col, 1.0);
+  ${vlDepthAlpha}
 }
 `;

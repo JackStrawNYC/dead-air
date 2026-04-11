@@ -32,7 +32,7 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
-import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
+import { buildRaymarchNormal, buildRaymarchAO, buildDepthAlphaOutput } from "./shared/raymarching.glsl";
 import { lightingGLSL } from "./shared/lighting.glsl";
 
 export const infernoVert = /* glsl */ `
@@ -56,6 +56,7 @@ const postProcess = buildPostProcessGLSL({
 
 const in2NormalGLSL = buildRaymarchNormal("in2Map($P, bass, energy, drumOnset, tension, flowTime, floodLevel, melodicPitch, eruptionScale, geyserTime).x", { eps: 0.003, name: "in2Normal" });
 const in2OcclusionGLSL = buildRaymarchAO("in2Map($P, bass, energy, drumOnset, tension, flowTime, floodLevel, melodicPitch, eruptionScale, geyserTime).x", { steps: 5, stepBase: 0.02, stepScale: 0.06, weightDecay: 0.7, finalMult: 4.0, name: "in2Occlusion" });
+const in2DepthAlpha = buildDepthAlphaOutput("totalDist", "MAX_DIST");
 
 export const infernoFrag = /* glsl */ `
 precision highp float;
@@ -750,5 +751,6 @@ void main() {
   col = applyPostProcess(col, uv, screenP);
 
   gl_FragColor = vec4(col, 1.0);
+  ${in2DepthAlpha}
 }
 `;

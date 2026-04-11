@@ -28,6 +28,7 @@ import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
 import { lightingGLSL } from "./shared/lighting.glsl";
+import { buildDepthAlphaOutput } from "./shared/raymarching.glsl";
 
 export const auroraVert = /* glsl */ `
 varying vec2 vUv;
@@ -47,6 +48,7 @@ const postProcess = buildPostProcessGLSL({
   eraGradingEnabled: true,
   lightLeakEnabled: false,
 });
+const arDepthAlpha = buildDepthAlphaOutput("max(marchDist, 0.0)", "120.0");
 
 export const auroraFrag = /* glsl */ `
 precision highp float;
@@ -632,5 +634,6 @@ void main() {
   col = applyPostProcess(col, uv, screenP);
 
   gl_FragColor = vec4(col, 1.0);
+  ${arDepthAlpha}
 }
 `;

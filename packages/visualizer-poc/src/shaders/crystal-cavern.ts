@@ -26,7 +26,8 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
-import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
+import { buildRaymarchNormal, buildRaymarchAO, buildDepthAlphaOutput } from "./shared/raymarching.glsl";
+import { lightingGLSL } from "./shared/lighting.glsl";
 
 export const crystalCavernVert = /* glsl */ `
 varying vec2 vUv;
@@ -38,6 +39,7 @@ void main() {
 
 const cvNormalGLSL = buildRaymarchNormal("cvMap($P, bassVib, climaxShatter)", { eps: 0.003, name: "cvNormal" });
 const cvAOGLSL = buildRaymarchAO("cvMap($P, bassVib, climaxShatter)", { steps: 5, stepBase: 0.0, stepScale: 0.08, weightDecay: 0.6, finalMult: 3.0, name: "cvAmbientOcclusion" });
+const cvDepthAlpha = buildDepthAlphaOutput("totalDist", "MAX_DIST");
 
 export const crystalCavernFrag = /* glsl */ `
 precision highp float;
@@ -45,6 +47,8 @@ precision highp float;
 ${sharedUniformsGLSL}
 
 ${noiseGLSL}
+
+${lightingGLSL}
 
 ${buildPostProcessGLSL({
   grainStrength: "normal",
@@ -610,9 +614,13 @@ void main() {
   vec3 fogColor = vec3(0.01, 0.005, 0.02);
   col = mix(col, fogColor, fogDensity * (0.4 + fogNoise * 0.4));
 
+  // Shared color temperature for crossfade continuity
+  col = applyTemperature(col);
+
   // === POST-PROCESSING ===
   col = applyPostProcess(col, uv, screenP);
 
   gl_FragColor = vec4(col, 1.0);
+  ${cvDepthAlpha}
 }
 `;

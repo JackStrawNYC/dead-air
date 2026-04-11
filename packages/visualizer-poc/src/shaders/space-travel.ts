@@ -27,6 +27,7 @@ import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
 import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
+import { lightingGLSL } from "./shared/lighting.glsl";
 
 export const spaceTravelVert = /* glsl */ `
 varying vec2 vUv;
@@ -45,6 +46,8 @@ precision highp float;
 ${sharedUniformsGLSL}
 
 ${noiseGLSL}
+
+${lightingGLSL}
 
 ${buildPostProcessGLSL({ grainStrength: "light", flareEnabled: true, halationEnabled: true, caEnabled: true, bloomEnabled: true, bloomThresholdOffset: -0.1 })}
 
@@ -349,6 +352,9 @@ void main() {
     col += iconEmergence(screenPos, uTime, energy, bass, palCol1, palCol2, nf, uClimaxPhase, uSectionIndex);
     col += heroIconEmergence(screenPos, uTime, energy, bass, palCol1, palCol2, nf, uSectionIndex);
   }
+
+  // Shared color temperature for crossfade continuity
+  col = applyTemperature(col);
 
   // Post-processing
   col = applyPostProcess(col, vUv, screenPos);

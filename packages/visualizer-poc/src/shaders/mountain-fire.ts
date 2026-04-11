@@ -27,6 +27,7 @@ import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
 import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
+import { lightingGLSL } from "./shared/lighting.glsl";
 
 export const mountainFireVert = /* glsl */ `
 varying vec2 vUv;
@@ -45,6 +46,8 @@ precision highp float;
 ${sharedUniformsGLSL}
 
 ${noiseGLSL}
+
+${lightingGLSL}
 
 ${buildPostProcessGLSL({
   grainStrength: "normal",
@@ -492,6 +495,9 @@ void main() {
   float vignette = 1.0 - dot(screenPos * vigScale, screenPos * vigScale);
   vignette = smoothstep(0.0, 1.0, vignette);
   col = mix(vec3(0.01, 0.005, 0.002), col, vignette);
+
+  // Shared color temperature for crossfade continuity
+  col = applyTemperature(col);
 
   // ─── Post-processing ───
   col = applyPostProcess(col, vUv, screenPos);

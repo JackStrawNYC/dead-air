@@ -28,7 +28,7 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
-import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
+import { buildRaymarchNormal, buildRaymarchAO, buildDepthAlphaOutput } from "./shared/raymarching.glsl";
 import { lightingGLSL } from "./shared/lighting.glsl";
 
 export const kaleidoscopeVert = /* glsl */ `
@@ -41,6 +41,7 @@ void main() {
 
 const ksNormalGLSL = buildRaymarchNormal("ksMap($P, bassSize, gemCount, shatterAmt, flowTime).x", { eps: 0.001, name: "ksNormal" });
 const ksOccGLSL = buildRaymarchAO("ksMap($P, bassSize, gemCount, shatterAmt, flowTime).x", { steps: 5, stepBase: 0.01, stepScale: 0.12, weightDecay: 0.7, finalMult: 3.0, name: "ksOcclusion" });
+const ksDepthAlpha = buildDepthAlphaOutput("totalDist", "MAX_DIST");
 
 export const kaleidoscopeFrag = /* glsl */ `
 precision highp float;
@@ -510,5 +511,6 @@ void main() {
   col = applyPostProcess(col, uv, screenPos);
 
   gl_FragColor = vec4(col, 1.0);
+  ${ksDepthAlpha}
 }
 `;

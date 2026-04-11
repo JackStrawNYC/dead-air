@@ -6,7 +6,7 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
-import { buildRaymarchNormal } from "./shared/raymarching.glsl";
+import { buildRaymarchNormal, buildDepthAlphaOutput } from "./shared/raymarching.glsl";
 import { lightingGLSL } from "./shared/lighting.glsl";
 
 export const fractalTempleVert = /* glsl */ `
@@ -16,6 +16,7 @@ void main() { vUv = uv; gl_Position = vec4(position, 1.0); }
 
 const postProcess = buildPostProcessGLSL({ bloomThresholdOffset: 0.05, caEnabled: true, dofEnabled: true, eraGradingEnabled: true });
 const ftNormal = buildRaymarchNormal("ftMap($P, energy, bass, ft, psyche)", { eps: 0.002, name: "ftCalcNormal" });
+const ftDepthAlpha = buildDepthAlphaOutput("td", "12.0");
 
 export const fractalTempleFrag = /* glsl */ `
 precision highp float;
@@ -166,5 +167,6 @@ void main() {
   col = applyTemperature(col);
   col = applyPostProcess(col, uv, p);
   gl_FragColor = vec4(col, 1.0);
+  ${ftDepthAlpha}
 }
 `;

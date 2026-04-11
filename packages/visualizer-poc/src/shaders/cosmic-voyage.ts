@@ -27,6 +27,7 @@ import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
 import { lightingGLSL } from "./shared/lighting.glsl";
+import { buildDepthAlphaOutput } from "./shared/raymarching.glsl";
 
 export const cosmicVoyageVert = /* glsl */ `
 varying vec2 vUv;
@@ -35,6 +36,8 @@ void main() {
   gl_Position = vec4(position, 1.0);
 }
 `;
+
+const cvyDepthAlpha = buildDepthAlphaOutput("(1.0 - clamp(accDensity, 0.0, 1.0))", "1.0");
 
 export const cosmicVoyageFrag = /* glsl */ `
 precision highp float;
@@ -310,5 +313,6 @@ void main() {
   col = applyPostProcess(col, vUv, screenPos);
 
   gl_FragColor = vec4(col, 1.0);
+  ${cvyDepthAlpha}
 }
 `;

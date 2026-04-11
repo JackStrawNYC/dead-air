@@ -32,6 +32,7 @@ import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
 import { lightingGLSL } from "./shared/lighting.glsl";
+import { buildDepthAlphaOutput } from "./shared/raymarching.glsl";
 
 export const mandalaEngineVert = /* glsl */ `
 varying vec2 vUv;
@@ -51,6 +52,7 @@ const postProcess = buildPostProcessGLSL({
   eraGradingEnabled: true,
   lensDistortionEnabled: true,
 });
+const me2DepthAlpha = buildDepthAlphaOutput("totalDist", "15.0");
 
 export const mandalaEngineFrag = /* glsl */ `
 precision highp float;
@@ -586,5 +588,6 @@ void main() {
   col = applyPostProcess(col, uv, p);
 
   gl_FragColor = vec4(col, 1.0);
+  ${me2DepthAlpha}
 }
 `;
