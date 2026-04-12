@@ -353,8 +353,13 @@ void main() {
   // ─── Climax ───
   float climB = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5) * clamp(uClimaxIntensity, 0.0, 1.0);
 
+  // ─── Internal evolution over long holds ───
+  float holdP = clamp(uShaderHoldProgress, 0.0, 1.0);
+  float evolveComplexity = smoothstep(0.0, 0.5, holdP) * (1.0 - smoothstep(0.8, 1.0, holdP) * 0.4);
+  float evolveOpenness = 1.0 - smoothstep(0.0, 0.3, holdP) * 0.3 + smoothstep(0.75, 1.0, holdP) * 0.3;
+
   // ─── Derived parameters ───
-  float viscosity = tension; // high tension = rigid oil
+  float viscosity = tension * (1.0 - evolveComplexity * 0.3); // oil loosens as complexity builds
   float splashWave = drumOn * (1.0 + specFlux * 0.5); // drum onset + spectral flux = splash
   float llTime = uDynamicTime * (0.06 + slowE * 0.10) * (1.0 + sJam * 0.6 - sSpace * 0.4);
 
@@ -394,7 +399,7 @@ void main() {
   vec3 fw = normalize(lookPt - ro);
   vec3 ri = normalize(cross(vec3(0.0, 1.0, 0.0), fw));
   vec3 llUp = cross(fw, ri);
-  float fov = 0.75 + energy * 0.1 + climB * 0.15;
+  float fov = (0.75 + energy * 0.1 + climB * 0.15) * evolveOpenness;
   vec3 rd = normalize(p.x * ri + p.y * llUp + fov * fw);
 
   // ─── Raymarch the cathedral scene ───
@@ -450,7 +455,7 @@ void main() {
     // Caustics are stronger on floor (facing up), weaker on walls
     float causticMask = max(dot(norm, vec3(0.0, 1.0, 0.0)), 0.0);
     causticMask += max(dot(norm, vec3(0.0, -1.0, 0.0)), 0.0) * 0.3; // some on ceiling too
-    vec3 causticCol = oilLight * caustic * causticMask * (0.4 + highsVal * 0.6);
+    vec3 causticCol = oilLight * caustic * causticMask * (0.4 + highsVal * 0.6) * (0.5 + evolveComplexity * 0.5);
 
     // ─── Surface color: stone cathedral walls/floor ───
     // Per-surface variation

@@ -15,6 +15,14 @@
  *     - Deep (150-300 frames): + strobe + time dilation
  *     - Transcendent (300+ frames): force sacred shaders, overlay -> 0, max time dilation
  *
+ *   locked -> surrender: transcendent depth (300+ frames) + moderate coherence drop (> 0.10)
+ *     - 90-180 frame visual silence (scales with lock depth)
+ *     - Overlays: 0, luminance: -0.15 (near-black), saturation: 0.25 (near-monochrome)
+ *     - Vignette: 0.40 (extreme tunnel), time dilation: 0.05 (near-stopped)
+ *     - Camera locked, shader held (no switches), no strobe
+ *
+ *   surrender -> releasing: graceful wind-down (90 frames)
+ *
  *   locked -> releasing: graceful wind-down (90 frames)
  *     - Luminance lift fades 0.15 -> 0
  *     - Overlay opacity fades 0.05 -> 1.0
@@ -37,7 +45,7 @@ import { computeCoherence } from "./coherence";
 
 // --- Types ---
 
-export type ITPhase = "normal" | "locking" | "locked" | "releasing" | "breaking";
+export type ITPhase = "normal" | "locking" | "locked" | "surrender" | "releasing" | "breaking";
 
 export type LockDepth = "shallow" | "medium" | "deep" | "transcendent";
 
@@ -78,6 +86,8 @@ export interface ITVisualState {
   heroEruption: boolean;
   /** Vignette tightening during lock (0 = normal, 0.3 = tight tunnel focus) */
   vignettePull: number;
+  /** Whether currently in surrender phase (visual silence after transcendent lock) */
+  isSurrender: boolean;
 }
 
 // --- Constants ---
@@ -109,6 +119,15 @@ const RELEASING_FRAMES = 90;
 /** Sudden break detection: score drop threshold in < 15 frames */
 const SUDDEN_BREAK_SCORE_DROP = 0.3;
 const SUDDEN_BREAK_WINDOW = 15;
+
+/** Surrender phase: visual silence after transcendent lock when coherence drops suddenly.
+ *  Triggers when locked at transcendent depth (300+ frames) and coherence drops > 0.10 in 15 frames.
+ *  Duration: 90-180 frames (3-6s), scaled by how deep the lock was. */
+const SURRENDER_MIN_FRAMES = 90;
+const SURRENDER_MAX_FRAMES = 180;
+/** Surrender trigger: coherence drop threshold within SURRENDER_DETECT_WINDOW frames */
+const SURRENDER_SCORE_DROP = 0.10;
+const SURRENDER_DETECT_WINDOW = 15;
 
 /** Max transcendent locks per set before gating to "deep" tier */
 const MAX_TRANSCENDENT_PER_SET = 1;
@@ -252,12 +271,71 @@ export function computeITResponse(
           snapZoom: framesSinceUnlock < 3 ? 0.8 : 0, // snap zoom on break frame
           heroEruption: false,
           vignettePull: 0,
+          isSurrender: false,
         };
       }
     } else {
-      // Releasing: gradual wind-down over 90 frames
-      if (framesSinceUnlock < RELEASING_FRAMES) {
-        const releaseProgress = framesSinceUnlock / RELEASING_FRAMES;
+      // Detect if the prior lock was transcendent (300+ frames) with moderate coherence drop
+      // → surrender phase: visual silence before gradual release
+      let priorLockDuration = 0;
+      if (unlockFrame > 0) {
+        for (let i = unlockFrame - 1; i >= Math.max(0, unlockFrame - 600); i--) {
+          const st = computeCoherence(frames, i);
+          if (!st.isLocked) {
+            priorLockDuration = unlockFrame - (i + 1);
+            break;
+          }
+          if (i === Math.max(0, unlockFrame - 600)) {
+            priorLockDuration = unlockFrame - i;
+          }
+        }
+      }
+
+      // Check for moderate coherence drop (> SURRENDER_SCORE_DROP within detect window)
+      let isSurrenderDrop = false;
+      if (priorLockDuration >= DEEP_END && unlockFrame > 0) {
+        const scoreAtUnlock = computeCoherence(frames, unlockFrame).score;
+        const scoreBefore = computeCoherence(frames, Math.max(0, unlockFrame - SURRENDER_DETECT_WINDOW)).score;
+        isSurrenderDrop = (scoreBefore - scoreAtUnlock) > SURRENDER_SCORE_DROP;
+      }
+
+      // Surrender: visual silence after transcendent lock
+      // Duration scales with lock depth — deeper lock = longer surrender (90-180 frames)
+      const surrenderDuration = isSurrenderDrop
+        ? Math.round(SURRENDER_MIN_FRAMES + Math.min(1, (priorLockDuration - DEEP_END) / 300) * (SURRENDER_MAX_FRAMES - SURRENDER_MIN_FRAMES))
+        : 0;
+
+      if (isSurrenderDrop && framesSinceUnlock < surrenderDuration) {
+        // Surrender phase: near-black visual silence, hold current shader frozen
+        const surrenderProgress = framesSinceUnlock / surrenderDuration;
+
+        return {
+          phase: "surrender",
+          convergenceProgress: 0,
+          targetHue,
+          overlayOpacityOverride: 0,                         // complete visual silence
+          cameraLock: true,                                  // absolute freeze
+          luminanceLift: -0.15,                              // near-black, darken aggressively
+          snapToMusicalTime: false,
+          flashIntensity: 0,
+          triggerReset: false,
+          strobeIntensity: 0,                                // no strobe during surrender
+          timeDilation: 0.05,                                // near-stopped shader animation
+          flashHue: 0,
+          lockDepth: "transcendent",
+          forceTranscendentShader: true,                     // hold current shader, don't switch
+          saturationSurge: 0.25,                             // near-monochrome
+          snapZoom: 0,
+          heroEruption: false,
+          vignettePull: 0.40,                                // extreme tunnel, edges fully dark
+          isSurrender: true,
+        };
+      }
+
+      // Releasing: gradual wind-down over 90 frames (offset by surrender duration if applicable)
+      const releaseStart = isSurrenderDrop ? surrenderDuration : 0;
+      if (framesSinceUnlock >= releaseStart && framesSinceUnlock < releaseStart + RELEASING_FRAMES) {
+        const releaseProgress = (framesSinceUnlock - releaseStart) / RELEASING_FRAMES;
         const eased = smoothstep(releaseProgress);
 
         return {
@@ -265,7 +343,7 @@ export function computeITResponse(
           convergenceProgress: 0,
           targetHue,
           overlayOpacityOverride: LOCKED_OVERLAY_OPACITY + (1 - LOCKED_OVERLAY_OPACITY) * eased,
-          cameraLock: framesSinceUnlock < 30,
+          cameraLock: framesSinceUnlock - releaseStart < 30,
           luminanceLift: LOCKED_LUMINANCE_LIFT * (1 - eased),
           snapToMusicalTime: false,
           flashIntensity: 0,
@@ -279,6 +357,7 @@ export function computeITResponse(
           snapZoom: 0,
           heroEruption: false,
           vignettePull: 0,
+          isSurrender: false,
         };
       }
     }
@@ -312,6 +391,7 @@ export function computeITResponse(
         snapZoom: eased > 0.7 ? (eased - 0.7) * 2 : 0, // gentle zoom pull-in
         heroEruption: eased > 0.95, // fire hero icon at convergence completion
         vignettePull: eased * 0.15, // start tightening focus
+        isSurrender: false,
       };
     }
 
@@ -417,6 +497,7 @@ export function computeITResponse(
       snapZoom,
       heroEruption: false,
       vignettePull,
+      isSurrender: false,
     };
   }
 
@@ -445,6 +526,7 @@ export function computeITResponse(
       snapZoom: 0,
       heroEruption: false,
       vignettePull: eased * 0.05,
+      isSurrender: false,
     };
   }
 
@@ -471,5 +553,6 @@ function defaultState(): ITVisualState {
     snapZoom: 0,
     heroEruption: false,
     vignettePull: 0,
+    isSurrender: false,
   };
 }

@@ -55,11 +55,11 @@ ${lightingGLSL}
 ${buildPostProcessGLSL({
   bloomEnabled: true,
   bloomThresholdOffset: 0.1,
-  halationEnabled: false,
+  halationEnabled: true,
   grainStrength: "light",
   temporalBlendEnabled: true,
-  caEnabled: false,
-  lightLeakEnabled: false,
+  caEnabled: true,
+  lightLeakEnabled: true,
 })}
 
 varying vec2 vUv;

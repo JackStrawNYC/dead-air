@@ -31,6 +31,7 @@ import { fxaaVert, fxaaFrag } from "../shaders/shared/fxaa.glsl";
 import { gpuMonitor } from "../utils/gpu-monitor";
 import { DEFAULT_LIGHTING, type LightingState } from "../utils/lighting-context";
 import { createBaseUniforms as createSharedBaseUniforms, syncBaseUniforms, ERA_SATURATION, ERA_BRIGHTNESS, ERA_SEPIA } from "../utils/shader-uniforms";
+import { useShowVisualSeed } from "../data/ShowVisualSeedContext";
 
 /** Reusable Color for save/restore clear color */
 const _clearColor = new THREE.Color();
@@ -82,6 +83,7 @@ export const MultiPassQuad: React.FC<Props> = ({
     time, beatDecay, smooth, palettePrimary, paletteSecondary,
     paletteSaturation, tempo, musicalTime, climaxPhase, climaxIntensity,
     heroTrigger, heroProgress, jamDensity, jamPhase, jamProgress, coherence, dynamicTime, isLocked, peakOfShow,
+    songProgress, shaderHoldProgress,
   } = useAudioData();
   const { width, height } = useVideoConfig();
   const currentFrame = useCurrentFrame();
@@ -94,6 +96,7 @@ export const MultiPassQuad: React.FC<Props> = ({
   const eraSepia = ERA_SEPIA[eraKey] ?? 0.0;
   const filmStock = deriveFilmStock(showCtx?.showSeed ?? 0);
   const venueProfile = getVenueProfile(showCtx?.venueType ?? "");
+  const showVisualSeed = useShowVisualSeed();
   const gl = useThree((state) => state.gl);
 
   const lastRenderedFrame = useRef(-1);
@@ -300,10 +303,12 @@ export const MultiPassQuad: React.FC<Props> = ({
     tempo, musicalTime, climaxPhase, climaxIntensity,
     heroTrigger, heroProgress, jamDensity, jamPhase, jamProgress,
     coherence, isLocked, peakOfShow,
+    songProgress, shaderHoldProgress,
     eraSaturation, eraBrightness, eraSepia,
     filmStock, venueProfile,
     shaderWidth: width, shaderHeight: height,
     sceneConfig, envelope, lightingRef,
+    showVisualSeed,
   });
 
   // Update FFT texture

@@ -279,6 +279,11 @@ void main() {
   float isClimax = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5);
   float climaxEngulf = isClimax * climaxIntensity;
 
+  // Stem reactivity
+  float stemDrums = clamp(uStemDrums, 0.0, 1.0);
+  float stemBass = clamp(uStemBass, 0.0, 1.0);
+  float vocalE = clamp(uVocalEnergy, 0.0, 1.0);
+
   // Section type
   float sJam = smoothstep(4.5, 5.5, uSectionType) * (1.0 - step(5.5, uSectionType));
   float sSpace = smoothstep(6.5, 7.5, uSectionType);
@@ -297,6 +302,8 @@ void main() {
   // Burst amount from onsets and drum hits
   float burstAmt = onsetSnap * 0.6 + drumOnset * 0.8;
   burstAmt *= 1.0 + aggression * 0.4;
+  // Stem drums add eruption pulse
+  burstAmt += stemDrums * 0.3;
 
   // Palette
   float hue1 = uPalettePrimary;
@@ -348,8 +355,12 @@ void main() {
     vec3(1.0, 0.6, 0.1),    // bright orange-gold
     energy
   );
-  fireGlow *= fireGrad * (0.15 + energy * 0.25 + climaxEngulf * 0.3 + bass * 0.1);
+  // Stem bass intensifies lava flow glow
+  fireGlow *= fireGrad * (0.15 + energy * 0.25 + climaxEngulf * 0.3 + bass * 0.1 + stemBass * 0.12);
   col += fireGlow;
+
+  // Vocal warmth: smoke takes on warm glow when voice present
+  col += vec3(0.08, 0.04, 0.02) * vocalE * scn.a * 0.2;
 
   // === DRUM ONSET EXPLOSION FLASH ===
   if (drumOnset > 0.3) {

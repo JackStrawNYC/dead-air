@@ -7,6 +7,8 @@ import {
   orchestrateScript,
   orchestrateAssetGeneration,
   orchestrateRender,
+  renderWithRust,
+  isRustRendererAvailable,
 } from '@dead-air/pipeline';
 
 const log = createLogger('cli:produce');
@@ -41,6 +43,7 @@ export function registerProduceCommand(program: Command): void {
     .option('--render-concurrency <n>', 'Max parallel segment renders', parseInt)
     .option('--frame-concurrency <n>', 'Parallel frame renders per segment', parseInt)
     .option('--preview', 'Render at 720p for fast iteration')
+    .option('--renderer <type>', 'Renderer: remotion, rust, or auto (default: auto)', 'auto')
     .option('--no-cache', 'Skip analysis cache')
     .option('--analysis-concurrency <n>', 'Parallel librosa analysis workers', parseInt)
     .option('--archive-id <id>', 'Specific Archive.org identifier to ingest (skip auto-selection)')
@@ -58,6 +61,7 @@ export function registerProduceCommand(program: Command): void {
           renderConcurrency?: number;
           frameConcurrency?: number;
           preview?: boolean;
+          renderer?: string;
           cache?: boolean;
           analysisConcurrency?: number;
           archiveId?: string;
@@ -245,20 +249,44 @@ export function registerProduceCommand(program: Command): void {
           if (stagesToRun.includes('render')) {
             currentStage = 'render';
             console.log('--- Stage: render ---');
-            const result = await orchestrateRender({
-              episodeId,
-              db,
-              dataDir: config.paths.data,
-              concurrency: options.renderConcurrency ?? config.remotion.concurrency,
-              frameConcurrency: options.frameConcurrency,
-              gl: (options.gl as 'angle' | 'swiftshader') ?? undefined,
-              preview: options.preview,
-              lambda: options.lambda,
-              lambdaRegion: config.aws.region,
-            });
-            console.log(`  Frames: ${result.totalFrames} (${(result.totalFrames / 30).toFixed(1)}s)`);
-            if (result.finalPath) {
-              console.log(`  Output: ${result.finalPath}`);
+
+            const useRust =
+              options.renderer === 'rust' ||
+              (options.renderer === 'auto' && isRustRendererAvailable());
+
+            if (useRust) {
+              console.log('  Renderer: Rust/wgpu (native GPU)');
+              const outputPath = `${config.paths.data}/renders/${episodeId}/show.mp4`;
+              const result = await renderWithRust({
+                dataDir: config.paths.data,
+                outputPath,
+                preview: options.preview,
+              });
+              console.log(`  Frames: ${result.totalFrames} (${result.durationSec.toFixed(1)}s)`);
+              console.log(`  Render time: ${result.renderTimeSec.toFixed(1)}s`);
+              console.log(`  Output: ${result.outputPath}`);
+
+              // Update DB
+              db.prepare(
+                'UPDATE episodes SET render_path = ?, duration_seconds = ?, current_stage = ?, status = ? WHERE id = ?',
+              ).run(result.outputPath, Math.round(result.durationSec), 'rendered', 'rendered', episodeId);
+            } else {
+              console.log('  Renderer: Remotion (Chrome/WebGL)');
+              const result = await orchestrateRender({
+                episodeId,
+                db,
+                dataDir: config.paths.data,
+                concurrency: options.renderConcurrency ?? config.remotion.concurrency,
+                frameConcurrency: options.frameConcurrency,
+                gl: (options.gl as 'angle' | 'swiftshader') ?? undefined,
+                preview: options.preview,
+                lambda: options.lambda,
+                lambdaRegion: config.aws.region,
+              });
+              console.log(`  Frames: ${result.totalFrames} (${(result.totalFrames / 30).toFixed(1)}s)`);
+              if (result.finalPath) {
+                console.log(`  Output: ${result.finalPath}`);
+              }
             }
             console.log();
           }

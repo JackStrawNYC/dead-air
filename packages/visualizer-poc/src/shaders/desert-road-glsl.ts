@@ -93,6 +93,11 @@ void main() {
   float pitch = clamp(uMelodicPitch, 0.0, 1.0);
   float t = uDynamicTime;
 
+  // Stem reactivity
+  float stemDrums = clamp(uStemDrums, 0.0, 1.0);
+  float stemBass = clamp(uStemBass, 0.0, 1.0);
+  float vocalE = clamp(uVocalEnergy, 0.0, 1.0);
+
   // Section modulation
   float sType = uSectionType;
   float jamMod = smoothstep(4.5, 5.5, sType);
@@ -109,7 +114,8 @@ void main() {
   vec3 palCol2 = hsv2rgb(vec3(uPaletteSecondary + hueShift * 0.08, 0.6 * uPaletteSaturation, 0.85));
 
   // --- Heat shimmer (UV distortion below horizon) ---
-  float shimmerAmt = bass * 0.006 + energy * 0.003;
+  // Stem bass adds ground vibration to shimmer
+  float shimmerAmt = bass * 0.006 + energy * 0.003 + stemBass * 0.004;
   float depthFromHorizon = max(0.0, horizon - uv.y);
   vec2 shimmerUV = uv;
   shimmerUV.x += sin(uv.y * 80.0 + t * 3.0) * shimmerAmt * depthFromHorizon * 5.0;
@@ -131,6 +137,9 @@ void main() {
   float sunDist = length(vec2(p.x - 0.1, uv.y - horizon - 0.05));
   float sunGlow = exp(-sunDist * 8.0) * (0.5 + slowE * 0.3);
   sky += vec3(0.6, 0.35, 0.1) * sunGlow;
+
+  // Drums: distant thunder pulse on horizon
+  sky += vec3(0.08, 0.04, 0.06) * stemDrums * smoothstep(0.3, 0.0, abs(uv.y - horizon));
 
   vec3 col = sky;
 
@@ -175,8 +184,9 @@ void main() {
   col = mix(col, vec3(0.8, 0.8, 0.75), edgeLines * 0.5);
 
   // --- Dust (6-octave rich detail) ---
+  // Vocal energy intensifies wind/dust
   float dustNoise = fbm6(vec3(p.x * 3.0 * detailMod, p.y * 2.0 - t * 0.5 * speed, t * 0.3));
-  float dustMask = below * smoothstep(0.0, 0.15, depth) * (0.1 + onset * 0.4 + energy * 0.2);
+  float dustMask = below * smoothstep(0.0, 0.15, depth) * (0.1 + onset * 0.4 + energy * 0.2 + vocalE * 0.15);
   float dust = dustNoise * dustMask * 0.15;
   col = mix(col, vec3(0.6, 0.5, 0.35), dust);
 

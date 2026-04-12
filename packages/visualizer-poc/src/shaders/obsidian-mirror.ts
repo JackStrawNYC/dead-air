@@ -53,12 +53,12 @@ ${lightingGLSL}
 
 ${buildPostProcessGLSL({
   grainStrength: "normal",
-  bloomEnabled: false,
-  halationEnabled: false,
-  caEnabled: false,
-  lightLeakEnabled: false,
+  bloomEnabled: true,
+  halationEnabled: true,
+  caEnabled: true,
+  lightLeakEnabled: true,
   lensDistortionEnabled: true,
-  beatPulseEnabled: false,
+  beatPulseEnabled: true,
   eraGradingEnabled: true,
   temporalBlendEnabled: true,
 })}

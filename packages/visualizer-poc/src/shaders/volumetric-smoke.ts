@@ -15,6 +15,8 @@
 
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
+import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
+import { lightingGLSL } from "./shared/lighting.glsl";
 
 export const volumetricSmokeVert = /* glsl */ `
 varying vec2 vUv;
@@ -30,6 +32,18 @@ precision highp float;
 ${sharedUniformsGLSL}
 
 ${noiseGLSL}
+${lightingGLSL}
+
+${buildPostProcessGLSL({
+  bloomEnabled: true,
+  bloomThresholdOffset: -0.10,
+  halationEnabled: true,
+  caEnabled: true,
+  lightLeakEnabled: true,
+  eraGradingEnabled: true,
+  grainStrength: "light",
+  thermalShimmerEnabled: true,
+})}
 
 varying vec2 vUv;
 
@@ -179,31 +193,6 @@ void main() {
   col *= 1.0 + climaxBoost * 0.15;
   col *= 1.0 + uBeatSnap * 0.15 * (1.0 + climaxBoost * 0.3);
 
-  // === VIGNETTE ===
-  float vigScale = mix(0.35, 0.28, energy);
-  float vignette = 1.0 - dot(p * vigScale, p * vigScale);
-  vignette = smoothstep(0.0, 1.0, vignette);
-  col = mix(vec3(0.03, 0.02, 0.04), col, vignette);
-
-  // === CUSTOM INLINE BLOOM (not buildPostProcessGLSL — already has volumetric lights) ===
-  float lum = dot(col, vec3(0.299, 0.587, 0.114));
-  float bloomThreshold = mix(0.35, 0.20, energy) - climaxBoost * 0.08;
-  float bloomAmount = max(0.0, lum - bloomThreshold) * (2.5 + climaxBoost * 1.0);
-  vec3 bloomColor = mix(col, spotlightTint * 0.8, 0.3);
-  vec3 bloom = bloomColor * bloomAmount * 0.35;
-  col = col + bloom - col * bloom;
-
-  // === LIGHT LEAK ===
-  col += lightLeak(p, uDynamicTime, energy, uOnsetSnap);
-
-  // === CINEMATIC GRADE ===
-  col = cinematicGrade(col, energy);
-
-  // === FILM GRAIN ===
-  float grainTime = floor(uTime * 15.0) / 15.0;
-  float grainIntensity = mix(0.04, 0.02, energy);
-  col += filmGrainRes(uv, grainTime, uResolution.y) * grainIntensity;
-
   // Onset saturation pulse
   float onsetPulse = step(0.5, uOnsetSnap) * uOnsetSnap;
   float onsetLuma = dot(col, vec3(0.299, 0.587, 0.114));
@@ -218,6 +207,10 @@ void main() {
   float isBuild = step(0.5, uClimaxPhase) * step(uClimaxPhase, 1.5);
   float liftMult = mix(1.0, 0.15, isBuild * clamp(uClimaxIntensity, 0.0, 1.0));
   col = max(col, vec3(0.04, 0.03, 0.05) * liftMult);
+
+  // === STANDARD POST-PROCESSING CHAIN ===
+  col = applyTemperature(col);
+  col = applyPostProcess(col, uv, p);
 
   gl_FragColor = vec4(col, 1.0);
 }

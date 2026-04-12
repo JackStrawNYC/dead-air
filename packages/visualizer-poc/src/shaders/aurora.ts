@@ -46,7 +46,7 @@ const postProcess = buildPostProcessGLSL({
   bloomThresholdOffset: -0.05,
   lensDistortionEnabled: true,
   eraGradingEnabled: true,
-  lightLeakEnabled: false,
+  lightLeakEnabled: true,
 });
 const arDepthAlpha = buildDepthAlphaOutput("max(marchDist, 0.0)", "120.0");
 

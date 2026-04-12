@@ -96,6 +96,14 @@ fn make_frame_data(time: f32, energy: f32) -> dead_air_renderer::manifest::Frame
         param_drum_reactivity: 1.0,
         param_vocal_weight: 1.0,
         peak_of_show: 0.0,
+        contrast: None,
+        motion_blur_samples: 1,
+        shader_hold_progress: None,
+        song_progress: None,
+        show_bloom_character: None,
+        show_grain_character: None,
+        show_temperature_character: None,
+        show_contrast_character: None,
     }
 }
 
@@ -145,7 +153,7 @@ fn compile_and_render(
     let pipeline = renderer.create_pipeline(&fragment_module);
     let uniform_data = dead_air_renderer::uniforms::build_uniform_buffer(frame_data, width, height);
 
-    renderer.render_frame(&pipeline, &uniform_data);
+    renderer.render_frame(&pipeline, &uniform_data, None, None, None, None);
     let pixels = renderer.read_pixels();
 
     let output_path = format!("/tmp/dead-air-{}.png", shader_name);

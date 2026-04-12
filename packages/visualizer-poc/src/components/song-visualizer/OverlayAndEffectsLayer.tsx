@@ -34,7 +34,8 @@ export interface OverlayAndEffectsLayerProps {
   palette?: ColorPalette;
   frames: EnhancedFrameData[];
   energyLevel: "quiet" | "mid" | "peak";
-  // IT flash
+  // IT overlay dimming + flash
+  itOverlayOverride: number;
   itFlashIntensity: number;
   itFlashHue: number;
   // Dead air shimmer
@@ -60,6 +61,7 @@ export const OverlayAndEffectsLayer: React.FC<OverlayAndEffectsLayerProps> = ({
   palette,
   frames: f,
   energyLevel,
+  itOverlayOverride,
   itFlashIntensity,
   itFlashHue,
   effectivePalette,
@@ -83,7 +85,7 @@ export const OverlayAndEffectsLayer: React.FC<OverlayAndEffectsLayerProps> = ({
       frames={f}
       focusSuppression={1}
       energyLevel={energyLevel}
-      itOverlayOverride={1}
+      itOverlayOverride={itOverlayOverride}
       counterpointOverlayInversion={0}
       climaxDesaturation={0}
       deadAirFactor={deadAirFactor}

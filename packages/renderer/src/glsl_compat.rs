@@ -20,7 +20,6 @@ use std::collections::HashMap;
 fn regex_replace_texture(line: &str, sampler_name: &str, replacement: &str) -> String {
     let pattern = format!("texture({}", sampler_name);
     let mut result = String::with_capacity(line.len());
-    let mut chars = line.chars().peekable();
     let mut i = 0;
     let line_bytes = line.as_bytes();
     let pattern_bytes = pattern.as_bytes();
@@ -40,6 +39,52 @@ fn regex_replace_texture(line: &str, sampler_name: &str, replacement: &str) -> S
             i = j;
         } else {
             result.push(line_bytes[i] as char);
+            i += 1;
+        }
+    }
+
+    result
+}
+
+/// Replace `texture(samplerName, uvExpr)` with `funcName(uvExpr)`.
+/// Extracts the UV argument (everything after the first comma) and passes it
+/// to the replacement function. Handles nested parentheses.
+fn regex_replace_texture_with_func(source: &str, sampler_name: &str, func_name: &str) -> String {
+    let pattern = format!("texture({}", sampler_name);
+    let mut result = String::with_capacity(source.len());
+    let mut i = 0;
+    let bytes = source.as_bytes();
+    let pbytes = pattern.as_bytes();
+    let plen = pbytes.len();
+
+    while i < bytes.len() {
+        if i + plen <= bytes.len() && &bytes[i..i + plen] == pbytes {
+            // Found texture(samplerName — extract UV argument
+            let mut j = i + plen;
+            // Skip to first comma (separating sampler name from UV coords)
+            while j < bytes.len() && bytes[j] != b',' {
+                j += 1;
+            }
+            if j < bytes.len() {
+                j += 1; // skip comma
+            }
+            // j now points past the comma — start of UV expression
+            let uv_start = j;
+            let mut depth = 1; // inside the outer texture( call
+            while j < bytes.len() && depth > 0 {
+                if bytes[j] == b'(' { depth += 1; }
+                if bytes[j] == b')' { depth -= 1; }
+                if depth > 0 { j += 1; }
+            }
+            // j points to the closing paren
+            let uv_arg = std::str::from_utf8(&bytes[uv_start..j]).unwrap_or("vec2(0.0)");
+            result.push_str(func_name);
+            result.push('(');
+            result.push_str(uv_arg.trim());
+            result.push(')');
+            i = j + 1; // skip past closing paren
+        } else {
+            result.push(bytes[i] as char);
             i += 1;
         }
     }
@@ -302,10 +347,297 @@ fn inject_global_captures(source: &str) -> String {
     output
 }
 
+/// Fix dynamic loop bounds that cause black renders in naga/WGSL/SPIRV.
+///
+/// GLSL shaders use patterns like:
+///   int steps = int(mix(16.0, 28.0, energy));
+///   for (int i = 0; i < steps; i++) { ... }
+///
+/// naga can't determine loop bounds at compile time. WGSL/SPIRV requires
+/// analyzable bounds, resulting in 0 iterations and black output.
+///
+/// This pass rewrites dynamic loops to use constant max bounds with early break:
+///   for (int i = 0; i < 28; i++) { if (i >= steps) break; ... }
+fn fix_dynamic_loop_bounds(src: &str) -> String {
+    let lines: Vec<&str> = src.lines().collect();
+    let mut output = Vec::with_capacity(lines.len());
+
+    // First pass: collect declarations of variables that are assigned int(mix(...))
+    // or other dynamic expressions, so we know their max values.
+    let mut var_max: HashMap<String, u32> = HashMap::new();
+
+    for line in &lines {
+        let trimmed = line.trim();
+        // Match: int <varname> = int(mix(<a>, <b>, ...));
+        // Also match with trailing arithmetic: int(mix(24.0, 40.0, energy) * ...) + int(...)
+        if let Some(rest) = trimmed.strip_prefix("int ") {
+            if let Some(eq_pos) = rest.find(" = ") {
+                let var_name = rest[..eq_pos].trim().to_string();
+                let rhs = rest[eq_pos + 3..].trim();
+
+                // Skip pure constant assignments like "int steps = 80;"
+                if let Some(val) = parse_int_literal(rhs.trim_end_matches(';')) {
+                    var_max.insert(var_name, val as u32);
+                    continue;
+                }
+
+                // Extract max from int(mix(a, b, ...)) patterns
+                if let Some(max_val) = extract_mix_max(rhs) {
+                    var_max.insert(var_name, max_val);
+                } else if rhs.contains("int(") || rhs.contains("float(") {
+                    // Some dynamic expression we can't parse — use safe default
+                    var_max.insert(var_name, 128);
+                }
+            }
+        }
+    }
+
+    // Second pass: rewrite for-loops with dynamic bounds
+    for line in &lines {
+        let trimmed = line.trim();
+
+        // Match: for (int <var> = 0; <var> < <bound>; <var>++)
+        if let Some(rewritten) = try_rewrite_for_loop(trimmed, &var_max) {
+            // Preserve leading whitespace
+            let indent = &line[..line.len() - line.trim_start().len()];
+            output.push(format!("{}{}", indent, rewritten));
+        } else {
+            output.push(line.to_string());
+        }
+    }
+
+    output.join("\n")
+}
+
+/// Try to parse a simple integer literal (e.g., "80", "128").
+fn parse_int_literal(s: &str) -> Option<i64> {
+    s.trim().parse::<i64>().ok()
+}
+
+/// Extract the maximum value from a `int(mix(a, b, ...))` expression.
+///
+/// Handles patterns like:
+///   int(mix(16.0, 28.0, energy))                       → 28
+///   int(mix(24.0, 40.0, energy) * energyDetail * 0.85) → 40  (conservative: just mix max)
+///   int(mix(32.0, 96.0, energy)) + int(sJam * 12.0)    → 96 + 12 = 108
+///   int(mix(4.0, float(MAX_CRYSTALS), energy))          → can't parse float(MAX_CRYSTALS), use 128
+fn extract_mix_max(rhs: &str) -> Option<u32> {
+    // Find all int(mix(a, b, ...)) occurrences and sum their max values.
+    // This handles cases like:
+    //   int(mix(24.0, 48.0, energy) * 0.8) + int(sJam * 8.0) - int(sSpace * 8.0)
+    // We take the max of each additive int(...) term (ignore subtractive terms for safety).
+
+    let mut total_max: Option<u32> = None;
+    let mut pos = 0;
+    let bytes = rhs.as_bytes();
+
+    while pos < bytes.len() {
+        // Look for int(mix(
+        if let Some(mix_start) = rhs[pos..].find("int(mix(") {
+            let abs_start = pos + mix_start + 8; // skip "int(mix("
+            // Extract the first two arguments of mix(a, b, ...)
+            if let Some((a, b)) = extract_two_floats(&rhs[abs_start..]) {
+                let max_val = if a > b { a } else { b };
+                total_max = Some(total_max.unwrap_or(0) + max_val as u32);
+            } else {
+                // Can't parse mix args (e.g., float(MAX_CRYSTALS)) — use default
+                return Some(128);
+            }
+            pos = abs_start;
+        } else if let Some(int_start) = rhs[pos..].find("int(") {
+            // Handle standalone int(expr) like int(sJam * 12.0)
+            let abs_start = pos + int_start + 4;
+            // Try to extract a numeric multiplier
+            if let Some(val) = extract_int_expr_max(&rhs[abs_start..]) {
+                total_max = Some(total_max.unwrap_or(0) + val);
+            }
+            pos = abs_start;
+        } else {
+            break;
+        }
+    }
+
+    total_max
+}
+
+/// Extract two float literals from the beginning of a mix() argument list.
+/// Input: "16.0, 28.0, energy))"  →  Some((16.0, 28.0))
+fn extract_two_floats(s: &str) -> Option<(f64, f64)> {
+    let mut parts = s.splitn(3, ',');
+    let a_str = parts.next()?.trim();
+    let b_str = parts.next()?.trim();
+
+    let a = a_str.parse::<f64>().ok()?;
+    let b = b_str.parse::<f64>().ok()?;
+
+    Some((a, b))
+}
+
+/// Extract the max value from a simple int() expression like "sJam * 12.0)".
+/// Looks for a numeric literal and returns its ceiling.
+fn extract_int_expr_max(s: &str) -> Option<u32> {
+    // Find the closing paren, accounting for nesting
+    let mut depth = 1;
+    let mut end = 0;
+    for (i, ch) in s.chars().enumerate() {
+        if ch == '(' { depth += 1; }
+        if ch == ')' {
+            depth -= 1;
+            if depth == 0 { end = i; break; }
+        }
+    }
+    let expr = &s[..end];
+
+    // Look for numeric literals in the expression
+    let mut max_num: Option<f64> = None;
+    for token in expr.split(|c: char| !c.is_ascii_digit() && c != '.') {
+        if let Ok(v) = token.parse::<f64>() {
+            if v > 1.0 {
+                max_num = Some(match max_num {
+                    Some(prev) => if v > prev { v } else { prev },
+                    None => v,
+                });
+            }
+        }
+    }
+
+    max_num.map(|v| v.ceil() as u32)
+}
+
+/// Try to rewrite a for-loop line with a dynamic bound to use a constant max.
+///
+/// Matches: `for (int <v> = 0; <v> < <bound>; <v>++)`
+/// where <bound> is a known dynamic variable (not a literal, not a #define constant).
+///
+/// Returns the rewritten line or None if no rewrite needed.
+fn try_rewrite_for_loop(trimmed: &str, var_max: &HashMap<String, u32>) -> Option<String> {
+    // Quick pre-check
+    if !trimmed.starts_with("for") || !trimmed.contains("for ") && !trimmed.starts_with("for(") {
+        if !trimmed.starts_with("for") {
+            return None;
+        }
+    }
+
+    // Parse: for (int <loopvar> = 0; <loopvar> < <bound>; <loopvar>++)
+    // Also handle for(int ... without space
+    let rest = if let Some(r) = trimmed.strip_prefix("for (") {
+        r
+    } else if let Some(r) = trimmed.strip_prefix("for(") {
+        r
+    } else {
+        return None;
+    };
+
+    // Find the three semicolon-separated parts within the parens
+    // First part: "int <v> = 0"
+    let semi1 = rest.find(';')?;
+    let init_part = rest[..semi1].trim();
+
+    // Parse init: "int <v> = 0"
+    let init_rest = init_part.strip_prefix("int ")?;
+    let eq_pos = init_rest.find(" = ")?;
+    let loop_var = init_rest[..eq_pos].trim();
+    let init_val = init_rest[eq_pos + 3..].trim();
+    if init_val != "0" {
+        return None; // Only handle loops starting at 0
+    }
+
+    // Second part: "<v> < <bound>"
+    let after_semi1 = &rest[semi1 + 1..];
+    let semi2 = after_semi1.find(';')?;
+    let cond_part = after_semi1[..semi2].trim();
+
+    // Parse condition: "<v> < <bound>"
+    let lt_pos = cond_part.find(" < ")?;
+    let cond_var = cond_part[..lt_pos].trim();
+    if cond_var != loop_var {
+        return None;
+    }
+    let bound_var = cond_part[lt_pos + 3..].trim();
+
+    // Check: is bound_var a literal integer? If so, skip (already constant).
+    if bound_var.parse::<i64>().is_ok() {
+        return None;
+    }
+
+    // Check: is bound_var ALL_CAPS (likely a #define constant)? If so, skip.
+    if bound_var.chars().all(|c| c.is_ascii_uppercase() || c == '_') && bound_var.len() > 1 {
+        return None;
+    }
+
+    // Third part: "<v>++" followed by ")" and optional " {"
+    let after_semi2 = &rest[semi1 + 1 + semi2 + 1..];
+    let close_paren = after_semi2.find(')')?;
+    let incr_part = after_semi2[..close_paren].trim();
+    let expected_incr = format!("{}++", loop_var);
+    if incr_part != expected_incr {
+        return None;
+    }
+    let after_paren = after_semi2[close_paren + 1..].trim();
+
+    // Look up the max value for this bound variable
+    let max_val = var_max.get(bound_var)?;
+
+    // Build the rewritten for-loop
+    let has_open_brace = after_paren.starts_with('{');
+    let trailing = if has_open_brace {
+        &after_paren[1..] // content after the {
+    } else {
+        after_paren
+    };
+
+    if has_open_brace {
+        // Original: for (int i = 0; i < steps; i++) { <rest>
+        // Rewrite:  for (int i = 0; i < 28; i++) { if (i >= steps) break; <rest>
+        let break_guard = format!("if ({} >= {}) break;", loop_var, bound_var);
+        let trailing_trimmed = trailing.trim();
+        if trailing_trimmed.is_empty() {
+            Some(format!(
+                "for (int {} = 0; {} < {}; {}++) {{ {} ",
+                loop_var, loop_var, max_val, loop_var, break_guard
+            ))
+        } else {
+            Some(format!(
+                "for (int {} = 0; {} < {}; {}++) {{ {} {}",
+                loop_var, loop_var, max_val, loop_var, break_guard, trailing_trimmed
+            ))
+        }
+    } else {
+        // Original: for (int i = 0; i < steps; i++)
+        // Rewrite:  for (int i = 0; i < 28; i++)
+        // And on the NEXT line (which should be {), we'll add the break guard.
+        // For simplicity, inject the brace + break inline:
+        Some(format!(
+            "for (int {} = 0; {} < {}; {}++) {{ if ({} >= {}) break;",
+            loop_var, loop_var, max_val, loop_var, loop_var, bound_var
+        ))
+    }
+}
+
+/// Texture requirements detected from shader source.
+#[derive(Debug, Default, Clone)]
+pub struct ShaderTextureInfo {
+    /// Shader uses `texture(uPrevFrame, ...)` — needs feedback buffer
+    pub needs_prev_frame: bool,
+    /// Shader uses `texture(uFFTTexture, ...)` — needs FFT data texture
+    pub needs_fft: bool,
+}
+
+/// Detect which sampler2D textures a shader uses by scanning the GLSL source.
+/// This is a read-only analysis — the shader code is NOT modified.
+pub fn extract_sampler_names(source: &str) -> ShaderTextureInfo {
+    ShaderTextureInfo {
+        needs_prev_frame: source.contains("uPrevFrame"),
+        needs_fft: source.contains("uFFTTexture"),
+    }
+}
+
 /// Convert a WebGL GLSL ES fragment shader to desktop GLSL 450 with UBO.
 pub fn webgl_to_desktop(source: &str) -> String {
     // First pass: fix captured locals in generated raymarching functions
     let source = inject_global_captures(source);
+    // Second pass: fix dynamic loop bounds (naga/WGSL requires constant bounds)
+    let source = fix_dynamic_loop_bounds(&source);
     let mut uniform_lines: Vec<String> = Vec::new();
     let mut body_lines: Vec<String> = Vec::new();
     let needs_frag_color = source.contains("gl_FragColor");
@@ -357,17 +689,18 @@ pub fn webgl_to_desktop(source: &str) -> String {
         // textureCube → texture
         transformed = transformed.replace("textureCube(", "texture(");
 
-        // Stub out texture reads from stripped samplers → return black/zero
-        // texture(uPrevFrame, uv) → vec4(0.0) (no feedback in basic renderer)
-        // texture(uFFTTexture, ...) → vec4(0.0) (no FFT texture)
+        // Replace texture reads for known samplers with stub function calls.
+        // The stub functions are injected below; in Phase 2+, shader_cache.rs
+        // replaces them with real texture sampling in the generated WGSL.
         if transformed.contains("texture(uPrevFrame") {
-            // Replace texture(uPrevFrame, anything) with vec4(0.05, 0.03, 0.08, 1.0) (dark purple, not pure black)
-            let re_prev = regex_replace_texture(&transformed, "uPrevFrame", "vec4(0.05, 0.03, 0.08, 1.0)");
-            transformed = re_prev;
+            transformed = regex_replace_texture_with_func(
+                &transformed, "uPrevFrame", "_deadair_sample_prev",
+            );
         }
         if transformed.contains("texture(uFFTTexture") {
-            let re_fft = regex_replace_texture(&transformed, "uFFTTexture", "vec4(0.0)");
-            transformed = re_fft;
+            transformed = regex_replace_texture_with_func(
+                &transformed, "uFFTTexture", "_deadair_sample_fft",
+            );
         }
 
         body_lines.push(transformed);
@@ -390,6 +723,22 @@ pub fn webgl_to_desktop(source: &str) -> String {
             output.push('\n');
         }
         output.push_str("};\n\n");
+    }
+
+    // Inject stub functions for texture sampling (before shader body).
+    // These survive naga compilation as named functions. shader_cache.rs
+    // replaces their bodies in the WGSL output with real textureSample calls.
+    let needs_prev = body_lines.iter().any(|l| l.contains("_deadair_sample_prev"));
+    let needs_fft = body_lines.iter().any(|l| l.contains("_deadair_sample_fft"));
+
+    if needs_prev {
+        output.push_str("vec4 _deadair_sample_prev(vec2 uv) { return vec4(0.05, 0.03, 0.08, 1.0); }\n");
+    }
+    if needs_fft {
+        output.push_str("vec4 _deadair_sample_fft(vec2 uv) { return vec4(0.0, 0.0, 0.0, 0.0); }\n");
+    }
+    if needs_prev || needs_fft {
+        output.push('\n');
     }
 
     // Emit rest of shader
@@ -511,5 +860,214 @@ void main() {}
         assert!(desktop.contains("  vec2 uResolution;"));
         assert!(desktop.contains("  vec3 uCamPos;"));
         assert!(desktop.contains("};"));
+    }
+
+    // ─── Dynamic loop bound tests ───────────────────────────────────────
+
+    #[test]
+    fn test_dynamic_loop_basic_mix() {
+        let src = r#"
+int steps = int(mix(16.0, 28.0, energy));
+for (int i = 0; i < steps; i++) {
+    color += marchStep(i);
+}
+"#;
+        let result = fix_dynamic_loop_bounds(src);
+        assert!(result.contains("for (int i = 0; i < 28; i++) { if (i >= steps) break;"),
+            "Expected constant max 28 with break guard, got:\n{}", result);
+        // Original variable declaration should be preserved
+        assert!(result.contains("int steps = int(mix(16.0, 28.0, energy));"));
+    }
+
+    #[test]
+    fn test_dynamic_loop_larger_mix() {
+        let src = r#"
+int maxSteps = int(mix(32.0, 96.0, energy));
+for (int i = 0; i < maxSteps; i++) {
+    d = sceneSDF(ro + rd * t);
+}
+"#;
+        let result = fix_dynamic_loop_bounds(src);
+        assert!(result.contains("i < 96;"), "Expected max 96, got:\n{}", result);
+        assert!(result.contains("if (i >= maxSteps) break;"));
+    }
+
+    #[test]
+    fn test_dynamic_loop_reversed_mix_args() {
+        // mix(larger, smaller, x) — max should still be the larger value
+        let src = r#"
+int steps = int(mix(40.0, 20.0, energy));
+for (int i = 0; i < steps; i++) {
+    doSomething();
+}
+"#;
+        let result = fix_dynamic_loop_bounds(src);
+        assert!(result.contains("i < 40;"), "Expected max 40, got:\n{}", result);
+    }
+
+    #[test]
+    fn test_literal_loop_untouched() {
+        let src = r#"
+for (int i = 0; i < 80; i++) {
+    color += step(i);
+}
+"#;
+        let result = fix_dynamic_loop_bounds(src);
+        assert!(result.contains("i < 80; i++)"), "Literal loop should not be modified");
+        assert!(!result.contains("break;"), "Literal loop should not get a break guard");
+    }
+
+    #[test]
+    fn test_define_constant_untouched() {
+        let src = r#"
+for (int i = 0; i < MAX_STEPS; i++) {
+    march();
+}
+"#;
+        let result = fix_dynamic_loop_bounds(src);
+        assert!(result.contains("i < MAX_STEPS;"), "ALL_CAPS constant should not be modified");
+        assert!(!result.contains("break;"));
+    }
+
+    #[test]
+    fn test_prefixed_define_constant_untouched() {
+        let src = r#"
+for (int i = 0; i < LL_MAX_STEPS; i++) {
+    march();
+}
+"#;
+        let result = fix_dynamic_loop_bounds(src);
+        assert!(result.contains("i < LL_MAX_STEPS;"), "ALL_CAPS constant should not be modified");
+    }
+
+    #[test]
+    fn test_multiple_dynamic_loops() {
+        let src = r#"
+int steps = int(mix(16.0, 28.0, energy));
+for (int i = 0; i < steps; i++) {
+    color += marchStep(i);
+}
+int maxSteps = int(mix(32.0, 96.0, energy));
+for (int j = 0; j < maxSteps; j++) {
+    d = sceneSDF(ro + rd * t);
+}
+"#;
+        let result = fix_dynamic_loop_bounds(src);
+        assert!(result.contains("i < 28;"), "First loop should use max 28");
+        assert!(result.contains("j < 96;"), "Second loop should use max 96");
+        assert!(result.contains("if (i >= steps) break;"));
+        assert!(result.contains("if (j >= maxSteps) break;"));
+    }
+
+    #[test]
+    fn test_mix_with_extra_arithmetic() {
+        // int(mix(24.0, 48.0, energy) * energyDetail * 0.8) + int(sJam * 8.0) - int(sSpace * 8.0)
+        let src = r#"
+int steps = int(mix(24.0, 48.0, energy) * energyDetail * 0.8) + int(sJam * 8.0) - int(sSpace * 8.0) + int(tension * 4.0);
+for (int i = 0; i < steps; i++) {
+    march();
+}
+"#;
+        let result = fix_dynamic_loop_bounds(src);
+        // Should extract mix max (48) + sJam term (8) + tension term (4) = 60
+        assert!(result.contains("if (i >= steps) break;"),
+            "Should have break guard, got:\n{}", result);
+        // The exact max depends on parsing, but it should be > 48
+        assert!(!result.contains("i < steps;"),
+            "Dynamic bound should be replaced with constant");
+    }
+
+    #[test]
+    fn test_constant_int_assignment_skipped() {
+        // int steps = 80; — already constant, the loop already has constant bound
+        // But since the loop references 'steps' (a variable), it will still get rewritten
+        let src = r#"
+int steps = 80;
+for (int i = 0; i < steps; i++) {
+    march();
+}
+"#;
+        let result = fix_dynamic_loop_bounds(src);
+        // Even though the var is constant, the loop bound is still a variable name.
+        // The rewrite makes it explicit for naga.
+        assert!(result.contains("i < 80;"), "Should use the literal value 80");
+        assert!(result.contains("if (i >= steps) break;"));
+    }
+
+    #[test]
+    fn test_nested_loops_both_rewritten() {
+        let src = r#"
+int outerSteps = int(mix(10.0, 20.0, energy));
+int innerSteps = int(mix(4.0, 8.0, energy));
+for (int i = 0; i < outerSteps; i++) {
+    for (int j = 0; j < innerSteps; j++) {
+        doWork(i, j);
+    }
+}
+"#;
+        let result = fix_dynamic_loop_bounds(src);
+        assert!(result.contains("i < 20;"), "Outer loop should use max 20");
+        assert!(result.contains("j < 8;"), "Inner loop should use max 8");
+    }
+
+    #[test]
+    fn test_end_to_end_through_webgl_to_desktop() {
+        let webgl = r#"
+precision highp float;
+uniform float uTime;
+uniform float uEnergy;
+
+void main() {
+    float energy = uEnergy;
+    int steps = int(mix(16.0, 28.0, energy));
+    vec3 color = vec3(0.0);
+    for (int i = 0; i < steps; i++) {
+        color += vec3(0.01);
+    }
+    gl_FragColor = vec4(color, 1.0);
+}
+"#;
+        let desktop = webgl_to_desktop(webgl);
+        assert!(desktop.contains("i < 28;"),
+            "Dynamic loop should be fixed in full pipeline, got:\n{}", desktop);
+        assert!(desktop.contains("if (i >= steps) break;"));
+        // Other conversions should still work
+        assert!(desktop.contains("#version 450"));
+        assert!(desktop.contains("fragColor"));
+    }
+
+    #[test]
+    fn test_extract_two_floats() {
+        assert_eq!(extract_two_floats("16.0, 28.0, energy))"), Some((16.0, 28.0)));
+        assert_eq!(extract_two_floats("32.0, 96.0, energy))"), Some((32.0, 96.0)));
+        assert_eq!(extract_two_floats("4.0, 8.0, x)"), Some((4.0, 8.0)));
+    }
+
+    #[test]
+    fn test_extract_mix_max_basic() {
+        assert_eq!(extract_mix_max("int(mix(16.0, 28.0, energy));"), Some(28));
+        assert_eq!(extract_mix_max("int(mix(32.0, 96.0, energy));"), Some(96));
+        assert_eq!(extract_mix_max("int(mix(60.0, 90.0, energy));"), Some(90));
+    }
+
+    #[test]
+    fn test_extract_mix_max_with_additive_terms() {
+        let rhs = "int(mix(24.0, 48.0, energy) * 0.8) + int(sJam * 8.0);";
+        let max = extract_mix_max(rhs);
+        assert!(max.is_some());
+        // 48 from mix + 8 from sJam term = 56
+        assert!(max.unwrap() >= 48, "Expected >= 48, got {}", max.unwrap());
+    }
+
+    #[test]
+    fn test_for_loop_without_space() {
+        let src = r#"
+int steps = int(mix(16.0, 28.0, energy));
+for(int i = 0; i < steps; i++) {
+    march();
+}
+"#;
+        let result = fix_dynamic_loop_bounds(src);
+        assert!(result.contains("i < 28;"), "Should handle for( without space");
     }
 }

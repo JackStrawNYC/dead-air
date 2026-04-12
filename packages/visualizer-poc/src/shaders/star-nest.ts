@@ -109,6 +109,11 @@ void main() {
   float beatSnap = clamp(uBeatSnap, 0.0, 1.0);
   float drumBeat = clamp(uDrumBeat, 0.0, 1.0);
 
+  // Stem reactivity
+  float stemDrums = clamp(uStemDrums, 0.0, 1.0);
+  float stemBass = clamp(uStemBass, 0.0, 1.0);
+  float vocalE = clamp(uVocalEnergy, 0.0, 1.0);
+
   // === SECTION-TYPE MODULATION ===
   float sectionT = uSectionType;
   float sJam = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
@@ -124,7 +129,8 @@ void main() {
 
   // === KALI FRACTAL PARAMETERS ===
   // Formfactor: the heart of the fractal shape. Bass reshapes geometry.
-  float formfactor = 0.53 + bass * 0.18 + onset * 0.12 + beatSnap * 0.06;
+  // Stem bass adds pulsation to star geometry
+  float formfactor = 0.53 + bass * 0.18 + onset * 0.12 + beatSnap * 0.06 + stemBass * 0.08;
   formfactor = mix(formfactor, formfactor * 1.08, sJam);   // jam: more complex
   formfactor = mix(formfactor, formfactor * 0.92, sSpace);  // space: smoother
 
@@ -283,7 +289,12 @@ void main() {
   // === AMBIENT NEBULA: fills voids with palette color (never pitch black) ===
   float ambNoise = fbm3(vec3(p * 0.6, uDynamicTime * 0.04)) * 0.5 + 0.5;
   vec3 ambColor = mix(palCol1, palCol2, ambNoise) * mix(0.08, 0.03, energy);
+  // Vocal warmth adds nebula glow
+  ambColor *= 1.0 + vocalE * 0.4;
   col += ambColor;
+
+  // Drums boost star twinkle rate via brightness flutter
+  col *= 1.0 + stemDrums * 0.08 * sin(uTime * 8.0);
 
   // === QUIET PASSAGE STARS: tiny sparkle particles during soft moments ===
   float quietness = smoothstep(0.3, 0.05, energy);

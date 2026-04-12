@@ -36,7 +36,7 @@ const postProcess = buildPostProcessGLSL({
   halationEnabled: true,
   bloomEnabled: true,
   bloomThresholdOffset: -0.15,
-  caEnabled: false,
+  caEnabled: true,
   dofEnabled: true,
   lensDistortionEnabled: true,
   lightLeakEnabled: true,
@@ -267,6 +267,11 @@ void main() {
   float isClimax = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5);
   float climaxBoost = isClimax * clamp(uClimaxIntensity, 0.0, 1.0);
 
+  // Stem reactivity
+  float stemDrums = clamp(uStemDrums, 0.0, 1.0);
+  float stemBass = clamp(uStemBass, 0.0, 1.0);
+  float vocalE = clamp(uVocalEnergy, 0.0, 1.0);
+
   // Section-type gates
   float sectionT = uSectionType;
   float sJam = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
@@ -299,6 +304,8 @@ void main() {
   prm += energy * 0.30; // energy adds slight thickening
   prm += sJam * 0.1;
   prm -= sSpace * 0.15;
+  // Stem bass deepens haze density
+  prm += stemBass * 0.08;
 
   vec4 scn = _sg_render(ro, rd, time, prm, energy, highs);
   vec3 col = scn.rgb;
@@ -319,7 +326,8 @@ void main() {
   // Overall screen-space golden glow toward sun direction
   vec3 sunDir = normalize(vec3(0.4, 0.7, 0.8));
   float sunDot = max(0.0, dot(rd, sunDir));
-  float atmosphericGlow = pow(sunDot, 3.0) * 0.25 * (0.6 + energy * 0.4);
+  // Vocal energy intensifies golden glow
+  float atmosphericGlow = pow(sunDot, 3.0) * 0.25 * (0.6 + energy * 0.4 + vocalE * 0.25);
   vec3 glowColor = mix(vec3(1.0, 0.88, 0.5), vec3(1.0, 0.7, 0.4), energy);
   col += glowColor * atmosphericGlow * (1.0 - scn.a * 0.3);
 
@@ -340,6 +348,8 @@ void main() {
   // === BEAT PULSE: rhythmic warm brightness ===
   // Beat stability makes pulses more regular and confident
   float beatPulse = uBeatSnap * (0.08 + beatStab * 0.06);
+  // Drums add shimmer pulse to the golden haze
+  beatPulse += stemDrums * 0.06;
   col *= 1.0 + beatPulse;
 
   // Onset snap: bright flash of scattered light

@@ -44,9 +44,9 @@ const postProcess = buildPostProcessGLSL({
   halationEnabled: true,
   bloomEnabled: true,
   bloomThresholdOffset: -0.08,
-  caEnabled: false,
+  caEnabled: true,
   lensDistortionEnabled: true,
-  lightLeakEnabled: false,
+  lightLeakEnabled: true,
   eraGradingEnabled: true,
   dofEnabled: true,
 });

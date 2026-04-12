@@ -136,6 +136,14 @@ fn test_benchmark_300_frames() {
             param_drum_reactivity: 1.0,
             param_vocal_weight: 1.0,
             peak_of_show: 0.0,
+            contrast: None,
+            motion_blur_samples: 1,
+            shader_hold_progress: None,
+            song_progress: None,
+            show_bloom_character: None,
+            show_grain_character: None,
+            show_temperature_character: None,
+            show_contrast_character: None,
         }
     }).collect();
 
@@ -143,7 +151,7 @@ fn test_benchmark_300_frames() {
     let start_gpu = std::time::Instant::now();
     for frame in &frame_datas {
         let uniform_data = dead_air_renderer::uniforms::build_uniform_buffer(frame, width, height);
-        renderer.render_frame(&pipeline, &uniform_data);
+        renderer.render_frame(&pipeline, &uniform_data, None, None, None, None);
         // Read pixels back (required to actually execute the GPU work)
         let _pixels = renderer.read_pixels();
     }
@@ -158,7 +166,7 @@ fn test_benchmark_300_frames() {
     let start_full = std::time::Instant::now();
     for (i, frame) in frame_datas.iter().enumerate() {
         let uniform_data = dead_air_renderer::uniforms::build_uniform_buffer(frame, width, height);
-        renderer.render_frame(&pipeline, &uniform_data);
+        renderer.render_frame(&pipeline, &uniform_data, None, None, None, None);
         let pixels = renderer.read_pixels();
         image::save_buffer(
             format!("{}/frame_{:05}.png", out_dir, i),

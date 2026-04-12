@@ -139,6 +139,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
   const frame = useCurrentFrame();
   // Map render frame to analysis frame index (analysis is always at 30fps)
   const analysisFrameScale = 30 / fps; // 1.0 at 30fps, 0.5 at 60fps
+  const fpsScale = fps / 30; // 1.0 at 30fps, 2.0 at 60fps — scales frame constants to wall-clock time
 
   // ─── Show narrative arc (cross-song state) ───
   // Precomputed narrative from Root.tsx takes priority (works in both Studio and CLI).
@@ -248,12 +249,45 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
   // ─── Effective palette (curated identity > setlist > chroma-derived) ───
   // Curated identities are hand-tuned for mood accuracy and take priority
   // over setlist palette overrides which may be generic.
-  const effectivePalette = useMemo((): ColorPalette | undefined => {
+  const basePalette = useMemo((): ColorPalette | undefined => {
     if (songIdentity?.palette) return songIdentity.palette;
     if (props.song.palette) return props.song.palette;
     if (analysis?.frames?.length) return deriveChromaPalette(analysis.frames, showSeed);
     return undefined;
   }, [props.song.palette, songIdentity, analysis, showSeed]);
+
+  // ─── Cross-song visual continuity ───
+  // The show is a journey — its color identity should evolve, not reset each song.
+  // Two mechanisms:
+  // 1. Show-level hue drift: +1.5° per song creates a sense of progression
+  //    through the show. By song 20, the palette has drifted 30° — perceptible
+  //    as warmth evolving but not enough to override song identity.
+  // 2. Entry ease: first 150 frames (5s) desaturate slightly and blend toward
+  //    a neutral midpoint, then ease into this song's full palette. Prevents
+  //    jarring color shifts between songs.
+  const songsCompleted = narrative?.state.songsCompleted ?? 0;
+  const showHueDrift = songsCompleted * 1.5;
+  const effectivePalette = useMemo((): ColorPalette | undefined => {
+    if (!basePalette) return undefined;
+    return {
+      ...basePalette,
+      primary: ((basePalette.primary ?? 0) + showHueDrift) % 360,
+      secondary: ((basePalette.secondary ?? 120) + showHueDrift * 0.5) % 360,
+    };
+  }, [basePalette, showHueDrift]);
+
+  // Per-frame palette easing: first 150 frames (at 30fps) ease saturation from muted → full.
+  // This creates a gentle "awakening" as each song's visual identity emerges,
+  // rather than slamming in at full saturation.
+  // During segues, skip the ease — the viewer is mid-flow and a desaturation dip is jarring.
+  const paletteEaseFrames = 150 * (fps / 30);
+  const paletteEaseFactor = props.segueIn ? 1 : Math.min(1, frame / paletteEaseFrames);
+  const renderedPalette = useMemo((): ColorPalette | undefined => {
+    if (!effectivePalette) return undefined;
+    if (paletteEaseFactor >= 1) return effectivePalette;
+    const easedSat = (effectivePalette.saturation ?? 1) * (0.65 + 0.35 * paletteEaseFactor);
+    return { ...effectivePalette, saturation: easedSat };
+  }, [effectivePalette, paletteEaseFactor]);
 
   // ─── Icon overlay schedule (image-based Dead icons rendered through GLSL) ───
   const iconSchedule = useMemo(
@@ -704,6 +738,58 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
     props.show?.songs.length ?? 0,
   );
 
+  // ─── Peak-of-Show Blackout ───
+  // After THE moment of the show, 60 frames (2s) of near-black followed by 120 frames
+  // of slow recovery. This creates a dramatic visual breath after transcendence.
+  // Detection: when peak was recently active (intensity > 0.3 within last 30 frames)
+  // and climax is now in release phase, the blackout begins.
+  let peakBlackoutFactor = 0;
+  const blackoutFrames = Math.round(60 * fpsScale);
+  const recoveryFrames = Math.round(120 * fpsScale);
+  if (climaxState.phase === "release" && !peakOfShow.isActive) {
+    // Look backward to find the last frame where peak was active
+    let peakEndFrame = -1;
+    const searchWindow = Math.round(210 * fpsScale); // peak duration is 210 frames at 30fps
+    for (let i = frameIdx - 1; i >= Math.max(0, frameIdx - searchWindow); i--) {
+      const pastPeak = detectPeakOfShow(
+        f, i,
+        props.narrativeState?.songPeakScores ?? [],
+        props.narrativeState?.peakOfShowFired ?? false,
+        narrative?.state.songsCompleted ?? 0,
+        props.show?.songs.length ?? 0,
+      );
+      if (pastPeak.isActive && pastPeak.intensity > 0.3) {
+        peakEndFrame = i + 1;
+        // Find the actual end of the peak (first non-active frame after this)
+        for (let j = i + 1; j <= frameIdx; j++) {
+          const checkPeak = detectPeakOfShow(
+            f, j,
+            props.narrativeState?.songPeakScores ?? [],
+            props.narrativeState?.peakOfShowFired ?? false,
+            narrative?.state.songsCompleted ?? 0,
+            props.show?.songs.length ?? 0,
+          );
+          if (!checkPeak.isActive) {
+            peakEndFrame = j;
+            break;
+          }
+        }
+        break;
+      }
+    }
+
+    if (peakEndFrame >= 0) {
+      const framesSincePeakEnd = frameIdx - peakEndFrame;
+      if (framesSincePeakEnd < blackoutFrames) {
+        // Blackout phase: ramp to near-black quickly
+        peakBlackoutFactor = Math.min(1, framesSincePeakEnd / Math.round(15 * fpsScale));
+      } else if (framesSincePeakEnd < blackoutFrames + recoveryFrames) {
+        // Recovery phase: slowly come back to life
+        peakBlackoutFactor = 1 - (framesSincePeakEnd - blackoutFrames) / recoveryFrames;
+      }
+    }
+  }
+
   // Overlay density: use the most relevant 1-2 factors for current context.
   // Previous 12-factor product collapsed to near-zero (0.85^12 = 0.14).
   // Now: pick the dominant context, apply it directly.
@@ -744,7 +830,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
 
   // ─── Dead air detection: ambient visuals after music ends ───
   const musicEndFrame = useMemo(() => findMusicEnd(f, durationInFrames), [f, durationInFrames]);
-  const DEAD_AIR_CROSSFADE = 90; // 3 seconds
+  const DEAD_AIR_CROSSFADE = 90 * fpsScale; // 3 seconds (FPS-aware)
   const deadAirFactor = musicEndFrame < durationInFrames && frame > musicEndFrame
     ? Math.min(1, (frame - musicEndFrame) / DEAD_AIR_CROSSFADE)
     : 0;
@@ -767,12 +853,12 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
 
   // ─── Intro factor: song card visible ~15s, then shader takes over ───
   // 0 = art dominates (shader suppressed), 1 = shader + icons fully open.
-  const INTRO_FULL = 450;  // 15s at 30fps — song card is hero
-  const INTRO_RAMP = 150;  // 5s ramp — shader fades in (15s-20s)
+  const INTRO_FULL = 450 * fpsScale;  // 15s (FPS-aware) — song card is hero
+  const INTRO_RAMP = 150 * fpsScale;  // 5s ramp (FPS-aware) — shader fades in (15s-20s)
   const introFactor = props.segueIn
-      ? (frame < 90 ? 1                                                              // 0-3s: full shader (crossfade)
-        : frame < 150 ? 1 - 0.50 * ((frame - 90) / 60)                              // 3-5s: dim to 50%
-        : frame < 360 ? 0.50 + 0.50 * ((frame - 150) / 210)                         // 5-12s: ramp back to full
+      ? (frame < 90 * fpsScale ? 1                                                    // 0-3s: full shader (crossfade)
+        : frame < 150 * fpsScale ? 1 - 0.50 * ((frame - 90 * fpsScale) / (60 * fpsScale))   // 3-5s: dim to 50%
+        : frame < 360 * fpsScale ? 0.50 + 0.50 * ((frame - 150 * fpsScale) / (210 * fpsScale)) // 5-12s: ramp back to full
         : 1)
     : isInSuiteMiddle ? 1
     : frame < INTRO_FULL ? 0.0                                                       // 0-15s: shader OFF (art hero, no flicker)
@@ -782,15 +868,34 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
   // ─── Fade in/out ───
   // Start fade-out 1 frame before the end of analyzed audio to ensure visuals are fully
   // gone by the time audio ends (analysis rounds up via ceil, creating a +1 frame mismatch)
-  const fadeIn = props.segueIn ? 1 : interpolate(frame, [0, FADE_FRAMES], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const fadeFrames = FADE_FRAMES * fpsScale; // FPS-aware fade duration
+  const fadeIn = props.segueIn ? 1 : interpolate(frame, [0, fadeFrames], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
   // Song art bookend stays until the composition ends — no early fadeout
   // Just a quick 1-second fade at the very last frames
-  const fadeOut = props.segueOut ? 1 : interpolate(frame, [durationInFrames - 30, durationInFrames - 1], [1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const fadeOut = props.segueOut ? 1 : interpolate(frame, [durationInFrames - 30 * fpsScale, durationInFrames - 1], [1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
   // Progressive dim during dead air: after crossfade completes, fade toward near-black.
   // Non-segue songs get an extra "visual breath" — the last 60 frames (2s) fade deeper
   // than segue songs, creating a brief moment of darkness between songs for pacing contrast.
   // No dimming. Shader stays bright, song art fades in over it during dead air.
-  const opacity = Math.min(fadeIn, fadeOut);
+  const baseOpacity = Math.min(fadeIn, fadeOut);
+
+  // ─── End-of-song visual breathing ───
+  // Last 120 frames (4s at 30fps): gradual dimming + overlay suppression.
+  // Creates a moment of visual stillness between songs, separate from dead air detection.
+  // Segue songs skip this — the music flows directly into the next song.
+  const endBreathFrames = Math.round(120 * fpsScale);
+  const endBreathStart = durationInFrames - endBreathFrames;
+  const endBreathFactor = (!props.segueOut && frame > endBreathStart)
+    ? Math.min(1, (frame - endBreathStart) / endBreathFrames)
+    : 0;
+  // Brightness dims to ~30% at song end (0.7 reduction at full ramp)
+  // Peak-of-show blackout: near-black after THE moment, then slow recovery
+  const peakBrightnessMult = Math.max(0.08, 1.0 - peakBlackoutFactor);
+  const opacity = baseOpacity * (1 - endBreathFactor * 0.7) * peakBrightnessMult;
+  // End-of-song overlay suppression: overlays fade to silence during breathing ramp
+  // Peak-of-show overlay suppression: overlays vanish completely during blackout
+  const peakOverlayMult = Math.max(0.0, 1.0 - peakBlackoutFactor);
+  const endBreathOverlaySuppression = (1 - endBreathFactor) * peakOverlayMult;
 
   // ─── Space time dilation: Space phases get transcendently slow shaders ───
   const spaceTimeDilation = drumsSpaceState?.subPhase === "space_ambient" ? 0.25
@@ -832,6 +937,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
         peakOfShowIntensity={peakOfShow.intensity}
         deadAirFactor={deadAirFactor}
         spaceTimeDilation={spaceTimeDilation}
+        showVisualSeed={props.narrativeState?.showVisualSeed}
       >
       <VisualizerErrorBoundary>
       <div style={{ position: "absolute", inset: 0, opacity }}>
@@ -856,7 +962,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
               songIdentity={songIdentity}
               stemSection={stemSection}
               songDuration={analysis?.meta?.duration}
-              palette={effectivePalette}
+              palette={renderedPalette}
               segueIn={props.segueIn}
               isSacredSegueIn={isSacredSegueIn}
               isInSuiteMiddle={!!isInSuiteMiddle}
@@ -873,6 +979,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
               reactiveState={reactiveState}
               visualMemory={visualMemory}
               cameraProfile={activeCameraProfile}
+              showShaderPool={props.narrativeState?.showShaderPool}
               segueOut={props.segueOut}
               segueFromMode={props.segueFromMode}
               segueToMode={props.segueToMode}
@@ -885,7 +992,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
               segueToTitle={segueToTitle}
               frame={frame}
               durationInFrames={durationInFrames}
-              fadeFrames={FADE_FRAMES}
+              fadeFrames={fadeFrames}
             />
           </SilentErrorBoundary>
           </div>
@@ -904,14 +1011,15 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
             frame={frame}
             activeEntries={activeEntries}
             opacityMap={opacityMap}
-            mediaSuppression={mediaSuppression}
+            mediaSuppression={mediaSuppression * endBreathOverlaySuppression}
             tempo={tempo}
-            palette={effectivePalette}
+            palette={renderedPalette}
             frames={f}
             energyLevel={energyLevel}
+            itOverlayOverride={itState.overlayOpacityOverride}
             itFlashIntensity={itState.flashIntensity}
             itFlashHue={itState.flashHue}
-            effectivePalette={effectivePalette}
+            effectivePalette={renderedPalette}
           />
 
         </EnergyEnvelope>

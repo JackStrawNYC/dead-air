@@ -4,24 +4,29 @@
 //!   1. Load manifest (shader GLSL + per-frame uniforms + overlay SVGs)
 //!   2. Compile shaders via naga (GLSL → WGSL → wgpu pipeline)
 //!   3. For each frame:
-//!      a. Render primary shader on GPU
+//!      a. Render primary shader on GPU (HDR)
 //!      b. If transition: render secondary shader, blend
-//!      c. Composite overlay SVGs via resvg
-//!      d. Composite text layers (concert info, now playing, setlist)
-//!      e. Pipe raw pixels to FFmpeg (or save PNG)
+//!      c. Copy scene to feedback buffer (for next frame's uPrevFrame)
+//!      d. Output pass (HDR → SDR)
+//!      e. Composite overlay SVGs/PNGs
+//!      f. Pipe raw pixels to FFmpeg (or save PNG)
 //!   4. FFmpeg encodes to H.264/H.265 video
 //!
 //! Usage:
 //!   dead-air-renderer --manifest manifest.json -o show.mp4 --width 3840 --height 2160
 //!   dead-air-renderer --manifest manifest.json --png-dir ./frames  # PNG mode (slower)
 
+mod compute;
 mod compositor;
 mod ffmpeg;
 pub mod glsl_compat;
 mod gpu;
 mod manifest;
 mod overlay_cache;
+mod motion_blur;
+mod postprocess;
 mod shader_cache;
+mod temporal;
 mod text_layers;
 mod transition;
 mod uniforms;
@@ -75,8 +80,6 @@ fn main() {
     env_logger::init();
     let args = Args::parse();
 
-    // Determine output mode
-    let use_ffmpeg = args.output.is_some();
     if let Some(dir) = &args.png_dir {
         std::fs::create_dir_all(dir).expect("Failed to create PNG directory");
     }
@@ -116,10 +119,51 @@ fn main() {
         start.elapsed().as_secs_f64()
     );
 
+    // ─── Create feedback + FFT textures ───
+    let (feedback_a, feedback_a_view) = renderer.create_feedback_texture("feedback_a");
+    let (feedback_b, feedback_b_view) = renderer.create_feedback_texture("feedback_b");
+    let (fft_texture, fft_view) = renderer.create_fft_texture();
+    let mut feedback_idx: usize = 0; // 0 = write to A, read from B; 1 = write to B, read from A
+
+    // ─── Create post-processing pipeline ───
+    let pp_pipeline = postprocess::PostProcessPipeline::new(
+        renderer.device(),
+        renderer.vertex_module(),
+        args.width,
+        args.height,
+    );
+    println!("Post-processing: bloom ({}x{}) + tonemap + grain", args.width / 2, args.height / 2);
+
+    // ─── Create GPU transition pipeline ───
+    let transition_pipeline = transition::GpuTransitionPipeline::new(
+        renderer.device(),
+        renderer.vertex_module(),
+    );
+
+    // ─── Create temporal blend pipeline ───
+    let temporal_pipeline = temporal::TemporalBlendPipeline::new(
+        renderer.device(),
+        renderer.vertex_module(),
+    );
+
+    // ─── Create particle system (10K particles) ───
+    let particle_system = compute::ParticleSystem::new(
+        renderer.device(),
+        10_000,
+        renderer.vertex_module(),
+    );
+
+    // ─── Create motion blur pipeline ───
+    let motion_blur_pipeline = motion_blur::MotionBlurPipeline::new(
+        renderer.device(),
+        renderer.vertex_module(),
+        args.width,
+        args.height,
+    );
+
     // Compile all shaders
     let mut shader_cache = shader_cache::ShaderCache::new();
 
-    // Also compile secondary shaders for transitions
     let mut all_shader_ids: std::collections::HashSet<&str> = manifest
         .frames
         .iter()
@@ -138,7 +182,7 @@ fn main() {
             match shader_cache.compile(&renderer, shader_id, glsl) {
                 Ok(_) => compiled += 1,
                 Err(e) => {
-                    eprintln!("  WARN: {} failed: {}", shader_id, &e[..e.len().min(80)]);
+                    eprintln!("  WARN: {} failed: {}", shader_id, &e[..e.len().min(120)]);
                     failed += 1;
                 }
             }
@@ -185,67 +229,242 @@ fn main() {
         manifest.frames.len()
     };
 
-    for frame_idx in start_idx..end_idx {
-        let frame = &manifest.frames[frame_idx];
+    let mut last_frame_idx: Option<usize> = None;
 
-        // ─── Step 1: Render primary shader ───
-        let pipeline = match shader_cache.get_pipeline(&frame.shader_id) {
-            Some(p) => p,
-            None => {
-                progress.inc(1);
-                continue;
-            }
-        };
+    // Pipelined rendering: while frame N renders on GPU, we process frame N-1's
+    // pixels on CPU (overlays + FFmpeg). This overlaps GPU and CPU work.
+    //
+    // Flow:
+    //   Frame 0: submit GPU work → no previous frame to process
+    //   Frame 1: read frame 0 pixels + process + output, submit frame 1 GPU work
+    //   Frame 2: read frame 1 pixels + process + output, submit frame 2 GPU work
+    //   ...
+    //   After loop: read + process + output the final frame
 
-        let uniform_data = uniforms::build_uniform_buffer(frame, args.width, args.height);
-        renderer.render_frame(pipeline, &uniform_data);
+    // State for deferred output of the previous frame
+    let mut pending_frame_idx: Option<usize> = None;
+
+    /// Process a completed frame: read pixels, composite overlays, write to output.
+    fn process_completed_frame(
+        renderer: &mut gpu::GpuRenderer,
+        frame_idx: usize,
+        manifest: &manifest::Manifest,
+        overlay_image_cache: &mut overlay_cache::OverlayImageCache,
+        ffmpeg_pipe: &mut Option<ffmpeg::FfmpegPipe>,
+        png_dir: &Option<std::path::PathBuf>,
+        width: u32,
+        height: u32,
+    ) {
         let mut pixels = renderer.read_pixels();
 
-        // ─── Step 2: Transition blending (if active) ───
-        if let (Some(ref sec_id), Some(blend_prog)) =
-            (&frame.secondary_shader_id, frame.blend_progress)
-        {
-            if let Some(sec_pipeline) = shader_cache.get_pipeline(sec_id) {
-                renderer.render_frame(sec_pipeline, &uniform_data);
-                let sec_pixels = renderer.read_pixels();
-
-                let blend_mode = match frame.blend_mode.as_deref() {
-                    Some("additive") => transition::TransitionBlendMode::Additive,
-                    Some("luminance_key") => transition::TransitionBlendMode::LuminanceKey,
-                    _ => transition::TransitionBlendMode::Dissolve,
-                };
-
-                pixels = transition::blend_transition(&pixels, &sec_pixels, blend_prog, blend_mode);
-            }
-        }
-
-        // ─── Step 3: Composite overlays ───
-        // Option A: overlay_schedule (cached PNGs + per-frame transforms — fast)
+        // Composite overlays
         if let Some(ref schedule) = manifest.overlay_schedule {
             if let Some(frame_overlays) = schedule.get(frame_idx) {
                 for instance in frame_overlays {
                     overlay_image_cache.composite_instance(
-                        &mut pixels, args.width, args.height, instance,
+                        &mut pixels, width, height, instance,
                     );
                 }
             }
-        }
-        // Option B: overlay_layers (inline SVGs — slower, for testing)
-        else if let Some(ref overlay_layers) = manifest.overlay_layers {
+        } else if let Some(ref overlay_layers) = manifest.overlay_layers {
             if let Some(frame_overlays) = overlay_layers.get(frame_idx) {
-                compositor::composite_layers(&mut pixels, frame_overlays, args.width, args.height);
+                compositor::composite_layers(&mut pixels, frame_overlays, width, height);
             }
         }
 
-        // ─── Step 4: Output ───
+        // Output
         if let Some(ref mut pipe) = ffmpeg_pipe {
             pipe.write_frame(&pixels).expect("FFmpeg write failed");
-        } else if let Some(ref dir) = args.png_dir {
+        } else if let Some(ref dir) = png_dir {
             let path = dir.join(format!("frame_{:07}.png", frame_idx));
-            image::save_buffer(&path, &pixels, args.width, args.height, image::ColorType::Rgba8)
+            image::save_buffer(&path, &pixels, width, height, image::ColorType::Rgba8)
                 .expect("PNG save failed");
         }
+    }
 
+    for frame_idx in start_idx..end_idx {
+        // ─── Process previous frame's pixels while GPU is idle between submissions ───
+        if let Some(prev_idx) = pending_frame_idx {
+            process_completed_frame(
+                &mut renderer, prev_idx, &manifest,
+                &mut overlay_image_cache, &mut ffmpeg_pipe, &args.png_dir,
+                args.width, args.height,
+            );
+            progress.inc(1);
+        }
+
+        let frame = &manifest.frames[frame_idx];
+
+        // ─── Seek detection ───
+        if let Some(last) = last_frame_idx {
+            if frame_idx != last + 1 {
+                feedback_idx = 0;
+            }
+        }
+
+        // ─── Update FFT texture ───
+        let fft_data = uniforms::build_fft_data(frame);
+        renderer.update_fft_texture(&fft_texture, &fft_data);
+
+        // ─── Particles disabled: they obscure shader output ───
+        // Particles were distracting colored dots that masked the actual shader visuals.
+        // The shaders themselves have their own visual effects (volumetric light, caustics, etc.)
+        // that are more interesting than generic particle overlays.
+
+        // ─── Submit GPU work for current frame ───
+        let shader_info = shader_cache.get_shader_info(&frame.shader_id);
+        let pipeline = match shader_info {
+            Some(info) => &info.pipeline,
+            None => {
+                pending_frame_idx = None;
+                last_frame_idx = Some(frame_idx);
+                continue;
+            }
+        };
+        let needs_textures = shader_info
+            .map(|i| i.texture_info.needs_prev_frame || i.texture_info.needs_fft)
+            .unwrap_or(false);
+
+        let prev_frame_view = if feedback_idx == 0 { &feedback_b_view } else { &feedback_a_view };
+        let texture_bind_group = if needs_textures {
+            Some(renderer.create_texture_bind_group(prev_frame_view, &fft_view))
+        } else {
+            None
+        };
+        let feedback_target = if feedback_idx == 0 { &feedback_a } else { &feedback_b };
+
+        let uniform_data = uniforms::build_uniform_buffer(frame, args.width, args.height);
+        let pp_uniforms = postprocess::PostProcessUniforms {
+            bloom_threshold: -0.08 - frame.energy * 0.18,
+            bloom_intensity: 1.0,
+            energy: frame.energy,
+            time: frame.time,
+            grain_amount: 0.02 + frame.energy * 0.05,
+            vignette_strength: 1.0,
+            resolution: [args.width as f32, args.height as f32],
+            bass: frame.bass,
+            onset_snap: frame.onset_snap,
+            era_brightness: frame.era_brightness,
+            era_sepia: frame.era_sepia,
+            envelope_brightness: frame.envelope_brightness,
+            envelope_saturation: frame.envelope_saturation,
+            dynamic_time: frame.dynamic_time,
+            _pad: 0.0,
+        };
+
+        // Temporal blend: use previous feedback buffer for noise reduction.
+        // Higher blend for quiet/ambient, zero during transitions.
+        let has_transition = frame.secondary_shader_id.is_some() && frame.blend_progress.is_some();
+        let temporal_strength = if has_transition {
+            0.0 // disable during transitions to prevent ghosting
+        } else {
+            // Quiet sections: stronger blend (0.15), loud: weaker (0.03)
+            0.03 + (1.0 - frame.energy.min(1.0)) * 0.12
+        };
+        let temporal_prev_view = if feedback_idx == 0 { &feedback_b_view } else { &feedback_a_view };
+        let temporal_param = if temporal_strength > 0.001 {
+            Some((&temporal_pipeline, temporal_prev_view as &wgpu::TextureView, temporal_strength))
+        } else {
+            None
+        };
+
+        if has_transition {
+            let sec_id = frame.secondary_shader_id.as_ref().unwrap();
+            let blend_prog = frame.blend_progress.unwrap();
+            if let Some(sec_info) = shader_cache.get_shader_info(sec_id) {
+                let sec_needs_tex = sec_info.texture_info.needs_prev_frame
+                    || sec_info.texture_info.needs_fft;
+                let sec_tex_bg = if sec_needs_tex {
+                    let pf_view = if feedback_idx == 0 { &feedback_a_view } else { &feedback_b_view };
+                    Some(renderer.create_texture_bind_group(pf_view, &fft_view))
+                } else {
+                    None
+                };
+                let blend_mode_str = frame.blend_mode.as_deref().unwrap_or("dissolve");
+
+                renderer.render_frame_with_transition(
+                    pipeline,
+                    &sec_info.pipeline,
+                    &uniform_data,
+                    texture_bind_group.as_ref(),
+                    sec_tex_bg.as_ref(),
+                    blend_prog,
+                    blend_mode_str,
+                    Some(feedback_target),
+                    Some((&pp_pipeline, &pp_uniforms)),
+                    &transition_pipeline,
+                );
+            } else {
+                // Secondary shader not found — render primary only
+                renderer.render_frame(
+                    pipeline, &uniform_data,
+                    texture_bind_group.as_ref(), Some(feedback_target),
+                    Some((&pp_pipeline, &pp_uniforms)),
+                    None, // no temporal during transitions
+                );
+            }
+        } else if frame.motion_blur_samples > 1 {
+            // ─── Motion blur: render N sub-frames, accumulate, then post-process ───
+            let samples = frame.motion_blur_samples.min(8);
+            let weight = 1.0 / samples as f32;
+            let time_step = 1.0 / args.fps as f32;
+
+            for s in 0..samples {
+                // Offset time for this sub-frame (spread across one frame period)
+                let sub_offset = (s as f32 / samples as f32 - 0.5) * time_step;
+                let mut sub_uniform_data = uniform_data.clone();
+                // Patch uTime (offset 0) and uDynamicTime (offset 4)
+                sub_uniform_data[0..4].copy_from_slice(&(frame.time + sub_offset).to_le_bytes());
+                sub_uniform_data[4..8].copy_from_slice(&(frame.dynamic_time + sub_offset).to_le_bytes());
+
+                // Render sub-frame to scene_texture (no pp, no readback)
+                renderer.render_scene_to_hdr(
+                    pipeline, &sub_uniform_data,
+                    texture_bind_group.as_ref(),
+                    if s == 0 { Some(feedback_target) } else { None },
+                );
+
+                // Accumulate into motion blur buffer
+                let mut encoder = renderer.device().create_command_encoder(
+                    &wgpu::CommandEncoderDescriptor { label: Some("mb_accum") },
+                );
+                motion_blur_pipeline.accumulate_sub_frame(
+                    &mut encoder, renderer.device(), &renderer.texture_sampler,
+                    renderer.scene_texture_view(), weight, s == 0,
+                    renderer.vertex_buffer(), renderer.index_buffer(),
+                );
+                renderer.queue().submit(std::iter::once(encoder.finish()));
+            }
+
+            // Post-process the accumulated result + readback
+            renderer.postprocess_and_readback(
+                &pp_pipeline, &pp_uniforms, &motion_blur_pipeline.accum_view,
+            );
+        } else {
+            // Standard path: scene → particles → post-process → readback
+            renderer.render_scene_to_hdr(
+                pipeline, &uniform_data,
+                texture_bind_group.as_ref(), Some(feedback_target),
+            );
+
+            // Post-process + readback (create an owned view to avoid borrow conflict)
+            let scene_view = renderer.create_scene_view();
+            renderer.postprocess_and_readback(&pp_pipeline, &pp_uniforms, &scene_view);
+        }
+
+        // GPU work submitted — mark this frame as pending readback
+        feedback_idx = 1 - feedback_idx;
+        pending_frame_idx = Some(frame_idx);
+        last_frame_idx = Some(frame_idx);
+    }
+
+    // ─── Process the final frame ───
+    if let Some(prev_idx) = pending_frame_idx {
+        process_completed_frame(
+            &mut renderer, prev_idx, &manifest,
+            &mut overlay_image_cache, &mut ffmpeg_pipe, &args.png_dir,
+            args.width, args.height,
+        );
         progress.inc(1);
     }
 

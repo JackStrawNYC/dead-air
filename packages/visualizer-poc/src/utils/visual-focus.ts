@@ -25,12 +25,13 @@ export interface VisualFocusState {
  *  so idle at 0.35 yields effective overlay ≈ 0.35 * rotation * density ≈ 0.10-0.15.
  *  This keeps overlays present as psychedelic texture without washing out shaders. */
 /** Focus rules by climax phase — shader IS the show at peaks.
- *  Climax: shader owns everything. Overlays near-zero so color is pure.
+ *  Climax: shader OWNS the moment. Overlays at 0.15 minimum (was 0.50) — visual surrender.
+ *  Sustain: overlays at 0.20 minimum (was 0.55) — shader still dominant.
  *  Idle: overlays at 0.25 (was 0.35) — let darkness breathe.
  *  Release: warm afterglow, overlays return as emotional texture. */
 const PHASE_FOCUS: Record<ClimaxPhase, VisualFocusState> = {
-  climax:  { shaderOpacity: 1.0,  artOpacity: 0.0,  overlayOpacity: 0.50, grainOpacity: 0.5 },
-  sustain: { shaderOpacity: 1.0,  artOpacity: 0.0,  overlayOpacity: 0.55, grainOpacity: 0.6 },
+  climax:  { shaderOpacity: 1.0,  artOpacity: 0.0,  overlayOpacity: 0.15, grainOpacity: 0.5 },
+  sustain: { shaderOpacity: 1.0,  artOpacity: 0.0,  overlayOpacity: 0.20, grainOpacity: 0.6 },
   build:   { shaderOpacity: 1.0,  artOpacity: 0.12, overlayOpacity: 0.60, grainOpacity: 0.8 },
   release: { shaderOpacity: 1.0,  artOpacity: 0.35, overlayOpacity: 0.70, grainOpacity: 1.0 },
   idle:    { shaderOpacity: 1.0,  artOpacity: 0.25, overlayOpacity: 0.70, grainOpacity: 1.0 },

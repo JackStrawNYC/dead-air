@@ -564,6 +564,11 @@ void main() {
   vec3 accentColor = paletteHueColor(hue2, 0.85, 0.95);
   accentColor = mix(accentColor, vec3(0.3, 0.7, 0.9), 0.3);
 
+  // Internal evolution over long holds
+  float holdP = clamp(uShaderHoldProgress, 0.0, 1.0);
+  float evolveComplexity = smoothstep(0.0, 0.5, holdP) * (1.0 - smoothstep(0.8, 1.0, holdP) * 0.4);
+  float evolveOpenness = 1.0 - smoothstep(0.0, 0.3, holdP) * 0.3 + smoothstep(0.75, 1.0, holdP) * 0.3;
+
   // === FLOW TIME (section-modulated) ===
   // Widened animation speed: nearly still at quiet, flowing at loud (was 0.15+0.08)
   float flowTime = uDynamicTime * (0.08 + slowE * 0.18)
@@ -612,8 +617,8 @@ void main() {
   }
 
   // === BASE COLOR: deep ocean void ===
-  // Space → deeper darkness, chorus → brighter
-  float abyssDepth = 0.3 + spaceScore * 0.4 - sChorus * 0.15;
+  // Space → deeper darkness, chorus → brighter. Hold evolution opens up abyss then resolves.
+  float abyssDepth = (0.3 + spaceScore * 0.4 - sChorus * 0.15) * evolveOpenness;
   vec3 col = waterColor * mix(0.15, 0.05, abyssDepth);
 
   // === VOLUMETRIC LIGHT SHAFTS (accumulated along ray) ===
@@ -625,8 +630,8 @@ void main() {
     shaftAccum += do2LightShaft(shPos, flowTime, vocalPresence) * shaftStepSize * 0.15;
   }
 
-  // Chorus floods the scene with light
-  float shaftMult = 1.0 + sChorus * 1.5 + climaxAmount * 0.8;
+  // Chorus floods the scene with light. Hold evolution modulates shaft intensity.
+  float shaftMult = (1.0 + sChorus * 1.5 + climaxAmount * 0.8) * (0.3 + evolveComplexity * 0.7);
   vec3 shaftColor = mix(vec3(0.4, 0.6, 0.8), accentColor, 0.3);
   col += shaftColor * shaftAccum * shaftMult;
 

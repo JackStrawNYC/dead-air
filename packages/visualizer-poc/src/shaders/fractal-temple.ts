@@ -81,6 +81,11 @@ void main() {
   float climB = step(1.5,uClimaxPhase)*step(uClimaxPhase,3.5)*clamp(uClimaxIntensity,0.0,1.0);
   float ft = uDynamicTime*(0.03+slowE*0.09)*(1.0+sJam*0.5-sSpace*0.4);
 
+  // Internal evolution over long holds
+  float holdP = clamp(uShaderHoldProgress, 0.0, 1.0);
+  float evolveComplexity = smoothstep(0.0, 0.5, holdP) * (1.0 - smoothstep(0.8, 1.0, holdP) * 0.4);
+  float evolveOpenness = 1.0 - smoothstep(0.0, 0.3, holdP) * 0.3 + smoothstep(0.75, 1.0, holdP) * 0.3;
+
   // Palette
   vec3 wt = paletteHueColor(uPalettePrimary, 0.55, 0.85);
   float wl = dot(wt,vec3(0.299,0.587,0.114));
@@ -95,12 +100,12 @@ void main() {
   vec3 fw = normalize(tg-ro);
   vec3 ri = normalize(cross(vec3(0.0,1.0,0.0),fw));
   vec3 up2 = cross(fw,ri);
-  float fov = 0.85+energy*0.1+climB*0.15;
+  float fov = (0.85+energy*0.1+climB*0.15) * evolveOpenness;
   vec3 rd = normalize(p.x*ri + p.y*up2 + fov*fw);
 
-  // Raymarch
+  // Raymarch — step count evolves with hold (fewer early, max at peak)
   float td = 0.0; vec3 hp = ro; bool ht = false;
-  int ms = int(mix(32.0,96.0,energy));
+  int ms = int(mix(32.0,96.0,energy) * (0.6 + evolveComplexity * 0.4));
   for (int i = 0; i < 96; i++) {
     if (i >= ms) break;
     vec3 ps = ro+rd*td;
@@ -152,7 +157,7 @@ void main() {
     if (gt2 > td && ht) break;
     vec3 gp = ro+rd*gt2;
     float occ = ftMap(gp+normalize(lp-gp)*0.5, energy,bass,ft,psyche);
-    float fog = fbm3(gp*0.3+ft*0.02)*(0.05+bass*0.30);
+    float fog = fbm3(gp*0.3+ft*0.02)*(0.05+bass*0.30) * (0.4 + evolveComplexity * 0.6);
     ra += smoothstep(-0.1,0.3,occ)*0.02*(0.3+fog);
   }
   col += grCol*ra*(0.15+vocalP*0.65+climB*0.4);

@@ -25,3 +25,6 @@ export type { SceneRenderOptions, SceneRenderResult } from './scene-renderer.js'
 
 export { generateSubtitles } from './subtitle-generator.js';
 export type { SubtitleOptions, SubtitleResult } from './subtitle-generator.js';
+
+export { renderWithRust, isRustRendererAvailable } from './rust-renderer.js';
+export type { RustRenderOptions, RustRenderResult } from './rust-renderer.js';

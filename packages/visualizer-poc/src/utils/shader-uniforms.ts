@@ -18,6 +18,7 @@ import { DEFAULT_SHADER_PARAMS, type ShaderParameterProfile } from "../config/sh
 import type { CameraProfile } from "../config/camera-profiles";
 import type { FilmStockParams } from "./show-film-stock";
 import type { VenueProfile } from "./venue-profiles";
+import type { ShowVisualSeed } from "./show-visual-seed";
 
 // ── Era constants (canonical source of truth) ──
 
@@ -133,6 +134,8 @@ export interface UniformSyncData {
   coherence: number;
   isLocked: boolean;
   peakOfShow: number;
+  songProgress: number;
+  shaderHoldProgress: number;
   eraSaturation: number;
   eraBrightness: number;
   eraSepia: number;
@@ -150,6 +153,8 @@ export interface UniformSyncData {
   envelope: { brightness: number; saturation: number; hue: number };
   /** Mutable ref to LightingState for EMA smoothing across frames */
   lightingRef: { current: LightingState };
+  /** Per-show visual seed (null = no show-level modulation) */
+  showVisualSeed?: ShowVisualSeed | null;
 }
 
 /**
@@ -208,6 +213,8 @@ export function createBaseUniforms(
     uChroma2: { value: new THREE.Vector4(0, 0, 0, 0) },
     uCamOffset: { value: new THREE.Vector2(0, 0) },
     uJamDensity: { value: 0.5 },
+    uSongProgress: { value: 0 },
+    uShaderHoldProgress: { value: 0 },
     uJamPhase: { value: -1 },
     uJamProgress: { value: 0 },
     uCoherence: { value: 0 },
@@ -289,6 +296,10 @@ export function createBaseUniforms(
     uAmbientColor: { value: new THREE.Vector3(0.08, 0.07, 0.09) },
     uColorTemperature: { value: 0.0 },
     uTemporalBlendStrength: { value: 0.0 },
+    uShowGrainCharacter: { value: 0.5 },
+    uShowBloomCharacter: { value: 0.0 },
+    uShowTemperatureCharacter: { value: 0.0 },
+    uShowContrastCharacter: { value: 0.5 },
   };
 }
 
@@ -307,7 +318,7 @@ export function syncBaseUniforms(
     palettePrimary, paletteSecondary, paletteSaturation,
     tempo, musicalTime, climaxPhase, climaxIntensity,
     heroTrigger, heroProgress, jamDensity, jamPhase, jamProgress,
-    coherence, isLocked, peakOfShow,
+    coherence, isLocked, peakOfShow, songProgress, shaderHoldProgress,
     eraSaturation, eraBrightness, eraSepia,
     filmStock, venueProfile,
     shaderWidth, shaderHeight,
@@ -351,6 +362,8 @@ export function syncBaseUniforms(
   // as "amplified evolution" — deeper colors, more intricate geometry, maximum
   // pattern stability. The visual world deepens instead of freezing.
   u.uCoherence.value = isLocked ? Math.min(2.0, coherence * 1.5 + 0.5) : coherence;
+  u.uSongProgress.value = songProgress ?? 0;
+  u.uShaderHoldProgress.value = shaderHoldProgress ?? 0;
   u.uSlowEnergy.value = smooth.slowEnergy;
   u.uStemBass.value = smooth.stemBass;
   u.uStemDrums.value = smooth.drumOnset; // drums energy = drum onset
@@ -444,6 +457,15 @@ export function syncBaseUniforms(
 
   // Temporal blend — disabled by default (0.0), set by render pipeline when active
   u.uTemporalBlendStrength.value = 0.0;
+
+  // Per-show visual identity (from ShowVisualSeed)
+  {
+    const svs = data.showVisualSeed;
+    u.uShowGrainCharacter.value = svs?.grainPreference ?? 0.5;
+    u.uShowBloomCharacter.value = svs?.bloomBias ?? 0.0;
+    u.uShowTemperatureCharacter.value = svs?.paletteTemperature ?? 0.0;
+    u.uShowContrastCharacter.value = svs?.contrastCharacter ?? 0.5;
+  }
 
   // 3D Camera (uses profile from SceneConfig context)
   const cam3d = compute3DCamera(

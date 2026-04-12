@@ -50,11 +50,10 @@ ${noiseGLSL}
 ${lightingGLSL}
 
 // COSMIC VOYAGE FIX: previously had temporalBlend + anaglyph + caEnabled
-// all on. The volumetric fractal accumulation produces high-contrast pixels;
-// chromatic aberration + anaglyph fringe-shifted those into rainbow noise,
-// and temporalBlend fed the broken frames back in, accumulating into the
-// neon green/blue/pink "rocky" pattern. Disabled the noisy ones.
-${buildPostProcessGLSL({ halationEnabled: true, caEnabled: false, anaglyphEnabled: false, dofEnabled: true, temporalBlendEnabled: false })}
+// all on simultaneously. anaglyph fringe-shifted high-contrast pixels into
+// rainbow noise, temporalBlend fed that back in. Fix: anaglyph + temporalBlend
+// stay off, CA alone is safe (max 0.03 cap prevents fringing on volumetric).
+${buildPostProcessGLSL({ halationEnabled: true, caEnabled: true, lightLeakEnabled: true, anaglyphEnabled: false, dofEnabled: true, temporalBlendEnabled: false })}
 
 varying vec2 vUv;
 
@@ -129,6 +128,11 @@ void main() {
   float chromaH = uChromaHue;
   float chordHue = float(int(uChordIndex)) / 24.0 * 0.12 * smoothstep(0.3, 0.6, uChordConfidence);
 
+  // Internal evolution over long holds
+  float holdP = clamp(uShaderHoldProgress, 0.0, 1.0);
+  float evolveComplexity = smoothstep(0.0, 0.5, holdP) * (1.0 - smoothstep(0.8, 1.0, holdP) * 0.4);
+  float evolveOpenness = 1.0 - smoothstep(0.0, 0.3, holdP) * 0.3 + smoothstep(0.75, 1.0, holdP) * 0.3;
+
   float sectionT = uSectionType;
   float sJam = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
   float sSpace = smoothstep(6.5, 7.5, sectionT);
@@ -160,7 +164,7 @@ void main() {
   vec3 rolledRight = camRt * cos(rollAngle) + camUpDir * sin(rollAngle);
   vec3 rolledUp = -camRt * sin(rollAngle) + camUpDir * cos(rollAngle);
 
-  float fov = mix(1.5, 2.0, bass);
+  float fov = mix(1.5, 2.0, bass) * evolveOpenness;
   vec3 rayDir = normalize(screenPos.x * rolledRight + screenPos.y * rolledUp + fov * camFwd);
 
   // ═══ Palette ═══
@@ -193,8 +197,8 @@ void main() {
     float n2 = fbm3(noiseP * 1.9 + 7.3);
     float n3 = fbm3(noiseP * 4.0 + 19.1);
     float density = pow(n1 * 0.55 + n2 * 0.30 + n3 * 0.15 + 0.5, 1.4);
-    // Widened density: 4x range (sparse quiet → dense loud)
-    density = clamp(density * (0.30 + energy * 0.70 + bass * 0.40), 0.0, 1.4);
+    // Widened density: 4x range (sparse quiet → dense loud), modulated by hold evolution
+    density = clamp(density * (0.30 + energy * 0.70 + bass * 0.40) * (0.5 + evolveComplexity * 0.5), 0.0, 1.4);
     accDensity = density;
 
     // Per-pixel hue offset based on ray direction so adjacent pixels
@@ -279,8 +283,8 @@ void main() {
   }
 
   // Fog: palette-colored
-  // Widened fog: thick fog at quiet (0.25) → clear at loud (0.90)
-  float fogDist = mix(0.25, 0.90, energy);
+  // Widened fog: thick fog at quiet (0.25) → clear at loud (0.90), resolves to fog at end
+  float fogDist = mix(0.25, 0.90, energy) * (0.7 + evolveComplexity * 0.3);
   vec3 fogColor = mix(cloudColor, emissionColor, 0.3) * 0.25;
   float fogAmount = (1.0 - fogDist) * 0.35;
   col = mix(col, fogColor, fogAmount * smoothstep(0.5, 0.0, lumAcc));

@@ -53,7 +53,7 @@ ${buildPostProcessGLSL({
   grainStrength: "normal",
   bloomEnabled: true,
   halationEnabled: true,
-  caEnabled: false,
+  caEnabled: true,
   lightLeakEnabled: true,
   dofEnabled: false,
   temporalBlendEnabled: true,

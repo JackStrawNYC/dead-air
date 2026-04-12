@@ -424,12 +424,17 @@ void main() {
   vec3 warmTint = hsv2rgb(vec3(h1 + 0.05, sat * 0.4, 0.5));
   vec3 coolTint = hsv2rgb(vec3(h2 + 0.3, sat * 0.3, 0.3));
 
+  // ─── Internal evolution over long holds ───
+  float holdP = clamp(uShaderHoldProgress, 0.0, 1.0);
+  float evolveComplexity = smoothstep(0.0, 0.5, holdP) * (1.0 - smoothstep(0.8, 1.0, holdP) * 0.4);
+  float evolveOpenness = 1.0 - smoothstep(0.0, 0.3, holdP) * 0.3 + smoothstep(0.75, 1.0, holdP) * 0.3;
+
   // ─── Time / motion ───
   float flowTime = uDynamicTime * (0.05 + slowE * 0.03)
                  * mix(1.0, 1.5, sJam) * mix(1.0, 0.3, sSpace);
 
   // ─── Mirror distance: bass makes the corridor breathe ───
-  float baseMirrorDist = 3.0;
+  float baseMirrorDist = 3.0 * evolveOpenness;
   // Bass pulsing: corridor breathes with the rhythm
   float breathe = bass * 0.4 + fftBass * 0.2;
   float mirrorDist = baseMirrorDist + sin(flowTime * 1.5) * breathe * 0.5 - breathe * 0.15;
@@ -444,7 +449,7 @@ void main() {
   tiltAngle += sSolo * 0.06 * sin(flowTime * 0.5);
 
   // ─── Frame geometry parameters ───
-  float frameThick = 0.12 + energy * 0.12;
+  float frameThick = (0.12 + energy * 0.12) * (0.6 + evolveComplexity * 0.4);
 
   // ─── Bass vibration for floor ───
   float bassVib = stemBass * 0.5 + bass * 0.3;
@@ -477,7 +482,7 @@ void main() {
   worldUp = normalize(vec3(sin(camTilt), cos(camTilt), 0.0));
   vec3 ri = normalize(cross(fw, worldUp));
   vec3 camUp = cross(ri, fw);
-  float fov = 0.8 + energy * 0.1 - sSpace * 0.15 + climaxBoost * 0.3;
+  float fov = (0.8 + energy * 0.1 - sSpace * 0.15 + climaxBoost * 0.3) * evolveOpenness;
   vec3 rd = normalize(p.x * ri + p.y * camUp + fov * fw);
 
   // ─── Raymarch the mirror corridor geometry ───

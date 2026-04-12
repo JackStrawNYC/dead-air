@@ -182,6 +182,10 @@ export interface AudioDataContext {
   jamProgress: number;
   /** Peak-of-show intensity: 0 = not in peak, 1 = peak transcendence */
   peakOfShow: number;
+  /** Song progress: 0 at song start, 1 at song end */
+  songProgress: number;
+  /** Shader hold progress: 0 at section start, 1 at section end (spans full hold) */
+  shaderHoldProgress: number;
 }
 
 const AudioCtx = createContext<AudioDataContext | null>(null);
@@ -481,7 +485,7 @@ function useSmoother(
 
 export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, sections, palette, tempo, jamDensity, coherence: coherenceProp, isLocked: isLockedProp, snapToMusicalTime: snapToMusicalTimeProp }) => {
   const frameIdx = useCurrentFrame();
-  const { fps, width, height } = useVideoConfig();
+  const { fps, width, height, durationInFrames } = useVideoConfig();
 
   const idx = Math.min(Math.max(0, frameIdx), frames.length - 1);
   const fd = frames[idx];
@@ -570,7 +574,16 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
   }, [frames, fps, tempo]);
 
   const sectionList = sections ?? [];
-  const { sectionIndex, sectionProgress } = findCurrentSection(sectionList, idx);
+  const { sectionIndex, section: currentSectionObj, sectionProgress } = findCurrentSection(sectionList, idx);
+
+  // Song progress: 0 at start, 1 at end
+  const songProgress = durationInFrames > 0 ? frameIdx / durationInFrames : 0;
+
+  // Shader hold progress: 0 at section start, 1 at section end
+  // For long holds (jam/space), this spans the full multi-section hold
+  const shaderHoldProgress = currentSectionObj
+    ? (idx - currentSectionObj.frameStart) / Math.max(1, currentSectionObj.frameEnd - currentSectionObj.frameStart)
+    : 0;
 
   const energy = useSmoother(S.energy, frames, idx, (f) => f.rms, isSeek);
   const egate = energyGate(energy);
@@ -782,6 +795,8 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
     jamPhase: jamPhaseCtx.phase,
     jamProgress: jamPhaseCtx.progress,
     peakOfShow: peakOfShowIntensity,
+    songProgress,
+    shaderHoldProgress,
   };
 
   return (

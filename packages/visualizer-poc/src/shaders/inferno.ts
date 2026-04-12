@@ -397,12 +397,17 @@ void main() {
   float isClimax = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5);
   float climaxBoost = isClimax * clamp(uClimaxIntensity, 0.0, 1.0);
 
+  // Internal evolution over long holds
+  float holdP = clamp(uShaderHoldProgress, 0.0, 1.0);
+  float evolveComplexity = smoothstep(0.0, 0.5, holdP) * (1.0 - smoothstep(0.8, 1.0, holdP) * 0.4);
+  float evolveOpenness = 1.0 - smoothstep(0.0, 0.3, holdP) * 0.3 + smoothstep(0.75, 1.0, holdP) * 0.3;
+
   // === DERIVED PARAMETERS ===
   float eruptionScale = clamp(eruptionMod * (0.1 + energy * 0.8 + drumOnset * 0.4 + aggressive * 0.3)
-                              + climaxBoost * 0.5, 0.0, 2.0) * geyserMod;
+                              + climaxBoost * 0.5, 0.0, 2.0) * geyserMod * (0.3 + evolveComplexity * 0.7);
   float floodLevel = clamp(lavaFloodMod + bass * 0.3 + climaxBoost * 0.4, -0.3, 1.0);
   float magmaPressure = clamp((bass * 0.4 + energy * 0.3 + vocalPresence * 0.3) * magmaGlowMod
-                              + climaxBoost * 0.3, 0.0, 1.2);
+                              + climaxBoost * 0.3, 0.0, 1.2) * (0.4 + evolveComplexity * 0.6);
   float flowTime = uDynamicTime * (0.15 + slowEnergy * 0.1);
   float geyserTime = uDynamicTime * (0.8 + energy * 0.5);
 

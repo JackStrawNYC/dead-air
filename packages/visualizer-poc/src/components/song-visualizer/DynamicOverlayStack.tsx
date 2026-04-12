@@ -10,11 +10,12 @@
  * Extracted from SongVisualizer to isolate the overlay rendering loop.
  */
 
-import React, { Suspense } from "react";
-import { useCurrentFrame, interpolate, Easing } from "remotion";
+import React, { Suspense, useContext } from "react";
+import { useCurrentFrame, useVideoConfig, interpolate, Easing } from "remotion";
 import { SilentErrorBoundary } from "../SilentErrorBoundary";
 import { SongPaletteProvider } from "../../data/SongPaletteContext";
 import { TempoProvider } from "../../data/TempoContext";
+import { CameraMotionContext } from "../CameraMotion";
 import type { EnhancedFrameData, ColorPalette } from "../../data/types";
 
 
@@ -78,6 +79,9 @@ export const DynamicOverlayStack: React.FC<Props> = ({
   deadAirFactor = 0,
 }) => {
   const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  const fpsScale = fps / 30; // 1.0 at 30fps, 2.0 at 60fps
+  const camMotion = useContext(CameraMotionContext);
 
   // Enhanced beat-synced overlay opacity pulse with drum-stem and section awareness
   const frameIdx = Math.min(frame, frames.length - 1);
@@ -163,7 +167,7 @@ export const DynamicOverlayStack: React.FC<Props> = ({
 
   const gateOpacity = interpolate(
     frame,
-    [OVERLAY_GATE_END, OVERLAY_GATE_END + 90],
+    [OVERLAY_GATE_END * fpsScale, (OVERLAY_GATE_END + 90) * fpsScale],
     [0, 1],
     { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: Easing.out(Easing.cubic) },
   );
@@ -224,7 +228,7 @@ export const DynamicOverlayStack: React.FC<Props> = ({
             opacity: gateOpacity,
             pointerEvents: "none",
             mixBlendMode: "screen",
-            filter: desatFilter,
+            filter: [breathFilter, desatFilter].filter(Boolean).join(" ") || undefined,
             contain: "layout style paint",
           }}
         >
@@ -257,7 +261,8 @@ export const DynamicOverlayStack: React.FC<Props> = ({
           inset: 0,
           opacity: gateOpacity,
           filter: [
-            hueRotation !== 0 ? `hue-rotate(${hueRotation.toFixed(1)}deg)` : "",
+            (hueRotation !== 0 || energyHueClamp !== 0) ? `hue-rotate(${(hueRotation + energyHueClamp).toFixed(1)}deg)` : "",
+            breathFilter,
             desatFilter ?? "",
           ].filter(Boolean).join(" ") || undefined,
           contain: "layout style paint",
@@ -267,10 +272,21 @@ export const DynamicOverlayStack: React.FC<Props> = ({
           // Per-layer parallax drift: deeper layers drift slower, surface layers faster
           const layerDriftFactor = 0.5 + (layer / 10) * 1.0;
           const parallaxTime = frame / 30;
-          // Skip parallax transform for barely-visible overlays (saves composite cost)
-          const applyParallax = opacity >= 0.3;
-          const parallaxX = applyParallax ? Math.sin(parallaxTime * 0.06) * 3 * layerDriftFactor : 0;
-          const parallaxY = applyParallax ? Math.cos(parallaxTime * 0.04 + 1.3) * 2 * layerDriftFactor : 0;
+          // Skip transforms for barely-visible overlays (saves composite cost)
+          const applyMotion = opacity >= 0.3;
+          // Energy-driven amplitude: louder passages = more visual motion
+          const energyAmplify = 1.0 + slowEnergy * 0.5;
+          const parallaxX = applyMotion ? Math.sin(parallaxTime * 0.06 + layer * 0.4) * 3 * layerDriftFactor * energyAmplify : 0;
+          const parallaxY = applyMotion ? Math.cos(parallaxTime * 0.04 + 1.3 + layer * 0.3) * 2 * layerDriftFactor * energyAmplify : 0;
+          // Camera motion parallax: deeper layers move less with camera, foreground moves more
+          const camParallaxFactor = 0.4 + (layer / 10) * 0.7; // layer 1: 0.47, layer 10: 1.1
+          const camParallaxX = applyMotion ? camMotion.translateX * camParallaxFactor * 0.3 : 0; // 30% of camera motion
+          const camParallaxY = applyMotion ? camMotion.translateY * camParallaxFactor * 0.3 : 0;
+          // Scale breathing: gentle swell synced to slow energy envelope.
+          // Each layer breathes at a slightly different phase for organic depth.
+          const breathScale = applyMotion ? 1.0 + Math.sin(parallaxTime * 0.08 + layer * 0.7) * 0.012 * (0.5 + slowEnergy) : 1;
+          // Subtle rotation drift: geometric/sacred layers tilt more, atmospheric less
+          const rotDrift = applyMotion ? Math.sin(parallaxTime * 0.03 + layer * 1.1) * 0.3 * layerDriftFactor : 0;
           return (
           <div
             key={name}
@@ -280,7 +296,9 @@ export const DynamicOverlayStack: React.FC<Props> = ({
               opacity,
               pointerEvents: "none",
               mixBlendMode: blendMode ?? "screen",
-              transform: applyParallax ? `translate(${parallaxX.toFixed(2)}px, ${parallaxY.toFixed(2)}px)` : undefined,
+              transform: applyMotion
+                ? `translate(${(parallaxX + camParallaxX).toFixed(2)}px, ${(parallaxY + camParallaxY).toFixed(2)}px) scale(${breathScale.toFixed(4)}) rotate(${rotDrift.toFixed(2)}deg)`
+                : undefined,
               contain: "layout style paint",
               willChange: "opacity, transform",
             }}

@@ -19,6 +19,8 @@ import { JamPhaseProvider } from "../../data/JamPhaseContext";
 import { PeakOfShowProvider } from "../../data/PeakOfShowContext";
 import { DeadAirProvider } from "../../data/DeadAirContext";
 import { TimeDilationProvider } from "../../data/TimeDilationContext";
+import { ShowVisualSeedProvider } from "../../data/ShowVisualSeedContext";
+import type { ShowVisualSeed } from "../../utils/show-visual-seed";
 import type { AudioSnapshot } from "../../utils/audio-reactive";
 
 export interface VisualizerProviderStackProps {
@@ -33,6 +35,7 @@ export interface VisualizerProviderStackProps {
   peakOfShowIntensity: number;
   deadAirFactor: number;
   spaceTimeDilation: number;
+  showVisualSeed?: ShowVisualSeed | null;
   children: React.ReactNode;
 }
 
@@ -47,6 +50,7 @@ export const VisualizerProviderStack: React.FC<VisualizerProviderStackProps> = (
   peakOfShowIntensity,
   deadAirFactor,
   spaceTimeDilation,
+  showVisualSeed,
   children,
 }) => (
   <ShowNarrativeProvider totalSongs={totalSongs} initialState={narrativeInitialState}>
@@ -58,7 +62,9 @@ export const VisualizerProviderStack: React.FC<VisualizerProviderStackProps> = (
   <PeakOfShowProvider value={peakOfShowIntensity}>
   <DeadAirProvider value={deadAirFactor}>
   <TimeDilationProvider value={spaceTimeDilation}>
+  <ShowVisualSeedProvider value={showVisualSeed ?? null}>
     {children}
+  </ShowVisualSeedProvider>
   </TimeDilationProvider>
   </DeadAirProvider>
   </PeakOfShowProvider>

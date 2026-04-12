@@ -147,6 +147,14 @@ fn test_render_one_frame() {
         param_drum_reactivity: 1.0,
         param_vocal_weight: 1.0,
         peak_of_show: 0.0,
+        contrast: None,
+        motion_blur_samples: 1,
+        shader_hold_progress: None,
+        song_progress: None,
+        show_bloom_character: None,
+        show_grain_character: None,
+        show_temperature_character: None,
+        show_contrast_character: None,
     };
 
     let uniform_data = dead_air_renderer::uniforms::build_uniform_buffer(
@@ -155,7 +163,7 @@ fn test_render_one_frame() {
     println!("Uniform buffer: {} bytes", uniform_data.len());
 
     // Step 6: RENDER!
-    renderer.render_frame(&pipeline, &uniform_data);
+    renderer.render_frame(&pipeline, &uniform_data, None, None, None, None);
     println!("Frame rendered on GPU");
 
     // Step 7: Read pixels back

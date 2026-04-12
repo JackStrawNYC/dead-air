@@ -56,7 +56,7 @@ const postProcess = buildPostProcessGLSL({
   caEnabled: true,
   lensDistortionEnabled: true,
   eraGradingEnabled: true,
-  lightLeakEnabled: false,
+  lightLeakEnabled: true,
   stageFloodEnabled: false,
 });
 

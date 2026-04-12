@@ -41,7 +41,7 @@ const postProcess = buildPostProcessGLSL({
   grainStrength: "normal",
   caEnabled: true,
   lensDistortionEnabled: true,
-  lightLeakEnabled: false,
+  lightLeakEnabled: true,
   temporalBlendEnabled: false,
 });
 

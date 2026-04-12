@@ -25,12 +25,12 @@ void main() {
 const postProcess = buildPostProcessGLSL({
   grainStrength: "light",
   halationEnabled: true,
-  bloomEnabled: false,
-  caEnabled: false,
-  dofEnabled: false,
-  lensDistortionEnabled: false,
-  lightLeakEnabled: false,
-  beatPulseEnabled: false,
+  bloomEnabled: true,
+  caEnabled: true,
+  dofEnabled: true,
+  lensDistortionEnabled: true,
+  lightLeakEnabled: true,
+  beatPulseEnabled: true,
 });
 
 export const proteanCloudsFrag = /* glsl */ `
@@ -167,8 +167,19 @@ void main() {
   float bass = clamp(uBass, 0.0, 1.0);
   float slowE = clamp(uSlowEnergy, 0.0, 1.0);
 
+  // Stem reactivity
+  float stemDrums = clamp(uStemDrums, 0.0, 1.0);
+  float stemBass = clamp(uStemBass, 0.0, 1.0);
+  float vocalE = clamp(uVocalEnergy, 0.0, 1.0);
+
+  // Internal evolution over long holds
+  float holdP = clamp(uShaderHoldProgress, 0.0, 1.0);
+  float evolveComplexity = smoothstep(0.0, 0.5, holdP) * (1.0 - smoothstep(0.8, 1.0, holdP) * 0.4);
+  float evolveOpenness = 1.0 - smoothstep(0.0, 0.3, holdP) * 0.3 + smoothstep(0.75, 1.0, holdP) * 0.3;
+
   // Time: SLOW. Clouds drift like breathing, not racing.
-  float timeScale = 0.8 + slowE * 0.3 + energy * 0.4;
+  // Drums add subtle turbulence churn (applied to timeScale BEFORE time computation)
+  float timeScale = (0.8 + slowE * 0.3 + energy * 0.4 + stemDrums * 0.3) * (0.7 + evolveComplexity * 0.3);
   float time = uDynamicTime * timeScale;
 
   // Palette from song identity
@@ -196,8 +207,12 @@ void main() {
   _pc_prm1 = smoothstep(-0.4, 0.4, sin(uTime * 0.1));
   // Bass gently thickens clouds
   _pc_prm1 += bass * 0.1;
+  // Stem bass modulates cloud density
+  _pc_prm1 += stemBass * 0.12;
   // Slow energy is the mood — no onset/beat reactivity on density
   _pc_prm1 += slowE * 0.15;
+  // Hold evolution: sparse at start, thick at peak, opens at resolution
+  _pc_prm1 *= (0.5 + evolveComplexity * 0.5);
   // Climax: clouds open up slowly
   float isClimax = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5);
   _pc_prm1 -= isClimax * uClimaxIntensity * 0.3;
@@ -219,6 +234,9 @@ void main() {
     vec3 localLight = col;
     col = mix(localLight, localLight * sharedLight, 0.3);
   }
+
+  // Vocal warmth: warm light breakthrough in clouds
+  col += vec3(0.06, 0.04, 0.02) * vocalE * 0.3;
 
   // Original nimitz gamma/tone
   col = pow(col, vec3(0.55, 0.65, 0.6)) * vec3(1.0, 0.97, 0.9);

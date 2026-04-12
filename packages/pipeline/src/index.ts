@@ -19,8 +19,8 @@ export { orchestrateAssetGeneration } from './assets/index.js';
 export type { AssetGenOptions, AssetGenResult } from './assets/index.js';
 
 // Render pipeline
-export { orchestrateRender, buildCompositionProps, renderScenes, concatScenes } from './render/index.js';
-export type { RenderPipelineOptions, RenderPipelineResult, EpisodeProps, SegmentProps, SceneRenderOptions } from './render/index.js';
+export { orchestrateRender, buildCompositionProps, renderScenes, concatScenes, renderWithRust, isRustRendererAvailable } from './render/index.js';
+export type { RenderPipelineOptions, RenderPipelineResult, EpisodeProps, SegmentProps, SceneRenderOptions, RustRenderOptions, RustRenderResult } from './render/index.js';
 
 // Batch pipeline
 export { orchestrateBatch } from './batch/index.js';

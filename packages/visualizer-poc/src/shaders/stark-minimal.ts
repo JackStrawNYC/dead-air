@@ -60,7 +60,7 @@ ${buildPostProcessGLSL({
   grainStrength: "light",
   bloomEnabled: true,
   bloomThresholdOffset: -0.04,
-  caEnabled: false,
+  caEnabled: true,
   halationEnabled: true,
   lensDistortionEnabled: true,
   dofEnabled: true,

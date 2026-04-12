@@ -4,12 +4,12 @@
 //! transitions, audio-reactive uniforms) and writes a manifest with per-frame data.
 //! This Rust renderer reads the manifest and renders each frame on the GPU.
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::Path;
 
 /// Top-level manifest: shaders + per-frame data.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Manifest {
     /// Map of shader_id → pre-composed GLSL source string.
     pub shaders: HashMap<String, String>,
@@ -36,7 +36,7 @@ pub struct Manifest {
 }
 
 /// Per-frame data: which shader to use + all uniform values.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct FrameData {
     /// Which shader to render (key into manifest.shaders)
     pub shader_id: String,
@@ -175,10 +175,58 @@ pub struct FrameData {
 
     // Peak of show
     pub peak_of_show: f32,
+
+    // Song/shader progress (Phase 2C)
+    #[serde(default)]
+    pub song_progress: Option<f32>,
+    #[serde(default)]
+    pub shader_hold_progress: Option<f32>,
+
+    // Per-show visual character (Phase 4C)
+    #[serde(default)]
+    pub show_grain_character: Option<f32>,
+    #[serde(default)]
+    pub show_bloom_character: Option<f32>,
+    #[serde(default)]
+    pub show_temperature_character: Option<f32>,
+    #[serde(default)]
+    pub show_contrast_character: Option<f32>,
+
+    // FFT contrast data (7-band spectral contrast for FFT texture)
+    // Optional — if missing, synthesized from bass/mids/highs/energy
+    #[serde(default)]
+    pub contrast: Option<Vec<f32>>,
+
+    // Motion blur sub-frame count (1 = no blur, 2-8 = blur intensity)
+    // Adaptive: quiet=1 (free), medium=2, climax=4
+    #[serde(default = "default_motion_blur")]
+    pub motion_blur_samples: u32,
 }
 
+fn default_motion_blur() -> u32 { 1 }
+
+/// Load a manifest from disk. Supports both JSON (.json) and MessagePack (.msgpack) formats.
+/// MessagePack is ~5-10x faster for large manifests (648K frames at 60fps = ~500MB JSON).
 pub fn load_manifest(path: &Path) -> Result<Manifest, Box<dyn std::error::Error>> {
-    let content = std::fs::read_to_string(path)?;
-    let manifest: Manifest = serde_json::from_str(&content)?;
-    Ok(manifest)
+    let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("json");
+
+    if ext == "msgpack" || ext == "mp" {
+        let data = std::fs::read(path)?;
+        let manifest: Manifest = rmp_serde::from_slice(&data)?;
+        Ok(manifest)
+    } else {
+        let content = std::fs::read_to_string(path)?;
+        let manifest: Manifest = serde_json::from_str(&content)?;
+        Ok(manifest)
+    }
+}
+
+/// Save a manifest in MessagePack format (for use by generate-full-manifest.ts).
+pub fn save_manifest_msgpack(manifest: &Manifest, path: &Path) -> Result<(), Box<dyn std::error::Error>>
+where
+    Manifest: serde::Serialize,
+{
+    let data = rmp_serde::to_vec(manifest)?;
+    std::fs::write(path, data)?;
+    Ok(())
 }

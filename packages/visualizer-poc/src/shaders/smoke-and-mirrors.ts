@@ -229,6 +229,11 @@ void main() {
   float isClimax = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5);
   float climaxBoost = isClimax * uClimaxIntensity;
 
+  // Internal evolution over long holds
+  float holdP = clamp(uShaderHoldProgress, 0.0, 1.0);
+  float evolveComplexity = smoothstep(0.0, 0.5, holdP) * (1.0 - smoothstep(0.8, 1.0, holdP) * 0.4);
+  float evolveOpenness = 1.0 - smoothstep(0.0, 0.3, holdP) * 0.3 + smoothstep(0.75, 1.0, holdP) * 0.3;
+
   float flowTime = uDynamicTime * (0.08 + flux * 0.04) * mix(1.0, 1.3, sJam) * mix(1.0, 0.4, sSpace);
   float bassVib = bass * 0.30;
 
@@ -251,7 +256,7 @@ void main() {
   vec3 camFwd = normalize(camLookAt - camOrigin);
   vec3 camRt = normalize(cross(vec3(0.0, 1.0, 0.0), camFwd));
   vec3 camUpDir = cross(camFwd, camRt);
-  float fov = 1.3 + bass * 0.1;
+  float fov = (1.3 + bass * 0.1) * evolveOpenness;
   vec3 rayDir = normalize(screenPos.x * camRt + screenPos.y * camUpDir + fov * camFwd);
 
   // ═══ Raymarch scene ═══
@@ -338,7 +343,7 @@ void main() {
       vec3 samplePos = camOrigin + rayDir * marchT;
 
       float density = samSmokeDensity(samplePos, bass, flowTime, energy, tension);
-      density *= 0.06;
+      density *= 0.06 * (0.4 + evolveComplexity * 0.6);
 
       if (density > 0.001) {
         float alpha = density * (1.0 - fogAlpha);
@@ -371,7 +376,7 @@ void main() {
     }
     float spotCone = smoothstep(0.4, 0.0, length(screenPos - vec2(0.0, 0.2))) * vocalPres * 0.3;
     vec3 rayColor = mix(fogTint * 0.5, vec3(0.9, 0.85, 0.75), 0.3 + melPitch * 0.2);
-    col += rayColor * godRayAccum * (1.0 + spotCone * 2.0 + climaxBoost * 0.5);
+    col += rayColor * godRayAccum * (1.0 + spotCone * 2.0 + climaxBoost * 0.5) * (0.3 + evolveComplexity * 0.7);
   }
 
   // Beat + climax

@@ -258,6 +258,11 @@ void main() {
   float isClimax = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5);
   float climaxBoost = isClimax * uClimaxIntensity;
 
+  // Internal evolution over long holds
+  float holdP = clamp(uShaderHoldProgress, 0.0, 1.0);
+  float evolveComplexity = smoothstep(0.0, 0.5, holdP) * (1.0 - smoothstep(0.8, 1.0, holdP) * 0.4);
+  float evolveOpenness = 1.0 - smoothstep(0.0, 0.3, holdP) * 0.3 + smoothstep(0.75, 1.0, holdP) * 0.3;
+
   float slowTime = uDynamicTime * 0.05;
   float bassVib = bass * 0.3;
   float tempoScale = uLocalTempo / 120.0;
@@ -277,7 +282,7 @@ void main() {
   vec3 camFwd = normalize(camLookAt - camOrigin);
   vec3 camRt = normalize(cross(vec3(0.0, 1.0, 0.0), camFwd));
   vec3 camUpDir = cross(camFwd, camRt);
-  float fov = 1.3 + bass * 0.1;
+  float fov = (1.3 + bass * 0.1) * evolveOpenness;
   vec3 rayDir = normalize(screenPos.x * camRt + screenPos.y * camUpDir + fov * camFwd);
 
   // ═══ Raymarch scene ═══
@@ -355,11 +360,11 @@ void main() {
 
   // ═══ Volumetric beams — the main visual feature ═══
   {
-    float activeBeams = 3.0 + energy * 5.0;
+    float activeBeams = (3.0 + energy * 5.0) * (0.4 + evolveComplexity * 0.6);
     activeBeams *= mix(1.0, 1.3, sJam) * mix(1.0, 0.3, sSpace);
     activeBeams += climaxBoost * 3.0;
     float sweepSpeed = mix(0.2, 0.8, energy) * tempoScale * mix(1.0, 1.5, sJam) * mix(1.0, 0.3, sSpace);
-    float hazeAmount = mix(0.3, 1.0, slowE) + flux * 0.2;
+    float hazeAmount = (mix(0.3, 1.0, slowE) + flux * 0.2) * (0.5 + evolveComplexity * 0.5);
 
     vec3 beamAccum = vec3(0.0);
 

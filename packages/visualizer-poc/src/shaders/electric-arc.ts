@@ -46,7 +46,7 @@ const postProcess = buildPostProcessGLSL({
   grainStrength: "light",
   thermalShimmerEnabled: true,
   temporalBlendEnabled: true,
-  lightLeakEnabled: false,
+  lightLeakEnabled: true,
   dofEnabled: true,
 });
 

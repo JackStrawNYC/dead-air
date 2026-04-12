@@ -37,7 +37,7 @@ const postProcess = buildPostProcessGLSL({
   bloomThresholdOffset: -0.15,
   caEnabled: true,
   lensDistortionEnabled: true,
-  lightLeakEnabled: false,
+  lightLeakEnabled: true,
   eraGradingEnabled: true,
 });
 
@@ -296,6 +296,11 @@ void main() {
   float isClimax = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5);
   float climaxTear = isClimax * climaxIntensity;
 
+  // Stem reactivity
+  float stemDrums = clamp(uStemDrums, 0.0, 1.0);
+  float stemBass = clamp(uStemBass, 0.0, 1.0);
+  float vocalE = clamp(uVocalEnergy, 0.0, 1.0);
+
   // Section type
   float sSpace = smoothstep(6.5, 7.5, uSectionType);
   float sJam = smoothstep(4.5, 5.5, uSectionType) * (1.0 - step(5.5, uSectionType));
@@ -329,6 +334,10 @@ void main() {
   _dsv_prm1 = smoothstep(-0.4, 0.4, sin(uTime * 0.15));
   // Bass pulses dark matter
   _dsv_prm1 += bass * 0.25;
+  // Stem bass deepens void distortion
+  _dsv_prm1 += stemBass * 0.15;
+  // Drums ripple the void
+  _dsv_prm1 += stemDrums * 0.1 * sin(uTime * 3.0);
   // Improvisation thickens and distorts
   _dsv_prm1 += improv * 0.3;
   // Climax: dark matter dissipates, revealing the cosmos
@@ -359,6 +368,9 @@ void main() {
   float nebulaHue = fract(spectralFlux * 0.5 + melodicPitch * 0.3 + 0.7);
   vec3 nebulaColor = hsv2rgb(vec3(nebulaHue, 0.5, 0.15)) * nebulaGlow;
   col += nebulaColor * (0.1 + cosmic * 0.15) * (1.0 - scn.a * 0.8);
+
+  // Vocal warmth: faint warm glow emerging from the void
+  col += vec3(0.12, 0.06, 0.03) * vocalE * 0.15 * (1.0 - scn.a);
 
   // === TRANSCENDENT CLIMAX: vast star field revelation ===
   if (climaxTear > 0.3) {

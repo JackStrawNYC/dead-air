@@ -23,6 +23,7 @@ import { temporalBlendVert, temporalBlendFrag } from "../shaders/shared/temporal
 import { gpuMonitor } from "../utils/gpu-monitor";
 import { DEFAULT_LIGHTING, type LightingState } from "../utils/lighting-context";
 import { createBaseUniforms, syncBaseUniforms, ERA_SATURATION, ERA_BRIGHTNESS, ERA_SEPIA } from "../utils/shader-uniforms";
+import { useShowVisualSeed } from "../data/ShowVisualSeedContext";
 
 /** Passthrough vertex shader for output mesh */
 const PASSTHROUGH_VERT = /* glsl */ `
@@ -58,7 +59,7 @@ export const FullscreenQuad: React.FC<Props> = ({
   fragmentShader,
   extraUniforms,
 }) => {
-  const { time, beatDecay, smooth, palettePrimary, paletteSecondary, paletteSaturation, tempo, musicalTime, climaxPhase, climaxIntensity, heroTrigger, heroProgress, jamDensity, coherence, dynamicTime, isLocked, jamPhase, jamProgress, peakOfShow } = useAudioData();
+  const { time, beatDecay, smooth, palettePrimary, paletteSecondary, paletteSaturation, tempo, musicalTime, climaxPhase, climaxIntensity, heroTrigger, heroProgress, jamDensity, coherence, dynamicTime, isLocked, jamPhase, jamProgress, peakOfShow, songProgress, shaderHoldProgress } = useAudioData();
   const { width, height } = useVideoConfig();
   const sceneConfig = useSceneConfig();
   const envelope = useEnvelopeValues();
@@ -69,6 +70,7 @@ export const FullscreenQuad: React.FC<Props> = ({
   const eraSepia = ERA_SEPIA[eraKey] ?? 0.0;
   const filmStock = deriveFilmStock(showCtx?.showSeed ?? 0);
   const venueProfile = getVenueProfile(showCtx?.venueType ?? "");
+  const showVisualSeed = useShowVisualSeed();
   const gl = useThree((state) => state.gl);
   const currentFrame = useCurrentFrame();
 
@@ -294,10 +296,12 @@ export const FullscreenQuad: React.FC<Props> = ({
     tempo, musicalTime, climaxPhase, climaxIntensity,
     heroTrigger, heroProgress, jamDensity, jamPhase, jamProgress,
     coherence, isLocked, peakOfShow,
+    songProgress, shaderHoldProgress,
     eraSaturation, eraBrightness, eraSepia,
     filmStock, venueProfile,
     shaderWidth, shaderHeight,
     sceneConfig, envelope, lightingRef,
+    showVisualSeed,
   });
 
   // Update FFT texture from 7-band contrast (padded to 64 bins)

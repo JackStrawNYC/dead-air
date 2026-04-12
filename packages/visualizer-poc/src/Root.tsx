@@ -3,6 +3,7 @@ import { Composition, getInputProps } from "remotion";
 import { SongVisualizer, SongVisualizerProps } from "./SongVisualizer";
 import { ShowIntro } from "./components/ShowIntro";
 import { ChapterCard } from "./components/ChapterCard";
+import { OverlayPreview } from "./OverlayPreview";
 import { SetBreakCard } from "./components/SetBreakCard";
 import { EndCard } from "./components/EndCard";
 import type { SetlistEntry, ShowSetlist, OverlaySchedule, ColorPalette } from "./data/types";
@@ -20,7 +21,7 @@ import type { VisualMode } from "./data/types";
 // Falls back to data/ root (Cornell '77) for backward compatibility.
 const RENDER_WIDTH = parseInt(process.env.RENDER_WIDTH ?? "1920", 10);
 const RENDER_HEIGHT = parseInt(process.env.RENDER_HEIGHT ?? "1080", 10);
-const RENDER_FPS = parseInt(process.env.RENDER_FPS ?? "30", 10);
+const RENDER_FPS = parseInt(process.env.RENDER_FPS ?? "60", 10);
 
 const inputProps = getInputProps() as Record<string, unknown>;
 const showId = (inputProps.showId as string) ?? process.env.SHOW_ID ?? "";
@@ -115,6 +116,8 @@ interface SerializedNarrative {
   suiteInfo: PrecomputedNarrative["suiteInfo"];
   prevSongContext: PrecomputedNarrative["prevSongContext"];
   predictedOverlayIds: string[];
+  showVisualSeed?: PrecomputedNarrative["showVisualSeed"];
+  showShaderPool?: PrecomputedNarrative["showShaderPool"];
 }
 
 const narrativeStates: PrecomputedNarrative[] = (narrativeStatesRaw as SerializedNarrative[]).map((s) => ({
@@ -133,6 +136,8 @@ const narrativeStates: PrecomputedNarrative[] = (narrativeStatesRaw as Serialize
   suiteInfo: s.suiteInfo,
   prevSongContext: s.prevSongContext,
   predictedOverlayIds: s.predictedOverlayIds,
+  showVisualSeed: s.showVisualSeed ?? null,
+  showShaderPool: s.showShaderPool ?? [],
 }));
 
 const FPS_SCALE = RENDER_FPS / 30; // 1.0 at 30fps, 2.0 at 60fps
@@ -373,6 +378,16 @@ export const Root: React.FC = () => {
           }}
         />
       )}
+      {/* Overlay preview — renders a single overlay for PNG export */}
+      <Composition
+        id="OverlayPreview"
+        component={OverlayPreview as any}
+        durationInFrames={60}
+        fps={30}
+        width={RENDER_WIDTH}
+        height={RENDER_HEIGHT}
+        defaultProps={{ overlayName: "BreathingStealie" }}
+      />
     </>
   );
 };

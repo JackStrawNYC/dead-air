@@ -89,11 +89,18 @@ void main() {
   float flatness = clamp(uFlatness, 0.0, 1.0);
   float t = uDynamicTime;
 
+  // Stem reactivity
+  float stemDrums = clamp(uStemDrums, 0.0, 1.0);
+  float stemBass = clamp(uStemBass, 0.0, 1.0);
+  float vocalE = clamp(uVocalEnergy, 0.0, 1.0);
+
   float sType = uSectionType;
   float jamMod = smoothstep(4.5, 5.5, sType);
   float spaceMod = smoothstep(6.5, 7.5, sType);
 
   float fireIntensity = energy * (1.0 + jamMod * 0.5) * (1.0 - spaceMod * 0.6);
+  // Stem drums add fire crackle pulse
+  fireIntensity += stemDrums * 0.2;
 
   // --- Domain warping + palette ---
   vec2 warpedP = p + vec2(fbm3(vec3(p * 0.5, t * 0.05)), fbm3(vec3(p * 0.5 + 100.0, t * 0.05))) * 0.3;
@@ -164,7 +171,8 @@ void main() {
   vec2 emberUV = vec2(p.x, uv.y - baseY);
   float emberVal = embers(emberUV, t, onset, fireIntensity);
   vec3 emberCol = hsv2rgb(vec3(h + 0.02, 0.85, 1.0));
-  col += emberCol * emberVal * (0.4 + fireIntensity * 0.6);
+  // Stem bass intensifies ember glow
+  col += emberCol * emberVal * (0.4 + fireIntensity * 0.6 + stemBass * 0.2);
 
   // --- Smoke ---
   float smokeY = uv.y - baseY - ridge3H;
@@ -172,7 +180,9 @@ void main() {
   float smokeMask = smoothstep(0.0, 0.15, smokeY) * smoothstep(0.4, 0.05, smokeY);
   smokeMask *= exp(-abs(p.x) * 2.0);
   float smoke = smokeNoise * smokeMask * (flatness * 0.3 + fireIntensity * 0.2) * 0.4;
-  col = mix(col, vec3(0.2, 0.15, 0.12), smoke);
+  // Vocal warmth tints smoke drift with warm glow
+  vec3 smokeCol = mix(vec3(0.2, 0.15, 0.12), vec3(0.25, 0.17, 0.12), vocalE * 0.5);
+  col = mix(col, smokeCol, smoke);
 
   // --- Ground (below front ridge) ---
   float groundY = baseY - 0.05;

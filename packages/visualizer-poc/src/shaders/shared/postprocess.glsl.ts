@@ -122,7 +122,7 @@ ${
   // which was visually flat. New swings are 2-3x wider.
   {
     float lum = dot(col, vec3(0.299, 0.587, 0.114));
-    float bloomThreshold = mix(0.58, 0.18, energy) + uBloomThreshold${bloomThresholdStr};
+    float bloomThreshold = mix(0.58, 0.18, energy) + uBloomThreshold${bloomThresholdStr} + uShowBloomCharacter;
     float bloomAmount = max(0.0, lum - bloomThreshold);
     vec3 bloomColor = mix(col, vec3(1.0, 0.95, 0.90), 0.4);
     float bloomCap = 0.20 + energy * 0.55;
@@ -166,6 +166,24 @@ ${
     col = mix(col, shifted, feedbackStr);
   }
 
+  // Atmospheric perspective: distant elements desaturate and shift cool
+  // uCamDof encodes depth-of-field strength — higher during deep 3D scenes
+  {
+    float depthFactor = clamp(uCamDof, 0.0, 1.0);
+    if (depthFactor > 0.01) {
+      // Use screen-space position as proxy for depth (edges = further)
+      float screenDepth = length(p) * 0.7;
+      float atmosphereMask = smoothstep(0.2, 0.8, screenDepth) * depthFactor;
+      // Desaturate distant areas
+      float atmoLuma = dot(col, vec3(0.299, 0.587, 0.114));
+      col = mix(col, vec3(atmoLuma), atmosphereMask * 0.25);
+      // Cool shift (blue-gray atmospheric haze)
+      col = mix(col, col * vec3(0.92, 0.95, 1.08), atmosphereMask * 0.15);
+      // Subtle additive haze
+      col += vec3(0.02, 0.025, 0.04) * atmosphereMask * 0.3;
+    }
+  }
+
   // Cinematic grade (ACES tone mapping)
   col = cinematicGrade(col, energy);
 
@@ -192,11 +210,45 @@ ${
 
       // Slight warm tint on quiet passages — candlelight intimacy
       col = mix(col, col * vec3(1.06, 1.02, 0.94), quietness * 0.3);
+
+      // Nebular wisps: slow flowing organic shapes that give quiet void visual weight.
+      // Without this, quiet = black screen. With it, quiet = breathing living space.
+      float wispNoise = snoise(vec3(uv * 1.5 + uDynamicTime * 0.008, uDynamicTime * 0.015));
+      float wispNoise2 = snoise(vec3(uv * 2.8 - uDynamicTime * 0.012, uDynamicTime * 0.01 + 5.0));
+      float wispMask = smoothstep(0.25, 0.65, wispNoise) * smoothstep(0.2, 0.6, wispNoise2);
+      // Wisp color follows song palette for identity — not random
+      float wispHue = uPalettePrimary / 360.0;
+      vec3 wispColor = hsv2rgb(vec3(wispHue, 0.25, 0.06));
+      col += wispColor * wispMask * quietness * 0.15;
+
+      // Deeper vignette in quiet passages — intimate, focused, contemplative
+      float quietVig = 1.0 - dot(p * 1.1, p * 1.1);
+      quietVig = smoothstep(0.0, 1.0, quietVig);
+      col *= mix(1.0, quietVig, quietness * 0.18);
+
+      // Slow chromatic drift: very subtle hue rotation over time
+      // gives quiet passages a sense of time passing, not frozen
+      float driftAngle = uDynamicTime * 0.003 * quietness;
+      vec3 driftHsv = rgb2hsv(col);
+      driftHsv.x = fract(driftHsv.x + driftAngle);
+      col = mix(col, hsv2rgb(driftHsv), quietness * 0.15);
     }
   }
 
   // Envelope brightness (the ONE knob)
   col *= uEnvelopeBrightness;
+
+  // Entrainment oscillation: very slow brightness breathing at 0.07Hz (14s period)
+  // Below conscious perception threshold but within brainwave alpha-wave range.
+  // During Space passages, slower (20s) and stronger for meditative states.
+  {
+    float spaceDepth = clamp(uSpaceScore, 0.0, 1.0);
+    float entrainPeriod = mix(14.0, 20.0, spaceDepth); // seconds
+    float entrainAmp = mix(0.03, 0.05, spaceDepth);    // ±3-5% brightness
+    float entrainPhase = uDynamicTime / entrainPeriod * 6.28318;
+    float entrainWave = sin(entrainPhase) * entrainAmp;
+    col *= 1.0 + entrainWave;
+  }
 
   // Envelope saturation: wide energy knee so quiet = visibly muted, loud = vivid.
   // Widened from 0.72-1.22 to 0.55-1.35 for dramatically more color contrast.
@@ -214,6 +266,35 @@ ${
     vec3 ehHsv = rgb2hsv(col);
     ehHsv.x = fract(ehHsv.x + uEnvelopeHue / 6.28318530718);
     col = hsv2rgb(ehHsv);
+  }
+
+  // ─── Semantic CLAP modulation ───
+  // 8 ML-derived semantic scores shift every shader's visual character.
+  // psychedelic/chaotic → vivid, saturated, bloomy
+  // tender/ambient → desaturated, cool, intimate
+  // cosmic → cool highlights, spatial depth
+  // aggressive/triumphant → warm, punchy, saturated
+  // All uniforms ?? 0 when unavailable — zero-impact graceful fallback.
+  {
+    // Saturation: expressive categories boost, contemplative reduce
+    float semSatBoost = uSemanticPsychedelic * 0.08 + uSemanticTriumphant * 0.06
+                      + uSemanticAggressive * 0.05 + uSemanticChaotic * 0.04;
+    float semSatReduce = uSemanticTender * 0.06 + uSemanticAmbient * 0.04;
+    float semSatMod = 1.0 + semSatBoost - semSatReduce;
+    float semLuma = dot(col, vec3(0.299, 0.587, 0.114));
+    col = mix(vec3(semLuma), col, clamp(semSatMod, 0.7, 1.4));
+
+    // Color temperature: cosmic/ambient → cool tint, aggressive/triumphant → warm
+    float semWarm = uSemanticAggressive * 0.025 + uSemanticTriumphant * 0.02
+                  + uSemanticRhythmic * 0.01;
+    float semCool = uSemanticCosmic * 0.025 + uSemanticAmbient * 0.02
+                  + uSemanticTender * 0.01;
+    col *= vec3(1.0 + semWarm - semCool, 1.0, 1.0 - semWarm + semCool);
+
+    // Highlight bloom emphasis: psychedelic/cosmic scenes glow more
+    float semGlow = (uSemanticPsychedelic + uSemanticCosmic) * 0.03;
+    float semHighMask = smoothstep(0.55, 0.95, dot(col, vec3(0.299, 0.587, 0.114)));
+    col += col * semHighMask * semGlow;
   }
 
 ${
@@ -235,16 +316,19 @@ ${
   }
 
   // Blacks crush: push near-black toward true black for contrast
+  // uShowContrastCharacter (0-1) modulates crush: 0 = soft (80%), 1 = punchy (120%)
   {
     float crushLuma = dot(col, vec3(0.299, 0.587, 0.114));
     float crushFactor = smoothstep(0.0, 0.15, crushLuma);
-    col *= crushFactor * 0.3 + 0.7;
+    col *= (crushFactor * 0.3 + 0.7) * (0.8 + uShowContrastCharacter * 0.4);
   }
 
   // Color persistence: saturated highlights glow with lingering warmth
+  // uShowTemperatureCharacter (-1 to +1) shifts warm/cool globally
   {
     float highlightMask = smoothstep(0.5, 0.9, dot(col, vec3(0.299, 0.587, 0.114)));
     col = mix(col, col * vec3(1.05, 1.0, 0.95), highlightMask * 0.3 * energy);
+    col *= vec3(1.0 + uShowTemperatureCharacter * 0.02, 1.0, 1.0 - uShowTemperatureCharacter * 0.02);
   }
 
 ${
@@ -265,9 +349,10 @@ ${
 }
 
   // Film grain: animated 2-frame hold
+  // uShowGrainCharacter (0-1) modulates: 0 = clean show (70%), 1 = gritty show (130%)
   {
     float grainTime = floor(uTime * 15.0) / 15.0;
-    float grainIntensity = ${grainExpr};
+    float grainIntensity = ${grainExpr} * (0.7 + uShowGrainCharacter * 0.6);
 ${
   grainStrength !== "none"
     ? `    col += filmGrainRes(uv, grainTime, uResolution.y) * grainIntensity * uShowGrain;`

@@ -39,7 +39,7 @@ const postProcess = buildPostProcessGLSL({
   caEnabled: true,
   dofEnabled: true,
   lensDistortionEnabled: true,
-  lightLeakEnabled: false,
+  lightLeakEnabled: true,
   beatPulseEnabled: true,
   eraGradingEnabled: true,
 });
@@ -316,6 +316,11 @@ void main() {
   float isClimax = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5);
   float climaxBoost = isClimax * clamp(uClimaxIntensity, 0.0, 1.0);
 
+  // Stem reactivity
+  float stemDrums = clamp(uStemDrums, 0.0, 1.0);
+  float stemBass = clamp(uStemBass, 0.0, 1.0);
+  float vocalE = clamp(uVocalEnergy, 0.0, 1.0);
+
   // Section-type gates
   float sectionT = uSectionType;
   float sJam = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
@@ -359,9 +364,12 @@ void main() {
   // Climax: extreme density for maximum lightning contrast
   prm += climaxBoost * 0.15;
 
-  float bassRumble = bass * (0.5 + energy * 0.5);
+  // Stem bass adds thunder rumble glow
+  float bassRumble = bass * (0.5 + energy * 0.5) + stemBass * 0.2;
+  // Stem drums boost lightning strike triggers
+  float stormOnset = clamp(onsetSnap + stemDrums * 0.25, 0.0, 1.0);
 
-  vec4 scn = _ss_render(ro, rd, time, prm, energy, bassRumble, onsetSnap, drumOnset);
+  vec4 scn = _ss_render(ro, rd, time, prm, energy, bassRumble, stormOnset, drumOnset);
   vec3 col = scn.rgb;
 
   // Saturation-preserving color blend (nimitz)
@@ -377,7 +385,7 @@ void main() {
 
   // === SCREEN-SPACE LIGHTNING BOLTS ===
   // Visible bolt overlay on top of volumetric (at high energy / climax)
-  float boltIntensity = onsetSnap * energy * 0.6 + drumOnset * energy * 0.3 + climaxBoost * 0.4;
+  float boltIntensity = stormOnset * energy * 0.6 + drumOnset * energy * 0.3 + climaxBoost * 0.4;
   if (boltIntensity > 0.05) {
     // Up to 3 simultaneous bolts
     float bolt1 = lightningBranch(p, uDynamicTime * 4.0, 0.3) * lightningFlash(onsetSnap, uDynamicTime, 0);
@@ -396,8 +404,10 @@ void main() {
 
   // === GLOBAL LIGHTNING FLASH ===
   // Full-screen flash on strong onsets — illuminates everything
-  float globalFlash = onsetSnap * onsetSnap * 0.15 * energy;
+  float globalFlash = stormOnset * stormOnset * 0.15 * energy;
   globalFlash += drumOnset * drumOnset * 0.08 * energy;
+  // Vocal energy brightens lightning arcs
+  col *= 1.0 + vocalE * 0.12;
   col += vec3(0.6, 0.65, 0.9) * globalFlash;
 
   // === SKY: dark storm gradient ===

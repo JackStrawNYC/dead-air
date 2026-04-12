@@ -9,7 +9,7 @@
 
 use std::collections::HashMap;
 use std::path::Path;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 /// Pre-rendered overlay image (cached RGBA pixels at render resolution).
 pub struct CachedOverlay {
@@ -19,7 +19,7 @@ pub struct CachedOverlay {
 }
 
 /// Per-frame transform parameters for an overlay.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OverlayTransform {
     pub opacity: f32,
     pub scale: f32,
@@ -42,14 +42,14 @@ impl Default for OverlayTransform {
 }
 
 /// Keyframe for animated overlays — an SVG rendered at a specific frame.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct OverlayKeyframe {
     pub frame: u32,
     pub svg: String,
 }
 
 /// Overlay instance in the per-frame schedule.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct OverlayInstance {
     pub overlay_id: String,
     pub transform: OverlayTransform,
@@ -71,10 +71,16 @@ impl OverlayImageCache {
         }
     }
 
-    /// Load a pre-rendered overlay PNG from disk.
+    /// Load a pre-rendered overlay image from disk (supports PNG, JPEG, etc.).
     pub fn load_png(&mut self, overlay_id: &str, path: &Path) -> Result<(), String> {
-        let img = image::open(path)
-            .map_err(|e| format!("Failed to load {}: {}", path.display(), e))?
+        // Use content-based format detection (not file extension) because
+        // some overlay files are JPEG with .png extension.
+        let reader = image::io::Reader::open(path)
+            .map_err(|e| format!("Failed to open {}: {}", path.display(), e))?
+            .with_guessed_format()
+            .map_err(|e| format!("Failed to detect format {}: {}", path.display(), e))?;
+        let img = reader.decode()
+            .map_err(|e| format!("Failed to decode {}: {}", path.display(), e))?
             .to_rgba8();
         let width = img.width();
         let height = img.height();

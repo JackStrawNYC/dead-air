@@ -140,6 +140,7 @@ export function getModeForSection(
   shaderModeLastUsed?: Map<VisualMode, number>,
   stemDominant?: string,
   visualMemory?: VisualMemoryState,
+  showShaderPool?: VisualMode[],
 ): VisualMode {
   // Explicit override always wins
   const override = song.sectionOverrides?.find((o) => o.sectionIndex === sectionIndex);
@@ -153,7 +154,7 @@ export function getModeForSection(
   // deepens — colors shift, geometry breathes, depth opens. Transcendence
   // = deepening, not freezing. The shader ID is locked; parameters evolve.
   if (coherenceIsLocked) {
-    return getModeForSection(song, sectionIndex - 1, sections, seed, era, false, usedShaderModes, songIdentity, stemSection, frames, songDuration, setNumber, trackNumber, shaderModeLastUsed);
+    return getModeForSection(song, sectionIndex - 1, sections, seed, era, false, usedShaderModes, songIdentity, stemSection, frames, songDuration, setNumber, trackNumber, shaderModeLastUsed, stemDominant, visualMemory, showShaderPool);
     // Note: parameter evolution is driven by the EnergyEnvelope and
     // shader-internal uCoherence uniform, which continues to respond
     // to audio even when the shader ID is locked.
@@ -165,7 +166,7 @@ export function getModeForSection(
     if (section) {
       const prevSection = sectionIndex > 0 ? sections[sectionIndex - 1] : null;
       const prevMode = sectionIndex > 0
-        ? getModeForSection(song, sectionIndex - 1, sections, seed, era, false, usedShaderModes, songIdentity, undefined, frames, songDuration, setNumber, trackNumber, shaderModeLastUsed)
+        ? getModeForSection(song, sectionIndex - 1, sections, seed, era, false, usedShaderModes, songIdentity, undefined, frames, songDuration, setNumber, trackNumber, shaderModeLastUsed, stemDominant, visualMemory, showShaderPool)
         : song.defaultMode;
 
       // Visual evolution: change shader on energy transitions only
@@ -178,7 +179,13 @@ export function getModeForSection(
           // Filter by continuous-energy affinity and era. avgEnergy is the
           // actual section RMS (0..1) — replaces the old 3-bucket discretization
           // that made every "low" song share one shader pool.
-          const energyPool = getModesForContinuousEnergy(section.avgEnergy, era, song.defaultMode);
+          let energyPool = getModesForContinuousEnergy(section.avgEnergy, era, song.defaultMode);
+          // Show shader pool whitelist: restrict to curated per-show shaders
+          if (showShaderPool && showShaderPool.length > 0) {
+            const poolSet = new Set(showShaderPool);
+            const filtered = energyPool.filter((m) => poolSet.has(m));
+            if (filtered.length >= 2) energyPool = filtered; // soft filter
+          }
           const energySet = new Set(energyPool);
           let candidates = affinityPool.filter((m) => energySet.has(m));
 
@@ -249,7 +256,13 @@ export function getModeForSection(
       // center and the section's actual avgEnergy, so a quiet ballad section
       // (avgEnergy 0.10) and a quiet station section (avgEnergy 0.20) draw
       // from genuinely different distributions instead of identical "low" pools.
-      const pool = getModesForContinuousEnergy(section.avgEnergy, era, song.defaultMode);
+      let pool = getModesForContinuousEnergy(section.avgEnergy, era, song.defaultMode);
+      // Show shader pool whitelist: restrict to curated per-show shaders
+      if (showShaderPool && showShaderPool.length > 0) {
+        const poolSet = new Set(showShaderPool);
+        const filtered = pool.filter((m) => poolSet.has(m));
+        if (filtered.length >= 2) pool = filtered; // soft filter
+      }
 
       // Recency-weighted variety: penalize recently/frequently used modes
       let filteredPool = pool;

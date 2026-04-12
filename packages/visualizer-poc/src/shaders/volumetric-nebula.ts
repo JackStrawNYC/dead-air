@@ -66,6 +66,11 @@ void main() {
   float tension = clamp(uHarmonicTension, 0.0, 1.0);
   float pitch = clamp(uMelodicPitch, 0.0, 1.0);
 
+  // Stem reactivity
+  float stemDrums = clamp(uStemDrums, 0.0, 1.0);
+  float stemBass = clamp(uStemBass, 0.0, 1.0);
+  float vocalE = clamp(uVocalEnergy, 0.0, 1.0);
+
   // Section-type gates
   float sectionT = uSectionType;
   float sJam = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
@@ -76,7 +81,8 @@ void main() {
   float isClimax = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5);
   float climaxBoost = isClimax * clamp(uClimaxIntensity, 0.0, 1.0);
 
-  float flowTime = uDynamicTime * (0.03 + slowE * 0.02) * (1.0 + sJam * 0.5 - sSpace * 0.4);
+  // Stem drums accelerate gas churn
+  float flowTime = uDynamicTime * (0.03 + slowE * 0.02 + stemDrums * 0.01) * (1.0 + sJam * 0.5 - sSpace * 0.4);
 
   // === PALETTE ===
   float hue1 = uPalettePrimary;
@@ -127,7 +133,8 @@ void main() {
 
     // Bass density boost + section modulation
     density += sJam * 0.15 - sSpace * 0.1;
-    density *= 0.6 + bass * 0.5;
+    // Stem bass deepens nebula density
+    density *= 0.6 + bass * 0.5 + stemBass * 0.2;
 
     // Drum onset flash
     density += drumOnset * 0.2 * exp(-fi * 0.08);
@@ -171,6 +178,9 @@ void main() {
   float glowNoise = fbm3(vec3(p * 2.0, flowTime * 0.15));
   vec3 glowCol = mix(nebulaTint, emissionTint, glowNoise * 0.5 + 0.5) * 0.05;
   col += glowCol * (0.3 + energy * 0.2);
+
+  // Vocal warmth: warm color bands in nebula
+  col += vec3(0.08, 0.04, 0.02) * vocalE * 0.2 * nebulaAlpha;
 
   // Beat + climax
   col *= 1.0 + climaxBoost * 0.2;

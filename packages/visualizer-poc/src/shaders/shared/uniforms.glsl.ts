@@ -74,6 +74,8 @@ uniform float uClimaxPhase;
 uniform float uClimaxIntensity;
 uniform float uCoherence;
 uniform float uJamDensity;
+uniform float uSongProgress;        // 0 at song start, 1 at song end
+uniform float uShaderHoldProgress;   // 0 at section start, 1 at section end (spans full hold)
 
 // ─── Jam Evolution ───
 uniform float uJamPhase;    // 0=exploration, 1=building, 2=peak_space, 3=resolution (-1=not a jam)
@@ -175,6 +177,12 @@ uniform float uColorTemperature;
 
 // ─── Temporal Coherence ───
 uniform float uTemporalBlendStrength;
+
+// ─── Per-Show Visual Identity ───
+uniform float uShowGrainCharacter;     // 0-1 grain texture variation
+uniform float uShowBloomCharacter;     // -0.1 to +0.1 bloom threshold bias
+uniform float uShowTemperatureCharacter; // -1 to +1 warm/cool shift
+uniform float uShowContrastCharacter;  // 0-1 blacks crush intensity
 
 // ─── Spatial ───
 uniform vec2 uResolution;

@@ -36,6 +36,7 @@ const EXPECTED_UNIFORM_NAMES = [
   "uSectionProgress", "uSectionIndex",
   "uClimaxPhase", "uClimaxIntensity",
   "uCoherence", "uJamDensity",
+  "uSongProgress", "uShaderHoldProgress",
   // Jam Evolution
   "uJamPhase", "uJamProgress",
   // Palette / Color
@@ -79,6 +80,9 @@ const EXPECTED_UNIFORM_NAMES = [
   "uAmbientColor", "uColorTemperature",
   // Temporal Coherence
   "uTemporalBlendStrength",
+  // Per-Show Visual Identity
+  "uShowGrainCharacter", "uShowBloomCharacter",
+  "uShowTemperatureCharacter", "uShowContrastCharacter",
   // Spatial
   "uResolution", "uCamOffset",
 ];
@@ -118,6 +122,7 @@ function makeMinimalSyncData(): UniformSyncData {
     heroTrigger: 0, heroProgress: 0,
     jamDensity: 0.5, jamPhase: -1, jamProgress: 0,
     coherence: 0.5, isLocked: false, peakOfShow: 0,
+    songProgress: 0.5, shaderHoldProgress: 0.3,
     eraSaturation: 1.0, eraBrightness: 1.0, eraSepia: 0.0,
     filmStock: { warmth: 0, contrast: 1, saturation: 0, grain: 1, bloom: 1, halation: 0 },
     venueProfile: { warmth: 0, vignette: 0.2, grainMult: 1, bloomMult: 1, contrast: 1, palette: "neutral" },

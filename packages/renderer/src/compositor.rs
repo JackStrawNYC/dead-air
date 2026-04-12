@@ -13,10 +13,10 @@
 //!   - Multiply: a*b — darkens, good for shadows
 //!   - Luminosity: overlay's luminance onto base color
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 /// Blend mode for overlay compositing.
-#[derive(Debug, Clone, Copy, Deserialize, Default)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum BlendMode {
     #[default]
@@ -30,7 +30,7 @@ pub enum BlendMode {
 }
 
 /// A single overlay layer to composite onto the shader output.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct OverlayLayer {
     /// SVG string (from react-dom/server rendering)
     pub svg: String,

@@ -33,7 +33,7 @@ const postProcess = buildPostProcessGLSL({
   halationEnabled: true,
   bloomEnabled: true,
   beatPulseEnabled: true,
-  lightLeakEnabled: false,
+  lightLeakEnabled: true,
   grainStrength: "normal",
 });
 

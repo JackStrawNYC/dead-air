@@ -1,9 +1,13 @@
+pub mod compute;
 pub mod compositor;
 pub mod ffmpeg;
 pub mod glsl_compat;
 pub mod gpu;
 pub mod manifest;
+pub mod motion_blur;
 pub mod overlay_cache;
+pub mod postprocess;
+pub mod temporal;
 pub mod text_layers;
 pub mod transition;
 pub mod uniforms;

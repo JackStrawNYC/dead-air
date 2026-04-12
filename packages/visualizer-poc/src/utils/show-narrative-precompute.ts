@@ -19,6 +19,8 @@ import { lookupSongIdentity, getOrGenerateSongIdentity } from "../data/song-iden
 import { TRANSITION_AFFINITY } from "../scenes/transition-affinity";
 import { seededLCG as seededRandom } from "./seededRandom";
 import { hashString } from "./hash";
+import { computeShowVisualSeed, type ShowVisualSeed } from "./show-visual-seed";
+import { SCENE_REGISTRY } from "../scenes/scene-registry";
 
 export interface PrecomputedNarrative {
   /** Songs completed before this one */
@@ -51,6 +53,10 @@ export interface PrecomputedNarrative {
   prevSongContext: PrevSongContext | null;
   /** Predicted overlay IDs from previous songs (for cross-song dedup) */
   predictedOverlayIds: string[];
+  /** Show-level visual fingerprint derived from audio analysis */
+  showVisualSeed: ShowVisualSeed | null;
+  /** Curated 25-35 shaders for this show based on spectral family */
+  showShaderPool: VisualMode[];
 }
 
 export interface PrevSongContext {
@@ -112,6 +118,26 @@ export function precomputeNarrativeStates(
   // Pre-detect suites from the full setlist
   const songTitles = songs.map((s) => s.title);
 
+  // ─── Show Visual Seed: aggregate all song frames for show-level fingerprint ───
+  const allSongFrames: { rms: number; centroid?: number; flatness?: number }[][] = [];
+  for (const song of songs) {
+    const frames = loadFrames(song.trackId);
+    if (frames && frames.length > 0) {
+      allSongFrames.push(frames.map((f) => ({
+        rms: f.rms,
+        centroid: undefined, // NarrativeFrameData only has rms + flatness
+        flatness: f.flatness,
+      })));
+    }
+  }
+  const showDateHash = hashString(songs.map((s) => s.trackId).join("::"));
+  const showVisualSeed = allSongFrames.length > 0
+    ? computeShowVisualSeed(allSongFrames, showDateHash)
+    : null;
+
+  // ─── Show Shader Pool: curated 25-35 shaders based on spectral family ───
+  const showShaderPool: VisualMode[] = buildShowShaderPool(showVisualSeed, songs);
+
   // Accumulating state
   const songPeakEnergies: number[] = [];
   const songPeakScores: number[] = [];
@@ -148,6 +174,8 @@ export function precomputeNarrativeStates(
       suiteInfo,
       prevSongContext,
       predictedOverlayIds: [...accumulatedOverlayIds],
+      showVisualSeed,
+      showShaderPool,
     });
 
     // --- Compute this song's contribution for the NEXT song ---
@@ -274,4 +302,78 @@ export function precomputeNarrativeStates(
   }
 
   return states;
+}
+
+/**
+ * Build a curated shader pool for this show based on spectral family.
+ * 12-15 from dominant family, 8-10 from secondary, 5-8 wildcards.
+ * Song identity preferred modes are always included.
+ */
+function buildShowShaderPool(
+  seed: ShowVisualSeed | null,
+  songs: NarrativeSongInput[],
+): VisualMode[] {
+  if (!seed) return []; // empty = no filtering downstream
+
+  const allModes = Object.keys(SCENE_REGISTRY) as VisualMode[];
+  const byFamily = new Map<string, VisualMode[]>();
+  const versatile: VisualMode[] = [];
+
+  for (const mode of allModes) {
+    const entry = SCENE_REGISTRY[mode];
+    const family = entry?.spectralFamily;
+    if (!family) {
+      versatile.push(mode);
+    } else {
+      if (!byFamily.has(family)) byFamily.set(family, []);
+      byFamily.get(family)!.push(mode);
+    }
+  }
+
+  const pool = new Set<VisualMode>();
+
+  // Primary family: 12-15 shaders
+  const primaryModes = byFamily.get(seed.dominantSpectralFamily) ?? [];
+  const primaryTarget = Math.min(15, primaryModes.length);
+  // Deterministic shuffle using showHash
+  const shuffledPrimary = deterministicShuffle(primaryModes, seed.showHash);
+  for (let i = 0; i < primaryTarget; i++) pool.add(shuffledPrimary[i]);
+
+  // Secondary family: 8-10 shaders
+  const secondaryModes = byFamily.get(seed.secondarySpectralFamily) ?? [];
+  const secondaryTarget = Math.min(10, secondaryModes.length);
+  const shuffledSecondary = deterministicShuffle(secondaryModes, seed.showHash + 1);
+  for (let i = 0; i < secondaryTarget; i++) pool.add(shuffledSecondary[i]);
+
+  // Wildcards: 5-8 from remaining families + versatile
+  const wildcardCandidates: VisualMode[] = [...versatile];
+  for (const [family, modes] of byFamily) {
+    if (family !== seed.dominantSpectralFamily && family !== seed.secondarySpectralFamily) {
+      wildcardCandidates.push(...modes);
+    }
+  }
+  const shuffledWild = deterministicShuffle(wildcardCandidates, seed.showHash + 2);
+  const wildcardTarget = Math.min(8, shuffledWild.length);
+  for (let i = 0; i < wildcardTarget; i++) pool.add(shuffledWild[i]);
+
+  // Always include song-identity preferred modes
+  for (const song of songs) {
+    const identity = lookupSongIdentity(song.title);
+    if (identity?.preferredModes) {
+      for (const m of identity.preferredModes) pool.add(m as VisualMode);
+    }
+  }
+
+  return Array.from(pool);
+}
+
+/** Deterministic shuffle using a simple LCG seeded from hash */
+function deterministicShuffle<T>(arr: T[], seed: number): T[] {
+  const result = [...arr];
+  const rng = seededRandom(seed);
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
 }

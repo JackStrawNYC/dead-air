@@ -69,10 +69,18 @@ fn test_render_with_overlay() {
         param_color_sat_bias: 0.0, param_complexity: 1.0,
         param_drum_reactivity: 1.0, param_vocal_weight: 1.0,
         peak_of_show: 0.0,
+        contrast: None,
+        motion_blur_samples: 1,
+        shader_hold_progress: None,
+        song_progress: None,
+        show_bloom_character: None,
+        show_grain_character: None,
+        show_temperature_character: None,
+        show_contrast_character: None,
     };
 
     let uniforms = dead_air_renderer::uniforms::build_uniform_buffer(&frame, width, height);
-    renderer.render_frame(&pipeline, &uniforms);
+    renderer.render_frame(&pipeline, &uniforms, None, None, None, None);
     let mut pixels = renderer.read_pixels();
     println!("Shader rendered: {} pixels", pixels.len() / 4);
 

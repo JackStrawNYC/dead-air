@@ -16,6 +16,17 @@ import type { EnhancedFrameData } from "../data/types";
 import type { JamEvolution, JamPhase } from "../utils/jam-evolution";
 import { energyGate } from "../utils/math";
 
+export interface CameraMotionValues {
+  translateX: number; // pixels
+  translateY: number; // pixels
+  scale: number;      // 1.0 = no zoom
+  rotation: number;   // degrees
+}
+
+export const CameraMotionContext = React.createContext<CameraMotionValues>({
+  translateX: 0, translateY: 0, scale: 1, rotation: 0,
+});
+
 interface Props {
   frames: EnhancedFrameData[];
   children: React.ReactNode;
@@ -275,7 +286,16 @@ export const CameraMotion: React.FC<Props> = ({ frames, children, jamEvolution, 
   // Creates a depth-of-field feel — center stays sharp, edges soften
   const dofBlur = Math.min(3, blendedEnergy * 8); // 0-3px blur at edges
 
+  // Expose camera motion values via context for parallax consumption by overlay layers
+  const motionValues: CameraMotionValues = {
+    translateX: totalX,
+    translateY: totalY,
+    scale,
+    rotation: tiltDeg,
+  };
+
   return (
+    <CameraMotionContext.Provider value={motionValues}>
     <div
       style={{
         position: "absolute",
@@ -308,5 +328,6 @@ export const CameraMotion: React.FC<Props> = ({ frames, children, jamEvolution, 
         />
       )}
     </div>
+    </CameraMotionContext.Provider>
   );
 };

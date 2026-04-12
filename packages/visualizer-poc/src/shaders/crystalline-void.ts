@@ -53,9 +53,9 @@ ${lightingGLSL}
 ${buildPostProcessGLSL({
   grainStrength: "light",
   bloomEnabled: true,
-  halationEnabled: false,
+  halationEnabled: true,
   caEnabled: true,
-  lightLeakEnabled: false,
+  lightLeakEnabled: true,
   temporalBlendEnabled: true,
 })}
 

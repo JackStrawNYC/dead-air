@@ -398,6 +398,11 @@ void main() {
   // ─── Climax state ───
   float climB = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5) * clamp(uClimaxIntensity, 0.0, 1.0);
 
+  // ─── Internal evolution over long holds ───
+  float holdP = clamp(uShaderHoldProgress, 0.0, 1.0);
+  float evolveComplexity = smoothstep(0.0, 0.5, holdP) * (1.0 - smoothstep(0.8, 1.0, holdP) * 0.4);
+  float evolveOpenness = 1.0 - smoothstep(0.0, 0.3, holdP) * 0.3 + smoothstep(0.75, 1.0, holdP) * 0.3;
+
   // ─── Time (slowed, section-modulated) ───
   float tm = uDynamicTime * (0.06 + slowE * 0.03) * (1.0 + sJam * 0.5 - sSpace * 0.4);
   // Drum onset snaps: accumulate discrete angular jumps
@@ -410,15 +415,15 @@ void main() {
   float h2 = uPaletteSecondary;
   vec3 palSecondary = paletteHueColor(h2, 0.85, 0.95);
 
-  // Backlight color: warm golden, modulated by vocal presence
+  // Backlight color: warm golden, modulated by vocal presence and hold evolution
   vec3 backlightColor = mix(vec3(1.0, 0.85, 0.55), vec3(1.0, 0.95, 0.85), vocalP);
-  backlightColor *= 0.5 + vocalP * 1.0;
+  backlightColor *= (0.5 + vocalP * 1.0) * (0.4 + evolveComplexity * 0.6);
   // Chorus: full illumination — backlight strengthened
   backlightColor *= 1.0 + sChorus * 0.6;
 
   // ─── Camera: head-on view of the mandala ───
-  // Camera looks straight down the Z axis at the mandala
-  float camZ = -3.5 + melPitch * 0.8 - climB * 1.0;
+  // Camera looks straight down the Z axis at the mandala. Evolve pulls back at start/end.
+  float camZ = (-3.5 + melPitch * 0.8 - climB * 1.0) * evolveOpenness;
   // Subtle drift for life
   float driftX = sin(tm * 0.07) * 0.15 * mix(1.0, 0.02, sSpace);
   float driftY = cos(tm * 0.05) * 0.1 * mix(1.0, 0.02, sSpace);
@@ -428,7 +433,7 @@ void main() {
   vec3 fw = normalize(lookAt - ro);
   vec3 ri = normalize(cross(vec3(0.0, 1.0, 0.0), fw));
   vec3 upVec = cross(fw, ri);
-  float fov = 0.9 + energy * 0.30 + climB * 0.25;
+  float fov = (0.9 + energy * 0.30 + climB * 0.25) * evolveOpenness;
   vec3 rd = normalize(p.x * ri + p.y * upVec + fov * fw);
 
   // ─── Raymarch ───
