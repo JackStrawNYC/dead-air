@@ -8,6 +8,7 @@
 //! Usage:
 //!   dead-air-renderer --manifest manifest.json --output-dir ./frames --width 3840 --height 2160
 
+mod compositor;
 pub mod glsl_compat;
 mod gpu;
 mod manifest;
