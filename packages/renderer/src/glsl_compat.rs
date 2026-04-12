@@ -13,6 +13,38 @@
 //!   - Convert individual `uniform float/vec2/vec3/vec4` → UBO block
 //!   - Strip sampler2D uniforms (textures handled separately)
 
+/// Replace `texture(samplerName, ...)` calls with a constant value.
+/// Handles nested parentheses in the second argument.
+fn regex_replace_texture(line: &str, sampler_name: &str, replacement: &str) -> String {
+    let pattern = format!("texture({}", sampler_name);
+    let mut result = String::with_capacity(line.len());
+    let mut chars = line.chars().peekable();
+    let mut i = 0;
+    let line_bytes = line.as_bytes();
+    let pattern_bytes = pattern.as_bytes();
+    let plen = pattern_bytes.len();
+
+    while i < line_bytes.len() {
+        if i + plen <= line_bytes.len() && &line_bytes[i..i + plen] == pattern_bytes {
+            // Found texture(samplerName — skip to matching closing paren
+            let mut depth = 1;
+            let mut j = i + plen;
+            while j < line_bytes.len() && depth > 0 {
+                if line_bytes[j] == b'(' { depth += 1; }
+                if line_bytes[j] == b')' { depth -= 1; }
+                j += 1;
+            }
+            result.push_str(replacement);
+            i = j;
+        } else {
+            result.push(line_bytes[i] as char);
+            i += 1;
+        }
+    }
+
+    result
+}
+
 /// Check if a word appears as a standalone identifier in GLSL source.
 /// Returns false for substrings (e.g., "ft" inside "ftMap" or "float").
 fn is_word_used_in(source: &str, word: &str) -> bool {
@@ -58,8 +90,10 @@ fn is_word_used_in(source: &str, word: &str) -> bool {
 /// In main(), the shader reassigns them before calling the generated functions,
 /// so the globals act as "pass-through" values.
 fn inject_global_captures(source: &str) -> String {
-    // Variables commonly captured by generated raymarch functions
+    // Variables commonly captured by generated raymarch functions.
+    // Comprehensive list derived from batch-validating all 123 shaders.
     let capture_candidates = [
+        // Common audio/section locals
         "energy", "bass", "ft", "psyche", "flowTime", "floodLevel",
         "melodicPitch", "eruptionScale", "geyserTime", "tension",
         "drumOnset", "slowE", "vocalP", "sJam", "sSpace",
@@ -67,6 +101,41 @@ fn inject_global_captures(source: &str) -> String {
         "stability", "onset", "highs", "mids", "timbral",
         "timeVal", "energyVal", "bassVal", "midsVal", "vocalPresence",
         "drumOn", "climaxBoost", "coherence",
+        // Discovered from batch validation of 123 shaders
+        "basePipeRadius", "bassShake", "bassV", "bassVib",
+        "beatSnap", "beatSnap2", "bloomState", "cellScale",
+        "climaxAmount", "climaxPhase", "corruption", "dcTime",
+        "destructionLevel", "dissolveProgress", "drumSnap",
+        "expansionPhase", "flowSpeedMod", "gapWidth", "growthRate",
+        "hcTime", "icoRadius", "llTime", "majorR", "maTime",
+        "melPitch", "musTime", "ncTime", "reelAngle", "rockAngle",
+        "sway", "time", "trackStability", "tunnelRadius",
+        // Second batch from validation
+        "baseFluidRadius", "bassBreath", "bassPulse", "bassSize",
+        "beatStab", "beatStability", "chaos", "climaxBurst",
+        "climaxIntensity", "climaxLift", "climaxOpen", "climaxShatter",
+        "d0", "density", "dishCount", "drumV", "emergence", "energyV",
+        "filmAdvance", "fl2BeatPulse", "forecast", "fzScale",
+        "granDisp", "melodicP", "minorR", "pitch", "randomness",
+        "rotSpeed", "sceneTime", "shakeAmp", "slowTime", "twist",
+        "twistMult", "ventTime", "viscosity", "wallThickness",
+        // Third batch
+        "beatSteady", "churn", "climax", "climaxAperture",
+        "drumShift", "firingRate", "flowPhase", "fzFoldLimit",
+        "gemCount", "irregularity", "jamDissolve", "morphAmt",
+        "prismAngle", "ringCountMod", "roadW", "rotAngle",
+        "rotation", "seismicPhase", "splashWave", "tempoV",
+        "tiltDir", "vocalGlow", "weave",
+        // Fourth batch
+        "blobCount", "branchDensity", "burstAmount", "cellTime",
+        "climaxV", "crowdCount", "explSpeed", "fzIterations",
+        "halfW", "melodicFreq", "onsetCascade", "shatterAmt",
+        "slowEnergy", "tensionV",
+        // Fifth batch
+        "bassScale", "climaxErupt", "fzFoldDistort", "stabilityV",
+        "halfH", "drumSync", "turbulence", "pressureWave", "shatterAmount",
+        // Sixth batch
+        "climaxWarp", "breachAmount", "pressureOrigin",
     ];
 
     // Detect which of these are used by a generated function (has _rmp param)
@@ -216,8 +285,10 @@ pub fn webgl_to_desktop(source: &str) -> String {
             continue;
         }
 
-        // Skip sampler uniforms entirely (textures not supported in basic renderer)
+        // Sampler uniforms: keep as binding 1+ (not in UBO), but stub texture calls
         if trimmed.starts_with("uniform ") && trimmed.contains("sampler") {
+            // For now, skip sampler declarations — texture support comes later.
+            // Code that references samplers will be stubbed below.
             continue;
         }
 
@@ -236,6 +307,19 @@ pub fn webgl_to_desktop(source: &str) -> String {
 
         // textureCube → texture
         transformed = transformed.replace("textureCube(", "texture(");
+
+        // Stub out texture reads from stripped samplers → return black/zero
+        // texture(uPrevFrame, uv) → vec4(0.0) (no feedback in basic renderer)
+        // texture(uFFTTexture, ...) → vec4(0.0) (no FFT texture)
+        if transformed.contains("texture(uPrevFrame") {
+            // Replace texture(uPrevFrame, anything) with vec4(0.05, 0.03, 0.08, 1.0) (dark purple, not pure black)
+            let re_prev = regex_replace_texture(&transformed, "uPrevFrame", "vec4(0.05, 0.03, 0.08, 1.0)");
+            transformed = re_prev;
+        }
+        if transformed.contains("texture(uFFTTexture") {
+            let re_fft = regex_replace_texture(&transformed, "uFFTTexture", "vec4(0.0)");
+            transformed = re_fft;
+        }
 
         body_lines.push(transformed);
     }
