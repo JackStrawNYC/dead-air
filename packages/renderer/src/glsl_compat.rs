@@ -136,6 +136,8 @@ fn inject_global_captures(source: &str) -> String {
         "halfH", "drumSync", "turbulence", "pressureWave", "shatterAmount",
         // Sixth batch
         "climaxWarp", "breachAmount", "pressureOrigin",
+        // Seventh batch
+        "sectionSpeedMul",
     ];
 
     // Detect which of these are used by a generated function (has _rmp param)

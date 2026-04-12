@@ -2,222 +2,117 @@
 /**
  * Manifest Generator — bridges the TypeScript brain to the Rust GPU renderer.
  *
- * This script evaluates all TypeScript routing logic (scene selection, audio-reactive
- * uniforms, transitions, crossfades) and outputs a JSON manifest that the Rust
- * renderer consumes.
- *
- * The manifest contains:
- *   1. Pre-composed GLSL strings (all template literals resolved)
- *   2. Per-frame data: shader_id + all uniform values
+ * Reads real show data (setlist + per-track audio analysis) and outputs
+ * a JSON manifest for the Rust renderer.
  *
  * Usage:
- *   npx tsx generate-manifest.ts --show-dir ../visualizer-poc/data/shows/cornell-77 \
- *     --output manifest.json --fps 60
+ *   npx tsx generate-manifest.ts \
+ *     --data-dir ../visualizer-poc/data \
+ *     --output manifest.json \
+ *     --fps 60 --width 3840 --height 2160
  */
 
-import { readFileSync, writeFileSync, existsSync } from "fs";
+import { readFileSync, writeFileSync, existsSync, readdirSync } from "fs";
 import { join, resolve } from "path";
 
-// ─── Import shader GLSL strings from visualizer-poc ───
-// Each shader exports its fragment shader as a template-literal string.
-// By importing here, all ${sharedUniformsGLSL}, ${noiseGLSL}, etc. are resolved.
-
+const __dirname = new URL(".", import.meta.url).pathname;
 const VISUALIZER_ROOT = resolve(__dirname, "../visualizer-poc");
 
-// We dynamically import all shader modules to get their pre-composed GLSL
+// ─── Collect pre-composed GLSL strings ───
+
 async function collectShaderGLSL(): Promise<Record<string, string>> {
   const shaders: Record<string, string> = {};
+  const shaderDir = join(VISUALIZER_ROOT, "src/shaders");
+  const skipFiles = new Set([
+    "noise.ts", "dual-blend.ts", "overlay-sdf.ts", "shader-strings.ts",
+    "mesh-deformation.ts", "particle-burst.ts",
+  ]);
+  const files = readdirSync(shaderDir)
+    .filter(f => f.endsWith(".ts") && !f.includes(".test.") && !f.startsWith("shared") && !skipFiles.has(f));
 
-  // Map of scene registry keys → shader file + export names
-  // This maps VisualMode → the actual GLSL fragment string
-  const shaderMap: Record<string, { file: string; exportName: string }> = {
-    fractal_temple: { file: "fractal-temple", exportName: "fractalTempleFrag" },
-    inferno: { file: "inferno", exportName: "infernoFrag" },
-    cosmic_voyage: { file: "cosmic-voyage", exportName: "cosmicVoyageFrag" },
-    deep_ocean: { file: "deep-ocean", exportName: "deepOceanFrag" },
-    river: { file: "river", exportName: "riverFrag" },
-    ocean: { file: "ocean", exportName: "oceanFrag" },
-    protean_clouds: { file: "protean-clouds", exportName: "proteanCloudsFrag" },
-    volumetric_clouds: { file: "volumetric-clouds", exportName: "volumetricCloudsFrag" },
-    volumetric_smoke: { file: "volumetric-smoke", exportName: "volumetricSmokeFrag" },
-    volumetric_nebula: { file: "volumetric-nebula", exportName: "volumetricNebulaFrag" },
-    space_travel: { file: "space-travel", exportName: "spaceTravelFrag" },
-    aurora: { file: "aurora", exportName: "auroraFrag" },
-    tie_dye: { file: "tie-dye", exportName: "tieDyeFrag" },
-    sacred_geometry: { file: "sacred-geometry", exportName: "sacredGeometryFrag" },
-    mandala_engine: { file: "mandala-engine", exportName: "mandalaEngineFrag" },
-    kaleidoscope: { file: "kaleidoscope", exportName: "kaleidoscopeFrag" },
-    star_nest: { file: "star-nest", exportName: "starNestFrag" },
-    particle_nebula: { file: "particle-nebula", exportName: "particleNebulaFrag" },
-    cosmic_dust: { file: "cosmic-dust", exportName: "cosmicDustFrag" },
-    void_light: { file: "void-light", exportName: "voidLightFrag" },
-    stained_glass: { file: "stained-glass", exportName: "stainedGlassFrag" },
-    electric_arc: { file: "electric-arc", exportName: "electricArcFrag" },
-    feedback_recursion: { file: "feedback-recursion", exportName: "feedbackRecursionFrag" },
-    reaction_diffusion: { file: "reaction-diffusion", exportName: "reactionDiffusionFrag" },
-    fractal_zoom: { file: "fractal-zoom", exportName: "fractalZoomFrag" },
-    lava_flow: { file: "lava-flow", exportName: "lavaFlowFrag" },
-    plasma_field: { file: "plasma-field", exportName: "plasmaFieldFrag" },
-    digital_rain: { file: "digital-rain", exportName: "digitalRainFrag" },
-    morphogenesis: { file: "morphogenesis", exportName: "morphogenesisFrag" },
-    mycelium_network: { file: "mycelium-network", exportName: "myceliumNetworkFrag" },
-  };
-
-  for (const [shaderId, { file, exportName }] of Object.entries(shaderMap)) {
+  for (const file of files) {
     try {
-      const modulePath = join(VISUALIZER_ROOT, "src/shaders", `${file}.ts`);
-      if (!existsSync(modulePath)) {
-        console.warn(`Shader file not found: ${modulePath}`);
-        continue;
+      const mod = await import(join(shaderDir, file));
+      const fragKey = Object.keys(mod).find(k => k.endsWith("Frag"));
+      if (fragKey && typeof mod[fragKey] === "string" && mod[fragKey].length > 100) {
+        const shaderId = file.replace(".ts", "").replace(/-/g, "_");
+        shaders[shaderId] = mod[fragKey];
       }
-      const mod = await import(modulePath);
-      if (mod[exportName]) {
-        shaders[shaderId] = mod[exportName];
-      } else {
-        console.warn(`Export ${exportName} not found in ${file}.ts`);
-      }
-    } catch (e) {
-      console.warn(`Failed to import shader ${shaderId}: ${e}`);
-    }
+    } catch {}
   }
-
   return shaders;
 }
 
-// ─── Types ───
+// ─── Audio helpers ───
 
-interface ShowConfig {
-  showDir: string;
-  fps: number;
-  width: number;
-  height: number;
-}
-
-interface FrameManifestEntry {
-  shader_id: string;
-  frame: number;
-  secondary_shader_id: string | null;
-  blend_progress: number | null;
-  blend_mode: string | null;
-  // All uniform values (80+ fields)
-  [key: string]: number | string | null;
-}
-
-interface Manifest {
-  shaders: Record<string, string>;
-  frames: FrameManifestEntry[];
-  width: number;
-  height: number;
-  fps: number;
-  show_title: string;
-}
-
-// ─── Audio snapshot computation ───
-// Simplified version of computeAudioSnapshot for manifest generation.
-// In production, this should import from visualizer-poc/src/utils/audio-reactive.ts
-
-function gaussianSmooth(
-  frames: any[],
-  idx: number,
-  field: string,
-  windowSize: number,
-): number {
-  const half = Math.floor(windowSize / 2);
-  let sum = 0;
-  let weightSum = 0;
+function gaussianSmooth(frames: any[], idx: number, field: string, win: number): number {
+  const half = Math.floor(win / 2);
+  let sum = 0, w = 0;
   for (let i = -half; i <= half; i++) {
     const fi = Math.max(0, Math.min(frames.length - 1, idx + i));
-    const w = Math.exp((-i * i) / (2 * (windowSize / 4) ** 2));
-    const val = frames[fi]?.[field] ?? 0;
-    sum += val * w;
-    weightSum += w;
+    const g = Math.exp((-i * i) / (2 * (win / 4) ** 2));
+    sum += (frames[fi]?.[field] ?? 0) * g;
+    w += g;
   }
-  return weightSum > 0 ? sum / weightSum : 0;
+  return w > 0 ? sum / w : 0;
 }
 
-function computeFrameUniforms(
-  frames: any[],
-  frameIdx: number,
-  fps: number,
-  tempo: number,
-  width: number,
-  height: number,
+function chromaHue(f: any): number {
+  const c = f.chroma;
+  if (!c || !Array.isArray(c)) return 180;
+  let mi = 0, mv = 0;
+  for (let i = 0; i < 12; i++) if ((c[i] ?? 0) > mv) { mv = c[i]; mi = i; }
+  return mi * 30;
+}
+
+function sectionTypeFloat(st?: string): number {
+  const map: Record<string, number> = { intro: 0, verse: 1, chorus: 2, bridge: 3, solo: 4, jam: 5, outro: 6, space: 7 };
+  return map[st ?? "jam"] ?? 5;
+}
+
+function computeUniforms(
+  frames: any[], idx: number, fps: number, tempo: number,
+  width: number, height: number, globalTime: number,
 ): Record<string, number> {
-  const f = frames[frameIdx] ?? {};
-  const time = frameIdx / fps;
+  const f = frames[idx] ?? {};
+  const time = globalTime + idx / fps;
+  const energy = gaussianSmooth(frames, idx, "rms", 25);
+  const slowEnergy = gaussianSmooth(frames, idx, "rms", 90);
+  const bass = gaussianSmooth(frames, idx, "sub", 15) + gaussianSmooth(frames, idx, "low", 15);
 
-  // Smoothed values
-  const energy = gaussianSmooth(frames, frameIdx, "rms", 25);
-  const slowEnergy = gaussianSmooth(frames, frameIdx, "rms", 90);
-  const bass = gaussianSmooth(frames, frameIdx, "sub", 15) +
-    gaussianSmooth(frames, frameIdx, "low", 15);
-  const mids = gaussianSmooth(frames, frameIdx, "mid", 12);
-  const highs = gaussianSmooth(frames, frameIdx, "high", 12);
-  const centroid = gaussianSmooth(frames, frameIdx, "centroid", 15);
-
-  // Beat tracking
-  const beatConfidence = f.beatConfidence ?? 0;
-  const beatStability = f.beatStability ?? 0;
-  const musicalTime = f.musicalTime ?? ((time * tempo / 60) % 1);
+  const factor = Math.max(0, Math.min(1, (energy - 0.05) / 0.30));
+  const envBrightness = 0.55 + Math.sqrt(factor) * 0.50;
 
   return {
-    time,
-    dynamic_time: time, // simplified — production should accumulate proportional to energy
-    beat_time: time * (tempo / 120),
-    musical_time: musicalTime,
-    tempo,
-    energy,
-    rms: f.rms ?? 0,
-    bass,
-    mids,
-    highs,
-    onset: f.onset ?? 0,
-    centroid,
-    beat: f.beat ? 1 : 0,
+    time, dynamic_time: time, beat_time: time * (tempo / 120),
+    musical_time: (time * tempo / 60) % 1, tempo,
+    energy, rms: f.rms ?? 0, bass,
+    mids: gaussianSmooth(frames, idx, "mid", 12),
+    highs: gaussianSmooth(frames, idx, "high", 12),
+    onset: f.onset ?? 0, centroid: f.centroid ?? 0.5, beat: f.beat ? 1 : 0,
     slow_energy: slowEnergy,
-    fast_energy: gaussianSmooth(frames, frameIdx, "rms", 5),
-    fast_bass: gaussianSmooth(frames, frameIdx, "sub", 5),
-    spectral_flux: f.spectralFlux ?? 0,
-    energy_accel: 0,
-    energy_trend: 0,
-    onset_snap: f.onset ?? 0,
-    beat_snap: f.beat ? 1 : 0,
-    beat_confidence: beatConfidence,
-    beat_stability: beatStability,
+    fast_energy: gaussianSmooth(frames, idx, "rms", 5),
+    fast_bass: gaussianSmooth(frames, idx, "sub", 5),
+    spectral_flux: 0, energy_accel: 0, energy_trend: 0,
+    onset_snap: f.onset ?? 0, beat_snap: f.beat ? 1 : 0,
+    beat_confidence: f.beatConfidence ?? 0.5, beat_stability: 0.5,
     downbeat: f.downbeat ? 1 : 0,
-    drum_onset: f.stemDrumOnset ?? 0,
-    drum_beat: f.stemDrumBeat ?? 0,
-    stem_bass: f.stemBassRms ?? 0,
-    stem_drums: f.stemDrumOnset ?? 0,
-    vocal_energy: f.stemVocalRms ?? 0,
-    vocal_presence: f.stemVocalPresence ?? 0,
-    other_energy: f.stemOtherRms ?? 0,
-    other_centroid: f.stemOtherCentroid ?? 0,
-    chroma_hue: computeChromaHue(f),
-    chroma_shift: 0,
-    chord_index: f.chordIndex ?? 0,
-    harmonic_tension: f.harmonicTension ?? 0,
-    melodic_pitch: f.melodicPitch ?? 0,
-    melodic_direction: f.melodicDirection ?? 0,
-    melodic_confidence: f.melodicConfidence ?? 0,
-    chord_confidence: f.chordConfidence ?? 0,
-    section_type: parseSectionType(f.sectionType),
-    section_index: 0,
-    section_progress: 0,
-    climax_phase: 0,
-    climax_intensity: 0,
-    coherence: 0,
-    jam_density: 0.5,
-    jam_phase: 0,
-    jam_progress: 0,
-    energy_forecast: 0,
-    peak_approaching: 0,
-    tempo_derivative: f.tempoDerivative ?? 0,
-    dynamic_range: f.dynamicRange ?? 0.5,
-    space_score: f.spaceScore ?? 0,
-    timbral_brightness: f.timbralBrightness ?? 0.5,
-    timbral_flux: f.timbralFlux ?? 0,
-    vocal_pitch: f.vocalPitch ?? 0,
+    drum_onset: f.stemDrumOnset ?? 0, drum_beat: f.stemDrumBeat ? 1 : 0,
+    stem_bass: f.stemBassRms ?? bass, stem_drums: f.stemDrumOnset ?? 0,
+    vocal_energy: f.stemVocalRms ?? 0, vocal_presence: f.stemVocalPresence ? 1 : 0,
+    other_energy: f.stemOtherRms ?? 0, other_centroid: f.stemOtherCentroid ?? 0.5,
+    chroma_hue: chromaHue(f), chroma_shift: 0,
+    chord_index: f.chordIndex ?? 0, harmonic_tension: f.harmonicTension ?? 0,
+    melodic_pitch: f.melodicPitch ?? 0.5, melodic_direction: f.melodicDirection ?? 0,
+    melodic_confidence: f.melodicConfidence ?? 0, chord_confidence: f.chordConfidence ?? 0,
+    section_type: sectionTypeFloat(f.sectionType),
+    section_index: 0, section_progress: 0,
+    climax_phase: 0, climax_intensity: 0, coherence: 0,
+    jam_density: 0.5, jam_phase: 0, jam_progress: 0,
+    energy_forecast: 0, peak_approaching: 0,
+    tempo_derivative: f.tempoDerivative ?? 0, dynamic_range: f.dynamicRange ?? 0.5,
+    space_score: f.spaceScore ?? 0, timbral_brightness: f.timbralBrightness ?? 0.5,
+    timbral_flux: f.timbralFlux ?? 0, vocal_pitch: f.vocalPitch ?? 0,
     vocal_pitch_confidence: f.vocalPitchConfidence ?? 0,
     improvisation_score: f.improvisationScore ?? 0,
     semantic_psychedelic: f.semantic_psychedelic ?? 0,
@@ -228,155 +123,97 @@ function computeFrameUniforms(
     semantic_ambient: f.semantic_ambient ?? 0,
     semantic_chaotic: f.semantic_chaotic ?? 0,
     semantic_triumphant: f.semantic_triumphant ?? 0,
-    palette_primary: 0.7,
-    palette_secondary: 0.3,
-    palette_saturation: 0.75,
-    envelope_brightness: 0.55 + Math.sqrt(Math.min(1, energy / 0.35)) * 0.50,
-    envelope_saturation: 1.0,
+    palette_primary: 0.08, palette_secondary: 0.55, palette_saturation: 0.85,
+    envelope_brightness: envBrightness, envelope_saturation: 1.0 + energy * 0.2,
     envelope_hue: 0,
-    era_saturation: 1.0,
-    era_brightness: 1.0,
-    era_sepia: 0,
-    show_warmth: 0,
-    show_contrast: 1.0,
-    show_saturation: 1.0,
-    show_grain: 1.0,
-    show_bloom: 1.0,
-    param_bass_scale: 1.0,
-    param_energy_scale: 1.0,
-    param_motion_speed: 1.0,
-    param_color_sat_bias: 0,
-    param_complexity: 1.0,
-    param_drum_reactivity: 1.0,
-    param_vocal_weight: 1.0,
+    era_saturation: 1.05, era_brightness: 1.0, era_sepia: 0.06,
+    show_warmth: 0, show_contrast: 1.0, show_saturation: 1.0,
+    show_grain: 1.0, show_bloom: 1.0,
+    param_bass_scale: 1.0, param_energy_scale: 1.0, param_motion_speed: 1.0,
+    param_color_sat_bias: 0, param_complexity: 1.0,
+    param_drum_reactivity: 1.0, param_vocal_weight: 1.0,
     peak_of_show: 0,
   };
-}
-
-function computeChromaHue(frame: any): number {
-  const chroma = frame.chroma;
-  if (!chroma || !Array.isArray(chroma)) return 180;
-  let maxIdx = 0;
-  let maxVal = 0;
-  for (let i = 0; i < 12; i++) {
-    if ((chroma[i] ?? 0) > maxVal) {
-      maxVal = chroma[i];
-      maxIdx = i;
-    }
-  }
-  return maxIdx * 30; // 0-360 hue from pitch class
-}
-
-function parseSectionType(st: string | undefined): number {
-  switch (st) {
-    case "intro": return 0;
-    case "verse": return 1;
-    case "chorus": return 2;
-    case "bridge": return 3;
-    case "solo": return 4;
-    case "jam": return 5;
-    case "outro": return 6;
-    case "space": return 7;
-    default: return 5; // default to jam
-  }
 }
 
 // ─── Main ───
 
 async function main() {
   const args = process.argv.slice(2);
-  const showDirIdx = args.indexOf("--show-dir");
-  const outputIdx = args.indexOf("--output");
-  const fpsIdx = args.indexOf("--fps");
-  const widthIdx = args.indexOf("--width");
-  const heightIdx = args.indexOf("--height");
+  const getArg = (name: string, def: string) => {
+    const idx = args.indexOf(`--${name}`);
+    return idx >= 0 ? args[idx + 1] : def;
+  };
 
-  const showDir = showDirIdx >= 0 ? args[showDirIdx + 1] : null;
-  const outputPath = outputIdx >= 0 ? args[outputIdx + 1] : "manifest.json";
-  const fps = fpsIdx >= 0 ? parseInt(args[fpsIdx + 1]) : 60;
-  const width = widthIdx >= 0 ? parseInt(args[widthIdx + 1]) : 3840;
-  const height = heightIdx >= 0 ? parseInt(args[heightIdx + 1]) : 2160;
+  const dataDir = getArg("data-dir", join(VISUALIZER_ROOT, "data"));
+  const outputPath = getArg("output", "manifest.json");
+  const fps = parseInt(getArg("fps", "60"));
+  const width = parseInt(getArg("width", "3840"));
+  const height = parseInt(getArg("height", "2160"));
 
-  if (!showDir) {
-    console.error("Usage: npx tsx generate-manifest.ts --show-dir <path> [--output manifest.json] [--fps 60]");
-    process.exit(1);
-  }
+  console.log(`Data: ${dataDir}`);
 
-  console.log(`Generating manifest for: ${showDir}`);
-  console.log(`Output: ${outputPath} | ${width}x${height} @ ${fps}fps`);
+  const setlist = JSON.parse(readFileSync(join(dataDir, "setlist.json"), "utf-8"));
+  const showTitle = `${setlist.venue ?? "?"} — ${setlist.date ?? ""}`;
+  console.log(`Show: ${showTitle} (${setlist.songs?.length ?? 0} songs)`);
 
-  // Load show data
-  const setlistPath = join(showDir, "setlist.json");
-  if (!existsSync(setlistPath)) {
-    console.error(`Setlist not found: ${setlistPath}`);
-    process.exit(1);
-  }
-  const setlist = JSON.parse(readFileSync(setlistPath, "utf-8"));
-
-  // Collect pre-composed GLSL strings
-  console.log("Collecting shader GLSL...");
+  console.log("Collecting GLSL...");
   const shaders = await collectShaderGLSL();
-  console.log(`Collected ${Object.keys(shaders).length} shader GLSL strings`);
+  console.log(`${Object.keys(shaders).length} shaders collected`);
 
-  // Build per-frame manifest
-  const allFrames: FrameManifestEntry[] = [];
-  const defaultShader = "fractal_temple"; // fallback
+  const allFrames: any[] = [];
+  let globalTime = 0;
 
   for (const song of setlist.songs ?? []) {
-    const analysisPath = join(showDir, "tracks", `${song.slug ?? song.title}_analysis.json`);
-    if (!existsSync(analysisPath)) {
-      console.warn(`Analysis not found for ${song.title}, skipping`);
-      continue;
-    }
+    const path = join(dataDir, "tracks", `${song.trackId}-analysis.json`);
+    if (!existsSync(path)) { console.warn(`  SKIP: ${song.title}`); continue; }
 
-    const analysis = JSON.parse(readFileSync(analysisPath, "utf-8"));
+    const analysis = JSON.parse(readFileSync(path, "utf-8"));
     const frames = analysis.frames ?? [];
     const tempo = analysis.meta?.tempo ?? 120;
-    const totalFrames = Math.ceil((frames.length / 30) * fps); // upsample if fps > 30
+    const afps = analysis.meta?.fps ?? 30;
+    const totalOut = Math.ceil((frames.length / afps) * fps);
+    const shaderId = (song.defaultMode ?? "protean_clouds").replace(/-/g, "_");
 
-    console.log(`  ${song.title}: ${frames.length} analysis frames → ${totalFrames} render frames`);
+    console.log(`  ${song.title}: ${frames.length}→${totalOut} frames (${shaderId})`);
 
-    // Simple shader assignment — in production, use full SceneRouter logic
-    const shaderId = song.defaultMode ?? song.preferredModes?.[0] ?? defaultShader;
-
-    for (let renderFrame = 0; renderFrame < totalFrames; renderFrame++) {
-      // Map render frame to analysis frame (handles fps upsampling)
-      const analysisFrame = Math.min(
-        Math.floor(renderFrame * (30 / fps)),
-        frames.length - 1,
-      );
-
-      const uniforms = computeFrameUniforms(frames, analysisFrame, fps, tempo, width, height);
-
+    for (let i = 0; i < totalOut; i++) {
+      const ai = Math.min(Math.floor(i * (afps / fps)), frames.length - 1);
       allFrames.push({
         shader_id: shaderId,
         frame: allFrames.length,
-        secondary_shader_id: null,
-        blend_progress: null,
-        blend_mode: null,
-        ...uniforms,
+        secondary_shader_id: null, blend_progress: null, blend_mode: null,
+        ...computeUniforms(frames, ai, fps, tempo, width, height, globalTime),
       });
     }
+    globalTime += frames.length / afps;
   }
 
-  // Build manifest
-  const manifest: Manifest = {
-    shaders,
-    frames: allFrames,
-    width,
-    height,
-    fps,
-    show_title: setlist.title ?? "Unknown Show",
-  };
+  // Stream JSON to avoid memory limits (678K frames = ~500MB+)
+  console.log(`\nWriting: ${allFrames.length} frames, ${Object.keys(shaders).length} shaders`);
+  const { createWriteStream } = await import("fs");
+  const ws = createWriteStream(outputPath);
 
-  // Write manifest
-  console.log(`Writing manifest: ${allFrames.length} frames, ${Object.keys(shaders).length} shaders`);
-  writeFileSync(outputPath, JSON.stringify(manifest));
-  const sizeMB = (Buffer.byteLength(JSON.stringify(manifest)) / 1024 / 1024).toFixed(1);
-  console.log(`Manifest written: ${outputPath} (${sizeMB} MB)`);
+  ws.write('{"shaders":');
+  ws.write(JSON.stringify(shaders));
+  ws.write(`,"width":${width},"height":${height},"fps":${fps},"show_title":${JSON.stringify(showTitle)}`);
+  ws.write(',"frames":[\n');
+
+  for (let i = 0; i < allFrames.length; i++) {
+    if (i > 0) ws.write(',\n');
+    ws.write(JSON.stringify(allFrames[i]));
+    if (i % 100000 === 0 && i > 0) process.stdout.write(`  ${(i / allFrames.length * 100).toFixed(0)}%\r`);
+  }
+
+  ws.write('\n]}');
+  await new Promise<void>((resolve, reject) => {
+    ws.end(() => resolve());
+    ws.on("error", reject);
+  });
+
+  const { statSync } = await import("fs");
+  const mb = (statSync(outputPath).size / 1048576).toFixed(1);
+  console.log(`Done: ${outputPath} (${mb} MB)`);
 }
 
-main().catch((e) => {
-  console.error(e);
-  process.exit(1);
-});
+main().catch(e => { console.error(e); process.exit(1); });
