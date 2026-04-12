@@ -276,8 +276,9 @@ export function buildRotationSchedule(
       const midSnapshot = computeAudioSnapshot(frames, midFrame);
       const midEnergy = computeSmoothedEnergy(frames, midFrame);
       windowTexture = detectTexture(midSnapshot, midEnergy);
+      // INVERTED: peaks get FEWER overlays (shader clarity), quiet gets MORE
       if (windowTexture === "peak") {
-        targetCount += 1;
+        targetCount = Math.max(0, targetCount - 1);
       }
     }
 

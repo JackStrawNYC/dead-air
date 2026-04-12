@@ -447,7 +447,8 @@ describe("scoreOverlayLive", () => {
 });
 
 describe("computeTargetCount", () => {
-  it("returns fewer overlays at low energy", () => {
+  it("returns MORE overlays at low energy (inverted density)", () => {
+    // Inverted: quiet passages are rich (more overlays), peaks are clean (fewer)
     const config = makeConfig();
     const lowSnapshot = makeSnapshot({ energy: 0.03 });
     const highSnapshot = makeSnapshot({ energy: 0.35 });
@@ -455,7 +456,7 @@ describe("computeTargetCount", () => {
     const lowCount = computeTargetCount(lowSnapshot, config);
     const highCount = computeTargetCount(highSnapshot, config);
 
-    expect(highCount).toBeGreaterThanOrEqual(lowCount);
+    expect(lowCount).toBeGreaterThanOrEqual(highCount);
   });
 
   it("caps at pool size", () => {

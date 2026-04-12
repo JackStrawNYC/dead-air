@@ -302,11 +302,11 @@ const ACCENT_CONFIG: Record<string, { onsetThreshold: number; peakOpacity: numbe
   low:  { onsetThreshold: 0.45, peakOpacity: 0.40, decayFrames: 10 },
 };
 
-/** Energy count ranges */
+/** Energy count ranges — INVERTED: quiet=rich atmosphere, peak=clean impact */
 const ENERGY_COUNTS: Record<string, { min: number; max: number }> = {
-  low:  { min: 1, max: 1 },
-  mid:  { min: 1, max: 2 },
-  high: { min: 2, max: 3 },
+  low:  { min: 2, max: 3 },   // quiet: rich atmospheric depth
+  mid:  { min: 1, max: 2 },   // moderate: balanced
+  high: { min: 1, max: 1 },   // peaks: clean, shader owns the moment
 };
 
 // ─── Types ───
