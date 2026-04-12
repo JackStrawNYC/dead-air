@@ -33,7 +33,8 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
-import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
+import { lightingGLSL } from "./shared/lighting.glsl";
+import { buildRaymarchNormal, buildRaymarchAO, buildDepthAlphaOutput } from "./shared/raymarching.glsl";
 
 const fl2NormalGLSL = buildRaymarchNormal(
   "fl2Map($P, time, fl2BeatPulse, churn, blobCount, climaxErupt)",
@@ -43,6 +44,7 @@ const fl2AOGLSL = buildRaymarchAO(
   "fl2Map($P, time, fl2BeatPulse, churn, blobCount, climaxErupt)",
   { steps: 5, stepBase: 0.0, stepScale: 0.1, weightDecay: 0.6, finalMult: 2.0, name: "fl2AmbientOcclusion" },
 );
+const fl2DepthAlpha = buildDepthAlphaOutput("marchT", "FL2_MAX_DIST");
 
 export const fluidLightVert = /* glsl */ `
 varying vec2 vUv;
@@ -58,6 +60,7 @@ precision highp float;
 ${sharedUniformsGLSL}
 
 ${noiseGLSL}
+${lightingGLSL}
 
 ${buildPostProcessGLSL({
   grainStrength: "normal",
@@ -440,7 +443,9 @@ void main() {
   }
 
   // === POST-PROCESSING ===
+  col = applyTemperature(col);
   col = applyPostProcess(col, vUv, screenP);
   gl_FragColor = vec4(col, 1.0);
+  ${fl2DepthAlpha}
 }
 `;

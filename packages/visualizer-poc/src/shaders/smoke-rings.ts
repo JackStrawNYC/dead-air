@@ -25,6 +25,7 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
+import { lightingGLSL } from "./shared/lighting.glsl";
 
 export const smokeRingsVert = /* glsl */ `
 varying vec2 vUv;
@@ -50,6 +51,7 @@ precision highp float;
 ${sharedUniformsGLSL}
 
 ${noiseGLSL}
+${lightingGLSL}
 
 ${postProcess}
 
@@ -400,6 +402,7 @@ void main() {
   col = mix(vec3(0.004, 0.003, 0.006), col, vignette);
 
   // === POST-PROCESSING ===
+  col = applyTemperature(col);
   col = applyPostProcess(col, uv, p);
 
   gl_FragColor = vec4(col, 1.0);

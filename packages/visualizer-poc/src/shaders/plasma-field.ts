@@ -31,7 +31,8 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
-import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
+import { lightingGLSL } from "./shared/lighting.glsl";
+import { buildRaymarchNormal, buildRaymarchAO, buildDepthAlphaOutput } from "./shared/raymarching.glsl";
 
 const pf2NormalGLSL = buildRaymarchNormal(
   "pf2Map($P, majorR, minorR, bass, energy, drumOnset, tension, stability, vocalGlow, melodicFreq, flowTime, turbulence, breachAmount).x",
@@ -41,6 +42,7 @@ const pf2OccGLSL = buildRaymarchAO(
   "pf2Map($P, majorR, minorR, bass, energy, drumOnset, tension, stability, vocalGlow, melodicFreq, flowTime, turbulence, breachAmount).x",
   { steps: 5, stepBase: 0.02, stepScale: 0.08, weightDecay: 0.65, finalMult: 3.5, name: "pf2Occlusion" },
 );
+const pf2DepthAlpha = buildDepthAlphaOutput("totalDist", "MAX_DIST");
 
 export const plasmaFieldVert = /* glsl */ `
 varying vec2 vUv;
@@ -68,6 +70,7 @@ precision highp float;
 ${sharedUniformsGLSL}
 
 ${noiseGLSL}
+${lightingGLSL}
 
 ${postProcess}
 
@@ -689,8 +692,10 @@ void main() {
   }
 
   // === POST PROCESS ===
+  col = applyTemperature(col);
   col = applyPostProcess(col, uv, screenP);
 
   gl_FragColor = vec4(col, 1.0);
+  ${pf2DepthAlpha}
 }
 `;

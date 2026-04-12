@@ -32,7 +32,8 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
-import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
+import { lightingGLSL } from "./shared/lighting.glsl";
+import { buildRaymarchNormal, buildRaymarchAO, buildDepthAlphaOutput } from "./shared/raymarching.glsl";
 
 export const vintageFilmVert = /* glsl */ `
 varying vec2 vUv;
@@ -44,6 +45,7 @@ void main() {
 
 const vf3NormalGLSL = buildRaymarchNormal("vf3Map($P, reelAngle, filmAdvance, weave, tension)", { eps: 0.003, name: "vf3Normal" });
 const vf3AOGLSL = buildRaymarchAO("vf3Map($P, reelAngle, filmAdvance, weave, tension)", { steps: 5, stepBase: 0.0, stepScale: 0.1, weightDecay: 0.6, finalMult: 2.5, name: "vf3AmbientOcclusion" });
+const vf3DepthAlpha = buildDepthAlphaOutput("marchT", "VF3_MAX_DIST");
 
 export const vintageFilmFrag = /* glsl */ `
 precision highp float;
@@ -51,6 +53,7 @@ precision highp float;
 ${sharedUniformsGLSL}
 
 ${noiseGLSL}
+${lightingGLSL}
 
 ${buildPostProcessGLSL({
   grainStrength: "heavy",
@@ -550,7 +553,9 @@ void main() {
   }
 
   // === POST-PROCESSING ===
+  col = applyTemperature(col);
   col = applyPostProcess(col, vUv, screenP);
   gl_FragColor = vec4(col, 1.0);
+  ${vf3DepthAlpha}
 }
 `;

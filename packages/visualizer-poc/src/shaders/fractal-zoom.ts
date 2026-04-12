@@ -24,7 +24,8 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
-import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
+import { lightingGLSL } from "./shared/lighting.glsl";
+import { buildRaymarchNormal, buildRaymarchAO, buildDepthAlphaOutput } from "./shared/raymarching.glsl";
 
 const fzNormalGLSL = buildRaymarchNormal(
   "fzMap($P, fzScale, fzFoldLimit, fzIterations, fzFoldDistort).x",
@@ -34,6 +35,7 @@ const fzAOGLSL = buildRaymarchAO(
   "fzMap($P, fzScale, fzFoldLimit, fzIterations, fzFoldDistort).x",
   { steps: 5, stepBase: 0.01, stepScale: 0.06, weightDecay: 0.7, finalMult: 2.5, name: "fzAmbientOcclusion" },
 );
+const fzDepthAlpha = buildDepthAlphaOutput("totalDist", "FZ_MAX_DIST");
 
 export const fractalZoomVert = /* glsl */ `
 varying vec2 vUv;
@@ -58,6 +60,7 @@ precision highp float;
 ${sharedUniformsGLSL}
 uniform sampler2D uPrevFrame;
 ${noiseGLSL}
+${lightingGLSL}
 ${postProcess}
 
 varying vec2 vUv;
@@ -368,8 +371,10 @@ void main() {
   // ─── Post-processing ───
   vec2 postUv = screenUv;
   vec2 postP = (postUv - 0.5) * aspect;
+  col = applyTemperature(col);
   col = applyPostProcess(col, postUv, postP);
 
   gl_FragColor = vec4(col, 1.0);
+  ${fzDepthAlpha}
 }
 `;

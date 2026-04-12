@@ -32,6 +32,7 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
+import { lightingGLSL } from "./shared/lighting.glsl";
 
 export const obsidianMirrorVert = /* glsl */ `
 varying vec2 vUv;
@@ -48,6 +49,7 @@ ${sharedUniformsGLSL}
 uniform sampler2D uPrevFrame;
 
 ${noiseGLSL}
+${lightingGLSL}
 
 ${buildPostProcessGLSL({
   grainStrength: "normal",
@@ -425,6 +427,7 @@ void main() {
   }
 
   // ─── Post-processing (bloom off, halation off, CA off) ───
+  col = applyTemperature(col);
   col = applyPostProcess(col, vUv, screenP);
 
   gl_FragColor = vec4(col, 1.0);

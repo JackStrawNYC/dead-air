@@ -27,7 +27,8 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
-import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
+import { lightingGLSL } from "./shared/lighting.glsl";
+import { buildRaymarchNormal, buildRaymarchAO, buildDepthAlphaOutput } from "./shared/raymarching.glsl";
 
 const f2NormalGLSL = buildRaymarchNormal(
   "f2SceneMap($P, flowTime, bass, drumOnset, tension, onset).x",
@@ -37,6 +38,7 @@ const f2AOGLSL = buildRaymarchAO(
   "f2SceneMap($P, flowTime, bass, drumOnset, tension, onset).x",
   { steps: 5, stepBase: 0.02, stepScale: 0.06, weightDecay: 0.7, finalMult: 3.0, name: "f2CalcAO" },
 );
+const f2DepthAlpha = buildDepthAlphaOutput("marchDist", "F2_MAX_DIST");
 
 export const fluid2DVert = /* glsl */ `
 varying vec2 vUv;
@@ -52,6 +54,7 @@ precision highp float;
 ${sharedUniformsGLSL}
 
 ${noiseGLSL}
+${lightingGLSL}
 
 ${buildPostProcessGLSL({ grainStrength: 'light', bloomEnabled: true, halationEnabled: true, caEnabled: true, dofEnabled: true })}
 
@@ -435,8 +438,10 @@ void main() {
   col += heroIconEmergence(screenP, uTime, energy, bass, caveTint, waterTint, _nf, uSectionIndex);
 
   // === POST-PROCESSING ===
+  col = applyTemperature(col);
   col = applyPostProcess(col, uv, screenP);
 
   gl_FragColor = vec4(col, 1.0);
+  ${f2DepthAlpha}
 }
 `;

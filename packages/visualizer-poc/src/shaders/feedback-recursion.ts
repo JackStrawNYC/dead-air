@@ -34,6 +34,7 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
+import { lightingGLSL } from "./shared/lighting.glsl";
 
 export const feedbackRecursionVert = /* glsl */ `
 varying vec2 vUv;
@@ -59,6 +60,7 @@ export const feedbackRecursionFrag = /* glsl */ `
 precision highp float;
 ${sharedUniformsGLSL}
 ${noiseGLSL}
+${lightingGLSL}
 ${postProcess}
 varying vec2 vUv;
 
@@ -658,6 +660,7 @@ void main() {
   col = max(col, vec3(0.015, 0.012, 0.02) * liftMult);
 
   // ─── Post-process chain ───
+  col = applyTemperature(col);
   col = applyPostProcess(col, uv, p);
 
   gl_FragColor = vec4(col, 1.0);

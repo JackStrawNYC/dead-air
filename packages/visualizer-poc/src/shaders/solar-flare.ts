@@ -36,7 +36,8 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
-import { buildRaymarchNormal } from "./shared/raymarching.glsl";
+import { lightingGLSL } from "./shared/lighting.glsl";
+import { buildRaymarchNormal, buildDepthAlphaOutput } from "./shared/raymarching.glsl";
 
 export const solarFlareVert = /* glsl */ `
 varying vec2 vUv;
@@ -47,6 +48,7 @@ void main() {
 `;
 
 const sfNormalGLSL = buildRaymarchNormal("sfMap($P, granDisp, tension)", { eps: 0.005, name: "sfNormal" });
+const sfDepthAlpha = buildDepthAlphaOutput("totalDist", "SF_MAX_DIST");
 
 export const solarFlareFrag = /* glsl */ `
 precision highp float;
@@ -55,6 +57,7 @@ ${sharedUniformsGLSL}
 uniform sampler2D uPrevFrame;
 
 ${noiseGLSL}
+${lightingGLSL}
 
 ${buildPostProcessGLSL({
   bloomEnabled: true,
@@ -718,11 +721,13 @@ void main() {
   // POST-PROCESSING
   // ================================================================
 
+  col = applyTemperature(col);
   col = applyPostProcess(col, uv, screenP);
 
   // Store plasma state in RG, visual in RGB
   gl_FragColor = vec4(col, 1.0);
   gl_FragColor.r = mix(col.r, plasmaTemp, 0.5);
   gl_FragColor.g = mix(col.g, magneticField, 0.5);
+  ${sfDepthAlpha}
 }
 `;

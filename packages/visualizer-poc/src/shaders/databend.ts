@@ -33,7 +33,7 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
-import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
+import { buildRaymarchNormal, buildRaymarchAO, buildDepthAlphaOutput } from "./shared/raymarching.glsl";
 import { lightingGLSL } from "./shared/lighting.glsl";
 
 export const databendVert = /* glsl */ `
@@ -52,6 +52,7 @@ const dbAOGLSL = buildRaymarchAO(
   "dbMap($P, corruption, randomness, drumShift, onsetCascade, bassScale, beatStability, time, climaxShatter)",
   { steps: 5, stepBase: 0.0, stepScale: 0.1, weightDecay: 0.6, finalMult: 2.5, name: "dbAmbientOcclusion" },
 );
+const dbDepthAlpha = buildDepthAlphaOutput("marchT", "DB_MAX_DIST");
 
 export const databendFrag = /* glsl */ `
 precision highp float;
@@ -491,5 +492,6 @@ void main() {
   col = applyTemperature(col);
   col = applyPostProcess(col, vUv, screenP);
   gl_FragColor = vec4(col, 1.0);
+  ${dbDepthAlpha}
 }
 `;

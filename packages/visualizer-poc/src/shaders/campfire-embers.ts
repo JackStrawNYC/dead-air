@@ -25,7 +25,7 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
-import { buildRaymarchNormal } from "./shared/raymarching.glsl";
+import { buildRaymarchNormal, buildDepthAlphaOutput } from "./shared/raymarching.glsl";
 import { lightingGLSL } from "./shared/lighting.glsl";
 
 export const campfireEmbersVert = /* glsl */ `
@@ -50,6 +50,7 @@ const postProcess = buildPostProcessGLSL({
 });
 
 const ceNormalGLSL = buildRaymarchNormal("ceMap($P, timeVal)", { eps: 0.001, name: "ceNormal" });
+const ceDepthAlpha = buildDepthAlphaOutput("marchDist", "MAX_MARCH_DIST");
 
 export const campfireEmbersFrag = /* glsl */ `
 precision highp float;
@@ -602,5 +603,6 @@ void main() {
   col = applyPostProcess(col, vUv, centeredP);
 
   gl_FragColor = vec4(col, 1.0);
+  ${ceDepthAlpha}
 }
 `;

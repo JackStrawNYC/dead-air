@@ -18,6 +18,7 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
+import { lightingGLSL } from "./shared/lighting.glsl";
 
 export const stormVortexVert = /* glsl */ `
 varying vec2 vUv;
@@ -40,6 +41,7 @@ export const stormVortexFrag = /* glsl */ `
 precision highp float;
 ${sharedUniformsGLSL}
 ${noiseGLSL}
+${lightingGLSL}
 ${postProcess}
 varying vec2 vUv;
 
@@ -630,6 +632,7 @@ void main() {
   col += heroIconEmergence(p, uTime, energy, uBass, stormCol, lightCol, _nf, uSectionIndex);
 
   // ─── Post Process ───
+  col = applyTemperature(col);
   col = applyPostProcess(col, uv, p);
 
   gl_FragColor = vec4(col, 1.0);

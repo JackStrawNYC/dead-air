@@ -33,7 +33,8 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
-import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
+import { lightingGLSL } from "./shared/lighting.glsl";
+import { buildRaymarchNormal, buildRaymarchAO, buildDepthAlphaOutput } from "./shared/raymarching.glsl";
 
 export const starkMinimalVert = /* glsl */ `
 varying vec2 vUv;
@@ -45,6 +46,7 @@ void main() {
 
 const smNormalGLSL = buildRaymarchNormal("smMap($P, bassVib, beatStability, onset, climaxAperture)", { eps: 0.002, name: "smNormal" });
 const smAOGLSL = buildRaymarchAO("smMap($P, bassVib, beatStability, onset, climaxAperture)", { steps: 5, stepBase: 0.0, stepScale: 0.12, weightDecay: 0.55, finalMult: 3.0, name: "smAmbientOcclusion" });
+const smDepthAlpha = buildDepthAlphaOutput("marchT", "SM_MAX_DIST");
 
 export const starkMinimalFrag = /* glsl */ `
 precision highp float;
@@ -52,6 +54,7 @@ precision highp float;
 ${sharedUniformsGLSL}
 
 ${noiseGLSL}
+${lightingGLSL}
 
 ${buildPostProcessGLSL({
   grainStrength: "light",
@@ -446,7 +449,9 @@ void main() {
   }
 
   // === POST-PROCESSING ===
+  col = applyTemperature(col);
   col = applyPostProcess(col, vUv, screenP);
   gl_FragColor = vec4(col, 1.0);
+  ${smDepthAlpha}
 }
 `;

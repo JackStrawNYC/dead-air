@@ -17,6 +17,7 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
+import { lightingGLSL } from "./shared/lighting.glsl";
 
 export const oceanGlslVert = /* glsl */ `
 varying vec2 vUv;
@@ -32,6 +33,7 @@ precision highp float;
 ${sharedUniformsGLSL}
 
 ${noiseGLSL}
+${lightingGLSL}
 
 ${buildPostProcessGLSL({
   bloomEnabled: true,
@@ -176,6 +178,7 @@ void main() {
   float subsurfMask = step(uv.y, horizon) * smoothstep(0.0, 0.15, depth);
   col += subsurfColor * subsurfMask * 0.3 * energy;
 
+  col = applyTemperature(col);
   vec2 pp = uv * 2.0 - 1.0; col = applyPostProcess(col, uv, pp);
   gl_FragColor = vec4(col, 1.0);
 }

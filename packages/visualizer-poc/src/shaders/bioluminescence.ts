@@ -26,6 +26,10 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
+import { lightingGLSL } from "./shared/lighting.glsl";
+import { buildDepthAlphaOutput } from "./shared/raymarching.glsl";
+
+const blDepthAlpha = buildDepthAlphaOutput("marchDist", "BL_MAX_DIST");
 
 export const bioluminescenceVert = /* glsl */ `
 varying vec2 vUv;
@@ -42,6 +46,7 @@ ${sharedUniformsGLSL}
 uniform sampler2D uPrevFrame;
 
 ${noiseGLSL}
+${lightingGLSL}
 
 ${buildPostProcessGLSL({
   grainStrength: "light",
@@ -392,8 +397,10 @@ void main() {
   col = mix(vec3(0.001, 0.001, 0.003), col, vignette);
 
   // ---- Post-processing ----
+  col = applyTemperature(col);
   col = applyPostProcess(col, vUv, screenP);
 
   gl_FragColor = vec4(col, 1.0);
+  ${blDepthAlpha}
 }
 `;

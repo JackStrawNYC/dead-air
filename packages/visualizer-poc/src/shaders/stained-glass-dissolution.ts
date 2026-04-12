@@ -35,7 +35,7 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
-import { buildRaymarchNormal } from "./shared/raymarching.glsl";
+import { buildRaymarchNormal, buildDepthAlphaOutput } from "./shared/raymarching.glsl";
 import { lightingGLSL } from "./shared/lighting.glsl";
 
 export const stainedGlassDissolutionVert = /* glsl */ `
@@ -59,6 +59,7 @@ const postProcess = buildPostProcessGLSL({
 });
 
 const sgNormalGLSL = buildRaymarchNormal("sgMap($P, dissolveProgress, tension, climaxBurst, bassVib, beatSteady).x", { eps: 0.003, name: "sgNormal" });
+const sgDepthAlpha = buildDepthAlphaOutput("totalDist", "MAX_DIST");
 
 export const stainedGlassDissolutionFrag = /* glsl */ `
 precision highp float;
@@ -671,5 +672,6 @@ void main() {
   col = applyPostProcess(col, uv, p);
 
   gl_FragColor = vec4(col, 1.0);
+  ${sgDepthAlpha}
 }
 `;

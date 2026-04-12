@@ -26,7 +26,8 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
-import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
+import { lightingGLSL } from "./shared/lighting.glsl";
+import { buildRaymarchNormal, buildRaymarchAO, buildDepthAlphaOutput } from "./shared/raymarching.glsl";
 
 export const smokeAndMirrorsVert = /* glsl */ `
 varying vec2 vUv;
@@ -38,6 +39,7 @@ void main() {
 
 const samNormalGLSL = buildRaymarchNormal("samSceneSDF($P, flowTime, bassVib).x", { eps: 0.003, name: "samCalcNormal" });
 const samAOGLSL = buildRaymarchAO("samSceneSDF($P, flowTime, bassVib).x", { steps: 5, stepBase: 0.0, stepScale: 0.12, weightDecay: 0.6, finalMult: 2.5, name: "samCalcAO" });
+const samDepthAlpha = buildDepthAlphaOutput("totalDist", "MAX_DIST");
 
 export const smokeAndMirrorsFrag = /* glsl */ `
 precision highp float;
@@ -46,6 +48,7 @@ ${sharedUniformsGLSL}
 uniform sampler2D uPrevFrame;
 
 ${noiseGLSL}
+${lightingGLSL}
 
 ${buildPostProcessGLSL({ grainStrength: "normal", bloomEnabled: true, halationEnabled: true, caEnabled: true, temporalBlendEnabled: true })}
 
@@ -394,8 +397,10 @@ void main() {
   }
 
   // Post-processing
+  col = applyTemperature(col);
   col = applyPostProcess(col, vUv, screenPos);
 
   gl_FragColor = vec4(col, 1.0);
+  ${samDepthAlpha}
 }
 `;

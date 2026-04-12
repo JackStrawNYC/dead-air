@@ -28,7 +28,8 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
-import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
+import { lightingGLSL } from "./shared/lighting.glsl";
+import { buildRaymarchNormal, buildRaymarchAO, buildDepthAlphaOutput } from "./shared/raymarching.glsl";
 
 const pr2NormalGLSL = buildRaymarchNormal(
   "pr2SceneSDFScalar($P, sceneTime, bass, tiltDir)",
@@ -38,6 +39,7 @@ const pr2AOGLSL = buildRaymarchAO(
   "pr2SceneSDFScalar($P, sceneTime, bass, tiltDir)",
   { steps: 5, stepBase: 0.0, stepScale: 0.15, weightDecay: 0.6, finalMult: 0.8, name: "pr2CalcOcclusion" },
 );
+const pr2DepthAlpha = buildDepthAlphaOutput("marchDist", "PR2_MAX_DIST");
 
 export const prismRefractionVert = /* glsl */ `
 varying vec2 vUv;
@@ -54,6 +56,7 @@ ${sharedUniformsGLSL}
 uniform sampler2D uPrevFrame;
 
 ${noiseGLSL}
+${lightingGLSL}
 
 ${buildPostProcessGLSL({
   grainStrength: "light",
@@ -395,8 +398,10 @@ void main() {
   col = mix(bgColor, col, vignette);
 
   // ---- Post-processing ----
+  col = applyTemperature(col);
   col = applyPostProcess(col, vUv, screenP);
 
   gl_FragColor = vec4(col, 1.0);
+  ${pr2DepthAlpha}
 }
 `;

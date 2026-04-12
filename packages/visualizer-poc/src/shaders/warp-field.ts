@@ -31,6 +31,10 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
+import { lightingGLSL } from "./shared/lighting.glsl";
+import { buildDepthAlphaOutput } from "./shared/raymarching.glsl";
+
+const wfDepthAlpha = buildDepthAlphaOutput("totalDist", "MAX_DIST");
 
 export const warpFieldVert = /* glsl */ `
 varying vec2 vUv;
@@ -46,6 +50,7 @@ precision highp float;
 ${sharedUniformsGLSL}
 
 ${noiseGLSL}
+${lightingGLSL}
 
 ${buildPostProcessGLSL({ bloomEnabled: true, caEnabled: true, halationEnabled: true, grainStrength: "light", thermalShimmerEnabled: true })}
 
@@ -490,7 +495,9 @@ void main() {
   col = mix(vec3(0.003, 0.002, 0.008), col, vignette);
 
   // ─── Post-processing ───
+  col = applyTemperature(col);
   col = applyPostProcess(col, uv, screenPos);
   gl_FragColor = vec4(col, 1.0);
+  ${wfDepthAlpha}
 }
 `;

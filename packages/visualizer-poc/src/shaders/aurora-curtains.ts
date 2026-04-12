@@ -27,7 +27,8 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
-import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
+import { lightingGLSL } from "./shared/lighting.glsl";
+import { buildRaymarchNormal, buildRaymarchAO, buildDepthAlphaOutput } from "./shared/raymarching.glsl";
 
 export const auroraCurtainsVert = /* glsl */ `
 varying vec2 vUv;
@@ -39,6 +40,7 @@ void main() {
 
 const acuNormalGLSL = buildRaymarchNormal("acuTerrainSDF($P)", { eps: 0.05, name: "acuTerrainNormal" });
 const acuAOGLSL = buildRaymarchAO("acuTerrainSDF($P)", { steps: 5, stepBase: 0.0, stepScale: 0.3, weightDecay: 0.6, finalMult: 0.6, name: "acuTerrainOcclusion" });
+const acuDepthAlpha = buildDepthAlphaOutput("(terrainDist > 0.0 ? terrainDist : ACU_MAX_DIST)", "ACU_MAX_DIST");
 
 export const auroraCurtainsFrag = /* glsl */ `
 precision highp float;
@@ -46,6 +48,7 @@ precision highp float;
 ${sharedUniformsGLSL}
 
 ${noiseGLSL}
+${lightingGLSL}
 
 ${buildPostProcessGLSL({
   bloomEnabled: true,
@@ -380,8 +383,10 @@ void main() {
   col = mix(vec3(0.002, 0.003, 0.008), col, vignette);
 
   // ---- Post-processing ----
+  col = applyTemperature(col);
   col = applyPostProcess(col, vUv, screenP);
 
   gl_FragColor = vec4(col, 1.0);
+  ${acuDepthAlpha}
 }
 `;

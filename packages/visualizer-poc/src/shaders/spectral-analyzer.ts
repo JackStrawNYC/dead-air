@@ -27,7 +27,8 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
-import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
+import { lightingGLSL } from "./shared/lighting.glsl";
+import { buildRaymarchNormal, buildRaymarchAO, buildDepthAlphaOutput } from "./shared/raymarching.glsl";
 
 export const spectralAnalyzerVert = /* glsl */ `
 varying vec2 vUv;
@@ -39,6 +40,7 @@ void main() {
 
 const saNormalGLSL = buildRaymarchNormal("saSceneMap($P, timeVal, onset, beatSnap2, drumOnset, beatStab).x", { eps: 0.003, name: "saCalcNormal" });
 const saAOGLSL = buildRaymarchAO("saSceneMap($P, timeVal, onset, beatSnap2, drumOnset, beatStab).x", { steps: 5, stepBase: -0.05, stepScale: 0.08, weightDecay: 0.65, finalMult: 3.0, name: "saCalcAO" });
+const saDepthAlpha = buildDepthAlphaOutput("marchDist", "SA_MAX_DIST");
 
 export const spectralAnalyzerFrag = /* glsl */ `
 precision highp float;
@@ -46,6 +48,7 @@ precision highp float;
 ${sharedUniformsGLSL}
 
 ${noiseGLSL}
+${lightingGLSL}
 
 ${buildPostProcessGLSL({ grainStrength: "light", bloomEnabled: true, halationEnabled: true, caEnabled: true, crtEnabled: true })}
 
@@ -378,8 +381,10 @@ void main() {
   col += heroIconEmergence(screenP, uTime, energy, bass, _ic1, _ic2, _nf, uSectionIndex);
 
   // Post-processing
+  col = applyTemperature(col);
   col = applyPostProcess(col, uv, screenP);
 
   gl_FragColor = vec4(col, 1.0);
+  ${saDepthAlpha}
 }
 `;

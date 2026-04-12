@@ -35,7 +35,8 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
-import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
+import { lightingGLSL } from "./shared/lighting.glsl";
+import { buildRaymarchNormal, buildRaymarchAO, buildDepthAlphaOutput } from "./shared/raymarching.glsl";
 
 export const reactionDiffusionVert = /* glsl */ `
 varying vec2 vUv;
@@ -47,6 +48,7 @@ void main() {
 
 const rd2NormalGLSL = buildRaymarchNormal("rd2Map($P, bass, energy, tension, stability, flowTime)", { eps: 0.005, name: "rd2Normal" });
 const rd2AOGLSL = buildRaymarchAO("rd2Map($P, bass, energy, tension, stability, flowTime)", { steps: 5, stepBase: -0.10, stepScale: 0.12, weightDecay: 0.65, finalMult: 2.5, name: "rd2AmbientOcclusion" });
+const rd2DepthAlpha = buildDepthAlphaOutput("totalDist", "MAX_DIST");
 
 const postProcess = buildPostProcessGLSL({
   grainStrength: "normal",
@@ -63,6 +65,7 @@ ${sharedUniformsGLSL}
 uniform sampler2D uPrevFrame;
 
 ${noiseGLSL}
+${lightingGLSL}
 
 ${postProcess}
 
@@ -418,8 +421,10 @@ void main() {
   }
 
   // === POST-PROCESSING ===
+  col = applyTemperature(col);
   col = applyPostProcess(col, uv, screenP);
 
   gl_FragColor = vec4(col, 1.0);
+  ${rd2DepthAlpha}
 }
 `;

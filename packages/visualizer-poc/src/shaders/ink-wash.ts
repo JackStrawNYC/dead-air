@@ -33,6 +33,7 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
+import { lightingGLSL } from "./shared/lighting.glsl";
 
 export const inkWashVert = /* glsl */ `
 varying vec2 vUv;
@@ -49,6 +50,7 @@ ${sharedUniformsGLSL}
 uniform sampler2D uPrevFrame;
 
 ${noiseGLSL}
+${lightingGLSL}
 
 ${buildPostProcessGLSL({
   bloomEnabled: true,
@@ -487,6 +489,7 @@ void main() {
   col = mix(vec3(0.01, 0.02, 0.04), col, vignette);
 
   // ─── Post-processing ───
+  col = applyTemperature(col);
   col = applyPostProcess(col, vUv, screenP);
 
   gl_FragColor = vec4(col, 1.0);

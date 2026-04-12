@@ -32,7 +32,7 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
-import { buildRaymarchNormal } from "./shared/raymarching.glsl";
+import { buildRaymarchNormal, buildDepthAlphaOutput } from "./shared/raymarching.glsl";
 import { lightingGLSL } from "./shared/lighting.glsl";
 
 export const aviaryCanopyVert = /* glsl */ `
@@ -55,6 +55,7 @@ const postProcess = buildPostProcessGLSL({
 });
 
 const acNormalGLSL = buildRaymarchNormal("acMap($P, sway, flowTime, energy, drumOnset, density).x", { eps: 0.008, name: "acNormal" });
+const acDepthAlpha = buildDepthAlphaOutput("totalDist", "AC_MAX_DIST");
 
 export const aviaryCanopyFrag = /* glsl */ `
 precision highp float;
@@ -572,5 +573,6 @@ void main() {
   col = applyPostProcess(col, uvCoord, p);
 
   gl_FragColor = vec4(col, 1.0);
+  ${acDepthAlpha}
 }
 `;

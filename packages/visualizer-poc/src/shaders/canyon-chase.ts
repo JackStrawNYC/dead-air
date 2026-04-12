@@ -29,6 +29,7 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
+import { lightingGLSL } from "./shared/lighting.glsl";
 
 export const canyonChaseVert = /* glsl */ `
 varying vec2 vUv;
@@ -56,6 +57,7 @@ precision highp float;
 ${sharedUniformsGLSL}
 
 ${noiseGLSL}
+${lightingGLSL}
 
 ${postProcess}
 
@@ -565,6 +567,7 @@ void main() {
   col += darknessTexture(uv, uTime, energy);
 
   // ─── Post-processing (shared chain) ───
+  col = applyTemperature(col);
   col = applyPostProcess(col, vUv, screenP);
 
   gl_FragColor = vec4(col, 1.0);

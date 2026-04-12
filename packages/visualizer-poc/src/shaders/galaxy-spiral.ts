@@ -31,6 +31,7 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
+import { lightingGLSL } from "./shared/lighting.glsl";
 
 export const galaxySpiralVert = /* glsl */ `
 varying vec2 vUv;
@@ -55,6 +56,7 @@ precision highp float;
 ${sharedUniformsGLSL}
 
 ${noiseGLSL}
+${lightingGLSL}
 
 ${postProcess}
 
@@ -499,6 +501,7 @@ void main() {
   // ═══════════════════════════════════════════════════
   // Post-processing
   // ═══════════════════════════════════════════════════
+  col = applyTemperature(col);
   col = applyPostProcess(col, uv, screenP);
   gl_FragColor = vec4(col, 1.0);
 }

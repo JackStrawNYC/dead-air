@@ -27,7 +27,7 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
-import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
+import { buildRaymarchNormal, buildRaymarchAO, buildDepthAlphaOutput } from "./shared/raymarching.glsl";
 import { lightingGLSL } from "./shared/lighting.glsl";
 
 export const electricArcVert = /* glsl */ `
@@ -52,6 +52,7 @@ const postProcess = buildPostProcessGLSL({
 
 const eaNormalGLSL = buildRaymarchNormal("eaMap($P)", { eps: 0.004, name: "eaNormal" });
 const eaAOGLSL = buildRaymarchAO("eaMap($P)", { steps: 5, stepBase: 0.0, stepScale: 0.12, weightDecay: 0.6, finalMult: 2.0, name: "eaAmbientOcc" });
+const eaDepthAlpha = buildDepthAlphaOutput("totalDist", "MAX_DIST");
 
 export const electricArcFrag = /* glsl */ `
 precision highp float;
@@ -757,5 +758,6 @@ void main() {
   col = applyPostProcess(col, vUv, (vUv - 0.5) * aspect);
 
   gl_FragColor = vec4(col, 1.0);
+  ${eaDepthAlpha}
 }
 `;

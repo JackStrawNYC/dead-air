@@ -28,7 +28,8 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
-import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
+import { lightingGLSL } from "./shared/lighting.glsl";
+import { buildRaymarchNormal, buildRaymarchAO, buildDepthAlphaOutput } from "./shared/raymarching.glsl";
 
 export const spinningSpiralVert = /* glsl */ `
 varying vec2 vUv;
@@ -40,6 +41,7 @@ void main() {
 
 const ssNormalGLSL = buildRaymarchNormal("ssMapScalar($P, slowTime, bass, tension)", { eps: 0.003, name: "ssCalcNormal" });
 const ssAOGLSL = buildRaymarchAO("ssMapScalar($P, slowTime, bass, tension)", { steps: 5, stepBase: 0.0, stepScale: 0.1, weightDecay: 0.6, finalMult: 2.0, name: "ssCalcOcclusion" });
+const ssDepthAlpha = buildDepthAlphaOutput("marchDist", "SS_MAX_DIST");
 
 export const spinningSpiralFrag = /* glsl */ `
 precision highp float;
@@ -48,6 +50,7 @@ ${sharedUniformsGLSL}
 uniform sampler2D uPrevFrame;
 
 ${noiseGLSL}
+${lightingGLSL}
 
 ${buildPostProcessGLSL({
   grainStrength: "light",
@@ -378,8 +381,10 @@ void main() {
   col = mix(vec3(0.01, 0.005, 0.02), col, vignette);
 
   // ---- Post-processing ----
+  col = applyTemperature(col);
   col = applyPostProcess(col, vUv, screenP);
 
   gl_FragColor = vec4(col, 1.0);
+  ${ssDepthAlpha}
 }
 `;

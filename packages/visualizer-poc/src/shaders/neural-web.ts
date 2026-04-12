@@ -24,7 +24,8 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
-import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
+import { lightingGLSL } from "./shared/lighting.glsl";
+import { buildRaymarchNormal, buildRaymarchAO, buildDepthAlphaOutput } from "./shared/raymarching.glsl";
 
 const nwNormalGLSL = buildRaymarchNormal(
   "nwMap($P, flowTime, bass, energy, chaos, firingRate, branchDensity, drumSync).dist",
@@ -34,6 +35,7 @@ const nwOccGLSL = buildRaymarchAO(
   "nwMap($P, flowTime, bass, energy, chaos, firingRate, branchDensity, drumSync).dist",
   { steps: 5, stepBase: 0.02, stepScale: 0.06, weightDecay: 0.6, finalMult: 3.0, name: "nwOcclusion" },
 );
+const nwDepthAlpha = buildDepthAlphaOutput("totalDist", "NW_MAX_DIST");
 
 export const neuralWebVert = /* glsl */ `
 varying vec2 vUv;
@@ -60,6 +62,7 @@ ${sharedUniformsGLSL}
 uniform sampler2D uPrevFrame;
 
 ${noiseGLSL}
+${lightingGLSL}
 
 ${postProcess}
 
@@ -480,8 +483,10 @@ void main() {
   }
 
   // === POST-PROCESSING ===
+  col = applyTemperature(col);
   col = applyPostProcess(col, uv, screenPos);
 
   gl_FragColor = vec4(col, 1.0);
+  ${nwDepthAlpha}
 }
 `;

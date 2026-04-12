@@ -14,6 +14,7 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
+import { lightingGLSL } from "./shared/lighting.glsl";
 
 export const tieDyeVert = /* glsl */ `
 varying vec2 vUv;
@@ -32,6 +33,7 @@ export const tieDyeFrag = /* glsl */ `
 precision highp float;
 ${sharedUniformsGLSL}
 ${noiseGLSL}
+${lightingGLSL}
 ${postProcess}
 varying vec2 vUv;
 
@@ -408,6 +410,7 @@ void main() {
   col += heroIconEmergence(pScreen, uTime, energy, uBass, palWarm, palCool, iconNoise, uSectionIndex);
 
   // ─── Post-processing chain ───
+  col = applyTemperature(col);
   col = applyPostProcess(col, uvCoord, pScreen);
 
   gl_FragColor = vec4(col, 1.0);

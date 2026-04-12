@@ -28,7 +28,7 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
-import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
+import { buildRaymarchNormal, buildRaymarchAO, buildDepthAlphaOutput } from "./shared/raymarching.glsl";
 import { lightingGLSL } from "./shared/lighting.glsl";
 
 export const climaxSurgeVert = /* glsl */ `
@@ -47,6 +47,7 @@ const csAOGLSL = buildRaymarchAO(
   "csSceneMap($P, timeVal, musTime, bass, onset, tension, forecast, ringCountMod, explSpeed).x",
   { steps: 5, stepBase: -0.04, stepScale: 0.06, weightDecay: 0.7, finalMult: 3.0, name: "csCalcAO" },
 );
+const csDepthAlpha = buildDepthAlphaOutput("marchDist", "CS_MAX_DIST");
 
 export const climaxSurgeFrag = /* glsl */ `
 precision highp float;
@@ -427,5 +428,6 @@ void main() {
   col = applyPostProcess(col, uv, screenP);
 
   gl_FragColor = vec4(col, 1.0);
+  ${csDepthAlpha}
 }
 `;

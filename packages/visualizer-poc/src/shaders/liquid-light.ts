@@ -25,7 +25,8 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
-import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
+import { lightingGLSL } from "./shared/lighting.glsl";
+import { buildRaymarchNormal, buildRaymarchAO, buildDepthAlphaOutput } from "./shared/raymarching.glsl";
 
 const llNormalGLSL = buildRaymarchNormal(
   "llMap($P, bass, energy, llTime, viscosity, splashWave, beatStab, sJam, sSpace, sChorus, climB)",
@@ -35,6 +36,7 @@ const llAOGLSL = buildRaymarchAO(
   "llMap($P, bass, energy, llTime, viscosity, splashWave, beatStab, sJam, sSpace, sChorus, climB)",
   { steps: 4, stepBase: 0.0, stepScale: 0.12, weightDecay: 0.5, finalMult: 0.35, name: "llCalcAO" },
 );
+const llDepthAlpha = buildDepthAlphaOutput("totalDist", "LL_MAX_DIST");
 
 export const liquidLightVert = /* glsl */ `
 varying vec2 vUv;
@@ -56,6 +58,7 @@ export const liquidLightFrag = /* glsl */ `
 precision highp float;
 ${sharedUniformsGLSL}
 ${noiseGLSL}
+${lightingGLSL}
 ${postProcess}
 varying vec2 vUv;
 
@@ -542,7 +545,9 @@ void main() {
   col = max(col, vec3(0.01, 0.008, 0.012));
 
   // ─── Post-process ───
+  col = applyTemperature(col);
   col = applyPostProcess(col, uv, p);
   gl_FragColor = vec4(col, 1.0);
+  ${llDepthAlpha}
 }
 `;

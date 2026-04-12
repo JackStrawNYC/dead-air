@@ -27,7 +27,7 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
-import { buildRaymarchNormal } from "./shared/raymarching.glsl";
+import { buildRaymarchNormal, buildDepthAlphaOutput } from "./shared/raymarching.glsl";
 import { lightingGLSL } from "./shared/lighting.glsl";
 
 export const locomotiveEngineVert = /* glsl */ `
@@ -49,6 +49,7 @@ const postProcess = buildPostProcessGLSL({
 });
 
 const leNormalGLSL = buildRaymarchNormal("leMap($P, bassV, energyV, tempoV, tensionV, stabilityV, climaxWarp, sectionSpeedMul).x", { eps: 0.002, name: "leNormal" });
+const leDepthAlpha = buildDepthAlphaOutput("totalDist", "LE_MAX_DIST");
 
 export const locomotiveEngineFrag = /* glsl */ `
 precision highp float;
@@ -708,5 +709,6 @@ void main() {
   col = applyPostProcess(col, vUv, screenP);
 
   gl_FragColor = vec4(col, 1.0);
+  ${leDepthAlpha}
 }
 `;

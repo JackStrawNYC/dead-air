@@ -26,7 +26,8 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
-import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
+import { lightingGLSL } from "./shared/lighting.glsl";
+import { buildRaymarchNormal, buildRaymarchAO, buildDepthAlphaOutput } from "./shared/raymarching.glsl";
 
 export const crystallineGrowthVert = /* glsl */ `
 varying vec2 vUv;
@@ -44,6 +45,7 @@ const cgAOGLSL = buildRaymarchAO(
   "cgSceneMap($P, timeVal, growthRate, onset, tension, bass, beatSnap2, melodicPitch, beatStab).x",
   { steps: 5, stepBase: -0.03, stepScale: 0.04, weightDecay: 0.7, finalMult: 5.0, name: "cgCalcAO" },
 );
+const cgDepthAlpha = buildDepthAlphaOutput("marchDist", "CG_MAX_DIST");
 
 export const crystallineGrowthFrag = /* glsl */ `
 precision highp float;
@@ -51,6 +53,7 @@ precision highp float;
 ${sharedUniformsGLSL}
 
 ${noiseGLSL}
+${lightingGLSL}
 
 ${buildPostProcessGLSL({ grainStrength: "light", bloomEnabled: true, halationEnabled: true, caEnabled: true })}
 
@@ -401,8 +404,10 @@ void main() {
   }
 
   // Post-processing
+  col = applyTemperature(col);
   col = applyPostProcess(col, uv, screenP);
 
   gl_FragColor = vec4(col, 1.0);
+  ${cgDepthAlpha}
 }
 `;

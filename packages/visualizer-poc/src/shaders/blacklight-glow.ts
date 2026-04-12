@@ -26,7 +26,7 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
-import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
+import { buildRaymarchNormal, buildRaymarchAO, buildDepthAlphaOutput } from "./shared/raymarching.glsl";
 import { lightingGLSL } from "./shared/lighting.glsl";
 
 export const blacklightGlowVert = /* glsl */ `
@@ -45,6 +45,7 @@ const bg2AOGLSL = buildRaymarchAO(
   "bg2SceneSDF($P, bassBreath, flowTime).x",
   { steps: 5, stepBase: 0.0, stepScale: 0.12, weightDecay: 0.6, finalMult: 2.5, name: "bg2CalcAO" },
 );
+const bg2DepthAlpha = buildDepthAlphaOutput("totalDist", "MAX_DIST");
 
 export const blacklightGlowFrag = /* glsl */ `
 precision highp float;
@@ -484,5 +485,6 @@ void main() {
   col = applyPostProcess(col, vUv, screenPos);
 
   gl_FragColor = vec4(col, 1.0);
+  ${bg2DepthAlpha}
 }
 `;

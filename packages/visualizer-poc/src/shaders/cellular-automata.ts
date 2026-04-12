@@ -28,6 +28,10 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
+import { lightingGLSL } from "./shared/lighting.glsl";
+import { buildDepthAlphaOutput } from "./shared/raymarching.glsl";
+
+const ca2DepthAlpha = buildDepthAlphaOutput("marchDist", "CA2_MAX_DIST");
 
 export const cellularAutomataVert = /* glsl */ `
 varying vec2 vUv;
@@ -44,6 +48,7 @@ ${sharedUniformsGLSL}
 uniform sampler2D uPrevFrame;
 
 ${noiseGLSL}
+${lightingGLSL}
 
 ${buildPostProcessGLSL({
   grainStrength: "light",
@@ -339,8 +344,10 @@ void main() {
   col = mix(bgColor * 0.3, col, vignette);
 
   // ---- Post-processing ----
+  col = applyTemperature(col);
   col = applyPostProcess(col, vUv, screenP);
 
   gl_FragColor = vec4(col, 1.0);
+  ${ca2DepthAlpha}
 }
 `;

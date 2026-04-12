@@ -28,7 +28,8 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
-import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
+import { lightingGLSL } from "./shared/lighting.glsl";
+import { buildRaymarchNormal, buildRaymarchAO, buildDepthAlphaOutput } from "./shared/raymarching.glsl";
 
 const lp2NormalGLSL = buildRaymarchNormal(
   "lp2SceneSDFScalar($P, sceneTime, bass, energy, tension, coherence)",
@@ -38,6 +39,7 @@ const lp2AOGLSL = buildRaymarchAO(
   "lp2SceneSDFScalar($P, sceneTime, bass, energy, tension, coherence)",
   { steps: 4, stepBase: 0.0, stepScale: 0.15, weightDecay: 0.5, finalMult: 2.0, name: "lp2CalcOcclusion" },
 );
+const lp2DepthAlpha = buildDepthAlphaOutput("marchDist", "LP2_MAX_DIST");
 
 export const liquidProjectorVert = /* glsl */ `
 varying vec2 vUv;
@@ -54,6 +56,7 @@ ${sharedUniformsGLSL}
 uniform sampler2D uPrevFrame;
 
 ${noiseGLSL}
+${lightingGLSL}
 
 ${buildPostProcessGLSL({
   grainStrength: "normal",
@@ -382,8 +385,10 @@ void main() {
   col = mix(vec3(0.005, 0.003, 0.002), col, vignette);
 
   // ---- Post-processing ----
+  col = applyTemperature(col);
   col = applyPostProcess(col, vUv, screenP);
 
   gl_FragColor = vec4(col, 1.0);
+  ${lp2DepthAlpha}
 }
 `;

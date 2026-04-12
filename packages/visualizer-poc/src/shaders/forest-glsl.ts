@@ -17,6 +17,7 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
+import { lightingGLSL } from "./shared/lighting.glsl";
 
 export const forestGlslVert = /* glsl */ `
 varying vec2 vUv;
@@ -32,6 +33,7 @@ precision highp float;
 ${sharedUniformsGLSL}
 
 ${noiseGLSL}
+${lightingGLSL}
 
 ${buildPostProcessGLSL({
   bloomEnabled: true,
@@ -190,6 +192,7 @@ void main() {
   float depthFog = smoothstep(0.3, 0.55, uv.y) * 0.15;
   col = mix(col, vec3(0.2, 0.25, 0.18) * lightLevel, depthFog);
 
+  col = applyTemperature(col);
   vec2 pp = uv * 2.0 - 1.0; col = applyPostProcess(col, uv, pp);
   gl_FragColor = vec4(col, 1.0);
 }

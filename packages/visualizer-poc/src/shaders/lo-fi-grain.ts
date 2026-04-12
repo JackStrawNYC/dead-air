@@ -27,7 +27,8 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
-import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
+import { lightingGLSL } from "./shared/lighting.glsl";
+import { buildRaymarchNormal, buildRaymarchAO, buildDepthAlphaOutput } from "./shared/raymarching.glsl";
 
 const lfNormalGLSL = buildRaymarchNormal(
   "lfMap($P, bass, drumOnset, beatSnap, emergence, tension, melPitch, timeVal)",
@@ -37,6 +38,7 @@ const lfAOGLSL = buildRaymarchAO(
   "lfMap($P, bass, drumOnset, beatSnap, emergence, tension, melPitch, timeVal)",
   { steps: 5, stepBase: 0.0, stepScale: 0.06, weightDecay: 0.6, finalMult: 3.0, name: "lfAmbientOcclusion" },
 );
+const lfDepthAlpha = buildDepthAlphaOutput("marchDist", "LF_MAX_DIST");
 
 export const loFiGrainVert = /* glsl */ `
 varying vec2 vUv;
@@ -64,6 +66,7 @@ precision highp float;
 ${sharedUniformsGLSL}
 
 ${noiseGLSL}
+${lightingGLSL}
 
 ${postProcess}
 
@@ -676,8 +679,10 @@ void main() {
   }
 
   // ─── Post-processing (shared chain) ───
+  col = applyTemperature(col);
   col = applyPostProcess(col, vUv, centeredP);
 
   gl_FragColor = vec4(col, 1.0);
+  ${lfDepthAlpha}
 }
 `;

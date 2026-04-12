@@ -30,7 +30,8 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
-import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
+import { lightingGLSL } from "./shared/lighting.glsl";
+import { buildRaymarchNormal, buildRaymarchAO, buildDepthAlphaOutput } from "./shared/raymarching.glsl";
 
 export const truchetTilingVert = /* glsl */ `
 varying vec2 vUv;
@@ -42,6 +43,7 @@ void main() {
 
 const ttNormalGLSL = buildRaymarchNormal("ttMap($P, basePipeRadius, baseFluidRadius, tension, flowPhase, burstAmount, pressureWave, pressureOrigin).x", { eps: 0.003, name: "ttNormal" });
 const ttAOGLSL = buildRaymarchAO("ttMap($P, basePipeRadius, baseFluidRadius, tension, flowPhase, burstAmount, pressureWave, pressureOrigin).x", { steps: 5, stepBase: 0.0, stepScale: 0.02, weightDecay: 0.85, finalMult: 6.0, name: "ttOcclusion" });
+const ttDepthAlpha = buildDepthAlphaOutput("travelDist", "MAX_DIST");
 
 export const truchetTilingFrag = /* glsl */ `
 precision highp float;
@@ -49,6 +51,7 @@ precision highp float;
 ${sharedUniformsGLSL}
 
 ${noiseGLSL}
+${lightingGLSL}
 
 ${buildPostProcessGLSL({ grainStrength: "normal", bloomEnabled: true, halationEnabled: true, caEnabled: true })}
 
@@ -553,8 +556,10 @@ void main() {
   }
 
   // ─── Post-processing ───
+  col = applyTemperature(col);
   col = applyPostProcess(col, vUv, screenPos);
 
   gl_FragColor = vec4(col, 1.0);
+  ${ttDepthAlpha}
 }
 `;

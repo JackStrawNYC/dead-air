@@ -26,7 +26,8 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
-import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
+import { lightingGLSL } from "./shared/lighting.glsl";
+import { buildRaymarchNormal, buildRaymarchAO, buildDepthAlphaOutput } from "./shared/raymarching.glsl";
 
 export const voronoiFlowVert = /* glsl */ `
 varying vec2 vUv;
@@ -38,6 +39,7 @@ void main() {
 
 const vf2NormalGLSL = buildRaymarchNormal("vf2Map($P, cellScale, wallThickness, irregularity, cellTime, drumOnset, shatterAmount).x", { eps: 0.003, name: "vf2Normal" });
 const vf2AOGLSL = buildRaymarchAO("vf2Map($P, cellScale, wallThickness, irregularity, cellTime, drumOnset, shatterAmount).x", { steps: 5, stepBase: -0.02, stepScale: 0.03, weightDecay: 0.7, finalMult: 1.5, name: "vf2AO" });
+const vf2DepthAlpha = buildDepthAlphaOutput("totalDist", "MAX_DIST");
 
 const postProcess = buildPostProcessGLSL({
   bloomEnabled: true,
@@ -56,6 +58,7 @@ precision highp float;
 ${sharedUniformsGLSL}
 
 ${noiseGLSL}
+${lightingGLSL}
 
 ${postProcess}
 
@@ -435,8 +438,10 @@ void main() {
   }
 
   // === POST PROCESS ===
+  col = applyTemperature(col);
   col = applyPostProcess(col, uv, screenPos);
 
   gl_FragColor = vec4(col, 1.0);
+  ${vf2DepthAlpha}
 }
 `;

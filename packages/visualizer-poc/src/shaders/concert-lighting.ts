@@ -26,7 +26,8 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
-import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
+import { lightingGLSL } from "./shared/lighting.glsl";
+import { buildRaymarchNormal, buildRaymarchAO, buildDepthAlphaOutput } from "./shared/raymarching.glsl";
 
 export const concertLightingVert = /* glsl */ `
 varying vec2 vUv;
@@ -44,6 +45,7 @@ const cl2AOGLSL = buildRaymarchAO(
   "cl2SceneSDF($P, bassVib).x",
   { steps: 5, stepBase: 0.0, stepScale: 0.15, weightDecay: 0.6, finalMult: 2.0, name: "cl2CalcAO" },
 );
+const cl2DepthAlpha = buildDepthAlphaOutput("totalDist", "MAX_DIST");
 
 export const concertLightingFrag = /* glsl */ `
 precision highp float;
@@ -51,6 +53,7 @@ precision highp float;
 ${sharedUniformsGLSL}
 
 ${noiseGLSL}
+${lightingGLSL}
 
 ${buildPostProcessGLSL({ halationEnabled: true, bloomEnabled: true, caEnabled: true, bloomThresholdOffset: -0.06 })}
 
@@ -374,8 +377,10 @@ void main() {
   }
 
   // Post-processing
+  col = applyTemperature(col);
   col = applyPostProcess(col, vUv, screenPos);
 
   gl_FragColor = vec4(col, 1.0);
+  ${cl2DepthAlpha}
 }
 `;

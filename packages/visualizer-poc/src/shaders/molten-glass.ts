@@ -27,7 +27,8 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
-import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
+import { lightingGLSL } from "./shared/lighting.glsl";
+import { buildRaymarchNormal, buildRaymarchAO, buildDepthAlphaOutput } from "./shared/raymarching.glsl";
 
 const mglNormalGLSL = buildRaymarchNormal(
   "mglSceneSDF($P, bassPulse, rotAngle, stability, flowTime).x",
@@ -37,6 +38,7 @@ const mglAOGLSL = buildRaymarchAO(
   "mglSceneSDF($P, bassPulse, rotAngle, stability, flowTime).x",
   { steps: 5, stepBase: 0.0, stepScale: 0.08, weightDecay: 0.6, finalMult: 3.0, name: "mglCalcAO" },
 );
+const mglDepthAlpha = buildDepthAlphaOutput("totalDist", "MAX_DIST");
 
 export const moltenGlassVert = /* glsl */ `
 varying vec2 vUv;
@@ -53,6 +55,7 @@ ${sharedUniformsGLSL}
 uniform sampler2D uPrevFrame;
 
 ${noiseGLSL}
+${lightingGLSL}
 
 ${buildPostProcessGLSL({ grainStrength: "normal", bloomEnabled: true, halationEnabled: true, caEnabled: true, temporalBlendEnabled: true })}
 
@@ -414,8 +417,10 @@ void main() {
   }
 
   // Post-processing
+  col = applyTemperature(col);
   col = applyPostProcess(col, vUv, screenPos);
 
   gl_FragColor = vec4(col, 1.0);
+  ${mglDepthAlpha}
 }
 `;

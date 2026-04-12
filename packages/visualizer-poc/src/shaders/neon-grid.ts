@@ -26,7 +26,8 @@
 import { noiseGLSL } from "./noise";
 import { sharedUniformsGLSL } from "./shared/uniforms.glsl";
 import { buildPostProcessGLSL } from "./shared/postprocess.glsl";
-import { buildRaymarchNormal, buildRaymarchAO } from "./shared/raymarching.glsl";
+import { lightingGLSL } from "./shared/lighting.glsl";
+import { buildRaymarchNormal, buildRaymarchAO, buildDepthAlphaOutput } from "./shared/raymarching.glsl";
 
 const ngNormalGLSL = buildRaymarchNormal(
   "ngSceneSDFScalar($P, sceneTime, bass, tension)",
@@ -36,6 +37,7 @@ const ngAOGLSL = buildRaymarchAO(
   "ngSceneSDFScalar($P, sceneTime, bass, tension)",
   { steps: 5, stepBase: 0.0, stepScale: 0.2, weightDecay: 0.6, finalMult: 0.8, name: "ngCalcOcclusion" },
 );
+const ngDepthAlpha = buildDepthAlphaOutput("marchDist", "NG_MAX_DIST");
 
 export const neonGridVert = /* glsl */ `
 varying vec2 vUv;
@@ -52,6 +54,7 @@ ${sharedUniformsGLSL}
 uniform sampler2D uPrevFrame;
 
 ${noiseGLSL}
+${lightingGLSL}
 
 ${buildPostProcessGLSL({
   grainStrength: "light",
@@ -374,8 +377,10 @@ void main() {
   col = mix(vec3(0.01, 0.005, 0.02), col, vignette);
 
   // ---- Post-processing ----
+  col = applyTemperature(col);
   col = applyPostProcess(col, vUv, screenP);
 
   gl_FragColor = vec4(col, 1.0);
+  ${ngDepthAlpha}
 }
 `;
