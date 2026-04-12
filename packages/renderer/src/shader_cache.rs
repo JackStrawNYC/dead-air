@@ -5,6 +5,7 @@
 
 use std::collections::HashMap;
 
+use crate::glsl_compat;
 use crate::gpu::GpuRenderer;
 
 pub struct ShaderCache {
@@ -28,12 +29,15 @@ impl ShaderCache {
         shader_id: &str,
         glsl_source: &str,
     ) -> Result<(), String> {
+        // Convert WebGL GLSL ES → desktop GLSL 450
+        let desktop_glsl = glsl_compat::webgl_to_desktop(glsl_source);
+
         // Parse GLSL → naga IR
         let mut parser = naga::front::glsl::Frontend::default();
         let options = naga::front::glsl::Options::from(naga::ShaderStage::Fragment);
 
         let module = parser
-            .parse(&options, glsl_source)
+            .parse(&options, &desktop_glsl)
             .map_err(|errors| {
                 let msgs: Vec<String> = errors.errors.iter().map(|e| format!("{}", e)).collect();
                 format!("GLSL parse error in {}: {}", shader_id, msgs.join("; "))
