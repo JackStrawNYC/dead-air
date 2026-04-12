@@ -48,13 +48,14 @@ interface TurtleSpec {
 interface Star { x: number; y: number; r: number; speed: number; phase: number; }
 
 function buildTurtles(): TurtleSpec[] {
+  // Dead-era earthy psychedelic tones: forest green, deep teal, sage, burnt amber, olive, rich brown
   return [
-    { idx: 0, xFrac: 0.08, depth: 0.78, hue: 110, instrument: "banjo", phase: 0.0 },
-    { idx: 1, xFrac: 0.23, depth: 0.92, hue: 150, instrument: "tambourine", phase: 1.2 },
-    { idx: 2, xFrac: 0.38, depth: 1.05, hue: 88, instrument: "fiddle", phase: 2.4 },
-    { idx: 3, xFrac: 0.55, depth: 1.00, hue: 28, instrument: "drum", phase: 0.7 },
-    { idx: 4, xFrac: 0.72, depth: 0.92, hue: 200, instrument: "mandolin", phase: 1.9 },
-    { idx: 5, xFrac: 0.88, depth: 0.78, hue: 320, instrument: "horn", phase: 0.4 },
+    { idx: 0, xFrac: 0.08, depth: 0.78, hue: 142, instrument: "banjo", phase: 0.0 },    // forest green
+    { idx: 1, xFrac: 0.23, depth: 0.92, hue: 178, instrument: "tambourine", phase: 1.2 }, // deep teal
+    { idx: 2, xFrac: 0.38, depth: 1.05, hue: 95, instrument: "fiddle", phase: 2.4 },      // sage/olive
+    { idx: 3, xFrac: 0.55, depth: 1.00, hue: 28, instrument: "drum", phase: 0.7 },        // burnt amber
+    { idx: 4, xFrac: 0.72, depth: 0.92, hue: 165, instrument: "mandolin", phase: 1.9 },   // teal-green
+    { idx: 5, xFrac: 0.88, depth: 0.78, hue: 18, instrument: "horn", phase: 0.4 },        // rich brown
   ];
 }
 
@@ -80,7 +81,7 @@ function buildSparks(): Star[] {
   }));
 }
 
-const hsl = (h: number, s = 80, l = 55) => `hsl(${((h % 360) + 360) % 360}, ${s}%, ${l}%)`;
+const hsl = (h: number, s = 65, l = 38) => `hsl(${((h % 360) + 360) % 360}, ${s}%, ${l}%)`;
 
 interface Props { frames: EnhancedFrameData[]; }
 
@@ -110,9 +111,10 @@ export const MarchingTerrapins: React.FC<Props> = ({ frames }) => {
   const tintShift = snap.chromaHue - 180;
   const baseHue = 130;
   const tintHue = ((baseHue + tintShift * 0.55) % 360 + 360) % 360;
-  const skyTop = `hsl(${(tintHue + 200) % 360}, 50%, 8%)`;
-  const skyMid = `hsl(${(tintHue + 220) % 360}, 38%, 14%)`;
-  const skyHorizon = `hsl(${(tintHue + 18) % 360}, 45%, 24%)`;
+  // Deep blue-green atmosphere — moonlit forest / underwater cave vibe
+  const skyTop = `hsl(${(tintHue + 210) % 360}, 40%, 4%)`;
+  const skyMid = `hsl(${(tintHue + 195) % 360}, 35%, 8%)`;
+  const skyHorizon = `hsl(${(tintHue + 175) % 360}, 30%, 14%)`;
 
   const groundY = height * 0.78;
   const baseTurtleH = height * 0.40;
@@ -130,14 +132,16 @@ export const MarchingTerrapins: React.FC<Props> = ({ frames }) => {
     const bob = Math.sin(bobPhase) * (2 + bounce * 10 + snap.beatDecay * 12) * scale;
     const cyT = groundY - tH * 0.45 + bob;
 
-    const shellHue = (spec.hue + tintShift * 0.5) % 360;
-    const shellMain = hsl(shellHue, 75, 48);
-    const shellLight = hsl(shellHue, 90, 70);
-    const shellDeep = hsl(shellHue, 80, 28);
-    const skinCol = hsl(shellHue + 30, 60, 55);
-    const skinDeep = hsl(shellHue + 30, 65, 35);
-    const accent = hsl(shellHue, 100, 75);
-    const stroke = "rgba(20, 8, 2, 0.85)";
+    const shellHue = (spec.hue + tintShift * 0.3) % 360;
+    const shellMain = hsl(shellHue, 55, 32);
+    const shellLight = hsl(shellHue, 50, 48);
+    const shellDeep = hsl(shellHue, 60, 16);
+    const shellRim = hsl(shellHue, 45, 22);
+    const skinCol = hsl(shellHue + 25, 40, 38);
+    const skinDeep = hsl(shellHue + 25, 50, 24);
+    const accent = hsl(shellHue + 10, 40, 28);
+    const scuteHighlight = hsl(shellHue, 35, 44);
+    const stroke = "rgba(12, 5, 0, 0.90)";
 
     const tx = cxT;
     const ty = cyT;
@@ -226,24 +230,61 @@ export const MarchingTerrapins: React.FC<Props> = ({ frames }) => {
           const mx = tx + Math.cos(a) * tW * 0.42;
           const my = ty + Math.sin(a) * tH * 0.28 + tH * 0.05;
           return (
-            <ellipse key={`mg-${k}`} cx={mx} cy={my} rx={tW * 0.05} ry={tH * 0.04}
-              fill={shellMain} stroke={accent} strokeWidth={0.8} opacity={0.55} />
+            <g key={`mg-${k}`}>
+              <ellipse cx={mx} cy={my} rx={tW * 0.05} ry={tH * 0.04}
+                fill={shellRim} stroke={shellDeep} strokeWidth={1.0} opacity={0.65} />
+              {/* Subtle growth line on marginal */}
+              <ellipse cx={mx} cy={my} rx={tW * 0.03} ry={tH * 0.025}
+                fill="none" stroke={shellDeep} strokeWidth={0.4} opacity={0.2} />
+            </g>
           );
         })}
 
-        {/* ── 7 central hexagonal scutes ── */}
-        {scutes.map(([sx, sy, sr], si) => (
-          <g key={`sc-${si}`}>
-            <polygon points={hexPts(tx + sx * tW, ty + sy * tH, sr * tH)}
-              fill={shellMain} stroke={accent} strokeWidth={1.2} opacity={0.8} />
-            <polygon points={hexPts(tx + sx * tW, ty + sy * tH, sr * tH * 0.55)}
-              fill="none" stroke={accent} strokeWidth={0.6} opacity={0.6} />
-          </g>
-        ))}
+        {/* ── 7 central hexagonal scutes with domed gradients + growth rings ── */}
+        {scutes.map(([sx, sy, sr], si) => {
+          const scX = tx + sx * tW;
+          const scY = ty + sy * tH;
+          const scR = sr * tH;
+          const gradId = `scute-grad-${spec.idx}-${si}`;
+          return (
+            <g key={`sc-${si}`}>
+              {/* Per-scute radial gradient: lighter center, darker edge */}
+              <defs>
+                <radialGradient id={gradId} cx="40%" cy="35%" r="60%">
+                  <stop offset="0%" stopColor={scuteHighlight} />
+                  <stop offset="55%" stopColor={shellMain} />
+                  <stop offset="100%" stopColor={shellDeep} />
+                </radialGradient>
+              </defs>
+              {/* Filled hex scute with dome shading */}
+              <polygon points={hexPts(scX, scY, scR)}
+                fill={`url(#${gradId})`} stroke={shellRim} strokeWidth={1.8} opacity={0.9} />
+              {/* Growth ring 1 — outermost */}
+              <polygon points={hexPts(scX + scR * 0.04, scY + scR * 0.03, scR * 0.72)}
+                fill="none" stroke={shellDeep} strokeWidth={0.7} opacity={0.15} />
+              {/* Growth ring 2 — middle */}
+              <polygon points={hexPts(scX - scR * 0.02, scY + scR * 0.02, scR * 0.48)}
+                fill="none" stroke={shellDeep} strokeWidth={0.6} opacity={0.15} />
+              {/* Growth ring 3 — inner */}
+              <polygon points={hexPts(scX + scR * 0.01, scY - scR * 0.01, scR * 0.25)}
+                fill="none" stroke={shellDeep} strokeWidth={0.5} opacity={0.12} />
+              {/* Organic bezier growth lines inside scute */}
+              <path d={`M ${scX - scR * 0.35} ${scY - scR * 0.1}
+                Q ${scX - scR * 0.1} ${scY - scR * 0.25} ${scX + scR * 0.3} ${scY - scR * 0.15}`}
+                stroke={shellDeep} strokeWidth={0.5} fill="none" opacity={0.13} />
+              <path d={`M ${scX - scR * 0.2} ${scY + scR * 0.15}
+                Q ${scX + scR * 0.05} ${scY + scR * 0.3} ${scX + scR * 0.35} ${scY + scR * 0.1}`}
+                stroke={shellDeep} strokeWidth={0.5} fill="none" opacity={0.13} />
+              <path d={`M ${scX - scR * 0.15} ${scY - scR * 0.02}
+                Q ${scX + scR * 0.1} ${scY + scR * 0.08} ${scX + scR * 0.28} ${scY - scR * 0.05}`}
+                stroke={shellDeep} strokeWidth={0.4} fill="none" opacity={0.10} />
+            </g>
+          );
+        })}
 
-        {/* Shell sheen */}
-        <ellipse cx={tx - tW * 0.10} cy={ty - tH * 0.18} rx={tW * 0.18} ry={tH * 0.10}
-          fill="rgba(255, 255, 255, 0.30)" />
+        {/* Shell sheen — subtle, not cartoony */}
+        <ellipse cx={tx - tW * 0.10} cy={ty - tH * 0.18} rx={tW * 0.14} ry={tH * 0.08}
+          fill="rgba(220, 210, 180, 0.12)" />
 
         {/* ── Front legs ── */}
         <g transform={`translate(0 ${legA})`}>
@@ -306,6 +347,51 @@ export const MarchingTerrapins: React.FC<Props> = ({ frames }) => {
         {/* Nostril */}
         <circle cx={tx - tW * 0.66} cy={ty - tH * 0.01} r={0.6}
           fill="black" opacity={0.6} />
+
+        {/* ── Head/neck skin stipple texture ── */}
+        {Array.from({ length: 12 }).map((_, d) => {
+          const rng = seeded(spec.idx * 1000 + d * 137);
+          const dx = tx - tW * (0.52 + rng() * 0.14);
+          const dy = ty - tH * 0.06 + rng() * tH * 0.10;
+          return (
+            <circle key={`hstip-${d}`} cx={dx} cy={dy} r={0.6 + rng() * 0.8}
+              fill={skinDeep} opacity={0.18 + rng() * 0.10} />
+          );
+        })}
+        {/* Head scale lines */}
+        {Array.from({ length: 4 }).map((_, d) => {
+          const rng = seeded(spec.idx * 2000 + d * 251);
+          const sx0 = tx - tW * (0.54 + rng() * 0.10);
+          const sy0 = ty - tH * 0.04 + rng() * tH * 0.06;
+          return (
+            <path key={`hscl-${d}`}
+              d={`M ${sx0} ${sy0} Q ${sx0 + rng() * 3} ${sy0 + rng() * 2} ${sx0 + 2 + rng() * 3} ${sy0 + 1 + rng() * 2}`}
+              stroke={skinDeep} strokeWidth={0.5} fill="none" opacity={0.15} />
+          );
+        })}
+
+        {/* ── Leg skin stipple texture ── */}
+        {Array.from({ length: 8 }).map((_, d) => {
+          const rng = seeded(spec.idx * 3000 + d * 193);
+          const side = d < 4 ? -1 : 1;
+          const lx = tx + side * tW * (0.18 + rng() * 0.14);
+          const ly = ty + tH * (0.20 + rng() * 0.14);
+          return (
+            <circle key={`lstip-${d}`} cx={lx} cy={ly} r={0.5 + rng() * 0.6}
+              fill={skinDeep} opacity={0.16 + rng() * 0.08} />
+          );
+        })}
+
+        {/* ── Tail skin texture ── */}
+        {Array.from({ length: 4 }).map((_, d) => {
+          const rng = seeded(spec.idx * 4000 + d * 311);
+          const tdx = tx + tW * (0.44 + rng() * 0.10);
+          const tdy = ty + tH * (0.06 + rng() * 0.10);
+          return (
+            <circle key={`tstip-${d}`} cx={tdx} cy={tdy} r={0.4 + rng() * 0.5}
+              fill={skinDeep} opacity={0.14 + rng() * 0.08} />
+          );
+        })}
 
         {/* ── Instrument ── */}
         {(() => {
@@ -412,7 +498,7 @@ export const MarchingTerrapins: React.FC<Props> = ({ frames }) => {
 
         {/* ── Glow halo ── */}
         <ellipse cx={tx} cy={ty} rx={tW * 0.65} ry={tH * 0.5}
-          fill={hsl(shellHue, 100, 60)} opacity={0.25 * bounce}
+          fill={hsl(shellHue, 45, 35)} opacity={0.18 * bounce}
           filter="url(#mt-blur)" />
       </g>
     );
@@ -423,8 +509,8 @@ export const MarchingTerrapins: React.FC<Props> = ({ frames }) => {
     const flick = 0.5 + Math.sin(frame * s.speed + s.phase) * 0.5;
     return (
       <circle key={`st-${i}`} cx={s.x * width} cy={s.y * height}
-        r={s.r * (0.7 + flick * 0.6)}
-        fill="#fff5d0" opacity={0.40 + flick * 0.45} />
+        r={s.r * (0.7 + flick * 0.5)}
+        fill="#c8b88a" opacity={0.25 + flick * 0.30} />
     );
   });
 
@@ -433,8 +519,8 @@ export const MarchingTerrapins: React.FC<Props> = ({ frames }) => {
     const flick = 0.5 + Math.sin(frame * s.speed + s.phase) * 0.5;
     return (
       <circle key={`spk-${i}`} cx={s.x * width} cy={s.y * height}
-        r={s.r * (0.7 + bounce * 0.6)}
-        fill={hsl(tintHue, 90, 75)} opacity={0.40 * flick * bounce} />
+        r={s.r * (0.7 + bounce * 0.5)}
+        fill={hsl(tintHue, 50, 45)} opacity={0.25 * flick * bounce} />
     );
   });
 
@@ -445,12 +531,12 @@ export const MarchingTerrapins: React.FC<Props> = ({ frames }) => {
     return (
       <g key={`sl-${i}`}>
         <rect x={lx - 18} y={ly - 8} width={36} height={16} rx={4}
-          fill="rgba(40, 40, 50, 0.85)" stroke="rgba(60, 60, 70, 0.9)" strokeWidth={1} />
+          fill="rgba(25, 22, 30, 0.90)" stroke="rgba(40, 38, 48, 0.85)" strokeWidth={1} />
         <ellipse cx={lx} cy={ly + 8} rx={14} ry={6}
-          fill="rgba(255, 240, 180, 0.85)" />
+          fill="rgba(180, 155, 100, 0.55)" />
         <path d={`M ${lx - 80} ${ly + 8} L ${lx + 80} ${ly + 8}
           L ${lx + 200} ${groundY} L ${lx - 200} ${groundY} Z`}
-          fill="rgba(255, 240, 180, 0.07)" />
+          fill="rgba(180, 155, 100, 0.04)" />
       </g>
     );
   });
@@ -468,16 +554,16 @@ export const MarchingTerrapins: React.FC<Props> = ({ frames }) => {
             <stop offset="100%" stopColor={skyHorizon} />
           </linearGradient>
           <linearGradient id="mt-floor" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="rgba(60, 36, 14, 0.95)" />
-            <stop offset="100%" stopColor="rgba(15, 8, 2, 1)" />
+            <stop offset="0%" stopColor="rgba(30, 20, 10, 0.95)" />
+            <stop offset="100%" stopColor="rgba(8, 4, 2, 1)" />
           </linearGradient>
           <radialGradient id="mt-spot">
-            <stop offset="0%" stopColor={hsl(tintHue, 90, 80)} stopOpacity={0.40} />
-            <stop offset="100%" stopColor={hsl(tintHue, 90, 80)} stopOpacity={0} />
+            <stop offset="0%" stopColor={hsl(tintHue, 40, 50)} stopOpacity={0.25} />
+            <stop offset="100%" stopColor={hsl(tintHue, 40, 50)} stopOpacity={0} />
           </radialGradient>
           <radialGradient id="mt-vig">
-            <stop offset="55%" stopColor="rgba(0,0,0,0)" />
-            <stop offset="100%" stopColor="rgba(0,0,0,0.65)" />
+            <stop offset="40%" stopColor="rgba(0,0,0,0)" />
+            <stop offset="100%" stopColor="rgba(0,0,0,0.78)" />
           </radialGradient>
           <filter id="mt-blur" x="-50%" y="-50%" width="200%" height="200%">
             <feGaussianBlur stdDeviation="8" />
@@ -492,7 +578,7 @@ export const MarchingTerrapins: React.FC<Props> = ({ frames }) => {
 
         {/* Stage truss + lights */}
         <line x1={0} y1={height * 0.06} x2={width} y2={height * 0.06}
-          stroke="rgba(60, 60, 70, 0.85)" strokeWidth={3} />
+          stroke="rgba(30, 28, 35, 0.85)" strokeWidth={3} />
         {stageLights}
 
         {/* Spotlight */}
@@ -501,17 +587,17 @@ export const MarchingTerrapins: React.FC<Props> = ({ frames }) => {
 
         {/* Distant horizon */}
         <path d={`M 0 ${height * 0.72} L ${width * 0.18} ${height * 0.64} L ${width * 0.32} ${height * 0.68} L ${width * 0.5} ${height * 0.60} L ${width * 0.68} ${height * 0.66} L ${width * 0.85} ${height * 0.62} L ${width} ${height * 0.68} L ${width} ${height * 0.78} L 0 ${height * 0.78} Z`}
-          fill="rgba(20, 12, 30, 0.85)" />
+          fill="rgba(10, 8, 18, 0.92)" />
 
         {/* Stage floor */}
         <rect x={0} y={groundY} width={width} height={height - groundY} fill="url(#mt-floor)" />
         {Array.from({ length: 8 }, (_, i) => (
           <line key={`plank-${i}`} x1={0} y1={groundY + i * 14} x2={width} y2={groundY + i * 14}
-            stroke="rgba(70, 40, 14, 0.45)" strokeWidth={0.8} />
+            stroke="rgba(40, 22, 8, 0.35)" strokeWidth={0.8} />
         ))}
         {Array.from({ length: 12 }, (_, i) => (
           <line key={`pv-${i}`} x1={(i / 11) * width} y1={groundY} x2={(i / 11) * width} y2={height}
-            stroke="rgba(70, 40, 14, 0.30)" strokeWidth={0.6} />
+            stroke="rgba(40, 22, 8, 0.22)" strokeWidth={0.6} />
         ))}
 
         {/* Turtles */}
@@ -523,7 +609,7 @@ export const MarchingTerrapins: React.FC<Props> = ({ frames }) => {
         {/* Onset flash */}
         {flash > 0.05 && (
           <rect width={width} height={height}
-            fill={`rgba(255, 245, 220, ${flash * 0.10})`}
+            fill={`rgba(180, 150, 100, ${flash * 0.08})`}
             style={{ mixBlendMode: "screen" }} />
         )}
 

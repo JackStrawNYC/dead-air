@@ -13,6 +13,7 @@ import { useCurrentFrame, useVideoConfig, interpolate } from "remotion";
 import type { EnhancedFrameData } from "../data/types";
 import { useAudioSnapshot } from "./parametric/audio-helpers";
 import { useTempoFactor } from "../data/TempoContext";
+import { PsychedelicDefs, FILTER_IDS, PATTERN_IDS, NoiseLayer } from "./psychedelic-filters";
 
 interface Props {
   frames: EnhancedFrameData[];
@@ -159,7 +160,7 @@ export const RoseOverlay: React.FC<Props> = ({ frames }) => {
 
   const cx = 200; // SVG center x
   const cy = 185; // SVG center y (bloom center, stem goes below)
-  const baseSize = Math.min(width, height) * 0.32;
+  const baseSize = Math.min(width, height) * 0.55;
 
   /* ---- Audio-reactive values ---- */
   const slowE = snap.slowEnergy;
@@ -176,13 +177,13 @@ export const RoseOverlay: React.FC<Props> = ({ frames }) => {
   const rotation = (frame / 30) * 0.5 * tempoFactor;
 
   // Overall overlay opacity — gentle presence, energy adds intensity
-  const opacity = interpolate(energy, [0.02, 0.3], [0.18, 0.42], {
+  const opacity = interpolate(energy, [0.02, 0.3], [0.45, 0.85], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
 
   // Glow intensity driven by energy
-  const glowIntensity = interpolate(energy, [0.05, 0.5], [15, 50], {
+  const glowIntensity = interpolate(energy, [0.05, 0.5], [25, 70], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
@@ -203,15 +204,15 @@ export const RoseOverlay: React.FC<Props> = ({ frames }) => {
   const baseHue = 355 + hueShift; // centered on deep red
   const h = ((baseHue % 360) + 360) % 360;
 
-  const deepCrimson = `hsl(${h}, 78%, 28%)`;
-  const crimson = `hsl(${h}, 75%, 38%)`;
-  const rosePink = `hsl(${(h + 8) % 360}, 70%, 52%)`;
-  const lightEdge = `hsl(${(h + 12) % 360}, 65%, 68%)`;
-  const budColor = `hsl(${(h - 5 + 360) % 360}, 82%, 22%)`;
-  const stemGreen = `hsl(${(120 + hueShift * 0.3) % 360}, 45%, 28%)`;
-  const leafGreen = `hsl(${(125 + hueShift * 0.3) % 360}, 50%, 32%)`;
+  const deepCrimson = `hsl(${h}, 78%, 22%)`;
+  const crimson = `hsl(${h}, 75%, 30%)`;
+  const rosePink = `hsl(${(h + 8) % 360}, 70%, 42%)`;
+  const lightEdge = `hsl(${(h + 12) % 360}, 65%, 55%)`;
+  const budColor = `hsl(${(h - 5 + 360) % 360}, 82%, 16%)`;
+  const stemGreen = `hsl(${(120 + hueShift * 0.3) % 360}, 55%, 22%)`;
+  const leafGreen = `hsl(${(125 + hueShift * 0.3) % 360}, 60%, 26%)`;
   const sepalGreen = `hsl(${(115 + hueShift * 0.2) % 360}, 40%, 26%)`;
-  const glowColor = `hsla(${h}, 60%, 35%, ${0.25 + energy * 0.2})`;
+  const glowColor = `hsla(${h}, 60%, 35%, ${0.40 + energy * 0.25})`;
   const veinColor = `hsla(${(h - 10 + 360) % 360}, 50%, 20%, 0.18)`;
   const leafVeinColor = `hsla(120, 30%, 18%, 0.25)`;
 
@@ -306,6 +307,15 @@ export const RoseOverlay: React.FC<Props> = ({ frames }) => {
           xmlns="http://www.w3.org/2000/svg"
         >
           <defs>
+            <PsychedelicDefs
+              prefix="ro"
+              frame={frame}
+              energy={energy}
+              bass={snap.bass}
+              beatDecay={beatD}
+              turbulenceFreq={0.014}
+              include={["watercolorBleed", "organicDistort", "glowBleed", "filmGrain"]}
+            />
             {/* Radial glow behind bloom */}
             <radialGradient id="rose-glow" cx="50%" cy="26%" r="30%">
               <stop offset="0%" stopColor={glowColor} />
@@ -350,17 +360,20 @@ export const RoseOverlay: React.FC<Props> = ({ frames }) => {
             </filter>
           </defs>
 
-          {/* ============ Atmospheric radial glow ============ */}
-          <ellipse
-            cx={cx}
-            cy={cy}
-            rx={120 + energy * 30}
-            ry={110 + energy * 25}
-            fill="url(#rose-glow)"
-            filter="url(#rose-soft-glow)"
-          />
+          {/* ============ Atmospheric radial glow — with light bloom ============ */}
+          <g filter={`url(#${FILTER_IDS.glowBleed("ro")})`}>
+            <ellipse
+              cx={cx}
+              cy={cy}
+              rx={120 + energy * 30}
+              ry={110 + energy * 25}
+              fill="url(#rose-glow)"
+              filter="url(#rose-soft-glow)"
+            />
+          </g>
 
-          {/* ============ Stem with S-curve ============ */}
+          {/* ============ Stem with S-curve — organic distortion ============ */}
+          <g filter={`url(#${FILTER_IDS.organicDistort("ro")})`}>
           <path
             d={stemPath}
             stroke="url(#stem-grad)"
@@ -424,6 +437,11 @@ export const RoseOverlay: React.FC<Props> = ({ frames }) => {
               </g>
             );
           })}
+
+          </g>{/* end stem organic distort */}
+
+          {/* ============ All bloom elements — watercolor bleed for painterly feel ============ */}
+          <g filter={`url(#${FILTER_IDS.organicDistort("ro")})`}>
 
           {/* ============ Sepals (behind bloom) ============ */}
           {Array.from({ length: sepalCount }, (_, i) => {
@@ -573,6 +591,109 @@ export const RoseOverlay: React.FC<Props> = ({ frames }) => {
               fill="rgba(255,255,255,0.9)"
             />
           </g>
+
+          </g>{/* end watercolor bleed group */}
+
+          {/* ============ Companion rose — smaller, offset lower-right ============ */}
+          <g transform="translate(140, 180) scale(0.65)" opacity={opacity * 0.85}>
+            {/* Companion sepals */}
+            {Array.from({ length: sepalCount }, (_, i) => {
+              const angle = (i / sepalCount) * 360 + 36;
+              const sp = petalPath(cx, cy + 8, sepalLength, sepalWidth, 0.3);
+              return (
+                <path
+                  key={`comp-sepal-${i}`}
+                  d={sp}
+                  fill={sepalGreen}
+                  opacity={0.55}
+                  transform={`rotate(${angle} ${cx} ${cy})`}
+                />
+              );
+            })}
+            {/* Companion outer petals */}
+            {Array.from({ length: outerPetals }, (_, i) => {
+              const angle = (i / outerPetals) * 360 + 12;
+              const curlDir = i % 2 === 0 ? -1 : 1;
+              const curlAmount = curlDir * (0.5 + Math.cos(i * 1.1) * 0.35);
+              const pp = petalPath(cx, cy, outerLength, outerWidth, curlAmount);
+              return (
+                <g
+                  key={`comp-outer-${i}`}
+                  transform={`rotate(${angle} ${cx} ${cy})`}
+                  opacity={0.88 - i * 0.015}
+                >
+                  <path d={pp} fill="url(#petal-outer-grad)" />
+                  <path d={pp} fill="none" stroke={lightEdge} strokeWidth="0.7" opacity={0.2} />
+                </g>
+              );
+            })}
+            {/* Companion middle petals */}
+            {Array.from({ length: middlePetals }, (_, i) => {
+              const angle = (i / middlePetals) * 360 + 38;
+              const curlDir = i % 2 === 0 ? 1 : -1;
+              const curlAmount = curlDir * (0.45 + Math.sin(i * 1.5) * 0.2);
+              const pp = petalPath(cx, cy, middleLength, middleWidth, curlAmount);
+              return (
+                <g
+                  key={`comp-mid-${i}`}
+                  transform={`rotate(${angle} ${cx} ${cy})`}
+                  opacity={0.82}
+                >
+                  <path d={pp} fill="url(#petal-mid-grad)" />
+                </g>
+              );
+            })}
+            {/* Companion inner petals */}
+            {Array.from({ length: innerPetals }, (_, i) => {
+              const angle = (i / innerPetals) * 360 + 45;
+              const curlAmount = (i % 2 === 0 ? -1 : 1) * 0.35;
+              const pp = petalPath(cx, cy, innerLength, innerWidth, curlAmount);
+              return (
+                <g
+                  key={`comp-inner-${i}`}
+                  transform={`rotate(${angle} ${cx} ${cy})`}
+                  opacity={0.75}
+                >
+                  <path d={pp} fill="url(#petal-inner-grad)" />
+                </g>
+              );
+            })}
+            {/* Companion bud center */}
+            <path
+              d={budSpiralPath(cx, cy, 12, 2.2)}
+              stroke={budColor}
+              strokeWidth="1.8"
+              fill="none"
+              opacity={0.65}
+            />
+            <circle cx={cx} cy={cy} r={5} fill={budColor} opacity={0.8} />
+          </g>
+
+          {/* ============ Scattered loose petals ============ */}
+          {[
+            { x: 50, y: 80, rot: 35, scale: 0.7, opacity: 0.65 },
+            { x: 330, y: 120, rot: 155, scale: 0.6, opacity: 0.6 },
+            { x: 70, y: 450, rot: 210, scale: 0.75, opacity: 0.7 },
+            { x: 310, y: 520, rot: 95, scale: 0.65, opacity: 0.6 },
+            { x: 160, y: 600, rot: 270, scale: 0.55, opacity: 0.7 },
+            { x: 350, y: 350, rot: 310, scale: 0.6, opacity: 0.65 },
+            { x: 20, y: 280, rot: 140, scale: 0.7, opacity: 0.75 },
+            { x: 280, y: 680, rot: 50, scale: 0.5, opacity: 0.6 },
+          ].map((petal, i) => {
+            const pp = petalPath(0, 0, outerLength * petal.scale, outerWidth * petal.scale, (i % 2 === 0 ? 1 : -1) * 0.5);
+            return (
+              <g
+                key={`loose-petal-${i}`}
+                transform={`translate(${petal.x}, ${petal.y}) rotate(${petal.rot}) scale(${petal.scale})`}
+                opacity={petal.opacity}
+                filter="url(#dewdrop-blur)"
+              >
+                <path d={pp} fill="url(#petal-outer-grad)" />
+              </g>
+            );
+          })}
+
+          {/* Film grain removed — creates opaque rect over transparent bg */}
         </svg>
       </div>
     </div>

@@ -25,7 +25,9 @@ export function dynamicCrossfadeDuration(
   frames: EnhancedFrameData[],
   boundary: number,
   lookback = 60,
+  fps = 30,
 ): number {
+  const scale = fps / 30;
   const lo = Math.max(0, boundary - lookback);
   const hi = Math.min(frames.length - 1, boundary + lookback);
 
@@ -57,12 +59,13 @@ export function dynamicCrossfadeDuration(
   // Problem: quiet changes should be IMPERCEPTIBLE (fast), energy transitions
   // should PRESERVE MOMENTUM (long). The viewer shouldn't notice quiet changes
   // but should FEEL the energy morphing.
+  // All durations scale by fps/30 so they represent consistent wall-clock time
   let baseDuration: number;
-  if (beforeQuiet && afterQuiet) baseDuration = 60;    // 2s — quick, imperceptible
-  else if (beforeLoud && afterLoud) baseDuration = 360; // 12s — slow, momentum preserved
-  else if (beforeQuiet && afterLoud) baseDuration = 240; // 8s — builds anticipation
-  else if (beforeLoud && afterQuiet) baseDuration = 120; // 4s — energy releases naturally
-  else baseDuration = 180;                               // 6s — moderate default
+  if (beforeQuiet && afterQuiet) baseDuration = Math.round(60 * scale);    // 2s — quick, imperceptible
+  else if (beforeLoud && afterLoud) baseDuration = Math.round(360 * scale); // 12s — slow, momentum preserved
+  else if (beforeQuiet && afterLoud) baseDuration = Math.round(240 * scale); // 8s — builds anticipation
+  else if (beforeLoud && afterQuiet) baseDuration = Math.round(120 * scale); // 4s — energy releases naturally
+  else baseDuration = Math.round(180 * scale);                               // 6s — moderate default
 
   // Spectral flux compression — capped at 0.7 (was 0.4) so even rapid timbral
   // changes get a smooth 4s+ crossfade instead of a 2s snap.
@@ -86,9 +89,8 @@ export function dynamicCrossfadeDuration(
   // Chill cap: floor at 0.7 (was 0.4) so high-flux moments still get smooth fades
   const fluxCompression = Math.max(0.7, 1 - Math.min(avgFlux / 0.25, 1) * 0.3);
 
-  // Floor: 45 frames (1.5s) minimum. Quiet transitions can be fast (imperceptible).
-  // Old floor was 90 (3s) which made quiet transitions too noticeable.
-  return Math.max(45, Math.round(baseDuration * fluxCompression));
+  // Floor: 1.5s minimum (scales with fps). Quiet transitions can be fast (imperceptible).
+  return Math.max(Math.round(45 * scale), Math.round(baseDuration * fluxCompression));
 }
 
 /**
@@ -97,11 +99,14 @@ export function dynamicCrossfadeDuration(
  * CHILL CALIBRATION (3-hour party background):
  * Now 4 beats worth of frames with floor of 90 (3s). Crossfades land on
  * phrase-friendly boundaries instead of feeling rushed. Ceiling 180 (6s).
+ *
+ * FPS-aware: scales frame counts by fps/30 so durations are consistent
+ * regardless of render framerate (30fps or 60fps).
  */
-export function beatCrossfadeFrames(tempo?: number): number {
-  if (!tempo || tempo <= 0) return 120; // 4s default
-  // 4 beats at given tempo, at 30fps
-  const framesPerBeat = (60 / tempo) * 30;
-  // Floor lowered to 45 (1.5s) to match dynamicCrossfadeDuration floor
-  return Math.max(45, Math.min(360, Math.round(framesPerBeat * 4)));
+export function beatCrossfadeFrames(tempo?: number, fps = 30): number {
+  const scale = fps / 30;
+  if (!tempo || tempo <= 0) return Math.round(120 * scale); // 4s default
+  // 4 beats at given tempo, scaled by fps
+  const framesPerBeat = (60 / tempo) * fps;
+  return Math.max(Math.round(45 * scale), Math.min(Math.round(360 * scale), Math.round(framesPerBeat * 4)));
 }

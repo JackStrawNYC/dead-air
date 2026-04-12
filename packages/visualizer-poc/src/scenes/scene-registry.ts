@@ -974,9 +974,40 @@ export function getComplement(mode: VisualMode): VisualMode {
 // intentionally ALLOWED — the stem/duration/narrative bias layers reference them,
 // and blocking them here made those biases dead code.
 const AUTO_SELECT_BLOCKLIST: Set<VisualMode> = new Set([
-  // Genuinely low-quality or overly specific shaders
+  // ═══ C tier: genuinely weak — flat, generic, or cliche ═══
   "combustible_voronoi", "creation", "fluid_2d",
-  // Song-specific variations — designed for specific songs, not general auto-select
+  "spectral_bridge",       // 2D HSL bands, screensaver-tier
+  "obsidian_mirror",       // 2D flat composition
+  "amber_drift",           // 2D fog orbs, flat
+  "volumetric_clouds",     // 204 lines, basic FBM — protean_clouds is better
+  "volumetric_smoke",      // 217 lines, basic smoke
+  "volumetric_nebula",     // 203 lines, basic nebula
+  "digital_rain",          // Matrix cliche, doesn't fit the Dead
+  "seascape",              // Shadertoy port, not adapted
+  "protean_clouds",        // Base variant; song-specific variants are better
+  "storm_vortex",          // No raymarching lib, may not deliver
+  "mycelium_network",      // Unclear execution quality
+
+  // ═══ C+ tier: below the fractal_temple bar ═══
+  "warm_nebula",           // Short, less complex than other nebulae
+  "particle_nebula",       // Short, minimal volumetric
+  "liquid_mandala",        // Short, simpler SDF
+  "star_nest",             // Kali fractal port, single technique
+  "crystalline_void",      // 2D compositing disguised as 3D
+  "space_travel",          // Short, basic tunnel
+  "cosmic_voyage",         // Simple volumetric despite good audio reactivity
+  "fractal_zoom",          // Already redirected to liquid_light
+
+  // ═══ B- "any" affinity shaders — too weak to show at every energy level ═══
+  "acid_melt",             // Simpler SDF, psychedelic but thin
+  "aurora_sky",            // Redundant with aurora (B+), less refined
+  "spinning_spiral",       // Simple technique, generic
+  "prism_refraction",      // Simpler version of dance_floor_prism
+  "spectral_analyzer",     // Generic music visualizer aesthetic
+  "neon_grid",             // Cliche synthwave, doesn't fit Dead
+  "concert_beams",         // Less refined than concert_lighting
+
+  // ═══ Song-specific protean variants — via song identity only ═══
   "morning_dew_fog", "dark_star_void", "fire_mountain_smoke",
   "estimated_prophet_mist", "wharf_rat_storm", "scarlet_golden_haze",
   "st_stephen_lightning", "terrapin_nebula",
