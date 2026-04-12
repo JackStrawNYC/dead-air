@@ -346,7 +346,11 @@ export function syncBaseUniforms(
   u.uJamDensity.value = jamDensity;
   u.uJamPhase.value = jamPhase;
   u.uJamProgress.value = jamProgress;
-  u.uCoherence.value = coherence;
+  // When coherence is locked (IT moment), boost the coherence uniform
+  // above 1.0 to signal transcendent state. Shaders interpret uCoherence > 1.0
+  // as "amplified evolution" — deeper colors, more intricate geometry, maximum
+  // pattern stability. The visual world deepens instead of freezing.
+  u.uCoherence.value = isLocked ? Math.min(2.0, coherence * 1.5 + 0.5) : coherence;
   u.uSlowEnergy.value = smooth.slowEnergy;
   u.uStemBass.value = smooth.stemBass;
   u.uStemDrums.value = smooth.drumOnset; // drums energy = drum onset

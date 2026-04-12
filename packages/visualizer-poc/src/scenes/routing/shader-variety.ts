@@ -17,6 +17,7 @@ import { detectChordMood } from "../../utils/chord-mood";
 import { estimateImprovisationScore } from "../../utils/improv-detector";
 import { getSectionSpectralFamily } from "../../utils/spectral-section";
 import { computeSemanticProfile, extractSemanticScores } from "../../utils/semantic-router";
+import { detectGroove } from "../../utils/groove-detector";
 import { AUTO_VARIETY_MIN_SECTION } from "./crossfade-timing";
 import { scoreDiversityBonus, type VisualMemoryState } from "../../utils/visual-memory";
 
@@ -147,9 +148,15 @@ export function getModeForSection(
   // Section 0 always uses default
   if (sectionIndex === 0) return validateSafe(song.defaultMode, song.defaultMode);
 
-  // Coherence lock: hold current shader
+  // Coherence lock: hold shader ID but allow parameter evolution.
+  // During "IT" moments, the shader stays the same but the visual world
+  // deepens — colors shift, geometry breathes, depth opens. Transcendence
+  // = deepening, not freezing. The shader ID is locked; parameters evolve.
   if (coherenceIsLocked) {
     return getModeForSection(song, sectionIndex - 1, sections, seed, era, false, usedShaderModes, songIdentity, stemSection, frames, songDuration, setNumber, trackNumber, shaderModeLastUsed);
+    // Note: parameter evolution is driven by the EnergyEnvelope and
+    // shader-internal uCoherence uniform, which continues to respond
+    // to audio even when the shader ID is locked.
   }
 
   // Seeded variation with affinity-aware morphing
@@ -187,11 +194,18 @@ export function getModeForSection(
           }
           if (candidates.length === 0) candidates = affinityPool;
 
-          // Preferred mode awareness: intersect with preferred modes first
+          // Preferred mode hard ceiling: song identity dominates shader selection.
+          // When preferredModes exist, they are a HARD ceiling — only preferred
+          // shaders can be selected, weighted 5x for show modes. This ensures
+          // Dark Star looks like Dark Star, not random rotation.
           if (songIdentity?.preferredModes?.length && seed !== undefined) {
-            const preferredSet = new Set(songIdentity.preferredModes);
-            const preferredCandidates = candidates.filter((m) => preferredSet.has(m));
-            if (preferredCandidates.length > 0) candidates = preferredCandidates;
+            const showModes = getShowModesForSong(songIdentity.preferredModes, seed, song.title);
+            const showModeSet = new Set(showModes);
+            const remainingPreferred = songIdentity.preferredModes.filter((m: string) => !showModeSet.has(m));
+            const weightedPool: VisualMode[] = [];
+            for (const m of showModes) { for (let i = 0; i < 5; i++) weightedPool.push(m); }
+            for (const m of remainingPreferred) { for (let i = 0; i < 2; i++) weightedPool.push(m); }
+            if (weightedPool.length > 0) candidates = weightedPool;
           }
 
           // Recency-weighted variety: penalize recently/frequently used modes
@@ -327,6 +341,66 @@ export function getModeForSection(
           const improvMatches = improvModes.filter((m) => filteredPool.includes(m));
           if (improvMatches.length > 0) {
             filteredPool = [...filteredPool, ...improvMatches, ...improvMatches]; // 3x weight
+          }
+        }
+      }
+
+      // ─── Groove detection: PRIMARY routing signal ───
+      // Groove type (pocket/driving/floating/freeform) directly maps to shader families.
+      // This is a STRONG bias — groove determines visual character.
+      if (frames && section) {
+        const midFrame = Math.floor((section.frameStart + section.frameEnd) / 2);
+        const f = frames[midFrame];
+        if (f) {
+          const groove = detectGroove(
+            f.beatStability ?? 0.5,
+            f.stemDrumOnset ?? 0,
+            section.avgEnergy ?? 0.2,
+            f.flatness ?? 0.3,
+          );
+          if (groove.confidence > 0.3) {
+            const GROOVE_SHADERS: Record<string, VisualMode[]> = {
+              pocket: ["protean_clouds", "mandala_engine", "aurora", "tie_dye", "vintage_film"],
+              driving: ["inferno", "cosmic_voyage", "electric_arc", "plasma_field", "lava_flow"],
+              floating: ["void_light", "cosmic_dust", "deep_ocean", "volumetric_nebula", "particle_nebula"],
+              freeform: ["cosmic_voyage", "deep_ocean", "fractal_zoom", "reaction_diffusion", "morphogenesis"],
+            };
+            const grooveModes = (GROOVE_SHADERS[groove.type] ?? []).filter((m: VisualMode) => filteredPool.includes(m));
+            if (grooveModes.length > 0) {
+              // 4x weight — groove is a primary signal
+              for (let i = 0; i < 3; i++) filteredPool = [...filteredPool, ...grooveModes];
+            }
+          }
+        }
+      }
+
+      // ─── Semantic routing: PRIMARY routing signal ───
+      // CLAP semantic scores (psychedelic/cosmic/aggressive/etc.) drive shader families.
+      // When a dominant semantic category has confidence > 0.35, its preferred shaders
+      // get 4x weight — the visual should MATCH the musical mood.
+      if (frames && section) {
+        const midFrame = Math.floor((section.frameStart + section.frameEnd) / 2);
+        const f = frames[midFrame];
+        if (f) {
+          const scores = extractSemanticScores({
+            semanticPsychedelic: f.semantic_psychedelic ?? 0,
+            semanticAggressive: f.semantic_aggressive ?? 0,
+            semanticTender: f.semantic_tender ?? 0,
+            semanticCosmic: f.semantic_cosmic ?? 0,
+            semanticRhythmic: f.semantic_rhythmic ?? 0,
+            semanticAmbient: f.semantic_ambient ?? 0,
+            semanticChaotic: f.semantic_chaotic ?? 0,
+            semanticTriumphant: f.semantic_triumphant ?? 0,
+          });
+          if (scores) {
+            const profile = computeSemanticProfile(scores);
+            if (profile.dominant && profile.dominantConfidence > 0.35 && profile.preferredShaders.length > 0) {
+              const semanticMatches = profile.preferredShaders.filter((m: VisualMode) => filteredPool.includes(m));
+              if (semanticMatches.length > 0) {
+                // 4x weight — semantic is a primary signal
+                for (let i = 0; i < 3; i++) filteredPool = [...filteredPool, ...semanticMatches];
+              }
+            }
           }
         }
       }
