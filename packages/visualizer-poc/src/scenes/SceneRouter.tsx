@@ -199,34 +199,17 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
         const energyBefore = prevSectionIdx >= 0 && sections[prevSectionIdx] ? averageEnergy(frames, sections[prevSectionIdx].frameStart, boundary) : 0;
         const energyAfter = currentSection ? averageEnergy(frames, boundary, currentSection.frameEnd) : 0;
 
-        // High energy delta: use GPU blend for organic crossfade
+        // ALL transitions use GPU blend modes — no CSS crossfades.
+        // GPU transitions render both shaders and blend at the pixel level,
+        // producing seamless morphs instead of jarring opacity fades.
+        // Blend mode is selected based on energy context:
+        //   - High energy delta (>0.15): luminance_key (bright areas punch through)
+        //   - High flux: noise_dissolve (organic, psychedelic)
+        //   - Low energy: additive (soft glow)
+        //   - Default: dissolve (clean linear crossfade)
         const energyDelta = Math.abs(energyAfter - energyBefore);
-        if (energyDelta > 0.15) {
-          const GPU_CROSSFADE_LEN = 120; // 4s GPU crossfade
-          const gpuDistFromStart = frame - crossfadeStart;
-          if (gpuDistFromStart >= 0 && gpuDistFromStart < GPU_CROSSFADE_LEN) {
-            const gpuProgress = gpuDistFromStart / GPU_CROSSFADE_LEN;
-            const gpuBlendMode = transitionStyleToBlendMode("dissolve", energyAfter);
-            return (
-              <GPUTransition
-                outMode={prevMode}
-                inMode={currentMode}
-                progress={gpuProgress}
-                blendMode={gpuBlendMode}
-                frames={frames}
-                sections={sections}
-                palette={palette}
-                tempo={tempo}
-                jamDensity={jamDensity}
-              />
-            );
-          }
-        }
 
-        const sectionLabel = currentSection ? (frames[boundary]?.sectionType ?? undefined) : undefined;
-        const scenePreferredOut = SCENE_REGISTRY[prevMode]?.preferredTransitionOut;
-        const scenePreferredIn = SCENE_REGISTRY[currentMode]?.preferredTransitionIn;
-        // Compute spectral flux at boundary for style selection
+        // Compute spectral flux for blend mode selection
         const fluxWindow = 8;
         const fluxLo = Math.max(1, boundary - fluxWindow);
         const fluxHi = Math.min(frames.length - 1, boundary + fluxWindow);
@@ -243,14 +226,25 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
           fluxCount++;
         }
         const boundaryFlux = fluxCount > 0 ? fluxSum / fluxCount : 0;
-        const transitionStyle = selectTransitionStyle(energyBefore, energyAfter, sectionLabel, scenePreferredIn, scenePreferredOut, boundaryFlux);
+
+        // Select GPU blend mode based on energy context
+        let gpuBlendMode: string;
+        if (energyDelta > 0.15) gpuBlendMode = "luminance_key";
+        else if (boundaryFlux > 0.25) gpuBlendMode = "noise_dissolve";
+        else if (energyAfter < 0.08) gpuBlendMode = "additive";
+        else gpuBlendMode = "dissolve";
+
         return (
-          <SceneCrossfade
+          <GPUTransition
+            outMode={prevMode}
+            inMode={currentMode}
             progress={progress}
-            outgoing={renderMode(prevMode, frames, sections, palette, tempo, undefined, jamDensity, sceneConfig)}
-            incoming={renderMode(currentMode, frames, sections, palette, tempo, undefined, jamDensity, sceneConfig)}
-            flashFrame={beatFrame !== null ? beatFrame : undefined}
-            style={transitionStyle}
+            blendMode={transitionStyleToBlendMode(gpuBlendMode as any, energyAfter)}
+            frames={frames}
+            sections={sections}
+            palette={palette}
+            tempo={tempo}
+            jamDensity={jamDensity}
           />
         );
       }

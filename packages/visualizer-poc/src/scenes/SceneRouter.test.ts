@@ -557,47 +557,47 @@ describe('getDrumsSpaceMode', () => {
 // --- dynamicCrossfadeDuration ---
 
 describe('dynamicCrossfadeDuration', () => {
-  it('quiet→quiet returns ~720 (ultra-gentle dissolve)', () => {
-    // Both sides quiet (rms < 0.08)
+  it('quiet→quiet returns ~60 (quick, imperceptible)', () => {
+    // Both sides quiet (rms < 0.08) — changes should be fast and invisible
     const frames = Array.from({ length: 200 }, () => mockFrame({ rms: 0.03 }));
     const duration = dynamicCrossfadeDuration(frames, 100);
-    // CHILL CALIBRATION: 720 frames (24s) with flux compression floor at 0.7
-    expect(duration).toBeGreaterThanOrEqual(500);
-    expect(duration).toBeLessThanOrEqual(720);
+    // MUSICAL TIMING: 60 frames (2s), quick dissolve
+    expect(duration).toBeGreaterThanOrEqual(42);
+    expect(duration).toBeLessThanOrEqual(60);
   });
 
-  it('loud→loud returns ~150 (smooth crossfade)', () => {
+  it('loud→loud returns ~360 (slow, momentum preserved)', () => {
     const frames = Array.from({ length: 200 }, () => mockFrame({ rms: 0.35 }));
     const duration = dynamicCrossfadeDuration(frames, 100);
-    // CHILL CALIBRATION: 150 frames (5s), floor at 90 (3s)
-    expect(duration).toBeGreaterThanOrEqual(90);
-    expect(duration).toBeLessThanOrEqual(150);
+    // MUSICAL TIMING: 360 frames (12s), preserves energy momentum
+    expect(duration).toBeGreaterThanOrEqual(250);
+    expect(duration).toBeLessThanOrEqual(360);
   });
 
-  it('quiet→loud returns ~180 (moderate snap)', () => {
+  it('quiet→loud returns ~240 (builds anticipation)', () => {
     const frames = Array.from({ length: 200 }, (_, i) =>
       mockFrame({ rms: i < 100 ? 0.03 : 0.35 }),
     );
     const duration = dynamicCrossfadeDuration(frames, 100);
-    // CHILL CALIBRATION: 180 frames (6s), floor at 90 (3s)
-    expect(duration).toBeGreaterThanOrEqual(90);
-    expect(duration).toBeLessThanOrEqual(180);
+    // MUSICAL TIMING: 240 frames (8s), builds energy
+    expect(duration).toBeGreaterThanOrEqual(168);
+    expect(duration).toBeLessThanOrEqual(240);
   });
 
-  it('loud→quiet returns ~240 (gentle fade)', () => {
+  it('loud→quiet returns ~120 (energy releases naturally)', () => {
     const frames = Array.from({ length: 200 }, (_, i) =>
       mockFrame({ rms: i < 100 ? 0.35 : 0.03 }),
     );
     const duration = dynamicCrossfadeDuration(frames, 100);
-    // CHILL CALIBRATION: 240 frames (8s), floor at 90 (3s)
-    expect(duration).toBeGreaterThanOrEqual(90);
-    expect(duration).toBeLessThanOrEqual(240);
+    // MUSICAL TIMING: 120 frames (4s), natural release
+    expect(duration).toBeGreaterThanOrEqual(84);
+    expect(duration).toBeLessThanOrEqual(120);
   });
 
   it('mid energy returns ~180 (default)', () => {
     const frames = Array.from({ length: 200 }, () => mockFrame({ rms: 0.12 }));
     const duration = dynamicCrossfadeDuration(frames, 100);
-    // CHILL CALIBRATION: 180 frames (6s) default, floor at 90 (3s)
+    // MUSICAL TIMING: 180 frames (6s) default
     expect(duration).toBeGreaterThanOrEqual(90);
     expect(duration).toBeLessThanOrEqual(180);
   });

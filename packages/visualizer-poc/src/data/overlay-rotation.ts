@@ -135,10 +135,13 @@ const CROSSFADE_FRAMES_DEFAULT = 120;
  * floods in with maximum visual density (A-tier only). The contrast between
  * dropout silence and peak flood creates the show's visceral impact.
  */
+// INVERTED density: peaks are CLEAN (1-2 iconic overlays for impact),
+// quiet passages are RICH (4-5 overlays creating atmosphere and depth).
+// The viewer should feel immersed during jams and focused during peaks.
 const ENERGY_COUNTS: Record<string, { min: number; max: number }> = {
-  low:  { min: 2,  max: 2 },   // quiet: gentle wash, Dead iconography always present
-  mid:  { min: 2,  max: 3 },   // moderate: texture depth with character overlays
-  high: { min: 3,  max: 5 },   // peaks: vivid Dead imagery flood
+  low:  { min: 4,  max: 5 },   // quiet: rich atmospheric depth, Dead world-building
+  mid:  { min: 3,  max: 4 },   // moderate: solid overlay support
+  high: { min: 1,  max: 2 },   // peaks: clean, impactful, shader owns the moment
 };
 
 /** A-tier overlays: the only overlays allowed during peaks (high energy).

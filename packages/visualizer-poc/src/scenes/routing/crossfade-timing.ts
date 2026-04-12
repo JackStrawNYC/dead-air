@@ -52,17 +52,17 @@ export function dynamicCrossfadeDuration(
   const afterQuiet = afterEnergy < QUIET;
   const afterLoud = afterEnergy > LOUD;
 
-  // CHILL CALIBRATION (3-hour party background):
-  // Minimum crossfade is now 90 frames (3s) — no snap cuts. Defaults raised so
-  // section transitions are felt as gentle dissolves rather than sudden swaps.
-  // Flux compression cap raised from 0.4 → 0.7 so even high-flux moments still
-  // give the crossfade enough time to be smooth.
+  // MUSICAL TIMING: Inverted from "chill" calibration.
+  // Old logic: quiet transitions were LONG (24s), loud were SHORT (5s).
+  // Problem: quiet changes should be IMPERCEPTIBLE (fast), energy transitions
+  // should PRESERVE MOMENTUM (long). The viewer shouldn't notice quiet changes
+  // but should FEEL the energy morphing.
   let baseDuration: number;
-  if (beforeQuiet && afterQuiet) baseDuration = 720;   // 24s ultra-gentle dissolve
-  else if (beforeLoud && afterLoud) baseDuration = 150; // 5s — was 2.4s
-  else if (beforeQuiet && afterLoud) baseDuration = 180; // 6s — was 3.6s
-  else if (beforeLoud && afterQuiet) baseDuration = 240; // 8s — was 6s
-  else baseDuration = 180;                               // 6s default — was 4.5s
+  if (beforeQuiet && afterQuiet) baseDuration = 60;    // 2s — quick, imperceptible
+  else if (beforeLoud && afterLoud) baseDuration = 360; // 12s — slow, momentum preserved
+  else if (beforeQuiet && afterLoud) baseDuration = 240; // 8s — builds anticipation
+  else if (beforeLoud && afterQuiet) baseDuration = 120; // 4s — energy releases naturally
+  else baseDuration = 180;                               // 6s — moderate default
 
   // Spectral flux compression — capped at 0.7 (was 0.4) so even rapid timbral
   // changes get a smooth 4s+ crossfade instead of a 2s snap.
@@ -86,8 +86,9 @@ export function dynamicCrossfadeDuration(
   // Chill cap: floor at 0.7 (was 0.4) so high-flux moments still get smooth fades
   const fluxCompression = Math.max(0.7, 1 - Math.min(avgFlux / 0.25, 1) * 0.3);
 
-  // Hard floor: never less than 90 frames (3 seconds) — no snap cuts in chill mode
-  return Math.max(90, Math.round(baseDuration * fluxCompression));
+  // Floor: 45 frames (1.5s) minimum. Quiet transitions can be fast (imperceptible).
+  // Old floor was 90 (3s) which made quiet transitions too noticeable.
+  return Math.max(45, Math.round(baseDuration * fluxCompression));
 }
 
 /**
