@@ -35,7 +35,8 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync, rmSync, readdirSync
 import { join, resolve } from "path";
 import { cpus } from "os";
 
-const ROOT = resolve(import.meta.dirname, "..");
+const __dirname = typeof import.meta.dirname === "string" ? import.meta.dirname : new URL(".", import.meta.url).pathname;
+const ROOT = resolve(__dirname, "..");
 const DATA_DIR = join(ROOT, "data");
 const TRACKS_DIR = join(DATA_DIR, "tracks");
 const OUT_DIR = join(ROOT, "out");
@@ -263,7 +264,7 @@ function ensureBundle(): string {
   console.log("Bundling Remotion project ...");
   mkdirSync(BUNDLE_DIR, { recursive: true });
   execSync(
-    `npx remotion bundle ${ENTRY} --out-dir=${BUNDLE_DIR}`,
+    `node_modules/.bin/remotion bundle ${ENTRY} --out-dir=${BUNDLE_DIR}`,
     { cwd: ROOT, stdio: "inherit" },
   );
   writeFileSync(BUNDLE_HASH_FILE, currentHash);
@@ -407,7 +408,7 @@ function renderSong(
     if (!(resume && isValidOutput(videoOnlyPath))) {
       console.log(`  Rendering video (${totalFrames} frames, single pass) ...`);
       const cmd = [
-        "npx remotion render",
+        "node_modules/.bin/remotion render",
         bundlePath,
         song.trackId,
         videoOnlyPath,
@@ -447,7 +448,7 @@ function renderSong(
       } else {
         console.log(`  Chunk ${start}-${end} (${end - start + 1} frames) ...`);
         const cmd = [
-          "npx remotion render",
+          "node_modules/.bin/remotion render",
           bundlePath,
           song.trackId,
           chunkPath,
@@ -519,7 +520,7 @@ function renderShowIntro(bundlePath: string): string | null {
   // ample time to load assets + warm shader cache, while keeping --concurrency=2
   // (to avoid memory pressure on 4K decode).
   const cmd = [
-    "npx remotion render",
+    "node_modules/.bin/remotion render",
     bundlePath,
     "ShowIntro",
     outputPath,
@@ -542,7 +543,7 @@ function renderEndCard(bundlePath: string): string {
 
   console.log("\nRendering end card (12s) ...");
   const cmd = [
-    "npx remotion render",
+    "node_modules/.bin/remotion render",
     bundlePath,
     "EndCard",
     outputPath,
@@ -564,7 +565,7 @@ function renderSetBreak(bundlePath: string): string {
   const breakDuration = setBreakSecArg ? parseInt(setBreakSecArg, 10) : 10;
   console.log(`\nRendering set break (${breakDuration}s) ...`);
   const cmd = [
-    "npx remotion render",
+    "node_modules/.bin/remotion render",
     bundlePath,
     "SetBreak",
     outputPath,
@@ -586,7 +587,7 @@ function renderChapterCard(index: number, bundlePath: string): string {
 
   console.log(`  Rendering Chapter-${index} (6s) ...`);
   const cmd = [
-    "npx remotion render",
+    "node_modules/.bin/remotion render",
     bundlePath,
     `Chapter-${index}`,
     outputPath,

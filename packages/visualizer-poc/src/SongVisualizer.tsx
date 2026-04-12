@@ -164,9 +164,14 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
   // toward underrepresented visual regions across a multi-hour show.
   const visualMemory = useMemo((): VisualMemoryState | undefined => {
     const usedModes = narrative?.state.usedShaderModes;
-    if (!usedModes || usedModes.size === 0) return undefined;
+    if (!usedModes) return undefined;
     let memory = createInitialMemory();
-    for (const [mode, count] of usedModes.entries()) {
+    // Handle both Map (live context) and plain object (JSON-serialized precompute)
+    const entries: [string, number][] = usedModes instanceof Map
+      ? Array.from(usedModes.entries())
+      : Object.entries(usedModes);
+    if (entries.length === 0) return undefined;
+    for (const [mode, count] of entries) {
       // Approximate duration: count * average section length (900 frames = 30s at 30fps)
       memory = updateVisualMemory(memory, mode as VisualMode, count * 900);
     }
