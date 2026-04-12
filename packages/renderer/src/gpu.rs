@@ -211,7 +211,7 @@ impl GpuRenderer {
             },
             fragment: Some(wgpu::FragmentState {
                 module: fragment_module,
-                entry_point: Some("fs_main"),
+                entry_point: Some("main"),
                 targets: &[Some(wgpu::ColorTargetState {
                     format: wgpu::TextureFormat::Rgba8Unorm,
                     blend: None,
