@@ -1,0 +1,14 @@
+/Users/chrisgardella/dead-air/packages/renderer/target/release/deps/serde-72711dc3383f9718.d: /Users/chrisgardella/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs /Users/chrisgardella/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs /Users/chrisgardella/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs /Users/chrisgardella/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs /Users/chrisgardella/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs /Users/chrisgardella/dead-air/packages/renderer/target/release/build/serde-af01a792c82b84d8/out/private.rs
+
+/Users/chrisgardella/dead-air/packages/renderer/target/release/deps/libserde-72711dc3383f9718.rlib: /Users/chrisgardella/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs /Users/chrisgardella/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs /Users/chrisgardella/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs /Users/chrisgardella/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs /Users/chrisgardella/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs /Users/chrisgardella/dead-air/packages/renderer/target/release/build/serde-af01a792c82b84d8/out/private.rs
+
+/Users/chrisgardella/dead-air/packages/renderer/target/release/deps/libserde-72711dc3383f9718.rmeta: /Users/chrisgardella/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs /Users/chrisgardella/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs /Users/chrisgardella/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs /Users/chrisgardella/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs /Users/chrisgardella/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs /Users/chrisgardella/dead-air/packages/renderer/target/release/build/serde-af01a792c82b84d8/out/private.rs
+
+/Users/chrisgardella/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs:
+/Users/chrisgardella/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs:
+/Users/chrisgardella/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs:
+/Users/chrisgardella/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs:
+/Users/chrisgardella/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs:
+/Users/chrisgardella/dead-air/packages/renderer/target/release/build/serde-af01a792c82b84d8/out/private.rs:
+
+# env-dep:OUT_DIR=/Users/chrisgardella/dead-air/packages/renderer/target/release/build/serde-af01a792c82b84d8/out

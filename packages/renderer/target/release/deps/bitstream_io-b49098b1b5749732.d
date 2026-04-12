@@ -1,0 +1,10 @@
+/Users/chrisgardella/dead-air/packages/renderer/target/release/deps/bitstream_io-b49098b1b5749732.d: /Users/chrisgardella/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/bitstream-io-4.9.0/src/lib.rs /Users/chrisgardella/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/bitstream-io-4.9.0/src/huffman.rs /Users/chrisgardella/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/bitstream-io-4.9.0/src/read.rs /Users/chrisgardella/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/bitstream-io-4.9.0/src/write.rs
+
+/Users/chrisgardella/dead-air/packages/renderer/target/release/deps/libbitstream_io-b49098b1b5749732.rlib: /Users/chrisgardella/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/bitstream-io-4.9.0/src/lib.rs /Users/chrisgardella/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/bitstream-io-4.9.0/src/huffman.rs /Users/chrisgardella/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/bitstream-io-4.9.0/src/read.rs /Users/chrisgardella/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/bitstream-io-4.9.0/src/write.rs
+
+/Users/chrisgardella/dead-air/packages/renderer/target/release/deps/libbitstream_io-b49098b1b5749732.rmeta: /Users/chrisgardella/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/bitstream-io-4.9.0/src/lib.rs /Users/chrisgardella/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/bitstream-io-4.9.0/src/huffman.rs /Users/chrisgardella/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/bitstream-io-4.9.0/src/read.rs /Users/chrisgardella/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/bitstream-io-4.9.0/src/write.rs
+
+/Users/chrisgardella/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/bitstream-io-4.9.0/src/lib.rs:
+/Users/chrisgardella/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/bitstream-io-4.9.0/src/huffman.rs:
+/Users/chrisgardella/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/bitstream-io-4.9.0/src/read.rs:
+/Users/chrisgardella/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/bitstream-io-4.9.0/src/write.rs:
