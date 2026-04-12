@@ -12,12 +12,14 @@ use std::path::Path;
 #[derive(Debug, Deserialize)]
 pub struct Manifest {
     /// Map of shader_id → pre-composed GLSL source string.
-    /// The Node.js pre-pass resolves all template literals
-    /// (${sharedUniformsGLSL}, ${noiseGLSL}, etc.) before writing.
     pub shaders: HashMap<String, String>,
 
     /// Per-frame rendering instructions.
     pub frames: Vec<FrameData>,
+
+    /// Per-frame overlay layers (SVG strings with blend mode + opacity).
+    /// Indexed by frame number. Optional — omit for shader-only renders.
+    pub overlay_layers: Option<Vec<Vec<crate::compositor::OverlayLayer>>>,
 
     /// Metadata
     pub width: Option<u32>,
