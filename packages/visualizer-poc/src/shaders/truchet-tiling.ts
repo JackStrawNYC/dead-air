@@ -552,7 +552,7 @@ void main() {
     vec3 heroCol1 = fluidColor * 1.5;
     vec3 heroCol2 = hsv2rgb(vec3(uPaletteSecondary + 0.1, 0.9, 1.0));
     col += heroIconEmergence(screenPos, uTime, energy, bass, heroCol1, heroCol2, nf,
-                             uClimaxPhase, uHeroIconProgress) * 0.7;
+                             uClimaxPhase) * 0.7;
   }
 
   // ─── Post-processing ───

@@ -13,6 +13,8 @@
 //!   - Convert individual `uniform float/vec2/vec3/vec4` → UBO block
 //!   - Strip sampler2D uniforms (textures handled separately)
 
+use std::collections::HashMap;
+
 /// Replace `texture(samplerName, ...)` calls with a constant value.
 /// Handles nested parentheses in the second argument.
 fn regex_replace_texture(line: &str, sampler_name: &str, replacement: &str) -> String {
@@ -137,7 +139,10 @@ fn inject_global_captures(source: &str) -> String {
         // Sixth batch
         "climaxWarp", "breachAmount", "pressureOrigin",
         // Seventh batch
-        "sectionSpeedMul",
+        "sectionSpeedMul", "d0",
+        // Int captures (detected from failing shaders)
+        "blobCount", "fzIterations", "numSignals", "fogSteps",
+        "marchSteps", "signalSteps", "steps",
     ];
 
     // Detect which of these are used by a generated function (has _rmp param)
@@ -196,9 +201,43 @@ fn inject_global_captures(source: &str) -> String {
         return source.to_string();
     }
 
+    // Detect the type of each captured variable from its declaration in main()
+    // Look for patterns like "int blobCount = ..." or "float energy = ..."
+    let mut var_types: HashMap<&str, &str> = HashMap::new();
+    let mut in_main_scan = false;
+    let mut scan_depth = 0;
+    for line in &lines {
+        let t = line.trim();
+        if t == "void main() {" || t.starts_with("void main()") {
+            in_main_scan = true;
+            scan_depth = 0;
+        }
+        if in_main_scan {
+            for ch in t.chars() {
+                if ch == '{' { scan_depth += 1; }
+                if ch == '}' { scan_depth -= 1; }
+            }
+            if scan_depth <= 0 && t.contains('}') { in_main_scan = false; }
+
+            for var in &needed_globals {
+                let float_decl = format!("float {} = ", var);
+                let int_decl = format!("int {} = ", var);
+                let vec2_decl = format!("vec2 {} = ", var);
+                let vec3_decl = format!("vec3 {} = ", var);
+                if t.starts_with(&float_decl) || t.contains(&format!(" {} = ", var)) && t.contains("float") {
+                    var_types.entry(var).or_insert("float");
+                } else if t.starts_with(&int_decl) {
+                    var_types.insert(var, "int");
+                } else if t.starts_with(&vec2_decl) {
+                    var_types.insert(var, "vec2");
+                } else if t.starts_with(&vec3_decl) {
+                    var_types.insert(var, "vec3");
+                }
+            }
+        }
+    }
+
     // Inject global declarations BEFORE the generated functions.
-    // We also need to convert `float energy = ...` in main() to `energy = ...` (assignment, not declaration)
-    // for the variables we've made global.
     let mut output = String::with_capacity(source.len() + 512);
     let mut globals_injected = false;
     let mut in_main = false;
@@ -214,7 +253,14 @@ fn inject_global_captures(source: &str) -> String {
         {
             output.push_str("// [compat] globals for generated function captures\n");
             for var in &needed_globals {
-                output.push_str(&format!("float {} = 0.0;\n", var));
+                let var_type = var_types.get(var).copied().unwrap_or("float");
+                let default_val = match var_type {
+                    "int" => "0",
+                    "vec2" => "vec2(0.0)",
+                    "vec3" => "vec3(0.0)",
+                    _ => "0.0",
+                };
+                output.push_str(&format!("{} {} = {};\n", var_type, var, default_val));
             }
             output.push('\n');
             globals_injected = true;
@@ -239,7 +285,8 @@ fn inject_global_captures(source: &str) -> String {
         let mut modified = line.to_string();
         if in_main {
             for var in &needed_globals {
-                let local_decl = format!("float {} = ", var);
+                let var_type = var_types.get(var).copied().unwrap_or("float");
+                let local_decl = format!("{} {} = ", var_type, var);
                 let assignment = format!("{} = ", var);
                 if trimmed.starts_with(&local_decl) {
                     modified = modified.replace(&local_decl, &assignment);

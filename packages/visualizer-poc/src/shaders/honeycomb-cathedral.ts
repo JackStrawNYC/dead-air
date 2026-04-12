@@ -271,6 +271,7 @@ void main() {
 
   // ─── Raymarch ───
   float totalDist = 0.0;
+  float hitSurfaceDist = 0.0;
   vec3 hitPos = ro;
   bool wasHit = false;
   int maxSteps = int(mix(32.0, 96.0, energy));
@@ -285,6 +286,7 @@ void main() {
 
     if (dist < 0.002) {
       hitPos = marchPos;
+      hitSurfaceDist = dist;
       wasHit = true;
       break;
     }
@@ -326,7 +328,7 @@ void main() {
 
     // ─── Subsurface scattering (honey translucency) ───
     // Thinner walls → more light passes through
-    float thickness = clamp(d0 * 10.0, 0.0, 1.0);
+    float thickness = clamp(hitSurfaceDist * 10.0, 0.0, 1.0);
     vec3 sss = hcSubsurface(hitPos, norm, lightDir, rd, 1.0 - thickness, sssColor, vocalP);
 
     // ─── Depth fog ───
