@@ -20,6 +20,7 @@ mod ffmpeg;
 pub mod glsl_compat;
 mod gpu;
 mod manifest;
+mod overlay_cache;
 mod shader_cache;
 mod text_layers;
 mod transition;
@@ -145,6 +146,18 @@ fn main() {
     }
     println!("Shaders: {} compiled, {} failed", compiled, failed);
 
+    // Load overlay cache if overlay PNG directory exists
+    let mut overlay_image_cache = overlay_cache::OverlayImageCache::new();
+    if let Some(ref png_dir) = manifest.overlay_png_dir {
+        let png_path = std::path::Path::new(png_dir);
+        if png_path.exists() {
+            match overlay_image_cache.load_directory(png_path) {
+                Ok(count) => println!("Overlays: {} PNGs loaded from {}", count, png_dir),
+                Err(e) => eprintln!("  WARN: overlay load failed: {}", e),
+            }
+        }
+    }
+
     // Start FFmpeg pipe if video output
     let mut ffmpeg_pipe = if let Some(ref output_path) = args.output {
         Some(
@@ -206,8 +219,19 @@ fn main() {
             }
         }
 
-        // ─── Step 3: Composite overlays (from manifest) ───
-        if let Some(ref overlay_layers) = manifest.overlay_layers {
+        // ─── Step 3: Composite overlays ───
+        // Option A: overlay_schedule (cached PNGs + per-frame transforms — fast)
+        if let Some(ref schedule) = manifest.overlay_schedule {
+            if let Some(frame_overlays) = schedule.get(frame_idx) {
+                for instance in frame_overlays {
+                    overlay_image_cache.composite_instance(
+                        &mut pixels, args.width, args.height, instance,
+                    );
+                }
+            }
+        }
+        // Option B: overlay_layers (inline SVGs — slower, for testing)
+        else if let Some(ref overlay_layers) = manifest.overlay_layers {
             if let Some(frame_overlays) = overlay_layers.get(frame_idx) {
                 compositor::composite_layers(&mut pixels, frame_overlays, args.width, args.height);
             }

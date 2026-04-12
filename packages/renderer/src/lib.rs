@@ -3,6 +3,7 @@ pub mod ffmpeg;
 pub mod glsl_compat;
 pub mod gpu;
 pub mod manifest;
+pub mod overlay_cache;
 pub mod text_layers;
 pub mod transition;
 pub mod uniforms;

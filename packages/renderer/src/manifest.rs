@@ -21,6 +21,13 @@ pub struct Manifest {
     /// Indexed by frame number. Optional — omit for shader-only renders.
     pub overlay_layers: Option<Vec<Vec<crate::compositor::OverlayLayer>>>,
 
+    /// Per-frame overlay instances with transforms (preferred over overlay_layers).
+    /// Each frame has a list of overlay instances with cached PNG + transform params.
+    pub overlay_schedule: Option<Vec<Vec<crate::overlay_cache::OverlayInstance>>>,
+
+    /// Directory containing pre-rendered overlay PNGs.
+    pub overlay_png_dir: Option<String>,
+
     /// Metadata
     pub width: Option<u32>,
     pub height: Option<u32>,
