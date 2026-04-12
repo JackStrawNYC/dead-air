@@ -200,14 +200,14 @@ float me2Ring(vec3 p, int ringIdx, float ringRadius, float breathe,
 
   // Thickness gets thinner for outer rings
   float baseThick = mix(0.06, 0.03, float(ringIdx) / 7.0);
-  float thick = baseThick * (1.0 + energy * 0.3);
+  float thick = baseThick * (0.7 + energy * 0.6);
 
   float d = 1e5;
 
   if (geomType == 0) {
     // Lotus petals
     int petals = int(6.0 + energy * 4.0 + float(ringIdx) * 2.0);
-    float petalLen = 0.3 + energy * 0.15;
+    float petalLen = 0.3 + energy * 0.30;
     float petalW = 0.05 + energy * 0.02;
     float curlAmt = 0.3 + tension * 0.5;
     d = me2Lotus(p, R, petals, petalLen, petalW, curlAmt);
@@ -217,7 +217,7 @@ float me2Ring(vec3 p, int ringIdx, float ringRadius, float breathe,
     d = me2DharmaWheel(p, R, spokes, thick * 2.0);
   } else if (geomType == 2) {
     // Vajra diamonds
-    float vSize = 0.08 + energy * 0.04;
+    float vSize = 0.08 + energy * 0.12;
     d = me2Vajra(p, R, vSize);
   } else {
     // Star mandala
@@ -428,7 +428,7 @@ void main() {
   vec3 fw = normalize(lookAt - ro);
   vec3 ri = normalize(cross(vec3(0.0, 1.0, 0.0), fw));
   vec3 upVec = cross(fw, ri);
-  float fov = 0.9 + energy * 0.15 + climB * 0.25;
+  float fov = 0.9 + energy * 0.30 + climB * 0.25;
   vec3 rd = normalize(p.x * ri + p.y * upVec + fov * fw);
 
   // ─── Raymarch ───
@@ -519,7 +519,7 @@ void main() {
     col *= occl;
 
     // Energy boost
-    col *= 1.0 + energy * 0.3;
+    col *= 0.7 + energy * 0.6;
 
   } else {
     // ─── Background: deep void with subtle glow from mandala center ───

@@ -192,7 +192,7 @@ void main() {
 
   float flowTime = uDynamicTime * 0.1;
   float tunnelRadius = 2.5 + sin(flowTime * 0.2) * 0.3;
-  float twist = 0.15 + tension * 0.3 + energy * 0.15;
+  float twist = 0.15 + tension * 0.3 + energy * 0.30;
   twist *= mix(1.0, 0.3, stability);
   float bassBreath = bass;
 

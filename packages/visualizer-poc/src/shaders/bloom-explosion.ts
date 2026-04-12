@@ -480,10 +480,10 @@ void main() {
   // Gentle orbit around the flower, closer during space, wider at climax
   float camDist = 1.2 - sSpace * 0.3 + climaxBoost * 0.6;
   float camAngle = flowTime * 0.15 + sJam * sin(flowTime * 0.3) * 0.2;
-  float camHeight = 0.35 + melodicPitch * 0.2 + bass * 0.05;
+  float camHeight = 0.35 + melodicPitch * 0.2 + bass * 0.14;
 
   // Bass breathing: camera pulses closer on bass
-  camDist -= bass * 0.08;
+  camDist -= bass * 0.20;
 
   vec3 ro = vec3(
     sin(camAngle) * camDist,
@@ -511,9 +511,9 @@ void main() {
   float totalDist = 0.0;
   vec2 mapResult = vec2(1e10, -1.0);
   bool wasFound = false;
-  int maxSteps = int(mix(48.0, 72.0, energy));
+  int maxSteps = int(mix(32.0, 96.0, energy));
 
-  for (int i = 0; i < 72; i++) {
+  for (int i = 0; i < 96; i++) {
     if (i >= maxSteps) break;
     vec3 marchPos = ro + rd * totalDist;
     mapResult = beMap(marchPos, bloomState, curlAmount, explodeForce,
@@ -571,7 +571,7 @@ void main() {
       matColor = mix(matColor, vec3(1.0, 0.95, 0.8), climaxBoost * 0.6);
     } else if (matId < 1.5) {
       // Stamen: golden
-      matColor = stamenColor * (1.0 + energy * 0.3);
+      matColor = stamenColor * (0.7 + energy * 0.6);
     } else if (matId < 2.5) {
       // Pollen: bright gold particles
       matColor = pollenColor * (1.5 + drumOnset * 1.0);
@@ -658,7 +658,7 @@ void main() {
 
   // === BASS BREATHING ===
   // Gentle brightness pulse with bass
-  col *= 1.0 + bass * 0.08 * (1.0 + joyMult * 0.3);
+  col *= 1.0 + bass * 0.20 * (1.0 + joyMult * 0.3);
 
   // === JOY GLOW ===
   // Triumphant semantic: warm golden overall lift

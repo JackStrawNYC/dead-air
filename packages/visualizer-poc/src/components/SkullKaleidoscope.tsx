@@ -105,9 +105,9 @@ export const SkullKaleidoscope: React.FC<Props> = ({ frames }) => {
 
   // Audio drives
   const halo = interpolate(snap.slowEnergy, [0.02, 0.32], [0.55, 1.18], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-  const shimmer = interpolate(snap.energy, [0.02, 0.30], [0.45, 1.0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const shimmer = interpolate(snap.energy, [0.02, 0.30], [0.20, 1.0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
   const lowThrob = interpolate(snap.bass, [0.0, 0.65], [0.30, 1.0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-  const breathScale = 1 + Math.sin(frame * 0.018) * 0.04 + snap.beatDecay * 0.06;
+  const breathScale = 1 + Math.sin(frame * 0.018) * 0.04 + snap.beatDecay * 0.18;
   const flash = snap.onsetEnvelope > 0.5 ? Math.min(1, (snap.onsetEnvelope - 0.4) * 1.7) : 0;
 
   // Tie-dye palette

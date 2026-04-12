@@ -259,7 +259,7 @@ void main() {
   densityMod *= (1.0 - dustParting * 0.7); // climax parts the dust
 
   // ─── Volumetric raymarch (40-72 steps) ───
-  int stepCount = int(mix(40.0, 72.0, smoothstep(0.15, 0.55, energy)));
+  int stepCount = int(mix(28.0, 96.0, smoothstep(0.15, 0.55, energy)));
   float stepSize = 0.10;
 
   vec3 dustAccum = vec3(0.0);
@@ -275,7 +275,7 @@ void main() {
   // Sparkle from drum onset
   float sparkleParam = drumOnset * 1.5;
 
-  for (int i = 0; i < 72; i++) {
+  for (int i = 0; i < 96; i++) {
     if (i >= stepCount) break;
     if (dustAlpha > 0.96) break;
 

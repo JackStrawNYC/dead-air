@@ -92,11 +92,13 @@ vec3 oc2Hash3(float n) {
 // ============================================================
 float oc2WaveHeight(vec2 xz, float timeVal, float energy, float bass,
                     float melPitch, float tension, float sJam, float sSpace) {
-  float storminess = clamp(energy + bass * 0.3, 0.0, 1.5);
-  float waveSpeed = (0.3 + energy * 0.5) * (1.0 + sJam * 0.4 - sSpace * 0.6);
+  // Widened storminess: calm glass at quiet, raging storm at loud
+  float storminess = clamp(energy * 1.4 + bass * 0.5, 0.0, 1.5);
+  float waveSpeed = (0.10 + energy * 0.80) * (1.0 + sJam * 0.5 - sSpace * 0.7);
   float waveTime = timeVal * waveSpeed;
-  float waveFreq = mix(0.08, 0.2, energy) + melPitch * 0.05 + sJam * 0.04;
-  float waveAmp = mix(0.3, 4.0, storminess) * (1.0 + sJam * 0.3 - sSpace * 0.7);
+  float waveFreq = mix(0.06, 0.25, energy) + melPitch * 0.08 + sJam * 0.05;
+  // Wider amplitude: glass-calm (0.1) at quiet → massive swells (5.0) at loud
+  float waveAmp = mix(0.1, 5.0, storminess) * (1.0 + sJam * 0.4 - sSpace * 0.8);
 
   float h = 0.0;
   float freq = waveFreq;
@@ -115,8 +117,8 @@ float oc2WaveHeight(vec2 xz, float timeVal, float energy, float bass,
     amp *= 0.5;
   }
 
-  // Cross-chop from tension
-  h += sin(xz.x * 0.5 + xz.y * 0.5 + waveTime * 2.0) * tension * 0.3;
+  // Cross-chop from tension — widened for visible chop at high harmonic tension
+  h += sin(xz.x * 0.5 + xz.y * 0.5 + waveTime * 2.0) * tension * 0.7;
 
   return h;
 }
@@ -223,7 +225,8 @@ vec3 oc2Subsurface(vec3 hitPos, vec3 norm, vec3 sunDir, float energy,
   float causticN = fbm3(vec3(hitPos.xz * 0.1 + vec2(0.0, -timeVal * 0.05), timeVal * 0.05));
   causticN = pow(max(causticN * 0.5 + 0.5, 0.0), 3.0);
   vec3 sssColor = mix(vec3(0.0, 0.3, 0.2), palCol1 * 0.8, 0.3);
-  return sssColor * (sss + causticN * 0.15) * (0.3 + energy * 0.7);
+  // Widened subsurface: barely visible at quiet, rich caustics at loud
+  return sssColor * (sss + causticN * 0.25) * (0.10 + energy * 1.0);
 }
 
 void main() {

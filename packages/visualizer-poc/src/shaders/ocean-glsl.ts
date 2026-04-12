@@ -58,7 +58,7 @@ float waveHeight(vec2 pos, float time, float energy, float bass) {
   h += snoise(vec3(pos.x * 5.0, pos.y * 3.0, time * 0.5)) * amp * 0.8;
 
   // Bass swell (long-period wave)
-  h += sin(pos.x * 2.0 + time * 0.3) * bass * 0.04;
+  h += sin(pos.x * 2.0 + time * 0.3) * bass * 0.12;
 
   return h;
 }

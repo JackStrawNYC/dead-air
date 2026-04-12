@@ -68,7 +68,7 @@ export const EmptyChair: React.FC<Props> = ({ frames }) => {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
-  const beatPulse = 1 + beatDecay * 0.04;
+  const beatPulse = 1 + beatDecay * 0.12;
   const hue = 28 + ((chromaHue % 360) / 360) * 16;
   const micGlow = interpolate(vocalEnergy, [0, 0.4], [0, 1], {
     extrapolateLeft: "clamp",

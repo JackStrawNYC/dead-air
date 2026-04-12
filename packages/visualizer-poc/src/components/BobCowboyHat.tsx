@@ -106,9 +106,10 @@ export const BobCowboyHat: React.FC<Props> = ({ frames }) => {
   const onsetEnv = snap.onsetEnvelope;
   const chromaHue = snap.chromaHue;
 
-  const sunBright = 0.6 + slowEnergy * 0.4;
-  const conchoShine = 0.5 + energy * 0.4 + onsetEnv * 0.5 + beatDecay * 0.2;
-  const rimGlow = 0.5 + slowEnergy * 0.3 + beatDecay * 0.3;
+  // Widened: dim at quiet, blazing at loud
+  const sunBright = 0.25 + slowEnergy * 0.8;
+  const conchoShine = 0.2 + energy * 0.7 + onsetEnv * 0.6 + beatDecay * 0.4;
+  const rimGlow = 0.2 + slowEnergy * 0.6 + beatDecay * 0.5;
   const tumbleSpeed = 0.5 + bass * 2.0;
 
   const baseHue = 28;

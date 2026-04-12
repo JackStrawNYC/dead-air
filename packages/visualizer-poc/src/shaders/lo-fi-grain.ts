@@ -480,7 +480,7 @@ void main() {
   float camSway = sin(timeVal * 0.04) * 0.1;
   vec3 camPosition = vec3(
     camSway + effectiveBeat * 0.03,
-    2.2 + bass * 0.05,
+    2.2 + bass * 0.14,
     -1.8
   );
   vec3 lookAtPt = vec3(0.0, 0.0, 0.1);

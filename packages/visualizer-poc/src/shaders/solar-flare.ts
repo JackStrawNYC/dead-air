@@ -437,7 +437,7 @@ void main() {
       // Surface temperature from granulation
       // Cell centers are hotter (rising plasma), edges cooler (sinking)
       float cellHeat = smoothstep(0.0, 0.15, gran.y); // bright cell interior
-      surfaceTemp = 0.15 + cellHeat * 0.35 + energy * 0.15;
+      surfaceTemp = 0.15 + cellHeat * 0.35 + energy * 0.30;
 
       // Sunspot cooling
       vec3 surfDir = normalize(surfacePos);

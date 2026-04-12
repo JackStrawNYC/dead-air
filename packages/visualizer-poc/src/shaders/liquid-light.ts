@@ -102,7 +102,7 @@ vec2 llOilField(vec3 pos, float bass, float energy, float llTime,
   mergeK = clamp(mergeK, 0.1, 0.8);
 
   // Flow speed: section-type modulated
-  float flowSpeed = 0.08 + energy * 0.06;
+  float flowSpeed = 0.08 + energy * 0.30;
   flowSpeed *= 1.0 + sJam * 0.8 - sSpace * 0.5;
   flowSpeed *= 1.0 + climB * 0.5;
 
@@ -128,7 +128,7 @@ vec2 llOilField(vec3 pos, float bass, float energy, float llTime,
     );
 
     // Blob radius: bass increases size, climax shrinks (evaporation)
-    float blobR = 0.25 + bass * 0.15 + llHash(fi * 7.3) * 0.1;
+    float blobR = 0.25 + bass * 0.30 + llHash(fi * 7.3) * 0.1;
     blobR *= 1.0 - climB * 0.6; // evaporation during climax
     blobR *= mix(1.0, 0.85, sSpace); // smaller in space sections
 
@@ -356,7 +356,7 @@ void main() {
   // ─── Derived parameters ───
   float viscosity = tension; // high tension = rigid oil
   float splashWave = drumOn * (1.0 + specFlux * 0.5); // drum onset + spectral flux = splash
-  float llTime = uDynamicTime * (0.06 + slowE * 0.04) * (1.0 + sJam * 0.6 - sSpace * 0.4);
+  float llTime = uDynamicTime * (0.06 + slowE * 0.10) * (1.0 + sJam * 0.6 - sSpace * 0.4);
 
   // ─── Palette ───
   // h1/h2 use cosine-hue for the multi-blob procedural color generator (llOilColor)
@@ -401,7 +401,7 @@ void main() {
   float totalDist = 0.0;
   vec3 hitPos = ro;
   bool wasHit = false;
-  int maxSteps = int(mix(48.0, 72.0, energy));
+  int maxSteps = int(mix(32.0, 96.0, energy));
 
   for (int i = 0; i < LL_MAX_STEPS; i++) {
     if (i >= maxSteps) break;
@@ -463,7 +463,7 @@ void main() {
 
     // ─── Compose surface lighting ───
     // Ambient: dark cathedral interior lit primarily by overhead oil projection
-    vec3 ambient = stoneBase * 0.03 * (1.0 + energy * 0.15);
+    vec3 ambient = stoneBase * 0.03 * (0.7 + energy * 0.60);
 
     // Diffuse lit by oil transmission color
     vec3 oilLit = surfColor * (oilLight * 0.4 + vec3(0.1)) * diffuse;
@@ -474,7 +474,7 @@ void main() {
     col *= llAO;
 
     // Specular highlights: tinted by oil color
-    col += mix(vec3(1.0), oilLight, 0.5) * spec * 0.15 * (1.0 + energy * 0.3);
+    col += mix(vec3(1.0), oilLight, 0.5) * spec * 0.15 * (0.7 + energy * 0.6);
 
     // Fresnel rim: subtle glow at grazing angles
     vec3 rimColor = mix(palSecondary * 0.15, oilLight * 0.2, energy);

@@ -375,7 +375,7 @@ void main() {
   // Palette tinting — subtle, respect the void
   vec3 palCol1 = paletteHueColor(uPalettePrimary, 0.85, 0.85);
   vec3 palCol2 = paletteHueColor(uPaletteSecondary, 0.85, 0.85);
-  float palMix = 0.08 + energy * 0.06;
+  float palMix = 0.08 + energy * 0.30;
   col = mix(col, col * mix(palCol1, palCol2, sin(uTime * 0.06) * 0.5 + 0.5), palMix);
 
   // Gamma — deep, rich, dark

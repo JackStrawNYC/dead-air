@@ -224,7 +224,7 @@ float mgMap(vec3 p, float flowTime, float energy, float bass, float complexity,
       cos(cellPhase * 0.6 + fi * 0.9) * (1.2 + fi * 0.2)
     );
     float cellR = 0.06 + sin(cellPhase + fi) * 0.02 + bass * 0.02;
-    float wallT = 0.3 + energy * 0.15;
+    float wallT = 0.3 + energy * 0.30;
     dist = mgSmin(dist, mgCell(p - cellPos, cellR, wallT, growthPulse + fi), 0.08);
   }
 
@@ -387,9 +387,9 @@ void main() {
   float totalDist = 0.0;
   vec3 marchPos = ro;
   bool marchHit = false;
-  int maxSteps = int(mix(48.0, 80.0, energy + climaxBranching * 0.3));
+  int maxSteps = int(mix(32.0, 96.0, energy + climaxBranching * 0.3));
 
-  for (int i = 0; i < 80; i++) {
+  for (int i = 0; i < 96; i++) {
     if (i >= maxSteps) break;
     vec3 ps = ro + rd * totalDist;
     float d = mgMap(ps, flowTime, energy, bass, complexity, divisionEvt, growthPulse, thickness, generations, climaxBranching);

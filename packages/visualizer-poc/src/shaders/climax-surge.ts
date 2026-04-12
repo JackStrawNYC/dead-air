@@ -125,7 +125,7 @@ vec2 csSceneMap(vec3 pos, float timeVal, float musTime, float bass, float onset,
     float ringRadius = ringPhase * 8.0 * explSpeed; // expanding outward
 
     // Ring thickness: thinner as it expands
-    float ringThickness = (0.08 + bass * 0.04) * (1.0 - ringPhase * 0.7);
+    float ringThickness = (0.08 + bass * 0.12) * (1.0 - ringPhase * 0.7);
 
     // Skip tiny or huge rings
     if (ringRadius < 0.1 || ringRadius > 7.0) continue;

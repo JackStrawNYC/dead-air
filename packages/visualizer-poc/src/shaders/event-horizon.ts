@@ -349,7 +349,7 @@ void main() {
   orbitDist += spaceScore * 3.0;    // space = distant contemplation
   orbitDist = max(orbitDist, bhRadius * 2.5); // never inside the hole
 
-  float orbitSpeed = 0.08 + slowE * 0.06;
+  float orbitSpeed = 0.08 + slowE * 0.14;
   float orbitAngle = uDynamicTime * orbitSpeed;
 
   // Slight vertical oscillation
@@ -394,7 +394,7 @@ void main() {
   bool swallowed = false;
 
   // Adaptive step count based on energy
-  int stepCount = int(mix(50.0, 80.0, energy));
+  int stepCount = int(mix(32.0, 96.0, energy));
 
   vec3 currentRd = rd;
 

@@ -90,7 +90,7 @@ export const PrismRainbow: React.FC<Props> = ({ frames }) => {
 
   // Audio
   const ambientWarmth = interpolate(snap.slowEnergy, [0.02, 0.32], [0.55, 1.15], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-  const beamBright = interpolate(snap.energy, [0.02, 0.32], [0.45, 1.0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const beamBright = interpolate(snap.energy, [0.02, 0.32], [0.20, 1.0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
   const redThick = 1 + snap.bass * 0.5;
   const greenThick = 1 + snap.mids * 0.5;
   const blueThick = 1 + snap.highs * 0.5;

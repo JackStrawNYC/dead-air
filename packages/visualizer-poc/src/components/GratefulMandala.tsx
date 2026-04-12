@@ -72,9 +72,9 @@ export const GratefulMandala: React.FC<Props> = ({ frames }) => {
 
   // Audio drives
   const cosmicGlow = interpolate(snap.slowEnergy, [0.02, 0.32], [0.55, 1.18], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-  const ringBright = interpolate(snap.energy, [0.02, 0.30], [0.45, 1.0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const ringBright = interpolate(snap.energy, [0.02, 0.30], [0.20, 1.0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
   const lowThrob = interpolate(snap.bass, [0.0, 0.65], [0.30, 1.0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-  const ringPulse = 1 + snap.beatDecay * 0.06;
+  const ringPulse = 1 + snap.beatDecay * 0.18;
   const flash = snap.onsetEnvelope > 0.5 ? Math.min(1, (snap.onsetEnvelope - 0.4) * 1.7) : 0;
 
   // Mandala palette

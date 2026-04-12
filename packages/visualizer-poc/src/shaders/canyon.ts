@@ -360,7 +360,7 @@ void main() {
     // Sun glow toward horizon
     col += vec3(1.0, 0.85, 0.55) * smoothstep(0.4, 0.0, abs(rd.y - 0.05)) * 0.35;
     // Energy boost on the slot
-    col *= 1.0 + energy * 0.3 + climaxBoost * 0.4;
+    col *= 0.7 + energy * 0.6 + climaxBoost * 0.4;
   } else {
     vec3 hitPos = camOrigin + rd * marchResult.x;
     vec3 norm = canNormal(hitPos);
@@ -449,7 +449,7 @@ void main() {
     col += matColor * bounceCol * floorBounce * (0.6 + sChorus * 0.4 + climaxBoost * 0.5);
 
     // ─── Energy-driven warmth and brightness lift ───
-    col *= 1.0 + energy * 0.35 + climaxBoost * 0.25;
+    col *= 0.7 + energy * 0.65 + climaxBoost * 0.25;
 
     // Dynamic range contrast
     col *= mix(0.9, 1.25, dynRange * diffuse);

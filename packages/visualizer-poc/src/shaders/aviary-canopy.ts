@@ -400,7 +400,7 @@ void main() {
   vec3 marchPos = ro;
 
   // Adaptive step count: more steps at higher energy
-  int stepCount = int(mix(50.0, 80.0, energy));
+  int stepCount = int(mix(32.0, 96.0, energy));
 
   for (int i = 0; i < AC_MAX_STEPS; i++) {
     if (i >= stepCount) break;
@@ -556,7 +556,7 @@ void main() {
   {
     float dapplePattern = fbm3(vec3(p * 1.5 + flowTime * 0.1, flowTime * 0.05));
     dapplePattern = 0.5 + 0.5 * dapplePattern;
-    float dappleStr = 0.05 * (1.0 + energy * 0.3) * (1.0 - climaxBreak * 0.5);
+    float dappleStr = 0.05 * (0.7 + energy * 0.6) * (1.0 - climaxBreak * 0.5);
     vec3 dappleCol = vec3(1.0, 0.95, 0.7) * dapplePattern * dappleStr;
     col += dappleCol;
   }

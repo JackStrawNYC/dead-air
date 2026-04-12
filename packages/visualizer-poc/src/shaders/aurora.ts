@@ -524,7 +524,7 @@ void main() {
       // Reflected aurora color (height-dependent)
       vec3 reflAurora = mix(auroraColor1, auroraColor2, reflY * 2.0) * curtainBright;
       // Add ripple distortion to reflection (bass-driven)
-      float ripple = sin(hitPos.x * 8.0 + hitPos.z * 6.0 + uDynamicTime * 0.5) * bass * 0.15;
+      float ripple = sin(hitPos.x * 8.0 + hitPos.z * 6.0 + uDynamicTime * 0.5) * bass * 0.30;
       reflAurora *= (0.8 + 0.2 * ripple);
 
       vec3 lakeCol = iceBase * (ambient + auroraLight * 0.5)

@@ -104,7 +104,7 @@ vec3 in2MagmaColor(float temp, float hueShift) {
 
 float in2CavernWall(vec3 pos, float bass, float tension) {
   // Cylindrical cavern: distance from y-axis minus radius
-  float radius = 5.0 + bass * 0.8;
+  float radius = 5.0 + bass * 1.6;
   float cylinderDist = radius - length(pos.xz);
 
   // Rocky wall detail via ridged multifractal
@@ -211,8 +211,8 @@ float in2Geyser(vec3 pos, float energy, float drumOnset, float geyserTime,
     vec3 localPos = pos - vec3(gPos.x, -1.5, gPos.y);
 
     // Geyser: inverted cone of fire
-    float geyserHeight = (1.0 + energy * 3.0 + drumOnset * 2.0 + melodicPitch * 1.0) * eruptionScale;
-    float geyserWidth = 0.3 + energy * 0.15 + drumOnset * 0.2;
+    float geyserHeight = (0.5 + energy * 5.0 + drumOnset * 3.0 + melodicPitch * 1.5) * eruptionScale;
+    float geyserWidth = 0.15 + energy * 0.35 + drumOnset * 0.3;
 
     // Cone shape: wider at top
     float heightFrac = clamp(localPos.y / max(geyserHeight, 0.1), 0.0, 1.0);
@@ -385,7 +385,10 @@ void main() {
 
   // Section-driven modifiers
   // Jam=maximum eruption, space=smoldering embers, chorus=lava flood, solo=dramatic geysers
-  float eruptionMod = mix(1.0, 1.8, sJam) * mix(1.0, 0.15, sSpace) * mix(1.0, 1.3, sChorus) * mix(1.0, 1.5, sSolo);
+  // Space sections: energy-dependent minimum (0.20-0.35) instead of flat 0.15
+  // so loud space still shows SOMETHING, and jam eruption reaches higher
+  float spaceFloor = mix(0.20, 0.35, energy);
+  float eruptionMod = mix(1.0, 2.2, sJam) * mix(1.0, spaceFloor, sSpace) * mix(1.0, 1.5, sChorus) * mix(1.0, 1.8, sSolo);
   float lavaFloodMod = mix(0.0, 0.2, sJam) * 1.0 + sChorus * 0.6 + sSpace * (-0.3);
   float magmaGlowMod = mix(1.0, 1.5, sJam) * mix(1.0, 0.5, sSpace) * mix(1.0, 1.4, sChorus);
   float geyserMod = mix(1.0, 1.6, sJam) * mix(1.0, 0.1, sSpace) * mix(1.0, 1.2, sChorus) * mix(1.0, 1.4, sSolo);
@@ -395,7 +398,7 @@ void main() {
   float climaxBoost = isClimax * clamp(uClimaxIntensity, 0.0, 1.0);
 
   // === DERIVED PARAMETERS ===
-  float eruptionScale = clamp(eruptionMod * (0.3 + energy * 0.5 + drumOnset * 0.3 + aggressive * 0.2)
+  float eruptionScale = clamp(eruptionMod * (0.1 + energy * 0.8 + drumOnset * 0.4 + aggressive * 0.3)
                               + climaxBoost * 0.5, 0.0, 2.0) * geyserMod;
   float floodLevel = clamp(lavaFloodMod + bass * 0.3 + climaxBoost * 0.4, -0.3, 1.0);
   float magmaPressure = clamp((bass * 0.4 + energy * 0.3 + vocalPresence * 0.3) * magmaGlowMod

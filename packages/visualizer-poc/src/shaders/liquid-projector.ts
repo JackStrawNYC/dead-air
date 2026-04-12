@@ -121,7 +121,7 @@ float lp2WaxBlobs(vec3 pos, float time, float bass, float energy, float tension,
     float zPos = cos(time * 0.07 + seed * 3.0) * 0.6;
 
     // Blob radius: varies with position and energy
-    float radius = 0.25 + fi * 0.04 + energy * 0.08;
+    float radius = 0.25 + fi * 0.04 + energy * 0.20;
     // Blobs stretch when moving (tension = viscosity)
     float stretch = 1.0 + abs(cos(phase)) * tension * 0.3;
 

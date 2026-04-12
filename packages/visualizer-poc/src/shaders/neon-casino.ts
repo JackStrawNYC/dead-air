@@ -250,7 +250,7 @@ vec2 ncMap(vec3 p, float ncTime, float energy, float bass, float drumOn,
 
   // Dice — tumbling in the corridor
   {
-    float diceSz = 0.22 + energy * 0.04;
+    float diceSz = 0.22 + energy * 0.12;
     // Two dice per cell at different positions
     for (int di = 0; di < 2; di++) {
       float doff = float(di);
@@ -381,7 +381,7 @@ void main() {
   float climB = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5) * clamp(uClimaxIntensity, 0.0, 1.0);
 
   // Dynamic time with section modulation
-  float ncTime = uDynamicTime * (0.08 + slowE * 0.06) * (1.0 + sJam * 0.5 - sSpace * 0.4);
+  float ncTime = uDynamicTime * (0.08 + slowE * 0.14) * (1.0 + sJam * 0.5 - sSpace * 0.4);
 
   // Palette
   float h1 = uPalettePrimary;
@@ -600,7 +600,7 @@ void main() {
       // Noise-based density
       float hazeDensity = fbm3(hazePos * 0.15 + ncTime * 0.03);
       hazeDensity = hazeDensity * 0.5 + 0.5; // remap 0-1
-      hazeDensity *= (0.04 + energy * 0.06 + sSpace * 0.03);
+      hazeDensity *= (0.04 + energy * 0.30 + sSpace * 0.03);
       // Height falloff: thicker near floor
       float heightFade = smoothstep(3.0, -0.5, hazePos.y);
       hazeDensity *= heightFade;

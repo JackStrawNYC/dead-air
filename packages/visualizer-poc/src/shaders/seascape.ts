@@ -232,7 +232,7 @@ void main() {
   choppy *= mix(1.0, 1.4, sJam);     // jam: rough chop
 
   // Wave frequency: energy drives wind speed
-  float freq = 0.14 + energy * 0.06 + highs * 0.03;
+  float freq = 0.14 + energy * 0.30 + highs * 0.03;
 
   // Amplitude per octave
   float amp = 0.6 + bass * 0.2;
@@ -279,7 +279,7 @@ void main() {
   vec3 ro = vec3(0.0, eyeHeight, uDynamicTime * 1.5);
 
   // Look direction: slight pitch down toward horizon
-  float lookDown = -0.12 - bass * 0.04;
+  float lookDown = -0.12 - bass * 0.12;
   vec3 lookTarget = vec3(sin(uDynamicTime * 0.04) * 0.3, lookDown, 1.0);
   vec3 rd = normalize(vec3(p.x * aspect.x, p.y + lookDown + 0.3, -1.5));
 
@@ -365,7 +365,7 @@ void main() {
       oceanColor += sunCol * spec * 0.6;
 
       // === FOAM on wave crests ===
-      float foamThreshold = 0.55 - energy * 0.15 - onset * 0.2 - flux * 0.1;
+      float foamThreshold = 0.55 - energy * 0.30 - onset * 0.2 - flux * 0.1;
       float foam = smoothstep(foamThreshold, foamThreshold + 0.15, waveHeight);
       foam *= 0.5 + _ss_noise2d(hitPos.xz * 8.0 + uDynamicTime * 0.5) * 0.5;
       foam = clamp(foam, 0.0, 1.0);

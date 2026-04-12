@@ -78,7 +78,7 @@ float ssSpiralTube(vec3 pos, float time, float bass, float tension) {
 
   // Logarithmic spiral parameters
   float growthRate = log(PHI) / TAU; // golden ratio growth per revolution
-  float spiralA = 0.3 + bass * 0.05;
+  float spiralA = 0.3 + bass * 0.14;
 
   // Find nearest spiral arm
   float nearestDist = 1e6;

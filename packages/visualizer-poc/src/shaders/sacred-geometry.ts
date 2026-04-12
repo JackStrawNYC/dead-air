@@ -288,7 +288,7 @@ float sg2Map(vec3 p, float energy, float bass, float tension, float tm,
       for (int j = 0; j < 3; j++) {
         float ringY = -1.5 + float(j) * SG2_PHI * 0.9;
         vec3 ringP = p - pillarPos - vec3(0.0, ringY, 0.0);
-        float ring = sg2Torus(ringP, 0.25 + bass * 0.04, 0.03);
+        float ring = sg2Torus(ringP, 0.25 + bass * 0.12, 0.03);
         d = min(d, ring);
       }
     }
@@ -326,7 +326,7 @@ float sg2Map(vec3 p, float energy, float bass, float tension, float tm,
     float ang = orbitSpeed;
     vec3 oPos = vec3(cos(ang) * orbitR, sin(tm * 0.3) * 0.5, sin(ang) * orbitR);
     vec3 op = sg2RotY(tm * 0.4) * sg2RotX(tm * 0.3) * (p - oPos);
-    float sz = 0.2 + bass * 0.05;
+    float sz = 0.2 + bass * 0.14;
     d = min(d, sg2Octa(op, sz));
   }
 
@@ -336,7 +336,7 @@ float sg2Map(vec3 p, float energy, float bass, float tension, float tm,
     float ang2 = orbitSpeed + SG2_TAU / 3.0;
     vec3 tPos = vec3(cos(ang2) * orbitR, sin(tm * 0.25 + 2.0) * 0.5, sin(ang2) * orbitR);
     vec3 tp = sg2RotZ(tm * 0.35) * sg2RotY(tm * 0.25) * (p - tPos);
-    float tsz = 0.25 + bass * 0.05;
+    float tsz = 0.25 + bass * 0.14;
     float tetra = sg2Tetra(tp, tsz);
     d = min(d, tetra / vis); // vis modulates effective distance
   }
@@ -346,7 +346,7 @@ float sg2Map(vec3 p, float energy, float bass, float tension, float tm,
     float ang3 = orbitSpeed + SG2_TAU * 2.0 / 3.0;
     vec3 iPos = vec3(cos(ang3) * orbitR, sin(tm * 0.35 + 4.0) * 0.5, sin(ang3) * orbitR);
     vec3 ip = sg2RotX(tm * 0.3) * sg2RotZ(tm * 0.2) * (p - iPos);
-    float isz = 0.18 + bass * 0.04;
+    float isz = 0.18 + bass * 0.12;
     d = min(d, sg2Icosa(ip, isz));
   }
 
@@ -355,7 +355,7 @@ float sg2Map(vec3 p, float energy, float bass, float tension, float tm,
     float ang4 = -orbitSpeed * 0.7 + SG2_PI;
     vec3 dPos = vec3(cos(ang4) * orbitR * 0.8, 1.0 + sin(tm * 0.2) * 0.3, sin(ang4) * orbitR * 0.8);
     vec3 dp = sg2RotY(-tm * 0.25) * sg2RotX(tm * 0.15) * (p - dPos);
-    float dsz = 0.2 + bass * 0.04;
+    float dsz = 0.2 + bass * 0.12;
     d = min(d, sg2Dodeca(dp, dsz));
   }
 

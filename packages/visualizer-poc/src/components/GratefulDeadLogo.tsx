@@ -133,10 +133,10 @@ export const GratefulDeadLogo: React.FC<Props> = ({ frames }) => {
   if (masterOpacity < 0.01) return null;
 
   // Audio drives
-  const warmth = interpolate(snap.slowEnergy, [0.02, 0.32], [0.55, 1.10], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-  const shimmer = interpolate(snap.energy, [0.02, 0.30], [0.45, 1.0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const warmth = interpolate(snap.slowEnergy, [0.02, 0.32], [0.20, 1.50], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const shimmer = interpolate(snap.energy, [0.02, 0.30], [0.20, 1.0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
   const dropWeight = interpolate(snap.bass, [0.0, 0.65], [0.35, 1.0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-  const letterPulse = 1 + snap.beatDecay * 0.06;
+  const letterPulse = 1 + snap.beatDecay * 0.18;
   const flash = snap.onsetEnvelope > 0.5 ? Math.min(1, (snap.onsetEnvelope - 0.4) * 1.6) : 0;
 
   // Psychedelic palette

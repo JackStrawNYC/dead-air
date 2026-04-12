@@ -62,7 +62,7 @@ float embers(vec2 p, float time, float onset, float energy) {
     float h2 = fract(sin(fi * 311.7) * 43758.5453);
     float h3 = fract(sin(fi * 543.3) * 43758.5453);
 
-    float speed = 0.1 + h1 * 0.2 + energy * 0.15;
+    float speed = 0.1 + h1 * 0.2 + energy * 0.30;
     float phase = fract(time * speed + h3);
     float x = (h2 - 0.5) * 0.8 + sin(time * (0.5 + h1) + fi) * 0.1;
     float y = phase * 0.5;

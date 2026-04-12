@@ -88,7 +88,7 @@ export const SunMoonMotif: React.FC<Props> = ({ frames }) => {
 
   // Audio
   const cosmicWarmth = interpolate(snap.slowEnergy, [0.02, 0.32], [0.55, 1.15], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-  const sunBright = interpolate(snap.energy, [0.02, 0.32], [0.45, 1.0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const sunBright = interpolate(snap.energy, [0.02, 0.32], [0.20, 1.0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
   const bodyPulse = 1 + snap.bass * 0.20;
   const rayRotation = (frame * 0.18 * tempoFactor + snap.beatDecay * 30) % 360;
   const flashBurst = snap.onsetEnvelope > 0.5 ? Math.min(1, (snap.onsetEnvelope - 0.4) * 1.6) : 0;

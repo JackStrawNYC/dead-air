@@ -243,7 +243,7 @@ void main() {
   float beatSnap = clamp(uBeatSnap, 0.0, 1.0);
 
   float timeVal = uDynamicTime;
-  float flowTime = timeVal * (0.06 + slowE * 0.04);
+  float flowTime = timeVal * (0.06 + slowE * 0.10);
 
   // Section-type modulation
   float sectionT = uSectionType;

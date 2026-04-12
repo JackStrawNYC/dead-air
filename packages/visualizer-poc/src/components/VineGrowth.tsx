@@ -394,7 +394,7 @@ export const VineGrowth: React.FC<Props> = ({ frames }) => {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
-  const foliageGlow = interpolate(slowEnergy, [0.02, 0.32], [0.55, 1.10], {
+  const foliageGlow = interpolate(slowEnergy, [0.02, 0.32], [0.20, 1.50], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });

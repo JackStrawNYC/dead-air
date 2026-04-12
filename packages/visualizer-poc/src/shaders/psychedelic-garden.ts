@@ -618,7 +618,7 @@ void main() {
   float climaxBoost = isClimax * climaxI;
 
   // ─── Set global scene parameters ───
-  pgGardenTime = uDynamicTime * (0.06 + slowE * 0.04) * mix(1.0, 1.6, sJam) * mix(1.0, 0.3, sSpace);
+  pgGardenTime = uDynamicTime * (0.06 + slowE * 0.10) * mix(1.0, 1.6, sJam) * mix(1.0, 0.3, sSpace);
 
   pgBloomState = mix(0.15, 1.0, energy);
   pgBloomState = mix(pgBloomState, 1.0, sChorus * 0.6);
@@ -805,7 +805,7 @@ void main() {
 
     // Rim light (backlight through petals)
     float rim = pow(1.0 - max(0.0, dot(n, -rd)), 3.0);
-    vec3 rimLight = sunColor * rim * 0.15 * (1.0 + energy * 0.3);
+    vec3 rimLight = sunColor * rim * 0.15 * (0.7 + energy * 0.6);
 
     // ─── Compose lighting ───
     col = matCol * (diffuseLight + ambient) + sssColor + specular + rimLight;

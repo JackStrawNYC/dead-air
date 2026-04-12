@@ -296,7 +296,7 @@ void main() {
   // THIN haze — prm stays low
   float prm = smoothstep(-0.4, 0.4, sin(uTime * 0.15));
   prm *= 0.6; // reduce overall density
-  prm += energy * 0.15; // energy adds slight thickening
+  prm += energy * 0.30; // energy adds slight thickening
   prm += sJam * 0.1;
   prm -= sSpace * 0.15;
 
@@ -312,7 +312,7 @@ void main() {
   vec3 palCol1 = paletteHueColor(hue1, 0.8, 0.9);
   vec3 palCol2 = paletteHueColor(hue2, 0.8, 0.9);
   // Warm palette bias
-  float palMix = 0.12 + energy * 0.08;
+  float palMix = 0.12 + energy * 0.20;
   col = mix(col, col * mix(palCol1, palCol2, sin(uTime * 0.08) * 0.5 + 0.5), palMix);
 
   // === FORWARD SCATTER ATMOSPHERIC GLOW ===

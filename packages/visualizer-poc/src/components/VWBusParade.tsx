@@ -108,8 +108,9 @@ export const VWBusParade: React.FC<Props> = ({ frames }) => {
   const onsetEnv = snap.onsetEnvelope;
   const chromaHue = snap.chromaHue;
 
-  const sunBright = 0.6 + slowEnergy * 0.4;
-  const headlightGlow = 0.5 + energy * 0.4 + beatDecay * 0.4;
+  // Widened: dim at quiet, blazing at loud
+  const sunBright = 0.25 + slowEnergy * 0.8;
+  const headlightGlow = 0.2 + energy * 0.7 + beatDecay * 0.6;
 
   const baseHue = 28;
   const tintHue = ((baseHue + (chromaHue - 180) * 0.32) % 360 + 360) % 360;

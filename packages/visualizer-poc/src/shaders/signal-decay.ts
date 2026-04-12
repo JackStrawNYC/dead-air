@@ -362,7 +362,7 @@ void main() {
   // Distant nebula glow reacting to bass
   float nebulaField = fbm6(vec3(rd.xy * 3.0, flowTime * 0.05));
   vec3 nebulaTint = mix(signalTint * 0.1, secondaryTint * 0.15, nebulaField * 0.5 + 0.5);
-  col += nebulaTint * (0.1 + bass * 0.15);
+  col += nebulaTint * (0.1 + bass * 0.30);
 
   // ─── Surface shading ───
   if (marchHasHit) {
@@ -555,7 +555,7 @@ void main() {
   // ─── Secondary glow layer ───
   float glowNoise = fbm3(vec3(p * 2.0, flowTime * 0.12));
   vec3 glowLayer = mix(signalTint, secondaryTint, glowNoise * 0.5 + 0.5) * 0.03;
-  col += glowLayer * (0.2 + energy * 0.15);
+  col += glowLayer * (0.2 + energy * 0.30);
 
   // ─── Icon emergence ───
   {

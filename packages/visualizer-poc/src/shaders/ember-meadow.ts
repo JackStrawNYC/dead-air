@@ -309,11 +309,11 @@ void main() {
     float centerDist = abs(baseX - 0.5);
     float height = mix(0.22, 0.32, 1.0 - centerDist) + emHash11(seed * 7.3) * 0.04;
     // Bass pulse
-    height *= 1.0 + bass * 0.08 + effectiveBeat * 0.05;
+    height *= 1.0 + bass * 0.20 + effectiveBeat * 0.05;
 
     // Wind sway: phase-offset per flower
     float swayPhase = fi * 0.7 + windTime * (1.2 + melodicDir * 0.2);
-    float swayAmp = (0.025 + slowE * 0.04) * swayBoost;
+    float swayAmp = (0.025 + slowE * 0.10) * swayBoost;
     swayAmp *= mix(0.6, 1.0, stability);
     swayAmp += onset * 0.015;
     float sway = sin(swayPhase) * swayAmp + sin(swayPhase * 1.7 + 0.5) * swayAmp * 0.3;

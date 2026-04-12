@@ -108,7 +108,7 @@ export const UncleSam: React.FC<Props> = ({ frames }) => {
 
   const flagWave = 0.5 + slowEnergy * 0.5 + bass * 0.2;
   const fireworkIntensity = 0.5 + energy * 0.4 + onsetEnv * 0.5;
-  const fingerPulse = 1 + bass * 0.08 + beatDecay * 0.04;
+  const fingerPulse = 1 + bass * 0.08 + beatDecay * 0.12;
   const starPulse = 1 + beatDecay * 0.4;
 
   /* Psychedelic patriotic palette */

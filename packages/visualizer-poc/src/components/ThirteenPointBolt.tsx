@@ -99,16 +99,17 @@ export const ThirteenPointBolt: React.FC<Props> = ({ frames }) => {
   const masterOpacity = Math.min(fadeIn, fadeOut) * 0.95;
   if (masterOpacity < 0.01) return null;
 
-  // Audio drives
-  const warmth = interpolate(snap.slowEnergy, [0.02, 0.32], [0.55, 1.10], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-  const boltBright = interpolate(snap.energy, [0.02, 0.30], [0.45, 1.0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-  const stormDrive = interpolate(snap.bass, [0.0, 0.65], [0.30, 1.0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-  const boltPulse = 1 + snap.beatDecay * 0.06;
+  // Audio drives — widened for dramatic quiet/loud contrast
+  const warmth = interpolate(snap.slowEnergy, [0.02, 0.32], [0.15, 1.50], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const boltBright = interpolate(snap.energy, [0.02, 0.30], [0.20, 1.0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const stormDrive = interpolate(snap.bass, [0.0, 0.65], [0.15, 1.0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  // Beat pulse: 4x wider (0.25 vs 0.06) — visible bolt throb on every beat
+  const boltPulse = 1 + snap.beatDecay * 0.25;
   const flash = snap.onsetEnvelope > 0.5 ? Math.min(1, (snap.onsetEnvelope - 0.4) * 1.7) : 0;
 
-  // Bolt palette modulated by chromaHue
+  // Bolt palette modulated by chromaHue — wider shift for more color drama
   const baseHue = 50;
-  const tintHue = ((baseHue + (snap.chromaHue - 180) * 0.30) % 360 + 360) % 360;
+  const tintHue = ((baseHue + (snap.chromaHue - 180) * 0.55) % 360 + 360) % 360;
   const boltColor = `hsl(${tintHue}, 92%, ${60 + boltBright * 14}%)`;
   const boltCore = `hsl(${tintHue}, 100%, ${82 + boltBright * 12}%)`;
   const boltDeep = `hsl(${(tintHue - 20 + 360) % 360}, 90%, ${42 + boltBright * 10}%)`;
@@ -159,12 +160,12 @@ export const ThirteenPointBolt: React.FC<Props> = ({ frames }) => {
 
   // Storm clouds
   const cloudNodes = clouds.map((c, i) => {
-    const cxN = ((c.cx + frame * c.drift * (1 + stormDrive * 0.6)) % 1.2) - 0.1;
-    const churn = 1 + stormDrive * 0.18 + Math.sin(frame * 0.012 + i) * 0.04;
+    const cxN = ((c.cx + frame * c.drift * (1 + stormDrive * 1.2)) % 1.2) - 0.1;
+    const churn = 1 + stormDrive * 0.35 + Math.sin(frame * 0.012 + i) * 0.06;
     return (
       <ellipse key={`cl-${i}`} cx={cxN * width} cy={c.cy * height}
         rx={c.rx * width * churn} ry={c.ry * height * churn}
-        fill={`rgba(${20 + c.shade * 10}, ${22 + c.shade * 10}, ${30 + c.shade * 12}, ${0.55 + stormDrive * 0.22})`}
+        fill={`rgba(${20 + c.shade * 10}, ${22 + c.shade * 10}, ${30 + c.shade * 12}, ${0.30 + stormDrive * 0.50})`}
         filter="url(#tpb-blur)" />
     );
   });
@@ -174,8 +175,8 @@ export const ThirteenPointBolt: React.FC<Props> = ({ frames }) => {
     const flick = 0.5 + Math.sin(frame * s.speed + s.phase) * 0.5;
     return (
       <circle key={`spk-${i}`} cx={s.x * width} cy={s.y * height}
-        r={s.r * (0.7 + boltBright * 0.6)}
-        fill={boltCore} opacity={0.40 * flick * boltBright} />
+        r={s.r * (0.3 + boltBright * 1.2)}
+        fill={boltCore} opacity={0.40 * flick * Math.max(0.10, boltBright)} />
     );
   });
 
@@ -190,7 +191,7 @@ export const ThirteenPointBolt: React.FC<Props> = ({ frames }) => {
     const sy0 = by(p1[1] + (p2[1] - p1[1]) * segT);
     const wig = Math.sin(frame * 0.10 * tempoFactor + b.phase) * 0.3;
     const a = b.angle + wig;
-    const len = b.len * (0.85 + boltBright * 0.30);
+    const len = b.len * (0.55 + boltBright * 0.60);
     const ex = sx0 + Math.cos(a) * len;
     const ey = sy0 + Math.sin(a) * len;
     const mx = sx0 + Math.cos(a) * len * 0.5 + Math.sin(a) * 8;

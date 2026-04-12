@@ -474,7 +474,7 @@ export const BoxOfRain: React.FC<Props> = ({ frames }) => {
             cy={cubeScreenBottom + cubeScreenHeight * 0.4}
             rx={cubeScreenWidth * 0.8}
             ry={cubeScreenHeight * 0.25}
-            fill={`hsla(${wireHue}, 30%, 50%, ${0.06 + beatDecay * 0.04})`}
+            fill={`hsla(${wireHue}, 30%, 50%, ${0.06 + beatDecay * 0.12})`}
             style={{ filter: "blur(12px)" }}
           />
         </g>

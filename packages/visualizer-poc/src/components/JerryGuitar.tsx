@@ -74,8 +74,8 @@ export const JerryGuitar: React.FC<Props> = ({ frames }) => {
   if (masterOpacity < 0.01) return null;
 
   // Audio drives
-  const spotWarmth = interpolate(snap.slowEnergy, [0.02, 0.32], [0.55, 1.10], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-  const brassShimmer = interpolate(snap.energy, [0.02, 0.30], [0.45, 1.0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const spotWarmth = interpolate(snap.slowEnergy, [0.02, 0.32], [0.20, 1.50], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const brassShimmer = interpolate(snap.energy, [0.02, 0.30], [0.20, 1.0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
   const sustain = interpolate(snap.bass, [0.0, 0.7], [0.30, 1.0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
   const stringPulse = 1 + snap.beatDecay * 0.5;
   const flash = snap.onsetEnvelope > 0.5 ? Math.min(1, (snap.onsetEnvelope - 0.4) * 1.6) : 0;

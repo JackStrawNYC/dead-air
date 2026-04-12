@@ -88,7 +88,7 @@ export const MosesStaff: React.FC<Props> = ({ frames }) => {
 
   // Audio drives
   const divineGlow = interpolate(snap.slowEnergy, [0.02, 0.32], [0.55, 1.15], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-  const rayBright = interpolate(snap.energy, [0.02, 0.30], [0.45, 1.0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const rayBright = interpolate(snap.energy, [0.02, 0.30], [0.20, 1.0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
   const stormDrive = interpolate(snap.bass, [0.0, 0.65], [0.30, 1.0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
   const staffPulse = 1 + snap.beatDecay * 0.35;
   const flashSeed = (frame * 0.137 + Math.sin(frame * 0.041) * 1.7) % 1;

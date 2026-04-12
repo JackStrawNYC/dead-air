@@ -414,7 +414,7 @@ void main() {
   float flowPhase = uDynamicTime * (0.5 + energy * 2.0) * flowSpeed * accelBoost;
 
   // Pipe radius: bass-pulsed
-  float basePipeRadius = 0.06 + bass * 0.04;
+  float basePipeRadius = 0.06 + bass * 0.12;
   basePipeRadius *= mix(1.0, 1.3, sJam) * mix(1.0, 0.6, sSpace);
 
   // Fluid radius (inside pipes)

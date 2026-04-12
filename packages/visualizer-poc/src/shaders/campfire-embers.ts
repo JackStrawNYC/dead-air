@@ -402,7 +402,7 @@ void main() {
   // ─── Camera setup: sitting across the fire, looking slightly down ───
   vec3 camPosition = vec3(
     sin(timeVal * 0.03) * 0.15,
-    0.8 + bass * 0.08,
+    0.8 + bass * 0.20,
     -2.2 + energy * 0.1
   );
   vec3 lookAtPt = vec3(0.0, 0.6 + melPitch * 0.3, 0.0);
@@ -414,7 +414,7 @@ void main() {
 
   // ─── Flame parameters (audio-driven) ───
   float flameHeight = (1.2 + bass * 0.8 + melPitch * 0.4 + climaxBoost * 1.5) * fireScale2;
-  float flameWidth = (0.35 + bass * 0.15 + energy * 0.1) * mix(1.0, 1.3, sChorus) * mix(1.0, 0.4, sSpace);
+  float flameWidth = (0.35 + bass * 0.30 + energy * 0.1) * mix(1.0, 1.3, sChorus) * mix(1.0, 0.4, sSpace);
 
   // ─── Raymarch solid scene ───
   float marchDist = 0.0;
@@ -532,7 +532,7 @@ void main() {
       if (smokeDens < 0.01) continue;
 
       // Smoke is dark, slightly warm-tinted from firelight below
-      vec3 smokeCol = vec3(0.08, 0.06, 0.04) * (1.0 + energy * 0.3);
+      vec3 smokeCol = vec3(0.08, 0.06, 0.04) * (0.7 + energy * 0.6);
       // Firelight illuminating smoke from below
       float smokeLightDist = length(smokePos - vec3(0.0, 0.5, 0.0));
       float smokeLight = 1.0 / (1.0 + smokeLightDist * smokeLightDist * 0.8);

@@ -439,7 +439,7 @@ void main() {
 
   // === DERIVED PARAMETERS ===
   float majorR = 2.5; // torus major radius
-  float minorR = 0.6 + bass * 0.05; // torus tube radius (breathes with bass)
+  float minorR = 0.6 + bass * 0.14; // torus tube radius (breathes with bass)
   float stability = beatStability * containmentMod * (1.0 - tension * 0.4);
   float turbulence = clamp(turbulenceMod * (0.3 + drumOnset * 0.4 + tension * 0.3), 0.0, 1.5);
   float plasmaTemp = clamp(plasmaTempMod * (0.3 + energy * 0.4 + bass * 0.2 + timbralBright * 0.1 + dynRange * 0.1), 0.0, 1.2);
@@ -665,7 +665,7 @@ void main() {
   // Subtle energy barrier visible as a faint shell around the torus
   {
     float distFromTorus = abs(pf2Ring(ro + rd * totalDist, majorR, minorR + 0.1));
-    float shellGlow = smoothstep(0.2, 0.0, distFromTorus) * energy * 0.15;
+    float shellGlow = smoothstep(0.2, 0.0, distFromTorus) * energy * 0.30;
     vec3 shieldColor = mix(vec3(0.1, 0.3, 0.8), vec3(0.8, 0.2, 0.1), tension);
     col += shieldColor * shellGlow * (0.5 + stability * 0.5);
   }

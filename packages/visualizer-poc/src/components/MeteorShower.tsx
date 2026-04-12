@@ -91,9 +91,11 @@ export const MeteorShower: React.FC<Props> = ({ frames }) => {
   if (masterOpacity < 0.01) return null;
 
   // Audio
-  const atmosGlow = interpolate(snap.slowEnergy, [0.02, 0.32], [0.55, 1.15], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-  const meteorBright = interpolate(snap.energy, [0.02, 0.32], [0.45, 1.0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-  const trailMul = 1 + snap.beatDecay * 0.5;
+  // Widened: faint ambient at quiet → vivid shower at loud
+  const atmosGlow = interpolate(snap.slowEnergy, [0.02, 0.32], [0.20, 1.50], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const meteorBright = interpolate(snap.energy, [0.02, 0.32], [0.10, 1.0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  // Widened trail: short at quiet → dramatic streaks at loud
+  const trailMul = 1 + snap.beatDecay * 1.0;
   const burstSpawn = snap.onsetEnvelope > 0.6;
   const burst = snap.onsetEnvelope > 0.5 ? Math.min(1, (snap.onsetEnvelope - 0.4) * 1.6) : 0;
 

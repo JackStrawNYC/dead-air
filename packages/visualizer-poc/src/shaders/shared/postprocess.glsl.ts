@@ -169,16 +169,42 @@ ${
   // Cinematic grade (ACES tone mapping)
   col = cinematicGrade(col, energy);
 
+  // Quiet-passage micro-detail: when energy drops, add subtle visual texture
+  // instead of just dimming to darkness. Sparkles, dust motes, enhanced grain.
+  // Follows the Cosmic Voyage model — quiet should look DIFFERENT, not EMPTY.
+  {
+    float quietness = smoothstep(0.20, 0.04, energy);
+    if (quietness > 0.01) {
+      // Micro-sparkle dust motes: hash-based point lights in screen space
+      vec2 sparkleUV = uv * vec2(80.0, 45.0);
+      vec2 sparkleCell = floor(sparkleUV);
+      vec2 sparkleFrac = fract(sparkleUV) - 0.5;
+      float sparkleHash = fract(sin(dot(sparkleCell, vec2(127.1, 311.7)) + floor(uTime * 2.0)) * 43758.5453);
+      float sparkleDist = length(sparkleFrac);
+      float sparkle = smoothstep(0.15, 0.02, sparkleDist) * step(0.92, sparkleHash);
+      // Gentle warm sparkle color
+      vec3 sparkleCol = mix(vec3(0.8, 0.75, 0.65), vec3(0.6, 0.7, 0.9), sparkleHash * 0.5);
+      col += sparkleCol * sparkle * quietness * 0.08;
+
+      // Atmospheric dust drift: very slow noise-based luminance variation
+      float dustNoise = snoise(vec3(uv * 3.0, uDynamicTime * 0.02));
+      col += vec3(0.03, 0.025, 0.02) * (dustNoise * 0.5 + 0.5) * quietness * 0.15;
+
+      // Slight warm tint on quiet passages — candlelight intimacy
+      col = mix(col, col * vec3(1.06, 1.02, 0.94), quietness * 0.3);
+    }
+  }
+
   // Envelope brightness (the ONE knob)
   col *= uEnvelopeBrightness;
 
-  // Envelope saturation, with an energy knee so quiet sections read as muted
-  // and loud sections read as vivid. Ballad RMS ~0.10 → ~0.78x saturation;
-  // rocker RMS ~0.65 → ~1.18x saturation. This is the visual signal that
-  // viewers actually feel as "this song looks slow/fast".
+  // Envelope saturation: wide energy knee so quiet = visibly muted, loud = vivid.
+  // Widened from 0.72-1.22 to 0.55-1.35 for dramatically more color contrast.
+  // Ballad at RMS ~0.10 → ~0.60x sat (moody/desaturated).
+  // Rocker at RMS ~0.65 → ~1.28x sat (vivid/punchy).
   {
     float envLuma = dot(col, vec3(0.299, 0.587, 0.114));
-    float satKnee = mix(0.72, 1.22, energy);
+    float satKnee = mix(0.55, 1.35, energy);
     col = mix(vec3(envLuma), col, uEnvelopeSaturation * satKnee);
   }
 

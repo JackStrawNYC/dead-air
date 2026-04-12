@@ -216,7 +216,7 @@ vec3 btGodRays(vec3 ro, vec3 rd, float maxDist, float energy, float bass,
 
     // Fog/dust density: noise-modulated atmosphere
     float dustNoise = fbm3(samplePos * 2.0 + vec3(0.0, time * 0.03, time * 0.08));
-    float dustDensity = (0.15 + energy * 0.35 + bass * 0.15) * (0.5 + dustNoise * 0.5);
+    float dustDensity = (0.15 + energy * 0.35 + bass * 0.30) * (0.5 + dustNoise * 0.5);
 
     // Jam: beams dance wildly (oscillate gap positions)
     float jamWobble = sJam * sin(fi * 0.7 + time * 3.0) * 0.3;
@@ -389,7 +389,7 @@ void main() {
   coolTint = mix(coolTint, vec3(0.2, 0.25, 0.4), 0.2);
 
   // ─── Time / motion ───
-  float flowTime = uDynamicTime * (0.06 + slowE * 0.04) * mix(1.0, 1.4, sJam) * mix(1.0, 0.4, sSpace);
+  float flowTime = uDynamicTime * (0.06 + slowE * 0.10) * mix(1.0, 1.4, sJam) * mix(1.0, 0.4, sSpace);
   float scrollSpeed = 0.5 + slowE * 1.5 + sJam * 0.8;
 
   // ─── Slat gap width (audio modulated) ───
@@ -444,9 +444,9 @@ void main() {
   float totalDist = 0.0;
   vec3 hitPos = ro;
   bool didHitGeom = false;
-  int maxSteps = int(mix(48.0, 80.0, energy));
+  int maxSteps = int(mix(32.0, 96.0, energy));
 
-  for (int i = 0; i < 80; i++) {
+  for (int i = 0; i < 96; i++) {
     if (i >= maxSteps) break;
     vec3 pos = ro + rd * totalDist;
     float dist = btMap(pos, bassShake, gapWidth, climaxOpen, flowTime);
@@ -503,7 +503,7 @@ void main() {
     vec3 specLight = sunColor * spec * 0.15;
 
     // Fresnel rim
-    vec3 rimLight = warmTint * fresnel * 0.08 * (1.0 + energy * 0.3);
+    vec3 rimLight = warmTint * fresnel * 0.08 * (0.7 + energy * 0.6);
 
     col = matCol * (ambient + directLight) * occl + specLight + rimLight;
     col *= depthFade;

@@ -444,7 +444,7 @@ void main() {
   tiltAngle += sSolo * 0.06 * sin(flowTime * 0.5);
 
   // ─── Frame geometry parameters ───
-  float frameThick = 0.12 + energy * 0.04;
+  float frameThick = 0.12 + energy * 0.12;
 
   // ─── Bass vibration for floor ───
   float bassVib = stemBass * 0.5 + bass * 0.3;
@@ -485,9 +485,9 @@ void main() {
   vec3 hitPos = ro;
   float hitMatId = -1.0;
   bool didHitGeom = false;
-  int maxSteps = int(mix(48.0, 72.0, energy));
+  int maxSteps = int(mix(32.0, 96.0, energy));
 
-  for (int i = 0; i < 72; i++) {
+  for (int i = 0; i < 96; i++) {
     if (i >= maxSteps) break;
     vec3 pos = ro + rd * totalDist;
     float matId;

@@ -378,7 +378,7 @@ void main() {
 
   // Vignette — aggressive dark edges
   vec2 q = vUv;
-  float vigStrength = 0.18 - energy * 0.04;
+  float vigStrength = 0.18 - energy * 0.12;
   col *= pow(16.0 * q.x * q.y * (1.0 - q.x) * (1.0 - q.y), vigStrength) * 0.7 + 0.3;
 
   // Onset flash

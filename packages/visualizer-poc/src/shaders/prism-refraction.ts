@@ -115,7 +115,7 @@ float pr2SceneSDF(vec3 pos, float time, float bass, float tiltDir, out int pr2Ob
   // Main prism (centered, rotates slowly)
   vec3 p1 = pr2RotY(time * 0.1 + tiltDir * 0.2) * pos;
   p1 = pr2RotX(0.15) * p1;
-  float prism1 = pr2SdTriPrism(p1, vec2(1.0 + bass * 0.15, 1.5));
+  float prism1 = pr2SdTriPrism(p1, vec2(1.0 + bass * 0.30, 1.5));
   if (prism1 < minDist) { minDist = prism1; pr2ObjId = 1; }
 
   // Secondary prism (offset, different angle)

@@ -340,7 +340,7 @@ void main() {
   vec3 rd = normalize(vec3(p.x, p.y + 0.4, -1.0));
 
   // Gentle camera sway from bass
-  float sway = bass * 0.08;
+  float sway = bass * 0.20;
   rd.xz *= _na_rot2(sin(uDynamicTime * 0.15) * sway);
   rd.yz *= _na_rot2(cos(uDynamicTime * 0.12) * sway * 0.5);
 

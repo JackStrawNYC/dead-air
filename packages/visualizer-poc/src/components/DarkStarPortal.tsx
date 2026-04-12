@@ -101,13 +101,14 @@ export const DarkStarPortal: React.FC<Props> = ({ frames }) => {
   });
 
   // Accretion disk glow intensity
-  const glowIntensity = interpolate(energy, [0.03, 0.3], [0.3, 1], {
+  // Widened glow: barely visible at quiet → vivid at loud
+  const glowIntensity = interpolate(energy, [0.03, 0.3], [0.10, 1], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
 
-  // Lensing warp strength
-  const lensStrength = interpolate(energy, [0.05, 0.3], [0.02, 0.08], {
+  // Widened lensing: subtle warp at quiet → dramatic at loud (was 0.02-0.08)
+  const lensStrength = interpolate(energy, [0.05, 0.3], [0.01, 0.15], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
@@ -182,11 +183,13 @@ export const DarkStarPortal: React.FC<Props> = ({ frames }) => {
 
         {/* Orbiting rings */}
         {rings.map((ring, i) => {
-          // Bass → ring rotation speed multiplier
-          const bassRotMult = 0.6 + snap.bass * 0.8;
+          // Bass → ring rotation speed + radius warping (gravitational pull on bass)
+          const bassRotMult = 0.3 + snap.bass * 1.4;
           const rotAngle = cycleFrame * ring.speed * 0.5 * bassRotMult + ring.phase;
-          const ringR = ring.radius * formScale;
-          const ringAlpha = glowIntensity * 0.7;
+          // Bass-driven ring wobble: elliptical distortion on bass hits
+          const ringWobble = 1 + snap.bass * 0.12 * Math.sin(rotAngle * 3 + i);
+          const ringR = ring.radius * formScale * ringWobble;
+          const ringAlpha = glowIntensity * 0.7 + snap.beatDecay * 0.2;
           const color = `hsla(${ring.hue}, 85%, 70%, ${ringAlpha})`;
 
           return (

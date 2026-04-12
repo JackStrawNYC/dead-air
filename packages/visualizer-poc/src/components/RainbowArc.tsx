@@ -109,7 +109,7 @@ export const RainbowArc: React.FC<Props> = ({ frames }) => {
 
   // Audio
   const skyWarmth = interpolate(snap.slowEnergy, [0.02, 0.32], [0.55, 1.15], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-  const arcBright = interpolate(snap.energy, [0.02, 0.32], [0.45, 1.0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const arcBright = interpolate(snap.energy, [0.02, 0.32], [0.20, 1.0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
   const arcThick = 1 + snap.bass * 0.30;
   const flap = Math.sin(frame * 0.18 * tempoFactor) * (4 + snap.beatDecay * 6);
   const shimmerBurst = snap.onsetEnvelope > 0.5 ? Math.min(1, (snap.onsetEnvelope - 0.4) * 1.6) : 0;

@@ -127,7 +127,7 @@ export const DarkStarAscent: React.FC<Props> = ({ frames }) => {
 
   // Audio
   const coronaGlow = interpolate(snap.slowEnergy, [0.02, 0.32], [0.55, 1.15], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-  const promBright = interpolate(snap.energy, [0.02, 0.32], [0.45, 1.0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const promBright = interpolate(snap.energy, [0.02, 0.32], [0.20, 1.0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
   const gravityPulse = 1 + snap.bass * 0.40;
   const accelMul = 1 + snap.beatDecay * 0.6;
   const flareBurst = snap.onsetEnvelope > 0.5 ? Math.min(1, (snap.onsetEnvelope - 0.4) * 1.8) : 0;

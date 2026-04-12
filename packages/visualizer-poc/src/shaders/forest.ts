@@ -130,7 +130,7 @@ void main() {
   diffuse *= mix(1.0, 0.7 + soloSpot * 0.6, soloFocus);
 
   // Bass: subtle ground throb
-  diffuse += bass * 0.04 * sin(vWorldPos.x * 0.5 + uDynamicTime * 1.5);
+  diffuse += bass * 0.12 * sin(vWorldPos.x * 0.5 + uDynamicTime * 1.5);
 
   col *= diffuse;
 

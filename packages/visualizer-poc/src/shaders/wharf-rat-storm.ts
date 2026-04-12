@@ -287,7 +287,7 @@ void main() {
   // === PROTEAN PARAMETERS ===
   // prm controls the density character
   float prm = 0.6 + tension * 0.3; // high base = heavy clouds
-  prm += bass * 0.15; // bass rumble
+  prm += bass * 0.30; // bass rumble
   // Energy barely affects until the build
   prm += energy * 0.1 * smoothstep(0.4, 0.7, energy); // gated energy response
   // Climax thins clouds dramatically
@@ -305,7 +305,7 @@ void main() {
   vec3 palCol1 = paletteHueColor(hue1, 0.55, 0.85);
   vec3 palCol2 = paletteHueColor(hue2, 0.55, 0.85);
   // Very subtle palette influence — storm is mostly gray
-  float palMix = 0.06 + energy * 0.04;
+  float palMix = 0.06 + energy * 0.12;
   col = mix(col, col * mix(palCol1, palCol2, sin(uTime * 0.05) * 0.5 + 0.5), palMix);
 
   // === GOD RAYS THROUGH CLOUD BREAKS (climax only) ===

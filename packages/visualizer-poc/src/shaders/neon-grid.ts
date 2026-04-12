@@ -139,7 +139,7 @@ vec3 ngGridPattern(vec3 pos, float time, float energy, float bass, float highs,
   vec2 gridUV = vec2(pos.x, pos.z + scroll);
 
   float gridDensity = density;
-  float lineWidth = 0.02 + bass * 0.04;
+  float lineWidth = 0.02 + bass * 0.12;
 
   // Grid lines
   float gx = abs(fract(gridUV.x * gridDensity) - 0.5);

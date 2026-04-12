@@ -785,7 +785,7 @@ void main() {
   accentColor = mix(accentColor, vec3(0.4, 0.8, 0.6), 0.2); // tropical green accent
 
   // === FLOW TIME (section-modulated) ===
-  float flowTime = uDynamicTime * (0.12 + slowE * 0.06)
+  float flowTime = uDynamicTime * (0.12 + slowE * 0.14)
     * mix(1.0, 1.5, sJam)
     * mix(1.0, 0.4, sSpace)
     * mix(1.0, 1.2, sChorus);

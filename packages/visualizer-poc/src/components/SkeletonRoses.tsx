@@ -158,16 +158,18 @@ export const SkeletonRoses: React.FC<Props> = ({ frames }) => {
 
   // Size: breathes with energy
   const baseSize = Math.min(width, height) * 0.4;
-  const breathe = interpolate(energy, [0.03, 0.35], [0.85, 1.15], {
+  // Widened breathing: subtle at quiet → dramatic at loud
+  const breathe = interpolate(energy, [0.03, 0.35], [0.72, 1.28], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
 
   // Slow rotation (tempo-scaled) + beat impulse
-  const rotation = (frame / 30) * 1.5 * tempoFactor + snap.beatDecay * 1.5;
+  // Widened beat rotation: more dramatic spin on beat (was ×1.5, now ×5)
+  const rotation = (frame / 30) * 1.5 * tempoFactor + snap.beatDecay * 5;
 
-  // Opacity: always visible, vivid at peaks (0.30 - 0.75)
-  const opacity = interpolate(energy, [0.02, 0.3], [0.30, 0.75], {
+  // Widened opacity: ghostly at quiet → vivid at loud
+  const opacity = interpolate(energy, [0.02, 0.3], [0.15, 0.85], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
@@ -178,15 +180,16 @@ export const SkeletonRoses: React.FC<Props> = ({ frames }) => {
   const roseColor = hueToHex(roseHue, 0.75, 0.55);
   const stemColor = hueToHex(0.33, 0.5, 0.35); // green stems
 
-  // Glow from energy + bass
-  const bassGlow = 0.8 + snap.bass * 1.0;
-  const glowRadius = interpolate(energy, [0.05, 0.3], [8, 35], {
+  // Widened glow: subtle at quiet → blazing at loud
+  const bassGlow = 0.3 + snap.bass * 1.5;
+  const glowRadius = interpolate(energy, [0.05, 0.3], [3, 45], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   }) * bassGlow;
 
   // Onset → scale spike
-  const onsetScale = 1 + snap.onsetEnvelope * 0.04;
+  // Widened onset scale: visible pulse on transients (was 0.04, invisible)
+  const onsetScale = 1 + snap.onsetEnvelope * 0.15;
 
   const size = baseSize * breathe;
 

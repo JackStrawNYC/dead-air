@@ -116,7 +116,7 @@ float hcMap(vec3 pos, float energy, float bass, float hcTime, float tension,
   float cellScale = 2.5 + melPitch * 0.5; // melodic pitch varies cell density
 
   // Breathing: bass pulses the overall scale
-  cellScale *= 1.0 + bass * 0.08;
+  cellScale *= 1.0 + bass * 0.20;
 
   // Repeating cell along Z (tunnel)
   float cellDepth = 1.8;
@@ -273,9 +273,9 @@ void main() {
   float totalDist = 0.0;
   vec3 hitPos = ro;
   bool wasHit = false;
-  int maxSteps = int(mix(50.0, 80.0, energy));
+  int maxSteps = int(mix(32.0, 96.0, energy));
 
-  for (int i = 0; i < 80; i++) {
+  for (int i = 0; i < 96; i++) {
     if (i >= maxSteps) break;
     vec3 marchPos = ro + rd * totalDist;
     float dist = hcMap(marchPos, energy, bass, hcTime, tension, melPitch, sJam, sSpace, climB, drumOn);
@@ -348,8 +348,8 @@ void main() {
     col = wallColor * (0.25 + diffuse * 0.85 + fillDiff * 1.5) * hcAO;
     col += colLight * spec * 0.55 * (1.0 + energy * 0.4);
     col += colGlow * fresnel * 0.35 * (1.0 + vocalP * 0.5);
-    col += sss * 0.65 * (1.0 + energy * 0.3);
-    col *= 1.0 + energy * 0.30;
+    col += sss * 0.65 * (0.7 + energy * 0.6);
+    col *= 0.7 + energy * 0.60;
 
     // Space sections: add ethereal ambient to vast empty areas
     col += mix(vec3(0.0), warmWhite * 0.02, sSpace);

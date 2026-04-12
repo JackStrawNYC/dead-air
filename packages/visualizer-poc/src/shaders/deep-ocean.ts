@@ -120,14 +120,15 @@ float do2Terrain(vec3 pos, float bassVal, float time) {
 
   // Ridged sand ripples (bass makes them pulse)
   float ripple = ridgedMultifractal(pos * 0.4 + vec3(time * 0.02, 0.0, 0.0), 4, 2.0, 0.5);
-  terrain -= ripple * 0.6 * (1.0 + bassVal * 0.3);
+  // Widened ripple: bass pulse more dramatic (was 0.3, now 0.8)
+  terrain -= ripple * 0.6 * (1.0 + bassVal * 0.8);
 
   // Large rock formations
   float rocks = fbm6(pos * 0.15 + vec3(0.0, 0.0, time * 0.005));
   terrain -= max(0.0, rocks - 0.2) * 2.5;
 
-  // Bass-driven rumble
-  float rumble = sin(pos.x * 0.5 + time * 0.8) * sin(pos.z * 0.7 + time * 0.6) * bassVal * 0.15;
+  // Bass-driven rumble — widened 3x (was 0.15, nearly invisible)
+  float rumble = sin(pos.x * 0.5 + time * 0.8) * sin(pos.z * 0.7 + time * 0.6) * bassVal * 0.45;
   terrain += rumble;
 
   return terrain;
@@ -166,7 +167,8 @@ float do2CoralBranch(vec3 pos, float seed, float growth) {
 
 float do2CoralFormation(vec3 pos, float time, float midsVal, float bassVal) {
   float coral = MAX_DIST;
-  float growth = 0.8 + midsVal * 0.3;
+  // Widened coral growth: sparse at quiet, dense overgrown at loud
+  float growth = 0.5 + midsVal * 0.7;
 
   // Place 5 coral clusters along the seafloor
   for (int idx = 0; idx < 5; idx++) {
@@ -181,7 +183,8 @@ float do2CoralFormation(vec3 pos, float time, float midsVal, float bassVal) {
     );
 
     // Gentle bass sway at base
-    coralPos.x += sin(time * 0.3 + fi) * bassVal * 0.15;
+    // Widened coral sway: dramatic bass-synchronized swaying (was 0.15)
+    coralPos.x += sin(time * 0.3 + fi) * bassVal * 0.45;
 
     float branch = do2CoralBranch(pos - coralPos, seedVal, growth);
     coral = min(coral, branch);
@@ -390,7 +393,8 @@ float do2LightShaft(vec3 pos, float time, float vocalPresence) {
   float depthFade = smoothstep(-5.0, 3.0, pos.y);
 
   // Vocal presence intensifies
-  float shaftStr = (0.3 + vocalPresence * 0.7) * depthFade * shaftPattern;
+  // Widened: subtle ambient shafts at quiet, dramatic god rays at loud
+  float shaftStr = (0.10 + vocalPresence * 1.0) * depthFade * shaftPattern;
 
   // Scattering noise
   float scatter = fbm3(pos * 0.5 + vec3(time * 0.05));
@@ -408,7 +412,8 @@ vec3 do2Bioluminescence(vec3 rayOrigin, vec3 rayDir, float time, float energyVal
   vec3 bioLight = vec3(0.0);
 
   // Number of creatures scales with energy + jam section
-  int creatureCount = int(6.0 + energyVal * 6.0 + sectionJam * 8.0);
+  // Widened: 2 creatures at quiet → 20 at loud jam (was 6-20, now 2-22)
+  int creatureCount = int(2.0 + energyVal * 12.0 + sectionJam * 8.0);
 
   for (int bIdx = 0; bIdx < 20; bIdx++) {
     if (bIdx >= creatureCount) break;
@@ -560,17 +565,19 @@ void main() {
   accentColor = mix(accentColor, vec3(0.3, 0.7, 0.9), 0.3);
 
   // === FLOW TIME (section-modulated) ===
-  float flowTime = uDynamicTime * (0.15 + slowE * 0.08)
-    * mix(1.0, 1.4, sJam)
-    * mix(1.0, 0.3, sSpace)
-    * mix(1.0, 1.2, sChorus);
+  // Widened animation speed: nearly still at quiet, flowing at loud (was 0.15+0.08)
+  float flowTime = uDynamicTime * (0.08 + slowE * 0.18)
+    * mix(1.0, 1.6, sJam)
+    * mix(1.0, 0.20, sSpace)
+    * mix(1.0, 1.3, sChorus);
 
   // === CAMERA RAY ===
   vec3 rayOrigin, rayDir;
   setupCameraRay(uv, aspect, rayOrigin, rayDir);
 
   // Underwater camera drift: gentle bass-driven sway
-  float swayX = sin(flowTime * 0.4) * 0.3 * (1.0 + bassVal * 0.5);
+  // Widened camera sway: dramatic bass-driven oscillation (was 0.3 * 1.5x)
+  float swayX = sin(flowTime * 0.4) * 0.3 * (0.5 + bassVal * 1.2);
   float swayY = cos(flowTime * 0.3) * 0.15;
   rayOrigin += vec3(swayX, swayY - 0.5, 0.0);
 
@@ -711,7 +718,8 @@ void main() {
   // === BIOLUMINESCENT PARTICLES ===
   // Energy drives count, jam section intensifies
   vec3 bioGlow = do2Bioluminescence(rayOrigin, rayDir, flowTime, energy, timbralBright, sJam);
-  col += bioGlow * (0.8 + energy * 0.5);
+  // Widened bioluminescence: dim glow at quiet, vivid at loud
+  col += bioGlow * (0.4 + energy * 1.0);
 
   // === MARINE SNOW ===
   col += do2MarineSnow(rayOrigin, rayDir, flowTime, fastE);

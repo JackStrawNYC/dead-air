@@ -261,7 +261,7 @@ void main() {
   float sectionWallOpacity = mix(1.0, 0.6, sChorus) * mix(1.0, 1.5, sSpace);
 
   // Time
-  float flowTime = uDynamicTime * (0.06 + slowE * 0.04) * sectionFlowMul;
+  float flowTime = uDynamicTime * (0.06 + slowE * 0.10) * sectionFlowMul;
   float cellTime = uDynamicTime * 0.04 * mix(1.0, 2.5, sJam) * mix(1.0, 0.15, sSpace);
 
   // Climax shatter: phase 2+ triggers shatter, phase 3 reforms
@@ -320,7 +320,7 @@ void main() {
                               drumOnset, nearCenter, cellCol);
 
       // Interior glow: vocal presence lights up cell interiors
-      float interiorGlow = vocalPresence * 0.35 + energy * 0.15;
+      float interiorGlow = vocalPresence * 0.35 + energy * 0.30;
       interiorGlow *= sectionGlowMul;
       // Proximity to cell center = brighter
       float centerProx = 1.0 - smoothstep(0.0, 0.5, cellData.x);

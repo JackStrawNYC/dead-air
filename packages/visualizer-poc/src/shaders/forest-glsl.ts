@@ -176,7 +176,7 @@ void main() {
 
   // Ray color (golden-green filtered light)
   vec3 rayColor = mix(vec3(0.4, 0.5, 0.2), vec3(0.6, 0.5, 0.25), slowE);
-  col += rayColor * rays * (0.15 + energy * 0.15 + chorusMod * 0.15);
+  col += rayColor * rays * (0.15 + energy * 0.30 + chorusMod * 0.15);
 
   // Onset flicker: extra light pulse through canopy
   float flickerPulse = onset * 0.2 * (1.0 - canopy * 0.5);

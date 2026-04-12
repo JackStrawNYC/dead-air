@@ -62,7 +62,7 @@ float ps2SwarmDensity(vec3 pos, float timeVal, float energy, float bass, float o
                       float vocalP, float tension, float drumOnset, float flowDir,
                       float beatStab, float timbralFlux, float beatSnap2) {
   // Base flow: large-scale swarm drift using curl noise approximation
-  float flowSpeed = 0.08 + energy * 0.06;
+  float flowSpeed = 0.08 + energy * 0.30;
   vec3 flowPos = pos;
 
   // Melodic direction biases the flow
@@ -108,7 +108,7 @@ float ps2SwarmDensity(vec3 pos, float timeVal, float energy, float bass, float o
   float density = primary + secondary + tertiary;
 
   // Shape the density: threshold to create discrete flock formations
-  float threshold = 0.1 - energy * 0.15 - bass * 0.1;
+  float threshold = 0.1 - energy * 0.30 - bass * 0.1;
   density = smoothstep(threshold, threshold + 0.3, density);
 
   // Bass core: concentrated density at center

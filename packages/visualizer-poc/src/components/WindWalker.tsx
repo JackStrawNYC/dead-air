@@ -768,7 +768,7 @@ export const WindWalker: React.FC<Props> = ({ frames }) => {
           y={0}
           width={width}
           height={height}
-          fill={hslToRgba(skyHue + 10, 0.05, 0.4, 0.04 + beatDecay * 0.04)}
+          fill={hslToRgba(skyHue + 10, 0.05, 0.4, 0.04 + beatDecay * 0.12)}
         />
       </svg>
     </div>

@@ -369,7 +369,7 @@ void main() {
   // ═══════════════════════════════════════════════════
   // Volumetric raymarch — emission + absorption model
   // ═══════════════════════════════════════════════════
-  int stepCount = int(mix(48.0, 80.0, smoothstep(0.2, 0.6, energyVal)));
+  int stepCount = int(mix(32.0, 96.0, smoothstep(0.2, 0.6, energyVal)));
   float stepSize = 0.1;
   float maxDist = 8.0;
 

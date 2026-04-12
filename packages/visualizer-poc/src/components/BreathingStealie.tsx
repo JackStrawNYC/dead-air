@@ -85,13 +85,19 @@ export const BreathingStealie: React.FC<Props> = ({ frames }) => {
   const masterOpacity = Math.min(fadeIn, fadeOut) * 0.95;
   if (masterOpacity < 0.01) return null;
 
-  // Audio drives
-  const haloDrive = interpolate(snap.slowEnergy, [0.02, 0.32], [0.55, 1.18], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-  const eyeFire = interpolate(snap.energy, [0.02, 0.30], [0.40, 1.0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-  const lowThrob = interpolate(snap.bass, [0.0, 0.65], [0.30, 1.0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-  const breath = 1 + Math.sin(frame * 0.018) * 0.04 + snap.beatDecay * 0.07;
-  const boltPulse = 1 + snap.beatDecay * 0.45;
+  // Audio drives — WIDENED dynamic range for dramatic quiet/loud contrast
+  const haloDrive = interpolate(snap.slowEnergy, [0.02, 0.32], [0.30, 1.40], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const eyeFire = interpolate(snap.energy, [0.02, 0.30], [0.15, 1.0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const lowThrob = interpolate(snap.bass, [0.0, 0.65], [0.15, 1.0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  // Breathing: wider ±10% scale instead of ±4%, plus stronger beat response
+  const breath = 1 + Math.sin(frame * 0.018) * 0.10 + snap.beatDecay * 0.12;
+  // Bolt pulse: wider range, more explosive on beat
+  const boltPulse = 1 + snap.beatDecay * 0.65;
   const flash = snap.onsetEnvelope > 0.5 ? Math.min(1, (snap.onsetEnvelope - 0.4) * 1.7) : 0;
+  // Skull warp: bass-driven geometric distortion (ripple the skull outline)
+  const skullWarp = snap.bass * 0.06;
+  // Jaw tremble on drum onset
+  const jawShake = snap.onsetEnvelope * 2.5;
 
   // Cosmic palette modulated by chromaHue
   const baseHue = 270;
@@ -128,17 +134,23 @@ export const BreathingStealie: React.FC<Props> = ({ frames }) => {
     );
   });
 
-  // Dust orbiting Stealie
+  // Dust orbiting Stealie — energy-driven orbit speed + size + chaotic wobble
   const dustNodes = dust.map((d, i) => {
-    const t = frame * d.speed + d.phase;
+    const energySpeed = 1 + snap.energy * 3.0; // 1x quiet, 4x loud
+    const t = frame * d.speed * energySpeed + d.phase;
     const ang = d.ang + t;
-    const rad = stealieR * (1.05 + d.rad);
-    const x = cx + Math.cos(ang) * rad;
-    const y = cy + Math.sin(ang) * rad * 0.95;
+    // Bass-driven radial breathing: dust pulses outward on bass hits
+    const radialPulse = 1.0 + snap.bass * 0.15 + snap.beatDecay * 0.08;
+    const rad = stealieR * (1.05 + d.rad) * radialPulse;
+    // Chaotic wobble at high energy
+    const wobbleX = snap.energy > 0.15 ? Math.sin(t * 3.7 + i) * snap.energy * 8 : 0;
+    const wobbleY = snap.energy > 0.15 ? Math.cos(t * 2.9 + i * 1.3) * snap.energy * 6 : 0;
+    const x = cx + Math.cos(ang) * rad + wobbleX;
+    const y = cy + Math.sin(ang) * rad * 0.95 + wobbleY;
     const flick = 0.5 + Math.sin(t * 2.1) * 0.4;
     return (
-      <circle key={`dust-${i}`} cx={x} cy={y} r={d.size * (0.7 + eyeFire * 0.8)}
-        fill={tintCore} opacity={0.45 * flick * eyeFire} />
+      <circle key={`dust-${i}`} cx={x} cy={y} r={d.size * (0.5 + eyeFire * 1.2)}
+        fill={tintCore} opacity={0.45 * flick * Math.max(0.15, eyeFire)} />
     );
   });
 
@@ -158,10 +170,10 @@ export const BreathingStealie: React.FC<Props> = ({ frames }) => {
   const rayNodes: React.ReactNode[] = [];
   for (let r = 0; r < RAY_COUNT; r++) {
     const a = (r / RAY_COUNT) * Math.PI * 2 + (fieldRotation * Math.PI) / 180;
-    const len = stealieR * (1.4 + eyeFire * 0.6 + Math.sin(frame * 0.04 + r) * 0.1);
+    const len = stealieR * (1.1 + eyeFire * 1.0 + Math.sin(frame * 0.04 + r) * 0.15);
     const x2 = Math.cos(a) * len;
     const y2 = Math.sin(a) * len;
-    const w0 = 18 + eyeFire * 22;
+    const w0 = 8 + eyeFire * 38;
     rayNodes.push(
       <g key={`ray-${r}`}>
         <path d={`M 0 0 L ${x2 - w0 * 0.6} ${y2} L ${x2 + w0 * 0.6} ${y2} Z`} fill={tintColor} opacity={0.10 * eyeFire * haloDrive} />
@@ -302,12 +314,14 @@ export const BreathingStealie: React.FC<Props> = ({ frames }) => {
         <ellipse cx={sx(0.34)} cy={sy(-0.30)} rx={stealieR * 0.18} ry={stealieR * 0.16}
           stroke={ringStroke} strokeWidth={Math.max(2, stealieR * 0.022)} fill="rgba(0,0,0,0.7)" />
 
-        {/* Eye glow — pulsating */}
-        <ellipse cx={sx(-0.34)} cy={sy(-0.30)} rx={stealieR * 0.14 * (0.85 + eyeFire * 0.25)}
-          ry={stealieR * 0.12 * (0.85 + eyeFire * 0.25)}
+        {/* Eye glow — pulsating with wider range + bass-driven warp */}
+        <ellipse cx={sx(-0.34 - skullWarp * 0.5)} cy={sy(-0.30 + skullWarp * 0.3)}
+          rx={stealieR * 0.14 * (0.60 + eyeFire * 0.55)}
+          ry={stealieR * 0.12 * (0.60 + eyeFire * 0.55)}
           fill="url(#bs-eye)" style={{ mixBlendMode: "screen" }} />
-        <ellipse cx={sx(0.34)} cy={sy(-0.30)} rx={stealieR * 0.14 * (0.85 + eyeFire * 0.25)}
-          ry={stealieR * 0.12 * (0.85 + eyeFire * 0.25)}
+        <ellipse cx={sx(0.34 + skullWarp * 0.5)} cy={sy(-0.30 + skullWarp * 0.3)}
+          rx={stealieR * 0.14 * (0.60 + eyeFire * 0.55)}
+          ry={stealieR * 0.12 * (0.60 + eyeFire * 0.55)}
           fill="url(#bs-eye)" style={{ mixBlendMode: "screen" }} />
 
         {/* Pupils */}
@@ -318,10 +332,10 @@ export const BreathingStealie: React.FC<Props> = ({ frames }) => {
         <path d={`M ${sx(0)} ${sy(-0.10)} L ${sx(-0.08)} ${sy(0.06)} L ${sx(0.08)} ${sy(0.06)} Z`}
           stroke={ringStroke} strokeWidth={Math.max(1.4, stealieR * 0.015)} fill="rgba(0,0,0,0.5)" />
 
-        {/* Jaw */}
-        <path d={`M ${sx(-0.58)} ${sy(0.04)}
-          Q ${sx(-0.45)} ${sy(0.62)} ${sx(0)} ${sy(0.70)}
-          Q ${sx(0.45)} ${sy(0.62)} ${sx(0.58)} ${sy(0.04)}`}
+        {/* Jaw — trembles on drum onset, drops slightly on bass */}
+        <path d={`M ${sx(-0.58)} ${sy(0.04 + lowThrob * 0.03)}
+          Q ${sx(-0.45 + jawShake * 0.003)} ${sy(0.62 + lowThrob * 0.05)} ${sx(0)} ${sy(0.70 + lowThrob * 0.06)}
+          Q ${sx(0.45 - jawShake * 0.003)} ${sy(0.62 + lowThrob * 0.05)} ${sx(0.58)} ${sy(0.04 + lowThrob * 0.03)}`}
           stroke={ringStroke} strokeWidth={Math.max(1.6, stealieR * 0.018)} fill="none" opacity={0.6} />
 
         {/* Teeth hint */}

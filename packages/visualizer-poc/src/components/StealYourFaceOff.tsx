@@ -83,11 +83,12 @@ export const StealYourFaceOff: React.FC<Props> = ({ frames }) => {
   const masterOpacity = Math.min(fadeIn, fadeOut) * 0.95;
   if (masterOpacity < 0.01) return null;
 
-  // Audio drives
-  const halo = interpolate(snap.slowEnergy, [0.02, 0.32], [0.55, 1.18], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-  const eyeFire = interpolate(snap.energy, [0.02, 0.30], [0.45, 1.0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-  const lowThrob = interpolate(snap.bass, [0.0, 0.65], [0.30, 1.0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-  const stealiePulse = 1 + snap.beatDecay * 0.05;
+  // Audio drives — widened for dramatic quiet/loud contrast
+  const halo = interpolate(snap.slowEnergy, [0.02, 0.32], [0.20, 1.50], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const eyeFire = interpolate(snap.energy, [0.02, 0.30], [0.10, 1.0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const lowThrob = interpolate(snap.bass, [0.0, 0.65], [0.15, 1.0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  // Widened stealie pulse: 5% → 20% (visible throb on every beat)
+  const stealiePulse = 1 + snap.beatDecay * 0.20;
   const flash = snap.onsetEnvelope > 0.5 ? Math.min(1, (snap.onsetEnvelope - 0.4) * 1.7) : 0;
 
   // Cosmic palette modulated by chromaHue

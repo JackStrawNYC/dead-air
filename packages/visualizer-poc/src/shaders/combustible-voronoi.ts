@@ -303,7 +303,7 @@ void main() {
     float seed = fi * 11.37 + 3.14;
     vec2 emberPos = vec2(
       sin(seed * 7.0 + uDynamicTime * 0.2) * 0.6,
-      fract(seed * 0.31 + uDynamicTime * (0.04 + energy * 0.06)) * 2.5 - 1.0
+      fract(seed * 0.31 + uDynamicTime * (0.04 + energy * 0.30)) * 2.5 - 1.0
     );
     // Embers drift with wind
     emberPos.x += sin(uDynamicTime * 0.5 + fi) * 0.15 * slowE;

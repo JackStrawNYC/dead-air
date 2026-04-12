@@ -86,7 +86,7 @@ float wnCloudDensity(vec3 pos, float time, float bass, float energy, float tensi
   float density = broad * 0.6 + detail * 0.4;
 
   // Bass breathing
-  density *= 1.0 + bass * 0.15 * sin(length(pos) * 0.5 + time * 1.0);
+  density *= 1.0 + bass * 0.30 * sin(length(pos) * 0.5 + time * 1.0);
 
   // Coherence warp: low coherence = more turbulent
   float turbulence = snoise(vec3(pos * 1.5 + vec2(time * 0.04, 0.0).xyy)) * coherenceWarp;

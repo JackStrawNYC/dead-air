@@ -95,7 +95,7 @@ export const GospelChurch: React.FC<Props> = ({ frames }) => {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
-  const choirLight = interpolate(snap.vocalEnergy, [0.0, 0.55], [0.45, 1.0], {
+  const choirLight = interpolate(snap.vocalEnergy, [0.0, 0.55], [0.20, 1.0], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });

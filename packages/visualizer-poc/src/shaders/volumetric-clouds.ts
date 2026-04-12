@@ -87,7 +87,7 @@ void main() {
   float melodicPitch = clamp(uMelodicPitch, 0.0, 1.0);
   float chordHue = float(int(uChordIndex)) / 24.0 * 0.12;
 
-  float flowTime = uDynamicTime * (0.08 + slowE * 0.04) * mix(1.0, 1.4, sJam) * mix(1.0, 0.4, sSpace);
+  float flowTime = uDynamicTime * (0.08 + slowE * 0.10) * mix(1.0, 1.4, sJam) * mix(1.0, 0.4, sSpace);
 
   // === PALETTE (chord-shifted) ===
   float hue1 = uPalettePrimary + chordHue;

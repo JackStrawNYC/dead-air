@@ -323,7 +323,7 @@ void main() {
   vec3 fw = normalize(lookAt - ro);
   vec3 ri = normalize(cross(vec3(0.0, 1.0, 0.0), fw));
   vec3 upVec = cross(fw, ri);
-  float fov = 0.75 + energy * 0.15 + climB * 0.2;
+  float fov = 0.75 + energy * 0.30 + climB * 0.2;
   vec3 rd = normalize(p.x * ri + p.y * upVec + fov * fw);
 
   // ─── Rotation speed from energy + section ───
@@ -344,7 +344,7 @@ void main() {
   // ═══════════════════════════════════════════
   // VOLUMETRIC CLOUD RAYMARCH (primary pass)
   // ═══════════════════════════════════════════
-  int maxSteps = int(mix(40.0, 72.0, energy)) + int(sJam * 12.0) - int(sSpace * 10.0);
+  int maxSteps = int(mix(28.0, 96.0, energy)) + int(sJam * 12.0) - int(sSpace * 10.0);
   float stepSize = 0.16 - energy * 0.03;
 
   vec3 cloudAccum = vec3(0.0);
@@ -354,7 +354,7 @@ void main() {
   vec3 surfacePos = ro;
   float totalDist = 0.0;
 
-  for (int i = 0; i < 72; i++) {
+  for (int i = 0; i < 96; i++) {
     if (i >= maxSteps) break;
     float fi = float(i);
     float marchT = 0.3 + fi * stepSize;
@@ -594,7 +594,7 @@ void main() {
   // ATMOSPHERIC SCATTERING (blue-grey volumetric fog)
   // ═══════════════════════════════════════════
   {
-    float fogDensity = 0.08 + bass * 0.04 + energy * 0.02;
+    float fogDensity = 0.08 + bass * 0.12 + energy * 0.02;
     vec3 fogColor = mix(vec3(0.06, 0.07, 0.1), stormCol * 0.15, 0.4);
     float fogAmount = 1.0 - exp(-totalDist * fogDensity * 0.1);
     col = mix(col, fogColor, fogAmount * 0.3);

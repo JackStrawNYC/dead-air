@@ -34,21 +34,21 @@ float ftMap(vec3 p, float energy, float bass, float ft, float psyche) {
   vec3 rp = p; rp.z = mod(p.z + 1.25, 2.5) - 1.25;
   float ch = fract(sin(cz*127.1+311.7)*43758.5453);
   float ch2 = fract(sin(cz*269.5+183.3)*43758.5453);
-  float R = 1.0 + bass*0.15 + sin(ft*0.3 + ch*TAU)*0.08;
+  float R = 1.0 + bass*0.35 + sin(ft*0.3 + ch*TAU)*0.08;
   // Wall sculpting
   float wa = atan(rp.y, rp.x);
   float sc = sin(wa*6.0+ft*0.08)*0.1 + sin(wa*12.0-ft*0.04+ch*3.0)*0.05 + sin(rp.z*4.0+ft*0.15)*0.06;
   sc *= (1.0 + psyche*0.6);
   float d = -(length(rp.xy) - R - sc);
-  // Ribs
-  float ribZ = abs(rp.z) - (1.25 - 0.15 - energy*0.06);
-  float ribR = length(rp.xy) - (R - 0.4 - energy*0.15);
+  // Ribs — wider energy response: quiet = thin ribs, loud = thick structural beams
+  float ribZ = abs(rp.z) - (1.25 - 0.10 - energy*0.18);
+  float ribR = length(rp.xy) - (R - 0.35 - energy*0.30);
   d = min(d, max(ribZ, -ribR));
   // Pillars
   for (int i = 0; i < 6; i++) {
     float a = float(i)*TAU/6.0 + ch2*0.4;
     vec2 pc = vec2(cos(a),sin(a)) * (R*0.82);
-    d = min(d, length(rp.xy-pc) - (0.1+energy*0.04));
+    d = min(d, length(rp.xy-pc) - (0.05+energy*0.15));
   }
   // Jewels
   for (int i = 0; i < 3; i++) {
@@ -59,7 +59,7 @@ float ftMap(vec3 p, float energy, float bass, float ft, float psyche) {
     float cr2 = cos(rot); float sr2 = sin(rot);
     jp.xy = mat2(cr2,sr2,-sr2,cr2) * jp.xy;
     jp.yz = mat2(cr2,sr2,-sr2,cr2) * jp.yz;
-    d = min(d, ftOcta(jp, 0.12+energy*0.08+ch*0.03));
+    d = min(d, ftOcta(jp, 0.05+energy*0.20+ch*0.03));
   }
   return d;
 }
@@ -79,7 +79,7 @@ void main() {
   float sJam = smoothstep(4.5,5.5,uSectionType)*(1.0-step(5.5,uSectionType));
   float sSpace = smoothstep(6.5,7.5,uSectionType);
   float climB = step(1.5,uClimaxPhase)*step(uClimaxPhase,3.5)*clamp(uClimaxIntensity,0.0,1.0);
-  float ft = uDynamicTime*(0.06+slowE*0.04)*(1.0+sJam*0.4-sSpace*0.3);
+  float ft = uDynamicTime*(0.03+slowE*0.09)*(1.0+sJam*0.5-sSpace*0.4);
 
   // Palette
   vec3 wt = paletteHueColor(uPalettePrimary, 0.55, 0.85);
@@ -100,8 +100,8 @@ void main() {
 
   // Raymarch
   float td = 0.0; vec3 hp = ro; bool ht = false;
-  int ms = int(mix(48.0,80.0,energy));
-  for (int i = 0; i < 80; i++) {
+  int ms = int(mix(32.0,96.0,energy));
+  for (int i = 0; i < 96; i++) {
     if (i >= ms) break;
     vec3 ps = ro+rd*td;
     float d = ftMap(ps, energy, bass, ft, psyche);
@@ -133,7 +133,7 @@ void main() {
     float dp = clamp(td/10.0,0.0,1.0);
     vec3 stone = mix(wt*0.18, wt*0.04, dp);
     col = stone*(0.03+df*0.25)*ao2 + lt*sp*0.15 + grCol*fr*0.06;
-    col *= 1.0+energy*0.3;
+    col *= 0.7+energy*0.6;
   } else {
     col = wt*0.01 + grCol*exp(-td*0.5)*0.03;
     // Climax: stars
@@ -152,13 +152,13 @@ void main() {
     if (gt2 > td && ht) break;
     vec3 gp = ro+rd*gt2;
     float occ = ftMap(gp+normalize(lp-gp)*0.5, energy,bass,ft,psyche);
-    float fog = fbm3(gp*0.3+ft*0.02)*(0.1+bass*0.15);
+    float fog = fbm3(gp*0.3+ft*0.02)*(0.05+bass*0.30);
     ra += smoothstep(-0.1,0.3,occ)*0.02*(0.3+fog);
   }
-  col += grCol*ra*(0.3+vocalP*0.4+climB*0.3);
+  col += grCol*ra*(0.15+vocalP*0.65+climB*0.4);
 
   col += wt*0.015;
-  col *= 1.0+uBeatSnap*0.1;
+  col *= 1.0+uBeatSnap*0.2;
   float vg = 1.0-dot(p*0.28,p*0.28);
   col = mix(vec3(0.02,0.015,0.03), col, smoothstep(0.0,1.0,vg));
   // Icons removed — clean shader output

@@ -72,7 +72,7 @@ export const EgyptianEye: React.FC<Props> = ({ frames }) => {
 
   // Audio
   const divineGlow = interpolate(snap.slowEnergy, [0.02, 0.32], [0.55, 1.15], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-  const irisBright = interpolate(snap.energy, [0.02, 0.32], [0.45, 1.0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const irisBright = interpolate(snap.energy, [0.02, 0.32], [0.20, 1.0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
   const pupilPulse = 1 + snap.bass * 0.30;
   const wingFlutter = Math.sin(frame * 0.04 * tempoFactor) * (3 + snap.beatDecay * 6);
   const eyeFlash = snap.onsetEnvelope > 0.5 ? Math.min(1, (snap.onsetEnvelope - 0.4) * 1.6) : 0;

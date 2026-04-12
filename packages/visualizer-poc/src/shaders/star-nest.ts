@@ -146,10 +146,10 @@ void main() {
   float darkmatter = mix(0.18, 0.06, bass) * mix(1.2, 0.8, sJam);
 
   // Distance fading per step
-  float distfading = 0.73 + energy * 0.08;
+  float distfading = 0.73 + energy * 0.20;
 
   // === CAMERA SETUP ===
-  float driftSpeed = 0.08 + slowE * 0.12 + energy * 0.06 + climaxBoost * 0.15;
+  float driftSpeed = 0.08 + slowE * 0.12 + energy * 0.30 + climaxBoost * 0.15;
   driftSpeed = mix(driftSpeed, driftSpeed * 1.5, sJam);
   driftSpeed = mix(driftSpeed, driftSpeed * 0.3, sSpace);
   float camT = uDynamicTime * driftSpeed;
@@ -278,7 +278,7 @@ void main() {
   vec3 col = mix(vec3(lum), totalColor, saturation);
 
   // === OVERALL BRIGHTNESS: energy + climax lift ===
-  col *= 1.1 + energy * 0.15 + climaxBoost * 0.2;
+  col *= 1.1 + energy * 0.30 + climaxBoost * 0.2;
 
   // === AMBIENT NEBULA: fills voids with palette color (never pitch black) ===
   float ambNoise = fbm3(vec3(p * 0.6, uDynamicTime * 0.04)) * 0.5 + 0.5;

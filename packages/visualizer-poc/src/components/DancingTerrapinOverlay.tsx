@@ -101,13 +101,14 @@ export const DancingTerrapinOverlay: React.FC<Props> = ({ frames }) => {
   const masterOpacity = Math.min(fadeIn, fadeOut) * 0.95;
   if (masterOpacity < 0.01) return null;
 
-  const warmth = interpolate(snap.slowEnergy, [0.0, 0.32], [0.55, 1.10], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-  const bounce = interpolate(snap.energy, [0.0, 0.30], [0.45, 1.0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  // Widened dynamic ranges
+  const warmth = interpolate(snap.slowEnergy, [0.0, 0.32], [0.20, 1.50], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const bounce = interpolate(snap.energy, [0.0, 0.30], [0.20, 1.0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
   const flash = snap.onsetEnvelope > 0.5 ? Math.min(1, (snap.onsetEnvelope - 0.4) * 1.6) : 0;
 
   const tintShift = snap.chromaHue - 180;
   const baseHue = 130;
-  const tintHue = ((baseHue + tintShift * 0.30) % 360 + 360) % 360;
+  const tintHue = ((baseHue + tintShift * 0.55) % 360 + 360) % 360;
   const skyTop = `hsl(${(tintHue + 200) % 360}, 50%, 8%)`;
   const skyMid = `hsl(${(tintHue + 220) % 360}, 38%, 14%)`;
   const skyHorizon = `hsl(${(tintHue + 18) % 360}, 45%, 24%)`;
@@ -132,7 +133,8 @@ export const DancingTerrapinOverlay: React.FC<Props> = ({ frames }) => {
     const tW = tH * 1.20;
     const cx = spec.xFrac * width;
     const bobPhase = frame * 0.10 * tempoFactor + spec.phase;
-    const bob = Math.sin(bobPhase) * (4 + bounce * 6 + snap.beatDecay * 8) * scale;
+    // Widened bounce: more dramatic dance (was 4+6+8, now 2+10+12)
+    const bob = Math.sin(bobPhase) * (2 + bounce * 10 + snap.beatDecay * 12) * scale;
     const cyT = groundY - tH * 0.45 + bob;
 
     const shellHue = (spec.hue + tintShift * 0.5) % 360;

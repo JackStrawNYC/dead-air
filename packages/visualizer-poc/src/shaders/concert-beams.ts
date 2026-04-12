@@ -384,7 +384,7 @@ void main() {
       vec3 soloDir = normalize(soloTarget - beamOrigin);
       vec3 beamDir = normalize(mix(defaultDir, soloDir, soloConverge));
 
-      float coneAngle = 0.08 + energy * 0.04 + bass * 0.02;
+      float coneAngle = 0.08 + energy * 0.12 + bass * 0.02;
       float beamIntensity = (0.3 + energy * 0.7) * mix(1.0, 0.2, sSpace);
       beamIntensity += effectiveBeat * 0.2;
       beamIntensity += climaxBoost * 0.3;

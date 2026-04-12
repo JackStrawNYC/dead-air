@@ -117,7 +117,7 @@ float opOilField(vec3 surfPos, vec3 projPos, float projIdx,
 
   // Primary blob
   float blob1 = fbm6(warped * viscosity);
-  blob1 = smoothstep(0.05 - bass * 0.08, 0.15, blob1);
+  blob1 = smoothstep(0.05 - bass * 0.20, 0.15, blob1);
 
   // Secondary smaller blob (counter-rotating)
   vec3 warped2 = vec3(discUV * 1.5 + vec2(-wy, wx) * 0.3, flowTime * 0.25 + seed + 20.0);
@@ -312,16 +312,16 @@ void main() {
   vec3 camRight = normalize(cross(fw, worldUp));
   vec3 camUp = cross(camRight, fw);
 
-  float fov = 0.7 + energy * 0.15 + climaxOpen * 0.3;
+  float fov = 0.7 + energy * 0.30 + climaxOpen * 0.3;
   vec3 rd = normalize(p.x * camRight + p.y * camUp + fov * fw);
 
   // ─── Raymarch ───
   float totalDist = 0.0;
   vec3 marchPos = camPos;
   bool marchHit = false;
-  int maxSteps = int(mix(48.0, 72.0, energy));
+  int maxSteps = int(mix(32.0, 96.0, energy));
 
-  for (int i = 0; i < 72; i++) {
+  for (int i = 0; i < 96; i++) {
     if (i >= maxSteps) break;
     vec3 ps = camPos + rd * totalDist;
     float d = opMap(ps, energy, bass, flowTime, sJam, sSpace, climaxOpen);

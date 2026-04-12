@@ -69,11 +69,12 @@ export const SkeletonBand: React.FC<Props> = ({ frames }) => {
   const masterOpacity = Math.min(fadeIn, fadeOut) * 0.95;
   if (masterOpacity < 0.01) return null;
 
-  // Audio
-  const stageBright = interpolate(snap.slowEnergy, [0.02, 0.32], [0.5, 1.0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-  const motion = interpolate(snap.energy, [0.02, 0.30], [0.4, 1.0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  // Audio — widened for dramatic quiet/loud contrast
+  const stageBright = interpolate(snap.slowEnergy, [0.02, 0.32], [0.20, 1.40], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const motion = interpolate(snap.energy, [0.02, 0.30], [0.15, 1.0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
   const bassRock = interpolate(snap.bass, [0.0, 0.7], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-  const drumPulse = 1 + snap.beatDecay * 0.5;
+  // Widened drum pulse: ±50% → ±80% (visible skeleton bounce on every beat)
+  const drumPulse = 1 + snap.beatDecay * 0.8;
   const cymbalFlash = snap.onsetEnvelope > 0.55 ? Math.min(1, (snap.onsetEnvelope - 0.4) * 1.6) : 0;
 
   // Tie-dye palette — base hue cycles with chromaHue
@@ -102,11 +103,16 @@ export const SkeletonBand: React.FC<Props> = ({ frames }) => {
 
   // Skeleton renderer
   const renderSkeleton = (sx: number, baseY: number, type: string, scale: number, idx: number) => {
-    const sway = Math.sin(frame * 0.05 * tempoFactor + idx * 1.3) * 3 * motion;
+    // Widened sway: energy-driven (still at quiet → wild at loud)
+    const sway = Math.sin(frame * 0.05 * tempoFactor + idx * 1.3) * (1 + motion * 8);
     const headR = 14 * scale;
-    const headCY = baseY - 110 * scale;
+    // Bass-driven head nod: skull dips forward on bass hits
+    const headNod = bassRock * snap.beatDecay * 6 * scale;
+    const headCY = baseY - 110 * scale + headNod;
     const ribTopY = headCY + headR + 4;
-    const ribBotY = ribTopY + 36 * scale;
+    // Beat-synced ribcage expansion: ribs spread on beat
+    const ribExpand = 1 + snap.beatDecay * 0.15;
+    const ribBotY = ribTopY + 36 * scale * ribExpand;
     const pelvisY = ribBotY + 12 * scale;
     const legBotY = baseY;
 
@@ -138,7 +144,7 @@ export const SkeletonBand: React.FC<Props> = ({ frames }) => {
         {/* Ribcage */}
         {Array.from({ length: 5 }).map((_, i) => {
           const ry = ribTopY + 4 + i * 6;
-          const widthAtY = (16 - Math.abs(i - 2) * 2) * scale;
+          const widthAtY = (16 - Math.abs(i - 2) * 2) * scale * ribExpand;
           return (
             <path key={`rib-${i}`}
               d={`M ${sx} ${ry} Q ${sx - widthAtY} ${ry + 1} ${sx - widthAtY} ${ry + 4} M ${sx} ${ry} Q ${sx + widthAtY} ${ry + 1} ${sx + widthAtY} ${ry + 4}`}

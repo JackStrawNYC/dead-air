@@ -381,7 +381,7 @@ vec3 maStageLights(vec3 ro, vec3 rd, float totalDist, bool wasHit, float maTime,
       float inCone = smoothstep(coneR, coneR * 0.5, projR);
 
       // Haze: fbm fog density
-      float haze = fbm3(samplePos * 0.5 + maTime * 0.04) * (0.1 + bass * 0.15);
+      float haze = fbm3(samplePos * 0.5 + maTime * 0.04) * (0.1 + bass * 0.30);
       float attenuation = 1.0 / (1.0 + projLen * projLen * 0.5);
 
       accumLight += beamColor * inCone * (0.008 + haze * 0.005) * attenuation * energy;
@@ -443,7 +443,7 @@ void main() {
 
   // ─── Mobius geometry parameters ───
   float majorR = 2.0; // major radius of the torus/strip centerline
-  float halfW = 0.6 + bass * 0.08; // strip half-width (bass breathing)
+  float halfW = 0.6 + bass * 0.20; // strip half-width (bass breathing)
   float halfH = 0.04 + energy * 0.01; // strip half-thickness
 
   // Twist multiplier: 1.0 = standard Mobius (180 degree twist per revolution)
@@ -457,7 +457,7 @@ void main() {
   morphAmt += climB * 0.2;
 
   // Dynamic time
-  float maTime = uDynamicTime * (0.05 + slowE * 0.04) * (1.0 + sJam * 0.4 - sSpace * 0.3);
+  float maTime = uDynamicTime * (0.05 + slowE * 0.10) * (1.0 + sJam * 0.4 - sSpace * 0.3);
 
   // ─── Palette ───
   float h1 = uPalettePrimary;
@@ -538,9 +538,9 @@ void main() {
   float totalDist = 0.0;
   vec3 hitPos = ro;
   bool wasHit = false;
-  int maxSteps = int(mix(48.0, 72.0, energy));
+  int maxSteps = int(mix(32.0, 96.0, energy));
 
-  for (int i = 0; i < 72; i++) {
+  for (int i = 0; i < 96; i++) {
     if (i >= maxSteps) break;
     vec3 marchPos = ro + rd * totalDist;
     float dist = maMap(marchPos, energy, bass, maTime, tension,

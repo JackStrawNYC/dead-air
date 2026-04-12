@@ -129,19 +129,20 @@ float rivBankHeight(vec2 xz) {
 // ============================================================
 float rivWaterHeight(vec2 xz, float timeVal, float energy, float bass, float tension,
                      float sJam, float sSpace) {
-  float flowSpeed = mix(0.5, 2.5, energy) * mix(1.0, 1.6, sJam) * mix(1.0, 0.15, sSpace);
+  // Widened flow speed: nearly still at quiet (0.15), rushing at loud (3.5)
+  float flowSpeed = mix(0.15, 3.5, energy) * mix(1.0, 1.8, sJam) * mix(1.0, 0.10, sSpace);
   float flowZ = xz.y - timeVal * flowSpeed;
 
   float h = 0.0;
-  // Broad swells
-  h += sin(flowZ * 0.3 + xz.x * 0.1) * 0.08 * (1.0 + bass * 0.5);
-  // Mid waves
-  h += sin(flowZ * 1.2 + xz.x * 0.5 + 2.0) * 0.04 * energy;
-  h += sin(flowZ * 2.5 - xz.x * 0.8) * 0.02 * energy;
+  // Broad swells — widened bass response (1.0x quiet → 2.0x loud)
+  h += sin(flowZ * 0.3 + xz.x * 0.1) * 0.08 * (0.5 + bass * 1.2);
+  // Mid waves — widened energy multiplier
+  h += sin(flowZ * 1.2 + xz.x * 0.5 + 2.0) * 0.06 * energy;
+  h += sin(flowZ * 2.5 - xz.x * 0.8) * 0.04 * energy;
   // FBM texture
   h += snoise(vec3(xz.x * 0.3, flowZ * 0.5, timeVal * 0.1)) * 0.06 * energy;
-  // Cross-chop from tension
-  h += sin(xz.x * 2.0 + flowZ * 2.0 + timeVal) * tension * 0.03;
+  // Cross-chop from tension — widened 4x (was 0.03, invisible)
+  h += sin(xz.x * 2.0 + flowZ * 2.0 + timeVal) * tension * 0.12;
   return h - 0.2;
 }
 
@@ -282,7 +283,8 @@ vec3 rivSky(vec3 rd, float slowE, vec3 sunDir, vec3 palCol1, vec3 palCol2) {
 vec3 rivMist(vec3 ro, vec3 rd, float marchDist, float timeVal, float energy,
              float vocalP) {
   vec3 mist = vec3(0.0);
-  float mistIntensity = vocalP * 0.4 + energy * 0.15;
+  // Widened mist: barely visible at quiet, thick atmospheric at loud
+  float mistIntensity = vocalP * 0.6 + energy * 0.35;
   if (mistIntensity < 0.02) return mist;
 
   float stepSize = 0.5;
@@ -407,7 +409,8 @@ void main() {
       specPow = 8.0;
     } else if (matID < 1.5) {
       // Water surface
-      float waterDepth = 0.5 + energy * 0.3;
+      // Widened water depth: shallow/clear at quiet, deep/rich at loud
+      float waterDepth = 0.3 + energy * 0.6;
       vec3 deepColor = mix(vec3(0.05, 0.15, 0.2), palCol1 * 0.4, 0.2);
       vec3 shallowColor = mix(vec3(0.1, 0.25, 0.3), palCol2 * 0.5, 0.15);
       matColor = mix(deepColor, shallowColor, 0.5);
@@ -417,8 +420,8 @@ void main() {
       vec3 skyRefl = rivSky(reflDir, slowE, sunDir, palCol1, palCol2);
       matColor = mix(matColor, skyRefl, fresnelVal * 0.7);
 
-      // Foam at rapids: high displacement = foam
-      float flowSpeed = mix(0.5, 2.5, energy) * mix(1.0, 1.6, sJam) * mix(1.0, 0.15, sSpace);
+      // Foam at rapids: high displacement = foam — matching widened flow speed
+      float flowSpeed = mix(0.15, 3.5, energy) * mix(1.0, 1.8, sJam) * mix(1.0, 0.10, sSpace);
       float foamNoise = fbm3(vec3(hitPos.xz * 1.5 + vec2(0.0, -timeVal * flowSpeed * 0.3), timeVal * 0.2));
       float foamMask = smoothstep(0.4, 0.7, foamNoise) * energy;
       foamMask += onset * 0.3;

@@ -168,7 +168,7 @@ export const CosmicStarfield: React.FC<Props> = ({ frames }) => {
 
   // Audio drives
   const cosmicGlow = interpolate(snap.slowEnergy, [0.02, 0.32], [0.55, 1.15], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-  const haloBright = interpolate(snap.energy, [0.02, 0.32], [0.45, 1.0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const haloBright = interpolate(snap.energy, [0.02, 0.32], [0.20, 1.0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
   const giantPulse = 1 + snap.bass * 0.35;
   const twinkleAmp = 0.4 + snap.beatDecay * 0.4;
   const flareBurst = snap.onsetEnvelope > 0.5 ? Math.min(1, (snap.onsetEnvelope - 0.4) * 1.6) : 0;

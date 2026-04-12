@@ -352,7 +352,7 @@ void main() {
   float climaxV = isClimax * clamp(uClimaxIntensity, 0.0, 1.0);
 
   // ─── Dynamic time ───
-  float ft = uDynamicTime * (0.1 + slowE * 0.08) * (1.0 + sChorus * 0.5 - sSpace * 0.4);
+  float ft = uDynamicTime * (0.1 + slowE * 0.18) * (1.0 + sChorus * 0.5 - sSpace * 0.4);
 
   // ─── Forward travel speed ───
   float forwardSpeed = ft * 6.0 + sChorus * ft * 3.0;

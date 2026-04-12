@@ -367,7 +367,7 @@ void main() {
   // Audio-reactive density parameters
   _epm_prm1 = smoothstep(-0.4, 0.4, sin(uTime * 0.15));
   _epm_prm1 += vocalThicken * 0.3;
-  _epm_prm1 += bass * 0.15;
+  _epm_prm1 += bass * 0.30;
   // Beat crashes thicken momentarily
   _epm_prm1 += uBeatSnap * 0.2;
   // Climax parts the mist
@@ -415,7 +415,7 @@ void main() {
   }
 
   // === WAVE CRASH BRIGHTNESS on beat ===
-  float crashBrightness = uBeatSnap * energy * 0.08;
+  float crashBrightness = uBeatSnap * energy * 0.20;
   float crashMask = smoothstep(0.1, -0.2, p.y);
   col += vec3(0.5, 0.55, 0.6) * crashBrightness * crashMask;
 
@@ -431,7 +431,7 @@ void main() {
   }
 
   // Palette tinting
-  float palMix = 0.12 + energy * 0.08;
+  float palMix = 0.12 + energy * 0.20;
   col = mix(col, col * mix(palCol1, palCol2, sin(uTime * 0.1) * 0.5 + 0.5), palMix);
 
   // Gamma — cool, oceanic

@@ -139,13 +139,15 @@ void main() {
   float climaxBoost = isClimax * uClimaxIntensity;
 
   // ═══ Camera ═══
-  float driftSpeed = 0.12 + energy * 0.15 + uFastEnergy * 0.06;
-  driftSpeed *= mix(1.0, 1.5, sJam) * mix(1.0, 0.3, sSpace);
+  // Widened drift speed: 3x range (0.05 quiet → 0.38 loud) instead of old 2x
+  float driftSpeed = 0.05 + energy * 0.28 + uFastEnergy * 0.10;
+  driftSpeed *= mix(1.0, 1.8, sJam) * mix(1.0, 0.20, sSpace);
   float camT = uDynamicTime * driftSpeed;
   vec3 camPos = cvyCameraPath(camT);
 
   float shakeGate = smoothstep(0.25, 0.55, energy);
-  float shakeAmt = bass * 0.06 * shakeGate * mix(1.0, 0.2, stability);
+  // Widened camera shake: perceptible bass-driven motion (was 0.06, invisible)
+  float shakeAmt = bass * 0.14 * shakeGate * mix(1.0, 0.2, stability);
   camPos.x += snoise(vec3(uTime * 6.0, 0.0, 0.0)) * shakeAmt;
   camPos.y += snoise(vec3(0.0, uTime * 6.0, 0.0)) * shakeAmt;
 
@@ -191,7 +193,8 @@ void main() {
     float n2 = fbm3(noiseP * 1.9 + 7.3);
     float n3 = fbm3(noiseP * 4.0 + 19.1);
     float density = pow(n1 * 0.55 + n2 * 0.30 + n3 * 0.15 + 0.5, 1.4);
-    density = clamp(density * (0.55 + energy * 0.45 + bass * 0.25), 0.0, 1.2);
+    // Widened density: 4x range (sparse quiet → dense loud)
+    density = clamp(density * (0.30 + energy * 0.70 + bass * 0.40), 0.0, 1.4);
     accDensity = density;
 
     // Per-pixel hue offset based on ray direction so adjacent pixels
@@ -206,7 +209,8 @@ void main() {
     // applies cinematicGrade ACES tone mapping which brightens dim values
     // significantly, so the source needs to be dark enough that the
     // brightened result still looks restrained instead of neon.
-    float satCap = 0.30 + energy * 0.15;
+    // Widened saturation: muted quiet (0.15) → vivid loud (0.55)
+    float satCap = 0.15 + energy * 0.40;
     vec3 deepSpace = paletteHueColor(hue1 + pixelHue + depthDriftHue, satCap, 0.18);
     vec3 nebulaWarm = paletteHueColor(hue2 + pixelHue * 0.6 - depthDriftHue * 0.5, satCap + 0.08, 0.26);
     vec3 emissionCore = mix(emissionColor * 0.4, vec3(0.55, 0.50, 0.42), 0.6);
@@ -275,7 +279,8 @@ void main() {
   }
 
   // Fog: palette-colored
-  float fogDist = mix(0.40, 0.85, energy);
+  // Widened fog: thick fog at quiet (0.25) → clear at loud (0.90)
+  float fogDist = mix(0.25, 0.90, energy);
   vec3 fogColor = mix(cloudColor, emissionColor, 0.3) * 0.25;
   float fogAmount = (1.0 - fogDist) * 0.35;
   col = mix(col, fogColor, fogAmount * smoothstep(0.5, 0.0, lumAcc));
@@ -289,7 +294,8 @@ void main() {
   col *= 1.0 + effectiveBeat * 0.12;
 
   // Nebula glow
-  float glowAmount = accGlow * (0.8 + bass * 0.4);
+  // Widened glow: dim ambient at quiet, vivid bass-driven emission at loud
+  float glowAmount = accGlow * (0.4 + bass * 0.9);
   col += mix(emissionColor, cloudColor, 0.3) * 0.45 * glowAmount;
 
   // Vignette

@@ -82,7 +82,7 @@ varying vec2 vUv;
 // Three nested FBM layers at different scales approximate Gray-Scott dynamics.
 float rd2Pattern(vec3 pos, float tension, float stability, float energy, float time) {
   // Feed/kill analogs control pattern morphology
-  float feed = 0.03 + energy * 0.04;
+  float feed = 0.03 + energy * 0.12;
   float kill = 0.05 + tension * 0.04;
 
   // Domain warp for organic flow
@@ -203,7 +203,7 @@ float rd2Particles(vec3 pos, float climaxIntensity, float time, float bass) {
     );
 
     float dist = length(pos - particlePos);
-    float particle = smoothstep(0.15 + bass * 0.05, 0.0, dist);
+    float particle = smoothstep(0.15 + bass * 0.14, 0.0, dist);
     accum += particle;
   }
 
@@ -348,7 +348,7 @@ void main() {
 
     // Wet rock specular highlight (timbral brightness controls intensity)
     float fresnel = pow(1.0 - max(0.0, dot(-rd, surfNorm)), 3.0);
-    float specularStr = timbralBright * 0.4 + energy * 0.15;
+    float specularStr = timbralBright * 0.4 + energy * 0.30;
     vec3 specular = bioGlow * fresnel * specularStr;
 
     // --- Compose surface ---

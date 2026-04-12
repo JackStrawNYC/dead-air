@@ -153,7 +153,7 @@ float dfCrowd(vec3 p, float bass, float tempo, float drumOnset, float crowdCount
     // Beat bob: synced to tempo with per-person phase offset
     float bobPhase = fract(seed * 0.37);
     float bobFreq = tempo / 60.0;
-    float bobAmt = (0.05 + bass * 0.15) * sin(DF_TAU * bobFreq * uDynamicTime + bobPhase * DF_TAU);
+    float bobAmt = (0.05 + bass * 0.30) * sin(DF_TAU * bobFreq * uDynamicTime + bobPhase * DF_TAU);
     // Drum onset: crowd jumps
     bobAmt += drumOnset * 0.2;
     float person = dfCrowdPerson(p - crowdPos, bobAmt);
@@ -227,7 +227,7 @@ vec2 dfMap(vec3 p, float energy, float bass, float tension, float climaxPhase,
   // ─── Mirror ball ───
   {
     vec3 mp = p - vec3(0.0, 3.5, 0.0);
-    float ballRadius = 0.5 + bass * 0.05;
+    float ballRadius = 0.5 + bass * 0.14;
     float d = dfMirrorBall(mp, ballRadius);
     if (d < nearest) { nearest = d; matId = 2.0; }
   }
@@ -281,7 +281,7 @@ vec3 dfBeamVolume(vec3 ro, vec3 rd, float energy, float bass, float beamCount,
         cos(beamAngle) * 0.7
       ));
 
-      float beamDist = dfBeam(sp, beamOrigin, beamDir, 0.06 + energy * 0.04);
+      float beamDist = dfBeam(sp, beamOrigin, beamDir, 0.06 + energy * 0.12);
       float beamGlow = smoothstep(0.3, 0.0, beamDist);
       beamGlow *= exp(-marchT * 0.08); // Distance falloff
       beamGlow *= 0.015;

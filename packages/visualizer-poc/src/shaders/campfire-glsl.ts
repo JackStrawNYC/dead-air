@@ -82,7 +82,7 @@ float flameShape(vec2 uv, float time, float energy, float bass) {
   p.x += distort * (1.0 + bass * 0.5);
 
   // Flame height driven by energy
-  float height = 0.15 + energy * 0.35 + bass * 0.08;
+  float height = 0.15 + energy * 0.35 + bass * 0.20;
 
   // Tapered shape: wide at bottom, narrow at top
   float taper = smoothstep(height, 0.0, p.y) * smoothstep(-0.02, 0.05, p.y);
@@ -152,7 +152,7 @@ void main() {
   float skyGrad = uv.y;
   vec3 skyTop = vec3(0.02, 0.02, 0.06);
   vec3 skyMid = vec3(0.04, 0.03, 0.08);
-  vec3 skyHorizon = vec3(0.08 + slowE * 0.06, 0.04 + slowE * 0.03, 0.03);
+  vec3 skyHorizon = vec3(0.08 + slowE * 0.14, 0.04 + slowE * 0.03, 0.03);
   vec3 sky = mix(skyHorizon, skyMid, smoothstep(0.2, 0.5, skyGrad));
   sky = mix(sky, skyTop, smoothstep(0.5, 0.9, skyGrad));
 

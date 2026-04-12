@@ -430,7 +430,7 @@ void main() {
   float accumulatedGlow = 0.0; // volumetric glow along ray
 
   // Energy-adaptive step count
-  int marchSteps = int(mix(48.0, 80.0, energy));
+  int marchSteps = int(mix(32.0, 96.0, energy));
 
   for (int stepIdx = 0; stepIdx < MN_MAX_STEPS; stepIdx++) {
     if (stepIdx >= marchSteps) break;

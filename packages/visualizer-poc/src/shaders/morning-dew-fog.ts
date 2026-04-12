@@ -340,7 +340,7 @@ void main() {
   }
 
   // Palette tinting
-  float palMix = 0.1 + energy * 0.08;
+  float palMix = 0.1 + energy * 0.20;
   col = mix(col, col * mix(palCol1, palCol2, sin(uTime * 0.08) * 0.5 + 0.5), palMix);
 
   // Gamma / tone — slightly lifted for the foggy atmosphere

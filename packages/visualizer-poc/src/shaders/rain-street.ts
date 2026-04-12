@@ -371,7 +371,7 @@ void main() {
 
   // ═══ Ground fog ═══
   {
-    float fogAmount = vocalE * 0.3 + bass * 0.15 + 0.05;
+    float fogAmount = vocalE * 0.3 + bass * 0.30 + 0.05;
     fogAmount *= mix(1.0, 0.3, sSpace);
     float fogHeight = smoothstep(0.4, 0.2, fragUv.y);
     float fogNoise = fbm3(vec3(screenPos.x * 2.0, flowTime * 0.2, flowTime * 0.1));

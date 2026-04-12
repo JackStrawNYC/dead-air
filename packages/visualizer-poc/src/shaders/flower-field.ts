@@ -215,7 +215,7 @@ vec2 fflMap(vec3 pos, float timeVal, float bass, float energy, float bloomState,
 
   // Wind sway parameters
   float windTime = timeVal * 0.3;
-  float windBase = bass * 0.08 + 0.03;
+  float windBase = bass * 0.20 + 0.03;
 
   // Place flowers in a grid around the camera
   vec2 cellSize = vec2(0.8);
@@ -234,7 +234,7 @@ vec2 fflMap(vec3 pos, float timeVal, float bass, float energy, float bloomState,
 
       // Per-flower properties from hash
       float seed = fflHash2(neighborID * 7.13);
-      float stemH = 0.15 + seed * 0.25 + energy * 0.08;
+      float stemH = 0.15 + seed * 0.25 + energy * 0.20;
       float petalCnt = floor(mix(5.0, 8.0, fflHash2(neighborID * 5.17)));
 
       // Wind sway per flower

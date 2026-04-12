@@ -161,7 +161,7 @@ export const MushroomForest: React.FC<Props> = ({ frames }) => {
   const masterOpacity = Math.min(fadeIn, fadeOut) * 0.95;
   if (masterOpacity < 0.01) return null;
 
-  const warmth = interpolate(snap.slowEnergy, [0.0, 0.32], [0.55, 1.10], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const warmth = interpolate(snap.slowEnergy, [0.0, 0.32], [0.20, 1.50], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
   const glow = interpolate(snap.energy, [0.0, 0.30], [0.45, 1.10], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
   const stemPulse = 1 + snap.bass * 0.06;
   const capPulse = 1 + snap.beatDecay * 0.05;

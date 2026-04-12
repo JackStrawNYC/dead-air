@@ -657,7 +657,8 @@ export const Europe72Jester: React.FC<Props> = ({ frames }) => {
   const presence = Math.min(fadeIn, fadeOut);
 
   // Energy-modulated opacity
-  const energyOpacity = interpolate(energy, [0.04, 0.18, 0.4], [0.45, 0.78, 0.95], {
+  // Widened opacity: ghostly at quiet → vivid at loud
+  const energyOpacity = interpolate(energy, [0.04, 0.18, 0.4], [0.20, 0.65, 0.95], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
@@ -665,11 +666,12 @@ export const Europe72Jester: React.FC<Props> = ({ frames }) => {
   if (opacity < 0.02) return null;
 
   // ── Dance / bobbing motion synced to musicalTime ──
-  // musicalTime is in [0,1) per beat — convert to radians for sine wave
+  // Widened: barely moving at quiet → energetic dance at loud
   const dancePhase = musicalTime * Math.PI * 2;
-  const bounceY = Math.sin(dancePhase) * 6 + beatDecay * 4;
-  const swayDeg = Math.cos(dancePhase * 0.5) * 3 + Math.sin(frame * 0.02 * tempoFactor) * 1.2;
-  const capWag = Math.sin(dancePhase + Math.PI / 4) * 0.6 + beatDecay * 0.5;
+  const bounceY = Math.sin(dancePhase) * (4 + energy * 12) + beatDecay * 8;
+  const swayDeg = Math.cos(dancePhase * 0.5) * (2 + energy * 6) + Math.sin(frame * 0.02 * tempoFactor) * 2;
+  // Widened cap wag: 0.6° → 5° range (was invisible)
+  const capWag = Math.sin(dancePhase + Math.PI / 4) * (0.5 + energy * 4) + beatDecay * 2;
 
   // Eye sparkle pulses on onsets and gentle ambient breathing
   const eyeSparkle = Math.min(

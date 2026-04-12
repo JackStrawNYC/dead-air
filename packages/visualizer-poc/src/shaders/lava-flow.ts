@@ -146,7 +146,7 @@ float lvTerrain(vec3 pos, float bass, float tension, float flowTime, float flowS
 
 float lvLava(vec3 pos, float bass, float energy, float flowTime, float flowSpeedMod) {
   // Lava sits in channel depressions
-  float lavaY = -0.4 + bass * 0.15 + energy * 0.1;
+  float lavaY = -0.4 + bass * 0.30 + energy * 0.1;
 
   // Flowing surface undulation
   float waveZ = sin(pos.z * 1.2 - flowTime * flowSpeedMod * 2.0) * 0.06;
@@ -309,7 +309,7 @@ vec2 lvCrustPattern(vec3 pos, float flowTime, float flowSpeedMod, float tension,
   float crustNoise = ridgedMultifractal(crustPos, 4, 2.2, 0.5);
 
   // Tension destabilizes crust (lower threshold = more cracks)
-  float crustThreshold = mix(0.55, 0.35, tension) - bass * 0.08;
+  float crustThreshold = mix(0.55, 0.35, tension) - bass * 0.20;
   float crust = smoothstep(crustThreshold, crustThreshold + 0.15, crustNoise);
 
   // Crack glow: bright emission at plate boundaries
@@ -433,7 +433,7 @@ void main() {
                               + climaxBoost * 0.6, 0.0, 2.0);
   float magmaPressure = clamp((bass * 0.4 + energy * 0.3 + vocalPresence * 0.3) * magmaGlowMod
                               + climaxBoost * 0.3, 0.0, 1.2);
-  float flowTime = uDynamicTime * (0.12 + slowEnergy * 0.08 + bass * 0.05);
+  float flowTime = uDynamicTime * (0.12 + slowEnergy * 0.08 + bass * 0.14);
   float ventTime = uDynamicTime * (0.7 + energy * 0.4);
   float shakeAmp = (bass * 0.4 + drumOnset * 0.3 + beatSnap * 0.2) * shakeMod * (1.0 + climaxBoost * 0.4);
 
@@ -665,7 +665,7 @@ void main() {
     skyColor += vec3(0.03, 0.015, 0.008) * (smokeNoise * 0.5 + 0.5) * (1.0 - skyGrad);
 
     // Distant eruption glow: pulsing on energy
-    float distantEruption = smoothstep(0.0, -0.1, rd.y) * energy * 0.15;
+    float distantEruption = smoothstep(0.0, -0.1, rd.y) * energy * 0.30;
     skyColor += lvMagmaColor(0.5, hueShift) * distantEruption;
 
     col = skyColor;
@@ -689,7 +689,7 @@ void main() {
   // === VOLCANIC ASH HAZE ===
   {
     float ashNoise = fbm3(vec3(screenP * 2.5 + flowTime * 0.2, uDynamicTime * 0.08));
-    float ashMask = smoothstep(0.2, 0.55, ashNoise) * energy * 0.06;
+    float ashMask = smoothstep(0.2, 0.55, ashNoise) * energy * 0.30;
     col += vec3(0.15, 0.08, 0.04) * ashMask * shakeMod;
   }
 

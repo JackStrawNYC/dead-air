@@ -670,7 +670,7 @@ void main() {
         // Core brightness (hot white-blue center)
         float coreMask = 1.0 - smoothstep(0.0, 0.004, arcDist);
         // Glow halo
-        float glowMask = 1.0 - smoothstep(0.0, 0.06 + bass * 0.04, arcDist);
+        float glowMask = 1.0 - smoothstep(0.0, 0.06 + bass * 0.12, arcDist);
 
         // Arc color: melodic pitch shifts blue→orange, palette tinted
         float arcHue = palHue1 + mix(0.6, 0.1, melodicPitch) + fi * 0.04;

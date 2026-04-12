@@ -412,7 +412,7 @@ void main() {
   // Bass drives amplitude, slowEnergy drives speed, beatStability smooths
   float rockSpeed = 0.8 + slowE * 0.6;
   rockSpeed *= mix(1.0, 0.2, sSpace); // near-still in space sections
-  float rockAmplitude = 0.04 + bass * 0.08;
+  float rockAmplitude = 0.04 + bass * 0.20;
   rockAmplitude *= mix(1.0, 0.1, sSpace * spaceScr);
   rockAmplitude *= 1.0 + sJam * 0.3; // slightly more vigorous in jams
   float rockSmooth = mix(0.7, 1.0, beatStab); // stability smooths the motion

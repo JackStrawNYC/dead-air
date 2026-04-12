@@ -298,7 +298,7 @@ void main() {
 
   // Grid spacing for column placement
   float gridSpacing = 1.5;
-  int numSamples = int(mix(40.0, 70.0, energy));
+  int numSamples = int(mix(28.0, 96.0, energy));
 
   // March along the ray, sampling rain columns
   for (int i = 0; i < 70; i++) {

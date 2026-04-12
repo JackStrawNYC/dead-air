@@ -154,21 +154,25 @@ export const SunflowerStealie: React.FC<Props> = ({ frames }) => {
   const tempoFactor = useTempoFactor();
 
   const baseSize = Math.min(width, height) * 0.44;
-  const breathe = interpolate(energy, [0.03, 0.35], [0.88, 1.12], {
+  // Widened breathing: tight bud at quiet → full bloom at loud
+  const breathe = interpolate(energy, [0.03, 0.35], [0.75, 1.25], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
 
   // Petals scale independently with energy (more dramatic spread)
-  const petalScale = interpolate(energy, [0.05, 0.4], [0.85, 1.2], {
+  // Widened petal scale: closed tight at quiet → wide bloom at loud
+  const petalScale = interpolate(energy, [0.05, 0.4], [0.65, 1.35], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
 
   // Slow rotation + beat impulse
-  const rotation = (frame / 60) * tempoFactor + snap.beatDecay * 4;
+  // Widened rotation: more dramatic beat-driven spin (was ×4, now ×10)
+  const rotation = (frame / 60) * tempoFactor + snap.beatDecay * 10;
 
-  const opacity = interpolate(energy, [0.02, 0.35], [0.25, 0.65], {
+  // Widened opacity: ghostly at quiet → vivid at loud
+  const opacity = interpolate(energy, [0.02, 0.35], [0.12, 0.80], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
@@ -182,8 +186,9 @@ export const SunflowerStealie: React.FC<Props> = ({ frames }) => {
   const boltColor = hueToHex(chromaHue, 0.8, 0.55);
   const centerColor = hueToHex((blendedHue + 0.05) % 1, 0.6, 0.35);
 
-  const bassGlow = 0.7 + snap.bass * 1.0;
-  const glowRadius = interpolate(energy, [0.05, 0.3], [5, 28], {
+  // Widened bass glow: subtle at quiet → blazing at loud
+  const bassGlow = 0.3 + snap.bass * 1.5;
+  const glowRadius = interpolate(energy, [0.05, 0.3], [2, 40], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   }) * bassGlow;

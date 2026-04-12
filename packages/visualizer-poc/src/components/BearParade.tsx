@@ -88,16 +88,16 @@ export const BearParade: React.FC<Props> = ({ frames }) => {
   const masterOpacity = Math.min(fadeIn, fadeOut) * 0.95;
   if (masterOpacity < 0.01) return null;
 
-  // Audio drives
-  const warmth = interpolate(snap.slowEnergy, [0.02, 0.32], [0.55, 1.10], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-  const bounce = interpolate(snap.energy, [0.02, 0.30], [0.45, 1.0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-  const stomp = interpolate(snap.bass, [0.0, 0.65], [0.30, 1.0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  // Audio drives — widened for dramatic quiet/loud contrast
+  const warmth = interpolate(snap.slowEnergy, [0.02, 0.32], [0.20, 1.50], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const bounce = interpolate(snap.energy, [0.02, 0.30], [0.20, 1.0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const stomp = interpolate(snap.bass, [0.0, 0.65], [0.15, 1.0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
   const flash = snap.onsetEnvelope > 0.5 ? Math.min(1, (snap.onsetEnvelope - 0.4) * 1.6) : 0;
 
   // Rainbow palette modulated by chromaHue
   const tintShift = snap.chromaHue - 180;
   const baseHue = 30;
-  const tintHue = ((baseHue + tintShift * 0.40) % 360 + 360) % 360;
+  const tintHue = ((baseHue + tintShift * 0.65) % 360 + 360) % 360;
   const tintCore = `hsl(${tintHue}, 92%, 82%)`;
   const skyTop = `hsl(${(tintHue + 200) % 360}, 50%, 12%)`;
   const skyMid = `hsl(${(tintHue + 220) % 360}, 35%, 18%)`;
@@ -137,8 +137,10 @@ export const BearParade: React.FC<Props> = ({ frames }) => {
     const xPos = ((spec.xOffset + slowDrift) % 1.10) - 0.05;
     const cxBear = xPos * width;
     const bobPhase = frame * 0.10 * tempoFactor + spec.phase;
-    const bob = Math.sin(bobPhase) * (4 + bounce * 6 + snap.beatDecay * 8) * scale;
-    const cyBear = groundY - bH * 0.50 + bob;
+    const bob = Math.sin(bobPhase) * (2 + bounce * 10 + snap.beatDecay * 12) * scale;
+    // Bass stomp: pushes bear down on bass hits (paw slam effect)
+    const stompPush = stomp * snap.beatDecay * 6 * scale;
+    const cyBear = groundY - bH * 0.50 + bob + stompPush;
 
     const fillCol = `hsl(${(spec.hue + tintShift) % 360}, 80%, 55%)`;
     const fillCore = `hsl(${(spec.hue + tintShift) % 360}, 95%, 70%)`;

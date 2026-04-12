@@ -390,7 +390,7 @@ void main() {
   // Bass resonance glow at base
   {
     float baseDist = length(screenP);
-    float baseGlow = exp(-baseDist * baseDist * 4.0) * bass * 0.15;
+    float baseGlow = exp(-baseDist * baseDist * 4.0) * bass * 0.30;
     col += hsv2rgb(vec3(hue1, sat * 0.6, 1.0)) * baseGlow;
   }
 

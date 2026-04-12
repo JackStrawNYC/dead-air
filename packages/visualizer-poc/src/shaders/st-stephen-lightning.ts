@@ -331,7 +331,7 @@ void main() {
   // Shake with energy — the storm is alive
   ro += vec3(
     sin(uTime * 1.5) * energy * 0.3,
-    cos(uTime * 1.2) * energy * 0.15,
+    cos(uTime * 1.2) * energy * 0.30,
     0.0
   );
   float dspAmp = 0.8;
@@ -372,7 +372,7 @@ void main() {
   float hue2 = uPaletteSecondary;
   vec3 palCol1 = paletteHueColor(hue1, 0.85, 0.85);
   vec3 palCol2 = paletteHueColor(hue2, 0.85, 0.85);
-  float palMix = 0.10 + energy * 0.08;
+  float palMix = 0.10 + energy * 0.20;
   col = mix(col, col * mix(palCol1, palCol2, sin(uTime * 0.12) * 0.5 + 0.5), palMix);
 
   // === SCREEN-SPACE LIGHTNING BOLTS ===

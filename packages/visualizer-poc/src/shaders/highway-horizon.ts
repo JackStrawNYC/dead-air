@@ -300,7 +300,7 @@ vec2 hhShimmer(vec2 uv, float dist, float energy, float ft, float sJam) {
 
 // ─── Desert dust / atmospheric haze ───
 vec3 hhDust(vec3 pos, vec3 rd, float energy, float ft) {
-  float density = energy * 0.15;
+  float density = energy * 0.30;
   float dustNoise = fbm3(vec3(pos.xz * 0.05, ft * 0.03));
   dustNoise = max(dustNoise, 0.0);
   // Distance attenuation
@@ -336,7 +336,7 @@ void main() {
   float climaxV = isClimax * clamp(uClimaxIntensity, 0.0, 1.0);
 
   // ─── Dynamic time ───
-  float ft = uDynamicTime * (0.08 + slowE * 0.06) * (1.0 + sJam * 0.3 - sSpace * 0.4);
+  float ft = uDynamicTime * (0.08 + slowE * 0.14) * (1.0 + sJam * 0.3 - sSpace * 0.4);
 
   // ─── Road width: bass pulsing ───
   float roadW = 2.5 + bass * 0.3 + sin(ft * 0.2) * 0.1;

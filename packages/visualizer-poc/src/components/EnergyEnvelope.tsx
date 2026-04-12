@@ -46,8 +46,10 @@ export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod,
   // Intro damping: suppress ALL reactive brightness during intro so art/text shines
   const reactivity = introFactor;
 
-  // ── One brightness knob. That's it. ──
-  const brightness = 0.80 + Math.sqrt(factor) * 0.20 * reactivity;
+  // ── One brightness knob. Wide dynamic range. ──
+  // 0.55 (quiet) → 1.05 (loud): 50% swing instead of old 20%.
+  // sqrt curve preserves gentle ramp-up from silence without harsh dark.
+  const brightness = 0.55 + Math.sqrt(factor) * 0.50 * reactivity;
 
   // Drums/Space phase adjustments
   let dsBrightOffset = 0;
@@ -67,7 +69,7 @@ export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod,
   // which is effectively invisible. 60% → floor of ~30% brightness.
   const baseBrightness = deadAirFactor > 0.5
     ? brightness  // no minimum floor during heavy dead air
-    : Math.max(0.75, brightness);
+    : Math.max(0.50, brightness);
   const finalBrightness = deadAirFactor > 0
     ? Math.max(0.15, baseBrightness * (1 - deadAirFactor * 0.60))
     : baseBrightness;

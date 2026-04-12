@@ -270,7 +270,7 @@ void main() {
     terrainCol += vec3(0.04, 0.06, 0.1) * fresnelVal * 0.15;
 
     // Bass ground glow
-    float glowFromBelow = exp(-max(terrainH - 0.5, 0.0) * 0.5) * bass * 0.08;
+    float glowFromBelow = exp(-max(terrainH - 0.5, 0.0) * 0.5) * bass * 0.20;
     vec3 groundGlowCol = hsv2rgb(vec3(hue1, 0.6, 1.0));
     terrainCol += groundGlowCol * glowFromBelow * e2;
 

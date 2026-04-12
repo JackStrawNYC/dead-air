@@ -57,15 +57,18 @@ export const AmericanBeauty: React.FC<Props> = ({ frames }) => {
   const masterOpacity = Math.min(fadeIn, fadeOut) * 0.95;
   if (masterOpacity < 0.01) return null;
 
-  const warmth = interpolate(snap.slowEnergy, [0.0, 0.32], [0.55, 1.10], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-  const glow = interpolate(snap.energy, [0.0, 0.30], [0.55, 1.0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-  const pulse = 1 + snap.beatDecay * 0.04 + snap.bass * 0.02;
-  const sway = Math.sin(frame * 0.012 * tempoFactor) * 4;
+  // Widened dynamic ranges — quiet rose barely glows, loud rose blooms vivid
+  const warmth = interpolate(snap.slowEnergy, [0.0, 0.32], [0.20, 1.50], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const glow = interpolate(snap.energy, [0.0, 0.30], [0.25, 1.0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  // Widened pulse: ±4% → ±12% beat + ±6% bass (was barely visible)
+  const pulse = 1 + snap.beatDecay * 0.12 + snap.bass * 0.06;
+  // Wider sway: ±4px → ±8px + bass-driven swell
+  const sway = Math.sin(frame * 0.012 * tempoFactor) * 8 + snap.bass * 3;
   const sparkle = snap.onsetEnvelope > 0.4 ? Math.min(1, (snap.onsetEnvelope - 0.3) * 1.6) : 0;
 
-  // Hue rotation: crimson -> burgundy -> coral
+  // Hue rotation: crimson -> burgundy -> coral — wider chroma influence
   const baseHue = 350;
-  const hueShift = ((snap.chromaHue - 180) * 0.18);
+  const hueShift = ((snap.chromaHue - 180) * 0.40);
   const roseHue = ((baseHue + hueShift) % 360 + 360) % 360;
 
   // Rose dimensions
@@ -86,9 +89,10 @@ export const AmericanBeauty: React.FC<Props> = ({ frames }) => {
       const tipY = cy + Math.sin(a) * (radius + petalLen);
       const wxN = -Math.sin(a) * petalWid;
       const wyN = Math.cos(a) * petalWid;
-      // Curl
-      const curlX = -Math.sin(a) * petalLen * 0.20;
-      const curlY = Math.cos(a) * petalLen * 0.20;
+      // Curl — bass-driven unfurling: petals open wider on bass hits
+      const curlAmount = 0.20 + snap.bass * 0.15 + snap.beatDecay * 0.08;
+      const curlX = -Math.sin(a) * petalLen * curlAmount;
+      const curlY = Math.cos(a) * petalLen * curlAmount;
 
       // Gradient unique per petal
       const gid = `petal-${ringHue.toFixed(0)}-${count}-${i}-${lightness.toFixed(0)}`;

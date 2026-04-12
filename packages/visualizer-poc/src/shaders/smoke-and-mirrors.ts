@@ -230,7 +230,7 @@ void main() {
   float climaxBoost = isClimax * uClimaxIntensity;
 
   float flowTime = uDynamicTime * (0.08 + flux * 0.04) * mix(1.0, 1.3, sJam) * mix(1.0, 0.4, sSpace);
-  float bassVib = bass * 0.15;
+  float bassVib = bass * 0.30;
 
   // Palette
   float hue1 = uPalettePrimary + chromaH * 0.2 + chordHue;

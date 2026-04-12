@@ -516,7 +516,7 @@ void main() {
   // === DUST HAZE from fissures ===
   {
     float dustNoise = fbm3(vec3(screenP * 3.0 + flowTime * 0.3, uDynamicTime * 0.1));
-    float dustMask = smoothstep(0.2, 0.6, dustNoise) * energy * 0.08;
+    float dustMask = smoothstep(0.2, 0.6, dustNoise) * energy * 0.20;
     col += vec3(0.2, 0.12, 0.06) * dustMask * shakeMod;
   }
 

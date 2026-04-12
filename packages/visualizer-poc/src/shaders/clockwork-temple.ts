@@ -216,7 +216,7 @@ float ctMap(vec3 p, float ft, float energy, float bass, float drumSnap,
   float reassemble = smoothstep(0.7, 1.0, climax);
 
   // Bass-driven gear breathing
-  float bassPulse = 1.0 + bass * 0.08;
+  float bassPulse = 1.0 + bass * 0.20;
 
   // Beat stability → rotation jitter
   float jitter = (1.0 - stability) * sin(ft * 17.3) * 0.15;
@@ -324,7 +324,7 @@ float ctMap(vec3 p, float ft, float energy, float bass, float drumSnap,
     float swingAmp = 0.4 + pitch * 0.5;
     // Damped in space, wild in jam
     swingAmp *= (1.0 + sJam * 0.5) * (1.0 - sSpace * 0.3);
-    float swingFreq = 1.0 + energy * 0.3;
+    float swingFreq = 0.7 + energy * 0.6;
     float swing = sin(ft * swingFreq) * swingAmp;
     // Beat snap: flash at apex
     float apexFlash = beatSnap * step(0.95, abs(sin(ft * swingFreq)));
@@ -500,7 +500,7 @@ void main() {
 
     // Faint radial gradient (warm center glow from mechanism)
     float centerGlow = exp(-dot(p, p) * 1.5);
-    col += brassCol * centerGlow * 0.04 * (1.0 + energy * 0.3);
+    col += brassCol * centerGlow * 0.04 * (0.7 + energy * 0.6);
 
     // Space section: distant single star-like points
     if (sSpace > 0.1) {

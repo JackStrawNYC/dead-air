@@ -251,7 +251,7 @@ void main() {
 
   // Moon brightness — vocal makes the moon "listen".
   float moonBright = 0.55 + vocal * 0.55 + uClimaxPhase * 0.05;
-  moonBright *= 0.92 + energy * 0.08;
+  moonBright *= 0.92 + energy * 0.20;
   moonBright *= stillness;
 
   // ─── Color accumulator ───

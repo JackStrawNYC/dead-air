@@ -99,15 +99,17 @@ export const StealieFade: React.FC<Props> = ({ frames }) => {
   const onset = snap.onsetEnvelope ?? 0;
   const chromaHue = snap.chromaHue ?? 180;
 
-  const warmth = interpolate(slowE, [0.02, 0.32], [0.55, 1.10], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-  const hatchDensity = interpolate(energy, [0.02, 0.30], [0.45, 1.0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-  const lowGlow = interpolate(bass, [0.0, 0.65], [0.30, 1.0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-  const grainShimmer = 1 + beatDecay * 0.10;
+  // Widened dynamic ranges
+  const warmth = interpolate(slowE, [0.02, 0.32], [0.20, 1.50], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const hatchDensity = interpolate(energy, [0.02, 0.30], [0.20, 1.0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const lowGlow = interpolate(bass, [0.0, 0.65], [0.10, 1.0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  // Widened grain shimmer: ±10% → ±25% (visible texture response on beat)
+  const grainShimmer = 1 + beatDecay * 0.25;
   const flash = onset > 0.5 ? Math.min(1, (onset - 0.4) * 1.6) : 0;
 
-  // Ink palette modulated by chromaHue
+  // Ink palette modulated by chromaHue — wider shift (was 0.15)
   const baseHue = 28;  // sepia
-  const tintHue = ((baseHue + (chromaHue - 180) * 0.15) % 360 + 360) % 360;
+  const tintHue = ((baseHue + (chromaHue - 180) * 0.35) % 360 + 360) % 360;
   const inkColor = `hsl(${tintHue}, 35%, ${22 + lowGlow * 8}%)`;
   const inkLight = `hsl(${tintHue}, 30%, ${42 + warmth * 14}%)`;
   const paperLight = `hsl(${(tintHue + 5) % 360}, 25%, ${82 + warmth * 6}%)`;

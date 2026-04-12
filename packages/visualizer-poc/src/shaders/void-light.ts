@@ -459,7 +459,7 @@ void main() {
 
   // === CLIMAX: additional ambient glow when shattered ===
   if (climaxShatter > 0.01) {
-    float voidGlow = climaxShatter * energy * 0.08;
+    float voidGlow = climaxShatter * energy * 0.20;
     col += lightColor * voidGlow;
   }
 

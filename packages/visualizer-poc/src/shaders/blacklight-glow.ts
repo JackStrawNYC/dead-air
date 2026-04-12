@@ -249,7 +249,7 @@ void main() {
 
   float slowTime = uDynamicTime * 0.04;
   float flowTime = uDynamicTime * (0.05 + flux * 0.02) * mix(1.0, 1.4, sJam) * mix(1.0, 0.3, sSpace);
-  float bassBreath = 1.0 + bass * 0.15;
+  float bassBreath = 1.0 + bass * 0.30;
 
   // ═══ Camera setup ═══
   float camSway = sin(slowTime * 0.6) * 0.3 * mix(1.0, 0.2, sSpace);
@@ -263,7 +263,7 @@ void main() {
   vec3 camFwd = normalize(camLookAt - camOrigin);
   vec3 camRt = normalize(cross(vec3(0.0, 1.0, 0.0), camFwd));
   vec3 camUpDir = cross(camFwd, camRt);
-  float fov = 1.2 + bass * 0.15;
+  float fov = 1.2 + bass * 0.30;
   vec3 rayDir = normalize(screenPos.x * camRt + screenPos.y * camUpDir + fov * camFwd);
 
   // ═══ Raymarch ═══

@@ -453,7 +453,7 @@ void main() {
 
     // Rim lighting from eruption
     float rimLight = pow(1.0 - max(dot(viewDir, norm), 0.0), 4.0);
-    col += lavaLightCol * rimLight * energy * 0.08 * lavaAtten;
+    col += lavaLightCol * rimLight * energy * 0.20 * lavaAtten;
 
     // Dynamic range
     col *= mix(0.8, 1.2, dynRange * (shadow * 0.5 + 0.5));
