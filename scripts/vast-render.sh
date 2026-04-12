@@ -139,6 +139,10 @@ if [ "$SPLIT" = true ] && [ "$NUM_INSTANCES" -lt 2 ]; then
   exit 1
 fi
 
+# How many GPUs to use for split
+SPLIT_COUNT="$NUM_INSTANCES"
+[ "$SPLIT_COUNT" -gt 4 ] && SPLIT_COUNT=4  # cap at 4-way split
+
 # Get total frames for this track
 ANALYSIS_FILE="$VIZ_DIR/data/tracks/${TRACK}-analysis.json"
 if [ ! -f "$ANALYSIS_FILE" ]; then
@@ -230,14 +234,12 @@ echo "============================================"
 
 # Deploy to all needed GPUs
 if [ "$SPLIT" = true ]; then
-  # Deploy to first 2 GPUs
-  for ((i=0; i<2; i++)); do
+  for ((i=0; i<SPLIT_COUNT; i++)); do
     HOST="${INSTANCES[$((i*3+1))]}"
     PORT="${INSTANCES[$((i*3+2))]}"
     deploy_to_gpu "$HOST" "$PORT" "$((i+1))"
   done
 else
-  # Deploy to first GPU only
   HOST="${INSTANCES[1]}"
   PORT="${INSTANCES[2]}"
   deploy_to_gpu "$HOST" "$PORT" 1
@@ -251,13 +253,22 @@ if [ "$PREVIEW" = true ]; then
   PORT="${INSTANCES[2]}"
   launch_render "$HOST" "$PORT" 1 "--preview"
 elif [ "$SPLIT" = true ]; then
-  MIDPOINT=$((TOTAL_FRAMES / 2))
-  HOST1="${INSTANCES[1]}"
-  PORT1="${INSTANCES[2]}"
-  HOST2="${INSTANCES[4]}"
-  PORT2="${INSTANCES[5]}"
-  launch_render "$HOST1" "$PORT1" 1 "--frame-end=$MIDPOINT"
-  launch_render "$HOST2" "$PORT2" 2 "--frame-start=$MIDPOINT"
+  # Split frames evenly across all available GPUs
+  CHUNK_SIZE=$((TOTAL_FRAMES / SPLIT_COUNT))
+  for ((i=0; i<SPLIT_COUNT; i++)); do
+    HOST="${INSTANCES[$((i*3+1))]}"
+    PORT="${INSTANCES[$((i*3+2))]}"
+    FRAME_START=$((i * CHUNK_SIZE))
+    if [ $i -eq $((SPLIT_COUNT - 1)) ]; then
+      # Last GPU gets remaining frames
+      launch_render "$HOST" "$PORT" "$((i+1))" "--frame-start=$FRAME_START"
+    else
+      FRAME_END=$(((i + 1) * CHUNK_SIZE))
+      launch_render "$HOST" "$PORT" "$((i+1))" "--frame-start=$FRAME_START --frame-end=$FRAME_END"
+    fi
+  done
+  echo ""
+  echo "Split $TOTAL_FRAMES frames across $SPLIT_COUNT GPUs ($CHUNK_SIZE frames each)"
 else
   HOST="${INSTANCES[1]}"
   PORT="${INSTANCES[2]}"
