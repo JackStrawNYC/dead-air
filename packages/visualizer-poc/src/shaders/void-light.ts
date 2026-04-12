@@ -311,7 +311,7 @@ void main() {
   float melodicPitch = clamp(uMelodicPitch, 0.0, 1.0);
   float beatStability = clamp(uBeatStability, 0.0, 1.0);
   float vocalPresence = clamp(uVocalPresence, 0.0, 1.0);
-  float coherence = clamp(uCoherence, 0.0, 1.0);
+  float coherence = clamp(uCoherence, 0.0, 2.0);
   float dynamicRange = clamp(uDynamicRange, 0.0, 1.0);
   float sectionT = uSectionType;
 

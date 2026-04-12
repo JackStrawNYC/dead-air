@@ -440,7 +440,7 @@ void main() {
   float drumOn = clamp(uDrumOnset, 0.0, 1.0);
   float vocalP = clamp(uVocalPresence, 0.0, 1.0);
   float tension = clamp(uHarmonicTension, 0.0, 1.0);
-  float coherence = clamp(uCoherence, 0.0, 1.0);
+  float coherence = clamp(uCoherence, 0.0, 2.0);
   float spaceS = clamp(uSpaceScore, 0.0, 1.0);
   float timbralB = clamp(uTimbralBrightness, 0.0, 1.0);
   float psyche = clamp(uSemanticPsychedelic, 0.0, 1.0);

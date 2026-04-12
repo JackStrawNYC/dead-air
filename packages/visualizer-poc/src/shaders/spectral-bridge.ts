@@ -144,7 +144,7 @@ void main() {
   float onset = clamp(uOnsetSnap, 0.0, 1.0);
   float beatSnap = clamp(uBeatSnap, 0.0, 1.0) * smoothstep(0.3, 0.7, uBeatConfidence);
   float tension = clamp(uHarmonicTension, 0.0, 1.0);
-  float coherence = clamp(uCoherence, 0.0, 1.0);
+  float coherence = clamp(uCoherence, 0.0, 2.0);
   float stability = clamp(uBeatStability, 0.0, 1.0);
   float melodicDir = clamp(uMelodicDirection, -1.0, 1.0);
   float vocalGlow = clamp(uVocalEnergy, 0.0, 1.0);

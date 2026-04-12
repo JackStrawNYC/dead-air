@@ -102,5 +102,6 @@ export function beatCrossfadeFrames(tempo?: number): number {
   if (!tempo || tempo <= 0) return 120; // 4s default
   // 4 beats at given tempo, at 30fps
   const framesPerBeat = (60 / tempo) * 30;
-  return Math.max(90, Math.min(180, Math.round(framesPerBeat * 4)));
+  // Floor lowered to 45 (1.5s) to match dynamicCrossfadeDuration floor
+  return Math.max(45, Math.min(360, Math.round(framesPerBeat * 4)));
 }

@@ -346,18 +346,26 @@ export function getModeForSection(
       }
 
       // ─── Groove detection: PRIMARY routing signal ───
-      // Groove type (pocket/driving/floating/freeform) directly maps to shader families.
-      // This is a STRONG bias — groove determines visual character.
+      // Averages audio features across the section (not a single frame) for stable groove detection.
+      // Groove type (pocket/driving/floating/freeform) maps to shader families with 3x weight.
       if (frames && section) {
-        const midFrame = Math.floor((section.frameStart + section.frameEnd) / 2);
-        const f = frames[midFrame];
-        if (f) {
-          const groove = detectGroove(
-            f.beatStability ?? 0.5,
-            f.stemDrumOnset ?? 0,
-            section.avgEnergy ?? 0.2,
-            f.flatness ?? 0.3,
-          );
+        const sStart = section.frameStart;
+        const sEnd = Math.min(section.frameEnd, frames.length - 1);
+        const sampleCount = Math.min(10, sEnd - sStart);
+        if (sampleCount > 0) {
+          let avgStability = 0, avgDrumOnset = 0, avgFlatness = 0;
+          for (let s = 0; s < sampleCount; s++) {
+            const fi = sStart + Math.floor(s * (sEnd - sStart) / sampleCount);
+            const f = frames[fi];
+            avgStability += f?.beatStability ?? 0.5;
+            avgDrumOnset += f?.stemDrumOnset ?? 0;
+            avgFlatness += f?.flatness ?? 0.3;
+          }
+          avgStability /= sampleCount;
+          avgDrumOnset /= sampleCount;
+          avgFlatness /= sampleCount;
+
+          const groove = detectGroove(avgStability, avgDrumOnset, section.avgEnergy ?? 0.2, avgFlatness);
           if (groove.confidence > 0.3) {
             const GROOVE_SHADERS: Record<string, VisualMode[]> = {
               pocket: ["protean_clouds", "mandala_engine", "aurora", "tie_dye", "vintage_film"],
@@ -367,38 +375,57 @@ export function getModeForSection(
             };
             const grooveModes = (GROOVE_SHADERS[groove.type] ?? []).filter((m: VisualMode) => filteredPool.includes(m));
             if (grooveModes.length > 0) {
-              // 4x weight — groove is a primary signal
-              for (let i = 0; i < 3; i++) filteredPool = [...filteredPool, ...grooveModes];
+              // 3x weight — groove is a primary signal but shouldn't override song identity
+              for (let i = 0; i < 2; i++) filteredPool = [...filteredPool, ...grooveModes];
             }
           }
         }
       }
 
       // ─── Semantic routing: PRIMARY routing signal ───
-      // CLAP semantic scores (psychedelic/cosmic/aggressive/etc.) drive shader families.
-      // When a dominant semantic category has confidence > 0.35, its preferred shaders
-      // get 4x weight — the visual should MATCH the musical mood.
+      // Averages CLAP semantic scores across the section for stable mood detection.
+      // When dominant category confidence > 0.35, its preferred shaders get 3x weight.
       if (frames && section) {
-        const midFrame = Math.floor((section.frameStart + section.frameEnd) / 2);
-        const f = frames[midFrame];
-        if (f) {
+        const sStart = section.frameStart;
+        const sEnd = Math.min(section.frameEnd, frames.length - 1);
+        const sampleCount = Math.min(10, sEnd - sStart);
+        if (sampleCount > 0) {
+          let avgScores = { psychedelic: 0, aggressive: 0, tender: 0, cosmic: 0, rhythmic: 0, ambient: 0, chaotic: 0, triumphant: 0 };
+          for (let s = 0; s < sampleCount; s++) {
+            const fi = sStart + Math.floor(s * (sEnd - sStart) / sampleCount);
+            const f = frames[fi];
+            if (f) {
+              avgScores.psychedelic += f.semantic_psychedelic ?? 0;
+              avgScores.aggressive += f.semantic_aggressive ?? 0;
+              avgScores.tender += f.semantic_tender ?? 0;
+              avgScores.cosmic += f.semantic_cosmic ?? 0;
+              avgScores.rhythmic += f.semantic_rhythmic ?? 0;
+              avgScores.ambient += f.semantic_ambient ?? 0;
+              avgScores.chaotic += f.semantic_chaotic ?? 0;
+              avgScores.triumphant += f.semantic_triumphant ?? 0;
+            }
+          }
+          for (const k of Object.keys(avgScores) as (keyof typeof avgScores)[]) {
+            avgScores[k] /= sampleCount;
+          }
+
           const scores = extractSemanticScores({
-            semanticPsychedelic: f.semantic_psychedelic ?? 0,
-            semanticAggressive: f.semantic_aggressive ?? 0,
-            semanticTender: f.semantic_tender ?? 0,
-            semanticCosmic: f.semantic_cosmic ?? 0,
-            semanticRhythmic: f.semantic_rhythmic ?? 0,
-            semanticAmbient: f.semantic_ambient ?? 0,
-            semanticChaotic: f.semantic_chaotic ?? 0,
-            semanticTriumphant: f.semantic_triumphant ?? 0,
+            semanticPsychedelic: avgScores.psychedelic,
+            semanticAggressive: avgScores.aggressive,
+            semanticTender: avgScores.tender,
+            semanticCosmic: avgScores.cosmic,
+            semanticRhythmic: avgScores.rhythmic,
+            semanticAmbient: avgScores.ambient,
+            semanticChaotic: avgScores.chaotic,
+            semanticTriumphant: avgScores.triumphant,
           });
           if (scores) {
             const profile = computeSemanticProfile(scores);
             if (profile.dominant && profile.dominantConfidence > 0.35 && profile.preferredShaders.length > 0) {
               const semanticMatches = profile.preferredShaders.filter((m: VisualMode) => filteredPool.includes(m));
               if (semanticMatches.length > 0) {
-                // 4x weight — semantic is a primary signal
-                for (let i = 0; i < 3; i++) filteredPool = [...filteredPool, ...semanticMatches];
+                // 3x weight — semantic is a primary signal but respects song identity
+                for (let i = 0; i < 2; i++) filteredPool = [...filteredPool, ...semanticMatches];
               }
             }
           }

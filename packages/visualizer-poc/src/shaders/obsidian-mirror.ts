@@ -199,7 +199,7 @@ void main() {
   float vocal        = clamp(uVocalEnergy, 0.0, 1.0);
   float bass         = clamp(uBass, 0.0, 1.0);
   float highs        = clamp(uHighs, 0.0, 1.0);
-  float coherence    = clamp(uCoherence, 0.0, 1.0);
+  float coherence    = clamp(uCoherence, 0.0, 2.0);
   float onset        = clamp(uOnsetSnap, 0.0, 1.0);
   float beatConf     = smoothstep(0.3, 0.7, uBeatConfidence);
   // Exponentially decayed "beat decay" — gently fades after each beatSnap.

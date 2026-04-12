@@ -227,19 +227,24 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
         }
         const boundaryFlux = fluxCount > 0 ? fluxSum / fluxCount : 0;
 
-        // Select GPU blend mode based on energy context
-        let gpuBlendMode: string;
-        if (energyDelta > 0.15) gpuBlendMode = "luminance_key";
-        else if (boundaryFlux > 0.25) gpuBlendMode = "noise_dissolve";
-        else if (energyAfter < 0.08) gpuBlendMode = "additive";
-        else gpuBlendMode = "dissolve";
+        // Select GPU blend mode based on energy context.
+        // Use input names that transitionStyleToBlendMode recognizes:
+        //   "shader_luminance" → luminance_key (bright areas punch through)
+        //   "distortion" → noise_dissolve (organic, psychedelic)
+        //   "shader_additive" → additive (soft glow)
+        //   "dissolve" → noise_dissolve (clean)
+        let gpuStyle: string;
+        if (energyDelta > 0.15) gpuStyle = "shader_luminance";
+        else if (boundaryFlux > 0.25) gpuStyle = "distortion";
+        else if (energyAfter < 0.08) gpuStyle = "shader_additive";
+        else gpuStyle = "dissolve";
 
         return (
           <GPUTransition
             outMode={prevMode}
             inMode={currentMode}
             progress={progress}
-            blendMode={transitionStyleToBlendMode(gpuBlendMode as any, energyAfter)}
+            blendMode={transitionStyleToBlendMode(gpuStyle, energyAfter)}
             frames={frames}
             sections={sections}
             palette={palette}

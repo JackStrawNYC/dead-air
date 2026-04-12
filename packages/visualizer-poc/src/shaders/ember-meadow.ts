@@ -184,7 +184,7 @@ void main() {
   float melodicDir = clamp(uMelodicDirection, -1.0, 1.0);
   float tension = clamp(uHarmonicTension, 0.0, 1.0);
   float stability = clamp(uBeatStability, 0.0, 1.0);
-  float coherence = clamp(uCoherence, 0.0, 1.0);
+  float coherence = clamp(uCoherence, 0.0, 2.0);
   float chromaHueMod = uChromaHue * 0.10;
   float chordConf = smoothstep(0.3, 0.6, uChordConfidence);
   float chordHue = float(int(uChordIndex)) / 24.0 * 0.06 * chordConf;

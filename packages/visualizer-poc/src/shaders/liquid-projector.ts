@@ -196,7 +196,7 @@ void main() {
   float melodicPitch = clamp(uMelodicPitch * uMelodicConfidence, 0.0, 1.0);
   float melodicDir = clamp(uMelodicDirection, -1.0, 1.0);
   float effectiveBeat = uBeatSnap * smoothstep(0.3, 0.7, uBeatConfidence);
-  float coherence = clamp(uCoherence, 0.0, 1.0);
+  float coherence = clamp(uCoherence, 0.0, 2.0);
   float chromaHueMod = uChromaHue * 0.25;
   float chordConf = smoothstep(0.3, 0.6, uChordConfidence);
   float chordHue = float(int(uChordIndex)) / 24.0 * 0.12 * chordConf;

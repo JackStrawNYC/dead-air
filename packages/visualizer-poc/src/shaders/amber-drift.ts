@@ -161,7 +161,7 @@ void main() {
   float vocalEnergy = clamp(uVocalEnergy, 0.0, 1.0);
   float vocalPresence = clamp(uVocalPresence, 0.0, 1.0);
   float beatDecay = uBeatSnap * smoothstep(0.3, 0.7, uBeatConfidence);
-  float coherence = clamp(uCoherence, 0.0, 1.0);
+  float coherence = clamp(uCoherence, 0.0, 2.0);
   float chromaHueShift = uChromaHue * 0.08; // small warmth shift only
   float showWarmth = clamp(uShowWarmth, 0.0, 1.0);
   float e2 = energy * energy;

@@ -233,7 +233,7 @@ void main() {
   float vocalPresence = clamp(uVocalPresence, 0.0, 1.0);
   float melodicDir = clamp(uMelodicDirection, -1.0, 1.0);
   float melodicPitch = clamp(uMelodicPitch, 0.0, 1.0);
-  float coherence = clamp(uCoherence, 0.0, 1.0);
+  float coherence = clamp(uCoherence, 0.0, 2.0);
   float timbralBright = clamp(uTimbralBrightness, 0.0, 1.0);
   float onsetSnap = clamp(uOnsetSnap, 0.0, 1.0);
   float effectiveBeat = uBeatSnap * smoothstep(0.3, 0.7, uBeatConfidence);
