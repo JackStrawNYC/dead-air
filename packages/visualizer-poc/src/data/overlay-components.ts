@@ -22,6 +22,8 @@ import { GodRays } from "../components/GodRays";
 
 // ─── Layer 2: Sacred / Center-stage (13) ───
 import { BreathingStealie } from "../components/BreathingStealie";
+import { StealieTracedOverlay } from "../components/StealieTracedOverlay";
+import { BearTracedOverlay } from "../components/BearTracedOverlay";
 import { ThirteenPointBolt } from "../components/ThirteenPointBolt";
 import { StealYourFaceOff } from "../components/StealYourFaceOff";
 import { SkullKaleidoscope } from "../components/SkullKaleidoscope";
@@ -468,6 +470,8 @@ export const OVERLAY_COMPONENTS: Record<string, OverlayComponentEntry> = {
   GodRays:           { Component: GodRays, layer: 1 },
 
   // Layer 2: Sacred / Center-stage
+  StealieTraced:     { Component: StealieTracedOverlay, layer: 2 },
+  BearTraced:        { Component: BearTracedOverlay, layer: 6 },
   BreathingStealie:  { Component: BreathingStealie, layer: 2 },
   ThirteenPointBolt: { Component: ThirteenPointBolt, layer: 2 },
   StealYourFaceOff:  { Component: StealYourFaceOff, layer: 2 },

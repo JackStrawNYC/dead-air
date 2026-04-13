@@ -101,7 +101,7 @@ export const TracedIconOverlay: React.FC<Props> = ({
   const progress = cycleFrame / visibleDuration;
   const fadeIn = interpolate(progress, [0, 0.08], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
   const fadeOut = interpolate(progress, [0.92, 1], [1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-  const masterOpacity = Math.min(fadeIn, fadeOut) * 0.85;
+  const masterOpacity = Math.min(fadeIn, fadeOut) * 0.92;
   if (masterOpacity < 0.01) return null;
 
   // Size
@@ -128,15 +128,15 @@ export const TracedIconOverlay: React.FC<Props> = ({
   // Subtle rotation drift
   const rotation = Math.sin(frame * 0.003 * tempoFactor) * 1.5;
 
-  // Glow intensity from energy
-  const glowRadius = 8 + energy * 20;
-  const glowOpacity = 0.15 + slowE * 0.25;
+  // Glow intensity from energy — subtle, don't overpower
+  const glowRadius = 6 + energy * 12;
+  const glowOpacity = 0.08 + slowE * 0.15;
 
   // Onset flash
   const flashOpacity = onset > 0.5 ? (onset - 0.5) * 0.3 : 0;
 
-  // ChromaHue color shift
-  const hueShift = (chromaHue - 180) * 0.2;
+  // ChromaHue color shift — reduced to avoid desaturation
+  const hueShift = (chromaHue - 180) * 0.08;
 
   // Resolve color tokens to actual colors
   function resolveColor(color: string): string {
