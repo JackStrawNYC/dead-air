@@ -94,7 +94,7 @@ export async function renderWithRust(
   ], {
     cwd: RENDERER_ROOT,
     maxBuffer: 50 * 1024 * 1024, // 50MB for manifest generator output
-    timeout: 600_000, // 10 min
+    timeout: 3600_000, // 60 min — full 3-hour shows at 60fps take 15-30 min
   });
   log.info(`Manifest: ${manifestPath}`);
 
