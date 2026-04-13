@@ -718,6 +718,100 @@ async function main() {
     const frames = analysis.frames ?? [];
     let sections = analysis.sections ?? [];
 
+    // ─── Dead Air Detection ───────────────────────────────────────────
+    // Flag frames that are crowd noise, tuning, banter, or applause —
+    // NOT music. These get routed to calm ambient visuals instead of
+    // reactive shaders pulsing to Bob tuning his guitar.
+    //
+    // Detection signals:
+    //   - No beat regularity (beatConfidence low or no beats in window)
+    //   - Low spectral centroid (muddy/noisy, not tonal)
+    //   - High flatness (white noise / crowd noise)
+    //   - Low onset regularity (no rhythmic pattern)
+    //   - Very low or very high RMS without beat structure
+    //
+    // Each frame gets a deadAirScore 0-1. Above 0.5 = not music.
+    const deadAirFlags = new Uint8Array(frames.length); // 1 = dead air
+    {
+      const WINDOW = 60; // 2 seconds at 30fps
+      for (let fi = 0; fi < frames.length; fi++) {
+        const f = frames[fi];
+
+        // Signal 1: Beat regularity — count beats in ±window
+        let beatCount = 0;
+        const lo = Math.max(0, fi - WINDOW);
+        const hi = Math.min(frames.length - 1, fi + WINDOW);
+        for (let j = lo; j <= hi; j++) {
+          if (frames[j].beat) beatCount++;
+        }
+        const beatDensity = beatCount / (hi - lo + 1);
+        const noBeat = beatDensity < 0.015 ? 1.0 : beatDensity < 0.03 ? 0.5 : 0.0;
+
+        // Signal 2: Spectral flatness — high = noise, low = tonal
+        const flatness = f.flatness ?? 0.5;
+        const isNoisy = flatness > 0.6 ? 1.0 : flatness > 0.45 ? 0.5 : 0.0;
+
+        // Signal 3: Very low energy — silence/near-silence
+        const rms = f.rms ?? 0;
+        const isSilent = rms < 0.02 ? 1.0 : rms < 0.05 ? 0.5 : 0.0;
+
+        // Signal 4: Low spectral centroid — muddy, not musical
+        const centroid = f.centroid ?? 0.5;
+        const isMuddy = centroid < 0.2 ? 0.7 : 0.0;
+
+        // Signal 5: Onset regularity — irregular onsets = not music
+        let onsetCount = 0;
+        for (let j = lo; j <= hi; j++) {
+          if ((frames[j].onset ?? 0) > 0.3) onsetCount++;
+        }
+        const onsetDensity = onsetCount / (hi - lo + 1);
+        const noOnsets = onsetDensity < 0.01 ? 0.8 : onsetDensity < 0.03 ? 0.3 : 0.0;
+
+        // Composite score — weighted average
+        const deadAirScore =
+          noBeat * 0.35 +
+          isNoisy * 0.20 +
+          isSilent * 0.20 +
+          isMuddy * 0.10 +
+          noOnsets * 0.15;
+
+        deadAirFlags[fi] = deadAirScore > 0.4 ? 1 : 0;
+      }
+
+      // Smooth: require 2+ seconds of dead air to trigger (avoid false positives)
+      const SUSTAIN = 60; // 2 seconds
+      const smoothed_da = new Uint8Array(frames.length);
+      let runLength = 0;
+      for (let fi = 0; fi < frames.length; fi++) {
+        if (deadAirFlags[fi]) {
+          runLength++;
+        } else {
+          runLength = 0;
+        }
+        smoothed_da[fi] = runLength >= SUSTAIN ? 1 : 0;
+      }
+      // Back-fill: once we know a run exceeds SUSTAIN, flag the whole run
+      runLength = 0;
+      for (let fi = frames.length - 1; fi >= 0; fi--) {
+        if (smoothed_da[fi]) {
+          runLength++;
+        } else if (deadAirFlags[fi] && runLength > 0) {
+          smoothed_da[fi] = 1;
+          runLength++;
+        } else {
+          runLength = 0;
+        }
+      }
+      for (let fi = 0; fi < frames.length; fi++) {
+        deadAirFlags[fi] = smoothed_da[fi];
+      }
+
+      const deadFrames = deadAirFlags.reduce((s, v) => s + v, 0);
+      if (deadFrames > 0) {
+        console.log(`    Dead air: ${deadFrames} frames (${(deadFrames / frames.length * 100).toFixed(1)}%) — crowd/tuning/banter`);
+      }
+    }
+
     // If no sections from analysis, generate synthetic sections from energy contours.
     // Segments every 30-90 seconds based on energy changes, giving the router
     // meaningful boundaries to switch shaders at.
@@ -995,14 +1089,43 @@ async function main() {
         ? (i - routeState.sectionStartFrame) / routeSectionLen
         : 0;
 
+      // ─── Dead Air Override ───
+      // Non-music frames (crowd, tuning, banter, applause) get:
+      //   - A calm ambient shader (aurora or void_light)
+      //   - Suppressed energy/beat uniforms (no reactive pulsing)
+      //   - Dimmed brightness (warm, dark, ambient)
+      const isDeadAir = deadAirFlags[ai] === 1;
+      if (isDeadAir) {
+        // Force calm ambient shader during dead air
+        const deadAirShaders = ["aurora", "void_light", "cosmic_dust", "luminous_cavern"];
+        const daPool = deadAirShaders.filter(s => Object.keys(shaders).includes(s));
+        if (daPool.length > 0 && !daPool.includes(route.shaderId)) {
+          route.shaderId = daPool[Math.floor(seededRandom(ctx.songSeed + i * 11) * daPool.length)];
+          route.secondaryId = null;
+          route.blendProgress = null;
+          route.blendMode = null;
+        }
+      }
+
       // Compute uniforms with interpolation between adjacent analysis frames.
       // Structural analysis and routing use integer index (discrete decisions),
       // but continuous audio values are interpolated for smooth 60fps curves.
-      const uniforms = computeUniforms(
+      let uniforms = computeUniforms(
         frames, ai, fps, tempo, width, height, globalTime, frameAnalysis, smoothed,
         aiHi, interpT,
         song, i / Math.max(1, totalOut), routeSectionProgress, showVisualSeed,
       );
+
+      // Suppress reactive uniforms during dead air — calm ambient, no pulsing to noise
+      if (isDeadAir) {
+        uniforms.energy = Math.min(uniforms.energy ?? 0, 0.05);
+        uniforms.bass = Math.min(uniforms.bass ?? 0, 0.02);
+        uniforms.onset = 0;
+        uniforms.beat_snap = 0;
+        uniforms.drum_onset = 0;
+        uniforms.envelope_brightness = Math.min(uniforms.envelope_brightness ?? 0.5, 0.3);
+        uniforms.envelope_saturation = Math.min(uniforms.envelope_saturation ?? 0.5, 0.4);
+      }
 
       allFrames.push({
         shader_id: route.shaderId,
