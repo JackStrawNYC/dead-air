@@ -51,7 +51,7 @@ import { hashString } from "../visualizer-poc/src/utils/hash.js";
 
 // ─── Shader collection (same as generate-manifest.ts) ───
 
-async function collectShaderGLSL(): Promise<Record<string, string>> {
+export async function collectShaderGLSL(): Promise<Record<string, string>> {
   const shaders: Record<string, string> = {};
   const shaderDir = join(VISUALIZER_ROOT, "src/shaders");
   const skipFiles = new Set([
@@ -662,6 +662,9 @@ async function main() {
   const dataDir = getArg("data-dir", join(VISUALIZER_ROOT, "data"));
   const outputPath = getArg("output", "manifest.json");
   const fps = parseInt(getArg("fps", "60"));
+  const singleSongIdx = args.indexOf("--single-song") >= 0
+    ? parseInt(args[args.indexOf("--single-song") + 1])
+    : -1;
   const width = parseInt(getArg("width", "3840"));
   const height = parseInt(getArg("height", "2160"));
 
@@ -700,7 +703,9 @@ async function main() {
   const shaderModeLastUsed = new Map<string, number>();
   let showSongsCompleted = 0;
 
-  for (let songIdx = 0; songIdx < songs.length; songIdx++) {
+  const songStart = singleSongIdx >= 0 ? singleSongIdx : 0;
+  const songEnd = singleSongIdx >= 0 ? singleSongIdx + 1 : songs.length;
+  for (let songIdx = songStart; songIdx < songEnd; songIdx++) {
     const song = songs[songIdx];
     const trackPath = join(dataDir, "tracks", `${song.trackId}-analysis.json`);
     if (!existsSync(trackPath)) {
@@ -900,6 +905,15 @@ async function main() {
     showSongsCompleted++;
     const songElapsed = ((Date.now() - songStartTime) / 1000).toFixed(1);
     console.log(`  ✓ ${song.title} done (${totalOut} frames in ${songElapsed}s, ${allFrames.length} total)`);
+  }
+
+  // ─── Single-song mode: write just the frames array ───
+  if (singleSongIdx >= 0) {
+    console.log(`\n[full-manifest] Single-song mode: writing ${allFrames.length} frames`);
+    writeFileSync(outputPath, JSON.stringify(allFrames));
+    const mb = (statSync(outputPath).size / 1048576).toFixed(1);
+    console.log(`[full-manifest] Done: ${outputPath} (${mb} MB, ${allFrames.length} frames)`);
+    return;
   }
 
   // ─── Write manifest (streaming JSON for large shows) ───

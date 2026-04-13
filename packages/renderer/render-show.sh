@@ -90,19 +90,23 @@ echo "════════════════════════�
 echo ""
 
 # ─── STEP 1: Generate manifest ────────────────────────────────────
-echo "┌─ Step 1/5: Generate manifest"
-if [[ ! -f "$MANIFEST" ]]; then
-  echo "│  Running manifest generator..."
+echo "┌─ Step 1/5: Generate manifest (parallel)"
+if [[ -f "$MANIFEST" ]] && [[ $(python3 -c "import json; print(len(json.load(open('$MANIFEST')).get('frames',[])))" 2>/dev/null) -gt 0 ]]; then
+  echo "│  ✓ Manifest exists with frames, skipping (delete to regenerate)"
+else
+  echo "│  Running parallel manifest generator..."
   cd "$RENDERER_DIR"
-  npx tsx generate-full-manifest.ts \
+  NCPU=$(sysctl -n hw.ncpu 2>/dev/null || nproc 2>/dev/null || echo 4)
+  WORKERS=$((NCPU > 2 ? NCPU - 1 : 1))
+  echo "│  Concurrency: $WORKERS workers"
+  npx tsx generate-manifest-parallel.ts \
     --data-dir "$DATA_DIR" \
     --output "$MANIFEST" \
     --fps "$FPS" \
     --width "$WIDTH" \
-    --height "$HEIGHT"
+    --height "$HEIGHT" \
+    --concurrency "$WORKERS"
   echo "│  ✓ Manifest: $(du -h "$MANIFEST" | cut -f1)"
-else
-  echo "│  ✓ Manifest exists, skipping (delete to regenerate)"
 fi
 echo "└─"
 echo ""
