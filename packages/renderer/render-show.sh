@@ -66,6 +66,18 @@ mkdir -p "$WORK_DIR" "$OVERLAYS_DIR"
 
 echo "═══════════════════════════════════════════════════════════"
 echo "  Dead Air — Full Show Render Pipeline"
+echo ""
+echo "  Mode A (default): Rust shaders only + audio mux"
+echo "    Fast (10-35fps GPU). No text/overlays."
+echo "    Steps: manifest → Rust render → audio mux"
+echo ""
+echo "  Mode B (--with-overlays): Rust shaders + Remotion overlays"
+echo "    Requires alpha-capable codec (ProRes 4444 or PNG seq)."
+echo "    Steps: manifest → Rust render → Remotion overlays → composite → audio"
+echo ""
+echo "  Mode C (--remotion-only): Full Remotion render"
+echo "    Slowest but includes ALL text/overlays/cards."
+echo "    Steps: Remotion render → audio mux"
 echo "═══════════════════════════════════════════════════════════"
 echo "  Data:    $DATA_DIR"
 echo "  Output:  $OUTPUT"
@@ -121,36 +133,48 @@ echo ""
 
 # ─── STEP 3: Remotion text/overlay render ─────────────────────────
 echo "┌─ Step 3/5: Remotion text/overlay render"
+OVERLAYS_MP4="$WORK_DIR/overlays.mp4"
 if [[ "$SKIP_OVERLAYS" == "true" ]]; then
   echo "│  ⏭ Skipped (--skip-overlays)"
-elif [[ -f "$OVERLAYS_DIR/done.marker" ]]; then
-  echo "│  ✓ Overlays exist, skipping (delete done.marker to re-render)"
+elif [[ -f "$OVERLAYS_MP4" ]]; then
+  echo "│  ✓ Overlays MP4 exists, skipping (delete to re-render)"
 else
-  echo "│  Rendering text/overlay layers via Remotion..."
-  cd "$VISUALIZER_DIR"
+  echo "│  Rendering text/overlay layers via Remotion (OVERLAY_ONLY mode)..."
+  echo "│  This uses the existing Remotion pipeline with shaders disabled."
+  echo "│  Text, overlays, and cards render on transparent background."
+  echo "│"
+  cd "$RENDERER_DIR/.."
 
-  # Get total frame count from manifest
-  TOTAL_FRAMES=$(node -e "
-    const fs = require('fs');
-    const m = JSON.parse(fs.readFileSync('$MANIFEST', 'utf8'));
-    console.log(m.frames ? m.frames.length : 0);
-  ")
-  echo "│  Total frames: $TOTAL_FRAMES"
-
-  # Render the full show composition as a transparent PNG sequence
-  # Only the text/overlay layers render (shaders are replaced by transparent bg)
+  # Use the existing CLI produce command with --renderer=remotion and OVERLAY_ONLY=true
+  # This renders per-song compositions then concatenates, same as a normal Remotion render
+  # but with OVERLAY_ONLY=true so SongVisualizer skips shaders
+  OVERLAY_ONLY=true \
   RENDER_WIDTH=$WIDTH RENDER_HEIGHT=$HEIGHT RENDER_FPS=$FPS \
-  npx remotion render src/entry.ts FullShowOverlays \
-    --output "$OVERLAYS_DIR/frame-%06d.png" \
-    --image-format png \
-    --every-nth-frame 1 \
-    --concurrency 4 \
-    --log error \
-    2>&1 | tail -5
+  npx tsx packages/cli/src/commands/produce.ts render \
+    --data-dir "$DATA_DIR" \
+    --output "$OVERLAYS_MP4" \
+    --renderer remotion \
+    --codec prores \
+    --prores-profile 4444 \
+    2>&1 | tail -10
 
-  touch "$OVERLAYS_DIR/done.marker"
-  OVERLAY_COUNT=$(ls "$OVERLAYS_DIR"/*.png 2>/dev/null | wc -l)
-  echo "│  ✓ Overlays: $OVERLAY_COUNT frames"
+  # If prores with alpha isn't available, fall back to PNG sequence
+  if [[ ! -f "$OVERLAYS_MP4" ]]; then
+    echo "│  ProRes 4444 failed, falling back to H.264 overlay render..."
+    OVERLAY_ONLY=true \
+    RENDER_WIDTH=$WIDTH RENDER_HEIGHT=$HEIGHT RENDER_FPS=$FPS \
+    npx tsx packages/cli/src/commands/produce.ts render \
+      --data-dir "$DATA_DIR" \
+      --output "$OVERLAYS_MP4" \
+      --renderer remotion \
+      2>&1 | tail -10
+  fi
+
+  if [[ -f "$OVERLAYS_MP4" ]]; then
+    echo "│  ✓ Overlays: $(du -h "$OVERLAYS_MP4" | cut -f1)"
+  else
+    echo "│  ⚠ Overlay render failed — continuing without overlays"
+  fi
 fi
 echo "└─"
 echo ""
@@ -161,14 +185,17 @@ if [[ "$SKIP_COMPOSITE" == "true" ]]; then
   echo "│  ⏭ Skipped (--skip-composite)"
   COMPOSITE_MP4="$SHADERS_MP4"
 elif [[ ! -f "$SHADERS_MP4" ]]; then
-  echo "│  ⚠ No shaders MP4, using overlays-only"
+  echo "│  ⚠ No shaders MP4 — using overlays only"
+  COMPOSITE_MP4="$OVERLAYS_MP4"
+elif [[ ! -f "$OVERLAYS_MP4" ]]; then
+  echo "│  ⚠ No overlays MP4 — using shaders only"
   COMPOSITE_MP4="$SHADERS_MP4"
 else
   echo "│  Compositing overlays over shaders..."
   ffmpeg -y \
     -i "$SHADERS_MP4" \
-    -framerate "$FPS" -i "$OVERLAYS_DIR/frame-%06d.png" \
-    -filter_complex "[0:v][1:v]overlay=0:0:format=auto" \
+    -i "$OVERLAYS_MP4" \
+    -filter_complex "[0:v][1:v]overlay=0:0:format=auto:shortest=1" \
     -c:v libx264 -preset slow -crf "$CRF" \
     -pix_fmt yuv420p -movflags +faststart \
     "$COMPOSITE_MP4" \
