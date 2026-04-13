@@ -941,6 +941,37 @@ impl GpuRenderer {
     }
 
     /// Copy output texture to the current readback buffer and swap indices.
+    /// Skip post-processing: copy HDR scene directly to output + readback.
+    /// The GLSL shader already includes bloom/grain/halation/vignette.
+    pub fn scene_to_readback(&mut self, hdr_source: &wgpu::TextureView) {
+        let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("no_pp_readback"),
+        });
+        // Copy HDR source to output texture via a simple fullscreen blit
+        // (output_texture is RGBA8, HDR is float — this clamps to 0-1)
+        encoder.copy_texture_to_texture(
+            wgpu::TexelCopyTextureInfo {
+                texture: &self.scene_texture,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
+            wgpu::TexelCopyTextureInfo {
+                texture: &self.output_texture,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
+            wgpu::Extent3d {
+                width: self.width,
+                height: self.height,
+                depth_or_array_layers: 1,
+            },
+        );
+        self.copy_to_readback(&mut encoder);
+        self.queue.submit(std::iter::once(encoder.finish()));
+    }
+
     fn copy_to_readback(&mut self, encoder: &mut wgpu::CommandEncoder) {
         let bytes_per_row = Self::padded_bytes_per_row(self.width);
         encoder.copy_texture_to_buffer(

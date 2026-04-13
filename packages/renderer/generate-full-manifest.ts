@@ -737,23 +737,24 @@ async function main() {
       for (let fi = 0; fi < frames.length; fi++) {
         const f = frames[fi];
 
-        // Signal 1: Beat regularity — count beats in ±window
+        // Signal 1: Beat regularity — count confident beats in ±window
         let beatCount = 0;
         const lo = Math.max(0, fi - WINDOW);
         const hi = Math.min(frames.length - 1, fi + WINDOW);
         for (let j = lo; j <= hi; j++) {
-          if (frames[j].beat) beatCount++;
+          if (frames[j].beat && (frames[j].beatConfidence ?? 0) > 0.5) beatCount++;
         }
         const beatDensity = beatCount / (hi - lo + 1);
-        const noBeat = beatDensity < 0.015 ? 1.0 : beatDensity < 0.03 ? 0.5 : 0.0;
+        const noBeat = beatDensity < 0.02 ? 1.0 : beatDensity < 0.04 ? 0.5 : 0.0;
 
         // Signal 2: Spectral flatness — high = noise, low = tonal
         const flatness = f.flatness ?? 0.5;
-        const isNoisy = flatness > 0.6 ? 1.0 : flatness > 0.45 ? 0.5 : 0.0;
+        const isNoisy = flatness > 0.5 ? 1.0 : flatness > 0.35 ? 0.5 : 0.0;
 
-        // Signal 3: Very low energy — silence/near-silence
+        // Signal 3: Low energy — crowd noise / tuning / banter
+        // Crowd noise is typically RMS 0.01-0.08. Music is 0.1+.
         const rms = f.rms ?? 0;
-        const isSilent = rms < 0.02 ? 1.0 : rms < 0.05 ? 0.5 : 0.0;
+        const isSilent = rms < 0.08 ? 1.0 : rms < 0.12 ? 0.5 : 0.0;
 
         // Signal 4: Low spectral centroid — muddy, not musical
         const centroid = f.centroid ?? 0.5;
@@ -776,6 +777,24 @@ async function main() {
           noOnsets * 0.15;
 
         deadAirFlags[fi] = deadAirScore > 0.4 ? 1 : 0;
+      }
+
+      // Large-window RMS check: if average RMS in a 10-second window is < 0.10,
+      // it's dead air (crowd noise, tuning, banter). Beat detection is unreliable
+      // for non-music content (hallucinated beats in noise).
+      const MUSIC_WINDOW = 300; // 10 seconds at 30fps
+      for (let fi = 0; fi < frames.length; fi++) {
+        if (deadAirFlags[fi]) continue; // already flagged
+        const mLo = Math.max(0, fi - MUSIC_WINDOW);
+        const mHi = Math.min(frames.length - 1, fi + MUSIC_WINDOW);
+        let rmsSum = 0;
+        for (let j = mLo; j <= mHi; j++) {
+          rmsSum += frames[j].rms ?? 0;
+        }
+        const avgRms = rmsSum / (mHi - mLo + 1);
+        if (avgRms < 0.10) {
+          deadAirFlags[fi] = 1;
+        }
       }
 
       // Smooth: require 2+ seconds of dead air to trigger (avoid false positives)

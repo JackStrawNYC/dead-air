@@ -71,6 +71,11 @@ struct Args {
     #[arg(long, default_value_t = 0)]
     start_frame: u32,
 
+    /// Skip Rust-side post-processing (GLSL shaders already include bloom/grain/halation).
+    /// Removes 5 redundant GPU passes per frame for ~3-5x speedup.
+    #[arg(long, default_value_t = false)]
+    no_pp: bool,
+
     /// End frame (0 = all)
     #[arg(long, default_value_t = 0)]
     end_frame: u32,
@@ -406,7 +411,7 @@ fn main() {
                     blend_prog,
                     blend_mode_str,
                     Some(feedback_target),
-                    Some((&pp_pipeline, &pp_uniforms)),
+                    if args.no_pp { None } else { Some((&pp_pipeline, &pp_uniforms)) },
                     &transition_pipeline,
                 );
             } else {
@@ -414,7 +419,7 @@ fn main() {
                 renderer.render_frame(
                     pipeline, &uniform_data,
                     texture_bind_group.as_ref(), Some(feedback_target),
-                    Some((&pp_pipeline, &pp_uniforms)),
+                    if args.no_pp { None } else { Some((&pp_pipeline, &pp_uniforms)) },
                     None, // no temporal during transitions
                 );
             }
@@ -452,9 +457,13 @@ fn main() {
             }
 
             // Post-process the accumulated result + readback
-            renderer.postprocess_and_readback(
-                &pp_pipeline, &pp_uniforms, &motion_blur_pipeline.accum_view,
-            );
+            if args.no_pp {
+                renderer.scene_to_readback(&motion_blur_pipeline.accum_view);
+            } else {
+                renderer.postprocess_and_readback(
+                    &pp_pipeline, &pp_uniforms, &motion_blur_pipeline.accum_view,
+                );
+            }
         } else {
             // Standard path: scene → particles → post-process → readback
             renderer.render_scene_to_hdr(
@@ -462,9 +471,14 @@ fn main() {
                 texture_bind_group.as_ref(), Some(feedback_target),
             );
 
-            // Post-process + readback (create an owned view to avoid borrow conflict)
-            let scene_view = renderer.create_scene_view();
-            renderer.postprocess_and_readback(&pp_pipeline, &pp_uniforms, &scene_view);
+            // Post-process + readback
+            if args.no_pp {
+                let scene_view = renderer.create_scene_view();
+                renderer.scene_to_readback(&scene_view);
+            } else {
+                let scene_view = renderer.create_scene_view();
+                renderer.postprocess_and_readback(&pp_pipeline, &pp_uniforms, &scene_view);
+            }
         }
 
         // GPU work submitted — mark this frame as pending readback
