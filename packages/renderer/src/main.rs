@@ -291,6 +291,21 @@ fn main() {
                 args.width, args.height,
             );
             progress.inc(1);
+
+            // Log progress every 5% for non-TTY environments (piped output, log files)
+            let done = progress.position();
+            let total = progress.length().unwrap_or(1);
+            let interval = total / 20; // every 5%
+            if interval > 0 && done % interval == 0 && done > 0 {
+                let elapsed = progress.elapsed().as_secs_f64();
+                let fps_actual = done as f64 / elapsed;
+                let eta_sec = if fps_actual > 0.0 { (total - done) as f64 / fps_actual } else { 0.0 };
+                eprintln!(
+                    "[progress] {}/{} frames ({:.0}%) | {:.1} fps | ETA: {:.0}m{:.0}s",
+                    done, total, done as f64 / total as f64 * 100.0,
+                    fps_actual, eta_sec / 60.0, eta_sec % 60.0,
+                );
+            }
         }
 
         let frame = &manifest.frames[frame_idx];
