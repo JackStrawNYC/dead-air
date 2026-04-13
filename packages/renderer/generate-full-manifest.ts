@@ -715,8 +715,53 @@ async function main() {
     }
 
     const analysis = JSON.parse(readFileSync(trackPath, "utf-8"));
-    const frames = analysis.frames ?? [];
+    let frames = analysis.frames ?? [];
     let sections = analysis.sections ?? [];
+
+    // ─── Auto-trim: remove non-music from start and end ───────────────
+    // Archive.org recordings include crowd noise, tuning, and applause
+    // before/after songs. Find where music actually starts and ends.
+    {
+      const WINDOW = 90; // 3 seconds at 30fps
+      const THRESHOLD = 0.10; // RMS below this = not music
+
+      // Find music start
+      let musicStart = 0;
+      for (let i = 0; i < frames.length - WINDOW; i += 30) {
+        let avg = 0;
+        for (let j = i; j < i + WINDOW; j++) avg += frames[j].rms ?? 0;
+        avg /= WINDOW;
+        if (avg > THRESHOLD) {
+          musicStart = Math.max(0, i - 30); // 1s before music
+          break;
+        }
+      }
+
+      // Find music end
+      let musicEnd = frames.length;
+      for (let i = frames.length - 1; i > WINDOW; i -= 30) {
+        let avg = 0;
+        for (let j = i - WINDOW; j < i; j++) avg += frames[j].rms ?? 0;
+        avg /= WINDOW;
+        if (avg > THRESHOLD) {
+          musicEnd = Math.min(frames.length, i + 60); // 2s after music
+          break;
+        }
+      }
+
+      const trimFront = musicStart / (analysis.meta?.fps ?? 30);
+      const trimBack = (frames.length - musicEnd) / (analysis.meta?.fps ?? 30);
+      if (trimFront > 3 || trimBack > 5) {
+        console.log(`    Trim: ${trimFront.toFixed(0)}s front, ${trimBack.toFixed(0)}s back (${frames.length} → ${musicEnd - musicStart} frames)`);
+        frames = frames.slice(musicStart, musicEnd);
+        // Adjust section boundaries
+        sections = sections.map((s: any) => ({
+          ...s,
+          start: Math.max(0, (s.start ?? s.frameStart ?? 0) - musicStart),
+          end: Math.max(0, (s.end ?? s.frameEnd ?? frames.length) - musicStart),
+        })).filter((s: any) => s.end > 0);
+      }
+    }
 
     // ─── Dead Air Detection ───────────────────────────────────────────
     // Flag frames that are crowd noise, tuning, banter, or applause —
