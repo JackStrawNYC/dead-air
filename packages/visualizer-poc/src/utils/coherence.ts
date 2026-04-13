@@ -179,14 +179,77 @@ export function computeRawScore(
   return chroma * 0.30 + beat * 0.25 + density * 0.25 + sustain * 0.20;
 }
 
-// ─── Main computation ───
+// ─── Batch computation (O(n) instead of O(n²)) ───
+
+/**
+ * Pre-compute all coherence scores and lock states for all frames in one pass.
+ * Returns an array of CoherenceScore, one per frame.
+ *
+ * This replaces the O(n × LOCK_SCAN_WINDOW) backward-scan approach with:
+ *   1. Compute all raw scores in one pass: O(n × window) total
+ *   2. Simulate hysteresis forward in one pass: O(n)
+ * Total: O(n × window) instead of O(n × LOCK_SCAN_WINDOW × window)
+ *
+ * For a 14K frame song: ~840K frame accesses instead of ~756M (900x speedup).
+ */
+export function batchComputeCoherence(
+  frames: EnhancedFrameData[],
+): CoherenceScore[] {
+  const n = frames.length;
+  if (n === 0) return [];
+
+  // Step 1: compute all raw scores (the expensive part, but done once)
+  const rawScores = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    rawScores[i] = computeRawScore(frames, i);
+  }
+
+  // Step 2: simulate lock hysteresis forward in one pass
+  const results: CoherenceScore[] = new Array(n);
+  let locked = false;
+  let framesAbove = 0;
+  let framesBelow = 0;
+  let lockStart = -1;
+
+  for (let i = 0; i < n; i++) {
+    const s = rawScores[i];
+
+    if (s > LOCK_ENTER_THRESHOLD) {
+      framesAbove++;
+      framesBelow = 0;
+    } else if (s < LOCK_EXIT_THRESHOLD) {
+      framesBelow++;
+      framesAbove = 0;
+    } else {
+      framesAbove = 0;
+      framesBelow = 0;
+    }
+
+    if (!locked && framesAbove >= LOCK_ENTER_FRAMES) {
+      locked = true;
+      lockStart = i - LOCK_ENTER_FRAMES + 1;
+    }
+
+    if (locked && framesBelow >= LOCK_EXIT_FRAMES) {
+      locked = false;
+      lockStart = -1;
+    }
+
+    results[i] = {
+      score: Math.max(0, Math.min(1, s)),
+      isLocked: locked,
+      lockDuration: locked && lockStart >= 0 ? i - lockStart : 0,
+    };
+  }
+
+  return results;
+}
+
+// ─── Single-frame computation (legacy, used by Remotion real-time) ───
 
 /**
  * Compute coherence score for a single frame.
- *
- * DETERMINISTIC: pure function of frame data (no module-level state).
- * Scans backward from current frame to determine lock state via hysteresis
- * simulation. Safe for Remotion's out-of-order frame rendering.
+ * For batch/manifest generation, use batchComputeCoherence() instead.
  */
 export function computeCoherence(
   frames: EnhancedFrameData[],

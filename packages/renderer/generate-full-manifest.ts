@@ -31,7 +31,7 @@ const VISUALIZER_ROOT = resolve(__dirname, "../visualizer-poc");
 import { computeAudioSnapshot, buildBeatArray } from "../visualizer-poc/src/utils/audio-reactive.js";
 import { classifyStemSection, detectSolo } from "../visualizer-poc/src/utils/stem-features.js";
 import { detectStemInterplay } from "../visualizer-poc/src/utils/stem-interplay.js";
-import { computeCoherence } from "../visualizer-poc/src/utils/coherence.js";
+import { computeCoherence, batchComputeCoherence } from "../visualizer-poc/src/utils/coherence.js";
 import { computeITResponse } from "../visualizer-poc/src/utils/it-response.js";
 import { computeDrumsSpacePhase } from "../visualizer-poc/src/utils/drums-space-phase.js";
 import { computeClimaxState, climaxModulation } from "../visualizer-poc/src/utils/climax-state.js";
@@ -733,24 +733,33 @@ async function main() {
 
     // Batch-precompute expensive window-scanning analysis functions
     // This turns O(n*w) per-frame cost into O(n*w) total cost
-    const preCoherence: any[] = new Array(frames.length);
+    // Batch precompute: use O(n) batch functions where available
+    const batchStart = Date.now();
+
+    // Coherence: O(n*window) batch instead of O(n*300*window) per-frame
+    let t0 = Date.now();
+    let preCoherence: any[];
+    try { preCoherence = batchComputeCoherence(frames); } catch { preCoherence = frames.map(() => ({ isLocked: false, score: 0 })); }
+    const coherenceMs = Date.now() - t0;
+
+    // Remaining functions: still per-frame but benefit from coherence being pre-done
     const preIT: any[] = new Array(frames.length);
     const preInterplay: any[] = new Array(frames.length);
     const preReactive: any[] = new Array(frames.length);
     const preJamCycle: any[] = new Array(frames.length);
     const preClimaxState: any[] = new Array(frames.length);
 
-    const batchStart = Date.now();
+    t0 = Date.now();
     for (let bi = 0; bi < frames.length; bi++) {
-      try { preCoherence[bi] = computeCoherence(frames, bi); } catch { preCoherence[bi] = { isLocked: false, score: 0 }; }
       try { preIT[bi] = computeITResponse(frames, bi); } catch { preIT[bi] = { forceTranscendentShader: false }; }
       try { preInterplay[bi] = detectStemInterplay(frames, bi); } catch { preInterplay[bi] = null; }
       try { preReactive[bi] = computeReactiveTriggers(frames, bi, { coherenceLocked: preCoherence[bi]?.isLocked ?? false }); } catch { preReactive[bi] = { triggered: false, triggerType: null, shaderPool: [] }; }
       try { preJamCycle[bi] = detectJamCycle(frames, bi, sections); } catch { preJamCycle[bi] = { phase: "setup", progress: 0, isDeepening: false }; }
       try { preClimaxState[bi] = computeClimaxState(frames, bi, sections); } catch { preClimaxState[bi] = { phase: "idle", intensity: 0 }; }
     }
+    const restMs = Date.now() - t0;
     const batchMs = Date.now() - batchStart;
-    console.log(`    Batch precompute: ${frames.length} frames in ${(batchMs / 1000).toFixed(1)}s (${(frames.length / (batchMs / 1000)).toFixed(0)} frames/sec)`);
+    console.log(`    Batch precompute: ${frames.length} frames in ${(batchMs / 1000).toFixed(1)}s (coherence: ${(coherenceMs / 1000).toFixed(1)}s, rest: ${(restMs / 1000).toFixed(1)}s)`);
 
     const ctx: SongContext & { _preComputed?: any } = {
       frames,
