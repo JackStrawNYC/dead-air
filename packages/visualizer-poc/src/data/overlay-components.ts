@@ -24,6 +24,14 @@ import { GodRays } from "../components/GodRays";
 import { BreathingStealie } from "../components/BreathingStealie";
 import { StealieTracedOverlay } from "../components/StealieTracedOverlay";
 import { BearTracedOverlay } from "../components/BearTracedOverlay";
+import { SacredGeometryOverlay } from "../components/SacredGeometryOverlay";
+import { MushroomCluster } from "../components/MushroomCluster";
+import { LotusBloom } from "../components/LotusBloom";
+import { CelestialFaces } from "../components/CelestialFaces";
+import { SmokeWisps } from "../components/SmokeWisps";
+import { OscilloscopeOverlay } from "../components/OscilloscopeOverlay";
+import { OuroborosOverlay } from "../components/OuroborosOverlay";
+import { SpiralGalaxyOverlay } from "../components/SpiralGalaxyOverlay";
 import { ThirteenPointBolt } from "../components/ThirteenPointBolt";
 import { StealYourFaceOff } from "../components/StealYourFaceOff";
 import { SkullKaleidoscope } from "../components/SkullKaleidoscope";
@@ -472,6 +480,14 @@ export const OVERLAY_COMPONENTS: Record<string, OverlayComponentEntry> = {
   // Layer 2: Sacred / Center-stage
   StealieTraced:     { Component: StealieTracedOverlay, layer: 2 },
   BearTraced:        { Component: BearTracedOverlay, layer: 6 },
+  SacredGeometryOverlay: { Component: SacredGeometryOverlay, layer: 2 },
+  MushroomCluster:   { Component: MushroomCluster, layer: 5 },
+  LotusBloom:        { Component: LotusBloom, layer: 2 },
+  CelestialFaces:    { Component: CelestialFaces, layer: 5 },
+  SmokeWisps:        { Component: SmokeWisps, layer: 1 },
+  OscilloscopeOverlay: { Component: OscilloscopeOverlay, layer: 9 },
+  OuroborosOverlay:  { Component: OuroborosOverlay, layer: 2 },
+  SpiralGalaxyOverlay: { Component: SpiralGalaxyOverlay, layer: 5 },
   BreathingStealie:  { Component: BreathingStealie, layer: 2 },
   ThirteenPointBolt: { Component: ThirteenPointBolt, layer: 2 },
   StealYourFaceOff:  { Component: StealYourFaceOff, layer: 2 },

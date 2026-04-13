@@ -102,6 +102,18 @@ export const OVERLAY_REGISTRY: OverlayEntry[] = [
   { name: "VHSGlitch",           layer: 10, category: "distortion", tags: ["retro", "psychedelic"],       energyBand: "mid",  weight: 2, dutyCycle: 100, energyResponse: [0.15, 0.35, 2.5], tier: "B" },
   { name: "FilmGrain",           layer: 10, category: "distortion", tags: ["retro"],                      energyBand: "any",  weight: 1, alwaysActive: true, tier: "B" },
 
+  // ═══ Psychedelic Counterculture Overlays ═══
+  { name: "SacredGeometryOverlay", layer: 2, category: "sacred", tags: ["cosmic", "psychedelic"],        energyBand: "mid",  weight: 3, dutyCycle: 100, energyResponse: [0.05, 0.20, 1.8], tier: "A" },
+  { name: "MushroomCluster",   layer: 5, category: "nature",    tags: ["psychedelic", "organic"],        energyBand: "low",  weight: 2, dutyCycle: 100, energyResponse: [0.02, 0.15, 2.0], tier: "A" },
+  { name: "LotusBloom",        layer: 2, category: "sacred",    tags: ["contemplative", "organic"],      energyBand: "low",  weight: 2, dutyCycle: 100, energyResponse: [0.02, 0.12, 2.0], tier: "A" },
+  { name: "CelestialFaces",    layer: 5, category: "nature",    tags: ["cosmic", "contemplative"],       energyBand: "any",  weight: 2, dutyCycle: 100, energyResponse: [0.03, 0.18, 1.5], tier: "A" },
+  { name: "SmokeWisps",        layer: 1, category: "atmospheric", tags: ["organic", "contemplative"],    energyBand: "any",  weight: 2, dutyCycle: 100, energyResponse: [0.0, 0.08, 2.5], tier: "A", alwaysActive: true },
+  { name: "OscilloscopeOverlay", layer: 9, category: "hud",     tags: ["retro", "mechanical"],           energyBand: "any",  weight: 1, dutyCycle: 50,  energyResponse: [0.05, 0.15, 2.0], tier: "B" },
+  { name: "OuroborosOverlay",  layer: 2, category: "sacred",    tags: ["cosmic", "psychedelic"],         energyBand: "mid",  weight: 2, dutyCycle: 100, energyResponse: [0.03, 0.18, 1.8], tier: "A" },
+  { name: "SpiralGalaxyOverlay", layer: 5, category: "nature",  tags: ["cosmic", "contemplative"],       energyBand: "low",  weight: 2, dutyCycle: 100, energyResponse: [0.02, 0.12, 2.0], tier: "A" },
+  { name: "StealieTraced",     layer: 2, category: "sacred",    tags: ["dead-culture", "psychedelic"],   energyBand: "any",  weight: 3, dutyCycle: 100, energyResponse: [0.03, 0.15, 1.5], tier: "A" },
+  { name: "BearTraced",        layer: 6, category: "character", tags: ["dead-culture", "festival"],      energyBand: "any",  weight: 3, dutyCycle: 100, energyResponse: [0.03, 0.18, 1.5], tier: "A" },
+
   // ═══ Phase 9 Wave 3: New Overlays (8) ═══
   { name: "RainDrops",       layer: 1, category: "atmospheric", tags: ["organic", "contemplative"],      energyBand: "low",  weight: 1, dutyCycle: 100, energyResponse: [0.0, 0.05, 2.5], tier: "B" },
   { name: "FogBank",         layer: 1, category: "atmospheric", tags: ["organic", "contemplative"],      energyBand: "low",  weight: 1, dutyCycle: 100, energyResponse: [0.0, 0.08, 2.5], tier: "B" },
