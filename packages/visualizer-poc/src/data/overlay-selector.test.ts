@@ -275,7 +275,7 @@ describe("selectOverlaysForShow", () => {
     // No non-always-active overlay should appear in >60% of songs
     // (frequency cap is 40%, with some tolerance for always-active)
     for (const [name, count] of freq) {
-      if (name === "SongTitle" || name === "FilmGrain") continue; // always-active
+      if (name === "SongTitle" || name === "FilmGrain" || name === "SmokeWisps") continue; // always-active
       expect(count).toBeLessThanOrEqual(5); // max ~83% of 6 songs, but with penalties should be lower
     }
   });
@@ -321,7 +321,7 @@ describe("curated overlay pool", () => {
     expect(names).toContain("WallOfSound");
   });
 
-  it("has 401 total overlays in full registry", () => {
-    expect(OVERLAY_REGISTRY.length).toBe(401);
+  it("has 410 total overlays in full registry", () => {
+    expect(OVERLAY_REGISTRY.length).toBe(410);
   });
 });

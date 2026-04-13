@@ -350,7 +350,7 @@ export const OVERLAY_REGISTRY: OverlayEntry[] = [
   { name: "ShootingStar",            layer: 1, category: "atmospheric", tags: ["organic","contemplative"], energyBand: "low", weight: 1, dutyCycle: 100, energyResponse: [0,0.08,2.5], tier: "C" },
   { name: "SkullRosesOverlay",       layer: 1, category: "atmospheric", tags: ["organic","contemplative"], energyBand: "low", weight: 1, dutyCycle: 100, energyResponse: [0,0.08,2.5], tier: "C" },
   { name: "Slinky",                  layer: 4, category: "geometric", tags: ["mechanical","psychedelic"], energyBand: "mid", weight: 2, dutyCycle: 33, energyResponse: [0.08,0.25,2], tier: "C" },
-  { name: "SmokeWisps",              layer: 1, category: "atmospheric", tags: ["organic","contemplative"], energyBand: "low", weight: 1, dutyCycle: 100, energyResponse: [0,0.08,2.5], tier: "C" },
+  // SmokeWisps moved to Psychedelic Counterculture section (line ~110)
   { name: "Snowfall",                layer: 1, category: "atmospheric", tags: ["organic","contemplative"], energyBand: "low", weight: 1, dutyCycle: 100, energyResponse: [0,0.08,2.5], tier: "C" },
   { name: "SoapBubbles",             layer: 1, category: "atmospheric", tags: ["organic","contemplative"], energyBand: "low", weight: 1, dutyCycle: 100, energyResponse: [0,0.08,2.5], tier: "C" },
   { name: "SolarEclipse",            layer: 1, category: "atmospheric", tags: ["organic","contemplative"], energyBand: "low", weight: 1, dutyCycle: 100, energyResponse: [0,0.08,2.5], tier: "C" },

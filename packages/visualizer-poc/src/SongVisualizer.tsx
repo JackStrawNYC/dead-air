@@ -940,11 +940,14 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
         showVisualSeed={props.narrativeState?.showVisualSeed}
       >
       <VisualizerErrorBoundary>
-      <div style={{ position: "absolute", inset: 0, opacity }}>
+      <div style={{ position: "absolute", inset: 0, opacity, background: process.env.OVERLAY_ONLY === "true" ? "transparent" : undefined }}>
         <CameraMotion frames={f} jamEvolution={jamEvolution} bass={audioSnapshot.bass} cameraFreeze={counterpoint.cameraFreeze || itState.cameraLock || introFactor < 0.5} drumsSpacePhase={drumsSpaceState?.subPhase} fastEnergy={audioSnapshot.fastEnergy} vocalPresence={audioSnapshot.vocalPresence} isSolo={soloState.isSolo} soloIntensity={soloState.intensity} grooveMotionMult={grooveMods.motionMult * fatigue.motionMult * stemInterplay.motionMult * peakOfShow.motionMult * crowdEnergy.motionMult * narrativeDirective.motionMult * stemCharacter.motionMult} groovePulseMult={grooveMods.pulseMult * phraseState.zoomBreathing * tempoLock.zoomPulse * regularityStabilityMod} sectionDriftMult={sectionVocab.driftSpeedMult} cameraSteadiness={Math.max(0, Math.min(1, sectionVocab.cameraSteadiness + setTheme.cameraSteadinessOffset))} cameraDrama={climaxMod.cameraDrama} itSnapZoom={itState.snapZoom} deadAirFactor={deadAirFactor}>
         <EraGrade>
         <EnergyEnvelope snapshot={audioSnapshot} climaxMod={climaxMod} calibration={energyCalibration} drumsSpacePhase={drumsSpaceState?.subPhase} itLuminanceLift={itState.luminanceLift} itSaturationSurge={itState.saturationSurge} itVignettePull={itState.vignettePull} deadAirFactor={deadAirFactor} introFactor={introFactor}>
           <div style={{ position: "absolute", inset: 0, opacity: introFactor }}>
+          {/* OVERLAY_ONLY mode: skip shaders entirely, just render text/overlay layers
+              on transparent background for compositing over Rust shader render */}
+          {process.env.OVERLAY_ONLY !== "true" && (
           <SilentErrorBoundary name="SceneRouter" resetKey={frame}>
             <SceneRouterWithSegues
               frames={f}
@@ -995,6 +998,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
               fadeFrames={fadeFrames}
             />
           </SilentErrorBoundary>
+          )}
           </div>
 
           <OverlayAndEffectsLayer
