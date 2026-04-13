@@ -37,6 +37,8 @@ export interface RustRenderOptions {
   preview?: boolean;
   startFrame?: number;
   endFrame?: number;
+  /** If true, render Remotion overlay layer and composite over Rust shaders */
+  withOverlays?: boolean;
 }
 
 export interface RustRenderResult {
@@ -148,8 +150,66 @@ export async function renderWithRust(
     throw new Error(`Rust renderer exited with code ${renderResult.code}`);
   }
 
+  // ─── Step 2.5: Overlay render + composite (Mode B) ───
+  let videoForMux = rawVideoPath;
+
+  if (options.withOverlays) {
+    const overlayVideoPath = join(renderDir, 'overlays.mov');
+    const compositeVideoPath = join(renderDir, 'composite.mp4');
+
+    log.info('Step 2.5a: Rendering text/overlay layers via Remotion (OVERLAY_ONLY)...');
+
+    // Render the full show through Remotion with OVERLAY_ONLY=true
+    // This skips shaders and produces transparent video (ProRes 4444 with alpha)
+    try {
+      await execFileAsync('npx', [
+        'tsx',
+        join(RENDERER_ROOT, '..', 'cli', 'src', 'commands', 'produce.ts'),
+        'render',
+        '--data-dir', dataDir,
+        '--output', overlayVideoPath,
+        '--renderer', 'remotion',
+      ], {
+        cwd: join(RENDERER_ROOT, '..'),
+        maxBuffer: 50 * 1024 * 1024,
+        timeout: 7200_000, // 2 hours for full Remotion render
+        env: {
+          ...process.env,
+          OVERLAY_ONLY: 'true',
+          RENDER_WIDTH: String(renderWidth),
+          RENDER_HEIGHT: String(renderHeight),
+          RENDER_FPS: String(fps),
+        },
+      });
+      log.info(`Overlay render: ${overlayVideoPath}`);
+
+      // Composite: overlay video on top of shader video
+      log.info('Step 2.5b: FFmpeg composite (shaders + overlays)...');
+      await execFileAsync('ffmpeg', [
+        '-y',
+        '-i', rawVideoPath,
+        '-i', overlayVideoPath,
+        '-filter_complex', '[0:v][1:v]overlay=0:0:format=auto:shortest=1',
+        '-c:v', 'libx264',
+        '-preset', 'slow',
+        '-crf', String(crf),
+        '-pix_fmt', 'yuv420p',
+        '-movflags', '+faststart',
+        compositeVideoPath,
+      ], { timeout: 3600_000 }); // 1 hour for composite
+
+      videoForMux = compositeVideoPath;
+      log.info(`Composite: ${compositeVideoPath}`);
+    } catch (err) {
+      log.warn(`Overlay render failed — using shader-only video: ${err}`);
+      // Fall back to shader-only video
+      videoForMux = rawVideoPath;
+    }
+  }
+
   // ─── Step 3: Mux audio ───
-  log.info('Step 3/3: Muxing audio...');
+  const stepNum = options.withOverlays ? '3/3' : '3/3';
+  log.info(`Step ${stepNum}: Muxing audio...`);
 
   // Find the audio file(s) — concatenated show audio or per-song
   const showAudioPath = join(dataDir, 'audio', 'show.flac');
@@ -163,7 +223,7 @@ export async function renderWithRust(
   if (audioPath) {
     await execFileAsync('ffmpeg', [
       '-y',
-      '-i', rawVideoPath,
+      '-i', videoForMux,
       '-i', audioPath,
       '-c:v', 'copy',
       '-c:a', 'aac',
@@ -177,7 +237,7 @@ export async function renderWithRust(
     // No audio file found — just copy the raw video
     log.warn('No show audio found — output has no audio track');
     const { copyFileSync } = await import('fs');
-    copyFileSync(rawVideoPath, outputPath);
+    copyFileSync(videoForMux, outputPath);
   }
 
   const renderTimeSec = (Date.now() - startTime) / 1000;

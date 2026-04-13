@@ -44,6 +44,7 @@ export function registerProduceCommand(program: Command): void {
     .option('--frame-concurrency <n>', 'Parallel frame renders per segment', parseInt)
     .option('--preview', 'Render at 720p for fast iteration')
     .option('--renderer <type>', 'Renderer: remotion, rust, or auto (default: auto)', 'auto')
+    .option('--with-overlays', 'Mode B: Rust shaders + Remotion text/overlays composite')
     .option('--no-cache', 'Skip analysis cache')
     .option('--analysis-concurrency <n>', 'Parallel librosa analysis workers', parseInt)
     .option('--archive-id <id>', 'Specific Archive.org identifier to ingest (skip auto-selection)')
@@ -261,6 +262,7 @@ export function registerProduceCommand(program: Command): void {
                 dataDir: config.paths.data,
                 outputPath,
                 preview: options.preview,
+                withOverlays: !!(options as any).withOverlays,
               });
               console.log(`  Frames: ${result.totalFrames} (${result.durationSec.toFixed(1)}s)`);
               console.log(`  Render time: ${result.renderTimeSec.toFixed(1)}s`);

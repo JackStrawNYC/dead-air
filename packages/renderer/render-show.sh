@@ -27,6 +27,7 @@ WIDTH=3840
 HEIGHT=2160
 FPS=60
 CRF=18
+WITH_OVERLAYS=false
 SKIP_SHADERS=false
 SKIP_OVERLAYS=false
 SKIP_COMPOSITE=false
@@ -39,6 +40,7 @@ while [[ $# -gt 0 ]]; do
     --height)     HEIGHT="$2"; shift 2;;
     --fps)        FPS="$2"; shift 2;;
     --crf)        CRF="$2"; shift 2;;
+    --with-overlays)  WITH_OVERLAYS=true; shift;;
     --skip-shaders)   SKIP_SHADERS=true; shift;;
     --skip-overlays)  SKIP_OVERLAYS=true; shift;;
     --skip-composite) SKIP_COMPOSITE=true; shift;;
@@ -134,7 +136,9 @@ echo ""
 # ─── STEP 3: Remotion text/overlay render ─────────────────────────
 echo "┌─ Step 3/5: Remotion text/overlay render"
 OVERLAYS_MP4="$WORK_DIR/overlays.mp4"
-if [[ "$SKIP_OVERLAYS" == "true" ]]; then
+if [[ "$WITH_OVERLAYS" != "true" ]]; then
+  echo "│  ⏭ Skipped (pass --with-overlays to enable Mode B)"
+elif [[ "$SKIP_OVERLAYS" == "true" ]]; then
   echo "│  ⏭ Skipped (--skip-overlays)"
 elif [[ -f "$OVERLAYS_MP4" ]]; then
   echo "│  ✓ Overlays MP4 exists, skipping (delete to re-render)"
@@ -181,7 +185,10 @@ echo ""
 
 # ─── STEP 4: FFmpeg composite ────────────────────────────────────
 echo "┌─ Step 4/5: FFmpeg composite (shaders + overlays)"
-if [[ "$SKIP_COMPOSITE" == "true" ]]; then
+if [[ "$WITH_OVERLAYS" != "true" ]]; then
+  echo "│  ⏭ Skipped (no overlays to composite)"
+  COMPOSITE_MP4="$SHADERS_MP4"
+elif [[ "$SKIP_COMPOSITE" == "true" ]]; then
   echo "│  ⏭ Skipped (--skip-composite)"
   COMPOSITE_MP4="$SHADERS_MP4"
 elif [[ ! -f "$SHADERS_MP4" ]]; then
