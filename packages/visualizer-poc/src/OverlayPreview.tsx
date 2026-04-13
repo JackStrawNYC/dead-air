@@ -10,7 +10,7 @@ import type { EnhancedFrameData } from "./data/types";
 // Generate synthetic frames with moderate energy for overlay preview
 function generateFrames(count: number): EnhancedFrameData[] {
   return Array.from({ length: count }, (_, i) => ({
-    rms: 0.35 + Math.sin(i * 0.05) * 0.15,
+    rms: 0.55 + Math.sin(i * 0.05) * 0.15,
     sub: 0.2 + Math.sin(i * 0.03) * 0.1,
     low: 0.15, mid: 0.2, high: 0.15,
     onset: i % 30 === 0 ? 0.8 : 0,
@@ -57,7 +57,7 @@ export const OverlayPreview: React.FC<{ overlayName?: string }> = ({
   const { Component } = entry;
 
   return (
-    <div style={{ position: "relative", width: "100%", height: "100%", background: "transparent" }}>
+    <div style={{ position: "relative", width: "100%", height: "100%", background: "#0a0a12" }}>
       <Component frames={frames} />
     </div>
   );
