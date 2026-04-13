@@ -938,6 +938,9 @@ async function main() {
     let prevShaderId = defaultMode;
     let prevState: any = null;
     let shaderStartFrame = 0;
+    let transitionStartFrame = -1;
+    let transitionLength = 0;
+    let transitionFromShader = "";
 
     // Build section boundaries for routing (frame ranges in output fps)
     const sectionBounds = (sections ?? []).map((s: any) => ({
@@ -1075,7 +1078,26 @@ async function main() {
       }
 
       if (route.shaderId !== prevShaderId) {
+        // Generate a 3-second crossfade ramp into the new shader
+        const CROSSFADE_FRAMES = Math.round(90 * (fps / 30));
+        transitionFromShader = prevShaderId;
+        route.secondaryId = prevShaderId;
+        route.blendProgress = 0.0;
+        route.blendMode = "dissolve";
         shaderStartFrame = i;
+        transitionStartFrame = i;
+        transitionLength = CROSSFADE_FRAMES;
+      }
+      // Override blend data during crossfade ramp — smooth 0→1 over 3 seconds
+      if (transitionStartFrame >= 0) {
+        if (i < transitionStartFrame + transitionLength) {
+          const progress = (i - transitionStartFrame) / transitionLength;
+          route.secondaryId = transitionFromShader;
+          route.blendProgress = Math.min(1.0, progress);
+          route.blendMode = "dissolve";
+        } else {
+          transitionStartFrame = -1; // crossfade complete
+        }
       }
       prevShaderId = route.shaderId;
 
@@ -1090,17 +1112,15 @@ async function main() {
         : 0;
 
       // ─── Dead Air Override ───
-      // Non-music frames (crowd, tuning, banter, applause) get:
-      //   - A calm ambient shader (aurora or void_light)
-      //   - Suppressed energy/beat uniforms (no reactive pulsing)
-      //   - Dimmed brightness (warm, dark, ambient)
+      // Non-music frames get one consistent calm shader (not randomized per-frame)
       const isDeadAir = deadAirFlags[ai] === 1;
       if (isDeadAir) {
-        // Force calm ambient shader during dead air
+        // Pick ONE dead air shader per song (seeded by song, not by frame)
         const deadAirShaders = ["aurora", "void_light", "cosmic_dust", "luminous_cavern"];
         const daPool = deadAirShaders.filter(s => Object.keys(shaders).includes(s));
-        if (daPool.length > 0 && !daPool.includes(route.shaderId)) {
-          route.shaderId = daPool[Math.floor(seededRandom(ctx.songSeed + i * 11) * daPool.length)];
+        if (daPool.length > 0) {
+          const deadAirShader = daPool[Math.floor(seededRandom(ctx.songSeed) * daPool.length)];
+          route.shaderId = deadAirShader;
           route.secondaryId = null;
           route.blendProgress = null;
           route.blendMode = null;
