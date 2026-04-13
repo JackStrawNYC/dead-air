@@ -407,12 +407,12 @@ function routeScene(
   const energy = analysis.snapshot?.energy ?? 0.3;
   const beat = ctx.frames[Math.min(frameIdx, ctx.frames.length - 1)]?.beat ? 1 : 0;
 
-  // Priority 1: IT transcendent forcing
-  if (itState?.forceTranscendentShader) {
-    const pool = ["cosmic_voyage", "cosmic_voyage", "mandala_engine", "aurora"];
-    const pick = pool[Math.floor(seededRandom(ctx.songSeed + frameIdx * 7) * pool.length)];
-    return { shaderId: pick, secondaryId: null, blendProgress: null, blendMode: null };
-  }
+  // Priority 1: IT transcendent forcing — DISABLED in manifest generator.
+  // The simplified batch coherence detection is too sensitive (locks 94% of frames),
+  // forcing nearly the entire show into a 4-shader pool. The real Remotion engine
+  // has more nuanced frame-by-frame coherence that works correctly.
+  // TODO: calibrate batch coherence thresholds to match real-time behavior.
+  // if (itState?.forceTranscendentShader) { ... }
 
   // Priority 2: Drums/Space override
   if (drumsSpaceState?.subPhase) {
@@ -716,7 +716,41 @@ async function main() {
 
     const analysis = JSON.parse(readFileSync(trackPath, "utf-8"));
     const frames = analysis.frames ?? [];
-    const sections = analysis.sections ?? [];
+    let sections = analysis.sections ?? [];
+
+    // If no sections from analysis, generate synthetic sections from energy contours.
+    // Segments every 30-90 seconds based on energy changes, giving the router
+    // meaningful boundaries to switch shaders at.
+    if (sections.length === 0 && frames.length > 0) {
+      sections = [];
+      const analysisRate = analysis.meta?.fps ?? 30;
+      const SECTION_MIN = Math.round(30 * analysisRate);  // min 30s per section
+      const SECTION_MAX = Math.round(90 * analysisRate);   // max 90s per section
+      let segStart = 0;
+      let lastEnergy = frames[0]?.rms ?? 0;
+
+      for (let fi = SECTION_MIN; fi < frames.length; fi++) {
+        const e = frames[fi]?.rms ?? 0;
+        const delta = Math.abs(e - lastEnergy);
+        const elapsed = fi - segStart;
+
+        // Split on significant energy change after minimum hold, or at max
+        if ((delta > 0.08 && elapsed >= SECTION_MIN) || elapsed >= SECTION_MAX) {
+          const avgE = frames.slice(segStart, fi).reduce((s, f) => s + (f.rms ?? 0), 0) / (fi - segStart);
+          const sectionType = avgE > 0.25 ? "chorus" : avgE > 0.12 ? "verse" : "space";
+          sections.push({ start: segStart, end: fi, type: sectionType });
+          segStart = fi;
+          lastEnergy = e;
+        }
+      }
+      // Final section
+      if (segStart < frames.length) {
+        const avgE = frames.slice(segStart).reduce((s, f) => s + (f.rms ?? 0), 0) / (frames.length - segStart);
+        const sectionType = avgE > 0.25 ? "chorus" : avgE > 0.12 ? "verse" : "space";
+        sections.push({ start: segStart, end: frames.length, type: sectionType });
+      }
+      console.log(`    Synthetic sections: ${sections.length} (from energy contours)`);
+    }
     const tempo = analysis.meta?.tempo ?? 120;
     const afps = analysis.meta?.fps ?? 30;
     const totalOut = Math.ceil((frames.length / afps) * fps);
@@ -813,40 +847,72 @@ async function main() {
 
     // Build section boundaries for routing (frame ranges in output fps)
     const sectionBounds = (sections ?? []).map((s: any) => ({
-      start: Math.floor((s.frameStart ?? 0) * (fps / afps)),
-      end: Math.floor((s.frameEnd ?? frames.length) * (fps / afps)),
+      start: Math.floor((s.start ?? s.frameStart ?? 0) * (fps / afps)),
+      end: Math.floor((s.end ?? s.frameEnd ?? frames.length) * (fps / afps)),
     }));
 
-    // Pre-compute per-section modes using getModeForSection (real SceneRouter logic)
+    // Pre-compute per-section shader selection using energy-based routing.
+    // Uses song identity preferred modes when available, otherwise picks from
+    // the full active shader pool based on section energy level.
     const sectionModes: string[] = [];
+    const preferredModes = songIdentity?.preferredModes ?? [];
+    const activeShaderPool = Object.keys(shaders).filter(s =>
+      !["combustible_voronoi", "creation", "fluid_2d", "spectral_bridge",
+        "obsidian_mirror", "amber_drift", "volumetric_clouds", "volumetric_smoke",
+        "volumetric_nebula", "digital_rain", "protean_clouds", "seascape",
+        "storm_vortex", "warm_nebula", "particle_nebula", "liquid_mandala",
+        "star_nest", "crystalline_void", "space_travel", "cosmic_voyage",
+        "fractal_zoom", "acid_melt", "aurora_sky", "spinning_spiral",
+        "prism_refraction", "spectral_analyzer", "neon_grid", "concert_beams",
+      ].includes(s)
+    );
+
     for (let si = 0; si < Math.max(1, sections.length); si++) {
-      try {
-        const mode = getModeForSection(
-          { ...song, defaultMode } as any,  // SetlistEntry
-          si,
-          sections,
-          ctx.songSeed,
-          setlist.era,
-          false,  // coherenceIsLocked (per-frame, not per-section)
-          usedShaderModes,
-          songIdentity,
-          undefined,  // stemSection (per-frame)
-          frames,
-          frames.length / afps,  // songDuration
-          setNumber,
-          song.trackNumber ?? songIdx,
-          shaderModeLastUsed,
-          undefined,  // stemDominant
-          undefined,  // visualMemory
-        );
-        sectionModes.push(mode);
-      } catch {
-        sectionModes.push(defaultMode);
+      const section = sections[si] ?? { start: 0, end: frames.length, type: "verse" };
+      const sectionStart = section.start ?? section.frameStart ?? 0;
+      const sectionEnd = section.end ?? section.frameEnd ?? frames.length;
+      const mid = Math.floor((sectionStart + sectionEnd) / 2);
+      const avgEnergy = smoothed.energy[Math.min(mid, frames.length - 1)] ?? 0.3;
+
+      // Pick from song identity preferred modes if available
+      let pool = preferredModes.length > 0
+        ? preferredModes.filter((m: string) => activeShaderPool.includes(m))
+        : [];
+
+      // Fallback: energy-based pool from all active shaders
+      if (pool.length === 0) {
+        if (avgEnergy > 0.25) {
+          pool = activeShaderPool.filter(s => ["inferno", "lava_flow", "electric_arc", "liquid_light",
+            "concert_lighting", "molten_forge", "dance_floor_prism", "fractal_temple"].includes(s));
+        } else if (avgEnergy < 0.10) {
+          pool = activeShaderPool.filter(s => ["aurora", "deep_ocean", "luminous_cavern", "ancient_forest",
+            "memorial_drift", "porch_twilight", "void_light", "cosmic_dust"].includes(s));
+        } else {
+          pool = activeShaderPool.filter(s => ["fractal_temple", "stained_glass", "kaleidoscope",
+            "ink_wash", "morphogenesis", "sacred_geometry", "oil_projector", "cosmic_cathedral",
+            "desert_cathedral", "coral_reef"].includes(s));
+        }
       }
+
+      // Final fallback
+      if (pool.length === 0) pool = ["fractal_temple", "aurora", "deep_ocean", "inferno", "stained_glass"];
+
+      // Seeded selection for determinism, avoid repeating the previous shader
+      const seed = ctx.songSeed + si * 137;
+      let pick = pool[Math.floor(seededRandom(seed) * pool.length)];
+      // Try to avoid repeating the last section's shader
+      if (sectionModes.length > 0 && pick === sectionModes[sectionModes.length - 1] && pool.length > 1) {
+        pick = pool[Math.floor(seededRandom(seed + 99) * pool.length)];
+      }
+      sectionModes.push(pick);
     }
-    if (sectionModes.length > 1) {
+    {
       const unique = new Set(sectionModes);
       console.log(`    Sections: ${sectionModes.length} sections, ${unique.size} unique shaders [${[...unique].join(", ")}]`);
+      if (unique.size <= 1) {
+        console.log(`    WARNING: Only 1 shader for entire song — routing may be broken`);
+        console.log(`    Default mode: ${defaultMode}, sections: ${sections.length}`);
+      }
     }
 
     // Track current section with real per-section mode routing
@@ -900,6 +966,20 @@ async function main() {
       }
 
       const route = routeScene(ctx, frameAnalysis, i, prevShaderId, defaultMode, routeState);
+
+      // HARD MINIMUM HOLD: no shader switch within 900 frames (30s at 30fps)
+      // This is the last line of defense against seizure-fast switching.
+      // routeScene may suggest a switch, but we suppress it if the current
+      // shader hasn't been held long enough.
+      const framesSinceSwitch = i - shaderStartFrame;
+      const MIN_HOLD = 900 * (fps / 30); // 30 seconds, scaled by fps
+      if (route.shaderId !== prevShaderId && framesSinceSwitch < MIN_HOLD) {
+        route.shaderId = prevShaderId;
+        route.secondaryId = null;
+        route.blendProgress = null;
+        route.blendMode = null;
+      }
+
       if (route.shaderId !== prevShaderId) {
         shaderStartFrame = i;
       }
