@@ -749,9 +749,33 @@ async function main() {
     const preJamCycle: any[] = new Array(frames.length);
     const preClimaxState: any[] = new Array(frames.length);
 
+    // Derive IT response from pre-computed coherence (avoids re-computing coherence)
     t0 = Date.now();
     for (let bi = 0; bi < frames.length; bi++) {
-      try { preIT[bi] = computeITResponse(frames, bi); } catch { preIT[bi] = { forceTranscendentShader: false }; }
+      const coh = preCoherence[bi];
+      // Simplified IT: if coherence is locked, force transcendent shader
+      // This avoids computeITResponse calling computeCoherence internally
+      preIT[bi] = {
+        forceTranscendentShader: coh?.isLocked && (coh?.lockDuration ?? 0) > 300,
+        phase: coh?.isLocked ? "locked" : "normal",
+        lockDepth: coh?.isLocked
+          ? (coh.lockDuration > 300 ? "transcendent" : coh.lockDuration > 150 ? "deep" : coh.lockDuration > 90 ? "medium" : "shallow")
+          : "shallow",
+        overlayOpacityOverride: coh?.isLocked ? Math.max(0.05, 1.0 - (coh.lockDuration / 300)) : null,
+        cameraLock: coh?.isLocked && (coh?.lockDuration ?? 0) > 15,
+        luminanceLift: coh?.isLocked ? Math.min(0.15, (coh.lockDuration ?? 0) / 600) : 0,
+        saturationSurge: coh?.isLocked ? Math.min(0.20, (coh.lockDuration ?? 0) / 500) : 0,
+        flashIntensity: 0,
+        flashHue: 0,
+        snapZoom: 0,
+        vignettePull: coh?.isLocked && (coh?.lockDuration ?? 0) > 150 ? 0.15 : 0,
+        timeDilation: coh?.isLocked ? Math.max(0.2, 1.0 - (coh.lockDuration ?? 0) / 600) : 1.0,
+      };
+    }
+    const itMs = Date.now() - t0;
+
+    t0 = Date.now();
+    for (let bi = 0; bi < frames.length; bi++) {
       try { preInterplay[bi] = detectStemInterplay(frames, bi); } catch { preInterplay[bi] = null; }
       try { preReactive[bi] = computeReactiveTriggers(frames, bi, { coherenceLocked: preCoherence[bi]?.isLocked ?? false }); } catch { preReactive[bi] = { triggered: false, triggerType: null, shaderPool: [] }; }
       try { preJamCycle[bi] = detectJamCycle(frames, bi, sections); } catch { preJamCycle[bi] = { phase: "setup", progress: 0, isDeepening: false }; }
@@ -759,7 +783,7 @@ async function main() {
     }
     const restMs = Date.now() - t0;
     const batchMs = Date.now() - batchStart;
-    console.log(`    Batch precompute: ${frames.length} frames in ${(batchMs / 1000).toFixed(1)}s (coherence: ${(coherenceMs / 1000).toFixed(1)}s, rest: ${(restMs / 1000).toFixed(1)}s)`);
+    console.log(`    Batch precompute: ${frames.length} frames in ${(batchMs / 1000).toFixed(1)}s (coherence: ${(coherenceMs / 1000).toFixed(1)}s, IT: ${(itMs / 1000).toFixed(1)}s, rest: ${(restMs / 1000).toFixed(1)}s)`);
 
     const ctx: SongContext & { _preComputed?: any } = {
       frames,
