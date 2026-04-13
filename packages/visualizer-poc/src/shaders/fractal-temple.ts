@@ -14,7 +14,7 @@ varying vec2 vUv;
 void main() { vUv = uv; gl_Position = vec4(position, 1.0); }
 `;
 
-const postProcess = buildPostProcessGLSL({ bloomThresholdOffset: 0.05, caEnabled: true, dofEnabled: true, eraGradingEnabled: true });
+const postProcess = buildPostProcessGLSL({ bloomEnabled: true, bloomThresholdOffset: -0.04, caEnabled: true, dofEnabled: true, eraGradingEnabled: true, halationEnabled: true, grainStrength: "normal", lightLeakEnabled: true, lensDistortionEnabled: true, beatPulseEnabled: false });
 const ftNormal = buildRaymarchNormal("ftMap($P, energy, bass, ft, psyche)", { eps: 0.002, name: "ftCalcNormal" });
 const ftDepthAlpha = buildDepthAlphaOutput("td", "12.0");
 
@@ -86,12 +86,17 @@ void main() {
   float evolveComplexity = smoothstep(0.0, 0.5, holdP) * (1.0 - smoothstep(0.8, 1.0, holdP) * 0.4);
   float evolveOpenness = 1.0 - smoothstep(0.0, 0.3, holdP) * 0.3 + smoothstep(0.75, 1.0, holdP) * 0.3;
 
-  // Palette
-  vec3 wt = paletteHueColor(uPalettePrimary, 0.55, 0.85);
+  // Palette — sacred gold/amber light, deep warm-tinted shadows
+  // Bias primary toward sacred gold (0.08–0.14), secondary toward warm amber (0.06–0.10)
+  float ftH1 = mix(uPalettePrimary, 0.10 + fract(uPalettePrimary) * 0.06, 0.4);
+  float ftH2 = mix(uPaletteSecondary, 0.08 + fract(uPaletteSecondary) * 0.05, 0.35);
+  vec3 wt = paletteHueColor(ftH1, 0.50, 0.82);
   float wl = dot(wt,vec3(0.299,0.587,0.114));
-  wt = mix(vec3(wl),wt,0.4);
-  vec3 lt = paletteHueColor(uPaletteSecondary, 0.85, 1.0);
-  vec3 grCol = mix(lt, vec3(1.0,0.85,0.6), clamp(uVocalPitch,0.0,1.0)*0.4);
+  wt = mix(vec3(wl),wt,0.45); // slightly more saturation than before
+  wt = mix(wt, vec3(0.85, 0.72, 0.45), 0.15); // sacred gold undertone
+  vec3 lt = paletteHueColor(ftH2, 0.80, 1.0);
+  lt = mix(lt, vec3(1.0, 0.90, 0.65), 0.2); // amber sacred light
+  vec3 grCol = mix(lt, vec3(1.0,0.85,0.55), clamp(uVocalPitch,0.0,1.0)*0.45);
 
   // Camera: forward travel
   float fwd2 = ft*3.0;
@@ -165,9 +170,9 @@ void main() {
   col += wt*0.015;
   col *= 1.0+uBeatSnap*0.2;
   float vg = 1.0-dot(p*0.28,p*0.28);
-  col = mix(vec3(0.02,0.015,0.03), col, smoothstep(0.0,1.0,vg));
+  col = mix(vec3(0.025,0.018,0.01), col, smoothstep(0.0,1.0,vg)); // warm dark vignette
   // Icons removed — clean shader output
-  col = max(col, vec3(0.03,0.02,0.04));
+  col = max(col, vec3(0.035,0.025,0.015)); // warm shadow floor — sacred spaces are never cold
   // Shared color temperature for crossfade continuity
   col = applyTemperature(col);
   col = applyPostProcess(col, uv, p);

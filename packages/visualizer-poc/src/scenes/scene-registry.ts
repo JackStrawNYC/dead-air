@@ -24,6 +24,7 @@ import type { SceneTransitionStyle } from "../utils/transition-selector";
 import { SceneConfigProvider } from "./SceneConfigContext";
 import type { CameraProfile } from "../config/camera-profiles";
 import type { ShaderParameterProfile } from "../config/shader-parameters";
+import type { PostProcessConfig } from "../shaders/shared/postprocess.glsl";
 
 // ─── Scene Component Interface ───
 
@@ -57,6 +58,16 @@ export interface SceneRegistryEntry {
   gradingIntensity?: number;
   /** Spectral family for timbral routing. Omitted = versatile (accepts any family). */
   spectralFamily?: SpectralFamily;
+  /**
+   * Per-shader post-processing personality overrides.
+   * Flows through SceneConfigContext to FullscreenQuad/MultiPassQuad.
+   * These are declarative hints — the actual GLSL PostProcessConfig is baked
+   * into each shader's buildPostProcessGLSL() call. This field allows the
+   * registry to advertise each shader's post-processing character for systems
+   * that need to reason about visual differences (e.g., transition selection,
+   * show-level balancing).
+   */
+  postProcessOverrides?: Partial<PostProcessConfig>;
 }
 
 // ─── Lazy imports for code splitting ───
@@ -157,6 +168,11 @@ import { NimitzAuroraScene } from "./NimitzAuroraScene";
 import { CreationScene } from "./CreationScene";
 // Raymarched 3D
 import { FractalTempleScene } from "./FractalTempleScene";
+import { LuminousCavernScene } from "./LuminousCavernScene";
+import { AncientForestScene } from "./AncientForestScene";
+import { DesertCathedralScene } from "./DesertCathedralScene";
+import { CosmicCathedralScene } from "./CosmicCathedralScene";
+import { MoltenForgeScene } from "./MoltenForgeScene";
 // Veneta '72 show-specific shaders
 import { HighwayHorizonScene } from "./HighwayHorizonScene";
 import { HoneycombCathedralScene } from "./HoneycombCathedralScene";
@@ -196,12 +212,14 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     complement: "protean_clouds",
     gradingIntensity: 0.75,
     spectralFamily: "warm",
+    postProcessOverrides: { bloomThresholdOffset: -0.12, caEnabled: false, halationEnabled: true, stageFloodEnabled: true, thermalShimmerEnabled: true, beatPulseEnabled: false },
   },
   oil_projector: {
     Component: OilProjectorScene,
     energyAffinity: "mid",
     complement: "protean_clouds",
     spectralFamily: "warm",
+    postProcessOverrides: { grainStrength: "heavy", caEnabled: false, halationEnabled: true, bloomThresholdOffset: -0.04, beatPulseEnabled: false },
   },
   // ─── Bright: high centroid, punchy ───
   concert_lighting: {
@@ -211,6 +229,7 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     preferredTransitionIn: "flash",
     gradingIntensity: 0.5,
     spectralFamily: "bright",
+    postProcessOverrides: { halationEnabled: true, stageFloodEnabled: true, lightLeakEnabled: true, caEnabled: false, bloomThresholdOffset: -0.12, beatPulseEnabled: true },
   },
   lo_fi_grain: {
     Component: LoFiGrainScene,
@@ -235,6 +254,7 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     energyAffinity: "high",
     complement: "vintage_film",
     gradingIntensity: 0.75,
+    postProcessOverrides: { caEnabled: false, halationEnabled: true, paletteCycleEnabled: true, bloomThresholdOffset: -0.08, beatPulseEnabled: false },
   },
   cosmic_dust: {
     Component: CosmicDustScene,
@@ -253,6 +273,7 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     complement: "inferno",
     preferredTransitionIn: "void",
     spectralFamily: "cosmic",
+    postProcessOverrides: { grainStrength: "none", halationEnabled: false, caEnabled: true, lightLeakEnabled: false, beatPulseEnabled: false, bloomThresholdOffset: -0.08 },
   },
   inferno: {
     Component: InfernoScene,
@@ -261,6 +282,7 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     preferredTransitionIn: "flash",
     gradingIntensity: 0.7,
     spectralFamily: "warm",
+    postProcessOverrides: { grainStrength: "heavy", bloomThresholdOffset: -0.20, caEnabled: false, halationEnabled: true, thermalShimmerEnabled: true, beatPulseEnabled: true },
   },
   deep_ocean: {
     Component: DeepOceanScene,
@@ -268,6 +290,7 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     complement: "inferno",
     preferredTransitionIn: "void",
     spectralFamily: "warm",
+    postProcessOverrides: { grainStrength: "none", bloomThresholdOffset: -0.18, caEnabled: false, halationEnabled: true, lightLeakEnabled: false, beatPulseEnabled: false },
   },
   aurora: {
     Component: AuroraScene,
@@ -275,6 +298,7 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     complement: "protean_clouds",
     preferredTransitionIn: "dissolve",
     spectralFamily: "tonal",
+    postProcessOverrides: { grainStrength: "none", caEnabled: false, halationEnabled: true, bloomThresholdOffset: -0.08, lightLeakEnabled: false, beatPulseEnabled: false },
   },
   crystal_cavern: {
     Component: CrystalCavernScene,
@@ -330,6 +354,7 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     complement: "cosmic_voyage",
     gradingIntensity: 0.8,
     spectralFamily: "tonal",
+    postProcessOverrides: { grainStrength: "none", halationEnabled: false, paletteCycleEnabled: true, caEnabled: true, bloomThresholdOffset: -0.15, beatPulseEnabled: false },
   },
   fractal_zoom: {
     Component: LiquidLightScene, // Redirected: fractal_zoom renders as liquid_light (Mandelbrot looks bad fullscreen)
@@ -337,6 +362,7 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     complement: "cosmic_voyage",
     preferredTransitionIn: "morph",
     spectralFamily: "tonal",
+    postProcessOverrides: { grainStrength: "none", halationEnabled: false, caEnabled: true, paletteCycleEnabled: true, bloomThresholdOffset: -0.12, beatPulseEnabled: false },
   },
   sacred_geometry: {
     Component: SacredGeometryScene,
@@ -344,6 +370,7 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     complement: "cosmic_voyage",
     preferredTransitionIn: "dissolve",
     spectralFamily: "tonal",
+    postProcessOverrides: { caEnabled: false, halationEnabled: true, bloomThresholdOffset: -0.04, beatPulseEnabled: false },
   },
   reaction_diffusion: {
     Component: ReactionDiffusionScene,
@@ -368,6 +395,7 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     energyAffinity: "any",
     complement: "cosmic_voyage",
     spectralFamily: "textural",
+    postProcessOverrides: { grainStrength: "heavy", halationEnabled: false, caEnabled: true, crtEnabled: true, lightLeakEnabled: false, beatPulseEnabled: true },
   },
   truchet_tiling: {
     Component: TruchetTilingScene,
@@ -400,6 +428,7 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     preferredTransitionIn: "distortion",
     gradingIntensity: 0.6,
     spectralFamily: "bright",
+    postProcessOverrides: { grainStrength: "heavy", bloomThresholdOffset: -0.25, caEnabled: true, thermalShimmerEnabled: true, lightLeakEnabled: false, beatPulseEnabled: true },
   },
   morphogenesis: {
     Component: MorphogenesisScene,
@@ -412,6 +441,7 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     energyAffinity: "any",
     complement: "cosmic_voyage",
     spectralFamily: "tonal",
+    postProcessOverrides: { caEnabled: false, halationEnabled: true, bloomThresholdOffset: -0.06, beatPulseEnabled: false },
   },
   neural_web: {
     Component: NeuralWebScene,
@@ -442,6 +472,7 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     complement: "cosmic_voyage",
     gradingIntensity: 0.65,
     spectralFamily: "warm",
+    postProcessOverrides: { grainStrength: "heavy", bloomThresholdOffset: -0.18, caEnabled: false, halationEnabled: true, thermalShimmerEnabled: true, beatPulseEnabled: true },
   },
   // Phase 9 Wave 2: 8 new scenes
   mycelium_network: {
@@ -460,6 +491,7 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     energyAffinity: "low",
     complement: "deep_ocean",
     spectralFamily: "warm",
+    postProcessOverrides: { grainStrength: "none", bloomThresholdOffset: -0.15, caEnabled: false, halationEnabled: true, lightLeakEnabled: false, beatPulseEnabled: false },
   },
   solar_flare: {
     Component: SolarFlareScene,
@@ -473,6 +505,7 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     energyAffinity: "any",
     complement: "cosmic_voyage",
     spectralFamily: "cosmic",
+    postProcessOverrides: { grainStrength: "none", halationEnabled: false, caEnabled: true, bloomThresholdOffset: -0.10, lightLeakEnabled: false, beatPulseEnabled: false },
   },
   warp_field: {
     Component: WarpFieldScene,
@@ -541,6 +574,7 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     complement: "deep_ocean",
     preferredTransitionIn: "dissolve",
     spectralFamily: "bright",
+    postProcessOverrides: { grainStrength: "none", caEnabled: false, halationEnabled: true, bloomThresholdOffset: -0.10, lightLeakEnabled: false, beatPulseEnabled: false },
   },
   forest: {
     Component: ForestScene,
@@ -666,6 +700,7 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     preferredTransitionIn: "dissolve",
     gradingIntensity: 0.7,
     spectralFamily: "cosmic",
+    postProcessOverrides: { caEnabled: false, halationEnabled: true, bloomThresholdOffset: -0.06, lightLeakEnabled: false, beatPulseEnabled: false },
   },
   morning_dew_fog: {
     Component: MorningDewFogScene,
@@ -680,6 +715,7 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     complement: "st_stephen_lightning",
     preferredTransitionIn: "void",
     spectralFamily: "cosmic",
+    postProcessOverrides: { grainStrength: "heavy", halationEnabled: false, bloomThresholdOffset: 0.05, lightLeakEnabled: false, beatPulseEnabled: false },
   },
   fire_mountain_smoke: {
     Component: FireMountainSmokeScene,
@@ -733,6 +769,7 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     complement: "dark_star_void",
     preferredTransitionIn: "void",
     spectralFamily: "cosmic",
+    postProcessOverrides: { grainStrength: "none", halationEnabled: false, caEnabled: true, bloomThresholdOffset: -0.10, lightLeakEnabled: false, beatPulseEnabled: false },
   },
   seascape: {
     Component: SeascapeScene,
@@ -770,6 +807,14 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     complement: "cosmic_voyage",
     preferredTransitionIn: "void",
     spectralFamily: "cosmic",
+    postProcessOverrides: { halationEnabled: true, bloomThresholdOffset: -0.04, beatPulseEnabled: false, lightLeakEnabled: true },
+  },
+  luminous_cavern: {
+    Component: LuminousCavernScene,
+    energyAffinity: "low",
+    complement: "deep_ocean",
+    spectralFamily: "cosmic",
+    gradingIntensity: 0.85,
   },
   // ─── Veneta '72 show-specific shaders ───
   highway_horizon: {
@@ -848,6 +893,7 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     complement: "porch_twilight",
     preferredTransitionIn: "dissolve",
     spectralFamily: "warm",
+    postProcessOverrides: { grainStrength: "heavy", halationEnabled: false, bloomThresholdOffset: 0.10, caEnabled: false, lightLeakEnabled: false, beatPulseEnabled: false },
   },
   boxcar_tunnel: {
     Component: BoxcarTunnelScene,
@@ -890,6 +936,7 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     complement: "memorial_drift",
     preferredTransitionIn: "dissolve",
     spectralFamily: "warm",
+    postProcessOverrides: { caEnabled: false, halationEnabled: true, bloomThresholdOffset: -0.06, beatPulseEnabled: false },
   },
   bloom_explosion: {
     Component: BloomExplosionScene,
@@ -904,6 +951,7 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     complement: "boxcar_tunnel",
     preferredTransitionIn: "flash",
     spectralFamily: "warm",
+    postProcessOverrides: { grainStrength: "heavy", bloomThresholdOffset: -0.20, caEnabled: false, thermalShimmerEnabled: true, beatPulseEnabled: true },
   },
   dance_floor_prism: {
     Component: DanceFloorPrismScene,
@@ -911,6 +959,7 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     complement: "neon_casino",
     preferredTransitionIn: "flash",
     spectralFamily: "bright",
+    postProcessOverrides: { halationEnabled: true, stageFloodEnabled: true, paletteCycleEnabled: true, caEnabled: false, bloomThresholdOffset: -0.14, beatPulseEnabled: true },
   },
   stained_glass_dissolution: {
     Component: StainedGlassDissolutionScene,
@@ -948,6 +997,35 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     energyAffinity: "mid",
     complement: "warm_nebula",
     spectralFamily: "warm",
+  },
+  // ─── A+++ Raymarched 3D environments ───
+  ancient_forest: {
+    Component: AncientForestScene,
+    energyAffinity: "low",
+    complement: "luminous_cavern",
+    spectralFamily: "warm",
+    gradingIntensity: 0.8,
+  },
+  desert_cathedral: {
+    Component: DesertCathedralScene,
+    energyAffinity: "mid",
+    complement: "fractal_temple",
+    spectralFamily: "warm",
+    gradingIntensity: 0.85,
+  },
+  cosmic_cathedral: {
+    Component: CosmicCathedralScene,
+    energyAffinity: "high",
+    complement: "fractal_temple",
+    spectralFamily: "cosmic",
+    gradingIntensity: 0.9,
+  },
+  molten_forge: {
+    Component: MoltenForgeScene,
+    energyAffinity: "high",
+    complement: "fractal_flames",
+    spectralFamily: "warm",
+    gradingIntensity: 0.85,
   },
 };
 
@@ -1171,11 +1249,12 @@ export function renderScene(
     return React.createElement(fallback.Component, props);
   }
   const gi = entry.gradingIntensity;
-  // Wrap in SceneConfigProvider when we have non-default grading or caller-supplied config
-  if ((gi !== undefined && gi < 1.0) || config?.cameraProfile || config?.shaderParams) {
+  const ppOverrides = entry.postProcessOverrides;
+  // Wrap in SceneConfigProvider when we have non-default grading, post-process overrides, or caller-supplied config
+  if ((gi !== undefined && gi < 1.0) || ppOverrides || config?.cameraProfile || config?.shaderParams) {
     return React.createElement(
       SceneConfigProvider,
-      { value: { gradingIntensity: gi ?? 1.0, ...config } },
+      { value: { gradingIntensity: gi ?? 1.0, postProcessOverrides: ppOverrides, ...config } },
       React.createElement(entry.Component, props),
     );
   }

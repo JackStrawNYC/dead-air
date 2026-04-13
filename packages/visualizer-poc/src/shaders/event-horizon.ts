@@ -338,26 +338,50 @@ void main() {
   // ─── Flow time with time dilation near the hole ───
   float flowTime = uDynamicTime * (0.5 + slowE * 0.3);
 
-  // ─── Camera orbit ───
-  // Jam phase controls orbital distance: exploration=far, building=closer, peak=event horizon
+  // ─── Camera orbit — cinematic black hole encounter ───
+  float holdP = clamp(uShaderHoldProgress, 0.0, 1.0);
+
+  // HoldProgress drives a gravitational approach story:
+  // Phase 1 (0.0-0.2): Distant observation — wide orbit, disk visible
+  // Phase 2 (0.2-0.5): Gravitational capture — spiraling inward
+  // Phase 3 (0.5-0.8): Close orbit — skimming the accretion disk
+  // Phase 4 (0.8-1.0): Slingshot escape — accelerating away
+  float observe = smoothstep(0.0, 0.2, holdP);
+  float capture = smoothstep(0.2, 0.5, holdP);
+  float skimDisk = smoothstep(0.5, 0.8, holdP);
+  float escape = smoothstep(0.8, 1.0, holdP);
+
+  // Jam phase ALSO controls orbital distance (layers on holdP)
   float orbitDist = 8.0;
-  orbitDist += jamExplore * 4.0;    // wide orbit during exploration
-  orbitDist -= jamBuilding * 2.5;   // falling inward during building
-  orbitDist -= jamPeak * 4.0;       // at the event horizon during peak
-  orbitDist += jamResolve * 3.0;    // pulling back during resolution
-  orbitDist -= climaxPower * 1.5;   // climax pulls you closer
-  orbitDist += spaceScore * 3.0;    // space = distant contemplation
+  // holdP-driven approach
+  orbitDist = mix(orbitDist, 6.0, observe);
+  orbitDist = mix(orbitDist, 4.0, capture);
+  orbitDist = mix(orbitDist, 3.0, skimDisk);
+  orbitDist = mix(orbitDist, 7.0, escape);
+  // Jam phase layers on top
+  orbitDist += jamExplore * 3.0;
+  orbitDist -= jamBuilding * 2.0;
+  orbitDist -= jamPeak * 3.0;
+  orbitDist += jamResolve * 2.5;
+  orbitDist -= climaxPower * 1.5;
+  orbitDist += spaceScore * 3.0;
   orbitDist = max(orbitDist, bhRadius * 2.5); // never inside the hole
 
-  float orbitSpeed = 0.08 + slowE * 0.14;
+  float orbitSpeed = (0.08 + slowE * 0.14) * (0.6 + energy * 0.8);
+  // Speed increases during capture, peaks during skim
+  orbitSpeed *= mix(1.0, 1.5, capture) * mix(1.0, 1.8, skimDisk) * mix(1.0, 0.6, escape);
+  // Space: frozen orbit
+  orbitSpeed *= mix(1.0, 0.15, sSpace);
   float orbitAngle = uDynamicTime * orbitSpeed;
 
-  // Slight vertical oscillation
-  float camY = sin(uDynamicTime * 0.05) * 1.5 + 0.5;
-  // During jams, more dramatic camera angles
-  camY += sJam * sin(uDynamicTime * 0.12) * 1.0;
-  // Space: nearly edge-on with the disk
-  camY *= mix(1.0, 0.2, sSpace);
+  // Vertical oscillation evolves: high at observe, dipping during skim, rising at escape
+  float camY = mix(2.0, 1.5, observe);
+  camY = mix(camY, 0.3, capture); // getting pulled into disk plane
+  camY = mix(camY, 0.1, skimDisk) + sin(uDynamicTime * 0.12) * 0.3 * skimDisk;
+  camY = mix(camY, 2.5, escape); // slingshot rises
+  // Section modulation
+  camY += sJam * sin(uDynamicTime * 0.12) * 0.8;
+  camY *= mix(1.0, 0.2, sSpace); // space: edge-on
 
   vec3 ro = vec3(
     cos(orbitAngle) * orbitDist,
@@ -365,21 +389,25 @@ void main() {
     sin(orbitAngle) * orbitDist
   );
 
-  // Look at the singularity with slight offset for drama
+  // Look at the singularity with dramatic offset
   vec3 lookTarget = vec3(0.0, 0.0, 0.0);
-  // Slight look offset during building phase (anticipation)
   lookTarget.x += sin(uDynamicTime * 0.3) * 0.2 * jamBuilding;
+  // During skim, look slightly ahead of orbital path for drama
+  lookTarget += vec3(sin(orbitAngle + 0.3), -0.1, cos(orbitAngle + 0.3)) * 0.3 * skimDisk;
 
   vec3 forward = normalize(lookTarget - ro);
   vec3 worldUp = vec3(0.0, 1.0, 0.0);
-  // Gentle camera roll
-  float rollAngle = sin(uDynamicTime * 0.03) * 0.08 + improv * sin(uDynamicTime * 0.1) * 0.12;
+  // Camera roll intensifies during capture, calms at escape
+  float rollIntensity = mix(0.08, 0.2, capture) * mix(1.0, 0.3, escape);
+  float rollAngle = sin(uDynamicTime * 0.03) * rollIntensity + improv * sin(uDynamicTime * 0.1) * 0.08;
   worldUp = vec3(sin(rollAngle), cos(rollAngle), 0.0);
 
   vec3 camRight = normalize(cross(forward, worldUp));
   vec3 camUp = cross(camRight, forward);
 
   float fovScale = tan(radians(mix(50.0, 70.0, jamPeak + climaxPower * 0.5)) * 0.5);
+  // FOV widens during escape for dramatic slingshot feel
+  fovScale *= mix(1.0, 1.15, escape);
   vec3 rd = normalize(forward + camRight * p.x * fovScale + camUp * p.y * fovScale);
 
   // ─── MAIN RAYMARCH WITH GRAVITATIONAL LENSING ───

@@ -40,14 +40,17 @@ void main() {
 
 const postProcess = buildPostProcessGLSL({
   bloomEnabled: true,
-  bloomThresholdOffset: -0.2,
+  bloomThresholdOffset: -0.25,
   caEnabled: true,
   halationEnabled: true,
-  grainStrength: "light",
+  grainStrength: "heavy",
   thermalShimmerEnabled: true,
   temporalBlendEnabled: true,
-  lightLeakEnabled: true,
+  lightLeakEnabled: false,
   dofEnabled: true,
+  beatPulseEnabled: true,
+  lensDistortionEnabled: true,
+  eraGradingEnabled: true,
 });
 
 const eaNormalGLSL = buildRaymarchNormal("eaMap($P)", { eps: 0.004, name: "eaNormal" });
@@ -516,15 +519,65 @@ void main() {
   int arcCount = max(1, int(2.0 + energy * 4.0 + drumOnset * 4.0 + arcCountMod + fftHigh * 2.0));
   arcCount = min(arcCount, 12);
 
-  // Palette
-  float palHue1 = uPalettePrimary + chromaHueMod + chordHue;
-  float palHue2 = uPaletteSecondary + chromaHueMod;
+  // Palette — electric blue/violet core with hot orange discharge
+  float rawPH1 = uPalettePrimary + chromaHueMod + chordHue;
+  float palHue1 = mix(rawPH1, 0.68 + fract(rawPH1) * 0.12, 0.5); // pull toward electric blue-violet
+  float rawPH2 = uPaletteSecondary + chromaHueMod;
+  float palHue2 = mix(rawPH2, 0.08 + fract(rawPH2) * 0.1, 0.35); // warm orange for discharge contrast
 
   // ═══════════════════════════════════════════════════
-  // Camera setup (3D camera uniforms)
+  // Camera choreography — per-shader cinematic path
   // ═══════════════════════════════════════════════════
   vec3 ro, rd;
   setupCameraRay(uv, aspect, ro, rd);
+
+  // Hold progress drives camera journey: distant survey → tight focus → pull-away
+  float holdP = clamp(uShaderHoldProgress, 0.0, 1.0);
+
+  // Phase 1 (0.0-0.3): Wide establishing shot — camera orbits at distance
+  // Phase 2 (0.3-0.7): Push in close — intimate with the arcs
+  // Phase 3 (0.7-1.0): Crane up and pull back — reveal the full Tesla coil array
+  float phase1 = smoothstep(0.0, 0.3, holdP);
+  float phase2 = smoothstep(0.3, 0.7, holdP);
+  float phase3 = smoothstep(0.7, 1.0, holdP);
+
+  float camSpeed = slowTime * (0.15 + energy * 0.25);
+  // Section: jam=orbit fast, space=nearly still, solo=tight orbit
+  float camSpeedMul = mix(1.0, 2.0, sJam) * mix(1.0, 0.15, sSpace) * mix(1.0, 0.6, sSolo);
+  camSpeed *= camSpeedMul;
+
+  // Orbit radius: starts wide, pushes close, pulls back
+  float camDist = mix(4.5, 2.0, phase1 * (1.0 - phase2 * 0.6));
+  camDist += phase3 * 2.5; // pull back at end
+  camDist -= sSolo * 0.8; // solo: tighter focus
+  camDist += sSpace * 1.5; // space: distant contemplation
+
+  float orbitAngle = camSpeed;
+  float camY = sin(camSpeed * 0.7) * 0.5 * (1.0 - sSpace * 0.8);
+  // Crane up in phase 3
+  camY += phase3 * 1.5;
+  // Jam: dynamic vertical motion
+  camY += sJam * sin(camSpeed * 1.3) * 0.6;
+
+  ro = vec3(cos(orbitAngle) * camDist, camY + 0.3, sin(orbitAngle) * camDist);
+
+  // Look target: center with slight lead during orbit, tighter during solo
+  vec3 lookAt = vec3(
+    sin(camSpeed * 1.1) * 0.2 * (1.0 - sSpace * 0.9),
+    mix(0.0, 0.3, phase2) - phase3 * 0.2,
+    cos(camSpeed * 0.9) * 0.15
+  );
+  vec3 camFwd = normalize(lookAt - ro);
+  vec3 camRt = normalize(cross(camFwd, vec3(0.0, 1.0, 0.0)));
+  vec3 camUpVec = cross(camRt, camFwd);
+
+  // Gentle roll during jams
+  float roll = sin(camSpeed * 0.4) * 0.06 * sJam;
+  vec3 rolledRt = camRt * cos(roll) + camUpVec * sin(roll);
+  vec3 rolledUp = -camRt * sin(roll) + camUpVec * cos(roll);
+
+  float camFov = mix(0.8, 1.1, energy) + phase3 * 0.15;
+  rd = normalize(rolledRt * (uv.x - 0.5) * aspect.x + rolledUp * (uv.y - 0.5) + camFwd * camFov);
 
   // ═══════════════════════════════════════════════════
   // SDF Raymarch
@@ -568,10 +621,10 @@ void main() {
     float light2Str = 0.5 + energy * 0.3;
     float light3Str = 0.4 + energy * 0.3;
 
-    // Light colors: electric blue/violet tinted by palette
-    vec3 light1Col = hsv2rgb(vec3(palHue1, 0.7, 1.0)) * light1Str;
-    vec3 light2Col = hsv2rgb(vec3(palHue2, 0.6, 1.0)) * light2Str;
-    vec3 light3Col = hsv2rgb(vec3(palHue1 + 0.15, 0.5, 0.9)) * light3Str;
+    // Light colors: electric blue/violet with dangerous warmth
+    vec3 light1Col = hsv2rgb(vec3(palHue1, 0.8, 1.0)) * light1Str;
+    vec3 light2Col = hsv2rgb(vec3(palHue2, 0.75, 0.95)) * light2Str; // warm amber fill
+    vec3 light3Col = hsv2rgb(vec3(palHue1 + 0.08, 0.6, 0.95)) * light3Str;
 
     // Diffuse lighting from each light
     vec3 toL1 = normalize(light1Pos - surfPos);
@@ -616,17 +669,19 @@ void main() {
       col += matColor * vec3(0.5, 0.4, 0.8) * flashStr;
     }
 
-    // Distance fog (industrial haze)
+    // Distance fog — electric ozone haze (blue-violet industrial atmosphere)
     float fogDist = length(surfPos - ro);
     float fogAmount = 1.0 - exp(-fogDist * 0.06);
-    vec3 fogColor = vec3(0.02, 0.015, 0.04) + hsv2rgb(vec3(palHue1, 0.3, 0.04)) * energy;
+    vec3 fogColor = vec3(0.015, 0.012, 0.04) + hsv2rgb(vec3(palHue1, 0.4, 0.05)) * energy;
+    fogColor += vec3(0.005, 0.002, 0.01); // violet-tinted haze
     col = mix(col, fogColor, fogAmount);
 
   } else {
-    // Sky / background — dark industrial void with subtle plasma fog
-    vec3 bgFog = vec3(0.01, 0.008, 0.02);
+    // Background — industrial void charged with electric potential
+    vec3 bgFog = vec3(0.008, 0.006, 0.025); // deep violet-black
     float bgNoise = fbm3(vec3(rd * 2.0 + slowTime * 0.03));
-    bgFog += hsv2rgb(vec3(palHue1 + bgNoise * 0.1, 0.4, 0.03)) * energy;
+    bgFog += hsv2rgb(vec3(palHue1 + bgNoise * 0.08, 0.5, 0.04)) * energy;
+    bgFog += vec3(0.003, 0.001, 0.008); // charged purple base
     col = bgFog;
   }
 
@@ -672,13 +727,15 @@ void main() {
         // Glow halo
         float glowMask = 1.0 - smoothstep(0.0, 0.06 + bass * 0.12, arcDist);
 
-        // Arc color: melodic pitch shifts blue→orange, palette tinted
-        float arcHue = palHue1 + mix(0.6, 0.1, melodicPitch) + fi * 0.04;
-        float arcSat = mix(0.5, 0.9, energy) * uPaletteSaturation;
-        float arcBri = 0.9 + energy * 0.1 + brightMod;
+        // Arc color: melodic pitch shifts blue→orange, white-hot core
+        float arcHue = palHue1 + mix(0.5, 0.05, melodicPitch) + fi * 0.03;
+        float arcSat = mix(0.55, 0.95, energy) * uPaletteSaturation;
+        float arcBri = 0.92 + energy * 0.08 + brightMod;
 
-        vec3 coreColor = mix(vec3(0.9, 0.92, 1.0), hsv2rgb(vec3(arcHue, arcSat * 0.3, 1.0)), 0.3);
-        vec3 glowColor = hsv2rgb(vec3(arcHue, arcSat, arcBri * 0.6));
+        // Core: white-hot with faint blue tint — like real electrical discharge
+        vec3 coreColor = mix(vec3(0.95, 0.97, 1.0), hsv2rgb(vec3(arcHue, arcSat * 0.2, 1.0)), 0.2);
+        coreColor += vec3(0.05, 0.02, 0.0) * melodicPitch; // hotter pitch = warmer core
+        vec3 glowColor = hsv2rgb(vec3(arcHue, arcSat, arcBri * 0.65));
 
         float volumeWeight = 0.035; // per-step contribution
         col += coreColor * coreMask * volumeWeight * 3.0;

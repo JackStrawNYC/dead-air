@@ -38,11 +38,14 @@ void main() {
 const postProcess = buildPostProcessGLSL({
   grainStrength: "light",
   bloomEnabled: true,
+  bloomThresholdOffset: -0.06,
   halationEnabled: true,
   lightLeakEnabled: true,
-  caEnabled: true,
-  lensDistortionEnabled: true,
+  caEnabled: false,
+  lensDistortionEnabled: false,
   eraGradingEnabled: true,
+  beatPulseEnabled: false,
+  dofEnabled: true,
 });
 
 const ptNormalGLSL = buildRaymarchNormal("ptMap($P, rockAngle)", { eps: 0.001, name: "ptNormal" });
@@ -573,14 +576,17 @@ void main() {
   // === DARKNESS TEXTURE (very low energy) ===
   col += darknessTexture(uv, uTime, energy);
 
-  // === PALETTE INFLUENCE ===
+  // === PALETTE INFLUENCE — sunset twilight: warm amber/peach sky, cool blue-purple dusk ===
   {
-    vec3 palCol1 = hsv2rgb(vec3(uPalettePrimary, 0.5 * uPaletteSaturation, 0.8));
-    vec3 palCol2 = hsv2rgb(vec3(uPaletteSecondary, 0.4 * uPaletteSaturation, 0.7));
-    // Subtle palette wash: warm layer blended over the scene
+    // Bias primary toward sunset amber/peach, secondary toward twilight blue-purple
+    float ptH1 = mix(uPalettePrimary, 0.07 + fract(uPalettePrimary) * 0.05, 0.45); // peach/amber
+    float ptH2 = mix(uPaletteSecondary, 0.70 + fract(uPaletteSecondary) * 0.08, 0.35); // twilight blue
+    vec3 palCol1 = hsv2rgb(vec3(ptH1, 0.6 * uPaletteSaturation, 0.85)); // warm sunset
+    vec3 palCol2 = hsv2rgb(vec3(ptH2, 0.35 * uPaletteSaturation, 0.55)); // cool dusk
+    // Warm-to-cool palette wash: sunset above, dusk below
     float palNoise = fbm3(vec3(screenP * 1.5, flowTime * 0.05));
-    vec3 palBlend = mix(palCol1, palCol2, palNoise * 0.5 + 0.5) * 0.04;
-    col += palBlend * energy * 0.3;
+    vec3 palBlend = mix(palCol1, palCol2, palNoise * 0.5 + 0.5) * 0.05;
+    col += palBlend * energy * 0.35;
   }
 
   // === ICON EMERGENCE ===

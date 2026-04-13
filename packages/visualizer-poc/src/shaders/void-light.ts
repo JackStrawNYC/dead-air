@@ -28,6 +28,10 @@
  *   uCoherence        -> light stability (flicker reduction)
  *   uDynamicRange     -> contrast between lit dust and void
  *   uChromaHue        -> primary light hue
+ *   uStemBass         -> deep icosahedron pulse + extra radiance
+ *   uShaderHoldProgress -> light evolves: faint ember → full blaze → warm settle
+ *   uSemanticPsychedelic -> light fractures into prismatic colors
+ *   uSemanticCosmic   -> faint nebula blue undertone in void
  */
 
 import { noiseGLSL } from "./noise";
@@ -313,6 +317,10 @@ void main() {
   float vocalPresence = clamp(uVocalPresence, 0.0, 1.0);
   float coherence = clamp(uCoherence, 0.0, 2.0);
   float dynamicRange = clamp(uDynamicRange, 0.0, 1.0);
+  float stemBass = clamp(uStemBass, 0.0, 1.0);
+  float holdP = clamp(uShaderHoldProgress, 0.0, 1.0);
+  float psyche = clamp(uSemanticPsychedelic, 0.0, 1.0);
+  float cosmic = clamp(uSemanticCosmic, 0.0, 1.0);
   float sectionT = uSectionType;
 
   // === SECTION-TYPE MODULATION ===
@@ -322,13 +330,19 @@ void main() {
 
   float time = uDynamicTime * 0.2;
 
-  // Icosahedron parameters
-  float icoRadius = 0.6 + bass * 0.3 + beatPulse(uMusicalTime) * 0.1;
+  // Hold progress: light evolves from faint ember → full blaze → settling warmth
+  float holdBlaze = smoothstep(0.0, 0.5, holdP) * (1.0 - smoothstep(0.85, 1.0, holdP) * 0.3);
+
+  // Icosahedron parameters — stem bass adds deep pulsing throb
+  float icoRadius = 0.6 + bass * 0.3 + stemBass * 0.15 + beatPulse(uMusicalTime) * 0.1;
+  icoRadius *= 0.8 + holdBlaze * 0.2; // grows over hold
   float rotSpeed = (0.3 + slowEnergy * 0.3) * mix(1.0, 2.0, sJam) * mix(1.0, 0.2, sSpace);
   float climaxShatter = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5) * uClimaxIntensity;
 
-  // Light intensity
+  // Light intensity — evolves with hold, stem bass adds deep radiance
   float lightIntensity = energy * 3.0 * mix(1.0, 1.3, sChorus) * mix(1.0, 0.3, sSpace);
+  lightIntensity *= 0.6 + holdBlaze * 0.4; // hold makes light grow
+  lightIntensity += stemBass * 0.5; // deep bass radiates extra light
   lightIntensity *= 0.5 + coherence * 0.5; // flicker when incoherent
   lightIntensity += onset * 2.0; // burst on onset
 
@@ -351,13 +365,60 @@ void main() {
   float lightLuma = dot(lightColor, vec3(0.299, 0.587, 0.114));
   lightColor = mix(lightColor, vec3(lightLuma), tension * 0.3);
 
-  // === RAY SETUP ===
+  // === RAY SETUP — cinematic camera choreography ===
   vec3 ro, rd;
   setupCameraRay(uv, aspect, ro, rd);
 
-  // Light source position (tracks icosahedron)
+  // Hold progress: darkness → ember discovery → full blaze orbit → settle
+  // Phase 1 (0.0-0.2): Static, distant — single point of light in void
+  // Phase 2 (0.2-0.5): Slow push-in — discovering the light source
+  // Phase 3 (0.5-0.8): Orbit around the icosahedron — full exploration
+  // Phase 4 (0.8-1.0): Settle into contemplative angle
+  float holdPhase1 = smoothstep(0.0, 0.2, holdP);
+  float holdPhase2 = smoothstep(0.2, 0.5, holdP);
+  float holdPhase3 = smoothstep(0.5, 0.8, holdP);
+  float holdPhase4 = smoothstep(0.8, 1.0, holdP);
+
+  float camTime = time * (0.3 + energy * 0.3);
+  float camTimeMul = mix(1.0, 1.8, sJam) * mix(1.0, 0.15, sSpace);
+  camTime *= camTimeMul;
+
+  // Distance: far → push in → orbit distance → settle close
+  float camDist = mix(6.0, 3.5, holdPhase1);
+  camDist = mix(camDist, 2.2, holdPhase2);
+  camDist = mix(camDist, 2.8, holdPhase3 * (1.0 - holdPhase4));
+  camDist += sSpace * 1.5; // space: pull back into void
+  camDist -= sJam * 0.5;   // jam: closer engagement
+
+  // Orbit: no orbit initially, then full orbit, then settle
+  float orbitActive = holdPhase2 * (1.0 - holdPhase4 * 0.7);
+  float orbitAngle = camTime * orbitActive;
+  float orbitY = sin(camTime * 0.6) * 0.8 * orbitActive;
+
+  // Elevation: low initially, rises with exploration
+  float camElev = mix(0.0, 0.5, holdPhase1) + orbitY;
+  camElev += holdPhase4 * 0.3; // settle slightly above
+
+  ro = vec3(
+    cos(orbitAngle) * camDist,
+    camElev,
+    sin(orbitAngle) * camDist
+  );
+
+  // Look at the light source with slight breathing
   float yOff = sin(time * 0.3) * melodicPitch * 1.5;
   vec3 lightPos = vec3(0.0, yOff, 0.0);
+  vec3 lookTarget = lightPos + vec3(
+    sin(camTime * 0.3) * 0.1 * (1.0 - sSpace * 0.9),
+    0.0,
+    cos(camTime * 0.25) * 0.08
+  );
+  vec3 camFwd = normalize(lookTarget - ro);
+  vec3 camRt = normalize(cross(camFwd, vec3(0.0, 1.0, 0.0)));
+  vec3 camUpVec = cross(camRt, camFwd);
+  float camFov = mix(0.7, 0.9, energy) + holdPhase3 * 0.1;
+  vec2 sp = (uv - 0.5) * aspect;
+  rd = normalize(camFwd * camFov + camRt * sp.x + camUpVec * sp.y);
 
   // === RAYMARCH ===
   float marchT = 0.0;
@@ -462,6 +523,12 @@ void main() {
     float voidGlow = climaxShatter * energy * 0.20;
     col += lightColor * voidGlow;
   }
+
+  // === SEMANTIC MODULATION ===
+  // Psychedelic: light fractures into prismatic colors
+  col = mix(col, col * vec3(1.15, 0.9, 1.1), psyche * 0.35);
+  // Cosmic: deep void gains faint nebula blue undertone
+  col += vec3(0.003, 0.005, 0.015) * cosmic * 0.5;
 
   // === TONE MAPPING (keep void truly dark) ===
   col = max(col, vec3(0.0));

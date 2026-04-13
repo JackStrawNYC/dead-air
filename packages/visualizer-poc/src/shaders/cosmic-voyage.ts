@@ -53,7 +53,7 @@ ${lightingGLSL}
 // all on simultaneously. anaglyph fringe-shifted high-contrast pixels into
 // rainbow noise, temporalBlend fed that back in. Fix: anaglyph + temporalBlend
 // stay off, CA alone is safe (max 0.03 cap prevents fringing on volumetric).
-${buildPostProcessGLSL({ halationEnabled: true, caEnabled: true, lightLeakEnabled: true, anaglyphEnabled: false, dofEnabled: true, temporalBlendEnabled: false })}
+${buildPostProcessGLSL({ halationEnabled: false, caEnabled: true, lightLeakEnabled: false, anaglyphEnabled: false, dofEnabled: true, temporalBlendEnabled: false, grainStrength: "none", bloomEnabled: true, bloomThresholdOffset: -0.08, beatPulseEnabled: false, lensDistortionEnabled: false })}
 
 varying vec2 vUv;
 
@@ -142,36 +142,65 @@ void main() {
   float isClimax = step(1.5, uClimaxPhase) * step(uClimaxPhase, 3.5);
   float climaxBoost = isClimax * uClimaxIntensity;
 
-  // ═══ Camera ═══
-  // Widened drift speed: 3x range (0.05 quiet → 0.38 loud) instead of old 2x
-  float driftSpeed = 0.05 + energy * 0.28 + uFastEnergy * 0.10;
+  // ═══ Camera — cinematic nebula flight with holdProgress evolution ═══
+  // Phase 1 (0.0-0.2): Slow drift — emerging from deep void into nebula edge
+  // Phase 2 (0.2-0.5): Accelerating — diving into the nebula core
+  // Phase 3 (0.5-0.8): Full speed — barrel roll through dense clouds
+  // Phase 4 (0.8-1.0): Decelerate — drift out the other side into open space
+  float emerge = smoothstep(0.0, 0.2, holdP);
+  float dive = smoothstep(0.2, 0.5, holdP);
+  float fullSpeed = smoothstep(0.5, 0.8, holdP);
+  float decel = smoothstep(0.8, 1.0, holdP);
+
+  // Drift speed evolves with holdP: slow start → peak → decelerate
+  float speedCurve = mix(0.3, 1.0, emerge);
+  speedCurve = mix(speedCurve, 1.5, dive);
+  speedCurve = mix(speedCurve, 1.8, fullSpeed * (1.0 - decel));
+  speedCurve = mix(speedCurve, 0.6, decel);
+
+  float driftSpeed = (0.05 + energy * 0.28 + uFastEnergy * 0.10) * speedCurve;
   driftSpeed *= mix(1.0, 1.8, sJam) * mix(1.0, 0.20, sSpace);
   float camT = uDynamicTime * driftSpeed;
   vec3 camPos = cvyCameraPath(camT);
 
+  // Lissajous amplitude evolves: tight at start/end, wide in the middle
+  float pathAmplitude = mix(0.5, 1.0, emerge) * mix(1.0, 1.3, fullSpeed) * mix(1.0, 0.7, decel);
+  camPos.xy *= pathAmplitude;
+
   float shakeGate = smoothstep(0.25, 0.55, energy);
-  // Widened camera shake: perceptible bass-driven motion (was 0.06, invisible)
   float shakeAmt = bass * 0.14 * shakeGate * mix(1.0, 0.2, stability);
+  // Shake increases during dive, calms during decel
+  shakeAmt *= mix(1.0, 1.3, dive) * mix(1.0, 0.4, decel);
   camPos.x += snoise(vec3(uTime * 6.0, 0.0, 0.0)) * shakeAmt;
   camPos.y += snoise(vec3(0.0, uTime * 6.0, 0.0)) * shakeAmt;
 
-  vec3 camLookTarget = cvyCameraPath(camT + 0.1);
+  // Look-ahead distance evolves: close at slow speed, far at high speed
+  float lookAhead = mix(0.05, 0.15, speedCurve);
+  vec3 camLookTarget = cvyCameraPath(camT + lookAhead);
+  camLookTarget.xy *= pathAmplitude;
   vec3 camFwd = normalize(camLookTarget - camPos);
   vec3 camRt = normalize(cross(vec3(0.0, 1.0, 0.0), camFwd));
   vec3 camUpDir = cross(camFwd, camRt);
 
-  float rollAngle = sin(camT * 0.37) * 0.20 + cos(camT * 0.23) * 0.16;
+  // Roll: gentle at edges, more dramatic during full speed
+  float rollIntensity = mix(0.12, 0.25, fullSpeed) * mix(1.0, 0.5, decel);
+  rollIntensity *= mix(1.0, 0.3, sSpace); // space: minimal roll
+  float rollAngle = sin(camT * 0.37) * rollIntensity + cos(camT * 0.23) * rollIntensity * 0.7;
   vec3 rolledRight = camRt * cos(rollAngle) + camUpDir * sin(rollAngle);
   vec3 rolledUp = -camRt * sin(rollAngle) + camUpDir * cos(rollAngle);
 
   float fov = mix(1.5, 2.0, bass) * evolveOpenness;
+  // FOV narrows at start (tunnel vision), widens at full speed
+  fov *= mix(0.85, 1.0, emerge) * mix(1.0, 1.1, fullSpeed);
   vec3 rayDir = normalize(screenPos.x * rolledRight + screenPos.y * rolledUp + fov * camFwd);
 
-  // ═══ Palette ═══
-  float hue1 = uPalettePrimary + chromaH * 0.15 + chordHue;
-  vec3 cloudColor = paletteHueColor(hue1, 0.78, 0.92);
-  float hue2 = uPaletteSecondary + chordHue * 0.5;
-  vec3 emissionColor = paletteHueColor(hue2, 0.85, 0.98);
+  // ═══ Palette — cosmic: deep purple/blue nebula with magenta/violet accents ═══
+  float rawCH1 = uPalettePrimary + chromaH * 0.15 + chordHue;
+  float hue1 = mix(rawCH1, 0.72 + fract(rawCH1) * 0.1, 0.4); // pull toward deep purple-blue
+  vec3 cloudColor = paletteHueColor(hue1, 0.75, 0.85);
+  float rawCH2 = uPaletteSecondary + chordHue * 0.5;
+  float hue2 = mix(rawCH2, 0.82 + fract(rawCH2) * 0.12, 0.35); // magenta/violet accent
+  vec3 emissionColor = paletteHueColor(hue2, 0.8, 0.95);
 
   // ═════════════════════════════════════════════════════════════════
   // COSMIC VOYAGE — REWRITE
@@ -217,7 +246,8 @@ void main() {
     float satCap = 0.15 + energy * 0.40;
     vec3 deepSpace = paletteHueColor(hue1 + pixelHue + depthDriftHue, satCap, 0.18);
     vec3 nebulaWarm = paletteHueColor(hue2 + pixelHue * 0.6 - depthDriftHue * 0.5, satCap + 0.08, 0.26);
-    vec3 emissionCore = mix(emissionColor * 0.4, vec3(0.55, 0.50, 0.42), 0.6);
+    // Emission cores: warm gold/amber star points in cosmic nebula (not grey)
+    vec3 emissionCore = mix(emissionColor * 0.4, vec3(0.55, 0.45, 0.30), 0.55);
 
     // Layer the colors by density
     vec3 nebulaCol = mix(deepSpace, nebulaWarm, smoothstep(0.20, 0.65, density));

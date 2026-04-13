@@ -3836,5 +3836,85 @@
       "drumReactivity": 0.5,
       "vocalWeight": 1.4
     }
+  },
+  "mississippihalf-step": {
+    "preferredModes": ["porch_twilight", "ancient_forest", "aurora", "flower_field", "river"],
+    "palette": { "primary": 40, "secondary": 120, "saturation": 0.70 },
+    "moodKeywords": ["contemplative", "organic"],
+    "narrativeArc": "gradual_build",
+    "thematicTags": ["pastoral", "storytelling", "warm"],
+    "cameraProfile": "gentle"
+  },
+  "aroundandaround": {
+    "preferredModes": ["concert_lighting", "dance_floor_prism", "liquid_light", "electric_arc", "inferno"],
+    "palette": { "primary": 15, "secondary": 45, "saturation": 0.90 },
+    "moodKeywords": ["festival", "intense"],
+    "narrativeArc": "energy_cycle",
+    "thematicTags": ["rocker", "party", "hot"],
+    "cameraProfile": "driving"
+  },
+  "greateststoryevertold": {
+    "preferredModes": ["clockwork_temple", "molten_forge", "electric_arc", "concert_lighting", "lava_flow"],
+    "palette": { "primary": 30, "secondary": 200, "saturation": 0.85 },
+    "moodKeywords": ["intense", "festival"],
+    "narrativeArc": "energy_cycle",
+    "thematicTags": ["funky", "driving", "mechanical"],
+    "cameraProfile": "driving"
+  },
+  "passenger": {
+    "preferredModes": ["cosmic_voyage", "warp_field", "cosmic_cathedral", "galaxy_spiral", "star_nest"],
+    "palette": { "primary": 260, "secondary": 320, "saturation": 0.75 },
+    "moodKeywords": ["cosmic", "psychedelic"],
+    "narrativeArc": "gradual_build",
+    "thematicTags": ["cosmic", "journey", "transcendent"],
+    "cameraProfile": "floating"
+  },
+  "lazylightning": {
+    "preferredModes": ["electric_arc", "concert_lighting", "liquid_light", "dance_floor_prism", "molten_forge"],
+    "palette": { "primary": 50, "secondary": 210, "saturation": 0.90 },
+    "moodKeywords": ["intense", "festival"],
+    "narrativeArc": "energy_cycle",
+    "thematicTags": ["electric", "driving", "hot"],
+    "cameraProfile": "driving"
+  },
+  "dancininthestreets": {
+    "preferredModes": ["concert_lighting", "dance_floor_prism", "liquid_light", "neon_casino", "electric_arc"],
+    "palette": { "primary": 340, "secondary": 50, "saturation": 0.90 },
+    "moodKeywords": ["festival", "intense"],
+    "narrativeArc": "energy_cycle",
+    "thematicTags": ["party", "urban", "hot"],
+    "cameraProfile": "driving"
+  },
+  "saintofcircumstance": {
+    "preferredModes": ["aurora", "stained_glass", "flower_field", "porch_twilight", "ancient_forest"],
+    "palette": { "primary": 180, "secondary": 40, "saturation": 0.75 },
+    "moodKeywords": ["contemplative", "organic"],
+    "narrativeArc": "gradual_build",
+    "thematicTags": ["reggae", "warm", "groovy"],
+    "cameraProfile": "gentle"
+  },
+  "alabamagetaway": {
+    "preferredModes": ["concert_lighting", "desert_cathedral", "molten_forge", "inferno", "lava_flow"],
+    "palette": { "primary": 20, "secondary": 45, "saturation": 0.90 },
+    "moodKeywords": ["festival", "intense"],
+    "narrativeArc": "energy_cycle",
+    "thematicTags": ["rocker", "driving", "hot"],
+    "cameraProfile": "driving"
+  },
+  "saintstephen": {
+    "preferredModes": ["st_stephen_lightning", "electric_arc", "cosmic_cathedral", "fractal_temple", "plasma_field"],
+    "palette": { "primary": 270, "secondary": 40, "saturation": 0.85 },
+    "moodKeywords": ["psychedelic", "intense"],
+    "narrativeArc": "build_to_climax",
+    "thematicTags": ["epic", "transcendent", "electric"],
+    "cameraProfile": "dynamic"
+  },
+  "farfromme": {
+    "preferredModes": ["memorial_drift", "porch_twilight", "luminous_cavern", "ancient_forest", "aurora"],
+    "palette": { "primary": 220, "secondary": 280, "saturation": 0.55 },
+    "moodKeywords": ["contemplative", "organic"],
+    "narrativeArc": "slow_reveal",
+    "thematicTags": ["melancholy", "tender", "quiet"],
+    "cameraProfile": "still"
   }
 }

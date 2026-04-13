@@ -38,12 +38,16 @@ void main() {
 `;
 
 const postProcess = buildPostProcessGLSL({
-  grainStrength: "light",
+  grainStrength: "none",
   halationEnabled: true,
   dofEnabled: true,
   bloomEnabled: true,
-  bloomThresholdOffset: -0.05,
-  caEnabled: true,
+  bloomThresholdOffset: -0.18,
+  caEnabled: false,
+  lensDistortionEnabled: true,
+  lightLeakEnabled: false,
+  beatPulseEnabled: false,
+  eraGradingEnabled: true,
 });
 
 const do2NormalGLSL = buildRaymarchNormal("do2Map($P, flowTime, bassVal, midsVal, drumOnset, melodicPitch, climaxAmount).x", { eps: 0.002, name: "do2Normal" });
@@ -556,13 +560,16 @@ void main() {
   float chromaHueMod = uChromaHue * 0.2;
   float chordHue = float(int(uChordIndex)) / 24.0 * 0.12;
 
-  float hue1 = uPalettePrimary + chromaHueMod + chordHue;
-  vec3 waterColor = paletteHueColor(hue1, 0.7, 0.85);
-  waterColor = mix(waterColor, vec3(0.02, 0.08, 0.18), 0.6 + spaceScore * 0.2);
+  // Palette — deep ocean: navy/indigo depths, cold blue-white highlights
+  float rawOcH1 = uPalettePrimary + chromaHueMod + chordHue;
+  float hue1 = mix(rawOcH1, 0.60 + fract(rawOcH1) * 0.08, 0.55); // pull toward deep blue
+  vec3 waterColor = paletteHueColor(hue1, 0.6, 0.7);
+  waterColor = mix(waterColor, vec3(0.02, 0.06, 0.18), 0.65 + spaceScore * 0.2); // deep navy
 
-  float hue2 = uPaletteSecondary;
-  vec3 accentColor = paletteHueColor(hue2, 0.85, 0.95);
-  accentColor = mix(accentColor, vec3(0.3, 0.7, 0.9), 0.3);
+  float rawOcH2 = uPaletteSecondary;
+  float hue2 = mix(rawOcH2, 0.55 + fract(rawOcH2) * 0.1, 0.4); // cool cyan-blue accent
+  vec3 accentColor = paletteHueColor(hue2, 0.7, 0.9);
+  accentColor = mix(accentColor, vec3(0.25, 0.65, 0.9), 0.4); // cold blue-white
 
   // Internal evolution over long holds
   float holdP = clamp(uShaderHoldProgress, 0.0, 1.0);
@@ -576,18 +583,60 @@ void main() {
     * mix(1.0, 0.20, sSpace)
     * mix(1.0, 1.3, sChorus);
 
-  // === CAMERA RAY ===
+  // === CAMERA RAY — cinematic underwater choreography ===
   vec3 rayOrigin, rayDir;
   setupCameraRay(uv, aspect, rayOrigin, rayDir);
 
-  // Underwater camera drift: gentle bass-driven sway
-  // Widened camera sway: dramatic bass-driven oscillation (was 0.3 * 1.5x)
-  float swayX = sin(flowTime * 0.4) * 0.3 * (0.5 + bassVal * 1.2);
-  float swayY = cos(flowTime * 0.3) * 0.15;
-  rayOrigin += vec3(swayX, swayY - 0.5, 0.0);
+  // Hold progress: surface descent → reef floor exploration → ascending drift
+  // Phase 1 (0.0-0.25): Descending from surface — light above fading
+  // Phase 2 (0.25-0.6): Lateral drift along the reef floor — discovering life
+  // Phase 3 (0.6-0.85): Push into a reef cave / under an arch
+  // Phase 4 (0.85-1.0): Slow ascent — looking up at surface light
+  float descend = smoothstep(0.0, 0.25, holdP);
+  float explore = smoothstep(0.25, 0.6, holdP);
+  float pushIn = smoothstep(0.6, 0.85, holdP);
+  float ascend = smoothstep(0.85, 1.0, holdP);
+
+  float camSpeed = flowTime * (0.4 + energy * 0.3);
+  float camSpeedMul = mix(1.0, 1.6, sJam) * mix(1.0, 0.2, sSpace) * mix(1.0, 1.2, sChorus);
+  camSpeed *= camSpeedMul;
+
+  // Depth: descend first, hover at floor, then slowly rise
+  float camY = mix(0.5, -0.8, descend);
+  camY -= explore * 0.3; // settle near floor
+  camY += ascend * 1.2; // rise at end
+
+  // Lateral drift: gentle during descent, wider during exploration
+  float driftX = sin(camSpeed * 0.3) * (0.3 + explore * 1.5);
+  float driftZ = camSpeed * 0.5; // slow forward swim
+  // Space: nearly frozen drift
+  driftX *= mix(1.0, 0.1, sSpace);
+  driftZ *= mix(1.0, 0.15, sSpace);
+  // Jam: wider exploration range
+  driftX += sJam * sin(camSpeed * 0.7) * 0.8;
+
+  rayOrigin = vec3(driftX, camY, driftZ);
+
+  // Bass-driven micro-sway layered on top
+  float swayX = sin(flowTime * 0.4) * 0.08 * (0.5 + bassVal * 0.8);
+  float swayY = cos(flowTime * 0.3) * 0.04;
+  rayOrigin += vec3(swayX, swayY, 0.0);
+
+  // Look direction: forward + slightly down during descent, ahead during explore, up during ascend
+  vec3 lookAt = rayOrigin + vec3(
+    sin(camSpeed * 0.2) * 0.2,
+    mix(-0.3, 0.0, descend) + ascend * 0.6 - pushIn * 0.2,
+    3.0
+  );
+  vec3 camFwd = normalize(lookAt - rayOrigin);
+  vec3 camRt = normalize(cross(camFwd, vec3(0.0, 1.0, 0.0)));
+  vec3 camUpVec = cross(camRt, camFwd);
+  float camFov = 0.8 + energy * 0.15 + pushIn * 0.1;
+  vec2 sp = (uv - 0.5) * aspect;
+  rayDir = normalize(camFwd * camFov + camRt * sp.x + camUpVec * sp.y);
 
   // Beat stability affects camera steadiness
-  float jitter = (1.0 - beatStab) * 0.05;
+  float jitter = (1.0 - beatStab) * 0.03;
   rayDir += vec3(
     snoise(vec3(uv * 5.0, uDynamicTime * 3.0)) * jitter,
     snoise(vec3(uv * 5.0 + 10.0, uDynamicTime * 3.0)) * jitter,

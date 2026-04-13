@@ -20,6 +20,8 @@
  *   uSemanticCosmic    -> bioluminescent color saturation boost
  *   uBeatSnap          -> rhythmic micro-pulse
  *   uDynamicRange      -> branch thickness variation
+ *   uStemBass          -> deep structural growth pulse + thicker branches
+ *   uShaderHoldProgress -> lifecycle: seed → growth → bloom → seed-dispersal
  */
 
 import { noiseGLSL } from "./noise";
@@ -313,6 +315,8 @@ void main() {
   float cosmicSemantic = clamp(uSemanticCosmic, 0.0, 1.0);
   float melodicDir = clamp(uMelodicDirection, -1.0, 1.0);
   float fluxRate = clamp(uTimbralFlux, 0.0, 1.0);
+  float stemBass = clamp(uStemBass, 0.0, 1.0);
+  float holdP = clamp(uShaderHoldProgress, 0.0, 1.0);
 
   // === Section-type modulation ===
   float sectionT = uSectionType;
@@ -336,14 +340,22 @@ void main() {
   float climaxRetract = smoothstep(2.5, 3.5, uClimaxPhase) * clamp(uClimaxIntensity, 0.0, 1.0);
   float climaxBranching = climaxExpansion * (1.0 - climaxRetract * 0.7);
 
+  // Hold progress: organism lifecycle (seed → growth → bloom → seed-dispersal)
+  float holdGrowth = smoothstep(0.0, 0.4, holdP);
+  float holdBloom = smoothstep(0.35, 0.7, holdP);
+  float holdDispersal = smoothstep(0.75, 1.0, holdP);
+
   // === Derived scene parameters ===
   float complexity = tension * (1.0 + energy * 0.5) + sJam * 0.2;
-  complexity = clamp(complexity, 0.0, 1.0);
+  complexity = clamp(complexity + holdBloom * 0.2, 0.0, 1.0); // bloom adds complexity
 
-  float growthPulse = bass * (1.0 + sChorus * 0.3);
+  // Stem bass adds deep structural growth pulse beyond surface bass
+  float growthPulse = bass * (1.0 + sChorus * 0.3) + stemBass * 0.25;
   float divisionEvt = smoothstep(0.3, 0.8, drumOnset) * (1.0 + sJam * 0.5);
-  float thickness = 0.8 + dynamicRange * 0.4 + bass * 0.2;
+  float thickness = 0.8 + dynamicRange * 0.4 + bass * 0.2 + stemBass * 0.15;
   float generations = energy * (1.0 + sJam * 0.4 + climaxBranching * 0.6);
+  generations += holdGrowth * 0.3; // more generations over hold duration
+  generations *= 1.0 - holdDispersal * 0.3; // dispersal thins out branches
 
   // === Palette ===
   float hue1 = uPalettePrimary;
@@ -365,22 +377,57 @@ void main() {
   vec3 sssCol = mix(vec3(0.2, 0.8, 0.4), vec3(0.9, 0.3, 0.5), tension * 0.5 + vocalPresence * 0.3);
   sssCol = mix(sssCol, accentTint, 0.4);
 
-  // === Camera: slow orbit around organisms ===
-  float camOrbit = flowTime * 0.3 + sin(flowTime * 0.07) * 0.5;
-  float camElev = 0.3 + sin(flowTime * 0.11) * 0.2 + pitch * 0.15;
-  float camDist = 2.2 - energy * 0.4 - climaxBranching * 0.3;
-  camDist += sSpace * 0.6; // pull back in space sections
+  // === Camera — cinematic organism lifecycle ===
+  // Hold progress mirrors the lifecycle: seed → growth → bloom → dispersal
+  // Phase 1 (0.0-0.25): Macro close-up on seed — tight, nearly still
+  // Phase 2 (0.25-0.5): Pull back as organism grows — revealing branching
+  // Phase 3 (0.5-0.75): Orbit at full bloom — exploring the mature form
+  // Phase 4 (0.75-1.0): Rise above — seeing seed dispersal from above
+  float seedPhase = smoothstep(0.0, 0.25, holdP);
+  float growPhase = smoothstep(0.25, 0.5, holdP);
+  float bloomPhase = smoothstep(0.5, 0.75, holdP);
+  float dispersalPhase = smoothstep(0.75, 1.0, holdP);
+
+  float camTime = flowTime * (0.2 + energy * 0.2);
+  float camTimeMul = mix(1.0, 1.8, sJam) * mix(1.0, 0.2, sSpace);
+  camTime *= camTimeMul;
+
+  // Distance: very close (seed) → pulling back (growth) → orbit distance → above
+  float camDist = mix(1.0, 1.5, seedPhase);
+  camDist = mix(camDist, 2.2, growPhase);
+  camDist -= energy * 0.3;
+  camDist -= climaxBranching * 0.3;
+  camDist += sSpace * 0.6;
+  camDist += dispersalPhase * 0.8; // slightly further for dispersal
+
+  // Orbit speed: none during seed, building during growth, active at bloom
+  float orbitActive = seedPhase * (0.2 + growPhase * 0.8);
+  float camOrbit = camTime * orbitActive + sin(camTime * 0.07) * 0.5;
+
+  // Elevation: low at seed level, rising with growth, high for dispersal
+  float camElev = mix(0.0, 0.2, seedPhase);
+  camElev += growPhase * 0.3;
+  camElev += dispersalPhase * 1.5; // crane up for dispersal view
+  camElev += sin(camTime * 0.3) * 0.15 * bloomPhase; // gentle bob at bloom
+  camElev += pitch * 0.1;
 
   vec3 ro = vec3(
     cos(camOrbit) * camDist,
-    camElev + melodicDir * 0.1,
+    camElev + melodicDir * 0.08,
     sin(camOrbit) * camDist
   );
-  vec3 lookAt = vec3(0.0, 0.25 + pitch * 0.15, 0.0);
+
+  // Look target: center of organism, lifts during dispersal
+  vec3 lookAt = vec3(
+    sin(camTime * 0.15) * 0.1 * bloomPhase,
+    0.15 + pitch * 0.1 + dispersalPhase * 0.3,
+    cos(camTime * 0.12) * 0.08 * bloomPhase
+  );
   vec3 fwd = normalize(lookAt - ro);
   vec3 side = normalize(cross(vec3(0.0, 1.0, 0.0), fwd));
   vec3 upVec = cross(fwd, side);
-  float fovVal = 0.9 + energy * 0.1 + climaxBranching * 0.2;
+  float fovVal = mix(0.7, 0.9, seedPhase) + energy * 0.1 + climaxBranching * 0.2;
+  fovVal += dispersalPhase * 0.15; // wider at dispersal
   vec3 rd = normalize(p.x * side + p.y * upVec + fovVal * fwd);
 
   // === Raymarch ===

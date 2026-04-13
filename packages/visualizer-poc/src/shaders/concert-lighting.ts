@@ -55,7 +55,7 @@ ${sharedUniformsGLSL}
 ${noiseGLSL}
 ${lightingGLSL}
 
-${buildPostProcessGLSL({ halationEnabled: true, bloomEnabled: true, caEnabled: true, bloomThresholdOffset: -0.06 })}
+${buildPostProcessGLSL({ halationEnabled: true, bloomEnabled: true, caEnabled: false, bloomThresholdOffset: -0.12, stageFloodEnabled: true, lightLeakEnabled: true, grainStrength: "normal", beatPulseEnabled: true, lensDistortionEnabled: true })}
 
 varying vec2 vUv;
 

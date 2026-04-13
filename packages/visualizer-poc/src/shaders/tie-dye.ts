@@ -22,11 +22,16 @@ void main() { vUv = uv; gl_Position = vec4(position, 1.0); }
 `;
 
 const postProcess = buildPostProcessGLSL({
-  bloomThresholdOffset: -0.05,
-  caEnabled: true,
+  bloomEnabled: true,
+  bloomThresholdOffset: -0.08,
+  caEnabled: false,
   halationEnabled: true,
   lightLeakEnabled: true,
   eraGradingEnabled: true,
+  grainStrength: "normal",
+  paletteCycleEnabled: true,
+  lensDistortionEnabled: false,
+  beatPulseEnabled: false,
 });
 
 export const tieDyeFrag = /* glsl */ `

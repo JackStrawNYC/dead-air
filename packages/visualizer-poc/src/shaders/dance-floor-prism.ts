@@ -44,12 +44,17 @@ void main() {
 `;
 
 const postProcess = buildPostProcessGLSL({
-  bloomThresholdOffset: -0.12,
-  caEnabled: true,
+  bloomEnabled: true,
+  bloomThresholdOffset: -0.14,
+  caEnabled: false,
   halationEnabled: true,
   lightLeakEnabled: true,
   eraGradingEnabled: true,
-  grainStrength: "light",
+  grainStrength: "normal",
+  stageFloodEnabled: true,
+  beatPulseEnabled: true,
+  lensDistortionEnabled: true,
+  paletteCycleEnabled: true,
 });
 
 const dfNormalGLSL = buildRaymarchNormal("dfMap($P, energy, bass, tension, climaxPhase, climaxIntensity, prismAngle, sJam, sSpace, sChorus, crowdCount).x", { eps: 0.002, name: "dfNormal" });

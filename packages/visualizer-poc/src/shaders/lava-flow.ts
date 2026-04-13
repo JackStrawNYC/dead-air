@@ -49,14 +49,17 @@ const lvAOGLSL = buildRaymarchAO("lvMap($P, bass, energy, drumOnset, tension, fl
 const lvDepthAlpha = buildDepthAlphaOutput("totalDist", "MAX_DIST");
 
 const postProcess = buildPostProcessGLSL({
-  bloomThresholdOffset: -0.1,
-  caEnabled: true,
+  bloomEnabled: true,
+  bloomThresholdOffset: -0.18,
+  caEnabled: false,
   dofEnabled: true,
   eraGradingEnabled: true,
   halationEnabled: true,
-  grainStrength: "normal",
+  grainStrength: "heavy",
   thermalShimmerEnabled: true,
   lightLeakEnabled: true,
+  lensDistortionEnabled: false,
+  beatPulseEnabled: true,
 });
 
 export const lavaFlowFrag = /* glsl */ `
@@ -84,12 +87,13 @@ varying vec2 vUv;
 
 vec3 lvMagmaColor(float temp, float hueShift) {
   float scaledT = clamp(temp, 0.0, 1.0);
-  vec3 col = vec3(0.0);
-  col += vec3(0.7, 0.06, 0.0) * smoothstep(0.0, 0.25, scaledT);
-  col += vec3(0.9, 0.25, 0.02) * smoothstep(0.15, 0.45, scaledT);
-  col += vec3(0.5, 0.45, 0.0) * smoothstep(0.4, 0.7, scaledT);
-  col += vec3(0.3, 0.3, 0.15) * smoothstep(0.6, 0.85, scaledT);
-  col += vec3(0.5, 0.5, 0.45) * smoothstep(0.85, 1.0, scaledT);
+  // Deep maroon base → crimson → orange → amber → white-hot
+  vec3 col = vec3(0.10, 0.02, 0.01); // warm maroon floor — never neutral black
+  col += vec3(0.65, 0.05, 0.0) * smoothstep(0.0, 0.22, scaledT);
+  col += vec3(0.90, 0.22, 0.01) * smoothstep(0.12, 0.42, scaledT);
+  col += vec3(0.55, 0.48, 0.0) * smoothstep(0.38, 0.68, scaledT);
+  col += vec3(0.32, 0.32, 0.12) * smoothstep(0.6, 0.83, scaledT);
+  col += vec3(0.6, 0.58, 0.5) * smoothstep(0.83, 1.0, scaledT); // white-hot
 
   float angle = hueShift * TAU * 0.08;
   float cs = cos(angle);
@@ -437,24 +441,74 @@ void main() {
   float ventTime = uDynamicTime * (0.7 + energy * 0.4);
   float shakeAmp = (bass * 0.4 + drumOnset * 0.3 + beatSnap * 0.2) * shakeMod * (1.0 + climaxBoost * 0.4);
 
-  // === PALETTE ===
-  float hue1 = uPalettePrimary + chordHue + chromaHueMod;
-  float hue2 = uPaletteSecondary + chordHue * 0.5;
-  float hueShift = uPalettePrimary + chromaHueMod;
-  vec3 basaltTint = paletteHueColor(hue1, 0.6, 0.85);
-  basaltTint = mix(basaltTint, vec3(0.2, 0.15, 0.12), 0.7); // push toward dark rock
+  // === PALETTE — volcanic red/orange, deep brown shadows ===
+  float rawH1 = uPalettePrimary + chordHue + chromaHueMod;
+  float hue1 = mix(rawH1, fract(rawH1) * 0.1, 0.55); // pull toward red/orange
+  float rawH2 = uPaletteSecondary + chordHue * 0.5;
+  float hue2 = mix(rawH2, 0.05 + fract(rawH2) * 0.07, 0.5); // amber
+  float hueShift = mix(uPalettePrimary + chromaHueMod, 0.03, 0.4);
+  vec3 basaltTint = paletteHueColor(hue1, 0.75, 0.65);
+  basaltTint = mix(basaltTint, vec3(0.18, 0.10, 0.06), 0.65); // deep brown volcanic rock
 
   // === HEAT DISTORTION on screen UVs ===
   vec2 heatOffset = lvHeatDistort(screenP, energy, bass, drumOnset);
   vec2 distortedUV = uv + heatOffset;
 
-  // === CAMERA (uses 3D camera system) ===
+  // === CAMERA — cinematic lava field traversal ===
   vec3 ro, rd;
   setupCameraRay(distortedUV, aspect, ro, rd);
 
-  // Camera shake: bass-driven micro-displacement
-  float shakeX = sin(uDynamicTime * 14.0) * shakeAmp * 0.018;
-  float shakeY = cos(uDynamicTime * 11.0 + 1.5) * shakeAmp * 0.012;
+  // Hold progress: survey from above → descend to lava level → drift along flow → rise
+  float holdP = clamp(uShaderHoldProgress, 0.0, 1.0);
+
+  // Phase 1 (0.0-0.25): Aerial survey — high angle over the lava field
+  // Phase 2 (0.25-0.55): Descend — camera drops near the surface
+  // Phase 3 (0.55-0.8): Drift along the flow — lateral tracking shot at lava level
+  // Phase 4 (0.8-1.0): Crane up — reveal the full volcanic landscape
+  float survey = smoothstep(0.0, 0.25, holdP);
+  float descend = smoothstep(0.25, 0.55, holdP);
+  float drift = smoothstep(0.55, 0.8, holdP);
+  float reveal = smoothstep(0.8, 1.0, holdP);
+
+  float camTime = uDynamicTime * (0.06 + energy * 0.1);
+  float camTimeMul = mix(1.0, 1.6, sJam) * mix(1.0, 0.2, sSpace);
+  camTime *= camTimeMul;
+
+  // Height: high → descend → lava level → rise
+  float camY = mix(3.0, 1.5, survey);
+  camY = mix(camY, 0.3, descend);
+  camY += reveal * 3.5;
+
+  // Forward drift along the flow + lateral motion
+  float camZ = camTime * 1.2;
+  float camX = sin(camTime * 0.3) * (0.5 + drift * 1.5);
+  camX *= mix(1.0, 0.1, sSpace);
+  camX += sJam * sin(camTime * 0.7) * 0.8;
+
+  // Orbit radius for bird's eye at start/end
+  float orbitR = mix(2.5, 1.0, descend) + reveal * 1.5;
+  float orbitA = camTime * 0.4 * survey * (1.0 - descend);
+  camX += cos(orbitA) * orbitR * (1.0 - descend);
+  camZ += sin(orbitA) * orbitR * (1.0 - descend);
+
+  ro = vec3(camX, camY, camZ);
+
+  // Look: down during survey, along flow during drift, panoramic during reveal
+  vec3 lookAt = ro + vec3(
+    sin(camTime * 0.2) * 0.2,
+    mix(-1.5, -0.3, descend) + reveal * 0.3,
+    mix(-2.0, 3.0, descend)
+  );
+  vec3 camFwd = normalize(lookAt - ro);
+  vec3 camRt = normalize(cross(camFwd, vec3(0.0, 1.0, 0.0)));
+  vec3 camUpVec = cross(camRt, camFwd);
+  float camFov = 0.85 + energy * 0.12;
+  vec2 sp2 = (distortedUV - 0.5) * aspect;
+  rd = normalize(camFwd * camFov + camRt * sp2.x + camUpVec * sp2.y);
+
+  // Micro-shake layered on top
+  float shakeX = sin(uDynamicTime * 14.0) * shakeAmp * 0.012;
+  float shakeY = cos(uDynamicTime * 11.0 + 1.5) * shakeAmp * 0.008;
   ro.x += shakeX;
   ro.y += shakeY;
 
@@ -580,9 +634,10 @@ void main() {
       vec3 obsidianBase = vec3(0.015, 0.015, 0.025);
       float surfNoise = fbm3(marchPos * 4.0) * 0.5 + 0.5;
 
-      // Subtle deep color from palette
-      vec3 deepTint = paletteHueColor(hue2, 0.85, 0.8);
-      obsidianBase = mix(obsidianBase, deepTint * 0.04, 0.25);
+      // Obsidian reflects warm amber light, not generic hue
+      vec3 deepTint = paletteHueColor(hue2, 0.9, 0.55);
+      obsidianBase = mix(obsidianBase, deepTint * 0.05, 0.3);
+      obsidianBase += vec3(0.015, 0.006, 0.002); // warm black
 
       // Diffuse: minimal (obsidian is mostly specular/reflective)
       float diffMagma = max(0.0, dot(norm, -magmaLightDir)) * 0.12;

@@ -39,13 +39,17 @@ void main() {
 
 const postProcess = buildPostProcessGLSL({
   bloomEnabled: true,
+  bloomThresholdOffset: -0.06,
   halationEnabled: true,
-  caEnabled: true,
-  grainStrength: "light",
+  caEnabled: false,
+  grainStrength: "normal",
   stageFloodEnabled: false,
   temporalBlendEnabled: false,
   lightLeakEnabled: true,
   dofEnabled: true,
+  lensDistortionEnabled: true,
+  eraGradingEnabled: true,
+  beatPulseEnabled: false,
 });
 
 const sglNormalGLSL = buildRaymarchNormal("sglMap($P)", { eps: 0.005, name: "sglNormal" });
@@ -311,22 +315,40 @@ float sglSoftShadow(vec3 ro, vec3 rd, float maxDist) {
 
 // ─── Stained glass color for a window panel ───
 vec3 sglGlassColor(vec2 panelUV, float windowID, float chordHue, float palHue1, float palHue2, float energy) {
-  // Each pane gets a unique color from the palette
+  // Each pane gets a unique jewel-tone color
   vec2 paneID = floor(panelUV * 4.0);
   float paneHash = sglHash(paneID + windowID * 17.0);
 
-  // Rich saturated colors: reds, blues, golds, greens
-  float hue = palHue1 + paneHash * 0.5 + chordHue;
-  float sat = mix(0.6, 1.0, energy);
-  float bri = mix(0.5, 1.0, energy);
+  // Jewel-tone palette: ruby, sapphire, emerald, gold, amethyst
+  // Five jewel colors distributed by hash
+  float jewelSlot = floor(paneHash * 5.0);
+  vec3 jewelColors[5];
+  jewelColors[0] = vec3(0.85, 0.08, 0.12); // ruby red
+  jewelColors[1] = vec3(0.10, 0.20, 0.90); // sapphire blue
+  jewelColors[2] = vec3(0.08, 0.70, 0.25); // emerald green
+  jewelColors[3] = vec3(1.00, 0.80, 0.15); // gold/amber
+  jewelColors[4] = vec3(0.55, 0.15, 0.80); // amethyst purple
+  int idx = int(jewelSlot);
+  vec3 jewelBase = jewelColors[0]; // fallback
+  if (idx == 1) jewelBase = jewelColors[1];
+  if (idx == 2) jewelBase = jewelColors[2];
+  if (idx == 3) jewelBase = jewelColors[3];
+  if (idx == 4) jewelBase = jewelColors[4];
 
-  vec3 glassCol = hsv2rgb(vec3(hue, sat, bri));
+  // Palette modulation: shift jewel base toward show palette hue
+  float palBlend = 0.25;
+  vec3 palTint = hsv2rgb(vec3(palHue1 + paneHash * 0.3 + chordHue, 0.9, 0.9));
+  vec3 glassCol = mix(jewelBase, palTint, palBlend);
 
-  // Some panes are warmer (gold/amber), some cooler (blue/violet)
-  float warmBias = step(0.5, sglHash(paneID + windowID * 31.0));
-  glassCol = mix(glassCol, glassCol * vec3(1.2, 0.9, 0.7), warmBias * 0.3);
+  // Energy drives saturation and brightness
+  float sat = mix(0.65, 1.0, energy);
+  float bri = mix(0.55, 1.0, energy);
+  vec3 hsvCol = rgb2hsv(glassCol);
+  hsvCol.y = min(hsvCol.y * sat / 0.8, 1.0);
+  hsvCol.z *= bri;
+  glassCol = hsv2rgb(hsvCol);
 
-  // Lead line grid within pane
+  // Lead line grid within pane — dark lead came
   vec2 paneLocal = fract(panelUV * 4.0);
   float leadLine = smoothstep(0.02, 0.06, min(paneLocal.x, paneLocal.y));
   leadLine *= smoothstep(0.02, 0.06, min(1.0 - paneLocal.x, 1.0 - paneLocal.y));
@@ -499,25 +521,58 @@ void main() {
   sectionBrightness = mix(sectionBrightness, 1.5, sChorus);  // full sunlight flood
   sectionBrightness = mix(sectionBrightness, 1.2, sSolo);
 
-  // ─── Palette ───
+  // ─── Palette — sacred stained glass: jewel tones + golden sacred light ───
   float chromaHueMod = uChromaHue * 0.15;
   float chordHue = float(int(uChordIndex)) / 24.0 * 0.2;
-  float palHue1 = uPalettePrimary + chromaHueMod + chordHue;
-  float palHue2 = uPaletteSecondary + chordHue * 0.5;
+  // Bias toward rich jewel-tone register (ruby/sapphire/emerald spectrum)
+  float rawSG1 = uPalettePrimary + chromaHueMod + chordHue;
+  float palHue1 = rawSG1; // let glass colors range freely for variety
+  float rawSG2 = uPaletteSecondary + chordHue * 0.5;
+  float palHue2 = rawSG2;
 
   // ─── Climax: windows shatter outward ───
   float isClimax = step(1.5, climaxPhase) * step(climaxPhase, 3.5);
   float climaxShatter = isClimax * climaxIntensity;
 
-  // ─── Camera ray (uses 3D camera system) ───
+  // ─── Camera ray — cinematic cathedral walk ───
   vec3 ro, rd;
   setupCameraRay(uv, aspect, ro, rd);
 
-  // Position camera inside the nave, looking down the aisle
-  // Override with gentle sway
-  float camSway = sin(uDynamicTime * 0.03) * 0.3;
-  ro = vec3(camSway, -1.0, -8.0);
-  vec3 lookAt = vec3(sin(uDynamicTime * 0.015) * 0.5, 0.5, 5.0);
+  // Hold progress drives a walk through the cathedral:
+  // Phase 1 (0.0-0.2): Enter the narthex — dark, eyes adjusting
+  // Phase 2 (0.2-0.5): Walk down the nave — light streams through windows
+  // Phase 3 (0.5-0.8): Pause and look up at the rose window — tilt up
+  // Phase 4 (0.8-1.0): Continue to altar — intimate close
+  float holdP = clamp(uShaderHoldProgress, 0.0, 1.0);
+  float enter = smoothstep(0.0, 0.2, holdP);
+  float walkNave = smoothstep(0.2, 0.5, holdP);
+  float lookUp = smoothstep(0.5, 0.8, holdP);
+  float toAltar = smoothstep(0.8, 1.0, holdP);
+
+  float camTime = uDynamicTime * (0.02 + energy * 0.02);
+  float camTimeMul = mix(1.0, 1.5, sJam) * mix(1.0, 0.3, sSpace);
+  camTime *= camTimeMul;
+
+  // Position: walk from back of nave toward the altar
+  float walkZ = mix(-10.0, -4.0, enter);
+  walkZ = mix(walkZ, 0.0, walkNave);
+  walkZ = mix(walkZ, 3.0, toAltar);
+
+  float camSway = sin(camTime * 0.5) * 0.25 * (1.0 - sSpace * 0.8);
+  // Lateral sway: slight walking motion, more during jam
+  camSway += sJam * sin(camTime * 1.0) * 0.4;
+
+  float camY = -1.0 + lookUp * 1.0; // rise when looking up
+
+  ro = vec3(camSway, camY, walkZ);
+
+  // Look target: ahead on the aisle, tilts up during lookUp phase
+  float lookUpY = mix(0.5, 3.0, lookUp * (1.0 - toAltar * 0.5));
+  vec3 lookAt = vec3(
+    sin(camTime * 0.3) * 0.3 * (1.0 - sSpace * 0.9),
+    lookUpY,
+    walkZ + 5.0
+  );
   vec3 fwd = normalize(lookAt - ro);
   vec3 camRight = normalize(cross(fwd, vec3(0.0, 1.0, 0.0)));
   vec3 camUp = cross(camRight, fwd);
@@ -577,7 +632,9 @@ void main() {
       // Colored light from windows projected on floor
       vec2 floorUV = pos.xz * 0.1;
       float floorPattern = fbm3(vec3(floorUV * 2.0 + uDynamicTime * 0.01, 0.0));
-      vec3 projectedLight = hsv2rgb(vec3(palHue1 + floorPattern * 0.3, 0.6 * energy, 0.3 * energy));
+      // Projected light: warm golden sacred light filtering through jewel-toned glass
+      vec3 projectedLight = hsv2rgb(vec3(palHue1 + floorPattern * 0.25, 0.65 * energy, 0.35 * energy));
+      projectedLight = mix(projectedLight, vec3(1.0, 0.85, 0.50) * energy * 0.3, 0.25); // golden bias
       matColor = stoneBase + projectedLight * sectionBrightness * 0.5;
     } else if (matID > 1.5) {
       // Glass panel: transmit colored light
@@ -606,12 +663,13 @@ void main() {
     float ambientLevel = mix(0.08, 0.04, tension);
     vec3 ambient = matColor * ambientLevel;
 
-    // Warm vocal ambient fill
-    vec3 vocalWarm = vec3(1.0, 0.85, 0.65) * vocalTotal * 0.08;
+    // Warm golden-amber vocal ambient fill (sacred candlelight)
+    vec3 vocalWarm = vec3(1.0, 0.82, 0.55) * vocalTotal * 0.09;
 
-    // Diffuse from window light
-    vec3 lightCol1 = hsv2rgb(vec3(palHue1, 0.5, 1.0));
-    vec3 lightCol2 = hsv2rgb(vec3(palHue2, 0.5, 1.0));
+    // Diffuse from window light — golden primary, jewel-toned secondary
+    vec3 lightCol1 = hsv2rgb(vec3(palHue1, 0.55, 1.0));
+    lightCol1 = mix(lightCol1, vec3(1.0, 0.90, 0.65), 0.2); // sacred golden bias
+    vec3 lightCol2 = hsv2rgb(vec3(palHue2, 0.55, 1.0));
     vec3 diffuseLight = lightCol1 * diffuse1 * shadow1 + lightCol2 * diffuse2 * shadow2;
     diffuseLight *= energySq * sectionBrightness;
 
@@ -675,7 +733,7 @@ void main() {
   {
     float fogDist = marchHit ? totalDist : MAX_DIST;
     float fogAmount = 1.0 - exp(-fogDist * 0.04);
-    vec3 fogColor = mix(vec3(0.02, 0.015, 0.03), vec3(0.04, 0.03, 0.05), energy);
+    vec3 fogColor = mix(vec3(0.02, 0.015, 0.01), vec3(0.04, 0.03, 0.02), energy); // warm cathedral haze
     // Tension deepens the fog
     fogColor *= mix(1.0, 0.5, tension);
     col = mix(col, fogColor, fogAmount * 0.6);

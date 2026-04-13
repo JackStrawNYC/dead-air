@@ -26,11 +26,13 @@ const postProcess = buildPostProcessGLSL({
   grainStrength: "light",
   halationEnabled: true,
   bloomEnabled: true,
-  caEnabled: true,
+  bloomThresholdOffset: -0.06,
+  caEnabled: false,
   dofEnabled: true,
-  lensDistortionEnabled: true,
-  lightLeakEnabled: true,
-  beatPulseEnabled: true,
+  lensDistortionEnabled: false,
+  lightLeakEnabled: false,
+  beatPulseEnabled: false,
+  eraGradingEnabled: true,
 });
 
 export const proteanCloudsFrag = /* glsl */ `

@@ -27,13 +27,16 @@ void main() {
 `;
 
 const postProcess = buildPostProcessGLSL({
-  grainStrength: 'normal',
+  grainStrength: 'heavy',
   halationEnabled: true,
   bloomEnabled: true,
-  bloomThresholdOffset: -0.05,
-  caEnabled: true,
+  bloomThresholdOffset: -0.04,
+  caEnabled: false,
   lightLeakEnabled: true,
   eraGradingEnabled: true,
+  lensDistortionEnabled: true,
+  beatPulseEnabled: false,
+  dofEnabled: true,
 });
 
 export const oilProjectorFrag = /* glsl */ `

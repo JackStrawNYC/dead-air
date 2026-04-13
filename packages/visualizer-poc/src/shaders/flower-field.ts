@@ -50,12 +50,16 @@ ${noiseGLSL}
 ${lightingGLSL}
 
 ${buildPostProcessGLSL({
-  grainStrength: "light",
+  grainStrength: "none",
   bloomEnabled: true,
-  bloomThresholdOffset: -0.06,
+  bloomThresholdOffset: -0.10,
   halationEnabled: true,
   dofEnabled: true,
-  lensDistortionEnabled: true,
+  lensDistortionEnabled: false,
+  caEnabled: false,
+  lightLeakEnabled: false,
+  beatPulseEnabled: false,
+  eraGradingEnabled: true,
 })}
 
 varying vec2 vUv;
@@ -416,12 +420,15 @@ void main() {
   bloomState += climaxBoost * 0.3 + onset * 0.3;
   bloomState = clamp(bloomState, 0.0, 1.0);
 
-  // Palette
-  float hue1 = uPalettePrimary + chromaH * 0.08;
-  float hue2 = uPaletteSecondary + chromaH * 0.06;
-  float sat = mix(0.5, 0.95, energy) * uPaletteSaturation;
-  vec3 palCol1 = hsv2rgb(vec3(hue1, sat, mix(0.85, 1.0, energy)));
-  vec3 palCol2 = hsv2rgb(vec3(hue2, sat * 0.9, mix(0.8, 0.95, energy)));
+  // Palette — wildflower meadow: warm golds, natural greens, petal pinks/purples
+  // Bias toward nature register: warm primary (yellow-gold), vivid secondary (petal hues)
+  float rawFH1 = uPalettePrimary + chromaH * 0.08;
+  float fHue1 = mix(rawFH1, 0.13 + fract(rawFH1) * 0.08, 0.3); // warm gold/yellow
+  float rawFH2 = uPaletteSecondary + chromaH * 0.06;
+  float fHue2 = mix(rawFH2, 0.85 + fract(rawFH2) * 0.15, 0.25); // petal pink/magenta
+  float sat = mix(0.55, 0.95, energy) * uPaletteSaturation;
+  vec3 palCol1 = hsv2rgb(vec3(fHue1, sat, mix(0.88, 1.0, energy)));
+  vec3 palCol2 = hsv2rgb(vec3(fHue2, sat * 0.92, mix(0.82, 0.95, energy)));
 
   // Camera setup — ground level among flowers
   float camPanX = uTime * 0.02 * (1.0 + sJam * 0.5 - sSpace * 0.3);
@@ -519,7 +526,7 @@ void main() {
 
     // ─── Compose lighting ───
     vec3 ambient = matColor * 0.15 * (0.5 + slowE * 0.5);
-    vec3 sunColor = vec3(1.0, 0.9, 0.7);
+    vec3 sunColor = vec3(1.0, 0.88, 0.62); // golden hour warmth
 
     col = ambient * ambOcc;
     col += matColor * sunColor * diffuse * 0.7;

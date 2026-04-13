@@ -38,13 +38,15 @@ void main() { vUv = uv; gl_Position = vec4(position, 1.0); }
 
 const postProcess = buildPostProcessGLSL({
   bloomEnabled: true,
-  bloomThresholdOffset: -0.05,
+  bloomThresholdOffset: -0.04,
   halationEnabled: true,
-  caEnabled: true,
+  caEnabled: false,
   lightLeakEnabled: true,
-  grainStrength: "light",
+  grainStrength: "normal",
   eraGradingEnabled: true,
   lensDistortionEnabled: true,
+  beatPulseEnabled: false,
+  dofEnabled: true,
 });
 
 export const sacredGeometryFrag = /* glsl */ `

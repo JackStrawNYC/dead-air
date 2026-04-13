@@ -39,14 +39,16 @@ void main() {
 `;
 
 const postProcess = buildPostProcessGLSL({
-  grainStrength: "light",
+  grainStrength: "none",
   halationEnabled: true,
-  caEnabled: true,
+  caEnabled: false,
   bloomEnabled: true,
-  bloomThresholdOffset: -0.05,
-  lensDistortionEnabled: true,
+  bloomThresholdOffset: -0.08,
+  lensDistortionEnabled: false,
   eraGradingEnabled: true,
-  lightLeakEnabled: true,
+  lightLeakEnabled: false,
+  beatPulseEnabled: false,
+  dofEnabled: true,
 });
 const arDepthAlpha = buildDepthAlphaOutput("max(marchDist, 0.0)", "120.0");
 
@@ -309,18 +311,46 @@ void main() {
     * mix(1.0, 1.2, sChorus)
     * (1.0 + uPeakApproaching * 0.3);
 
-  // ─── Camera: low position looking up at aurora sky ───
-  vec3 camPos = vec3(0.0, 1.5, 0.0);
-  // Subtle camera sway from energy trend
-  camPos.x += sin(uDynamicTime * 0.02) * 0.3;
-  camPos.z += cos(uDynamicTime * 0.015) * 0.2;
+  // ─── Camera — cinematic aurora viewing ───
+  // Hold progress: arrive at field → settle in → scan the sky → slow turn
+  float holdP = clamp(uShaderHoldProgress, 0.0, 1.0);
 
-  // Look upward (more so during climax)
-  float lookUpAngle = mix(0.35, 0.65, energy) + climaxBoost * 0.25;
+  // Phase 1 (0.0-0.2): Arrive — looking forward, aurora starts overhead
+  // Phase 2 (0.2-0.5): Tilt up — neck craning to take in the full display
+  // Phase 3 (0.5-0.8): Slow pan — following the aurora curtain across the sky
+  // Phase 4 (0.8-1.0): Turn around — 180 degree slow reveal of the landscape
+  float arrive = smoothstep(0.0, 0.2, holdP);
+  float tiltUp = smoothstep(0.2, 0.5, holdP);
+  float panSky = smoothstep(0.5, 0.8, holdP);
+  float turnAround = smoothstep(0.8, 1.0, holdP);
+
+  float camTime = uDynamicTime * (0.02 + energy * 0.015);
+  float camTimeMul = mix(1.0, 1.5, sJam) * mix(1.0, 0.3, sSpace);
+  camTime *= camTimeMul;
+
+  // Position: grounded, subtle drift
+  vec3 camPos = vec3(0.0, 1.5, 0.0);
+  camPos.x += sin(camTime * 0.5) * 0.3 * (1.0 - sSpace * 0.7);
+  camPos.z += cos(camTime * 0.4) * 0.2;
+  // Jam: restless wandering
+  camPos.x += sJam * sin(camTime * 1.2) * 0.5;
+
+  // Look direction: evolves with holdProgress
+  // Start looking forward-up, tilt further up, then pan laterally
+  float lookUpAngle = mix(0.25, 0.55, arrive);
+  lookUpAngle = mix(lookUpAngle, 0.85, tiltUp); // full skyward gaze
+  lookUpAngle = mix(lookUpAngle, 0.6, turnAround * 0.5); // relax at end
+  lookUpAngle += climaxBoost * 0.25;
+
+  // Horizontal pan: slow sweep following the curtain
+  float panAngle = panSky * sin(camTime * 0.3) * 0.6 + turnAround * 1.5;
+  // Space: minimal pan
+  panAngle *= mix(1.0, 0.15, sSpace);
+
   vec3 lookDir = normalize(vec3(
-    sin(uDynamicTime * 0.01) * 0.15,
+    sin(panAngle) * 0.6 + sin(camTime * 0.15) * 0.1,
     lookUpAngle,
-    -1.0
+    -cos(panAngle)
   ));
 
   // Build camera basis
@@ -353,21 +383,23 @@ void main() {
   // AURORA CURTAINS: multi-layer volumetric emission
   // ═══════════════════════════════════════════════════
 
-  // Aurora palette: green → purple → red shifted by harmonic tension
-  float hue1 = 0.33 + chromaH * 0.08 - harmTens * 0.15; // green baseline, tension shifts to purple
-  float hue2 = 0.75 + chromaH * 0.06 + harmTens * 0.10; // purple baseline, tension shifts to red
-  float saturation = mix(0.7, 1.0, slowE) * uPaletteSaturation;
+  // Aurora palette: natural emerald green → rose/magenta curtain edges
+  float hue1 = 0.33 + chromaH * 0.06 - harmTens * 0.12; // emerald green, tension shifts teal
+  float hue2 = 0.78 + chromaH * 0.05 + harmTens * 0.08; // rose-purple, tension shifts crimson
+  float saturation = mix(0.75, 1.0, slowE) * uPaletteSaturation;
 
   vec3 auroraColor1 = hsv2rgb(vec3(hue1, saturation, 1.0));
-  vec3 auroraColor2 = hsv2rgb(vec3(hue2, saturation * 0.9, 0.85));
+  vec3 auroraColor2 = hsv2rgb(vec3(hue2, saturation * 0.85, 0.80));
 
-  // Vocal presence → warm green glow boost
-  auroraColor1 = mix(auroraColor1, vec3(0.15, 1.0, 0.5), vocalPres * 0.25);
+  // Vocal presence → golden-green glow (nitrogen excitation)
+  auroraColor1 = mix(auroraColor1, vec3(0.2, 1.0, 0.45), vocalPres * 0.25);
 
-  // Palette tinting (blend in show palette)
-  vec3 palCol1 = hsv2rgb(vec3(uPalettePrimary, saturation, 1.0));
-  vec3 palCol2 = hsv2rgb(vec3(uPaletteSecondary, saturation * 0.9, 0.85));
-  auroraColor1 = mix(auroraColor1, palCol1, 0.2);
+  // Palette influence — gentle, biased toward natural aurora register
+  float palH1 = mix(uPalettePrimary, 0.30 + fract(uPalettePrimary) * 0.12, 0.3); // green/gold
+  float palH2 = mix(uPaletteSecondary, 0.76 + fract(uPaletteSecondary) * 0.1, 0.25); // rose/purple
+  vec3 palCol1 = hsv2rgb(vec3(palH1, saturation * 0.9, 0.95));
+  vec3 palCol2 = hsv2rgb(vec3(palH2, saturation * 0.85, 0.80));
+  auroraColor1 = mix(auroraColor1, palCol1, 0.18);
   auroraColor2 = mix(auroraColor2, palCol2, 0.15);
 
   // Aurora band parameters

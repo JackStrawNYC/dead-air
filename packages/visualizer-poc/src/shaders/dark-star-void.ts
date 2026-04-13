@@ -31,14 +31,15 @@ void main() {
 `;
 
 const postProcess = buildPostProcessGLSL({
-  grainStrength: "light",
-  halationEnabled: true,
+  grainStrength: "heavy",
+  halationEnabled: false,
   bloomEnabled: true,
-  bloomThresholdOffset: -0.15,
+  bloomThresholdOffset: 0.05,
   caEnabled: true,
   lensDistortionEnabled: true,
-  lightLeakEnabled: true,
+  lightLeakEnabled: false,
   eraGradingEnabled: true,
+  beatPulseEnabled: false,
 });
 
 export const darkStarVoidFrag = /* glsl */ `
@@ -384,14 +385,17 @@ void main() {
     col += transcendent * reveal * 0.3;
   }
 
-  // Palette tinting — subtle, respect the void
-  vec3 palCol1 = paletteHueColor(uPalettePrimary, 0.85, 0.85);
-  vec3 palCol2 = paletteHueColor(uPaletteSecondary, 0.85, 0.85);
-  float palMix = 0.08 + energy * 0.30;
+  // Palette tinting — deep indigo/violet void, desaturated and cold
+  // Shift palette toward indigo-violet register (0.7–0.85) with low saturation
+  float voidHue1 = mix(uPalettePrimary, 0.72 + fract(uPalettePrimary) * 0.1, 0.5);
+  float voidHue2 = mix(uPaletteSecondary, 0.78 + fract(uPaletteSecondary) * 0.08, 0.45);
+  vec3 palCol1 = paletteHueColor(voidHue1, 0.55, 0.7); // muted indigo
+  vec3 palCol2 = paletteHueColor(voidHue2, 0.45, 0.65); // desaturated violet
+  float palMix = 0.10 + energy * 0.25;
   col = mix(col, col * mix(palCol1, palCol2, sin(uTime * 0.06) * 0.5 + 0.5), palMix);
 
-  // Gamma — deep, rich, dark
-  col = pow(col, vec3(0.6, 0.62, 0.55)) * vec3(0.95, 0.93, 1.0);
+  // Gamma — deep, cold, void-like (blue channel brighter for icy depth)
+  col = pow(col, vec3(0.62, 0.64, 0.52)) * vec3(0.90, 0.88, 1.05);
 
   // Vignette — strong for infinite void feeling
   vec2 q = vUv;

@@ -26,6 +26,8 @@
  *   uChromaHue       → color modulation across arms
  *   uChordIndex      → harmonic color shift
  *   uBeatStability   → arm regularity (grand-design vs flocculent)
+ *   uStemBass        → deep gravitational pull on rotation + bulge glow
+ *   uShaderHoldProgress → galaxy detail intensifies, arm count grows over hold
  */
 
 import { noiseGLSL } from "./noise";
@@ -43,11 +45,15 @@ void main() {
 
 const postProcess = buildPostProcessGLSL({
   bloomEnabled: true,
-  bloomThresholdOffset: -0.15,
-  halationEnabled: true,
+  bloomThresholdOffset: -0.10,
+  halationEnabled: false,
   caEnabled: true,
-  grainStrength: "light",
+  grainStrength: "none",
   dofEnabled: true,
+  lightLeakEnabled: false,
+  beatPulseEnabled: false,
+  lensDistortionEnabled: false,
+  eraGradingEnabled: true,
 });
 
 export const galaxySpiralFrag = /* glsl */ `
@@ -242,21 +248,44 @@ vec3 gsMerger(vec3 pos, float mergerProgress, float flowTime, vec3 tintColor) {
   return emission;
 }
 
-// Camera orbit for the galaxy — determines view angle based on audio
+// Camera orbit for the galaxy — cinematic holdProgress-driven choreography
 void gsCamera(float time, float bassVal, float sJam, float sSpace, float sChorus,
               float climaxMerge, out vec3 camOrigin, out vec3 camLookAt) {
 
-  // Base orbit: slow rotation around the galaxy
-  float orbitSpeed = 0.02 + bassVal * 0.03 + sJam * 0.04;
+  float holdP = clamp(uShaderHoldProgress, 0.0, 1.0);
+  float energy = clamp(uEnergy, 0.0, 1.0);
+
+  // Hold progress drives a cinematic journey:
+  // Phase 1 (0.0-0.2): Edge-on approach — galaxy as thin line of light
+  // Phase 2 (0.2-0.5): Tilt up to reveal spiral structure
+  // Phase 3 (0.5-0.8): Overhead view — full face-on glory
+  // Phase 4 (0.8-1.0): Pull back into wide view for merger
+  float edgeOn = smoothstep(0.0, 0.2, holdP);
+  float tiltReveal = smoothstep(0.2, 0.5, holdP);
+  float faceOn = smoothstep(0.5, 0.8, holdP);
+  float wideView = smoothstep(0.8, 1.0, holdP);
+
+  // Base orbit: slow rotation, energy-responsive
+  float orbitSpeed = (0.02 + bassVal * 0.03 + sJam * 0.04) * (0.7 + energy * 0.6);
+  // Space: nearly frozen orbit
+  orbitSpeed *= mix(1.0, 0.15, sSpace);
   float orbitAngle = time * orbitSpeed;
 
-  // Orbit radius: pull back during merger for wider view
-  float orbitRadius = mix(3.0, 4.5, climaxMerge);
+  // Orbit radius: close initially, pulls back as we see more
+  float orbitRadius = mix(2.5, 3.0, edgeOn);
+  orbitRadius = mix(orbitRadius, 3.5, tiltReveal);
+  orbitRadius = mix(orbitRadius, 4.5, wideView + climaxMerge * 0.5);
+  orbitRadius += sSpace * 0.5; // space: slightly further
 
-  // Elevation angle: face-on for chorus, edge-on for space, 45deg default
-  float elevation = mix(0.6, 1.2, sChorus);         // chorus: high overhead
-  elevation = mix(elevation, 0.1, sSpace);           // space: nearly edge-on
-  elevation = mix(elevation, 0.8, sJam * 0.5);       // jam: moderately high
+  // Elevation: edge-on (low) → tilting → face-on (high) → settling
+  float elevation = mix(0.05, 0.3, edgeOn);
+  elevation = mix(elevation, 0.8, tiltReveal);
+  elevation = mix(elevation, 1.2, faceOn);
+  elevation = mix(elevation, 0.9, wideView * 0.5); // settle back
+  // Section overrides layered on top
+  elevation += sChorus * 0.3;
+  elevation = mix(elevation, 0.1, sSpace * 0.6); // space: nearly edge-on
+  elevation = mix(elevation, 0.8, sJam * 0.3);   // jam: moderately high
 
   camOrigin = vec3(
     cos(orbitAngle) * orbitRadius * cos(elevation),
@@ -264,8 +293,12 @@ void gsCamera(float time, float bassVal, float sJam, float sSpace, float sChorus
     sin(orbitAngle) * orbitRadius * cos(elevation)
   );
 
-  // Look at galactic center (with slight offset during merger)
-  camLookAt = vec3(0.0, 0.0, 0.0) + vec3(0.3, 0.1, 0.2) * climaxMerge;
+  // Look at galactic center with slight drift, offset during merger
+  camLookAt = vec3(
+    sin(time * 0.01) * 0.1,
+    0.0,
+    cos(time * 0.008) * 0.08
+  ) + vec3(0.3, 0.1, 0.2) * climaxMerge;
 }
 
 // Emission color for spiral arm material at a given position
@@ -308,6 +341,8 @@ void main() {
   float melodicPitch = clamp(uMelodicPitch, 0.0, 1.0);
   float chromaHueMod = uChromaHue * 0.15;
   float chordHueShift = float(int(uChordIndex)) / 24.0 * 0.1;
+  float stemBass = clamp(uStemBass, 0.0, 1.0);
+  float holdP = clamp(uShaderHoldProgress, 0.0, 1.0);
 
   float flowTime = uDynamicTime * (0.03 + slowEnergy * 0.02);
 
@@ -326,12 +361,16 @@ void main() {
   // Galaxy parameters
   // ═══════════════════════════════════════════════════
 
-  // Rotation speed: bass-driven + section modulation
-  float rotSpeed = 0.02 + bassVal * 0.04 + sJam * 0.06;
+  // Hold progress: galaxy evolves from distant overview → close spiral → wide merger view
+  float holdZoom = smoothstep(0.0, 0.5, holdP) * (1.0 - smoothstep(0.8, 1.0, holdP) * 0.3);
+  float holdDetail = smoothstep(0.2, 0.7, holdP);
+
+  // Rotation speed: bass-driven + section modulation + stem bass adds deep gravitational pull
+  float rotSpeed = 0.02 + bassVal * 0.04 + stemBass * 0.03 + sJam * 0.06;
   float rotation = uDynamicTime * rotSpeed;
 
-  // Arm count: 2 primary + section variation
-  float armCount = 2.0 + sChorus * 2.0 + sSolo * 1.0;
+  // Arm count: 2 primary + section variation + hold adds structure over time
+  float armCount = 2.0 + sChorus * 2.0 + sSolo * 1.0 + holdDetail * 1.0;
 
   // Arm winding tightness: harmonic tension drives it
   float tightness = mix(0.18, 0.40, harmonicTension);
@@ -340,13 +379,15 @@ void main() {
   float armNoise = (1.0 - stability) * 0.5;
 
   // ═══════════════════════════════════════════════════
-  // Palette
+  // Palette — galaxy: deep blue arms, magenta/violet emission, gold star clusters
   // ═══════════════════════════════════════════════════
-  float hue1 = uPalettePrimary + chromaHueMod + chordHueShift;
-  vec3 primaryTint = paletteHueColor(hue1, 0.85, 0.95);
+  float rawGH1 = uPalettePrimary + chromaHueMod + chordHueShift;
+  float gHue1 = mix(rawGH1, 0.68 + fract(rawGH1) * 0.12, 0.4); // deep blue-purple
+  vec3 primaryTint = paletteHueColor(gHue1, 0.8, 0.9);
 
-  float hue2 = uPaletteSecondary + chordHueShift * 0.5;
-  vec3 secondaryTint = paletteHueColor(hue2, 0.85, 0.95);
+  float rawGH2 = uPaletteSecondary + chordHueShift * 0.5;
+  float gHue2 = mix(rawGH2, 0.85 + fract(rawGH2) * 0.1, 0.35); // vivid magenta/violet
+  vec3 secondaryTint = paletteHueColor(gHue2, 0.8, 0.92);
 
   // ═══════════════════════════════════════════════════
   // Camera setup — custom orbit, not using setupCameraRay
@@ -398,9 +439,9 @@ void main() {
 
     // ─── Star clusters ───
     float starBrightness = gsStarCluster(samplePos, density);
-    // Star color temperature from melodic pitch
-    vec3 starWarm = vec3(1.0, 0.85, 0.6);
-    vec3 starCool = vec3(0.7, 0.85, 1.0);
+    // Star color temperature: warm gold/amber → cool blue-white
+    vec3 starWarm = vec3(1.0, 0.82, 0.50); // gold-amber, not just yellow
+    vec3 starCool = vec3(0.65, 0.80, 1.0); // blue-white, more saturated
     vec3 starColor = mix(starCool, starWarm, melodicPitch);
     totalStars += starBrightness * (1.0 - galaxyAlpha) * transmittance;
 
@@ -412,12 +453,14 @@ void main() {
       vec3 emission = gsArmEmission(samplePos, density, flowTime,
                                      primaryTint, secondaryTint, energyVal);
 
-      // Central bulge glow — warm white, vocal-presence driven
+      // Central bulge glow — warm white, vocal-presence driven, stem bass deepens
       float bulgeDist = length(samplePos);
       float bulgeGlow = exp(-bulgeDist * bulgeDist / (2.0 * 0.2 * 0.2));
       vec3 bulgeColor = mix(vec3(1.0, 0.9, 0.7), vec3(1.0, 0.95, 0.85), bulgeGlow);
-      float bulgeStrength = bulgeGlow * (0.5 + vocalPresence * 1.0);
+      float bulgeStrength = bulgeGlow * (0.5 + vocalPresence * 1.0 + stemBass * 0.6);
       emission += bulgeColor * bulgeStrength;
+      // Hold progress: galaxy detail intensifies over long holds
+      emission *= 0.7 + holdDetail * 0.3;
 
       // Depth coloring: cool toward far regions
       float depthFade = float(stepIdx) / float(stepCount);

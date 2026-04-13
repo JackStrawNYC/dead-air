@@ -177,8 +177,8 @@ describe("volumetric-nebula shader", () => {
 // ─── Registry Integration ───
 
 describe("volumetric shader registry", () => {
-  it("registry has 114 total entries", () => {
-    expect(Object.keys(SCENE_REGISTRY).length).toBe(114);
+  it("registry has 119 total entries", () => {
+    expect(Object.keys(SCENE_REGISTRY).length).toBe(119);
   });
 
   it("volumetric_clouds is registered with correct affinity", () => {

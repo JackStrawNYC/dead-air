@@ -43,7 +43,7 @@ ${sharedUniformsGLSL}
 ${noiseGLSL}
 ${lightingGLSL}
 
-${buildPostProcessGLSL({ grainStrength: 'light', halationEnabled: true, caEnabled: true, bloomEnabled: true, bloomThresholdOffset: -0.05, dofEnabled: true })}
+${buildPostProcessGLSL({ grainStrength: 'none', halationEnabled: false, caEnabled: true, bloomEnabled: true, bloomThresholdOffset: -0.10, dofEnabled: true, lightLeakEnabled: false, beatPulseEnabled: false, lensDistortionEnabled: false })}
 
 varying vec2 vUv;
 
@@ -182,12 +182,14 @@ void main() {
   float fov = mix(1.4, 2.0, bass) * mix(1.0, 0.85, sSolo);
   vec3 rd = normalize(p.x * rolledRight + p.y * rolledUp + fov * camForward);
 
-  // === PALETTE COLORS ===
-  float hue1 = uPalettePrimary + pitch * 0.15 + flux * uDynamicTime * 0.002;
-  vec3 palCol1 = paletteHueColor(hue1, 0.78, 0.92);
+  // === PALETTE — cosmic nebula: rich purple/blue with warm amber star cores ===
+  float rawSH1 = uPalettePrimary + pitch * 0.15 + flux * uDynamicTime * 0.002;
+  float hue1 = mix(rawSH1, 0.70 + fract(rawSH1) * 0.12, 0.4); // deep blue-purple nebula
+  vec3 palCol1 = paletteHueColor(hue1, 0.75, 0.88);
 
-  float hue2 = uPaletteSecondary + pitch * 0.1;
-  vec3 palCol2 = paletteHueColor(hue2, 0.85, 0.98);
+  float rawSH2 = uPaletteSecondary + pitch * 0.1;
+  float hue2 = mix(rawSH2, 0.83 + fract(rawSH2) * 0.1, 0.35); // magenta/violet accent
+  vec3 palCol2 = paletteHueColor(hue2, 0.8, 0.95);
 
   // === TRAVEL ORIGIN ===
   float travelSpeed = 0.03 + energy * 0.07 + climaxBoost * 0.1;
@@ -244,15 +246,15 @@ void main() {
       float density = clamp(a * 0.001, 0.0, 1.0);
       float depthHue = float(r) * 0.006 + passHueShift;
 
-      // Band 1: cool outer wisps
-      vec3 coolHue = paletteHueColor(hue1 + depthHue, 0.78, 0.92);
-      vec3 bandCool = coolHue * vec3(0.7, 0.85, 1.0);
+      // Band 1: cool outer wisps — deep blue-indigo
+      vec3 coolHue = paletteHueColor(hue1 + depthHue, 0.75, 0.88);
+      vec3 bandCool = coolHue * vec3(0.6, 0.75, 1.0); // push blue
 
-      // Band 2: warm body (palette blend)
-      vec3 bandWarm = mix(coolHue, palCol2, 0.4) * vec3(1.0, 0.95, 0.88);
+      // Band 2: warm nebula body — vivid purple/magenta
+      vec3 bandWarm = mix(coolHue, palCol2, 0.45) * vec3(1.0, 0.85, 0.95); // magenta warmth
 
-      // Band 3: white-hot emission cores
-      vec3 bandHot = mix(palCol2, vec3(1.0, 0.97, 0.92), 0.6);
+      // Band 3: warm star cores — gold/amber points (not pure white)
+      vec3 bandHot = mix(palCol2, vec3(1.0, 0.92, 0.75), 0.55); // warm gold-white
 
       vec3 localColor = mix(bandCool, bandWarm, smoothstep(0.1, 0.45, density));
       localColor = mix(localColor, bandHot, smoothstep(0.45, 0.85, density));

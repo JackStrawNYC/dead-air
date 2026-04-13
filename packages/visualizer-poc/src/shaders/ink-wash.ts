@@ -28,6 +28,10 @@
  *   uDynamicRange     → density contrast range
  *   uSpaceScore       → ambient dissolution rate
  *   uTimbralBrightness → caustic sharpness
+ *   uStemBass          → deep ink bloom expansion beyond surface bass
+ *   uShaderHoldProgress → camera submersion arc: surface → deep → surface
+ *   uSemanticPsychedelic → vivid color tints in ink, not pure black
+ *   uSemanticCosmic    → deep blue undertone in clear water areas
  */
 
 import { noiseGLSL } from "./noise";
@@ -120,7 +124,8 @@ float iwInkDensity(vec3 wp, float flowTime, float bass, float energy,
   mainInk *= mix(0.15, 0.7, energy);
 
   // Bass expands ink bloom radius (lower frequencies = larger clouds)
-  float bloomRadius = mix(1.0, 2.5, bass);
+  // Stem bass extends bloom further than surface bass — deep resonant expansion
+  float bloomRadius = mix(1.0, 2.5, bass) + stemBass * 0.6;
   float distFromCenter = length(wp.xz);
   float bloomMask = smoothstep(bloomRadius, bloomRadius * 0.3, distFromCenter);
   mainInk *= bloomMask;
@@ -289,6 +294,10 @@ void main() {
   float timbralBright = clamp(uTimbralBrightness, 0.0, 1.0);
   float chromaHueMod = uChromaHue * 0.06;
   float chordHue = float(int(uChordIndex)) / 24.0 * 0.04;
+  float stemBass = clamp(uStemBass, 0.0, 1.0);
+  float holdP = clamp(uShaderHoldProgress, 0.0, 1.0);
+  float psyche = clamp(uSemanticPsychedelic, 0.0, 1.0);
+  float cosmic = clamp(uSemanticCosmic, 0.0, 1.0);
 
   // ─── Section-type modulation ───
   float sectionT = uSectionType;
@@ -323,15 +332,54 @@ void main() {
   float hue2 = uPaletteSecondary + chordHue * 0.5;
   float palSat = uPaletteSaturation;
 
-  // ─── Ray setup (submerged camera) ───
+  // ─── Ray setup — cinematic ink immersion ───
   vec3 ro, rd;
   setupCameraRay(uv, aspect, ro, rd);
 
-  // Submerge camera: override position to be underwater
-  // Camera drifts gently with slow energy
-  ro.y = mix(0.5, 1.5, melodicPitch);
-  ro.x += sin(flowTime * 0.3) * 0.3;
-  ro.z += cos(flowTime * 0.25) * 0.2;
+  // Cinematic submersion journey:
+  // Phase 1 (0.0-0.2): Surface — looking down at first ink drop breaking the surface
+  // Phase 2 (0.2-0.5): Submerging — camera sinks as ink blooms around us
+  // Phase 3 (0.5-0.8): Deep — drifting through ink clouds, lateral exploration
+  // Phase 4 (0.8-1.0): Ascending — rising through thinning ink toward light
+  float surface = smoothstep(0.0, 0.2, holdP);
+  float submerge = smoothstep(0.2, 0.5, holdP);
+  float deepDrift = smoothstep(0.5, 0.8, holdP);
+  float ascending = smoothstep(0.8, 1.0, holdP);
+
+  float camTime = flowTime * (0.2 + energy * 0.15);
+  float camTimeMul = mix(1.0, 1.4, sJam) * mix(1.0, 0.2, sSpace);
+  camTime *= camTimeMul;
+
+  // Depth: surface → deep → rising
+  float holdDepth = mix(0.0, 0.3, surface);
+  holdDepth = mix(holdDepth, 0.8, submerge);
+  holdDepth = mix(holdDepth, 0.9, deepDrift);
+  holdDepth = mix(holdDepth, 0.3, ascending);
+
+  ro.y = mix(0.5, 1.5, melodicPitch) - holdDepth * 1.0;
+
+  // Lateral drift: minimal at surface, wide during deep phase
+  float lateralDrift = sin(camTime * 0.4) * (0.1 + deepDrift * 0.6);
+  lateralDrift *= mix(1.0, 0.1, sSpace); // space: still
+  lateralDrift += sJam * sin(camTime * 0.8) * 0.3;
+  ro.x += lateralDrift;
+
+  // Forward drift: slow progression through the ink field
+  float forwardDrift = camTime * 0.3 * (submerge + deepDrift * 0.5);
+  ro.z += forwardDrift + cos(camTime * 0.25) * 0.15;
+
+  // Override ray direction for look-angle evolution
+  vec3 lookAt = ro + vec3(
+    sin(camTime * 0.2) * 0.15,
+    mix(-0.3, 0.0, surface) - submerge * 0.2 + ascending * 0.5,
+    3.0
+  );
+  vec3 camFwd = normalize(lookAt - ro);
+  vec3 camRt = normalize(cross(camFwd, vec3(0.0, 1.0, 0.0)));
+  vec3 camUpVec = cross(camRt, camFwd);
+  float camFov = 0.8 + energy * 0.1;
+  vec2 sp = (uv - 0.5) * aspect;
+  rd = normalize(camFwd * camFov + camRt * sp.x + camUpVec * sp.y);
 
   // ─── Volumetric ink raymarch ───
   // We march through the water volume, accumulating ink density.
@@ -468,6 +516,12 @@ void main() {
     shimmer = shimmer * 0.5 + 0.5;
     col += vec3(0.02, 0.03, 0.04) * shimmer * sSpace * (1.0 - inkAlpha);
   }
+
+  // ─── Semantic atmosphere ───
+  // Psychedelic: ink takes on vivid color tints instead of pure black
+  col = mix(col, col * vec3(1.05, 0.95, 1.1), psyche * 0.4);
+  // Cosmic: deep blue undertone in clear water areas
+  col += vec3(0.005, 0.01, 0.025) * cosmic * (1.0 - inkAlpha) * 0.5;
 
   // ─── Beat + climax brightness ───
   col *= 1.0 + isClimax * climaxIntensity * 0.2;

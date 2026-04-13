@@ -23,6 +23,8 @@
  *   uPaletteSecondary→ secondary gem palette
  *   uChromaHue       → hue modulation
  *   uTimbralBrightness → rim light intensity
+ *   uStemBass         → deepens gem pulse beyond surface bass
+ *   uShaderHoldProgress → gems evolve: simple → complex → expansive over hold
  */
 
 import { noiseGLSL } from "./noise";
@@ -53,7 +55,7 @@ ${noiseGLSL}
 
 ${lightingGLSL}
 
-${buildPostProcessGLSL({ grainStrength: "normal", bloomEnabled: true, halationEnabled: true, paletteCycleEnabled: true, temporalBlendEnabled: true })}
+${buildPostProcessGLSL({ grainStrength: "none", bloomEnabled: true, bloomThresholdOffset: -0.15, halationEnabled: false, paletteCycleEnabled: true, temporalBlendEnabled: true, caEnabled: true, lightLeakEnabled: false, beatPulseEnabled: false, lensDistortionEnabled: false })}
 
 varying vec2 vUv;
 
@@ -266,6 +268,8 @@ void main() {
   float melodicPitch = clamp(uMelodicPitch * uMelodicConfidence, 0.0, 1.0);
   float spectralFlux = clamp(uSpectralFlux, 0.0, 1.0);
   float timbralBright = clamp(uTimbralBrightness, 0.0, 1.0);
+  float stemBass = clamp(uStemBass, 0.0, 1.0);
+  float holdP = clamp(uShaderHoldProgress, 0.0, 1.0);
   float climaxPhase = uClimaxPhase;
   float climaxIntensity = clamp(uClimaxIntensity, 0.0, 1.0);
 
@@ -306,9 +310,14 @@ void main() {
   rotAngle += drumOnset * 0.5;
 
   // ─── Gem Parameters ───
-  float gemSize = bass;
+  float gemSize = bass + stemBass * 0.15; // stem bass deepens gem pulse
   float gemCount = energy;
   gemCount = mix(gemCount, 1.0, chorusFactor * 0.5); // chorus: maximum gems
+  // Hold progress: gems grow more elaborate over time (simple → complex → expansive)
+  float holdComplexity = smoothstep(0.0, 0.5, holdP);
+  float holdExpansion = smoothstep(0.6, 1.0, holdP);
+  gemCount = mix(gemCount, min(gemCount + 0.3, 1.0), holdComplexity);
+  gemSize += holdExpansion * 0.1; // gems swell at end of hold
 
   // ─── Climax Shatter ───
   float isClimax = step(1.5, climaxPhase) * step(climaxPhase, 3.5);
@@ -319,16 +328,46 @@ void main() {
   float hue2 = uPaletteSecondary + uChromaHue * 0.08;
   float saturation = mix(0.3, 1.0, energy) * uPaletteSaturation;
 
-  // ─── Camera: looking down the tube ───
-  vec3 ro = vec3(0.0, 0.0, -1.0); // camera at tube entrance
-  float fovScale = tan(radians(mix(50.0, 70.0, energy)) * 0.5);
-  vec3 forward = vec3(0.0, 0.0, 1.0);
-  vec3 camRight = vec3(1.0, 0.0, 0.0);
-  vec3 camUp = vec3(0.0, 1.0, 0.0);
+  // ─── Camera — cinematic kaleidoscope journey ───
+  // Hold progress: entrance → dive into the tube → deep exploration → pull back
+  // Phase 1 (0.0-0.2): At the tube mouth — peering in, FOV narrow
+  // Phase 2 (0.2-0.5): Push forward into the tube — accelerating
+  // Phase 3 (0.5-0.8): Deep inside — off-axis wobble reveals new facets
+  // Phase 4 (0.8-1.0): Pull back — widening FOV, slowing
+  float enterTube = smoothstep(0.0, 0.2, holdP);
+  float pushIn = smoothstep(0.2, 0.5, holdP);
+  float deepExplore = smoothstep(0.5, 0.8, holdP);
+  float pullBack = smoothstep(0.8, 1.0, holdP);
 
-  // Slight camera sway from audio
-  float swayX = sin(flowTime * 0.7) * 0.03 * (1.0 + spectralFlux * 0.5);
-  float swayY = cos(flowTime * 0.5) * 0.02 * (1.0 + spectralFlux * 0.5);
+  float camTime = flowTime * (0.3 + energy * 0.2);
+  float camTimeMul = mix(1.0, 1.8, jamFactor) * mix(1.0, 0.2, spaceFactor);
+  camTime *= camTimeMul;
+
+  // Depth position: mouth → deep → pulling back
+  float zPos = mix(-1.0, -0.5, enterTube);
+  zPos = mix(zPos, 0.8, pushIn);
+  zPos = mix(zPos, 0.3, pullBack);
+
+  // Off-axis wobble: reveals different facets of the kaleidoscope
+  float wobbleAmt = deepExplore * 0.15 * (1.0 - pullBack * 0.5);
+  wobbleAmt += jamFactor * 0.1; // jam: more wobble
+  wobbleAmt *= mix(1.0, 0.1, spaceFactor); // space: nearly still
+
+  float wobbleX = sin(camTime * 0.8) * wobbleAmt;
+  float wobbleY = cos(camTime * 0.6) * wobbleAmt * 0.7;
+
+  vec3 ro = vec3(wobbleX, wobbleY, zPos);
+  float fovScale = tan(radians(mix(45.0, 70.0, energy * (0.7 + pushIn * 0.3))) * 0.5);
+  // FOV narrows at entrance, widens deep inside
+  fovScale *= mix(0.85, 1.0, enterTube) + pushIn * 0.1 + pullBack * 0.15;
+
+  vec3 forward = normalize(vec3(-wobbleX * 0.3, -wobbleY * 0.3, 1.0));
+  vec3 camRight = normalize(cross(forward, vec3(0.0, 1.0, 0.0)));
+  vec3 camUp = cross(camRight, forward);
+
+  // Spectral flux sway layered on top
+  float swayX = sin(flowTime * 0.7) * 0.02 * (1.0 + spectralFlux * 0.5);
+  float swayY = cos(flowTime * 0.5) * 0.015 * (1.0 + spectralFlux * 0.5);
   vec3 rd = normalize(forward + camRight * (screenPos.x * fovScale + swayX) + camUp * (screenPos.y * fovScale + swayY));
 
   // ─── Mirror Folding of Ray Direction ───

@@ -22,6 +22,10 @@
  *   uPaletteSecondary → beam accent color
  *   uSpectralFlux     → wall texture complexity
  *   uDynamicRange     → shadow depth contrast
+ *   uStemBass         → deep wall structural resonance glow
+ *   uShaderHoldProgress → passage narrows → opens → narrows (exploration arc)
+ *   uSemanticCosmic   → ancient starlight blue tint in shadows
+ *   uSemanticPsychedelic → vivid sandstone color shifting
  */
 
 import { noiseGLSL } from "./noise";
@@ -294,6 +298,10 @@ void main() {
   float tension = clamp(uHarmonicTension, 0.0, 1.0);
   float dynRange = clamp(uDynamicRange, 0.0, 1.0);
   float beatSnap = clamp(uBeatSnap, 0.0, 1.0);
+  float stemBass = clamp(uStemBass, 0.0, 1.0);
+  float holdP = clamp(uShaderHoldProgress, 0.0, 1.0);
+  float cosmic = clamp(uSemanticCosmic, 0.0, 1.0);
+  float psyche = clamp(uSemanticPsychedelic, 0.0, 1.0);
 
   float sectionT = uSectionType;
   float sJam = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
@@ -306,11 +314,15 @@ void main() {
 
   float timeVal = uDynamicTime * 0.1;
 
-  // Gap width: energy-driven
+  // Hold progress: canyon narrows → opens → narrows again (exploration arc)
+  float holdOpenness = smoothstep(0.0, 0.4, holdP) * (1.0 - smoothstep(0.8, 1.0, holdP) * 0.5);
+
+  // Gap width: energy-driven + hold evolution
   float gapWidth = mix(0.3, 1.2, energy);
   gapWidth *= mix(1.0, 0.5, sSpace);
   gapWidth *= mix(1.0, 1.4, sChorus);
   gapWidth += climaxBoost * 0.3;
+  gapWidth *= 0.7 + holdOpenness * 0.3; // hold evolves the passage width
   // Jam: walls pulse with beat
   gapWidth += sJam * beatPulse(uMusicalTime) * 0.1;
 
@@ -410,8 +422,9 @@ void main() {
 
       // Warm ambient from slow energy
       matColor += vec3(0.03, 0.015, 0.005) * slowE;
-      // Bass resonance glow
+      // Bass resonance glow — stem bass adds deep structural vibration
       matColor += vec3(0.04, 0.015, 0.005) * bass * 0.2;
+      matColor += vec3(0.05, 0.02, 0.01) * stemBass * 0.3; // deeper resonance from isolated bass
 
       specCol = matColor * 0.2;
     } else if (matID < 2.5) {
@@ -500,6 +513,12 @@ void main() {
   vignette = smoothstep(0.0, 1.0, vignette);
   vec3 vignetteCol = mix(vec3(0.10, 0.06, 0.04), palCol1 * 0.18, 0.4);
   col = mix(vignetteCol, col, vignette);
+
+  // ─��─ Semantic atmosphere ───
+  // Cosmic: deep blue tint in shadows, ancient starlight feeling
+  col += vec3(0.01, 0.015, 0.04) * cosmic * (1.0 - energy) * 0.5;
+  // Psychedelic: sandstone hue shifting, more vivid bands
+  col = mix(col, col * vec3(1.1, 0.95, 1.05), psyche * 0.3);
 
   // ─── Darkness texture ───
   col += darknessTexture(uv, uTime, energy);

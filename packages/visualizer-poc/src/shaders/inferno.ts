@@ -44,14 +44,17 @@ void main() {
 `;
 
 const postProcess = buildPostProcessGLSL({
-  bloomThresholdOffset: -0.12,
-  caEnabled: true,
+  bloomEnabled: true,
+  bloomThresholdOffset: -0.20,
+  caEnabled: false,
   dofEnabled: true,
   eraGradingEnabled: true,
   halationEnabled: true,
-  grainStrength: "normal",
+  grainStrength: "heavy",
   thermalShimmerEnabled: true,
   lightLeakEnabled: true,
+  lensDistortionEnabled: true,
+  beatPulseEnabled: true,
 });
 
 const in2NormalGLSL = buildRaymarchNormal("in2Map($P, bass, energy, drumOnset, tension, flowTime, floodLevel, melodicPitch, eruptionScale, geyserTime).x", { eps: 0.003, name: "in2Normal" });
@@ -83,12 +86,13 @@ varying vec2 vUv;
 
 vec3 in2MagmaColor(float temp, float hueShift) {
   float scaledT = clamp(temp, 0.0, 1.0);
-  vec3 col = vec3(0.0);
-  col += vec3(0.6, 0.05, 0.0) * smoothstep(0.0, 0.25, scaledT);
-  col += vec3(0.8, 0.2, 0.02) * smoothstep(0.15, 0.45, scaledT);
-  col += vec3(0.6, 0.45, 0.0) * smoothstep(0.4, 0.7, scaledT);
-  col += vec3(0.3, 0.3, 0.1) * smoothstep(0.6, 0.85, scaledT);
-  col += vec3(0.5, 0.5, 0.5) * smoothstep(0.85, 1.0, scaledT);
+  // Deep maroon base (not pure black) → crimson → orange → amber → white-hot
+  vec3 col = vec3(0.12, 0.02, 0.01); // warm maroon floor — shadows are never neutral
+  col += vec3(0.55, 0.04, 0.0) * smoothstep(0.0, 0.2, scaledT);
+  col += vec3(0.85, 0.18, 0.01) * smoothstep(0.12, 0.4, scaledT);
+  col += vec3(0.65, 0.50, 0.0) * smoothstep(0.35, 0.65, scaledT);
+  col += vec3(0.35, 0.35, 0.08) * smoothstep(0.6, 0.82, scaledT);
+  col += vec3(0.6, 0.6, 0.55) * smoothstep(0.82, 1.0, scaledT); // white-hot peak
 
   float angle = hueShift * TAU * 0.08;
   float cs = cos(angle);
@@ -411,27 +415,69 @@ void main() {
   float flowTime = uDynamicTime * (0.15 + slowEnergy * 0.1);
   float geyserTime = uDynamicTime * (0.8 + energy * 0.5);
 
-  // === PALETTE ===
-  float hue1 = uPalettePrimary + chordHue + chromaHueMod;
-  float hue2 = uPaletteSecondary + chordHue * 0.5;
-  float hueShift = uPalettePrimary + chromaHueMod;
+  // === PALETTE — biased toward infernal red/orange/amber ===
+  // Clamp palette hues toward warm register (0.0–0.12 on hue wheel = red→orange→amber)
+  float rawHue1 = uPalettePrimary + chordHue + chromaHueMod;
+  float hue1 = mix(rawHue1, fract(rawHue1) * 0.12, 0.6); // pull hard toward red/orange
+  float rawHue2 = uPaletteSecondary + chordHue * 0.5;
+  float hue2 = mix(rawHue2, 0.06 + fract(rawHue2) * 0.08, 0.5); // amber/gold secondary
+  float hueShift = mix(uPalettePrimary + chromaHueMod, 0.04, 0.4); // warm magma shift
 
   // === HEAT DISTORTION on screen UVs ===
   vec2 heatOffset = in2HeatDistort(screenP, energy, bass, drumOnset);
   vec2 distortedUV = uv + heatOffset;
   vec2 distortedP = (distortedUV - 0.5) * aspect;
 
-  // === CAMERA (uses 3D camera system with descent motion) ===
+  // === CAMERA — cinematic descent into the inferno ===
   vec3 ro, rd;
   setupCameraRay(distortedUV, aspect, ro, rd);
 
-  // Camera shake: bass-driven micro-displacement + descent vibration
-  float shakeAmp = bass * 0.5 + drumOnset * 0.3 + beatSnap * 0.2;
-  shakeAmp *= mix(1.0, 0.1, sSpace); // calm in space sections
-  float shakeX = sin(uDynamicTime * 13.0) * shakeAmp * 0.015;
-  float shakeY = cos(uDynamicTime * 11.0 + 1.5) * shakeAmp * 0.012;
-  ro.x += shakeX;
-  ro.y += shakeY;
+  // Hold progress: approach crater rim → descend → orbit within → crane up
+  // Phase 1 (0.0-0.2): Standing at rim — looking down at glow
+  // Phase 2 (0.2-0.5): Descending — camera drops into crater
+  // Phase 3 (0.5-0.8): Inside — slow orbit amid flames and geysers
+  // Phase 4 (0.8-1.0): Rising out — crane reveals scale
+  float rim = smoothstep(0.0, 0.2, holdP);
+  float descent = smoothstep(0.2, 0.5, holdP);
+  float inside = smoothstep(0.5, 0.8, holdP);
+  float escape = smoothstep(0.8, 1.0, holdP);
+
+  float camTime = uDynamicTime * (0.08 + energy * 0.12);
+  float camTimeMul = mix(1.0, 1.8, sJam) * mix(1.0, 0.2, sSpace);
+  camTime *= camTimeMul;
+
+  // Height: rim → deep → rising
+  float camY = mix(2.0, 0.5, rim);
+  camY = mix(camY, -1.0, descent);
+  camY = mix(camY, -0.5, inside * (1.0 - escape));
+  camY += escape * 3.0;
+
+  // Orbit: gentle at rim, active inside
+  float orbitRadius = mix(3.0, 1.5, descent) + escape * 2.0;
+  orbitRadius += sSpace * 1.0;
+  orbitRadius -= sJam * 0.4;
+  float orbitAngle = camTime * mix(0.3, 0.8, inside);
+
+  ro = vec3(cos(orbitAngle) * orbitRadius, camY, sin(orbitAngle) * orbitRadius);
+
+  // Look target: crater center, down during descent, up during escape
+  vec3 lookAt = vec3(
+    sin(camTime * 0.5) * 0.15,
+    mix(0.0, -1.5, descent) + escape * 0.5,
+    cos(camTime * 0.4) * 0.1
+  );
+  vec3 camFwd = normalize(lookAt - ro);
+  vec3 camRt = normalize(cross(camFwd, vec3(0.0, 1.0, 0.0)));
+  vec3 camUpVec = cross(camRt, camFwd);
+  float camFov = 0.85 + energy * 0.15 * evolveOpenness;
+  vec2 sp2 = (distortedUV - 0.5) * aspect;
+  rd = normalize(camFwd * camFov + camRt * sp2.x + camUpVec * sp2.y);
+
+  // Micro-shake: bass-driven, layered on top
+  float shakeAmp = bass * 0.3 + drumOnset * 0.2;
+  shakeAmp *= mix(1.0, 0.1, sSpace);
+  ro.x += sin(uDynamicTime * 13.0) * shakeAmp * 0.01;
+  ro.y += cos(uDynamicTime * 11.0 + 1.5) * shakeAmp * 0.008;
 
   // === RAYMARCH ===
   float totalDist = 0.0;
@@ -479,9 +525,10 @@ void main() {
       float ridgeDetail = ridged4(marchPos * 1.5) * 0.4;
       vec3 rockColor = mix(vec3(0.06, 0.04, 0.03), vec3(0.18, 0.12, 0.08), rockNoise);
 
-      // Palette tint
-      vec3 rockTint = paletteHueColor(hue1, 0.7, 0.85);
-      rockColor = mix(rockColor, rockTint * 0.15, 0.15);
+      // Palette tint — warm volcanic: deep maroon shadows, amber highlights
+      vec3 rockTint = paletteHueColor(hue1, 0.85, 0.7);
+      rockColor = mix(rockColor, rockTint * 0.15, 0.25);
+      rockColor += vec3(0.04, 0.015, 0.005) * (1.0 - rockNoise); // maroon shadow lift
 
       // Diffuse lighting: magma from below + dim ambient — blend shared for crossfade continuity
       float localDiffMagma = max(0.0, dot(norm, -magmaLightDir)) * 0.4;
@@ -520,9 +567,10 @@ void main() {
       vec3 obsidianBase = vec3(0.02, 0.02, 0.03);
       float surfNoise = fbm3(marchPos * 3.0) * 0.5 + 0.5;
 
-      // Subtle deep color from palette
-      vec3 deepTint = paletteHueColor(hue2, 0.85, 0.8);
-      obsidianBase = mix(obsidianBase, deepTint * 0.05, 0.3);
+      // Deep color — obsidian reflects molten amber, not generic palette
+      vec3 deepTint = paletteHueColor(hue2, 0.9, 0.6);
+      obsidianBase = mix(obsidianBase, deepTint * 0.06, 0.35);
+      obsidianBase += vec3(0.02, 0.008, 0.002); // warm black, not neutral
 
       // Diffuse: minimal (obsidian is mostly specular)
       float diffMagma = max(0.0, dot(norm, -magmaLightDir)) * 0.15;

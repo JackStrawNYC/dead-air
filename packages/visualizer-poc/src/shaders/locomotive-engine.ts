@@ -40,12 +40,16 @@ void main() {
 
 const postProcess = buildPostProcessGLSL({
   bloomEnabled: true,
-  bloomThresholdOffset: -0.06,
-  caEnabled: true,
+  bloomThresholdOffset: -0.20,
+  caEnabled: false,
   halationEnabled: true,
   lightLeakEnabled: true,
   eraGradingEnabled: true,
   thermalShimmerEnabled: true,
+  grainStrength: "heavy",
+  beatPulseEnabled: true,
+  lensDistortionEnabled: true,
+  dofEnabled: true,
 });
 
 const leNormalGLSL = buildRaymarchNormal("leMap($P, bassV, energyV, tempoV, tensionV, stabilityV, climaxWarp, sectionSpeedMul).x", { eps: 0.002, name: "leNormal" });

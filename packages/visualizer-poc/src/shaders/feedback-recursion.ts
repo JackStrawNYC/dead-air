@@ -46,14 +46,16 @@ void main() {
 
 const postProcess = buildPostProcessGLSL({
   bloomEnabled: true,
-  bloomThresholdOffset: -0.06,
+  bloomThresholdOffset: -0.10,
   caEnabled: true,
-  halationEnabled: true,
-  lightLeakEnabled: true,
+  halationEnabled: false,
+  lightLeakEnabled: false,
   beatPulseEnabled: true,
   lensDistortionEnabled: true,
   eraGradingEnabled: true,
-  grainStrength: "normal",
+  grainStrength: "heavy",
+  crtEnabled: true,
+  temporalBlendEnabled: true,
 });
 
 export const feedbackRecursionFrag = /* glsl */ `

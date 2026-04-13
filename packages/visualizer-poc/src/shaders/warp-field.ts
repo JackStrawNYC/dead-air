@@ -26,6 +26,10 @@
  *   uImprovisationScore -> field instability / chaos
  *   uTimbralBrightness -> star color temperature
  *   uDynamicRange      -> depth of tunnel visibility
+ *   uStemBass          -> deep spacetime ripple deformation
+ *   uShaderHoldProgress -> acceleration arc: sublight → warp → cruise
+ *   uSemanticPsychedelic -> grid lines fracture into prismatic rainbow
+ *   uSemanticCosmic    -> nebula-like depth in deep space backdrop
  */
 
 import { noiseGLSL } from "./noise";
@@ -305,6 +309,10 @@ void main() {
   float spectralFlux = clamp(uSpectralFlux, 0.0, 1.0);
   float timbralBright = clamp(uTimbralBrightness, 0.0, 1.0);
   float dynRange = clamp(uDynamicRange, 0.0, 1.0);
+  float stemBass = clamp(uStemBass, 0.0, 1.0);
+  float holdP = clamp(uShaderHoldProgress, 0.0, 1.0);
+  float psyche = clamp(uSemanticPsychedelic, 0.0, 1.0);
+  float cosmic = clamp(uSemanticCosmic, 0.0, 1.0);
   float climax = uClimaxPhase;
   float climaxInt = uClimaxIntensity;
 
@@ -356,11 +364,17 @@ void main() {
   // Highs add finer lattice detail by tightening spacing
   gridSpacing *= mix(1.0, 0.8, highs * 0.5);
 
-  float curvature = tension * 1.2 + bass * 0.3;
+  float curvature = tension * 1.2 + bass * 0.3 + stemBass * 0.2;
   // Solo: dramatic curvature increase
   curvature *= 1.0 + sSolo * 0.6;
 
-  float deformAmp = bass * 0.4 + spectralFlux * 0.15;
+  // Stem bass adds deep spacetime ripple beyond surface bass
+  float deformAmp = bass * 0.4 + stemBass * 0.2 + spectralFlux * 0.15;
+
+  // Hold progress: acceleration arc (sublight → approaching warp → full warp → cruise)
+  float holdAccel = smoothstep(0.0, 0.4, holdP);
+  warpSpd += holdAccel * 0.2; // hold gradually increases warp
+  warpSpd = clamp(warpSpd, 0.0, 1.5);
 
   float bubbleRadius = 3.0 + vocalGlow * 1.5;
   float bubbleThickness = 0.08 + mids * 0.04;
@@ -460,6 +474,12 @@ void main() {
     vec3 convColor = hsv2rgb(vec3(hue2 + 0.05, sat * 0.3, 0.3 + warpSpd * 0.5));
     col += convColor * convergence * mix(0.1, 0.6, clamp(warpSpd, 0.0, 1.0));
   }
+
+  // ─── Semantic atmosphere ───
+  // Psychedelic: grid lines fracture into prismatic rainbow
+  col = mix(col, col * vec3(1.1, 0.9, 1.15), psyche * 0.35);
+  // Cosmic: deep space backdrop gains nebula-like depth
+  col += vec3(0.003, 0.005, 0.018) * cosmic * (1.0 - clamp(warpSpd, 0.0, 1.0)) * 0.5;
 
   // ─── Peak approach glow ───
   col *= 1.0 + peakApproach * 0.15 + forecastGlow;

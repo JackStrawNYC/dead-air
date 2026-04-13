@@ -21,6 +21,10 @@
  *   uSpectralFlux     → current turbulence
  *   uDynamicRange     → depth contrast
  *   uBeatStability    → wave pattern regularity
+ *   uStemBass         → deep undertow foam churning
+ *   uShaderHoldProgress → scene time-of-day: morning → afternoon → golden hour
+ *   uSemanticPsychedelic → vivid water colors, intense reflections
+ *   uSemanticAmbient  → enhanced mist, softened contrast
  */
 
 import { noiseGLSL } from "./noise";
@@ -327,6 +331,10 @@ void main() {
   float dynRange = clamp(uDynamicRange, 0.0, 1.0);
   float beatSnap = clamp(uBeatSnap, 0.0, 1.0);
   float beatStab = clamp(uBeatStability, 0.0, 1.0);
+  float stemBass = clamp(uStemBass, 0.0, 1.0);
+  float holdP = clamp(uShaderHoldProgress, 0.0, 1.0);
+  float psyche = clamp(uSemanticPsychedelic, 0.0, 1.0);
+  float ambient = clamp(uSemanticAmbient, 0.0, 1.0);
 
   float sectionT = uSectionType;
   float sJam = smoothstep(4.5, 5.5, sectionT) * (1.0 - step(5.5, sectionT));
@@ -426,6 +434,8 @@ void main() {
       float foamMask = smoothstep(0.4, 0.7, foamNoise) * energy;
       foamMask += onset * 0.3;
       foamMask += climaxBoost * 0.2;
+      // Stem bass adds deep undertow foam churning
+      foamMask += stemBass * 0.15;
       matColor = mix(matColor, vec3(0.9, 0.92, 0.95), clamp(foamMask, 0.0, 0.7) * 0.6);
 
       // Sparkle from highs
@@ -491,6 +501,16 @@ void main() {
       palCol1, palCol2, nf, uSectionIndex);
     col += heroLight;
   }
+
+  // ─── Hold progress: scene evolves from morning → afternoon → golden hour ───
+  float goldenHour = smoothstep(0.7, 1.0, holdP);
+  col = mix(col, col * vec3(1.08, 0.98, 0.88), goldenHour * 0.3); // warm golden tint
+
+  // ─── Semantic atmosphere ───
+  // Psychedelic: water colors more vivid, reflections more intense
+  col = mix(col, col * vec3(1.1, 0.95, 1.05), psyche * 0.3);
+  // Ambient: enhances mist/haze, softens harsh contrast
+  col = mix(col, col * 0.9 + vec3(0.02, 0.025, 0.03), ambient * 0.2);
 
   // ─── Vignette ───
   float vigScale = mix(0.28, 0.22, energy);

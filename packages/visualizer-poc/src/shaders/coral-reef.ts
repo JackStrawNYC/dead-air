@@ -45,12 +45,16 @@ const cr2AOGLSL = buildRaymarchAO("cr2Map($P, flowTime, bassVal, midsVal).x", { 
 const cr2DepthAlpha = buildDepthAlphaOutput("totalDist", "MAX_DIST");
 
 const postProcess = buildPostProcessGLSL({
-  grainStrength: "light",
+  grainStrength: "none",
   halationEnabled: true,
   dofEnabled: true,
   bloomEnabled: true,
-  bloomThresholdOffset: -0.05,
-  caEnabled: true,
+  bloomThresholdOffset: -0.15,
+  caEnabled: false,
+  lensDistortionEnabled: true,
+  lightLeakEnabled: false,
+  beatPulseEnabled: false,
+  eraGradingEnabled: true,
 });
 
 export const coralReefFrag = /* glsl */ `
@@ -790,17 +794,58 @@ void main() {
     * mix(1.0, 0.4, sSpace)
     * mix(1.0, 1.2, sChorus);
 
-  // === CAMERA RAY ===
+  // === CAMERA RAY — cinematic reef choreography ===
   vec3 rayOrigin, rayDir;
   setupCameraRay(uv, aspect, rayOrigin, rayDir);
 
-  // Gentle underwater camera sway driven by bass
-  float swayX = sin(flowTime * 0.3) * 0.25 * (1.0 + bassVal * 0.4);
-  float swayY = cos(flowTime * 0.25) * 0.12;
-  rayOrigin += vec3(swayX, swayY - 0.3, 0.0);
+  // Hold progress: approach reef → glide along it → peek inside → drift away
+  float holdP = clamp(uShaderHoldProgress, 0.0, 1.0);
+
+  // Phase 1 (0.0-0.25): Approach from open water — reef appears ahead
+  // Phase 2 (0.25-0.55): Lateral glide along the reef wall — eye-level with fish
+  // Phase 3 (0.55-0.8): Tilt down and push in — macro detail on coral
+  // Phase 4 (0.8-1.0): Pull back and rise — reveal the reef from above
+  float approach = smoothstep(0.0, 0.25, holdP);
+  float glide = smoothstep(0.25, 0.55, holdP);
+  float macro = smoothstep(0.55, 0.8, holdP);
+  float reveal = smoothstep(0.8, 1.0, holdP);
+
+  float camSpeed = flowTime * (0.3 + energy * 0.25);
+  float camSpeedMul = mix(1.0, 1.5, sJam) * mix(1.0, 0.15, sSpace) * mix(1.0, 1.2, sChorus);
+  camSpeed *= camSpeedMul;
+
+  // Position: start far, approach, glide laterally, then rise
+  float camZ = mix(5.0, 0.5, approach) - macro * 0.5;
+  float camX = glide * sin(camSpeed * 0.4) * 3.0;
+  float camY = mix(0.0, -0.3, approach) - macro * 0.3 + reveal * 2.0;
+
+  // Space: gentle hover, minimal motion
+  camX *= mix(1.0, 0.1, sSpace);
+  // Jam: more energetic lateral swimming
+  camX += sJam * sin(camSpeed * 0.8) * 1.0;
+
+  rayOrigin = vec3(camX, camY, camZ);
+
+  // Gentle bass-driven micro-sway
+  float swayX = sin(flowTime * 0.3) * 0.06 * (1.0 + bassVal * 0.4);
+  float swayY = cos(flowTime * 0.25) * 0.03;
+  rayOrigin += vec3(swayX, swayY, 0.0);
+
+  // Look direction: forward at reef, tilting down for macro, up for reveal
+  vec3 lookAt = rayOrigin + vec3(
+    sin(camSpeed * 0.2) * 0.3 * glide,
+    -macro * 0.4 + reveal * 0.5,
+    -3.0
+  );
+  vec3 camFwd = normalize(lookAt - rayOrigin);
+  vec3 camRt = normalize(cross(camFwd, vec3(0.0, 1.0, 0.0)));
+  vec3 camUpVec = cross(camRt, camFwd);
+  float camFov = 0.8 + energy * 0.12 + macro * 0.08;
+  vec2 sp = (uv - 0.5) * aspect;
+  rayDir = normalize(camFwd * camFov + camRt * sp.x + camUpVec * sp.y);
 
   // Beat stability affects camera steadiness
-  float jitter = (1.0 - beatStab) * 0.04;
+  float jitter = (1.0 - beatStab) * 0.03;
   rayDir += vec3(
     snoise(vec3(uv * 4.0, uDynamicTime * 2.5)) * jitter,
     snoise(vec3(uv * 4.0 + 10.0, uDynamicTime * 2.5)) * jitter,

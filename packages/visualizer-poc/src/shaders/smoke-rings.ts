@@ -20,6 +20,9 @@
  *   uMelodicPitch     → vertical camera tilt
  *   uBeatStability    → ring coherence
  *   uDynamicRange     → density contrast
+ *   uShaderHoldProgress → ring density evolves: sparse → dense → dissolving
+ *   uSemanticPsychedelic → smoke takes vivid rainbow tints
+ *   uSemanticCosmic   → deep space blue wash in background
  */
 
 import { noiseGLSL } from "./noise";
@@ -267,6 +270,9 @@ void main() {
   float chordHue = float(int(uChordIndex)) / 24.0 * 0.12 * chordConf;
   float melodicPitch = clamp(uMelodicPitch, 0.0, 1.0);
   float slowEnergyV = clamp(uSlowEnergy, 0.0, 1.0);
+  float holdP = clamp(uShaderHoldProgress, 0.0, 1.0);
+  float psyche = clamp(uSemanticPsychedelic, 0.0, 1.0);
+  float cosmic = clamp(uSemanticCosmic, 0.0, 1.0);
 
   // === SECTION-TYPE MODULATION ===
   float sectionT = uSectionType;
@@ -377,8 +383,19 @@ void main() {
   // === DRUM ONSET FLASH (new ring birth flash) ===
   col += vec3(0.08, 0.06, 0.03) * onsetV * (1.0 - accumAlpha) * 0.5;
 
+  // === HOLD PROGRESS: ring spacing and density evolves ===
+  // Early hold: sparse rings, wide spacing. Mid hold: dense formation. Late hold: dissolving grandeur.
+  float holdDensity = smoothstep(0.0, 0.4, holdP) * (1.0 - smoothstep(0.8, 1.0, holdP) * 0.3);
+  col *= 0.8 + holdDensity * 0.2; // overall brightness evolves
+
   // === BEAT PULSE ===
   col *= 1.0 + uBeatSnap * 0.1 * (1.0 + climaxMerge * 0.3);
+
+  // === SEMANTIC ATMOSPHERE ===
+  // Psychedelic: smoke takes on vivid rainbow tints
+  col = mix(col, col * vec3(1.1, 0.95, 1.15), psyche * 0.35);
+  // Cosmic: deep space blue wash in background
+  col += vec3(0.005, 0.008, 0.02) * cosmic * (1.0 - accumAlpha) * 0.5;
 
   // === SOLO: brighter center, more contrast ===
   if (sSolo > 0.0) {

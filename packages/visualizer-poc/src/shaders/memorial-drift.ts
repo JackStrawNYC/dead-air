@@ -40,15 +40,16 @@ void main() {
 `;
 
 const postProcess = buildPostProcessGLSL({
-  grainStrength: "normal",
-  halationEnabled: true,
+  grainStrength: "heavy",
+  halationEnabled: false,
   bloomEnabled: true,
-  bloomThresholdOffset: -0.08,
-  caEnabled: true,
+  bloomThresholdOffset: 0.10,
+  caEnabled: false,
   lensDistortionEnabled: true,
-  lightLeakEnabled: true,
+  lightLeakEnabled: false,
   eraGradingEnabled: true,
   dofEnabled: true,
+  beatPulseEnabled: false,
 });
 
 const mdNormalGLSL = buildRaymarchNormal("mdMap($P).x", { eps: 0.003, name: "mdNormal" });
@@ -488,11 +489,52 @@ void main() {
   }
 
   // ═══════════════════════════════════════════════
-  // RAY SETUP
+  // RAY SETUP — cinematic camera choreography
   // ═══════════════════════════════════════════════
 
   vec3 ro, rd;
   setupCameraRay(uv, aspect, ro, rd);
+
+  // Hold progress drives camera: arrive at vigil → walk among monoliths → ascend above
+  float holdP = clamp(uShaderHoldProgress, 0.0, 1.0);
+  float energy2 = clamp(uEnergy, 0.0, 1.0);
+
+  // Phase 1 (0.0-0.3): Ground-level approach — walking toward the memorial
+  // Phase 2 (0.3-0.7): Drift among the monoliths — lateral glide, eye-level
+  // Phase 3 (0.7-1.0): Slow crane up — reveals the full field from above
+  float arrive = smoothstep(0.0, 0.3, holdP);
+  float explore = smoothstep(0.3, 0.7, holdP);
+  float ascend = smoothstep(0.7, 1.0, holdP);
+
+  float camTime = flowTime * (0.5 + energy2 * 0.3);
+  float camTimeMul = mix(1.0, 1.5, sJam) * mix(1.0, 0.2, sSpace);
+  camTime *= camTimeMul;
+
+  // Lateral drift: slow walk through the memorial field
+  float walkX = sin(camTime * 0.4) * (1.5 + arrive * 2.0);
+  float walkZ = camTime * 0.8 - 4.0; // forward progression
+
+  // Height: eye-level → ascending crane
+  float camY = mix(-0.5, 0.2, arrive) + ascend * 4.0;
+  // Space: nearly still, contemplative hover
+  walkX *= mix(1.0, 0.15, sSpace);
+  // Jam: wider orbit
+  walkX += sJam * sin(camTime * 0.8) * 1.0;
+
+  ro = vec3(walkX, camY, walkZ);
+
+  // Look target: center of the field, rises with crane
+  vec3 lookAt = vec3(
+    sin(camTime * 0.2) * 0.3 * (1.0 - sSpace * 0.8),
+    mix(0.0, 0.5, arrive) + ascend * 0.5,
+    walkZ + 3.0 + arrive * 2.0
+  );
+  vec3 camFwd = normalize(lookAt - ro);
+  vec3 camRt = normalize(cross(camFwd, vec3(0.0, 1.0, 0.0)));
+  vec3 camUpVec = cross(camRt, camFwd);
+  float camFov = 0.85 + energy2 * 0.1 - sSpace * 0.1;
+  vec2 sp = (uv - 0.5) * aspect;
+  rd = normalize(camFwd * camFov + camRt * sp.x + camUpVec * sp.y);
 
   // ═══════════════════════════════════════════════
   // RAYMARCH
@@ -518,18 +560,21 @@ void main() {
   // SHADING
   // ═══════════════════════════════════════════════
 
-  // Palette: muted memorial tones
-  vec3 slatePrimary = vec3(0.35, 0.38, 0.42); // cool slate
-  vec3 silverHighlight = vec3(0.65, 0.68, 0.72); // silver
-  vec3 candleGold = vec3(1.0, 0.78, 0.35); // warm gold
-  vec3 ashGray = vec3(0.50, 0.48, 0.46); // ash
+  // Palette: muted memorial tones — blue-gray melancholy, cold silver, one warm candle
+  vec3 palTint = paletteHueColor(uPalettePrimary, 0.15, 0.4); // very desaturated palette influence
+  vec3 slatePrimary = mix(vec3(0.30, 0.33, 0.42), palTint * 0.3, 0.12); // cool blue-slate
+  vec3 silverHighlight = vec3(0.60, 0.65, 0.75); // cold silver with ice-blue tint
+  vec3 candleGold = vec3(1.0, 0.78, 0.35); // warm gold — the only warmth
+  vec3 ashGray = vec3(0.45, 0.44, 0.47); // ash with faint blue undertone
 
-  // Chord hue subtly tints the candle warmth
+  // Chord hue subtly tints only the candle (the sole warm element)
   candleGold = mix(candleGold, hsv2rgb(vec3(0.08 + chordHue, 0.7, 0.9)), 0.2);
 
-  // Tender boosts warmth across the scene
-  slatePrimary += vec3(0.04, 0.02, 0.0) * tender;
-  silverHighlight += vec3(0.05, 0.03, 0.01) * tender;
+  // Tender adds restrained warmth — keeps overall cool melancholy
+  slatePrimary += vec3(0.02, 0.01, 0.0) * tender;
+  silverHighlight += vec3(0.03, 0.02, 0.01) * tender;
+  // Push shadows toward deep navy/purple for somber depth
+  slatePrimary += vec3(-0.02, -0.01, 0.03);
 
   vec3 col = vec3(0.0);
   float hitDist = marchResult.x;

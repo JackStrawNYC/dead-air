@@ -19,6 +19,8 @@
  *   uSlowEnergy       → ambient neural hum
  *   uMids             → dendritic branching density
  *   uStemDrums        → cascade amplification
+ *   uStemBass         → deep network-wide throb (distinct from drumOnset)
+ *   uShaderHoldProgress → network dormant → awakening → full activity → settling
  */
 
 import { noiseGLSL } from "./noise";
@@ -279,7 +281,9 @@ void main() {
   float timbralBright = clamp(uTimbralBrightness, 0.0, 1.0);
   float spaceScore = clamp(uSpaceScore, 0.0, 1.0);
   float stemDrums = clamp(uStemDrums, 0.0, 1.0);
+  float stemBass = clamp(uStemBass, 0.0, 1.0);
   float stability = clamp(uBeatStability, 0.0, 1.0);
+  float holdP = clamp(uShaderHoldProgress, 0.0, 1.0);
   float chromaHueMod = uChromaHue * 0.12;
 
   // Section-type modulation
@@ -289,11 +293,16 @@ void main() {
   float sChorus = smoothstep(1.5, 2.5, sectionT) * (1.0 - step(2.5, sectionT));
   float sSolo = smoothstep(3.5, 4.5, sectionT) * (1.0 - step(4.5, sectionT));
 
+  // Hold progress: network evolves from dormant → awakening → full activity → settling
+  float holdActivity = smoothstep(0.0, 0.3, holdP) * (1.0 - smoothstep(0.85, 1.0, holdP) * 0.25);
+
   // Derived parameters
   float firingRate = mix(1.0, 2.5, energy) * mix(1.0, 1.8, sJam) * mix(1.0, 0.2, sSpace) * mix(1.0, 1.3, sChorus);
-  float branchDensity = 0.4 + mids * 0.6;
+  firingRate *= 0.6 + holdActivity * 0.4; // firing rate builds over hold
+  float branchDensity = 0.4 + mids * 0.6 + holdActivity * 0.2; // more dendrites over time
   float chaos = tension * 0.8 + (1.0 - stability) * 0.2;
-  float drumSync = (drumOnset + stemDrums * 0.4) * mix(1.0, 1.5, sJam) * mix(1.0, 0.1, sSpace);
+  // Stem bass creates deep network-wide throb (distinct from surface drumOnset)
+  float drumSync = (drumOnset + stemDrums * 0.4 + stemBass * 0.2) * mix(1.0, 1.5, sJam) * mix(1.0, 0.1, sSpace);
 
   float flowTime = uDynamicTime * (0.06 + slowEnergy * 0.04) * mix(1.0, 1.3, sJam) * mix(1.0, 0.4, sSpace)
                    * (1.0 + spaceScore * 0.3);
@@ -468,9 +477,13 @@ void main() {
   }
 
   // === SEMANTIC MODULATION ===
+  // Cosmic: deeper blue neural void, more distant star-like synapse glow
+  col += vec3(0.005, 0.008, 0.02) * uSemanticCosmic * 0.4;
   col *= 1.0 + uSemanticCosmic * 0.12;
+  // Psychedelic: synaptic signals take on rainbow hues, firing neurons shift color
+  col = mix(col, col.gbr * 0.3 + col * 0.7, uSemanticPsychedelic * 0.25);
   col *= 1.0 + uSemanticPsychedelic * 0.08;
-  // Tender → warmer tint
+  // Tender → warmer tint, softer specular
   col = mix(col, col * vec3(1.05, 1.0, 0.92), uSemanticTender * 0.15);
 
   // === SDF ICON EMERGENCE ===

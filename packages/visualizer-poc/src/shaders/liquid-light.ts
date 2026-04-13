@@ -45,13 +45,16 @@ void main() { vUv = uv; gl_Position = vec4(position, 1.0); }
 
 const postProcess = buildPostProcessGLSL({
   bloomEnabled: true,
-  bloomThresholdOffset: -0.08,
+  bloomThresholdOffset: -0.12,
   halationEnabled: true,
-  caEnabled: true,
+  caEnabled: false,
   lightLeakEnabled: true,
   grainStrength: "light",
   eraGradingEnabled: true,
-  lensDistortionEnabled: true,
+  lensDistortionEnabled: false,
+  stageFloodEnabled: true,
+  thermalShimmerEnabled: true,
+  beatPulseEnabled: false,
 });
 
 export const liquidLightFrag = /* glsl */ `

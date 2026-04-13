@@ -46,12 +46,17 @@ void main() {
 `;
 
 const postProcess = buildPostProcessGLSL({
-  grainStrength: "normal",
+  grainStrength: "none",
   bloomEnabled: true,
+  bloomThresholdOffset: -0.12,
   caEnabled: true,
-  halationEnabled: true,
+  halationEnabled: false,
   temporalBlendEnabled: true,
   dofEnabled: true,
+  paletteCycleEnabled: true,
+  lightLeakEnabled: false,
+  beatPulseEnabled: false,
+  lensDistortionEnabled: false,
 });
 
 export const fractalZoomFrag = /* glsl */ `
