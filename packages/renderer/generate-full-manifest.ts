@@ -686,7 +686,7 @@ async function main() {
                           song.title?.toLowerCase().includes("space");
     const setNumber = song.set ?? 1;
 
-    console.log(`  ${song.title}: ${frames.length} → ${totalOut} frames (default: ${defaultMode})`);
+    console.log(`  [Song ${songIdx + 1}/${setlist.songs.length}] ${song.title}: ${frames.length} → ${totalOut} frames (default: ${defaultMode})`);
 
     // Pre-compute all Gaussian-smoothed values (O(n*w) once, then O(1) per frame)
     const smoothed = precomputeSmoothed(frames);
@@ -763,7 +763,16 @@ async function main() {
       };
     };
 
+    const progressInterval = Math.max(1, Math.floor(totalOut / 20)); // Log every 5%
+    const songStartTime = Date.now();
     for (let i = 0; i < totalOut; i++) {
+      if (i > 0 && i % progressInterval === 0) {
+        const pct = ((i / totalOut) * 100).toFixed(0);
+        const elapsed = ((Date.now() - songStartTime) / 1000).toFixed(1);
+        const fps_actual = (i / ((Date.now() - songStartTime) / 1000)).toFixed(0);
+        const eta = (((totalOut - i) / (i / ((Date.now() - songStartTime) / 1000)))).toFixed(0);
+        console.log(`    [${pct}%] ${i}/${totalOut} frames (${fps_actual} frames/sec, ETA ${eta}s)`);
+      }
       // Interpolated frame index for smooth 60fps (instead of nearest-neighbor)
       const { lo: ai, hi: aiHi, t: interpT } = getInterpolatedIndex(i, afps, fps, frames.length);
 
@@ -825,6 +834,8 @@ async function main() {
 
     globalTime += frames.length / afps;
     showSongsCompleted++;
+    const songElapsed = ((Date.now() - songStartTime) / 1000).toFixed(1);
+    console.log(`  ✓ ${song.title} done (${totalOut} frames in ${songElapsed}s, ${allFrames.length} total)`);
   }
 
   // ─── Write manifest (streaming JSON for large shows) ───
