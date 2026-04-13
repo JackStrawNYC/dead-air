@@ -178,28 +178,50 @@ function analyzeFrame(
   ctx: SongContext,
   idx: number,
   prevState: any,
+  smoothed?: SmoothedArrays,
 ): any {
   const { frames, sections, tempo, isDrumsSpace } = ctx;
   const f = frames[idx] ?? {};
 
-  // Build audio snapshot for pure utilities
-  let snapshot: any;
-  try {
-    snapshot = computeAudioSnapshot(frames, idx, 30);
-  } catch {
-    // Fallback if computeAudioSnapshot has interface mismatch
-    snapshot = {
-      energy: gaussianSmooth(frames, idx, "rms", 25),
-      bass: gaussianSmooth(frames, idx, "sub", 15),
-      mids: gaussianSmooth(frames, idx, "mid", 12),
-      highs: gaussianSmooth(frames, idx, "high", 12),
-      rms: f.rms ?? 0,
-      onset: f.onset ?? 0,
-      beat: f.beat ? 1 : 0,
-      spectralFlux: f.spectralFlux ?? 0,
-      centroid: f.centroid ?? 0.5,
-    };
-  }
+  // Use pre-smoothed values (O(1) lookup) instead of re-computing Gaussian per frame
+  const snapshot: any = smoothed ? {
+    energy: smoothed.energy[idx] ?? 0,
+    slowEnergy: smoothed.slowEnergy[idx] ?? 0,
+    fastEnergy: smoothed.fastEnergy[idx] ?? 0,
+    bass: smoothed.bass[idx] ?? 0,
+    fastBass: smoothed.fastBass[idx] ?? 0,
+    mids: smoothed.mids[idx] ?? 0,
+    highs: smoothed.highs[idx] ?? 0,
+    rms: f.rms ?? 0,
+    onset: f.onset ?? 0,
+    beat: f.beat ? 1 : 0,
+    beatConfidence: f.beatConfidence ?? 0.5,
+    beatStability: 0.5,
+    spectralFlux: f.spectralFlux ?? 0,
+    centroid: f.centroid ?? 0.5,
+    flatness: f.flatness ?? 0.5,
+    drumOnset: f.stemDrumOnset ?? 0,
+    vocalPresence: f.stemVocalPresence ?? 0,
+    chromaHue: 180,
+    musicalTime: idx / 30,
+    localTempo: f.localTempo ?? 120,
+  } : (() => {
+    try {
+      return computeAudioSnapshot(frames, idx, 30);
+    } catch {
+      return {
+        energy: gaussianSmooth(frames, idx, "rms", 25),
+        bass: gaussianSmooth(frames, idx, "sub", 15),
+        mids: gaussianSmooth(frames, idx, "mid", 12),
+        highs: gaussianSmooth(frames, idx, "high", 12),
+        rms: f.rms ?? 0,
+        onset: f.onset ?? 0,
+        beat: f.beat ? 1 : 0,
+        spectralFlux: f.spectralFlux ?? 0,
+        centroid: f.centroid ?? 0.5,
+      };
+    }
+  })();
 
   // Structural analysis (all pure functions)
   let stemSection = "jam";
@@ -223,13 +245,26 @@ function analyzeFrame(
 
   try { stemSection = classifyStemSection(snapshot); } catch (e) { failures.push(`stemSection: ${(e as Error).message?.slice(0,60)}`); }
   try { soloState = detectSolo(snapshot); } catch (e) { failures.push(`solo: ${(e as Error).message?.slice(0,60)}`); }
-  try { interplay = detectStemInterplay(frames, idx); } catch (e) { failures.push(`interplay: ${(e as Error).message?.slice(0,60)}`); }
-  try { coherenceState = computeCoherence(frames, idx); } catch (e) { failures.push(`coherence: ${(e as Error).message?.slice(0,60)}`); }
-  try { itState = computeITResponse(frames, idx); } catch (e) { failures.push(`IT: ${(e as Error).message?.slice(0,60)}`); }
-  try { drumsSpaceState = computeDrumsSpacePhase(frames, idx, isDrumsSpace); } catch (e) { failures.push(`drumsSpace: ${(e as Error).message?.slice(0,60)}`); }
-  try { climaxState = computeClimaxState(frames, idx, sections); } catch (e) { failures.push(`climax: ${(e as Error).message?.slice(0,60)}`); }
-  try { climaxMod = climaxModulation(climaxState as any); } catch (e) { failures.push(`climaxMod: ${(e as Error).message?.slice(0,60)}`); }
-  try { reactiveState = computeReactiveTriggers(frames, idx, { coherenceLocked: coherenceState.isLocked }); } catch (e) { failures.push(`reactive: ${(e as Error).message?.slice(0,60)}`); }
+  // Use precomputed values if available (O(1) lookup vs O(window) scan)
+  if ((ctx as any)._preComputed) {
+    const pre = (ctx as any)._preComputed;
+    interplay = pre.interplay[idx] ?? null;
+    coherenceState = pre.coherence[idx] ?? { isLocked: false, score: 0 };
+    itState = pre.it[idx] ?? { forceTranscendentShader: false };
+    climaxState = pre.climax[idx] ?? { phase: "idle", intensity: 0 };
+    reactiveState = pre.reactive[idx] ?? { triggered: false, triggerType: null, shaderPool: [] };
+    jamCycle = pre.jamCycle[idx] ?? { phase: "setup", progress: 0, isDeepening: false };
+    try { drumsSpaceState = computeDrumsSpacePhase(frames, idx, isDrumsSpace); } catch (e) { failures.push(`drumsSpace: ${(e as Error).message?.slice(0,60)}`); }
+    try { climaxMod = climaxModulation(climaxState as any); } catch (e) { failures.push(`climaxMod: ${(e as Error).message?.slice(0,60)}`); }
+  } else {
+    try { interplay = detectStemInterplay(frames, idx); } catch (e) { failures.push(`interplay: ${(e as Error).message?.slice(0,60)}`); }
+    try { coherenceState = computeCoherence(frames, idx); } catch (e) { failures.push(`coherence: ${(e as Error).message?.slice(0,60)}`); }
+    try { itState = computeITResponse(frames, idx); } catch (e) { failures.push(`IT: ${(e as Error).message?.slice(0,60)}`); }
+    try { drumsSpaceState = computeDrumsSpacePhase(frames, idx, isDrumsSpace); } catch (e) { failures.push(`drumsSpace: ${(e as Error).message?.slice(0,60)}`); }
+    try { climaxState = computeClimaxState(frames, idx, sections); } catch (e) { failures.push(`climax: ${(e as Error).message?.slice(0,60)}`); }
+    try { climaxMod = climaxModulation(climaxState as any); } catch (e) { failures.push(`climaxMod: ${(e as Error).message?.slice(0,60)}`); }
+    try { reactiveState = computeReactiveTriggers(frames, idx, { coherenceLocked: coherenceState.isLocked }); } catch (e) { failures.push(`reactive: ${(e as Error).message?.slice(0,60)}`); }
+  }
   try {
     groove = detectGroove(
       snapshot.beatStability ?? 0.5,
@@ -691,11 +726,40 @@ async function main() {
     // Pre-compute all Gaussian-smoothed values (O(n*w) once, then O(1) per frame)
     const smoothed = precomputeSmoothed(frames);
 
-    const ctx: SongContext = {
+    // Batch-precompute expensive window-scanning analysis functions
+    // This turns O(n*w) per-frame cost into O(n*w) total cost
+    const preCoherence: any[] = new Array(frames.length);
+    const preIT: any[] = new Array(frames.length);
+    const preInterplay: any[] = new Array(frames.length);
+    const preReactive: any[] = new Array(frames.length);
+    const preJamCycle: any[] = new Array(frames.length);
+    const preClimaxState: any[] = new Array(frames.length);
+
+    const batchStart = Date.now();
+    for (let bi = 0; bi < frames.length; bi++) {
+      try { preCoherence[bi] = computeCoherence(frames, bi); } catch { preCoherence[bi] = { isLocked: false, score: 0 }; }
+      try { preIT[bi] = computeITResponse(frames, bi); } catch { preIT[bi] = { forceTranscendentShader: false }; }
+      try { preInterplay[bi] = detectStemInterplay(frames, bi); } catch { preInterplay[bi] = null; }
+      try { preReactive[bi] = computeReactiveTriggers(frames, bi, { coherenceLocked: preCoherence[bi]?.isLocked ?? false }); } catch { preReactive[bi] = { triggered: false, triggerType: null, shaderPool: [] }; }
+      try { preJamCycle[bi] = detectJamCycle(frames, bi, sections); } catch { preJamCycle[bi] = { phase: "setup", progress: 0, isDeepening: false }; }
+      try { preClimaxState[bi] = computeClimaxState(frames, bi, sections); } catch { preClimaxState[bi] = { phase: "idle", intensity: 0 }; }
+    }
+    const batchMs = Date.now() - batchStart;
+    console.log(`    Batch precompute: ${frames.length} frames in ${(batchMs / 1000).toFixed(1)}s (${(frames.length / (batchMs / 1000)).toFixed(0)} frames/sec)`);
+
+    const ctx: SongContext & { _preComputed?: any } = {
       frames,
       sections,
       tempo,
       isDrumsSpace,
+      _preComputed: {
+        coherence: preCoherence,
+        it: preIT,
+        interplay: preInterplay,
+        reactive: preReactive,
+        jamCycle: preJamCycle,
+        climax: preClimaxState,
+      },
       songSeed: songIdx * 1000 + (song.trackId?.charCodeAt?.(0) ?? 0),
       setNumber,
       songIndexInSet: song.trackNumber ?? songIdx,
@@ -777,7 +841,7 @@ async function main() {
       const { lo: ai, hi: aiHi, t: interpT } = getInterpolatedIndex(i, afps, fps, frames.length);
 
       // Structural analysis (uses integer index — these are discrete state machines)
-      const frameAnalysis = analyzeFrame(ctx, ai, prevState);
+      const frameAnalysis = analyzeFrame(ctx, ai, prevState, smoothed);
       prevState = frameAnalysis;
 
       // Scene routing with hold enforcement (prevents seizure-fast switching)
