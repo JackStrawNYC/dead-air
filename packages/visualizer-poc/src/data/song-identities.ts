@@ -53,10 +53,13 @@ function loadJsonOverrides(): Record<string, SongIdentity> | null {
   if (jsonOverridesLoaded) return jsonOverrides;
   jsonOverridesLoaded = true;
   try {
-    // Dynamic require so webpack doesn't try to bundle 'fs' and 'path'
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const fs = typeof require !== "undefined" ? require("fs") : null;
-    const path = typeof require !== "undefined" ? require("path") : null;
+    // Skip in browser/webpack — fs/path aren't available
+    if (typeof window !== "undefined") return jsonOverrides;
+    // Use eval to hide require from webpack's static analysis
+    // eslint-disable-next-line no-eval
+    const _require = eval("require");
+    const fs = _require("fs");
+    const path = _require("path");
     if (!fs || !path) return jsonOverrides;
     const jsonPath = path.resolve(__dirname, "../../data/song-identities.json");
     if (fs.existsSync(jsonPath)) {

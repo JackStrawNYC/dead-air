@@ -811,7 +811,22 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
   }
   // Floor at 0.40 — overlays should be visible when present
   const combinedDensityMult = endScreenMult < 0.01 ? 0 : Math.max(0.40, rawDensityMult);
-  const opacityMap = opacityMapBase ? applyDensityMult(opacityMapBase, combinedDensityMult, continuousResult?.alwaysActive ?? rotationSchedule?.alwaysActive ?? []) : null;
+
+  // ─── Text visibility suppression ───
+  // Suppress overlays when ConcertInfo text is visible so they don't compete.
+  // ConcertInfo: DELAY=60 frames, SHOW_DURATION=360 frames → visible frames 60-420.
+  // Use matching fade curves for smooth suppression.
+  const TEXT_DELAY = 60 * fpsScale;
+  const TEXT_DURATION = 360 * fpsScale;
+  const TEXT_FADE = 60 * fpsScale;
+  const textLocalFrame = frame - TEXT_DELAY;
+  const textVisible = textLocalFrame >= 0 && textLocalFrame < TEXT_DURATION;
+  const textFadeIn = textVisible ? Math.min(1, textLocalFrame / TEXT_FADE) : 0;
+  const textFadeOut = textVisible ? Math.min(1, (TEXT_DURATION - textLocalFrame) / TEXT_FADE) : 0;
+  const textSuppression = Math.min(textFadeIn, textFadeOut); // 0 = no text, 1 = text fully visible
+  const textOverlaySuppression = 1 - textSuppression * 0.85; // Suppress overlays to 15% when text is showing
+
+  const opacityMap = opacityMapBase ? applyDensityMult(opacityMapBase, combinedDensityMult * textOverlaySuppression, continuousResult?.alwaysActive ?? rotationSchedule?.alwaysActive ?? []) : null;
 
   // ─── Lyric trigger suppression ───
   const activeLyricTrigger = lyricTriggerWindows.find((w) => frame >= w.frameStart - 150 && frame < w.frameEnd + 120);
@@ -853,9 +868,11 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
 
   // ─── Intro factor: song card visible ~15s, then shader takes over ───
   // 0 = art dominates (shader suppressed), 1 = shader + icons fully open.
+  // In OVERLAY_ONLY mode, always 1 so overlays/text render at full brightness.
   const INTRO_FULL = 450 * fpsScale;  // 15s (FPS-aware) — song card is hero
   const INTRO_RAMP = 150 * fpsScale;  // 5s ramp (FPS-aware) — shader fades in (15s-20s)
-  const introFactor = props.segueIn
+  const introFactor = process.env.OVERLAY_ONLY === "true" ? 1
+    : props.segueIn
       ? (frame < 90 * fpsScale ? 1                                                    // 0-3s: full shader (crossfade)
         : frame < 150 * fpsScale ? 1 - 0.50 * ((frame - 90 * fpsScale) / (60 * fpsScale))   // 3-5s: dim to 50%
         : frame < 360 * fpsScale ? 0.50 + 0.50 * ((frame - 150 * fpsScale) / (210 * fpsScale)) // 5-12s: ramp back to full

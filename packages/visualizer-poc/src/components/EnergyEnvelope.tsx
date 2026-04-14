@@ -44,6 +44,8 @@ export const EnergyEnvelope: React.FC<Props> = ({ snapshot, children, climaxMod,
   const factor = energyToFactor(energy, low, high); // 0 (quiet) → 1 (loud)
 
   // Intro damping: suppress ALL reactive brightness during intro so art/text shines
+  // In OVERLAY_ONLY mode, bypass all dimming — overlays composite over shader video
+  const isOverlayOnly = process.env.OVERLAY_ONLY === "true";
   const reactivity = introFactor;
 
   // ── One brightness knob. Wide dynamic range. ──

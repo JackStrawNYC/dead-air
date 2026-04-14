@@ -8,9 +8,6 @@
  * for backwards compatibility.
  */
 
-import fs from "fs";
-import path from "path";
-
 export interface ShowConfig {
   showId: string;
   date: string;
@@ -23,14 +20,22 @@ export interface ShowConfig {
   assetsDir: string;
 }
 
-const DATA_ROOT = path.resolve(import.meta.dirname ?? __dirname, "../../data");
-const SHOWS_ROOT = path.join(DATA_ROOT, "shows");
+// Browser-safe: skip fs/path entirely in webpack/browser context
+const _isBrowser = typeof window !== "undefined";
+// eslint-disable-next-line no-eval
+const _require = _isBrowser ? null : eval("require");
+const fs = _isBrowser ? null : _require("fs");
+const path = _isBrowser ? null : _require("path");
+
+const DATA_ROOT = path ? path.resolve(import.meta.dirname ?? __dirname, "../../data") : "";
+const SHOWS_ROOT = path ? path.join(DATA_ROOT, "shows") : "";
 
 /**
  * List all available show configs.
  * Scans `data/shows/` for directories containing `setlist.json`.
  */
 export function listShows(): ShowConfig[] {
+  if (!fs || !path) return [];
   const shows: ShowConfig[] = [];
 
   // Default show (Cornell '77 — data/ root)
@@ -58,6 +63,7 @@ export function listShows(): ShowConfig[] {
  * Falls back to default (data/ root) if showId is "cornell-77" or not found.
  */
 export function loadShowConfig(showId?: string): ShowConfig {
+  if (!fs || !path) return { showId: showId ?? "default", date: "unknown", venue: "unknown", dataDir: "", audioDir: "", assetsDir: "" };
   if (!showId || showId === "cornell-77") {
     return buildShowConfig("cornell-77", DATA_ROOT);
   }

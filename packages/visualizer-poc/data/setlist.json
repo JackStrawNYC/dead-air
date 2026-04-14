@@ -1,13 +1,187 @@
 {
   "date": "1972-08-27",
   "venue": "Old Renaissance Faire Grounds, Veneta, OR",
-  "bandName": "Grateful Dead",
+  "city": "Veneta, OR",
+  "era": "primal",
   "songs": [
     {
-      "trackId": "d1t03",
+      "title": "Promised Land",
+      "set": 1,
+      "trackId": "d1t01",
+      "segueInto": false,
+      "audioFile": "gd72-08-27d1t01.mp3",
+      "trackNumber": 1,
+      "defaultMode": "liquid_light"
+    },
+    {
       "title": "Sugaree",
       "set": 1,
+      "trackId": "d1t02",
+      "segueInto": false,
+      "audioFile": "gd72-08-27d1t02.mp3",
+      "trackNumber": 2,
+      "defaultMode": "liquid_light"
+    },
+    {
+      "title": "Me and My Uncle",
+      "set": 1,
+      "trackId": "d1t03",
+      "segueInto": false,
+      "audioFile": "gd72-08-27d1t03.mp3",
       "trackNumber": 3,
+      "defaultMode": "liquid_light"
+    },
+    {
+      "title": "Deal",
+      "set": 1,
+      "trackId": "d1t04",
+      "segueInto": false,
+      "audioFile": "gd72-08-27d1t04.mp3",
+      "trackNumber": 4,
+      "defaultMode": "liquid_light"
+    },
+    {
+      "title": "Black-Throated Wind",
+      "set": 1,
+      "trackId": "d1t05",
+      "segueInto": false,
+      "audioFile": "gd72-08-27d1t05.mp3",
+      "trackNumber": 5,
+      "defaultMode": "liquid_light"
+    },
+    {
+      "title": "China Cat Sunflower",
+      "set": 1,
+      "trackId": "d1t06",
+      "segueInto": false,
+      "audioFile": "gd72-08-27d1t06.mp3",
+      "trackNumber": 6,
+      "defaultMode": "liquid_light"
+    },
+    {
+      "title": "I Know You Rider",
+      "set": 1,
+      "trackId": "d1t07",
+      "segueInto": false,
+      "audioFile": "gd72-08-27d1t07.mp3",
+      "trackNumber": 7,
+      "defaultMode": "liquid_light"
+    },
+    {
+      "title": "Mexicali Blues",
+      "set": 1,
+      "trackId": "d1t08",
+      "segueInto": false,
+      "audioFile": "gd72-08-27d1t08.mp3",
+      "trackNumber": 8,
+      "defaultMode": "liquid_light"
+    },
+    {
+      "title": "Bertha",
+      "set": 1,
+      "trackId": "d1t09",
+      "segueInto": false,
+      "audioFile": "gd72-08-27d1t09.mp3",
+      "trackNumber": 9,
+      "defaultMode": "liquid_light"
+    },
+    {
+      "title": "Playing in the Band",
+      "set": 1,
+      "trackId": "d2t01",
+      "segueInto": false,
+      "audioFile": "gd72-08-27d2t01.mp3",
+      "trackNumber": 10,
+      "defaultMode": "liquid_light"
+    },
+    {
+      "title": "He's Gone",
+      "set": 1,
+      "trackId": "d2t02",
+      "segueInto": false,
+      "audioFile": "gd72-08-27d2t02.mp3",
+      "trackNumber": 11,
+      "defaultMode": "liquid_light"
+    },
+    {
+      "title": "Jack Straw",
+      "set": 1,
+      "trackId": "d2t03",
+      "segueInto": false,
+      "audioFile": "gd72-08-27d2t03.mp3",
+      "trackNumber": 12,
+      "defaultMode": "liquid_light"
+    },
+    {
+      "title": "Bird Song",
+      "set": 1,
+      "trackId": "d2t04",
+      "segueInto": false,
+      "audioFile": "gd72-08-27d2t04.mp3",
+      "trackNumber": 13,
+      "defaultMode": "liquid_light"
+    },
+    {
+      "title": "Greatest Story Ever Told",
+      "set": 1,
+      "trackId": "d2t05",
+      "segueInto": false,
+      "audioFile": "gd72-08-27d2t05.mp3",
+      "trackNumber": 14,
+      "defaultMode": "liquid_light"
+    },
+    {
+      "title": "Dark Star",
+      "set": 1,
+      "trackId": "d3t01",
+      "segueInto": false,
+      "audioFile": "gd72-08-27d3t01.mp3",
+      "trackNumber": 15,
+      "defaultMode": "liquid_light"
+    },
+    {
+      "title": "El Paso",
+      "set": 1,
+      "trackId": "d3t02",
+      "segueInto": false,
+      "audioFile": "gd72-08-27d3t02.mp3",
+      "trackNumber": 16,
+      "defaultMode": "liquid_light"
+    },
+    {
+      "title": "Sing Me Back Home",
+      "set": 1,
+      "trackId": "d3t03",
+      "segueInto": false,
+      "audioFile": "gd72-08-27d3t03.mp3",
+      "trackNumber": 17,
+      "defaultMode": "liquid_light"
+    },
+    {
+      "title": "Sugar Magnolia",
+      "set": 1,
+      "trackId": "d3t04",
+      "segueInto": false,
+      "audioFile": "gd72-08-27d3t04.mp3",
+      "trackNumber": 18,
+      "defaultMode": "liquid_light"
+    },
+    {
+      "title": "Casey Jones",
+      "set": 1,
+      "trackId": "d3t05",
+      "segueInto": false,
+      "audioFile": "gd72-08-27d3t05.mp3",
+      "trackNumber": 19,
+      "defaultMode": "liquid_light"
+    },
+    {
+      "title": "One More Saturday Night",
+      "set": 1,
+      "trackId": "d3t06",
+      "segueInto": false,
+      "audioFile": "gd72-08-27d3t06.mp3",
+      "trackNumber": 20,
       "defaultMode": "liquid_light"
     }
   ]
