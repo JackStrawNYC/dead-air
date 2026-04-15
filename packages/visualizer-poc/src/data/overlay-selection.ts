@@ -1,8 +1,14 @@
 /**
- * Overlay Selection — hero guarantee, layer diversity, and category balance.
+ * Overlay Selection — hero guarantee, layer diversity, prominence exclusion,
+ * and category balance.
  *
  * Given a scored list of overlays and a target count, selects the best
  * combination with guaranteed hero slots, layer diversity, and tag variety.
+ *
+ * Prominence classes prevent visual competition:
+ *   hero:    iconic foreground imagery (Stealie, Bolt, Bear) — max 1 per window
+ *   accent:  reactive/decorative focus elements — max 1 per window
+ *   ambient: background textures (starfield, smoke, grain) — unlimited
  *
  * Extracted from overlay-rotation.ts for focused responsibility.
  */
@@ -15,6 +21,11 @@ import { BAND_CONFIG } from "./band-config";
  * One hero is guaranteed per rotation window (reserved slot).
  */
 export const HERO_OVERLAY_NAMES = new Set(BAND_CONFIG.heroOverlays);
+
+/** Resolve an overlay's prominence class (defaults to "ambient" if unset). */
+function getProminence(entry: OverlayEntry): "hero" | "accent" | "ambient" {
+  return entry.prominence ?? "ambient";
+}
 
 /**
  * Select overlays for a window from scored candidates.
@@ -41,6 +52,9 @@ export function selectOverlaysForWindow(
   const selected: OverlayEntry[] = [];
   const selectedNames = new Set<string>();
   const usedLayers = new Set<number>();
+  // ─── Prominence exclusion: track whether we've filled each slot ───
+  let hasHero = false;
+  let hasAccent = false;
 
   // Song-specific hero: first priority — always present when targetCount > 0
   if (songHero && targetCount > 0) {
@@ -49,6 +63,9 @@ export function selectOverlaysForWindow(
       selected.push(heroCandidate.entry);
       selectedNames.add(heroCandidate.entry.name);
       usedLayers.add(heroCandidate.entry.layer);
+      const prom = getProminence(heroCandidate.entry);
+      if (prom === "hero") hasHero = true;
+      if (prom === "accent") hasAccent = true;
       // At high energy, hero owns the window — no other overlays
       if (windowEnergy === "high") {
         return selected;
@@ -68,6 +85,9 @@ export function selectOverlaysForWindow(
         selected.push(hero.entry);
         selectedNames.add(hero.entry.name);
         usedLayers.add(hero.entry.layer);
+        const prom = getProminence(hero.entry);
+        if (prom === "hero") hasHero = true;
+        if (prom === "accent") hasAccent = true;
       }
     }
   }
@@ -83,6 +103,19 @@ export function selectOverlaysForWindow(
   }
 
   // Fill remaining slots with layer-diverse picks
+  // ─── Prominence gate: skip candidates that would violate max-1 hero / max-1 accent ───
+  const isProminenceAllowed = (entry: OverlayEntry): boolean => {
+    const prom = getProminence(entry);
+    if (prom === "hero" && hasHero) return false;
+    if (prom === "accent" && hasAccent) return false;
+    return true;
+  };
+  const markProminence = (entry: OverlayEntry): void => {
+    const prom = getProminence(entry);
+    if (prom === "hero") hasHero = true;
+    if (prom === "accent") hasAccent = true;
+  };
+
   const byLayer = new Map<number, typeof scored>();
   for (const s of scored) {
     if (selectedNames.has(s.entry.name)) continue;
@@ -102,10 +135,11 @@ export function selectOverlaysForWindow(
 
     const candidates = byLayer.get(layer)!;
     for (const c of candidates) {
-      if (!selectedNames.has(c.entry.name)) {
+      if (!selectedNames.has(c.entry.name) && isProminenceAllowed(c.entry)) {
         selected.push(c.entry);
         selectedNames.add(c.entry.name);
         usedLayers.add(c.entry.layer);
+        markProminence(c.entry);
         break;
       }
     }
@@ -119,7 +153,7 @@ export function selectOverlaysForWindow(
     selectedCategories.set(sel.category, (selectedCategories.get(sel.category) ?? 0) + 1);
   }
   const diversitySorted = scored
-    .filter((s) => !selectedNames.has(s.entry.name))
+    .filter((s) => !selectedNames.has(s.entry.name) && isProminenceAllowed(s.entry))
     .map((s) => {
       let adjScore = s.score;
       let tagOverlap = 0;
@@ -134,8 +168,10 @@ export function selectOverlaysForWindow(
     .sort((a, b) => b.score - a.score);
   for (const s of diversitySorted) {
     if (selected.length >= targetCount) break;
+    if (!isProminenceAllowed(s.entry)) continue; // re-check — slots fill as we go
     selected.push(s.entry);
     selectedNames.add(s.entry.name);
+    markProminence(s.entry);
     for (const tag of s.entry.tags) selectedTags.add(tag);
     selectedCategories.set(s.entry.category, (selectedCategories.get(s.entry.category) ?? 0) + 1);
   }
@@ -147,7 +183,7 @@ export function selectOverlaysForWindow(
   const hasDeadIcon = selected.some((e) => e.tags.includes(DEAD_CULTURE_TAG));
   if (!hasDeadIcon && targetCount > 0 && scored.length > 0) {
     const deadCandidate = scored.find(
-      (s) => !selectedNames.has(s.entry.name) && s.entry.tags.includes(DEAD_CULTURE_TAG),
+      (s) => !selectedNames.has(s.entry.name) && s.entry.tags.includes(DEAD_CULTURE_TAG) && isProminenceAllowed(s.entry),
     );
     if (deadCandidate) {
       if (selected.length >= targetCount && selected.length > 1) {
@@ -155,11 +191,13 @@ export function selectOverlaysForWindow(
         for (let i = selected.length - 1; i >= 0; i--) {
           if (selected[i].name !== songHero && !HERO_OVERLAY_NAMES.has(selected[i].name)) {
             selected[i] = deadCandidate.entry;
+            markProminence(deadCandidate.entry);
             break;
           }
         }
       } else {
         selected.push(deadCandidate.entry);
+        markProminence(deadCandidate.entry);
       }
     }
   }

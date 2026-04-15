@@ -436,6 +436,12 @@ export interface OverlayEntry {
   audioAffinity?: Partial<Record<string, number>>;
   /** CSS mix-blend-mode for this overlay (default "screen") */
   blendMode?: "screen" | "overlay" | "multiply" | "soft-light" | "color-dodge" | "luminosity";
+  /** Visual prominence class — controls exclusion rules during selection.
+   *  hero: iconic foreground imagery (Stealie, Bolt, Bear) — max 1 per window.
+   *  accent: reactive/decorative focus elements — max 1 per window.
+   *  ambient: background textures (starfield, smoke, grain) — unlimited.
+   *  Defaults to "ambient" if not set. */
+  prominence?: "hero" | "accent" | "ambient";
 }
 
 /** Summary audio profile computed from a song's analysis frames.
