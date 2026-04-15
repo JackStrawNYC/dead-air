@@ -53,9 +53,11 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@resvg/resvg-js": "^2.6.2",
     "@types/node": "^22.0.0",
     "@types/react": "^18.3.3",
     "@types/three": "^0.183.1",
+    "sharp": "^0.33.0",
     "tsx": "^4.19.0",
     "typescript": "^5.7.0",
     "vitest": "^4.0.18"

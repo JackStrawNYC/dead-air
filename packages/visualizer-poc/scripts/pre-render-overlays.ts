@@ -28,7 +28,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 
 const I = (remotion as any).Internals;
 const __dirname = new URL(".", import.meta.url).pathname;
-const VISUALIZER_ROOT = resolve(__dirname, "../visualizer-poc");
+const VISUALIZER_ROOT = resolve(__dirname, "..");
 
 // ─── Remotion Context Factory ───
 
@@ -132,7 +132,14 @@ function renderOverlayToSVG(
     const html = renderToStaticMarkup(wrapped);
     // Extract SVG element, or use full HTML if it contains visual content
     const svgMatch = html.match(/<svg[^]*<\/svg>/);
-    if (svgMatch) return svgMatch[0];
+    if (svgMatch) {
+      let svg = svgMatch[0];
+      // Add xmlns if missing (React SSR omits it, resvg requires it)
+      if (!svg.includes('xmlns=')) {
+        svg = svg.replace('<svg ', '<svg xmlns="http://www.w3.org/2000/svg" ');
+      }
+      return svg;
+    }
     // If no SVG but has div content with styles, wrap in SVG for rasterization
     if (html.length > 50 && html.includes("style")) {
       return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">
@@ -148,15 +155,22 @@ function renderOverlayToSVG(
 
 // ─── PNG conversion ───
 
+import { execSync } from "child_process";
+
 async function svgToPng(svg: string, outputPath: string, width: number): Promise<boolean> {
+  // Save SVG first (fast)
+  const svgPath = outputPath.replace(".png", ".svg");
+  writeFileSync(svgPath, svg);
+
+  // Convert to PNG via ImageMagick (handles complex SVGs well)
   try {
-    const { Resvg } = await import("@resvg/resvg-js");
-    const resvg = new Resvg(svg, { fitTo: { mode: "width" as any, value: width } });
-    writeFileSync(outputPath, resvg.render().asPng());
+    execSync(
+      `convert -background none -resize ${width}x "${svgPath}" "${outputPath}"`,
+      { timeout: 30000, stdio: "pipe" },
+    );
     return true;
   } catch {
-    // Fallback: save SVG for later conversion
-    writeFileSync(outputPath.replace(".png", ".svg"), svg);
+    // SVG saved as fallback
     return false;
   }
 }

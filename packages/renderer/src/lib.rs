@@ -3,6 +3,7 @@ pub mod compositor;
 pub mod ffmpeg;
 pub mod glsl_compat;
 pub mod gpu;
+pub mod intro;
 pub mod manifest;
 pub mod motion_blur;
 pub mod overlay_cache;

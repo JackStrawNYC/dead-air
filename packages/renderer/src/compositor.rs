@@ -43,9 +43,25 @@ pub struct OverlayLayer {
     pub z_order: u32,
 }
 
+use std::sync::LazyLock;
+use std::sync::Arc;
+
+/// Cached font database — loaded once, reused for all SVG rasterizations.
+static FONTDB: LazyLock<Arc<usvg::fontdb::Database>> = LazyLock::new(|| {
+    let mut db = usvg::fontdb::Database::new();
+    db.load_system_fonts();
+    Arc::new(db)
+});
+
 /// Rasterize an SVG string to an RGBA pixel buffer.
 pub fn rasterize_svg(svg_str: &str, width: u32, height: u32) -> Option<Vec<u8>> {
-    let options = usvg::Options::default();
+    let mut options = usvg::Options::default();
+    // Use cached system fonts so text renders correctly
+    for face in FONTDB.faces() {
+        if let usvg::fontdb::Source::File(ref path) = face.source {
+            options.fontdb_mut().load_font_file(path).ok();
+        }
+    }
     let tree = usvg::Tree::from_str(svg_str, &options).ok()?;
 
     let mut pixmap = resvg::tiny_skia::Pixmap::new(width, height)?;

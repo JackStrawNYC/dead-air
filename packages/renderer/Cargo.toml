@@ -33,6 +33,8 @@ rmp-serde = "1"
 resvg = "0.45"
 # Tiny SVG parser (resvg dependency)
 usvg = "0.45"
+# Base64 encoding (for embedding brand PNG in SVG overlays)
+base64 = "0.22"
 
 [profile.release]
 opt-level = 3

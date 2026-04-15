@@ -49,6 +49,12 @@ import { lookupSongIdentity, getOrGenerateSongIdentity } from "../visualizer-poc
 import { computeShowVisualSeed, type ShowVisualSeed } from "../visualizer-poc/src/utils/show-visual-seed.js";
 import { hashString } from "../visualizer-poc/src/utils/hash.js";
 
+// ─── Overlay imports (for --with-overlays mode) ───
+import { buildRotationSchedule, getOverlayOpacities } from "../visualizer-poc/src/data/overlay-rotation.js";
+import { OVERLAY_REGISTRY, OVERLAY_BY_NAME, ALWAYS_ACTIVE } from "../visualizer-poc/src/data/overlay-registry.js";
+import { getEraPreset } from "../visualizer-poc/src/data/era-presets.js";
+import type { SectionBoundary } from "../visualizer-poc/src/data/types.js";
+
 // ─── Shader collection (same as generate-manifest.ts) ───
 
 export async function collectShaderGLSL(): Promise<Record<string, string>> {
@@ -667,8 +673,13 @@ async function main() {
     : -1;
   const width = parseInt(getArg("width", "3840"));
   const height = parseInt(getArg("height", "2160"));
+  const withOverlays = args.includes("--with-overlays");
+  const overlayPngDir = getArg("overlay-png-dir", "./overlay-pngs");
 
   console.log(`[full-manifest] Data: ${dataDir}`);
+  if (withOverlays) {
+    console.log(`[full-manifest] Overlays: ENABLED (PNG dir: ${overlayPngDir})`);
+  }
 
   const setlist = JSON.parse(readFileSync(join(dataDir, "setlist.json"), "utf-8"));
   const showTitle = `${setlist.venue ?? "?"} — ${setlist.date ?? ""}`;
@@ -695,6 +706,29 @@ async function main() {
   if (showVisualSeed) {
     console.log(`[full-manifest] Show seed: ${showVisualSeed.dominantSpectralFamily}/${showVisualSeed.secondarySpectralFamily}, temp=${showVisualSeed.paletteTemperature.toFixed(2)}`);
   }
+
+  // ─── Overlay pool setup (when --with-overlays) ───
+  let overlayPool: string[] = [];
+  if (withOverlays) {
+    const era = setlist.era ?? "primal";
+    const eraPreset = getEraPreset(era);
+    const eraExcluded = eraPreset ? new Set(eraPreset.excludedOverlays) : new Set<string>();
+    overlayPool = OVERLAY_REGISTRY
+      .filter(e => (e.tier === "A" || e.tier === "B") && !eraExcluded.has(e.name))
+      .map(e => e.name);
+    // Add always-active overlays
+    for (const name of ALWAYS_ACTIVE) {
+      if (!overlayPool.includes(name)) overlayPool.push(name);
+    }
+    console.log(`[full-manifest] Overlay pool: ${overlayPool.length} overlays (era: ${era})`);
+  }
+
+  // Per-frame overlay schedule: overlay_schedule[frameIdx] = OverlayInstance[]
+  const overlaySchedule: Array<Array<{
+    overlay_id: string;
+    transform: { opacity: number; scale: number; rotation_deg: number; offset_x: number; offset_y: number };
+    blend_mode: string;
+  }>> = [];
 
   // ─── Process each song ───
   const allFrames: any[] = [];
@@ -1221,6 +1255,109 @@ async function main() {
       });
     }
 
+    // ─── Overlay schedule for this song (when --with-overlays) ───
+    if (withOverlays && overlayPool.length > 0) {
+      const overlayStartTime = Date.now();
+
+      // Convert sections to SectionBoundary format expected by overlay rotation
+      const overlaySections: SectionBoundary[] = (sections ?? []).map((s: any, si: number) => {
+        const start = s.start ?? s.frameStart ?? 0;
+        const end = s.end ?? s.frameEnd ?? frames.length;
+        const mid = Math.floor((start + end) / 2);
+        const avgEnergy = smoothed.energy[Math.min(mid, frames.length - 1)] ?? 0.3;
+        const energy: "low" | "mid" | "high" = avgEnergy > 0.25 ? "high" : avgEnergy > 0.12 ? "mid" : "low";
+        return {
+          frameStart: start,
+          frameEnd: end,
+          label: `section_${si}`,
+          energy,
+          avgEnergy,
+        };
+      });
+
+      // Fallback if no sections
+      if (overlaySections.length === 0) {
+        overlaySections.push({
+          frameStart: 0,
+          frameEnd: frames.length,
+          label: "section_0",
+          energy: "mid" as const,
+          avgEnergy: 0.2,
+        });
+      }
+
+      // Build rotation schedule for this song
+      const rotSchedule = buildRotationSchedule(
+        overlayPool,
+        overlaySections,
+        song.trackId ?? `song${songIdx}`,
+        showDateHash,       // showSeed
+        frames,             // EnhancedFrameData[]
+        isDrumsSpace,
+        undefined,          // energyHints
+        setlist.era ?? "primal",
+        undefined,          // mode
+        songIdentity,
+        undefined,          // showArcModifiers
+        undefined,          // drumsSpacePhase
+        undefined,          // stemSectionType
+        showSongsCompleted, // songsCompleted
+        undefined,          // songHero
+        tempo,
+      );
+
+      // Get prominence data for blend mode mapping
+      const prominenceMap = new Map<string, string>();
+      for (const entry of OVERLAY_REGISTRY) {
+        if (entry.prominence) prominenceMap.set(entry.name, entry.prominence);
+      }
+
+      // Compute per-frame overlay instances
+      for (let i = 0; i < totalOut; i++) {
+        const { lo: ai } = getInterpolatedIndex(i, afps, fps, frames.length);
+        // Map output frame to analysis frame for overlay rotation (which operates at analysis fps)
+        const analysisFrame = ai;
+
+        const opacities = getOverlayOpacities(
+          analysisFrame,
+          rotSchedule,
+          frames,
+          undefined, // calibration
+          (ctx._preComputed?.reactive?.[ai] ?? { triggered: false, triggerType: null, shaderPool: [] }) as any,
+          tempo,
+        );
+
+        // Convert opacities to OverlayInstance array
+        const frameInstances: typeof overlaySchedule[0] = [];
+        for (const [overlayName, opacity] of Object.entries(opacities)) {
+          if (opacity <= 0.005) continue; // skip invisible overlays
+
+          // Map prominence to blend mode: hero=Normal (foreground), accent=Screen, ambient=Screen
+          const prominence = prominenceMap.get(overlayName) ?? "ambient";
+          const blendMode = prominence === "hero" ? "Normal" : "Screen";
+
+          frameInstances.push({
+            overlay_id: overlayName,
+            transform: {
+              opacity: Math.round(opacity * 1000) / 1000,
+              scale: 1.0,
+              rotation_deg: 0.0,
+              offset_x: 0.0,
+              offset_y: 0.0,
+            },
+            blend_mode: blendMode,
+          });
+        }
+        overlaySchedule.push(frameInstances);
+      }
+
+      const overlayMs = Date.now() - overlayStartTime;
+      const avgOverlays = overlaySchedule.length > 0
+        ? (overlaySchedule.slice(-totalOut).reduce((s, f) => s + f.length, 0) / totalOut).toFixed(1)
+        : "0";
+      console.log(`    Overlays: ${totalOut} frames in ${(overlayMs / 1000).toFixed(1)}s (avg ${avgOverlays} per frame)`);
+    }
+
     globalTime += frames.length / afps;
     showSongsCompleted++;
     const songElapsed = ((Date.now() - songStartTime) / 1000).toFixed(1);
@@ -1253,10 +1390,41 @@ async function main() {
     }
   }
 
-  ws.write('\n]}');
-  await new Promise<void>((resolve, reject) => {
-    ws.end(() => resolve());
-    ws.on("error", reject);
+  ws.write('\n]');
+
+  // ─── Write overlay schedule (when --with-overlays) ───
+  if (withOverlays && overlaySchedule.length > 0) {
+    console.log(`[full-manifest] Writing overlay_schedule: ${overlaySchedule.length} frames`);
+    ws.write(',"overlay_schedule":[\n');
+    for (let i = 0; i < overlaySchedule.length; i++) {
+      if (i > 0) ws.write(',\n');
+      ws.write(JSON.stringify(overlaySchedule[i]));
+      if (i % 50000 === 0 && i > 0) {
+        process.stdout.write(`  overlays ${(i / overlaySchedule.length * 100).toFixed(0)}%\r`);
+      }
+    }
+    ws.write('\n]');
+    ws.write(`,"overlay_png_dir":${JSON.stringify(resolve(overlayPngDir))}`);
+
+    // Report overlay usage stats
+    const overlayUsage = new Map<string, number>();
+    for (const frame of overlaySchedule) {
+      for (const inst of frame) {
+        overlayUsage.set(inst.overlay_id, (overlayUsage.get(inst.overlay_id) ?? 0) + 1);
+      }
+    }
+    const sortedOverlays = [...overlayUsage.entries()].sort((a, b) => b[1] - a[1]);
+    console.log(`\n[full-manifest] Overlay usage (top 15):`);
+    for (const [name, count] of sortedOverlays.slice(0, 15)) {
+      const pct = (count / overlaySchedule.length * 100).toFixed(1);
+      console.log(`  ${name}: ${count} frames (${pct}%)`);
+    }
+  }
+
+  ws.write('}');
+  await new Promise<void>((res, rej) => {
+    ws.end(() => res());
+    ws.on("error", rej);
   });
 
   const mb = (statSync(outputPath).size / 1048576).toFixed(1);

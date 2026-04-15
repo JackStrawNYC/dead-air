@@ -21,6 +21,7 @@ mod compositor;
 mod ffmpeg;
 pub mod glsl_compat;
 mod gpu;
+pub mod intro;
 mod manifest;
 mod overlay_cache;
 mod motion_blur;
@@ -79,6 +80,34 @@ struct Args {
     /// End frame (0 = all)
     #[arg(long, default_value_t = 0)]
     end_frame: u32,
+
+    /// Prepend a 15-second cinematic intro sequence before the show.
+    #[arg(long, default_value_t = false)]
+    with_intro: bool,
+
+    /// Show venue name (for intro card). Required with --with-intro.
+    #[arg(long)]
+    show_venue: Option<String>,
+
+    /// Show city (for intro card). Required with --with-intro.
+    #[arg(long)]
+    show_city: Option<String>,
+
+    /// Show date display string (for intro card, e.g. "August 27, 1972").
+    #[arg(long)]
+    show_date: Option<String>,
+
+    /// Show era for visual grading: primal, classic, hiatus, touch_of_grey, revival.
+    #[arg(long, default_value = "classic")]
+    show_era: String,
+
+    /// Show seed (0.0-1.0) for deterministic variation. Derived from date if omitted.
+    #[arg(long)]
+    show_seed: Option<f32>,
+
+    /// Path to brand logo PNG for intro sequence (e.g., dead-air-brand.png).
+    #[arg(long)]
+    brand_image: Option<String>,
 }
 
 fn main() {
@@ -91,14 +120,76 @@ fn main() {
 
     // Load manifest
     println!("Loading manifest: {}", args.manifest.display());
-    let manifest =
+    let mut manifest =
         manifest::load_manifest(&args.manifest).expect("Failed to load manifest");
+
+    // ─── Prepend intro sequence if requested ───
+    let intro_frame_count = if args.with_intro {
+        let venue = args.show_venue.as_deref().unwrap_or("Unknown Venue");
+        let city = args.show_city.as_deref().unwrap_or("");
+        let date_display = args.show_date.as_deref().unwrap_or("Unknown Date");
+        let seed = args.show_seed.unwrap_or_else(|| {
+            // Derive seed from date string hash
+            let hash: u32 = date_display.bytes().fold(5381u32, |h, b| h.wrapping_mul(33).wrapping_add(b as u32));
+            (hash % 1000) as f32 / 1000.0
+        });
+
+        let style = intro::style_for_era(&args.show_era, seed);
+        let show_meta = intro::ShowMeta {
+            venue: venue.to_string(),
+            city: city.to_string(),
+            date_display: date_display.to_string(),
+            brand_image_path: args.brand_image.clone(),
+        };
+
+        // Get first song's shader for the dissolve transition
+        let first_shader_id = manifest.frames.first().map(|f| f.shader_id.as_str());
+
+        let (intro_shaders, intro_frames, intro_overlays) =
+            intro::generate_intro(args.fps, args.width, args.height, &style, &show_meta, first_shader_id);
+
+        let n_intro = intro_frames.len();
+        println!("Intro: {} frames ({:.1}s) — era={}, seed={:.3}", n_intro, n_intro as f32 / args.fps as f32, args.show_era, seed);
+
+        // Merge: prepend intro shaders
+        for (id, glsl) in intro_shaders {
+            manifest.shaders.insert(id, glsl);
+        }
+
+        // Renumber existing frames and prepend intro frames
+        let offset = n_intro as u32;
+        for f in &mut manifest.frames {
+            f.frame += offset;
+        }
+        let mut combined_frames = intro_frames;
+        combined_frames.append(&mut manifest.frames);
+        manifest.frames = combined_frames;
+
+        // Merge overlay layers: prepend intro overlays
+        if let Some(ref mut existing_overlays) = manifest.overlay_layers {
+            let mut combined = intro_overlays;
+            combined.append(existing_overlays);
+            *existing_overlays = combined;
+        } else {
+            // Create overlay_layers with intro overlays + empty vecs for show frames
+            let show_frame_count = manifest.frames.len() - n_intro;
+            let mut combined = intro_overlays;
+            combined.extend((0..show_frame_count).map(|_| Vec::new()));
+            manifest.overlay_layers = Some(combined);
+        }
+
+        n_intro
+    } else {
+        0
+    };
 
     let total_frames = if args.end_frame > 0 {
         (args.end_frame - args.start_frame) as usize
     } else {
         manifest.frames.len() - args.start_frame as usize
     };
+
+    let _ = intro_frame_count; // suppress unused warning when not printing
 
     let output_label = if let Some(ref p) = args.output {
         format!("→ {}", p.display())
@@ -354,6 +445,7 @@ fn main() {
         let feedback_target = if feedback_idx == 0 { &feedback_a } else { &feedback_b };
 
         let uniform_data = uniforms::build_uniform_buffer(frame, args.width, args.height);
+        let is_intro = frame.shader_id == intro::INTRO_SHADER_ID;
         let pp_uniforms = postprocess::PostProcessUniforms {
             bloom_threshold: -0.08 - frame.energy * 0.18,
             bloom_intensity: 1.0,
