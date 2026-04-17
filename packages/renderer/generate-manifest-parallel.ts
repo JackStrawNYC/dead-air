@@ -97,8 +97,8 @@ async function processSongInChild(songEntry: typeof validSongs[0]): Promise<Song
       childArgs.push("--with-overlays", "--overlay-png-dir", overlayPngDir);
     }
     const child = fork(SINGLE_SONG_SCRIPT, childArgs, {
-      execArgv: ["--require", require.resolve("tsx/cjs")].filter(() => false), // tsx handles this
-      stdio: ["ignore", "pipe", "pipe"],
+      execArgv: [], // tsx is already handling TypeScript
+      stdio: ["ignore", "pipe", "pipe", "ipc"],
     });
 
     let stdout = "";
