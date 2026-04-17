@@ -6,8 +6,14 @@ DRIVE="/Users/chrisgardella/Library/CloudStorage/GoogleDrive-christopher.gardell
 OUTPUT="$DRIVE/veneta-8-27-72-FINAL.mp4"
 AUDIO_DIR="/Users/chrisgardella/dead-air/packages/visualizer-poc/public/audio/veneta-72"
 
-export AWS_ACCESS_KEY_ID=AKIAWYOAHZRMMVNSGPBV
-export AWS_SECRET_ACCESS_KEY="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"
+PROJECT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
+if [ -f "$PROJECT_DIR/.env" ]; then
+  export AWS_ACCESS_KEY_ID=$(grep REMOTION_AWS_ACCESS_KEY_ID "$PROJECT_DIR/.env" | cut -d= -f2-)
+  export AWS_SECRET_ACCESS_KEY=$(grep REMOTION_AWS_SECRET_ACCESS_KEY "$PROJECT_DIR/.env" | cut -d= -f2-)
+else
+  echo "ERROR: .env not found at $PROJECT_DIR/.env — set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY" >&2
+  exit 1
+fi
 export AWS_DEFAULT_REGION=us-east-1
 
 mkdir -p "$DRIVE"
