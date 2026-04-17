@@ -76,6 +76,7 @@ impl FfmpegPipe {
             "-colorspace".to_string(), "bt709".to_string(),
             "-color_primaries".to_string(), "bt709".to_string(),
             "-color_trc".to_string(), "iec61966-2-1".to_string(),
+            "-movflags".to_string(), "+faststart".to_string(),
             "-an".to_string(),
             output_path.to_string(),
         ]);

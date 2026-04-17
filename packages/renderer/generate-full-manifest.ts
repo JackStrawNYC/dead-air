@@ -605,7 +605,7 @@ function computeUniforms(
   const coherence = analysis?.coherenceState?.score ?? 0;
 
   return {
-    time, dynamic_time: time * (tempo / 120), beat_time: time * (tempo / 120),
+    time, dynamic_time: time * (tempo / 120), beat_time: time * (tempo / 120), // overwritten by frame loop accumulator
     musical_time: (time * tempo / 60) % 1, tempo,
     energy, rms: L("rms"), bass, mids, highs,
     onset: L("onset"),
@@ -1180,6 +1180,7 @@ async function main() {
 
     const progressInterval = Math.max(1, Math.floor(totalOut / 20)); // Log every 5%
     const songStartTime = Date.now();
+    let dynamicTimeAccum = 0; // Accumulated dynamic time with modifiers
     for (let i = 0; i < totalOut; i++) {
       if (i > 0 && i % progressInterval === 0) {
         const pct = ((i / totalOut) * 100).toFixed(0);
@@ -1288,6 +1289,19 @@ async function main() {
 
       // Fix section_index (not available in computeUniforms)
       uniforms.section_index = routeState.currentSectionIdx;
+
+      // Accumulate dynamic_time with modifiers (matches Remotion AudioReactiveCanvas)
+      const dt = 1 / fps; // time step per frame
+      const baseDT = dt * (tempo / 120); // tempo-scaled base
+      const fluxMult = 1.0 + Math.min(0.04, (uniforms.spectral_flux || 0) * 0.1); // spectral flux boost
+      const climaxState = frameAnalysis?.climaxState ?? { phase: "idle", intensity: 0 };
+      const climaxSpeed = (climaxState.phase === "climax" || climaxState.phase === "sustain")
+        ? 1.0 + (climaxState.intensity ?? 0) * 0.3 // up to 1.3x during climax
+        : 1.0;
+      const deadAirMult = isDeadAir ? 0.05 : 1.0; // 5% speed during dead air
+      dynamicTimeAccum += baseDT * fluxMult * climaxSpeed * deadAirMult;
+      uniforms.dynamic_time = dynamicTimeAccum;
+      uniforms.beat_time = dynamicTimeAccum; // keep in sync
 
       // Suppress reactive uniforms during dead air — calm ambient, no pulsing to noise
       if (isDeadAir) {
