@@ -624,7 +624,8 @@ function computeUniforms(
     slow_energy: slowEnergy,
     fast_energy: lerpSmoothed(smoothed.fastEnergy),
     fast_bass: lerpSmoothed(smoothed.fastBass),
-    spectral_flux: L("spectralFlux") || 0,
+    // Spectral flux: if not in analysis, approximate from energy derivative
+    spectral_flux: L("spectralFlux") || Math.abs(lerpSmoothed(smoothed.fastEnergy) - energy) * 3,
     energy_accel: lerpSmoothed(smoothed.fastEnergy) - energy,
     energy_trend: energy - slowEnergy,
     onset_snap: L("onset") * 0.3, beat_snap: f.beat ? 0.4 : 0, // gentle pulse, not strobe
@@ -656,8 +657,19 @@ function computeUniforms(
     jam_density: 0.5 + (jamCycle.progress ?? 0) * 0.3,
     jam_phase: jamPhaseMap[jamCycle.phase] ?? 0,  // discrete
     jam_progress: jamCycle.progress ?? 0,
-    energy_forecast: L("energyForecast"),
-    peak_approaching: L("peakApproaching"),
+    // Energy forecast: look ahead 60 frames (~2s) to predict energy trend
+    energy_forecast: (() => {
+      const lookAhead = Math.min(idx + 60, frames.length - 1);
+      const futureE = frames[lookAhead]?.rms ?? energy;
+      return Math.max(0, Math.min(1, futureE));
+    })(),
+    // Peak approaching: 1.0 when high energy is coming within 120 frames
+    peak_approaching: (() => {
+      for (let la = 1; la <= 120 && idx + la < frames.length; la++) {
+        if ((frames[idx + la]?.rms ?? 0) > 0.4) return Math.max(0, 1 - la / 120);
+      }
+      return 0;
+    })(),
     tempo_derivative: L("tempoDerivative"),
     dynamic_range: L("dynamicRange", 0.5),
     space_score: L("spaceScore"),
@@ -666,14 +678,17 @@ function computeUniforms(
     vocal_pitch: L("vocalPitch"),
     vocal_pitch_confidence: L("vocalPitchConfidence"),
     improvisation_score: L("improvisationScore"),
-    semantic_psychedelic: L("semantic_psychedelic"),
-    semantic_cosmic: L("semantic_cosmic"),
-    semantic_aggressive: L("semantic_aggressive"),
-    semantic_tender: L("semantic_tender"),
-    semantic_rhythmic: L("semantic_rhythmic"),
-    semantic_ambient: L("semantic_ambient"),
-    semantic_chaotic: L("semantic_chaotic"),
-    semantic_triumphant: L("semantic_triumphant"),
+    // CLAP semantic approximations: computed from available audio features
+    // when the actual CLAP ML pipeline hasn't run. These are heuristic
+    // mappings that give shaders SOMETHING to work with.
+    semantic_psychedelic: L("semantic_psychedelic") || Math.min(1, energy * 0.5 + (L("centroid", 0.5) - 0.3) * 2),
+    semantic_cosmic: L("semantic_cosmic") || Math.min(1, slowEnergy * 0.3 + (1 - energy) * 0.4),
+    semantic_aggressive: L("semantic_aggressive") || Math.min(1, energy * 0.8 + bass * 0.5 - 0.2),
+    semantic_tender: L("semantic_tender") || Math.min(1, (1 - energy) * 0.7 + (1 - bass) * 0.3),
+    semantic_rhythmic: L("semantic_rhythmic") || Math.min(1, (f.beat ? 0.5 : 0) + bass * 0.3 + L("onset") * 0.3),
+    semantic_ambient: L("semantic_ambient") || Math.min(1, (1 - energy) * 0.5 + L("centroid", 0.5) * 0.3),
+    semantic_chaotic: L("semantic_chaotic") || Math.max(0, Math.min(1, L("spectralFlux") * 2 + energy * 0.3 - 0.15)),
+    semantic_triumphant: L("semantic_triumphant") || Math.min(1, energy * 0.6 + (climax.phase === "climax" ? 0.4 : 0)),
     palette_primary: (song?.palette?.primary ?? 30) / 360,
     palette_secondary: (song?.palette?.secondary ?? 200) / 360,
     palette_saturation: song?.palette?.saturation ?? 0.85,
