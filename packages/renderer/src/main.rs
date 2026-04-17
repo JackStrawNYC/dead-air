@@ -16,6 +16,7 @@
 //!   dead-air-renderer --manifest manifest.json -o show.mp4 --width 3840 --height 2160
 //!   dead-air-renderer --manifest manifest.json --png-dir ./frames  # PNG mode (slower)
 
+mod chapter_card;
 mod compute;
 mod compositor;
 mod endcard;

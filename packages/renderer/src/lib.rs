@@ -1,3 +1,4 @@
+pub mod chapter_card;
 pub mod compute;
 pub mod compositor;
 pub mod endcard;
