@@ -688,9 +688,65 @@ function computeUniforms(
     semantic_ambient: L("semantic_ambient") || Math.min(1, (1 - energy) * 0.5 + L("centroid", 0.5) * 0.3),
     semantic_chaotic: L("semantic_chaotic") || Math.max(0, Math.min(1, L("spectralFlux") * 2 + energy * 0.3 - 0.15)),
     semantic_triumphant: L("semantic_triumphant") || Math.min(1, energy * 0.6 + (climax.phase === "climax" ? 0.4 : 0)),
-    palette_primary: (song?.palette?.primary ?? 30) / 360,
-    palette_secondary: (song?.palette?.secondary ?? 200) / 360,
-    palette_saturation: song?.palette?.saturation ?? 0.85,
+    // Dead-specific song palettes: warm, earthy, psychedelic
+    // Every Dead song has a COLOR. Not algorithmic — hand-curated from the culture.
+    palette_primary: (song?.palette?.primary ?? (() => {
+      const deadPalettes: Record<string, [number, number, number]> = {
+        // [primary hue, secondary hue, saturation] — all warm, earthy, Dead
+        "Promised Land":        [15, 40, 0.90],   // red-orange / amber
+        "Sugaree":              [340, 270, 0.80],  // rose / deep purple
+        "Me and My Uncle":      [35, 20, 0.85],   // dusty gold / warm brown
+        "Deal":                 [10, 45, 0.90],    // crimson / golden
+        "Black-Throated Wind":  [220, 280, 0.70],  // storm blue / indigo
+        "China Cat Sunflower":  [40, 25, 0.95],    // warm amber / orange sunshine
+        "I Know You Rider":     [30, 350, 0.90],   // golden / warm magenta
+        "Mexicali Blues":       [25, 45, 0.85],    // desert orange / cactus gold
+        "Bertha":               [5, 35, 0.90],     // hot red / amber
+        "Playing in the Band":  [280, 320, 0.85],  // deep purple / warm magenta
+        "He's Gone":            [250, 220, 0.65],  // twilight blue / storm gray
+        "Jack Straw":           [20, 45, 0.85],    // warm orange / golden
+        "Bird Song":            [50, 130, 0.80],   // golden / forest green
+        "Greatest Story Ever Told": [35, 10, 0.90], // amber / red
+        "Dark Star":            [260, 290, 0.75],  // deep indigo / violet
+        "El Paso":              [25, 15, 0.85],    // desert sand / warm red
+        "Sing Me Back Home":    [30, 270, 0.70],   // warm amber / muted purple
+        "Sugar Magnolia":       [45, 30, 0.95],    // golden sunshine / warm orange
+        "Casey Jones":          [10, 40, 0.90],    // red / golden
+        "One More Saturday Night": [350, 280, 0.90], // hot pink-red / purple
+      };
+      const p = deadPalettes[song?.title ?? ""] ?? [30, 350, 0.85];
+      return p[0];
+    })()) / 360,
+    palette_secondary: (song?.palette?.secondary ?? (() => {
+      const deadPalettes: Record<string, [number, number, number]> = {
+        "Promised Land": [15, 40, 0.90], "Sugaree": [340, 270, 0.80],
+        "Me and My Uncle": [35, 20, 0.85], "Deal": [10, 45, 0.90],
+        "Black-Throated Wind": [220, 280, 0.70], "China Cat Sunflower": [40, 25, 0.95],
+        "I Know You Rider": [30, 350, 0.90], "Mexicali Blues": [25, 45, 0.85],
+        "Bertha": [5, 35, 0.90], "Playing in the Band": [280, 320, 0.85],
+        "He's Gone": [250, 220, 0.65], "Jack Straw": [20, 45, 0.85],
+        "Bird Song": [50, 130, 0.80], "Greatest Story Ever Told": [35, 10, 0.90],
+        "Dark Star": [260, 290, 0.75], "El Paso": [25, 15, 0.85],
+        "Sing Me Back Home": [30, 270, 0.70], "Sugar Magnolia": [45, 30, 0.95],
+        "Casey Jones": [10, 40, 0.90], "One More Saturday Night": [350, 280, 0.90],
+      };
+      return (deadPalettes[song?.title ?? ""] ?? [30, 350, 0.85])[1];
+    })()) / 360,
+    palette_saturation: song?.palette?.saturation ?? (() => {
+      const deadPalettes: Record<string, [number, number, number]> = {
+        "Promised Land": [15, 40, 0.90], "Sugaree": [340, 270, 0.80],
+        "Me and My Uncle": [35, 20, 0.85], "Deal": [10, 45, 0.90],
+        "Black-Throated Wind": [220, 280, 0.70], "China Cat Sunflower": [40, 25, 0.95],
+        "I Know You Rider": [30, 350, 0.90], "Mexicali Blues": [25, 45, 0.85],
+        "Bertha": [5, 35, 0.90], "Playing in the Band": [280, 320, 0.85],
+        "He's Gone": [250, 220, 0.65], "Jack Straw": [20, 45, 0.85],
+        "Bird Song": [50, 130, 0.80], "Greatest Story Ever Told": [35, 10, 0.90],
+        "Dark Star": [260, 290, 0.75], "El Paso": [25, 15, 0.85],
+        "Sing Me Back Home": [30, 270, 0.70], "Sugar Magnolia": [45, 30, 0.95],
+        "Casey Jones": [10, 40, 0.90], "One More Saturday Night": [350, 280, 0.90],
+      };
+      return (deadPalettes[song?.title ?? ""] ?? [30, 350, 0.85])[2];
+    })(),
     envelope_brightness: envBrightness,
     envelope_saturation: envSaturation,
     envelope_hue: envHue,
@@ -700,10 +756,10 @@ function computeUniforms(
     show_warmth: 0.20, show_contrast: 1.08, show_saturation: 1.10,
     show_grain: 1.2, show_bloom: 1.1,
     // Dynamic params: quiet drifts slowly, peaks churn intensely
-    // Dynamic params: quiet breathes slowly, peaks drive hard
-    param_bass_scale: 0.5 + energy * 0.5,      // 0.50 → 1.0
-    param_energy_scale: 0.6 + energy * 0.4,     // 0.60 → 1.0
-    param_motion_speed: 0.25 + energy * 0.55,   // 0.25 (slow drift) → 0.80 (driving)
+    // Dynamic params: quiet is GLACIAL (liquid light), peaks are flowing (not frantic)
+    param_bass_scale: 0.4 + energy * 0.6,      // 0.40 → 1.0
+    param_energy_scale: 0.5 + energy * 0.5,     // 0.50 → 1.0
+    param_motion_speed: 0.18 + energy * 0.42,   // 0.18 (glacial drift) → 0.60 (flowing)
     param_color_sat_bias: 0, param_complexity: 1.0,
     param_drum_reactivity: 1.0, param_vocal_weight: 1.0,
     peak_of_show: analysis?.peakOfShow?.isPeak ? 1 : 0,
@@ -1169,31 +1225,33 @@ async function main() {
       // Shader pools curated for GRATEFUL DEAD concert aesthetic:
       // Prioritize: warm concert lighting, psychedelic tie-dye, liquid light projectors
       // These shaders look like you're AT a Dead show, not watching a screensaver
-      // HIGH energy: explosive, screen-filling, vivid
+      // HIGH energy: explosive, screen-filling, vivid, WARM
+      // Removed oil_projector/coral_reef — their green base fights warm palettes
       const HIGH_ENERGY_SHADERS = new Set([
         "tie_dye", "inferno", "lava_flow", "fractal_flames",
-        "oil_projector", "fractal_temple", "kaleidoscope",
+        "fractal_temple", "kaleidoscope", "stained_glass",
       ]);
-      // LOW energy: still screen-filling, just gentler and slower
+      // LOW energy: screen-filling, gentle, warm tones
       const LOW_ENERGY_SHADERS = new Set([
-        "oil_projector", "tie_dye", "stained_glass", "coral_reef",
-        "sacred_geometry", "smoke_rings", "fractal_temple",
+        "tie_dye", "stained_glass", "sacred_geometry",
+        "smoke_rings", "fractal_temple", "kaleidoscope",
       ]);
 
       // Shaders that FILL THE SCREEN with psychedelic Dead concert color.
       // Sparse raymarchers (concert_lighting, ink_wash, void_light) look great
       // at high energy but produce mostly black at mid/low energy. Deprioritized.
+      // Dead-concert shaders: warm-toned, screen-filling, psychedelic
+      // REMOVED: oil_projector, coral_reef (green base fights warm palettes)
       const DEAD_CONCERT_SHADERS = new Set([
-        "tie_dye",              // #1 Dead shader — fills screen, psychedelic
-        "oil_projector",        // liquid light show — fills screen, organic
-        "fractal_flames",       // fire — fills screen, dramatic
-        "inferno",              // lava — fills screen, intense
-        "lava_flow",            // volcanic — fills screen, warm
-        "fractal_temple",       // cathedral — fills screen, sacred
-        "kaleidoscope",         // mandala — fills screen, psychedelic
-        "coral_reef",           // organic — fills screen, colorful
-        "stained_glass",        // cathedral light — fills screen, warm
-        "sacred_geometry",      // geometric — fills screen, spiritual
+        "tie_dye",              // #1 Dead shader — psychedelic color bleed
+        "fractal_flames",       // organic fire — warm tones
+        "inferno",              // volcanic lava — deep reds
+        "lava_flow",            // molten — warm amber/red
+        "fractal_temple",       // sacred cathedral — warm golden light
+        "kaleidoscope",         // mandala — adapts to palette well
+        "stained_glass",        // cathedral light — warm colored glass
+        "sacred_geometry",      // geometric — spiritual, warm
+        "smoke_rings",          // gentle smoke — neutral, takes palette color
       ]);
 
       // Pick from song identity preferred modes IF they give us enough Dead-concert variety.
@@ -1217,11 +1275,10 @@ async function main() {
           pool = activeShaderPool.filter(s => LOW_ENERGY_SHADERS.has(s));
         } else {
           // MID energy: varied, evolving, textured
-          // MID energy: the Dead's sweet spot — screen-filling, psychedelic, warm
-          pool = activeShaderPool.filter(s => ["tie_dye", "oil_projector",
-            "fractal_temple", "stained_glass", "fractal_flames",
-            "kaleidoscope", "coral_reef", "sacred_geometry",
-            "lava_flow", "inferno"].includes(s));
+          // MID energy: the Dead's sweet spot — screen-filling, psychedelic, WARM
+          pool = activeShaderPool.filter(s => ["tie_dye", "fractal_temple",
+            "stained_glass", "fractal_flames", "kaleidoscope",
+            "sacred_geometry", "lava_flow", "inferno", "smoke_rings"].includes(s));
         }
       }
 

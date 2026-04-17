@@ -355,6 +355,42 @@ ${
     );
     col = mix(col, sepiaColor, uEraSepia);
   }
+  // Show warmth: shifts entire color temperature toward amber/golden.
+  // The Dead aesthetic is WARM — no cold digital blues.
+  // uShowWarmth > 0 = warmer (amber), < 0 = cooler (blue)
+  {
+    float w = uShowWarmth;
+    col.r *= 1.0 + w * 0.3;   // boost red
+    col.g *= 1.0 + w * 0.08;  // slight green boost (golden, not orange)
+    col.b *= 1.0 - w * 0.25;  // reduce blue
+  }
+  // Song palette color grading: rotate hues toward the song's intended palette.
+  // uPalettePrimary is a hue (0-1). This gently shifts the scene toward that hue
+  // like a color grade in film post-production. 30% blend = noticeable but not forced.
+  // Song palette color grading: force the scene into the song's color world.
+  // The Dead aesthetic demands song-specific palettes — Sugar Magnolia is GOLDEN,
+  // Dark Star is INDIGO, He's Gone is PURPLE. No generic green/cyan.
+  {
+    vec3 hsv = rgb2hsv(col);
+    float targetHue = uPalettePrimary;
+    float currentHue = hsv.x;
+    // Strong hue rotation toward target
+    float hueDiff = targetHue - currentHue;
+    if (hueDiff > 0.5) hueDiff -= 1.0;
+    if (hueDiff < -0.5) hueDiff += 1.0;
+    // Adaptive strength: rotate MORE when current hue is far from target
+    float dist = abs(hueDiff);
+    float strength = mix(0.50, 0.85, smoothstep(0.05, 0.25, dist));
+    hsv.x = fract(currentHue + hueDiff * strength);
+    hsv.y = mix(hsv.y, uPaletteSaturation, 0.30);
+    col = hsv2rgb(hsv);
+  }
+  // Show contrast: punch up the dynamic range
+  {
+    float midpoint = 0.5;
+    col = midpoint + (col - midpoint) * uShowContrast;
+    col = max(col, vec3(0.0));
+  }
 `
     : ""
 }
