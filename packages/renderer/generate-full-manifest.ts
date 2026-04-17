@@ -1513,7 +1513,10 @@ async function main() {
           // FilmGrain: very subtle — it should add texture not haze
           if (overlayName === "FilmGrain") finalOpacity = Math.min(finalOpacity, 0.15);
           // SmokeWisps: only during quiet passages, invisible at peaks
-          if (overlayName === "SmokeWisps") finalOpacity = finalOpacity * Math.max(0, 1.0 - energy * 3);
+          if (overlayName === "SmokeWisps") {
+            const frameEnergy = frames[ai]?.rms ?? 0.3;
+            finalOpacity = finalOpacity * Math.max(0, 1.0 - frameEnergy * 3);
+          }
           // ConcertInfo: brief appearance at song start then gone
           if (overlayName === "ConcertInfo") {
             const songTimeSec = i / fps;
