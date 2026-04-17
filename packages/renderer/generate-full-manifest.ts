@@ -1484,16 +1484,17 @@ async function main() {
           const prominence = prominenceMap.get(overlayName) ?? "ambient";
           const blendMode = prominence === "hero" ? "normal" : "screen";
 
-          // Scale by overlay type — prevent oversized overlays
-          let scale = 0.6; // default: 60% of frame (not full-screen)
+          // Scale: overlay PNGs are full-frame (1920x1080). Scale controls what
+          // fraction of the frame the overlay covers. 0.25 = quarter of frame.
+          let scale = 0.30; // default: 30% of frame
           if (overlayName === "SongTitle" || overlayName === "ConcertInfo") {
-            scale = 0.4; // text overlays: smaller, positioned
+            scale = 0.20; // text: small, positioned at bottom
           } else if (overlayName === "FilmGrain") {
             scale = 1.0; // grain covers full frame
           } else if (prominence === "hero") {
-            scale = 0.5; // hero icons: prominent but not overwhelming
+            scale = 0.25; // hero icons: visible but not dominating
           } else if (prominence === "accent") {
-            scale = 0.55;
+            scale = 0.28;
           }
 
           // Cap opacity: ambient overlays should be subtle, not opaque

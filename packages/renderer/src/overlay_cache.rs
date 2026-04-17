@@ -204,6 +204,13 @@ fn composite_transformed(
     let scx = sw as f32 * 0.5;
     let scy = sh as f32 * 0.5;
 
+    // Scale semantics: scale=1.0 means overlay fills the frame (source maps 1:1 to target).
+    // scale=0.5 means overlay is 50% of frame size (source is shrunk to half).
+    // Since overlay PNGs are rasterized at full render resolution, we need to
+    // map target pixels to source pixels: smaller scale = more source pixels per target pixel.
+    // inv_scale > 1 shrinks the overlay, inv_scale < 1 enlarges it.
+    let inv_scale = 1.0 / scale.max(0.01);
+
     // For each target pixel, find corresponding source pixel
     for ty in 0..th {
         for tx in 0..tw {
@@ -212,7 +219,6 @@ fn composite_transformed(
             let dy = ty as f32 - cy;
 
             // Inverse rotate + scale to find source coordinate
-            let inv_scale = 1.0 / scale;
             let sx_f = (dx * cos_r + dy * sin_r) * inv_scale + scx;
             let sy_f = (-dx * sin_r + dy * cos_r) * inv_scale + scy;
 
@@ -238,6 +244,13 @@ fn composite_transformed(
             let sr = source[si] as f32 / 255.0;
             let sg = source[si + 1] as f32 / 255.0;
             let sb = source[si + 2] as f32 / 255.0;
+
+            // Skip near-black pixels: overlay PNGs often have opaque dark backgrounds
+            // instead of transparent alpha. Treat dark pixels as transparent.
+            let luma = sr * 0.2126 + sg * 0.7152 + sb * 0.0722;
+            if luma < 0.04 {
+                continue;
+            }
 
             let tr = target[ti] as f32 / 255.0;
             let tg = target[ti + 1] as f32 / 255.0;
