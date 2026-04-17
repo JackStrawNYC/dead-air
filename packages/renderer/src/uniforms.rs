@@ -16,6 +16,36 @@ use crate::manifest::FrameData;
 /// Padded to 16-byte alignment → 656.
 const UBO_SIZE: usize = 656;
 
+/// EMA smoothing alpha for lighting transitions.
+/// At 30fps: alpha=0.03 → ~2s transition. At 60fps: alpha=0.015 → ~2s.
+const LIGHTING_EMA_ALPHA: f32 = 0.03;
+
+/// Persistent lighting state for EMA smoothing across frames.
+#[derive(Clone, Copy)]
+pub struct LightingState {
+    pub dir: [f32; 3],
+    pub color: [f32; 3],
+    pub intensity: f32,
+    pub ambient: [f32; 3],
+    pub temperature: f32,
+}
+
+impl Default for LightingState {
+    fn default() -> Self {
+        Self {
+            dir: [0.3, 0.8, 0.5],
+            color: [1.0, 0.95, 0.9],
+            intensity: 0.7,
+            ambient: [0.08, 0.07, 0.09],
+            temperature: 0.0,
+        }
+    }
+}
+
+fn lerp(a: f32, b: f32, t: f32) -> f32 {
+    a + (b - a) * t
+}
+
 /// Write a f32 at a specific byte offset in the buffer.
 fn write_f32(buf: &mut [u8], offset: usize, val: f32) {
     let bytes = val.to_le_bytes();
@@ -24,7 +54,8 @@ fn write_f32(buf: &mut [u8], offset: usize, val: f32) {
 
 /// Build the uniform buffer for a single frame.
 /// Offsets match the GLSL uniform declaration order exactly (std140 layout).
-pub fn build_uniform_buffer(frame: &FrameData, width: u32, height: u32) -> Vec<u8> {
+/// `lighting` is mutated in-place with EMA-smoothed lighting transitions.
+pub fn build_uniform_buffer(frame: &FrameData, width: u32, height: u32, lighting: &mut LightingState) -> Vec<u8> {
     // Pad to 16-byte alignment (wgpu requirement for uniform buffers)
     let padded_size = (UBO_SIZE + 15) & !15;
     let mut buf = vec![0u8; padded_size];
@@ -43,7 +74,10 @@ pub fn build_uniform_buffer(frame: &FrameData, width: u32, height: u32) -> Vec<u
     write_f32(&mut buf, 32, frame.beat);           // uBeat
     write_f32(&mut buf, 36, frame.mids);           // uMids
     write_f32(&mut buf, 40, frame.energy);         // uEnergy
-    write_f32(&mut buf, 44, 0.0);                  // uFlatness
+    // uFlatness: spectral flatness (0=tonal, 1=noise-like). Approximate from
+    // available features: high centroid + low harmonic tension ≈ flat/noisy.
+    let flatness = frame.centroid * 0.5 + (1.0 - frame.harmonic_tension.min(1.0)) * 0.3;
+    write_f32(&mut buf, 44, flatness.clamp(0.0, 1.0)); // uFlatness
 
     // ─── Smoothed / Derived Audio ─── (offsets 48-76)
     write_f32(&mut buf, 48, frame.slow_energy);    // uSlowEnergy
@@ -52,14 +86,14 @@ pub fn build_uniform_buffer(frame: &FrameData, width: u32, height: u32) -> Vec<u
     write_f32(&mut buf, 60, frame.spectral_flux);  // uSpectralFlux
     write_f32(&mut buf, 64, frame.energy_accel);   // uEnergyAccel
     write_f32(&mut buf, 68, frame.energy_trend);   // uEnergyTrend
-    write_f32(&mut buf, 72, 0.0);                  // uLocalTempo
+    write_f32(&mut buf, 72, frame.tempo);           // uLocalTempo (≈ global tempo)
     write_f32(&mut buf, 76, frame.tempo);          // uTempo
 
     // ─── Beat / Rhythm ─── (offsets 80-92)
     write_f32(&mut buf, 80, frame.onset_snap);     // uOnsetSnap
     write_f32(&mut buf, 84, frame.beat_snap);      // uBeatSnap
     write_f32(&mut buf, 88, frame.musical_time);   // uMusicalTime
-    write_f32(&mut buf, 92, 0.0);                  // uSnapToMusicalTime
+    write_f32(&mut buf, 92, frame.musical_time);    // uSnapToMusicalTime (≈ musical time)
 
     // ─── Drum Stem ─── (offsets 96-124)
     write_f32(&mut buf, 96, frame.drum_onset);     // uDrumOnset
@@ -69,7 +103,7 @@ pub fn build_uniform_buffer(frame: &FrameData, width: u32, height: u32) -> Vec<u
     write_f32(&mut buf, 112, frame.drum_onset);    // uStemDrumOnset
     write_f32(&mut buf, 116, frame.vocal_energy);  // uVocalEnergy
     write_f32(&mut buf, 120, frame.vocal_presence);// uVocalPresence
-    write_f32(&mut buf, 124, 0.0);                 // uStemVocalRms
+    write_f32(&mut buf, 124, frame.vocal_energy);   // uStemVocalRms
 
     // ─── Vocal / Other Stem ─── (offsets 128-132)
     write_f32(&mut buf, 128, frame.other_energy);  // uOtherEnergy
@@ -78,7 +112,9 @@ pub fn build_uniform_buffer(frame: &FrameData, width: u32, height: u32) -> Vec<u
     // ─── Chroma / Spectral ─── (offsets 136-236)
     write_f32(&mut buf, 136, frame.chroma_hue);    // uChromaHue
     write_f32(&mut buf, 140, frame.chroma_shift);  // uChromaShift
-    write_f32(&mut buf, 144, 0.0);                 // uAfterglowHue
+    // uAfterglowHue: hue carryover from high-energy moments. Approximate
+    // from chroma_hue weighted by energy — lingers when energy was high.
+    write_f32(&mut buf, 144, frame.chroma_hue * frame.energy.min(1.0) * 0.5); // uAfterglowHue
     // padding 148-159 (align vec4 to 16)
 
     // uContrast0 at 160 (vec4): spectral contrast bands 0-3
@@ -269,9 +305,9 @@ pub fn build_uniform_buffer(frame: &FrameData, width: u32, height: u32) -> Vec<u
     write_f32(&mut buf, 552, frame.param_vocal_weight);    // uParamVocalWeight
     // padding 556-559 (align vec3 uKeyLightDir to 16)
 
-    // ─── Shared Lighting Context (section-aware) ─── (offsets 560-604)
+    // ─── Shared Lighting Context (EMA-smoothed, section-aware) ─── (offsets 560-604)
     {
-        let section = frame.section_type as i32; // 0=verse,1=chorus,2=bridge,3=intro,4=outro,5=jam,6=solo,7=space
+        let section = frame.section_type as i32;
         let energy = frame.energy.clamp(0.0, 1.0);
 
         // Section lighting presets: [dir_x, dir_y, dir_z, col_r, col_g, col_b, intensity, amb_r, amb_g, amb_b, temp]
@@ -288,34 +324,56 @@ pub fn build_uniform_buffer(frame: &FrameData, width: u32, height: u32) -> Vec<u
         let idx = (section as usize).min(7);
         let p = presets[idx];
 
-        // Energy modulation: brighter light at higher energy
+        // Compute TARGET lighting for this section + energy
         let energy_boost = energy * 0.15;
         let ambient_boost = energy * 0.04;
-        let intensity = (p[6] + energy_boost).clamp(0.0, 1.0);
-
-        // Normalize direction
         let len = (p[0]*p[0] + p[1]*p[1] + p[2]*p[2]).sqrt().max(0.001);
-        write_f32(&mut buf, 560, p[0] / len); // uKeyLightDir.x
-        write_f32(&mut buf, 564, p[1] / len); // uKeyLightDir.y
-        write_f32(&mut buf, 568, p[2] / len); // uKeyLightDir.z
-        // padding at 572-575 (uKeyLightColor needs 16-byte alignment)
+        let target = LightingState {
+            dir: [p[0] / len, p[1] / len, p[2] / len],
+            color: [p[3], p[4], p[5]],
+            intensity: (p[6] + energy_boost).clamp(0.0, 1.0),
+            ambient: [
+                (p[7] + ambient_boost).clamp(0.0, 1.0),
+                (p[8] + ambient_boost).clamp(0.0, 1.0),
+                (p[9] + ambient_boost).clamp(0.0, 1.0),
+            ],
+            temperature: (p[10] * 0.6 + frame.show_warmth * 0.4).clamp(-1.0, 1.0),
+        };
 
-        write_f32(&mut buf, 576, p[3]);       // uKeyLightColor.r
-        write_f32(&mut buf, 580, p[4]);       // uKeyLightColor.g
-        write_f32(&mut buf, 584, p[5]);       // uKeyLightColor.b
-        write_f32(&mut buf, 588, intensity);  // uKeyLightIntensity
+        // EMA smooth: ~2s transition between section lighting states
+        let a = LIGHTING_EMA_ALPHA;
+        lighting.dir[0] = lerp(lighting.dir[0], target.dir[0], a);
+        lighting.dir[1] = lerp(lighting.dir[1], target.dir[1], a);
+        lighting.dir[2] = lerp(lighting.dir[2], target.dir[2], a);
+        lighting.color[0] = lerp(lighting.color[0], target.color[0], a);
+        lighting.color[1] = lerp(lighting.color[1], target.color[1], a);
+        lighting.color[2] = lerp(lighting.color[2], target.color[2], a);
+        lighting.intensity = lerp(lighting.intensity, target.intensity, a);
+        lighting.ambient[0] = lerp(lighting.ambient[0], target.ambient[0], a);
+        lighting.ambient[1] = lerp(lighting.ambient[1], target.ambient[1], a);
+        lighting.ambient[2] = lerp(lighting.ambient[2], target.ambient[2], a);
+        lighting.temperature = lerp(lighting.temperature, target.temperature, a);
 
-        write_f32(&mut buf, 592, (p[7] + ambient_boost).clamp(0.0, 1.0)); // uAmbientColor.r
-        write_f32(&mut buf, 596, (p[8] + ambient_boost).clamp(0.0, 1.0)); // uAmbientColor.g
-        write_f32(&mut buf, 600, (p[9] + ambient_boost).clamp(0.0, 1.0)); // uAmbientColor.b
-
-        // Color temperature: blend section preset with show warmth
-        let temp = p[10] * 0.6 + frame.show_warmth * 0.4;
-        write_f32(&mut buf, 604, temp.clamp(-1.0, 1.0)); // uColorTemperature
+        // Re-normalize direction after interpolation
+        let dl = (lighting.dir[0]*lighting.dir[0] + lighting.dir[1]*lighting.dir[1] + lighting.dir[2]*lighting.dir[2]).sqrt().max(0.001);
+        write_f32(&mut buf, 560, lighting.dir[0] / dl);
+        write_f32(&mut buf, 564, lighting.dir[1] / dl);
+        write_f32(&mut buf, 568, lighting.dir[2] / dl);
+        write_f32(&mut buf, 576, lighting.color[0]);
+        write_f32(&mut buf, 580, lighting.color[1]);
+        write_f32(&mut buf, 584, lighting.color[2]);
+        write_f32(&mut buf, 588, lighting.intensity);
+        write_f32(&mut buf, 592, lighting.ambient[0]);
+        write_f32(&mut buf, 596, lighting.ambient[1]);
+        write_f32(&mut buf, 600, lighting.ambient[2]);
+        write_f32(&mut buf, 604, lighting.temperature);
     }
 
     // ─── Temporal Coherence ─── (offset 608)
-    write_f32(&mut buf, 608, 0.0);  // uTemporalBlendStrength
+    // Energy-responsive: quiet sections get more temporal blending (smooth motion),
+    // loud sections get less (crisp transients). Matches Remotion EnergyEnvelope.
+    let temporal_blend = 0.12 * (1.0 - frame.energy.min(1.0) * 0.5);
+    write_f32(&mut buf, 608, temporal_blend);  // uTemporalBlendStrength
 
     // ─── Per-Show Visual Identity ─── (offsets 612-624)
     write_f32(&mut buf, 612, frame.show_grain_character.unwrap_or(0.5));       // uShowGrainCharacter

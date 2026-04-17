@@ -150,7 +150,7 @@ fn test_benchmark_300_frames() {
     // ═══ BENCHMARK: GPU render only (no disk I/O) ═══
     let start_gpu = std::time::Instant::now();
     for frame in &frame_datas {
-        let uniform_data = dead_air_renderer::uniforms::build_uniform_buffer(frame, width, height);
+        let uniform_data = dead_air_renderer::uniforms::build_uniform_buffer(frame, width, height, &mut dead_air_renderer::uniforms::LightingState::default());
         renderer.render_frame(&pipeline, &uniform_data, None, None, None, None);
         // Read pixels back (required to actually execute the GPU work)
         let _pixels = renderer.read_pixels();
@@ -165,7 +165,7 @@ fn test_benchmark_300_frames() {
 
     let start_full = std::time::Instant::now();
     for (i, frame) in frame_datas.iter().enumerate() {
-        let uniform_data = dead_air_renderer::uniforms::build_uniform_buffer(frame, width, height);
+        let uniform_data = dead_air_renderer::uniforms::build_uniform_buffer(frame, width, height, &mut dead_air_renderer::uniforms::LightingState::default());
         renderer.render_frame(&pipeline, &uniform_data, None, None, None, None);
         let pixels = renderer.read_pixels();
         image::save_buffer(

@@ -638,7 +638,7 @@ function computeUniforms(
     melodic_confidence: L("melodicConfidence"),
     chord_confidence: L("chordConfidence"),
     section_type: sectionTypeFloat(f.sectionType),  // discrete
-    section_index: 0,
+    section_index: 0, // overwritten by frame loop with routeState.currentSectionIdx
     section_progress: L("sectionProgress"),
     climax_phase: climaxPhaseMap[climax.phase] ?? 0,  // discrete
     climax_intensity: climax.intensity ?? 0,
@@ -1285,6 +1285,9 @@ async function main() {
         aiHi, interpT,
         song, i / Math.max(1, totalOut), routeSectionProgress, showVisualSeed,
       );
+
+      // Fix section_index (not available in computeUniforms)
+      uniforms.section_index = routeState.currentSectionIdx;
 
       // Suppress reactive uniforms during dead air — calm ambient, no pulsing to noise
       if (isDeadAir) {

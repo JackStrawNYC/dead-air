@@ -224,6 +224,7 @@ fn main() {
     let (feedback_b, feedback_b_view) = renderer.create_feedback_texture("feedback_b");
     let (fft_texture, fft_view) = renderer.create_fft_texture();
     let mut feedback_idx: usize = 0; // 0 = write to A, read from B; 1 = write to B, read from A
+    let mut lighting_state = uniforms::LightingState::default();
 
     // ─── Create post-processing pipeline ───
     let pp_pipeline = postprocess::PostProcessPipeline::new(
@@ -470,11 +471,17 @@ fn main() {
         };
         let feedback_target = if feedback_idx == 0 { &feedback_a } else { &feedback_b };
 
-        let uniform_data = uniforms::build_uniform_buffer(frame, args.width, args.height);
+        let uniform_data = uniforms::build_uniform_buffer(frame, args.width, args.height, &mut lighting_state);
         let is_intro = frame.shader_id == intro::INTRO_SHADER_ID;
         let pp_uniforms = postprocess::PostProcessUniforms {
-            bloom_threshold: -0.08 - frame.energy * 0.18,
-            bloom_intensity: 1.0,
+            // Bloom threshold offset: raises the base threshold in the extract shader.
+            // GLSL in-shader bloom handles per-pixel glow. Rust spatial bloom should
+            // only catch genuinely bright highlights (lum > 0.6+).
+            // Formula in extract: mix(0.58, 0.18, energy) + this_offset
+            // With offset=0.10: effective threshold = 0.68 (quiet) → 0.28 (loud)
+            // Only bright highlights bloom spatially, not the whole image.
+            bloom_threshold: 0.10 - frame.energy * 0.08,
+            bloom_intensity: 0.8,
             energy: frame.energy,
             time: frame.time,
             grain_amount: 0.02 + frame.energy * 0.05,

@@ -79,7 +79,7 @@ fn test_render_with_overlay() {
         show_contrast_character: None,
     };
 
-    let uniforms = dead_air_renderer::uniforms::build_uniform_buffer(&frame, width, height);
+    let uniforms = dead_air_renderer::uniforms::build_uniform_buffer(&frame, width, height, &mut dead_air_renderer::uniforms::LightingState::default());
     renderer.render_frame(&pipeline, &uniforms, None, None, None, None);
     let mut pixels = renderer.read_pixels();
     println!("Shader rendered: {} pixels", pixels.len() / 4);

@@ -151,7 +151,7 @@ fn compile_and_render(
     });
 
     let pipeline = renderer.create_pipeline(&fragment_module);
-    let uniform_data = dead_air_renderer::uniforms::build_uniform_buffer(frame_data, width, height);
+    let uniform_data = dead_air_renderer::uniforms::build_uniform_buffer(frame_data, width, height, &mut dead_air_renderer::uniforms::LightingState::default());
 
     renderer.render_frame(&pipeline, &uniform_data, None, None, None, None);
     let pixels = renderer.read_pixels();

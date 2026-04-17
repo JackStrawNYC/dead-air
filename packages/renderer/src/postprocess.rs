@@ -258,16 +258,26 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     var col = textureSample(scene_hdr, tex_sampler, in.uv).rgb;
     let bloom = textureSample(bloom_tex, tex_sampler, in.uv).rgb;
 
-    // ─── Spatial bloom only ───
-    // Spatial bloom — real multi-pass Gaussian blur, the one thing GLSL single-pass can't do.
-    // Energy-reactive: subtle glow at rest, dramatic bloom at peaks.
-    let bloom_amount = 0.12 + pp.energy * 0.35;
-    // Warm the bloom slightly — bright areas glow amber, not clinical white
+    // ─── Spatial bloom (complementary to GLSL in-shader bloom) ───
+    // GLSL applyPostProcess() already does per-pixel bloom (unblurred glow).
+    // Rust adds SPATIAL bloom: real multi-pass Gaussian blur for soft glow halos.
+    // Keep intensity low to complement, not compete with GLSL bloom.
+    let bloom_amount = 0.05 + pp.energy * 0.15;
+    // Warm tint: bright areas glow amber, not clinical white
     let bloom_warm = mix(bloom, bloom * vec3<f32>(1.05, 0.98, 0.92), 0.3);
-    // Additive blend with soft clamp — allows glow without washing out
-    col = col + bloom_warm * bloom_amount * pp.bloom_intensity;
+    // Screen blend: prevents exceeding 1.0 naturally (unlike additive)
+    let b = bloom_warm * bloom_amount * pp.bloom_intensity;
+    col = col + b * (vec3<f32>(1.0) - col);
 
-    // Clamp to [0,1] for SDR output
+    // Soft Reinhard rolloff instead of hard clamp — prevents highlight clipping.
+    // GLSL ACES already tone-mapped to ~[0,1], but bloom can push slightly above.
+    // Reinhard compresses >1.0 gracefully instead of flat-clamping to white.
+    let white_point = 1.5;
+    col = col * (vec3<f32>(1.0) + col / (white_point * white_point)) / (vec3<f32>(1.0) + col);
+
+    // NO sRGB encoding here — GLSL ACES tone mapping already outputs
+    // display-referred sRGB values (designed for WebGL canvas display).
+    // Adding sRGB encoding would double-encode gamma, washing out the image.
     col = clamp(col, vec3<f32>(0.0), vec3<f32>(1.0));
 
     return vec4<f32>(col, 1.0);

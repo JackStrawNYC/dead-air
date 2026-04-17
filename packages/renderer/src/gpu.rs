@@ -46,8 +46,9 @@ fn vs_main(in: VertexInput) -> VertexOutput {
 }
 "#;
 
-/// HDR → SDR output pass shader. Clamps HDR values to [0,1].
-/// In Phase 3, this becomes the full tonemap + post-processing pipeline.
+/// HDR → SDR output pass shader with soft Reinhard rolloff.
+/// GLSL ACES tone mapping already outputs display-referred sRGB values.
+/// No additional gamma encoding — just prevent hard clipping.
 const OUTPUT_SHADER_WGSL: &str = r#"
 @group(0) @binding(0) var tex_sampler: sampler;
 @group(0) @binding(1) var hdr_input: texture_2d<f32>;
@@ -59,8 +60,11 @@ struct VertexOutput {
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    let color = textureSample(hdr_input, tex_sampler, in.uv);
-    return clamp(color, vec4<f32>(0.0), vec4<f32>(1.0));
+    var col = textureSample(hdr_input, tex_sampler, in.uv).rgb;
+    // Soft Reinhard rolloff: compresses >1.0 gracefully
+    let white_point = 1.5;
+    col = col * (vec3<f32>(1.0) + col / (white_point * white_point)) / (vec3<f32>(1.0) + col);
+    return vec4<f32>(clamp(col, vec3<f32>(0.0), vec3<f32>(1.0)), 1.0);
 }
 "#;
 
