@@ -1144,8 +1144,8 @@ async function main() {
       "neon_grid", "concert_beams", "blacklight_glow", "liquid_projector",
       "databend", "signal_decay", "climax_surge", "cellular_automata",
       "bioluminescence",
-      // Black-frame risk: unclear implementation or sparse output
-      "storm_vortex", "mycelium_network", "cosmic_voyage",
+      // Black-frame risk: unclear implementation, sparse output, or naga compile failure
+      "storm_vortex", "mycelium_network", "cosmic_voyage", "solar_flare",
       // Show-specific variants: only used via song identity, not random pool
       "morning_dew_fog", "dark_star_void", "fire_mountain_smoke",
       "estimated_prophet_mist", "wharf_rat_storm", "scarlet_golden_haze",
@@ -1166,7 +1166,7 @@ async function main() {
       // Energy-appropriate shader sets (shared between identity and fallback)
       const HIGH_ENERGY_SHADERS = new Set(["inferno", "lava_flow", "electric_arc",
         "concert_lighting", "fractal_temple", "fractal_flames", "tie_dye",
-        "solar_flare", "plasma_field", "feedback_recursion", "mandala_engine"]);
+        "plasma_field", "feedback_recursion", "mandala_engine"]);
       const LOW_ENERGY_SHADERS = new Set(["aurora", "deep_ocean", "ancient_forest",
         "void_light", "cosmic_dust", "ink_wash", "smoke_rings",
         "stained_glass", "coral_reef", "oil_projector"]);
