@@ -256,16 +256,16 @@ struct VertexOutput {
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     var col = textureSample(scene_hdr, tex_sampler, in.uv).rgb;
-    // GLSL-only bloom: all bloom is handled by applyPostProcess() inside
-    // the shader. Rust spatial bloom is DISABLED to prevent double-processing,
-    // highlight clipping, and washed-out output.
-    //
-    // The bloom_tex is still generated (extract+blur) but NOT composited.
-    // If spatial bloom is needed in the future, re-enable with careful
-    // intensity tuning to complement (not compound with) GLSL bloom.
 
-    // Soft Reinhard rolloff for any HDR overshoot from the GLSL pipeline.
-    // ACES maps to ~[0,1] but some shaders push slightly above via bloom/halation.
+    // Ambient brightness floor: prevents pure black frames from dark shaders.
+    // Adds a subtle deep blue-purple haze (0.02-0.04) to near-black pixels.
+    // Quiet passages feel intimate and dark, not broken/empty.
+    let luma = dot(col, vec3<f32>(0.2126, 0.7152, 0.0722));
+    let ambient_floor = vec3<f32>(0.015, 0.010, 0.025); // deep indigo
+    let floor_strength = smoothstep(0.05, 0.0, luma); // only lifts truly dark pixels
+    col = col + ambient_floor * floor_strength;
+
+    // Soft Reinhard rolloff for HDR overshoot
     let white_point = 2.0;
     col = col * (vec3<f32>(1.0) + col / (white_point * white_point)) / (vec3<f32>(1.0) + col);
     col = clamp(col, vec3<f32>(0.0), vec3<f32>(1.0));

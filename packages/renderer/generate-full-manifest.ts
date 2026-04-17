@@ -557,35 +557,35 @@ function computeUniforms(
   // Structural analysis values (discrete state machines — don't interpolate phases)
   const climax = analysis?.climaxState ?? { phase: "idle", intensity: 0 };
 
-  // Base brightness: 0.65 (quiet) → 0.95 (loud) — NARROW range for flow, not strobe
-  // Previous: 0.55-1.05 was too wide, causing harsh brightness swings
-  let envBrightness = 0.65 + Math.sqrt(factor) * 0.30;
+  // Envelope brightness: WIDE range for cinematic dynamic arc.
+  // Quiet: 0.35 (intimate, dark) → Loud: 1.10 (overwhelming, bright)
+  // sqrt curve ensures smooth gradient, not binary switch.
+  let envBrightness = 0.35 + Math.sqrt(factor) * 0.75;
 
-  // Base saturation: 0.75 (quiet) → 1.10 (loud) — subtle, not overwhelming
-  // Previous: 0.55-1.35 was too wide, max 1.43 with climax = over-saturated
-  const satKnee = 0.75 + factor * 0.35;
+  // Envelope saturation: WIDE range for emotional arc.
+  // Quiet: 0.50 (muted, contemplative) → Loud: 1.30 (vivid, electric)
+  const satKnee = 0.50 + factor * 0.80;
   let envSaturation = satKnee;
 
-  // Climax modulation: GENTLE boosts — the music should feel intense through
-  // the shader's internal animation, not through brightness/saturation cranking
+  // Climax modulation: meaningful boosts that a viewer FEELS
   const climaxPhase = climax.phase;
   const climaxT = ss(climax.intensity ?? 0);
   if (climaxPhase === "climax") {
-    envBrightness += 0.05 * climaxT;
-    envSaturation += 0.15 * climaxT;
+    envBrightness += 0.15 * climaxT;
+    envSaturation += 0.25 * climaxT;
   } else if (climaxPhase === "sustain") {
-    envBrightness += 0.03 * climaxT;
-    envSaturation += 0.10 * climaxT;
+    envBrightness += 0.10 * climaxT;
+    envSaturation += 0.15 * climaxT;
   } else if (climaxPhase === "build") {
-    envBrightness += 0.01 * climaxT;
+    envBrightness += 0.03 * climaxT;
     envSaturation -= 0.05 * climaxT;
   } else if (climaxPhase === "release") {
-    envBrightness -= 0.01 * climaxT;
-    envSaturation += 0.03 * climaxT;
+    envBrightness -= 0.03 * climaxT;
+    envSaturation += 0.05 * climaxT;
   } else {
-    // idle: slight dim
-    envSaturation -= 0.05 * climaxT;
-    envBrightness -= 0.02 * climaxT;
+    // idle: subdued, intimate
+    envSaturation -= 0.08 * climaxT;
+    envBrightness -= 0.05 * climaxT;
   }
 
   // Hue: drums/space phase + chroma breathing
@@ -602,9 +602,9 @@ function computeUniforms(
   hueShiftDeg += chromaBreathing;
   const envHue = hueShiftDeg * (Math.PI / 180); // convert to radians
 
-  // Clamp to narrower ranges for cinematic flow (not reactive strobe)
-  envBrightness = Math.max(0.40, Math.min(1.05, envBrightness));
-  envSaturation = Math.max(0.70, Math.min(1.25, envSaturation));
+  // Wide clamp for full cinematic dynamic range
+  envBrightness = Math.max(0.30, Math.min(1.20, envBrightness));
+  envSaturation = Math.max(0.50, Math.min(1.30, envSaturation));
   const climaxPhaseMap: Record<string, number> = { idle: 0, build: 1, climax: 2, sustain: 3, release: 4 };
   const jamCycle = analysis?.jamCycle ?? { phase: "setup", progress: 0 };
   const jamPhaseMap: Record<string, number> = { exploration: 0, building: 1, peak_space: 2, resolution: 3 };
@@ -683,7 +683,10 @@ function computeUniforms(
     era_saturation: 1.05, era_brightness: 1.0, era_sepia: 0.06,
     show_warmth: 0, show_contrast: 1.0, show_saturation: 1.0,
     show_grain: 1.0, show_bloom: 1.0,
-    param_bass_scale: 0.6, param_energy_scale: 0.7, param_motion_speed: 0.45, // cinematic flow: slow, atmospheric
+    // Dynamic params: quiet drifts slowly, peaks churn intensely
+    param_bass_scale: 0.3 + energy * 0.7,      // 0.30 (quiet) → 1.0 (loud)
+    param_energy_scale: 0.4 + energy * 0.6,     // 0.40 (quiet) → 1.0 (loud)
+    param_motion_speed: 0.15 + energy * 0.70,   // 0.15 (quiet drift) → 0.85 (peak churn)
     param_color_sat_bias: 0, param_complexity: 1.0,
     param_drum_reactivity: 1.0, param_vocal_weight: 1.0,
     peak_of_show: analysis?.peakOfShow?.isPeak ? 1 : 0,
