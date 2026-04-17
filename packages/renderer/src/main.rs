@@ -573,6 +573,15 @@ fn main() {
             None
         };
 
+        // Skip FXAA for shaders with fine geometric detail (fractals, mandalas, sacred geometry)
+        // FXAA softens edges which destroys procedural pattern crispness
+        let skip_fxaa = matches!(frame.shader_id.as_str(),
+            "fractal_temple" | "mandala_engine" | "sacred_geometry" | "kaleidoscope" |
+            "truchet_tiling" | "diffraction_rings" | "stained_glass" | "neural_web" |
+            "voronoi_flow" | "fractal_flames" | "fractal_zoom" | "reaction_diffusion" |
+            "morphogenesis" | "feedback_recursion" | "crystalline_growth"
+        );
+
         if has_transition {
             let sec_id = frame.secondary_shader_id.as_ref().unwrap();
             let blend_prog = frame.blend_progress.unwrap();
@@ -598,6 +607,7 @@ fn main() {
                     Some(feedback_target),
                     if args.no_pp { None } else { Some((&pp_pipeline, &pp_uniforms)) },
                     &transition_pipeline,
+                    skip_fxaa,
                 );
             } else {
                 // Secondary shader not found — render primary only
@@ -606,6 +616,7 @@ fn main() {
                     texture_bind_group.as_ref(), Some(feedback_target),
                     if args.no_pp { None } else { Some((&pp_pipeline, &pp_uniforms)) },
                     None, // no temporal during transitions
+                    skip_fxaa,
                 );
             }
         } else if frame.motion_blur_samples > 1 {
@@ -646,7 +657,7 @@ fn main() {
                 renderer.scene_to_readback(&motion_blur_pipeline.accum_view);
             } else {
                 renderer.postprocess_and_readback(
-                    &pp_pipeline, &pp_uniforms, &motion_blur_pipeline.accum_view,
+                    &pp_pipeline, &pp_uniforms, &motion_blur_pipeline.accum_view, skip_fxaa,
                 );
             }
         } else {
@@ -662,7 +673,7 @@ fn main() {
                 renderer.scene_to_readback(&scene_view);
             } else {
                 let scene_view = renderer.create_scene_view();
-                renderer.postprocess_and_readback(&pp_pipeline, &pp_uniforms, &scene_view);
+                renderer.postprocess_and_readback(&pp_pipeline, &pp_uniforms, &scene_view, skip_fxaa);
             }
         }
 

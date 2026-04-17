@@ -466,6 +466,7 @@ impl PostProcessPipeline {
 
     /// Run the full post-processing pipeline.
     /// Reads from scene_texture (HDR), writes to output_texture (SDR).
+    /// If `skip_fxaa` is true, writes composite directly to output (preserves fractal detail).
     pub fn run(
         &self,
         encoder: &mut wgpu::CommandEncoder,
@@ -476,6 +477,7 @@ impl PostProcessPipeline {
         uniforms: &PostProcessUniforms,
         vertex_buffer: &wgpu::Buffer,
         index_buffer: &wgpu::Buffer,
+        skip_fxaa: bool,
     ) {
         let uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("pp_uniforms"),
@@ -532,21 +534,27 @@ impl PostProcessPipeline {
             ],
         });
 
-        self.run_pass(encoder, &self.composite_pipeline, &composite_bg,
-            &self.pre_fxaa_view, vertex_buffer, index_buffer);
+        if skip_fxaa {
+            // Write composite directly to output — preserves fine geometric detail
+            // (fractal edges, mandala lines, sacred geometry patterns)
+            self.run_pass(encoder, &self.composite_pipeline, &composite_bg,
+                output_view, vertex_buffer, index_buffer);
+        } else {
+            // Composite → pre-FXAA buffer → FXAA → output
+            self.run_pass(encoder, &self.composite_pipeline, &composite_bg,
+                &self.pre_fxaa_view, vertex_buffer, index_buffer);
 
-        // ─── Pass 5: FXAA (pre-FXAA → final output) ───
-        let fxaa_bg = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("pp_fxaa_bg"),
-            layout: &self.blur_bind_group_layout, // reuse: sampler + texture
-            entries: &[
-                wgpu::BindGroupEntry { binding: 0, resource: wgpu::BindingResource::Sampler(sampler) },
-                wgpu::BindGroupEntry { binding: 1, resource: wgpu::BindingResource::TextureView(&self.pre_fxaa_view) },
-            ],
-        });
-
-        self.run_pass(encoder, &self.fxaa_pipeline, &fxaa_bg,
-            output_view, vertex_buffer, index_buffer);
+            let fxaa_bg = device.create_bind_group(&wgpu::BindGroupDescriptor {
+                label: Some("pp_fxaa_bg"),
+                layout: &self.blur_bind_group_layout,
+                entries: &[
+                    wgpu::BindGroupEntry { binding: 0, resource: wgpu::BindingResource::Sampler(sampler) },
+                    wgpu::BindGroupEntry { binding: 1, resource: wgpu::BindingResource::TextureView(&self.pre_fxaa_view) },
+                ],
+            });
+            self.run_pass(encoder, &self.fxaa_pipeline, &fxaa_bg,
+                output_view, vertex_buffer, index_buffer);
+        }
     }
 
     fn run_pass(

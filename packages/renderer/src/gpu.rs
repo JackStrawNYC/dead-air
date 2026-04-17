@@ -745,6 +745,7 @@ impl GpuRenderer {
         pp: &crate::postprocess::PostProcessPipeline,
         pp_uniforms: &crate::postprocess::PostProcessUniforms,
         hdr_source: &wgpu::TextureView,
+        skip_fxaa: bool,
     ) {
         let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("pp_readback_encoder"),
@@ -759,6 +760,7 @@ impl GpuRenderer {
             pp_uniforms,
             &self.vertex_buffer,
             &self.index_buffer,
+            skip_fxaa,
         );
 
         self.copy_to_readback(&mut encoder);
@@ -777,6 +779,7 @@ impl GpuRenderer {
         feedback_target: Option<&wgpu::Texture>,
         pp: Option<(&crate::postprocess::PostProcessPipeline, &crate::postprocess::PostProcessUniforms)>,
         temporal: Option<(&crate::temporal::TemporalBlendPipeline, &wgpu::TextureView, f32)>,
+        skip_fxaa: bool,
     ) {
         // Create uniform buffer for this frame
         let uniform_buffer = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -884,6 +887,7 @@ impl GpuRenderer {
                 pp_uniforms,
                 &self.vertex_buffer,
                 &self.index_buffer,
+                skip_fxaa,
             );
         } else {
             // Simple clamp pass (fallback when post-processing not initialized)
@@ -1004,6 +1008,7 @@ impl GpuRenderer {
         feedback_target: Option<&wgpu::Texture>,
         pp: Option<(&crate::postprocess::PostProcessPipeline, &crate::postprocess::PostProcessUniforms)>,
         transition_pipeline: &crate::transition::GpuTransitionPipeline,
+        skip_fxaa: bool,
     ) {
         let uniform_buffer = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("frame_uniforms"),
@@ -1179,6 +1184,7 @@ impl GpuRenderer {
                 pp_uniforms,
                 &self.vertex_buffer,
                 &self.index_buffer,
+                skip_fxaa,
             );
         } else {
             let mut rp = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
