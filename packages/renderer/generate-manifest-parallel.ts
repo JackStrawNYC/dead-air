@@ -12,7 +12,7 @@
 
 import { fork } from "child_process";
 import { existsSync, readFileSync, writeFileSync, mkdirSync, createWriteStream } from "fs";
-import { join } from "path";
+import { join, resolve } from "path";
 import { cpus } from "os";
 
 const args = process.argv.slice(2);
@@ -27,6 +27,8 @@ const fps = parseInt(getArg("fps", "30"));
 const width = parseInt(getArg("width", "1920"));
 const height = parseInt(getArg("height", "1080"));
 const concurrency = parseInt(getArg("concurrency", String(Math.max(1, cpus().length - 1))));
+const withOverlays = args.includes("--with-overlays");
+const overlayPngDir = getArg("overlay-png-dir", "overlay-pngs");
 
 const SCRIPT_DIR = new URL(".", import.meta.url).pathname;
 const SINGLE_SONG_SCRIPT = join(SCRIPT_DIR, "generate-full-manifest.ts");
@@ -35,6 +37,9 @@ console.log(`[parallel-manifest] Concurrency: ${concurrency} workers`);
 console.log(`[parallel-manifest] Data: ${dataDir}`);
 console.log(`[parallel-manifest] Output: ${outputPath}`);
 console.log(`[parallel-manifest] ${width}x${height} @ ${fps}fps`);
+if (withOverlays) {
+  console.log(`[parallel-manifest] Overlays: ENABLED (PNG dir: ${overlayPngDir})`);
+}
 
 // Load setlist
 const setlist = JSON.parse(readFileSync(join(dataDir, "setlist.json"), "utf-8"));
@@ -80,14 +85,18 @@ async function processSongInChild(songEntry: typeof validSongs[0]): Promise<Song
     const startTime = Date.now();
 
     // Fork the single-song manifest generator with special args
-    const child = fork(SINGLE_SONG_SCRIPT, [
+    const childArgs = [
       "--data-dir", dataDir,
       "--output", framesPath,
       "--fps", String(fps),
       "--width", String(width),
       "--height", String(height),
       "--single-song", String(idx),  // NEW: process only this song
-    ], {
+    ];
+    if (withOverlays) {
+      childArgs.push("--with-overlays", "--overlay-png-dir", overlayPngDir);
+    }
+    const child = fork(SINGLE_SONG_SCRIPT, childArgs, {
       execArgv: ["--require", require.resolve("tsx/cjs")].filter(() => false), // tsx handles this
       stdio: ["ignore", "pipe", "pipe"],
     });
@@ -168,10 +177,46 @@ async function main() {
     }
   }
 
-  ws.write("\n]}");
+  ws.write("\n]"); // close frames array
+
+  // Merge overlay schedules from per-song overlay files
+  if (withOverlays) {
+    console.log("[parallel-manifest] Merging overlay schedules...");
+    let overlayFrameCount = 0;
+    ws.write(',"overlay_schedule":[\n');
+    let firstOverlayFrame = true;
+
+    for (const result of results) {
+      if (result.frameCount === 0) continue;
+      const overlayPath = result.framesPath.replace("-frames.json", "-overlays.json");
+      if (existsSync(overlayPath)) {
+        const songOverlays = JSON.parse(readFileSync(overlayPath, "utf-8"));
+        for (let i = 0; i < songOverlays.length; i++) {
+          if (!firstOverlayFrame) ws.write(",\n");
+          ws.write(JSON.stringify(songOverlays[i]));
+          firstOverlayFrame = false;
+          overlayFrameCount++;
+        }
+      } else {
+        // Fill with empty arrays for frames without overlay data
+        for (let i = 0; i < result.frameCount; i++) {
+          if (!firstOverlayFrame) ws.write(",\n");
+          ws.write("[]");
+          firstOverlayFrame = false;
+          overlayFrameCount++;
+        }
+      }
+    }
+
+    ws.write("\n]"); // close overlay_schedule array
+    ws.write(`,"overlay_png_dir":${JSON.stringify(resolve(overlayPngDir))}`);
+    console.log(`[parallel-manifest] Overlay schedule: ${overlayFrameCount} frames merged`);
+  }
+
+  ws.write("}"); // close root object
   ws.end();
 
-  await new Promise<void>((resolve) => ws.on("finish", resolve));
+  await new Promise<void>((res) => ws.on("finish", res));
 
   console.log(`\n[parallel-manifest] Done: ${outputPath} (${frameIdx} frames)`);
   console.log(`[parallel-manifest] Total time: ${elapsed}s`);

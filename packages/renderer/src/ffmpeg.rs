@@ -69,6 +69,13 @@ impl FfmpegPipe {
         args.extend([
             "-pix_fmt".to_string(), "yuv420p".to_string(),
             "-threads".to_string(), "0".to_string(),
+            // Color space flags: GLSL shaders output full-range sRGB values
+            // (ACES tone mapping → display-referred). Without these flags FFmpeg
+            // treats full-range 0-255 as limited-range 16-235, crushing contrast.
+            "-color_range".to_string(), "pc".to_string(),
+            "-colorspace".to_string(), "bt709".to_string(),
+            "-color_primaries".to_string(), "bt709".to_string(),
+            "-color_trc".to_string(), "iec61966-2-1".to_string(),
             "-an".to_string(),
             output_path.to_string(),
         ]);

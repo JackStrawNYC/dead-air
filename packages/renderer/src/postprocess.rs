@@ -5,8 +5,8 @@
 //!
 //! Pipeline:
 //!   1. Bloom extract: threshold bright pixels from HDR scene → half-res texture
-//!   2. Gaussian blur horizontal: 13-tap separable blur
-//!   3. Gaussian blur vertical: 13-tap separable blur
+//!   2. Gaussian blur horizontal: 21-tap separable blur (sigma 8)
+//!   3. Gaussian blur vertical: 21-tap separable blur (sigma 8)
 //!   4. Bloom combine: additive blend bloom back onto scene
 //!   5. Tonemap + grade: ACES filmic tone mapping, vignette, film grain
 //!
@@ -16,7 +16,7 @@
 use crate::gpu;
 use wgpu::util::DeviceExt;
 
-/// 13-tap Gaussian blur kernel (sigma ≈ 4.0, normalized)
+/// 21-tap Gaussian blur kernel (sigma ≈ 8.0, normalized)
 const BLOOM_EXTRACT_WGSL: &str = r#"
 @group(0) @binding(0) var tex_sampler: sampler;
 @group(0) @binding(1) var scene_hdr: texture_2d<f32>;
@@ -72,20 +72,28 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let tex_size = vec2<f32>(textureDimensions(bloom_tex));
     let pixel = 1.0 / tex_size.x;
 
-    // 13-tap Gaussian (sigma ≈ 4.0)
-    var color = textureSample(bloom_tex, tex_sampler, in.uv) * 0.1964825501511404;
-    color += textureSample(bloom_tex, tex_sampler, in.uv + vec2<f32>(pixel * 1.0, 0.0)) * 0.1748072902979518;
-    color += textureSample(bloom_tex, tex_sampler, in.uv - vec2<f32>(pixel * 1.0, 0.0)) * 0.1748072902979518;
-    color += textureSample(bloom_tex, tex_sampler, in.uv + vec2<f32>(pixel * 2.0, 0.0)) * 0.1209853622595717;
-    color += textureSample(bloom_tex, tex_sampler, in.uv - vec2<f32>(pixel * 2.0, 0.0)) * 0.1209853622595717;
-    color += textureSample(bloom_tex, tex_sampler, in.uv + vec2<f32>(pixel * 3.0, 0.0)) * 0.0651095085903614;
-    color += textureSample(bloom_tex, tex_sampler, in.uv - vec2<f32>(pixel * 3.0, 0.0)) * 0.0651095085903614;
-    color += textureSample(bloom_tex, tex_sampler, in.uv + vec2<f32>(pixel * 4.0, 0.0)) * 0.0272144126261124;
-    color += textureSample(bloom_tex, tex_sampler, in.uv - vec2<f32>(pixel * 4.0, 0.0)) * 0.0272144126261124;
-    color += textureSample(bloom_tex, tex_sampler, in.uv + vec2<f32>(pixel * 5.0, 0.0)) * 0.0088437749498348;
-    color += textureSample(bloom_tex, tex_sampler, in.uv - vec2<f32>(pixel * 5.0, 0.0)) * 0.0088437749498348;
-    color += textureSample(bloom_tex, tex_sampler, in.uv + vec2<f32>(pixel * 6.0, 0.0)) * 0.0022333669926236;
-    color += textureSample(bloom_tex, tex_sampler, in.uv - vec2<f32>(pixel * 6.0, 0.0)) * 0.0022333669926236;
+    // 21-tap Gaussian (sigma ≈ 8.0) — wide enough for visible glow at 4K
+    var color = textureSample(bloom_tex, tex_sampler, in.uv) * 0.0614940458401963;
+    color += textureSample(bloom_tex, tex_sampler, in.uv + vec2<f32>(pixel * 1.0, 0.0)) * 0.0610154953788405;
+    color += textureSample(bloom_tex, tex_sampler, in.uv - vec2<f32>(pixel * 1.0, 0.0)) * 0.0610154953788405;
+    color += textureSample(bloom_tex, tex_sampler, in.uv + vec2<f32>(pixel * 2.0, 0.0)) * 0.0596020729507300;
+    color += textureSample(bloom_tex, tex_sampler, in.uv - vec2<f32>(pixel * 2.0, 0.0)) * 0.0596020729507300;
+    color += textureSample(bloom_tex, tex_sampler, in.uv + vec2<f32>(pixel * 3.0, 0.0)) * 0.0573187533929180;
+    color += textureSample(bloom_tex, tex_sampler, in.uv - vec2<f32>(pixel * 3.0, 0.0)) * 0.0573187533929180;
+    color += textureSample(bloom_tex, tex_sampler, in.uv + vec2<f32>(pixel * 4.0, 0.0)) * 0.0542683049813684;
+    color += textureSample(bloom_tex, tex_sampler, in.uv - vec2<f32>(pixel * 4.0, 0.0)) * 0.0542683049813684;
+    color += textureSample(bloom_tex, tex_sampler, in.uv + vec2<f32>(pixel * 5.0, 0.0)) * 0.0505836223292604;
+    color += textureSample(bloom_tex, tex_sampler, in.uv - vec2<f32>(pixel * 5.0, 0.0)) * 0.0505836223292604;
+    color += textureSample(bloom_tex, tex_sampler, in.uv + vec2<f32>(pixel * 6.0, 0.0)) * 0.0464181410867075;
+    color += textureSample(bloom_tex, tex_sampler, in.uv - vec2<f32>(pixel * 6.0, 0.0)) * 0.0464181410867075;
+    color += textureSample(bloom_tex, tex_sampler, in.uv + vec2<f32>(pixel * 7.0, 0.0)) * 0.0419352958139972;
+    color += textureSample(bloom_tex, tex_sampler, in.uv - vec2<f32>(pixel * 7.0, 0.0)) * 0.0419352958139972;
+    color += textureSample(bloom_tex, tex_sampler, in.uv + vec2<f32>(pixel * 8.0, 0.0)) * 0.0372980241918532;
+    color += textureSample(bloom_tex, tex_sampler, in.uv - vec2<f32>(pixel * 8.0, 0.0)) * 0.0372980241918532;
+    color += textureSample(bloom_tex, tex_sampler, in.uv + vec2<f32>(pixel * 9.0, 0.0)) * 0.0326592412182720;
+    color += textureSample(bloom_tex, tex_sampler, in.uv - vec2<f32>(pixel * 9.0, 0.0)) * 0.0326592412182720;
+    color += textureSample(bloom_tex, tex_sampler, in.uv + vec2<f32>(pixel * 10.0, 0.0)) * 0.0281540257359548;
+    color += textureSample(bloom_tex, tex_sampler, in.uv - vec2<f32>(pixel * 10.0, 0.0)) * 0.0281540257359548;
 
     return color;
 }
@@ -105,20 +113,28 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let tex_size = vec2<f32>(textureDimensions(bloom_tex));
     let pixel = 1.0 / tex_size.y;
 
-    // 13-tap Gaussian (same kernel as horizontal)
-    var color = textureSample(bloom_tex, tex_sampler, in.uv) * 0.1964825501511404;
-    color += textureSample(bloom_tex, tex_sampler, in.uv + vec2<f32>(0.0, pixel * 1.0)) * 0.1748072902979518;
-    color += textureSample(bloom_tex, tex_sampler, in.uv - vec2<f32>(0.0, pixel * 1.0)) * 0.1748072902979518;
-    color += textureSample(bloom_tex, tex_sampler, in.uv + vec2<f32>(0.0, pixel * 2.0)) * 0.1209853622595717;
-    color += textureSample(bloom_tex, tex_sampler, in.uv - vec2<f32>(0.0, pixel * 2.0)) * 0.1209853622595717;
-    color += textureSample(bloom_tex, tex_sampler, in.uv + vec2<f32>(0.0, pixel * 3.0)) * 0.0651095085903614;
-    color += textureSample(bloom_tex, tex_sampler, in.uv - vec2<f32>(0.0, pixel * 3.0)) * 0.0651095085903614;
-    color += textureSample(bloom_tex, tex_sampler, in.uv + vec2<f32>(0.0, pixel * 4.0)) * 0.0272144126261124;
-    color += textureSample(bloom_tex, tex_sampler, in.uv - vec2<f32>(0.0, pixel * 4.0)) * 0.0272144126261124;
-    color += textureSample(bloom_tex, tex_sampler, in.uv + vec2<f32>(0.0, pixel * 5.0)) * 0.0088437749498348;
-    color += textureSample(bloom_tex, tex_sampler, in.uv - vec2<f32>(0.0, pixel * 5.0)) * 0.0088437749498348;
-    color += textureSample(bloom_tex, tex_sampler, in.uv + vec2<f32>(0.0, pixel * 6.0)) * 0.0022333669926236;
-    color += textureSample(bloom_tex, tex_sampler, in.uv - vec2<f32>(0.0, pixel * 6.0)) * 0.0022333669926236;
+    // 21-tap Gaussian (same kernel as horizontal)
+    var color = textureSample(bloom_tex, tex_sampler, in.uv) * 0.0614940458401963;
+    color += textureSample(bloom_tex, tex_sampler, in.uv + vec2<f32>(0.0, pixel * 1.0)) * 0.0610154953788405;
+    color += textureSample(bloom_tex, tex_sampler, in.uv - vec2<f32>(0.0, pixel * 1.0)) * 0.0610154953788405;
+    color += textureSample(bloom_tex, tex_sampler, in.uv + vec2<f32>(0.0, pixel * 2.0)) * 0.0596020729507300;
+    color += textureSample(bloom_tex, tex_sampler, in.uv - vec2<f32>(0.0, pixel * 2.0)) * 0.0596020729507300;
+    color += textureSample(bloom_tex, tex_sampler, in.uv + vec2<f32>(0.0, pixel * 3.0)) * 0.0573187533929180;
+    color += textureSample(bloom_tex, tex_sampler, in.uv - vec2<f32>(0.0, pixel * 3.0)) * 0.0573187533929180;
+    color += textureSample(bloom_tex, tex_sampler, in.uv + vec2<f32>(0.0, pixel * 4.0)) * 0.0542683049813684;
+    color += textureSample(bloom_tex, tex_sampler, in.uv - vec2<f32>(0.0, pixel * 4.0)) * 0.0542683049813684;
+    color += textureSample(bloom_tex, tex_sampler, in.uv + vec2<f32>(0.0, pixel * 5.0)) * 0.0505836223292604;
+    color += textureSample(bloom_tex, tex_sampler, in.uv - vec2<f32>(0.0, pixel * 5.0)) * 0.0505836223292604;
+    color += textureSample(bloom_tex, tex_sampler, in.uv + vec2<f32>(0.0, pixel * 6.0)) * 0.0464181410867075;
+    color += textureSample(bloom_tex, tex_sampler, in.uv - vec2<f32>(0.0, pixel * 6.0)) * 0.0464181410867075;
+    color += textureSample(bloom_tex, tex_sampler, in.uv + vec2<f32>(0.0, pixel * 7.0)) * 0.0419352958139972;
+    color += textureSample(bloom_tex, tex_sampler, in.uv - vec2<f32>(0.0, pixel * 7.0)) * 0.0419352958139972;
+    color += textureSample(bloom_tex, tex_sampler, in.uv + vec2<f32>(0.0, pixel * 8.0)) * 0.0372980241918532;
+    color += textureSample(bloom_tex, tex_sampler, in.uv - vec2<f32>(0.0, pixel * 8.0)) * 0.0372980241918532;
+    color += textureSample(bloom_tex, tex_sampler, in.uv + vec2<f32>(0.0, pixel * 9.0)) * 0.0326592412182720;
+    color += textureSample(bloom_tex, tex_sampler, in.uv - vec2<f32>(0.0, pixel * 9.0)) * 0.0326592412182720;
+    color += textureSample(bloom_tex, tex_sampler, in.uv + vec2<f32>(0.0, pixel * 10.0)) * 0.0281540257359548;
+    color += textureSample(bloom_tex, tex_sampler, in.uv - vec2<f32>(0.0, pixel * 10.0)) * 0.0281540257359548;
 
     return color;
 }
@@ -243,10 +259,13 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let bloom = textureSample(bloom_tex, tex_sampler, in.uv).rgb;
 
     // ─── Spatial bloom only ───
-    // Real multi-pass Gaussian blur bloom — the one thing GLSL single-pass can't do.
-    // Screen blend at low intensity so it adds glow without washing out the image.
-    let bloom_amount = 0.06 + pp.energy * 0.15;
-    col = col + bloom * bloom_amount * pp.bloom_intensity - col * bloom * bloom_amount * pp.bloom_intensity;
+    // Spatial bloom — real multi-pass Gaussian blur, the one thing GLSL single-pass can't do.
+    // Energy-reactive: subtle glow at rest, dramatic bloom at peaks.
+    let bloom_amount = 0.12 + pp.energy * 0.35;
+    // Warm the bloom slightly — bright areas glow amber, not clinical white
+    let bloom_warm = mix(bloom, bloom * vec3<f32>(1.05, 0.98, 0.92), 0.3);
+    // Additive blend with soft clamp — allows glow without washing out
+    col = col + bloom_warm * bloom_amount * pp.bloom_intensity;
 
     // Clamp to [0,1] for SDR output
     col = clamp(col, vec3<f32>(0.0), vec3<f32>(1.0));

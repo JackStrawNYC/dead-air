@@ -545,11 +545,60 @@ function computeUniforms(
   const mids = lerpSmoothed(smoothed.mids);
   const highs = lerpSmoothed(smoothed.highs);
 
-  const factor = Math.max(0, Math.min(1, (energy - 0.05) / 0.30));
-  const envBrightness = 0.55 + Math.sqrt(factor) * 0.50;
+  // Smoothstep helper
+  const ss = (t2: number) => { const c = Math.max(0, Math.min(1, t2)); return c * c * (3 - 2 * c); };
+
+  // Energy factor with smoothstep (wider range than before)
+  const factor = ss((energy - 0.05) / 0.30);
 
   // Structural analysis values (discrete state machines — don't interpolate phases)
   const climax = analysis?.climaxState ?? { phase: "idle", intensity: 0 };
+
+  // Base brightness: 0.55 (quiet) → 1.05 (loud) with sqrt curve
+  let envBrightness = 0.55 + Math.sqrt(factor) * 0.50;
+
+  // Base saturation: 0.55 (quiet) → 1.35 (loud) with wide knee
+  const satKnee = 0.55 + factor * 0.80;
+  let envSaturation = satKnee;
+
+  // Climax modulation: boost brightness and saturation during climax/sustain
+  const climaxPhase = climax.phase;
+  const climaxT = ss(climax.intensity ?? 0);
+  if (climaxPhase === "climax") {
+    envBrightness += 0.10 * climaxT;
+    envSaturation += 0.40 * climaxT;
+  } else if (climaxPhase === "sustain") {
+    envBrightness += 0.07 * climaxT;
+    envSaturation += 0.25 * climaxT;
+  } else if (climaxPhase === "build") {
+    envBrightness += 0.01 * climaxT;
+    envSaturation -= 0.10 * climaxT;
+  } else if (climaxPhase === "release") {
+    envBrightness -= 0.01 * climaxT;
+    envSaturation += 0.08 * climaxT;
+  } else {
+    // idle: slight desaturation
+    envSaturation -= 0.10 * climaxT;
+    envBrightness -= 0.04 * climaxT;
+  }
+
+  // Hue: drums/space phase + chroma breathing
+  let hueShiftDeg = 0;
+  const sType = f.sectionType ?? "";
+  if (sType === "space" || sType === "ambient") {
+    hueShiftDeg += 15; // blue shift for space
+  } else if (sType === "drums" || sType === "percussion") {
+    hueShiftDeg += 12; // warm shift for drums
+  }
+  // Chroma breathing: dominant pitch class modulates hue ±5 degrees
+  const chromaHueNorm = chromaHue(f) / 360; // 0-1
+  const chromaBreathing = (chromaHueNorm - 0.5) * 10 * Math.min(1, energy * 4);
+  hueShiftDeg += chromaBreathing;
+  const envHue = hueShiftDeg * (Math.PI / 180); // convert to radians
+
+  // Clamp to safe ranges
+  envBrightness = Math.max(0.15, Math.min(1.55, envBrightness));
+  envSaturation = Math.max(0.55, Math.min(1.80, envSaturation));
   const climaxPhaseMap: Record<string, number> = { idle: 0, build: 1, climax: 2, sustain: 3, release: 4 };
   const jamCycle = analysis?.jamCycle ?? { phase: "setup", progress: 0 };
   const jamPhaseMap: Record<string, number> = { exploration: 0, building: 1, peak_space: 2, resolution: 3 };
@@ -619,8 +668,8 @@ function computeUniforms(
     palette_secondary: (song?.palette?.secondary ?? 200) / 360,
     palette_saturation: song?.palette?.saturation ?? 0.85,
     envelope_brightness: envBrightness,
-    envelope_saturation: 1.0 + energy * 0.2,
-    envelope_hue: 0,
+    envelope_saturation: envSaturation,
+    envelope_hue: envHue,
     era_saturation: 1.05, era_brightness: 1.0, era_sepia: 0.06,
     show_warmth: 0, show_contrast: 1.0, show_saturation: 1.0,
     show_grain: 1.0, show_bloom: 1.0,
@@ -1373,6 +1422,14 @@ async function main() {
     writeFileSync(outputPath, JSON.stringify(allFrames));
     const mb = (statSync(outputPath).size / 1048576).toFixed(1);
     console.log(`[full-manifest] Done: ${outputPath} (${mb} MB, ${allFrames.length} frames)`);
+
+    // Write overlay schedule to a sibling file for the parallel merger to pick up
+    if (withOverlays && overlaySchedule.length > 0) {
+      const overlayPath = outputPath.replace("-frames.json", "-overlays.json");
+      writeFileSync(overlayPath, JSON.stringify(overlaySchedule));
+      const overlayMb = (statSync(overlayPath).size / 1048576).toFixed(1);
+      console.log(`[full-manifest] Overlays: ${overlayPath} (${overlayMb} MB, ${overlaySchedule.length} frames)`);
+    }
     return;
   }
 

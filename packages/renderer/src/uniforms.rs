@@ -174,17 +174,64 @@ pub fn build_uniform_buffer(frame: &FrameData, width: u32, height: u32) -> Vec<u
     write_f32(&mut buf, 400, 0.2);                     // uVenueVignette
     // padding 404-415 (align vec3 uCamPos to 16)
 
-    // ─── 3D Camera ─── (offsets 416-452)
-    write_f32(&mut buf, 416, 0.0);  // uCamPos.x
-    write_f32(&mut buf, 420, 0.0);  // uCamPos.y
-    write_f32(&mut buf, 424, 0.0);  // uCamPos.z
-    // padding at 428-431 (uCamTarget needs 16-byte alignment)
-    write_f32(&mut buf, 432, 0.0);  // uCamTarget.x
-    write_f32(&mut buf, 436, 0.0);  // uCamTarget.y
-    write_f32(&mut buf, 440, 0.0);  // uCamTarget.z
-    write_f32(&mut buf, 444, 60.0); // uCamFov (packs into uCamTarget padding)
-    write_f32(&mut buf, 448, 0.0);  // uCamDof
-    write_f32(&mut buf, 452, 5.0);  // uCamFocusDist
+    // ─── 3D Camera (computed from audio) ─── (offsets 416-452)
+    {
+        let energy = frame.energy.clamp(0.0, 1.0);
+        let bass = frame.bass.clamp(0.0, 1.0);
+        let time = frame.time;
+        let dyn_time = frame.dynamic_time;
+        let vocal_p = frame.vocal_presence.clamp(0.0, 1.0);
+        let drum_on = frame.drum_onset.clamp(0.0, 1.0);
+        let beat_stab = frame.beat_stability.clamp(0.0, 1.0);
+        let climax_int = frame.climax_intensity.clamp(0.0, 1.0);
+
+        // Orbital path: radius shrinks with energy, orbit slowly
+        let base_radius = 3.5 - energy * 0.5;
+        let vocal_mod = if vocal_p > 0.3 { 0.9 } else { 1.0 };
+        let radius = base_radius * vocal_mod;
+        let orbit_angle = dyn_time * 0.02;
+        let orbit_height = (dyn_time * 0.015).sin() * 0.3;
+
+        let cam_x = orbit_angle.sin() * radius;
+        let cam_y = orbit_height;
+        let cam_z = orbit_angle.cos() * radius;
+
+        // Bass shake (dampened by steadiness + vocals)
+        let shake_damp = 1.0 - beat_stab * 0.8;
+        let vocal_shake_damp = if vocal_p > 0.3 { 0.8 } else { 1.0 };
+        let sd = shake_damp * vocal_shake_damp;
+        let shake_x = (time * 3.7).sin() * bass * 0.06 * sd;
+        let shake_y = (time * 2.3).cos() * bass * 0.04 * sd;
+        let shake_z = (time * 4.1).sin() * bass * 0.03 * sd;
+
+        // Drum jolt
+        let jolt_thresh = 0.5;
+        let jolt_x = if drum_on > jolt_thresh { (drum_on - jolt_thresh) * 0.08 * (time * 7.3).sin() } else { 0.0 };
+        let jolt_y = if drum_on > jolt_thresh { (drum_on - jolt_thresh) * 0.06 * (time * 5.1).cos() } else { 0.0 };
+        let jolt_z = if drum_on > jolt_thresh { (drum_on - jolt_thresh) * 0.04 * (time * 6.7).sin() } else { 0.0 };
+
+        write_f32(&mut buf, 416, cam_x + shake_x + jolt_x); // uCamPos.x
+        write_f32(&mut buf, 420, cam_y + shake_y + jolt_y); // uCamPos.y
+        write_f32(&mut buf, 424, cam_z + shake_z + jolt_z); // uCamPos.z
+        // padding at 428-431 (uCamTarget needs 16-byte alignment)
+
+        // Target: slight sway
+        let tgt_x = (dyn_time * 0.01).sin() * 0.1;
+        let tgt_y = (dyn_time * 0.008).cos() * 0.05;
+        write_f32(&mut buf, 432, tgt_x); // uCamTarget.x
+        write_f32(&mut buf, 436, tgt_y); // uCamTarget.y
+        write_f32(&mut buf, 440, 0.0);   // uCamTarget.z
+
+        // FOV: wider at peaks (50 base, +10 at full energy)
+        let fov = (50.0 + energy * 10.0).clamp(45.0, 65.0);
+        write_f32(&mut buf, 444, fov);    // uCamFov
+
+        // DOF: energy + climax driven
+        let dof = (energy * 0.4 + climax_int * 0.3).clamp(0.0, 1.0);
+        let focus_dist = (3.0 - energy * 1.0).clamp(2.0, 5.0);
+        write_f32(&mut buf, 448, dof);          // uCamDof
+        write_f32(&mut buf, 452, focus_dist);   // uCamFocusDist
+    }
 
     // ─── Envelope ─── (offsets 456-464)
     write_f32(&mut buf, 456, frame.envelope_brightness); // uEnvelopeBrightness
@@ -222,20 +269,50 @@ pub fn build_uniform_buffer(frame: &FrameData, width: u32, height: u32) -> Vec<u
     write_f32(&mut buf, 552, frame.param_vocal_weight);    // uParamVocalWeight
     // padding 556-559 (align vec3 uKeyLightDir to 16)
 
-    // ─── Shared Lighting Context ─── (offsets 560-604)
-    write_f32(&mut buf, 560, 0.3);  // uKeyLightDir.x
-    write_f32(&mut buf, 564, 0.8);  // uKeyLightDir.y
-    write_f32(&mut buf, 568, 0.5);  // uKeyLightDir.z
-    // padding at 572-575 (uKeyLightColor needs 16-byte alignment)
-    write_f32(&mut buf, 576, 1.0);  // uKeyLightColor.x
-    write_f32(&mut buf, 580, 0.95); // uKeyLightColor.y
-    write_f32(&mut buf, 584, 0.9);  // uKeyLightColor.z
-    write_f32(&mut buf, 588, 1.0);  // uKeyLightIntensity (packs into uKeyLightColor padding)
-    // uAmbientColor needs 16-byte alignment → 592
-    write_f32(&mut buf, 592, 0.1);  // uAmbientColor.x
-    write_f32(&mut buf, 596, 0.1);  // uAmbientColor.y
-    write_f32(&mut buf, 600, 0.15); // uAmbientColor.z
-    write_f32(&mut buf, 604, frame.show_warmth * 0.5);  // uColorTemperature (packs into uAmbientColor padding)
+    // ─── Shared Lighting Context (section-aware) ─── (offsets 560-604)
+    {
+        let section = frame.section_type as i32; // 0=verse,1=chorus,2=bridge,3=intro,4=outro,5=jam,6=solo,7=space
+        let energy = frame.energy.clamp(0.0, 1.0);
+
+        // Section lighting presets: [dir_x, dir_y, dir_z, col_r, col_g, col_b, intensity, amb_r, amb_g, amb_b, temp]
+        let presets: [[f32; 11]; 8] = [
+            [0.2, 0.6, 0.8, 1.0, 0.93, 0.85, 0.6, 0.10, 0.08, 0.06, 0.3],  // verse
+            [0.0, 1.0, 0.3, 1.0, 1.0, 1.0, 0.9, 0.12, 0.11, 0.12, 0.0],    // chorus
+            [0.3, 0.7, 0.5, 0.95, 0.93, 0.95, 0.55, 0.08, 0.08, 0.09, 0.0], // bridge
+            [0.2, 0.5, 0.7, 0.9, 0.88, 0.85, 0.45, 0.06, 0.05, 0.07, 0.1],  // intro
+            [0.1, 0.7, 0.4, 0.9, 0.85, 0.8, 0.4, 0.06, 0.05, 0.06, 0.15],   // outro
+            [0.7, 0.4, -0.3, 0.85, 0.9, 1.0, 0.7, 0.06, 0.07, 0.12, -0.3],  // jam
+            [0.1, 0.9, 0.2, 1.0, 0.92, 0.75, 0.85, 0.09, 0.07, 0.05, 0.4],  // solo
+            [0.0, 1.0, 0.0, 0.8, 0.75, 0.9, 0.3, 0.05, 0.03, 0.08, -0.5],   // space
+        ];
+        let idx = (section as usize).min(7);
+        let p = presets[idx];
+
+        // Energy modulation: brighter light at higher energy
+        let energy_boost = energy * 0.15;
+        let ambient_boost = energy * 0.04;
+        let intensity = (p[6] + energy_boost).clamp(0.0, 1.0);
+
+        // Normalize direction
+        let len = (p[0]*p[0] + p[1]*p[1] + p[2]*p[2]).sqrt().max(0.001);
+        write_f32(&mut buf, 560, p[0] / len); // uKeyLightDir.x
+        write_f32(&mut buf, 564, p[1] / len); // uKeyLightDir.y
+        write_f32(&mut buf, 568, p[2] / len); // uKeyLightDir.z
+        // padding at 572-575 (uKeyLightColor needs 16-byte alignment)
+
+        write_f32(&mut buf, 576, p[3]);       // uKeyLightColor.r
+        write_f32(&mut buf, 580, p[4]);       // uKeyLightColor.g
+        write_f32(&mut buf, 584, p[5]);       // uKeyLightColor.b
+        write_f32(&mut buf, 588, intensity);  // uKeyLightIntensity
+
+        write_f32(&mut buf, 592, (p[7] + ambient_boost).clamp(0.0, 1.0)); // uAmbientColor.r
+        write_f32(&mut buf, 596, (p[8] + ambient_boost).clamp(0.0, 1.0)); // uAmbientColor.g
+        write_f32(&mut buf, 600, (p[9] + ambient_boost).clamp(0.0, 1.0)); // uAmbientColor.b
+
+        // Color temperature: blend section preset with show warmth
+        let temp = p[10] * 0.6 + frame.show_warmth * 0.4;
+        write_f32(&mut buf, 604, temp.clamp(-1.0, 1.0)); // uColorTemperature
+    }
 
     // ─── Temporal Coherence ─── (offset 608)
     write_f32(&mut buf, 608, 0.0);  // uTemporalBlendStrength
@@ -250,8 +327,18 @@ pub fn build_uniform_buffer(frame: &FrameData, width: u32, height: u32) -> Vec<u
     // ─── Spatial ─── (offsets 632-644)
     write_f32(&mut buf, 632, width as f32);  // uResolution.x
     write_f32(&mut buf, 636, height as f32); // uResolution.y
-    write_f32(&mut buf, 640, 0.0);  // uCamOffset.x
-    write_f32(&mut buf, 644, 0.0);  // uCamOffset.y
+    // ─── Camera Offset (parallax drift) ─── (offsets 640-644)
+    {
+        let bass_amp = frame.bass.clamp(0.0, 1.0) * 12.0;
+        let time = frame.time;
+        let dyn_time = frame.dynamic_time;
+        let cam_off_x = (time * 3.7).sin() * bass_amp * 0.5
+            + (dyn_time * 0.03 * std::f32::consts::PI * 2.0).sin() * 4.0;
+        let cam_off_y = (time * 2.3).cos() * bass_amp * 0.3
+            + (dyn_time * 0.03 * std::f32::consts::PI * 2.0 * 0.7 + 1.3).cos() * 2.4;
+        write_f32(&mut buf, 640, cam_off_x); // uCamOffset.x
+        write_f32(&mut buf, 644, cam_off_y); // uCamOffset.y
+    }
 
     // Total data: 648 bytes, padded to 656 (16-byte alignment)
 
