@@ -33,6 +33,21 @@ pub struct Manifest {
     pub height: Option<u32>,
     pub fps: Option<u32>,
     pub show_title: Option<String>,
+
+    /// Song boundaries for chapter card insertion.
+    #[serde(default)]
+    pub song_boundaries: Option<Vec<SongBoundary>>,
+}
+
+/// Song boundary marker for chapter cards.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct SongBoundary {
+    pub title: String,
+    pub set: u32,
+    #[serde(rename = "startFrame")]
+    pub start_frame: u32,
+    #[serde(rename = "endFrame")]
+    pub end_frame: u32,
 }
 
 /// Per-frame data: which shader to use + all uniform values.

@@ -160,6 +160,23 @@ async function main() {
   ws.write(JSON.stringify(shaders));
   ws.write(`,"width":${width},"height":${height},"fps":${fps}`);
   ws.write(`,"show_title":${JSON.stringify(`${setlist.venue} — ${setlist.date}`)}`);
+
+  // Build song boundaries for chapter cards
+  const songBoundaries: { title: string; set: number; startFrame: number; endFrame: number }[] = [];
+  let boundaryOffset = 0;
+  for (const result of results) {
+    if (result.frameCount === 0) continue;
+    const song = songs[result.idx];
+    songBoundaries.push({
+      title: song?.title ?? `Song ${result.idx + 1}`,
+      set: song?.set ?? 1,
+      startFrame: boundaryOffset,
+      endFrame: boundaryOffset + result.frameCount,
+    });
+    boundaryOffset += result.frameCount;
+  }
+  ws.write(`,"song_boundaries":${JSON.stringify(songBoundaries)}`);
+
   ws.write(',"frames":[\n');
 
   let frameIdx = 0;

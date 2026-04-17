@@ -1508,10 +1508,33 @@ async function main() {
 
           // Cap opacity: ambient overlays should be subtle, not opaque
           let finalOpacity = opacity;
-          if (prominence === "ambient") finalOpacity = Math.min(finalOpacity, 0.5);
-          if (prominence === "accent") finalOpacity = Math.min(finalOpacity, 0.7);
-          // SongTitle: visible but not screaming
-          if (overlayName === "SongTitle") finalOpacity = Math.min(finalOpacity, 0.6);
+          if (prominence === "ambient") finalOpacity = Math.min(finalOpacity, 0.35);
+          if (prominence === "accent") finalOpacity = Math.min(finalOpacity, 0.55);
+          // FilmGrain: very subtle — it should add texture not haze
+          if (overlayName === "FilmGrain") finalOpacity = Math.min(finalOpacity, 0.15);
+          // SmokeWisps: only during quiet passages, invisible at peaks
+          if (overlayName === "SmokeWisps") finalOpacity = finalOpacity * Math.max(0, 1.0 - energy * 3);
+          // ConcertInfo: brief appearance at song start then gone
+          if (overlayName === "ConcertInfo") {
+            const songTimeSec = i / fps;
+            if (songTimeSec < 0.5) finalOpacity = songTimeSec * 0.8;
+            else if (songTimeSec < 6.0) finalOpacity = 0.4;
+            else if (songTimeSec < 8.0) finalOpacity = 0.4 * (1.0 - (songTimeSec - 6.0) / 2.0);
+            else finalOpacity = 0;
+          }
+          // SongTitle: fade in at song start, hold 8s, fade out by 11s, then invisible
+          if (overlayName === "SongTitle") {
+            const songTimeSec = i / fps;
+            if (songTimeSec < 1.0) {
+              finalOpacity = songTimeSec * 0.6; // fade in over 1s
+            } else if (songTimeSec < 9.0) {
+              finalOpacity = 0.6; // hold
+            } else if (songTimeSec < 11.0) {
+              finalOpacity = 0.6 * (1.0 - (songTimeSec - 9.0) / 2.0); // fade out over 2s
+            } else {
+              finalOpacity = 0; // invisible after 11s
+            }
+          }
 
           // Scatter overlays across the frame — don't stack at center
           // Use seeded hash of overlay name for deterministic but varied positioning

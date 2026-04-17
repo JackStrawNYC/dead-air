@@ -115,6 +115,14 @@ struct Args {
     #[arg(long, default_value_t = false)]
     with_endcard: bool,
 
+    /// Song titles for end card setlist (comma-separated). If omitted, derived from manifest.
+    #[arg(long)]
+    song_titles: Option<String>,
+
+    /// Insert 3-second chapter cards between songs (requires song_boundaries in manifest).
+    #[arg(long, default_value_t = false)]
+    with_chapter_cards: bool,
+
     /// Override overlay PNG directory (instead of path baked into manifest).
     #[arg(long)]
     overlay_png_dir: Option<String>,
@@ -193,23 +201,81 @@ fn main() {
         0
     };
 
+    // ─── Insert chapter cards between songs if requested ───
+    if args.with_chapter_cards {
+        if let Some(ref boundaries) = manifest.song_boundaries {
+            if boundaries.len() > 1 {
+                // Insert chapter cards in reverse order (so frame indices stay valid)
+                let mut insertions: Vec<(u32, String, u32, u32)> = Vec::new();
+                for (i, boundary) in boundaries.iter().enumerate().skip(1) {
+                    // Skip first song (intro handles it)
+                    let set_label = format!("Set {}", boundary.set);
+                    insertions.push((
+                        boundary.start_frame + intro_frame_count as u32,
+                        boundary.title.clone(),
+                        boundary.set,
+                        i as u32 + 1,
+                    ));
+                }
+                insertions.reverse(); // insert from back to front
+
+                for (insert_at, title, _set, track_num) in &insertions {
+                    let set_label = format!("Set {}", _set);
+                    let (cc_shaders, cc_frames, cc_overlays) =
+                        chapter_card::generate_chapter_card(
+                            args.fps, args.width, args.height,
+                            title, &set_label, *track_num,
+                        );
+
+                    let n_cc = cc_frames.len();
+                    // Register shaders
+                    for (id, glsl) in cc_shaders {
+                        manifest.shaders.entry(id).or_insert(glsl);
+                    }
+
+                    // Renumber frames after insertion point
+                    let offset = n_cc as u32;
+                    for f in manifest.frames.iter_mut() {
+                        if f.frame >= *insert_at {
+                            f.frame += offset;
+                        }
+                    }
+
+                    // Insert chapter card frames
+                    let insert_idx = manifest.frames.iter().position(|f| f.frame >= *insert_at + offset).unwrap_or(manifest.frames.len());
+                    let mut cc_numbered = cc_frames;
+                    for (j, f) in cc_numbered.iter_mut().enumerate() {
+                        f.frame = *insert_at + j as u32;
+                    }
+                    manifest.frames.splice(insert_idx..insert_idx, cc_numbered);
+                }
+
+                println!("Chapter cards: {} inserted ({} songs)", insertions.len(),
+                    insertions.len());
+            }
+        }
+    }
+
     // ─── Append end card sequence if requested ───
     if args.with_endcard {
         let venue = args.show_venue.as_deref().unwrap_or("Unknown Venue");
         let date_display = args.show_date.as_deref().unwrap_or("Unknown Date");
 
-        // Collect song titles from manifest (deduplicate consecutive same-shader runs)
-        let mut songs: Vec<String> = Vec::new();
-        let mut prev_shader = String::new();
-        for f in &manifest.frames {
-            if f.shader_id != prev_shader && !f.shader_id.starts_with("__") {
-                // Use shader_id as song title placeholder (real titles come from setlist)
-                if songs.len() < 25 { // cap at 25 for display
-                    songs.push(f.shader_id.replace('_', " "));
+        // Use real song titles if provided, otherwise derive from manifest
+        let songs: Vec<String> = if let Some(ref titles) = args.song_titles {
+            titles.split(',').map(|s| s.trim().to_string()).collect()
+        } else {
+            // Fallback: deduplicate shader IDs (not ideal but works for single-song)
+            let mut s = Vec::new();
+            let mut prev = String::new();
+            for f in &manifest.frames {
+                if f.shader_id != prev && !f.shader_id.starts_with("__") && s.len() < 25 {
+                    s.push(f.shader_id.replace('_', " "));
                 }
-                prev_shader = f.shader_id.clone();
+                prev = f.shader_id.clone();
             }
-        }
+            s
+        };
 
         let meta = endcard::EndcardMeta {
             venue: venue.to_string(),
