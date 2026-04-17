@@ -1503,14 +1503,29 @@ async function main() {
           // SongTitle: visible but not screaming
           if (overlayName === "SongTitle") finalOpacity = Math.min(finalOpacity, 0.6);
 
+          // Scatter overlays across the frame — don't stack at center
+          // Use seeded hash of overlay name for deterministic but varied positioning
+          const nameHash = overlayName.split("").reduce((h, c) => ((h << 5) - h + c.charCodeAt(0)) | 0, 0);
+          const posRng = Math.abs(nameHash % 1000) / 1000; // 0-1 from name
+          let offsetX = 0.0;
+          let offsetY = 0.0;
+          if (overlayName !== "FilmGrain" && overlayName !== "SongTitle" && overlayName !== "ConcertInfo") {
+            // Distribute icons across frame quadrants based on name hash
+            // Range: -0.25 to +0.25 (centered within the visible area)
+            offsetX = (posRng - 0.5) * 0.5;
+            offsetY = (((nameHash >> 8) & 0xFF) / 255 - 0.5) * 0.4;
+          } else if (overlayName === "SongTitle") {
+            offsetX = 0.0; offsetY = 0.35; // bottom center
+          }
+
           frameInstances.push({
             overlay_id: overlayName,
             transform: {
               opacity: Math.round(finalOpacity * 1000) / 1000,
               scale,
               rotation_deg: 0.0,
-              offset_x: 0.0,
-              offset_y: 0.0,
+              offset_x: Math.round(offsetX * 1000) / 1000,
+              offset_y: Math.round(offsetY * 1000) / 1000,
             },
             blend_mode: blendMode,
           });
