@@ -251,12 +251,13 @@ pub fn build_uniform_buffer(frame: &FrameData, width: u32, height: u32, lighting
         write_f32(&mut buf, 424, cam_z + shake_z + jolt_z); // uCamPos.z
         // padding at 428-431 (uCamTarget needs 16-byte alignment)
 
-        // Target: slight sway
+        // Target: 3D sway (not locked to Z=0 plane)
         let tgt_x = (dyn_time * 0.01).sin() * 0.1;
         let tgt_y = (dyn_time * 0.008).cos() * 0.05;
+        let tgt_z = (dyn_time * 0.006).sin() * 0.03 * energy; // subtle Z drift, energy-gated
         write_f32(&mut buf, 432, tgt_x); // uCamTarget.x
         write_f32(&mut buf, 436, tgt_y); // uCamTarget.y
-        write_f32(&mut buf, 440, 0.0);   // uCamTarget.z
+        write_f32(&mut buf, 440, tgt_z); // uCamTarget.z
 
         // FOV: wider at peaks (50 base, +10 at full energy)
         let fov = (50.0 + energy * 10.0).clamp(45.0, 65.0);

@@ -1310,8 +1310,9 @@ async function main() {
         uniforms.onset = 0;
         uniforms.beat_snap = 0;
         uniforms.drum_onset = 0;
-        uniforms.envelope_brightness = Math.min(uniforms.envelope_brightness ?? 0.5, 0.3);
-        uniforms.envelope_saturation = Math.min(uniforms.envelope_saturation ?? 0.5, 0.4);
+        // Keep dead air visible but subdued (not nearly invisible)
+        uniforms.envelope_brightness = Math.min(uniforms.envelope_brightness ?? 0.5, 0.45);
+        uniforms.envelope_saturation = Math.min(uniforms.envelope_saturation ?? 0.5, 0.65);
       }
 
       allFrames.push({
