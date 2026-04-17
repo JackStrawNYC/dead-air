@@ -203,7 +203,11 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 }
 "#;
 
-/// Final compositing: combine scene + bloom, apply tone mapping, vignette, grain.
+/// Final compositing: add spatial bloom only, pass through everything else.
+/// All tone mapping, grain, era grading, vignette, halation, CA, etc. are
+/// already applied by the GLSL applyPostProcess() inside each shader.
+/// The only thing Rust adds is real multi-pass spatial bloom (impossible in
+/// single-pass WebGL) — this is the one advantage over the Remotion pipeline.
 const COMPOSITE_WGSL: &str = r#"
 @group(0) @binding(0) var tex_sampler: sampler;
 @group(0) @binding(1) var scene_hdr: texture_2d<f32>;
@@ -233,96 +237,19 @@ struct VertexOutput {
     @location(0) uv: vec2<f32>,
 };
 
-// Gentle filmic tonemap — preserves dark detail better than ACES.
-// ACES maps 0.01 → 0.004 (60% loss in darks). This Reinhard variant
-// with toe lift maps 0.01 → 0.009, keeping dim atmospheric shaders visible.
-fn tonemap(x: vec3<f32>) -> vec3<f32> {
-    // Reinhard with white point at 4.0 (allows > 1.0 HDR values to compress)
-    let white = 4.0;
-    let mapped = x * (1.0 + x / (white * white)) / (1.0 + x);
-    return clamp(mapped, vec3<f32>(0.0), vec3<f32>(1.0));
-}
-
-// Film grain (animated hash noise)
-fn hash12(p: vec2<f32>) -> f32 {
-    var p3 = fract(vec3<f32>(p.x, p.y, p.x) * 0.1031);
-    p3 = p3 + dot(p3, vec3<f32>(p3.y + 33.33, p3.z + 33.33, p3.x + 33.33));
-    return fract((p3.x + p3.y) * p3.z);
-}
-
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     var col = textureSample(scene_hdr, tex_sampler, in.uv).rgb;
     let bloom = textureSample(bloom_tex, tex_sampler, in.uv).rgb;
 
-    // ─── 1. Bloom compositing (screen blend) ───
-    // Reduced: GLSL already adds its own bloom, so GPU bloom is supplemental only
+    // ─── Spatial bloom only ───
+    // Real multi-pass Gaussian blur bloom — the one thing GLSL single-pass can't do.
+    // Screen blend at low intensity so it adds glow without washing out the image.
     let bloom_amount = 0.06 + pp.energy * 0.15;
-    let bloom_warm = mix(bloom, bloom * vec3<f32>(1.0, 0.98, 0.95), 0.25);
-    // Screen blend: col + bloom - col * bloom
-    col = col + bloom_warm * bloom_amount * pp.bloom_intensity - col * bloom_warm * bloom_amount * pp.bloom_intensity;
+    col = col + bloom * bloom_amount * pp.bloom_intensity - col * bloom * bloom_amount * pp.bloom_intensity;
 
-    // ─── 2. Halation: REMOVED — GLSL applyPostProcess() already applies halation ───
-
-    // ─── 3. Chromatic aberration: REMOVED — GLSL applyPostProcess() already applies CA ───
-
-    // ─── 4. Light leak: REMOVED — GLSL applyPostProcess() already applies light leaks ───
-
-    // ─── 5. Adaptive exposure: lift dim scenes without blowing out bright ones ───
-    // Raymarching shaders (cathedral, ocean, inferno) have ambient levels of 0.01-0.04.
-    // Without this boost they're nearly invisible after tonemapping + gamma.
-    // Bright shaders (cosmic_voyage, aurora) are unaffected since the boost
-    // fades out for pixels above ~0.15.
-    {
-        let pixel_luma = dot(col, vec3<f32>(0.2126, 0.7152, 0.0722));
-        let lift = smoothstep(0.15, 0.0, pixel_luma) * 2.0;
-        col = col * (1.0 + lift);
-    }
-
-    // ─── 6. Envelope brightness ───
-    col = col * pp.envelope_brightness;
-
-    // ─── 7. Tonemap ───
-    col = tonemap(col);
-
-    // ─── 7. Envelope saturation ───
-    {
-        let env_luma = dot(col, vec3<f32>(0.299, 0.587, 0.114));
-        let sat_knee = mix(0.55, 1.35, pp.energy);
-        col = mix(vec3<f32>(env_luma), col, pp.envelope_saturation * sat_knee);
-    }
-
-    // ─── 8. Vignette: REMOVED — GLSL applyPostProcess() already applies vignette ───
-
-    // ─── 9. Black crush: REMOVED — counterproductive for atmospheric shaders ───
-
-    // ─── 10. Color persistence: REMOVED — GLSL handles color grading ───
-
-    // ─── 11. Era grading: brightness + sepia tint ───
-    col = col * pp.era_brightness;
-    {
-        let sepia_luma = dot(col, vec3<f32>(0.299, 0.587, 0.114));
-        let sepia_color = vec3<f32>(sepia_luma * 1.2, sepia_luma * 1.0, sepia_luma * 0.8);
-        col = mix(col, sepia_color, pp.era_sepia);
-    }
-
-    // ─── 12. Film grain (reduced — GLSL already adds grain) ───
-    let grain_time = floor(pp.time * 15.0) / 15.0;
-    let grain = hash12(in.uv * pp.resolution + vec2<f32>(grain_time * 100.0, 0.0));
-    let grain_val = (grain - 0.5) * pp.grain_amount * 0.3;
-    col = col + vec3<f32>(grain_val);
-
-    // ─── 13. Minimal gamma correction ───
-    // Only lift truly dark pixels (linear-output shaders like liquid-light).
-    // Shaders that already apply their own gamma (protean-clouds pow(0.55))
-    // output values > 0.2 and should pass through nearly unchanged.
+    // Clamp to [0,1] for SDR output
     col = clamp(col, vec3<f32>(0.0), vec3<f32>(1.0));
-    let luma_final = dot(col, vec3<f32>(0.2126, 0.7152, 0.0722));
-    // Only apply gamma to dark pixels (< 0.12 luma). Above that, pass through.
-    let dark_lift = smoothstep(0.12, 0.0, luma_final);
-    // For dark pixels: pow(x, 0.55) ≈ sRGB. For bright: pow(x, 1.0) = identity.
-    let gamma_exp_2 = mix(1.0, 0.55, dark_lift);
-    col = pow(col, vec3<f32>(gamma_exp_2));
 
     return vec4<f32>(col, 1.0);
 }

@@ -42,8 +42,8 @@ const ALL_MODES: VisualMode[] = [
 ];
 
 describe("SCENE_REGISTRY", () => {
-  it("has exactly 114 registered modes", () => {
-    expect(Object.keys(SCENE_REGISTRY).length).toBe(119);
+  it("has exactly 125 registered modes", () => {
+    expect(Object.keys(SCENE_REGISTRY).length).toBe(125);
   });
 
   it("contains all expected modes", () => {
@@ -131,9 +131,9 @@ describe("getModesForEnergy", () => {
 });
 
 describe("getRegisteredModes", () => {
-  it("returns all 114 modes", () => {
+  it("returns all 125 modes", () => {
     const modes = getRegisteredModes();
-    expect(modes.length).toBe(119);
+    expect(modes.length).toBe(125);
     for (const mode of ALL_MODES) {
       expect(modes).toContain(mode);
     }

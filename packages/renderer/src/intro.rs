@@ -17,8 +17,6 @@ use std::collections::HashMap;
 
 /// Intro timing constants (in seconds).
 const INTRO_DURATION: f32 = 15.0;
-const BLACK_DURATION: f32 = 1.0;
-const EMERGENCE_END: f32 = 5.0;
 const LOGO_START: f32 = 5.0;
 const LOGO_END: f32 = 10.0;
 const CARD_START: f32 = 10.0;

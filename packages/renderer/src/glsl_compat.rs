@@ -15,37 +15,6 @@
 
 use std::collections::HashMap;
 
-/// Replace `texture(samplerName, ...)` calls with a constant value.
-/// Handles nested parentheses in the second argument.
-fn regex_replace_texture(line: &str, sampler_name: &str, replacement: &str) -> String {
-    let pattern = format!("texture({}", sampler_name);
-    let mut result = String::with_capacity(line.len());
-    let mut i = 0;
-    let line_bytes = line.as_bytes();
-    let pattern_bytes = pattern.as_bytes();
-    let plen = pattern_bytes.len();
-
-    while i < line_bytes.len() {
-        if i + plen <= line_bytes.len() && &line_bytes[i..i + plen] == pattern_bytes {
-            // Found texture(samplerName — skip to matching closing paren
-            let mut depth = 1;
-            let mut j = i + plen;
-            while j < line_bytes.len() && depth > 0 {
-                if line_bytes[j] == b'(' { depth += 1; }
-                if line_bytes[j] == b')' { depth -= 1; }
-                j += 1;
-            }
-            result.push_str(replacement);
-            i = j;
-        } else {
-            result.push(line_bytes[i] as char);
-            i += 1;
-        }
-    }
-
-    result
-}
-
 /// Replace `texture(samplerName, uvExpr)` with `funcName(uvExpr)`.
 /// Extracts the UV argument (everything after the first comma) and passes it
 /// to the replacement function. Handles nested parentheses.
@@ -147,7 +116,7 @@ fn inject_global_captures(source: &str) -> String {
         "sChorus", "sSolo", "climB", "spaceScore", "aggressive",
         "stability", "onset", "highs", "mids", "timbral",
         "timeVal", "energyVal", "bassVal", "midsVal", "vocalPresence",
-        "drumOn", "climaxBoost", "coherence",
+        "drumOn", "climaxBoost", "coherence", "holdP",
         // Discovered from batch validation of 123 shaders
         "basePipeRadius", "bassShake", "bassV", "bassVib",
         "beatSnap", "beatSnap2", "bloomState", "cellScale",
@@ -184,9 +153,9 @@ fn inject_global_captures(source: &str) -> String {
         // Sixth batch
         "climaxWarp", "breachAmount", "pressureOrigin",
         // Seventh batch
-        "sectionSpeedMul", "d0",
+        "sectionSpeedMul",
         // Int captures (detected from failing shaders)
-        "blobCount", "fzIterations", "numSignals", "fogSteps",
+        "numSignals", "fogSteps",
         "marchSteps", "signalSteps", "steps",
     ];
 

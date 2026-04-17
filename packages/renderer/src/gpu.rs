@@ -122,7 +122,7 @@ impl GpuRenderer {
     pub async fn new(width: u32, height: u32) -> Result<Self, Box<dyn std::error::Error>> {
         // ─── GPU adapter + device ───
         let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
-            backends: wgpu::Backends::all(),
+            backends: wgpu::Backends::PRIMARY,
             ..Default::default()
         });
 
@@ -438,14 +438,6 @@ impl GpuRenderer {
         &self.queue
     }
 
-    pub fn width(&self) -> u32 {
-        self.width
-    }
-
-    pub fn height(&self) -> u32 {
-        self.height
-    }
-
     pub fn scene_texture_view(&self) -> &wgpu::TextureView {
         &self.scene_texture_view
     }
@@ -454,10 +446,6 @@ impl GpuRenderer {
     /// Use when you need the view separately from a mutable renderer borrow.
     pub fn create_scene_view(&self) -> wgpu::TextureView {
         self.scene_texture.create_view(&wgpu::TextureViewDescriptor::default())
-    }
-
-    pub fn output_texture_view(&self) -> &wgpu::TextureView {
-        &self.output_texture_view
     }
 
     pub fn vertex_buffer(&self) -> &wgpu::Buffer {
@@ -674,24 +662,6 @@ impl GpuRenderer {
             },
             wgpu::Extent3d { width: 64, height: 1, depth_or_array_layers: 1 },
         );
-    }
-
-    /// Clear a feedback texture to the default dark purple (matching JS engine stub).
-    pub fn clear_feedback_texture(&self, texture: &wgpu::Texture) {
-        // Write a single dark purple pixel to a 1x1 area, then let the clear happen
-        // via a render pass. For simplicity, we just submit a clear render pass.
-        let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
-        let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("clear_feedback"),
-        });
-        // Using a tiny 1-pixel texture clear via copy isn't practical at full res.
-        // Instead, we'll accept that the texture starts zeroed and the first frame
-        // will have black feedback. The visual difference is negligible.
-        // For seek detection, the caller can just note that feedback is stale.
-        let _ = &view; // suppress unused warning
-        let _ = encoder;
-        // TODO: Implement proper clear if needed. For now, new textures start at zero
-        // which is close enough to the dark purple stub.
     }
 
     /// Render ONLY the scene shader to the HDR scene texture. No post-processing, no readback.
@@ -947,27 +917,42 @@ impl GpuRenderer {
         let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("no_pp_readback"),
         });
-        // Copy HDR source to output texture via a simple fullscreen blit
-        // (output_texture is RGBA8, HDR is float — this clamps to 0-1)
-        encoder.copy_texture_to_texture(
-            wgpu::TexelCopyTextureInfo {
-                texture: &self.scene_texture,
-                mip_level: 0,
-                origin: wgpu::Origin3d::ZERO,
-                aspect: wgpu::TextureAspect::All,
-            },
-            wgpu::TexelCopyTextureInfo {
-                texture: &self.output_texture,
-                mip_level: 0,
-                origin: wgpu::Origin3d::ZERO,
-                aspect: wgpu::TextureAspect::All,
-            },
-            wgpu::Extent3d {
-                width: self.width,
-                height: self.height,
-                depth_or_array_layers: 1,
-            },
-        );
+        // Blit HDR source to SDR output via a render pass (handles Rgba16Float → Rgba8Unorm)
+        let source_bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("no_pp_blit_bind_group"),
+            layout: &self.output_bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::Sampler(&self.texture_sampler),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::TextureView(hdr_source),
+                },
+            ],
+        });
+        {
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("no_pp_blit_pass"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: &self.output_texture_view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: None,
+                timestamp_writes: None,
+                occlusion_query_set: None,
+            });
+            render_pass.set_pipeline(&self.output_pipeline);
+            render_pass.set_bind_group(0, &source_bind_group, &[]);
+            render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
+            render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
+            render_pass.draw_indexed(0..QUAD_INDICES.len() as u32, 0, 0..1);
+        }
         self.copy_to_readback(&mut encoder);
         self.queue.submit(std::iter::once(encoder.finish()));
     }
@@ -1158,6 +1143,24 @@ impl GpuRenderer {
                 blend_mode,
                 &self.vertex_buffer,
                 &self.index_buffer,
+            );
+
+            // Update feedback with the post-transition blended result so next
+            // frame's uPrevFrame sees the actual output, not the pre-blend primary.
+            encoder.copy_texture_to_texture(
+                wgpu::TexelCopyTextureInfo {
+                    texture: &self.scene_texture,
+                    mip_level: 0,
+                    origin: wgpu::Origin3d::ZERO,
+                    aspect: wgpu::TextureAspect::All,
+                },
+                wgpu::TexelCopyTextureInfo {
+                    texture: fb_tex,
+                    mip_level: 0,
+                    origin: wgpu::Origin3d::ZERO,
+                    aspect: wgpu::TextureAspect::All,
+                },
+                wgpu::Extent3d { width: self.width, height: self.height, depth_or_array_layers: 1 },
             );
         }
 

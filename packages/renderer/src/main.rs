@@ -108,6 +108,10 @@ struct Args {
     /// Path to brand logo PNG for intro sequence (e.g., dead-air-brand.png).
     #[arg(long)]
     brand_image: Option<String>,
+
+    /// Override overlay PNG directory (instead of path baked into manifest).
+    #[arg(long)]
+    overlay_png_dir: Option<String>,
 }
 
 fn main() {
@@ -286,6 +290,11 @@ fn main() {
     }
     println!("Shaders: {} compiled, {} failed", compiled, failed);
 
+    // Override overlay PNG directory from CLI if provided
+    if let Some(ref cli_png_dir) = args.overlay_png_dir {
+        manifest.overlay_png_dir = Some(cli_png_dir.clone());
+    }
+
     // Load overlay cache if overlay PNG directory exists
     let mut overlay_image_cache = overlay_cache::OverlayImageCache::new();
     if let Some(ref png_dir) = manifest.overlay_png_dir {
@@ -300,9 +309,15 @@ fn main() {
 
     // Start FFmpeg pipe if video output
     let mut ffmpeg_pipe = if let Some(ref output_path) = args.output {
+        let codec = std::env::var("FFMPEG_CODEC").unwrap_or_else(|_| "libx264".to_string());
+        let preset = std::env::var("FFMPEG_PRESET").unwrap_or_else(|_| "medium".to_string());
         Some(
-            ffmpeg::FfmpegPipe::new(args.width, args.height, args.fps, &output_path.to_string_lossy())
-                .expect("Failed to start FFmpeg"),
+            ffmpeg::FfmpegPipe::new_with_codec(
+                args.width, args.height, args.fps,
+                &output_path.to_string_lossy(),
+                &codec, &preset, args.crf,
+            )
+            .expect("Failed to start FFmpeg"),
         )
     } else {
         None
@@ -427,8 +442,19 @@ fn main() {
         let pipeline = match shader_info {
             Some(info) => &info.pipeline,
             None => {
+                // Shader failed to compile — write a black frame to maintain A/V sync
+                let black_frame = vec![0u8; args.width as usize * args.height as usize * 4];
+                if let Some(ref mut pipe) = ffmpeg_pipe {
+                    pipe.write_frame(&black_frame).expect("FFmpeg write failed");
+                } else if let Some(ref dir) = args.png_dir {
+                    let path = dir.join(format!("frame_{:07}.png", frame_idx));
+                    image::save_buffer(&path, &black_frame, args.width, args.height, image::ColorType::Rgba8)
+                        .expect("PNG save failed");
+                }
+                eprintln!("  WARN: frame {} black (shader {} not compiled)", frame_idx, frame.shader_id);
                 pending_frame_idx = None;
                 last_frame_idx = Some(frame_idx);
+                progress.inc(1);
                 continue;
             }
         };
@@ -487,7 +513,7 @@ fn main() {
                 let sec_needs_tex = sec_info.texture_info.needs_prev_frame
                     || sec_info.texture_info.needs_fft;
                 let sec_tex_bg = if sec_needs_tex {
-                    let pf_view = if feedback_idx == 0 { &feedback_a_view } else { &feedback_b_view };
+                    let pf_view = if feedback_idx == 0 { &feedback_b_view } else { &feedback_a_view };
                     Some(renderer.create_texture_bind_group(pf_view, &fft_view))
                 } else {
                     None

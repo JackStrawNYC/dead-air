@@ -103,11 +103,6 @@ impl ShaderCache {
         Ok(())
     }
 
-    /// Get a cached render pipeline by shader_id.
-    pub fn get_pipeline(&self, shader_id: &str) -> Option<&wgpu::RenderPipeline> {
-        self.shaders.get(shader_id).map(|info| &info.pipeline)
-    }
-
     /// Get full shader info (pipeline + texture requirements) by shader_id.
     pub fn get_shader_info(&self, shader_id: &str) -> Option<&ShaderInfo> {
         self.shaders.get(shader_id)

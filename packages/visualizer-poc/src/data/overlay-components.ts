@@ -310,7 +310,6 @@ import { MarqueeLights } from "../components/MarqueeLights";
 import { MatrixRain } from "../components/MatrixRain";
 import { MemphisDesign } from "../components/MemphisDesign";
 import { MengerSponge } from "../components/MengerSponge";
-import { MeteorShower } from "../components/MeteorShower";
 import { Metronome } from "../components/Metronome";
 import { MolecularBonds } from "../components/MolecularBonds";
 import { MoonPhases } from "../components/MoonPhases";
@@ -384,7 +383,6 @@ import { SheetMusic } from "../components/SheetMusic";
 import { ShootingStar } from "../components/ShootingStar";
 import { SkullRosesOverlay } from "../components/SkullRosesOverlay";
 import { Slinky } from "../components/Slinky";
-import { SmokeWisps } from "../components/SmokeWisps";
 import { Snowfall } from "../components/Snowfall";
 import { SoapBubbles } from "../components/SoapBubbles";
 import { SolarEclipse } from "../components/SolarEclipse";
@@ -696,7 +694,6 @@ export const OVERLAY_COMPONENTS: Record<string, OverlayComponentEntry> = {
   GraffitiTag:             { Component: GraffitiTag, layer: 10 },
   Gyroscope:               { Component: Gyroscope, layer: 4 },
   HeartbeatEKG:            { Component: HeartbeatEKG, layer: 9 },
-  HeatShimmer:             { Component: HeatShimmer, layer: 10 },
   Hieroglyphs:             { Component: Hieroglyphs, layer: 2 },
   HighwaySign:             { Component: HighwaySign, layer: 7 },
   HilbertCurve:            { Component: HilbertCurve, layer: 4 },
@@ -733,7 +730,6 @@ export const OVERLAY_COMPONENTS: Record<string, OverlayComponentEntry> = {
   MatrixRain:              { Component: MatrixRain, layer: 1 },
   MemphisDesign:           { Component: MemphisDesign, layer: 4 },
   MengerSponge:            { Component: MengerSponge, layer: 4 },
-  MeteorShower:            { Component: MeteorShower, layer: 1 },
   Metronome:               { Component: Metronome, layer: 9 },
   MolecularBonds:          { Component: MolecularBonds, layer: 4 },
   MoonPhases:              { Component: MoonPhases, layer: 1 },
@@ -808,7 +804,6 @@ export const OVERLAY_COMPONENTS: Record<string, OverlayComponentEntry> = {
   ShootingStar:            { Component: ShootingStar, layer: 1 },
   SkullRosesOverlay:       { Component: SkullRosesOverlay, layer: 1 },
   Slinky:                  { Component: Slinky, layer: 4 },
-  SmokeWisps:              { Component: SmokeWisps, layer: 1 },
   Snowfall:                { Component: Snowfall, layer: 1 },
   SoapBubbles:             { Component: SoapBubbles, layer: 1 },
   SolarEclipse:            { Component: SolarEclipse, layer: 1 },

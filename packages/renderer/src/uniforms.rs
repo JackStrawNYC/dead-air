@@ -115,7 +115,7 @@ pub fn build_uniform_buffer(frame: &FrameData, width: u32, height: u32) -> Vec<u
     write_f32(&mut buf, 244, frame.section_index);    // uSectionIndex
     write_f32(&mut buf, 248, frame.climax_phase);     // uClimaxPhase
     write_f32(&mut buf, 252, frame.climax_intensity); // uClimaxIntensity
-    write_f32(&mut buf, 256, 0.0);                    // uCoherence
+    write_f32(&mut buf, 256, frame.coherence);          // uCoherence
     write_f32(&mut buf, 260, frame.jam_density);      // uJamDensity
     write_f32(&mut buf, 264, frame.song_progress.unwrap_or(0.0));        // uSongProgress
     write_f32(&mut buf, 268, frame.shader_hold_progress.unwrap_or(0.0)); // uShaderHoldProgress

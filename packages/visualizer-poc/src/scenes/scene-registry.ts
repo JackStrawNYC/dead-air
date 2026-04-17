@@ -201,6 +201,11 @@ import { AmberDriftScene } from "./AmberDriftScene";
 import { ObsidianMirrorScene } from "./ObsidianMirrorScene";
 import { SpectralBridgeScene } from "./SpectralBridgeScene";
 import { EmberMeadowScene } from "./EmberMeadowScene";
+import { SmokeAndMirrorsScene } from "./SmokeAndMirrorsScene";
+import { MoltenGlassScene } from "./MoltenGlassScene";
+import { ParticleBurstScene } from "./ParticleBurstScene";
+import { DualBlendScene } from "./DualBlendScene";
+import { ConcertBeamsScene } from "./ConcertBeamsScene";
 
 // ─── Scene Registry ───
 
@@ -1026,6 +1031,41 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     complement: "fractal_flames",
     spectralFamily: "warm",
     gradingIntensity: 0.85,
+  },
+  smoke_and_mirrors: {
+    Component: SmokeAndMirrorsScene,
+    energyAffinity: "mid",
+    complement: "deep_ocean",
+    spectralFamily: "warm",
+  },
+  molten_glass: {
+    Component: MoltenGlassScene,
+    energyAffinity: "mid",
+    complement: "crystal_cavern",
+    spectralFamily: "warm",
+  },
+  particle_burst: {
+    Component: ParticleBurstScene,
+    energyAffinity: "high",
+    complement: "cosmic_dust",
+    spectralFamily: "bright",
+  },
+  dual_blend: {
+    Component: DualBlendScene,
+    energyAffinity: "any",
+    complement: "liquid_light",
+  },
+  concert_beams: {
+    Component: ConcertBeamsScene,
+    energyAffinity: "high",
+    complement: "concert_lighting",
+    preferredTransitionIn: "flash",
+    spectralFamily: "bright",
+  },
+  dual_shader: {
+    Component: DualBlendScene,
+    energyAffinity: "any",
+    complement: "liquid_light",
   },
 };
 

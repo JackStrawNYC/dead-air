@@ -208,7 +208,7 @@ export function getModeForSection(
           if (songIdentity?.preferredModes?.length && seed !== undefined) {
             const showModes = getShowModesForSong(songIdentity.preferredModes, seed, song.title);
             const showModeSet = new Set(showModes);
-            const remainingPreferred = songIdentity.preferredModes.filter((m: string) => !showModeSet.has(m));
+            const remainingPreferred = songIdentity.preferredModes.filter((m) => !showModeSet.has(m));
             const weightedPool: VisualMode[] = [];
             for (const m of showModes) { for (let i = 0; i < 5; i++) weightedPool.push(m); }
             for (const m of remainingPreferred) { for (let i = 0; i < 2; i++) weightedPool.push(m); }
@@ -370,7 +370,7 @@ export function getModeForSection(
           for (let s = 0; s < sampleCount; s++) {
             const fi = sStart + Math.floor(s * (sEnd - sStart) / sampleCount);
             const f = frames[fi];
-            avgStability += f?.beatStability ?? 0.5;
+            avgStability += f?.beatConfidence ?? 0.5;
             avgDrumOnset += f?.stemDrumOnset ?? 0;
             avgFlatness += f?.flatness ?? 0.3;
           }

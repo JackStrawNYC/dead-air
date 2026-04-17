@@ -367,10 +367,10 @@ float do2Caustic(vec2 coord, float time, float sharpness) {
       cos(ct - iter.x) + sin(ct + iter.y),
       sin(ct - iter.y) + cos(ct + iter.x)
     );
-    causVal += 1.0 / length(vec2(
+    causVal += 1.0 / max(length(vec2(
       coord.x / (sin(iter.x + ct) / intensity),
       coord.y / (cos(iter.y + ct) / intensity)
-    ));
+    )), 1e-4);
   }
 
   causVal /= 5.0;

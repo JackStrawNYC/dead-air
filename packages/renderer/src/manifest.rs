@@ -221,12 +221,3 @@ pub fn load_manifest(path: &Path) -> Result<Manifest, Box<dyn std::error::Error>
     }
 }
 
-/// Save a manifest in MessagePack format (for use by generate-full-manifest.ts).
-pub fn save_manifest_msgpack(manifest: &Manifest, path: &Path) -> Result<(), Box<dyn std::error::Error>>
-where
-    Manifest: serde::Serialize,
-{
-    let data = rmp_serde::to_vec(manifest)?;
-    std::fs::write(path, data)?;
-    Ok(())
-}

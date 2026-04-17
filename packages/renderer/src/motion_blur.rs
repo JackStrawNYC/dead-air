@@ -249,22 +249,4 @@ impl MotionBlurPipeline {
         rp.draw_indexed(0..6, 0, 0..1);
     }
 
-    /// Compute the number of motion blur samples for a frame.
-    /// Based on energy, climax phase, and camera motion.
-    pub fn compute_sample_count(energy: f32, climax_intensity: f32) -> u32 {
-        // Quiet sections: no blur (free)
-        if energy < 0.15 {
-            return 1;
-        }
-        // Climax: heavy blur
-        if climax_intensity > 0.5 {
-            return 4;
-        }
-        // Medium energy: light blur
-        if energy > 0.4 {
-            return 2;
-        }
-        // Default: no blur
-        1
-    }
 }

@@ -20,7 +20,6 @@ import { findCurrentSection } from "../utils/section-lookup";
 import type { SongIdentity } from "../data/song-identities";
 import type { StemSectionType } from "../utils/stem-features";
 // selectTransitionStyle no longer needed — all transitions use GPUTransition
-import { getShaderStrings } from "../shaders/shader-strings";
 import { GPUTransition, transitionStyleToBlendMode } from "./GPUTransition";
 import type { JamEvolution, JamPhaseBoundaries } from "../utils/jam-evolution";
 import type { JamCycleState } from "../utils/jam-cycles";
@@ -34,7 +33,7 @@ import { dynamicCrossfadeDuration, beatCrossfadeFrames } from "./routing/crossfa
 import { findNearestBeat } from "./routing/beat-sync";
 import { getModeForSection } from "./routing/shader-variety";
 import { getDrumsSpaceMode } from "./routing/drums-space-router";
-import { averageEnergy, selectDualBlendMode, renderMode } from "./routing/scene-utils";
+import { averageEnergy, renderMode } from "./routing/scene-utils";
 import { renderSectionOverride } from "./routing/SectionOverrideRouter";
 import { renderReactiveTrigger, renderReactiveExitCrossfade } from "./routing/ReactiveShaderRouter";
 import { renderJamPhase } from "./routing/JamPhaseRouter";
@@ -408,86 +407,8 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
   let mainScene: React.ReactNode;
   const sectionLen = currentSection ? currentSection.frameEnd - currentSection.frameStart : 0;
 
-  // Set-aware energy thresholds: Set 1 requires higher energy, Set 2+ standard
-  const isSet1 = setNumber === 1;
-  const dualEnergyThreshold = isSet1 ? 0.18 : 0.12;
-  const dualBlendCap = isSet1 ? 0.35 : 0.55;
-
-  // Climax force: any section during climax/sustain phase, or high-energy sections
-  const climaxForceDual = (climaxPhaseProp !== undefined && climaxPhaseProp >= 2 && climaxPhaseProp <= 3 && frameEnergy > 0.08)
-    || (currentSection?.energy === "high" && frameEnergy > dualEnergyThreshold);
-
-  // Cooldown: every 3rd section forced single for visual contrast
-  const dualCooldown = currentSectionIdx > 0 && currentSectionIdx % 3 === 0;
-
-  // Stem interplay modulation: tight-lock encourages dual composition
-  const interplayForceDual = stemInterplayMode === "tight-lock";
-  const isSoloSpotlight = stemInterplayMode === "solo-spotlight";
-
-  const shouldDual = !dualCooldown && !isSoloSpotlight && (climaxForceDual || interplayForceDual || (sectionLen >= 600 && (
-    frameEnergy > dualEnergyThreshold ||
-    stemSection === "jam" || stemSection === "solo"
-  )));
-
-  // Solo-spotlight dual: subtle focus blend instead of full suppression
-  const shouldSoloSpotlightDual = isSoloSpotlight && sectionLen >= 600 && frameEnergy > 0.06;
-
-  if (shouldDual || shouldSoloSpotlightDual) {
-    // Prefer transition affinity pool for secondary shader selection
-    const affinityPool = TRANSITION_AFFINITY[currentMode];
-    const rng = seededRandom((seed ?? 0) + currentSectionIdx * 13);
-
-    let secondaryMode: VisualMode;
-    if (shouldSoloSpotlightDual) {
-      // Solo spotlight: blend a focus-appropriate shader (stark, void, aurora)
-      const soloPool: VisualMode[] = ["deep_ocean", "void_light", "aurora", "deep_ocean"];
-      const soloFiltered = soloPool.filter((m) => m !== currentMode);
-      secondaryMode = soloFiltered[Math.floor(rng() * soloFiltered.length)] ?? getComplement(currentMode);
-    } else {
-      secondaryMode = affinityPool && affinityPool.length > 0
-        ? affinityPool[Math.floor(rng() * affinityPool.length)]
-        : getComplement(currentMode);
-    }
-
-    const stringsA = getShaderStrings(currentMode);
-    const stringsB = getShaderStrings(secondaryMode);
-
-    if (stringsA && stringsB) {
-      // Get climax phase from frame data for blend mode selection
-      const frameData = frames[Math.min(frame, frames.length - 1)];
-      const frameSectionType = frameData?.sectionType;
-      const blendMode = selectDualBlendMode(frameEnergy, currentSection?.energy, undefined, frameSectionType);
-      // Asymmetric blend with beat pulse: primary dominates at rest,
-      // secondary punches through on beats for dynamic contrast (not mush)
-      const sectionProgress = currentSection
-        ? (frame - currentSection.frameStart) / Math.max(1, sectionLen)
-        : 0;
-      // Ramp up over first 20% of section (don't start at full blend)
-      const sectionRamp = Math.min(1, sectionProgress / 0.2);
-
-      let blendProgress: number;
-      if (shouldSoloSpotlightDual) {
-        // Solo spotlight: subtle 20-30% blend for visual focus effect
-        const soloBaseBlend = 0.15 + frameEnergy * 0.15;
-        const soloBeatPulse = (frameData?.beat ? 0.08 : 0) * Math.max(0.3, frameEnergy);
-        blendProgress = (soloBaseBlend + soloBeatPulse) * sectionRamp;
-        blendProgress = Math.min(0.30, blendProgress);
-      } else {
-        // Standard dual-shader blend
-        const baseBlend = 0.10 + frameEnergy * 0.30;
-        const arcBlend = Math.sin(sectionProgress * Math.PI) * 0.12;
-        const beatPulse = (frameData?.beat ? 0.15 : 0) * Math.max(0.3, frameEnergy);
-        blendProgress = (baseBlend + arcBlend + beatPulse) * sectionRamp;
-        blendProgress = Math.min(dualBlendCap, blendProgress);
-      }
-
-      mainScene = renderMode(currentMode, frames, sections, palette, tempo, undefined, jamDensity, sceneConfig);
-    } else {
-      mainScene = renderMode(currentMode, frames, sections, palette, tempo, undefined, jamDensity, sceneConfig);
-    }
-  } else {
-    mainScene = renderMode(currentMode, frames, sections, palette, tempo, undefined, jamDensity, sceneConfig);
-  }
+  // TODO: dual-shader composition not yet wired — render single mode for now
+  mainScene = renderMode(currentMode, frames, sections, palette, tempo, undefined, jamDensity, sceneConfig);
 
   // Dead air crossfade: transition to ambient shader after music ends
   // Use a neutral desaturated palette so the song's personality doesn't bleed into applause

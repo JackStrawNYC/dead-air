@@ -535,7 +535,7 @@ float sdStealie(vec2 p, float radius) {
   // Horizontal divider across the middle
   float divider = _ns_sdBox(p, vec2(radius * 0.85, radius * 0.035));
   // Lightning bolt through center
-  float bolt = _ns_sdBolt(p * (1.0 / radius));
+  float bolt = _ns_sdBolt(p * (1.0 / max(radius, 1e-4)));
   // Combine: ring OR divider OR bolt, masked to circle
   float shape = min(ring, min(divider, bolt * radius));
   // Eye sockets — two circles in upper half

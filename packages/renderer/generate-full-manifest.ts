@@ -674,6 +674,8 @@ async function main() {
   const width = parseInt(getArg("width", "3840"));
   const height = parseInt(getArg("height", "2160"));
   const withOverlays = args.includes("--with-overlays");
+  const noTrim = args.includes("--no-trim");
+  const overlayPngDirExplicit = args.indexOf("--overlay-png-dir") >= 0;
   const overlayPngDir = getArg("overlay-png-dir", "./overlay-pngs");
 
   console.log(`[full-manifest] Data: ${dataDir}`);
@@ -755,7 +757,8 @@ async function main() {
     // ─── Auto-trim: remove non-music from start and end ───────────────
     // Archive.org recordings include crowd noise, tuning, and applause
     // before/after songs. Find where music actually starts and ends.
-    {
+    // Skip when --no-trim is passed.
+    if (!noTrim) {
       const WINDOW = 90; // 3 seconds at 30fps
       const THRESHOLD = 0.10; // RMS below this = not music
 
@@ -1334,7 +1337,7 @@ async function main() {
 
           // Map prominence to blend mode: hero=Normal (foreground), accent=Screen, ambient=Screen
           const prominence = prominenceMap.get(overlayName) ?? "ambient";
-          const blendMode = prominence === "hero" ? "Normal" : "Screen";
+          const blendMode = prominence === "hero" ? "normal" : "screen";
 
           frameInstances.push({
             overlay_id: overlayName,
@@ -1404,7 +1407,7 @@ async function main() {
       }
     }
     ws.write('\n]');
-    ws.write(`,"overlay_png_dir":${JSON.stringify(resolve(overlayPngDir))}`);
+    ws.write(`,"overlay_png_dir":${JSON.stringify(overlayPngDirExplicit ? overlayPngDir : resolve(overlayPngDir))}`);
 
     // Report overlay usage stats
     const overlayUsage = new Map<string, number>();

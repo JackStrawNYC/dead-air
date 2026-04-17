@@ -10,11 +10,12 @@
 //!   }
 //!   pipe.finish()?;
 
-use std::io::Write;
+use std::io::{BufWriter, Write};
 use std::process::{Child, Command, Stdio};
 
 pub struct FfmpegPipe {
     child: Child,
+    writer: Option<BufWriter<std::process::ChildStdin>>,
     width: u32,
     height: u32,
     frames_written: u64,
@@ -28,10 +29,15 @@ impl FfmpegPipe {
         fps: u32,
         output_path: &str,
     ) -> Result<Self, Box<dyn std::error::Error>> {
-        Self::new_with_codec(width, height, fps, output_path, "libx264", "slow", 18)
+        // Use NVENC if FFMPEG_CODEC=h264_nvenc, otherwise libx264 ultrafast
+        let codec = std::env::var("FFMPEG_CODEC").unwrap_or_else(|_| "libx264".to_string());
+        let preset = std::env::var("FFMPEG_PRESET").unwrap_or_else(|_| "medium".to_string());
+        Self::new_with_codec(width, height, fps, output_path, &codec, &preset, 18)
     }
 
     /// Start FFmpeg with specific codec settings.
+    /// For NVENC: codec="h264_nvenc", preset="p4" (balanced), crf maps to -cq.
+    /// For libx264: codec="libx264", preset="fast"/"slow", crf is CRF value.
     pub fn new_with_codec(
         width: u32,
         height: u32,
@@ -41,29 +47,48 @@ impl FfmpegPipe {
         preset: &str,
         crf: u32,
     ) -> Result<Self, Box<dyn std::error::Error>> {
-        let child = Command::new("ffmpeg")
-            .args([
-                "-y",                           // Overwrite output
-                "-f", "rawvideo",               // Input format: raw pixels
-                "-pix_fmt", "rgba",             // Input pixel format
-                "-s", &format!("{}x{}", width, height), // Input size
-                "-r", &format!("{}", fps),      // Input framerate
-                "-i", "pipe:0",                 // Read from stdin
-                "-c:v", codec,                  // Video codec
-                "-preset", preset,              // Encoding speed/quality tradeoff
-                "-crf", &format!("{}", crf),    // Quality (lower = better, 18 ≈ visually lossless)
-                "-pix_fmt", "yuv420p",          // Output pixel format (compatibility)
-                "-movflags", "+faststart",      // Web-friendly MP4
-                "-an",                          // No audio (added separately)
-                output_path,
-            ])
+        let is_nvenc = codec.contains("nvenc");
+        let mut args = vec![
+            "-y".to_string(),
+            "-f".to_string(), "rawvideo".to_string(),
+            "-pix_fmt".to_string(), "rgba".to_string(),
+            "-s".to_string(), format!("{}x{}", width, height),
+            "-r".to_string(), format!("{}", fps),
+            "-i".to_string(), "pipe:0".to_string(),
+            "-c:v".to_string(), codec.to_string(),
+            "-preset".to_string(), preset.to_string(),
+        ];
+        if is_nvenc {
+            // NVENC: constant quality mode, -cq for quality (lower = better)
+            args.extend(["-rc".to_string(), "constqp".to_string()]);
+            args.extend(["-cq".to_string(), format!("{}", crf)]);
+            args.extend(["-b:v".to_string(), "0".to_string()]);
+        } else {
+            args.extend(["-crf".to_string(), format!("{}", crf)]);
+        }
+        args.extend([
+            "-pix_fmt".to_string(), "yuv420p".to_string(),
+            "-threads".to_string(), "0".to_string(),
+            "-an".to_string(),
+            output_path.to_string(),
+        ]);
+        let mut child = Command::new("ffmpeg")
+            .args(&args)
             .stdin(Stdio::piped())
             .stdout(Stdio::null())
-            .stderr(Stdio::piped())
+            .stderr(Stdio::inherit())
             .spawn()?;
+
+        // Wrap stdin in a 256MB BufWriter to prevent pipe deadlocks.
+        // Without this, each 33MB frame write blocks until ffmpeg reads from
+        // the tiny 64KB kernel pipe buffer. The BufWriter absorbs multiple
+        // frames, letting the GPU render ahead while ffmpeg encodes.
+        let stdin = child.stdin.take().ok_or("FFmpeg stdin not available")?;
+        let writer = Some(BufWriter::with_capacity(256 * 1024 * 1024, stdin));
 
         Ok(Self {
             child,
+            writer,
             width,
             height,
             frames_written: 0,
@@ -83,12 +108,8 @@ impl FfmpegPipe {
             .into());
         }
 
-        let stdin = self
-            .child
-            .stdin
-            .as_mut()
-            .ok_or("FFmpeg stdin not available")?;
-        stdin.write_all(pixels)?;
+        let writer = self.writer.as_mut().ok_or("FFmpeg writer not available")?;
+        writer.write_all(pixels)?;
         self.frames_written += 1;
 
         Ok(())
@@ -97,20 +118,16 @@ impl FfmpegPipe {
     /// Close the pipe and wait for FFmpeg to finish encoding.
     /// Returns the total number of frames written.
     pub fn finish(mut self) -> Result<u64, Box<dyn std::error::Error>> {
-        // Close stdin to signal EOF
-        drop(self.child.stdin.take());
+        // Flush and drop the BufWriter to send remaining data + signal EOF
+        if let Some(writer) = self.writer.take() {
+            let mut inner = writer.into_inner()?;
+            inner.flush()?;
+            drop(inner);
+        }
 
-        let output = self.child.wait_with_output()?;
-        if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            // Only show last few lines of FFmpeg output
-            let last_lines: Vec<&str> = stderr.lines().rev().take(5).collect();
-            return Err(format!(
-                "FFmpeg exited with {}: {}",
-                output.status,
-                last_lines.into_iter().rev().collect::<Vec<_>>().join("\n")
-            )
-            .into());
+        let status = self.child.wait()?;
+        if !status.success() {
+            return Err(format!("FFmpeg exited with {}", status).into());
         }
 
         Ok(self.frames_written)
