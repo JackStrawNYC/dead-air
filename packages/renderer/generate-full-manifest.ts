@@ -1172,7 +1172,9 @@ async function main() {
       if (pool.length === 0) {
         if (avgEnergy > 0.25) {
           // HIGH energy: dramatic, intense, screen-filling
-          pool = activeShaderPool.filter(s => ["inferno", "lava_flow", "electric_arc", "liquid_light",
+          // HIGH energy: screen-filling, dramatic, intense color
+          // liquid_light REMOVED — sparse/dark raymarcher, not screen-filling
+          pool = activeShaderPool.filter(s => ["inferno", "lava_flow", "electric_arc",
             "concert_lighting", "fractal_temple", "fractal_flames", "tie_dye",
             "solar_flare", "plasma_field", "feedback_recursion", "mandala_engine"].includes(s));
         } else if (avgEnergy < 0.10) {
@@ -1186,7 +1188,7 @@ async function main() {
             "ink_wash", "morphogenesis", "sacred_geometry", "oil_projector",
             "neural_web", "voronoi_flow", "tie_dye", "feedback_recursion",
             "truchet_tiling", "diffraction_rings", "aurora_curtains",
-            "coral_reef", "warp_field", "galaxy_spiral"].includes(s));
+            "coral_reef", "warp_field", "galaxy_spiral", "liquid_light"].includes(s));
         }
       }
 
@@ -1478,15 +1480,34 @@ async function main() {
         for (const [overlayName, opacity] of Object.entries(opacities)) {
           if (opacity <= 0.005) continue; // skip invisible overlays
 
-          // Map prominence to blend mode: hero=Normal (foreground), accent=Screen, ambient=Screen
+          // Map prominence to blend mode and scale
           const prominence = prominenceMap.get(overlayName) ?? "ambient";
           const blendMode = prominence === "hero" ? "normal" : "screen";
+
+          // Scale by overlay type — prevent oversized overlays
+          let scale = 0.6; // default: 60% of frame (not full-screen)
+          if (overlayName === "SongTitle" || overlayName === "ConcertInfo") {
+            scale = 0.4; // text overlays: smaller, positioned
+          } else if (overlayName === "FilmGrain") {
+            scale = 1.0; // grain covers full frame
+          } else if (prominence === "hero") {
+            scale = 0.5; // hero icons: prominent but not overwhelming
+          } else if (prominence === "accent") {
+            scale = 0.55;
+          }
+
+          // Cap opacity: ambient overlays should be subtle, not opaque
+          let finalOpacity = opacity;
+          if (prominence === "ambient") finalOpacity = Math.min(finalOpacity, 0.5);
+          if (prominence === "accent") finalOpacity = Math.min(finalOpacity, 0.7);
+          // SongTitle: visible but not screaming
+          if (overlayName === "SongTitle") finalOpacity = Math.min(finalOpacity, 0.6);
 
           frameInstances.push({
             overlay_id: overlayName,
             transform: {
-              opacity: Math.round(opacity * 1000) / 1000,
-              scale: 1.0,
+              opacity: Math.round(finalOpacity * 1000) / 1000,
+              scale,
               rotation_deg: 0.0,
               offset_x: 0.0,
               offset_y: 0.0,
