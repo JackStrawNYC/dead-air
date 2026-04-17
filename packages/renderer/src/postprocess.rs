@@ -258,16 +258,16 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     var col = textureSample(scene_hdr, tex_sampler, in.uv).rgb;
     let bloom = textureSample(bloom_tex, tex_sampler, in.uv).rgb;
 
-    // Ambient brightness floor: prevents pure black frames.
+    // Ambient floor: warm deep purple — concert venue in darkness.
+    // Not gray/clinical, but the warm glow of a dark room with stage lighting.
     let luma = dot(col, vec3<f32>(0.2126, 0.7152, 0.0722));
-    let ambient_floor = vec3<f32>(0.015, 0.010, 0.025);
-    let floor_strength = smoothstep(0.05, 0.0, luma);
+    let ambient_floor = vec3<f32>(0.025, 0.012, 0.035); // warm purple-indigo
+    let floor_strength = smoothstep(0.06, 0.0, luma);
     col = col + ambient_floor * floor_strength;
 
-    // Subtle spatial bloom: 12% screen blend. GLSL handles per-pixel bloom;
-    // this adds the SPATIAL spread that single-pass GLSL can't do.
-    // Screen blend: col + bloom * (1 - col) — naturally can't exceed 1.0.
-    let bloom_amount = 0.12;
+    // Subtle spatial bloom: 5% screen blend. Just enough for soft glow halos
+    // without washing out the vivid colors the Dead aesthetic demands.
+    let bloom_amount = 0.05;
     col = col + bloom * bloom_amount * (vec3<f32>(1.0) - col);
 
     // Soft Reinhard rolloff for HDR overshoot

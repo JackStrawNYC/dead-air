@@ -133,17 +133,17 @@ function precomputeSmoothed(frames: any[]): SmoothedArrays {
     highs: new Float32Array(n),
   };
 
-  // CINEMATIC FLOW: wider smoothing windows = react to musical phrases, not individual hits.
-  // Analysis is ~10fps, so window=60 ≈ 6 seconds (a full musical phrase).
-  // Previous windows (25/5/15/12) reacted to sub-second transients = twitchy.
+  // Smoothing: react to 2-4 second musical phrases. Not individual hits,
+  // but not so slow it feels disconnected from the music.
+  // Analysis is ~10fps, so window=30 ≈ 3 seconds.
   for (let i = 0; i < n; i++) {
-    result.energy[i] = gaussianSmooth(frames, i, "rms", 60);      // was 25 (~2.5s) → 60 (~6s)
-    result.slowEnergy[i] = gaussianSmooth(frames, i, "rms", 150); // was 90 (~9s) → 150 (~15s)
-    result.fastEnergy[i] = gaussianSmooth(frames, i, "rms", 15);  // was 5 (~0.5s) → 15 (~1.5s)
-    result.bass[i] = gaussianSmooth(frames, i, "sub", 40) + gaussianSmooth(frames, i, "low", 40); // was 15 → 40
-    result.fastBass[i] = gaussianSmooth(frames, i, "sub", 15);    // was 5 → 15
-    result.mids[i] = gaussianSmooth(frames, i, "mid", 30);        // was 12 → 30
-    result.highs[i] = gaussianSmooth(frames, i, "high", 30);      // was 12 → 30
+    result.energy[i] = gaussianSmooth(frames, i, "rms", 35);      // ~3.5s (musical phrase)
+    result.slowEnergy[i] = gaussianSmooth(frames, i, "rms", 100); // ~10s (song arc)
+    result.fastEnergy[i] = gaussianSmooth(frames, i, "rms", 8);   // ~0.8s (responsive)
+    result.bass[i] = gaussianSmooth(frames, i, "sub", 25) + gaussianSmooth(frames, i, "low", 25); // ~2.5s
+    result.fastBass[i] = gaussianSmooth(frames, i, "sub", 8);     // ~0.8s
+    result.mids[i] = gaussianSmooth(frames, i, "mid", 20);        // ~2s
+    result.highs[i] = gaussianSmooth(frames, i, "high", 20);      // ~2s
   }
 
   return result;
@@ -557,14 +557,13 @@ function computeUniforms(
   // Structural analysis values (discrete state machines — don't interpolate phases)
   const climax = analysis?.climaxState ?? { phase: "idle", intensity: 0 };
 
-  // Envelope brightness: WIDE range for cinematic dynamic arc.
-  // Quiet: 0.35 (intimate, dark) → Loud: 1.10 (overwhelming, bright)
-  // sqrt curve ensures smooth gradient, not binary switch.
-  let envBrightness = 0.35 + Math.sqrt(factor) * 0.75;
+  // Envelope brightness: dark quiet, bright loud, but never washed
+  // Quiet: 0.45 (dim but visible) → Loud: 1.15 (vivid, punchy)
+  let envBrightness = 0.45 + Math.sqrt(factor) * 0.70;
 
-  // Envelope saturation: WIDE range for emotional arc.
-  // Quiet: 0.50 (muted, contemplative) → Loud: 1.30 (vivid, electric)
-  const satKnee = 0.50 + factor * 0.80;
+  // Envelope saturation: RICH, not muted. The Dead = vivid color.
+  // Quiet: 0.80 (still colorful) → Loud: 1.40 (psychedelic vivid)
+  const satKnee = 0.80 + factor * 0.60;
   let envSaturation = satKnee;
 
   // Climax modulation: meaningful boosts that a viewer FEELS
@@ -602,9 +601,9 @@ function computeUniforms(
   hueShiftDeg += chromaBreathing;
   const envHue = hueShiftDeg * (Math.PI / 180); // convert to radians
 
-  // Wide clamp for full cinematic dynamic range
-  envBrightness = Math.max(0.30, Math.min(1.20, envBrightness));
-  envSaturation = Math.max(0.50, Math.min(1.30, envSaturation));
+  // Rich, vivid range — the Dead is NOT muted
+  envBrightness = Math.max(0.35, Math.min(1.20, envBrightness));
+  envSaturation = Math.max(0.75, Math.min(1.50, envSaturation));
   const climaxPhaseMap: Record<string, number> = { idle: 0, build: 1, climax: 2, sustain: 3, release: 4 };
   const jamCycle = analysis?.jamCycle ?? { phase: "setup", progress: 0 };
   const jamPhaseMap: Record<string, number> = { exploration: 0, building: 1, peak_space: 2, resolution: 3 };
@@ -613,14 +612,14 @@ function computeUniforms(
   return {
     time, dynamic_time: time, beat_time: time, // overwritten by frame loop accumulator
     musical_time: (time * tempo / 60) % 1, tempo,
-    // FLOW TUNING: dampen raw energy/onset for smooth motion, not twitchy pulses
-    energy: energy * 0.85, // slightly below raw — prevents over-driving
-    rms: L("rms") * 0.85,
-    bass: bass * 0.80, // bass drives the most visual motion, keep it controlled
+    // Restore energy — the Dead plays LOUD. Let the shaders feel it.
+    energy: energy * 0.95,
+    rms: L("rms") * 0.95,
+    bass: bass * 0.90,
     mids, highs,
-    onset: L("onset") * 0.3, // heavily dampened — onsets should be gentle swells not flashes
+    onset: L("onset") * 0.5, // dampened but present — onsets drive visual accents
     centroid: L("centroid", 0.5),
-    beat: f.beat ? 0.7 : 0,  // reduce beat pulse from 1.0 to 0.7 — subtle not strobe
+    beat: f.beat ? 0.8 : 0,  // perceptible beat pulse
     slow_energy: slowEnergy,
     fast_energy: lerpSmoothed(smoothed.fastEnergy),
     fast_bass: lerpSmoothed(smoothed.fastBass),
@@ -628,7 +627,7 @@ function computeUniforms(
     spectral_flux: L("spectralFlux") || Math.abs(lerpSmoothed(smoothed.fastEnergy) - energy) * 3,
     energy_accel: lerpSmoothed(smoothed.fastEnergy) - energy,
     energy_trend: energy - slowEnergy,
-    onset_snap: L("onset") * 0.3, beat_snap: f.beat ? 0.4 : 0, // gentle pulse, not strobe
+    onset_snap: L("onset") * 0.5, beat_snap: f.beat ? 0.6 : 0, // musical pulse
     beat_confidence: L("beatConfidence", 0.5),
     beat_stability: L("beatStability", 0.5),
     downbeat: f.downbeat ? 1 : 0,  // discrete
@@ -695,13 +694,16 @@ function computeUniforms(
     envelope_brightness: envBrightness,
     envelope_saturation: envSaturation,
     envelope_hue: envHue,
-    era_saturation: 1.05, era_brightness: 1.0, era_sepia: 0.06,
-    show_warmth: 0, show_contrast: 1.0, show_saturation: 1.0,
-    show_grain: 1.0, show_bloom: 1.0,
+    // Era grading: Veneta 1972 = primal era, outdoor Oregon sunshine
+    // Warm golden tones, rich saturation, subtle sepia, analog feel
+    era_saturation: 1.15, era_brightness: 1.05, era_sepia: 0.12,
+    show_warmth: 0.20, show_contrast: 1.08, show_saturation: 1.10,
+    show_grain: 1.2, show_bloom: 1.1,
     // Dynamic params: quiet drifts slowly, peaks churn intensely
-    param_bass_scale: 0.3 + energy * 0.7,      // 0.30 (quiet) → 1.0 (loud)
-    param_energy_scale: 0.4 + energy * 0.6,     // 0.40 (quiet) → 1.0 (loud)
-    param_motion_speed: 0.15 + energy * 0.70,   // 0.15 (quiet drift) → 0.85 (peak churn)
+    // Dynamic params: quiet breathes slowly, peaks drive hard
+    param_bass_scale: 0.5 + energy * 0.5,      // 0.50 → 1.0
+    param_energy_scale: 0.6 + energy * 0.4,     // 0.60 → 1.0
+    param_motion_speed: 0.25 + energy * 0.55,   // 0.25 (slow drift) → 0.80 (driving)
     param_color_sat_bias: 0, param_complexity: 1.0,
     param_drum_reactivity: 1.0, param_vocal_weight: 1.0,
     peak_of_show: analysis?.peakOfShow?.isPeak ? 1 : 0,
@@ -1164,25 +1166,47 @@ async function main() {
       const avgEnergy = smoothed.energy[Math.min(mid, frames.length - 1)] ?? 0.3;
 
       // Energy-appropriate shader sets (shared between identity and fallback)
-      const HIGH_ENERGY_SHADERS = new Set(["inferno", "lava_flow", "electric_arc",
-        "concert_lighting", "fractal_temple", "fractal_flames", "tie_dye",
-        "plasma_field", "feedback_recursion", "mandala_engine"]);
-      const LOW_ENERGY_SHADERS = new Set(["aurora", "deep_ocean", "ancient_forest",
-        "void_light", "cosmic_dust", "ink_wash", "smoke_rings",
-        "stained_glass", "coral_reef", "oil_projector"]);
+      // Shader pools curated for GRATEFUL DEAD concert aesthetic:
+      // Prioritize: warm concert lighting, psychedelic tie-dye, liquid light projectors
+      // These shaders look like you're AT a Dead show, not watching a screensaver
+      // HIGH energy: explosive, screen-filling, vivid
+      const HIGH_ENERGY_SHADERS = new Set([
+        "tie_dye", "inferno", "lava_flow", "fractal_flames",
+        "oil_projector", "fractal_temple", "kaleidoscope",
+      ]);
+      // LOW energy: still screen-filling, just gentler and slower
+      const LOW_ENERGY_SHADERS = new Set([
+        "oil_projector", "tie_dye", "stained_glass", "coral_reef",
+        "sacred_geometry", "smoke_rings", "fractal_temple",
+      ]);
 
-      // Pick from song identity preferred modes, filtered by energy appropriateness
+      // Shaders that FILL THE SCREEN with psychedelic Dead concert color.
+      // Sparse raymarchers (concert_lighting, ink_wash, void_light) look great
+      // at high energy but produce mostly black at mid/low energy. Deprioritized.
+      const DEAD_CONCERT_SHADERS = new Set([
+        "tie_dye",              // #1 Dead shader — fills screen, psychedelic
+        "oil_projector",        // liquid light show — fills screen, organic
+        "fractal_flames",       // fire — fills screen, dramatic
+        "inferno",              // lava — fills screen, intense
+        "lava_flow",            // volcanic — fills screen, warm
+        "fractal_temple",       // cathedral — fills screen, sacred
+        "kaleidoscope",         // mandala — fills screen, psychedelic
+        "coral_reef",           // organic — fills screen, colorful
+        "stained_glass",        // cathedral light — fills screen, warm
+        "sacred_geometry",      // geometric — fills screen, spiritual
+      ]);
+
+      // Pick from song identity preferred modes IF they give us enough Dead-concert variety.
+      // Need at least 3 options for visual variety across sections.
       let pool: string[] = [];
       if (preferredModes.length > 0) {
-        const energySet = avgEnergy > 0.25 ? HIGH_ENERGY_SHADERS
-          : avgEnergy < 0.10 ? LOW_ENERGY_SHADERS : null; // null = any
-        pool = preferredModes.filter((m: string) =>
-          activeShaderPool.includes(m) && (energySet === null || energySet.has(m))
+        const deadFiltered = preferredModes.filter((m: string) =>
+          activeShaderPool.includes(m) && DEAD_CONCERT_SHADERS.has(m)
         );
-        // If energy filtering removes all preferred modes, use any preferred that's active
-        if (pool.length === 0) {
-          pool = preferredModes.filter((m: string) => activeShaderPool.includes(m));
+        if (deadFiltered.length >= 3) {
+          pool = deadFiltered;
         }
+        // Otherwise: fall through to energy pools (already Dead-curated)
       }
 
       // Fallback: energy-based pool from curated A+/A/B shaders
@@ -1193,11 +1217,11 @@ async function main() {
           pool = activeShaderPool.filter(s => LOW_ENERGY_SHADERS.has(s));
         } else {
           // MID energy: varied, evolving, textured
-          pool = activeShaderPool.filter(s => ["fractal_temple", "stained_glass", "kaleidoscope",
-            "ink_wash", "morphogenesis", "sacred_geometry", "oil_projector",
-            "neural_web", "voronoi_flow", "tie_dye", "feedback_recursion",
-            "truchet_tiling", "diffraction_rings", "aurora_curtains",
-            "coral_reef", "warp_field", "galaxy_spiral", "liquid_light"].includes(s));
+          // MID energy: the Dead's sweet spot — screen-filling, psychedelic, warm
+          pool = activeShaderPool.filter(s => ["tie_dye", "oil_projector",
+            "fractal_temple", "stained_glass", "fractal_flames",
+            "kaleidoscope", "coral_reef", "sacred_geometry",
+            "lava_flow", "inferno"].includes(s));
         }
       }
 
@@ -1368,8 +1392,9 @@ async function main() {
       // Show warmth: derive from era
       uniforms.show_warmth = (() => {
         const era = showVisualSeed?.era ?? "classic";
+        // Warmth by era: primal (1966-74) = golden outdoor sunshine
         const warmth: Record<string, number> = {
-          primal: 0.15, classic: 0.05, hiatus: -0.05, touch_of_grey: 0.0, revival: -0.02,
+          primal: 0.30, classic: 0.12, hiatus: -0.05, touch_of_grey: 0.0, revival: -0.02,
         };
         return warmth[era] ?? 0;
       })();
