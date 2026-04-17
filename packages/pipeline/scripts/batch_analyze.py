@@ -14,7 +14,7 @@ import os
 import subprocess
 import sys
 from pathlib import Path
-from concurrent.futures import ProcessPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
 def analyze_single(audio_path: str, output_path: str, script_dir: str) -> dict:
@@ -23,12 +23,7 @@ def analyze_single(audio_path: str, output_path: str, script_dir: str) -> dict:
 
     config = {
         "audioPath": audio_path,
-        "analyses": [
-            "energy", "tempo", "spectral", "onsets", "key",
-            "chroma", "contrast", "beats", "sections",
-            "stems", "melodic", "chords", "structure",
-            "deep_audio"
-        ]
+        "analyses": ["energy", "tempo", "spectral", "onsets", "key"]
     }
 
     try:
@@ -110,7 +105,7 @@ def main():
             else:
                 print(f"  ✗ {result['error']}")
     else:
-        with ProcessPoolExecutor(max_workers=args.parallel) as executor:
+        with ThreadPoolExecutor(max_workers=args.parallel) as executor:
             futures = {}
             for audio_path in audio_files:
                 output_path = str(output_dir / f"{audio_path.stem}-analysis.json")

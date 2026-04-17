@@ -89,8 +89,8 @@ def align(config):
         for w in seg.get("words", []):
             word_entry = {
                 "word": w.get("word", "").strip(),
-                "start": round(w.get("start", 0), 3),
-                "end": round(w.get("end", 0), 3),
+                "start": round(w["start"], 3) if "start" in w else None,
+                "end": round(w["end"], 3) if "end" in w else None,
             }
             if "score" in w:
                 word_entry["score"] = round(w["score"], 3)
@@ -101,8 +101,8 @@ def align(config):
     segments = []
     for seg in aligned.get("segments", []):
         segments.append({
-            "start": round(seg.get("start", 0), 3),
-            "end": round(seg.get("end", 0), 3),
+            "start": round(seg["start"], 3) if "start" in seg else None,
+            "end": round(seg["end"], 3) if "end" in seg else None,
             "text": seg.get("text", "").strip(),
         })
 

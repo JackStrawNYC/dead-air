@@ -81,10 +81,21 @@ def analyze(config):
     return result
 
 
+def _sanitize(obj):
+    """Replace NaN/inf with None for JSON-safe serialization."""
+    if isinstance(obj, float) and (np.isnan(obj) or np.isinf(obj)):
+        return None
+    if isinstance(obj, dict):
+        return {k: _sanitize(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_sanitize(v) for v in obj]
+    return obj
+
+
 if __name__ == "__main__":
     try:
         config = json.loads(sys.stdin.read())
-        result = analyze(config)
+        result = _sanitize(analyze(config))
         print(json.dumps(result))
     except Exception as e:
         print(json.dumps({"ok": False, "error": str(e)}))
