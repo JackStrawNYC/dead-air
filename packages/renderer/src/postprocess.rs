@@ -256,14 +256,19 @@ struct VertexOutput {
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     var col = textureSample(scene_hdr, tex_sampler, in.uv).rgb;
+    let bloom = textureSample(bloom_tex, tex_sampler, in.uv).rgb;
 
-    // Ambient brightness floor: prevents pure black frames from dark shaders.
-    // Adds a subtle deep blue-purple haze (0.02-0.04) to near-black pixels.
-    // Quiet passages feel intimate and dark, not broken/empty.
+    // Ambient brightness floor: prevents pure black frames.
     let luma = dot(col, vec3<f32>(0.2126, 0.7152, 0.0722));
-    let ambient_floor = vec3<f32>(0.015, 0.010, 0.025); // deep indigo
-    let floor_strength = smoothstep(0.05, 0.0, luma); // only lifts truly dark pixels
+    let ambient_floor = vec3<f32>(0.015, 0.010, 0.025);
+    let floor_strength = smoothstep(0.05, 0.0, luma);
     col = col + ambient_floor * floor_strength;
+
+    // Subtle spatial bloom: 12% screen blend. GLSL handles per-pixel bloom;
+    // this adds the SPATIAL spread that single-pass GLSL can't do.
+    // Screen blend: col + bloom * (1 - col) — naturally can't exceed 1.0.
+    let bloom_amount = 0.12;
+    col = col + bloom * bloom_amount * (vec3<f32>(1.0) - col);
 
     // Soft Reinhard rolloff for HDR overshoot
     let white_point = 2.0;
@@ -478,13 +483,44 @@ impl PostProcessPipeline {
             usage: wgpu::BufferUsages::UNIFORM,
         });
 
-        // Bloom passes SKIPPED: GLSL applyPostProcess() handles all bloom in-shader.
-        // Spatial bloom was double-processing and washing out highlights.
-        // Passes 1-3 (extract + blur_h + blur_v) are not executed, saving ~5ms/frame.
-        // The bloom_extract texture contains uninitialized data but composite shader
-        // ignores it (just passes through scene with Reinhard rolloff).
+        // ─── Pass 1: Bloom extract (full-res → half-res bright pixels) ───
+        let extract_bg = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("pp_extract_bg"),
+            layout: &self.extract_bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry { binding: 0, resource: wgpu::BindingResource::Sampler(sampler) },
+                wgpu::BindGroupEntry { binding: 1, resource: wgpu::BindingResource::TextureView(scene_view) },
+                wgpu::BindGroupEntry { binding: 2, resource: uniform_buffer.as_entire_binding() },
+            ],
+        });
+        self.run_pass(encoder, &self.bloom_extract_pipeline, &extract_bg,
+            &self.bloom_extract_view, vertex_buffer, index_buffer);
 
-        // ─── Composite (scene → pre-FXAA texture with Reinhard rolloff) ───
+        // ─── Pass 2: Horizontal Gaussian blur ───
+        let blur_h_bg = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("pp_blur_h_bg"),
+            layout: &self.blur_bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry { binding: 0, resource: wgpu::BindingResource::Sampler(sampler) },
+                wgpu::BindGroupEntry { binding: 1, resource: wgpu::BindingResource::TextureView(&self.bloom_extract_view) },
+            ],
+        });
+        self.run_pass(encoder, &self.blur_h_pipeline, &blur_h_bg,
+            &self.bloom_blur_view, vertex_buffer, index_buffer);
+
+        // ─── Pass 3: Vertical Gaussian blur ───
+        let blur_v_bg = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("pp_blur_v_bg"),
+            layout: &self.blur_bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry { binding: 0, resource: wgpu::BindingResource::Sampler(sampler) },
+                wgpu::BindGroupEntry { binding: 1, resource: wgpu::BindingResource::TextureView(&self.bloom_blur_view) },
+            ],
+        });
+        self.run_pass(encoder, &self.blur_v_pipeline, &blur_v_bg,
+            &self.bloom_extract_view, vertex_buffer, index_buffer);
+
+        // ─── Pass 4: Composite (scene + subtle spatial bloom → pre-FXAA) ───
         let composite_bg = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("pp_composite_bg"),
             layout: &self.composite_bind_group_layout,
