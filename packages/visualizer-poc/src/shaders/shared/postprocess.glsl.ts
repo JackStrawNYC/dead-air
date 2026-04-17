@@ -68,6 +68,7 @@ export function buildPostProcessGLSL(config: PostProcessConfig = {}): string {
     stageFloodEnabled = false,
     caEnabled = true,
     lightLeakEnabled = true,
+    thermalShimmerEnabled = false,
   } = config;
 
   // Grain intensity expression. Wide energy swing — quiet ballads should look
@@ -104,6 +105,16 @@ ${
   float bp = beatPulse(uMusicalTime);
   float bpGated = bp * smoothstep(0.4, 0.8, uBeatConfidence);
   col *= 1.0 + bpGated * 0.012;
+`
+    : ""
+}
+${
+  thermalShimmerEnabled
+    ? `  // Thermal shimmer: heat-haze UV displacement — shifts subsequent
+  // post-process effects (bloom halos, chromatic aberration, halation)
+  // creating wavy distortion on the glow layers.
+  uv = thermalShimmer(uv, uTime, energy, uResolution);
+  p = (uv - 0.5) * vec2(uResolution.x / uResolution.y, 1.0);
 `
     : ""
 }

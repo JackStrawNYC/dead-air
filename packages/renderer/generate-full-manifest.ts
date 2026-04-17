@@ -1336,8 +1336,32 @@ async function main() {
         song, i / Math.max(1, totalOut), routeSectionProgress, showVisualSeed,
       );
 
-      // Fix section_index (not available in computeUniforms)
+      // Fix section_index and section_progress (not available in computeUniforms)
       uniforms.section_index = routeState.currentSectionIdx;
+      uniforms.section_progress = routeSectionProgress;
+
+      // Chroma shift: change between adjacent frames' chroma hue (harmonic drift)
+      if (ai > 0) {
+        const prevHue = chromaHue(frames[ai - 1]) || 0;
+        const curHue = chromaHue(frames[ai]) || 0;
+        uniforms.chroma_shift = Math.abs(curHue - prevHue) / 360; // 0-1 normalized
+      }
+
+      // Tempo derivative: approximate from local tempo stability
+      if (ai > 10) {
+        const prevTempo = frames[ai - 10]?.localTempo ?? tempo;
+        const curTempo = frames[ai]?.localTempo ?? tempo;
+        uniforms.tempo_derivative = (curTempo - prevTempo) / 10; // BPM change per frame
+      }
+
+      // Show warmth: derive from era
+      uniforms.show_warmth = (() => {
+        const era = showVisualSeed?.era ?? "classic";
+        const warmth: Record<string, number> = {
+          primal: 0.15, classic: 0.05, hiatus: -0.05, touch_of_grey: 0.0, revival: -0.02,
+        };
+        return warmth[era] ?? 0;
+      })();
 
       // Accumulate dynamic_time with modifiers.
       // IMPORTANT: tempo does NOT accelerate shader animation — it drives beat sync only.
