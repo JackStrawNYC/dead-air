@@ -133,14 +133,17 @@ function precomputeSmoothed(frames: any[]): SmoothedArrays {
     highs: new Float32Array(n),
   };
 
+  // CINEMATIC FLOW: wider smoothing windows = react to musical phrases, not individual hits.
+  // Analysis is ~10fps, so window=60 ≈ 6 seconds (a full musical phrase).
+  // Previous windows (25/5/15/12) reacted to sub-second transients = twitchy.
   for (let i = 0; i < n; i++) {
-    result.energy[i] = gaussianSmooth(frames, i, "rms", 25);
-    result.slowEnergy[i] = gaussianSmooth(frames, i, "rms", 90);
-    result.fastEnergy[i] = gaussianSmooth(frames, i, "rms", 5);
-    result.bass[i] = gaussianSmooth(frames, i, "sub", 15) + gaussianSmooth(frames, i, "low", 15);
-    result.fastBass[i] = gaussianSmooth(frames, i, "sub", 5);
-    result.mids[i] = gaussianSmooth(frames, i, "mid", 12);
-    result.highs[i] = gaussianSmooth(frames, i, "high", 12);
+    result.energy[i] = gaussianSmooth(frames, i, "rms", 60);      // was 25 (~2.5s) → 60 (~6s)
+    result.slowEnergy[i] = gaussianSmooth(frames, i, "rms", 150); // was 90 (~9s) → 150 (~15s)
+    result.fastEnergy[i] = gaussianSmooth(frames, i, "rms", 15);  // was 5 (~0.5s) → 15 (~1.5s)
+    result.bass[i] = gaussianSmooth(frames, i, "sub", 40) + gaussianSmooth(frames, i, "low", 40); // was 15 → 40
+    result.fastBass[i] = gaussianSmooth(frames, i, "sub", 15);    // was 5 → 15
+    result.mids[i] = gaussianSmooth(frames, i, "mid", 30);        // was 12 → 30
+    result.highs[i] = gaussianSmooth(frames, i, "high", 30);      // was 12 → 30
   }
 
   return result;
@@ -554,32 +557,35 @@ function computeUniforms(
   // Structural analysis values (discrete state machines — don't interpolate phases)
   const climax = analysis?.climaxState ?? { phase: "idle", intensity: 0 };
 
-  // Base brightness: 0.55 (quiet) → 1.05 (loud) with sqrt curve
-  let envBrightness = 0.55 + Math.sqrt(factor) * 0.50;
+  // Base brightness: 0.65 (quiet) → 0.95 (loud) — NARROW range for flow, not strobe
+  // Previous: 0.55-1.05 was too wide, causing harsh brightness swings
+  let envBrightness = 0.65 + Math.sqrt(factor) * 0.30;
 
-  // Base saturation: 0.55 (quiet) → 1.35 (loud) with wide knee
-  const satKnee = 0.55 + factor * 0.80;
+  // Base saturation: 0.75 (quiet) → 1.10 (loud) — subtle, not overwhelming
+  // Previous: 0.55-1.35 was too wide, max 1.43 with climax = over-saturated
+  const satKnee = 0.75 + factor * 0.35;
   let envSaturation = satKnee;
 
-  // Climax modulation: boost brightness and saturation during climax/sustain
+  // Climax modulation: GENTLE boosts — the music should feel intense through
+  // the shader's internal animation, not through brightness/saturation cranking
   const climaxPhase = climax.phase;
   const climaxT = ss(climax.intensity ?? 0);
   if (climaxPhase === "climax") {
-    envBrightness += 0.10 * climaxT;
-    envSaturation += 0.40 * climaxT;
+    envBrightness += 0.05 * climaxT;
+    envSaturation += 0.15 * climaxT;
   } else if (climaxPhase === "sustain") {
-    envBrightness += 0.07 * climaxT;
-    envSaturation += 0.25 * climaxT;
+    envBrightness += 0.03 * climaxT;
+    envSaturation += 0.10 * climaxT;
   } else if (climaxPhase === "build") {
     envBrightness += 0.01 * climaxT;
-    envSaturation -= 0.10 * climaxT;
+    envSaturation -= 0.05 * climaxT;
   } else if (climaxPhase === "release") {
     envBrightness -= 0.01 * climaxT;
-    envSaturation += 0.08 * climaxT;
+    envSaturation += 0.03 * climaxT;
   } else {
-    // idle: slight desaturation
-    envSaturation -= 0.10 * climaxT;
-    envBrightness -= 0.04 * climaxT;
+    // idle: slight dim
+    envSaturation -= 0.05 * climaxT;
+    envBrightness -= 0.02 * climaxT;
   }
 
   // Hue: drums/space phase + chroma breathing
@@ -596,28 +602,32 @@ function computeUniforms(
   hueShiftDeg += chromaBreathing;
   const envHue = hueShiftDeg * (Math.PI / 180); // convert to radians
 
-  // Clamp to safe ranges
-  envBrightness = Math.max(0.15, Math.min(1.55, envBrightness));
-  envSaturation = Math.max(0.55, Math.min(1.80, envSaturation));
+  // Clamp to narrower ranges for cinematic flow (not reactive strobe)
+  envBrightness = Math.max(0.40, Math.min(1.05, envBrightness));
+  envSaturation = Math.max(0.70, Math.min(1.25, envSaturation));
   const climaxPhaseMap: Record<string, number> = { idle: 0, build: 1, climax: 2, sustain: 3, release: 4 };
   const jamCycle = analysis?.jamCycle ?? { phase: "setup", progress: 0 };
   const jamPhaseMap: Record<string, number> = { exploration: 0, building: 1, peak_space: 2, resolution: 3 };
   const coherence = analysis?.coherenceState?.score ?? 0;
 
   return {
-    time, dynamic_time: time * (tempo / 120), beat_time: time * (tempo / 120), // overwritten by frame loop accumulator
+    time, dynamic_time: time, beat_time: time, // overwritten by frame loop accumulator
     musical_time: (time * tempo / 60) % 1, tempo,
-    energy, rms: L("rms"), bass, mids, highs,
-    onset: L("onset"),
+    // FLOW TUNING: dampen raw energy/onset for smooth motion, not twitchy pulses
+    energy: energy * 0.85, // slightly below raw — prevents over-driving
+    rms: L("rms") * 0.85,
+    bass: bass * 0.80, // bass drives the most visual motion, keep it controlled
+    mids, highs,
+    onset: L("onset") * 0.3, // heavily dampened — onsets should be gentle swells not flashes
     centroid: L("centroid", 0.5),
-    beat: f.beat ? 1 : 0,  // discrete — don't interpolate
+    beat: f.beat ? 0.7 : 0,  // reduce beat pulse from 1.0 to 0.7 — subtle not strobe
     slow_energy: slowEnergy,
     fast_energy: lerpSmoothed(smoothed.fastEnergy),
     fast_bass: lerpSmoothed(smoothed.fastBass),
     spectral_flux: L("spectralFlux") || 0,
     energy_accel: lerpSmoothed(smoothed.fastEnergy) - energy,
     energy_trend: energy - slowEnergy,
-    onset_snap: L("onset"), beat_snap: f.beat ? 1 : 0,
+    onset_snap: L("onset") * 0.3, beat_snap: f.beat ? 0.4 : 0, // gentle pulse, not strobe
     beat_confidence: L("beatConfidence", 0.5),
     beat_stability: L("beatStability", 0.5),
     downbeat: f.downbeat ? 1 : 0,  // discrete
@@ -673,7 +683,7 @@ function computeUniforms(
     era_saturation: 1.05, era_brightness: 1.0, era_sepia: 0.06,
     show_warmth: 0, show_contrast: 1.0, show_saturation: 1.0,
     show_grain: 1.0, show_bloom: 1.0,
-    param_bass_scale: 1.0, param_energy_scale: 1.0, param_motion_speed: 1.0,
+    param_bass_scale: 0.6, param_energy_scale: 0.7, param_motion_speed: 0.45, // cinematic flow: slow, atmospheric
     param_color_sat_bias: 0, param_complexity: 1.0,
     param_drum_reactivity: 1.0, param_vocal_weight: 1.0,
     peak_of_show: analysis?.peakOfShow?.isPeak ? 1 : 0,
@@ -1290,13 +1300,16 @@ async function main() {
       // Fix section_index (not available in computeUniforms)
       uniforms.section_index = routeState.currentSectionIdx;
 
-      // Accumulate dynamic_time with modifiers (matches Remotion AudioReactiveCanvas)
+      // Accumulate dynamic_time with modifiers.
+      // IMPORTANT: tempo does NOT accelerate shader animation — it drives beat sync only.
+      // Previously tempo/120 made 150 BPM songs run 1.25x faster which was seizure-inducing.
+      // Now: base speed = real time, with subtle modifiers for musical feel.
       const dt = 1 / fps; // time step per frame
-      const baseDT = dt * (tempo / 120); // tempo-scaled base
-      const fluxMult = 1.0 + Math.min(0.04, (uniforms.spectral_flux || 0) * 0.1); // spectral flux boost
+      const baseDT = dt; // real-time base (NOT tempo-scaled)
+      const fluxMult = 1.0 + Math.min(0.02, (uniforms.spectral_flux || 0) * 0.05); // subtle flux boost
       const climaxState = frameAnalysis?.climaxState ?? { phase: "idle", intensity: 0 };
       const climaxSpeed = (climaxState.phase === "climax" || climaxState.phase === "sustain")
-        ? 1.0 + (climaxState.intensity ?? 0) * 0.3 // up to 1.3x during climax
+        ? 1.0 + (climaxState.intensity ?? 0) * 0.15 // up to 1.15x during climax (was 1.3x)
         : 1.0;
       const deadAirMult = isDeadAir ? 0.05 : 1.0; // 5% speed during dead air
       dynamicTimeAccum += baseDT * fluxMult * climaxSpeed * deadAirMult;
