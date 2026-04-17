@@ -88,9 +88,9 @@ def load_clap_model():
         print("ERROR: laion-clap not installed. Install with: pip install laion-clap>=1.1.4", file=sys.stderr)
         sys.exit(1)
 
-    print("Loading CLAP model (laion/larger_clap_music) ...")
-    model = laion_clap.CLAP_Module(enable_fusion=False, amodel="HTSAT-base")
-    model.load_ckpt()
+    print("Loading CLAP model (music_speech_audioset_epoch_15_esc_89.98) ...")
+    model = laion_clap.CLAP_Module(enable_fusion=False, amodel="HTSAT-tiny")
+    model.load_ckpt()  # downloads default checkpoint (~300MB) on first run
     print("CLAP model loaded.")
     return model
 
