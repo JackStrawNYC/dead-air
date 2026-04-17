@@ -1131,16 +1131,30 @@ async function main() {
     // the full active shader pool based on section energy level.
     const sectionModes: string[] = [];
     const preferredModes = songIdentity?.preferredModes ?? [];
-    const activeShaderPool = Object.keys(shaders).filter(s =>
-      !["combustible_voronoi", "creation", "fluid_2d", "spectral_bridge",
-        "obsidian_mirror", "amber_drift", "volumetric_clouds", "volumetric_smoke",
-        "volumetric_nebula", "digital_rain", "protean_clouds", "seascape",
-        "storm_vortex", "warm_nebula", "particle_nebula", "liquid_mandala",
-        "star_nest", "crystalline_void", "space_travel", "cosmic_voyage",
-        "fractal_zoom", "acid_melt", "aurora_sky", "spinning_spiral",
-        "prism_refraction", "spectral_analyzer", "neon_grid", "concert_beams",
-      ].includes(s)
-    );
+    // A+/A/B tier only — every shader in this pool should make a viewer say "beautiful"
+    // C/D tier, black-frame risk, show-specific variants, and screensaver shaders are BLOCKED
+    const SHADER_BLOCKLIST = new Set([
+      // C/D tier: generic procedural, screensaver quality
+      "combustible_voronoi", "creation", "fluid_2d", "spectral_bridge",
+      "obsidian_mirror", "amber_drift", "volumetric_clouds", "volumetric_smoke",
+      "volumetric_nebula", "digital_rain", "protean_clouds", "seascape",
+      "warm_nebula", "particle_nebula", "liquid_mandala", "star_nest",
+      "crystalline_void", "space_travel", "fractal_zoom", "acid_melt",
+      "aurora_sky", "spinning_spiral", "prism_refraction", "spectral_analyzer",
+      "neon_grid", "concert_beams", "blacklight_glow", "liquid_projector",
+      "databend", "signal_decay", "climax_surge", "cellular_automata",
+      "bioluminescence",
+      // Black-frame risk: unclear implementation or sparse output
+      "storm_vortex", "mycelium_network", "cosmic_voyage",
+      // Show-specific variants: only used via song identity, not random pool
+      "morning_dew_fog", "dark_star_void", "fire_mountain_smoke",
+      "estimated_prophet_mist", "wharf_rat_storm", "scarlet_golden_haze",
+      "st_stephen_lightning", "terrapin_nebula",
+      // Redundant with better versions
+      "dual_blend", "dual_shader", "smoke_and_mirrors", "molten_glass",
+      "particle_burst",
+    ]);
+    const activeShaderPool = Object.keys(shaders).filter(s => !SHADER_BLOCKLIST.has(s));
 
     for (let si = 0; si < Math.max(1, sections.length); si++) {
       const section = sections[si] ?? { start: 0, end: frames.length, type: "verse" };
@@ -1154,18 +1168,25 @@ async function main() {
         ? preferredModes.filter((m: string) => activeShaderPool.includes(m))
         : [];
 
-      // Fallback: energy-based pool from all active shaders
+      // Fallback: energy-based pool from curated A+/A/B shaders
       if (pool.length === 0) {
         if (avgEnergy > 0.25) {
+          // HIGH energy: dramatic, intense, screen-filling
           pool = activeShaderPool.filter(s => ["inferno", "lava_flow", "electric_arc", "liquid_light",
-            "concert_lighting", "molten_forge", "dance_floor_prism", "fractal_temple"].includes(s));
+            "concert_lighting", "fractal_temple", "fractal_flames", "tie_dye",
+            "solar_flare", "plasma_field", "feedback_recursion", "mandala_engine"].includes(s));
         } else if (avgEnergy < 0.10) {
-          pool = activeShaderPool.filter(s => ["aurora", "deep_ocean", "luminous_cavern", "ancient_forest",
-            "memorial_drift", "porch_twilight", "void_light", "cosmic_dust"].includes(s));
+          // LOW energy: atmospheric, contemplative, intimate
+          pool = activeShaderPool.filter(s => ["aurora", "deep_ocean", "ancient_forest",
+            "void_light", "cosmic_dust", "ink_wash", "smoke_rings",
+            "stained_glass", "coral_reef", "oil_projector"].includes(s));
         } else {
+          // MID energy: varied, evolving, textured
           pool = activeShaderPool.filter(s => ["fractal_temple", "stained_glass", "kaleidoscope",
-            "ink_wash", "morphogenesis", "sacred_geometry", "oil_projector", "cosmic_cathedral",
-            "desert_cathedral", "coral_reef"].includes(s));
+            "ink_wash", "morphogenesis", "sacred_geometry", "oil_projector",
+            "neural_web", "voronoi_flow", "tie_dye", "feedback_recursion",
+            "truchet_tiling", "diffraction_rings", "aurora_curtains",
+            "coral_reef", "warp_field", "galaxy_spiral"].includes(s));
         }
       }
 
