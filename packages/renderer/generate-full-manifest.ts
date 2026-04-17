@@ -1163,25 +1163,34 @@ async function main() {
       const mid = Math.floor((sectionStart + sectionEnd) / 2);
       const avgEnergy = smoothed.energy[Math.min(mid, frames.length - 1)] ?? 0.3;
 
-      // Pick from song identity preferred modes if available
-      let pool = preferredModes.length > 0
-        ? preferredModes.filter((m: string) => activeShaderPool.includes(m))
-        : [];
+      // Energy-appropriate shader sets (shared between identity and fallback)
+      const HIGH_ENERGY_SHADERS = new Set(["inferno", "lava_flow", "electric_arc",
+        "concert_lighting", "fractal_temple", "fractal_flames", "tie_dye",
+        "solar_flare", "plasma_field", "feedback_recursion", "mandala_engine"]);
+      const LOW_ENERGY_SHADERS = new Set(["aurora", "deep_ocean", "ancient_forest",
+        "void_light", "cosmic_dust", "ink_wash", "smoke_rings",
+        "stained_glass", "coral_reef", "oil_projector"]);
+
+      // Pick from song identity preferred modes, filtered by energy appropriateness
+      let pool: string[] = [];
+      if (preferredModes.length > 0) {
+        const energySet = avgEnergy > 0.25 ? HIGH_ENERGY_SHADERS
+          : avgEnergy < 0.10 ? LOW_ENERGY_SHADERS : null; // null = any
+        pool = preferredModes.filter((m: string) =>
+          activeShaderPool.includes(m) && (energySet === null || energySet.has(m))
+        );
+        // If energy filtering removes all preferred modes, use any preferred that's active
+        if (pool.length === 0) {
+          pool = preferredModes.filter((m: string) => activeShaderPool.includes(m));
+        }
+      }
 
       // Fallback: energy-based pool from curated A+/A/B shaders
       if (pool.length === 0) {
         if (avgEnergy > 0.25) {
-          // HIGH energy: dramatic, intense, screen-filling
-          // HIGH energy: screen-filling, dramatic, intense color
-          // liquid_light REMOVED — sparse/dark raymarcher, not screen-filling
-          pool = activeShaderPool.filter(s => ["inferno", "lava_flow", "electric_arc",
-            "concert_lighting", "fractal_temple", "fractal_flames", "tie_dye",
-            "solar_flare", "plasma_field", "feedback_recursion", "mandala_engine"].includes(s));
+          pool = activeShaderPool.filter(s => HIGH_ENERGY_SHADERS.has(s));
         } else if (avgEnergy < 0.10) {
-          // LOW energy: atmospheric, contemplative, intimate
-          pool = activeShaderPool.filter(s => ["aurora", "deep_ocean", "ancient_forest",
-            "void_light", "cosmic_dust", "ink_wash", "smoke_rings",
-            "stained_glass", "coral_reef", "oil_projector"].includes(s));
+          pool = activeShaderPool.filter(s => LOW_ENERGY_SHADERS.has(s));
         } else {
           // MID energy: varied, evolving, textured
           pool = activeShaderPool.filter(s => ["fractal_temple", "stained_glass", "kaleidoscope",
