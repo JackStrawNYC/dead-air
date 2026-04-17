@@ -1,5 +1,6 @@
 pub mod compute;
 pub mod compositor;
+pub mod endcard;
 pub mod ffmpeg;
 pub mod glsl_compat;
 pub mod gpu;

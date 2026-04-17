@@ -18,6 +18,7 @@
 
 mod compute;
 mod compositor;
+mod endcard;
 mod ffmpeg;
 pub mod glsl_compat;
 mod gpu;
@@ -109,6 +110,10 @@ struct Args {
     #[arg(long)]
     brand_image: Option<String>,
 
+    /// Append a 10-second cinematic end card with setlist recap after the show.
+    #[arg(long, default_value_t = false)]
+    with_endcard: bool,
+
     /// Override overlay PNG directory (instead of path baked into manifest).
     #[arg(long)]
     overlay_png_dir: Option<String>,
@@ -186,6 +191,61 @@ fn main() {
     } else {
         0
     };
+
+    // ─── Append end card sequence if requested ───
+    if args.with_endcard {
+        let venue = args.show_venue.as_deref().unwrap_or("Unknown Venue");
+        let date_display = args.show_date.as_deref().unwrap_or("Unknown Date");
+
+        // Collect song titles from manifest (deduplicate consecutive same-shader runs)
+        let mut songs: Vec<String> = Vec::new();
+        let mut prev_shader = String::new();
+        for f in &manifest.frames {
+            if f.shader_id != prev_shader && !f.shader_id.starts_with("__") {
+                // Use shader_id as song title placeholder (real titles come from setlist)
+                if songs.len() < 25 { // cap at 25 for display
+                    songs.push(f.shader_id.replace('_', " "));
+                }
+                prev_shader = f.shader_id.clone();
+            }
+        }
+
+        let meta = endcard::EndcardMeta {
+            venue: venue.to_string(),
+            date_display: date_display.to_string(),
+            songs,
+        };
+
+        let last_shader_id = manifest.frames.last().map(|f| f.shader_id.as_str());
+        let (ec_shaders, ec_frames, ec_overlays) =
+            endcard::generate_endcard(args.fps, args.width, args.height, &meta, last_shader_id);
+
+        let n_endcard = ec_frames.len();
+        println!("End card: {} frames ({:.1}s)", n_endcard, n_endcard as f32 / args.fps as f32);
+
+        // Merge: append endcard shaders
+        for (id, glsl) in ec_shaders {
+            manifest.shaders.insert(id, glsl);
+        }
+
+        // Renumber endcard frames and append
+        let offset = manifest.frames.len() as u32;
+        let mut ec_frames_numbered = ec_frames;
+        for f in &mut ec_frames_numbered {
+            f.frame += offset;
+        }
+        manifest.frames.append(&mut ec_frames_numbered);
+
+        // Merge overlay layers: append endcard overlays
+        if let Some(ref mut existing_overlays) = manifest.overlay_layers {
+            existing_overlays.extend(ec_overlays);
+        } else {
+            let show_frame_count = manifest.frames.len() - n_endcard;
+            let mut combined: Vec<Vec<_>> = (0..show_frame_count).map(|_| Vec::new()).collect();
+            combined.extend(ec_overlays);
+            manifest.overlay_layers = Some(combined);
+        }
+    }
 
     let total_frames = if args.end_frame > 0 {
         (args.end_frame - args.start_frame) as usize
