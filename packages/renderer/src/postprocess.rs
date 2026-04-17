@@ -478,48 +478,13 @@ impl PostProcessPipeline {
             usage: wgpu::BufferUsages::UNIFORM,
         });
 
-        // ─── Pass 1: Bloom extract (full-res scene → half-res bright pixels) ───
-        let extract_bg = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("pp_extract_bg"),
-            layout: &self.extract_bind_group_layout,
-            entries: &[
-                wgpu::BindGroupEntry { binding: 0, resource: wgpu::BindingResource::Sampler(sampler) },
-                wgpu::BindGroupEntry { binding: 1, resource: wgpu::BindingResource::TextureView(scene_view) },
-                wgpu::BindGroupEntry { binding: 2, resource: uniform_buffer.as_entire_binding() },
-            ],
-        });
+        // Bloom passes SKIPPED: GLSL applyPostProcess() handles all bloom in-shader.
+        // Spatial bloom was double-processing and washing out highlights.
+        // Passes 1-3 (extract + blur_h + blur_v) are not executed, saving ~5ms/frame.
+        // The bloom_extract texture contains uninitialized data but composite shader
+        // ignores it (just passes through scene with Reinhard rolloff).
 
-        self.run_pass(encoder, &self.bloom_extract_pipeline, &extract_bg,
-            &self.bloom_extract_view, vertex_buffer, index_buffer);
-
-        // ─── Pass 2: Horizontal Gaussian blur ───
-        let blur_h_bg = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("pp_blur_h_bg"),
-            layout: &self.blur_bind_group_layout,
-            entries: &[
-                wgpu::BindGroupEntry { binding: 0, resource: wgpu::BindingResource::Sampler(sampler) },
-                wgpu::BindGroupEntry { binding: 1, resource: wgpu::BindingResource::TextureView(&self.bloom_extract_view) },
-            ],
-        });
-
-        self.run_pass(encoder, &self.blur_h_pipeline, &blur_h_bg,
-            &self.bloom_blur_view, vertex_buffer, index_buffer);
-
-        // ─── Pass 3: Vertical Gaussian blur ───
-        let blur_v_bg = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("pp_blur_v_bg"),
-            layout: &self.blur_bind_group_layout,
-            entries: &[
-                wgpu::BindGroupEntry { binding: 0, resource: wgpu::BindingResource::Sampler(sampler) },
-                wgpu::BindGroupEntry { binding: 1, resource: wgpu::BindingResource::TextureView(&self.bloom_blur_view) },
-            ],
-        });
-
-        // Write back to bloom_extract (ping-pong)
-        self.run_pass(encoder, &self.blur_v_pipeline, &blur_v_bg,
-            &self.bloom_extract_view, vertex_buffer, index_buffer);
-
-        // ─── Pass 4: Composite (scene + bloom → pre-FXAA texture) ───
+        // ─── Composite (scene → pre-FXAA texture with Reinhard rolloff) ───
         let composite_bg = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("pp_composite_bg"),
             layout: &self.composite_bind_group_layout,
