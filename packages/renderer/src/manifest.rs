@@ -225,6 +225,15 @@ pub struct FrameData {
     #[serde(default)]
     pub effect_intensity: f32,
 
+    // Composited visual layer mode (0=none, 1-10=composited effects)
+    // Runs independently of effect_mode — can have both at once.
+    #[serde(default)]
+    pub composited_mode: u32,
+
+    // Composited effect intensity (0.0-1.0)
+    #[serde(default)]
+    pub composited_intensity: f32,
+
     // Show position (0.0=start, 1.0=end) for macro-pacing
     #[serde(default)]
     pub show_position: f32,

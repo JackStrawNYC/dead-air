@@ -378,7 +378,10 @@ fn main() {
         args.width,
         args.height,
     );
-    println!("Effects: 24 visual modes available");
+    println!("Effects: 14 post-process + 10 composited modes available");
+
+    // ─── Create composited effects pipeline ───
+    let composited_pipeline = composited_effects::CompositedPipeline::new(renderer.device());
 
     // ─── Create GPU transition pipeline ───
     let transition_pipeline = transition::GpuTransitionPipeline::new(
@@ -824,6 +827,41 @@ fn main() {
                     renderer.copy_to_readback(&mut copy_encoder);
                     renderer.queue().submit(std::iter::once(copy_encoder.finish()));
                 }
+            }
+        }
+
+        // ─── Apply composited visual layer AFTER effects ───
+        // Composited effects generate new visual elements (particles, caustics, etc.)
+        // and alpha-blend them ON TOP of the output texture.
+        {
+            let comp_mode = frame.composited_mode;
+            let comp_intensity = frame.composited_intensity;
+
+            if comp_mode > 0 && comp_intensity > 0.01 {
+                let comp_uniforms = composited_effects::CompositedUniforms {
+                    mode: comp_mode,
+                    intensity: comp_intensity,
+                    time: frame.time,
+                    energy: frame.energy,
+                    bass: frame.bass,
+                    beat_snap: frame.beat_snap,
+                    width: args.width as f32,
+                    height: args.height as f32,
+                };
+                let output_view = renderer.output_texture_view();
+                let mut encoder = renderer.device().create_command_encoder(
+                    &wgpu::CommandEncoderDescriptor { label: Some("composited_pass") },
+                );
+                let applied = composited_pipeline.apply(
+                    &mut encoder, renderer.device(),
+                    output_view, &comp_uniforms,
+                    renderer.vertex_buffer(), renderer.index_buffer(),
+                );
+                if applied {
+                    // Re-trigger readback since we modified the output texture
+                    renderer.copy_to_readback(&mut encoder);
+                }
+                renderer.queue().submit(std::iter::once(encoder.finish()));
             }
         }
 

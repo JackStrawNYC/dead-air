@@ -96,61 +96,45 @@ fn hash22(p: vec2<f32>) -> vec2<f32> {
 // ═══════════════════════════════════════════════════════════
 fn particle_swarm(uv: vec2<f32>, intensity: f32, time: f32, energy: f32, bass: f32) -> vec4<f32> {
     var col = vec3<f32>(0.0);
-    let aspect = cu.width / cu.height;
 
-    // 3 layers at different scales for depth perception
-    for (var layer = 0; layer < 3; layer = layer + 1) {
-        let lid = f32(layer);
-        let layer_scale = 15.0 + lid * 20.0; // 15, 35, 55 cells
-        let layer_speed = (0.3 + lid * 0.2) * (0.5 + energy);
-        let layer_size = (0.004 - lid * 0.001) * (1.0 + energy * 0.5);
-        let layer_brightness = 1.0 - lid * 0.25;
+    // 8-12 large floating orbs (not thousands of specks)
+    // Each orb is a prominent glowing sphere with halo
+    for (var i = 0; i < 12; i = i + 1) {
+        let id = f32(i);
+        let h1 = hash21(vec2<f32>(id * 73.7, id * 37.1));
+        let h2 = hash21(vec2<f32>(id * 91.3 + 7.0, id * 23.9));
 
-        let p = uv * layer_scale;
-        let cell = floor(p);
+        // Only show subset based on energy (4 at rest, 12 at peak)
+        if (h1 > 0.35 + energy * 0.55) { continue; }
 
-        // Check 3x3 neighborhood for nearby particles
-        for (var dy = -1; dy <= 1; dy = dy + 1) {
-            for (var dx = -1; dx <= 1; dx = dx + 1) {
-                let neighbor = cell + vec2<f32>(f32(dx), f32(dy));
-                let h = hash22(neighbor + vec2<f32>(lid * 100.0, 0.0));
+        // Large slow orbital motion
+        let phase = id * 1.618 * TAU; // golden ratio spacing
+        let speed = 0.08 + h1 * 0.06;
+        let orbit = 0.25 + h2 * 0.15;
+        let ox = 0.5 + cos(time * speed + phase) * orbit;
+        let oy = 0.5 + sin(time * speed * 0.7 + phase * 1.3) * orbit * 0.7;
 
-                // Only ~60% of cells have particles (density control)
-                if (h.x > 0.4 + (1.0 - energy) * 0.2) { continue; }
+        // Bass breathing
+        let breath = 1.0 + bass * 0.15;
+        let px = mix(0.5, ox, breath);
+        let py = mix(0.5, oy, breath);
 
-                // Particle position within cell (animated orbit)
-                let orbit_phase = h.y * TAU + time * layer_speed * (0.5 + h.x);
-                let orbit_r = 0.2 + h.x * 0.25;
-                let particle_pos = neighbor + 0.5 + vec2<f32>(
-                    cos(orbit_phase) * orbit_r,
-                    sin(orbit_phase * 0.7 + h.y * 3.0) * orbit_r
-                );
+        let dist = length(uv - vec2<f32>(px, py));
 
-                // Bass breathing: particles pulse outward from center
-                let to_center = (particle_pos / layer_scale - 0.5);
-                let breath = bass * 0.15 * intensity;
-                let breathed_pos = particle_pos + to_center * layer_scale * breath;
+        // Large orb: soft outer halo + bright core
+        let orb_size = 0.06 + h2 * 0.04 + energy * 0.02;
+        let halo = smoothstep(orb_size * 2.5, 0.0, dist) * 0.4;
+        let core = smoothstep(orb_size * 0.4, 0.0, dist) * 0.8;
+        let glow = halo + core;
 
-                let diff = p - breathed_pos;
-                let dist = length(vec2<f32>(diff.x, diff.y * aspect));
+        // White-gold color (cuts through any background)
+        let hue = fract(h1 * 0.5 + time * 0.02);
+        let orb_col = vec3<f32>(1.0, 0.90 + hue * 0.1, 0.6 + hue * 0.2);
 
-                // Soft glow with size variation
-                let glow = smoothstep(layer_size * 3.0, 0.0, dist);
-
-                // Warm color: amber to gold, shifting with time
-                let hue = fract(h.x * 0.3 + h.y * 0.7 + time * 0.01);
-                let particle_col = vec3<f32>(
-                    0.9 + hue * 0.1,
-                    0.6 + (1.0 - hue) * 0.2,
-                    0.2 + hue * 0.1
-                ) * layer_brightness;
-
-                col += particle_col * glow * intensity * 0.06;
-            }
-        }
+        col += orb_col * glow * intensity;
     }
 
-    let alpha = min(length(col) * 3.0, 1.0) * intensity;
+    let alpha = min(length(col), 0.9) * intensity;
     return vec4<f32>(col, alpha);
 }
 
@@ -224,12 +208,12 @@ fn caustics(uv: vec2<f32>, intensity: f32, time: f32, energy: f32) -> vec4<f32> 
 
     // Warm caustic color (golden-aqua, not clinical blue)
     let col = vec3<f32>(
-        caustic_r * 0.6 + caustic_g * 0.3,
+        caustic_r * 0.7 + caustic_g * 0.3,
         caustic_g * 0.7 + caustic_b * 0.2,
-        caustic_b * 0.5 + caustic_r * 0.1
-    ) * intensity * 0.35;
+        caustic_b * 0.5 + caustic_r * 0.15
+    ) * intensity * 0.75;
 
-    let alpha = max(caustic_r, max(caustic_g, caustic_b)) * intensity * 0.4;
+    let alpha = max(caustic_r, max(caustic_g, caustic_b)) * intensity * 0.65;
     return vec4<f32>(col, alpha);
 }
 
@@ -258,10 +242,10 @@ fn celestial_map(uv: vec2<f32>, intensity: f32, time: f32) -> vec4<f32> {
     // 3 star layers at different densities
     for (var layer = 0; layer < 3; layer = layer + 1) {
         let lid = f32(layer);
-        let grid = 20.0 + lid * 15.0; // 20, 35, 50 cells
-        let star_chance = 0.70 + lid * 0.08; // fewer stars in denser grids
-        let brightness_mult = 1.0 - lid * 0.35;
-        let size = 0.06 - lid * 0.015;
+        let grid = 8.0 + lid * 6.0; // 8, 14, 20 cells (much fewer, bigger)
+        let star_chance = 0.65 + lid * 0.10;
+        let brightness_mult = 1.0 - lid * 0.25;
+        let size = 0.12 - lid * 0.03; // much larger stars with halos
 
         let p = rotated * grid;
         let cell = floor(p);
@@ -293,18 +277,18 @@ fn celestial_map(uv: vec2<f32>, intensity: f32, time: f32) -> vec4<f32> {
                 star_col = vec3<f32>(1.0, 0.85, 0.6); // orange/red dwarf
             }
 
-            col += star_col * star_glow * (0.7 + cu.energy * 0.3);
+            col += star_col * star_glow * (1.2 + cu.energy * 0.8);
         }
     }
 
-    // Faint nebula wisps (adds depth between stars)
+    // Nebula wisps (adds depth between stars)
     let nebula_p = rotated * 3.0;
     let n1 = sin(nebula_p.x * 2.0 + time * 0.02) * sin(nebula_p.y * 1.5 + time * 0.015);
     let n2 = sin(nebula_p.x * 3.5 + time * 0.03) * cos(nebula_p.y * 2.8 + time * 0.02);
-    let nebula = max(n1 * n2, 0.0) * 0.03 * intensity;
-    col += vec3<f32>(0.3, 0.2, 0.5) * nebula; // faint purple nebula
+    let nebula = max(n1 * n2, 0.0) * 0.12 * intensity;
+    col += vec3<f32>(0.4, 0.25, 0.6) * nebula; // purple nebula
 
-    let alpha = min(length(col) * 2.0, 1.0) * intensity;
+    let alpha = min(length(col) * 1.5, 0.8) * intensity;
     return vec4<f32>(col * intensity, alpha);
 }
 
@@ -379,58 +363,53 @@ fn tunnel_wormhole(uv: vec2<f32>, intensity: f32, time: f32, energy: f32) -> vec
 fn fire_embers(uv: vec2<f32>, intensity: f32, time: f32, energy: f32, bass: f32) -> vec4<f32> {
     var col = vec3<f32>(0.0);
 
-    // 2 layers: foreground (large, fast) + background (small, slow)
-    for (var layer = 0; layer < 2; layer = layer + 1) {
-        let lid = f32(layer);
-        let grid_scale = 12.0 + lid * 8.0; // 12x, 20x grid
-        let rise_speed = 0.08 + lid * 0.04;
-        let base_size = 0.006 - lid * 0.002;
-        let layer_bright = 1.0 - lid * 0.3;
+    // 10 large individual embers rising from the bottom
+    for (var i = 0; i < 10; i = i + 1) {
+        let id = f32(i);
+        let h1 = hash21(vec2<f32>(id * 47.3, id * 83.1));
+        let h2 = hash21(vec2<f32>(id * 67.9 + 5.0, id * 31.7));
 
-        let p = vec2<f32>(uv.x * grid_scale, uv.y * grid_scale * 0.6); // taller cells
-        let cell = floor(p);
+        // Only show subset based on energy (3 at rest, 10 at peak)
+        if (h1 > 0.3 + energy * 0.7) { continue; }
 
-        for (var dy = -1; dy <= 1; dy = dy + 1) {
-            for (var dx = -1; dx <= 1; dx = dx + 1) {
-                let neighbor = cell + vec2<f32>(f32(dx), f32(dy));
-                let h = hash22(neighbor + vec2<f32>(lid * 50.0, 0.0));
+        // Rise: each ember continuously loops bottom→top
+        let rise_speed = 0.04 + h2 * 0.03;
+        let life = fract(h1 * 0.5 - time * rise_speed);
 
-                // ~50% of cells have embers
-                if (h.x > 0.5 + (1.0 - energy) * 0.15) { continue; }
+        // Horizontal position: scattered across width with turbulent drift
+        let base_x = h1;
+        let drift = sin(time * (1.0 + h2 * 2.0) + id * 3.7) * 0.08 * (0.5 + life);
+        let ember_x = base_x + drift;
+        let ember_y = 1.0 - life; // rises from bottom to top
 
-                // Rise animation: each ember rises independently
-                let rise = fract(h.y * 0.5 - time * rise_speed * (0.5 + h.x));
-                let life = rise; // 0 = fresh (bottom), 1 = dying (top)
+        let dist = length(uv - vec2<f32>(ember_x, ember_y));
 
-                // Position with turbulent horizontal drift
-                let drift_amp = 0.15 + life * 0.2;
-                let drift = sin(time * (1.5 + h.x * 3.0) + h.y * TAU) * drift_amp;
-                let ember_x = (neighbor.x + 0.5 + h.x * 0.3 + drift) / grid_scale;
-                let ember_y = 1.0 - rise; // rises from bottom
+        // Large ember with glow halo
+        let size = (0.04 + h2 * 0.025) * (1.0 - life * 0.5) * (1.0 + bass * 0.3);
+        let halo = smoothstep(size * 3.0, 0.0, dist) * 0.5;
+        let core = smoothstep(size * 0.5, 0.0, dist) * 0.8;
+        let glow = halo + core;
 
-                let dist = length(uv - vec2<f32>(ember_x, ember_y));
-
-                // Size: larger when fresh, shrinks as it cools
-                let size = base_size * (1.0 - life * 0.6) * (1.0 + bass * 0.4);
-                let glow = smoothstep(size * 3.5, 0.0, dist);
-
-                // Color gradient: white-hot → orange → deep red → dark
-                var ember_col: vec3<f32>;
-                if (life < 0.2) {
-                    ember_col = mix(vec3<f32>(1.0, 0.95, 0.8), vec3<f32>(1.0, 0.7, 0.2), life * 5.0);
-                } else if (life < 0.6) {
-                    ember_col = mix(vec3<f32>(1.0, 0.7, 0.2), vec3<f32>(0.8, 0.2, 0.05), (life - 0.2) * 2.5);
-                } else {
-                    ember_col = mix(vec3<f32>(0.8, 0.2, 0.05), vec3<f32>(0.2, 0.05, 0.0), (life - 0.6) * 2.5);
-                }
-
-                let fade = (1.0 - life * 0.9); // fade as it rises
-                col += ember_col * glow * fade * intensity * 0.08 * layer_bright;
-            }
+        // Hot→cool color: white → orange → red → dark
+        var ember_col: vec3<f32>;
+        if (life < 0.15) {
+            ember_col = vec3<f32>(1.0, 0.95, 0.85); // white-hot
+        } else if (life < 0.4) {
+            let t = (life - 0.15) / 0.25;
+            ember_col = mix(vec3<f32>(1.0, 0.95, 0.85), vec3<f32>(1.0, 0.6, 0.15), t);
+        } else if (life < 0.7) {
+            let t = (life - 0.4) / 0.3;
+            ember_col = mix(vec3<f32>(1.0, 0.6, 0.15), vec3<f32>(0.9, 0.2, 0.05), t);
+        } else {
+            let t = (life - 0.7) / 0.3;
+            ember_col = mix(vec3<f32>(0.9, 0.2, 0.05), vec3<f32>(0.3, 0.05, 0.0), t);
         }
+
+        let fade = 1.0 - life * 0.7;
+        col += ember_col * glow * fade * intensity;
     }
 
-    let alpha = min(length(col) * 4.0, 1.0) * intensity;
+    let alpha = min(length(col), 0.9) * intensity;
     return vec4<f32>(col, alpha);
 }
 
@@ -446,41 +425,41 @@ fn fire_embers(uv: vec2<f32>, intensity: f32, time: f32, energy: f32, bass: f32)
 fn ripple_waves(uv: vec2<f32>, intensity: f32, time: f32, beat_snap: f32) -> vec4<f32> {
     var wave_total = 0.0;
 
-    // 3 wave sources at different positions
-    for (var i = 0; i < 3; i = i + 1) {
+    // 2 wave sources — fewer for cleaner ring visibility
+    for (var i = 0; i < 2; i = i + 1) {
         let id = f32(i);
-        let phase = id * 2.094;
+        let phase = id * PI;
         let source = vec2<f32>(
-            0.5 + sin(time * 0.05 + phase) * 0.2,
-            0.5 + cos(time * 0.04 + phase * 0.7) * 0.2
+            0.5 + sin(time * 0.04 + phase) * 0.15,
+            0.5 + cos(time * 0.03 + phase * 0.7) * 0.15
         );
         let dist = length(uv - source);
 
-        // Expanding rings with decay
-        let wave_freq = 25.0 + cu.energy * 15.0;
-        let speed = time * (1.5 + cu.energy);
-        let wave = sin(dist * wave_freq - speed + id * 2.0);
+        // Sharp bright ring lines (not soft waves)
+        let wave_freq = 18.0 + cu.energy * 12.0;
+        let speed = time * (1.0 + cu.energy * 0.5);
+        let wave_raw = sin(dist * wave_freq - speed + id * PI);
 
-        // Sharp peaks, soft troughs (like real water ripples)
-        let sharp = pow(max(wave, 0.0), 2.0);
+        // Very sharp peaks — thin bright lines with dark gaps
+        let sharp = pow(max(wave_raw, 0.0), 4.0);
 
         // Decay with distance
-        let decay = smoothstep(0.5, 0.05, dist);
+        let decay = smoothstep(0.55, 0.08, dist);
         wave_total += sharp * decay;
     }
 
-    // Beat-triggered center burst
-    if (beat_snap > 0.3) {
+    // Beat-triggered center burst (strong)
+    if (beat_snap > 0.2) {
         let center_dist = length(uv - vec2<f32>(0.5, 0.5));
-        let burst = sin(center_dist * 40.0 - time * 4.0) * beat_snap;
-        wave_total += max(burst, 0.0) * smoothstep(0.4, 0.0, center_dist);
+        let burst = pow(max(sin(center_dist * 30.0 - time * 3.0), 0.0), 3.0) * beat_snap;
+        wave_total += burst * smoothstep(0.5, 0.0, center_dist);
     }
 
-    wave_total = min(wave_total / 3.0, 1.0);
+    wave_total = min(wave_total, 1.0);
 
-    // Warm ripple color
-    let col = vec3<f32>(0.9, 0.8, 0.6) * wave_total * intensity * 0.18;
-    let alpha = wave_total * intensity * 0.15;
+    // Bright white ripple lines — high contrast
+    let col = vec3<f32>(1.0, 1.0, 0.90) * wave_total * intensity * 1.0;
+    let alpha = wave_total * intensity * 0.70;
     return vec4<f32>(col, alpha);
 }
 
@@ -494,17 +473,20 @@ fn ripple_waves(uv: vec2<f32>, intensity: f32, time: f32, beat_snap: f32) -> vec
 // - Smooth attack/release (not binary on/off)
 // ═══════════════════════════════════════════════════════════
 fn strobe_flicker(intensity: f32, beat_snap: f32, energy: f32) -> vec4<f32> {
-    // Triple gate: beat must be confident, energy must be moderate+, intensity set
-    let gate = beat_snap * energy * intensity;
+    // Gate: beat_snap drives the flash, energy provides base level
+    let gate = beat_snap * intensity;
 
-    // Only trigger above 0.5 threshold (prevents constant flicker)
-    let trigger = smoothstep(0.5, 0.8, gate);
+    // Trigger above 0.2 threshold (was 0.5 — too restrictive)
+    let trigger = smoothstep(0.2, 0.6, gate);
 
-    // Max 12% warm amber overlay (safe for photosensitive viewers)
-    let flash_val = trigger * 0.12;
+    // Energy gates the maximum: quiet=subtle, loud=strong
+    let energy_gate = smoothstep(0.15, 0.5, energy);
+
+    // Max 30% warm amber overlay (safe for photosensitive viewers — under 3Hz)
+    let flash_val = trigger * energy_gate * 0.30;
 
     // Warm amber flash (not cold white — matches Dead aesthetic)
-    let flash_color = vec3<f32>(1.0, 0.85, 0.6);
+    let flash_color = vec3<f32>(1.0, 0.85, 0.55);
 
     return vec4<f32>(flash_color * flash_val, flash_val);
 }
@@ -552,19 +534,19 @@ fn geometric_breakdown(uv: vec2<f32>, intensity: f32, time: f32, energy: f32) ->
     let edge_width = 0.02 + energy * 0.02;
     let edge = smoothstep(edge_width, 0.0, edge_dist);
 
-    // Cell interior: subtle warm color variation based on cell ID
+    // Cell interior: warm color variation based on cell ID
     let cell_hash = hash21(closest_cell);
     let cell_col = vec3<f32>(
-        0.15 + cell_hash * 0.08,
-        0.10 + cell_hash * 0.05,
-        0.05 + cell_hash * 0.03
+        0.25 + cell_hash * 0.15,
+        0.15 + cell_hash * 0.10,
+        0.08 + cell_hash * 0.05
     );
 
-    // Golden edge color
-    let edge_col = vec3<f32>(0.9, 0.75, 0.4) * edge;
+    // Bright golden edge color
+    let edge_col = vec3<f32>(1.0, 0.85, 0.5) * edge;
 
     let col = (edge_col + cell_col * (1.0 - edge)) * intensity;
-    let alpha = (edge * 0.3 + 0.05) * intensity;
+    let alpha = (edge * 0.55 + 0.10) * intensity;
     return vec4<f32>(col, alpha);
 }
 
@@ -618,8 +600,8 @@ fn liquid_metal(uv: vec2<f32>, intensity: f32, time: f32, energy: f32, bass: f32
     let spec_col = vec3<f32>(1.0, 0.95, 0.85) * spec * 0.6;
     let fresnel_col = vec3<f32>(0.7, 0.65, 0.5) * fresnel;
 
-    let final_col = (base_col * (0.4 + abs(surface) * 0.6) + spec_col + fresnel_col) * intensity;
-    let alpha = intensity * (0.15 + abs(surface) * 0.15 + spec * 0.2);
+    let final_col = (base_col * (0.5 + abs(surface) * 0.7) + spec_col * 1.5 + fresnel_col * 1.3) * intensity;
+    let alpha = intensity * (0.25 + abs(surface) * 0.20 + spec * 0.30);
     return vec4<f32>(final_col, alpha);
 }
 
@@ -682,7 +664,8 @@ fn concert_poster(uv: vec2<f32>, intensity: f32, time: f32, energy: f32) -> vec4
     let frame_col = vec3<f32>(0.12, 0.06, 0.02); // dark frame
     let final_col = mix(poster_col, frame_col, frame_line);
 
-    let alpha = intensity * 0.35;
+    // With additive blend, use lower alpha to avoid washing out the scene
+    let alpha = intensity * 0.18;
     return vec4<f32>(final_col * intensity, alpha);
 }
 
@@ -710,12 +693,196 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 }
 "#;
 
-// Note: This module defines the shaders but does NOT create a pipeline yet.
-// The pipeline creation follows the same pattern as effects.rs EffectPipeline
-// but with alpha blending enabled (additive or screen blend onto the scene).
-// Integration into the render loop is a separate step.
+/// Vertex shader for composited effects (same fullscreen quad as effects.rs).
+const COMP_VERTEX_WGSL: &str = r#"
+struct VertexInput {
+    @location(0) position: vec2<f32>,
+    @location(1) uv: vec2<f32>,
+};
 
-/// Placeholder for future pipeline — shaders are defined and ready to compile.
-pub fn get_composited_shader_source() -> &'static str {
-    COMPOSITED_WGSL
+struct VertexOutput {
+    @builtin(position) clip_position: vec4<f32>,
+    @location(0) uv: vec2<f32>,
+};
+
+@vertex
+fn vs_main(in: VertexInput) -> VertexOutput {
+    var out: VertexOutput;
+    out.clip_position = vec4<f32>(in.position, 0.0, 1.0);
+    out.uv = in.uv;
+    return out;
+}
+"#;
+
+pub struct CompositedPipeline {
+    pipeline: wgpu::RenderPipeline,
+    bind_group_layout: wgpu::BindGroupLayout,
+}
+
+impl CompositedPipeline {
+    pub fn new(device: &wgpu::Device) -> Self {
+        let vertex_buffer_layout = wgpu::VertexBufferLayout {
+            array_stride: 16, // position f32x2 + uv f32x2
+            step_mode: wgpu::VertexStepMode::Vertex,
+            attributes: &[
+                wgpu::VertexAttribute {
+                    offset: 0,
+                    shader_location: 0,
+                    format: wgpu::VertexFormat::Float32x2,
+                },
+                wgpu::VertexAttribute {
+                    offset: 8,
+                    shader_location: 1,
+                    format: wgpu::VertexFormat::Float32x2,
+                },
+            ],
+        };
+
+        let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("composited_bind_group_layout"),
+            entries: &[
+                // Uniforms only — composited effects generate content from scratch
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+            ],
+        });
+
+        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("composited_pipeline_layout"),
+            bind_group_layouts: &[&bind_group_layout],
+            push_constant_ranges: &[],
+        });
+
+        // Strip VertexOutput from fragment shader (defined in vertex shader)
+        let frag_source = COMPOSITED_WGSL.replace(
+            "struct VertexOutput {\n    @builtin(position) clip_position: vec4<f32>,\n    @location(0) uv: vec2<f32>,\n};",
+            "// VertexOutput defined in vertex shader"
+        );
+
+        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("composited_shader"),
+            source: wgpu::ShaderSource::Wgsl(
+                format!("{}\n{}", COMP_VERTEX_WGSL, frag_source).into(),
+            ),
+        });
+
+        let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("composited_pipeline"),
+            layout: Some(&pipeline_layout),
+            vertex: wgpu::VertexState {
+                module: &shader,
+                entry_point: Some("vs_main"),
+                buffers: &[vertex_buffer_layout],
+                compilation_options: Default::default(),
+            },
+            fragment: Some(wgpu::FragmentState {
+                module: &shader,
+                entry_point: Some("fs_main"),
+                targets: &[Some(wgpu::ColorTargetState {
+                    format: crate::gpu::OUTPUT_FORMAT,
+                    // Additive blending: composited layer ADDS light to the scene.
+                    // result = effect_rgb * alpha + scene_rgb
+                    // This makes particles/stars/embers glow through any background.
+                    blend: Some(wgpu::BlendState {
+                        color: wgpu::BlendComponent {
+                            src_factor: wgpu::BlendFactor::SrcAlpha,
+                            dst_factor: wgpu::BlendFactor::One,
+                            operation: wgpu::BlendOperation::Add,
+                        },
+                        alpha: wgpu::BlendComponent {
+                            src_factor: wgpu::BlendFactor::One,
+                            dst_factor: wgpu::BlendFactor::One,
+                            operation: wgpu::BlendOperation::Add,
+                        },
+                    }),
+                    write_mask: wgpu::ColorWrites::ALL,
+                })],
+                compilation_options: Default::default(),
+            }),
+            primitive: wgpu::PrimitiveState {
+                topology: wgpu::PrimitiveTopology::TriangleList,
+                strip_index_format: None,
+                front_face: wgpu::FrontFace::Ccw,
+                cull_mode: None,
+                unclipped_depth: false,
+                polygon_mode: wgpu::PolygonMode::Fill,
+                conservative: false,
+            },
+            depth_stencil: None,
+            multisample: wgpu::MultisampleState::default(),
+            multiview: None,
+            cache: None,
+        });
+
+        Self {
+            pipeline,
+            bind_group_layout,
+        }
+    }
+
+    /// Apply composited effect directly onto the target texture view.
+    /// The effect renders WITH alpha blending enabled, so it overlays on existing content.
+    /// Returns true if effect was applied, false if passthrough (mode 0 or low intensity).
+    pub fn apply(
+        &self,
+        encoder: &mut wgpu::CommandEncoder,
+        device: &wgpu::Device,
+        target_view: &wgpu::TextureView,
+        uniforms: &CompositedUniforms,
+        vertex_buffer: &wgpu::Buffer,
+        index_buffer: &wgpu::Buffer,
+    ) -> bool {
+        if uniforms.mode == 0 || uniforms.intensity < 0.01 {
+            return false;
+        }
+
+        let uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("composited_uniforms"),
+            contents: bytemuck::bytes_of(uniforms),
+            usage: wgpu::BufferUsages::UNIFORM,
+        });
+
+        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("composited_bind_group"),
+            layout: &self.bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: uniform_buffer.as_entire_binding(),
+                },
+            ],
+        });
+
+        let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: Some("composited_pass"),
+            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                view: target_view,
+                resolve_target: None,
+                ops: wgpu::Operations {
+                    // LOAD — preserve existing scene content underneath
+                    load: wgpu::LoadOp::Load,
+                    store: wgpu::StoreOp::Store,
+                },
+            })],
+            depth_stencil_attachment: None,
+            timestamp_writes: None,
+            occlusion_query_set: None,
+        });
+
+        render_pass.set_pipeline(&self.pipeline);
+        render_pass.set_bind_group(0, &bind_group, &[]);
+        render_pass.set_vertex_buffer(0, vertex_buffer.slice(..));
+        render_pass.set_index_buffer(index_buffer.slice(..), wgpu::IndexFormat::Uint16);
+        render_pass.draw_indexed(0..6, 0, 0..1);
+
+        true
+    }
 }
