@@ -1979,6 +1979,26 @@ async function main() {
           });
         }
 
+        // Song art: small poster in bottom-left corner.
+        // Fades in over 3s at song start, holds at low opacity, fades during peaks.
+        const songArtId = `SongArt_${song.trackId}`;
+        const artFadeIn = Math.min(i / (fps * 3), 1.0); // 3s fade in
+        const artEnergyFade = 1.0 - Math.min(1, Math.max(0, ((smoothed.energy[ai] ?? 0.3) - 0.4) / 0.3)); // fade out at high energy
+        const artOpacity = 0.25 * artFadeIn * artEnergyFade; // max 25% opacity
+        if (artOpacity > 0.01) {
+          frameInstances.push({
+            overlay_id: songArtId,
+            transform: {
+              opacity: Math.round(artOpacity * 1000) / 1000,
+              scale: 0.18, // small — bottom-left poster
+              rotation_deg: 0,
+              offset_x: -0.38, // bottom-left
+              offset_y: 0.35,
+            },
+            blend_mode: "screen",
+          });
+        }
+
         overlaySchedule.push(frameInstances);
       }
 
@@ -2149,29 +2169,40 @@ async function main() {
   ws.write(`,"song_boundaries":${JSON.stringify(songBoundaries)}`);
   ws.write(',"frames":[\n');
 
+  // Helper: write with backpressure handling for large files
+  const safeWrite = (data: string): Promise<void> => {
+    return new Promise((resolve) => {
+      if (!ws.write(data)) {
+        ws.once('drain', resolve);
+      } else {
+        resolve();
+      }
+    });
+  };
+
   for (let i = 0; i < allFrames.length; i++) {
-    if (i > 0) ws.write(',\n');
-    ws.write(JSON.stringify(allFrames[i]));
+    if (i > 0) await safeWrite(',\n');
+    await safeWrite(JSON.stringify(allFrames[i]));
     if (i % 50000 === 0 && i > 0) {
-      process.stdout.write(`  ${(i / allFrames.length * 100).toFixed(0)}%\r`);
+      process.stdout.write(`  ${(i / allFrames.length * 100).toFixed(0)}%`);
     }
   }
 
-  ws.write('\n]');
+  await safeWrite('\n]');
 
   // ─── Write overlay schedule (when --with-overlays) ───
   if (withOverlays && overlaySchedule.length > 0) {
-    console.log(`[full-manifest] Writing overlay_schedule: ${overlaySchedule.length} frames`);
-    ws.write(',"overlay_schedule":[\n');
+    console.log(`\n[full-manifest] Writing overlay_schedule: ${overlaySchedule.length} frames`);
+    await safeWrite(',"overlay_schedule":[\n');
     for (let i = 0; i < overlaySchedule.length; i++) {
-      if (i > 0) ws.write(',\n');
-      ws.write(JSON.stringify(overlaySchedule[i]));
+      if (i > 0) await safeWrite(',\n');
+      await safeWrite(JSON.stringify(overlaySchedule[i]));
       if (i % 50000 === 0 && i > 0) {
-        process.stdout.write(`  overlays ${(i / overlaySchedule.length * 100).toFixed(0)}%\r`);
+        process.stdout.write(`  overlays ${(i / overlaySchedule.length * 100).toFixed(0)}%`);
       }
     }
-    ws.write('\n]');
-    ws.write(`,"overlay_png_dir":${JSON.stringify(overlayPngDirExplicit ? overlayPngDir : resolve(overlayPngDir))}`);
+    await safeWrite('\n]');
+    await safeWrite(`,"overlay_png_dir":${JSON.stringify(overlayPngDirExplicit ? overlayPngDir : resolve(overlayPngDir))}`);
 
     // Report overlay usage stats
     const overlayUsage = new Map<string, number>();
@@ -2188,7 +2219,7 @@ async function main() {
     }
   }
 
-  ws.write('}');
+  await safeWrite('}');
   await new Promise<void>((res, rej) => {
     ws.end(() => res());
     ws.on("error", rej);
