@@ -127,7 +127,7 @@ fn chapter_card_overlay_svg(
          <text x=\"{}\" y=\"{}\" font-size=\"{}\" font-weight=\"300\" \
           fill=\"white\" text-anchor=\"middle\" \
           letter-spacing=\"2\" \
-          font-family=\"Cormorant Garamond, Georgia, serif\" \
+          font-family=\"Georgia, 'Palatino Linotype', serif\" font-style=\"italic\" \
           filter=\"drop-shadow(0 2px 8px rgba(0,0,0,0.7))\">{}</text>\
          <text x=\"{}\" y=\"{}\" font-size=\"{}\" font-weight=\"400\" \
           fill=\"rgba(255,255,255,0.5)\" text-anchor=\"middle\" \

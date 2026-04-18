@@ -849,15 +849,15 @@ fn dead_air_logo_svg(width: u32, height: u32, opacity: f32) -> String {
   </defs>
   <g opacity="{op}">
     <!-- Warm halo glow (3 merged blurs for intensity) -->
-    <text x="{cx}" y="{cy}" font-family="Cormorant Garamond" font-size="{fs}" font-weight="600"
+    <text x="{cx}" y="{cy}" font-family="Georgia, 'Palatino Linotype', serif" font-style="italic" font-size="{fs}" font-weight="600"
       fill="rgba(255,180,100,0.4)" text-anchor="middle" letter-spacing="{ls}"
       filter="url(#glow)">Dead Air</text>
     <!-- Shadow for depth -->
-    <text x="{cx}" y="{cy}" font-family="Cormorant Garamond" font-size="{fs}" font-weight="600"
+    <text x="{cx}" y="{cy}" font-family="Georgia, 'Palatino Linotype', serif" font-style="italic" font-size="{fs}" font-weight="600"
       fill="rgba(255,250,235,0.95)" text-anchor="middle" letter-spacing="{ls}"
       filter="url(#shadow)">Dead Air</text>
     <!-- "presents" in italic, lighter -->
-    <text x="{cx}" y="{py}" font-family="Cormorant Garamond" font-size="{ps}" font-weight="300"
+    <text x="{cx}" y="{py}" font-family="Georgia, 'Palatino Linotype', serif" font-style="italic" font-size="{ps}" font-weight="300"
       fill="rgba(255,240,215,0.5)" text-anchor="middle"
       letter-spacing="5" font-style="italic">presents</text>
   </g>
@@ -906,13 +906,13 @@ fn show_card_svg(
     </filter>
   </defs>
   <g opacity="{op}">
-    <text x="{cx}" y="{y1}" font-family="Cormorant Garamond" font-size="{vs}" font-weight="600"
+    <text x="{cx}" y="{y1}" font-family="Georgia, 'Palatino Linotype', serif" font-style="italic" font-size="{vs}" font-weight="600"
       fill="rgba(255,245,230,0.90)" text-anchor="middle" letter-spacing="{vls}"
       filter="url(#textglow)">{venue}</text>
-    <text x="{cx}" y="{y2}" font-family="Cormorant Garamond" font-size="{cs}" font-weight="300"
+    <text x="{cx}" y="{y2}" font-family="Georgia, 'Palatino Linotype', serif" font-style="italic" font-size="{cs}" font-weight="300"
       fill="rgba(255,240,220,0.70)" text-anchor="middle"
       letter-spacing="2">{city}</text>
-    <text x="{cx}" y="{y3}" font-family="Cormorant Garamond" font-size="{ds}" font-weight="300"
+    <text x="{cx}" y="{y3}" font-family="Georgia, 'Palatino Linotype', serif" font-style="italic" font-size="{ds}" font-weight="300"
       fill="rgba(255,235,210,0.60)" text-anchor="middle"
       letter-spacing="3">{date}</text>
   </g>

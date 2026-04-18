@@ -127,7 +127,7 @@ fn endcard_overlay_svg(
          <g opacity=\"{}\">\
          <text x=\"{}\" y=\"{}\" font-size=\"{}\" font-weight=\"300\" \
           fill=\"white\" text-anchor=\"middle\" letter-spacing=\"12\" \
-          font-family=\"Cormorant Garamond, Georgia, serif\" \
+          font-family=\"Georgia, 'Palatino Linotype', serif\" font-style=\"italic\" \
           filter=\"drop-shadow(0 2px 8px rgba(0,0,0,0.7))\">DEAD AIR</text>\
          <text x=\"{}\" y=\"{}\" font-size=\"{}\" font-weight=\"400\" \
           fill=\"rgba(255,255,255,0.7)\" text-anchor=\"middle\" \
