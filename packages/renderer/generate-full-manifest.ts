@@ -1940,17 +1940,27 @@ async function main() {
             finalScale *= (1.0 + frameBass * 0.08); // up to 8% larger on bass hits
           }
 
-          frameInstances.push({
+          const instance: any = {
             overlay_id: overlayName,
             transform: {
-              opacity: Math.round(Math.min(finalOpacity, 0.35) * 1000) / 1000, // hard cap 35%
+              opacity: Math.round(Math.min(finalOpacity, overlayName === "SongTitle" ? 1.0 : 0.35) * 1000) / 1000,
               scale: Math.round(finalScale * 1000) / 1000,
               rotation_deg: Math.round(rotDeg * 10) / 10,
               offset_x: Math.round(offsetX * 1000) / 1000,
               offset_y: Math.round(offsetY * 1000) / 1000,
             },
             blend_mode: blendMode,
-          });
+          };
+          // SongTitle: attach inline SVG for text rendering (no PNG exists)
+          if (overlayName === "SongTitle" && finalOpacity > 0.01) {
+            const safeTitle = song.title.replace(/&/g, '&amp;');
+            instance.keyframe_svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}"><defs><filter id="ts" x="-10%" y="-10%" width="120%" height="120%"><feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#000" flood-opacity="0.8"/></filter></defs><text x="${width / 2}" y="${Math.round(height * 0.92)}" text-anchor="middle" font-family="Georgia,serif" font-style="italic" font-size="${Math.round(height * 0.05)}" fill="rgba(255,248,230,1)" filter="url(#ts)" letter-spacing="4">${safeTitle}</text><text x="${width / 2}" y="${Math.round(height * 0.96)}" text-anchor="middle" font-family="Georgia,serif" font-size="${Math.round(height * 0.022)}" fill="rgba(255,248,230,0.5)" letter-spacing="2">SET ${song.set ?? 1}</text></svg>`;
+          }
+          // FilmGrain + SmokeWisps: skip if no PNG (handled by GLSL postprocess / cosmetic)
+          if ((overlayName === "FilmGrain" || overlayName === "SmokeWisps") && finalOpacity > 0) {
+            continue; // no PNG, no SVG — skip to avoid silent cache miss
+          }
+          frameInstances.push(instance);
         }
 
         // Dead cultural watermark: one iconic symbol always subtly present.
