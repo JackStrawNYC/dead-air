@@ -7,7 +7,7 @@
 |---|-------|----------|-------------------|----------------|
 | 1 | 9 try/catch blocks in analyzeFrame() | LOW | **No** — all 13 functions succeed | 0 |
 | 2 | 6 silent catch blocks in batch precompute | LOW | **No** — 0 failures across all songs | 0 |
-| 3 | Song identity preferred modes fully blocked | **HIGH** | **Yes** — 3/3 songs with identities fall through | ~32,182 frames (Sugaree + Deal + Bertha) |
+| 3 | Song identity preferred modes fully blocked | **HIGH** | **Yes** — ALL 22 identities fall through, `veneta-routing.ts` is dead code | 565,954 (100%) |
 | 4 | `luminous_cavern` shader compile failure → black frames | **CRITICAL** | **Yes** — 5,251 frames will render black | 5,251 (0.9%) |
 | 5 | Overlay PNG directory | OK | **No** — 286 PNGs loaded correctly | 0 |
 | 6 | Missing shader_id / secondary_shader_id refs | OK | **No** — all refs exist in shaders map | 0 |
@@ -203,3 +203,11 @@ All 7 silent catch blocks now have logging. Behavior unchanged.
 5. **MEDIUM: Remove `stem_bass` fallback masking** — change `L("stemBassRms") || bass` to `L("stemBassRms") ?? 0` so missing stem data is visible, not masked.
 
 6. **LOW: Validate all shader_ids at manifest write time** — add pre-flight check before writing manifest.
+
+7. **MEDIUM: Strip unused shaders from manifest** — 107 of 128 shaders in the manifest are never referenced by any frame. Only 14 primary + 18 secondary = ~21 unique shaders are used. Stripping the unused 107 would significantly reduce the 1.6GB manifest size.
+
+8. **MEDIUM: Additional dead fields** — `jam_phase`, `jam_progress`, `peak_of_show`, `param_color_sat_bias` are uniformly zero across all 565,954 frames. The underlying computations may be silently failing or their upstream data sources are missing.
+
+9. **LOW: `veneta-routing.ts` is dead code** — The entire show-specific routing file (`packages/visualizer-poc/src/data/veneta-routing.ts`) has no effect because none of its curated shaders pass the `DEAD_CONCERT_SHADERS` gate. Either expand the whitelist or bypass it for show-specific identities.
+
+10. **LOW: Additional silent catches in `pre-render-overlays.ts`** — lines 85-89 (audio analysis JSON parse) and 152-161 (SVG→PNG rasterization) silently swallow errors.
