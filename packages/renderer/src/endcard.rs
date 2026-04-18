@@ -126,12 +126,12 @@ fn endcard_overlay_svg(
         "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{}\" height=\"{}\">\
          <g opacity=\"{}\">\
          <text x=\"{}\" y=\"{}\" font-size=\"{}\" font-weight=\"300\" \
-          fill=\"white\" text-anchor=\"middle\" letter-spacing=\"12\" \
+          fill=\"rgba(255,245,225,0.85)\" text-anchor=\"middle\" letter-spacing=\"20\" \
           font-family=\"Georgia, 'Palatino Linotype', serif\" font-style=\"italic\" \
-          filter=\"drop-shadow(0 2px 8px rgba(0,0,0,0.7))\">DEAD AIR</text>\
-         <text x=\"{}\" y=\"{}\" font-size=\"{}\" font-weight=\"400\" \
-          fill=\"rgba(255,255,255,0.7)\" text-anchor=\"middle\" \
-          font-family=\"Helvetica Neue, Arial, sans-serif\">{} — {}</text>\
+          filter=\"drop-shadow(0 2px 12px rgba(200,120,40,0.5))\">DEAD AIR</text>\
+         <text x=\"{}\" y=\"{}\" font-size=\"{}\" font-weight=\"300\" \
+          fill=\"rgba(255,230,200,0.6)\" text-anchor=\"middle\" letter-spacing=\"3\" \
+          font-family=\"Georgia, 'Palatino Linotype', serif\" font-style=\"italic\">{} — {}</text>\
          {}\
          </g></svg>",
         width, height, op,

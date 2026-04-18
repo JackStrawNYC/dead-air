@@ -815,21 +815,20 @@ pub fn generate_intro(
 
 // ─── SVG Text Generators ───
 
-/// "DEAD AIR" logo — large, centered, vintage serif with warm glow.
+/// "DEAD AIR" logo — large, spaced, uppercase, vintage poster feel.
+/// Evokes the Dead's poster art tradition: wide letter-spacing, warm glow,
+/// serif letterforms that feel hand-drawn and organic, not digital.
 fn dead_air_logo_svg(width: u32, height: u32, opacity: f32) -> String {
     let op = format!("{:.3}", opacity.clamp(0.0, 1.0));
     let cx = width / 2;
-    // Position slightly above center
     let cy = (height as f32 * 0.45) as u32;
-    // Large display size — ~10% of width for brand presence
-    let font_size = (width as f32 * 0.10).max(64.0) as u32;
-    // Tight letter spacing
-    let letter_spacing = (font_size as f32 * 0.06) as u32;
+    // Large but elegant — poster-sized with dramatic spacing
+    let font_size = (width as f32 * 0.08).max(56.0) as u32;
+    // WIDE letter spacing — the Dead poster tradition
+    let letter_spacing = (font_size as f32 * 0.35) as u32;
 
-    // "Dead Air" logo with "presents" below — Cormorant Garamond
-    // Brand treatment: big, semi-bold, warm glow halo, drop shadow for depth
-    let presents_size = (font_size as f32 * 0.28) as u32;
-    let presents_y = cy + (font_size as f32 * 0.55) as u32;
+    let presents_size = (font_size as f32 * 0.25) as u32;
+    let presents_y = cy + (font_size as f32 * 0.60) as u32;
     let shadow_blur = (font_size as f32 * 0.08).max(4.0) as u32;
     format!(
         r#"<svg xmlns="http://www.w3.org/2000/svg" width="{w}" height="{h}">
@@ -848,18 +847,18 @@ fn dead_air_logo_svg(width: u32, height: u32, opacity: f32) -> String {
     </filter>
   </defs>
   <g opacity="{op}">
-    <!-- Warm halo glow (3 merged blurs for intensity) -->
-    <text x="{cx}" y="{cy}" font-family="Georgia, 'Palatino Linotype', serif" font-style="italic" font-size="{fs}" font-weight="600"
-      fill="rgba(255,180,100,0.4)" text-anchor="middle" letter-spacing="{ls}"
-      filter="url(#glow)">Dead Air</text>
-    <!-- Shadow for depth -->
-    <text x="{cx}" y="{cy}" font-family="Georgia, 'Palatino Linotype', serif" font-style="italic" font-size="{fs}" font-weight="600"
-      fill="rgba(255,250,235,0.95)" text-anchor="middle" letter-spacing="{ls}"
-      filter="url(#shadow)">Dead Air</text>
-    <!-- "presents" in italic, lighter -->
+    <!-- Warm halo glow — amber light behind the letters -->
+    <text x="{cx}" y="{cy}" font-family="Georgia, 'Palatino Linotype', serif" font-style="italic" font-size="{fs}" font-weight="300"
+      fill="rgba(255,160,70,0.35)" text-anchor="middle" letter-spacing="{ls}"
+      filter="url(#glow)">DEAD AIR</text>
+    <!-- Main text — warm cream with depth shadow -->
+    <text x="{cx}" y="{cy}" font-family="Georgia, 'Palatino Linotype', serif" font-style="italic" font-size="{fs}" font-weight="300"
+      fill="rgba(255,245,225,0.90)" text-anchor="middle" letter-spacing="{ls}"
+      filter="url(#shadow)">DEAD AIR</text>
+    <!-- "presents" — whisper-quiet beneath -->
     <text x="{cx}" y="{py}" font-family="Georgia, 'Palatino Linotype', serif" font-style="italic" font-size="{ps}" font-weight="300"
-      fill="rgba(255,240,215,0.5)" text-anchor="middle"
-      letter-spacing="5" font-style="italic">presents</text>
+      fill="rgba(255,230,200,0.4)" text-anchor="middle"
+      letter-spacing="8">presents</text>
   </g>
 </svg>"#,
         w = width,
