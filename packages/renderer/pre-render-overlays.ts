@@ -86,7 +86,7 @@ function buildAudioFrames(dataDir: string): { quiet: any[]; mid: any[]; loud: an
         const analysis = JSON.parse(readFileSync(join(tracksDir, files[0]), "utf-8"));
         realFrames = analysis.frames;
         console.log(`  Using real audio from ${files[0]} (${realFrames!.length} frames)`);
-      } catch {}
+      } catch (e) { console.warn(`  [WARN] Failed to parse audio analysis: ${(e as Error).message?.slice(0,80)}`); }
     }
   }
 
@@ -154,8 +154,9 @@ async function svgToPng(svg: string, outputPath: string, width: number): Promise
     const resvg = new Resvg(svg, { fitTo: { mode: "width" as any, value: width } });
     writeFileSync(outputPath, resvg.render().asPng());
     return true;
-  } catch {
+  } catch (e) {
     // Fallback: save SVG for later conversion
+    console.warn(`  [WARN] PNG rasterization failed, saving SVG fallback: ${(e as Error).message?.slice(0,80)}`);
     writeFileSync(outputPath.replace(".png", ".svg"), svg);
     return false;
   }

@@ -607,7 +607,7 @@ function computeUniforms(
   envSaturation = Math.max(0.75, Math.min(1.50, envSaturation));
   const climaxPhaseMap: Record<string, number> = { idle: 0, build: 1, climax: 2, sustain: 3, release: 4 };
   const jamCycle = analysis?.jamCycle ?? { phase: "setup", progress: 0 };
-  const jamPhaseMap: Record<string, number> = { exploration: 0, building: 1, peak_space: 2, resolution: 3 };
+  const jamPhaseMap: Record<string, number> = { setup: 0, exploration: 1, building: 2, peak_space: 3, resolution: 4 };
   const coherence = analysis?.coherenceState?.score ?? 0;
 
   return {
@@ -763,9 +763,11 @@ function computeUniforms(
     param_energy_scale: 0.5 + energy * 0.5,
     param_motion_speed: 0.18 + energy * 0.35 + lerpSmoothed(smoothed.fastEnergy) * 0.12,
     // Base: 0.18-0.53 from slow energy, +0.12 from fast energy = phrase tracking
-    param_color_sat_bias: 0, param_complexity: 1.0,
-    param_drum_reactivity: 1.0, param_vocal_weight: 1.0,
-    peak_of_show: analysis?.peakOfShow?.isPeak ? 1 : 0,
+    param_color_sat_bias: ((song?.palette?.saturation ?? 0.85) - 0.85) * 2, // negative for muted songs, positive for vivid
+    param_complexity: 0.5 + energy * 0.5,
+    param_drum_reactivity: 0.5 + (L("stemDrumOnset") ?? 0) * 0.5,
+    param_vocal_weight: L("stemVocalPresence") > 0.5 ? 0.8 : 0.3,
+    peak_of_show: analysis?.peakOfShow?.isPeak ? 1 : (climax.phase === "climax" && (climax.intensity ?? 0) > 0.8 ? 0.5 : 0),
     // Phase 2C: shader progress uniforms
     song_progress: songProgress ?? 0,
     shader_hold_progress: sectionProgress ?? 0,
@@ -2110,12 +2112,39 @@ async function main() {
     return;
   }
 
+  // ─── Strip unused shaders ───
+  // Only include shaders actually referenced by frames (primary + secondary).
+  // Reduces manifest from ~1.6GB to ~400MB for a typical 20-song show.
+  const usedShaderIds = new Set<string>();
+  for (const fr of allFrames) {
+    usedShaderIds.add(fr.shader_id);
+    if (fr.secondary_shader_id) usedShaderIds.add(fr.secondary_shader_id);
+  }
+  const strippedShaders: Record<string, string> = {};
+  for (const id of usedShaderIds) {
+    if (shaders[id]) strippedShaders[id] = shaders[id];
+  }
+  const stripped = Object.keys(shaders).length - Object.keys(strippedShaders).length;
+  console.log(`[full-manifest] Shader strip: ${Object.keys(strippedShaders).length} used, ${stripped} unused removed`);
+
+  // Pre-flight validation: every referenced shader must have GLSL source
+  let missingShaders = 0;
+  for (const id of usedShaderIds) {
+    if (!strippedShaders[id]) {
+      console.error(`  ERROR: frame references shader "${id}" but no GLSL source found`);
+      missingShaders++;
+    }
+  }
+  if (missingShaders > 0) {
+    console.error(`[full-manifest] ${missingShaders} referenced shaders have no source — render will produce black frames`);
+  }
+
   // ─── Write manifest (streaming JSON for large shows) ───
-  console.log(`\n[full-manifest] Writing: ${allFrames.length} frames, ${Object.keys(shaders).length} shaders`);
+  console.log(`\n[full-manifest] Writing: ${allFrames.length} frames, ${Object.keys(strippedShaders).length} shaders`);
   const ws = createWriteStream(outputPath);
 
   ws.write('{"shaders":');
-  ws.write(JSON.stringify(shaders));
+  ws.write(JSON.stringify(strippedShaders));
   ws.write(`,"width":${width},"height":${height},"fps":${fps},"show_title":${JSON.stringify(showTitle)}`);
   ws.write(`,"song_boundaries":${JSON.stringify(songBoundaries)}`);
   ws.write(',"frames":[\n');
