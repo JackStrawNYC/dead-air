@@ -2001,6 +2001,82 @@ async function main() {
     console.log(`  ✓ ${song.title} done (${totalOut} frames in ${songElapsed}s, ${allFrames.length} total)`);
   }
 
+  // ─── Song boundary crossfades ───
+  // Smooth transitions between songs: last 2s of song N blends into first 2s of song N+1.
+  // Prevents hard cuts where 25+ fields jump simultaneously (black flash, shader cold-start).
+  const BOUNDARY_FADE_FRAMES = Math.round(fps * 2); // 2 seconds at output fps
+  if (songBoundaries.length > 1) {
+    console.log(`[full-manifest] Applying ${songBoundaries.length - 1} song boundary crossfades (${BOUNDARY_FADE_FRAMES} frames each)`);
+    let crossfadesApplied = 0;
+
+    for (let bi = 0; bi < songBoundaries.length - 1; bi++) {
+      const songA = songBoundaries[bi];
+      const songB = songBoundaries[bi + 1];
+      const boundary = songA.endFrame; // = songB.startFrame
+
+      // Skip if either song is too short for a crossfade
+      const songALen = songA.endFrame - songA.startFrame;
+      const songBLen = songB.endFrame - songB.startFrame;
+      if (songALen < BOUNDARY_FADE_FRAMES * 2 || songBLen < BOUNDARY_FADE_FRAMES * 2) continue;
+
+      // Determine blend mode: segue pairs use luminance_key, others use dissolve
+      const songAData = songs[bi];
+      const isSegue = songAData?.segueInto && songAData.segueInto !== false;
+      const blendMode = isSegue ? "luminance_key" : "dissolve";
+
+      // Get the shader at end of song A and start of song B
+      const shaderAtEndA = allFrames[boundary - 1]?.shader_id;
+      const shaderAtStartB = allFrames[boundary]?.shader_id;
+      if (!shaderAtEndA || !shaderAtStartB) continue;
+
+      // Get motion_blur at boundary edges for smoothing
+      const mbEndA = allFrames[boundary - 1]?.motion_blur_samples ?? 1;
+      const mbStartB = allFrames[boundary]?.motion_blur_samples ?? 1;
+
+      // Last BOUNDARY_FADE_FRAMES of song A: blend toward song B's shader
+      for (let j = 0; j < BOUNDARY_FADE_FRAMES; j++) {
+        const fi = boundary - BOUNDARY_FADE_FRAMES + j;
+        if (fi < songA.startFrame || fi >= boundary) continue;
+        const progress = j / BOUNDARY_FADE_FRAMES; // 0→1
+        const frame = allFrames[fi];
+        if (!frame) continue;
+
+        // Don't layer two crossfades — skip if already has a section crossfade
+        if (frame.secondary_shader_id && (frame.blend_progress ?? 0) > 0.01) continue;
+
+        frame.secondary_shader_id = shaderAtStartB;
+        frame.blend_progress = progress;
+        frame.blend_mode = blendMode;
+
+        // Smooth motion_blur_samples across boundary
+        frame.motion_blur_samples = Math.round(mbEndA + (mbStartB - mbEndA) * progress);
+      }
+
+      // First BOUNDARY_FADE_FRAMES of song B: blend from song A's shader
+      for (let j = 0; j < BOUNDARY_FADE_FRAMES; j++) {
+        const fi = boundary + j;
+        if (fi >= songB.endFrame) continue;
+        const progress = 1.0 - (j / BOUNDARY_FADE_FRAMES); // 1→0 (outgoing shader fades)
+        const frame = allFrames[fi];
+        if (!frame) continue;
+
+        // Don't layer on existing crossfade
+        if (frame.secondary_shader_id && (frame.blend_progress ?? 0) > 0.01) continue;
+
+        frame.secondary_shader_id = shaderAtEndA;
+        frame.blend_progress = progress;
+        frame.blend_mode = blendMode;
+
+        // Smooth motion_blur_samples across boundary
+        frame.motion_blur_samples = Math.round(mbStartB + (mbEndA - mbStartB) * progress);
+      }
+
+      crossfadesApplied++;
+      console.log(`    ${songA.title} → ${songB.title}: ${blendMode}${isSegue ? " (segue)" : ""}`);
+    }
+    console.log(`[full-manifest] ${crossfadesApplied} boundary crossfades applied`);
+  }
+
   // ─── Single-song mode: write just the frames array ───
   if (singleSongIdx >= 0) {
     console.log(`\n[full-manifest] Single-song mode: writing ${allFrames.length} frames`);
