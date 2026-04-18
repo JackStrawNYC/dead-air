@@ -896,17 +896,19 @@ async function main() {
     // before/after songs. Find where music actually starts and ends.
     // Skip when --no-trim is passed.
     if (!noTrim) {
-      const WINDOW = 90; // 3 seconds at 30fps
-      const THRESHOLD = 0.10; // RMS below this = not music
+      const WINDOW = 150; // 5 seconds at 30fps — require sustained music
+      const THRESHOLD = 0.08; // RMS below this = not music
 
-      // Find music start
+      // Find music start: require 80% of frames in window above threshold
+      // (not just average — prevents single loud moments from triggering)
       let musicStart = 0;
       for (let i = 0; i < frames.length - WINDOW; i += 30) {
-        let avg = 0;
-        for (let j = i; j < i + WINDOW; j++) avg += frames[j].rms ?? 0;
-        avg /= WINDOW;
-        if (avg > THRESHOLD) {
-          musicStart = Math.max(0, i - 30); // 1s before music
+        let aboveCount = 0;
+        for (let j = i; j < i + WINDOW; j++) {
+          if ((frames[j].rms ?? 0) > THRESHOLD) aboveCount++;
+        }
+        if (aboveCount > WINDOW * 0.8) { // 80% of 5-second window must be music
+          musicStart = Math.max(0, i - 15); // 0.5s before music
           break;
         }
       }
