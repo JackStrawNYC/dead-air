@@ -1630,12 +1630,23 @@ async function main() {
           let offsetX = 0.0;
           let offsetY = 0.0;
           if (overlayName !== "FilmGrain" && overlayName !== "SongTitle" && overlayName !== "ConcertInfo") {
-            // Distribute icons across frame quadrants based on name hash
-            // Range: -0.25 to +0.25 (centered within the visible area)
-            offsetX = (posRng - 0.5) * 0.5;
-            offsetY = (((nameHash >> 8) & 0xFF) / 255 - 0.5) * 0.4;
+            // Base position from name hash + slow time-based drift
+            // Like liquid light — everything drifts slowly, nothing is frozen
+            const timeSec = i / fps;
+            const driftSpeed = 0.015 + (posRng * 0.01); // slightly different speed per overlay
+            const driftX = Math.sin(timeSec * driftSpeed * 2 + nameHash) * 0.08;
+            const driftY = Math.cos(timeSec * driftSpeed * 1.3 + nameHash * 0.7) * 0.06;
+            offsetX = (posRng - 0.5) * 0.4 + driftX;
+            offsetY = (((nameHash >> 8) & 0xFF) / 255 - 0.5) * 0.3 + driftY;
           } else if (overlayName === "SongTitle") {
             offsetX = 0.0; offsetY = 0.35; // bottom center
+          }
+
+          // Slow rotation for icons — like floating in liquid light
+          let rotDeg = 0.0;
+          if (overlayName !== "FilmGrain" && overlayName !== "SongTitle" && overlayName !== "ConcertInfo") {
+            const timeSec = i / fps;
+            rotDeg = Math.sin(timeSec * 0.02 + nameHash * 0.1) * 8; // ±8° gentle sway
           }
 
           frameInstances.push({
@@ -1643,7 +1654,7 @@ async function main() {
             transform: {
               opacity: Math.round(finalOpacity * 1000) / 1000,
               scale,
-              rotation_deg: 0.0,
+              rotation_deg: Math.round(rotDeg * 10) / 10,
               offset_x: Math.round(offsetX * 1000) / 1000,
               offset_y: Math.round(offsetY * 1000) / 1000,
             },
