@@ -1582,15 +1582,15 @@ async function main() {
 
           // Scale: overlay PNGs are full-frame (1920x1080). Scale controls what
           // fraction of the frame the overlay covers. 0.25 = quarter of frame.
-          let scale = 0.30; // default: 30% of frame
+          let scale = 0.38; // default: 38% of frame
           if (overlayName === "SongTitle" || overlayName === "ConcertInfo") {
-            scale = 0.20; // text: small, positioned at bottom
+            scale = 0.22;
           } else if (overlayName === "FilmGrain") {
-            scale = 1.0; // grain covers full frame
+            scale = 1.0;
           } else if (prominence === "hero") {
-            scale = 0.25; // hero icons: visible but not dominating
+            scale = 0.35; // hero icons: present, recognizable
           } else if (prominence === "accent") {
-            scale = 0.28;
+            scale = 0.33;
           }
 
           // Cap opacity: overlays should enhance, not dominate
