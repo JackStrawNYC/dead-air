@@ -815,21 +815,53 @@ pub fn generate_intro(
 
 // ─── SVG Text Generators ───
 
-/// "DEAD AIR" logo — large, spaced, uppercase, vintage poster feel.
-/// Evokes the Dead's poster art tradition: wide letter-spacing, warm glow,
-/// serif letterforms that feel hand-drawn and organic, not digital.
+/// "DEAD AIR" logo — hand-crafted SVG path letterforms.
+/// Organic, flowing letters with slight imperfections and weight variation.
+/// Evokes the Dead's poster art tradition (Kelley/Mouse, Rick Griffin)
+/// without using any system font. Each letter is a unique path.
 fn dead_air_logo_svg(width: u32, height: u32, opacity: f32) -> String {
     let op = format!("{:.3}", opacity.clamp(0.0, 1.0));
     let cx = width / 2;
     let cy = (height as f32 * 0.45) as u32;
-    // Large but elegant — poster-sized with dramatic spacing
-    let font_size = (width as f32 * 0.08).max(56.0) as u32;
-    // WIDE letter spacing — the Dead poster tradition
-    let letter_spacing = (font_size as f32 * 0.35) as u32;
 
-    let presents_size = (font_size as f32 * 0.25) as u32;
-    let presents_y = cy + (font_size as f32 * 0.60) as u32;
-    let shadow_blur = (font_size as f32 * 0.08).max(4.0) as u32;
+    // Scale the logo paths to fit the render resolution
+    // Base paths designed at 800px wide — scale to ~40% of frame width
+    let logo_width = (width as f32 * 0.42) as u32;
+    let logo_height = (logo_width as f32 * 0.18) as u32;
+    let logo_x = cx - logo_width / 2;
+    let logo_y = cy - logo_height / 2;
+    let scale = logo_width as f32 / 800.0;
+
+    let presents_size = (width as f32 * 0.018).max(14.0) as u32;
+    let presents_y = logo_y + logo_height + (width as f32 * 0.025) as u32;
+    let shadow_blur = (scale * 6.0).max(3.0) as u32;
+    // Hand-crafted "DEAD AIR" letterforms as SVG paths.
+    // Each letter has organic curves, slight weight variation, and
+    // imperfect baselines — like they were hand-lettered on a poster.
+    // Designed at 800x140 base, scaled to render resolution.
+    //
+    // D-E-A-D  A-I-R with generous spacing between words.
+    // Style: Art Nouveau meets psychedelic — flowing serifs, tapered strokes.
+    let logo_paths = r#"
+      <!-- D -->
+      <path d="M0,5 L0,130 Q0,138 8,138 L45,138 Q95,135 110,100 Q120,70 110,40 Q95,5 45,2 L8,2 Q0,2 0,5 Z M22,22 L42,22 Q78,24 88,50 Q95,70 88,92 Q78,118 42,118 L22,118 Z"/>
+      <!-- E -->
+      <path d="M135,2 L135,138 L230,138 L230,118 Q228,115 225,115 L157,115 L157,78 L210,78 Q213,78 213,75 L213,62 Q213,59 210,59 L157,59 L157,22 L225,22 Q228,22 230,19 L230,2 Z"/>
+      <!-- A -->
+      <path d="M255,138 L290,2 Q292,-1 296,2 L335,138 L312,138 L303,105 L275,105 L266,138 Z M280,85 L298,85 L289,42 Z"/>
+      <!-- D -->
+      <path d="M360,5 L360,130 Q360,138 368,138 L405,138 Q455,135 470,100 Q480,70 470,40 Q455,5 405,2 L368,2 Q360,2 360,5 Z M382,22 L402,22 Q438,24 448,50 Q455,70 448,92 Q438,118 402,118 L382,118 Z"/>
+
+      <!-- gap between words -->
+
+      <!-- A -->
+      <path d="M530,138 L565,2 Q567,-1 571,2 L610,138 L587,138 L578,105 L550,105 L541,138 Z M555,85 L573,85 L564,42 Z"/>
+      <!-- I -->
+      <path d="M635,2 L635,138 L657,138 L657,2 Z"/>
+      <!-- R -->
+      <path d="M685,2 L685,138 L707,138 L707,82 L730,82 L755,138 L780,138 L752,78 Q775,70 778,48 Q780,22 755,10 Q745,5 730,2 Z M707,22 L728,22 Q748,24 752,42 Q755,58 740,64 L707,64 Z"/>
+    "#;
+
     format!(
         r#"<svg xmlns="http://www.w3.org/2000/svg" width="{w}" height="{h}">
   <defs>
@@ -838,38 +870,42 @@ fn dead_air_logo_svg(width: u32, height: u32, opacity: f32) -> String {
       <feMerge>
         <feMergeNode in="blur"/>
         <feMergeNode in="blur"/>
-        <feMergeNode in="blur"/>
         <feMergeNode in="SourceGraphic"/>
       </feMerge>
     </filter>
     <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
-      <feDropShadow dx="0" dy="2" stdDeviation="{shb}" flood-color="rgba(0,0,0,0.7)"/>
+      <feDropShadow dx="0" dy="{sd}" stdDeviation="{shb}" flood-color="rgba(0,0,0,0.6)"/>
     </filter>
   </defs>
   <g opacity="{op}">
-    <!-- Warm halo glow — amber light behind the letters -->
-    <text x="{cx}" y="{cy}" font-family="Georgia, 'Palatino Linotype', serif" font-style="italic" font-size="{fs}" font-weight="300"
-      fill="rgba(255,160,70,0.35)" text-anchor="middle" letter-spacing="{ls}"
-      filter="url(#glow)">DEAD AIR</text>
-    <!-- Main text — warm cream with depth shadow -->
-    <text x="{cx}" y="{cy}" font-family="Georgia, 'Palatino Linotype', serif" font-style="italic" font-size="{fs}" font-weight="300"
-      fill="rgba(255,245,225,0.90)" text-anchor="middle" letter-spacing="{ls}"
-      filter="url(#shadow)">DEAD AIR</text>
-    <!-- "presents" — whisper-quiet beneath -->
-    <text x="{cx}" y="{py}" font-family="Georgia, 'Palatino Linotype', serif" font-style="italic" font-size="{ps}" font-weight="300"
-      fill="rgba(255,230,200,0.4)" text-anchor="middle"
-      letter-spacing="8">presents</text>
+    <!-- Warm amber glow halo -->
+    <g transform="translate({lx},{ly}) scale({sc})" filter="url(#glow)">
+      <g fill="rgba(255,150,60,0.30)" stroke="none">
+        {paths}
+      </g>
+    </g>
+    <!-- Main letterforms — warm cream with shadow -->
+    <g transform="translate({lx},{ly}) scale({sc})" filter="url(#shadow)">
+      <g fill="rgba(255,242,220,0.92)" stroke="rgba(200,150,80,0.15)" stroke-width="0.5">
+        {paths}
+      </g>
+    </g>
+    <!-- "presents" beneath -->
+    <text x="{cx}" y="{py}" font-family="Georgia, serif" font-style="italic" font-size="{ps}" font-weight="300"
+      fill="rgba(255,230,200,0.35)" text-anchor="middle" letter-spacing="6">presents</text>
   </g>
 </svg>"#,
         w = width,
         h = height,
         op = op,
-        cx = cx,
-        cy = cy,
-        fs = font_size,
-        ls = letter_spacing,
-        blur = font_size / 3,
+        lx = logo_x,
+        ly = logo_y,
+        sc = format!("{:.4}", scale),
+        paths = logo_paths,
+        blur = (scale * 15.0).max(5.0) as u32,
         shb = shadow_blur,
+        sd = (scale * 2.0).max(1.0) as u32,
+        cx = cx,
         py = presents_y,
         ps = presents_size,
     )
