@@ -804,7 +804,34 @@ async function main() {
   };
 
   const dataDir = getArg("data-dir", join(VISUALIZER_ROOT, "data"));
+  // Song-named analysis directory (data/tracks/) has stem-aligned, CLAP-enriched files.
+  // Preferred over disc-track analysis (visualizer-poc/data/tracks/) which is duration-mismatched.
+  const songAnalysisDir = join(__dirname, "../../data/tracks");
   const outputPath = getArg("output", "manifest.json");
+
+  // Resolve analysis path: try song-named file first, fall back to disc-track ID.
+  // Song-named: {title-slug}-{date}-analysis.json in data/tracks/
+  // Disc-track: {trackId}-analysis.json in dataDir/tracks/
+  function resolveAnalysisPath(song: any, showDate: string): string | null {
+    // Try song-named path first (correctly aligned with stems + has CLAP semantics)
+    const slug = song.title
+      .toLowerCase()
+      .replace(/'/g, " ")          // He's Gone → he s gone (apostrophe → space → hyphen)
+      .replace(/[^a-z0-9]+/g, "-") // spaces/punctuation → hyphens
+      .replace(/-+/g, "-")         // collapse multiple hyphens
+      .replace(/^-|-$/g, "");      // trim leading/trailing hyphens
+    const songNamedPath = join(songAnalysisDir, `${slug}-${showDate}-analysis.json`);
+    if (existsSync(songNamedPath)) return songNamedPath;
+
+    // Fallback to disc-track ID path
+    const discTrackPath = join(dataDir, "tracks", `${song.trackId}-analysis.json`);
+    if (existsSync(discTrackPath)) {
+      console.warn(`    [WARN] Using disc-track analysis for ${song.title} (song-named not found at ${slug}-${showDate})`);
+      return discTrackPath;
+    }
+
+    return null;
+  }
   const fps = parseInt(getArg("fps", "60"));
   const singleSongIdx = args.indexOf("--single-song") >= 0
     ? parseInt(args[args.indexOf("--single-song") + 1])
@@ -831,10 +858,11 @@ async function main() {
   console.log(`[full-manifest] ${Object.keys(shaders).length} shaders collected`);
 
   // ─── Compute show visual seed from all song analysis data ───
+  const showDate = setlist.date ?? "unknown";
   const allSongFrames: any[][] = [];
   for (const song of songs) {
-    const trackPath = join(dataDir, "tracks", `${song.trackId}-analysis.json`);
-    if (existsSync(trackPath)) {
+    const trackPath = resolveAnalysisPath(song, showDate);
+    if (trackPath) {
       const a = JSON.parse(readFileSync(trackPath, "utf-8"));
       if (a.frames) allSongFrames.push(a.frames);
     }
@@ -884,8 +912,8 @@ async function main() {
   // Estimate total show frames for show_position calculation
   let totalShowFrames = 0;
   for (let si = songStart; si < songEnd; si++) {
-    const tp = join(dataDir, "tracks", `${songs[si].trackId}-analysis.json`);
-    if (existsSync(tp)) {
+    const tp = resolveAnalysisPath(songs[si], showDate);
+    if (tp) {
       const a = JSON.parse(readFileSync(tp, "utf-8"));
       totalShowFrames += Math.ceil((a.frames?.length ?? 0) / (a.meta?.fps ?? 30) * fps);
     }
@@ -893,8 +921,8 @@ async function main() {
   totalShowFrames = Math.max(1, totalShowFrames);
   for (let songIdx = songStart; songIdx < songEnd; songIdx++) {
     const song = songs[songIdx];
-    const trackPath = join(dataDir, "tracks", `${song.trackId}-analysis.json`);
-    if (!existsSync(trackPath)) {
+    const trackPath = resolveAnalysisPath(song, showDate);
+    if (!trackPath) {
       console.warn(`  SKIP: ${song.title} (no analysis)`);
       showSongsCompleted++;
       continue;

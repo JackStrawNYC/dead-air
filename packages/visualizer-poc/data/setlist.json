@@ -53,7 +53,7 @@
       "title": "China Cat Sunflower",
       "set": 1,
       "trackId": "d1t06",
-      "segueInto": false,
+      "segueInto": "I Know You Rider",
       "audioFile": "gd72-08-27d1t06.mp3",
       "trackNumber": 6,
       "defaultMode": "liquid_light"
@@ -63,6 +63,7 @@
       "set": 1,
       "trackId": "d1t07",
       "segueInto": false,
+      "segueFrom": "China Cat Sunflower",
       "audioFile": "gd72-08-27d1t07.mp3",
       "trackNumber": 7,
       "defaultMode": "liquid_light"
@@ -87,101 +88,103 @@
     },
     {
       "title": "Playing in the Band",
-      "set": 1,
+      "set": 2,
       "trackId": "d2t01",
       "segueInto": false,
       "audioFile": "gd72-08-27d2t01.mp3",
-      "trackNumber": 10,
+      "trackNumber": 1,
       "defaultMode": "liquid_light"
     },
     {
       "title": "He's Gone",
-      "set": 1,
+      "set": 2,
       "trackId": "d2t02",
       "segueInto": false,
       "audioFile": "gd72-08-27d2t02.mp3",
-      "trackNumber": 11,
+      "trackNumber": 2,
       "defaultMode": "liquid_light"
     },
     {
       "title": "Jack Straw",
-      "set": 1,
+      "set": 2,
       "trackId": "d2t03",
       "segueInto": false,
       "audioFile": "gd72-08-27d2t03.mp3",
-      "trackNumber": 12,
+      "trackNumber": 3,
       "defaultMode": "liquid_light"
     },
     {
       "title": "Bird Song",
-      "set": 1,
+      "set": 2,
       "trackId": "d2t04",
       "segueInto": false,
       "audioFile": "gd72-08-27d2t04.mp3",
-      "trackNumber": 13,
+      "trackNumber": 4,
       "defaultMode": "liquid_light"
     },
     {
       "title": "Greatest Story Ever Told",
-      "set": 1,
+      "set": 2,
       "trackId": "d2t05",
       "segueInto": false,
       "audioFile": "gd72-08-27d2t05.mp3",
-      "trackNumber": 14,
+      "trackNumber": 5,
       "defaultMode": "liquid_light"
     },
     {
       "title": "Dark Star",
-      "set": 1,
+      "set": 3,
       "trackId": "d3t01",
-      "segueInto": false,
+      "segueInto": "El Paso",
       "audioFile": "gd72-08-27d3t01.mp3",
-      "trackNumber": 15,
+      "trackNumber": 1,
       "defaultMode": "liquid_light"
     },
     {
       "title": "El Paso",
-      "set": 1,
+      "set": 3,
       "trackId": "d3t02",
-      "segueInto": false,
+      "segueInto": "Sing Me Back Home",
+      "segueFrom": "Dark Star",
       "audioFile": "gd72-08-27d3t02.mp3",
-      "trackNumber": 16,
+      "trackNumber": 2,
       "defaultMode": "liquid_light"
     },
     {
       "title": "Sing Me Back Home",
-      "set": 1,
+      "set": 3,
       "trackId": "d3t03",
       "segueInto": false,
+      "segueFrom": "El Paso",
       "audioFile": "gd72-08-27d3t03.mp3",
-      "trackNumber": 17,
+      "trackNumber": 3,
       "defaultMode": "liquid_light"
     },
     {
       "title": "Sugar Magnolia",
-      "set": 1,
+      "set": 3,
       "trackId": "d3t04",
       "segueInto": false,
       "audioFile": "gd72-08-27d3t04.mp3",
-      "trackNumber": 18,
+      "trackNumber": 4,
       "defaultMode": "liquid_light"
     },
     {
       "title": "Casey Jones",
-      "set": 1,
+      "set": 3,
       "trackId": "d3t05",
       "segueInto": false,
       "audioFile": "gd72-08-27d3t05.mp3",
-      "trackNumber": 19,
+      "trackNumber": 5,
       "defaultMode": "liquid_light"
     },
     {
       "title": "One More Saturday Night",
-      "set": 1,
+      "set": 3,
       "trackId": "d3t06",
       "segueInto": false,
       "audioFile": "gd72-08-27d3t06.mp3",
-      "trackNumber": 20,
+      "trackNumber": 6,
       "defaultMode": "liquid_light"
     }
   ]
