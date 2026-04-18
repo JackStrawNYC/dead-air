@@ -875,6 +875,16 @@ async function main() {
   const usedShaderModes = new Map<string, number>();
   const shaderModeLastUsed = new Map<string, number>();
   let showSongsCompleted = 0;
+  // Estimate total show frames for show_position calculation
+  let totalShowFrames = 0;
+  for (let si = songStart; si < songEnd; si++) {
+    const tp = join(dataDir, "tracks", `${songs[si].trackId}-analysis.json`);
+    if (existsSync(tp)) {
+      const a = JSON.parse(readFileSync(tp, "utf-8"));
+      totalShowFrames += Math.ceil((a.frames?.length ?? 0) / (a.meta?.fps ?? 30) * fps);
+    }
+  }
+  totalShowFrames = Math.max(1, totalShowFrames);
 
   const songStart = singleSongIdx >= 0 ? singleSongIdx : 0;
   const songEnd = singleSongIdx >= 0 ? singleSongIdx + 1 : songs.length;
@@ -1450,15 +1460,57 @@ async function main() {
         uniforms.tempo_derivative = (curTempo - prevTempo) / 10; // BPM change per frame
       }
 
-      // Show warmth: derive from era
+      // Show warmth: derive from era + time-of-day shift
+      // Veneta started late afternoon → outdoor shows get cooler as night falls
+      const showPos = allFrames.length / Math.max(1, totalShowFrames);
+      uniforms.show_position = showPos;
       uniforms.show_warmth = (() => {
         const era = showVisualSeed?.era ?? "classic";
-        // Warmth by era: primal (1966-74) = golden outdoor sunshine
         const warmth: Record<string, number> = {
           primal: 0.30, classic: 0.12, hiatus: -0.05, touch_of_grey: 0.0, revival: -0.02,
         };
-        return warmth[era] ?? 0;
+        let base = warmth[era] ?? 0;
+        // Time-of-day shift: warmer in first half (golden hour), cooler in second (dusk/night)
+        base += (1.0 - showPos) * 0.08 - showPos * 0.04;
+        return base;
       })();
+
+      // Effect triggers: fire visual modes at specific musical moments
+      const climaxState = frameAnalysis?.climaxState ?? { phase: "idle", intensity: 0 };
+      if (climaxState.phase === "climax" && (climaxState.intensity ?? 0) > 0.7) {
+        // Peak climax moments: hypersaturation + chromatic split
+        uniforms.effect_mode = 3; // hypersaturation
+        uniforms.effect_intensity = (climaxState.intensity ?? 0) * 0.6;
+      } else if (climaxState.phase === "sustain" && (climaxState.intensity ?? 0) > 0.5) {
+        // Sustained peaks: trails/echo
+        uniforms.effect_mode = 5; // trails
+        uniforms.effect_intensity = (climaxState.intensity ?? 0) * 0.4;
+      } else if (climaxState.phase === "build" && (climaxState.intensity ?? 0) > 0.6) {
+        // Building toward peak: breath pulse
+        uniforms.effect_mode = 9; // breath pulse
+        uniforms.effect_intensity = (climaxState.intensity ?? 0) * 0.3;
+      } else {
+        uniforms.effect_mode = 0;
+        uniforms.effect_intensity = 0;
+      }
+
+      // Camera behavior: section-type driven storytelling
+      // Quiet = pull-back (feel vast), peaks = push-in (feel intimate),
+      // jams = rotate (feel disoriented), ballads = static (feel grounded)
+      const sectionFloat = uniforms.section_type ?? 5;
+      if (climaxState.phase === "climax") {
+        uniforms.camera_behavior = 5; // zoom-punch at climax
+      } else if (sectionFloat >= 6.5) { // space
+        uniforms.camera_behavior = 1; // pull-back (vast)
+      } else if (sectionFloat >= 4.5 && sectionFloat < 5.5) { // jam
+        uniforms.camera_behavior = 3; // rotate (disorienting)
+      } else if (sectionFloat < 1.5) { // verse/intro
+        uniforms.camera_behavior = 4; // static (grounded)
+      } else if (sectionFloat >= 1.5 && sectionFloat < 2.5) { // chorus
+        uniforms.camera_behavior = 2; // push-in (intimate)
+      } else {
+        uniforms.camera_behavior = 0; // auto
+      }
 
       // Accumulate dynamic_time with modifiers.
       // IMPORTANT: tempo does NOT accelerate shader animation — it drives beat sync only.

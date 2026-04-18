@@ -221,11 +221,23 @@ pub fn build_uniform_buffer(frame: &FrameData, width: u32, height: u32, lighting
         let beat_stab = frame.beat_stability.clamp(0.0, 1.0);
         let climax_int = frame.climax_intensity.clamp(0.0, 1.0);
 
-        // Orbital path: radius shrinks with energy, orbit slowly
-        let base_radius = 3.5 - energy * 0.5;
+        // Camera behavior: section-type driven storytelling
+        // 0=auto, 1=pull-back (vast), 2=push-in (intimate), 3=rotate (disorienting),
+        // 4=static (grounded), 5=zoom-punch (climax)
+        let cam_behavior = frame.camera_behavior;
+        let behavior_mod = match cam_behavior {
+            1 => (1.5_f32, 0.005_f32),  // pull-back: wider radius, slower orbit
+            2 => (0.6, 0.03),            // push-in: tighter radius, faster orbit
+            3 => (1.0, 0.04),            // rotate: normal radius, fast spin
+            4 => (1.0, 0.002),           // static: normal radius, nearly still
+            5 => (0.8, 0.01),            // zoom-punch: tight, moderate
+            _ => (1.0, 0.02),            // auto: default orbital
+        };
+
+        let base_radius = (3.5 - energy * 0.5) * behavior_mod.0;
         let vocal_mod = if vocal_p > 0.3 { 0.9 } else { 1.0 };
         let radius = base_radius * vocal_mod;
-        let orbit_angle = dyn_time * 0.02;
+        let orbit_angle = dyn_time * behavior_mod.1;
         let orbit_height = (dyn_time * 0.015).sin() * 0.3;
 
         let cam_x = orbit_angle.sin() * radius;
