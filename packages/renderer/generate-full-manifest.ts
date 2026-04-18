@@ -1343,6 +1343,12 @@ async function main() {
     let effectHoldIntensity = 0; // Base intensity for held effect
     let effectHoldFrames = 0;    // How long current effect has been held
     let effectCooldown = 0;      // Frames remaining in cooldown after effect ends
+
+    // Composited effect hold state (independent of post-process effects)
+    let compHoldMode = 0;
+    let compHoldIntensity = 0;
+    let compHoldFrames = 0;
+    let compCooldown = 0;
     for (let i = 0; i < totalOut; i++) {
       if (i > 0 && i % progressInterval === 0) {
         const pct = ((i / totalOut) * 100).toFixed(0);
@@ -1599,6 +1605,83 @@ async function main() {
         uniforms.camera_behavior = 2; // push-in (intimate)
       } else {
         uniforms.camera_behavior = 0; // auto
+      }
+
+      // ─── Composited effect triggers (independent of post-process effects) ───
+      // Composited effects add visual LAYERS (particles, caustics, embers, etc.)
+      // They run ~10-15% of the time, complementing but not overlapping with post-process.
+      const COMP_MIN_HOLD = Math.round(fps * 4); // 4 seconds minimum
+      const COMP_MAX_HOLD = Math.round(fps * 10); // 10 seconds max
+      const COMP_COOLDOWN = Math.round(fps * 8); // 8 second gap
+
+      let desiredComp = 0;
+      let desiredCompIntensity = 0;
+      const compSeed = seededRandom(i * 3571 + songIdx * 521);
+
+      if (sectionType >= 6.5 && energy < 0.15) {
+        // Deep space: celestial map or liquid metal
+        if (compSeed > 0.80) {
+          const choices = [3, 9]; // celestial map, liquid metal
+          desiredComp = choices[Math.floor(seededRandom(songIdx * 211 + Math.floor(i / COMP_MIN_HOLD)) * choices.length)];
+          desiredCompIntensity = 0.50 + spaceScore * 0.20;
+        }
+      } else if (sectionType >= 4.5 && sectionType < 5.5 && energy > 0.35) {
+        // Jam: particles, caustics, fire, geometric
+        if (compSeed > 0.85) {
+          const choices = [1, 2, 5, 8]; // particles, caustics, fire, geometric
+          desiredComp = choices[Math.floor(seededRandom(songIdx * 223 + Math.floor(i / COMP_MIN_HOLD)) * choices.length)];
+          desiredCompIntensity = 0.40 + energy * 0.30;
+        }
+      } else if (climaxState.phase === "climax" || (climaxState.phase === "sustain" && energy > 0.5)) {
+        // Climax: tunnel, fire, strobe
+        if (compSeed > 0.70) {
+          const choices = [4, 5, 7]; // tunnel, fire, strobe
+          desiredComp = choices[Math.floor(seededRandom(songIdx * 239 + Math.floor(i / COMP_MIN_HOLD)) * choices.length)];
+          desiredCompIntensity = 0.55 + energy * 0.25;
+        }
+      } else if (energy > 0.45 && beatSnap > 0.4) {
+        // High-energy beats: ripples, strobe, geometric
+        if (compSeed > 0.88) {
+          const choices = [6, 7, 8]; // ripples, strobe, geometric
+          desiredComp = choices[Math.floor(seededRandom(songIdx * 251 + Math.floor(i / COMP_MIN_HOLD)) * choices.length)];
+          desiredCompIntensity = 0.45 + energy * 0.25;
+        }
+      } else if (songProg > 0.90 && energy > 0.30) {
+        // Song finale: concert poster, tunnel
+        if (compSeed > 0.85) {
+          const choices = [10, 4]; // concert poster, tunnel
+          desiredComp = choices[Math.floor(seededRandom(songIdx * 263 + Math.floor(i / COMP_MIN_HOLD)) * choices.length)];
+          desiredCompIntensity = 0.50;
+        }
+      }
+
+      // Composited hold logic (same pattern as post-process)
+      if (compHoldMode > 0 && compHoldFrames < COMP_MAX_HOLD) {
+        uniforms.composited_mode = compHoldMode;
+        const fadeIn = Math.min(compHoldFrames / 20, 1.0);
+        const remainingInMax = COMP_MAX_HOLD - compHoldFrames;
+        const fadeOut = Math.min(remainingInMax / 20, 1.0);
+        uniforms.composited_intensity = compHoldIntensity * fadeIn * fadeOut;
+        compHoldFrames++;
+      } else if (compHoldMode > 0) {
+        uniforms.composited_mode = 0;
+        uniforms.composited_intensity = 0;
+        compCooldown = COMP_COOLDOWN;
+        compHoldMode = 0;
+        compHoldFrames = 0;
+      } else if (compCooldown > 0) {
+        uniforms.composited_mode = 0;
+        uniforms.composited_intensity = 0;
+        compCooldown--;
+      } else if (desiredComp > 0) {
+        compHoldMode = desiredComp;
+        compHoldIntensity = desiredCompIntensity;
+        compHoldFrames = 1;
+        uniforms.composited_mode = desiredComp;
+        uniforms.composited_intensity = desiredCompIntensity * 0.05;
+      } else {
+        uniforms.composited_mode = 0;
+        uniforms.composited_intensity = 0;
       }
 
       // Accumulate dynamic_time with modifiers.
