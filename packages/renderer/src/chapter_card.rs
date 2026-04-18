@@ -317,7 +317,7 @@ pub fn generate_chapter_card(
             show_temperature_character: Some(0.0),
             show_contrast_character: Some(0.5),
             contrast: Some(vec![0.0; 7]),
-            motion_blur_samples: 1,
+            motion_blur_samples: 1, effect_mode: 0, effect_intensity: 0.0, show_position: 0.0, camera_behavior: 0,
         });
 
         // SVG text overlay

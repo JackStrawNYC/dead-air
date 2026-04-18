@@ -76,10 +76,7 @@ struct EffectUniforms {
 }
 @group(0) @binding(3) var<uniform> fx: EffectUniforms;
 
-struct VertexOutput {
-    @builtin(position) clip_position: vec4<f32>,
-    @location(0) uv: vec2<f32>,
-};
+// VertexOutput defined in VERTEX_WGSL (shared)
 
 const PI: f32 = 3.14159265359;
 const TAU: f32 = 6.28318530718;
@@ -779,7 +776,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 }
 "#;
 
-/// Vertex shader (shared with postprocess)
+/// Shared struct definitions + vertex shader
 const VERTEX_WGSL: &str = r#"
 struct VertexInput {
     @location(0) position: vec2<f32>,
@@ -813,9 +810,24 @@ impl EffectPipeline {
         device: &wgpu::Device,
         width: u32,
         height: u32,
-        sampler: &wgpu::Sampler,
-        vertex_buffer_layout: wgpu::VertexBufferLayout<'static>,
     ) -> Self {
+        // Vertex layout matching gpu.rs quad vertices: position (f32x2) + uv (f32x2)
+        let vertex_buffer_layout = wgpu::VertexBufferLayout {
+            array_stride: 16, // 4 floats × 4 bytes
+            step_mode: wgpu::VertexStepMode::Vertex,
+            attributes: &[
+                wgpu::VertexAttribute {
+                    offset: 0,
+                    shader_location: 0,
+                    format: wgpu::VertexFormat::Float32x2,
+                },
+                wgpu::VertexAttribute {
+                    offset: 8,
+                    shader_location: 1,
+                    format: wgpu::VertexFormat::Float32x2,
+                },
+            ],
+        };
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("effect_bind_group_layout"),
             entries: &[

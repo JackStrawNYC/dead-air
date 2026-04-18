@@ -740,7 +740,7 @@ pub fn generate_intro(
             show_temperature_character: Some(style.show_warmth),
             show_contrast_character: Some(style.show_contrast),
             contrast: None,
-            motion_blur_samples: 1,
+            motion_blur_samples: 1, effect_mode: 0, effect_intensity: 0.0, show_position: 0.0, camera_behavior: 0,
         };
 
         frames.push(frame);

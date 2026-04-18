@@ -216,6 +216,22 @@ pub struct FrameData {
     // Adaptive: quiet=1 (free), medium=2, climax=4
     #[serde(default = "default_motion_blur")]
     pub motion_blur_samples: u32,
+
+    // Visual effect mode (0=none, 1-14=post-processing, 15+=composited)
+    #[serde(default)]
+    pub effect_mode: u32,
+
+    // Effect intensity (0.0-1.0)
+    #[serde(default)]
+    pub effect_intensity: f32,
+
+    // Show position (0.0=start, 1.0=end) for macro-pacing
+    #[serde(default)]
+    pub show_position: f32,
+
+    // Camera behavior override (0=auto, 1=pull-back, 2=push-in, 3=rotate, 4=static, 5=zoom-punch)
+    #[serde(default)]
+    pub camera_behavior: u32,
 }
 
 fn default_motion_blur() -> u32 { 1 }

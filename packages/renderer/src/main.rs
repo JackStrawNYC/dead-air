@@ -372,6 +372,14 @@ fn main() {
     );
     println!("Post-processing: bloom ({}x{}) + tonemap + grain", args.width / 2, args.height / 2);
 
+    // ─── Create visual effects pipeline ───
+    let effect_pipeline = effects::EffectPipeline::new(
+        renderer.device(),
+        args.width,
+        args.height,
+    );
+    println!("Effects: 24 visual modes available");
+
     // ─── Create GPU transition pipeline ───
     let transition_pipeline = transition::GpuTransitionPipeline::new(
         renderer.device(),
@@ -744,13 +752,49 @@ fn main() {
                 texture_bind_group.as_ref(), Some(feedback_target),
             );
 
+            // Apply visual effect (if active) between scene render and postprocess
+            let effect_mode = if args.effect_mode > 0 { args.effect_mode } else { frame.effect_mode };
+            let effect_intensity = if args.effect_mode > 0 { args.effect_intensity } else { frame.effect_intensity };
+
+            let scene_view = renderer.create_scene_view();
+            let prev_view = if feedback_idx == 0 { &feedback_b_view } else { &feedback_a_view };
+
+            // Determine the input view for postprocess (scene or effect output)
+            let pp_input = if effect_mode > 0 && effect_intensity > 0.01 {
+                let fx_uniforms = effects::EffectUniforms {
+                    mode: effect_mode,
+                    intensity: effect_intensity,
+                    time: frame.time,
+                    energy: frame.energy,
+                    bass: frame.bass,
+                    beat_snap: frame.beat_snap,
+                    width: args.width as f32,
+                    height: args.height as f32,
+                };
+                let mut encoder = renderer.device().create_command_encoder(
+                    &wgpu::CommandEncoderDescriptor { label: Some("effect_pass") },
+                );
+                let applied = effect_pipeline.apply(
+                    &mut encoder, renderer.device(), &renderer.texture_sampler,
+                    &scene_view, prev_view, &fx_uniforms,
+                    renderer.vertex_buffer(), renderer.index_buffer(),
+                );
+                renderer.queue().submit(std::iter::once(encoder.finish()));
+
+                if applied {
+                    effect_pipeline.output_view()
+                } else {
+                    &scene_view
+                }
+            } else {
+                &scene_view
+            };
+
             // Post-process + readback
             if args.no_pp {
-                let scene_view = renderer.create_scene_view();
-                renderer.scene_to_readback(&scene_view);
+                renderer.scene_to_readback(pp_input);
             } else {
-                let scene_view = renderer.create_scene_view();
-                renderer.postprocess_and_readback(&pp_pipeline, &pp_uniforms, &scene_view, skip_fxaa);
+                renderer.postprocess_and_readback(&pp_pipeline, &pp_uniforms, pp_input, skip_fxaa);
             }
         }
 
