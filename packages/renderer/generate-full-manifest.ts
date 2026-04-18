@@ -75,7 +75,7 @@ export async function collectShaderGLSL(): Promise<Record<string, string>> {
         const shaderId = file.replace(".ts", "").replace(/-/g, "_");
         shaders[shaderId] = mod[fragKey];
       }
-    } catch {}
+    } catch (e) { console.warn(`  [WARN] shader import failed for ${file}: ${(e as Error).message?.slice(0,80)}`); }
   }
   return shaders;
 }
@@ -217,7 +217,8 @@ function analyzeFrame(
   } : (() => {
     try {
       return computeAudioSnapshot(frames, idx, 30);
-    } catch {
+    } catch (e) { if (idx === 0) console.warn(`    [WARN] computeAudioSnapshot FAILED: ${(e as Error).message?.slice(0,100)}`);
+
       return {
         energy: gaussianSmooth(frames, idx, "rms", 25),
         bass: gaussianSmooth(frames, idx, "sub", 15),
@@ -1118,7 +1119,7 @@ async function main() {
     // Coherence: O(n*window) batch instead of O(n*300*window) per-frame
     let t0 = Date.now();
     let preCoherence: any[];
-    try { preCoherence = batchComputeCoherence(frames); } catch { preCoherence = frames.map(() => ({ isLocked: false, score: 0 })); }
+    try { preCoherence = batchComputeCoherence(frames); } catch (e) { console.warn(`    [WARN] batchComputeCoherence FAILED: ${(e as Error).message?.slice(0,120)}`); preCoherence = frames.map(() => ({ isLocked: false, score: 0 })); }
     const coherenceMs = Date.now() - t0;
 
     // Remaining functions: still per-frame but benefit from coherence being pre-done
@@ -1155,14 +1156,22 @@ async function main() {
 
     t0 = Date.now();
     for (let bi = 0; bi < frames.length; bi++) {
-      try { preInterplay[bi] = detectStemInterplay(frames, bi); } catch { preInterplay[bi] = null; }
-      try { preReactive[bi] = computeReactiveTriggers(frames, bi, { coherenceLocked: preCoherence[bi]?.isLocked ?? false }); } catch { preReactive[bi] = { triggered: false, triggerType: null, shaderPool: [] }; }
-      try { preJamCycle[bi] = detectJamCycle(frames, bi, sections); } catch { preJamCycle[bi] = { phase: "setup", progress: 0, isDeepening: false }; }
-      try { preClimaxState[bi] = computeClimaxState(frames, bi, sections); } catch { preClimaxState[bi] = { phase: "idle", intensity: 0 }; }
+      try { preInterplay[bi] = detectStemInterplay(frames, bi); } catch (e) { if (bi === 0) console.warn(`    [WARN] detectStemInterplay FAILED on frame 0: ${(e as Error).message?.slice(0,100)}`); preInterplay[bi] = null; }
+      try { preReactive[bi] = computeReactiveTriggers(frames, bi, { coherenceLocked: preCoherence[bi]?.isLocked ?? false }); } catch (e) { if (bi === 0) console.warn(`    [WARN] computeReactiveTriggers FAILED on frame 0: ${(e as Error).message?.slice(0,100)}`); preReactive[bi] = { triggered: false, triggerType: null, shaderPool: [] }; }
+      try { preJamCycle[bi] = detectJamCycle(frames, bi, sections); } catch (e) { if (bi === 0) console.warn(`    [WARN] detectJamCycle FAILED on frame 0: ${(e as Error).message?.slice(0,100)}`); preJamCycle[bi] = { phase: "setup", progress: 0, isDeepening: false }; }
+      try { preClimaxState[bi] = computeClimaxState(frames, bi, sections); } catch (e) { if (bi === 0) console.warn(`    [WARN] computeClimaxState FAILED on frame 0: ${(e as Error).message?.slice(0,100)}`); preClimaxState[bi] = { phase: "idle", intensity: 0 }; }
     }
     const restMs = Date.now() - t0;
     const batchMs = Date.now() - batchStart;
+    // Count precompute failures for visibility
+    const preFailCounts = {
+      interplay: preInterplay.filter(v => v === null).length,
+      reactive: preReactive.filter(v => !v?.triggered && v?.triggerType === null && v?.shaderPool?.length === 0).length,
+      jamCycle: preJamCycle.filter(v => v?.phase === "setup" && v?.progress === 0).length,
+      climax: preClimaxState.filter(v => v?.phase === "idle" && v?.intensity === 0).length,
+    };
     console.log(`    Batch precompute: ${frames.length} frames in ${(batchMs / 1000).toFixed(1)}s (coherence: ${(coherenceMs / 1000).toFixed(1)}s, IT: ${(itMs / 1000).toFixed(1)}s, rest: ${(restMs / 1000).toFixed(1)}s)`);
+    console.log(`    Precompute neutral-defaults: interplay=${preFailCounts.interplay}/${frames.length}, reactive=${preFailCounts.reactive}/${frames.length}, jamCycle=${preFailCounts.jamCycle}/${frames.length}, climax=${preFailCounts.climax}/${frames.length}`);
 
     const ctx: SongContext & { _preComputed?: any } = {
       frames,
