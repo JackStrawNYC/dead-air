@@ -125,6 +125,14 @@ struct Args {
     #[arg(long, default_value_t = false)]
     with_chapter_cards: bool,
 
+    /// Force a visual effect mode (0=none, 1=kaleidoscope, 2=feedback, 3=hypersat, etc.)
+    #[arg(long, default_value_t = 0)]
+    effect_mode: u32,
+
+    /// Effect intensity (0.0-1.0). Default 0.7.
+    #[arg(long, default_value_t = 0.7)]
+    effect_intensity: f32,
+
     /// Override overlay PNG directory (instead of path baked into manifest).
     #[arg(long)]
     overlay_png_dir: Option<String>,
