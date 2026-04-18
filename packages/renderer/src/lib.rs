@@ -1,4 +1,5 @@
 pub mod chapter_card;
+pub mod composited_effects;
 pub mod compute;
 pub mod compositor;
 pub mod effects;

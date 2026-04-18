@@ -17,6 +17,7 @@
 //!   dead-air-renderer --manifest manifest.json --png-dir ./frames  # PNG mode (slower)
 
 mod chapter_card;
+mod composited_effects;
 mod compute;
 mod compositor;
 mod effects;
