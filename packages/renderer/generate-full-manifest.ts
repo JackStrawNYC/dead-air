@@ -1634,31 +1634,50 @@ async function main() {
           const posRng = Math.abs(nameHash % 1000) / 1000; // 0-1 from name
           let offsetX = 0.0;
           let offsetY = 0.0;
-          if (overlayName !== "FilmGrain" && overlayName !== "SongTitle" && overlayName !== "ConcertInfo") {
-            // Base position from name hash + slow time-based drift
-            // Like liquid light — everything drifts slowly, nothing is frozen
+          // Audio-reactive overlay transforms: overlays breathe with the music
+          const frameRms = frames[ai]?.rms ?? 0.2;
+          const frameBass = frames[ai]?.stemBassRms ?? frames[ai]?.rms ?? 0.2;
+          const frameBeat = frames[ai]?.beat ? 1 : 0;
+          const isIcon = overlayName !== "FilmGrain" && overlayName !== "SongTitle" && overlayName !== "ConcertInfo";
+
+          if (isIcon) {
             const timeSec = i / fps;
-            const driftSpeed = 0.015 + (posRng * 0.01); // slightly different speed per overlay
-            const driftX = Math.sin(timeSec * driftSpeed * 2 + nameHash) * 0.08;
-            const driftY = Math.cos(timeSec * driftSpeed * 1.3 + nameHash * 0.7) * 0.06;
-            offsetX = (posRng - 0.5) * 0.4 + driftX;
-            offsetY = (((nameHash >> 8) & 0xFF) / 255 - 0.5) * 0.3 + driftY;
+            // Drift: energy-modulated speed (nearly still in quiet, flowing at peaks)
+            const driftSpeed = (0.008 + frameRms * 0.02) + (posRng * 0.005);
+            const driftX = Math.sin(timeSec * driftSpeed * 2 + nameHash) * (0.05 + frameRms * 0.05);
+            const driftY = Math.cos(timeSec * driftSpeed * 1.3 + nameHash * 0.7) * (0.04 + frameRms * 0.04);
+            offsetX = (posRng - 0.5) * 0.35 + driftX;
+            offsetY = (((nameHash >> 8) & 0xFF) / 255 - 0.5) * 0.25 + driftY;
+
+            // Opacity: breathe with bass — subtle pulse on rhythm
+            const breathe = 1.0 + Math.sin(timeSec * 3.0 + nameHash) * frameBass * 0.15;
+            finalOpacity *= breathe;
+
+            // Beat flash: tiny brightness bump on beats
+            if (frameBeat) finalOpacity *= 1.08;
           } else if (overlayName === "SongTitle") {
-            offsetX = 0.0; offsetY = 0.35; // bottom center
+            offsetX = 0.0; offsetY = 0.35;
           }
 
-          // Slow rotation for icons — like floating in liquid light
+          // Rotation: energy-modulated sway
           let rotDeg = 0.0;
-          if (overlayName !== "FilmGrain" && overlayName !== "SongTitle" && overlayName !== "ConcertInfo") {
+          if (isIcon) {
             const timeSec = i / fps;
-            rotDeg = Math.sin(timeSec * 0.02 + nameHash * 0.1) * 8; // ±8° gentle sway
+            const rotSpeed = 0.015 + frameRms * 0.01;
+            rotDeg = Math.sin(timeSec * rotSpeed + nameHash * 0.1) * (5 + frameRms * 8); // ±5° quiet, ±13° loud
+          }
+
+          // Scale: breathe with bass — icons pulse subtly with the low end
+          let finalScale = scale;
+          if (isIcon) {
+            finalScale *= (1.0 + frameBass * 0.08); // up to 8% larger on bass hits
           }
 
           frameInstances.push({
             overlay_id: overlayName,
             transform: {
-              opacity: Math.round(finalOpacity * 1000) / 1000,
-              scale,
+              opacity: Math.round(Math.min(finalOpacity, 0.35) * 1000) / 1000, // hard cap 35%
+              scale: Math.round(finalScale * 1000) / 1000,
               rotation_deg: Math.round(rotDeg * 10) / 10,
               offset_x: Math.round(offsetX * 1000) / 1000,
               offset_y: Math.round(offsetY * 1000) / 1000,
