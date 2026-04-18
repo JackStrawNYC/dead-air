@@ -2004,6 +2004,8 @@ async function main() {
   // ─── Song boundary crossfades ───
   // Smooth transitions between songs: last 2s of song N blends into first 2s of song N+1.
   // Prevents hard cuts where 25+ fields jump simultaneously (black flash, shader cold-start).
+  // Boundary crossfades OVERRIDE section crossfades (they take precedence).
+  // Energy/brightness are smoothed across the boundary to prevent uniform discontinuity.
   const BOUNDARY_FADE_FRAMES = Math.round(fps * 2); // 2 seconds at output fps
   if (songBoundaries.length > 1) {
     console.log(`[full-manifest] Applying ${songBoundaries.length - 1} song boundary crossfades (${BOUNDARY_FADE_FRAMES} frames each)`);
@@ -2029,9 +2031,17 @@ async function main() {
       const shaderAtStartB = allFrames[boundary]?.shader_id;
       if (!shaderAtEndA || !shaderAtStartB) continue;
 
-      // Get motion_blur at boundary edges for smoothing
-      const mbEndA = allFrames[boundary - 1]?.motion_blur_samples ?? 1;
-      const mbStartB = allFrames[boundary]?.motion_blur_samples ?? 1;
+      // Snapshot values at boundary edges for smoothing
+      const endA = allFrames[boundary - 1];
+      const startB = allFrames[boundary];
+      const mbEndA = endA?.motion_blur_samples ?? 1;
+      const mbStartB = startB?.motion_blur_samples ?? 1;
+      const energyEndA = endA?.energy ?? 0.3;
+      const energyStartB = startB?.energy ?? 0.3;
+      const brightEndA = endA?.envelope_brightness ?? 1.0;
+      const brightStartB = startB?.envelope_brightness ?? 1.0;
+      const satEndA = endA?.envelope_saturation ?? 1.0;
+      const satStartB = startB?.envelope_saturation ?? 1.0;
 
       // Last BOUNDARY_FADE_FRAMES of song A: blend toward song B's shader
       for (let j = 0; j < BOUNDARY_FADE_FRAMES; j++) {
@@ -2041,15 +2051,18 @@ async function main() {
         const frame = allFrames[fi];
         if (!frame) continue;
 
-        // Don't layer two crossfades — skip if already has a section crossfade
-        if (frame.secondary_shader_id && (frame.blend_progress ?? 0) > 0.01) continue;
-
+        // Boundary crossfade OVERRIDES section crossfades (takes precedence)
         frame.secondary_shader_id = shaderAtStartB;
         frame.blend_progress = progress;
         frame.blend_mode = blendMode;
 
-        // Smooth motion_blur_samples across boundary
+        // Smooth motion_blur, energy, brightness, saturation toward song B values
         frame.motion_blur_samples = Math.round(mbEndA + (mbStartB - mbEndA) * progress);
+        // Ease energy/brightness toward the incoming song's values in the last 25% of the fade
+        const easeT = Math.max(0, (progress - 0.75) * 4); // 0 until 75%, then 0→1
+        frame.energy = (frame.energy ?? 0) * (1 - easeT) + energyStartB * easeT;
+        frame.envelope_brightness = (frame.envelope_brightness ?? 1) * (1 - easeT) + brightStartB * easeT;
+        frame.envelope_saturation = (frame.envelope_saturation ?? 1) * (1 - easeT) + satStartB * easeT;
       }
 
       // First BOUNDARY_FADE_FRAMES of song B: blend from song A's shader
@@ -2060,15 +2073,18 @@ async function main() {
         const frame = allFrames[fi];
         if (!frame) continue;
 
-        // Don't layer on existing crossfade
-        if (frame.secondary_shader_id && (frame.blend_progress ?? 0) > 0.01) continue;
-
+        // Boundary crossfade OVERRIDES section crossfades (takes precedence)
         frame.secondary_shader_id = shaderAtEndA;
         frame.blend_progress = progress;
         frame.blend_mode = blendMode;
 
-        // Smooth motion_blur_samples across boundary
+        // Smooth motion_blur, energy, brightness, saturation from song A values
         frame.motion_blur_samples = Math.round(mbStartB + (mbEndA - mbStartB) * progress);
+        // Ease energy/brightness from the outgoing song's values in the first 25% of the fade
+        const easeT = Math.max(0, (progress - 0.75) * 4); // strong at start, fades by 25%
+        frame.energy = (frame.energy ?? 0) * (1 - easeT) + energyEndA * easeT;
+        frame.envelope_brightness = (frame.envelope_brightness ?? 1) * (1 - easeT) + brightEndA * easeT;
+        frame.envelope_saturation = (frame.envelope_saturation ?? 1) * (1 - easeT) + satEndA * easeT;
       }
 
       crossfadesApplied++;
