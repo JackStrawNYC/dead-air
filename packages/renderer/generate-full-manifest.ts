@@ -875,6 +875,10 @@ async function main() {
   const usedShaderModes = new Map<string, number>();
   const shaderModeLastUsed = new Map<string, number>();
   let showSongsCompleted = 0;
+
+  const songStart = singleSongIdx >= 0 ? singleSongIdx : 0;
+  const songEnd = singleSongIdx >= 0 ? singleSongIdx + 1 : songs.length;
+
   // Estimate total show frames for show_position calculation
   let totalShowFrames = 0;
   for (let si = songStart; si < songEnd; si++) {
@@ -885,9 +889,6 @@ async function main() {
     }
   }
   totalShowFrames = Math.max(1, totalShowFrames);
-
-  const songStart = singleSongIdx >= 0 ? singleSongIdx : 0;
-  const songEnd = singleSongIdx >= 0 ? singleSongIdx + 1 : songs.length;
   for (let songIdx = songStart; songIdx < songEnd; songIdx++) {
     const song = songs[songIdx];
     const trackPath = join(dataDir, "tracks", `${song.trackId}-analysis.json`);
@@ -1519,7 +1520,7 @@ async function main() {
       const dt = 1 / fps; // time step per frame
       const baseDT = dt; // real-time base (NOT tempo-scaled)
       const fluxMult = 1.0 + Math.min(0.02, (uniforms.spectral_flux || 0) * 0.05); // subtle flux boost
-      const climaxState = frameAnalysis?.climaxState ?? { phase: "idle", intensity: 0 };
+      // climaxState already declared above for effect triggers
       const climaxSpeed = (climaxState.phase === "climax" || climaxState.phase === "sustain")
         ? 1.0 + (climaxState.intensity ?? 0) * 0.15 // up to 1.15x during climax (was 1.3x)
         : 1.0;
