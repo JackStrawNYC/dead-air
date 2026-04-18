@@ -125,17 +125,27 @@ fn endcard_overlay_svg(
     format!(
         "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{}\" height=\"{}\">\
          <g opacity=\"{}\">\
-         <text x=\"{}\" y=\"{}\" font-size=\"{}\" font-weight=\"300\" \
-          fill=\"rgba(255,245,225,0.85)\" text-anchor=\"middle\" letter-spacing=\"20\" \
-          font-family=\"Georgia, 'Palatino Linotype', serif\" font-style=\"italic\" \
-          filter=\"drop-shadow(0 2px 12px rgba(200,120,40,0.5))\">DEAD AIR</text>\
+         <g transform=\"translate({},{}) scale({})\" filter=\"drop-shadow(0 2px 12px rgba(200,120,40,0.5))\">\
+          <g fill=\"rgba(255,242,220,0.85)\" stroke=\"none\">\
+           <path d=\"M0,5 L0,130 Q0,138 8,138 L45,138 Q95,135 110,100 Q120,70 110,40 Q95,5 45,2 L8,2 Q0,2 0,5 Z M22,22 L42,22 Q78,24 88,50 Q95,70 88,92 Q78,118 42,118 L22,118 Z\"/>\
+           <path d=\"M135,2 L135,138 L230,138 L230,118 Q228,115 225,115 L157,115 L157,78 L210,78 Q213,78 213,75 L213,62 Q213,59 210,59 L157,59 L157,22 L225,22 Q228,22 230,19 L230,2 Z\"/>\
+           <path d=\"M255,138 L290,2 Q292,-1 296,2 L335,138 L312,138 L303,105 L275,105 L266,138 Z M280,85 L298,85 L289,42 Z\"/>\
+           <path d=\"M360,5 L360,130 Q360,138 368,138 L405,138 Q455,135 470,100 Q480,70 470,40 Q455,5 405,2 L368,2 Q360,2 360,5 Z M382,22 L402,22 Q438,24 448,50 Q455,70 448,92 Q438,118 402,118 L382,118 Z\"/>\
+           <path d=\"M530,138 L565,2 Q567,-1 571,2 L610,138 L587,138 L578,105 L550,105 L541,138 Z M555,85 L573,85 L564,42 Z\"/>\
+           <path d=\"M635,2 L635,138 L657,138 L657,2 Z\"/>\
+           <path d=\"M685,2 L685,138 L707,138 L707,82 L730,82 L755,138 L780,138 L752,78 Q775,70 778,48 Q780,22 755,10 Q745,5 730,2 Z M707,22 L728,22 Q748,24 752,42 Q755,58 740,64 L707,64 Z\"/>\
+          </g>\
+         </g>\
          <text x=\"{}\" y=\"{}\" font-size=\"{}\" font-weight=\"300\" \
           fill=\"rgba(255,230,200,0.6)\" text-anchor=\"middle\" letter-spacing=\"3\" \
           font-family=\"Georgia, 'Palatino Linotype', serif\" font-style=\"italic\">{} — {}</text>\
          {}\
          </g></svg>",
         width, height, op,
-        cx, cy_brand, brand_size,
+        // SVG logo: center horizontally, position at cy_brand
+        cx - (brand_size as f32 * 2.8) as u32, // logo left edge (paths are 800 wide, scale ~0.7)
+        cy_brand - (brand_size as f32 * 0.5) as u32, // logo top
+        format!("{:.3}", brand_size as f32 / 140.0), // scale (paths are 140 tall)
         cx, cy_brand + (brand_size as f32 * 1.2) as u32, info_size,
         xml_escape(&meta.venue), xml_escape(&meta.date_display),
         songs_text,
