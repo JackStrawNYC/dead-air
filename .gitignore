@@ -13,3 +13,8 @@ out/
 **/client_secret*.json
 **/token.json
 *.log
+
+# Lyrics data (copyrighted text + generated alignment artifacts)
+packages/pipeline/data/lyrics/
+packages/pipeline/data/lyrics-aligned/
+packages/pipeline/.venv-align/
