@@ -233,6 +233,114 @@ fn breath_pulse(uv: vec2<f32>, intensity: f32, time: f32) -> vec2<f32> {
 }
 
 // ═══════════════════════════════════════════════════════════
+// EFFECT 10: LIGHT LEAK BURST — warm amber flash overlay
+// ═══════════════════════════════════════════════════════════
+fn light_leak_burst(col: vec3<f32>, uv: vec2<f32>, intensity: f32, time: f32, beat_snap: f32) -> vec3<f32> {
+    // Radial gradient from a drifting point — warm amber light burst
+    let leak_center = vec2<f32>(
+        0.3 + sin(time * 0.15) * 0.4,
+        0.4 + cos(time * 0.12) * 0.3
+    );
+    let dist = length(uv - leak_center);
+    let glow = smoothstep(0.6, 0.0, dist) * intensity;
+    // Beat-triggered flash intensification
+    let flash = glow * (1.0 + beat_snap * 1.5);
+    // Warm amber leak color
+    let leak_color = vec3<f32>(1.0, 0.7, 0.3);
+    return col + leak_color * flash * 0.35;
+}
+
+// ═══════════════════════════════════════════════════════════
+// EFFECT 11: TIME DILATION — temporal slow-motion via feedback
+// ═══════════════════════════════════════════════════════════
+fn time_dilation(uv: vec2<f32>, scene_col: vec3<f32>, intensity: f32) -> vec3<f32> {
+    // Heavy blend with previous frame — creates visual "slow motion"
+    let prev = textureSample(prev_frame_tex, tex_sampler, uv).rgb;
+    // 85-95% previous frame = extreme temporal smoothing
+    let blend = 0.85 + intensity * 0.10;
+    return mix(scene_col, prev, blend);
+}
+
+// ═══════════════════════════════════════════════════════════
+// EFFECT 12: MOIRE PATTERNS — interference grid overlay
+// ═══════════════════════════════════════════════════════════
+fn moire_patterns(col: vec3<f32>, uv: vec2<f32>, intensity: f32, time: f32) -> vec3<f32> {
+    let aspect = fx.width / fx.height;
+    let p = vec2<f32>((uv.x - 0.5) * aspect, uv.y - 0.5);
+
+    // Two overlapping grids at slightly different angles
+    let freq = 40.0 + intensity * 60.0;
+    let angle1 = time * 0.02;
+    let angle2 = time * 0.02 + 0.4;
+
+    let grid1_x = p.x * cos(angle1) - p.y * sin(angle1);
+    let grid2_x = p.x * cos(angle2) - p.y * sin(angle2);
+
+    let pattern1 = sin(grid1_x * freq);
+    let pattern2 = sin(grid2_x * freq);
+
+    // Interference = product of two grids
+    let moire = pattern1 * pattern2;
+    let moire_val = smoothstep(-0.3, 0.3, moire) * intensity * 0.25;
+
+    return col + col * moire_val;
+}
+
+// ═══════════════════════════════════════════════════════════
+// EFFECT 13: DEPTH OF FIELD — radial blur from center
+// ═══════════════════════════════════════════════════════════
+fn depth_of_field(uv: vec2<f32>, intensity: f32) -> vec3<f32> {
+    let center = vec2<f32>(0.5, 0.5);
+    let dist = length(uv - center);
+
+    // Blur amount increases with distance from center
+    let blur_amount = dist * intensity * 0.012;
+
+    // 5-tap radial blur
+    var col = textureSample(scene_tex, tex_sampler, uv).rgb * 0.4;
+    let dir = normalize(uv - center) * blur_amount;
+    col += textureSample(scene_tex, tex_sampler, uv + dir).rgb * 0.15;
+    col += textureSample(scene_tex, tex_sampler, uv - dir).rgb * 0.15;
+    col += textureSample(scene_tex, tex_sampler, uv + dir * 2.0).rgb * 0.15;
+    col += textureSample(scene_tex, tex_sampler, uv - dir * 2.0).rgb * 0.15;
+
+    return col;
+}
+
+// ═══════════════════════════════════════════════════════════
+// EFFECT 14: GLITCH / DATAMOSH — digital corruption
+// ═══════════════════════════════════════════════════════════
+fn glitch_datamosh(uv: vec2<f32>, scene_col: vec3<f32>, intensity: f32, time: f32, beat_snap: f32) -> vec3<f32> {
+    var col = scene_col;
+
+    // Horizontal line displacement (scanline glitch)
+    let line_hash = fract(sin(floor(uv.y * 80.0) * 43758.5453 + floor(time * 8.0)) * 12345.6789);
+    if (line_hash > (1.0 - intensity * 0.15)) {
+        let shift = (line_hash - 0.5) * intensity * 0.15;
+        col = textureSample(scene_tex, tex_sampler, vec2<f32>(uv.x + shift, uv.y)).rgb;
+    }
+
+    // Block displacement on beats
+    if (beat_snap > 0.3) {
+        let block_x = floor(uv.x * 8.0) / 8.0;
+        let block_y = floor(uv.y * 6.0) / 6.0;
+        let block_hash = fract(sin(block_x * 127.1 + block_y * 311.7 + floor(time * 4.0)) * 43758.5453);
+        if (block_hash > (1.0 - intensity * beat_snap * 0.2)) {
+            // Swap with previous frame block
+            let prev = textureSample(prev_frame_tex, tex_sampler, uv).rgb;
+            col = prev;
+        }
+    }
+
+    // Color channel offset on some lines
+    if (line_hash > (1.0 - intensity * 0.08)) {
+        col = vec3<f32>(col.b, col.r, col.g); // channel swap
+    }
+
+    return col;
+}
+
+// ═══════════════════════════════════════════════════════════
 // MAIN: dispatch to active effect
 // ═══════════════════════════════════════════════════════════
 @fragment
@@ -273,6 +381,16 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         col = chromatic_split(in.uv, intensity, fx.energy, fx.time);
     } else if (fx.mode == 5u) { // Trails/echo
         col = trails_echo(in.uv, col, intensity);
+    } else if (fx.mode == 10u) { // Light leak burst
+        col = light_leak_burst(col, in.uv, intensity, fx.time, fx.beat_snap);
+    } else if (fx.mode == 11u) { // Time dilation
+        col = time_dilation(in.uv, col, intensity);
+    } else if (fx.mode == 12u) { // Moire patterns
+        col = moire_patterns(col, in.uv, intensity, fx.time);
+    } else if (fx.mode == 13u) { // Depth of field
+        col = depth_of_field(in.uv, intensity);
+    } else if (fx.mode == 14u) { // Glitch datamosh
+        col = glitch_datamosh(in.uv, col, intensity, fx.time, fx.beat_snap);
     }
 
     return vec4<f32>(col, 1.0);
