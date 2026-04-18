@@ -96,56 +96,36 @@ const TAU: f32 = 6.28318530718;
 fn kaleidoscope(uv: vec2<f32>, intensity: f32, time: f32, energy: f32) -> vec2<f32> {
     let center = vec2<f32>(0.5, 0.5);
     let p = uv - center;
-    let aspect = fx.width / fx.height;
-    let pa = vec2<f32>(p.x * aspect, p.y);
 
-    var angle = atan2(pa.y, pa.x);
-    let radius = length(pa);
+    // Convert to polar coordinates
+    var angle = atan2(p.y, p.x);
+    let radius = length(p);
 
-    // Smooth fold count: interpolate between integer folds for seamless transitions.
-    // 5 at rest → 8 at peak energy. Uses smoothstep for organic feel.
-    let fold_float = 5.0 + smoothstep(0.1, 0.6, energy) * 3.0;
-    let fold_lo = floor(fold_float);
-    let fold_hi = fold_lo + 1.0;
-    let fold_blend = fract(fold_float);
+    // Number of folds: 6 at rest, up to 8 at peak energy
+    let folds = 6.0 + energy * 2.0;
+    let sector = TAU / folds;
 
-    // Fold with lower count
-    let sector_lo = TAU / fold_lo;
-    var a_lo = ((angle % sector_lo) + sector_lo) % sector_lo;
-    if (a_lo > sector_lo * 0.5) { a_lo = sector_lo - a_lo; }
+    // Fold the angle into one sector
+    // Add PI to shift atan2 range from [-PI,PI] to [0,TAU]
+    var a = angle + PI;
+    a = a - floor(a / sector) * sector; // modulo into [0, sector]
 
-    // Fold with higher count
-    let sector_hi = TAU / fold_hi;
-    var a_hi = ((angle % sector_hi) + sector_hi) % sector_hi;
-    if (a_hi > sector_hi * 0.5) { a_hi = sector_hi - a_hi; }
+    // Mirror within sector for clean symmetry
+    if (a > sector * 0.5) {
+        a = sector - a;
+    }
 
-    // Blend between fold counts for smooth transition
-    var a = mix(a_lo, a_hi, smoothstep(0.3, 0.7, fold_blend));
+    // Slow rotation
+    a = a + time * 0.04 * intensity;
 
-    // Musically-reactive rotation: slow drift + beat accent
-    let drift = time * 0.03 * intensity; // very slow base drift
-    let beat_accent = fx.beat_snap * 0.05 * intensity; // subtle beat-locked nudge
-    a = a + drift + beat_accent;
+    // Convert back to cartesian
+    let new_uv = vec2<f32>(
+        cos(a) * radius + 0.5,
+        sin(a) * radius + 0.5
+    );
 
-    // Bass breathing: subtle radial zoom
-    let zoom = 1.0 + fx.bass * 0.06 * intensity;
-    let zoomed_radius = radius * zoom;
-
-    // Convert back to cartesian with aspect correction
-    let new_p = vec2<f32>(cos(a) * zoomed_radius / aspect, sin(a) * zoomed_radius);
-
-    // Anti-alias fold edges: blend with original UV near sector boundaries
-    // This prevents the hard seam visible at fold lines
-    let sector = TAU / fold_lo;
-    let fold_pos = ((angle % sector) + sector) % sector;
-    let edge_dist = min(fold_pos, sector - fold_pos); // distance to nearest fold edge
-    let aa_width = 0.015; // anti-aliasing width in radians
-    let edge_blend = smoothstep(0.0, aa_width, edge_dist);
-    let final_p = mix(p / vec2<f32>(aspect, 1.0) * zoom, new_p, edge_blend * intensity);
-
-    // Edge fade: prevent border artifacts at frame edges
-    let edge_fade = smoothstep(0.0, 0.05, min(min(uv.x, 1.0 - uv.x), min(uv.y, 1.0 - uv.y)));
-    return mix(uv, final_p * vec2<f32>(1.0, 1.0) + center, intensity * edge_fade);
+    // Blend with original based on intensity
+    return mix(uv, clamp(new_uv, vec2<f32>(0.01), vec2<f32>(0.99)), intensity);
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -900,7 +880,7 @@ impl EffectPipeline {
                 module: &shader,
                 entry_point: Some("fs_main"),
                 targets: &[Some(wgpu::ColorTargetState {
-                    format: crate::gpu::SCENE_FORMAT,
+                    format: crate::gpu::OUTPUT_FORMAT,
                     blend: None,
                     write_mask: wgpu::ColorWrites::ALL,
                 })],
@@ -921,15 +901,18 @@ impl EffectPipeline {
             cache: None,
         });
 
-        // Create intermediate texture (same format as scene — Rgba16Float)
+        // Create intermediate texture — SDR format (Rgba8Unorm) to match output texture.
+        // Effects run AFTER postprocess, transforming the final SDR output.
         let output_texture = device.create_texture(&wgpu::TextureDescriptor {
             label: Some("effect_output"),
             size: wgpu::Extent3d { width, height, depth_or_array_layers: 1 },
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
-            format: crate::gpu::SCENE_FORMAT,
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+            format: crate::gpu::OUTPUT_FORMAT,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT
+                | wgpu::TextureUsages::TEXTURE_BINDING
+                | wgpu::TextureUsages::COPY_SRC,
             view_formats: &[],
         });
         let output_view = output_texture.create_view(&wgpu::TextureViewDescriptor::default());
@@ -1006,5 +989,9 @@ impl EffectPipeline {
 
     pub fn output_view(&self) -> &wgpu::TextureView {
         &self.output_view
+    }
+
+    pub fn output_texture(&self) -> &wgpu::Texture {
+        &self.output_texture
     }
 }

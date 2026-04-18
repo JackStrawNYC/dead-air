@@ -746,21 +746,31 @@ fn main() {
                 );
             }
         } else {
-            // Standard path: scene → particles → post-process → readback
+            // Standard path: scene → post-process → readback
             renderer.render_scene_to_hdr(
                 pipeline, &uniform_data,
                 texture_bind_group.as_ref(), Some(feedback_target),
             );
 
-            // Apply visual effect (if active) between scene render and postprocess
+            // Post-process + readback
+            if args.no_pp {
+                let scene_view = renderer.create_scene_view();
+                renderer.scene_to_readback(&scene_view);
+            } else {
+                let scene_view = renderer.create_scene_view();
+                renderer.postprocess_and_readback(&pp_pipeline, &pp_uniforms, &scene_view, skip_fxaa);
+            }
+        }
+
+        // ─── Apply visual effect AFTER all render paths ───
+        // Effects transform the output texture in-place, regardless of which
+        // render path (transition/motionblur/standard) produced the frame.
+        // This runs AFTER postprocess, modifying the final SDR output.
+        {
             let effect_mode = if args.effect_mode > 0 { args.effect_mode } else { frame.effect_mode };
             let effect_intensity = if args.effect_mode > 0 { args.effect_intensity } else { frame.effect_intensity };
 
-            let scene_view = renderer.create_scene_view();
-            let prev_view = if feedback_idx == 0 { &feedback_b_view } else { &feedback_a_view };
-
-            // Determine the input view for postprocess (scene or effect output)
-            let pp_input = if effect_mode > 0 && effect_intensity > 0.01 {
+            if effect_mode > 0 && effect_intensity > 0.01 {
                 let fx_uniforms = effects::EffectUniforms {
                     mode: effect_mode,
                     intensity: effect_intensity,
@@ -771,30 +781,49 @@ fn main() {
                     width: args.width as f32,
                     height: args.height as f32,
                 };
+                // Read from the OUTPUT texture (SDR, post-processed)
+                let output_view = renderer.output_texture_view();
+                let prev_view = if feedback_idx == 0 { &feedback_b_view } else { &feedback_a_view };
                 let mut encoder = renderer.device().create_command_encoder(
                     &wgpu::CommandEncoderDescriptor { label: Some("effect_pass") },
                 );
                 let applied = effect_pipeline.apply(
                     &mut encoder, renderer.device(), &renderer.texture_sampler,
-                    &scene_view, prev_view, &fx_uniforms,
+                    output_view, prev_view, &fx_uniforms,
                     renderer.vertex_buffer(), renderer.index_buffer(),
                 );
                 renderer.queue().submit(std::iter::once(encoder.finish()));
 
+                // If effect was applied, copy its output back to the scene texture
+                // so the readback gets the effected result
                 if applied {
-                    effect_pipeline.output_view()
-                } else {
-                    &scene_view
+                    let mut copy_encoder = renderer.device().create_command_encoder(
+                        &wgpu::CommandEncoderDescriptor { label: Some("effect_copy") },
+                    );
+                    copy_encoder.copy_texture_to_texture(
+                        wgpu::TexelCopyTextureInfo {
+                            texture: &effect_pipeline.output_texture(),
+                            mip_level: 0,
+                            origin: wgpu::Origin3d::ZERO,
+                            aspect: wgpu::TextureAspect::All,
+                        },
+                        wgpu::TexelCopyTextureInfo {
+                            texture: renderer.output_texture(),
+                            mip_level: 0,
+                            origin: wgpu::Origin3d::ZERO,
+                            aspect: wgpu::TextureAspect::All,
+                        },
+                        wgpu::Extent3d {
+                            width: args.width,
+                            height: args.height,
+                            depth_or_array_layers: 1,
+                        },
+                    );
+                    // Re-trigger readback: the original readback happened before the effect,
+                    // so we need to copy the effected output to the readback buffer again.
+                    renderer.copy_to_readback(&mut copy_encoder);
+                    renderer.queue().submit(std::iter::once(copy_encoder.finish()));
                 }
-            } else {
-                &scene_view
-            };
-
-            // Post-process + readback
-            if args.no_pp {
-                renderer.scene_to_readback(pp_input);
-            } else {
-                renderer.postprocess_and_readback(&pp_pipeline, &pp_uniforms, pp_input, skip_fxaa);
             }
         }
 

@@ -192,7 +192,7 @@ impl GpuRenderer {
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
             format: OUTPUT_FORMAT,
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC | wgpu::TextureUsages::COPY_DST | wgpu::TextureUsages::TEXTURE_BINDING,
             view_formats: &[],
         });
         let output_texture_view = output_texture.create_view(&wgpu::TextureViewDescriptor::default());
@@ -458,6 +458,14 @@ impl GpuRenderer {
 
     pub fn index_buffer(&self) -> &wgpu::Buffer {
         &self.index_buffer
+    }
+
+    pub fn output_texture(&self) -> &wgpu::Texture {
+        &self.output_texture
+    }
+
+    pub fn output_texture_view(&self) -> &wgpu::TextureView {
+        &self.output_texture_view
     }
 
     pub fn vertex_module(&self) -> &wgpu::ShaderModule {
@@ -965,7 +973,7 @@ impl GpuRenderer {
         self.queue.submit(std::iter::once(encoder.finish()));
     }
 
-    fn copy_to_readback(&mut self, encoder: &mut wgpu::CommandEncoder) {
+    pub fn copy_to_readback(&mut self, encoder: &mut wgpu::CommandEncoder) {
         let bytes_per_row = Self::padded_bytes_per_row(self.width);
         encoder.copy_texture_to_buffer(
             wgpu::TexelCopyTextureInfo {
