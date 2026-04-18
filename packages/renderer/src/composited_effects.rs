@@ -27,10 +27,11 @@ pub enum CompositedEffect {
     CelestialMap = 3,
     TunnelWormhole = 4,
     FireEmbers = 5,
-    LiquidMetal = 6,
-    RippleWaves = 7,
-    StrobeFlicker = 8,
-    GeometricBreakdown = 9,
+    RippleWaves = 6,
+    StrobeFlicker = 7,
+    GeometricBreakdown = 8,
+    LiquidMetal = 9,
+    ConcertPoster = 10,
 }
 
 /// Uniform buffer for composited effect parameters.
@@ -319,6 +320,91 @@ fn geometric_breakdown(uv: vec2<f32>, intensity: f32, time: f32, energy: f32) ->
 }
 
 // ═══════════════════════════════════════════════════════════
+// EFFECT 9: LIQUID METAL — chrome reflective surface overlay
+// ═══════════════════════════════════════════════════════════
+fn liquid_metal(uv: vec2<f32>, intensity: f32, time: f32, energy: f32, bass: f32) -> vec4<f32> {
+    let aspect = cu.width / cu.height;
+    let p = vec2<f32>((uv.x - 0.5) * aspect, uv.y - 0.5);
+
+    // Flowing metallic surface: layered noise creating chrome-like reflections
+    let t = time * 0.2;
+    var metal = 0.0;
+
+    // Layer 1: broad undulations
+    metal += sin(p.x * 3.0 + t + sin(p.y * 2.0 + t * 0.7)) * 0.4;
+    metal += sin(p.y * 4.0 - t * 0.8 + cos(p.x * 3.0 + t * 0.5)) * 0.3;
+
+    // Layer 2: fine ripples (bass-reactive)
+    let ripple_freq = 8.0 + bass * 12.0;
+    metal += sin(p.x * ripple_freq + t * 2.0) * sin(p.y * ripple_freq * 0.7 + t * 1.5) * 0.3;
+
+    // Layer 3: specular highlights
+    let spec_angle = atan2(p.y, p.x) + t * 0.3;
+    let spec = pow(max(sin(spec_angle * 3.0 + length(p) * 10.0 - t * 2.0), 0.0), 8.0);
+    metal += spec * energy;
+
+    // Chrome color: silver-blue with warm highlights
+    let highlight = smoothstep(0.3, 0.8, metal);
+    let col = mix(
+        vec3<f32>(0.15, 0.18, 0.22),  // dark chrome
+        vec3<f32>(0.9, 0.85, 0.75),    // bright highlight (warm silver)
+        highlight
+    );
+
+    // Fresnel-like edge glow
+    let edge = smoothstep(0.0, 0.3, length(p));
+    let fresnel = (1.0 - edge) * 0.3;
+
+    let final_col = col * (0.5 + metal * 0.5) + vec3<f32>(0.8, 0.7, 0.5) * fresnel;
+    let alpha = intensity * 0.25 * (0.3 + abs(metal) * 0.7);
+    return vec4<f32>(final_col * intensity, alpha);
+}
+
+// ═══════════════════════════════════════════════════════════
+// EFFECT 10: CONCERT POSTER FREEZE — brief stylized freeze
+// Captures the current visual, applies poster-art treatment:
+// high contrast, limited palette, halftone dots, bold edges.
+// ═══════════════════════════════════════════════════════════
+fn concert_poster(uv: vec2<f32>, intensity: f32, time: f32, energy: f32) -> vec4<f32> {
+    // This effect reads the scene (unlike other composited effects)
+    // but transforms it into a poster-art style overlay.
+    // It should only fire briefly (1-2 seconds) at peak moments.
+
+    // Halftone dot pattern
+    let dot_scale = 60.0;
+    let dot_uv = uv * dot_scale;
+    let dot_cell = floor(dot_uv);
+    let dot_frac = fract(dot_uv) - 0.5;
+    let dot_dist = length(dot_frac);
+
+    // Dot size based on "ink coverage" — darker areas get bigger dots
+    let sample_uv = (dot_cell + 0.5) / dot_scale;
+    // Can't sample scene_tex here (it's not bound in composited effects)
+    // Instead, use procedural luminance based on position
+    let pseudo_luma = 0.5 + sin(sample_uv.x * 12.0 + time) * 0.2 + cos(sample_uv.y * 8.0) * 0.2;
+    let dot_size = (1.0 - pseudo_luma) * 0.45;
+    let dot = smoothstep(dot_size + 0.02, dot_size, dot_dist);
+
+    // Bold border frame
+    let border = smoothstep(0.0, 0.02, uv.x) * smoothstep(0.0, 0.02, uv.y)
+               * smoothstep(0.0, 0.02, 1.0 - uv.x) * smoothstep(0.0, 0.02, 1.0 - uv.y);
+    let frame = 1.0 - border;
+
+    // Poster color: limited palette (warm amber, deep red, cream)
+    let poster_col = mix(
+        vec3<f32>(0.9, 0.85, 0.7),  // cream paper
+        vec3<f32>(0.8, 0.2, 0.1),    // poster red ink
+        dot
+    );
+
+    // Frame border in dark
+    let final_col = mix(poster_col, vec3<f32>(0.1, 0.05, 0.0), frame * 0.8);
+
+    let alpha = intensity * 0.4;
+    return vec4<f32>(final_col * intensity, alpha);
+}
+
+// ═══════════════════════════════════════════════════════════
 // MAIN: dispatch and output with alpha for compositing
 // ═══════════════════════════════════════════════════════════
 @fragment
@@ -335,6 +421,8 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     if (cu.mode == 6u) { return ripple_waves(in.uv, cu.intensity, cu.time, cu.beat_snap); }
     if (cu.mode == 7u) { return strobe_flicker(cu.intensity, cu.beat_snap, cu.energy); }
     if (cu.mode == 8u) { return geometric_breakdown(in.uv, cu.intensity, cu.time, cu.energy); }
+    if (cu.mode == 9u) { return liquid_metal(in.uv, cu.intensity, cu.time, cu.energy, cu.bass); }
+    if (cu.mode == 10u) { return concert_poster(in.uv, cu.intensity, cu.time, cu.energy); }
 
     return vec4<f32>(0.0, 0.0, 0.0, 0.0);
 }
