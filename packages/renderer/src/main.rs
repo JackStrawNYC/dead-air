@@ -19,6 +19,7 @@
 mod chapter_card;
 mod compute;
 mod compositor;
+mod effects;
 mod endcard;
 mod ffmpeg;
 pub mod glsl_compat;

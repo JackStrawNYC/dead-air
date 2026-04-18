@@ -1,6 +1,7 @@
 pub mod chapter_card;
 pub mod compute;
 pub mod compositor;
+pub mod effects;
 pub mod endcard;
 pub mod ffmpeg;
 pub mod glsl_compat;
