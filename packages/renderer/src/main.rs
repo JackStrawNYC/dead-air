@@ -517,7 +517,13 @@ fn main() {
     ) {
         let mut pixels = renderer.read_pixels();
 
-        // Composite overlays
+        // Composite overlays: SVG layers (intro/endcard) + PNG schedule (manifest overlays)
+        // Both can be active simultaneously — SVG layers first, then PNG overlays on top.
+        if let Some(ref overlay_layers) = manifest.overlay_layers {
+            if let Some(frame_overlays) = overlay_layers.get(frame_idx) {
+                compositor::composite_layers(&mut pixels, frame_overlays, width, height);
+            }
+        }
         if let Some(ref schedule) = manifest.overlay_schedule {
             if let Some(frame_overlays) = schedule.get(frame_idx) {
                 for instance in frame_overlays {
@@ -525,10 +531,6 @@ fn main() {
                         &mut pixels, width, height, instance,
                     );
                 }
-            }
-        } else if let Some(ref overlay_layers) = manifest.overlay_layers {
-            if let Some(frame_overlays) = overlay_layers.get(frame_idx) {
-                compositor::composite_layers(&mut pixels, frame_overlays, width, height);
             }
         }
 
