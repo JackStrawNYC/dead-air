@@ -245,10 +245,11 @@ fn composite_transformed(
             let sg = source[si + 1] as f32 / 255.0;
             let sb = source[si + 2] as f32 / 255.0;
 
-            // Skip near-black pixels: overlay PNGs often have opaque dark backgrounds
-            // instead of transparent alpha. Treat dark pixels as transparent.
+            // Skip dark pixels: overlay PNGs have 100% opaque dark backgrounds.
+            // Aggressively skip anything below 12% luminance — only render the
+            // actual bright icon content, not the dark surround.
             let luma = sr * 0.2126 + sg * 0.7152 + sb * 0.0722;
-            if luma < 0.04 {
+            if luma < 0.12 {
                 continue;
             }
 

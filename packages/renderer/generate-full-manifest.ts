@@ -1689,7 +1689,9 @@ async function main() {
         // Dead cultural watermark: one iconic symbol always subtly present.
         // Rotates through Dead icons on a slow 30-second cycle.
         // Screen-blended at 10-12% opacity — felt more than seen.
-        const DEAD_ICONS = ["BreathingStealie", "ThirteenPointBolt", "BearTraced", "StealYourFaceOff", "GoldenRoad"];
+        // Only icons that have bright content in their PNGs (dark backgrounds get stripped).
+        // StealYourFaceOff (0.1% bright) and BearTraced (missing) removed.
+        const DEAD_ICONS = ["BreathingStealie", "ThirteenPointBolt", "GoldenRoad", "StealieFade"];
         const iconCycleIdx = Math.floor((i / fps / 30)) % DEAD_ICONS.length; // new icon every 30s
         const iconName = DEAD_ICONS[iconCycleIdx];
         // Don't add if this icon is already in the frame (from regular rotation)
