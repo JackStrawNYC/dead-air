@@ -1308,17 +1308,19 @@ async function main() {
         "smoke_rings",          // gentle smoke — neutral, takes palette color
       ]);
 
-      // Pick from song identity preferred modes IF they give us enough Dead-concert variety.
-      // Need at least 3 options for visual variety across sections.
+      // Pick from song identity preferred modes. Trust authored identity over the
+      // generic DEAD_CONCERT_SHADERS whitelist — the blocklist is the quality safety net.
+      // Only require modes survive the blocklist (activeShaderPool check), not the whitelist.
       let pool: string[] = [];
       if (preferredModes.length > 0) {
-        const deadFiltered = preferredModes.filter((m: string) =>
-          activeShaderPool.includes(m) && DEAD_CONCERT_SHADERS.has(m)
+        const identityFiltered = preferredModes.filter((m: string) =>
+          activeShaderPool.includes(m)
         );
-        if (deadFiltered.length >= 3) {
-          pool = deadFiltered;
+        if (identityFiltered.length >= 1) {
+          pool = identityFiltered;
+        } else {
+          console.warn(`    [WARN] song "${song.title}" has preferredModes [${preferredModes.join(", ")}] but all are blocklisted — falling through to energy pool`);
         }
-        // Otherwise: fall through to energy pools (already Dead-curated)
       }
 
       // Fallback: energy-based pool from curated A+/A/B shaders
