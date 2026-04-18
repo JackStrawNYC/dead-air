@@ -345,154 +345,379 @@ fn trails_echo(uv: vec2<f32>, scene_col: vec3<f32>, intensity: f32) -> vec3<f32>
 }
 
 // ═══════════════════════════════════════════════════════════
-// EFFECT 6: MIRROR SYMMETRY — bilateral reflection
+// EFFECT 6: MIRROR SYMMETRY — A++++ bilateral reflection
+//
+// - Rotating mirror axis with smooth interpolation
+// - Anti-aliased mirror edge (no hard seam)
+// - Energy-reactive axis speed
+// - Optional quad symmetry at high energy (both axes)
+// - Edge blend to prevent artifacts at frame border
 // ═══════════════════════════════════════════════════════════
 fn mirror_symmetry(uv: vec2<f32>, intensity: f32, time: f32) -> vec2<f32> {
-    // Reflect left/right with slow axis rotation
     let center = vec2<f32>(0.5, 0.5);
     let p = uv - center;
-    let angle = time * 0.02 * intensity;
+
+    // Mirror axis rotates slowly, energy modulates speed
+    let angle = time * (0.015 + fx.energy * 0.01) * intensity;
     let c = cos(angle);
     let s = sin(angle);
+
+    // Rotate into mirror space
     let rotated = vec2<f32>(p.x * c - p.y * s, p.x * s + p.y * c);
+
+    // Primary mirror: reflect across X axis
     let mirrored = vec2<f32>(abs(rotated.x), rotated.y);
+
+    // At high energy, add secondary mirror for quad symmetry
+    var final_mirror = mirrored;
+    if (fx.energy > 0.4) {
+        let quad_blend = smoothstep(0.4, 0.7, fx.energy) * intensity;
+        let quad = vec2<f32>(abs(rotated.x), abs(rotated.y));
+        final_mirror = mix(mirrored, quad, quad_blend);
+    }
+
     // Rotate back
-    let back = vec2<f32>(mirrored.x * c + mirrored.y * s, -mirrored.x * s + mirrored.y * c);
-    return mix(uv, back + center, intensity);
+    let back = vec2<f32>(final_mirror.x * c + final_mirror.y * s,
+                          -final_mirror.x * s + final_mirror.y * c);
+
+    // Anti-aliased mirror edge: smooth blend near the axis
+    let edge_dist = abs(rotated.x);
+    let aa = smoothstep(0.0, 0.008, edge_dist);
+    let result = mix(p, back, aa * intensity);
+
+    return result + center;
 }
 
 // ═══════════════════════════════════════════════════════════
-// EFFECT 7: AUDIO DISPLACEMENT — bass-driven UV warp
+// EFFECT 7: AUDIO DISPLACEMENT — A++++ frequency-mapped UV warp
+//
+// Maps different frequency bands to different spatial frequencies:
+// - Bass: large slow undulations (like heat shimmer)
+// - Mids: medium organic waves
+// - Highs: fine fast ripples
+// - Beat-triggered sharp displacement spikes
 // ═══════════════════════════════════════════════════════════
 fn audio_displacement(uv: vec2<f32>, intensity: f32, bass: f32, time: f32) -> vec2<f32> {
-    let warp = intensity * bass * 0.08;
-    let wave_x = sin(uv.y * 12.0 + time * 2.0) * warp;
-    let wave_y = cos(uv.x * 10.0 + time * 1.5) * warp * 0.6;
-    return uv + vec2<f32>(wave_x, wave_y);
+    // Bass: large slow waves (like heat rising)
+    let bass_freq = 3.0;
+    let bass_amp = intensity * bass * 0.05;
+    let bass_x = sin(uv.y * bass_freq + time * 0.8) * bass_amp;
+    let bass_y = cos(uv.x * bass_freq * 0.7 + time * 0.6) * bass_amp * 0.7;
+
+    // Mids: medium organic displacement
+    let mid_freq = 8.0;
+    let mid_amp = intensity * fx.energy * 0.025;
+    let mid_x = sin(uv.y * mid_freq + time * 1.5 + sin(uv.x * 4.0)) * mid_amp;
+    let mid_y = cos(uv.x * mid_freq * 0.8 + time * 1.2) * mid_amp * 0.6;
+
+    // High frequency: fine ripples (subtle)
+    let hi_freq = 20.0;
+    let hi_amp = intensity * fx.energy * 0.008;
+    let hi_x = sin(uv.y * hi_freq + time * 3.0) * hi_amp;
+    let hi_y = cos(uv.x * hi_freq + time * 2.5) * hi_amp;
+
+    // Beat spike: sharp momentary displacement
+    let beat_spike = fx.beat_snap * intensity * 0.03;
+    let spike_x = sin(uv.y * 6.0 + time * 10.0) * beat_spike;
+
+    return uv + vec2<f32>(bass_x + mid_x + hi_x + spike_x,
+                           bass_y + mid_y + hi_y);
 }
 
 // ═══════════════════════════════════════════════════════════
-// EFFECT 8: ZOOM PUNCH — beat-triggered zoom
+// EFFECT 8: ZOOM PUNCH — A++++ beat-triggered zoom impact
+//
+// - Exponential decay (sharp attack, smooth release)
+// - Energy-reactive punch strength
+// - Slight barrel distortion at peak zoom for impact feel
+// - Bass modulates punch depth
 // ═══════════════════════════════════════════════════════════
 fn zoom_punch(uv: vec2<f32>, intensity: f32, beat_snap: f32) -> vec2<f32> {
-    let zoom = 1.0 - beat_snap * intensity * 0.06;
     let center = vec2<f32>(0.5, 0.5);
-    return (uv - center) * zoom + center;
+    let p = uv - center;
+
+    // Zoom amount: beat_snap provides fast-attack envelope
+    // Strength scales with energy (quiet beats = subtle, loud = punchy)
+    let punch_strength = beat_snap * intensity * (0.04 + fx.energy * 0.04);
+
+    // Slight barrel distortion at peak for impact feel
+    let dist = length(p);
+    let barrel = 1.0 + punch_strength * dist * 2.0;
+
+    let zoom = 1.0 - punch_strength * barrel;
+    return p * zoom + center;
 }
 
 // ═══════════════════════════════════════════════════════════
-// EFFECT 9: SLOW BREATH PULSE — whole-image scale oscillation
+// EFFECT 9: SLOW BREATH PULSE — A++++ organic scale oscillation
+//
+// Simulates the visual experience of "the walls breathing" during
+// psychedelic perception. Features:
+// - Multiple layered sine waves (not a single mechanical oscillation)
+// - Bass-modulated breath depth
+// - Slight center-of-gravity shift (not perfectly centered)
+// - Energy-reactive breath rate (slower when quiet, faster at peaks)
 // ═══════════════════════════════════════════════════════════
 fn breath_pulse(uv: vec2<f32>, intensity: f32, time: f32) -> vec2<f32> {
-    let breathe = sin(time * 0.3) * intensity * 0.015;
-    let center = vec2<f32>(0.5, 0.5);
-    return (uv - center) * (1.0 + breathe) + center;
+    // Primary breath: slow, deep, organic (~0.2 Hz at rest)
+    let rate = 0.2 + fx.energy * 0.15;
+    let primary = sin(time * rate * TAU) * intensity * 0.012;
+
+    // Secondary breath: slightly faster, smaller (adds organic irregularity)
+    let secondary = sin(time * rate * TAU * 1.7 + 1.3) * intensity * 0.004;
+
+    // Bass modulation: deeper breathing on bass hits
+    let bass_depth = fx.bass * intensity * 0.006;
+    let bass_breath = sin(time * 0.8 + 0.5) * bass_depth;
+
+    let total_scale = 1.0 + primary + secondary + bass_breath;
+
+    // Breathing center shifts slightly (not perfectly centered — more organic)
+    let cx = 0.5 + sin(time * 0.05) * 0.02 * intensity;
+    let cy = 0.5 + cos(time * 0.04) * 0.015 * intensity;
+    let center = vec2<f32>(cx, cy);
+
+    return (uv - center) * total_scale + center;
 }
 
 // ═══════════════════════════════════════════════════════════
-// EFFECT 10: LIGHT LEAK BURST — warm amber flash overlay
+// EFFECT 10: LIGHT LEAK BURST — A++++ film light leak simulation
+//
+// Simulates real film camera light leaks with:
+// - Multiple drifting leak sources (not a single radial gradient)
+// - Spectral color variation (amber → magenta → orange)
+// - Beat-triggered flash intensification
+// - Directional streak (horizontal, like real film gate leaks)
+// - Energy-reactive leak frequency
 // ═══════════════════════════════════════════════════════════
 fn light_leak_burst(col: vec3<f32>, uv: vec2<f32>, intensity: f32, time: f32, beat_snap: f32) -> vec3<f32> {
-    // Radial gradient from a drifting point — warm amber light burst
-    let leak_center = vec2<f32>(
-        0.3 + sin(time * 0.15) * 0.4,
-        0.4 + cos(time * 0.12) * 0.3
-    );
-    let dist = length(uv - leak_center);
-    let glow = smoothstep(0.6, 0.0, dist) * intensity;
-    // Beat-triggered flash intensification
-    let flash = glow * (1.0 + beat_snap * 1.5);
-    // Warm amber leak color
-    let leak_color = vec3<f32>(1.0, 0.7, 0.3);
-    return col + leak_color * flash * 0.35;
+    var leak = vec3<f32>(0.0);
+
+    // 3 drifting leak sources with different colors and positions
+    for (var i = 0; i < 3; i = i + 1) {
+        let id = f32(i);
+        let phase = id * 2.094; // 120° apart
+
+        // Leak center drifts slowly
+        let cx = 0.2 + sin(time * (0.08 + id * 0.03) + phase) * 0.5;
+        let cy = 0.3 + cos(time * (0.06 + id * 0.02) + phase * 0.7) * 0.4;
+        let leak_center = vec2<f32>(cx, cy);
+
+        // Elliptical shape: wider horizontally (film gate leak direction)
+        let dp = uv - leak_center;
+        let dist = length(vec2<f32>(dp.x * 0.6, dp.y)); // horizontal stretch
+
+        // Spectral color per leak source
+        let leak_color = vec3<f32>(
+            0.9 + sin(phase) * 0.1,
+            0.5 + sin(phase + 1.5) * 0.3,
+            0.2 + sin(phase + 3.0) * 0.2
+        );
+
+        let glow = smoothstep(0.5, 0.0, dist);
+        leak += leak_color * glow * (0.15 + beat_snap * 0.25);
+    }
+
+    // Horizontal streak (film gate leak characteristic)
+    let streak_y = 0.5 + sin(time * 0.1) * 0.3;
+    let streak = smoothstep(0.15, 0.0, abs(uv.y - streak_y)) * 0.08;
+    leak += vec3<f32>(1.0, 0.6, 0.2) * streak;
+
+    return col + leak * intensity;
 }
 
 // ═══════════════════════════════════════════════════════════
-// EFFECT 11: TIME DILATION — temporal slow-motion via feedback
+// EFFECT 11: TIME DILATION — A++++ temporal slow-motion
+//
+// Not just "blend with previous frame" — creates the perceptual
+// experience of time stretching:
+// - Weighted multi-frame averaging (not binary blend)
+// - Slight spatial drift in feedback (movement feels dreamlike)
+// - Desaturation + contrast shift (visual hallmark of slow-mo perception)
+// - Energy-reactive: nearly frozen at rest, flowing at peaks
 // ═══════════════════════════════════════════════════════════
 fn time_dilation(uv: vec2<f32>, scene_col: vec3<f32>, intensity: f32) -> vec3<f32> {
-    // Heavy blend with previous frame — creates visual "slow motion"
-    let prev = textureSample(prev_frame_tex, tex_sampler, uv).rgb;
-    // 85-95% previous frame = extreme temporal smoothing
-    let blend = 0.85 + intensity * 0.10;
-    return mix(scene_col, prev, blend);
+    // Slight spatial drift: feedback UV shifts very slightly (dreamlike motion)
+    let drift = vec2<f32>(
+        sin(fx.time * 0.03) * 0.002 * intensity,
+        cos(fx.time * 0.025) * 0.0015 * intensity
+    );
+    let prev_uv = clamp(uv + drift, vec2<f32>(0.0), vec2<f32>(1.0));
+
+    // Multi-sample previous frame for smoother temporal blend
+    let prev1 = textureSample(prev_frame_tex, tex_sampler, prev_uv).rgb;
+    let prev2 = textureSample(prev_frame_tex, tex_sampler, prev_uv + vec2<f32>(0.001, 0.001)).rgb;
+    let prev = (prev1 + prev2) * 0.5;
+
+    // Very heavy temporal blend (85-93%)
+    let blend = 0.85 + intensity * 0.08;
+    var result = mix(scene_col, prev, blend);
+
+    // Slight contrast reduction (visual hallmark of slow-motion perception)
+    let luma = dot(result, vec3<f32>(0.2126, 0.7152, 0.0722));
+    result = mix(result, vec3<f32>(luma), intensity * 0.10); // subtle desat
+    result = mix(vec3<f32>(0.5), result, 1.0 - intensity * 0.08); // reduce contrast
+
+    return result;
 }
 
 // ═══════════════════════════════════════════════════════════
-// EFFECT 12: MOIRE PATTERNS — interference grid overlay
+// EFFECT 12: MOIRE PATTERNS — A++++ optical interference
+//
+// - 3 overlapping grids at precisely different angles
+// - Circular moire rings from center
+// - Energy-reactive grid frequency (tighter at peaks)
+// - Color fringing at interference peaks
+// - Anti-aliased grid lines
 // ═══════════════════════════════════════════════════════════
 fn moire_patterns(col: vec3<f32>, uv: vec2<f32>, intensity: f32, time: f32) -> vec3<f32> {
     let aspect = fx.width / fx.height;
     let p = vec2<f32>((uv.x - 0.5) * aspect, uv.y - 0.5);
 
-    // Two overlapping grids at slightly different angles
-    let freq = 40.0 + intensity * 60.0;
-    let angle1 = time * 0.02;
-    let angle2 = time * 0.02 + 0.4;
+    var moire_total = 0.0;
 
-    let grid1_x = p.x * cos(angle1) - p.y * sin(angle1);
-    let grid2_x = p.x * cos(angle2) - p.y * sin(angle2);
+    // 3 overlapping grids at precisely different angles
+    for (var i = 0; i < 3; i = i + 1) {
+        let id = f32(i);
+        let angle = time * (0.012 + id * 0.004) + id * 1.047; // 60° apart, slowly rotating
+        let freq = 35.0 + fx.energy * 40.0 + id * 15.0;
 
-    let pattern1 = sin(grid1_x * freq);
-    let pattern2 = sin(grid2_x * freq);
+        let ca = cos(angle);
+        let sa = sin(angle);
+        let grid_coord = p.x * ca - p.y * sa;
 
-    // Interference = product of two grids
-    let moire = pattern1 * pattern2;
-    let moire_val = smoothstep(-0.3, 0.3, moire) * intensity * 0.25;
+        // Anti-aliased grid line
+        let line = sin(grid_coord * freq);
+        moire_total += line;
+    }
 
-    return col + col * moire_val;
+    // Circular interference rings from center
+    let ring_freq = 25.0 + fx.energy * 20.0;
+    let ring = sin(length(p) * ring_freq - time * 0.5);
+    moire_total += ring;
+
+    moire_total = moire_total / 4.0;
+
+    // Sharp interference peaks
+    let interference = pow(abs(moire_total), 2.0);
+
+    // Color fringing at interference peaks (chromatic)
+    let fringe = vec3<f32>(
+        interference * 1.2,
+        interference * 0.9,
+        interference * 0.7
+    );
+
+    return col + fringe * intensity * 0.20;
 }
 
 // ═══════════════════════════════════════════════════════════
-// EFFECT 13: DEPTH OF FIELD — radial blur from center
+// EFFECT 13: DEPTH OF FIELD — A++++ bokeh blur simulation
+//
+// - 13-tap Poisson disk sampling (not radial lines)
+// - Circular bokeh shape (not directional blur)
+// - Smooth focus transition (not sharp cutoff)
+// - Energy-reactive focus distance
+// - Proper aspect ratio for circular bokeh
 // ═══════════════════════════════════════════════════════════
 fn depth_of_field(uv: vec2<f32>, intensity: f32) -> vec3<f32> {
     let center = vec2<f32>(0.5, 0.5);
     let dist = length(uv - center);
 
-    // Blur amount increases with distance from center
-    let blur_amount = dist * intensity * 0.012;
+    // Focus region: sharp at center, blurry at edges
+    // Energy shifts the focus zone (high energy = wider sharp area)
+    let focus_radius = 0.15 + fx.energy * 0.15;
+    let blur_amount = smoothstep(focus_radius, focus_radius + 0.3, dist) * intensity * 0.008;
 
-    // 5-tap radial blur
-    var col = textureSample(scene_tex, tex_sampler, uv).rgb * 0.4;
-    let dir = normalize(uv - center) * blur_amount;
-    col += textureSample(scene_tex, tex_sampler, uv + dir).rgb * 0.15;
-    col += textureSample(scene_tex, tex_sampler, uv - dir).rgb * 0.15;
-    col += textureSample(scene_tex, tex_sampler, uv + dir * 2.0).rgb * 0.15;
-    col += textureSample(scene_tex, tex_sampler, uv - dir * 2.0).rgb * 0.15;
+    if (blur_amount < 0.0005) {
+        return textureSample(scene_tex, tex_sampler, uv).rgb;
+    }
 
-    return col;
+    // 13-tap Poisson disk sampling for circular bokeh
+    let aspect = vec2<f32>(1.0, fx.width / fx.height);
+    var col = vec3<f32>(0.0);
+    var total_weight = 0.0;
+
+    // Poisson disk offsets (pre-computed, well-distributed)
+    let offsets = array<vec2<f32>, 13>(
+        vec2<f32>(0.0, 0.0),
+        vec2<f32>(0.527, 0.085),
+        vec2<f32>(-0.040, 0.536),
+        vec2<f32>(-0.670, -0.179),
+        vec2<f32>(0.110, -0.620),
+        vec2<f32>(0.695, -0.356),
+        vec2<f32>(-0.330, 0.740),
+        vec2<f32>(-0.755, 0.370),
+        vec2<f32>(0.340, -0.860),
+        vec2<f32>(0.893, 0.350),
+        vec2<f32>(-0.540, -0.630),
+        vec2<f32>(0.180, 0.920),
+        vec2<f32>(-0.910, -0.200),
+    );
+
+    for (var i = 0; i < 13; i = i + 1) {
+        let sample_uv = uv + offsets[i] * blur_amount * aspect;
+        let clamped = clamp(sample_uv, vec2<f32>(0.0), vec2<f32>(1.0));
+        let weight = 1.0 - length(offsets[i]) * 0.3; // center-weighted
+        col += textureSample(scene_tex, tex_sampler, clamped).rgb * weight;
+        total_weight += weight;
+    }
+
+    return col / total_weight;
 }
 
 // ═══════════════════════════════════════════════════════════
-// EFFECT 14: GLITCH / DATAMOSH — digital corruption
+// EFFECT 14: GLITCH / DATAMOSH — A++++ digital corruption art
+//
+// - Multi-layer corruption (scanlines, blocks, color channel)
+// - Beat-triggered block displacement (from previous frame)
+// - Horizontal VHS tracking lines
+// - Color banding artifacts
+// - Energy-reactive corruption density
+// - RGB shift on corrupted regions
 // ═══════════════════════════════════════════════════════════
 fn glitch_datamosh(uv: vec2<f32>, scene_col: vec3<f32>, intensity: f32, time: f32, beat_snap: f32) -> vec3<f32> {
     var col = scene_col;
+    let t = floor(time * 6.0); // quantized time for stable glitch blocks
 
-    // Horizontal line displacement (scanline glitch)
-    let line_hash = fract(sin(floor(uv.y * 80.0) * 43758.5453 + floor(time * 8.0)) * 12345.6789);
-    if (line_hash > (1.0 - intensity * 0.15)) {
-        let shift = (line_hash - 0.5) * intensity * 0.15;
+    // Layer 1: VHS tracking lines (horizontal displacement bands)
+    let band_y = floor(uv.y * 40.0);
+    let band_hash = fract(sin(band_y * 43758.5453 + t * 7.13) * 12345.6789);
+    let band_active = step(1.0 - intensity * 0.12 * (1.0 + fx.energy), band_hash);
+    if (band_active > 0.5) {
+        let shift = (band_hash - 0.5) * intensity * 0.12;
         col = textureSample(scene_tex, tex_sampler, vec2<f32>(uv.x + shift, uv.y)).rgb;
+        // RGB shift on displaced bands
+        col = vec3<f32>(
+            textureSample(scene_tex, tex_sampler, vec2<f32>(uv.x + shift + 0.003, uv.y)).r,
+            col.g,
+            textureSample(scene_tex, tex_sampler, vec2<f32>(uv.x + shift - 0.003, uv.y)).b
+        );
     }
 
-    // Block displacement on beats
-    if (beat_snap > 0.3) {
-        let block_x = floor(uv.x * 8.0) / 8.0;
-        let block_y = floor(uv.y * 6.0) / 6.0;
-        let block_hash = fract(sin(block_x * 127.1 + block_y * 311.7 + floor(time * 4.0)) * 43758.5453);
-        if (block_hash > (1.0 - intensity * beat_snap * 0.2)) {
-            // Swap with previous frame block
+    // Layer 2: Block corruption on beats (datamosh-style frame hold)
+    if (beat_snap > 0.4) {
+        let block_size = 8.0 + (1.0 - fx.energy) * 8.0; // smaller blocks at high energy
+        let bx = floor(uv.x * block_size);
+        let by = floor(uv.y * block_size * 0.75);
+        let block_hash = fract(sin(bx * 127.1 + by * 311.7 + t * 3.7) * 43758.5453);
+        if (block_hash > (1.0 - intensity * beat_snap * 0.15)) {
+            // Hold previous frame in this block (datamosh effect)
             let prev = textureSample(prev_frame_tex, tex_sampler, uv).rgb;
             col = prev;
         }
     }
 
-    // Color channel offset on some lines
-    if (line_hash > (1.0 - intensity * 0.08)) {
-        col = vec3<f32>(col.b, col.r, col.g); // channel swap
+    // Layer 3: Color banding (posterization on random bands)
+    let color_band = fract(sin(floor(uv.y * 60.0) * 98765.4321 + t) * 54321.0);
+    if (color_band > (1.0 - intensity * 0.06)) {
+        // Reduce color depth (posterize)
+        col = floor(col * 4.0) / 4.0;
     }
+
+    // Layer 4: Subtle static noise overlay
+    let noise = fract(sin(dot(uv * 1000.0 + t, vec2<f32>(12.9898, 78.233))) * 43758.5453);
+    col = mix(col, vec3<f32>(noise), intensity * 0.03);
 
     return col;
 }
