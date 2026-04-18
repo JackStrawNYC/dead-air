@@ -1575,9 +1575,10 @@ async function main() {
         for (const [overlayName, opacity] of Object.entries(opacities)) {
           if (opacity <= 0.005) continue; // skip invisible overlays
 
-          // Map prominence to blend mode and scale
+          // ALL overlays use screen blend — dark pixels vanish naturally.
+          // "Normal" blend makes dark icons look like opaque stickers on bright shaders.
           const prominence = prominenceMap.get(overlayName) ?? "ambient";
-          const blendMode = prominence === "hero" ? "normal" : "screen";
+          const blendMode = "screen";
 
           // Scale: overlay PNGs are full-frame (1920x1080). Scale controls what
           // fraction of the frame the overlay covers. 0.25 = quarter of frame.
@@ -1592,10 +1593,12 @@ async function main() {
             scale = 0.28;
           }
 
-          // Cap opacity: ambient overlays should be subtle, not opaque
+          // Cap opacity: overlays should enhance, not dominate
           let finalOpacity = opacity;
-          if (prominence === "ambient") finalOpacity = Math.min(finalOpacity, 0.35);
-          if (prominence === "accent") finalOpacity = Math.min(finalOpacity, 0.55);
+          if (prominence === "ambient") finalOpacity = Math.min(finalOpacity, 0.25);
+          if (prominence === "accent") finalOpacity = Math.min(finalOpacity, 0.40);
+          // Hero icons: still subtle — they're cultural texture, not logos
+          if (prominence === "hero") finalOpacity = Math.min(finalOpacity, 0.30);
           // FilmGrain: very subtle — it should add texture not haze
           if (overlayName === "FilmGrain") finalOpacity = Math.min(finalOpacity, 0.15);
           // SmokeWisps: only during quiet passages, invisible at peaks
