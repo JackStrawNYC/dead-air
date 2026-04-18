@@ -634,7 +634,7 @@ function computeUniforms(
     downbeat: f.downbeat ? 1 : 0,  // discrete
     drum_onset: L("stemDrumOnset"),
     drum_beat: f.stemDrumBeat ? 1 : 0,  // discrete
-    stem_bass: L("stemBassRms") || bass,
+    stem_bass: L("stemBassRms") ?? 0,
     stem_drums: L("stemDrumOnset"),
     vocal_energy: L("stemVocalRms"),
     vocal_presence: L("stemVocalPresence") > 0.5 ? 1 : 0,
@@ -872,6 +872,7 @@ async function main() {
 
   // ─── Process each song ───
   const allFrames: any[] = [];
+  const songBoundaries: Array<{ title: string; set: number; startFrame: number; endFrame: number }> = [];
   let globalTime = 0;
   const usedShaderModes = new Map<string, number>();
   const shaderModeLastUsed = new Map<string, number>();
@@ -1227,6 +1228,7 @@ async function main() {
       "databend", "signal_decay", "climax_surge", "cellular_automata",
       "bioluminescence",
       // Black-frame risk: unclear implementation, sparse output, or naga compile failure
+      "luminous_cavern", // snoise undefined → naga compile failure → 5251 black frames
       "storm_vortex", "mycelium_network", "cosmic_voyage", "solar_flare",
       // Show-specific variants: only used via song identity, not random pool
       "morning_dew_fog", "dark_star_void", "fire_mountain_smoke",
@@ -1444,7 +1446,7 @@ async function main() {
       const isDeadAir = deadAirFlags[ai] === 1;
       if (isDeadAir) {
         // Pick ONE dead air shader per song (seeded by song, not by frame)
-        const deadAirShaders = ["aurora", "void_light", "cosmic_dust", "luminous_cavern"];
+        const deadAirShaders = ["aurora", "void_light", "cosmic_dust", "smoke_rings"];
         const daPool = deadAirShaders.filter(s => Object.keys(shaders).includes(s));
         if (daPool.length > 0) {
           const deadAirShader = daPool[Math.floor(seededRandom(ctx.songSeed) * daPool.length)];
@@ -1955,6 +1957,14 @@ async function main() {
       console.log(`    Overlays: ${totalOut} frames in ${(overlayMs / 1000).toFixed(1)}s (avg ${avgOverlays} per frame)`);
     }
 
+    // Track song boundary for chapter cards
+    songBoundaries.push({
+      title: song.title,
+      set: song.set ?? (songIdx < 10 ? 1 : songIdx < 15 ? 2 : 3),
+      startFrame: allFrames.length - totalOut,
+      endFrame: allFrames.length,
+    });
+
     globalTime += frames.length / afps;
     showSongsCompleted++;
     const songElapsed = ((Date.now() - songStartTime) / 1000).toFixed(1);
@@ -1985,6 +1995,7 @@ async function main() {
   ws.write('{"shaders":');
   ws.write(JSON.stringify(shaders));
   ws.write(`,"width":${width},"height":${height},"fps":${fps},"show_title":${JSON.stringify(showTitle)}`);
+  ws.write(`,"song_boundaries":${JSON.stringify(songBoundaries)}`);
   ws.write(',"frames":[\n');
 
   for (let i = 0; i < allFrames.length; i++) {
