@@ -1648,6 +1648,31 @@ async function main() {
             blend_mode: blendMode,
           });
         }
+
+        // Dead cultural watermark: one iconic symbol always subtly present.
+        // Rotates through Dead icons on a slow 30-second cycle.
+        // Screen-blended at 10-12% opacity — felt more than seen.
+        const DEAD_ICONS = ["BreathingStealie", "ThirteenPointBolt", "BearTraced", "StealYourFaceOff", "GoldenRoad"];
+        const iconCycleIdx = Math.floor((i / fps / 30)) % DEAD_ICONS.length; // new icon every 30s
+        const iconName = DEAD_ICONS[iconCycleIdx];
+        // Don't add if this icon is already in the frame (from regular rotation)
+        if (!frameInstances.some(fi => fi.overlay_id === iconName)) {
+          // Slow breathing opacity: 8-12% with gentle sine wave
+          const breathe = 0.10 + Math.sin(i / fps * 0.3) * 0.02;
+          const iconHash = iconName.split("").reduce((h, c) => ((h << 5) - h + c.charCodeAt(0)) | 0, 0);
+          frameInstances.push({
+            overlay_id: iconName,
+            transform: {
+              opacity: Math.round(breathe * 1000) / 1000,
+              scale: 0.20, // small — it's a watermark, not a feature
+              rotation_deg: 0,
+              offset_x: Math.round(((Math.abs(iconHash % 100) / 100 - 0.5) * 0.3) * 1000) / 1000,
+              offset_y: Math.round(((Math.abs((iconHash >> 8) % 100) / 100 - 0.5) * 0.3) * 1000) / 1000,
+            },
+            blend_mode: "screen",
+          });
+        }
+
         overlaySchedule.push(frameInstances);
       }
 

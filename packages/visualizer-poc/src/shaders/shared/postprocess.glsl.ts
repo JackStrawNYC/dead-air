@@ -227,10 +227,10 @@ ${
       float wispNoise = snoise(vec3(uv * 1.5 + uDynamicTime * 0.008, uDynamicTime * 0.015));
       float wispNoise2 = snoise(vec3(uv * 2.8 - uDynamicTime * 0.012, uDynamicTime * 0.01 + 5.0));
       float wispMask = smoothstep(0.25, 0.65, wispNoise) * smoothstep(0.2, 0.6, wispNoise2);
-      // Wisp color follows song palette for identity — not random
-      float wispHue = uPalettePrimary / 360.0;
-      vec3 wispColor = hsv2rgb(vec3(wispHue, 0.25, 0.06));
-      col += wispColor * wispMask * quietness * 0.15;
+      // Wisp color follows song palette — warm, song-specific glow
+      float wispHue = uPalettePrimary; // already 0-1
+      vec3 wispColor = hsv2rgb(vec3(wispHue, 0.40, 0.12));
+      col += wispColor * wispMask * quietness * 0.25;
 
       // Deeper vignette in quiet passages — intimate, focused, contemplative
       float quietVig = 1.0 - dot(p * 1.1, p * 1.1);
@@ -378,9 +378,11 @@ ${
     float hueDiff = targetHue - currentHue;
     if (hueDiff > 0.5) hueDiff -= 1.0;
     if (hueDiff < -0.5) hueDiff += 1.0;
-    // Adaptive strength: rotate MORE when current hue is far from target
+    // Adaptive strength: rotate MORE when current hue is far from target.
+    // 55% for nearby hues (preserve shader character), 92% for distant
+    // (force into song palette — no off-brand colors in a Dead show)
     float dist = abs(hueDiff);
-    float strength = mix(0.50, 0.85, smoothstep(0.05, 0.25, dist));
+    float strength = mix(0.55, 0.92, smoothstep(0.05, 0.20, dist));
     hsv.x = fract(currentHue + hueDiff * strength);
     hsv.y = mix(hsv.y, uPaletteSaturation, 0.30);
     col = hsv2rgb(hsv);
