@@ -258,10 +258,16 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     var col = textureSample(scene_hdr, tex_sampler, in.uv).rgb;
     let bloom = textureSample(bloom_tex, tex_sampler, in.uv).rgb;
 
-    // Ambient floor: warm deep purple — concert venue in darkness.
-    // Not gray/clinical, but the warm glow of a dark room with stage lighting.
+    // Ambient floor: song-palette-tinted darkness.
+    // Uses the bloom texture as a color reference — the bloom contains
+    // the song's dominant color, so the ambient glow matches.
     let luma = dot(col, vec3<f32>(0.2126, 0.7152, 0.0722));
-    let ambient_floor = vec3<f32>(0.025, 0.012, 0.035); // warm purple-indigo
+    let bloom_color = textureSample(bloom_tex, tex_sampler, vec2<f32>(0.5, 0.5)).rgb;
+    let bloom_luma = dot(bloom_color, vec3<f32>(0.2126, 0.7152, 0.0722));
+    // Mix between warm purple base and bloom-derived color
+    let base_ambient = vec3<f32>(0.020, 0.010, 0.030);
+    let palette_ambient = bloom_color * 0.04 / max(bloom_luma, 0.01);
+    let ambient_floor = mix(base_ambient, palette_ambient, 0.5);
     let floor_strength = smoothstep(0.06, 0.0, luma);
     col = col + ambient_floor * floor_strength;
 

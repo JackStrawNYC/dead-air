@@ -215,9 +215,10 @@ ${
       vec3 sparkleCol = mix(vec3(0.8, 0.75, 0.65), vec3(0.6, 0.7, 0.9), sparkleHash * 0.5);
       col += sparkleCol * sparkle * quietness * 0.08;
 
-      // Atmospheric dust drift: very slow noise-based luminance variation
+      // Atmospheric dust drift: warm-tinted noise-based luminance wash
       float dustNoise = snoise(vec3(uv * 3.0, uDynamicTime * 0.02));
-      col += vec3(0.03, 0.025, 0.02) * (dustNoise * 0.5 + 0.5) * quietness * 0.15;
+      vec3 dustColor = hsv2rgb(vec3(uPalettePrimary, 0.30, 0.06)); // song-palette tinted
+      col += dustColor * (dustNoise * 0.5 + 0.5) * quietness * 0.30;
 
       // Slight warm tint on quiet passages — candlelight intimacy
       col = mix(col, col * vec3(1.06, 1.02, 0.94), quietness * 0.3);
@@ -355,14 +356,18 @@ ${
     );
     col = mix(col, sepiaColor, uEraSepia);
   }
-  // Show warmth: shifts entire color temperature toward amber/golden.
-  // The Dead aesthetic is WARM — no cold digital blues.
-  // uShowWarmth > 0 = warmer (amber), < 0 = cooler (blue)
+  // Show warmth: color temperature shift via highlight/shadow split.
+  // Warm: shadows go deep amber-purple, highlights go golden.
+  // This avoids the crude RGB multiply that muddles darks.
   {
     float w = uShowWarmth;
-    col.r *= 1.0 + w * 0.3;   // boost red
-    col.g *= 1.0 + w * 0.08;  // slight green boost (golden, not orange)
-    col.b *= 1.0 - w * 0.25;  // reduce blue
+    float luma = dot(col, vec3(0.2126, 0.7152, 0.0722));
+    // Warm highlights: push bright areas toward golden
+    vec3 warmHighlight = vec3(1.0 + w * 0.20, 1.0 + w * 0.06, 1.0 - w * 0.15);
+    // Warm shadows: push dark areas toward deep amber-purple (not mud)
+    vec3 warmShadow = vec3(1.0 + w * 0.08, 1.0 - w * 0.02, 1.0 - w * 0.06);
+    vec3 warmMult = mix(warmShadow, warmHighlight, smoothstep(0.15, 0.60, luma));
+    col *= warmMult;
   }
   // Song palette color grading: rotate hues toward the song's intended palette.
   // uPalettePrimary is a hue (0-1). This gently shifts the scene toward that hue
@@ -374,17 +379,24 @@ ${
     vec3 hsv = rgb2hsv(col);
     float targetHue = uPalettePrimary;
     float currentHue = hsv.x;
-    // Strong hue rotation toward target
     float hueDiff = targetHue - currentHue;
     if (hueDiff > 0.5) hueDiff -= 1.0;
     if (hueDiff < -0.5) hueDiff += 1.0;
-    // Adaptive strength: rotate MORE when current hue is far from target.
-    // 55% for nearby hues (preserve shader character), 92% for distant
-    // (force into song palette — no off-brand colors in a Dead show)
+
+    // Luminance-aware hue rotation:
+    // - Dark pixels: minimal rotation (preserve shadow depth)
+    // - Bright/saturated pixels: strong rotation (enforce palette)
+    // - Desaturated pixels: minimal rotation (preserve grays/whites)
+    // This prevents monochromatic output while keeping the palette identity.
     float dist = abs(hueDiff);
-    float strength = mix(0.55, 0.92, smoothstep(0.05, 0.20, dist));
+    float baseStrength = mix(0.50, 0.90, smoothstep(0.05, 0.20, dist));
+    float satGate = smoothstep(0.08, 0.30, hsv.y); // only rotate colored pixels
+    float lumGate = smoothstep(0.03, 0.15, hsv.z) * smoothstep(0.95, 0.80, hsv.z); // not too dark or bright
+    float strength = baseStrength * satGate * lumGate;
+
     hsv.x = fract(currentHue + hueDiff * strength);
-    hsv.y = mix(hsv.y, uPaletteSaturation, 0.30);
+    // Gentle saturation blend — preserve the shader's own saturation character
+    hsv.y = mix(hsv.y, uPaletteSaturation, 0.15 * satGate);
     col = hsv2rgb(hsv);
   }
   // Show contrast: punch up the dynamic range

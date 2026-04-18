@@ -750,16 +750,18 @@ function computeUniforms(
     envelope_brightness: envBrightness,
     envelope_saturation: envSaturation,
     envelope_hue: envHue,
-    // Era grading: Veneta 1972 = primal era, outdoor Oregon sunshine
-    // Warm golden tones, rich saturation, subtle sepia, analog feel
-    era_saturation: 1.15, era_brightness: 1.05, era_sepia: 0.12,
-    show_warmth: 0.20, show_contrast: 1.08, show_saturation: 1.10,
-    show_grain: 1.2, show_bloom: 1.1,
+    // Era grading: Veneta 1972 = primal era, outdoor Oregon afternoon sunshine.
+    // Strong golden warmth, rich saturation, visible sepia, analog 16mm feel.
+    era_saturation: 1.20, era_brightness: 1.08, era_sepia: 0.15,
+    show_warmth: 0.25, show_contrast: 1.10, show_saturation: 1.15,
+    show_grain: 1.3, show_bloom: 1.15,
     // Dynamic params: quiet drifts slowly, peaks churn intensely
-    // Dynamic params: quiet is GLACIAL (liquid light), peaks are flowing (not frantic)
-    param_bass_scale: 0.4 + energy * 0.6,      // 0.40 → 1.0
-    param_energy_scale: 0.5 + energy * 0.5,     // 0.50 → 1.0
-    param_motion_speed: 0.18 + energy * 0.42,   // 0.18 (glacial drift) → 0.60 (flowing)
+    // Dynamic params: glacial quiet, flowing peaks.
+    // Fast energy adds phrase-level responsiveness on top of base speed.
+    param_bass_scale: 0.4 + energy * 0.6,
+    param_energy_scale: 0.5 + energy * 0.5,
+    param_motion_speed: 0.18 + energy * 0.35 + lerpSmoothed(smoothed.fastEnergy) * 0.12,
+    // Base: 0.18-0.53 from slow energy, +0.12 from fast energy = phrase tracking
     param_color_sat_bias: 0, param_complexity: 1.0,
     param_drum_reactivity: 1.0, param_vocal_weight: 1.0,
     peak_of_show: analysis?.peakOfShow?.isPeak ? 1 : 0,
