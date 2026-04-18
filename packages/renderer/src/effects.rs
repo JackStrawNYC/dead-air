@@ -205,38 +205,40 @@ fn hypersaturation(col: vec3<f32>, intensity: f32, energy: f32) -> vec3<f32> {
     let luma = dot(col, vec3<f32>(0.2126, 0.7152, 0.0722));
 
     // Protect shadows and highlights — only push midtone saturation.
-    // Dark pixels (luma < 0.1): minimal boost (prevents noise amplification)
-    // Bright pixels (luma > 0.85): reduced boost (prevents clipping to white)
     let midtone_mask = smoothstep(0.05, 0.20, luma) * smoothstep(0.95, 0.75, luma);
-
-    // Base saturation multiplier: 1.5x at rest, up to 3.5x at peak energy
-    let base_mult = 1.5 + intensity * (1.0 + energy * 1.5);
-    let sat_mult = 1.0 + (base_mult - 1.0) * midtone_mask;
 
     // Extract chroma (color information separated from luminance)
     let chroma = col - vec3<f32>(luma);
 
+    // Detect input saturation: reduce effect on already-vivid pixels.
+    // Prevents neon blowout on shaders like tie_dye that are inherently saturated.
+    let input_sat = length(chroma) / max(luma, 0.08);
+    let sat_guard = 1.0 - smoothstep(0.6, 1.8, input_sat); // reduce boost as input gets more saturated
+
+    // Base saturation multiplier: 1.0x base, scaled by intensity and energy
+    // Kept modest to avoid ugly neon on vivid inputs
+    let base_mult = 1.0 + intensity * (0.6 + energy * 1.0) * sat_guard;
+    let sat_mult = 1.0 + (base_mult - 1.0) * midtone_mask;
+
     // Hue-dependent saturation: warm colors (red/amber/gold) boost MORE
     // than cool colors (blue/cyan). This reinforces the Dead warm palette.
-    let warmth = max(chroma.r - chroma.b, 0.0); // positive when warm-toned
-    let warm_boost = 1.0 + warmth * intensity * 0.5;
+    let warmth = max(chroma.r - chroma.b, 0.0);
+    let warm_boost = 1.0 + warmth * intensity * 0.3 * sat_guard;
 
     // Apply saturation with warm bias
     var result = vec3<f32>(luma) + chroma * sat_mult * warm_boost;
 
     // Gamut compression: soft-clip values that exceed [0,1] instead of hard clamp.
-    // This preserves hue (hard clamp shifts hue toward white).
     let max_channel = max(result.r, max(result.g, result.b));
     if (max_channel > 1.0) {
         let compress = 1.0 / max_channel;
-        result = mix(result, result * compress, smoothstep(1.0, 1.5, max_channel));
+        result = mix(result, result * compress, smoothstep(0.85, 1.2, max_channel));
     }
     result = max(result, vec3<f32>(0.0));
 
     // Subtle vibrance on top: boost the LEAST saturated channel
-    // (fills in muted areas without oversaturating already-vivid areas)
     let min_channel = min(result.r, min(result.g, result.b));
-    let vibrance = intensity * 0.15 * midtone_mask;
+    let vibrance = intensity * 0.10 * midtone_mask * sat_guard;
     result = result + (vec3<f32>(luma) - result) * vec3<f32>(-vibrance) * (1.0 - min_channel);
 
     return max(result, vec3<f32>(0.0));
@@ -258,8 +260,8 @@ fn chromatic_split(uv: vec2<f32>, intensity: f32, energy: f32, time: f32) -> vec
     let dist_from_center = length(to_center);
 
     // Radial split: stronger at edges (like real lens aberration)
-    let radial_strength = smoothstep(0.0, 0.5, dist_from_center);
-    let base_offset = intensity * (0.004 + energy * 0.012) * radial_strength;
+    let radial_strength = smoothstep(0.0, 0.45, dist_from_center);
+    let base_offset = intensity * (0.007 + energy * 0.018) * radial_strength;
 
     // Beat pulse: brief split intensification
     let beat_pulse = 1.0 + fx.beat_snap * 0.8 * intensity;
@@ -375,30 +377,31 @@ fn mirror_symmetry(uv: vec2<f32>, intensity: f32, time: f32) -> vec2<f32> {
 // - Beat-triggered sharp displacement spikes
 // ═══════════════════════════════════════════════════════════
 fn audio_displacement(uv: vec2<f32>, intensity: f32, bass: f32, time: f32) -> vec2<f32> {
-    // Bass: large slow waves (like heat rising)
-    let bass_freq = 3.0;
-    let bass_amp = intensity * bass * 0.05;
+    // Bass: large slow waves (like heat rising off asphalt)
+    let bass_freq = 2.5;
+    let bass_amp = intensity * bass * 0.10;
     let bass_x = sin(uv.y * bass_freq + time * 0.8) * bass_amp;
     let bass_y = cos(uv.x * bass_freq * 0.7 + time * 0.6) * bass_amp * 0.7;
 
-    // Mids: medium organic displacement
-    let mid_freq = 8.0;
-    let mid_amp = intensity * fx.energy * 0.025;
-    let mid_x = sin(uv.y * mid_freq + time * 1.5 + sin(uv.x * 4.0)) * mid_amp;
+    // Mids: medium organic displacement (water surface ripple)
+    let mid_freq = 6.0;
+    let mid_amp = intensity * fx.energy * 0.055;
+    let mid_x = sin(uv.y * mid_freq + time * 1.5 + sin(uv.x * 3.0) * 0.5) * mid_amp;
     let mid_y = cos(uv.x * mid_freq * 0.8 + time * 1.2) * mid_amp * 0.6;
 
-    // High frequency: fine ripples (subtle)
-    let hi_freq = 20.0;
-    let hi_amp = intensity * fx.energy * 0.008;
+    // High frequency: fine ripples
+    let hi_freq = 16.0;
+    let hi_amp = intensity * fx.energy * 0.018;
     let hi_x = sin(uv.y * hi_freq + time * 3.0) * hi_amp;
     let hi_y = cos(uv.x * hi_freq + time * 2.5) * hi_amp;
 
     // Beat spike: sharp momentary displacement
-    let beat_spike = fx.beat_snap * intensity * 0.03;
-    let spike_x = sin(uv.y * 6.0 + time * 10.0) * beat_spike;
+    let beat_spike = fx.beat_snap * intensity * 0.06;
+    let spike_x = sin(uv.y * 5.0 + time * 10.0) * beat_spike;
+    let spike_y = cos(uv.x * 4.0 + time * 8.0) * beat_spike * 0.5;
 
     return uv + vec2<f32>(bass_x + mid_x + hi_x + spike_x,
-                           bass_y + mid_y + hi_y);
+                           bass_y + mid_y + hi_y + spike_y);
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -415,11 +418,11 @@ fn zoom_punch(uv: vec2<f32>, intensity: f32, beat_snap: f32) -> vec2<f32> {
 
     // Zoom amount: beat_snap provides fast-attack envelope
     // Strength scales with energy (quiet beats = subtle, loud = punchy)
-    let punch_strength = beat_snap * intensity * (0.04 + fx.energy * 0.04);
+    let punch_strength = beat_snap * intensity * (0.06 + fx.energy * 0.06);
 
-    // Slight barrel distortion at peak for impact feel
+    // Barrel distortion at peak for impact feel (stronger radial bulge)
     let dist = length(p);
-    let barrel = 1.0 + punch_strength * dist * 2.0;
+    let barrel = 1.0 + punch_strength * dist * 3.0;
 
     let zoom = 1.0 - punch_strength * barrel;
     return p * zoom + center;
@@ -436,22 +439,25 @@ fn zoom_punch(uv: vec2<f32>, intensity: f32, beat_snap: f32) -> vec2<f32> {
 // - Energy-reactive breath rate (slower when quiet, faster at peaks)
 // ═══════════════════════════════════════════════════════════
 fn breath_pulse(uv: vec2<f32>, intensity: f32, time: f32) -> vec2<f32> {
-    // Primary breath: slow, deep, organic (~0.2 Hz at rest)
-    let rate = 0.2 + fx.energy * 0.15;
-    let primary = sin(time * rate * TAU) * intensity * 0.012;
+    // Primary breath: slow, deep, organic (~0.15 Hz at rest — "walls breathing")
+    let rate = 0.15 + fx.energy * 0.10;
+    let primary = sin(time * rate * TAU) * intensity * 0.035;
 
     // Secondary breath: slightly faster, smaller (adds organic irregularity)
-    let secondary = sin(time * rate * TAU * 1.7 + 1.3) * intensity * 0.004;
+    let secondary = sin(time * rate * TAU * 1.7 + 1.3) * intensity * 0.012;
+
+    // Tertiary micro-breath: fast subtle flutter
+    let tertiary = sin(time * rate * TAU * 3.1 + 2.7) * intensity * 0.005;
 
     // Bass modulation: deeper breathing on bass hits
-    let bass_depth = fx.bass * intensity * 0.006;
+    let bass_depth = fx.bass * intensity * 0.020;
     let bass_breath = sin(time * 0.8 + 0.5) * bass_depth;
 
-    let total_scale = 1.0 + primary + secondary + bass_breath;
+    let total_scale = 1.0 + primary + secondary + tertiary + bass_breath;
 
-    // Breathing center shifts slightly (not perfectly centered — more organic)
-    let cx = 0.5 + sin(time * 0.05) * 0.02 * intensity;
-    let cy = 0.5 + cos(time * 0.04) * 0.015 * intensity;
+    // Breathing center shifts more noticeably (organic, not robotic)
+    let cx = 0.5 + sin(time * 0.07) * 0.04 * intensity;
+    let cy = 0.5 + cos(time * 0.055) * 0.03 * intensity;
     let center = vec2<f32>(cx, cy);
 
     return (uv - center) * total_scale + center;
@@ -470,37 +476,46 @@ fn breath_pulse(uv: vec2<f32>, intensity: f32, time: f32) -> vec2<f32> {
 fn light_leak_burst(col: vec3<f32>, uv: vec2<f32>, intensity: f32, time: f32, beat_snap: f32) -> vec3<f32> {
     var leak = vec3<f32>(0.0);
 
-    // 3 drifting leak sources with different colors and positions
-    for (var i = 0; i < 3; i = i + 1) {
+    // 4 drifting leak sources with warm spectral colors
+    for (var i = 0; i < 4; i = i + 1) {
         let id = f32(i);
-        let phase = id * 2.094; // 120° apart
+        let phase = id * 1.571; // 90° apart
 
-        // Leak center drifts slowly
-        let cx = 0.2 + sin(time * (0.08 + id * 0.03) + phase) * 0.5;
-        let cy = 0.3 + cos(time * (0.06 + id * 0.02) + phase * 0.7) * 0.4;
+        // Leak center drifts — biased toward edges (where real film leaks occur)
+        let cx = 0.15 + sin(time * (0.06 + id * 0.025) + phase) * 0.7;
+        let cy = 0.2 + cos(time * (0.05 + id * 0.018) + phase * 0.7) * 0.6;
         let leak_center = vec2<f32>(cx, cy);
 
         // Elliptical shape: wider horizontally (film gate leak direction)
         let dp = uv - leak_center;
-        let dist = length(vec2<f32>(dp.x * 0.6, dp.y)); // horizontal stretch
+        let dist = length(vec2<f32>(dp.x * 0.5, dp.y));
 
-        // Spectral color per leak source
+        // Warm spectral colors: amber, gold, magenta, orange
         let leak_color = vec3<f32>(
-            0.9 + sin(phase) * 0.1,
-            0.5 + sin(phase + 1.5) * 0.3,
-            0.2 + sin(phase + 3.0) * 0.2
+            0.95 + sin(phase) * 0.05,
+            0.45 + sin(phase + 1.5) * 0.35,
+            0.15 + sin(phase + 3.0) * 0.25
         );
 
-        let glow = smoothstep(0.5, 0.0, dist);
-        leak += leak_color * glow * (0.15 + beat_snap * 0.25);
+        // Wider, softer glow with stronger base
+        let glow = smoothstep(0.65, 0.0, dist);
+        leak += leak_color * glow * (0.30 + beat_snap * 0.40);
     }
 
-    // Horizontal streak (film gate leak characteristic)
-    let streak_y = 0.5 + sin(time * 0.1) * 0.3;
-    let streak = smoothstep(0.15, 0.0, abs(uv.y - streak_y)) * 0.08;
-    leak += vec3<f32>(1.0, 0.6, 0.2) * streak;
+    // Horizontal streak (film gate leak characteristic) — wider and brighter
+    let streak_y = 0.5 + sin(time * 0.08) * 0.35;
+    let streak = smoothstep(0.20, 0.0, abs(uv.y - streak_y)) * 0.18;
+    leak += vec3<f32>(1.0, 0.55, 0.15) * streak;
 
-    return col + leak * intensity;
+    // Edge vignette leak: light creeping in from frame borders
+    let edge_leak = max(0.0, 1.0 - length((uv - 0.5) * 1.4));
+    let edge_inv = 1.0 - edge_leak; // stronger at edges
+    leak += vec3<f32>(0.9, 0.4, 0.1) * edge_inv * edge_inv * 0.08;
+
+    // Screen blend for more natural light addition (prevents blown whites)
+    let leaked = col + leak * intensity * (vec3<f32>(1.0) - col * 0.3);
+
+    return leaked;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -516,8 +531,8 @@ fn light_leak_burst(col: vec3<f32>, uv: vec2<f32>, intensity: f32, time: f32, be
 fn time_dilation(uv: vec2<f32>, scene_col: vec3<f32>, intensity: f32) -> vec3<f32> {
     // Slight spatial drift: feedback UV shifts very slightly (dreamlike motion)
     let drift = vec2<f32>(
-        sin(fx.time * 0.03) * 0.002 * intensity,
-        cos(fx.time * 0.025) * 0.0015 * intensity
+        sin(fx.time * 0.03) * 0.003 * intensity,
+        cos(fx.time * 0.025) * 0.002 * intensity
     );
     let prev_uv = clamp(uv + drift, vec2<f32>(0.0), vec2<f32>(1.0));
 
@@ -526,8 +541,20 @@ fn time_dilation(uv: vec2<f32>, scene_col: vec3<f32>, intensity: f32) -> vec3<f3
     let prev2 = textureSample(prev_frame_tex, tex_sampler, prev_uv + vec2<f32>(0.001, 0.001)).rgb;
     let prev = (prev1 + prev2) * 0.5;
 
-    // Very heavy temporal blend (85-93%)
-    let blend = 0.85 + intensity * 0.08;
+    // Detect empty/black previous frame (first frame scenario).
+    // If prev is near-black, use scene color instead to avoid crushing to darkness.
+    let prev_brightness = dot(prev, vec3<f32>(0.333, 0.334, 0.333));
+    if (prev_brightness < 0.02) {
+        // No valid previous frame — apply only the perceptual effects to scene
+        let luma = dot(scene_col, vec3<f32>(0.2126, 0.7152, 0.0722));
+        var result = mix(scene_col, vec3<f32>(luma), intensity * 0.10);
+        result = mix(vec3<f32>(0.5), result, 1.0 - intensity * 0.08);
+        return result;
+    }
+
+    // Temporal blend: heavy but not overwhelming (70-82%).
+    // Previous value of 85-93% was too extreme — crushed scene to near-invisible.
+    let blend = 0.70 + intensity * 0.12;
     var result = mix(scene_col, prev, blend);
 
     // Slight contrast reduction (visual hallmark of slow-motion perception)
@@ -576,16 +603,21 @@ fn moire_patterns(col: vec3<f32>, uv: vec2<f32>, intensity: f32, time: f32) -> v
     moire_total = moire_total / 4.0;
 
     // Sharp interference peaks
-    let interference = pow(abs(moire_total), 2.0);
+    let interference = pow(abs(moire_total), 1.5);
 
-    // Color fringing at interference peaks (chromatic)
+    // Color fringing at interference peaks (chromatic) — stronger warm bias
     let fringe = vec3<f32>(
-        interference * 1.2,
-        interference * 0.9,
-        interference * 0.7
+        interference * 1.3,
+        interference * 0.85,
+        interference * 0.55
     );
 
-    return col + fringe * intensity * 0.20;
+    // Multiply blend: moire darkens/modulates the scene at interference zones
+    let moire_mod = 1.0 - interference * intensity * 0.25;
+    let modulated = col * max(vec3<f32>(moire_mod), vec3<f32>(0.3));
+
+    // Add color fringe on top
+    return modulated + fringe * intensity * 0.40;
 }
 
 // ═══════════════════════════════════════════════════════════

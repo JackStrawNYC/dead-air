@@ -1337,6 +1337,12 @@ async function main() {
     const progressInterval = Math.max(1, Math.floor(totalOut / 20)); // Log every 5%
     const songStartTime = Date.now();
     let dynamicTimeAccum = 0; // Accumulated dynamic time with modifiers
+
+    // Effect hold state: prevents flickering between effect modes
+    let effectHoldMode = 0;      // Currently held effect mode (0 = none)
+    let effectHoldIntensity = 0; // Base intensity for held effect
+    let effectHoldFrames = 0;    // How long current effect has been held
+    let effectCooldown = 0;      // Frames remaining in cooldown after effect ends
     for (let i = 0; i < totalOut; i++) {
       if (i > 0 && i % progressInterval === 0) {
         const pct = ((i / totalOut) * 100).toFixed(0);
@@ -1476,20 +1482,102 @@ async function main() {
         return base;
       })();
 
-      // Effect triggers: fire visual modes at specific musical moments
+      // Effect triggers: fire visual modes at specific musical moments.
+      // Uses climax state, energy, section type, and song characteristics.
+      // Effects fire ~15-25% of the time, with minimum hold duration (no flickering).
       const climaxState = frameAnalysis?.climaxState ?? { phase: "idle", intensity: 0 };
-      if (climaxState.phase === "climax" && (climaxState.intensity ?? 0) > 0.7) {
-        // Peak climax moments: hypersaturation + chromatic split
-        uniforms.effect_mode = 3; // hypersaturation
-        uniforms.effect_intensity = (climaxState.intensity ?? 0) * 0.6;
-      } else if (climaxState.phase === "sustain" && (climaxState.intensity ?? 0) > 0.5) {
-        // Sustained peaks: trails/echo
-        uniforms.effect_mode = 5; // trails
-        uniforms.effect_intensity = (climaxState.intensity ?? 0) * 0.4;
-      } else if (climaxState.phase === "build" && (climaxState.intensity ?? 0) > 0.6) {
-        // Building toward peak: breath pulse
-        uniforms.effect_mode = 9; // breath pulse
-        uniforms.effect_intensity = (climaxState.intensity ?? 0) * 0.3;
+      const energy = uniforms.energy ?? 0;
+      const sectionType = uniforms.section_type ?? 5;
+      const songProg = uniforms.song_progress ?? 0;
+      const beatSnap = uniforms.beat_snap ?? 0;
+      const spaceScore = uniforms.space_score ?? 0;
+
+      // Effect hold state (persists across frames within this song)
+      // Once an effect triggers, hold it for MIN_HOLD frames before allowing change
+      const MIN_EFFECT_HOLD = Math.round(fps * 3); // 3 seconds minimum
+      const MAX_EFFECT_HOLD = Math.round(fps * 8); // 8 seconds maximum
+      const COOLDOWN_FRAMES = Math.round(fps * 5); // 5 second gap between effects
+
+      // Determine desired effect based on musical state
+      let desiredMode = 0;
+      let desiredIntensity = 0;
+
+      if (climaxState.phase === "climax" || (climaxState.phase === "sustain" && (climaxState.intensity ?? 0) > 0.6)) {
+        // Peak moments: always trigger dramatic effects
+        const peak = climaxState.intensity ?? 0.8;
+        const choices = [3, 4, 1, 10]; // hypersaturation, chromatic, kaleidoscope, light leak
+        desiredMode = choices[Math.floor(seededRandom(songIdx * 131 + Math.floor(i / MIN_EFFECT_HOLD)) * choices.length)];
+        desiredIntensity = peak * 0.65;
+      } else if (climaxState.phase === "build" && (climaxState.intensity ?? 0) > 0.7) {
+        // Strong build only: anticipatory effects
+        const build = climaxState.intensity ?? 0.6;
+        const choices = [9, 2, 12]; // breath pulse, deep feedback, moire
+        desiredMode = choices[Math.floor(seededRandom(songIdx * 137 + Math.floor(i / MIN_EFFECT_HOLD)) * choices.length)];
+        desiredIntensity = build * 0.40;
+      } else if (energy > 0.50 && beatSnap > 0.5) {
+        // High-energy strong beat moments: rare punchy effects (~10%)
+        const trigger = seededRandom(i * 7919 + songIdx * 251);
+        if (trigger > 0.90) {
+          const choices = [8, 4, 14, 7]; // zoom punch, chromatic, glitch, audio displace
+          desiredMode = choices[Math.floor(seededRandom(songIdx * 149 + Math.floor(i / MIN_EFFECT_HOLD)) * choices.length)];
+          desiredIntensity = energy * 0.50;
+        }
+      } else if (sectionType >= 4.5 && sectionType < 5.5 && energy > 0.35) {
+        // Jam sections: psychedelic effects (rare, ~12%)
+        const trigger = seededRandom(i * 6271 + songIdx * 307);
+        if (trigger > 0.88) {
+          const choices = [2, 5, 1, 6, 7]; // feedback, trails, kaleidoscope, mirror, audio displace
+          desiredMode = choices[Math.floor(seededRandom(songIdx * 163 + Math.floor(i / MIN_EFFECT_HOLD)) * choices.length)];
+          desiredIntensity = 0.35 + energy * 0.25;
+        }
+      } else if (spaceScore > 0.6) {
+        // Deep space sections: dreamy effects (rare, ~15%)
+        const trigger = seededRandom(i * 5381 + songIdx * 389);
+        if (trigger > 0.85) {
+          const choices = [11, 13, 9]; // time dilation, DoF, breath
+          desiredMode = choices[Math.floor(seededRandom(songIdx * 173 + Math.floor(i / MIN_EFFECT_HOLD)) * choices.length)];
+          desiredIntensity = 0.30 + spaceScore * 0.20;
+        }
+      } else if (songProg > 0.88 && energy > 0.40) {
+        // Song climax region (last 12%): rare (~12%)
+        const trigger = seededRandom(i * 4507 + songIdx * 431);
+        if (trigger > 0.88) {
+          const choices = [10, 3, 5]; // light leak, hypersaturation, trails
+          desiredMode = choices[Math.floor(seededRandom(songIdx * 191 + Math.floor(i / MIN_EFFECT_HOLD)) * choices.length)];
+          desiredIntensity = energy * 0.45;
+        }
+      }
+
+      // Apply hold logic: don't flicker between effects
+      if (effectHoldMode > 0 && effectHoldFrames < MAX_EFFECT_HOLD) {
+        // Currently holding an effect — keep it
+        uniforms.effect_mode = effectHoldMode;
+        // Smooth intensity: fade in over 15 frames, sustain, fade out over 15 frames
+        const fadeIn = Math.min(effectHoldFrames / 15, 1.0);
+        const remainingInMax = MAX_EFFECT_HOLD - effectHoldFrames;
+        const fadeOut = Math.min(remainingInMax / 15, 1.0);
+        uniforms.effect_intensity = effectHoldIntensity * fadeIn * fadeOut;
+        effectHoldFrames++;
+      } else if (effectHoldMode > 0) {
+        // Hold expired — enter cooldown
+        uniforms.effect_mode = 0;
+        uniforms.effect_intensity = 0;
+        effectCooldown = COOLDOWN_FRAMES;
+        effectHoldMode = 0;
+        effectHoldFrames = 0;
+      } else if (effectCooldown > 0) {
+        // In cooldown — no effects
+        uniforms.effect_mode = 0;
+        uniforms.effect_intensity = 0;
+        effectCooldown--;
+      } else if (desiredMode > 0) {
+        // New effect trigger — start hold
+        effectHoldMode = desiredMode;
+        effectHoldIntensity = desiredIntensity;
+        effectHoldFrames = 0;
+        uniforms.effect_mode = desiredMode;
+        uniforms.effect_intensity = desiredIntensity * 0.067; // first frame fade-in
+        effectHoldFrames = 1;
       } else {
         uniforms.effect_mode = 0;
         uniforms.effect_intensity = 0;
