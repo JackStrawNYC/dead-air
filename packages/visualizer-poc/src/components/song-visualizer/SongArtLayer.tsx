@@ -56,13 +56,17 @@ export const SongArtLayer: React.FC<SongArtProps> = ({
     [0, ART_PEAK_OPACITY, ART_PEAK_OPACITY, 0],
     { ...clampOpts, easing: Easing.inOut(Easing.cubic) },
   );
-  // DEAD AIR: bring the card back at higher opacity (0.85 instead of 0.5) to clearly
-  // signal "song over, between tracks". Viewers should immediately recognize the song
-  // ended without needing to look at audio waveforms.
-  const finalOpacity = Math.max(cardOpacity, deadAirFactor * 0.85) * segueFade;
-  if (finalOpacity < 0.01) return null;
+  // DEAD AIR: bring the card back at higher opacity (0.85 instead of 0.5)
+  const baseOpacity = Math.max(cardOpacity, deadAirFactor * 0.85) * segueFade;
 
-  const breath = 1.0 + energy * 0.05;
+  // Energy-based suppression curve: full at quiet (<0.5), ghost at peaks (>0.85).
+  // Preserves song identity throughout while letting peaks own the screen.
+  const energySuppression = energy < 0.5 ? 1.0
+    : energy > 0.85 ? 0.15
+    : 1.0 - (energy - 0.5) / 0.35 * 0.85; // linear 1.0 → 0.15
+
+  const finalOpacity = baseOpacity * energySuppression;
+  if (finalOpacity < 0.01) return null;
 
   return (
     <div
@@ -87,8 +91,8 @@ export const SongArtLayer: React.FC<SongArtProps> = ({
           aspectRatio: "1.3 / 1",
           borderRadius: "3px",
           overflow: "hidden",
-          boxShadow: "0 8px 24px rgba(0,0,0,0.6), 0 2px 6px rgba(0,0,0,0.4)",
-          border: "1px solid rgba(255,255,255,0.15)",
+          boxShadow: "0 8px 32px rgba(0,0,0,0.7), 0 2px 8px rgba(0,0,0,0.5), 0 0 60px rgba(0,0,0,0.3)",
+          border: "1px solid rgba(255,255,255,0.20)",
         }}
       >
         <img
@@ -100,15 +104,15 @@ export const SongArtLayer: React.FC<SongArtProps> = ({
             height: "100%",
             objectFit: "cover",
             objectPosition: "center 38%",
-            filter: `brightness(${(0.7 * breath).toFixed(3)}) contrast(0.95) saturate(0.85) ${hueRotation !== 0 ? `hue-rotate(${hueRotation.toFixed(1)}deg)` : ""}`,
+            filter: `${hueRotation !== 0 ? `hue-rotate(${hueRotation.toFixed(1)}deg)` : ""}`,
           }}
         />
-        {/* Inner darken vignette */}
+        {/* Subtle edge vignette — lighter than before to preserve legibility */}
         <div
           style={{
             position: "absolute",
             inset: 0,
-            background: "radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.35) 100%)",
+            background: "radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.15) 100%)",
             pointerEvents: "none",
           }}
         />
