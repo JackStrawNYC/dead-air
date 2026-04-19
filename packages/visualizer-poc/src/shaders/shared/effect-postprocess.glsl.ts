@@ -212,6 +212,162 @@ vec3 celestialMap(float intensity, float time, float energy) {
   return col;
 }
 
+// ─── Composited Mode 4: Tunnel / Wormhole ───
+// Hyperspace tunnel: concentric rings with parallax, spiral twist, warm palette.
+// Direct port from composited_effects.rs mode 4.
+vec3 tunnel(float intensity, float time, float energy, float bass) {
+  float aspect = uEffectResolution.x / uEffectResolution.y;
+  vec2 p = vec2((vUv.x - 0.5) * aspect, vUv.y - 0.5);
+  float radius = length(p);
+  float angle = atan(p.y, p.x);
+
+  // Bass ring pulse
+  float bassPulse = bass * 0.04 * intensity;
+
+  vec3 col = vec3(0.0);
+
+  // 2 ring layers at different speeds
+  for (int layer = 0; layer < 2; layer++) {
+    float fl = float(layer);
+    float speed = 0.3 + fl * 0.2;
+    float ringSpace = 0.08 + fl * 0.04;
+
+    float ringPos = fract(radius / ringSpace - time * speed * 0.2 + bassPulse);
+    float thickness = 0.03 + energy * 0.08;
+    float ring = smoothstep(thickness, 0.0, abs(ringPos - 0.5));
+
+    // Spiral twist
+    float twist = angle + radius * 3.0 * intensity + time * 0.3;
+
+    // Warm color gradient
+    vec3 ringColor = mix(
+      vec3(1.0, 0.75, 0.3),  // gold
+      vec3(0.8, 0.2, 0.1),    // red
+      sin(twist + fl * 1.5) * 0.5 + 0.5
+    );
+
+    // Depth fade
+    float depthFade = smoothstep(0.6, 0.1, radius);
+    col += ringColor * ring * depthFade * intensity * 0.5;
+  }
+
+  return col;
+}
+
+// ─── Composited Mode 5: Fire / Embers ───
+// Rising ember field with hot→cool color gradient, turbulent drift.
+// Direct port from composited_effects.rs mode 5.
+vec3 fireEmbers(float intensity, float time, float energy, float bass) {
+  float aspect = uEffectResolution.x / uEffectResolution.y;
+  vec2 p = vec2((vUv.x - 0.5) * aspect, vUv.y - 0.5);
+
+  vec3 col = vec3(0.0);
+
+  for (int i = 0; i < 10; i++) {
+    float fi = float(i);
+    float h1 = hash(fi * 7.31);
+
+    // Energy gates count: 3 at rest, 10 at peak
+    if (h1 > 0.30 + energy * 0.70) continue;
+
+    float h2 = hash(fi * 13.17);
+    float h3 = hash(fi * 23.41);
+
+    // Rise cycle (bottom to top, looping)
+    float riseSpeed = 0.1 + h2 * 0.15;
+    float life = fract(h1 * 0.5 - time * riseSpeed);
+
+    // Horizontal drift
+    float baseX = (h3 - 0.5) * 0.6;
+    float driftX = baseX + sin(time * (1.0 + h1 * 2.0)) * 0.08 * (0.5 + life);
+
+    // Ember position
+    vec2 emberPos = vec2(driftX, -0.4 + life * 0.9);
+    float dist = length(p - emberPos);
+
+    // Size tapers as ember rises + bass puff
+    float size = (0.04 + h3 * 0.025) * (1.0 - life * 0.5) * (1.0 + bass * 0.3);
+
+    // Glow
+    float halo = smoothstep(size * 3.0, 0.0, dist) * 0.3;
+    float core = smoothstep(size, 0.0, dist) * 0.8;
+    float glow = halo + core;
+
+    // Hot→cool color gradient based on life
+    vec3 emberColor;
+    if (life < 0.15) emberColor = vec3(1.0, 0.95, 0.85);       // white-hot
+    else if (life < 0.4) emberColor = mix(vec3(1.0, 0.95, 0.85), vec3(1.0, 0.6, 0.15), (life - 0.15) / 0.25);
+    else if (life < 0.7) emberColor = mix(vec3(1.0, 0.6, 0.15), vec3(0.9, 0.2, 0.05), (life - 0.4) / 0.3);
+    else emberColor = mix(vec3(0.9, 0.2, 0.05), vec3(0.3, 0.05, 0.0), (life - 0.7) / 0.3);
+
+    col += emberColor * glow * intensity;
+  }
+
+  return col;
+}
+
+// ─── Composited Mode 6: Ripple / Waves ───
+// Concentric wave rings from multiple sources, beat-triggered center burst.
+// Direct port from composited_effects.rs mode 6.
+vec3 rippleWaves(float intensity, float time, float energy, float beatSnap) {
+  float aspect = uEffectResolution.x / uEffectResolution.y;
+  vec3 col = vec3(0.0);
+
+  // 2 wave sources
+  for (int i = 0; i < 2; i++) {
+    float fi = float(i);
+    float phase = fi * 3.14;
+    vec2 source = vec2(
+      (0.5 + sin(time * 0.04 + phase) * 0.15) * aspect,
+      0.5 + cos(time * 0.03 + phase + 1.0) * 0.15
+    );
+
+    vec2 p = vec2(vUv.x * aspect, vUv.y);
+    float dist = length(p - source);
+
+    // Wave frequency (tighter at peaks)
+    float freq = 18.0 + energy * 12.0;
+    float speed = time * 2.0 + fi * 1.5;
+
+    // Sharp peaks
+    float wave = pow(max(sin(dist * freq - speed), 0.0), 4.0);
+
+    // Decay with distance
+    float decay = smoothstep(0.55, 0.08, dist);
+
+    col += vec3(1.0, 1.0, 0.90) * wave * decay * intensity * 0.4;
+  }
+
+  // Beat burst from center
+  if (beatSnap > 0.2) {
+    vec2 p = vec2((vUv.x - 0.5) * aspect, vUv.y - 0.5);
+    float centerDist = length(p);
+    float burst = pow(max(sin(centerDist * 30.0 - time * 3.0), 0.0), 3.0);
+    float burstDecay = smoothstep(0.4, 0.0, centerDist);
+    col += vec3(1.0, 0.95, 0.85) * burst * burstDecay * beatSnap * intensity * 0.5;
+  }
+
+  return col;
+}
+
+// ─── Composited Mode 7: Strobe / Flicker ───
+// Safe controlled flash: broadcast-safe (<3Hz, <20% delta), beat-gated, warm amber.
+// Direct port from composited_effects.rs mode 7.
+vec3 strobeFlicker(float intensity, float energy, float beatSnap) {
+  // Gate: beat_snap * intensity
+  float gate = beatSnap * intensity;
+  float trigger = smoothstep(0.2, 0.6, gate);
+
+  // Energy gate: only during energetic moments
+  float energyGate = smoothstep(0.15, 0.5, energy);
+
+  // Max flash capped at 30% (broadcast safe)
+  float flash = trigger * energyGate * 0.30;
+
+  // Warm amber (not clinical white)
+  return vec3(1.0, 0.85, 0.55) * flash;
+}
+
 // ─── Composited Mode 8: Geometric Breakdown ───
 // Crystal fracture: animated Voronoi cells with golden edges, beat-triggered.
 // Direct port from composited_effects.rs mode 8.
@@ -519,6 +675,14 @@ void main() {
       comp = caustics(uCompositedIntensity, uEffectTime, uEffectEnergy, uEffectBass);
     } else if (uCompositedMode == 3) {
       comp = celestialMap(uCompositedIntensity, uEffectTime, uEffectEnergy);
+    } else if (uCompositedMode == 4) {
+      comp = tunnel(uCompositedIntensity, uEffectTime, uEffectEnergy, uEffectBass);
+    } else if (uCompositedMode == 5) {
+      comp = fireEmbers(uCompositedIntensity, uEffectTime, uEffectEnergy, uEffectBass);
+    } else if (uCompositedMode == 6) {
+      comp = rippleWaves(uCompositedIntensity, uEffectTime, uEffectEnergy, uEffectBeatSnap);
+    } else if (uCompositedMode == 7) {
+      comp = strobeFlicker(uCompositedIntensity, uEffectEnergy, uEffectBeatSnap);
     } else if (uCompositedMode == 8) {
       comp = geometricBreakdown(uCompositedIntensity, uEffectTime, uEffectEnergy, uEffectBeatSnap);
     }
