@@ -215,6 +215,47 @@ vec4 lightLeak(vec4 scene, float intensity, float time, float beatSnap) {
   return vec4(result, scene.a);
 }
 
+// ─── Mode 12: Moire Patterns ───
+// Optical interference: 3 overlapping grids + circular rings, color fringing.
+// Direct port from effects.rs mode 12.
+vec4 moirePatterns(vec4 scene, float intensity, float energy, float time) {
+  float aspect = uEffectResolution.x / uEffectResolution.y;
+  vec2 p = vec2((vUv.x - 0.5) * aspect, vUv.y - 0.5);
+
+  // Grid base frequency (tighter at peaks)
+  float baseFreq = 35.0 + energy * 40.0;
+
+  // 3 grids at 60° angles, slowly rotating
+  float moire = 0.0;
+  for (int i = 0; i < 3; i++) {
+    float fi = float(i);
+    float angle = fi * 1.0472 + time * (0.01 + fi * 0.005); // 60° spacing + rotation
+    float freq = baseFreq * (1.0 + fi * 0.3);
+    float gridCoord = p.x * cos(angle) + p.y * sin(angle);
+    moire += sin(gridCoord * freq) * 0.33;
+  }
+
+  // Circular rings from center
+  float ringFreq = baseFreq * 0.8;
+  float rings = sin(length(p) * ringFreq - time * 0.5);
+  moire += rings * 0.25;
+
+  // Interference peak
+  float interference = pow(abs(moire), 1.5);
+
+  // Color fringing: warm bias
+  vec3 fringe = vec3(
+    interference * 1.3,
+    interference * 0.85,
+    interference * 0.55
+  );
+
+  // Multiply blend onto scene
+  vec3 result = scene.rgb * max(1.0 - fringe * intensity * 0.25, 0.3);
+
+  return vec4(result, scene.a);
+}
+
 // ─── Mode 1: Kaleidoscope ───
 // Radial symmetry with 6-8 folds, smooth interpolation, anti-aliased edges.
 // Direct port from effects.rs mode 1.
@@ -351,6 +392,8 @@ void main() {
       result = trails(scene, intensity, energy);
     } else if (uEffectMode == 10) {
       result = lightLeak(scene, intensity, uEffectTime, uEffectBeatSnap);
+    } else if (uEffectMode == 12) {
+      result = moirePatterns(scene, intensity, uEffectEnergy, uEffectTime);
     }
     // Unimplemented post-process modes: keep scene unchanged
   }
