@@ -16,7 +16,7 @@
  *   └─ AudioLayer (song audio + crowd ambience)
  */
 
-import React, { useMemo, useRef, useEffect } from "react";
+import React, { useMemo, useRef, useEffect, useState } from "react";
 import * as THREE from "three";
 import { staticFile, useCurrentFrame, useVideoConfig, interpolate, delayRender, continueRender, Img } from "remotion";
 import { SceneCrossfade } from "./scenes/SceneCrossfade";
@@ -88,6 +88,7 @@ import {
   mediaCatalog,
 } from "./components/song-visualizer/show-data-loader";
 import { VisualizerProviderStack } from "./components/song-visualizer/VisualizerProviderStack";
+import type { EffectSchedule } from "./data/EffectScheduleContext";
 import { SceneRouterWithSegues } from "./components/song-visualizer/SceneRouterWithSegues";
 import { OverlayAndEffectsLayer } from "./components/song-visualizer/OverlayAndEffectsLayer";
 import { TextLayer } from "./components/song-visualizer/TextLayer";
@@ -181,6 +182,31 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
 
   // ─── Data loading & analysis ───
   const analysis = loadAnalysis(props as unknown as Record<string, unknown>);
+
+  // ─── Effect schedule loading (manifest-driven post-process effects) ───
+  const [effectSchedule, setEffectSchedule] = useState<EffectSchedule | null>(null);
+  useEffect(() => {
+    const handle = delayRender("Loading effect schedule");
+    try {
+      const url = staticFile(`effect-schedules/${props.song.trackId}-effects.json`);
+      fetch(url)
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data: EffectSchedule | null) => {
+          setEffectSchedule(data);
+          continueRender(handle);
+        })
+        .catch(() => {
+          // No effect schedule available — render without effects
+          continueRender(handle);
+        });
+    } catch {
+      continueRender(handle);
+    }
+    return () => {
+      // Ensure handle is resolved on unmount
+      try { continueRender(handle); } catch { /* already resolved */ }
+    };
+  }, [props.song.trackId]);
 
   const activeSet = useMemo(
     () => props.activeOverlays ? new Set(props.activeOverlays) : null,
@@ -955,6 +981,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
         deadAirFactor={deadAirFactor}
         spaceTimeDilation={spaceTimeDilation}
         showVisualSeed={props.narrativeState?.showVisualSeed}
+        effectSchedule={effectSchedule}
       >
       <VisualizerErrorBoundary>
       <div style={{ position: "absolute", inset: 0, opacity, background: process.env.OVERLAY_ONLY === "true" ? "transparent" : undefined }}>

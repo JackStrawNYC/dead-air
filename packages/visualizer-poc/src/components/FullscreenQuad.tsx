@@ -20,10 +20,12 @@ import { useEnvelopeValues } from "../data/EnvelopeContext";
 import { fxaaVert, fxaaFrag } from "../shaders/shared/fxaa.glsl";
 import { dofVert, dofFrag } from "../shaders/shared/dof-postpass.glsl";
 import { temporalBlendVert, temporalBlendFrag } from "../shaders/shared/temporal-blend.glsl";
+import { effectPostProcessVert, effectPostProcessFrag } from "../shaders/shared/effect-postprocess.glsl";
 import { gpuMonitor } from "../utils/gpu-monitor";
 import { DEFAULT_LIGHTING, type LightingState } from "../utils/lighting-context";
 import { createBaseUniforms, syncBaseUniforms, ERA_SATURATION, ERA_BRIGHTNESS, ERA_SEPIA } from "../utils/shader-uniforms";
 import { useShowVisualSeed } from "../data/ShowVisualSeedContext";
+import { useEffectSchedule } from "../data/EffectScheduleContext";
 
 /** Passthrough vertex shader for output mesh */
 const PASSTHROUGH_VERT = /* glsl */ `
@@ -108,11 +110,15 @@ export const FullscreenQuad: React.FC<Props> = ({
   const shaderWidth = Math.max(1, Math.round(width / SHADER_DOWNSCALE));
   const shaderHeight = Math.max(1, Math.round(height / SHADER_DOWNSCALE));
 
+  // Effect schedule: per-frame effect mode/intensity from manifest
+  const effectState = useEffectSchedule();
+
   const targetsRef = useRef<{
     main: THREE.WebGLRenderTarget;
     dof: THREE.WebGLRenderTarget;
     temporalCurrent: THREE.WebGLRenderTarget;
     temporalPrev: THREE.WebGLRenderTarget;
+    effect: THREE.WebGLRenderTarget;
     fxaa: THREE.WebGLRenderTarget;
   } | null>(null);
 
@@ -122,11 +128,13 @@ export const FullscreenQuad: React.FC<Props> = ({
       gpuMonitor.untrackRenderTarget(targetsRef.current.dof);
       gpuMonitor.untrackRenderTarget(targetsRef.current.temporalCurrent);
       gpuMonitor.untrackRenderTarget(targetsRef.current.temporalPrev);
+      gpuMonitor.untrackRenderTarget(targetsRef.current.effect);
       gpuMonitor.untrackRenderTarget(targetsRef.current.fxaa);
       targetsRef.current.main.dispose();
       targetsRef.current.dof.dispose();
       targetsRef.current.temporalCurrent.dispose();
       targetsRef.current.temporalPrev.dispose();
+      targetsRef.current.effect.dispose();
       targetsRef.current.fxaa.dispose();
     }
     const opts: THREE.RenderTargetOptions = {
@@ -140,12 +148,14 @@ export const FullscreenQuad: React.FC<Props> = ({
       dof: new THREE.WebGLRenderTarget(shaderWidth, shaderHeight, opts),
       temporalCurrent: new THREE.WebGLRenderTarget(shaderWidth, shaderHeight, opts),
       temporalPrev: new THREE.WebGLRenderTarget(shaderWidth, shaderHeight, opts),
+      effect: new THREE.WebGLRenderTarget(shaderWidth, shaderHeight, opts),
       fxaa: new THREE.WebGLRenderTarget(shaderWidth, shaderHeight, opts),
     };
     gpuMonitor.trackRenderTarget(targetsRef.current.main, "FullscreenQuad:main");
     gpuMonitor.trackRenderTarget(targetsRef.current.dof, "FullscreenQuad:dof");
     gpuMonitor.trackRenderTarget(targetsRef.current.temporalCurrent, "FullscreenQuad:temporalCurrent");
     gpuMonitor.trackRenderTarget(targetsRef.current.temporalPrev, "FullscreenQuad:temporalPrev");
+    gpuMonitor.trackRenderTarget(targetsRef.current.effect, "FullscreenQuad:effect");
     gpuMonitor.trackRenderTarget(targetsRef.current.fxaa, "FullscreenQuad:fxaa");
     return () => {
       if (targetsRef.current) {
@@ -153,11 +163,13 @@ export const FullscreenQuad: React.FC<Props> = ({
         gpuMonitor.untrackRenderTarget(targetsRef.current.dof);
         gpuMonitor.untrackRenderTarget(targetsRef.current.temporalCurrent);
         gpuMonitor.untrackRenderTarget(targetsRef.current.temporalPrev);
+        gpuMonitor.untrackRenderTarget(targetsRef.current.effect);
         gpuMonitor.untrackRenderTarget(targetsRef.current.fxaa);
         targetsRef.current.main.dispose();
         targetsRef.current.dof.dispose();
         targetsRef.current.temporalCurrent.dispose();
         targetsRef.current.temporalPrev.dispose();
+        targetsRef.current.effect.dispose();
         targetsRef.current.fxaa.dispose();
       }
       targetsRef.current = null;
@@ -244,6 +256,34 @@ export const FullscreenQuad: React.FC<Props> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Effect post-process pass (manifest-driven, between temporal blend and FXAA)
+  const effectPass = useMemo(() => {
+    const scene = new THREE.Scene();
+    const geo = new THREE.PlaneGeometry(2, 2);
+    const effectUniforms = {
+      uInputTexture: { value: null as THREE.Texture | null },
+      uEffectPrevFrame: { value: null as THREE.Texture | null },
+      uEffectMode: { value: 0 },
+      uEffectIntensity: { value: 0 },
+      uEffectTime: { value: 0 },
+      uEffectEnergy: { value: 0 },
+      uEffectBass: { value: 0 },
+      uEffectBeatSnap: { value: 0 },
+      uEffectResolution: { value: new THREE.Vector2(width, height) },
+    };
+    const mat = new THREE.ShaderMaterial({
+      vertexShader: effectPostProcessVert,
+      fragmentShader: effectPostProcessFrag,
+      uniforms: effectUniforms,
+      depthWrite: false,
+      depthTest: false,
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    scene.add(mesh);
+    return { scene, uniforms: effectUniforms };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // FXAA pass
   const fxaaPass = useMemo(() => {
     const scene = new THREE.Scene();
@@ -271,7 +311,7 @@ export const FullscreenQuad: React.FC<Props> = ({
     return () => {
       mainPass.mesh.geometry.dispose();
       mainPass.material.dispose();
-      for (const pass of [dofPass, temporalPass, fxaaPass]) {
+      for (const pass of [dofPass, temporalPass, effectPass, fxaaPass]) {
         pass.scene.children.forEach((c) => {
           if (c instanceof THREE.Mesh) {
             c.geometry.dispose();
@@ -280,7 +320,7 @@ export const FullscreenQuad: React.FC<Props> = ({
         });
       }
     };
-  }, [mainPass, dofPass, temporalPass, fxaaPass]);
+  }, [mainPass, dofPass, temporalPass, effectPass, fxaaPass]);
 
   // Initialize with a 1x1 dark texture to prevent black frame on mount
   const outputUniforms = useMemo(() => {
@@ -388,8 +428,27 @@ export const FullscreenQuad: React.FC<Props> = ({
       fxaaInputTexture = postDofTexture;
     }
 
-    // Pass 3: FXAA anti-aliasing — runs at the downscaled shader resolution
-    fxaaPass.uniforms.uInputTexture.value = fxaaInputTexture;
+    // Pass 3: Effect post-process (manifest-driven, skip if mode 0)
+    let effectOutputTexture = fxaaInputTexture;
+    if (effectState.effectMode > 0) {
+      effectPass.uniforms.uInputTexture.value = fxaaInputTexture;
+      effectPass.uniforms.uEffectMode.value = effectState.effectMode;
+      effectPass.uniforms.uEffectIntensity.value = effectState.effectIntensity;
+      effectPass.uniforms.uEffectTime.value = time;
+      effectPass.uniforms.uEffectEnergy.value = smooth.energy;
+      effectPass.uniforms.uEffectBass.value = smooth.bass;
+      effectPass.uniforms.uEffectBeatSnap.value = smooth.beatSnap ?? 0;
+      effectPass.uniforms.uEffectResolution.value.set(shaderWidth, shaderHeight);
+
+      gl.setRenderTarget(targets.effect);
+      gl.clear();
+      gl.render(effectPass.scene, camera);
+
+      effectOutputTexture = targets.effect.texture;
+    }
+
+    // Pass 4: FXAA anti-aliasing — runs at the downscaled shader resolution
+    fxaaPass.uniforms.uInputTexture.value = effectOutputTexture;
     fxaaPass.uniforms.uResolution.value.set(shaderWidth, shaderHeight);
     gl.setRenderTarget(targets.fxaa);
     gl.clear();

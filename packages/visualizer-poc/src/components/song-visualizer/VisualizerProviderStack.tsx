@@ -20,6 +20,7 @@ import { PeakOfShowProvider } from "../../data/PeakOfShowContext";
 import { DeadAirProvider } from "../../data/DeadAirContext";
 import { TimeDilationProvider } from "../../data/TimeDilationContext";
 import { ShowVisualSeedProvider } from "../../data/ShowVisualSeedContext";
+import { EffectScheduleProvider, type EffectSchedule } from "../../data/EffectScheduleContext";
 import type { ShowVisualSeed } from "../../utils/show-visual-seed";
 import type { AudioSnapshot } from "../../utils/audio-reactive";
 
@@ -36,6 +37,7 @@ export interface VisualizerProviderStackProps {
   deadAirFactor: number;
   spaceTimeDilation: number;
   showVisualSeed?: ShowVisualSeed | null;
+  effectSchedule?: EffectSchedule | null;
   children: React.ReactNode;
 }
 
@@ -51,6 +53,7 @@ export const VisualizerProviderStack: React.FC<VisualizerProviderStackProps> = (
   deadAirFactor,
   spaceTimeDilation,
   showVisualSeed,
+  effectSchedule,
   children,
 }) => (
   <ShowNarrativeProvider totalSongs={totalSongs} initialState={narrativeInitialState}>
@@ -63,7 +66,9 @@ export const VisualizerProviderStack: React.FC<VisualizerProviderStackProps> = (
   <DeadAirProvider value={deadAirFactor}>
   <TimeDilationProvider value={spaceTimeDilation}>
   <ShowVisualSeedProvider value={showVisualSeed ?? null}>
+  <EffectScheduleProvider schedule={effectSchedule ?? null}>
     {children}
+  </EffectScheduleProvider>
   </ShowVisualSeedProvider>
   </TimeDilationProvider>
   </DeadAirProvider>

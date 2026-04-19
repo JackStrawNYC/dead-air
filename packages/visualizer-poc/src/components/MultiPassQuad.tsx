@@ -28,9 +28,11 @@ import { getVenueProfile } from "../utils/venue-profiles";
 import { useSceneConfig } from "../scenes/SceneConfigContext";
 import { useEnvelopeValues } from "../data/EnvelopeContext";
 import { fxaaVert, fxaaFrag } from "../shaders/shared/fxaa.glsl";
+import { effectPostProcessVert, effectPostProcessFrag } from "../shaders/shared/effect-postprocess.glsl";
 import { gpuMonitor } from "../utils/gpu-monitor";
 import { DEFAULT_LIGHTING, type LightingState } from "../utils/lighting-context";
 import { createBaseUniforms as createSharedBaseUniforms, syncBaseUniforms, ERA_SATURATION, ERA_BRIGHTNESS, ERA_SEPIA } from "../utils/shader-uniforms";
+import { useEffectSchedule } from "../data/EffectScheduleContext";
 import { useShowVisualSeed } from "../data/ShowVisualSeedContext";
 
 /** Reusable Color for save/restore clear color */
@@ -98,6 +100,7 @@ export const MultiPassQuad: React.FC<Props> = ({
   const venueProfile = getVenueProfile(showCtx?.venueType ?? "");
   const showVisualSeed = useShowVisualSeed();
   const gl = useThree((state) => state.gl);
+  const effectState = useEffectSchedule();
 
   const lastRenderedFrame = useRef(-1);
 
@@ -124,6 +127,7 @@ export const MultiPassQuad: React.FC<Props> = ({
     a: THREE.WebGLRenderTarget;
     b: THREE.WebGLRenderTarget;
     feedback: THREE.WebGLRenderTarget | null;
+    effect: THREE.WebGLRenderTarget;
     fxaa: THREE.WebGLRenderTarget;
   } | null>(null);
 
@@ -133,10 +137,12 @@ export const MultiPassQuad: React.FC<Props> = ({
       gpuMonitor.untrackRenderTarget(targetsRef.current.a);
       gpuMonitor.untrackRenderTarget(targetsRef.current.b);
       if (targetsRef.current.feedback) gpuMonitor.untrackRenderTarget(targetsRef.current.feedback);
+      gpuMonitor.untrackRenderTarget(targetsRef.current.effect);
       gpuMonitor.untrackRenderTarget(targetsRef.current.fxaa);
       targetsRef.current.a.dispose();
       targetsRef.current.b.dispose();
       targetsRef.current.feedback?.dispose();
+      targetsRef.current.effect.dispose();
       targetsRef.current.fxaa.dispose();
     }
     const opts: THREE.RenderTargetOptions = {
@@ -152,21 +158,25 @@ export const MultiPassQuad: React.FC<Props> = ({
       a: new THREE.WebGLRenderTarget(width, height, opts),
       b: new THREE.WebGLRenderTarget(width, height, opts),
       feedback: fb,
+      effect: new THREE.WebGLRenderTarget(width, height, opts),
       fxaa: new THREE.WebGLRenderTarget(width, height, opts),
     };
     gpuMonitor.trackRenderTarget(targetsRef.current.a, "MultiPassQuad:a");
     gpuMonitor.trackRenderTarget(targetsRef.current.b, "MultiPassQuad:b");
     if (fb) gpuMonitor.trackRenderTarget(fb, "MultiPassQuad:feedback");
+    gpuMonitor.trackRenderTarget(targetsRef.current.effect, "MultiPassQuad:effect");
     gpuMonitor.trackRenderTarget(targetsRef.current.fxaa, "MultiPassQuad:fxaa");
     return () => {
       if (targetsRef.current) {
         gpuMonitor.untrackRenderTarget(targetsRef.current.a);
         gpuMonitor.untrackRenderTarget(targetsRef.current.b);
         if (targetsRef.current.feedback) gpuMonitor.untrackRenderTarget(targetsRef.current.feedback);
+        gpuMonitor.untrackRenderTarget(targetsRef.current.effect);
         gpuMonitor.untrackRenderTarget(targetsRef.current.fxaa);
         targetsRef.current.a.dispose();
         targetsRef.current.b.dispose();
         targetsRef.current.feedback?.dispose();
+        targetsRef.current.effect.dispose();
         targetsRef.current.fxaa.dispose();
       }
       targetsRef.current = null;
@@ -247,6 +257,34 @@ export const MultiPassQuad: React.FC<Props> = ({
     return { scene, uniforms: copyUniforms };
   }, []);
 
+  // Effect post-process pass (manifest-driven, between post-passes and FXAA)
+  const effectPass = useMemo(() => {
+    const scene = new THREE.Scene();
+    const geo = new THREE.PlaneGeometry(2, 2);
+    const effectUniforms = {
+      uInputTexture: { value: null as THREE.Texture | null },
+      uEffectPrevFrame: { value: null as THREE.Texture | null },
+      uEffectMode: { value: 0 },
+      uEffectIntensity: { value: 0 },
+      uEffectTime: { value: 0 },
+      uEffectEnergy: { value: 0 },
+      uEffectBass: { value: 0 },
+      uEffectBeatSnap: { value: 0 },
+      uEffectResolution: { value: new THREE.Vector2(width, height) },
+    };
+    const mat = new THREE.ShaderMaterial({
+      vertexShader: effectPostProcessVert,
+      fragmentShader: effectPostProcessFrag,
+      uniforms: effectUniforms,
+      depthWrite: false,
+      depthTest: false,
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    scene.add(mesh);
+    return { scene, uniforms: effectUniforms };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // FXAA anti-aliasing pass (runs after all post-passes, before feedback copy)
   const fxaaPass = useMemo(() => {
     const scene = new THREE.Scene();
@@ -277,14 +315,13 @@ export const MultiPassQuad: React.FC<Props> = ({
         pp.mesh.geometry.dispose();
         pp.material.dispose();
       }
-      copyPass.scene.children.forEach((c) => {
-        if (c instanceof THREE.Mesh) { c.geometry.dispose(); (c.material as THREE.ShaderMaterial).dispose(); }
-      });
-      fxaaPass.scene.children.forEach((c) => {
-        if (c instanceof THREE.Mesh) { c.geometry.dispose(); (c.material as THREE.ShaderMaterial).dispose(); }
-      });
+      for (const pass of [copyPass, effectPass, fxaaPass]) {
+        pass.scene.children.forEach((c) => {
+          if (c instanceof THREE.Mesh) { c.geometry.dispose(); (c.material as THREE.ShaderMaterial).dispose(); }
+        });
+      }
     };
-  }, [mainPass, postPassObjects, copyPass, fxaaPass]);
+  }, [mainPass, postPassObjects, copyPass, effectPass, fxaaPass]);
 
   // Output material ref (for the visible mesh)
   const outputMaterialRef = useRef<THREE.ShaderMaterial>(null);
@@ -394,8 +431,27 @@ export const MultiPassQuad: React.FC<Props> = ({
       gl.render(copyPass.scene, camera);
     }
 
+    // Effect post-process pass (manifest-driven, skip if mode 0)
+    let effectOutputTexture = preFxaaTarget.texture;
+    if (effectState.effectMode > 0) {
+      effectPass.uniforms.uInputTexture.value = preFxaaTarget.texture;
+      effectPass.uniforms.uEffectMode.value = effectState.effectMode;
+      effectPass.uniforms.uEffectIntensity.value = effectState.effectIntensity;
+      effectPass.uniforms.uEffectTime.value = time;
+      effectPass.uniforms.uEffectEnergy.value = smooth.energy;
+      effectPass.uniforms.uEffectBass.value = smooth.bass;
+      effectPass.uniforms.uEffectBeatSnap.value = smooth.beatSnap ?? 0;
+      effectPass.uniforms.uEffectResolution.value.set(width, height);
+
+      gl.setRenderTarget(targets.effect);
+      gl.clear();
+      gl.render(effectPass.scene, camera);
+
+      effectOutputTexture = targets.effect.texture;
+    }
+
     // FXAA anti-aliasing: final quality pass
-    fxaaPass.uniforms.uInputTexture.value = preFxaaTarget.texture;
+    fxaaPass.uniforms.uInputTexture.value = effectOutputTexture;
     fxaaPass.uniforms.uResolution.value.set(width, height);
     gl.setRenderTarget(targets.fxaa);
     gl.clear();

@@ -53,7 +53,7 @@
       "title": "China Cat Sunflower",
       "set": 1,
       "trackId": "d1t06",
-      "segueInto": "I Know You Rider",
+      "segueInto": true,
       "audioFile": "gd72-08-27d1t06.mp3",
       "trackNumber": 6,
       "defaultMode": "liquid_light"
@@ -135,7 +135,7 @@
       "title": "Dark Star",
       "set": 3,
       "trackId": "d3t01",
-      "segueInto": "El Paso",
+      "segueInto": true,
       "audioFile": "gd72-08-27d3t01.mp3",
       "trackNumber": 1,
       "defaultMode": "liquid_light"
@@ -144,7 +144,7 @@
       "title": "El Paso",
       "set": 3,
       "trackId": "d3t02",
-      "segueInto": "Sing Me Back Home",
+      "segueInto": true,
       "segueFrom": "Dark Star",
       "audioFile": "gd72-08-27d3t02.mp3",
       "trackNumber": 2,
