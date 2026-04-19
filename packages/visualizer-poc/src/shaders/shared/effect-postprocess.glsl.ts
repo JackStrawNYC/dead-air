@@ -101,6 +101,59 @@ vec3 particleSwarm(float intensity, float time, float energy, float bass) {
   return col;
 }
 
+// ─── Composited Mode 2: Caustics ───
+// Underwater light refraction: Voronoi cell edges at 3 scales,
+// chromatic dispersion, warm golden-aqua. Direct port from composited_effects.rs mode 2.
+vec3 caustics(float intensity, float time, float energy, float bass) {
+  float aspect = uEffectResolution.x / uEffectResolution.y;
+  vec3 col = vec3(0.0);
+
+  // Bass-reactive wave amplitude
+  float bassAmp = 0.3 + bass * 0.3;
+
+  // 3 layers at different scales
+  for (int layer = 0; layer < 3; layer++) {
+    float fl = float(layer);
+    float scale = 5.0 + fl * 3.0; // 5, 8, 11 cells
+    float speed = 0.8 + fl * 0.4;
+
+    vec2 p = vec2(vUv.x * aspect, vUv.y) * scale;
+
+    // Find nearest Voronoi cell
+    float minDist = 10.0;
+    float secondDist = 10.0;
+
+    for (int y = -1; y <= 1; y++) {
+      for (int x = -1; x <= 1; x++) {
+        vec2 cell = floor(p) + vec2(float(x), float(y));
+        vec2 point = cell + vec2(
+          hash(dot(cell, vec2(127.1, 311.7))),
+          hash(dot(cell, vec2(269.5, 183.3)))
+        );
+        // Animate points with bass
+        point += sin(time * speed * (1.0 + point.x * 2.0)) * bassAmp * 0.3;
+
+        float d = length(p - point);
+        if (d < minDist) { secondDist = minDist; minDist = d; }
+        else if (d < secondDist) { secondDist = d; }
+      }
+    }
+
+    // Edge detection: bright where cells meet
+    float edge = secondDist - minDist;
+    // Sharpness: energy-reactive
+    float sharpness = 2.0 + energy * 6.0;
+    float caustic = pow(max(1.0 - edge * sharpness, 0.0), 2.0);
+
+    col += caustic * (0.33 + fl * 0.1);
+  }
+
+  // Warm golden-aqua color (not clinical blue)
+  vec3 causticColor = vec3(1.0, 0.85, 0.55) * col;
+
+  return causticColor * intensity * 0.65;
+}
+
 // ─── Composited Mode 8: Geometric Breakdown ───
 // Crystal fracture: animated Voronoi cells with golden edges, beat-triggered.
 // Direct port from composited_effects.rs mode 8.
@@ -404,6 +457,8 @@ void main() {
 
     if (uCompositedMode == 1) {
       comp = particleSwarm(uCompositedIntensity, uEffectTime, uEffectEnergy, uEffectBass);
+    } else if (uCompositedMode == 2) {
+      comp = caustics(uCompositedIntensity, uEffectTime, uEffectEnergy, uEffectBass);
     } else if (uCompositedMode == 8) {
       comp = geometricBreakdown(uCompositedIntensity, uEffectTime, uEffectEnergy, uEffectBeatSnap);
     }
