@@ -21,8 +21,8 @@ import { OVERLAY_BY_NAME } from "../../data/overlay-registry";
 
 const OVERLAY_GATE_END = 60;  // 2s — Dead iconography should be present almost immediately
 
-/** Percentage offset for quadrant-positioned overlays. Configurable constant. */
-const REGION_OFFSET_PCT = 25;
+/** Scale factor for quadrant-constrained overlays (0-1). */
+const QUADRANT_SCALE = 0.70;
 
 interface OverlayComponentEntry {
   Component: React.ComponentType<{ frames: EnhancedFrameData[] }>;
@@ -291,28 +291,32 @@ export const DynamicOverlayStack: React.FC<Props> = ({
           // Subtle rotation drift: geometric/sacred layers tilt more, atmospheric less
           const rotDrift = applyMotion ? Math.sin(parallaxTime * 0.03 + layer * 1.1) * 0.3 * layerDriftFactor : 0;
 
-          // Region-based spatial offset: prevents focal overlays from stacking at center
+          // Region-based spatial containment: constrains focal overlays to quadrants
           const registryEntry = OVERLAY_BY_NAME.get(name);
           const region = registryEntry?.region ?? "edge";
-          let regionOffsetX = 0;
-          let regionOffsetY = 0;
-          if (region === "upper-left") { regionOffsetX = -REGION_OFFSET_PCT; regionOffsetY = -REGION_OFFSET_PCT; }
-          else if (region === "upper-right") { regionOffsetX = REGION_OFFSET_PCT; regionOffsetY = -REGION_OFFSET_PCT; }
-          else if (region === "lower-left") { regionOffsetX = -REGION_OFFSET_PCT; regionOffsetY = REGION_OFFSET_PCT; }
-          else if (region === "lower-right") { regionOffsetX = REGION_OFFSET_PCT; regionOffsetY = REGION_OFFSET_PCT; }
-          // "center" and "edge" get no offset
+          // Quadrant overlays get constrained to their region at reduced scale
+          const isQuadrant = region !== "edge" && region !== "center";
+          const quadrantStyle: React.CSSProperties = isQuadrant ? {
+            width: `${QUADRANT_SCALE * 100}%`,
+            height: `${QUADRANT_SCALE * 100}%`,
+            top: region.startsWith("upper") ? "0" : undefined,
+            bottom: region.startsWith("lower") ? "0" : undefined,
+            left: region.endsWith("left") ? "0" : undefined,
+            right: region.endsWith("right") ? "0" : undefined,
+          } : {};
 
           return (
           <div
             key={name}
             style={{
               position: "absolute",
-              inset: 0,
+              ...(isQuadrant ? {} : { inset: 0 }),
+              ...quadrantStyle,
               opacity,
               pointerEvents: "none",
               mixBlendMode: blendMode ?? "screen",
-              transform: applyMotion || regionOffsetX !== 0 || regionOffsetY !== 0
-                ? `translate(${regionOffsetX}%, ${regionOffsetY}%) translate(${(parallaxX + camParallaxX).toFixed(2)}px, ${(parallaxY + camParallaxY).toFixed(2)}px) scale(${breathScale.toFixed(4)}) rotate(${rotDrift.toFixed(2)}deg)`
+              transform: applyMotion
+                ? `translate(${(parallaxX + camParallaxX).toFixed(2)}px, ${(parallaxY + camParallaxY).toFixed(2)}px) scale(${breathScale.toFixed(4)}) rotate(${rotDrift.toFixed(2)}deg)`
                 : undefined,
               contain: "layout style paint",
               willChange: "opacity, transform",
