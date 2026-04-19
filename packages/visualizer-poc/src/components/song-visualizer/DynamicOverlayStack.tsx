@@ -17,9 +17,12 @@ import { SongPaletteProvider } from "../../data/SongPaletteContext";
 import { TempoProvider } from "../../data/TempoContext";
 import { CameraMotionContext } from "../CameraMotion";
 import type { EnhancedFrameData, ColorPalette } from "../../data/types";
-
+import { OVERLAY_BY_NAME } from "../../data/overlay-registry";
 
 const OVERLAY_GATE_END = 60;  // 2s — Dead iconography should be present almost immediately
+
+/** Percentage offset for quadrant-positioned overlays. Configurable constant. */
+const REGION_OFFSET_PCT = 25;
 
 interface OverlayComponentEntry {
   Component: React.ComponentType<{ frames: EnhancedFrameData[] }>;
@@ -287,6 +290,18 @@ export const DynamicOverlayStack: React.FC<Props> = ({
           const breathScale = applyMotion ? 1.0 + Math.sin(parallaxTime * 0.08 + layer * 0.7) * 0.012 * (0.5 + slowEnergy) : 1;
           // Subtle rotation drift: geometric/sacred layers tilt more, atmospheric less
           const rotDrift = applyMotion ? Math.sin(parallaxTime * 0.03 + layer * 1.1) * 0.3 * layerDriftFactor : 0;
+
+          // Region-based spatial offset: prevents focal overlays from stacking at center
+          const registryEntry = OVERLAY_BY_NAME.get(name);
+          const region = registryEntry?.region ?? "edge";
+          let regionOffsetX = 0;
+          let regionOffsetY = 0;
+          if (region === "upper-left") { regionOffsetX = -REGION_OFFSET_PCT; regionOffsetY = -REGION_OFFSET_PCT; }
+          else if (region === "upper-right") { regionOffsetX = REGION_OFFSET_PCT; regionOffsetY = -REGION_OFFSET_PCT; }
+          else if (region === "lower-left") { regionOffsetX = -REGION_OFFSET_PCT; regionOffsetY = REGION_OFFSET_PCT; }
+          else if (region === "lower-right") { regionOffsetX = REGION_OFFSET_PCT; regionOffsetY = REGION_OFFSET_PCT; }
+          // "center" and "edge" get no offset
+
           return (
           <div
             key={name}
@@ -296,8 +311,8 @@ export const DynamicOverlayStack: React.FC<Props> = ({
               opacity,
               pointerEvents: "none",
               mixBlendMode: blendMode ?? "screen",
-              transform: applyMotion
-                ? `translate(${(parallaxX + camParallaxX).toFixed(2)}px, ${(parallaxY + camParallaxY).toFixed(2)}px) scale(${breathScale.toFixed(4)}) rotate(${rotDrift.toFixed(2)}deg)`
+              transform: applyMotion || regionOffsetX !== 0 || regionOffsetY !== 0
+                ? `translate(${regionOffsetX}%, ${regionOffsetY}%) translate(${(parallaxX + camParallaxX).toFixed(2)}px, ${(parallaxY + camParallaxY).toFixed(2)}px) scale(${breathScale.toFixed(4)}) rotate(${rotDrift.toFixed(2)}deg)`
                 : undefined,
               contain: "layout style paint",
               willChange: "opacity, transform",

@@ -442,6 +442,13 @@ export interface OverlayEntry {
    *  ambient: background textures (starfield, smoke, grain) — unlimited.
    *  Defaults to "ambient" if not set. */
   prominence?: "hero" | "accent" | "ambient";
+  /** Screen region for spatial distribution. Prevents focal overlays from stacking
+   *  at screen center. The rotation engine enforces max 1 overlay per focal region.
+   *  center: large central focal elements (mandalas, sacred geometry)
+   *  upper-left, upper-right, lower-left, lower-right: quadrant-assigned focal elements
+   *  edge: full-frame ambient overlays (grain, smoke, fog) — no collision limit
+   *  Defaults to "edge" if not set. */
+  region?: "center" | "upper-left" | "upper-right" | "lower-left" | "lower-right" | "edge";
 }
 
 /** Summary audio profile computed from a song's analysis frames.

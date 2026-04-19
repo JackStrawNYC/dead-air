@@ -350,7 +350,22 @@ export function buildRotationSchedule(
     // Select overlays via extracted selection module (hero guarantee + diversity)
     const selected = selectOverlaysForWindow(scored, targetCount, isDrumsSpace ?? false, window.isDropout ?? false, poolEntries, songHero, window.energy);
 
-    window.overlays = selected.map((e) => e.name);
+    // Region collision enforcement: max 1 overlay per focal region per window.
+    // "edge" overlays have no collision limit. "center" and quadrants are exclusive.
+    const regionOccupied = new Set<string>();
+    const deduped: typeof selected = [];
+    for (const entry of selected) {
+      const region = entry.region ?? "edge";
+      if (region === "edge") {
+        deduped.push(entry); // edge overlays always pass
+      } else if (!regionOccupied.has(region)) {
+        regionOccupied.add(region);
+        deduped.push(entry);
+      }
+      // Collision: skip this overlay (lower priority loses)
+    }
+
+    window.overlays = deduped.map((e) => e.name);
     previousWindowOverlays = new Set(selected.map((e) => e.name));
     previousWindowFrames = windowFrames;
     previousWindowEnergy = window.energy;
