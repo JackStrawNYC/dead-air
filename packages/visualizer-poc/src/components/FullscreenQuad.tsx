@@ -295,6 +295,8 @@ export const FullscreenQuad: React.FC<Props> = ({
       uEffectEnergy: { value: 0 },
       uEffectBass: { value: 0 },
       uEffectBeatSnap: { value: 0 },
+      uCompositedMode: { value: 0 },
+      uCompositedIntensity: { value: 0 },
       uEffectResolution: { value: new THREE.Vector2(width, height) },
     };
     const mat = new THREE.ShaderMaterial({
@@ -456,14 +458,17 @@ export const FullscreenQuad: React.FC<Props> = ({
       fxaaInputTexture = postDofTexture;
     }
 
-    // Pass 3: Effect post-process (manifest-driven, skip if mode 0)
+    // Pass 3: Effect post-process + composited (manifest-driven)
     // Bind effect feedback (previous frame's effect output) for stateful effects
     effectPass.uniforms.uEffectPrevFrame.value = targets.effectFeedback.texture;
+    const effectActive = effectState.effectMode > 0 || effectState.compositedMode > 0;
     let effectOutputTexture = fxaaInputTexture;
-    if (effectState.effectMode > 0) {
+    if (effectActive) {
       effectPass.uniforms.uInputTexture.value = fxaaInputTexture;
       effectPass.uniforms.uEffectMode.value = effectState.effectMode;
       effectPass.uniforms.uEffectIntensity.value = effectState.effectIntensity;
+      effectPass.uniforms.uCompositedMode.value = effectState.compositedMode;
+      effectPass.uniforms.uCompositedIntensity.value = effectState.compositedIntensity;
       effectPass.uniforms.uEffectTime.value = time;
       effectPass.uniforms.uEffectEnergy.value = smooth.energy;
       effectPass.uniforms.uEffectBass.value = smooth.bass;

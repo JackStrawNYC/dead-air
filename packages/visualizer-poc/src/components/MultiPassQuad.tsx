@@ -277,6 +277,8 @@ export const MultiPassQuad: React.FC<Props> = ({
       uEffectEnergy: { value: 0 },
       uEffectBass: { value: 0 },
       uEffectBeatSnap: { value: 0 },
+      uCompositedMode: { value: 0 },
+      uCompositedIntensity: { value: 0 },
       uEffectResolution: { value: new THREE.Vector2(width, height) },
     };
     const mat = new THREE.ShaderMaterial({
@@ -445,13 +447,16 @@ export const MultiPassQuad: React.FC<Props> = ({
       gl.render(copyPass.scene, camera);
     }
 
-    // Effect post-process pass (manifest-driven, skip if mode 0)
+    // Effect post-process + composited (manifest-driven)
     effectPass.uniforms.uEffectPrevFrame.value = targets.effectFeedback.texture;
+    const effectActive = effectState.effectMode > 0 || effectState.compositedMode > 0;
     let effectOutputTexture = preFxaaTarget.texture;
-    if (effectState.effectMode > 0) {
+    if (effectActive) {
       effectPass.uniforms.uInputTexture.value = preFxaaTarget.texture;
       effectPass.uniforms.uEffectMode.value = effectState.effectMode;
       effectPass.uniforms.uEffectIntensity.value = effectState.effectIntensity;
+      effectPass.uniforms.uCompositedMode.value = effectState.compositedMode;
+      effectPass.uniforms.uCompositedIntensity.value = effectState.compositedIntensity;
       effectPass.uniforms.uEffectTime.value = time;
       effectPass.uniforms.uEffectEnergy.value = smooth.energy;
       effectPass.uniforms.uEffectBass.value = smooth.bass;

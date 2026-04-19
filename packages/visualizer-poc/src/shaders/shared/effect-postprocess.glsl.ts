@@ -1,15 +1,15 @@
 /**
- * Post-process effect shader — ported from Rust/WGSL renderer.
+ * Combined effect shader — post-process + composited effects.
  *
- * Single GLSL fragment shader that handles all 14 post-process effect modes,
- * branching on uEffectMode uniform. Each mode is a direct port of the
- * corresponding WGSL effect from packages/renderer/src/effects.rs.
+ * Single GLSL fragment shader that handles:
+ * - 14 post-process effect modes (transform scene: saturation, trails, etc.)
+ * - 10 composited effect modes (generate new content: particles, caustics, etc.)
+ *
+ * Both are ported from the Rust/WGSL renderer (effects.rs + composited_effects.rs).
+ * Composited effects are additively blended onto the post-processed scene.
  *
  * Pipeline position: runs AFTER temporal blend, BEFORE FXAA.
  * Reads uInputTexture (scene output), writes to next target.
- *
- * Mode 0 = passthrough (no effect active).
- * Modes 1-14 correspond to the Rust EffectMode enum.
  */
 
 export const effectPostProcessVert = /* glsl */ `
@@ -25,8 +25,13 @@ precision highp float;
 
 uniform sampler2D uInputTexture;
 uniform sampler2D uEffectPrevFrame;
+// Post-process uniforms
 uniform int uEffectMode;
 uniform float uEffectIntensity;
+// Composited uniforms
+uniform int uCompositedMode;
+uniform float uCompositedIntensity;
+// Shared audio uniforms
 uniform float uEffectTime;
 uniform float uEffectEnergy;
 uniform float uEffectBass;
@@ -34,6 +39,131 @@ uniform float uEffectBeatSnap;
 uniform vec2 uEffectResolution;
 
 varying vec2 vUv;
+
+#define PI 3.14159265
+#define TAU 6.28318530
+
+// ─── Pseudo-random hash ───
+float hash(float n) { return fract(sin(n) * 43758.5453123); }
+
+// ═══════════════════════════════════════════════════════════
+// COMPOSITED EFFECTS (generate new content, additive blend)
+// ═══════════════════════════════════════════════════════════
+
+// ─── Composited Mode 1: Particle Swarm ───
+// 4-12 large glowing floating orbs with halos, golden glow, orbital motion.
+// Direct port from composited_effects.rs mode 1.
+vec3 particleSwarm(float intensity, float time, float energy, float bass) {
+  float aspect = uEffectResolution.x / uEffectResolution.y;
+  vec2 p = vec2((vUv.x - 0.5) * aspect, vUv.y - 0.5);
+
+  vec3 col = vec3(0.0);
+
+  for (int i = 0; i < 12; i++) {
+    float fi = float(i);
+    float h1 = hash(fi * 7.31);
+
+    // Energy gates particle count: 4 at rest, 12 at peak
+    if (h1 > 0.35 + energy * 0.55) continue;
+
+    float h2 = hash(fi * 13.17);
+    float h3 = hash(fi * 23.41);
+    float phase = h1 * TAU;
+    float speed = 0.3 + h2 * 0.4;
+    float orbitRadius = 0.15 + h3 * 0.25;
+
+    // Orbital position
+    float ox = cos(time * speed + phase) * orbitRadius;
+    float oy = sin(time * speed * 0.7 + phase + 1.3) * orbitRadius;
+
+    // Bass breathing: pull toward center on bass hits
+    ox = mix(ox, ox * 0.5, bass * 0.15);
+    oy = mix(oy, oy * 0.5, bass * 0.15);
+
+    vec2 particlePos = vec2(ox, oy);
+    float dist = length(p - particlePos);
+
+    // Particle size (larger at peaks)
+    float size = 0.06 + h1 * 0.04 + energy * 0.02;
+
+    // Double glow: soft halo + bright core
+    float halo = smoothstep(size * 3.0, 0.0, dist) * 0.3;
+    float core = smoothstep(size, 0.0, dist) * 0.8;
+    float glow = halo + core;
+
+    // Color: white-gold with hue variation
+    float hue = h2;
+    vec3 particleColor = vec3(1.0, 0.90 + hue * 0.1, 0.6 + hue * 0.2);
+
+    col += particleColor * glow * intensity;
+  }
+
+  return col;
+}
+
+// ─── Composited Mode 8: Geometric Breakdown ───
+// Crystal fracture: animated Voronoi cells with golden edges, beat-triggered.
+// Direct port from composited_effects.rs mode 8.
+vec3 geometricBreakdown(float intensity, float time, float energy, float beatSnap) {
+  float aspect = uEffectResolution.x / uEffectResolution.y;
+  vec2 p = vec2(vUv.x * aspect, vUv.y);
+
+  // Cell count: 3 at rest, 9 at peaks
+  float cellCount = 3.0 + energy * 6.0;
+
+  // Beat explosion: cells move apart
+  float beatExplode = smoothstep(0.2, 0.8, beatSnap);
+
+  // Find nearest Voronoi cell
+  float minDist = 10.0;
+  float secondDist = 10.0;
+  vec2 nearestCell = vec2(0.0);
+  float nearestHash = 0.0;
+
+  for (int i = 0; i < 9; i++) {
+    float fi = float(i);
+    if (fi >= cellCount) break;
+
+    vec2 cellPos = vec2(
+      hash(fi * 127.1 + 1.0),
+      hash(fi * 311.7 + 2.0)
+    );
+    // Animate cells
+    cellPos += sin(time * 0.4 + cellPos * TAU) * (0.12 + beatExplode * 0.15);
+    cellPos = vec2(cellPos.x * aspect, cellPos.y);
+
+    float d = length(p - cellPos);
+    if (d < minDist) {
+      secondDist = minDist;
+      minDist = d;
+      nearestCell = cellPos;
+      nearestHash = hash(fi * 43.17);
+    } else if (d < secondDist) {
+      secondDist = d;
+    }
+  }
+
+  // Edge detection
+  float edge = secondDist - minDist;
+  float edgeWidth = 0.02 + energy * 0.02;
+  float edgeLine = 1.0 - smoothstep(0.0, edgeWidth, edge);
+
+  // Golden edge color
+  vec3 edgeColor = vec3(1.0, 0.85, 0.5) * edgeLine;
+
+  // Cell interior: warm browns
+  vec3 cellColor = vec3(
+    0.25 + nearestHash * 0.15,
+    0.15 + nearestHash * 0.10,
+    0.08 + nearestHash * 0.05
+  ) * (1.0 - edgeLine) * 0.3;
+
+  return (edgeColor + cellColor) * intensity;
+}
+
+// ═══════════════════════════════════════════════════════════
+// POST-PROCESS EFFECTS (transform existing scene)
+// ═══════════════════════════════════════════════════════════
 
 // ─── Mode 5: Trails / Echo ───
 // CRT phosphor decay: motion-persistent trails that warm as they fade.
@@ -112,29 +242,36 @@ vec4 hypersaturation(vec4 scene, float intensity, float energy) {
 
 void main() {
   vec4 scene = texture2D(uInputTexture, vUv);
+  vec4 result = scene;
 
-  // Mode 0: passthrough (no effect active)
-  if (uEffectMode == 0) {
-    gl_FragColor = scene;
-    return;
+  // ── Post-process effects (transform scene) ──
+  if (uEffectMode > 0) {
+    float intensity = uEffectIntensity;
+    float energy = uEffectEnergy;
+
+    if (uEffectMode == 3) {
+      result = hypersaturation(scene, intensity, energy);
+    } else if (uEffectMode == 5) {
+      result = trails(scene, intensity, energy);
+    }
+    // Unimplemented post-process modes: keep scene unchanged
   }
 
-  float intensity = uEffectIntensity;
-  float energy = uEffectEnergy;
+  // ── Composited effects (additive blend on top) ──
+  if (uCompositedMode > 0) {
+    vec3 comp = vec3(0.0);
 
-  // Mode 3: Hypersaturation
-  if (uEffectMode == 3) {
-    gl_FragColor = hypersaturation(scene, intensity, energy);
-    return;
+    if (uCompositedMode == 1) {
+      comp = particleSwarm(uCompositedIntensity, uEffectTime, uEffectEnergy, uEffectBass);
+    } else if (uCompositedMode == 8) {
+      comp = geometricBreakdown(uCompositedIntensity, uEffectTime, uEffectEnergy, uEffectBeatSnap);
+    }
+    // Unimplemented composited modes: no contribution
+
+    // Additive blend (screen-like)
+    result.rgb += comp;
   }
 
-  // Mode 5: Trails / Echo (stateful — reads uEffectPrevFrame)
-  if (uEffectMode == 5) {
-    gl_FragColor = trails(scene, intensity, energy);
-    return;
-  }
-
-  // Unimplemented modes: passthrough
-  gl_FragColor = scene;
+  gl_FragColor = result;
 }
 `;
