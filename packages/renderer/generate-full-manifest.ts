@@ -45,7 +45,7 @@ import { findNearestBeat } from "../visualizer-poc/src/scenes/routing/beat-sync.
 import { dynamicCrossfadeDuration } from "../visualizer-poc/src/scenes/routing/crossfade-timing.js";
 import { getModeForSection } from "../visualizer-poc/src/scenes/routing/shader-variety.js";
 import { TRANSITION_AFFINITY, SCENE_REGISTRY } from "../visualizer-poc/src/scenes/scene-registry.js";
-import { lookupSongIdentity, getOrGenerateSongIdentity } from "../visualizer-poc/src/data/song-identities.js";
+import { lookupSongIdentity, getOrGenerateSongIdentity, setActiveShowDate } from "../visualizer-poc/src/data/song-identities.js";
 import { computeShowVisualSeed, type ShowVisualSeed } from "../visualizer-poc/src/utils/show-visual-seed.js";
 import { hashString } from "../visualizer-poc/src/utils/hash.js";
 
@@ -854,6 +854,9 @@ async function main() {
   const showTitle = `${setlist.venue ?? "?"} — ${setlist.date ?? ""}`;
   const songs = setlist.songs ?? [];
   console.log(`[full-manifest] Show: ${showTitle} (${songs.length} songs)`);
+
+  // Activate show-specific routing (e.g. Veneta song identities with preferredModes)
+  if (setlist.date) setActiveShowDate(setlist.date);
 
   console.log("[full-manifest] Collecting GLSL...");
   const shaders = await collectShaderGLSL();

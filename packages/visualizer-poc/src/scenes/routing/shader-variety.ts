@@ -146,8 +146,18 @@ export function getModeForSection(
   const override = song.sectionOverrides?.find((o) => o.sectionIndex === sectionIndex);
   if (override) return validateSafe(override.mode, song.defaultMode);
 
-  // Section 0 always uses default
-  if (sectionIndex === 0) return validateSafe(song.defaultMode, song.defaultMode);
+  // Section 0: use first authored preferredMode if available, else default.
+  // This prevents every song from opening on liquid_light (the global default)
+  // when the song has a curated visual identity.
+  if (sectionIndex === 0) {
+    if (songIdentity?.preferredModes?.length) {
+      // Pick the first non-blocked preferredMode
+      for (const mode of songIdentity.preferredModes) {
+        if (SAFE_SHADERS.has(mode)) return mode;
+      }
+    }
+    return validateSafe(song.defaultMode, song.defaultMode);
+  }
 
   // Coherence lock: hold shader ID but allow parameter evolution.
   // During "IT" moments, the shader stays the same but the visual world
