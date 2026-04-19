@@ -165,6 +165,56 @@ vec3 geometricBreakdown(float intensity, float time, float energy, float beatSna
 // POST-PROCESS EFFECTS (transform existing scene)
 // ═══════════════════════════════════════════════════════════
 
+// ─── Mode 10: Light Leak Burst ───
+// Film camera light leak: warm amber/gold/magenta drifting sources,
+// horizontal streak, edge vignette. Direct port from effects.rs mode 10.
+vec4 lightLeak(vec4 scene, float intensity, float time, float beatSnap) {
+  vec2 uv = vUv;
+  vec3 leak = vec3(0.0);
+
+  // Beat-reactive glow strength
+  float glowMult = 0.30 + beatSnap * 0.40;
+
+  // 4 drifting leak sources
+  for (int i = 0; i < 4; i++) {
+    float fi = float(i);
+    // Source position drifts over time
+    float sx = 0.5 + sin(time * 0.03 + fi * 1.7) * 0.35;
+    float sy = 0.5 + cos(time * 0.025 + fi * 2.3) * 0.3;
+
+    // Elliptical falloff (wider horizontally, like anamorphic lens)
+    float dx = (uv.x - sx) * 0.7;
+    float dy = uv.y - sy;
+    float dist = sqrt(dx * dx + dy * dy);
+
+    float glow = smoothstep(0.65, 0.0, dist) * glowMult;
+
+    // Warm spectral variation per source
+    vec3 leakColor;
+    if (i == 0) leakColor = vec3(1.0, 0.55, 0.15);       // amber
+    else if (i == 1) leakColor = vec3(1.0, 0.75, 0.25);   // gold
+    else if (i == 2) leakColor = vec3(0.9, 0.45, 0.55);   // magenta
+    else leakColor = vec3(1.0, 0.65, 0.20);               // orange
+
+    leak += leakColor * glow;
+  }
+
+  // Horizontal streak at varying Y position
+  float streakY = 0.5 + sin(time * 0.015) * 0.3;
+  float streak = smoothstep(0.20, 0.0, abs(uv.y - streakY)) * 0.15 * glowMult;
+  leak += vec3(1.0, 0.7, 0.3) * streak;
+
+  // Edge vignette leak
+  float edgeDist = max(abs(uv.x - 0.5), abs(uv.y - 0.5)) * 2.0;
+  float edgeLeak = smoothstep(0.7, 1.0, edgeDist) * 0.2;
+  leak += vec3(0.9, 0.4, 0.1) * edgeLeak;
+
+  // Screen blend to avoid blown whites
+  vec3 result = scene.rgb + leak * intensity * (1.0 - scene.rgb);
+
+  return vec4(result, scene.a);
+}
+
 // ─── Mode 1: Kaleidoscope ───
 // Radial symmetry with 6-8 folds, smooth interpolation, anti-aliased edges.
 // Direct port from effects.rs mode 1.
@@ -299,6 +349,8 @@ void main() {
       result = hypersaturation(scene, intensity, energy);
     } else if (uEffectMode == 5) {
       result = trails(scene, intensity, energy);
+    } else if (uEffectMode == 10) {
+      result = lightLeak(scene, intensity, uEffectTime, uEffectBeatSnap);
     }
     // Unimplemented post-process modes: keep scene unchanged
   }
