@@ -858,6 +858,28 @@ async function main() {
   // Activate show-specific routing (e.g. Veneta song identities with preferredModes)
   if (setlist.date) setActiveShowDate(setlist.date);
 
+  // Load sacred moments (authored effect overrides for specific frame ranges)
+  interface SacredMoment {
+    song: string;
+    trackId: string;
+    label: string;
+    startFrame: number;
+    endFrame: number;
+    forcePostProcessMode: number;
+    forcePostProcessIntensity: number;
+    forceCompositedMode: number;
+    forceCompositedIntensity: number;
+    fadeFrames: number;
+    overrideMinHold: boolean;
+  }
+  let sacredMoments: SacredMoment[] = [];
+  const sacredPath = join(resolve(__dirname, "../../data/shows"), setlist.date ?? "unknown", "sacred-moments.json");
+  if (existsSync(sacredPath)) {
+    const sacredData = JSON.parse(readFileSync(sacredPath, "utf-8"));
+    sacredMoments = sacredData.moments ?? [];
+    console.log(`[full-manifest] Sacred moments: ${sacredMoments.length} regions loaded from ${sacredPath}`);
+  }
+
   console.log("[full-manifest] Collecting GLSL...");
   const shaders = await collectShaderGLSL();
   console.log(`[full-manifest] ${Object.keys(shaders).length} shaders collected`);
@@ -1728,6 +1750,42 @@ async function main() {
       } else {
         uniforms.composited_mode = 0;
         uniforms.composited_intensity = 0;
+      }
+
+      // ─── Sacred moment overrides (authored effect directives) ───
+      // Applied AFTER normal trigger cascade — force specific effects in sacred regions.
+      // MIN_HOLD and COOLDOWN are bypassed. Fades in/out at region boundaries.
+      const songTrackId = song.trackId;
+      for (const sm of sacredMoments) {
+        if (sm.trackId !== songTrackId) continue;
+        if (i < sm.startFrame || i >= sm.endFrame) continue;
+
+        // Compute fade envelope (30-frame crossfade at boundaries)
+        const fadeLen = sm.fadeFrames ?? 30;
+        const framesIn = i - sm.startFrame;
+        const framesOut = sm.endFrame - 1 - i;
+        const fadeIn = Math.min(framesIn / fadeLen, 1.0);
+        const fadeOut = Math.min(framesOut / fadeLen, 1.0);
+        const fade = fadeIn * fadeOut;
+
+        // Override post-process effect
+        uniforms.effect_mode = sm.forcePostProcessMode;
+        uniforms.effect_intensity = sm.forcePostProcessIntensity * fade;
+
+        // Override composited effect
+        uniforms.composited_mode = sm.forceCompositedMode;
+        uniforms.composited_intensity = sm.forceCompositedIntensity * fade;
+
+        // Reset hold state so normal cascade doesn't fight the override next frame
+        effectHoldMode = sm.forcePostProcessMode;
+        effectHoldIntensity = sm.forcePostProcessIntensity;
+        effectHoldFrames = 1;
+        effectCooldown = 0;
+        compHoldMode = sm.forceCompositedMode;
+        compHoldIntensity = sm.forceCompositedIntensity;
+        compHoldFrames = 1;
+        compCooldown = 0;
+        break; // First matching moment wins
       }
 
       // Accumulate dynamic_time with modifiers.
