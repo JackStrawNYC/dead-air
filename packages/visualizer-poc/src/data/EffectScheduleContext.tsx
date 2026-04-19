@@ -10,7 +10,7 @@
  */
 
 import React, { createContext, useContext, useMemo } from "react";
-import { useCurrentFrame } from "remotion";
+import { useCurrentFrame, useVideoConfig } from "remotion";
 
 /** Per-frame effect data from the manifest */
 export interface EffectScheduleFrame {
@@ -63,12 +63,18 @@ export const EffectScheduleProvider: React.FC<ProviderProps> = ({
   children,
 }) => {
   const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
 
   const state = useMemo<EffectState>(() => {
     if (!schedule || !schedule.frames || schedule.frames.length === 0) {
       return EMPTY_STATE;
     }
-    const idx = Math.min(Math.max(0, frame), schedule.frames.length - 1);
+    // The effect schedule is stored at schedule.fps (typically 30fps from the
+    // manifest generator). When the renderer runs at a different fps (e.g. 60fps),
+    // we must scale the frame index: render frame 60 at 60fps = 1 second =
+    // schedule frame 30 at 30fps. Without this, effects play at double speed.
+    const fpsScale = schedule.fps / fps;
+    const idx = Math.min(Math.max(0, Math.floor(frame * fpsScale)), schedule.frames.length - 1);
     const f = schedule.frames[idx];
     return {
       effectMode: f.effectMode,
@@ -76,7 +82,7 @@ export const EffectScheduleProvider: React.FC<ProviderProps> = ({
       compositedMode: f.compositedMode,
       compositedIntensity: f.compositedIntensity,
     };
-  }, [schedule, frame]);
+  }, [schedule, frame, fps]);
 
   return (
     <EffectScheduleCtx.Provider value={state}>
@@ -88,4 +94,18 @@ export const EffectScheduleProvider: React.FC<ProviderProps> = ({
 /** Hook to read the current frame's effect state */
 export function useEffectSchedule(): EffectState {
   return useContext(EffectScheduleCtx);
+}
+
+/**
+ * Pure function for computing effect schedule index from render frame.
+ * Exported for testing — ensures fps scaling is applied correctly.
+ */
+export function computeEffectIndex(
+  renderFrame: number,
+  scheduleFps: number,
+  renderFps: number,
+  scheduleLength: number,
+): number {
+  const fpsScale = scheduleFps / renderFps;
+  return Math.min(Math.max(0, Math.floor(renderFrame * fpsScale)), scheduleLength - 1);
 }
