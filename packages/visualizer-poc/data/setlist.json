@@ -20,7 +20,8 @@
       "segueInto": false,
       "audioFile": "gd72-08-27d1t02.mp3",
       "trackNumber": 2,
-      "defaultMode": "liquid_light"
+      "defaultMode": "liquid_light",
+      "songArt": "assets/song-art/veneta-72/d1t02.png"
     },
     {
       "title": "Me and My Uncle",
@@ -29,7 +30,8 @@
       "segueInto": false,
       "audioFile": "gd72-08-27d1t03.mp3",
       "trackNumber": 3,
-      "defaultMode": "liquid_light"
+      "defaultMode": "liquid_light",
+      "songArt": "assets/song-art/veneta-72/d1t03.png"
     },
     {
       "title": "Deal",
@@ -38,7 +40,8 @@
       "segueInto": false,
       "audioFile": "gd72-08-27d1t04.mp3",
       "trackNumber": 4,
-      "defaultMode": "liquid_light"
+      "defaultMode": "liquid_light",
+      "songArt": "assets/song-art/veneta-72/d1t04.png"
     },
     {
       "title": "Black-Throated Wind",
@@ -47,7 +50,8 @@
       "segueInto": false,
       "audioFile": "gd72-08-27d1t05.mp3",
       "trackNumber": 5,
-      "defaultMode": "liquid_light"
+      "defaultMode": "liquid_light",
+      "songArt": "assets/song-art/veneta-72/d1t05.png"
     },
     {
       "title": "China Cat Sunflower",
@@ -56,7 +60,8 @@
       "segueInto": true,
       "audioFile": "gd72-08-27d1t06.mp3",
       "trackNumber": 6,
-      "defaultMode": "liquid_light"
+      "defaultMode": "liquid_light",
+      "songArt": "assets/song-art/veneta-72/d1t06.png"
     },
     {
       "title": "I Know You Rider",
@@ -66,7 +71,8 @@
       "segueFrom": "China Cat Sunflower",
       "audioFile": "gd72-08-27d1t07.mp3",
       "trackNumber": 7,
-      "defaultMode": "liquid_light"
+      "defaultMode": "liquid_light",
+      "songArt": "assets/song-art/veneta-72/d1t07.png"
     },
     {
       "title": "Mexicali Blues",
@@ -75,7 +81,8 @@
       "segueInto": false,
       "audioFile": "gd72-08-27d1t08.mp3",
       "trackNumber": 8,
-      "defaultMode": "liquid_light"
+      "defaultMode": "liquid_light",
+      "songArt": "assets/song-art/veneta-72/d1t08.png"
     },
     {
       "title": "Bertha",
@@ -84,7 +91,8 @@
       "segueInto": false,
       "audioFile": "gd72-08-27d1t09.mp3",
       "trackNumber": 9,
-      "defaultMode": "liquid_light"
+      "defaultMode": "liquid_light",
+      "songArt": "assets/song-art/veneta-72/d1t09.png"
     },
     {
       "title": "Playing in the Band",
@@ -102,7 +110,8 @@
       "segueInto": false,
       "audioFile": "gd72-08-27d2t02.mp3",
       "trackNumber": 2,
-      "defaultMode": "liquid_light"
+      "defaultMode": "liquid_light",
+      "songArt": "assets/song-art/veneta-72/d2t02.png"
     },
     {
       "title": "Jack Straw",
@@ -111,7 +120,8 @@
       "segueInto": false,
       "audioFile": "gd72-08-27d2t03.mp3",
       "trackNumber": 3,
-      "defaultMode": "liquid_light"
+      "defaultMode": "liquid_light",
+      "songArt": "assets/song-art/veneta-72/d2t03.png"
     },
     {
       "title": "Bird Song",
@@ -120,7 +130,8 @@
       "segueInto": false,
       "audioFile": "gd72-08-27d2t04.mp3",
       "trackNumber": 4,
-      "defaultMode": "liquid_light"
+      "defaultMode": "liquid_light",
+      "songArt": "assets/song-art/veneta-72/d2t04.png"
     },
     {
       "title": "Greatest Story Ever Told",
@@ -129,7 +140,8 @@
       "segueInto": false,
       "audioFile": "gd72-08-27d2t05.mp3",
       "trackNumber": 5,
-      "defaultMode": "liquid_light"
+      "defaultMode": "liquid_light",
+      "songArt": "assets/song-art/veneta-72/d2t05.png"
     },
     {
       "title": "Dark Star",
@@ -138,7 +150,8 @@
       "segueInto": true,
       "audioFile": "gd72-08-27d3t01.mp3",
       "trackNumber": 1,
-      "defaultMode": "liquid_light"
+      "defaultMode": "liquid_light",
+      "songArt": "assets/song-art/veneta-72/d3t01.png"
     },
     {
       "title": "El Paso",
@@ -148,7 +161,8 @@
       "segueFrom": "Dark Star",
       "audioFile": "gd72-08-27d3t02.mp3",
       "trackNumber": 2,
-      "defaultMode": "liquid_light"
+      "defaultMode": "liquid_light",
+      "songArt": "assets/song-art/veneta-72/d3t02.png"
     },
     {
       "title": "Sing Me Back Home",
@@ -158,7 +172,8 @@
       "segueFrom": "El Paso",
       "audioFile": "gd72-08-27d3t03.mp3",
       "trackNumber": 3,
-      "defaultMode": "liquid_light"
+      "defaultMode": "liquid_light",
+      "songArt": "assets/song-art/veneta-72/d3t03.png"
     },
     {
       "title": "Sugar Magnolia",
@@ -167,7 +182,8 @@
       "segueInto": false,
       "audioFile": "gd72-08-27d3t04.mp3",
       "trackNumber": 4,
-      "defaultMode": "liquid_light"
+      "defaultMode": "liquid_light",
+      "songArt": "assets/song-art/veneta-72/d3t04.png"
     },
     {
       "title": "Casey Jones",
@@ -176,7 +192,8 @@
       "segueInto": false,
       "audioFile": "gd72-08-27d3t05.mp3",
       "trackNumber": 5,
-      "defaultMode": "liquid_light"
+      "defaultMode": "liquid_light",
+      "songArt": "assets/song-art/veneta-72/d3t05.png"
     },
     {
       "title": "One More Saturday Night",
@@ -185,7 +202,8 @@
       "segueInto": false,
       "audioFile": "gd72-08-27d3t06.mp3",
       "trackNumber": 6,
-      "defaultMode": "liquid_light"
+      "defaultMode": "liquid_light",
+      "songArt": "assets/song-art/veneta-72/d3t06.png"
     }
   ]
 }
