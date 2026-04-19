@@ -642,6 +642,99 @@ vec4 hypersaturation(vec4 scene, float intensity, float energy) {
   return vec4(boosted, scene.a);
 }
 
+// ─── Composited Mode 9: Liquid Metal ───
+// Chrome/mercury surface: multi-layer noise, fresnel rim, specular highlights.
+// Direct port from composited_effects.rs mode 9.
+vec3 liquidMetal(float intensity, float time, float energy, float bass) {
+  float aspect = uEffectResolution.x / uEffectResolution.y;
+  vec2 p = vec2((vUv.x - 0.5) * aspect * 2.0, (vUv.y - 0.5) * 2.0);
+
+  float t = time * 0.5;
+
+  // Layer 1: large undulations
+  float surface = sin(p.x * 2.5 + t + sin(p.y * 1.8 + t * 0.6)) * 0.35;
+  // Layer 2: medium detail
+  surface += sin(p.x * 5.0 + p.y * 3.0 + t * 1.2) * 0.20;
+  // Layer 3: bass ripples
+  float rippleFreq = 8.0 + bass * 8.0;
+  surface += sin(p.x * rippleFreq + t * 3.0) * sin(p.y * rippleFreq * 0.8) * bass * 0.25;
+
+  // Approximate normal from surface
+  float normal = cos(surface * PI);
+
+  // Fresnel rim lighting
+  float fresnel = pow(1.0 - abs(normal), 3.0) * 0.4;
+
+  // Specular highlights
+  float radius = length(p);
+  float angle = atan(p.y, p.x);
+  float specPow = 6.0 + energy * 8.0;
+  float specular = pow(max(sin(angle * 4.0 + radius * 12.0), 0.0), specPow) * 0.6;
+
+  // Chrome color: cool dark → warm gold
+  vec3 baseColor = mix(
+    vec3(0.18, 0.20, 0.25),  // cool chrome
+    vec3(0.85, 0.78, 0.60),  // warm gold
+    abs(surface) * 0.7 + 0.3
+  );
+
+  vec3 col = baseColor * (0.5 + abs(surface) * 0.7) + vec3(specular * 1.5) + vec3(fresnel * 1.3);
+
+  return col * intensity;
+}
+
+// ─── Composited Mode 10: Concert Poster ───
+// Halftone CMYK dots, limited warm palette, ornate border, aged paper.
+// Direct port from composited_effects.rs mode 10.
+vec3 concertPoster(float intensity, float time, float energy) {
+  vec2 uv = vUv;
+
+  // Halftone dot scale (larger dots at peaks, smaller at rest)
+  float dotScale = 40.0 + energy * 30.0;
+
+  // 3 halftone grids at 30° angles
+  float dots = 0.0;
+  for (int i = 0; i < 3; i++) {
+    float fi = float(i);
+    float angle = fi * 0.524; // ~30° each
+    float ca = cos(angle), sa = sin(angle);
+    vec2 rotUv = vec2(uv.x * ca - uv.y * sa, uv.x * sa + uv.y * ca);
+    vec2 grid = fract(rotUv * dotScale) - 0.5;
+
+    // Tone hash for dot size variation
+    float tone = hash2(floor(rotUv * dotScale));
+    float dotDist = length(grid);
+    float dot = smoothstep(tone * 0.4 + 0.02, tone * 0.4, dotDist);
+    dots += dot * 0.33;
+  }
+
+  // Paper texture: cream with noise grain
+  vec3 paper = vec3(0.92, 0.88, 0.78);
+  paper += (hash2(uv * 200.0 + time * 0.01) - 0.5) * 0.03;
+
+  // Poster ink colors
+  vec3 red = vec3(0.75, 0.15, 0.08);
+  vec3 dark = vec3(0.15, 0.08, 0.03);
+  vec3 ink = mix(red, dark, smoothstep(0.3, 0.7, dots));
+
+  vec3 col = mix(paper, ink, smoothstep(0.3, 0.7, dots));
+
+  // Border frame
+  float borderOuter = max(
+    smoothstep(0.03, 0.04, uv.x) * smoothstep(0.03, 0.04, 1.0 - uv.x),
+    0.0
+  ) * max(
+    smoothstep(0.03, 0.04, uv.y) * smoothstep(0.03, 0.04, 1.0 - uv.y),
+    0.0
+  );
+  float borderInner = smoothstep(0.05, 0.06, uv.x) * smoothstep(0.05, 0.06, 1.0 - uv.x)
+                    * smoothstep(0.05, 0.06, uv.y) * smoothstep(0.05, 0.06, 1.0 - uv.y);
+  float frame = (1.0 - borderOuter) + (1.0 - borderInner) * 0.5;
+  col = mix(col, vec3(0.12, 0.06, 0.02), clamp(frame, 0.0, 1.0) * 0.8);
+
+  return col * intensity * 0.18;
+}
+
 void main() {
   vec4 scene = texture2D(uInputTexture, vUv);
   vec4 result = scene;
@@ -685,6 +778,11 @@ void main() {
       comp = strobeFlicker(uCompositedIntensity, uEffectEnergy, uEffectBeatSnap);
     } else if (uCompositedMode == 8) {
       comp = geometricBreakdown(uCompositedIntensity, uEffectTime, uEffectEnergy, uEffectBeatSnap);
+    }
+    } else if (uCompositedMode == 9) {
+      comp = liquidMetal(uCompositedIntensity, uEffectTime, uEffectEnergy, uEffectBass);
+    } else if (uCompositedMode == 10) {
+      comp = concertPoster(uCompositedIntensity, uEffectTime, uEffectEnergy);
     }
     // Unimplemented composited modes: no contribution
 
