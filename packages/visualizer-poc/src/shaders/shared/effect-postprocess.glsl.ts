@@ -756,6 +756,126 @@ vec4 kaleidoscope(vec4 scene, float intensity, float energy, float time) {
   return mix(scene, kaleidScene * edgeFade + scene * (1.0 - edgeFade), intensity);
 }
 
+// ─── Mode 2: Deep Feedback ───
+// Analog video feedback vortex: infinite spiral tunnel with color shift, organic decay.
+// Direct port from effects.rs mode 2.
+vec4 deepFeedback(vec4 scene, float intensity, float energy, float bass, float time) {
+  vec3 col = scene.rgb;
+  vec3 prev = texture2D(uEffectPrevFrame, vUv).rgb;
+
+  // Detect empty previous frame
+  float prevLum = dot(prev, vec3(0.299, 0.587, 0.114));
+  if (prevLum < 0.001) return scene;
+
+  // Zoom + rotation for feedback vortex
+  float zoomSpeed = 1.0 - bass * 0.015;
+  float rotSpeed = 0.004 + energy * 0.006;
+  float angle = time * rotSpeed;
+  float ca = cos(angle), sa = sin(angle);
+
+  // 3-tap sampling for smooth trails
+  vec3 feedback = vec3(0.0);
+  for (int tap = 0; tap < 3; tap++) {
+    float ft = float(tap);
+    float tapOffset = ft * 0.003;
+    vec2 uv = vUv - 0.5;
+    uv *= zoomSpeed - tapOffset;
+    uv = vec2(uv.x * ca + uv.y * sa, -uv.x * sa + uv.y * ca);
+    uv += 0.5;
+    feedback += texture2D(uEffectPrevFrame, clamp(uv, 0.0, 1.0)).rgb;
+  }
+  feedback /= 3.0;
+
+  // HSV hue rotation per recursion
+  float hueShift = intensity * 0.05;
+  // Approximate hue rotation via channel rotation
+  feedback = vec3(
+    feedback.r * cos(hueShift) + feedback.g * sin(hueShift),
+    feedback.g * cos(hueShift) - feedback.r * sin(hueShift),
+    feedback.b
+  );
+
+  // Saturation decay (prevent white-out)
+  float fbLum = dot(feedback, vec3(0.299, 0.587, 0.114));
+  feedback = mix(feedback, vec3(fbLum), 0.03);
+
+  // Blend: energy drives recursion depth
+  float blend = intensity * (0.3 + energy * 0.4);
+  col = mix(col, feedback, blend);
+
+  return vec4(col, scene.a);
+}
+
+// ─── Mode 11: Time Dilation ───
+// Slow-motion perception: weighted multi-frame averaging, spatial drift, desaturation.
+// Direct port from effects.rs mode 11.
+vec4 timeDilation(vec4 scene, float intensity) {
+  vec3 prev = texture2D(uEffectPrevFrame, vUv + vec2(0.003, 0.002) * intensity).rgb;
+
+  // Detect empty previous frame
+  float prevLum = dot(prev, vec3(0.299, 0.587, 0.114));
+  if (prevLum < 0.001) return scene;
+
+  // Heavy blend from previous (70-82% history)
+  float historyWeight = 0.70 + 0.12 * intensity;
+  vec3 col = mix(scene.rgb, prev, historyWeight);
+
+  // Slight desaturation (dreamlike)
+  float lum = dot(col, vec3(0.299, 0.587, 0.114));
+  col = mix(col, vec3(lum), intensity * 0.10);
+
+  // Contrast reduction
+  col = mix(vec3(0.5), col, 1.0 - intensity * 0.08);
+
+  return vec4(col, scene.a);
+}
+
+// ─── Mode 14: Glitch / Datamosh ───
+// Digital corruption: scanlines, block displacement, color banding, static noise.
+// Direct port from effects.rs mode 14.
+vec4 glitchDatamosh(vec4 scene, float intensity, float energy, float beatSnap, float time) {
+  vec2 uv = vUv;
+  vec3 col = scene.rgb;
+  float quantTime = floor(time * 6.0);
+
+  // Layer 1: VHS tracking lines (horizontal bands with shift + RGB split)
+  float scanY = floor(uv.y * 80.0);
+  float scanHash = hash(scanY + quantTime * 13.37);
+  if (scanHash > 1.0 - intensity * 0.15) {
+    float shift = (scanHash - 0.5) * intensity * 0.05;
+    col.r = texture2D(uInputTexture, vec2(uv.x + shift, uv.y)).r;
+    col.b = texture2D(uInputTexture, vec2(uv.x - shift * 0.7, uv.y)).b;
+  }
+
+  // Layer 2: Block hold (beat-triggered, holds previous frame in random blocks)
+  if (beatSnap > 0.4) {
+    float blockSize = 8.0 + (1.0 - energy) * 8.0;
+    vec2 block = floor(uv * blockSize);
+    float blockHash = hash(dot(block, vec2(127.1, 311.7)) + quantTime);
+    if (blockHash > 0.6) {
+      vec3 prev = texture2D(uEffectPrevFrame, uv).rgb;
+      float prevLum = dot(prev, vec3(0.299, 0.587, 0.114));
+      if (prevLum > 0.001) col = prev;
+    }
+  }
+
+  // Layer 3: Color banding (posterization on random scanlines)
+  float bandHash = hash(scanY * 2.71 + quantTime * 7.13);
+  if (bandHash > 1.0 - intensity * 0.1) {
+    col = floor(col * 4.0) / 4.0;
+  }
+
+  // Layer 4: Static noise overlay
+  float noise = hash(uv.x * 1000.0 + uv.y * 777.0 + time * 100.0);
+  col = mix(col, vec3(noise), intensity * 0.03);
+
+  // Gradual desaturation
+  float lum = dot(col, vec3(0.299, 0.587, 0.114));
+  col = mix(col, vec3(lum), intensity * 0.05);
+
+  return vec4(col, scene.a);
+}
+
 // ─── Mode 5: Trails / Echo ───
 // CRT phosphor decay: motion-persistent trails that warm as they fade.
 // Direct port from effects.rs mode 5.
@@ -935,6 +1055,8 @@ void main() {
 
     if (uEffectMode == 1) {
       result = kaleidoscope(scene, intensity, energy, uEffectTime);
+    } else if (uEffectMode == 2) {
+      result = deepFeedback(scene, intensity, energy, uEffectBass, uEffectTime);
     } else if (uEffectMode == 3) {
       result = hypersaturation(scene, intensity, energy);
     } else if (uEffectMode == 4) {
@@ -951,12 +1073,16 @@ void main() {
       result = breathPulse(scene, intensity, energy, uEffectBass, uEffectTime);
     } else if (uEffectMode == 10) {
       result = lightLeak(scene, intensity, uEffectTime, uEffectBeatSnap);
+    } else if (uEffectMode == 11) {
+      result = timeDilation(scene, intensity);
     } else if (uEffectMode == 12) {
       result = moirePatterns(scene, intensity, uEffectEnergy, uEffectTime);
     } else if (uEffectMode == 13) {
       result = depthOfField(scene, intensity, energy);
+    } else if (uEffectMode == 14) {
+      result = glitchDatamosh(scene, intensity, energy, uEffectBeatSnap, uEffectTime);
     }
-    // Unimplemented post-process modes: keep scene unchanged
+    // All 14 post-process modes implemented
   }
 
   // ── Composited effects (additive blend on top) ──
