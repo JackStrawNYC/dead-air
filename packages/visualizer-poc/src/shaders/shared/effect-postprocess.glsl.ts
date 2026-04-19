@@ -523,6 +523,195 @@ vec4 moirePatterns(vec4 scene, float intensity, float energy, float time) {
   return vec4(result, scene.a);
 }
 
+// ─── Mode 4: Chromatic Split ───
+// Prismatic RGB channel separation at screen edges, beats trigger split pulse.
+// Direct port from effects.rs mode 4.
+vec4 chromaticSplit(vec4 scene, float intensity, float energy, float beatSnap, float time) {
+  vec2 uv = vUv;
+  float aspect = uEffectResolution.x / uEffectResolution.y;
+
+  // Radial distance from center (stronger at edges)
+  vec2 center = uv - 0.5;
+  center.x *= aspect;
+  float dist = length(center);
+
+  // Split direction rotates over time
+  float angle = atan(center.y, center.x) + time * 0.1;
+
+  // Offset amount: edge-weighted, energy-scaled, beat-pulsed
+  float offsetBase = intensity * (0.008 + energy * 0.006) * dist;
+  float beatPulse = 1.0 + beatSnap * 0.8;
+  float offset = offsetBase * beatPulse;
+
+  // Split direction vector
+  vec2 dir = vec2(cos(angle), sin(angle)) * offset;
+  dir.x /= aspect;
+
+  // Sample R, G, B at different offsets (2-tap per channel for smoothness)
+  float r = (texture2D(uInputTexture, uv + dir).r + texture2D(uInputTexture, uv + dir * 0.7).r) * 0.5;
+  float g = texture2D(uInputTexture, uv).g;
+  float b = (texture2D(uInputTexture, uv - dir).b + texture2D(uInputTexture, uv - dir * 0.7).b) * 0.5;
+
+  return vec4(r, g, b, scene.a);
+}
+
+// ─── Mode 6: Mirror Symmetry ───
+// Bilateral reflection along rotating axis, quad symmetry at high energy.
+// Direct port from effects.rs mode 6.
+vec4 mirrorSymmetry(vec4 scene, float intensity, float energy, float time) {
+  vec2 uv = vUv - 0.5;
+  float aspect = uEffectResolution.x / uEffectResolution.y;
+  uv.x *= aspect;
+
+  // Rotating mirror axis
+  float axisAngle = time * (0.015 + energy * 0.01);
+  float ca = cos(axisAngle), sa = sin(axisAngle);
+
+  // Rotate UV into mirror space
+  vec2 rotUv = vec2(uv.x * ca + uv.y * sa, -uv.x * sa + uv.y * ca);
+
+  // Reflect across X axis
+  rotUv.x = abs(rotUv.x);
+
+  // Quad symmetry at high energy
+  float quadBlend = smoothstep(0.4, 0.8, energy);
+  vec2 quadUv = abs(rotUv);
+  rotUv = mix(rotUv, quadUv, quadBlend);
+
+  // Rotate back and convert to texture coords
+  vec2 mirrorUv = vec2(rotUv.x * ca - rotUv.y * sa, rotUv.x * sa + rotUv.y * ca);
+  mirrorUv.x /= aspect;
+  mirrorUv += 0.5;
+
+  // Anti-aliased edge near axis
+  float edgeDist = abs(uv.x * ca + uv.y * sa);
+  float edgeAA = smoothstep(0.0, 0.008, edgeDist);
+
+  vec4 mirrorScene = texture2D(uInputTexture, clamp(mirrorUv, 0.0, 1.0));
+
+  return mix(scene, mirrorScene, intensity * edgeAA);
+}
+
+// ─── Mode 7: Audio Displacement ───
+// Frequency-mapped UV warping: bass=slow undulations, mids=ripples, highs=fine detail.
+// Direct port from effects.rs mode 7.
+vec4 audioDisplacement(vec4 scene, float intensity, float energy, float bass, float beatSnap, float time) {
+  vec2 uv = vUv;
+
+  // Three frequency layers
+  float bassWarp = sin(uv.y * 2.5 + time * 0.8) * bass * 0.10;
+  float midWarp = sin(uv.y * 6.0 + time * 1.5) * energy * 0.055;
+  float highWarp = sin(uv.y * 16.0 + time * 3.0) * energy * 0.018;
+
+  // Beat spike
+  float beatWarp = sin(uv.y * 5.0 + time * 10.0) * beatSnap * 0.06;
+
+  float totalWarp = (bassWarp + midWarp + highWarp + beatWarp) * intensity;
+
+  vec2 warpedUv = uv + vec2(totalWarp, totalWarp * 0.3);
+
+  return texture2D(uInputTexture, clamp(warpedUv, 0.0, 1.0));
+}
+
+// ─── Mode 8: Zoom Punch ───
+// Beat-triggered zoom impact with barrel distortion.
+// Direct port from effects.rs mode 8.
+vec4 zoomPunch(vec4 scene, float intensity, float energy, float beatSnap) {
+  vec2 uv = vUv;
+  vec2 center = uv - 0.5;
+  float dist = length(center);
+
+  // Punch strength from beat
+  float punchStrength = beatSnap * intensity * (0.06 + energy * 0.06);
+
+  // Barrel distortion at peak
+  float barrel = 1.0 + punchStrength * dist * 3.0;
+
+  // Zoom
+  float zoom = 1.0 - punchStrength * barrel;
+
+  vec2 punchedUv = center * zoom + 0.5;
+
+  return texture2D(uInputTexture, clamp(punchedUv, 0.0, 1.0));
+}
+
+// ─── Mode 9: Slow Breath Pulse ───
+// "Walls breathing" psychedelic pulse: layered sine waves, drifting center.
+// Direct port from effects.rs mode 9.
+vec4 breathPulse(vec4 scene, float intensity, float energy, float bass, float time) {
+  vec2 uv = vUv;
+
+  // Breath rate (faster at high energy)
+  float rate = 0.15 + energy * 0.10;
+
+  // Multi-layered breathing
+  float primary = sin(time * rate * TAU) * intensity * 0.035;
+  float secondary = sin(time * rate * TAU * 1.7 + 1.3) * intensity * 0.012;
+  float tertiary = sin(time * rate * TAU * 3.1 + 2.7) * intensity * 0.005;
+
+  // Bass breath
+  float bassBreath = sin(time * 0.8 + 0.5) * bass * 0.020;
+
+  float totalBreath = primary + secondary + tertiary + bassBreath;
+
+  // Breathing center drifts organically
+  float cx = 0.5 + sin(time * 0.07) * 0.04;
+  float cy = 0.5 + cos(time * 0.05) * 0.03;
+
+  vec2 center = uv - vec2(cx, cy);
+  float zoom = 1.0 - totalBreath;
+
+  vec2 breathedUv = center * zoom + vec2(cx, cy);
+
+  return texture2D(uInputTexture, clamp(breathedUv, 0.0, 1.0));
+}
+
+// ─── Mode 13: Depth of Field ───
+// Bokeh blur: sharp center, blurry edges, 13-tap Poisson disk sampling.
+// Direct port from effects.rs mode 13.
+vec4 depthOfField(vec4 scene, float intensity, float energy) {
+  vec2 uv = vUv;
+  float aspect = uEffectResolution.x / uEffectResolution.y;
+
+  // Focus radius: expands at high energy
+  float focusRadius = 0.15 + energy * 0.15;
+
+  vec2 center = uv - 0.5;
+  center.x *= aspect;
+  float dist = length(center);
+
+  // Blur amount: stronger at edges
+  float blur = smoothstep(focusRadius, focusRadius + 0.3, dist) * intensity * 0.008;
+
+  if (blur < 0.0001) return scene;
+
+  // Aspect correction for offsets
+  vec2 aspectCorr = vec2(1.0, aspect);
+
+  // 13-tap Poisson disk sampling
+  vec3 col = scene.rgb;
+  float totalWeight = 1.0;
+
+  // Well-distributed Poisson points
+  vec2 taps[12];
+  taps[0] = vec2(-0.94, 0.34);  taps[1] = vec2(0.76, -0.65);
+  taps[2] = vec2(-0.09, -0.93); taps[3] = vec2(0.97, 0.26);
+  taps[4] = vec2(-0.81, -0.59); taps[5] = vec2(0.33, 0.95);
+  taps[6] = vec2(-0.50, 0.87);  taps[7] = vec2(0.60, 0.44);
+  taps[8] = vec2(-0.38, -0.35); taps[9] = vec2(0.21, -0.47);
+  taps[10] = vec2(-0.73, 0.10); taps[11] = vec2(0.48, -0.15);
+
+  for (int i = 0; i < 12; i++) {
+    vec2 offset = taps[i] * blur * aspectCorr;
+    float weight = 1.0 - length(taps[i]) * 0.3;
+    col += texture2D(uInputTexture, uv + offset).rgb * weight;
+    totalWeight += weight;
+  }
+
+  col /= totalWeight;
+  return vec4(col, scene.a);
+}
+
 // ─── Mode 1: Kaleidoscope ───
 // Radial symmetry with 6-8 folds, smooth interpolation, anti-aliased edges.
 // Direct port from effects.rs mode 1.
@@ -748,12 +937,24 @@ void main() {
       result = kaleidoscope(scene, intensity, energy, uEffectTime);
     } else if (uEffectMode == 3) {
       result = hypersaturation(scene, intensity, energy);
+    } else if (uEffectMode == 4) {
+      result = chromaticSplit(scene, intensity, energy, uEffectBeatSnap, uEffectTime);
     } else if (uEffectMode == 5) {
       result = trails(scene, intensity, energy);
+    } else if (uEffectMode == 6) {
+      result = mirrorSymmetry(scene, intensity, energy, uEffectTime);
+    } else if (uEffectMode == 7) {
+      result = audioDisplacement(scene, intensity, energy, uEffectBass, uEffectBeatSnap, uEffectTime);
+    } else if (uEffectMode == 8) {
+      result = zoomPunch(scene, intensity, energy, uEffectBeatSnap);
+    } else if (uEffectMode == 9) {
+      result = breathPulse(scene, intensity, energy, uEffectBass, uEffectTime);
     } else if (uEffectMode == 10) {
       result = lightLeak(scene, intensity, uEffectTime, uEffectBeatSnap);
     } else if (uEffectMode == 12) {
       result = moirePatterns(scene, intensity, uEffectEnergy, uEffectTime);
+    } else if (uEffectMode == 13) {
+      result = depthOfField(scene, intensity, energy);
     }
     // Unimplemented post-process modes: keep scene unchanged
   }
