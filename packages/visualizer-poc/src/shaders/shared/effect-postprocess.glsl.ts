@@ -165,6 +165,50 @@ vec3 geometricBreakdown(float intensity, float time, float energy, float beatSna
 // POST-PROCESS EFFECTS (transform existing scene)
 // ═══════════════════════════════════════════════════════════
 
+// ─── Mode 1: Kaleidoscope ───
+// Radial symmetry with 6-8 folds, smooth interpolation, anti-aliased edges.
+// Direct port from effects.rs mode 1.
+vec4 kaleidoscope(vec4 scene, float intensity, float energy, float time) {
+  vec2 uv = vUv;
+  float aspect = uEffectResolution.x / uEffectResolution.y;
+
+  // Center and aspect-correct
+  vec2 p = vec2((uv.x - 0.5) * aspect, uv.y - 0.5);
+
+  // Convert to polar coordinates
+  float radius = length(p);
+  float angle = atan(p.y, p.x);
+
+  // Fold count: 6 at rest, 8 at peak energy
+  float folds = 6.0 + energy * 2.0;
+
+  // Slow rotation
+  angle += time * 0.04;
+
+  // Modulo into one sector and mirror
+  float sectorAngle = TAU / folds;
+  angle = mod(angle, sectorAngle);
+  // Mirror: fold at midpoint of sector
+  if (angle > sectorAngle * 0.5) {
+    angle = sectorAngle - angle;
+  }
+
+  // Convert back to UV space
+  vec2 kaleidUv = vec2(
+    cos(angle) * radius / aspect + 0.5,
+    sin(angle) * radius + 0.5
+  );
+
+  // Clamp and fade at edges to prevent border artifacts
+  float edgeFade = smoothstep(0.0, 0.02, kaleidUv.x) * smoothstep(1.0, 0.98, kaleidUv.x)
+                 * smoothstep(0.0, 0.02, kaleidUv.y) * smoothstep(1.0, 0.98, kaleidUv.y);
+
+  vec4 kaleidScene = texture2D(uInputTexture, clamp(kaleidUv, 0.0, 1.0));
+
+  // Blend between original and kaleidoscope based on intensity
+  return mix(scene, kaleidScene * edgeFade + scene * (1.0 - edgeFade), intensity);
+}
+
 // ─── Mode 5: Trails / Echo ───
 // CRT phosphor decay: motion-persistent trails that warm as they fade.
 // Direct port from effects.rs mode 5.
@@ -249,7 +293,9 @@ void main() {
     float intensity = uEffectIntensity;
     float energy = uEffectEnergy;
 
-    if (uEffectMode == 3) {
+    if (uEffectMode == 1) {
+      result = kaleidoscope(scene, intensity, energy, uEffectTime);
+    } else if (uEffectMode == 3) {
       result = hypersaturation(scene, intensity, energy);
     } else if (uEffectMode == 5) {
       result = trails(scene, intensity, energy);
