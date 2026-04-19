@@ -154,6 +154,64 @@ vec3 caustics(float intensity, float time, float energy, float bass) {
   return causticColor * intensity * 0.65;
 }
 
+// ─── Composited Mode 3: Celestial Map ───
+// Deep star field: 3 depth layers, realistic twinkling, star color temperature.
+// Direct port from composited_effects.rs mode 3.
+vec3 celestialMap(float intensity, float time, float energy) {
+  vec2 uv = vUv;
+  vec3 col = vec3(0.0);
+
+  // Slow celestial rotation
+  float rot = time * 0.005;
+  float cr = cos(rot), sr = sin(rot);
+  uv = vec2(uv.x * cr - uv.y * sr, uv.x * sr + uv.y * cr);
+
+  // 3 star layers at different depths
+  for (int layer = 0; layer < 3; layer++) {
+    float fl = float(layer);
+    float gridSize = 8.0 + fl * 6.0; // 8, 14, 20 cells
+    float brightMult = 1.0 - fl * 0.25; // closer = brighter
+
+    vec2 grid = floor(uv * gridSize);
+    vec2 frac_uv = fract(uv * gridSize);
+
+    // Star placement per cell
+    float cellHash = hash2(grid + fl * 100.0);
+    if (cellHash < 0.65 + fl * 0.10) continue; // density gate
+
+    // Star position within cell
+    vec2 starPos = vec2(hash2(grid * 1.1 + fl), hash2(grid * 2.3 + fl));
+    float dist = length(frac_uv - starPos);
+
+    // Star size (smaller for distant layers)
+    float starSize = (0.08 - fl * 0.02);
+    float star = smoothstep(starSize, 0.0, dist);
+
+    // Realistic twinkling (atmospheric scintillation)
+    float twinkleSpeed = 1.0 + hash2(grid * 3.7) * 3.0;
+    float twinkle = 0.6 + sin(time * twinkleSpeed) * 0.25
+                       + sin(time * twinkleSpeed * 2.3) * 0.15;
+
+    // Star color temperature
+    float tempHash = hash2(grid * 5.1 + fl);
+    vec3 starColor;
+    if (tempHash < 0.3) starColor = vec3(0.7, 0.8, 1.0);       // blue giant
+    else if (tempHash < 0.7) starColor = vec3(1.0, 0.98, 0.92); // white
+    else starColor = vec3(1.0, 0.85, 0.6);                       // red dwarf
+
+    // Energy makes stars brighter
+    float energyBoost = 1.2 + energy * 0.8;
+
+    col += starColor * star * twinkle * brightMult * energyBoost * intensity;
+  }
+
+  // Faint nebula wisps
+  float nebula = sin(uv.x * 3.0 + time * 0.02) * sin(uv.y * 2.5 + time * 0.015) * 0.5 + 0.5;
+  col += vec3(0.4, 0.25, 0.6) * nebula * 0.03 * intensity;
+
+  return col;
+}
+
 // ─── Composited Mode 8: Geometric Breakdown ───
 // Crystal fracture: animated Voronoi cells with golden edges, beat-triggered.
 // Direct port from composited_effects.rs mode 8.
@@ -459,6 +517,8 @@ void main() {
       comp = particleSwarm(uCompositedIntensity, uEffectTime, uEffectEnergy, uEffectBass);
     } else if (uCompositedMode == 2) {
       comp = caustics(uCompositedIntensity, uEffectTime, uEffectEnergy, uEffectBass);
+    } else if (uCompositedMode == 3) {
+      comp = celestialMap(uCompositedIntensity, uEffectTime, uEffectEnergy);
     } else if (uCompositedMode == 8) {
       comp = geometricBreakdown(uCompositedIntensity, uEffectTime, uEffectEnergy, uEffectBeatSnap);
     }
