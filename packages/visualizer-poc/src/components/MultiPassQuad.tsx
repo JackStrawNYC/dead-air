@@ -128,6 +128,7 @@ export const MultiPassQuad: React.FC<Props> = ({
     b: THREE.WebGLRenderTarget;
     feedback: THREE.WebGLRenderTarget | null;
     effect: THREE.WebGLRenderTarget;
+    effectFeedback: THREE.WebGLRenderTarget;
     fxaa: THREE.WebGLRenderTarget;
   } | null>(null);
 
@@ -138,11 +139,13 @@ export const MultiPassQuad: React.FC<Props> = ({
       gpuMonitor.untrackRenderTarget(targetsRef.current.b);
       if (targetsRef.current.feedback) gpuMonitor.untrackRenderTarget(targetsRef.current.feedback);
       gpuMonitor.untrackRenderTarget(targetsRef.current.effect);
+      gpuMonitor.untrackRenderTarget(targetsRef.current.effectFeedback);
       gpuMonitor.untrackRenderTarget(targetsRef.current.fxaa);
       targetsRef.current.a.dispose();
       targetsRef.current.b.dispose();
       targetsRef.current.feedback?.dispose();
       targetsRef.current.effect.dispose();
+      targetsRef.current.effectFeedback.dispose();
       targetsRef.current.fxaa.dispose();
     }
     const opts: THREE.RenderTargetOptions = {
@@ -159,12 +162,14 @@ export const MultiPassQuad: React.FC<Props> = ({
       b: new THREE.WebGLRenderTarget(width, height, opts),
       feedback: fb,
       effect: new THREE.WebGLRenderTarget(width, height, opts),
+      effectFeedback: new THREE.WebGLRenderTarget(width, height, opts),
       fxaa: new THREE.WebGLRenderTarget(width, height, opts),
     };
     gpuMonitor.trackRenderTarget(targetsRef.current.a, "MultiPassQuad:a");
     gpuMonitor.trackRenderTarget(targetsRef.current.b, "MultiPassQuad:b");
     if (fb) gpuMonitor.trackRenderTarget(fb, "MultiPassQuad:feedback");
     gpuMonitor.trackRenderTarget(targetsRef.current.effect, "MultiPassQuad:effect");
+    gpuMonitor.trackRenderTarget(targetsRef.current.effectFeedback, "MultiPassQuad:effectFeedback");
     gpuMonitor.trackRenderTarget(targetsRef.current.fxaa, "MultiPassQuad:fxaa");
     return () => {
       if (targetsRef.current) {
@@ -172,11 +177,13 @@ export const MultiPassQuad: React.FC<Props> = ({
         gpuMonitor.untrackRenderTarget(targetsRef.current.b);
         if (targetsRef.current.feedback) gpuMonitor.untrackRenderTarget(targetsRef.current.feedback);
         gpuMonitor.untrackRenderTarget(targetsRef.current.effect);
+        gpuMonitor.untrackRenderTarget(targetsRef.current.effectFeedback);
         gpuMonitor.untrackRenderTarget(targetsRef.current.fxaa);
         targetsRef.current.a.dispose();
         targetsRef.current.b.dispose();
         targetsRef.current.feedback?.dispose();
         targetsRef.current.effect.dispose();
+        targetsRef.current.effectFeedback.dispose();
         targetsRef.current.fxaa.dispose();
       }
       targetsRef.current = null;
@@ -371,6 +378,13 @@ export const MultiPassQuad: React.FC<Props> = ({
     const targets = targetsRef.current;
     if (!targets) return;
 
+    if (gap) {
+      // Clear effect feedback on seek to prevent ghosting from distant frames
+      gl.setRenderTarget(targets.effectFeedback);
+      gl.clear();
+      gl.setRenderTarget(null);
+    }
+
     if (feedback && gap && targets.feedback) {
       // Clear with very dark (not pure black) to prevent black-flash on seek
       gl.getClearColor(_clearColor);
@@ -432,6 +446,7 @@ export const MultiPassQuad: React.FC<Props> = ({
     }
 
     // Effect post-process pass (manifest-driven, skip if mode 0)
+    effectPass.uniforms.uEffectPrevFrame.value = targets.effectFeedback.texture;
     let effectOutputTexture = preFxaaTarget.texture;
     if (effectState.effectMode > 0) {
       effectPass.uniforms.uInputTexture.value = preFxaaTarget.texture;
@@ -448,6 +463,12 @@ export const MultiPassQuad: React.FC<Props> = ({
       gl.render(effectPass.scene, camera);
 
       effectOutputTexture = targets.effect.texture;
+
+      // Copy effect output to feedback buffer for next frame (stateful effects)
+      copyPass.uniforms.uInputTexture.value = targets.effect.texture;
+      gl.setRenderTarget(targets.effectFeedback);
+      gl.clear();
+      gl.render(copyPass.scene, camera);
     }
 
     // FXAA anti-aliasing: final quality pass

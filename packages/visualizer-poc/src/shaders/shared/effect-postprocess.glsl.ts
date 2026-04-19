@@ -35,6 +35,41 @@ uniform vec2 uEffectResolution;
 
 varying vec2 vUv;
 
+// ─── Mode 5: Trails / Echo ───
+// CRT phosphor decay: motion-persistent trails that warm as they fade.
+// Direct port from effects.rs mode 5.
+// Requires uEffectPrevFrame (previous frame's effect output).
+vec4 trails(vec4 scene, float intensity, float energy) {
+  // Read previous frame (effect feedback buffer)
+  vec3 prev = texture2D(uEffectPrevFrame, vUv).rgb;
+
+  // Detect empty previous frame (first frame or after seek)
+  float prevLum = dot(prev, vec3(0.299, 0.587, 0.114));
+  if (prevLum < 0.001) {
+    return scene; // No trails on first frame
+  }
+
+  // Persistence: higher intensity and energy = longer trails
+  float persistence = 0.65 + intensity * (0.10 + energy * 0.13);
+
+  // Trail color warming: cool→amber shift as trails age
+  vec3 trail = prev;
+  trail.r += trail.r * intensity * 0.04; // warm red
+  trail.b -= trail.b * intensity * 0.03; // reduce blue
+
+  // Desaturate trails slightly (phosphor afterglow)
+  float trailLum = dot(trail, vec3(0.299, 0.587, 0.114));
+  trail = mix(trail, vec3(trailLum), intensity * 0.08);
+
+  // Screen blend: scene + trail * (1 - scene) — no darkening
+  vec3 blended = scene.rgb + trail * (1.0 - scene.rgb) * intensity;
+
+  // Mix with persistence (how much trail carries forward)
+  vec3 result = mix(scene.rgb, blended, persistence);
+
+  return vec4(result, scene.a);
+}
+
 // ─── Mode 3: Hypersaturation ───
 // Psychedelic color explosion: midtone saturation boost with warm bias,
 // gamut compression, soft-clip. Direct port from effects.rs mode 3.
@@ -90,6 +125,12 @@ void main() {
   // Mode 3: Hypersaturation
   if (uEffectMode == 3) {
     gl_FragColor = hypersaturation(scene, intensity, energy);
+    return;
+  }
+
+  // Mode 5: Trails / Echo (stateful — reads uEffectPrevFrame)
+  if (uEffectMode == 5) {
+    gl_FragColor = trails(scene, intensity, energy);
     return;
   }
 
