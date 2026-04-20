@@ -61,7 +61,7 @@ const PRESETS: Record<string, RenderPreset> = {
   draft:   { width: 1280, height: 720,  concurrency: 6, skipGrain: true,  skipBloom: true,  label: "Draft (720p, no grain/bloom)" },
   preview: { width: 1920, height: 1080, concurrency: 8, skipGrain: false, skipBloom: false, label: "Preview (1080p, full quality)" },
   final:   { width: 1920, height: 1080, concurrency: 3, skipGrain: false, skipBloom: false, label: "Final (1080p, full quality, max fidelity)" },
-  "4k":    { width: 3840, height: 2160, concurrency: 6, skipGrain: false, skipBloom: false, label: "4K (2160p, full quality)" },
+  "4k":    { width: 3840, height: 2160, concurrency: 10, skipGrain: false, skipBloom: false, label: "4K (2160p, full quality)" },
 };
 
 // Parse args
@@ -725,7 +725,10 @@ function main() {
   const numCores = cpus().length;
   const renderWidth = parseInt(process.env.RENDER_WIDTH ?? "1920", 10);
   const pixelScale = (renderWidth * parseInt(process.env.RENDER_HEIGHT ?? "1080", 10)) / (1920 * 1080);
-  const adaptiveConcurrency = activePreset?.concurrency ?? Math.min(12, Math.max(4, Math.floor(numCores / pixelScale)));
+  // GPU-bound at 4K: RTX 4090 handles 10+ concurrent Chrome workers (24GB VRAM, ~500MB per 4K worker).
+  // CPU-bound at 1080p: scale with core count. The old formula (cores/pixelScale) was too conservative
+  // at 4K, yielding 4 workers on 16-core machines when the GPU could handle 10+.
+  const adaptiveConcurrency = activePreset?.concurrency ?? Math.min(16, Math.max(6, Math.floor(numCores / Math.sqrt(pixelScale))));
   console.log(`Resolution: ${process.env.RENDER_WIDTH}x${process.env.RENDER_HEIGHT} | Concurrency: ${adaptiveConcurrency} (${numCores} cores)`);
 
   const setlist = JSON.parse(readFileSync(join(DATA_DIR, "setlist.json"), "utf-8"));
