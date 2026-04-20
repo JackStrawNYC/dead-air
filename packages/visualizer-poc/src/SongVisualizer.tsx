@@ -67,8 +67,7 @@ import { endScreenOverlayMult } from "./utils/end-screen-zones";
 import { getVenueProfile } from "./utils/venue-profiles";
 import { deriveChromaPalette } from "./utils/chroma-palette";
 import { SongPositionIndicator } from "./components/SongPositionIndicator";
-import { JamTimer } from "./components/JamTimer";
-import { UpNextTeaser } from "./components/UpNextTeaser";
+// JamTimer and UpNextTeaser removed — break concert film immersion
 // Visual fatigue, crowd energy, after-jam, tour position, set-theme, show-arc
 // computations moved to useVisualModifiers hook
 import { detectStemInterplay } from "./utils/stem-interplay";
