@@ -689,10 +689,24 @@ function concatShow(
   writeFileSync(listPath, entries.join("\n"));
 
   console.log(`\nConcatenating ${entries.length} segments (${chaptersInserted} chapter cards) into full show ...`);
-  execSync(
-    `ffmpeg -y -f concat -safe 0 -i "${listPath}" -c:v copy -c:a copy "${showOutput}"`,
-    { cwd: ROOT, stdio: "inherit" },
-  );
+
+  // If rendering at <4K, upscale to 4K in the concat step for YouTube's premium
+  // VP9 bitrate allocation (~20Mbps vs ~8Mbps at 1080p). Lanczos scaling preserves
+  // shader gradient quality. No visual difference for procedural content.
+  const renderWidth = parseInt(process.env.RENDER_WIDTH ?? "1920", 10);
+  const upscale4K = renderWidth < 3840;
+  if (upscale4K) {
+    console.log("Upscaling to 4K for YouTube premium bitrate (lanczos)...");
+    execSync(
+      `ffmpeg -y -f concat -safe 0 -i "${listPath}" -vf "scale=3840:2160:flags=lanczos" -c:v libx264 -crf 18 -preset medium -c:a copy "${showOutput}"`,
+      { cwd: ROOT, stdio: "inherit" },
+    );
+  } else {
+    execSync(
+      `ffmpeg -y -f concat -safe 0 -i "${listPath}" -c:v copy -c:a copy "${showOutput}"`,
+      { cwd: ROOT, stdio: "inherit" },
+    );
+  }
   console.log(`Full show: ${showOutput}`);
 }
 

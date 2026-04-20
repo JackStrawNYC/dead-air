@@ -28,7 +28,7 @@ STATE_DIR="$PROJECT_DIR/out/vast-render-state"
 
 NUM_INSTANCES=8
 FPS=60
-RESOLUTION="--4k"
+RESOLUTION=""
 DRY_RUN=false
 ACTION="render"
 
@@ -36,7 +36,7 @@ for arg in "$@"; do
   case "$arg" in
     --instances=*) NUM_INSTANCES="${arg#*=}" ;;
     --fps=*) FPS="${arg#*=}" ;;
-    --4k) RESOLUTION="--4k" ;;
+    --4k) RESOLUTION="" ;;
     --1080p) RESOLUTION="" ;;
     --dry-run) DRY_RUN=true ;;
     --status) ACTION="status" ;;
