@@ -25,6 +25,8 @@ export const OVERLAY_REGISTRY: OverlayEntry[] = [
   { name: "CrowdDance",      layer: 1, category: "atmospheric", tags: ["festival", "intense"],           energyBand: "high", weight: 1, dutyCycle: 100, energyResponse: [0.20, 0.35, 2.0], tier: "B", prominence: "ambient", region: "edge" },
   { name: "GlowSticks",      layer: 1, category: "atmospheric", tags: ["festival", "intense"],           energyBand: "high", weight: 1, dutyCycle: 100, energyResponse: [0.15, 0.30, 2.0], tier: "B", prominence: "ambient", region: "edge" },
   { name: "GodRays",          layer: 1, category: "atmospheric", tags: ["contemplative", "cosmic"],       energyBand: "low",  weight: 1, dutyCycle: 100, energyResponse: [0.0, 0.08, 2.5], tier: "B", prominence: "ambient", region: "edge" },
+  { name: "NeonStreaks",      layer: 1, category: "atmospheric", tags: ["festival", "intense"],           energyBand: "high", weight: 2, dutyCycle: 100, energyResponse: [0.15, 0.30, 2.0], tier: "A", prominence: "ambient", region: "edge" },
+  { name: "CandleGlow",      layer: 1, category: "atmospheric", tags: ["contemplative", "organic"],      energyBand: "low",  weight: 2, dutyCycle: 100, energyResponse: [0.03, 0.15, 1.5], tier: "A", prominence: "ambient", region: "edge" },
 
   // ═══ Layer 2: Sacred / Center-stage — ALL DEMOTED to C ═══
   // These are SVG illustrations that look like clip art on top of shaders.

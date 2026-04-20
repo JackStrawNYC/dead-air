@@ -19,6 +19,8 @@ import { LighterWave } from "../components/LighterWave";
 import { CrowdDance } from "../components/CrowdDance";
 import { GlowSticks } from "../components/GlowSticks";
 import { GodRays } from "../components/GodRays";
+import { NeonStreaks } from "../components/NeonStreaks";
+import { CandleGlow } from "../components/CandleGlow";
 
 // ─── Layer 2: Sacred / Center-stage (13) ───
 import { BreathingStealie } from "../components/BreathingStealie";
@@ -474,6 +476,8 @@ export const OVERLAY_COMPONENTS: Record<string, OverlayComponentEntry> = {
   CrowdDance:        { Component: CrowdDance, layer: 1 },
   GlowSticks:        { Component: GlowSticks, layer: 1 },
   GodRays:           { Component: GodRays, layer: 1 },
+  NeonStreaks:        { Component: NeonStreaks, layer: 1 },
+  CandleGlow:        { Component: CandleGlow, layer: 1 },
 
   // Layer 2: Sacred / Center-stage
   StealieTraced:     { Component: StealieTracedOverlay, layer: 2 },

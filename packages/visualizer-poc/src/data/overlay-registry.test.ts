@@ -32,8 +32,8 @@ describe("overlay-registry integrity", () => {
     expect(unique.size).toBe(names.length);
   });
 
-  it("has exactly 410 entries", () => {
-    expect(OVERLAY_REGISTRY.length).toBe(410);
+  it("has exactly 412 entries", () => {
+    expect(OVERLAY_REGISTRY.length).toBe(412);
   });
 
   it("all entries have required fields", () => {
