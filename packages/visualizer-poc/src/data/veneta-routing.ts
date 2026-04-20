@@ -85,13 +85,13 @@ export const VENETA_SONG_IDENTITIES: Record<string, SongIdentity> = {
     palette: { primary: 35, secondary: 200, saturation: 1.0 },
     overlayBoost: [
       // Soul
-      "GreyhoundBus",
+      "LiquidLightBorder",
       // Show
       ...VENETA_SHOW_OVERLAYS,
       // General + Culture
-      "OregonMeadow",
-      "BearParade",
-      "GlowSticks",
+      "HeatShimmer",
+      "TieDyeWash",
+      "MeteorShower",
     ],
     overlayDensity: 1.0,
     moodKeywords: ["festival", "intense"],
@@ -112,14 +112,14 @@ export const VENETA_SONG_IDENTITIES: Record<string, SongIdentity> = {
     palette: { primary: 15, secondary: 340, saturation: 0.95 },
     overlayBoost: [
       // Soul
-      "SugareeRose",
-      "Roses",
+      "Fireflies",
+      "GodRays",
       // Show
       ...VENETA_SHOW_OVERLAYS,
       // General + Culture
-      "OregonMeadow",
+      "HeatShimmer",
       "Fireflies",
-      "BreathingStealie",
+      "FibonacciSpiral",
     ],
     overlayDensity: 1.1,
     moodKeywords: ["contemplative", "organic", "dead-culture"],
@@ -139,16 +139,15 @@ export const VENETA_SONG_IDENTITIES: Record<string, SongIdentity> = {
     palette: { primary: 25, secondary: 195, saturation: 0.9 },
     overlayBoost: [
       // Soul
-      "CowboySaloon",
-      "MexicaliDesert",
+      "SmokeWisps",
+      "HeatShimmer",
       // Show
       ...VENETA_SHOW_OVERLAYS,
       // General
-      "OregonMeadow",
-      "BearParade",
+      "OregonSunBlaze",
     ],
-    overlayDensity: 1.0,
-    moodKeywords: ["retro", "festival"],
+    overlayDensity: 0.9,
+    moodKeywords: ["organic", "festival"],
     narrativeArc: "story_arc",
     thematicTags: ["cowboy", "western", "outlaw"],
   },
@@ -165,13 +164,13 @@ export const VENETA_SONG_IDENTITIES: Record<string, SongIdentity> = {
     palette: { primary: 350, secondary: 180, saturation: 1.0 },
     overlayBoost: [
       // Soul
-      "PlayingCards",
+      "KaleidoscopeFilter",
       // Show
       ...VENETA_SHOW_OVERLAYS,
       // General
-      "BearParade",
-      "GlowSticks",
-      "BreathingStealie",
+      "TieDyeWash",
+      "MeteorShower",
+      "FibonacciSpiral",
     ],
     overlayDensity: 1.0,
     moodKeywords: ["festival", "intense"],
@@ -190,12 +189,12 @@ export const VENETA_SONG_IDENTITIES: Record<string, SongIdentity> = {
     palette: { primary: 20, secondary: 220, saturation: 0.85 },
     overlayBoost: [
       // Soul
-      "WindWalker",
+      "FogBank",
       // Show
       ...VENETA_SHOW_OVERLAYS,
       // General + Culture
-      "OregonMeadow",
-      "BearParade",
+      "HeatShimmer",
+      "TieDyeWash",
     ],
     overlayDensity: 0.9,
     moodKeywords: ["contemplative", "organic"],
@@ -215,14 +214,14 @@ export const VENETA_SONG_IDENTITIES: Record<string, SongIdentity> = {
     palette: { primary: 50, secondary: 320, saturation: 1.0 },
     overlayBoost: [
       // Soul (China Cat has its own overlay!)
-      "ChinaCatSunflower",
+      "PrismRainbow",
       // Show
       ...VENETA_SHOW_OVERLAYS,
       // General + Culture
-      "OregonMeadow",
+      "HeatShimmer",
       "Fireflies",
-      "BreathingStealie",
-      "BearParade",
+      "FibonacciSpiral",
+      "TieDyeWash",
     ],
     overlayDensity: 1.2,
     moodKeywords: ["psychedelic", "organic", "dead-culture"],
@@ -243,13 +242,13 @@ export const VENETA_SONG_IDENTITIES: Record<string, SongIdentity> = {
     palette: { primary: 40, secondary: 200, saturation: 1.0 },
     overlayBoost: [
       // Soul (THE iconic train imagery)
-      "HeadlightTrain",
-      "SteamLocomotive",
+      "MeteorShower",
+      "LiquidLightBorder",
       // Show
       ...VENETA_SHOW_OVERLAYS,
       // General + Culture
-      "OregonMeadow",
-      "BearParade",
+      "HeatShimmer",
+      "TieDyeWash",
     ],
     overlayDensity: 1.2,
     moodKeywords: ["festival", "intense", "dead-culture"],
@@ -270,13 +269,13 @@ export const VENETA_SONG_IDENTITIES: Record<string, SongIdentity> = {
     palette: { primary: 30, secondary: 170, saturation: 0.95 },
     overlayBoost: [
       // Soul
-      "MexicaliDesert",
-      "CowboySaloon",
+      "HeatShimmer",
+      "SmokeWisps",
       // Show
       ...VENETA_SHOW_OVERLAYS,
       // General + Culture
-      "OregonMeadow",
-      "BearParade",
+      "HeatShimmer",
+      "TieDyeWash",
     ],
     overlayDensity: 1.0,
     moodKeywords: ["retro", "festival"],
@@ -284,7 +283,7 @@ export const VENETA_SONG_IDENTITIES: Record<string, SongIdentity> = {
     thematicTags: ["mexico", "border", "warm"],
   },
 
-  /** "Bertha" — peppy Dead anthem */
+  /** "SmokeWisps" — peppy Dead anthem */
   bertha: {
     preferredModes: [
       "warm_nebula", // anchor
@@ -296,14 +295,14 @@ export const VENETA_SONG_IDENTITIES: Record<string, SongIdentity> = {
     palette: { primary: 25, secondary: 320, saturation: 1.0 },
     overlayBoost: [
       // Soul
-      "Bertha",
-      "SkullRoses",
+      "SmokeWisps",
+      "FibonacciSpiral",
       // Show
       ...VENETA_SHOW_OVERLAYS,
       // General + Culture
-      "OregonMeadow",
-      "BreathingStealie",
-      "BearParade",
+      "HeatShimmer",
+      "FibonacciSpiral",
+      "TieDyeWash",
     ],
     overlayDensity: 1.2,
     moodKeywords: ["dead-culture", "festival"],
@@ -325,13 +324,13 @@ export const VENETA_SONG_IDENTITIES: Record<string, SongIdentity> = {
     palette: { primary: 45, secondary: 280, saturation: 0.95 },
     overlayBoost: [
       // Soul
-      "MusicalNotation",
+      "KaleidoscopeFilter",
       // Show
       ...VENETA_SHOW_OVERLAYS,
       // General + Culture
-      "OregonMeadow",
-      "BreathingStealie",
-      "BearParade",
+      "HeatShimmer",
+      "FibonacciSpiral",
+      "TieDyeWash",
     ],
     overlayDensity: 1.1,
     moodKeywords: ["psychedelic", "festival"],
@@ -351,17 +350,17 @@ export const VENETA_SONG_IDENTITIES: Record<string, SongIdentity> = {
     palette: { primary: 220, secondary: 30, saturation: 0.7 },
     overlayBoost: [
       // Soul
-      "EmptyChair",
-      "BirdInFlight",
+      "SmokeWisps",
+      "CosmicStarfield",
       // Show (slightly suppressed for somber mood)
       "OregonSunBlaze",
       "HeatShimmer",
       "RenaissanceFaireBanner",
       // General + Culture
-      "OregonMeadow",
-      "BreathingStealie",
+      "HeatShimmer",
+      "FibonacciSpiral",
     ],
-    overlaySuppress: ["GlowSticks", "CrowdDance"],
+    overlaySuppress: ["MeteorShower", "TieDyeWash"],
     overlayDensity: 0.7, // sparse — mournful
     moodKeywords: ["contemplative", "organic"],
     narrativeArc: "elegy",
@@ -381,13 +380,13 @@ export const VENETA_SONG_IDENTITIES: Record<string, SongIdentity> = {
     palette: { primary: 30, secondary: 200, saturation: 1.0 },
     overlayBoost: [
       // Soul
-      "WichitaTulsa",
-      "CowboySaloon",
+      "HeatShimmer",
+      "SmokeWisps",
       // Show
       ...VENETA_SHOW_OVERLAYS,
       // General + Culture
-      "OregonMeadow",
-      "BearParade",
+      "HeatShimmer",
+      "TieDyeWash",
     ],
     overlayDensity: 1.1,
     moodKeywords: ["intense", "festival"],
@@ -408,15 +407,15 @@ export const VENETA_SONG_IDENTITIES: Record<string, SongIdentity> = {
     palette: { primary: 40, secondary: 200, saturation: 0.9 },
     overlayBoost: [
       // Soul
-      "BirdInFlight",
+      "CosmicStarfield",
       // Show
       ...VENETA_SHOW_OVERLAYS,
       // General + Culture
-      "OregonMeadow",
+      "HeatShimmer",
       "Fireflies",
-      "BreathingStealie",
+      "FibonacciSpiral",
     ],
-    overlaySuppress: ["GlowSticks"],
+    overlaySuppress: ["MeteorShower"],
     overlayDensity: 0.9,
     moodKeywords: ["contemplative", "organic"],
     narrativeArc: "meditative_journey",
@@ -436,13 +435,13 @@ export const VENETA_SONG_IDENTITIES: Record<string, SongIdentity> = {
     palette: { primary: 45, secondary: 280, saturation: 0.95 },
     overlayBoost: [
       // Soul
-      "MosesStaff",
+      "GodRays",
       // Show
       ...VENETA_SHOW_OVERLAYS,
       // General + Culture
-      "OregonMeadow",
-      "BreathingStealie",
-      "BearParade",
+      "HeatShimmer",
+      "FibonacciSpiral",
+      "TieDyeWash",
     ],
     overlayDensity: 1.0,
     moodKeywords: ["intense", "festival"],
@@ -463,15 +462,15 @@ export const VENETA_SONG_IDENTITIES: Record<string, SongIdentity> = {
     palette: { primary: 270, secondary: 60, saturation: 0.85 },
     overlayBoost: [
       // Soul (Drums/Space has its own existing overlays)
-      "DrumCircle",
       "SpaceDrums",
-      "DrummersDuo",
+      "SpaceDrums",
+      "SpaceDrums",
       // Show (only the most cosmic/atmospheric)
       "OregonSunBlaze",
       "HeatShimmer",
       "SunshineDaydreamCamera",
       // General + Culture
-      "BreathingStealie",
+      "FibonacciSpiral",
       "DarkStarPortal",
     ],
     overlayDensity: 1.0,
@@ -506,16 +505,14 @@ export const VENETA_SONG_IDENTITIES: Record<string, SongIdentity> = {
       // Soul (Dark Star deepest cut: KeseyFurthur)
       "DarkStarPortal",
       "DarkStarAscent",
-      "KeseyFurthur", // ← THE legendary moment
       // Show (Veneta-essential)
       ...VENETA_SHOW_OVERLAYS,
       // General + Culture
-      "OregonMeadow",
-      "BreathingStealie",
-      "PsychedelicEye",
-      "BearParade",
+      "CosmicStarfield",
+      "FibonacciSpiral",
+      "SpaceDrums",
     ],
-    overlayDensity: 1.3, // dense — 33 minutes needs variety
+    overlayDensity: 0.4, // sparse — let deep feedback shader dominate
     moodKeywords: ["cosmic", "psychedelic", "dead-culture"],
     narrativeArc: "meditative_journey",
     thematicTags: ["cosmic", "exploration", "iconic", "veneta-defining"],
@@ -535,13 +532,13 @@ export const VENETA_SONG_IDENTITIES: Record<string, SongIdentity> = {
     palette: { primary: 20, secondary: 350, saturation: 0.95 },
     overlayBoost: [
       // Soul
-      "CowboySaloon",
-      "MexicaliDesert",
+      "SmokeWisps",
+      "HeatShimmer",
       // Show
       ...VENETA_SHOW_OVERLAYS,
       // General + Culture
-      "OregonMeadow",
-      "BearParade",
+      "HeatShimmer",
+      "TieDyeWash",
     ],
     overlayDensity: 1.0,
     moodKeywords: ["retro", "festival"],
@@ -562,17 +559,17 @@ export const VENETA_SONG_IDENTITIES: Record<string, SongIdentity> = {
     palette: { primary: 25, secondary: 220, saturation: 0.7 },
     overlayBoost: [
       // Soul
-      "PrisonBars",
-      "EmptyChair",
+      "FogBank",
+      "SmokeWisps",
       // Show (toned down)
       "OregonSunBlaze",
       "HeatShimmer",
       "SunshineDaydreamCamera",
       // General + Culture
-      "OregonMeadow",
-      "BreathingStealie",
+      "HeatShimmer",
+      "FibonacciSpiral",
     ],
-    overlaySuppress: ["GlowSticks", "CrowdDance"],
+    overlaySuppress: ["MeteorShower", "TieDyeWash"],
     overlayDensity: 0.7,
     moodKeywords: ["contemplative", "organic"],
     narrativeArc: "elegy",
@@ -592,18 +589,15 @@ export const VENETA_SONG_IDENTITIES: Record<string, SongIdentity> = {
     palette: { primary: 45, secondary: 320, saturation: 1.0 },
     overlayBoost: [
       // Soul
-      "SugarMagnolia",
-      "Roses",
-      "AmericanBeauty",
+      "GodRays",
+      "TieDyeWash",
+      "PrismRainbow",
       // Show
       ...VENETA_SHOW_OVERLAYS,
       // General + Culture
-      "OregonMeadow",
-      "Fireflies",
-      "BreathingStealie",
-      "BearParade",
+      "MeteorShower",
     ],
-    overlayDensity: 1.3,
+    overlayDensity: 1.1,
     moodKeywords: ["festival", "organic", "dead-culture"],
     narrativeArc: "celebration",
     thematicTags: ["romantic", "joyous", "iconic"],
@@ -622,14 +616,14 @@ export const VENETA_SONG_IDENTITIES: Record<string, SongIdentity> = {
     palette: { primary: 30, secondary: 200, saturation: 1.0 },
     overlayBoost: [
       // Soul
-      "SteamLocomotive",
-      "HeadlightTrain",
+      "LiquidLightBorder",
+      "MeteorShower",
       // Show
       ...VENETA_SHOW_OVERLAYS,
       // General + Culture
-      "OregonMeadow",
-      "BearParade",
-      "GlowSticks",
+      "HeatShimmer",
+      "TieDyeWash",
+      "MeteorShower",
     ],
     overlayDensity: 1.2,
     moodKeywords: ["festival", "intense", "dead-culture"],
@@ -652,11 +646,11 @@ export const VENETA_SONG_IDENTITIES: Record<string, SongIdentity> = {
       // Show
       ...VENETA_SHOW_OVERLAYS,
       // General + Culture (party!)
-      "OregonMeadow",
-      "GlowSticks",
-      "CrowdDance",
-      "BearParade",
-      "BreathingStealie",
+      "HeatShimmer",
+      "MeteorShower",
+      "TieDyeWash",
+      "TieDyeWash",
+      "FibonacciSpiral",
     ],
     overlayDensity: 1.3,
     moodKeywords: ["festival", "intense"],
@@ -677,16 +671,16 @@ export const VENETA_SONG_IDENTITIES: Record<string, SongIdentity> = {
     palette: { primary: 30, secondary: 220, saturation: 0.75 },
     overlayBoost: [
       // Soul
-      "GospelChurch",
+      "GodRays",
       // Show (gentle versions)
       "OregonSunBlaze",
       "HeatShimmer",
       "SunshineDaydreamCamera",
       // General + Culture
-      "OregonMeadow",
-      "BreathingStealie",
+      "HeatShimmer",
+      "FibonacciSpiral",
     ],
-    overlaySuppress: ["GlowSticks", "CrowdDance"],
+    overlaySuppress: ["MeteorShower", "TieDyeWash"],
     overlayDensity: 0.7,
     moodKeywords: ["contemplative", "organic", "dead-culture"],
     narrativeArc: "elegy",
@@ -695,6 +689,7 @@ export const VENETA_SONG_IDENTITIES: Record<string, SongIdentity> = {
     transitionIn: "dissolve",
     transitionOut: "void",
   },
+
 };
 
 // ─── Veneta-specific aliases (handle title variations) ───
