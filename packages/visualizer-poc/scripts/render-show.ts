@@ -89,6 +89,14 @@ const concurrencyArg = args.find((a) => a.startsWith("--concurrency="))?.split("
 const noIntro = args.includes("--no-intro");
 const noEndCard = args.includes("--no-end-card");
 const noChapters = args.includes("--no-chapters");
+const overlayOnly = args.includes("--overlay-only");
+
+// OVERLAY_ONLY mode: skip shaders, render overlays/text on transparent background.
+// Used for compositing overlay layer on top of Rust shader render.
+if (overlayOnly) {
+  process.env.OVERLAY_ONLY = "true";
+  console.log("OVERLAY_ONLY mode: shaders skipped, transparent background");
+}
 // Frame range filter for splitting a single song across multiple machines.
 // Each machine renders only chunks whose start frame falls within [frameStart, frameEnd).
 // After all machines finish, collect chunks and concat on one machine.
@@ -400,7 +408,8 @@ function renderSong(
   const chunksDir = join(SONGS_DIR, `${song.trackId}-chunks`);
   mkdirSync(chunksDir, { recursive: true });
 
-  const videoOnlyPath = join(chunksDir, "video-only.mp4");
+  const videoExt = overlayOnly ? "webm" : "mp4";
+  const videoOnlyPath = join(chunksDir, `video-only.${videoExt}`);
 
   // Step 1: Render video-only (muted) — chunked for speed
   if (totalFrames <= chunkSize) {
@@ -419,6 +428,7 @@ function renderSong(
         `--delay-render-timeout-in-milliseconds=300000`,
         `--frames=0-${totalFrames - 1}`,
         "--muted",
+        ...(overlayOnly ? ["--codec=vp8"] : []),
       ].join(" ");
       execWithRetry(cmd, { cwd: ROOT, stdio: "inherit" }, `${song.trackId} single-pass`);
     } else {
@@ -431,7 +441,7 @@ function renderSong(
 
     while (start < totalFrames) {
       const end = Math.min(start + chunkSize - 1, totalFrames - 1);
-      const chunkPath = join(chunksDir, `chunk-${String(start).padStart(8, "0")}.mp4`);
+      const chunkPath = join(chunksDir, `chunk-${String(start).padStart(8, "0")}.${videoExt}`);
 
       // --frame-start / --frame-end: skip chunks outside the requested range.
       // This allows splitting a long song across multiple machines — each
@@ -459,6 +469,7 @@ function renderSong(
           `--delay-render-timeout-in-milliseconds=300000`,
           `--frames=${start}-${end}`,
           "--muted",
+        ...(overlayOnly ? ["--codec=vp8"] : []),
         ].join(" ");
         execWithRetry(cmd, { cwd: ROOT, stdio: "inherit" }, `${song.trackId} chunk ${start}-${end}`);
       }
