@@ -222,8 +222,10 @@ export const DynamicOverlayStack: React.FC<Props> = ({
   return (
     <TempoProvider tempo={tempo}>
     <SongPaletteProvider palette={palette}>
-      {/* GLSL overlays — rendered as regular components (they wrap OverlayQuad internally) */}
-      {glslOverlays.length > 0 && (
+      {/* GLSL overlays — rendered as regular components (they wrap OverlayQuad internally).
+          Skip in OVERLAY_ONLY mode: GLSL overlays use Three.js Canvas which triggers
+          shader compilation errors (pc_fragColor) and crash-loops Chrome. */}
+      {glslOverlays.length > 0 && process.env.OVERLAY_ONLY !== "true" && (
         <div
           style={{
             position: "absolute",
