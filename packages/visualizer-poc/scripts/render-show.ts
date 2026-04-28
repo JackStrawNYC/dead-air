@@ -95,8 +95,11 @@ const overlayOnly = args.includes("--overlay-only");
 // Used for compositing overlay layer on top of Rust shader render.
 if (overlayOnly) {
   process.env.OVERLAY_ONLY = "true";
-  console.log("OVERLAY_ONLY mode: shaders skipped, transparent background");
+  console.log("OVERLAY_ONLY mode: using OverlayOnlyVisualizer (fast, no WebGL)");
 }
+
+// Composition ID prefix: overlay-only renders use "overlay-{trackId}" compositions
+const compositionPrefix = overlayOnly ? "overlay-" : "";
 // Frame range filter for splitting a single song across multiple machines.
 // Each machine renders only chunks whose start frame falls within [frameStart, frameEnd).
 // After all machines finish, collect chunks and concat on one machine.
@@ -419,7 +422,7 @@ function renderSong(
       const cmd = [
         "node_modules/.bin/remotion render",
         bundlePath,
-        song.trackId,
+        compositionPrefix + song.trackId,
         videoOnlyPath,
         `--props=${analysisPath}`,
         `--gl=${glArg}`,
@@ -460,7 +463,7 @@ function renderSong(
         const cmd = [
           "node_modules/.bin/remotion render",
           bundlePath,
-          song.trackId,
+          compositionPrefix + song.trackId,
           chunkPath,
           `--props=${analysisPath}`,
           `--gl=${glArg}`,

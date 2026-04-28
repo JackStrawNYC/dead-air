@@ -1,6 +1,7 @@
 import React from "react";
 import { Composition, getInputProps } from "remotion";
 import { SongVisualizer, SongVisualizerProps } from "./SongVisualizer";
+import { OverlayOnlyVisualizer, OverlayOnlyProps } from "./OverlayOnlyVisualizer";
 import { ShowIntro } from "./components/ShowIntro";
 import { ChapterCard } from "./components/ChapterCard";
 import { OverlayPreview } from "./OverlayPreview";
@@ -143,7 +144,7 @@ const narrativeStates: PrecomputedNarrative[] = (narrativeStatesRaw as Serialize
 const FPS_SCALE = RENDER_FPS / 30; // 1.0 at 30fps, 2.0 at 60fps
 const DEFAULT_FRAMES = Math.round(31417 * FPS_SCALE); // Morning Dew fallback
 const SET_BREAK_FRAMES = Math.round(300 * FPS_SCALE); // 10 seconds
-const SHOW_INTRO_FRAMES = Math.round(465 * FPS_SCALE); // ~15.5s (7s video + 2s crossfade + 5s poster hold + 1.5s fade)
+const SHOW_INTRO_FRAMES = Math.round(555 * FPS_SCALE); // ~18.5s (10s full brand video + 2s crossfade + 5s poster hold + 1.5s fade)
 const CHAPTER_CARD_FRAMES = Math.round(180 * FPS_SCALE); // 6 seconds
 const END_CARD_FRAMES = Math.round(360 * FPS_SCALE);     // 12 seconds
 
@@ -312,6 +313,44 @@ export const Root: React.FC = () => {
           />
         );
       })}
+
+      {/* Overlay-only compositions — stripped-down renderer for overlay pass */}
+      {setlist.songs.map((song: SetlistEntry, i: number) => (
+          <Composition
+            key={`overlay-${song.trackId}`}
+            id={`overlay-${song.trackId}`}
+            component={OverlayOnlyVisualizer as React.ComponentType<any>}
+            durationInFrames={DEFAULT_FRAMES}
+            fps={RENDER_FPS}
+            width={RENDER_WIDTH}
+            height={RENDER_HEIGHT}
+            defaultProps={{
+              song,
+              activeOverlays: getActiveOverlays(song.trackId),
+              energyHints: getEnergyHints(song.trackId),
+              show: setlist,
+            } satisfies OverlayOnlyProps as Record<string, unknown>}
+            calculateMetadata={async ({ props }) => {
+              const p = props as Record<string, unknown>;
+              let analysis: any = null;
+              if (p.meta && p.frames) {
+                analysis = safeParse(FlexibleTrackAnalysisSchema, { meta: p.meta, frames: p.frames });
+              } else {
+                try {
+                  const { staticFile } = require("remotion");
+                  const url = staticFile(`tracks/${song.trackId}-analysis.json`);
+                  const res = await fetch(url);
+                  if (res.ok) analysis = safeParse(FlexibleTrackAnalysisSchema, await res.json());
+                } catch {}
+              }
+              const totalFrames = analysis?.meta?.totalFrames ?? timelineByTrackId[song.trackId] ?? DEFAULT_FRAMES;
+              return {
+                durationInFrames: Math.round(totalFrames * FPS_SCALE),
+                props: { ...props, analysis },
+              };
+            }}
+          />
+      ))}
 
       {/* Set break — cinematic interstitial between sets */}
       <Composition
