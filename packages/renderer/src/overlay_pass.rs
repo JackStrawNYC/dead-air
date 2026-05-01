@@ -97,6 +97,9 @@ fn vs_main(@builtin(vertex_index) vid: u32, inst: InstanceIn) -> VsOut {
 @group(0) @binding(0) var atlas_tex: texture_2d<f32>;
 @group(0) @binding(1) var atlas_samp: sampler;
 
+// Premultiplied output: each pipeline pairs this with a different BlendState
+// to realise Normal / Screen / Multiply. Premultiplying in the shader keeps
+// the per-mode blend math expressible as standard wgpu BlendComponents.
 @fragment
 fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     let src = textureSample(atlas_tex, atlas_samp, in.uv);
@@ -108,9 +111,17 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     if (luma < 0.12) {
         discard;
     }
-    return vec4<f32>(src.rgb, src.a * in.opacity);
+    let a = src.a * in.opacity;
+    // Premultiplied source: the blend state below combines this with dst.
+    return vec4<f32>(src.rgb * a, a);
 }
 "#;
+
+/// Blend mode index in the schedule's `OverlayInstance::blend_mode`.
+/// Matches `compositor::BlendMode` ordinals via `instance_to_gpu`.
+const BLEND_NORMAL: u32 = 0;
+const BLEND_SCREEN: u32 = 1;
+const BLEND_MULTIPLY: u32 = 2;
 
 pub struct OverlayCompositingPipeline {
     pub atlas_texture: wgpu::Texture,
@@ -118,7 +129,14 @@ pub struct OverlayCompositingPipeline {
     pub atlas_sampler: wgpu::Sampler,
     pub bind_group_layout: wgpu::BindGroupLayout,
     pub bind_group: wgpu::BindGroup,
-    pub pipeline: wgpu::RenderPipeline,
+    /// One render pipeline per blend mode. Premultiplied source from the
+    /// fragment shader pairs with mode-specific BlendComponents:
+    ///   Normal:   src + dst*(1 - src.a)             (alpha-blend, premul)
+    ///   Screen:   src + dst*(1 - src.rgb)           (1 - (1-src)(1-dst) when α=1)
+    ///   Multiply: src*dst + dst*(1 - src.a)         (mix between dst*src and dst by α)
+    pub pipeline_normal: wgpu::RenderPipeline,
+    pub pipeline_screen: wgpu::RenderPipeline,
+    pub pipeline_multiply: wgpu::RenderPipeline,
     pub atlas_width: u32,
     pub atlas_height: u32,
 }
@@ -223,46 +241,99 @@ impl OverlayCompositingPipeline {
             push_constant_ranges: &[],
         });
 
-        let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("overlay_pipeline"),
-            layout: Some(&layout),
-            vertex: wgpu::VertexState {
-                module: &module,
-                entry_point: Some("vs_main"),
-                buffers: &[wgpu::VertexBufferLayout {
-                    array_stride: std::mem::size_of::<OverlayInstanceGPU>() as u64,
-                    step_mode: wgpu::VertexStepMode::Instance,
-                    attributes: &[
-                        wgpu::VertexAttribute { format: wgpu::VertexFormat::Float32x2, offset: 0,  shader_location: 0 },
-                        wgpu::VertexAttribute { format: wgpu::VertexFormat::Float32x2, offset: 8,  shader_location: 1 },
-                        wgpu::VertexAttribute { format: wgpu::VertexFormat::Float32x4, offset: 16, shader_location: 2 },
-                        wgpu::VertexAttribute { format: wgpu::VertexFormat::Float32,   offset: 32, shader_location: 3 },
-                        wgpu::VertexAttribute { format: wgpu::VertexFormat::Float32,   offset: 36, shader_location: 4 },
-                        wgpu::VertexAttribute { format: wgpu::VertexFormat::Uint32,    offset: 40, shader_location: 5 },
-                        wgpu::VertexAttribute { format: wgpu::VertexFormat::Uint32,    offset: 44, shader_location: 6 },
-                    ],
-                }],
-                compilation_options: Default::default(),
+        let make_pipeline = |label: &'static str, blend: wgpu::BlendState| {
+            device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                label: Some(label),
+                layout: Some(&layout),
+                vertex: wgpu::VertexState {
+                    module: &module,
+                    entry_point: Some("vs_main"),
+                    buffers: &[wgpu::VertexBufferLayout {
+                        array_stride: std::mem::size_of::<OverlayInstanceGPU>() as u64,
+                        step_mode: wgpu::VertexStepMode::Instance,
+                        attributes: &[
+                            wgpu::VertexAttribute { format: wgpu::VertexFormat::Float32x2, offset: 0,  shader_location: 0 },
+                            wgpu::VertexAttribute { format: wgpu::VertexFormat::Float32x2, offset: 8,  shader_location: 1 },
+                            wgpu::VertexAttribute { format: wgpu::VertexFormat::Float32x4, offset: 16, shader_location: 2 },
+                            wgpu::VertexAttribute { format: wgpu::VertexFormat::Float32,   offset: 32, shader_location: 3 },
+                            wgpu::VertexAttribute { format: wgpu::VertexFormat::Float32,   offset: 36, shader_location: 4 },
+                            wgpu::VertexAttribute { format: wgpu::VertexFormat::Uint32,    offset: 40, shader_location: 5 },
+                            wgpu::VertexAttribute { format: wgpu::VertexFormat::Uint32,    offset: 44, shader_location: 6 },
+                        ],
+                    }],
+                    compilation_options: Default::default(),
+                },
+                fragment: Some(wgpu::FragmentState {
+                    module: &module,
+                    entry_point: Some("fs_main"),
+                    targets: &[Some(wgpu::ColorTargetState {
+                        format: target_format,
+                        blend: Some(blend),
+                        write_mask: wgpu::ColorWrites::ALL,
+                    })],
+                    compilation_options: Default::default(),
+                }),
+                primitive: wgpu::PrimitiveState {
+                    topology: wgpu::PrimitiveTopology::TriangleList,
+                    ..Default::default()
+                },
+                depth_stencil: None,
+                multisample: wgpu::MultisampleState::default(),
+                multiview: None,
+                cache: None,
+            })
+        };
+
+        // Source from fragment shader is premultiplied (rgb * a, a).
+        // Standard premultiplied alpha-over-dst:
+        //   final = src + dst * (1 - src.a)
+        let blend_normal = wgpu::BlendState {
+            color: wgpu::BlendComponent {
+                src_factor: wgpu::BlendFactor::One,
+                dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
+                operation: wgpu::BlendOperation::Add,
             },
-            fragment: Some(wgpu::FragmentState {
-                module: &module,
-                entry_point: Some("fs_main"),
-                targets: &[Some(wgpu::ColorTargetState {
-                    format: target_format,
-                    blend: Some(wgpu::BlendState::ALPHA_BLENDING),
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
-                compilation_options: Default::default(),
-            }),
-            primitive: wgpu::PrimitiveState {
-                topology: wgpu::PrimitiveTopology::TriangleList,
-                ..Default::default()
+            alpha: wgpu::BlendComponent {
+                src_factor: wgpu::BlendFactor::One,
+                dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
+                operation: wgpu::BlendOperation::Add,
             },
-            depth_stencil: None,
-            multisample: wgpu::MultisampleState::default(),
-            multiview: None,
-            cache: None,
-        });
+        };
+        // Screen with premultiplied src:
+        //   final = src + dst * (1 - src.rgb)
+        // When α=1, src is already the raw color → 1 - (1-src)(1-dst) = src + dst - src*dst ✓
+        // OneMinusSrc multiplies dst by (1 - src.r, 1 - src.g, 1 - src.b).
+        let blend_screen = wgpu::BlendState {
+            color: wgpu::BlendComponent {
+                src_factor: wgpu::BlendFactor::One,
+                dst_factor: wgpu::BlendFactor::OneMinusSrc,
+                operation: wgpu::BlendOperation::Add,
+            },
+            alpha: wgpu::BlendComponent {
+                src_factor: wgpu::BlendFactor::One,
+                dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
+                operation: wgpu::BlendOperation::Add,
+            },
+        };
+        // Multiply with premultiplied src:
+        //   final = src * dst + dst * (1 - src.a)
+        // When α=1: src*dst (pure multiply). When α=0: dst (no effect).
+        let blend_multiply = wgpu::BlendState {
+            color: wgpu::BlendComponent {
+                src_factor: wgpu::BlendFactor::Dst,
+                dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
+                operation: wgpu::BlendOperation::Add,
+            },
+            alpha: wgpu::BlendComponent {
+                src_factor: wgpu::BlendFactor::One,
+                dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
+                operation: wgpu::BlendOperation::Add,
+            },
+        };
+
+        let pipeline_normal = make_pipeline("overlay_pipeline_normal", blend_normal);
+        let pipeline_screen = make_pipeline("overlay_pipeline_screen", blend_screen);
+        let pipeline_multiply = make_pipeline("overlay_pipeline_multiply", blend_multiply);
 
         Self {
             atlas_texture,
@@ -270,15 +341,18 @@ impl OverlayCompositingPipeline {
             atlas_sampler,
             bind_group_layout,
             bind_group,
-            pipeline,
+            pipeline_normal,
+            pipeline_screen,
+            pipeline_multiply,
             atlas_width: atlas.width,
             atlas_height: atlas.height,
         }
     }
 
-    /// Encode a single composite-overlays pass that draws all `instances`
-    /// into `target` using the prebuilt pipeline. Caller owns the encoder
-    /// (keeps it transparent how this fits into the wider render loop).
+    /// Encode a composite-overlays pass that draws all `instances` into
+    /// `target`, grouping by blend_mode so each group renders through the
+    /// pipeline whose BlendState implements the right formula. Caller owns
+    /// the encoder.
     pub fn encode(
         &self,
         encoder: &mut wgpu::CommandEncoder,
@@ -289,35 +363,58 @@ impl OverlayCompositingPipeline {
         if instances.is_empty() {
             return;
         }
-        // Per-frame: upload instance data to a small VBO. Re-create each call
-        // for simplicity; phase C optimization will reuse a pool.
-        let instance_buffer = wgpu::util::DeviceExt::create_buffer_init(
-            device,
-            &wgpu::util::BufferInitDescriptor {
-                label: Some("overlay_instances"),
-                contents: bytemuck::cast_slice(instances),
-                usage: wgpu::BufferUsages::VERTEX,
-            },
-        );
 
-        let mut rp = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("overlay_composite_pass"),
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view: target,
-                resolve_target: None,
-                ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Load,        // composite ON TOP — keep existing frame
-                    store: wgpu::StoreOp::Store,
+        // Group by blend_mode. Stable ordering inside each group preserves
+        // overlay z-order intent (later instances paint on top).
+        let mut groups: [Vec<OverlayInstanceGPU>; 3] = Default::default();
+        for inst in instances {
+            let idx = match inst.blend_mode {
+                BLEND_NORMAL => 0,
+                BLEND_SCREEN => 1,
+                BLEND_MULTIPLY => 2,
+                _ => 1, // unknown → screen, matching CPU fallback
+            };
+            groups[idx].push(*inst);
+        }
+
+        let pipelines = [
+            (&self.pipeline_normal, "overlay_pass_normal"),
+            (&self.pipeline_screen, "overlay_pass_screen"),
+            (&self.pipeline_multiply, "overlay_pass_multiply"),
+        ];
+
+        for (i, group) in groups.iter().enumerate() {
+            if group.is_empty() {
+                continue;
+            }
+            let (pipeline, label) = pipelines[i];
+            let instance_buffer = wgpu::util::DeviceExt::create_buffer_init(
+                device,
+                &wgpu::util::BufferInitDescriptor {
+                    label: Some(label),
+                    contents: bytemuck::cast_slice(group),
+                    usage: wgpu::BufferUsages::VERTEX,
                 },
-            })],
-            depth_stencil_attachment: None,
-            timestamp_writes: None,
-            occlusion_query_set: None,
-        });
-        rp.set_pipeline(&self.pipeline);
-        rp.set_bind_group(0, &self.bind_group, &[]);
-        rp.set_vertex_buffer(0, instance_buffer.slice(..));
-        rp.draw(0..6, 0..instances.len() as u32);
+            );
+            let mut rp = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some(label),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: target,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Load,
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: None,
+                timestamp_writes: None,
+                occlusion_query_set: None,
+            });
+            rp.set_pipeline(pipeline);
+            rp.set_bind_group(0, &self.bind_group, &[]);
+            rp.set_vertex_buffer(0, instance_buffer.slice(..));
+            rp.draw(0..6, 0..group.len() as u32);
+        }
     }
 }
 

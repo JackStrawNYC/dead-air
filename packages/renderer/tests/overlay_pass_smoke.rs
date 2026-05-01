@@ -298,3 +298,135 @@ fn gpu_compositing_does_not_y_flip() {
         bot,
     );
 }
+
+/// Catch blend-mode regressions. Render a 50%-gray sprite with a known
+/// background (medium green) using each blend mode, and assert the result
+/// is in the expected range:
+///   Normal:    medium gray (50% mix of bg and gray)
+///   Screen:    brighter than bg (1 - (1-gray)*(1-bg))
+///   Multiply:  darker than bg (gray * bg)
+#[test]
+fn gpu_compositing_blend_modes_distinguishable() {
+    use dead_air_renderer::{
+        overlay_atlas::build_atlas,
+        overlay_cache::CachedOverlay,
+        overlay_pass::{OverlayCompositingPipeline, OverlayInstanceGPU},
+    };
+    use std::collections::HashMap;
+
+    let renderer = pollster::block_on(dead_air_renderer::gpu::GpuRenderer::new(64, 64))
+        .expect("GPU init");
+    let device = renderer.device();
+    let queue = renderer.queue();
+
+    // 32x32 mid-gray sprite, all 128. Lum = 128 → passes the 0.12 gate.
+    let sprite_pixels = vec![128u8; 32 * 32 * 4]
+        .chunks_exact(4)
+        .flat_map(|_| [128u8, 128, 128, 255])
+        .collect::<Vec<_>>();
+    let mut overlays = HashMap::new();
+    overlays.insert("gray".to_string(), CachedOverlay { pixels: sprite_pixels, width: 32, height: 32 });
+    let atlas = build_atlas(&overlays, 64).expect("atlas");
+    let pipeline = OverlayCompositingPipeline::new(device, queue, &atlas, wgpu::TextureFormat::Rgba8Unorm);
+    let entry = atlas.lookup["gray"];
+
+    let render_with_blend = |blend_mode: u32| -> [u8; 4] {
+        let target = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("blend_target"),
+            size: wgpu::Extent3d { width: 64, height: 64, depth_or_array_layers: 1 },
+            mip_level_count: 1, sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Rgba8Unorm,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
+            view_formats: &[],
+        });
+        let view = target.create_view(&wgpu::TextureViewDescriptor::default());
+        let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
+        // Background: medium green (0.4, 0.6, 0.4).
+        {
+            let _ = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("bg"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: &view, resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(wgpu::Color { r: 0.4, g: 0.6, b: 0.4, a: 1.0 }),
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: None, timestamp_writes: None, occlusion_query_set: None,
+            });
+        }
+        let inst = OverlayInstanceGPU {
+            center: [0.0, 0.0],
+            half_size: [0.5, 0.5],
+            uv_rect: [entry.uv_min[0], entry.uv_min[1], entry.uv_max[0], entry.uv_max[1]],
+            opacity: 1.0,
+            rotation_rad: 0.0,
+            blend_mode,
+            _pad: 0,
+        };
+        pipeline.encode(&mut encoder, device, &view, &[inst]);
+
+        let bpr = ((64 * 4 + 255) / 256) * 256;
+        let staging = device.create_buffer(&wgpu::BufferDescriptor {
+            label: None, size: (bpr * 64) as u64,
+            usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
+            mapped_at_creation: false,
+        });
+        encoder.copy_texture_to_buffer(
+            wgpu::TexelCopyTextureInfo {
+                texture: &target, mip_level: 0,
+                origin: wgpu::Origin3d::ZERO, aspect: wgpu::TextureAspect::All,
+            },
+            wgpu::TexelCopyBufferInfo {
+                buffer: &staging,
+                layout: wgpu::TexelCopyBufferLayout {
+                    offset: 0, bytes_per_row: Some(bpr as u32), rows_per_image: Some(64),
+                },
+            },
+            wgpu::Extent3d { width: 64, height: 64, depth_or_array_layers: 1 },
+        );
+        queue.submit(std::iter::once(encoder.finish()));
+        let slice = staging.slice(..);
+        let (tx, rx) = std::sync::mpsc::channel();
+        slice.map_async(wgpu::MapMode::Read, move |r| { tx.send(r).ok(); });
+        let _ = device.poll(wgpu::Maintain::Wait);
+        rx.recv().unwrap().unwrap();
+        let data = slice.get_mapped_range();
+        // Sample center pixel — guaranteed inside the sprite.
+        let i = 32 * bpr as usize + 32 * 4;
+        [data[i], data[i + 1], data[i + 2], data[i + 3]]
+    };
+
+    let normal = render_with_blend(0);
+    let screen = render_with_blend(1);
+    let multiply = render_with_blend(2);
+    eprintln!("[blend] normal: {:?}", normal);
+    eprintln!("[blend] screen: {:?}", screen);
+    eprintln!("[blend] multiply: {:?}", multiply);
+
+    // bg green channel = 0.6 = 153. Sprite is 128 (~0.5).
+    // Normal: gray over bg → ~128 on R/G/B with alpha=255.
+    // Screen on green: 1 - (1 - 0.5)(1 - 0.6) = 1 - 0.2 = 0.8 = 204
+    // Multiply on green: 0.5 * 0.6 = 0.3 = 76
+
+    // Per-channel sanity:
+    // - Normal output should be ~128 (overlay color wins, alpha=1)
+    assert!(
+        (normal[1] as i32 - 128).abs() < 20,
+        "normal blend green channel should be near 128 (overlay), got {}",
+        normal[1]
+    );
+    // - Screen brightens: G should be > bg green (153) and > normal (128)
+    assert!(
+        screen[1] > 180,
+        "screen blend green should be near 204 (brighter than bg), got {}",
+        screen[1]
+    );
+    // - Multiply darkens: G should be < bg green (153) and < normal (128)
+    assert!(
+        multiply[1] < 100,
+        "multiply blend green should be near 76 (darker than bg), got {}",
+        multiply[1]
+    );
+}
