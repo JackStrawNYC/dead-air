@@ -1,0 +1,941 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "dead-air-uniform-schema",
+  "description": "Std140 uniform layout extracted from packages/renderer/src/uniforms.rs. Source of truth for future codegen.",
+  "total_size_bytes": 656,
+  "generated_from": "packages/renderer/src/uniforms.rs",
+  "generated_at_utc": "2026-05-01",
+  "uniform_count": 116,
+  "uniforms": [
+    {
+      "name": "uTime",
+      "offset": 0,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.time",
+      "group": "Time"
+    },
+    {
+      "name": "uDynamicTime",
+      "offset": 4,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.dynamic_time",
+      "group": "Time"
+    },
+    {
+      "name": "uBeatTime",
+      "offset": 8,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.beat_time",
+      "group": "Time"
+    },
+    {
+      "name": "uBass",
+      "offset": 12,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.bass",
+      "group": "Core Audio Features"
+    },
+    {
+      "name": "uRms",
+      "offset": 16,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.rms",
+      "group": "Core Audio Features"
+    },
+    {
+      "name": "uCentroid",
+      "offset": 20,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.centroid",
+      "group": "Core Audio Features"
+    },
+    {
+      "name": "uHighs",
+      "offset": 24,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.highs",
+      "group": "Core Audio Features"
+    },
+    {
+      "name": "uOnset",
+      "offset": 28,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.onset",
+      "group": "Core Audio Features"
+    },
+    {
+      "name": "uBeat",
+      "offset": 32,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.beat",
+      "group": "Core Audio Features"
+    },
+    {
+      "name": "uMids",
+      "offset": 36,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.mids",
+      "group": "Core Audio Features"
+    },
+    {
+      "name": "uEnergy",
+      "offset": 40,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.energy",
+      "group": "Core Audio Features"
+    },
+    {
+      "name": "uFlatness",
+      "offset": 44,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "flatness.clamp(0.0, 1.0)",
+      "group": "Core Audio Features"
+    },
+    {
+      "name": "uSlowEnergy",
+      "offset": 48,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.slow_energy",
+      "group": "Smoothed / Derived Audio"
+    },
+    {
+      "name": "uFastEnergy",
+      "offset": 52,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.fast_energy",
+      "group": "Smoothed / Derived Audio"
+    },
+    {
+      "name": "uFastBass",
+      "offset": 56,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.fast_bass",
+      "group": "Smoothed / Derived Audio"
+    },
+    {
+      "name": "uSpectralFlux",
+      "offset": 60,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.spectral_flux",
+      "group": "Smoothed / Derived Audio"
+    },
+    {
+      "name": "uEnergyAccel",
+      "offset": 64,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.energy_accel",
+      "group": "Smoothed / Derived Audio"
+    },
+    {
+      "name": "uEnergyTrend",
+      "offset": 68,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.energy_trend",
+      "group": "Smoothed / Derived Audio"
+    },
+    {
+      "name": "uLocalTempo",
+      "offset": 72,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.tempo",
+      "group": "Smoothed / Derived Audio",
+      "notes": "(≈ global tempo)"
+    },
+    {
+      "name": "uTempo",
+      "offset": 76,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.tempo",
+      "group": "Smoothed / Derived Audio"
+    },
+    {
+      "name": "uOnsetSnap",
+      "offset": 80,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.onset_snap",
+      "group": "Beat / Rhythm"
+    },
+    {
+      "name": "uBeatSnap",
+      "offset": 84,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.beat_snap",
+      "group": "Beat / Rhythm"
+    },
+    {
+      "name": "uMusicalTime",
+      "offset": 88,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.musical_time",
+      "group": "Beat / Rhythm"
+    },
+    {
+      "name": "uSnapToMusicalTime",
+      "offset": 92,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.musical_time",
+      "group": "Beat / Rhythm",
+      "notes": "(≈ musical time)"
+    },
+    {
+      "name": "uDrumOnset",
+      "offset": 96,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.drum_onset",
+      "group": "Drum Stem"
+    },
+    {
+      "name": "uDrumBeat",
+      "offset": 100,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.drum_beat",
+      "group": "Drum Stem"
+    },
+    {
+      "name": "uStemBass",
+      "offset": 104,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.stem_bass",
+      "group": "Drum Stem"
+    },
+    {
+      "name": "uStemDrums",
+      "offset": 108,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.stem_drums",
+      "group": "Drum Stem"
+    },
+    {
+      "name": "uStemDrumOnset",
+      "offset": 112,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.drum_onset",
+      "group": "Drum Stem"
+    },
+    {
+      "name": "uVocalEnergy",
+      "offset": 116,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.vocal_energy",
+      "group": "Drum Stem"
+    },
+    {
+      "name": "uVocalPresence",
+      "offset": 120,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.vocal_presence",
+      "group": "Drum Stem"
+    },
+    {
+      "name": "uStemVocalRms",
+      "offset": 124,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.vocal_energy",
+      "group": "Drum Stem"
+    },
+    {
+      "name": "uOtherEnergy",
+      "offset": 128,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.other_energy",
+      "group": "Vocal / Other Stem"
+    },
+    {
+      "name": "uOtherCentroid",
+      "offset": 132,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.other_centroid",
+      "group": "Vocal / Other Stem"
+    },
+    {
+      "name": "uChromaHue",
+      "offset": 136,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.chroma_hue",
+      "group": "Chroma / Spectral"
+    },
+    {
+      "name": "uChromaShift",
+      "offset": 140,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.chroma_shift",
+      "group": "Chroma / Spectral"
+    },
+    {
+      "name": "uAfterglowHue",
+      "offset": 144,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.chroma_hue * frame.energy.min(1.0) * 0.5",
+      "group": "Chroma / Spectral"
+    },
+    {
+      "name": "uContrast0",
+      "offset": 160,
+      "size": 16,
+      "glsl_type": "vec4",
+      "rust_source": "[loop]",
+      "group": "Chroma / Spectral"
+    },
+    {
+      "name": "uContrast1",
+      "offset": 176,
+      "size": 16,
+      "glsl_type": "vec4",
+      "rust_source": "[loop]",
+      "group": "Chroma / Spectral"
+    },
+    {
+      "name": "uChroma0",
+      "offset": 192,
+      "size": 16,
+      "glsl_type": "vec4",
+      "rust_source": "[loop]",
+      "group": "Chroma / Spectral"
+    },
+    {
+      "name": "uChroma1",
+      "offset": 208,
+      "size": 16,
+      "glsl_type": "vec4",
+      "rust_source": "[loop]",
+      "group": "Chroma / Spectral"
+    },
+    {
+      "name": "uChroma2",
+      "offset": 224,
+      "size": 16,
+      "glsl_type": "vec4",
+      "rust_source": "[loop]",
+      "group": "Chroma / Spectral"
+    },
+    {
+      "name": "uSectionProgress",
+      "offset": 240,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.section_progress",
+      "group": "Section / Structure"
+    },
+    {
+      "name": "uSectionIndex",
+      "offset": 244,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.section_index",
+      "group": "Section / Structure"
+    },
+    {
+      "name": "uClimaxPhase",
+      "offset": 248,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.climax_phase",
+      "group": "Section / Structure"
+    },
+    {
+      "name": "uClimaxIntensity",
+      "offset": 252,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.climax_intensity",
+      "group": "Section / Structure"
+    },
+    {
+      "name": "uCoherence",
+      "offset": 256,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.coherence",
+      "group": "Section / Structure"
+    },
+    {
+      "name": "uJamDensity",
+      "offset": 260,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.jam_density",
+      "group": "Section / Structure"
+    },
+    {
+      "name": "uSongProgress",
+      "offset": 264,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.song_progress.unwrap_or(0.0)",
+      "group": "Section / Structure"
+    },
+    {
+      "name": "uShaderHoldProgress",
+      "offset": 268,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.shader_hold_progress.unwrap_or(0.0)",
+      "group": "Section / Structure"
+    },
+    {
+      "name": "uJamPhase",
+      "offset": 272,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.jam_phase",
+      "group": "Jam Evolution"
+    },
+    {
+      "name": "uJamProgress",
+      "offset": 276,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.jam_progress",
+      "group": "Jam Evolution"
+    },
+    {
+      "name": "uPalettePrimary",
+      "offset": 280,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.palette_primary",
+      "group": "Palette / Color"
+    },
+    {
+      "name": "uPaletteSecondary",
+      "offset": 284,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.palette_secondary",
+      "group": "Palette / Color"
+    },
+    {
+      "name": "uPaletteSaturation",
+      "offset": 288,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.palette_saturation",
+      "group": "Palette / Color"
+    },
+    {
+      "name": "uEraSaturation",
+      "offset": 292,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.era_saturation",
+      "group": "Era"
+    },
+    {
+      "name": "uEraBrightness",
+      "offset": 296,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.era_brightness",
+      "group": "Era"
+    },
+    {
+      "name": "uEraSepia",
+      "offset": 300,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.era_sepia",
+      "group": "Era"
+    },
+    {
+      "name": "uBloomThreshold",
+      "offset": 304,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "-0.08 - frame.energy * 0.18",
+      "group": "Post-Process Control"
+    },
+    {
+      "name": "uLensDistortion",
+      "offset": 308,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "0.02 + frame.energy * 0.06",
+      "group": "Post-Process Control"
+    },
+    {
+      "name": "uGradingIntensity",
+      "offset": 312,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "1.0",
+      "group": "Post-Process Control"
+    },
+    {
+      "name": "uMelodicPitch",
+      "offset": 316,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.melodic_pitch",
+      "group": "Melodic / Harmonic"
+    },
+    {
+      "name": "uMelodicDirection",
+      "offset": 320,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.melodic_direction",
+      "group": "Melodic / Harmonic"
+    },
+    {
+      "name": "uChordIndex",
+      "offset": 324,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.chord_index",
+      "group": "Melodic / Harmonic"
+    },
+    {
+      "name": "uHarmonicTension",
+      "offset": 328,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.harmonic_tension",
+      "group": "Melodic / Harmonic"
+    },
+    {
+      "name": "uChordConfidence",
+      "offset": 332,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.chord_confidence",
+      "group": "Melodic / Harmonic"
+    },
+    {
+      "name": "uSectionType",
+      "offset": 336,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.section_type",
+      "group": "Melodic / Harmonic"
+    },
+    {
+      "name": "uEnergyForecast",
+      "offset": 340,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.energy_forecast",
+      "group": "Melodic / Harmonic"
+    },
+    {
+      "name": "uPeakApproaching",
+      "offset": 344,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.peak_approaching",
+      "group": "Melodic / Harmonic"
+    },
+    {
+      "name": "uBeatStability",
+      "offset": 348,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.beat_stability",
+      "group": "Melodic / Harmonic"
+    },
+    {
+      "name": "uDownbeat",
+      "offset": 352,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.downbeat",
+      "group": "Melodic / Harmonic"
+    },
+    {
+      "name": "uBeatConfidence",
+      "offset": 356,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.beat_confidence",
+      "group": "Melodic / Harmonic"
+    },
+    {
+      "name": "uMelodicConfidence",
+      "offset": 360,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.melodic_confidence",
+      "group": "Melodic / Harmonic"
+    },
+    {
+      "name": "uImprovisationScore",
+      "offset": 364,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.improvisation_score",
+      "group": "Melodic / Harmonic"
+    },
+    {
+      "name": "uPeakOfShow",
+      "offset": 368,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.peak_of_show",
+      "group": "Peak-of-Show"
+    },
+    {
+      "name": "uHeroIconTrigger",
+      "offset": 372,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "0.0",
+      "group": "Hero Icon"
+    },
+    {
+      "name": "uHeroIconProgress",
+      "offset": 376,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "0.0",
+      "group": "Hero Icon"
+    },
+    {
+      "name": "uShowWarmth",
+      "offset": 380,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.show_warmth",
+      "group": "Show Film Stock"
+    },
+    {
+      "name": "uShowContrast",
+      "offset": 384,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.show_contrast",
+      "group": "Show Film Stock"
+    },
+    {
+      "name": "uShowSaturation",
+      "offset": 388,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.show_saturation",
+      "group": "Show Film Stock"
+    },
+    {
+      "name": "uShowGrain",
+      "offset": 392,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.show_grain",
+      "group": "Show Film Stock"
+    },
+    {
+      "name": "uShowBloom",
+      "offset": 396,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.show_bloom",
+      "group": "Show Film Stock"
+    },
+    {
+      "name": "uVenueVignette",
+      "offset": 400,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "0.2",
+      "group": "Venue Profile"
+    },
+    {
+      "name": "uCamFov",
+      "offset": 444,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "fov",
+      "group": "3D Camera (computed from audio)"
+    },
+    {
+      "name": "uCamDof",
+      "offset": 448,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "dof",
+      "group": "3D Camera (computed from audio)"
+    },
+    {
+      "name": "uCamFocusDist",
+      "offset": 452,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "focus_dist",
+      "group": "3D Camera (computed from audio)"
+    },
+    {
+      "name": "uEnvelopeBrightness",
+      "offset": 456,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.envelope_brightness",
+      "group": "Envelope"
+    },
+    {
+      "name": "uEnvelopeSaturation",
+      "offset": 460,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.envelope_saturation",
+      "group": "Envelope"
+    },
+    {
+      "name": "uEnvelopeHue",
+      "offset": 464,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.envelope_hue",
+      "group": "Envelope"
+    },
+    {
+      "name": "uTempoDerivative",
+      "offset": 468,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.tempo_derivative",
+      "group": "Deep Audio (Level 2)"
+    },
+    {
+      "name": "uDynamicRange",
+      "offset": 472,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.dynamic_range",
+      "group": "Deep Audio (Level 2)"
+    },
+    {
+      "name": "uSpaceScore",
+      "offset": 476,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.space_score",
+      "group": "Deep Audio (Level 2)"
+    },
+    {
+      "name": "uTimbralBrightness",
+      "offset": 480,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.timbral_brightness",
+      "group": "Deep Audio (Level 2)"
+    },
+    {
+      "name": "uTimbralFlux",
+      "offset": 484,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.timbral_flux",
+      "group": "Deep Audio (Level 2)"
+    },
+    {
+      "name": "uVocalPitch",
+      "offset": 488,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.vocal_pitch",
+      "group": "Deep Audio (Level 2)"
+    },
+    {
+      "name": "uPhilBombWave",
+      "offset": 492,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "0.0",
+      "group": "Effects"
+    },
+    {
+      "name": "uSemanticPsychedelic",
+      "offset": 496,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.semantic_psychedelic",
+      "group": "Semantic Labels (CLAP)"
+    },
+    {
+      "name": "uSemanticCosmic",
+      "offset": 500,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.semantic_cosmic",
+      "group": "Semantic Labels (CLAP)"
+    },
+    {
+      "name": "uSemanticChaotic",
+      "offset": 504,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.semantic_chaotic",
+      "group": "Semantic Labels (CLAP)"
+    },
+    {
+      "name": "uSemanticAggressive",
+      "offset": 508,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.semantic_aggressive",
+      "group": "Semantic Labels (CLAP)"
+    },
+    {
+      "name": "uSemanticTender",
+      "offset": 512,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.semantic_tender",
+      "group": "Semantic Labels (CLAP)"
+    },
+    {
+      "name": "uSemanticAmbient",
+      "offset": 516,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.semantic_ambient",
+      "group": "Semantic Labels (CLAP)"
+    },
+    {
+      "name": "uSemanticRhythmic",
+      "offset": 520,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.semantic_rhythmic",
+      "group": "Semantic Labels (CLAP)"
+    },
+    {
+      "name": "uSemanticTriumphant",
+      "offset": 524,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.semantic_triumphant",
+      "group": "Semantic Labels (CLAP)"
+    },
+    {
+      "name": "uParamBassScale",
+      "offset": 528,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.param_bass_scale",
+      "group": "Per-Song Shader Parameter Modulation"
+    },
+    {
+      "name": "uParamEnergyScale",
+      "offset": 532,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.param_energy_scale",
+      "group": "Per-Song Shader Parameter Modulation"
+    },
+    {
+      "name": "uParamMotionSpeed",
+      "offset": 536,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.param_motion_speed",
+      "group": "Per-Song Shader Parameter Modulation"
+    },
+    {
+      "name": "uParamColorSatBias",
+      "offset": 540,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.param_color_sat_bias",
+      "group": "Per-Song Shader Parameter Modulation"
+    },
+    {
+      "name": "uParamComplexity",
+      "offset": 544,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.param_complexity",
+      "group": "Per-Song Shader Parameter Modulation"
+    },
+    {
+      "name": "uParamDrumReactivity",
+      "offset": 548,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.param_drum_reactivity",
+      "group": "Per-Song Shader Parameter Modulation"
+    },
+    {
+      "name": "uParamVocalWeight",
+      "offset": 552,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.param_vocal_weight",
+      "group": "Per-Song Shader Parameter Modulation"
+    },
+    {
+      "name": "uTemporalBlendStrength",
+      "offset": 608,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "temporal_blend",
+      "group": "Temporal Coherence"
+    },
+    {
+      "name": "uShowGrainCharacter",
+      "offset": 612,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.show_grain_character.unwrap_or(0.5)",
+      "group": "Per-Show Visual Identity"
+    },
+    {
+      "name": "uShowBloomCharacter",
+      "offset": 616,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.show_bloom_character.unwrap_or(0.0)",
+      "group": "Per-Show Visual Identity"
+    },
+    {
+      "name": "uShowTemperatureCharacter",
+      "offset": 620,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.show_temperature_character.unwrap_or(0.0)",
+      "group": "Per-Show Visual Identity"
+    },
+    {
+      "name": "uShowContrastCharacter",
+      "offset": 624,
+      "size": 4,
+      "glsl_type": "float",
+      "rust_source": "frame.show_contrast_character.unwrap_or(0.5)",
+      "group": "Per-Show Visual Identity"
+    }
+  ]
+}

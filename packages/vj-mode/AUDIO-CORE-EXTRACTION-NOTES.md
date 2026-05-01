@@ -38,16 +38,31 @@ packages/audio-core/
 └── tests/                    — same tests imported into both consumers
 ```
 
-## Why deferred
+## Status
 
-Real value comes from **also** porting both `vj-mode` and `visualizer-poc` to consume the new package. Half the work (creating the new package without rewriting consumers) just adds a third copy.
+**Phase A done (2026-05-01):** `@dead-air/audio-core` package created and shipped with 5 modules + 89 passing tests.
 
-A correct extraction is roughly:
-- 1 day — extract pure math + tests
-- 2 days — port vj-mode classes to use the shared kernels
-- 2 days — port visualizer-poc functions to use the shared kernels + verify no manifest output drift
+  - `math.ts` — smoothstep, lerp, clamp + variants
+  - `hash.ts` — djb2 string hash + variants
+  - `seeded-random.ts` — mulberry32 + LCG + seededShuffle
+  - `ring-buffer.ts` — fixed-capacity circular buffer
+  - `gaussian-smoother.ts` — incremental Gaussian smoother
 
-Total: ~5 working days, matching the audit's "1 week" estimate. Out of scope for this session.
+The originals in `visualizer-poc/src/utils/` are still in place; nothing has switched over yet. Consumer migration is phase B.
+
+**Phase B (consumer migration) — still deferred (2-4 days):**
+
+  - `visualizer-poc` add `@dead-air/audio-core` as a dependency, replace
+    `from "./math"` with `from "@dead-air/audio-core/math"` etc.
+    Verify Remotion bundler resolves the package (use a Veneta render diff).
+  - `vj-mode` consume the same primitives where the analyzer classes
+    currently re-implement them in-line.
+  - `manifest-generator` consume directly (it imports utils from
+    visualizer-poc today; switching to the shared package decouples it).
+  - Once both consumers are switched, delete the originals from
+    `visualizer-poc/src/utils/`.
+
+A manifest-output equivalence check on one Veneta song before/after is the gate before deleting the originals.
 
 ## Acceptance criteria
 

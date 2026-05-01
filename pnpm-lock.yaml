@@ -8,12 +8,27 @@ importers:
 
   .:
     devDependencies:
+      msgpackr:
+        specifier: ^1.11.10
+        version: 1.11.10
       turbo:
         specifier: ^2.3.0
         version: 2.8.9
       typescript:
         specifier: ^5.7.0
         version: 5.9.3
+
+  packages/audio-core:
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.11
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
+      vitest:
+        specifier: ^4.0.18
+        version: 4.0.18(@types/node@22.19.11)(terser@5.46.0)(tsx@4.21.0)
 
   packages/cli:
     dependencies:
@@ -129,6 +144,22 @@ importers:
         specifier: ^4.0.18
         version: 4.0.18(@types/node@22.19.11)(terser@5.46.0)(tsx@4.21.0)
 
+  packages/manifest-generator:
+    dependencies:
+      msgpackr:
+        specifier: ^1.11.10
+        version: 1.11.10
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.11
+      tsx:
+        specifier: ^4.19.0
+        version: 4.21.0
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
+
   packages/pipeline:
     dependencies:
       '@anthropic-ai/sdk':
@@ -168,49 +199,6 @@ importers:
       vitest:
         specifier: ^4.0.18
         version: 4.0.18(@types/node@22.19.11)(terser@5.46.0)(tsx@4.21.0)
-
-  packages/remotion:
-    dependencies:
-      '@dead-air/core':
-        specifier: workspace:*
-        version: link:../core
-      '@remotion/bundler':
-        specifier: 4.0.242
-        version: 4.0.242(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
-      '@remotion/cli':
-        specifier: 4.0.242
-        version: 4.0.242(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
-      '@remotion/google-fonts':
-        specifier: 4.0.242
-        version: 4.0.242(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
-      '@remotion/media-utils':
-        specifier: 4.0.242
-        version: 4.0.242(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
-      '@remotion/renderer':
-        specifier: 4.0.242
-        version: 4.0.242(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
-      '@remotion/transitions':
-        specifier: 4.0.242
-        version: 4.0.242(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
-      react:
-        specifier: ^18.3.1
-        version: 18.3.1
-      react-dom:
-        specifier: ^18.3.1
-        version: 18.3.1(react@18.3.1)
-      remotion:
-        specifier: 4.0.242
-        version: 4.0.242(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
-    devDependencies:
-      '@types/node':
-        specifier: ^22.0.0
-        version: 22.19.11
-      '@types/react':
-        specifier: ^18.3.3
-        version: 18.3.28
-      typescript:
-        specifier: ^5.7.0
-        version: 5.9.3
 
   packages/visualizer-poc:
     dependencies:
@@ -1216,6 +1204,36 @@ packages:
   '@jridgewell/trace-mapping@0.3.31':
     resolution: {integrity: sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==}
 
+  '@msgpackr-extract/msgpackr-extract-darwin-arm64@3.0.3':
+    resolution: {integrity: sha512-QZHtlVgbAdy2zAqNA9Gu1UpIuI8Xvsd1v8ic6B2pZmeFnFcMWiPLfWXh7TVw4eGEZ/C9TH281KwhVoeQUKbyjw==}
+    cpu: [arm64]
+    os: [darwin]
+
+  '@msgpackr-extract/msgpackr-extract-darwin-x64@3.0.3':
+    resolution: {integrity: sha512-mdzd3AVzYKuUmiWOQ8GNhl64/IoFGol569zNRdkLReh6LRLHOXxU4U8eq0JwaD8iFHdVGqSy4IjFL4reoWCDFw==}
+    cpu: [x64]
+    os: [darwin]
+
+  '@msgpackr-extract/msgpackr-extract-linux-arm64@3.0.3':
+    resolution: {integrity: sha512-YxQL+ax0XqBJDZiKimS2XQaf+2wDGVa1enVRGzEvLLVFeqa5kx2bWbtcSXgsxjQB7nRqqIGFIcLteF/sHeVtQg==}
+    cpu: [arm64]
+    os: [linux]
+
+  '@msgpackr-extract/msgpackr-extract-linux-arm@3.0.3':
+    resolution: {integrity: sha512-fg0uy/dG/nZEXfYilKoRe7yALaNmHoYeIoJuJ7KJ+YyU2bvY8vPv27f7UKhGRpY6euFYqEVhxCFZgAUNQBM3nw==}
+    cpu: [arm]
+    os: [linux]
+
+  '@msgpackr-extract/msgpackr-extract-linux-x64@3.0.3':
+    resolution: {integrity: sha512-cvwNfbP07pKUfq1uH+S6KJ7dT9K8WOE4ZiAcsrSes+UY55E/0jLYc+vq+DO7jlmqRb5zAggExKm0H7O/CBaesg==}
+    cpu: [x64]
+    os: [linux]
+
+  '@msgpackr-extract/msgpackr-extract-win32-x64@3.0.3':
+    resolution: {integrity: sha512-x0fWaQtYp4E6sktbsdAqnehxDgEc/VwM7uLsRCYWaiGu0ykYdZPiS8zCWdnjHwyiumousxfBm4SO31eXqwEZhQ==}
+    cpu: [x64]
+    os: [win32]
+
   '@react-three/fiber@8.18.0':
     resolution: {integrity: sha512-FYZZqD0UUHUswKz3LQl2Z7H24AhD14XGTsIRw3SJaXUxyfVMi+1yiZGmqTcPt/CkPpdU7rrxqcyQ1zJE5DjvIQ==}
     peerDependencies:
@@ -1310,9 +1328,6 @@ packages:
       react: '>=16.8.0'
       react-dom: '>=16.8.0'
 
-  '@remotion/paths@4.0.242':
-    resolution: {integrity: sha512-dWNX6PlNBBvZZQUGcgrOjuxZ5pmMqRRv+d2CHMM/sDf+NcXO46GB3V5wp9GkWdiHG6lEmjh59qHkptIcfqRrHw==}
-
   '@remotion/player@4.0.242':
     resolution: {integrity: sha512-ZcQQOoVQ/3R5jj9JumE5Z0+byG8vuA0uaFGF6UB3deTjhVr/8O4tavRi/XZ3vDk/NQBTwV68BcxAAN7a8bEyAg==}
     peerDependencies:
@@ -1327,12 +1342,6 @@ packages:
 
   '@remotion/serverless@4.0.242':
     resolution: {integrity: sha512-EQhg6/nepzzoS7JUFJHXfPNdCt+uFZQwlIkp9+B/r/akvYFkqtaxi5M7jnuCA2hOmb2R+qwdDSDfe3FTUptTlQ==}
-
-  '@remotion/shapes@4.0.242':
-    resolution: {integrity: sha512-VNRB5v+HUSFZzJk5Eh/GbW7gvZktzoYhbdds6taAAb323mTbpu6zHN2xHixOJgk9foIixZN7rKBNeg85NO0YQA==}
-    peerDependencies:
-      react: '>=16.8.0'
-      react-dom: '>=16.8.0'
 
   '@remotion/streaming@4.0.242':
     resolution: {integrity: sha512-9Hl58kDyUQfP24yLxjE7kc5NmGcnMJMzUy8mdJGrW/kLin4/MDXCzNwa8Unr4g/m5sZdm48IaXoR3XZrNu+h9w==}
@@ -1354,12 +1363,6 @@ packages:
       react-dom: '>=16.8.0'
       remotion: 4.0.242
       three: '>=0.137.0'
-
-  '@remotion/transitions@4.0.242':
-    resolution: {integrity: sha512-HLx8RZNRPnCD2jrVbfknnT+w231DvOX+1JUwfj9sAW4xa7jbEPYd1H1I5+jg/KeZB2Y/uB6qSGJmrwDYOooeqA==}
-    peerDependencies:
-      react: '>=16.8.0'
-      react-dom: '>=16.8.0'
 
   '@resvg/resvg-js-android-arm-eabi@2.6.2':
     resolution: {integrity: sha512-FrJibrAk6v29eabIPgcTUMPXiEz8ssrAk7TXxsiZzww9UTQ1Z5KAbFJs+Z0Ez+VZTYgnE5IQJqBcoSiMebtPHA==}
@@ -2743,6 +2746,13 @@ packages:
   ms@2.1.3:
     resolution: {integrity: sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA==}
 
+  msgpackr-extract@3.0.3:
+    resolution: {integrity: sha512-P0efT1C9jIdVRefqjzOQ9Xml57zpOXnIuS+csaB4MdZbTdmGDLo8XhzBG1N7aO11gKDDkJvBLULeFTo46wwreA==}
+    hasBin: true
+
+  msgpackr@1.11.10:
+    resolution: {integrity: sha512-iCZNq+HszvF+fC3anCm4nBmWEnbeIAfpDs6IStAEKhQ2YSgkjzVG2FF9XJqwwQh5bH3N9OUTUt4QwVN6MLMLtA==}
+
   nanoid@3.3.11:
     resolution: {integrity: sha512-N8SpfPUnUp1bK+PMYW8qSWdl9U+wwNWI4QKxOYDy9JAro3WMX7p2OeVRF9v+347pnakNevPmiHhNmZ2HbFA76w==}
     engines: {node: ^10 || ^12 || ^13.7 || ^14 || >=15.0.1}
@@ -2779,6 +2789,10 @@ packages:
   node-fetch@3.3.2:
     resolution: {integrity: sha512-dRB78srN/l6gqWulah9SrxeYnxeddIG30+GOqK/9OlLVyLg3HPnr6SqOWTWOXKRwC2eGYCkZ59NNuSgvSrpgOA==}
     engines: {node: ^12.20.0 || ^14.13.1 || >=16.0.0}
+
+  node-gyp-build-optional-packages@5.2.2:
+    resolution: {integrity: sha512-s+w+rBWnpTMwSFbaE0UXsRlg7hU4FjekKU4eyAih5T8nJuNZT1nNsskXpxmeqSK9UzkBl6UgRlnKc8hz8IEqOw==}
+    hasBin: true
 
   node-releases@2.0.27:
     resolution: {integrity: sha512-nmh3lCkYZ3grZvqcCH+fjmQ7X+H0OeZgP40OierEaAptX4XofMh5kwNbWh7lBduUzCcV/8kZ+NDLCwm2iorIlA==}
@@ -4800,6 +4814,24 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
 
+  '@msgpackr-extract/msgpackr-extract-darwin-arm64@3.0.3':
+    optional: true
+
+  '@msgpackr-extract/msgpackr-extract-darwin-x64@3.0.3':
+    optional: true
+
+  '@msgpackr-extract/msgpackr-extract-linux-arm64@3.0.3':
+    optional: true
+
+  '@msgpackr-extract/msgpackr-extract-linux-arm@3.0.3':
+    optional: true
+
+  '@msgpackr-extract/msgpackr-extract-linux-x64@3.0.3':
+    optional: true
+
+  '@msgpackr-extract/msgpackr-extract-win32-x64@3.0.3':
+    optional: true
+
   '@react-three/fiber@8.18.0(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(three@0.183.1)':
     dependencies:
       '@babel/runtime': 7.28.6
@@ -4935,8 +4967,6 @@ snapshots:
       react-dom: 18.3.1(react@18.3.1)
       remotion: 4.0.242(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
 
-  '@remotion/paths@4.0.242': {}
-
   '@remotion/player@4.0.242(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
     dependencies:
       react: 18.3.1
@@ -4977,12 +5007,6 @@ snapshots:
       - react-dom
       - supports-color
       - utf-8-validate
-
-  '@remotion/shapes@4.0.242(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
-    dependencies:
-      '@remotion/paths': 4.0.242
-      react: 18.3.1
-      react-dom: 18.3.1(react@18.3.1)
 
   '@remotion/streaming@4.0.242': {}
 
@@ -5041,14 +5065,6 @@ snapshots:
       react-dom: 18.3.1(react@18.3.1)
       remotion: 4.0.242(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       three: 0.183.1
-
-  '@remotion/transitions@4.0.242(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
-    dependencies:
-      '@remotion/paths': 4.0.242
-      '@remotion/shapes': 4.0.242(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
-      react: 18.3.1
-      react-dom: 18.3.1(react@18.3.1)
-      remotion: 4.0.242(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
 
   '@resvg/resvg-js-android-arm-eabi@2.6.2':
     optional: true
@@ -6623,6 +6639,22 @@ snapshots:
 
   ms@2.1.3: {}
 
+  msgpackr-extract@3.0.3:
+    dependencies:
+      node-gyp-build-optional-packages: 5.2.2
+    optionalDependencies:
+      '@msgpackr-extract/msgpackr-extract-darwin-arm64': 3.0.3
+      '@msgpackr-extract/msgpackr-extract-darwin-x64': 3.0.3
+      '@msgpackr-extract/msgpackr-extract-linux-arm': 3.0.3
+      '@msgpackr-extract/msgpackr-extract-linux-arm64': 3.0.3
+      '@msgpackr-extract/msgpackr-extract-linux-x64': 3.0.3
+      '@msgpackr-extract/msgpackr-extract-win32-x64': 3.0.3
+    optional: true
+
+  msgpackr@1.11.10:
+    optionalDependencies:
+      msgpackr-extract: 3.0.3
+
   nanoid@3.3.11: {}
 
   napi-build-utils@2.0.0: {}
@@ -6646,6 +6678,11 @@ snapshots:
       data-uri-to-buffer: 4.0.1
       fetch-blob: 3.2.0
       formdata-polyfill: 4.0.10
+
+  node-gyp-build-optional-packages@5.2.2:
+    dependencies:
+      detect-libc: 2.1.2
+    optional: true
 
   node-releases@2.0.27: {}
 

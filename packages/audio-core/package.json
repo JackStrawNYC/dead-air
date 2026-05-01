@@ -1,0 +1,45 @@
+{
+  "name": "@dead-air/audio-core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Pure-math audio analysis primitives shared between visualizer-poc, vj-mode, and manifest-generator.",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./math": {
+      "import": "./dist/math.js",
+      "types": "./dist/math.d.ts"
+    },
+    "./hash": {
+      "import": "./dist/hash.js",
+      "types": "./dist/hash.d.ts"
+    },
+    "./seeded-random": {
+      "import": "./dist/seeded-random.js",
+      "types": "./dist/seeded-random.d.ts"
+    },
+    "./ring-buffer": {
+      "import": "./dist/ring-buffer.js",
+      "types": "./dist/ring-buffer.d.ts"
+    },
+    "./gaussian-smoother": {
+      "import": "./dist/gaussian-smoother.js",
+      "types": "./dist/gaussian-smoother.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc --project tsconfig.json",
+    "type-check": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0",
+    "vitest": "^4.0.18"
+  }
+}
