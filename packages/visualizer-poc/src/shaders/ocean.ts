@@ -97,8 +97,13 @@ float oc2WaveHeight(vec2 xz, float timeVal, float energy, float bass,
   float waveSpeed = (0.10 + energy * 0.80) * (1.0 + sJam * 0.5 - sSpace * 0.7);
   float waveTime = timeVal * waveSpeed;
   float waveFreq = mix(0.06, 0.25, energy) + melPitch * 0.08 + sJam * 0.05;
-  // Wider amplitude: glass-calm (0.1) at quiet → massive swells (5.0) at loud
-  float waveAmp = mix(0.1, 5.0, storminess) * (1.0 + sJam * 0.4 - sSpace * 0.8);
+  // Wider amplitude: glass-calm (0.1) at quiet → big-but-not-camera-eating swells.
+  // Original 5.0 max amp combined with 6-octave summing pushed peak surface
+  // height to ~10, larger than camH≈6 — camera ended up INSIDE the waves
+  // every frame, raymarcher hit the surface at distance 0 on every ray, and
+  // the hitPos lighting math broke. Cap at 2.0 keeps peak height under camH
+  // even with 6-octave summing. Camera was also raised below.
+  float waveAmp = mix(0.1, 2.0, storminess) * (1.0 + sJam * 0.4 - sSpace * 0.8);
 
   float h = 0.0;
   float freq = waveFreq;
@@ -268,7 +273,9 @@ void main() {
   vec3 palCol2 = hsv2rgb(vec3(hue2, palSat * 0.7, mix(0.4, 0.7, energy)));
 
   // Camera: hovering above ocean
-  float camH = 6.0 + sin(uTime * 0.04) * 1.5;
+  // Raised from 6.0 — needs to clear the 6-octave wave summed peak height
+  // even at peak storminess. Trade-off: lower view angle, but visible water.
+  float camH = 10.0 + sin(uTime * 0.04) * 1.5;
   vec3 camOrigin = vec3(sin(uTime * 0.02) * 5.0, camH, uTime * 0.3);
   vec3 camTarget = camOrigin + vec3(0.0, -3.0, 10.0);
   vec3 camForward = normalize(camTarget - camOrigin);
