@@ -50,10 +50,11 @@ Multi-commit execution against [`ARCHITECTURAL-AUDIT-2026-04.md`](./ARCHITECTURA
   - Per-directory rollup committed to `inventory-imports.json`
 
 ### Wave 4 — perf + live
-- **4.1** GPU overlay compositing
+- **4.1** GPU overlay compositing — **FULLY CLOSED**
   - Phase A: `overlay_atlas.rs` shelf packer, 5 unit tests
-  - Phase B: `overlay_pass.rs` instanced WGSL pipeline, end-to-end smoke test passes
-  - Phase C (hot-path swap) deferred — needs CPU/GPU pixel-equivalence gate
+  - Phase B: `overlay_pass.rs` instanced WGSL pipeline, end-to-end smoke
+  - Phase C: render loop integration via `--gpu-overlays` flag
+  - Phase D: CPU/GPU pixel parity test — both paths produce 1352 active pixels exactly
 - **4.2** Live Rust renderer mode
   - Phase A: `tests/live_mode_budget.rs` measures shader perf at 1080p on M3 Pro
   - Real data: cheap tier OK60, expensive tier needs LOD, volumetric tier too slow
@@ -64,9 +65,6 @@ Multi-commit execution against [`ARCHITECTURAL-AUDIT-2026-04.md`](./ARCHITECTURA
 ### Wave 3.5 — visualizer-poc package split (phase B, the actual move)
 - Inventory done; the move itself needs `git mv` + sed import rewrite + manifest-output equivalence test.
 - Plan in `MONOLITH-SPLIT-NOTES.md` — ~7 working days.
-
-### Wave 4.1 — GPU compositing hot-path swap (phase C)
-- Pipeline ready; needs render_loop integration + CPU/GPU pixel diff test.
 
 ### Wave 4.2 — Live Rust mode (phase B onwards)
 - Frame budget data in hand; needs cpal input, real-time DSP, winit window, reactive router port.
