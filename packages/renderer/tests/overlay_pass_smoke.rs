@@ -299,6 +299,116 @@ fn gpu_compositing_does_not_y_flip() {
     );
 }
 
+/// Catch offset_y direction regressions. CPU compositor uses Y-down
+/// (positive offset_y = below center). The GPU converter must mirror
+/// this even though NDC is Y-up. Place a sprite at offset_y = +0.3 and
+/// assert it lands in the bottom half of the rendered output.
+#[test]
+fn gpu_compositing_offset_y_matches_cpu_convention() {
+    use dead_air_renderer::{
+        overlay_atlas::build_atlas,
+        overlay_cache::{CachedOverlay, OverlayInstance, OverlayTransform},
+        overlay_pass::{instance_to_gpu, OverlayCompositingPipeline},
+        compositor::BlendMode,
+    };
+    use std::collections::HashMap;
+
+    let renderer = pollster::block_on(dead_air_renderer::gpu::GpuRenderer::new(128, 128))
+        .expect("GPU init");
+    let device = renderer.device();
+    let queue = renderer.queue();
+
+    // 32x32 bright sprite (passes lum gate)
+    let sprite = vec![220u8; 32 * 32 * 4]
+        .chunks_exact(4)
+        .flat_map(|_| [220u8, 220, 220, 255])
+        .collect::<Vec<_>>();
+    let mut overlays = HashMap::new();
+    overlays.insert("dot".to_string(), CachedOverlay { pixels: sprite, width: 32, height: 32 });
+    let atlas = build_atlas(&overlays, 64).expect("atlas");
+    let pipeline = OverlayCompositingPipeline::new(device, queue, &atlas, wgpu::TextureFormat::Rgba8Unorm);
+
+    let inst = OverlayInstance {
+        overlay_id: "dot".to_string(),
+        transform: OverlayTransform {
+            opacity: 1.0,
+            scale: 1.0,
+            rotation_deg: 0.0,
+            offset_x: 0.0,
+            offset_y: 0.3,  // CPU semantics: 30% BELOW center
+        },
+        blend_mode: BlendMode::Normal,
+        keyframe_svg: None,
+    };
+    let gpu_instances = vec![
+        instance_to_gpu(&inst, &atlas, 128, 128).expect("conv"),
+    ];
+
+    let target = device.create_texture(&wgpu::TextureDescriptor {
+        label: Some("offsety_target"),
+        size: wgpu::Extent3d { width: 128, height: 128, depth_or_array_layers: 1 },
+        mip_level_count: 1, sample_count: 1,
+        dimension: wgpu::TextureDimension::D2,
+        format: wgpu::TextureFormat::Rgba8Unorm,
+        usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
+        view_formats: &[],
+    });
+    let view = target.create_view(&wgpu::TextureViewDescriptor::default());
+    let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
+    {
+        let _ = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: Some("clear"),
+            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                view: &view, resolve_target: None,
+                ops: wgpu::Operations { load: wgpu::LoadOp::Clear(wgpu::Color::BLACK), store: wgpu::StoreOp::Store },
+            })],
+            depth_stencil_attachment: None, timestamp_writes: None, occlusion_query_set: None,
+        });
+    }
+    pipeline.encode(&mut encoder, device, &view, &gpu_instances);
+
+    let bpr = ((128 * 4 + 255) / 256) * 256;
+    let staging = device.create_buffer(&wgpu::BufferDescriptor {
+        label: None, size: (bpr * 128) as u64,
+        usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
+        mapped_at_creation: false,
+    });
+    encoder.copy_texture_to_buffer(
+        wgpu::TexelCopyTextureInfo { texture: &target, mip_level: 0, origin: wgpu::Origin3d::ZERO, aspect: wgpu::TextureAspect::All },
+        wgpu::TexelCopyBufferInfo {
+            buffer: &staging,
+            layout: wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(bpr as u32), rows_per_image: Some(128) },
+        },
+        wgpu::Extent3d { width: 128, height: 128, depth_or_array_layers: 1 },
+    );
+    queue.submit(std::iter::once(encoder.finish()));
+    let slice = staging.slice(..);
+    let (tx, rx) = std::sync::mpsc::channel();
+    slice.map_async(wgpu::MapMode::Read, move |r| { tx.send(r).ok(); });
+    let _ = device.poll(wgpu::Maintain::Wait);
+    rx.recv().unwrap().unwrap();
+    let data = slice.get_mapped_range();
+
+    // Count active pixels in top half vs bottom half.
+    let mut top = 0usize;
+    let mut bottom = 0usize;
+    for row in 0..128usize {
+        for col in 0..128usize {
+            let i = row * bpr as usize + col * 4;
+            if data[i] > 50 {
+                if row < 64 { top += 1; } else { bottom += 1; }
+            }
+        }
+    }
+    eprintln!("[offset_y] top: {}, bottom: {}", top, bottom);
+    // offset_y=+0.3 means below center → bottom half should have most pixels.
+    assert!(
+        bottom > top * 2,
+        "offset_y=+0.3 should land sprite in bottom half (top={}, bottom={})",
+        top, bottom,
+    );
+}
+
 /// Catch blend-mode regressions. Render a 50%-gray sprite with a known
 /// background (medium green) using each blend mode, and assert the result
 /// is in the expected range:

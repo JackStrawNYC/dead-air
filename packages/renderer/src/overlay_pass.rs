@@ -437,7 +437,12 @@ pub fn instance_to_gpu(
         return None;
     }
     let entry = atlas.lookup.get(&inst.overlay_id)?;
-    let center = [inst.transform.offset_x * 2.0, inst.transform.offset_y * 2.0];
+    // Coordinate system reconciliation:
+    //   CPU compositor (overlay_cache.rs) uses image-space Y-down. offset_y
+    //   = +0.3 means 30% BELOW center → near bottom of the frame.
+    //   GPU NDC is Y-up. To put +0.3 below center we need NDC y = -0.6.
+    //   Same flip for rotation direction (CW in image-space = CCW in NDC).
+    let center = [inst.transform.offset_x * 2.0, -inst.transform.offset_y * 2.0];
     // Convert source pixel size → NDC half-extent at the requested scale.
     let half_w_ndc = (entry.src_size[0] as f32 * inst.transform.scale) / target_width as f32;
     let half_h_ndc = (entry.src_size[1] as f32 * inst.transform.scale) / target_height as f32;
@@ -452,7 +457,7 @@ pub fn instance_to_gpu(
         half_size: [half_w_ndc, half_h_ndc],
         uv_rect: [entry.uv_min[0], entry.uv_min[1], entry.uv_max[0], entry.uv_max[1]],
         opacity: inst.transform.opacity,
-        rotation_rad: inst.transform.rotation_deg.to_radians(),
+        rotation_rad: -inst.transform.rotation_deg.to_radians(),
         blend_mode,
         _pad: 0,
     })
