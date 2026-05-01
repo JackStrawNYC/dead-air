@@ -11,6 +11,7 @@
     "convert:msgpack": "tsx convert-manifest-to-msgpack.mts"
   },
   "dependencies": {
+    "@dead-air/audio-core": "workspace:*",
     "msgpackr": "^1.11.10"
   },
   "devDependencies": {

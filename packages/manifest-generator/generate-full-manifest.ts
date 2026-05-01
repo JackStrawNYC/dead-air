@@ -54,7 +54,7 @@ import { getModeForSection } from "../visualizer-poc/src/scenes/routing/shader-v
 import { TRANSITION_AFFINITY, SCENE_REGISTRY } from "../visualizer-poc/src/scenes/scene-registry.js";
 import { lookupSongIdentity, getOrGenerateSongIdentity, setActiveShowDate } from "../visualizer-poc/src/data/song-identities.js";
 import { computeShowVisualSeed, type ShowVisualSeed } from "../visualizer-poc/src/utils/show-visual-seed.js";
-import { hashString } from "../visualizer-poc/src/utils/hash.js";
+import { hashString } from "@dead-air/audio-core/hash";
 
 // ─── Overlay imports (for --with-overlays mode) ───
 import { buildRotationSchedule, getOverlayOpacities } from "../visualizer-poc/src/data/overlay-rotation.js";

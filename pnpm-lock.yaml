@@ -146,6 +146,9 @@ importers:
 
   packages/manifest-generator:
     dependencies:
+      '@dead-air/audio-core':
+        specifier: workspace:*
+        version: link:../audio-core
       msgpackr:
         specifier: ^1.11.10
         version: 1.11.10
