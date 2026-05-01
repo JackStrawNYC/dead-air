@@ -256,3 +256,116 @@ pub const FIELDS: &[UniformField] = &[
     UniformField { name: "uShowTemperatureCharacter", offset: 620, size: 4, kind: UniformKind::Float },
     UniformField { name: "uShowContrastCharacter", offset: 624, size: 4, kind: UniformKind::Float },
 ];
+
+/// Pack the schema-declared simple field copies into the std140 buffer.
+/// Auto-generated from schema entries whose rust_source is `frame.X` or
+/// `frame.X.unwrap_or(default)`. Computed uniforms (camera, lighting,
+/// derived formulas) are still owned by `crate::uniforms::build_uniform_buffer`.
+/// Returns the count of fields written for diagnostics.
+pub fn pack_simple_uniforms(frame: &crate::manifest::FrameData, buf: &mut [u8]) -> usize {
+    use crate::manifest::FrameData;
+    let _ = std::any::type_name::<FrameData>();  // ensure import survives unused-warning lints
+    fn w(buf: &mut [u8], offset: usize, val: f32) {
+        buf[offset..offset + 4].copy_from_slice(&val.to_le_bytes());
+    }
+    let mut written = 0usize;
+    w(buf, 0, frame.time); written += 1;
+    w(buf, 4, frame.dynamic_time); written += 1;
+    w(buf, 8, frame.beat_time); written += 1;
+    w(buf, 12, frame.bass); written += 1;
+    w(buf, 16, frame.rms); written += 1;
+    w(buf, 20, frame.centroid); written += 1;
+    w(buf, 24, frame.highs); written += 1;
+    w(buf, 28, frame.onset); written += 1;
+    w(buf, 32, frame.beat); written += 1;
+    w(buf, 36, frame.mids); written += 1;
+    w(buf, 40, frame.energy); written += 1;
+    w(buf, 48, frame.slow_energy); written += 1;
+    w(buf, 52, frame.fast_energy); written += 1;
+    w(buf, 56, frame.fast_bass); written += 1;
+    w(buf, 60, frame.spectral_flux); written += 1;
+    w(buf, 64, frame.energy_accel); written += 1;
+    w(buf, 68, frame.energy_trend); written += 1;
+    w(buf, 72, frame.tempo); written += 1;
+    w(buf, 76, frame.tempo); written += 1;
+    w(buf, 80, frame.onset_snap); written += 1;
+    w(buf, 84, frame.beat_snap); written += 1;
+    w(buf, 88, frame.musical_time); written += 1;
+    w(buf, 92, frame.musical_time); written += 1;
+    w(buf, 96, frame.drum_onset); written += 1;
+    w(buf, 100, frame.drum_beat); written += 1;
+    w(buf, 104, frame.stem_bass); written += 1;
+    w(buf, 108, frame.stem_drums); written += 1;
+    w(buf, 112, frame.drum_onset); written += 1;
+    w(buf, 116, frame.vocal_energy); written += 1;
+    w(buf, 120, frame.vocal_presence); written += 1;
+    w(buf, 124, frame.vocal_energy); written += 1;
+    w(buf, 128, frame.other_energy); written += 1;
+    w(buf, 132, frame.other_centroid); written += 1;
+    w(buf, 136, frame.chroma_hue); written += 1;
+    w(buf, 140, frame.chroma_shift); written += 1;
+    w(buf, 240, frame.section_progress); written += 1;
+    w(buf, 244, frame.section_index); written += 1;
+    w(buf, 248, frame.climax_phase); written += 1;
+    w(buf, 252, frame.climax_intensity); written += 1;
+    w(buf, 256, frame.coherence); written += 1;
+    w(buf, 260, frame.jam_density); written += 1;
+    w(buf, 264, frame.song_progress.unwrap_or(0.0)); written += 1;
+    w(buf, 268, frame.shader_hold_progress.unwrap_or(0.0)); written += 1;
+    w(buf, 272, frame.jam_phase); written += 1;
+    w(buf, 276, frame.jam_progress); written += 1;
+    w(buf, 280, frame.palette_primary); written += 1;
+    w(buf, 284, frame.palette_secondary); written += 1;
+    w(buf, 288, frame.palette_saturation); written += 1;
+    w(buf, 292, frame.era_saturation); written += 1;
+    w(buf, 296, frame.era_brightness); written += 1;
+    w(buf, 300, frame.era_sepia); written += 1;
+    w(buf, 316, frame.melodic_pitch); written += 1;
+    w(buf, 320, frame.melodic_direction); written += 1;
+    w(buf, 324, frame.chord_index); written += 1;
+    w(buf, 328, frame.harmonic_tension); written += 1;
+    w(buf, 332, frame.chord_confidence); written += 1;
+    w(buf, 336, frame.section_type); written += 1;
+    w(buf, 340, frame.energy_forecast); written += 1;
+    w(buf, 344, frame.peak_approaching); written += 1;
+    w(buf, 348, frame.beat_stability); written += 1;
+    w(buf, 352, frame.downbeat); written += 1;
+    w(buf, 356, frame.beat_confidence); written += 1;
+    w(buf, 360, frame.melodic_confidence); written += 1;
+    w(buf, 364, frame.improvisation_score); written += 1;
+    w(buf, 368, frame.peak_of_show); written += 1;
+    w(buf, 380, frame.show_warmth); written += 1;
+    w(buf, 384, frame.show_contrast); written += 1;
+    w(buf, 388, frame.show_saturation); written += 1;
+    w(buf, 392, frame.show_grain); written += 1;
+    w(buf, 396, frame.show_bloom); written += 1;
+    w(buf, 456, frame.envelope_brightness); written += 1;
+    w(buf, 460, frame.envelope_saturation); written += 1;
+    w(buf, 464, frame.envelope_hue); written += 1;
+    w(buf, 468, frame.tempo_derivative); written += 1;
+    w(buf, 472, frame.dynamic_range); written += 1;
+    w(buf, 476, frame.space_score); written += 1;
+    w(buf, 480, frame.timbral_brightness); written += 1;
+    w(buf, 484, frame.timbral_flux); written += 1;
+    w(buf, 488, frame.vocal_pitch); written += 1;
+    w(buf, 496, frame.semantic_psychedelic); written += 1;
+    w(buf, 500, frame.semantic_cosmic); written += 1;
+    w(buf, 504, frame.semantic_chaotic); written += 1;
+    w(buf, 508, frame.semantic_aggressive); written += 1;
+    w(buf, 512, frame.semantic_tender); written += 1;
+    w(buf, 516, frame.semantic_ambient); written += 1;
+    w(buf, 520, frame.semantic_rhythmic); written += 1;
+    w(buf, 524, frame.semantic_triumphant); written += 1;
+    w(buf, 528, frame.param_bass_scale); written += 1;
+    w(buf, 532, frame.param_energy_scale); written += 1;
+    w(buf, 536, frame.param_motion_speed); written += 1;
+    w(buf, 540, frame.param_color_sat_bias); written += 1;
+    w(buf, 544, frame.param_complexity); written += 1;
+    w(buf, 548, frame.param_drum_reactivity); written += 1;
+    w(buf, 552, frame.param_vocal_weight); written += 1;
+    w(buf, 612, frame.show_grain_character.unwrap_or(0.5)); written += 1;
+    w(buf, 616, frame.show_bloom_character.unwrap_or(0.0)); written += 1;
+    w(buf, 620, frame.show_temperature_character.unwrap_or(0.0)); written += 1;
+    w(buf, 624, frame.show_contrast_character.unwrap_or(0.5)); written += 1;
+    written
+}

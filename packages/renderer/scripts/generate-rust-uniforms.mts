@@ -27,7 +27,12 @@ interface UniformEntry {
   offset: number;
   size: number;
   glsl_type: "float" | "vec2" | "vec3" | "vec4";
+  rust_source: string;
 }
+
+/** Match `frame.field_name` (and the unwrap_or-on-Option flavor). */
+const SIMPLE_FIELD_RE = /^frame\.([a-z_][a-z_0-9]*)$/;
+const OPTION_UNWRAP_RE = /^frame\.([a-z_][a-z_0-9]*)\.unwrap_or\(([0-9.]+)\)$/;
 
 const schema = JSON.parse(readFileSync(SCHEMA_IN, "utf-8")) as {
   total_size_bytes: number;
@@ -83,5 +88,44 @@ for (const u of schema.uniforms) {
 lines.push(`];`);
 lines.push("");
 
+// ─── Codegen: pack_simple_uniforms ───
+// Auto-generates write_f32 calls for every uniform whose rust_source
+// is a direct frame.X reference (or frame.X.unwrap_or(default)). The
+// computed/synthetic uniforms (formulas, camera, lighting EMA) stay
+// hand-written in src/uniforms.rs; this function handles the boring
+// 80% so adding a new simple uniform is a schema-only edit.
+lines.push("/// Pack the schema-declared simple field copies into the std140 buffer.");
+lines.push("/// Auto-generated from schema entries whose rust_source is `frame.X` or");
+lines.push("/// `frame.X.unwrap_or(default)`. Computed uniforms (camera, lighting,");
+lines.push("/// derived formulas) are still owned by `crate::uniforms::build_uniform_buffer`.");
+lines.push("/// Returns the count of fields written for diagnostics.");
+lines.push("pub fn pack_simple_uniforms(frame: &crate::manifest::FrameData, buf: &mut [u8]) -> usize {");
+lines.push("    use crate::manifest::FrameData;");
+lines.push("    let _ = std::any::type_name::<FrameData>();  // ensure import survives unused-warning lints");
+lines.push("    fn w(buf: &mut [u8], offset: usize, val: f32) {");
+lines.push("        buf[offset..offset + 4].copy_from_slice(&val.to_le_bytes());");
+lines.push("    }");
+lines.push("    let mut written = 0usize;");
+let simpleCount = 0;
+for (const u of schema.uniforms) {
+  if (u.glsl_type !== "float") continue;
+  const m1 = u.rust_source.match(SIMPLE_FIELD_RE);
+  if (m1) {
+    lines.push(`    w(buf, ${u.offset}, frame.${m1[1]}); written += 1;`);
+    simpleCount++;
+    continue;
+  }
+  const m2 = u.rust_source.match(OPTION_UNWRAP_RE);
+  if (m2) {
+    lines.push(`    w(buf, ${u.offset}, frame.${m2[1]}.unwrap_or(${m2[2]})); written += 1;`);
+    simpleCount++;
+    continue;
+  }
+}
+lines.push("    written");
+lines.push("}");
+lines.push("");
+
 writeFileSync(OUT, lines.join("\n"));
 console.log(`[generate-rust-uniforms] ${schema.uniforms.length} fields → ${OUT}`);
+console.log(`[generate-rust-uniforms] pack_simple_uniforms emits ${simpleCount} writes`);
