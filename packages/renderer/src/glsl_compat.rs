@@ -105,6 +105,49 @@ fn is_word_used_in(source: &str, word: &str) -> bool {
 /// Fix: declare these common locals as globals (float, initialized to 0.0).
 /// In main(), the shader reassigns them before calling the generated functions,
 /// so the globals act as "pass-through" values.
+/// Return everything in the source EXCEPT the body of `void main() { ... }`.
+/// Brace-counted so it correctly handles nested blocks. Used to decide which
+/// candidate variables need a top-level global (main has its own scope).
+fn scope_outside_main(source: &str) -> String {
+    let bytes = source.as_bytes();
+    // Find the start of `void main(`.
+    let main_marker = "void main(";
+    let main_pos = match source.find(main_marker) {
+        Some(p) => p,
+        None => return source.to_string(),
+    };
+    // Find the opening `{` after the signature.
+    let mut i = main_pos + main_marker.len();
+    while i < bytes.len() && bytes[i] != b'{' {
+        i += 1;
+    }
+    if i >= bytes.len() {
+        return source.to_string();
+    }
+    let body_start = i; // points at `{`
+    // Brace-count to the matching `}`.
+    let mut depth = 0i32;
+    let mut j = i;
+    while j < bytes.len() {
+        if bytes[j] == b'{' { depth += 1; }
+        if bytes[j] == b'}' {
+            depth -= 1;
+            if depth == 0 { break; }
+        }
+        j += 1;
+    }
+    let body_end = (j + 1).min(bytes.len()); // include the closing `}`
+
+    // Concatenate pre-main + post-main.
+    let mut out = String::with_capacity(source.len());
+    out.push_str(&source[..body_start]);
+    out.push(' ');
+    if body_end < source.len() {
+        out.push_str(&source[body_end..]);
+    }
+    out
+}
+
 fn inject_global_captures(source: &str) -> String {
     // Variables commonly captured by generated raymarch functions.
     // Comprehensive list derived from batch-validating all 123 shaders.
@@ -157,57 +200,34 @@ fn inject_global_captures(source: &str) -> String {
         // Int captures (detected from failing shaders)
         "numSignals", "fogSteps",
         "marchSteps", "signalSteps", "steps",
+        // 2026-05-01: discovered via golden_frame_silent_failure_gate strict mode
+        "stemBass", "stemDrums", "vocalE",
     ];
 
-    // Detect which of these are used by a generated function (has _rmp param)
-    // but defined as local in main()
+    // The "captured scope" is all source text EXCEPT the body of `void main()`.
+    // (main owns its own locals — they don't need capture injection.) Anywhere
+    // else a candidate appears, treat it as needing a global.
     let lines: Vec<&str> = source.lines().collect();
-    let mut in_generated_func = false;
-    let mut generated_func_body = String::new();
-    let mut depth = 0;
+    let captured_scope = scope_outside_main(source);
 
-    for line in &lines {
-        let trimmed = line.trim();
-        if (trimmed.starts_with("vec3 ") || trimmed.starts_with("float "))
-            && trimmed.contains("(vec3 _rmp")
-            && trimmed.contains('{')
-        {
-            in_generated_func = true;
-            depth = 1;
-            generated_func_body.push_str(trimmed);
-            continue;
-        }
-        if in_generated_func {
-            for ch in trimmed.chars() {
-                if ch == '{' { depth += 1; }
-                if ch == '}' { depth -= 1; }
-            }
-            generated_func_body.push_str(trimmed);
-            generated_func_body.push(' ');
-            if depth <= 0 {
-                in_generated_func = false;
-            }
-        }
-    }
-
-    if generated_func_body.is_empty() {
+    if captured_scope.is_empty() {
         return source.to_string();
     }
 
-    // Find which candidates are actually used in the generated function body
+    // Find which candidates are actually used in any captured-scope body.
     let mut needed_globals: Vec<&str> = Vec::new();
     for var in &capture_candidates {
-        // Check if used in generated function body with word-boundary awareness.
-        // A variable like "ft" must not match inside "ftMap" or "float".
-        // Use patterns that ensure the char AFTER the variable is non-alphanumeric.
-        let is_used = is_word_used_in(&generated_func_body, var);
+        let is_used = is_word_used_in(&captured_scope, var);
 
         if is_used {
-            // Only inject if it's NOT already a uniform (would conflict)
+            // Skip if the candidate is already declared as a uniform OR as a
+            // top-level global (some shaders manually declare it).
             let uniform_decl = format!("uniform float {};", var);
-            if !source.contains(&uniform_decl) {
-                needed_globals.push(var);
+            let global_decl = format!("\nfloat {} = ", var);
+            if source.contains(&uniform_decl) || source.contains(&global_decl) {
+                continue;
             }
+            needed_globals.push(var);
         }
     }
 
@@ -260,11 +280,27 @@ fn inject_global_captures(source: &str) -> String {
     for line in &lines {
         let trimmed = line.trim();
 
-        // Inject globals right before the first generated function
-        if !globals_injected
-            && (trimmed.starts_with("vec3 ") || trimmed.starts_with("float "))
-            && trimmed.contains("(vec3 _rmp")
-        {
+        // Inject globals right before the FIRST top-level function definition
+        // (any return type / name — not just `_rmp`). Catches captures from
+        // helper functions like `iwInkDensity` that aren't generated raymarchers.
+        let looks_like_fn = trimmed.contains('(')
+            && trimmed.contains(')')
+            && trimmed.ends_with('{')
+            && !trimmed.starts_with("if")
+            && !trimmed.starts_with("for")
+            && !trimmed.starts_with("while")
+            && !trimmed.starts_with("switch")
+            && !trimmed.starts_with("//")
+            && (trimmed.starts_with("vec2 ")
+                || trimmed.starts_with("vec3 ")
+                || trimmed.starts_with("vec4 ")
+                || trimmed.starts_with("float ")
+                || trimmed.starts_with("int ")
+                || trimmed.starts_with("void ")
+                || trimmed.starts_with("mat2 ")
+                || trimmed.starts_with("mat3 ")
+                || trimmed.starts_with("mat4 "));
+        if !globals_injected && looks_like_fn {
             output.push_str("// [compat] globals for generated function captures\n");
             for var in &needed_globals {
                 let var_type = var_types.get(var).copied().unwrap_or("float");
@@ -609,6 +645,7 @@ pub fn webgl_to_desktop(source: &str) -> String {
     let source = fix_dynamic_loop_bounds(&source);
     let mut uniform_lines: Vec<String> = Vec::new();
     let mut body_lines: Vec<String> = Vec::new();
+    let mut varying_index: u32 = 0;
     let needs_frag_color = source.contains("gl_FragColor");
 
     for line in source.lines() {
@@ -644,9 +681,24 @@ pub fn webgl_to_desktop(source: &str) -> String {
 
         let mut transformed = line.to_string();
 
-        // varying → in (fragment shader)
+        // varying → in (fragment shader). The shared vertex shader only writes
+        // ONE output: `vUv` at location 0. Any other `varying` declarations in
+        // shader source are dead (they'd never receive vertex data anyway) AND
+        // cause naga validation errors ("Multiple bindings at location 0"), so
+        // we strip them entirely. vUv gets explicit location 0.
         if trimmed.starts_with("varying ") {
-            transformed = transformed.replacen("varying ", "in ", 1);
+            // Only keep vUv; strip all other varyings.
+            if trimmed.contains(" vUv") || trimmed.contains("\tvUv") {
+                let _ = varying_index; // suppress unused
+                transformed = transformed.replacen(
+                    "varying ",
+                    "layout(location = 0) in ",
+                    1,
+                );
+            } else {
+                // Replace the line with a comment so line numbers in errors stay sensible.
+                transformed = format!("// [compat] stripped unsupported varying: {}", trimmed);
+            }
         }
 
         // gl_FragColor → fragColor

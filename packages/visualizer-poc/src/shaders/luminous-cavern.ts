@@ -261,8 +261,9 @@ void main() {
 
     // ─── CAUSTICS ──────────────────────────────────────────────
     // Underwater light patterns on surfaces — more visible at shallow depth
-    float caustic1 = snoise(hp.xz * 2.0 + ft * 0.3 + beatSnap * 0.5);
-    float caustic2 = snoise(hp.xz * 3.5 - ft * 0.2 + beatSnap * 0.3);
+    // snoise is vec3-only; project xz to vec3 with time on z so caustics still animate.
+    float caustic1 = snoise(vec3(hp.xz * 2.0, ft * 0.3 + beatSnap * 0.5));
+    float caustic2 = snoise(vec3(hp.xz * 3.5, -ft * 0.2 + beatSnap * 0.3));
     float caustics = pow(max(caustic1 * caustic2, 0.0), 2.0) * (1.0 - depth) * (0.5 + energy * 1.5);
     // More intense when looking up (light from above)
     caustics *= smoothstep(-0.3, 0.8, n.y);

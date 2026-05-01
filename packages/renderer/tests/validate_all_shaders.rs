@@ -40,7 +40,7 @@ fn test_validate_all_shaders() {
         let module = match parser.parse(&options, &desktop) {
             Ok(m) => m,
             Err(e) => {
-                let msg = e.errors.iter().take(2).map(|e| format!("{}", e)).collect::<Vec<_>>().join("; ");
+                let msg = e.errors.iter().take(4).map(|err| format!("{:?}", err)).collect::<Vec<_>>().join(" | ");
                 failures.push((name.clone(), format!("PARSE: {}", msg)));
                 failed_parse += 1;
                 continue;
@@ -54,7 +54,21 @@ fn test_validate_all_shaders() {
         ).validate(&module) {
             Ok(i) => i,
             Err(e) => {
-                failures.push((name.clone(), format!("VALIDATE: {}", e)));
+                let mut buf = String::new();
+                let mut src: &dyn std::error::Error = &e;
+                buf.push_str(&format!("VALIDATE: {}", e));
+                while let Some(c) = src.source() {
+                    buf.push_str(&format!(" -> {}", c));
+                    src = c;
+                }
+                // Span hint
+                let spans: Vec<_> = e.spans().collect();
+                if !spans.is_empty() {
+                    let s = &spans[0].0;
+                    let to_byte = s.to_range().map(|r| format!("bytes {}..{}", r.start, r.end)).unwrap_or_default();
+                    buf.push_str(&format!(" [{}]", to_byte));
+                }
+                failures.push((name.clone(), buf));
                 failed_validate += 1;
                 continue;
             }

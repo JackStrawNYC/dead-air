@@ -13,6 +13,10 @@ mkdirSync(outDir, { recursive: true });
 const skipFiles = new Set([
   "noise.ts", "dual-blend.ts", "overlay-sdf.ts", "shader-strings.ts",
   "mesh-deformation.ts", "particle-burst.ts",
+  // 3D-mesh shaders for React Three Fiber — not fullscreen-quad shaders, so
+  // not consumable by the Rust renderer (which only renders to a fullscreen
+  // quad with the shared vec2 vUv vertex output).
+  "forest.ts",
 ]);
 
 const files = readdirSync(shaderDir)

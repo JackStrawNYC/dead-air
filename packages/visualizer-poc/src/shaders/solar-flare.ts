@@ -678,7 +678,7 @@ void main() {
   if (climaxBoost > 0.5) {
     // Screen-space plasma wash approaching the camera
     float washDist = length(screenP);
-    float washNoise = fbm3(vec3(screenP * 3.0 + vec3(uDynamicTime * 0.5), uDynamicTime * 0.3));
+    float washNoise = fbm3(vec3(screenP * 3.0 + vec2(uDynamicTime * 0.5), uDynamicTime * 0.3));
     float washMask = smoothstep(1.5, 0.0, washDist) * climaxBoost;
     washMask *= 0.5 + washNoise * 0.5;
     vec3 washColor = mix(
