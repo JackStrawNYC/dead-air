@@ -404,6 +404,140 @@ fn gpu_compositing_preserves_zorder_across_blend_modes() {
     );
 }
 
+/// Rotation direction parity test. Render a sprite that has clear up/down
+/// asymmetry (red top half, blue bottom half) at rotation_deg = +90 on
+/// both CPU and GPU. CPU: image-Y-down + positive deg → after 90° rot,
+/// what was on the top of the image lands on the LEFT of the target.
+/// GPU must agree. If the rotation handedness is inverted, what was on
+/// top would land on the RIGHT.
+#[test]
+fn gpu_compositing_rotation_matches_cpu() {
+    use dead_air_renderer::{
+        overlay_atlas::build_atlas,
+        overlay_cache::{CachedOverlay, OverlayInstance, OverlayTransform, OverlayImageCache},
+        overlay_pass::{instance_to_gpu, OverlayCompositingPipeline},
+        compositor::BlendMode,
+    };
+    use std::collections::HashMap;
+
+    let renderer = pollster::block_on(dead_air_renderer::gpu::GpuRenderer::new(128, 128))
+        .expect("GPU init");
+    let device = renderer.device();
+    let queue = renderer.queue();
+
+    // Sprite: red top-half, blue bottom-half (bright enough to pass lum gate).
+    let mut pixels = vec![0u8; 32 * 32 * 4];
+    for row in 0..32 {
+        for col in 0..32 {
+            let i = (row * 32 + col) * 4;
+            if row < 16 {
+                pixels[i]   = 255; pixels[i+1] = 200; pixels[i+2] = 200; pixels[i+3] = 255;
+            } else {
+                pixels[i]   = 200; pixels[i+1] = 200; pixels[i+2] = 255; pixels[i+3] = 255;
+            }
+        }
+    }
+    let mut overlays = HashMap::new();
+    overlays.insert("striped".to_string(), CachedOverlay { pixels: pixels.clone(), width: 32, height: 32 });
+    let atlas = build_atlas(&overlays, 64).expect("atlas");
+    let gpu_pipeline = OverlayCompositingPipeline::new(device, queue, &atlas, wgpu::TextureFormat::Rgba8Unorm);
+
+    // CPU side: same sprite via temp PNG.
+    let mut cpu_cache = OverlayImageCache::new();
+    let tmp = std::env::temp_dir().join("rot_parity.png");
+    image::save_buffer(&tmp, &pixels, 32, 32, image::ColorType::Rgba8).unwrap();
+    cpu_cache.load_png("striped", &tmp).unwrap();
+
+    let inst = OverlayInstance {
+        overlay_id: "striped".to_string(),
+        transform: OverlayTransform {
+            opacity: 1.0,
+            scale: 2.0,                  // 32×32 source → 64×64 target footprint
+            rotation_deg: 90.0,
+            offset_x: 0.0,
+            offset_y: 0.0,
+        },
+        blend_mode: BlendMode::Normal,
+        keyframe_svg: None,
+    };
+
+    // CPU render
+    let mut cpu = vec![0u8; 128 * 128 * 4];
+    cpu_cache.composite_instance(&mut cpu, 128, 128, &inst);
+
+    // GPU render
+    let target = device.create_texture(&wgpu::TextureDescriptor {
+        label: Some("rot_target"),
+        size: wgpu::Extent3d { width: 128, height: 128, depth_or_array_layers: 1 },
+        mip_level_count: 1, sample_count: 1,
+        dimension: wgpu::TextureDimension::D2,
+        format: wgpu::TextureFormat::Rgba8Unorm,
+        usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
+        view_formats: &[],
+    });
+    let view = target.create_view(&wgpu::TextureViewDescriptor::default());
+    let gpu_inst = instance_to_gpu(&inst, &atlas, 128, 128).expect("conv");
+    let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
+    {
+        let _ = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: Some("clear"),
+            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                view: &view, resolve_target: None,
+                ops: wgpu::Operations { load: wgpu::LoadOp::Clear(wgpu::Color::BLACK), store: wgpu::StoreOp::Store },
+            })],
+            depth_stencil_attachment: None, timestamp_writes: None, occlusion_query_set: None,
+        });
+    }
+    gpu_pipeline.encode(&mut encoder, device, &view, &[gpu_inst]);
+    let bpr = ((128 * 4 + 255) / 256) * 256;
+    let staging = device.create_buffer(&wgpu::BufferDescriptor {
+        label: None, size: (bpr * 128) as u64,
+        usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
+        mapped_at_creation: false,
+    });
+    encoder.copy_texture_to_buffer(
+        wgpu::TexelCopyTextureInfo { texture: &target, mip_level: 0, origin: wgpu::Origin3d::ZERO, aspect: wgpu::TextureAspect::All },
+        wgpu::TexelCopyBufferInfo {
+            buffer: &staging,
+            layout: wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(bpr as u32), rows_per_image: Some(128) },
+        },
+        wgpu::Extent3d { width: 128, height: 128, depth_or_array_layers: 1 },
+    );
+    queue.submit(std::iter::once(encoder.finish()));
+    let slice = staging.slice(..);
+    let (tx, rx) = std::sync::mpsc::channel();
+    slice.map_async(wgpu::MapMode::Read, move |r| { tx.send(r).ok(); });
+    let _ = device.poll(wgpu::Maintain::Wait);
+    rx.recv().unwrap().unwrap();
+    let gpu_data = slice.get_mapped_range();
+
+    // Sample the LEFT side (col=48) and RIGHT side (col=80) of the rotated sprite.
+    // The CPU and GPU should agree on which side is red-dominant after rotation.
+    let cpu_left  = (64 * 128 + 48) * 4; // CPU buffer (row*W+col)*4
+    let cpu_right = (64 * 128 + 80) * 4;
+    let gpu_left  = 64 * bpr as usize + 48 * 4;
+    let gpu_right = 64 * bpr as usize + 80 * 4;
+
+    let cpu_left_red  = cpu[cpu_left]  as i32 - cpu[cpu_left + 2]  as i32;
+    let cpu_right_red = cpu[cpu_right] as i32 - cpu[cpu_right + 2] as i32;
+    let gpu_left_red  = gpu_data[gpu_left]  as i32 - gpu_data[gpu_left + 2]  as i32;
+    let gpu_right_red = gpu_data[gpu_right] as i32 - gpu_data[gpu_right + 2] as i32;
+
+    eprintln!("[rotation] CPU left R-B={}, right R-B={}", cpu_left_red, cpu_right_red);
+    eprintln!("[rotation] GPU left R-B={}, right R-B={}", gpu_left_red, gpu_right_red);
+
+    // The two paths should at minimum agree on which side is red-dominant.
+    let cpu_left_redder = cpu_left_red > cpu_right_red;
+    let gpu_left_redder = gpu_left_red > gpu_right_red;
+    assert_eq!(
+        cpu_left_redder, gpu_left_redder,
+        "CPU and GPU disagree on rotation direction at +90° (CPU left-redder={}, GPU left-redder={})",
+        cpu_left_redder, gpu_left_redder,
+    );
+
+    let _ = std::fs::remove_file(&tmp);
+}
+
 /// Catch offset_y direction regressions. CPU compositor uses Y-down
 /// (positive offset_y = below center). The GPU converter must mirror
 /// this even though NDC is Y-up. Place a sprite at offset_y = +0.3 and
