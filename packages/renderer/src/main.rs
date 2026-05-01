@@ -39,6 +39,9 @@ mod text_layers;
 mod transition;
 mod uniforms;
 
+#[path = "../generated/uniforms_layout.rs"]
+mod uniforms_layout;
+
 use clap::Parser;
 use indicatif::{ProgressBar, ProgressStyle};
 use std::path::PathBuf;

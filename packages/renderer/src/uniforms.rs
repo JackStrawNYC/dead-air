@@ -60,6 +60,15 @@ pub fn build_uniform_buffer(frame: &FrameData, width: u32, height: u32, lighting
     let padded_size = (UBO_SIZE + 15) & !15;
     let mut buf = vec![0u8; padded_size];
 
+    // Schema-driven simple field copies (Wave 2.1 phase D). Writes the 98
+    // uniforms whose schema rust_source is `frame.X` or
+    // `frame.X.unwrap_or(default)` directly from `uniforms-schema.json`.
+    // The hand-written write_f32 calls below remain (belt-and-suspenders);
+    // they overwrite simple offsets with the same values and own the
+    // computed/synthetic uniforms (camera, lighting, formulas, vec blocks).
+    // Byte-equivalence is gated by tests/uniform_packer_parity.rs.
+    let _ = crate::uniforms_layout::pack_simple_uniforms(frame, &mut buf);
+
     // ─── Time ─── (offsets 0-8)
     write_f32(&mut buf, 0, frame.time);           // uTime
     write_f32(&mut buf, 4, frame.dynamic_time);   // uDynamicTime
