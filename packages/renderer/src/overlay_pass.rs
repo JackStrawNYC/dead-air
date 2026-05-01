@@ -350,9 +350,11 @@ impl OverlayCompositingPipeline {
     }
 
     /// Encode a composite-overlays pass that draws all `instances` into
-    /// `target`, grouping by blend_mode so each group renders through the
-    /// pipeline whose BlendState implements the right formula. Caller owns
-    /// the encoder.
+    /// `target`. Walks instances in input order and batches each run of
+    /// consecutive same-blend-mode instances into one draw call against
+    /// the matching pipeline. This preserves z-order across blend modes
+    /// (matches the CPU compositor, which paints instances strictly in
+    /// schedule order).
     pub fn encode(
         &self,
         encoder: &mut wgpu::CommandEncoder,
@@ -364,35 +366,29 @@ impl OverlayCompositingPipeline {
             return;
         }
 
-        // Group by blend_mode. Stable ordering inside each group preserves
-        // overlay z-order intent (later instances paint on top).
-        let mut groups: [Vec<OverlayInstanceGPU>; 3] = Default::default();
-        for inst in instances {
-            let idx = match inst.blend_mode {
-                BLEND_NORMAL => 0,
-                BLEND_SCREEN => 1,
-                BLEND_MULTIPLY => 2,
-                _ => 1, // unknown → screen, matching CPU fallback
-            };
-            groups[idx].push(*inst);
-        }
-
-        let pipelines = [
-            (&self.pipeline_normal, "overlay_pass_normal"),
-            (&self.pipeline_screen, "overlay_pass_screen"),
-            (&self.pipeline_multiply, "overlay_pass_multiply"),
-        ];
-
-        for (i, group) in groups.iter().enumerate() {
-            if group.is_empty() {
-                continue;
+        let pipeline_for = |mode: u32| -> (&wgpu::RenderPipeline, &'static str) {
+            match mode {
+                BLEND_NORMAL => (&self.pipeline_normal, "overlay_pass_normal"),
+                BLEND_MULTIPLY => (&self.pipeline_multiply, "overlay_pass_multiply"),
+                _ => (&self.pipeline_screen, "overlay_pass_screen"),
             }
-            let (pipeline, label) = pipelines[i];
+        };
+
+        // Walk instances in order, accumulating runs of identical blend mode.
+        let mut run_start = 0usize;
+        while run_start < instances.len() {
+            let run_mode = instances[run_start].blend_mode;
+            let mut run_end = run_start + 1;
+            while run_end < instances.len() && instances[run_end].blend_mode == run_mode {
+                run_end += 1;
+            }
+            let (pipeline, label) = pipeline_for(run_mode);
+            let run_slice = &instances[run_start..run_end];
             let instance_buffer = wgpu::util::DeviceExt::create_buffer_init(
                 device,
                 &wgpu::util::BufferInitDescriptor {
                     label: Some(label),
-                    contents: bytemuck::cast_slice(group),
+                    contents: bytemuck::cast_slice(run_slice),
                     usage: wgpu::BufferUsages::VERTEX,
                 },
             );
@@ -413,7 +409,9 @@ impl OverlayCompositingPipeline {
             rp.set_pipeline(pipeline);
             rp.set_bind_group(0, &self.bind_group, &[]);
             rp.set_vertex_buffer(0, instance_buffer.slice(..));
-            rp.draw(0..6, 0..group.len() as u32);
+            rp.draw(0..6, 0..run_slice.len() as u32);
+            drop(rp);
+            run_start = run_end;
         }
     }
 }

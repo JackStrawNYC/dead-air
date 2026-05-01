@@ -299,6 +299,111 @@ fn gpu_compositing_does_not_y_flip() {
     );
 }
 
+/// Catch z-order-across-blend-modes regressions. Render three sprites in
+/// order [Multiply at (-0.4, 0), Screen at (0, 0), Normal at (+0.4, 0)] and
+/// assert the bottom layer is the multiply (because each subsequent layer
+/// paints on top in schedule order, regardless of blend mode). If a future
+/// change re-introduced the bucket-by-mode batching, the multiply would
+/// paint LAST (overlapping screen and normal where they coincide).
+#[test]
+fn gpu_compositing_preserves_zorder_across_blend_modes() {
+    use dead_air_renderer::{
+        overlay_atlas::build_atlas,
+        overlay_cache::CachedOverlay,
+        overlay_pass::{OverlayCompositingPipeline, OverlayInstanceGPU},
+    };
+    use std::collections::HashMap;
+
+    let renderer = pollster::block_on(dead_air_renderer::gpu::GpuRenderer::new(64, 64))
+        .expect("GPU init");
+    let device = renderer.device();
+    let queue = renderer.queue();
+
+    // 16x16 white sprite (passes lum gate, identical for all 3 instances)
+    let sprite = vec![220u8; 16 * 16 * 4]
+        .chunks_exact(4)
+        .flat_map(|_| [220u8, 220, 220, 255])
+        .collect::<Vec<_>>();
+    let mut overlays = HashMap::new();
+    overlays.insert("dot".to_string(), CachedOverlay { pixels: sprite, width: 16, height: 16 });
+    let atlas = build_atlas(&overlays, 64).expect("atlas");
+    let pipeline = OverlayCompositingPipeline::new(device, queue, &atlas, wgpu::TextureFormat::Rgba8Unorm);
+    let entry = atlas.lookup["dot"];
+
+    // Three sprites at the SAME position. Order: multiply, screen, normal.
+    // If z-order is preserved, normal (last) wins → final RGB ≈ sprite color (220).
+    // If buckets re-order, screen would paint last (Screen group runs after Normal in old code).
+    let mk = |mode: u32| OverlayInstanceGPU {
+        center: [0.0, 0.0],
+        half_size: [16.0 / 64.0, 16.0 / 64.0],
+        uv_rect: [entry.uv_min[0], entry.uv_min[1], entry.uv_max[0], entry.uv_max[1]],
+        opacity: 1.0,
+        rotation_rad: 0.0,
+        blend_mode: mode,
+        _pad: 0,
+    };
+    let instances = vec![mk(2), mk(1), mk(0)]; // multiply, screen, normal
+
+    let target = device.create_texture(&wgpu::TextureDescriptor {
+        label: Some("z_target"),
+        size: wgpu::Extent3d { width: 64, height: 64, depth_or_array_layers: 1 },
+        mip_level_count: 1, sample_count: 1,
+        dimension: wgpu::TextureDimension::D2,
+        format: wgpu::TextureFormat::Rgba8Unorm,
+        usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
+        view_formats: &[],
+    });
+    let view = target.create_view(&wgpu::TextureViewDescriptor::default());
+    let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
+    {
+        let _ = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: Some("clear"),
+            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                view: &view, resolve_target: None,
+                // Mid-blue background so each blend mode would leave a different fingerprint.
+                ops: wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(wgpu::Color { r: 0.2, g: 0.2, b: 0.6, a: 1.0 }),
+                    store: wgpu::StoreOp::Store,
+                },
+            })],
+            depth_stencil_attachment: None, timestamp_writes: None, occlusion_query_set: None,
+        });
+    }
+    pipeline.encode(&mut encoder, device, &view, &instances);
+    let bpr = ((64 * 4 + 255) / 256) * 256;
+    let staging = device.create_buffer(&wgpu::BufferDescriptor {
+        label: None, size: (bpr * 64) as u64,
+        usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
+        mapped_at_creation: false,
+    });
+    encoder.copy_texture_to_buffer(
+        wgpu::TexelCopyTextureInfo { texture: &target, mip_level: 0, origin: wgpu::Origin3d::ZERO, aspect: wgpu::TextureAspect::All },
+        wgpu::TexelCopyBufferInfo {
+            buffer: &staging,
+            layout: wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(bpr as u32), rows_per_image: Some(64) },
+        },
+        wgpu::Extent3d { width: 64, height: 64, depth_or_array_layers: 1 },
+    );
+    queue.submit(std::iter::once(encoder.finish()));
+    let slice = staging.slice(..);
+    let (tx, rx) = std::sync::mpsc::channel();
+    slice.map_async(wgpu::MapMode::Read, move |r| { tx.send(r).ok(); });
+    let _ = device.poll(wgpu::Maintain::Wait);
+    rx.recv().unwrap().unwrap();
+    let data = slice.get_mapped_range();
+
+    // Center pixel (32, 32) — Normal painted last, sprite color is gray 220.
+    let i = 32 * bpr as usize + 32 * 4;
+    let center = [data[i], data[i + 1], data[i + 2]];
+    eprintln!("[z_order] center pixel: {:?} (expect ~[220, 220, 220])", center);
+    // Allow some slack — Normal at α=1 should be near sprite color, not bg color.
+    assert!(
+        center[0] > 180 && center[1] > 180,
+        "Normal layer wasn't on top — got {:?}; if Multiply or Screen painted last, RGB would differ",
+        center,
+    );
+}
+
 /// Catch offset_y direction regressions. CPU compositor uses Y-down
 /// (positive offset_y = below center). The GPU converter must mirror
 /// this even though NDC is Y-up. Place a sprite at offset_y = +0.3 and
