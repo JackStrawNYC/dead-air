@@ -65,3 +65,44 @@ services:
     volumes: *gpu-volumes
     command: ["analyze-audio"]
     stdin_open: true
+
+  # ── Manifest generator (Node + TS, no GPU) ──────────────────
+
+  generate-manifest:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.manifest
+    image: dead-air-manifest
+    volumes:
+      - ../data:/data/in:ro
+      - ../out:/data/out
+    # Override at run time: docker compose run generate-manifest <args>
+    command: ["--data-dir", "/data/in", "--output", "/data/out/manifest.msgpack"]
+
+  # ── Rust GPU renderer (requires --gpus all on Linux/CUDA host) ──
+
+  render:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.renderer
+    image: dead-air-renderer
+    volumes:
+      - ../out:/data
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    command:
+      - "--manifest"
+      - "/data/manifest.msgpack"
+      - "--output"
+      - "/data/show.mp4"
+      - "--width"
+      - "3840"
+      - "--height"
+      - "2160"
+      - "--fps"
+      - "60"

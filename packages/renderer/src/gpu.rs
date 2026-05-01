@@ -78,8 +78,14 @@ pub struct GpuRenderer {
     device: wgpu::Device,
     queue: wgpu::Queue,
     adapter_name: String,
+    /// Output (final / readback) dimensions.
     width: u32,
     height: u32,
+    /// Scene-render dimensions. Equal to width/height by default; smaller when
+    /// `--scene-scale < 1.0` is set. Lets expensive procedural shaders run on
+    /// fewer pixels while output stays full-resolution (audit Wave 3.3 LOD).
+    scene_width: u32,
+    scene_height: u32,
 
     // HDR scene render target (Rgba16Float) — shaders render here
     scene_texture: wgpu::Texture,
@@ -123,7 +129,22 @@ pub struct GpuRenderer {
 }
 
 impl GpuRenderer {
+    /// Initialise with full output resolution AND a separate scene resolution.
+    /// scene_scale=1.0 (default) renders the scene at output size. <1.0 renders
+    /// the scene smaller and the postprocess sampler upscales to output size,
+    /// trading some sharpness for a major shader-cost reduction.
     pub async fn new(width: u32, height: u32) -> Result<Self, Box<dyn std::error::Error>> {
+        Self::new_with_scene_scale(width, height, 1.0).await
+    }
+
+    pub async fn new_with_scene_scale(width: u32, height: u32, scene_scale: f32) -> Result<Self, Box<dyn std::error::Error>> {
+        let scene_scale = scene_scale.clamp(0.25, 1.0);
+        let scene_width = ((width as f32 * scene_scale).round() as u32).max(64);
+        let scene_height = ((height as f32 * scene_scale).round() as u32).max(64);
+        Self::new_inner(width, height, scene_width, scene_height).await
+    }
+
+    async fn new_inner(width: u32, height: u32, scene_width: u32, scene_height: u32) -> Result<Self, Box<dyn std::error::Error>> {
         // ─── GPU adapter + device ───
         let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
             backends: wgpu::Backends::PRIMARY,
@@ -155,11 +176,13 @@ impl GpuRenderer {
 
         // ─── Textures ───
 
-        // HDR scene texture — shaders render to this (values can exceed 1.0)
-        // COPY_SRC needed for feedback buffer copy after scene render
+        // HDR scene texture — shaders render to this (values can exceed 1.0).
+        // Sized to scene_width/scene_height (LOD scaling); postprocess sampler
+        // upscales to full output resolution when reading from this view.
+        // COPY_SRC needed for feedback buffer copy after scene render.
         let scene_texture = device.create_texture(&wgpu::TextureDescriptor {
             label: Some("scene_texture_hdr"),
-            size: wgpu::Extent3d { width, height, depth_or_array_layers: 1 },
+            size: wgpu::Extent3d { width: scene_width, height: scene_height, depth_or_array_layers: 1 },
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
@@ -171,10 +194,10 @@ impl GpuRenderer {
         });
         let scene_texture_view = scene_texture.create_view(&wgpu::TextureViewDescriptor::default());
 
-        // Secondary HDR texture — for transition blending
+        // Secondary HDR texture — for transition blending. Same dims as scene_texture.
         let secondary_texture = device.create_texture(&wgpu::TextureDescriptor {
             label: Some("secondary_texture_hdr"),
-            size: wgpu::Extent3d { width, height, depth_or_array_layers: 1 },
+            size: wgpu::Extent3d { width: scene_width, height: scene_height, depth_or_array_layers: 1 },
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
@@ -409,6 +432,8 @@ impl GpuRenderer {
             adapter_name,
             width,
             height,
+            scene_width,
+            scene_height,
             scene_texture,
             scene_texture_view,
             secondary_texture,
@@ -595,13 +620,14 @@ impl GpuRenderer {
     }
 
     /// Create a feedback texture (Rgba16Float, same size as scene texture).
+    /// Sized to scene_width/scene_height — scene→feedback copy must match dims.
     /// Used for ping-pong feedback buffers (uPrevFrame).
     pub fn create_feedback_texture(&self, label: &str) -> (wgpu::Texture, wgpu::TextureView) {
         let texture = self.device.create_texture(&wgpu::TextureDescriptor {
             label: Some(label),
             size: wgpu::Extent3d {
-                width: self.width,
-                height: self.height,
+                width: self.scene_width,
+                height: self.scene_height,
                 depth_or_array_layers: 1,
             },
             mip_level_count: 1,
@@ -739,7 +765,7 @@ impl GpuRenderer {
                     texture: fb_tex,
                     mip_level: 0, origin: wgpu::Origin3d::ZERO, aspect: wgpu::TextureAspect::All,
                 },
-                wgpu::Extent3d { width: self.width, height: self.height, depth_or_array_layers: 1 },
+                wgpu::Extent3d { width: self.scene_width, height: self.scene_height, depth_or_array_layers: 1 },
             );
         }
 
@@ -1140,7 +1166,7 @@ impl GpuRenderer {
                     origin: wgpu::Origin3d::ZERO,
                     aspect: wgpu::TextureAspect::All,
                 },
-                wgpu::Extent3d { width: self.width, height: self.height, depth_or_array_layers: 1 },
+                wgpu::Extent3d { width: self.scene_width, height: self.scene_height, depth_or_array_layers: 1 },
             );
         }
 
@@ -1177,7 +1203,7 @@ impl GpuRenderer {
                     origin: wgpu::Origin3d::ZERO,
                     aspect: wgpu::TextureAspect::All,
                 },
-                wgpu::Extent3d { width: self.width, height: self.height, depth_or_array_layers: 1 },
+                wgpu::Extent3d { width: self.scene_width, height: self.scene_height, depth_or_array_layers: 1 },
             );
         }
 

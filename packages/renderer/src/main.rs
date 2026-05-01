@@ -143,6 +143,14 @@ struct Args {
     /// nothing (silently — the audit's #7 debt). Recommended for production.
     #[arg(long, default_value_t = false)]
     strict_overlays: bool,
+
+    /// Scene-render LOD scale (audit Wave 3.3). 1.0 renders the scene at full
+    /// output resolution; values < 1.0 render the scene shader at smaller
+    /// dimensions and the postprocess sampler upscales. Trades some sharpness
+    /// for major shader-cost reduction (0.75 ≈ 1.8x faster shader cost).
+    /// Range 0.25..=1.0.
+    #[arg(long, default_value_t = 1.0)]
+    scene_scale: f32,
 }
 
 fn main() {
@@ -354,8 +362,18 @@ fn main() {
 
     // Initialize GPU
     let start = Instant::now();
-    let mut renderer = pollster::block_on(gpu::GpuRenderer::new(args.width, args.height))
-        .expect("Failed to initialize GPU");
+    let mut renderer = pollster::block_on(
+        gpu::GpuRenderer::new_with_scene_scale(args.width, args.height, args.scene_scale)
+    ).expect("Failed to initialize GPU");
+    if (args.scene_scale - 1.0).abs() > 1e-3 {
+        println!(
+            "Scene LOD: rendering at {:.0}% of output ({}x{} scene → {}x{} output)",
+            args.scene_scale * 100.0,
+            (args.width as f32 * args.scene_scale) as u32,
+            (args.height as f32 * args.scene_scale) as u32,
+            args.width, args.height,
+        );
+    }
 
     println!(
         "GPU: {} ({:.2}s)",

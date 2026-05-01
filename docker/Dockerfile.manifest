@@ -1,0 +1,52 @@
+# Manifest generator — produces the per-frame JSON/MessagePack manifest the
+# Rust renderer consumes. Pure TypeScript, no GPU required.
+#
+# Inputs (mounted volumes):
+#   /data/in   — analysis JSON files + setlist.json (read-only)
+#   /data/out  — manifest output target
+#
+# Build:
+#   docker build -f docker/Dockerfile.manifest -t dead-air-manifest .
+#
+# Run:
+#   docker run --rm \
+#     -v $(pwd)/data:/data/in:ro \
+#     -v $(pwd)/out:/data/out \
+#     dead-air-manifest --output /data/out/manifest.msgpack --fps 60 --width 3840 --height 2160
+
+FROM node:22-bookworm-slim
+
+LABEL org.opencontainers.image.title="dead-air-manifest"
+LABEL org.opencontainers.image.description="Manifest generator for Dead Air visualizer"
+LABEL org.opencontainers.image.source="https://github.com/chrisgardella/dead-air"
+
+# pnpm via corepack so workspace resolution works inside the container.
+RUN corepack enable && corepack prepare pnpm@9.15.4 --activate
+
+WORKDIR /workspace
+
+# Copy workspace plumbing first so the install layer caches across source edits.
+COPY pnpm-workspace.yaml package.json pnpm-lock.yaml tsconfig.base.json turbo.json /workspace/
+
+# Copy only the packages the manifest generator transitively imports.
+# (visualizer-poc supplies the analysis utility functions; core has logger/types.)
+COPY packages/core/package.json /workspace/packages/core/package.json
+COPY packages/visualizer-poc/package.json /workspace/packages/visualizer-poc/package.json
+COPY packages/manifest-generator/package.json /workspace/packages/manifest-generator/package.json
+
+RUN pnpm install --frozen-lockfile --filter '@dead-air/manifest-generator...'
+
+# Now the actual source.
+COPY packages/core /workspace/packages/core
+COPY packages/visualizer-poc /workspace/packages/visualizer-poc
+COPY packages/manifest-generator /workspace/packages/manifest-generator
+
+WORKDIR /workspace/packages/manifest-generator
+
+# Default volume mount points; override at run time as needed.
+ENV DEAD_AIR_DATA_DIR=/data/in
+ENV DEAD_AIR_OUTPUT_DIR=/data/out
+VOLUME ["/data/in", "/data/out"]
+
+ENTRYPOINT ["pnpm", "exec", "tsx", "generate-manifest-parallel.ts"]
+CMD ["--data-dir", "/data/in", "--output", "/data/out/manifest.msgpack", "--fps", "60", "--width", "1920", "--height", "1080"]

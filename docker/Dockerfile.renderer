@@ -1,0 +1,55 @@
+# GPU renderer — consumes a manifest + overlay PNGs, produces video frames
+# through wgpu and pipes to FFmpeg. Linux/CUDA target; Mac/Metal builds run
+# the binary natively (no Docker).
+#
+# IMPORTANT: GPU access at runtime requires:
+#   nvidia-container-toolkit installed on host
+#   docker run --gpus all ...
+#
+# Build:
+#   docker build -f docker/Dockerfile.renderer -t dead-air-renderer .
+#
+# Run:
+#   docker run --rm --gpus all \
+#     -v $(pwd)/out:/data \
+#     dead-air-renderer \
+#     --manifest /data/manifest.msgpack \
+#     --output /data/show.mp4 \
+#     --width 3840 --height 2160 --fps 60
+
+FROM rust:1.83-bookworm AS builder
+
+LABEL org.opencontainers.image.title="dead-air-renderer-builder"
+
+# wgpu / naga build needs git + python3 (gn deps) + pkg-config + libxkbcommon-dev
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git python3 pkg-config build-essential libxkbcommon-dev \
+    libwayland-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /workspace
+COPY packages/renderer/Cargo.toml packages/renderer/Cargo.lock /workspace/
+# Vendor the source after the manifest so dep compilation caches.
+COPY packages/renderer/src /workspace/src
+RUN cargo build --release --bin dead-air-renderer
+
+# ─── Runtime image ─────────────────────────────────────────────
+FROM debian:bookworm-slim
+
+LABEL org.opencontainers.image.title="dead-air-renderer"
+LABEL org.opencontainers.image.description="GPU-native shader renderer for Dead Air"
+LABEL org.opencontainers.image.source="https://github.com/chrisgardella/dead-air"
+
+# FFmpeg for the output pipe + libxkbcommon for wgpu Vulkan loader.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ffmpeg libxkbcommon0 \
+    libvulkan1 mesa-vulkan-drivers \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder /workspace/target/release/dead-air-renderer /usr/local/bin/dead-air-renderer
+
+VOLUME ["/data"]
+ENV RUST_BACKTRACE=1
+
+ENTRYPOINT ["/usr/local/bin/dead-air-renderer"]
+CMD ["--help"]
