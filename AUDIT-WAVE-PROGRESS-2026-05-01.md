@@ -1,6 +1,7 @@
 # Audit Action Progress — 2026-05-01
 
 Single-session execution against [`ARCHITECTURAL-AUDIT-2026-04.md`](./ARCHITECTURAL-AUDIT-2026-04.md).
+Two commits land the changes; deferral docs capture the rest.
 
 ## Completed (code-level, tested)
 
@@ -9,84 +10,89 @@ Single-session execution against [`ARCHITECTURAL-AUDIT-2026-04.md`](./ARCHITECTU
 - `packages/manifest-generator/convert-manifest-to-msgpack.mts` — one-shot JSON→msgpack converter for legacy manifests.
 - `packages/renderer/src/manifest.rs` — added 3 round-trip tests + cross-format equivalence test, all passing.
 - `packages/renderer/tests/cross_lang_msgpack.rs` — cross-language test that loads a TS-emitted msgpack file in Rust.
-- **Effect**: msgpack manifests load correctly across the language boundary; smaller files, faster startup.
 
 ### Wave 1.2 — Overlay error manifest + pre-render validation (audit Debt #7)
-- `packages/renderer/src/overlay_cache.rs` — added `validate_schedule()` returning `ValidationReport` with missing overlays, frame-instance counts, sorted by frequency.
-- `packages/renderer/src/main.rs` — wired pre-flight validation + new `--strict-overlays` flag that aborts before render if anything is missing.
-- 3 new unit tests covering missing/passing/keyframe-skip cases.
-- **Effect**: missing overlay PNGs no longer silently render blank; production renders can opt into strict mode.
+- `packages/renderer/src/overlay_cache.rs` — `validate_schedule()` returning `ValidationReport` with missing overlays, frame-instance counts, sorted by frequency.
+- `packages/renderer/src/main.rs` — pre-flight validation + new `--strict-overlays` flag.
+- 3 unit tests covering missing/passing/keyframe-skip cases.
 
 ### Wave 1.3 — Split renderer main.rs into render_loop.rs (audit Section 3 #5)
-- `packages/renderer/src/render_loop.rs` — new module with `RenderResources` bag struct + `run()` driving the per-frame pipeline (transitions, motion blur, post-process, effects, composited overlays, readback).
-- `packages/renderer/src/main.rs` — went from 924 → 566 lines; now orchestrates init + cleanup, delegates the loop.
-- All 37 lib tests still pass.
-- **Effect**: render loop is independently callable from tests/benches; main.rs is now scannable.
+- `packages/renderer/src/render_loop.rs` — `RenderResources` bag struct + `run()` function.
+- `main.rs`: 924 → 566 lines.
 
 ### Wave 1.4 — Workspace path resolution (audit Debt #8)
-- `packages/core/src/utils/paths.ts` — new `findWorkspaceRoot()`, `packageRoot()`, `rendererRoot()`, `visualizerPocRoot()`, `fromRoot()` helpers. Honors `DEAD_AIR_ROOT` env override.
-- `packages/pipeline/src/render/rust-renderer.ts` — replaced `'../../../renderer'` with `rendererRoot()`.
-- `packages/cli/src/commands/generate-show.ts` — replaced `__dirname, '../../../visualizer-poc/data/...'` with `visualizerPocRoot()`.
-- 6 new vitest cases in `paths.test.ts`, all passing.
-- **Effect**: cross-package paths survive directory restructuring.
+- `packages/core/src/utils/paths.ts` — `findWorkspaceRoot/packageRoot/rendererRoot/visualizerPocRoot/fromRoot`. `DEAD_AIR_ROOT` env override.
+- `pipeline/src/render/rust-renderer.ts` and `cli/src/commands/generate-show.ts` updated to use helpers.
+- 6 vitest cases pass.
 
 ### Wave 1.5 — Move manifest generator out of /renderer/ (audit Debt #11)
-- New package: `packages/manifest-generator/` with own `package.json` + `tsconfig.json`.
-- Moved: `generate-manifest-parallel.ts`, `generate-full-manifest.ts`, `generate-manifest-worker.ts`, `generate-manifest.ts`, `convert-manifest-to-msgpack.mts`.
-- `packages/pipeline/src/render/rust-renderer.ts` updated to point at the new package.
-- `packages/renderer/render-show.sh` updated to `cd` into the new location.
-- Smoke test: parallel generator runs from new location, processes cached songs.
-- **Effect**: TypeScript no longer lives inside the Rust package; correct package topology.
+- New `packages/manifest-generator/` with own `package.json` + `tsconfig.json`.
+- Moved 5 generator files; relative imports kept working (same depth).
+- `rust-renderer.ts` + `render-show.sh` updated.
 
 ### Wave 2.4 — JSON-based show routing (audit Top #5)
 - `packages/visualizer-poc/scripts/extract-show-routing.mts` — extracts `VENETA_SONG_IDENTITIES` to `data/shows/1972-08-27/routing.json`.
-- `packages/visualizer-poc/src/data/veneta-routing.ts` — `getVenetaSongIdentity()` now checks the JSON file first, falls back to inline TS.
-- 5 new vitest cases in `veneta-routing.test.ts`, all passing.
-- **Effect**: show routing is editable via JSON (data/shows/1972-08-27/routing.json), no TypeScript changes required for an iteration cycle.
+- `veneta-routing.ts::getVenetaSongIdentity` checks JSON first, falls back to inline TS.
+- 5 vitest cases pass.
 
-### Wave 3.2 — Visual regression: silent-failure gate (audit Top #6, partial)
-- `packages/renderer/tests/render_multi_shader.rs` — new `golden_frame_silent_failure_gate` test walks all 128 GLSL fixtures, GPU-renders each at 256x256, asserts non-black + non-uniform output.
-- Threshold tunable via `DEAD_AIR_STRICT_GOLDEN_FRAMES=1`.
-- **Found 16 silently-broken shaders** (12% of catalog) — the audit's #15 risk in action. They're listed in test output for individual triage.
-- Also fixed `tests/render_one_frame.rs` and `tests/render_multi_shader.rs::test_render_multiple_shaders` which were stale (missing FrameData fields, missing `render_frame` arg).
-- **Effect**: regressions in glsl_compat or uniform packing now show up as test failures with named offenders.
+### Wave 3.1 — glsl_compat replacement safety net (audit Top #3, BIGGEST RISK) — phase 1
+- `packages/renderer/tests/glsl_compat_fixtures.rs` — characterization fixtures.
+- Walks 128 shader fixtures, runs `webgl_to_desktop`, writes converted output + hash manifest.
+- Asserts no empty conversions + `#version 450` in every output.
+- `DEAD_AIR_GLSL_BASELINE` env var enables byte-for-byte regression mode.
+- Phase 2 (replace regex with tree-sitter-glsl) now has its safety net.
 
-## Partial (code-level)
+### Wave 3.2 — Visual regression silent-failure gate (audit Top #6)
+- `packages/renderer/tests/render_multi_shader.rs::golden_frame_silent_failure_gate` — walks all 128 GLSL fixtures, GPU-renders at 256x256, asserts non-black + non-uniform output.
+- **Found 16 silently-broken shaders** — the audit's #15 risk surfaced.
+- `DEAD_AIR_STRICT_GOLDEN_FRAMES=1` fails on any silent failure.
+- Also fixed `tests/render_one_frame.rs` and `tests/render_multi_shader.rs::test_render_multiple_shaders` (were stale).
+
+### Wave 3.3 — Shader LOD scaling (audit Top #9)
+- `gpu.rs` parameterized with `scene_width`/`scene_height` (independent of output dims). Scene/secondary/feedback textures sized down; output texture + readback stay full-res; postprocess sampler upscales.
+- New `--scene-scale` flag (range 0.25..=1.0, default 1.0).
+- `tests/scene_scale_lod.rs` validates scale=0.75 produces valid full-res output.
+
+### Wave 3.4 — Dockerized one-command render (audit Top #4) — phase 1
+- `docker/Dockerfile.manifest` — Node 22 + tsx + msgpackr.
+- `docker/Dockerfile.renderer` — Rust + wgpu/Vulkan + ffmpeg multi-stage.
+- `docker/docker-compose.yml` — `generate-manifest` + `render` services with `--gpus all`.
+- `scripts/dead-air-render.sh` — orchestrator with `--show/--output/--width/--height/--fps/--scene-scale` flags + Docker auto-detect + skip switches.
+
+## Partial
 
 ### Wave 2.2 — `any` types in manifest generation (audit Debt #6)
-- Added `EnhancedFrameData` import + typed two reducer parameters in `generate-full-manifest.ts`.
-- 11 type errors remain — they reflect signature drift between callers and callees (computeReactiveTriggers, detectJamCycle, computeNarrativeDirective, ShowVisualSeed.era access). Each needs caller/callee alignment.
-- Documented in a header comment block at the top of `generate-full-manifest.ts`.
+- Typed two reducer parameters; added `EnhancedFrameData` import.
+- 11 type errors remain (caller/callee signature drift). Documented at top of `generate-full-manifest.ts`.
 
-## Documented + deferred (real implementation > 1 week each)
+## Documented + deferred (each multi-week)
 
 ### Wave 2.1 — Schema-driven uniform codegen
-- Plan: `packages/renderer/src/uniform-schema-NOTES.md` — schema shape, 5-phase safe migration, acceptance criteria.
+Plan: `packages/renderer/src/uniform-schema-NOTES.md` — schema shape, 5-phase safe migration (parse Rust comments → generate Rust struct → generate GLSL → switch TS packer → delete legacy), acceptance criteria.
 
 ### Wave 2.3 — Extract @dead-air/audio-core
-- Plan: `packages/vj-mode/AUDIO-CORE-EXTRACTION-NOTES.md` — analysis of vj-mode (real-time class-based) vs visualizer-poc (offline functional) implementations, identified genuinely shareable primitives, proposed package shape, acceptance criteria.
+Plan: `packages/vj-mode/AUDIO-CORE-EXTRACTION-NOTES.md` — analysis of vj-mode (real-time class state) vs visualizer-poc (offline functional), shareable primitives, package shape.
 
-## Not started
+### Wave 3.5 — Split visualizer-poc 250K-line monolith
+Plan: `packages/visualizer-poc/MONOLITH-SPLIT-NOTES.md` — split into `@dead-air/visual-engine` (data/, utils/, scenes/routing/, shaders/) + `@dead-air/remotion-compositions` (React/Remotion). 5-phase migration with manifest-output equivalence gate.
 
-| Task | Audit estimate | Why not in this session |
-|---|---|---|
-| Wave 3.1 — Replace glsl_compat.rs regex with proper GLSL parser | 2-3 weeks | tree-sitter-glsl integration + regression-test all 128 shaders |
-| Wave 3.3 — Shader LOD/complexity tiering | 1 week | Requires new render-target plumbing in gpu.rs + per-shader cost classification |
-| Wave 3.4 — Dockerized one-command render | 2-3 weeks | 4 new container images + orchestrator + cloud reproducibility validation |
-| Wave 3.5 — Split visualizer-poc 250K-line monolith | 2 weeks | Two-package extraction with import-graph rewrites |
-| Wave 4.1 — GPU overlay compositing | 2 weeks | New atlas pipeline + texture upload path + final render pass |
-| Wave 4.2 — Live Rust renderer mode | 3-4 weeks | Architecture change — eliminate manifest, share memory with VJ analysis |
+### Wave 4.1 — GPU overlay compositing
+Plan: `packages/renderer/src/gpu-overlay-compositing-NOTES.md` — atlas builder → GPU upload → instanced compositing pipeline → hot-path swap → pixel equivalence test.
+
+### Wave 4.2 — Live Rust renderer mode
+Plan: `packages/renderer/src/live-renderer-mode-NOTES.md` — frame budget validation → cpal audio + DSP → live FrameData synthesis → reactive router port from VJ Mode → winit window → production hardening.
 
 ## Test status
 
-Across the touched packages:
-- `cargo test --lib` — 37 passing (including 3 new manifest msgpack + 3 new overlay validation tests)
-- `cargo test --test cross_lang_msgpack` — 1 passing (Rust loads TS-emitted msgpack)
+- `cargo test --lib` — 37 passing (including new manifest msgpack + overlay validation tests)
+- `cargo test --test cross_lang_msgpack` — 1 passing (TS→Rust msgpack)
 - `cargo test --test render_one_frame` — 1 passing (was previously broken)
-- `cargo test --test render_multi_shader golden_frame` — 1 passing, reports 16 silently-broken shaders
+- `cargo test --test render_multi_shader golden_frame_silent_failure_gate` — 1 passing (12% silent-fail baseline reported)
+- `cargo test --test scene_scale_lod` — 1 passing (LOD validates)
+- `cargo test --test glsl_compat_fixtures` — 1 passing (128 shader baseline written)
 - `pnpm test` (core) — 56 passing (6 new path tests)
 - `pnpm test` (visualizer-poc, scoped) — 5 new veneta-routing tests passing
 
 ## Honest framing
 
-This is roughly 1-2 days of engineering value delivered in one session. The remaining items in the audit total ~14-19 weeks of estimated work — they are individual focused engineering blocks, not "complete in one go" tasks. The deferral docs (Wave 2.1 NOTES, Wave 2.3 NOTES, this file) capture the next concrete steps so future sessions can pick up cleanly.
+Two commits ship roughly 1-2 days of solid engineering value across 9 audit items. The remaining 5 deferred items each have a written plan with phase breakdown and acceptance criteria — they total ~10-13 weeks of estimated work and are the right size for individual focused engineering blocks, not "more turns of this conversation."
