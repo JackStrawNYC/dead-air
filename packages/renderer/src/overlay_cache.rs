@@ -126,6 +126,56 @@ impl OverlayImageCache {
         self.cache.get(overlay_id)
     }
 
+    /// True if an overlay is loaded.
+    pub fn contains(&self, overlay_id: &str) -> bool {
+        self.cache.contains_key(overlay_id)
+    }
+
+    /// Loaded overlay count.
+    pub fn len(&self) -> usize {
+        self.cache.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.cache.is_empty()
+    }
+
+    /// Pre-flight validation: scan a schedule, report which referenced overlays
+    /// are missing from the cache. Each missing overlay would otherwise render as
+    /// nothing — silently. Call this once at startup before the render loop.
+    ///
+    /// Returns (missing_overlay_ids, frame_instance_count_affected).
+    pub fn validate_schedule(
+        &self,
+        schedule: &[Vec<OverlayInstance>],
+    ) -> ValidationReport {
+        let mut missing: HashMap<String, usize> = HashMap::new();
+        let mut total_referenced = 0usize;
+        let mut keyframe_count = 0usize;
+        for frame in schedule {
+            for inst in frame {
+                if inst.keyframe_svg.is_some() {
+                    keyframe_count += 1;
+                    continue; // SVG keyframes don't need PNG cache
+                }
+                total_referenced += 1;
+                if !self.cache.contains_key(&inst.overlay_id) {
+                    *missing.entry(inst.overlay_id.clone()).or_insert(0) += 1;
+                }
+            }
+        }
+        let mut missing_vec: Vec<(String, usize)> = missing.into_iter().collect();
+        missing_vec.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+        let affected_instances: usize = missing_vec.iter().map(|(_, n)| *n).sum();
+        ValidationReport {
+            missing: missing_vec,
+            total_instances: total_referenced,
+            keyframe_instances: keyframe_count,
+            affected_instances,
+            cache_size: self.cache.len(),
+        }
+    }
+
     /// Render an overlay instance onto a target pixel buffer.
     /// Handles: scaling, rotation, translation, opacity, blend mode.
     pub fn composite_instance(
@@ -174,6 +224,54 @@ impl OverlayImageCache {
             &instance.transform,
             instance.blend_mode,
         );
+    }
+}
+
+/// Pre-flight overlay validation result.
+#[derive(Debug)]
+pub struct ValidationReport {
+    /// (overlay_id, frames_referenced). Sorted by frequency desc then id asc.
+    pub missing: Vec<(String, usize)>,
+    /// Total instances in schedule that needed a PNG (excludes keyframe SVGs).
+    pub total_instances: usize,
+    /// Animated keyframe SVG instances (don't need PNG cache).
+    pub keyframe_instances: usize,
+    /// Sum of frame-instances that will silently render as nothing.
+    pub affected_instances: usize,
+    /// Number of overlays loaded into cache.
+    pub cache_size: usize,
+}
+
+impl ValidationReport {
+    pub fn ok(&self) -> bool {
+        self.missing.is_empty()
+    }
+
+    /// Human-readable report. Always logs a summary; on missing, dumps top offenders.
+    pub fn print(&self) {
+        if self.ok() {
+            println!(
+                "Overlays: validation OK — {} loaded, {} schedule instances + {} keyframe SVGs",
+                self.cache_size, self.total_instances, self.keyframe_instances
+            );
+            return;
+        }
+        eprintln!(
+            "Overlays: VALIDATION FAILED — {} unique overlays missing, {} frame-instances will render blank",
+            self.missing.len(),
+            self.affected_instances
+        );
+        eprintln!(
+            "Overlays: cache_size={}, total_referenced={}, keyframes={}",
+            self.cache_size, self.total_instances, self.keyframe_instances
+        );
+        let limit = self.missing.len().min(20);
+        for (id, count) in &self.missing[..limit] {
+            eprintln!("  MISSING: {} ({} frames)", id, count);
+        }
+        if self.missing.len() > limit {
+            eprintln!("  ... +{} more missing overlays", self.missing.len() - limit);
+        }
     }
 }
 
@@ -294,6 +392,64 @@ mod tests {
         assert_eq!(t.opacity, 1.0);
         assert_eq!(t.scale, 1.0);
         assert_eq!(t.rotation_deg, 0.0);
+    }
+
+    fn instance(id: &str) -> OverlayInstance {
+        OverlayInstance {
+            overlay_id: id.to_string(),
+            transform: OverlayTransform::default(),
+            blend_mode: crate::compositor::BlendMode::Normal,
+            keyframe_svg: None,
+        }
+    }
+
+    #[test]
+    fn validate_schedule_finds_missing() {
+        let mut cache = OverlayImageCache::new();
+        cache.cache.insert(
+            "loaded".to_string(),
+            CachedOverlay { pixels: vec![0; 16], width: 2, height: 2 },
+        );
+        let schedule = vec![
+            vec![instance("loaded"), instance("missing_a")],
+            vec![instance("missing_a"), instance("missing_b")],
+            vec![instance("loaded")],
+        ];
+        let report = cache.validate_schedule(&schedule);
+        assert!(!report.ok());
+        assert_eq!(report.missing.len(), 2);
+        // missing_a referenced 2x, missing_b 1x — sorted by freq desc
+        assert_eq!(report.missing[0].0, "missing_a");
+        assert_eq!(report.missing[0].1, 2);
+        assert_eq!(report.missing[1].0, "missing_b");
+        assert_eq!(report.affected_instances, 3);
+        assert_eq!(report.total_instances, 5);
+    }
+
+    #[test]
+    fn validate_schedule_passes_when_all_loaded() {
+        let mut cache = OverlayImageCache::new();
+        cache.cache.insert(
+            "a".to_string(),
+            CachedOverlay { pixels: vec![0; 16], width: 2, height: 2 },
+        );
+        let schedule = vec![vec![instance("a"), instance("a")]];
+        let report = cache.validate_schedule(&schedule);
+        assert!(report.ok());
+        assert_eq!(report.affected_instances, 0);
+        assert_eq!(report.total_instances, 2);
+    }
+
+    #[test]
+    fn validate_schedule_skips_keyframe_svgs() {
+        let cache = OverlayImageCache::new();
+        let mut svg_inst = instance("doesnt_matter");
+        svg_inst.keyframe_svg = Some("<svg/>".to_string());
+        let schedule = vec![vec![svg_inst]];
+        let report = cache.validate_schedule(&schedule);
+        assert!(report.ok());
+        assert_eq!(report.keyframe_instances, 1);
+        assert_eq!(report.total_instances, 0);
     }
 
     #[test]

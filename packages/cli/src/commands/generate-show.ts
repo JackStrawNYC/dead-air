@@ -1,5 +1,5 @@
 import type { Command } from 'commander';
-import { createLogger } from '@dead-air/core';
+import { createLogger, visualizerPocRoot } from '@dead-air/core';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
@@ -106,7 +106,7 @@ export function registerGenerateShowCommand(program: Command): void {
         // Load song identities for lookup
         let songIdentities: Record<string, { preferredModes?: string[]; palette?: { primary: number; secondary: number; saturation?: number } }> = {};
         try {
-          const identitiesPath = path.resolve(__dirname, '../../../visualizer-poc/data/song-identities.json');
+          const identitiesPath = path.join(visualizerPocRoot(), 'data/song-identities.json');
           if (fs.existsSync(identitiesPath)) {
             songIdentities = JSON.parse(fs.readFileSync(identitiesPath, 'utf-8'));
             log.info(`Loaded ${Object.keys(songIdentities).length} song identities`);

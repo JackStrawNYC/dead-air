@@ -13,19 +13,17 @@
 
 import { execFile, spawn } from 'child_process';
 import { existsSync, mkdirSync } from 'fs';
-import { join, resolve } from 'path';
+import { join } from 'path';
 import { promisify } from 'util';
-import { createLogger } from '@dead-air/core';
+import { createLogger, rendererRoot, packageRoot } from '@dead-air/core';
 
 const execFileAsync = promisify(execFile);
 const log = createLogger('render:rust');
 
-const RENDERER_ROOT = resolve(
-  new URL('.', import.meta.url).pathname,
-  '../../../renderer',
-);
+const RENDERER_ROOT = rendererRoot();
+const MANIFEST_GENERATOR_ROOT = packageRoot('@dead-air/manifest-generator');
 const RUST_BINARY = join(RENDERER_ROOT, 'target/release/dead-air-renderer');
-const MANIFEST_GENERATOR = join(RENDERER_ROOT, 'generate-full-manifest.ts');
+const MANIFEST_GENERATOR = join(MANIFEST_GENERATOR_ROOT, 'generate-full-manifest.ts');
 
 export interface RustRenderOptions {
   dataDir: string;

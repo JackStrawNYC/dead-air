@@ -155,15 +155,22 @@ fn test_render_one_frame() {
         show_grain_character: None,
         show_temperature_character: None,
         show_contrast_character: None,
+        effect_mode: 0,
+        effect_intensity: 0.0,
+        composited_mode: 0,
+        composited_intensity: 0.0,
+        show_position: 0.5,
+        camera_behavior: 0,
     };
 
+    let mut lighting = dead_air_renderer::uniforms::LightingState::default();
     let uniform_data = dead_air_renderer::uniforms::build_uniform_buffer(
-        &frame_data, width, height,
+        &frame_data, width, height, &mut lighting,
     );
     println!("Uniform buffer: {} bytes", uniform_data.len());
 
     // Step 6: RENDER!
-    renderer.render_frame(&pipeline, &uniform_data, None, None, None, None);
+    renderer.render_frame(&pipeline, &uniform_data, None, None, None, None, false);
     println!("Frame rendered on GPU");
 
     // Step 7: Read pixels back

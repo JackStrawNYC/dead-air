@@ -261,3 +261,111 @@ pub fn load_manifest(path: &Path) -> Result<Manifest, Box<dyn std::error::Error>
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn sample_frame(idx: u32) -> FrameData {
+        FrameData {
+            shader_id: "test_shader".to_string(),
+            frame: idx,
+            secondary_shader_id: None,
+            blend_progress: None,
+            blend_mode: None,
+            energy: 0.5, rms: 0.4, bass: 0.3, mids: 0.6, highs: 0.7,
+            onset: 0.1, centroid: 0.5, beat: 0.0,
+            slow_energy: 0.45, fast_energy: 0.55, fast_bass: 0.35,
+            spectral_flux: 0.2, energy_accel: 0.0, energy_trend: 0.1,
+            tempo: 120.0, onset_snap: 0.0, beat_snap: 0.0, musical_time: 0.0,
+            beat_confidence: 0.8, beat_stability: 0.9, downbeat: 0.0,
+            drum_onset: 0.0, drum_beat: 0.0, stem_bass: 0.0, stem_drums: 0.0,
+            vocal_energy: 0.0, vocal_presence: 0.0,
+            other_energy: 0.0, other_centroid: 0.5,
+            chroma_hue: 0.0, chroma_shift: 0.0, chord_index: 0.0,
+            harmonic_tension: 0.0, melodic_pitch: 0.0, melodic_direction: 0.0,
+            melodic_confidence: 0.0, chord_confidence: 0.0,
+            section_type: 0.0, section_index: 0.0, section_progress: 0.0,
+            climax_phase: 0.0, climax_intensity: 0.0, coherence: 0.0,
+            jam_density: 0.0, jam_phase: 0.0, jam_progress: 0.0,
+            energy_forecast: 0.0, peak_approaching: 0.0,
+            tempo_derivative: 0.0, dynamic_range: 0.5, space_score: 0.0,
+            timbral_brightness: 0.5, timbral_flux: 0.0, vocal_pitch: 0.0,
+            vocal_pitch_confidence: 0.0, improvisation_score: 0.0,
+            semantic_psychedelic: 0.0, semantic_cosmic: 0.0,
+            semantic_aggressive: 0.0, semantic_tender: 0.0,
+            semantic_rhythmic: 0.0, semantic_ambient: 0.0,
+            semantic_chaotic: 0.0, semantic_triumphant: 0.0,
+            palette_primary: 0.5, palette_secondary: 0.5, palette_saturation: 1.0,
+            time: idx as f32 / 60.0, dynamic_time: 0.0, beat_time: 0.0,
+            envelope_brightness: 1.0, envelope_saturation: 1.0, envelope_hue: 0.0,
+            era_saturation: 1.0, era_brightness: 1.0, era_sepia: 0.0,
+            show_warmth: 0.0, show_contrast: 1.0, show_saturation: 1.0,
+            show_grain: 0.0, show_bloom: 1.0,
+            param_bass_scale: 1.0, param_energy_scale: 1.0, param_motion_speed: 1.0,
+            param_color_sat_bias: 0.0, param_complexity: 1.0,
+            param_drum_reactivity: 1.0, param_vocal_weight: 1.0,
+            peak_of_show: 0.0,
+            song_progress: Some(0.5), shader_hold_progress: None,
+            show_grain_character: None, show_bloom_character: None,
+            show_temperature_character: None, show_contrast_character: None,
+            contrast: None,
+            motion_blur_samples: 1,
+            effect_mode: 0, effect_intensity: 0.0,
+            composited_mode: 0, composited_intensity: 0.0,
+            show_position: 0.0, camera_behavior: 0,
+        }
+    }
+
+    fn sample_manifest() -> Manifest {
+        let mut shaders = HashMap::new();
+        shaders.insert("test_shader".to_string(), "void main() {}".to_string());
+        Manifest {
+            shaders,
+            frames: vec![sample_frame(0), sample_frame(1), sample_frame(2)],
+            overlay_layers: None,
+            overlay_schedule: None,
+            overlay_png_dir: None,
+            width: Some(1920),
+            height: Some(1080),
+            fps: Some(60),
+            show_title: Some("Test Show".to_string()),
+            song_boundaries: None,
+        }
+    }
+
+    #[test]
+    fn manifest_roundtrip_msgpack() {
+        let m = sample_manifest();
+        let bytes = rmp_serde::to_vec_named(&m).expect("encode msgpack");
+        let decoded: Manifest = rmp_serde::from_slice(&bytes).expect("decode msgpack");
+        assert_eq!(decoded.frames.len(), 3);
+        assert_eq!(decoded.frames[0].shader_id, "test_shader");
+        assert_eq!(decoded.frames[2].frame, 2);
+        assert_eq!(decoded.width, Some(1920));
+        assert!((decoded.frames[1].energy - 0.5).abs() < 1e-5);
+    }
+
+    #[test]
+    fn manifest_roundtrip_json() {
+        let m = sample_manifest();
+        let s = serde_json::to_string(&m).expect("encode json");
+        let decoded: Manifest = serde_json::from_str(&s).expect("decode json");
+        assert_eq!(decoded.frames.len(), 3);
+        assert_eq!(decoded.frames[0].shader_id, "test_shader");
+    }
+
+    /// Cross-format equivalence: msgpack and json must produce equivalent manifests.
+    #[test]
+    fn manifest_msgpack_json_equivalent() {
+        let m = sample_manifest();
+        let json: Manifest =
+            serde_json::from_str(&serde_json::to_string(&m).unwrap()).unwrap();
+        let msgpack: Manifest =
+            rmp_serde::from_slice(&rmp_serde::to_vec_named(&m).unwrap()).unwrap();
+        assert_eq!(json.frames.len(), msgpack.frames.len());
+        assert_eq!(json.frames[0].shader_id, msgpack.frames[0].shader_id);
+        assert_eq!(json.frames[1].frame, msgpack.frames[1].frame);
+        assert!((json.frames[2].energy - msgpack.frames[2].energy).abs() < 1e-5);
+    }
+}
+

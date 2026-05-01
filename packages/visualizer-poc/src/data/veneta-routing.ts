@@ -760,29 +760,70 @@ function normalizeTitle(title: string): string {
   return title.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
+// ─── JSON Override Layer (audit Wave 2.4: no-code show routing) ───
+// data/shows/{date}/routing.json takes precedence over the inline TS
+// VENETA_SONG_IDENTITIES so non-developers can iterate on visual direction.
+// The inline TS stays as a fallback (and as canonical seed for `extract-show-routing.mts`).
+
+let _jsonRoutingCache: Record<string, SongIdentity> | null = null;
+let _jsonRoutingLoaded = false;
+
+function loadShowRoutingJson(): Record<string, SongIdentity> | null {
+  if (_jsonRoutingLoaded) return _jsonRoutingCache;
+  _jsonRoutingLoaded = true;
+  // Skip in browser/Remotion bundle — fs/path aren't available there.
+  if (typeof window !== "undefined") return _jsonRoutingCache;
+  try {
+    // Hide require from webpack so it doesn't try to bundle fs.
+    // eslint-disable-next-line no-eval
+    const _require = eval("require");
+    const fs = _require("fs");
+    const path = _require("path");
+    if (!fs || !path) return _jsonRoutingCache;
+    const jsonPath = path.resolve(__dirname, "../../data/shows", VENETA_SHOW_DATE, "routing.json");
+    if (!fs.existsSync(jsonPath)) return _jsonRoutingCache;
+    const raw = JSON.parse(fs.readFileSync(jsonPath, "utf-8")) as { songs?: Record<string, SongIdentity> };
+    if (raw && raw.songs && typeof raw.songs === "object") {
+      _jsonRoutingCache = raw.songs;
+    }
+  } catch {
+    // Silent fall-through to TS defaults — expected in browser/Remotion bundle.
+  }
+  return _jsonRoutingCache;
+}
+
 /**
  * Look up a Veneta-specific song identity by title.
  * Returns undefined if no Veneta-specific identity exists for this song,
  * in which case the caller should fall back to the default lookupSongIdentity().
  *
+ * Lookup order: routing.json (if present) → inline VENETA_SONG_IDENTITIES.
+ *
  * Only call this when isVenetaShow(showDate) is true.
  */
 export function getVenetaSongIdentity(title: string): SongIdentity | undefined {
   const normalized = normalizeTitle(title);
+  const titleLower = title.toLowerCase().trim();
 
-  // Direct lookup
+  const overrides = loadShowRoutingJson();
+
+  // 1) JSON override layer
+  if (overrides) {
+    if (overrides[normalized]) return overrides[normalized];
+    const aliased = VENETA_SONG_ALIASES[normalized];
+    if (aliased && overrides[aliased]) return overrides[aliased];
+    const aliasedDirect = VENETA_SONG_ALIASES[titleLower];
+    if (aliasedDirect && overrides[aliasedDirect]) return overrides[aliasedDirect];
+  }
+
+  // 2) Inline TS fallback
   if (VENETA_SONG_IDENTITIES[normalized]) {
     return VENETA_SONG_IDENTITIES[normalized];
   }
-
-  // Alias lookup
   const aliased = VENETA_SONG_ALIASES[normalized];
   if (aliased && VENETA_SONG_IDENTITIES[aliased]) {
     return VENETA_SONG_IDENTITIES[aliased];
   }
-
-  // Also try the alias map with the title-as-typed (handles space-containing variants)
-  const titleLower = title.toLowerCase().trim();
   const aliasedDirect = VENETA_SONG_ALIASES[titleLower];
   if (aliasedDirect && VENETA_SONG_IDENTITIES[aliasedDirect]) {
     return VENETA_SONG_IDENTITIES[aliasedDirect];

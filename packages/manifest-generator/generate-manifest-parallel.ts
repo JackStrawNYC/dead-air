@@ -12,8 +12,9 @@
 
 import { fork } from "child_process";
 import { existsSync, readFileSync, writeFileSync, mkdirSync, createWriteStream } from "fs";
-import { join, resolve } from "path";
+import { join, resolve, extname } from "path";
 import { cpus } from "os";
+import { Packr } from "msgpackr";
 
 const args = process.argv.slice(2);
 const getArg = (name: string, def: string) => {
@@ -29,6 +30,13 @@ const height = parseInt(getArg("height", "1080"));
 const concurrency = parseInt(getArg("concurrency", String(Math.max(1, cpus().length - 1))));
 const withOverlays = args.includes("--with-overlays");
 const overlayPngDir = getArg("overlay-png-dir", "overlay-pngs");
+
+// Detect MessagePack output. Rust loader (manifest.rs) supports both .msgpack/.mp
+// extensions natively. MessagePack is ~5-10x smaller and ~5-10x faster to load.
+const useMsgpack = (() => {
+  const ext = extname(outputPath).toLowerCase();
+  return ext === ".msgpack" || ext === ".mp";
+})();
 
 const SCRIPT_DIR = new URL(".", import.meta.url).pathname;
 const SINGLE_SONG_SCRIPT = join(SCRIPT_DIR, "generate-full-manifest.ts");
@@ -154,27 +162,43 @@ async function main() {
   const shaders = await collectShaderGLSL();
   console.log(`[parallel-manifest] ${Object.keys(shaders).length} shaders`);
 
-  console.log("[parallel-manifest] Writing merged manifest...");
+  // Build song boundaries for chapter cards
+  const songBoundaries: { title: string; set: number; startFrame: number; endFrame: number }[] = [];
+  {
+    let boundaryOffset = 0;
+    for (const result of results) {
+      if (result.frameCount === 0) continue;
+      const song = songs[result.idx];
+      songBoundaries.push({
+        title: song?.title ?? `Song ${result.idx + 1}`,
+        set: song?.set ?? 1,
+        startFrame: boundaryOffset,
+        endFrame: boundaryOffset + result.frameCount,
+      });
+      boundaryOffset += result.frameCount;
+    }
+  }
+
+  if (useMsgpack) {
+    await writeManifestMsgpack(results, shaders, songBoundaries, totalFrames, elapsed);
+  } else {
+    await writeManifestJson(results, shaders, songBoundaries, totalFrames, elapsed);
+  }
+}
+
+async function writeManifestJson(
+  results: SongResult[],
+  shaders: Record<string, string>,
+  songBoundaries: { title: string; set: number; startFrame: number; endFrame: number }[],
+  totalFrames: number,
+  elapsed: string,
+) {
+  console.log("[parallel-manifest] Writing merged manifest (JSON)...");
   const ws = createWriteStream(outputPath);
   ws.write('{"shaders":');
   ws.write(JSON.stringify(shaders));
   ws.write(`,"width":${width},"height":${height},"fps":${fps}`);
   ws.write(`,"show_title":${JSON.stringify(`${setlist.venue} — ${setlist.date}`)}`);
-
-  // Build song boundaries for chapter cards
-  const songBoundaries: { title: string; set: number; startFrame: number; endFrame: number }[] = [];
-  let boundaryOffset = 0;
-  for (const result of results) {
-    if (result.frameCount === 0) continue;
-    const song = songs[result.idx];
-    songBoundaries.push({
-      title: song?.title ?? `Song ${result.idx + 1}`,
-      set: song?.set ?? 1,
-      startFrame: boundaryOffset,
-      endFrame: boundaryOffset + result.frameCount,
-    });
-    boundaryOffset += result.frameCount;
-  }
   ws.write(`,"song_boundaries":${JSON.stringify(songBoundaries)}`);
 
   ws.write(',"frames":[\n');
@@ -185,7 +209,7 @@ async function main() {
     const frames = JSON.parse(readFileSync(result.framesPath, "utf-8"));
     for (let i = 0; i < frames.length; i++) {
       if (frameIdx > 0) ws.write(",\n");
-      frames[i].frame = frameIdx; // renumber globally
+      frames[i].frame = frameIdx;
       ws.write(JSON.stringify(frames[i]));
       frameIdx++;
     }
@@ -194,9 +218,8 @@ async function main() {
     }
   }
 
-  ws.write("\n]"); // close frames array
+  ws.write("\n]");
 
-  // Merge overlay schedules from per-song overlay files
   if (withOverlays) {
     console.log("[parallel-manifest] Merging overlay schedules...");
     let overlayFrameCount = 0;
@@ -215,7 +238,6 @@ async function main() {
           overlayFrameCount++;
         }
       } else {
-        // Fill with empty arrays for frames without overlay data
         for (let i = 0; i < result.frameCount; i++) {
           if (!firstOverlayFrame) ws.write(",\n");
           ws.write("[]");
@@ -225,17 +247,91 @@ async function main() {
       }
     }
 
-    ws.write("\n]"); // close overlay_schedule array
+    ws.write("\n]");
     ws.write(`,"overlay_png_dir":${JSON.stringify(resolve(overlayPngDir))}`);
     console.log(`[parallel-manifest] Overlay schedule: ${overlayFrameCount} frames merged`);
   }
 
-  ws.write("}"); // close root object
+  ws.write("}");
   ws.end();
-
   await new Promise<void>((res) => ws.on("finish", res));
 
   console.log(`\n[parallel-manifest] Done: ${outputPath} (${frameIdx} frames)`);
+  console.log(`[parallel-manifest] Total time: ${elapsed}s`);
+}
+
+async function writeManifestMsgpack(
+  results: SongResult[],
+  shaders: Record<string, string>,
+  songBoundaries: { title: string; set: number; startFrame: number; endFrame: number }[],
+  totalFrames: number,
+  elapsed: string,
+) {
+  console.log("[parallel-manifest] Writing merged manifest (MessagePack)...");
+  console.log("[parallel-manifest] NOTE: msgpack path buffers all frames in RAM (~2-3GB peak for 60fps 3hr show)");
+
+  // Assemble entire manifest in memory; msgpack pack is much more compact than JSON,
+  // but still requires the full object graph. Per-song frames are loaded sequentially
+  // and concatenated, so peak RSS is bounded by the merged frames array.
+  const allFrames: any[] = new Array(totalFrames);
+  let frameIdx = 0;
+  for (const result of results) {
+    if (result.frameCount === 0) continue;
+    const frames = JSON.parse(readFileSync(result.framesPath, "utf-8"));
+    for (let i = 0; i < frames.length; i++) {
+      frames[i].frame = frameIdx;
+      allFrames[frameIdx++] = frames[i];
+    }
+    if (frameIdx % 50000 === 0) {
+      process.stdout.write(`  ${(frameIdx / totalFrames * 100).toFixed(0)}% loaded\r`);
+    }
+  }
+
+  // Truncate in case of empty songs (rare).
+  allFrames.length = frameIdx;
+
+  const manifest: Record<string, unknown> = {
+    shaders,
+    width,
+    height,
+    fps,
+    show_title: `${setlist.venue} — ${setlist.date}`,
+    song_boundaries: songBoundaries,
+    frames: allFrames,
+  };
+
+  if (withOverlays) {
+    console.log("\n[parallel-manifest] Merging overlay schedules...");
+    const overlaySchedule: any[] = new Array(totalFrames);
+    let oi = 0;
+    for (const result of results) {
+      if (result.frameCount === 0) continue;
+      const overlayPath = result.framesPath.replace("-frames.json", "-overlays.json");
+      if (existsSync(overlayPath)) {
+        const songOverlays = JSON.parse(readFileSync(overlayPath, "utf-8"));
+        for (let i = 0; i < songOverlays.length; i++) overlaySchedule[oi++] = songOverlays[i];
+      } else {
+        for (let i = 0; i < result.frameCount; i++) overlaySchedule[oi++] = [];
+      }
+    }
+    overlaySchedule.length = oi;
+    manifest.overlay_schedule = overlaySchedule;
+    manifest.overlay_png_dir = resolve(overlayPngDir);
+    console.log(`[parallel-manifest] Overlay schedule: ${oi} frames merged`);
+  }
+
+  // useRecords MUST be false: Rust's rmp_serde only parses standard msgpack maps,
+  // not msgpackr's "records" extension. structuredClone disabled — plain data, no cycles.
+  // useFloat32: ALWAYS (1) cuts frame floats from 8B → 4B (≈50% smaller frame payload).
+  // Rust FrameData fields are f32; we already lose nothing by truncating in transit.
+  const packr = new Packr({ useRecords: false, structuredClone: false, useFloat32: 1 });
+  console.log("[parallel-manifest] Packing msgpack...");
+  const t0 = Date.now();
+  const buffer = packr.pack(manifest);
+  console.log(`[parallel-manifest] Packed in ${((Date.now() - t0) / 1000).toFixed(1)}s, ${(buffer.length / 1048576).toFixed(1)} MB`);
+
+  writeFileSync(outputPath, buffer);
+  console.log(`\n[parallel-manifest] Done: ${outputPath} (${frameIdx} frames, ${(buffer.length / 1048576).toFixed(1)} MB)`);
   console.log(`[parallel-manifest] Total time: ${elapsed}s`);
 }
 

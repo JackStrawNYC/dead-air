@@ -104,6 +104,12 @@ fn make_frame_data(time: f32, energy: f32) -> dead_air_renderer::manifest::Frame
         show_grain_character: None,
         show_temperature_character: None,
         show_contrast_character: None,
+        effect_mode: 0,
+        effect_intensity: 0.0,
+        composited_mode: 0,
+        composited_intensity: 0.0,
+        show_position: 0.5,
+        camera_behavior: 0,
     }
 }
 
@@ -153,7 +159,7 @@ fn compile_and_render(
     let pipeline = renderer.create_pipeline(&fragment_module);
     let uniform_data = dead_air_renderer::uniforms::build_uniform_buffer(frame_data, width, height, &mut dead_air_renderer::uniforms::LightingState::default());
 
-    renderer.render_frame(&pipeline, &uniform_data, None, None, None, None);
+    renderer.render_frame(&pipeline, &uniform_data, None, None, None, None, false);
     let pixels = renderer.read_pixels();
 
     let output_path = format!("/tmp/dead-air-{}.png", shader_name);
@@ -207,4 +213,148 @@ fn test_render_multiple_shaders() {
             let _ = std::process::Command::new("open").arg(&path).spawn();
         }
     }
+}
+
+/// Walk every .glsl in /tmp/dead-air-glsl, render at low res, assert non-black
+/// AND non-uniform output. This catches the audit's #15 risk: shaders that
+/// compile clean but render as garbage because glsl_compat.rs missed a capture
+/// or a uniform doesn't reach the GPU.
+///
+/// Skips silently if no fixtures exist (CI without the TS export step).
+/// Run `npx tsx packages/renderer/export-shaders.mts` first to populate fixtures.
+#[test]
+fn golden_frame_silent_failure_gate() {
+    let glsl_dir = "/tmp/dead-air-glsl";
+    let dir = match std::fs::read_dir(glsl_dir) {
+        Ok(d) => d,
+        Err(_) => {
+            eprintln!("[golden-frame] no fixtures at {} — skipping. Run export-shaders.mts first.", glsl_dir);
+            return;
+        }
+    };
+
+    // Smaller resolution = faster batch test. 256x256 is enough to detect
+    // silent black/uniform failures while keeping the batch under a minute.
+    let width = 256u32;
+    let height = 256u32;
+
+    let mut renderer = pollster::block_on(dead_air_renderer::gpu::GpuRenderer::new(width, height))
+        .expect("Failed to init GPU");
+
+    let mut shader_names: Vec<String> = dir
+        .filter_map(|e| e.ok())
+        .filter(|e| e.path().extension().map_or(false, |ext| ext == "glsl"))
+        .map(|e| e.path().file_stem().unwrap().to_string_lossy().to_string())
+        .collect();
+    shader_names.sort();
+
+    let frame = make_frame_data(8.0, 0.55);
+
+    let mut compile_failed = Vec::new();
+    let mut all_black = Vec::new();
+    let mut nearly_uniform = Vec::new();
+    let mut ok = 0usize;
+
+    for name in &shader_names {
+        let glsl_path = format!("/tmp/dead-air-glsl/{}.glsl", name);
+        let glsl = match std::fs::read_to_string(&glsl_path) {
+            Ok(s) => s,
+            Err(_) => continue,
+        };
+        let desktop = dead_air_renderer::glsl_compat::webgl_to_desktop(&glsl);
+
+        let mut parser = naga::front::glsl::Frontend::default();
+        let opts = naga::front::glsl::Options::from(naga::ShaderStage::Fragment);
+        let module = match parser.parse(&opts, &desktop) {
+            Ok(m) => m,
+            Err(_) => { compile_failed.push(name.clone()); continue; }
+        };
+        let info = match naga::valid::Validator::new(
+            naga::valid::ValidationFlags::all(),
+            naga::valid::Capabilities::all(),
+        ).validate(&module) {
+            Ok(i) => i,
+            Err(_) => { compile_failed.push(name.clone()); continue; }
+        };
+        let wgsl = match naga::back::wgsl::write_string(&module, &info, naga::back::wgsl::WriterFlags::empty()) {
+            Ok(w) => w,
+            Err(_) => { compile_failed.push(name.clone()); continue; }
+        };
+
+        let module = renderer.device().create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some(name),
+            source: wgpu::ShaderSource::Wgsl(wgsl.into()),
+        });
+        let pipeline = renderer.create_pipeline(&module);
+        let uniform_data = dead_air_renderer::uniforms::build_uniform_buffer(
+            &frame, width, height,
+            &mut dead_air_renderer::uniforms::LightingState::default(),
+        );
+
+        renderer.render_frame(&pipeline, &uniform_data, None, None, None, None, false);
+        let pixels = renderer.read_pixels();
+
+        // Mean luminance check (catches all-black or near-black)
+        let mut mean_lum = 0.0f64;
+        let mut min_lum = 255.0f64;
+        let mut max_lum = 0.0f64;
+        let n = pixels.len() / 4;
+        for px in pixels.chunks(4) {
+            let lum = px[0] as f64 * 0.299 + px[1] as f64 * 0.587 + px[2] as f64 * 0.114;
+            mean_lum += lum;
+            if lum < min_lum { min_lum = lum; }
+            if lum > max_lum { max_lum = lum; }
+        }
+        mean_lum /= n as f64;
+        let range = max_lum - min_lum;
+
+        if mean_lum < 4.0 {
+            all_black.push((name.clone(), mean_lum));
+            continue;
+        }
+        if range < 8.0 {
+            // Solid color — not black but no detail. Likely uniform-not-reaching-GPU bug.
+            nearly_uniform.push((name.clone(), range));
+            continue;
+        }
+        ok += 1;
+    }
+
+    println!("\n[golden-frame] Silent-failure gate over {} shaders:", shader_names.len());
+    println!("  OK:              {}", ok);
+    println!("  Compile failed:  {}", compile_failed.len());
+    println!("  All-black:       {}", all_black.len());
+    println!("  Nearly uniform:  {}", nearly_uniform.len());
+
+    if !all_black.is_empty() {
+        eprintln!("\n  ALL-BLACK shaders (silent renderer failure):");
+        for (name, lum) in &all_black {
+            eprintln!("    {} (mean lum {:.2})", name, lum);
+        }
+    }
+    if !nearly_uniform.is_empty() {
+        eprintln!("\n  NEARLY-UNIFORM shaders (uniform not reaching GPU?):");
+        for (name, range) in &nearly_uniform {
+            eprintln!("    {} (lum range {:.2})", name, range);
+        }
+    }
+
+    // Threshold tuned for *regression detection*, not absolute correctness.
+    // April 2026 baseline: 16/128 silently fail under default uniforms (12%).
+    // Failing the gate at 25% catches a systemic regression (e.g., glsl_compat
+    // bug breaking a whole shader family) without blocking on the existing
+    // tech debt these specific shaders represent. Tighten this once the 16
+    // baseline failures are individually fixed or audited.
+    //
+    // Set DEAD_AIR_STRICT_GOLDEN_FRAMES=1 to fail on ANY silent failure.
+    let total = shader_names.len();
+    let broken = all_black.len() + nearly_uniform.len();
+    let broken_pct = broken as f64 / total.max(1) as f64;
+    let strict = std::env::var("DEAD_AIR_STRICT_GOLDEN_FRAMES").as_deref() == Ok("1");
+    let limit = if strict { 0.0 } else { 0.25 };
+    assert!(
+        broken_pct <= limit,
+        "{}/{} shaders silently render black or uniform ({:.0}%, limit {:.0}%) — see list above",
+        broken, total, broken_pct * 100.0, limit * 100.0
+    );
 }

@@ -1,0 +1,21 @@
+{
+  "name": "@dead-air/manifest-generator",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Builds the per-frame manifest consumed by the Rust renderer. Pure TypeScript — no GPU, no Rust.",
+  "scripts": {
+    "type-check": "tsc --noEmit",
+    "generate": "tsx generate-manifest-parallel.ts",
+    "generate:single": "tsx generate-full-manifest.ts",
+    "convert:msgpack": "tsx convert-manifest-to-msgpack.mts"
+  },
+  "dependencies": {
+    "msgpackr": "^1.11.10"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  }
+}

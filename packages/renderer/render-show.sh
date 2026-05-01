@@ -95,7 +95,8 @@ if [[ -f "$MANIFEST" ]] && [[ $(python3 -c "import json; print(len(json.load(ope
   echo "│  ✓ Manifest exists with frames, skipping (delete to regenerate)"
 else
   echo "│  Running parallel manifest generator..."
-  cd "$RENDERER_DIR"
+  # Manifest generator now lives in @dead-air/manifest-generator (sibling package).
+  cd "$RENDERER_DIR/../manifest-generator"
   NCPU=$(sysctl -n hw.ncpu 2>/dev/null || nproc 2>/dev/null || echo 4)
   WORKERS=$((NCPU > 2 ? NCPU - 1 : 1))
   echo "│  Concurrency: $WORKERS workers"

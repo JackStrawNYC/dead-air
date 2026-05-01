@@ -1,0 +1,883 @@
+{
+  "$schema": "../../../schemas/show-routing.schema.json",
+  "showDate": "1972-08-27",
+  "description": "Per-song visual identities for the Veneta 8/27/72 show. Editable without TypeScript.",
+  "songs": {
+    "promisedland": {
+      "preferredModes": [
+        "highway_horizon",
+        "neon_grid",
+        "ember_meadow",
+        "desert_road",
+        "climax_surge"
+      ],
+      "palette": {
+        "primary": 35,
+        "secondary": 200,
+        "saturation": 1
+      },
+      "overlayBoost": [
+        "LiquidLightBorder",
+        "OregonSunBlaze",
+        "HeatShimmer",
+        "VenetaSwimmers",
+        "RenaissanceFaireBanner",
+        "SunshineDaydreamCamera",
+        "HeatShimmer",
+        "TieDyeWash",
+        "MeteorShower"
+      ],
+      "overlayDensity": 1,
+      "moodKeywords": [
+        "festival",
+        "intense"
+      ],
+      "narrativeArc": "celebration",
+      "thematicTags": [
+        "road",
+        "opener",
+        "rolling"
+      ],
+      "transitionOut": "morph"
+    },
+    "sugaree": {
+      "preferredModes": [
+        "warm_nebula",
+        "amber_drift",
+        "fluid_light",
+        "aurora_curtains",
+        "scarlet_golden_haze"
+      ],
+      "palette": {
+        "primary": 15,
+        "secondary": 340,
+        "saturation": 0.95
+      },
+      "overlayBoost": [
+        "Fireflies",
+        "GodRays",
+        "OregonSunBlaze",
+        "HeatShimmer",
+        "VenetaSwimmers",
+        "RenaissanceFaireBanner",
+        "SunshineDaydreamCamera",
+        "HeatShimmer",
+        "Fireflies",
+        "FibonacciSpiral"
+      ],
+      "overlayDensity": 1.1,
+      "moodKeywords": [
+        "contemplative",
+        "organic",
+        "dead-culture"
+      ],
+      "narrativeArc": "story_arc",
+      "thematicTags": [
+        "wistful",
+        "love",
+        "warm"
+      ],
+      "transitionOut": "dissolve"
+    },
+    "meandmyuncle": {
+      "preferredModes": [
+        "desert_road",
+        "warm_nebula",
+        "ember_meadow",
+        "scarlet_golden_haze"
+      ],
+      "palette": {
+        "primary": 25,
+        "secondary": 195,
+        "saturation": 0.9
+      },
+      "overlayBoost": [
+        "SmokeWisps",
+        "HeatShimmer",
+        "OregonSunBlaze",
+        "HeatShimmer",
+        "VenetaSwimmers",
+        "RenaissanceFaireBanner",
+        "SunshineDaydreamCamera",
+        "OregonSunBlaze"
+      ],
+      "overlayDensity": 0.9,
+      "moodKeywords": [
+        "organic",
+        "festival"
+      ],
+      "narrativeArc": "story_arc",
+      "thematicTags": [
+        "cowboy",
+        "western",
+        "outlaw"
+      ]
+    },
+    "deal": {
+      "preferredModes": [
+        "neon_casino",
+        "neon_grid",
+        "spectral_bridge",
+        "ember_meadow",
+        "climax_surge"
+      ],
+      "palette": {
+        "primary": 350,
+        "secondary": 180,
+        "saturation": 1
+      },
+      "overlayBoost": [
+        "KaleidoscopeFilter",
+        "OregonSunBlaze",
+        "HeatShimmer",
+        "VenetaSwimmers",
+        "RenaissanceFaireBanner",
+        "SunshineDaydreamCamera",
+        "TieDyeWash",
+        "MeteorShower",
+        "FibonacciSpiral"
+      ],
+      "overlayDensity": 1,
+      "moodKeywords": [
+        "festival",
+        "intense"
+      ],
+      "narrativeArc": "celebration",
+      "thematicTags": [
+        "gambling",
+        "warning",
+        "rolling"
+      ]
+    },
+    "blackthroatedwind": {
+      "preferredModes": [
+        "desert_road",
+        "warm_nebula",
+        "stark_minimal",
+        "spectral_bridge"
+      ],
+      "palette": {
+        "primary": 20,
+        "secondary": 220,
+        "saturation": 0.85
+      },
+      "overlayBoost": [
+        "FogBank",
+        "OregonSunBlaze",
+        "HeatShimmer",
+        "VenetaSwimmers",
+        "RenaissanceFaireBanner",
+        "SunshineDaydreamCamera",
+        "HeatShimmer",
+        "TieDyeWash"
+      ],
+      "overlayDensity": 0.9,
+      "moodKeywords": [
+        "contemplative",
+        "organic"
+      ],
+      "narrativeArc": "story_arc",
+      "thematicTags": [
+        "road",
+        "wind",
+        "freedom"
+      ]
+    },
+    "chinacatsunflower": {
+      "preferredModes": [
+        "warm_nebula",
+        "fluid_light",
+        "ember_meadow",
+        "aurora_curtains",
+        "scarlet_golden_haze"
+      ],
+      "palette": {
+        "primary": 50,
+        "secondary": 320,
+        "saturation": 1
+      },
+      "overlayBoost": [
+        "PrismRainbow",
+        "OregonSunBlaze",
+        "HeatShimmer",
+        "VenetaSwimmers",
+        "RenaissanceFaireBanner",
+        "SunshineDaydreamCamera",
+        "HeatShimmer",
+        "Fireflies",
+        "FibonacciSpiral",
+        "TieDyeWash"
+      ],
+      "overlayDensity": 1.2,
+      "moodKeywords": [
+        "psychedelic",
+        "organic",
+        "dead-culture"
+      ],
+      "narrativeArc": "energy_cycle",
+      "thematicTags": [
+        "psychedelic",
+        "feline",
+        "iconic"
+      ],
+      "transitionOut": "morph"
+    },
+    "iknowyourider": {
+      "preferredModes": [
+        "neon_grid",
+        "highway_horizon",
+        "warm_nebula",
+        "climax_surge",
+        "ember_meadow"
+      ],
+      "palette": {
+        "primary": 40,
+        "secondary": 200,
+        "saturation": 1
+      },
+      "overlayBoost": [
+        "MeteorShower",
+        "LiquidLightBorder",
+        "OregonSunBlaze",
+        "HeatShimmer",
+        "VenetaSwimmers",
+        "RenaissanceFaireBanner",
+        "SunshineDaydreamCamera",
+        "HeatShimmer",
+        "TieDyeWash"
+      ],
+      "overlayDensity": 1.2,
+      "moodKeywords": [
+        "festival",
+        "intense",
+        "dead-culture"
+      ],
+      "narrativeArc": "build_to_climax",
+      "thematicTags": [
+        "train",
+        "rolling",
+        "iconic"
+      ],
+      "climaxBehavior": {
+        "peakSaturation": 0.6,
+        "flash": true
+      },
+      "transitionIn": "morph"
+    },
+    "mexicaliblues": {
+      "preferredModes": [
+        "desert_road",
+        "warm_nebula",
+        "ember_meadow",
+        "scarlet_golden_haze"
+      ],
+      "palette": {
+        "primary": 30,
+        "secondary": 170,
+        "saturation": 0.95
+      },
+      "overlayBoost": [
+        "HeatShimmer",
+        "SmokeWisps",
+        "OregonSunBlaze",
+        "HeatShimmer",
+        "VenetaSwimmers",
+        "RenaissanceFaireBanner",
+        "SunshineDaydreamCamera",
+        "HeatShimmer",
+        "TieDyeWash"
+      ],
+      "overlayDensity": 1,
+      "moodKeywords": [
+        "retro",
+        "festival"
+      ],
+      "narrativeArc": "story_arc",
+      "thematicTags": [
+        "mexico",
+        "border",
+        "warm"
+      ]
+    },
+    "bertha": {
+      "preferredModes": [
+        "warm_nebula",
+        "fluid_light",
+        "aurora_curtains",
+        "ember_meadow",
+        "spectral_bridge"
+      ],
+      "palette": {
+        "primary": 25,
+        "secondary": 320,
+        "saturation": 1
+      },
+      "overlayBoost": [
+        "SmokeWisps",
+        "FibonacciSpiral",
+        "OregonSunBlaze",
+        "HeatShimmer",
+        "VenetaSwimmers",
+        "RenaissanceFaireBanner",
+        "SunshineDaydreamCamera",
+        "HeatShimmer",
+        "FibonacciSpiral",
+        "TieDyeWash"
+      ],
+      "overlayDensity": 1.2,
+      "moodKeywords": [
+        "dead-culture",
+        "festival"
+      ],
+      "narrativeArc": "celebration",
+      "thematicTags": [
+        "iconic",
+        "rolling",
+        "dead-culture"
+      ]
+    },
+    "playingintheband": {
+      "preferredModes": [
+        "fluid_light",
+        "spectral_bridge",
+        "warm_nebula",
+        "kaleidoscope",
+        "void_light"
+      ],
+      "palette": {
+        "primary": 45,
+        "secondary": 280,
+        "saturation": 0.95
+      },
+      "overlayBoost": [
+        "KaleidoscopeFilter",
+        "OregonSunBlaze",
+        "HeatShimmer",
+        "VenetaSwimmers",
+        "RenaissanceFaireBanner",
+        "SunshineDaydreamCamera",
+        "HeatShimmer",
+        "FibonacciSpiral",
+        "TieDyeWash"
+      ],
+      "overlayDensity": 1.1,
+      "moodKeywords": [
+        "psychedelic",
+        "festival"
+      ],
+      "narrativeArc": "jam_vehicle",
+      "thematicTags": [
+        "improvisation",
+        "exploration"
+      ]
+    },
+    "hesgone": {
+      "preferredModes": [
+        "obsidian_mirror",
+        "stark_minimal",
+        "amber_drift",
+        "warm_nebula",
+        "ink_wash"
+      ],
+      "palette": {
+        "primary": 220,
+        "secondary": 30,
+        "saturation": 0.7
+      },
+      "overlayBoost": [
+        "SmokeWisps",
+        "CosmicStarfield",
+        "OregonSunBlaze",
+        "HeatShimmer",
+        "RenaissanceFaireBanner",
+        "HeatShimmer",
+        "FibonacciSpiral"
+      ],
+      "overlaySuppress": [
+        "MeteorShower",
+        "TieDyeWash"
+      ],
+      "overlayDensity": 0.7,
+      "moodKeywords": [
+        "contemplative",
+        "organic"
+      ],
+      "narrativeArc": "elegy",
+      "thematicTags": [
+        "loss",
+        "farewell",
+        "tender"
+      ],
+      "visualPacing": {
+        "introBreathingFrames": 600,
+        "buildRate": 0.5,
+        "climaxStyle": "subtle"
+      }
+    },
+    "jackstraw": {
+      "preferredModes": [
+        "highway_horizon",
+        "desert_road",
+        "warm_nebula",
+        "climax_surge",
+        "neon_grid"
+      ],
+      "palette": {
+        "primary": 30,
+        "secondary": 200,
+        "saturation": 1
+      },
+      "overlayBoost": [
+        "HeatShimmer",
+        "SmokeWisps",
+        "OregonSunBlaze",
+        "HeatShimmer",
+        "VenetaSwimmers",
+        "RenaissanceFaireBanner",
+        "SunshineDaydreamCamera",
+        "HeatShimmer",
+        "TieDyeWash"
+      ],
+      "overlayDensity": 1.1,
+      "moodKeywords": [
+        "intense",
+        "festival"
+      ],
+      "narrativeArc": "build_to_climax",
+      "thematicTags": [
+        "outlaw",
+        "western",
+        "dueling"
+      ],
+      "climaxBehavior": {
+        "peakSaturation": 0.5,
+        "flash": true
+      }
+    },
+    "birdsong": {
+      "preferredModes": [
+        "warm_nebula",
+        "amber_drift",
+        "aurora_curtains",
+        "fluid_light",
+        "scarlet_golden_haze"
+      ],
+      "palette": {
+        "primary": 40,
+        "secondary": 200,
+        "saturation": 0.9
+      },
+      "overlayBoost": [
+        "CosmicStarfield",
+        "OregonSunBlaze",
+        "HeatShimmer",
+        "VenetaSwimmers",
+        "RenaissanceFaireBanner",
+        "SunshineDaydreamCamera",
+        "HeatShimmer",
+        "Fireflies",
+        "FibonacciSpiral"
+      ],
+      "overlaySuppress": [
+        "MeteorShower"
+      ],
+      "overlayDensity": 0.9,
+      "moodKeywords": [
+        "contemplative",
+        "organic"
+      ],
+      "narrativeArc": "meditative_journey",
+      "thematicTags": [
+        "tender",
+        "tribute",
+        "soaring"
+      ],
+      "visualPacing": {
+        "introBreathingFrames": 450,
+        "buildRate": 0.7,
+        "climaxStyle": "transcendent"
+      }
+    },
+    "greateststoryevertold": {
+      "preferredModes": [
+        "sacred_geometry",
+        "ember_meadow",
+        "warm_nebula",
+        "climax_surge",
+        "fractal_temple"
+      ],
+      "palette": {
+        "primary": 45,
+        "secondary": 280,
+        "saturation": 0.95
+      },
+      "overlayBoost": [
+        "GodRays",
+        "OregonSunBlaze",
+        "HeatShimmer",
+        "VenetaSwimmers",
+        "RenaissanceFaireBanner",
+        "SunshineDaydreamCamera",
+        "HeatShimmer",
+        "FibonacciSpiral",
+        "TieDyeWash"
+      ],
+      "overlayDensity": 1,
+      "moodKeywords": [
+        "intense",
+        "festival"
+      ],
+      "narrativeArc": "build_to_climax",
+      "thematicTags": [
+        "biblical",
+        "mythical",
+        "epic"
+      ],
+      "climaxBehavior": {
+        "peakSaturation": 0.5,
+        "flash": true
+      }
+    },
+    "drumsspace": {
+      "preferredModes": [
+        "void_light",
+        "dark_star_void",
+        "obsidian_mirror",
+        "spectral_bridge",
+        "creation"
+      ],
+      "palette": {
+        "primary": 270,
+        "secondary": 60,
+        "saturation": 0.85
+      },
+      "overlayBoost": [
+        "SpaceDrums",
+        "SpaceDrums",
+        "SpaceDrums",
+        "OregonSunBlaze",
+        "HeatShimmer",
+        "SunshineDaydreamCamera",
+        "FibonacciSpiral",
+        "DarkStarPortal"
+      ],
+      "overlayDensity": 1,
+      "moodKeywords": [
+        "cosmic",
+        "psychedelic",
+        "contemplative"
+      ],
+      "narrativeArc": "meditative_journey",
+      "thematicTags": [
+        "percussion",
+        "cosmic",
+        "exploration"
+      ],
+      "drumsSpaceShaders": {
+        "drums_tribal": "void_light",
+        "transition": "creation",
+        "space_ambient": "dark_star_void",
+        "space_textural": "obsidian_mirror",
+        "space_melodic": "warm_nebula",
+        "reemergence": "void_light"
+      }
+    },
+    "darkstar": {
+      "preferredModes": [
+        "dark_star_void",
+        "void_light",
+        "creation",
+        "warm_nebula",
+        "spectral_bridge",
+        "obsidian_mirror",
+        "fluid_light"
+      ],
+      "palette": {
+        "primary": 270,
+        "secondary": 30,
+        "saturation": 0.9
+      },
+      "overlayBoost": [
+        "DarkStarPortal",
+        "DarkStarAscent",
+        "OregonSunBlaze",
+        "HeatShimmer",
+        "VenetaSwimmers",
+        "RenaissanceFaireBanner",
+        "SunshineDaydreamCamera",
+        "CosmicStarfield",
+        "FibonacciSpiral",
+        "SpaceDrums"
+      ],
+      "overlayDensity": 0.4,
+      "moodKeywords": [
+        "cosmic",
+        "psychedelic",
+        "dead-culture"
+      ],
+      "narrativeArc": "meditative_journey",
+      "thematicTags": [
+        "cosmic",
+        "exploration",
+        "iconic",
+        "veneta-defining"
+      ],
+      "visualPacing": {
+        "introBreathingFrames": 600,
+        "buildRate": 0.6,
+        "climaxStyle": "transcendent"
+      },
+      "climaxBehavior": {
+        "peakSaturation": 0.4,
+        "peakBrightness": 0.2
+      },
+      "transitionOut": "morph"
+    },
+    "elpaso": {
+      "preferredModes": [
+        "desert_road",
+        "warm_nebula",
+        "ember_meadow",
+        "scarlet_golden_haze"
+      ],
+      "palette": {
+        "primary": 20,
+        "secondary": 350,
+        "saturation": 0.95
+      },
+      "overlayBoost": [
+        "SmokeWisps",
+        "HeatShimmer",
+        "OregonSunBlaze",
+        "HeatShimmer",
+        "VenetaSwimmers",
+        "RenaissanceFaireBanner",
+        "SunshineDaydreamCamera",
+        "HeatShimmer",
+        "TieDyeWash"
+      ],
+      "overlayDensity": 1,
+      "moodKeywords": [
+        "retro",
+        "festival"
+      ],
+      "narrativeArc": "story_arc",
+      "thematicTags": [
+        "cowboy",
+        "love",
+        "death"
+      ],
+      "transitionIn": "morph"
+    },
+    "singmebackhome": {
+      "preferredModes": [
+        "obsidian_mirror",
+        "stark_minimal",
+        "amber_drift",
+        "warm_nebula",
+        "ink_wash"
+      ],
+      "palette": {
+        "primary": 25,
+        "secondary": 220,
+        "saturation": 0.7
+      },
+      "overlayBoost": [
+        "FogBank",
+        "SmokeWisps",
+        "OregonSunBlaze",
+        "HeatShimmer",
+        "SunshineDaydreamCamera",
+        "HeatShimmer",
+        "FibonacciSpiral"
+      ],
+      "overlaySuppress": [
+        "MeteorShower",
+        "TieDyeWash"
+      ],
+      "overlayDensity": 0.7,
+      "moodKeywords": [
+        "contemplative",
+        "organic"
+      ],
+      "narrativeArc": "elegy",
+      "thematicTags": [
+        "prison",
+        "death-row",
+        "tender"
+      ],
+      "visualPacing": {
+        "introBreathingFrames": 600,
+        "buildRate": 0.5,
+        "climaxStyle": "subtle"
+      }
+    },
+    "sugarmagnolia": {
+      "preferredModes": [
+        "ember_meadow",
+        "warm_nebula",
+        "fluid_light",
+        "aurora_curtains",
+        "scarlet_golden_haze"
+      ],
+      "palette": {
+        "primary": 45,
+        "secondary": 320,
+        "saturation": 1
+      },
+      "overlayBoost": [
+        "GodRays",
+        "TieDyeWash",
+        "PrismRainbow",
+        "OregonSunBlaze",
+        "HeatShimmer",
+        "VenetaSwimmers",
+        "RenaissanceFaireBanner",
+        "SunshineDaydreamCamera",
+        "MeteorShower"
+      ],
+      "overlayDensity": 1.1,
+      "moodKeywords": [
+        "festival",
+        "organic",
+        "dead-culture"
+      ],
+      "narrativeArc": "celebration",
+      "thematicTags": [
+        "romantic",
+        "joyous",
+        "iconic"
+      ],
+      "climaxBehavior": {
+        "peakSaturation": 0.5
+      }
+    },
+    "caseyjones": {
+      "preferredModes": [
+        "neon_grid",
+        "highway_horizon",
+        "ember_meadow",
+        "climax_surge",
+        "warm_nebula"
+      ],
+      "palette": {
+        "primary": 30,
+        "secondary": 200,
+        "saturation": 1
+      },
+      "overlayBoost": [
+        "LiquidLightBorder",
+        "MeteorShower",
+        "OregonSunBlaze",
+        "HeatShimmer",
+        "VenetaSwimmers",
+        "RenaissanceFaireBanner",
+        "SunshineDaydreamCamera",
+        "HeatShimmer",
+        "TieDyeWash",
+        "MeteorShower"
+      ],
+      "overlayDensity": 1.2,
+      "moodKeywords": [
+        "festival",
+        "intense",
+        "dead-culture"
+      ],
+      "narrativeArc": "celebration",
+      "thematicTags": [
+        "train",
+        "warning",
+        "iconic"
+      ],
+      "climaxBehavior": {
+        "peakSaturation": 0.55
+      }
+    },
+    "onemoresaturdaynight": {
+      "preferredModes": [
+        "neon_casino",
+        "neon_grid",
+        "climax_surge",
+        "spectral_bridge",
+        "ember_meadow"
+      ],
+      "palette": {
+        "primary": 350,
+        "secondary": 180,
+        "saturation": 1
+      },
+      "overlayBoost": [
+        "OregonSunBlaze",
+        "HeatShimmer",
+        "VenetaSwimmers",
+        "RenaissanceFaireBanner",
+        "SunshineDaydreamCamera",
+        "HeatShimmer",
+        "MeteorShower",
+        "TieDyeWash",
+        "TieDyeWash",
+        "FibonacciSpiral"
+      ],
+      "overlayDensity": 1.3,
+      "moodKeywords": [
+        "festival",
+        "intense"
+      ],
+      "narrativeArc": "celebration",
+      "thematicTags": [
+        "party",
+        "joyous",
+        "saturday-night"
+      ],
+      "climaxBehavior": {
+        "peakSaturation": 0.6,
+        "flash": true
+      }
+    },
+    "andwebidyougoodnight": {
+      "preferredModes": [
+        "obsidian_mirror",
+        "amber_drift",
+        "warm_nebula",
+        "stark_minimal",
+        "sacred_geometry"
+      ],
+      "palette": {
+        "primary": 30,
+        "secondary": 220,
+        "saturation": 0.75
+      },
+      "overlayBoost": [
+        "GodRays",
+        "OregonSunBlaze",
+        "HeatShimmer",
+        "SunshineDaydreamCamera",
+        "HeatShimmer",
+        "FibonacciSpiral"
+      ],
+      "overlaySuppress": [
+        "MeteorShower",
+        "TieDyeWash"
+      ],
+      "overlayDensity": 0.7,
+      "moodKeywords": [
+        "contemplative",
+        "organic",
+        "dead-culture"
+      ],
+      "narrativeArc": "elegy",
+      "thematicTags": [
+        "gospel",
+        "farewell",
+        "sacred"
+      ],
+      "visualPacing": {
+        "introBreathingFrames": 750,
+        "buildRate": 0.4,
+        "climaxStyle": "transcendent"
+      },
+      "transitionIn": "dissolve",
+      "transitionOut": "void"
+    }
+  }
+}

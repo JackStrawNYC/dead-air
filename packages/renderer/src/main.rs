@@ -30,6 +30,7 @@ mod manifest;
 mod overlay_cache;
 mod motion_blur;
 mod postprocess;
+mod render_loop;
 mod shader_cache;
 mod temporal;
 mod text_layers;
@@ -136,6 +137,12 @@ struct Args {
     /// Override overlay PNG directory (instead of path baked into manifest).
     #[arg(long)]
     overlay_png_dir: Option<String>,
+
+    /// Fail the render if any overlay referenced in the schedule is missing
+    /// from the PNG cache. Without this flag, missing overlays render as
+    /// nothing (silently — the audit's #7 debt). Recommended for production.
+    #[arg(long, default_value_t = false)]
+    strict_overlays: bool,
 }
 
 fn main() {
@@ -448,11 +455,25 @@ fn main() {
     let mut overlay_image_cache = overlay_cache::OverlayImageCache::new();
     if let Some(ref png_dir) = manifest.overlay_png_dir {
         let png_path = std::path::Path::new(png_dir);
-        if png_path.exists() {
+        if !png_path.exists() {
+            eprintln!("  WARN: overlay_png_dir {} does not exist — schedule overlays will render blank", png_dir);
+        } else {
             match overlay_image_cache.load_directory(png_path) {
                 Ok(count) => println!("Overlays: {} PNGs loaded from {}", count, png_dir),
                 Err(e) => eprintln!("  WARN: overlay load failed: {}", e),
             }
+        }
+    }
+
+    // Pre-flight validation: walk the overlay schedule, verify every referenced
+    // overlay PNG is loaded. Without this check, missing overlays render as
+    // nothing — the audit's debt #7 silent-failure problem.
+    if let Some(ref schedule) = manifest.overlay_schedule {
+        let report = overlay_image_cache.validate_schedule(schedule);
+        report.print();
+        if !report.ok() && args.strict_overlays {
+            eprintln!("Overlays: --strict-overlays set, aborting before render to avoid silent failures");
+            std::process::exit(2);
         }
     }
 
@@ -489,403 +510,43 @@ fn main() {
         manifest.frames.len()
     };
 
-    let mut last_frame_idx: Option<usize> = None;
+    let _ = particle_system; // currently disabled in the loop; kept for future re-enable
 
-    // Pipelined rendering: while frame N renders on GPU, we process frame N-1's
-    // pixels on CPU (overlays + FFmpeg). This overlaps GPU and CPU work.
-    //
-    // Flow:
-    //   Frame 0: submit GPU work → no previous frame to process
-    //   Frame 1: read frame 0 pixels + process + output, submit frame 1 GPU work
-    //   Frame 2: read frame 1 pixels + process + output, submit frame 2 GPU work
-    //   ...
-    //   After loop: read + process + output the final frame
-
-    // State for deferred output of the previous frame
-    let mut pending_frame_idx: Option<usize> = None;
-
-    /// Process a completed frame: read pixels, composite overlays, write to output.
-    fn process_completed_frame(
-        renderer: &mut gpu::GpuRenderer,
-        frame_idx: usize,
-        manifest: &manifest::Manifest,
-        overlay_image_cache: &mut overlay_cache::OverlayImageCache,
-        ffmpeg_pipe: &mut Option<ffmpeg::FfmpegPipe>,
-        png_dir: &Option<std::path::PathBuf>,
-        width: u32,
-        height: u32,
-    ) {
-        let mut pixels = renderer.read_pixels();
-
-        // Composite overlays: SVG layers (intro/endcard) + PNG schedule (manifest overlays)
-        // Both can be active simultaneously — SVG layers first, then PNG overlays on top.
-        if let Some(ref overlay_layers) = manifest.overlay_layers {
-            if let Some(frame_overlays) = overlay_layers.get(frame_idx) {
-                compositor::composite_layers(&mut pixels, frame_overlays, width, height);
-            }
-        }
-        if let Some(ref schedule) = manifest.overlay_schedule {
-            if let Some(frame_overlays) = schedule.get(frame_idx) {
-                for instance in frame_overlays {
-                    overlay_image_cache.composite_instance(
-                        &mut pixels, width, height, instance,
-                    );
-                }
-            }
-        }
-
-        // Output
-        if let Some(ref mut pipe) = ffmpeg_pipe {
-            pipe.write_frame(&pixels).expect("FFmpeg write failed");
-        } else if let Some(ref dir) = png_dir {
-            let path = dir.join(format!("frame_{:07}.png", frame_idx));
-            image::save_buffer(&path, &pixels, width, height, image::ColorType::Rgba8)
-                .expect("PNG save failed");
-        }
-    }
-
-    for frame_idx in start_idx..end_idx {
-        // ─── Process previous frame's pixels while GPU is idle between submissions ───
-        if let Some(prev_idx) = pending_frame_idx {
-            process_completed_frame(
-                &mut renderer, prev_idx, &manifest,
-                &mut overlay_image_cache, &mut ffmpeg_pipe, &args.png_dir,
-                args.width, args.height,
-            );
-            progress.inc(1);
-
-            // Log progress every 5% for non-TTY environments (piped output, log files)
-            let done = progress.position();
-            let total = progress.length().unwrap_or(1);
-            let interval = total / 20; // every 5%
-            if interval > 0 && done % interval == 0 && done > 0 {
-                let elapsed = progress.elapsed().as_secs_f64();
-                let fps_actual = done as f64 / elapsed;
-                let eta_sec = if fps_actual > 0.0 { (total - done) as f64 / fps_actual } else { 0.0 };
-                eprintln!(
-                    "[progress] {}/{} frames ({:.0}%) | {:.1} fps | ETA: {:.0}m{:.0}s",
-                    done, total, done as f64 / total as f64 * 100.0,
-                    fps_actual, eta_sec / 60.0, eta_sec % 60.0,
-                );
-            }
-        }
-
-        let frame = &manifest.frames[frame_idx];
-
-        // ─── Seek detection ───
-        if let Some(last) = last_frame_idx {
-            if frame_idx != last + 1 {
-                feedback_idx = 0;
-            }
-        }
-
-        // ─── Update FFT texture ───
-        let fft_data = uniforms::build_fft_data(frame);
-        renderer.update_fft_texture(&fft_texture, &fft_data);
-
-        // ─── Particles disabled: they obscure shader output ───
-        // Particles were distracting colored dots that masked the actual shader visuals.
-        // The shaders themselves have their own visual effects (volumetric light, caustics, etc.)
-        // that are more interesting than generic particle overlays.
-
-        // ─── Submit GPU work for current frame ───
-        let shader_info = shader_cache.get_shader_info(&frame.shader_id);
-        let pipeline = match shader_info {
-            Some(info) => &info.pipeline,
-            None => {
-                // Shader failed to compile — write a black frame to maintain A/V sync
-                let black_frame = vec![0u8; args.width as usize * args.height as usize * 4];
-                if let Some(ref mut pipe) = ffmpeg_pipe {
-                    pipe.write_frame(&black_frame).expect("FFmpeg write failed");
-                } else if let Some(ref dir) = args.png_dir {
-                    let path = dir.join(format!("frame_{:07}.png", frame_idx));
-                    image::save_buffer(&path, &black_frame, args.width, args.height, image::ColorType::Rgba8)
-                        .expect("PNG save failed");
-                }
-                eprintln!("  WARN: frame {} black (shader {} not compiled)", frame_idx, frame.shader_id);
-                pending_frame_idx = None;
-                last_frame_idx = Some(frame_idx);
-                progress.inc(1);
-                continue;
-            }
-        };
-        let needs_textures = shader_info
-            .map(|i| i.texture_info.needs_prev_frame || i.texture_info.needs_fft)
-            .unwrap_or(false);
-
-        let prev_frame_view = if feedback_idx == 0 { &feedback_b_view } else { &feedback_a_view };
-        let texture_bind_group = if needs_textures {
-            Some(renderer.create_texture_bind_group(prev_frame_view, &fft_view))
-        } else {
-            None
-        };
-        let feedback_target = if feedback_idx == 0 { &feedback_a } else { &feedback_b };
-
-        let uniform_data = uniforms::build_uniform_buffer(frame, args.width, args.height, &mut lighting_state);
-        let is_intro = frame.shader_id == intro::INTRO_SHADER_ID;
-        let pp_uniforms = postprocess::PostProcessUniforms {
-            // Bloom threshold offset: raises the base threshold in the extract shader.
-            // GLSL in-shader bloom handles per-pixel glow. Rust spatial bloom should
-            // only catch genuinely bright highlights (lum > 0.6+).
-            // Formula in extract: mix(0.58, 0.18, energy) + this_offset
-            // With offset=0.10: effective threshold = 0.68 (quiet) → 0.28 (loud)
-            // Only bright highlights bloom spatially, not the whole image.
-            bloom_threshold: 0.10 - frame.energy * 0.08,
-            bloom_intensity: 0.8,
-            energy: frame.energy,
-            time: frame.time,
-            grain_amount: 0.02 + frame.energy * 0.05,
-            vignette_strength: 1.0,
-            resolution: [args.width as f32, args.height as f32],
-            bass: frame.bass,
-            onset_snap: frame.onset_snap,
-            era_brightness: frame.era_brightness,
-            era_sepia: frame.era_sepia,
-            envelope_brightness: frame.envelope_brightness,
-            envelope_saturation: frame.envelope_saturation,
-            dynamic_time: frame.dynamic_time,
-            _pad: 0.0,
-        };
-
-        // Temporal blend: use previous feedback buffer for noise reduction.
-        // Higher blend for quiet/ambient, zero during transitions.
-        let has_transition = frame.secondary_shader_id.is_some() && frame.blend_progress.is_some();
-        let temporal_strength = if has_transition {
-            0.0 // disable during transitions to prevent ghosting
-        } else {
-            // Quiet sections: stronger blend (0.15), loud: weaker (0.03)
-            0.03 + (1.0 - frame.energy.min(1.0)) * 0.12
-        };
-        let temporal_prev_view = if feedback_idx == 0 { &feedback_b_view } else { &feedback_a_view };
-        let temporal_param = if temporal_strength > 0.001 {
-            Some((&temporal_pipeline, temporal_prev_view as &wgpu::TextureView, temporal_strength))
-        } else {
-            None
-        };
-
-        // Skip FXAA for shaders with fine geometric detail (fractals, mandalas, sacred geometry)
-        // FXAA softens edges which destroys procedural pattern crispness
-        let skip_fxaa = matches!(frame.shader_id.as_str(),
-            "fractal_temple" | "mandala_engine" | "sacred_geometry" | "kaleidoscope" |
-            "truchet_tiling" | "diffraction_rings" | "stained_glass" | "neural_web" |
-            "voronoi_flow" | "fractal_flames" | "fractal_zoom" | "reaction_diffusion" |
-            "morphogenesis" | "feedback_recursion" | "crystalline_growth"
-        );
-
-        if has_transition {
-            let sec_id = frame.secondary_shader_id.as_ref().unwrap();
-            let blend_prog = frame.blend_progress.unwrap();
-            if let Some(sec_info) = shader_cache.get_shader_info(sec_id) {
-                let sec_needs_tex = sec_info.texture_info.needs_prev_frame
-                    || sec_info.texture_info.needs_fft;
-                let sec_tex_bg = if sec_needs_tex {
-                    let pf_view = if feedback_idx == 0 { &feedback_b_view } else { &feedback_a_view };
-                    Some(renderer.create_texture_bind_group(pf_view, &fft_view))
-                } else {
-                    None
-                };
-                let blend_mode_str = frame.blend_mode.as_deref().unwrap_or("dissolve");
-
-                renderer.render_frame_with_transition(
-                    pipeline,
-                    &sec_info.pipeline,
-                    &uniform_data,
-                    texture_bind_group.as_ref(),
-                    sec_tex_bg.as_ref(),
-                    blend_prog,
-                    blend_mode_str,
-                    Some(feedback_target),
-                    if args.no_pp { None } else { Some((&pp_pipeline, &pp_uniforms)) },
-                    &transition_pipeline,
-                    skip_fxaa,
-                );
-            } else {
-                // Secondary shader not found — render primary only
-                renderer.render_frame(
-                    pipeline, &uniform_data,
-                    texture_bind_group.as_ref(), Some(feedback_target),
-                    if args.no_pp { None } else { Some((&pp_pipeline, &pp_uniforms)) },
-                    None, // no temporal during transitions
-                    skip_fxaa,
-                );
-            }
-        } else if frame.motion_blur_samples > 1 {
-            // ─── Motion blur: render N sub-frames, accumulate, then post-process ───
-            let samples = frame.motion_blur_samples.min(8);
-            let weight = 1.0 / samples as f32;
-            let time_step = 1.0 / args.fps as f32;
-
-            for s in 0..samples {
-                // Offset time for this sub-frame (spread across one frame period)
-                let sub_offset = (s as f32 / samples as f32 - 0.5) * time_step;
-                let mut sub_uniform_data = uniform_data.clone();
-                // Patch uTime (offset 0) and uDynamicTime (offset 4)
-                sub_uniform_data[0..4].copy_from_slice(&(frame.time + sub_offset).to_le_bytes());
-                sub_uniform_data[4..8].copy_from_slice(&(frame.dynamic_time + sub_offset).to_le_bytes());
-
-                // Render sub-frame to scene_texture (no pp, no readback)
-                renderer.render_scene_to_hdr(
-                    pipeline, &sub_uniform_data,
-                    texture_bind_group.as_ref(),
-                    if s == 0 { Some(feedback_target) } else { None },
-                );
-
-                // Accumulate into motion blur buffer
-                let mut encoder = renderer.device().create_command_encoder(
-                    &wgpu::CommandEncoderDescriptor { label: Some("mb_accum") },
-                );
-                motion_blur_pipeline.accumulate_sub_frame(
-                    &mut encoder, renderer.device(), &renderer.texture_sampler,
-                    renderer.scene_texture_view(), weight, s == 0,
-                    renderer.vertex_buffer(), renderer.index_buffer(),
-                );
-                renderer.queue().submit(std::iter::once(encoder.finish()));
-            }
-
-            // Post-process the accumulated result + readback
-            if args.no_pp {
-                renderer.scene_to_readback(&motion_blur_pipeline.accum_view);
-            } else {
-                renderer.postprocess_and_readback(
-                    &pp_pipeline, &pp_uniforms, &motion_blur_pipeline.accum_view, skip_fxaa,
-                );
-            }
-        } else {
-            // Standard path: scene → post-process → readback
-            renderer.render_scene_to_hdr(
-                pipeline, &uniform_data,
-                texture_bind_group.as_ref(), Some(feedback_target),
-            );
-
-            // Post-process + readback
-            if args.no_pp {
-                let scene_view = renderer.create_scene_view();
-                renderer.scene_to_readback(&scene_view);
-            } else {
-                let scene_view = renderer.create_scene_view();
-                renderer.postprocess_and_readback(&pp_pipeline, &pp_uniforms, &scene_view, skip_fxaa);
-            }
-        }
-
-        // ─── Apply visual effect AFTER all render paths ───
-        // Effects transform the output texture in-place, regardless of which
-        // render path (transition/motionblur/standard) produced the frame.
-        // This runs AFTER postprocess, modifying the final SDR output.
-        {
-            let effect_mode = if args.effect_mode > 0 { args.effect_mode } else { frame.effect_mode };
-            let effect_intensity = if args.effect_mode > 0 { args.effect_intensity } else { frame.effect_intensity };
-
-            if effect_mode > 0 && effect_intensity > 0.01 {
-                let fx_uniforms = effects::EffectUniforms {
-                    mode: effect_mode,
-                    intensity: effect_intensity,
-                    time: frame.time,
-                    energy: frame.energy,
-                    bass: frame.bass,
-                    beat_snap: frame.beat_snap,
-                    width: args.width as f32,
-                    height: args.height as f32,
-                };
-                // Read from the OUTPUT texture (SDR, post-processed)
-                let output_view = renderer.output_texture_view();
-                let prev_view = if feedback_idx == 0 { &feedback_b_view } else { &feedback_a_view };
-                let mut encoder = renderer.device().create_command_encoder(
-                    &wgpu::CommandEncoderDescriptor { label: Some("effect_pass") },
-                );
-                let applied = effect_pipeline.apply(
-                    &mut encoder, renderer.device(), &renderer.texture_sampler,
-                    output_view, prev_view, &fx_uniforms,
-                    renderer.vertex_buffer(), renderer.index_buffer(),
-                );
-                renderer.queue().submit(std::iter::once(encoder.finish()));
-
-                // If effect was applied, copy its output back to the scene texture
-                // so the readback gets the effected result
-                if applied {
-                    let mut copy_encoder = renderer.device().create_command_encoder(
-                        &wgpu::CommandEncoderDescriptor { label: Some("effect_copy") },
-                    );
-                    copy_encoder.copy_texture_to_texture(
-                        wgpu::TexelCopyTextureInfo {
-                            texture: &effect_pipeline.output_texture(),
-                            mip_level: 0,
-                            origin: wgpu::Origin3d::ZERO,
-                            aspect: wgpu::TextureAspect::All,
-                        },
-                        wgpu::TexelCopyTextureInfo {
-                            texture: renderer.output_texture(),
-                            mip_level: 0,
-                            origin: wgpu::Origin3d::ZERO,
-                            aspect: wgpu::TextureAspect::All,
-                        },
-                        wgpu::Extent3d {
-                            width: args.width,
-                            height: args.height,
-                            depth_or_array_layers: 1,
-                        },
-                    );
-                    // Re-trigger readback: the original readback happened before the effect,
-                    // so we need to copy the effected output to the readback buffer again.
-                    renderer.copy_to_readback(&mut copy_encoder);
-                    renderer.queue().submit(std::iter::once(copy_encoder.finish()));
-                }
-            }
-        }
-
-        // ─── Apply composited visual layer AFTER effects ───
-        // Composited effects generate new visual elements (particles, caustics, etc.)
-        // and alpha-blend them ON TOP of the output texture.
-        {
-            let comp_mode = frame.composited_mode;
-            let comp_intensity = frame.composited_intensity;
-
-            if comp_mode > 0 && comp_intensity > 0.01 {
-                let comp_uniforms = composited_effects::CompositedUniforms {
-                    mode: comp_mode,
-                    intensity: comp_intensity,
-                    time: frame.time,
-                    energy: frame.energy,
-                    bass: frame.bass,
-                    beat_snap: frame.beat_snap,
-                    width: args.width as f32,
-                    height: args.height as f32,
-                };
-                let output_view = renderer.output_texture_view();
-                let mut encoder = renderer.device().create_command_encoder(
-                    &wgpu::CommandEncoderDescriptor { label: Some("composited_pass") },
-                );
-                let applied = composited_pipeline.apply(
-                    &mut encoder, renderer.device(),
-                    output_view, &comp_uniforms,
-                    renderer.vertex_buffer(), renderer.index_buffer(),
-                );
-                if applied {
-                    // Re-trigger readback since we modified the output texture
-                    renderer.copy_to_readback(&mut encoder);
-                }
-                renderer.queue().submit(std::iter::once(encoder.finish()));
-            }
-        }
-
-        // GPU work submitted — mark this frame as pending readback
-        feedback_idx = 1 - feedback_idx;
-        pending_frame_idx = Some(frame_idx);
-        last_frame_idx = Some(frame_idx);
-    }
-
-    // ─── Process the final frame ───
-    if let Some(prev_idx) = pending_frame_idx {
-        process_completed_frame(
-            &mut renderer, prev_idx, &manifest,
-            &mut overlay_image_cache, &mut ffmpeg_pipe, &args.png_dir,
-            args.width, args.height,
-        );
-        progress.inc(1);
-    }
+    let resources = render_loop::RenderResources {
+        renderer: &mut renderer,
+        manifest: &manifest,
+        shader_cache: &shader_cache,
+        overlay_image_cache: &mut overlay_image_cache,
+        ffmpeg_pipe: &mut ffmpeg_pipe,
+        png_dir: &args.png_dir,
+        pp_pipeline: &pp_pipeline,
+        effect_pipeline: &effect_pipeline,
+        composited_pipeline: &composited_pipeline,
+        transition_pipeline: &transition_pipeline,
+        temporal_pipeline: &temporal_pipeline,
+        motion_blur_pipeline: &motion_blur_pipeline,
+        feedback_a: &feedback_a,
+        feedback_b: &feedback_b,
+        feedback_a_view: &feedback_a_view,
+        feedback_b_view: &feedback_b_view,
+        fft_texture: &fft_texture,
+        fft_view: &fft_view,
+        lighting_state: &mut lighting_state,
+        feedback_idx: &mut feedback_idx,
+        width: args.width,
+        height: args.height,
+        fps: args.fps,
+        no_pp: args.no_pp,
+        effect_mode_override: args.effect_mode,
+        effect_intensity_override: args.effect_intensity,
+        start_frame: start_idx,
+        end_frame: end_idx,
+        progress: &progress,
+    };
+    let _frames_written = render_loop::run(resources);
 
     progress.finish_with_message("done");
 
-    // Finish FFmpeg encoding
     if let Some(pipe) = ffmpeg_pipe {
         print!("Encoding video... ");
         let frames_written = pipe.finish().expect("FFmpeg encoding failed");
@@ -902,3 +563,4 @@ fn main() {
         elapsed.as_secs_f64() * 1000.0 / total_frames as f64,
     );
 }
+

@@ -17,6 +17,22 @@
  *     --data-dir ../visualizer-poc/data \
  *     --output manifest.json \
  *     --fps 60 --width 3840 --height 2160
+ *
+ * KNOWN TYPE DEBT (audit Debt #6 — "31 any types"):
+ *   Several call sites here pass arguments that don't match the imported function
+ *   signatures. They survive at runtime because every call is wrapped in try/catch
+ *   that defaults to a stub state. This means routing decisions silently degrade
+ *   to defaults instead of using real analysis. The fix requires aligning each
+ *   caller to the current callee signature, then deleting the stub fallbacks so
+ *   genuine breakage is visible.
+ *   Active mismatches (as of 2026-05-01):
+ *     - computeAudioSnapshot: caller passes (frames, idx, 30) but expects beatArray as 3rd arg
+ *     - computeReactiveTriggers: caller passes 3 args, expects 5-8 (section bounds, tempo)
+ *     - detectJamCycle: caller passes 3 args, expects 4 (with sectionType)
+ *     - computeNarrativeDirective: shape mismatch, currently `as any` cast
+ *     - GrooveState/GrooveVisualModifiers: literal default shape doesn't match real types
+ *     - ShowVisualSeed.era: accessed but not on type
+ *   None of these crash production today; they just hide bugs. Fix as a focused pass.
  */
 
 import { readFileSync, writeFileSync, existsSync, readdirSync, createWriteStream, statSync } from "fs";
@@ -53,7 +69,7 @@ import { hashString } from "../visualizer-poc/src/utils/hash.js";
 import { buildRotationSchedule, getOverlayOpacities } from "../visualizer-poc/src/data/overlay-rotation.js";
 import { OVERLAY_REGISTRY, OVERLAY_BY_NAME, ALWAYS_ACTIVE } from "../visualizer-poc/src/data/overlay-registry.js";
 import { getEraPreset } from "../visualizer-poc/src/data/era-presets.js";
-import type { SectionBoundary } from "../visualizer-poc/src/data/types.js";
+import type { SectionBoundary, EnhancedFrameData } from "../visualizer-poc/src/data/types.js";
 
 // ─── Shader collection (same as generate-manifest.ts) ───
 
@@ -1138,7 +1154,7 @@ async function main() {
 
         // Split on significant energy change after minimum hold, or at max
         if ((delta > 0.08 && elapsed >= SECTION_MIN) || elapsed >= SECTION_MAX) {
-          const avgE = frames.slice(segStart, fi).reduce((s, f) => s + (f.rms ?? 0), 0) / (fi - segStart);
+          const avgE = frames.slice(segStart, fi).reduce((s: number, f: EnhancedFrameData) => s + (f.rms ?? 0), 0) / (fi - segStart);
           const sectionType = avgE > 0.25 ? "chorus" : avgE > 0.12 ? "verse" : "space";
           sections.push({ start: segStart, end: fi, type: sectionType });
           segStart = fi;
@@ -1147,7 +1163,7 @@ async function main() {
       }
       // Final section
       if (segStart < frames.length) {
-        const avgE = frames.slice(segStart).reduce((s, f) => s + (f.rms ?? 0), 0) / (frames.length - segStart);
+        const avgE = frames.slice(segStart).reduce((s: number, f: EnhancedFrameData) => s + (f.rms ?? 0), 0) / (frames.length - segStart);
         const sectionType = avgE > 0.25 ? "chorus" : avgE > 0.12 ? "verse" : "space";
         sections.push({ start: segStart, end: frames.length, type: sectionType });
       }
