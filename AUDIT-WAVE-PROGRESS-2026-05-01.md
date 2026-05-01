@@ -12,12 +12,13 @@ Multi-commit execution against [`ARCHITECTURAL-AUDIT-2026-04.md`](./ARCHITECTURA
 - **1.5** Manifest generator extracted to `@dead-air/manifest-generator` package
 
 ### Wave 2 — type safety + show config (all done in code)
-- **2.1** Schema-driven uniform codegen
+- **2.1** Schema-driven uniform codegen — **FULLY CLOSED**
   - Phase A: `extract-uniform-schema.mts` produces `uniforms-schema.json` (116 uniforms)
   - Phase B: `generate-uniform-packer.mts` produces typed TS packer (`generated/uniform-packer.ts`)
-  - Phase C: `generate-rust-uniforms.mts` + `generate-glsl-uniforms.mts` produce Rust struct + GLSL block
-  - Drift gates: `tests/uniform_schema_drift.rs` + `tests/uniforms_layout_drift.rs`
-  - Phase D (hand-written packer cutover) deferred — needs byte-equivalence validation
+  - Phase C: `generate-rust-uniforms.mts` emits Rust offsets/struct + `pack_simple_uniforms` codegen; `generate-glsl-uniforms.mts` emits the GLSL block
+  - Phase D: codegen wired into the live render path; 105 hand-written simple write_f32 calls deleted from uniforms.rs (471 → 366 lines)
+  - Drift gates: `uniform_schema_drift.rs`, `uniforms_layout_drift.rs`, `uniform_packer_parity.rs`
+  - **Adding a new simple uniform is now schema-only** (audit Top #2 acceptance criterion met)
 - **2.2** All 11 type errors in `manifest-generator` resolved (caller/callee signature alignment + dead `generate-manifest-worker.ts` deleted)
 - **2.3** `@dead-air/audio-core` extracted + consumer migration via shims
   - 5 modules + 89 internal tests
@@ -50,11 +51,19 @@ Multi-commit execution against [`ARCHITECTURAL-AUDIT-2026-04.md`](./ARCHITECTURA
   - Per-directory rollup committed to `inventory-imports.json`
 
 ### Wave 4 — perf + live
-- **4.1** GPU overlay compositing — **FULLY CLOSED**
+- **4.1** GPU overlay compositing — **FULLY CLOSED + 4 correctness fixes from a real render**
   - Phase A: `overlay_atlas.rs` shelf packer, 5 unit tests
   - Phase B: `overlay_pass.rs` instanced WGSL pipeline, end-to-end smoke
   - Phase C: render loop integration via `--gpu-overlays` flag
   - Phase D: CPU/GPU pixel parity test — both paths produce 1352 active pixels exactly
+  - Phase E: CPU-vs-GPU perf benchmark — **12x speedup** on M3 Pro at 1080p (15.85 ms → 1.33 ms / frame)
+  - Bug fixes after a user screenshot exposed orientation issues:
+    - Y-flip in WGSL UV mapping (NDC up vs image V down)
+    - offset_y direction (CPU image-Y-down vs NDC-Y-up)
+    - Rotation handedness (CW in image-space vs CCW in NDC)
+    - Blend mode dispatch (was always Normal; now Normal/Screen/Multiply per pipeline)
+    - Z-order across interleaved blend modes (now run-batched in input order)
+  - Regression coverage: 6 smoke tests in `overlay_pass_smoke.rs` plus parity
 - **4.2** Live Rust renderer mode
   - Phase A: `tests/live_mode_budget.rs` measures shader perf at 1080p on M3 Pro
   - Real data: cheap tier OK60, expensive tier needs LOD, volumetric tier too slow
