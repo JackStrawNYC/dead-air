@@ -78,8 +78,13 @@ fn vs_main(@builtin(vertex_index) vid: u32, inst: InstanceIn) -> VsOut {
     let pos = inst.center + rotated;
 
     // Atlas UV from local quad coordinate.
-    let t = (local + vec2<f32>(1.0, 1.0)) * 0.5; // 0..1 across the quad
-    let uv = mix(inst.uv_rect.xy, inst.uv_rect.zw, t);
+    // NDC Y points UP, but image UV V points DOWN. Without the flip, the
+    // sprite renders upside-down. This is what bit Wave 4.1 in the wild
+    // (the parity test missed it because solid-color sprites are
+    // Y-flip invariant). Flip V on the way in.
+    let tx = (local.x + 1.0) * 0.5;            // 0..1 left to right
+    let ty = 1.0 - (local.y + 1.0) * 0.5;       // 0..1 top to bottom (image-Y)
+    let uv = mix(inst.uv_rect.xy, inst.uv_rect.zw, vec2<f32>(tx, ty));
 
     var out: VsOut;
     out.clip_pos = vec4<f32>(pos, 0.0, 1.0);
