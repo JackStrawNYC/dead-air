@@ -95,6 +95,14 @@ fn vs_main(@builtin(vertex_index) vid: u32, inst: InstanceIn) -> VsOut {
 @fragment
 fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     let src = textureSample(atlas_tex, atlas_samp, in.uv);
+    // Match the CPU compositor's luminance gate (overlay_cache.rs:252):
+    // overlay PNGs have opaque dark backgrounds; only pixels above ~12%
+    // luminance are real content. Without this gate, GPU compositing
+    // shows the full sprite quad instead of just the icon.
+    let luma = dot(src.rgb, vec3<f32>(0.2126, 0.7152, 0.0722));
+    if (luma < 0.12) {
+        discard;
+    }
     return vec4<f32>(src.rgb, src.a * in.opacity);
 }
 "#;
@@ -309,34 +317,37 @@ impl OverlayCompositingPipeline {
 }
 
 /// Convert one schedule overlay instance into a GPU instance, given the atlas
-/// lookup. Returns None when the overlay isn't in the atlas (silent overlays
-/// that the validation gate flags separately) or when its keyframe SVG would
-/// fall back to the CPU compositor.
+/// lookup and the target render dimensions. Returns None when the overlay
+/// isn't in the atlas or when its keyframe SVG would fall back to the CPU
+/// rasterizer.
+///
+/// Scale semantics match `overlay_cache::composite_transformed`:
+/// `scale = 1.0` means the source PNG is mapped 1:1 onto the target (so the
+/// overlay covers `src_size` target pixels). The NDC half-extent is therefore
+/// `(src_size * scale) / target_dim`.
 pub fn instance_to_gpu(
     inst: &crate::overlay_cache::OverlayInstance,
     atlas: &crate::overlay_atlas::OverlayAtlas,
+    target_width: u32,
+    target_height: u32,
 ) -> Option<OverlayInstanceGPU> {
     if inst.keyframe_svg.is_some() {
-        return None; // SVG keyframes still go through the CPU rasterizer
+        return None;
     }
     let entry = atlas.lookup.get(&inst.overlay_id)?;
-    // Map manifest transform (offset is fraction of frame; scale 1.0 = full
-    // frame) into NDC ([-1, 1] across both axes).
     let center = [inst.transform.offset_x * 2.0, inst.transform.offset_y * 2.0];
-    // half_size in NDC: scale=1.0 means the overlay covers the full frame
-    // (NDC half-extent of 1.0 each axis). The overlay's source aspect ratio
-    // is implicit in the atlas UV rect — we square the quad and let the
-    // sampler stretch like the CPU compositor does.
-    let half_size = [inst.transform.scale, inst.transform.scale];
+    // Convert source pixel size → NDC half-extent at the requested scale.
+    let half_w_ndc = (entry.src_size[0] as f32 * inst.transform.scale) / target_width as f32;
+    let half_h_ndc = (entry.src_size[1] as f32 * inst.transform.scale) / target_height as f32;
     let blend_mode = match inst.blend_mode {
         crate::compositor::BlendMode::Normal => 0u32,
         crate::compositor::BlendMode::Screen => 1,
         crate::compositor::BlendMode::Multiply => 2,
-        _ => 1, // fallback to screen, matching CPU compositor
+        _ => 1,
     };
     Some(OverlayInstanceGPU {
         center,
-        half_size,
+        half_size: [half_w_ndc, half_h_ndc],
         uv_rect: [entry.uv_min[0], entry.uv_min[1], entry.uv_max[0], entry.uv_max[1]],
         opacity: inst.transform.opacity,
         rotation_rad: inst.transform.rotation_deg.to_radians(),

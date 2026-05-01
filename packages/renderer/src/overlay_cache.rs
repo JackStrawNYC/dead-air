@@ -12,6 +12,7 @@ use std::path::Path;
 use serde::{Deserialize, Serialize};
 
 /// Pre-rendered overlay image (cached RGBA pixels at render resolution).
+#[derive(Clone)]
 pub struct CachedOverlay {
     pub pixels: Vec<u8>,
     pub width: u32,

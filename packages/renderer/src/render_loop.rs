@@ -251,7 +251,7 @@ pub fn run(mut r: RenderResources<'_>) -> usize {
                 if let Some(frame_overlays) = schedule.get(frame_idx) {
                     let gpu_instances: Vec<_> = frame_overlays
                         .iter()
-                        .filter_map(|inst| overlay_pass::instance_to_gpu(inst, atlas))
+                        .filter_map(|inst| overlay_pass::instance_to_gpu(inst, atlas, r.width, r.height))
                         .collect();
                     if !gpu_instances.is_empty() {
                         let mut encoder = r.renderer.device().create_command_encoder(
