@@ -29,6 +29,7 @@ pub mod intro;
 mod manifest;
 mod overlay_atlas;
 mod overlay_cache;
+mod overlay_pass;
 mod motion_blur;
 mod postprocess;
 mod render_loop;

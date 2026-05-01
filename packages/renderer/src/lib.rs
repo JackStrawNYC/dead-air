@@ -12,6 +12,7 @@ pub mod manifest;
 pub mod motion_blur;
 pub mod overlay_atlas;
 pub mod overlay_cache;
+pub mod overlay_pass;
 pub mod postprocess;
 pub mod temporal;
 pub mod text_layers;
