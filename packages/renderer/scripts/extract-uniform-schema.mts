@@ -1,18 +1,27 @@
 #!/usr/bin/env npx tsx
 /**
- * Extract uniform schema from packages/renderer/src/uniforms.rs.
+ * SCHEMA EXTRACTION — HISTORICAL TOOL
  *
- * Wave 2.1 phase A: parses the hand-written std140 packing code to produce
- * a machine-readable schema (JSON) that future codegen passes can consume
- * to generate the Rust struct, the GLSL declarations, and the TypeScript
- * emitter from a single source of truth.
+ * This script was the original Wave 2.1 phase A bootstrapper. It scanned
+ * `packages/renderer/src/uniforms.rs` for write_f32 calls to seed
+ * `uniforms-schema.json`.
  *
- * Output: packages/renderer/uniforms-schema.json
+ * As of phase D (commit 9e07e97), the 105 simple write_f32 calls were
+ * deleted from uniforms.rs in favour of the schema-driven codegen
+ * `pack_simple_uniforms`. THE SCHEMA IS NOW THE SOURCE OF TRUTH — running
+ * this extractor against the current uniforms.rs would produce ~18
+ * entries (only the computed/synthetic ones remain), wiping the schema.
  *
- * Until codegen lands, this schema is purely diagnostic — but it lets us
- * detect drift via a CI check (re-extract, diff against the committed file).
+ * The script is kept for reference / one-shot use against a historical
+ * checkout of uniforms.rs. Day-to-day workflow:
  *
- * Patterns recognized:
+ *   1. Edit `packages/renderer/uniforms-schema.json` directly.
+ *   2. Run `generate-rust-uniforms.mts` and `generate-uniform-packer.mts`
+ *      and `generate-glsl-uniforms.mts` to regenerate downstream.
+ *   3. `cargo test --test uniforms_layout_drift` and
+ *      `cargo test --test uniform_packer_parity` validate the layout.
+ *
+ * Patterns this script still recognises (kept verbatim):
  *   write_f32(&mut buf, OFFSET, frame.RUST_FIELD);       // uName
  *   write_f32(&mut buf, OFFSET, EXPR);                   // uName (extra notes)
  *   for-loop chroma block at offsets 192/208/224         (vec4 each)
