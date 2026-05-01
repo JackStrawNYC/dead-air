@@ -28,6 +28,7 @@ SKIP_ANALYSIS=false
 SKIP_MANIFEST=false
 SKIP_RENDER=false
 STRICT_OVERLAYS=false
+GPU_OVERLAYS=false
 
 usage() {
   cat <<EOF
@@ -55,6 +56,9 @@ Skip switches (for resuming):
 
 Quality gates:
   --strict-overlays       Abort if overlay PNGs are missing
+
+Performance:
+  --gpu-overlays          GPU-side overlay compositing (Wave 4.1)
 EOF
   exit 1
 }
@@ -73,6 +77,7 @@ while [[ $# -gt 0 ]]; do
     --skip-manifest)    SKIP_MANIFEST=true; shift;;
     --skip-render)      SKIP_RENDER=true; shift;;
     --strict-overlays)  STRICT_OVERLAYS=true; shift;;
+    --gpu-overlays)     GPU_OVERLAYS=true; shift;;
     -h|--help)          usage;;
     *)                  echo "Unknown arg: $1"; usage;;
   esac
@@ -168,16 +173,22 @@ else
     --scene-scale "$SCENE_SCALE"
   )
   [[ "$STRICT_OVERLAYS" == "true" ]] && RENDER_ARGS+=(--strict-overlays)
+  [[ "$GPU_OVERLAYS" == "true" ]] && RENDER_ARGS+=(--gpu-overlays)
 
   if [[ "$USE_DOCKER" == "yes" ]] && command -v nvidia-smi >/dev/null 2>&1; then
     cd "$ROOT/docker"
+    DOCKER_RENDER_ARGS=(
+      --manifest /data/manifest.msgpack
+      --output "/data/$(basename "$OUTPUT")"
+      --width "$WIDTH" --height "$HEIGHT" --fps "$FPS"
+      --scene-scale "$SCENE_SCALE"
+    )
+    [[ "$STRICT_OVERLAYS" == "true" ]] && DOCKER_RENDER_ARGS+=(--strict-overlays)
+    [[ "$GPU_OVERLAYS" == "true" ]] && DOCKER_RENDER_ARGS+=(--gpu-overlays)
     docker compose run --rm \
       -v "$ROOT/out/${SHOW}:/data" \
       render \
-      --manifest /data/manifest.msgpack \
-      --output "/data/$(basename "$OUTPUT")" \
-      --width "$WIDTH" --height "$HEIGHT" --fps "$FPS" \
-      --scene-scale "$SCENE_SCALE"
+      "${DOCKER_RENDER_ARGS[@]}"
     cp "$ROOT/out/${SHOW}/$(basename "$OUTPUT")" "$OUTPUT"
     cd "$ROOT"
   else
