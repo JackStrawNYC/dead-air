@@ -38,6 +38,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@dead-air/audio-core": "workspace:*",
     "@react-three/fiber": "^8.18.0",
     "@remotion/cli": "4.0.242",
     "@remotion/google-fonts": "4.0.242",

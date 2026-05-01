@@ -205,6 +205,9 @@ importers:
 
   packages/visualizer-poc:
     dependencies:
+      '@dead-air/audio-core':
+        specifier: workspace:*
+        version: link:../audio-core
       '@react-three/fiber':
         specifier: ^8.18.0
         version: 8.18.0(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(three@0.183.1)
