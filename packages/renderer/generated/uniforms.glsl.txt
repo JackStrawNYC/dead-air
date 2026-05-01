@@ -1,0 +1,169 @@
+// AUTO-GENERATED — do not edit by hand.
+// Source: packages/renderer/uniforms-schema.json
+// Regenerate: npx tsx packages/renderer/scripts/generate-glsl-uniforms.mts
+
+// ─── Time ───
+uniform float uTime;
+uniform float uDynamicTime;
+uniform float uBeatTime;
+
+// ─── Core Audio Features ───
+uniform float uBass;
+uniform float uRms;
+uniform float uCentroid;
+uniform float uHighs;
+uniform float uOnset;
+uniform float uBeat;
+uniform float uMids;
+uniform float uEnergy;
+uniform float uFlatness;
+
+// ─── Smoothed / Derived Audio ───
+uniform float uSlowEnergy;
+uniform float uFastEnergy;
+uniform float uFastBass;
+uniform float uSpectralFlux;
+uniform float uEnergyAccel;
+uniform float uEnergyTrend;
+uniform float uLocalTempo;  // (≈ global tempo)
+uniform float uTempo;
+
+// ─── Beat / Rhythm ───
+uniform float uOnsetSnap;
+uniform float uBeatSnap;
+uniform float uMusicalTime;
+uniform float uSnapToMusicalTime;  // (≈ musical time)
+
+// ─── Drum Stem ───
+uniform float uDrumOnset;
+uniform float uDrumBeat;
+uniform float uStemBass;
+uniform float uStemDrums;
+uniform float uStemDrumOnset;
+uniform float uVocalEnergy;
+uniform float uVocalPresence;
+uniform float uStemVocalRms;
+
+// ─── Vocal / Other Stem ───
+uniform float uOtherEnergy;
+uniform float uOtherCentroid;
+
+// ─── Chroma / Spectral ───
+uniform float uChromaHue;
+uniform float uChromaShift;
+uniform float uAfterglowHue;
+uniform vec4 uContrast0;
+uniform vec4 uContrast1;
+uniform vec4 uChroma0;
+uniform vec4 uChroma1;
+uniform vec4 uChroma2;
+
+// ─── Section / Structure ───
+uniform float uSectionProgress;
+uniform float uSectionIndex;
+uniform float uClimaxPhase;
+uniform float uClimaxIntensity;
+uniform float uCoherence;
+uniform float uJamDensity;
+uniform float uSongProgress;
+uniform float uShaderHoldProgress;
+
+// ─── Jam Evolution ───
+uniform float uJamPhase;
+uniform float uJamProgress;
+
+// ─── Palette / Color ───
+uniform float uPalettePrimary;
+uniform float uPaletteSecondary;
+uniform float uPaletteSaturation;
+
+// ─── Era ───
+uniform float uEraSaturation;
+uniform float uEraBrightness;
+uniform float uEraSepia;
+
+// ─── Post-Process Control ───
+uniform float uBloomThreshold;
+uniform float uLensDistortion;
+uniform float uGradingIntensity;
+
+// ─── Melodic / Harmonic ───
+uniform float uMelodicPitch;
+uniform float uMelodicDirection;
+uniform float uChordIndex;
+uniform float uHarmonicTension;
+uniform float uChordConfidence;
+uniform float uSectionType;
+uniform float uEnergyForecast;
+uniform float uPeakApproaching;
+uniform float uBeatStability;
+uniform float uDownbeat;
+uniform float uBeatConfidence;
+uniform float uMelodicConfidence;
+uniform float uImprovisationScore;
+
+// ─── Peak-of-Show ───
+uniform float uPeakOfShow;
+
+// ─── Hero Icon ───
+uniform float uHeroIconTrigger;
+uniform float uHeroIconProgress;
+
+// ─── Show Film Stock ───
+uniform float uShowWarmth;
+uniform float uShowContrast;
+uniform float uShowSaturation;
+uniform float uShowGrain;
+uniform float uShowBloom;
+
+// ─── Venue Profile ───
+uniform float uVenueVignette;
+
+// ─── 3D Camera (computed from audio) ───
+uniform float uCamFov;
+uniform float uCamDof;
+uniform float uCamFocusDist;
+
+// ─── Envelope ───
+uniform float uEnvelopeBrightness;
+uniform float uEnvelopeSaturation;
+uniform float uEnvelopeHue;
+
+// ─── Deep Audio (Level 2) ───
+uniform float uTempoDerivative;
+uniform float uDynamicRange;
+uniform float uSpaceScore;
+uniform float uTimbralBrightness;
+uniform float uTimbralFlux;
+uniform float uVocalPitch;
+
+// ─── Effects ───
+uniform float uPhilBombWave;
+
+// ─── Semantic Labels (CLAP) ───
+uniform float uSemanticPsychedelic;
+uniform float uSemanticCosmic;
+uniform float uSemanticChaotic;
+uniform float uSemanticAggressive;
+uniform float uSemanticTender;
+uniform float uSemanticAmbient;
+uniform float uSemanticRhythmic;
+uniform float uSemanticTriumphant;
+
+// ─── Per-Song Shader Parameter Modulation ───
+uniform float uParamBassScale;
+uniform float uParamEnergyScale;
+uniform float uParamMotionSpeed;
+uniform float uParamColorSatBias;
+uniform float uParamComplexity;
+uniform float uParamDrumReactivity;
+uniform float uParamVocalWeight;
+
+// ─── Temporal Coherence ───
+uniform float uTemporalBlendStrength;
+
+// ─── Per-Show Visual Identity ───
+uniform float uShowGrainCharacter;
+uniform float uShowBloomCharacter;
+uniform float uShowTemperatureCharacter;
+uniform float uShowContrastCharacter;
