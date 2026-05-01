@@ -28,9 +28,28 @@ Key swaps:
 
 ## Phase plan
 
-### Phase A — Frame budget validation (1 week)
-- Benchmark: render a representative shader at 1080p / 60fps on the target hardware. Confirm <16ms total budget achievable.
-- Identify shaders that bust budget; they need either LOD downgrade (Wave 3.3) or exclusion from live pool.
+### Phase A — Frame budget validation (DONE 2026-05-01)
+`tests/live_mode_budget.rs` measures p50/p95/p99 per representative shader at 1080p on the target hardware. Run with `cargo test --release --test live_mode_budget -- --ignored --nocapture`.
+
+Initial measurements on Apple M3 Pro:
+
+| Tier        | Shader            | p50 ms | p95 ms | Verdict |
+|---|---|---:|---:|---|
+| cheap       | (cosmic-voyage)   | 5.1    | 5.2    | OK60    |
+| expensive   | fractal-temple    | 20.3   | 21.9   | ok30    |
+| expensive   | mandala-engine    | 82.6   | 85.6   | TOO SLOW |
+| volumetric  | protean-clouds    | 61.4   | 62.9   | TOO SLOW |
+| volumetric  | aurora            | 153.7  | 157.1  | TOO SLOW |
+| volumetric  | deep-ocean        | 258.7  | 270.0  | TOO SLOW |
+| volumetric  | volumetric-smoke  | 1778.6 | 1800.5 | catastrophic (1.8s/frame) |
+
+**Conclusions:**
+1. Live mode at 1080p/60fps is feasible only for the cheap tier (~30% of catalog).
+2. The expensive tier (~40%) needs `--scene-scale 0.5` (Wave 3.3) to fit budget.
+3. The volumetric tier (~30%) is fundamentally too costly on M3 Pro — must be **excluded** from the live shader pool, OR the live mode must drop to 30fps.
+4. Buying a desktop GPU (RTX 4090) would shift the picture. The benchmark should be re-run on target hardware before serious live-product work.
+
+This data informs phase D (reactive scene router) — the live router must filter out volumetric shaders entirely on this class of hardware.
 
 ### Phase B — Audio input + DSP (1 week)
 - `cpal` input from default device.
