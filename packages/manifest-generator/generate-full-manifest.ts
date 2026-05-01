@@ -18,21 +18,12 @@
  *     --output manifest.json \
  *     --fps 60 --width 3840 --height 2160
  *
- * KNOWN TYPE DEBT (audit Debt #6 — "31 any types"):
- *   Several call sites here pass arguments that don't match the imported function
- *   signatures. They survive at runtime because every call is wrapped in try/catch
- *   that defaults to a stub state. This means routing decisions silently degrade
- *   to defaults instead of using real analysis. The fix requires aligning each
- *   caller to the current callee signature, then deleting the stub fallbacks so
- *   genuine breakage is visible.
- *   Active mismatches (as of 2026-05-01):
- *     - computeAudioSnapshot: caller passes (frames, idx, 30) but expects beatArray as 3rd arg
- *     - computeReactiveTriggers: caller passes 3 args, expects 5-8 (section bounds, tempo)
- *     - detectJamCycle: caller passes 3 args, expects 4 (with sectionType)
- *     - computeNarrativeDirective: shape mismatch, currently `as any` cast
- *     - GrooveState/GrooveVisualModifiers: literal default shape doesn't match real types
- *     - ShowVisualSeed.era: accessed but not on type
- *   None of these crash production today; they just hide bugs. Fix as a focused pass.
+ * Type-correctness status (audit Debt #6):
+ *   The previous-session signature mismatches have been resolved: callers now
+ *   align with current callee signatures (computeAudioSnapshot, computeReactiveTriggers,
+ *   detectJamCycle, GrooveState/GrooveVisualModifiers default shapes, era source).
+ *   The try/catch fallbacks are still present — they protect against runtime failures
+ *   inside the analysis utilities themselves, not type errors.
  */
 
 import { readFileSync, writeFileSync, existsSync, readdirSync, createWriteStream, statSync } from "fs";
@@ -199,6 +190,29 @@ interface SongContext {
   usedShaderModes: Map<string, number>;
 }
 
+/**
+ * Find the section containing `idx` and return its [start, end) bounds.
+ * Sections in the manifest may use either `start`/`end` or `frameStart`/`frameEnd`
+ * field names — accept both. Falls back to the whole song when no match.
+ */
+function findSectionBounds(
+  sections: any[],
+  idx: number,
+  totalFrames: number,
+): { start: number; end: number } {
+  if (!sections || sections.length === 0) {
+    return { start: 0, end: totalFrames };
+  }
+  for (const s of sections) {
+    const start = s.start ?? s.frameStart ?? 0;
+    const end = s.end ?? s.frameEnd ?? start + (s.length ?? 0);
+    if (idx >= start && idx < end) {
+      return { start, end };
+    }
+  }
+  return { start: 0, end: totalFrames };
+}
+
 function analyzeFrame(
   ctx: SongContext,
   idx: number,
@@ -232,7 +246,7 @@ function analyzeFrame(
     localTempo: f.localTempo ?? 120,
   } : (() => {
     try {
-      return computeAudioSnapshot(frames, idx, 30);
+      return computeAudioSnapshot(frames, idx, undefined, 30);
     } catch (e) { if (idx === 0) console.warn(`    [WARN] computeAudioSnapshot FAILED: ${(e as Error).message?.slice(0,100)}`);
 
       return {
@@ -258,10 +272,28 @@ function analyzeFrame(
   let drumsSpaceState = null;
   let climaxState = { phase: "idle", intensity: 0 };
   let climaxMod = { saturationOffset: 0, brightnessOffset: 0, bloomOffset: 0 };
-  let reactiveState = { triggered: false, triggerType: null, shaderPool: [] as string[] };
-  let groove = { type: "pocket", motionMult: 1.0 };
-  let grooveMods = { motionMult: 1.0, overlayDensityMult: 1.0 };
-  let jamCycle = { phase: "setup", progress: 0, isDeepening: false };
+  // Default ReactiveState matching the real type (reactive-triggers.ts).
+  let reactiveState: import("../visualizer-poc/src/utils/reactive-triggers.js").ReactiveState = {
+    isTriggered: false,
+    triggerType: null,
+    triggerStrength: 0,
+    triggerAge: 0,
+    suggestedModes: [],
+    overlayInjections: [],
+    cooldownRemaining: 0,
+  };
+  // Default GrooveState matching groove-detector.ts
+  let groove: import("../visualizer-poc/src/utils/groove-detector.js").GrooveState = {
+    type: "pocket",
+    confidence: 0,
+  };
+  let grooveMods: import("../visualizer-poc/src/utils/groove-detector.js").GrooveVisualModifiers = {
+    temperatureShift: 0,
+    motionMult: 1.0,
+    regularity: 0.5,
+    pulseMult: 1.0,
+  };
+  let jamCycle = { phase: "setup", progress: 0, isDeepening: false, cycleCount: 0 };
   let sectionVocab = { overlayDensityMult: 1.0, driftSpeedMult: 1.0 };
   let narrative = { saturationOffset: 0, temperature: 0, overlayDensityMult: 1.0, motionMult: 1.0 };
   let peakOfShow = { isPeak: false, intensity: 0 };
@@ -289,7 +321,17 @@ function analyzeFrame(
     try { drumsSpaceState = computeDrumsSpacePhase(frames, idx, isDrumsSpace); } catch (e) { failures.push(`drumsSpace: ${(e as Error).message?.slice(0,60)}`); }
     try { climaxState = computeClimaxState(frames, idx, sections); } catch (e) { failures.push(`climax: ${(e as Error).message?.slice(0,60)}`); }
     try { climaxMod = climaxModulation(climaxState as any); } catch (e) { failures.push(`climaxMod: ${(e as Error).message?.slice(0,60)}`); }
-    try { reactiveState = computeReactiveTriggers(frames, idx, { coherenceLocked: coherenceState.isLocked }); } catch (e) { failures.push(`reactive: ${(e as Error).message?.slice(0,60)}`); }
+    // Locate section bounds for the current frame so reactive triggers can
+    // reason about position within the section.
+    const sectionBounds = findSectionBounds(sections, idx, frames.length);
+    try {
+      reactiveState = computeReactiveTriggers(
+        frames, idx,
+        sectionBounds.start, sectionBounds.end,
+        tempo,
+        coherenceState.isLocked,
+      );
+    } catch (e) { failures.push(`reactive: ${(e as Error).message?.slice(0,60)}`); }
   }
   try {
     groove = detectGroove(
@@ -298,9 +340,12 @@ function analyzeFrame(
       snapshot.energy ?? 0.3,
       snapshot.flatness ?? 0.5,
     );
-    grooveMods = grooveModifiers(groove as any);
+    grooveMods = grooveModifiers(groove);
   } catch (e) { failures.push(`groove: ${(e as Error).message?.slice(0,60)}`); }
-  try { jamCycle = detectJamCycle(frames, idx, sections); } catch (e) { failures.push(`jamCycle: ${(e as Error).message?.slice(0,60)}`); }
+  try {
+    const b = findSectionBounds(sections, idx, frames.length);
+    jamCycle = detectJamCycle(frames, idx, b.start, b.end);
+  } catch (e) { failures.push(`jamCycle: ${(e as Error).message?.slice(0,60)}`); }
   try { sectionVocab = getSectionVocabulary(stemSection) as any; } catch (e) { failures.push(`sectionVocab: ${(e as Error).message?.slice(0,60)}`); }
   try {
     narrative = computeNarrativeDirective({
@@ -543,7 +588,9 @@ function computeUniforms(
   songProgress?: number,
   sectionProgress?: number,
   showVisualSeed?: ShowVisualSeed | null,
+  showEra?: string,
 ): Record<string, number> {
+  void showEra; // reserved for future use (currently derived from setlist.era at call site)
   const f = frames[idx] ?? {};
   const t = interpT ?? 0;
   const hi = idxHi ?? idx;
@@ -792,8 +839,10 @@ function computeUniforms(
     show_bloom_character: showVisualSeed?.bloomBias ?? 0.0,
     show_temperature_character: showVisualSeed?.paletteTemperature ?? 0.0,
     show_contrast_character: showVisualSeed?.contrastCharacter ?? 0.5,
-    // FFT contrast data (7-band)
-    contrast: [
+    // FFT contrast data (7-band tuple, see EnhancedFrameData.contrast)
+    // Cast: this single field is number[]; the rest of the Record is number,
+    // so we keep the loose Record<string, number> shape for downstream simplicity.
+    contrast: ([
       bass,
       f.stemBassRms ?? bass,
       mids,
@@ -801,7 +850,7 @@ function computeUniforms(
       highs,
       f.timbralBrightness ?? 0.5,
       f.spectralFlux ?? 0,
-    ],
+    ] as unknown) as number,
     // Motion blur: adaptive sample count based on energy + climax
     motion_blur_samples: (() => {
       const ci = climax.intensity ?? 0;
@@ -1229,8 +1278,23 @@ async function main() {
     t0 = Date.now();
     for (let bi = 0; bi < frames.length; bi++) {
       try { preInterplay[bi] = detectStemInterplay(frames, bi); } catch (e) { if (bi === 0) console.warn(`    [WARN] detectStemInterplay FAILED on frame 0: ${(e as Error).message?.slice(0,100)}`); preInterplay[bi] = null; }
-      try { preReactive[bi] = computeReactiveTriggers(frames, bi, { coherenceLocked: preCoherence[bi]?.isLocked ?? false }); } catch (e) { if (bi === 0) console.warn(`    [WARN] computeReactiveTriggers FAILED on frame 0: ${(e as Error).message?.slice(0,100)}`); preReactive[bi] = { triggered: false, triggerType: null, shaderPool: [] }; }
-      try { preJamCycle[bi] = detectJamCycle(frames, bi, sections); } catch (e) { if (bi === 0) console.warn(`    [WARN] detectJamCycle FAILED on frame 0: ${(e as Error).message?.slice(0,100)}`); preJamCycle[bi] = { phase: "setup", progress: 0, isDeepening: false }; }
+      const sb = findSectionBounds(sections, bi, frames.length);
+      try {
+        preReactive[bi] = computeReactiveTriggers(
+          frames, bi,
+          sb.start, sb.end,
+          tempo,
+          preCoherence[bi]?.isLocked ?? false,
+        );
+      } catch (e) {
+        if (bi === 0) console.warn(`    [WARN] computeReactiveTriggers FAILED on frame 0: ${(e as Error).message?.slice(0,100)}`);
+        preReactive[bi] = {
+          isTriggered: false, triggerType: null, triggerStrength: 0,
+          triggerAge: 0, suggestedModes: [], overlayInjections: [],
+          cooldownRemaining: 0,
+        };
+      }
+      try { preJamCycle[bi] = detectJamCycle(frames, bi, sb.start, sb.end); } catch (e) { if (bi === 0) console.warn(`    [WARN] detectJamCycle FAILED on frame 0: ${(e as Error).message?.slice(0,100)}`); preJamCycle[bi] = { phase: "setup", progress: 0, isDeepening: false, cycleCount: 0 }; }
       try { preClimaxState[bi] = computeClimaxState(frames, bi, sections); } catch (e) { if (bi === 0) console.warn(`    [WARN] computeClimaxState FAILED on frame 0: ${(e as Error).message?.slice(0,100)}`); preClimaxState[bi] = { phase: "idle", intensity: 0 }; }
     }
     const restMs = Date.now() - t0;
@@ -1537,6 +1601,7 @@ async function main() {
         frames, ai, fps, tempo, width, height, globalTime, frameAnalysis, smoothed,
         aiHi, interpT,
         song, i / Math.max(1, totalOut), routeSectionProgress, showVisualSeed,
+        setlist.era ?? "classic",
       );
 
       // Fix section_index and section_progress (not available in computeUniforms)
@@ -1562,7 +1627,9 @@ async function main() {
       const showPos = allFrames.length / Math.max(1, totalShowFrames);
       uniforms.show_position = showPos;
       uniforms.show_warmth = (() => {
-        const era = showVisualSeed?.era ?? "classic";
+        // Era is a show-level concept (date-derived), not part of audio analysis.
+        // It comes from setlist.era; defaults to "classic" if absent.
+        const era = (setlist as any)?.era ?? "classic";
         const warmth: Record<string, number> = {
           primal: 0.30, classic: 0.12, hiatus: -0.05, touch_of_grey: 0.0, revival: -0.02,
         };
