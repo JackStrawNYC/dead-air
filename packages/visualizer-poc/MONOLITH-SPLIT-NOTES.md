@@ -34,9 +34,26 @@ These are the obvious public-API surface to keep stable through the move.
 
 ## Phase plan
 
-### Phase A — Inventory (1 day)
-- Build a graph of `data/` and `utils/` files: which import each other, which are imported from outside.
-- Identify any circular deps — fix before the move.
+### Phase A — Inventory (DONE 2026-05-01)
+`scripts/inventory-imports.mts` walks src/ and classifies every file:
+
+| Top dir | engine | view | total |
+|---|---:|---:|---:|
+| src/shaders   | 143 |   0 | 143 |
+| src/utils     |  63 |   2 |  65 |
+| src/data      |  20 |  16 |  36 |
+| src/scenes    |   7 | 135 | 142 |
+| src/config    |   2 |   0 |   2 |
+| src/components|   4 | 476 | 480 |
+| src/hooks     |   0 |   3 |   3 |
+| src/ (root)   |   0 |   8 |   8 |
+| **total**     | **239** | **640** | **879** |
+
+**Zero mixed modules.** Every .ts file is either purely engine (no React/Remotion/Three imports) or purely view (uses them). The package boundary is therefore mechanical.
+
+Full per-file report: `packages/visualizer-poc/inventory-imports.json`.
+
+Phase A unlocks confident phase C — we know the move splits cleanly along directory boundaries with two minor exceptions (4 .tsx in components and 7 in scenes that are actually engine-pure; 2 .ts in utils that pull in React via context). Those become the explicit hand-merge cases.
 
 ### Phase B — Create `@dead-air/visual-engine` package skeleton (1 day)
 - New `packages/visual-engine/{package.json,tsconfig.json,src/index.ts}`.
