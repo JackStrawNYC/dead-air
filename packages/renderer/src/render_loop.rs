@@ -9,8 +9,8 @@
 
 use crate::{
     composited_effects, compositor, effects, ffmpeg, gpu, intro, manifest,
-    motion_blur, overlay_cache, postprocess, shader_cache, temporal, transition,
-    uniforms,
+    motion_blur, overlay_cache, overlay_pass, postprocess, shader_cache,
+    temporal, transition, uniforms,
 };
 use indicatif::ProgressBar;
 
@@ -51,6 +51,13 @@ pub struct RenderResources<'a> {
     pub start_frame: usize,
     pub end_frame: usize,
     pub progress: &'a ProgressBar,
+
+    /// Optional GPU overlay compositing pipeline (Wave 4.1 phase C).
+    /// When `Some`, overlays are composited GPU-side onto output_texture
+    /// before readback, and the CPU compositor is skipped for the
+    /// schedule (intro/endcard SVG layers still go CPU).
+    pub gpu_overlay_pipeline: Option<&'a overlay_pass::OverlayCompositingPipeline>,
+    pub gpu_overlay_atlas: Option<&'a crate::overlay_atlas::OverlayAtlas>,
 }
 
 /// Run the full render loop. Returns the number of frames written.
@@ -66,6 +73,7 @@ pub fn run(mut r: RenderResources<'_>) -> usize {
                 r.renderer, prev_idx, r.manifest,
                 r.overlay_image_cache, r.ffmpeg_pipe, r.png_dir,
                 r.width, r.height,
+                r.gpu_overlay_pipeline.is_some(),
             );
             r.progress.inc(1);
             frames_written += 1;
@@ -233,6 +241,32 @@ pub fn run(mut r: RenderResources<'_>) -> usize {
             r.width, r.height,
         );
 
+        // GPU overlay compositing (Wave 4.1 phase C).
+        // When the GPU pipeline + atlas are present, paint schedule overlays
+        // onto the output texture before readback. The CPU compositor in
+        // process_completed_frame will then skip the schedule (intro/endcard
+        // SVG layers still go CPU since they're per-frame rasterized).
+        if let (Some(pipeline), Some(atlas)) = (r.gpu_overlay_pipeline, r.gpu_overlay_atlas) {
+            if let Some(ref schedule) = r.manifest.overlay_schedule {
+                if let Some(frame_overlays) = schedule.get(frame_idx) {
+                    let gpu_instances: Vec<_> = frame_overlays
+                        .iter()
+                        .filter_map(|inst| overlay_pass::instance_to_gpu(inst, atlas))
+                        .collect();
+                    if !gpu_instances.is_empty() {
+                        let mut encoder = r.renderer.device().create_command_encoder(
+                            &wgpu::CommandEncoderDescriptor { label: Some("gpu_overlay_pass") },
+                        );
+                        let target = r.renderer.output_texture_view();
+                        pipeline.encode(&mut encoder, r.renderer.device(), target, &gpu_instances);
+                        // Re-trigger readback since we modified output_texture.
+                        r.renderer.copy_to_readback(&mut encoder);
+                        r.renderer.queue().submit(std::iter::once(encoder.finish()));
+                    }
+                }
+            }
+        }
+
         *r.feedback_idx = 1 - *r.feedback_idx;
         pending_frame_idx = Some(frame_idx);
         last_frame_idx = Some(frame_idx);
@@ -243,6 +277,7 @@ pub fn run(mut r: RenderResources<'_>) -> usize {
             r.renderer, prev_idx, r.manifest,
             r.overlay_image_cache, r.ffmpeg_pipe, r.png_dir,
             r.width, r.height,
+            r.gpu_overlay_pipeline.is_some(),
         );
         r.progress.inc(1);
         frames_written += 1;
@@ -388,6 +423,9 @@ fn apply_composited_pass(
 }
 
 /// Read GPU pixels, composite CPU overlays, write to output sink.
+/// When `schedule_handled_by_gpu` is true, the schedule overlays were
+/// already painted on output_texture by `overlay_pass` and are skipped here;
+/// the SVG layer compositing path (intro/endcard) is unaffected either way.
 pub fn process_completed_frame(
     renderer: &mut gpu::GpuRenderer,
     frame_idx: usize,
@@ -397,6 +435,7 @@ pub fn process_completed_frame(
     png_dir: &Option<std::path::PathBuf>,
     width: u32,
     height: u32,
+    schedule_handled_by_gpu: bool,
 ) {
     let mut pixels = renderer.read_pixels();
 
@@ -405,10 +444,12 @@ pub fn process_completed_frame(
             compositor::composite_layers(&mut pixels, frame_overlays, width, height);
         }
     }
-    if let Some(ref schedule) = manifest.overlay_schedule {
-        if let Some(frame_overlays) = schedule.get(frame_idx) {
-            for instance in frame_overlays {
-                overlay_image_cache.composite_instance(&mut pixels, width, height, instance);
+    if !schedule_handled_by_gpu {
+        if let Some(ref schedule) = manifest.overlay_schedule {
+            if let Some(frame_overlays) = schedule.get(frame_idx) {
+                for instance in frame_overlays {
+                    overlay_image_cache.composite_instance(&mut pixels, width, height, instance);
+                }
             }
         }
     }

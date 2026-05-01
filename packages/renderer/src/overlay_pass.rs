@@ -308,6 +308,43 @@ impl OverlayCompositingPipeline {
     }
 }
 
+/// Convert one schedule overlay instance into a GPU instance, given the atlas
+/// lookup. Returns None when the overlay isn't in the atlas (silent overlays
+/// that the validation gate flags separately) or when its keyframe SVG would
+/// fall back to the CPU compositor.
+pub fn instance_to_gpu(
+    inst: &crate::overlay_cache::OverlayInstance,
+    atlas: &crate::overlay_atlas::OverlayAtlas,
+) -> Option<OverlayInstanceGPU> {
+    if inst.keyframe_svg.is_some() {
+        return None; // SVG keyframes still go through the CPU rasterizer
+    }
+    let entry = atlas.lookup.get(&inst.overlay_id)?;
+    // Map manifest transform (offset is fraction of frame; scale 1.0 = full
+    // frame) into NDC ([-1, 1] across both axes).
+    let center = [inst.transform.offset_x * 2.0, inst.transform.offset_y * 2.0];
+    // half_size in NDC: scale=1.0 means the overlay covers the full frame
+    // (NDC half-extent of 1.0 each axis). The overlay's source aspect ratio
+    // is implicit in the atlas UV rect — we square the quad and let the
+    // sampler stretch like the CPU compositor does.
+    let half_size = [inst.transform.scale, inst.transform.scale];
+    let blend_mode = match inst.blend_mode {
+        crate::compositor::BlendMode::Normal => 0u32,
+        crate::compositor::BlendMode::Screen => 1,
+        crate::compositor::BlendMode::Multiply => 2,
+        _ => 1, // fallback to screen, matching CPU compositor
+    };
+    Some(OverlayInstanceGPU {
+        center,
+        half_size,
+        uv_rect: [entry.uv_min[0], entry.uv_min[1], entry.uv_max[0], entry.uv_max[1]],
+        opacity: inst.transform.opacity,
+        rotation_rad: inst.transform.rotation_deg.to_radians(),
+        blend_mode,
+        _pad: 0,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

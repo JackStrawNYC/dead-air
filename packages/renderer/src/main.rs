@@ -153,6 +153,13 @@ struct Args {
     /// Range 0.25..=1.0.
     #[arg(long, default_value_t = 1.0)]
     scene_scale: f32,
+
+    /// Enable GPU overlay compositing (audit Wave 4.1 phase C). Builds an
+    /// atlas at startup and paints schedule overlays on the GPU output
+    /// texture in a single instanced draw call per frame instead of the
+    /// per-pixel CPU path. Falls back to CPU when overlay PNGs aren't loaded.
+    #[arg(long, default_value_t = false)]
+    gpu_overlays: bool,
 }
 
 fn main() {
@@ -532,6 +539,32 @@ fn main() {
 
     let _ = particle_system; // currently disabled in the loop; kept for future re-enable
 
+    // GPU overlay compositing setup (Wave 4.1 phase C). Only when --gpu-overlays
+    // is set AND we actually have overlays loaded; otherwise fall through to CPU.
+    let (gpu_overlay_atlas, gpu_overlay_pipeline) = if args.gpu_overlays && !overlay_image_cache.is_empty() {
+        println!("Overlays: building GPU atlas (Wave 4.1)...");
+        let atlas = overlay_atlas::build_atlas(overlay_image_cache.entries(), 4096)
+            .expect("build atlas");
+        println!(
+            "Overlays: atlas {}x{} packed ({} entries, {:.1}% utilization)",
+            atlas.width, atlas.height,
+            atlas.lookup.len(),
+            atlas.utilization * 100.0,
+        );
+        let pipeline = overlay_pass::OverlayCompositingPipeline::new(
+            renderer.device(),
+            renderer.queue(),
+            &atlas,
+            gpu::OUTPUT_FORMAT,
+        );
+        (Some(atlas), Some(pipeline))
+    } else {
+        if args.gpu_overlays {
+            eprintln!("Overlays: --gpu-overlays set but no overlay PNGs loaded — falling back to CPU compositor");
+        }
+        (None, None)
+    };
+
     let resources = render_loop::RenderResources {
         renderer: &mut renderer,
         manifest: &manifest,
@@ -562,6 +595,8 @@ fn main() {
         start_frame: start_idx,
         end_frame: end_idx,
         progress: &progress,
+        gpu_overlay_pipeline: gpu_overlay_pipeline.as_ref(),
+        gpu_overlay_atlas: gpu_overlay_atlas.as_ref(),
     };
     let _frames_written = render_loop::run(resources);
 
