@@ -10,6 +10,7 @@ pub mod gpu;
 pub mod intro;
 pub mod manifest;
 pub mod motion_blur;
+pub mod overlay_atlas;
 pub mod overlay_cache;
 pub mod postprocess;
 pub mod temporal;

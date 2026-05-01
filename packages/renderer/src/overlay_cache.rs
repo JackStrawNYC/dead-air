@@ -131,6 +131,12 @@ impl OverlayImageCache {
         self.cache.contains_key(overlay_id)
     }
 
+    /// Borrow the underlying cache map (for batch operations like atlas
+    /// packing — see `overlay_atlas::build_atlas`).
+    pub fn entries(&self) -> &HashMap<String, CachedOverlay> {
+        &self.cache
+    }
+
     /// Loaded overlay count.
     pub fn len(&self) -> usize {
         self.cache.len()

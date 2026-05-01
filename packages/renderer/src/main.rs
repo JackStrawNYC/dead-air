@@ -27,6 +27,7 @@ pub mod glsl_compat;
 mod gpu;
 pub mod intro;
 mod manifest;
+mod overlay_atlas;
 mod overlay_cache;
 mod motion_blur;
 mod postprocess;
