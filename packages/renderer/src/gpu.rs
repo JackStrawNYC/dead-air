@@ -110,6 +110,108 @@ pub const SCENE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba16Float;
 /// SDR output format for final readback and encoding.
 pub const OUTPUT_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8Unorm;
 
+/// One scene-rendering surface bundle at a particular LOD scale. The
+/// renderer holds N of these (one per active cost tier) so shaders can
+/// render at different resolutions in the same show — e.g. busted shaders
+/// at 0.5x, cheap shaders at 1.0x. All textures in a bundle share dims so
+/// `copy_texture_to_texture` (scene→feedback) is always legal within a
+/// bundle but not across bundles. Switching tiers between frames resets
+/// the feedback chain (the new tier's chain starts black).
+pub struct SceneTargets {
+    /// Diagnostic label, e.g. "full" / "slow" / "busted".
+    pub label: &'static str,
+    /// Render scale relative to output dims.
+    pub scale: f32,
+    /// Pixel dims of every texture in this bundle.
+    pub width: u32,
+    pub height: u32,
+    /// Primary scene render target (HDR). Scene fragments draw here.
+    pub scene_texture: wgpu::Texture,
+    pub scene_view: wgpu::TextureView,
+    /// Secondary scene render target (HDR) — transition pipeline draws
+    /// shader B here, then blends with scene_texture.
+    pub secondary_texture: wgpu::Texture,
+    pub secondary_view: wgpu::TextureView,
+    /// Ping-pong feedback chain. The render loop tracks an index 0/1 and
+    /// uses the *opposite* slot as `uPrevFrame` for the current frame,
+    /// then writes the current scene into the active slot.
+    pub feedback_a: wgpu::Texture,
+    pub feedback_a_view: wgpu::TextureView,
+    pub feedback_b: wgpu::Texture,
+    pub feedback_b_view: wgpu::TextureView,
+}
+
+impl SceneTargets {
+    fn new(device: &wgpu::Device, label: &'static str, scale: f32, output_w: u32, output_h: u32) -> Self {
+        let width = ((output_w as f32 * scale).round() as u32).max(64);
+        let height = ((output_h as f32 * scale).round() as u32).max(64);
+        let mk_render_target = |kind: &str| -> (wgpu::Texture, wgpu::TextureView) {
+            let t = device.create_texture(&wgpu::TextureDescriptor {
+                label: Some(&format!("scene_{}_{}_hdr", label, kind)),
+                size: wgpu::Extent3d { width, height, depth_or_array_layers: 1 },
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D2,
+                format: SCENE_FORMAT,
+                usage: wgpu::TextureUsages::RENDER_ATTACHMENT
+                    | wgpu::TextureUsages::TEXTURE_BINDING
+                    | wgpu::TextureUsages::COPY_SRC,
+                view_formats: &[],
+            });
+            let v = t.create_view(&wgpu::TextureViewDescriptor::default());
+            (t, v)
+        };
+        let mk_feedback = |kind: &str| -> (wgpu::Texture, wgpu::TextureView) {
+            let t = device.create_texture(&wgpu::TextureDescriptor {
+                label: Some(&format!("scene_{}_{}_feedback", label, kind)),
+                size: wgpu::Extent3d { width, height, depth_or_array_layers: 1 },
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D2,
+                format: SCENE_FORMAT,
+                usage: wgpu::TextureUsages::COPY_DST | wgpu::TextureUsages::TEXTURE_BINDING,
+                view_formats: &[],
+            });
+            let v = t.create_view(&wgpu::TextureViewDescriptor::default());
+            (t, v)
+        };
+        let (scene_texture, scene_view) = mk_render_target("scene");
+        let (secondary_texture, secondary_view) = mk_render_target("secondary");
+        let (feedback_a, feedback_a_view) = mk_feedback("a");
+        let (feedback_b, feedback_b_view) = mk_feedback("b");
+        Self {
+            label, scale, width, height,
+            scene_texture, scene_view,
+            secondary_texture, secondary_view,
+            feedback_a, feedback_a_view,
+            feedback_b, feedback_b_view,
+        }
+    }
+
+    /// Pick (prev_frame_view, target_texture) for ping-pong feedback.
+    /// `idx` is the active slot — caller writes here, reads from the other.
+    pub fn feedback_pair(&self, idx: usize) -> (&wgpu::TextureView, &wgpu::Texture) {
+        if idx == 0 {
+            (&self.feedback_b_view, &self.feedback_a)
+        } else {
+            (&self.feedback_a_view, &self.feedback_b)
+        }
+    }
+}
+
+/// Convert a CostTier to its index in tier_to_targets.
+/// Order matches the enum: Ok60, Ok30, Slow, Busted, Unknown.
+fn tier_index(tier: crate::shader_tiers::CostTier) -> usize {
+    use crate::shader_tiers::CostTier;
+    match tier {
+        CostTier::Ok60 => 0,
+        CostTier::Ok30 => 1,
+        CostTier::Slow => 2,
+        CostTier::Busted => 3,
+        CostTier::Unknown => 4,
+    }
+}
+
 pub struct GpuRenderer {
     device: wgpu::Device,
     queue: wgpu::Queue,
@@ -117,19 +219,14 @@ pub struct GpuRenderer {
     /// Output (final / readback) dimensions.
     width: u32,
     height: u32,
-    /// Scene-render dimensions. Equal to width/height by default; smaller when
-    /// `--scene-scale < 1.0` is set. Lets expensive procedural shaders run on
-    /// fewer pixels while output stays full-resolution (audit Wave 3.3 LOD).
-    scene_width: u32,
-    scene_height: u32,
 
-    // HDR scene render target (Rgba16Float) — shaders render here
-    scene_texture: wgpu::Texture,
-    scene_texture_view: wgpu::TextureView,
-
-    // Secondary HDR scene texture — for transition blending (shader B renders here)
-    secondary_texture: wgpu::Texture,
-    secondary_texture_view: wgpu::TextureView,
+    /// Scene-rendering surface bundles indexed by tier. Phase 1 has one
+    /// entry; Phase 2 will have one per active cost tier so per-frame LOD
+    /// works without per-frame texture allocation.
+    targets_pool: Vec<SceneTargets>,
+    /// Map CostTier (as u8) → index into `targets_pool`. Phase 1 always
+    /// points to 0; Phase 2 routes per-tier.
+    tier_to_targets: [usize; 5],
 
     // SDR output render target (Rgba8Unorm) — output pass writes here
     output_texture: wgpu::Texture,
@@ -167,7 +264,6 @@ pub struct GpuRenderer {
     // Output pass: HDR → SDR conversion
     output_bind_group_layout: wgpu::BindGroupLayout,
     output_pipeline: wgpu::RenderPipeline,
-    output_bind_group: wgpu::BindGroup,
 }
 
 impl GpuRenderer {
@@ -181,12 +277,32 @@ impl GpuRenderer {
 
     pub async fn new_with_scene_scale(width: u32, height: u32, scene_scale: f32) -> Result<Self, Box<dyn std::error::Error>> {
         let scene_scale = scene_scale.clamp(0.25, 1.0);
-        let scene_width = ((width as f32 * scene_scale).round() as u32).max(64);
-        let scene_height = ((height as f32 * scene_scale).round() as u32).max(64);
-        Self::new_inner(width, height, scene_width, scene_height).await
+        Self::new_with_tier_scales(width, height, &[("full", scene_scale)], &[0; 5]).await
     }
 
-    async fn new_inner(width: u32, height: u32, scene_width: u32, scene_height: u32) -> Result<Self, Box<dyn std::error::Error>> {
+    /// Create a renderer with multiple SceneTargets, one per (label, scale)
+    /// in `tiers`, and a `tier_to_targets` map indexed by `CostTier as u8`
+    /// pointing into that list. Phase 2 of adaptive scale uses this to
+    /// allocate a "full" + "slow" + "busted" trio at startup.
+    pub async fn new_with_tier_scales(
+        width: u32,
+        height: u32,
+        tiers: &[(&'static str, f32)],
+        tier_to_targets: &[usize; 5],
+    ) -> Result<Self, Box<dyn std::error::Error>> {
+        assert!(!tiers.is_empty(), "at least one (label, scale) tier required");
+        for (i, idx) in tier_to_targets.iter().enumerate() {
+            assert!(*idx < tiers.len(), "tier_to_targets[{}] = {} out of range (tiers.len() = {})", i, idx, tiers.len());
+        }
+        Self::new_inner(width, height, tiers, *tier_to_targets).await
+    }
+
+    async fn new_inner(
+        width: u32,
+        height: u32,
+        tier_scales: &[(&'static str, f32)],
+        tier_to_targets: [usize; 5],
+    ) -> Result<Self, Box<dyn std::error::Error>> {
         // ─── GPU adapter + device ───
         let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
             backends: wgpu::Backends::PRIMARY,
@@ -217,37 +333,12 @@ impl GpuRenderer {
             .await?;
 
         // ─── Textures ───
-
-        // HDR scene texture — shaders render to this (values can exceed 1.0).
-        // Sized to scene_width/scene_height (LOD scaling); postprocess sampler
-        // upscales to full output resolution when reading from this view.
-        // COPY_SRC needed for feedback buffer copy after scene render.
-        let scene_texture = device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("scene_texture_hdr"),
-            size: wgpu::Extent3d { width: scene_width, height: scene_height, depth_or_array_layers: 1 },
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: SCENE_FORMAT,
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT
-                | wgpu::TextureUsages::TEXTURE_BINDING
-                | wgpu::TextureUsages::COPY_SRC,
-            view_formats: &[],
-        });
-        let scene_texture_view = scene_texture.create_view(&wgpu::TextureViewDescriptor::default());
-
-        // Secondary HDR texture — for transition blending. Same dims as scene_texture.
-        let secondary_texture = device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("secondary_texture_hdr"),
-            size: wgpu::Extent3d { width: scene_width, height: scene_height, depth_or_array_layers: 1 },
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: SCENE_FORMAT,
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
-            view_formats: &[],
-        });
-        let secondary_texture_view = secondary_texture.create_view(&wgpu::TextureViewDescriptor::default());
+        // One SceneTargets bundle per requested tier. Each bundle holds its
+        // own scene/secondary/feedback textures so per-tier LOD doesn't
+        // require per-frame texture allocation.
+        let targets_pool: Vec<SceneTargets> = tier_scales.iter()
+            .map(|(label, scale)| SceneTargets::new(&device, label, *scale, width, height))
+            .collect();
 
         // SDR output texture — output pass writes here, then copied to readback buffer
         let output_texture = device.create_texture(&wgpu::TextureDescriptor {
@@ -456,21 +547,9 @@ impl GpuRenderer {
             cache: None,
         });
 
-        // Bind the HDR scene texture as input to the output pass
-        let output_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("output_bind_group"),
-            layout: &output_bind_group_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: wgpu::BindingResource::Sampler(&texture_sampler),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: wgpu::BindingResource::TextureView(&scene_texture_view),
-                },
-            ],
-        });
+        // The output_bind_group binds whichever scene texture the current
+        // frame rendered into. Since we now have one per tier, the bind
+        // group is built per-call; the small allocation cost is < 1µs.
 
         Ok(Self {
             device,
@@ -478,12 +557,8 @@ impl GpuRenderer {
             adapter_name,
             width,
             height,
-            scene_width,
-            scene_height,
-            scene_texture,
-            scene_texture_view,
-            secondary_texture,
-            secondary_texture_view,
+            targets_pool,
+            tier_to_targets,
             output_texture,
             output_texture_view,
             readback_buffers,
@@ -498,7 +573,6 @@ impl GpuRenderer {
             texture_sampler,
             output_bind_group_layout,
             output_pipeline,
-            output_bind_group,
         })
     }
 
@@ -514,14 +588,55 @@ impl GpuRenderer {
         &self.queue
     }
 
-    pub fn scene_texture_view(&self) -> &wgpu::TextureView {
-        &self.scene_texture_view
+    /// Default scene targets (the first allocated bundle). Equivalent to
+    /// `targets_for_tier(CostTier::Ok60)` for renderers built with
+    /// `new()` / `new_with_scene_scale()` (single bundle).
+    pub fn primary_targets(&self) -> &SceneTargets {
+        &self.targets_pool[0]
     }
 
-    /// Create a new owned texture view of the scene texture.
-    /// Use when you need the view separately from a mutable renderer borrow.
+    /// All allocated scene-target bundles in declaration order. Useful for
+    /// per-tier diagnostics + tests. Phase 1: always length 1.
+    pub fn targets_pool(&self) -> &[SceneTargets] {
+        &self.targets_pool
+    }
+
+    /// Look up the SceneTargets bundle assigned to a cost tier.
+    pub fn targets_for_tier(&self, tier: crate::shader_tiers::CostTier) -> &SceneTargets {
+        let idx = self.tier_to_targets[tier_index(tier)].min(self.targets_pool.len() - 1);
+        &self.targets_pool[idx]
+    }
+
+    /// Convenience: return the *index* into `targets_pool` for a tier.
+    /// render_loop uses this to detect tier transitions (resets feedback).
+    pub fn tier_target_index(&self, tier: crate::shader_tiers::CostTier) -> usize {
+        self.tier_to_targets[tier_index(tier)].min(self.targets_pool.len() - 1)
+    }
+
+    /// Build a fresh output_pipeline bind group for the given scene view.
+    /// The output pass samples one of N tier-specific scene textures, so
+    /// the bind group must be built per call rather than stored on Self.
+    fn output_bind_group_for(&self, scene_view: &wgpu::TextureView) -> wgpu::BindGroup {
+        self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("output_bind_group"),
+            layout: &self.output_bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry { binding: 0, resource: wgpu::BindingResource::Sampler(&self.texture_sampler) },
+                wgpu::BindGroupEntry { binding: 1, resource: wgpu::BindingResource::TextureView(scene_view) },
+            ],
+        })
+    }
+
+    /// Back-compat shim — returns the primary scene view. Existing tests
+    /// and render-loop sites that don't yet thread per-tier targets call
+    /// this. New code should call `primary_targets().scene_view`.
+    pub fn scene_texture_view(&self) -> &wgpu::TextureView {
+        &self.targets_pool[0].scene_view
+    }
+
+    /// Back-compat shim — owned scene view from the primary bundle.
     pub fn create_scene_view(&self) -> wgpu::TextureView {
-        self.scene_texture.create_view(&wgpu::TextureViewDescriptor::default())
+        self.targets_pool[0].scene_texture.create_view(&wgpu::TextureViewDescriptor::default())
     }
 
     pub fn vertex_buffer(&self) -> &wgpu::Buffer {
@@ -670,15 +785,17 @@ impl GpuRenderer {
         })
     }
 
-    /// Create a feedback texture (Rgba16Float, same size as scene texture).
-    /// Sized to scene_width/scene_height — scene→feedback copy must match dims.
-    /// Used for ping-pong feedback buffers (uPrevFrame).
+    /// Create a feedback texture sized to the **primary** scene targets.
+    /// Kept for tests + back-compat with single-tier callers; multi-tier
+    /// callers should use `targets_for_tier(tier).feedback_a/b` instead
+    /// (the bundle owns its own feedback chain).
     pub fn create_feedback_texture(&self, label: &str) -> (wgpu::Texture, wgpu::TextureView) {
+        let primary = &self.targets_pool[0];
         let texture = self.device.create_texture(&wgpu::TextureDescriptor {
             label: Some(label),
             size: wgpu::Extent3d {
-                width: self.scene_width,
-                height: self.scene_height,
+                width: primary.width,
+                height: primary.height,
                 depth_or_array_layers: 1,
             },
             mip_level_count: 1,
@@ -785,7 +902,7 @@ impl GpuRenderer {
             let mut rp = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("scene_only_pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &self.scene_texture_view,
+                    view: &self.targets_pool[0].scene_view,
                     resolve_target: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
@@ -809,14 +926,14 @@ impl GpuRenderer {
         if let Some(fb_tex) = feedback_target {
             encoder.copy_texture_to_texture(
                 wgpu::TexelCopyTextureInfo {
-                    texture: &self.scene_texture,
+                    texture: &self.targets_pool[0].scene_texture,
                     mip_level: 0, origin: wgpu::Origin3d::ZERO, aspect: wgpu::TextureAspect::All,
                 },
                 wgpu::TexelCopyTextureInfo {
                     texture: fb_tex,
                     mip_level: 0, origin: wgpu::Origin3d::ZERO, aspect: wgpu::TextureAspect::All,
                 },
-                wgpu::Extent3d { width: self.scene_width, height: self.scene_height, depth_or_array_layers: 1 },
+                wgpu::Extent3d { width: self.targets_pool[0].width, height: self.targets_pool[0].height, depth_or_array_layers: 1 },
             );
         }
 
@@ -891,7 +1008,7 @@ impl GpuRenderer {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("scene_pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &self.scene_texture_view,
+                    view: &self.targets_pool[0].scene_view,
                     resolve_target: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
@@ -917,7 +1034,7 @@ impl GpuRenderer {
         if let Some(fb_tex) = feedback_target {
             encoder.copy_texture_to_texture(
                 wgpu::TexelCopyTextureInfo {
-                    texture: &self.scene_texture,
+                    texture: &self.targets_pool[0].scene_texture,
                     mip_level: 0,
                     origin: wgpu::Origin3d::ZERO,
                     aspect: wgpu::TextureAspect::All,
@@ -945,19 +1062,19 @@ impl GpuRenderer {
                     &mut encoder,
                     &self.device,
                     &self.texture_sampler,
-                    &self.scene_texture_view,
+                    &self.targets_pool[0].scene_view,
                     prev_view,
-                    &self.secondary_texture_view,
+                    &self.targets_pool[0].secondary_view,
                     blend_strength,
                     &self.vertex_buffer,
                     &self.index_buffer,
                 );
-                &self.secondary_texture_view
+                &self.targets_pool[0].secondary_view
             } else {
-                &self.scene_texture_view
+                &self.targets_pool[0].scene_view
             }
         } else {
-            &self.scene_texture_view
+            &self.targets_pool[0].scene_view
         };
 
         // ─── Pass 2: Post-processing — HDR → SDR ───
@@ -976,6 +1093,7 @@ impl GpuRenderer {
             );
         } else {
             // Simple clamp pass (fallback when post-processing not initialized)
+            let bg = self.output_bind_group_for(&self.targets_pool[0].scene_view);
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("output_pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
@@ -992,7 +1110,7 @@ impl GpuRenderer {
             });
 
             render_pass.set_pipeline(&self.output_pipeline);
-            render_pass.set_bind_group(0, &self.output_bind_group, &[]);
+            render_pass.set_bind_group(0, &bg, &[]);
             render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
             render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
             render_pass.draw_indexed(0..QUAD_INDICES.len() as u32, 0, 0..1);
@@ -1119,7 +1237,7 @@ impl GpuRenderer {
             let mut rp = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("primary_pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &self.scene_texture_view,
+                    view: &self.targets_pool[0].scene_view,
                     resolve_target: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
@@ -1145,7 +1263,7 @@ impl GpuRenderer {
             let mut rp = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("secondary_pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &self.secondary_texture_view,
+                    view: &self.targets_pool[0].secondary_view,
                     resolve_target: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
@@ -1206,7 +1324,7 @@ impl GpuRenderer {
         if let Some(fb_tex) = feedback_target {
             encoder.copy_texture_to_texture(
                 wgpu::TexelCopyTextureInfo {
-                    texture: &self.scene_texture,
+                    texture: &self.targets_pool[0].scene_texture,
                     mip_level: 0,
                     origin: wgpu::Origin3d::ZERO,
                     aspect: wgpu::TextureAspect::All,
@@ -1217,7 +1335,7 @@ impl GpuRenderer {
                     origin: wgpu::Origin3d::ZERO,
                     aspect: wgpu::TextureAspect::All,
                 },
-                wgpu::Extent3d { width: self.scene_width, height: self.scene_height, depth_or_array_layers: 1 },
+                wgpu::Extent3d { width: self.targets_pool[0].width, height: self.targets_pool[0].height, depth_or_array_layers: 1 },
             );
         }
 
@@ -1231,8 +1349,8 @@ impl GpuRenderer {
                 &self.device,
                 &self.texture_sampler,
                 &fb_view,               // primary (copied from scene)
-                &self.secondary_texture_view,  // secondary
-                &self.scene_texture_view,      // output (scene_texture)
+                &self.targets_pool[0].secondary_view,  // secondary
+                &self.targets_pool[0].scene_view,      // output (scene_texture)
                 blend_progress,
                 blend_mode,
                 &self.vertex_buffer,
@@ -1243,7 +1361,7 @@ impl GpuRenderer {
             // frame's uPrevFrame sees the actual output, not the pre-blend primary.
             encoder.copy_texture_to_texture(
                 wgpu::TexelCopyTextureInfo {
-                    texture: &self.scene_texture,
+                    texture: &self.targets_pool[0].scene_texture,
                     mip_level: 0,
                     origin: wgpu::Origin3d::ZERO,
                     aspect: wgpu::TextureAspect::All,
@@ -1254,7 +1372,7 @@ impl GpuRenderer {
                     origin: wgpu::Origin3d::ZERO,
                     aspect: wgpu::TextureAspect::All,
                 },
-                wgpu::Extent3d { width: self.scene_width, height: self.scene_height, depth_or_array_layers: 1 },
+                wgpu::Extent3d { width: self.targets_pool[0].width, height: self.targets_pool[0].height, depth_or_array_layers: 1 },
             );
         }
 
@@ -1264,7 +1382,7 @@ impl GpuRenderer {
                 &mut encoder,
                 &self.device,
                 &self.texture_sampler,
-                &self.scene_texture_view,
+                &self.targets_pool[0].scene_view,
                 &self.output_texture_view,
                 pp_uniforms,
                 &self.vertex_buffer,
@@ -1272,6 +1390,7 @@ impl GpuRenderer {
                 skip_fxaa,
             );
         } else {
+            let bg = self.output_bind_group_for(&self.targets_pool[0].scene_view);
             let mut rp = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("output_pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
@@ -1287,7 +1406,7 @@ impl GpuRenderer {
                 occlusion_query_set: None,
             });
             rp.set_pipeline(&self.output_pipeline);
-            rp.set_bind_group(0, &self.output_bind_group, &[]);
+            rp.set_bind_group(0, &bg, &[]);
             rp.set_vertex_buffer(0, self.vertex_buffer.slice(..));
             rp.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
             rp.draw_indexed(0..6, 0, 0..1);

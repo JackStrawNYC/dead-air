@@ -34,6 +34,7 @@ mod motion_blur;
 mod postprocess;
 mod render_loop;
 mod shader_cache;
+mod shader_tiers;
 mod temporal;
 mod text_layers;
 mod transition;
