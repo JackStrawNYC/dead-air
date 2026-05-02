@@ -2236,6 +2236,40 @@ async function main() {
       // Source: first authored overlayBoost entry from songIdentity.
       const songHero: string | undefined = songIdentity?.overlayBoost?.[0];
 
+      // Song-level dominant stem section: pick the most-common stem
+      // classification across precomputed frame analysis. Was passed as
+      // undefined; overlay-rotation uses it to bias overlay families
+      // (vocal/solo/jam/quiet each pull different overlay sets).
+      let dominantStemSection: any = undefined;
+      try {
+        const stemCounts: Record<string, number> = {};
+        const sampleStride = Math.max(1, Math.floor(frames.length / 200));
+        for (let fi = 0; fi < frames.length; fi += sampleStride) {
+          const cached = preReactive[fi]; // reuse precompute pass — frame state has stemSection downstream
+          // Frame analysis hasn't run yet here; sample stem classification
+          // directly from the frame's drum/vocal/other ratios.
+          const drumE = (frames[fi]?.stemDrumRms ?? 0);
+          const vocalE = (frames[fi]?.stemVocalRms ?? 0);
+          const otherE = (frames[fi]?.stemOtherRms ?? 0);
+          const total = drumE + vocalE + otherE;
+          if (total < 0.05) {
+            stemCounts.quiet = (stemCounts.quiet ?? 0) + 1;
+          } else if (vocalE / total > 0.4) {
+            stemCounts.vocal = (stemCounts.vocal ?? 0) + 1;
+          } else if (otherE / total > 0.55) {
+            stemCounts.solo = (stemCounts.solo ?? 0) + 1;
+          } else {
+            stemCounts.jam = (stemCounts.jam ?? 0) + 1;
+          }
+        }
+        let topCount = 0;
+        for (const [k, v] of Object.entries(stemCounts)) {
+          if (v > topCount) { topCount = v; dominantStemSection = k; }
+        }
+      } catch {
+        dominantStemSection = undefined;
+      }
+
       // Build rotation schedule for this song
       const rotSchedule = buildRotationSchedule(
         overlayPool,
@@ -2249,8 +2283,8 @@ async function main() {
         undefined,          // mode
         songIdentity,
         showArcModifiers,
-        undefined,          // drumsSpacePhase
-        undefined,          // stemSectionType
+        undefined,                  // drumsSpacePhase (per-frame, can't be a song-level constant)
+        dominantStemSection,        // now wired from sampled stem-energy analysis
         showSongsCompleted, // songsCompleted
         songHero,           // now wired (was undefined)
         tempo,
