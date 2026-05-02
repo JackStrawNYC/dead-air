@@ -67,6 +67,7 @@ pub struct RenderResources<'a> {
 /// Run the full render loop. Returns the number of frames written.
 pub fn run(mut r: RenderResources<'_>) -> usize {
     let mut last_frame_idx: Option<usize> = None;
+    let mut last_targets_idx: Option<usize> = None;
     let mut pending_frame_idx: Option<usize> = None;
     let mut frames_written = 0usize;
 
@@ -145,6 +146,20 @@ pub fn run(mut r: RenderResources<'_>) -> usize {
         } else {
             primary_tier
         };
+
+        // Tier change detection: when the per-frame router switches from
+        // bundle A to bundle B, bundle B's feedback chain holds stale data
+        // (or zero on first use). Reset feedback_idx to 0 so the prev_frame
+        // sample reads the bundle's other slot (also zero) — fresh start
+        // for bundle B's feedback effect on this frame, valid pings on
+        // subsequent frames in the same bundle.
+        let target_idx_now = r.renderer.tier_target_index(tier_for_targets);
+        if let Some(last_idx) = last_targets_idx {
+            if last_idx != target_idx_now {
+                *r.feedback_idx = 0;
+            }
+        }
+        last_targets_idx = Some(target_idx_now);
 
         // Pull tier-correct feedback handles. `pick_tier_feedback` clones
         // wgpu Texture/TextureView (Arc internally, cheap) so the borrow
