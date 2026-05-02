@@ -511,13 +511,29 @@ function routeScene(
   // Priority 4: Section crossfade
   const sectionLen = routeState.sectionEndFrame - routeState.sectionStartFrame;
   const sectionProgress = sectionLen > 0 ? (frameIdx - routeState.sectionStartFrame) / sectionLen : 0;
-  // 15% of section, max 3s — scale by fps (90 frames = 3s at 30fps)
-  const fpsScale = (ctx as any).fps ? (ctx as any).fps / 30 : 2; // default 60fps = 2x
-  const crossfadeLen = Math.min(Math.round(90 * fpsScale), Math.floor(sectionLen * 0.15));
+  const fps = (ctx as any).fps ?? 60;
+  // dynamicCrossfadeDuration was imported but never called; the old
+  // hardcoded `min(90 * fpsScale, sectionLen * 0.15)` capped fades at
+  // 3s and produced sub-second crossfades for short sections — this
+  // is the "shader transitions felt abrupt" Cornell-feedback signal.
+  // The dynamic helper picks 2-12s based on quiet/loud context AND
+  // accounts for spectral flux at the boundary.
+  const dynamicLen = ctx.frames
+    ? dynamicCrossfadeDuration(
+        ctx.frames as any,
+        Math.max(0, Math.min(ctx.frames.length - 1, routeState.sectionStartFrame)),
+        60,
+        fps,
+      )
+    : Math.round(180 * (fps / 30)); // 6s default
+  const crossfadeLen = Math.min(dynamicLen, Math.max(1, Math.floor(sectionLen * 0.30)));
 
-  // Crossfade IN: first frames of a new section
-  if (sectionProgress < 0.15 && prevShaderId !== routeState.currentMode && crossfadeLen > 0) {
-    const crossfadeProgress = sectionProgress / 0.15;
+  // Crossfade IN: first frames of a new section. Window scales with
+  // crossfadeLen / sectionLen so even very long sections get the full
+  // dynamic fade (was capped at 15% of section).
+  const crossfadeWindow = sectionLen > 0 ? Math.min(0.45, crossfadeLen / sectionLen) : 0.15;
+  if (sectionProgress < crossfadeWindow && prevShaderId !== routeState.currentMode && crossfadeLen > 0) {
+    const crossfadeProgress = sectionProgress / crossfadeWindow;
     // Blend mode based on energy delta
     let blendMode = "dissolve";
     if (energy > 0.4) blendMode = "luminance_key";
