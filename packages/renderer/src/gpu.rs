@@ -16,11 +16,17 @@ struct Vertex {
     uv: [f32; 2],
 }
 
+// UV convention: V=0 at NDC y=-1 (bottom), V=1 at NDC y=+1 (top).
+// This matches Three.js / R3F's standard fullscreen pass — the convention the
+// Dead Air shaders were originally written against. With the inverted layout
+// (V=0 at top), shaders using `screenPos.y * camUpV` to drive 3D rays got
+// Y-flipped output: top of frame showed ground, bottom showed sky. River and
+// other 3D-camera shaders rendered upside-down relative to designer intent.
 const FULLSCREEN_QUAD: &[Vertex] = &[
-    Vertex { position: [-1.0, -1.0], uv: [0.0, 1.0] },
-    Vertex { position: [ 1.0, -1.0], uv: [1.0, 1.0] },
-    Vertex { position: [-1.0,  1.0], uv: [0.0, 0.0] },
-    Vertex { position: [ 1.0,  1.0], uv: [1.0, 0.0] },
+    Vertex { position: [-1.0, -1.0], uv: [0.0, 0.0] },
+    Vertex { position: [ 1.0, -1.0], uv: [1.0, 0.0] },
+    Vertex { position: [-1.0,  1.0], uv: [0.0, 1.0] },
+    Vertex { position: [ 1.0,  1.0], uv: [1.0, 1.0] },
 ];
 
 const QUAD_INDICES: &[u16] = &[0, 1, 2, 2, 1, 3];
