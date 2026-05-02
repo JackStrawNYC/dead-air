@@ -58,6 +58,7 @@ import { hashString } from "@dead-air/audio-core/hash";
 
 // ─── Overlay imports (for --with-overlays mode) ───
 import { buildRotationSchedule, getOverlayOpacities } from "../visualizer-poc/src/data/overlay-rotation.js";
+import { computeShowArcPhase, getShowArcModifiers } from "../visualizer-poc/src/data/show-arc.js";
 import { OVERLAY_REGISTRY, OVERLAY_BY_NAME, ALWAYS_ACTIVE } from "../visualizer-poc/src/data/overlay-registry.js";
 import { getEraPreset } from "../visualizer-poc/src/data/era-presets.js";
 import type { SectionBoundary, EnhancedFrameData } from "../visualizer-poc/src/data/types.js";
@@ -1103,6 +1104,12 @@ async function main() {
   // "transcendent moment" treatment in the second half of the show.
   const previousSongPeaks: number[] = [];
   let peakOfShowFired = false;
+  // Show-arc tracking: track songs-since-last-drums-space so post-jam
+  // songs get the post_space arc phase (changes overlay density,
+  // saturation/brightness via getShowArcModifiers). Was passed as
+  // undefined to buildRotationSchedule, leaving the whole show-arc
+  // narrative arc system unwired.
+  let postJamSegmentCount = -1; // -1 = no jam yet; 0 = currently in jam; >0 = N songs after
 
   const songStart = singleSongIdx >= 0 ? singleSongIdx : 0;
   const songEnd = singleSongIdx >= 0 ? singleSongIdx + 1 : songs.length;
@@ -2205,6 +2212,19 @@ async function main() {
         });
       }
 
+      // Show-arc phase: where in the show are we? Drives overlay density,
+      // saturation/brightness via getShowArcModifiers. Was passed as
+      // undefined; now computed per song from set/track/post-jam position.
+      const songsInThisSet = songs.filter((s: any) => (s.set ?? 1) === setNumber).length;
+      const arcPhase = computeShowArcPhase({
+        setNumber,
+        trackNumber: song.trackNumber ?? (songIdx + 1),
+        songsInSet: songsInThisSet,
+        isJamSegment: isDrumsSpace,
+        postJamSegmentCount: postJamSegmentCount > 0 ? postJamSegmentCount : 0,
+      });
+      const showArcModifiers = getShowArcModifiers(arcPhase);
+
       // Build rotation schedule for this song
       const rotSchedule = buildRotationSchedule(
         overlayPool,
@@ -2217,7 +2237,7 @@ async function main() {
         setlist.era ?? "primal",
         undefined,          // mode
         songIdentity,
-        undefined,          // showArcModifiers
+        showArcModifiers,   // now wired (was undefined)
         undefined,          // drumsSpacePhase
         undefined,          // stemSectionType
         showSongsCompleted, // songsCompleted
@@ -2454,6 +2474,12 @@ async function main() {
 
     globalTime += frames.length / afps;
     showSongsCompleted++;
+    // Track post-jam offset: 0 during a jam segment, increments after.
+    if (isDrumsSpace) {
+      postJamSegmentCount = 0;
+    } else if (postJamSegmentCount >= 0) {
+      postJamSegmentCount++;
+    }
     const songElapsed = ((Date.now() - songStartTime) / 1000).toFixed(1);
     console.log(`  ✓ ${song.title} done (${totalOut} frames in ${songElapsed}s, ${allFrames.length} total)`);
   }
