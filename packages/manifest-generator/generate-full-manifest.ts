@@ -2256,6 +2256,36 @@ async function main() {
         tempo,
       );
 
+      // Post-pass: apply songIdentity.overlaySuppress + overlayBoost to each
+      // rotation window. buildRotationSchedule honors overlayDensity but
+      // doesn't read suppress/boost lists (the score-aware overlay-selector
+      // does, but manifest-gen uses overlay-rotation instead). Without this
+      // pass, authored "no laser shows during this song" / "always show
+      // skeleton-couple" intent had ZERO effect.
+      const suppressSet = new Set(songIdentity?.overlaySuppress ?? []);
+      const boostList = songIdentity?.overlayBoost ?? [];
+      if (suppressSet.size > 0 || boostList.length > 0) {
+        for (const w of rotSchedule.windows) {
+          // Drop suppressed
+          if (suppressSet.size > 0) {
+            w.overlays = w.overlays.filter(name => !suppressSet.has(name));
+          }
+          // Force-include boost candidates that aren't already present
+          // (cap at original window size + 2 to avoid runaway density)
+          if (boostList.length > 0) {
+            const present = new Set(w.overlays);
+            const cap = w.overlays.length + 2;
+            for (const name of boostList) {
+              if (w.overlays.length >= cap) break;
+              if (!present.has(name) && OVERLAY_BY_NAME.has(name)) {
+                w.overlays.push(name);
+                present.add(name);
+              }
+            }
+          }
+        }
+      }
+
       // Get prominence data for blend mode mapping
       const prominenceMap = new Map<string, string>();
       for (const entry of OVERLAY_REGISTRY) {
