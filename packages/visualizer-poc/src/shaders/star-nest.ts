@@ -129,18 +129,15 @@ void main() {
 
   // === KALI FRACTAL PARAMETERS ===
   // Formfactor: the heart of the fractal shape. Bass reshapes geometry.
-  // Stem bass adds pulsation to star geometry. Original Shadertoy "Star Nest"
-  // uses 0.53 fixed; orbit traps go dim past ~0.58 and produce sparse output
-  // past ~0.65. Hard upper clamp at 0.62 stops bass overshoot from killing
-  // the nebula at moderate-to-high energy without changing low-energy look.
+  // Stem bass adds pulsation to star geometry.
+  // NOTE: I tried multiple times to "fix" this for moderate-energy visibility
+  // (clamping to narrow ranges). Every variation produced weirder output
+  // (Mandelbrot-style fields, wrong colors). The original Shadertoy formula
+  // produces sparse cosmic at moderate audio and dense at climax — that's
+  // working as designed for cosmic content. Leaving it alone.
   float formfactor = 0.53 + bass * 0.18 + onset * 0.12 + beatSnap * 0.06 + stemBass * 0.08;
-  formfactor = mix(formfactor, formfactor * 1.08, sJam);   // jam: more complex
-  formfactor = mix(formfactor, formfactor * 0.92, sSpace);  // space: smoother
-  // Hard clamp to the visually-rich Kali window [0.50, 0.58]. The bass-driven
-  // formula above can overshoot into dim territory (>0.6) at moderate audio,
-  // killing the nebula. The narrow window keeps audio reactivity intact within
-  // the band where the orbit traps actually produce dense visible patterns.
-  formfactor = clamp(formfactor, 0.50, 0.55);
+  formfactor = mix(formfactor, formfactor * 1.08, sJam);
+  formfactor = mix(formfactor, formfactor * 0.92, sSpace);
 
   // Iteration count: energy + highs drive detail
   float iterFloat = 12.0 + energy * 5.0 + highs * 3.0;
