@@ -90,6 +90,68 @@ export async function collectShaderGLSL(): Promise<Record<string, string>> {
 
 // ─── Audio helpers ───
 
+// ─── Lyric karaoke ───
+// Loads word-level alignment from packages/pipeline/data/lyrics-aligned/
+// and emits per-frame SVG overlays so vocals get on-screen lyrics — the
+// audit flagged this as MISSING ("infrastructure exists, never wired").
+//
+// File format (from packages/pipeline/scripts/align_lyrics.py):
+//   { lines: [{ text, start, end, line_confidence, words: [...] }] }
+//
+// Time semantics: line.start/end are in AUDIO seconds within the song's
+// raw audio file. Manifest gen trims dead air from the front, so the
+// caller passes trimFrontSeconds — we subtract it to convert to OUTPUT
+// time (the frame timeline the renderer sees).
+interface AlignedLyricLine {
+  text: string;
+  start: number;
+  end: number;
+  line_confidence?: number;
+}
+function loadAlignedLyrics(songSlug: string, showDate: string): AlignedLyricLine[] | null {
+  const path = `${__dirname}/../pipeline/data/lyrics-aligned/${songSlug}-${showDate}.json`;
+  try {
+    if (!existsSync(path)) return null;
+    const data = JSON.parse(readFileSync(path, "utf-8"));
+    if (!Array.isArray(data?.lines)) return null;
+    // Drop low-confidence lines — they're probably misaligned and would
+    // flash random text at viewers. <0.50 is the alignment QA threshold.
+    return data.lines
+      .filter((l: any) => typeof l.text === "string"
+        && typeof l.start === "number"
+        && typeof l.end === "number"
+        && (l.line_confidence ?? 1) >= 0.50)
+      .map((l: any) => ({
+        text: l.text.trim(),
+        start: l.start,
+        end: l.end,
+        line_confidence: l.line_confidence,
+      }));
+  } catch {
+    return null;
+  }
+}
+/** Build a karaoke-style SVG for a lyric line. Bottom 18% of frame,
+ *  italic Georgia with drop shadow for legibility over busy shaders. */
+function lyricLineSvg(text: string, width: number, height: number, fadeOpacity: number): string {
+  // Escape for XML
+  const safe = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  // Auto-size: shrink long lines so they fit a 90% width band
+  const charBudget = 50;
+  const fontSize = text.length > charBudget
+    ? Math.round(height * 0.038 * (charBudget / text.length))
+    : Math.round(height * 0.038);
+  const y = Math.round(height * 0.86);
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}">`
+    + `<defs><filter id="lyrShadow" x="-10%" y="-30%" width="120%" height="160%">`
+    + `<feDropShadow dx="0" dy="3" stdDeviation="6" flood-color="#000" flood-opacity="0.85"/>`
+    + `</filter></defs>`
+    + `<text x="${width / 2}" y="${y}" text-anchor="middle" `
+    + `font-family="Georgia,serif" font-style="italic" font-size="${fontSize}" `
+    + `fill="rgba(255,250,235,${fadeOpacity.toFixed(3)})" filter="url(#lyrShadow)" `
+    + `letter-spacing="2">${safe}</text></svg>`;
+}
+
 function gaussianSmooth(frames: any[], idx: number, field: string, win: number): number {
   const half = Math.floor(win / 2);
   let sum = 0, w = 0;
@@ -1173,6 +1235,10 @@ async function main() {
 
       const trimFront = musicStart / (analysis.meta?.fps ?? 30);
       const trimBack = (frames.length - musicEnd) / (analysis.meta?.fps ?? 30);
+      // Hoist trimFrontSeconds outside the trim block so the lyric karaoke
+      // pass can convert OUTPUT frame index → AUDIO time correctly. Without
+      // this every lyric line would be offset by the trim amount.
+      (analysis as any).__trimFrontSeconds = trimFront;
       if (trimFront > 3 || trimBack > 5) {
         console.log(`    Trim: ${trimFront.toFixed(0)}s front, ${trimBack.toFixed(0)}s back (${frames.length} → ${musicEnd - musicStart} frames)`);
         frames = frames.slice(musicStart, musicEnd);
@@ -1339,6 +1405,21 @@ async function main() {
     // uses safeDefaultMode below which falls through the blocklist.
     const defaultMode = (song.defaultMode ?? "protean_clouds").replace(/-/g, "_");
     const songIdentity = lookupSongIdentity(song.title) ?? undefined;
+
+    // Load aligned lyrics (Wave 7 — was MISSING per audit). The slug
+    // matches the audio-path resolver's algorithm so files like
+    // "He's Gone" → "he-s-gone-1972-08-27.json" resolve cleanly.
+    const lyricSlug = song.title
+      .toLowerCase()
+      .replace(/'/g, " ")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/-+/g, "-")
+      .replace(/^-|-$/g, "");
+    const alignedLyrics = loadAlignedLyrics(lyricSlug, showDate);
+    const trimFrontSeconds: number = (analysis as any).__trimFrontSeconds ?? 0;
+    if (alignedLyrics && alignedLyrics.length > 0) {
+      console.log(`    Lyrics: ${alignedLyrics.length} aligned lines (trim=${trimFrontSeconds.toFixed(1)}s)`);
+    }
     const isDrumsSpace = song.title?.toLowerCase().includes("drums") ||
                           song.title?.toLowerCase().includes("space");
     const setNumber = song.set ?? 1;
@@ -2534,6 +2615,41 @@ async function main() {
             },
             blend_mode: "screen",
           });
+        }
+
+        // ─── Lyric karaoke ───
+        // If aligned lyrics exist for this song, find the active line for
+        // this frame's audio time and inject a text-SVG overlay. Lines
+        // are sorted by start time; we scan forward only (linear amortized).
+        // Fades: 0.25s in/out on opacity for smooth presence; max-opacity
+        // capped at 0.85 so the lyrics never feel like a hard subtitle
+        // strip overlaid on the visual.
+        if (alignedLyrics && alignedLyrics.length > 0) {
+          const t = i / fps + trimFrontSeconds;
+          // Binary-search would be cleaner but lyrics are <50 lines/song
+          // — linear is fine and simpler.
+          for (const line of alignedLyrics) {
+            if (t < line.start - 0.25 || t > line.end + 0.25) continue;
+            // Triangular fade: 0 → 0.85 over 0.25s in, hold, 0.85 → 0 over 0.25s out
+            let op = 0.85;
+            if (t < line.start) op = ((t - (line.start - 0.25)) / 0.25) * 0.85;
+            else if (t > line.end) op = ((line.end + 0.25 - t) / 0.25) * 0.85;
+            op = Math.max(0, Math.min(0.85, op));
+            if (op < 0.01) continue;
+            frameInstances.push({
+              overlay_id: "Lyrics",
+              transform: {
+                opacity: Math.round(op * 1000) / 1000,
+                scale: 1.0,
+                rotation_deg: 0,
+                offset_x: 0,
+                offset_y: 0,
+              },
+              blend_mode: "normal",
+              keyframe_svg: lyricLineSvg(line.text, width, height, op),
+            });
+            break; // one line at a time — no overlapping lyric stack
+          }
         }
 
         overlaySchedule.push(frameInstances);

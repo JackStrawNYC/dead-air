@@ -421,6 +421,36 @@ ${
 }
   }
 
+  // ─── ERA FILM STOCK CHARACTER ───
+  // The audit flagged era authenticity as "just hue-shift, not film stock".
+  // This block adds real film characteristics scaled by uShowGrain (per-era
+  // value: primal/classic ≈ 1.3-1.8, touch_of_grey ≈ 1.0, revival ≈ 0.7-0.9).
+  // High grain = older film stock = lifted blacks + soft vignette + slight
+  // contrast reduction. Low grain = digital = no treatment.
+  {
+    // filmness: 0 (digital) → 1 (heavy super-8 / 1972 primal)
+    float filmness = clamp((uShowGrain - 0.8) / 0.8, 0.0, 1.0);
+    if (filmness > 0.01) {
+      // Lifted blacks: super-8 / 16mm don't crush to pure black.
+      // Lift the floor by 4% × filmness for that "warm darkness" feel.
+      col = max(col, vec3(0.04 * filmness));
+      // Soft contrast roll-off — film has lower dynamic range than digital.
+      // Pull values away from the extremes by a small amount.
+      vec3 midpoint = vec3(0.5);
+      col = mix(col, midpoint + (col - midpoint) * 0.92, filmness * 0.5);
+      // Period vignette: heavy on super-8, none on digital.
+      vec2 vCenter = uv - 0.5;
+      float vDist = length(vCenter);
+      float vign = 1.0 - smoothstep(0.45, 0.75, vDist) * 0.35 * filmness;
+      col *= vign;
+      // Slight warm cast in the shadows (silver halide tarnish — physical
+      // film aging gives warm lows). Highlights stay neutral.
+      float shadowMask = 1.0 - smoothstep(0.0, 0.4, dot(col, vec3(0.299, 0.587, 0.114)));
+      col.r += shadowMask * 0.025 * filmness;
+      col.g += shadowMask * 0.012 * filmness;
+    }
+  }
+
   // ─── PEAK OF SHOW: the once-per-show transcendent moment ───
   // detectPeakOfShow fires uPeakOfShow > 0.5 for ~7s at THE moment of the
   // show (deep set 2 jam climax, etc.). This applies a universal "golden
