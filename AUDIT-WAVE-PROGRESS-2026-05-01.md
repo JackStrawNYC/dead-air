@@ -71,13 +71,29 @@ Multi-commit execution against [`ARCHITECTURAL-AUDIT-2026-04.md`](./ARCHITECTURA
 - **4.2** Live Rust renderer mode
   - Phase A: `tests/live_mode_budget.rs` measures shader perf at 1080p on M3 Pro
   - Real data: cheap tier OK60, expensive tier needs LOD, volumetric tier too slow
-  - Phase B (cpal audio + DSP + winit window) deferred
+  - Phase B (cpal audio + DSP + winit window) deferred — user is local-only
 
-## Not yet started (large-scope)
-
-### Wave 3.5 — visualizer-poc package split (phase B, the actual move)
-- Inventory done; the move itself needs `git mv` + sed import rewrite + manifest-output equivalence test.
-- Plan in `MONOLITH-SPLIT-NOTES.md` — ~7 working days.
+### Wave 5 — adaptive LOD + GPU profiling + particles (May 2026 session)
+- **5.1** Per-shader cost baseline (Debt #12 closed)
+  - `tests/shader_cost_profile.rs` walks all 127 shaders at 360p
+  - `SHADER-COST-PROFILE-2026-05-02.md` is the optimization triage list
+  - Baseline: 80 OK60, 20 OK30, 12 SLOW, 15 BUSTED on M3 Pro
+- **5.2** Multi-tier per-frame `--scene-scale`
+  - `SceneTargets` bundle (scene + secondary + ping-pong feedback)
+  - `GpuRenderer` allocates one bundle per active cost tier
+  - render_loop routes per frame: BUSTED → 0.5x bundle, others stay full
+  - Transitions render through the smaller-scale bundle to fit the worst-case shader
+  - `--slow-scene-scale 0.75`, `--busted-scene-scale 0.5`, `--no-adaptive-scale`
+  - 3 multi_tier_render integration tests + all 8 GPU integration tests pass
+- **5.3** Particle system wired (Debt #15 closed)
+  - `compute.rs` was implemented but never called; now opt-in via `--particles N`
+  - Update + render run after scene/pp; double readback ping-pong wins
+  - Particle uniforms scale spawn rate with energy, turbulence with bass
+  - 2 particle_system_smoke tests confirm M3 Pro compute pipeline works
+- **5.4** Pre-flight gates batch
+  - `--strict-shaders`, `--strict-dimensions`, `--validate-only` (CI gates)
+  - Top-10 shader frame distribution printed every render
+  - GPU overlay atlas drops cross-checked vs schedule
 
 ### Wave 4.2 — Live Rust mode (phase B onwards)
 - Frame budget data in hand; needs cpal input, real-time DSP, winit window, reactive router port.
