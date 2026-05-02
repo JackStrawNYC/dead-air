@@ -909,8 +909,14 @@ function computeUniforms(
     // Era grading: Veneta 1972 = primal era, outdoor Oregon afternoon sunshine.
     // Strong golden warmth, rich saturation, visible sepia, analog 16mm feel.
     era_saturation: 1.20, era_brightness: 1.08, era_sepia: 0.15,
-    show_warmth: 0.25, show_contrast: 1.10, show_saturation: 1.15,
-    show_grain: 1.3, show_bloom: 1.15,
+    show_warmth: 0.25,
+    // climaxMod modulates bloom + contrast per-frame on top of the
+    // era-graded base so peak moments visibly bloom + sharpen.
+    // Half-weight (0.5x) so climax-band offsets don't overdrive.
+    show_contrast: 1.10 * (1 + ((analysis?.climaxMod?.contrastOffset ?? 0) * 0.5)),
+    show_saturation: 1.15,
+    show_grain: 1.3,
+    show_bloom: 1.15 * (1 + ((analysis?.climaxMod?.bloomOffset ?? 0) * 0.5)),
     // Dynamic params: quiet drifts slowly, peaks churn intensely
     // Dynamic params: glacial quiet, flowing peaks.
     // Fast energy adds phrase-level responsiveness on top of base speed.
