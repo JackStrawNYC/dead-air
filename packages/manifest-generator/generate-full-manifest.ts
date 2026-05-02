@@ -47,7 +47,7 @@ import { detectGroove, grooveModifiers } from "../visualizer-poc/src/utils/groov
 import { detectJamCycle } from "../visualizer-poc/src/utils/jam-cycles.js";
 import { getSectionVocabulary } from "../visualizer-poc/src/utils/section-vocabulary.js";
 import { computeNarrativeDirective } from "../visualizer-poc/src/utils/visual-narrator.js";
-import { detectPeakOfShow } from "../visualizer-poc/src/utils/peak-of-show.js";
+import { detectPeakOfShow, computeSongPeakScore } from "../visualizer-poc/src/utils/peak-of-show.js";
 import { findNearestBeat } from "../visualizer-poc/src/scenes/routing/beat-sync.js";
 import { dynamicCrossfadeDuration } from "../visualizer-poc/src/scenes/routing/crossfade-timing.js";
 import { getModeForSection } from "../visualizer-poc/src/scenes/routing/shader-variety.js";
@@ -1013,6 +1013,11 @@ async function main() {
   const usedShaderModes = new Map<string, number>();
   const shaderModeLastUsed = new Map<string, number>();
   let showSongsCompleted = 0;
+  // Peak-of-show state: detectPeakOfShow was imported but never called.
+  // Track per-song peak scores so the function can fire its one-time
+  // "transcendent moment" treatment in the second half of the show.
+  const previousSongPeaks: number[] = [];
+  let peakOfShowFired = false;
 
   const songStart = singleSongIdx >= 0 ? singleSongIdx : 0;
   const songEnd = singleSongIdx >= 0 ? singleSongIdx + 1 : songs.length;
@@ -1644,6 +1649,21 @@ async function main() {
 
       // Structural analysis (uses integer index — these are discrete state machines)
       const frameAnalysis = analyzeFrame(ctx, ai, prevState, smoothed);
+      // Peak-of-show: detect THE moment of the show (one-time, second
+      // half only). Mutate frameAnalysis.peakOfShow so the uniform
+      // lookup at line 849 picks it up, and latch peakOfShowFired at
+      // show level so it never fires again.
+      if (!peakOfShowFired) {
+        const ps = detectPeakOfShow(
+          frames as any, ai, previousSongPeaks,
+          peakOfShowFired, showSongsCompleted, songs.length,
+        );
+        if (ps.isActive) {
+          frameAnalysis.peakOfShow = { isPeak: true, intensity: ps.intensity };
+          peakOfShowFired = true;
+          console.log(`    [PEAK OF SHOW] frame ${i} (intensity=${ps.intensity.toFixed(2)}) — golden treatment armed`);
+        }
+      }
       prevState = frameAnalysis;
 
       // Scene routing with hold enforcement (prevents seizure-fast switching)
@@ -2304,6 +2324,15 @@ async function main() {
       startFrame: allFrames.length - totalOut,
       endFrame: allFrames.length,
     });
+
+    // Record this song's peak score so detectPeakOfShow can compare
+    // against subsequent songs.
+    try {
+      const songPeak = computeSongPeakScore(frames as any);
+      previousSongPeaks.push(songPeak);
+    } catch (e) {
+      // Non-fatal — fail open, peak detection just keeps trying
+    }
 
     globalTime += frames.length / afps;
     showSongsCompleted++;
