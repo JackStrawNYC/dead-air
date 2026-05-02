@@ -265,10 +265,17 @@ pub fn load_manifest(path: &Path) -> Result<Manifest, Box<dyn std::error::Error>
 /// shaders map. Each entry in `missing` is `(shader_id, count_of_frames)`.
 /// A missing shader silently renders as a black frame in the renderer's
 /// fallback path — this lets `main` warn or abort before that happens.
+///
+/// Also includes a frame-count distribution across all referenced shaders,
+/// which doubles as a "what does this show actually render" summary —
+/// useful when a render finishes and the user wants to know whether one
+/// shader dominated the frame count.
 #[derive(Debug)]
 pub struct ShaderValidationReport {
     /// Sorted by frame-count desc.
     pub missing: Vec<(String, usize)>,
+    /// All referenced shader_ids with their frame counts, sorted by count desc.
+    pub distribution: Vec<(String, usize)>,
     pub total_referenced: usize,
     pub frames_affected: usize,
     pub unique_shader_ids: usize,
@@ -304,6 +311,34 @@ impl ShaderValidationReport {
             eprintln!("  ... +{} more missing shader_ids", self.missing.len() - limit);
         }
     }
+
+    /// Print the top N shaders by frame count, with their share of total
+    /// frames. Run alongside `print()` to surface the show's shader mix —
+    /// catches both intentional dominance and routing bugs that pin one
+    /// shader for an entire show.
+    pub fn print_distribution(&self, top_n: usize) {
+        if self.distribution.is_empty() {
+            return;
+        }
+        let total = self.total_referenced.max(1) as f64;
+        let limit = self.distribution.len().min(top_n);
+        println!(
+            "Shaders: top {} by frame count (of {} unique, {} total refs):",
+            limit, self.distribution.len(), self.total_referenced,
+        );
+        for (id, count) in &self.distribution[..limit] {
+            let pct = 100.0 * (*count as f64) / total;
+            println!("  {:>5} ({:>5.1}%)  {}", count, pct, id);
+        }
+        if self.distribution.len() > limit {
+            let tail: usize = self.distribution[limit..].iter().map(|(_, c)| c).sum();
+            let tail_pct = 100.0 * (tail as f64) / total;
+            println!(
+                "  {:>5} ({:>5.1}%)  +{} other shader_ids",
+                tail, tail_pct, self.distribution.len() - limit,
+            );
+        }
+    }
 }
 
 impl Manifest {
@@ -335,11 +370,18 @@ impl Manifest {
         }
         let mut missing: Vec<(String, usize)> = missing_counts.into_iter().collect();
         missing.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+        let unique = counts.len();
+        let mut distribution: Vec<(String, usize)> = counts
+            .into_iter()
+            .map(|(k, v)| (k.to_string(), v))
+            .collect();
+        distribution.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
         ShaderValidationReport {
             missing,
+            distribution,
             total_referenced: total,
             frames_affected: affected,
-            unique_shader_ids: counts.len(),
+            unique_shader_ids: unique,
             available_shaders: self.shaders.len(),
         }
     }
@@ -467,6 +509,32 @@ mod tests {
         assert_eq!(r.missing[0].0, "also_missing");
         assert_eq!(r.missing[1].0, "nonexistent");
         assert_eq!(r.frames_affected, 2);
+    }
+
+    #[test]
+    fn validate_shader_refs_distribution_sorted_desc() {
+        let mut m = sample_manifest();
+        // sample_manifest already has 3 frames using "test_shader".
+        // Add 5 more frames using "popular" and 1 using "rare".
+        m.shaders.insert("popular".to_string(), "// glsl".to_string());
+        m.shaders.insert("rare".to_string(), "// glsl".to_string());
+        for i in 10..15 {
+            let mut f = sample_frame(i);
+            f.shader_id = "popular".to_string();
+            m.frames.push(f);
+        }
+        let mut rare = sample_frame(20);
+        rare.shader_id = "rare".to_string();
+        m.frames.push(rare);
+
+        let r = m.validate_shader_refs();
+        assert!(r.ok());
+        assert_eq!(r.distribution.len(), 3);
+        // Sorted by count desc: popular(5), test_shader(3), rare(1)
+        assert_eq!(r.distribution[0], ("popular".to_string(), 5));
+        assert_eq!(r.distribution[1], ("test_shader".to_string(), 3));
+        assert_eq!(r.distribution[2], ("rare".to_string(), 1));
+        assert_eq!(r.total_referenced, 9);
     }
 
     /// Cross-format equivalence: msgpack and json must produce equivalent manifests.

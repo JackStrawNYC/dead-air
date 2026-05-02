@@ -465,6 +465,7 @@ fn main() {
     // those typos / missing exports before render starts.
     let shader_validation = manifest.validate_shader_refs();
     shader_validation.print();
+    shader_validation.print_distribution(10);
     if !shader_validation.ok() && args.strict_shaders {
         eprintln!("Shaders: --strict-shaders set, aborting before render");
         std::process::exit(2);
