@@ -32,6 +32,11 @@ pub struct OverlayAtlas {
     pub lookup: HashMap<String, AtlasEntry>,
     /// Bytes used / total atlas size, for diagnostics.
     pub utilization: f32,
+    /// Overlay IDs that were too large or didn't fit in the remaining
+    /// shelves. Any schedule reference to one of these silently renders
+    /// as nothing under --gpu-overlays — main.rs cross-checks the
+    /// schedule and refuses the render under --strict-overlays.
+    pub skipped: Vec<String>,
 }
 
 /// Build a packed atlas from the loaded overlay cache.
@@ -111,6 +116,7 @@ pub fn build_atlas(
         height: atlas_size,
         lookup,
         utilization,
+        skipped,
     })
 }
 
@@ -174,6 +180,10 @@ mod tests {
         let atlas = build_atlas(&overlays, 256).expect("pack");
         assert!(!atlas.lookup.contains_key("huge"));
         assert!(atlas.lookup.contains_key("ok"));
+        // The dropped overlay must surface in `skipped` so main.rs can
+        // cross-check it against the schedule.
+        assert!(atlas.skipped.contains(&"huge".to_string()));
+        assert!(!atlas.skipped.contains(&"ok".to_string()));
     }
 
     #[test]

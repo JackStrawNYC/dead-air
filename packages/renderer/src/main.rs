@@ -636,6 +636,38 @@ fn main() {
             atlas.lookup.len(),
             atlas.utilization * 100.0,
         );
+
+        // Cross-check: did the atlas drop overlays the schedule actually
+        // references? Loaded-but-unfit overlays would silently render
+        // as nothing in the GPU compositor.
+        if !atlas.skipped.is_empty() {
+            let schedule_ids: std::collections::HashSet<&str> = manifest
+                .overlay_schedule
+                .as_ref()
+                .map(|sched| {
+                    sched.iter()
+                        .flat_map(|frame| frame.iter().map(|inst| inst.overlay_id.as_str()))
+                        .collect()
+                })
+                .unwrap_or_default();
+            let dropped_in_schedule: Vec<&String> = atlas.skipped.iter()
+                .filter(|id| schedule_ids.contains(id.as_str()))
+                .collect();
+            if !dropped_in_schedule.is_empty() {
+                eprintln!(
+                    "Overlays: ATLAS DROPPED {} schedule-referenced overlay(s) — they will silently render as nothing:",
+                    dropped_in_schedule.len(),
+                );
+                for id in dropped_in_schedule.iter().take(10) {
+                    eprintln!("  DROPPED: {}", id);
+                }
+                if args.strict_overlays {
+                    eprintln!("Overlays: --strict-overlays set, aborting before render");
+                    std::process::exit(2);
+                }
+            }
+        }
+
         let pipeline = overlay_pass::OverlayCompositingPipeline::new(
             renderer.device(),
             renderer.queue(),
