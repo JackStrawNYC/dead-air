@@ -7,6 +7,10 @@ Multi-commit execution against [`ARCHITECTURAL-AUDIT-2026-04.md`](./ARCHITECTURA
 ### Wave 1 — quick wins (full set)
 - **1.1** MessagePack manifest output (msgpackr ↔ rmp-serde, cross-language tested)
 - **1.2** Overlay pre-flight validation + `--strict-overlays` flag
+  - Sibling: shader_id pre-flight + `--strict-shaders` (mirrors overlay debt #7)
+  - Sibling: `--strict-dimensions` catches manifest-vs-CLI WxH/fps drift
+  - Sibling: `--validate-only` exits after pre-flight (CI gate, sub-second)
+  - Pre-flight now also prints top-10 shader frame distribution every render
 - **1.3** Split renderer `main.rs` 924→566 lines, render loop in `render_loop.rs`
 - **1.4** Workspace path resolution helpers in `@dead-air/core` + 6 tests
 - **1.5** Manifest generator extracted to `@dead-air/manifest-generator` package
