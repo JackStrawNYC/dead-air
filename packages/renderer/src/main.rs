@@ -178,13 +178,25 @@ struct Args {
     #[arg(long, default_value_t = 1.0)]
     scene_scale: f32,
 
-    /// Skip the manifest-aware auto-scale recommendation. Without this
-    /// flag, the renderer scans the manifest for BUSTED/SLOW shaders
-    /// (per the shader_tiers cost-baseline data) and may LOWER --scene-scale
-    /// to keep heavy frames within budget. Set this to use --scene-scale
-    /// verbatim regardless of the manifest's shader mix.
+    /// Disable per-tier multi-scale rendering. With this flag, all shaders
+    /// render at --scene-scale regardless of cost. Without it, the renderer
+    /// allocates separate scene-target bundles for SLOW and BUSTED shaders
+    /// at --slow-scene-scale and --busted-scene-scale, while OK60/OK30
+    /// shaders use the full --scene-scale.
     #[arg(long, default_value_t = false)]
     no_adaptive_scale: bool,
+
+    /// Render scale for SLOW-tier shaders (33-67ms p95 at 360p baseline).
+    /// Capped at --scene-scale (won't UPSCALE beyond user's base).
+    #[arg(long, default_value_t = 0.75)]
+    slow_scene_scale: f32,
+
+    /// Render scale for BUSTED-tier shaders (>67ms p95 at 360p baseline).
+    /// Capped at --scene-scale. The 15 BUSTED shaders in the baseline
+    /// (voronoi-flow, psychedelic-garden, etc.) take 4-5s/frame at 4K
+    /// without LOD; 0.5x cuts that to ~1s and makes 60fps achievable.
+    #[arg(long, default_value_t = 0.5)]
+    busted_scene_scale: f32,
 
     /// Enable GPU overlay compositing (audit Wave 4.1 phase C). Builds an
     /// atlas at startup and paints schedule overlays on the GPU output
@@ -438,48 +450,80 @@ fn main() {
         total_frames, args.width, args.height, args.fps, output_label
     );
 
-    // Adaptive scale: walk the manifest's shader_id distribution and pick a
-    // global scene_scale that keeps BUSTED-tier frames within frame budget.
-    // Conservative — only lowers scale when ≥3% of frames hit a heavy shader.
-    let effective_scene_scale = if args.no_adaptive_scale {
-        args.scene_scale
-    } else {
-        let frame_shader_iter = manifest.frames.iter().flat_map(|f| {
-            std::iter::once(f.shader_id.as_str())
-                .chain(f.secondary_shader_id.as_deref())
-        });
-        let (recommended, busted, slow, total) = dead_air_renderer::shader_tiers::recommend_global_scale(
-            frame_shader_iter, args.scene_scale,
-        );
-        if (recommended - args.scene_scale).abs() > 1e-3 {
-            let heavy_pct = 100.0 * (busted + slow) as f32 / total.max(1) as f32;
+    // ─── Per-tier adaptive scale ───
+    // Count tier hits in the manifest and allocate one SceneTargets bundle
+    // per active tier. OK60/OK30/Unknown share the "full" bundle at
+    // --scene-scale; SLOW gets its own at --slow-scene-scale; BUSTED gets
+    // its own at --busted-scene-scale. With --no-adaptive-scale, only the
+    // "full" bundle is allocated and every tier maps to it.
+    let mut busted_count = 0usize;
+    let mut slow_count = 0usize;
+    let mut total_refs = 0usize;
+    for f in &manifest.frames {
+        for sid in std::iter::once(f.shader_id.as_str()).chain(f.secondary_shader_id.as_deref()) {
+            match dead_air_renderer::shader_tiers::tier_for(sid) {
+                dead_air_renderer::shader_tiers::CostTier::Busted => busted_count += 1,
+                dead_air_renderer::shader_tiers::CostTier::Slow => slow_count += 1,
+                _ => {}
+            }
+            total_refs += 1;
+        }
+    }
+
+    let base_scale = args.scene_scale.clamp(0.25, 1.0);
+    let slow_scale = args.slow_scene_scale.clamp(0.25, 1.0).min(base_scale);
+    let busted_scale = args.busted_scene_scale.clamp(0.25, 1.0).min(base_scale);
+
+    let mut tier_scales: Vec<(&'static str, f32)> = vec![("full", base_scale)];
+    let mut full_idx = 0usize;
+    let mut slow_idx = 0usize;
+    let mut busted_idx = 0usize;
+    if !args.no_adaptive_scale && slow_count > 0 && (slow_scale - base_scale).abs() > 1e-3 {
+        slow_idx = tier_scales.len();
+        tier_scales.push(("slow", slow_scale));
+    }
+    if !args.no_adaptive_scale && busted_count > 0 && (busted_scale - base_scale).abs() > 1e-3 {
+        busted_idx = tier_scales.len();
+        tier_scales.push(("busted", busted_scale));
+    }
+    // Default both to "full" if no separate bundle was allocated.
+    if slow_idx == 0 { slow_idx = full_idx; }
+    if busted_idx == 0 { busted_idx = full_idx; }
+    let _ = full_idx;
+    // tier_to_targets indexed by [Ok60, Ok30, Slow, Busted, Unknown] = u8.
+    let tier_to_targets = [0, 0, slow_idx, busted_idx, 0];
+
+    if total_refs > 0 {
+        let heavy_pct = 100.0 * (busted_count + slow_count) as f32 / total_refs as f32;
+        if tier_scales.len() == 1 {
             println!(
-                "Adaptive scale: manifest is {:.1}% heavy ({} BUSTED + {} SLOW of {} refs) — lowering --scene-scale {:.2} → {:.2} (override with --no-adaptive-scale)",
-                heavy_pct, busted, slow, total, args.scene_scale, recommended,
+                "Adaptive scale: single bundle at {:.2}x ({} BUSTED + {} SLOW of {} refs = {:.1}%)",
+                base_scale, busted_count, slow_count, total_refs, heavy_pct,
             );
-        } else if busted > 0 || slow > 0 {
-            let heavy_pct = 100.0 * (busted + slow) as f32 / total.max(1) as f32;
+        } else {
+            let labels: Vec<String> = tier_scales.iter()
+                .map(|(l, s)| format!("{}={:.2}x", l, s))
+                .collect();
             println!(
-                "Adaptive scale: {:.1}% heavy ({} BUSTED + {} SLOW of {} refs) — below 3% threshold, keeping --scene-scale {:.2}",
-                heavy_pct, busted, slow, total, args.scene_scale,
+                "Adaptive scale: {} bundles ({}) — {} BUSTED + {} SLOW of {} refs ({:.1}% heavy)",
+                tier_scales.len(), labels.join(", "),
+                busted_count, slow_count, total_refs, heavy_pct,
             );
         }
-        recommended
-    };
+    }
 
     // Initialize GPU
     let start = Instant::now();
     let mut renderer = pollster::block_on(
-        gpu::GpuRenderer::new_with_scene_scale(args.width, args.height, effective_scene_scale)
+        gpu::GpuRenderer::new_with_tier_scales(args.width, args.height, &tier_scales, &tier_to_targets)
     ).expect("Failed to initialize GPU");
-    if (effective_scene_scale - 1.0).abs() > 1e-3 {
-        println!(
-            "Scene LOD: rendering at {:.0}% of output ({}x{} scene → {}x{} output)",
-            effective_scene_scale * 100.0,
-            (args.width as f32 * effective_scene_scale) as u32,
-            (args.height as f32 * effective_scene_scale) as u32,
-            args.width, args.height,
-        );
+    for t in renderer.targets_pool() {
+        if (t.scale - 1.0).abs() > 1e-3 || tier_scales.len() > 1 {
+            println!(
+                "  bundle '{}': {}x{} ({:.0}% of output)",
+                t.label, t.width, t.height, t.scale * 100.0,
+            );
+        }
     }
 
     println!(
@@ -489,8 +533,8 @@ fn main() {
     );
 
     // ─── Create feedback + FFT textures ───
-    let (feedback_a, feedback_a_view) = renderer.create_feedback_texture("feedback_a");
-    let (feedback_b, feedback_b_view) = renderer.create_feedback_texture("feedback_b");
+    // Per-tier feedback chains live inside renderer.targets_pool — render_loop
+    // sources them via renderer.pick_tier_feedback(tier, write_slot).
     let (fft_texture, fft_view) = renderer.create_fft_texture();
     let mut feedback_idx: usize = 0; // 0 = write to A, read from B; 1 = write to B, read from A
     let mut lighting_state = uniforms::LightingState::default();
@@ -733,10 +777,6 @@ fn main() {
         transition_pipeline: &transition_pipeline,
         temporal_pipeline: &temporal_pipeline,
         motion_blur_pipeline: &motion_blur_pipeline,
-        feedback_a: &feedback_a,
-        feedback_b: &feedback_b,
-        feedback_a_view: &feedback_a_view,
-        feedback_b_view: &feedback_b_view,
         fft_texture: &fft_texture,
         fft_view: &fft_view,
         lighting_state: &mut lighting_state,

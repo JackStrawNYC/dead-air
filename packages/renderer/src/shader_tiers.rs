@@ -147,49 +147,6 @@ pub fn scale_for(shader_id: &str, base: f32, busted_scale: f32) -> f32 {
     }
 }
 
-/// Pick a global scene_scale based on what fraction of the manifest's
-/// frames hit BUSTED or SLOW shaders. The renderer currently has one
-/// scene_texture per render — true per-frame LOD requires multi-scale
-/// texture allocation which is a separate follow-up.
-///
-/// Policy: lean conservative — only drop scale when the heavy frames are
-/// a meaningful chunk of the show, since dropping scale also softens the
-/// cheap shaders (which is most of the show).
-///
-///   busted+slow share        recommended scale
-///   ────────────────────     ─────────────────
-///   ≥ 25%                    0.5
-///   ≥ 10%                    0.625
-///   ≥ 3%                      0.75
-///   < 3%                      base (no override)
-///
-/// Returns `(recommended_scale, busted_count, slow_count, total_frames)`.
-pub fn recommend_global_scale<I, S>(shader_ids: I, base: f32) -> (f32, usize, usize, usize)
-where
-    I: IntoIterator<Item = S>,
-    S: AsRef<str>,
-{
-    let mut busted = 0usize;
-    let mut slow = 0usize;
-    let mut total = 0usize;
-    for id in shader_ids {
-        match tier_for(id.as_ref()) {
-            CostTier::Busted => busted += 1,
-            CostTier::Slow => slow += 1,
-            _ => {}
-        }
-        total += 1;
-    }
-    if total == 0 {
-        return (base, 0, 0, 0);
-    }
-    let heavy_share = (busted + slow) as f32 / total as f32;
-    let recommended = if heavy_share >= 0.25 { 0.5 }
-        else if heavy_share >= 0.10 { 0.625 }
-        else if heavy_share >= 0.03 { 0.75 }
-        else { base };
-    (recommended.min(base), busted, slow, total)
-}
 
 #[cfg(test)]
 mod tests {
@@ -231,53 +188,4 @@ mod tests {
         assert_eq!(scale_for("amber-drift", 0.75, 0.5), 0.75);
     }
 
-    #[test]
-    fn recommend_global_scale_no_heavy_frames() {
-        let (scale, b, s, t) = recommend_global_scale(
-            ["amber-drift", "ember-meadow", "neon-grid"],
-            1.0,
-        );
-        assert_eq!(scale, 1.0);
-        assert_eq!((b, s, t), (0, 0, 3));
-    }
-
-    #[test]
-    fn recommend_global_scale_majority_busted() {
-        // 3 busted + 1 cheap = 75% heavy → 0.5
-        let (scale, b, _s, t) = recommend_global_scale(
-            ["voronoi-flow", "psychedelic-garden", "bioluminescence", "amber-drift"],
-            1.0,
-        );
-        assert_eq!(scale, 0.5);
-        assert_eq!(b, 3);
-        assert_eq!(t, 4);
-    }
-
-    #[test]
-    fn recommend_global_scale_minor_busted() {
-        // 1 busted + 19 cheap = 5% heavy → 0.75
-        let mut frames: Vec<&str> = vec!["voronoi-flow"];
-        frames.extend(std::iter::repeat("amber-drift").take(19));
-        let (scale, b, _s, t) = recommend_global_scale(frames, 1.0);
-        assert_eq!(scale, 0.75);
-        assert_eq!(b, 1);
-        assert_eq!(t, 20);
-    }
-
-    #[test]
-    fn recommend_global_scale_respects_base() {
-        // User asked for 0.4; recommendation can't UPSCALE above that.
-        let (scale, _, _, _) = recommend_global_scale(
-            ["voronoi-flow", "psychedelic-garden", "bioluminescence", "amber-drift"],
-            0.4,
-        );
-        assert_eq!(scale, 0.4);
-    }
-
-    #[test]
-    fn recommend_global_scale_empty_manifest() {
-        let (scale, b, s, t) = recommend_global_scale(std::iter::empty::<&str>(), 0.85);
-        assert_eq!(scale, 0.85);
-        assert_eq!((b, s, t), (0, 0, 0));
-    }
 }

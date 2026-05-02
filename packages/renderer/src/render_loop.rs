@@ -31,10 +31,7 @@ pub struct RenderResources<'a> {
     pub temporal_pipeline: &'a temporal::TemporalBlendPipeline,
     pub motion_blur_pipeline: &'a motion_blur::MotionBlurPipeline,
 
-    pub feedback_a: &'a wgpu::Texture,
-    pub feedback_b: &'a wgpu::Texture,
-    pub feedback_a_view: &'a wgpu::TextureView,
-    pub feedback_b_view: &'a wgpu::TextureView,
+    /// FFT texture is shared across tiers (it's a 64x1 audio-data texture).
     pub fft_texture: &'a wgpu::Texture,
     pub fft_view: &'a wgpu::TextureView,
 
@@ -117,27 +114,54 @@ pub fn run(mut r: RenderResources<'_>) -> usize {
             .map(|i| i.texture_info.needs_prev_frame || i.texture_info.needs_fft)
             .unwrap_or(false);
 
-        let prev_frame_view = if *r.feedback_idx == 0 { r.feedback_b_view } else { r.feedback_a_view };
+        // Per-tier routing: pick the SceneTargets bundle for this shader.
+        // Transitions use the smaller-scale of (primary, secondary) so the
+        // worst-case shader fits its budget; the cheap one downscales for
+        // the brief transition window.
+        let primary_tier = crate::shader_tiers::tier_for(&frame.shader_id);
+        let has_transition = frame.secondary_shader_id.is_some() && frame.blend_progress.is_some();
+        let tier_for_targets = if has_transition {
+            // pick_transition_target_idx picks the smaller-scale bundle;
+            // we then look up which tier maps to that index by re-applying
+            // tier_target_index to both candidates and taking the one whose
+            // index won. Cheaper: just hand both tiers to renderer and let
+            // it return the chosen index, then derive a "synthetic tier".
+            let secondary_tier = crate::shader_tiers::tier_for(
+                frame.secondary_shader_id.as_deref().unwrap_or(""),
+            );
+            let chosen_idx = r.renderer.pick_transition_target_idx(primary_tier, secondary_tier);
+            if chosen_idx == r.renderer.tier_target_index(primary_tier) {
+                primary_tier
+            } else {
+                secondary_tier
+            }
+        } else {
+            primary_tier
+        };
+
+        // Pull tier-correct feedback handles. `pick_tier_feedback` clones
+        // wgpu Texture/TextureView (Arc internally, cheap) so the borrow
+        // ends here and the &mut renderer calls below are unblocked.
+        let tf = r.renderer.pick_tier_feedback(tier_for_targets, *r.feedback_idx);
+
         let texture_bind_group = if needs_textures {
-            Some(r.renderer.create_texture_bind_group(prev_frame_view, r.fft_view))
+            Some(r.renderer.create_texture_bind_group(&tf.prev_frame_view, r.fft_view))
         } else {
             None
         };
-        let feedback_target = if *r.feedback_idx == 0 { r.feedback_a } else { r.feedback_b };
 
         let uniform_data = uniforms::build_uniform_buffer(frame, r.width, r.height, r.lighting_state);
 
         let pp_uniforms = build_pp_uniforms(frame, r.width, r.height);
 
         // Temporal blend strength: stronger for quiet/ambient, off during transitions.
-        let has_transition = frame.secondary_shader_id.is_some() && frame.blend_progress.is_some();
         let temporal_strength = if has_transition {
             0.0
         } else {
             0.03 + (1.0 - frame.energy.min(1.0)) * 0.12
         };
         let _temporal_param = if temporal_strength > 0.001 {
-            Some((r.temporal_pipeline, prev_frame_view, temporal_strength))
+            Some((r.temporal_pipeline, &tf.prev_frame_view, temporal_strength))
         } else {
             None
         };
@@ -151,13 +175,14 @@ pub fn run(mut r: RenderResources<'_>) -> usize {
                 let sec_needs_tex = sec_info.texture_info.needs_prev_frame
                     || sec_info.texture_info.needs_fft;
                 let sec_tex_bg = if sec_needs_tex {
-                    Some(r.renderer.create_texture_bind_group(prev_frame_view, r.fft_view))
+                    Some(r.renderer.create_texture_bind_group(&tf.prev_frame_view, r.fft_view))
                 } else {
                     None
                 };
                 let blend_mode_str = frame.blend_mode.as_deref().unwrap_or("dissolve");
 
-                r.renderer.render_frame_with_transition(
+                r.renderer.render_frame_with_transition_idx(
+                    tf.bundle_idx,
                     pipeline,
                     &sec_info.pipeline,
                     &uniform_data,
@@ -165,15 +190,16 @@ pub fn run(mut r: RenderResources<'_>) -> usize {
                     sec_tex_bg.as_ref(),
                     blend_prog,
                     blend_mode_str,
-                    Some(feedback_target),
+                    Some(&tf.feedback_target),
                     if r.no_pp { None } else { Some((r.pp_pipeline, &pp_uniforms)) },
                     r.transition_pipeline,
                     skip_fxaa,
                 );
             } else {
-                r.renderer.render_frame(
+                r.renderer.render_frame_idx(
+                    tf.bundle_idx,
                     pipeline, &uniform_data,
-                    texture_bind_group.as_ref(), Some(feedback_target),
+                    texture_bind_group.as_ref(), Some(&tf.feedback_target),
                     if r.no_pp { None } else { Some((r.pp_pipeline, &pp_uniforms)) },
                     None,
                     skip_fxaa,
@@ -190,10 +216,11 @@ pub fn run(mut r: RenderResources<'_>) -> usize {
                 sub_uniform_data[0..4].copy_from_slice(&(frame.time + sub_offset).to_le_bytes());
                 sub_uniform_data[4..8].copy_from_slice(&(frame.dynamic_time + sub_offset).to_le_bytes());
 
-                r.renderer.render_scene_to_hdr(
+                r.renderer.render_scene_to_hdr_idx(
+                    tf.bundle_idx,
                     pipeline, &sub_uniform_data,
                     texture_bind_group.as_ref(),
-                    if s == 0 { Some(feedback_target) } else { None },
+                    if s == 0 { Some(&tf.feedback_target) } else { None },
                 );
 
                 let mut encoder = r.renderer.device().create_command_encoder(
@@ -201,7 +228,7 @@ pub fn run(mut r: RenderResources<'_>) -> usize {
                 );
                 r.motion_blur_pipeline.accumulate_sub_frame(
                     &mut encoder, r.renderer.device(), &r.renderer.texture_sampler,
-                    r.renderer.scene_texture_view(), weight, s == 0,
+                    &tf.scene_view, weight, s == 0,
                     r.renderer.vertex_buffer(), r.renderer.index_buffer(),
                 );
                 r.renderer.queue().submit(std::iter::once(encoder.finish()));
@@ -215,22 +242,21 @@ pub fn run(mut r: RenderResources<'_>) -> usize {
                 );
             }
         } else {
-            r.renderer.render_scene_to_hdr(
+            r.renderer.render_scene_to_hdr_idx(
+                tf.bundle_idx,
                 pipeline, &uniform_data,
-                texture_bind_group.as_ref(), Some(feedback_target),
+                texture_bind_group.as_ref(), Some(&tf.feedback_target),
             );
             if r.no_pp {
-                let scene_view = r.renderer.create_scene_view();
-                r.renderer.scene_to_readback(&scene_view);
+                r.renderer.scene_to_readback(&tf.scene_view);
             } else {
-                let scene_view = r.renderer.create_scene_view();
-                r.renderer.postprocess_and_readback(r.pp_pipeline, &pp_uniforms, &scene_view, skip_fxaa);
+                r.renderer.postprocess_and_readback(r.pp_pipeline, &pp_uniforms, &tf.scene_view, skip_fxaa);
             }
         }
 
         // Visual effect pass (post-processing transform, in-place).
         apply_effect_pass(
-            r.renderer, r.effect_pipeline, prev_frame_view, frame,
+            r.renderer, r.effect_pipeline, &tf.prev_frame_view, frame,
             r.effect_mode_override, r.effect_intensity_override,
             r.width, r.height,
         );
