@@ -112,11 +112,41 @@ Plus per-song variety enforcement (50% cap), thin-identity drop (when
 (3D-mesh shader, vWorldPos compile fail), msgpack direct output for
 full-show (avoids Node 512MB string limit).
 
-Veneta v3 validation (1920x1080@30fps, 349,507 frames):
-- Total unique shaders: 21 → **66** (catalog utilization 24% → 76%)
-- BUSTED unique: 2 → **11** (the user's "only 4 heavy shaders" complaint)
-- SLOW unique: 2 → **6**
-- 66/66 shaders compile cleanly (forest blocklisted)
+**Round 2 (continuation)** — more dead-data wirings:
+- **6.4** `narrative` directive applied (brightness/saturation/temperature
+  offsets — was computed every frame, never read)
+- **6.5** `sectionVocab` brightness/saturation offsets applied
+- **6.6** `grooveModifiers` temperatureShift applied (±10° hue)
+- **6.7** `climaxModulation` brightness/saturation half-weight applied
+- **6.8** `climaxModulation` bloom + contrast → per-frame `show_bloom`/
+  `show_contrast` (was hardcoded constants)
+- **6.9** Overlay density chain: narrative + vocab + interplay + peak
+  multiplied into per-frame opacity (was dropped)
+- **6.10** Drums/Space override expanded from 1 hardcoded shader per
+  subphase to 5-element pools (cosmic_voyage was 11.7% of frames
+  despite being blocklisted)
+- **6.11** DUAL_POOLS blocklist cleanup — 5 entries removed
+  (cosmic_voyage / protean_clouds / fluid_2d / particle_nebula /
+  bioluminescence) so dual blends no longer render black secondaries
+- **6.12** Reactive triggers field-name mismatch fix —
+  `triggered`/`shaderPool` → `isTriggered`/`suggestedModes`. Whole
+  reactive system was dead code in manifest gen.
+- **6.13** `safeDefaultMode` — plugged 3 raw-defaultMode leaks that let
+  blocklisted shaders into prevShaderId / routeScene. protean_clouds
+  was 4.5% of frames despite being blocked.
+- **6.14** `showArcModifiers` wired — was passed as undefined.
+  computeShowArcPhase now drives per-song arc treatment.
+- **6.15** `songHero` wired from songIdentity.overlayBoost[0] — each
+  song's signature overlay is now guaranteed to appear.
+
+Veneta final validation (1920x1080@30fps, 349,507 frames):
+- Total unique shaders: 21 → **60** (catalog utilization 24% → 69%)
+- BUSTED unique: 2 → **11**
+- SLOW unique: 2 → **7**
+- 60/60 shaders compile cleanly (forest blocklisted)
+- protean_clouds (BLOCKED) frames: leaking → **0%**
+- cosmic_voyage (BLOCKED) frames: 11.7% → **0%**
+- Top shader dominance: void_light 18.5% → fluid_light 12.5% (flatter)
 
 ### Wave 4.2 — Live Rust mode (phase B onwards)
 - Frame budget data in hand; needs cpal input, real-time DSP, winit window, reactive router port.
