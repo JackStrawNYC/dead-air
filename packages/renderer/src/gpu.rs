@@ -16,22 +16,22 @@ struct Vertex {
     uv: [f32; 2],
 }
 
-// UV: V=0 at NDC y=-1 (bottom), V=1 at NDC y=+1 (top).
-// Matches Three.js / R3F convention used by the original Dead Air shaders.
-// The previously inverted layout caused 3D-camera shaders (river, ocean,
-// forest, etc.) to render upside-down — sky at bottom, ground at top —
-// because `screenPos.y * camUpV` in the shaders points UP for positive
-// screenPos.y, but the inverted UV made screenPos.y negative at frame top.
+// Image-convention UV: V=0 at NDC top, V=1 at NDC bottom. Matches the
+// stored row order of textures (textureSample uses V=0 at top of data),
+// so postprocess + output passes can sample scene_texture without a
+// per-call flip. Scene shaders that expect Three.js convention
+// (V=1 at top) get a V-flip in their dedicated vertex shader below.
 const FULLSCREEN_QUAD: &[Vertex] = &[
-    Vertex { position: [-1.0, -1.0], uv: [0.0, 0.0] },
-    Vertex { position: [ 1.0, -1.0], uv: [1.0, 0.0] },
-    Vertex { position: [-1.0,  1.0], uv: [0.0, 1.0] },
-    Vertex { position: [ 1.0,  1.0], uv: [1.0, 1.0] },
+    Vertex { position: [-1.0, -1.0], uv: [0.0, 1.0] },
+    Vertex { position: [ 1.0, -1.0], uv: [1.0, 1.0] },
+    Vertex { position: [-1.0,  1.0], uv: [0.0, 0.0] },
+    Vertex { position: [ 1.0,  1.0], uv: [1.0, 0.0] },
 ];
 
 const QUAD_INDICES: &[u16] = &[0, 1, 2, 2, 1, 3];
 
-/// The vertex shader is constant — just passes through position and UV.
+/// Vertex shader for postprocess + output passes — passthrough UV (image
+/// convention: V=0 at top of frame, matching textureSample orientation).
 const VERTEX_SHADER_WGSL: &str = r#"
 struct VertexInput {
     @location(0) position: vec2<f32>,
@@ -48,6 +48,36 @@ fn vs_main(in: VertexInput) -> VertexOutput {
     var out: VertexOutput;
     out.clip_position = vec4<f32>(in.position, 0.0, 1.0);
     out.uv = in.uv;
+    return out;
+}
+"#;
+
+/// Vertex shader for SCENE shaders only — flips V on the way out so the
+/// fragment sees Three.js / R3F convention (V=1 at top of frame). The
+/// Dead Air shader catalog assumes screenPos.y > 0 means UP; without
+/// this flip every 3D-camera shader renders upside-down (sky at bottom).
+/// The fragment writes into a render-attachment texture, and that texture
+/// is then sampled by postprocess passes using the regular passthrough
+/// vertex shader — which is correct because the texture stores image-Y-down
+/// data, and the scene's "Three.js up" content lands in the texture row
+/// that corresponds to NDC top (= row 0, image top).
+const SCENE_VERTEX_SHADER_WGSL: &str = r#"
+struct VertexInput {
+    @location(0) position: vec2<f32>,
+    @location(1) uv: vec2<f32>,
+};
+
+struct VertexOutput {
+    @builtin(position) clip_position: vec4<f32>,
+    @location(0) uv: vec2<f32>,
+};
+
+@vertex
+fn vs_main(in: VertexInput) -> VertexOutput {
+    var out: VertexOutput;
+    out.clip_position = vec4<f32>(in.position, 0.0, 1.0);
+    // Flip V: image-convention input UV → Three.js-convention output UV.
+    out.uv = vec2<f32>(in.uv.x, 1.0 - in.uv.y);
     return out;
 }
 "#;
@@ -117,6 +147,12 @@ pub struct GpuRenderer {
 
     // Vertex shader module (shared across all pipelines)
     vertex_module: wgpu::ShaderModule,
+    /// Scene-shader vertex module — same as vertex_module but flips V on
+    /// output so scene fragments see Three.js-convention vUv (V=1 at frame
+    /// top). Used by `create_pipeline` for scene shaders. Postprocess + output
+    /// passes keep using `vertex_module` so they sample textures with
+    /// image-convention UV (V=0 at frame top).
+    scene_vertex_module: wgpu::ShaderModule,
 
     // Uniform bind group layout (set=0: uniform buffer for scene shaders)
     pub uniform_bind_group_layout: wgpu::BindGroupLayout,
@@ -257,10 +293,14 @@ impl GpuRenderer {
             usage: wgpu::BufferUsages::INDEX,
         });
 
-        // ─── Shared vertex shader ───
+        // ─── Shared vertex shaders ───
         let vertex_module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("vertex_shader"),
             source: wgpu::ShaderSource::Wgsl(VERTEX_SHADER_WGSL.into()),
+        });
+        let scene_vertex_module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("scene_vertex_shader"),
+            source: wgpu::ShaderSource::Wgsl(SCENE_VERTEX_SHADER_WGSL.into()),
         });
 
         // ─── Shared linear sampler ───
@@ -452,6 +492,7 @@ impl GpuRenderer {
             vertex_buffer,
             index_buffer,
             vertex_module,
+            scene_vertex_module,
             uniform_bind_group_layout,
             texture_bind_group_layout,
             texture_sampler,
@@ -516,7 +557,8 @@ impl GpuRenderer {
             label: Some("scene_pipeline"),
             layout: Some(&pipeline_layout),
             vertex: wgpu::VertexState {
-                module: &self.vertex_module,
+                // Scene shaders see Three.js-convention vUv (V=1 at frame top).
+                module: &self.scene_vertex_module,
                 entry_point: Some("vs_main"),
                 buffers: &[wgpu::VertexBufferLayout {
                     array_stride: std::mem::size_of::<Vertex>() as u64,
@@ -575,11 +617,14 @@ impl GpuRenderer {
             push_constant_ranges: &[],
         });
 
+        let _ = &self.scene_vertex_module; // also used below
+
         self.device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("scene_pipeline_with_textures"),
             layout: Some(&pipeline_layout),
             vertex: wgpu::VertexState {
-                module: &self.vertex_module,
+                // Scene shaders see Three.js-convention vUv (V=1 at frame top).
+                module: &self.scene_vertex_module,
                 entry_point: Some("vs_main"),
                 buffers: &[wgpu::VertexBufferLayout {
                     array_stride: std::mem::size_of::<Vertex>() as u64,
