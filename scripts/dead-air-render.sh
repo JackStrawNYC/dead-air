@@ -27,6 +27,8 @@ USE_DOCKER="auto"
 SKIP_ANALYSIS=false
 SKIP_MANIFEST=false
 SKIP_RENDER=false
+SKIP_MUX=false
+LOUDNESS_TARGET="-14"
 STRICT_OVERLAYS=false
 STRICT_SHADERS=false
 STRICT_DIMENSIONS=false
@@ -60,6 +62,8 @@ Skip switches (for resuming):
   --skip-analysis
   --skip-manifest
   --skip-render
+  --skip-mux              Skip the audio mux step (output is silent video)
+  --loudness <db>         LUFS target for mux normalization (default -14)
 
 Quality gates:
   --strict-overlays       Abort if overlay PNGs are missing
@@ -91,6 +95,8 @@ while [[ $# -gt 0 ]]; do
     --skip-analysis)    SKIP_ANALYSIS=true; shift;;
     --skip-manifest)    SKIP_MANIFEST=true; shift;;
     --skip-render)      SKIP_RENDER=true; shift;;
+    --skip-mux)         SKIP_MUX=true; shift;;
+    --loudness)         LOUDNESS_TARGET="$2"; shift 2;;
     --strict-overlays)  STRICT_OVERLAYS=true; shift;;
     --strict-shaders)   STRICT_SHADERS=true; shift;;
     --strict-dimensions) STRICT_DIMENSIONS=true; shift;;
@@ -237,7 +243,37 @@ else
     ./target/release/dead-air-renderer "${RENDER_ARGS[@]}"
     cd "$ROOT"
   fi
-  echo "└─ ✓ render complete: $OUTPUT"
+  echo "└─ ✓ render complete: $OUTPUT (silent video)"
+fi
+
+# ─── Step 4: audio mux ───
+# The Rust renderer outputs video-only. Without this step the final MP4
+# is a 3-hour silent film. Mux concatenated per-song audio with loudness
+# normalization (YouTube spec, -14 LUFS).
+if [[ "$SKIP_MUX" == "true" ]] || [[ "$SKIP_RENDER" == "true" ]]; then
+  echo "─ Step 4/4 [skipped] — output is silent video at $OUTPUT"
+elif [[ ! -f "$OUTPUT" ]]; then
+  echo "─ Step 4/4 [skipped] — render output not found at $OUTPUT"
+else
+  echo "┌─ Step 4/4: audio mux + loudness normalization"
+  # Move the silent render aside; final muxed file takes the user's --output path.
+  SILENT_VIDEO="${OUTPUT%.*}-silent.${OUTPUT##*.}"
+  mv "$OUTPUT" "$SILENT_VIDEO"
+
+  if "${ROOT}/scripts/mux-audio.sh" \
+       --show "$SHOW" \
+       --video "$SILENT_VIDEO" \
+       --output "$OUTPUT" \
+       --loudness "$LOUDNESS_TARGET"; then
+    rm -f "$SILENT_VIDEO"
+    echo "└─ ✓ mux complete: $OUTPUT (with audio)"
+  else
+    # Mux failed — keep both files so user can retry mux without re-rendering.
+    mv "$SILENT_VIDEO" "$OUTPUT"
+    echo "└─ ✗ mux FAILED — keeping silent video at $OUTPUT" >&2
+    echo "   Retry with: scripts/mux-audio.sh --show $SHOW --video $OUTPUT --output ${OUTPUT%.*}-final.${OUTPUT##*.}" >&2
+    exit 4
+  fi
 fi
 
 echo "═══════════════════════════════════════════════════"
