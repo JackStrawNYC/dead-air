@@ -16,11 +16,17 @@ struct Vertex {
     uv: [f32; 2],
 }
 
+// UV: V=0 at NDC y=-1 (bottom), V=1 at NDC y=+1 (top).
+// Matches Three.js / R3F convention used by the original Dead Air shaders.
+// The previously inverted layout caused 3D-camera shaders (river, ocean,
+// forest, etc.) to render upside-down — sky at bottom, ground at top —
+// because `screenPos.y * camUpV` in the shaders points UP for positive
+// screenPos.y, but the inverted UV made screenPos.y negative at frame top.
 const FULLSCREEN_QUAD: &[Vertex] = &[
-    Vertex { position: [-1.0, -1.0], uv: [0.0, 1.0] },
-    Vertex { position: [ 1.0, -1.0], uv: [1.0, 1.0] },
-    Vertex { position: [-1.0,  1.0], uv: [0.0, 0.0] },
-    Vertex { position: [ 1.0,  1.0], uv: [1.0, 0.0] },
+    Vertex { position: [-1.0, -1.0], uv: [0.0, 0.0] },
+    Vertex { position: [ 1.0, -1.0], uv: [1.0, 0.0] },
+    Vertex { position: [-1.0,  1.0], uv: [0.0, 1.0] },
+    Vertex { position: [ 1.0,  1.0], uv: [1.0, 1.0] },
 ];
 
 const QUAD_INDICES: &[u16] = &[0, 1, 2, 2, 1, 3];
