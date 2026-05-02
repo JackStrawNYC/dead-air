@@ -1365,6 +1365,9 @@ async function main() {
       // Black-frame risk: unclear implementation, sparse output, or naga compile failure
       "luminous_cavern", // snoise undefined → naga compile failure → 5251 black frames
       "storm_vortex", "mycelium_network", "cosmic_voyage", "solar_flare",
+      // 3D-mesh shaders (not fullscreen-quad) — uses vWorldPos varying that
+      // Rust renderer's vertex shader doesn't produce → naga compile failure.
+      "forest",
       // Show-specific variants: only used via song identity, not random pool
       "morning_dew_fog", "dark_star_void", "fire_mountain_smoke",
       "estimated_prophet_mist", "wharf_rat_storm", "scarlet_golden_haze",
@@ -1529,10 +1532,53 @@ async function main() {
       usedShaderModes.set(pick as any, (usedShaderModes.get(pick as any) ?? 0) + 1);
       shaderModeLastUsed.set(pick as any, songIdx + 1);
     }
+
+    // VARIETY ENFORCEMENT POST-PASS
+    // Even with all the bias layers in getModeForSection, songs with rich
+    // identities + matching stem/groove/semantic biases can collapse to a
+    // single mode (multiple layers stacking copies of the same shader on
+    // an already-narrow preferred pool). Cap any single shader at 50% of
+    // a multi-section song's picks: replace excess occurrences with a
+    // varied alternative from the activeShaderPool, weighted by the
+    // continuous-energy gaussian for that section's avgEnergy.
+    if (sectionModes.length >= 4) {
+      const counts = new Map<string, number>();
+      for (const m of sectionModes) counts.set(m, (counts.get(m) ?? 0) + 1);
+      const cap = Math.ceil(sectionModes.length * 0.5);
+      // For each over-cap shader, find its excess section indices and replace.
+      // Skip section 0 (preserve authored opening).
+      const overCap = [...counts.entries()].filter(([, c]) => c > cap);
+      for (const [overMode, ] of overCap) {
+        const overIndices = sectionModes
+          .map((m, i) => m === overMode ? i : -1)
+          .filter(i => i >= 0 && i > 0);  // never replace section 0
+        // Build alternative pool: activeShaderPool minus the over-mode minus other over-modes.
+        const overSet = new Set(overCap.map(([m]) => m));
+        const alts = activeShaderPool.filter((s: string) => !overSet.has(s));
+        if (alts.length === 0) continue;
+        // Replace from the END of the over list so leading occurrences (early
+        // sections) keep the authored mode.
+        const excess = counts.get(overMode)! - cap;
+        for (let i = 0; i < excess && i < overIndices.length; i++) {
+          const idx = overIndices[overIndices.length - 1 - i];
+          // Pick from alts, preferring shaders not yet used in this song
+          const songUsed = new Set(sectionModes);
+          const fresh = alts.filter((m: string) => !songUsed.has(m));
+          const pickPool = fresh.length > 0 ? fresh : alts;
+          const newPick = pickPool[Math.floor(seededRandom(ctx.songSeed + idx * 991) * pickPool.length)];
+          // Update show-level state — decrement old, increment new.
+          usedShaderModes.set(overMode as any, (usedShaderModes.get(overMode as any) ?? 1) - 1);
+          usedShaderModes.set(newPick as any, (usedShaderModes.get(newPick as any) ?? 0) + 1);
+          shaderModeLastUsed.set(newPick as any, songIdx + 1);
+          sectionModes[idx] = newPick;
+        }
+      }
+    }
+
     {
       const unique = new Set(sectionModes);
       console.log(`    Sections: ${sectionModes.length} sections, ${unique.size} unique shaders [${[...unique].join(", ")}]`);
-      if (unique.size <= 1) {
+      if (unique.size <= 1 && sectionModes.length > 1) {
         console.log(`    WARNING: Only 1 shader for entire song — routing may be broken`);
         console.log(`    Default mode: ${defaultMode}, sections: ${sections.length}`);
       }
