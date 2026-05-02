@@ -35,6 +35,7 @@ GPU_OVERLAYS=false
 NO_ADAPTIVE_SCALE=false
 SLOW_SCENE_SCALE=""
 BUSTED_SCENE_SCALE=""
+PARTICLES=""
 
 usage() {
   cat <<EOF
@@ -72,6 +73,7 @@ Performance:
   --no-adaptive-scale     Disable per-tier multi-scale rendering
   --slow-scene-scale <s>  Scale for SLOW-tier shaders (default 0.75)
   --busted-scene-scale <s> Scale for BUSTED-tier shaders (default 0.5)
+  --particles <N>         GPU particle overlay count (0 = disabled, default 0)
 EOF
   exit 1
 }
@@ -98,6 +100,7 @@ while [[ $# -gt 0 ]]; do
     --no-adaptive-scale) NO_ADAPTIVE_SCALE=true; shift;;
     --slow-scene-scale) SLOW_SCENE_SCALE="$2"; shift 2;;
     --busted-scene-scale) BUSTED_SCENE_SCALE="$2"; shift 2;;
+    --particles) PARTICLES="$2"; shift 2;;
     -h|--help)          usage;;
     *)                  echo "Unknown arg: $1"; usage;;
   esac
@@ -200,6 +203,7 @@ else
   [[ "$NO_ADAPTIVE_SCALE" == "true" ]] && RENDER_ARGS+=(--no-adaptive-scale)
   [[ -n "$SLOW_SCENE_SCALE" ]] && RENDER_ARGS+=(--slow-scene-scale "$SLOW_SCENE_SCALE")
   [[ -n "$BUSTED_SCENE_SCALE" ]] && RENDER_ARGS+=(--busted-scene-scale "$BUSTED_SCENE_SCALE")
+  [[ -n "$PARTICLES" ]] && RENDER_ARGS+=(--particles "$PARTICLES")
 
   if [[ "$USE_DOCKER" == "yes" ]] && command -v nvidia-smi >/dev/null 2>&1; then
     cd "$ROOT/docker"
@@ -217,6 +221,7 @@ else
     [[ "$NO_ADAPTIVE_SCALE" == "true" ]] && DOCKER_RENDER_ARGS+=(--no-adaptive-scale)
     [[ -n "$SLOW_SCENE_SCALE" ]] && DOCKER_RENDER_ARGS+=(--slow-scene-scale "$SLOW_SCENE_SCALE")
     [[ -n "$BUSTED_SCENE_SCALE" ]] && DOCKER_RENDER_ARGS+=(--busted-scene-scale "$BUSTED_SCENE_SCALE")
+    [[ -n "$PARTICLES" ]] && DOCKER_RENDER_ARGS+=(--particles "$PARTICLES")
     docker compose run --rm \
       -v "$ROOT/out/${SHOW}:/data" \
       render \

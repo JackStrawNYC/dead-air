@@ -55,6 +55,13 @@ pub struct RenderResources<'a> {
     /// schedule (intro/endcard SVG layers still go CPU).
     pub gpu_overlay_pipeline: Option<&'a overlay_pass::OverlayCompositingPipeline>,
     pub gpu_overlay_atlas: Option<&'a crate::overlay_atlas::OverlayAtlas>,
+
+    /// Optional GPU particle system (audit Debt #15). When `Some`, particles
+    /// are updated + drawn additively onto the output texture after the
+    /// scene/postprocess pass, then a follow-up `copy_to_readback` overwrites
+    /// the buffer the in-frame readback wrote (the buffer-swap math works out
+    /// — readback_idx ping-pongs through both writes).
+    pub particle_system: Option<&'a crate::compute::ParticleSystem>,
 }
 
 /// Run the full render loop. Returns the number of frames written.
@@ -254,6 +261,23 @@ pub fn run(mut r: RenderResources<'_>) -> usize {
             }
         }
 
+        // GPU particle overlay (audit Debt #15). Runs after the scene/pp
+        // pass already wrote output_texture and did its readback; we update
+        // particles, draw them additively over output, then issue a second
+        // copy_to_readback. The double-buffered readback's idx swap means
+        // the second write lands in the buffer that read_pixels will
+        // consume next, so the particles-included frame wins.
+        if let Some(particles) = r.particle_system {
+            let p_uniforms = build_particle_uniforms(frame, r.fps);
+            let mut encoder = r.renderer.device().create_command_encoder(
+                &wgpu::CommandEncoderDescriptor { label: Some("particle_pass") },
+            );
+            particles.update(&mut encoder, r.renderer.device(), &p_uniforms);
+            particles.render(&mut encoder, r.renderer.device(), r.renderer.output_texture_view());
+            r.renderer.copy_to_readback(&mut encoder);
+            r.renderer.queue().submit(std::iter::once(encoder.finish()));
+        }
+
         // Visual effect pass (post-processing transform, in-place).
         apply_effect_pass(
             r.renderer, r.effect_pipeline, &tf.prev_frame_view, frame,
@@ -310,6 +334,28 @@ pub fn run(mut r: RenderResources<'_>) -> usize {
     }
 
     frames_written
+}
+
+/// Build particle compute-shader uniforms from the current audio frame.
+/// Spawn rate scales with energy, turbulence with bass — particles bloom
+/// during loud moments and settle during quiet ones.
+fn build_particle_uniforms(
+    frame: &manifest::FrameData,
+    fps: u32,
+) -> crate::compute::ParticleUniforms {
+    crate::compute::ParticleUniforms {
+        delta_time: 1.0 / fps as f32,
+        gravity: 0.4,
+        drag: 0.985,
+        energy: frame.energy,
+        bass: frame.bass,
+        time: frame.time,
+        // 50-500 particles/sec scaling with energy. At 0 energy emission
+        // dies out so the system gracefully fades.
+        spawn_rate: 50.0 + frame.energy * 450.0,
+        // Bass drives turbulence — kicks visibly punch the field.
+        turbulence: 0.3 + frame.bass * 0.4,
+    }
 }
 
 fn build_pp_uniforms(

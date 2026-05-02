@@ -204,6 +204,13 @@ struct Args {
     /// per-pixel CPU path. Falls back to CPU when overlay PNGs aren't loaded.
     #[arg(long, default_value_t = false)]
     gpu_overlays: bool,
+
+    /// Enable GPU particle overlay (audit Debt #15). 0 = disabled (default).
+    /// When > 0, allocates that many particles and renders them additively
+    /// over the postprocessed scene. Particle spawn rate / forces are
+    /// driven by the per-frame audio uniforms (energy, bass).
+    #[arg(long, default_value_t = 0)]
+    particles: u32,
 }
 
 fn main() {
@@ -571,12 +578,19 @@ fn main() {
         renderer.vertex_module(),
     );
 
-    // ─── Create particle system (10K particles) ───
-    let particle_system = compute::ParticleSystem::new(
-        renderer.device(),
-        10_000,
-        renderer.vertex_module(),
-    );
+    // ─── Create particle system (audit Debt #15) ───
+    // Allocated only when --particles N > 0; otherwise None.
+    let particle_system = if args.particles > 0 {
+        let count = args.particles.min(1_000_000);
+        println!("Particles: GPU compute system enabled ({} particles)", count);
+        Some(compute::ParticleSystem::new(
+            renderer.device(),
+            count,
+            renderer.vertex_module(),
+        ))
+    } else {
+        None
+    };
 
     // ─── Create motion blur pipeline ───
     let motion_blur_pipeline = motion_blur::MotionBlurPipeline::new(
@@ -704,8 +718,6 @@ fn main() {
         manifest.frames.len()
     };
 
-    let _ = particle_system; // currently disabled in the loop; kept for future re-enable
-
     // GPU overlay compositing setup (Wave 4.1 phase C). Only when --gpu-overlays
     // is set AND we actually have overlays loaded; otherwise fall through to CPU.
     let (gpu_overlay_atlas, gpu_overlay_pipeline) = if args.gpu_overlays && !overlay_image_cache.is_empty() {
@@ -792,6 +804,7 @@ fn main() {
         progress: &progress,
         gpu_overlay_pipeline: gpu_overlay_pipeline.as_ref(),
         gpu_overlay_atlas: gpu_overlay_atlas.as_ref(),
+        particle_system: particle_system.as_ref(),
     };
     let _frames_written = render_loop::run(resources);
 
