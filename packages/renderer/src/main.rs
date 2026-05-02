@@ -161,6 +161,14 @@ struct Args {
     #[arg(long, default_value_t = false)]
     validate_only: bool,
 
+    /// Fail the render if the manifest's recorded width/height/fps don't
+    /// match the CLI args. The manifest generator stamps these fields when
+    /// it produces output; rendering with mismatched dimensions causes
+    /// subtle shader-time bugs (e.g. iResolution.xy ≠ output dims) and
+    /// frame-count / A-V drift. Recommended for production.
+    #[arg(long, default_value_t = false)]
+    strict_dimensions: bool,
+
     /// Scene-render LOD scale (audit Wave 3.3). 1.0 renders the scene at full
     /// output resolution; values < 1.0 render the scene shader at smaller
     /// dimensions and the postprocess sampler upscales. Trades some sharpness
@@ -189,6 +197,43 @@ fn main() {
     println!("Loading manifest: {}", args.manifest.display());
     let mut manifest =
         manifest::load_manifest(&args.manifest).expect("Failed to load manifest");
+
+    // Pre-flight: manifest dimensions vs CLI args. Mismatches cause subtle
+    // shader-time bugs (iResolution drift) and A-V desync. We always print
+    // the comparison; --strict-dimensions makes any mismatch fatal.
+    {
+        let mut mismatches: Vec<String> = Vec::new();
+        if let Some(mw) = manifest.width {
+            if mw != args.width {
+                mismatches.push(format!("width manifest={} cli={}", mw, args.width));
+            }
+        }
+        if let Some(mh) = manifest.height {
+            if mh != args.height {
+                mismatches.push(format!("height manifest={} cli={}", mh, args.height));
+            }
+        }
+        if let Some(mf) = manifest.fps {
+            if mf != args.fps {
+                mismatches.push(format!("fps manifest={} cli={}", mf, args.fps));
+            }
+        }
+        if mismatches.is_empty() {
+            if manifest.width.is_some() || manifest.height.is_some() || manifest.fps.is_some() {
+                println!("Dimensions: manifest matches CLI ({}x{} @ {}fps)", args.width, args.height, args.fps);
+            }
+        } else {
+            eprintln!("Dimensions: MISMATCH between manifest and CLI args:");
+            for m in &mismatches {
+                eprintln!("  - {}", m);
+            }
+            if args.strict_dimensions {
+                eprintln!("Dimensions: --strict-dimensions set, aborting before render");
+                std::process::exit(2);
+            }
+            eprintln!("Dimensions: continuing anyway (pass --strict-dimensions to fail fast)");
+        }
+    }
 
     // ─── Prepend intro sequence if requested ───
     let intro_frame_count = if args.with_intro {
