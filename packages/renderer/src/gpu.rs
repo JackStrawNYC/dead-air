@@ -842,30 +842,6 @@ impl GpuRenderer {
         })
     }
 
-    /// Create a feedback texture sized to the **primary** scene targets.
-    /// Kept for tests + back-compat with single-tier callers; multi-tier
-    /// callers should use `targets_for_tier(tier).feedback_a/b` instead
-    /// (the bundle owns its own feedback chain).
-    pub fn create_feedback_texture(&self, label: &str) -> (wgpu::Texture, wgpu::TextureView) {
-        let primary = &self.targets_pool[0];
-        let texture = self.device.create_texture(&wgpu::TextureDescriptor {
-            label: Some(label),
-            size: wgpu::Extent3d {
-                width: primary.width,
-                height: primary.height,
-                depth_or_array_layers: 1,
-            },
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: SCENE_FORMAT,
-            usage: wgpu::TextureUsages::COPY_DST | wgpu::TextureUsages::TEXTURE_BINDING,
-            view_formats: &[],
-        });
-        let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
-        (texture, view)
-    }
-
     /// Create a 1D FFT texture (64x1 Rgba8Unorm) for frequency data.
     pub fn create_fft_texture(&self) -> (wgpu::Texture, wgpu::TextureView) {
         let texture = self.device.create_texture(&wgpu::TextureDescriptor {
