@@ -128,13 +128,11 @@ void main() {
   float climaxBoost = isClimax * climaxI;
 
   // === KALI FRACTAL PARAMETERS ===
-  // Formfactor: the heart of the fractal shape. The original Shadertoy
-  // "Star Nest" uses a constant 0.53 — the orbit traps go dim quickly past
-  // 0.55, near-zero past 0.58. Audio-driven variation must be very small or
-  // the nebula vanishes. Use bass for ±0.015 wobble around 0.53; jam/space
-  // contribute nothing visible-breaking.
-  float formfactor = 0.53 + bass * 0.015 + onset * 0.01 + beatSnap * 0.005 + stemBass * 0.005;
-  formfactor = clamp(formfactor, 0.520, 0.555);
+  // Formfactor: the heart of the fractal shape. Bass reshapes geometry.
+  // Stem bass adds pulsation to star geometry
+  float formfactor = 0.53 + bass * 0.18 + onset * 0.12 + beatSnap * 0.06 + stemBass * 0.08;
+  formfactor = mix(formfactor, formfactor * 1.08, sJam);   // jam: more complex
+  formfactor = mix(formfactor, formfactor * 0.92, sSpace);  // space: smoother
 
   // Iteration count: energy + highs drive detail
   float iterFloat = 12.0 + energy * 5.0 + highs * 3.0;
