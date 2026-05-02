@@ -2733,6 +2733,15 @@ async function main() {
       const satEndA = endA?.envelope_saturation ?? 1.0;
       const satStartB = startB?.envelope_saturation ?? 1.0;
 
+      // For non-segue boundaries, apply a "breathing room" visual exhale —
+      // triangular brightness/saturation dim that bottoms at 75% / 80% at
+      // the exact crossover. Dead concerts have natural pauses between
+      // non-segue songs (applause, banter, tuning); the manifest trims
+      // those out of the audio so the visual needs to suggest the breath.
+      // Audit flagged this as "no breathing room between songs". Segues
+      // skip the dim because they're meant to flow without a pause.
+      const breathingDim = !isSegue;
+
       // Last BOUNDARY_FADE_FRAMES of song A: blend toward song B's shader
       for (let j = 0; j < BOUNDARY_FADE_FRAMES; j++) {
         const fi = boundary - BOUNDARY_FADE_FRAMES + j;
@@ -2753,6 +2762,14 @@ async function main() {
         frame.energy = (frame.energy ?? 0) * (1 - easeT) + energyStartB * easeT;
         frame.envelope_brightness = (frame.envelope_brightness ?? 1) * (1 - easeT) + brightStartB * easeT;
         frame.envelope_saturation = (frame.envelope_saturation ?? 1) * (1 - easeT) + satStartB * easeT;
+
+        // Breathing dim: outgoing half (linear ramp 1.0 → 0.75 brightness, 1.0 → 0.80 sat)
+        if (breathingDim) {
+          const breathFactor = 1.0 - progress * 0.25; // 1.0 → 0.75
+          const breathSatFactor = 1.0 - progress * 0.20; // 1.0 → 0.80
+          frame.envelope_brightness = (frame.envelope_brightness ?? 1) * breathFactor;
+          frame.envelope_saturation = (frame.envelope_saturation ?? 1) * breathSatFactor;
+        }
       }
 
       // First BOUNDARY_FADE_FRAMES of song B: blend from song A's shader
@@ -2775,6 +2792,16 @@ async function main() {
         frame.energy = (frame.energy ?? 0) * (1 - easeT) + energyEndA * easeT;
         frame.envelope_brightness = (frame.envelope_brightness ?? 1) * (1 - easeT) + brightEndA * easeT;
         frame.envelope_saturation = (frame.envelope_saturation ?? 1) * (1 - easeT) + satEndA * easeT;
+
+        // Breathing dim: incoming half (linear ramp 0.75 → 1.0 brightness, 0.80 → 1.0 sat).
+        // progress here is INVERTED (1→0 over the window) so we use j-progress.
+        if (breathingDim) {
+          const incomingProgress = j / BOUNDARY_FADE_FRAMES; // 0→1
+          const breathFactor = 0.75 + incomingProgress * 0.25; // 0.75 → 1.0
+          const breathSatFactor = 0.80 + incomingProgress * 0.20; // 0.80 → 1.0
+          frame.envelope_brightness = (frame.envelope_brightness ?? 1) * breathFactor;
+          frame.envelope_saturation = (frame.envelope_saturation ?? 1) * breathSatFactor;
+        }
       }
 
       crossfadesApplied++;
