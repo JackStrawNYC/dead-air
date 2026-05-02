@@ -1721,6 +1721,16 @@ async function main() {
     let compHoldIntensity = 0;
     let compHoldFrames = 0;
     let compCooldown = 0;
+
+    // Pre-allocate per-frame overlay density multiplier — computed during
+    // the main render-frame loop (where narrative + sectionVocab are
+    // available) and consumed by the overlay phase below. Without this
+    // bridge the overlayDensityMult fields from both narrative and vocab
+    // would be wasted (computed every frame, never reach the overlay
+    // opacity calculation).
+    const overlayDensityMults = new Float32Array(totalOut);
+    overlayDensityMults.fill(1.0);
+
     for (let i = 0; i < totalOut; i++) {
       if (i > 0 && i % progressInterval === 0) {
         const pct = ((i / totalOut) * 100).toFixed(0);
@@ -1750,6 +1760,13 @@ async function main() {
         }
       }
       prevState = frameAnalysis;
+      // Stash the per-frame overlay density multiplier so the later
+      // overlay phase can apply it. narrative + vocab + peakOfShow
+      // each contribute; multiplied (not summed) so a 0.5 vocab + 0.5
+      // peak give 0.25 not 0.0.
+      overlayDensityMults[i] = (frameAnalysis.narrative?.overlayDensityMult ?? 1.0)
+        * (frameAnalysis.sectionVocab?.overlayDensityMult ?? 1.0)
+        * (frameAnalysis.peakOfShow?.isPeak ? 0.5 : 1.0);
 
       // Scene routing with hold enforcement (prevents seizure-fast switching)
       const routeState = getRouteState(i);
@@ -2220,9 +2237,16 @@ async function main() {
           tempo,
         );
 
+        // Apply per-frame overlay density multiplier from narrative +
+        // vocab + peak-of-show (precomputed during the main loop).
+        // The renderer already enforces minimum and maximum opacities
+        // per overlay; this multiplier is the section-level shape.
+        const densityMult = overlayDensityMults[i] ?? 1.0;
+
         // Convert opacities to OverlayInstance array
         const frameInstances: typeof overlaySchedule[0] = [];
-        for (const [overlayName, opacity] of Object.entries(opacities)) {
+        for (const [overlayName, opacityRaw] of Object.entries(opacities)) {
+          const opacity = opacityRaw * densityMult;
           if (opacity <= 0.005) continue; // skip invisible overlays
 
           // ALL overlays use screen blend — dark pixels vanish naturally.
