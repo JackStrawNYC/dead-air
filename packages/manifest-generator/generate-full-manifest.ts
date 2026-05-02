@@ -1447,8 +1447,11 @@ async function main() {
       usedShaderModes,
     };
 
-    // SHADER_BLOCKLIST hoisted up here so safeDefaultMode can use it
-    // (was previously declared inside the section loop below).
+    // Globally blocked — never picked by any path. Includes:
+    // - C/D tier procedural / screensaver-quality
+    // - Black-frame risks (compile failures, sparse output)
+    // - Redundant variants superseded by better versions
+    // - 3D-mesh shaders incompatible with fullscreen-quad pipeline
     const SHADER_BLOCKLIST = new Set([
       "combustible_voronoi", "creation", "fluid_2d", "spectral_bridge",
       "obsidian_mirror", "amber_drift", "volumetric_clouds", "volumetric_smoke",
@@ -1460,11 +1463,18 @@ async function main() {
       "databend", "signal_decay", "climax_surge", "cellular_automata",
       "bioluminescence", "luminous_cavern", "storm_vortex", "mycelium_network",
       "cosmic_voyage", "solar_flare", "forest",
+      "dual_blend", "dual_shader", "smoke_and_mirrors", "molten_glass",
+      "particle_burst",
+    ]);
+    // Identity-only shaders: hand-crafted song-specific variants that should
+    // ONLY be picked when a songIdentity explicitly names them in
+    // preferredModes — not via random pool. Without this distinction, songs
+    // like Scarlet Begonias with `preferredModes: ["scarlet_golden_haze"]`
+    // had their signature shader stripped out by the variety-validity filter.
+    const IDENTITY_ONLY_SHADERS = new Set([
       "morning_dew_fog", "dark_star_void", "fire_mountain_smoke",
       "estimated_prophet_mist", "wharf_rat_storm", "scarlet_golden_haze",
       "st_stephen_lightning", "terrapin_nebula",
-      "dual_blend", "dual_shader", "smoke_and_mirrors", "molten_glass",
-      "particle_burst",
     ]);
 
     // Safe default — falls through blocklist. Use this anywhere routing
@@ -1568,8 +1578,10 @@ async function main() {
       //   < 3 valid           → DROP identity, let continuous-energy
       //                         pool drive variety (defaultMode still
       //                         anchors section 0)
+      // Allow identity-only show-specific variants when explicitly named
+      // (scarlet_golden_haze for Scarlet, dark_star_void for Dark Star, etc.)
       const validPreferred = (songIdentity?.preferredModes ?? []).filter(
-        (m: any) => activeShaderPool.includes(m as any)
+        (m: any) => activeShaderPool.includes(m as any) || (IDENTITY_ONLY_SHADERS.has(m) && shaders[m])
       );
       const useIdentity = songIdentity && validPreferred.length >= 3;
       const filteredIdentity: any = useIdentity
@@ -1607,7 +1619,11 @@ async function main() {
           showShaderPool,           // restrict to manifest-available, non-blocklisted
         );
         // Manifest-gen blocklist wins over shader-variety's SAFE_SHADERS.
-        if (candidate && activeShaderPool.includes(candidate as any) && !SHADER_BLOCKLIST.has(candidate as any)) {
+        // Identity-only shaders pass when songIdentity explicitly named them.
+        const isIdentityNamed = !!filteredIdentity?.preferredModes?.includes(candidate as any);
+        if (candidate
+            && (activeShaderPool.includes(candidate as any) || (isIdentityNamed && IDENTITY_ONLY_SHADERS.has(candidate) && shaders[candidate]))
+            && !SHADER_BLOCKLIST.has(candidate as any)) {
           pick = candidate as string;
         }
       } catch (e) {
