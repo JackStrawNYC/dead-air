@@ -259,7 +259,10 @@ vec3 fl2VolumeFog(vec3 ro, vec3 rd, float maxT, float time, float viscosity,
     float onsetBoost = onsetFlash * exp(-fi * 0.15) * 2.0;
     density += onsetBoost * 0.2;
 
-    density *= 0.04 * (0.5 + energy * 1.0);
+    // Density multiplier: doubled from 0.04 → 0.08 base. Original made fluid-light
+    // near-invisible at low energy (multiplier was 0.02-0.06). New range
+    // 0.04-0.12 keeps low-energy visible without overdriving high-energy.
+    density *= 0.08 * (0.5 + energy * 1.0);
 
     if (density > 0.001) {
       // Bioluminescent color

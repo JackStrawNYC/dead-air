@@ -470,8 +470,10 @@ void main() {
     surfColor = mix(surfColor, surfColor * 0.8 + oilLight * 0.25, isFloor);
 
     // ─── Compose surface lighting ───
-    // Ambient: dark cathedral interior lit primarily by overhead oil projection
-    vec3 ambient = stoneBase * 0.03 * (0.7 + energy * 0.60);
+    // Ambient: dark cathedral interior lit primarily by overhead oil projection.
+    // Floor bumped from 0.03 → 0.06 so quiet passages aren't pure black; the
+    // oil-light contribution still dominates at energy.
+    vec3 ambient = stoneBase * 0.06 * (0.7 + energy * 0.60);
 
     // Diffuse lit by oil transmission color
     vec3 oilLit = surfColor * (oilLight * 0.4 + vec3(0.1)) * diffuse;

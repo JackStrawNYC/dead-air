@@ -527,7 +527,10 @@ void main() {
       float coreDiff = max(0.0, dot(norm, toCoreDir))
                        / (1.0 + 0.08 * length(coreLightPos - marchPos));
 
-      col = metalBase * (0.06 + diffPlasma * plasmaTemp + diffAmbient) * occVal;
+      // Lighting coefficient: ambient floor 0.18 (was 0.06) so the ring is
+      // visible even when plasmaTemp is low (quiet passages). At high energy
+      // diffPlasma * plasmaTemp adds significant brightness on top.
+      col = metalBase * (0.18 + diffPlasma * plasmaTemp + diffAmbient) * occVal;
 
       // Plasma illumination on containment interior (warm glow from confined plasma)
       vec3 plasmaIllum = pf2PlasmaColor(plasmaTemp * 0.5, hueShift);
@@ -643,10 +646,12 @@ void main() {
                                      plasmaTemp, turbulence);
     col = volPlasma;
 
-    // Distant lab walls: very dark with subtle palette-tinted ambient
-    vec3 labWall = vec3(0.01, 0.012, 0.018);
+    // Distant lab walls: very dark with subtle palette-tinted ambient.
+    // Base raised from 0.01-0.018 → 0.025-0.04 so quiet passages aren't
+    // pure black. Keeps the moody sci-fi lab character but stays visible.
+    vec3 labWall = vec3(0.025, 0.030, 0.040);
     vec3 labTint = paletteHueColor(hue1, 0.7, 0.85);
-    labWall += labTint * 0.005;
+    labWall += labTint * 0.012;
     col += labWall;
   }
 

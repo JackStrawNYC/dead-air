@@ -284,21 +284,27 @@ fn run_visibility_gate(frame: &dead_air_renderer::manifest::FrameData) -> Option
         renderer.render_frame(&pipeline, &uniform_data, None, None, None, None, false);
         let pixels = renderer.read_pixels();
 
-        let mut mean_lum = 0.0f64;
-        let mut min_lum = 255.0f64;
-        let mut max_lum = 0.0f64;
-        let n = pixels.len() / 4;
+        let mut lums: Vec<f64> = Vec::with_capacity(pixels.len() / 4);
         for px in pixels.chunks(4) {
-            let lum = px[0] as f64 * 0.299 + px[1] as f64 * 0.587 + px[2] as f64 * 0.114;
-            mean_lum += lum;
-            if lum < min_lum { min_lum = lum; }
-            if lum > max_lum { max_lum = lum; }
+            lums.push(px[0] as f64 * 0.299 + px[1] as f64 * 0.587 + px[2] as f64 * 0.114);
         }
-        mean_lum /= n as f64;
-        let range = max_lum - min_lum;
+        let mean_lum: f64 = lums.iter().sum::<f64>() / lums.len() as f64;
+        let mut sorted = lums.clone();
+        sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        let p95 = sorted[(sorted.len() as f64 * 0.95) as usize];
+        let p05 = sorted[(sorted.len() as f64 * 0.05) as usize];
+        let range = p95 - p05;
 
-        if mean_lum < 4.0 {
-            all_black.push((name.clone(), mean_lum));
+        // Visibility = either bright on average OR has clearly visible bright
+        // content (top 5% of pixels are well above black). The bright-content
+        // test catches shaders like plasma-field/liquid-light that are dark
+        // backgrounds with prominent bright features (would fail mean-only).
+        let bright_enough = mean_lum >= 4.0 || p95 >= 30.0;
+        if !bright_enough {
+            // Track the better of (mean, p95/8) so the report shows whether
+            // the shader is uniformly dim or just lacking a bright spot.
+            let report_lum = mean_lum.max(p95 / 8.0);
+            all_black.push((name.clone(), report_lum));
             continue;
         }
         if range < 8.0 {
