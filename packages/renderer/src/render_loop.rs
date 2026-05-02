@@ -24,6 +24,16 @@ pub struct RenderResources<'a> {
     pub ffmpeg_pipe: &'a mut Option<ffmpeg::FfmpegPipe>,
     pub png_dir: &'a Option<std::path::PathBuf>,
 
+    /// Optional path to the final video output. When set, a sibling
+    /// `<output>.progress.json` is written every `--checkpoint-every`
+    /// frames so a crash mid-render leaves recoverable state (frame
+    /// count, fps, ETA, timestamp). Recovery: re-run with `--start-frame
+    /// N` reading N from the checkpoint. The partial MP4 will be
+    /// corrupt at the truncation point; user should mux the resumed
+    /// chunk separately and concat.
+    pub output_path: Option<&'a std::path::Path>,
+    pub checkpoint_every: usize,
+
     pub pp_pipeline: &'a postprocess::PostProcessPipeline,
     pub effect_pipeline: &'a effects::EffectPipeline,
     pub composited_pipeline: &'a composited_effects::CompositedPipeline,
@@ -83,6 +93,17 @@ pub fn run(mut r: RenderResources<'_>) -> usize {
             r.progress.inc(1);
             frames_written += 1;
             log_progress_milestone(r.progress);
+            // Periodic checkpoint flush so a crash leaves recoverable state.
+            if r.checkpoint_every > 0 && frames_written > 0 && frames_written % r.checkpoint_every == 0 {
+                if let Some(out) = r.output_path {
+                    let done = r.progress.position();
+                    let total = r.progress.length().unwrap_or(1);
+                    let elapsed = r.progress.elapsed().as_secs_f64();
+                    let fps_actual = done as f64 / elapsed.max(0.001);
+                    let eta_sec = if fps_actual > 0.0 { (total - done) as f64 / fps_actual } else { 0.0 };
+                    write_checkpoint(out, done as usize, total as usize, fps_actual, eta_sec);
+                }
+            }
         }
 
         let frame = &r.manifest.frames[frame_idx];
@@ -565,4 +586,45 @@ fn log_progress_milestone(progress: &ProgressBar) {
         done, total, done as f64 / total as f64 * 100.0,
         fps_actual, eta_sec / 60.0, eta_sec % 60.0,
     );
+}
+
+/// Write a small JSON checkpoint next to the output video. Called every
+/// `checkpoint_every` frames. A 12-hour render that crashes at hour 8
+/// leaves this file with the last-known frame count, so the user can
+/// re-run with `--start-frame N` to resume. The partial MP4 will be
+/// corrupt at the truncation point; recovery flow:
+///   1. Read checkpoint.json → N
+///   2. Re-render with `--start-frame N --end-frame TOTAL` → tail.mp4
+///   3. ffmpeg concat the partial.mp4 (truncated to frame N-1) + tail.mp4
+fn write_checkpoint(
+    output_path: &std::path::Path,
+    frames_done: usize,
+    total_frames: usize,
+    fps_actual: f64,
+    eta_sec: f64,
+) {
+    let mut buf = String::with_capacity(256);
+    buf.push_str("{\n");
+    buf.push_str(&format!("  \"frames_done\": {},\n", frames_done));
+    buf.push_str(&format!("  \"frames_total\": {},\n", total_frames));
+    buf.push_str(&format!("  \"percent\": {:.1},\n",
+        (frames_done as f64 / total_frames.max(1) as f64) * 100.0));
+    buf.push_str(&format!("  \"fps_actual\": {:.2},\n", fps_actual));
+    buf.push_str(&format!("  \"eta_seconds\": {:.0},\n", eta_sec));
+    buf.push_str(&format!("  \"timestamp\": {},\n",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0)));
+    buf.push_str(&format!("  \"resume_arg\": \"--start-frame {}\"\n", frames_done));
+    buf.push_str("}\n");
+
+    let checkpoint_path = {
+        let s = output_path.to_string_lossy();
+        std::path::PathBuf::from(format!("{}.progress.json", s))
+    };
+    // Atomic write: tmp then rename. Avoids reading partial JSON during a
+    // race with the writer.
+    let tmp = checkpoint_path.with_extension("json.tmp");
+    if std::fs::write(&tmp, buf).is_ok() {
+        let _ = std::fs::rename(&tmp, &checkpoint_path);
+    }
 }

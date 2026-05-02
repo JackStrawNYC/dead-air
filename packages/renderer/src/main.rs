@@ -211,6 +211,15 @@ struct Args {
     /// driven by the per-frame audio uniforms (energy, bass).
     #[arg(long, default_value_t = 0)]
     particles: u32,
+
+    /// Write a checkpoint JSON next to the output every N frames so a
+    /// long-running render that crashes mid-stream leaves recoverable
+    /// state. The file lands at <output>.progress.json with the last
+    /// frame number — re-run with `--start-frame N` to resume from there.
+    /// 0 disables checkpoint writing. Recommended: 1000-5000 for
+    /// hour-scale renders (1000 ≈ 33s of 30fps content).
+    #[arg(long, default_value_t = 1000)]
+    checkpoint_every: u32,
 }
 
 fn main() {
@@ -784,6 +793,8 @@ fn main() {
         overlay_image_cache: &mut overlay_image_cache,
         ffmpeg_pipe: &mut ffmpeg_pipe,
         png_dir: &args.png_dir,
+        output_path: args.output.as_deref(),
+        checkpoint_every: args.checkpoint_every as usize,
         pp_pipeline: &pp_pipeline,
         effect_pipeline: &effect_pipeline,
         composited_pipeline: &composited_pipeline,

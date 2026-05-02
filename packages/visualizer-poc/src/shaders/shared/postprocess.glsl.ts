@@ -421,6 +421,36 @@ ${
 }
   }
 
+  // ─── PEAK OF SHOW: the once-per-show transcendent moment ───
+  // detectPeakOfShow fires uPeakOfShow > 0.5 for ~7s at THE moment of the
+  // show (deep set 2 jam climax, etc.). This applies a universal "golden
+  // hour" treatment over whatever shader is rendering: saturation lift,
+  // warm color convergence toward 35° amber, brightness boost, and a slow
+  // radial pulse from center that breathes once per second. Peak intensity
+  // ramps in/out via the uniform's value (0-1).
+  if (uPeakOfShow > 0.01) {
+    float peak = clamp(uPeakOfShow, 0.0, 1.0);
+    // Slow radial pulse — 1Hz breath from center, max amplitude 0.15
+    vec2 pCenter = uv - 0.5;
+    float pDist = length(pCenter);
+    float pPulse = 0.5 + 0.5 * sin(uTime * 6.2832 - pDist * 4.0);
+    float radial = (1.0 - smoothstep(0.0, 0.85, pDist)) * pPulse;
+    // Brightness lift: +35% center → +5% edges, all scaled by peak intensity
+    col *= 1.0 + (0.05 + radial * 0.30) * peak;
+    // Saturation lift via HSV
+    vec3 peakHsv = rgb2hsv(col);
+    peakHsv.y = mix(peakHsv.y, min(1.0, peakHsv.y * 1.45), peak);
+    // Warm convergence: pull hue 25% toward 35° amber (golden hour)
+    float warmHue = 35.0 / 360.0;
+    float hueDelta = warmHue - peakHsv.x;
+    if (hueDelta > 0.5) hueDelta -= 1.0; else if (hueDelta < -0.5) hueDelta += 1.0;
+    peakHsv.x = fract(peakHsv.x + hueDelta * 0.25 * peak);
+    col = hsv2rgb(peakHsv);
+    // Vignette inversion: bright center, slightly darkened edges for halo feel
+    float peakVign = 1.0 - pDist * 0.4 * peak;
+    col *= peakVign;
+  }
+
   // Final HDR safety clamp: prevent runaway accumulation from cascading into broken
   // patterns. [0, 2] preserves headroom for bloom/specular while bounding the worst
   // case so feedback loops + bright shaders can't produce stuck channel artifacts.
