@@ -730,6 +730,14 @@ function computeUniforms(
     envBrightness += (vocab.brightnessOffset ?? 0);
     envSaturation += (vocab.saturationOffset ?? 0);
   }
+  // Groove modifiers: temperature shift from detected groove type
+  // (pocket=warm, driving=hot, floating=cool, freeform=neutral).
+  // grooveModifiers was computed every frame, never read.
+  const gMods = analysis?.grooveMods;
+  if (gMods) {
+    // temperatureShift -1..+1 → ±10° hue (subtle, layers with vocab+narrative)
+    hueShiftDeg += (gMods.temperatureShift ?? 0) * 10;
+  }
   const envHue = hueShiftDeg * (Math.PI / 180); // convert to radians
 
   // Rich, vivid range — the Dead is NOT muted
