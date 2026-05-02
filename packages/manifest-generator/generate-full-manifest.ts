@@ -2476,8 +2476,57 @@ async function main() {
     console.error(`[full-manifest] ${missingShaders} referenced shaders have no source — render will produce black frames`);
   }
 
-  // ─── Write manifest (streaming JSON for large shows) ───
-  console.log(`\n[full-manifest] Writing: ${allFrames.length} frames, ${Object.keys(strippedShaders).length} shaders`);
+  // ─── Write manifest ───
+  // Two paths:
+  //   .msgpack — pack the full Manifest object via msgpackr (Buffer-based;
+  //     handles >512MB cleanly because there's no intermediate JSON string).
+  //     Renderer loads ~2x faster than JSON, file is ~50% smaller.
+  //   .json    — stream JSON token-by-token to avoid Node's 512MB string limit.
+  if (outputPath.endsWith('.msgpack')) {
+    console.log(`\n[full-manifest] Writing msgpack: ${allFrames.length} frames, ${Object.keys(strippedShaders).length} shaders`);
+    const { Packr } = await import('msgpackr');
+    const manifestObj: any = {
+      shaders: strippedShaders,
+      width, height, fps,
+      show_title: showTitle,
+      song_boundaries: songBoundaries,
+      frames: allFrames,
+    };
+    if (withOverlays && overlaySchedule.length > 0) {
+      manifestObj.overlay_schedule = overlaySchedule;
+      manifestObj.overlay_png_dir = overlayPngDirExplicit ? overlayPngDir : resolve(overlayPngDir);
+
+      const overlayUsage = new Map<string, number>();
+      for (const frame of overlaySchedule) {
+        for (const inst of frame) {
+          overlayUsage.set(inst.overlay_id, (overlayUsage.get(inst.overlay_id) ?? 0) + 1);
+        }
+      }
+      const sortedOverlays = [...overlayUsage.entries()].sort((a, b) => b[1] - a[1]);
+      console.log(`[full-manifest] Overlay usage (top 15):`);
+      for (const [name, count] of sortedOverlays.slice(0, 15)) {
+        const pct = (count / overlaySchedule.length * 100).toFixed(1);
+        console.log(`  ${name}: ${count} frames (${pct}%)`);
+      }
+    }
+    // Settings must match the Rust loader (rmp_serde) — useRecords=false, useFloat32=ALWAYS.
+    const packr = new Packr({ useRecords: false, structuredClone: false, useFloat32: 1 });
+    const buffer = packr.pack(manifestObj);
+    writeFileSync(outputPath, buffer);
+    const mb = (statSync(outputPath).size / 1048576).toFixed(1);
+    console.log(`[full-manifest] Done: ${outputPath} (${mb} MB, ${allFrames.length} frames)`);
+
+    // Report shader usage even on the msgpack path
+    const sortedModes = [...usedShaderModes.entries()].sort((a, b) => b[1] - a[1]);
+    console.log(`\n[full-manifest] Shader usage (top 15):`);
+    for (const [name, count] of sortedModes.slice(0, 15)) {
+      const pct = (count / allFrames.length * 100).toFixed(1);
+      console.log(`  ${name}: ${count} frames (${pct}%)`);
+    }
+    return;
+  }
+
+  console.log(`\n[full-manifest] Writing JSON: ${allFrames.length} frames, ${Object.keys(strippedShaders).length} shaders`);
   const ws = createWriteStream(outputPath);
 
   ws.write('{"shaders":');
