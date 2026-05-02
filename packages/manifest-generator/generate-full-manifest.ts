@@ -188,6 +188,10 @@ interface SongContext {
   showSongsCompleted: number;
   totalShowSongs: number;
   usedShaderModes: Map<string, number>;
+  /** Pre-blocklist-filtered shader IDs available for this show. Used by
+   *  routeScene priority overrides (drums/space, reactive triggers, dual)
+   *  to avoid picking blocklisted shaders that would render as black. */
+  activeShaderPool?: string[];
 }
 
 /**
@@ -310,7 +314,7 @@ function analyzeFrame(
     coherenceState = pre.coherence[idx] ?? { isLocked: false, score: 0 };
     itState = pre.it[idx] ?? { forceTranscendentShader: false };
     climaxState = pre.climax[idx] ?? { phase: "idle", intensity: 0 };
-    reactiveState = pre.reactive[idx] ?? { triggered: false, triggerType: null, shaderPool: [] };
+    reactiveState = pre.reactive[idx] ?? { isTriggered: false, triggerType: null, triggerStrength: 0, triggerAge: 0, suggestedModes: [], overlayInjections: [], cooldownRemaining: 0 };
     jamCycle = pre.jamCycle[idx] ?? { phase: "setup", progress: 0, isDeepening: false };
     try { drumsSpaceState = computeDrumsSpacePhase(frames, idx, isDrumsSpace); } catch (e) { failures.push(`drumsSpace: ${(e as Error).message?.slice(0,60)}`); }
     try { climaxMod = climaxModulation(climaxState as any); } catch (e) { failures.push(`climaxMod: ${(e as Error).message?.slice(0,60)}`); }
@@ -515,11 +519,22 @@ function routeScene(
     return { shaderId: ds, secondaryId: null, blendProgress: null, blendMode: null };
   }
 
-  // Priority 3: Reactive trigger injection
-  if (reactiveState?.triggered && reactiveState.shaderPool?.length > 0) {
-    const pool = reactiveState.shaderPool;
-    const pick = pool[Math.floor(seededRandom(ctx.songSeed + frameIdx * 3) * pool.length)];
-    return { shaderId: pick, secondaryId: prevShaderId, blendProgress: 0.3, blendMode: "dissolve" };
+  // Priority 3: Reactive trigger injection.
+  // Field names previously mismatched (triggered/shaderPool vs the source's
+  // isTriggered/suggestedModes), so this priority NEVER fired — the whole
+  // reactive system (spectral_eruption, energy_eruption, groove_solidify,
+  // etc.) was dead code in manifest gen. Now wired correctly. Pool is
+  // post-filtered against activeShaderPool (the trigger source includes
+  // some blocklisted names like cosmic_voyage / fluid_2d).
+  if (reactiveState?.isTriggered && reactiveState.suggestedModes?.length > 0) {
+    const showPool = ctx.activeShaderPool ?? [];
+    const filteredPool = showPool.length > 0
+      ? reactiveState.suggestedModes.filter((m: string) => showPool.includes(m))
+      : reactiveState.suggestedModes;
+    if (filteredPool.length > 0) {
+      const pick = filteredPool[Math.floor(seededRandom(ctx.songSeed + frameIdx * 3) * filteredPool.length)];
+      return { shaderId: pick, secondaryId: prevShaderId, blendProgress: 0.3, blendMode: "dissolve" };
+    }
   }
 
   // Priority 4: Section crossfade
@@ -1337,7 +1352,7 @@ async function main() {
     // Count precompute failures for visibility
     const preFailCounts = {
       interplay: preInterplay.filter(v => v === null).length,
-      reactive: preReactive.filter(v => !v?.triggered && v?.triggerType === null && v?.shaderPool?.length === 0).length,
+      reactive: preReactive.filter(v => !v?.isTriggered && v?.triggerType === null && v?.suggestedModes?.length === 0).length,
       jamCycle: preJamCycle.filter(v => v?.phase === "setup" && v?.progress === 0).length,
       climax: preClimaxState.filter(v => v?.phase === "idle" && v?.intensity === 0).length,
     };
@@ -1412,6 +1427,9 @@ async function main() {
       "particle_burst",
     ]);
     const activeShaderPool = Object.keys(shaders).filter(s => !SHADER_BLOCKLIST.has(s));
+    // Late-binding so routeScene's priority overrides (drums/space, reactive
+    // triggers, dual) can post-filter blocklisted picks.
+    ctx.activeShaderPool = activeShaderPool;
 
     for (let si = 0; si < Math.max(1, sections.length); si++) {
       const section = sections[si] ?? { start: 0, end: frames.length, type: "verse" };
@@ -2145,7 +2163,7 @@ async function main() {
           rotSchedule,
           frames,
           undefined, // calibration
-          (ctx._preComputed?.reactive?.[ai] ?? { triggered: false, triggerType: null, shaderPool: [] }) as any,
+          (ctx._preComputed?.reactive?.[ai] ?? { isTriggered: false, triggerType: null, triggerStrength: 0, triggerAge: 0, suggestedModes: [], overlayInjections: [], cooldownRemaining: 0 }) as any,
           tempo,
         );
 
