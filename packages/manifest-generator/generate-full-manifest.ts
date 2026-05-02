@@ -2296,7 +2296,7 @@ async function main() {
         isDrumsSpace,
         undefined,          // energyHints
         setlist.era ?? "primal",
-        undefined,          // mode
+        safeDefaultMode,    // mode — drives SCENE_OVERLAY_BIAS scoring per overlay
         songIdentity,
         showArcModifiers,
         undefined,                  // drumsSpacePhase (per-frame, can't be a song-level constant)
