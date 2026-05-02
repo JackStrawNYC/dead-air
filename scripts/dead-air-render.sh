@@ -32,6 +32,7 @@ STRICT_SHADERS=false
 STRICT_DIMENSIONS=false
 VALIDATE_ONLY=false
 GPU_OVERLAYS=false
+NO_ADAPTIVE_SCALE=false
 
 usage() {
   cat <<EOF
@@ -66,6 +67,8 @@ Quality gates:
 
 Performance:
   --gpu-overlays          GPU-side overlay compositing (Wave 4.1)
+  --no-adaptive-scale     Skip manifest-aware --scene-scale lowering
+                          (use --scene-scale verbatim)
 EOF
   exit 1
 }
@@ -89,6 +92,7 @@ while [[ $# -gt 0 ]]; do
     --strict-all)       STRICT_OVERLAYS=true; STRICT_SHADERS=true; STRICT_DIMENSIONS=true; shift;;
     --validate-only)    VALIDATE_ONLY=true; shift;;
     --gpu-overlays)     GPU_OVERLAYS=true; shift;;
+    --no-adaptive-scale) NO_ADAPTIVE_SCALE=true; shift;;
     -h|--help)          usage;;
     *)                  echo "Unknown arg: $1"; usage;;
   esac
@@ -188,6 +192,7 @@ else
   [[ "$STRICT_DIMENSIONS" == "true" ]] && RENDER_ARGS+=(--strict-dimensions)
   [[ "$VALIDATE_ONLY" == "true" ]] && RENDER_ARGS+=(--validate-only)
   [[ "$GPU_OVERLAYS" == "true" ]] && RENDER_ARGS+=(--gpu-overlays)
+  [[ "$NO_ADAPTIVE_SCALE" == "true" ]] && RENDER_ARGS+=(--no-adaptive-scale)
 
   if [[ "$USE_DOCKER" == "yes" ]] && command -v nvidia-smi >/dev/null 2>&1; then
     cd "$ROOT/docker"
@@ -202,6 +207,7 @@ else
     [[ "$STRICT_DIMENSIONS" == "true" ]] && DOCKER_RENDER_ARGS+=(--strict-dimensions)
     [[ "$VALIDATE_ONLY" == "true" ]] && DOCKER_RENDER_ARGS+=(--validate-only)
     [[ "$GPU_OVERLAYS" == "true" ]] && DOCKER_RENDER_ARGS+=(--gpu-overlays)
+    [[ "$NO_ADAPTIVE_SCALE" == "true" ]] && DOCKER_RENDER_ARGS+=(--no-adaptive-scale)
     docker compose run --rm \
       -v "$ROOT/out/${SHOW}:/data" \
       render \

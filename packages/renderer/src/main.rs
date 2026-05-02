@@ -177,6 +177,14 @@ struct Args {
     #[arg(long, default_value_t = 1.0)]
     scene_scale: f32,
 
+    /// Skip the manifest-aware auto-scale recommendation. Without this
+    /// flag, the renderer scans the manifest for BUSTED/SLOW shaders
+    /// (per the shader_tiers cost-baseline data) and may LOWER --scene-scale
+    /// to keep heavy frames within budget. Set this to use --scene-scale
+    /// verbatim regardless of the manifest's shader mix.
+    #[arg(long, default_value_t = false)]
+    no_adaptive_scale: bool,
+
     /// Enable GPU overlay compositing (audit Wave 4.1 phase C). Builds an
     /// atlas at startup and paints schedule overlays on the GPU output
     /// texture in a single instanced draw call per frame instead of the
@@ -429,17 +437,46 @@ fn main() {
         total_frames, args.width, args.height, args.fps, output_label
     );
 
+    // Adaptive scale: walk the manifest's shader_id distribution and pick a
+    // global scene_scale that keeps BUSTED-tier frames within frame budget.
+    // Conservative — only lowers scale when ≥3% of frames hit a heavy shader.
+    let effective_scene_scale = if args.no_adaptive_scale {
+        args.scene_scale
+    } else {
+        let frame_shader_iter = manifest.frames.iter().flat_map(|f| {
+            std::iter::once(f.shader_id.as_str())
+                .chain(f.secondary_shader_id.as_deref())
+        });
+        let (recommended, busted, slow, total) = dead_air_renderer::shader_tiers::recommend_global_scale(
+            frame_shader_iter, args.scene_scale,
+        );
+        if (recommended - args.scene_scale).abs() > 1e-3 {
+            let heavy_pct = 100.0 * (busted + slow) as f32 / total.max(1) as f32;
+            println!(
+                "Adaptive scale: manifest is {:.1}% heavy ({} BUSTED + {} SLOW of {} refs) — lowering --scene-scale {:.2} → {:.2} (override with --no-adaptive-scale)",
+                heavy_pct, busted, slow, total, args.scene_scale, recommended,
+            );
+        } else if busted > 0 || slow > 0 {
+            let heavy_pct = 100.0 * (busted + slow) as f32 / total.max(1) as f32;
+            println!(
+                "Adaptive scale: {:.1}% heavy ({} BUSTED + {} SLOW of {} refs) — below 3% threshold, keeping --scene-scale {:.2}",
+                heavy_pct, busted, slow, total, args.scene_scale,
+            );
+        }
+        recommended
+    };
+
     // Initialize GPU
     let start = Instant::now();
     let mut renderer = pollster::block_on(
-        gpu::GpuRenderer::new_with_scene_scale(args.width, args.height, args.scene_scale)
+        gpu::GpuRenderer::new_with_scene_scale(args.width, args.height, effective_scene_scale)
     ).expect("Failed to initialize GPU");
-    if (args.scene_scale - 1.0).abs() > 1e-3 {
+    if (effective_scene_scale - 1.0).abs() > 1e-3 {
         println!(
             "Scene LOD: rendering at {:.0}% of output ({}x{} scene → {}x{} output)",
-            args.scene_scale * 100.0,
-            (args.width as f32 * args.scene_scale) as u32,
-            (args.height as f32 * args.scene_scale) as u32,
+            effective_scene_scale * 100.0,
+            (args.width as f32 * effective_scene_scale) as u32,
+            (args.height as f32 * effective_scene_scale) as u32,
             args.width, args.height,
         );
     }

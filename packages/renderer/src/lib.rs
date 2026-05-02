@@ -14,6 +14,7 @@ pub mod overlay_atlas;
 pub mod overlay_cache;
 pub mod overlay_pass;
 pub mod postprocess;
+pub mod shader_tiers;
 pub mod temporal;
 pub mod text_layers;
 pub mod transition;
