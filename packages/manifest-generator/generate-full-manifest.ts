@@ -398,19 +398,24 @@ function seededRandom(seed: number): number {
   return x - Math.floor(x);
 }
 
-// Complementary shader pools for dual composition
+// Complementary shader pools for dual composition.
+// All entries are non-blocklisted — the previous version contained
+// cosmic_voyage / protean_clouds / fluid_2d / particle_nebula /
+// bioluminescence which the SHADER_BLOCKLIST drops, so dual blends
+// silently fell back to the renderer's "missing-shader" path = black
+// secondary layer.
 const DUAL_POOLS: Record<string, string[]> = {
-  protean_clouds: ["aurora", "cosmic_voyage", "void_light"],
-  fractal_temple: ["deep_ocean", "mandala_engine", "sacred_geometry"],
-  liquid_light: ["tie_dye", "oil_projector", "fluid_2d"],
-  inferno: ["electric_arc", "lava_flow", "fire_mountain_smoke"],
-  aurora: ["cosmic_voyage", "void_light", "particle_nebula"],
-  cosmic_voyage: ["aurora", "void_light", "protean_clouds"],
-  deep_ocean: ["crystal_cavern", "bioluminescence", "void_light"],
+  protean_clouds: ["aurora", "fluid_light", "void_light", "deep_ocean"],
+  fractal_temple: ["deep_ocean", "mandala_engine", "sacred_geometry", "honeycomb_cathedral"],
+  liquid_light: ["tie_dye", "oil_projector", "ink_wash", "fluid_light"],
+  inferno: ["electric_arc", "lava_flow", "fire_mountain_smoke", "bloom_explosion"],
+  aurora: ["void_light", "fluid_light", "deep_ocean", "memorial_drift"],
+  cosmic_voyage: ["aurora", "void_light", "fluid_light", "deep_ocean"],
+  deep_ocean: ["crystal_cavern", "void_light", "fluid_light", "memorial_drift"],
 };
 
 function getDualPool(mode: string): string[] {
-  return DUAL_POOLS[mode] ?? ["aurora", "cosmic_voyage", "void_light"];
+  return DUAL_POOLS[mode] ?? ["aurora", "void_light", "fluid_light", "deep_ocean"];
 }
 
 interface RouteState {
@@ -487,14 +492,23 @@ function routeScene(
 
   // Priority 2: Drums/Space override
   if (drumsSpaceState?.subPhase) {
-    const dsMap: Record<string, string> = {
-      drums_build: "inferno",
-      drums_peak: "electric_arc",
-      space_ambient: "cosmic_voyage",
-      space_textural: "aurora",
-      space_melodic: "void_light",
+    // Multi-option pools per phase (was 1 hardcoded shader each → cosmic_voyage
+    // alone drove ~12% of full-show frames despite being blocklisted, because
+    // the override fired for every space_ambient frame). Now picks varied,
+    // post-blocklist alternatives via a seeded shuffle for determinism +
+    // stem/section variety. The first non-blocked shader wins.
+    const dsPools: Record<string, string[]> = {
+      drums_build:    ["inferno", "lava_flow", "electric_arc", "earthquake_fissure", "fractal_flames"],
+      drums_peak:     ["electric_arc", "inferno", "bloom_explosion", "lava_flow", "psychedelic_garden"],
+      space_ambient:  ["void_light", "deep_ocean", "aurora", "memorial_drift", "fluid_light", "ember_meadow"],
+      space_textural: ["aurora", "aurora_curtains", "fluid_light", "void_light", "stark_minimal"],
+      space_melodic:  ["void_light", "aurora", "ember_meadow", "fluid_light", "porch_twilight"],
     };
-    const ds = dsMap[drumsSpaceState.subPhase] ?? defaultMode;
+    const pool = dsPools[drumsSpaceState.subPhase] ?? [defaultMode];
+    // Seeded pick keeps the same subphase consistent within a song
+    // but varies across songs/seeds.
+    const seedKey = ctx.songSeed + (drumsSpaceState.subPhase.length * 31);
+    const ds = pool[Math.floor(seededRandom(seedKey) * pool.length)] ?? defaultMode;
     if (ds !== prevShaderId) {
       return { shaderId: ds, secondaryId: prevShaderId, blendProgress: 0.5, blendMode: "dissolve" };
     }
