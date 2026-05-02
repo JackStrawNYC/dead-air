@@ -87,11 +87,17 @@ void main() {{
 }
 
 /// Generate the chapter card SVG overlay — song title (large, centered),
-/// artist name, and set position label.
+/// artist name, set position label, venue + date, and a Dead-style
+/// ornamental flourish. Audit flagged generic Netflix-doc design; this
+/// upgrade adds concert-poster typography (uppercase serif title with
+/// letter spacing), venue/date stamps for documentary context, and
+/// double-line + diamond flourish in place of the bare middle rule.
 fn chapter_card_overlay_svg(
     song_title: &str,
     set_label: &str,
     track_number: u32,
+    venue: Option<&str>,
+    date: Option<&str>,
     width: u32,
     height: u32,
     opacity: f32,
@@ -99,21 +105,51 @@ fn chapter_card_overlay_svg(
     let op = format!("{:.2}", opacity.clamp(0.0, 1.0));
     let cx = width / 2;
 
-    // Song title: large, centered vertically
+    // Song title — UPPERCASE for concert-poster feel, with generous letter spacing
+    let title_upper = song_title.to_uppercase();
     let title_y = (height as f32 * 0.45) as u32;
-    let title_size = (width as f32 * 0.035).max(28.0) as u32;
+    let title_size = (width as f32 * 0.042).max(36.0) as u32;
 
-    // Set label + track number: smaller, below the title
-    let label_y = title_y + (title_size as f32 * 1.6) as u32;
+    // Set + track label
+    let label_y = title_y + (title_size as f32 * 1.4) as u32;
     let label_size = (width as f32 * 0.014).max(12.0) as u32;
+
+    // Venue + date — below set/track for documentary context
+    let venue_y = label_y + (label_size as f32 * 1.8) as u32;
+    let venue_size = (width as f32 * 0.013).max(11.0) as u32;
 
     // Artist: above the title, subtle
     let artist_y = title_y - (title_size as f32 * 1.2) as u32;
     let artist_size = (width as f32 * 0.012).max(10.0) as u32;
 
-    // Thin decorative line between artist and title
-    let line_y = title_y - (title_size as f32 * 0.5) as u32;
-    let line_half_w = (width as f32 * 0.06) as u32;
+    // Ornamental flourish — double line with center diamond, between artist and title
+    let line_y = title_y - (title_size as f32 * 0.55) as u32;
+    let line_half_w = (width as f32 * 0.08) as u32;
+    let diamond_cy = line_y;
+    let diamond_r = (label_size as f32 * 0.35) as u32;
+    let venue_text = venue.unwrap_or("");
+    let date_text = date.unwrap_or("");
+    let venue_date = if !venue_text.is_empty() && !date_text.is_empty() {
+        format!("{} \u{2022} {}", venue_text.to_uppercase(), date_text)
+    } else if !venue_text.is_empty() {
+        venue_text.to_uppercase()
+    } else if !date_text.is_empty() {
+        date_text.to_string()
+    } else {
+        String::new()
+    };
+
+    let venue_block = if venue_date.is_empty() {
+        String::new()
+    } else {
+        format!(
+            "<text x=\"{}\" y=\"{}\" font-size=\"{}\" font-weight=\"300\" \
+             fill=\"rgba(255,255,255,0.40)\" text-anchor=\"middle\" \
+             letter-spacing=\"3\" \
+             font-family=\"Helvetica Neue, Arial, sans-serif\">{}</text>",
+            cx, venue_y, venue_size, venue_date,
+        )
+    };
 
     format!(
         "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{}\" height=\"{}\">\
@@ -123,15 +159,21 @@ fn chapter_card_overlay_svg(
           letter-spacing=\"4\" \
           font-family=\"Helvetica Neue, Arial, sans-serif\">GRATEFUL DEAD</text>\
          <line x1=\"{}\" y1=\"{}\" x2=\"{}\" y2=\"{}\" \
-          stroke=\"rgba(255,255,255,0.2)\" stroke-width=\"1\" />\
-         <text x=\"{}\" y=\"{}\" font-size=\"{}\" font-weight=\"300\" \
-          fill=\"white\" text-anchor=\"middle\" \
-          letter-spacing=\"2\" \
-          font-family=\"Georgia, 'Palatino Linotype', serif\" font-style=\"italic\" \
-          filter=\"drop-shadow(0 2px 8px rgba(0,0,0,0.7))\">{}</text>\
+          stroke=\"rgba(255,255,255,0.30)\" stroke-width=\"1\" />\
+         <line x1=\"{}\" y1=\"{}\" x2=\"{}\" y2=\"{}\" \
+          stroke=\"rgba(255,255,255,0.30)\" stroke-width=\"1\" />\
+         <polygon points=\"{},{} {},{} {},{} {},{}\" \
+          fill=\"rgba(255,255,255,0.55)\" />\
          <text x=\"{}\" y=\"{}\" font-size=\"{}\" font-weight=\"400\" \
-          fill=\"rgba(255,255,255,0.5)\" text-anchor=\"middle\" \
-          font-family=\"Helvetica Neue, Arial, sans-serif\">{} \u{2022} Track {}</text>\
+          fill=\"white\" text-anchor=\"middle\" \
+          letter-spacing=\"6\" \
+          font-family=\"Georgia, 'Palatino Linotype', serif\" \
+          filter=\"drop-shadow(0 2px 10px rgba(0,0,0,0.85))\">{}</text>\
+         <text x=\"{}\" y=\"{}\" font-size=\"{}\" font-weight=\"400\" \
+          fill=\"rgba(255,255,255,0.55)\" text-anchor=\"middle\" \
+          letter-spacing=\"3\" \
+          font-family=\"Helvetica Neue, Arial, sans-serif\">{} \u{00B7} TRACK {}</text>\
+         {}\
          </g></svg>",
         width,
         height,
@@ -140,22 +182,34 @@ fn chapter_card_overlay_svg(
         cx,
         artist_y,
         artist_size,
-        // Decorative line
+        // Left half of double line (split by diamond)
         cx - line_half_w,
+        line_y,
+        cx - diamond_r * 2,
+        line_y,
+        // Right half of double line
+        cx + diamond_r * 2,
         line_y,
         cx + line_half_w,
         line_y,
-        // Song title
+        // Diamond at center: top, right, bottom, left
+        cx, diamond_cy - diamond_r,
+        cx + diamond_r, diamond_cy,
+        cx, diamond_cy + diamond_r,
+        cx - diamond_r, diamond_cy,
+        // Song title (UPPERCASE)
         cx,
         title_y,
         title_size,
-        xml_escape(song_title),
+        xml_escape(&title_upper),
         // Set label + track
         cx,
         label_y,
         label_size,
-        xml_escape(set_label),
+        xml_escape(set_label).to_uppercase(),
         track_number,
+        // Venue + date block (may be empty)
+        venue_block,
     )
 }
 
@@ -179,6 +233,8 @@ pub fn generate_chapter_card(
     song_title: &str,
     set_label: &str,
     track_number: u32,
+    venue: Option<&str>,
+    date: Option<&str>,
 ) -> (HashMap<String, String>, Vec<FrameData>, Vec<Vec<OverlayLayer>>) {
     let total_frames = (CHAPTER_DURATION * fps as f32) as usize;
 
@@ -325,6 +381,8 @@ pub fn generate_chapter_card(
             song_title,
             set_label,
             track_number,
+            venue,
+            date,
             width,
             height,
             text_opacity,

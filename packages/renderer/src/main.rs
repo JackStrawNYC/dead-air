@@ -356,6 +356,8 @@ fn main() {
                         chapter_card::generate_chapter_card(
                             args.fps, args.width, args.height,
                             title, &set_label, *track_num,
+                            args.show_venue.as_deref(),
+                            args.show_date.as_deref(),
                         );
 
                     let n_cc = cc_frames.len();
