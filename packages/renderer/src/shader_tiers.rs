@@ -128,9 +128,91 @@ pub fn tier_for(shader_id: &str) -> CostTier {
         | "honeycomb-cathedral" | "honeycomb_cathedral"
         => CostTier::Ok30,
 
-        // Everything else: Ok60 if known, Unknown otherwise. We could
-        // exhaustively list all 80 OK60 shaders but the lookup is the
-        // hot path and the Unknown→Ok60-treatment fallback is safe.
+        // OK60 — < 16.67ms p95 at 360p. Listed explicitly so the tier
+        // rollup distinguishes "actually OK60" from "not in baseline"
+        // (which now correctly reads as a stale-baseline signal).
+        "amber-drift" | "amber_drift"
+        | "ancient-forest" | "ancient_forest"
+        | "aurora-curtains" | "aurora_curtains"
+        | "aurora-sky" | "aurora_sky"
+        | "blacklight-glow" | "blacklight_glow"
+        | "boxcar-tunnel" | "boxcar_tunnel"
+        | "campfire-embers" | "campfire_embers"
+        | "campfire-glsl" | "campfire_glsl"
+        | "cellular-automata" | "cellular_automata"
+        | "climax-surge" | "climax_surge"
+        | "clockwork-temple" | "clockwork_temple"
+        | "combustible-voronoi" | "combustible_voronoi"
+        | "concert-beams" | "concert_beams"
+        | "concert-lighting" | "concert_lighting"
+        | "cosmic-cathedral" | "cosmic_cathedral"
+        | "cosmic-railroad" | "cosmic_railroad"
+        | "cosmic-voyage" | "cosmic_voyage"
+        | "crystal-cavern" | "crystal_cavern"
+        | "crystalline-growth" | "crystalline_growth"
+        | "crystalline-void" | "crystalline_void"
+        | "dance-floor-prism" | "dance_floor_prism"
+        | "databend"
+        | "desert-cantina" | "desert_cantina"
+        | "desert-cathedral" | "desert_cathedral"
+        | "desert-road-glsl" | "desert_road_glsl"
+        | "diffraction-rings" | "diffraction_rings"
+        | "digital-rain" | "digital_rain"
+        | "electric-arc" | "electric_arc"
+        | "ember-meadow" | "ember_meadow"
+        | "event-horizon" | "event_horizon"
+        | "feedback-recursion" | "feedback_recursion"
+        | "fire-mountain-smoke" | "fire_mountain_smoke"
+        | "fluid-2d" | "fluid_2d"
+        | "forest-glsl" | "forest_glsl"
+        | "fractal-flames" | "fractal_flames"
+        | "fractal-temple" | "fractal_temple"
+        | "fractal-zoom" | "fractal_zoom"
+        | "ink-wash" | "ink_wash"
+        | "kaleidoscope"
+        | "liquid-light" | "liquid_light"
+        | "liquid-mandala" | "liquid_mandala"
+        | "liquid-projector" | "liquid_projector"
+        | "lo-fi-grain" | "lo_fi_grain"
+        | "luminous-cavern" | "luminous_cavern"
+        | "mandala-engine" | "mandala_engine"
+        | "molten-forge" | "molten_forge"
+        | "molten-glass" | "molten_glass"
+        | "mountain-fire" | "mountain_fire"
+        | "mountain-fire-glsl" | "mountain_fire_glsl"
+        | "neon-casino" | "neon_casino"
+        | "neon-grid" | "neon_grid"
+        | "nimitz-aurora" | "nimitz_aurora"
+        | "obsidian-mirror" | "obsidian_mirror"
+        | "ocean"
+        | "ocean-glsl" | "ocean_glsl"
+        | "oil-projector" | "oil_projector"
+        | "porch-twilight" | "porch_twilight"
+        | "prism-refraction" | "prism_refraction"
+        | "protean-clouds" | "protean_clouds"
+        | "rain-street" | "rain_street"
+        | "river-glsl" | "river_glsl"
+        | "sacred-geometry" | "sacred_geometry"
+        | "scarlet-golden-haze" | "scarlet_golden_haze"
+        | "seascape"
+        | "signal-decay" | "signal_decay"
+        | "solar-flare" | "solar_flare"
+        | "spectral-bridge" | "spectral_bridge"
+        | "spinning-spiral" | "spinning_spiral"
+        | "st-stephen-lightning" | "st_stephen_lightning"
+        | "stained-glass" | "stained_glass"
+        | "stained-glass-dissolution" | "stained_glass_dissolution"
+        | "star-nest" | "star_nest"
+        | "stark-minimal" | "stark_minimal"
+        | "storm"
+        | "terrapin-nebula" | "terrapin_nebula"
+        | "vintage-film" | "vintage_film"
+        | "void-light" | "void_light"
+        | "volumetric-nebula" | "volumetric_nebula"
+        | "warp-field" | "warp_field"
+        | "wharf-rat-storm" | "wharf_rat_storm"
+        => CostTier::Ok60,
+
         _ => CostTier::Unknown,
     }
 }
@@ -167,11 +249,18 @@ mod tests {
     }
 
     #[test]
-    fn known_cheap_shader_returns_ok30_or_unknown_not_busted() {
-        // ember-meadow is OK60 (1.6ms p95) — falls through to Unknown.
-        // Critical: it must NEVER classify as Busted/Slow.
-        let t = tier_for("ember-meadow");
-        assert!(matches!(t, CostTier::Unknown | CostTier::Ok60));
+    fn known_cheap_shader_returns_ok60() {
+        // ember-meadow is OK60 (1.6ms p95).
+        assert_eq!(tier_for("ember-meadow"), CostTier::Ok60);
+        assert_eq!(tier_for("ember_meadow"), CostTier::Ok60);
+        assert_eq!(tier_for("void_light"), CostTier::Ok60);
+        assert_eq!(tier_for("cosmic_voyage"), CostTier::Ok60);
+    }
+
+    #[test]
+    fn unknown_shader_returns_unknown() {
+        // Truly unknown — not in any list. Should hint at stale baseline.
+        assert_eq!(tier_for("totally-made-up-shader"), CostTier::Unknown);
     }
 
     #[test]
