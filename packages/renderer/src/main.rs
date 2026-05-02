@@ -447,6 +447,21 @@ fn main() {
         args.height,
     );
 
+    // Pre-flight: every shader_id referenced by a frame must be present in
+    // the manifest's shaders map. A missing shader silently renders as a
+    // black frame in the renderer's fallback path; this validation surfaces
+    // those typos / missing exports before render starts.
+    {
+        let report = manifest.validate_shader_refs();
+        report.print();
+        if !report.ok() && args.strict_overlays {
+            // Reuse --strict-overlays as a "strict pre-flight" flag — same
+            // intent (refuse to render with known-broken inputs).
+            eprintln!("Shaders: --strict-overlays set, aborting before render");
+            std::process::exit(2);
+        }
+    }
+
     // Compile all shaders
     let mut shader_cache = shader_cache::ShaderCache::new();
 

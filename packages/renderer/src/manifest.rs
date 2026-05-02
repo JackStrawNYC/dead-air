@@ -261,6 +261,90 @@ pub fn load_manifest(path: &Path) -> Result<Manifest, Box<dyn std::error::Error>
     }
 }
 
+/// Pre-flight report on shader_ids referenced by frames vs available in the
+/// shaders map. Each entry in `missing` is `(shader_id, count_of_frames)`.
+/// A missing shader silently renders as a black frame in the renderer's
+/// fallback path — this lets `main` warn or abort before that happens.
+#[derive(Debug)]
+pub struct ShaderValidationReport {
+    /// Sorted by frame-count desc.
+    pub missing: Vec<(String, usize)>,
+    pub total_referenced: usize,
+    pub frames_affected: usize,
+    pub unique_shader_ids: usize,
+    pub available_shaders: usize,
+}
+
+impl ShaderValidationReport {
+    pub fn ok(&self) -> bool {
+        self.missing.is_empty()
+    }
+
+    pub fn print(&self) {
+        if self.ok() {
+            println!(
+                "Shaders: validation OK — {} unique shader_ids referenced, all present in {} loaded",
+                self.unique_shader_ids, self.available_shaders,
+            );
+            return;
+        }
+        eprintln!(
+            "Shaders: VALIDATION FAILED — {} unique shader_ids missing, {} frames will render as black",
+            self.missing.len(), self.frames_affected,
+        );
+        eprintln!(
+            "Shaders: {} unique referenced, {} loaded, {} total frame references",
+            self.unique_shader_ids, self.available_shaders, self.total_referenced,
+        );
+        let limit = self.missing.len().min(20);
+        for (id, count) in &self.missing[..limit] {
+            eprintln!("  MISSING: {} ({} frames)", id, count);
+        }
+        if self.missing.len() > limit {
+            eprintln!("  ... +{} more missing shader_ids", self.missing.len() - limit);
+        }
+    }
+}
+
+impl Manifest {
+    /// Walk every frame's shader_id (and secondary_shader_id) and verify each
+    /// is present in `self.shaders`. The renderer's missing-shader fallback
+    /// writes a black frame; this report makes that silent failure visible
+    /// before render starts.
+    pub fn validate_shader_refs(&self) -> ShaderValidationReport {
+        use std::collections::HashMap;
+        let mut counts: HashMap<&str, usize> = HashMap::new();
+        let mut total = 0usize;
+        let mut missing_counts: HashMap<String, usize> = HashMap::new();
+        let mut affected = 0usize;
+        for f in &self.frames {
+            *counts.entry(&f.shader_id).or_insert(0) += 1;
+            total += 1;
+            if !self.shaders.contains_key(&f.shader_id) {
+                *missing_counts.entry(f.shader_id.clone()).or_insert(0) += 1;
+                affected += 1;
+            }
+            if let Some(ref sid) = f.secondary_shader_id {
+                *counts.entry(sid.as_str()).or_insert(0) += 1;
+                total += 1;
+                if !self.shaders.contains_key(sid) {
+                    *missing_counts.entry(sid.clone()).or_insert(0) += 1;
+                    affected += 1;
+                }
+            }
+        }
+        let mut missing: Vec<(String, usize)> = missing_counts.into_iter().collect();
+        missing.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+        ShaderValidationReport {
+            missing,
+            total_referenced: total,
+            frames_affected: affected,
+            unique_shader_ids: counts.len(),
+            available_shaders: self.shaders.len(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -352,6 +436,37 @@ mod tests {
         let decoded: Manifest = serde_json::from_str(&s).expect("decode json");
         assert_eq!(decoded.frames.len(), 3);
         assert_eq!(decoded.frames[0].shader_id, "test_shader");
+    }
+
+    #[test]
+    fn validate_shader_refs_passes_when_all_present() {
+        let m = sample_manifest();  // shaders has "test_shader", all 3 frames use it
+        let r = m.validate_shader_refs();
+        assert!(r.ok());
+        assert_eq!(r.unique_shader_ids, 1);
+        assert_eq!(r.frames_affected, 0);
+        assert_eq!(r.total_referenced, 3);
+    }
+
+    #[test]
+    fn validate_shader_refs_flags_missing() {
+        let mut m = sample_manifest();
+        // Add a frame referencing a non-existent shader.
+        let mut bad = sample_frame(99);
+        bad.shader_id = "nonexistent".to_string();
+        m.frames.push(bad);
+        // And another with a missing secondary.
+        let mut bad2 = sample_frame(100);
+        bad2.secondary_shader_id = Some("also_missing".to_string());
+        m.frames.push(bad2);
+
+        let r = m.validate_shader_refs();
+        assert!(!r.ok());
+        assert_eq!(r.missing.len(), 2);
+        // Sorted by frame count desc then id asc — both have count 1 so alpha order: also_missing < nonexistent
+        assert_eq!(r.missing[0].0, "also_missing");
+        assert_eq!(r.missing[1].0, "nonexistent");
+        assert_eq!(r.frames_affected, 2);
     }
 
     /// Cross-format equivalence: msgpack and json must produce equivalent manifests.
