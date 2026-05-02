@@ -1766,6 +1766,7 @@ async function main() {
       // peak give 0.25 not 0.0.
       overlayDensityMults[i] = (frameAnalysis.narrative?.overlayDensityMult ?? 1.0)
         * (frameAnalysis.sectionVocab?.overlayDensityMult ?? 1.0)
+        * (frameAnalysis.interplay?.densityMult ?? 1.0)
         * (frameAnalysis.peakOfShow?.isPeak ? 0.5 : 1.0);
 
       // Scene routing with hold enforcement (prevents seizure-fast switching)
