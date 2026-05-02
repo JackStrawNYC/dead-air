@@ -1869,10 +1869,15 @@ async function main() {
       // Compute uniforms with interpolation between adjacent analysis frames.
       // Structural analysis and routing use integer index (discrete decisions),
       // but continuous audio values are interpolated for smooth 60fps curves.
+      // Merge songIdentity.palette into song so computeUniforms can read it
+      // via song?.palette. SetlistEntry.palette wins if both are set.
+      const songForUniforms = (song?.palette || !songIdentity?.palette)
+        ? song
+        : { ...song, palette: songIdentity.palette };
       let uniforms = computeUniforms(
         frames, ai, fps, tempo, width, height, globalTime, frameAnalysis, smoothed,
         aiHi, interpT,
-        song, i / Math.max(1, totalOut), routeSectionProgress, showVisualSeed,
+        songForUniforms, i / Math.max(1, totalOut), routeSectionProgress, showVisualSeed,
         setlist.era ?? "classic",
       );
 
