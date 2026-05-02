@@ -1415,47 +1415,97 @@ async function main() {
         "smoke_rings",          // gentle smoke — neutral, takes palette color
       ]);
 
-      // Pick from song identity preferred modes. Trust authored identity over the
-      // generic DEAD_CONCERT_SHADERS whitelist — the blocklist is the quality safety net.
-      // Only require modes survive the blocklist (activeShaderPool check), not the whitelist.
-      let pool: string[] = [];
-      if (preferredModes.length > 0) {
-        const identityFiltered = preferredModes.filter((m: string) =>
-          activeShaderPool.includes(m)
+      // PRIMARY: use shader-variety::getModeForSection — the same sophisticated
+      // router the Remotion engine uses. It applies recency weighting,
+      // visual-memory diversity, song-identity preferences, spectral-family
+      // matching, and continuous-energy gaussian-weighted pools. Until now
+      // this function was imported but never called, defaulting to the
+      // hardcoded HIGH/LOW/MID pools below — which capped Veneta to 21
+      // unique shaders out of 87 active.
+      const adaptedSections = (sections ?? []).map((s: any) => {
+        const sStart = s.start ?? s.frameStart ?? 0;
+        const sEnd = s.end ?? s.frameEnd ?? frames.length;
+        const sMid = Math.floor((sStart + sEnd) / 2);
+        const sAvg = smoothed.energy[Math.min(sMid, frames.length - 1)] ?? 0.3;
+        return {
+          frameStart: sStart,
+          frameEnd: sEnd,
+          avgEnergy: sAvg,
+          energy: sAvg >= 0.4 ? "high" : sAvg >= 0.15 ? "mid" : "low",
+        };
+      });
+      const songEntryShape: any = {
+        ...song,
+        defaultMode,
+      };
+      const showShaderPool = activeShaderPool as any;
+      let pick: string | null = null;
+      try {
+        const candidate = getModeForSection(
+          songEntryShape,
+          si,
+          adaptedSections as any,
+          ctx.songSeed,
+          (setlist as any).era,
+          false,                  // coherenceIsLocked — manifest gen is offline batch
+          usedShaderModes as any, // SHOW-LEVEL state, persists across songs
+          songIdentity,
+          undefined,              // stemSection
+          frames as any,          // for spectral matching
+          totalOut,               // songDuration in frames
+          setNumber,
+          songIdx + 1,            // trackNumber (1-based)
+          shaderModeLastUsed as any,
+          undefined,              // stemDominant
+          undefined,              // visualMemory — could thread through later
+          showShaderPool,         // restrict to manifest-available, non-blocklisted
         );
-        if (identityFiltered.length >= 1) {
-          pool = identityFiltered;
-        } else {
-          console.warn(`    [WARN] song "${song.title}" has preferredModes [${preferredModes.join(", ")}] but all are blocklisted — falling through to energy pool`);
+        // Manifest-gen blocklist wins over shader-variety's SAFE_SHADERS.
+        if (candidate && activeShaderPool.includes(candidate as any) && !SHADER_BLOCKLIST.has(candidate as any)) {
+          pick = candidate as string;
+        }
+      } catch (e) {
+        console.warn(`    [WARN] getModeForSection threw: ${e} — falling back to legacy pool`);
+      }
+
+      // FALLBACK: legacy hardcoded pool. Only fires if getModeForSection
+      // returned a blocklisted/missing shader (which should be rare since
+      // we passed showShaderPool = activeShaderPool).
+      if (!pick) {
+        let pool: string[] = [];
+        if (preferredModes.length > 0) {
+          const identityFiltered = preferredModes.filter((m: string) =>
+            activeShaderPool.includes(m)
+          );
+          if (identityFiltered.length >= 1) {
+            pool = identityFiltered;
+          }
+        }
+        if (pool.length === 0) {
+          if (avgEnergy > 0.25) {
+            pool = activeShaderPool.filter(s => HIGH_ENERGY_SHADERS.has(s));
+          } else if (avgEnergy < 0.10) {
+            pool = activeShaderPool.filter(s => LOW_ENERGY_SHADERS.has(s));
+          } else {
+            pool = activeShaderPool.filter(s => ["tie_dye", "fractal_temple",
+              "stained_glass", "fractal_flames", "kaleidoscope",
+              "sacred_geometry", "lava_flow", "inferno", "smoke_rings"].includes(s));
+          }
+        }
+        if (pool.length === 0) pool = ["fractal_temple", "aurora", "deep_ocean", "inferno", "stained_glass"];
+        const seed = ctx.songSeed + si * 137;
+        pick = pool[Math.floor(seededRandom(seed) * pool.length)];
+        if (sectionModes.length > 0 && pick === sectionModes[sectionModes.length - 1] && pool.length > 1) {
+          pick = pool[Math.floor(seededRandom(seed + 99) * pool.length)];
         }
       }
 
-      // Fallback: energy-based pool from curated A+/A/B shaders
-      if (pool.length === 0) {
-        if (avgEnergy > 0.25) {
-          pool = activeShaderPool.filter(s => HIGH_ENERGY_SHADERS.has(s));
-        } else if (avgEnergy < 0.10) {
-          pool = activeShaderPool.filter(s => LOW_ENERGY_SHADERS.has(s));
-        } else {
-          // MID energy: varied, evolving, textured
-          // MID energy: the Dead's sweet spot — screen-filling, psychedelic, WARM
-          pool = activeShaderPool.filter(s => ["tie_dye", "fractal_temple",
-            "stained_glass", "fractal_flames", "kaleidoscope",
-            "sacred_geometry", "lava_flow", "inferno", "smoke_rings"].includes(s));
-        }
-      }
-
-      // Final fallback
-      if (pool.length === 0) pool = ["fractal_temple", "aurora", "deep_ocean", "inferno", "stained_glass"];
-
-      // Seeded selection for determinism, avoid repeating the previous shader
-      const seed = ctx.songSeed + si * 137;
-      let pick = pool[Math.floor(seededRandom(seed) * pool.length)];
-      // Try to avoid repeating the last section's shader
-      if (sectionModes.length > 0 && pick === sectionModes[sectionModes.length - 1] && pool.length > 1) {
-        pick = pool[Math.floor(seededRandom(seed + 99) * pool.length)];
-      }
       sectionModes.push(pick);
+      // Update show-level recency state so the NEXT section's call to
+      // getModeForSection sees what we picked. Without this the recency
+      // weighting can't fire and variety collapses.
+      usedShaderModes.set(pick as any, (usedShaderModes.get(pick as any) ?? 0) + 1);
+      shaderModeLastUsed.set(pick as any, songIdx + 1);
     }
     {
       const unique = new Set(sectionModes);
