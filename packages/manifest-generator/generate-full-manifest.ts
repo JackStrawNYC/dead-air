@@ -738,6 +738,23 @@ function computeUniforms(
     // temperatureShift -1..+1 → ±10° hue (subtle, layers with vocab+narrative)
     hueShiftDeg += (gMods.temperatureShift ?? 0) * 10;
   }
+  // Climax modulation: rich offsets that exceed the hardcoded climax
+  // boosts above. climaxModulation factors in anticipation +
+  // stem-dominant context, returns specific saturation/brightness/
+  // bloom/contrast offsets. Computed but only the saturation +
+  // brightness fields fed downstream — adopt the rest now too.
+  const cMod = analysis?.climaxMod;
+  if (cMod) {
+    // Note: the hardcoded climax block above (lines ~682-696) already
+    // contributed phase-based boosts. cMod refines by intensity +
+    // anticipation. Apply the DELTA (cMod is computed independently),
+    // not double-counting the hardcoded path. Magnitudes from
+    // climaxModulation are small enough (typical |saturationOffset|
+    // < 0.15, |brightnessOffset| < 0.10) that adding still keeps the
+    // envelope_brightness/saturation clamps comfortable.
+    envBrightness += (cMod.brightnessOffset ?? 0) * 0.5;  // half-weight to avoid double-apply with hardcoded climax
+    envSaturation += (cMod.saturationOffset ?? 0) * 0.5;
+  }
   const envHue = hueShiftDeg * (Math.PI / 180); // convert to radians
 
   // Rich, vivid range — the Dead is NOT muted
