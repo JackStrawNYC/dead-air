@@ -94,6 +94,29 @@ Multi-commit execution against [`ARCHITECTURAL-AUDIT-2026-04.md`](./ARCHITECTURA
   - `--strict-shaders`, `--strict-dimensions`, `--validate-only` (CI gates)
   - Top-10 shader frame distribution printed every render
   - GPU overlay atlas drops cross-checked vs schedule
+- **5.5** Per-tier rollup in pre-flight (cost-baseline summary every render)
+- **5.6** Tier-change feedback chain reset (eliminates stale-bundle artifacts)
+
+### Wave 6 — manifest-gen routing unlock (May 2026 session, in progress)
+Three "imported but never called" routing functions wired:
+- **6.1** `getModeForSection` — sophisticated picker (recency weighting,
+  song identity, spectral matching, visual memory, continuous-energy pools)
+- **6.2** `dynamicCrossfadeDuration` — energy-aware 2-12s transitions
+  (was hardcoded 0.5-3s cap, the Cornell "abrupt transitions" signal)
+- **6.3** `detectPeakOfShow` — one-time golden "moment of the show"
+  treatment (brightness +0.20, saturation +0.35, overlay density 0.5x,
+  camera 0.6x, ~7s duration)
+
+Plus per-song variety enforcement (50% cap), thin-identity drop (when
+< 3 valid preferred modes survive blocklist), forest blocklisted
+(3D-mesh shader, vWorldPos compile fail), msgpack direct output for
+full-show (avoids Node 512MB string limit).
+
+Veneta v3 validation (1920x1080@30fps, 349,507 frames):
+- Total unique shaders: 21 → **66** (catalog utilization 24% → 76%)
+- BUSTED unique: 2 → **11** (the user's "only 4 heavy shaders" complaint)
+- SLOW unique: 2 → **6**
+- 66/66 shaders compile cleanly (forest blocklisted)
 
 ### Wave 4.2 — Live Rust mode (phase B onwards)
 - Frame budget data in hand; needs cpal input, real-time DSP, winit window, reactive router port.
