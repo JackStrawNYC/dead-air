@@ -2225,6 +2225,12 @@ async function main() {
       });
       const showArcModifiers = getShowArcModifiers(arcPhase);
 
+      // Song hero: the song's signature overlay. Without it, overlay
+      // selection has no "must-include" guarantee — Sugar Magnolia might
+      // not get its rose, Casey Jones might not get its cocaine spoon, etc.
+      // Source: first authored overlayBoost entry from songIdentity.
+      const songHero: string | undefined = songIdentity?.overlayBoost?.[0];
+
       // Build rotation schedule for this song
       const rotSchedule = buildRotationSchedule(
         overlayPool,
@@ -2237,11 +2243,11 @@ async function main() {
         setlist.era ?? "primal",
         undefined,          // mode
         songIdentity,
-        showArcModifiers,   // now wired (was undefined)
+        showArcModifiers,
         undefined,          // drumsSpacePhase
         undefined,          // stemSectionType
         showSongsCompleted, // songsCompleted
-        undefined,          // songHero
+        songHero,           // now wired (was undefined)
         tempo,
       );
 
