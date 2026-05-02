@@ -708,6 +708,19 @@ function computeUniforms(
   const chromaHueNorm = chromaHue(f) / 360; // 0-1
   const chromaBreathing = (chromaHueNorm - 0.5) * 10 * Math.min(1, energy * 4);
   hueShiftDeg += chromaBreathing;
+
+  // Narrative directive: per-song authored arc affects color/brightness.
+  // computeNarrativeDirective was called every frame but its output was
+  // discarded. Now its offsets are applied additively (small magnitudes
+  // — ±0.2 brightness, ±0.3 sat — so sections still feel like the same
+  // song but the authored narrative arc actually colors the rendering).
+  const nar = analysis?.narrative;
+  if (nar) {
+    envBrightness += (nar.brightnessOffset ?? 0);
+    envSaturation += (nar.saturationOffset ?? 0);
+    // temperature: -1 cool, +1 warm. Map to ±15° hue shift.
+    hueShiftDeg += (nar.temperature ?? 0) * 15;
+  }
   const envHue = hueShiftDeg * (Math.PI / 180); // convert to radians
 
   // Rich, vivid range — the Dead is NOT muted
