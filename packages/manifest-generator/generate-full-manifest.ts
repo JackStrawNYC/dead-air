@@ -721,6 +721,15 @@ function computeUniforms(
     // temperature: -1 cool, +1 warm. Map to ±15° hue shift.
     hueShiftDeg += (nar.temperature ?? 0) * 15;
   }
+  // Section vocabulary: per-section-type (verse/chorus/jam/space/etc.)
+  // brightness + saturation offsets. Also computed every frame, also
+  // dropped. Smaller magnitudes (±0.1 brightness, ±0.2 sat per the
+  // VOCABULARIES table) — verses dim/desaturate, choruses brighten.
+  const vocab = analysis?.sectionVocab;
+  if (vocab) {
+    envBrightness += (vocab.brightnessOffset ?? 0);
+    envSaturation += (vocab.saturationOffset ?? 0);
+  }
   const envHue = hueShiftDeg * (Math.PI / 180); // convert to radians
 
   // Rich, vivid range — the Dead is NOT muted
