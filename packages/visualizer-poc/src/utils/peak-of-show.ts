@@ -107,17 +107,27 @@ export function detectPeakOfShow(
     ? Math.max(...previousSongPeaks)
     : 0;
 
-  // Need to exceed both a minimum threshold AND all previous song peaks
-  const MIN_THRESHOLD = 0.08;
+  // Need a meaningful absolute energy score AND to roughly meet/exceed
+  // the show's prior peak. Old logic required 1.1x prior max — too
+  // strict for shows with consistently high-energy jams (Veneta never
+  // fired). 0.95x lets the FIRST equally-intense moment in the second
+  // half fire, which is the intended behavior: "THE moment" should
+  // always exist somewhere in a 3-hour show.
+  // MIN_THRESHOLD 0.15 filters out quiet ambient passages but admits
+  // moderately energetic jam moments (real Dead jam peaks score 0.4-0.6).
+  const MIN_THRESHOLD = 0.15;
   if (currentScore < MIN_THRESHOLD) return NEUTRAL;
 
-  const requiredScore = previousMax > 0 ? previousMax * 1.1 : MIN_THRESHOLD;
+  const requiredScore = previousMax > 0
+    ? Math.max(MIN_THRESHOLD, previousMax * 0.95)
+    : MIN_THRESHOLD;
   if (currentScore < requiredScore) return NEUTRAL;
 
-  // Intensity: how far above the threshold (0-1, capped)
-  // Stronger peaks = more intense visual treatment
+  // Intensity: how far above the threshold (0-1, capped). Even a barely-
+  // qualifying moment fires at intensity 0.4 (visible but not overdone);
+  // a moment 50% above threshold maxes out the treatment.
   const excessRatio = (currentScore - requiredScore) / Math.max(0.01, requiredScore);
-  const intensity = Math.max(0, Math.min(1, excessRatio * 2));
+  const intensity = Math.max(0.4, Math.min(1, 0.4 + excessRatio * 1.5));
 
   return {
     isActive: intensity > 0.01,
