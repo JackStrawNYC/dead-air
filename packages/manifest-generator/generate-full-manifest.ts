@@ -510,7 +510,10 @@ function routeScene(
     };
     const pool = dsPools[drumsSpaceState.subPhase] ?? [defaultMode];
     // Seeded pick keeps the same subphase consistent within a song
-    // but varies across songs/seeds.
+    // but varies across songs/seeds. defaultMode here may be blocklisted
+    // — that's a routeScene-internal limitation; the section-level pick
+    // path uses safeDefaultMode/anchorMode so this only matters when
+    // dsPools doesn't have an entry for the subphase.
     const seedKey = ctx.songSeed + (drumsSpaceState.subPhase.length * 31);
     const ds = pool[Math.floor(seededRandom(seedKey) * pool.length)] ?? defaultMode;
     if (ds !== prevShaderId) {
@@ -1324,6 +1327,9 @@ async function main() {
     const tempo = analysis.meta?.tempo ?? 120;
     const afps = analysis.meta?.fps ?? 30;
     const totalOut = Math.ceil((frames.length / afps) * fps);
+    // Raw authored default mode — may be blocklisted (e.g. cosmic_voyage,
+    // protean_clouds). Used for diagnostics + fallback. Active routing
+    // uses safeDefaultMode below which falls through the blocklist.
     const defaultMode = (song.defaultMode ?? "protean_clouds").replace(/-/g, "_");
     const songIdentity = lookupSongIdentity(song.title) ?? undefined;
     const isDrumsSpace = song.title?.toLowerCase().includes("drums") ||
@@ -1434,7 +1440,35 @@ async function main() {
       usedShaderModes,
     };
 
-    let prevShaderId = defaultMode;
+    // SHADER_BLOCKLIST hoisted up here so safeDefaultMode can use it
+    // (was previously declared inside the section loop below).
+    const SHADER_BLOCKLIST = new Set([
+      "combustible_voronoi", "creation", "fluid_2d", "spectral_bridge",
+      "obsidian_mirror", "amber_drift", "volumetric_clouds", "volumetric_smoke",
+      "volumetric_nebula", "digital_rain", "protean_clouds", "seascape",
+      "warm_nebula", "particle_nebula", "liquid_mandala", "star_nest",
+      "crystalline_void", "space_travel", "fractal_zoom", "acid_melt",
+      "aurora_sky", "spinning_spiral", "prism_refraction", "spectral_analyzer",
+      "neon_grid", "concert_beams", "blacklight_glow", "liquid_projector",
+      "databend", "signal_decay", "climax_surge", "cellular_automata",
+      "bioluminescence", "luminous_cavern", "storm_vortex", "mycelium_network",
+      "cosmic_voyage", "solar_flare", "forest",
+      "morning_dew_fog", "dark_star_void", "fire_mountain_smoke",
+      "estimated_prophet_mist", "wharf_rat_storm", "scarlet_golden_haze",
+      "st_stephen_lightning", "terrapin_nebula",
+      "dual_blend", "dual_shader", "smoke_and_mirrors", "molten_glass",
+      "particle_burst",
+    ]);
+
+    // Safe default — falls through blocklist. Use this anywhere routing
+    // logic would otherwise leak the raw authored defaultMode (which may
+    // be cosmic_voyage / protean_clouds / etc, all blocked).
+    const SAFE_FALLBACK_DEFAULT = "fractal_temple";
+    const safeDefaultMode = !SHADER_BLOCKLIST.has(defaultMode) && shaders[defaultMode]
+      ? defaultMode
+      : SAFE_FALLBACK_DEFAULT;
+
+    let prevShaderId = safeDefaultMode;
     let prevState: any = null;
     let shaderStartFrame = 0;
     let transitionStartFrame = -1;
@@ -1452,33 +1486,7 @@ async function main() {
     // the full active shader pool based on section energy level.
     const sectionModes: string[] = [];
     const preferredModes = songIdentity?.preferredModes ?? [];
-    // A+/A/B tier only — every shader in this pool should make a viewer say "beautiful"
-    // C/D tier, black-frame risk, show-specific variants, and screensaver shaders are BLOCKED
-    const SHADER_BLOCKLIST = new Set([
-      // C/D tier: generic procedural, screensaver quality
-      "combustible_voronoi", "creation", "fluid_2d", "spectral_bridge",
-      "obsidian_mirror", "amber_drift", "volumetric_clouds", "volumetric_smoke",
-      "volumetric_nebula", "digital_rain", "protean_clouds", "seascape",
-      "warm_nebula", "particle_nebula", "liquid_mandala", "star_nest",
-      "crystalline_void", "space_travel", "fractal_zoom", "acid_melt",
-      "aurora_sky", "spinning_spiral", "prism_refraction", "spectral_analyzer",
-      "neon_grid", "concert_beams", "blacklight_glow", "liquid_projector",
-      "databend", "signal_decay", "climax_surge", "cellular_automata",
-      "bioluminescence",
-      // Black-frame risk: unclear implementation, sparse output, or naga compile failure
-      "luminous_cavern", // snoise undefined → naga compile failure → 5251 black frames
-      "storm_vortex", "mycelium_network", "cosmic_voyage", "solar_flare",
-      // 3D-mesh shaders (not fullscreen-quad) — uses vWorldPos varying that
-      // Rust renderer's vertex shader doesn't produce → naga compile failure.
-      "forest",
-      // Show-specific variants: only used via song identity, not random pool
-      "morning_dew_fog", "dark_star_void", "fire_mountain_smoke",
-      "estimated_prophet_mist", "wharf_rat_storm", "scarlet_golden_haze",
-      "st_stephen_lightning", "terrapin_nebula",
-      // Redundant with better versions
-      "dual_blend", "dual_shader", "smoke_and_mirrors", "molten_glass",
-      "particle_burst",
-    ]);
+    // SHADER_BLOCKLIST is now hoisted above (used by safeDefaultMode).
     const activeShaderPool = Object.keys(shaders).filter(s => !SHADER_BLOCKLIST.has(s));
     // Late-binding so routeScene's priority overrides (drums/space, reactive
     // triggers, dual) can post-filter blocklisted picks.
@@ -1700,7 +1708,7 @@ async function main() {
       const section = sectionBounds[currentSectionIdx] ?? { start: 0, end: totalOut };
       return {
         currentSectionIdx,
-        currentMode: sectionModes[currentSectionIdx] ?? defaultMode,
+        currentMode: sectionModes[currentSectionIdx] ?? safeDefaultMode,
         sectionStartFrame: section.start,
         sectionEndFrame: section.end,
       };
@@ -1786,7 +1794,7 @@ async function main() {
         }
       }
 
-      const route = routeScene(ctx, frameAnalysis, i, prevShaderId, defaultMode, routeState);
+      const route = routeScene(ctx, frameAnalysis, i, prevShaderId, safeDefaultMode, routeState);
 
       // HARD MINIMUM HOLD: no shader switch within 900 frames (30s at 30fps)
       // This is the last line of defense against seizure-fast switching.
