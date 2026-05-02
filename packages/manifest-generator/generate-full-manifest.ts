@@ -1434,9 +1434,31 @@ async function main() {
           energy: sAvg >= 0.4 ? "high" : sAvg >= 0.15 ? "mid" : "low",
         };
       });
+      // Pre-filter the song's preferredModes against activeShaderPool.
+      // Many authored identities have 3-5 preferredModes but 2-3 of them
+      // are now blocklisted (added to the cull AFTER identities were
+      // authored), leaving only 1-2 valid. With < 3 valid the picker
+      // collapses every section to those few — which produced the
+      // "1-unique-per-song" symptom. So:
+      //   ≥ 3 valid preferred → use as authored, full identity weight
+      //   < 3 valid           → DROP identity, let continuous-energy
+      //                         pool drive variety (defaultMode still
+      //                         anchors section 0)
+      const validPreferred = (songIdentity?.preferredModes ?? []).filter(
+        (m: any) => activeShaderPool.includes(m as any)
+      );
+      const useIdentity = songIdentity && validPreferred.length >= 3;
+      const filteredIdentity: any = useIdentity
+        ? { ...songIdentity, preferredModes: validPreferred }
+        : undefined;
+      // For songs without rich identities, anchor section 0 on the FIRST
+      // valid preferred mode (or defaultMode if all blocked) so the
+      // authored opening still wins.
+      const anchorMode = (validPreferred[0] as any)
+        ?? (activeShaderPool.includes(defaultMode) ? defaultMode : "fractal_temple");
       const songEntryShape: any = {
         ...song,
-        defaultMode,
+        defaultMode: anchorMode,
       };
       const showShaderPool = activeShaderPool as any;
       let pick: string | null = null;
@@ -1447,18 +1469,18 @@ async function main() {
           adaptedSections as any,
           ctx.songSeed,
           (setlist as any).era,
-          false,                  // coherenceIsLocked — manifest gen is offline batch
-          usedShaderModes as any, // SHOW-LEVEL state, persists across songs
-          songIdentity,
-          undefined,              // stemSection
-          frames as any,          // for spectral matching
-          totalOut,               // songDuration in frames
+          false,                    // coherenceIsLocked — manifest gen is offline batch
+          usedShaderModes as any,   // SHOW-LEVEL state, persists across songs
+          filteredIdentity,         // identity only when we have ≥3 valid preferred
+          undefined,                // stemSection
+          frames as any,            // for spectral matching
+          totalOut,                 // songDuration in frames
           setNumber,
-          songIdx + 1,            // trackNumber (1-based)
+          songIdx + 1,              // trackNumber (1-based)
           shaderModeLastUsed as any,
-          undefined,              // stemDominant
-          undefined,              // visualMemory — could thread through later
-          showShaderPool,         // restrict to manifest-available, non-blocklisted
+          undefined,                // stemDominant
+          undefined,                // visualMemory — could thread through later
+          showShaderPool,           // restrict to manifest-available, non-blocklisted
         );
         // Manifest-gen blocklist wins over shader-variety's SAFE_SHADERS.
         if (candidate && activeShaderPool.includes(candidate as any) && !SHADER_BLOCKLIST.has(candidate as any)) {
