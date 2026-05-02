@@ -28,6 +28,9 @@ SKIP_ANALYSIS=false
 SKIP_MANIFEST=false
 SKIP_RENDER=false
 STRICT_OVERLAYS=false
+STRICT_SHADERS=false
+STRICT_DIMENSIONS=false
+VALIDATE_ONLY=false
 GPU_OVERLAYS=false
 
 usage() {
@@ -56,6 +59,10 @@ Skip switches (for resuming):
 
 Quality gates:
   --strict-overlays       Abort if overlay PNGs are missing
+  --strict-shaders        Abort if any frame's shader_id is missing
+  --strict-dimensions     Abort if manifest WxH/fps disagree with CLI args
+  --strict-all            Enable all three --strict-* gates
+  --validate-only         Run pre-flight checks only; skip the render
 
 Performance:
   --gpu-overlays          GPU-side overlay compositing (Wave 4.1)
@@ -77,6 +84,10 @@ while [[ $# -gt 0 ]]; do
     --skip-manifest)    SKIP_MANIFEST=true; shift;;
     --skip-render)      SKIP_RENDER=true; shift;;
     --strict-overlays)  STRICT_OVERLAYS=true; shift;;
+    --strict-shaders)   STRICT_SHADERS=true; shift;;
+    --strict-dimensions) STRICT_DIMENSIONS=true; shift;;
+    --strict-all)       STRICT_OVERLAYS=true; STRICT_SHADERS=true; STRICT_DIMENSIONS=true; shift;;
+    --validate-only)    VALIDATE_ONLY=true; shift;;
     --gpu-overlays)     GPU_OVERLAYS=true; shift;;
     -h|--help)          usage;;
     *)                  echo "Unknown arg: $1"; usage;;
@@ -173,6 +184,9 @@ else
     --scene-scale "$SCENE_SCALE"
   )
   [[ "$STRICT_OVERLAYS" == "true" ]] && RENDER_ARGS+=(--strict-overlays)
+  [[ "$STRICT_SHADERS" == "true" ]] && RENDER_ARGS+=(--strict-shaders)
+  [[ "$STRICT_DIMENSIONS" == "true" ]] && RENDER_ARGS+=(--strict-dimensions)
+  [[ "$VALIDATE_ONLY" == "true" ]] && RENDER_ARGS+=(--validate-only)
   [[ "$GPU_OVERLAYS" == "true" ]] && RENDER_ARGS+=(--gpu-overlays)
 
   if [[ "$USE_DOCKER" == "yes" ]] && command -v nvidia-smi >/dev/null 2>&1; then
@@ -184,6 +198,9 @@ else
       --scene-scale "$SCENE_SCALE"
     )
     [[ "$STRICT_OVERLAYS" == "true" ]] && DOCKER_RENDER_ARGS+=(--strict-overlays)
+    [[ "$STRICT_SHADERS" == "true" ]] && DOCKER_RENDER_ARGS+=(--strict-shaders)
+    [[ "$STRICT_DIMENSIONS" == "true" ]] && DOCKER_RENDER_ARGS+=(--strict-dimensions)
+    [[ "$VALIDATE_ONLY" == "true" ]] && DOCKER_RENDER_ARGS+=(--validate-only)
     [[ "$GPU_OVERLAYS" == "true" ]] && DOCKER_RENDER_ARGS+=(--gpu-overlays)
     docker compose run --rm \
       -v "$ROOT/out/${SHOW}:/data" \
