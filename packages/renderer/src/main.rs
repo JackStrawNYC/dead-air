@@ -607,6 +607,7 @@ fn main() {
     let shader_validation = manifest.validate_shader_refs();
     shader_validation.print();
     shader_validation.print_distribution(10);
+    shader_validation.print_tier_distribution();
     if !shader_validation.ok() && args.strict_shaders {
         eprintln!("Shaders: --strict-shaders set, aborting before render");
         std::process::exit(2);

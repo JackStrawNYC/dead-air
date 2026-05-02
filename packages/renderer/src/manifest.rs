@@ -339,6 +339,49 @@ impl ShaderValidationReport {
             );
         }
     }
+
+    /// Print a per-cost-tier rollup of frame counts. Combined with the
+    /// top-N distribution this answers "is my show heavy?" at a glance:
+    /// SLOW + BUSTED frame count tells you exactly how much LOD will
+    /// help. Unique-id counts within each tier point at the actual
+    /// optimization candidates.
+    pub fn print_tier_distribution(&self) {
+        use crate::shader_tiers::{tier_for, CostTier};
+        if self.distribution.is_empty() {
+            return;
+        }
+        let mut buckets: [(usize, usize); 5] = [(0, 0); 5]; // (frames, unique)
+        for (id, count) in &self.distribution {
+            let i = match tier_for(id) {
+                CostTier::Ok60 => 0,
+                CostTier::Ok30 => 1,
+                CostTier::Slow => 2,
+                CostTier::Busted => 3,
+                CostTier::Unknown => 4,
+            };
+            buckets[i].0 += count;
+            buckets[i].1 += 1;
+        }
+        let labels = ["OK60", "OK30", "SLOW", "BUSTED", "UNKNOWN"];
+        let total = self.total_referenced.max(1) as f64;
+        println!("Shaders: tier rollup (cost-baseline 360p, see SHADER-COST-PROFILE-2026-05-02.md):");
+        for (i, label) in labels.iter().enumerate() {
+            let (frames, unique) = buckets[i];
+            if frames == 0 { continue; }
+            let pct = 100.0 * (frames as f64) / total;
+            println!("  {:<8} {:>6} ({:>5.1}%)  {} unique shader_id(s)", label, frames, pct, unique);
+        }
+        // Hint when many UNKNOWN — baseline data is stale, re-run profile.
+        if buckets[4].1 > 0 {
+            let unk_share = buckets[4].0 as f64 / total;
+            if unk_share > 0.20 {
+                println!(
+                    "  HINT: {:.0}% of refs hit UNKNOWN tier — cost baseline may be stale; re-run shader_cost_profile",
+                    unk_share * 100.0,
+                );
+            }
+        }
+    }
 }
 
 impl Manifest {
@@ -509,6 +552,30 @@ mod tests {
         assert_eq!(r.missing[0].0, "also_missing");
         assert_eq!(r.missing[1].0, "nonexistent");
         assert_eq!(r.frames_affected, 2);
+    }
+
+    #[test]
+    fn validate_shader_refs_tier_distribution_buckets_correctly() {
+        let mut m = sample_manifest();
+        // Add a couple of known BUSTED + SLOW shader hits so the rollup
+        // has something interesting to bucket.
+        m.shaders.insert("voronoi-flow".to_string(), "// glsl".to_string());
+        m.shaders.insert("river".to_string(), "// glsl".to_string());
+        for i in 50..52 {
+            let mut f = sample_frame(i);
+            f.shader_id = "voronoi-flow".to_string();
+            m.frames.push(f);
+        }
+        let mut river_frame = sample_frame(60);
+        river_frame.shader_id = "river".to_string();
+        m.frames.push(river_frame);
+
+        let r = m.validate_shader_refs();
+        // The distribution + tier_distribution helpers should have populated.
+        assert!(r.distribution.iter().any(|(id, _)| id == "voronoi-flow"));
+        assert!(r.distribution.iter().any(|(id, _)| id == "river"));
+        // No assertion failure = print_tier_distribution doesn't panic.
+        r.print_tier_distribution();
     }
 
     #[test]
