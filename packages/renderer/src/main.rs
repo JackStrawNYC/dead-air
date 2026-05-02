@@ -149,6 +149,18 @@ struct Args {
     #[arg(long, default_value_t = false)]
     strict_overlays: bool,
 
+    /// Fail the render if any shader_id referenced by a frame is missing
+    /// from the manifest's shaders map. Without this flag, missing shaders
+    /// render as black frames in the fallback path.
+    #[arg(long, default_value_t = false)]
+    strict_shaders: bool,
+
+    /// Run all pre-flight validation (shader refs, overlay schedule) and
+    /// exit before the render loop. Combine with --strict-* flags to use as
+    /// a CI gate. Exit code 0 if all validations pass, 1 if any fail.
+    #[arg(long, default_value_t = false)]
+    validate_only: bool,
+
     /// Scene-render LOD scale (audit Wave 3.3). 1.0 renders the scene at full
     /// output resolution; values < 1.0 render the scene shader at smaller
     /// dimensions and the postprocess sampler upscales. Trades some sharpness
@@ -451,15 +463,11 @@ fn main() {
     // the manifest's shaders map. A missing shader silently renders as a
     // black frame in the renderer's fallback path; this validation surfaces
     // those typos / missing exports before render starts.
-    {
-        let report = manifest.validate_shader_refs();
-        report.print();
-        if !report.ok() && args.strict_overlays {
-            // Reuse --strict-overlays as a "strict pre-flight" flag — same
-            // intent (refuse to render with known-broken inputs).
-            eprintln!("Shaders: --strict-overlays set, aborting before render");
-            std::process::exit(2);
-        }
+    let shader_validation = manifest.validate_shader_refs();
+    shader_validation.print();
+    if !shader_validation.ok() && args.strict_shaders {
+        eprintln!("Shaders: --strict-shaders set, aborting before render");
+        std::process::exit(2);
     }
 
     // Compile all shaders
@@ -513,13 +521,26 @@ fn main() {
     // Pre-flight validation: walk the overlay schedule, verify every referenced
     // overlay PNG is loaded. Without this check, missing overlays render as
     // nothing — the audit's debt #7 silent-failure problem.
-    if let Some(ref schedule) = manifest.overlay_schedule {
+    let overlay_validation_ok = if let Some(ref schedule) = manifest.overlay_schedule {
         let report = overlay_image_cache.validate_schedule(schedule);
         report.print();
-        if !report.ok() && args.strict_overlays {
+        let ok = report.ok();
+        if !ok && args.strict_overlays {
             eprintln!("Overlays: --strict-overlays set, aborting before render to avoid silent failures");
             std::process::exit(2);
         }
+        ok
+    } else {
+        true
+    };
+
+    if args.validate_only {
+        let all_ok = shader_validation.ok() && overlay_validation_ok;
+        println!(
+            "Pre-flight validation complete (--validate-only set). Result: {}",
+            if all_ok { "PASS" } else { "FAIL" }
+        );
+        std::process::exit(if all_ok { 0 } else { 1 });
     }
 
     // Start FFmpeg pipe if video output
