@@ -12,6 +12,7 @@
 
 use std::io::{BufWriter, Write};
 use std::process::{Child, Command, Stdio};
+use std::time::{Duration, Instant};
 
 pub struct FfmpegPipe {
     child: Child,
@@ -19,6 +20,11 @@ pub struct FfmpegPipe {
     width: u32,
     height: u32,
     frames_written: u64,
+    /// Frames between try_wait() liveness checks. Each check is one cheap
+    /// syscall (waitpid WNOHANG). Detecting FFmpeg death within ~0.5s lets
+    /// us surface the real exit code instead of a generic broken-pipe error
+    /// from a future write_all.
+    liveness_check_interval: u64,
 }
 
 impl FfmpegPipe {
@@ -100,6 +106,7 @@ impl FfmpegPipe {
             width,
             height,
             frames_written: 0,
+            liveness_check_interval: 30,
         })
     }
 
@@ -116,8 +123,32 @@ impl FfmpegPipe {
             .into());
         }
 
+        // Liveness probe: every N frames, check whether ffmpeg has died.
+        // Without this, write_all blocks/buffers until the kernel pipe fills,
+        // delaying the error by minutes on a 256MB BufWriter at 4K.
+        if self.frames_written % self.liveness_check_interval == 0 {
+            if let Ok(Some(status)) = self.child.try_wait() {
+                self.writer = None; // prevent further buffered writes
+                return Err(format!(
+                    "FFmpeg died after {} frames (exit={}). Check stderr above for the real cause (disk full, codec error, container mismatch).",
+                    self.frames_written, status
+                ).into());
+            }
+        }
+
         let writer = self.writer.as_mut().ok_or("FFmpeg writer not available")?;
-        writer.write_all(pixels)?;
+        if let Err(e) = writer.write_all(pixels) {
+            // BrokenPipe means ffmpeg closed stdin — try to fetch the real
+            // exit code so the operator knows why instead of just seeing EPIPE.
+            if let Ok(Some(status)) = self.child.try_wait() {
+                self.writer = None;
+                return Err(format!(
+                    "FFmpeg pipe closed at frame {} (exit={}, write error: {})",
+                    self.frames_written, status, e
+                ).into());
+            }
+            return Err(e.into());
+        }
         self.frames_written += 1;
 
         Ok(())
@@ -125,6 +156,11 @@ impl FfmpegPipe {
 
     /// Close the pipe and wait for FFmpeg to finish encoding.
     /// Returns the total number of frames written.
+    ///
+    /// Bounded wait: 10 minutes. Even a 4K MP4 with movflags=+faststart
+    /// (which rewrites the moov atom) finishes within a couple minutes
+    /// once stdin closes. A longer hang means FFmpeg is stuck and we
+    /// kill it rather than blocking the operator forever.
     pub fn finish(mut self) -> Result<u64, Box<dyn std::error::Error>> {
         // Flush and drop the BufWriter to send remaining data + signal EOF
         if let Some(writer) = self.writer.take() {
@@ -133,12 +169,29 @@ impl FfmpegPipe {
             drop(inner);
         }
 
-        let status = self.child.wait()?;
-        if !status.success() {
-            return Err(format!("FFmpeg exited with {}", status).into());
+        let timeout = Duration::from_secs(600);
+        let start = Instant::now();
+        loop {
+            match self.child.try_wait()? {
+                Some(status) => {
+                    if !status.success() {
+                        return Err(format!("FFmpeg exited with {}", status).into());
+                    }
+                    return Ok(self.frames_written);
+                }
+                None => {
+                    if start.elapsed() > timeout {
+                        let _ = self.child.kill();
+                        let _ = self.child.wait();
+                        return Err(format!(
+                            "FFmpeg did not finalize within {}s after {} frames — killed. Output may be unplayable.",
+                            timeout.as_secs(), self.frames_written
+                        ).into());
+                    }
+                    std::thread::sleep(Duration::from_millis(100));
+                }
+            }
         }
-
-        Ok(self.frames_written)
     }
 
     /// Number of frames written so far.
