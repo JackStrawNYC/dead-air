@@ -25,6 +25,8 @@ VIDEO=""
 OUTPUT=""
 LOUDNESS_TARGET="-14"   # LUFS — YouTube target
 DRY_RUN=false
+INTRO_SECONDS="0"        # silence prepended to audio (matches intro video duration)
+ENDCARD_SECONDS="0"      # silence appended to audio (matches endcard video duration)
 
 usage() {
   cat <<EOF
@@ -36,8 +38,10 @@ Required:
   --output <path>   Final MP4 with audio muxed
 
 Options:
-  --loudness <db>   LUFS target for normalization (default: -14, YouTube spec)
-  --dry-run         Print the concat list + ffmpeg command without running
+  --loudness <db>     LUFS target for normalization (default: -14, YouTube spec)
+  --intro-seconds <s> Silence prepended to match intro video duration (default 0)
+  --endcard-seconds <s> Silence appended to match endcard video duration (default 0)
+  --dry-run           Print the concat list + ffmpeg command without running
 EOF
   exit 1
 }
@@ -47,8 +51,10 @@ while [[ $# -gt 0 ]]; do
     --show)     SHOW="$2"; shift 2;;
     --video)    VIDEO="$2"; shift 2;;
     --output)   OUTPUT="$2"; shift 2;;
-    --loudness) LOUDNESS_TARGET="$2"; shift 2;;
-    --dry-run)  DRY_RUN=true; shift;;
+    --loudness)        LOUDNESS_TARGET="$2"; shift 2;;
+    --intro-seconds)   INTRO_SECONDS="$2"; shift 2;;
+    --endcard-seconds) ENDCARD_SECONDS="$2"; shift 2;;
+    --dry-run)         DRY_RUN=true; shift;;
     -h|--help)  usage;;
     *) echo "Unknown arg: $1"; usage;;
   esac
@@ -97,22 +103,41 @@ fi
 VIDEO_DURATION_SEC=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$VIDEO" 2>/dev/null || echo "0")
 echo "Video: $(basename "$VIDEO") (${VIDEO_DURATION_SEC}s)"
 echo "Audio: ${TOTAL} songs, ${MISSING} missing, $(wc -l < "$CONCAT_LIST" | tr -d ' ') tracks queued"
+if [[ "$INTRO_SECONDS" != "0" ]] || [[ "$ENDCARD_SECONDS" != "0" ]]; then
+  echo "Audio padding: ${INTRO_SECONDS}s silence at start, ${ENDCARD_SECONDS}s silence at end"
+fi
+
+# Build the ffmpeg input + filter chain.
+# Without intro/endcard padding (legacy path): single concat input.
+# With padding: anullsrc → concat → anullsrc → concat-filter to align
+# the song audio with the post-intro / pre-endcard window of the video.
+# Without this, a render with --with-intro 15s would play song 1's
+# music DURING the intro (audio frame 0 = video frame 0 = intro start).
+
+build_ffmpeg_args() {
+  local args=()
+  args+=( -i "$VIDEO" )
+  args+=( -f concat -safe 0 -i "$CONCAT_LIST" )
+  if [[ "$INTRO_SECONDS" != "0" ]] || [[ "$ENDCARD_SECONDS" != "0" ]]; then
+    # anullsrc generates silent stereo audio; we then concat
+    # [intro-silence][songs][endcard-silence] via filter_complex.
+    args+=( -f lavfi -i "anullsrc=channel_layout=stereo:sample_rate=48000:duration=${INTRO_SECONDS}" )
+    args+=( -f lavfi -i "anullsrc=channel_layout=stereo:sample_rate=48000:duration=${ENDCARD_SECONDS}" )
+    args+=( -filter_complex "[2:a][1:a][3:a]concat=n=3:v=0:a=1[padded];[padded]loudnorm=I=${LOUDNESS_TARGET}:TP=-1.5:LRA=11[aout]" )
+    args+=( -map "0:v:0" -map "[aout]" )
+  else
+    args+=( -af "loudnorm=I=${LOUDNESS_TARGET}:TP=-1.5:LRA=11" )
+    args+=( -map "0:v:0" -map "1:a:0" )
+  fi
+  args+=( -c:v copy -c:a aac -b:a 320k -ar 48000 -shortest "$OUTPUT" )
+  printf "%s\0" "${args[@]}"
+}
 
 if [[ "$DRY_RUN" == "true" ]]; then
   echo "--- concat list ---"
   cat "$CONCAT_LIST"
   echo "--- ffmpeg command ---"
-  cat <<CMD
-ffmpeg -y \\
-  -i "$VIDEO" \\
-  -f concat -safe 0 -i "$CONCAT_LIST" \\
-  -c:v copy \\
-  -c:a aac -b:a 320k -ar 48000 \\
-  -af "loudnorm=I=${LOUDNESS_TARGET}:TP=-1.5:LRA=11" \\
-  -map 0:v:0 -map 1:a:0 \\
-  -shortest \\
-  "$OUTPUT"
-CMD
+  printf "ffmpeg -y"; build_ffmpeg_args | tr '\0' '\n' | sed 's/^/  /'
   exit 0
 fi
 
@@ -120,15 +145,9 @@ fi
 # Two-pass loudnorm would be more accurate but doubles encode time; the
 # single-pass default with TP=-1.5 (true peak) and LRA=11 (loudness range)
 # is YouTube-acceptable for archival concert content.
-ffmpeg -y -hide_banner -loglevel warning -stats \
-  -i "$VIDEO" \
-  -f concat -safe 0 -i "$CONCAT_LIST" \
-  -c:v copy \
-  -c:a aac -b:a 320k -ar 48000 \
-  -af "loudnorm=I=${LOUDNESS_TARGET}:TP=-1.5:LRA=11" \
-  -map 0:v:0 -map 1:a:0 \
-  -shortest \
-  "$OUTPUT"
+declare -a FFMPEG_ARGS=()
+while IFS= read -r -d '' a; do FFMPEG_ARGS+=( "$a" ); done < <(build_ffmpeg_args)
+ffmpeg -y -hide_banner -loglevel warning -stats "${FFMPEG_ARGS[@]}"
 
 # Verify the output has both streams.
 HAS_VIDEO=$(ffprobe -v error -select_streams v:0 -show_entries stream=codec_name -of csv=p=0 "$OUTPUT" 2>/dev/null || echo "")

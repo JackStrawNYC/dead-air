@@ -29,6 +29,8 @@ SKIP_MANIFEST=false
 SKIP_RENDER=false
 SKIP_MUX=false
 LOUDNESS_TARGET="-14"
+INTRO_SECONDS="0"
+ENDCARD_SECONDS="0"
 STRICT_OVERLAYS=false
 STRICT_SHADERS=false
 STRICT_DIMENSIONS=false
@@ -64,6 +66,8 @@ Skip switches (for resuming):
   --skip-render
   --skip-mux              Skip the audio mux step (output is silent video)
   --loudness <db>         LUFS target for mux normalization (default -14)
+  --intro-seconds <s>     Length of silent intro to pad before music starts (sync with --with-intro)
+  --endcard-seconds <s>   Length of silent endcard to pad after music ends (sync with --with-endcard)
 
 Quality gates:
   --strict-overlays       Abort if overlay PNGs are missing
@@ -97,6 +101,8 @@ while [[ $# -gt 0 ]]; do
     --skip-render)      SKIP_RENDER=true; shift;;
     --skip-mux)         SKIP_MUX=true; shift;;
     --loudness)         LOUDNESS_TARGET="$2"; shift 2;;
+    --intro-seconds)    INTRO_SECONDS="$2"; shift 2;;
+    --endcard-seconds)  ENDCARD_SECONDS="$2"; shift 2;;
     --strict-overlays)  STRICT_OVERLAYS=true; shift;;
     --strict-shaders)   STRICT_SHADERS=true; shift;;
     --strict-dimensions) STRICT_DIMENSIONS=true; shift;;
@@ -264,7 +270,9 @@ else
        --show "$SHOW" \
        --video "$SILENT_VIDEO" \
        --output "$OUTPUT" \
-       --loudness "$LOUDNESS_TARGET"; then
+       --loudness "$LOUDNESS_TARGET" \
+       --intro-seconds "$INTRO_SECONDS" \
+       --endcard-seconds "$ENDCARD_SECONDS"; then
     rm -f "$SILENT_VIDEO"
     echo "└─ ✓ mux complete: $OUTPUT (with audio)"
   else
