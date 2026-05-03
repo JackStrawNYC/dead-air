@@ -66,6 +66,30 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SETLIST="${ROOT}/packages/visualizer-poc/data/shows/${SHOW}/setlist.json"
 AUDIO_ROOT="${ROOT}/packages/visualizer-poc/public/audio"
 
+# Auto-detect intro/endcard durations from the render-info.json sidecar
+# the renderer writes alongside its OUTPUT path. The orchestrator renames
+# the renderer's output to <name>-silent.<ext> before mux, so the sidecar
+# may be at either <video>.render-info.json or the un-suffixed name.
+# CLI args still override autodetected values.
+RENDER_INFO=""
+for candidate in "${VIDEO}.render-info.json" "${OUTPUT}.render-info.json" "${VIDEO/-silent.mp4/.mp4}.render-info.json"; do
+  if [[ -f "$candidate" ]]; then
+    RENDER_INFO="$candidate"
+    break
+  fi
+done
+if [[ -n "$RENDER_INFO" ]]; then
+  if [[ "$INTRO_SECONDS" == "0" ]]; then
+    INTRO_SECONDS=$(jq -r '.intro_seconds // 0' "$RENDER_INFO" 2>/dev/null || echo "0")
+  fi
+  if [[ "$ENDCARD_SECONDS" == "0" ]]; then
+    ENDCARD_SECONDS=$(jq -r '.endcard_seconds // 0' "$RENDER_INFO" 2>/dev/null || echo "0")
+  fi
+  if [[ "$INTRO_SECONDS" != "0" ]] || [[ "$ENDCARD_SECONDS" != "0" ]]; then
+    echo "Auto-detected from $RENDER_INFO: intro=${INTRO_SECONDS}s, endcard=${ENDCARD_SECONDS}s"
+  fi
+fi
+
 [[ ! -f "$SETLIST" ]] && { echo "ERROR: setlist not found: $SETLIST"; exit 1; }
 [[ ! -f "$VIDEO" ]] && { echo "ERROR: video not found: $VIDEO"; exit 1; }
 mkdir -p "$(dirname "$OUTPUT")"

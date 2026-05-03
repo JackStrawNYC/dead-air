@@ -390,6 +390,7 @@ fn main() {
     }
 
     // ─── Append end card sequence if requested ───
+    let mut endcard_frame_count: usize = 0;
     if args.with_endcard {
         let venue = args.show_venue.as_deref().unwrap_or("Unknown Venue");
         let date_display = args.show_date.as_deref().unwrap_or("Unknown Date");
@@ -437,6 +438,7 @@ fn main() {
             endcard::generate_endcard(args.fps, args.width, args.height, &meta, last_shader_id);
 
         let n_endcard = ec_frames.len();
+        endcard_frame_count = n_endcard;
         println!("End card: {} frames ({:.1}s)", n_endcard, n_endcard as f32 / args.fps as f32);
 
         // Merge: append endcard shaders
@@ -469,7 +471,29 @@ fn main() {
         manifest.frames.len() - args.start_frame as usize
     };
 
-    let _ = intro_frame_count; // suppress unused warning when not printing
+    // Write render-info.json sidecar — captures intro/endcard durations
+    // (in seconds) so mux-audio.sh can pad the right amount of silence
+    // without the user having to manually pass --intro-seconds. Without
+    // this sidecar, --with-intro renders would silently desync audio
+    // because the user forgot to mirror the intro duration on the mux
+    // side.
+    if let Some(ref output_path) = args.output {
+        let intro_sec = intro_frame_count as f64 / args.fps as f64;
+        let endcard_sec = endcard_frame_count as f64 / args.fps as f64;
+        let info_path = std::path::PathBuf::from(format!("{}.render-info.json", output_path.display()));
+        let body = format!(
+            "{{\n  \"intro_frames\": {},\n  \"intro_seconds\": {:.3},\n  \"endcard_frames\": {},\n  \"endcard_seconds\": {:.3},\n  \"total_frames\": {},\n  \"width\": {},\n  \"height\": {},\n  \"fps\": {}\n}}\n",
+            intro_frame_count, intro_sec,
+            endcard_frame_count, endcard_sec,
+            total_frames, args.width, args.height, args.fps,
+        );
+        if let Err(e) = std::fs::write(&info_path, body) {
+            eprintln!("  WARN: failed to write {}: {}", info_path.display(), e);
+        } else if intro_frame_count > 0 || endcard_frame_count > 0 {
+            println!("Render info: {} (intro={:.1}s, endcard={:.1}s)",
+                info_path.display(), intro_sec, endcard_sec);
+        }
+    }
 
     let output_label = if let Some(ref p) = args.output {
         format!("→ {}", p.display())
