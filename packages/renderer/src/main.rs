@@ -728,6 +728,58 @@ fn main() {
         std::process::exit(if all_ok { 0 } else { 1 });
     }
 
+    // Pre-flight disk space check. A 12-hour render that fills the disk
+    // mid-stream produces an unrecoverable corrupt MP4 + loses all GPU
+    // work. Estimate output size from frame count + resolution and fail
+    // loud BEFORE starting if available space is insufficient.
+    if let Some(ref output_path) = args.output {
+        // Empirical: H.264 CRF 20 at 1080p ≈ 6 Mbps avg, ≈ 45 KB per frame
+        // at 30fps. 4K ≈ 4x that. Scale conservatively (2x safety factor)
+        // so we don't false-warn on highly-compressible content.
+        let pixels_per_frame = (args.width as u64) * (args.height as u64);
+        let bytes_per_frame_est = (pixels_per_frame / 24).max(15_000); // ~1080p ≈ 86KB; tunable
+        let est_total_bytes = bytes_per_frame_est * (total_frames as u64);
+        let est_mb = est_total_bytes / (1024 * 1024);
+
+        // Get available disk space at the output dir
+        let parent = output_path.parent().unwrap_or(std::path::Path::new("."));
+        let abs_parent = if parent.as_os_str().is_empty() {
+            std::path::PathBuf::from(".")
+        } else {
+            parent.to_path_buf()
+        };
+        // Use `df` for portability — wgpu/Rust doesn't have a stable disk-free API
+        let df_out = std::process::Command::new("df")
+            .arg("-Pk")
+            .arg(&abs_parent)
+            .output()
+            .ok()
+            .and_then(|o| String::from_utf8(o.stdout).ok());
+        if let Some(df) = df_out {
+            // df -Pk output: line 2, col 4 = "Available" in 1KB blocks
+            if let Some(avail_kb) = df.lines().nth(1)
+                .and_then(|line| line.split_whitespace().nth(3))
+                .and_then(|s| s.parse::<u64>().ok())
+            {
+                let avail_mb = avail_kb / 1024;
+                println!(
+                    "Disk: {} MB available at {}, estimated render output ~{} MB ({} frames)",
+                    avail_mb, abs_parent.display(), est_mb, total_frames,
+                );
+                if avail_mb < est_mb + 500 {
+                    eprintln!(
+                        "[WARN] Available disk space ({} MB) is close to or below estimated output size ({} MB) + 500 MB safety margin. Render may fail mid-stream and produce a corrupt MP4.",
+                        avail_mb, est_mb,
+                    );
+                    if avail_mb < est_mb / 2 {
+                        eprintln!("[FATAL] Available disk space ({} MB) is less than half the estimated output. Aborting before render.", avail_mb);
+                        std::process::exit(3);
+                    }
+                }
+            }
+        }
+    }
+
     // Start FFmpeg pipe if video output
     let mut ffmpeg_pipe = if let Some(ref output_path) = args.output {
         let codec = std::env::var("FFMPEG_CODEC").unwrap_or_else(|_| "libx264".to_string());
