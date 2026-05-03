@@ -410,10 +410,26 @@ fn main() {
             s
         };
 
+        // Build rich entries from manifest.song_boundaries when available
+        // (set numbers + frame ranges → durations). Falls back to plain
+        // titles otherwise. Adds set headers + per-song durations to the
+        // outro setlist — concert-poster vs Netflix-doc difference.
+        let entries: Vec<endcard::EndcardSongEntry> = manifest.song_boundaries
+            .as_ref()
+            .map(|bounds| {
+                bounds.iter().map(|b| endcard::EndcardSongEntry {
+                    title: b.title.clone(),
+                    set: b.set,
+                    duration_sec: ((b.end_frame - b.start_frame) / args.fps) as u32,
+                }).collect()
+            })
+            .unwrap_or_default();
+
         let meta = endcard::EndcardMeta {
             venue: venue.to_string(),
             date_display: date_display.to_string(),
             songs,
+            entries,
         };
 
         let last_shader_id = manifest.frames.last().map(|f| f.shader_id.as_str());

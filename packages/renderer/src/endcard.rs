@@ -22,11 +22,24 @@ const FINAL_FADE_START: f32 = 7.0;
 
 pub const ENDCARD_SHADER_ID: &str = "__endcard__";
 
+/// Per-song line in the end-card setlist. Set + duration data lets the
+/// outro group songs by set with running times — the difference between
+/// "Netflix doc credits" and "tape-trader's setlist sheet."
+pub struct EndcardSongEntry {
+    pub title: String,
+    pub set: u32,         // 1, 2, or 3 (encore)
+    pub duration_sec: u32, // 0 if unknown — just title shown
+}
+
 /// Show metadata for the end card.
 pub struct EndcardMeta {
     pub venue: String,
     pub date_display: String,
+    /// Legacy plain title list — used as fallback when entries is empty.
     pub songs: Vec<String>,
+    /// Rich entries grouped by set, with per-song durations. Preferred over
+    /// `songs` when populated.
+    pub entries: Vec<EndcardSongEntry>,
 }
 
 /// Generate the end card GLSL shader — a gentle fog/ember fade-out.
@@ -107,19 +120,96 @@ fn endcard_overlay_svg(
     let info_size = (width as f32 * 0.012).max(12.0) as u32;
     let song_size = (width as f32 * 0.010).max(10.0) as u32;
 
+    // Setlist rendering: prefer rich entries (set headers + durations) when
+    // provided; fall back to plain title list for back-compat. Two-column
+    // layout for shows with many songs (Veneta has 23) so all fit on screen.
     let mut songs_text = String::new();
     let song_start_y = (height as f32 * 0.50) as u32;
     let line_h = (height as f32 * 0.025).max(14.0) as u32;
+    let header_h = (height as f32 * 0.034).max(20.0) as u32;
+    let header_size = (width as f32 * 0.013).max(12.0) as u32;
+    let bottom_limit = height - 50;
 
-    for (i, title) in meta.songs.iter().enumerate() {
-        let y = song_start_y + (i as u32) * line_h;
-        if y > height - 50 { break; } // don't overflow
-        songs_text.push_str(&format!(
-            "<text x=\"{}\" y=\"{}\" font-size=\"{}\" font-weight=\"400\" \
-             fill=\"rgba(255,255,255,0.6)\" text-anchor=\"middle\" \
-             font-family=\"Helvetica Neue, Arial, sans-serif\">{}</text>",
-            cx, y, song_size, xml_escape(title),
-        ));
+    if !meta.entries.is_empty() {
+        // Determine column layout: songs per col so it fits vertically.
+        let total_lines: u32 = {
+            let mut last_set = 0u32;
+            let mut n = 0u32;
+            for e in &meta.entries {
+                if e.set != last_set { n += 1; last_set = e.set; } // header line
+                n += 1; // song line
+            }
+            n
+        };
+        let avail_h = bottom_limit.saturating_sub(song_start_y);
+        let max_per_col = (avail_h / line_h).max(1);
+        let two_col = total_lines > max_per_col;
+        let col_count = if two_col { 2 } else { 1 };
+        let col_x_offset = if two_col { (width as f32 * 0.18) as u32 } else { 0 };
+        let col_max_lines = (total_lines + col_count - 1) / col_count;
+
+        let mut last_set = 0u32;
+        let mut line_idx_in_col = 0u32;
+        let mut col = 0u32;
+        for entry in &meta.entries {
+            if entry.set != last_set {
+                last_set = entry.set;
+                if line_idx_in_col >= col_max_lines && col + 1 < col_count {
+                    col += 1;
+                    line_idx_in_col = 0;
+                }
+                let y = song_start_y + line_idx_in_col * line_h + (header_h - line_h);
+                let label = match entry.set {
+                    1 => "SET ONE",
+                    2 => "SET TWO",
+                    3 => "ENCORE",
+                    _ => "",
+                };
+                let x = if col == 0 { cx - col_x_offset } else { cx + col_x_offset };
+                if y < bottom_limit {
+                    songs_text.push_str(&format!(
+                        "<text x=\"{}\" y=\"{}\" font-size=\"{}\" font-weight=\"500\" \
+                         fill=\"rgba(255,230,200,0.85)\" text-anchor=\"middle\" \
+                         letter-spacing=\"4\" \
+                         font-family=\"Helvetica Neue, Arial, sans-serif\">{}</text>",
+                        x, y, header_size, label,
+                    ));
+                }
+                line_idx_in_col += 1;
+            }
+            if line_idx_in_col >= col_max_lines && col + 1 < col_count {
+                col += 1;
+                line_idx_in_col = 0;
+            }
+            let y = song_start_y + line_idx_in_col * line_h;
+            let x = if col == 0 { cx - col_x_offset } else { cx + col_x_offset };
+            if y < bottom_limit {
+                let dur = if entry.duration_sec > 0 {
+                    let m = entry.duration_sec / 60;
+                    let s = entry.duration_sec % 60;
+                    format!("  {}:{:02}", m, s)
+                } else { String::new() };
+                songs_text.push_str(&format!(
+                    "<text x=\"{}\" y=\"{}\" font-size=\"{}\" font-weight=\"400\" \
+                     fill=\"rgba(255,255,255,0.65)\" text-anchor=\"middle\" \
+                     font-family=\"Georgia, 'Palatino Linotype', serif\" font-style=\"italic\">{}{}</text>",
+                    x, y, song_size, xml_escape(&entry.title), xml_escape(&dur),
+                ));
+            }
+            line_idx_in_col += 1;
+        }
+    } else {
+        // Legacy fallback — single-column plain list (no sets, no durations)
+        for (i, title) in meta.songs.iter().enumerate() {
+            let y = song_start_y + (i as u32) * line_h;
+            if y > bottom_limit { break; }
+            songs_text.push_str(&format!(
+                "<text x=\"{}\" y=\"{}\" font-size=\"{}\" font-weight=\"400\" \
+                 fill=\"rgba(255,255,255,0.6)\" text-anchor=\"middle\" \
+                 font-family=\"Helvetica Neue, Arial, sans-serif\">{}</text>",
+                cx, y, song_size, xml_escape(title),
+            ));
+        }
     }
 
     format!(
