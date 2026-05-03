@@ -34,6 +34,12 @@ pub struct RenderResources<'a> {
     pub output_path: Option<&'a std::path::Path>,
     pub checkpoint_every: usize,
 
+    /// Device-lost signal from wgpu's set_device_lost_callback. When this
+    /// flips true, the render loop exits cleanly at the next frame
+    /// boundary — better than submitting hours of failed work to a dead
+    /// device. The checkpoint file preserves recoverable state.
+    pub device_lost: Option<&'a std::sync::atomic::AtomicBool>,
+
     pub pp_pipeline: &'a postprocess::PostProcessPipeline,
     pub effect_pipeline: &'a effects::EffectPipeline,
     pub composited_pipeline: &'a composited_effects::CompositedPipeline,
@@ -82,6 +88,21 @@ pub fn run(mut r: RenderResources<'_>) -> usize {
     let mut frames_written = 0usize;
 
     for frame_idx in r.start_frame..r.end_frame {
+        // Device-lost guard: exit cleanly if the GPU died.
+        if let Some(flag) = r.device_lost {
+            if flag.load(std::sync::atomic::Ordering::Relaxed) {
+                eprintln!("[render-loop] device-lost detected at frame {} — exiting cleanly. {} frames written.", frame_idx, frames_written);
+                // Final checkpoint flush so recovery has the latest state
+                if let Some(out) = r.output_path {
+                    let done = r.progress.position();
+                    let total = r.progress.length().unwrap_or(1);
+                    let elapsed = r.progress.elapsed().as_secs_f64();
+                    let fps_actual = done as f64 / elapsed.max(0.001);
+                    write_checkpoint(out, done as usize, total as usize, fps_actual, 0.0);
+                }
+                break;
+            }
+        }
         // Process previous frame's pixels while GPU is idle between submissions.
         if let Some(prev_idx) = pending_frame_idx {
             process_completed_frame(

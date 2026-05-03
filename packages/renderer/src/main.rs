@@ -551,6 +551,21 @@ fn main() {
     let mut renderer = pollster::block_on(
         gpu::GpuRenderer::new_with_tier_scales(args.width, args.height, &tier_scales, &tier_to_targets)
     ).expect("Failed to initialize GPU");
+
+    // GPU device-lost handler. Fires on driver crash, GPU reset, OOM,
+    // or thermal kill. Sets a shared atomic so the render loop exits
+    // gracefully at the next frame boundary instead of submitting hours
+    // of failed work to a dead device. Checkpoint file (already written
+    // every --checkpoint-every frames) preserves recoverable state.
+    let device_lost = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let device_lost_signal = device_lost.clone();
+    renderer.set_device_lost_callback(move |reason, msg| {
+        eprintln!(
+            "\n[FATAL] wgpu device lost: {:?} — {}\n[FATAL] Render loop will exit at next frame boundary. Checkpoint preserved at <output>.progress.json — resume with --start-frame N from that file.",
+            reason, msg,
+        );
+        device_lost_signal.store(true, std::sync::atomic::Ordering::Relaxed);
+    });
     for t in renderer.targets_pool() {
         if (t.scale - 1.0).abs() > 1e-3 || tier_scales.len() > 1 {
             println!(
@@ -813,6 +828,7 @@ fn main() {
         png_dir: &args.png_dir,
         output_path: args.output.as_deref(),
         checkpoint_every: args.checkpoint_every as usize,
+        device_lost: Some(&device_lost),
         pp_pipeline: &pp_pipeline,
         effect_pipeline: &effect_pipeline,
         composited_pipeline: &composited_pipeline,

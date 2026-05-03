@@ -289,6 +289,19 @@ impl GpuRenderer {
         Self::new_with_scene_scale(width, height, 1.0).await
     }
 
+    /// Register a callback that fires when the wgpu device is lost
+    /// (driver crash, GPU reset, OOM, etc.). The callback runs ONCE on
+    /// the wgpu callback thread. For long renders this is the audit's
+    /// critical "GPU device-lost is unhandled" gap — without it, the
+    /// render loop would keep submitting failed work for hours after
+    /// the GPU died, with no log of why.
+    pub fn set_device_lost_callback<F>(&self, cb: F)
+    where
+        F: Fn(wgpu::DeviceLostReason, String) + Send + 'static,
+    {
+        self.device.set_device_lost_callback(cb);
+    }
+
     pub async fn new_with_scene_scale(width: u32, height: u32, scene_scale: f32) -> Result<Self, Box<dyn std::error::Error>> {
         let scene_scale = scene_scale.clamp(0.25, 1.0);
         Self::new_with_tier_scales(width, height, &[("full", scene_scale)], &[0; 5]).await
