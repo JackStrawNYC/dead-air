@@ -1071,6 +1071,11 @@ async function main() {
   const height = parseInt(getArg("height", "2160"));
   const withOverlays = args.includes("--with-overlays");
   const noTrim = args.includes("--no-trim");
+  // Audit fix: missing analysis JSONs were silently skipped (loud songs
+  // would render with all-zero audio uniforms = no reactivity for that
+  // song's entire duration). --strict-analysis aborts manifest gen if
+  // ANY song's analysis is missing/malformed. Recommended for production.
+  const strictAnalysis = args.includes("--strict-analysis");
   const overlayPngDirExplicit = args.indexOf("--overlay-png-dir") >= 0;
   const overlayPngDir = getArg("overlay-png-dir", "./overlay-pngs");
 
@@ -1176,16 +1181,61 @@ async function main() {
   const songStart = singleSongIdx >= 0 ? singleSongIdx : 0;
   const songEnd = singleSongIdx >= 0 ? singleSongIdx + 1 : songs.length;
 
-  // Estimate total show frames for show_position calculation
+  // Pre-flight readiness scan: per-song analysis + lyric availability.
+  // Failed analysis = the song renders with flat/zero audio uniforms
+  // (no reactivity). Failed lyrics = no karaoke for that song. Surfacing
+  // both up-front lets the user notice + fix BEFORE betting 12 hours
+  // of GPU time on a partially-broken render.
   let totalShowFrames = 0;
+  const missingAnalysis: string[] = [];
+  const missingLyrics: string[] = [];
+  const malformedAnalysis: { title: string; error: string }[] = [];
   for (let si = songStart; si < songEnd; si++) {
-    const tp = resolveAnalysisPath(songs[si], showDate);
-    if (tp) {
+    const s = songs[si];
+    const tp = resolveAnalysisPath(s, showDate);
+    if (!tp) {
+      missingAnalysis.push(s.title);
+      continue;
+    }
+    try {
       const a = JSON.parse(readFileSync(tp, "utf-8"));
-      totalShowFrames += Math.ceil((a.frames?.length ?? 0) / (a.meta?.fps ?? 30) * fps);
+      if (!Array.isArray(a.frames) || a.frames.length === 0) {
+        malformedAnalysis.push({ title: s.title, error: "no frames array" });
+        continue;
+      }
+      totalShowFrames += Math.ceil((a.frames.length) / (a.meta?.fps ?? 30) * fps);
+    } catch (e) {
+      malformedAnalysis.push({ title: s.title, error: (e as Error).message?.slice(0, 80) ?? "parse error" });
+      continue;
+    }
+    // Lyric check (informational — not fatal even under --strict-analysis,
+    // since not every song has lyrics worth aligning, e.g. Stage Announcements
+    // and Drums/Space).
+    const lyricSlug = s.title
+      .toLowerCase().replace(/'/g, " ").replace(/[^a-z0-9]+/g, "-")
+      .replace(/-+/g, "-").replace(/^-|-$/g, "");
+    const lyricPath = `${__dirname}/../pipeline/data/lyrics-aligned/${lyricSlug}-${showDate}.json`;
+    if (!existsSync(lyricPath)) {
+      missingLyrics.push(s.title);
     }
   }
   totalShowFrames = Math.max(1, totalShowFrames);
+
+  // Print readiness summary so the user sees the picture before render.
+  const totalSongs = songEnd - songStart;
+  console.log(`[full-manifest] Pre-flight readiness:`);
+  console.log(`  Analysis: ${totalSongs - missingAnalysis.length - malformedAnalysis.length}/${totalSongs} OK, ${missingAnalysis.length} missing, ${malformedAnalysis.length} malformed`);
+  console.log(`  Lyrics:   ${totalSongs - missingLyrics.length}/${totalSongs} aligned`);
+  if (missingAnalysis.length > 0) {
+    console.warn(`  MISSING ANALYSIS: ${missingAnalysis.slice(0, 8).join(", ")}${missingAnalysis.length > 8 ? `, +${missingAnalysis.length - 8} more` : ""}`);
+  }
+  for (const { title, error } of malformedAnalysis.slice(0, 5)) {
+    console.warn(`  MALFORMED ANALYSIS: ${title} — ${error}`);
+  }
+  if (strictAnalysis && (missingAnalysis.length > 0 || malformedAnalysis.length > 0)) {
+    console.error(`[full-manifest] --strict-analysis set, aborting before render due to ${missingAnalysis.length + malformedAnalysis.length} bad analysis files`);
+    process.exit(2);
+  }
   for (let songIdx = songStart; songIdx < songEnd; songIdx++) {
     const song = songs[songIdx];
     const trackPath = resolveAnalysisPath(song, showDate);
