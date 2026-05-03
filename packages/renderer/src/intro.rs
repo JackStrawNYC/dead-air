@@ -76,7 +76,7 @@ pub fn style_for_era(era: &str, show_seed: f32) -> IntroStyle {
             show_seed,
             show_warmth: 0.2,          // gentler warmth
             show_contrast: 0.1,
-            show_grain: 0.4,
+            show_grain: 1.6,           // heavy 16mm/super-8 feel — triggers film stock treatment (gate >0.8)
             show_bloom: 0.1,
         },
         "classic" => IntroStyle {
@@ -89,7 +89,7 @@ pub fn style_for_era(era: &str, show_seed: f32) -> IntroStyle {
             show_seed,
             show_warmth: 0.1,
             show_contrast: 0.0,
-            show_grain: 0.2,
+            show_grain: 1.4,           // strong 35mm period feel
             show_bloom: 0.0,
         },
         "hiatus" => IntroStyle {
@@ -102,7 +102,7 @@ pub fn style_for_era(era: &str, show_seed: f32) -> IntroStyle {
             show_seed,
             show_warmth: -0.1,
             show_contrast: 0.1,
-            show_grain: 0.3,
+            show_grain: 1.2,           // medium film grain — Egypt/Closing of Winterland feel
             show_bloom: -0.05,
         },
         "touch_of_grey" => IntroStyle {
@@ -115,7 +115,7 @@ pub fn style_for_era(era: &str, show_seed: f32) -> IntroStyle {
             show_seed,
             show_warmth: 0.0,
             show_contrast: -0.05,
-            show_grain: 0.1,
+            show_grain: 1.0,           // light video-era texture — late-80s SVHS
             show_bloom: 0.05,
         },
         "revival" => IntroStyle {
@@ -128,7 +128,7 @@ pub fn style_for_era(era: &str, show_seed: f32) -> IntroStyle {
             show_seed,
             show_warmth: 0.05,
             show_contrast: 0.0,
-            show_grain: 0.15,
+            show_grain: 0.9,           // subtle film texture — modern but not pristine digital
             show_bloom: 0.0,
         },
         _ => IntroStyle { era: era.into(), show_seed, ..IntroStyle::default() },
