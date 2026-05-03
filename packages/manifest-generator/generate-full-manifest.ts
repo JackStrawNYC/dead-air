@@ -226,6 +226,39 @@ function lyricLineSvg(text: string, width: number, height: number, fadeOpacity: 
     + `letter-spacing="2">${safe}</text></svg>`;
 }
 
+/**
+ * Per-era show-body color grading. Drives era_saturation, era_brightness,
+ * era_sepia, show_warmth, and show_grain in the uniform output. The grain
+ * value crosses the postprocess film-stock gate (>0.8) for 70s eras and
+ * stays under it for 80s+ so modern-era shows look digital-clean rather
+ * than artificially aged.
+ *
+ * Values mirror the intro era styles in packages/renderer/src/intro.rs so
+ * the intro and body share the same era character.
+ */
+function eraGrading(era: string): {
+  era_saturation: number;
+  era_brightness: number;
+  era_sepia: number;
+  show_warmth: number;
+  show_grain: number;
+} {
+  switch (era) {
+    case "primal":        // 1965-72 — outdoor 16mm, warm + grainy
+      return { era_saturation: 1.20, era_brightness: 1.08, era_sepia: 0.15, show_warmth: 0.25, show_grain: 1.5 };
+    case "classic":       // 1973-78 — 35mm period feel, slightly less sepia
+      return { era_saturation: 1.15, era_brightness: 1.05, era_sepia: 0.10, show_warmth: 0.18, show_grain: 1.4 };
+    case "hiatus":        // 1975 / Egypt / Closing of Winterland — cleaner 35mm
+      return { era_saturation: 1.05, era_brightness: 1.02, era_sepia: 0.05, show_warmth: 0.10, show_grain: 1.1 };
+    case "touch_of_grey": // 1985-90 — late-80s SVHS (under the 0.8 grain gate)
+      return { era_saturation: 1.10, era_brightness: 1.00, era_sepia: 0.02, show_warmth: 0.05, show_grain: 0.7 };
+    case "revival":       // 1990s+ Dead & Co — digital-clean
+      return { era_saturation: 1.05, era_brightness: 1.00, era_sepia: 0.00, show_warmth: 0.05, show_grain: 0.4 };
+    default:
+      return { era_saturation: 1.10, era_brightness: 1.02, era_sepia: 0.05, show_warmth: 0.10, show_grain: 1.0 };
+  }
+}
+
 function gaussianSmooth(frames: any[], idx: number, field: string, win: number): number {
   const half = Math.floor(win / 2);
   let sum = 0, w = 0;
@@ -775,7 +808,7 @@ function computeUniforms(
   showVisualSeed?: ShowVisualSeed | null,
   showEra?: string,
 ): Record<string, number> {
-  void showEra; // reserved for future use (currently derived from setlist.era at call site)
+  const eraGrade = eraGrading(showEra ?? "primal");
   const f = frames[idx] ?? {};
   const t = interpT ?? 0;
   const hi = idxHi ?? idx;
@@ -1046,16 +1079,20 @@ function computeUniforms(
     envelope_brightness: envBrightness,
     envelope_saturation: envSaturation,
     envelope_hue: envHue,
-    // Era grading: Veneta 1972 = primal era, outdoor Oregon afternoon sunshine.
-    // Strong golden warmth, rich saturation, visible sepia, analog 16mm feel.
-    era_saturation: 1.20, era_brightness: 1.08, era_sepia: 0.15,
-    show_warmth: 0.25,
+    // Era grading: per-era values mirror the intro era styles in
+    // packages/renderer/src/intro.rs so the body and intro share the
+    // same visual character. Grain crosses the postprocess film-stock
+    // gate (>0.8) for 70s eras and stays under it for 80s+.
+    era_saturation: eraGrade.era_saturation,
+    era_brightness: eraGrade.era_brightness,
+    era_sepia: eraGrade.era_sepia,
+    show_warmth: eraGrade.show_warmth,
     // climaxMod modulates bloom + contrast per-frame on top of the
     // era-graded base so peak moments visibly bloom + sharpen.
     // Half-weight (0.5x) so climax-band offsets don't overdrive.
     show_contrast: 1.10 * (1 + ((analysis?.climaxMod?.contrastOffset ?? 0) * 0.5)),
     show_saturation: 1.15,
-    show_grain: 1.3,
+    show_grain: eraGrade.show_grain,
     show_bloom: 1.15 * (1 + ((analysis?.climaxMod?.bloomOffset ?? 0) * 0.5)),
     // Dynamic params: quiet drifts slowly, peaks churn intensely
     // Dynamic params: glacial quiet, flowing peaks.
