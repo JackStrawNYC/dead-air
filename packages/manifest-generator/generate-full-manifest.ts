@@ -133,6 +133,80 @@ function loadAlignedLyrics(songSlug: string, showDate: string): AlignedLyricLine
 }
 /** Build a karaoke-style SVG for a lyric line. Bottom 18% of frame,
  *  italic Georgia with drop shadow for legibility over busy shaders. */
+/**
+ * Concert stage lighting SVG — three converging beams from above the frame.
+ * Models real moving-head spotlights: bright fixture point at top, soft cone
+ * fall-off, atmospheric scatter. Two outer beams use the song's primary +
+ * secondary palette hues (so the lighting "matches" the song character),
+ * one center beam stays neutral white-warm for contrast.
+ *
+ * Activation: only fires above an energy threshold (peaks/jams/climaxes).
+ * Per-beat brightness modulation via the `beatBoost` parameter (0..1).
+ *
+ * Renders at low opacity (caller's `opacity`) and screen-blends, so it
+ * lifts highlights into the frame the way real venue lights do — never
+ * dominates the shader content underneath.
+ */
+function stageLightsSvg(
+  width: number,
+  height: number,
+  primaryHue: number,    // 0..360
+  secondaryHue: number,  // 0..360
+  beatBoost: number,     // 0..1 — kick/onset brightness multiplier
+  sweepPhase: number,    // 0..2π — slow horizontal sweep
+  opacity: number,       // 0..1 — per-frame envelope opacity
+): string {
+  const w = width;
+  const h = height;
+  // Beam endpoints at floor level, sweeping slowly side-to-side.
+  // Origin points are offscreen above the frame so beams enter from "above".
+  const sway = Math.sin(sweepPhase) * (w * 0.08);
+  const swayInv = Math.sin(sweepPhase + Math.PI) * (w * 0.06);
+  // Beam fixture origins (just above top edge)
+  const o1x = w * 0.20 + sway;
+  const o2x = w * 0.50 + swayInv;
+  const o3x = w * 0.80 - sway;
+  const oy  = -h * 0.05;
+  // Beam floor sweeps wider — converging downward
+  const floorY = h * 1.05;
+  const halfWidth1 = w * 0.18;
+  const halfWidth2 = w * 0.14;
+  // Beat boost adds 0..40% to fixture core brightness
+  const coreA = (0.55 + beatBoost * 0.40) * opacity;
+  const haloA = (0.20 + beatBoost * 0.20) * opacity;
+  const tipA  = 0; // transparent at floor — pure cone fall-off
+  // Color helpers: HSL strings
+  const warm = `hsl(${primaryHue.toFixed(0)},85%,62%)`;
+  const cool = `hsl(${secondaryHue.toFixed(0)},80%,60%)`;
+  const neutral = `hsl(40,60%,86%)`; // warm-white for center beam
+  // Build beam polygon: tight diamond at fixture, wide trapezoid at floor
+  const beam = (cx: number, hw: number, color: string, alpha: number, gradId: string) =>
+    `<polygon points="${(cx - hw * 0.04).toFixed(1)},${oy.toFixed(1)} ${(cx + hw * 0.04).toFixed(1)},${oy.toFixed(1)} ${(cx + hw).toFixed(1)},${floorY.toFixed(1)} ${(cx - hw).toFixed(1)},${floorY.toFixed(1)}" fill="url(#${gradId})" opacity="${alpha.toFixed(3)}"/>`;
+  // Linear gradient: bright source at top → transparent at bottom
+  const grad = (id: string, color: string) =>
+    `<linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1">`
+    + `<stop offset="0" stop-color="${color}" stop-opacity="${coreA.toFixed(3)}"/>`
+    + `<stop offset="0.35" stop-color="${color}" stop-opacity="${(coreA * 0.45).toFixed(3)}"/>`
+    + `<stop offset="1" stop-color="${color}" stop-opacity="${tipA.toFixed(3)}"/>`
+    + `</linearGradient>`;
+  // Fixture rim halo: bright dot at top of each beam
+  const halo = (cx: number, color: string) =>
+    `<ellipse cx="${cx.toFixed(1)}" cy="${(oy + h * 0.02).toFixed(1)}" rx="${(w * 0.012).toFixed(1)}" ry="${(h * 0.008).toFixed(1)}" fill="${color}" opacity="${haloA.toFixed(3)}"/>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}">`
+    + `<defs>`
+    + grad("g1", warm)
+    + grad("g2", neutral)
+    + grad("g3", cool)
+    + `</defs>`
+    + beam(o1x, halfWidth1, warm, 1.0, "g1")
+    + beam(o2x, halfWidth2, neutral, 1.0, "g2")
+    + beam(o3x, halfWidth1, cool, 1.0, "g3")
+    + halo(o1x, warm)
+    + halo(o2x, neutral)
+    + halo(o3x, cool)
+    + `</svg>`;
+}
+
 function lyricLineSvg(text: string, width: number, height: number, fadeOpacity: number): string {
   // Escape for XML
   const safe = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -1157,6 +1231,7 @@ async function main() {
     overlay_id: string;
     transform: { opacity: number; scale: number; rotation_deg: number; offset_x: number; offset_y: number };
     blend_mode: string;
+    keyframe_svg?: string;
   }>> = [];
 
   // ─── Process each song ───
@@ -2699,6 +2774,50 @@ async function main() {
               keyframe_svg: lyricLineSvg(line.text, width, height, op),
             });
             break; // one line at a time — no overlapping lyric stack
+          }
+        }
+
+        // ─── Stage lighting beams ───
+        // Concert spotlight pair (warm + cool, song-palette tinted) from above
+        // the frame. Activates at energy > 0.55 with a soft ramp so beams fade
+        // in during builds rather than snap on. Pulses brighter on each beat.
+        // Suppressed in the first 4 seconds of a song so the song-title and
+        // lyric intro can breathe; suppressed during drums-space because the
+        // visuals are meant to be sparse there.
+        if (!isDrumsSpace) {
+          const energy = frames[ai]?.rms ?? 0;
+          const songTimeSec = i / fps;
+          const introMute = Math.max(0, Math.min(1, (songTimeSec - 4.0) / 2.0)); // 0 → 1 over 4-6s
+          const energyEnvelope = Math.max(0, Math.min(1, (energy - 0.55) / 0.25));
+          const baseOp = 0.18 * energyEnvelope * introMute; // peak at ~18% (screen blend)
+          if (baseOp > 0.005) {
+            const beat = frames[ai]?.beat ? 1 : 0;
+            const beatBoost = beat * 0.8 + (frames[ai]?.stemBassRms ?? 0) * 0.4;
+            // Resolve song hues from palette (primary, secondary); default warm/cool.
+            const songPalette: any = (song as any)?.palette ?? songIdentity?.palette;
+            let hP = 30;
+            let hS = 200;
+            if (songPalette?.primary !== undefined) hP = songPalette.primary;
+            if (songPalette?.secondary !== undefined) hS = songPalette.secondary;
+            // Slow horizontal sweep — ~12s period — so beams "feel" alive.
+            const sweepPhase = (songTimeSec / 12.0) * Math.PI * 2;
+            frameInstances.push({
+              overlay_id: "StageLights",
+              transform: {
+                opacity: 1.0, // opacity baked into SVG via per-stop alpha
+                scale: 1.0,
+                rotation_deg: 0,
+                offset_x: 0,
+                offset_y: 0,
+              },
+              blend_mode: "screen",
+              keyframe_svg: stageLightsSvg(
+                width, height, hP, hS,
+                Math.min(1, beatBoost),
+                sweepPhase,
+                Math.min(1, baseOp),
+              ),
+            });
           }
         }
 
