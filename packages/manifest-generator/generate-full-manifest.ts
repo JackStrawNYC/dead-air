@@ -208,6 +208,33 @@ function stageLightsSvg(
 }
 
 /**
+ * Drums-or-Space ritual marker — single large word ("DRUMS" or "SPACE")
+ * rendered low and very dim at the bottom edge. Names the sacred segment
+ * without competing with the shader. Bottom-center, wide letter spacing,
+ * Helvetica thin, ~10% opacity. Pulses subtly with bass/onset.
+ */
+function ritualMarkerSvg(
+  width: number,
+  height: number,
+  label: string,    // "DRUMS" or "SPACE"
+  pulse: number,    // 0..1 — bass-driven brightness modulation
+  opacity: number,  // 0..1 envelope
+): string {
+  const w = width;
+  const h = height;
+  const fontSize = Math.round(h * 0.075);
+  const y = Math.round(h * 0.92);
+  const op = (opacity * (0.55 + pulse * 0.45)).toFixed(3);
+  // Color: cool slate for both — distinct from warm encore lights / song titles
+  const color = `rgba(180,200,220,${op})`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}">`
+    + `<text x="${w / 2}" y="${y}" text-anchor="middle" `
+    + `font-family="Helvetica Neue, Arial, sans-serif" font-weight="200" `
+    + `font-size="${fontSize}" letter-spacing="${Math.round(fontSize * 0.4)}" `
+    + `fill="${color}">${label}</text></svg>`;
+}
+
+/**
  * Encore lighter-flames ambient — small warm-amber dots scattered in the
  * lower portion of the frame, subtly flickering. Evokes the audience
  * lighting lighters/phones during the last song of the night. Active
@@ -1764,8 +1791,16 @@ async function main() {
     if (alignedLyrics && alignedLyrics.length > 0) {
       console.log(`    Lyrics: ${alignedLyrics.length} aligned lines (trim=${trimFrontSeconds.toFixed(1)}s)`);
     }
-    const isDrumsSpace = song.title?.toLowerCase().includes("drums") ||
-                          song.title?.toLowerCase().includes("space");
+    // Distinguish Drums vs Space — they're sacred and visually different.
+    // Drums: tribal, rhythmic, percussive. Space: void, cosmic, motionless.
+    // Both get nearly all overlays suppressed so the moment isn't cluttered.
+    const titleLower = song.title?.toLowerCase() ?? "";
+    const isDrums = titleLower.includes("drums") && !titleLower.includes("space");
+    const isSpace = titleLower.includes("space") && !titleLower.includes("drums");
+    // "Drums > Space" combined track: treat as space-dominant since the
+    // drums portion is usually the front quarter of the track.
+    const isDrumsAndSpace = titleLower.includes("drums") && titleLower.includes("space");
+    const isDrumsSpace = isDrums || isSpace || isDrumsAndSpace;
     const setNumber = song.set ?? 1;
     // Encore detection. Three signals, any of which counts:
     //   1. Explicit set === "encore" / song.encore === true
@@ -2805,8 +2840,13 @@ async function main() {
 
         // Convert opacities to OverlayInstance array
         const frameInstances: typeof overlaySchedule[0] = [];
+        // Drums>Space: aggressive overlay suppression. The shader is the
+        // entire visual statement here; clutter breaks the ritual. We
+        // multiply curated opacities by 0.10 (down from densityMult) so
+        // they read as ghostly residue rather than active overlays.
+        const drumsSpaceOpMult = isDrumsSpace ? 0.10 : 1.0;
         for (const [overlayName, opacityRaw] of Object.entries(opacities)) {
-          const opacity = opacityRaw * densityMult;
+          const opacity = opacityRaw * densityMult * drumsSpaceOpMult;
           if (opacity <= 0.005) continue; // skip invisible overlays
 
           // ALL overlays use screen blend — dark pixels vanish naturally.
@@ -3051,6 +3091,39 @@ async function main() {
                 sweepPhase,
                 Math.min(1, baseOp),
               ),
+            });
+          }
+        }
+
+        // ─── Drums / Space ritual marker ───
+        // Single large dim word at the bottom of the frame, naming the
+        // sacred segment. Doesn't compete with the shader — barely there.
+        // Pulses with bass for Drums, with overall energy for Space.
+        if (isDrums || isDrumsAndSpace || isSpace) {
+          const songTimeSec = i / fps;
+          // Fade in over first 1.5s so the marker emerges as the segment opens
+          const ramp = Math.min(1, songTimeSec / 1.5);
+          // Determine label: combined Drums>Space tracks switch at ~30% through
+          const songProgress = totalOut > 0 ? i / totalOut : 0;
+          let label = "SPACE";
+          if (isDrums) label = "DRUMS";
+          else if (isDrumsAndSpace) label = songProgress < 0.30 ? "DRUMS" : "SPACE";
+          const pulseSrc = label === "DRUMS"
+            ? (frames[ai]?.stemBassRms ?? frames[ai]?.bass ?? 0)
+            : (frames[ai]?.rms ?? 0);
+          const markerOp = 0.18 * ramp;
+          if (markerOp > 0.01) {
+            frameInstances.push({
+              overlay_id: "RitualMarker",
+              transform: {
+                opacity: 1.0,
+                scale: 1.0,
+                rotation_deg: 0,
+                offset_x: 0,
+                offset_y: 0,
+              },
+              blend_mode: "screen",
+              keyframe_svg: ritualMarkerSvg(width, height, label, Math.min(1, pulseSrc), markerOp),
             });
           }
         }
