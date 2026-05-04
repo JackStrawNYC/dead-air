@@ -554,9 +554,71 @@ const VOCALIST_COLOR: Record<Vocalist, { rgb: string; initials: string; full: st
 };
 
 /**
- * Vocal-lead glyph — small monogram + name in vocalist's color, top-left
- * corner. Only renders when the vocalist is actively singing (gated on
- * stem-vocal energy at the call site). Pulses subtly with vocal RMS.
+ * Per-vocalist instrument-silhouette SVG path data (drawn in a 100x40
+ * viewBox unit space; the glyph renderer scales to actual pixels).
+ * Each is hand-crafted: a Strat-shape for Jerry, double-horn SG for Bob,
+ * long-bodied bass for Phil, harmonica + mic for Pigpen, Hammond keys
+ * for Brent, vocal mic for Donna. Picked to be the most visually
+ * recognizable item associated with each member.
+ */
+const VOCALIST_INSTRUMENT_SVG: Record<Vocalist, string> = {
+  // Jerry — stylized solid-body guitar (Tiger/Wolf vibe), body left, neck right
+  jerry:
+    "M14,20 C14,11 21,7 30,7 C40,7 47,10 50,14 L74,14 L78,12 L86,12 L88,14 L88,18 "
+    + "L86,20 L88,22 L88,26 L86,28 L78,28 L74,26 L50,26 C47,30 40,33 30,33 C21,33 14,29 14,20 Z "
+    + "M68,18 L72,18 L72,22 L68,22 Z",
+  // Bob — double-cutaway SG-style horns
+  bob:
+    "M10,20 L20,8 L30,14 L42,12 C50,12 55,16 55,20 C55,24 50,28 42,28 L30,26 L20,32 Z "
+    + "M55,17 L82,15 L86,17 L88,20 L86,23 L82,25 L55,23 Z "
+    + "M82,18 L86,18 L86,22 L82,22 Z",
+  // Pigpen — harmonica (rectangle with row of mouth holes)
+  pigpen:
+    "M10,14 L72,14 L75,16 L75,24 L72,26 L10,26 L7,24 L7,16 Z "
+    + "M14,17 L18,17 L18,19 L14,19 Z M21,17 L25,17 L25,19 L21,19 Z "
+    + "M28,17 L32,17 L32,19 L28,19 Z M35,17 L39,17 L39,19 L35,19 Z "
+    + "M42,17 L46,17 L46,19 L42,19 Z M49,17 L53,17 L53,19 L49,19 Z "
+    + "M56,17 L60,17 L60,19 L56,19 Z M63,17 L67,17 L67,19 L63,19 Z",
+  // Phil — long-bodied bass with extended scale + signature lower horn
+  phil:
+    "M8,20 C8,11 14,7 22,7 C32,7 38,10 42,14 L58,14 L62,12 L78,12 L82,14 L86,14 L88,16 L88,20 "
+    + "L86,22 L82,22 L82,26 L78,28 L62,28 L58,26 L42,26 C38,30 32,33 22,33 C14,33 8,29 8,20 Z "
+    + "M70,18 L74,18 L74,22 L70,22 Z M76,18 L80,18 L80,22 L76,22 Z",
+  // Brent — Hammond organ side view: keyboard with drawbars above
+  brent:
+    "M6,16 L94,16 L94,18 L6,18 Z "
+    + "M6,18 L94,18 L94,28 L6,28 Z "
+    + "M14,18 L14,28 M22,18 L22,28 M30,18 L30,28 M38,18 L38,28 M46,18 L46,28 "
+    + "M54,18 L54,28 M62,18 L62,28 M70,18 L70,28 M78,18 L78,28 M86,18 L86,28 "
+    + "M14,12 L17,12 L17,16 L14,16 Z M22,11 L25,11 L25,16 L22,16 Z "
+    + "M30,13 L33,13 L33,16 L30,16 Z M38,10 L41,10 L41,16 L38,16 Z "
+    + "M46,12 L49,12 L49,16 L46,16 Z M54,11 L57,11 L57,16 L54,16 Z "
+    + "M62,13 L65,13 L65,16 L62,16 Z M70,10 L73,10 L73,16 L70,16 Z "
+    + "M78,12 L81,12 L81,16 L78,16 Z",
+  // Donna — vocal microphone in profile (capsule head + grille + barrel)
+  donna:
+    "M22,8 C30,8 36,12 36,20 C36,28 30,32 22,32 C14,32 8,28 8,20 C8,12 14,8 22,8 Z "
+    + "M14,14 L30,14 M14,18 L30,18 M14,22 L30,22 M14,26 L30,26 "
+    + "M36,18 L40,18 L40,22 L36,22 Z "
+    + "M40,19 L62,19 L62,21 L40,21 Z "
+    + "M62,16 L66,16 L66,24 L62,24 Z "
+    + "M66,18 L88,21 L66,22 Z",
+};
+
+/**
+ * Vocal-lead glyph — instrument silhouette + vocalist name in their
+ * signature color, top-left corner. Each instrument is hand-drawn as
+ * SVG path data and recognizable: Jerry's solid-body guitar, Bob's
+ * double-horn SG, Phil's long bass, Pigpen's harmonica, Brent's
+ * Hammond organ, Donna's vocal mic.
+ *
+ * No initials — initials read as a chat-status badge. The instrument
+ * silhouette is the ID; a deadhead recognizes "guitar = Jerry"
+ * within seconds.
+ *
+ * Pulses with vocal RMS (instrument breathes brighter on louder
+ * phrases). Caller gates render on stem-vocal-rms threshold so this
+ * only appears when the vocalist is actively singing.
  */
 function vocalistGlyphSvg(
   width: number,
@@ -568,27 +630,60 @@ function vocalistGlyphSvg(
   const w = width;
   const h = height;
   const v = VOCALIST_COLOR[vocalist];
+  const path = VOCALIST_INSTRUMENT_SVG[vocalist];
+  // Glyph dimensions: instrument is ~5% of frame width, name beneath.
   const margin = w * 0.018;
-  const x = margin;
-  const y = margin + h * 0.012;
-  const initialsSize = Math.round(h * 0.024);
+  const iconW = w * 0.052;
+  const iconH = iconW * 0.4;     // viewBox is 100x40
+  const iconX = margin;
+  const iconY = margin + h * 0.018;
   const nameSize = Math.round(h * 0.013);
   const op = opacity * (0.6 + pulse * 0.4);
-  const a = op.toFixed(3);
-  const dimA = (op * 0.65).toFixed(3);
-  // Small color dot at the very corner + text to its right
-  const dotR = h * 0.006;
-  const dotCx = x + dotR;
-  const dotCy = y + initialsSize * 0.55;
-  const textX = dotCx + dotR * 2.2;
+  const fillA = op.toFixed(3);
+  const nameA = (op * 0.7).toFixed(3);
+  const fill = `rgba(${v.rgb},${fillA})`;
+  // Tiny pulse dot to the right of the instrument — beats with vocal energy
+  const dotR = h * 0.0035;
+  const dotCx = iconX + iconW + dotR * 2;
+  const dotCy = iconY + iconH * 0.5;
+  const dotA = (op * (0.4 + pulse * 0.6)).toFixed(3);
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}">`
-    + `<circle cx="${dotCx.toFixed(1)}" cy="${dotCy.toFixed(1)}" r="${dotR.toFixed(1)}" fill="rgba(${v.rgb},${a})"/>`
-    + `<text x="${textX.toFixed(1)}" y="${(dotCy + initialsSize * 0.35).toFixed(1)}" `
-    + `font-family="Helvetica Neue, Arial, sans-serif" font-weight="500" `
-    + `font-size="${initialsSize}" letter-spacing="2" fill="rgba(${v.rgb},${a})">${v.initials}</text>`
-    + `<text x="${textX.toFixed(1)}" y="${(dotCy + initialsSize * 0.35 + nameSize * 1.4).toFixed(1)}" `
-    + `font-family="Helvetica Neue, Arial, sans-serif" font-weight="300" `
-    + `font-size="${nameSize}" letter-spacing="3" fill="rgba(${v.rgb},${dimA})">${v.full}</text>`
+    + `<g transform="translate(${iconX.toFixed(1)} ${iconY.toFixed(1)}) scale(${(iconW / 100).toFixed(4)} ${(iconH / 40).toFixed(4)})">`
+    + `<path d="${path}" fill="${fill}"/>`
+    + `</g>`
+    + `<circle cx="${dotCx.toFixed(1)}" cy="${dotCy.toFixed(1)}" r="${dotR.toFixed(1)}" fill="rgba(${v.rgb},${dotA})"/>`
+    + `<text x="${iconX.toFixed(1)}" y="${(iconY + iconH + nameSize * 1.5).toFixed(1)}" `
+    + `font-family="Georgia,serif" font-style="italic" font-weight="400" `
+    + `font-size="${nameSize}" letter-spacing="2" fill="rgba(${v.rgb},${nameA})">${v.full}</text>`
+    + `</svg>`;
+}
+
+/**
+ * Subtle full-frame color cast keyed to the lead vocalist's hue. So
+ * even peripherally, the screen warms toward gold during Jerry songs
+ * and cools toward blue during Bob songs — a deadhead "feels" who's
+ * singing without consciously checking the corner glyph.
+ *
+ * Very low alpha (0.04-0.07) and screen-blended so it lifts highlights
+ * gently rather than tinting shadows. Off during peaks (let the music
+ * breathe at climaxes) and during drums-space (no vocalist context).
+ */
+function vocalistColorCastSvg(
+  width: number,
+  height: number,
+  vocalist: Vocalist,
+  opacity: number,
+): string {
+  const w = width, h = height;
+  const v = VOCALIST_COLOR[vocalist];
+  const a = opacity.toFixed(3);
+  // Vignette-style: stronger at center top/bottom, weaker at edges
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}">`
+    + `<defs><radialGradient id="vc" cx="0.5" cy="0.5" r="0.75">`
+    + `<stop offset="0" stop-color="rgb(${v.rgb})" stop-opacity="${a}"/>`
+    + `<stop offset="1" stop-color="rgb(${v.rgb})" stop-opacity="0"/>`
+    + `</radialGradient></defs>`
+    + `<rect x="0" y="0" width="${w}" height="${h}" fill="url(#vc)"/>`
     + `</svg>`;
 }
 
@@ -3548,6 +3643,26 @@ async function main() {
                 Math.min(1, vocalEnergy * 2),
                 glyphOp,
               ),
+            });
+          }
+          // Subtle full-frame color cast so the screen warms toward the
+          // vocalist's hue even when the corner glyph is dim. Suppressed
+          // at peaks (the climax should breathe at full color) and during
+          // drums-space (no vocalist context). ~5% peak alpha.
+          const peakSuppress2 = (overlayDensityMults[i] ?? 1.0) < 0.7 ? 0.2 : 1.0;
+          const castOp = 0.055 * vocalGate * introMute * peakSuppress2;
+          if (castOp > 0.005) {
+            frameInstances.push({
+              overlay_id: "VocalCast",
+              transform: {
+                opacity: 1.0,
+                scale: 1.0,
+                rotation_deg: 0,
+                offset_x: 0,
+                offset_y: 0,
+              },
+              blend_mode: "screen",
+              keyframe_svg: vocalistColorCastSvg(width, height, vocalist, castOp),
             });
           }
         }
