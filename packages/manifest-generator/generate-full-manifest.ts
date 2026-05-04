@@ -304,55 +304,115 @@ function venueOutdoorDaySvg(width: number, height: number, timeSec: number, opac
   const op = Math.max(0, Math.min(1, opacity));
   const sunHazeA  = (0.28 * op).toFixed(3);
   const sunCoreA  = (0.18 * op).toFixed(3);
-  const treeA     = (0.55 * op).toFixed(3);
-  const treeMidA  = (0.30 * op).toFixed(3);
   // Sun position drifts slowly over the show (paired with time-of-day arc)
   const sunX = w * (0.50 + Math.sin(timeSec * 0.0008) * 0.35);
   const sunY = h * 0.12;
   const sunR = h * 0.45;
-  // Tree silhouette: gentle wavy edge across bottom 6% of frame
-  const treeBaseY = h * 0.94;
-  const treeAmp = h * 0.025;
-  let treePath = `M0,${h.toFixed(0)} L0,${treeBaseY.toFixed(1)}`;
-  const treeSegs = 28;
-  for (let k = 0; k <= treeSegs; k++) {
-    const x = (k / treeSegs) * w;
-    const phase = (k * 0.7 + timeSec * 0.05);
-    const dy = Math.sin(phase) * treeAmp + Math.sin(phase * 2.3 + 1.7) * (treeAmp * 0.5);
-    const y = treeBaseY + dy;
-    treePath += ` L${x.toFixed(1)},${y.toFixed(1)}`;
-  }
-  treePath += ` L${w.toFixed(0)},${h.toFixed(0)} Z`;
-  // Mid-band tree (further-back tree-line, dimmer + smoother)
-  const treeMidBaseY = h * 0.91;
-  const treeMidAmp = h * 0.012;
-  let treeMidPath = `M0,${h.toFixed(0)} L0,${treeMidBaseY.toFixed(1)}`;
-  for (let k = 0; k <= 16; k++) {
-    const x = (k / 16) * w;
-    const phase = (k * 0.5 + timeSec * 0.03 + 1.1);
-    const dy = Math.sin(phase) * treeMidAmp;
-    const y = treeMidBaseY + dy;
-    treeMidPath += ` L${x.toFixed(1)},${y.toFixed(1)}`;
-  }
-  treeMidPath += ` L${w.toFixed(0)},${h.toFixed(0)} Z`;
-  // Dust motes — 14 deterministic positions, slow drift
-  const motes = (() => {
-    const rand = (s: number) => {
-      let z = (s * 9301 + 49297) % 233280;
-      return z / 233280;
+
+  // Deterministic seeded RNG for tree-line irregularity. Same seed across
+  // frames so the tree line stays anchored — only individual leaf-shimmer
+  // motion is time-driven, not the whole silhouette dancing around.
+  const rand = (s: number) => {
+    let z = (s * 9301 + 49297) % 233280;
+    return z / 233280;
+  };
+
+  // Build a fractal-noise tree-line path. Three octaves of value-noise
+  // sampled at increasing frequency, then a few discrete tall spires
+  // for individual trees breaking the line. NOT a sine wave — real
+  // treelines are irregular and that's the entire point of this.
+  const buildTreeLine = (
+    baseY: number,
+    bandAmp: number,
+    segs: number,
+    seedOffset: number,
+    spireCount: number,
+    spireMaxH: number,
+  ): string => {
+    // Sample value-noise with linear-interp between integer-spaced anchors.
+    const sampleNoise = (octave: number, t: number): number => {
+      const freq = Math.pow(2, octave);
+      const idx = t * freq;
+      const i0 = Math.floor(idx);
+      const f = idx - i0;
+      const a = rand(i0 * 73 + seedOffset + octave * 401) - 0.5;
+      const b = rand((i0 + 1) * 73 + seedOffset + octave * 401) - 0.5;
+      const fade = f * f * (3 - 2 * f); // smoothstep
+      return a + (b - a) * fade;
     };
-    let dots = "";
-    for (let n = 0; n < 14; n++) {
-      const baseX = rand(n * 31 + 7) * w;
-      const baseY = h * (0.30 + rand(n * 53 + 11) * 0.35);
-      const driftX = baseX + Math.sin(timeSec * 0.04 + n * 1.3) * (w * 0.04);
-      const driftY = baseY + Math.cos(timeSec * 0.03 + n * 0.9) * (h * 0.02);
-      const r = h * (0.0012 + rand(n * 17 + 3) * 0.002);
-      const a = (op * (0.25 + rand(n * 23 + 19) * 0.35)).toFixed(3);
-      dots += `<circle cx="${driftX.toFixed(1)}" cy="${driftY.toFixed(1)}" r="${r.toFixed(2)}" fill="rgba(255,235,180,${a})"/>`;
+
+    // Pre-pick spire positions + heights deterministically so individual
+    // tree spires break above the noise band.
+    const spires: Array<{ x: number; height: number; w: number }> = [];
+    for (let s = 0; s < spireCount; s++) {
+      const sx = rand(s * 137 + seedOffset + 9001) * w;
+      const sh = (0.4 + rand(s * 211 + seedOffset + 17) * 0.6) * spireMaxH;
+      const sw = w * (0.012 + rand(s * 53 + seedOffset + 31) * 0.020);
+      spires.push({ x: sx, height: sh, w: sw });
     }
-    return dots;
-  })();
+
+    let path = `M0,${h.toFixed(0)} L0,${baseY.toFixed(1)}`;
+    for (let k = 0; k <= segs; k++) {
+      const t = k / segs;
+      const x = t * w;
+      // 3-octave FBM-ish value noise
+      const n = sampleNoise(1, t) * 0.5
+              + sampleNoise(2, t) * 0.30
+              + sampleNoise(3, t) * 0.18;
+      let dy = n * bandAmp * 2; // -bandAmp..+bandAmp roughly
+      // Spire injection: when x is near a spire, lift the line UP (negative y)
+      for (const sp of spires) {
+        const dist = Math.abs(x - sp.x);
+        if (dist < sp.w) {
+          // Triangular bump — peaks at spire center
+          const lift = (1 - dist / sp.w) * sp.height;
+          dy -= lift;
+        }
+      }
+      const y = baseY + dy;
+      path += ` L${x.toFixed(1)},${y.toFixed(1)}`;
+    }
+    path += ` L${w.toFixed(0)},${h.toFixed(0)} Z`;
+    return path;
+  };
+
+  // Three receding tree-line bands: distant (very dim), middle, foreground.
+  // Each at its own seed offset so the noise patterns don't repeat.
+  const treeFarPath = buildTreeLine(
+    h * 0.885,  // baseline (highest = furthest back)
+    h * 0.008,  // small noise amplitude
+    34, 100,    // segs, seed
+    8, h * 0.025, // 8 modest spires
+  );
+  const treeMidPath = buildTreeLine(
+    h * 0.910,
+    h * 0.014,
+    44, 200,
+    10, h * 0.040,
+  );
+  const treeNearPath = buildTreeLine(
+    h * 0.935,
+    h * 0.022,
+    60, 300,
+    14, h * 0.055,
+  );
+  const treeFarA  = (0.22 * op).toFixed(3);
+  const treeMidA  = (0.42 * op).toFixed(3);
+  const treeNearA = (0.62 * op).toFixed(3);
+
+  // Dust motes — 18 positions across two depth layers (near + far)
+  let motes = "";
+  for (let n = 0; n < 18; n++) {
+    const baseX = rand(n * 31 + 7) * w;
+    const baseY = h * (0.28 + rand(n * 53 + 11) * 0.42);
+    const farMote = n >= 12; // 6 far motes — smaller + dimmer
+    const driftX = baseX + Math.sin(timeSec * 0.04 + n * 1.3) * (w * 0.04);
+    const driftY = baseY + Math.cos(timeSec * 0.03 + n * 0.9) * (h * 0.02);
+    const r = h * (farMote ? 0.0006 : 0.0014 + rand(n * 17 + 3) * 0.0018);
+    const baseA = farMote ? 0.18 : 0.32 + rand(n * 23 + 19) * 0.30;
+    const a = (op * baseA).toFixed(3);
+    motes += `<circle cx="${driftX.toFixed(1)}" cy="${driftY.toFixed(1)}" r="${r.toFixed(2)}" fill="rgba(255,235,180,${a})"/>`;
+  }
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}">`
     + `<defs>`
     + `<radialGradient id="sun" cx="0.5" cy="0.5" r="0.5">`
@@ -363,8 +423,9 @@ function venueOutdoorDaySvg(width: number, height: number, timeSec: number, opac
     + `</defs>`
     + `<circle cx="${sunX.toFixed(1)}" cy="${sunY.toFixed(1)}" r="${sunR.toFixed(1)}" fill="url(#sun)"/>`
     + motes
+    + `<path d="${treeFarPath}" fill="rgba(35,42,30,${treeFarA})"/>`
     + `<path d="${treeMidPath}" fill="rgba(20,28,18,${treeMidA})"/>`
-    + `<path d="${treePath}" fill="rgba(8,14,10,${treeA})"/>`
+    + `<path d="${treeNearPath}" fill="rgba(8,14,10,${treeNearA})"/>`
     + `</svg>`;
 }
 
