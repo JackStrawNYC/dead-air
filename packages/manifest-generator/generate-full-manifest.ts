@@ -208,6 +208,53 @@ function stageLightsSvg(
 }
 
 /**
+ * Encore lighter-flames ambient — small warm-amber dots scattered in the
+ * lower portion of the frame, subtly flickering. Evokes the audience
+ * lighting lighters/phones during the last song of the night. Active
+ * only during the encore so it doesn't become wallpaper.
+ *
+ * Deterministic positions seeded by a fixed value so dots stay anchored
+ * across frames (don't dance around — only flicker in opacity).
+ */
+function lighterFlamesSvg(
+  width: number,
+  height: number,
+  timeSec: number,
+  envelope: number, // 0..1 — encore fade-in/out gate
+): string {
+  const w = width;
+  const h = height;
+  const rDot = w * 0.0035;       // ~3px @ 1080p, ~7px @ 4K
+  const rGlow = rDot * 3;
+  const dotCount = 44;
+  // Mulberry32-style deterministic PRNG seeded by index
+  const rand = (seed: number) => {
+    let s = seed >>> 0;
+    s = (s + 0x6D2B79F5) >>> 0;
+    s = Math.imul(s ^ (s >>> 15), s | 1);
+    s ^= s + Math.imul(s ^ (s >>> 7), s | 61);
+    return ((s ^ (s >>> 14)) >>> 0) / 4294967296;
+  };
+  let dots = "";
+  for (let n = 0; n < dotCount; n++) {
+    const x = rand(n * 7919 + 1) * w * 0.92 + w * 0.04;     // 4-96% width
+    const y = h * (0.62 + rand(n * 3517 + 5) * 0.32);        // 62-94% height
+    const baseOp = 0.45 + rand(n * 1361 + 9) * 0.45;         // 0.45-0.90 base
+    const phase = rand(n * 9173 + 13) * Math.PI * 2;
+    const flicker = 0.7 + 0.3 * Math.sin(timeSec * (3 + rand(n * 257 + 17) * 2) + phase);
+    const op = (baseOp * flicker * envelope).toFixed(3);
+    if (parseFloat(op) < 0.04) continue;
+    dots += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${rGlow.toFixed(1)}" fill="url(#lf)" opacity="${op}"/>`;
+  }
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}">`
+    + `<defs><radialGradient id="lf" cx="0.5" cy="0.5" r="0.5">`
+    + `<stop offset="0" stop-color="#ffd28a" stop-opacity="0.95"/>`
+    + `<stop offset="0.35" stop-color="#ff9a3c" stop-opacity="0.55"/>`
+    + `<stop offset="1" stop-color="#ff7a14" stop-opacity="0"/>`
+    + `</radialGradient></defs>${dots}</svg>`;
+}
+
+/**
  * Persistent show-context HUD — top-right corner block. Grounds the
  * abstract visuals in the show's actual identity: where, when, and
  * how far through. Rendered every frame so a viewer joining mid-show
@@ -884,6 +931,7 @@ function computeUniforms(
   showVisualSeed?: ShowVisualSeed | null,
   showEra?: string,
   showProgress?: number, // 0..1 — overall position through the entire show (for time-of-day arc)
+  isEncoreSong?: boolean, // true if current song is the encore — boosts warmth + bloom
 ): Record<string, number> {
   const eraGrade = eraGrading(showEra ?? "primal");
   // Time-of-day arc: subtle drift in warmth/brightness/saturation across the
@@ -908,6 +956,12 @@ function computeUniforms(
     todBright = 0.99 + (0.95 - 0.99) * t;
     todSat   = 1.05 + (0.92 - 1.05) * t;
   }
+  // Encore boost: visual escalation on the last song(s) of the night.
+  // Adds extra warmth + brightness so the encore *feels* like one,
+  // working with the time-of-day arc rather than against it.
+  const encoreBoostWarmth = isEncoreSong ? 0.08 : 0;
+  const encoreBoostBright = isEncoreSong ? 1.04 : 1.0;
+  const encoreBoostBloom  = isEncoreSong ? 1.15 : 1.0;
   const f = frames[idx] ?? {};
   const t = interpT ?? 0;
   const hi = idxHi ?? idx;
@@ -1183,16 +1237,16 @@ function computeUniforms(
     // layered on top so the 3-hour show feels like afternoon → sunset →
     // night rather than 180 disconnected minutes.
     era_saturation: eraGrade.era_saturation * todSat,
-    era_brightness: eraGrade.era_brightness * todBright,
+    era_brightness: eraGrade.era_brightness * todBright * encoreBoostBright,
     era_sepia: eraGrade.era_sepia,
-    show_warmth: eraGrade.show_warmth + todWarmth,
+    show_warmth: eraGrade.show_warmth + todWarmth + encoreBoostWarmth,
     // climaxMod modulates bloom + contrast per-frame on top of the
     // era-graded base so peak moments visibly bloom + sharpen.
     // Half-weight (0.5x) so climax-band offsets don't overdrive.
     show_contrast: 1.10 * (1 + ((analysis?.climaxMod?.contrastOffset ?? 0) * 0.5)),
     show_saturation: 1.15 * todSat,
     show_grain: eraGrade.show_grain,
-    show_bloom: 1.15 * (1 + ((analysis?.climaxMod?.bloomOffset ?? 0) * 0.5)),
+    show_bloom: 1.15 * encoreBoostBloom * (1 + ((analysis?.climaxMod?.bloomOffset ?? 0) * 0.5)),
     // Dynamic params: quiet drifts slowly, peaks churn intensely
     // Dynamic params: glacial quiet, flowing peaks.
     // Fast energy adds phrase-level responsiveness on top of base speed.
@@ -1706,6 +1760,10 @@ async function main() {
     const isDrumsSpace = song.title?.toLowerCase().includes("drums") ||
                           song.title?.toLowerCase().includes("space");
     const setNumber = song.set ?? 1;
+    // Encore detection — last set with ≤3 songs counts as the encore.
+    // Same rule used by the show-context HUD so labels stay consistent.
+    const isEncoreSong = setNumber === totalSetCount
+      && (songsPerSet.get(setNumber) ?? 99) <= 3;
 
     console.log(`  [Song ${songIdx + 1}/${setlist.songs.length}] ${song.title}: ${frames.length} → ${totalOut} frames (default: ${defaultMode})`);
 
@@ -2262,6 +2320,7 @@ async function main() {
         songForUniforms, i / Math.max(1, totalOut), routeSectionProgress, showVisualSeed,
         setlist.era ?? "classic",
         showProgress,
+        isEncoreSong,
       );
 
       // Fix section_index and section_progress (not available in computeUniforms)
@@ -2978,6 +3037,32 @@ async function main() {
                 sweepPhase,
                 Math.min(1, baseOp),
               ),
+            });
+          }
+        }
+
+        // ─── Encore lighter flames ───
+        // Active only during the encore (last set with ≤3 songs). Fade-in
+        // over first 2s of the song so it builds with the moment instead
+        // of snapping on. Suppressed during peak-of-show — lighters are
+        // ambient, not focal, so they shouldn't compete with the climax.
+        if (isEncoreSong) {
+          const songTimeSec = i / fps;
+          const flameRamp = Math.min(1, songTimeSec / 2.0);
+          const peakSuppress = (overlayDensityMults[i] ?? 1.0) < 0.7 ? 0.5 : 1.0;
+          const flameOp = 0.32 * flameRamp * peakSuppress;
+          if (flameOp > 0.02) {
+            frameInstances.push({
+              overlay_id: "LighterFlames",
+              transform: {
+                opacity: 1.0,
+                scale: 1.0,
+                rotation_deg: 0,
+                offset_x: 0,
+                offset_y: 0,
+              },
+              blend_mode: "screen",
+              keyframe_svg: lighterFlamesSvg(width, height, i / fps, flameOp),
             });
           }
         }
