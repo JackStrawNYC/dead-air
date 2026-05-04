@@ -247,24 +247,25 @@ ${
     }
   }
 
-  // Envelope brightness — but with a 60% floor so quiet sections stay
-  // visible. Pure col *= uEnvelopeBrightness crushed already-dim shader
-  // output to near-black during low-energy moments. Mapped 0.55..1.20
-  // (the manifest's clamp range) to a 0.60..1.15 multiplier so quiet
-  // moments dim to 60% of shader output rather than 35%.
-  float envBrightMul = mix(0.60, 1.15, clamp((uEnvelopeBrightness - 0.55) / 0.65, 0.0, 1.0));
+  // Envelope brightness — 70% floor. Pure col *= uEnvelopeBrightness
+  // crushed already-dim shader output to near-black during low-energy
+  // moments. Mapped 0.55..1.20 (manifest clamp range) to 0.70..1.15
+  // so quiet moments dim to 70% of shader output rather than 35%.
+  float envBrightMul = mix(0.70, 1.15, clamp((uEnvelopeBrightness - 0.55) / 0.65, 0.0, 1.0));
   col *= envBrightMul;
 
-  // Low-energy ambient haze — subtle warm offset added when uEnergy is
-  // low so frames are never absolute black even when the shader itself
-  // has faded to dark. Many shaders multiply their output by uEnergy
-  // and produce near-zero when audio is quiet; this floor catches that
-  // case so a viewer always sees *something*. Disappears at moderate
-  // energy (>0.30) so it doesn't tint loud passages.
+  // Low-energy ambient haze — substantial warm-amber lift when uEnergy
+  // is low so dark-shader-output frames don't fade to black. Many
+  // shaders multiply their output by uEnergy and produce near-zero
+  // when audio is quiet (or in dead-air sections, intro lulls,
+  // boundary breathing dim). Adds up to +0.18 max RGB lift on the
+  // quietest frames; fades out by uEnergy=0.35 so loud passages are
+  // unaffected. Color is subtle warm amber consistent with concert
+  // venue spillover lighting.
   {
-    float quietAmount = 1.0 - smoothstep(0.05, 0.30, uEnergy);
-    vec3 quietHaze = vec3(0.030, 0.022, 0.014); // very dark warm amber
-    col += quietHaze * quietAmount * 1.6;
+    float quietAmount = 1.0 - smoothstep(0.05, 0.35, uEnergy);
+    vec3 quietHaze = vec3(0.090, 0.065, 0.035); // warm amber spill
+    col += quietHaze * quietAmount * 2.0;
   }
 
   // Entrainment oscillation: very slow brightness breathing at 0.07Hz (14s period)

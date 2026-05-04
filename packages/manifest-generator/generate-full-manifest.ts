@@ -3539,16 +3539,19 @@ async function main() {
       uniforms.dynamic_time = dynamicTimeAccum;
       uniforms.beat_time = dynamicTimeAccum; // keep in sync
 
-      // Suppress reactive uniforms during dead air — calm ambient, no pulsing to noise
+      // Suppress reactive uniforms during dead air — calm ambient, no pulsing to noise.
+      // Was crushing brightness to 0.45 (below the 0.55 envelope floor) which produced
+      // near-black frames during song-start lulls. Lifted to keep dead-air visibly
+      // atmospheric while still distinct from active music.
       if (isDeadAir) {
-        uniforms.energy = Math.min(uniforms.energy ?? 0, 0.05);
-        uniforms.bass = Math.min(uniforms.bass ?? 0, 0.02);
+        uniforms.energy = Math.min(uniforms.energy ?? 0, 0.12);  // was 0.05 — too low for quiet-haze gate
+        uniforms.bass = Math.min(uniforms.bass ?? 0, 0.05);      // was 0.02
         uniforms.onset = 0;
         uniforms.beat_snap = 0;
         uniforms.drum_onset = 0;
-        // Keep dead air visible but subdued (not nearly invisible)
-        uniforms.envelope_brightness = Math.min(uniforms.envelope_brightness ?? 0.5, 0.45);
-        uniforms.envelope_saturation = Math.min(uniforms.envelope_saturation ?? 0.5, 0.65);
+        // Dead air is QUIET, not INVISIBLE — keep within the floor band.
+        uniforms.envelope_brightness = Math.min(uniforms.envelope_brightness ?? 0.65, 0.65);
+        uniforms.envelope_saturation = Math.min(uniforms.envelope_saturation ?? 0.80, 0.80);
       }
 
       allFrames.push({
