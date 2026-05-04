@@ -4478,7 +4478,22 @@ async function main() {
     // Settings must match the Rust loader (rmp_serde) — useRecords=false, useFloat32=ALWAYS.
     const packr = new Packr({ useRecords: false, structuredClone: false, useFloat32: 1 });
     const buffer = packr.pack(manifestObj);
-    writeFileSync(outputPath, buffer);
+    // writeFileSync caps at 2GB (Node's max single-call buffer length).
+    // For shows with many inline keyframe SVG overlays the manifest can
+    // exceed that. Chunk the write so it works for any size.
+    const fs = await import("fs");
+    const fd = fs.openSync(outputPath, "w");
+    try {
+      const CHUNK = 256 * 1024 * 1024; // 256MB per writeSync call — well under 2GB
+      let pos = 0;
+      while (pos < buffer.length) {
+        const end = Math.min(pos + CHUNK, buffer.length);
+        fs.writeSync(fd, buffer, pos, end - pos);
+        pos = end;
+      }
+    } finally {
+      fs.closeSync(fd);
+    }
     const mb = (statSync(outputPath).size / 1048576).toFixed(1);
     console.log(`[full-manifest] Done: ${outputPath} (${mb} MB, ${allFrames.length} frames)`);
 
