@@ -247,8 +247,25 @@ ${
     }
   }
 
-  // Envelope brightness (the ONE knob)
-  col *= uEnvelopeBrightness;
+  // Envelope brightness — but with a 60% floor so quiet sections stay
+  // visible. Pure col *= uEnvelopeBrightness crushed already-dim shader
+  // output to near-black during low-energy moments. Mapped 0.55..1.20
+  // (the manifest's clamp range) to a 0.60..1.15 multiplier so quiet
+  // moments dim to 60% of shader output rather than 35%.
+  float envBrightMul = mix(0.60, 1.15, clamp((uEnvelopeBrightness - 0.55) / 0.65, 0.0, 1.0));
+  col *= envBrightMul;
+
+  // Low-energy ambient haze — subtle warm offset added when uEnergy is
+  // low so frames are never absolute black even when the shader itself
+  // has faded to dark. Many shaders multiply their output by uEnergy
+  // and produce near-zero when audio is quiet; this floor catches that
+  // case so a viewer always sees *something*. Disappears at moderate
+  // energy (>0.30) so it doesn't tint loud passages.
+  {
+    float quietAmount = 1.0 - smoothstep(0.05, 0.30, uEnergy);
+    vec3 quietHaze = vec3(0.030, 0.022, 0.014); // very dark warm amber
+    col += quietHaze * quietAmount * 1.6;
+  }
 
   // Entrainment oscillation: very slow brightness breathing at 0.07Hz (14s period)
   // Below conscious perception threshold but within brainwave alpha-wave range.

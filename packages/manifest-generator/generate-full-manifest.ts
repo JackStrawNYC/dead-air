@@ -1889,9 +1889,12 @@ function computeUniforms(
   // Structural analysis values (discrete state machines — don't interpolate phases)
   const climax = analysis?.climaxState ?? { phase: "idle", intensity: 0 };
 
-  // Envelope brightness: dark quiet, bright loud, but never washed
-  // Quiet: 0.45 (dim but visible) → Loud: 1.15 (vivid, punchy)
-  let envBrightness = 0.45 + Math.sqrt(factor) * 0.70;
+  // Envelope brightness: dim-but-visible quiet, bright loud.
+  // Quiet: 0.62 (dim but always readable) → Loud: 1.15 (vivid, punchy).
+  // Was 0.45 quiet baseline — too dark, low-energy frames rendered as
+  // near-black voids over a 3-hour show. Lifted floor so quiet moments
+  // remain atmospheric rather than absent.
+  let envBrightness = 0.62 + Math.sqrt(factor) * 0.53;
 
   // Envelope saturation: RICH, not muted. The Dead = vivid color.
   // Quiet: 0.80 (still colorful) → Loud: 1.40 (psychedelic vivid)
@@ -1980,9 +1983,11 @@ function computeUniforms(
   }
   const envHue = hueShiftDeg * (Math.PI / 180); // convert to radians
 
-  // Rich, vivid range — the Dead is NOT muted
-  envBrightness = Math.max(0.35, Math.min(1.20, envBrightness));
-  envSaturation = Math.max(0.75, Math.min(1.50, envSaturation));
+  // Rich, vivid range — the Dead is NOT muted. Floor lifted from 0.35 to
+  // 0.55 so even maximally suppressed moments (idle climax + boundary
+  // breathing dim) stay above the "fade-to-black" zone.
+  envBrightness = Math.max(0.55, Math.min(1.20, envBrightness));
+  envSaturation = Math.max(0.80, Math.min(1.50, envSaturation));
   const climaxPhaseMap: Record<string, number> = { idle: 0, build: 1, climax: 2, sustain: 3, release: 4 };
   const jamCycle = analysis?.jamCycle ?? { phase: "setup", progress: 0 };
   const jamPhaseMap: Record<string, number> = { setup: 0, exploration: 1, building: 2, peak_space: 3, resolution: 4 };
