@@ -208,6 +208,56 @@ function stageLightsSvg(
 }
 
 /**
+ * Canonical Grateful Dead segues — songs known to flow directly into
+ * each other with no clean break. At these boundaries the chapter card
+ * is suppressed and the inter-song crossfade is extended so the moment
+ * reads as one sacred sequence rather than two adjacent songs.
+ *
+ * Detection is loose: we lower-case + strip punctuation on both sides
+ * before comparing, so "China Cat Sunflower" and "china cat sunflower"
+ * both match. setlist.songs[i].segueInto === true on the *first* song
+ * of a segue pair also forces the boundary to be a segue, regardless
+ * of whether the pair is in this list.
+ */
+const KNOWN_SEGUES: Array<[string, string]> = [
+  // The sacred suites
+  ["china cat sunflower", "i know you rider"],
+  ["help on the way", "slipknot"],
+  ["slipknot", "franklin's tower"],
+  ["scarlet begonias", "fire on the mountain"],
+  ["estimated prophet", "eyes of the world"],
+  ["lost sailor", "saint of circumstance"],
+  ["playing in the band", "drums"],
+  ["drums", "space"],
+  ["space", "the other one"],
+  ["space", "wharf rat"],
+  ["space", "stella blue"],
+  ["the other one", "wharf rat"],
+  ["the other one", "stella blue"],
+  ["weather report suite", "let it grow"],
+  ["truckin'", "the other one"],
+  ["uncle john's band", "playing in the band"],
+  // Common late-show transitions
+  ["sugar magnolia", "sunshine daydream"],
+  ["he's gone", "truckin'"],
+  ["dark star", "the other one"],
+  ["dark star", "sugar magnolia"],
+  ["dark star", "el paso"],
+];
+function normalizeSongTitle(title: string): string {
+  return (title ?? "").toLowerCase()
+    .replace(/[''`]/g, "")
+    .replace(/[^a-z0-9 ]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+function isKnownSegue(fromTitle: string, toTitle: string): boolean {
+  const a = normalizeSongTitle(fromTitle);
+  const b = normalizeSongTitle(toTitle);
+  return KNOWN_SEGUES.some(([x, y]) => x === a && y === b);
+}
+
+/**
  * Venue type inference from venue name + (optional) explicit setlist
  * field. The ambient overlay below is driven by this — outdoor field
  * shows get sun-haze + tree silhouette, theaters get red velvet rim,
@@ -1788,7 +1838,7 @@ async function main() {
 
   // ─── Process each song ───
   const allFrames: any[] = [];
-  const songBoundaries: Array<{ title: string; set: number; startFrame: number; endFrame: number }> = [];
+  const songBoundaries: Array<{ title: string; set: number; startFrame: number; endFrame: number; segueFromPrev?: boolean }> = [];
   let globalTime = 0;
   const usedShaderModes = new Map<string, number>();
   const shaderModeLastUsed = new Map<string, number>();
@@ -3616,12 +3666,24 @@ async function main() {
       console.log(`    Overlays: ${totalOut} frames in ${(overlayMs / 1000).toFixed(1)}s (avg ${avgOverlays} per frame)`);
     }
 
-    // Track song boundary for chapter cards
+    // Track song boundary for chapter cards. segueFromPrev: true when
+    // the previous song flowed directly into this one (canonical Dead
+    // segue pair OR explicit setlist.songs[i-1].segueInto). Used by the
+    // renderer to suppress the chapter card and extend the crossfade.
+    let segueFromPrev = false;
+    if (songIdx > songStart) {
+      const prevSong = songs[songIdx - 1];
+      const prevExplicit = prevSong?.segueInto === true || (prevSong as any)?.segue === true;
+      if (prevExplicit || isKnownSegue(prevSong?.title ?? "", song.title ?? "")) {
+        segueFromPrev = true;
+      }
+    }
     songBoundaries.push({
       title: song.title,
       set: song.set ?? (songIdx < 10 ? 1 : songIdx < 15 ? 2 : 3),
       startFrame: allFrames.length - totalOut,
       endFrame: allFrames.length,
+      segueFromPrev,
     });
 
     // Record this song's peak score so detectPeakOfShow can compare
@@ -3665,10 +3727,18 @@ async function main() {
       const songBLen = songB.endFrame - songB.startFrame;
       if (songALen < BOUNDARY_FADE_FRAMES * 2 || songBLen < BOUNDARY_FADE_FRAMES * 2) continue;
 
-      // Determine blend mode: segue pairs use luminance_key, others use dissolve
+      // Determine blend mode: segue pairs use luminance_key + extended fade,
+      // others use dissolve. Segue detection accepts EITHER an explicit
+      // setlist.songs[bi].segueInto flag OR membership in the canonical
+      // KNOWN_SEGUES table (China>Rider, Help>Slip>Franklin, Scarlet>Fire,
+      // Estimated>Eyes, etc.).
       const songAData = songs[bi];
-      const isSegue = songAData?.segueInto && songAData.segueInto !== false;
+      const isSegue = (songAData?.segueInto && songAData.segueInto !== false)
+        || isKnownSegue(songAData?.title ?? "", songs[bi + 1]?.title ?? "");
       const blendMode = isSegue ? "luminance_key" : "dissolve";
+      // Extend the crossfade for segues so the moment reads as continuous
+      // sequence rather than two adjacent songs. 2s → 4s.
+      const fadeFrames = isSegue ? BOUNDARY_FADE_FRAMES * 2 : BOUNDARY_FADE_FRAMES;
 
       // Get the shader at end of song A and start of song B
       const shaderAtEndA = allFrames[boundary - 1]?.shader_id;
@@ -3696,11 +3766,11 @@ async function main() {
       // skip the dim because they're meant to flow without a pause.
       const breathingDim = !isSegue;
 
-      // Last BOUNDARY_FADE_FRAMES of song A: blend toward song B's shader
-      for (let j = 0; j < BOUNDARY_FADE_FRAMES; j++) {
-        const fi = boundary - BOUNDARY_FADE_FRAMES + j;
+      // Last fadeFrames of song A: blend toward song B's shader
+      for (let j = 0; j < fadeFrames; j++) {
+        const fi = boundary - fadeFrames + j;
         if (fi < songA.startFrame || fi >= boundary) continue;
-        const progress = j / BOUNDARY_FADE_FRAMES; // 0→1
+        const progress = j / fadeFrames; // 0→1
         const frame = allFrames[fi];
         if (!frame) continue;
 
@@ -3726,11 +3796,11 @@ async function main() {
         }
       }
 
-      // First BOUNDARY_FADE_FRAMES of song B: blend from song A's shader
-      for (let j = 0; j < BOUNDARY_FADE_FRAMES; j++) {
+      // First fadeFrames of song B: blend from song A's shader
+      for (let j = 0; j < fadeFrames; j++) {
         const fi = boundary + j;
         if (fi >= songB.endFrame) continue;
-        const progress = 1.0 - (j / BOUNDARY_FADE_FRAMES); // 1→0 (outgoing shader fades)
+        const progress = 1.0 - (j / fadeFrames); // 1→0 (outgoing shader fades)
         const frame = allFrames[fi];
         if (!frame) continue;
 
@@ -3750,7 +3820,7 @@ async function main() {
         // Breathing dim: incoming half (linear ramp 0.75 → 1.0 brightness, 0.80 → 1.0 sat).
         // progress here is INVERTED (1→0 over the window) so we use j-progress.
         if (breathingDim) {
-          const incomingProgress = j / BOUNDARY_FADE_FRAMES; // 0→1
+          const incomingProgress = j / fadeFrames; // 0→1
           const breathFactor = 0.75 + incomingProgress * 0.25; // 0.75 → 1.0
           const breathSatFactor = 0.80 + incomingProgress * 0.20; // 0.80 → 1.0
           frame.envelope_brightness = (frame.envelope_brightness ?? 1) * breathFactor;

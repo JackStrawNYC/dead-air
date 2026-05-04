@@ -48,6 +48,12 @@ pub struct SongBoundary {
     pub start_frame: u32,
     #[serde(rename = "endFrame")]
     pub end_frame: u32,
+    /// True when this song is the second half of a canonical segue
+    /// (the prior song flows directly into this one with no break).
+    /// At segue boundaries the chapter card is suppressed and the
+    /// shader crossfade is extended for visual continuity.
+    #[serde(default, rename = "segueFromPrev")]
+    pub segue_from_prev: bool,
 }
 
 /// Per-frame data: which shader to use + all uniform values.

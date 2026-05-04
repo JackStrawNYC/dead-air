@@ -342,8 +342,16 @@ fn main() {
                 // Each insertion: (insert_at, title, set, track_num, prev_set)
                 // prev_set is the set of the previous boundary; if it differs
                 // from `set` we render a setbreak instead of a chapter card.
+                // Boundaries flagged segue_from_prev get NO interstitial — the
+                // previous song flows directly into this one and a chapter
+                // card would break the sacred sequence.
                 let mut insertions: Vec<(u32, String, u32, u32, u32)> = Vec::new();
+                let mut segue_skips = 0;
                 for (i, boundary) in boundaries.iter().enumerate().skip(1) {
+                    if boundary.segue_from_prev {
+                        segue_skips += 1;
+                        continue;
+                    }
                     let prev_set = boundaries[i - 1].set;
                     insertions.push((
                         boundary.start_frame + intro_frame_count as u32,
@@ -352,6 +360,9 @@ fn main() {
                         i as u32 + 1,
                         prev_set,
                     ));
+                }
+                if segue_skips > 0 {
+                    println!("Chapter cards: {} suppressed at segue boundaries", segue_skips);
                 }
                 insertions.reverse(); // insert from back to front so indices stay valid
 
