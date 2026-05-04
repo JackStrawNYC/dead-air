@@ -208,6 +208,117 @@ function stageLightsSvg(
 }
 
 /**
+ * Per-song lead-vocalist lookup. Keyed by lower-cased song title.
+ * Veneta '72 (Pigpen's penultimate year) is mostly Jerry/Bob; Pigpen
+ * was on tour but didn't lead vocal duties at this show.
+ *
+ * For songs not in the table, the visualizer skips the vocal-lead
+ * glyph entirely — better to show nothing than to mis-attribute.
+ */
+type Vocalist = "jerry" | "bob" | "pigpen" | "brent" | "donna" | "phil";
+const VOCALIST_BY_SONG: Record<string, Vocalist> = {
+  // Jerry-led
+  "sugaree": "jerry", "deal": "jerry", "bertha": "jerry",
+  "casey jones": "jerry", "bird song": "jerry",
+  "sing me back home": "jerry", "china cat sunflower": "jerry",
+  "i know you rider": "jerry", "dark star": "jerry",
+  "stella blue": "jerry", "ripple": "jerry",
+  "scarlet begonias": "jerry", "fire on the mountain": "jerry",
+  "eyes of the world": "jerry", "althea": "jerry",
+  "shakedown street": "jerry", "touch of grey": "jerry",
+  "he's gone": "jerry", "wharf rat": "jerry",
+  "tennessee jed": "jerry", "loser": "jerry",
+  "candyman": "jerry", "uncle john's band": "jerry",
+  "friend of the devil": "jerry", "row jimmy": "jerry",
+  "row jimmy row": "jerry", "brokedown palace": "jerry",
+  "morning dew": "jerry", "us blues": "jerry",
+  "u.s. blues": "jerry", "franklin's tower": "jerry",
+  "help on the way": "jerry", "slipknot": "jerry",
+  "the wheel": "jerry", "wheel": "jerry",
+  // Bob-led
+  "the promised land": "bob", "promised land": "bob",
+  "me and my uncle": "bob", "mexicali blues": "bob",
+  "black-throated wind": "bob", "black throated wind": "bob",
+  "jack straw": "bob", "greatest story ever told": "bob",
+  "el paso": "bob", "one more saturday night": "bob",
+  "playing in the band": "bob", "playin' in the band": "bob",
+  "estimated prophet": "bob", "lost sailor": "bob",
+  "saint of circumstance": "bob", "looks like rain": "bob",
+  "throwing stones": "bob", "sugar magnolia": "bob",
+  "weather report suite": "bob", "let it grow": "bob",
+  "samson and delilah": "bob", "i need a miracle": "bob",
+  "minglewood blues": "bob", "new minglewood blues": "bob",
+  "mama tried": "bob", "cassidy": "bob",
+  // Pigpen-led
+  "good lovin'": "pigpen", "good lovin": "pigpen",
+  "lovelight": "pigpen", "turn on your lovelight": "pigpen",
+  "big boss man": "pigpen", "mr. charlie": "pigpen",
+  "mr charlie": "pigpen", "caution": "pigpen",
+  "smokestack lightning": "pigpen", "hard to handle": "pigpen",
+  "next time you see me": "pigpen", "katie mae": "pigpen",
+  "easy wind": "pigpen", "operator": "pigpen",
+  // Phil
+  "box of rain": "phil", "unbroken chain": "phil",
+  // Brent
+  "i will take you home": "brent", "far from me": "brent",
+  "hey pocky way": "brent", "tons of steel": "brent",
+  "just a little light": "brent", "blow away": "brent",
+  // Donna (mid-70s)
+  "playing in the band/donna": "donna", "from the heart of me": "donna",
+};
+function lookupVocalist(title: string): Vocalist | null {
+  const k = (title ?? "").toLowerCase().trim();
+  return VOCALIST_BY_SONG[k] ?? null;
+}
+const VOCALIST_COLOR: Record<Vocalist, { rgb: string; initials: string; full: string }> = {
+  jerry:  { rgb: "210,150,40",  initials: "JG", full: "JERRY"  }, // warm gold
+  bob:    { rgb: "120,170,210", initials: "BW", full: "BOB"    }, // sky blue
+  pigpen: { rgb: "200,60,40",   initials: "PP", full: "PIGPEN" }, // blood orange
+  brent:  { rgb: "180,120,200", initials: "BM", full: "BRENT"  }, // violet
+  donna:  { rgb: "230,140,170", initials: "DG", full: "DONNA"  }, // rose
+  phil:   { rgb: "150,150,170", initials: "PL", full: "PHIL"   }, // silver
+};
+
+/**
+ * Vocal-lead glyph — small monogram + name in vocalist's color, top-left
+ * corner. Only renders when the vocalist is actively singing (gated on
+ * stem-vocal energy at the call site). Pulses subtly with vocal RMS.
+ */
+function vocalistGlyphSvg(
+  width: number,
+  height: number,
+  vocalist: Vocalist,
+  pulse: number,    // 0..1 — vocal-rms-driven
+  opacity: number,  // 0..1 envelope
+): string {
+  const w = width;
+  const h = height;
+  const v = VOCALIST_COLOR[vocalist];
+  const margin = w * 0.018;
+  const x = margin;
+  const y = margin + h * 0.012;
+  const initialsSize = Math.round(h * 0.024);
+  const nameSize = Math.round(h * 0.013);
+  const op = opacity * (0.6 + pulse * 0.4);
+  const a = op.toFixed(3);
+  const dimA = (op * 0.65).toFixed(3);
+  // Small color dot at the very corner + text to its right
+  const dotR = h * 0.006;
+  const dotCx = x + dotR;
+  const dotCy = y + initialsSize * 0.55;
+  const textX = dotCx + dotR * 2.2;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}">`
+    + `<circle cx="${dotCx.toFixed(1)}" cy="${dotCy.toFixed(1)}" r="${dotR.toFixed(1)}" fill="rgba(${v.rgb},${a})"/>`
+    + `<text x="${textX.toFixed(1)}" y="${(dotCy + initialsSize * 0.35).toFixed(1)}" `
+    + `font-family="Helvetica Neue, Arial, sans-serif" font-weight="500" `
+    + `font-size="${initialsSize}" letter-spacing="2" fill="rgba(${v.rgb},${a})">${v.initials}</text>`
+    + `<text x="${textX.toFixed(1)}" y="${(dotCy + initialsSize * 0.35 + nameSize * 1.4).toFixed(1)}" `
+    + `font-family="Helvetica Neue, Arial, sans-serif" font-weight="300" `
+    + `font-size="${nameSize}" letter-spacing="3" fill="rgba(${v.rgb},${dimA})">${v.full}</text>`
+    + `</svg>`;
+}
+
+/**
  * Drums-or-Space ritual marker — single large word ("DRUMS" or "SPACE")
  * rendered low and very dim at the bottom edge. Names the sacred segment
  * without competing with the shader. Bottom-center, wide letter spacing,
@@ -1808,6 +1919,9 @@ async function main() {
     //   3. Last song of the show — always gets encore weight even if the
     //      show didn't formally label one (e.g. Veneta set 3 has 8 songs
     //      but One More Saturday Night IS the encore).
+    // Per-song lead vocalist (Jerry/Bob/Pigpen/etc.) — null if unknown.
+    // Drives a subtle top-left corner glyph during vocal passages.
+    const vocalist = lookupVocalist(song.title ?? "");
     const isLastRealSong = songIdx === lastRealSongIdx;
     const explicitEncore = (song.set as any) === "encore" || (song as any).encore === true;
     const shortLastSet = setNumber === totalSetCount
@@ -3090,6 +3204,41 @@ async function main() {
                 Math.min(1, beatBoost),
                 sweepPhase,
                 Math.min(1, baseOp),
+              ),
+            });
+          }
+        }
+
+        // ─── Vocal-lead glyph ───
+        // Top-left corner monogram + name in vocalist's color. Only renders
+        // when a vocalist is actively singing (gated on stem-vocal energy).
+        // Suppressed during drums>space (no vocals there) and the first 1.5s
+        // of a song so it doesn't fight the song-title intro.
+        if (vocalist && !isDrumsSpace) {
+          const songTimeSec = i / fps;
+          const vocalEnergy = frames[ai]?.stemVocalRms
+            ?? frames[ai]?.stemVocalPresence
+            ?? 0;
+          // Smooth threshold so the glyph fades in/out with vocals rather
+          // than blinking on every breath.
+          const vocalGate = Math.max(0, Math.min(1, (vocalEnergy - 0.10) / 0.20));
+          const introMute = Math.min(1, Math.max(0, (songTimeSec - 1.5) / 1.5));
+          const glyphOp = 0.65 * vocalGate * introMute;
+          if (glyphOp > 0.04) {
+            frameInstances.push({
+              overlay_id: "VocalLead",
+              transform: {
+                opacity: 1.0,
+                scale: 1.0,
+                rotation_deg: 0,
+                offset_x: 0,
+                offset_y: 0,
+              },
+              blend_mode: "screen",
+              keyframe_svg: vocalistGlyphSvg(
+                width, height, vocalist,
+                Math.min(1, vocalEnergy * 2),
+                glyphOp,
               ),
             });
           }
