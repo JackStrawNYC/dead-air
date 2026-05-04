@@ -208,6 +208,230 @@ function stageLightsSvg(
 }
 
 /**
+ * Venue type inference from venue name + (optional) explicit setlist
+ * field. The ambient overlay below is driven by this — outdoor field
+ * shows get sun-haze + tree silhouette, theaters get red velvet rim,
+ * arenas get overhead rim light, stadiums get open vastness.
+ */
+type VenueType = "outdoor-day" | "outdoor-night" | "theater" | "arena" | "stadium";
+function inferVenueType(venue: string, explicitType?: string | null): VenueType | null {
+  if (explicitType) {
+    const t = explicitType.toLowerCase();
+    if (["outdoor-day", "outdoor-night", "theater", "arena", "stadium"].includes(t)) {
+      return t as VenueType;
+    }
+  }
+  const v = (venue ?? "").toLowerCase();
+  if (!v) return null;
+  // Outdoor / festival / field
+  if (/\b(festival|field|park|meadow|grounds|fairground|raceway|speedway|amphithea|amphitheatre|bowl|pavilion|farm|mountain)\b/.test(v)) {
+    return "outdoor-day";
+  }
+  // Theater (older, smaller, indoor with curtains)
+  if (/\b(theatre|theater|opera|hall|ballroom|fillmore|capitol|warfield|orpheum|paramount|palace|civic)\b/.test(v)) {
+    return "theater";
+  }
+  // Stadium (huge open, often outdoor)
+  if (/\b(stadium|coliseum|colosseum|jfk|bowl)\b/.test(v)) {
+    return "stadium";
+  }
+  // Arena (indoor, larger than theater)
+  if (/\b(arena|garden|center|spectrum|forum|frostburg|civic)\b/.test(v)) {
+    return "arena";
+  }
+  return null;
+}
+
+/**
+ * Outdoor-day venue ambience — warm sun haze at top + transparent middle
+ * + dark tree-silhouette band at the very bottom. Made for Veneta-style
+ * outdoor field shows. Slowly drifting dust motes in the middle band give
+ * it life without being busy.
+ */
+function venueOutdoorDaySvg(width: number, height: number, timeSec: number, opacity: number): string {
+  const w = width;
+  const h = height;
+  const op = Math.max(0, Math.min(1, opacity));
+  const sunHazeA  = (0.28 * op).toFixed(3);
+  const sunCoreA  = (0.18 * op).toFixed(3);
+  const treeA     = (0.55 * op).toFixed(3);
+  const treeMidA  = (0.30 * op).toFixed(3);
+  // Sun position drifts slowly over the show (paired with time-of-day arc)
+  const sunX = w * (0.50 + Math.sin(timeSec * 0.0008) * 0.35);
+  const sunY = h * 0.12;
+  const sunR = h * 0.45;
+  // Tree silhouette: gentle wavy edge across bottom 6% of frame
+  const treeBaseY = h * 0.94;
+  const treeAmp = h * 0.025;
+  let treePath = `M0,${h.toFixed(0)} L0,${treeBaseY.toFixed(1)}`;
+  const treeSegs = 28;
+  for (let k = 0; k <= treeSegs; k++) {
+    const x = (k / treeSegs) * w;
+    const phase = (k * 0.7 + timeSec * 0.05);
+    const dy = Math.sin(phase) * treeAmp + Math.sin(phase * 2.3 + 1.7) * (treeAmp * 0.5);
+    const y = treeBaseY + dy;
+    treePath += ` L${x.toFixed(1)},${y.toFixed(1)}`;
+  }
+  treePath += ` L${w.toFixed(0)},${h.toFixed(0)} Z`;
+  // Mid-band tree (further-back tree-line, dimmer + smoother)
+  const treeMidBaseY = h * 0.91;
+  const treeMidAmp = h * 0.012;
+  let treeMidPath = `M0,${h.toFixed(0)} L0,${treeMidBaseY.toFixed(1)}`;
+  for (let k = 0; k <= 16; k++) {
+    const x = (k / 16) * w;
+    const phase = (k * 0.5 + timeSec * 0.03 + 1.1);
+    const dy = Math.sin(phase) * treeMidAmp;
+    const y = treeMidBaseY + dy;
+    treeMidPath += ` L${x.toFixed(1)},${y.toFixed(1)}`;
+  }
+  treeMidPath += ` L${w.toFixed(0)},${h.toFixed(0)} Z`;
+  // Dust motes — 14 deterministic positions, slow drift
+  const motes = (() => {
+    const rand = (s: number) => {
+      let z = (s * 9301 + 49297) % 233280;
+      return z / 233280;
+    };
+    let dots = "";
+    for (let n = 0; n < 14; n++) {
+      const baseX = rand(n * 31 + 7) * w;
+      const baseY = h * (0.30 + rand(n * 53 + 11) * 0.35);
+      const driftX = baseX + Math.sin(timeSec * 0.04 + n * 1.3) * (w * 0.04);
+      const driftY = baseY + Math.cos(timeSec * 0.03 + n * 0.9) * (h * 0.02);
+      const r = h * (0.0012 + rand(n * 17 + 3) * 0.002);
+      const a = (op * (0.25 + rand(n * 23 + 19) * 0.35)).toFixed(3);
+      dots += `<circle cx="${driftX.toFixed(1)}" cy="${driftY.toFixed(1)}" r="${r.toFixed(2)}" fill="rgba(255,235,180,${a})"/>`;
+    }
+    return dots;
+  })();
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}">`
+    + `<defs>`
+    + `<radialGradient id="sun" cx="0.5" cy="0.5" r="0.5">`
+    + `<stop offset="0" stop-color="#fff5d6" stop-opacity="${sunCoreA}"/>`
+    + `<stop offset="0.4" stop-color="#ffd58a" stop-opacity="${sunHazeA}"/>`
+    + `<stop offset="1" stop-color="#ff9a3c" stop-opacity="0"/>`
+    + `</radialGradient>`
+    + `</defs>`
+    + `<circle cx="${sunX.toFixed(1)}" cy="${sunY.toFixed(1)}" r="${sunR.toFixed(1)}" fill="url(#sun)"/>`
+    + motes
+    + `<path d="${treeMidPath}" fill="rgba(20,28,18,${treeMidA})"/>`
+    + `<path d="${treePath}" fill="rgba(8,14,10,${treeA})"/>`
+    + `</svg>`;
+}
+
+/**
+ * Outdoor-night venue ambience — deep cool sky wash with a sparse
+ * starfield and a faint horizon glow. Simpler than the day variant.
+ */
+function venueOutdoorNightSvg(width: number, height: number, timeSec: number, opacity: number): string {
+  const w = width, h = height;
+  const op = Math.max(0, Math.min(1, opacity));
+  const horizonA = (0.20 * op).toFixed(3);
+  const rand = (s: number) => { let z = (s * 9301 + 49297) % 233280; return z / 233280; };
+  let stars = "";
+  for (let n = 0; n < 36; n++) {
+    const x = rand(n * 41 + 13) * w;
+    const y = h * (0.05 + rand(n * 71 + 5) * 0.55);
+    const baseA = 0.4 + rand(n * 19 + 23) * 0.5;
+    const twinkle = 0.65 + 0.35 * Math.sin(timeSec * (1 + rand(n * 7 + 1) * 2) + rand(n * 11 + 17) * 6.28);
+    const a = (op * baseA * twinkle).toFixed(3);
+    const r = h * (0.0010 + rand(n * 13 + 29) * 0.0015);
+    stars += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(2)}" fill="rgba(220,230,255,${a})"/>`;
+  }
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}">`
+    + `<defs><linearGradient id="horiz" x1="0" y1="1" x2="0" y2="0">`
+    + `<stop offset="0" stop-color="#0a1530" stop-opacity="${horizonA}"/>`
+    + `<stop offset="0.3" stop-color="#0a1530" stop-opacity="0"/>`
+    + `</linearGradient></defs>`
+    + `<rect x="0" y="0" width="${w}" height="${h}" fill="url(#horiz)"/>`
+    + stars
+    + `</svg>`;
+}
+
+/**
+ * Theater venue ambience — warm red proscenium rim light at top + sides,
+ * suggesting the curtain frame of a vintage theater (Fillmore, Capitol,
+ * Warfield).
+ */
+function venueTheaterSvg(width: number, height: number, opacity: number): string {
+  const w = width, h = height;
+  const op = Math.max(0, Math.min(1, opacity));
+  const rimA = (0.35 * op).toFixed(3);
+  const sideA = (0.20 * op).toFixed(3);
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}">`
+    + `<defs>`
+    + `<linearGradient id="prosTop" x1="0" y1="0" x2="0" y2="1">`
+    + `<stop offset="0" stop-color="#7a1018" stop-opacity="${rimA}"/>`
+    + `<stop offset="0.18" stop-color="#7a1018" stop-opacity="0"/>`
+    + `</linearGradient>`
+    + `<linearGradient id="prosLeft" x1="0" y1="0" x2="1" y2="0">`
+    + `<stop offset="0" stop-color="#5c0c14" stop-opacity="${sideA}"/>`
+    + `<stop offset="0.10" stop-color="#5c0c14" stop-opacity="0"/>`
+    + `</linearGradient>`
+    + `<linearGradient id="prosRight" x1="1" y1="0" x2="0" y2="0">`
+    + `<stop offset="0" stop-color="#5c0c14" stop-opacity="${sideA}"/>`
+    + `<stop offset="0.10" stop-color="#5c0c14" stop-opacity="0"/>`
+    + `</linearGradient>`
+    + `</defs>`
+    + `<rect x="0" y="0" width="${w}" height="${h}" fill="url(#prosTop)"/>`
+    + `<rect x="0" y="0" width="${w}" height="${h}" fill="url(#prosLeft)"/>`
+    + `<rect x="0" y="0" width="${w}" height="${h}" fill="url(#prosRight)"/>`
+    + `</svg>`;
+}
+
+/**
+ * Arena venue ambience — overhead rim of warm lights at the top edge,
+ * suggesting the ring of stadium-rigging spots high above the floor.
+ */
+function venueArenaSvg(width: number, height: number, opacity: number): string {
+  const w = width, h = height;
+  const op = Math.max(0, Math.min(1, opacity));
+  const rimA = (0.30 * op).toFixed(3);
+  const dotA = (0.55 * op).toFixed(3);
+  let dots = "";
+  for (let n = 0; n < 22; n++) {
+    const x = (n + 0.5) * (w / 22);
+    const y = h * 0.025;
+    const r = h * 0.005;
+    dots += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}" fill="rgba(255,220,160,${dotA})"/>`;
+  }
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}">`
+    + `<defs><linearGradient id="rimTop" x1="0" y1="0" x2="0" y2="1">`
+    + `<stop offset="0" stop-color="#ffe8b8" stop-opacity="${rimA}"/>`
+    + `<stop offset="0.10" stop-color="#ffe8b8" stop-opacity="0"/>`
+    + `</linearGradient></defs>`
+    + `<rect x="0" y="0" width="${w}" height="${h}" fill="url(#rimTop)"/>`
+    + dots
+    + `</svg>`;
+}
+
+/**
+ * Stadium venue ambience — open vast cool wash, faint horizon line at
+ * mid-frame, no rim lights (you're outdoors and far from the rigging).
+ */
+function venueStadiumSvg(width: number, height: number, opacity: number): string {
+  const w = width, h = height;
+  const op = Math.max(0, Math.min(1, opacity));
+  const skyA = (0.18 * op).toFixed(3);
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}">`
+    + `<defs><linearGradient id="skyVast" x1="0" y1="0" x2="0" y2="1">`
+    + `<stop offset="0" stop-color="#3060a0" stop-opacity="${skyA}"/>`
+    + `<stop offset="0.45" stop-color="#3060a0" stop-opacity="0"/>`
+    + `</linearGradient></defs>`
+    + `<rect x="0" y="0" width="${w}" height="${h}" fill="url(#skyVast)"/>`
+    + `</svg>`;
+}
+
+function venueAmbienceSvg(type: VenueType, width: number, height: number, timeSec: number, opacity: number): string {
+  switch (type) {
+    case "outdoor-day":   return venueOutdoorDaySvg(width, height, timeSec, opacity);
+    case "outdoor-night": return venueOutdoorNightSvg(width, height, timeSec, opacity);
+    case "theater":       return venueTheaterSvg(width, height, opacity);
+    case "arena":         return venueArenaSvg(width, height, opacity);
+    case "stadium":       return venueStadiumSvg(width, height, opacity);
+  }
+}
+
+/**
  * Per-song lead-vocalist lookup. Keyed by lower-cased song title.
  * Veneta '72 (Pigpen's penultimate year) is mostly Jerry/Bob; Pigpen
  * was on tour but didn't lead vocal duties at this show.
@@ -1667,6 +1891,12 @@ async function main() {
   const venueLabel = shortVenue(setlist.venue ?? "");
   const dateLabel = formatShortDate(setlist.date ?? "");
   const totalSetCount = songsPerSet.size;
+  // Venue type (drives the ambient overlay) — explicit setlist.venueType
+  // wins, otherwise inferred from venue name. null = no venue ambient.
+  const venueType = inferVenueType(setlist.venue ?? "", (setlist as any).venueType ?? null);
+  if (venueType) {
+    console.log(`[full-manifest] Venue ambient: ${venueType}`);
+  }
 
   for (let songIdx = songStart; songIdx < songEnd; songIdx++) {
     const song = songs[songIdx];
@@ -3205,6 +3435,34 @@ async function main() {
                 sweepPhase,
                 Math.min(1, baseOp),
               ),
+            });
+          }
+        }
+
+        // ─── Venue ambient ───
+        // Always-on (subtly) backdrop tying the abstract visuals to the
+        // physical room. Renders BEFORE other foreground overlays in the
+        // instance list so per-pixel compositing layers it underneath.
+        // Suppressed during peak-of-show + drums-space so it doesn't
+        // clutter sacred moments. Outdoor-day reads with the time-of-day
+        // arc — sun position drifts across the show.
+        if (venueType) {
+          const showElapsedSec = (allFrames.length + i) / fps;
+          const peakSuppress = (overlayDensityMults[i] ?? 1.0) < 0.7 ? 0.3 : 1.0;
+          const dsSuppress = isDrumsSpace ? 0.4 : 1.0;
+          const venueOp = 0.65 * peakSuppress * dsSuppress;
+          if (venueOp > 0.04) {
+            frameInstances.push({
+              overlay_id: "VenueAmbient",
+              transform: {
+                opacity: 1.0,
+                scale: 1.0,
+                rotation_deg: 0,
+                offset_x: 0,
+                offset_y: 0,
+              },
+              blend_mode: "screen",
+              keyframe_svg: venueAmbienceSvg(venueType, width, height, showElapsedSec, venueOp),
             });
           }
         }
