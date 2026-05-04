@@ -940,6 +940,41 @@ function vocalistColorCastSvg(
 }
 
 /**
+ * Segue marker — small bottom-center indicator during a canonical Dead
+ * segue boundary (China>Rider, Help>Slip>Franklin, Scarlet>Fire, etc.).
+ * Names what's happening so a deadhead recognizes the moment, then
+ * fades. NOT a hard label — a refined typographic gesture: thin gold
+ * arrow + the segue name in small italic Georgia.
+ */
+function segueMarkerSvg(
+  width: number,
+  height: number,
+  fromTitle: string,
+  toTitle: string,
+  opacity: number,
+): string {
+  const w = width;
+  const h = height;
+  const fontSize = Math.round(h * 0.018);
+  const arrowSize = Math.round(h * 0.014);
+  const y = h * 0.965;
+  const op = Math.max(0, Math.min(1, opacity));
+  const txtA = (op * 0.85).toFixed(3);
+  const goldA = (op * 0.9).toFixed(3);
+  // Compose: "China Cat Sunflower  ▶  I Know You Rider"
+  const line = `${fromTitle}  ▶  ${toTitle}`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}">`
+    + `<defs><filter id="segShadow"><feDropShadow dx="0" dy="${(h * 0.0010).toFixed(1)}" stdDeviation="${(h * 0.0020).toFixed(1)}" flood-color="#000" flood-opacity="0.85"/></filter></defs>`
+    // Subtle gold rule above the text
+    + `<line x1="${(w * 0.42).toFixed(1)}" y1="${(y - fontSize * 0.95).toFixed(1)}" x2="${(w * 0.58).toFixed(1)}" y2="${(y - fontSize * 0.95).toFixed(1)}" stroke="rgba(220,180,90,${goldA})" stroke-width="${(h * 0.0008).toFixed(1)}"/>`
+    // Centered italic line
+    + `<text x="${(w / 2).toFixed(1)}" y="${y.toFixed(1)}" text-anchor="middle" `
+    + `font-family="Georgia, 'Palatino Linotype', serif" font-style="italic" font-size="${fontSize}" `
+    + `letter-spacing="2" fill="rgba(245,238,220,${txtA})" filter="url(#segShadow)">${line}</text>`
+    + `</svg>`;
+}
+
+/**
  * Drums-or-Space ritual marker — single large word ("DRUMS" or "SPACE")
  * rendered low and very dim at the bottom edge. Names the sacred segment
  * without competing with the shader. Bottom-center, wide letter spacing,
@@ -4226,6 +4261,23 @@ async function main() {
       const brightStartB = startB?.envelope_brightness ?? 1.0;
       const satEndA = endA?.envelope_saturation ?? 1.0;
       const satStartB = startB?.envelope_saturation ?? 1.0;
+      // Palette bleed: smooth chroma_hue + palette_primary/secondary across
+      // the boundary so the colors flow with the segue. Without this, song
+      // A's amber palette would jump to song B's blue palette at the exact
+      // boundary frame even though the shaders crossfade — felt like a cut
+      // for color.
+      const chromaEndA = endA?.chroma_hue ?? 0;
+      const chromaStartB = startB?.chroma_hue ?? 0;
+      const palPriEndA = endA?.palette_primary ?? 0;
+      const palPriStartB = startB?.palette_primary ?? 0;
+      const palSecEndA = endA?.palette_secondary ?? 0;
+      const palSecStartB = startB?.palette_secondary ?? 0;
+      // Hue bleed uses a shortest-arc lerp so going amber→blue takes the
+      // visible direction, not the long way around the wheel.
+      const lerpHue = (a: number, b: number, t: number) => {
+        const d = ((b - a + 540) % 360) - 180;
+        return (a + d * t + 360) % 360;
+      };
 
       // For non-segue boundaries, apply a "breathing room" visual exhale —
       // triangular brightness/saturation dim that bottoms at 75% / 80% at
@@ -4264,6 +4316,28 @@ async function main() {
           frame.envelope_brightness = (frame.envelope_brightness ?? 1) * breathFactor;
           frame.envelope_saturation = (frame.envelope_saturation ?? 1) * breathSatFactor;
         }
+        // Segue palette bleed: lerp chroma + palette hues toward song B
+        // smoothly across the entire fade window (not just the last 25%).
+        if (isSegue) {
+          frame.chroma_hue       = lerpHue(chromaEndA, chromaStartB, progress);
+          frame.palette_primary  = palPriEndA   + (palPriStartB - palPriEndA)   * progress;
+          frame.palette_secondary= palSecEndA   + (palSecStartB - palSecEndA)   * progress;
+          // Inject the segue marker overlay into THIS frame's overlay
+          // schedule so the bottom-edge "▶ Song A → Song B" indicator
+          // shows during the transition window. Triangular fade: 0 →
+          // 0.85 by mid-fade → 0 at end.
+          if (overlaySchedule[fi]) {
+            const triFade = Math.min(progress * 2, 1) * 0.85; // ramps in over first half
+            if (triFade > 0.04) {
+              overlaySchedule[fi].push({
+                overlay_id: "SegueMarker",
+                transform: { opacity: 1.0, scale: 1.0, rotation_deg: 0, offset_x: 0, offset_y: 0 },
+                blend_mode: "normal",
+                keyframe_svg: segueMarkerSvg(width, height, songA.title, songB.title, triFade),
+              });
+            }
+          }
+        }
       }
 
       // First fadeFrames of song B: blend from song A's shader
@@ -4295,6 +4369,26 @@ async function main() {
           const breathSatFactor = 0.80 + incomingProgress * 0.20; // 0.80 → 1.0
           frame.envelope_brightness = (frame.envelope_brightness ?? 1) * breathFactor;
           frame.envelope_saturation = (frame.envelope_saturation ?? 1) * breathSatFactor;
+        }
+        // Segue palette bleed (incoming half — finishing the lerp).
+        if (isSegue) {
+          // progress here is 1→0 over the window. invert for our 0→1 lerp.
+          const incomingProgress = j / fadeFrames; // 0→1
+          frame.chroma_hue        = lerpHue(chromaEndA, chromaStartB, 0.5 + incomingProgress * 0.5);
+          frame.palette_primary   = palPriEndA   + (palPriStartB - palPriEndA)   * (0.5 + incomingProgress * 0.5);
+          frame.palette_secondary = palSecEndA   + (palSecStartB - palSecEndA)   * (0.5 + incomingProgress * 0.5);
+          // Segue marker overlay continues fading out across the incoming half.
+          if (overlaySchedule[fi]) {
+            const triFade = Math.max(0, 1 - incomingProgress * 2) * 0.85; // 0.85 → 0 over first half of incoming
+            if (triFade > 0.04) {
+              overlaySchedule[fi].push({
+                overlay_id: "SegueMarker",
+                transform: { opacity: 1.0, scale: 1.0, rotation_deg: 0, offset_x: 0, offset_y: 0 },
+                blend_mode: "normal",
+                keyframe_svg: segueMarkerSvg(width, height, songA.title, songB.title, triFade),
+              });
+            }
+          }
         }
       }
 
