@@ -1517,6 +1517,13 @@ async function main() {
     }
     for (const [set, count] of setCounters.entries()) songsPerSet.set(set, count);
   }
+  // Find the last *real* song of the show (skip stage-announcement tracks
+  // which are typically d?t01 / d?t-last). Used to flag the encore.
+  let lastRealSongIdx = -1;
+  for (let si = songEnd - 1; si >= songStart; si--) {
+    const t = songs[si]?.title?.toLowerCase() ?? "";
+    if (!t.includes("announcement") && !t.includes("tuning")) { lastRealSongIdx = si; break; }
+  }
   // Total show duration in seconds (for HUD elapsed/total display).
   const totalShowSeconds = totalShowFrames / fps;
   const venueLabel = shortVenue(setlist.venue ?? "");
@@ -1760,10 +1767,17 @@ async function main() {
     const isDrumsSpace = song.title?.toLowerCase().includes("drums") ||
                           song.title?.toLowerCase().includes("space");
     const setNumber = song.set ?? 1;
-    // Encore detection — last set with ≤3 songs counts as the encore.
-    // Same rule used by the show-context HUD so labels stay consistent.
-    const isEncoreSong = setNumber === totalSetCount
+    // Encore detection. Three signals, any of which counts:
+    //   1. Explicit set === "encore" / song.encore === true
+    //   2. Last set is short (≤3 songs) — typical 2-set + encore show
+    //   3. Last song of the show — always gets encore weight even if the
+    //      show didn't formally label one (e.g. Veneta set 3 has 8 songs
+    //      but One More Saturday Night IS the encore).
+    const isLastRealSong = songIdx === lastRealSongIdx;
+    const explicitEncore = (song.set as any) === "encore" || (song as any).encore === true;
+    const shortLastSet = setNumber === totalSetCount
       && (songsPerSet.get(setNumber) ?? 99) <= 3;
+    const isEncoreSong = explicitEncore || shortLastSet || isLastRealSong;
 
     console.log(`  [Song ${songIdx + 1}/${setlist.songs.length}] ${song.title}: ${frames.length} → ${totalOut} frames (default: ${defaultMode})`);
 
