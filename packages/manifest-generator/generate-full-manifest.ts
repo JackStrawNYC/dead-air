@@ -1642,12 +1642,26 @@ function routeScene(
     // the override fired for every space_ambient frame). Now picks varied,
     // post-blocklist alternatives via a seeded shuffle for determinism +
     // stem/section variety. The first non-blocked shader wins.
+    // Pool keys MUST match the actual DrumsSpaceSubPhase enum values from
+    // drums-space-phase.ts (was a bug: drums_build/drums_peak never matched
+    // anything, so drums portions silently fell back to defaultMode and
+    // looked identical to space).
+    //
+    // Drums pool: percussive, beat-locked, fire/heat shaders. Tribal feel.
+    // Space pools: void/cosmic/atmospheric. Minimal motion.
+    // Transition / reemergence: bridge between the two energies.
     const dsPools: Record<string, string[]> = {
-      drums_build:    ["inferno", "lava_flow", "electric_arc", "earthquake_fissure", "fractal_flames"],
-      drums_peak:     ["electric_arc", "inferno", "bloom_explosion", "lava_flow", "psychedelic_garden"],
+      // Heavy percussion — fractal flames, mandala, kaleidoscope, electric arc.
+      // All beat-reactive and rhythmic; deep_ocean as a wildcard for textural drum.
+      drums_tribal:   ["fractal_flames", "mandala_engine", "kaleidoscope", "electric_arc", "reaction_diffusion"],
+      // Drums thinning into space — bridge shaders (lava_flow, fluid_light)
+      transition:     ["lava_flow", "fluid_light", "aurora", "fractal_flames"],
+      // Full Space — cosmic void, deep ocean, aurora drift
       space_ambient:  ["void_light", "deep_ocean", "aurora", "memorial_drift", "fluid_light", "ember_meadow"],
       space_textural: ["aurora", "aurora_curtains", "fluid_light", "void_light", "stark_minimal"],
       space_melodic:  ["void_light", "aurora", "ember_meadow", "fluid_light", "porch_twilight"],
+      // Band re-entering — energy rising back, warmer shaders
+      reemergence:    ["aurora", "ember_meadow", "fluid_light", "lava_flow", "psychedelic_garden"],
     };
     const pool = dsPools[drumsSpaceState.subPhase] ?? [defaultMode];
     // Seeded pick keeps the same subphase consistent within a song
