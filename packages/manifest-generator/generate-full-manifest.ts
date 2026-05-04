@@ -883,8 +883,31 @@ function computeUniforms(
   sectionProgress?: number,
   showVisualSeed?: ShowVisualSeed | null,
   showEra?: string,
+  showProgress?: number, // 0..1 — overall position through the entire show (for time-of-day arc)
 ): Record<string, number> {
   const eraGrade = eraGrading(showEra ?? "primal");
+  // Time-of-day arc: subtle drift in warmth/brightness/saturation across the
+  // 3-hour show so it feels like an afternoon-to-night progression rather
+  // than 180 disconnected minutes. Magnitude is small — the per-song palette
+  // and era grading remain dominant. Three-stop curve:
+  //   0.0  afternoon   warmth +0.05, bright ×1.02, sat ×1.02
+  //   0.5  sunset      warmth +0.10, bright ×0.99, sat ×1.05  (golden hour)
+  //   1.0  night       warmth -0.05, bright ×0.95, sat ×0.92  (cool, deep)
+  const sp = Math.max(0, Math.min(1, showProgress ?? 0));
+  let todWarmth = 0;
+  let todBright = 1;
+  let todSat = 1;
+  if (sp < 0.5) {
+    const t = sp / 0.5;
+    todWarmth = 0.05 + (0.10 - 0.05) * t;
+    todBright = 1.02 + (0.99 - 1.02) * t;
+    todSat   = 1.02 + (1.05 - 1.02) * t;
+  } else {
+    const t = (sp - 0.5) / 0.5;
+    todWarmth = 0.10 + (-0.05 - 0.10) * t;
+    todBright = 0.99 + (0.95 - 0.99) * t;
+    todSat   = 1.05 + (0.92 - 1.05) * t;
+  }
   const f = frames[idx] ?? {};
   const t = interpT ?? 0;
   const hi = idxHi ?? idx;
@@ -1155,19 +1178,19 @@ function computeUniforms(
     envelope_brightness: envBrightness,
     envelope_saturation: envSaturation,
     envelope_hue: envHue,
-    // Era grading: per-era values mirror the intro era styles in
-    // packages/renderer/src/intro.rs so the body and intro share the
-    // same visual character. Grain crosses the postprocess film-stock
-    // gate (>0.8) for 70s eras and stays under it for 80s+.
-    era_saturation: eraGrade.era_saturation,
-    era_brightness: eraGrade.era_brightness,
+    // Era grading + time-of-day arc: era values mirror intro.rs (so body
+    // and intro share era character), then a subtle time-of-day drift is
+    // layered on top so the 3-hour show feels like afternoon → sunset →
+    // night rather than 180 disconnected minutes.
+    era_saturation: eraGrade.era_saturation * todSat,
+    era_brightness: eraGrade.era_brightness * todBright,
     era_sepia: eraGrade.era_sepia,
-    show_warmth: eraGrade.show_warmth,
+    show_warmth: eraGrade.show_warmth + todWarmth,
     // climaxMod modulates bloom + contrast per-frame on top of the
     // era-graded base so peak moments visibly bloom + sharpen.
     // Half-weight (0.5x) so climax-band offsets don't overdrive.
     show_contrast: 1.10 * (1 + ((analysis?.climaxMod?.contrastOffset ?? 0) * 0.5)),
-    show_saturation: 1.15,
+    show_saturation: 1.15 * todSat,
     show_grain: eraGrade.show_grain,
     show_bloom: 1.15 * (1 + ((analysis?.climaxMod?.bloomOffset ?? 0) * 0.5)),
     // Dynamic params: quiet drifts slowly, peaks churn intensely
@@ -2231,11 +2254,14 @@ async function main() {
       const songForUniforms = (song?.palette || !songIdentity?.palette)
         ? song
         : { ...song, palette: songIdentity.palette };
+      // Show progress (0..1) drives the time-of-day arc inside computeUniforms.
+      const showProgress = (allFrames.length + i) / Math.max(1, totalShowFrames);
       let uniforms = computeUniforms(
         frames, ai, fps, tempo, width, height, globalTime, frameAnalysis, smoothed,
         aiHi, interpT,
         songForUniforms, i / Math.max(1, totalOut), routeSectionProgress, showVisualSeed,
         setlist.era ?? "classic",
+        showProgress,
       );
 
       // Fix section_index and section_progress (not available in computeUniforms)
