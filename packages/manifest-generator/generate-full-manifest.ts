@@ -207,6 +207,82 @@ function stageLightsSvg(
     + `</svg>`;
 }
 
+/**
+ * Persistent show-context HUD — top-right corner block. Grounds the
+ * abstract visuals in the show's actual identity: where, when, and
+ * how far through. Rendered every frame so a viewer joining mid-show
+ * is never confused about what they're watching.
+ *
+ * Compact: ~22% width × ~7% height. Semi-transparent dark backplate
+ * for legibility over any shader. Two lines of small-caps Georgia.
+ */
+function showContextHudSvg(
+  width: number,
+  height: number,
+  venueShort: string,    // e.g. "VENETA, OR"
+  dateShort: string,     // e.g. "8/27/72"
+  setLabel: string,      // e.g. "SET 2" or "ENCORE"
+  songInSet: string,     // e.g. "4/6"
+  elapsedClock: string,  // e.g. "1:23"
+  totalClock: string,    // e.g. "3:03"
+  opacity: number,       // 0..1 envelope (lets us fade out during peak-of-show)
+): string {
+  const w = width;
+  const h = height;
+  const boxW = w * 0.24;
+  const boxH = h * 0.075;
+  const margin = w * 0.018;
+  const x = w - boxW - margin;
+  const y = margin;
+  const rx = h * 0.008;
+  const padX = boxW * 0.07;
+  const fontL1 = Math.round(h * 0.022);
+  const fontL2 = Math.round(h * 0.016);
+  const bgA = (0.55 * opacity).toFixed(3);
+  const txtA = opacity.toFixed(3);
+  const dimA = (0.78 * opacity).toFixed(3);
+  // Thin top accent bar — concert-poster touch
+  const accentA = (0.85 * opacity).toFixed(3);
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}">`
+    + `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${boxW.toFixed(1)}" height="${boxH.toFixed(1)}" rx="${rx.toFixed(1)}" ry="${rx.toFixed(1)}" fill="rgba(8,8,12,${bgA})"/>`
+    + `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${boxW.toFixed(1)}" height="${(h * 0.003).toFixed(1)}" fill="rgba(220,180,90,${accentA})"/>`
+    + `<text x="${(x + padX).toFixed(1)}" y="${(y + boxH * 0.42).toFixed(1)}" `
+    + `font-family="Georgia,serif" font-size="${fontL1}" font-weight="700" `
+    + `letter-spacing="3" fill="rgba(245,238,220,${txtA})">${venueShort} · ${dateShort}</text>`
+    + `<text x="${(x + padX).toFixed(1)}" y="${(y + boxH * 0.78).toFixed(1)}" `
+    + `font-family="Georgia,serif" font-size="${fontL2}" `
+    + `letter-spacing="2" fill="rgba(220,210,190,${dimA})">${setLabel} · ${songInSet} · ${elapsedClock} / ${totalClock}</text>`
+    + `</svg>`;
+}
+
+/** Format seconds as "M:SS" or "H:MM:SS". */
+function formatClock(sec: number): string {
+  const s = Math.floor(sec) % 60;
+  const m = Math.floor(sec / 60) % 60;
+  const h = Math.floor(sec / 3600);
+  if (h > 0) return `${h}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+/** Format ISO date "1972-08-27" as "8/27/72". */
+function formatShortDate(iso: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  if (!m) return iso;
+  const yy = m[1].slice(2);
+  return `${parseInt(m[2], 10)}/${parseInt(m[3], 10)}/${yy}`;
+}
+
+/** Extract a short city/venue label from a long venue string. */
+function shortVenue(venue: string): string {
+  if (!venue) return "";
+  // "Old Renaissance Faire Grounds, Veneta, OR" → "VENETA, OR"
+  const parts = venue.split(",").map(s => s.trim()).filter(Boolean);
+  if (parts.length >= 2) {
+    return `${parts[parts.length - 2]}, ${parts[parts.length - 1]}`.toUpperCase();
+  }
+  return venue.toUpperCase();
+}
+
 function lyricLineSvg(text: string, width: number, height: number, fadeOpacity: number): string {
   // Escape for XML
   const safe = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -1348,6 +1424,28 @@ async function main() {
     console.error(`[full-manifest] --strict-analysis set, aborting before render due to ${missingAnalysis.length + malformedAnalysis.length} bad analysis files`);
     process.exit(2);
   }
+
+  // Per-set song counts + per-song position-within-set lookup, used by
+  // the show-context HUD overlay. Computed once here so the per-frame
+  // loop below is a pair of map reads instead of repeated scans.
+  const songsPerSet = new Map<number, number>();
+  const songPositionInSet = new Map<number, number>(); // songIdx → 1-based position
+  {
+    const setCounters = new Map<number, number>();
+    for (let si = songStart; si < songEnd; si++) {
+      const set = songs[si]?.set ?? 1;
+      const next = (setCounters.get(set) ?? 0) + 1;
+      setCounters.set(set, next);
+      songPositionInSet.set(si, next);
+    }
+    for (const [set, count] of setCounters.entries()) songsPerSet.set(set, count);
+  }
+  // Total show duration in seconds (for HUD elapsed/total display).
+  const totalShowSeconds = totalShowFrames / fps;
+  const venueLabel = shortVenue(setlist.venue ?? "");
+  const dateLabel = formatShortDate(setlist.date ?? "");
+  const totalSetCount = songsPerSet.size;
+
   for (let songIdx = songStart; songIdx < songEnd; songIdx++) {
     const song = songs[songIdx];
     const trackPath = resolveAnalysisPath(song, showDate);
@@ -2853,6 +2951,51 @@ async function main() {
                 Math.min(1, beatBoost),
                 sweepPhase,
                 Math.min(1, baseOp),
+              ),
+            });
+          }
+        }
+
+        // ─── Show-context HUD ───
+        // Persistent top-right block grounding the abstract visuals in
+        // the show's actual identity. Always visible (so a viewer who
+        // tunes in mid-show is never lost), but fades during peak-of-show
+        // so it doesn't compete with the climax. Skipped during the very
+        // first second so the brand intro isn't cluttered.
+        {
+          const songTimeSec = i / fps;
+          const showElapsedSec = (allFrames.length + i) / fps;
+          // Set label: detect encore (last set with ≤3 songs is the encore on most shows)
+          const setNum = song.set ?? 1;
+          const isEncoreSet = setNum === totalSetCount && (songsPerSet.get(setNum) ?? 99) <= 3;
+          const setLabel = isEncoreSet ? "ENCORE" : `SET ${setNum}`;
+          const inSet = songPositionInSet.get(songIdx) ?? 1;
+          const setTotal = songsPerSet.get(setNum) ?? 1;
+          // Fade in over first 1.5s of show, fade during peak, dim during drums-space.
+          // Peak-of-show detection uses overlayDensityMults (which includes a 0.5x
+          // contribution during peak frames) — under 0.7 means peak is active.
+          const showStartFade = Math.min(1, showElapsedSec / 1.5);
+          const peakFade = (overlayDensityMults[i] ?? 1.0) < 0.7 ? 0.35 : 1.0;
+          const dsFade = isDrumsSpace ? 0.45 : 1.0;
+          const hudOp = 0.85 * showStartFade * peakFade * dsFade;
+          if (hudOp > 0.02 && songTimeSec > 0.0) {
+            frameInstances.push({
+              overlay_id: "ShowContextHUD",
+              transform: {
+                opacity: 1.0, // alpha baked into SVG
+                scale: 1.0,
+                rotation_deg: 0,
+                offset_x: 0,
+                offset_y: 0,
+              },
+              blend_mode: "normal",
+              keyframe_svg: showContextHudSvg(
+                width, height,
+                venueLabel, dateLabel, setLabel,
+                `${inSet}/${setTotal}`,
+                formatClock(showElapsedSec),
+                formatClock(totalShowSeconds),
+                hudOp,
               ),
             });
           }
