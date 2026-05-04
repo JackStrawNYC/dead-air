@@ -101,6 +101,9 @@ void main() {{
 fn setbreak_overlay_svg(
     from_set: u32,
     to_set: u32,
+    just_completed: &[String],   // titles of songs in the just-finished set
+    just_completed_min: u32,     // total minutes of the just-finished set
+    upcoming: &[String],         // first ~5 titles of the upcoming set
     venue: Option<&str>,
     date: Option<&str>,
     width: u32,
@@ -109,24 +112,105 @@ fn setbreak_overlay_svg(
 ) -> String {
     let op = format!("{:.2}", opacity.clamp(0.0, 1.0));
     let cx = width / 2;
+    let w = width as f32;
+    let h = height as f32;
 
-    let title_y = (height as f32 * 0.45) as u32;
-    let title_size = (width as f32 * 0.055).max(48.0) as u32;
+    // SETBREAK title centered slightly above middle
+    let title_y = (h * 0.30) as u32;
+    let title_size = (w * 0.055).max(48.0) as u32;
 
-    let subtitle_y = title_y + (title_size as f32 * 1.4) as u32;
-    let subtitle_size = (width as f32 * 0.018).max(16.0) as u32;
-
-    let venue_y = subtitle_y + (subtitle_size as f32 * 2.4) as u32;
-    let venue_size = (width as f32 * 0.013).max(11.0) as u32;
-
+    // Header above title
     let header_y = title_y - (title_size as f32 * 1.2) as u32;
-    let header_size = (width as f32 * 0.013).max(11.0) as u32;
+    let header_size = (w * 0.013).max(11.0) as u32;
 
+    // Ornament between header and title
     let line_y = title_y - (title_size as f32 * 0.55) as u32;
-    let line_half_w = (width as f32 * 0.10) as u32;
+    let line_half_w = (w * 0.10) as u32;
     let diamond_cy = line_y;
-    let diamond_r = (subtitle_size as f32 * 0.45) as u32;
+    let diamond_r = (header_size as f32 * 0.55) as u32;
 
+    // Just-completed set summary (subtitle line under SETBREAK)
+    let summary_y = title_y + (title_size as f32 * 1.0) as u32;
+    let summary_size = (w * 0.016).max(14.0) as u32;
+    let summary_text = format!(
+        "END OF SET {}  \u{00B7}  {} SONGS  \u{00B7}  {} MINUTES",
+        from_set,
+        just_completed.len(),
+        just_completed_min,
+    );
+
+    // Two-column layout: just-completed set list (left), upcoming set list (right)
+    let cols_y = summary_y + (summary_size as f32 * 2.6) as u32;
+    let col_label_size = (w * 0.012).max(10.0) as u32;
+    let song_size = (w * 0.014).max(12.0) as u32;
+    let line_h = (song_size as f32 * 1.55) as u32;
+
+    let col_left_x = (w * 0.28) as u32;
+    let col_right_x = (w * 0.72) as u32;
+
+    // Left column: just-completed set heading + truncated song list
+    let col_label_left_y = cols_y;
+    let mut left_block = format!(
+        "<text x=\"{}\" y=\"{}\" font-size=\"{}\" font-weight=\"400\" \
+         fill=\"rgba(220,180,90,0.85)\" text-anchor=\"middle\" letter-spacing=\"4\" \
+         font-family=\"Helvetica Neue, Arial, sans-serif\">SET {} \u{2014} JUST PLAYED</text>",
+        col_left_x, col_label_left_y, col_label_size, from_set,
+    );
+    // Show up to 6 just-completed songs; if more, abbreviate the middle
+    let show_completed: Vec<&String> = if just_completed.len() <= 6 {
+        just_completed.iter().collect()
+    } else {
+        let mut v: Vec<&String> = just_completed.iter().take(3).collect();
+        v.extend(just_completed.iter().skip(just_completed.len() - 3));
+        v
+    };
+    for (idx, song) in show_completed.iter().enumerate() {
+        let y = col_label_left_y + (line_h * (idx as u32 + 2));
+        let display = if just_completed.len() > 6 && idx == 3 {
+            format!("\u{2026} \u{00B7} {}", xml_escape(song))
+        } else {
+            xml_escape(song)
+        };
+        left_block.push_str(&format!(
+            "<text x=\"{}\" y=\"{}\" font-size=\"{}\" font-weight=\"300\" \
+             fill=\"rgba(245,238,220,0.72)\" text-anchor=\"middle\" letter-spacing=\"1\" \
+             font-family=\"Georgia, 'Palatino Linotype', serif\">{}</text>",
+            col_left_x, y, song_size, display,
+        ));
+    }
+
+    // Right column: upcoming set heading + first 5 songs (preview)
+    let col_label_right_y = cols_y;
+    let mut right_block = format!(
+        "<text x=\"{}\" y=\"{}\" font-size=\"{}\" font-weight=\"400\" \
+         fill=\"rgba(220,180,90,0.85)\" text-anchor=\"middle\" letter-spacing=\"4\" \
+         font-family=\"Helvetica Neue, Arial, sans-serif\">SET {} \u{2014} UP NEXT</text>",
+        col_right_x, col_label_right_y, col_label_size, to_set,
+    );
+    let show_upcoming: Vec<&String> = upcoming.iter().take(5).collect();
+    for (idx, song) in show_upcoming.iter().enumerate() {
+        let y = col_label_right_y + (line_h * (idx as u32 + 2));
+        right_block.push_str(&format!(
+            "<text x=\"{}\" y=\"{}\" font-size=\"{}\" font-weight=\"400\" \
+             fill=\"rgba(255,250,235,0.92)\" text-anchor=\"middle\" letter-spacing=\"1\" \
+             font-family=\"Georgia, 'Palatino Linotype', serif\">{}</text>",
+            col_right_x, y, song_size, xml_escape(song),
+        ));
+    }
+    if upcoming.len() > 5 {
+        let y = col_label_right_y + (line_h * (show_upcoming.len() as u32 + 2));
+        right_block.push_str(&format!(
+            "<text x=\"{}\" y=\"{}\" font-size=\"{}\" font-style=\"italic\" \
+             fill=\"rgba(220,210,190,0.55)\" text-anchor=\"middle\" letter-spacing=\"2\" \
+             font-family=\"Georgia, 'Palatino Linotype', serif\">+ {} more</text>",
+            col_right_x, y, song_size,
+            upcoming.len() - 5,
+        ));
+    }
+
+    // Footer: venue · date · "INTERMISSION ~20 MIN"
+    let footer_y = (h * 0.93) as u32;
+    let footer_size = (w * 0.013).max(11.0) as u32;
     let venue_text = venue.unwrap_or("");
     let date_text = date.unwrap_or("");
     let venue_date = if !venue_text.is_empty() && !date_text.is_empty() {
@@ -134,20 +218,16 @@ fn setbreak_overlay_svg(
     } else {
         venue_text.to_uppercase() + date_text
     };
-    let venue_block = if venue_date.is_empty() {
+    let footer_block = if venue_date.is_empty() {
         String::new()
     } else {
         format!(
             "<text x=\"{}\" y=\"{}\" font-size=\"{}\" font-weight=\"300\" \
-             fill=\"rgba(255,255,255,0.42)\" text-anchor=\"middle\" \
-             letter-spacing=\"3\" \
-             font-family=\"Helvetica Neue, Arial, sans-serif\">{}</text>",
-            cx, venue_y, venue_size, venue_date,
+             fill=\"rgba(255,255,255,0.42)\" text-anchor=\"middle\" letter-spacing=\"4\" \
+             font-family=\"Helvetica Neue, Arial, sans-serif\">{}  \u{00B7}  INTERMISSION \u{223C}20 MIN</text>",
+            cx, footer_y, footer_size, venue_date,
         )
     };
-
-    // Subtitle text shows the set transition with arrow.
-    let subtitle = format!("END OF SET {}   \u{2192}   SET {} BEGINS", from_set, to_set);
 
     format!(
         "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{}\" height=\"{}\">\
@@ -167,23 +247,32 @@ fn setbreak_overlay_svg(
           letter-spacing=\"14\" \
           font-family=\"Georgia, 'Palatino Linotype', serif\" \
           filter=\"drop-shadow(0 2px 14px rgba(0,0,0,0.85))\">SETBREAK</text>\
-         <text x=\"{}\" y=\"{}\" font-size=\"{}\" font-weight=\"400\" \
-          fill=\"rgba(255,255,255,0.70)\" text-anchor=\"middle\" \
-          letter-spacing=\"4\" \
+         <text x=\"{}\" y=\"{}\" font-size=\"{}\" font-weight=\"300\" \
+          fill=\"rgba(255,255,255,0.78)\" text-anchor=\"middle\" letter-spacing=\"4\" \
           font-family=\"Helvetica Neue, Arial, sans-serif\">{}</text>\
+         {}\
+         {}\
          {}\
          </g></svg>",
         width, height, op,
+        // INTERMISSION header
         cx, header_y, header_size,
+        // Ornament: left-line + right-line + diamond
         cx - line_half_w, line_y, cx - diamond_r * 2, line_y,
         cx + diamond_r * 2, line_y, cx + line_half_w, line_y,
         cx, diamond_cy - diamond_r,
         cx + diamond_r, diamond_cy,
         cx, diamond_cy + diamond_r,
         cx - diamond_r, diamond_cy,
+        // SETBREAK title
         cx, title_y, title_size,
-        cx, subtitle_y, subtitle_size, subtitle,
-        venue_block,
+        // Summary line
+        cx, summary_y, summary_size, summary_text,
+        // Two columns
+        left_block,
+        right_block,
+        // Footer
+        footer_block,
     )
 }
 
@@ -330,6 +419,9 @@ pub fn generate_setbreak_panel(
     height: u32,
     from_set: u32,
     to_set: u32,
+    just_completed: &[String],
+    just_completed_min: u32,
+    upcoming: &[String],
     venue: Option<&str>,
     date: Option<&str>,
 ) -> (HashMap<String, String>, Vec<FrameData>, Vec<Vec<OverlayLayer>>) {
@@ -415,7 +507,13 @@ pub fn generate_setbreak_panel(
             composited_mode: 0, composited_intensity: 0.0,
             show_position: 0.0, camera_behavior: 0,
         });
-        let svg = setbreak_overlay_svg(from_set, to_set, venue, date, width, height, text_opacity);
+        let svg = setbreak_overlay_svg(
+            from_set, to_set,
+            just_completed, just_completed_min,
+            upcoming,
+            venue, date,
+            width, height, text_opacity,
+        );
         overlays.push(vec![OverlayLayer {
             svg, opacity: text_opacity, blend_mode: BlendMode::Screen, z_order: 10,
         }]);

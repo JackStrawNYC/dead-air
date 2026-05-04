@@ -372,9 +372,28 @@ fn main() {
                     let is_setbreak = *set != *prev_set;
                     let (cc_shaders, cc_frames, cc_overlays) = if is_setbreak {
                         setbreak_count += 1;
+                        // Gather song lists for the just-completed set + upcoming set.
+                        // Just-completed = all boundaries with set == prev_set.
+                        // Upcoming     = first 5 boundaries with set == set.
+                        let just_completed: Vec<String> = boundaries.iter()
+                            .filter(|b| b.set == *prev_set)
+                            .map(|b| b.title.clone())
+                            .collect();
+                        // Estimate just-completed minutes: sum of frame ranges / fps.
+                        let just_completed_frames: u64 = boundaries.iter()
+                            .filter(|b| b.set == *prev_set)
+                            .map(|b| (b.end_frame - b.start_frame) as u64)
+                            .sum();
+                        let just_completed_min = (just_completed_frames as f32 / args.fps as f32 / 60.0).round() as u32;
+                        let upcoming: Vec<String> = boundaries.iter()
+                            .filter(|b| b.set == *set)
+                            .map(|b| b.title.clone())
+                            .collect();
                         chapter_card::generate_setbreak_panel(
                             args.fps, args.width, args.height,
                             *prev_set, *set,
+                            &just_completed, just_completed_min,
+                            &upcoming,
                             args.show_venue.as_deref(),
                             args.show_date.as_deref(),
                         )
