@@ -459,76 +459,267 @@ function venueOutdoorNightSvg(width: number, height: number, timeSec: number, op
 }
 
 /**
- * Theater venue ambience — warm red proscenium rim light at top + sides,
- * suggesting the curtain frame of a vintage theater (Fillmore, Capitol,
- * Warfield).
+ * Theater venue ambience — vintage proscenium arch with hanging red velvet
+ * drapes on either side, warm wall sconces down the side walls, and a row
+ * of footlight glow at the bottom. Evokes Fillmore West, Capitol Theatre,
+ * Warfield — the indoor 1960s/70s rock theaters.
+ *
+ * Three layers from back to front: drape gradient wash, drape vertical
+ * folds, sconces + footlights. Asymmetric sconce intensities so it
+ * doesn't read as procedurally-generated dots.
  */
 function venueTheaterSvg(width: number, height: number, opacity: number): string {
   const w = width, h = height;
   const op = Math.max(0, Math.min(1, opacity));
-  const rimA = (0.35 * op).toFixed(3);
-  const sideA = (0.20 * op).toFixed(3);
+  const drapeA = (0.32 * op).toFixed(3);
+  const drapeFoldA = (0.18 * op).toFixed(3);
+  const archA = (0.45 * op).toFixed(3);
+  const sconceA = (0.65 * op).toFixed(3);
+  const footA = (0.55 * op).toFixed(3);
+
+  // Proscenium arch — soft curved shape across the top frame edge.
+  // Bezier suggests an arched opening rather than a rectangular cut.
+  const archMaxH = h * 0.18;
+  const archDip = h * 0.10;
+  const archPath = `M0,0 L${w},0 L${w},${archMaxH.toFixed(0)} `
+    + `Q${(w * 0.75).toFixed(0)},${archDip.toFixed(0)} ${(w * 0.5).toFixed(0)},${archDip.toFixed(0)} `
+    + `Q${(w * 0.25).toFixed(0)},${archDip.toFixed(0)} 0,${archMaxH.toFixed(0)} Z`;
+
+  // Drape side panels — left + right with vertical fold streaks.
+  const drapeW = w * 0.085;
+  // Vertical fold lines suggesting fabric pleats — each is a thin darker streak
+  let drapeFolds = "";
+  const foldCount = 7;
+  for (let s = 0; s < foldCount; s++) {
+    const xL = (s / foldCount) * drapeW + drapeW * 0.05;
+    const xR = w - drapeW + (s / foldCount) * drapeW + drapeW * 0.05;
+    drapeFolds += `<line x1="${xL.toFixed(1)}" y1="${archMaxH.toFixed(0)}" x2="${xL.toFixed(1)}" y2="${h.toFixed(0)}" stroke="rgba(40,4,8,${drapeFoldA})" stroke-width="${(w * 0.0018).toFixed(1)}"/>`;
+    drapeFolds += `<line x1="${xR.toFixed(1)}" y1="${archMaxH.toFixed(0)}" x2="${xR.toFixed(1)}" y2="${h.toFixed(0)}" stroke="rgba(40,4,8,${drapeFoldA})" stroke-width="${(w * 0.0018).toFixed(1)}"/>`;
+  }
+
+  // Wall sconces — 4 per side at uneven heights + intensities (some dim,
+  // some warmer) so they don't look procedural.
+  const sconceY = [0.30, 0.48, 0.65, 0.80];
+  const sconceMod = [1.0, 0.78, 1.05, 0.82];
+  let sconces = "";
+  for (let s = 0; s < 4; s++) {
+    const y = h * sconceY[s];
+    const mod = sconceMod[s];
+    const xL = drapeW * 0.45;
+    const xR = w - drapeW * 0.45;
+    const r = h * 0.012;
+    const a = (parseFloat(sconceA) * mod).toFixed(3);
+    sconces += `<circle cx="${xL.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}" fill="url(#sconce)" opacity="${a}"/>`;
+    sconces += `<circle cx="${xR.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}" fill="url(#sconce)" opacity="${a}"/>`;
+  }
+
+  // Footlight row — gentle warm glow across the bottom edge
+  const footH = h * 0.08;
+
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}">`
     + `<defs>`
-    + `<linearGradient id="prosTop" x1="0" y1="0" x2="0" y2="1">`
-    + `<stop offset="0" stop-color="#7a1018" stop-opacity="${rimA}"/>`
-    + `<stop offset="0.18" stop-color="#7a1018" stop-opacity="0"/>`
+    + `<linearGradient id="drapeL" x1="0" y1="0" x2="1" y2="0">`
+    + `<stop offset="0" stop-color="#6a0c14" stop-opacity="${drapeA}"/>`
+    + `<stop offset="1" stop-color="#6a0c14" stop-opacity="0"/>`
     + `</linearGradient>`
-    + `<linearGradient id="prosLeft" x1="0" y1="0" x2="1" y2="0">`
-    + `<stop offset="0" stop-color="#5c0c14" stop-opacity="${sideA}"/>`
-    + `<stop offset="0.10" stop-color="#5c0c14" stop-opacity="0"/>`
+    + `<linearGradient id="drapeR" x1="1" y1="0" x2="0" y2="0">`
+    + `<stop offset="0" stop-color="#6a0c14" stop-opacity="${drapeA}"/>`
+    + `<stop offset="1" stop-color="#6a0c14" stop-opacity="0"/>`
     + `</linearGradient>`
-    + `<linearGradient id="prosRight" x1="1" y1="0" x2="0" y2="0">`
-    + `<stop offset="0" stop-color="#5c0c14" stop-opacity="${sideA}"/>`
-    + `<stop offset="0.10" stop-color="#5c0c14" stop-opacity="0"/>`
+    + `<linearGradient id="footRow" x1="0" y1="1" x2="0" y2="0">`
+    + `<stop offset="0" stop-color="#ffd58a" stop-opacity="${footA}"/>`
+    + `<stop offset="1" stop-color="#ffd58a" stop-opacity="0"/>`
     + `</linearGradient>`
+    + `<radialGradient id="sconce" cx="0.5" cy="0.5" r="0.5">`
+    + `<stop offset="0" stop-color="#ffe0a8" stop-opacity="1"/>`
+    + `<stop offset="0.4" stop-color="#ffb060" stop-opacity="0.55"/>`
+    + `<stop offset="1" stop-color="#ff8030" stop-opacity="0"/>`
+    + `</radialGradient>`
     + `</defs>`
-    + `<rect x="0" y="0" width="${w}" height="${h}" fill="url(#prosTop)"/>`
-    + `<rect x="0" y="0" width="${w}" height="${h}" fill="url(#prosLeft)"/>`
-    + `<rect x="0" y="0" width="${w}" height="${h}" fill="url(#prosRight)"/>`
+    // Proscenium arch — dark frame across top
+    + `<path d="${archPath}" fill="rgba(20,4,8,${archA})"/>`
+    // Drape side panels
+    + `<rect x="0" y="${archMaxH.toFixed(0)}" width="${drapeW.toFixed(1)}" height="${(h - archMaxH).toFixed(1)}" fill="url(#drapeL)"/>`
+    + `<rect x="${(w - drapeW).toFixed(1)}" y="${archMaxH.toFixed(0)}" width="${drapeW.toFixed(1)}" height="${(h - archMaxH).toFixed(1)}" fill="url(#drapeR)"/>`
+    + drapeFolds
+    + sconces
+    // Footlight row
+    + `<rect x="0" y="${(h - footH).toFixed(1)}" width="${w}" height="${footH.toFixed(1)}" fill="url(#footRow)"/>`
     + `</svg>`;
 }
 
 /**
- * Arena venue ambience — overhead rim of warm lights at the top edge,
- * suggesting the ring of stadium-rigging spots high above the floor.
+ * Arena venue ambience — overhead truss rigging with uneven warm spots,
+ * a single brighter follow-spot cone, and subtle seating-bowl gradients
+ * on the sides. Evokes MSG, the Spectrum, the Forum — indoor arenas.
+ *
+ * The truss lights are NOT evenly spaced and not uniform brightness —
+ * real concert rigging has gels of different temperatures and some
+ * fixtures dimmer than others. Asymmetric placement breaks the
+ * "procedurally generated row" look.
  */
 function venueArenaSvg(width: number, height: number, opacity: number): string {
   const w = width, h = height;
   const op = Math.max(0, Math.min(1, opacity));
-  const rimA = (0.30 * op).toFixed(3);
-  const dotA = (0.55 * op).toFixed(3);
-  let dots = "";
-  for (let n = 0; n < 22; n++) {
-    const x = (n + 0.5) * (w / 22);
-    const y = h * 0.025;
-    const r = h * 0.005;
-    dots += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}" fill="rgba(255,220,160,${dotA})"/>`;
+  const trussBarA = (0.30 * op).toFixed(3);
+  const sideA = (0.18 * op).toFixed(3);
+  const followConeA = (0.10 * op).toFixed(3);
+  const followCoreA = (0.85 * op).toFixed(3);
+
+  // Truss bar — thin dark horizontal bar across the top suggesting
+  // overhead lighting rigging (like the structural beam holding all
+  // the fixtures).
+  const trussY = h * 0.018;
+  const trussH = h * 0.005;
+
+  // Spot lights mounted to the truss — 14 fixtures at irregular spacing,
+  // varied intensities. Uses deterministic seeded positions so they don't
+  // dance around frame to frame.
+  const rand = (s: number) => { let z = (s * 9301 + 49297) % 233280; return z / 233280; };
+  const spotPositions: Array<{ x: number; intensity: number; tint: "warm" | "cool" }> = [];
+  let cursor = w * 0.04;
+  while (cursor < w * 0.98 && spotPositions.length < 14) {
+    const gap = w * (0.045 + rand(spotPositions.length * 17 + 3) * 0.040);
+    const intensity = 0.55 + rand(spotPositions.length * 41 + 11) * 0.45;
+    const tint: "warm" | "cool" = rand(spotPositions.length * 53 + 7) > 0.7 ? "cool" : "warm";
+    spotPositions.push({ x: cursor, intensity, tint });
+    cursor += gap;
   }
+
+  let spots = "";
+  for (const sp of spotPositions) {
+    const r = h * 0.006;
+    const a = (parseFloat(`${0.65 * op}`) * sp.intensity).toFixed(3);
+    const grad = sp.tint === "warm" ? "spotWarm" : "spotCool";
+    spots += `<circle cx="${sp.x.toFixed(1)}" cy="${(trussY + trussH * 0.5).toFixed(1)}" r="${r.toFixed(1)}" fill="url(#${grad})" opacity="${a}"/>`;
+    // Light spill cone (very thin, angled down)
+    const spillTopY = trussY + trussH;
+    const spillBotY = h * 0.32;
+    const spillW = w * 0.04;
+    const spillA = (0.06 * op * sp.intensity).toFixed(3);
+    const colStop = sp.tint === "warm" ? "255,220,160" : "200,210,255";
+    spots += `<polygon points="${(sp.x - r * 0.6).toFixed(1)},${spillTopY.toFixed(1)} `
+      + `${(sp.x + r * 0.6).toFixed(1)},${spillTopY.toFixed(1)} `
+      + `${(sp.x + spillW * 0.5).toFixed(1)},${spillBotY.toFixed(1)} `
+      + `${(sp.x - spillW * 0.5).toFixed(1)},${spillBotY.toFixed(1)}" `
+      + `fill="rgba(${colStop},${spillA})"/>`;
+  }
+
+  // Single follow-spot — much brighter cone tracking center stage
+  const followX = w * 0.5;
+  const followCone = `<polygon points="${(followX - w * 0.012).toFixed(1)},${(trussY + trussH).toFixed(1)} `
+    + `${(followX + w * 0.012).toFixed(1)},${(trussY + trussH).toFixed(1)} `
+    + `${(followX + w * 0.10).toFixed(1)},${(h * 0.92).toFixed(1)} `
+    + `${(followX - w * 0.10).toFixed(1)},${(h * 0.92).toFixed(1)}" `
+    + `fill="url(#followGrad)"/>`;
+
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}">`
-    + `<defs><linearGradient id="rimTop" x1="0" y1="0" x2="0" y2="1">`
-    + `<stop offset="0" stop-color="#ffe8b8" stop-opacity="${rimA}"/>`
-    + `<stop offset="0.10" stop-color="#ffe8b8" stop-opacity="0"/>`
-    + `</linearGradient></defs>`
-    + `<rect x="0" y="0" width="${w}" height="${h}" fill="url(#rimTop)"/>`
-    + dots
+    + `<defs>`
+    + `<radialGradient id="spotWarm" cx="0.5" cy="0.5" r="0.5">`
+    + `<stop offset="0" stop-color="#fff5d8" stop-opacity="1"/>`
+    + `<stop offset="0.4" stop-color="#ffd58a" stop-opacity="0.7"/>`
+    + `<stop offset="1" stop-color="#ff9a3c" stop-opacity="0"/>`
+    + `</radialGradient>`
+    + `<radialGradient id="spotCool" cx="0.5" cy="0.5" r="0.5">`
+    + `<stop offset="0" stop-color="#e8f0ff" stop-opacity="1"/>`
+    + `<stop offset="0.4" stop-color="#a8c0ff" stop-opacity="0.6"/>`
+    + `<stop offset="1" stop-color="#5070d0" stop-opacity="0"/>`
+    + `</radialGradient>`
+    + `<linearGradient id="followGrad" x1="0" y1="0" x2="0" y2="1">`
+    + `<stop offset="0" stop-color="#fffae0" stop-opacity="${followConeA}"/>`
+    + `<stop offset="1" stop-color="#fffae0" stop-opacity="0"/>`
+    + `</linearGradient>`
+    + `<linearGradient id="bowlL" x1="0" y1="0" x2="1" y2="0">`
+    + `<stop offset="0" stop-color="#1a1410" stop-opacity="${sideA}"/>`
+    + `<stop offset="1" stop-color="#1a1410" stop-opacity="0"/>`
+    + `</linearGradient>`
+    + `<linearGradient id="bowlR" x1="1" y1="0" x2="0" y2="0">`
+    + `<stop offset="0" stop-color="#1a1410" stop-opacity="${sideA}"/>`
+    + `<stop offset="1" stop-color="#1a1410" stop-opacity="0"/>`
+    + `</linearGradient>`
+    + `</defs>`
+    // Seating-bowl side darkening
+    + `<rect x="0" y="${(h * 0.1).toFixed(1)}" width="${(w * 0.12).toFixed(1)}" height="${(h * 0.85).toFixed(1)}" fill="url(#bowlL)"/>`
+    + `<rect x="${(w * 0.88).toFixed(1)}" y="${(h * 0.1).toFixed(1)}" width="${(w * 0.12).toFixed(1)}" height="${(h * 0.85).toFixed(1)}" fill="url(#bowlR)"/>`
+    // Truss bar
+    + `<rect x="0" y="${trussY.toFixed(1)}" width="${w}" height="${trussH.toFixed(1)}" fill="rgba(20,18,14,${trussBarA})"/>`
+    // Follow-spot cone (rendered before individual spots so spots glow on top)
+    + followCone
+    // Individual spots + spill
+    + spots
     + `</svg>`;
 }
 
 /**
- * Stadium venue ambience — open vast cool wash, faint horizon line at
- * mid-frame, no rim lights (you're outdoors and far from the rigging).
+ * Stadium venue ambience — open sky wash + distant stadium-rim silhouette
+ * across the bottom + crowd-glow horizon haze + a few far-edge tower
+ * lights. Evokes JFK, Shea, the open-air stadiums where the band looked
+ * tiny on a vast stage.
+ *
+ * Layered back-to-front: cool sky gradient, crowd-glow horizon band,
+ * stadium-rim silhouette curve, distant tower lights at corners.
  */
 function venueStadiumSvg(width: number, height: number, opacity: number): string {
   const w = width, h = height;
   const op = Math.max(0, Math.min(1, opacity));
   const skyA = (0.18 * op).toFixed(3);
+  const hazeA = (0.22 * op).toFixed(3);
+  const rimA = (0.62 * op).toFixed(3);
+  const towerA = (0.55 * op).toFixed(3);
+
+  // Stadium rim silhouette — gentle curve across mid-bottom suggesting
+  // the far edge of the stadium bowl. Two-bezier curve dipping in middle.
+  const rimBaseY = h * 0.74;
+  const rimCenterDip = h * 0.78;
+  const rimEndsY = h * 0.71;
+  const rimPath = `M0,${h.toFixed(0)} L0,${rimEndsY.toFixed(1)} `
+    + `Q${(w * 0.25).toFixed(0)},${rimBaseY.toFixed(1)} ${(w * 0.5).toFixed(0)},${rimCenterDip.toFixed(1)} `
+    + `Q${(w * 0.75).toFixed(0)},${rimBaseY.toFixed(1)} ${w.toFixed(0)},${rimEndsY.toFixed(1)} `
+    + `L${w.toFixed(0)},${h.toFixed(0)} Z`;
+
+  // Crowd-glow horizon haze — warm band just above the rim suggesting
+  // thousands of people lit by stage spillover.
+  const hazeY = h * 0.66;
+  const hazeH = h * 0.10;
+
+  // Tower lights — 4 distant corner lights, asymmetric spacing
+  const towerPositions = [
+    { x: w * 0.06, y: h * 0.62 },
+    { x: w * 0.20, y: h * 0.59 },
+    { x: w * 0.78, y: h * 0.61 },
+    { x: w * 0.94, y: h * 0.63 },
+  ];
+  let towers = "";
+  for (const t of towerPositions) {
+    const r = h * 0.0035;
+    towers += `<circle cx="${t.x.toFixed(1)}" cy="${t.y.toFixed(1)}" r="${r.toFixed(1)}" fill="rgba(255,235,180,${towerA})"/>`;
+    // Soft halo
+    towers += `<circle cx="${t.x.toFixed(1)}" cy="${t.y.toFixed(1)}" r="${(r * 4).toFixed(1)}" fill="url(#towerGlow)" opacity="${(parseFloat(towerA) * 0.5).toFixed(3)}"/>`;
+  }
+
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}">`
-    + `<defs><linearGradient id="skyVast" x1="0" y1="0" x2="0" y2="1">`
+    + `<defs>`
+    + `<linearGradient id="skyVast" x1="0" y1="0" x2="0" y2="1">`
     + `<stop offset="0" stop-color="#3060a0" stop-opacity="${skyA}"/>`
     + `<stop offset="0.45" stop-color="#3060a0" stop-opacity="0"/>`
-    + `</linearGradient></defs>`
+    + `</linearGradient>`
+    + `<linearGradient id="crowdHaze" x1="0" y1="0.5" x2="0" y2="0">`
+    + `<stop offset="0" stop-color="#ffb060" stop-opacity="${hazeA}"/>`
+    + `<stop offset="1" stop-color="#ffb060" stop-opacity="0"/>`
+    + `</linearGradient>`
+    + `<radialGradient id="towerGlow" cx="0.5" cy="0.5" r="0.5">`
+    + `<stop offset="0" stop-color="#ffe5b8" stop-opacity="1"/>`
+    + `<stop offset="1" stop-color="#ffe5b8" stop-opacity="0"/>`
+    + `</radialGradient>`
+    + `</defs>`
+    // Sky wash
     + `<rect x="0" y="0" width="${w}" height="${h}" fill="url(#skyVast)"/>`
+    // Crowd-glow horizon haze
+    + `<rect x="0" y="${hazeY.toFixed(1)}" width="${w}" height="${hazeH.toFixed(1)}" fill="url(#crowdHaze)"/>`
+    // Tower lights with halos (rendered before rim so rim cuts in front of them)
+    + towers
+    // Stadium rim silhouette
+    + `<path d="${rimPath}" fill="rgba(8,10,14,${rimA})"/>`
     + `</svg>`;
 }
 
