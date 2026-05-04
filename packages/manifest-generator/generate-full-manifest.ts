@@ -983,10 +983,8 @@ function lighterFlamesSvg(
 ): string {
   const w = width;
   const h = height;
-  const rDot = w * 0.0035;       // ~3px @ 1080p, ~7px @ 4K
-  const rGlow = rDot * 3;
-  const dotCount = 44;
-  // Mulberry32-style deterministic PRNG seeded by index
+  // Mulberry32-style deterministic PRNG seeded by index — same positions
+  // every frame so flames stay anchored, only brightness/wink animates.
   const rand = (seed: number) => {
     let s = seed >>> 0;
     s = (s + 0x6D2B79F5) >>> 0;
@@ -994,23 +992,73 @@ function lighterFlamesSvg(
     s ^= s + Math.imul(s ^ (s >>> 7), s | 61);
     return ((s ^ (s >>> 14)) >>> 0) / 4294967296;
   };
+
+  // Three depth layers: far (small dim, scattered high), mid, near
+  // (large bright, scattered low). Total ~280 lighters.
+  // Each layer has its own y-band to suggest tiered audience seating.
+  const layers = [
+    // Far audience back rows: smaller, dimmer, higher in frame
+    { count: 130, baseR: w * 0.0018, glowR: w * 0.0050, yMin: 0.55, yMax: 0.78, opMin: 0.35, opMax: 0.65, seed: 100 },
+    // Middle audience: medium
+    { count: 90,  baseR: w * 0.0030, glowR: w * 0.0085, yMin: 0.66, yMax: 0.86, opMin: 0.50, opMax: 0.85, seed: 200 },
+    // Front audience: large, bright, lowest in frame
+    { count: 60,  baseR: w * 0.0048, glowR: w * 0.0140, yMin: 0.78, yMax: 0.95, opMin: 0.65, opMax: 1.00, seed: 300 },
+  ];
+
   let dots = "";
-  for (let n = 0; n < dotCount; n++) {
-    const x = rand(n * 7919 + 1) * w * 0.92 + w * 0.04;     // 4-96% width
-    const y = h * (0.62 + rand(n * 3517 + 5) * 0.32);        // 62-94% height
-    const baseOp = 0.45 + rand(n * 1361 + 9) * 0.45;         // 0.45-0.90 base
-    const phase = rand(n * 9173 + 13) * Math.PI * 2;
-    const flicker = 0.7 + 0.3 * Math.sin(timeSec * (3 + rand(n * 257 + 17) * 2) + phase);
-    const op = (baseOp * flicker * envelope).toFixed(3);
-    if (parseFloat(op) < 0.04) continue;
-    dots += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${rGlow.toFixed(1)}" fill="url(#lf)" opacity="${op}"/>`;
+  for (const layer of layers) {
+    for (let n = 0; n < layer.count; n++) {
+      const seed = layer.seed + n;
+      const x = rand(seed * 7919 + 1) * w * 0.96 + w * 0.02;
+      // Deterministic y in layer's vertical band
+      const yBase = h * (layer.yMin + rand(seed * 3517 + 5) * (layer.yMax - layer.yMin));
+      // Smoke rise — slow upward drift, ~3% of frame height over time
+      const smokeRise = Math.sin(timeSec * 0.03 + n * 0.15) * (h * 0.005);
+      const y = yBase + smokeRise;
+      // Per-dot flicker frequency + phase
+      const flickerFreq = 2.5 + rand(seed * 257 + 17) * 3.0;
+      const phase = rand(seed * 9173 + 13) * Math.PI * 2;
+      const flicker = 0.65 + 0.35 * Math.sin(timeSec * flickerFreq + phase);
+      // Wink-out: every ~10s each lighter has a chance to be "out" briefly,
+      // then re-light. Smooth via squared-cosine envelope.
+      const winkPhase = (timeSec * 0.18 + rand(seed * 41 + 7) * 12) % 8;
+      const winkActive = winkPhase < 0.7;
+      let winkMult = 1.0;
+      if (winkActive) {
+        // 0..1..0 over the wink window
+        const t = winkPhase / 0.7;
+        winkMult = 0.15 + 0.85 * (1 - Math.cos(t * Math.PI * 2)) * 0.5;
+      }
+      const baseOp = layer.opMin + rand(seed * 1361 + 9) * (layer.opMax - layer.opMin);
+      const op = (baseOp * flicker * winkMult * envelope).toFixed(3);
+      if (parseFloat(op) < 0.025) continue;
+      // Slight color variation: most warm-amber, occasional cooler (phone screens, lit cigarettes)
+      const isPhone = rand(seed * 211 + 23) > 0.92; // 8% chance
+      const grad = isPhone ? "lfCool" : "lfWarm";
+      dots += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${layer.glowR.toFixed(1)}" fill="url(#${grad})" opacity="${op}"/>`;
+      // Bright core dot for foreground layer only — adds sharpness to the
+      // closest lighters
+      if (layer === layers[2] && parseFloat(op) > 0.5) {
+        const coreA = (parseFloat(op) * 0.8).toFixed(3);
+        const coreColor = isPhone ? "#e8f0ff" : "#fff5d8";
+        dots += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${layer.baseR.toFixed(1)}" fill="${coreColor}" opacity="${coreA}"/>`;
+      }
+    }
   }
+
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}">`
-    + `<defs><radialGradient id="lf" cx="0.5" cy="0.5" r="0.5">`
+    + `<defs>`
+    + `<radialGradient id="lfWarm" cx="0.5" cy="0.5" r="0.5">`
     + `<stop offset="0" stop-color="#ffd28a" stop-opacity="0.95"/>`
     + `<stop offset="0.35" stop-color="#ff9a3c" stop-opacity="0.55"/>`
     + `<stop offset="1" stop-color="#ff7a14" stop-opacity="0"/>`
-    + `</radialGradient></defs>${dots}</svg>`;
+    + `</radialGradient>`
+    + `<radialGradient id="lfCool" cx="0.5" cy="0.5" r="0.5">`
+    + `<stop offset="0" stop-color="#cce0ff" stop-opacity="0.85"/>`
+    + `<stop offset="0.35" stop-color="#80a8ff" stop-opacity="0.45"/>`
+    + `<stop offset="1" stop-color="#4070d0" stop-opacity="0"/>`
+    + `</radialGradient>`
+    + `</defs>${dots}</svg>`;
 }
 
 /**
