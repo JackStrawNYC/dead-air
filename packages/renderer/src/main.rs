@@ -333,40 +333,56 @@ fn main() {
     };
 
     // ─── Insert chapter cards between songs if requested ───
+    // For set-N → set-N+1 boundaries, insert a SETBREAK panel (8s, larger
+    // typography, distinct subtitle) instead of a per-song chapter card.
+    // For all other boundaries, the regular 3s per-song card.
     if args.with_chapter_cards {
         if let Some(ref boundaries) = manifest.song_boundaries {
             if boundaries.len() > 1 {
-                // Insert chapter cards in reverse order (so frame indices stay valid)
-                let mut insertions: Vec<(u32, String, u32, u32)> = Vec::new();
+                // Each insertion: (insert_at, title, set, track_num, prev_set)
+                // prev_set is the set of the previous boundary; if it differs
+                // from `set` we render a setbreak instead of a chapter card.
+                let mut insertions: Vec<(u32, String, u32, u32, u32)> = Vec::new();
                 for (i, boundary) in boundaries.iter().enumerate().skip(1) {
-                    // Skip first song (intro handles it)
-                    let set_label = format!("Set {}", boundary.set);
+                    let prev_set = boundaries[i - 1].set;
                     insertions.push((
                         boundary.start_frame + intro_frame_count as u32,
                         boundary.title.clone(),
                         boundary.set,
                         i as u32 + 1,
+                        prev_set,
                     ));
                 }
-                insertions.reverse(); // insert from back to front
+                insertions.reverse(); // insert from back to front so indices stay valid
 
-                for (insert_at, title, _set, track_num) in &insertions {
-                    let set_label = format!("Set {}", _set);
-                    let (cc_shaders, cc_frames, cc_overlays) =
+                let mut setbreak_count = 0;
+                let mut chapter_count = 0;
+                for (insert_at, title, set, track_num, prev_set) in &insertions {
+                    let is_setbreak = *set != *prev_set;
+                    let (cc_shaders, cc_frames, cc_overlays) = if is_setbreak {
+                        setbreak_count += 1;
+                        chapter_card::generate_setbreak_panel(
+                            args.fps, args.width, args.height,
+                            *prev_set, *set,
+                            args.show_venue.as_deref(),
+                            args.show_date.as_deref(),
+                        )
+                    } else {
+                        chapter_count += 1;
+                        let set_label = format!("Set {}", *set);
                         chapter_card::generate_chapter_card(
                             args.fps, args.width, args.height,
                             title, &set_label, *track_num,
                             args.show_venue.as_deref(),
                             args.show_date.as_deref(),
-                        );
+                        )
+                    };
 
                     let n_cc = cc_frames.len();
-                    // Register shaders
                     for (id, glsl) in cc_shaders {
                         manifest.shaders.entry(id).or_insert(glsl);
                     }
 
-                    // Renumber frames after insertion point
                     let offset = n_cc as u32;
                     for f in manifest.frames.iter_mut() {
                         if f.frame >= *insert_at {
@@ -374,17 +390,36 @@ fn main() {
                         }
                     }
 
-                    // Insert chapter card frames
                     let insert_idx = manifest.frames.iter().position(|f| f.frame >= *insert_at + offset).unwrap_or(manifest.frames.len());
                     let mut cc_numbered = cc_frames;
                     for (j, f) in cc_numbered.iter_mut().enumerate() {
                         f.frame = *insert_at + j as u32;
                     }
                     manifest.frames.splice(insert_idx..insert_idx, cc_numbered);
+
+                    // Splice overlays at the same index so the title/subtitle
+                    // SVG actually appears on screen. (Without this, the chapter
+                    // card text was generated then thrown away — the moment
+                    // played as just the fog shader.)
+                    if let Some(ref mut existing_overlays) = manifest.overlay_layers {
+                        existing_overlays.splice(insert_idx..insert_idx, cc_overlays);
+                    } else {
+                        // No prior overlay_layers: build one with empty vecs for
+                        // existing frames and the cc_overlays at the right slot.
+                        let total = manifest.frames.len();
+                        let mut layers: Vec<Vec<crate::compositor::OverlayLayer>> =
+                            (0..total).map(|_| Vec::new()).collect();
+                        for (k, ov) in cc_overlays.into_iter().enumerate() {
+                            if insert_idx + k < layers.len() {
+                                layers[insert_idx + k] = ov;
+                            }
+                        }
+                        manifest.overlay_layers = Some(layers);
+                    }
                 }
 
-                println!("Chapter cards: {} inserted ({} songs)", insertions.len(),
-                    insertions.len());
+                println!("Chapter cards: {} inserted ({} per-song, {} setbreak)",
+                    insertions.len(), chapter_count, setbreak_count);
             }
         }
     }
