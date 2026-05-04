@@ -1083,29 +1083,70 @@ function showContextHudSvg(
 ): string {
   const w = width;
   const h = height;
-  const boxW = w * 0.24;
-  const boxH = h * 0.075;
-  const margin = w * 0.018;
-  const x = w - boxW - margin;
-  const y = margin;
-  const rx = h * 0.008;
-  const padX = boxW * 0.07;
-  const fontL1 = Math.round(h * 0.022);
-  const fontL2 = Math.round(h * 0.016);
-  const bgA = (0.55 * opacity).toFixed(3);
+  const margin = w * 0.020;
+  // Right-aligned typography — no backplate. Drop shadow for legibility
+  // over any shader, gold filigree ornament, etched serif title.
+  const rightX = w - margin;
+  const titleY = margin + h * 0.030;
+  const subY = titleY + h * 0.025;
+  const ornY = titleY + h * 0.008;
+  const fontTitle = Math.round(h * 0.024);
+  const fontSub = Math.round(h * 0.014);
   const txtA = opacity.toFixed(3);
-  const dimA = (0.78 * opacity).toFixed(3);
-  // Thin top accent bar — concert-poster touch
-  const accentA = (0.85 * opacity).toFixed(3);
+  const dimA = (0.72 * opacity).toFixed(3);
+  const goldA = (0.85 * opacity).toFixed(3);
+  const goldDimA = (0.55 * opacity).toFixed(3);
+  // Filigree ornament — small vine-flourish curve to the LEFT of the title.
+  // Hand-drawn-feeling SVG path: stem curve + two leaves + center diamond.
+  const ornW = h * 0.060;
+  const ornH = h * 0.012;
+  const ornX = rightX - ornW; // anchor to the right above title baseline
+  const ornCx = ornX + ornW * 0.5;
+  const ornCy = ornY;
+  // Stem path: gentle S-curve across the ornament width
+  const ornStem = `M${ornX.toFixed(1)},${ornCy.toFixed(1)} `
+    + `Q${(ornX + ornW * 0.20).toFixed(1)},${(ornCy - ornH * 0.5).toFixed(1)} `
+    + `${(ornX + ornW * 0.45).toFixed(1)},${ornCy.toFixed(1)} `
+    + `Q${(ornX + ornW * 0.70).toFixed(1)},${(ornCy + ornH * 0.5).toFixed(1)} `
+    + `${(ornX + ornW).toFixed(1)},${ornCy.toFixed(1)}`;
+  // Two leaves on the stem (small ellipses tilted)
+  const leafAR = h * 0.005;
+  const leafBR = h * 0.005;
+  const leafA_x = ornX + ornW * 0.22;
+  const leafA_y = ornCy - ornH * 0.30;
+  const leafB_x = ornX + ornW * 0.72;
+  const leafB_y = ornCy + ornH * 0.30;
+  // Center diamond
+  const diamondR = h * 0.0035;
+  // Subtle thin gold rule under the title row, connecting ornament to text
+  const ruleY = subY + h * 0.022;
+  const ruleW = w * 0.225;
+  const ruleX = rightX - ruleW;
+
+  // Drop-shadow filter (stamped/etched look) — subtle dark offset
+  const shadowDef = `<filter id="hudShadow" x="-10%" y="-10%" width="120%" height="120%">`
+    + `<feDropShadow dx="0" dy="${(h * 0.0014).toFixed(1)}" stdDeviation="${(h * 0.0028).toFixed(1)}" flood-color="#000" flood-opacity="0.85"/>`
+    + `</filter>`;
+
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}">`
-    + `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${boxW.toFixed(1)}" height="${boxH.toFixed(1)}" rx="${rx.toFixed(1)}" ry="${rx.toFixed(1)}" fill="rgba(8,8,12,${bgA})"/>`
-    + `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${boxW.toFixed(1)}" height="${(h * 0.003).toFixed(1)}" fill="rgba(220,180,90,${accentA})"/>`
-    + `<text x="${(x + padX).toFixed(1)}" y="${(y + boxH * 0.42).toFixed(1)}" `
-    + `font-family="Georgia,serif" font-size="${fontL1}" font-weight="700" `
-    + `letter-spacing="3" fill="rgba(245,238,220,${txtA})">${venueShort} · ${dateShort}</text>`
-    + `<text x="${(x + padX).toFixed(1)}" y="${(y + boxH * 0.78).toFixed(1)}" `
-    + `font-family="Georgia,serif" font-size="${fontL2}" `
-    + `letter-spacing="2" fill="rgba(220,210,190,${dimA})">${setLabel} · ${songInSet} · ${elapsedClock} / ${totalClock}</text>`
+    + `<defs>${shadowDef}</defs>`
+    // Filigree ornament — gold vine flourish above title
+    + `<g opacity="${goldA}">`
+    + `<path d="${ornStem}" stroke="rgb(220,180,90)" stroke-width="${(h * 0.0014).toFixed(1)}" fill="none"/>`
+    + `<ellipse cx="${leafA_x.toFixed(1)}" cy="${leafA_y.toFixed(1)}" rx="${leafAR.toFixed(1)}" ry="${(leafAR * 0.45).toFixed(1)}" transform="rotate(-30 ${leafA_x.toFixed(1)} ${leafA_y.toFixed(1)})" fill="rgb(220,180,90)"/>`
+    + `<ellipse cx="${leafB_x.toFixed(1)}" cy="${leafB_y.toFixed(1)}" rx="${leafBR.toFixed(1)}" ry="${(leafBR * 0.45).toFixed(1)}" transform="rotate(30 ${leafB_x.toFixed(1)} ${leafB_y.toFixed(1)})" fill="rgb(220,180,90)"/>`
+    + `<polygon points="${(ornCx - diamondR).toFixed(1)},${ornCy.toFixed(1)} ${ornCx.toFixed(1)},${(ornCy - diamondR).toFixed(1)} ${(ornCx + diamondR).toFixed(1)},${ornCy.toFixed(1)} ${ornCx.toFixed(1)},${(ornCy + diamondR).toFixed(1)}" fill="rgb(220,180,90)"/>`
+    + `</g>`
+    // Title: VENUE · DATE in etched serif caps with drop shadow
+    + `<text x="${rightX.toFixed(1)}" y="${titleY.toFixed(1)}" text-anchor="end" `
+    + `font-family="Georgia, 'Palatino Linotype', serif" font-size="${fontTitle}" font-weight="700" `
+    + `letter-spacing="4" fill="rgba(245,238,220,${txtA})" filter="url(#hudShadow)">${venueShort}  ·  ${dateShort}</text>`
+    // Sub: set / song / clock, smaller refined italic
+    + `<text x="${rightX.toFixed(1)}" y="${subY.toFixed(1)}" text-anchor="end" `
+    + `font-family="Georgia, 'Palatino Linotype', serif" font-style="italic" font-size="${fontSub}" `
+    + `letter-spacing="2" fill="rgba(220,210,190,${dimA})" filter="url(#hudShadow)">${setLabel}  ·  ${songInSet}  ·  ${elapsedClock} / ${totalClock}</text>`
+    // Thin gold rule under the typography
+    + `<line x1="${ruleX.toFixed(1)}" y1="${ruleY.toFixed(1)}" x2="${rightX.toFixed(1)}" y2="${ruleY.toFixed(1)}" stroke="rgba(220,180,90,${goldDimA})" stroke-width="${(h * 0.0009).toFixed(1)}"/>`
     + `</svg>`;
 }
 
