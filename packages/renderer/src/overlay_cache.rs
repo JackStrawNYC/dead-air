@@ -272,12 +272,11 @@ impl ValidationReport {
             "Overlays: cache_size={}, total_referenced={}, keyframes={}",
             self.cache_size, self.total_instances, self.keyframe_instances
         );
-        let limit = self.missing.len().min(20);
-        for (id, count) in &self.missing[..limit] {
+        // Print all missing overlays so a fix-list can be derived from the
+        // log directly (was capped at 20 + "+N more"). 50-100 lines of text
+        // is fine; truncating obscures which PNGs need to be generated.
+        for (id, count) in &self.missing {
             eprintln!("  MISSING: {} ({} frames)", id, count);
-        }
-        if self.missing.len() > limit {
-            eprintln!("  ... +{} more missing overlays", self.missing.len() - limit);
         }
     }
 }

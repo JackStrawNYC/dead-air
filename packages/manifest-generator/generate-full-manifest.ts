@@ -219,6 +219,18 @@ function stageLightsSvg(
  * of a segue pair also forces the boundary to be a segue, regardless
  * of whether the pair is in this list.
  */
+/**
+ * Overlays referenced by overlay-rotation that have no PNG in the renderer
+ * cache (packages/renderer/overlay-pngs/). Skipped at manifest-gen time so
+ * the renderer doesn't flag them as missing + render them as blank. To add
+ * one of these back: render its PNG first via the Remotion overlay-stills
+ * pipeline.
+ */
+const UNRENDERABLE_OVERLAYS = new Set<string>([
+  "BearTraced", "FibonacciSpiral", "ParticleExplosion", "LaserShow",
+  "LightningBoltOverlay",
+]);
+
 const KNOWN_SEGUES: Array<[string, string]> = [
   // The sacred suites
   ["china cat sunflower", "i know you rider"],
@@ -3735,6 +3747,10 @@ async function main() {
         for (const [overlayName, opacityRaw] of Object.entries(opacities)) {
           const opacity = opacityRaw * densityMult * drumsSpaceOpMult;
           if (opacity <= 0.005) continue; // skip invisible overlays
+          // Skip overlays that have no PNG in the renderer cache. These
+          // were causing "MISSING" warnings + blank renders. If we want
+          // them in future, rasterize PNGs first.
+          if (UNRENDERABLE_OVERLAYS.has(overlayName)) continue;
 
           // ALL overlays use screen blend — dark pixels vanish naturally.
           // "Normal" blend makes dark icons look like opaque stickers on bright shaders.
@@ -3834,6 +3850,17 @@ async function main() {
             finalScale *= (1.0 + frameBass * 0.08); // up to 8% larger on bass hits
           }
 
+          // SongTitle is invisible after the 11s intro window — drop the
+          // instance entirely so the renderer doesn't flag it as "missing
+          // PNG" for ~95% of frames. Without this skip, every frame past
+          // 11s into a song pushes a SongTitle instance with no PNG and
+          // no keyframe_svg (gated on finalOpacity > 0.01) which counted
+          // as 292k missing-overlay errors.
+          if (overlayName === "SongTitle" && finalOpacity <= 0.01) continue;
+          // FilmGrain + SmokeWisps: handled by GLSL postprocess. Skip
+          // unconditionally — no PNG, no SVG, just silent cache misses.
+          if (overlayName === "FilmGrain" || overlayName === "SmokeWisps") continue;
+
           const instance: any = {
             overlay_id: overlayName,
             transform: {
@@ -3845,14 +3872,12 @@ async function main() {
             },
             blend_mode: blendMode,
           };
-          // SongTitle: attach inline SVG for text rendering (no PNG exists)
-          if (overlayName === "SongTitle" && finalOpacity > 0.01) {
+          // SongTitle: attach inline SVG for text rendering (no PNG exists).
+          // Always attach when we get here (we've already filtered out the
+          // <0.01 opacity case above).
+          if (overlayName === "SongTitle") {
             const safeTitle = song.title.replace(/&/g, '&amp;');
             instance.keyframe_svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}"><defs><filter id="ts" x="-10%" y="-10%" width="120%" height="120%"><feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#000" flood-opacity="0.8"/></filter></defs><text x="${width / 2}" y="${Math.round(height * 0.92)}" text-anchor="middle" font-family="Georgia,serif" font-style="italic" font-size="${Math.round(height * 0.05)}" fill="rgba(255,248,230,1)" filter="url(#ts)" letter-spacing="4">${safeTitle}</text><text x="${width / 2}" y="${Math.round(height * 0.96)}" text-anchor="middle" font-family="Georgia,serif" font-size="${Math.round(height * 0.022)}" fill="rgba(255,248,230,0.5)" letter-spacing="2">SET ${song.set ?? 1}</text></svg>`;
-          }
-          // FilmGrain + SmokeWisps: skip if no PNG (handled by GLSL postprocess / cosmetic)
-          if ((overlayName === "FilmGrain" || overlayName === "SmokeWisps") && finalOpacity > 0) {
-            continue; // no PNG, no SVG — skip to avoid silent cache miss
           }
           frameInstances.push(instance);
         }
@@ -3885,22 +3910,27 @@ async function main() {
 
         // Song art: small poster in bottom-left corner.
         // Fades in over 3s at song start, holds at low opacity, fades during peaks.
-        const songArtId = `SongArt_${song.trackId}`;
-        const artFadeIn = Math.min(i / (fps * 3), 1.0); // 3s fade in
-        const artEnergyFade = 1.0 - Math.min(1, Math.max(0, ((smoothed.energy[ai] ?? 0.3) - 0.4) / 0.3)); // fade out at high energy
-        const artOpacity = 0.25 * artFadeIn * artEnergyFade; // max 25% opacity
-        if (artOpacity > 0.01) {
-          frameInstances.push({
-            overlay_id: songArtId,
-            transform: {
-              opacity: Math.round(artOpacity * 1000) / 1000,
-              scale: 0.18, // small — bottom-left poster
-              rotation_deg: 0,
-              offset_x: -0.38, // bottom-left
-              offset_y: 0.35,
-            },
-            blend_mode: "screen",
-          });
+        // Skipped for stage-announcement / tuning tracks (no song = no poster).
+        const isStageAnnouncement = (song.title ?? "").toLowerCase().includes("announcement")
+          || (song.title ?? "").toLowerCase().includes("tuning");
+        if (!isStageAnnouncement) {
+          const songArtId = `SongArt_${song.trackId}`;
+          const artFadeIn = Math.min(i / (fps * 3), 1.0); // 3s fade in
+          const artEnergyFade = 1.0 - Math.min(1, Math.max(0, ((smoothed.energy[ai] ?? 0.3) - 0.4) / 0.3)); // fade out at high energy
+          const artOpacity = 0.25 * artFadeIn * artEnergyFade; // max 25% opacity
+          if (artOpacity > 0.01) {
+            frameInstances.push({
+              overlay_id: songArtId,
+              transform: {
+                opacity: Math.round(artOpacity * 1000) / 1000,
+                scale: 0.18, // small — bottom-left poster
+                rotation_deg: 0,
+                offset_x: -0.38, // bottom-left
+                offset_y: 0.35,
+              },
+              blend_mode: "screen",
+            });
+          }
         }
 
         // ─── Lyric karaoke ───
