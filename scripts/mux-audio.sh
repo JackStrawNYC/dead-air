@@ -100,9 +100,18 @@ CONCAT_LIST="$(mktemp -t deadair-concat-XXXXXX.txt)"
 trap 'rm -f "$CONCAT_LIST"' EXIT
 
 MISSING=0
+SKIPPED=0
 TOTAL=0
 while IFS=$'\t' read -r title relpath; do
   TOTAL=$((TOTAL + 1))
+  # Skip Stage Announcement / tuning tracks — the manifest gen filters
+  # them from the video, so including their audio causes A/V drift.
+  title_lower="$(echo "$title" | tr '[:upper:]' '[:lower:]')"
+  if [[ "$title_lower" == *"announcement"* || "$title_lower" == *"tuning"* ]]; then
+    echo "  SKIP: '${title}' (not in video manifest)" >&2
+    SKIPPED=$((SKIPPED + 1))
+    continue
+  fi
   abspath="${AUDIO_ROOT}/${relpath}"
   if [[ ! -f "$abspath" ]]; then
     echo "  WARN: missing audio for '${title}' → ${relpath}" >&2
