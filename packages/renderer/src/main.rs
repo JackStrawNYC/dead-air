@@ -327,6 +327,19 @@ fn main() {
             manifest.overlay_layers = Some(combined);
         }
 
+        // Also prepend empty entries to overlay_schedule so its indexing
+        // stays aligned with manifest.frames after the splice. Without
+        // this, the body's keyframe overlays (lyrics, HUD, vocal glyph,
+        // lighter flames, etc.) were rendered ~15 seconds early because
+        // schedule.get(frame_idx) hit body frame N when frame_idx pointed
+        // at intro_frames+N-th rendered frame.
+        if let Some(ref mut existing_schedule) = manifest.overlay_schedule {
+            let mut combined: Vec<Vec<crate::overlay_cache::OverlayInstance>> =
+                (0..n_intro).map(|_| Vec::new()).collect();
+            combined.append(existing_schedule);
+            *existing_schedule = combined;
+        }
+
         n_intro
     } else {
         0
@@ -446,6 +459,17 @@ fn main() {
                         }
                         manifest.overlay_layers = Some(layers);
                     }
+
+                    // Also splice empty entries into overlay_schedule so its
+                    // indexing stays aligned with manifest.frames. Without
+                    // this, body keyframe overlays (HUD, vocal glyph, etc.)
+                    // were rendered ahead-of-song after each chapter card,
+                    // accumulating drift through the show.
+                    if let Some(ref mut existing_schedule) = manifest.overlay_schedule {
+                        let empty: Vec<Vec<crate::overlay_cache::OverlayInstance>> =
+                            (0..n_cc).map(|_| Vec::new()).collect();
+                        existing_schedule.splice(insert_idx..insert_idx, empty);
+                    }
                 }
 
                 println!("Chapter cards: {} inserted ({} per-song, {} setbreak)",
@@ -527,6 +551,14 @@ fn main() {
             let mut combined: Vec<Vec<_>> = (0..show_frame_count).map(|_| Vec::new()).collect();
             combined.extend(ec_overlays);
             manifest.overlay_layers = Some(combined);
+        }
+
+        // Also append empty entries to overlay_schedule for the endcard
+        // frames so its indexing stays aligned with manifest.frames.
+        if let Some(ref mut existing_schedule) = manifest.overlay_schedule {
+            for _ in 0..n_endcard {
+                existing_schedule.push(Vec::new());
+            }
         }
     }
 

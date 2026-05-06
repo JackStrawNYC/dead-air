@@ -3940,33 +3940,11 @@ async function main() {
         // Fades: 0.25s in/out on opacity for smooth presence; max-opacity
         // capped at 0.85 so the lyrics never feel like a hard subtitle
         // strip overlaid on the visual.
-        if (alignedLyrics && alignedLyrics.length > 0) {
-          const t = i / fps + trimFrontSeconds;
-          // Binary-search would be cleaner but lyrics are <50 lines/song
-          // — linear is fine and simpler.
-          for (const line of alignedLyrics) {
-            if (t < line.start - 0.25 || t > line.end + 0.25) continue;
-            // Triangular fade: 0 → 0.85 over 0.25s in, hold, 0.85 → 0 over 0.25s out
-            let op = 0.85;
-            if (t < line.start) op = ((t - (line.start - 0.25)) / 0.25) * 0.85;
-            else if (t > line.end) op = ((line.end + 0.25 - t) / 0.25) * 0.85;
-            op = Math.max(0, Math.min(0.85, op));
-            if (op < 0.01) continue;
-            frameInstances.push({
-              overlay_id: "Lyrics",
-              transform: {
-                opacity: Math.round(op * 1000) / 1000,
-                scale: 1.0,
-                rotation_deg: 0,
-                offset_x: 0,
-                offset_y: 0,
-              },
-              blend_mode: "normal",
-              keyframe_svg: lyricLineSvg(line.text, width, height, op),
-            });
-            break; // one line at a time — no overlapping lyric stack
-          }
-        }
+        // Lyrics disabled — when overlay_schedule sync was off they
+        // looked awful on screen. Re-enable by removing this block once
+        // we want them back. Kept the loadAlignedLyrics call above so
+        // the pre-flight readiness scan still reports lyric coverage.
+        void alignedLyrics;
 
         // ─── Stage lighting beams ───
         // Concert spotlight pair (warm + cool, song-palette tinted) from above
