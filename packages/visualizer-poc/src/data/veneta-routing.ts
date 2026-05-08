@@ -477,13 +477,17 @@ export const VENETA_SONG_IDENTITIES: Record<string, SongIdentity> = {
     moodKeywords: ["cosmic", "psychedelic", "contemplative"],
     narrativeArc: "meditative_journey",
     thematicTags: ["percussion", "cosmic", "exploration"],
+    // Drums/Space identity overrides — gated against activeShaderPool
+    // by pickDrumsSpaceMode, so blocklisted picks fall through to the
+    // default pool. Curated for Veneta's contemplative-cosmic D/S feel,
+    // golden-hour-into-evening warmth, into Stella Blue reemergence.
     drumsSpaceShaders: {
-      drums_tribal: "void_light",
-      transition: "creation",
-      space_ambient: "dark_star_void",
-      space_textural: "obsidian_mirror",
-      space_melodic: "warm_nebula",
-      reemergence: "void_light",
+      drums_tribal: "mandala_engine",      // sacred ritual geometry
+      transition: "aurora",                // golden drift (Veneta golden-hour)
+      space_ambient: "dark_star_void",     // THE Veneta D/S anchor
+      space_textural: "nimitz_aurora",     // cosmic-bar-setter with texture
+      space_melodic: "honeycomb_cathedral",// bar-setter tonal returning
+      reemergence: "aurora",               // golden re-emergence into next song
     },
   },
 

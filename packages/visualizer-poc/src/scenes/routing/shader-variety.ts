@@ -20,6 +20,8 @@ import { computeSemanticProfile, extractSemanticScores } from "../../utils/seman
 import { detectGroove } from "../../utils/groove-detector";
 import { AUTO_VARIETY_MIN_SECTION } from "./crossfade-timing";
 import { scoreDiversityBonus, type VisualMemoryState } from "../../utils/visual-memory";
+import { pickDrumsSpaceMode } from "./drums-space-router";
+import type { DrumsSpaceSubPhase } from "../../utils/drums-space-phase";
 
 /**
  * Safe shaders whitelist — validate chosen mode at the end.
@@ -141,10 +143,20 @@ export function getModeForSection(
   stemDominant?: string,
   visualMemory?: VisualMemoryState,
   showShaderPool?: VisualMode[],
+  drumsSpacePhase?: DrumsSpaceSubPhase,
 ): VisualMode {
   // Explicit override always wins
   const override = song.sectionOverrides?.find((o) => o.sectionIndex === sectionIndex);
   if (override) return validateSafe(override.mode, song.defaultMode);
+
+  // Drums/Space ritual override — sacred phase routing wins over normal
+  // section logic (and over coherence lock — the ritual IS the coherent
+  // moment). Pool curated in drums-space-router.ts; song identity
+  // drumsSpaceShaders override the pool when present and pool-valid.
+  if (drumsSpacePhase) {
+    const ds = pickDrumsSpaceMode(drumsSpacePhase, seed ?? 0, songIdentity, showShaderPool);
+    return validateSafe(ds, song.defaultMode);
+  }
 
   // Section 0: use first authored preferredMode if available, else default.
   // This prevents every song from opening on liquid_light (the global default)

@@ -507,40 +507,61 @@ describe('getModeForSection', () => {
 // --- getDrumsSpaceMode ---
 
 describe('getDrumsSpaceMode', () => {
-  it('drums_tribal returns inferno or concert_lighting', () => {
+  // Source-of-truth pools live in drums-space-router.ts.
+  // These tests verify the legacy alias still routes correctly to the
+  // curated A+++ pools and that song-identity overrides win.
+
+  const DRUMS_TRIBAL_POOL = [
+    'mandala_engine', 'kaleidoscope', 'electric_arc',
+    'sacred_geometry', 'dance_floor_prism', 'clockwork_temple',
+  ];
+  const TRANSITION_POOL = [
+    'aurora', 'nimitz_aurora', 'aurora_curtains',
+    'fractal_temple', 'stained_glass_dissolution',
+  ];
+  const SPACE_AMBIENT_POOL = [
+    'deep_ocean', 'cosmic_dust', 'void_light', 'nimitz_aurora',
+    'fractal_temple', 'honeycomb_cathedral', 'aurora',
+  ];
+  const REEMERGENCE_POOL = [
+    'aurora', 'nimitz_aurora', 'ember_meadow',
+    'fractal_temple', 'mandala_engine',
+  ];
+
+  it('drums_tribal returns from curated tribal pool', () => {
     const results = new Set<VisualMode>();
-    for (let seed = 0; seed < 50; seed++) {
+    for (let seed = 0; seed < 200; seed++) {
       results.add(getDrumsSpaceMode('drums_tribal', seed));
     }
-    expect([...results].every((m) => m === 'inferno' || m === 'concert_lighting')).toBe(true);
+    expect([...results].every((m) => DRUMS_TRIBAL_POOL.includes(m as string))).toBe(true);
   });
 
-  it('transition returns cosmic_voyage or aurora', () => {
+  it('transition returns from curated transition pool', () => {
     const results = new Set<VisualMode>();
-    for (let seed = 0; seed < 50; seed++) {
+    for (let seed = 0; seed < 200; seed++) {
       results.add(getDrumsSpaceMode('transition', seed));
     }
-    expect([...results].every((m) => m === 'cosmic_voyage' || m === 'aurora')).toBe(true);
+    expect([...results].every((m) => TRANSITION_POOL.includes(m as string))).toBe(true);
   });
 
-  it('space_ambient returns from ambient pool', () => {
-    const pool = ['deep_ocean', 'cosmic_dust', 'crystal_cavern', 'void_light'];
+  it('space_ambient returns from curated ambient pool', () => {
     const results = new Set<VisualMode>();
-    for (let seed = 0; seed < 100; seed++) {
+    for (let seed = 0; seed < 200; seed++) {
       results.add(getDrumsSpaceMode('space_ambient', seed));
     }
-    expect([...results].every((m) => pool.includes(m))).toBe(true);
+    expect([...results].every((m) => SPACE_AMBIENT_POOL.includes(m as string))).toBe(true);
   });
 
-  it('reemergence returns inferno or protean_clouds', () => {
+  it('reemergence returns from curated reemergence pool', () => {
     const results = new Set<VisualMode>();
-    for (let seed = 0; seed < 50; seed++) {
+    for (let seed = 0; seed < 200; seed++) {
       results.add(getDrumsSpaceMode('reemergence', seed));
     }
-    expect([...results].every((m) => m === 'inferno' || m === 'protean_clouds')).toBe(true);
+    expect([...results].every((m) => REEMERGENCE_POOL.includes(m as string))).toBe(true);
   });
 
-  it('unknown phase defaults to cosmic_voyage', () => {
+  it('unknown phase falls back to a safe atmospheric default', () => {
+    // Without an active pool, falls through to cosmic_voyage.
     expect(getDrumsSpaceMode('unknown_phase', 42)).toBe('cosmic_voyage');
   });
 
@@ -551,6 +572,27 @@ describe('getDrumsSpaceMode', () => {
       },
     } as SongIdentity;
     expect(getDrumsSpaceMode('drums_tribal', 42, identity)).toBe('aurora');
+  });
+
+  it('seeded picks are deterministic per (phase, seed)', () => {
+    const a = getDrumsSpaceMode('space_ambient', 12345);
+    const b = getDrumsSpaceMode('space_ambient', 12345);
+    expect(a).toBe(b);
+  });
+
+  it('space_ambient and space_melodic do not collide on seed (length-collision regression)', () => {
+    // Both phase strings are 13 chars long; the prior length-based seeding
+    // gave them the same RNG. The phase-hash seeding must produce distinct
+    // distributions across many seeds.
+    let differences = 0;
+    for (let seed = 0; seed < 100; seed++) {
+      if (getDrumsSpaceMode('space_ambient', seed) !== getDrumsSpaceMode('space_melodic', seed)) {
+        differences++;
+      }
+    }
+    // Expect majority of seeds to differ — pools are not identical but
+    // overlap (aurora/void_light/nimitz_aurora). Strict check: > 50%.
+    expect(differences).toBeGreaterThan(50);
   });
 });
 

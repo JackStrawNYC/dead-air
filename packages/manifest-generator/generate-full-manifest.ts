@@ -41,6 +41,7 @@ import { detectStemInterplay } from "../visualizer-poc/src/utils/stem-interplay.
 import { computeCoherence, batchComputeCoherence } from "../visualizer-poc/src/utils/coherence.js";
 import { computeITResponse } from "../visualizer-poc/src/utils/it-response.js";
 import { computeDrumsSpacePhase } from "../visualizer-poc/src/utils/drums-space-phase.js";
+import { pickDrumsSpaceMode, DRUMS_SPACE_ENTRY_BLEND } from "../visualizer-poc/src/scenes/routing/drums-space-router.js";
 import { computeClimaxState, climaxModulation } from "../visualizer-poc/src/utils/climax-state.js";
 import { computeReactiveTriggers } from "../visualizer-poc/src/utils/reactive-triggers.js";
 import { detectGroove, grooveModifiers } from "../visualizer-poc/src/utils/groove-detector.js";
@@ -1380,6 +1381,10 @@ interface SongContext {
    *  routeScene priority overrides (drums/space, reactive triggers, dual)
    *  to avoid picking blocklisted shaders that would render as black. */
   activeShaderPool?: string[];
+  /** Song identity (from song-identities.ts). Provides per-song
+   *  drumsSpaceShaders overrides, preferredModes, etc. Routing overrides
+   *  (drums/space) consult this so curated identity wins over the pool pick. */
+  songIdentity?: any;
 }
 
 /**
@@ -1682,44 +1687,27 @@ function routeScene(
   // TODO: calibrate batch coherence thresholds to match real-time behavior.
   // if (itState?.forceTranscendentShader) { ... }
 
-  // Priority 2: Drums/Space override
+  // Priority 2: Drums/Space override.
+  // Sacred ritual moment of the show — the pools and entry blend modes
+  // are curated in drums-space-router.ts (single source of truth shared
+  // with the runtime/Remotion path). Song identity drumsSpaceShaders
+  // override the pool when present and pool-valid.
   if (drumsSpaceState?.subPhase) {
-    // Multi-option pools per phase (was 1 hardcoded shader each → cosmic_voyage
-    // alone drove ~12% of full-show frames despite being blocklisted, because
-    // the override fired for every space_ambient frame). Now picks varied,
-    // post-blocklist alternatives via a seeded shuffle for determinism +
-    // stem/section variety. The first non-blocked shader wins.
-    // Pool keys MUST match the actual DrumsSpaceSubPhase enum values from
-    // drums-space-phase.ts (was a bug: drums_build/drums_peak never matched
-    // anything, so drums portions silently fell back to defaultMode and
-    // looked identical to space).
-    //
-    // Drums pool: percussive, beat-locked, fire/heat shaders. Tribal feel.
-    // Space pools: void/cosmic/atmospheric. Minimal motion.
-    // Transition / reemergence: bridge between the two energies.
-    const dsPools: Record<string, string[]> = {
-      // Heavy percussion — fractal flames, mandala, kaleidoscope, electric arc.
-      // All beat-reactive and rhythmic; deep_ocean as a wildcard for textural drum.
-      drums_tribal:   ["fractal_flames", "mandala_engine", "kaleidoscope", "electric_arc", "reaction_diffusion"],
-      // Drums thinning into space — bridge shaders (lava_flow, fluid_light)
-      transition:     ["lava_flow", "fluid_light", "aurora", "fractal_flames"],
-      // Full Space — cosmic void, deep ocean, aurora drift
-      space_ambient:  ["void_light", "deep_ocean", "aurora", "memorial_drift", "fluid_light", "ember_meadow"],
-      space_textural: ["aurora", "aurora_curtains", "fluid_light", "void_light", "stark_minimal"],
-      space_melodic:  ["void_light", "aurora", "ember_meadow", "fluid_light", "porch_twilight"],
-      // Band re-entering — energy rising back, warmer shaders
-      reemergence:    ["aurora", "ember_meadow", "fluid_light", "lava_flow", "psychedelic_garden"],
-    };
-    const pool = dsPools[drumsSpaceState.subPhase] ?? [defaultMode];
-    // Seeded pick keeps the same subphase consistent within a song
-    // but varies across songs/seeds. defaultMode here may be blocklisted
-    // — that's a routeScene-internal limitation; the section-level pick
-    // path uses safeDefaultMode/anchorMode so this only matters when
-    // dsPools doesn't have an entry for the subphase.
-    const seedKey = ctx.songSeed + (drumsSpaceState.subPhase.length * 31);
-    const ds = pool[Math.floor(seededRandom(seedKey) * pool.length)] ?? defaultMode;
+    const ds = pickDrumsSpaceMode(
+      drumsSpaceState.subPhase,
+      ctx.songSeed,
+      ctx.songIdentity,
+      ctx.activeShaderPool,
+    );
     if (ds !== prevShaderId) {
-      return { shaderId: ds, secondaryId: prevShaderId, blendProgress: 0.5, blendMode: "dissolve" };
+      // Per-phase entry blend mode reflects the musical character:
+      //   drums_tribal → additive (heat erupts), space_ambient →
+      //   luminance_key (light dissolves into void), reemergence →
+      //   additive (light returns), others → dissolve.
+      const blendMode = DRUMS_SPACE_ENTRY_BLEND[
+        drumsSpaceState.subPhase as keyof typeof DRUMS_SPACE_ENTRY_BLEND
+      ] ?? "dissolve";
+      return { shaderId: ds, secondaryId: prevShaderId, blendProgress: 0.0, blendMode };
     }
     return { shaderId: ds, secondaryId: null, blendProgress: null, blendMode: null };
   }
@@ -2812,6 +2800,7 @@ async function main() {
       showSongsCompleted,
       totalShowSongs: songs.length,
       usedShaderModes,
+      songIdentity,
     };
 
     // Globally blocked — never picked by any path. Includes:
@@ -2858,6 +2847,11 @@ async function main() {
     let transitionStartFrame = -1;
     let transitionLength = 0;
     let transitionFromShader = "";
+    // Preserve the routeScene-suggested blend mode through the crossfade
+    // ramp. Without this, drums/space entry blends (additive heat,
+    // luminance_key void, etc.) collapse to "dissolve" the moment the
+    // ramp logic overrides blendMode.
+    let transitionBlendMode: string = "dissolve";
 
     // Build section boundaries for routing (frame ranges in output fps)
     const sectionBounds = (sections ?? []).map((s: any) => ({
@@ -3200,23 +3194,28 @@ async function main() {
       }
 
       if (route.shaderId !== prevShaderId) {
-        // Generate a 3-second crossfade ramp into the new shader
+        // Generate a 3-second crossfade ramp into the new shader.
+        // Latch the routeScene-suggested blend mode so per-phase entries
+        // (drums/space additive, luminance_key, etc.) survive the ramp
+        // instead of being clobbered by a hardcoded "dissolve".
         const CROSSFADE_FRAMES = Math.round(90 * (fps / 30));
         transitionFromShader = prevShaderId;
+        transitionBlendMode = route.blendMode ?? "dissolve";
         route.secondaryId = prevShaderId;
         route.blendProgress = 0.0;
-        route.blendMode = "dissolve";
+        route.blendMode = transitionBlendMode;
         shaderStartFrame = i;
         transitionStartFrame = i;
         transitionLength = CROSSFADE_FRAMES;
       }
-      // Override blend data during crossfade ramp — smooth 0→1 over 3 seconds
+      // Override blend data during crossfade ramp — smooth 0→1 over 3 seconds.
+      // Preserve the latched transitionBlendMode (NOT hardcoded dissolve).
       if (transitionStartFrame >= 0) {
         if (i < transitionStartFrame + transitionLength) {
           const progress = (i - transitionStartFrame) / transitionLength;
           route.secondaryId = transitionFromShader;
           route.blendProgress = Math.min(1.0, progress);
-          route.blendMode = "dissolve";
+          route.blendMode = transitionBlendMode;
         } else {
           transitionStartFrame = -1; // crossfade complete
         }
