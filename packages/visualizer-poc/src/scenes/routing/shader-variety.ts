@@ -16,7 +16,7 @@ import { applySetShaderFilter } from "../../utils/set-theme";
 import { detectChordMood } from "../../utils/chord-mood";
 import { estimateImprovisationScore } from "../../utils/improv-detector";
 import { getSectionSpectralFamily } from "../../utils/spectral-section";
-import { computeSemanticProfile, extractSemanticScores } from "../../utils/semantic-router";
+import { computeSemanticProfile, extractSemanticScores, pickSemanticHardGate } from "../../utils/semantic-router";
 import { detectGroove } from "../../utils/groove-detector";
 import { AUTO_VARIETY_MIN_SECTION } from "./crossfade-timing";
 import { scoreDiversityBonus, type VisualMemoryState } from "../../utils/visual-memory";
@@ -179,6 +179,46 @@ export function getModeForSection(
       const candidates = filtered.length > 0 ? filtered : stemFamily;
       const rng = seededRandom((seed ?? 0) + sectionIndex * 7919 + 99991);
       return validateSafe(candidates[Math.floor(rng() * candidates.length)], song.defaultMode);
+    }
+  }
+
+  // Strong CLAP semantic dominance hard-gate — when one of the 8 categories
+  // (psychedelic / aggressive / tender / cosmic / rhythmic / ambient /
+  // chaotic / triumphant) crosses 0.55 confidence, restrict the pool to
+  // that category's curated shader family. The audit flagged semantic as
+  // cosmetic-only (postprocess saturation); this gate makes it structural.
+  // Same identity guard as stems — preferredModes wins if curated.
+  if (!songIdentity?.preferredModes?.length && sectionIndex > 0 && frames && sections[sectionIndex]) {
+    const sec = sections[sectionIndex];
+    const sStart = sec.frameStart;
+    const sEnd = Math.min(sec.frameEnd, frames.length - 1);
+    const sampleCount = Math.min(10, sEnd - sStart);
+    if (sampleCount > 0) {
+      const avg = { psychedelic: 0, aggressive: 0, tender: 0, cosmic: 0, rhythmic: 0, ambient: 0, chaotic: 0, triumphant: 0 };
+      for (let s = 0; s < sampleCount; s++) {
+        const fi = sStart + Math.floor(s * (sEnd - sStart) / sampleCount);
+        const f = frames[fi];
+        if (!f) continue;
+        avg.psychedelic += f.semantic_psychedelic ?? 0;
+        avg.aggressive += f.semantic_aggressive ?? 0;
+        avg.tender += f.semantic_tender ?? 0;
+        avg.cosmic += f.semantic_cosmic ?? 0;
+        avg.rhythmic += f.semantic_rhythmic ?? 0;
+        avg.ambient += f.semantic_ambient ?? 0;
+        avg.chaotic += f.semantic_chaotic ?? 0;
+        avg.triumphant += f.semantic_triumphant ?? 0;
+      }
+      for (const k of Object.keys(avg) as (keyof typeof avg)[]) avg[k] /= sampleCount;
+      const profile = computeSemanticProfile(avg);
+      const semanticPool = pickSemanticHardGate(profile);
+      if (semanticPool && semanticPool.length > 0) {
+        const filtered = showShaderPool && showShaderPool.length > 0
+          ? semanticPool.filter((m) => showShaderPool.includes(m))
+          : semanticPool;
+        const candidates = filtered.length > 0 ? filtered : semanticPool;
+        const rng = seededRandom((seed ?? 0) + sectionIndex * 7919 + 88811);
+        return validateSafe(candidates[Math.floor(rng() * candidates.length)], song.defaultMode);
+      }
     }
   }
 

@@ -40,16 +40,18 @@ export interface SemanticProfile {
 }
 
 // ─── Semantic → Shader Mappings ───
-
-const SEMANTIC_SHADERS: Record<keyof SemanticScores, VisualMode[]> = {
-  psychedelic: ["cosmic_voyage", "cosmic_voyage", "protean_clouds", "protean_clouds", "deep_ocean"],
-  aggressive: ["inferno", "inferno", "protean_clouds", "cosmic_voyage"],
-  tender: ["aurora", "protean_clouds", "vintage_film", "deep_ocean"],
-  cosmic: ["cosmic_voyage", "cosmic_dust", "deep_ocean", "volumetric_nebula", "void_light"],
-  rhythmic: ["mandala_engine", "inferno", "cosmic_voyage", "cosmic_voyage"],
-  ambient: ["cosmic_dust", "deep_ocean", "void_light", "deep_ocean"],
-  chaotic: ["cosmic_voyage", "deep_ocean", "cosmic_voyage", "deep_ocean"],
-  triumphant: ["cosmic_voyage", "protean_clouds", "protean_clouds", "inferno"],
+// All entries are post-blocklist + non-BUSTED. The prior pools heavily relied
+// on cosmic_voyage / protean_clouds (now blocked) and inferno (BUSTED 80ms),
+// which made semantic routing largely redirect to the safe-default.
+export const SEMANTIC_SHADERS: Record<keyof SemanticScores, VisualMode[]> = {
+  psychedelic: ["fractal_temple", "kaleidoscope", "sacred_geometry", "mandala_engine", "honeycomb_cathedral"],
+  aggressive:  ["electric_arc", "dance_floor_prism", "clockwork_temple", "mandala_engine", "kaleidoscope"],
+  tender:      ["porch_twilight", "ember_meadow", "aurora", "nimitz_aurora", "honeycomb_cathedral"],
+  cosmic:      ["deep_ocean", "cosmic_dust", "void_light", "dark_star_void", "fractal_temple", "nimitz_aurora"],
+  rhythmic:    ["mandala_engine", "kaleidoscope", "electric_arc", "sacred_geometry", "dance_floor_prism"],
+  ambient:     ["cosmic_dust", "void_light", "deep_ocean", "nimitz_aurora", "aurora"],
+  chaotic:     ["fractal_temple", "electric_arc", "mandala_engine", "kaleidoscope", "stained_glass_dissolution"],
+  triumphant:  ["fractal_temple", "dance_floor_prism", "sacred_geometry", "ember_meadow", "honeycomb_cathedral"],
 };
 
 // ─── Semantic → Overlay Category Biases ───
@@ -232,4 +234,28 @@ export function extractSemanticScores(snapshot: {
     chaotic: snapshot.semanticChaotic ?? 0,
     triumphant: snapshot.semanticTriumphant ?? 0,
   };
+}
+
+/** Confidence threshold above which CLAP semantic dominance HARD-restricts
+ *  the shader pool. The audit identified semantic as cosmetic (postprocess
+ *  saturation only); this gate makes it structural at strong confidence
+ *  while keeping the existing soft-bias path active below threshold. */
+export const SEMANTIC_HARD_GATE_CONFIDENCE = 0.55;
+
+/** Decide whether semantic dominance should restrict the shader pool.
+ *  Returns null when confidence is below threshold or there's no clear
+ *  dominant — caller falls back to the existing soft-bias routing.
+ *
+ *  Intentionally a bit higher than the stem hard-gate (0.6 vs 0.55) because
+ *  CLAP scores are noisier than stem-energy ratios, so we want a slightly
+ *  stronger signal before forcing a pivot. */
+export function pickSemanticHardGate(
+  profile: SemanticProfile,
+): VisualMode[] | null {
+  if (!profile.dominant) return null;
+  if (profile.dominantConfidence < SEMANTIC_HARD_GATE_CONFIDENCE) return null;
+  // Pull the SOURCE pool (not the weighted-list `preferredShaders`), so we
+  // get distinct candidates without the 2x stuffing meant for soft-bias.
+  const pool = SEMANTIC_SHADERS[profile.dominant];
+  return pool && pool.length > 0 ? pool : null;
 }
