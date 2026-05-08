@@ -21,6 +21,9 @@ import type { SongIdentity } from "../data/song-identities";
 import type { StemSectionType } from "../utils/stem-features";
 // selectTransitionStyle no longer needed — all transitions use GPUTransition
 import { GPUTransition, transitionStyleToBlendMode } from "./GPUTransition";
+import { DualShaderScene } from "./DualShaderScene";
+import { getShaderStrings } from "../shaders/shader-strings";
+import { decideDualShader, type ClimaxPhase } from "./routing/dual-shader-climax";
 import type { JamEvolution, JamPhaseBoundaries } from "../utils/jam-evolution";
 import type { JamCycleState } from "../utils/jam-cycles";
 import type { InterplayMode } from "../utils/stem-interplay";
@@ -401,14 +404,39 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
 
   // ─── Dual-shader composition ───
   // Two shaders run simultaneously on the GPU, composited via blend modes.
-  // Creates psychedelic depth that a single shader can't achieve.
-  // Activates for: high-energy sections, jam/solo stems, tight-lock interplay,
-  // solo-spotlight focus (subtle), and Set 1 at higher energy thresholds.
+  // Activates for climax phases 1-4 (build → climax → sustain → release) and
+  // tight-lock stem interplay; decision policy lives in dual-shader-climax.ts
+  // and explicitly guards against the "muddy peak" failure mode by keeping
+  // blendProgress < 0.5 at the moment of climax impact.
+  //
+  // Falls back to single-shader rendering when the chosen mode pair lacks
+  // raw GLSL strings (Three.js scenes), or when neither climax nor tight-
+  // lock is active.
   let mainScene: React.ReactNode;
-  const sectionLen = currentSection ? currentSection.frameEnd - currentSection.frameStart : 0;
+  const dualDecision = decideDualShader(climaxPhaseProp as ClimaxPhase | undefined, stemInterplayMode);
+  const partnerMode = dualDecision.active ? getComplement(currentMode) : null;
+  const stringsA = dualDecision.active ? getShaderStrings(currentMode) : null;
+  const stringsB = dualDecision.active && partnerMode ? getShaderStrings(partnerMode) : null;
 
-  // TODO: dual-shader composition not yet wired — render single mode for now
-  mainScene = renderMode(currentMode, frames, sections, palette, tempo, undefined, jamDensity, sceneConfig);
+  if (dualDecision.active && stringsA && stringsB && partnerMode && partnerMode !== currentMode) {
+    mainScene = (
+      <DualShaderScene
+        frames={frames}
+        sections={sections}
+        palette={palette}
+        tempo={tempo}
+        jamDensity={jamDensity}
+        vertA={stringsA.vert}
+        fragA={stringsA.frag}
+        vertB={stringsB.vert}
+        fragB={stringsB.frag}
+        blendMode={dualDecision.blendMode}
+        blendProgress={dualDecision.blendProgress}
+      />
+    );
+  } else {
+    mainScene = renderMode(currentMode, frames, sections, palette, tempo, undefined, jamDensity, sceneConfig);
+  }
 
   // Dead air crossfade: transition to ambient shader after music ends
   // Use a neutral desaturated palette so the song's personality doesn't bleed into applause
