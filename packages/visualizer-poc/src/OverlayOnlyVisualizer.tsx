@@ -34,7 +34,7 @@ import { SilentErrorBoundary } from "./components/SilentErrorBoundary";
 import { SongArtLayer } from "./components/song-visualizer/SongArtLayer";
 import { ConcertInfo } from "./components/ConcertInfo";
 import { buildBeatArray, computeAudioSnapshot } from "./utils/audio-reactive";
-import { getShowSeed } from "./data/ShowContext";
+import { getShowSeed, ShowContextProvider } from "./data/ShowContext";
 import { lookupSongIdentity, getOrGenerateSongIdentity, setActiveShowDate } from "./data/song-identities";
 import { deriveChromaPalette } from "./utils/chroma-palette";
 
@@ -136,6 +136,7 @@ export const OverlayOnlyVisualizer: React.FC<OverlayOnlyProps> = (props) => {
 
   return (
     <div style={{ width, height, position: "relative", overflow: "hidden", background: "transparent" }}>
+      <ShowContextProvider show={props.show}>
       <SongPaletteProvider palette={palette}>
       <TempoProvider tempo={tempo}>
 
@@ -179,11 +180,12 @@ export const OverlayOnlyVisualizer: React.FC<OverlayOnlyProps> = (props) => {
           })}
         </div>
 
-        {/* Song title text */}
-        <ConcertInfo songTitle={props.song.title} />
+        {/* ConcertInfo removed from overlay-only pass — venue/date shown in intro,
+            song titles shown via Rust chapter cards */}
 
       </TempoProvider>
       </SongPaletteProvider>
+      </ShowContextProvider>
     </div>
   );
 };

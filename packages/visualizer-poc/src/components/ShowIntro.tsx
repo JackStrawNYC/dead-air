@@ -22,10 +22,10 @@ import { CosmicVoyageScene } from "../scenes/CosmicVoyageScene";
 import type { EnhancedFrameData, ColorPalette } from "../data/types";
 
 // ─── Timing constants (frames at 30fps) ───
-const POSTER_START = 210;          // 7s — scene begins crossfading in
+const POSTER_START = 300;          // 10s — full Dead Air brand video plays before crossfade
 const CROSSFADE_FRAMES = 60;      // 2s — video → scene visual crossfade
 const FADE_OUT_FRAMES = 45;       // 1.5s — scene fades to black at end
-const AUDIO_CROSSFADE_START = 195; // 6.5s — video audio starts fading out (0.5s before visual)
+const AUDIO_CROSSFADE_START = 285; // 9.5s — video audio starts fading out (0.5s before visual)
 
 // Duration of Phase 2 in frames (from POSTER_START to end)
 const PHASE2_FRAMES = 255;        // ~8.5s

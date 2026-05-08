@@ -205,5 +205,6 @@
       "defaultMode": "liquid_light",
       "songArt": "assets/song-art/veneta-72/d3t06.png"
     }
-  ]
+  ],
+  "showPoster": "assets/song-art/veneta-72/show-poster.png"
 }
