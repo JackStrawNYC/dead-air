@@ -198,6 +198,13 @@ ${
   // Cinematic grade (ACES tone mapping)
   col = cinematicGrade(col, energy);
 
+  // Vignette-stack guard: prior code multiplied a quiet-passage vignette
+  // (~18% edge crush) AND later the dramatic vignette (~35%), giving ~47%
+  // edge darkness during quiet sections. Audit flagged the stack. Now both
+  // contribute their darkening fraction here; the deeper (max) wins and is
+  // applied ONCE at the dramatic vignette site.
+  float quietVigDarken = 0.0;
+
   // Quiet-passage micro-detail: when energy drops, add subtle visual texture
   // instead of just dimming to darkness. Sparkles, dust motes, enhanced grain.
   // Follows the Cosmic Voyage model — quiet should look DIFFERENT, not EMPTY.
@@ -233,10 +240,12 @@ ${
       vec3 wispColor = hsv2rgb(vec3(wispHue, 0.40, 0.12));
       col += wispColor * wispMask * quietness * 0.25;
 
-      // Deeper vignette in quiet passages — intimate, focused, contemplative
+      // Deeper vignette in quiet passages — intimate, focused, contemplative.
+      // Stash the darkening fraction; applied alongside the dramatic vignette
+      // below so the two don't multiplicatively stack into ~47% edge crush.
       float quietVig = 1.0 - dot(p * 1.1, p * 1.1);
       quietVig = smoothstep(0.0, 1.0, quietVig);
-      col *= mix(1.0, quietVig, quietness * 0.18);
+      quietVigDarken = (1.0 - quietVig) * quietness * 0.18;
 
       // Slow chromatic drift: very subtle hue rotation over time
       // gives quiet passages a sense of time passing, not frozen
@@ -338,11 +347,16 @@ ${
     : ""
 }
 
-  // Dramatic vignette
+  // Dramatic vignette — combined with the deferred quiet-vignette darkening
+  // via max() so the two never stack multiplicatively. Without the max
+  // guard, a quiet passage would get *0.82 (quiet) * *0.65 (dramatic) =
+  // *0.53 at the edge — 47% crush, audit-flagged.
   {
     float vig = 1.0 - dot(p * 0.9, p * 0.9);
     vig = smoothstep(0.0, 1.0, vig);
-    col *= mix(1.0, vig, 0.35);
+    float dramaticDarken = (1.0 - vig) * 0.35;
+    float totalDarken = max(quietVigDarken, dramaticDarken);
+    col *= 1.0 - totalDarken;
   }
 
   // Blacks crush: push near-black toward true black for contrast
