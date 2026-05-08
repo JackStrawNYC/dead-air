@@ -337,6 +337,16 @@ def analyze_track(audio_path: Path, output_path: Path, stems_dir: Path | None = 
         chord_names.append(f"{note_names[i]}m")
     chord_templates = np.array(chord_templates)  # (24, 12)
 
+    # Unit-normalize the templates so the dot product against a unit-normalized
+    # chroma vector is true cosine similarity, bounded in [0, 1] for non-negative
+    # inputs. Without this normalization the templates have L2 norm sqrt(3) and
+    # scores reach ~1.73 — confidence bleeds past 1.0 (mean 1.19 on Veneta), all
+    # downstream `> 0.3` / `> 0.6` thresholds become meaningless, and the
+    # smoothstep(0.3, 0.6, x) used in 8 shaders saturates regardless of true
+    # match quality. argmax is preserved (uniform scaling doesn't change ranking).
+    chord_template_norms = np.linalg.norm(chord_templates, axis=1, keepdims=True)
+    chord_templates_n = chord_templates / (chord_template_norms + 1e-8)
+
     # Smooth chroma over ~0.5s window for chord stability
     chroma_smooth_win = max(1, int(FPS * 0.5))
     chroma_smoothed = np.zeros_like(chroma)
@@ -353,11 +363,12 @@ def analyze_track(audio_path: Path, output_path: Path, stems_dir: Path | None = 
         if frame_chroma.sum() < 0.01:
             continue
         frame_chroma_n = frame_chroma / (np.linalg.norm(frame_chroma) + 1e-8)
-        # Dot product with each template
-        scores = chord_templates @ frame_chroma_n
+        # Cosine similarity (both vectors unit-normalized) → bounded in [0, 1]
+        # for non-negative chroma. Defensive clip handles any FP edge.
+        scores = chord_templates_n @ frame_chroma_n
         best_idx = scores.argmax()
         chord_idx_arr[t] = best_idx
-        chord_confidence_arr[t] = float(scores[best_idx])
+        chord_confidence_arr[t] = float(np.clip(scores[best_idx], 0.0, 1.0))
 
     # Harmonic tension: rate of chord change over 2s window
     tension_window = int(FPS * 2)
