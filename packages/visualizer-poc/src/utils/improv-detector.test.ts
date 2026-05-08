@@ -104,6 +104,62 @@ describe("estimateImprovisationScore", () => {
     expect(wildScore).toBeGreaterThan(steadyScore);
   });
 
+  // ─── Threshold reachability (regression guard for May 2026 audit) ───
+  // Prior calibration (tempo_std/15, changes/4, smooth sigma=1s) made the
+  // formula compress: real Dead jams maxed at ~0.5 and never crossed the
+  // 0.65 improv_spike trigger or the 0.6 shader-variety bias. These tests
+  // pin the formula's reach so a future tweak can't silently revert it.
+
+  it("realistic Dead jam (Bertha-style) crosses the 0.6 shader-variety bias threshold", () => {
+    // Tempo wandering 120-128 (8 BPM peak-to-peak — std ~3 BPM),
+    // 1.5 chord changes/sec, beatConf ~0.45 (loose), energy ~0.45,
+    // tension ~0.55. This is a moderately-jammy mid-set passage.
+    const frames = Array.from({ length: 120 }, (_, i) =>
+      mockFrame({
+        localTempo: 120 + 8 * Math.sin(i * 0.2),  // 4 BPM std
+        chordIndex: (Math.floor(i / 20) % 24) / 23, // change every 20 frames = 1.5/sec
+        beatConfidence: 0.45,
+        rms: 0.45,
+        harmonicTension: 0.55,
+      }),
+    );
+    const score = estimateImprovisationScore(frames, 60);
+    expect(score, `Dead jam should cross 0.6 (got ${score.toFixed(3)})`).toBeGreaterThan(0.6);
+  });
+
+  it("Drums/Space-style passage crosses the 0.65 improv_spike trigger threshold", () => {
+    // Tempo drifting 100-130 (std ~10 BPM), 2 chord changes/sec,
+    // beatConf ~0.3 (free time), energy ~0.4, tension ~0.7. Drums>Space
+    // exploration zone where the trigger should fire.
+    const frames = Array.from({ length: 120 }, (_, i) =>
+      mockFrame({
+        localTempo: 115 + 15 * Math.sin(i * 0.13),
+        chordIndex: (Math.floor(i / 15) % 24) / 23, // 2/sec
+        beatConfidence: 0.3,
+        rms: 0.4,
+        harmonicTension: 0.7,
+      }),
+    );
+    const score = estimateImprovisationScore(frames, 60);
+    expect(score, `D/S should cross 0.65 (got ${score.toFixed(3)})`).toBeGreaterThan(0.65);
+  });
+
+  it("verse-style structured passage stays below 0.4 (no false-positive triggers)", () => {
+    // Steady 120 BPM, chord change every ~2 sec (0.5/sec), beatConf 0.85,
+    // energy 0.3, low tension. Should never trigger as improv.
+    const frames = Array.from({ length: 120 }, (_, i) =>
+      mockFrame({
+        localTempo: 120 + 0.5 * Math.sin(i * 0.1),
+        chordIndex: (Math.floor(i / 60) % 4) / 23,
+        beatConfidence: 0.85,
+        rms: 0.3,
+        harmonicTension: 0.15,
+      }),
+    );
+    const score = estimateImprovisationScore(frames, 60);
+    expect(score, `verse must stay below 0.4 (got ${score.toFixed(3)})`).toBeLessThan(0.4);
+  });
+
   it("respects custom windowSize parameter", () => {
     // First 50 frames stable, next 50 frames chaotic
     const frames: EnhancedFrameData[] = [

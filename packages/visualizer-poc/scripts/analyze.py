@@ -378,7 +378,14 @@ def analyze_track(audio_path: Path, output_path: Path, stems_dir: Path | None = 
     # --- Improvisation score ---
     # Composite score (0-1) from tempo variance (25%), harmonic novelty (25%),
     # beat instability × energy (30%), harmonic tension (20%).
-    # Smoothed with 2s Gaussian window.
+    #
+    # Calibration (May 2026): the prior divisors (tempo_std/15, changes/4)
+    # were set for unrealistic extremes — typical Dead jam tempo drift is
+    # 4-8 BPM (not 15) and chord-change rate caps near 2/sec (not 4). Combined
+    # with a 1-second Gaussian over an already 3-second analysis window, real
+    # jams maxed at ~0.5 and never crossed the 0.65 improv_spike trigger.
+    # Recalibrated below: divisors match observed ranges, post-smooth sigma
+    # cut from FPS (1s) → FPS/4 (~0.25s) so peaks survive.
     print("Computing improvisation score ...")
     improv_window = int(3 * FPS)  # 3s analysis window
     improv_arr = np.zeros(n_frames)
@@ -389,16 +396,19 @@ def analyze_track(audio_path: Path, output_path: Path, stems_dir: Path | None = 
         if win_len < FPS:
             continue
 
-        # Tempo variance component
+        # Tempo variance: typical Dead jam drift is 4-8 BPM. /8 hits 1.0
+        # at ~8 BPM std (real jams), where /15 needed unrealistic 15 BPM
+        # std and never saturated.
         tempos = local_tempo_arr[lo_i:hi_i]
         tempo_std = np.std(tempos) if len(tempos) > 2 else 0.0
-        tempo_var = min(1.0, tempo_std / 15.0)
+        tempo_var = min(1.0, tempo_std / 8.0)
 
-        # Harmonic novelty: chord change rate
+        # Harmonic novelty: chord change rate. Realistic ceiling is ~2/sec
+        # (any faster is template noise, not real chord changes).
         chords_win = chord_idx_arr[lo_i:hi_i]
         changes = np.sum(np.diff(chords_win) != 0)
         changes_per_sec = changes / (win_len / FPS)
-        harm_novelty = min(1.0, changes_per_sec / 4.0)
+        harm_novelty = min(1.0, changes_per_sec / 2.0)
 
         # Beat instability × energy
         beat_stab = np.mean(beat_confidence_arr[lo_i:hi_i])
@@ -415,9 +425,11 @@ def analyze_track(audio_path: Path, output_path: Path, stems_dir: Path | None = 
             avg_tension * 0.20
         )
 
-    # Smooth with 2s Gaussian
+    # Light smoothing (~0.25s) — removes single-frame jitter but preserves
+    # the 3-5 second improv peaks the trigger system is gated on. The
+    # previous sigma=FPS (1s) flattened those peaks below threshold.
     from scipy.ndimage import gaussian_filter1d
-    improv_arr = gaussian_filter1d(improv_arr, sigma=FPS)
+    improv_arr = gaussian_filter1d(improv_arr, sigma=FPS / 4.0)
     improv_arr = np.clip(improv_arr, 0.0, 1.0)
     improv_arr = pad_or_trim_1d(improv_arr, n_frames)
     print(f"Improvisation: mean={improv_arr.mean():.3f}, max={improv_arr.max():.3f}")

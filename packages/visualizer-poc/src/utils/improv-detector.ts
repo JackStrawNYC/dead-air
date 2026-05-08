@@ -7,6 +7,11 @@
  *   - Beat instability × energy (30%): unstable rhythm at high energy = improv
  *   - Harmonic tension (20%): sustained high tension = exploratory
  *
+ * Calibration (May 2026): divisors recalibrated to match observed Dead-jam
+ * ranges (tempo_std/8 BPM, changes_per_sec/2). Prior values (15, 4) were
+ * unreachable — real jams maxed at ~0.5 and never crossed the 0.6/0.65
+ * trigger thresholds. KEEP IN SYNC with analyze.py improv_arr computation.
+ *
  * Used as fallback when Python-side improvisationScore is unavailable.
  * When Python score IS available, it takes precedence (computed from
  * librosa features with better temporal resolution).
@@ -43,8 +48,10 @@ export function estimateImprovisationScore(
   if (tempos.length > 2) {
     const mean = tempos.reduce((a, b) => a + b, 0) / tempos.length;
     const variance = tempos.reduce((sum, t) => sum + (t - mean) ** 2, 0) / tempos.length;
-    // Normalize: typical BPM variance is 0-100; score 0.3+ means significant drift
-    tempoVariance = Math.min(1, Math.sqrt(variance) / 15);
+    // Typical Dead jam tempo drift is 4-8 BPM std. /8 saturates at the
+    // realistic upper end; the prior /15 needed unrealistic drift and
+    // never saturated.
+    tempoVariance = Math.min(1, Math.sqrt(variance) / 8);
   }
 
   // 2. Harmonic novelty (25%)
@@ -58,9 +65,11 @@ export function estimateImprovisationScore(
       prevChord = quantized;
     }
   }
-  // Normalize: 0-2 changes per second is normal, 4+ is novel
+  // Realistic ceiling is ~2 changes/sec (any faster is template noise).
+  // Prior /4 made novelty unreachable in real Dead progressions where
+  // 1.5/sec is already a busy jam.
   const changesPerSecond = chordChanges / (count / 30);
-  const harmonicNovelty = Math.min(1, changesPerSecond / 4);
+  const harmonicNovelty = Math.min(1, changesPerSecond / 2);
 
   // 3. Beat instability × energy (30%)
   let beatStabilitySum = 0;
