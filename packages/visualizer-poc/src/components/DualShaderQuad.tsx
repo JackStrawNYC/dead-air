@@ -20,7 +20,7 @@ import { useEnvelopeValues } from "../data/EnvelopeContext";
 import { fxaaFrag } from "../shaders/shared/fxaa.glsl";
 import { gpuMonitor } from "../utils/gpu-monitor";
 import { DEFAULT_LIGHTING, type LightingState } from "../utils/lighting-context";
-import { createBaseUniforms, syncBaseUniforms, ERA_SATURATION, ERA_BRIGHTNESS, ERA_SEPIA } from "../utils/shader-uniforms";
+import { createBaseUniforms, syncBaseUniforms, ERA_SATURATION, ERA_BRIGHTNESS, ERA_SEPIA, ERA_BLACK_LIFT, ERA_CONTRAST_SCALE } from "../utils/shader-uniforms";
 import { useShowVisualSeed } from "../data/ShowVisualSeedContext";
 
 export type DualBlendMode =
@@ -81,6 +81,8 @@ export const DualShaderQuad: React.FC<Props> = ({
   const eraSaturation = ERA_SATURATION[eraKey] ?? 1.0;
   const eraBrightness = ERA_BRIGHTNESS[eraKey] ?? 1.0;
   const eraSepia = ERA_SEPIA[eraKey] ?? 0.0;
+  const eraBlackLift = ERA_BLACK_LIFT[eraKey] ?? 0.0;
+  const eraContrastScale = ERA_CONTRAST_SCALE[eraKey] ?? 1.0;
   const filmStock = deriveFilmStock(showCtx?.showSeed ?? 0);
   const venueProfile = getVenueProfile(showCtx?.venueType ?? "");
   const showVisualSeed = useShowVisualSeed();
@@ -203,7 +205,7 @@ export const DualShaderQuad: React.FC<Props> = ({
     heroTrigger, heroProgress, jamDensity, jamPhase, jamProgress,
     coherence, isLocked, peakOfShow,
     songProgress, shaderHoldProgress,
-    eraSaturation, eraBrightness, eraSepia,
+    eraSaturation, eraBrightness, eraSepia, eraBlackLift, eraContrastScale,
     filmStock, venueProfile,
     shaderWidth: width, shaderHeight: height,
     sceneConfig, envelope, lightingRef,

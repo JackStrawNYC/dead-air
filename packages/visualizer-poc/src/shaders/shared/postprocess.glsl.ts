@@ -363,7 +363,27 @@ ${
 
 ${
   eraGradingEnabled
-    ? `  // Era brightness + sepia tint
+    ? `  // Era film-stock character — direct (not via uShowGrain backdoor).
+  // The audit flagged 1972 vs 1977 as visually identical; this block
+  // applies per-era black-lift (older film can't hit pure black) and a
+  // contrast-curve scale (older film softer S-curve, digital harder)
+  // so eras read as distinct stocks even before sepia/brightness fire.
+  {
+    // Lifted blacks: floor scaled by era stock. primal=0.06 (warm super-8
+    // darkness), classic=0.02, digital eras=0. Pure floor so it doesn't
+    // fight the existing film-stock block downstream (which keys on grain).
+    if (uEraBlackLift > 0.001) {
+      col = max(col, vec3(uEraBlackLift));
+    }
+    // S-curve contrast scale around midpoint 0.5. < 1.0 = softer (primal,
+    // hiatus); > 1.0 = harder (touch_of_grey 80s). Pulls toward or away
+    // from midpoint by (1 - scale).
+    if (abs(uEraContrastScale - 1.0) > 0.005) {
+      vec3 mid = vec3(0.5);
+      col = mid + (col - mid) * uEraContrastScale;
+    }
+  }
+  // Era brightness + sepia tint
   col *= uEraBrightness;
   {
     float sepiaLuma = dot(col, vec3(0.299, 0.587, 0.114));

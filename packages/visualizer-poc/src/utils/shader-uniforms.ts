@@ -21,29 +21,63 @@ import type { VenueProfile } from "./venue-profiles";
 import type { ShowVisualSeed } from "./show-visual-seed";
 
 // ── Era constants (canonical source of truth) ──
+//
+// May 2026 audit: prior values (sat 0.88-1.10, brightness 0.95-1.01, sepia
+// 0.0-0.15) made 1972 and 1977 visually identical to a viewer — era was
+// just a hue tint. Widened below so each era reads as a distinct film
+// stock; black-lift and contrast-scale are NEW per-era uniforms that the
+// postprocess block consumes alongside the existing brightness/sepia
+// (real film stocks have lifted blacks and softer S-curves; digital is
+// clean and contrasty). Each era now reads:
+//
+//   primal    1965-1974 — old film, faded poster, lifted warm blacks
+//   classic   1976-1979 — peak Wall of Sound, polished, vivid
+//   hiatus    1975 — transitional, restrained
+//   touch_of_grey 1985-1989 — MTV-era pop, contrasty
+//   revival   1990-1995 — clean digital, neutral
 
 export const ERA_SATURATION: Record<string, number> = {
-  primal: 0.90,
-  classic: 1.05,
-  hiatus: 0.88,
-  touch_of_grey: 1.10,
-  revival: 0.98,
+  primal: 0.85,
+  classic: 1.10,
+  hiatus: 0.92,
+  touch_of_grey: 1.18,
+  revival: 1.00,
 };
 
 export const ERA_BRIGHTNESS: Record<string, number> = {
-  primal: 0.97,
-  classic: 1.0,
-  hiatus: 0.95,
-  touch_of_grey: 1.01,
-  revival: 1.0,
+  primal: 0.93,
+  classic: 1.04,
+  hiatus: 0.96,
+  touch_of_grey: 1.05,
+  revival: 1.00,
 };
 
 export const ERA_SEPIA: Record<string, number> = {
-  primal: 0.15,
-  classic: 0.06,
-  hiatus: 0.0,
-  touch_of_grey: 0.0,
-  revival: 0.0,
+  primal: 0.18,
+  classic: 0.05,
+  hiatus: 0.10,
+  touch_of_grey: 0.00,
+  revival: 0.00,
+};
+
+/** Lifted-blacks floor — older film stocks can't hit pure black; 0.06 ≈
+ *  warm darkness of 16mm super-8. Digital eras = 0. */
+export const ERA_BLACK_LIFT: Record<string, number> = {
+  primal: 0.06,
+  classic: 0.02,
+  hiatus: 0.04,
+  touch_of_grey: 0.00,
+  revival: 0.00,
+};
+
+/** S-curve contrast multiplier — older film has softer rolloff (< 1.0),
+ *  modern digital has higher contrast (> 1.0). 1.0 = neutral. */
+export const ERA_CONTRAST_SCALE: Record<string, number> = {
+  primal: 0.92,
+  classic: 1.05,
+  hiatus: 0.95,
+  touch_of_grey: 1.10,
+  revival: 1.00,
 };
 
 /** Reverse map: sectionTypeFloat (0-7) back to string for lighting context */
@@ -139,6 +173,10 @@ export interface UniformSyncData {
   eraSaturation: number;
   eraBrightness: number;
   eraSepia: number;
+  /** Per-era lifted-blacks floor — film stocks can't hit pure black. */
+  eraBlackLift: number;
+  /** Per-era S-curve contrast scale — older film softer, digital more contrasty. */
+  eraContrastScale: number;
   filmStock: FilmStockParams;
   venueProfile: VenueProfile;
   /** Shader internal resolution width (may differ from output width for downscaling) */
@@ -231,6 +269,8 @@ export function createBaseUniforms(
     uEraSaturation: { value: 1.0 },
     uEraBrightness: { value: 1.0 },
     uEraSepia: { value: 0.0 },
+    uEraBlackLift: { value: 0.0 },
+    uEraContrastScale: { value: 1.0 },
     uBloomThreshold: { value: 0.0 },
     uLensDistortion: { value: 0.0 },
     uGradingIntensity: { value: 1.0 },
@@ -319,7 +359,7 @@ export function syncBaseUniforms(
     tempo, musicalTime, climaxPhase, climaxIntensity,
     heroTrigger, heroProgress, jamDensity, jamPhase, jamProgress,
     coherence, isLocked, peakOfShow, songProgress, shaderHoldProgress,
-    eraSaturation, eraBrightness, eraSepia,
+    eraSaturation, eraBrightness, eraSepia, eraBlackLift, eraContrastScale,
     filmStock, venueProfile,
     shaderWidth, shaderHeight,
     sceneConfig, envelope, lightingRef,
@@ -382,6 +422,8 @@ export function syncBaseUniforms(
   u.uEraSaturation.value = eraSaturation;
   u.uEraBrightness.value = eraBrightness;
   u.uEraSepia.value = eraSepia;
+  u.uEraBlackLift.value = eraBlackLift;
+  u.uEraContrastScale.value = eraContrastScale;
   u.uBloomThreshold.value = -0.08 - smooth.energy * 0.18;
   u.uLensDistortion.value = 0.02 + smooth.energy * 0.06;
   u.uGradingIntensity.value = sceneConfig.gradingIntensity;

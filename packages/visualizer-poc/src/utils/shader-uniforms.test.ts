@@ -41,7 +41,7 @@ const EXPECTED_UNIFORM_NAMES = [
   "uJamPhase", "uJamProgress",
   // Palette / Color
   "uPalettePrimary", "uPaletteSecondary", "uPaletteSaturation",
-  "uEraSaturation", "uEraBrightness", "uEraSepia",
+  "uEraSaturation", "uEraBrightness", "uEraSepia", "uEraBlackLift", "uEraContrastScale",
   // Post-Process Control
   "uBloomThreshold", "uLensDistortion", "uGradingIntensity",
   // Melodic / Harmonic
@@ -123,7 +123,7 @@ function makeMinimalSyncData(): UniformSyncData {
     jamDensity: 0.5, jamPhase: -1, jamProgress: 0,
     coherence: 0.5, isLocked: false, peakOfShow: 0,
     songProgress: 0.5, shaderHoldProgress: 0.3,
-    eraSaturation: 1.0, eraBrightness: 1.0, eraSepia: 0.0,
+    eraSaturation: 1.0, eraBrightness: 1.0, eraSepia: 0.0, eraBlackLift: 0.0, eraContrastScale: 1.0,
     filmStock: { warmth: 0, contrast: 1, saturation: 0, grain: 1, bloom: 1 },
     venueProfile: { warmth: 0, vignette: 0.2, grainMult: 1, bloomMult: 1, overlayDensityMult: 1 },
     shaderWidth: 1920, shaderHeight: 1080,

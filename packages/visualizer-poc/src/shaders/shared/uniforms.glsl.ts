@@ -88,6 +88,8 @@ uniform float uPaletteSaturation;
 uniform float uEraSaturation;
 uniform float uEraBrightness;
 uniform float uEraSepia;
+uniform float uEraBlackLift;     // Per-era lifted-blacks floor (older film stocks)
+uniform float uEraContrastScale; // Per-era S-curve scale (< 1 softer, > 1 harder)
 
 // ─── Post-Process Control ───
 uniform float uBloomThreshold;
