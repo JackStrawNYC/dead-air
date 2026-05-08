@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   computeDrumsSpacePhase,
   classifyRawPhase,
+  getDrumsSpaceTreatment,
 } from "./drums-space-phase";
 import type { EnhancedFrameData } from "../data/types";
 
@@ -97,5 +98,71 @@ describe("drums-space-phase", () => {
       const phase = classifyRawPhase(0.25, 0.10, 0.30, 0.3, true, 0.6);
       expect(phase).toBe("reemergence");
     });
+  });
+});
+
+describe("getDrumsSpaceTreatment — space_ambient transcendent apex (audit Tier 1 #5)", () => {
+  it("early space_ambient (progress 0.3) is suppressed (existing behavior)", () => {
+    const t = getDrumsSpaceTreatment({
+      subPhase: "space_ambient",
+      phaseProgress: 0.3,
+      reemergenceProgress: 0,
+    });
+    expect(t.brightnessOffset).toBeLessThan(0);
+    expect(t.saturationOffset).toBeLessThan(0);
+  });
+
+  it("mid space_ambient (progress 0.6, before apex) stays in deep void", () => {
+    const t = getDrumsSpaceTreatment({
+      subPhase: "space_ambient",
+      phaseProgress: 0.6,
+      reemergenceProgress: 0,
+    });
+    // Pre-apex: brightness still negative (no apex lift yet)
+    expect(t.brightnessOffset).toBeLessThan(-0.10);
+  });
+
+  it("deep space_ambient (progress 0.85, in apex) LIFTS brightness", () => {
+    const early = getDrumsSpaceTreatment({
+      subPhase: "space_ambient",
+      phaseProgress: 0.5,
+      reemergenceProgress: 0,
+    });
+    const apex = getDrumsSpaceTreatment({
+      subPhase: "space_ambient",
+      phaseProgress: 0.85,
+      reemergenceProgress: 0,
+    });
+    expect(apex.brightnessOffset).toBeGreaterThan(early.brightnessOffset);
+    expect(apex.saturationOffset).toBeGreaterThan(early.saturationOffset);
+    expect(apex.hueShift).toBeGreaterThan(early.hueShift);
+  });
+
+  it("full space_ambient apex (progress 1.0) is brighter than baseline negative", () => {
+    const t = getDrumsSpaceTreatment({
+      subPhase: "space_ambient",
+      phaseProgress: 1.0,
+      reemergenceProgress: 0,
+    });
+    // Apex lift: brightnessOffset ends at +0.05 instead of -0.15
+    expect(t.brightnessOffset).toBeGreaterThanOrEqual(0.0);
+    expect(t.brightnessOffset).toBeLessThanOrEqual(0.10);
+    expect(t.maxOverlays).toBe(1); // one iconic atmospheric overlay surfaces
+  });
+
+  it("space_textural at high progress does NOT trigger apex (only space_ambient)", () => {
+    // The transcendent apex is intentionally exclusive to space_ambient —
+    // textural gets a softer treatment without the gold lift.
+    const ambient = getDrumsSpaceTreatment({
+      subPhase: "space_ambient",
+      phaseProgress: 1.0,
+      reemergenceProgress: 0,
+    });
+    const textural = getDrumsSpaceTreatment({
+      subPhase: "space_textural",
+      phaseProgress: 1.0,
+      reemergenceProgress: 0,
+    });
+    expect(ambient.brightnessOffset).toBeGreaterThan(textural.brightnessOffset);
   });
 });

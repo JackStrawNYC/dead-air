@@ -155,6 +155,28 @@ export function getDrumsSpaceTreatment(state: DrumsSpaceState): DrumsSpaceVisual
     treatment.maxOverlays = Math.round(1 + 2 * rp);
   }
 
+  // ─── SPACE_AMBIENT TRANSCENDENT APEX (audit Tier 1 #5) ───
+  // The audit identified the deepest Space passage as suppressed (-0.15
+  // brightness, -0.20 saturation) when it should feel transcendent — the
+  // "still point" of the show. After 70% of the way into space_ambient
+  // (the band has held the void for several seconds), gently LIFT both
+  // brightness and saturation so the moment glows like a "transcendent
+  // void" instead of crushing to near-black.
+  //
+  // Curve over phaseProgress 0.7 → 1.0:
+  //   brightness: -0.15 → +0.05 (gold-warm lift, ~+20% across the apex)
+  //   saturation: -0.20 → -0.05 (colors return to near-neutral)
+  //   maxOverlays: 0 → 1 (one iconic atmospheric overlay surfaces)
+  //   hueShift:   +20° → +35° (warmer toward the apex peak)
+  if (state.subPhase === "space_ambient" && progress > 0.7) {
+    const apex = (progress - 0.7) / 0.3; // 0..1 across the apex window
+    const apexLift = apex * apex * (3 - 2 * apex); // smoothstep
+    treatment.brightnessOffset = -0.15 + 0.20 * apexLift;
+    treatment.saturationOffset = -0.20 + 0.15 * apexLift;
+    treatment.hueShift = 20 + 15 * apexLift;
+    treatment.maxOverlays = apex > 0.5 ? 1 : 0;
+  }
+
   return treatment;
 }
 
