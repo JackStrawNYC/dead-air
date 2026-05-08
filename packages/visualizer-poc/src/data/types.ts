@@ -77,6 +77,15 @@ export interface EnhancedFrameData {
   vocalPitch?: number;
   /** Vocal pitch confidence from isolated vocal stem (0-1) */
   vocalPitchConfidence?: number;
+  // ─── Krumhansl-Schmuckler key detection (Tier 3) ───
+  /** Tonic note normalized 0..1 (corresponds to indices 0..11 = C..B) */
+  keyTonic?: number;
+  /** 0 = minor key, 1 = major key */
+  keyMode?: number;
+  /** Confidence of the detected key, 0..1 */
+  keyConfidence?: number;
+  /** 1 only at the boundary frame of a detected key change, else 0 */
+  keyChange?: number;
   /** CLAP semantic score: psychedelic (0-1) */
   semantic_psychedelic?: number;
   /** CLAP semantic score: aggressive (0-1) */

@@ -64,6 +64,11 @@ export const EnhancedFrameDataSchema = z.object({
   timbralFlux: z.number().optional(),
   vocalPitch: z.number().optional(),
   vocalPitchConfidence: z.number().optional(),
+  // Krumhansl-Schmuckler key detection (Tier 3)
+  keyTonic: z.number().optional(),
+  keyMode: z.number().optional(),
+  keyConfidence: z.number().optional(),
+  keyChange: z.number().optional(),
   semantic_psychedelic: z.number().optional(),
   semantic_aggressive: z.number().optional(),
   semantic_tender: z.number().optional(),

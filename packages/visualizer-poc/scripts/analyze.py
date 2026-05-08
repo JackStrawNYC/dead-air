@@ -386,6 +386,78 @@ def analyze_track(audio_path: Path, output_path: Path, stems_dir: Path | None = 
     chord_confidence_arr = pad_or_trim_1d(chord_confidence_arr, n_frames)
     print(f"Chord detection: {len(set(chord_label_arr))} unique chords, avg tension={harmonic_tension_arr.mean():.3f}")
 
+    # --- Key detection (Krumhansl-Schmuckler) ---
+    # Per-window estimate (5 seconds), interpolated to per-frame.
+    # Krumhansl-Schmuckler correlates the smoothed chroma vector against
+    # 24 key profiles (12 major + 12 minor) and picks the highest match.
+    # Source: same algorithm exists in analyze_audio.py:16-40 but was never
+    # integrated into the main pipeline (audit Tier 3).
+    print("Detecting song key (Krumhansl-Schmuckler) ...")
+    KS_MAJOR = np.array(
+        [6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88]
+    )
+    KS_MINOR = np.array(
+        [6.33, 2.68, 3.52, 5.38, 2.60, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17]
+    )
+
+    def estimate_key_window(chroma_vec):
+        """Returns (tonic_idx 0-11, mode 0=minor 1=major, confidence 0-1)."""
+        s = chroma_vec.sum()
+        if s < 1e-3:
+            return 0, 1, 0.0
+        norm = chroma_vec / s
+        best_corr = -2.0
+        best_tonic = 0
+        best_mode = 1
+        for i in range(12):
+            rotated = np.roll(norm, -i)
+            cm = float(np.corrcoef(rotated, KS_MAJOR)[0, 1])
+            cn = float(np.corrcoef(rotated, KS_MINOR)[0, 1])
+            if cm > best_corr:
+                best_corr = cm
+                best_tonic = i
+                best_mode = 1
+            if cn > best_corr:
+                best_corr = cn
+                best_tonic = i
+                best_mode = 0
+        # Map correlation [-1, 1] to confidence [0, 1] with a soft floor —
+        # values < 0.3 are essentially noise, values > 0.7 are strong.
+        conf = max(0.0, min(1.0, (best_corr - 0.2) / 0.6))
+        return best_tonic, best_mode, conf
+
+    key_window_frames = int(5 * FPS)  # 5s windows
+    key_tonic_arr = np.zeros(n_frames, dtype=float)
+    key_mode_arr = np.zeros(n_frames, dtype=float)
+    key_confidence_arr = np.zeros(n_frames, dtype=float)
+    key_change_arr = np.zeros(n_frames, dtype=int)
+    prev_tonic, prev_mode = -1, -1
+    for w_start in range(0, n_frames, key_window_frames // 2):  # 50% overlap
+        w_end = min(n_frames, w_start + key_window_frames)
+        if w_end - w_start < FPS:
+            continue
+        # Use chroma_smoothed if available, else raw chroma
+        win_chroma = chroma_smoothed[:, w_start:min(w_end, chroma_smoothed.shape[1])]
+        if win_chroma.shape[1] < 1:
+            continue
+        avg_chroma = win_chroma.mean(axis=1)
+        tonic, mode, conf = estimate_key_window(avg_chroma)
+        # Key-change flag: only fire once when key actually shifts AND
+        # confidence is high enough to trust the call.
+        if conf > 0.5 and (tonic != prev_tonic or mode != prev_mode):
+            if prev_tonic >= 0:
+                key_change_arr[w_start] = 1
+            prev_tonic = tonic
+            prev_mode = mode
+        # Fill the window
+        for i in range(w_start, w_end):
+            key_tonic_arr[i] = tonic / 11.0  # normalize 0-1
+            key_mode_arr[i] = float(mode)     # 0 minor, 1 major
+            key_confidence_arr[i] = conf
+    print(f"Key detection: tonic mean={key_tonic_arr.mean():.3f}, "
+          f"mode mean={key_mode_arr.mean():.3f}, conf mean={key_confidence_arr.mean():.3f}, "
+          f"key changes={int(key_change_arr.sum())}")
+
     # --- Improvisation score ---
     # Composite score (0-1) from tempo variance (25%), harmonic novelty (25%),
     # beat instability × energy (30%), harmonic tension (20%).
@@ -706,6 +778,11 @@ def analyze_track(audio_path: Path, output_path: Path, stems_dir: Path | None = 
             "timbralFlux": round(float(timbral_flux_arr[i]), 4),
             "vocalPitch": round(float(vocal_pitch_arr[i]), 4),
             "vocalPitchConfidence": round(float(vocal_pitch_conf_arr[i]), 4),
+            # Krumhansl-Schmuckler key detection (Tier 3)
+            "keyTonic": round(float(key_tonic_arr[i]), 4),       # 0..1 normalized 0-11 tonic index
+            "keyMode": round(float(key_mode_arr[i]), 1),         # 0=minor, 1=major
+            "keyConfidence": round(float(key_confidence_arr[i]), 3),
+            "keyChange": int(key_change_arr[i]),                  # 1 only on key-change boundary frame
         }
         # Add stem-specific fields when available
         if stem_data and stem_data["available"]:
