@@ -288,17 +288,38 @@ export function getModeForSection(
           }
           if (candidates.length === 0) candidates = affinityPool;
 
-          // Preferred mode hard ceiling: song identity dominates shader selection.
-          // When preferredModes exist, they are a HARD ceiling — only preferred
-          // shaders can be selected, weighted 5x for show modes. This ensures
-          // Dark Star looks like Dark Star, not random rotation.
+          // Preferred mode soft ceiling (audit Tier 1 #6): song identity
+          // dominates shader selection — but try to morph musically.
+          //
+          // Prior behavior was a HARD ceiling (only preferredModes allowed),
+          // which skipped TRANSITION_AFFINITY morphing and made verse→chorus
+          // jumps feel arbitrary. New behavior:
+          //   1. preferred ∩ affinityPool — preserves identity AND smooth
+          //      morph from the previous shader. This is the win case.
+          //   2. If intersection is starved (< 2 modes), fall through to the
+          //      full preferredModes pool (preserves identity, sacrifices
+          //      morph) — the prior hard-ceiling behavior.
+          //   3. preferredModes still get the 5x show-mode + 2x remaining
+          //      weighting so the song's signature dominates the rotation.
           if (songIdentity?.preferredModes?.length && seed !== undefined) {
             const showModes = getShowModesForSong(songIdentity.preferredModes, seed, song.title);
             const showModeSet = new Set(showModes);
             const remainingPreferred = songIdentity.preferredModes.filter((m) => !showModeSet.has(m));
+            // Try the affinity-aware path first: preferred ∩ affinityPool
+            const affinityPreferredShow = showModes.filter((m) => affinityPool.includes(m));
+            const affinityPreferredRem = remainingPreferred.filter((m) => affinityPool.includes(m));
+            const totalAffinityPreferred = affinityPreferredShow.length + affinityPreferredRem.length;
+
             const weightedPool: VisualMode[] = [];
-            for (const m of showModes) { for (let i = 0; i < 5; i++) weightedPool.push(m); }
-            for (const m of remainingPreferred) { for (let i = 0; i < 2; i++) weightedPool.push(m); }
+            if (totalAffinityPreferred >= 2) {
+              // Win case — preserves identity AND musical morphing.
+              for (const m of affinityPreferredShow) { for (let i = 0; i < 5; i++) weightedPool.push(m); }
+              for (const m of affinityPreferredRem) { for (let i = 0; i < 2; i++) weightedPool.push(m); }
+            } else {
+              // Fallback — affinity intersection too thin; full preferred pool.
+              for (const m of showModes) { for (let i = 0; i < 5; i++) weightedPool.push(m); }
+              for (const m of remainingPreferred) { for (let i = 0; i < 2; i++) weightedPool.push(m); }
+            }
             if (weightedPool.length > 0) candidates = weightedPool;
           }
 
