@@ -1,6 +1,64 @@
 import { describe, it, expect } from "vitest";
-import { getSectionVocabulary, blendVocabularies } from "./section-vocabulary";
+import { getSectionVocabulary, blendVocabularies, getSectionShaderFamily, SECTION_TYPE_FAMILIES } from "./section-vocabulary";
 import type { SectionVocabulary } from "./section-vocabulary";
+
+const KNOWN_BLOCKED = new Set([
+  "combustible_voronoi", "creation", "fluid_2d", "spectral_bridge",
+  "obsidian_mirror", "amber_drift", "volumetric_clouds", "volumetric_smoke",
+  "volumetric_nebula", "digital_rain", "protean_clouds", "seascape",
+  "warm_nebula", "particle_nebula", "cosmic_voyage",
+]);
+const BUSTED_TIER = new Set([
+  "voronoi_flow", "psychedelic_garden", "bioluminescence", "memorial_drift",
+  "smoke_rings", "coral_reef", "smoke_and_mirrors", "flower_field",
+  "particle_nebula", "bloom_explosion", "inferno", "earthquake_fissure",
+  "lava_flow", "desert_road",
+]);
+
+describe("SECTION_TYPE_FAMILIES — pool integrity (Tier 1 #3)", () => {
+  const types = ["verse", "chorus", "jam", "space", "solo", "bridge", "intro", "outro"];
+
+  it.each(types)("%s family has at least 4 candidates", (t) => {
+    expect(SECTION_TYPE_FAMILIES[t].length).toBeGreaterThanOrEqual(4);
+  });
+
+  it.each(types)("%s family contains no blocked shaders", (t) => {
+    const blocked = SECTION_TYPE_FAMILIES[t].filter((s) => KNOWN_BLOCKED.has(s));
+    expect(blocked, `${t} has blocked: ${blocked.join(", ")}`).toEqual([]);
+  });
+
+  it.each(types)("%s family contains no BUSTED shaders", (t) => {
+    const busted = SECTION_TYPE_FAMILIES[t].filter((s) => BUSTED_TIER.has(s));
+    expect(busted, `${t} has BUSTED: ${busted.join(", ")}`).toEqual([]);
+  });
+
+  it("space family leans cosmic/void (audit-flagged sacred moment)", () => {
+    expect(SECTION_TYPE_FAMILIES.space).toContain("deep_ocean");
+    expect(SECTION_TYPE_FAMILIES.space).toContain("void_light");
+    expect(SECTION_TYPE_FAMILIES.space).toContain("cosmic_dust");
+  });
+
+  it("verse family leans intimate/warm (low-motion sections)", () => {
+    expect(SECTION_TYPE_FAMILIES.verse).toContain("porch_twilight");
+  });
+
+  it("solo family leans dramatic (high-energy sections)", () => {
+    expect(SECTION_TYPE_FAMILIES.solo).toContain("electric_arc");
+  });
+});
+
+describe("getSectionShaderFamily", () => {
+  it("returns family for known section types", () => {
+    expect(getSectionShaderFamily("jam")).toEqual(SECTION_TYPE_FAMILIES.jam);
+    expect(getSectionShaderFamily("VERSE")).toEqual(SECTION_TYPE_FAMILIES.verse);
+  });
+
+  it("returns null for unknown / undefined", () => {
+    expect(getSectionShaderFamily(undefined)).toBeNull();
+    expect(getSectionShaderFamily("")).toBeNull();
+    expect(getSectionShaderFamily("foo_bar")).toBeNull();
+  });
+});
 
 describe("getSectionVocabulary", () => {
   it("returns verse vocabulary", () => {

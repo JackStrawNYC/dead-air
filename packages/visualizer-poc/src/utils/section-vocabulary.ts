@@ -91,6 +91,42 @@ const VOCABULARIES: Record<string, SectionVocabulary> = {
   },
 };
 
+/** Per-section-type preferred shader family. Soft bias (not a hard gate)
+ *  — section type is always present; a hard gate would be too aggressive
+ *  and would conflict with stem / semantic / song-identity routing.
+ *  Used by getModeForSection to weight matching shaders 2x in the pool.
+ *
+ *  All entries are post-blocklist + non-BUSTED, drawn from the catalog of
+ *  bar-setter atmospheric shaders. Each section's family is chosen so the
+ *  visual character matches the musical character:
+ *
+ *    verse / intro / outro → still / intimate (low motion)
+ *    chorus / solo         → vivid / dramatic (high contrast)
+ *    jam                   → expansive / exploratory (deep + drift)
+ *    space                 → void / transcendent (still + cosmic)
+ *    bridge                → transitional (atmospheric)
+ */
+import type { VisualMode } from "../data/types";
+
+export const SECTION_TYPE_FAMILIES: Record<string, VisualMode[]> = {
+  verse:  ["porch_twilight", "ember_meadow", "aurora", "nimitz_aurora", "honeycomb_cathedral"],
+  chorus: ["fractal_temple", "sacred_geometry", "mandala_engine", "dance_floor_prism", "kaleidoscope"],
+  jam:    ["deep_ocean", "cosmic_dust", "fractal_temple", "nimitz_aurora", "void_light"],
+  space:  ["deep_ocean", "cosmic_dust", "void_light", "dark_star_void", "nimitz_aurora", "fractal_temple"],
+  solo:   ["electric_arc", "dance_floor_prism", "mandala_engine", "fractal_temple", "kaleidoscope"],
+  bridge: ["aurora", "nimitz_aurora", "fractal_temple", "honeycomb_cathedral"],
+  intro:  ["aurora", "ember_meadow", "porch_twilight", "fractal_temple", "nimitz_aurora"],
+  outro:  ["porch_twilight", "ember_meadow", "aurora", "nimitz_aurora"],
+};
+
+/** Get the preferred shader family for a section type. Returns null when
+ *  the type is unknown — caller falls through to existing routing. */
+export function getSectionShaderFamily(sectionType: string | undefined): VisualMode[] | null {
+  if (!sectionType) return null;
+  const family = SECTION_TYPE_FAMILIES[sectionType.toLowerCase()];
+  return family && family.length > 0 ? family : null;
+}
+
 /** Default vocabulary for unknown section types */
 const DEFAULT_VOCABULARY: SectionVocabulary = {
   overlayDensityMult: 1.0,

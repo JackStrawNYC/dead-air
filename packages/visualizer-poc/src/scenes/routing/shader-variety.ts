@@ -17,6 +17,7 @@ import { detectChordMood } from "../../utils/chord-mood";
 import { estimateImprovisationScore } from "../../utils/improv-detector";
 import { getSectionSpectralFamily } from "../../utils/spectral-section";
 import { computeSemanticProfile, extractSemanticScores, pickSemanticHardGate } from "../../utils/semantic-router";
+import { getSectionShaderFamily } from "../../utils/section-vocabulary";
 import { detectGroove } from "../../utils/groove-detector";
 import { AUTO_VARIETY_MIN_SECTION } from "./crossfade-timing";
 import { scoreDiversityBonus, type VisualMemoryState } from "../../utils/visual-memory";
@@ -367,6 +368,24 @@ export function getModeForSection(
         for (const m of showModes) { for (let i = 0; i < 5; i++) weightedPool.push(m); }
         for (const m of remainingPreferred) { for (let i = 0; i < 2; i++) weightedPool.push(m); }
         if (weightedPool.length > 0) filteredPool = weightedPool;
+      }
+
+      // Section-type shader-family soft bias — verse / chorus / jam / space /
+      // solo / bridge / intro / outro each prefer a curated family per
+      // SECTION_TYPE_FAMILIES. Soft 2x weight (not a hard gate — section
+      // type is always present, hard-gating would conflict with stem /
+      // semantic / song-identity layers above). Reads sectionType from the
+      // mid-section frame for stability.
+      if (frames && section) {
+        const midIdx = Math.min(Math.floor((section.frameStart + section.frameEnd) / 2), frames.length - 1);
+        const sectionType = frames[midIdx]?.sectionType;
+        const sectionFamily = getSectionShaderFamily(sectionType);
+        if (sectionFamily) {
+          const matches = sectionFamily.filter((m) => filteredPool.includes(m));
+          if (matches.length > 0) {
+            filteredPool = [...filteredPool, ...matches, ...matches]; // 2x weight
+          }
+        }
       }
 
       // Stem section bias: route shaders by what the band is doing
