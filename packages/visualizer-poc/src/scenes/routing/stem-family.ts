@@ -50,6 +50,7 @@ export const STEM_FAMILY_POOLS: Record<StemDominant, VisualMode[]> = {
     "sacred_geometry",        // ritual hex lattice
     "dance_floor_prism",      // bright Veneta-era ritual
     "clockwork_temple",       // tribal architecture
+    "concert_lighting",       // Dead-show stage rig — PAR cans + crowd
   ],
 
   // Bobby Weir — rhythm guitar, grounded amber, steady driving
@@ -59,6 +60,7 @@ export const STEM_FAMILY_POOLS: Record<StemDominant, VisualMode[]> = {
     "fractal_temple",         // bar-setter, structured
     "honeycomb_cathedral",    // bar-setter, tonal grounding
     "aurora",                 // soft warm drift
+    "concert_lighting",       // Bobby holds it down — grounded stage feel
   ],
 
   // Vocals (any singer) — human warmth, intimacy
