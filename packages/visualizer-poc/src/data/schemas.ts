@@ -73,6 +73,8 @@ export const EnhancedFrameDataSchema = z.object({
   silenceScore: z.number().optional(),
   applauseScore: z.number().optional(),
   musicScore: z.number().optional(),
+  // Vocal-vs-instrumental energy ratio (Tier 3)
+  vocalEnergyRatio: z.number().optional(),
   semantic_psychedelic: z.number().optional(),
   semantic_aggressive: z.number().optional(),
   semantic_tender: z.number().optional(),

@@ -93,6 +93,9 @@ export interface EnhancedFrameData {
   applauseScore?: number;
   /** Music present: tracked beats + non-flat spectrum + nontrivial energy */
   musicScore?: number;
+  /** Vocal share of tonal energy: vocalRms / (vocalRms + otherRms + bassRms).
+   *  0..1 — distinguishes "Jerry sings" (~1) from "Jerry solos" (~0). Tier 3. */
+  vocalEnergyRatio?: number;
   /** CLAP semantic score: psychedelic (0-1) */
   semantic_psychedelic?: number;
   /** CLAP semantic score: aggressive (0-1) */

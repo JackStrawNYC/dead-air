@@ -838,15 +838,32 @@ def analyze_track(audio_path: Path, output_path: Path, stems_dir: Path | None = 
         }
         # Add stem-specific fields when available
         if stem_data and stem_data["available"]:
-            frame["stemBassRms"] = round(float(stem_data["bassRms"][i]), 4)
+            bass_rms = float(stem_data["bassRms"][i])
+            frame["stemBassRms"] = round(bass_rms, 4)
             frame["stemDrumOnset"] = round(float(stem_data["drumOnset"][i]), 4)
             frame["stemDrumBeat"] = i in stem_data["drumBeatSet"]
+            vocal_rms = 0.0
+            other_rms = 0.0
             if "vocalRms" in stem_data:
-                frame["stemVocalRms"] = round(float(stem_data["vocalRms"][i]), 4)
+                vocal_rms = float(stem_data["vocalRms"][i])
+                frame["stemVocalRms"] = round(vocal_rms, 4)
                 frame["stemVocalPresence"] = bool(stem_data["vocalPresence"][i])
             if "otherRms" in stem_data:
-                frame["stemOtherRms"] = round(float(stem_data["otherRms"][i]), 4)
+                other_rms = float(stem_data["otherRms"][i])
+                frame["stemOtherRms"] = round(other_rms, 4)
                 frame["stemOtherCentroid"] = round(float(stem_data["otherCentroid"][i]), 4)
+            # Vocal-vs-instrumental ratio (Tier 3): vocalEnergyRatio of total
+            # tonal-source energy (vocal + other + bass). Drums excluded
+            # because they're not part of the "who's playing what" signal.
+            # 1.0 = pure vocal (Garcia singing acapella), 0.0 = pure instrumental
+            # (Garcia soloing or band jamming), 0.5 = balanced. Distinguishes
+            # "Jerry sings" from "Jerry solos" — useful for vocal-aware
+            # routing/grading.
+            tonal_total = vocal_rms + other_rms + bass_rms
+            if tonal_total > 1e-4:
+                frame["vocalEnergyRatio"] = round(vocal_rms / tonal_total, 4)
+            else:
+                frame["vocalEnergyRatio"] = 0.0
         frames.append(frame)
 
     meta = {
