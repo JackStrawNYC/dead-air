@@ -2826,6 +2826,20 @@ async function main() {
       "cosmic_voyage", "solar_flare", "forest",
       "dual_blend", "dual_shader", "smoke_and_mirrors", "molten_glass",
       "particle_burst",
+      // ─── BUSTED tier — cost monsters (audit Tier 2 cull) ───
+      // Each takes > 2.4s/frame at 4K; multi-minute jam holds single-
+      // handedly bottleneck a render. inferno (80ms) kept off-list because
+      // drums-space-router explicitly opts it in for Drums (iconic).
+      "voronoi_flow",          // 494ms p95
+      "psychedelic_garden",    // 353ms p95
+      "smoke_rings",           // 237ms p95
+      "coral_reef",            // 129ms p95
+      "flower_field",          // 109ms p95
+      "memorial_drift",        // 103ms p95
+      "bloom_explosion",       //  85ms p95
+      "earthquake_fissure",    //  73ms p95
+      "lava_flow",             //  78ms p95
+      "desert_road",           //  68ms p95
     ]);
     // Identity-only shaders: hand-crafted song-specific variants that should
     // ONLY be picked when a songIdentity explicitly names them in

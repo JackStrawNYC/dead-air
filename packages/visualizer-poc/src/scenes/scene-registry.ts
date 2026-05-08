@@ -1092,6 +1092,22 @@ export function getComplement(mode: VisualMode): VisualMode {
 // intentionally ALLOWED — the stem/duration/narrative bias layers reference them,
 // and blocking them here made those biases dead code.
 const AUTO_SELECT_BLOCKLIST: Set<VisualMode> = new Set([
+  // ═══ BUSTED tier — cost-monster shaders (audit Tier 2 cull) ═══
+  // p95 > 66ms @ 360p extrapolates to > 2.4s/frame at 4K. During multi-
+  // minute jam holds these single-handedly bottleneck a render. inferno
+  // (80ms) is iconic for Drums and explicitly opted-in by drums-space-router;
+  // the rest are pure cost with no irreplaceable visual signature.
+  "voronoi_flow",          // 494ms p95 — top offender, ~4s/frame at 4K
+  "psychedelic_garden",    // 353ms p95
+  "smoke_rings",           // 237ms p95
+  "coral_reef",            // 129ms p95
+  "flower_field",          // 109ms p95
+  "memorial_drift",        // 103ms p95
+  "bloom_explosion",       //  85ms p95
+  "earthquake_fissure",    //  73ms p95
+  "lava_flow",             //  78ms p95
+  "desert_road",           //  68ms p95
+
   // ═══ C tier: genuinely weak — flat, generic, or cliche ═══
   "combustible_voronoi", "creation", "fluid_2d",
   "spectral_bridge",       // 2D HSL bands, screensaver-tier
