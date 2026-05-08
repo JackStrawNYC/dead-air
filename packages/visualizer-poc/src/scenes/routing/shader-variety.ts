@@ -22,6 +22,7 @@ import { AUTO_VARIETY_MIN_SECTION } from "./crossfade-timing";
 import { scoreDiversityBonus, type VisualMemoryState } from "../../utils/visual-memory";
 import { pickDrumsSpaceMode } from "./drums-space-router";
 import type { DrumsSpaceSubPhase } from "../../utils/drums-space-phase";
+import { pickStemFamilyPool } from "./stem-family";
 
 /**
  * Safe shaders whitelist — validate chosen mode at the end.
@@ -144,6 +145,10 @@ export function getModeForSection(
   visualMemory?: VisualMemoryState,
   showShaderPool?: VisualMode[],
   drumsSpacePhase?: DrumsSpaceSubPhase,
+  /** When stem dominance is strong (>0.6), restricts pool to the
+   *  musician's family. Soft (low-confidence) bias remains via stemDominant
+   *  string in the existing weighting code below. */
+  stemDominantConfidence?: number,
 ): VisualMode {
   // Explicit override always wins
   const override = song.sectionOverrides?.find((o) => o.sectionIndex === sectionIndex);
@@ -156,6 +161,25 @@ export function getModeForSection(
   if (drumsSpacePhase) {
     const ds = pickDrumsSpaceMode(drumsSpacePhase, seed ?? 0, songIdentity, showShaderPool);
     return validateSafe(ds, song.defaultMode);
+  }
+
+  // Strong stem dominance hard-gate — when one musician unmistakably drives
+  // the section (confidence > 0.6), restrict to their shader family. Phil's
+  // bass bombs → indigo deep; Jerry's golden leads → aurora cathedral;
+  // drums lock → tribal geometry. Song identity (preferredModes) still wins
+  // — if curated identity is set, keep the soft-bias path below.
+  if (!songIdentity?.preferredModes?.length && sectionIndex > 0) {
+    const stemFamily = pickStemFamilyPool(stemDominant, stemDominantConfidence);
+    if (stemFamily && stemFamily.length > 0) {
+      // Filter to show pool when provided so we never pick a non-renderable
+      // shader for this show.
+      const filtered = showShaderPool && showShaderPool.length > 0
+        ? stemFamily.filter((m) => showShaderPool.includes(m))
+        : stemFamily;
+      const candidates = filtered.length > 0 ? filtered : stemFamily;
+      const rng = seededRandom((seed ?? 0) + sectionIndex * 7919 + 99991);
+      return validateSafe(candidates[Math.floor(rng() * candidates.length)], song.defaultMode);
+    }
   }
 
   // Section 0: use first authored preferredMode if available, else default.

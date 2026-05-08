@@ -1021,6 +1021,7 @@ export const SongVisualizer: React.FC<SongVisualizerProps> = (props) => {
               trackNumber={props.song.trackNumber ?? 1}
               stemInterplayMode={stemInterplay.mode}
               stemDominant={stemCharacter.dominant}
+              stemDominantConfidence={stemCharacter.confidence}
               itForceTranscendentShader={itState.forceTranscendentShader}
               reactiveState={reactiveState}
               visualMemory={visualMemory}

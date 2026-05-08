@@ -142,6 +142,10 @@ interface Props {
   stemInterplayMode?: InterplayMode;
   /** Dominant stem musician for shader pool bias */
   stemDominant?: string;
+  /** 0-1 confidence that the dominant musician truly drives the mix.
+   *  >= 0.6 hard-restricts pool to the musician's family (stem-family.ts);
+   *  < 0.6 keeps the existing soft-bias path. */
+  stemDominantConfidence?: number;
   /** Force transcendent shader (from IT response deep coherence lock) */
   itForceTranscendentShader?: boolean;
   /** Reactive trigger state from mid-section audio analysis */
@@ -154,7 +158,7 @@ interface Props {
   showShaderPool?: VisualMode[];
 }
 
-export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, seed, jamDensity, deadAirMode, deadAirFactor, era, coherenceIsLocked, usedShaderModes, shaderModeLastUsed, drumsSpacePhase, songIdentity, stemSection, songDuration, palette: paletteProp, segueIn, isSacredSegueIn, isInSuiteMiddle, setNumber, jamEvolution, jamPhaseBoundaries, jamCycle, jamPhaseShaders, climaxPhase: climaxPhaseProp, trackNumber, stemInterplayMode, stemDominant, itForceTranscendentShader, reactiveState, visualMemory, cameraProfile, showShaderPool }) => {
+export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, seed, jamDensity, deadAirMode, deadAirFactor, era, coherenceIsLocked, usedShaderModes, shaderModeLastUsed, drumsSpacePhase, songIdentity, stemSection, songDuration, palette: paletteProp, segueIn, isSacredSegueIn, isInSuiteMiddle, setNumber, jamEvolution, jamPhaseBoundaries, jamCycle, jamPhaseShaders, climaxPhase: climaxPhaseProp, trackNumber, stemInterplayMode, stemDominant, stemDominantConfidence, itForceTranscendentShader, reactiveState, visualMemory, cameraProfile, showShaderPool }) => {
   const frame = useCurrentFrame();
   const palette = paletteProp ?? song.palette;
 
@@ -203,7 +207,7 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
   const reactiveResult = renderReactiveTrigger(reactiveState, coherenceIsLocked, deadAirFactor, song, songIdentity, seed, currentSectionIdx, sections, era, usedShaderModes, stemSection, frames, songDuration, setNumber, trackNumber, shaderModeLastUsed, stemDominant, palette, tempo, jamDensity, frame, renderMode, getModeForSection, lastReactiveModeRef, reactiveExitRef);
   if (reactiveResult) return reactiveResult;
 
-  const currentMode = getModeForSection(song, currentSectionIdx, sections, seed, era, coherenceIsLocked, usedShaderModes, songIdentity, stemSection, frames, songDuration, setNumber, trackNumber, shaderModeLastUsed, stemDominant, visualMemory, showShaderPool);
+  const currentMode = getModeForSection(song, currentSectionIdx, sections, seed, era, coherenceIsLocked, usedShaderModes, songIdentity, stemSection, frames, songDuration, setNumber, trackNumber, shaderModeLastUsed, stemDominant, visualMemory, showShaderPool, undefined, stemDominantConfidence);
 
   // ─── Reactive exit crossfade — delegated to ReactiveShaderRouter
   const reactiveExitResult = renderReactiveExitCrossfade(reactiveExitRef, frame, currentMode, frames, sections, palette, tempo, jamDensity, renderMode);
@@ -225,7 +229,7 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
   // Crossfade INTO this section (from previous) — beat-synced when possible
   // High energy delta transitions (>0.15) use DualShaderQuad for organic GPU blending
   if (prevSectionIdx >= 0 && !suppressCrossfade) {
-    const prevMode = getModeForSection(song, prevSectionIdx, sections, seed, era, false, usedShaderModes, songIdentity, stemSection, frames, songDuration, setNumber, trackNumber, shaderModeLastUsed, stemDominant, visualMemory, showShaderPool);
+    const prevMode = getModeForSection(song, prevSectionIdx, sections, seed, era, false, usedShaderModes, songIdentity, stemSection, frames, songDuration, setNumber, trackNumber, shaderModeLastUsed, stemDominant, visualMemory, showShaderPool, undefined, stemDominantConfidence);
     if (prevMode !== currentMode) {
       // ─── cutsPermitted gate: section types that forbid cuts suppress all normal transitions
       const incomingSectionType = frames[Math.min(frame, frames.length - 1)]?.sectionType;
@@ -311,7 +315,7 @@ export const SceneRouter: React.FC<Props> = ({ frames, sections, song, tempo, se
   // Crossfade OUT of this section (to next) — beat-synced when possible
   // High energy delta transitions use DualShaderQuad for organic GPU blending
   if (nextSectionIdx < sections.length) {
-    const nextMode = getModeForSection(song, nextSectionIdx, sections, seed, era, false, usedShaderModes, songIdentity, stemSection, frames, songDuration, setNumber, trackNumber, shaderModeLastUsed, stemDominant, visualMemory, showShaderPool);
+    const nextMode = getModeForSection(song, nextSectionIdx, sections, seed, era, false, usedShaderModes, songIdentity, stemSection, frames, songDuration, setNumber, trackNumber, shaderModeLastUsed, stemDominant, visualMemory, showShaderPool, undefined, stemDominantConfidence);
     if (nextMode !== currentMode) {
       // ─── cutsPermitted gate: section types that forbid cuts suppress all normal transitions
       const outgoingSectionType = frames[Math.min(frame, frames.length - 1)]?.sectionType;
