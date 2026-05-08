@@ -69,6 +69,10 @@ export const EnhancedFrameDataSchema = z.object({
   keyMode: z.number().optional(),
   keyConfidence: z.number().optional(),
   keyChange: z.number().optional(),
+  // Silence / applause classifier (Tier 3)
+  silenceScore: z.number().optional(),
+  applauseScore: z.number().optional(),
+  musicScore: z.number().optional(),
   semantic_psychedelic: z.number().optional(),
   semantic_aggressive: z.number().optional(),
   semantic_tender: z.number().optional(),

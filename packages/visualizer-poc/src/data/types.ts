@@ -86,6 +86,13 @@ export interface EnhancedFrameData {
   keyConfidence?: number;
   /** 1 only at the boundary frame of a detected key change, else 0 */
   keyChange?: number;
+  // ─── Silence / applause classifier (Tier 3) ───
+  /** Silence between songs: rms<0.05 + low beat-conf + low onset, 0..1 */
+  silenceScore?: number;
+  /** Audience applause: mid-energy broadband flat spectrum + low beat-conf */
+  applauseScore?: number;
+  /** Music present: tracked beats + non-flat spectrum + nontrivial energy */
+  musicScore?: number;
   /** CLAP semantic score: psychedelic (0-1) */
   semantic_psychedelic?: number;
   /** CLAP semantic score: aggressive (0-1) */
