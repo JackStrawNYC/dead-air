@@ -3164,7 +3164,11 @@ async function main() {
       overlayDensityMults[i] = (frameAnalysis.narrative?.overlayDensityMult ?? 1.0)
         * (frameAnalysis.sectionVocab?.overlayDensityMult ?? 1.0)
         * (frameAnalysis.interplay?.densityMult ?? 1.0)
-        * (frameAnalysis.peakOfShow?.isPeak ? 0.5 : 1.0);
+        // Peak-of-show clarity: drop overlay density to 30% so the
+        // transcendent moment shows through 2-3 iconic overlays instead
+        // of muddied compound layers (audit Tier 1 #4 — peaks fewer,
+        // quiet more).
+        * (frameAnalysis.peakOfShow?.isPeak ? 0.3 : 1.0);
 
       // Scene routing with hold enforcement (prevents seizure-fast switching)
       const routeState = getRouteState(i);

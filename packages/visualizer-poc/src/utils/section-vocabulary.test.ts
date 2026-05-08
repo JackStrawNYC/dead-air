@@ -61,15 +61,17 @@ describe("getSectionShaderFamily", () => {
 });
 
 describe("getSectionVocabulary", () => {
-  it("returns verse vocabulary", () => {
+  // Audit Tier 1 #4 inverted the overlay-density curve: peaks fewer
+  // (chorus/solo), quiet more (verse/intro/outro). Tests pinned below.
+  it("returns verse vocabulary (atmospheric fill)", () => {
     const v = getSectionVocabulary("verse");
-    expect(v.overlayDensityMult).toBe(0.7);
+    expect(v.overlayDensityMult).toBe(1.2);
     expect(v.cutsPermitted).toBe(false);
   });
 
-  it("returns chorus vocabulary", () => {
+  it("returns chorus vocabulary (peak clarity, fewer overlays)", () => {
     const v = getSectionVocabulary("chorus");
-    expect(v.overlayDensityMult).toBe(1.3);
+    expect(v.overlayDensityMult).toBe(0.6);
     expect(v.cutsPermitted).toBe(true);
     expect(v.saturationOffset).toBe(0.15);
     expect(v.brightnessOffset).toBe(0.06);
@@ -79,6 +81,24 @@ describe("getSectionVocabulary", () => {
     const v = getSectionVocabulary("jam");
     expect(v.overlayDensityMult).toBe(0.5);
     expect(v.cutsPermitted).toBe(true);
+  });
+
+  it("inverted density curve — peak sections sparser than quiet sections", () => {
+    // Pin the inversion regression guard: solo/chorus/jam (peaks) MUST
+    // have lower density than intro/outro/verse (quiet). A future tweak
+    // that re-stacks overlays at peaks would fail this check.
+    const intro = getSectionVocabulary("intro").overlayDensityMult;
+    const outro = getSectionVocabulary("outro").overlayDensityMult;
+    const verse = getSectionVocabulary("verse").overlayDensityMult;
+    const chorus = getSectionVocabulary("chorus").overlayDensityMult;
+    const solo = getSectionVocabulary("solo").overlayDensityMult;
+    const jam = getSectionVocabulary("jam").overlayDensityMult;
+
+    expect(intro).toBeGreaterThan(chorus);
+    expect(intro).toBeGreaterThan(solo);
+    expect(verse).toBeGreaterThan(chorus);
+    expect(outro).toBeGreaterThan(solo);
+    expect(outro).toBeGreaterThan(jam);
   });
 
   it("returns space vocabulary with negative saturation offset", () => {
@@ -112,7 +132,7 @@ describe("getSectionVocabulary", () => {
 
   it("handles case-insensitive lookup", () => {
     const v = getSectionVocabulary("VERSE");
-    expect(v.overlayDensityMult).toBe(0.7);
+    expect(v.overlayDensityMult).toBe(1.2);
   });
 });
 
@@ -142,9 +162,9 @@ describe("blendVocabularies", () => {
 
   it("returns midpoint values at t=0.5", () => {
     const result = blendVocabularies(verse, chorus, 0.5);
-    // overlayDensityMult: 0.7 + (1.3 - 0.7) * 0.5 = 1.0
-    expect(result.overlayDensityMult).toBeCloseTo(1.0);
-    // driftSpeedMult: 0.8 + (1.2 - 0.8) * 0.5 = 1.0
+    // overlayDensityMult: 1.2 + (0.6 - 1.2) * 0.5 = 0.9 (post-inversion values)
+    expect(result.overlayDensityMult).toBeCloseTo(0.9);
+    // driftSpeedMult: 0.8 + (1.2 - 0.8) * 0.5 = 1.0 (unchanged)
     expect(result.driftSpeedMult).toBeCloseTo(1.0);
   });
 

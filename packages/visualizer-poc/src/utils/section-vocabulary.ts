@@ -25,8 +25,19 @@ export interface SectionVocabulary {
 }
 
 const VOCABULARIES: Record<string, SectionVocabulary> = {
+  // ─── Overlay density curve (audit Tier 1 #4 — INVERTED) ───
+  // Audit identified the prior values as backwards: chorus at 1.3 added
+  // overlays during peaks (where clarity is needed), while intro/outro at
+  // 0.3 stripped atmosphere from quiet sections (where layered fill makes
+  // the show feel alive instead of empty).
+  //
+  // The corrected curve:
+  //   peaks (chorus / solo / jam):      LOW density — clarity at the moment
+  //   quiet (verse / intro / outro):    HIGH density — atmospheric fill
+  //   space:                            MINIMAL — void by design
+  //   bridge:                           NEUTRAL — transitional
   verse: {
-    overlayDensityMult: 0.7,
+    overlayDensityMult: 1.2,         // ↑ from 0.7 — intimate atmospheric layering
     cameraSteadiness: 0.8,
     driftSpeedMult: 0.8,
     saturationOffset: 0,
@@ -34,7 +45,7 @@ const VOCABULARIES: Record<string, SectionVocabulary> = {
     brightnessOffset: 0,
   },
   chorus: {
-    overlayDensityMult: 1.3,
+    overlayDensityMult: 0.6,         // ↓ from 1.3 — peak clarity, 2-3 iconic
     cameraSteadiness: 0.5,
     driftSpeedMult: 1.2,
     saturationOffset: +0.15,
@@ -42,7 +53,7 @@ const VOCABULARIES: Record<string, SectionVocabulary> = {
     brightnessOffset: +0.06,
   },
   jam: {
-    overlayDensityMult: 0.5,
+    overlayDensityMult: 0.5,         // unchanged — exploratory needs space
     cameraSteadiness: 0.3,
     driftSpeedMult: 1.3,
     saturationOffset: -0.03,
@@ -50,7 +61,7 @@ const VOCABULARIES: Record<string, SectionVocabulary> = {
     brightnessOffset: 0,
   },
   space: {
-    overlayDensityMult: 0.25,
+    overlayDensityMult: 0.25,        // unchanged — void by design
     cameraSteadiness: 0.9,
     driftSpeedMult: 0.4,
     saturationOffset: -0.12,
@@ -58,7 +69,7 @@ const VOCABULARIES: Record<string, SectionVocabulary> = {
     brightnessOffset: -0.03,
   },
   solo: {
-    overlayDensityMult: 0.4,
+    overlayDensityMult: 0.3,         // ↓ from 0.4 — laser focus on the solo
     cameraSteadiness: 0.4,
     driftSpeedMult: 1.5,
     saturationOffset: +0.20,
@@ -66,7 +77,7 @@ const VOCABULARIES: Record<string, SectionVocabulary> = {
     brightnessOffset: +0.06,
   },
   bridge: {
-    overlayDensityMult: 0.6,
+    overlayDensityMult: 1.1,         // ↑ from 0.6 — transitional, layered
     cameraSteadiness: 0.6,
     driftSpeedMult: 0.9,
     saturationOffset: +0.04,
@@ -74,7 +85,7 @@ const VOCABULARIES: Record<string, SectionVocabulary> = {
     brightnessOffset: 0,
   },
   intro: {
-    overlayDensityMult: 0.3,
+    overlayDensityMult: 1.5,         // ↑ from 0.3 — atmosphere fills the room
     cameraSteadiness: 0.7,
     driftSpeedMult: 0.6,
     saturationOffset: -0.05,
@@ -82,7 +93,7 @@ const VOCABULARIES: Record<string, SectionVocabulary> = {
     brightnessOffset: -0.02,
   },
   outro: {
-    overlayDensityMult: 0.4,
+    overlayDensityMult: 1.4,         // ↑ from 0.4 — final atmosphere lingers
     cameraSteadiness: 0.8,
     driftSpeedMult: 0.5,
     saturationOffset: -0.08,
