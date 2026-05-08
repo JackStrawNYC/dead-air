@@ -739,6 +739,9 @@ pub fn generate_intro(
             show_bloom_character: Some(style.show_bloom),
             show_temperature_character: Some(style.show_warmth),
             show_contrast_character: Some(style.show_contrast),
+            show_progress: Some(0.0),  // intro plays before show begins
+            era_black_lift: None,
+            era_contrast_scale: None,
             contrast: None,
             motion_blur_samples: 1, effect_mode: 0, effect_intensity: 0.0, composited_mode: 0, composited_intensity: 0.0, show_position: 0.0, camera_behavior: 0,
         };

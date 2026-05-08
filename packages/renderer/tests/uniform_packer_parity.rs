@@ -53,6 +53,7 @@ fn sample_frame() -> FrameData {
         shader_hold_progress: Some(0.4), song_progress: Some(0.55),
         show_bloom_character: Some(0.05), show_grain_character: Some(0.6),
         show_temperature_character: Some(-0.05), show_contrast_character: Some(0.7),
+        show_progress: Some(0.42), era_black_lift: Some(0.06), era_contrast_scale: Some(0.92),
         effect_mode: 0, effect_intensity: 0.0,
         composited_mode: 0, composited_intensity: 0.0,
         show_position: 0.5, camera_behavior: 0,

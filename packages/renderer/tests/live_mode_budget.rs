@@ -185,6 +185,7 @@ fn make_frame_data() -> dead_air_renderer::manifest::FrameData {
         shader_hold_progress: None, song_progress: None,
         show_bloom_character: None, show_grain_character: None,
         show_temperature_character: None, show_contrast_character: None,
+        show_progress: None, era_black_lift: None, era_contrast_scale: None,
         effect_mode: 0, effect_intensity: 0.0,
         composited_mode: 0, composited_intensity: 0.0,
         show_position: 0.5, camera_behavior: 0,

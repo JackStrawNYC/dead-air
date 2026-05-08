@@ -13,8 +13,10 @@ use crate::manifest::FrameData;
 
 /// Total uniform buffer size in bytes.
 /// 125 uniforms, last is uCamOffset (vec2) at offset 640, size 8 → 648.
-/// Padded to 16-byte alignment → 656.
-const UBO_SIZE: usize = 656;
+/// Padded to 16-byte alignment → 672 (was 656; bumped by Tier 0 audit fixes
+/// adding uShowProgress / uEraBlackLift / uEraContrastScale at offsets
+/// 648 / 652 / 656).
+const UBO_SIZE: usize = 672;
 
 /// EMA smoothing alpha for lighting transitions.
 /// At 30fps: alpha=0.03 → ~2s transition. At 60fps: alpha=0.015 → ~2s.
@@ -315,7 +317,16 @@ pub fn build_uniform_buffer(frame: &FrameData, width: u32, height: u32, lighting
         write_f32(&mut buf, 644, cam_off_y); // uCamOffset.y
     }
 
-    // Total data: 648 bytes, padded to 656 (16-byte alignment)
+    // ─── Per-Show Visual Identity (extended) ─── (offsets 648-659)
+    // Three uniforms added by the post-Veneta audit Tier 0 fixes:
+    //   648: uShowProgress     — 0..1 across whole show, drives time-of-day arc
+    //   652: uEraBlackLift     — film-stock lifted-blacks floor per era
+    //   656: uEraContrastScale — film-stock S-curve scale per era
+    write_f32(&mut buf, 648, frame.show_progress.unwrap_or(0.0));
+    write_f32(&mut buf, 652, frame.era_black_lift.unwrap_or(0.0));
+    write_f32(&mut buf, 656, frame.era_contrast_scale.unwrap_or(1.0));
+
+    // Total data: 660 bytes, padded to 672 (16-byte alignment)
 
     buf
 }

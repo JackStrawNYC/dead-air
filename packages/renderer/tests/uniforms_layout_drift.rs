@@ -9,9 +9,10 @@ use dead_air_renderer::uniforms_layout;
 
 #[test]
 fn ubo_size_agrees_with_uniforms_rs() {
-    // The hand-written uniforms.rs uses 656 as UBO_SIZE; this is the schema
-    // value. Both must stay aligned.
-    assert_eq!(uniforms_layout::UBO_SIZE, 656);
+    // The hand-written uniforms.rs uses 672 as UBO_SIZE (bumped from 656 by
+    // the May 2026 audit Tier 0 fixes adding uShowProgress / uEraBlackLift /
+    // uEraContrastScale at offsets 648 / 652 / 656). Both must stay aligned.
+    assert_eq!(uniforms_layout::UBO_SIZE, 672);
 }
 
 #[test]

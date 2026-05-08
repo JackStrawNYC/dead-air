@@ -3,7 +3,7 @@
 // Regenerate: npx tsx packages/renderer/scripts/generate-uniform-packer.mts
 // Drift gate: cargo test --test uniform_schema_drift
 
-export const UNIFORM_BUFFER_SIZE = 656;
+export const UNIFORM_BUFFER_SIZE = 672;
 
 export interface UniformValues {
   // ─── Time ───
@@ -263,6 +263,12 @@ export interface UniformValues {
   uShowTemperatureCharacter?: number;
   /** offset 624 — frame.show_contrast_character.unwrap_or(0.5) */
   uShowContrastCharacter?: number;
+  /** offset 648 — frame.show_progress.unwrap_or(0.0) */
+  uShowProgress?: number;
+  /** offset 652 — frame.era_black_lift.unwrap_or(0.0) */
+  uEraBlackLift?: number;
+  /** offset 656 — frame.era_contrast_scale.unwrap_or(1.0) */
+  uEraContrastScale?: number;
 }
 
 /** Pack a partial UniformValues into the std140 buffer. Missing fields stay 0. */
@@ -414,6 +420,9 @@ export function packUniforms(values: UniformValues, target?: Uint8Array): Uint8A
   if (values.uShowBloomCharacter !== undefined) view.setFloat32(616, values.uShowBloomCharacter, true);
   if (values.uShowTemperatureCharacter !== undefined) view.setFloat32(620, values.uShowTemperatureCharacter, true);
   if (values.uShowContrastCharacter !== undefined) view.setFloat32(624, values.uShowContrastCharacter, true);
+  if (values.uShowProgress !== undefined) view.setFloat32(648, values.uShowProgress, true);
+  if (values.uEraBlackLift !== undefined) view.setFloat32(652, values.uEraBlackLift, true);
+  if (values.uEraContrastScale !== undefined) view.setFloat32(656, values.uEraContrastScale, true);
 
   return buf;
 }
@@ -535,4 +544,7 @@ export const UNIFORM_FIELDS: ReadonlyArray<{ name: string; offset: number; type:
   { name: "uShowBloomCharacter", offset: 616, type: "float" },
   { name: "uShowTemperatureCharacter", offset: 620, type: "float" },
   { name: "uShowContrastCharacter", offset: 624, type: "float" },
+  { name: "uShowProgress", offset: 648, type: "float" },
+  { name: "uEraBlackLift", offset: 652, type: "float" },
+  { name: "uEraContrastScale", offset: 656, type: "float" },
 ];

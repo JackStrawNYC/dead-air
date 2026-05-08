@@ -144,6 +144,7 @@ fn test_benchmark_300_frames() {
             show_grain_character: None,
             show_temperature_character: None,
             show_contrast_character: None,
+            show_progress: None, era_black_lift: None, era_contrast_scale: None,
             effect_mode: 0,
             effect_intensity: 0.0,
             composited_mode: 0,

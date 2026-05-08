@@ -390,6 +390,9 @@ pub fn generate_endcard(
             show_bloom_character: Some(0.0),
             show_temperature_character: Some(0.0),
             show_contrast_character: Some(0.5),
+            show_progress: Some(1.0),  // endcard plays after show ends
+            era_black_lift: None,
+            era_contrast_scale: None,
             contrast: Some(vec![0.0; 7]),
             motion_blur_samples: 1, effect_mode: 0, effect_intensity: 0.0, composited_mode: 0, composited_intensity: 0.0, show_position: 0.0, camera_behavior: 0,
         });

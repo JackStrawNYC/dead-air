@@ -1259,22 +1259,30 @@ function eraGrading(era: string): {
   era_saturation: number;
   era_brightness: number;
   era_sepia: number;
+  era_black_lift: number;
+  era_contrast_scale: number;
   show_warmth: number;
   show_grain: number;
 } {
+  // Values mirror ERA_BLACK_LIFT and ERA_CONTRAST_SCALE in
+  // visualizer-poc/src/utils/shader-uniforms.ts (post-Veneta Tier 0 #8 audit
+  // fix). Black-lift simulates film stocks that can't hit pure black;
+  // contrast-scale tunes the S-curve roll-off (older film softer, digital
+  // harder). Together with sepia/brightness/sat, each era reads as a
+  // distinct stock instead of just a hue tint.
   switch (era) {
-    case "primal":        // 1965-72 — outdoor 16mm, warm + grainy
-      return { era_saturation: 1.20, era_brightness: 1.08, era_sepia: 0.15, show_warmth: 0.25, show_grain: 1.5 };
+    case "primal":        // 1965-72 — outdoor 16mm, warm + grainy + lifted blacks
+      return { era_saturation: 1.20, era_brightness: 1.08, era_sepia: 0.15, era_black_lift: 0.06, era_contrast_scale: 0.92, show_warmth: 0.25, show_grain: 1.5 };
     case "classic":       // 1973-78 — 35mm period feel, slightly less sepia
-      return { era_saturation: 1.15, era_brightness: 1.05, era_sepia: 0.10, show_warmth: 0.18, show_grain: 1.4 };
+      return { era_saturation: 1.15, era_brightness: 1.05, era_sepia: 0.10, era_black_lift: 0.02, era_contrast_scale: 1.05, show_warmth: 0.18, show_grain: 1.4 };
     case "hiatus":        // 1975 / Egypt / Closing of Winterland — cleaner 35mm
-      return { era_saturation: 1.05, era_brightness: 1.02, era_sepia: 0.05, show_warmth: 0.10, show_grain: 1.1 };
+      return { era_saturation: 1.05, era_brightness: 1.02, era_sepia: 0.05, era_black_lift: 0.04, era_contrast_scale: 0.95, show_warmth: 0.10, show_grain: 1.1 };
     case "touch_of_grey": // 1985-90 — late-80s SVHS (under the 0.8 grain gate)
-      return { era_saturation: 1.10, era_brightness: 1.00, era_sepia: 0.02, show_warmth: 0.05, show_grain: 0.7 };
+      return { era_saturation: 1.10, era_brightness: 1.00, era_sepia: 0.02, era_black_lift: 0.00, era_contrast_scale: 1.10, show_warmth: 0.05, show_grain: 0.7 };
     case "revival":       // 1990s+ Dead & Co — digital-clean
-      return { era_saturation: 1.05, era_brightness: 1.00, era_sepia: 0.00, show_warmth: 0.05, show_grain: 0.4 };
+      return { era_saturation: 1.05, era_brightness: 1.00, era_sepia: 0.00, era_black_lift: 0.00, era_contrast_scale: 1.00, show_warmth: 0.05, show_grain: 0.4 };
     default:
-      return { era_saturation: 1.10, era_brightness: 1.02, era_sepia: 0.05, show_warmth: 0.10, show_grain: 1.0 };
+      return { era_saturation: 1.10, era_brightness: 1.02, era_sepia: 0.05, era_black_lift: 0.02, era_contrast_scale: 1.00, show_warmth: 0.10, show_grain: 1.0 };
   }
 }
 
@@ -2141,6 +2149,8 @@ function computeUniforms(
     era_saturation: eraGrade.era_saturation * todSat,
     era_brightness: eraGrade.era_brightness * todBright * encoreBoostBright,
     era_sepia: eraGrade.era_sepia,
+    era_black_lift: eraGrade.era_black_lift,
+    era_contrast_scale: eraGrade.era_contrast_scale,
     show_warmth: eraGrade.show_warmth + todWarmth + encoreBoostWarmth,
     // climaxMod modulates bloom + contrast per-frame on top of the
     // era-graded base so peak moments visibly bloom + sharpen.

@@ -213,6 +213,20 @@ pub struct FrameData {
     #[serde(default)]
     pub show_contrast_character: Option<f32>,
 
+    // Tier 0 audit fixes (May 2026): plumbed UBO uniforms at offsets 648-656
+    /// 0..1 across the whole show — drives the time-of-day color arc in
+    /// postprocess.glsl (afternoon → golden hour → twilight).
+    #[serde(default)]
+    pub show_progress: Option<f32>,
+    /// Per-era lifted-blacks floor (older film stocks can't hit pure black).
+    /// Set per-era from ERA_BLACK_LIFT in the TypeScript pipeline.
+    #[serde(default)]
+    pub era_black_lift: Option<f32>,
+    /// Per-era S-curve contrast scale (< 1 softer for older film, > 1
+    /// harder for digital). Set per-era from ERA_CONTRAST_SCALE.
+    #[serde(default)]
+    pub era_contrast_scale: Option<f32>,
+
     // FFT contrast data (7-band spectral contrast for FFT texture)
     // Optional — if missing, synthesized from bass/mids/highs/energy
     #[serde(default)]
@@ -483,6 +497,7 @@ mod tests {
             song_progress: Some(0.5), shader_hold_progress: None,
             show_grain_character: None, show_bloom_character: None,
             show_temperature_character: None, show_contrast_character: None,
+            show_progress: None, era_black_lift: None, era_contrast_scale: None,
             contrast: None,
             motion_blur_samples: 1,
             effect_mode: 0, effect_intensity: 0.0,

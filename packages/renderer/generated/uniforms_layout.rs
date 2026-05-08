@@ -3,7 +3,7 @@
 //! Regenerate: npx tsx packages/renderer/scripts/generate-rust-uniforms.mts
 
 /// Total std140 uniform buffer size in bytes (matches uniforms.rs UBO_SIZE).
-pub const UBO_SIZE: usize = 656;
+pub const UBO_SIZE: usize = 672;
 
 /// Schema-declared offset of every uniform, by GLSL name.
 /// Use `OFFSETS::U_TIME` etc — naming follows SCREAMING_SNAKE convention.
@@ -124,6 +124,9 @@ pub mod offsets {
     pub const U_SHOW_BLOOM_CHARACTER: usize = 616;
     pub const U_SHOW_TEMPERATURE_CHARACTER: usize = 620;
     pub const U_SHOW_CONTRAST_CHARACTER: usize = 624;
+    pub const U_SHOW_PROGRESS: usize = 648;
+    pub const U_ERA_BLACK_LIFT: usize = 652;
+    pub const U_ERA_CONTRAST_SCALE: usize = 656;
 }
 
 /// Per-uniform metadata for runtime introspection.
@@ -255,6 +258,9 @@ pub const FIELDS: &[UniformField] = &[
     UniformField { name: "uShowBloomCharacter", offset: 616, size: 4, kind: UniformKind::Float },
     UniformField { name: "uShowTemperatureCharacter", offset: 620, size: 4, kind: UniformKind::Float },
     UniformField { name: "uShowContrastCharacter", offset: 624, size: 4, kind: UniformKind::Float },
+    UniformField { name: "uShowProgress", offset: 648, size: 4, kind: UniformKind::Float },
+    UniformField { name: "uEraBlackLift", offset: 652, size: 4, kind: UniformKind::Float },
+    UniformField { name: "uEraContrastScale", offset: 656, size: 4, kind: UniformKind::Float },
 ];
 
 /// Pack the schema-declared simple field copies into the std140 buffer.
@@ -367,5 +373,8 @@ pub fn pack_simple_uniforms(frame: &crate::manifest::FrameData, buf: &mut [u8]) 
     w(buf, 616, frame.show_bloom_character.unwrap_or(0.0)); written += 1;
     w(buf, 620, frame.show_temperature_character.unwrap_or(0.0)); written += 1;
     w(buf, 624, frame.show_contrast_character.unwrap_or(0.5)); written += 1;
+    w(buf, 648, frame.show_progress.unwrap_or(0.0)); written += 1;
+    w(buf, 652, frame.era_black_lift.unwrap_or(0.0)); written += 1;
+    w(buf, 656, frame.era_contrast_scale.unwrap_or(1.0)); written += 1;
     written
 }
