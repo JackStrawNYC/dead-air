@@ -596,7 +596,11 @@ void main() {
   // ATMOSPHERIC GLOW: aurora illuminates low sky
   // ═══════════════════════════════════════════════════
   float glowY = smoothstep(0.3, -0.2, screenP.y);
-  float glowStrength = totalAuroraAlpha * (0.06 + energy * 0.10 + climaxBoost * 0.08);
+  // Spectral centroid (audio brightness) drives atmospheric glow strength
+  // — bright audio (cymbals, sibilance) lifts the horizon shimmer, dark
+  // audio (sub-bass) leaves it dim. Subtle: 0.06 base, up to ~0.30 peak.
+  float arCentroid = clamp(uCentroid, 0.0, 1.0);
+  float glowStrength = totalAuroraAlpha * (0.06 + energy * 0.10 + climaxBoost * 0.08 + arCentroid * 0.06);
   vec3 glowColor = mix(auroraColor1, vec3(0.1, 0.2, 0.15), 0.5);
   col += glowColor * glowY * glowStrength;
 

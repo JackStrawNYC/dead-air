@@ -554,11 +554,16 @@ void main() {
     // Beat snap flash on edges
     vec3 beatFlash = vec3(1.0, 0.95, 0.85) * patternLine * beatSnp * 0.4;
 
-    // Compose surface
+    // Compose surface. Spectral centroid (audio brightness) lifts the
+    // specular contribution AND the flower-of-life pattern glow — so
+    // bright audio (cymbals, vocal sibilance) etches the sacred-geometry
+    // edges in golden light; dark audio (sub-bass, low pads) lets them
+    // recede into stone.
+    float sgCentroid = clamp(uCentroid, 0.0, 1.0);
     col = stoneColor * (0.05 + diff * 0.3) * occl;
-    col += palSecondary * spec * 0.12 * (1.0 + timbralB * 0.5);
+    col += palSecondary * spec * (0.12 + sgCentroid * 0.10) * (1.0 + timbralB * 0.5);
     col += mix(palSecondary, goldenLight, 0.5) * fresnel * 0.08;
-    col += patternGlow;
+    col += patternGlow * (1.0 + sgCentroid * 0.35);
     col += beatFlash;
 
     // Coherence: high = sharp golden edges, low = diffuse warm glow

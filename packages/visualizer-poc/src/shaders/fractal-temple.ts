@@ -142,7 +142,11 @@ void main() {
     ao2 = clamp(ao2,0.15,1.0);
     float dp = clamp(td/10.0,0.0,1.0);
     vec3 stone = mix(wt*0.18, wt*0.04, dp);
-    col = stone*(0.03+df*0.25)*ao2 + lt*sp*0.15 + grCol*fr*0.06;
+    // Spectral brightness boosts jewel specular highlights — bright audio
+    // (cymbals, vocal sibilance, pick attack) makes stone facets and amber
+    // god-light pop; dark audio (sub-bass, low rumble) leaves them muted.
+    float centroidLift = clamp(uCentroid, 0.0, 1.0);
+    col = stone*(0.03+df*0.25)*ao2 + lt*sp*(0.15 + centroidLift*0.18) + grCol*fr*0.06;
     col *= 0.7+energy*0.6;
   } else {
     col = wt*0.01 + grCol*exp(-td*0.5)*0.03;

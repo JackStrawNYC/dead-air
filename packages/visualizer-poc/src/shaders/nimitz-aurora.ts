@@ -385,8 +385,12 @@ void main() {
   }
 
   // ─── Horizon glow from aurora light ───
+  // Spectral centroid (audio brightness — high frequencies, sibilance) lifts
+  // the horizon shimmer so bright audio paints a vivid skyline and dark audio
+  // leaves the horizon as a quiet smudge.
   float horizonBand = exp(-abs(p.y + 0.3) * 12.0);
-  vec3 horizGlow = aurora.rgb * horizonBand * 0.15 * energy;
+  float naCentroid = clamp(uCentroid, 0.0, 1.0);
+  vec3 horizGlow = aurora.rgb * horizonBand * (0.15 + naCentroid * 0.10) * energy;
   col += horizGlow;
 
   // ─── Beat pulse ───

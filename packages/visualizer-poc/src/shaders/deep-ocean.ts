@@ -770,10 +770,12 @@ void main() {
   }
 
   // === BIOLUMINESCENT PARTICLES ===
-  // Energy drives count, jam section intensifies
+  // Energy drives count, jam section intensifies. Spectral centroid
+  // (audio brightness — cymbals, vocal sibilance) lifts the glow so
+  // bright audio = sparkly creatures, dark audio = muted depths.
   vec3 bioGlow = do2Bioluminescence(rayOrigin, rayDir, flowTime, energy, timbralBright, sJam);
-  // Widened bioluminescence: dim glow at quiet, vivid at loud
-  col += bioGlow * (0.4 + energy * 1.0);
+  float centroidLift = clamp(uCentroid, 0.0, 1.0);
+  col += bioGlow * (0.4 + energy * 1.0 + centroidLift * 0.35);
 
   // === MARINE SNOW ===
   col += do2MarineSnow(rayOrigin, rayDir, flowTime, fastE);
