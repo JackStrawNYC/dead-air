@@ -75,6 +75,7 @@ uniform float uClimaxIntensity;
 uniform float uCoherence;
 uniform float uJamDensity;
 uniform float uSongProgress;        // 0 at song start, 1 at song end
+uniform float uShowProgress;        // 0 at show start, 1 at show end (drives time-of-day arc)
 uniform float uShaderHoldProgress;   // 0 at section start, 1 at section end (spans full hold)
 
 // ─── Jam Evolution ───

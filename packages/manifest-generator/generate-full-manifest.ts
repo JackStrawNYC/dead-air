@@ -2163,6 +2163,11 @@ function computeUniforms(
     peak_of_show: analysis?.peakOfShow?.isPeak ? 1 : (climax.phase === "climax" && (climax.intensity ?? 0) > 0.8 ? 0.5 : 0),
     // Phase 2C: shader progress uniforms
     song_progress: songProgress ?? 0,
+    // Whole-show 0..1 — drives the postprocess.glsl time-of-day color
+    // arc (afternoon → golden hour → twilight). Already used inline above
+    // to modulate era brightness/sat/warmth; emitting here lets future
+    // schema-regeneration plumb it as its own GPU uniform too.
+    show_progress: sp,
     shader_hold_progress: sectionProgress ?? 0,
     // Phase 4C: per-show visual character (computed once per show)
     show_grain_character: showVisualSeed?.grainPreference ?? 0.5,

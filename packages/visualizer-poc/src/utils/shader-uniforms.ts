@@ -169,6 +169,10 @@ export interface UniformSyncData {
   isLocked: boolean;
   peakOfShow: number;
   songProgress: number;
+  /** 0 at show start, 1 at show end. Drives the afternoon→sunset→night
+   *  color arc in postprocess.glsl so the 3-hour show feels like an arc,
+   *  not 20 disconnected songs. */
+  showProgress: number;
   shaderHoldProgress: number;
   eraSaturation: number;
   eraBrightness: number;
@@ -252,6 +256,7 @@ export function createBaseUniforms(
     uCamOffset: { value: new THREE.Vector2(0, 0) },
     uJamDensity: { value: 0.5 },
     uSongProgress: { value: 0 },
+    uShowProgress: { value: 0 },
     uShaderHoldProgress: { value: 0 },
     uJamPhase: { value: -1 },
     uJamProgress: { value: 0 },
@@ -358,7 +363,7 @@ export function syncBaseUniforms(
     palettePrimary, paletteSecondary, paletteSaturation,
     tempo, musicalTime, climaxPhase, climaxIntensity,
     heroTrigger, heroProgress, jamDensity, jamPhase, jamProgress,
-    coherence, isLocked, peakOfShow, songProgress, shaderHoldProgress,
+    coherence, isLocked, peakOfShow, songProgress, showProgress, shaderHoldProgress,
     eraSaturation, eraBrightness, eraSepia, eraBlackLift, eraContrastScale,
     filmStock, venueProfile,
     shaderWidth, shaderHeight,
@@ -403,6 +408,7 @@ export function syncBaseUniforms(
   // pattern stability. The visual world deepens instead of freezing.
   u.uCoherence.value = isLocked ? Math.min(2.0, coherence * 1.5 + 0.5) : coherence;
   u.uSongProgress.value = songProgress ?? 0;
+  u.uShowProgress.value = showProgress ?? 0;
   u.uShaderHoldProgress.value = shaderHoldProgress ?? 0;
   u.uSlowEnergy.value = smooth.slowEnergy;
   u.uStemBass.value = smooth.stemBass;

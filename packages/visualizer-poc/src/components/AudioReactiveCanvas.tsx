@@ -184,6 +184,11 @@ export interface AudioDataContext {
   peakOfShow: number;
   /** Song progress: 0 at song start, 1 at song end */
   songProgress: number;
+  /** Show progress: 0 at show start, 1 at show end (drives time-of-day arc).
+   *  Defaults to songProgress when no show context is available (single-song
+   *  preview). Production runtime path should override this from a show-aware
+   *  context provider. */
+  showProgress: number;
   /** Shader hold progress: 0 at section start, 1 at section end (spans full hold) */
   shaderHoldProgress: number;
 }
@@ -578,6 +583,11 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
 
   // Song progress: 0 at start, 1 at end
   const songProgress = durationInFrames > 0 ? frameIdx / durationInFrames : 0;
+  // Show progress: in single-song preview we fall back to songProgress so
+  // the time-of-day arc still has a sensible signal. Production multi-song
+  // shows pass this through from the manifest (manifest-generator computes
+  // the show-spanning value across all frames at line ~3260).
+  const showProgress = songProgress;
 
   // Shader hold progress: 0 at section start, 1 at section end
   // For long holds (jam/space), this spans the full multi-section hold
@@ -796,6 +806,7 @@ export const AudioReactiveCanvas: React.FC<Props> = ({ frames, children, style, 
     jamProgress: jamPhaseCtx.progress,
     peakOfShow: peakOfShowIntensity,
     songProgress,
+    showProgress,
     shaderHoldProgress,
   };
 

@@ -71,7 +71,7 @@ export const DualShaderQuad: React.FC<Props> = ({
     time, beatDecay, smooth, palettePrimary, paletteSecondary,
     paletteSaturation, tempo, musicalTime, climaxPhase, climaxIntensity,
     heroTrigger, heroProgress, jamDensity, jamPhase, jamProgress, coherence, dynamicTime, isLocked, peakOfShow,
-    songProgress, shaderHoldProgress,
+    songProgress, showProgress, shaderHoldProgress,
   } = useAudioData();
   const { width, height } = useVideoConfig();
   const sceneConfig = useSceneConfig();
@@ -204,7 +204,7 @@ export const DualShaderQuad: React.FC<Props> = ({
     tempo, musicalTime, climaxPhase, climaxIntensity,
     heroTrigger, heroProgress, jamDensity, jamPhase, jamProgress,
     coherence, isLocked, peakOfShow,
-    songProgress, shaderHoldProgress,
+    songProgress, showProgress, shaderHoldProgress,
     eraSaturation, eraBrightness, eraSepia, eraBlackLift, eraContrastScale,
     filmStock, venueProfile,
     shaderWidth: width, shaderHeight: height,

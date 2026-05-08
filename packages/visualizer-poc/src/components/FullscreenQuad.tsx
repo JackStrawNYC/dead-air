@@ -61,7 +61,7 @@ export const FullscreenQuad: React.FC<Props> = ({
   fragmentShader,
   extraUniforms,
 }) => {
-  const { time, beatDecay, smooth, palettePrimary, paletteSecondary, paletteSaturation, tempo, musicalTime, climaxPhase, climaxIntensity, heroTrigger, heroProgress, jamDensity, coherence, dynamicTime, isLocked, jamPhase, jamProgress, peakOfShow, songProgress, shaderHoldProgress } = useAudioData();
+  const { time, beatDecay, smooth, palettePrimary, paletteSecondary, paletteSaturation, tempo, musicalTime, climaxPhase, climaxIntensity, heroTrigger, heroProgress, jamDensity, coherence, dynamicTime, isLocked, jamPhase, jamProgress, peakOfShow, songProgress, showProgress, shaderHoldProgress } = useAudioData();
   const { width, height } = useVideoConfig();
   const sceneConfig = useSceneConfig();
   const envelope = useEnvelopeValues();
@@ -366,7 +366,7 @@ export const FullscreenQuad: React.FC<Props> = ({
     tempo, musicalTime, climaxPhase, climaxIntensity,
     heroTrigger, heroProgress, jamDensity, jamPhase, jamProgress,
     coherence, isLocked, peakOfShow,
-    songProgress, shaderHoldProgress,
+    songProgress, showProgress, shaderHoldProgress,
     eraSaturation, eraBrightness, eraSepia, eraBlackLift, eraContrastScale,
     filmStock, venueProfile,
     shaderWidth, shaderHeight,

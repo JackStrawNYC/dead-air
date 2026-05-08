@@ -361,6 +361,39 @@ ${
     col *= vec3(1.0 + uShowTemperatureCharacter * 0.02, 1.0, 1.0 - uShowTemperatureCharacter * 0.02);
   }
 
+  // ─── TIME-OF-DAY COLOR ARC ───
+  // Drives the visible afternoon → sunset → night palette shift across the
+  // 3-hour show via uShowProgress (0..1). Three-stop curve applied as a
+  // multiplicative tint over highlights — preserves shadow integrity, only
+  // bright pixels carry the time-of-day cast (which is how real golden hour
+  // and twilight read on film).
+  //
+  //   0.0  afternoon    warm amber tint  (R 1.04, G 1.00, B 0.92)
+  //   0.5  golden hour  rich gold tint   (R 1.10, G 1.00, B 0.80)
+  //   1.0  twilight     cool violet tint (R 0.92, G 0.92, B 1.06)
+  //
+  // The audit identified this as a missing dimension — manifest-generator
+  // already modulates era_saturation/brightness by tod, but no explicit
+  // amber→golden→violet hue curve was applied. This is that curve.
+  {
+    float sp = clamp(uShowProgress, 0.0, 1.0);
+    vec3 todTint;
+    if (sp < 0.5) {
+      // afternoon (1.04, 1.00, 0.92) → golden hour (1.10, 1.00, 0.80)
+      float t = sp * 2.0;
+      todTint = mix(vec3(1.04, 1.00, 0.92), vec3(1.10, 1.00, 0.80), t);
+    } else {
+      // golden hour (1.10, 1.00, 0.80) → twilight (0.92, 0.92, 1.06)
+      float t = (sp - 0.5) * 2.0;
+      todTint = mix(vec3(1.10, 1.00, 0.80), vec3(0.92, 0.92, 1.06), t);
+    }
+    // Apply only to highlights so shadows stay neutral — golden hour reads
+    // as "warm sun on top of cool shade," not "everything is yellow."
+    float todLuma = dot(col, vec3(0.299, 0.587, 0.114));
+    float todMask = smoothstep(0.10, 0.55, todLuma);
+    col *= mix(vec3(1.0), todTint, todMask);
+  }
+
 ${
   eraGradingEnabled
     ? `  // Era film-stock character — direct (not via uShowGrain backdoor).
