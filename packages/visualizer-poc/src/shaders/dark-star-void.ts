@@ -38,7 +38,9 @@ const postProcess = buildPostProcessGLSL({
   caEnabled: true,
   lensDistortionEnabled: true,
   lightLeakEnabled: false,
-  eraGradingEnabled: true,
+  // Self-graded protean variant — disabling postprocess era grading prevents
+  // double-crush of the curated dark-star-void palette.
+  eraGradingEnabled: false,
   beatPulseEnabled: false,
 });
 

@@ -44,7 +44,9 @@ const postProcess = buildPostProcessGLSL({
   lensDistortionEnabled: true,
   lightLeakEnabled: true,
   beatPulseEnabled: false,
-  eraGradingEnabled: true,
+  // Self-graded protean variant — disabling postprocess era grading prevents
+  // double-crush of the curated terrapin-nebula palette.
+  eraGradingEnabled: false,
 });
 
 export const terrapinNebulaFrag = /* glsl */ `

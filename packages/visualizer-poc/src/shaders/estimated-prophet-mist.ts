@@ -39,7 +39,9 @@ const postProcess = buildPostProcessGLSL({
   caEnabled: true,
   lensDistortionEnabled: true,
   lightLeakEnabled: true,
-  eraGradingEnabled: true,
+  // Self-graded protean variant — disabling postprocess era grading prevents
+  // double-crush of the curated misty-prophet palette.
+  eraGradingEnabled: false,
 });
 
 export const estimatedProphetMistFrag = /* glsl */ `

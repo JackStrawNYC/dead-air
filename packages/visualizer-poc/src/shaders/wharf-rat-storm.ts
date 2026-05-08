@@ -38,7 +38,9 @@ const postProcess = buildPostProcessGLSL({
   dofEnabled: true,
   lensDistortionEnabled: true,
   lightLeakEnabled: true,
-  eraGradingEnabled: true,
+  // Self-graded protean variant — disabling postprocess era grading prevents
+  // double-crush of the curated wharf-rat-storm palette.
+  eraGradingEnabled: false,
 });
 
 export const wharfRatStormFrag = /* glsl */ `

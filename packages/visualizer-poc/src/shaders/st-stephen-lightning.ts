@@ -41,7 +41,9 @@ const postProcess = buildPostProcessGLSL({
   lensDistortionEnabled: true,
   lightLeakEnabled: true,
   beatPulseEnabled: true,
-  eraGradingEnabled: true,
+  // Self-graded protean variant — disabling postprocess era grading prevents
+  // double-crush of the curated lightning-storm palette.
+  eraGradingEnabled: false,
 });
 
 export const stStephenLightningFrag = /* glsl */ `

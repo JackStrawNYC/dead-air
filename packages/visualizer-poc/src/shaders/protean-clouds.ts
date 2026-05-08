@@ -32,7 +32,12 @@ const postProcess = buildPostProcessGLSL({
   lensDistortionEnabled: false,
   lightLeakEnabled: false,
   beatPulseEnabled: false,
-  eraGradingEnabled: true,
+  // Self-graded shader — applies its own pow(0.55,0.65,0.6) tone curve at
+  // line 244 before post-process. Era grading on top would double-crush
+  // (the audit identified this as the most visible double-grade case —
+  // protean's hand-curated nimitz "warm-cinematic" look conflicts with
+  // postprocess cinematicGrade re-applying era saturation/contrast).
+  eraGradingEnabled: false,
 });
 
 export const proteanCloudsFrag = /* glsl */ `

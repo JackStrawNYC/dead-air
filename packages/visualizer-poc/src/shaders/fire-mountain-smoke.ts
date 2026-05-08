@@ -39,7 +39,9 @@ const postProcess = buildPostProcessGLSL({
   lensDistortionEnabled: true,
   lightLeakEnabled: true,
   thermalShimmerEnabled: true,
-  eraGradingEnabled: true,
+  // Self-graded protean variant — disabling postprocess era grading prevents
+  // the double-crush that washes out the curated fire-mountain palette.
+  eraGradingEnabled: false,
 });
 
 export const fireMountainSmokeFrag = /* glsl */ `
