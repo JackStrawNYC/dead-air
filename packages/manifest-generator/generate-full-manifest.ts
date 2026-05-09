@@ -3972,27 +3972,46 @@ async function main() {
         }
 
         // Song art: small poster in bottom-left corner.
-        // Fades in over 3s at song start, holds at low opacity, fades during peaks.
-        // Skipped for stage-announcement / tuning tracks (no song = no poster).
+        // Concert-doc convention — the poster identifies the song at the
+        // start, then gets out of the way of the visuals. Show schedule:
+        //   0.0–3.0s   fade in (peaks at 25% opacity)
+        //   3.0–12.0s  hold (energy-modulated fade during peaks)
+        //   12.0–14.0s fade out
+        //   14.0s+     invisible (skip emission entirely)
+        //
+        // Prior behavior kept the poster visible the entire song — user
+        // feedback after the Sugaree validation render.
         const isStageAnnouncement = (song.title ?? "").toLowerCase().includes("announcement")
           || (song.title ?? "").toLowerCase().includes("tuning");
         if (!isStageAnnouncement) {
           const songArtId = `SongArt_${song.trackId}`;
-          const artFadeIn = Math.min(i / (fps * 3), 1.0); // 3s fade in
-          const artEnergyFade = 1.0 - Math.min(1, Math.max(0, ((smoothed.energy[ai] ?? 0.3) - 0.4) / 0.3)); // fade out at high energy
-          const artOpacity = 0.25 * artFadeIn * artEnergyFade; // max 25% opacity
-          if (artOpacity > 0.01) {
-            frameInstances.push({
-              overlay_id: songArtId,
-              transform: {
-                opacity: Math.round(artOpacity * 1000) / 1000,
-                scale: 0.18, // small — bottom-left poster
-                rotation_deg: 0,
-                offset_x: -0.38, // bottom-left
-                offset_y: 0.35,
-              },
-              blend_mode: "screen",
-            });
+          const songTimeSec = i / fps;
+          let timeFactor: number;
+          if (songTimeSec < 3.0) {
+            timeFactor = songTimeSec / 3.0;          // fade in 0→1
+          } else if (songTimeSec < 12.0) {
+            timeFactor = 1.0;                        // hold
+          } else if (songTimeSec < 14.0) {
+            timeFactor = 1.0 - (songTimeSec - 12.0) / 2.0; // fade out 1→0
+          } else {
+            timeFactor = 0;                          // invisible
+          }
+          if (timeFactor > 0) {
+            const artEnergyFade = 1.0 - Math.min(1, Math.max(0, ((smoothed.energy[ai] ?? 0.3) - 0.4) / 0.3));
+            const artOpacity = 0.25 * timeFactor * artEnergyFade;
+            if (artOpacity > 0.01) {
+              frameInstances.push({
+                overlay_id: songArtId,
+                transform: {
+                  opacity: Math.round(artOpacity * 1000) / 1000,
+                  scale: 0.18,
+                  rotation_deg: 0,
+                  offset_x: -0.38,
+                  offset_y: 0.35,
+                },
+                blend_mode: "screen",
+              });
+            }
           }
         }
 
