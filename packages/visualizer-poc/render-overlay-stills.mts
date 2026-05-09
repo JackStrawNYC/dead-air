@@ -21,13 +21,29 @@ import { buildVariantWindows } from "./src/utils/overlay-frame-window";
 const OUTPUT_DIR = "/tmp/dead-air-overlays";
 fs.mkdirSync(OUTPUT_DIR, { recursive: true });
 
+// Coverage set: all A-tier overlays from overlay-registry.ts plus the
+// previously-rendered seed list (some of which are B/C tier but actively
+// scheduled). 50+ unique names → 150+ PNG triples. The Rust compositor's
+// variant lookup falls back to bare PNG when a variant is missing, but
+// shows benefit most when the full triple is on disk.
 const OVERLAYS = [
+  // ─── Existing seed list (B/C-tier active) ───
   "BreathingStealie", "ThirteenPointBolt", "GodRays", "Fireflies",
   "TieDyeWash", "BearParade", "SkeletonBand", "MarchingTerrapins",
   "CosmicStarfield", "LavaLamp", "SkullKaleidoscope", "DarkStarPortal",
   "RoseOverlay", "LightningBoltOverlay", "StealYourFaceOff",
   "SacredGeometry", "VoronoiFlow", "FractalZoom", "MandalaGenerator",
   "StainedGlass",
+  // ─── A-tier expansion (from overlay-registry.ts tier: "A") ───
+  "AmericanBeauty", "BearTraced", "BirdInFlight", "CandleGlow",
+  "CelestialFaces", "GospelChurch", "GratefulDeadLogo", "HeadlightTrain",
+  "HeatShimmer", "LiquidLightBorder", "LotusBloom", "MeteorShower",
+  "MexicaliDesert", "MoonPhases", "MushroomCluster", "MushroomForest",
+  "MusicalNotation", "NeonStreaks", "OregonSunBlaze", "OuroborosOverlay",
+  "PlayingCards", "PrismRainbow", "RainbowArc", "RenaissanceFaireBanner",
+  "SacredGeometryOverlay", "SmokeWisps", "SpeakerStack", "SpiralGalaxyOverlay",
+  "StealieTraced", "SugareeRose", "SunshineDaydreamCamera", "TieDyeBorder",
+  "VenetaSwimmers", "WallOfSound",
 ];
 
 /** Source track for representative frames — d2t03 is a mid-set Veneta jam
