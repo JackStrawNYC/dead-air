@@ -69,6 +69,7 @@ fn cpu_and_gpu_compositors_produce_similar_output() {
         },
         blend_mode: BlendMode::Screen,  // matches the audit-noted CPU default
         keyframe_svg: None,
+        variant: None,
     };
     let instances = vec![make_inst("a", -0.2), make_inst("b", 0.2)];
 

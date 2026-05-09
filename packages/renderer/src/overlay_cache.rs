@@ -58,6 +58,12 @@ pub struct OverlayInstance {
     pub blend_mode: crate::compositor::BlendMode,
     /// If set, this is an animated keyframe SVG (overrides cached PNG)
     pub keyframe_svg: Option<String>,
+    /// Energy variant ("low" | "mid" | "high"), set by the manifest
+    /// generator from the frame's RMS quantile vs song-level p10/p50/p90.
+    /// When present, lookup tries `{overlay_id}-{variant}` first and
+    /// falls back to bare `overlay_id` on cache miss. Tier 0 #4 audit fix.
+    #[serde(default)]
+    pub variant: Option<String>,
 }
 
 /// Cache of pre-rendered overlay images.
@@ -212,12 +218,24 @@ impl OverlayImageCache {
             } else {
                 return;
             }
-        } else if let Some(cached) = self.cache.get(&instance.overlay_id) {
-            source_pixels = cached.pixels.clone(); // TODO: avoid clone with lifetime work
-            src_w = cached.width;
-            src_h = cached.height;
         } else {
-            return;
+            // Variant-aware lookup: try `{overlay_id}-{variant}` first when the
+            // manifest set a variant; fall back to bare `overlay_id` on cache
+            // miss so old manifests keep working unchanged. Tier 0 #4 audit fix.
+            let cached_opt = match instance.variant.as_deref() {
+                Some(v) if !v.is_empty() && v != "mid" => {
+                    let key = format!("{}-{}", instance.overlay_id, v);
+                    self.cache.get(&key).or_else(|| self.cache.get(&instance.overlay_id))
+                }
+                _ => self.cache.get(&instance.overlay_id),
+            };
+            if let Some(cached) = cached_opt {
+                source_pixels = cached.pixels.clone(); // TODO: avoid clone with lifetime work
+                src_w = cached.width;
+                src_h = cached.height;
+            } else {
+                return;
+            }
         }
 
         // Apply transform and composite
@@ -406,7 +424,78 @@ mod tests {
             transform: OverlayTransform::default(),
             blend_mode: crate::compositor::BlendMode::Normal,
             keyframe_svg: None,
+            variant: None,
         }
+    }
+
+    fn instance_v(id: &str, variant: &str) -> OverlayInstance {
+        OverlayInstance {
+            overlay_id: id.to_string(),
+            transform: OverlayTransform::default(),
+            blend_mode: crate::compositor::BlendMode::Normal,
+            keyframe_svg: None,
+            variant: Some(variant.to_string()),
+        }
+    }
+
+    /// Tier 0 #4 variant-lookup behavior: `instance.variant=Some("low")`
+    /// must look up `{id}-low` first, fall back to bare `{id}` on miss.
+    /// We test the lookup logic via cache state rather than calling
+    /// composite() (which needs a real rendering target).
+    #[test]
+    fn variant_lookup_resolves_to_specific_when_present() {
+        let mut cache = OverlayImageCache::new();
+        cache.cache.insert(
+            "BreathingStealie".to_string(),
+            CachedOverlay { pixels: vec![1; 16], width: 2, height: 2 },
+        );
+        cache.cache.insert(
+            "BreathingStealie-low".to_string(),
+            CachedOverlay { pixels: vec![2; 16], width: 2, height: 2 },
+        );
+        // Mirror the lookup pattern in composite()
+        let inst = instance_v("BreathingStealie", "low");
+        let key = format!("{}-{}", inst.overlay_id, inst.variant.as_ref().unwrap());
+        let chosen = cache.cache.get(&key).or_else(|| cache.cache.get(&inst.overlay_id));
+        assert!(chosen.is_some());
+        assert_eq!(chosen.unwrap().pixels[0], 2); // -low pixels, not bare
+    }
+
+    #[test]
+    fn variant_lookup_falls_back_to_bare_when_variant_missing() {
+        let mut cache = OverlayImageCache::new();
+        cache.cache.insert(
+            "BreathingStealie".to_string(),
+            CachedOverlay { pixels: vec![1; 16], width: 2, height: 2 },
+        );
+        // No `BreathingStealie-high` in cache
+        let inst = instance_v("BreathingStealie", "high");
+        let key = format!("{}-{}", inst.overlay_id, inst.variant.as_ref().unwrap());
+        let chosen = cache.cache.get(&key).or_else(|| cache.cache.get(&inst.overlay_id));
+        assert!(chosen.is_some());
+        assert_eq!(chosen.unwrap().pixels[0], 1); // bare fallback
+    }
+
+    #[test]
+    fn variant_mid_uses_bare_id_directly() {
+        // The mid variant intentionally maps to the bare PNG name (Tier 0 #4
+        // back-compat), so composite() short-circuits past the variant suffix.
+        let mut cache = OverlayImageCache::new();
+        cache.cache.insert(
+            "BreathingStealie".to_string(),
+            CachedOverlay { pixels: vec![5; 16], width: 2, height: 2 },
+        );
+        let inst = instance_v("BreathingStealie", "mid");
+        // Composite branch when variant is "mid" → bare lookup directly.
+        let chosen = match inst.variant.as_deref() {
+            Some(v) if !v.is_empty() && v != "mid" => {
+                let key = format!("{}-{}", inst.overlay_id, v);
+                cache.cache.get(&key).or_else(|| cache.cache.get(&inst.overlay_id))
+            }
+            _ => cache.cache.get(&inst.overlay_id),
+        };
+        assert!(chosen.is_some());
+        assert_eq!(chosen.unwrap().pixels[0], 5);
     }
 
     #[test]

@@ -78,6 +78,7 @@ fn cpu_vs_gpu_overlay_performance() {
             },
             blend_mode: BlendMode::Screen,
             keyframe_svg: None,
+            variant: None,
         }
     }).collect();
 

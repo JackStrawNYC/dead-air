@@ -459,6 +459,7 @@ fn gpu_compositing_rotation_matches_cpu() {
         },
         blend_mode: BlendMode::Normal,
         keyframe_svg: None,
+        variant: None,
     };
 
     // CPU render
@@ -578,6 +579,7 @@ fn gpu_compositing_offset_y_matches_cpu_convention() {
         },
         blend_mode: BlendMode::Normal,
         keyframe_svg: None,
+        variant: None,
     };
     let gpu_instances = vec![
         instance_to_gpu(&inst, &atlas, 128, 128).expect("conv"),

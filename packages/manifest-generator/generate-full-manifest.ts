@@ -2339,6 +2339,9 @@ async function main() {
     transform: { opacity: number; scale: number; rotation_deg: number; offset_x: number; offset_y: number };
     blend_mode: string;
     keyframe_svg?: string;
+    /** Energy variant ("low" | "mid" | "high") per Tier 0 #4. Rust compositor
+     *  tries `{overlay_id}-{variant}.png` first, bare id falls back. */
+    variant?: "low" | "mid" | "high";
   }>> = [];
 
   // ─── Process each song ───
@@ -2794,6 +2797,25 @@ async function main() {
     };
     console.log(`    Batch precompute: ${frames.length} frames in ${(batchMs / 1000).toFixed(1)}s (coherence: ${(coherenceMs / 1000).toFixed(1)}s, IT: ${(itMs / 1000).toFixed(1)}s, rest: ${(restMs / 1000).toFixed(1)}s)`);
     console.log(`    Precompute neutral-defaults: interplay=${preFailCounts.interplay}/${frames.length}, reactive=${preFailCounts.reactive}/${frames.length}, jamCycle=${preFailCounts.jamCycle}/${frames.length}, climax=${preFailCounts.climax}/${frames.length}`);
+
+    // ─── Overlay variant thresholds (Tier 0 #4 audit) ───
+    // Pre-render emitted 3 PNG variants per overlay sampled at the song's
+    // 10th / 50th / 90th RMS quantile windows. Per-frame variant selection
+    // looks up `{overlay_id}-{variant}` in the Rust cache; bare `overlay_id`
+    // falls back when the variant is missing. Compute the song's p33/p66
+    // splits so each output frame routes to the closest variant.
+    const songRmsForQuantile = frames.map((f) => f.rms ?? 0).filter((r) => r > 0).sort((a, b) => a - b);
+    const overlayLowThresh = songRmsForQuantile.length > 0
+      ? songRmsForQuantile[Math.floor(songRmsForQuantile.length * 0.33)]
+      : 0.15;
+    const overlayHighThresh = songRmsForQuantile.length > 0
+      ? songRmsForQuantile[Math.floor(songRmsForQuantile.length * 0.66)]
+      : 0.45;
+    function overlayVariantForFrame(rms: number): "low" | "mid" | "high" {
+      if (rms < overlayLowThresh) return "low";
+      if (rms > overlayHighThresh) return "high";
+      return "mid";
+    }
 
     const ctx: SongContext & { _preComputed?: any } = {
       frames,
@@ -3893,6 +3915,14 @@ async function main() {
           // unconditionally — no PNG, no SVG, just silent cache misses.
           if (overlayName === "FilmGrain" || overlayName === "SmokeWisps") continue;
 
+          // Tier 0 #4: emit energy variant per instance — Rust compositor
+          // tries `{overlay_id}-{variant}` first, falls back to bare id when
+          // the variant PNG isn't present. Skip variant on SongTitle (it's
+          // a per-frame keyframe SVG, not a PNG lookup).
+          const overlayVariant = overlayName === "SongTitle"
+            ? undefined
+            : overlayVariantForFrame(frames[ai]?.rms ?? 0);
+
           const instance: any = {
             overlay_id: overlayName,
             transform: {
@@ -3903,6 +3933,7 @@ async function main() {
               offset_y: Math.round(offsetY * 1000) / 1000,
             },
             blend_mode: blendMode,
+            ...(overlayVariant ? { variant: overlayVariant } : {}),
           };
           // SongTitle: attach inline SVG for text rendering (no PNG exists).
           // Always attach when we get here (we've already filtered out the
