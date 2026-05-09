@@ -24,6 +24,7 @@ import { scoreDiversityBonus, type VisualMemoryState } from "../../utils/visual-
 import { pickDrumsSpaceMode } from "./drums-space-router";
 import type { DrumsSpaceSubPhase } from "../../utils/drums-space-phase";
 import { pickStemFamilyPool } from "./stem-family";
+import { pickKeyModeBias, pickSilenceOverride, pickVocalRatioBias } from "./tier3-routing";
 
 /**
  * Safe shaders whitelist — validate chosen mode at the end.
@@ -162,6 +163,24 @@ export function getModeForSection(
   if (drumsSpacePhase) {
     const ds = pickDrumsSpaceMode(drumsSpacePhase, seed ?? 0, songIdentity, showShaderPool);
     return validateSafe(ds, song.defaultMode);
+  }
+
+  // Tier 3: silence override — when the section averages > 0.5 silenceScore
+  // (dead air between songs), route to ambient/atmospheric shaders so the
+  // empty audio reads as "moment of reflection" instead of "video paused."
+  // Hard-restrict the pool similarly to drumsSpacePhase. Identity guard:
+  // even silence on a song with curated identity skips this — the song's
+  // visual world stays intact through quiet passages.
+  if (frames && sections[sectionIndex] && !songIdentity?.preferredModes?.length && sectionIndex > 0) {
+    const silencePool = pickSilenceOverride(frames, sections[sectionIndex]);
+    if (silencePool && silencePool.length > 0) {
+      const filtered = showShaderPool && showShaderPool.length > 0
+        ? silencePool.filter((m) => showShaderPool.includes(m))
+        : silencePool;
+      const candidates = filtered.length > 0 ? filtered : silencePool;
+      const rng = seededRandom((seed ?? 0) + sectionIndex * 7919 + 77711);
+      return validateSafe(candidates[Math.floor(rng() * candidates.length)], song.defaultMode);
+    }
   }
 
   // Strong stem dominance hard-gate — when one musician unmistakably drives
@@ -403,6 +422,36 @@ export function getModeForSection(
         const sectionFamily = getSectionShaderFamily(sectionType);
         if (sectionFamily) {
           const matches = sectionFamily.filter((m) => filteredPool.includes(m));
+          if (matches.length > 0) {
+            filteredPool = [...filteredPool, ...matches, ...matches]; // 2x weight
+          }
+        }
+      }
+
+      // Tier 3: Key-mode bias — major-key sections lean warm (aurora,
+      // ember_meadow, fractal_temple); minor-key sections lean cool (deep_ocean,
+      // dark_star_void, void_light). Soft 2x weight; only fires when key
+      // confidence > 0.5 averaged across the section. Adds harmonic awareness
+      // to the existing chord-mood and semantic biases.
+      if (frames && section) {
+        const keyPool = pickKeyModeBias(frames, section);
+        if (keyPool) {
+          const matches = keyPool.filter((m) => filteredPool.includes(m));
+          if (matches.length > 0) {
+            filteredPool = [...filteredPool, ...matches, ...matches]; // 2x weight
+          }
+        }
+      }
+
+      // Tier 3: Vocal/instrumental ratio bias — vocal-dominant sections
+      // (Garcia singing) lean warm/intimate; instrumental-dominant
+      // (Garcia soloing or full band jam) lean dramatic/expansive.
+      // Distinguishes "Jerry sings" from "Jerry solos" via the precomputed
+      // vocalEnergyRatio = vocalRms/(vocal+other+bass). Soft 2x weight.
+      if (frames && section) {
+        const vocalPool = pickVocalRatioBias(frames, section);
+        if (vocalPool) {
+          const matches = vocalPool.filter((m) => filteredPool.includes(m));
           if (matches.length > 0) {
             filteredPool = [...filteredPool, ...matches, ...matches]; // 2x weight
           }
