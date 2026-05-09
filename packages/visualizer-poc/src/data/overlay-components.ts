@@ -94,6 +94,7 @@ import { SunshineDaydreamCamera } from "../components/SunshineDaydreamCamera";
 import { VenetaSwimmers } from "../components/VenetaSwimmers";
 import { RenaissanceFaireBanner } from "../components/RenaissanceFaireBanner";
 import { LotSceneRedux } from "../components/LotSceneRedux";
+import { TaperRigDetail } from "../components/TaperRigDetail";
 import { OregonMeadow } from "../components/OregonMeadow";
 import { HeatShimmer } from "../components/HeatShimmer";
 import { GreyhoundBus } from "../components/GreyhoundBus";
@@ -530,6 +531,7 @@ export const OVERLAY_COMPONENTS: Record<string, OverlayComponentEntry> = {
   VenetaSwimmers:        { Component: VenetaSwimmers, layer: 5 },
   RenaissanceFaireBanner:{ Component: RenaissanceFaireBanner, layer: 1 },
   LotSceneRedux:         { Component: LotSceneRedux as any, layer: 6 },
+  TaperRigDetail:        { Component: TaperRigDetail as any, layer: 7 },
   OregonMeadow:          { Component: OregonMeadow, layer: 5 },
   HeatShimmer:           { Component: HeatShimmer, layer: 1 },
   GreyhoundBus:          { Component: GreyhoundBus, layer: 6 },
