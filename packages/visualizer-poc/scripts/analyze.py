@@ -458,54 +458,6 @@ def analyze_track(audio_path: Path, output_path: Path, stems_dir: Path | None = 
           f"mode mean={key_mode_arr.mean():.3f}, conf mean={key_confidence_arr.mean():.3f}, "
           f"key changes={int(key_change_arr.sum())}")
 
-    # --- Silence / applause classifier (Tier 3) ---
-    # Differentiates dead-air silence (between songs), audience applause,
-    # and music. Drives dead-air visual ambient + applause-aware overlay
-    # treatment. Three soft scores per frame, all 0..1:
-    #   silenceScore   — true silence (very low RMS, no beats, no flux)
-    #   applauseScore  — broadband flat energy (applause / cheering)
-    #   musicScore     — present music (the inverse case, useful as a gate)
-    print("Computing silence/applause classifier ...")
-    silence_score_arr = np.zeros(n_frames)
-    applause_score_arr = np.zeros(n_frames)
-    music_score_arr = np.zeros(n_frames)
-    # Spectral flatness already computed (flatness_norm). Applause has
-    # high flatness + mid energy + low beat regularity — broadband noise
-    # without tonal structure.
-    for i in range(n_frames):
-        e = float(rms_norm[i])
-        flat = float(flatness_norm[i])
-        bc = float(beat_confidence_arr[i])
-        oset = float(onset_norm[i]) if i < len(onset_norm) else 0.0
-        # Silence: very low energy, no beats. Strict thresholds — only
-        # near-true silence triggers.
-        if e < 0.05 and bc < 0.30 and oset < 0.10:
-            # Smooth gate: lower e + lower bc → higher score
-            sil = (1.0 - e / 0.05) * 0.6 + (1.0 - bc / 0.30) * 0.4
-            silence_score_arr[i] = max(0.0, min(1.0, sil))
-        # Applause: mid energy + high flatness + low beat regularity.
-        # Real applause sits at ~0.10-0.40 RMS with flatness > 0.55 and
-        # very weak beat tracking.
-        if e > 0.05 and e < 0.45 and flat > 0.55 and bc < 0.35:
-            app = (flat - 0.55) / 0.45 * 0.5  # flatness contribution
-            app += min(1.0, e / 0.30) * 0.3   # energy contribution
-            app += (1.0 - bc / 0.35) * 0.2    # beat-irregularity contribution
-            applause_score_arr[i] = max(0.0, min(1.0, app))
-        # Music: present pitch + tracked beats + non-flat spectrum.
-        if e > 0.10 and (bc > 0.35 or flat < 0.50):
-            mu = 0.0
-            mu += min(1.0, e / 0.40) * 0.4
-            mu += min(1.0, bc / 0.6) * 0.3
-            mu += (1.0 - min(1.0, flat / 0.55)) * 0.3
-            music_score_arr[i] = max(0.0, min(1.0, mu))
-    # Light smoothing — these are state-like signals, not transient triggers
-    silence_score_arr = gaussian_filter1d(silence_score_arr, sigma=FPS / 6.0)
-    applause_score_arr = gaussian_filter1d(applause_score_arr, sigma=FPS / 6.0)
-    music_score_arr = gaussian_filter1d(music_score_arr, sigma=FPS / 6.0)
-    print(f"Silence classifier: silence frames={int((silence_score_arr > 0.5).sum())}, "
-          f"applause frames={int((applause_score_arr > 0.5).sum())}, "
-          f"music frames={int((music_score_arr > 0.5).sum())}")
-
     # --- Improvisation score ---
     # Composite score (0-1) from tempo variance (25%), harmonic novelty (25%),
     # beat instability × energy (30%), harmonic tension (20%).
@@ -675,6 +627,46 @@ def analyze_track(audio_path: Path, output_path: Path, stems_dir: Path | None = 
     chroma = pad_or_trim_2d(chroma, n_frames)
     contrast_norm = pad_or_trim_2d(contrast_norm, n_frames)
     flatness_norm = pad_or_trim_1d(flatness_norm, n_frames)
+
+    # --- Silence / applause classifier (Tier 3) ---
+    # Differentiates dead-air silence (between songs), audience applause,
+    # and music. Three soft scores per frame, all 0..1:
+    #   silenceScore   — true silence (very low RMS, no beats, no flux)
+    #   applauseScore  — broadband flat energy (applause / cheering)
+    #   musicScore     — present music (inverse — useful as a gate)
+    # Placed AFTER flatness_norm + improv block so all four inputs
+    # (rms_norm, flatness_norm, beat_confidence_arr, onset_norm) and
+    # gaussian_filter1d (imported in improv block) are available.
+    print("Computing silence/applause classifier ...")
+    silence_score_arr = np.zeros(n_frames)
+    applause_score_arr = np.zeros(n_frames)
+    music_score_arr = np.zeros(n_frames)
+    for i in range(n_frames):
+        e = float(rms_norm[i])
+        flat = float(flatness_norm[i])
+        bc = float(beat_confidence_arr[i])
+        oset = float(onset_norm[i]) if i < len(onset_norm) else 0.0
+        if e < 0.05 and bc < 0.30 and oset < 0.10:
+            sil = (1.0 - e / 0.05) * 0.6 + (1.0 - bc / 0.30) * 0.4
+            silence_score_arr[i] = max(0.0, min(1.0, sil))
+        if e > 0.05 and e < 0.45 and flat > 0.55 and bc < 0.35:
+            app = (flat - 0.55) / 0.45 * 0.5
+            app += min(1.0, e / 0.30) * 0.3
+            app += (1.0 - bc / 0.35) * 0.2
+            applause_score_arr[i] = max(0.0, min(1.0, app))
+        if e > 0.10 and (bc > 0.35 or flat < 0.50):
+            mu = 0.0
+            mu += min(1.0, e / 0.40) * 0.4
+            mu += min(1.0, bc / 0.6) * 0.3
+            mu += (1.0 - min(1.0, flat / 0.55)) * 0.3
+            music_score_arr[i] = max(0.0, min(1.0, mu))
+    from scipy.ndimage import gaussian_filter1d as _gf  # may already be imported above
+    silence_score_arr = _gf(silence_score_arr, sigma=FPS / 6.0)
+    applause_score_arr = _gf(applause_score_arr, sigma=FPS / 6.0)
+    music_score_arr = _gf(music_score_arr, sigma=FPS / 6.0)
+    print(f"Silence classifier: silence frames={int((silence_score_arr > 0.5).sum())}, "
+          f"applause frames={int((applause_score_arr > 0.5).sum())}, "
+          f"music frames={int((music_score_arr > 0.5).sum())}")
 
     # --- Section detection ---
     sections = detect_sections(y, sr, n_frames, rms_norm)
