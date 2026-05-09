@@ -93,6 +93,7 @@ import { KeseyFurthur } from "../components/KeseyFurthur";
 import { SunshineDaydreamCamera } from "../components/SunshineDaydreamCamera";
 import { VenetaSwimmers } from "../components/VenetaSwimmers";
 import { RenaissanceFaireBanner } from "../components/RenaissanceFaireBanner";
+import { LotSceneRedux } from "../components/LotSceneRedux";
 import { OregonMeadow } from "../components/OregonMeadow";
 import { HeatShimmer } from "../components/HeatShimmer";
 import { GreyhoundBus } from "../components/GreyhoundBus";
@@ -528,6 +529,7 @@ export const OVERLAY_COMPONENTS: Record<string, OverlayComponentEntry> = {
   SunshineDaydreamCamera:{ Component: SunshineDaydreamCamera, layer: 7 },
   VenetaSwimmers:        { Component: VenetaSwimmers, layer: 5 },
   RenaissanceFaireBanner:{ Component: RenaissanceFaireBanner, layer: 1 },
+  LotSceneRedux:         { Component: LotSceneRedux as any, layer: 6 },
   OregonMeadow:          { Component: OregonMeadow, layer: 5 },
   HeatShimmer:           { Component: HeatShimmer, layer: 1 },
   GreyhoundBus:          { Component: GreyhoundBus, layer: 6 },
