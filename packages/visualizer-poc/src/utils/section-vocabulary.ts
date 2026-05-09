@@ -120,14 +120,14 @@ const VOCABULARIES: Record<string, SectionVocabulary> = {
 import type { VisualMode } from "../data/types";
 
 export const SECTION_TYPE_FAMILIES: Record<string, VisualMode[]> = {
-  verse:  ["porch_twilight", "ember_meadow", "aurora", "nimitz_aurora", "honeycomb_cathedral"],
+  verse:  ["porch_twilight", "ember_meadow", "aurora", "nimitz_aurora", "honeycomb_cathedral", "firelit_room"],
   chorus: ["fractal_temple", "sacred_geometry", "mandala_engine", "dance_floor_prism", "kaleidoscope", "concert_lighting"],
   jam:    ["deep_ocean", "cosmic_dust", "fractal_temple", "nimitz_aurora", "void_light"],
   space:  ["deep_ocean", "cosmic_dust", "void_light", "dark_star_void", "nimitz_aurora", "fractal_temple"],
   solo:   ["electric_arc", "dance_floor_prism", "mandala_engine", "fractal_temple", "kaleidoscope", "concert_lighting"],
   bridge: ["aurora", "nimitz_aurora", "fractal_temple", "honeycomb_cathedral"],
-  intro:  ["aurora", "ember_meadow", "porch_twilight", "fractal_temple", "nimitz_aurora"],
-  outro:  ["porch_twilight", "ember_meadow", "aurora", "nimitz_aurora"],
+  intro:  ["aurora", "ember_meadow", "porch_twilight", "fractal_temple", "nimitz_aurora", "firelit_room"],
+  outro:  ["porch_twilight", "ember_meadow", "aurora", "nimitz_aurora", "firelit_room"],
 };
 
 /** Get the preferred shader family for a section type. Returns null when

@@ -258,6 +258,7 @@ export type VisualMode =
   | "molten_glass"
   | "combustible_voronoi"
   | "fractal_temple"
+  | "firelit_room"
   | "luminous_cavern"
   | "ancient_forest"
   | "desert_cathedral"

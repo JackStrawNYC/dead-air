@@ -168,6 +168,7 @@ import { NimitzAuroraScene } from "./NimitzAuroraScene";
 import { CreationScene } from "./CreationScene";
 // Raymarched 3D
 import { FractalTempleScene } from "./FractalTempleScene";
+import { FirelitRoomScene } from "./FirelitRoomScene";
 import { LuminousCavernScene } from "./LuminousCavernScene";
 import { AncientForestScene } from "./AncientForestScene";
 import { DesertCathedralScene } from "./DesertCathedralScene";
@@ -813,6 +814,14 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     preferredTransitionIn: "void",
     spectralFamily: "cosmic",
     postProcessOverrides: { halationEnabled: true, bloomThresholdOffset: -0.04, beatPulseEnabled: false, lightLeakEnabled: true },
+  },
+  firelit_room: {
+    Component: FirelitRoomScene,
+    energyAffinity: "low",
+    complement: "porch_twilight",
+    preferredTransitionIn: "morph",
+    spectralFamily: "warm",
+    postProcessOverrides: { halationEnabled: true, bloomThresholdOffset: -0.06, lightLeakEnabled: true, beatPulseEnabled: false },
   },
   luminous_cavern: {
     Component: LuminousCavernScene,
