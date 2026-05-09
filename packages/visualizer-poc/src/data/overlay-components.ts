@@ -96,6 +96,7 @@ import { RenaissanceFaireBanner } from "../components/RenaissanceFaireBanner";
 import { LotSceneRedux } from "../components/LotSceneRedux";
 import { TaperRigDetail } from "../components/TaperRigDetail";
 import { HandDrawnSetlist } from "../components/HandDrawnSetlist";
+import { StadiumLightRig } from "../components/StadiumLightRig";
 import { OregonMeadow } from "../components/OregonMeadow";
 import { HeatShimmer } from "../components/HeatShimmer";
 import { GreyhoundBus } from "../components/GreyhoundBus";
@@ -534,6 +535,7 @@ export const OVERLAY_COMPONENTS: Record<string, OverlayComponentEntry> = {
   LotSceneRedux:         { Component: LotSceneRedux as any, layer: 6 },
   TaperRigDetail:        { Component: TaperRigDetail as any, layer: 7 },
   HandDrawnSetlist:      { Component: HandDrawnSetlist as any, layer: 7 },
+  StadiumLightRig:       { Component: StadiumLightRig as any, layer: 3 },
   OregonMeadow:          { Component: OregonMeadow, layer: 5 },
   HeatShimmer:           { Component: HeatShimmer, layer: 1 },
   GreyhoundBus:          { Component: GreyhoundBus, layer: 6 },
