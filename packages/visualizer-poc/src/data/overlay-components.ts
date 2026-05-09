@@ -98,6 +98,7 @@ import { TaperRigDetail } from "../components/TaperRigDetail";
 import { HandDrawnSetlist } from "../components/HandDrawnSetlist";
 import { StadiumLightRig } from "../components/StadiumLightRig";
 import { HeavyCrowdDance } from "../components/HeavyCrowdDance";
+import { AcidTestProjection } from "../components/AcidTestProjection";
 import { OregonMeadow } from "../components/OregonMeadow";
 import { HeatShimmer } from "../components/HeatShimmer";
 import { GreyhoundBus } from "../components/GreyhoundBus";
@@ -538,6 +539,7 @@ export const OVERLAY_COMPONENTS: Record<string, OverlayComponentEntry> = {
   HandDrawnSetlist:      { Component: HandDrawnSetlist as any, layer: 7 },
   StadiumLightRig:       { Component: StadiumLightRig as any, layer: 3 },
   HeavyCrowdDance:       { Component: HeavyCrowdDance as any, layer: 6 },
+  AcidTestProjection:    { Component: AcidTestProjection as any, layer: 4 },
   OregonMeadow:          { Component: OregonMeadow, layer: 5 },
   HeatShimmer:           { Component: HeatShimmer, layer: 1 },
   GreyhoundBus:          { Component: GreyhoundBus, layer: 6 },
