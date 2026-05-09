@@ -259,6 +259,7 @@ export type VisualMode =
   | "combustible_voronoi"
   | "fractal_temple"
   | "firelit_room"
+  | "mercury_pools"
   | "luminous_cavern"
   | "ancient_forest"
   | "desert_cathedral"

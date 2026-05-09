@@ -72,6 +72,7 @@ export const DRUMS_SPACE_SHADER_POOLS: Record<DrumsSpaceSubPhase, VisualMode[]> 
     "void_light",
     "nimitz_aurora",
     "fractal_temple",
+    "mercury_pools",         // metallic-liquid blobs floating in cosmic dark
   ],
 
   // SPACE_MELODIC — guitar/keys returning, tonal content.

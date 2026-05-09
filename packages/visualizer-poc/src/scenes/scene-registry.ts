@@ -169,6 +169,7 @@ import { CreationScene } from "./CreationScene";
 // Raymarched 3D
 import { FractalTempleScene } from "./FractalTempleScene";
 import { FirelitRoomScene } from "./FirelitRoomScene";
+import { MercuryPoolsScene } from "./MercuryPoolsScene";
 import { LuminousCavernScene } from "./LuminousCavernScene";
 import { AncientForestScene } from "./AncientForestScene";
 import { DesertCathedralScene } from "./DesertCathedralScene";
@@ -822,6 +823,14 @@ export const SCENE_REGISTRY: Record<VisualMode, SceneRegistryEntry> = {
     preferredTransitionIn: "morph",
     spectralFamily: "warm",
     postProcessOverrides: { halationEnabled: true, bloomThresholdOffset: -0.06, lightLeakEnabled: true, beatPulseEnabled: false },
+  },
+  mercury_pools: {
+    Component: MercuryPoolsScene,
+    energyAffinity: "any",
+    complement: "deep_ocean",
+    preferredTransitionIn: "morph",
+    spectralFamily: "cosmic",
+    postProcessOverrides: { halationEnabled: true, bloomThresholdOffset: -0.04, beatPulseEnabled: false },
   },
   luminous_cavern: {
     Component: LuminousCavernScene,
