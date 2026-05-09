@@ -125,9 +125,9 @@ export const SECTION_TYPE_FAMILIES: Record<string, VisualMode[]> = {
   jam:    ["deep_ocean", "cosmic_dust", "fractal_temple", "nimitz_aurora", "void_light"],
   space:  ["deep_ocean", "cosmic_dust", "void_light", "dark_star_void", "nimitz_aurora", "fractal_temple"],
   solo:   ["electric_arc", "dance_floor_prism", "mandala_engine", "fractal_temple", "kaleidoscope", "concert_lighting"],
-  bridge: ["aurora", "nimitz_aurora", "fractal_temple", "honeycomb_cathedral"],
-  intro:  ["aurora", "ember_meadow", "porch_twilight", "fractal_temple", "nimitz_aurora", "firelit_room"],
-  outro:  ["porch_twilight", "ember_meadow", "aurora", "nimitz_aurora", "firelit_room"],
+  bridge: ["aurora", "nimitz_aurora", "fractal_temple", "honeycomb_cathedral", "vintage_film"],
+  intro:  ["aurora", "ember_meadow", "porch_twilight", "fractal_temple", "nimitz_aurora", "firelit_room", "vintage_film"],
+  outro:  ["porch_twilight", "ember_meadow", "aurora", "nimitz_aurora", "firelit_room", "vintage_film"],
 };
 
 /** Get the preferred shader family for a section type. Returns null when
