@@ -14,7 +14,7 @@
  * for smooth audio features.
  */
 
-import { RingBuffer } from "./ring-buffer";
+import { RingBuffer } from "./ring-buffer.js";
 
 export class GaussianSmoother {
   /** Half-window size (number of frames on each side) */
