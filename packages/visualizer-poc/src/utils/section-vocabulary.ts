@@ -120,9 +120,9 @@ const VOCABULARIES: Record<string, SectionVocabulary> = {
 import type { VisualMode } from "../data/types";
 
 export const SECTION_TYPE_FAMILIES: Record<string, VisualMode[]> = {
-  verse:  ["porch_twilight", "ember_meadow", "aurora", "nimitz_aurora", "honeycomb_cathedral", "firelit_room"],
+  verse:  ["porch_twilight", "ember_meadow", "aurora", "nimitz_aurora", "honeycomb_cathedral", "firelit_room", "highway_horizon", "desert_cantina"],
   chorus: ["fractal_temple", "sacred_geometry", "mandala_engine", "dance_floor_prism", "kaleidoscope", "concert_lighting"],
-  jam:    ["deep_ocean", "cosmic_dust", "fractal_temple", "nimitz_aurora", "void_light"],
+  jam:    ["deep_ocean", "cosmic_dust", "fractal_temple", "nimitz_aurora", "void_light", "highway_horizon", "cosmic_railroad"],
   space:  ["deep_ocean", "cosmic_dust", "void_light", "dark_star_void", "nimitz_aurora", "fractal_temple"],
   solo:   ["electric_arc", "dance_floor_prism", "mandala_engine", "fractal_temple", "kaleidoscope", "concert_lighting"],
   bridge: ["aurora", "nimitz_aurora", "fractal_temple", "honeycomb_cathedral", "vintage_film"],

@@ -61,6 +61,8 @@ export const STEM_FAMILY_POOLS: Record<StemDominant, VisualMode[]> = {
     "honeycomb_cathedral",    // bar-setter, tonal grounding
     "aurora",                 // soft warm drift
     "concert_lighting",       // Bobby holds it down — grounded stage feel
+    "highway_horizon",        // cowboy songs (Mexicali, Me & My Uncle)
+    "desert_cantina",         // bar-room cowboy aesthetic
   ],
 
   // Vocals (any singer) — human warmth, intimacy
