@@ -1,0 +1,203 @@
+{
+  "date": "1977-09-03",
+  "venue": "Raceway Park, Englishtown, NJ",
+  "venueShort": "Raceway Park",
+  "venueLocation": "Englishtown, NJ",
+  "bandName": "Grateful Dead",
+  "taperInfo": "Matrix (SBD + AUD blend, dusborne mtx, 131317)",
+  "era": "classic",
+  "venueType": "outdoor",
+  "tourName": "Summer 1977",
+  "showPoster": "assets/song-art/englishtown-77/show-poster.png",
+  "songs": [
+    {
+      "trackId": "s1t01",
+      "title": "Tuning",
+      "set": 1,
+      "trackNumber": 1,
+      "defaultMode": "aurora",
+      "audioFile": "englishtown-77/gd77-09-03s1t01.mp3",
+      "palette": { "primary": 30, "secondary": 200, "saturation": 0.45 }
+    },
+    {
+      "trackId": "s1t02",
+      "title": "The Promised Land",
+      "set": 1,
+      "trackNumber": 2,
+      "defaultMode": "fractal_temple",
+      "audioFile": "englishtown-77/gd77-09-03s1t02.mp3",
+      "palette": { "primary": 200, "secondary": 40, "saturation": 0.75 }
+    },
+    {
+      "trackId": "s1t03",
+      "title": "They Love Each Other",
+      "set": 1,
+      "trackNumber": 3,
+      "defaultMode": "porch_twilight",
+      "audioFile": "englishtown-77/gd77-09-03s1t03.mp3",
+      "palette": { "primary": 45, "secondary": 280, "saturation": 0.7 }
+    },
+    {
+      "trackId": "s1t04",
+      "title": "Me and My Uncle",
+      "set": 1,
+      "trackNumber": 4,
+      "defaultMode": "ember_meadow",
+      "audioFile": "englishtown-77/gd77-09-03s1t04.mp3",
+      "palette": { "primary": 25, "secondary": 220, "saturation": 0.65 }
+    },
+    {
+      "trackId": "s1t05",
+      "title": "Mississippi Half-Step Uptown Toodeloo",
+      "set": 1,
+      "trackNumber": 5,
+      "defaultMode": "fractal_temple",
+      "audioFile": "englishtown-77/gd77-09-03s1t05.mp3",
+      "palette": { "primary": 50, "secondary": 240, "saturation": 0.8 }
+    },
+    {
+      "trackId": "s1t06",
+      "title": "Looks Like Rain",
+      "set": 1,
+      "trackNumber": 6,
+      "defaultMode": "deep_ocean",
+      "audioFile": "englishtown-77/gd77-09-03s1t06.mp3",
+      "palette": { "primary": 220, "secondary": 60, "saturation": 0.75 }
+    },
+    {
+      "trackId": "s1t07",
+      "title": "Peggy-O",
+      "set": 1,
+      "trackNumber": 7,
+      "defaultMode": "porch_twilight",
+      "audioFile": "englishtown-77/gd77-09-03s1t07.mp3",
+      "palette": { "primary": 35, "secondary": 250, "saturation": 0.6 }
+    },
+    {
+      "trackId": "s1t08",
+      "title": "New Minglewood Blues",
+      "set": 1,
+      "trackNumber": 8,
+      "defaultMode": "electric_arc",
+      "audioFile": "englishtown-77/gd77-09-03s1t08.mp3",
+      "palette": { "primary": 15, "secondary": 200, "saturation": 0.85 }
+    },
+    {
+      "trackId": "s1t09",
+      "title": "Friend of the Devil",
+      "set": 1,
+      "trackNumber": 9,
+      "defaultMode": "honeycomb_cathedral",
+      "audioFile": "englishtown-77/gd77-09-03s1t09.mp3",
+      "palette": { "primary": 40, "secondary": 270, "saturation": 0.7 }
+    },
+    {
+      "trackId": "s1t10",
+      "title": "The Music Never Stopped",
+      "set": 1,
+      "trackNumber": 10,
+      "defaultMode": "dance_floor_prism",
+      "audioFile": "englishtown-77/gd77-09-03s1t10.mp3",
+      "palette": { "primary": 320, "secondary": 60, "saturation": 0.85 }
+    },
+    {
+      "trackId": "s2t01",
+      "title": "Tuning",
+      "set": 2,
+      "trackNumber": 1,
+      "defaultMode": "aurora",
+      "audioFile": "englishtown-77/gd77-09-03s2t01.mp3",
+      "palette": { "primary": 280, "secondary": 30, "saturation": 0.4 }
+    },
+    {
+      "trackId": "s2t02",
+      "title": "Bertha",
+      "set": 2,
+      "trackNumber": 2,
+      "defaultMode": "fractal_temple",
+      "audioFile": "englishtown-77/gd77-09-03s2t02.mp3",
+      "palette": { "primary": 350, "secondary": 60, "saturation": 0.85 }
+    },
+    {
+      "trackId": "s2t03",
+      "title": "Good Lovin'",
+      "set": 2,
+      "trackNumber": 3,
+      "defaultMode": "dance_floor_prism",
+      "audioFile": "englishtown-77/gd77-09-03s2t03.mp3",
+      "palette": { "primary": 30, "secondary": 290, "saturation": 0.85 }
+    },
+    {
+      "trackId": "s2t04",
+      "title": "Loser",
+      "set": 2,
+      "trackNumber": 4,
+      "defaultMode": "deep_ocean",
+      "audioFile": "englishtown-77/gd77-09-03s2t04.mp3",
+      "palette": { "primary": 280, "secondary": 40, "saturation": 0.75 }
+    },
+    {
+      "trackId": "s2t05",
+      "title": "Estimated Prophet",
+      "set": 2,
+      "trackNumber": 5,
+      "defaultMode": "estimated_prophet_mist",
+      "audioFile": "englishtown-77/gd77-09-03s2t05.mp3",
+      "palette": { "primary": 250, "secondary": 30, "saturation": 0.8 }
+    },
+    {
+      "trackId": "s2t06",
+      "title": "Eyes of the World",
+      "set": 2,
+      "trackNumber": 6,
+      "defaultMode": "fractal_temple",
+      "audioFile": "englishtown-77/gd77-09-03s2t06.mp3",
+      "palette": { "primary": 180, "secondary": 45, "saturation": 0.85 }
+    },
+    {
+      "trackId": "s2t07",
+      "title": "Samson & Delilah",
+      "set": 2,
+      "trackNumber": 7,
+      "defaultMode": "inferno",
+      "audioFile": "englishtown-77/gd77-09-03s2t07.mp3",
+      "palette": { "primary": 15, "secondary": 240, "saturation": 0.9 }
+    },
+    {
+      "trackId": "s2t08",
+      "title": "He's Gone",
+      "set": 2,
+      "trackNumber": 8,
+      "defaultMode": "deep_ocean",
+      "audioFile": "englishtown-77/gd77-09-03s2t08.mp3",
+      "palette": { "primary": 250, "secondary": 35, "saturation": 0.75 }
+    },
+    {
+      "trackId": "s2t09",
+      "title": "Not Fade Away",
+      "set": 2,
+      "trackNumber": 9,
+      "defaultMode": "mandala_engine",
+      "audioFile": "englishtown-77/gd77-09-03s2t09.mp3",
+      "palette": { "primary": 0, "secondary": 50, "saturation": 0.85 }
+    },
+    {
+      "trackId": "s2t10",
+      "title": "Truckin'",
+      "set": 2,
+      "trackNumber": 10,
+      "defaultMode": "fractal_temple",
+      "audioFile": "englishtown-77/gd77-09-03s2t10.mp3",
+      "palette": { "primary": 30, "secondary": 270, "saturation": 0.8 }
+    },
+    {
+      "trackId": "s2t11",
+      "title": "Terrapin Station",
+      "set": 2,
+      "trackNumber": 11,
+      "defaultMode": "terrapin_nebula",
+      "audioFile": "englishtown-77/gd77-09-03s2t11.mp3",
+      "palette": { "primary": 30, "secondary": 220, "saturation": 0.85 }
+    }
+  ]
+}

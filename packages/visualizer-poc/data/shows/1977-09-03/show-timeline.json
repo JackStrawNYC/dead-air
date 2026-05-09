@@ -1,0 +1,133 @@
+{
+  "date": "1977-09-03",
+  "totalFrames": 359032,
+  "totalDuration": 11967.733333333334,
+  "tracks": [
+    {
+      "trackId": "s1t01",
+      "globalFrameStart": 0,
+      "globalFrameEnd": 1048,
+      "totalFrames": 1048
+    },
+    {
+      "trackId": "s1t02",
+      "globalFrameStart": 1048,
+      "globalFrameEnd": 13370,
+      "totalFrames": 12322
+    },
+    {
+      "trackId": "s1t03",
+      "globalFrameStart": 13370,
+      "globalFrameEnd": 31406,
+      "totalFrames": 18036
+    },
+    {
+      "trackId": "s1t04",
+      "globalFrameStart": 31406,
+      "globalFrameEnd": 40948,
+      "totalFrames": 9542
+    },
+    {
+      "trackId": "s1t05",
+      "globalFrameStart": 40948,
+      "globalFrameEnd": 65360,
+      "totalFrames": 24412
+    },
+    {
+      "trackId": "s1t06",
+      "globalFrameStart": 65360,
+      "globalFrameEnd": 80235,
+      "totalFrames": 14875
+    },
+    {
+      "trackId": "s1t07",
+      "globalFrameStart": 80235,
+      "globalFrameEnd": 99318,
+      "totalFrames": 19083
+    },
+    {
+      "trackId": "s1t08",
+      "globalFrameStart": 99318,
+      "globalFrameEnd": 109628,
+      "totalFrames": 10310
+    },
+    {
+      "trackId": "s1t09",
+      "globalFrameStart": 109628,
+      "globalFrameEnd": 124422,
+      "totalFrames": 14794
+    },
+    {
+      "trackId": "s1t10",
+      "globalFrameStart": 124422,
+      "globalFrameEnd": 136807,
+      "totalFrames": 12385
+    },
+    {
+      "trackId": "s2t01",
+      "globalFrameStart": 136807,
+      "globalFrameEnd": 137856,
+      "totalFrames": 1049
+    },
+    {
+      "trackId": "s2t02",
+      "globalFrameStart": 137856,
+      "globalFrameEnd": 153123,
+      "totalFrames": 15267
+    },
+    {
+      "trackId": "s2t03",
+      "globalFrameStart": 153123,
+      "globalFrameEnd": 164925,
+      "totalFrames": 11802
+    },
+    {
+      "trackId": "s2t04",
+      "globalFrameStart": 164925,
+      "globalFrameEnd": 184585,
+      "totalFrames": 19660
+    },
+    {
+      "trackId": "s2t05",
+      "globalFrameStart": 184585,
+      "globalFrameEnd": 201670,
+      "totalFrames": 17085
+    },
+    {
+      "trackId": "s2t06",
+      "globalFrameStart": 201670,
+      "globalFrameEnd": 232748,
+      "totalFrames": 31078
+    },
+    {
+      "trackId": "s2t07",
+      "globalFrameStart": 232748,
+      "globalFrameEnd": 249740,
+      "totalFrames": 16992
+    },
+    {
+      "trackId": "s2t08",
+      "globalFrameStart": 249740,
+      "globalFrameEnd": 279833,
+      "totalFrames": 30093
+    },
+    {
+      "trackId": "s2t09",
+      "globalFrameStart": 279833,
+      "globalFrameEnd": 315342,
+      "totalFrames": 35509
+    },
+    {
+      "trackId": "s2t10",
+      "globalFrameStart": 315342,
+      "globalFrameEnd": 339102,
+      "totalFrames": 23760
+    },
+    {
+      "trackId": "s2t11",
+      "globalFrameStart": 339102,
+      "globalFrameEnd": 359032,
+      "totalFrames": 19930
+    }
+  ]
+}
