@@ -344,3 +344,52 @@ Week 5: the data table component and the design tokens, then the four screens th
 Week 6: AI franchise management v1 (rosters, lineups, rotations, simple free agency) and the 50-season no-human league-health test. At the end of this week there's a thing a person can play for an evening.
 
 That's the point at which the design stops being a document and becomes whatever the engine tells us.
+
+## 15. Decisions from the review: name, stack, and building solo
+
+### Naming
+
+The umbrella brand needs to work as a prefix on every sport: "X Baseball", "X Hockey", "X Football", the way Football Manager and Out of the Park Baseball read as products. So the word has to be sport-neutral, mean "the person who runs the team," and be short enough to survive the prefix. That rules out anything baseball-flavored (Pennant, Dugout, Backstop) and anything already owned by fantasy sports (Dynasty, Commissioner, Owner's Box).
+
+Candidates, in order of preference:
+
+1. Front Office. The literal name for the job. "Front Office Baseball" reads like a product that already exists. Weakness: generic enough that the .com is certainly gone and there's a low-grade trademark search to do.
+2. Rebuild. What every GM is actually doing. Short, active, a little funny, ownable. "Rebuild Baseball." Weakness: sounds like a construction company out of context.
+3. Tenure. Your run as GM, from hiring to firing. Unusual enough to own, works across sports, and the game's career arc (get fired, get hired somewhere worse) is literally the word. Weakness: abstract; needs a tagline the first time.
+4. Big Board. Draft-room language, alliterative with Baseball, and a nod to draftanomics' heritage. Weakness: draft-centric for a game that's mostly about the other 11 months.
+5. War Room. Evocative and gaming-native. Weakness: political and military connotations, and crowded.
+
+On TLDs: .gg is gaming-native, usually available, and cheap; .com for the umbrella if the name allows. Product URLs become baseball.name.gg or name.gg/baseball. The GitHub org and npm scope should match the name, so this decision gates the repo.
+
+### The UI stack
+
+Franchise mode's stack is not inherited, so this is a fresh choice for a solo developer building a data-dense, offline-capable, worker-driven app.
+
+- TypeScript everywhere, pnpm workspaces, Vite, Vitest, Biome for lint and format (one tool, zero config arguments with yourself).
+- React 19. Svelte 5 is arguably nicer for a solo developer, but React has the deepest ecosystem for the two hard UI problems here (headless tables and virtualization), and the largest corpus for AI-assisted development, which matters a lot when the team is one person.
+- TanStack Router for type-safe routes (everything hyperlinked, every player name a link, deep-linkable history), TanStack Table for headless table logic, TanStack Virtual for the long lists, TanStack Query as the cache over the worker RPC, since the UI-to-worker boundary is literally a client-server model.
+- Tailwind v4 with design tokens as CSS variables, Radix primitives for accessible menus, dialogs and popovers, and our own component layer on top. No off-the-shelf component kit's default look; the editorial feel is the product.
+- Typography: an editorial display serif for headers and player names, a sans with real tabular figures for everything numeric. Tabular figures are non-negotiable; misaligned stat columns are the fastest way to look amateur.
+- Charts: D3 scales with hand-rolled SVG components. Sparklines, win-probability graphs and rating bands are small and bespoke, and a chart library would fight the design.
+- Storage: SQLite WASM on OPFS, running inside the worker, instead of IndexedDB. This is the decision I'd argue hardest for. A 150-season league is a relational problem (leaderboards across all history, splits, "every player who hit 40 homers for a losing team"), and IndexedDB makes every one of those queries a hand-written index and a full scan. SQLite gives real queries, real indexes, and a save file that's a .sqlite users can open in any DB browser. The engine's hot state (rosters, ratings) lives in typed arrays in memory during a sim and flushes to SQLite per day. OPFS support is universal in current browsers; a fallback to IndexedDB-backed VFS covers stragglers.
+- Comlink for the worker boundary. The engine package itself has zero dependencies and runs identically in Node for the calibration suite.
+- vite-plugin-pwa for offline. Static hosting (Cloudflare Pages or similar); no backend at all until sync and multiplayer, and then Cloudflare Workers plus D1/R2 or Supabase, decided when it's needed.
+- Procedural SVG faces, a rewrite in spirit of ZenGM's faces.js with age progression.
+
+### What building solo changes
+
+The six-week plan in section 14 was written for a small team. Solo, the same milestones are the right sequence but the calendar is the engine's, not the plan's: each milestone is done when it's done, and the order is what matters.
+
+Three things get more important, not less, when it's one person:
+
+- The AI franchise manager is also the delegation feature. Everything an AI team does for itself (lineups, rotations, promotions, DFA decisions, free agent bidding) is the same code that runs when a human toggles "auto" on that subsystem. Build it once, serve both. This is the single biggest economy available to a solo developer on this project, and it means AI team management lands earlier in the order than it would for a team, not later.
+- The test suites are the second engineer. Calibration, league-health, and transaction property tests catch the regressions nobody else will be there to notice. They're not optional infrastructure to add later.
+- The cut list is real. Phase 1, solo: engine, calendar and offseason, world generation, the draft, simple contracts and free agency, AI teams, and the four core screens. Everything else (faces, news engine, finances, watch mode, the full farm) waits. A majors-only game with a working offseason and competent AI opponents is playable and worth showing; a half-built farm system is neither.
+
+### Public early access vs. closed alpha
+
+The question section 14 asked badly: when phase 1 is playable, does it go on the internet for anyone, or stay with a small invited group until the farm system exists in phase 2?
+
+Public early gets feedback, calibration reports from real leagues, and the start of a community, and for a solo developer the motivation of real users matters. The cost is that the audience this game is for will judge it on the farm system, and the first version doesn't have one. "Another ZenGM clone" is a hard first impression to reverse.
+
+Recommendation: public, labeled early access, with a visible roadmap, but not before the offseason loop works. Simming a season is a demo; simming a season, running an offseason, and starting the next one is a game. Recruit the first fifty players from the OOTP and ZenGM communities directly, because they'll find the calibration bugs in a week that would take a year to find alone.
