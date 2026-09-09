@@ -22,7 +22,7 @@ Everything below hangs off five commitments. When two features conflict, these d
 1. Real rules, not approximations. For a GM, the transaction system is the game. Options, waivers, service time, arbitration, the Rule 5 draft. Fake versions of these ("players just become free agents after their contract") gut the strategy. We implement the actual MLB ruleset, configurable where leagues differ.
 2. Fog of war. True ratings are never shown. You see your scouts' estimates, with error bars, and the error bars are the game. Certainty is something you buy, with scouting budget and time.
 3. Layered depth. Playable in ten minutes, masterable in hundreds of hours. Every subsystem has a "delegate this" switch with a competent AI behind it. A casual player who auto-delegates the minors and scouting still has a complete game. Depth is opt-in, never a toll.
-4. Statistical fidelity. A simulated season's aggregate output should be indistinguishable from a real MLB season: league slash lines, run environment, the shape of the leaderboards, the distribution of team win totals. This is testable and we test it (section 8).
+4. Statistical fidelity. A simulated season's aggregate output should be indistinguishable from a real MLB season: league slash lines, run environment, the shape of the leaderboards, the distribution of team win totals. This is testable and we test it (sections 4 and 9).
 5. A living world. History accumulates. Awards, records, Hall of Fame inductions, retired numbers, franchise droughts, that one fictional shortstop who hit .360 in 2041 and everyone in your league's Discord still talks about. Long-run attachment is the retention engine, and it's built from accumulated history plus a narrative layer that surfaces it.
 
 And one aesthetic commitment: beautiful density. Baseball UIs are either dense and ugly (OOTP) or clean and shallow. Baseball Savant and The Athletic proved dense can be gorgeous. That's the bar.
@@ -117,7 +117,7 @@ This is the moat. It's what OOTP has and ZenGM doesn't, and it's the part we ref
 - Contracts with the full toolkit: club/player/vesting options, opt-outs, incentives, no-trade clauses, salary deferrals, extensions, retained salary in trades. Qualifying offers with draft-pick compensation.
 - A competitive balance tax with escalating and repeater penalties, plus revenue sharing. League financial structure (CBT vs. hard cap vs. nothing) is configurable per league, because custom leagues will want it.
 
-All of it enforced by a transaction validator: there should be no reachable illegal roster state, ever, and that validator is property-tested (section 8).
+All of it enforced by a transaction validator: there should be no reachable illegal roster state, ever, and that validator is property-tested (section 9).
 
 ### Acquisition channels
 
@@ -276,3 +276,71 @@ Mobile. The ZenGM audience plays on phones, a lot. Dense sortable tables, a trad
 - Playtesting and exploit hunting as a planned phase, not a hope. The trade AI in particular needs adversarial testers whose job is to break it, and a feedback channel to report the trade that shouldn't have gone through.
 - Product analytics and the boring parts: where do new players churn (probably the offseason), autosave, confirmation on irreversible actions (a DFA is irreversible; a sim past the deadline is irreversible), payments, terms and privacy, community moderation for shared leagues, and support load.
 - Multiplayer specifics, when it comes: commissioner tools, turn deadlines, trade review, async sim schedules. Deferred to phase 4 but the calendar state machine should be built knowing it'll run on a server one day.
+
+## 14. Final review: what I'd change, what's locked, what's still yours
+
+A last pass reading the doc as the engineer who starts Monday. Three things I'd now revise from the earlier sections, a set of architecture principles that fell out of stress-testing the design, the decisions that are settled, and the ones that are still yours to make before the first commit.
+
+### Three revisions to my own recommendations
+
+The two-fidelity engine (section 4) is probably the wrong first move. I called "one model, two fidelities" a hard architectural rule. Run the arithmetic: a 30-team MLB season is about 2,430 games times roughly 300 pitches, call it 730,000 pitch resolutions, and four minor league levels add roughly 2.5 million more. Around 3.2 million pitch resolutions per league-year. A pitch resolution written without allocations in the hot loop (typed arrays, precomputed matchup tables, one PRNG draw per decision) is on the order of 5 to 10 microseconds in modern JavaScript. That's 15 to 35 seconds for the whole league, inside the 60-second budget, with one model instead of two. The outcome-conditioned expansion also has a real flaw I glossed over: it can't support mid-plate-appearance decisions in manage mode (a steal on 2-1, a pitchout, a mid-count pinch hitter), because the outcome was sampled before the count existed. Revised rule: build pitch-level as the only model, benchmark it against the 60-second target by the end of the engine's second week, and add a plate-appearance-level fast path only if the benchmark fails, with a CI test that the two agree on aggregates if that day ever comes. Minor league games are the first candidate for the fast path if it's needed, because nobody watches them.
+
+Phase 1 "majors-only" (section 11) is right for rule enforcement and wrong for the data model. If phase 1 players have contracts and reach free agency, but service time, option years, and 40-man status don't exist in the data model until phase 2, then phase 2 begins with a migration that invents history for every player in every existing league. Revised: the data model is complete from day one. Every player carries service days, options used, 40-man status, minor league level, injury history, and contract structure fields from the first commit. Phase 1 simply doesn't enforce most of the rules on them yet. Enforcement is phased; the schema is not.
+
+The draftanomics extraction audit (section 12) shouldn't block anything. Build the baseball engine as a standalone package with no platform dependency, because the engine is UI-agnostic anyway. Use draftanomics' UI stack for the baseball app unless someone has a specific reason not to, since a divergent stack is a fork on day one and the engine doesn't care either way. Extract shared platform code when the second real consumer exists, which is the moment the abstraction is knowable. Someone who knows the franchise mode code can run the audit in parallel; it isn't on the critical path.
+
+### Architecture principles that fell out of the stress test
+
+The event log is the source of truth. Every stat is a projection of play-by-play events. Stat tables are materialized caches that can be rebuilt from the log. This is what saves us when we realize in season 40 that we never tracked, say, first-pitch swing rate: recompute from events. It also makes the export format obvious (events plus current state) and makes the calibration suite trivially honest, since it reads the same events the UI does. Define the plate-appearance outcome taxonomy on day one (K, BB, IBB, HBP, 1B, 2B, 3B, HR, groundout, flyout, lineout, popout, sac fly, sac bunt, double play, fielder's choice, reached on error, catcher's interference) because everything downstream keys on it.
+
+The sim ticks by calendar day, not by game. A 10-day IL, a 7-day DFA clock, the 20 days in the minors that burn an option, 172 days for a year of service time. These are calendar rules. Days without games still tick, and the offseason is just days with a different phase active. The calendar state machine from section 13 and the day tick are the same object.
+
+Team perception is derived, not stored. Fog of war means each of 30 AI teams needs its own estimate of every player. Materialized, that's 30 teams times ~7,000 players times ~20 ratings, updated constantly. Instead: a perceived rating is the true rating plus deterministic noise seeded by (team, player, rating), scaled by that team's confidence in that player. Nothing stored beyond confidence levels; identical results every time it's computed; a scouting assignment is a confidence bump. Same mechanism serves the human's scouts and the public bureau.
+
+Separate PRNG streams per subsystem. Game sim, development, injuries, AI decisions, world generation each get their own stream from the master seed. Changing the injury model doesn't reshuffle every game result, which is what makes golden-master tests survivable across refactors.
+
+League structure is data. Team count, leagues, divisions, playoff format, DH rule, roster sizes, and every rule toggle from section 13 live in a league config object. No file in the engine knows the number 30.
+
+Potential is latent and drifts. Not a fixed number stamped at generation. Injuries lower it, late growth raises it, and scouts estimate it with the same uncertainty as current ability. This is what makes late bloomers and post-hype collapses emerge rather than being scripted.
+
+Each minor league level has its own run environment. A-ball has more strikeouts and worse defense than AAA. Level-to-level translation should emerge from talent distribution plus per-level environment, never from a hardcoded "AA stats times 0.8."
+
+The draft class exists a year before the draft. Scouts have to have something to scout. Amateur pool generation, with high school and college histories and stock that rises and falls over the spring, is part of the calendar, not a one-shot at draft time.
+
+The UI never touches storage directly. All reads are queries to the worker; all writes are commands. Nothing is held in memory that isn't on screen. This is what lets a 150-season league open without loading 150 seasons.
+
+### Decisions that are locked
+
+- Fictional players and team identities, real cities, first-class import/export for community rosters.
+- Client-first: engine in a Web Worker, league in IndexedDB, anonymous play by default, accounts optional, PWA.
+- Full MLB ruleset with the current CBA as the baseline, every rule a toggle.
+- 20-80 display scale over a continuous internal scale; true ratings never displayed.
+- Pitch-level engine as the sole model, benchmark-gated, fast path as contingency.
+- Complete schema from day one, phased enforcement.
+- Event log as source of truth, stats as projections.
+- Calendar-day tick with an explicit phase state machine.
+- Statistical calibration and AI-league-health suites as CI, from the first week the engine produces a season.
+- Free forever for single-player; paid tier is sync, multiplayer, and premium analytics.
+
+### Decisions that are still yours
+
+1. Product name and domain. Not technically blocking, but it gates the repo name, the package scope, and the brand-architecture question (umbrella site vs. separate brands), and that question decides where accounts live.
+2. The UI stack, which I'm assuming is draftanomics' stack. If franchise mode is on something you'd rather leave behind, this is the moment to say so, because the baseball app will be the bigger codebase within a year.
+3. Team size and timeline. The phase plan assumes a small team shipping phase 1 in roughly a quarter and phase 2 in the next two. If it's one person, phase 1 needs a cut list (drop faces, drop the news engine, keep the engine, tables, draft, and offseason).
+4. Whether phase 1 ships publicly or stays a closed alpha. Public phase 1 gets real calibration feedback and starts the community early; it also means the first impression is a majors-only game with no farm, and the audience we most want will notice.
+
+### The first six weeks, if we start Monday
+
+Week 1: repo, league config schema, the complete player and team data model, the outcome taxonomy, the event log format, PRNG streams. No sim yet. Property tests on the schema.
+
+Week 2: the pitch-level engine for a single game between two generated teams, producing a valid box score from the event log. Benchmark harness. This is the walking skeleton and it's the milestone that tells us whether the single-model bet holds.
+
+Week 3: world generation v1 (30 teams, plausible rosters, no back-history yet), schedule generation, and simming a full regular season. First run of the calibration suite, expected to fail, which is the point.
+
+Week 4: the calendar and phase state machine, day ticking, the season rollover (awards, aging, development, retirements, a draft). Second calibration pass.
+
+Week 5: the data table component and the design tokens, then the four screens that make it a game: franchise home, player page, standings, league stat tables. Everything else waits.
+
+Week 6: AI franchise management v1 (rosters, lineups, rotations, simple free agency) and the 50-season no-human league-health test. At the end of this week there's a thing a person can play for an evening.
+
+That's the point at which the design stops being a document and becomes whatever the engine tells us.
