@@ -1,6 +1,6 @@
-# Baseball GM: product and simulation design
+# GM Seat Baseball: product and simulation design
 
-Design document for a standalone baseball GM game, the second sport in the GM-mode family after the draftanomics franchise mode. This is a thinking document, not a spec to build from yet. It covers positioning, the simulation model, the transaction system, UI, architecture, and a phased roadmap, with open questions at the end.
+Design document for GM Seat Baseball, the flagship product of The GM Seat (thegmseat.com), a family of sports GM games built after the draftanomics franchise mode. This is a thinking document, not a spec to build from yet. It covers positioning, the simulation model, the transaction system, UI, architecture, and a phased roadmap, with open questions at the end.
 
 ## 1. Where this sits in the market
 
@@ -347,19 +347,20 @@ That's the point at which the design stops being a document and becomes whatever
 
 ## 15. Decisions from the review: name, stack, and building solo
 
-### Naming
+### Naming: The GM Seat
 
-The umbrella brand needs to work as a prefix on every sport: "X Baseball", "X Hockey", "X Football", the way Football Manager and Out of the Park Baseball read as products. So the word has to be sport-neutral, mean "the person who runs the team," and be short enough to survive the prefix. That rules out anything baseball-flavored (Pennant, Dugout, Backstop) and anything already owned by fantasy sports (Dynasty, Commissioner, Owner's Box).
+Decided. The umbrella brand is The GM Seat, at thegmseat.com (registered on Cloudflare). It passes the tests from the candidate list: sport-neutral, it means the job, and it works as a prefix. Product names drop the article in prefix form: GM Seat Baseball, GM Seat Hockey, GM Seat Football. The full "The GM Seat" is the umbrella and the landing page.
 
-Candidates, in order of preference:
+The name also hands us the career-mode framing for free. You take the seat, you keep the seat, you lose the seat. The owner's patience meter is the hot seat. Getting fired and taking a worse seat somewhere else is the arc. "Take the seat" is the landing page's only sentence.
 
-1. Front Office. The literal name for the job. "Front Office Baseball" reads like a product that already exists. Weakness: generic enough that the .com is certainly gone and there's a low-grade trademark search to do.
-2. Rebuild. What every GM is actually doing. Short, active, a little funny, ownable. "Rebuild Baseball." Weakness: sounds like a construction company out of context.
-3. Tenure. Your run as GM, from hiring to firing. Unusual enough to own, works across sports, and the game's career arc (get fired, get hired somewhere worse) is literally the word. Weakness: abstract; needs a tagline the first time.
-4. Big Board. Draft-room language, alliterative with Baseball, and a nod to draftanomics' heritage. Weakness: draft-centric for a game that's mostly about the other 11 months.
-5. War Room. Evocative and gaming-native. Weakness: political and military connotations, and crowded.
+What follows from the name:
 
-On TLDs: .gg is gaming-native, usually available, and cheap; .com for the umbrella if the name allows. Product URLs become baseball.name.gg or name.gg/baseball. The GitHub org and npm scope should match the name, so this decision gates the repo.
+- URLs are paths, not subdomains: thegmseat.com/baseball, thegmseat.com/hockey. One app shell, one deployment, one set of cookies and accounts, one design system, with each sport as a lazily loaded route bundle. Subdomains buy deployment isolation a solo developer doesn't need and pay for it in duplicated shells.
+- One monorepo for the whole family: platform packages plus one package group per sport. The GitHub org and npm scope are `gmseat` (@gmseat/baseball-engine, @gmseat/platform, @gmseat/ui). The repo is `gmseat/gmseat`.
+- Hosting on Cloudflare, since the domain already lives there: Pages for the static app, Workers plus D1 and R2 when sync and multiplayer arrive. Keeping DNS, hosting, and the eventual backend in one console is worth more to one person than any marginal hosting advantage elsewhere.
+- Save files carry the scope in their name (`.gmseat` extension wrapping the SQLite file) so a league shared on a forum is recognizably ours.
+
+The earlier candidates (Front Office, Rebuild, Tenure, Big Board, War Room) are retired.
 
 ### The UI stack
 
