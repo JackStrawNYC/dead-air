@@ -1,0 +1,3350 @@
+{
+  "log": [
+    "shot 00-new-league-1440 @ ",
+    "league open on 2026-03-26",
+    "shot 01-desk-camp-1440 @ 2026-03-26",
+    "team id 18",
+    "opening day passed: 2026-03-27",
+    "walk letter on desk: /baseball/players/2316",
+    "shot 02-desk-contract-decision-1440 @ 2026-03-29",
+    "shot 02-desk-contract-decision-390 @ 2026-03-29",
+    "July: 2026-06-11",
+    "trade offer on desk: offer-12 at 2026-06-11",
+    "offer link /baseball/trades",
+    "shot 10-desk-1440 @ 2026-06-11",
+    "shot 10-desk-390 @ 2026-06-11",
+    "shot 11-desk-decisions-filter-1440 @ 2026-06-11",
+    "shot 12-desk-urgent-filter-1440 @ 2026-06-11",
+    "shot 20-club-1440 @ 2026-06-11",
+    "shot 20-club-390 @ 2026-06-11",
+    "shot 21-roster-lineup-1440 @ 2026-06-11",
+    "shot 21-roster-lineup-390 @ 2026-06-11",
+    "shot 30-player-1440 @ 2026-06-11",
+    "shot 30-player-390 @ 2026-06-11",
+    "shot 31-player-contract-1440 @ 2026-06-11",
+    "shot 31-player-contract-390 @ 2026-06-11",
+    "shot 40-trade-negotiation-1440 @ 2026-06-11",
+    "shot 41-trade-deal-panel-1440 @ 2026-06-11",
+    "shot 40-trade-negotiation-390 @ 2026-06-11",
+    "shot 41-trade-deal-panel-390 @ 2026-06-11",
+    "shot 50-free-agents-1440 @ 2026-06-11",
+    "shot 50-free-agents-390 @ 2026-06-11",
+    "shot 51-draft-1440 @ 2026-06-11",
+    "shot 51-draft-390 @ 2026-06-11",
+    "shot 52-farm-1440 @ 2026-06-11",
+    "shot 52-farm-390 @ 2026-06-11",
+    "shot 60-advance-before-1440 @ 2026-06-11",
+    "shot 62-advance-after-1440 @ 2026-06-12",
+    "shot 64-week-after-1440 @ 2026-06-17",
+    "shot 60-advance-before-390 @ 2026-06-17",
+    "shot 62-advance-after-390 @ 2026-06-18",
+    "shot 64-week-after-390 @ 2026-06-19",
+    "shot 70-phone-nav-drawer-390 @ 2026-06-19",
+    "shot 71-menu-play-1440 @ 2026-06-19",
+    "shot 72-menu-front-office-1440 @ 2026-06-19",
+    "shot 73-free-agent-review-dialog-1440 @ 2026-06-19",
+    "shot 80-standings-1440 @ 2026-06-19",
+    "shot 80-standings-390 @ 2026-06-19",
+    "shot 81-dugout-1440 @ 2026-06-19",
+    "shot 81-dugout-390 @ 2026-06-19",
+    "shot 82-scouts-1440 @ 2026-06-19",
+    "shot 82-scouts-390 @ 2026-06-19",
+    "shot 83-news-1440 @ 2026-06-19",
+    "shot 83-news-390 @ 2026-06-19",
+    "shot 84-stats-1440 @ 2026-06-19",
+    "shot 84-stats-390 @ 2026-06-19",
+    "shot 85-players-1440 @ 2026-06-19",
+    "shot 85-players-390 @ 2026-06-19",
+    "shot 86-scores-1440 @ 2026-06-19",
+    "shot 86-scores-390 @ 2026-06-19",
+    "shot 87-organization-1440 @ 2026-06-19",
+    "shot 87-organization-390 @ 2026-06-19"
+  ],
+  "pageErrors": [],
+  "metrics": {
+    "00-new-league-1440": {
+      "vw": 1440,
+      "vh": 900,
+      "headerHeight": 50,
+      "headerPct": 6,
+      "mainPadLeft": 20,
+      "mainWidth": 1400,
+      "panelsInFold": [
+        "CHOOSE YOUR FRANCHISE"
+      ],
+      "tables": [],
+      "clickablesInFold": 32,
+      "headerClickablesInFold": 6,
+      "primaryAction": {
+        "text": "Start the league",
+        "top": 858,
+        "inFold": true
+      },
+      "hscroll": false,
+      "overflowContainers": 0,
+      "scrollHeight": 1612,
+      "inkPct": 26,
+      "headerBandPct": 6,
+      "desk": [],
+      "date": "",
+      "url": "http://localhost:4373/baseball/new"
+    },
+    "01-desk-camp-1440": {
+      "vw": 1440,
+      "vh": 900,
+      "headerHeight": 125,
+      "headerPct": 14,
+      "mainPadLeft": 20,
+      "mainWidth": 1400,
+      "panelsInFold": [
+        "NATIONAL EAST",
+        "THE OWNER",
+        "THE STAFF",
+        "THE DESK",
+        "YOUR FIRST EVENING",
+        "NEWS"
+      ],
+      "tables": [
+        {
+          "cols": 3,
+          "bodyCells": 3,
+          "rows": 5,
+          "inFold": true,
+          "panel": "NATIONAL EAST"
+        },
+        {
+          "cols": 4,
+          "bodyCells": 4,
+          "rows": 6,
+          "inFold": true,
+          "panel": "THE STAFF"
+        },
+        {
+          "cols": 0,
+          "bodyCells": 4,
+          "rows": 4,
+          "inFold": false,
+          "panel": "RECENT AND UPCOMING"
+        }
+      ],
+      "clickablesInFold": 34,
+      "headerClickablesInFold": 32,
+      "primaryAction": {
+        "text": "ADVANCE\nPLAY ONE DAY, STOPPING FOR DECISIONS.",
+        "top": 56,
+        "inFold": true
+      },
+      "hscroll": false,
+      "overflowContainers": 1,
+      "scrollHeight": 2585,
+      "inkPct": 37,
+      "headerBandPct": 14,
+      "desk": [
+        {
+          "key": "physicals-2026",
+          "urgent": "false",
+          "decision": "false",
+          "inFold": true
+        },
+        {
+          "key": "mandate-2026-set",
+          "urgent": "false",
+          "decision": "false",
+          "inFold": true
+        },
+        {
+          "key": "walk-2026-2316",
+          "urgent": "false",
+          "decision": "true",
+          "inFold": true
+        }
+      ],
+      "date": "2026-03-26",
+      "url": "http://localhost:4373/baseball/"
+    },
+    "02-desk-contract-decision-1440": {
+      "vw": 1440,
+      "vh": 900,
+      "headerHeight": 125,
+      "headerPct": 14,
+      "mainPadLeft": 20,
+      "mainWidth": 1400,
+      "panelsInFold": [
+        "NATIONAL EAST",
+        "THE OWNER",
+        "THE STAFF",
+        "THE DESK",
+        "RECENT AND UPCOMING",
+        "NEWS"
+      ],
+      "tables": [
+        {
+          "cols": 3,
+          "bodyCells": 3,
+          "rows": 5,
+          "inFold": true,
+          "panel": "NATIONAL EAST"
+        },
+        {
+          "cols": 4,
+          "bodyCells": 4,
+          "rows": 6,
+          "inFold": true,
+          "panel": "THE STAFF"
+        },
+        {
+          "cols": 0,
+          "bodyCells": 4,
+          "rows": 7,
+          "inFold": true,
+          "panel": "RECENT AND UPCOMING"
+        }
+      ],
+      "clickablesInFold": 36,
+      "headerClickablesInFold": 33,
+      "primaryAction": {
+        "text": "ADVANCE\nPLAY ONE DAY, STOPPING FOR DECISIONS.",
+        "top": 56,
+        "inFold": true
+      },
+      "hscroll": false,
+      "overflowContainers": 1,
+      "scrollHeight": 2120,
+      "inkPct": 36,
+      "headerBandPct": 14,
+      "desk": [
+        {
+          "key": "mandate-2026-set",
+          "urgent": "false",
+          "decision": "false",
+          "inFold": true
+        },
+        {
+          "key": "physicals-2026",
+          "urgent": "false",
+          "decision": "false",
+          "inFold": true
+        },
+        {
+          "key": "walk-2026-2316",
+          "urgent": "false",
+          "decision": "true",
+          "inFold": true
+        }
+      ],
+      "date": "2026-03-29",
+      "url": "http://localhost:4373/baseball/"
+    },
+    "02-desk-contract-decision-390": {
+      "vw": 390,
+      "vh": 844,
+      "headerHeight": 174,
+      "headerPct": 21,
+      "mainPadLeft": 0,
+      "mainWidth": 390,
+      "panelsInFold": [
+        "THE DESK"
+      ],
+      "tables": [
+        {
+          "cols": 3,
+          "bodyCells": 3,
+          "rows": 5,
+          "inFold": false,
+          "panel": "NATIONAL EAST"
+        },
+        {
+          "cols": 4,
+          "bodyCells": 4,
+          "rows": 6,
+          "inFold": false,
+          "panel": "THE STAFF"
+        },
+        {
+          "cols": 0,
+          "bodyCells": 4,
+          "rows": 7,
+          "inFold": false,
+          "panel": "RECENT AND UPCOMING"
+        }
+      ],
+      "clickablesInFold": 10,
+      "headerClickablesInFold": 12,
+      "primaryAction": {
+        "text": "ADVANCE\nPLAY ONE DAY, STOPPING FOR DECISIONS.",
+        "top": 105,
+        "inFold": true
+      },
+      "hscroll": false,
+      "overflowContainers": 1,
+      "scrollHeight": 4859,
+      "inkPct": 47,
+      "headerBandPct": 21,
+      "desk": [
+        {
+          "key": "mandate-2026-set",
+          "urgent": "false",
+          "decision": "false",
+          "inFold": true
+        },
+        {
+          "key": "physicals-2026",
+          "urgent": "false",
+          "decision": "false",
+          "inFold": true
+        },
+        {
+          "key": "walk-2026-2316",
+          "urgent": "false",
+          "decision": "true",
+          "inFold": true
+        }
+      ],
+      "date": "2026-03-29",
+      "url": "http://localhost:4373/baseball/"
+    },
+    "10-desk-1440": {
+      "vw": 1440,
+      "vh": 900,
+      "headerHeight": 125,
+      "headerPct": 14,
+      "mainPadLeft": 20,
+      "mainWidth": 1400,
+      "panelsInFold": [
+        "NATIONAL EAST",
+        "THE OWNER",
+        "THE STAFF",
+        "THE DESK",
+        "NEWS"
+      ],
+      "tables": [
+        {
+          "cols": 3,
+          "bodyCells": 3,
+          "rows": 5,
+          "inFold": true,
+          "panel": "NATIONAL EAST"
+        },
+        {
+          "cols": 4,
+          "bodyCells": 4,
+          "rows": 6,
+          "inFold": true,
+          "panel": "THE STAFF"
+        },
+        {
+          "cols": 0,
+          "bodyCells": 4,
+          "rows": 9,
+          "inFold": false,
+          "panel": "RECENT AND UPCOMING"
+        }
+      ],
+      "clickablesInFold": 34,
+      "headerClickablesInFold": 32,
+      "primaryAction": {
+        "text": "ADVANCE\nPLAY ONE DAY, STOPPING FOR DECISIONS.",
+        "top": 56,
+        "inFold": true
+      },
+      "hscroll": false,
+      "overflowContainers": 1,
+      "scrollHeight": 3010,
+      "inkPct": 37,
+      "headerBandPct": 14,
+      "desk": [
+        {
+          "key": "il-2334-20615",
+          "urgent": "true",
+          "decision": "true",
+          "inFold": true
+        },
+        {
+          "key": "offer-12",
+          "urgent": "true",
+          "decision": "true",
+          "inFold": true
+        },
+        {
+          "key": "ask-2026-starter",
+          "urgent": "false",
+          "decision": "true",
+          "inFold": true
+        },
+        {
+          "key": "ask-2026-hole-CF",
+          "urgent": "false",
+          "decision": "true",
+          "inFold": true
+        },
+        {
+          "key": "setback-2394-20613",
+          "urgent": "false",
+          "decision": "false",
+          "inFold": false
+        },
+        {
+          "key": "coach-hitting-2026-2",
+          "urgent": "false",
+          "decision": "false",
+          "inFold": false
+        },
+        {
+          "key": "coach-pitching-2026-2",
+          "urgent": "false",
+          "decision": "false",
+          "inFold": false
+        },
+        {
+          "key": "setback-2343-20610",
+          "urgent": "false",
+          "decision": "false",
+          "inFold": false
+        },
+        {
+          "key": "setback-2409-20602",
+          "urgent": "false",
+          "decision": "false",
+          "inFold": false
+        },
+        {
+          "key": "setback-2437-20601",
+          "urgent": "false",
+          "decision": "false",
+          "inFold": false
+        },
+        {
+          "key": "mandate-2026-set",
+          "urgent": "false",
+          "decision": "false",
+          "inFold": false
+        }
+      ],
+      "date": "2026-06-11",
+      "url": "http://localhost:4373/baseball/"
+    },
+    "10-desk-390": {
+      "vw": 390,
+      "vh": 844,
+      "headerHeight": 174,
+      "headerPct": 21,
+      "mainPadLeft": 0,
+      "mainWidth": 390,
+      "panelsInFold": [
+        "THE DESK"
+      ],
+      "tables": [
+        {
+          "cols": 3,
+          "bodyCells": 3,
+          "rows": 5,
+          "inFold": false,
+          "panel": "NATIONAL EAST"
+        },
+        {
+          "cols": 4,
+          "bodyCells": 4,
+          "rows": 6,
+          "inFold": false,
+          "panel": "THE STAFF"
+        },
+        {
+          "cols": 0,
+          "bodyCells": 4,
+          "rows": 9,
+          "inFold": false,
+          "panel": "RECENT AND UPCOMING"
+        }
+      ],
+      "clickablesInFold": 9,
+      "headerClickablesInFold": 11,
+      "primaryAction": {
+        "text": "ADVANCE\nPLAY ONE DAY, STOPPING FOR DECISIONS.",
+        "top": 105,
+        "inFold": true
+      },
+      "hscroll": false,
+      "overflowContainers": 1,
+      "scrollHeight": 6245,
+      "inkPct": 47,
+      "headerBandPct": 21,
+      "desk": [
+        {
+          "key": "il-2334-20615",
+          "urgent": "true",
+          "decision": "true",
+          "inFold": true
+        },
+        {
+          "key": "offer-12",
+          "urgent": "true",
+          "decision": "true",
+          "inFold": true
+        },
+        {
+          "key": "ask-2026-starter",
+          "urgent": "false",
+          "decision": "true",
+          "inFold": false
+        },
+        {
+          "key": "ask-2026-hole-CF",
+          "urgent": "false",
+          "decision": "true",
+          "inFold": false
+        },
+        {
+          "key": "setback-2394-20613",
+          "urgent": "false",
+          "decision": "false",
+          "inFold": false
+        },
+        {
+          "key": "coach-hitting-2026-2",
+          "urgent": "false",
+          "decision": "false",
+          "inFold": false
+        },
+        {
+          "key": "coach-pitching-2026-2",
+          "urgent": "false",
+          "decision": "false",
+          "inFold": false
+        },
+        {
+          "key": "setback-2343-20610",
+          "urgent": "false",
+          "decision": "false",
+          "inFold": false
+        },
+        {
+          "key": "setback-2409-20602",
+          "urgent": "false",
+          "decision": "false",
+          "inFold": false
+        },
+        {
+          "key": "setback-2437-20601",
+          "urgent": "false",
+          "decision": "false",
+          "inFold": false
+        },
+        {
+          "key": "mandate-2026-set",
+          "urgent": "false",
+          "decision": "false",
+          "inFold": false
+        }
+      ],
+      "date": "2026-06-11",
+      "url": "http://localhost:4373/baseball/"
+    },
+    "11-desk-decisions-filter-1440": {
+      "vw": 1440,
+      "vh": 900,
+      "headerHeight": 125,
+      "headerPct": 14,
+      "mainPadLeft": 20,
+      "mainWidth": 1400,
+      "panelsInFold": [
+        "NATIONAL EAST",
+        "THE OWNER",
+        "THE STAFF",
+        "THE DESK",
+        "NEWS"
+      ],
+      "tables": [
+        {
+          "cols": 3,
+          "bodyCells": 3,
+          "rows": 5,
+          "inFold": true,
+          "panel": "NATIONAL EAST"
+        },
+        {
+          "cols": 4,
+          "bodyCells": 4,
+          "rows": 6,
+          "inFold": true,
+          "panel": "THE STAFF"
+        },
+        {
+          "cols": 0,
+          "bodyCells": 4,
+          "rows": 9,
+          "inFold": false,
+          "panel": "RECENT AND UPCOMING"
+        }
+      ],
+      "clickablesInFold": 33,
+      "headerClickablesInFold": 31,
+      "primaryAction": {
+        "text": "ADVANCE\nPLAY ONE DAY, STOPPING FOR DECISIONS.",
+        "top": 56,
+        "inFold": true
+      },
+      "hscroll": false,
+      "overflowContainers": 1,
+      "scrollHeight": 2277,
+      "inkPct": 37,
+      "headerBandPct": 14,
+      "desk": [
+        {
+          "key": "il-2334-20615",
+          "urgent": "true",
+          "decision": "true",
+          "inFold": true
+        },
+        {
+          "key": "offer-12",
+          "urgent": "true",
+          "decision": "true",
+          "inFold": true
+        },
+        {
+          "key": "ask-2026-starter",
+          "urgent": "false",
+          "decision": "true",
+          "inFold": true
+        },
+        {
+          "key": "ask-2026-hole-CF",
+          "urgent": "false",
+          "decision": "true",
+          "inFold": true
+        }
+      ],
+      "date": "2026-06-11",
+      "url": "http://localhost:4373/baseball/"
+    },
+    "12-desk-urgent-filter-1440": {
+      "vw": 1440,
+      "vh": 900,
+      "headerHeight": 125,
+      "headerPct": 14,
+      "mainPadLeft": 20,
+      "mainWidth": 1400,
+      "panelsInFold": [
+        "NATIONAL EAST",
+        "THE OWNER",
+        "THE STAFF",
+        "THE DESK",
+        "(untitled)",
+        "RECENT AND UPCOMING",
+        "NEWS"
+      ],
+      "tables": [
+        {
+          "cols": 3,
+          "bodyCells": 3,
+          "rows": 5,
+          "inFold": true,
+          "panel": "NATIONAL EAST"
+        },
+        {
+          "cols": 4,
+          "bodyCells": 4,
+          "rows": 6,
+          "inFold": true,
+          "panel": "THE STAFF"
+        },
+        {
+          "cols": 0,
+          "bodyCells": 4,
+          "rows": 9,
+          "inFold": true,
+          "panel": "RECENT AND UPCOMING"
+        }
+      ],
+      "clickablesInFold": 33,
+      "headerClickablesInFold": 32,
+      "primaryAction": {
+        "text": "ADVANCE\nPLAY ONE DAY, STOPPING FOR DECISIONS.",
+        "top": 56,
+        "inFold": true
+      },
+      "hscroll": false,
+      "overflowContainers": 1,
+      "scrollHeight": 2277,
+      "inkPct": 37,
+      "headerBandPct": 14,
+      "desk": [
+        {
+          "key": "il-2334-20615",
+          "urgent": "true",
+          "decision": "true",
+          "inFold": true
+        },
+        {
+          "key": "offer-12",
+          "urgent": "true",
+          "decision": "true",
+          "inFold": true
+        }
+      ],
+      "date": "2026-06-11",
+      "url": "http://localhost:4373/baseball/"
+    },
+    "20-club-1440": {
+      "vw": 1440,
+      "vh": 900,
+      "headerHeight": 125,
+      "headerPct": 14,
+      "mainPadLeft": 20,
+      "mainWidth": 1400,
+      "panelsInFold": [
+        "LINEUP",
+        "PITCHING STAFF"
+      ],
+      "tables": [
+        {
+          "cols": 8,
+          "bodyCells": 8,
+          "rows": 9,
+          "inFold": true,
+          "panel": "LINEUP"
+        },
+        {
+          "cols": 0,
+          "bodyCells": 6,
+          "rows": 5,
+          "inFold": true,
+          "panel": "PITCHING STAFF"
+        },
+        {
+          "cols": 0,
+          "bodyCells": 6,
+          "rows": 8,
+          "inFold": true,
+          "panel": "PITCHING STAFF"
+        },
+        {
+          "cols": 5,
+          "bodyCells": 5,
+          "rows": 15,
+          "inFold": false,
+          "panel": "RESERVE"
+        },
+        {
+          "cols": 4,
+          "bodyCells": 4,
+          "rows": 8,
+          "inFold": false,
+          "panel": "BUSINESS"
+        },
+        {
+          "cols": 19,
+          "bodyCells": 19,
+          "rows": 1,
+          "inFold": false,
+          "panel": "FINANCES"
+        },
+        {
+          "cols": 4,
+          "bodyCells": 4,
+          "rows": 4,
+          "inFold": false,
+          "panel": "DEPARTMENTS"
+        }
+      ],
+      "clickablesInFold": 137,
+      "headerClickablesInFold": 32,
+      "primaryAction": {
+        "text": "DAY\nPLAY ONE DAY, STOPPING FOR DECISIONS.",
+        "top": 56,
+        "inFold": true
+      },
+      "hscroll": false,
+      "overflowContainers": 3,
+      "scrollHeight": 4863,
+      "inkPct": 37,
+      "headerBandPct": 14,
+      "desk": [],
+      "date": "2026-06-11",
+      "url": "http://localhost:4373/baseball/teams/18"
+    },
+    "20-club-390": {
+      "vw": 390,
+      "vh": 844,
+      "headerHeight": 174,
+      "headerPct": 21,
+      "mainPadLeft": 0,
+      "mainWidth": 390,
+      "panelsInFold": [
+        "LINEUP"
+      ],
+      "tables": [
+        {
+          "cols": 8,
+          "bodyCells": 8,
+          "rows": 9,
+          "inFold": false,
+          "panel": "LINEUP"
+        },
+        {
+          "cols": 0,
+          "bodyCells": 6,
+          "rows": 5,
+          "inFold": false,
+          "panel": "PITCHING STAFF"
+        },
+        {
+          "cols": 0,
+          "bodyCells": 6,
+          "rows": 8,
+          "inFold": false,
+          "panel": "PITCHING STAFF"
+        },
+        {
+          "cols": 5,
+          "bodyCells": 5,
+          "rows": 15,
+          "inFold": false,
+          "panel": "RESERVE"
+        },
+        {
+          "cols": 4,
+          "bodyCells": 4,
+          "rows": 8,
+          "inFold": false,
+          "panel": "BUSINESS"
+        },
+        {
+          "cols": 19,
+          "bodyCells": 19,
+          "rows": 1,
+          "inFold": false,
+          "panel": "FINANCES"
+        },
+        {
+          "cols": 4,
+          "bodyCells": 4,
+          "rows": 4,
+          "inFold": false,
+          "panel": "DEPARTMENTS"
+        }
+      ],
+      "clickablesInFold": 11,
+      "headerClickablesInFold": 11,
+      "primaryAction": {
+        "text": "DAY\nPLAY ONE DAY, STOPPING FOR DECISIONS.",
+        "top": 105,
+        "inFold": true
+      },
+      "hscroll": false,
+      "overflowContainers": 7,
+      "scrollHeight": 8369,
+      "inkPct": 43,
+      "headerBandPct": 21,
+      "desk": [],
+      "date": "2026-06-11",
+      "url": "http://localhost:4373/baseball/teams/18"
+    },
+    "21-roster-lineup-1440": {
+      "vw": 1440,
+      "vh": 900,
+      "headerHeight": 125,
+      "headerPct": 14,
+      "mainPadLeft": 20,
+      "mainWidth": 1400,
+      "panelsInFold": [
+        "LINEUP",
+        "PITCHING STAFF",
+        "RESERVE"
+      ],
+      "tables": [
+        {
+          "cols": 8,
+          "bodyCells": 8,
+          "rows": 9,
+          "inFold": true,
+          "panel": "LINEUP"
+        },
+        {
+          "cols": 0,
+          "bodyCells": 6,
+          "rows": 5,
+          "inFold": true,
+          "panel": "PITCHING STAFF"
+        },
+        {
+          "cols": 0,
+          "bodyCells": 6,
+          "rows": 8,
+          "inFold": true,
+          "panel": "PITCHING STAFF"
+        },
+        {
+          "cols": 5,
+          "bodyCells": 5,
+          "rows": 15,
+          "inFold": true,
+          "panel": "RESERVE"
+        },
+        {
+          "cols": 4,
+          "bodyCells": 4,
+          "rows": 8,
+          "inFold": false,
+          "panel": "BUSINESS"
+        },
+        {
+          "cols": 19,
+          "bodyCells": 19,
+          "rows": 1,
+          "inFold": false,
+          "panel": "FINANCES"
+        },
+        {
+          "cols": 4,
+          "bodyCells": 4,
+          "rows": 4,
+          "inFold": false,
+          "panel": "DEPARTMENTS"
+        }
+      ],
+      "clickablesInFold": 144,
+      "headerClickablesInFold": 32,
+      "primaryAction": {
+        "text": "DAY\nPLAY ONE DAY, STOPPING FOR DECISIONS.",
+        "top": 56,
+        "inFold": true
+      },
+      "hscroll": false,
+      "overflowContainers": 3,
+      "scrollHeight": 4863,
+      "inkPct": 37,
+      "headerBandPct": 14,
+      "desk": [],
+      "date": "2026-06-11",
+      "url": "http://localhost:4373/baseball/teams/18#club-roster"
+    },
+    "21-roster-lineup-390": {
+      "vw": 390,
+      "vh": 844,
+      "headerHeight": 174,
+      "headerPct": 21,
+      "mainPadLeft": 0,
+      "mainWidth": 390,
+      "panelsInFold": [
+        "LINEUP",
+        "PITCHING STAFF"
+      ],
+      "tables": [
+        {
+          "cols": 8,
+          "bodyCells": 8,
+          "rows": 9,
+          "inFold": true,
+          "panel": "LINEUP"
+        },
+        {
+          "cols": 0,
+          "bodyCells": 6,
+          "rows": 5,
+          "inFold": false,
+          "panel": "PITCHING STAFF"
+        },
+        {
+          "cols": 0,
+          "bodyCells": 6,
+          "rows": 8,
+          "inFold": false,
+          "panel": "PITCHING STAFF"
+        },
+        {
+          "cols": 5,
+          "bodyCells": 5,
+          "rows": 15,
+          "inFold": false,
+          "panel": "RESERVE"
+        },
+        {
+          "cols": 4,
+          "bodyCells": 4,
+          "rows": 8,
+          "inFold": false,
+          "panel": "BUSINESS"
+        },
+        {
+          "cols": 19,
+          "bodyCells": 19,
+          "rows": 1,
+          "inFold": false,
+          "panel": "FINANCES"
+        },
+        {
+          "cols": 4,
+          "bodyCells": 4,
+          "rows": 4,
+          "inFold": false,
+          "panel": "DEPARTMENTS"
+        }
+      ],
+      "clickablesInFold": 74,
+      "headerClickablesInFold": 11,
+      "primaryAction": {
+        "text": "DAY\nPLAY ONE DAY, STOPPING FOR DECISIONS.",
+        "top": 105,
+        "inFold": true
+      },
+      "hscroll": false,
+      "overflowContainers": 7,
+      "scrollHeight": 8369,
+      "inkPct": 48,
+      "headerBandPct": 21,
+      "desk": [],
+      "date": "2026-06-11",
+      "url": "http://localhost:4373/baseball/teams/18#club-roster"
+    },
+    "30-player-1440": {
+      "vw": 1440,
+      "vh": 900,
+      "headerHeight": 125,
+      "headerPct": 14,
+      "mainPadLeft": 20,
+      "mainWidth": 1400,
+      "panelsInFold": [
+        "EXTENSION TALKS",
+        "RATINGS",
+        "DEFENSE",
+        "SCOUTING REPORT",
+        "THE GLOVE, BY THE PLAYS MADE",
+        "DEVELOPMENT PLAN"
+      ],
+      "tables": [
+        {
+          "cols": 7,
+          "bodyCells": 7,
+          "rows": 1,
+          "inFold": true,
+          "panel": "THE GLOVE, BY THE PLAYS MADE"
+        },
+        {
+          "cols": 19,
+          "bodyCells": 19,
+          "rows": 7,
+          "inFold": false,
+          "panel": "BATTING, BY SEASON"
+        },
+        {
+          "cols": 8,
+          "bodyCells": 8,
+          "rows": 9,
+          "inFold": false,
+          "panel": "2026 SPLITS"
+        },
+        {
+          "cols": 13,
+          "bodyCells": 13,
+          "rows": 20,
+          "inFold": false,
+          "panel": "GAME LOG, AT THE PLATE"
+        }
+      ],
+      "clickablesInFold": 15,
+      "headerClickablesInFold": 32,
+      "primaryAction": {
+        "text": "DAY\nPLAY ONE DAY, STOPPING FOR DECISIONS.",
+        "top": 56,
+        "inFold": true
+      },
+      "hscroll": false,
+      "overflowContainers": 0,
+      "scrollHeight": 3061,
+      "inkPct": 26,
+      "headerBandPct": 14,
+      "desk": [],
+      "date": "2026-06-11",
+      "url": "http://localhost:4373/baseball/players/2316"
+    },
+    "30-player-390": {
+      "vw": 390,
+      "vh": 844,
+      "headerHeight": 174,
+      "headerPct": 21,
+      "mainPadLeft": 0,
+      "mainWidth": 390,
+      "panelsInFold": [
+        "EXTENSION TALKS"
+      ],
+      "tables": [
+        {
+          "cols": 7,
+          "bodyCells": 7,
+          "rows": 1,
+          "inFold": false,
+          "panel": "THE GLOVE, BY THE PLAYS MADE"
+        },
+        {
+          "cols": 19,
+          "bodyCells": 19,
+          "rows": 7,
+          "inFold": false,
+          "panel": "BATTING, BY SEASON"
+        },
+        {
+          "cols": 8,
+          "bodyCells": 8,
+          "rows": 9,
+          "inFold": false,
+          "panel": "2026 SPLITS"
+        },
+        {
+          "cols": 13,
+          "bodyCells": 13,
+          "rows": 20,
+          "inFold": false,
+          "panel": "GAME LOG, AT THE PLATE"
+        }
+      ],
+      "clickablesInFold": 9,
+      "headerClickablesInFold": 11,
+      "primaryAction": {
+        "text": "DAY\nPLAY ONE DAY, STOPPING FOR DECISIONS.",
+        "top": 105,
+        "inFold": true
+      },
+      "hscroll": false,
+      "overflowContainers": 3,
+      "scrollHeight": 4768,
+      "inkPct": 44,
+      "headerBandPct": 21,
+      "desk": [],
+      "date": "2026-06-11",
+      "url": "http://localhost:4373/baseball/players/2316"
+    },
+    "31-player-contract-1440": {
+      "vw": 1440,
+      "vh": 900,
+      "headerHeight": 125,
+      "headerPct": 14,
+      "mainPadLeft": 20,
+      "mainWidth": 1400,
+      "panelsInFold": [
+        "EXTENSION TALKS",
+        "RATINGS",
+        "DEFENSE",
+        "SCOUTING REPORT",
+        "THE GLOVE, BY THE PLAYS MADE",
+        "DEVELOPMENT PLAN",
+        "CARD",
+        "INJURY HISTORY",
+        "ON THE WIRE"
+      ],
+      "tables": [
+        {
+          "cols": 7,
+          "bodyCells": 7,
+          "rows": 1,
+          "inFold": true,
+          "panel": "THE GLOVE, BY THE PLAYS MADE"
+        },
+        {
+          "cols": 19,
+          "bodyCells": 19,
+          "rows": 7,
+          "inFold": false,
+          "panel": "BATTING, BY SEASON"
+        },
+        {
+          "cols": 8,
+          "bodyCells": 8,
+          "rows": 9,
+          "inFold": false,
+          "panel": "2026 SPLITS"
+        },
+        {
+          "cols": 13,
+          "bodyCells": 13,
+          "rows": 20,
+          "inFold": false,
+          "panel": "GAME LOG, AT THE PLATE"
+        }
+      ],
+      "clickablesInFold": 14,
+      "headerClickablesInFold": 32,
+      "primaryAction": {
+        "text": "DAY\nPLAY ONE DAY, STOPPING FOR DECISIONS.",
+        "top": 56,
+        "inFold": true
+      },
+      "hscroll": false,
+      "overflowContainers": 0,
+      "scrollHeight": 3061,
+      "inkPct": 29,
+      "headerBandPct": 14,
+      "desk": [],
+      "date": "2026-06-11",
+      "url": "http://localhost:4373/baseball/players/2316#player-contract"
+    },
+    "31-player-contract-390": {
+      "vw": 390,
+      "vh": 844,
+      "headerHeight": 174,
+      "headerPct": 21,
+      "mainPadLeft": 0,
+      "mainWidth": 390,
+      "panelsInFold": [
+        "EXTENSION TALKS",
+        "RATINGS",
+        "DEFENSE"
+      ],
+      "tables": [
+        {
+          "cols": 7,
+          "bodyCells": 7,
+          "rows": 1,
+          "inFold": false,
+          "panel": "THE GLOVE, BY THE PLAYS MADE"
+        },
+        {
+          "cols": 19,
+          "bodyCells": 19,
+          "rows": 7,
+          "inFold": false,
+          "panel": "BATTING, BY SEASON"
+        },
+        {
+          "cols": 8,
+          "bodyCells": 8,
+          "rows": 9,
+          "inFold": false,
+          "panel": "2026 SPLITS"
+        },
+        {
+          "cols": 13,
+          "bodyCells": 13,
+          "rows": 20,
+          "inFold": false,
+          "panel": "GAME LOG, AT THE PLATE"
+        }
+      ],
+      "clickablesInFold": 9,
+      "headerClickablesInFold": 11,
+      "primaryAction": {
+        "text": "DAY\nPLAY ONE DAY, STOPPING FOR DECISIONS.",
+        "top": 105,
+        "inFold": true
+      },
+      "hscroll": false,
+      "overflowContainers": 3,
+      "scrollHeight": 4768,
+      "inkPct": 39,
+      "headerBandPct": 21,
+      "desk": [],
+      "date": "2026-06-11",
+      "url": "http://localhost:4373/baseball/players/2316#player-contract"
+    },
+    "40-trade-negotiation-1440": {
+      "vw": 1440,
+      "vh": 900,
+      "headerHeight": 125,
+      "headerPct": 14,
+      "mainPadLeft": 20,
+      "mainWidth": 1400,
+      "panelsInFold": [
+        "THE PHONE",
+        "THE DEAL",
+        "BROOKLYN HARBOR",
+        "LV\nLAS VEGAS NEON"
+      ],
+      "tables": [
+        {
+          "cols": 7,
+          "bodyCells": 7,
+          "rows": 144,
+          "inFold": true,
+          "panel": "BROOKLYN HARBOR"
+        },
+        {
+          "cols": 6,
+          "bodyCells": 6,
+          "rows": 141,
+          "inFold": true,
+          "panel": "LV\nLAS VEGAS NEON"
+        }
+      ],
+      "clickablesInFold": 38,
+      "headerClickablesInFold": 31,
+      "primaryAction": {
+        "text": "DAY\nPLAY ONE DAY, STOPPING FOR DECISIONS.",
+        "top": 56,
+        "inFold": true
+      },
+      "hscroll": false,
+      "overflowContainers": 2,
+      "scrollHeight": 1571,
+      "inkPct": 29,
+      "headerBandPct": 14,
+      "desk": [],
+      "date": "2026-06-11",
+      "url": "http://localhost:4373/baseball/trades?with=13&offer=12"
+    },
+    "41-trade-deal-panel-1440": {
+      "vw": 1440,
+      "vh": 900,
+      "headerHeight": 125,
+      "headerPct": 14,
+      "mainPadLeft": 20,
+      "mainWidth": 1400,
+      "panelsInFold": [
+        "THE PHONE",
+        "THE DEAL",
+        "BROOKLYN HARBOR",
+        "LV\nLAS VEGAS NEON"
+      ],
+      "tables": [
+        {
+          "cols": 7,
+          "bodyCells": 7,
+          "rows": 144,
+          "inFold": true,
+          "panel": "BROOKLYN HARBOR"
+        },
+        {
+          "cols": 6,
+          "bodyCells": 6,
+          "rows": 141,
+          "inFold": true,
+          "panel": "LV\nLAS VEGAS NEON"
+        }
+      ],
+      "clickablesInFold": 38,
+      "headerClickablesInFold": 32,
+      "primaryAction": {
+        "text": "DAY\nPLAY ONE DAY, STOPPING FOR DECISIONS.",
+        "top": 56,
+        "inFold": true
+      },
+      "hscroll": false,
+      "overflowContainers": 2,
+      "scrollHeight": 1571,
+      "inkPct": 29,
+      "headerBandPct": 14,
+      "desk": [],
+      "date": "2026-06-11",
+      "url": "http://localhost:4373/baseball/trades?with=13&offer=12"
+    },
+    "40-trade-negotiation-390": {
+      "vw": 390,
+      "vh": 844,
+      "headerHeight": 174,
+      "headerPct": 21,
+      "mainPadLeft": 0,
+      "mainWidth": 390,
+      "panelsInFold": [
+        "THE PHONE",
+        "THE DEAL",
+        "BROOKLYN HARBOR"
+      ],
+      "tables": [
+        {
+          "cols": 7,
+          "bodyCells": 7,
+          "rows": 144,
+          "inFold": true,
+          "panel": "BROOKLYN HARBOR"
+        },
+        {
+          "cols": 6,
+          "bodyCells": 6,
+          "rows": 141,
+          "inFold": false,
+          "panel": "LV\nLAS VEGAS NEON"
+        }
+      ],
+      "clickablesInFold": 31,
+      "headerClickablesInFold": 10,
+      "primaryAction": {
+        "text": "DAY\nPLAY ONE DAY, STOPPING FOR DECISIONS.",
+        "top": 105,
+        "inFold": true
+      },
+      "hscroll": false,
+      "overflowContainers": 2,
+      "scrollHeight": 2870,
+      "inkPct": 47,
+      "headerBandPct": 21,
+      "desk": [],
+      "date": "2026-06-11",
+      "url": "http://localhost:4373/baseball/trades?with=13&offer=12"
+    },
+    "41-trade-deal-panel-390": {
+      "vw": 390,
+      "vh": 844,
+      "headerHeight": 174,
+      "headerPct": 21,
+      "mainPadLeft": 0,
+      "mainWidth": 390,
+      "panelsInFold": [
+        "THE PHONE",
+        "THE DEAL",
+        "BROOKLYN HARBOR"
+      ],
+      "tables": [
+        {
+          "cols": 7,
+          "bodyCells": 7,
+          "rows": 144,
+          "inFold": true,
+          "panel": "BROOKLYN HARBOR"
+        },
+        {
+          "cols": 6,
+          "bodyCells": 6,
+          "rows": 141,
+          "inFold": false,
+          "panel": "LV\nLAS VEGAS NEON"
+        }
+      ],
+      "clickablesInFold": 31,
+      "headerClickablesInFold": 11,
+      "primaryAction": {
+        "text": "DAY\nPLAY ONE DAY, STOPPING FOR DECISIONS.",
+        "top": 105,
+        "inFold": true
+      },
+      "hscroll": false,
+      "overflowContainers": 2,
+      "scrollHeight": 2870,
+      "inkPct": 47,
+      "headerBandPct": 21,
+      "desk": [],
+      "date": "2026-06-11",
+      "url": "http://localhost:4373/baseball/trades?with=13&offer=12"
+    },
+    "50-free-agents-1440": {
+      "vw": 1440,
+      "vh": 900,
+      "headerHeight": 125,
+      "headerPct": 14,
+      "mainPadLeft": 20,
+      "mainWidth": 1400,
+      "panelsInFold": [
+        "ON WAIVERS",
+        "THE MARKET"
+      ],
+      "tables": [
+        {
+          "cols": 8,
+          "bodyCells": 8,
+          "rows": 2,
+          "inFold": true,
+          "panel": "ON WAIVERS"
+        },
+        {
+          "cols": 7,
+          "bodyCells": 7,
+          "rows": 38,
+          "inFold": true,
+          "panel": ""
+        }
+      ],
+      "clickablesInFold": 32,
+      "headerClickablesInFold": 32,
+      "primaryAction": {
+        "text": "DAY\nPLAY ONE DAY, STOPPING FOR DECISIONS.",
+        "top": 56,
+        "inFold": true
+      },
+      "hscroll": false,
+      "overflowContainers": 0,
+      "scrollHeight": 1330,
+      "inkPct": 24,
+      "headerBandPct": 14,
+      "desk": [],
+      "date": "2026-06-11",
+      "url": "http://localhost:4373/baseball/free-agents"
+    },
+    "50-free-agents-390": {
+      "vw": 390,
+      "vh": 844,
+      "headerHeight": 174,
+      "headerPct": 21,
+      "mainPadLeft": 0,
+      "mainWidth": 390,
+      "panelsInFold": [
+        "ON WAIVERS",
+        "THE MARKET"
+      ],
+      "tables": [
+        {
+          "cols": 8,
+          "bodyCells": 8,
+          "rows": 2,
+          "inFold": true,
+          "panel": "ON WAIVERS"
+        },
+        {
+          "cols": 7,
+          "bodyCells": 7,
+          "rows": 38,
+          "inFold": true,
+          "panel": ""
+        }
+      ],
+      "clickablesInFold": 23,
+      "headerClickablesInFold": 11,
+      "primaryAction": {
+        "text": "DAY\nPLAY ONE DAY, STOPPING FOR DECISIONS.",
+        "top": 105,
+        "inFold": true
+      },
+      "hscroll": false,
+      "overflowContainers": 2,
+      "scrollHeight": 1488,
+      "inkPct": 52,
+      "headerBandPct": 21,
+      "desk": [],
+      "date": "2026-06-11",
+      "url": "http://localhost:4373/baseball/free-agents"
+    },
+    "51-draft-1440": {
+      "vw": 1440,
+      "vh": 900,
+      "headerHeight": 125,
+      "headerPct": 14,
+      "mainPadLeft": 20,
+      "mainWidth": 1400,
+      "panelsInFold": [
+        "THE BOARD",
+        "PICKS"
+      ],
+      "tables": [
+        {
+          "cols": 8,
+          "bodyCells": 8,
+          "rows": 38,
+          "inFold": true,
+          "panel": ""
+        }
+      ],
+      "clickablesInFold": 44,
+      "headerClickablesInFold": 32,
+      "primaryAction": {
+        "text": "DAY\nPLAY ONE DAY, STOPPING FOR DECISIONS.",
+        "top": 56,
+        "inFold": true
+      },
+      "hscroll": false,
+      "overflowContainers": 0,
+      "scrollHeight": 1256,
+      "inkPct": 24,
+      "headerBandPct": 14,
+      "desk": [],
+      "date": "2026-06-11",
+      "url": "http://localhost:4373/baseball/draft"
+    },
+    "51-draft-390": {
+      "vw": 390,
+      "vh": 844,
+      "headerHeight": 174,
+      "headerPct": 21,
+      "mainPadLeft": 0,
+      "mainWidth": 390,
+      "panelsInFold": [
+        "THE BOARD"
+      ],
+      "tables": [
+        {
+          "cols": 8,
+          "bodyCells": 8,
+          "rows": 38,
+          "inFold": true,
+          "panel": ""
+        }
+      ],
+      "clickablesInFold": 34,
+      "headerClickablesInFold": 11,
+      "primaryAction": {
+        "text": "DAY\nPLAY ONE DAY, STOPPING FOR DECISIONS.",
+        "top": 105,
+        "inFold": true
+      },
+      "hscroll": false,
+      "overflowContainers": 1,
+      "scrollHeight": 1481,
+      "inkPct": 51,
+      "headerBandPct": 21,
+      "desk": [],
+      "date": "2026-06-11",
+      "url": "http://localhost:4373/baseball/draft"
+    },
+    "52-farm-1440": {
+      "vw": 1440,
+      "vh": 900,
+      "headerHeight": 125,
+      "headerPct": 14,
+      "mainPadLeft": 20,
+      "mainWidth": 1400,
+      "panelsInFold": [
+        "ISOTOPES · AAA",
+        "NATIONAL EAST"
+      ],
+      "tables": [
+        {
+          "cols": 7,
+          "bodyCells": 7,
+          "rows": 25,
+          "inFold": true,
+          "panel": ""
+        },
+        {
+          "cols": 5,
+          "bodyCells": 5,
+          "rows": 5,
+          "inFold": true,
+          "panel": "NATIONAL EAST"
+        }
+      ],
+      "clickablesInFold": 52,
+      "headerClickablesInFold": 32,
+      "primaryAction": {
+        "text": "DAY\nPLAY ONE DAY, STOPPING FOR DECISIONS.",
+        "top": 56,
+        "inFold": true
+      },
+      "hscroll": false,
+      "overflowContainers": 0,
+      "scrollHeight": 1159,
+      "inkPct": 31,
+      "headerBandPct": 14,
+      "desk": [],
+      "date": "2026-06-11",
+      "url": "http://localhost:4373/baseball/farm?view=AAA"
+    },
+    "52-farm-390": {
+      "vw": 390,
+      "vh": 844,
+      "headerHeight": 174,
+      "headerPct": 21,
+      "mainPadLeft": 0,
+      "mainWidth": 390,
+      "panelsInFold": [
+        "ISOTOPES · AAA"
+      ],
+      "tables": [
+        {
+          "cols": 7,
+          "bodyCells": 7,
+          "rows": 25,
+          "inFold": true,
+          "panel": ""
+        },
+        {
+          "cols": 5,
+          "bodyCells": 5,
+          "rows": 5,
+          "inFold": false,
+          "panel": "NATIONAL EAST"
+        }
+      ],
+      "clickablesInFold": 32,
+      "headerClickablesInFold": 11,
+      "primaryAction": {
+        "text": "DAY\nPLAY ONE DAY, STOPPING FOR DECISIONS.",
+        "top": 105,
+        "inFold": true
+      },
+      "hscroll": false,
+      "overflowContainers": 1,
+      "scrollHeight": 1737,
+      "inkPct": 45,
+      "headerBandPct": 21,
+      "desk": [],
+      "date": "2026-06-11",
+      "url": "http://localhost:4373/baseball/farm?view=AAA"
+    },
+    "60-advance-before-1440": {
+      "vw": 1440,
+      "vh": 900,
+      "headerHeight": 125,
+      "headerPct": 14,
+      "mainPadLeft": 20,
+      "mainWidth": 1400,
+      "panelsInFold": [
+        "NATIONAL EAST",
+        "THE OWNER",
+        "THE STAFF",
+        "THE DESK",
+        "NEWS"
+      ],
+      "tables": [
+        {
+          "cols": 3,
+          "bodyCells": 3,
+          "rows": 5,
+          "inFold": true,
+          "panel": "NATIONAL EAST"
+        },
+        {
+          "cols": 4,
+          "bodyCells": 4,
+          "rows": 6,
+          "inFold": true,
+          "panel": "THE STAFF"
+        },
+        {
+          "cols": 0,
+          "bodyCells": 4,
+          "rows": 9,
+          "inFold": false,
+          "panel": "RECENT AND UPCOMING"
+        }
+      ],
+      "clickablesInFold": 33,
+      "headerClickablesInFold": 31,
+      "primaryAction": {
+        "text": "ADVANCE\nPLAY ONE DAY, STOPPING FOR DECISIONS.",
+        "top": 56,
+        "inFold": true
+      },
+      "hscroll": false,
+      "overflowContainers": 1,
+      "scrollHeight": 3010,
+      "inkPct": 37,
+      "headerBandPct": 14,
+      "desk": [
+        {
+          "key": "il-2334-20615",
+          "urgent": "true",
+          "decision": "true",
+          "inFold": true
+        },
+        {
+          "key": "offer-12",
+          "urgent": "true",
+          "decision": "true",
+          "inFold": true
+        },
+        {
+          "key": "ask-2026-starter",
+          "urgent": "false",
+          "decision": "true",
+          "inFold": true
+        },
+        {
+          "key": "ask-2026-hole-CF",
+          "urgent": "false",
+          "decision": "true",
+          "inFold": true
+        },
+        {
+          "key": "setback-2394-20613",
+          "urgent": "false",
+          "decision": "false",
+          "inFold": false
+        },
+        {
+          "key": "coach-hitting-2026-2",
+          "urgent": "false",
+          "decision": "false",
+          "inFold": false
+        },
+        {
+          "key": "coach-pitching-2026-2",
+          "urgent": "false",
+          "decision": "false",
+          "inFold": false
+        },
+        {
+          "key": "setback-2343-20610",
+          "urgent": "false",
+          "decision": "false",
+          "inFold": false
+        },
+        {
+          "key": "setback-2409-20602",
+          "urgent": "false",
+          "decision": "false",
+          "inFold": false
+        },
+        {
+          "key": "setback-2437-20601",
+          "urgent": "false",
+          "decision": "false",
+          "inFold": false
+        },
+        {
+          "key": "mandate-2026-set",
+          "urgent": "false",
+          "decision": "false",
+          "inFold": false
+        }
+      ],
+      "date": "2026-06-11",
+      "url": "http://localhost:4373/baseball/"
+    },
+    "62-advance-after-1440": {
+      "vw": 1440,
+      "vh": 900,
+      "headerHeight": 125,
+      "headerPct": 14,
+      "mainPadLeft": 20,
+      "mainWidth": 1400,
+      "panelsInFold": [
+        "NATIONAL EAST",
+        "THE OWNER",
+        "THE STAFF",
+        "THE DESK",
+        "NEWS"
+      ],
+      "tables": [
+        {
+          "cols": 3,
+          "bodyCells": 3,
+          "rows": 5,
+          "inFold": true,
+          "panel": "NATIONAL EAST"
+        },
+        {
+          "cols": 4,
+          "bodyCells": 4,
+          "rows": 6,
+          "inFold": true,
+          "panel": "THE STAFF"
+        },
+        {
+          "cols": 0,
+          "bodyCells": 4,
+          "rows": 9,
+          "inFold": false,
+          "panel": "RECENT AND UPCOMING"
+        }
+      ],
+      "clickablesInFold": 34,
+      "headerClickablesInFold": 32,
+      "primaryAction": {
+        "text": "ADVANCE\nPLAY ONE DAY, STOPPING FOR DECISIONS.",
+        "top": 56,
+        "inFold": true
+      },
+      "hscroll": false,
+      "overflowContainers": 1,
+      "scrollHeight": 2703,
+      "inkPct": 36,
+      "headerBandPct": 14,
+      "desk": [
+        {
+          "key": "il-2334-20615",
+          "urgent": "true",
+          "decision": "true",
+          "inFold": true
+        },
+        {
+          "key": "ask-2026-starter",
+          "urgent": "false",
+          "decision": "true",
+          "inFold": true
+        },
+        {
+          "key": "ask-2026-hole-CF",
+          "urgent": "false",
+          "decision": "true",
+          "inFold": true
+        },
+        {
+          "key": "setback-2394-20613",
+          "urgent": "false",
+          "decision": "false",
+          "inFold": true
+        },
+        {
+          "key": "coach-hitting-2026-2",
+          "urgent": "false",
+          "decision": "false",
+          "inFold": false
+        },
+        {
+          "key": "coach-pitching-2026-2",
+          "urgent": "false",
+          "decision": "false",
+          "inFold": false
+        },
+        {
+          "key": "setback-2343-20610",
+          "urgent": "false",
+          "decision": "false",
+          "inFold": false
+        },
+        {
+          "key": "setback-2409-20602",
+          "urgent": "false",
+          "decision": "false",
+          "inFold": false
+        },
+        {
+          "key": "mandate-2026-set",
+          "urgent": "false",
+          "decision": "false",
+          "inFold": false
+        }
+      ],
+      "date": "2026-06-12",
+      "url": "http://localhost:4373/baseball/"
+    },
+    "64-week-after-1440": {
+      "vw": 1440,
+      "vh": 900,
+      "headerHeight": 125,
+      "headerPct": 14,
+      "mainPadLeft": 20,
+      "mainWidth": 1400,
+      "panelsInFold": [
+        "NATIONAL EAST",
+        "THE OWNER",
+        "THE STAFF",
+        "THE DESK",
+        "NEWS"
+      ],
+      "tables": [
+        {
+          "cols": 3,
+          "bodyCells": 3,
+          "rows": 5,
+          "inFold": true,
+          "panel": "NATIONAL EAST"
+        },
+        {
+          "cols": 4,
+          "bodyCells": 4,
+          "rows": 6,
+          "inFold": true,
+          "panel": "THE STAFF"
+        },
+        {
+          "cols": 0,
+          "bodyCells": 4,
+          "rows": 9,
+          "inFold": false,
+          "panel": "RECENT AND UPCOMING"
+        }
+      ],
+      "clickablesInFold": 32,
+      "headerClickablesInFold": 33,
+      "primaryAction": {
+        "text": "ADVANCE\nPLAY ONE DAY, STOPPING FOR DECISIONS.",
+        "top": 56,
+        "inFold": true
+      },
+      "hscroll": false,
+      "overflowContainers": 1,
+      "scrollHeight": 2715,
+      "inkPct": 39,
+      "headerBandPct": 14,
+      "desk": [
+        {
+          "key": "course-2352-20621",
+          "urgent": "true",
+          "decision": "true",
+          "inFold": true
+        },
+        {
+          "key": "il-2334-20615",
+          "urgent": "true",
+          "decision": "true",
+          "inFold": true
+        },
+        {
+          "key": "ask-2026-arm",
+          "urgent": "false",
+          "decision": "true",
+          "inFold": true
+        },
+        {
+          "key": "ask-2026-starter",
+          "urgent": "false",
+          "decision": "true",
+          "inFold": true
+        },
+        {
+          "key": "ask-2026-hole-CF",
+          "urgent": "false",
+          "decision": "true",
+          "inFold": false
+        },
+        {
+          "key": "setback-2394-20613",
+          "urgent": "false",
+          "decision": "false",
+          "inFold": false
+        },
+        {
+          "key": "setback-2343-20610",
+          "urgent": "false",
+          "decision": "false",
+          "inFold": false
+        },
+        {
+          "key": "mandate-2026-set",
+          "urgent": "false",
+          "decision": "false",
+          "inFold": false
+        }
+      ],
+      "date": "2026-06-17",
+      "url": "http://localhost:4373/baseball/"
+    },
+    "60-advance-before-390": {
+      "vw": 390,
+      "vh": 844,
+      "headerHeight": 174,
+      "headerPct": 21,
+      "mainPadLeft": 0,
+      "mainWidth": 390,
+      "panelsInFold": [
+        "THE DESK"
+      ],
+      "tables": [
+        {
+          "cols": 3,
+          "bodyCells": 3,
+          "rows": 5,
+          "inFold": false,
+          "panel": "NATIONAL EAST"
+        },
+        {
+          "cols": 4,
+          "bodyCells": 4,
+          "rows": 6,
+          "inFold": false,
+          "panel": "THE STAFF"
+        },
+        {
+          "cols": 0,
+          "bodyCells": 4,
+          "rows": 9,
+          "inFold": false,
+          "panel": "RECENT AND UPCOMING"
+        }
+      ],
+      "clickablesInFold": 9,
+      "headerClickablesInFold": 11,
+      "primaryAction": {
+        "text": "ADVANCE\nPLAY ONE DAY, STOPPING FOR DECISIONS.",
+        "top": 105,
+        "inFold": true
+      },
+      "hscroll": false,
+      "overflowContainers": 1,
+      "scrollHeight": 6245,
+      "inkPct": 48,
+      "headerBandPct": 21,
+      "desk": [
+        {
+          "key": "course-2352-20621",
+          "urgent": "true",
+          "decision": "true",
+          "inFold": true
+        },
+        {
+          "key": "il-2334-20615",
+          "urgent": "true",
+          "decision": "true",
+          "inFold": true
+        },
+        {
+          "key": "ask-2026-arm",
+          "urgent": "false",
+          "decision": "true",
+          "inFold": false
+        },
+        {
+          "key": "ask-2026-starter",
+          "urgent": "false",
+          "decision": "true",
+          "inFold": false
+        },
+        {
+          "key": "ask-2026-hole-CF",
+          "urgent": "false",
+          "decision": "true",
+          "inFold": false
+        },
+        {
+          "key": "setback-2394-20613",
+          "urgent": "false",
+          "decision": "false",
+          "inFold": false
+        },
+        {
+          "key": "setback-2343-20610",
+          "urgent": "false",
+          "decision": "false",
+          "inFold": false
+        },
+        {
+          "key": "mandate-2026-set",
+          "urgent": "false",
+          "decision": "false",
+          "inFold": false
+        }
+      ],
+      "date": "2026-06-17",
+      "url": "http://localhost:4373/baseball/"
+    },
+    "62-advance-after-390": {
+      "vw": 390,
+      "vh": 844,
+      "headerHeight": 174,
+      "headerPct": 21,
+      "mainPadLeft": 0,
+      "mainWidth": 390,
+      "panelsInFold": [
+        "THE DESK"
+      ],
+      "tables": [
+        {
+          "cols": 3,
+          "bodyCells": 3,
+          "rows": 5,
+          "inFold": false,
+          "panel": "NATIONAL EAST"
+        },
+        {
+          "cols": 4,
+          "bodyCells": 4,
+          "rows": 6,
+          "inFold": false,
+          "panel": "THE STAFF"
+        },
+        {
+          "cols": 0,
+          "bodyCells": 4,
+          "rows": 9,
+          "inFold": false,
+          "panel": "RECENT AND UPCOMING"
+        }
+      ],
+      "clickablesInFold": 8,
+      "headerClickablesInFold": 12,
+      "primaryAction": {
+        "text": "ADVANCE\nPLAY ONE DAY, STOPPING FOR DECISIONS.",
+        "top": 105,
+        "inFold": true
+      },
+      "hscroll": false,
+      "overflowContainers": 1,
+      "scrollHeight": 6262,
+      "inkPct": 50,
+      "headerBandPct": 21,
+      "desk": [
+        {
+          "key": "offer-13",
+          "urgent": "true",
+          "decision": "true",
+          "inFold": true
+        },
+        {
+          "key": "course-2352-20621",
+          "urgent": "true",
+          "decision": "true",
+          "inFold": true
+        },
+        {
+          "key": "il-2334-20615",
+          "urgent": "true",
+          "decision": "true",
+          "inFold": false
+        },
+        {
+          "key": "ask-2026-starter",
+          "urgent": "false",
+          "decision": "true",
+          "inFold": false
+        },
+        {
+          "key": "ask-2026-hole-CF",
+          "urgent": "false",
+          "decision": "true",
+          "inFold": false
+        },
+        {
+          "key": "setback-2394-20613",
+          "urgent": "false",
+          "decision": "false",
+          "inFold": false
+        },
+        {
+          "key": "setback-2343-20610",
+          "urgent": "false",
+          "decision": "false",
+          "inFold": false
+        },
+        {
+          "key": "mandate-2026-set",
+          "urgent": "false",
+          "decision": "false",
+          "inFold": false
+        }
+      ],
+      "date": "2026-06-18",
+      "url": "http://localhost:4373/baseball/"
+    },
+    "64-week-after-390": {
+      "vw": 390,
+      "vh": 844,
+      "headerHeight": 174,
+      "headerPct": 21,
+      "mainPadLeft": 0,
+      "mainWidth": 390,
+      "panelsInFold": [
+        "THE DESK"
+      ],
+      "tables": [
+        {
+          "cols": 3,
+          "bodyCells": 3,
+          "rows": 5,
+          "inFold": false,
+          "panel": "NATIONAL EAST"
+        },
+        {
+          "cols": 4,
+          "bodyCells": 4,
+          "rows": 6,
+          "inFold": false,
+          "panel": "THE STAFF"
+        },
+        {
+          "cols": 0,
+          "bodyCells": 4,
+          "rows": 9,
+          "inFold": false,
+          "panel": "RECENT AND UPCOMING"
+        }
+      ],
+      "clickablesInFold": 8,
+      "headerClickablesInFold": 12,
+      "primaryAction": {
+        "text": "ADVANCE\nPLAY ONE DAY, STOPPING FOR DECISIONS.",
+        "top": 105,
+        "inFold": true
+      },
+      "hscroll": false,
+      "overflowContainers": 1,
+      "scrollHeight": 6542,
+      "inkPct": 49,
+      "headerBandPct": 21,
+      "desk": [
+        {
+          "key": "offer-14",
+          "urgent": "true",
+          "decision": "true",
+          "inFold": true
+        },
+        {
+          "key": "offer-13",
+          "urgent": "true",
+          "decision": "true",
+          "inFold": true
+        },
+        {
+          "key": "course-2352-20621",
+          "urgent": "true",
+          "decision": "true",
+          "inFold": false
+        },
+        {
+          "key": "il-2334-20615",
+          "urgent": "true",
+          "decision": "true",
+          "inFold": false
+        },
+        {
+          "key": "ask-2026-starter",
+          "urgent": "false",
+          "decision": "true",
+          "inFold": false
+        },
+        {
+          "key": "ask-2026-hole-CF",
+          "urgent": "false",
+          "decision": "true",
+          "inFold": false
+        },
+        {
+          "key": "setback-2394-20613",
+          "urgent": "false",
+          "decision": "false",
+          "inFold": false
+        },
+        {
+          "key": "setback-2343-20610",
+          "urgent": "false",
+          "decision": "false",
+          "inFold": false
+        },
+        {
+          "key": "mandate-2026-set",
+          "urgent": "false",
+          "decision": "false",
+          "inFold": false
+        }
+      ],
+      "date": "2026-06-19",
+      "url": "http://localhost:4373/baseball/"
+    },
+    "70-phone-nav-drawer-390": {
+      "vw": 390,
+      "vh": 844,
+      "headerHeight": 651,
+      "headerPct": 77,
+      "mainPadLeft": 0,
+      "mainWidth": 390,
+      "panelsInFold": [
+        "THE DESK"
+      ],
+      "tables": [
+        {
+          "cols": 3,
+          "bodyCells": 3,
+          "rows": 5,
+          "inFold": false,
+          "panel": "NATIONAL EAST"
+        },
+        {
+          "cols": 4,
+          "bodyCells": 4,
+          "rows": 6,
+          "inFold": false,
+          "panel": "THE STAFF"
+        },
+        {
+          "cols": 0,
+          "bodyCells": 4,
+          "rows": 9,
+          "inFold": false,
+          "panel": "RECENT AND UPCOMING"
+        }
+      ],
+      "clickablesInFold": 1,
+      "headerClickablesInFold": 32,
+      "primaryAction": {
+        "text": "ADVANCE\nPLAY ONE DAY, STOPPING FOR DECISIONS.",
+        "top": 582,
+        "inFold": true
+      },
+      "hscroll": false,
+      "overflowContainers": 1,
+      "scrollHeight": 7004,
+      "inkPct": 32,
+      "headerBandPct": 76,
+      "desk": [
+        {
+          "key": "offer-14",
+          "urgent": "true",
+          "decision": "true",
+          "inFold": false
+        },
+        {
+          "key": "offer-13",
+          "urgent": "true",
+          "decision": "true",
+          "inFold": false
+        },
+        {
+          "key": "course-2352-20621",
+          "urgent": "true",
+          "decision": "true",
+          "inFold": false
+        },
+        {
+          "key": "il-2334-20615",
+          "urgent": "true",
+          "decision": "true",
+          "inFold": false
+        },
+        {
+          "key": "ask-2026-starter",
+          "urgent": "false",
+          "decision": "true",
+          "inFold": false
+        },
+        {
+          "key": "ask-2026-hole-CF",
+          "urgent": "false",
+          "decision": "true",
+          "inFold": false
+        },
+        {
+          "key": "setback-2394-20613",
+          "urgent": "false",
+          "decision": "false",
+          "inFold": false
+        },
+        {
+          "key": "setback-2343-20610",
+          "urgent": "false",
+          "decision": "false",
+          "inFold": false
+        },
+        {
+          "key": "mandate-2026-set",
+          "urgent": "false",
+          "decision": "false",
+          "inFold": false
+        }
+      ],
+      "date": "2026-06-19",
+      "url": "http://localhost:4373/baseball/"
+    },
+    "71-menu-play-1440": {
+      "vw": 1440,
+      "vh": 900,
+      "headerHeight": 125,
+      "headerPct": 14,
+      "mainPadLeft": 20,
+      "mainWidth": 1400,
+      "panelsInFold": [
+        "NATIONAL EAST",
+        "THE OWNER",
+        "THE STAFF",
+        "THE DESK",
+        "NEWS"
+      ],
+      "tables": [
+        {
+          "cols": 3,
+          "bodyCells": 3,
+          "rows": 5,
+          "inFold": true,
+          "panel": "NATIONAL EAST"
+        },
+        {
+          "cols": 4,
+          "bodyCells": 4,
+          "rows": 6,
+          "inFold": true,
+          "panel": "THE STAFF"
+        },
+        {
+          "cols": 0,
+          "bodyCells": 4,
+          "rows": 9,
+          "inFold": false,
+          "panel": "RECENT AND UPCOMING"
+        }
+      ],
+      "clickablesInFold": 33,
+      "headerClickablesInFold": 33,
+      "primaryAction": {
+        "text": "ADVANCE\nPLAY ONE DAY, STOPPING FOR DECISIONS.",
+        "top": 56,
+        "inFold": true
+      },
+      "hscroll": false,
+      "overflowContainers": 1,
+      "scrollHeight": 2975,
+      "inkPct": 38,
+      "headerBandPct": 14,
+      "desk": [
+        {
+          "key": "offer-14",
+          "urgent": "true",
+          "decision": "true",
+          "inFold": true
+        },
+        {
+          "key": "offer-13",
+          "urgent": "true",
+          "decision": "true",
+          "inFold": true
+        },
+        {
+          "key": "course-2352-20621",
+          "urgent": "true",
+          "decision": "true",
+          "inFold": true
+        },
+        {
+          "key": "il-2334-20615",
+          "urgent": "true",
+          "decision": "true",
+          "inFold": false
+        },
+        {
+          "key": "ask-2026-starter",
+          "urgent": "false",
+          "decision": "true",
+          "inFold": false
+        },
+        {
+          "key": "ask-2026-hole-CF",
+          "urgent": "false",
+          "decision": "true",
+          "inFold": false
+        },
+        {
+          "key": "setback-2394-20613",
+          "urgent": "false",
+          "decision": "false",
+          "inFold": false
+        },
+        {
+          "key": "setback-2343-20610",
+          "urgent": "false",
+          "decision": "false",
+          "inFold": false
+        },
+        {
+          "key": "mandate-2026-set",
+          "urgent": "false",
+          "decision": "false",
+          "inFold": false
+        }
+      ],
+      "date": "2026-06-19",
+      "url": "http://localhost:4373/baseball/"
+    },
+    "72-menu-front-office-1440": {
+      "vw": 1440,
+      "vh": 900,
+      "headerHeight": 125,
+      "headerPct": 14,
+      "mainPadLeft": 20,
+      "mainWidth": 1400,
+      "panelsInFold": [
+        "NATIONAL EAST",
+        "THE OWNER",
+        "THE STAFF",
+        "THE DESK",
+        "NEWS"
+      ],
+      "tables": [
+        {
+          "cols": 3,
+          "bodyCells": 3,
+          "rows": 5,
+          "inFold": true,
+          "panel": "NATIONAL EAST"
+        },
+        {
+          "cols": 4,
+          "bodyCells": 4,
+          "rows": 6,
+          "inFold": true,
+          "panel": "THE STAFF"
+        },
+        {
+          "cols": 0,
+          "bodyCells": 4,
+          "rows": 9,
+          "inFold": false,
+          "panel": "RECENT AND UPCOMING"
+        }
+      ],
+      "clickablesInFold": 33,
+      "headerClickablesInFold": 33,
+      "primaryAction": {
+        "text": "ADVANCE\nPLAY ONE DAY, STOPPING FOR DECISIONS.",
+        "top": 56,
+        "inFold": true
+      },
+      "hscroll": false,
+      "overflowContainers": 1,
+      "scrollHeight": 2975,
+      "inkPct": 38,
+      "headerBandPct": 14,
+      "desk": [
+        {
+          "key": "offer-14",
+          "urgent": "true",
+          "decision": "true",
+          "inFold": true
+        },
+        {
+          "key": "offer-13",
+          "urgent": "true",
+          "decision": "true",
+          "inFold": true
+        },
+        {
+          "key": "course-2352-20621",
+          "urgent": "true",
+          "decision": "true",
+          "inFold": true
+        },
+        {
+          "key": "il-2334-20615",
+          "urgent": "true",
+          "decision": "true",
+          "inFold": false
+        },
+        {
+          "key": "ask-2026-starter",
+          "urgent": "false",
+          "decision": "true",
+          "inFold": false
+        },
+        {
+          "key": "ask-2026-hole-CF",
+          "urgent": "false",
+          "decision": "true",
+          "inFold": false
+        },
+        {
+          "key": "setback-2394-20613",
+          "urgent": "false",
+          "decision": "false",
+          "inFold": false
+        },
+        {
+          "key": "setback-2343-20610",
+          "urgent": "false",
+          "decision": "false",
+          "inFold": false
+        },
+        {
+          "key": "mandate-2026-set",
+          "urgent": "false",
+          "decision": "false",
+          "inFold": false
+        }
+      ],
+      "date": "2026-06-19",
+      "url": "http://localhost:4373/baseball/"
+    },
+    "73-free-agent-review-dialog-1440": {
+      "vw": 1440,
+      "vh": 900,
+      "headerHeight": 125,
+      "headerPct": 14,
+      "mainPadLeft": 20,
+      "mainWidth": 1400,
+      "panelsInFold": [
+        "ON WAIVERS",
+        "THE MARKET"
+      ],
+      "tables": [
+        {
+          "cols": 8,
+          "bodyCells": 8,
+          "rows": 4,
+          "inFold": true,
+          "panel": "ON WAIVERS"
+        },
+        {
+          "cols": 7,
+          "bodyCells": 7,
+          "rows": 38,
+          "inFold": true,
+          "panel": ""
+        }
+      ],
+      "clickablesInFold": 37,
+      "headerClickablesInFold": 33,
+      "primaryAction": {
+        "text": "DAY\nPLAY ONE DAY, STOPPING FOR DECISIONS.",
+        "top": 56,
+        "inFold": true
+      },
+      "hscroll": false,
+      "overflowContainers": 0,
+      "scrollHeight": 1355,
+      "inkPct": 27,
+      "headerBandPct": 14,
+      "desk": [],
+      "date": "2026-06-19",
+      "url": "http://localhost:4373/baseball/free-agents"
+    },
+    "80-standings-1440": {
+      "vw": 1440,
+      "vh": 900,
+      "headerHeight": 125,
+      "headerPct": 14,
+      "mainPadLeft": 20,
+      "mainWidth": 1400,
+      "panelsInFold": [
+        "AMERICAN EAST",
+        "AMERICAN CENTRAL",
+        "AMERICAN WEST",
+        "NATIONAL EAST",
+        "NATIONAL CENTRAL",
+        "NATIONAL WEST"
+      ],
+      "tables": [
+        {
+          "cols": 10,
+          "bodyCells": 10,
+          "rows": 5,
+          "inFold": true,
+          "panel": "AMERICAN EAST"
+        },
+        {
+          "cols": 10,
+          "bodyCells": 10,
+          "rows": 5,
+          "inFold": true,
+          "panel": "AMERICAN CENTRAL"
+        },
+        {
+          "cols": 10,
+          "bodyCells": 10,
+          "rows": 5,
+          "inFold": true,
+          "panel": "AMERICAN WEST"
+        },
+        {
+          "cols": 6,
+          "bodyCells": 6,
+          "rows": 12,
+          "inFold": false,
+          "panel": "AMERICAN WILD CARD"
+        },
+        {
+          "cols": 10,
+          "bodyCells": 10,
+          "rows": 5,
+          "inFold": true,
+          "panel": "NATIONAL EAST"
+        },
+        {
+          "cols": 10,
+          "bodyCells": 10,
+          "rows": 5,
+          "inFold": true,
+          "panel": "NATIONAL CENTRAL"
+        },
+        {
+          "cols": 10,
+          "bodyCells": 10,
+          "rows": 5,
+          "inFold": true,
+          "panel": "NATIONAL WEST"
+        },
+        {
+          "cols": 6,
+          "bodyCells": 6,
+          "rows": 12,
+          "inFold": false,
+          "panel": "NATIONAL WILD CARD"
+        },
+        {
+          "cols": 6,
+          "bodyCells": 6,
+          "rows": 15,
+          "inFold": false,
+          "panel": "POWER RANKINGS"
+        },
+        {
+          "cols": 6,
+          "bodyCells": 6,
+          "rows": 15,
+          "inFold": false,
+          "panel": "POWER RANKINGS"
+        }
+      ],
+      "clickablesInFold": 27,
+      "headerClickablesInFold": 33,
+      "primaryAction": {
+        "text": "DAY\nPLAY ONE DAY, STOPPING FOR DECISIONS.",
+        "top": 56,
+        "inFold": true
+      },
+      "hscroll": false,
+      "overflowContainers": 0,
+      "scrollHeight": 2081,
+      "inkPct": 34,
+      "headerBandPct": 14,
+      "desk": [],
+      "date": "2026-06-19",
+      "url": "http://localhost:4373/baseball/standings"
+    },
+    "80-standings-390": {
+      "vw": 390,
+      "vh": 844,
+      "headerHeight": 174,
+      "headerPct": 21,
+      "mainPadLeft": 0,
+      "mainWidth": 390,
+      "panelsInFold": [
+        "AMERICAN EAST",
+        "AMERICAN CENTRAL",
+        "AMERICAN WEST"
+      ],
+      "tables": [
+        {
+          "cols": 10,
+          "bodyCells": 10,
+          "rows": 5,
+          "inFold": true,
+          "panel": "AMERICAN EAST"
+        },
+        {
+          "cols": 10,
+          "bodyCells": 10,
+          "rows": 5,
+          "inFold": true,
+          "panel": "AMERICAN CENTRAL"
+        },
+        {
+          "cols": 10,
+          "bodyCells": 10,
+          "rows": 5,
+          "inFold": false,
+          "panel": "AMERICAN WEST"
+        },
+        {
+          "cols": 6,
+          "bodyCells": 6,
+          "rows": 12,
+          "inFold": false,
+          "panel": "AMERICAN WILD CARD"
+        },
+        {
+          "cols": 10,
+          "bodyCells": 10,
+          "rows": 5,
+          "inFold": false,
+          "panel": "NATIONAL EAST"
+        },
+        {
+          "cols": 10,
+          "bodyCells": 10,
+          "rows": 5,
+          "inFold": false,
+          "panel": "NATIONAL CENTRAL"
+        },
+        {
+          "cols": 10,
+          "bodyCells": 10,
+          "rows": 5,
+          "inFold": false,
+          "panel": "NATIONAL WEST"
+        },
+        {
+          "cols": 6,
+          "bodyCells": 6,
+          "rows": 12,
+          "inFold": false,
+          "panel": "NATIONAL WILD CARD"
+        },
+        {
+          "cols": 6,
+          "bodyCells": 6,
+          "rows": 15,
+          "inFold": false,
+          "panel": "POWER RANKINGS"
+        },
+        {
+          "cols": 6,
+          "bodyCells": 6,
+          "rows": 15,
+          "inFold": false,
+          "panel": "POWER RANKINGS"
+        }
+      ],
+      "clickablesInFold": 11,
+      "headerClickablesInFold": 12,
+      "primaryAction": {
+        "text": "DAY\nPLAY ONE DAY, STOPPING FOR DECISIONS.",
+        "top": 105,
+        "inFold": true
+      },
+      "hscroll": false,
+      "overflowContainers": 10,
+      "scrollHeight": 4105,
+      "inkPct": 48,
+      "headerBandPct": 21,
+      "desk": [],
+      "date": "2026-06-19",
+      "url": "http://localhost:4373/baseball/standings"
+    },
+    "81-dugout-1440": {
+      "vw": 1440,
+      "vh": 900,
+      "headerHeight": 125,
+      "headerPct": 14,
+      "mainPadLeft": 20,
+      "mainWidth": 1400,
+      "panelsInFold": [
+        "THE MANAGER'S RECORD, 2026",
+        "MANAGE A GAME"
+      ],
+      "tables": [
+        {
+          "cols": 0,
+          "bodyCells": 3,
+          "rows": 8,
+          "inFold": true,
+          "panel": "THE MANAGER'S RECORD, 2026"
+        }
+      ],
+      "clickablesInFold": 0,
+      "headerClickablesInFold": 33,
+      "primaryAction": {
+        "text": "DAY\nPLAY ONE DAY, STOPPING FOR DECISIONS.",
+        "top": 56,
+        "inFold": true
+      },
+      "hscroll": false,
+      "overflowContainers": 0,
+      "scrollHeight": 964,
+      "inkPct": 34,
+      "headerBandPct": 14,
+      "desk": [],
+      "date": "2026-06-19",
+      "url": "http://localhost:4373/baseball/dugout"
+    },
+    "81-dugout-390": {
+      "vw": 390,
+      "vh": 844,
+      "headerHeight": 174,
+      "headerPct": 21,
+      "mainPadLeft": 0,
+      "mainWidth": 390,
+      "panelsInFold": [
+        "THE MANAGER'S RECORD, 2026"
+      ],
+      "tables": [
+        {
+          "cols": 0,
+          "bodyCells": 3,
+          "rows": 8,
+          "inFold": true,
+          "panel": "THE MANAGER'S RECORD, 2026"
+        }
+      ],
+      "clickablesInFold": 0,
+      "headerClickablesInFold": 12,
+      "primaryAction": {
+        "text": "DAY\nPLAY ONE DAY, STOPPING FOR DECISIONS.",
+        "top": 105,
+        "inFold": true
+      },
+      "hscroll": false,
+      "overflowContainers": 0,
+      "scrollHeight": 1703,
+      "inkPct": 54,
+      "headerBandPct": 21,
+      "desk": [],
+      "date": "2026-06-19",
+      "url": "http://localhost:4373/baseball/dugout"
+    },
+    "82-scouts-1440": {
+      "vw": 1440,
+      "vh": 900,
+      "headerHeight": 125,
+      "headerPct": 14,
+      "mainPadLeft": 20,
+      "mainWidth": 1400,
+      "panelsInFold": [
+        "THE DEPARTMENT",
+        "LOOKING FOR WORK",
+        "REPORTS FILED"
+      ],
+      "tables": [
+        {
+          "cols": 11,
+          "bodyCells": 11,
+          "rows": 4,
+          "inFold": true,
+          "panel": "THE DEPARTMENT"
+        },
+        {
+          "cols": 6,
+          "bodyCells": 6,
+          "rows": 8,
+          "inFold": true,
+          "panel": "LOOKING FOR WORK"
+        }
+      ],
+      "clickablesInFold": 28,
+      "headerClickablesInFold": 33,
+      "primaryAction": {
+        "text": "DAY\nPLAY ONE DAY, STOPPING FOR DECISIONS.",
+        "top": 56,
+        "inFold": true
+      },
+      "hscroll": false,
+      "overflowContainers": 1,
+      "scrollHeight": 1373,
+      "inkPct": 38,
+      "headerBandPct": 14,
+      "desk": [],
+      "date": "2026-06-19",
+      "url": "http://localhost:4373/baseball/scouts"
+    },
+    "82-scouts-390": {
+      "vw": 390,
+      "vh": 844,
+      "headerHeight": 174,
+      "headerPct": 21,
+      "mainPadLeft": 0,
+      "mainWidth": 390,
+      "panelsInFold": [
+        "THE DEPARTMENT",
+        "LOOKING FOR WORK"
+      ],
+      "tables": [
+        {
+          "cols": 11,
+          "bodyCells": 11,
+          "rows": 4,
+          "inFold": true,
+          "panel": "THE DEPARTMENT"
+        },
+        {
+          "cols": 6,
+          "bodyCells": 6,
+          "rows": 8,
+          "inFold": true,
+          "panel": "LOOKING FOR WORK"
+        }
+      ],
+      "clickablesInFold": 10,
+      "headerClickablesInFold": 12,
+      "primaryAction": {
+        "text": "DAY\nPLAY ONE DAY, STOPPING FOR DECISIONS.",
+        "top": 105,
+        "inFold": true
+      },
+      "hscroll": false,
+      "overflowContainers": 2,
+      "scrollHeight": 2546,
+      "inkPct": 48,
+      "headerBandPct": 21,
+      "desk": [],
+      "date": "2026-06-19",
+      "url": "http://localhost:4373/baseball/scouts"
+    },
+    "83-news-1440": {
+      "vw": 1440,
+      "vh": 900,
+      "headerHeight": 125,
+      "headerPct": 14,
+      "mainPadLeft": 20,
+      "mainWidth": 1400,
+      "panelsInFold": [
+        "2026-06-19",
+        "2026-06-18",
+        "2026-06-17",
+        "2026-06-16"
+      ],
+      "tables": [],
+      "clickablesInFold": 27,
+      "headerClickablesInFold": 33,
+      "primaryAction": {
+        "text": "DAY\nPLAY ONE DAY, STOPPING FOR DECISIONS.",
+        "top": 56,
+        "inFold": true
+      },
+      "hscroll": false,
+      "overflowContainers": 0,
+      "scrollHeight": 4625,
+      "inkPct": 25,
+      "headerBandPct": 14,
+      "desk": [],
+      "date": "2026-06-19",
+      "url": "http://localhost:4373/baseball/news"
+    },
+    "83-news-390": {
+      "vw": 390,
+      "vh": 844,
+      "headerHeight": 174,
+      "headerPct": 21,
+      "mainPadLeft": 0,
+      "mainWidth": 390,
+      "panelsInFold": [
+        "2026-06-19",
+        "2026-06-18"
+      ],
+      "tables": [],
+      "clickablesInFold": 23,
+      "headerClickablesInFold": 12,
+      "primaryAction": {
+        "text": "DAY\nPLAY ONE DAY, STOPPING FOR DECISIONS.",
+        "top": 105,
+        "inFold": true
+      },
+      "hscroll": false,
+      "overflowContainers": 0,
+      "scrollHeight": 8350,
+      "inkPct": 45,
+      "headerBandPct": 21,
+      "desk": [],
+      "date": "2026-06-19",
+      "url": "http://localhost:4373/baseball/news"
+    },
+    "84-stats-1440": {
+      "vw": 1440,
+      "vh": 900,
+      "headerHeight": 125,
+      "headerPct": 14,
+      "mainPadLeft": 20,
+      "mainWidth": 1400,
+      "panelsInFold": [
+        "BATTING"
+      ],
+      "tables": [
+        {
+          "cols": 7,
+          "bodyCells": 7,
+          "rows": 38,
+          "inFold": true,
+          "panel": ""
+        }
+      ],
+      "clickablesInFold": 58,
+      "headerClickablesInFold": 33,
+      "primaryAction": {
+        "text": "DAY\nPLAY ONE DAY, STOPPING FOR DECISIONS.",
+        "top": 56,
+        "inFold": true
+      },
+      "hscroll": false,
+      "overflowContainers": 0,
+      "scrollHeight": 1077,
+      "inkPct": 23,
+      "headerBandPct": 14,
+      "desk": [],
+      "date": "2026-06-19",
+      "url": "http://localhost:4373/baseball/stats?kind=batting"
+    },
+    "84-stats-390": {
+      "vw": 390,
+      "vh": 844,
+      "headerHeight": 174,
+      "headerPct": 21,
+      "mainPadLeft": 0,
+      "mainWidth": 390,
+      "panelsInFold": [
+        "BATTING"
+      ],
+      "tables": [
+        {
+          "cols": 7,
+          "bodyCells": 7,
+          "rows": 38,
+          "inFold": true,
+          "panel": ""
+        }
+      ],
+      "clickablesInFold": 36,
+      "headerClickablesInFold": 12,
+      "primaryAction": {
+        "text": "DAY\nPLAY ONE DAY, STOPPING FOR DECISIONS.",
+        "top": 105,
+        "inFold": true
+      },
+      "hscroll": false,
+      "overflowContainers": 1,
+      "scrollHeight": 1392,
+      "inkPct": 49,
+      "headerBandPct": 21,
+      "desk": [],
+      "date": "2026-06-19",
+      "url": "http://localhost:4373/baseball/stats?kind=batting"
+    },
+    "85-players-1440": {
+      "vw": 1440,
+      "vh": 900,
+      "headerHeight": 125,
+      "headerPct": 14,
+      "mainPadLeft": 20,
+      "mainWidth": 1400,
+      "panelsInFold": [
+        "EVERY PLAYER"
+      ],
+      "tables": [
+        {
+          "cols": 8,
+          "bodyCells": 8,
+          "rows": 38,
+          "inFold": true,
+          "panel": ""
+        }
+      ],
+      "clickablesInFold": 62,
+      "headerClickablesInFold": 33,
+      "primaryAction": {
+        "text": "DAY\nPLAY ONE DAY, STOPPING FOR DECISIONS.",
+        "top": 56,
+        "inFold": true
+      },
+      "hscroll": false,
+      "overflowContainers": 0,
+      "scrollHeight": 1166,
+      "inkPct": 23,
+      "headerBandPct": 14,
+      "desk": [],
+      "date": "2026-06-19",
+      "url": "http://localhost:4373/baseball/players"
+    },
+    "85-players-390": {
+      "vw": 390,
+      "vh": 844,
+      "headerHeight": 174,
+      "headerPct": 21,
+      "mainPadLeft": 0,
+      "mainWidth": 390,
+      "panelsInFold": [
+        "EVERY PLAYER"
+      ],
+      "tables": [
+        {
+          "cols": 8,
+          "bodyCells": 8,
+          "rows": 38,
+          "inFold": true,
+          "panel": ""
+        }
+      ],
+      "clickablesInFold": 47,
+      "headerClickablesInFold": 12,
+      "primaryAction": {
+        "text": "DAY\nPLAY ONE DAY, STOPPING FOR DECISIONS.",
+        "top": 105,
+        "inFold": true
+      },
+      "hscroll": false,
+      "overflowContainers": 1,
+      "scrollHeight": 1298,
+      "inkPct": 52,
+      "headerBandPct": 21,
+      "desk": [],
+      "date": "2026-06-19",
+      "url": "http://localhost:4373/baseball/players"
+    },
+    "86-scores-1440": {
+      "vw": 1440,
+      "vh": 900,
+      "headerHeight": 125,
+      "headerPct": 14,
+      "mainPadLeft": 20,
+      "mainWidth": 1400,
+      "panelsInFold": [
+        "FINALS"
+      ],
+      "tables": [],
+      "clickablesInFold": 67,
+      "headerClickablesInFold": 33,
+      "primaryAction": {
+        "text": "DAY\nPLAY ONE DAY, STOPPING FOR DECISIONS.",
+        "top": 56,
+        "inFold": true
+      },
+      "hscroll": false,
+      "overflowContainers": 0,
+      "scrollHeight": 900,
+      "inkPct": 18,
+      "headerBandPct": 14,
+      "desk": [],
+      "date": "2026-06-19",
+      "url": "http://localhost:4373/baseball/scores"
+    },
+    "86-scores-390": {
+      "vw": 390,
+      "vh": 844,
+      "headerHeight": 174,
+      "headerPct": 21,
+      "mainPadLeft": 0,
+      "mainWidth": 390,
+      "panelsInFold": [
+        "FINALS"
+      ],
+      "tables": [],
+      "clickablesInFold": 23,
+      "headerClickablesInFold": 12,
+      "primaryAction": {
+        "text": "DAY\nPLAY ONE DAY, STOPPING FOR DECISIONS.",
+        "top": 105,
+        "inFold": true
+      },
+      "hscroll": false,
+      "overflowContainers": 0,
+      "scrollHeight": 1771,
+      "inkPct": 32,
+      "headerBandPct": 21,
+      "desk": [],
+      "date": "2026-06-19",
+      "url": "http://localhost:4373/baseball/scores"
+    },
+    "87-organization-1440": {
+      "vw": 1440,
+      "vh": 900,
+      "headerHeight": 125,
+      "headerPct": 14,
+      "mainPadLeft": 20,
+      "mainWidth": 1400,
+      "panelsInFold": [
+        "DEPTH CHART"
+      ],
+      "tables": [
+        {
+          "cols": 6,
+          "bodyCells": 6,
+          "rows": 11,
+          "inFold": true,
+          "panel": "DEPTH CHART"
+        },
+        {
+          "cols": 7,
+          "bodyCells": 7,
+          "rows": 33,
+          "inFold": false,
+          "panel": ""
+        }
+      ],
+      "clickablesInFold": 57,
+      "headerClickablesInFold": 33,
+      "primaryAction": {
+        "text": "DAY\nPLAY ONE DAY, STOPPING FOR DECISIONS.",
+        "top": 56,
+        "inFold": true
+      },
+      "hscroll": false,
+      "overflowContainers": 0,
+      "scrollHeight": 2278,
+      "inkPct": 27,
+      "headerBandPct": 14,
+      "desk": [],
+      "date": "2026-06-19",
+      "url": "http://localhost:4373/baseball/teams/18/organization"
+    },
+    "87-organization-390": {
+      "vw": 390,
+      "vh": 844,
+      "headerHeight": 174,
+      "headerPct": 21,
+      "mainPadLeft": 0,
+      "mainWidth": 390,
+      "panelsInFold": [
+        "DEPTH CHART"
+      ],
+      "tables": [
+        {
+          "cols": 6,
+          "bodyCells": 6,
+          "rows": 11,
+          "inFold": true,
+          "panel": "DEPTH CHART"
+        },
+        {
+          "cols": 7,
+          "bodyCells": 7,
+          "rows": 33,
+          "inFold": false,
+          "panel": ""
+        }
+      ],
+      "clickablesInFold": 31,
+      "headerClickablesInFold": 12,
+      "primaryAction": {
+        "text": "DAY\nPLAY ONE DAY, STOPPING FOR DECISIONS.",
+        "top": 105,
+        "inFold": true
+      },
+      "hscroll": false,
+      "overflowContainers": 2,
+      "scrollHeight": 2596,
+      "inkPct": 49,
+      "headerBandPct": 21,
+      "desk": [],
+      "date": "2026-06-19",
+      "url": "http://localhost:4373/baseball/teams/18/organization"
+    }
+  }
+}
